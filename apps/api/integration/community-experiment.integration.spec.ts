@@ -464,6 +464,16 @@ describe('6.1 community feed experiment arms', () => {
       expect(second.mode).toBe('auto')
       const firstIds = first.items.map((item) => item.id)
       const secondIds = second.items.map((item) => item.id)
+
+      /*
+       * THE FLOOR COMES FIRST, because both assertions below are vacuously true
+       * over an empty second page: `filter(...)` of nothing is `[]` and
+       * `every(...)` of nothing is `true`. This test calls itself the control, so
+       * a page-two that returned no rows at all would have satisfied it while
+       * proving neither disjointness nor band filtering.
+       */
+      expect(secondIds.length).toBeGreaterThan(0)
+
       // A real continuation: disjoint from page one, and still band-filtered.
       expect(firstIds.filter((id) => secondIds.includes(id))).toEqual([])
       expect(second.items.every((item) => item.climateBand === resolvedBand)).toBe(true)

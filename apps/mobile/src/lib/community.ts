@@ -23,14 +23,18 @@ import {
   allocateCommunityPostResponseSchema,
   communityFeedResponseSchema,
   communityPostResponseSchema,
+  openCommunityPostResponseSchema,
   publishCommunityPostResponseSchema,
   reportCommunityPostResponseSchema,
   uploadGarmentBytes,
   withdrawCommunityPostResponseSchema,
   COMMUNITY_AGE_GATE_DENIED_MESSAGE,
+  COMMUNITY_CURSOR_INVALID_MESSAGE,
   COMMUNITY_FEED_DISABLED_MESSAGE,
+  COMMUNITY_MEDIA_UNAVAILABLE_MESSAGE,
   COMMUNITY_REPORT_REASON_CHANGED_MESSAGE,
   COMMUNITY_SELF_REPORT_MESSAGE,
+  type CommunityExperimentVariant,
   type CommunityFeed,
   type CommunityFeedItem,
   type CommunityFeedMode,
@@ -53,6 +57,8 @@ export type CommunityFailureReason =
   | 'reason_changed'
   | 'self_report'
   | 'disabled'
+  | 'cursor_invalid'
+  | 'media_unavailable'
   | 'upload_failed'
   | 'permission_denied'
   | 'picker_failed'
@@ -115,6 +121,16 @@ function readRetryAfterSeconds(response: Response): number | undefined {
 }
 
 function reasonForResponse(status: number, message: string): CommunityFailureReason {
+  if (status === 400) {
+    // Reachable without any client bug. The feed cursor is bound to the resolved
+    // band as well as the mode, and under `auto` the band is recomputed per
+    // request from weather guaranteed fresh for only 60 minutes, so a snapshot
+    // that goes stale between two pages of one scroll invalidates the cursor the
+    // reader is holding. The contract's answer is to restart paging, which the
+    // screen can only do if this arrives as its own reason instead of `unknown`.
+    if (message.includes(COMMUNITY_CURSOR_INVALID_MESSAGE)) return 'cursor_invalid'
+    return 'unknown'
+  }
   if (status === 401) return 'signed_out'
   if (status === 403) {
     if (message.includes(COMMUNITY_AGE_GATE_DENIED_MESSAGE)) return 'age_gate'
@@ -133,7 +149,13 @@ function reasonForResponse(status: number, message: string): CommunityFailureRea
   }
   if (status === 429) return 'rate_limited'
   if (status === 503) {
-    return message.includes(COMMUNITY_FEED_DISABLED_MESSAGE) ? 'disabled' : 'unknown'
+    if (message.includes(COMMUNITY_FEED_DISABLED_MESSAGE)) return 'disabled'
+    // A stored object that cannot be signed is our outage, not a missing post,
+    // and it answers 503 on both the single-post read and the publish. Folding it
+    // into `unknown` told the author their look could not be published with no
+    // hint that waiting would fix it.
+    if (message.includes(COMMUNITY_MEDIA_UNAVAILABLE_MESSAGE)) return 'media_unavailable'
+    return 'unknown'
   }
   return 'unknown'
 }
@@ -219,6 +241,41 @@ export async function getCommunityPostFromMobile(
     return communityPostResponseSchema.parse(response).data
   } catch (error: unknown) {
     throw await communityError(error, 'Unable to load this community post.')
+  }
+}
+
+/**
+ * Records one card open. The route existed and the generated operation existed;
+ * nothing called either, and `community_card_opened` is the only input to the
+ * beta gate's advance condition, so the gate was unmeasurable.
+ *
+ * `experimentVariant` is SENT rather than re-derived server-side: it is the arm
+ * the client was serving when the card was drawn, so the event is attributed to
+ * the feed the reader actually saw even if the assignment moved in between.
+ * `isSelf` and the dedupe key stay server-decided, because the advance condition
+ * counts non-self opens and a client-asserted flag would let the population being
+ * measured move the number that decides whether the feature ships.
+ */
+export async function recordCommunityCardOpenedFromMobile(
+  postId: string,
+  experimentVariant: CommunityExperimentVariant,
+  signal?: AbortSignal
+): Promise<void> {
+  const accessToken = await readAccessToken()
+  try {
+    const response = await withRequestTimeout(signal, (requestSignal) =>
+      communityClient(accessToken).apiV1CommunityPostsPostIdOpenedPost(
+        {
+          postId,
+          xCouturePlatform: 'mobile',
+          openCommunityPostInput: { experimentVariant },
+        },
+        { signal: requestSignal }
+      )
+    )
+    openCommunityPostResponseSchema.parse(response)
+  } catch (error: unknown) {
+    throw await communityError(error, 'Unable to record this card open.')
   }
 }
 

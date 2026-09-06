@@ -717,18 +717,20 @@ const communityDedupeKeySchema = nonEmptyString.describe(
   'Deterministic idempotency key. The analytics sink upserts on it so a retried emit counts once.'
 )
 
-export const communityFeedViewedEventSchema = z.object({
-  analyticsSubjectId: nonEmptyString,
-  platform: communityPlatformSchema,
-  dedupeKey: communityDedupeKeySchema,
-  /** The viewer's own resolved band. Never the requested filter; see filterMode. */
-  climateBand: climateBandSchema.nullable(),
-  bandResolved: z.boolean(),
-  filterMode: communityFeedModeSchema,
-  experimentVariant: communityExperimentVariantSchema,
-  itemCount: z.number().int().min(0),
-  isEmpty: z.boolean(),
-})
+export const communityFeedViewedEventSchema = z
+  .object({
+    analyticsSubjectId: nonEmptyString,
+    platform: communityPlatformSchema,
+    dedupeKey: communityDedupeKeySchema,
+    /** The viewer's own resolved band. Never the requested filter; see filterMode. */
+    climateBand: climateBandSchema.nullable(),
+    bandResolved: z.boolean(),
+    filterMode: communityFeedModeSchema,
+    experimentVariant: communityExperimentVariantSchema,
+    itemCount: z.number().int().min(0),
+    isEmpty: z.boolean(),
+  })
+  .strict()
 
 export type CommunityFeedViewedEvent = z.infer<typeof communityFeedViewedEventSchema>
 
@@ -736,79 +738,103 @@ export type CommunityFeedViewedEvent = z.infer<typeof communityFeedViewedEventSc
  * The beta gate advances on non-self card-open lift, so the self flag is required
  * rather than derived, and the variant has to travel with the event to split arms.
  */
-export const communityCardOpenedEventSchema = z.object({
-  analyticsSubjectId: nonEmptyString,
-  platform: communityPlatformSchema,
-  dedupeKey: communityDedupeKeySchema,
-  climateBand: climateBandSchema.nullable(),
-  isSelf: z.boolean(),
-  experimentVariant: communityExperimentVariantSchema,
-})
+export const communityCardOpenedEventSchema = z
+  .object({
+    analyticsSubjectId: nonEmptyString,
+    platform: communityPlatformSchema,
+    dedupeKey: communityDedupeKeySchema,
+    climateBand: climateBandSchema.nullable(),
+    isSelf: z.boolean(),
+    experimentVariant: communityExperimentVariantSchema,
+  })
+  .strict()
 
 export type CommunityCardOpenedEvent = z.infer<typeof communityCardOpenedEventSchema>
 
-export const communityPostAllocatedEventSchema = z.object({
-  analyticsSubjectId: nonEmptyString,
-  platform: communityPlatformSchema,
-  dedupeKey: communityDedupeKeySchema,
-  replayed: z.boolean(),
-})
+export const communityPostAllocatedEventSchema = z
+  .object({
+    analyticsSubjectId: nonEmptyString,
+    platform: communityPlatformSchema,
+    dedupeKey: communityDedupeKeySchema,
+    replayed: z.boolean(),
+  })
+  .strict()
 
 export type CommunityPostAllocatedEvent = z.infer<
   typeof communityPostAllocatedEventSchema
 >
 
-export const communityPostSubmittedEventSchema = z.object({
-  analyticsSubjectId: nonEmptyString,
-  platform: communityPlatformSchema,
-  dedupeKey: communityDedupeKeySchema,
-  climateBand: climateBandSchema.nullable(),
-  hasCaption: z.boolean(),
-  hasChallenge: z.boolean(),
-})
+export const communityPostSubmittedEventSchema = z
+  .object({
+    analyticsSubjectId: nonEmptyString,
+    platform: communityPlatformSchema,
+    dedupeKey: communityDedupeKeySchema,
+    climateBand: climateBandSchema.nullable(),
+    hasCaption: z.boolean(),
+    hasChallenge: z.boolean(),
+  })
+  .strict()
 
 export type CommunityPostSubmittedEvent = z.infer<
   typeof communityPostSubmittedEventSchema
 >
 
-export const communityPostPublishedEventSchema = z.object({
-  analyticsSubjectId: nonEmptyString,
-  platform: communityPlatformSchema,
-  dedupeKey: communityDedupeKeySchema,
-  climateBand: climateBandSchema.nullable(),
-})
+export const communityPostPublishedEventSchema = z
+  .object({
+    analyticsSubjectId: nonEmptyString,
+    platform: communityPlatformSchema,
+    dedupeKey: communityDedupeKeySchema,
+    climateBand: climateBandSchema.nullable(),
+  })
+  .strict()
 
 export type CommunityPostPublishedEvent = z.infer<
   typeof communityPostPublishedEventSchema
 >
 
-export const communityPostReportedEventSchema = z.object({
-  analyticsSubjectId: nonEmptyString,
-  platform: communityPlatformSchema,
-  dedupeKey: communityDedupeKeySchema,
-  reason: communityReportReasonSchema,
-})
+export const communityPostReportedEventSchema = z
+  .object({
+    analyticsSubjectId: nonEmptyString,
+    platform: communityPlatformSchema,
+    dedupeKey: communityDedupeKeySchema,
+    reason: communityReportReasonSchema,
+  })
+  .strict()
 
 export type CommunityPostReportedEvent = z.infer<typeof communityPostReportedEventSchema>
 
-export const communityPostWithdrawnEventSchema = z.object({
-  analyticsSubjectId: nonEmptyString,
-  platform: communityPlatformSchema,
-  dedupeKey: communityDedupeKeySchema,
-  climateBand: climateBandSchema.nullable(),
-})
+export const communityPostWithdrawnEventSchema = z
+  .object({
+    analyticsSubjectId: nonEmptyString,
+    platform: communityPlatformSchema,
+    dedupeKey: communityDedupeKeySchema,
+    climateBand: climateBandSchema.nullable(),
+  })
+  .strict()
 
 export type CommunityPostWithdrawnEvent = z.infer<
   typeof communityPostWithdrawnEventSchema
 >
 
-/** One per unique published participant, so the challenge count stays honest. */
-export const communityChallengeParticipatedEventSchema = z.object({
-  analyticsSubjectId: nonEmptyString,
-  platform: communityPlatformSchema,
-  dedupeKey: communityDedupeKeySchema,
-  climateBand: climateBandSchema.nullable(),
-})
+/**
+ * One per unique published participant, so the challenge count stays honest.
+ *
+ * `challengeId` is required and non-nullable because the event is only emitted for
+ * a submission that actually joined a challenge. Without it the beta gate could
+ * count participants and could not attribute any of them to a challenge, which is
+ * the number the editorial calendar is judged on. It duplicates a component of
+ * `dedupeKey` deliberately: the key is opaque to the sink and must stay free to
+ * change shape, so it is not a field the sink can group by.
+ */
+export const communityChallengeParticipatedEventSchema = z
+  .object({
+    analyticsSubjectId: nonEmptyString,
+    platform: communityPlatformSchema,
+    dedupeKey: communityDedupeKeySchema,
+    climateBand: climateBandSchema.nullable(),
+    challengeId: nonEmptyString,
+  })
+  .strict()
 
 export type CommunityChallengeParticipatedEvent = z.infer<
   typeof communityChallengeParticipatedEventSchema
@@ -1958,6 +1984,7 @@ export const communityChallengeParticipatedPropertiesSchema = z
     platform: communityPlatformSchema,
     dedupe_key: nonEmptyString,
     climate_band: climateBandSchema.nullable(),
+    challenge_id: nonEmptyString,
   })
   .strict()
 
@@ -2273,6 +2300,7 @@ export function trackCommunityChallengeParticipated(
       platform: parsed.platform,
       dedupe_key: parsed.dedupeKey,
       climate_band: parsed.climateBand,
+      challenge_id: parsed.challengeId,
     }),
   }
 }

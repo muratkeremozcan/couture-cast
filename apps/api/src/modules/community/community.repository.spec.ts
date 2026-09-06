@@ -1321,6 +1321,51 @@ describe('CommunityRepository', () => {
       expect(result).toEqual({ kind: 'reason_changed', existingReason: 'other' })
     })
 
+    // TWO RACES, TWO DIFFERENT ANSWERS. P2002 means another request won the
+    // mint and the loser reads the winner's value; P2003 means the author's
+    // account was deleted while the page was being assembled and there is
+    // nothing to alias. Story 6.1 makes the second reachable in production: the
+    // feed is table-wide by design and returns other people's posts, so a read
+    // races the account erasure this same story ships with a 72-hour window.
+    it('returns null when the author was deleted mid-read, rather than throwing', async () => {
+      const { repo, aliasFindUnique, aliasCreate } = createRepo()
+      aliasFindUnique.mockResolvedValueOnce(null)
+      aliasCreate.mockRejectedValueOnce(
+        new Prisma.PrismaClientKnownRequestError('foreign key constraint violated', {
+          code: 'P2003',
+          clientVersion: 'test',
+        })
+      )
+
+      await expect(
+        repo.resolveAlias('user-erased', () => 'Style Explorer NEW00001')
+      ).resolves.toBeNull()
+    })
+
+    it('omits a vanished author from a page rather than failing the whole page', async () => {
+      // Throwing here turned one stranger's deletion into a 500 for every other
+      // item in the response.
+      const { repo, aliasFindMany, aliasFindUnique, aliasCreate } = createRepo()
+      aliasFindMany.mockResolvedValueOnce([
+        { user_id: 'author-alive', alias: 'Style Explorer AAAA1111' },
+      ])
+      aliasFindUnique.mockResolvedValueOnce(null)
+      aliasCreate.mockRejectedValueOnce(
+        new Prisma.PrismaClientKnownRequestError('foreign key constraint violated', {
+          code: 'P2003',
+          clientVersion: 'test',
+        })
+      )
+
+      const aliases = await repo.resolveAliases(
+        ['author-alive', 'author-erased'],
+        () => 'Style Explorer NEW00001'
+      )
+
+      expect(aliases.get('author-alive')).toBe('Style Explorer AAAA1111')
+      expect(aliases.has('author-erased')).toBe(false)
+    })
+
     it('rethrows a non-P2002 failure out of the lazy alias insert', async () => {
       const { repo, aliasFindUnique, aliasCreate } = createRepo()
       aliasFindUnique.mockResolvedValueOnce(null)

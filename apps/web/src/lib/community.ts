@@ -25,14 +25,18 @@ import {
   allocateCommunityPostResponseSchema,
   communityFeedResponseSchema,
   communityPostResponseSchema,
+  openCommunityPostResponseSchema,
   publishCommunityPostResponseSchema,
   reportCommunityPostResponseSchema,
   uploadGarmentBytes,
   withdrawCommunityPostResponseSchema,
   COMMUNITY_AGE_GATE_DENIED_MESSAGE,
+  COMMUNITY_CURSOR_INVALID_MESSAGE,
   COMMUNITY_FEED_DISABLED_MESSAGE,
+  COMMUNITY_MEDIA_UNAVAILABLE_MESSAGE,
   COMMUNITY_REPORT_REASON_CHANGED_MESSAGE,
   COMMUNITY_SELF_REPORT_MESSAGE,
+  type CommunityExperimentVariant,
   type CommunityFeed,
   type CommunityFeedItem,
   type CommunityFeedMode,
@@ -73,6 +77,8 @@ export type CommunityFailureReason =
   | 'reason_changed'
   | 'self_report'
   | 'disabled'
+  | 'cursor_invalid'
+  | 'media_unavailable'
   | 'upload_failed'
   | 'image_too_small'
   | 'unknown'
@@ -152,6 +158,20 @@ function readRetryAfterSeconds(response: Response): number | undefined {
 
 function reasonForResponse(status: number, message: string): CommunityFailureReason {
   if (status === 401) return 'signed_out'
+  if (status === 400) {
+    // Reachable without anyone tampering with a cursor. The feed cursor is bound
+    // to the filter mode AND the resolved band it was minted under, and under
+    // `auto` that band is recomputed per request from weather guaranteed fresh
+    // for only 60 minutes. A snapshot going stale mid-scroll therefore answers
+    // 400, which the contract documents as the signal to restart paging. Left
+    // unclassified, the grid put a whole-feed alert over a populated grid and
+    // then re-sent the dead cursor on every further Load more.
+    if (message.includes(COMMUNITY_CURSOR_INVALID_MESSAGE)) return 'cursor_invalid'
+    // Every other 400 on these routes is a rejected payload -- a caption with a
+    // link, alt text over 200 characters -- which the compose form already
+    // reports against the field the author can fix.
+    return 'unknown'
+  }
   if (status === 403) {
     if (message.includes(COMMUNITY_AGE_GATE_DENIED_MESSAGE)) return 'age_gate'
     // `community.service.ts` throws the self-report refusal as a
@@ -169,7 +189,13 @@ function reasonForResponse(status: number, message: string): CommunityFailureRea
   }
   if (status === 429) return 'rate_limited'
   if (status === 503) {
-    return message.includes(COMMUNITY_FEED_DISABLED_MESSAGE) ? 'disabled' : 'unknown'
+    if (message.includes(COMMUNITY_FEED_DISABLED_MESSAGE)) return 'disabled'
+    // A published row whose stored object cannot be signed. The server reports it
+    // as an outage rather than a 404 precisely so the reader is told to come
+    // back, and `disabled` copy would instead tell them the whole community is
+    // switched off.
+    if (message.includes(COMMUNITY_MEDIA_UNAVAILABLE_MESSAGE)) return 'media_unavailable'
+    return 'unknown'
   }
   return 'unknown'
 }
@@ -279,6 +305,42 @@ export async function isCommunityPostVisibleFromWeb(
     return true
   } catch {
     return false
+  }
+}
+
+/**
+ * Records that a viewer opened a card.
+ *
+ * `experimentVariant` is passed in rather than re-derived because the contract
+ * requires the arm the CLIENT was serving when the card was drawn; the server
+ * would otherwise attribute an open to whatever arm it resolves at emit time,
+ * which is a different feed whenever an assignment moves between a read and a
+ * tap. Everything else on the event -- the subject, the dedupe key, the climate
+ * band and `isSelf` -- is decided server-side, and `isSelf` deliberately so: the
+ * beta gate advances on NON-self card-open lift, so a client-asserted flag would
+ * let the population being measured move the number that decides whether the
+ * feature ships.
+ */
+export async function openCommunityPostFromWeb(
+  postId: string,
+  experimentVariant: CommunityExperimentVariant,
+  signal?: AbortSignal
+): Promise<void> {
+  const accessToken = readAccessToken()
+  try {
+    const response = await createWebApiClient({
+      accessToken,
+    }).apiV1CommunityPostsPostIdOpenedPost(
+      {
+        postId,
+        xCouturePlatform: 'web',
+        openCommunityPostInput: { experimentVariant },
+      },
+      { signal }
+    )
+    openCommunityPostResponseSchema.parse(response)
+  } catch (error: unknown) {
+    throw await communityError(error, 'Unable to record this card open.')
   }
 }
 

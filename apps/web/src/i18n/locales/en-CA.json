@@ -470,6 +470,9 @@
       "authorFallback": "Style explorer",
       "imageUnavailable": "Image unavailable",
       "imageRetry": "Reload image",
+      "open": "View look",
+      "openLabel": "View the look by {{author}}",
+      "detailClose": "Close this look",
       "report": "Report",
       "reported": "Reported",
       "withdraw": "Withdraw",
@@ -572,6 +575,7 @@
       "selfReport": "You cannot report your own look.",
       "notFound": "This look is no longer available.",
       "disabled": "The community feed is temporarily unavailable.",
+      "mediaUnavailable": "This look is temporarily unavailable. Try again shortly.",
       "generic": "Something went wrong. Try again."
     }
   }

@@ -2024,3 +2024,312 @@ test does not go red under the mutation, because under READ COMMITTED the loser
 sees either the committed new status or the old one and both readings are
 self-consistent. It is an invariant test, its docblock says so, and it is
 recorded here as an invariant test so nobody later reads it as race coverage.
+
+## Generated SDK freshness has no CI guard, unlike the OpenAPI document (2026-09-06)
+
+`packages/api-client/docs/http.openapi.json` is protected against going stale.
+`packages/api-client/testing/http-openapi.spec.ts:70-75` regenerates the
+document in-process and asserts `expect(checkedInSpec).toEqual(spec)`, so a
+contract change that is not accompanied by a regenerated document fails the
+test suite.
+
+`packages/api-client/src/generated/**` has no equivalent. Nothing in the
+repository regenerates the SDK and fails on a diff.
+`.github/workflows/schema-validation.yml:43` regenerates the OpenAPI document
+and hands it to Optic, and it stops there. The generated API classes and models
+are only ever checked in by hand after someone remembers to run
+`npm run generate:api-client`.
+
+The consequence is a silent, one-directional drift. The contracts and the JSON
+stay in lockstep because a test enforces it; the SDK can fall behind both, and
+every gate stays green while it does. That gap is what makes the whole class of
+"stale generated file that still typechecks" defects survivable, and this branch
+has hit that class repeatedly.
+
+The fix is one step in `schema-validation.yml`, next to the Optic step that
+already regenerates the spec:
+
+```yaml
+- run: npm run generate:api-client
+- run: git diff --exit-code -- packages/api-client/src/generated
+```
+
+Recording it here rather than fixing it inline because it changes a shared CI
+workflow that gates every story, not only this one, and it should land with an
+owner who can watch the first few runs.
+
+A related observation worth keeping with it. During the story 6.1 review the
+generated output was compared field by field against the contracts and the JSON,
+in both directions, and was found completely fresh: nine operations, every
+schema, every enum member and its order, every default, bound and
+`additionalProperties`. The gap above is therefore latent rather than currently
+realised. It is worth closing precisely while the artifacts agree, because a
+guard added later has to first prove which of the three sources is the wrong one.
+
+### The socket-events document is in worse shape than the SDK was
+
+Found by the subagent that fixed the nullable-object typing, and recorded here
+because it belongs with the guard above rather than on its own.
+
+`packages/api-client/docs/socket-events.openapi.json` is checked in and generated
+by `gen:openapi:events` (`packages/api-client/package.json:45`). It has no
+freshness spec, and no workflow runs its generator. Verified: a search of
+`packages/api-client/testing` and `packages/api-client/src` for any reference to
+the file returns nothing, and the only mention anywhere is the npm script that
+produces it.
+
+So it carries both weaknesses at once. The HTTP document at least has an equality
+test even though CI never regenerates the SDK; this one has neither, which makes
+it the artifact most likely to be silently wrong. The same two-line fix applies,
+pointed at its own generator:
+
+```yaml
+- run: npm run gen:openapi:events --workspace @couture/api-client
+- run: git diff --exit-code -- packages/api-client/docs/socket-events.openapi.json
+```
+
+**Settled on 2026-09-06, and the guard is now in
+`.github/workflows/schema-validation.yml`.** Both questions were answered by
+running the generator rather than by reasoning about the file.
+
+The `lookbook:new` absence is by design, not staleness.
+`packages/api-client/scripts/generate-events-openapi.ts` registers three component
+schemas (`LookbookNewEvent`, `RitualUpdateEvent`, `AlertWeatherEvent`) and nothing
+else; the emitted document has `paths: {}`. Channel-name strings are never in the
+generator's surface, so `lookbook:new` could not appear whatever the document's
+freshness, and searching for the channel name was searching for the wrong thing.
+The document describes payload shapes; ADR-007 owns the channel names.
+
+The document was already fresh. `npm run gen:openapi:events --workspace
+@couture/api-client` produced a byte-identical file. That is consistent with what
+reading it showed: the checked-in `LookbookNewEvent` already carries the
+post-Story-6.1 shape, with `mediaUrls` gone, `climateBand` narrowed to the
+six-band tuple, and `additionalProperties: false` on `data` matching the inner
+`.strict()` in `socket-events.ts`.
+
+So the guard starts from a green baseline, which is the whole reason for settling
+staleness first. It runs before the SDK step, because it is only `tsx` over the
+shared Zod types where that step downloads the openapi-generator JAR, and after
+the `@couture/utils` build, because `socket-events.ts` imports `CLIMATE_BANDS`.
+
+Nothing is deferred here any more. The entry stays as the record of why the
+document had no guard for as long as it did, and of the sequence: settle whether
+the artifact is already wrong, then guard it.
+
+## Scope a validator change by its call sites, not by its field names (2026-09-06)
+
+Fixing `refineChallengeWindow` meant finding every fixture the tightened rule
+would newly reject. The first attempt grepped for the field names the rule reads,
+`timeZone` and `time_zone`, and produced nine files across `apps/api`, `apps/web`,
+`apps/mobile` and `packages/api-client`. That list was reported to two other
+sessions, one of which handed over three files and paused its own work on the
+strength of it.
+
+The list was wrong. Grepping instead for the two schemas the refinement is
+attached to, `createCommunityChallengeInputSchema` and
+`updateCommunityChallengeInputSchema`, produced two files. Everything else in the
+first list held either a response projection, which carries no refinement at all,
+or a value written straight to the repository or to Prisma, which never reaches
+the schema. The service says so in its own comment: "The Monday-anchored,
+exactly-seven-day, valid-IANA-zone rules are enforced by the contract schema, so
+the 400 arrives before this method runs."
+
+Running every surviving fixture through the new rule rather than reasoning about
+them narrowed it once more, to a single fixture in the reviewer's own file. Every
+Pact fixture already conformed, because whoever chose those dates had picked true
+local midnight rather than UTC midnight.
+
+The general rule: a validator's reach is its call sites, not the population of
+values it would reject if it ever saw one. Scoping a validation change by field
+name over-reports by whatever multiple of the codebase happens to use that name
+for something else, and over-reporting to teammates is expensive in a way a
+private wrong guess is not. Find the schema, find who parses it, and stop there.
+
+The corollary that made this cheap to check: run the candidate rule over the
+existing fixtures and read the verdicts, rather than predicting them. That took
+one script and replaced an argument about nine files with a list of one.
+
+## An advisory CI job cannot be the last line of defence (2026-09-06)
+
+A mutation-testing leftover reached `main`'s pull request as committed code.
+`packages/api-client/src/contracts/http/community.ts` on `934ab95a` carried
+`// MUTANT: mode comparison removed`, with the cursor mode-binding branch of
+`safeDecodeCommunityFeedCursor` deleted. That branch is what makes a client that
+changed filters restart paging rather than read one filtered set through
+another's keyset. It happened because a whole-tree `git add -A` ran across a
+shared checkout while another session was mid-mutation; the same commit
+clobbered a third session's contract edits.
+
+The leftover is not the finding. The finding is what caught it and what did not.
+
+Two jobs went red. `PR checks` failed on `error TS6133: 'expectedMode' is
+declared but its value is never read`, which is a typecheck noticing an orphaned
+parameter and has nothing to do with cursor binding. `Playwright e2e` failed on
+`6.1-API-04 rejects a well-formed cursor presented under another mode`, which is
+the behavioural check doing precisely its job.
+
+The behavioural check is the one that cannot block a merge. It runs in a job
+whose failure the gate treats as advisory, so on its own it produces a red tick
+that reads like flake next to a green quality gate. Had the mutation been made
+somewhere `expectedMode` stayed in use — a changed comparison rather than a
+deleted one, or a mutation to any function whose parameters all remain
+referenced — typecheck would have passed and the regression would have merged
+with the only evidence against it sitting in a job nobody is required to act on.
+
+So the rule, stated generally because it is not about this mutant: **a job whose
+failure is advisory cannot be the only thing standing between a regression and
+`main`.** Either the check is load-bearing, in which case its job must be able
+to fail the merge, or it is genuinely informational, in which case something
+that can fail the merge has to cover the same property. Today the cursor mode
+binding is covered at the contract tier by `6.1-CON-003` in
+`packages/api-client/testing/community-contract.spec.ts`, which does run inside
+the blocking gate, so the property is not actually unguarded. That was luck
+rather than design: nothing checks that every property asserted only in an
+advisory job also has a blocking assertion.
+
+What a fix needs. An audit of which jobs are advisory and which are blocking,
+then, for each advisory job, either promotion to blocking or a named blocking
+test covering each property it is the sole guard for. The narrower, cheaper
+first step is to stop whole-tree commits in a shared checkout, which is a
+process change rather than a code one and prevents the specific incident without
+addressing the gating gap underneath it.
+
+## An exact-set assertion is the only thing that detects an absence (2026-09-06)
+
+**Fixed on the day it was found. `6.1-CON-042` in
+`packages/api-client/testing/community-contract.spec.ts` now asserts the exact
+documented response set and the security scheme for all nine community
+operations.** This entry is the record of why, because the mechanism generalises
+past this module.
+
+### What happened
+
+Six OpenAPI response descriptions were written into
+`packages/api-client/src/contracts/http/community.ts`, lost from the working tree,
+reapplied, and lost again. Neither the type checker nor any test noticed either
+time. They were found by a person reading the regenerated JSON.
+
+### Why nothing caught it
+
+Not a gap in any one test. `packages/api-client/testing/http-openapi.spec.ts`
+compares the checked-in document against a freshly generated one, so it catches a
+document that has gone STALE relative to the contracts. The SDK guard added to
+`.github/workflows/schema-validation.yml` the same day does the same for the
+generated client. Both prove that the contracts, the document and the SDK AGREE,
+and agreement is preserved perfectly when a change is absent from all three. A
+missing response description is indistinguishable from a description nobody ever
+wanted.
+
+Only one assertion in the community suite could have detected an absence, and it
+did: `6.1-CON-041` pins the exact response-code set for the card-open path, and it
+turned red the moment a documented 400 was added there. That was one operation out
+of nine. The other eight would have stayed green through any of their documented
+failures silently disappearing.
+
+### The fix, and the part worth reusing
+
+The convention already existed in the repository, three times, in the same
+directory. `wardrobe-contract.spec.ts:265-284`,
+`wardrobe-onboarding-contract.spec.ts:300` and
+`wardrobe-silhouette-contract.spec.ts:330` each drive a route table of
+`{ method, path, statuses }` and assert
+`Object.keys(operation?.responses ?? {}).sort()` against it alongside the security
+scheme, in one loop. Community had never adopted it. Writing the guard was reading
+three neighbouring spec files, not designing anything.
+
+**The reusable lesson is that one: before writing a new kind of guard, check
+whether a sibling module already has one.** A convention that already exists is
+better than an equivalent new one even when the new one is slightly nicer, because
+it is already understood, already reviewed, and the next person to touch a fourth
+module now has four examples pointing the same way instead of two competing shapes.
+
+Two details carried into the community version:
+
+- **`security` is pinned as well as the codes.** An operation quietly losing
+  `bearerAuth` is the same class of absence and considerably worse, and it is the
+  one nobody would catch by reading, because an unauthenticated endpoint looks
+  exactly like an authenticated one in the registration source.
+- **The failure message names the operation and says what moved, in which
+  direction.** A developer who breaks it learns which operation and which code was
+  added or removed without opening the document.
+
+The table asserts a length of nine before iterating, so a row silently dropped
+from the table itself shrinks the surface under assertion and fails rather than
+passing quietly.
+
+### Proved rather than assumed
+
+The guard was mutation-tested, both halves, against the real contract source with
+a checksummed backup and a verified byte-exact restore:
+
+- Removing the withdraw 409 produced: `POST /api/v1/community/posts/{postId}/withdraw
+response codes changed. Added: none. Removed: 409.`
+- Stripping `bearerAuth` from the feed operation produced: `GET /api/v1/community/feed
+does not require bearerAuth.`
+
+A guard adopted because it is conventional, and never shown to fail, is a guard
+nobody has checked.
+
+### One finding the table surfaced, not yet resolved
+
+`POST /api/v1/community/posts/allocate` documents a 429 that the implementation
+cannot produce. `CommunityService.allocatePost` enforces no rolling cap, and the
+only two throws of `CommunityRateLimitException` are in `publishPost` and
+`reportPost`. The table asserts what the document says today, with a comment on
+that row recording the discrepancy, because choosing between rate-limiting
+allocation and removing the documented response is a product decision rather than
+a fixture edit. When it is decided, that row moves with it.
+
+## Deferred from: code review of 6-1-community-feed-by-climate-band (2026-09-06)
+
+These came out of the `/bmad-code-review` pass over the story 6.1 branch. Each
+one is real and none of them blocks the story. They are separated from the
+findings that are being fixed on the branch, which are recorded in the story
+file's own Code Review Findings section.
+
+- **Text moderation matches whole tokens against a fixed word list.**
+  `apps/api/src/modules/community/community-moderation.engine.ts:183-198` uses
+  `tokens.includes(term)` for single words, and `normalizeTextForModeration`
+  strips diacritics only. Repeated characters, internal punctuation and spaced
+  variants all pass. This is presented as "multilingual text safety filtering",
+  and obfuscation handling was never specified, so widening it is a product
+  decision rather than a defect fix. Worth pairing with the decision about the
+  five supported locales that have no dictionary at all.
+
+- **The caption URL and email denylist is a hardcoded TLD list.**
+  `packages/api-client/src/contracts/http/community.ts:212-214`. Domains outside
+  the listed TLDs pass, and ordinary prose containing a listed TLD is refused.
+  It is documented in the OpenAPI description as though it were a complete
+  boundary control, and nothing downstream re-checks. Either narrow the
+  documented claim or move the check to the moderation engine where it can be
+  revised without a contract change.
+
+- **`classifyClimateBand` has a floor on usable days and no ceiling.**
+  `packages/utils/src/climate-band.ts:126-163`. `MINIMUM_USABLE_DAYS` is three
+  and the caller passes whatever the provider returned, so a provider that
+  starts returning fourteen days instead of seven silently changes every
+  viewer's band with no code change and no version stamp on the classification.
+  The `localDate` dedupe keeps the first occurrence in array order, so a
+  refreshed forecast appended for a date already present loses to the stale row.
+
+- **Moderation dispatch cadence differs by a factor of sixty between the local
+  stack and production.** `community-maintenance.scheduler.ts:25` uses a
+  one-minute cron; `apps/api/src/workers/community.bootstrap.ts:38` uses a
+  one-second interval. The bootstrap comment states that only the trigger
+  differs, which is true of the work but not of the latency an author
+  experiences, and end-to-end runs therefore prove a responsiveness production
+  does not have.
+
+- **`packages/db` specs import a sibling workspace by relative path.**
+  `packages/db/test/community-schema.spec.ts:16,20` and
+  `packages/db/test/rls/harness.ts:19` reach into `../../utils/src` and
+  `../../testing/src` rather than through the package entry points. They cannot
+  catch a symbol missing from `packages/utils/src/index.ts`, and they hard-code
+  the monorepo directory layout.
+
+- **`packages/db` has four separate expressions of "build `@couture/utils`
+  first", and `test` has none.** `packages/db/package.json` carries the
+  dependency in `predb:seed`, inline in `db:reset`, inline in `typecheck` and in
+  the newer `prelint`, while `test` and `test:coverage` have no prebuild at all.
+  A clean checkout can lint and typecheck but cannot reliably test. One shared
+  prebuild script referenced by all of them removes the asymmetry.

@@ -576,7 +576,10 @@ export class CommunityRepository {
    * `upsert` rather than find-then-create: two concurrent feed requests for a
    * first-time author would otherwise race on the unique index.
    */
-  async resolveAlias(userId: string, generateAlias: () => string): Promise<string> {
+  async resolveAlias(
+    userId: string,
+    generateAlias: () => string
+  ): Promise<string | null> {
     const existing = await this.prisma.communityAlias.findUnique({
       where: { user_id: userId },
     })
@@ -590,15 +593,34 @@ export class CommunityRepository {
       })
       return created.alias
     } catch (error: unknown) {
-      if (
-        error instanceof Prisma.PrismaClientKnownRequestError &&
-        error.code === 'P2002'
-      ) {
-        const raced = await this.prisma.communityAlias.findUnique({
-          where: { user_id: userId },
-        })
-        if (raced) {
-          return raced.alias
+      if (error instanceof Prisma.PrismaClientKnownRequestError) {
+        // TWO RACES, TWO DIFFERENT ANSWERS.
+        //
+        // P2002, the unique index on `user_id`: another request minted an alias
+        // for this author between the read above and this insert. Both were
+        // right to try, one won, and the loser reads the winner's value. The
+        // author exists and has an alias.
+        if (error.code === 'P2002') {
+          const raced = await this.prisma.communityAlias.findUnique({
+            where: { user_id: userId },
+          })
+          if (raced) {
+            return raced.alias
+          }
+        }
+
+        // P2003, the foreign key onto `User`: the author's account was deleted
+        // while this page was being assembled. There is nothing to alias and
+        // there never will be, so this returns null rather than throwing.
+        //
+        // THIS IS REACHABLE IN PRODUCTION, and Story 6.1 is what makes it so.
+        // The feed is table-wide by design and returns other people's posts, so
+        // a viewer's read genuinely races the account erasure this same story
+        // ships with its 72-hour completion window. Throwing here turned one
+        // stranger's deletion into a 500 for the whole page: every other item in
+        // the response was lost because one author had gone.
+        if (error.code === 'P2003') {
+          return null
         }
       }
       throw error
@@ -622,7 +644,13 @@ export class CommunityRepository {
 
     for (const userId of unique) {
       if (!aliases.has(userId)) {
-        aliases.set(userId, await this.resolveAlias(userId, generateAlias))
+        const alias = await this.resolveAlias(userId, generateAlias)
+        // An author who vanished mid-page is simply absent from the map. The
+        // caller drops the item rather than inventing a name for a person who
+        // no longer exists; see `buildFeedItems`.
+        if (alias !== null) {
+          aliases.set(userId, alias)
+        }
       }
     }
 

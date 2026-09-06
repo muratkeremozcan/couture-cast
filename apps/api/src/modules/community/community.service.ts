@@ -18,7 +18,11 @@ import {
   COMMUNITY_FEED_DISABLED_MESSAGE,
   COMMUNITY_IDEMPOTENCY_MISMATCH_MESSAGE,
   COMMUNITY_MEDIA_UNAVAILABLE_MESSAGE,
+  COMMUNITY_AGE_GATE_DENIED_MESSAGE,
+  COMMUNITY_NOT_POST_AUTHOR_MESSAGE,
   COMMUNITY_POST_NOT_FOUND_MESSAGE,
+  COMMUNITY_POST_NOT_WITHDRAWABLE_MESSAGE,
+  COMMUNITY_REPORT_RATE_LIMITED_MESSAGE,
   COMMUNITY_POST_RATE_LIMITED_MESSAGE,
   COMMUNITY_REPORT_REASON_CHANGED_MESSAGE,
   COMMUNITY_SELF_REPORT_MESSAGE,
@@ -66,6 +70,7 @@ import { generateCommunityAuthorAlias } from './community-alias.js'
 import { buildAltTextSuggestion } from './community-alt-text.js'
 import {
   feedViewDedupeKey,
+  communitySubjectToken,
   postDedupeKey,
   resolveCommunityExperimentVariant,
 } from './community-analytics.js'
@@ -266,6 +271,38 @@ export class CommunityService {
    * separately: a band of viewers can browse before anyone can post. Both
    * default false in production until the beta gate passes.
    */
+  /**
+   * The age gate, translated into this surface's own refusal message.
+   *
+   * THE MESSAGE BOTH CLIENTS MATCH ON WAS NEVER SENT. Every refusal in
+   * `GuardianService.assertWardrobeUploadAllowed` throws
+   * `ForbiddenException('GUARDIAN_CONSENT_REQUIRED')`, while the web and mobile
+   * clients classify a community 403 on `COMMUNITY_AGE_GATE_DENIED_MESSAGE` and
+   * fall through to `unknown` for anything else. So a 13-to-15-year-old whose
+   * guardian consent had lapsed saw the generic "We could not publish your
+   * look.", and `community.error.ageGate`, translated into all ten locales, was
+   * unreachable copy.
+   *
+   * The translation happens HERE rather than in the guard, and that placement is
+   * the point. `GUARDIAN_CONSENT_REQUIRED` is the wardrobe surface's own code,
+   * pinned by its tests and meaningful to it; the refusal message is a property
+   * of the SURFACE the person is standing on, not of the check being run. One
+   * shared guard, two surfaces, two messages.
+   *
+   * Only `ForbiddenException` is rewritten. Anything else the guard can raise is
+   * a fault rather than a refusal and must not be dressed up as an age gate.
+   */
+  private async assertAgeGateAllows(userId: string, role?: string): Promise<void> {
+    try {
+      await this.guardianService.assertWardrobeUploadAllowed(userId, role)
+    } catch (error) {
+      if (error instanceof ForbiddenException) {
+        throw new ForbiddenException(COMMUNITY_AGE_GATE_DENIED_MESSAGE)
+      }
+      throw error
+    }
+  }
+
   private async assertReadEnabled(userId: string): Promise<void> {
     await this.assertFlagEnabled('community_read_enabled', userId)
   }
@@ -466,6 +503,36 @@ export class CommunityService {
 
       const isSelf = post.user_id === viewerUserId
       const alias = aliases.get(post.user_id)
+
+      // The author's account was deleted while this page was being assembled.
+      // Drop the item, for the same reason the unsignable branch above drops
+      // one: a single vanished stranger must not cost the viewer every other
+      // item in the response, which is what throwing out of the read path did.
+      //
+      // DROPPED RATHER THAN RENDERED WITH A PLACEHOLDER. `LookbookPost.user_id`
+      // cascades from `User`, so this row is already gone or about to be, and
+      // the erasure sweep is on its way to removing its object too. Showing an
+      // erased author's post under an invented name would keep deleted content
+      // on a public feed and attach a name to a person who asked to be removed.
+      //
+      // Dropping here cannot skip a page. `nextCursor` is minted in the
+      // repository from the last ROW of the page, before this loop runs, so the
+      // keyset still points where it did.
+      let displayName = 'You'
+      if (!isSelf) {
+        if (alias === undefined) {
+          this.logger.warn(
+            {
+              event: 'community_author_erased_mid_read',
+              postId: post.id,
+            },
+            'Community post omitted from the feed: its author was deleted while the page was being assembled'
+          )
+          continue
+        }
+        displayName = alias
+      }
+
       items.push({
         id: post.id,
         caption: post.caption ?? null,
@@ -477,7 +544,12 @@ export class CommunityService {
         status: post.status,
         challengeId: post.challenge_id ?? null,
         author: {
-          displayName: isSelf ? 'You' : (alias ?? generateCommunityAuthorAlias()),
+          // `displayName` is resolved before the push so the guard above proves
+          // it. The previous `?? generateCommunityAuthorAlias()` fallback minted
+          // an UNPERSISTED random name, so an author with no alias row appeared
+          // under a different name on every request and a viewer had no way to
+          // tell that from a real one.
+          displayName,
           isSelf,
         },
       })
@@ -524,8 +596,17 @@ export class CommunityService {
     })
   }
 
+  /**
+   * The author's pseudonym, or `unknown` when the account has been deleted.
+   *
+   * `resolveAlias` returns null for an author whose `User` row has gone, which a
+   * feed read can race against account erasure. A report about a vanished author
+   * is still a real report and must still be recorded, so this collapses to the
+   * same `unknown` the caller already uses for a post it cannot find.
+   */
   private async resolveAuthorAlias(userId: string): Promise<string> {
-    return this.repository.resolveAlias(userId, generateCommunityAuthorAlias)
+    const alias = await this.repository.resolveAlias(userId, generateCommunityAuthorAlias)
+    return alias ?? 'unknown'
   }
 
   private readUrlExpiry(): string {
@@ -685,11 +766,17 @@ export class CommunityService {
       // Scoped to the VIEWER as well as the post. The sink upserts on this key,
       // so a post-only key collapsed every viewer's open of one post into a
       // single event and the lift the beta gate measures could never rise above
-      // one per post. The report event next door already keys on
-      // `${postId}:${userId}` and says why; this was a local inconsistency
-      // rather than a considered choice.
+      // one per post.
+      //
+      // The user component is `communitySubjectToken`, NEVER the raw id.
+      // `dedupe_key` is a declared property on this event's schema and travels
+      // to the analytics sink, while the event is pseudonymous: `user_id` is
+      // nulled on the persisted row and `distinctId` is an HMAC. A raw id in
+      // this string would put the pseudonym and the identity it hides in the
+      // same row, making every row a self-contained join key back to the person.
+      // That does not weaken the pseudonymity, it undoes it.
       dedupeKey: postDedupeKey(
-        `${params.postId}:${params.userId}`,
+        `${params.postId}:${communitySubjectToken(params.userId)}`,
         'community_card_opened'
       ),
       climateBand: post.climate_band ?? null,
@@ -710,7 +797,7 @@ export class CommunityService {
     const { userId, role, idempotencyKey, platform, input } = params
 
     await this.assertWriteEnabled(userId)
-    await this.guardianService.assertWardrobeUploadAllowed(userId, role)
+    await this.assertAgeGateAllows(userId, role)
 
     const { viewerBand } = await this.resolveViewerBand(userId)
     const altTextSuggestion = buildAltTextSuggestion({
@@ -842,7 +929,7 @@ export class CommunityService {
     const { userId, role, platform, input } = params
 
     await this.assertWriteEnabled(userId)
-    await this.guardianService.assertWardrobeUploadAllowed(userId, role)
+    await this.assertAgeGateAllows(userId, role)
 
     const { post, altText, objectPath } = await this.loadPublishablePost(userId, input)
 
@@ -1058,8 +1145,12 @@ export class CommunityService {
       case 'self_report':
         throw new ForbiddenException(COMMUNITY_SELF_REPORT_MESSAGE)
       case 'rate_limited':
+        // The REPORT limiter's own message, not the daily posting one. Both are
+        // 429s from the same exception type, and reusing the posting copy told
+        // a reporter who had hit the abuse limiter to stop posting, which is
+        // advice about a different action they may not have taken at all.
         throw new CommunityRateLimitException(
-          COMMUNITY_POST_RATE_LIMITED_MESSAGE,
+          COMMUNITY_REPORT_RATE_LIMITED_MESSAGE,
           result.retryAfterSeconds
         )
       case 'reason_changed':
@@ -1074,9 +1165,14 @@ export class CommunityService {
 
     await this.capture(userId, 'community_post_reported', {
       platform,
-      // The dedupe key is scoped to the reporter as well as the post, so two
-      // people reporting the same post stay two events.
-      dedupeKey: postDedupeKey(`${postId}:${userId}`, 'community_post_reported'),
+      // Scoped to the reporter as well as the post, so two people reporting the
+      // same post stay two events. The reporter is the HMAC token and never the
+      // raw id: this event is pseudonymous and `dedupe_key` ships to the sink,
+      // so a raw id here would hand the sink the mapping the HMAC withholds.
+      dedupeKey: postDedupeKey(
+        `${postId}:${communitySubjectToken(userId)}`,
+        'community_post_reported'
+      ),
       reason: input.reason,
     })
 
@@ -1104,13 +1200,17 @@ export class CommunityService {
     }
 
     if (post.user_id !== userId) {
-      throw new ForbiddenException('NOT_POST_AUTHOR')
+      // An exported constant rather than a bare literal, like every other
+      // refusal in this module. Both clients classify on these strings, so a
+      // literal is the one condition they cannot render a localized state for
+      // and fall through to a generic error on.
+      throw new ForbiddenException(COMMUNITY_NOT_POST_AUTHOR_MESSAGE)
     }
 
     // Withdrawal used to accept any status, so a draft that had never been
     // submitted could be "withdrawn" and an already-withdrawn post re-stamped.
     if (!WITHDRAWABLE_STATUSES.has(post.status)) {
-      throw new ConflictException('POST_NOT_WITHDRAWABLE')
+      throw new ConflictException(COMMUNITY_POST_NOT_WITHDRAWABLE_MESSAGE)
     }
 
     // Withdrawal schedules deletion. It used to write `status` alone, which is
@@ -1133,14 +1233,29 @@ export class CommunityService {
   /**
    * Marks every piece of a member's community content for erasure.
    *
-   * THIS METHOD HAS NO CALLER TODAY, AND THAT IS THE POINT. There is no
-   * account-deletion flow anywhere in `apps/api`
-   * (`premium-entitlement.service.ts:145` says the same thing about its own
-   * hook point), so account erasure has nowhere to attach. Writing the community
-   * half now means that when a deletion flow is built it calls one method rather
-   * than rediscovering which columns start the clock; leaving it out would mean
-   * account deletion silently skipping community content the first time someone
-   * wires it up.
+   * THIS METHOD IS DELIBERATELY UNCALLED. It is not a producer defect and it has
+   * been re-filed as one enough times to be worth stating outright.
+   *
+   * There is no account-deletion flow anywhere in `apps/api` to call it. Every
+   * `@Delete` route in the codebase is resource-scoped — a garment, a capsule, a
+   * saved location, a palette, My Form — and there is no user deletion, no GDPR
+   * erasure endpoint and no maintenance job that erases an account.
+   * (`premium-entitlement.service.ts:145` records the same absence about its own
+   * hook point.) Building one here would mean inventing an account-deletion
+   * contract, along with decisions about wardrobe garments, palette insights and
+   * saved locations that belong to whichever story owns that work.
+   *
+   * WHAT WILL CALL IT: the account-deletion flow, when a story builds it. It
+   * calls this to erase the community half, and the two ordering constraints
+   * below are what it has to honour. Writing the community half now means that
+   * flow calls one method instead of rediscovering which columns start the
+   * clock; leaving it out would mean account deletion silently skipping
+   * community content the first time someone wires it up.
+   *
+   * THE OTHER TRIGGER IS LIVE AND MUST STAY. `withdrawPost` schedules erasure
+   * today through `withdrawPostAndRequestErasure`, so the sweep is reachable in
+   * production and this method's absence of a caller does not make the erasure
+   * path dead code.
    *
    * TWO ORDERING CONSTRAINTS FOR THAT FUTURE CALLER, both load-bearing:
    *

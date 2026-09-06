@@ -12,12 +12,12 @@ import {
   View,
 } from 'react-native'
 import { useLocalSearchParams } from 'expo-router'
-import type { CommunityCardDeepLinkTarget } from '@couture/api-client'
 import { hasDeepLinkIntent, parseDeepLink } from '@couture/utils'
 import type {
   ClimateBand,
   CommunityAuthorPostState,
   CommunityBandUnresolvedReason,
+  CommunityExperimentVariant,
   CommunityFeedItem,
   CommunityFeedMode,
   CommunityReportReason,
@@ -25,10 +25,12 @@ import type {
 } from '@couture/api-client/contracts/http'
 import { InfoBanner } from '@/components/info-banner'
 import { useMobileAnalytics } from '@/src/analytics/mobile-analytics'
-import { loadMobileCommunityCardTarget } from '@/src/lib/mobile-deep-link-handler'
 import { safeFindNodeHandle } from '@/src/lib/accessibility-focus'
 import {
+  communityFailureReason,
   getCommunityFeedFromMobile,
+  getCommunityPostFromMobile,
+  recordCommunityCardOpenedFromMobile,
   reportCommunityPostFromMobile,
   withdrawCommunityPostFromMobile,
 } from '@/src/lib/community'
@@ -75,15 +77,27 @@ export function CommunityScreen() {
   const targetRef = useRef<View>(null)
   const newPostButtonRef = useRef<View>(null)
   const cardRefs = useRef(new Map<string, View | null>())
-  const [target, setTarget] = useState<CommunityCardDeepLinkTarget | null>(null)
+  const [deepLinkPost, setDeepLinkPost] = useState<CommunityFeedItem | null>(null)
   const [isInvalidDeepLink, setIsInvalidDeepLink] = useState(false)
 
   // Feed state
   const [mode, setMode] = useState<CommunityFeedMode>('auto')
+  /**
+   * The mode the SERVER served, which is not always the one that was requested:
+   * the beta experiment resolves a request for `auto` to whichever arm the viewer
+   * is assigned. The chip strip and the feed heading read this, so the `all` arm
+   * no longer sees the `auto` chip pressed and labelled "Your climate: ..." over a
+   * feed carrying every region. Requests keep using `mode`; the server binds the
+   * cursor to the effective mode either way.
+   */
+  const [servedMode, setServedMode] = useState<CommunityFeedMode>('auto')
+  const [experimentVariant, setExperimentVariant] =
+    useState<CommunityExperimentVariant | null>(null)
   const [items, setItems] = useState<CommunityFeedItem[]>([])
   const [authorStates, setAuthorStates] = useState<CommunityAuthorPostState[]>([])
   const [nextCursor, setNextCursor] = useState<string | null>(null)
   const [viewerBand, setViewerBand] = useState<ClimateBand | null>(null)
+  const [bandResolved, setBandResolved] = useState(true)
   const [bandUnresolvedReason, setBandUnresolvedReason] =
     useState<CommunityBandUnresolvedReason | null>(null)
   const [activeChallenge, setActiveChallenge] =
@@ -114,7 +128,6 @@ export function CommunityScreen() {
     fallbackKey: string
   } | null>(null)
 
-  // Deep Link Handling (preserved from the original implementation)
   useEffect(() => {
     const rawParams = { source, type, cardId, expiresAt }
     const fail = (reason: string) => {
@@ -141,28 +154,44 @@ export function CommunityScreen() {
     }
 
     let active = true
-    void loadMobileCommunityCardTarget(parsed.payload.cardId)
-      .then((resolvedTarget) => {
+    const controller = new AbortController()
+    /*
+     * Resolved against the community API rather than assembled from the
+     * notification's own payload. The synthetic card carried no image, no alt
+     * text and no moderation controls, and it could only ever find a post whose
+     * `lookbook:new` event was still inside the event-poll window, so a link to
+     * anything older failed for a post that was still on the feed. The API is
+     * also the only thing that knows whether THIS viewer may see the post: it
+     * answers 404 for everything they may not.
+     */
+    void getCommunityPostFromMobile(parsed.payload.cardId, controller.signal)
+      .then((post) => {
         if (!active) {
           return
         }
-        if (!resolvedTarget) {
-          fail('Community card target was not found')
-          return
-        }
-        setTarget(resolvedTarget)
+        setDeepLinkPost(post)
         setIsInvalidDeepLink(false)
         analytics.capture('deep_link_handled', {
           source: 'notification',
           type: 'community',
-          cardId: resolvedTarget.id,
+          cardId: post.id,
           surface: 'mobile',
         })
       })
-      .catch(() => active && fail('Community card target could not be loaded'))
+      .catch((error: unknown) => {
+        if (!active) {
+          return
+        }
+        fail(
+          communityFailureReason(error) === 'not_found'
+            ? 'Community card target was not found'
+            : 'Community card target could not be loaded'
+        )
+      })
 
     return () => {
       active = false
+      controller.abort()
     }
   }, [source, type, cardId, expiresAt, analytics])
 
@@ -179,11 +208,11 @@ export function CommunityScreen() {
   }, [])
 
   useEffect(() => {
-    if (!target) {
+    if (!deepLinkPost) {
       return
     }
     focusNode(targetRef.current)
-  }, [focusNode, target])
+  }, [focusNode, deepLinkPost])
 
   /**
    * One in-flight feed request at a time, guarded twice: the `AbortController`
@@ -193,12 +222,22 @@ export function CommunityScreen() {
    */
   const requestGenerationRef = useRef(0)
   const controllerRef = useRef<AbortController | null>(null)
+  /**
+   * Cursors the server has already rejected as stale. `onEndReached` fires off
+   * scroll position rather than off state, so it can arrive again with the dead
+   * cursor before the re-render that cleared it, and this is what makes a second
+   * send impossible rather than merely unlikely.
+   */
+  const rejectedCursorsRef = useRef(new Set<string>())
 
   const loadFeed = useCallback(
     async (
       targetMode: CommunityFeedMode,
       { cursor, refresh = false }: { cursor?: string; refresh?: boolean } = {}
     ): Promise<void> => {
+      if (cursor !== undefined && rejectedCursorsRef.current.has(cursor)) {
+        return
+      }
       controllerRef.current?.abort()
       const controller = new AbortController()
       controllerRef.current = controller
@@ -214,41 +253,74 @@ export function CommunityScreen() {
         setFeedState('loading')
       }
 
+      let pageCursor = cursor
       try {
-        const feed = await getCommunityFeedFromMobile({
-          mode: targetMode,
-          cursor,
-          limit: FEED_PAGE_SIZE,
-          signal: controller.signal,
-        })
-        if (generation !== requestGenerationRef.current) {
-          return
-        }
-        setItems((previous) => {
-          if (!cursor) {
-            return feed.items
+        // Runs at most twice. The retry goes out with no cursor at all, and only a
+        // cursor can be rejected as stale, so the loop cannot come round again.
+        for (;;) {
+          try {
+            const feed = await getCommunityFeedFromMobile({
+              mode: targetMode,
+              cursor: pageCursor,
+              limit: FEED_PAGE_SIZE,
+              signal: controller.signal,
+            })
+            if (generation !== requestGenerationRef.current) {
+              return
+            }
+            const isAppend = pageCursor !== undefined
+            setItems((previous) => {
+              if (!isAppend) {
+                return feed.items
+              }
+              const seen = new Set(previous.map((item) => item.id))
+              return [...previous, ...feed.items.filter((item) => !seen.has(item.id))]
+            })
+            setAuthorStates(feed.authorStates)
+            setNextCursor(feed.nextCursor)
+            setServedMode(feed.mode)
+            setExperimentVariant(feed.experimentVariant)
+            setViewerBand(feed.viewerBand)
+            setBandResolved(feed.bandResolved)
+            setBandUnresolvedReason(feed.bandUnresolvedReason)
+            setActiveChallenge(feed.activeChallenge)
+            setFeedError(null)
+            setFeedState('ready')
+            return
+          } catch (error: unknown) {
+            if (
+              generation !== requestGenerationRef.current ||
+              controller.signal.aborted
+            ) {
+              return
+            }
+            if (
+              pageCursor !== undefined &&
+              communityFailureReason(error) === 'cursor_invalid'
+            ) {
+              /*
+               * Ordinary operation, not a fault, so it is recovered from silently.
+               * The cursor carries the band it was minted under, and under `auto`
+               * that band is recomputed per request from weather guaranteed fresh
+               * for only 60 minutes; a snapshot going stale mid-scroll is enough to
+               * invalidate it. The contract's stated remedy is to restart paging,
+               * which is what dropping the cursor here does.
+               */
+              rejectedCursorsRef.current.add(pageCursor)
+              setNextCursor(null)
+              pageCursor = undefined
+              continue
+            }
+            // A first page that fails owns the screen; a refresh or a next page that
+            // fails keeps what is already on screen and speaks up beside it.
+            if (isFirstPage) {
+              setFeedError(error)
+              setFeedState('error')
+            } else {
+              setActionError({ error, fallbackKey: 'community.error.load' })
+            }
+            return
           }
-          const seen = new Set(previous.map((item) => item.id))
-          return [...previous, ...feed.items.filter((item) => !seen.has(item.id))]
-        })
-        setAuthorStates(feed.authorStates)
-        setNextCursor(feed.nextCursor)
-        setViewerBand(feed.viewerBand)
-        setBandUnresolvedReason(feed.bandUnresolvedReason)
-        setActiveChallenge(feed.activeChallenge)
-        setFeedError(null)
-        setFeedState('ready')
-      } catch (error: unknown) {
-        if (generation !== requestGenerationRef.current || controller.signal.aborted) {
-          return
-        }
-        // A first page that fails owns the screen; a refresh or a next page that
-        // fails keeps what is already on screen and speaks up beside it.
-        if (isFirstPage) {
-          setFeedError(error)
-          setFeedState('error')
-        } else {
-          setActionError({ error, fallbackKey: 'community.error.load' })
         }
       } finally {
         if (generation === requestGenerationRef.current) {
@@ -267,12 +339,12 @@ export function CommunityScreen() {
 
   const modeLabel = useMemo(
     () =>
-      mode === 'auto' && viewerBand
+      servedMode === 'auto' && viewerBand
         ? t('community.filters.mode.autoWithBand', {
             band: t(`community.band.${viewerBand}`),
           })
-        : t(`community.filters.mode.${mode}`),
-    [mode, t, viewerBand]
+        : t(`community.filters.mode.${servedMode}`),
+    [servedMode, t, viewerBand]
   )
 
   useEffect(() => {
@@ -290,6 +362,9 @@ export function CommunityScreen() {
     setNextCursor(null)
     setActionError(null)
     setMode(next)
+    // Optimistic so the strip responds to the tap; the response corrects it when
+    // the experiment serves a different arm than the one that was asked for.
+    setServedMode(next)
   }, [])
 
   const handleRefresh = useCallback(() => {
@@ -305,6 +380,23 @@ export function CommunityScreen() {
       void loadFeed(mode, { cursor: nextCursor })
     }
   }, [feedState, isLoadingMore, isRefreshing, loadFeed, mode, nextCursor])
+
+  const handleOpenCard = useCallback(
+    (post: CommunityFeedItem) => {
+      if (!experimentVariant) {
+        // The arm is server-assigned and arrives on the feed response. An open
+        // recorded before the first read would be filed under an arm the client
+        // guessed, and the beta gate compares the two arms against each other.
+        return
+      }
+      // Measurement only: a failure here costs one data point and must never
+      // interrupt someone reading the feed.
+      void recordCommunityCardOpenedFromMobile(post.id, experimentVariant).catch(
+        () => undefined
+      )
+    },
+    [experimentVariant]
+  )
 
   const markReported = useCallback((postId: string) => {
     setReportedPostIds((previous) => new Set(previous).add(postId))
@@ -405,6 +497,12 @@ export function CommunityScreen() {
     )
     return t(key, options)
   }, [locale, reportError, t])
+
+  /** The deep-linked look is drawn once, above the grid; the feed page it also sits on must not draw it again. */
+  const listItems = useMemo(
+    () => (deepLinkPost ? items.filter((item) => item.id !== deepLinkPost.id) : items),
+    [deepLinkPost, items]
+  )
 
   const feedErrorMessage = useMemo(() => {
     const { key, options } = communityErrorTranslation(
@@ -588,7 +686,15 @@ export function CommunityScreen() {
           </Text>
         </View>
       ) : null}
-      {bandUnresolvedReason ? (
+      {/*
+        Every clause is load-bearing. `bandResolved` was never read, so the banner
+        fired on the unresolved reason alone; and the reason is reported whenever
+        the viewer's own band fails to resolve, whatever is being served. Someone
+        who pinned a band, or chose "Every climate", was told "you are seeing every
+        climate band" over a feed that was neither. Only `auto` falls back to every
+        region because the band failed, so only `auto` has anything to explain.
+      */}
+      {servedMode === 'auto' && !bandResolved && bandUnresolvedReason ? (
         <View
           testID="community-band-unresolved"
           style={[
@@ -601,28 +707,39 @@ export function CommunityScreen() {
           </Text>
         </View>
       ) : null}
-      {target && (
+      {deepLinkPost ? (
         <View
-          ref={targetRef}
-          testID={`highlighted-community-card-${target.id}`}
-          accessibilityRole="text"
-          focusable
-          style={[styles.highlightCard, { backgroundColor: palette.subtleSurface }]}
+          testID={`highlighted-community-card-${deepLinkPost.id}`}
+          style={styles.highlightSection}
         >
           {/*
-            Deep-link highlight copy has no `community.*` key yet, and story 3.7's
-            `deep-link-handling.test.tsx` asserts this exact wording. Reported as a
-            locale gap rather than translated against an approximate key.
+            Grouping is deliberate here and only here: the badge is one line of
+            text, so collapsing it costs nothing, and it gives accessibility focus
+            somewhere to land that announces why this look is at the top. The card
+            below it stays ungrouped, so the reader walks into its alt text and
+            controls exactly as they would in the feed.
           */}
-          <Text style={[styles.highlightBadge, { color: palette.text }]}>
-            Community post #{target.id}
-          </Text>
-          <Text style={[styles.stateBody, { color: palette.text }]}>
-            {target.event.data.climateBand ?? 'All-weather'} look from{' '}
-            {target.event.data.locale ?? 'the community'}
-          </Text>
+          <View
+            ref={targetRef}
+            accessible
+            accessibilityRole="header"
+            style={styles.highlightBadgeRow}
+          >
+            <Text style={[styles.highlightBadge, { color: palette.text }]}>
+              {t('community.deepLink.highlight')}
+            </Text>
+          </View>
+          <CommunityCard
+            item={deepLinkPost}
+            isHighlighted
+            isReported={reportedPostIds.has(deepLinkPost.id)}
+            onReport={handleReportPost}
+            onWithdraw={handleWithdrawPost}
+            onImageExpiry={handleImageExpiry}
+            onOpen={handleOpenCard}
+          />
         </View>
-      )}
+      ) : null}
       {activeChallenge && (
         <CommunityChallengeBanner
           challenge={activeChallenge}
@@ -688,13 +805,13 @@ export function CommunityScreen() {
       </View>
 
       <CommunityFilterChips
-        selectedMode={mode}
+        selectedMode={servedMode}
         onSelectMode={handleSelectMode}
         viewerBand={viewerBand}
       />
 
       <FlatList
-        data={feedState === 'loading' ? [] : items}
+        data={feedState === 'loading' ? [] : listItems}
         keyExtractor={(item) => item.id}
         renderItem={({ item }) => (
           <CommunityCard
@@ -706,6 +823,7 @@ export function CommunityScreen() {
             onReport={handleReportPost}
             onWithdraw={handleWithdrawPost}
             onImageExpiry={handleImageExpiry}
+            onOpen={handleOpenCard}
           />
         )}
         refreshControl={
@@ -789,13 +907,11 @@ const styles = StyleSheet.create({
     fontSize: 13,
     fontWeight: '600',
   },
-  highlightCard: {
-    marginHorizontal: 16,
-    marginVertical: 12,
-    padding: 16,
-    borderRadius: 12,
-    borderWidth: 2,
-    borderColor: ACCENT_GOLD,
+  highlightSection: {
+    marginTop: 12,
+  },
+  highlightBadgeRow: {
+    paddingHorizontal: 16,
   },
   highlightBadge: {
     fontSize: 12,

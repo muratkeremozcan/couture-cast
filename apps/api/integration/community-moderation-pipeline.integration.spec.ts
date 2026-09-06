@@ -195,8 +195,19 @@ describe('6.1 community moderation pipeline', () => {
 
       const first = await dispatcher.dispatchPending()
       expect(first.dispatched).toBeGreaterThanOrEqual(1)
-      expect(first.failed).toBe(0)
 
+      // `first.failed` is deliberately NOT asserted to be zero. The dispatcher
+      // claims every pending outbox row in the table, so that count includes
+      // rows this test did not create: on a shared development database a suite
+      // running in another process contributes its own in-flight rows, and this
+      // assertion read 9 during one such overlap while the row under test
+      // dispatched perfectly. It is the same reason `drainSweep` exists in the
+      // lifecycle suite -- a table-wide sweep is not a property one test can own.
+      //
+      // What this test is actually about is asserted below and is fully scoped
+      // to its own post: exactly one job enqueued, the deterministic job id, and
+      // an outbox row stamped with one attempt. A dispatch that failed for THIS
+      // post could satisfy none of those.
       const dispatchedForPost = queue.jobs.filter((job) => job.postId === postId)
       expect(dispatchedForPost).toHaveLength(1)
 

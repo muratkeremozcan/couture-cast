@@ -592,6 +592,7 @@
     "share": "Partagez votre look",
     "newPost": "Nouvelle publication",
     "deepLink": {
+      "highlight": "Ouvert depuis votre notification",
       "invalid": "Ce lien est invalide, expiré ou n’est plus disponible."
     },
     "filters": {
@@ -747,6 +748,7 @@
       "selfReport": "Vous ne pouvez pas signaler votre propre look.",
       "notFound": "Ce look n’est plus disponible.",
       "disabled": "Le fil de la communauté est temporairement non disponible.",
+      "mediaUnavailable": "Ce look est temporairement non disponible. Réessayez dans un moment.",
       "generic": "Une erreur s’est produite. Réessayez."
     }
   }

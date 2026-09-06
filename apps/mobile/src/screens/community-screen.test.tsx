@@ -22,6 +22,7 @@
  */
 /* eslint-disable @typescript-eslint/await-thenable */
 import React from 'react'
+import { Buffer } from 'buffer'
 import type * as ReactNativeModule from 'react-native'
 import { configure, fireEvent, screen, waitFor } from '@testing-library/react'
 import { delay, http, HttpResponse } from 'msw'
@@ -39,13 +40,18 @@ import {
 import { CLIMATE_BANDS } from '@couture/utils'
 import {
   COMMUNITY_AGE_GATE_DENIED_MESSAGE,
+  COMMUNITY_CURSOR_INVALID_MESSAGE,
   COMMUNITY_FEED_DISABLED_MESSAGE,
+  COMMUNITY_MEDIA_UNAVAILABLE_MESSAGE,
   COMMUNITY_REPORT_REASON_CHANGED_MESSAGE,
   COMMUNITY_SELF_REPORT_MESSAGE,
   communityBandUnresolvedReasonSchema,
+  encodeCommunityFeedCursor,
+  type ClimateBand,
   type CommunityAuthorPostState,
   type CommunityFeed,
   type CommunityFeedItem,
+  type CommunityFeedMode,
   type CommunityPostStatus,
 } from '@couture/api-client/contracts/http'
 
@@ -201,6 +207,29 @@ function feed(overrides: Partial<CommunityFeed> = {}): CommunityFeed {
     activeChallenge: null,
     ...overrides,
   }
+}
+
+/**
+ * The contract's cursor codec is Node's `Buffer`, and this suite runs in a real
+ * browser where there is no `Buffer` at all, so `encodeCommunityFeedCursor` is not
+ * callable here without this. Minting is not negotiable: a hand-written literal
+ * cannot express the mode-and-band binding the recovery below turns on, and the
+ * encoder parses before it encodes, so it is also what makes a future required
+ * field a compile error rather than a silently passing test.
+ *
+ * `apps/mobile/vitest.config.ts` should carry `'buffer'` in `optimizeDeps.include`
+ * for the reason its own comment gives; that file belongs to another owner.
+ */
+const browserGlobal = globalThis as typeof globalThis & { Buffer?: typeof Buffer }
+browserGlobal.Buffer ??= Buffer
+
+function cursor(band: ClimateBand | null, mode: CommunityFeedMode = 'auto') {
+  return encodeCommunityFeedCursor({
+    publishedAt: '2026-09-05T12:00:00.000Z',
+    id: 'post-a',
+    mode,
+    band,
+  })
 }
 
 const CHALLENGE = {
@@ -380,12 +409,45 @@ describe('Mobile community screen (Story 6.1)', () => {
     expect(screen.getByTestId('community-screen')).toBeTruthy()
   })
 
+  it('6.1-MOB-094 resolves a deep-linked look from the API and draws it once', async () => {
+    mockParams = { source: 'notification', type: 'community', cardId: 'post-a' }
+    let postReads = 0
+    server.use(
+      http.get('*/api/v1/community/posts/:postId', ({ params }) => {
+        postReads += 1
+        return HttpResponse.json({ data: item({ id: params.postId as string }) })
+      })
+    )
+
+    await render(<CommunityScreen />)
+
+    const highlight = await screen.findByTestId('highlighted-community-card-post-a')
+    expect(postReads).toBe(1)
+    // The badge was a hardcoded "Community post #<id>", and the body under it was
+    // three more English literals assembled from the notification's payload.
+    expect(highlight.textContent).toContain(enUS.community.deepLink.highlight)
+
+    // A real card rather than a synthetic one: the alt text the author had to
+    // confirm and the moderation control are both present, and neither could be on
+    // a card built from a `lookbook:new` event, which carries neither.
+    expect(
+      screen.getByTestId('community-card-image-post-a').getAttribute('aria-label')
+    ).toBe(item().altText)
+    expect(screen.getByTestId('community-card-report-post-a')).toBeTruthy()
+
+    // The same look is also on the first feed page. It is drawn once, at the top.
+    expect(screen.getAllByTestId('community-post-card-post-a')).toHaveLength(1)
+    expect(highlight.contains(screen.getByTestId('community-post-card-post-a'))).toBe(
+      true
+    )
+  })
+
   it('6.1-MOB-084 drops a deep-link target that resolves after the tab was left', async () => {
     mockParams = { source: 'notification', type: 'community', cardId: 'look-42' }
     server.use(
-      http.get('*/api/v1/events/poll', async () => {
+      http.get('*/api/v1/community/posts/:postId', async () => {
         await delay(200)
-        return HttpResponse.json({ events: [], nextSince: '2026-09-05T12:00:00.000Z' })
+        return HttpResponse.json({ data: item({ id: 'look-42' }) })
       })
     )
 
@@ -525,6 +587,142 @@ describe('Mobile community screen (Story 6.1)', () => {
      */
     expect(panel.textContent).toBe(enUS.community.error.load)
     expect(panel.textContent).not.toBe(enUS.community.error.withdraw)
+  })
+
+  it('6.1-MOB-089 restarts paging on a rejected cursor and never sends it twice', async () => {
+    // Both cursors are real: the band is what changes between them, which is the
+    // whole mechanism. Under `auto` the server recomputes the band per request
+    // from weather guaranteed fresh for 60 minutes, so a snapshot going stale
+    // between two pages of one scroll is enough to invalidate the held cursor.
+    const staleCursor = cursor('temperate_dry')
+    const freshCursor = cursor('cold_dry')
+
+    serveFeed((url) => {
+      const sent = url.searchParams.get('cursor')
+      if (sent === staleCursor) {
+        return errorEnvelope(400, COMMUNITY_CURSOR_INVALID_MESSAGE)
+      }
+      if (sent === freshCursor) {
+        return feedJson({ items: [item({ id: 'post-page-2' })], nextCursor: null })
+      }
+      return feedUrls.length === 1
+        ? feedJson({ nextCursor: staleCursor })
+        : feedJson({ items: [item({ id: 'post-restarted' })], nextCursor: freshCursor })
+    })
+
+    await render(<CommunityScreen />)
+    press(await screen.findByTestId('community-feed-load-more'))
+
+    await screen.findByTestId('community-post-card-post-restarted')
+
+    // Silent recovery. This is normal operation on `auto`, not a fault, and the
+    // reader is given no error to act on because there is nothing for them to do.
+    expect(screen.queryByTestId('community-action-error')).toBeNull()
+    expect(screen.queryByTestId('community-feed-error')).toBeNull()
+    // Paging restarted, so the page the dead cursor came from is gone.
+    expect(screen.queryByTestId('community-post-card-post-a')).toBeNull()
+
+    press(await screen.findByTestId('community-feed-load-more'))
+    await screen.findByTestId('community-post-card-post-page-2')
+
+    // THE ASSERTION THAT CATCHES THE LOOP. Surfacing an error and stopping there
+    // left `nextCursor` holding the dead cursor while `feedState` stayed `ready`,
+    // so `onEndReached` at threshold 0.5 re-sent it on every scroll, forever.
+    // Counting the sends is what distinguishes a recovery from a retry storm; an
+    // assertion that some error appeared would have passed against the defect.
+    const staleSends = feedUrls.filter(
+      (url) => url.searchParams.get('cursor') === staleCursor
+    )
+    expect(staleSends).toHaveLength(1)
+  })
+
+  it('6.1-MOB-090 shows the arm it is actually being served, not the one it asked for', async () => {
+    // Half the beta cohort. The client requests `auto` by default and the server
+    // resolves it to the viewer's assigned arm, so an `all` viewer used to see the
+    // `auto` chip pressed and labelled "Your climate: ..." over every region.
+    serveFeed(() => feedJson({ mode: 'all', experimentVariant: 'all' }))
+
+    await render(<CommunityScreen />)
+    await screen.findByTestId('community-post-card-post-a')
+
+    expect(screen.getByTestId('community-filter-chip-all').style.borderWidth).toBe('2px')
+    expect(screen.getByTestId('community-filter-chip-auto').style.borderWidth).toBe('1px')
+    expect(screen.getByTestId('community-filter-chip-auto').textContent).toBe(
+      enUS.community.filters.mode.auto
+    )
+    // Still one read: the served mode is display state, so adopting it must not
+    // send the screen round again.
+    expect(feedUrls).toHaveLength(1)
+  })
+
+  it('6.1-MOB-091 explains an unresolved band only where it changed what was served', async () => {
+    serveFeed((url) =>
+      feedJson({
+        // A pinned band and `all` are both served exactly as asked whether or not
+        // the viewer's own band resolves, so neither has anything to explain.
+        mode: (url.searchParams.get('mode') ?? 'auto') as CommunityFeedMode,
+        viewerBand: null,
+        bandResolved: false,
+        bandUnresolvedReason: 'no_location',
+      })
+    )
+
+    await render(<CommunityScreen />)
+    await screen.findByTestId('community-band-unresolved')
+
+    press(screen.getByTestId('community-filter-chip-warm_dry'))
+    await waitFor(() =>
+      expect(screen.queryByTestId('community-band-unresolved')).toBeNull()
+    )
+
+    press(screen.getByTestId('community-filter-chip-all'))
+    await waitFor(() =>
+      expect(screen.getByTestId('community-filter-chip-all').style.borderWidth).toBe(
+        '2px'
+      )
+    )
+    expect(screen.queryByTestId('community-band-unresolved')).toBeNull()
+  })
+
+  it('6.1-MOB-092 records a card open with the arm the feed was served in', async () => {
+    const opened: { postId: string; body: unknown }[] = []
+    serveFeed(() => feedJson({ mode: 'all', experimentVariant: 'all' }))
+    server.use(
+      http.post(
+        '*/api/v1/community/posts/:postId/opened',
+        async ({ params, request }) => {
+          opened.push({ postId: params.postId as string, body: await request.json() })
+          return HttpResponse.json({ tracked: true })
+        }
+      )
+    )
+
+    await render(<CommunityScreen />)
+    press(await screen.findByTestId('community-card-open-post-a'))
+
+    await waitFor(() => expect(opened).toHaveLength(1))
+    expect(opened[0]?.postId).toBe('post-a')
+    // Sent rather than re-derived, so the open is attributed to the feed the
+    // viewer actually saw. `isSelf` is absent because the server decides it: the
+    // gate counts non-self opens and this client never compares ids.
+    expect(opened[0]?.body).toEqual({ experimentVariant: 'all' })
+  })
+
+  it('6.1-MOB-093 keeps a failed card open away from the reader', async () => {
+    server.use(
+      http.post('*/api/v1/community/posts/:postId/opened', () =>
+        errorEnvelope(500, 'Internal server error.')
+      )
+    )
+
+    await render(<CommunityScreen />)
+    press(await screen.findByTestId('community-card-open-post-a'))
+
+    // Measurement only. A dropped open costs a data point; interrupting someone
+    // reading the feed to say so costs more.
+    await delay(100)
+    expect(screen.queryByTestId('community-action-error')).toBeNull()
+    expect(document.body.textContent).not.toContain(SDK_ERROR_MESSAGE)
   })
 
   it('6.1-MOB-080 gives accessibility focus back to the card that opened the dialog', async () => {
@@ -1117,6 +1315,11 @@ describe('mobile community client (Story 6.1)', () => {
   })
 
   it.each([
+    // `community.service.ts` answers this 400 whenever a cursor no longer matches
+    // the mode or the resolved band it was minted under; the screen restarts
+    // paging on it, which it can only do if it arrives as its own reason.
+    [400, COMMUNITY_CURSOR_INVALID_MESSAGE, 'cursor_invalid'],
+    [400, 'Some other bad request.', 'unknown'],
     [401, 'Unauthorized', 'signed_out'],
     [403, COMMUNITY_AGE_GATE_DENIED_MESSAGE, 'age_gate'],
     // The service refuses a self-report with a ForbiddenException, so this
@@ -1131,6 +1334,10 @@ describe('mobile community client (Story 6.1)', () => {
     [409, 'Some other conflict.', 'unknown'],
     [429, 'Slow down.', 'rate_limited'],
     [503, COMMUNITY_FEED_DISABLED_MESSAGE, 'disabled'],
+    // A published row whose object cannot be signed. The service answers this on
+    // the single-post read and on publish, and it shares its status with the
+    // rollout kill switch, so the two are told apart by message alone.
+    [503, COMMUNITY_MEDIA_UNAVAILABLE_MESSAGE, 'media_unavailable'],
     [503, 'Down for maintenance.', 'unknown'],
     [500, 'Internal server error.', 'unknown'],
   ])('6.1-MOB-024 classifies HTTP %s "%s" as %s', async (status, message, reason) => {

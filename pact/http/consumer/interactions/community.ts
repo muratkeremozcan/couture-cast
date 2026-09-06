@@ -134,11 +134,34 @@ const AUTO_MODE_CURSOR = encodeCommunityFeedCursor({
   mode: 'auto',
   band: VIEWER_BAND,
 })
-const ALL_MODE_CURSOR = encodeCommunityFeedCursor({
+/*
+ * EACH REJECTION FIXTURE ISOLATES ONE MECHANISM, because the cursor has three
+ * rejection paths that deliberately return the same message and a fixture that
+ * trips two of them cannot tell you which one is still working.
+ *
+ * This was `mode: 'all', band: null`, which mismatches BOTH the mode and the
+ * band a request for `auto` resolves. Deleting the mode comparison out of
+ * `safeDecodeCommunityFeedCursor` left it green, because the band comparison
+ * still rejected it — the interaction named the mode and proved the band.
+ *
+ * `temperate_dry` is the band literal that resolves to the SAME filter band as
+ * `auto` does for this viewer (`VIEWER_BAND`), so a cursor minted under it and
+ * presented under `auto` matches on band and differs only on mode.
+ */
+const FOREIGN_MODE_CURSOR = encodeCommunityFeedCursor({
   publishedAt: PUBLISHED_AT,
   id: PUBLISHED_POST_ID,
-  mode: 'all',
-  band: null,
+  mode: VIEWER_BAND,
+  band: VIEWER_BAND,
+})
+
+/** The mirror: the mode matches what `auto` resolves to and only the band
+ * differs, so nothing but the band comparison can reject it. */
+const FOREIGN_BAND_CURSOR = encodeCommunityFeedCursor({
+  publishedAt: PUBLISHED_AT,
+  id: PUBLISHED_POST_ID,
+  mode: 'auto',
+  band: 'cold_dry',
 })
 const MALFORMED_CURSOR = 'not-a-base64url-cursor'
 
@@ -610,10 +633,20 @@ export const communityFeedRejections: CommunityFeedRejection[] = [
   {
     description: 'rejects a cursor minted under a different filter mode',
     state: 'The community feed is readable',
-    query: { mode: 'auto', limit: String(PAGE_LIMIT), cursor: ALL_MODE_CURSOR },
+    query: { mode: 'auto', limit: String(PAGE_LIMIT), cursor: FOREIGN_MODE_CURSOR },
     // The SAME message as the row above, and that identity is the assertion: a
     // client that changed filters cannot tell a corrupt cursor from one
     // belonging to another filter, and in either case restarts paging.
+    message: COMMUNITY_CURSOR_INVALID_MESSAGE,
+  },
+  {
+    description: 'rejects a cursor whose band no longer matches the viewer',
+    state: 'The community feed is readable',
+    query: { mode: 'auto', limit: String(PAGE_LIMIT), cursor: FOREIGN_BAND_CURSOR },
+    // Under `auto` the band is recomputed per request from weather that is only
+    // guaranteed fresh for 60 minutes. A viewer whose band moves mid-scroll must
+    // restart paging rather than apply page one's keyset to a different filtered
+    // set, and this is the row that proves the band half of the binding.
     message: COMMUNITY_CURSOR_INVALID_MESSAGE,
   },
 ]

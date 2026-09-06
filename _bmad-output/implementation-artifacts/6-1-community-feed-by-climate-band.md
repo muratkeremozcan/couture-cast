@@ -240,3 +240,142 @@ Corrected on 2026-09-05: this section previously named `npm run test:e2e:mobile`
 is not a script in this repository. The mobile entry point is
 `npm run test:mobile:e2e:android`. Pact, burn-in and k6 were absent and are all tiers
 this story's own task list requires.
+
+## Code Review Findings
+
+Produced by `/bmad-code-review` on 2026-09-06 over the whole story branch. Four
+review layers ran (blind hunter, edge case hunter, verification gap, acceptance
+auditor); all four returned and none failed. The diff was reviewed in two
+passes because it exceeded the workflow's chunking threshold by roughly sixteen
+times: groups A and B (`packages/db`, `packages/utils`, the HTTP contracts,
+`apps/api`) against baseline `55ab7998`, then groups C, D and E (web and mobile
+clients, the outer test tiers, the generated artifacts) against the working tree
+at `a2cf8ba5` and later.
+
+Owners are `w-api` for `apps/api`, `w-tests` for the test tiers, `f3` for the
+contracts and the clients, and `w-review` for the contract documentation set.
+
+### Pass one: groups A and B
+
+Nine findings rated high. Six were closed while the review was still running and
+were re-verified in code before this record was written.
+
+| ID   | Severity | Finding                                                                                                                                                                           | Owner | Disposition                                                                                                                                                                                                                                                                     |
+| ---- | -------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ----- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| AB-1 | high     | Guardian consent revocation never hid published posts; `consent_suspended` had no producer                                                                                        | w-api | Closed. `guardian.service.ts:813-822` now suspends `published` and `pending_review` inside the revocation transaction                                                                                                                                                           |
+| AB-2 | high     | `erasure_requested_at` had no producer, so the whole erasure sweep was unreachable                                                                                                | w-api | Partly closed. `community.repository.ts:272` `withdrawPostAndRequestErasure` stamps the clock on withdrawal. `requestAccountContentErasure` (`community.service.ts:1161`) still has no caller outside specs, so the account-deletion half of the matrix row remains unreachable |
+| AB-3 | high     | `EngagementEvent` kept `authenticated` grants and self-only RLS policies while `LookbookPost` was locked down, giving a post-id existence oracle through its required foreign key | w-api | Closed. `migration.sql:379-385` revokes the grants and drops all four policies                                                                                                                                                                                                  |
+| AB-4 | high     | `community_card_opened` had no HTTP route, and its dedupe key omitted the viewer                                                                                                  | f3    | Route closed (`community.controller.ts:244`) and the key is now `${postId}:${userId}`. The client half is open; see C-F2                                                                                                                                                        |
+| AB-5 | high     | The age gate returned early unless the role claim was exactly `teen`                                                                                                              | w-api | Closed. `assertWardrobeUploadAllowed` now resolves age from the stored profile for every caller                                                                                                                                                                                 |
+| AB-6 | high     | Reporting and withdrawal were gated on `community_write_enabled`, so an incident that closed posting also closed abuse reporting and author self-removal                          | w-api | Closed. Both call `assertReadEnabled` (`community.service.ts:1034`, `:1099`)                                                                                                                                                                                                    |
+| AB-7 | high     | No moderation resolution or takedown path existed anywhere                                                                                                                        | w-api | Closed by `community-moderation.actions.ts`                                                                                                                                                                                                                                     |
+| AB-8 | high     | A passing verdict wrote no `ModerationEvent`, and `content_snapshot` was declared on both audit tables and never written                                                          | w-api | Closed by `community-audit-snapshot.ts`                                                                                                                                                                                                                                         |
+| AB-9 | high     | The feed cursor bound the filter mode and not the resolved band, so under `auto` a band change between pages re-filtered the page under a stale keyset                            | f3    | Closed. The cursor payload carries `band`. Note that closing it made a 400 reachable in ordinary reading, which is C-F4                                                                                                                                                         |
+
+Twenty-three medium findings and a low tail were also raised in that pass. The
+ones being fixed on the branch are folded into the table below where they
+overlap; the ones that are not are recorded in `deferred-work.md` under
+"Deferred from: code review of 6-1-community-feed-by-climate-band (2026-09-06)".
+
+### Pass two: groups C, D and E
+
+Twenty-six findings, eight rated high. Nothing is deferred; all twenty-six are
+being fixed on this branch.
+
+| ID    | Severity                | Finding                                                                                                                                                                                                                                                                                                                                                                                                                                                                           | Owner        | Disposition                                                                         |
+| ----- | ----------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ------------ | ----------------------------------------------------------------------------------- | --- | -------- |
+| C-F2  | high                    | `community_card_opened` still has no producer. The route and SDK operation exist, but neither client wraps them and neither card carries a click or press affordance (`community-lookbook-grid.tsx:672`, `community-card.tsx:262`). AC 7's advance condition cannot rise above zero                                                                                                                                                                                               | f3           | Assigned                                                                            |
+| E-1   | high                    | The generated SDK types four nullable community fields as non-null (`generated/models/index.ts:1629`, `:1972`, `:2152`, `:2518`). Regenerating does not fix it: openapi-generator 7.21.0 drops `null` from OpenAPI 3.1 `type: [object, "null"]` for object nodes while handling scalars correctly. Seven nodes repository-wide. `packages/api-client/src/index.ts:35` re-exports `./generated` without the community contract types, so the wrong type wins from the package root | f3           | Assigned                                                                            |
+| C-F1  | high                    | The age-gate 403 message both clients classify on is never sent. Every refusal is `GUARDIAN_CONSENT_REQUIRED`, so consent refusals render as a generic error and `community.error.ageGate` is unreachable in all ten locales. The tests on both surfaces construct the message themselves, so they are vacuous                                                                                                                                                                    | w-api and f3 | Assigned                                                                            |
+| C-F4  | high                    | A 400 invalid cursor classifies as `unknown` and never restarts paging. Closing AB-9 made this reachable without tampering, because the resolved band is derived per request from weather guaranteed fresh for only 60 minutes. Mobile re-fires the dead cursor on `onEndReached` at threshold 0.5, which is an unbounded loop                                                                                                                                                    | f3           | Assigned                                                                            |
+| D-1   | high, vacuous pass      | Pact provider verification of all three feed rejections cannot fail. `doubles/community.ts:281-295` implements `getFeed` as a zero-argument function that unconditionally rejects, and one state backs all three rows                                                                                                                                                                                                                                                             | w-tests      | Assigned                                                                            |
+| D-2   | high, vacuous pass      | `6.1-API-01` never inspects an item, so the strict item-projection parse never runs against a real row. This is the tier Pact explicitly delegates non-leakage to. `assertSeededFeed` exists at `community-session.ts:99` with zero call sites                                                                                                                                                                                                                                    | w-tests      | Assigned                                                                            |
+| C-F6  | high                    | Mobile lets an author confirm alt text and then rewrite it. Web resets confirmation on edit; `community-post-sheet.tsx:558` does not. `z.literal(true)` still holds structurally while the guarantee it encodes is gone                                                                                                                                                                                                                                                           | f3           | Assigned                                                                            |
+| C-F7  | high                    | The mobile card's outer `accessible` grouping makes the confirmed alt text unannounced and the Report and Withdraw controls unfocusable on iOS (`community-card.tsx:264-266`). The test asserts the nested prop rather than reachability, so it passes                                                                                                                                                                                                                            | f3           | Assigned                                                                            |
+| C-F3  | medium                  | Neither client reads `feed.mode` or `feed.experimentVariant`, so a viewer in the `all` arm sees the `auto` chip labelled with their resolved band over an every-region feed                                                                                                                                                                                                                                                                                                       | f3           | Assigned                                                                            |
+| C-F5  | medium                  | The band-unresolved banner renders on reason truthiness alone and `bandResolved` is read by neither client, so it appears under a pinned band where its text is false                                                                                                                                                                                                                                                                                                             | f3           | Assigned                                                                            |
+| C-F8  | medium                  | "Resolve visible target directly" is unimplemented. Web discards the resolved `CommunityFeedItem` and focuses by element id, which is null past the first page; mobile renders a synthetic card from notification data and leaves `getCommunityPostFromMobile` with no production caller. Neither client polls an owned post until terminal                                                                                                                                       | f3           | Assigned                                                                            |
+| C-F9  | medium                  | Four hardcoded English strings on the mobile deep-link card, pinned by `deep-link-handling.test.tsx:266` asserting them verbatim                                                                                                                                                                                                                                                                                                                                                  | f3           | Assigned                                                                            |
+| C-F10 | medium                  | Four further web and mobile divergences against the identical-states requirement, including web's `item.altText ?? …` yielding `alt=""` where mobile's `?.trim()                                                                                                                                                                                                                                                                                                                  |              | ` falls back correctly                                                              | f3  | Assigned |
+| C-F11 | medium                  | A 503 carrying `COMMUNITY_MEDIA_UNAVAILABLE_MESSAGE` classifies as `unknown` on both surfaces, with no catalog key                                                                                                                                                                                                                                                                                                                                                                | f3           | Assigned                                                                            |
+| D-3   | medium, vacuous pass    | `6.1-INT-075`, described in its own comment as the control, passes over zero rows: `filter(...).toEqual([])` and `every(...).toBe(true)` are both vacuous on an empty second page                                                                                                                                                                                                                                                                                                 | w-tests      | Assigned                                                                            |
+| D-4   | medium, wrong assertion | The query-plan predicate check is satisfied by the SELECT list. `toContain('published_at')` plus a detached `toContain('IS NOT NULL')` cannot detect loss of the predicate the file was rewritten to guard                                                                                                                                                                                                                                                                        | w-tests      | Assigned                                                                            |
+| D-5   | medium, wrong assertion | `6.1-API-04`'s guard admits both legal values so it cannot fire, and its comment claims `auto` is never the effective mode when `auto` is one of the two arms                                                                                                                                                                                                                                                                                                                     | w-tests      | Assigned                                                                            |
+| D-6   | medium, vacuous pass    | `6.1-E2E-04`'s axe scan waits only for `toBeAttached` on a grid the file itself documents as rendering with zero items and no layout box                                                                                                                                                                                                                                                                                                                                          | w-tests      | Assigned                                                                            |
+| E-2   | medium                  | Withdraw throws `ConflictException('POST_NOT_WITHDRAWABLE')` and 409 was undocumented                                                                                                                                                                                                                                                                                                                                                                                             | w-review     | Fixed                                                                               |
+| E-3   | medium                  | Report's and withdraw's 503 descriptions said "Community write rollout is disabled" while both call `assertReadEnabled`                                                                                                                                                                                                                                                                                                                                                           | w-review     | Fixed                                                                               |
+| E-4   | medium                  | `GET /posts/{postId}`, `POST /posts/{postId}/opened` and `POST /posts/{postId}/withdraw` validate a required header or body and returned an undocumented 400                                                                                                                                                                                                                                                                                                                      | w-review     | Fixed                                                                               |
+| E-5   | medium                  | Publish documented the challenge-not-found condition under 404 while the service throws 400                                                                                                                                                                                                                                                                                                                                                                                       | w-review     | Fixed                                                                               |
+| E-6   | medium                  | Publish's 409 omitted the upload-not-completed condition                                                                                                                                                                                                                                                                                                                                                                                                                          | w-review     | Fixed                                                                               |
+| E-7   | medium                  | The cursor parameter description and the feed 400 description were both silent about `band`                                                                                                                                                                                                                                                                                                                                                                                       | w-review     | Fixed                                                                               |
+| E-8   | low                     | `openapi.ts:154-157` said eight community operations and listed eight; nine are registered                                                                                                                                                                                                                                                                                                                                                                                        | w-review     | Fixed. Version stays `1.6.0` because the ninth path is additive under the same bump |
+| D-7   | low, wrong assertion    | `6.1-DB-001` is titled "in every status" and inserts four posts, but its assertion is a table-grant refusal raised before any row is considered, so the fixture cannot influence the outcome                                                                                                                                                                                                                                                                                      | w-tests      | Assigned                                                                            |
+
+A separate process gap was raised and is recorded in `deferred-work.md` under
+"Generated SDK freshness has no CI guard, unlike the OpenAPI document": the
+OpenAPI document is protected by an equality test and `src/generated/**` is
+protected by nothing.
+
+### Verified clean
+
+Recorded so a later reader does not re-open settled ground. Each of these was
+attacked deliberately and held.
+
+- **RLS posture.** API-only access on the owner connection, zero policies and
+  zero grants to `anon` and `authenticated` on all six community tables, a
+  private bucket with no client-facing storage policy, and opaque
+  `community/<postId>/<random>.<ext>` object paths carrying no user id. The
+  author's own row stays reachable through `getPost` and `authorStates`.
+- **Keyset paging on its own axis.** A post published mid-page receives a newer
+  `published_at`, so it is excluded from later pages rather than duplicated, and
+  `nextCursor` is taken before the unsignable-media filter, so a dropped item
+  does not skip rows.
+- **The rolling rate limit.** One production writer of `submitted_at`, one of
+  `pending_review`, the advisory lock genuinely the first statement of the
+  transaction, and both early returns commit and release the lock.
+- **Fail-closed screening.** No production path reaches a passing verdict. The
+  fixture is double-gated on the environment variable and `allowsTestOnlySecrets()`,
+  an unknown value throws at startup rather than falling back, and both
+  non-runtime compositions default to `UnavailableNsfwImageScreener`.
+- **Generated artifact freshness.** Nine operations, every schema, field, enum
+  member and its order, default, bound and `additionalProperties` matched
+  contract to OpenAPI JSON to SDK in both directions with zero divergence. The
+  late `/opened` path and the `CommunityChallengeCopy` `additionalProperties`
+  override both landed on all three carriers. No enum-null corruption in any
+  community enum. No hand-editing under `src/generated/**`.
+- **Client fundamentals.** `isSelf` is server-sourced everywhere and nothing
+  compares ids client-side. Request cancellation on filter change is correct on
+  both surfaces. Both MSW handler sets parse every fixture through the
+  contract's own response schema, which closes fixture drift. Ten-locale
+  `community.*` parity holds. `altTextConfirmed` is a genuine UI gate on both
+  surfaces at the component layer.
+- **Test tiers that hold.** `migration-hygiene.spec.ts` carries explicit
+  non-vacuity floors on all three guards. `6.1-DB-034` was already repaired
+  against this bug class and `6.1-DB-015` skips loudly. Every Maestro
+  `assertNotVisible` id resolves to a real `testID`. The k6 community scenario
+  requires at least one item and its thresholds are genuinely exercised.
+
+### Could not check without executing
+
+Recorded with the exact command, so whoever picks these up does not have to
+reconstruct them.
+
+- Whether `docs/http.openapi.json` is byte-identical to a fresh generate. Three
+  converging signals say yes, and the equality spec at
+  `testing/http-openapi.spec.ts:70-75` enforces it in the suite. To settle it:
+  `npm run generate:api-client && git diff --stat -- packages/api-client/docs packages/api-client/src/generated`
+- D-1 as a mutation test: `npm run test:pact` after deleting the mode comparison
+  inside `safeDecodeCommunityFeedCursor`. Provider verification staying green is
+  the defect.
+- D-2 as a mutation test: `npm run test:pw-local -- playwright/tests/api/community-feed.api.spec.ts`
+  against a database with `LookbookPost` truncated. `6.1-API-01` staying green
+  over an empty feed is the defect.
+- C-F7's runtime half needs TalkBack on Android or a manual iOS VoiceOver pass.
+  The code and the React Native grouping contract are verified; the announced
+  output is not.
+- Whether the `EngagementEvent` grants are live in the deployed database rather
+  than only in the migration DDL:
+  `npm run test --workspace packages/db -- test/rls/policy-matrix.spec.ts`
+- Prisma's transaction timeout behaviour under `pg_advisory_xact_lock`
+  contention, specifically whether concurrent same-user submissions surface as
+  the documented 429 or as a P2028 500.

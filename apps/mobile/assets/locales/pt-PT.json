@@ -592,6 +592,7 @@
     "share": "Partilhe o seu visual",
     "newPost": "Nova publicação",
     "deepLink": {
+      "highlight": "Aberto a partir da sua notificação",
       "invalid": "Esta ligação é inválida, expirou ou já não está disponível."
     },
     "filters": {
@@ -747,6 +748,7 @@
       "selfReport": "Não pode denunciar o seu próprio visual.",
       "notFound": "Este visual já não está disponível.",
       "disabled": "O feed da comunidade está temporariamente indisponível.",
+      "mediaUnavailable": "Este visual está temporariamente indisponível. Tente novamente dentro de momentos.",
       "generic": "Algo correu mal. Tente novamente."
     }
   }

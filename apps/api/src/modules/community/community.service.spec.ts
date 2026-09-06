@@ -17,6 +17,7 @@ import {
   communityPostWithdrawnEventSchema,
 } from '@couture/api-client'
 import {
+  COMMUNITY_AGE_GATE_DENIED_MESSAGE,
   COMMUNITY_CURSOR_INVALID_MESSAGE,
   communityFeedItemSchema,
   communityFeedSchema,
@@ -1040,7 +1041,12 @@ describe('CommunityService', () => {
         .map((call) => (call[2] as { dedupeKey: string }).dedupeKey)
       expect(keys).toHaveLength(2)
       expect(keys[0]).not.toBe(keys[1])
-      expect(keys[0]).toContain('viewer-one')
+      // Deliberately NOT an assertion on the token's value. The property that
+      // matters is the ABSENCE of the raw id, and a test pinned to the token
+      // string would pass just as happily if someone later concatenated the id
+      // back on beside it. See the pseudonymity block below.
+      expect(keys[0]).not.toContain('viewer-one')
+      expect(keys[1]).not.toContain('viewer-two')
     })
 
     it('attributes the open to the arm the client was serving, not to a fresh derivation', async () => {
@@ -1540,6 +1546,178 @@ describe('CommunityService', () => {
     })
   })
 
+  // `dedupe_key` is a declared property on all three of these event schemas and
+  // travels to the analytics sink, while every community event is in
+  // `PSEUDONYMOUS_EVENT_TYPES`: `user_id` is nulled on the persisted row and
+  // `distinctId` is an HMAC. A raw user id inside the key would therefore land on
+  // the same row as the pseudonym meant to hide it, making that row a
+  // self-contained join back to the person. It does not weaken the pseudonymity,
+  // it undoes it, which is the same defect as a user id in an object path.
+  //
+  // These assert the MECHANISM, not the current token format, so they still fail
+  // if someone reintroduces the id alongside a token later.
+  describe('dedupe keys never carry a raw user id', () => {
+    const rawUserId = 'user-viewer-456-raw-identity'
+
+    it('keeps the reporter out of the report key', async () => {
+      const { service, captureEvent, recordReport } = createService()
+      recordReport.mockResolvedValueOnce({ kind: 'created' })
+
+      await service.reportPost({
+        userId: rawUserId,
+        postId: 'other-post',
+        platform: 'web',
+        input: { reason: 'spam' },
+      })
+
+      const call = captureEvent.mock.calls.find(
+        (entry) => entry[1] === 'community_post_reported'
+      )
+      const { dedupeKey } = call?.[2] as { dedupeKey: string }
+      expect(dedupeKey).not.toContain(rawUserId)
+      // The post is still in the key, so two reporters on one post stay two
+      // events and a replayed report still collapses.
+      expect(dedupeKey).toContain('other-post')
+    })
+
+    it('keeps the viewer out of the card-open key', async () => {
+      const { service, findPostById, captureEvent } = createService()
+      findPostById.mockResolvedValueOnce(publishedPost)
+
+      await service.recordCardOpened({
+        userId: rawUserId,
+        postId: 'post-other-user',
+        platform: 'web',
+        input: { experimentVariant: 'auto' },
+      })
+
+      const call = captureEvent.mock.calls.find(
+        (entry) => entry[1] === 'community_card_opened'
+      )
+      const { dedupeKey } = call?.[2] as { dedupeKey: string }
+      expect(dedupeKey).not.toContain(rawUserId)
+      expect(dedupeKey).toContain('post-other-user')
+    })
+
+    it('still distinguishes two viewers, so the tokenization did not collapse the key', async () => {
+      // The whole reason the viewer is in this key: without it the sink's upsert
+      // folds every viewer's open of one post into a single event and the
+      // non-self lift the beta gate advances on cannot exceed one per post.
+      const { service, findPostById, captureEvent } = createService()
+      findPostById.mockResolvedValue(publishedPost)
+
+      await service.recordCardOpened({
+        userId: 'raw-viewer-alpha',
+        postId: 'post-other-user',
+        platform: 'web',
+        input: { experimentVariant: 'auto' },
+      })
+      await service.recordCardOpened({
+        userId: 'raw-viewer-beta',
+        postId: 'post-other-user',
+        platform: 'web',
+        input: { experimentVariant: 'auto' },
+      })
+
+      const keys = captureEvent.mock.calls
+        .filter((entry) => entry[1] === 'community_card_opened')
+        .map((entry) => (entry[2] as { dedupeKey: string }).dedupeKey)
+      expect(keys[0]).not.toBe(keys[1])
+    })
+
+    it('produces the same key twice for one viewer, so a retry still collapses', async () => {
+      const { service, findPostById, captureEvent } = createService()
+      findPostById.mockResolvedValue(publishedPost)
+
+      for (let attempt = 0; attempt < 2; attempt += 1) {
+        await service.recordCardOpened({
+          userId: rawUserId,
+          postId: 'post-other-user',
+          platform: 'web',
+          input: { experimentVariant: 'auto' },
+        })
+      }
+
+      const keys = captureEvent.mock.calls
+        .filter((entry) => entry[1] === 'community_card_opened')
+        .map((entry) => (entry[2] as { dedupeKey: string }).dedupeKey)
+      expect(keys[0]).toBe(keys[1])
+    })
+  })
+
+  describe('age gate refusals', () => {
+    const ageGateAllocateInput = {
+      locale: 'en-US' as const,
+      contentType: 'image/jpeg' as const,
+      byteSize: 1024 * 500,
+      sha256: 'a'.repeat(64),
+      widthPx: 1080,
+      heightPx: 1350,
+    }
+
+    // The clients classify a community 403 on `COMMUNITY_AGE_GATE_DENIED_MESSAGE`
+    // and fall through to a generic "We could not publish your look." for
+    // anything else. The shared guard throws `GUARDIAN_CONSENT_REQUIRED`, which
+    // is the wardrobe surface's own code, so until this translation existed the
+    // age-gate copy translated into all ten locales was unreachable.
+    it('publishes the community message rather than the wardrobe code', async () => {
+      const { service, assertWardrobeUploadAllowed } = createService()
+      assertWardrobeUploadAllowed.mockRejectedValueOnce(
+        new ForbiddenException('GUARDIAN_CONSENT_REQUIRED')
+      )
+
+      await expect(
+        service.publishPost({
+          userId: viewerUserId,
+          role: 'teen',
+          platform: 'web',
+          input: {
+            postId: 'post-mine',
+            uploadSessionId: 'session-1',
+            altText: 'A denim jacket over a striped shirt',
+            altTextConfirmed: true as const,
+            caption: 'Autumn commute look',
+            locale: 'en-US' as const,
+          },
+        })
+      ).rejects.toThrow(COMMUNITY_AGE_GATE_DENIED_MESSAGE)
+    })
+
+    it('translates the refusal on the allocate path too, so the gate reads the same at both steps', async () => {
+      const { service, assertWardrobeUploadAllowed } = createService()
+      assertWardrobeUploadAllowed.mockRejectedValueOnce(
+        new ForbiddenException('GUARDIAN_CONSENT_REQUIRED')
+      )
+
+      await expect(
+        service.allocatePost({
+          userId: viewerUserId,
+          role: 'teen',
+          idempotencyKey: 'idem-age-gate',
+          platform: 'web',
+          input: ageGateAllocateInput,
+        })
+      ).rejects.toThrow(COMMUNITY_AGE_GATE_DENIED_MESSAGE)
+    })
+
+    it('does not dress a non-Forbidden fault up as an age gate', async () => {
+      // A database outage inside the guard is a 500, not a message telling a
+      // grown adult they are too young to post.
+      const { service, assertWardrobeUploadAllowed } = createService()
+      assertWardrobeUploadAllowed.mockRejectedValueOnce(new Error('connection lost'))
+
+      await expect(
+        service.allocatePost({
+          userId: viewerUserId,
+          role: 'adult',
+          idempotencyKey: 'idem-fault',
+          platform: 'web',
+          input: ageGateAllocateInput,
+        })
+      ).rejects.toThrow('connection lost')
+    })
+  })
+
   describe('requestAccountContentErasure', () => {
     // The erasure sweep had no producer at all: `erasure_requested_at` was
     // written only by the test factory, so a withdrawn post's image stayed in
@@ -1691,17 +1869,53 @@ describe('CommunityService', () => {
       expect(signReadUrls).not.toHaveBeenCalled()
     })
 
-    it('falls back to a minted alias when the lookup returns nothing for an author', async () => {
-      // Defensive: `resolveAliases` fills every gap itself, so an absent entry
-      // means the alias table and the feed query disagreed. The viewer still
-      // gets a pseudonym rather than a crash or a raw id.
+    // THIS TEST USED TO ASSERT THE OPPOSITE, that a missing alias fell back to a
+    // freshly minted one, on the premise that an absent entry meant the alias
+    // table and the feed query had disagreed. That premise was wrong. An absent
+    // entry means `resolveAlias` hit P2003 and the author's account was deleted
+    // while the page was being assembled, which Story 6.1 makes reachable in
+    // production because it ships account erasure with a 72-hour window against
+    // a feed that is table-wide by design.
+    //
+    // The old fallback minted an UNPERSISTED name, so the same author rendered
+    // differently on every request, and it kept an erased person's post on a
+    // public feed under an invented identity.
+    it('drops a post whose author was deleted while the page was being assembled', async () => {
       const { service, resolveAliases } = createService()
       resolveAliases.mockResolvedValueOnce(new Map())
 
       const result = await service.getFeed({ userId: viewerUserId, platform: 'web' })
 
-      expect(result.items[0]?.author.displayName).toMatch(/^Style Explorer [0-9A-F]{8}$/)
-      expect(result.items[0]?.author.displayName).not.toContain('user-author-999')
+      expect(result.items.some((item) => item.author.isSelf === false)).toBe(false)
+      // Never a minted stand-in, and never a raw id.
+      for (const item of result.items) {
+        expect(item.author.displayName).not.toMatch(/^Style Explorer [0-9A-F]{8}$/)
+        expect(item.author.displayName).not.toContain('user-author-999')
+      }
+    })
+
+    it('loses only the erased author, never the rest of the page', async () => {
+      // The failure this closes served a 500 for the WHOLE page because one
+      // stranger's account had gone mid-read. Every other item has to survive,
+      // which is the entire difference between a dropped card and an outage.
+      const survivor = {
+        ...publishedPost,
+        id: 'post-survivor',
+        user_id: 'user-author-998',
+      }
+      const { service, resolveAliases } = createService({
+        posts: [publishedPost, survivor],
+      })
+      // Only the survivor's author resolves; `user-author-999` was deleted while
+      // the page was being assembled, so `resolveAliases` omits it.
+      resolveAliases.mockResolvedValueOnce(
+        new Map([['user-author-998', 'Style Explorer DEADBEEF']])
+      )
+
+      const result = await service.getFeed({ userId: viewerUserId, platform: 'web' })
+
+      expect(result.items.map((item) => item.id)).toEqual(['post-survivor'])
+      expect(result.items[0]?.author.displayName).toBe('Style Explorer DEADBEEF')
     })
 
     it('drops the challenge when its copy has no usable entry at all', async () => {

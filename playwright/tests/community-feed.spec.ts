@@ -142,7 +142,19 @@ test.describe('6.1 community feed by climate band', () => {
   test('6.1-E2E-04 feed page passes axe', async ({ page, communitySession }) => {
     expect(communitySession.userId).toBeTruthy()
     await page.goto(COMMUNITY_ROUTE)
-    await expect(page.getByTestId('community-card-grid')).toBeAttached()
+
+    /*
+     * WAITING FOR A CARD, NOT FOR THE GRID. The grid container is attached even
+     * with zero items — this file says so two tests up, which is why the other
+     * assertions use `toBeAttached` — so an axe scan gated on attachment alone
+     * runs against an empty tree and every card-level rule passes by having
+     * nothing to examine. Image alt text, the accessible name of the report
+     * control and the card's heading structure are exactly the rules this scan
+     * exists for, and all of them live inside a card.
+     */
+    const firstCard = page.locator('[data-testid^="lookbook-card-"]').first()
+    await expect(firstCard).toBeVisible()
+
     await checkA11y(page)
   })
 

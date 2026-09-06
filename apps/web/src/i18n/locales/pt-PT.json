@@ -470,6 +470,9 @@
       "authorFallback": "Explorador de estilo",
       "imageUnavailable": "Imagem indisponível",
       "imageRetry": "Recarregar a imagem",
+      "open": "Ver visual",
+      "openLabel": "Ver o visual de {{author}}",
+      "detailClose": "Fechar este visual",
       "report": "Denunciar",
       "reported": "Denunciado",
       "withdraw": "Retirar",
@@ -572,6 +575,7 @@
       "selfReport": "Não pode denunciar o seu próprio visual.",
       "notFound": "Este visual já não está disponível.",
       "disabled": "O feed da comunidade está temporariamente indisponível.",
+      "mediaUnavailable": "Este visual está temporariamente indisponível. Tente novamente dentro de momentos.",
       "generic": "Algo correu mal. Tente novamente."
     }
   }

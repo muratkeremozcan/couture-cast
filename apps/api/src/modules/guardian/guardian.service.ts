@@ -1209,14 +1209,23 @@ export class GuardianService {
    * unknown age as an adult, is the hole this whole guard exists to close.
    *
    * IF YOU ARE WRITING A FIXTURE, A SEED, AN IMPORT OR A DEBUG SCRIPT THAT
-   * CREATES A USER, GIVE IT A BIRTHDATE. A row inserted straight into
-   * `UserProfile` without one cannot upload or post, and the failure surfaces
-   * here as `GUARDIAN_CONSENT_REQUIRED`, which reads like a consent problem
-   * rather than a missing column. When this change was made, exactly one row on
-   * the development database had no birthdate and it was a debug script's, which
-   * is the shape of every account this will refuse: signup cannot produce one.
-   * Failing that way round is the point. A script that forgets an age is
-   * refused at a public posting surface instead of silently passing.
+   * CREATES A USER, GIVE IT A PROFILE WITH A BIRTHDATE. A bare
+   * `prisma.user.create({ data: { email } })` is refused here, on the
+   * `!user.profile` branch, and so is a profile with a null `birthdate`. The
+   * failure surfaces as `GUARDIAN_CONSENT_REQUIRED`, which reads like a consent
+   * problem rather than a missing row.
+   *
+   * That population is not hypothetical. When this change was made, the test
+   * database held 226 accounts, of which 156 had NO `UserProfile` row at all,
+   * every one of them a bare integration-test fixture on the reserved
+   * `@synthetic.test` domain (`palette-advisor-*`, `community-lifecycle-*` and
+   * the like), and none of them an account a person had made. Zero accounts had
+   * a profile with a missing birthdate. So this guard refuses no real user and a
+   * great many fixtures, and any integration test that creates a bare user and
+   * then calls a guarded surface will now be refused.
+   *
+   * Failing that way round is the point. A script that forgets an age is refused
+   * at a public posting surface instead of silently passing.
    *
    * `role` is kept in the signature and deliberately unused. Every caller
    * already passes it, and removing the parameter would turn any future

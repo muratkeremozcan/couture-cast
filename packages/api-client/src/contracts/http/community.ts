@@ -22,6 +22,14 @@ export const COMMUNITY_POST_NOT_FOUND_MESSAGE = 'Community post not found.'
 export const COMMUNITY_POST_RATE_LIMITED_MESSAGE =
   'You have reached the daily post limit. Please try again tomorrow.'
 
+/**
+ * Reporting has its own rolling cap and its own copy. The publish message was
+ * being reused for a reporting 429, which told someone who had reported too many
+ * posts that they had run out of posts.
+ */
+export const COMMUNITY_REPORT_RATE_LIMITED_MESSAGE =
+  'You have reached the daily report limit. Please try again tomorrow.'
+
 export const COMMUNITY_CHALLENGE_OVERLAP_MESSAGE =
   'An active challenge already exists for this climate band and window.'
 
@@ -42,7 +50,7 @@ export const COMMUNITY_UPLOAD_SESSION_MISMATCH_MESSAGE =
   'Upload session does not match this post.'
 
 export const COMMUNITY_CHALLENGE_WINDOW_INVALID_MESSAGE =
-  'Challenge window must start on a Monday and span exactly seven days in its time zone.'
+  'Challenge window must run from midnight on a Monday to midnight on the following Monday in its time zone.'
 
 export const COMMUNITY_IDEMPOTENCY_MISMATCH_MESSAGE =
   'Idempotency key was reused with a different payload.'
@@ -64,6 +72,17 @@ export const COMMUNITY_UPLOAD_NOT_COMPLETED_MESSAGE =
 
 export const COMMUNITY_CONSENT_SUSPENDED_MESSAGE =
   'Guardian consent is no longer active for this post.'
+
+/**
+ * Withdrawal's two refusals. Both were bare string literals thrown from the
+ * service, the only conditions in the module without an exported constant, so
+ * neither client could match them and both rendered a generic failure.
+ */
+export const COMMUNITY_NOT_POST_AUTHOR_MESSAGE =
+  'Only the author of a post can withdraw it.'
+
+export const COMMUNITY_POST_NOT_WITHDRAWABLE_MESSAGE =
+  'This post is not in a state that can be withdrawn.'
 
 // --- Platform & Headers -----------------------------------------------------
 
@@ -214,8 +233,9 @@ export function safeDecodeCommunityFeedCursor(
     if (!result.success) {
       return { success: false, error: COMMUNITY_CURSOR_INVALID_MESSAGE }
     }
-    // MUTANT: mode comparison removed
-
+    if (expectedMode !== undefined && result.data.mode !== expectedMode) {
+      return { success: false, error: COMMUNITY_CURSOR_INVALID_MESSAGE }
+    }
     // Rejected the same way a mode mismatch is, so a viewer whose band moved
     // between pages restarts paging rather than silently reading a different
     // filtered set from page one's keyset.
@@ -586,22 +606,87 @@ export const ianaTimeZoneSchema = nonEmptyStringSchema
 
 const MONDAY_WEEKDAY = 'Mon'
 const CHALLENGE_WINDOW_DAYS = 7
-const MILLISECONDS_PER_DAY = 24 * 60 * 60 * 1000
+
+interface ZonedWallClock {
+  weekday: string
+  year: number
+  month: number
+  day: number
+  hour: number
+  minute: number
+  second: number
+}
 
 /**
- * Returns null for a zone Intl rejects. A failed field-level `.refine()` marks the
- * value dirty rather than aborting, so this object-level refinement still runs with
- * whatever the caller sent; formatting an unknown zone would throw a RangeError out
- * of `safeParse` and surface as a 500 where the spec requires a 400.
+ * The wall-clock reading of an instant in a zone, or null for a zone Intl rejects.
+ *
+ * A failed field-level `.refine()` marks the value dirty rather than aborting, so
+ * this object-level refinement still runs with whatever the caller sent; formatting
+ * an unknown zone would throw a RangeError out of `safeParse` and surface as a 500
+ * where the spec requires a 400.
+ *
+ * `hourCycle: 'h23'` rather than `hour12: false` is load-bearing. Under `hour12:
+ * false` the en-US formatter renders local midnight as hour `24`, so a comparison
+ * against `0` silently never matches and every window is rejected for the wrong
+ * reason.
  */
-function weekdayInZone(isoTimestamp: string, timeZone: string): string | null {
+function zonedWallClock(isoTimestamp: string, timeZone: string): ZonedWallClock | null {
   try {
-    return new Intl.DateTimeFormat('en-US', { timeZone, weekday: 'short' }).format(
-      new Date(isoTimestamp)
-    )
+    const parts = new Intl.DateTimeFormat('en-US', {
+      timeZone,
+      weekday: 'short',
+      year: 'numeric',
+      month: '2-digit',
+      day: '2-digit',
+      hour: '2-digit',
+      minute: '2-digit',
+      second: '2-digit',
+      hourCycle: 'h23',
+    }).formatToParts(new Date(isoTimestamp))
+    const read = (type: Intl.DateTimeFormatPartTypes): string =>
+      parts.find((part) => part.type === type)?.value ?? ''
+    return {
+      weekday: read('weekday'),
+      year: Number(read('year')),
+      month: Number(read('month')),
+      day: Number(read('day')),
+      hour: Number(read('hour')),
+      minute: Number(read('minute')),
+      second: Number(read('second')),
+    }
   } catch {
     return null
   }
+}
+
+/** Whether a wall-clock reading is exactly midnight at the start of a Monday. */
+function isMondayMidnight(clock: ZonedWallClock): boolean {
+  return (
+    clock.weekday === MONDAY_WEEKDAY &&
+    clock.hour === 0 &&
+    clock.minute === 0 &&
+    clock.second === 0
+  )
+}
+
+/** The `YYYY-MM-DD` of a wall-clock reading, for calendar comparison. */
+function calendarDate(clock: ZonedWallClock): string {
+  const month = String(clock.month).padStart(2, '0')
+  const day = String(clock.day).padStart(2, '0')
+  return `${clock.year}-${month}-${day}`
+}
+
+/**
+ * The calendar date `days` after a wall-clock reading.
+ *
+ * `Date.UTC` on the wall-clock year, month and day is deliberate: this is pure
+ * calendar arithmetic on a date that has already been resolved in its own zone, so
+ * no offset applies and a DST transition inside the span cannot shift it.
+ */
+function calendarDatePlusDays(clock: ZonedWallClock, days: number): string {
+  const shifted = new Date(Date.UTC(clock.year, clock.month - 1, clock.day))
+  shifted.setUTCDate(shifted.getUTCDate() + days)
+  return shifted.toISOString().slice(0, 10)
 }
 
 const communityChallengeWindowShape = {
@@ -635,23 +720,43 @@ function refineChallengeWindow(
     })
     return
   }
-  if (end - start !== CHALLENGE_WINDOW_DAYS * MILLISECONDS_PER_DAY) {
+
+  const startClock = zonedWallClock(startsAt, timeZone)
+  const endClock = zonedWallClock(endsAt, timeZone)
+  if (startClock === null || endClock === null) {
+    // ianaTimeZoneSchema already raised the zone issue; adding a second one here
+    // would report a window problem the caller does not have.
+    return
+  }
+
+  if (!isMondayMidnight(startClock)) {
+    ctx.addIssue({
+      code: z.ZodIssueCode.custom,
+      path: ['startsAt'],
+      message: COMMUNITY_CHALLENGE_WINDOW_INVALID_MESSAGE,
+    })
+  }
+
+  if (!isMondayMidnight(endClock)) {
     ctx.addIssue({
       code: z.ZodIssueCode.custom,
       path: ['endsAt'],
       message: COMMUNITY_CHALLENGE_WINDOW_INVALID_MESSAGE,
     })
-  }
-  const startWeekday = weekdayInZone(startsAt, timeZone)
-  if (startWeekday === null) {
-    // ianaTimeZoneSchema already raised the zone issue; adding a second one here
-    // would report a window problem the caller does not have.
     return
   }
-  if (startWeekday !== MONDAY_WEEKDAY) {
+
+  // The span is seven LOCAL days, never a fixed number of absolute hours. A
+  // Monday-to-Monday week is 167 hours across a spring transition and 169 across
+  // an autumn one, so the previous `end - start === 7 * 24h` check rejected every
+  // legitimate window in a DST-observing zone and accepted only the ones landing an
+  // hour off the local boundary, which is the boundary `timeZone` exists to pin.
+  if (
+    calendarDate(endClock) !== calendarDatePlusDays(startClock, CHALLENGE_WINDOW_DAYS)
+  ) {
     ctx.addIssue({
       code: z.ZodIssueCode.custom,
-      path: ['startsAt'],
+      path: ['endsAt'],
       message: COMMUNITY_CHALLENGE_WINDOW_INVALID_MESSAGE,
     })
   }
@@ -823,7 +928,7 @@ export function registerCommunityContracts(
         required: false,
         schema: { type: 'string' },
         description:
-          'Opaque base64url keyset pagination cursor. Bound to the mode it was minted under; presenting it under a different mode returns 400.',
+          'Opaque base64url keyset pagination cursor. Bound both to the filter mode and to the climate band the feed resolved when it was minted. Presenting it under a different mode, or after the resolved band has changed, returns 400; discard it and restart paging from the first page.',
       },
       {
         name: 'limit',
@@ -842,7 +947,7 @@ export function registerCommunityContracts(
       },
       400: {
         description:
-          'Malformed cursor, cursor minted under a different filter mode, or invalid mode parameter.',
+          'Malformed cursor, cursor minted under a different filter mode, cursor minted under a different resolved climate band, or invalid mode parameter. Under mode=auto the resolved band is derived per request from weather guaranteed fresh for only 60 minutes, so a band that goes stale between pages produces this response during ordinary reading. Discard the cursor and restart paging from the first page.',
         content: {
           'application/json': { schema: commonSchemas.badRequestHttpErrorSchema },
         },
@@ -993,6 +1098,12 @@ export function registerCommunityContracts(
           'application/json': { schema: registeredPostResponse },
         },
       },
+      400: {
+        description: 'Missing or invalid x-couture-platform header.',
+        content: {
+          'application/json': { schema: commonSchemas.badRequestHttpErrorSchema },
+        },
+      },
       401: {
         description: 'Missing or invalid authentication headers.',
         content: {
@@ -1014,7 +1125,8 @@ export function registerCommunityContracts(
         },
       },
       503: {
-        description: 'Community read rollout is disabled.',
+        description:
+          'Community read rollout is disabled, or the post is visible but its media could not be signed. The second case is a storage outage rather than a missing post, and the caller should retry shortly.',
         content: {
           'application/json': { schema: commonSchemas.serviceUnavailableHttpErrorSchema },
         },
@@ -1063,7 +1175,7 @@ export function registerCommunityContracts(
       },
       400: {
         description:
-          'Invalid caption, invalid alt text, or alt text not confirmed by the author.',
+          'Invalid caption, invalid alt text, alt text not confirmed by the author, or a referenced challenge that is unknown, inactive, or outside its window.',
         content: {
           'application/json': { schema: commonSchemas.badRequestHttpErrorSchema },
         },
@@ -1081,14 +1193,14 @@ export function registerCommunityContracts(
         },
       },
       404: {
-        description: 'Post, upload session, or referenced challenge not found.',
+        description: 'Post or upload session not found.',
         content: {
           'application/json': { schema: commonSchemas.notFoundHttpErrorSchema },
         },
       },
       409: {
         description:
-          'Idempotency key reused with a different payload, or the upload session does not match the post.',
+          'Idempotency key reused with a different payload, the upload session does not match the post, or the image bytes were never uploaded to the allocated object path.',
         content: {
           'application/json': { schema: commonSchemas.conflictHttpErrorSchema },
         },
@@ -1115,7 +1227,8 @@ export function registerCommunityContracts(
         },
       },
       503: {
-        description: 'Community write rollout is disabled.',
+        description:
+          'Community write rollout is disabled, or the post was accepted but its media could not be signed for the response. The second case is a storage outage rather than a rejected publish.',
         content: {
           'application/json': { schema: commonSchemas.serviceUnavailableHttpErrorSchema },
         },
@@ -1215,7 +1328,8 @@ export function registerCommunityContracts(
         },
       },
       503: {
-        description: 'Community write rollout is disabled.',
+        description:
+          'Community read rollout is disabled. Reporting follows visibility rather than posting, so closing the write rollout during an incident does not disable it.',
         content: {
           'application/json': { schema: commonSchemas.serviceUnavailableHttpErrorSchema },
         },
@@ -1265,6 +1379,13 @@ export function registerCommunityContracts(
         description: 'Card open recorded.',
         content: {
           'application/json': { schema: commonSchemas.trackedResponseSchema },
+        },
+      },
+      400: {
+        description:
+          'Missing or invalid x-couture-platform header, or an invalid request body.',
+        content: {
+          'application/json': { schema: commonSchemas.badRequestHttpErrorSchema },
         },
       },
       401: {
@@ -1327,6 +1448,12 @@ export function registerCommunityContracts(
           'application/json': { schema: commonSchemas.trackedResponseSchema },
         },
       },
+      400: {
+        description: 'Missing or invalid x-couture-platform header.',
+        content: {
+          'application/json': { schema: commonSchemas.badRequestHttpErrorSchema },
+        },
+      },
       401: {
         description: 'Missing or invalid authentication headers.',
         content: {
@@ -1345,6 +1472,13 @@ export function registerCommunityContracts(
           'application/json': { schema: commonSchemas.notFoundHttpErrorSchema },
         },
       },
+      409: {
+        description:
+          'Post is not in a withdrawable state. A draft has never been submitted and an already withdrawn post has nothing left to withdraw, so both are refused rather than silently re-stamped.',
+        content: {
+          'application/json': { schema: commonSchemas.conflictHttpErrorSchema },
+        },
+      },
       500: {
         description: 'Internal server error occurred.',
         content: {
@@ -1354,7 +1488,8 @@ export function registerCommunityContracts(
         },
       },
       503: {
-        description: 'Community write rollout is disabled.',
+        description:
+          'Community read rollout is disabled. An author must be able to retract their own post during a posting freeze, so withdrawal follows visibility rather than posting.',
         content: {
           'application/json': { schema: commonSchemas.serviceUnavailableHttpErrorSchema },
         },

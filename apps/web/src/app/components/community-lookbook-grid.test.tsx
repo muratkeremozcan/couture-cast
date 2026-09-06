@@ -18,11 +18,16 @@ import { CLIMATE_BANDS } from '@couture/utils'
 import {
   allocateCommunityPostResponseSchema,
   communityBandUnresolvedReasonSchema,
+  communityFeedModeSchema,
   communityFeedResponseSchema,
+  communityPostResponseSchema,
   communityPostStatusSchema,
+  encodeCommunityFeedCursor,
   publishCommunityPostResponseSchema,
   COMMUNITY_AGE_GATE_DENIED_MESSAGE,
+  COMMUNITY_CURSOR_INVALID_MESSAGE,
   COMMUNITY_FEED_DISABLED_MESSAGE,
+  COMMUNITY_MEDIA_UNAVAILABLE_MESSAGE,
   COMMUNITY_POST_RATE_LIMITED_MESSAGE,
   COMMUNITY_POST_NOT_FOUND_MESSAGE,
   COMMUNITY_REPORT_REASON_CHANGED_MESSAGE,
@@ -30,6 +35,7 @@ import {
   type CommunityAuthorPostState,
   type CommunityBandUnresolvedReason,
   type CommunityFeed,
+  type CommunityFeedCursorPayload,
   type CommunityFeedItem,
   type CommunityPostStatus,
   type EmbeddedCommunityChallenge,
@@ -48,6 +54,8 @@ vi.mock('posthog-js', () => ({
 const FEED_PATH = '/api/v1/community/feed'
 const ALLOCATE_PATH = '/api/v1/community/posts/allocate'
 const PUBLISH_PATH = '/api/v1/community/posts/publish'
+const POST_PATH = '/api/v1/community/posts/:postId'
+const OPENED_PATH = '/api/v1/community/posts/:postId/opened'
 const REPORT_PATH = '/api/v1/community/posts/:postId/report'
 const WITHDRAW_PATH = '/api/v1/community/posts/:postId/withdraw'
 const UPLOAD_URL = 'https://mock-upload.test/upload'
@@ -67,6 +75,27 @@ const SUGGESTED_ALT_TEXT = 'A layered outfit photographed against a plain wall.'
 
 function isoIn(seconds: number): string {
   return new Date(Date.now() + seconds * 1000).toISOString()
+}
+
+/**
+ * Every cursor in this file is minted through the contract's own encoder rather
+ * than written as an opaque literal.
+ *
+ * `encodeCommunityFeedCursor` parses before it encodes, so a field added to
+ * `communityFeedCursorPayloadSchema` fails to compile here instead of leaving a
+ * string that keeps satisfying assertions the server could no longer produce.
+ * The `band` is the field that matters: it carries the RESOLVED band, which is a
+ * different value from `mode`, and it is the half of the binding that goes stale
+ * mid-scroll.
+ */
+function cursorFor(overrides: Partial<CommunityFeedCursorPayload> = {}): string {
+  return encodeCommunityFeedCursor({
+    publishedAt: '2026-09-01T10:00:00.000Z',
+    id: 'post-1',
+    mode: 'auto',
+    band: 'temperate_dry',
+    ...overrides,
+  })
 }
 
 function item(overrides: Partial<CommunityFeedItem> = {}): CommunityFeedItem {
@@ -144,8 +173,34 @@ function feedBody(overrides: Partial<CommunityFeed> = {}) {
   )
 }
 
+/**
+ * Echoes the requested mode back as the mode served, which is what the API does
+ * for every mode except `auto` -- that one resolves to the viewer's experiment
+ * arm. A fixed `mode: 'auto'` here would make every filter click look like the
+ * server had overridden the reader's choice, now that the surface renders the
+ * mode it was served rather than the one it asked for. An explicit override
+ * still wins, which is how the experiment's `auto` -> `all` case is set up.
+ */
 function feedHandler(overrides: Partial<CommunityFeed> = {}) {
-  return http.get(FEED_PATH, () => feedBody(overrides))
+  return http.get(FEED_PATH, ({ request }) => {
+    const requested = communityFeedModeSchema.safeParse(
+      new URL(request.url).searchParams.get('mode')
+    )
+    return feedBody({
+      ...(requested.success ? { mode: requested.data } : {}),
+      ...overrides,
+    })
+  })
+}
+
+/** The single-post read, which is how a deep link resolves a target off page one. */
+function postBody(overrides: Partial<CommunityFeedItem> = {}) {
+  return HttpResponse.json(
+    communityPostResponseSchema.parse({ data: item(overrides) }) as unknown as Record<
+      string,
+      unknown
+    >
+  )
 }
 
 /** The shared `.strict()` error envelope, which is how every reason is classified. */
@@ -479,13 +534,43 @@ describe('CommunityLookbookGrid (Story 6.1)', () => {
             viewerBand: null,
             bandResolved: false,
             bandUnresolvedReason: reason,
-            mode: 'all',
+            // `auto`, because that is the only mode the banner speaks for. The
+            // server resolves the band on every request whatever the mode, so it
+            // reports a reason under `all` and under a pinned band too, and the
+            // fixture said `all` while asserting copy that only makes sense for
+            // `auto`.
+            mode: 'auto',
           })
         )
         renderGrid()
 
         const notice = await screen.findByTestId('community-band-unresolved')
         expect(notice).toHaveTextContent(UNRESOLVED_COPY[reason])
+      }
+    )
+
+    it.each(['all', 'cold_dry'] as const)(
+      '6.1-WEB-063 keeps the band notice off a feed served as %s',
+      async (mode) => {
+        signIn()
+        // Producible exactly as written: the server resolves the viewer band
+        // before it resolves the filter, so a viewer with no saved location
+        // carries `no_location` on every response, including the ones where the
+        // band was never going to be applied. The banner says "you are seeing
+        // every climate band", which under a pinned band is simply false.
+        useMswHandlers(
+          feedHandler({
+            items: [item()],
+            viewerBand: null,
+            bandResolved: false,
+            bandUnresolvedReason: 'no_location',
+            mode,
+          })
+        )
+        renderGrid({ activeTab: mode })
+
+        await screen.findByTestId('lookbook-card-post-1')
+        expect(screen.queryByTestId('community-band-unresolved')).not.toBeInTheDocument()
       }
     )
 
@@ -539,7 +624,7 @@ describe('CommunityLookbookGrid (Story 6.1)', () => {
           viewerBand: null,
           bandResolved: false,
           bandUnresolvedReason: 'no_location',
-          mode: 'all',
+          mode: 'auto',
         })
       )
       renderGrid()
@@ -563,7 +648,7 @@ describe('CommunityLookbookGrid (Story 6.1)', () => {
           const mode = query.get('mode') ?? 'auto'
           if (mode === 'auto') {
             return query.get('cursor') === null
-              ? feedBody({ items: [item()], nextCursor: 'cursor-auto-1' })
+              ? feedBody({ items: [item()], nextCursor: cursorFor() })
               : feedBody({ items: [item({ id: 'post-2' })] })
           }
           return feedBody({
@@ -582,7 +667,7 @@ describe('CommunityLookbookGrid (Story 6.1)', () => {
 
       const pagedUrl = new URL(urls[1] ?? '')
       expect(pagedUrl.searchParams.get('mode')).toBe('auto')
-      expect(pagedUrl.searchParams.get('cursor')).toBe('cursor-auto-1')
+      expect(pagedUrl.searchParams.get('cursor')).toBe(cursorFor())
 
       await user.click(screen.getByTestId('community-filter-cold_dry'))
       await screen.findByTestId('lookbook-card-post-3')
@@ -631,6 +716,50 @@ describe('CommunityLookbookGrid (Story 6.1)', () => {
         'aria-pressed',
         'true'
       )
+    })
+
+    it('6.1-WEB-065 presses the chip the server served, not the one it asked for', async () => {
+      signIn()
+      const servedModes: string[] = []
+      // The `all` arm answering an `auto` request, which is exactly what half the
+      // beta cohort receives: `resolveEffectiveMode` swaps `auto` for the
+      // viewer's assignment and leaves every other mode alone.
+      useMswHandlers(
+        feedHandler({
+          items: [item()],
+          mode: 'all',
+          experimentVariant: 'all',
+          viewerBand: 'temperate_dry',
+        })
+      )
+      renderGrid({
+        onServedModeChange: (mode) => {
+          servedModes.push(mode)
+        },
+      })
+
+      await screen.findByTestId('lookbook-card-post-1')
+
+      expect(screen.getByTestId('community-filter-all')).toHaveAttribute(
+        'aria-pressed',
+        'true'
+      )
+      expect(screen.getByTestId('community-filter-auto')).toHaveAttribute(
+        'aria-pressed',
+        'false'
+      )
+      // The announcement names the feed that arrived. It used to name the request
+      // instead, so this reader was told "Showing Your climate: Temperate and dry
+      // looks" over a feed carrying every region.
+      expect(screen.getByTestId('community-live-region')).toHaveTextContent(
+        'Showing Every climate looks. 1 loaded.'
+      )
+      // `lookbook-prism-layout.tsx` renders a second filter nav outside this
+      // component, and only this component sees the response, so the served mode
+      // has to travel out the same way the resolved band does.
+      await waitFor(() => {
+        expect(servedModes).toContain('all')
+      })
     })
 
     it('6.1-WEB-014 reports the chosen filter to its caller', async () => {
@@ -707,7 +836,7 @@ describe('CommunityLookbookGrid (Story 6.1)', () => {
           return cursor === null
             ? feedBody({
                 items: [item(), item({ id: 'post-2' })],
-                nextCursor: 'cursor-auto-1',
+                nextCursor: cursorFor(),
               })
             : feedBody({
                 // `post-2` repeats across the page boundary; the merge must not.
@@ -726,9 +855,59 @@ describe('CommunityLookbookGrid (Story 6.1)', () => {
       const grid = screen.getByTestId('community-card-grid')
       expect(within(grid).getAllByRole('article')).toHaveLength(3)
       expect(screen.getAllByTestId('lookbook-card-post-2')).toHaveLength(1)
-      expect(new URL(urls[1] ?? '').searchParams.get('cursor')).toBe('cursor-auto-1')
+      expect(new URL(urls[1] ?? '').searchParams.get('cursor')).toBe(cursorFor())
       // The last page carries no cursor, so the control retires.
       expect(screen.queryByTestId('load-more-button')).not.toBeInTheDocument()
+    })
+
+    it('6.1-WEB-064 restarts paging silently when the cursor’s band moved mid-scroll', async () => {
+      signIn()
+      const requests: (string | null)[] = []
+      // A cursor minted while the viewer resolved to `cold_dry`, presented after
+      // they resolve to something else. Nothing is tampered with: under `auto`
+      // the band is recomputed on every request from weather guaranteed fresh
+      // for only 60 minutes, so this is what an ordinary scroll across that
+      // boundary looks like.
+      const staleCursor = cursorFor({ band: 'cold_dry' })
+      const freshCursor = cursorFor({ id: 'post-restarted' })
+      useMswHandlers(
+        http.get(FEED_PATH, ({ request }) => {
+          const cursor = new URL(request.url).searchParams.get('cursor')
+          requests.push(cursor)
+          if (cursor === staleCursor) {
+            return errorBody(400, COMMUNITY_CURSOR_INVALID_MESSAGE, 'Bad Request')
+          }
+          if (cursor === null) {
+            return requests.length === 1
+              ? feedBody({ items: [item()], nextCursor: staleCursor })
+              : feedBody({
+                  items: [item({ id: 'post-restarted' })],
+                  nextCursor: freshCursor,
+                })
+          }
+          return feedBody({ items: [item({ id: 'post-page-two' })], nextCursor: null })
+        })
+      )
+      const user = userEvent.setup()
+      renderGrid()
+
+      await screen.findByTestId('lookbook-card-post-1')
+      await user.click(screen.getByTestId('load-more-button'))
+      await screen.findByTestId('lookbook-card-post-restarted')
+
+      // Page one REPLACES what the grid was holding rather than appending to it:
+      // those rows were keyset off a filter the server has stopped serving.
+      expect(screen.queryByTestId('lookbook-card-post-1')).not.toBeInTheDocument()
+      // The contract's own words for this 400 are "so the client restarts
+      // paging". It is a normal operating condition, so it never becomes the
+      // whole-feed alert banner over a grid that still holds twelve looks.
+      expect(screen.queryByTestId('community-feed-error')).not.toBeInTheDocument()
+
+      // And the recovered cursor is the one that gets used. The dead cursor was
+      // previously never cleared, so every further Load more re-sent it.
+      await user.click(screen.getByTestId('load-more-button'))
+      await screen.findByTestId('lookbook-card-post-page-two')
+      expect(requests).toEqual([null, staleCursor, null, freshCursor])
     })
 
     it('6.1-WEB-057 does not double-request the next page on a second click', async () => {
@@ -739,7 +918,7 @@ describe('CommunityLookbookGrid (Story 6.1)', () => {
           calls += 1
           const cursor = new URL(request.url).searchParams.get('cursor')
           if (cursor === null) {
-            return feedBody({ items: [item()], nextCursor: 'cursor-auto-1' })
+            return feedBody({ items: [item()], nextCursor: cursorFor() })
           }
           await delay(30)
           return feedBody({ items: [item({ id: 'post-2' })] })
@@ -766,7 +945,7 @@ describe('CommunityLookbookGrid (Story 6.1)', () => {
         http.get(FEED_PATH, async ({ request }) => {
           const cursor = new URL(request.url).searchParams.get('cursor')
           if (cursor === null) {
-            return feedBody({ items: [item()], nextCursor: 'cursor-auto-1' })
+            return feedBody({ items: [item()], nextCursor: cursorFor() })
           }
           await delay(30)
           return feedBody({ items: [item({ id: 'post-2' })] })
@@ -786,6 +965,114 @@ describe('CommunityLookbookGrid (Story 6.1)', () => {
       expect(screen.getByTestId('community-live-region')).toHaveTextContent(
         'Loaded 1 more looks.'
       )
+    })
+  })
+
+  describe('card open', () => {
+    it('6.1-WEB-066 records the open with the arm this client was serving', async () => {
+      signIn()
+      const opened: { postId: string; platform: string | null; body: unknown }[] = []
+      // A pinned band with the `all` arm. The mode a reader chose and the arm
+      // they were assigned are independent -- `resolveEffectiveMode` only
+      // overrides `auto` -- so this is the response that proves the event carries
+      // the arm rather than the filter.
+      useMswHandlers(
+        feedHandler({ items: [item()], mode: 'cold_dry', experimentVariant: 'all' }),
+        http.post(OPENED_PATH, async ({ request, params }) => {
+          opened.push({
+            postId: String(params.postId),
+            platform: request.headers.get('x-couture-platform'),
+            body: await request.json(),
+          })
+          return HttpResponse.json({ tracked: true })
+        })
+      )
+      const user = userEvent.setup()
+      renderGrid({ activeTab: 'cold_dry' })
+
+      await screen.findByTestId('lookbook-card-post-1')
+      await user.click(screen.getByTestId('lookbook-open-post-1'))
+
+      await waitFor(() => {
+        expect(opened).toHaveLength(1)
+      })
+      expect(opened[0]?.postId).toBe('post-1')
+      expect(opened[0]?.platform).toBe('web')
+      // The WHOLE body, not just the one field. `openCommunityPostInputSchema` is
+      // `.strict()` and the server decides `isSelf` from the stored author id, so
+      // a client that helpfully sent its own would be rejected outright rather
+      // than ignored.
+      expect(opened[0]?.body).toEqual({ experimentVariant: 'all' })
+    })
+
+    it('6.1-WEB-067 opens the look whole, with the caption the grid clamps', async () => {
+      signIn()
+      useMswHandlers(
+        feedHandler({ items: [item()] }),
+        http.post(OPENED_PATH, () => HttpResponse.json({ tracked: true }))
+      )
+      const user = userEvent.setup()
+      renderGrid()
+
+      await screen.findByTestId('lookbook-card-post-1')
+      await user.click(screen.getByTestId('lookbook-open-post-1'))
+
+      const detail = await screen.findByTestId('community-detail')
+      expect(
+        within(detail).getByAltText(
+          'A charcoal wool coat over a cream knit, with black ankle boots.'
+        )
+      ).toBeInTheDocument()
+      expect(screen.getByTestId('community-detail-caption')).toHaveTextContent(
+        'Layered wool over a merino base for a damp commute.'
+      )
+      expect(screen.getByTestId('community-detail-author')).toHaveTextContent(
+        'Style Explorer 4F2A'
+      )
+      expect(screen.getByTestId('community-detail-band-post-1')).toHaveTextContent(
+        'Temperate and wet'
+      )
+    })
+
+    it('6.1-WEB-068 still opens the look when the open cannot be recorded', async () => {
+      signIn()
+      useMswHandlers(
+        feedHandler({ items: [item()] }),
+        http.post(OPENED_PATH, () => new HttpResponse(null, { status: 500 }))
+      )
+      const user = userEvent.setup()
+      renderGrid()
+
+      await screen.findByTestId('lookbook-card-post-1')
+      await user.click(screen.getByTestId('lookbook-open-post-1'))
+
+      // This route is measurement. A reader must not be kept from a photograph
+      // because the beta gate's counter is down.
+      expect(await screen.findByTestId('community-detail')).toBeInTheDocument()
+      expect(screen.queryByTestId('community-feed-error')).not.toBeInTheDocument()
+      expect(screen.queryByTestId('community-action-notice')).not.toBeInTheDocument()
+    })
+
+    it('6.1-WEB-069 has no axe violations with a look open', async () => {
+      signIn()
+      useMswHandlers(
+        feedHandler({ items: [item()] }),
+        http.post(OPENED_PATH, () => HttpResponse.json({ tracked: true }))
+      )
+      const user = userEvent.setup()
+      const { container } = renderGrid()
+
+      await screen.findByTestId('lookbook-card-post-1')
+      await user.click(screen.getByTestId('lookbook-open-post-1'))
+      await screen.findByTestId('community-detail')
+
+      const results = await axe.run(container, {
+        runOnly: { type: 'tag', values: ['wcag2a', 'wcag2aa', 'wcag21a', 'wcag21aa'] },
+      })
+      expect(
+        results.violations.map((violation) => violation.id),
+        JSON.stringify(results.violations, null, 2)
+      ).toEqual([])
     })
   })
 
@@ -1627,6 +1914,43 @@ describe('CommunityLookbookGrid (Story 6.1)', () => {
       expect(error).not.toHaveTextContent('upstream moderation queue unavailable')
     })
 
+    it('6.1-WEB-073 names a look the storage layer cannot serve back', async () => {
+      signIn()
+      restoreObjectUrl = installImagePrepMocks()
+      useMswHandlers(
+        feedHandler(),
+        imageFixtureHandler(),
+        http.post(ALLOCATE_PATH, () => allocateBody()),
+        // `requireFeedItem` raises this AFTER the state transition has committed:
+        // the look is published and it is our own signed URL that failed. That
+        // makes "We could not publish your look", the generic fallback this used
+        // to land on, the one sentence that was not true.
+        http.post(PUBLISH_PATH, () =>
+          errorBody(503, COMMUNITY_MEDIA_UNAVAILABLE_MESSAGE, 'Service Unavailable')
+        )
+      )
+      const user = userEvent.setup()
+      renderGrid()
+
+      await user.click(await screen.findByTestId('create-post-button'))
+      await choosePhoto(user)
+      await screen.findByDisplayValue(SUGGESTED_ALT_TEXT)
+      await user.click(screen.getByTestId('confirm-alt-text-checkbox'))
+      await user.click(screen.getByTestId('post-publish-submit'))
+
+      const error = await screen.findByTestId('create-post-error')
+      expect(error).toHaveTextContent(
+        'This look is temporarily unavailable. Try again shortly.'
+      )
+      // Not the kill-switch copy: the two 503s share a status and mean opposite
+      // things, and telling this author the whole community is switched off would
+      // send them away rather than back.
+      expect(error).not.toHaveTextContent(
+        'The community feed is temporarily unavailable.'
+      )
+      expect(error).not.toHaveTextContent(COMMUNITY_MEDIA_UNAVAILABLE_MESSAGE)
+    })
+
     it('6.1-WEB-060 does nothing when the file chooser is dismissed without a file', async () => {
       signIn()
       restoreObjectUrl = installImagePrepMocks()
@@ -1835,6 +2159,9 @@ describe('CommunityLookbookGrid (Story 6.1)', () => {
       )
       // Unmounted, not hidden: a hidden `<img>` keeps retrying the dead object.
       expect(screen.getByTestId('lookbook-image-post-1').querySelector('img')).toBeNull()
+      // And nothing to open: a card whose object will not load has no look to
+      // show, so it offers reload where it would otherwise offer the open.
+      expect(screen.queryByTestId('lookbook-open-post-1')).not.toBeInTheDocument()
 
       // The automatic chase re-read the feed and got the same dead URL back, so
       // the card stays on its manual control.
@@ -1933,6 +2260,76 @@ describe('CommunityLookbookGrid (Story 6.1)', () => {
       )
     })
 
+    it('6.1-WEB-070 resolves a deep-link target the loaded page does not hold', async () => {
+      signIn()
+      useMswHandlers(
+        feedHandler({ items: [item(), item({ id: 'post-2' })], nextCursor: cursorFor() }),
+        http.get(POST_PATH, ({ params }) =>
+          params.postId === 'post-99'
+            ? postBody({ id: 'post-99', caption: 'A look from far down the feed.' })
+            : errorBody(404, COMMUNITY_POST_NOT_FOUND_MESSAGE, 'Not Found')
+        )
+      )
+      renderGrid({ highlightedCardId: 'post-99' })
+
+      // The feed is keyset-paginated twelve rows at a time, so a notification can
+      // reference a look from any depth of it. `getElementById` alone found
+      // nothing for every target past page one: no scroll, no focus, no
+      // announcement, and no sign of the look the reader followed a link to.
+      const card = await screen.findByTestId('lookbook-card-post-99')
+      expect(card).toHaveAttribute('data-highlighted', 'true')
+      await waitFor(() => expect(card).toHaveFocus())
+      await waitFor(() =>
+        expect(screen.getByTestId('community-live-region')).toHaveTextContent(
+          'Focused on the highlighted look.'
+        )
+      )
+
+      const cards = within(screen.getByTestId('community-card-grid')).getAllByRole(
+        'article'
+      )
+      expect(cards[0]).toBe(card)
+      expect(cards).toHaveLength(3)
+    })
+
+    it('6.1-WEB-071 adds nothing for a deep-link target it may not see', async () => {
+      signIn()
+      useMswHandlers(
+        feedHandler({ items: [item()] }),
+        http.get(POST_PATH, () =>
+          errorBody(404, COMMUNITY_POST_NOT_FOUND_MESSAGE, 'Not Found')
+        )
+      )
+      renderGrid({ highlightedCardId: 'post-99' })
+
+      await screen.findByTestId('lookbook-card-post-1')
+      await waitFor(() =>
+        expect(
+          within(screen.getByTestId('community-card-grid')).getAllByRole('article')
+        ).toHaveLength(1)
+      )
+      // `processWebDeepLink` owns the invalid-link copy, and it has already run by
+      // the time this component mounts, so the grid says nothing of its own.
+      expect(screen.queryByTestId('community-feed-error')).not.toBeInTheDocument()
+    })
+
+    it('6.1-WEB-072 falls back to the card label when alt text is blank', async () => {
+      signIn()
+      // `communityFeedItemSchema` types `altText` as a nullable string, so an
+      // empty one is inside the contract and parses; today's publish path trims
+      // and rejects a blank, so this guards the shape the client accepts rather
+      // than a row the current writer produces. Mobile's `community-card.tsx`
+      // already falls back on `?.trim() ||`; `?? ` here handed the empty string
+      // straight through as `alt=""`, which marks a content image decorative and
+      // hides it from a screen reader entirely.
+      useMswHandlers(feedHandler({ items: [item({ altText: '' })] }))
+      renderGrid()
+
+      await screen.findByTestId('lookbook-card-post-1')
+      const image = screen.getByTestId('lookbook-image-post-1').querySelector('img')
+      expect(image).toHaveAttribute('alt', 'Look by Style Explorer 4F2A')
+    })
+
     it('6.1-WEB-050 reports the resolved band without re-firing the feed read', async () => {
       signIn()
       let feedCalls = 0
@@ -2007,7 +2404,7 @@ describe('CommunityLookbookGrid (Story 6.1)', () => {
             }),
           ],
           activeChallenge: CHALLENGE,
-          nextCursor: 'cursor-auto-1',
+          nextCursor: cursorFor(),
         })
       )
       const { container } = renderGrid({ sponsoredPostIds: ['post-2'] })

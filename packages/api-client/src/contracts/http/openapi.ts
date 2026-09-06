@@ -151,10 +151,10 @@ export function generateHttpOpenApiDocument() {
       // Story 5.5 bumps the minor again: two additive planner operations
       // (GET the seven-day window, POST a per-day reshuffle) under a new tag,
       // and no changes to existing operations.
-      // Story 6.1 bumps the minor again: eight additive community operations
-      // (feed read, single-post read, upload allocate, publish, report,
-      // withdraw, challenge create, challenge update) under a new tag, and no
-      // changes to existing operations.
+      // Story 6.1 bumps the minor again: nine additive community operations
+      // (feed read, single-post read, upload allocate, publish, report, card
+      // open, withdraw, challenge create, challenge update) under a new tag,
+      // and no changes to existing operations.
       version: '1.6.0',
       description: 'Canonical HTTP contracts shared across API, web, mobile, and tests.',
     },

@@ -1140,6 +1140,12 @@ describe('TelemetryService', () => {
           props.climateBand = 'cold_wet'
           props.hasCaption = true
           props.hasChallenge = false
+        } else if (eventType === 'community_challenge_participated') {
+          props.climateBand = 'cold_wet'
+          // Required and non-nullable: the event only fires for a submission
+          // that actually joined a challenge, so a nullable field would invent
+          // a state that cannot occur.
+          props.challengeId = 'challenge-42'
         } else {
           props.climateBand = 'cold_wet'
         }

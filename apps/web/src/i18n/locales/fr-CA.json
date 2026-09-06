@@ -470,6 +470,9 @@
       "authorFallback": "Explorateur de style",
       "imageUnavailable": "Image non disponible",
       "imageRetry": "Recharger l’image",
+      "open": "Voir le look",
+      "openLabel": "Voir le look de {{author}}",
+      "detailClose": "Fermer ce look",
       "report": "Signaler",
       "reported": "Signalé",
       "withdraw": "Retirer",
@@ -572,6 +575,7 @@
       "selfReport": "Vous ne pouvez pas signaler votre propre look.",
       "notFound": "Ce look n’est plus disponible.",
       "disabled": "Le fil de la communauté est temporairement non disponible.",
+      "mediaUnavailable": "Ce look est temporairement non disponible. Réessayez dans quelques instants.",
       "generic": "Une erreur s’est produite. Réessayez."
     }
   }

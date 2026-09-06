@@ -100,6 +100,7 @@ touchableSpy.createElement = createElement
 import { AccessibilityInfo, Platform, findNodeHandle } from 'react-native'
 import {
   COMMUNITY_FEED_DISABLED_MESSAGE,
+  COMMUNITY_MEDIA_UNAVAILABLE_MESSAGE,
   type EmbeddedCommunityChallenge,
 } from '@couture/api-client/contracts/http'
 import enUS from '@/assets/locales/en-US.json'
@@ -567,6 +568,36 @@ describe('CommunityPostSheet (Story 6.1)', () => {
     expect(onPublished).not.toHaveBeenCalled()
   })
 
+  it('6.1-MOB-095 tells a publish outage apart from the community kill switch', async () => {
+    server.use(
+      http.post('*/api/v1/community/posts/publish', () =>
+        errorEnvelope(503, COMMUNITY_MEDIA_UNAVAILABLE_MESSAGE)
+      )
+    )
+    renderSheet()
+
+    await pickAndAllocate()
+    press(screen.getByTestId('community-confirm-alt-text'))
+    await waitFor(() =>
+      expect(
+        screen.getByTestId('community-publish-button').getAttribute('aria-disabled')
+      ).not.toBe('true')
+    )
+    press(screen.getByTestId('community-publish-button'))
+
+    // `publishPost` answers 503 when the object it just checked can no longer be
+    // signed, and the rollout kill switch answers 503 too, so message is the only
+    // thing that separates them. Both used to collapse into the generic publish
+    // failure, which told the author nothing about waiting.
+    expect((await screen.findByTestId('community-publish-error')).textContent).toBe(
+      enUS.community.error.mediaUnavailable
+    )
+    expect(screen.getByTestId('community-publish-error').textContent).not.toBe(
+      enUS.community.error.disabled
+    )
+    expect(document.body.textContent).not.toContain(SDK_ERROR_MESSAGE)
+  })
+
   it('6.1-MOB-068 opts into the weekly challenge, and can opt back out', async () => {
     let publishBody: unknown = null
     server.use(
@@ -606,6 +637,7 @@ describe('CommunityPostSheet (Story 6.1)', () => {
       ['reason_changed', 'community.error.reasonChanged'],
       ['self_report', 'community.error.selfReport'],
       ['disabled', 'community.error.disabled'],
+      ['media_unavailable', 'community.error.mediaUnavailable'],
       ['upload_failed', 'community.error.upload'],
       ['permission_denied', 'community.validation.permissionDenied'],
       ['picker_failed', 'community.validation.pickerFailed'],

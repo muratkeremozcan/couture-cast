@@ -1,5 +1,5 @@
 import React, { useCallback, useEffect, useRef, useState } from 'react'
-import { Image, StyleSheet, Text, TouchableOpacity, View } from 'react-native'
+import { Image, Pressable, StyleSheet, Text, TouchableOpacity, View } from 'react-native'
 import { useTranslation } from 'react-i18next'
 import type { CommunityFeedItem } from '@couture/api-client/contracts/http'
 import { useHeroPalette } from '@/components/hero/hero-theme'
@@ -37,6 +37,7 @@ interface CommunityCardMediaProps {
   isUnavailable: boolean
   onError: () => void
   onRetry: () => void
+  onOpen: () => void
 }
 
 function CommunityCardMedia({
@@ -46,6 +47,7 @@ function CommunityCardMedia({
   isUnavailable,
   onError,
   onRetry,
+  onOpen,
 }: CommunityCardMediaProps) {
   const { t } = useTranslation()
   const palette = useHeroPalette()
@@ -73,18 +75,37 @@ function CommunityCardMedia({
           </TouchableOpacity>
         </View>
       ) : (
-        <Image
-          testID={`community-card-image-${postId}`}
-          source={{ uri: imageUri }}
+        /*
+         * The open affordance is the photo, not the whole card, and the wrapper is
+         * explicitly NOT `accessible`. A pressable that grouped the card, or even
+         * just its media, would make iOS announce one element and swallow both the
+         * alt text below and the moderation controls further down.
+         *
+         * VoiceOver activates the element it is focused on, which is the image, so
+         * the open has to be reachable from the image itself as well as from the
+         * touch target wrapping it. `onAccessibilityTap` is that second path; it is
+         * native-only, so no DOM assertion can observe it.
+         */
+        <Pressable
+          testID={`community-card-open-${postId}`}
+          accessible={false}
           style={styles.image}
-          resizeMode="cover"
-          // Without `accessible`, iOS VoiceOver skips the image entirely and the
-          // alt text the author was made to confirm is never announced.
-          accessible
-          accessibilityRole="image"
-          accessibilityLabel={label}
-          onError={onError}
-        />
+          onPress={onOpen}
+        >
+          <Image
+            testID={`community-card-image-${postId}`}
+            source={{ uri: imageUri }}
+            style={styles.image}
+            resizeMode="cover"
+            // Without `accessible`, iOS VoiceOver skips the image entirely and the
+            // alt text the author was made to confirm is never announced.
+            accessible
+            accessibilityRole="image"
+            accessibilityLabel={label}
+            onAccessibilityTap={onOpen}
+            onError={onError}
+          />
+        </Pressable>
       )}
     </View>
   )
@@ -162,21 +183,27 @@ export interface CommunityCardProps {
   isReported?: boolean
   /** Renders the sponsorship label variant required by the UX contract. */
   isSponsored?: boolean
+  /** Emphasises the look a notification deep link landed on. Mirrors web's `isHighlighted`. */
+  isHighlighted?: boolean
   /** Lets the screen return accessibility focus here when a modal closes. */
   containerRef?: React.Ref<View>
   onReport: (item: CommunityFeedItem) => void | Promise<void>
   onWithdraw: (item: CommunityFeedItem) => void | Promise<void>
   onImageExpiry?: (item: CommunityFeedItem) => void | Promise<void>
+  /** Records a card open. Measurement only; there is no detail view to navigate to yet. */
+  onOpen?: (item: CommunityFeedItem) => void
 }
 
 export function CommunityCard({
   item,
   isReported = false,
   isSponsored = false,
+  isHighlighted = false,
   containerRef,
   onReport,
   onWithdraw,
   onImageExpiry,
+  onOpen,
 }: CommunityCardProps) {
   const { t } = useTranslation()
   const palette = useHeroPalette()
@@ -191,9 +218,9 @@ export function CommunityCard({
   // Kept out of the expiry effect's dependency array on purpose: reading the
   // latest item and callback through a ref is what stops a refetch from
   // re-arming the timer with a brand new object identity.
-  const latestRef = useRef({ item, onImageExpiry })
+  const latestRef = useRef({ item, onImageExpiry, onOpen })
   useEffect(() => {
-    latestRef.current = { item, onImageExpiry }
+    latestRef.current = { item, onImageExpiry, onOpen }
   })
 
   const requestImageRefresh = useCallback(() => {
@@ -210,6 +237,10 @@ export function CommunityCard({
     attemptsRef.current = 0
     setImageState('ok')
     setRefreshTick((tick) => tick + 1)
+  }, [])
+
+  const handleOpen = useCallback(() => {
+    latestRef.current.onOpen?.(latestRef.current.item)
   }, [])
 
   useEffect(() => {
@@ -261,12 +292,17 @@ export function CommunityCard({
     <View
       ref={containerRef}
       testID={`community-post-card-${item.id}`}
-      accessible
+      // Deliberately NOT `accessible`. On iOS that collapses the card into one
+      // element, so VoiceOver announces `cardLabel` and stops: the alt text the
+      // author was made to confirm is never read and the Report and Withdraw
+      // controls stop being focusable. Web is unaffected either way, which is why
+      // the DOM assertions below could not catch it.
       accessibilityRole="summary"
       accessibilityLabel={cardLabel}
       style={[
         styles.card,
         { backgroundColor: palette.surface, borderColor: palette.divider },
+        isHighlighted && { borderColor: ACCENT_GOLD, borderWidth: 2 },
       ]}
     >
       <View style={styles.header}>
@@ -327,6 +363,7 @@ export function CommunityCard({
         isUnavailable={imageState === 'unavailable'}
         onError={requestImageRefresh}
         onRetry={handleRetryImage}
+        onOpen={handleOpen}
       />
 
       {item.caption ? (

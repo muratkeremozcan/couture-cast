@@ -470,6 +470,9 @@
       "authorFallback": "Explorador de estilo",
       "imageUnavailable": "Imagen no disponible",
       "imageRetry": "Volver a cargar la imagen",
+      "open": "Ver look",
+      "openLabel": "Ver el look de {{author}}",
+      "detailClose": "Cerrar este look",
       "report": "Reportar",
       "reported": "Reportado",
       "withdraw": "Retirar",
@@ -572,6 +575,7 @@
       "selfReport": "No puedes reportar tu propio look.",
       "notFound": "Este look ya no está disponible.",
       "disabled": "El feed de la comunidad no está disponible por el momento.",
+      "mediaUnavailable": "Este look no está disponible por el momento. Inténtalo de nuevo en unos minutos.",
       "generic": "Algo salió mal. Inténtalo de nuevo."
     }
   }

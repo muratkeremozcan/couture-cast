@@ -470,6 +470,9 @@
       "authorFallback": "Stilentdecker",
       "imageUnavailable": "Bild nicht verfügbar",
       "imageRetry": "Bild neu laden",
+      "open": "Look ansehen",
+      "openLabel": "Look von {{author}} ansehen",
+      "detailClose": "Diesen Look schließen",
       "report": "Melden",
       "reported": "Gemeldet",
       "withdraw": "Zurückziehen",
@@ -572,6 +575,7 @@
       "selfReport": "Du kannst deinen eigenen Look nicht melden.",
       "notFound": "Dieser Look ist nicht mehr verfügbar.",
       "disabled": "Der Community-Feed ist vorübergehend nicht verfügbar.",
+      "mediaUnavailable": "Dieser Look ist vorübergehend nicht verfügbar. Versuche es in Kürze erneut.",
       "generic": "Etwas ist schiefgelaufen. Versuche es erneut."
     }
   }

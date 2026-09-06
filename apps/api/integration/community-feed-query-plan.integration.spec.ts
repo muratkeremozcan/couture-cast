@@ -245,8 +245,15 @@ describe('6.1 community feed query plans', () => {
     // The predicate the repository adds and the old hand-written SQL omitted.
     // Asserting on the captured text keeps this file honest about what it is
     // explaining.
-    expect(sql).toContain('published_at')
-    expect(sql).toContain('IS NOT NULL')
+    /*
+     * ONE ANCHORED PREDICATE, not two detached substrings. `published_at` appears
+     * in the SELECT list and the ORDER BY of every query this file explains, and
+     * `IS NOT NULL` appears in any query carrying any such predicate on any
+     * column, so the pair was satisfied by SQL that had lost the
+     * `published_at IS NOT NULL` predicate entirely — which is the predicate this
+     * file was rewritten to guard.
+     */
+    expect(sql).toMatch(/"?published_at"?\s+IS\s+NOT\s+NULL/i)
 
     const plan = await explain(sql, ...params)
     expect(plan, `plan was:\n${plan}`).toContain(GLOBAL_FEED_INDEX)

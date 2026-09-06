@@ -20,6 +20,7 @@ import {
   type CommunityFeedMode,
 } from '@couture/api-client/contracts/http'
 import {
+  assertSeededFeed,
   communityApiTest as test,
   expect,
   SEEDED_COMMUNITY_POSTS,
@@ -40,6 +41,30 @@ const ALLOCATE_BODY = {
   sha256: 'd2c8a3f16b0e47a95c3d81f0b6e27a4c9d5e0f3a1b7c8d9e0f1a2b3c4d5e6f70',
   widthPx: 1080,
   heightPx: 1350,
+}
+
+/**
+ * The ten keys `communityFeedItemSchema` declares. `user_id` and
+ * `image_object_path` are the two the story forbids by name; an exact set catches
+ * those and anything else not allowlisted.
+ */
+const FEED_ITEM_KEYS = [
+  'altText',
+  'author',
+  'caption',
+  'challengeId',
+  'climateBand',
+  'createdAt',
+  'id',
+  'imageAccess',
+  'publishedAt',
+  'status',
+]
+
+type CommunityFeedItemShape = {
+  id: string
+  climateBand: string | null
+  caption: string | null
 }
 
 /** The nine keys `communityFeedSchema` declares, and no others. */
@@ -76,10 +101,40 @@ test.describe('6.1 community feed HTTP contract', () => {
      * so in place). This is the tier where "the server sends exactly the
      * allowlisted projection" can be proven.
      */
-    const body = (await response.json()) as { data: Record<string, unknown> }
+    const body = (await response.json()) as {
+      data: Record<string, unknown> & { items: Record<string, unknown>[] }
+    }
     expect(Object.keys(body)).toEqual(['data'])
     expect(Object.keys(body.data).sort()).toEqual(FEED_ENVELOPE_KEYS)
     expect(body.data.mode).toBe('all')
+
+    /*
+     * THE ENVELOPE IS NOT THE PROJECTION. The keys above describe the wrapper;
+     * the leak this test exists to catch would be inside an ITEM, and over an
+     * empty feed the assertions above pass without a single row being looked at.
+     * `assertSeededFeed` existed for this and had zero call sites in the
+     * repository, so the delegation the Pact interaction makes to "the tier where
+     * non-leakage can be proven" pointed at an assertion that was never written.
+     *
+     * The floor comes first so an unseeded database fails naming `npm run db:seed`
+     * rather than passing vacuously.
+     */
+    assertSeededFeed(body.data.items as unknown as CommunityFeedItemShape[])
+    expect(body.data.items.length).toBeGreaterThan(0)
+
+    /*
+     * Every item, not just the first: a projection that leaked on one row and not
+     * another would slip past a spot check. `user_id` and `image_object_path` are
+     * the two the story forbids by name, and an exact key set catches them and
+     * anything else that has not been allowlisted.
+     */
+    for (const item of body.data.items) {
+      expect(Object.keys(item).sort()).toEqual(FEED_ITEM_KEYS)
+      expect(Object.keys(item.author as Record<string, unknown>).sort()).toEqual([
+        'displayName',
+        'isSelf',
+      ])
+    }
   })
 
   test('6.1-API-02 rejects a mode the enum does not define', async ({
@@ -149,9 +204,14 @@ test.describe('6.1 community feed HTTP contract', () => {
     }
     const servedMode = servedBody.data.mode
     const servedBand = servedBody.data.viewerBand
-    // `auto` is never the EFFECTIVE mode: it always resolves to one arm or the
-    // other. If that stops being true this assertion says so before the mismatch
-    // below quietly becomes a match.
+    /*
+     * The two arms ARE `auto` and `all`, so `auto` surviving as the effective
+     * mode is normal and an earlier version of this comment claiming otherwise
+     * was simply wrong. What this guard is for is narrower: `resolveEffectiveMode`
+     * must resolve a requested `auto` to an ARM, never to a band literal, because
+     * `foreignMode` below is derived by flipping between exactly these two values
+     * and would stop being foreign if a third could appear.
+     */
     expect(['auto', 'all']).toContain(servedMode)
     const foreignMode: CommunityFeedMode = servedMode === 'all' ? 'auto' : 'all'
 

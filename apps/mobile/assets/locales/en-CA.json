@@ -592,6 +592,7 @@
     "share": "Share your look",
     "newPost": "New post",
     "deepLink": {
+      "highlight": "Opened from your notification",
       "invalid": "This link is invalid, expired, or no longer available."
     },
     "filters": {
@@ -747,6 +748,7 @@
       "selfReport": "You cannot report your own look.",
       "notFound": "This look is no longer available.",
       "disabled": "The community feed is temporarily unavailable.",
+      "mediaUnavailable": "This look is temporarily unavailable. Try again shortly.",
       "generic": "Something went wrong. Try again."
     }
   }

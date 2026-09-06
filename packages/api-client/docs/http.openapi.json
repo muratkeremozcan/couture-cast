@@ -18550,7 +18550,7 @@
             "schema": {
               "type": "string"
             },
-            "description": "Opaque base64url keyset pagination cursor. Bound to the mode it was minted under; presenting it under a different mode returns 400."
+            "description": "Opaque base64url keyset pagination cursor. Bound both to the filter mode and to the climate band the feed resolved when it was minted. Presenting it under a different mode, or after the resolved band has changed, returns 400; discard it and restart paging from the first page."
           },
           {
             "name": "limit",
@@ -18577,7 +18577,7 @@
             }
           },
           "400": {
-            "description": "Malformed cursor, cursor minted under a different filter mode, or invalid mode parameter.",
+            "description": "Malformed cursor, cursor minted under a different filter mode, cursor minted under a different resolved climate band, or invalid mode parameter. Under mode=auto the resolved band is derived per request from weather guaranteed fresh for only 60 minutes, so a band that goes stale between pages produces this response during ordinary reading. Discard the cursor and restart paging from the first page.",
             "content": {
               "application/json": {
                 "schema": {
@@ -18806,6 +18806,16 @@
               }
             }
           },
+          "400": {
+            "description": "Missing or invalid x-couture-platform header.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/BadRequestHttpError"
+                }
+              }
+            }
+          },
           "401": {
             "description": "Missing or invalid authentication headers.",
             "content": {
@@ -18837,7 +18847,7 @@
             }
           },
           "503": {
-            "description": "Community read rollout is disabled.",
+            "description": "Community read rollout is disabled, or the post is visible but its media could not be signed. The second case is a storage outage rather than a missing post, and the caller should retry shortly.",
             "content": {
               "application/json": {
                 "schema": {
@@ -18908,7 +18918,7 @@
             }
           },
           "400": {
-            "description": "Invalid caption, invalid alt text, or alt text not confirmed by the author.",
+            "description": "Invalid caption, invalid alt text, alt text not confirmed by the author, or a referenced challenge that is unknown, inactive, or outside its window.",
             "content": {
               "application/json": {
                 "schema": {
@@ -18938,7 +18948,7 @@
             }
           },
           "404": {
-            "description": "Post, upload session, or referenced challenge not found.",
+            "description": "Post or upload session not found.",
             "content": {
               "application/json": {
                 "schema": {
@@ -18948,7 +18958,7 @@
             }
           },
           "409": {
-            "description": "Idempotency key reused with a different payload, or the upload session does not match the post.",
+            "description": "Idempotency key reused with a different payload, the upload session does not match the post, or the image bytes were never uploaded to the allocated object path.",
             "content": {
               "application/json": {
                 "schema": {
@@ -18987,7 +18997,7 @@
             }
           },
           "503": {
-            "description": "Community write rollout is disabled.",
+            "description": "Community write rollout is disabled, or the post was accepted but its media could not be signed for the response. The second case is a storage outage rather than a rejected publish.",
             "content": {
               "application/json": {
                 "schema": {
@@ -19136,7 +19146,7 @@
             }
           },
           "503": {
-            "description": "Community write rollout is disabled.",
+            "description": "Community read rollout is disabled. Reporting follows visibility rather than posting, so closing the write rollout during an incident does not disable it.",
             "content": {
               "application/json": {
                 "schema": {
@@ -19201,6 +19211,16 @@
               "application/json": {
                 "schema": {
                   "$ref": "#/components/schemas/TrackedResponse"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Missing or invalid x-couture-platform header, or an invalid request body.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/BadRequestHttpError"
                 }
               }
             }
@@ -19295,6 +19315,16 @@
               }
             }
           },
+          "400": {
+            "description": "Missing or invalid x-couture-platform header.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/BadRequestHttpError"
+                }
+              }
+            }
+          },
           "401": {
             "description": "Missing or invalid authentication headers.",
             "content": {
@@ -19325,6 +19355,16 @@
               }
             }
           },
+          "409": {
+            "description": "Post is not in a withdrawable state. A draft has never been submitted and an already withdrawn post has nothing left to withdraw, so both are refused rather than silently re-stamped.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ConflictHttpError"
+                }
+              }
+            }
+          },
           "500": {
             "description": "Internal server error occurred.",
             "content": {
@@ -19336,7 +19376,7 @@
             }
           },
           "503": {
-            "description": "Community write rollout is disabled.",
+            "description": "Community read rollout is disabled. An author must be able to retract their own post during a posting freeze, so withdrawal follows visibility rather than posting.",
             "content": {
               "application/json": {
                 "schema": {

@@ -470,6 +470,9 @@
       "authorFallback": "Stil kâşifi",
       "imageUnavailable": "Görsel kullanılamıyor",
       "imageRetry": "Görseli yeniden yükle",
+      "open": "Kombini gör",
+      "openLabel": "{{author}} tarafından paylaşılan kombini gör",
+      "detailClose": "Bu kombini kapat",
       "report": "Şikayet et",
       "reported": "Şikayet edildi",
       "withdraw": "Geri çek",
@@ -572,6 +575,7 @@
       "selfReport": "Kendi kombinini şikayet edemezsin.",
       "notFound": "Bu kombin artık kullanılamıyor.",
       "disabled": "Topluluk akışı geçici olarak kullanılamıyor.",
+      "mediaUnavailable": "Bu kombin geçici olarak kullanılamıyor. Kısa süre sonra tekrar dene.",
       "generic": "Bir şeyler ters gitti. Tekrar dene."
     }
   }

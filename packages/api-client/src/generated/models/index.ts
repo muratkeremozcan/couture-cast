@@ -56,7 +56,7 @@ export interface AdvisorRecommendationCard {
    * @type {AdvisorRecommendationCardSponsored}
    * @memberof AdvisorRecommendationCard
    */
-  sponsored: AdvisorRecommendationCardSponsored
+  sponsored: AdvisorRecommendationCardSponsored | null
 }
 
 /**
@@ -1626,7 +1626,7 @@ export interface CommunityAuthorPostState {
    * @type {CreateGarmentItemResponseDataImageAccess}
    * @memberof CommunityAuthorPostState
    */
-  imageAccess: CreateGarmentItemResponseDataImageAccess
+  imageAccess: CreateGarmentItemResponseDataImageAccess | null
   /**
    *
    * @type {string}
@@ -1969,7 +1969,7 @@ export interface CommunityFeed {
    * @type {CommunityFeedActiveChallenge}
    * @memberof CommunityFeed
    */
-  activeChallenge: CommunityFeedActiveChallenge
+  activeChallenge: CommunityFeedActiveChallenge | null
 }
 
 /**
@@ -2149,7 +2149,7 @@ export interface CommunityFeedAuthorStatesInner {
    * @type {CreateGarmentItemResponseDataImageAccess}
    * @memberof CommunityFeedAuthorStatesInner
    */
-  imageAccess: CreateGarmentItemResponseDataImageAccess
+  imageAccess: CreateGarmentItemResponseDataImageAccess | null
   /**
    *
    * @type {string}
@@ -2515,7 +2515,7 @@ export interface CommunityFeedResponseData {
    * @type {CommunityFeedActiveChallenge}
    * @memberof CommunityFeedResponseData
    */
-  activeChallenge: CommunityFeedActiveChallenge
+  activeChallenge: CommunityFeedActiveChallenge | null
 }
 
 /**
@@ -2865,7 +2865,7 @@ export interface CreateGarmentItemResponseData {
    * @type {CreateGarmentItemResponseDataImageAccess}
    * @memberof CreateGarmentItemResponseData
    */
-  imageAccess: CreateGarmentItemResponseDataImageAccess
+  imageAccess: CreateGarmentItemResponseDataImageAccess | null
 }
 
 /**
@@ -5439,7 +5439,7 @@ export interface OutfitCapsuleResponseDataGarmentsInner {
    * @type {CreateGarmentItemResponseDataImageAccess}
    * @memberof OutfitCapsuleResponseDataGarmentsInner
    */
-  imageAccess: CreateGarmentItemResponseDataImageAccess
+  imageAccess: CreateGarmentItemResponseDataImageAccess | null
   /**
    *
    * @type {OutfitCapsuleResponseDataGarmentsInnerAvailabilityStatusEnum}
@@ -5603,7 +5603,7 @@ export interface PaletteAdvisorProfileRecommendationsInner {
    * @type {AdvisorRecommendationCardSponsored}
    * @memberof PaletteAdvisorProfileRecommendationsInner
    */
-  sponsored: AdvisorRecommendationCardSponsored
+  sponsored: AdvisorRecommendationCardSponsored | null
 }
 
 /**
@@ -6340,7 +6340,7 @@ export interface PlannerDayResultOneOfOutfitsInnerDisplayGarmentsInner {
    * @type {CreateGarmentItemResponseDataImageAccess}
    * @memberof PlannerDayResultOneOfOutfitsInnerDisplayGarmentsInner
    */
-  imageAccess: CreateGarmentItemResponseDataImageAccess
+  imageAccess: CreateGarmentItemResponseDataImageAccess | null
 }
 
 /**
@@ -7145,7 +7145,7 @@ export interface RitualResponseDataOutfitsInner {
    * @type {ScenarioOutfitShopThisLook}
    * @memberof RitualResponseDataOutfitsInner
    */
-  shopThisLook: ScenarioOutfitShopThisLook
+  shopThisLook: ScenarioOutfitShopThisLook | null
 }
 
 /**
@@ -7328,7 +7328,7 @@ export interface ScenarioOutfit {
    * @type {ScenarioOutfitShopThisLook}
    * @memberof ScenarioOutfit
    */
-  shopThisLook: ScenarioOutfitShopThisLook
+  shopThisLook: ScenarioOutfitShopThisLook | null
 }
 
 /**

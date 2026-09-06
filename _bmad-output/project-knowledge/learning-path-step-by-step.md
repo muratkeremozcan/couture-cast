@@ -7875,7 +7875,7 @@ flowchart TD
     FEED["GET /community/feed?mode=…"] --> RFLAG{"community_read_enabled"}
     RFLAG -- "off" --> D503["503 feed disabled"]
     RFLAG -- "on" --> BAND["resolve viewer band\nwalk ordered locations\nfresh or cached under 60 min\n3+ usable days"]
-    BAND --> PAGE["keyset on published_at,id\ncursor carries the mode\nmismatch restarts paging"]
+    BAND --> PAGE["keyset on published_at,id\ncursor carries mode AND resolved band\neither mismatch restarts paging"]
     PAGE --> SIGN["sign each object\nunsignable: omit + ERROR log\nsingle-post read answers 503"]
     SIGN --> ALIAS["CommunityAlias\n8 random hex, stored, never derived"]
     ALIAS --> ITEMS["items: published only"]
@@ -7887,3 +7887,20 @@ flowchart TD
   RLS -.-> ROW
   ERASE["account erasure / withdrawal"] --> HIDE["hide first, then delete objects\nModerationEvent.post_id SET NULL\nsnapshot + alias retained 12 months"]
 ```
+
+### A guard written for one workspace caught a different session's mistake in another
+
+`prisma db seed` runs the seed graph under `tsx`.
+There, a named import from a workspace `.ts` module resolves to a CJS namespace and the named export is not statically visible.
+`5.4-DB-040` was written to catch that, for the seed modules that already had the problem.
+
+Months later the user seed gained an `evaluateAgeGate` import from `@couture/utils`.
+Different package, different session, nobody involved had read that guard.
+It failed immediately with `does not provide an export named 'evaluateAgeGate'`, rather than at the next `db:seed` on somebody's machine.
+
+That is the only direct evidence this story produced that a cross-cutting guard repays what it costs.
+It is worth recording next to the guards that never fired, because a test whose whole value is the bug you never saw is invisible in a retrospective.
+
+The mechanism matters more than the anecdote.
+The guard was cheap because it re-runs the real entry point instead of reimplementing it, which is why it caught an import it was never written to know about.
+A guard that reimplements the thing it checks can only catch what its author already thought of.

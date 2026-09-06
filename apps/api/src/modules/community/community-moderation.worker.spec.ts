@@ -287,7 +287,19 @@ describe('CommunityModerationProcessor & Worker', () => {
         'community_challenge_participated',
         {
           platform: 'web',
-          dedupeKey: 'community_challenge_participated:challenge-42:user-9',
+          // The author component is an HMAC token, never the raw id.
+          // `dedupe_key` is a declared property on this pseudonymous event and
+          // travels to the analytics sink, so a raw id here would sit on the
+          // same row as the pseudonym meant to hide it. Asserted as an absence
+          // rather than a token value, so reintroducing the id alongside a
+          // token still fails.
+          dedupeKey: expect.stringMatching(
+            /^community_challenge_participated:challenge-42:[0-9a-f]{16}$/
+          ) as unknown as string,
+          // The challenge as a first-class dimension. It used to be legible
+          // only inside the key, which is opaque to the sink and free to change
+          // shape -- and it just did.
+          challengeId: 'challenge-42',
           climateBand: 'temperate_dry',
         }
       )

@@ -38,6 +38,8 @@ import {
   type ClimateBand,
   type CommunityAuthorPostState,
   type CommunityBandUnresolvedReason,
+  type CommunityExperimentVariant,
+  type CommunityFeed,
   type CommunityFeedItem,
   type CommunityFeedMode,
   type CommunityReportReason,
@@ -50,7 +52,9 @@ import {
   communityRetryAfterSeconds,
   generateIdempotencyKey,
   getCommunityFeedFromWeb,
+  getCommunityPostFromWeb,
   hasWebSession,
+  openCommunityPostFromWeb,
   publishCommunityLookFromWeb,
   reportCommunityPostFromWeb,
   withdrawCommunityPostFromWeb,
@@ -117,6 +121,11 @@ const FAILURE_KEYS: Record<CommunityFailureReason, string> = {
   reason_changed: 'community.error.reasonChanged',
   self_report: 'community.error.selfReport',
   disabled: 'community.error.disabled',
+  media_unavailable: 'community.error.mediaUnavailable',
+  // Only the feed read sends a cursor, and `readFeedPage` recovers from this one
+  // before any caller sees it, so this entry is the copy of last resort rather
+  // than a state the reader is expected to meet.
+  cursor_invalid: 'community.error.load',
   upload_failed: 'community.error.upload',
   image_too_small: 'community.validation.imageTooSmall',
   unknown: 'community.error.generic',
@@ -162,6 +171,21 @@ function suggestionOf(allocated: AllocatedLook | null): string | null {
 
 function bandLabel(band: ClimateBand | null | undefined, t: Translate): string {
   return band ? t(`community.band.${band}`) : t('community.band.unclassified')
+}
+
+function authorNameOf(item: CommunityFeedItem, t: Translate): string {
+  return item.author.isSelf ? t('community.card.authorSelf') : item.author.displayName
+}
+
+/**
+ * `?? ` was not enough. `altText` is `z.string().nullable()` on the wire, so a
+ * published row can carry an empty string, and `item.altText ?? fallback` hands
+ * that straight to `alt=""`, which marks a content image decorative and hides it
+ * from a screen reader entirely. Mobile's `community-card.tsx` already falls back
+ * on `?.trim() ||`; this is the same rule.
+ */
+function altTextOf(item: CommunityFeedItem, authorName: string, t: Translate): string {
+  return item.altText?.trim() || t('community.card.label', { author: authorName })
 }
 
 function modeLabel(
@@ -466,6 +490,7 @@ interface LookbookCardImageSurfaceProps {
   t: Translate
   onImageError: (item: CommunityFeedItem) => void
   onImageRetry: (item: CommunityFeedItem) => void
+  onOpen: (item: CommunityFeedItem) => void
 }
 
 function LookbookCardImageSurface({
@@ -475,11 +500,10 @@ function LookbookCardImageSurface({
   t,
   onImageError,
   onImageRetry,
+  onOpen,
 }: LookbookCardImageSurfaceProps) {
-  const authorName = item.author.isSelf
-    ? t('community.card.authorSelf')
-    : item.author.displayName
-  const altText = item.altText ?? t('community.card.label', { author: authorName })
+  const authorName = authorNameOf(item, t)
+  const altText = altTextOf(item, authorName, t)
 
   return (
     <div
@@ -519,7 +543,34 @@ function LookbookCardImageSurface({
         />
       )}
 
-      <div className="absolute left-3 top-3 flex flex-wrap items-center gap-2">
+      {/*
+       * The card's one real "open". The grid crops every look to 256px and clamps
+       * its caption to three lines, so viewing the look whole is an interaction
+       * the surface already implies rather than a click target invented to give
+       * `community_card_opened` a producer. It covers the image and carries the
+       * pill as its visible label; a card whose object will not load has nothing
+       * to open, so the failed state offers reload instead.
+       */}
+      {!isFailedImage && (
+        <button
+          type="button"
+          data-testid={`lookbook-open-${item.id}`}
+          aria-label={t('community.card.openLabel', { author: authorName })}
+          onClick={() => {
+            onOpen(item)
+          }}
+          className="absolute inset-0 flex items-end justify-end p-3 focus-visible:outline focus-visible:outline-2 focus-visible:-outline-offset-2 focus-visible:outline-[color:var(--theme-secondary)]"
+        >
+          <span
+            aria-hidden="true"
+            className="lookbook-metrics rounded-full bg-white/95 px-3 py-1 text-[10px] font-semibold uppercase tracking-wider text-[color:var(--theme-card-text)] shadow-sm motion-safe:transition-colors"
+          >
+            {t('community.card.open')}
+          </span>
+        </button>
+      )}
+
+      <div className="pointer-events-none absolute left-3 top-3 flex flex-wrap items-center gap-2">
         {/*
          * One band badge, not two. The old surface carried a `location-badge`
          * beside this one, but `communityFeedItemSchema` publishes no location:
@@ -577,9 +628,7 @@ function LookbookCardContent({
   onReport,
   onWithdraw,
 }: LookbookCardContentProps) {
-  const authorName = item.author.isSelf
-    ? t('community.card.authorSelf')
-    : item.author.displayName
+  const authorName = authorNameOf(item, t)
 
   return (
     <div className="flex flex-1 flex-col justify-between gap-3 p-5">
@@ -651,6 +700,7 @@ interface LookbookCardProps {
   t: Translate
   onImageError: (item: CommunityFeedItem) => void
   onImageRetry: (item: CommunityFeedItem) => void
+  onOpen: (item: CommunityFeedItem) => void
   onReport: (postId: string) => void
   onWithdraw: (postId: string) => void
 }
@@ -665,6 +715,7 @@ function LookbookCard({
   t,
   onImageError,
   onImageRetry,
+  onOpen,
   onReport,
   onWithdraw,
 }: LookbookCardProps) {
@@ -688,6 +739,7 @@ function LookbookCard({
         t={t}
         onImageError={onImageError}
         onImageRetry={onImageRetry}
+        onOpen={onOpen}
       />
       <LookbookCardContent
         item={item}
@@ -698,6 +750,76 @@ function LookbookCard({
         onWithdraw={onWithdraw}
       />
     </article>
+  )
+}
+
+// ---------------------------------------------------------------------------
+// LookbookDetailDialog
+// ---------------------------------------------------------------------------
+
+interface LookbookDetailDialogProps {
+  item: CommunityFeedItem
+  t: Translate
+  onClose: () => void
+}
+
+/**
+ * What a card opens into. The grid crops each look to a 256px `object-cover`
+ * band and clamps its caption to three lines, so this is the only place the
+ * whole photograph and the whole caption are readable.
+ *
+ * `object-contain` rather than the grid's `object-cover`: cropping is a grid
+ * affordance, and a look the reader deliberately opened must not lose its hem
+ * or its hat to the frame.
+ */
+function LookbookDetailDialog({ item, t, onClose }: LookbookDetailDialogProps) {
+  const authorName = authorNameOf(item, t)
+
+  return (
+    <AccessibleModal
+      isOpen
+      onClose={onClose}
+      title={t('community.card.label', { author: authorName })}
+      titleId="community-detail-title"
+      closeLabel={t('community.card.detailClose')}
+    >
+      <div data-testid="community-detail" className="flex flex-col gap-4">
+        <div className="relative h-80 w-full overflow-hidden rounded-[8px] bg-[var(--theme-card-bg)]">
+          <Image
+            src={item.imageAccess.url}
+            alt={altTextOf(item, authorName, t)}
+            fill
+            unoptimized
+            sizes="(min-width: 768px) 50vw, 100vw"
+            className="object-contain"
+          />
+        </div>
+
+        <div className="flex flex-wrap items-center gap-2">
+          <span
+            data-testid={`community-detail-band-${item.id}`}
+            className="lookbook-metrics rounded-md bg-[var(--theme-secondary)] px-2.5 py-1 text-[10px] font-semibold uppercase text-[color:var(--theme-primary)]"
+          >
+            {bandLabel(item.climateBand, t)}
+          </span>
+          <span
+            data-testid="community-detail-author"
+            className="lookbook-metrics text-xs font-semibold text-[color:var(--theme-card-text)]"
+          >
+            {authorName}
+          </span>
+        </div>
+
+        {item.caption && (
+          <p
+            data-testid="community-detail-caption"
+            className="text-xs leading-relaxed text-neutral-600"
+          >
+            {item.caption}
+          </p>
+        )}
+      </div>
+    </AccessibleModal>
   )
 }
 
@@ -1398,6 +1520,53 @@ function LoadMoreControl({
 // CommunityLookbookGrid
 // ---------------------------------------------------------------------------
 
+/**
+ * One page of the feed, with the single 400 ordinary browsing produces already
+ * resolved.
+ *
+ * A feed cursor is bound to the filter mode AND the resolved climate band it was
+ * minted under. Under `auto` that band is recomputed on every request from
+ * weather guaranteed fresh for only 60 minutes, so it can move between page one
+ * and page two of a single scroll, and the server answers 400 to keep the reader
+ * off a keyset that belongs to a differently filtered set. The contract's own
+ * words for that rejection are "so the client restarts paging": it is a normal
+ * operating condition, not a fault, and putting a whole-feed alert over a grid
+ * still holding twelve looks reported it as one.
+ *
+ * `restarted` tells the caller the rows it is holding are stale: the page came
+ * back from the head of the feed and REPLACES what it has rather than appending
+ * to it.
+ *
+ * The retry sends no cursor, so it cannot provoke the rejection it is recovering
+ * from; the extra request is bounded at one by construction rather than by a
+ * counter.
+ */
+async function readFeedPage(
+  mode: CommunityFeedMode,
+  cursor: string | undefined,
+  signal: AbortSignal
+): Promise<{ feed: CommunityFeed; restarted: boolean }> {
+  try {
+    return {
+      feed: await getCommunityFeedFromWeb({
+        mode,
+        cursor,
+        limit: FEED_PAGE_SIZE,
+        signal,
+      }),
+      restarted: false,
+    }
+  } catch (error: unknown) {
+    if (cursor === undefined || communityFailureReason(error) !== 'cursor_invalid') {
+      throw error
+    }
+    return {
+      feed: await getCommunityFeedFromWeb({ mode, limit: FEED_PAGE_SIZE, signal }),
+      restarted: true,
+    }
+  }
+}
+
 export interface CommunityLookbookGridProps {
   activeTab?: FilterCategory
   onTabChange?: (tab: FilterCategory) => void
@@ -1421,6 +1590,17 @@ export interface CommunityLookbookGridProps {
    * is a contradiction the reader has to resolve rather than a cosmetic gap.
    */
   onViewerBandChange?: (band: ClimateBand | null) => void
+  /**
+   * Reports the mode the server actually SERVED, which is not always the one
+   * that was requested: the beta experiment resolves a `auto` request to the
+   * viewer's arm, so half the cohort asks for `auto` and is served `all`.
+   *
+   * Exists for the same reason as {@link onViewerBandChange}. Only this
+   * component sees the feed response, and `lookbook-prism-layout.tsx` renders a
+   * second `LookbookFilterNav` outside it, so without this that nav shows the
+   * `auto` chip pressed over a feed carrying every region.
+   */
+  onServedModeChange?: (mode: CommunityFeedMode) => void
 }
 
 export function CommunityLookbookGrid({
@@ -1432,17 +1612,41 @@ export function CommunityLookbookGrid({
   showFilterNav = false,
   sponsoredPostIds,
   onViewerBandChange,
+  onServedModeChange,
 }: CommunityLookbookGridProps) {
   const { t, i18n } = useCommunityTranslation()
   const locale = useResolvedLocale(i18n.language)
 
   const [currentMode, setCurrentMode] = useState<FilterCategory>(activeTab)
+  /**
+   * The mode the server said it served, or `null` while the request that would
+   * answer that is still in flight. Distinct from `currentMode`, which is what
+   * the reader asked for and what the next request sends: a `auto` request is
+   * resolved to the viewer's experiment arm, so half the cohort asks for `auto`
+   * and is served `all`.
+   */
+  const [servedMode, setServedMode] = useState<CommunityFeedMode | null>(null)
   const [items, setItems] = useState<CommunityFeedItem[]>([])
   const [authorStates, setAuthorStates] = useState<CommunityAuthorPostState[]>([])
   const [viewerBand, setViewerBand] = useState<ClimateBand | null>(null)
+  const [bandResolved, setBandResolved] = useState(true)
   const [bandUnresolvedReason, setBandUnresolvedReason] =
     useState<CommunityBandUnresolvedReason | null>(null)
+  /**
+   * The arm this client was serving, held so a card-open can be attributed to
+   * the feed the viewer actually saw. `null` until a feed lands, and no card can
+   * be opened before then, so there is never a default to invent.
+   */
+  const [experimentVariant, setExperimentVariant] =
+    useState<CommunityExperimentVariant | null>(null)
   const [nextCursor, setNextCursor] = useState<string | null>(null)
+  /**
+   * A deep-link target that is not on the page the grid is holding. Resolved
+   * from `GET /posts/{postId}` and rendered at the head of the feed, because the
+   * referenced card routinely sits far past the twelve rows of page one.
+   */
+  const [deepLinkedItem, setDeepLinkedItem] = useState<CommunityFeedItem | null>(null)
+  const [openedItem, setOpenedItem] = useState<CommunityFeedItem | null>(null)
   const [activeChallenge, setActiveChallenge] =
     useState<EmbeddedCommunityChallenge | null>(null)
   const [isLoading, setIsLoading] = useState(false)
@@ -1498,6 +1702,13 @@ export function CommunityLookbookGrid({
     setCurrentMode(activeTab)
   }, [activeTab])
 
+  /**
+   * The mode this surface presents itself as showing. The server's answer wins
+   * once it has one, because `auto` is the arm the beta experiment varies and
+   * half the viewers who ask for it are served `all`.
+   */
+  const displayedMode: CommunityFeedMode = servedMode ?? currentMode
+
   // Reported from an effect rather than from inside `loadFeed`, so the caller's
   // callback stays out of that callback's dependency list: a caller that passes
   // an inline arrow would otherwise re-fire the whole feed read on every render.
@@ -1505,13 +1716,19 @@ export function CommunityLookbookGrid({
     onViewerBandChange?.(viewerBand)
   }, [onViewerBandChange, viewerBand])
 
+  useEffect(() => {
+    onServedModeChange?.(displayedMode)
+  }, [onServedModeChange, displayedMode])
+
   /**
    * One read of the feed.
    *
    * The cursor is bound to the mode it was minted under and the server answers
    * 400 for a mismatch, so a mode change restarts paging rather than carrying
    * the cursor across; `nextCursor` is cleared at the head of every non-append
-   * load for exactly that reason.
+   * load for exactly that reason. {@link readFeedPage} handles the other way
+   * that cursor goes dead -- the viewer's resolved band moving mid-scroll -- and
+   * reports it as `restarted`, which turns an append back into a replace.
    *
    * Holds no `t`: everything it stores is a key plus params, so a language
    * change repaints without re-requesting.
@@ -1534,17 +1751,15 @@ export function CommunityLookbookGrid({
     }
 
     try {
-      const feed = await getCommunityFeedFromWeb({
-        mode,
-        cursor,
-        limit: FEED_PAGE_SIZE,
-        signal: controller.signal,
-      })
+      const { feed, restarted } = await readFeedPage(mode, cursor, controller.signal)
       if (generation !== feedGenerationRef.current) {
         return
       }
+      setServedMode(feed.mode)
       setViewerBand(feed.viewerBand)
+      setBandResolved(feed.bandResolved)
       setBandUnresolvedReason(feed.bandUnresolvedReason)
+      setExperimentVariant(feed.experimentVariant)
       setAuthorStates(feed.authorStates)
       setActiveChallenge(feed.activeChallenge)
       setNextCursor(feed.nextCursor)
@@ -1553,7 +1768,7 @@ export function CommunityLookbookGrid({
       // clearing it is what left a recovered card reading "Image unavailable"
       // for the rest of the session.
       setFailedImages((previous) => pruneFailedImages(previous, feed.items))
-      if (append) {
+      if (append && !restarted) {
         // Counted from what the merge actually appends, not from the page size:
         // `mergeFeedPages` drops rows the previous page already carried, so
         // announcing `feed.items.length` told a screen-reader reader that more
@@ -1569,8 +1784,11 @@ export function CommunityLookbookGrid({
       } else {
         setItems(feed.items)
         setAnnouncement({
+          // The mode SERVED, not the mode asked for. A viewer in the `all` arm
+          // who requests `auto` is otherwise told "Showing Your climate: Cold and
+          // dry looks" over a feed carrying every region.
           key: 'community.feed.announceLoaded',
-          params: { filterMode: mode, count: feed.items.length },
+          params: { filterMode: feed.mode, count: feed.items.length },
         })
       }
     } catch (error: unknown) {
@@ -1589,6 +1807,11 @@ export function CommunityLookbookGrid({
   }, [])
 
   useEffect(() => {
+    // Cleared alongside the request, so the chips answer with the mode just
+    // clicked while the server is deciding what to serve for it, and correct
+    // themselves when it answers. Holding the previous served mode instead would
+    // leave the click looking like it did nothing.
+    setServedMode(null)
     void loadFeed(currentMode)
   }, [currentMode, loadFeed])
 
@@ -1600,6 +1823,47 @@ export function CommunityLookbookGrid({
     []
   )
 
+  /**
+   * Resolves a deep-link target the loaded pages do not contain.
+   *
+   * The feed is keyset-paginated twelve rows at a time and a notification can
+   * reference a look from any depth of it, so the old `getElementById` found
+   * nothing for every target past page one: no scroll, no focus, no
+   * announcement, and a reader who followed a link to one specific look landed on
+   * an ordinary feed with no sign of it. `GET /posts/{postId}` answers for the
+   * post directly and 404s for anything the caller may not see.
+   */
+  useEffect(() => {
+    const controller = new AbortController()
+    if (highlightedCardId && !items.some((item) => item.id === highlightedCardId)) {
+      void getCommunityPostFromWeb(highlightedCardId, controller.signal)
+        .then((post) => {
+          setDeepLinkedItem(post)
+        })
+        .catch(() => {
+          // A target withdrawn between the link being followed and this read is
+          // an expected outcome, and `processWebDeepLink` owns the invalid-link
+          // copy, so nothing is reported from here.
+          setDeepLinkedItem(null)
+        })
+    } else {
+      setDeepLinkedItem(null)
+    }
+    return () => {
+      controller.abort()
+    }
+  }, [highlightedCardId, items])
+
+  /**
+   * The rows on screen: the loaded pages, with a deep-link target that is not
+   * among them carried at the head. `mergeFeedPages` is what keeps the row from
+   * appearing twice once paging reaches the page it really belongs to.
+   */
+  const displayedItems = useMemo(
+    () => (deepLinkedItem ? mergeFeedPages([deepLinkedItem], items) : items),
+    [deepLinkedItem, items]
+  )
+
   useEffect(() => {
     if (!highlightedCardId) return
     const cardElement = document.getElementById(`lookbook-card-${highlightedCardId}`)
@@ -1608,7 +1872,7 @@ export function CommunityLookbookGrid({
       cardElement.focus()
       setAnnouncement({ key: 'community.feed.announceFocused' })
     }
-  }, [highlightedCardId, items])
+  }, [highlightedCardId, displayedItems])
 
   const handleModeChange = (mode: FilterCategory) => {
     setCurrentMode(mode)
@@ -1630,6 +1894,23 @@ export function CommunityLookbookGrid({
   const closeReportModal = () => {
     setReportingPostId(null)
     setReportError(null)
+  }
+
+  /**
+   * Opening a look shows it whole and records the one event AC7's advance
+   * condition is measured from.
+   *
+   * The record is fire-and-forget and its failure is swallowed on purpose: this
+   * is measurement, and a telemetry route that is down must not stop a reader
+   * seeing a photograph. The event's `isSelf` is decided server-side from the
+   * stored author id, so nothing here compares ids.
+   */
+  const handleOpenCard = (item: CommunityFeedItem) => {
+    setOpenedItem(item)
+    if (experimentVariant === null) {
+      return
+    }
+    void openCommunityPostFromWeb(item.id, experimentVariant).catch(() => undefined)
   }
 
   const handleImageError = useCallback(
@@ -1803,11 +2084,23 @@ export function CommunityLookbookGrid({
     ? 'grid-cols-1'
     : 'grid-cols-1 min-[768px]:grid-cols-2'
 
+  /**
+   * The banner explains why `auto` fell back to every region, so it belongs to
+   * `auto` alone. Rendering it on `bandUnresolvedReason` by itself told a reader
+   * who had pinned `cold_dry`, or chosen "Every climate", that they were "seeing
+   * every climate band" over a feed that was neither -- the server reports the
+   * reason on every response, including the ones where the band was never going
+   * to be used. `bandResolved` is the second half of the same gate: it is the
+   * field that actually says whether resolution failed.
+   */
+  const bandNoticeReason =
+    displayedMode === 'auto' && !bandResolved ? bandUnresolvedReason : null
+
   return (
     <aside aria-label={t('community.sectionLabel')} className="flex flex-col gap-6">
       {showFilterNav && (
         <LookbookFilterNav
-          activeTab={currentMode}
+          activeTab={displayedMode}
           isMobilePreview={isMobilePreview}
           onTabChange={handleModeChange}
           viewerBand={viewerBand}
@@ -1817,7 +2110,7 @@ export function CommunityLookbookGrid({
       <CommunityHeader canShare={hasSession} onShare={openCreateModal} t={t} />
 
       <CommunityNotices
-        bandUnresolvedReason={bandUnresolvedReason}
+        bandUnresolvedReason={bandNoticeReason}
         notice={notice}
         noticeText={renderMessage(notice?.message ?? null, t, viewerBand)}
         t={t}
@@ -1835,7 +2128,7 @@ export function CommunityLookbookGrid({
       <CommunityFeedStates
         isLoading={isLoading}
         errorText={renderMessage(feedError, t, viewerBand)}
-        itemCount={items.length}
+        itemCount={displayedItems.length}
         gridColumns={gridColumns}
         canShare={hasSession}
         onRetry={handleRetry}
@@ -1849,7 +2142,7 @@ export function CommunityLookbookGrid({
         aria-busy={isLoading || isLoadingMore}
         className={`grid gap-6 ${gridColumns}`}
       >
-        {items.map((item) => (
+        {displayedItems.map((item) => (
           <LookbookCard
             key={item.id}
             item={item}
@@ -1861,6 +2154,7 @@ export function CommunityLookbookGrid({
             t={t}
             onImageError={handleImageError}
             onImageRetry={handleImageRetry}
+            onOpen={handleOpenCard}
             onReport={(postId) => {
               setReportError(null)
               setReportingPostId(postId)
@@ -1891,6 +2185,16 @@ export function CommunityLookbookGrid({
       >
         {renderMessage(announcement, t, viewerBand)}
       </div>
+
+      {openedItem !== null && (
+        <LookbookDetailDialog
+          item={openedItem}
+          t={t}
+          onClose={() => {
+            setOpenedItem(null)
+          }}
+        />
+      )}
 
       {reportingPostId !== null && (
         <CommunityReportModal

@@ -3,7 +3,10 @@
 // SLA alert recording, and retry exhaustion handling.
 import { Inject, Injectable, Logger, Optional } from '@nestjs/common'
 import { PrismaClient, type ClimateBand, type LookbookPost } from '@prisma/client'
-import { TelemetryService } from '../telemetry/telemetry.service.js'
+import {
+  TelemetryService,
+  type TelemetryPropertiesMap,
+} from '../telemetry/telemetry.service.js'
 import {
   SupabaseCommunityStorageAdapter,
   type CommunityStorage,
@@ -14,7 +17,7 @@ import {
   DefaultCommunityModerationEngine,
 } from './community-moderation.engine.js'
 import { type CommunityModerationJob } from './community-moderation.queue.js'
-import { postDedupeKey } from './community-analytics.js'
+import { communitySubjectToken, postDedupeKey } from './community-analytics.js'
 import { buildCommunityContentSnapshot } from './community-audit-snapshot.js'
 import {
   CommunityImageValidationError,
@@ -166,11 +169,13 @@ export class CommunityModerationProcessor {
     userId: string,
     eventType: T,
     postId: string,
-    properties: {
-      platform: 'web' | 'mobile'
-      dedupeKey: string
-      climateBand: ClimateBand | null
-    }
+    // Typed FROM the telemetry map rather than hand-declared. The hand-written
+    // shape here silently omitted `challengeId` when the participation event
+    // gained it, and until the event schemas gained `.strict()` an extra or
+    // missing key would have been stripped at the boundary rather than
+    // reported. Deriving the type means a field added to an event is a compile
+    // error at this call site instead of an emission that is quietly wrong.
+    properties: TelemetryPropertiesMap[T]
   ): Promise<void> {
     try {
       await this.telemetryService.captureEvent(userId, eventType, properties)
@@ -290,13 +295,22 @@ export class CommunityModerationProcessor {
 
     if (challengeId) {
       // Keyed on the challenge and the author, so the sink counts unique
-      // published participants no matter how many posts one author submits.
+      // published participants no matter how many posts one author submits. The
+      // author is the HMAC token, never the raw id: this event is pseudonymous
+      // and `dedupe_key` travels to the sink as a plain property, so a raw id
+      // would put the pseudonym and the identity beside each other on one row.
       await this.emit(userId, 'community_challenge_participated', postId, {
         platform: platform ?? 'web',
         dedupeKey: postDedupeKey(
-          `${challengeId}:${userId}`,
+          `${challengeId}:${communitySubjectToken(userId)}`,
           'community_challenge_participated'
         ),
+        // The challenge as a first-class dimension. It used to be legible only
+        // inside the dedupe key, which is opaque to the sink by design and free
+        // to change shape -- and the key's shape has just changed, so without
+        // this field the beta gate would have lost the ability to attribute
+        // participation to a challenge at all.
+        challengeId,
         climateBand,
       })
     }

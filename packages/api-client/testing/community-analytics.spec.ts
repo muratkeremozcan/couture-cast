@@ -172,11 +172,13 @@ const communityEventCases: CommunityEventCase[] = [
         platform: 'mobile',
         dedupeKey: 'challenge:hmac-subject-1:challenge-1',
         climateBand: 'cold_dry',
+        challengeId: 'challenge-1',
       }),
     properties: {
       platform: 'mobile',
       dedupe_key: 'challenge:hmac-subject-1:challenge-1',
       climate_band: 'cold_dry',
+      challenge_id: 'challenge-1',
     },
   },
 ]

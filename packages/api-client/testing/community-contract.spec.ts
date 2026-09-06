@@ -508,19 +508,106 @@ describe('community HTTP contracts', () => {
       expect(new Date(AUCKLAND_MONDAY_START).getUTCDay()).toBe(0)
     })
 
-    it('6.1-CON-019 accepts a Monday-anchored week whose UTC weekday is Tuesday', () => {
-      // The mirror case, west of UTC: Monday 21:00 in Los Angeles is Tuesday
-      // 04:00 in UTC.
+    it('6.1-CON-019 accepts a Monday-anchored week west of UTC, at a non-UTC hour', () => {
+      // The mirror case, west of UTC. Local midnight in Los Angeles is 07:00 in
+      // UTC, so the instant is nowhere near a UTC day boundary and a check that
+      // read the UTC clock would reject it.
+      //
+      // This case used to assert a Tuesday UTC weekday, using Monday 21:00
+      // local. That is no longer a legal window: the rule now anchors on local
+      // MIDNIGHT rather than on the local weekday alone, and in any zone behind
+      // UTC local Monday midnight always reads Monday in UTC. Auckland in
+      // 6.1-CON-018 is the case that still shifts the UTC weekday, backwards to
+      // Sunday.
       const parsed = createCommunityChallengeInputSchema.parse(
         createInput({
-          startsAt: '2026-09-08T04:00:00.000Z',
-          endsAt: '2026-09-15T04:00:00.000Z',
+          startsAt: '2026-09-07T07:00:00.000Z',
+          endsAt: '2026-09-14T07:00:00.000Z',
           timeZone: 'America/Los_Angeles',
         })
       )
 
       expect(parsed.timeZone).toBe('America/Los_Angeles')
-      expect(new Date('2026-09-08T04:00:00.000Z').getUTCDay()).toBe(2)
+      expect(new Date('2026-09-07T07:00:00.000Z').getUTCHours()).toBe(7)
+    })
+
+    it('6.1-CON-019a rejects a Monday start that is not local midnight', () => {
+      // The hole the previous rule left open. 2026-03-02T15:37Z is 10:37 on a
+      // Monday morning in New York, and a check that reads the weekday and the
+      // elapsed hours but never the time of day accepted it as a
+      // "Monday seven-day window".
+      const result = createCommunityChallengeInputSchema.safeParse(
+        createInput({
+          startsAt: '2026-03-02T15:37:00.000Z',
+          endsAt: '2026-03-09T15:37:00.000Z',
+          timeZone: 'America/New_York',
+        })
+      )
+
+      expect(result.success).toBe(false)
+      expect(
+        result.success ? [] : result.error.issues.map((issue) => issue.path.join('.'))
+      ).toContain('startsAt')
+    })
+
+    describe('windows crossing a daylight-saving transition', () => {
+      // A Monday-to-Monday week is seven LOCAL days, which is 167 absolute hours
+      // across a spring transition and 169 across an autumn one. The rule this
+      // replaced compared `end - start` against a hardcoded seven times 24 hours,
+      // so in any DST-observing zone it rejected every legitimate window and
+      // accepted only the ones landing an hour off the local Monday boundary,
+      // which is the boundary `timeZone` is on the schema to pin.
+
+      it('6.1-CON-019b accepts a 167-hour week across the spring transition', () => {
+        const startsAt = '2026-03-02T05:00:00.000Z' // Mon 2026-03-02 00:00 EST
+        const endsAt = '2026-03-09T04:00:00.000Z' // Mon 2026-03-09 00:00 EDT
+
+        // Guard the fixture: if this ever equals 168 the case has stopped
+        // crossing a transition and proves nothing the other tests do not.
+        const elapsedHours =
+          (Date.parse(endsAt) - Date.parse(startsAt)) / (60 * 60 * 1000)
+        expect(elapsedHours).toBe(167)
+
+        const parsed = createCommunityChallengeInputSchema.parse(
+          createInput({ startsAt, endsAt, timeZone: 'America/New_York' })
+        )
+
+        expect(parsed.startsAt).toBe(startsAt)
+        expect(parsed.endsAt).toBe(endsAt)
+      })
+
+      it('6.1-CON-019c rejects the 168-hour instant the old rule demanded', () => {
+        // The load-bearing half. This is precisely the input the replaced rule
+        // required across that transition, and it lands at 01:00 on the Monday
+        // rather than at midnight. If this ever passes, the fixed-hour
+        // arithmetic has come back.
+        const startsAt = '2026-03-02T05:00:00.000Z'
+        const endsAt = '2026-03-09T05:00:00.000Z' // Mon 2026-03-09 01:00 EDT
+
+        expect((Date.parse(endsAt) - Date.parse(startsAt)) / (60 * 60 * 1000)).toBe(168)
+
+        const result = createCommunityChallengeInputSchema.safeParse(
+          createInput({ startsAt, endsAt, timeZone: 'America/New_York' })
+        )
+
+        expect(result.success).toBe(false)
+        expect(
+          result.success ? [] : result.error.issues.map((issue) => issue.path.join('.'))
+        ).toContain('endsAt')
+      })
+
+      it('6.1-CON-019d accepts a 169-hour week across the autumn transition', () => {
+        const startsAt = '2026-10-26T04:00:00.000Z' // Mon 2026-10-26 00:00 EDT
+        const endsAt = '2026-11-02T05:00:00.000Z' // Mon 2026-11-02 00:00 EST
+
+        expect((Date.parse(endsAt) - Date.parse(startsAt)) / (60 * 60 * 1000)).toBe(169)
+
+        const parsed = createCommunityChallengeInputSchema.parse(
+          createInput({ startsAt, endsAt, timeZone: 'America/New_York' })
+        )
+
+        expect(parsed.startsAt).toBe(startsAt)
+      })
     })
 
     it('6.1-CON-020 rejects a Tuesday start in the zone even when UTC reads Monday', () => {
@@ -807,6 +894,115 @@ describe('community HTTP contracts', () => {
       expect(communityFeed.properties?.bandUnresolvedReason?.enum).toContain(null)
     })
 
+    // Every community operation, its exact documented response set, and its
+    // security scheme, in one table.
+    //
+    // WHY AN EXACT SET AND NOT A SUBSET. On 2026-09-06 six response descriptions
+    // were written into `contracts/http/community.ts`, lost from the working tree,
+    // and neither the type checker nor any test noticed; they were found by a
+    // person reading the regenerated JSON. Nothing could have caught it, because
+    // every guard in this package proves that the contracts, the document and the
+    // SDK AGREE, and agreement is preserved perfectly when a change is absent from
+    // all three. A missing response description is indistinguishable from a
+    // description nobody wanted. Only an assertion that names what must be present
+    // can detect an absence, and at the time exactly one operation had one:
+    // 6.1-CON-041 below, which is what caught the 400 added to the card-open path.
+    //
+    // The shape is lifted from `wardrobe-contract.spec.ts:265-284` and its two
+    // siblings, which have driven this same table for three modules; community had
+    // simply never adopted it.
+    //
+    // `security` is pinned for the same reason as the codes. An operation that
+    // quietly loses `bearerAuth` is the same class of absence and considerably
+    // worse, and it is the one nobody would catch by reading, because an
+    // unauthenticated endpoint looks exactly like an authenticated one in the
+    // registration source.
+    const COMMUNITY_ROUTES = [
+      {
+        method: 'get',
+        path: '/api/v1/community/feed',
+        statuses: ['200', '400', '401', '500', '503'],
+      },
+      {
+        method: 'get',
+        path: '/api/v1/community/posts/{postId}',
+        statuses: ['200', '400', '401', '404', '500', '503'],
+      },
+      {
+        method: 'post',
+        path: '/api/v1/community/posts/allocate',
+        // The 429 here is documented and, as of 2026-09-06, not reachable:
+        // `CommunityService.allocatePost` enforces no rolling cap, and the only
+        // two throws of `CommunityRateLimitException` are in `publishPost` and
+        // `reportPost`. Recorded rather than quietly dropped, because deciding
+        // between rate-limiting allocation and removing the documented response
+        // is a product call, not a fixture edit. This row asserts what the
+        // document says today; when that decision lands, this row moves with it.
+        statuses: ['200', '400', '401', '403', '409', '429', '500', '503'],
+      },
+      {
+        method: 'post',
+        path: '/api/v1/community/posts/publish',
+        statuses: ['200', '400', '401', '403', '404', '409', '429', '500', '503'],
+      },
+      {
+        method: 'post',
+        path: '/api/v1/community/posts/{postId}/report',
+        statuses: ['200', '400', '401', '403', '404', '409', '429', '500', '503'],
+      },
+      {
+        method: 'post',
+        path: '/api/v1/community/posts/{postId}/opened',
+        statuses: ['200', '400', '401', '404', '500', '503'],
+      },
+      {
+        method: 'post',
+        path: '/api/v1/community/posts/{postId}/withdraw',
+        statuses: ['200', '400', '401', '403', '404', '409', '500', '503'],
+      },
+      {
+        method: 'post',
+        path: '/api/v1/community/challenges',
+        statuses: ['200', '400', '401', '403', '409', '500'],
+      },
+      {
+        method: 'patch',
+        path: '/api/v1/community/challenges/{id}',
+        statuses: ['200', '400', '401', '403', '404', '409', '500'],
+      },
+    ] as const
+
+    it('6.1-CON-042 publishes exactly the documented failures, and bearer auth, on every community operation', () => {
+      // Guard the table itself: a row silently dropped from it would shrink the
+      // surface under assertion without failing anything.
+      expect(COMMUNITY_ROUTES).toHaveLength(9)
+
+      for (const route of COMMUNITY_ROUTES) {
+        const label = `${route.method.toUpperCase()} ${route.path}`
+        const operation = document.paths?.[route.path]?.[route.method]
+
+        expect(operation, `${label} is not registered at all`).toBeDefined()
+        expect(
+          operation?.security,
+          `${label} does not require bearerAuth. An operation losing its security scheme reads identically to one that never had it.`
+        ).toEqual([{ bearerAuth: [] }])
+
+        const documented = Object.keys(operation?.responses ?? {}).sort()
+        const expected: string[] = [...route.statuses]
+        const added = documented.filter((code) => !expected.includes(code))
+        const removed = expected.filter((code) => !documented.includes(code))
+
+        expect(
+          documented,
+          `${label} response codes changed. Added: ${
+            added.length > 0 ? added.join(', ') : 'none'
+          }. Removed: ${
+            removed.length > 0 ? removed.join(', ') : 'none'
+          }. If the change is intended, update this route's statuses; if it is not, a documented response has gone missing.`
+        ).toEqual(expected)
+      }
+    })
+
     it('6.1-CON-041 registers the card-open path with its parameters and failures', () => {
       const openedPath = document.paths?.['/api/v1/community/posts/{postId}/opened']
 
@@ -822,8 +1018,15 @@ describe('community HTTP contracts', () => {
       // The exact set, because the absent codes carry meaning: any viewer may
       // open any post they can see, so there is no 403 to document, and a post
       // they cannot see is a 404 rather than an authorization failure.
+      //
+      // 400 is present because the controller rejects a missing or invalid
+      // `x-couture-platform` header and an invalid body before the service is
+      // reached. It was undocumented until 2026-09-06; this path was one of only
+      // three operations in the whole published spec that took a required header
+      // and documented no 400.
       expect(Object.keys(openedPath?.post?.responses ?? {}).sort()).toEqual([
         '200',
+        '400',
         '401',
         '404',
         '500',

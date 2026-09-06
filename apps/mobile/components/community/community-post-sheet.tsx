@@ -82,6 +82,8 @@ export function communityErrorTranslation(
       return { key: 'community.error.selfReport' }
     case 'disabled':
       return { key: 'community.error.disabled' }
+    case 'media_unavailable':
+      return { key: 'community.error.mediaUnavailable' }
     case 'upload_failed':
       return { key: 'community.error.upload' }
     case 'permission_denied':
@@ -90,6 +92,9 @@ export function communityErrorTranslation(
       return { key: 'community.validation.pickerFailed' }
     case 'image_too_small':
       return { key: 'community.validation.imageTooSmall' }
+    // `cursor_invalid` has no case and no catalog string on purpose: the screen
+    // recovers from it by restarting paging, so copy for it would be copy nobody
+    // can ever be shown.
     default:
       return { key: fallbackKey }
   }

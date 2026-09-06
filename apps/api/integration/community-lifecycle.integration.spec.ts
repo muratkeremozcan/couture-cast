@@ -67,6 +67,25 @@ function requireSchema(context: { skip: () => void }): boolean {
 
 const namespace = `community-lifecycle-${randomUUID().slice(0, 8)}`
 
+/**
+ * Every published fixture in this suite is stamped here rather than at `new
+ * Date()`, and the date is deliberately older than the seeded feed's
+ * `2026-01-01`.
+ *
+ * A run of this suite that does not reach its teardown leaves published rows
+ * behind, and stamped with the current time those rows LEAD the public feed.
+ * That is what broke `maestro/community-feed.yaml`, which opens on
+ * `extendedWaitUntil: visible: community-post-card-lookbook-5` on the premise
+ * that the newest seeded post leads: two newer cards above it push it off a
+ * phone viewport and the flow fails as though the feature were broken. Residue
+ * is still a defect and `reapPreviousRuns` below is the actual fix; this is the
+ * second line, so residue can never again disguise itself as a broken flow.
+ *
+ * Nothing in this suite asserts on feed ORDER, only on presence and status, so
+ * a fixed timestamp costs the tests nothing.
+ */
+const FIXTURE_PUBLISHED_AT = new Date('2025-06-01T00:00:00.000Z')
+
 async function createUser(label: string): Promise<string> {
   const user = await prisma.user.create({
     data: { email: `${namespace}-${label}-${randomUUID().slice(0, 8)}@synthetic.test` },
@@ -137,8 +156,81 @@ async function drainSweep(
   }
 }
 
+/**
+ * The prefix every account this suite creates shares, across every run.
+ *
+ * `namespace` carries a per-run UUID so one run's teardown cannot touch another
+ * run's rows while it is in flight. This is the wider prefix, used only to reap
+ * what a run that never finished left behind.
+ */
+const SUITE_ACCOUNT_PREFIX = 'community-lifecycle-'
+
+/**
+ * Removes residue from PREVIOUS runs of this suite.
+ *
+ * `afterAll` is the primary cleanup and it is correct, but it only runs if the
+ * process reaches it. A run that is killed, times out, or dies on an
+ * unrecoverable error leaves its accounts and posts behind for good, and because
+ * nothing ever looked for them again they accumulated silently: a measurement of
+ * the development feed found ten orphaned rows from a single interrupted run,
+ * two of them `published` and leading the public feed.
+ *
+ * Reaping at the START rather than only at the end is what makes the suite
+ * self-healing. Teardown cannot fix a run that already died; the next run can.
+ *
+ * SCOPED TO THIS SUITE'S OWN ACCOUNTS AND NOTHING ELSE. The filter is a join
+ * onto `User.email` under the reserved `@synthetic.test` domain with this
+ * suite's prefix, so it cannot reach a seeded account, a real one, or another
+ * suite's fixtures, and there is no second naming scheme to keep in step.
+ *
+ * A user carrying an `AuditLog` row is deliberately left standing. That table
+ * refuses DELETE by trigger because it is the immutable consent and moderation
+ * record, so the row pins its owner permanently; deleting the posts and aliases
+ * still removes everything that can affect a feed or a flow.
+ */
+async function reapPreviousRuns(): Promise<void> {
+  const stale = await prisma.user.findMany({
+    where: {
+      email: { startsWith: SUITE_ACCOUNT_PREFIX, endsWith: '@synthetic.test' },
+      NOT: { email: { startsWith: namespace } },
+    },
+    select: { id: true },
+  })
+  if (stale.length === 0) return
+
+  const userIds = stale.map((user) => user.id)
+  const posts = await prisma.lookbookPost.findMany({
+    where: { user_id: { in: userIds } },
+    select: { id: true },
+  })
+  const postIds = posts.map((post) => post.id)
+
+  await prisma.moderationEvent.deleteMany({ where: { post_id: { in: postIds } } })
+  await prisma.communityPostReport.deleteMany({ where: { post_id: { in: postIds } } })
+  await prisma.lookbookPost.deleteMany({ where: { id: { in: postIds } } })
+  await prisma.communityAlias.deleteMany({ where: { user_id: { in: userIds } } })
+  await prisma.guardianConsent.deleteMany({
+    where: {
+      OR: [{ teen_id: { in: userIds } }, { guardian_id: { in: userIds } }],
+    },
+  })
+
+  const pinned = await prisma.auditLog.findMany({
+    where: { user_id: { in: userIds } },
+    select: { user_id: true },
+    distinct: ['user_id'],
+  })
+  const pinnedIds = new Set(pinned.map((row) => row.user_id))
+  await prisma.user.deleteMany({
+    where: { id: { in: userIds.filter((id) => !pinnedIds.has(id)) } },
+  })
+}
+
 beforeAll(async () => {
   await probeSchema()
+  if (schemaReady) {
+    await reapPreviousRuns()
+  }
 })
 
 afterAll(async () => {
@@ -148,8 +240,15 @@ afterAll(async () => {
     // Consent rows hold a foreign key onto `User`, so they go before the users
     // do or the delete below fails on the constraint. `AuditLog` deliberately
     // has no cleanup: a trigger refuses DELETE on it because those rows are the
-    // immutable consent and moderation record. Nothing in this suite commits an
-    // audit row -- 6.1-INT-090 rolls its transaction back -- so none accumulate.
+    // immutable consent and moderation record.
+    //
+    // THIS COMMENT USED TO CLAIM NO AUDIT ROWS ACCUMULATE, on the grounds that
+    // 6.1-INT-090 rolls its transaction back. That was measured and found false:
+    // a `consent_revoked` row was committed by this suite and is on the
+    // development database now. An audit row pins its user permanently, so
+    // `user.deleteMany` below silently leaves that account standing. Everything
+    // that can affect a feed or a flow -- posts, aliases, consents -- is removed
+    // regardless, and `reapPreviousRuns` skips pinned users for the same reason.
     await prisma.guardianConsent.deleteMany({
       where: { teen: { email: { startsWith: namespace } } },
     })
@@ -177,7 +276,7 @@ describe('6.1 community lifecycle sweeps', () => {
       // vanished from their own view too.
       const storage = new InMemoryCommunityStorage()
       const userId = await createUser('consent')
-      const publishedAt = new Date()
+      const publishedAt = FIXTURE_PUBLISHED_AT
 
       const suspended = await createPost(storage, {
         id: postId('suspended'),
@@ -226,7 +325,7 @@ describe('6.1 community lifecycle sweeps', () => {
         id: postId('erasure'),
         userId,
         status: 'published',
-        publishedAt: new Date(),
+        publishedAt: FIXTURE_PUBLISHED_AT,
         caption: 'A caption that must not survive erasure',
         altText: 'Alt text that must not survive erasure',
         locationKey: 'us-il-chicago',
@@ -273,7 +372,7 @@ describe('6.1 community lifecycle sweeps', () => {
         id: postId('erasure-fail'),
         userId,
         status: 'published',
-        publishedAt: new Date(),
+        publishedAt: FIXTURE_PUBLISHED_AT,
         erasureRequestedAt: new Date(Date.now() - 60 * 60 * 1000),
       })
 
@@ -304,7 +403,7 @@ describe('6.1 community lifecycle sweeps', () => {
         id: postId('erasure-overdue'),
         userId,
         status: 'published',
-        publishedAt: new Date(),
+        publishedAt: FIXTURE_PUBLISHED_AT,
         erasureRequestedAt: new Date(
           Date.now() - (ERASURE_DEADLINE_HOURS + 1) * 60 * 60 * 1000
         ),
@@ -477,7 +576,7 @@ describe('6.1 community lifecycle sweeps', () => {
         id: postId('consent-tx'),
         userId: teenId,
         status: 'published',
-        publishedAt: new Date(),
+        publishedAt: FIXTURE_PUBLISHED_AT,
       })
 
       return { guardianId, teenId, postIdValue: post.id }

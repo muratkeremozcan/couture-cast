@@ -35,39 +35,24 @@ const PERMISSION_DENIED = '42501'
 describe.concurrent('community table RLS policies', () => {
   useRlsDatabase()
 
+  /*
+   * TITLED FOR WHAT IT PROVES. This was "in every status" and inserted one post
+   * per status, which read as a status matrix and was not one: `42501` is
+   * `insufficient_privilege`, a TABLE-level grant refusal that Postgres raises
+   * before any row is considered, so the fixture could not influence the result
+   * and four rows proved exactly what zero would have.
+   *
+   * One row is kept rather than none, and it earns its place narrowly: it shows
+   * the refusal is not an artifact of an empty table. Status coverage, if it is
+   * ever wanted, has to come from a test whose assertion can actually see rows.
+   */
   scenarioTest(
-    '6.1-DB-001 refuses the author a direct read of their own posts, in every status',
+    '6.1-DB-001 refuses the author a direct read of their own posts at the table grant',
     async ({ scenario: seeded }) => {
       const adminClient = await adminPool.connect()
-      const postIds = {
-        draft: randomUUID(),
-        pending: randomUUID(),
-        flagged: randomUUID(),
-        published: randomUUID(),
-      }
+      const postIds = { published: randomUUID() }
 
       try {
-        await insertLookbookPost(adminClient, {
-          id: postIds.draft,
-          userId: seeded.teenId,
-          status: 'draft',
-          caption: 'draft post',
-          publishedAt: null,
-        })
-        await insertLookbookPost(adminClient, {
-          id: postIds.pending,
-          userId: seeded.teenId,
-          status: 'pending_review',
-          caption: 'pending post',
-          publishedAt: null,
-        })
-        await insertLookbookPost(adminClient, {
-          id: postIds.flagged,
-          userId: seeded.teenId,
-          status: 'flagged',
-          caption: 'flagged post',
-          publishedAt: null,
-        })
         await insertLookbookPost(adminClient, {
           id: postIds.published,
           userId: seeded.teenId,
