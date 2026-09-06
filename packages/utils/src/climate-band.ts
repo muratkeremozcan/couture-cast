@@ -26,6 +26,21 @@
  *   wet-ratio denominator). Classification requires at least 3 usable unique days
  *   after localDate deduplication; fewer than 3 returns null. Null is a first-class
  *   state everywhere and is never a silent fallback to temperate_dry.
+ * - Window: at most 8 usable days are ever averaged (Story 5.5 Decision 3's daily
+ *   forecast cap: "today" plus a 7-day window; both providers' `extractDaily`
+ *   already truncate their raw daily array to 8 entries before it reaches this
+ *   function). This is a ceiling, not a target: a caller that hands in more days
+ *   than that (a provider change, a future caller concatenating snapshots, ...)
+ *   has the extra days silently dropped rather than silently averaged in, so a
+ *   provider returning a longer forecast can never change a viewer's band without
+ *   a corresponding code change here. `localDate` deduplication keeps the LAST
+ *   occurrence of a given date in array order, not the first: this function has
+ *   no row-write timestamp to reason about staleness, and the only ordering
+ *   guarantee any caller documents is that a refreshed forecast for a date is
+ *   appended after the stale one it replaces, so array order is the recency
+ *   signal. The 8-day window is then taken from the tail of that deduplicated,
+ *   recency-ordered list, so an old day pinned at the head of an oversized array
+ *   is exactly what gets dropped.
  */
 
 export const CLIMATE_BANDS = [
@@ -53,6 +68,13 @@ export interface ClimateBandDay {
 }
 
 const MINIMUM_USABLE_DAYS = 3
+// Story 6.1 deferred-work: matches the daily-forecast cap both weather
+// providers already enforce (`extractDaily(...).slice(0, 8)` in both
+// openweather.provider.ts and weatherapi.provider.ts, per Story 5.5 Decision
+// 3: "today" plus a 7-day window). Keeping this in lockstep with that cap
+// means a provider returning more days than the established window is capped
+// here too, rather than silently widening the rolling average.
+const MAXIMUM_USABLE_DAYS = 8
 const COLD_TEMPERATURE_UPPER_BOUND = 10
 const TEMPERATE_TEMPERATURE_UPPER_BOUND = 22
 const WET_DAY_PRECIPITATION_PROBABILITY_THRESHOLD = 0.4
@@ -130,17 +152,31 @@ export function classifyClimateBand(days: readonly ClimateBandDay[]): ClimateBan
 
   const rawUsableDays = days.filter(isUsableDay)
 
-  // Deduplicate by localDate when present
-  const seenDates = new Set<string>()
-  const usableDays: ClimateBandDay[] = []
-  for (const day of rawUsableDays) {
+  // Deduplicate by localDate when present, keeping the LAST occurrence of a
+  // given date rather than the first. There is no row-write timestamp on
+  // ClimateBandDay to reason about staleness with, and array order is the
+  // only recency signal any caller documents: a refreshed forecast for a
+  // date is appended after the stale one it replaces. A first-occurrence
+  // dedupe would let that stale row win.
+  const lastIndexForDate = new Map<string, number>()
+  rawUsableDays.forEach((day, index) => {
     if (day.localDate) {
-      if (seenDates.has(day.localDate)) {
-        continue
-      }
-      seenDates.add(day.localDate)
+      lastIndexForDate.set(day.localDate, index)
     }
-    usableDays.push(day)
+  })
+  let usableDays: ClimateBandDay[] = rawUsableDays.filter((day, index) => {
+    if (!day.localDate) {
+      return true
+    }
+    return lastIndexForDate.get(day.localDate) === index
+  })
+
+  // Ceiling: never average over more than MAXIMUM_USABLE_DAYS. Array order
+  // is the recency order established by the dedupe above, so the most
+  // recent days are at the tail; slicing from the tail drops the stale
+  // head-of-array days an oversized input would otherwise add.
+  if (usableDays.length > MAXIMUM_USABLE_DAYS) {
+    usableDays = usableDays.slice(-MAXIMUM_USABLE_DAYS)
   }
 
   if (usableDays.length < MINIMUM_USABLE_DAYS) {

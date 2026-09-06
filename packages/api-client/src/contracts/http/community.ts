@@ -263,7 +263,7 @@ export const communityPostCaptionSchema = z
   })
   .openapi({
     description:
-      'Caption of at most 280 characters. Must not contain URLs, web links, or email addresses.',
+      'Caption of at most 280 characters. Applies a best-effort denylist for a fixed set of TLDs (com, org, net, io, co, app, dev, ai, me, tv, info, biz, uk, ca, de, fr, tr) to catch URLs and web links, plus a generic pattern to catch email addresses. Domains outside this TLD list pass unblocked. Ordinary prose that merely contains a listed TLD as a substring is refused even when it is not actually a URL or email. Nothing downstream re-checks this field, so it should not be treated as a complete boundary control.',
   })
 
 export const communityPostAltTextSchema = z

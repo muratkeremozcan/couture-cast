@@ -29,14 +29,31 @@ import { shutdownWorkerResources } from './shutdown-resources'
  * BullMQ splits jobs across every worker subscribed to a queue name regardless
  * of process, so doing so would let a feature-flag sync or a retention purge
  * land on a process that cannot route it. It runs the same three functions on a
- * plain interval instead. The work under test — an outbox row becoming a job,
- * a job screening a post, a post reaching a terminal state — is identical; only
- * the trigger differs, and the trigger is the one thing this process must not
- * share.
+ * plain interval instead, and the trigger is the one thing this process must
+ * not share with `bootstrap.ts`.
+ *
+ * THE WORK MATCHES PRODUCTION. THE CADENCE DIFFERS BY SIXTY TIMES. An outbox
+ * row becoming a job, a job screening a post, a post reaching a terminal
+ * state: all of that runs through the exact same
+ * `createCommunityWorkerRuntime` code path production uses. Production polls
+ * moderation dispatch once a minute, via the cron in
+ * `community-maintenance.scheduler.ts`
+ * (`COMMUNITY_MODERATION_DISPATCH_CRON_PATTERN`, `* * * * *`); this process
+ * polls it once a second (`DISPATCH_INTERVAL_MS` below). A Playwright spec
+ * built on this process's timing exercises the pipeline correctly. It says
+ * nothing about how fast an author sees that happen in production, where the
+ * wait to leave `pending_review` runs up to a minute against this process's
+ * one second.
  */
 const logger = createBaseLogger().child({ feature: 'community-workers' })
 
-/** Fast enough that a Playwright spec does not wait on it. */
+/**
+ * Sixty times faster than production's one-minute moderation-dispatch cron
+ * (`COMMUNITY_MODERATION_DISPATCH_CRON_PATTERN` in
+ * `community-maintenance.scheduler.ts`), so a Playwright spec does not wait on
+ * it. A passing E2E run on this interval is not evidence of production
+ * latency.
+ */
 const DISPATCH_INTERVAL_MS = 1_000
 const SWEEP_INTERVAL_MS = 30_000
 

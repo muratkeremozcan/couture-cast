@@ -2401,47 +2401,156 @@ file's own Code Review Findings section.
   experiences, and end-to-end runs therefore prove a responsiveness production
   does not have.
 
-- **`packages/db` specs import a sibling workspace by relative path.**
+- _Resolved 2026-09-06._ **`packages/db` specs import a sibling workspace by relative path.**
   `packages/db/test/community-schema.spec.ts:16,20` and
   `packages/db/test/rls/harness.ts:19` reach into `../../utils/src` and
   `../../testing/src` rather than through the package entry points. They cannot
   catch a symbol missing from `packages/utils/src/index.ts`, and they hard-code
   the monorepo directory layout.
 
-- **`packages/db` has four separate expressions of "build `@couture/utils`
+  Both now import `CLIMATE_BANDS` from `@couture/utils` and
+  `COMMUNITY_OBJECT_PATH_PATTERN`/`communityObjectPathContainsIdentifier`
+  (`community-schema.spec.ts`) and `buildLookbookPostCreateInput`/
+  `createLookbookPost`/`LookbookPostFactoryOverrides` (`rls/harness.ts`) from
+  `@couture/testing`, matching the bare-specifier convention every other
+  `@couture/testing` import site in the repository already uses (`grep`
+  confirmed no other consumer imports the `/factories/*` subpath directly).
+  Both symbols are re-exported through each package's root barrel, so nothing
+  else changed at the call sites.
+
+  Left alone deliberately: `packages/db/test/seed-compliance-block.spec.ts:28`,
+  `packages/db/test/fixtures/seed-graph-instantiation-probe.ts:26` and the four
+  `packages/db/prisma/seeds/*.ts` relative imports of `../../../testing/src/...`
+  and `../../../utils/src/...`. They weren't named in this item, and the probe's
+  own docblock (and `seed-graph-instantiation.spec.ts`, which exists to test
+  exactly this) explains why its relative import is load-bearing: `prisma db
+seed` runs the seed graph under `tsx`, where the package-entry-point import
+  resolves to a busted CJS/ESM interop shim once another module has `require`d
+  it first, and only the relative source import survives that. Converting those
+  would silently reintroduce the defect 5.4-DB-040 exists to catch.
+
+- _Resolved 2026-09-06._ **`packages/db` has four separate expressions of "build `@couture/utils`
   first", and `test` has none.** `packages/db/package.json` carries the
   dependency in `predb:seed`, inline in `db:reset`, inline in `typecheck` and in
   the newer `prelint`, while `test` and `test:coverage` have no prebuild at all.
   A clean checkout can lint and typecheck but cannot reliably test. One shared
   prebuild script referenced by all of them removes the asymmetry.
 
-## `npm run validate` cannot fail on a coverage regression, by construction (2026-09-06)
+  Added `prepare:shared-deps` (builds `@couture/utils` then `@couture/testing`,
+  in that dependency order), the same name and shape every other workspace in
+  the repo already uses for this exact purpose (`apps/api`, `apps/web`,
+  `apps/mobile`). `predb:seed`, `predb:reset` (new; `db:reset` previously called
+  `prisma db seed` directly rather than `npm run db:seed`, so it could not lean
+  on `predb:seed`'s hook and had to inline the build itself), `pretypecheck`,
+  `prelint`, `pretest` (new) and `pretest:coverage` (new) all now just run
+  `npm run prepare:shared-deps`, so every one of the six call sites, seeding
+  included, is the same one script rather than a sixth inline expression. The
+  now-first `@couture/testing` build was already required by `predb:seed` and
+  `db:reset`; extending it to `typecheck`/`lint`/`test`/`test:coverage` is a
+  superset of what they built before, not a behavior change on top of the fix
+  above, which is what makes the two items land together.
 
-Found while sealing story 6.1. `validate` is `npm-run-all typecheck lint test
-build`, and `test` is a plain `npm run --workspaces test`: no coverage, no
+  Verified by deleting `packages/utils/dist` and `packages/testing/dist`
+  outright and running `npm run test --workspace packages/db` and
+  `npm run test:coverage --workspace packages/db` from that state: both rebuilt
+  both packages via the new hook before a single spec file ran, and both
+  finished 31/31 files, 217/217 tests, coverage above every ratchet threshold,
+  exit 0. `npm run typecheck --workspace packages/db` and
+  `npm run lint --workspace packages/db` also stayed green against the
+  restructured scripts.
+
+## _Resolved 2026-09-06._ `npm run validate` cannot fail on a coverage regression, by construction
+
+Found while sealing story 6.1. `validate` was `npm-run-all typecheck lint test
+build`, and `test` was a plain `npm run --workspaces test`: no coverage, no
 ratchet. What actually gates a PR is `test:coverage`
 (`scripts/run-workspace-test-coverage.mjs`), run by `pr-checks.yml:181`. So a
-green local `validate` proves the suites ran and says nothing about whether
-the coverage ratchet still holds, and a developer who trusts "validate is
-green" is trusting a narrower claim than the sentence implies.
+green local `validate` proved only that the suites ran and said nothing about
+whether the coverage ratchet still held, and a developer who trusted "validate
+is green" was trusting a narrower claim than the sentence implied.
 
-This is not hypothetical. `apps/api/vitest.config.ts` records 2026-08-18, when
+This was not hypothetical. `apps/api/vitest.config.ts` records 2026-08-18, when
 `packages/db/.env` silently repointed `DATABASE_URL` inside a worker process,
 roughly sixty integration tests announced themselves skipped in a log nobody
 read, and the only surviving signal was the coverage ratchet failing for a
 reason that named coverage rather than the database. `validate` was green
-throughout that incident, and would be green again under the same fault today.
+throughout that incident, and would have been green again under the same fault
+today.
 
-Two ways to close it, deliberately left as a decision rather than a fix here,
-because it is a workflow change rather than a story-scoped one:
+**Decision: option 1, point `validate` at `test:coverage`.** Root
+`package.json`'s `validate` is now `npm-run-all typecheck lint test:coverage
+build`, so the local gate and the CI gate (`pr-checks.yml:181`) run the exact
+same command. Option 2 (documenting the distinction in `project-context.md`
+instead) was rejected for the reason already on the record above: a caveat
+about the command that exists so people can stop remembering caveats is the
+weaker fix, not a real one. `project-context.md`'s Development Workflow Rules
+line was still updated, but to describe what `validate` now does rather than
+to disclaim what it doesn't.
 
-1. Point `validate` at `test:coverage` instead of `test`, so the local gate
-   and the CI gate are the same gate. Slower local runs for everyone, in
-   exchange for "validate is green" meaning what people already assume it
-   means.
-2. Document the distinction in `project-context.md`'s Development Workflow
-   Rules, whose current line -- "use `npm run validate` for the full
-   typecheck, lint, test, and build gate" -- is precisely what invites the
-   reading that costs the incident above. The weaker option: it relies on
-   everyone remembering a caveat about the command that exists to let them
-   stop remembering caveats.
+**The timing objection didn't survive measurement.** The expected cost of
+option 1 was a slower local gate; measured, it is not. Four back-to-back
+root-level runs (`npm run test` vs `npm run test:coverage`, each timed with
+`time`, from both a cold and a from-fresh-`build:packages` starting state)
+put `test` at 66.75s-68.53s wall clock and `test:coverage` at 39.24s-42.55s,
+consistently, in both states. `test:coverage` is faster, not slower, and
+`scripts/run-workspace-test-coverage.mjs` covers every workspace `test` does
+(it discovers workspaces by `test:coverage` script presence, one more script
+than `test` requires) plus enforces coverage thresholds `test` doesn't check
+at all, so this isn't "faster because it does less."
+
+The reason is a separate, real gap, filed below rather than fixed here because
+it reaches outside `packages/db`: `apps/api`, `apps/web` and `apps/mobile` each
+have a `pretest` (or, on web, `previtest:run`) hook that rebuilds
+`@couture/config`/`@couture/utils`/`@couture/api-client`/`@couture/testing`
+before `test` runs, and none of the three has the equivalent `pretest:coverage`
+hook, so `test:coverage` never rebuilds those packages at all. Inside
+`validate`'s own pipeline this is harmless — `typecheck`'s `pretypecheck` and
+`lint`'s `prelint` each already run `build:packages` before either `test` or
+`test:coverage` gets a turn, and `pr-checks.yml` has the same shape (typecheck,
+lint, and an explicit `build` step all precede `Run tests with coverage`) — so
+the packages `test:coverage` needs are already fresh by the time it runs, in
+both `validate` and CI. That happens to make swapping `test` for
+`test:coverage` safe here. It does not make `npm run test:coverage` safe to run
+standalone, which is the debt the next entry records.
+
+**No CI workflow assumes `validate`'s speed.** `grep -rn "validate"
+.github/workflows` returns one comment mention and no invocation: CI never runs
+`npm run validate` as a unit, it runs `typecheck`, `lint`, `build` and
+`test:coverage` as their own separately-timed steps, so there was nothing in
+CI for a slower (or, as measured, faster) `validate` to disturb.
+
+## `test:coverage` skips the shared-package rebuild that `test` runs, in `apps/api`, `apps/web` and `apps/mobile` (2026-09-06)
+
+Found while measuring the `npm run validate` decision above, and real
+independently of it. `apps/api`'s `package.json` defines `pretest`,
+`pretest:watch`, `pretest:cov` and `pretest:integration`, each running
+`prepare:shared-deps` (`@couture/config`, `@couture/utils`, `@couture/api-client`,
+`@couture/testing`) -- but no `pretest:coverage`, which is the hook npm
+actually looks for when `test:coverage` itself is invoked. `apps/web` has the
+same shape one level removed: `test` runs `npm run vitest:run`, and
+`previtest:run` rebuilds `@couture/utils`/`@couture/api-client` first, but
+`test:coverage` calls `vitest run --coverage` directly with no `previtest:run`
+in between. `apps/mobile` has a `pretest` hook but, again, no
+`pretest:coverage`.
+
+The practical effect: `npm run test:coverage --workspace apps/api` (or `-web`,
+or `-mobile`), run on its own, uses whatever already happens to be sitting in
+those four packages' `dist/` directories -- stale, absent, or fresh depending
+on what the developer ran last -- rather than guaranteeing a fresh build the
+way `npm run test` on the same workspace does. Two ways that bites: a first
+checkout with no `dist/` at all fails outright on a missing module rather than
+building one; a `dist/` left over from before an unrelated edit to
+`@couture/utils` runs coverage against stale code and can pass or fail for the
+wrong reason. It has stayed invisible because every path that actually invokes
+`test:coverage` today -- `scripts/run-workspace-test-coverage.mjs`, in both
+`npm run validate` and `pr-checks.yml` -- runs it after `typecheck` and `lint`,
+whose own `pretypecheck`/`prelint` hooks (root-level, or `apps/api`'s own) call
+`build:packages`/`prepare:shared-deps` first. Nobody has hit the gap because
+nobody has run `test:coverage` as the first command against a checkout.
+
+Not fixed here: `apps/api/package.json`, `apps/web/package.json` and
+`apps/mobile/package.json` are outside `packages/db`, which is what this pass
+was scoped to. The fix, for whoever takes it, is the same shape
+`packages/db/package.json` now uses: a `pretest:coverage` (and, on web, a
+`previtest:coverage`-equivalent) hook per app, calling the `prepare:shared-deps`
+script that already exists in each of the three.

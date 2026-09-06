@@ -16,7 +16,7 @@ import {
   buildLookbookPostCreateInput,
   createLookbookPost,
   type LookbookPostFactoryOverrides,
-} from '../../../testing/src/factories/community.factory.ts'
+} from '@couture/testing'
 
 /**
  * Inserts a LookbookPost built by the shared factory, so this suite's fixtures

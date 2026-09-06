@@ -396,5 +396,77 @@ describe('climate-band classifier', () => {
       // 3 unique usable dates -> classifies
       expect(classifyClimateBand(threeUniqueDays)).toBe('temperate_dry')
     })
+
+    it('keeps the LAST occurrence of a duplicate localDate, not the first, when the two disagree', () => {
+      // Per the deferred-work note, a refreshed forecast for a date is appended
+      // right after the stale row it replaces, so array order is the recency
+      // signal: the second '2026-09-05' entry is the refreshed one.
+      const staleFirstOccurrence: ClimateBandDay = {
+        localDate: '2026-09-05',
+        temperatureMin: 0,
+        temperatureMax: 2, // stale midpoint 1 -> cold
+        precipitationAmount: 0, // dry
+      }
+      const refreshedSecondOccurrence: ClimateBandDay = {
+        localDate: '2026-09-05',
+        temperatureMin: 28,
+        temperatureMax: 32, // refreshed midpoint 30 -> warm
+        precipitationProbability: 0.9, // wet
+      }
+      const days: ClimateBandDay[] = [
+        staleFirstOccurrence,
+        refreshedSecondOccurrence,
+        {
+          localDate: '2026-09-06',
+          temperatureMin: 28,
+          temperatureMax: 32,
+          precipitationProbability: 0.9,
+        },
+        {
+          localDate: '2026-09-07',
+          temperatureMin: 28,
+          temperatureMax: 32,
+          precipitationProbability: 0.9,
+        },
+      ]
+
+      // Keeping the first (stale, cold/dry) occurrence would average
+      // (1 + 30 + 30) / 3 = 20.33 (temperate) with 2/3 wet -> 'temperate_wet'.
+      // The correct fix keeps the last (refreshed, warm/wet) occurrence:
+      // it averages 30/30/30 = 30 (warm) with 3/3 wet -> 'warm_wet'.
+      expect(classifyClimateBand(days)).toBe('warm_wet')
+    })
+  })
+
+  describe('MAXIMUM_USABLE_DAYS ceiling', () => {
+    it('caps the averaging window at 8 days, dropping stale days from the head of an oversized array', () => {
+      const keptTailDays: ClimateBandDay[] = [
+        { temperatureMin: 14, temperatureMax: 16, precipitationProbability: 0.5 }, // wet
+        { temperatureMin: 14, temperatureMax: 16, precipitationProbability: 0.5 }, // wet
+        { temperatureMin: 14, temperatureMax: 16, precipitationProbability: 0.5 }, // wet
+        { temperatureMin: 14, temperatureMax: 16, precipitationAmount: 0 }, // dry
+        { temperatureMin: 14, temperatureMax: 16, precipitationAmount: 0 }, // dry
+        { temperatureMin: 14, temperatureMax: 16, precipitationAmount: 0 }, // dry
+        { temperatureMin: 14, temperatureMax: 16, precipitationAmount: 0 }, // dry
+        { temperatureMin: 14, temperatureMax: 16, precipitationAmount: 0 }, // dry
+      ]
+      // On its own: 3/8 wet = 37.5% (< 40%) -> temperate_dry.
+      expect(classifyClimateBand(keptTailDays)).toBe('temperate_dry')
+
+      const staleHeadDay: ClimateBandDay = {
+        temperatureMin: 14,
+        temperatureMax: 16,
+        precipitationProbability: 0.5, // wet
+      }
+      // 9 usable days total: one more than MAXIMUM_USABLE_DAYS, sitting at the
+      // head of the array (the "oldest" position once trimmed to the most
+      // recent 8).
+      const oversizedDays: ClimateBandDay[] = [staleHeadDay, ...keptTailDays]
+
+      // A naive "use everything" implementation would count 4/9 wet = 44.4%
+      // (>= 40%) and return 'temperate_wet'. The ceiling must drop the head
+      // day so the result is unchanged from the 8-day case above.
+      expect(classifyClimateBand(oversizedDays)).toBe('temperate_dry')
+    })
   })
 })
