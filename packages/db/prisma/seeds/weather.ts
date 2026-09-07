@@ -8,7 +8,7 @@ const { createWeatherSnapshot } = unwrapCjsNamespace(weatherFactories)
 
 export type SeededWeather = { snapshotIds: string[]; segmentIds: string[] }
 
-const weatherSeeds = [
+export const weatherSeeds = [
   {
     id: 'wx-1',
     location: 'San Francisco, CA',
@@ -158,7 +158,7 @@ function toLocalDate(day: Date): string {
   return day.toISOString().slice(0, 10)
 }
 
-function buildDailySummaries(
+export function buildDailySummaries(
   seed: (typeof weatherSeeds)[number],
   from: Date
 ): Record<string, unknown>[] {
