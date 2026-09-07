@@ -293,10 +293,31 @@ describe('6.1 community lifecycle sweeps', () => {
         publishedAt,
       })
 
+      // READ FROM A CURSOR ANCHORED ON THIS SPEC'S OWN FIXTURES, not from the
+      // head of the global feed.
+      //
+      // `community-feed-query-plan.integration.spec.ts` inserts 2000 posts in
+      // its `beforeAll`, cycling all six bands with half of them `published` and
+      // `published_at` spread across the preceding 2000 minutes. These fixtures
+      // publish at `FIXTURE_PUBLISHED_AT`, over a year earlier, and the feed
+      // orders `published_at DESC`. So whenever Vitest happens to run that file
+      // alongside this one, several hundred fresher `cold_wet` rows fill the
+      // page and this assertion fails on a post that is present and correct.
+      //
+      // The cursor filters `published_at < cursor.publishedAt`, so anchoring one
+      // millisecond after the fixture timestamp puts these two rows at the head
+      // of their own page and excludes every newer row, whoever wrote it. The
+      // production keyset path is still what runs; only the window moves.
       const feed = await repository.findPublishedFeedPosts({
         filterBand: 'cold_wet',
         limit: 50,
         mode: 'cold_wet',
+        cursor: {
+          publishedAt: new Date(FIXTURE_PUBLISHED_AT.getTime() + 1).toISOString(),
+          id: live.id,
+          mode: 'cold_wet',
+          band: 'cold_wet',
+        },
       })
       const feedIds = feed.posts.map((post) => post.id)
       expect(feedIds).toContain(live.id)

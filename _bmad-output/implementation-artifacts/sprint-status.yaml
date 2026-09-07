@@ -30,7 +30,7 @@
 # - Dev moves story to 'review', SM/Code-Review validates, then Dev moves to 'done'
 
 generated: 2026-07-07
-last_updated: 2026-09-05
+last_updated: 2026-09-06
 project: couture-cast
 project_key: couture-cast
 tracking_system: file-system
@@ -97,7 +97,15 @@ development_status:
   # Epic 6: Community & Moderation Loop (Phase 2)
   epic-6: in-progress
   6-1-community-feed-by-climate-band: done
-  6-2-reactions-and-comments: backlog
-  6-3-locale-highlight-modules: backlog
-  6-4-social-export-workflows: backlog
-  6-5-moderation-queue-sla-tracking: backlog
+  6-2-production-content-screening-readiness: backlog
+  6-3-curated-reactions: backlog
+  6-4-threaded-comments: backlog
+  6-5-realtime-engagement-notifications: backlog
+  6-6-community-city-spotlight: backlog
+  6-7-home-spotlight-teaser: backlog
+  6-8-safe-branded-share-card-export: backlog
+  6-9-native-platform-sharing: backlog
+  6-10-moderator-queue-case-detail: backlog
+  6-11-moderation-decisions-account-sanctions: backlog
+  6-12-sla-monitoring-escalation: backlog
+  6-13-immutable-moderation-history: backlog

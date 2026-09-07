@@ -113,6 +113,29 @@ tags:
     id: 'community-filter-chip-all'
     label: 'The every-climate filter is offered'
 
+# THE VIEWER'S CLIMATE BAND RESOLVED, and until the seed carried daily summaries
+# it could not.
+#
+# `CommunityService.resolveViewerBand` classifies from
+# `WeatherSnapshot.daily_summaries` and from nothing else. That column was never
+# seeded, so every run of this flow resolved `viewerBand: null` with
+# `bandUnresolvedReason: 'weather_malformed'` and this banner was the permanent
+# state of the screen -- the `auto` feed quietly served every region instead of
+# the viewer's band, which is the behaviour this whole flow is named after.
+# `packages/db/prisma/seeds/weather.ts` now seeds an eight-day Celsius forecast
+# per location, and `chicago-il` (the location `run-maestro.mjs` creates for this
+# device's user) classifies `cold_wet`.
+#
+# Read the strength of this assertion honestly: the banner renders only under
+# `servedMode === 'auto' && !bandResolved` (`community-screen.tsx`), so in the
+# `all` arm of the experiment it is absent whatever the band does and this passes
+# without proving anything. In the `auto` arm it is a real guard, and it is the
+# half that used to fail: seeding regressed away, the banner returns, and this
+# turns red on the next `auto` run.
+- assertNotVisible:
+    id: 'community-band-unresolved'
+    label: "The viewer's climate band resolved from the seeded daily forecast"
+
 # THE TAP IS BRACKETED BY TWO ASSERTIONS, AND THAT IS THE POINT.
 #
 # `tapOn` reports COMPLETED whether or not anything handled the touch, so a tap
@@ -122,17 +145,43 @@ tags:
 # would still have passed. The flow would have been green while testing a filter
 # it never applied.
 #
-# Asserting the transition rather than the end state is what closes it. The
-# screen opens on `auto` (`useState<CommunityFeedMode>('auto')` in
-# community-screen.tsx), so the `before` assertion is not already true of the
-# state the tap produces, and the `after` assertion cannot hold unless the tap
-# was handled. `selected` reads `accessibilityState.selected` off the chip
-# (community-filter-chips.tsx), the same form `accessibility-hardening.yaml` and
-# `chip-navigation-bottom-nav.yaml` already use.
+# THE `before` HALF OF THAT BRACKET CANNOT NAME A CHIP, and the reason is the
+# beta experiment rather than anything about this flow.
+#
+# This assertion used to read `community-filter-chip-auto`, `selected: true`,
+# on the stated premise that "the screen opens on `auto`
+# (`useState<CommunityFeedMode>('auto')`)". That premise is only true for the
+# frames before the first response lands. The chip strip renders `servedMode`,
+# not the requested mode (`community-screen.tsx` sets it from `feed.mode`), and
+# the server resolves a requested `auto` to the viewer's experiment arm:
+# `resolveEffectiveMode` returns the variant, and `resolveCommunityExperimentVariant`
+# is `sha256('community-experiment:' + userId).readUInt8(0) % 2` -- a 50/50
+# split on the user id (`community-analytics.ts`). `run-maestro.mjs` signs up a
+# FRESH random user per run, so that split is re-rolled on every CI run and the
+# `auto` chip is selected in roughly half of them.
+#
+# That is not a hypothesis. Run 34060302593 passed with user
+# `cmtqbf8ao00004xn6d0a20kfb`, which hashes to the `auto` arm; run 34062456272
+# failed here with user `cmtqcy39f00004xkt00wrf3yq`, which hashes to `all`, and
+# the chip was correctly unselected. In the `all` arm the strip can never show
+# `auto` selected at all, because tapping `auto` re-requests `auto` and the
+# server resolves it straight back to `all`.
+#
+# So the `before` half asserts only that SOMETHING is selected, which holds in
+# both arms and still catches a strip that opens with no selection. The regex
+# id form is the one `accessibility-hardening.yaml` already uses for
+# `swap-option-.*`. The stronger claim the old assertion was reaching for --
+# that a tap MOVES the selection, from a known state that is not the target --
+# is asserted deterministically one tier down, where MSW controls the arm:
+# `6.1-MOB-091` in `apps/mobile/src/screens/community-screen.test.tsx` taps
+# `warm_dry` and then `all`, and pins the `all` chip becoming selected. That is
+# the right home for it; an arm this flow cannot choose is not something it can
+# assert a transition against.
 - assertVisible:
-    id: 'community-filter-chip-auto'
+    id: 'community-filter-chip-.*'
     selected: true
-    label: 'Precondition: the screen opens on the viewer-climate filter'
+    label: 'Precondition: the strip opens with a filter selected, whichever arm
+      the experiment served this run'
 
 - tapOn:
     id: 'community-filter-chip-all'
@@ -143,7 +192,9 @@ tags:
 - assertVisible:
     id: 'community-filter-chip-all'
     selected: true
-    label: 'The tap was handled: selection MOVED to the every-climate filter'
+    label: 'The feed is pinned to every climate. In the auto arm this also proves
+      the tap moved the selection; in the all arm it was already there, which is
+      why the transition itself is pinned in 6.1-MOB-091 instead'
 
 # --- The feed renders real seeded rows, in publication order -----------------
 

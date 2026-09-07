@@ -16,6 +16,7 @@
     "previtest:open": "npm run prepare:shared-deps",
     "vitest:open": "vitest --config vitest.browser.config.ts",
     "test": "npm run vitest:run",
+    "pretest:coverage": "npm run prepare:shared-deps",
     "test:coverage": "vitest run --config vitest.config.ts --coverage",
     "dev": "node ../../node_modules/next/dist/bin/next dev",
     "build": "node ../../node_modules/next/dist/bin/next build",

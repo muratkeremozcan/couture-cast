@@ -1207,6 +1207,57 @@ describe('CommunityRepository', () => {
       ).resolves.toEqual({ kind: 'overlap' })
     })
 
+    it('retries once after a deadlock and reports the overlap the winner created', async () => {
+      // 6.1-INT-053 caught this in CI as a raw 500. Two concurrent creates both
+      // pass the SELECT pre-check, both insert, and each ends up waiting on the
+      // other's index entry, so PostgreSQL aborts one with 40P01 instead of the
+      // clean 23P01 the overlap branch expects. The aborted transaction wrote
+      // nothing, so re-running it is safe, and by then the winner has committed
+      // and the pre-check returns `overlap` through the ordinary path.
+      const { repo, transaction } = createRepo()
+      transaction.mockRejectedValueOnce(
+        new Prisma.PrismaClientUnknownRequestError(
+          'PostgresError { code: "40P01", message: "deadlock detected" }',
+          { clientVersion: 'test' }
+        )
+      )
+      transaction.mockResolvedValueOnce({ kind: 'overlap' })
+
+      await expect(
+        repo.createChallengeWithoutOverlap(
+          'temperate_wet',
+          challengeData.starts_at,
+          challengeData.ends_at,
+          challengeData
+        )
+      ).resolves.toEqual({ kind: 'overlap' })
+      expect(transaction).toHaveBeenCalledTimes(2)
+    })
+
+    it('rethrows a deadlock that survives the retry rather than looping', async () => {
+      // The bound is the point. One retry settles two-way contention; retrying
+      // a deadlock that keeps recurring would hide a real lock-ordering bug
+      // behind a hang instead of surfacing it.
+      const { repo, transaction } = createRepo()
+      const deadlock = () =>
+        new Prisma.PrismaClientUnknownRequestError(
+          'PostgresError { code: "40P01", message: "deadlock detected" }',
+          { clientVersion: 'test' }
+        )
+      transaction.mockRejectedValueOnce(deadlock())
+      transaction.mockRejectedValueOnce(deadlock())
+
+      await expect(
+        repo.createChallengeWithoutOverlap(
+          'temperate_wet',
+          challengeData.starts_at,
+          challengeData.ends_at,
+          challengeData
+        )
+      ).rejects.toThrow('deadlock detected')
+      expect(transaction).toHaveBeenCalledTimes(2)
+    })
+
     it('rethrows an unknown error that carries no SQLSTATE at all', async () => {
       const { repo, transaction } = createRepo()
       transaction.mockRejectedValueOnce(

@@ -13,11 +13,11 @@ import { randomUUID } from 'node:crypto'
 import { afterAll, describe, expect, it } from 'vitest'
 import { Pool, type PoolClient } from 'pg'
 
-import { CLIMATE_BANDS } from '../../utils/src/climate-band.ts'
+import { CLIMATE_BANDS } from '@couture/utils'
 import {
   COMMUNITY_OBJECT_PATH_PATTERN,
   communityObjectPathContainsIdentifier,
-} from '../../testing/src/factories/community.factory.ts'
+} from '@couture/testing'
 import { buildSeededCommunityObjectPath } from '../prisma/seeds/community-storage.ts'
 
 const databaseUrl =

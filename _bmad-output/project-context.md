@@ -136,7 +136,9 @@ _This file contains critical rules and patterns that AI agents must follow when 
 - Respect the Turbo dependency graph: lint precedes tests and tests precede
   builds. Do not bypass failed prerequisite tasks.
 - Use `npm run verify:changed` for change-scoped validation and `npm run validate`
-  for the full typecheck, lint, test, and build gate.
+  for the full typecheck, lint, coverage-gated test, and build gate. `validate`
+  runs `test:coverage`, the same command `pr-checks.yml` gates on, so a green
+  local `validate` and a green PR quality gate mean the same thing.
 - For Prisma changes, edit the schema/migrations in `packages/db`, run the
   repository database generation/migration scripts, and commit required
   migration artifacts. Never hand-edit generated Prisma client output.

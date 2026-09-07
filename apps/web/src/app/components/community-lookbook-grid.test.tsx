@@ -1432,7 +1432,9 @@ describe('CommunityLookbookGrid (Story 6.1)', () => {
       // Reporting your own post is a 403 the server refuses; the CTA row shows
       // exactly one moderation affordance.
       expect(screen.queryByTestId('report-button-self-post')).not.toBeInTheDocument()
-      expect(screen.getByTestId('author-name-self-post')).toHaveTextContent('You')
+      // 'You' is three characters and a substring of plenty of display names, so the
+      // substring-matching toHaveTextContent would still pass if the self-label regressed.
+      expect(screen.getByTestId('author-name-self-post').textContent).toBe('You')
 
       expect(screen.getByTestId('report-button-post-1')).toBeInTheDocument()
       expect(screen.queryByTestId('withdraw-button-post-1')).not.toBeInTheDocument()

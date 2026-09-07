@@ -86,7 +86,7 @@
     "test:mobile:e2e:onboarding-my-form:ios": "npm run maestro:install --silent && cross-env MOBILE_E2E_PLATFORM=ios node ./scripts/run-maestro.mjs maestro/wardrobe-onboarding-my-form-flow.yaml --artifacts",
     "test:mobile:e2e:onboarding-localization:android": "npm run maestro:install --silent && cross-env MOBILE_E2E_PLATFORM=android node ./scripts/run-maestro.mjs maestro/wardrobe-onboarding-localization-flow.yaml --artifacts",
     "test:mobile:e2e:onboarding-localization:ios": "npm run maestro:install --silent && cross-env MOBILE_E2E_PLATFORM=ios node ./scripts/run-maestro.mjs maestro/wardrobe-onboarding-localization-flow.yaml --artifacts",
-    "validate": "npm-run-all typecheck lint test build",
+    "validate": "npm-run-all typecheck lint test:coverage build",
     "clean": "rimraf \"apps/**/dist\" \"packages/**/dist\" \"**/tsconfig.tsbuildinfo\"",
     "clean:install": "npx rimraf node_modules \"apps/**/node_modules\" \"packages/**/node_modules\" && npm install --no-progress",
     "prepare": "node .husky/install.mjs",

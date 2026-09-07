@@ -13,45 +13,12 @@ This ledger tracks items deferred during sprint execution and code reviews.
 ## Deferred from: code review of 2-1-scenario-outfit-generator.md (2026-07-16)
 
 - Database Race Condition on Recommendations: There is no database-level unique constraint or lock on the `OutfitRecommendation` table for `(user_id, forecast_segment_id, scenario)`. Concurrent requests could insert duplicate rows.
-- [x] _Already fixed; entry was stale when checked on 2026-08-20._ Tight Coupling and DI Violation on Redis Client: `RitualService` instantiates a new Redis client in the constructor rather than utilizing NestJS Dependency Injection. The client now arrives through the `RITUAL_REDIS_CLIENT` provider in `personalization.module.ts` and `RitualService` takes it by injection, so the violation described here no longer exists in the code.
-
-## Deferred from: code review of 2-2-comfort-calibration-settings.md (2026-07-21)
-
-- [x] Weak type safety in helper functions: Helper functions `getWindThreshold`, `getRainProbThreshold`, and `getRainAmountThreshold` in `ritual.service.ts` accept loose `string` parameters instead of using strongly-typed enums.
-- [x] Implicit Weather Units: Wind and rain threshold calculations use undocumented numerical limits without explicit constants or comments indicating what units are expected.
-
-## Deferred from: code review of 4-3-outfit-capsule-builder.md (2026-08-07)
-
-- _Resolved 2026-08-08._ Both items originally deferred here were implemented at the reviewer's request. The synthetic `default-<category>` garment IDs can no longer reach a capsule recommendation because the capsule's own evaluated garment set is what gets persisted, and the capsule surfaces now report pagination totals so a truncated list is visible.
 
 ## Deferred from: story 5.1 affiliate "Shop this look" CTA (2026-08-11)
 
 These were identified while drafting and implementing story 5.1 and were
 deliberately left out of its scope. Each records what was narrowed and why, so a
 later story does not have to rediscover the reasoning.
-
-- _Resolved 2026-08-20._ **Web `Sponsored` disclosure copy defect.**
-  `apps/web/src/app/components/lookbook-prism-layout.tsx:41-47` defines a
-  hardcoded `HERO_RECOMMENDATIONS.Sponsored` entry whose `eyebrow` field reads
-  `'Sponsored Selection'`. It is reachable in the UI:
-  `CHIP_DEFAULT_FILTER.Sponsored` is set at line 20 and
-  `apps/web/src/app/lib/deep-link-handler.ts:39` routes the `evening` deep link
-  to that chip. It is story 3.5 placeholder copy with no partner behind it.
-  Rewriting it inside a commerce story risked implying a sponsorship that does
-  not exist, so it was left alone. It should be corrected on its own.
-
-  Corrected. The eyebrow now reads "Brand Picks" over copy that describes
-  brand-forward pairings, which is what the chip's own `Brands` filter selects;
-  nothing in it asserts that anyone paid for the placement. The vocabulary for
-  genuine paid placement stays where story 5.1 put it, in
-  `commerce.shopThisLook.disclosure` and `.partnerLabel`, rendered only beside an
-  offer that exists — `prd.md:192` requires sponsored content to be labeled, and
-  placeholder copy borrowing that language is the inverse failure: a disclosure
-  with nothing to disclose. `lookbook-prism-layout.test.tsx` asserts the negative
-  (no "sponsored", "paid partnership", "presented by", or "commission" anywhere
-  in the hero card), because nothing about the page looks wrong when placeholder
-  copy claims a sponsorship, so only a test that refuses the words catches it
-  returning.
 
 - **No partner-facing admin console.** `CommercePartner` and `AffiliateOffer`
   rows are seed and migration managed. The operator runbook for onboarding a
@@ -118,73 +85,12 @@ later story does not have to rediscover the reasoning.
 
 ### Added during story 5.1 integration (2026-08-11)
 
-- _Resolved 2026-08-20._ **`api/index.ts` installs no `ApiExceptionFilter`, so `api_error_occurred`
-  telemetry has never been emitted in preview or production.** `NestFactory.create`
-  is called in three places and the deployed one is `apps/api/api/index.ts`, which
-  installs none of the filter, CORS, or request-context middleware that
-  `src/main.ts:64-73` installs. Error response bodies are unaffected, because
-  Nest's built-in filter produces the same `{ statusCode, message, error }`
-  envelope. The consequence is that every dashboard built on `api_error_occurred`
-  since story 1.4 has seen local traffic only, on every route. This predates
-  story 5.1 and is much wider than it; it is recorded here because story 5.1's
-  webhook work is what surfaced it.
-
-  Fixed by extracting the four wirings into `apps/api/src/bootstrap/configure-app.ts`,
-  which both `src/main.ts` and `api/index.ts` now call and neither re-implements.
-  In `api/index.ts` the call sits before `app.init()`, deliberately: Express
-  middleware registered after initialization never joins the stack and fails
-  open, which is the same silent shape as the original defect. The extraction is
-  what makes the fix durable — the previous arrangement let a second entrypoint
-  be written without any of it and nothing looked wrong, because Nest's built-in
-  filter produces the same response envelope. `configure-app.spec.ts` asserts all
-  four wirings and that the filter resolves its dependencies from the container,
-  so a future entrypoint that skips one turns a test red instead of a dashboard
-  empty.
-
-- _Resolved 2026-08-20._ **Mobile reuses `commerce.settings.error` for a failed preference READ.** The
-  string reads "Unable to update shopping preferences.", which is slightly wrong
-  when the failure was a load rather than a save. Decision 16 locks the key tree
-  and web shares it, so adding a `settings.loadError` key is a cross-surface
-  change across twenty catalog files. Cosmetic, deferred deliberately.
-
-  Done, across all twenty. `commerce.settings.loadError` mirrors each catalog's
-  own register for the sibling `error` key rather than being translated afresh,
-  so the two strings read as a pair in every locale. Both read paths use it.
-
-  Fixing it surfaced a larger defect on the web side.
-  `commerce-preferences-section.tsx` rendered `commerceErrorMessage(error, fallback)`,
-  and `commerceError` in `lib/commerce.ts` prefers the API's own error body —
-  which is English on every locale — so the catalog string would almost never
-  have shown. This is the same defect `premium.ts` was corrected for on
-  2026-08-19, in the entry further down this file that records the original
-  deferral as the wrong call. Both paths now use catalog copy unconditionally.
-  Nothing is lost by dropping the server text: these two endpoints have no
-  actionable failure to distinguish, a preferences read either worked or did not,
-  and the developer-facing message survives on the thrown `CommerceRequestError`
-  for logs. `5.1-WEB-SETTINGS-07` and `-09` now pin the save and load strings
-  separately.
-
 - **Web carries one commerce key mobile does not.** `commerce.settings.signedOutHint`
   ("Sign in to change this") exists because decision 17 requires a localized
   signed-out hint on the web settings section and decision 16's tree has no key
   for it. Web has 13 commerce keys, mobile has 12. This is deliberate: mobile
   settings is never reachable without a session, so an unused key there would be
   dead weight added only to satisfy symmetry.
-
-- _Resolved 2026-08-20._ **The mobile vitest browser run is flaky on a cold `node_modules/.vite`.**
-  Roughly 23 suites fail with "does not provide an export named 'default'" while
-  the Vite dependency optimizer rebundles; the second run is always green. This
-  reproduces on commits that predate story 5.1. The likely fix is widening
-  `optimizeDeps.include` in `apps/mobile/vitest.config.ts`, which every surface
-  inherits, so it was not changed inside a commerce story.
-
-  Checked on 2026-08-20 and found already fixed: this entry was stale rather than
-  outstanding. `apps/mobile/vitest.config.ts` carries exactly the widening this
-  entry proposed, with a docblock recording that naming `expo-router` removed ten
-  cold-run failures on its own and that `msw` and the native-only Expo modules
-  must never join the list. Two runs against a deleted `node_modules/.vite` came
-  back clean at 61 files and 595 tests, where this entry describes roughly 23
-  suites failing. No change was needed; the verification is the useful part.
 
 - **Pact provider verification has a pre-existing Linux flake at roughly 3 runs
   in 42.** Signature: "request was expected but not received" on any Story 4.2
@@ -201,60 +107,6 @@ later story does not have to rediscover the reasoning.
 
 These were identified while implementing story 5.2 and deliberately left out of
 its scope. Each records what was narrowed and why.
-
-- _Resolved 2026-08-20._ **The remaining `@Cron` consumers sit on a substrate that never fires in
-  production.** Story 5.2 verified the deploy-target facts: the API ships as
-  one Vercel serverless function (`apps/api/vercel.json`), no Vercel `crons`
-  config exists, and `ScheduleModule.forRoot()` lives only in the request app —
-  so a NestJS `@Cron` in this API has never provably fired in production.
-  Story 5.2 moved its own periodic work (billing reconciliation, commerce
-  retention) onto BullMQ Job Schedulers in the standalone worker runtime
-  (ADR-012's substrate) and took `CommerceRetentionService` off `@Cron` with
-  it. The remaining consumers — `feature-flags.cron`, `admin.cron`,
-  `guardian.cron` — share the dead-substrate defect but belong to other epics'
-  features; unverifiable cross-feature changes do not belong in a billing PR.
-  Owner ask: whoever owns flags/admin/guardian operations should re-host these
-  onto worker Job Schedulers the same way. Evidence: story 5.2 Decision 4a.
-
-  Done, and the count in the paragraph above was wrong: there were **five**
-  consumers, not three. `wardrobe-retention.service.ts` (hourly garment purge)
-  and `telemetry.service.ts` (hourly telemetry-event prune) also carried
-  `@Cron(CronExpression.EVERY_HOUR)` and are not named anywhere above, so
-  reading this entry alone would have left two dead sweeps behind. All five now
-  run as Job Schedulers on a new `maintenance` queue, registered by
-  `workers/maintenance.scheduler.ts` and dispatched by
-  `workers/maintenance.processor.ts`. `grep -rn "@Cron" apps/api/src` returns
-  comment lines only and `ScheduleModule.forRoot()` is gone from `app.module.ts`.
-
-  Three things worth knowing for anyone touching this next.
-
-  Every cadence is transcribed, not re-chosen, and `maintenance.scheduler.spec.ts`
-  pins each one to the expression its decorator carried, including the UTC
-  timezone on guardian emancipation — a teen turning 16 is evaluated against a
-  UTC calendar day, so a host-local schedule would emancipate on a different date
-  depending on where the worker runs.
-
-  The sweeps are hand-wired in `workers/bootstrap.ts` rather than resolved from a
-  Nest application context, and that is not a style preference. The worker runs
-  under `tsx` (`npm run start:workers`), whose esbuild transform does not emit the
-  `design:paramtypes` metadata Nest's DI reads. A `NestFactory.createApplicationContext`
-  there does not fail — it stalls forever resolving constructor parameters, with
-  no error and no log, while the same code works once `nest build` has run. This
-  was found the expensive way: an earlier revision of this change used a
-  `MaintenanceModule`, and it hung. Anyone reaching for Nest DI inside a
-  tsx-executed entrypoint should expect the same and should not spend the
-  afternoon re-deriving it.
-
-  `AdminCron` and `GuardianCron` swallowed their sweep errors, and their own tests
-  said why: an unhandled rejection inside a `@Cron` handler takes down the
-  process. That reason belonged to the substrate. On BullMQ a thrown error is the
-  correct outcome — it marks the job failed, retries under the queue's
-  `attempts: 3` backoff, and leaves a `JobFailure` row an operator can see — so
-  the processor rethrows after logging. The `*_failed` log event names are
-  unchanged, so any log-based alerting keeps matching. The two sweeps that already
-  swallowed inside their own service bodies (`purgeExpiredAndDeletedGarments`,
-  `pruneOldTelemetryEvents`) were left exactly as they were: this change moved
-  triggers, not service internals.
 
 - **No automated store-purchase E2E.** StoreKit-sandbox / Play-internal-testing
   purchase automation does not exist; the Maestro harness pins Expo Go, where
@@ -290,80 +142,6 @@ its scope. Each records what was narrowed and why.
   expensive half (multi-release migration; keep RC alive for old installs).
 
 ### Added during the story 5.2 test-quality review (2026-08-13)
-
-- **~~`packages/db/test/rls-policies.spec.ts` is 2868 lines and grows with every
-  story.~~ Resolved 2026-08-20.** The TEA review scored it the only HIGH
-  maintainability violation in the 34-file story-5.2 review set (limit: 1000
-  lines). It carried the RLS matrices of stories 4.3, 4.4, 5.1, and 5.2 plus the
-  guardian-consent, telemetry, and alert-delivery suites in a single describe,
-  and its ~110-line `SeededScenario` type and ~410-line
-  `seedScenario`/`cleanupScenario` pair had to grow for each new story, so every
-  story raised the cost of touching any older one.
-
-  Split as its own change into `packages/db/test/rls/`: one shared
-  `harness.ts` holding the category arrays, `SeededScenario`, `withRole`,
-  `seedScenario`/`cleanupScenario`, the `scenarioTest` fixture, and a
-  `useRlsDatabase()` that owns the per-file database lifecycle, plus ten
-  per-subject spec files (`policy-matrix`, `guardian-wardrobe`,
-  `identity-and-admin`, `capsules`, `onboarding-silhouette`,
-  `alerts-notifications`, `telemetry`, `commerce`, `premium-theme`, `billing`),
-  the longest 475 lines. Behaviour preservation was proved three ways: 58 test
-  blocks in and 58 out, 57 of them byte-identical and the 58th differing only in
-  a comment that named the old path; `npm run test -w packages/db` reporting 131
-  tests before and 131 after with an identical sorted list of full test names;
-  and a probe confirming Vitest's `isolate: true` gives each spec file its own
-  module registry, and therefore its own `adminPool`, despite the workspace's
-  `fileParallelism: false`. A new story now adds its actor matrix as a new file
-  and touches the harness only for the rows it seeds.
-
-- _Resolved 2026-08-20._ **Two shared Pact files have grown past the length limit the same way.**
-  `pact/http/consumer/api-contract-interactions.ts` is 3589 lines and
-  `pact/http/provider/provider-helper.ts` is 1583 lines. Neither is a story-5.2
-  artefact: both are cross-story accumulators that every story appends its
-  interactions and provider doubles to (5.2 added 393 and 162 lines
-  respectively). This is the identical pattern to the RLS spec above and should
-  be solved the same way and at the same time — per-domain modules behind one
-  registry, with the three-run Pact determinism gate as the proof the split
-  changed nothing. Filed together so whoever takes one takes both.
-
-  Both done, together, as this entry asked. The line counts above were stale by
-  the time anyone read them: PR #133 added 533 and 140 lines, so the real
-  starting sizes were 3982 and 1724.
-
-  `api-contract-interactions.ts` is a 33-line barrel over eleven per-domain
-  modules under `interactions/`, largest 738 lines. `provider-helper.ts` is 374
-  lines: its seventeen inline service doubles moved into ten factory modules
-  under `doubles/`, the `PACT_*` identifiers into `fixtures.ts`, and the
-  scenario state into `state.ts`. Nothing under `pact/` exceeds 1000 lines now.
-
-  The doubles used to be consts inside `startLocalPactProvider`, closing over
-  its locals. They read `state.ts`'s exported getters instead, which is why the
-  state had to become its own module rather than staying put and being exported:
-  `provider-helper.ts` imports the doubles, so a double importing state back out
-  of it would be a cycle. Each factory returns only what the Nest fixture
-  registers; the scenario readers and response shapers stay private to their
-  module.
-
-  Both public entry points kept their names and their exports, so
-  `web-api-client.pacttest.ts`, `mobile-api-client.pacttest.ts`,
-  `api-provider.pacttest.ts` and `state-handlers.ts` are untouched, and every
-  `*.md` that references either path still resolves.
-
-  Proof, in increasing order of strength. The determinism gate reports the same
-  68 and 77 interactions, stable across three runs. The generated pact JSON was
-  captured before the split and compared with `diff -r` after: **byte-identical**,
-  which the counts alone could not have shown, because a renamed interaction and
-  a dropped one cancel out in a total. Provider verification passes 547 `(OK)`
-  assertions across both pacts. `tsc -p pact/tsconfig.json` and `eslint pact`
-  are clean, and `npm run test:pact` — the exact command
-  `.github/workflows/contract-testing.yml` runs — exits 0.
-
-  Two notes for whoever splits the next accumulator. Generating each module's
-  imports by scanning its text for referenced names pulls in imports that exist
-  only because a docblock mentions another module's helper; strip comments
-  first. And an owner-anchor comment sitting on a boundary line follows the
-  wrong side of the split — `Story 2.3 Task 3 step 2 owner` landed above the
-  identity doubles instead of the ritual ones and had to be moved back by hand.
 
 - **Locale-parity scaffolding is duplicated across four i18n specs.** The
   `SUPPORTED_LOCALES`/catalog map, flatten, placeholder check, cognate
@@ -468,80 +246,6 @@ forgotten.
 
 ### Deliberately deferred so the higher test tiers could be authored separately
 
-- _Resolved 2026-08-20._ **The entire mobile surface of story 5.3 (Task 6).**
-  Built from this backlog, on the branch `feat/story-5-3-mobile-theme-surface`.
-  `apps/mobile/src/theme/theme-palettes.ts` carries the three palettes plus
-  Default with the same five solid colors the web `[data-theme]` blocks hold,
-  Winter Metallic's `cardBg` flattened to the solid Ice end (Decision 2), and no
-  `expo-linear-gradient` dependency added. `src/theme/theme-context.tsx` exports
-  `AppThemeProvider`/`useAppTheme()`, mounted in `app/_layout.tsx` inside
-  `AccessibilityAnnouncerProvider` and outside React Navigation's
-  `ThemeProvider`. `src/lib/premium-theme.ts` mirrors the web client's failure
-  taxonomy (`signed_out`/`not_entitled`/`themes_disabled`/`unknown`) and its
-  `resolvePremiumThemeKey` fallback over the shared `withRequestTimeout`.
-  `PremiumThemeSection` is inline in `app/(tabs)/settings.tsx` immediately after
-  `PremiumSettingsSection`, which is what its locked copy points at. The sixteen
-  `commerce.premium.theme.*` keys ship in all ten mobile catalogs with the same
-  copy as the web ones, audited by the new
-  `src/i18n/premium-theme-locales.spec.ts`; `premium-locales.spec.ts` gained the
-  one-line `theme`-subtree exclusion its web sibling already had, so its pinned
-  22-key 5.2 list still means what it meant. This closes the mobile halves of
-  AC 4, AC 6 and AC 7.
-
-  Two design points worth keeping. The provider owns the one read and the
-  section calls `refresh()` on entry rather than fetching for itself, so opening
-  settings costs a single round trip and the section can never disagree with the
-  rest of the app about which palette is applied. And the live preview is the
-  only element pinning no palette of its own, which is what makes AC 4's instant
-  apply assertable: `5.3-MOB-010` presses a card and asserts the preview's
-  background changes, rather than asserting a setter was called.
-
-  Evidence: `npm run verify:changed` exit 0 for `apps/mobile` (64 files, 639
-  tests), coverage ratchet green at 92.33 statements / 87.86 branches / 93.53
-  functions / 94.88 lines against thresholds of 90/85/90/92, lint and typecheck
-  clean. New tests: `premium-theme.test.ts` (23, MSW against the real generated
-  client), `settings-premium-theme-section.test.tsx` (11),
-  `theme-context.test.tsx` (7), `premium-theme-locales.spec.ts` (10).
-
-  **Built without `packages/tokens`, deliberately.** The palette hex values are
-  duplicated between `theme-palettes.ts` and `apps/web/src/app/globals.css`, and
-  the consolidation entry above stays open with this file as its second input.
-  `constants/colors.ts` and `hero-theme.ts` were left alone: they are OS
-  light/dark plumbing, a different axis from premium palettes (Decision 4's
-  trap).
-
-- _Resolved 2026-08-19._ **Pact interactions and the Playwright spec (Task
-  7).** Both authored, run for real, and green. `pact/http/consumer/api-contract-interactions.ts`
-  gained a "Story 5.3 premium theme switcher" section (7 interaction
-  functions covering GET entitled/Default/not-entitled, PUT update/reset, and
-  a table-driven 403/503 error pair), wired into both
-  `web-api-client.pacttest.ts` and `mobile-api-client.pacttest.ts` — unlike
-  5.2's asymmetric split, both consumers call both operations here. The three
-  provider states named above are registered in `state-handlers.ts` verbatim,
-  and `provider-helper.ts` gained scenario-driven `mockPremiumThemeService`/
-  `mockPremiumEntitlementService` doubles plus `PremiumThemeController`
-  registered in the verifier's Nest fixture — the first Pact provider wiring
-  of `PremiumEntitlementGuard`, left un-overridden so its real 403-before-503
-  precedence runs for real rather than being asserted only in the API unit
-  tier. `npm run test:pact:consumer` reports both pact files stable across 3
-  determinism runs (67 and 76 interactions); `npm run test:pact:provider`
-  verifies all 14 new interactions `OK`, including the inherited
-  `Cache-Control: private, no-store` header on the error responses too.
-  `playwright/tests/premium-theme-switcher.spec.ts` (4 tests, IDs
-  `5.3-E2E-010` through `5.3-E2E-013`) proves the locked state signed out
-  (+axe) and signed-in-non-entitled, the gallery (exactly 3 named palettes +
-  Default, Spring Bloom absent), select-then-reload persistence via the real
-  `<html data-theme>` attribute, and the Default fallback for an unrecognized
-  stored theme — the last one via a stubbed GET rather than a seeded DB row,
-  because `PremiumThemeKey` is a real Postgres enum with no code path that can
-  insert an out-of-enum value, which makes true DB-level staleness physically
-  unreachable; stubbing is what actually exercises `resolvePremiumThemeKey`'s
-  client-side fallback, the real AC 6 code path at this tier. All four tests
-  passed twice over (`--repeat-each=2`), including the serialized
-  seeded-active-user write journey, with no flakiness. Consumer-driven
-  compatibility between each client and the provider, and browser-level
-  locked/gallery/persistence/fallback behavior, are no longer unproven.
-
 - **The Maestro locked-state flow.** Held back deliberately for separate
   authoring. **No longer blocked** as of 2026-08-20: the mobile surface above
   shipped, so `premium-theme-section` and `premium-theme-locked` are real
@@ -560,44 +264,6 @@ forgotten.
   it should pick deliberately; the second is narrower but puts entitlement
   seeding into a shared script every flow runs. Ordering for whoever picks these
   up: mobile surface first, then the flow.
-
-- _Resolved 2026-08-19._ **The `playwright/support/helpers/accessibility.ts`
-  adapter rewrite (Decision 3).** `contrastRatio(left, right)` keeps its exported
-  signature over CSS `rgb()` strings; `parseRgb` still does the parsing, a new
-  `toHex` re-encodes the three channels, and the function delegates to
-  `@couture/utils`'s `contrastRatio`, which now holds the only luminance/gamma
-  maths this helper runs. Its caller
-  (`playwright/tests/commerce-affiliate-preferences.spec.ts:239`) is unchanged
-  and its `[P1] 5.1-E2E-WEB-04` test (the one asserting
-  `contrastRatio(ring.outlineColor, DARK_SURFACE_RGB)`) was run for real against
-  the local stack and still passes. The both-entry-points-agree test could not
-  live at the reserved `5.3-UTIL-007` id in `packages/utils/src/contrast.spec.ts`
-  after all: `packages/utils` is an isolated npm workspace package whose
-  `tsconfig.typecheck.json` pins `rootDir` to the package directory, so a
-  relative import reaching out to the Playwright tier would violate that rootDir
-  and pull `@playwright/test` types into a package with no reason to depend on
-  Playwright. It lives instead in the new
-  `playwright/support/helpers/accessibility.spec.ts`, run via the root `vitest`
-  binary since `playwright/` is not an npm workspace and has no
-  Playwright-runner-discoverable test tier of its own for pure-logic specs
-  (`playwright/config/base.config.ts`'s `testDir` only scans `playwright/tests`).
-  Wired into `npm run test:playwright-unit`, which `prepare:playwright` runs
-  before every Playwright entrypoint, so it isn't a file someone has to
-  remember to invoke by hand: the first version of this entry shipped without
-  that wiring, silently orphaned from every CI job, and only surfaced when
-  asked directly why a spec lived under `helpers/`.
-  `contrast.spec.ts`'s own comment reserving the id now points here. The
-  repository is back down to two copies of the WCAG luminance maths: the
-  canonical one in `@couture/utils`, and the inline duplicate in
-  `accessibility-hardening.spec.ts`, which stays deliberately untouched for the
-  reason given above.
-
-### Added during the story 5.3 code review (2026-08-18)
-
-Raised by the three review layers (Blind Hunter, Edge Case Hunter, Acceptance
-Auditor) over the whole story diff. Everything the review found that could be
-fixed inside the story's scope was fixed; these are the items that could not,
-each with the reason.
 
 - **`preserveNullableEnumValues` mutates the ZodEnum's shared values array, and
   nine nodes in the published OpenAPI document are invalid because of it.** The
@@ -626,26 +292,6 @@ each with the reason.
   `nullablePremiumThemeKeySchema` publishes a finished `enum` array of its own —
   so new contracts have a pattern to copy in the meantime.
 
-- _Resolved 2026-08-19._ **`5.3-INT-001` and `5.3-INT-002` have no test.**
-  Both now exist in `apps/api/integration/premium-theme.integration.spec.ts`
-  (5 tests total), run for real against the local PostgreSQL stack rather than
-  the in-memory doubles the unit tier uses. `5.3-INT-001` PUTs a palette
-  through one Nest app/Prisma connection and re-GETs it through a second,
-  independently-compiled app with its own `PrismaClient`, proving persistence
-  survives a real reconnect. `5.3-INT-002` proves a palette written by one
-  request context is read correctly by a different, independent one for the
-  same user — documented in the test itself as a server-side-consistency
-  proof, not mobile-client wiring, since Task 6 was cancelled and no mobile
-  client exists to actually prove the cross-device half. The suite also pins
-  the reset-never-deletes rule from Decision 8 at the repository level
-  (`PUT { theme: null }` leaves exactly one row with `theme = null`) and
-  confirms `updated_at` moves on every PUT, including one that resubmits the
-  already-stored value — there is no server-side unchanged-value
-  short-circuit; that guard is client-only (`5.3-WEB-115`). Ran in isolation
-  (5/5 passed) and as part of the full `apps/api` integration suite (201
-  passed, 2 pre-existing unrelated skips, no collisions with the sibling
-  `commerce-affiliate-*`/`premium-*` suites sharing the database).
-
 - **The web section's `load_failed` state has no retry control.** A transient
   failure on the initial GET leaves an entitled subscriber unable to reach their
   palettes again without a full page reload: the effect's only dependency is the
@@ -665,84 +311,6 @@ each with the reason.
   the assertion guards a component no operation consumes. Deferred because the
   fix regenerates the SDK and reshapes published nodes, which is an `optic diff`
   conversation of its own and has nothing to do with this story's behaviour.
-
-- _Resolved 2026-08-20._ **`commerce.premium.theme.locked.body` and `.signedOutBody` hardcode the three
-  palette names inside ten translated sentences.** Adding or retiring a palette
-  now means editing twenty localized strings by hand, and
-  `5.3-I18N-WEB-08` fails until every current name appears in each of them. The
-  catalogs already carry `names.*` keys that could be interpolated as a
-  `{{palettes}}` placeholder built from `PREMIUM_THEME_KEYS`. Deferred because
-  list formatting is locale-specific (serial comma, `und`/`et`/`ve`, conjunction
-  placement) and doing it properly means `Intl.ListFormat`, not string joining.
-
-  Done with `Intl.ListFormat`, as this entry proposed. A `usePaletteNameList`
-  hook builds the list from `PREMIUM_THEME_KEYS` and the `names.*` catalog keys
-  and passes it as `{{palettes}}`, so the gallery and the upsell copy read from
-  one source and a palette added to the contract appears in twenty sentences
-  without any of them being touched.
-
-  Nine of the ten locales' formatted output is byte-identical to the sentence the
-  catalog previously spelled out, which is what makes this behaviour-preserving.
-  The tenth is a correction worth naming rather than burying: CLDR drops the
-  serial comma in Canadian English, so `en-CA` moves from
-  "Jewel Radiance, Autumn Umber, and Winter Metallic" to
-  "…Autumn Umber and Winter Metallic". The hand-written catalog was following US
-  convention; CLDR is the authority on that punctuation, and deferring to it is
-  the whole reason to use the formatter.
-
-  Turkish keeps working because its case suffix attaches to the end of the list
-  (`{{palettes}}'in`) and the formatter puts the final name last in every locale.
-  `5.3-I18N-WEB-08` now asserts the placeholder is present and that no palette
-  name is hardcoded — the stronger check, because it also catches a translator
-  who resolves the list into their own prose and freezes today's three palettes
-  back into the catalog.
-
-- **~~`apps/web/src/lib/premium.ts` bakes untranslated English into the errors the
-  subscription section renders.~~ Fixed 2026-08-19, not deferred.** This entry was
-  originally filed as out of scope because it is story 5.2's surface and its own
-  tests pinned the English literals. That is not a reason to leave it: debt gets
-  handled when it is found, whichever story introduced it. `premium.ts` now
-  classifies failures the same way `premium-theme.ts` does
-  (`PremiumFailureReason`), the subscription section maps each reason onto a
-  `commerce.premium.*` key, and the two tests that asserted server English now
-  assert the catalog copy. Three new keys ship in all ten catalogs
-  (`errorAlreadySubscribed`, `errorNoWebSubscription`, `errorSubscribeDisabled`)
-  and the already-translated `manageInStore` finally renders on the path it was
-  written for. Kept here as a record rather than deleted, since the original
-  deferral was the wrong call and the reversal is the useful part.
-
-- _Resolved 2026-08-20._ **A `PUT` racing account erasure answers 500.** `PremiumThemeService.setTheme`'s
-  upsert violates `PremiumThemePreference_user_id_fkey` (P2003) if the `User` row
-  is deleted while the request is in flight, and nothing catches it. The window
-  is one request wide and the caller is an account that no longer exists, so the
-  500 is survivable; the tidy answer is to map P2003 onto the same not-found
-  shape the other commerce writes use.
-
-  Done as described. The upsert moved into a `writePreference` helper that
-  catches `P2003` and raises `NotFoundException(PREMIUM_THEME_OWNER_NOT_FOUND_MESSAGE)`,
-  matching `affiliate-click.service.ts` and `stripe-billing.service.ts`. The guard
-  is narrow on the code for the same reason `isEnumConversionError` next to it is:
-  every other Prisma failure is an infrastructure fault and must keep propagating.
-  Three unit tests pin the mapping, the message, and that a `P1017` still
-  propagates untouched.
-
-  The 404 is documented on the PUT operation and covered by Pact. An earlier
-  revision of this entry said the opposite — that publishing it would reshape
-  nodes and drag an `optic diff` conversation into a defect fix — and a
-  CodeRabbit review on PR #133 pushed back. The review was right and the
-  deferral was wrong on both counts. Adding a response to an operation is
-  additive: `optic diff` against `origin/main` reports
-  `PUT /api/v1/commerce/premium/theme: response 404: added` and passes, the
-  published document grows by ten lines, and the generated SDK does not change
-  at all. Beyond that, a status a client can actually receive belongs in the
-  contract whether or not documenting it is convenient.
-
-  A third error row now sits alongside the 403/503 pair in
-  `pact/http/consumer/api-contract-interactions.ts`, driven by a new
-  `The premium theme owner account no longer exists` provider state and an
-  `owner-erased` scenario on `mockPremiumThemeService`. Both consumer pacts
-  verify it green with the inherited `Cache-Control: private, no-store` header
-  (68 and 77 interactions, stable across the three determinism runs).
 
 - **Two `apps/api` integration runs against one PostgreSQL fail each other.**
   Recorded in `_bmad-output/project-knowledge/development-guide.md` with the
@@ -969,29 +537,6 @@ entry's own port question is one of them.
   same `allowsCommerceSeeding()` guard that keeps commerce seeding out of
   production. Onboarding a real beauty partner is an operator task with no UI.
 
-- **The CC-5.4 readiness blocker is discharged, and ADR-014 is deliberately
-  diverged from.** `refs/implementation-readiness-report-2025-11-13.md:242-245`
-  escalated "Architecture defines NestJS worker (server-side), but PRD implies
-  potential on-device option" as a CC-5.4 blocker. ADR-014 is the answer to that
-  question, not another voice in it: processing is server-side, in the API, with
-  Sharp, and the UX specification's on-device line is stale. **The divergence:**
-  ADR-014 prescribes "Sharp (image resize) → ONNX Runtime (color inference using
-  pre-trained model)", and this story declines the ONNX step. The output is one
-  four-way and one five-way classification that closed-form CIELAB colour science
-  settles exactly, while the repo's only ONNX consumer already carries a 50 MB
-  model directory, a `GARMENT_TAGGING_MODEL_DIR` cache and a
-  `verify:tagging-model` prestart gate for a genuinely learned task. ~~**ADR-014
-  should be amended to record this rather than left quietly contradicted.**~~
-
-  _Amended 2026-08-26._ `architecture.md`'s ADR-014 now records the divergence
-  inline, along with two things that ADR did not anticipate and that a reader
-  would otherwise get wrong: the derived palette lands on `PaletteProfile`
-  rather than in `wardrobe_items.color_palette`, and the selfie source is
-  PURGED on every terminal branch rather than left at rest in Supabase Storage
-  as the ADR's privacy paragraph describes. The purge is stricter than the ADR,
-  not a relaxation of it. A future story reintroducing ONNX, or relaxing the
-  purge, is reopening the ADR rather than implementing it.
-
 - **`AffiliateClick.recommendation_id` now has two meanings.** For a garment click
   it is the `ScenarioOutfit.id` the CTA was rendered on; for an advisor click it
   is the acting user's `PaletteProfile.id` (Decision 7). The column comment states
@@ -1001,16 +546,13 @@ entry's own port question is one of them.
   (`CommerceRepository.findPaletteProfileId`) rather than taken from the request
   body, because the 60-second dedupe index is `(user_id, offer_id,
 recommendation_id, minute)` and a client that can choose the third column can
-  mint unlimited attributed clicks for one offer inside one minute. ~~The garment
-  path still trusts the client's value, unchanged from 5.1; that asymmetry is
-  worth closing in a follow-up.~~
-
-  _The asymmetry was closed on 2026-08-26._ The garment path now derives its key
-  too, from a lookup it was already making: `findRecommendationScenario` is
-  scoped to `user_id`, so hoisting it above the dedupe check lets its answer
-  gate the key as well as the `scenario` column. An id that resolves is stored
-  as sent, which keeps the impression-to-click join the PRD's click-through
-  metric depends on; an id that does not collapses onto a single sentinel.
+  mint unlimited attributed clicks for one offer inside one minute. The garment
+  path derives its key the same way, from a lookup it was already making:
+  `findRecommendationScenario` is scoped to `user_id`, so hoisting it above the
+  dedupe check lets its answer gate the key as well as the `scenario` column. An
+  id that resolves is stored as sent, which keeps the impression-to-click join
+  the PRD's click-through metric depends on; an id that does not collapses onto a
+  single sentinel.
 
   A sentinel rather than a rejection, deliberately. A forged id and one whose
   `OutfitRecommendation` row rotated behind the Redis and on-device ritual
@@ -1024,50 +566,11 @@ recommendation_id, minute)` and a client that can choose the third column can
 
   The column's dual meaning stands, unchanged and still not worth a migration.
 
-- **Two shipped documents still claim on-device colour analysis.**
-  `ux-design-specification.md:409` states the pipeline is "an in-house build using
-  on-device palette detection so user imagery never leaves CoutureCast's
-  boundary", and `prd.md:294` asks to "confirm on-device processing constraints
-  … before CC-5.4". Both predate ADR-014 and both are now false about shipped
-  behaviour. ~~They are left standing because editing planning artifacts was not
-  in this story's scope, but a reader who trusts either will be wrong about
-  where face images are processed. They should be amended alongside ADR-014.~~
-
-  _Corrected 2026-08-26, alongside the ADR-014 amendment._ The UX line no longer
-  says "on-device"; its privacy claim survives the correction and is stronger
-  than it was, because the selfie is purged rather than retained. The PRD's open
-  question is struck through and answered in place — server-side, why on-device
-  was rejected, what is at rest, and where the work runs — rather than deleted,
-  so a reader following a link to it lands on the answer instead of on nothing.
-
 - **Watch and widget advisor surfaces are out of scope**, unchanged from story
   5.3's Decision 5 and story 5.1's reasoning. No file under `apps/mobile/targets/`
   or the Android widget sources is touched. Neither surface has room for a
   sponsorship disclosure, and an undisclosed affiliate tap target would breach the
   PRD guardrail at `prd.md:47`.
-
-- _Resolved 2026-08-26, and the entry it replaces was factually wrong._
-  **~~No workflow runs `test:integration` in CI.~~** The integration tier has
-  been running in CI the whole time. `apps/api/vitest.config.ts` includes
-  `integration/**/*.spec.ts` alongside `src/**`, so `pr-checks.yml`'s
-  `quality-gate` job runs all 26 suites inside its `test:coverage` step, against
-  the PostgreSQL and Redis service containers it declares and the migrations it
-  applies. The run on this branch's head commit is explicit about it:
-  `✓ integration/palette-advisor.integration.spec.ts (11 tests) 679ms`. The
-  `test:integration` SCRIPT is unused by any workflow, which is what the original
-  entry observed; the evidence it names is not.
-
-  What was genuinely missing is narrower and worth more than another job would
-  have been. Fourteen of those suites open with a `SELECT 1 FROM "Table"` probe
-  and `context.skip()` on failure — right for a laptop with no database, and
-  silent when CI points them at the wrong one. That is not hypothetical:
-  `apps/api/vitest.config.ts` records it happening on 2026-08-18, when
-  `packages/db/.env` repointed `DATABASE_URL` inside the worker and sixty-one
-  tests skipped behind a coverage failure that named coverage. `5.4-INT-031`
-  scrapes the probe set out of the sibling suites and fails the run when `CI` is
-  set and a probed table does not resolve; `5.4-INT-030` guards the scrape
-  against going vacuous. Verified both ways: green against the migrated
-  database, red against a database that does not exist.
 
 - **The advisor's Maestro coverage is the locked state only.** The harness signs
   up a fresh public-API user, so the entitled advisor, the consent journey and the
@@ -1077,44 +580,6 @@ recommendation_id, minute)` and a client that can choose the third column can
   (`palette-advisor-screen.test.tsx` through MSW,
   `playwright/tests/palette-advisor.spec.ts` against the seeded entitled user with
   the worker live).
-
-- _Resolved 2026-08-26._ **~~The advisor offer lookup has no query-plan
-  coverage.~~** `commerce-affiliate-offers-query-plan.integration.spec.ts` now
-  seeds an advisor cohort the same size as the garment one under the same
-  inactive partner, plus ten selectable rows under the active partner carrying
-  both undertone forms, so the lookup's `ORDER BY (advisor_undertone IS NULL)
-ASC` cannot rot unnoticed. `5.4-PLAN-01`/`-02`/`-03`/`-04` mirror
-  `5.1-PLAN-02`/`-04`/`-05`/`-06`.
-
-  Two things the closing pass learned that the original entry did not predict.
-  `5.4-PLAN-01` asserts `advisor_slot` is in the plan's Index Cond rather than
-  merely that the index is named: both indexes lead with
-  `(status, locale_region)`, so a scan pushing only those two columns down and
-  re-checking the slot on every heap row would satisfy a name check while
-  reading the whole region. And it deliberately does NOT assert the garment
-  index is absent — the predicate `locale_region = $3 OR locale_region = '*'`
-  becomes a BitmapOr whose `'*'` branch carries no `advisor_slot` and can be
-  served by either index. That is a choice between two index scans rather than
-  the table scan these tests rule out, and this fixture holds no `'*'` rows to
-  separate them, by design: a `'*'` row matches every request region and would
-  become a candidate offer in the sibling suites.
-
-  The original entry, for the record. **The advisor offer lookup has no
-  query-plan coverage.**
-  `commerce-affiliate-offers-query-plan.integration.spec.ts` seeds 4,000 GARMENT
-  offers and proves `findBestOffer` descends its composite index rather than
-  scanning the catalog. `findBestAdvisorOffer` now runs a second, structurally
-  identical lookup against the same table and has no equivalent proof: the
-  suite's volume rows all carry `garment_category`, so there is no advisor row
-  at volume for a plan to be honest about. Closing it means seeding an advisor
-  cohort alongside the garment one and mirroring `5.1-PLAN-02`/`5.1-PLAN-05` for
-  the advisor predicate, which is a rework of that suite's fixture rather than
-  an added assertion.
-
-  The half that could be closed cheaply was: `5.4-DB-041` asserts the advisor
-  index is PARTIAL on `advisor_slot IS NOT NULL`. That predicate is the one
-  Prisma's DSL cannot express, so a regenerated migration would silently drop it
-  and reintroduce the planner ambiguity that regressed `5.1-PLAN-03`.
 
 - **A pre-existing Pact consumer flake is still unfixed**, and it failed two CI
   runs on this branch. Both failures are in `web-api-client.pacttest.ts`,
@@ -1143,11 +608,6 @@ ASC` cannot rot unnoticed. `5.4-PLAN-01`/`-02`/`-03`/`-04` mirror
   symptom. It would also explain why it is Linux-only in practice: Linux recycles
   ephemeral ports from a lower, narrower range than macOS, which is likely why
   saturating a Mac reproduces nothing.
-
-  ~~Testing that means giving the Pact consumer clients a non-pooling dispatcher
-  through `createApiClient`'s existing `fetchApi` option — deliberately NOT a
-  `Connection: close` header, which undici would put on the wire and Pact would
-  record into the contract.~~
 
   **UPDATE 2026-08-26: it reproduced on macOS, and that reading of it is wrong.**
   `npm run test:pact` failed on run 3 of the determinism check on an M-series
@@ -1217,41 +677,6 @@ realtime fallback events` — a third distinct interaction, in a third file, wit
   instrumentation step is now cheaper than it was, because the stressed-run
   recipe reproduces the failure on demand.
 
-- _Resolved 2026-08-26, with its premise corrected._ **~~A ready palette whose
-  `analysis_version` this build has retired renders no advice and no
-  explanation.~~** The second half was right and is closed;
-  `commerce.premium.palette.staleVersion` now ships in all ten catalogs on both
-  surfaces and renders above the numbers it qualifies, pointing at the
-  `SourceChoice` controls that are already on screen in the `ready` state and
-  are the only refresh there is, because Decision 8 purged the selfie when the
-  last analysis terminated.
-
-  The FIRST half was wrong, and it had been written into three places before
-  anyone checked it. `PaletteAdvisorService.resolveRecommendations` builds its
-  cards from the CURRENT `ADVISOR_RULES`, keyed on the stored `undertone` and
-  `depth`; it never reads `analysis_version`, and no other read path does
-  either. A rules bump therefore resolves the full current card set, not an
-  empty one. `5.4-INT-032` pins that against real SQL. What a bump actually
-  costs the reader is the palette ABOVE the cards — an undertone, a depth and a
-  confidence derived under retired rules, presented exactly like a current
-  result — which is what the note says. `5.4-MOB-023` and `5.4-E2E-012` keep
-  their empty-list fixtures, relabelled as the hostile fixtures they are: a
-  surface that resolves no cards must not crash or error either, and no other
-  tier covers that.
-
-  The original entry, for the record. **A ready palette whose `analysis_version`
-  this build has retired renders no advice and no explanation.** `5.4-E2E-012` pins the state deliberately: the
-  result panel keeps showing undertone, depth and confidence, every stored
-  `item_key` from the retired version resolves to nothing, and the
-  recommendations `<ul>` renders empty. Nothing errors, which is the point —
-  but nothing tells the reader why the advice vanished either, so the panel
-  reads as broken rather than as stale. The state becomes reachable the first
-  time `ADVISOR_RULES_VERSION` is bumped with profiles already stored against
-  the old one, so it is a scheduled problem rather than a hypothetical. The fix
-  is one locale key ("your palette predates the current advice; re-derive it")
-  plus a re-derive affordance, across ten catalogs on two surfaces, which is
-  why it is recorded here rather than folded into a review pass.
-
 - **`gh run rerun --failed` can never turn the Maestro workflow green**, which
   makes recovering a single flaked shard more expensive than it should be. The
   `mobile-e2e-report-comment` action ends with an integrity check that refuses a
@@ -1269,37 +694,6 @@ realtime fallback events` — a third distinct interaction, in a third file, wit
   `download-artifact`'s default scope, which is a change to shared CI plumbing
   and wants its own proving run under `workflow_dispatch` before it gates
   anything.
-
-- _Resolved 2026-09-04 by story 5.5, commit `f95c09fa`._
-  **~~A pre-existing `open-settings.yaml` Maestro flake cost one shard re-run on
-  this PR.~~** The symptom this entry described is the Expo Go developer sheet,
-  and story 5.5 caught it with better evidence than the Android emulator this
-  entry asked for: a real CI failure on `mobile-e2e-android` shard 3, where
-  `tab-wardrobe` reported COMPLETED on all four retry attempts while the
-  hierarchy dump showed `tab-home` still on top and the screenshot showed the
-  sheet covering the tab bar. That sheet is drawn natively by Expo Go and never
-  appears in the hierarchy Maestro queries, which is why a `retry` around
-  `extendedWaitUntil` could never absorb it, and why story 5.5's larger bundle
-  (1903 modules, roughly 22 seconds to build) exposed it by pushing the sheet's
-  rise past `open-app.yaml`'s own absorb window. The fix extracts that file's
-  proven blind backdrop tap into `maestro/subflows/absorb-expo-dev-sheet.yaml`
-  and calls it from both `maestro/subflows/open-settings.yaml` and
-  `maestro/subflows/open-wardrobe-tab.yaml`, so any future caller inherits it.
-
-  The original entry, for the record. **A pre-existing `open-settings.yaml`
-  Maestro flake cost one shard re-run on this PR.** Shard 7 failed two story-3/4
-  flows, `garment-capsule-localization-flow` and `sanity`, both with
-  `Assertion is false: id: settings-screen is visible`, then passed both on
-  re-run. The subflow already carries the repair history for exactly this
-  symptom in its own docblock — the Expo Go developer sheet rising over the tab
-  bar and swallowing the tap, and pushed routes leaving the tab bar unreachable —
-  and already wraps tap-plus-assert in `retry: maxRetries: 3` around a 15-second
-  `extendedWaitUntil`. It is not a regression from story 5.4: shard 7 passed on
-  the immediately preceding commit, and the entire diff between the passing and
-  failing runs is two test files and two markdown documents, with no mobile app
-  code, no flow and no subflow touched. Diagnosing it further needs an Android
-  emulator reproducing the CI profile, which is where this repository's mobile
-  E2E lives by decision; there is no local Android path to iterate against.
 
 ## Deferred from: story 5.5 premium 7-day outfit planner (2026-09-04)
 
@@ -1970,397 +1364,6 @@ a payload directly, which production code path writes that same shape, and to
 be able to name the file. Where no such path exists, the test is pinning a
 contract that nothing honours.
 
-## Construct contract payloads through the contract's own encoder (2026-09-06)
-
-`6.1-API-04` hand-built its probe cursor as
-`JSON.stringify({ publishedAt, id, mode })`. When the cursor payload gained a
-required `band`, the `.strict()` schema began rejecting that probe at the parse
-step, which returns `COMMUNITY_CURSOR_INVALID_MESSAGE` and a 400. The test
-asserts precisely that message and that status, so it stayed green while it had
-stopped exercising mode binding entirely.
-
-Three things had to line up for this to hide, and each one is defensible on its
-own:
-
-1. **A per-workspace green does not cover cross-workspace consumers of a
-   contract.** `verify:api` was exit 0 and honest, because `pact/` sits outside
-   `apps/api`. The same field omission in the Pact fixtures was caught by the
-   repository-wide `npm run typecheck` as three `TS2345`s.
-2. **Even the repository-wide typecheck only covers consumers that go through a
-   typed constructor.** The Pact fixtures were catchable because they call
-   `encodeCommunityFeedCursor`. Hand-rolled JSON has no type to violate.
-3. **The cursor's three rejection paths deliberately return an identical
-   message.** Schema parse failure, mode mismatch and band mismatch are
-   indistinguishable to a client, which is correct: a viewer who changed filters
-   must not be able to tell which one fired. The same indistinguishability that
-   protects the client means no assertion on the response can reveal which path a
-   test is actually exercising.
-
-The rule that falls out is narrow and costs nothing: construct contract payloads
-through the contract's own encoder. `encodeCommunityFeedCursor` parses before it
-encodes, so the next required field becomes a compile error rather than a silent
-vacuous pass.
-
-A sweep of `apps`, `packages`, `pact` and `playwright` for hand-built cursor
-payloads returned zero further hits.
-
-## A correctness property that only exists under real concurrency (2026-09-06)
-
-Third appearance on this branch of a property that cannot exist without two
-transactions racing, guarded by a test that cannot produce two transactions.
-The rolling-window rate limit was caught by a racing test, the challenge overlap
-by the exclusion constraint underneath it, and the operator moderation lock had
-neither until this branch closed it.
-
-Both closures are mutation-proved. Deleting `FOR UPDATE` from
-`community-moderation.actions.ts` leaves all fourteen unit tests green and turns
-two integration tests red. Moving the consent hide from `tx` to `this.prisma`
-leaves eighty-nine guardian unit tests green and turns one red. Both mutations
-were run, then reverted, and the production files verified byte-exact against
-backups.
-
-One case was deliberately not sold as a third proof. The release-racing-takedown
-test does not go red under the mutation, because under READ COMMITTED the loser
-sees either the committed new status or the old one and both readings are
-self-consistent. It is an invariant test, its docblock says so, and it is
-recorded here as an invariant test so nobody later reads it as race coverage.
-
-## Generated SDK freshness has no CI guard, unlike the OpenAPI document (2026-09-06)
-
-`packages/api-client/docs/http.openapi.json` is protected against going stale.
-`packages/api-client/testing/http-openapi.spec.ts:70-75` regenerates the
-document in-process and asserts `expect(checkedInSpec).toEqual(spec)`, so a
-contract change that is not accompanied by a regenerated document fails the
-test suite.
-
-`packages/api-client/src/generated/**` has no equivalent. Nothing in the
-repository regenerates the SDK and fails on a diff.
-`.github/workflows/schema-validation.yml:43` regenerates the OpenAPI document
-and hands it to Optic, and it stops there. The generated API classes and models
-are only ever checked in by hand after someone remembers to run
-`npm run generate:api-client`.
-
-The consequence is a silent, one-directional drift. The contracts and the JSON
-stay in lockstep because a test enforces it; the SDK can fall behind both, and
-every gate stays green while it does. That gap is what makes the whole class of
-"stale generated file that still typechecks" defects survivable, and this branch
-has hit that class repeatedly.
-
-The fix is one step in `schema-validation.yml`, next to the Optic step that
-already regenerates the spec:
-
-```yaml
-- run: npm run generate:api-client
-- run: git diff --exit-code -- packages/api-client/src/generated
-```
-
-Recording it here rather than fixing it inline because it changes a shared CI
-workflow that gates every story, not only this one, and it should land with an
-owner who can watch the first few runs.
-
-A related observation worth keeping with it. During the story 6.1 review the
-generated output was compared field by field against the contracts and the JSON,
-in both directions, and was found completely fresh: nine operations, every
-schema, every enum member and its order, every default, bound and
-`additionalProperties`. The gap above is therefore latent rather than currently
-realised. It is worth closing precisely while the artifacts agree, because a
-guard added later has to first prove which of the three sources is the wrong one.
-
-### The socket-events document is in worse shape than the SDK was
-
-Found by the subagent that fixed the nullable-object typing, and recorded here
-because it belongs with the guard above rather than on its own.
-
-`packages/api-client/docs/socket-events.openapi.json` is checked in and generated
-by `gen:openapi:events` (`packages/api-client/package.json:45`). It has no
-freshness spec, and no workflow runs its generator. Verified: a search of
-`packages/api-client/testing` and `packages/api-client/src` for any reference to
-the file returns nothing, and the only mention anywhere is the npm script that
-produces it.
-
-So it carries both weaknesses at once. The HTTP document at least has an equality
-test even though CI never regenerates the SDK; this one has neither, which makes
-it the artifact most likely to be silently wrong. The same two-line fix applies,
-pointed at its own generator:
-
-```yaml
-- run: npm run gen:openapi:events --workspace @couture/api-client
-- run: git diff --exit-code -- packages/api-client/docs/socket-events.openapi.json
-```
-
-**Settled on 2026-09-06, and the guard is now in
-`.github/workflows/schema-validation.yml`.** Both questions were answered by
-running the generator rather than by reasoning about the file.
-
-The `lookbook:new` absence is by design, not staleness.
-`packages/api-client/scripts/generate-events-openapi.ts` registers three component
-schemas (`LookbookNewEvent`, `RitualUpdateEvent`, `AlertWeatherEvent`) and nothing
-else; the emitted document has `paths: {}`. Channel-name strings are never in the
-generator's surface, so `lookbook:new` could not appear whatever the document's
-freshness, and searching for the channel name was searching for the wrong thing.
-The document describes payload shapes; ADR-007 owns the channel names.
-
-The document was already fresh. `npm run gen:openapi:events --workspace
-@couture/api-client` produced a byte-identical file. That is consistent with what
-reading it showed: the checked-in `LookbookNewEvent` already carries the
-post-Story-6.1 shape, with `mediaUrls` gone, `climateBand` narrowed to the
-six-band tuple, and `additionalProperties: false` on `data` matching the inner
-`.strict()` in `socket-events.ts`.
-
-So the guard starts from a green baseline, which is the whole reason for settling
-staleness first. It runs before the SDK step, because it is only `tsx` over the
-shared Zod types where that step downloads the openapi-generator JAR, and after
-the `@couture/utils` build, because `socket-events.ts` imports `CLIMATE_BANDS`.
-
-Nothing is deferred here any more. The entry stays as the record of why the
-document had no guard for as long as it did, and of the sequence: settle whether
-the artifact is already wrong, then guard it.
-
-## Scope a validator change by its call sites, not by its field names (2026-09-06)
-
-Fixing `refineChallengeWindow` meant finding every fixture the tightened rule
-would newly reject. The first attempt grepped for the field names the rule reads,
-`timeZone` and `time_zone`, and produced nine files across `apps/api`, `apps/web`,
-`apps/mobile` and `packages/api-client`. That list was reported to two other
-sessions, one of which handed over three files and paused its own work on the
-strength of it.
-
-The list was wrong. Grepping instead for the two schemas the refinement is
-attached to, `createCommunityChallengeInputSchema` and
-`updateCommunityChallengeInputSchema`, produced two files. Everything else in the
-first list held either a response projection, which carries no refinement at all,
-or a value written straight to the repository or to Prisma, which never reaches
-the schema. The service says so in its own comment: "The Monday-anchored,
-exactly-seven-day, valid-IANA-zone rules are enforced by the contract schema, so
-the 400 arrives before this method runs."
-
-Running every surviving fixture through the new rule rather than reasoning about
-them narrowed it once more, to a single fixture in the reviewer's own file. Every
-Pact fixture already conformed, because whoever chose those dates had picked true
-local midnight rather than UTC midnight.
-
-The general rule: a validator's reach is its call sites, not the population of
-values it would reject if it ever saw one. Scoping a validation change by field
-name over-reports by whatever multiple of the codebase happens to use that name
-for something else, and over-reporting to teammates is expensive in a way a
-private wrong guess is not. Find the schema, find who parses it, and stop there.
-
-The corollary that made this cheap to check: run the candidate rule over the
-existing fixtures and read the verdicts, rather than predicting them. That took
-one script and replaced an argument about nine files with a list of one.
-
-## `toHaveTextContent` with a string is a substring check, and looks like equality (2026-09-06)
-
-The thirteenth instance of the vacuous-pass class on this branch, and the first
-where the weakness came from a matcher's own semantics rather than from how a
-test was written.
-
-Fixing the web copy of the served-mode chip defect needed an assertion that the
-unselected `auto` chip reads `Your climate` and not `Your climate: Temperate and
-dry`. The first attempt was
-`expect(chip).toHaveTextContent('Your climate', { exact: true })`. It passed
-against the fix AND against the mutation that removed the fix, which is the only
-reason anyone looked closer.
-
-Two things were wrong and both are worth knowing.
-
-`{ exact: true }` is not an option this matcher has. Read from the shipped
-artifact rather than the docs: `toHaveTextContent(node, checkWith, options =
-{normalizeWhitespace: true})` in
-`node_modules/@testing-library/jest-dom/dist/matchers-98b869c1.js:433` destructures
-only `normalizeWhitespace`. An unknown key is silently ignored, so the option
-that made the assertion look strict did nothing at all.
-
-And the matcher is a substring check by design. `matches()` at :156 is
-`matcher instanceof RegExp ? matcher.test(text) : text.includes(String(matcher))`.
-So every `toHaveTextContent('some label')` in this repository passes on any
-element whose text merely CONTAINS that label. That is correct and useful for
-"this banner mentions this message", and it is silently wrong wherever the point
-is that the text is exactly the label — precisely the shape here, where the
-expected value is a strict prefix of the buggy value.
-
-The replacement is `expect(chip.textContent).toBe('Your climate')`, which is
-already the convention on the mobile side (`6.1-MOB-090` asserts
-`.textContent).toBe(enUS.community.filters.mode.auto)`). Re-running the mutation
-against it goes correctly red with
-`expected 'Your climate: Temperate and dry' to be 'Your climate'`.
-
-Scope, measured rather than estimated: 296 uses of `toHaveTextContent` across
-`apps/` and `packages/`, of which 120 pass a string literal and therefore carry
-substring semantics. No remaining call site passes a bogus options object — that
-one was the only instance and it is gone. The 120 are not defects; most are
-genuine containment assertions. What is unaudited is which of them intend
-equality, and the honest answer is that nobody has looked.
-
-What a fix needs. The rule is cheap to state and hard to enforce by review: use
-`toHaveTextContent` when the claim is that text is PRESENT, and
-`expect(el.textContent).toBe(...)` when the claim is that text is EXACTLY this,
-because only the second can fail when a qualifier is appended.
-
-THE PREFIX HEURISTIC WAS RUN, so this is a measured recommendation rather than a
-suggested one. Flagging every positive `toHaveTextContent('X')` whose `X` is a
-strict prefix of another string literal in the same file takes a few seconds over
-29 files and returns six pairs. Triaged, none is a defect:
-
-- Three are `not.toHaveTextContent(...)`, where substring semantics is not merely
-  acceptable but STRONGER than equality: "this banner must not contain the raw
-  `ECONNRESET` anywhere" is exactly a containment claim. A lint rule has to
-  exclude the negated form or it will be noise.
-- `6.1-WEB-011` is the shape done right, and by accident of construction it is
-  the answer to the whole entry: it pairs `toHaveTextContent('Your climate')`
-  with `not.toHaveTextContent('Your climate:')`, so the second assertion carries
-  the exactness the first cannot. A rule should treat a positive and a negative
-  on the same element with a longer prefix as satisfied.
-- `toHaveTextContent('Loading')` on a disabled load-more button is a genuine
-  presence claim about a loading state.
-- `toHaveTextContent('You')` on `author-name-self-post` is the one worth
-  strengthening. Three characters is a weak claim about a display name, and the
-  surrounding test is about which moderation affordances render rather than about
-  pseudonymity, so nothing else in it would fail if the self label regressed to
-  something merely containing "You". Not urgent, because the pseudonymity
-  guarantee has real coverage elsewhere at the contract tier
-  (`6.1-CON-013`) and end to end (`6.1-E2E-06`, which pins the alias format).
-
-So the durable fix is a lint rule with two exclusions — negated assertions, and
-positives paired with a longer-prefix negation on the same element — and the
-backlog it produces today is one assertion, not 120.
-
-The general lesson, which is the branch's recurring one in a new costume: an
-options object with a plausible key that the callee never reads is a test that
-looks stronger than it is, and the only thing that distinguishes the two is
-mutating the code and watching the assertion fail.
-
-## An advisory CI job cannot be the last line of defence (2026-09-06)
-
-A mutation-testing leftover reached `main`'s pull request as committed code.
-`packages/api-client/src/contracts/http/community.ts` on `934ab95a` carried
-`// MUTANT: mode comparison removed`, with the cursor mode-binding branch of
-`safeDecodeCommunityFeedCursor` deleted. That branch is what makes a client that
-changed filters restart paging rather than read one filtered set through
-another's keyset. It happened because a whole-tree `git add -A` ran across a
-shared checkout while another session was mid-mutation; the same commit
-clobbered a third session's contract edits.
-
-The leftover is not the finding. The finding is what caught it and what did not.
-
-Two jobs went red. `PR checks` failed on `error TS6133: 'expectedMode' is
-declared but its value is never read`, which is a typecheck noticing an orphaned
-parameter and has nothing to do with cursor binding. `Playwright e2e` failed on
-`6.1-API-04 rejects a well-formed cursor presented under another mode`, which is
-the behavioural check doing precisely its job.
-
-The behavioural check is the one that cannot block a merge. It runs in a job
-whose failure the gate treats as advisory, so on its own it produces a red tick
-that reads like flake next to a green quality gate. Had the mutation been made
-somewhere `expectedMode` stayed in use — a changed comparison rather than a
-deleted one, or a mutation to any function whose parameters all remain
-referenced — typecheck would have passed and the regression would have merged
-with the only evidence against it sitting in a job nobody is required to act on.
-
-So the rule, stated generally because it is not about this mutant: **a job whose
-failure is advisory cannot be the only thing standing between a regression and
-`main`.** Either the check is load-bearing, in which case its job must be able
-to fail the merge, or it is genuinely informational, in which case something
-that can fail the merge has to cover the same property. Today the cursor mode
-binding is covered at the contract tier by `6.1-CON-003` in
-`packages/api-client/testing/community-contract.spec.ts`, which does run inside
-the blocking gate, so the property is not actually unguarded. That was luck
-rather than design: nothing checks that every property asserted only in an
-advisory job also has a blocking assertion.
-
-What a fix needs. An audit of which jobs are advisory and which are blocking,
-then, for each advisory job, either promotion to blocking or a named blocking
-test covering each property it is the sole guard for. The narrower, cheaper
-first step is to stop whole-tree commits in a shared checkout, which is a
-process change rather than a code one and prevents the specific incident without
-addressing the gating gap underneath it.
-
-## An exact-set assertion is the only thing that detects an absence (2026-09-06)
-
-**Fixed on the day it was found. `6.1-CON-042` in
-`packages/api-client/testing/community-contract.spec.ts` now asserts the exact
-documented response set and the security scheme for all nine community
-operations.** This entry is the record of why, because the mechanism generalises
-past this module.
-
-### What happened
-
-Six OpenAPI response descriptions were written into
-`packages/api-client/src/contracts/http/community.ts`, lost from the working tree,
-reapplied, and lost again. Neither the type checker nor any test noticed either
-time. They were found by a person reading the regenerated JSON.
-
-### Why nothing caught it
-
-Not a gap in any one test. `packages/api-client/testing/http-openapi.spec.ts`
-compares the checked-in document against a freshly generated one, so it catches a
-document that has gone STALE relative to the contracts. The SDK guard added to
-`.github/workflows/schema-validation.yml` the same day does the same for the
-generated client. Both prove that the contracts, the document and the SDK AGREE,
-and agreement is preserved perfectly when a change is absent from all three. A
-missing response description is indistinguishable from a description nobody ever
-wanted.
-
-Only one assertion in the community suite could have detected an absence, and it
-did: `6.1-CON-041` pins the exact response-code set for the card-open path, and it
-turned red the moment a documented 400 was added there. That was one operation out
-of nine. The other eight would have stayed green through any of their documented
-failures silently disappearing.
-
-### The fix, and the part worth reusing
-
-The convention already existed in the repository, three times, in the same
-directory. `wardrobe-contract.spec.ts:265-284`,
-`wardrobe-onboarding-contract.spec.ts:300` and
-`wardrobe-silhouette-contract.spec.ts:330` each drive a route table of
-`{ method, path, statuses }` and assert
-`Object.keys(operation?.responses ?? {}).sort()` against it alongside the security
-scheme, in one loop. Community had never adopted it. Writing the guard was reading
-three neighbouring spec files, not designing anything.
-
-**The reusable lesson is that one: before writing a new kind of guard, check
-whether a sibling module already has one.** A convention that already exists is
-better than an equivalent new one even when the new one is slightly nicer, because
-it is already understood, already reviewed, and the next person to touch a fourth
-module now has four examples pointing the same way instead of two competing shapes.
-
-Two details carried into the community version:
-
-- **`security` is pinned as well as the codes.** An operation quietly losing
-  `bearerAuth` is the same class of absence and considerably worse, and it is the
-  one nobody would catch by reading, because an unauthenticated endpoint looks
-  exactly like an authenticated one in the registration source.
-- **The failure message names the operation and says what moved, in which
-  direction.** A developer who breaks it learns which operation and which code was
-  added or removed without opening the document.
-
-The table asserts a length of nine before iterating, so a row silently dropped
-from the table itself shrinks the surface under assertion and fails rather than
-passing quietly.
-
-### Proved rather than assumed
-
-The guard was mutation-tested, both halves, against the real contract source with
-a checksummed backup and a verified byte-exact restore:
-
-- Removing the withdraw 409 produced: `POST /api/v1/community/posts/{postId}/withdraw
-response codes changed. Added: none. Removed: 409.`
-- Stripping `bearerAuth` from the feed operation produced: `GET /api/v1/community/feed
-does not require bearerAuth.`
-
-A guard adopted because it is conventional, and never shown to fail, is a guard
-nobody has checked.
-
-### One finding the table surfaced, not yet resolved
-
-`POST /api/v1/community/posts/allocate` documents a 429 that the implementation
-cannot produce. `CommunityService.allocatePost` enforces no rolling cap, and the
-only two throws of `CommunityRateLimitException` are in `publishPost` and
-`reportPost`. The table asserts what the document says today, with a comment on
-that row recording the discrepancy, because choosing between rate-limiting
-allocation and removing the documented response is a product decision rather than
-a fixture edit. When it is decided, that row moves with it.
-
 ## Deferred from: code review of 6-1-community-feed-by-climate-band (2026-09-06)
 
 These came out of the `/bmad-code-review` pass over the story 6.1 branch. Each
@@ -2376,41 +1379,3 @@ file's own Code Review Findings section.
   and obfuscation handling was never specified, so widening it is a product
   decision rather than a defect fix. Worth pairing with the decision about the
   five supported locales that have no dictionary at all.
-
-- **The caption URL and email denylist is a hardcoded TLD list.**
-  `packages/api-client/src/contracts/http/community.ts:212-214`. Domains outside
-  the listed TLDs pass, and ordinary prose containing a listed TLD is refused.
-  It is documented in the OpenAPI description as though it were a complete
-  boundary control, and nothing downstream re-checks. Either narrow the
-  documented claim or move the check to the moderation engine where it can be
-  revised without a contract change.
-
-- **`classifyClimateBand` has a floor on usable days and no ceiling.**
-  `packages/utils/src/climate-band.ts:126-163`. `MINIMUM_USABLE_DAYS` is three
-  and the caller passes whatever the provider returned, so a provider that
-  starts returning fourteen days instead of seven silently changes every
-  viewer's band with no code change and no version stamp on the classification.
-  The `localDate` dedupe keeps the first occurrence in array order, so a
-  refreshed forecast appended for a date already present loses to the stale row.
-
-- **Moderation dispatch cadence differs by a factor of sixty between the local
-  stack and production.** `community-maintenance.scheduler.ts:25` uses a
-  one-minute cron; `apps/api/src/workers/community.bootstrap.ts:38` uses a
-  one-second interval. The bootstrap comment states that only the trigger
-  differs, which is true of the work but not of the latency an author
-  experiences, and end-to-end runs therefore prove a responsiveness production
-  does not have.
-
-- **`packages/db` specs import a sibling workspace by relative path.**
-  `packages/db/test/community-schema.spec.ts:16,20` and
-  `packages/db/test/rls/harness.ts:19` reach into `../../utils/src` and
-  `../../testing/src` rather than through the package entry points. They cannot
-  catch a symbol missing from `packages/utils/src/index.ts`, and they hard-code
-  the monorepo directory layout.
-
-- **`packages/db` has four separate expressions of "build `@couture/utils`
-  first", and `test` has none.** `packages/db/package.json` carries the
-  dependency in `predb:seed`, inline in `db:reset`, inline in `typecheck` and in
-  the newer `prelint`, while `test` and `test:coverage` have no prebuild at all.
-  A clean checkout can lint and typecheck but cannot reliably test. One shared
-  prebuild script referenced by all of them removes the asymmetry.

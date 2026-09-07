@@ -17,6 +17,7 @@
     "test": "npm run vitest:run && npm run test:widget-prebuild && npm run test:watchos-prebuild",
     "test:widget-prebuild": "node --test plugins/with-widgets.test.js",
     "test:watchos-prebuild": "node --test plugins/with-watchos.test.js",
+    "pretest:coverage": "npm run prepare:shared-deps",
     "test:coverage": "vitest run --config vitest.config.ts --coverage",
     "start": "expo start",
     "android": "expo run:android",

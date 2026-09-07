@@ -395,6 +395,25 @@ describe('5.1 affiliate offer query plans', () => {
       }))
     )
 
+    // RECLAIM BEFORE SEEDING, or 5.1-PLAN-05 fails on a developer's machine.
+    //
+    // Every prior run of this file inserted its rows and deleted them again in
+    // `afterAll`, and a plain delete leaves dead tuples behind. Insert into a
+    // table carrying them and the fixture lands on fresh pages past the dead
+    // ones instead of reusing them, so the same rows spread across more of the
+    // file and an index scan over them reads proportionally more buffers.
+    // Measured on a local database seeded many times: 65 buffers against
+    // 5.1-PLAN-05's cap of 40, on a query that had not regressed at all. CI never
+    // saw it, because `pr-checks.yml` gives each run a fresh PostgreSQL container
+    // where the table has no history.
+    //
+    // `FULL` rather than plain `VACUUM` on purpose: plain VACUUM marks the space
+    // reusable but does not return trailing pages, and it is the physical extent
+    // this file measures against (`relpages`, read from `pg_class` below). The
+    // lock it takes is exclusive, which is affordable here and nowhere near a
+    // production path.
+    await prisma.$executeRawUnsafe('VACUUM (FULL) "AffiliateOffer"')
+
     await prisma.affiliateOffer.createMany({
       data: [...rows, ...guaranteedMatches, ...advisorRows, ...advisorMatches],
     })
