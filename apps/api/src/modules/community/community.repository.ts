@@ -787,20 +787,49 @@ export class CommunityChallengeWindowError extends Error {
  * Keyed on the SQLSTATE rather than on a constraint name, so renaming a
  * constraint cannot silently turn a 409 into a 500.
  */
+/** One extra attempt after a deadlock; see `mapChallengeConstraintErrors`. */
+const CHALLENGE_DEADLOCK_RETRY_LIMIT = 1
+
 async function mapChallengeConstraintErrors<T extends { kind: string }>(
   work: () => Promise<T>
 ): Promise<T | { kind: 'overlap' }> {
-  try {
-    return await work()
-  } catch (error: unknown) {
-    const sqlState = extractSqlState(error)
-    if (sqlState === '23P01') {
-      return { kind: 'overlap' }
+  for (let attempt = 0; ; attempt += 1) {
+    try {
+      return await work()
+    } catch (error: unknown) {
+      const sqlState = extractSqlState(error)
+      if (sqlState === '23P01') {
+        return { kind: 'overlap' }
+      }
+      if (sqlState === '23514') {
+        throw new CommunityChallengeWindowError()
+      }
+      // A DEADLOCK IS THE OTHER WAY TWO OVERLAPPING WRITES CAN COLLIDE, and
+      // without this it surfaced as a 500.
+      //
+      // Both callers pre-check with a SELECT and then INSERT inside one
+      // transaction, so two concurrent writers both see an empty calendar and
+      // both proceed; the GiST exclusion constraint is what actually serialises
+      // them. Usually the second one blocks on the first and loses cleanly with
+      // 23P01, which is the branch above. But when each transaction has already
+      // written its own index entry before scanning for conflicts, each ends up
+      // waiting on the other and PostgreSQL breaks the cycle by aborting one
+      // with 40P01 — a raw `PrismaClientUnknownRequestError` that neither
+      // branch above catches. Two admins creating overlapping challenges at the
+      // same moment would get a 500 rather than the documented 409.
+      //
+      // Retrying is the correct response rather than mapping 40P01 onto
+      // `overlap`: the aborted transaction wrote nothing, and a deadlock does
+      // not by itself prove an overlap. On the retry the winner has committed,
+      // so the pre-check SELECT sees it and returns `overlap` through the
+      // ordinary path. Bounded to one extra attempt deliberately — a single
+      // retry settles two-way contention, and retrying indefinitely would
+      // paper over a genuine lock-ordering bug instead of surfacing it.
+      if (sqlState === '40P01' && attempt < CHALLENGE_DEADLOCK_RETRY_LIMIT) {
+        continue
+      }
+      throw error
     }
-    if (sqlState === '23514') {
-      throw new CommunityChallengeWindowError()
-    }
-    throw error
   }
 }
 
