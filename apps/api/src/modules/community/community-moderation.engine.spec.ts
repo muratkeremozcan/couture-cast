@@ -3,12 +3,15 @@
 import { describe, expect, it } from 'vitest'
 import {
   ADR013_IMAGE_ENGINE_VERSION,
+  ADR013_NSFW_CLASSES,
   ADR013_TEXT_ENGINE_VERSION,
   DefaultCommunityModerationEngine,
   FixtureCommunityModerationEngine,
   FIXTURE_IMAGE_ENGINE_VERSION,
   FIXTURE_TEXT_ENGINE_VERSION,
+  IMAGE_DISPOSITION_CONFLICT_REASON,
   IMAGE_SCREENING_UNAVAILABLE_VERSION,
+  imageCleared,
   LOCALE_UNSCREENABLE_REASON,
   normalizeTextForModeration,
   resolveScreeningLanguage,
@@ -186,9 +189,71 @@ describe('CommunityModerationEngine (ADR-013)', () => {
       expect(result.reasons).toContain('nsfw')
       expect(result.score).toBeGreaterThan(0.9)
     })
+
+    it('reports the unscreened image as review rather than block', async () => {
+      // `review` is the queue a human already works. Reporting `block` would
+      // claim the model saw something, when the only fact is that no model ran.
+      const screener = new UnavailableNsfwImageScreener()
+      const result = await screener.screen(Buffer.from([0xff, 0xd8, 0xff, 0xe0]))
+
+      expect(result.disposition).toBe('review')
+      expect(result.passed).toBe(false)
+      expect(result.reasons).toEqual([SCREENING_UNAVAILABLE_REASON])
+    })
+  })
+
+  describe('three-way image disposition', () => {
+    const verdict = (
+      partial: Omit<ImageScreeningResult, 'engineVersion'>
+    ): ImageScreeningResult => ({
+      ...partial,
+      engineVersion: ADR013_IMAGE_ENGINE_VERSION,
+    })
+
+    it('pins the five class names in the manifest order', () => {
+      // The adapter applies these positionally to the model's output vector, so
+      // reordering them relabels every probability it reads back.
+      expect(ADR013_NSFW_CLASSES).toEqual([
+        'Drawing',
+        'Hentai',
+        'Neutral',
+        'Porn',
+        'Sexy',
+      ])
+    })
+
+    it('clears a passing image whose disposition is absent or pass', () => {
+      expect(imageCleared(verdict({ passed: true, reasons: [] }))).toBe(true)
+      expect(
+        imageCleared(verdict({ passed: true, reasons: [], disposition: 'pass' }))
+      ).toBe(true)
+    })
+
+    it('refuses a passing image whose disposition disagrees', () => {
+      expect(
+        imageCleared(verdict({ passed: true, reasons: [], disposition: 'review' }))
+      ).toBe(false)
+      expect(
+        imageCleared(verdict({ passed: true, reasons: [], disposition: 'block' }))
+      ).toBe(false)
+    })
+
+    it('refuses a failing image whatever its disposition claims', () => {
+      expect(imageCleared(verdict({ passed: false, reasons: ['nsfw'] }))).toBe(false)
+      expect(
+        imageCleared(verdict({ passed: false, reasons: [], disposition: 'pass' }))
+      ).toBe(false)
+    })
   })
 
   describe('moderatePost combined evaluation', () => {
+    const cleanPost = {
+      caption: 'Clean stylish caption',
+      altText: 'Clean alt text description',
+      locale: 'en-US',
+      imageBuffer: Buffer.from('bytes'),
+    }
+
     it('returns passed only when text and image both clear', async () => {
       const result = await engine.moderatePost({
         caption: 'A wonderful autumn look',
@@ -257,6 +322,79 @@ describe('CommunityModerationEngine (ADR-013)', () => {
       expect(result.outcome).toBe('flagged')
       expect(result.reasons).toContain('profanity')
       expect(result.reasons).toContain('nsfw')
+    })
+
+    it('refuses to publish when a screener passes an image it also blocks', async () => {
+      // A screener saying `passed: true` beside a blocking disposition is
+      // contradicting itself, and one of the two halves is wrong. Reading either
+      // half alone publishes on whichever one that is, so both have to agree.
+      const blocking = new DefaultCommunityModerationEngine(
+        new StubNsfwScreener({ passed: true, reasons: [], disposition: 'block' })
+      )
+      const reviewing = new DefaultCommunityModerationEngine(
+        new StubNsfwScreener({ passed: true, reasons: [], disposition: 'review' })
+      )
+
+      // The contradiction is named rather than left silent, so a held post does
+      // not reach the moderation queue with nothing to explain it, and so the
+      // reason points at the screener rather than at the image.
+      await expect(blocking.moderatePost(cleanPost)).resolves.toMatchObject({
+        outcome: 'flagged',
+        reasons: [IMAGE_DISPOSITION_CONFLICT_REASON],
+      })
+      await expect(reviewing.moderatePost(cleanPost)).resolves.toMatchObject({
+        outcome: 'flagged',
+        reasons: [IMAGE_DISPOSITION_CONFLICT_REASON],
+      })
+    })
+
+    it('refuses to publish when a screener fails an image it also passes', async () => {
+      const contradicting = new DefaultCommunityModerationEngine(
+        new StubNsfwScreener({ passed: false, reasons: ['nsfw'], disposition: 'pass' })
+      )
+      const result = await contradicting.moderatePost(cleanPost)
+
+      expect(result.outcome).toBe('flagged')
+      expect(result.image.disposition).toBe('pass')
+    })
+
+    it('flags a refusal that names no reason even when a disposition is present', async () => {
+      const silent = new DefaultCommunityModerationEngine(
+        new StubNsfwScreener({ passed: false, reasons: [], disposition: 'block' })
+      )
+      const result = await silent.moderatePost(cleanPost)
+
+      expect(result.outcome).toBe('flagged')
+      expect(result.reasons).toEqual([])
+    })
+
+    it('carries the model detail through onto result.image untouched', async () => {
+      // The processor persists these for the access-controlled evaluation
+      // payload, so anything the engine drops here cannot be recovered later.
+      const classProbabilities = {
+        Drawing: 0.01,
+        Hentai: 0.002,
+        Neutral: 0.95,
+        Porn: 0.008,
+        Sexy: 0.03,
+      }
+      const detailed = new DefaultCommunityModerationEngine(
+        new StubNsfwScreener({
+          passed: true,
+          reasons: [],
+          score: 0.03,
+          disposition: 'pass',
+          classProbabilities,
+          policyVersion: 'sha256:0f1e2d3c',
+        })
+      )
+
+      const result = await detailed.moderatePost(cleanPost)
+
+      expect(result.outcome).toBe('passed')
+      expect(result.image.classProbabilities).toEqual(classProbabilities)
+      expect(result.image.policyVersion).toBe('sha256:0f1e2d3c')
+      expect(result.image.disposition).toBe('pass')
     })
   })
 
@@ -333,6 +471,38 @@ describe('CommunityModerationEngine (ADR-013)', () => {
           process.env.TEST_ENV = originalTestEnv
         }
       }
+    })
+
+    it('derives an image disposition from the pinned passed flag', async () => {
+      const passing = new FixtureCommunityModerationEngine({
+        imageOutcome: { passed: true, reasons: [] },
+      })
+      const failing = new FixtureCommunityModerationEngine({
+        imageOutcome: { passed: false, reasons: ['nsfw'] },
+      })
+      const bytes = Buffer.from('test-bytes')
+
+      await expect(passing.screenImage(bytes)).resolves.toMatchObject({
+        disposition: 'pass',
+      })
+      await expect(failing.screenImage(bytes)).resolves.toMatchObject({
+        disposition: 'review',
+      })
+    })
+
+    it('holds a post whose pinned disposition contradicts its pinned pass', async () => {
+      const fixtureEngine = new FixtureCommunityModerationEngine({
+        textOutcome: { passed: true, reasons: [] },
+        imageOutcome: { passed: true, reasons: [], disposition: 'block' },
+      })
+
+      const result = await fixtureEngine.moderatePost({
+        caption: 'Normal caption',
+        imageBuffer: Buffer.from('test-bytes'),
+      })
+
+      expect(result.outcome).toBe('flagged')
+      expect(result.image.disposition).toBe('block')
     })
 
     it('still fails closed on images when no image outcome is configured', async () => {

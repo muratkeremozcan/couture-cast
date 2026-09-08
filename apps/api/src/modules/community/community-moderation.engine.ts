@@ -41,6 +41,17 @@ export const SCREENING_UNAVAILABLE_REASON = 'screening_unavailable'
 /** Reason emitted for a locale this engine holds no dictionary for. */
 export const LOCALE_UNSCREENABLE_REASON = 'locale_unscreenable'
 
+/**
+ * Reason emitted when a screener reports `passed: true` beside a `review` or
+ * `block` disposition.
+ *
+ * The verdict is refused either way, but a refusal with no reason at all leaves
+ * a held post in the moderation queue with nothing to explain it. This names the
+ * contradiction instead, which is also the signal that the screener itself is
+ * broken rather than that the image was.
+ */
+export const IMAGE_DISPOSITION_CONFLICT_REASON = 'image_disposition_conflict'
+
 export interface TextScreeningResult {
   passed: boolean
   reasons: string[]
@@ -388,9 +399,17 @@ async function screenPostText(
 
   const reasons = new Set<string>()
   const matchedTerms: string[] = []
+  // Union across both fields, not the caption's list. An empty caption screens
+  // no languages and returns an empty list, so reading the caption's answer
+  // alone reported "nothing was screened" for a post whose alt text had just
+  // been run against every dictionary.
+  const screenedLanguages = new Set<SupportedLanguage>()
   for (const result of results) {
     for (const reason of result.reasons) {
       reasons.add(reason)
+    }
+    for (const language of result.screenedLanguages ?? []) {
+      screenedLanguages.add(language)
     }
     matchedTerms.push(...(result.matchedTerms ?? []))
   }
@@ -403,7 +422,7 @@ async function screenPostText(
     reasons: reasonsArray,
     engineVersion: results[0]?.engineVersion ?? ADR013_TEXT_ENGINE_VERSION,
     matchedTerms,
-    screenedLanguages: results[0]?.screenedLanguages ?? [],
+    screenedLanguages: Array.from(screenedLanguages),
   }
 }
 
@@ -426,6 +445,9 @@ function combineScreeningResults(
   image: ImageScreeningResult
 ): CommunityModerationResult {
   const reasons = new Set<string>([...text.reasons, ...image.reasons])
+  if (image.passed && !imageCleared(image)) {
+    reasons.add(IMAGE_DISPOSITION_CONFLICT_REASON)
+  }
   const reasonsArray = Array.from(reasons)
 
   // The outcome follows each verdict's own `passed`, NOT whether it named a

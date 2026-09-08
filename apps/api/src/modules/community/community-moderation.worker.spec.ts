@@ -14,8 +14,12 @@ import {
   MODERATION_SCREENING_TIMEOUT_MS,
   withModerationTimeout,
 } from './community-moderation.processor'
-import { createCommunityModerationWorker } from './community-moderation.worker'
+import {
+  COMMUNITY_MODERATION_CONCURRENCY,
+  createCommunityModerationWorker,
+} from './community-moderation.worker'
 import type { CommunityModerationJob } from './community-moderation.queue'
+import type { CommunityModerationMeter } from './community-moderation.telemetry'
 import type { Job, WorkerOptions } from 'bullmq'
 
 const workerHarness = vi.hoisted(() => ({
@@ -23,6 +27,7 @@ const workerHarness = vi.hoisted(() => ({
     | ((job: Job<CommunityModerationJob>) => Promise<void>)
     | null,
   mockCreateWorker: vi.fn(),
+  mockDefaultWorkerOptions: vi.fn(() => ({})),
 }))
 
 vi.mock('../../workers/base.worker.js', () => ({
@@ -37,7 +42,7 @@ vi.mock('../../workers/base.worker.js', () => ({
       return { on: vi.fn(), close: vi.fn() }
     }
   ),
-  defaultWorkerOptions: vi.fn(() => ({})),
+  defaultWorkerOptions: workerHarness.mockDefaultWorkerOptions,
 }))
 
 /**
@@ -696,6 +701,168 @@ describe('CommunityModerationProcessor & Worker', () => {
       expect(mockPostUpdateMany).not.toHaveBeenCalled()
     })
   })
+  describe('attempt context and concurrency', () => {
+    const recordScreening = vi.fn()
+    const recordAttemptFailure = vi.fn()
+    const meter: CommunityModerationMeter = {
+      recordScreenerReadiness: vi.fn(),
+      recordScreening,
+      recordAttemptFailure,
+      recordModelHealth: vi.fn(),
+    }
+
+    const buildWorker = () =>
+      createCommunityModerationWorker({
+        prisma: mockPrisma,
+        storage: mockStorage,
+        telemetryService: mockTelemetryService,
+        engine: new FixtureCommunityModerationEngine({
+          imageOutcome: { passed: true, reasons: [], disposition: 'pass' },
+        }),
+        meter,
+      })
+
+    beforeEach(() => {
+      recordScreening.mockClear()
+      recordAttemptFailure.mockClear()
+    })
+
+    it('subscribes one job at a time, because one process holds one model', () => {
+      buildWorker()
+
+      expect(workerHarness.mockDefaultWorkerOptions).toHaveBeenCalledWith(
+        COMMUNITY_MODERATION_CONCURRENCY
+      )
+      expect(COMMUNITY_MODERATION_CONCURRENCY).toBe(1)
+    })
+
+    it('counts the attempt being executed, not the attempts already made', async () => {
+      // `attemptsMade` is the count BEFORE this attempt, so evidence built from
+      // it directly would report the last of three attempts as attempt 2.
+      buildWorker()
+      mockFindUnique.mockResolvedValueOnce(
+        pendingPost({
+          id: 'post-attempt',
+          user_id: 'user-attempt',
+          image_object_path: 'community/post-attempt/session-a.jpg',
+        })
+      )
+
+      await workerHarness.registeredProcessor!(
+        asJob({
+          data: { postId: 'post-attempt', uploadSessionId: 'sess-a' },
+          opts: { attempts: 3 },
+          attemptsMade: 1,
+        })
+      )
+
+      expect(recordScreening).toHaveBeenCalledWith(
+        'pass',
+        'published',
+        expect.any(Number),
+        2
+      )
+    })
+
+    it('counts a retryable failure separately from any terminal state', async () => {
+      // AC 5 wants the per-attempt fact and the final post state legible as two
+      // different things. This attempt fails and BullMQ will retry it, so there
+      // is a failure to count and no terminal transition to report.
+      buildWorker()
+      mockFindUnique.mockResolvedValueOnce(
+        pendingPost({
+          id: 'post-transient',
+          user_id: 'user-transient',
+          image_object_path: 'community/post-transient/session-b.jpg',
+        })
+      )
+      mockDownload.mockRejectedValueOnce(new Error('Transient network glitch'))
+
+      await expect(
+        workerHarness.registeredProcessor!(
+          asJob({
+            data: { postId: 'post-transient', uploadSessionId: 'sess-b' },
+            opts: { attempts: 3 },
+            attemptsMade: 0,
+          })
+        )
+      ).rejects.toThrow('Transient network glitch')
+
+      expect(recordAttemptFailure).toHaveBeenCalledWith('error', 1)
+      expect(recordScreening).not.toHaveBeenCalled()
+      expect(mockPostUpdateMany).not.toHaveBeenCalled()
+    })
+
+    it('records the final attempt alongside the review_failed transition', async () => {
+      buildWorker()
+      mockFindUnique.mockResolvedValueOnce(
+        pendingPost({
+          id: 'post-last',
+          user_id: 'user-last',
+          image_object_path: 'community/post-last/session-c.jpg',
+        })
+      )
+      mockDownload.mockRejectedValueOnce(new Error('Permanent failure'))
+
+      await expect(
+        workerHarness.registeredProcessor!(
+          asJob({
+            data: { postId: 'post-last', uploadSessionId: 'sess-c' },
+            opts: { attempts: 3 },
+            attemptsMade: 2,
+          })
+        )
+      ).rejects.toThrow('Permanent failure')
+
+      expect(recordAttemptFailure).toHaveBeenCalledWith('error', 3)
+      expect(mockPostUpdateMany).toHaveBeenCalledWith({
+        where: { id: 'post-last', status: 'pending_review' },
+        data: { status: 'review_failed', moderation_reason: 'Permanent failure' },
+      })
+    })
+
+    it('refuses to publish a screener that contradicts its own disposition', async () => {
+      // The fail-closed rule at the seam, exercised through the whole processor:
+      // `passed: true` with a `block` disposition must flag, not publish.
+      createCommunityModerationWorker({
+        prisma: mockPrisma,
+        storage: mockStorage,
+        telemetryService: mockTelemetryService,
+        engine: new FixtureCommunityModerationEngine({
+          imageOutcome: { passed: true, reasons: [], disposition: 'block' },
+        }),
+        meter,
+      })
+      mockFindUnique.mockResolvedValueOnce(
+        pendingPost({
+          id: 'post-contradiction',
+          user_id: 'user-contradiction',
+          image_object_path: 'community/post-contradiction/session-d.jpg',
+        })
+      )
+
+      await workerHarness.registeredProcessor!(
+        asJob({
+          data: { postId: 'post-contradiction', uploadSessionId: 'sess-d' },
+          opts: { attempts: 3 },
+          attemptsMade: 0,
+        })
+      )
+
+      expect(mockPostUpdateMany).toHaveBeenCalledWith(
+        expect.objectContaining({
+          data: expect.objectContaining({ status: 'flagged' }),
+        })
+      )
+      expect(recordScreening).toHaveBeenCalledWith(
+        'block',
+        'flagged',
+        expect.any(Number),
+        1
+      )
+    })
+  })
+
   describe('defensive branches', () => {
     it('constructs its own fail-closed engine when none is injected', async () => {
       // The zero-argument construction is what production uses, and its default
