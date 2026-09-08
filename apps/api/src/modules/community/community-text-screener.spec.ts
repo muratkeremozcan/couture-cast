@@ -611,6 +611,22 @@ describe('CommunityTextScreener severity mapping (AC 7)', () => {
     expect(screenCaption('a linen shirt dress').severity).toBeNull()
   })
 
+  it('takes the harshest grade when two lists grade the same term differently', () => {
+    const lenient = structuredClone(termLists.en)
+    lenient.entries.push({ term: 'graded', category: 'harassment', severity: 'low' })
+    const strict = structuredClone(termLists.tr)
+    strict.entries.push({ term: 'graded', category: 'harassment', severity: 'high' })
+    const directory = writeListFixture({
+      'en-v1.json': lenient,
+      'tr-v1.json': strict,
+    })
+    const split = new CommunityTextScreener({ listsDirectory: directory })
+
+    const result = split.screen({ text: 'graded', field: 'caption', locale: 'en-US' })
+    expect(result.severity).toBe('high')
+    expect(result.disposition).toBe('block')
+  })
+
   it('follows an injected policy rather than the default map', () => {
     const permissive: CommunityTextPolicy = {
       ...DEFAULT_COMMUNITY_TEXT_POLICY,

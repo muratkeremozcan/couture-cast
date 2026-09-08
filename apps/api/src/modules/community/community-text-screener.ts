@@ -956,28 +956,46 @@ export class CommunityTextScreener {
     hasLeetCharacter: boolean,
     budget: ExpansionBudget
   ): MatchOutcome | null {
-    for (const index of this.indexes) {
-      const exact = index.single.get(folded)
-      if (exact) return { meta: exact, obfuscated: false }
-    }
+    const exact = this.worstAcross((index) => index.single.get(folded))
+    if (exact) return { meta: exact, obfuscated: false }
 
     const collapsed = collapseRepeats(folded)
     if (!budget.spend(collapsed)) return null
-    for (const index of this.indexes) {
-      const repeated = index.singleCollapsed.get(collapsed)
-      if (repeated) return { meta: repeated, obfuscated: true }
-    }
+    const repeated = this.worstAcross((index) => index.singleCollapsed.get(collapsed))
+    if (repeated) return { meta: repeated, obfuscated: true }
 
     if (!hasLeetCharacter) return null
 
     const classed = toLeetClassForm(collapsed)
     if (!budget.spend(classed)) return null
-    for (const index of this.indexes) {
-      const leet = index.singleLeet.get(classed)
-      if (leet) return { meta: leet, obfuscated: true }
-    }
+    const leet = this.worstAcross((index) => index.singleLeet.get(classed))
+    if (leet) return { meta: leet, obfuscated: true }
 
     return null
+  }
+
+  /**
+   * The same word appears in more than one list, and the lists do not always
+   * grade it alike: `puta` is medium in Spanish and high in Portuguese. Stopping
+   * at the first index would let the order languages happen to be loaded in
+   * decide whether a term blocks or only reviews, so every list is consulted and
+   * the harshest grade wins.
+   */
+  private worstAcross(
+    lookup: (index: LanguageIndex) => TermMeta | undefined
+  ): TermMeta | null {
+    let worst: TermMeta | null = null
+    for (const index of this.indexes) {
+      const found = lookup(index)
+      if (!found) continue
+      if (
+        worst === null ||
+        SEVERITY_RANK[found.severity] > SEVERITY_RANK[worst.severity]
+      ) {
+        worst = found
+      }
+    }
+    return worst
   }
 }
 
