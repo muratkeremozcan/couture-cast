@@ -174,6 +174,12 @@ const PolicySchema = z.object({
   reasonCodes: z.object({
     image: z.record(z.string(), WithheldDispositionSchema),
     text: z.record(z.string(), WithheldDispositionSchema),
+    // Codes that accompany a clean result live outside `image` and `text` so that
+    // those two records keep the invariant that a reason code can never resolve to
+    // `pass`. A clean code still has to be named somewhere, because a screener that
+    // states a clean verdict is auditable and one that merely returns an empty reason
+    // list is indistinguishable from a screener that refused without explaining.
+    cleanCodes: z.object({ text: NonEmptySchema }),
     rationale: NonEmptySchema,
   }),
 })
@@ -184,7 +190,7 @@ const ManifestFileSchema = z.object({
   sha256: Sha256Schema,
 })
 
-/** The four values the manifest mirrors out of the policy, and nothing else. */
+/** The five values the manifest mirrors out of the policy, and nothing else. */
 const MIRRORED_THRESHOLD_KEYS = [
   'neutralPassMinimum',
   'unsafeAggregateMaximum',

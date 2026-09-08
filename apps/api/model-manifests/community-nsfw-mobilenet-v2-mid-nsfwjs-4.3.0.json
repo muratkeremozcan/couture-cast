@@ -85,7 +85,7 @@
     "version": "v1",
     "hashAlgorithm": "sha256",
     "hashInput": "file bytes",
-    "sha256": "f92aba6ddc0045681240e626e9867a6b4f6990fa030f292d031f495866ff0c26"
+    "sha256": "467f139bba94f5131a652c597fe91867ad553dd0ef271fc3604da55f4e66a6e6"
   },
   "runtime": {
     "node": ">=24.0.0",
@@ -122,7 +122,9 @@
         "memoryMib": 49152,
         "image": "512x640 JPEG, quality 90, flat #beb4aa, generated in process",
         "executedFrom": "compiled dist under plain node"
-      }
+      },
+      "runsTaken": 2,
+      "selectionRule": "slowest of the runs taken"
     },
     "measuredRationale": "Measured from compiled output under plain node, with the full production path in every sample, because the same script under tsx measured 670 MiB peak purely from esbuild being resident in the same process. peakResidentMib is process-wide: a worker thread shares its process with the supervisor, so 339.4 MiB is the whole worker process and is the right number for a container memory limit, which is what the gate is for. It is NOT the model’s own size and must not be quoted as one. Developer-laptop numbers are a sanity floor, and AC 8 still requires the real measurement on the named production target.",
     "regressionGate": {
@@ -134,6 +136,24 @@
     },
     "regressionGateRationale": "Three times measured is the regression detector for the three timing gates, all of which land well inside their absolute ceilings. It fails for memory: three times 339.4 MiB is 1018 MiB, nearly double the 512 MiB ceiling, so a memory gate set there could never fire because the ceiling would always trip first. AC 8 exists so a later run can fail the gate while staying inside the ceiling, and a gate above its own ceiling cannot do that. Each gate is therefore the smaller of three times measured and the absolute ceiling.",
     "uncappedThreeTimesPeakResidentMib": 1018,
-    "uncappedThreeTimesPeakResidentMibNote": "Recorded for traceability only. This is the uncapped three-times value, never the gate; the gate is 512. Reading it as headroom would be reading slack that does not exist."
+    "uncappedThreeTimesPeakResidentMibNote": "Recorded for traceability only. This is the uncapped three-times value, never the gate; the gate is 512. Reading it as headroom would be reading slack that does not exist.",
+    "measuredVariance": {
+      "note": "The same compiled measurement was run twice on the same machine with the same script and sample counts. Warm p95 is stable to two decimal places across runs and is the number the gate most depends on. Cold startup and peak RSS are not stable: cold startup moved 32 percent and peak RSS moved 17 percent, because peak RSS depends on when the garbage collector happens to run and cold startup depends on filesystem cache warmth for a 5.6 MB weight decode.",
+      "runs": [
+        {
+          "coldStartupMs": 236.5,
+          "warmP95Ms": 26.64,
+          "warmP99Ms": 31.21,
+          "peakResidentMib": 339.4
+        },
+        {
+          "coldStartupMs": 161.5,
+          "warmP95Ms": 26.61,
+          "warmP99Ms": 29.18,
+          "peakResidentMib": 282.3
+        }
+      ],
+      "selectionRationale": "The value recorded in measured is the SLOWEST of the runs taken, never the most recent, so the run-to-run variance sits inside the gate rather than outside it. Three times the faster cold start of 161.5 ms would set a gate of 485 ms, and a machine cold-starting at 236 ms on a cold filesystem cache would then fail a gate derived from a warm-cache run. A multi-sample cold-start p95 was considered and deliberately not taken: cold startup has 30 seconds of absolute headroom against a measured 161 to 237 ms, so this gate exists to catch a change of kind, such as a network fetch appearing or the union @tensorflow/tfjs package returning, and 710 ms catches that as well as a statistically tight number would."
+    }
   }
 }

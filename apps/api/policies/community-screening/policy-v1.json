@@ -118,6 +118,7 @@
   "reasonCodes": {
     "image": {
       "unsafe_class": "block",
+      "image_disposition_conflict": "review",
       "low_confidence": "review",
       "output_invalid": "review",
       "class_mismatch": "review",
@@ -132,6 +133,9 @@
       "script_mixed": "review",
       "script_unsupported": "review"
     },
-    "rationale": "Stable codes shared by the image adapter, the text screener and the durable pipeline, so a persisted reason means the same thing on every branch. The disposition recorded against each code is its floor: text_policy_match escalates to block when the matched term severity maps to block, and no code here can ever yield pass. text_input_truncated is its own code because it describes a different failure from the others: input past a per-field ceiling, or input that exhausted maxExpandedCharacters before every canonical representation was built, means part of the text was never screened at all. A clean result over a partial reading is not a clean result, so it fails closed to review under its own name instead of borrowing one that would misdescribe it."
+    "cleanCodes": {
+      "text": "text_clean"
+    },
+    "rationale": "Stable codes shared by the image adapter, the text screener and the durable pipeline, so a persisted reason means the same thing on every branch. The disposition recorded against each code is its floor: text_policy_match escalates to block when the matched term severity maps to block, and no code here can ever yield pass. text_input_truncated is its own code because it describes a different failure from the others: input past a per-field ceiling, or input that exhausted maxExpandedCharacters before every canonical representation was built, means part of the text was never screened at all. A clean result over a partial reading is not a clean result, so it fails closed to review under its own name instead of borrowing one that would misdescribe it. image_disposition_conflict covers a screener that reports passed true beside a refusing disposition: the two halves of its own verdict contradict each other, so the safe reading is the refusing one, and without a named code that case held a post with an empty reason list. text_clean sits in cleanCodes rather than in this table, because every code under image and text must resolve to review or block and the schema makes pass unrepresentable there. It still has to be named: a screener that states a clean verdict is auditable, whereas one that merely returns an empty reason list is indistinguishable from a screener that refused without explaining itself."
   }
 }
