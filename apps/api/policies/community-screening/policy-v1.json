@@ -110,7 +110,10 @@
         "licence": "UNLICENSED (repository-owned)"
       }
     ],
-    "listsRationale": "One reviewed list plus one allow list per enabled language, covering the seven languages the ten enabled Community Beta locales map to. Every entry carries source, version and licence, and a list missing any of the three fails startup. Story 6.2b replaces these repository-owned provenance records with the pinned upstream lists it vendors."
+    "listsRationale": "One reviewed list plus one allow list per enabled language, covering the seven languages the ten enabled Community Beta locales map to. Every entry carries source, version and licence, and a list missing any of the three fails startup. Story 6.2b replaces these repository-owned provenance records with the pinned upstream lists it vendors.",
+    "openQuestions": [
+      "The term lists were authored on a four-level severity scale and this policy has three, so critical was merged into high. No publication outcome changes, because both blocked. What is lost is ordering inside the block tier: a hate slur and ordinary strong profanity are now indistinguishable once both map to high, so a moderator queue cannot rank one above the other and a per-severity measurement cannot separate them. Story 6.2b measures the false-positive rate per severity and should decide then whether the fourth level earns its place."
+    ]
   },
   "reasonCodes": {
     "image": {
@@ -124,10 +127,11 @@
     },
     "text": {
       "text_policy_match": "review",
+      "text_input_truncated": "review",
       "locale_unscreenable": "review",
       "script_mixed": "review",
       "script_unsupported": "review"
     },
-    "rationale": "Stable codes shared by the image adapter, the text screener and the durable pipeline, so a persisted reason means the same thing on every branch. The disposition recorded against each code is its floor: text_policy_match escalates to block when the matched term's severity maps to block, and no code here can ever yield pass."
+    "rationale": "Stable codes shared by the image adapter, the text screener and the durable pipeline, so a persisted reason means the same thing on every branch. The disposition recorded against each code is its floor: text_policy_match escalates to block when the matched term severity maps to block, and no code here can ever yield pass. text_input_truncated is its own code because it describes a different failure from the others: input past a per-field ceiling, or input that exhausted maxExpandedCharacters before every canonical representation was built, means part of the text was never screened at all. A clean result over a partial reading is not a clean result, so it fails closed to review under its own name instead of borrowing one that would misdescribe it."
   }
 }

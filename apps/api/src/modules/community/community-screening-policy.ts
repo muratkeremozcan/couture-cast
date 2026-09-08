@@ -135,6 +135,7 @@ const TextPolicySchema = z
       rationale: NonEmptySchema,
     }),
     lists: z.array(TextListSchema).min(1),
+    openQuestions: z.array(NonEmptySchema).optional(),
   })
   .catchall(z.string())
   .superRefine((text, ctx) => {

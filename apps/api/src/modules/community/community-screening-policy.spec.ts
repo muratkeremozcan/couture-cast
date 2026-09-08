@@ -139,6 +139,12 @@ describe('the committed policy is conservative by construction', () => {
     expect(dispositions).not.toContain('pass')
   })
 
+  // Truncated input means part of the text was never screened, which none of
+  // the other text codes describes.
+  it('carries a distinct reason code for text that went partly unscreened', () => {
+    expect(policy.reasonCodes.text.text_input_truncated).toBe('review')
+  })
+
   it('covers exactly the languages the enabled locales require', () => {
     expect(policy.text.lists.map((list) => list.language).toSorted()).toEqual([
       ...COMMUNITY_SCREENING_LANGUAGES,
