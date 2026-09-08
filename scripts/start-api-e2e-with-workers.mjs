@@ -3,7 +3,7 @@ import path from 'node:path'
 import { fileURLToPath } from 'node:url'
 import { spawn } from 'node:child_process'
 import { config as loadEnv } from 'dotenv'
-import { applyLocalE2eDatabaseUrl } from './local-e2e-database.mjs'
+import { applyLocalE2eDatabaseUrl, isLocalTestRun } from './local-e2e-database.mjs'
 
 const repoRoot = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..')
 const startWeb = process.argv.includes('--with-web')
@@ -11,17 +11,63 @@ const apiBaseUrl = process.env.API_BASE_URL || 'http://127.0.0.1:4000'
 const webBaseUrl = process.env.WEB_E2E_BASE_URL || 'http://127.0.0.1:3005'
 const webUrl = new URL(webBaseUrl)
 
+function refuse(message) {
+  console.error(`[start-api-e2e-with-workers] ${message}`)
+  process.exit(1)
+}
+
+// What a run's community screening result is worth is a property of the whole
+// run, so it is chosen once, by name, and the screener selector is derived from
+// it. Letting a caller set both would let them disagree, and a disagreement here
+// files a fixture verdict under a real-model label with nothing in the run's own
+// output to say which one won.
+//
+// A selector the community runtime has not implemented yet makes the community
+// worker exit before readiness with `Unsupported COMMUNITY_NSFW_SCREENER value:
+// <x>` on its own stderr, forwarded below and then reported as a startup
+// failure. Leave it that way: a fallback to the fixture is what this whole
+// mechanism exists to prevent.
+const REAL_MODEL_MODE = 'real-model'
+const SCREENER_BY_EVIDENCE_MODE = new Map([
+  ['fixture', 'fixture'],
+  [REAL_MODEL_MODE, 'tensorflow'],
+])
+
+const evidenceMode =
+  (process.env.COMMUNITY_SCREENING_EVIDENCE_MODE ?? '').trim().toLowerCase() || 'fixture'
+const screenerSelector = SCREENER_BY_EVIDENCE_MODE.get(evidenceMode)
+if (!screenerSelector) {
+  refuse(
+    `Unsupported COMMUNITY_SCREENING_EVIDENCE_MODE value: ${evidenceMode}. Expected one of: ${[...SCREENER_BY_EVIDENCE_MODE.keys()].join(', ')}. An unknown mode is refused here because falling back to the fixture would hand back a cleared-every-image run under whatever label the caller meant to ask for.`
+  )
+}
+
+// A hand-set selector is a second claim about the run. Refusing is the only
+// answer that cannot silently discard one of the two claims.
+const callerScreener = (process.env.COMMUNITY_NSFW_SCREENER ?? '').trim()
+if (callerScreener && callerScreener !== screenerSelector) {
+  refuse(
+    `COMMUNITY_NSFW_SCREENER=${callerScreener} contradicts COMMUNITY_SCREENING_EVIDENCE_MODE=${evidenceMode}, which selects ${screenerSelector}. Set the evidence mode alone; the screener follows from it.`
+  )
+}
+
+const screeningEvidenceNote =
+  evidenceMode === REAL_MODEL_MODE
+    ? 'verdicts come from the pinned ADR-013 model'
+    : 'the fixture clears every image without looking at the bytes, so a pass proves nothing about image safety'
+
 const env = {
   ...process.env,
   NODE_ENV: 'test',
   TEST_ENV: 'local',
   GARMENT_TAGGING_ENGINE: 'fixture',
+  // What the default `fixture` evidence mode buys:
   // Story 6.1: without this the ADR-013 NSFW model is absent, every post fails
   // closed to `flagged`, and the published path — the story's central
   // acceptance criterion — cannot be exercised at any tier. The fixture clears
   // every image and proves nothing about image safety; it is refused outside a
   // test environment by both the selector and the fixture's own constructor.
-  COMMUNITY_NSFW_SCREENER: 'fixture',
+  COMMUNITY_NSFW_SCREENER: screenerSelector,
   PORT: process.env.PORT || '4000',
   API_BASE_URL: apiBaseUrl,
   HTTP_CORS_ORIGIN: process.env.HTTP_CORS_ORIGIN || webBaseUrl,
@@ -49,8 +95,8 @@ const rootEnvFiles = [
 ]
 const shouldForceLocalEnv = (env.TEST_ENV ?? '').toLowerCase() === 'local'
 
-// Two things a caller may already have decided must survive the `.env.local`
-// override below, both for the same reason: a file default is not allowed to
+// Three things a caller may already have decided must survive the `.env.local`
+// override below, all for the same reason: a file default is not allowed to
 // second-guess a deliberate, already-made choice.
 //
 // `POSTHOG_API_KEY: ''` is a deliberate disable, mirroring the same guard
@@ -65,10 +111,23 @@ const shouldForceLocalEnv = (env.TEST_ENV ?? '').toLowerCase() === 'local'
 // existed that was true by construction (nothing here touched it). The
 // override would otherwise silently break that contract whenever `.env.local`
 // also defines one, which it normally does.
+//
+// `COMMUNITY_NSFW_SCREENER` is the same class again with the highest cost of
+// getting it wrong: a `.env.local` that defined it would relabel a real-model
+// evidence run as a fixture one, and every artifact the run produced would
+// carry the wrong claim. No env file in this repository defines it today.
+// This carve-out reaches the launcher only. `apps/api/src/load-env.ts` repeats
+// the same `.env.local` override inside every child spawned below, over the
+// env handed to it, so a file default introduced later would still beat the
+// value passed through `spawn`. Closing that needs the same carve-out there.
 const explicitlyDisabled = Object.fromEntries(
   Object.entries(env).filter(([, value]) => value === '')
 )
-const callerDatabaseUrl = env.DATABASE_URL
+const callerOwned = Object.fromEntries(
+  ['DATABASE_URL', 'COMMUNITY_NSFW_SCREENER']
+    .map((key) => [key, env[key]])
+    .filter(([, value]) => value)
+)
 
 for (const file of rootEnvFiles) {
   const fullPath = path.join(repoRoot, file)
@@ -82,10 +141,25 @@ for (const file of rootEnvFiles) {
   })
 }
 
-Object.assign(env, explicitlyDisabled)
-if (callerDatabaseUrl) {
-  env.DATABASE_URL = callerDatabaseUrl
+Object.assign(env, explicitlyDisabled, callerOwned)
+
+// `.env.local` overrides this script's own `NODE_ENV` and `TEST_ENV` above, so
+// which environment the stack will declare itself to be is settled only here.
+// `isLocalTestRun` is the predicate `allowsTestOnlySecrets()` and
+// `allowsCommerceSeeding()` both ask, so failing it means the fixture tagging
+// engine, the fixture screener and the commerce seed all refuse to run. A
+// real-model evidence run that fails it is pointed at an environment it has no
+// business collecting evidence from, and refusing here is before the seed step
+// writes anything there.
+if (evidenceMode === REAL_MODEL_MODE && !isLocalTestRun(env)) {
+  refuse(
+    `COMMUNITY_SCREENING_EVIDENCE_MODE=${REAL_MODEL_MODE} requires NODE_ENV=test or TEST_ENV=local. Resolved NODE_ENV=${env.NODE_ENV}, TEST_ENV=${env.TEST_ENV} after loading ${rootEnvFiles.join(', ')}.`
+  )
 }
+
+console.log(
+  `[start-api-e2e-with-workers] Community screening path: ${evidenceMode} (COMMUNITY_NSFW_SCREENER=${env.COMMUNITY_NSFW_SCREENER}); ${screeningEvidenceNote}`
+)
 
 // A fresh clone or a new git worktree has no repo-level env file yet, so the
 // loop above fills nothing in. Only then does the local default apply, same
@@ -272,7 +346,7 @@ async function main() {
   }
 
   console.log(
-    '[start-api-e2e-with-workers] Starting API, Wardrobe Worker and Community Worker in E2E fixture mode...'
+    `[start-api-e2e-with-workers] Starting API, Wardrobe Worker and Community Worker with fixture garment tagging and ${evidenceMode} community screening...`
   )
 
   const { child: apiProcess } = startManagedProcess('node', ['apps/api/dist/src/main.js'])
