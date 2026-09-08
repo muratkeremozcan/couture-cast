@@ -50,11 +50,40 @@ export interface TextScreeningResult {
   screenedLanguages?: SupportedLanguage[]
 }
 
+/**
+ * The five ADR-013 class names, in the canonical order the model manifest pins.
+ * The adapter applies them positionally to the model's output vector, so the
+ * order here is part of the contract rather than presentation.
+ */
+export const ADR013_NSFW_CLASSES = [
+  'Drawing',
+  'Hentai',
+  'Neutral',
+  'Porn',
+  'Sexy',
+] as const
+
+export type Adr013NsfwClass = (typeof ADR013_NSFW_CLASSES)[number]
+
+/** AC 2's three-way image disposition. Only `pass` can reach publication. */
+export type NsfwImageDisposition = 'pass' | 'review' | 'block'
+
 export interface ImageScreeningResult {
   passed: boolean
   reasons: string[]
   engineVersion: string
   score?: number
+  /**
+   * Present once a screener has a real three-way opinion. It is optional
+   * because the unavailable and fixture adapters predate it and a required
+   * field would force them to invent one; {@link imageCleared} treats an absent
+   * disposition as deferring to `passed`.
+   */
+  disposition?: NsfwImageDisposition
+  /** Bounded model detail for the access-controlled evaluation payload. */
+  classProbabilities?: Readonly<Partial<Record<Adr013NsfwClass, number>>>
+  /** The hashed policy identity that produced {@link disposition}. */
+  policyVersion?: string
 }
 
 export interface CommunityModerationResult {
@@ -87,12 +116,41 @@ export interface CommunityModerationEngine {
 }
 
 /**
- * The seam ADR-013's TensorFlow.js NSFW model plugs into. Nothing in this
- * repository implements it yet; see {@link UnavailableNsfwImageScreener}.
+ * The seam ADR-013's TensorFlow.js NSFW model plugs into.
+ *
+ * An implementation that owns a model process also owns its lifecycle, so the
+ * two lifecycle members are optional here rather than in a second interface:
+ * `community-worker-runtime.ts` awaits {@link NsfwImageScreener.ensureReady}
+ * before the BullMQ consumer starts and calls {@link NsfwImageScreener.close}
+ * on shutdown, and the adapters that hold no resources simply omit both.
  */
 export interface NsfwImageScreener {
   readonly engineVersion: string
   screen(imageBuffer: Buffer): Promise<ImageScreeningResult>
+  /**
+   * Loads and verifies whatever the screener needs before it can answer, and
+   * reports the identity that will be persisted with every verdict.
+   */
+  ensureReady?(): Promise<NsfwScreenerReadiness>
+  /** Releases the model process, tensors and handles the screener opened. */
+  close?(): Promise<void>
+}
+
+/**
+ * What a screener knows about itself once it is ready. Every field beyond
+ * `engineVersion` is optional because the unavailable and fixture adapters
+ * genuinely have no model, no backend and no policy behind them, and inventing
+ * values for them is the kind of plausible-looking identity this story exists
+ * to prevent.
+ */
+export interface NsfwScreenerReadiness {
+  engineVersion: string
+  /** Hash of the policy file that produced the thresholds in use. */
+  policyVersion?: string
+  /** Hash pinning the model artifact that actually loaded. */
+  modelHash?: string
+  /** TensorFlow.js backend the inference runtime selected. */
+  backend?: string
 }
 
 // Multilingual profanity and safety term dictionaries
@@ -239,6 +297,7 @@ export class UnavailableNsfwImageScreener implements NsfwImageScreener {
       passed: false,
       reasons: [SCREENING_UNAVAILABLE_REASON],
       engineVersion: this.engineVersion,
+      disposition: 'review',
     })
   }
 }
@@ -348,6 +407,20 @@ async function screenPostText(
   }
 }
 
+/**
+ * Whether the image half may contribute to automatic publication.
+ *
+ * Both halves have to agree, and they are checked separately because they fail
+ * in opposite directions. `passed` is the seam's original verdict and stays
+ * authoritative on its own. `disposition` is AC 2's three-way answer, and a
+ * screener that reports `passed: true` beside a `review` or `block` disposition
+ * is contradicting itself; reading only one of the two would publish on the
+ * half that happens to be wrong.
+ */
+export function imageCleared(image: ImageScreeningResult): boolean {
+  return image.passed && (image.disposition ?? 'pass') === 'pass'
+}
+
 function combineScreeningResults(
   text: TextScreeningResult,
   image: ImageScreeningResult
@@ -360,7 +433,7 @@ function combineScreeningResults(
   // refuses an item without explaining itself is read as a pass, which is the
   // fail-open this whole engine exists to remove.
   return {
-    outcome: text.passed && image.passed ? 'passed' : 'flagged',
+    outcome: text.passed && imageCleared(image) ? 'passed' : 'flagged',
     reasons: reasonsArray,
     engineVersions: {
       text: text.engineVersion,
@@ -398,7 +471,12 @@ export class FixtureCommunityModerationEngine implements CommunityModerationEngi
   constructor(
     private readonly config: {
       textOutcome?: { passed: boolean; reasons: string[] }
-      imageOutcome?: { passed: boolean; reasons: string[]; score?: number }
+      imageOutcome?: {
+        passed: boolean
+        reasons: string[]
+        score?: number
+        disposition?: NsfwImageDisposition
+      }
     } = {}
   ) {
     if (!allowsTestOnlySecrets()) {
@@ -430,6 +508,7 @@ export class FixtureCommunityModerationEngine implements CommunityModerationEngi
       passed: outcome.passed,
       reasons: outcome.reasons,
       engineVersion: FIXTURE_IMAGE_ENGINE_VERSION,
+      disposition: outcome.disposition ?? (outcome.passed ? 'pass' : 'review'),
       ...(outcome.score === undefined ? {} : { score: outcome.score }),
     })
   }
