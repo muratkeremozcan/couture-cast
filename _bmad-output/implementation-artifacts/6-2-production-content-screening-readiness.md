@@ -226,9 +226,28 @@ amendment before a different inference technology is introduced.
 
 Add a supervised inference controller and an isolated inference entrypoint. Load the model from the
 bundles that ship inside `nsfwjs`, reached through its exported `nsfwjs/models/mobilenet_v2_mid`
-subpath: that module exposes `modelJson()` and a `weightBundles` array of base64 strings. Decode the
-bundles, concatenate them in `weightsManifest` path order, flatten the weight specs, and pass an
-in-memory `tf.io.IOHandler` to `loadGraphModel` from `@tensorflow/tfjs-converter`. This touches no
+subpath. Corrected on 2026-09-08 after the API was executed against `nsfwjs@4.3.0`: the subpath has
+no default export. It exports one named `MobileNetV2MidModel` whose `modelJson` is an async function
+and whose `weightBundles` is an array of async functions, and each of those resolves to an ES module
+namespace, so the payload sits on `.default`:
+
+```ts
+import { MobileNetV2MidModel as bundle } from 'nsfwjs/models/mobilenet_v2_mid'
+
+const modelJson = (await bundle.modelJson()).default
+const encodedBundles = await Promise.all(
+  bundle.weightBundles.map(async (loadBundle) => (await loadBundle()).default)
+)
+```
+
+Calling `bundle.modelJson()` without awaiting yields either
+`TypeError: bundle.modelJson is not a function` or an object whose only keys are `default` and
+`module.exports`, which is how the original wording was found to be wrong. `modelJson` carries
+`format` (`graph-model`), `generatedBy`, `convertedBy`, `userDefinedMetadata`, `modelTopology`, and a
+`weightsManifest` holding one group with paths `group1-shard1of2` and `group1-shard2of2`; the first
+encoded bundle is a 5,592,408-character base64 string. Decode the bundles, concatenate them in
+`weightsManifest` path order, flatten the weight specs, and pass an in-memory `tf.io.IOHandler` to
+`loadGraphModel` from `@tensorflow/tfjs-converter`. This touches no
 network, no `file://` handler, and no model directory. Verify the three artifact files against the
 manifest with `node:fs` before loading, and fail startup on a hash mismatch; that verification, plus
 the `package-lock.json` integrity hash, is the supply-chain control.
