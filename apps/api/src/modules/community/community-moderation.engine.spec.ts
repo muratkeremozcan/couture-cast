@@ -20,6 +20,7 @@ import {
   type ImageScreeningResult,
   type NsfwImageScreener,
 } from './community-moderation.engine'
+import { loadCommunityScreeningPolicy } from './community-screening-policy'
 
 /** A stand-in for a real ADR-013 model, so the pass path is exercisable. */
 class StubNsfwScreener implements NsfwImageScreener {
@@ -395,6 +396,17 @@ describe('CommunityModerationEngine (ADR-013)', () => {
       expect(result.image.classProbabilities).toEqual(classProbabilities)
       expect(result.image.policyVersion).toBe('sha256:0f1e2d3c')
       expect(result.image.disposition).toBe('pass')
+    })
+  })
+
+  describe('policy alignment', () => {
+    it('emits a conflict reason the approved policy actually declares', () => {
+      // The engine holds the string as a constant rather than reading the
+      // policy at screening time, so this is what stops the two drifting apart
+      // and leaving a reason code nothing downstream can map to a disposition.
+      const { policy } = loadCommunityScreeningPolicy()
+
+      expect(policy.reasonCodes.image[IMAGE_DISPOSITION_CONFLICT_REASON]).toBe('review')
     })
   })
 
