@@ -2,7 +2,7 @@
   "artifact": "community-content-screening-measurements",
   "artifactVersion": 1,
   "storyKey": "6-2-production-content-screening-readiness",
-  "generatedAt": "2026-09-08T21:56:27.571Z",
+  "generatedAt": "2026-09-08T22:01:43.301Z",
   "generatedBy": "npm run measure:community-screening",
   "scope": {
     "rendersVerdict": false,
@@ -16,7 +16,7 @@
     "statement": "The deterministic evaluation proves that unsafe class-probability vectors return block, that every threshold is crossed from both sides, and that no vector reaches pass without a confident Neutral. The lifecycle suite drives a fake inference runtime emitting an unsafe vector, which proves the transport from worker message through validation, class mapping, policy evaluation, reason codes, and engine identity to a block verdict. Neither establishes that the real model emits a high Porn or Hentai probability for genuinely unsafe input, and no synthetic vector can. That single link is what AC 7 assigns to Story 6.2b corpus-backed measurement."
   },
   "build": {
-    "commitSha": "0bac956ff19a340a9ebd09bf879c1a93a1345f89",
+    "commitSha": "ef237fd9c19f13b0477f03d175796478bca58684",
     "modelManifestSha256": "a61015d0d2036accdba2162267fcc5612cd3511da331bd313fe9aa75754af930",
     "policySha256": "7adfb6cb357b4669db222192c917b412ba6e3a4a8fb09c045d7039801d5dfa81",
     "fixtureManifestSha256": "b8cd2cd08dd419024a2cdb3ca84d03b3be7a5df211a92cd200853200bcb13243",
@@ -34,9 +34,26 @@
     "inputWidth": 224,
     "inputHeight": 224
   },
+  "modelVerification": {
+    "status": "unavailable",
+    "isEvidence": false,
+    "note": "The verification command did not complete, so no supply-chain evidence is recorded."
+  },
+  "engineIdentity": {
+    "textEngineVersion": null,
+    "imageEngineVersion": null,
+    "source": null,
+    "note": "The engine identity is produced by the screening loader at runtime and is not composed here. Run `npm run test:community-screening-readiness --workspace api` to record it."
+  },
+  "evidenceCorpus": {
+    "variable": "COMMUNITY_SCREENING_EVIDENCE_CORPUS_DIR",
+    "configured": false,
+    "note": "Restricted evaluation assets stay outside Git; only their versioned manifest and hashes are committed. Story 6.2b owns those corpora."
+  },
   "policyIdentity": {
     "policyId": "community-screening-policy-v1",
     "version": "v1",
+    "policySha256": "7adfb6cb357b4669db222192c917b412ba6e3a4a8fb09c045d7039801d5dfa81",
     "neutralPassMinimum": 0.85,
     "unsafeClasses": ["Hentai", "Porn"],
     "unsafeBlockMinimum": 0.35,

@@ -106,6 +106,83 @@ function gitWorkingTreeClean() {
   }
 }
 
+/**
+ * Runs the artifact verification and records what it actually reported.
+ *
+ * `verify:community-screening-model` exits 0 with status `skipped` whenever the
+ * selector is not `tensorflow`, because there is nothing installed to verify.
+ * A zero exit is therefore not evidence of a verified supply chain, and
+ * `isEvidence` is what carries that distinction into the payload: only a
+ * `passed` run counts. Reading the exit code alone is the mistake this exists to
+ * prevent.
+ */
+function verifyModel() {
+  const notEvidence = (status, note) => ({ status, isEvidence: false, note })
+
+  let raw
+  try {
+    raw = execFileSync(
+      'npm',
+      [
+        'run',
+        '--silent',
+        'verify:community-screening-model',
+        '--workspace',
+        'api',
+        '--',
+        '--json',
+      ],
+      { cwd: projectRoot, encoding: 'utf8', stdio: ['ignore', 'pipe', 'pipe'] }
+    )
+  } catch (error) {
+    const stdout = typeof error.stdout === 'string' ? error.stdout : ''
+    const parsed = parseVerifyJson(stdout)
+    return parsed
+      ? {
+          status: parsed.status ?? 'failed',
+          isEvidence: false,
+          note: parsed.message ?? null,
+        }
+      : notEvidence(
+          'unavailable',
+          'The verification command did not complete, so no supply-chain evidence is recorded.'
+        )
+  }
+
+  const parsed = parseVerifyJson(raw)
+  if (!parsed) {
+    return notEvidence(
+      'unavailable',
+      'The verification command produced no machine-readable result.'
+    )
+  }
+  if (parsed.status === 'skipped') {
+    return notEvidence(
+      'skipped',
+      `Verification was skipped because the selector is not tensorflow, so the model artifacts were never hashed. This is the absence of evidence, not a passing verification. ${parsed.message ?? ''}`.trim()
+    )
+  }
+  return {
+    status: parsed.status ?? 'unavailable',
+    isEvidence: parsed.status === 'passed',
+    note: parsed.message ?? null,
+  }
+}
+
+function parseVerifyJson(output) {
+  if (!output) return null
+  // npm prepends lifecycle noise even under --silent in some configurations, so
+  // the JSON object is located rather than assumed to start at byte zero.
+  const start = output.indexOf('{')
+  const end = output.lastIndexOf('}')
+  if (start === -1 || end <= start) return null
+  try {
+    return JSON.parse(output.slice(start, end + 1))
+  } catch {
+    return null
+  }
+}
+
 function summariseCorpus(manifest) {
   if (!manifest) return null
   const byBand = {}
@@ -225,9 +302,42 @@ function buildPayload() {
       inputHeight: modelManifest.inputHeight,
     },
 
+    modelVerification: verifyModel(),
+
+    /*
+     * Taken from the loader rather than composed here. The loader is what
+     * actually stamps `moderation_engine_version` on a row, so a string built
+     * independently in this file could agree with the manifest and still
+     * disagree with what ran. Absent until a readiness run records it.
+     */
+    engineIdentity: intermediate?.identity
+      ? {
+          textEngineVersion: intermediate.identity.textEngineVersion ?? null,
+          imageEngineVersion: intermediate.identity.imageEngineVersion ?? null,
+          source: 'screening loader, recorded by the readiness run',
+        }
+      : {
+          textEngineVersion: null,
+          imageEngineVersion: null,
+          source: null,
+          note: `The engine identity is produced by the screening loader at runtime and is not composed here. Run \`${COMMANDS.model.readiness}\` to record it.`,
+        },
+
+    /*
+     * Presence only, never the path. The restricted evaluation assets live
+     * outside the repository by design, and an absolute local path in a
+     * committed artifact is exactly what the story keeps out of hosted logs.
+     */
+    evidenceCorpus: {
+      variable: 'COMMUNITY_SCREENING_EVIDENCE_CORPUS_DIR',
+      configured: Boolean(process.env.COMMUNITY_SCREENING_EVIDENCE_CORPUS_DIR?.trim()),
+      note: 'Restricted evaluation assets stay outside Git; only their versioned manifest and hashes are committed. Story 6.2b owns those corpora.',
+    },
+
     policyIdentity: policy && {
       policyId: policy.policyId,
       version: policy.version,
+      policySha256: current.policySha256,
       neutralPassMinimum: policy.image?.neutralPassMinimum,
       unsafeClasses: policy.image?.unsafeClasses,
       unsafeBlockMinimum: policy.image?.unsafeBlockMinimum,
