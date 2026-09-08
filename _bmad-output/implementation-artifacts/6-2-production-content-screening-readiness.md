@@ -332,6 +332,20 @@ render no verdict and carry no signature, because the gates that a verdict would
 Story 6.2b against corpora and hosted hardware that do not exist here. Keeping the verdict out of this
 story is what stops a green fixture run from reading as a release decision.
 
+Recorded on 2026-09-08, after the decision that no unsafe imagery may enter this repository: the
+readiness payload must state the division of proof in these words rather than leave it implicit.
+Story 6.2 proves the policy and the pipeline. Story 6.2b proves the model's accuracy. The
+model-readiness gate signature depends on both. Concretely, the deterministic evaluation proves that
+unsafe class-probability vectors return `block`, that every threshold is crossed from both sides, and
+that no vector reaches `pass` without a confident `Neutral`; the lifecycle suite drives a fake
+inference runtime emitting an unsafe vector, which proves the transport from worker message through
+validation, class mapping, policy evaluation, reason codes, and engine identity to a block verdict.
+Neither establishes that the real model emits a high `Porn` or `Hentai` probability for genuinely
+unsafe input, and no synthetic vector can. That single link is exactly what AC 7 assigns to Story
+6.2b's corpus-backed measurement. For the same reason, the paired unsafe end-to-end journey is driven
+through the text screener and must be labelled with the screener that refused it, so it cannot be
+read as end-to-end proof of image blocking.
+
 ## Tasks / Subtasks
 
 - [ ] Task 0: Write the versioned policy file (AC: 1, 2, 7)
