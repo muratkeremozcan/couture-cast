@@ -9,6 +9,8 @@
     "classNamesRationale": "The exact NSFW_CLASSES set exported by nsfwjs@4.3.0, in the canonical order the model's output vector uses positionally. A vector of any other length, or a class-name set that does not match this list exactly, is invalid output and routes to review.",
     "neutralPassMinimum": 0.85,
     "neutralPassMinimumRationale": "Automatic publication requires a confident Neutral rather than merely the highest-scoring class. The benign reference image measured during story review scored Neutral 0.9063, so 0.85 leaves real headroom for ordinary fashion photography while still demanding clear model confidence. Anything at or below this value routes to review.",
+    "unsafeAggregateMaximum": 0.1,
+    "unsafeAggregateMaximumRationale": "A confident Neutral alone is not enough to publish. Neutral 0.86 with Porn 0.13 clears the Neutral gate and sits below the per-class block threshold, so without this third condition a vector carrying thirteen percent unsafe mass would reach automatic publication. Pass therefore also requires the sum of the unsafeClasses probabilities to be strictly below 0.10. The benign reference image sums Hentai 0.0421 and Porn 0.0015 to 0.0436, so an ordinary fashion photograph keeps better than a factor of two in hand, while any vector where unsafe mass is a real share of the distribution falls to review.",
     "unsafeClasses": ["Hentai", "Porn"],
     "unsafeClassesRationale": "Sexy is deliberately absent. On a fashion product, swimwear, lingerie and eveningwear score Sexy legitimately, and blocking them automatically would be the dominant false-positive source. A high Sexy probability still cannot reach pass, because it necessarily pushes Neutral below neutralPassMinimum, so such an image is withheld and shown to a human instead of being blocked outright. Drawing is not an unsafe class at all.",
     "unsafeBlockMinimum": 0.35,
@@ -16,7 +18,10 @@
     "probabilitySumTolerance": 0.001,
     "probabilitySumToleranceRationale": "The model output is already softmaxed and measured 0.99999992 on the reference input. A tolerance of 0.001 is three orders of magnitude above that float32 accumulation error and still small enough to catch a truncated, padded, or otherwise corrupted vector, which a permissive tolerance would wave through.",
     "boundaryDisposition": "review",
-    "boundaryDispositionRationale": "Comparisons are strict. A probability exactly at a threshold has not passed it, so pass requires Neutral strictly greater than neutralPassMinimum and block requires an unsafe class strictly greater than unsafeBlockMinimum. Both boundaries therefore resolve to review, which is the fail-closed direction on each side."
+    "boundaryDispositionRationale": "Comparisons are strict. A probability exactly at a threshold has not passed it, so pass requires Neutral strictly greater than neutralPassMinimum and block requires an unsafe class strictly greater than unsafeBlockMinimum. Both boundaries therefore resolve to review, which is the fail-closed direction on each side.",
+    "openQuestions": [
+      "An aggregate BLOCK threshold was considered and deliberately not set. A vector such as Hentai 0.30 with Porn 0.30 sums to 0.60 of unsafe mass yet clears neither single-class block rule, so it routes to review rather than block. That is safe, because review keeps the post unpublished, and it is a moderator queue-load question rather than a fail-open. Choosing a number for it without corpus evidence is exactly the measurement Story 6.2b exists to make, so it is left open here on purpose rather than guessed."
+    ]
   },
   "text": {
     "categories": ["profanity", "sexual", "hate", "harassment", "violence", "self_harm"],
@@ -39,10 +44,13 @@
       "rationale": "All seven enabled languages are written in Latin script, so Common and Inherited cover punctuation, digits and combining marks. Observed script is determined by deterministic Unicode inspection; no probabilistic language detection runs anywhere in this policy. Mixed or unsupported scripts are the confusable-substitution attack surface, so both fail closed to a human."
     },
     "limits": {
-      "maxInputCharacters": 280,
+      "maxInputCharacters": {
+        "caption": 280,
+        "altText": 200
+      },
       "maxCanonicalRepresentations": 8,
       "maxExpandedCharacters": 2048,
-      "rationale": "280 is the caption ceiling the public contract already enforces, and alt text is capped lower at 200, so bounding at the larger of the two needs no expansion of the contract. Capping the number of canonical representations and their combined length stops crafted input from amplifying normalization work without limit."
+      "rationale": "Per field, because the screener is field-aware and the public contract already enforces both ceilings: communityPostCaptionSchema caps a caption at 280 characters and communityPostAltTextSchema caps alt text at 200. Screening a longer value would mean normalising input the API had no business accepting. Capping the number of canonical representations and their combined length stops crafted input from amplifying normalization work without limit."
     },
     "lists": [
       {

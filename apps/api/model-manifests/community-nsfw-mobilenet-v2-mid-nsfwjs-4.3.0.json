@@ -72,6 +72,7 @@
   "forbiddenDependenciesRationale": "The union package pulls tfjs-backend-webgl, tfjs-layers and tfjs-data, which this worker never uses, and measured 286 MB installed against 88 MB for the three packages actually needed. It produces identical class probabilities, so its only effect here is to triple the image the Story 6.2b worker has to fit inside a free hosting tier.",
   "thresholds": {
     "neutralPassMinimum": 0.85,
+    "unsafeAggregateMaximum": 0.1,
     "unsafeBlockMinimum": 0.35,
     "unsafeClasses": ["Hentai", "Porn"],
     "probabilitySumTolerance": 0.001
@@ -84,7 +85,7 @@
     "version": "v1",
     "hashAlgorithm": "sha256",
     "hashInput": "file bytes",
-    "sha256": "7adfb6cb357b4669db222192c917b412ba6e3a4a8fb09c045d7039801d5dfa81"
+    "sha256": "ddfe5adcfce78f01a45eb5e2b682bb8ee3a8e87c6eab729295e7f48f4ed8aa44"
   },
   "runtime": {
     "node": ">=24.0.0",
@@ -100,8 +101,39 @@
       "outerScreeningCeilingMs": 30000,
       "peakResidentMib": 512
     },
-    "measured": null,
-    "regressionGate": null,
-    "rationale": "The absolute ceilings bound a pathological run and sit far above what this stack actually costs, so they cannot detect a regression on their own. The measurement command fills `measured` with warm p95, warm p99, cold startup and peak RSS from at least 1,000 warm inferences after warmup, and fills `regressionGate` at three times each measured value. Both stay null until a real measurement runs, so an unmeasured manifest can never be read as a passing gate."
+    "measured": {
+      "coldStartupMs": 236.5,
+      "warmP50Ms": 23.95,
+      "warmP95Ms": 26.64,
+      "warmP99Ms": 31.21,
+      "warmMaxMs": 73.54,
+      "peakResidentMib": 339.4,
+      "baselineResidentMibBeforeModelLoad": 71.3,
+      "warmSamples": 1000,
+      "warmupSamples": 50,
+      "replicas": 1,
+      "concurrency": 1,
+      "environment": {
+        "node": "v24.20.0",
+        "platform": "darwin",
+        "arch": "arm64",
+        "cpu": "Apple M4 Pro",
+        "cpuCount": 14,
+        "memoryMib": 49152,
+        "image": "512x640 JPEG, quality 90, flat #beb4aa, generated in process",
+        "executedFrom": "compiled dist under plain node"
+      }
+    },
+    "measuredRationale": "Measured from compiled output under plain node, with the full production path in every sample, because the same script under tsx measured 670 MiB peak purely from esbuild being resident in the same process. peakResidentMib is process-wide: a worker thread shares its process with the supervisor, so 339.4 MiB is the whole worker process and is the right number for a container memory limit, which is what the gate is for. It is NOT the model’s own size and must not be quoted as one. Developer-laptop numbers are a sanity floor, and AC 8 still requires the real measurement on the named production target.",
+    "regressionGate": {
+      "rule": "min(3 x measured, absolute ceiling)",
+      "coldStartupMs": 710,
+      "warmP95Ms": 80,
+      "warmP99Ms": 94,
+      "peakResidentMib": 512
+    },
+    "regressionGateRationale": "Three times measured is the regression detector for the three timing gates, all of which land well inside their absolute ceilings. It fails for memory: three times 339.4 MiB is 1018 MiB, nearly double the 512 MiB ceiling, so a memory gate set there could never fire because the ceiling would always trip first. AC 8 exists so a later run can fail the gate while staying inside the ceiling, and a gate above its own ceiling cannot do that. Each gate is therefore the smaller of three times measured and the absolute ceiling.",
+    "uncappedThreeTimesPeakResidentMib": 1018,
+    "uncappedThreeTimesPeakResidentMibNote": "Recorded for traceability only. This is the uncapped three-times value, never the gate; the gate is 512. Reading it as headroom would be reading slack that does not exist."
   }
 }
