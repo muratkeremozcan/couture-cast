@@ -302,7 +302,15 @@ function assessStaleness(intermediate, current) {
     }
   }
 
-  compare('commitSha', intermediate.commitSha ?? null, current.commitSha)
+  /*
+   * The commit SHA is recorded for traceability but deliberately NOT compared.
+   * It moves for reasons that cannot affect an inference: committing this very
+   * payload moves it, and so does editing a README. Comparing it would report
+   * false staleness on the commit that files the evidence, and a guard that
+   * cries wolf on its own output is one people learn to ignore. What genuinely
+   * determines the measurement is the four content hashes below, so those are
+   * the comparison.
+   */
   compare(
     'modelManifestSha256',
     intermediate.modelManifestSha256 ?? null,
@@ -318,6 +326,13 @@ function assessStaleness(intermediate, current) {
 
   return {
     current: mismatches.length === 0,
+    comparedInputs: [
+      'modelManifestSha256',
+      'policySha256',
+      'fixtureManifestSha256',
+      'lockfileSha256',
+    ],
+    commitShaAtMeasurement: intermediate.commitSha ?? null,
     mismatches,
     note:
       mismatches.length === 0
