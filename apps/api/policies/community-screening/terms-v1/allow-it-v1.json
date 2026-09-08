@@ -1,0 +1,14 @@
+{
+  "language": "it",
+  "listVersion": "terms-v1",
+  "listType": "allowList",
+  "provenance": {
+    "source": "repository-owned reviewed list",
+    "version": "v1",
+    "licence": "UNLICENSED (repository-owned)",
+    "retrievedAt": "2026-09-08",
+    "curator": "couture-cast trust and safety",
+    "notes": "These are ordinary Italian garment, styling and general words that collide with a term in this file or in another language file once the screener folds diacritics or collapses repeated characters. Cocktail, as in abito da cocktail, contains the English entry cock; culotte and culottes contain the Italian entry culo; Figaro, the cropped bolero jacket, contains the Italian entry figa; and puttanesca contains the Italian entry puttana. Allow-list lookup runs on the literal case-folded token, before diacritic and leet folding, so an accented or vulgar spelling is still screened."
+  },
+  "entries": ["cocktail", "culotte", "culottes", "figaro", "puttanesca"]
+}

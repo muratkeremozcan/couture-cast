@@ -1,0 +1,290 @@
+{
+  "language": "fr",
+  "listVersion": "terms-v1",
+  "listType": "terms",
+  "provenance": {
+    "source": "repository-owned reviewed list",
+    "version": "v1",
+    "licence": "UNLICENSED (repository-owned)",
+    "retrievedAt": "2026-09-08",
+    "curator": "couture-cast trust and safety",
+    "notes": "Curated by hand for French, seeded from the French dictionary Story 6.1 shipped in community-moderation.engine.ts and extended to the category and severity model. Coverage is metropolitan French, which is the register the supported fr locales resolve to. Every single-word term is at least four characters long, because each language's dictionary runs against every submission and a two or three character vulgarity in one language lands on an ordinary word in another; no entry here needed an exception to that floor. Entries that are also ordinary vocabulary in some register, such as baiser, bite, chatte and ordure, carry a low severity so a human reviewer makes the call on them. Hate slurs and self-harm incitement carry critical. The slur pédale is deliberately absent, because it and the bicycle pedal are the same literal token with the same accent, so screening it would flag ordinary cycling and styling copy with nothing to separate the two senses. Story 6.2b replaces this with a vendored, pinned upstream list under its own licence."
+  },
+  "entries": [
+    {
+      "term": "merde",
+      "category": "profanity",
+      "severity": "medium"
+    },
+    {
+      "term": "putain",
+      "category": "profanity",
+      "severity": "medium"
+    },
+    {
+      "term": "foutre",
+      "category": "profanity",
+      "severity": "medium"
+    },
+    {
+      "term": "chier",
+      "category": "profanity",
+      "severity": "medium"
+    },
+    {
+      "term": "niquer",
+      "category": "profanity",
+      "severity": "medium"
+    },
+    {
+      "term": "trou du cul",
+      "category": "profanity",
+      "severity": "medium"
+    },
+    {
+      "term": "merdique",
+      "category": "profanity",
+      "severity": "low"
+    },
+    {
+      "term": "foutu",
+      "category": "profanity",
+      "severity": "low"
+    },
+    {
+      "term": "chiant",
+      "category": "profanity",
+      "severity": "low"
+    },
+    {
+      "term": "connerie",
+      "category": "profanity",
+      "severity": "low"
+    },
+    {
+      "term": "couillon",
+      "category": "profanity",
+      "severity": "low"
+    },
+    {
+      "term": "branleur",
+      "category": "profanity",
+      "severity": "low"
+    },
+    {
+      "term": "bordel",
+      "category": "profanity",
+      "severity": "low"
+    },
+    {
+      "term": "enculer",
+      "category": "sexual",
+      "severity": "medium"
+    },
+    {
+      "term": "branler",
+      "category": "sexual",
+      "severity": "medium"
+    },
+    {
+      "term": "bite",
+      "category": "sexual",
+      "severity": "low"
+    },
+    {
+      "term": "couilles",
+      "category": "sexual",
+      "severity": "low"
+    },
+    {
+      "term": "chatte",
+      "category": "sexual",
+      "severity": "low"
+    },
+    {
+      "term": "baiser",
+      "category": "sexual",
+      "severity": "low"
+    },
+    {
+      "term": "salope",
+      "category": "harassment",
+      "severity": "high"
+    },
+    {
+      "term": "enculé",
+      "category": "harassment",
+      "severity": "high"
+    },
+    {
+      "term": "fils de pute",
+      "category": "harassment",
+      "severity": "high"
+    },
+    {
+      "term": "nique ta mère",
+      "category": "harassment",
+      "severity": "high"
+    },
+    {
+      "term": "va crever",
+      "category": "harassment",
+      "severity": "high"
+    },
+    {
+      "term": "connard",
+      "category": "harassment",
+      "severity": "medium"
+    },
+    {
+      "term": "connasse",
+      "category": "harassment",
+      "severity": "medium"
+    },
+    {
+      "term": "salopard",
+      "category": "harassment",
+      "severity": "medium"
+    },
+    {
+      "term": "salaud",
+      "category": "harassment",
+      "severity": "medium"
+    },
+    {
+      "term": "enfoiré",
+      "category": "harassment",
+      "severity": "medium"
+    },
+    {
+      "term": "pétasse",
+      "category": "harassment",
+      "severity": "medium"
+    },
+    {
+      "term": "pouffiasse",
+      "category": "harassment",
+      "severity": "medium"
+    },
+    {
+      "term": "pute",
+      "category": "harassment",
+      "severity": "medium"
+    },
+    {
+      "term": "crétin",
+      "category": "harassment",
+      "severity": "low"
+    },
+    {
+      "term": "abruti",
+      "category": "harassment",
+      "severity": "low"
+    },
+    {
+      "term": "débile",
+      "category": "harassment",
+      "severity": "low"
+    },
+    {
+      "term": "ordure",
+      "category": "harassment",
+      "severity": "low"
+    },
+    {
+      "term": "bâtard",
+      "category": "harassment",
+      "severity": "low"
+    },
+    {
+      "term": "nègre",
+      "category": "hate",
+      "severity": "high"
+    },
+    {
+      "term": "négro",
+      "category": "hate",
+      "severity": "high"
+    },
+    {
+      "term": "bougnoule",
+      "category": "hate",
+      "severity": "high"
+    },
+    {
+      "term": "chinetoque",
+      "category": "hate",
+      "severity": "high"
+    },
+    {
+      "term": "youpin",
+      "category": "hate",
+      "severity": "high"
+    },
+    {
+      "term": "bicot",
+      "category": "hate",
+      "severity": "high"
+    },
+    {
+      "term": "pédé",
+      "category": "hate",
+      "severity": "high"
+    },
+    {
+      "term": "tapette",
+      "category": "hate",
+      "severity": "high"
+    },
+    {
+      "term": "gouine",
+      "category": "hate",
+      "severity": "high"
+    },
+    {
+      "term": "sale race",
+      "category": "hate",
+      "severity": "high"
+    },
+    {
+      "term": "attardé mental",
+      "category": "hate",
+      "severity": "high"
+    },
+    {
+      "term": "nazi",
+      "category": "hate",
+      "severity": "high"
+    },
+    {
+      "term": "je vais te tuer",
+      "category": "violence",
+      "severity": "high"
+    },
+    {
+      "term": "je vais te violer",
+      "category": "violence",
+      "severity": "high"
+    },
+    {
+      "term": "va te faire pendre",
+      "category": "self_harm",
+      "severity": "high"
+    },
+    {
+      "term": "va te pendre",
+      "category": "self_harm",
+      "severity": "high"
+    },
+    {
+      "term": "va te suicider",
+      "category": "self_harm",
+      "severity": "high"
+    },
+    {
+      "term": "mets fin à tes jours",
+      "category": "self_harm",
+      "severity": "high"
+    }
+  ]
+}

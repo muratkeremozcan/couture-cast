@@ -1,0 +1,280 @@
+{
+  "language": "de",
+  "listVersion": "terms-v1",
+  "listType": "terms",
+  "provenance": {
+    "source": "repository-owned reviewed list",
+    "version": "v1",
+    "licence": "UNLICENSED (repository-owned)",
+    "retrievedAt": "2026-09-08",
+    "curator": "couture-cast trust and safety",
+    "notes": "German has no Story 6.1 dictionary to inherit, so this list was curated from scratch for Story 6.2. Terms keep their normal diacritics and use ß where German spells it that way, since the screener folds ß to ss and strips diacritics before it matches. Every single-word term is at least four characters long, so no exception to the minimum-length rule was needed. Two entries are vulgar in one sense and ordinary in another, and both carry low severity so they route to human review: Schwanz also names the tail or train of a garment, and Muschi is a common pet name for a cat. Four candidates were left out. Geil is everyday praise in German fashion copy, where ein geiler Look means a great look. Dick is the ordinary German adjective for thick and appears constantly in fabric descriptions; its inflected forms dicke and dicker sit on the allow list, and the bare form still matches the English entry at low severity. Transe is also the ordinary French noun for a trance. Bimbo is the ordinary Italian word for a small child. Möse stays at moderate severity even though folding its umlaut yields mose, which is the German name for Moses, because that collision is vanishingly rare in outfit copy and moderate severity sends a post to review."
+  },
+  "entries": [
+    {
+      "term": "scheiße",
+      "category": "profanity",
+      "severity": "medium"
+    },
+    {
+      "term": "arschloch",
+      "category": "profanity",
+      "severity": "medium"
+    },
+    {
+      "term": "arsch",
+      "category": "profanity",
+      "severity": "low"
+    },
+    {
+      "term": "arschgeige",
+      "category": "profanity",
+      "severity": "medium"
+    },
+    {
+      "term": "wichser",
+      "category": "profanity",
+      "severity": "medium"
+    },
+    {
+      "term": "ficken",
+      "category": "profanity",
+      "severity": "medium"
+    },
+    {
+      "term": "fick dich",
+      "category": "profanity",
+      "severity": "medium"
+    },
+    {
+      "term": "verpiss dich",
+      "category": "profanity",
+      "severity": "medium"
+    },
+    {
+      "term": "leck mich am arsch",
+      "category": "profanity",
+      "severity": "low"
+    },
+    {
+      "term": "fresse",
+      "category": "profanity",
+      "severity": "low"
+    },
+    {
+      "term": "bastard",
+      "category": "profanity",
+      "severity": "low"
+    },
+    {
+      "term": "halt die fresse",
+      "category": "harassment",
+      "severity": "medium"
+    },
+    {
+      "term": "drecksau",
+      "category": "harassment",
+      "severity": "medium"
+    },
+    {
+      "term": "miststück",
+      "category": "harassment",
+      "severity": "medium"
+    },
+    {
+      "term": "vollidiot",
+      "category": "harassment",
+      "severity": "medium"
+    },
+    {
+      "term": "blödmann",
+      "category": "harassment",
+      "severity": "low"
+    },
+    {
+      "term": "trottel",
+      "category": "harassment",
+      "severity": "low"
+    },
+    {
+      "term": "penner",
+      "category": "harassment",
+      "severity": "low"
+    },
+    {
+      "term": "verrecke",
+      "category": "harassment",
+      "severity": "high"
+    },
+    {
+      "term": "hure",
+      "category": "harassment",
+      "severity": "high"
+    },
+    {
+      "term": "nutte",
+      "category": "harassment",
+      "severity": "high"
+    },
+    {
+      "term": "schlampe",
+      "category": "harassment",
+      "severity": "high"
+    },
+    {
+      "term": "hurensohn",
+      "category": "harassment",
+      "severity": "high"
+    },
+    {
+      "term": "fotze",
+      "category": "harassment",
+      "severity": "high"
+    },
+    {
+      "term": "arschficker",
+      "category": "harassment",
+      "severity": "high"
+    },
+    {
+      "term": "wichsen",
+      "category": "sexual",
+      "severity": "medium"
+    },
+    {
+      "term": "titten",
+      "category": "sexual",
+      "severity": "medium"
+    },
+    {
+      "term": "möse",
+      "category": "sexual",
+      "severity": "medium"
+    },
+    {
+      "term": "schwanz",
+      "category": "sexual",
+      "severity": "low"
+    },
+    {
+      "term": "muschi",
+      "category": "sexual",
+      "severity": "low"
+    },
+    {
+      "term": "schwanzlutscher",
+      "category": "sexual",
+      "severity": "high"
+    },
+    {
+      "term": "neger",
+      "category": "hate",
+      "severity": "high"
+    },
+    {
+      "term": "kanake",
+      "category": "hate",
+      "severity": "high"
+    },
+    {
+      "term": "judensau",
+      "category": "hate",
+      "severity": "high"
+    },
+    {
+      "term": "schwuchtel",
+      "category": "hate",
+      "severity": "high"
+    },
+    {
+      "term": "untermensch",
+      "category": "hate",
+      "severity": "high"
+    },
+    {
+      "term": "sieg heil",
+      "category": "hate",
+      "severity": "high"
+    },
+    {
+      "term": "heil hitler",
+      "category": "hate",
+      "severity": "high"
+    },
+    {
+      "term": "juden raus",
+      "category": "hate",
+      "severity": "high"
+    },
+    {
+      "term": "ausländer raus",
+      "category": "hate",
+      "severity": "high"
+    },
+    {
+      "term": "tunte",
+      "category": "hate",
+      "severity": "high"
+    },
+    {
+      "term": "spast",
+      "category": "hate",
+      "severity": "high"
+    },
+    {
+      "term": "spasti",
+      "category": "hate",
+      "severity": "high"
+    },
+    {
+      "term": "krüppel",
+      "category": "hate",
+      "severity": "high"
+    },
+    {
+      "term": "zigeuner",
+      "category": "hate",
+      "severity": "high"
+    },
+    {
+      "term": "bring dich um",
+      "category": "self_harm",
+      "severity": "high"
+    },
+    {
+      "term": "töte dich selbst",
+      "category": "self_harm",
+      "severity": "high"
+    },
+    {
+      "term": "häng dich auf",
+      "category": "self_harm",
+      "severity": "high"
+    },
+    {
+      "term": "stirb endlich",
+      "category": "self_harm",
+      "severity": "high"
+    },
+    {
+      "term": "ich bringe dich um",
+      "category": "violence",
+      "severity": "high"
+    },
+    {
+      "term": "ich töte dich",
+      "category": "violence",
+      "severity": "high"
+    },
+    {
+      "term": "vergewaltigen",
+      "category": "violence",
+      "severity": "high"
+    },
+    {
+      "term": "vergewaltigung",
+      "category": "violence",
+      "severity": "high"
+    }
+  ]
+}
