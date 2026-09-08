@@ -1759,3 +1759,70 @@ describe('TensorflowNsfwImageScreener shutdown mid-lifecycle', () => {
     expect(latestWorker().terminate).toHaveBeenCalledTimes(1)
   })
 })
+
+describe('startup timeout teardown', () => {
+  // The timeout callback used to terminate a second time, unguarded, on top of
+  // the terminate `rejectInitialization` already performs with a catch. A
+  // `terminate()` that rejects therefore became an unhandled rejection, which
+  // Node turns into a process exit.
+  it('terminates exactly once and absorbs a rejecting terminate', async () => {
+    const escaped: unknown[] = []
+    const onUnhandled = (reason: unknown) => escaped.push(reason)
+    process.on('unhandledRejection', onUnhandled)
+
+    try {
+      const screener = new TensorflowNsfwImageScreener({
+        manifestPath: createManifestFixture(),
+      })
+      // Prime the policy cache on the real clock, as the sibling timeout test
+      // does: the load is filesystem I/O and a faked clock cannot drive it.
+      const first = screener.ensureReady()
+      await vi.waitFor(() => expect(workers()).toHaveLength(1))
+      latestWorker().emit('exit', 9)
+      await expect(first).rejects.toThrow(/exited before ready/)
+
+      vi.useFakeTimers()
+      vi.advanceTimersByTime(NSFW_FAILURE_COOLDOWN_MS + 1)
+      const retried = screener.ensureReady()
+      const settled = expect(retried).rejects.toThrow(/startup timed out after/)
+      await vi.advanceTimersByTimeAsync(0)
+
+      const stalled = latestWorker()
+      const terminate = vi.fn().mockRejectedValue(new Error('terminate refused'))
+      stalled.terminate = terminate
+      await vi.advanceTimersByTimeAsync(NSFW_INITIALIZATION_TIMEOUT_MS)
+      await settled
+
+      expect(terminate).toHaveBeenCalledTimes(1)
+      await vi.advanceTimersByTimeAsync(0)
+      expect(escaped).toEqual([])
+    } finally {
+      process.off('unhandledRejection', onUnhandled)
+    }
+  })
+
+  // Once initialization has been rejected the thread can still be alive, since
+  // `terminate()` is awaited in the background. An `error` arriving with no
+  // listener is rethrown by EventEmitter as an uncaught exception in the
+  // supervisor rather than being absorbed here.
+  it('keeps an error listener until the worker exits', async () => {
+    const screener = new TensorflowNsfwImageScreener({
+      manifestPath: createManifestFixture(),
+    })
+    const ready = screener.ensureReady()
+    const settled = expect(ready).rejects.toThrow(/tfjs-core/)
+    await vi.waitFor(() => expect(workers()).toHaveLength(1))
+    const worker = latestWorker()
+
+    worker.emit('error', { message: "Cannot find module '@tensorflow/tfjs-core'" })
+    await settled
+
+    const errorListeners = () => worker.listeners.get('error')?.length ?? 0
+
+    expect(errorListeners()).toBeGreaterThan(0)
+    expect(() => worker.emit('error', new Error('late crash'))).not.toThrow()
+
+    worker.emit('exit', 1)
+    expect(errorListeners()).toBe(0)
+  })
+})

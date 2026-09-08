@@ -591,15 +591,19 @@ export class TensorflowNsfwImageScreener implements NsfwImageScreener {
     const readyPromise = new Promise<void>((resolve, reject) => {
       let settled = false
       const timer = setTimeout(() => {
+        // `rejectInitialization` terminates the worker itself, with a catch.
+        // Terminating again here would be both redundant and unguarded, and a
+        // `terminate()` that rejects on this one path would become an
+        // unhandled rejection, which Node turns into a process exit.
         rejectInitialization(
           new Error(
             `Community NSFW model startup timed out after ${NSFW_INITIALIZATION_TIMEOUT_MS.toLocaleString()} ms`
           )
         )
-        void worker.terminate()
       }, NSFW_INITIALIZATION_TIMEOUT_MS)
       timer.unref()
 
+      const swallowLateError = () => undefined
       const cleanup = () => {
         clearTimeout(timer)
         worker.off('message', onMessage)
@@ -622,6 +626,11 @@ export class TensorflowNsfwImageScreener implements NsfwImageScreener {
           this.ready = false
           this.readyPromise = null
         }
+        // The thread can outlive this rejection, because `terminate()` is
+        // awaited in the background. An `error` emitted with no listener is
+        // rethrown by EventEmitter as an uncaught exception in the supervisor,
+        // so a no-op listener holds the window open until `exit`.
+        worker.on('error', swallowLateError)
         void worker.terminate().catch(() => undefined)
         reject(error)
       }
@@ -653,6 +662,7 @@ export class TensorflowNsfwImageScreener implements NsfwImageScreener {
       worker.on('error', onError)
       worker.on('exit', (code) => {
         worker.off('error', onRuntimeError)
+        worker.off('error', swallowLateError)
         if (this.worker === worker) {
           this.worker = null
           this.ready = false
