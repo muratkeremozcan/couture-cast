@@ -26,6 +26,14 @@ import {
   type CommunityModerationMeter,
 } from './community-moderation.telemetry.js'
 import { MODERATION_SCREENING_TIMEOUT_MS } from './community-moderation.processor.js'
+import {
+  loadCommunityScreeningPolicy,
+  type CommunityScreeningPolicy,
+} from './community-screening-policy.js'
+import {
+  CommunityTextScreener,
+  type CommunityTextPolicy,
+} from './community-text-screener.js'
 import { SupabaseCommunityStorageAdapter } from './community-storage.adapter.js'
 import { createBaseLogger } from '../../logger/pino.config.js'
 
@@ -129,6 +137,8 @@ export interface CommunityNsfwScreenerSelection {
   readiness: CommunityScreeningReadiness
   close: () => Promise<void>
 }
+
+type LoadedTextPolicy = CommunityScreeningPolicy['text']
 
 const logger = createBaseLogger().child({ feature: COMMUNITY_MODERATION_LOG_FEATURE })
 
@@ -313,6 +323,25 @@ async function finalizeSelection(
 }
 
 /**
+ * Bridges the loaded policy's text section onto the screener's declared shape.
+ *
+ * The only difference between the two is `severityDisposition`. The policy
+ * schema builds it with `z.record` over the severity enum, which Zod infers as
+ * a PARTIAL record, while the screener requires an entry for every severity
+ * because it indexes into it for each match. The loader already refuses a
+ * policy that is missing one -- `community-screening-policy.ts` rejects it with
+ * "severityDisposition has no entry for severity <s>" -- so the value reaching
+ * here is total, and the gap is in the inferred type rather than in the data.
+ *
+ * The assertion is narrow and cites the check that makes it sound rather than
+ * re-implementing it, because a second copy of that validation is a second copy
+ * that can drift from the first.
+ */
+function toTextScreenerPolicy(text: LoadedTextPolicy): CommunityTextPolicy {
+  return text as CommunityTextPolicy
+}
+
+/**
  * One composition of the community moderation pipeline, shared by every process
  * that runs it.
  *
@@ -349,7 +378,20 @@ export async function createCommunityWorkerRuntime(deps: {
   let engine = deps.engine
   if (!engine) {
     selection = await createNsfwImageScreener(meter)
-    engine = new DefaultCommunityModerationEngine(selection.screener)
+    // Built ONCE, here, from the loaded policy. Construction reads and
+    // validates fourteen term lists and throws on a missing file, missing
+    // provenance, an undeclared category or a policy that would let a declared
+    // locale bypass the other languages. AC 1 wants exactly those rejected
+    // before queue consumption, so this sits beside the model's readiness check
+    // and is deliberately not caught.
+    const loaded = loadCommunityScreeningPolicy()
+    engine = new DefaultCommunityModerationEngine(
+      selection.screener,
+      new CommunityTextScreener({
+        policy: toTextScreenerPolicy(loaded.policy.text),
+        policyVersion: loaded.identity.textEngineVersion,
+      })
+    )
   }
 
   const worker = createCommunityModerationWorker({

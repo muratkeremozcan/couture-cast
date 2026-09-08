@@ -1011,7 +1011,7 @@ describe('6.2 screening dispositions and attempt evidence', () => {
 
     const base = new FixtureCommunityModerationEngine(pinned)
     const policyBacked: CommunityModerationEngine = {
-      screenText: (text, locale) => base.screenText(text, locale),
+      screenText: (input) => base.screenText(input),
       screenImage: (bytes) => base.screenImage(bytes),
       moderatePost: async (input) => {
         const result = await base.moderatePost(input)

@@ -1,30 +1,28 @@
 import { allowsTestOnlySecrets } from '../../config/runtime-environment.js'
 import { FIXTURE_ENGINE_VERSION_SUFFIX } from './community-screening-policy.js'
-// Story 6.1 Task 4: ADR-013 automated content screening engine.
-// Dictionary-based text safety filtering and server-side NSFW image screening,
-// both with a deterministic, fail-closed verdict.
+import {
+  CommunityTextScreener,
+  SCREENING_LANGUAGES,
+  TEXT_CLEAN_REASON,
+  type CommunityTextScreeningResult,
+  type ScreeningLanguage,
+  type TextScreeningDisposition,
+  type TextScreeningField,
+} from './community-text-screener.js'
+// Story 6.1 Task 4, extended by Story 6.2: ADR-013 automated content screening.
 //
-// READ THE WORD "FILTERING" NARROWLY, because this used to say "multilingual
-// text safety filtering" and that oversold it in two directions at once.
+// The engine is a COMBINER, and deliberately little else. Text policy lives in
+// `CommunityTextScreener` and image policy behind the `NsfwImageScreener` seam,
+// so what is left here is the one rule neither of them can enforce alone: a post
+// publishes only when both halves say so, and each half's own verdict decides
+// that rather than whether it happened to name a reason.
 //
-// It screens three languages, not ten. `SCREENABLE_LANGUAGES` is `en`/`es`/`fr`;
-// `tr`, `de`, `it` and `pt` ship as supported locales with no dictionary here, and
-// `resolveScreeningLanguage` returns null for them so the post is held rather
-// than cleared. That is a deliberate fail-closed gap, not a silent pass.
-//
-// And within those three it matches whole tokens against a fixed word list.
-// `normalizeTextForModeration` folds diacritics and case and nothing else, and
-// `scanTermList` compares single-word terms by exact token equality against a
-// split on non-alphanumerics. So a repeated character, internal punctuation, or a
-// spaced-out variant all pass: `fuuuck`, `f.u.c.k` and `f u c k` are each invisible
-// to a dictionary holding the unobfuscated word. Only multi-word terms, which use
-// substring matching, tolerate punctuation in the middle.
-//
-// Obfuscation handling was never specified for this story, so widening it is a
-// product decision rather than a defect fix, and the honest thing in the meantime
-// is for this comment not to imply a boundary the code does not enforce. Anything
-// downstream that needs to assume real adversarial coverage does not have it yet.
-
+// It used to hold its own three-language word list, which oversold itself in one
+// direction and undersold itself in the other: it screened `en`/`es`/`fr` while
+// ten locales shipped, and inside those three it matched whole unobfuscated
+// tokens, so `fuuuck`, `f.u.c.k` and `f u c k` all passed. Both gaps are closed
+// by the screener this now delegates to, which runs all seven languages against
+// bounded canonical representations for every submission.
 export const ADR013_TEXT_ENGINE_VERSION = 'adr013-text-v2.0'
 export const ADR013_IMAGE_ENGINE_VERSION = 'adr013-nsfw-v1.0'
 export const IMAGE_SCREENING_UNAVAILABLE_VERSION = 'adr013-nsfw-unavailable'
@@ -39,8 +37,12 @@ export const FIXTURE_IMAGE_ENGINE_VERSION = `${ADR013_IMAGE_ENGINE_VERSION}${FIX
 /** Reason emitted when no NSFW model is wired, so the post cannot be cleared. */
 export const SCREENING_UNAVAILABLE_REASON = 'screening_unavailable'
 
-/** Reason emitted for a locale this engine holds no dictionary for. */
-export const LOCALE_UNSCREENABLE_REASON = 'locale_unscreenable'
+/**
+ * Re-exported rather than restated. The screener owns the vocabulary and the
+ * dependency runs one way, engine to screener, so a second copy of the string
+ * here is how the two would silently disagree.
+ */
+export { LOCALE_UNSCREENABLE_REASON } from './community-text-screener.js'
 
 /**
  * Reason emitted when a screener reports `passed: true` beside a `review` or
@@ -57,9 +59,20 @@ export interface TextScreeningResult {
   passed: boolean
   reasons: string[]
   engineVersion: string
-  matchedTerms?: string[]
-  /** Languages whose dictionaries actually ran against the text. */
-  screenedLanguages?: SupportedLanguage[]
+  /** AC 3's three-way answer for the text half, aggregated over both fields. */
+  disposition: TextScreeningDisposition
+  /** Languages whose lists actually ran, which is every language loaded. */
+  screenedLanguages: readonly ScreeningLanguage[]
+  /**
+   * One entry per screened field, each carrying its own declared locale,
+   * observed scripts, categories, severity and policy version.
+   *
+   * NO MATCHED TERMS ANYWHERE, and the field that used to carry them is gone
+   * rather than emptied. AC 4 keeps raw matched terms out of logs, metrics and
+   * generated evidence, and a field that exists but must always be empty is an
+   * invitation to fill it.
+   */
+  fields: readonly CommunityTextScreeningResult[]
 }
 
 /**
@@ -121,8 +134,20 @@ export interface PostScreeningInput {
   imageBuffer: Buffer
 }
 
+export interface TextFieldScreeningInput {
+  text: string | null | undefined
+  /**
+   * Required, with no default, because it selects the per-field input ceiling.
+   * A caption screened as `altText` would be bounded at 200 characters instead
+   * of 280 and truncate legitimate copy, and the laxer mistake in the other
+   * direction is worse.
+   */
+  field: TextScreeningField
+  locale?: string | null
+}
+
 export interface CommunityModerationEngine {
-  screenText(text: string, locale?: string | null): Promise<TextScreeningResult>
+  screenText(input: TextFieldScreeningInput): Promise<TextScreeningResult>
   screenImage(imageBuffer: Buffer): Promise<ImageScreeningResult>
   moderatePost(input: PostScreeningInput): Promise<CommunityModerationResult>
 }
@@ -171,127 +196,20 @@ export interface NsfwScreenerReadiness {
   backend?: string
 }
 
-// Multilingual profanity and safety term dictionaries
-const PROFANITY_EN = [
-  'fuck',
-  'fucking',
-  'fucker',
-  'motherfucker',
-  'shit',
-  'bullshit',
-  'bitch',
-  'asshole',
-  'bastard',
-  'cunt',
-  'dick',
-  'pussy',
-  'whore',
-  'slut',
-  'cock',
-]
-
-const SAFETY_EN = ['nigger', 'faggot', 'kill yourself', 'kys', 'nazi', 'terrorist']
-
-const PROFANITY_ES = [
-  'puta',
-  'puto',
-  'mierda',
-  'cabron',
-  'cabrona',
-  'pendejo',
-  'pendeja',
-  'chingar',
-  'chinga',
-  'chingado',
-  'coño',
-  'cono',
-  'joder',
-  'culiao',
-  'hijo de puta',
-]
-
-const SAFETY_ES = ['maricon', 'nazi', 'matate']
-
-const PROFANITY_FR = [
-  'merde',
-  'putain',
-  'connard',
-  'connasse',
-  'salope',
-  'salopard',
-  'encule',
-  'enculer',
-  'foutre',
-  'chier',
-  'bordel',
-  'pute',
-  'bite',
-  'batard',
-]
-
-const SAFETY_FR = ['negre', 'nazi', 'va te faire pendre']
-
-export type SupportedLanguage = 'en' | 'es' | 'fr'
-
 /**
- * Every language this engine can actually screen. The story's supported-locale
- * set is wider (`tr`, `de`, `it`, `pt` also ship), and that gap is the reason
- * {@link resolveScreeningLanguage} returns `null` rather than quietly falling
- * back to English.
- */
-export const SCREENABLE_LANGUAGES: readonly SupportedLanguage[] = ['en', 'es', 'fr']
-
-const DICTIONARIES: Record<
-  SupportedLanguage,
-  { profanity: readonly string[]; safety: readonly string[] }
-> = {
-  en: { profanity: PROFANITY_EN, safety: SAFETY_EN },
-  es: { profanity: PROFANITY_ES, safety: SAFETY_ES },
-  fr: { profanity: PROFANITY_FR, safety: SAFETY_FR },
-}
-
-/**
- * Returns the screenable language for a locale tag, or `null` when this engine
- * holds no dictionary for it.
+ * The default text screener, built once per process on first use.
  *
- * The previous implementation mapped anything that was not `es` or `fr` onto
- * `en`. Because `locale` arrives from the client on the publish request, that
- * turned a declared `de-DE` into "screen this Spanish caption with the English
- * dictionary" — a one-field opt-out of the Spanish and French filters. Callers
- * now screen every dictionary regardless of what the client declared, and use
- * this result only to decide whether the declared locale is one we can claim to
- * have screened.
+ * Constructing one reads and validates fourteen list files, so a fresh instance
+ * per engine, or worse per `screenText` call, would be filesystem work on the
+ * screening hot path. Production does not rely on this: the worker runtime
+ * builds one explicitly at startup from the loaded policy, which is where AC 1
+ * wants a malformed list to throw.
  */
-export function resolveScreeningLanguage(
-  locale?: string | null
-): SupportedLanguage | null {
-  if (!locale) return null
-  const normalized = locale.trim().toLowerCase()
-  return SCREENABLE_LANGUAGES.find((language) => normalized.startsWith(language)) ?? null
-}
+let sharedTextScreener: CommunityTextScreener | undefined
 
-export function normalizeTextForModeration(raw: string): string {
-  return raw
-    .normalize('NFD')
-    .replace(/[\u0300-\u036f]/g, '')
-    .toLowerCase()
-}
-
-function scanTermList(
-  terms: readonly string[],
-  normalized: string,
-  tokens: string[],
-  category: string,
-  reasons: Set<string>,
-  matchedTerms: string[]
-): void {
-  for (const term of terms) {
-    const hit = term.includes(' ') ? normalized.includes(term) : tokens.includes(term)
-    if (hit) {
-      reasons.add(category)
-      matchedTerms.push(term)
-    }
-  }
+function defaultTextScreener(): CommunityTextScreener {
+  sharedTextScreener ??= new CommunityTextScreener()
+  return sharedTextScreener
 }
 
 /**
@@ -321,62 +239,28 @@ export class UnavailableNsfwImageScreener implements NsfwImageScreener {
 }
 
 export class DefaultCommunityModerationEngine implements CommunityModerationEngine {
+  private readonly textScreener: CommunityTextScreener
+
   constructor(
-    private readonly imageScreener: NsfwImageScreener = new UnavailableNsfwImageScreener()
-  ) {}
+    private readonly imageScreener: NsfwImageScreener = new UnavailableNsfwImageScreener(),
+    textScreener?: CommunityTextScreener
+  ) {
+    this.textScreener = textScreener ?? defaultTextScreener()
+  }
 
   /**
-   * Screens `text` against every dictionary this engine holds, then adds
-   * {@link LOCALE_UNSCREENABLE_REASON} when the declared locale is one it has no
-   * dictionary for. Screening all dictionaries satisfies the spec's "caption and
-   * alt text screened in the resolved locale" strictly: the resolved locale's
-   * dictionary always runs when one exists, and running the others as well can
-   * only catch more.
+   * Delegates to the reusable text boundary, which runs every language's list
+   * against every submission whatever locale the client declared, and adds
+   * `locale_unscreenable` for a locale it holds no list for. Both behaviours
+   * predate this delegation and are preserved by it rather than rebuilt.
    */
-  screenText(text: string, locale?: string | null): Promise<TextScreeningResult> {
-    const declaredLanguage = resolveScreeningLanguage(locale)
-    const reasons = new Set<string>()
-
-    if (locale && !declaredLanguage) {
-      reasons.add(LOCALE_UNSCREENABLE_REASON)
-    }
-
-    if (!text || text.trim().length === 0) {
-      const emptyReasons = Array.from(reasons)
-      return Promise.resolve({
-        passed: emptyReasons.length === 0,
-        reasons: emptyReasons,
-        engineVersion: ADR013_TEXT_ENGINE_VERSION,
-        matchedTerms: [],
-        screenedLanguages: [],
-      })
-    }
-
-    const normalized = normalizeTextForModeration(text)
-    const tokens = normalized.split(/[^\p{L}\p{N}]+/u).filter(Boolean)
-    const matchedTerms: string[] = []
-
-    for (const language of SCREENABLE_LANGUAGES) {
-      const dictionary = DICTIONARIES[language]
-      scanTermList(
-        dictionary.profanity,
-        normalized,
-        tokens,
-        'profanity',
-        reasons,
-        matchedTerms
-      )
-      scanTermList(dictionary.safety, normalized, tokens, 'safety', reasons, matchedTerms)
-    }
-
-    const reasonsArray = Array.from(reasons)
-    return Promise.resolve({
-      passed: reasonsArray.length === 0,
-      reasons: reasonsArray,
-      engineVersion: ADR013_TEXT_ENGINE_VERSION,
-      matchedTerms,
-      screenedLanguages: [...SCREENABLE_LANGUAGES],
+  screenText(input: TextFieldScreeningInput): Promise<TextScreeningResult> {
+    const result = this.textScreener.screen({
+      text: input.text,
+      field: input.field,
+      locale: input.locale,
     })
+    return Promise.resolve(toTextScreeningResult([result]))
   }
 
   screenImage(imageBuffer: Buffer): Promise<ImageScreeningResult> {
@@ -392,6 +276,81 @@ export class DefaultCommunityModerationEngine implements CommunityModerationEngi
 }
 
 /**
+ * Folds one or more per-field results into the engine's text verdict.
+ *
+ * Only `pass` clears. `review` and `block` both withhold publication, which is
+ * the same explicit-verdict rule the image half follows, and the reason list is
+ * never what decides it.
+ */
+function harshest(
+  left: TextScreeningDisposition,
+  right: TextScreeningDisposition
+): TextScreeningDisposition {
+  if (left === 'block' || right === 'block') return 'block'
+  if (left === 'review' || right === 'review') return 'review'
+  return 'pass'
+}
+
+function toTextScreeningResult(
+  fields: readonly CommunityTextScreeningResult[]
+): TextScreeningResult {
+  const disposition = fields.reduce<TextScreeningDisposition>(
+    (accumulated, field) => harshest(accumulated, field.disposition),
+    'pass'
+  )
+  const reasons = new Set(fields.flatMap((field) => [...field.reasons]))
+  if (disposition !== 'pass') {
+    reasons.delete(TEXT_CLEAN_REASON)
+  }
+
+  return {
+    passed: disposition === 'pass',
+    reasons: Array.from(reasons),
+    engineVersion: fields[0]?.policyVersion ?? ADR013_TEXT_ENGINE_VERSION,
+    disposition,
+    screenedLanguages: Array.from(
+      new Set(fields.flatMap((field) => [...field.screenedLanguages]))
+    ),
+    fields,
+  }
+}
+
+/**
+ * Folds the caption's verdict and the alt text's into one.
+ *
+ * IT KEEPS THE FIRST RESULT'S `engineVersion` rather than re-deriving it from
+ * the fields, and that is the point. A pinned fixture outcome reports no
+ * per-field provenance at all, so re-deriving dropped its `-fixture` marker and
+ * a fixture run persisted a `moderation_engine_version` claiming the real text
+ * engine had screened the post.
+ */
+function combineTextResults(
+  results: readonly TextScreeningResult[]
+): TextScreeningResult {
+  const disposition = results.reduce<TextScreeningDisposition>(
+    (accumulated, result) => harshest(accumulated, result.disposition),
+    'pass'
+  )
+  const reasons = new Set(results.flatMap((result) => result.reasons))
+  if (disposition !== 'pass') {
+    reasons.delete(TEXT_CLEAN_REASON)
+  }
+
+  return {
+    // Same rule as `combineScreeningResults`: a half that refused without
+    // naming a reason still refuses.
+    passed: results.every((result) => result.passed),
+    reasons: Array.from(reasons),
+    engineVersion: results[0]?.engineVersion ?? ADR013_TEXT_ENGINE_VERSION,
+    disposition,
+    screenedLanguages: Array.from(
+      new Set(results.flatMap((result) => [...result.screenedLanguages]))
+    ),
+    fields: results.flatMap((result) => [...result.fields]),
+  }
+}
+
+/**
  * Screens caption and alt text together, so a clean caption cannot mask a
  * flagged alt text and an unscreenable locale is reported once for both.
  */
@@ -399,38 +358,22 @@ async function screenPostText(
   engine: Pick<CommunityModerationEngine, 'screenText'>,
   input: PostScreeningInput
 ): Promise<TextScreeningResult> {
-  const results: TextScreeningResult[] = [
-    await engine.screenText(input.caption ?? '', input.locale),
-    await engine.screenText(input.altText ?? '', input.locale),
+  // Both fields, each screened AS ITSELF. The field selects its own input
+  // ceiling, so passing a constant would bound one of them wrongly.
+  const results = [
+    await engine.screenText({
+      text: input.caption,
+      field: 'caption',
+      locale: input.locale,
+    }),
+    await engine.screenText({
+      text: input.altText,
+      field: 'altText',
+      locale: input.locale,
+    }),
   ]
 
-  const reasons = new Set<string>()
-  const matchedTerms: string[] = []
-  // Union across both fields, not the caption's list. An empty caption screens
-  // no languages and returns an empty list, so reading the caption's answer
-  // alone reported "nothing was screened" for a post whose alt text had just
-  // been run against every dictionary.
-  const screenedLanguages = new Set<SupportedLanguage>()
-  for (const result of results) {
-    for (const reason of result.reasons) {
-      reasons.add(reason)
-    }
-    for (const language of result.screenedLanguages ?? []) {
-      screenedLanguages.add(language)
-    }
-    matchedTerms.push(...(result.matchedTerms ?? []))
-  }
-
-  const reasonsArray = Array.from(reasons)
-  return {
-    // Same rule as `combineScreeningResults`: a sub-result that refused without
-    // naming a reason still refuses.
-    passed: results.every((result) => result.passed),
-    reasons: reasonsArray,
-    engineVersion: results[0]?.engineVersion ?? ADR013_TEXT_ENGINE_VERSION,
-    matchedTerms,
-    screenedLanguages: Array.from(screenedLanguages),
-  }
+  return combineTextResults(results)
 }
 
 /**
@@ -455,6 +398,15 @@ function combineScreeningResults(
   if (image.passed && !imageCleared(image)) {
     reasons.add(IMAGE_DISPOSITION_CONFLICT_REASON)
   }
+  const publishes = text.passed && imageCleared(image)
+  // `text_clean` stays on the text verdict, where "screened and clean" is a
+  // real auditable fact, and comes off the COMBINED list once anything holds
+  // the post. The combined list becomes `moderation_reason`, and a moderator
+  // reading "text_clean, screening_unavailable" as the reason a post was held
+  // has been told the opposite of what happened.
+  if (!publishes) {
+    reasons.delete(TEXT_CLEAN_REASON)
+  }
   const reasonsArray = Array.from(reasons)
 
   // The outcome follows each verdict's own `passed`, NOT whether it named a
@@ -462,7 +414,7 @@ function combineScreeningResults(
   // refuses an item without explaining itself is read as a pass, which is the
   // fail-open this whole engine exists to remove.
   return {
-    outcome: text.passed && imageCleared(image) ? 'passed' : 'flagged',
+    outcome: publishes ? 'passed' : 'flagged',
     reasons: reasonsArray,
     engineVersions: {
       text: text.engineVersion,
@@ -499,7 +451,11 @@ function combineScreeningResults(
 export class FixtureCommunityModerationEngine implements CommunityModerationEngine {
   constructor(
     private readonly config: {
-      textOutcome?: { passed: boolean; reasons: string[] }
+      textOutcome?: {
+        passed: boolean
+        reasons: string[]
+        disposition?: TextScreeningDisposition
+      }
       imageOutcome?: {
         passed: boolean
         reasons: string[]
@@ -513,19 +469,32 @@ export class FixtureCommunityModerationEngine implements CommunityModerationEngi
         'FixtureCommunityModerationEngine is strictly forbidden outside an allowed test environment'
       )
     }
+    this.delegate = new DefaultCommunityModerationEngine()
   }
 
-  screenText(text: string, locale?: string | null): Promise<TextScreeningResult> {
+  private readonly delegate: DefaultCommunityModerationEngine
+
+  screenText(input: TextFieldScreeningInput): Promise<TextScreeningResult> {
     if (this.config.textOutcome) {
+      const outcome = this.config.textOutcome
+      const disposition: TextScreeningDisposition = outcome.passed
+        ? 'pass'
+        : (outcome.disposition ?? 'review')
       return Promise.resolve({
-        passed: this.config.textOutcome.passed,
-        reasons: this.config.textOutcome.reasons,
+        passed: outcome.passed,
+        reasons: outcome.reasons,
         engineVersion: FIXTURE_TEXT_ENGINE_VERSION,
-        matchedTerms: [],
-        screenedLanguages: [...SCREENABLE_LANGUAGES],
+        disposition,
+        screenedLanguages: [...SCREENING_LANGUAGES],
+        // A pinned outcome screened no field, so there is no per-field
+        // provenance to report and inventing one would be a fixture claiming
+        // observed scripts and a policy version it never read.
+        fields: [],
       })
     }
-    return new DefaultCommunityModerationEngine().screenText(text, locale)
+    // The real screener, and therefore the REAL text version, because the work
+    // genuinely was done. Only a pinned outcome is a fixture.
+    return this.delegate.screenText(input)
   }
 
   screenImage(_imageBuffer: Buffer): Promise<ImageScreeningResult> {

@@ -13,14 +13,17 @@ import {
   IMAGE_SCREENING_UNAVAILABLE_VERSION,
   imageCleared,
   LOCALE_UNSCREENABLE_REASON,
-  normalizeTextForModeration,
-  resolveScreeningLanguage,
   SCREENING_UNAVAILABLE_REASON,
   UnavailableNsfwImageScreener,
   type ImageScreeningResult,
   type NsfwImageScreener,
 } from './community-moderation.engine'
 import { loadCommunityScreeningPolicy } from './community-screening-policy'
+import {
+  DEFAULT_COMMUNITY_TEXT_POLICY_VERSION,
+  TEXT_CLEAN_REASON,
+  TEXT_POLICY_MATCH_REASON,
+} from './community-text-screener'
 
 /** A stand-in for a real ADR-013 model, so the pass path is exercisable. */
 class StubNsfwScreener implements NsfwImageScreener {
@@ -41,116 +44,90 @@ const nsfwScreener = new StubNsfwScreener({
 describe('CommunityModerationEngine (ADR-013)', () => {
   const engine = new DefaultCommunityModerationEngine(cleanScreener)
 
-  describe('screenable language resolution and normalization', () => {
-    it('returns null for a locale this engine holds no dictionary for', () => {
-      // The old `resolveLanguage` mapped every unknown locale to `en`, which let a
-      // client declare `de-DE` and switch the Spanish and French dictionaries off
-      // for Spanish and French content.
-      expect(resolveScreeningLanguage('de-DE')).toBeNull()
-      expect(resolveScreeningLanguage('tr-TR')).toBeNull()
-      expect(resolveScreeningLanguage('it-IT')).toBeNull()
-      expect(resolveScreeningLanguage('pt-BR')).toBeNull()
-      expect(resolveScreeningLanguage(null)).toBeNull()
-      expect(resolveScreeningLanguage('')).toBeNull()
+  describe('text screening delegates to the reusable boundary', () => {
+    // The dictionaries, the obfuscation families and the seven-language
+    // coverage are `community-text-screener.spec.ts`'s subject. What is left to
+    // prove here is that the engine hands each field to it correctly and folds
+    // the answers without loosening either one.
+    const engine = new DefaultCommunityModerationEngine(cleanScreener)
+
+    it('screens each field as itself, because the field selects its ceiling', async () => {
+      const caption = await engine.screenText({
+        text: 'A classic autumn trench',
+        field: 'caption',
+        locale: 'en-US',
+      })
+      const altText = await engine.screenText({
+        text: 'Full length photo of a trench coat outfit',
+        field: 'altText',
+        locale: 'en-US',
+      })
+
+      expect(caption.fields[0]?.field).toBe('caption')
+      expect(altText.fields[0]?.field).toBe('altText')
     })
 
-    it('resolves the three languages with dictionaries', () => {
-      expect(resolveScreeningLanguage('en-US')).toBe('en')
-      expect(resolveScreeningLanguage('es-419')).toBe('es')
-      expect(resolveScreeningLanguage('fr-CA')).toBe('fr')
+    it('runs every language whatever locale the client declared', async () => {
+      const result = await engine.screenText({
+        text: 'A classic autumn trench',
+        field: 'caption',
+        locale: 'en-US',
+      })
+
+      // A client-controlled locale must not be able to opt a submission out of
+      // another language's list.
+      expect([...result.screenedLanguages].sort()).toEqual([
+        'de',
+        'en',
+        'es',
+        'fr',
+        'it',
+        'pt',
+        'tr',
+      ])
     })
 
-    it('normalizes text and strips diacritics', () => {
-      expect(normalizeTextForModeration('Héllo WÖRLD')).toBe('hello world')
-      expect(normalizeTextForModeration('Coño')).toBe('cono')
-    })
-  })
+    it('holds a post whose declared locale has no list', async () => {
+      const result = await engine.moderatePost({
+        caption: 'A classic autumn trench',
+        altText: 'Full length photo',
+        locale: 'ja-JP',
+        imageBuffer: Buffer.from('image'),
+      })
 
-  describe('text screening runs every dictionary regardless of declared locale', () => {
-    it('passes a clean caption', async () => {
-      const result = await engine.screenText(
-        'Layered wool coat with Chelsea boots for temperate weather',
-        'en-US'
-      )
-      expect(result.passed).toBe(true)
-      expect(result.reasons).toEqual([])
-      expect(result.engineVersion).toBe(ADR013_TEXT_ENGINE_VERSION)
-      expect(result.screenedLanguages).toEqual(['en', 'es', 'fr'])
-    })
-
-    it('does not false-positive on innocent substrings', async () => {
-      const result = await engine.screenText(
-        'A classic trench coat with passport pocket and brass buttons',
-        'en'
-      )
-      expect(result.passed).toBe(true)
-      expect(result.reasons).toEqual([])
-    })
-
-    it('flags Spanish profanity even when the client declares en-US', async () => {
-      // This is the attack the old locale-driven dictionary allowed: declare a
-      // locale whose dictionary does not contain the words you are using.
-      const result = await engine.screenText('Menuda mierda de impermeable', 'en-US')
-      expect(result.passed).toBe(false)
-      expect(result.reasons).toContain('profanity')
-      expect(result.matchedTerms).toContain('mierda')
-    })
-
-    it('flags French profanity even when the client declares es-419', async () => {
-      const result = await engine.screenText('Putain quel style magnifique', 'es-419')
-      expect(result.passed).toBe(false)
-      expect(result.matchedTerms).toContain('putain')
-    })
-
-    it('flags English profanity case-insensitively', async () => {
-      const result = await engine.screenText('This outfit is FUCKING amazing', 'en')
-      expect(result.passed).toBe(false)
-      expect(result.reasons).toContain('profanity')
-      expect(result.matchedTerms).toContain('fucking')
-    })
-
-    it('flags English safety violations', async () => {
-      const result = await engine.screenText('Go kill yourself right now', 'en')
-      expect(result.passed).toBe(false)
-      expect(result.reasons).toContain('safety')
-      expect(result.matchedTerms).toContain('kill yourself')
-    })
-
-    it('flags Spanish profanity with diacritics normalized', async () => {
-      const result = await engine.screenText('Qué coño me pongo hoy', 'es-419')
-      expect(result.passed).toBe(false)
-      expect(result.reasons).toContain('profanity')
-    })
-
-    it('flags Spanish and French safety terms', async () => {
-      const spanish = await engine.screenText('eres un maricon', 'es-419')
-      expect(spanish.passed).toBe(false)
-      expect(spanish.reasons).toContain('safety')
-
-      const french = await engine.screenText('sale nazi', 'fr-FR')
-      expect(french.passed).toBe(false)
-      expect(french.reasons).toContain('safety')
-    })
-
-    it('fails closed for a supported locale with no dictionary', async () => {
-      // `de`, `tr`, `it` and `pt` are all shipped locales with no dictionary. A
-      // clean-looking caption in one of them has NOT been screened, so it must
-      // not pass; it goes to human review instead.
-      const result = await engine.screenText('Ein schöner Mantel für den Herbst', 'de-DE')
-      expect(result.passed).toBe(false)
+      expect(result.outcome).toBe('flagged')
       expect(result.reasons).toContain(LOCALE_UNSCREENABLE_REASON)
     })
 
-    it('fails closed for an unscreenable locale even with empty text', async () => {
-      const result = await engine.screenText('', 'tr-TR')
-      expect(result.passed).toBe(false)
-      expect(result.reasons).toEqual([LOCALE_UNSCREENABLE_REASON])
+    it('carries per-field provenance for both fields', async () => {
+      const result = await engine.moderatePost({
+        caption: 'A classic autumn trench',
+        altText: 'Full length photo of a trench coat outfit',
+        locale: 'en-US',
+        imageBuffer: Buffer.from('image'),
+      })
+
+      expect(result.text.fields.map((field) => field.field)).toEqual([
+        'caption',
+        'altText',
+      ])
+      for (const field of result.text.fields) {
+        expect(field.policyVersion).toBeTruthy()
+        expect(field.observedScripts.length).toBeGreaterThan(0)
+      }
     })
 
-    it('passes empty text in a screenable locale', async () => {
-      const result = await engine.screenText('', 'en-US')
-      expect(result.passed).toBe(true)
-      expect(result.reasons).toEqual([])
+    it('exposes no matched terms anywhere in its result', async () => {
+      // AC 4 keeps raw matched terms out of logs, metrics and evidence, and the
+      // field that used to carry them is gone rather than emptied.
+      const result = await engine.moderatePost({
+        caption: 'A classic autumn trench',
+        altText: 'Full length photo',
+        locale: 'en-US',
+        imageBuffer: Buffer.from('image'),
+      })
+
+      expect(JSON.stringify(result)).not.toContain('matchedTerms')
     })
   })
 
@@ -264,9 +241,9 @@ describe('CommunityModerationEngine (ADR-013)', () => {
       })
 
       expect(result.outcome).toBe('passed')
-      expect(result.reasons).toEqual([])
+      expect(result.reasons).toEqual([TEXT_CLEAN_REASON])
       expect(result.engineVersions).toEqual({
-        text: ADR013_TEXT_ENGINE_VERSION,
+        text: DEFAULT_COMMUNITY_TEXT_POLICY_VERSION,
         image: ADR013_IMAGE_ENGINE_VERSION,
       })
     })
@@ -282,7 +259,7 @@ describe('CommunityModerationEngine (ADR-013)', () => {
       expect(result.outcome).toBe('flagged')
       expect(result.text.passed).toBe(false)
       expect(result.image.passed).toBe(true)
-      expect(result.reasons).toContain('profanity')
+      expect(result.reasons).toContain(TEXT_POLICY_MATCH_REASON)
     })
 
     it('flags a post whose alt text contains profanity but whose caption is clean', async () => {
@@ -294,7 +271,7 @@ describe('CommunityModerationEngine (ADR-013)', () => {
       })
 
       expect(result.outcome).toBe('flagged')
-      expect(result.reasons).toContain('profanity')
+      expect(result.reasons).toContain(TEXT_POLICY_MATCH_REASON)
     })
 
     it('flags a post with clean text when the image screener refuses it', async () => {
@@ -321,7 +298,7 @@ describe('CommunityModerationEngine (ADR-013)', () => {
       })
 
       expect(result.outcome).toBe('flagged')
-      expect(result.reasons).toContain('profanity')
+      expect(result.reasons).toContain(TEXT_POLICY_MATCH_REASON)
       expect(result.reasons).toContain('nsfw')
     })
 
@@ -366,7 +343,12 @@ describe('CommunityModerationEngine (ADR-013)', () => {
       const result = await silent.moderatePost(cleanPost)
 
       expect(result.outcome).toBe('flagged')
+      // Empty, and deliberately so. The image refused without explaining
+      // itself, and the text half's `text_clean` marker comes off the combined
+      // list once anything holds the post, so a moderator is never told the
+      // post was held because the text was clean.
       expect(result.reasons).toEqual([])
+      expect(result.text.reasons).toEqual([TEXT_CLEAN_REASON])
     })
 
     it('carries the model detail through onto result.image untouched', async () => {
@@ -460,9 +442,16 @@ describe('CommunityModerationEngine (ADR-013)', () => {
         imageOutcome: { passed: true, reasons: [] },
       })
 
-      const result = await fixtureEngine.screenText('A clean caption', 'en-US')
+      const result = await fixtureEngine.screenText({
+        text: 'A clean caption',
+        field: 'caption',
+        locale: 'en-US',
+      })
 
-      expect(result.engineVersion).toBe(ADR013_TEXT_ENGINE_VERSION)
+      // The screener's own policy version, and pointedly NOT a version carrying
+      // the fixture marker: a delegated screening really happened.
+      expect(result.engineVersion).toBe(DEFAULT_COMMUNITY_TEXT_POLICY_VERSION)
+      expect(result.engineVersion).not.toBe(FIXTURE_TEXT_ENGINE_VERSION)
     })
 
     it('refuses to construct outside an allowed test environment', () => {
