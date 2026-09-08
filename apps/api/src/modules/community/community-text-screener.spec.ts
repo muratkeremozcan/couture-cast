@@ -324,9 +324,16 @@ describe('CommunityTextScreener policy wiring (AC 7)', () => {
         .text
     )
     expect([...WITHHOLDING_REASONS].sort()).toEqual(declared.sort())
-    // The one code deliberately outside that map: it records a pass, and the
-    // policy types every entry there to a disposition that withholds a post.
+    // The pass code cannot live in that map, because the policy types every
+    // entry there to a disposition that withholds a post. It has its own block.
     expect(declared).not.toContain(TEXT_CLEAN_REASON)
+    expect(
+      (
+        approvedPolicy as {
+          reasonCodes: { cleanCodes: { text: string } }
+        }
+      ).reasonCodes.cleanCodes.text
+    ).toBe(TEXT_CLEAN_REASON)
   })
 
   it('names every shipped list file in the approved policy', () => {
