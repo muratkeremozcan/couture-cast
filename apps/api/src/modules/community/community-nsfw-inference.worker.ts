@@ -231,7 +231,7 @@ export function deriveModelDigest(files: readonly NsfwManifestFile[]): string {
   return hash.digest('hex')
 }
 
-function assertManifestIdentity(manifest: Partial<NsfwModelManifest>): void {
+export function assertManifestIdentity(manifest: Partial<NsfwModelManifest>): void {
   if (
     typeof manifest.modelFamily !== 'string' ||
     typeof manifest.packageName !== 'string' ||
@@ -398,12 +398,12 @@ export async function decodeImageToPixels(imageBuffer: Buffer): Promise<Uint8Arr
  * base64 string. Reading either without awaiting the call yields an object
  * whose only keys are `default` and `module.exports`.
  */
-interface NsfwModelDefinition {
+export interface NsfwModelDefinition {
   modelJson: () => Promise<{ default: Record<string, unknown> }>
   weightBundles: (() => Promise<{ default: string }>)[]
 }
 
-function isModelDefinition(value: unknown): value is NsfwModelDefinition {
+export function isModelDefinition(value: unknown): value is NsfwModelDefinition {
   if (typeof value !== 'object' || value === null) return false
   const candidate = value as Partial<NsfwModelDefinition>
   return (
@@ -416,7 +416,7 @@ function isModelDefinition(value: unknown): value is NsfwModelDefinition {
  * is structurally a model definition. The fallback is what survives a rename
  * upstream; the manifest name is what makes the intent auditable.
  */
-function selectModelDefinition(
+export function selectModelDefinition(
   moduleNamespace: Record<string, unknown>,
   manifest: NsfwModelManifest
 ): NsfwModelDefinition {
@@ -486,7 +486,7 @@ async function loadGraphModelFromPackage(
  * same weights, which catches a re-encoded or truncated bundle that would
  * otherwise reach `loadGraphModel` and fail somewhere less legible.
  */
-function assertWeightBundlesMatchManifest(
+export function assertWeightBundlesMatchManifest(
   manifest: NsfwModelManifest,
   weightsManifest: { paths: string[] }[],
   bundles: Buffer[],

@@ -656,10 +656,10 @@ export class TensorflowNsfwImageScreener implements NsfwImageScreener {
   }
 
   screen(imageBuffer: Buffer): Promise<NsfwImageScreeningResult> {
-    const dispatched = this.inferenceChain.then(
-      () => this.screenOnce(imageBuffer),
-      () => this.screenOnce(imageBuffer)
-    )
+    // The chain is re-seeded with a `catch`, so it is always fulfilled and a
+    // rejection handler here would be dead code. A failed screening therefore
+    // does not poison the queue behind it: the next request still runs.
+    const dispatched = this.inferenceChain.then(() => this.screenOnce(imageBuffer))
     this.inferenceChain = dispatched.catch(() => undefined)
     return dispatched
   }

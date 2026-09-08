@@ -4,7 +4,7 @@ import os from 'node:os'
 import path from 'node:path'
 import { afterEach, describe, expect, it, vi } from 'vitest'
 import { ADR013_IMAGE_ENGINE_VERSION } from './community-moderation.engine.js'
-import { readModelManifest } from './community-nsfw-inference.worker.js'
+import { findManifestIn, readModelManifest } from './community-nsfw-inference.worker.js'
 import type { NsfwRuntimeIdentity } from './community-nsfw-inference.worker.js'
 import {
   COMMUNITY_NSFW_MANIFEST_ENV,
@@ -490,6 +490,19 @@ describe('loadApprovedPolicy', () => {
     )
   })
 
+  // An omitted key reads as undefined against a policy value that is always
+  // present, so it has to surface as drift rather than as a silently skipped
+  // comparison.
+  it('rejects a mirror that omits one of the five pinned thresholds', async () => {
+    const partial = mirrorOf(POLICY)
+    delete partial.unsafeBlockMinimum
+    const { manifestPath } = manifestFixture({ thresholds: partial })
+
+    await expect(
+      loadApprovedPolicy(readModelManifest(manifestPath), manifestPath)
+    ).rejects.toThrow(/do not match the approved screening policy: unsafeBlockMinimum/)
+  })
+
   it('rejects a mirror that quietly adds a key the policy does not pin', async () => {
     const { manifestPath } = manifestFixture({
       thresholds: { ...mirrorOf(POLICY), sexyBlockMinimum: 0.4 },
@@ -588,6 +601,35 @@ describe('resolveManifestPath', () => {
     expect(path.basename(resolveManifestPath())).toBe(
       'community-nsfw-mobilenet-v2-mid-nsfwjs-4.3.0.json'
     )
+  })
+
+  it('refuses an override outside an allowed test environment', () => {
+    vi.stubEnv('NODE_ENV', 'production')
+    vi.stubEnv('TEST_ENV', '')
+
+    expect(() => resolveManifestPath('/tmp/somewhere-else.json')).toThrow(
+      /override is forbidden outside an allowed test environment/
+    )
+  })
+
+  it('skips a candidate directory that holds no community manifest', () => {
+    const empty = fs.mkdtempSync(path.join(os.tmpdir(), 'community-nsfw-empty-'))
+    temporaryDirectories.push(empty)
+    fs.writeFileSync(path.join(empty, 'unrelated.json'), '{}')
+    fs.writeFileSync(path.join(empty, 'community-nsfw-notes.txt'), 'ignored')
+
+    expect(() => findManifestIn([path.join(empty, 'missing'), empty])).toThrow(
+      /model manifest not found in/
+    )
+  })
+
+  it('takes the alphabetically first manifest from the first directory that has one', () => {
+    const directory = fs.mkdtempSync(path.join(os.tmpdir(), 'community-nsfw-many-'))
+    temporaryDirectories.push(directory)
+    fs.writeFileSync(path.join(directory, 'community-nsfw-b.json'), '{}')
+    fs.writeFileSync(path.join(directory, 'community-nsfw-a.json'), '{}')
+
+    expect(path.basename(findManifestIn([directory]))).toBe('community-nsfw-a.json')
   })
 })
 
