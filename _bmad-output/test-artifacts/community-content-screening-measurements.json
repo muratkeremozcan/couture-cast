@@ -2,7 +2,7 @@
   "artifact": "community-content-screening-measurements",
   "artifactVersion": 1,
   "storyKey": "6-2-production-content-screening-readiness",
-  "generatedAt": "2026-09-08T22:22:20.688Z",
+  "generatedAt": "2026-09-08T22:27:58.013Z",
   "generatedBy": "npm run measure:community-screening",
   "scope": {
     "rendersVerdict": false,
@@ -16,12 +16,12 @@
     "statement": "The deterministic evaluation proves that unsafe class-probability vectors return block, that every threshold is crossed from both sides, and that no vector reaches pass without a confident Neutral. The lifecycle suite drives a fake inference runtime emitting an unsafe vector, which proves the transport from worker message through validation, class mapping, policy evaluation, reason codes, and engine identity to a block verdict. Neither establishes that the real model emits a high Porn or Hentai probability for genuinely unsafe input, and no synthetic vector can. That single link is what AC 7 assigns to Story 6.2b corpus-backed measurement."
   },
   "build": {
-    "commitSha": "bdc88b7664115fdf9b4c926965ace27189df2c8c",
+    "commitSha": "9e453566e5bfd90308b7c0e9ece5d7039d8dea41",
     "modelManifestSha256": "e9d6ea99c94aa454d10cd552e09e6eafa2e862d72225a887fff838aead78025a",
     "policySha256": "f92aba6ddc0045681240e626e9867a6b4f6990fa030f292d031f495866ff0c26",
     "fixtureManifestSha256": "b8cd2cd08dd419024a2cdb3ca84d03b3be7a5df211a92cd200853200bcb13243",
     "lockfileSha256": "68b479987b242d657ed1de37c1c6a33aff4808e0e1af0b437f45ce5e1d8fc6a4",
-    "workingTreeClean": false,
+    "workingTreeClean": true,
     "nodeVersion": "v24.20.0",
     "platform": "darwin-arm64"
   },
@@ -78,170 +78,19 @@
   },
   "runtimeMeasurement": {
     "screening": {
-      "available": true,
-      "screeningPath": "tensorflow",
-      "measuredAt": "2026-09-08T22:22:12.469Z",
-      "modelDigest": "a0c76f72db261c54dc851b974c848dc9ce01576ca66b0f232f4848c950549322",
-      "policyVersion": "v1",
-      "policyDigest": "f92aba6ddc0045681240e626e9867a6b4f6990fa030f292d031f495866ff0c26",
-      "neutralRange": {
-        "min": 0.7521889209747314,
-        "max": 0.9991244673728943
-      },
-      "dispositionCounts": {
-        "pass": 10,
-        "review": 2
-      },
-      "corpusDispositions": [
-        {
-          "fixture": "safe-satin-plum-512x512.jpg",
-          "disposition": "pass",
-          "classProbabilities": {
-            "Drawing": 0.0002427424187771976,
-            "Hentai": 0.00009797471284400672,
-            "Neutral": 0.9991244673728943,
-            "Porn": 0.00052631925791502,
-            "Sexy": 0.000008504282959620468
-          },
-          "reasons": []
-        },
-        {
-          "fixture": "safe-linen-oat-768x512.jpg",
-          "disposition": "pass",
-          "classProbabilities": {
-            "Drawing": 0.013398231938481331,
-            "Hentai": 0.015129654668271542,
-            "Neutral": 0.9695661664009094,
-            "Porn": 0.0009511122480034828,
-            "Sexy": 0.0009548233938403428
-          },
-          "reasons": []
-        },
-        {
-          "fixture": "safe-pinstripe-slate-512x768.png",
-          "disposition": "pass",
-          "classProbabilities": {
-            "Drawing": 0.01442067138850689,
-            "Hentai": 0.005939358379691839,
-            "Neutral": 0.9722269177436829,
-            "Porn": 0.004433825146406889,
-            "Sexy": 0.0029793225694447756
-          },
-          "reasons": []
-        },
-        {
-          "fixture": "safe-check-navy-512x512.webp",
-          "disposition": "pass",
-          "classProbabilities": {
-            "Drawing": 0.051532261073589325,
-            "Hentai": 0.029437754303216934,
-            "Neutral": 0.9140307903289795,
-            "Porn": 0.0023520481772720814,
-            "Sexy": 0.0026471849996596575
-          },
-          "reasons": []
-        },
-        {
-          "fixture": "safe-knit-sage-512x512.jpg",
-          "disposition": "pass",
-          "classProbabilities": {
-            "Drawing": 0.03129097446799278,
-            "Hentai": 0.024890825152397156,
-            "Neutral": 0.9383296370506287,
-            "Porn": 0.00319466320797801,
-            "Sexy": 0.0022939033806324005
-          },
-          "reasons": []
-        },
-        {
-          "fixture": "safe-boucle-cream-512x512.jpg",
-          "disposition": "pass",
-          "classProbabilities": {
-            "Drawing": 0.025310909375548363,
-            "Hentai": 0.03368956223130226,
-            "Neutral": 0.940278172492981,
-            "Porn": 0.0001472584845032543,
-            "Sexy": 0.0005740808555856347
-          },
-          "reasons": []
-        },
-        {
-          "fixture": "safe-houndstooth-mono-512x512.png",
-          "disposition": "pass",
-          "classProbabilities": {
-            "Drawing": 0.06466282904148102,
-            "Hentai": 0.00951355416327715,
-            "Neutral": 0.9215112328529358,
-            "Porn": 0.0024886499159038067,
-            "Sexy": 0.0018237875774502754
-          },
-          "reasons": []
-        },
-        {
-          "fixture": "safe-denim-indigo-512x512.jpg",
-          "disposition": "pass",
-          "classProbabilities": {
-            "Drawing": 0.04944003000855446,
-            "Hentai": 0.03707378730177879,
-            "Neutral": 0.9106800556182861,
-            "Porn": 0.0010432869894430041,
-            "Sexy": 0.001762924250215292
-          },
-          "reasons": []
-        },
-        {
-          "fixture": "safe-neutral-grey-256x256.png",
-          "disposition": "pass",
-          "classProbabilities": {
-            "Drawing": 0.04841560125350952,
-            "Hentai": 0.0421307347714901,
-            "Neutral": 0.9063296914100647,
-            "Porn": 0.0015326595166698098,
-            "Sexy": 0.0015912291128188372
-          },
-          "reasons": []
-        },
-        {
-          "fixture": "safe-corduroy-rust-512x512.webp",
-          "disposition": "pass",
-          "classProbabilities": {
-            "Drawing": 0.06392449140548706,
-            "Hentai": 0.05224877968430519,
-            "Neutral": 0.8820895552635193,
-            "Porn": 0.0012339820386841893,
-            "Sexy": 0.0005032327608205378
-          },
-          "reasons": []
-        },
-        {
-          "fixture": "safe-twill-charcoal-512x512.jpg",
-          "disposition": "review",
-          "classProbabilities": {
-            "Drawing": 0.08849525451660156,
-            "Hentai": 0.08743124455213547,
-            "Neutral": 0.8177719116210938,
-            "Porn": 0.0027319451328366995,
-            "Sexy": 0.003569655120372772
-          },
-          "reasons": ["low_confidence"]
-        },
-        {
-          "fixture": "safe-herringbone-oat-512x512.jpg",
-          "disposition": "review",
-          "classProbabilities": {
-            "Drawing": 0.04833844304084778,
-            "Hentai": 0.19916078448295593,
-            "Neutral": 0.7521889209747314,
-            "Porn": 0.000016266632883343846,
-            "Sexy": 0.00029556130175478756
-          },
-          "reasons": ["low_confidence"]
-        }
-      ],
+      "available": false,
+      "screeningPath": null,
+      "reason": "A readiness measurement exists but was produced under different inputs, so it is withheld rather than reported as current.",
       "staleness": {
-        "current": true,
-        "mismatches": [],
-        "note": "Every input that produced these numbers matches the working tree."
+        "current": false,
+        "mismatches": [
+          {
+            "input": "commitSha",
+            "recordedAtMeasurement": "bdc88b7664115fdf9b4c926965ace27189df2c8c",
+            "current": "9e453566e5bfd90308b7c0e9ece5d7039d8dea41"
+          }
+        ],
+        "note": "These numbers were produced under different inputs and must not be read as describing this build. Re-run the readiness command."
       }
     },
     "performance": {
@@ -336,7 +185,7 @@
     {
       "id": "synthetic-safe-corpus",
       "statement": "The committed fixture corpus is synthetic woven-textile imagery, not photographs of real submissions, so it does not describe the distribution of real Community uploads.",
-      "mitigation": "The corpus spans a measured Neutral range from 0.9991 down to 0.7522, so it exercises both the pass and the review branch of the pinned policy.",
+      "mitigation": "The corpus is designed to span the model confidence range so that both the pass and the review branch of the pinned policy are exercised. No measured range is available on this checkout.",
       "revisitWhen": "Story 6.2b measures the false-positive rate on at least 250 openly licensed real fashion photographs."
     },
     {
