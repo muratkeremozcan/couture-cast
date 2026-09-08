@@ -1,0 +1,14 @@
+{
+  "language": "fr",
+  "listVersion": "terms-v1",
+  "listType": "allowList",
+  "provenance": {
+    "source": "repository-owned reviewed list",
+    "version": "v1",
+    "licence": "UNLICENSED (repository-owned)",
+    "retrievedAt": "2026-09-08",
+    "curator": "couture-cast trust and safety",
+    "notes": "Ordinary garment, styling and general vocabulary that collides with a term in one of the seven supported languages once diacritics are folded or repeated characters are collapsed. Allow-list lookup runs on the literal case-folded token, before diacritic and repeated-character folding, so negro keeps the Spanish, Portuguese and Italian colour name for black while the French négro still flags. Salopette and its plural are the French word for dungarees and carry the letters of salope at their head, so they are held out of any substring or stem matching the screener grows later. Puttee is the wrapped legging, putto is the Renaissance cherub motif that decorates printed silks, and bitte is German for please as well as the French word for a mooring bollard; each of those three collapses onto pute, puto or bite once a repeated letter pair is reduced."
+  },
+  "entries": ["negro", "salopette", "salopettes", "puttee", "putto", "bitte"]
+}

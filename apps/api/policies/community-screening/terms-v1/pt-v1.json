@@ -1,0 +1,265 @@
+{
+  "language": "pt",
+  "listVersion": "terms-v1",
+  "listType": "terms",
+  "provenance": {
+    "source": "repository-owned reviewed list",
+    "version": "v1",
+    "licence": "UNLICENSED (repository-owned)",
+    "retrievedAt": "2026-09-08",
+    "curator": "couture-cast trust and safety",
+    "notes": "Built from scratch because Story 6.1 shipped no Portuguese dictionary, and covers European and Brazilian Portuguese together since pt-PT and pt-BR are both enabled locales. Single-word terms are at least four characters long, so cu is absent from the list and is screened only inside the directed phrase vai tomar no cu. pica carries low severity so that it routes to human review, and it catches the European spelling piça once diacritics fold, while the allow list keeps the literal unaccented token clean for sewing copy. These vulgar words are left out because each is ordinary vocabulary in one of the seven screened languages: pila is a battery in Spanish, puto is a boy in European Portuguese, boceta is a small box, cacete is a loaf of bread, corno is a horn in Italian and names the cornicello charm, burro is butter in Italian, and piranha and biscate are a fish and an odd job. Three attested slurs are dropped for the same reason: bicha is the everyday European Portuguese word for a queue, veado is a deer, and sapatão is literally a big shoe, which a shoe catalogue cannot afford to have flagged as critical. macaco is screened only inside the directed phrase macaco de merda, because the bare word means monkey and car jack. The self-harm imperative se mata is omitted because se mata de trabalhar is an ordinary idiom."
+  },
+  "entries": [
+    {
+      "term": "caralho",
+      "category": "profanity",
+      "severity": "medium"
+    },
+    {
+      "term": "porra",
+      "category": "profanity",
+      "severity": "medium"
+    },
+    {
+      "term": "merda",
+      "category": "profanity",
+      "severity": "medium"
+    },
+    {
+      "term": "bosta",
+      "category": "profanity",
+      "severity": "medium"
+    },
+    {
+      "term": "foda",
+      "category": "profanity",
+      "severity": "medium"
+    },
+    {
+      "term": "foder",
+      "category": "profanity",
+      "severity": "medium"
+    },
+    {
+      "term": "fodido",
+      "category": "profanity",
+      "severity": "medium"
+    },
+    {
+      "term": "cabrão",
+      "category": "profanity",
+      "severity": "medium"
+    },
+    {
+      "term": "escroto",
+      "category": "profanity",
+      "severity": "medium"
+    },
+    {
+      "term": "cuzão",
+      "category": "profanity",
+      "severity": "medium"
+    },
+    {
+      "term": "puta que pariu",
+      "category": "profanity",
+      "severity": "medium"
+    },
+    {
+      "term": "caraças",
+      "category": "profanity",
+      "severity": "low"
+    },
+    {
+      "term": "puta",
+      "category": "harassment",
+      "severity": "high"
+    },
+    {
+      "term": "vadia",
+      "category": "harassment",
+      "severity": "high"
+    },
+    {
+      "term": "vagabunda",
+      "category": "harassment",
+      "severity": "high"
+    },
+    {
+      "term": "filho da puta",
+      "category": "harassment",
+      "severity": "high"
+    },
+    {
+      "term": "filha da puta",
+      "category": "harassment",
+      "severity": "high"
+    },
+    {
+      "term": "vai te foder",
+      "category": "harassment",
+      "severity": "high"
+    },
+    {
+      "term": "vai se foder",
+      "category": "harassment",
+      "severity": "high"
+    },
+    {
+      "term": "vai tomar no cu",
+      "category": "harassment",
+      "severity": "high"
+    },
+    {
+      "term": "vai à merda",
+      "category": "harassment",
+      "severity": "medium"
+    },
+    {
+      "term": "arrombado",
+      "category": "harassment",
+      "severity": "medium"
+    },
+    {
+      "term": "babaca",
+      "category": "harassment",
+      "severity": "medium"
+    },
+    {
+      "term": "otário",
+      "category": "harassment",
+      "severity": "low"
+    },
+    {
+      "term": "desgraçado",
+      "category": "harassment",
+      "severity": "low"
+    },
+    {
+      "term": "idiota",
+      "category": "harassment",
+      "severity": "low"
+    },
+    {
+      "term": "imbecil",
+      "category": "harassment",
+      "severity": "low"
+    },
+    {
+      "term": "buceta",
+      "category": "sexual",
+      "severity": "high"
+    },
+    {
+      "term": "xoxota",
+      "category": "sexual",
+      "severity": "high"
+    },
+    {
+      "term": "boquete",
+      "category": "sexual",
+      "severity": "high"
+    },
+    {
+      "term": "chupa meu pau",
+      "category": "sexual",
+      "severity": "high"
+    },
+    {
+      "term": "punheta",
+      "category": "sexual",
+      "severity": "medium"
+    },
+    {
+      "term": "siririca",
+      "category": "sexual",
+      "severity": "medium"
+    },
+    {
+      "term": "pica",
+      "category": "sexual",
+      "severity": "low"
+    },
+    {
+      "term": "paneleiro",
+      "category": "hate",
+      "severity": "high"
+    },
+    {
+      "term": "maricas",
+      "category": "hate",
+      "severity": "high"
+    },
+    {
+      "term": "viado",
+      "category": "hate",
+      "severity": "high"
+    },
+    {
+      "term": "boiola",
+      "category": "hate",
+      "severity": "high"
+    },
+    {
+      "term": "traveco",
+      "category": "hate",
+      "severity": "high"
+    },
+    {
+      "term": "macaco de merda",
+      "category": "hate",
+      "severity": "high"
+    },
+    {
+      "term": "retardado",
+      "category": "hate",
+      "severity": "high"
+    },
+    {
+      "term": "nazista",
+      "category": "hate",
+      "severity": "high"
+    },
+    {
+      "term": "estupro",
+      "category": "violence",
+      "severity": "high"
+    },
+    {
+      "term": "estuprar",
+      "category": "violence",
+      "severity": "high"
+    },
+    {
+      "term": "espancar",
+      "category": "violence",
+      "severity": "medium"
+    },
+    {
+      "term": "vou te matar",
+      "category": "violence",
+      "severity": "high"
+    },
+    {
+      "term": "vai se matar",
+      "category": "self_harm",
+      "severity": "high"
+    },
+    {
+      "term": "se mate",
+      "category": "self_harm",
+      "severity": "high"
+    },
+    {
+      "term": "mata te",
+      "category": "self_harm",
+      "severity": "high"
+    },
+    {
+      "term": "corta os pulsos",
+      "category": "self_harm",
+      "severity": "high"
+    }
+  ]
+}

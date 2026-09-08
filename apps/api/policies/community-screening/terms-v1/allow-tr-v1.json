@@ -1,0 +1,14 @@
+{
+  "language": "tr",
+  "listVersion": "terms-v1",
+  "listType": "allowList",
+  "provenance": {
+    "source": "repository-owned reviewed list",
+    "version": "v1",
+    "licence": "UNLICENSED (repository-owned)",
+    "retrievedAt": "2026-09-08",
+    "curator": "couture-cast trust and safety",
+    "notes": "Ordinary Turkish vocabulary that collides with a term in this or another language once diacritics fold or repeated characters collapse. Allow-list lookup runs on the literal case-folded token before either transform, so the Turkish spelling here stays clean while the vulgar spelling still flags. şıktır means it is chic and folds onto siktir, sıkış means a squeeze and folds onto sikiş, and kasar is the textile bleaching process and is the folded form of kaşar. Two entries meet an English slur once its doubled letter collapses: gök means sky, as in gök mavisi for sky blue, and fagot names both the bassoon and the openwork stitch that joins two fabric edges, which Turkish sewing copy calls fagot dikişi. Every entry here was checked against the terms all seven files actually ship."
+  },
+  "entries": ["şıktır", "sıkış", "kasar", "gök", "fagot"]
+}
