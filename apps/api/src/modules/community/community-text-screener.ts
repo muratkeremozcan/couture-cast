@@ -264,13 +264,31 @@ const MIN_SINGLE_TERM_LENGTH = 4
 const SHORT_TERM_EXCEPTIONS: ReadonlySet<string> = new Set(['kys', 'amk'])
 
 /**
- * A ceiling on the join window, so a pathological list cannot make the
- * spaced-letter reconstruction quadratic in the caption length. The window
- * itself is the longest single-word term the lists actually hold: a fixed
- * window shorter than that is a silent fail-open, because a term of more
- * characters than the window can never be rebuilt from its spaced form.
+ * Whether a candidate too short for the floor is one of the reviewed
+ * exceptions, in its own spelling or in leet-class form. The class form matters
+ * because `k y 5` and `4 m k` rejoin to something that is not the abbreviation.
+ * Computed on demand rather than precomputed, since the leet table is declared
+ * further down this file.
  */
-const JOIN_WINDOW_CEILING = 32
+function isReviewedShortTerm(folded: string): boolean {
+  if (SHORT_TERM_EXCEPTIONS.has(folded)) return true
+  const classed = toLeetClassForm(folded)
+  for (const term of SHORT_TERM_EXCEPTIONS) {
+    if (toLeetClassForm(term) === classed) return true
+  }
+  return false
+}
+
+/**
+ * The absolute cap on how many adjacent tokens are ever rejoined. The real
+ * bound is the data: a window grows while what it collapses to could still be a
+ * term, which is exact, because a candidate whose collapsed form is longer than
+ * the longest term can never match one. A fixed window is a silent fail-open,
+ * and a 12-token one hid three German terms whose spaced forms published. This
+ * ceiling only stops a run of identical characters, which collapses to one
+ * character however long it is, from growing the window without limit.
+ */
+const JOIN_WINDOW_CEILING = 64
 /** RFC 5646 caps a well-formed language tag well below this. */
 const MAX_LOCALE_TAG_LENGTH = 35
 /** Tokens this short are the raw material of a spaced-letter form, not words. */
@@ -476,6 +494,7 @@ interface TermMeta {
 interface PhraseEntry {
   readonly tokens: readonly string[]
   readonly collapsed: readonly string[]
+  readonly leet: readonly string[]
   readonly meta: TermMeta
 }
 
@@ -548,9 +567,47 @@ function readListFile<Parsed extends { language: ScreeningLanguage }>(
   return result.data
 }
 
+/**
+ * Indexes a term under its exact spelling, its repeat-collapsed form and its
+ * leet-class form.
+ *
+ * The length floor has to apply to the collapsed key too, for the same reason it
+ * applies to the term: `gook` collapses to `gok`, which is how a Turkish writer
+ * spells "sky" without its umlaut, so indexing that key makes ordinary copy
+ * flag. Dropping the key instead loses `gooook`, which is a silent fail-open,
+ * and neither is acceptable. So a short collapsed key is allowed only when the
+ * ordinary word it collides with is on an allow list, which clears the plain
+ * spelling while the term still catches every stretched one, and startup fails
+ * when it is not, rather than the collision being resolved silently either way.
+ */
+function indexSingleTerm(
+  term: string,
+  meta: TermMeta,
+  language: ScreeningLanguage,
+  allowSingles: ReadonlySet<string>,
+  single: Map<string, TermMeta>,
+  singleCollapsed: Map<string, TermMeta>,
+  singleLeet: Map<string, TermMeta>
+): void {
+  single.set(term, meta)
+  const collapsed = collapseRepeats(term)
+  if (
+    collapsed.length < MIN_SINGLE_TERM_LENGTH &&
+    !SHORT_TERM_EXCEPTIONS.has(collapsed) &&
+    !allowSingles.has(collapsed)
+  ) {
+    throw new CommunityTextScreenerConfigError(
+      `${language} has a term that collapses to under ${MIN_SINGLE_TERM_LENGTH} characters, which needs that collapsed spelling on an allow list or a reviewed exception before it can be indexed`
+    )
+  }
+  singleCollapsed.set(collapsed, meta)
+  singleLeet.set(toLeetClassForm(collapsed), meta)
+}
+
 function buildLanguageIndex(
   list: z.infer<typeof termsFileSchema>,
-  policy: CommunityTextPolicy
+  policy: CommunityTextPolicy,
+  allowSingles: ReadonlySet<string>
 ): LanguageIndex {
   const single = new Map<string, TermMeta>()
   const singleCollapsed = new Map<string, TermMeta>()
@@ -573,11 +630,26 @@ function buildLanguageIndex(
     }
 
     if (foldedTokens.length > 1) {
+      const collapsedTokens = foldedTokens.map(collapseRepeats)
       phrases.push({
         tokens: foldedTokens,
-        collapsed: foldedTokens.map(collapseRepeats),
+        collapsed: collapsedTokens,
+        leet: collapsedTokens.map(toLeetClassForm),
         meta,
       })
+      // A phrase also has to be findable with its spaces gone. `killyourself`
+      // written as one word, or spelled out letter by letter, arrives as a
+      // single reconstructed token that no window comparison can see, so the
+      // concatenation is indexed as though it were a single term.
+      indexSingleTerm(
+        foldedTokens.join(''),
+        meta,
+        list.language,
+        allowSingles,
+        single,
+        singleCollapsed,
+        singleLeet
+      )
       continue
     }
 
@@ -588,9 +660,15 @@ function buildLanguageIndex(
       )
     }
 
-    single.set(term, meta)
-    singleCollapsed.set(collapseRepeats(term), meta)
-    singleLeet.set(toLeetClassForm(collapseRepeats(term)), meta)
+    indexSingleTerm(
+      term,
+      meta,
+      list.language,
+      allowSingles,
+      single,
+      singleCollapsed,
+      singleLeet
+    )
   }
 
   return {
@@ -602,6 +680,39 @@ function buildLanguageIndex(
     singleLeet,
     phrases,
   }
+}
+
+interface PhraseWindowForms {
+  readonly collapsedTokens: readonly string[]
+  readonly leetTokens: readonly string[]
+  readonly foldedTokens: readonly string[]
+  readonly carriesLeet: readonly boolean[]
+  readonly allowed: readonly boolean[]
+}
+
+/**
+ * Whether `phrase` matches the window starting at `start`, and if so whether it
+ * needed a canonical form to do it. `null` means no match.
+ */
+function matchPhraseWindow(
+  phrase: PhraseEntry,
+  start: number,
+  forms: PhraseWindowForms
+): boolean | null {
+  let collapsedHit = true
+  let leetHit = true
+  let leetPresent = false
+  let exact = true
+  for (let offset = 0; offset < phrase.collapsed.length; offset += 1) {
+    const at = start + offset
+    if (forms.allowed[at]) return null
+    if (forms.collapsedTokens[at] !== phrase.collapsed[offset]) collapsedHit = false
+    if (forms.leetTokens[at] !== phrase.leet[offset]) leetHit = false
+    if (forms.foldedTokens[at] !== phrase.tokens[offset]) exact = false
+    if (forms.carriesLeet[at]) leetPresent = true
+  }
+  if (collapsedHit) return !exact
+  return leetHit && leetPresent ? true : null
 }
 
 interface MatchOutcome {
@@ -687,7 +798,7 @@ export class CommunityTextScreener {
   private readonly loadedLanguages: readonly ScreeningLanguage[]
   private readonly englishFilter: Filter
   private readonly fieldLimits: Readonly<Record<TextScreeningField, number>>
-  private readonly maxJoinWindow: number
+  private readonly longestTerm: number
 
   constructor(options: CommunityTextScreenerOptions = {}) {
     this.policy = options.policy ?? DEFAULT_COMMUNITY_TEXT_POLICY
@@ -720,20 +831,13 @@ export class CommunityTextScreener {
       )
     )
 
-    this.indexes = termLists.map((list) => buildLanguageIndex(list, this.policy))
-    this.maxJoinWindow = Math.min(
-      JOIN_WINDOW_CEILING,
-      Math.max(MIN_SINGLE_TERM_LENGTH, ...this.indexes.map((i) => i.longestSingleTerm))
-    )
-    this.loadedLanguages = Object.freeze(this.indexes.map((index) => index.language))
-    this.listVersions = Object.freeze(
-      Object.fromEntries(termLists.map((list) => [list.language, list.listVersion]))
-    )
-
     // Allow lists apply across languages rather than only to the file they were
     // written in, because every language's dictionary runs against every
     // submission. A word that is ordinary German copy has to survive the Italian
-    // list too, so the union is the only coherent reading.
+    // list too, so the union is the only coherent reading. They are built before
+    // the term indexes because indexing consults them: a term whose collapsed
+    // spelling collides with an ordinary word is only indexable once that word
+    // is cleared here.
     const allowSingles = new Set<string>()
     const allowPhrases: string[][] = []
     for (const list of allowLists) {
@@ -749,6 +853,18 @@ export class CommunityTextScreener {
     }
     this.allowSingles = allowSingles
     this.allowPhrases = allowPhrases
+
+    this.indexes = termLists.map((list) =>
+      buildLanguageIndex(list, this.policy, allowSingles)
+    )
+    this.longestTerm = Math.max(
+      MIN_SINGLE_TERM_LENGTH,
+      ...this.indexes.map((index) => index.longestSingleTerm)
+    )
+    this.loadedLanguages = Object.freeze(this.indexes.map((index) => index.language))
+    this.listVersions = Object.freeze(
+      Object.fromEntries(termLists.map((list) => [list.language, list.listVersion]))
+    )
 
     // ADR-013 names a profanity filter, and `bad-words` is it. Its vocabulary is
     // English-only and was never reviewed against fashion copy, so it runs after
@@ -910,22 +1026,7 @@ export class CommunityTextScreener {
       }
     }
 
-    const collapsedTokens = foldedTokens.map(collapseRepeats)
-    for (const index of this.indexes) {
-      for (const phrase of index.phrases) {
-        const width = phrase.collapsed.length
-        for (let start = 0; start + width <= collapsedTokens.length; start += 1) {
-          const window = collapsedTokens.slice(start, start + width)
-          if (window.some((_token, offset) => allowed[start + offset])) continue
-          if (!window.every((token, offset) => token === phrase.collapsed[offset]))
-            continue
-          const exact = foldedTokens
-            .slice(start, start + width)
-            .every((token, offset) => token === phrase.tokens[offset])
-          outcomes.push({ meta: phrase.meta, obfuscated: !exact })
-        }
-      }
-    }
+    outcomes.push(...this.collectPhraseMatches(literalTokens, foldedTokens, allowed))
 
     for (const candidate of this.buildJoinCandidates(literalTokens, budget)) {
       const outcome = this.matchCandidate(
@@ -936,6 +1037,43 @@ export class CommunityTextScreener {
       if (outcome) outcomes.push({ meta: outcome.meta, obfuscated: true })
     }
 
+    return outcomes
+  }
+
+  /**
+   * Multi-word terms, matched over a window of adjacent tokens in
+   * repeat-collapsed form and, when the text actually carries a digit or
+   * symbol, in leet-class form too.
+   *
+   * A phrase written with its spaces removed, or spelled out letter by letter,
+   * never reaches here: it arrives as one reconstructed token, which is why the
+   * concatenation is indexed as a single term as well.
+   */
+  private collectPhraseMatches(
+    literalTokens: readonly string[],
+    foldedTokens: readonly string[],
+    allowed: readonly boolean[]
+  ): MatchOutcome[] {
+    const outcomes: MatchOutcome[] = []
+    const collapsedTokens = foldedTokens.map(collapseRepeats)
+    const leetTokens = collapsedTokens.map(toLeetClassForm)
+    const carriesLeet = literalTokens.map((token) => LEET_TRIGGER_PATTERN.test(token))
+
+    for (const index of this.indexes) {
+      for (const phrase of index.phrases) {
+        const width = phrase.collapsed.length
+        for (let start = 0; start + width <= collapsedTokens.length; start += 1) {
+          const hit = matchPhraseWindow(phrase, start, {
+            collapsedTokens,
+            leetTokens,
+            foldedTokens,
+            carriesLeet,
+            allowed,
+          })
+          if (hit !== null) outcomes.push({ meta: phrase.meta, obfuscated: hit })
+        }
+      }
+    }
     return outcomes
   }
 
@@ -954,13 +1092,20 @@ export class CommunityTextScreener {
     let runStart = 0
 
     const flush = (endExclusive: number): void => {
-      const length = endExclusive - runStart
-      if (length < 2) return
-      const maxWindow = Math.min(length, this.maxJoinWindow)
-      for (let size = 2; size <= maxWindow; size += 1) {
-        for (let start = runStart; start + size <= endExclusive; start += 1) {
+      if (endExclusive - runStart < 2) return
+      for (let start = runStart; start < endExclusive - 1; start += 1) {
+        const maxSize = Math.min(endExclusive - start, JOIN_WINDOW_CEILING)
+        for (let size = 2; size <= maxSize; size += 1) {
           const joined = literalTokens.slice(start, start + size).join('')
-          if (joined.length < MIN_SINGLE_TERM_LENGTH) continue
+          const folded = toFoldedForm(joined)
+          if (collapseRepeats(folded).length > this.longestTerm) break
+          // The length floor keeps three-character candidates out, because
+          // rebuilding those from adjacent letters would flag ordinary copy
+          // everywhere. A reviewed exception has no ordinary reading in any of
+          // the seven languages, so `a m k` is still reassembled.
+          if (joined.length < MIN_SINGLE_TERM_LENGTH && !isReviewedShortTerm(folded)) {
+            continue
+          }
           if (this.allowSingles.has(joined)) continue
           if (!budget.spend(joined)) return
           candidates.push(joined)

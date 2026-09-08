@@ -17,6 +17,7 @@ import {
   LOCALE_SCREENING_LANGUAGES,
   LOCALE_UNSCREENABLE_REASON,
   SCREENING_LANGUAGES,
+  TEXT_SCREENING_SEVERITIES,
   SCRIPT_MIXED_REASON,
   SCRIPT_UNSUPPORTED_REASON,
   TEXT_CLEAN_REASON,
@@ -163,6 +164,18 @@ const withLeetspeak = (term: string) =>
     .replace(/s/g, '5')
     .replace(/t/g, '7')
 
+/** Every code `screen` can emit that withholds a post. */
+const WITHHOLDING_REASONS = [
+  TEXT_POLICY_MATCH_REASON,
+  TEXT_INPUT_TRUNCATED_REASON,
+  LOCALE_UNSCREENABLE_REASON,
+  SCRIPT_MIXED_REASON,
+  SCRIPT_UNSUPPORTED_REASON,
+]
+
+const severityRank = (severity: TextScreeningSeverity | null) =>
+  severity === null ? -1 : TEXT_SCREENING_SEVERITIES.indexOf(severity)
+
 const screener = new CommunityTextScreener()
 
 const screenCaption = (text: string, locale: string | null = 'en-US') =>
@@ -273,7 +286,10 @@ describe('CommunityTextScreener policy wiring (AC 7)', () => {
     if (value && typeof value === 'object') {
       return Object.fromEntries(
         Object.entries(value as Record<string, unknown>)
-          .filter(([key]) => !key.endsWith('Rationale') && key !== 'rationale')
+          .filter(
+            ([key]) =>
+              !key.endsWith('Rationale') && key !== 'rationale' && key !== 'openQuestions'
+          )
           .map(([key, nested]) => [key, withoutProse(nested)])
       )
     }
@@ -300,6 +316,17 @@ describe('CommunityTextScreener policy wiring (AC 7)', () => {
     })
     expect(loaded.identity.textEngineVersion).toContain(loaded.policySha256.slice(0, 12))
     expect(loaded.policy.text.limits.maxInputCharacters).toEqual(CONTRACT_FIELD_CEILINGS)
+  })
+
+  it('emits exactly the reason codes the approved policy declares', () => {
+    const declared = Object.keys(
+      (approvedPolicy as { reasonCodes: { text: Record<string, string> } }).reasonCodes
+        .text
+    )
+    expect([...WITHHOLDING_REASONS].sort()).toEqual(declared.sort())
+    // The one code deliberately outside that map: it records a pass, and the
+    // policy types every entry there to a disposition that withholds a post.
+    expect(declared).not.toContain(TEXT_CLEAN_REASON)
   })
 
   it('names every shipped list file in the approved policy', () => {
@@ -503,6 +530,40 @@ describe('CommunityTextScreener obfuscation families (AC 4)', () => {
     }
   })
 
+  it('sees through every obfuscation of a multi-word term, in every language', () => {
+    for (const language of SCREENING_LANGUAGES) {
+      const phrases = termLists[language].entries.filter((entry) =>
+        entry.term.includes(' ')
+      )
+      expect(phrases.length, language).toBeGreaterThan(0)
+
+      for (const entry of phrases) {
+        const joined = entry.term.replace(/ /g, '')
+        for (const disguised of [
+          joined,
+          withSpacedLetters(joined),
+          withPunctuation(joined),
+          withLeetspeak(entry.term),
+        ]) {
+          const result = screenCaption(disguised)
+          const where = `${language}: ${disguised}`
+          expect(result.disposition, where).not.toBe('pass')
+          // The phrase's own category and grade, not the plain form's totals:
+          // running the words together drops any standalone term inside the
+          // phrase, which is correct and would make an equality check wrong.
+          // Truncation is the crafted-amplification path and withholds the post
+          // on its own, so parity is only owed when the input was fully read.
+          if (!result.truncated) {
+            expect(result.categories, where).toContain(entry.category)
+            expect(severityRank(result.severity), where).toBeGreaterThanOrEqual(
+              severityRank(entry.severity)
+            )
+          }
+        }
+      }
+    }
+  })
+
   it('folds diacritics so an accented spelling cannot slip a term through', () => {
     expect(screenCaption('que coño de vestido').categories).not.toEqual([])
     expect(screenCaption('que cono de vestido').disposition).toBe('pass')
@@ -605,6 +666,31 @@ describe('CommunityTextScreener word boundaries and allow lists (AC 4)', () => {
     ]) {
       expect(screenCaption(caption).disposition, caption).toBe('pass')
     }
+  })
+
+  it('clears an ordinary word a term collapses onto without losing the term', () => {
+    // `gook` folds onto `gok`, the umlaut-less spelling Turkish writers use for
+    // "sky". The allow list clears the plain word; the slur stays indexed under
+    // its own spelling and under every stretched one.
+    expect(screenCaption('gok mavisi bir elbise').disposition).toBe('pass')
+    expect(screenCaption('you gook').categories).toContain('hate')
+    expect(screenCaption('you gooook').categories).toContain('hate')
+  })
+
+  it('records which terms are deliberately allow-listed as well', () => {
+    const allowedLiterals = new Set(
+      Object.values(allowLists).flatMap((list) => list.entries.map(toLiteralForm))
+    )
+    const alsoAllowed = SCREENING_LANGUAGES.flatMap((language) =>
+      termLists[language].entries
+        .filter((entry) => allowedLiterals.has(toLiteralForm(entry.term)))
+        .map((entry) => `${language}:${entry.term}`)
+    )
+    // Portuguese `pica` is on both lists on purpose: the plain spelling is
+    // ordinary sewing vocabulary and clears, while the term still catches a
+    // disguised one. Anything else appearing here nullifies a term by accident.
+    expect(alsoAllowed).toEqual(['pt:pica'])
+    expect(screenCaption('uma pica de costura fina').disposition).toBe('pass')
   })
 
   it('rebuilds a spaced-letter form across an allow-listed single character', () => {
@@ -794,6 +880,29 @@ describe('CommunityTextScreener startup validation (AC 3, AC 7)', () => {
     expect(() => new CommunityTextScreener({ listsDirectory: directory })).toThrow(
       /reviewed exception/
     )
+  })
+
+  it('rejects a term collapsing under the floor with no allow-list guard', () => {
+    const unguarded = structuredClone(termLists.en)
+    unguarded.entries.push({ term: 'zooo', category: 'hate', severity: 'high' })
+    expect(
+      () =>
+        new CommunityTextScreener({
+          listsDirectory: writeListFixture({ 'en-v1.json': unguarded }),
+        })
+    ).toThrow(/collapses to under/)
+
+    const guarded = structuredClone(allowLists.en)
+    guarded.entries.push('zo')
+    expect(
+      () =>
+        new CommunityTextScreener({
+          listsDirectory: writeListFixture({
+            'en-v1.json': unguarded,
+            'allow-en-v1.json': guarded,
+          }),
+        })
+    ).not.toThrow()
   })
 
   it('rejects a term that normalizes to nothing', () => {
