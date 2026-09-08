@@ -430,6 +430,44 @@ export class NsfwScreeningError extends Error {
   }
 }
 
+/**
+ * Normalizes whatever a worker thread's `error` event actually carries.
+ *
+ * The Node typings say `Error`, but the value crosses a thread boundary and is
+ * whatever the thread threw, so a module-resolution failure or a rejected
+ * non-Error arrives here as a plain object. Rejecting with that value makes
+ * Vitest print `{ stacks: [] }` and hides the real cause entirely: a worktree
+ * whose node_modules predated the TensorFlow.js install failed every case in
+ * the smoke suite with the true message, `Cannot find module
+ * '@tensorflow/tfjs-core'`, never once surfacing.
+ */
+export function toWorkerError(value: unknown, fallback: string): Error {
+  if (value instanceof Error) return value
+  if (typeof value === 'string' && value.length > 0) return new Error(value)
+  if (typeof value === 'object' && value !== null) {
+    const candidate = value as { message?: unknown; code?: unknown }
+    if (typeof candidate.message === 'string' && candidate.message.length > 0) {
+      const error = new Error(candidate.message)
+      if (typeof candidate.code === 'string') error.name = candidate.code
+      return error
+    }
+    // Nothing message-shaped, so serialise it rather than lose it.
+    try {
+      return new Error(`${fallback}: ${JSON.stringify(value)}`)
+    } catch {
+      return new Error(fallback)
+    }
+  }
+  if (
+    typeof value === 'number' ||
+    typeof value === 'boolean' ||
+    typeof value === 'bigint'
+  ) {
+    return new Error(`${fallback}: ${value.toString()}`)
+  }
+  return new Error(fallback)
+}
+
 export interface TensorflowNsfwImageScreenerOptions {
   manifestPath?: string
   inferenceTimeoutMs?: number
@@ -449,7 +487,7 @@ export class TensorflowNsfwImageScreener implements NsfwImageScreener {
   private resolvedEngineVersion: string | null = null
   private initializationFailure: { error: Error; failedAt: number } | null = null
   /** Settles an in-flight startup, so closing mid-startup cannot strand a caller. */
-  private abortInitialization: ((error: Error) => void) | null = null
+  private abortInitialization: ((error: unknown) => void) | null = null
   /** Serialises inference so one model process runs one classification at a time. */
   private inferenceChain: Promise<unknown> = Promise.resolve()
 
@@ -567,8 +605,9 @@ export class TensorflowNsfwImageScreener implements NsfwImageScreener {
         worker.off('message', onMessage)
         worker.off('error', onError)
       }
-      const rejectInitialization = (error: Error) => {
+      const rejectInitialization = (raw: unknown) => {
         if (settled) return
+        const error = toWorkerError(raw, 'Community NSFW model process failed to start')
         settled = true
         this.initializationFailure = { error, failedAt: Date.now() }
         cleanup()
@@ -587,8 +626,9 @@ export class TensorflowNsfwImageScreener implements NsfwImageScreener {
         reject(error)
       }
       this.abortInitialization = rejectInitialization
-      const onRuntimeError = (error: Error) => {
+      const onRuntimeError = (raw: unknown) => {
         if (this.closing || this.worker !== worker) return
+        const error = toWorkerError(raw, 'Community NSFW model process errored')
         this.initializationFailure = { error, failedAt: Date.now() }
         void this.restartWorker(worker).catch(() => undefined)
       }
@@ -607,7 +647,7 @@ export class TensorflowNsfwImageScreener implements NsfwImageScreener {
           rejectInitialization(new Error(message.error))
         }
       }
-      const onError = (error: Error) => rejectInitialization(error)
+      const onError = (raw: unknown) => rejectInitialization(raw)
 
       worker.on('message', onMessage)
       worker.on('error', onError)
@@ -730,8 +770,9 @@ export class TensorflowNsfwImageScreener implements NsfwImageScreener {
         }
       }
 
-      const onError = (error: Error) => {
+      const onError = (raw: unknown) => {
         cleanup()
+        const error = toWorkerError(raw, 'Community NSFW inference process errored')
         void this.restartWorker(worker).then(
           () => reject(error),
           (restartError: unknown) =>

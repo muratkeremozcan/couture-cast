@@ -21,6 +21,7 @@ import {
   evaluateNsfwDisposition,
   loadApprovedPolicy,
   resolveManifestPath,
+  toWorkerError,
 } from './tensorflow-nsfw-image-screener.js'
 import type { NsfwImagePolicy } from './tensorflow-nsfw-image-screener.js'
 
@@ -636,5 +637,57 @@ describe('resolveManifestPath', () => {
 describe('selector identity', () => {
   it('names the production selector value the runtime switches on', () => {
     expect(COMMUNITY_NSFW_SCREENER_TENSORFLOW).toBe('tensorflow')
+  })
+})
+
+describe('toWorkerError', () => {
+  it('passes a real Error through untouched', () => {
+    const original = new Error('Cannot find module @tensorflow/tfjs-core')
+
+    expect(toWorkerError(original, 'fallback')).toBe(original)
+  })
+
+  // The Node typings promise an Error on a worker's error event, but the value
+  // crosses a thread boundary and is whatever the thread threw. Rejecting with
+  // a bare object is what made Vitest print `{ stacks: [] }` and hid a missing
+  // TensorFlow.js install behind every failure in the smoke suite.
+  it('recovers the message from a message-shaped non-Error', () => {
+    const recovered = toWorkerError(
+      { message: "Cannot find module '@tensorflow/tfjs-core'", code: 'MODULE_NOT_FOUND' },
+      'fallback'
+    )
+
+    expect(recovered).toBeInstanceOf(Error)
+    expect(recovered.message).toBe("Cannot find module '@tensorflow/tfjs-core'")
+    expect(recovered.name).toBe('MODULE_NOT_FOUND')
+  })
+
+  it('serialises an object carrying no message rather than losing it', () => {
+    const recovered = toWorkerError({ stacks: [] }, 'model process failed')
+
+    expect(recovered.message).toBe('model process failed: {"stacks":[]}')
+  })
+
+  it.each([
+    ['a string', 'worker exploded', 'worker exploded'],
+    ['an empty string', '', 'model process failed'],
+    ['a number', 7, 'model process failed: 7'],
+    ['a boolean', false, 'model process failed: false'],
+    ['undefined', undefined, 'model process failed'],
+    ['null', null, 'model process failed'],
+  ])('turns %s into a real Error', (_label, raw, expected) => {
+    const recovered = toWorkerError(raw, 'model process failed')
+
+    expect(recovered).toBeInstanceOf(Error)
+    expect(recovered.message).toBe(expected)
+  })
+
+  it('survives a value that cannot be serialised', () => {
+    const circular: Record<string, unknown> = {}
+    circular.self = circular
+
+    expect(toWorkerError(circular, 'model process failed').message).toBe(
+      'model process failed'
+    )
   })
 })

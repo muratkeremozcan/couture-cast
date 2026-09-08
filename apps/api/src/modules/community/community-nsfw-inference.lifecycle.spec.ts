@@ -933,3 +933,517 @@ describe('forbidNetworkAccess', () => {
     }
   })
 })
+
+// Story 6.2 Task 2: the rest of the worker module's exported surface. Everything
+// below runs in this process with no TensorFlow.js at all. `initializeInferenceWorker`
+// and `loadGraphModelFromPackage` are the only exports that need a real graph
+// model, and the gated readiness command is where those two are proven.
+const {
+  NSFW_MODEL_INPUT_SIZE,
+  assertManifestIdentity,
+  assertWeightBundlesMatchManifest,
+  classifyPixels,
+  computeSha256,
+  decodeImageToPixels,
+  defaultManifestDirectories,
+  disposeInferenceWorker,
+  findManifestIn,
+  isModelDefinition,
+  runInferenceOnImage,
+  selectModelDefinition,
+  verifyManifestFile,
+} = NsfwWorkerModule
+
+const DECODED_PIXEL_COUNT = NSFW_MODEL_INPUT_SIZE * NSFW_MODEL_INPUT_SIZE * 3
+
+// Imported the way the worker imports it, so a run that never decodes an image
+// never loads the native binding either.
+async function solidImage(options: {
+  width: number
+  height: number
+  channels: 3 | 4
+  background: { r: number; g: number; b: number; alpha?: number }
+  format?: 'jpeg' | 'png'
+}): Promise<Buffer> {
+  const sharp = (await import('sharp')).default
+  const image = sharp({
+    create: {
+      width: options.width,
+      height: options.height,
+      channels: options.channels,
+      background: options.background,
+    },
+  })
+  return options.format === 'jpeg' ? image.jpeg().toBuffer() : image.png().toBuffer()
+}
+
+const pixelAt = (pixels: Uint8Array, offset: number): number[] =>
+  Array.from(pixels.subarray(offset, offset + 3))
+
+const squareImage = (): Promise<Buffer> =>
+  solidImage({
+    width: NSFW_MODEL_INPUT_SIZE,
+    height: NSFW_MODEL_INPUT_SIZE,
+    channels: 3,
+    background: { r: 12, g: 34, b: 56 },
+  })
+
+const manifestFrom = (
+  overrides: Record<string, unknown> = {}
+): NsfwWorkerModule.NsfwModelManifest =>
+  readModelManifest(createManifestFixture(overrides))
+
+const modelDefinition = (): NsfwWorkerModule.NsfwModelDefinition => ({
+  modelJson: () => Promise.resolve({ default: {} }),
+  weightBundles: [],
+})
+
+describe('decodeImageToPixels', () => {
+  it('decodes a 224x224 RGB image to one byte per channel', async () => {
+    const pixels = await decodeImageToPixels(await squareImage())
+
+    expect(pixels).toBeInstanceOf(Uint8Array)
+    expect(pixels).toHaveLength(DECODED_PIXEL_COUNT)
+    expect(pixelAt(pixels, 0)).toEqual([12, 34, 56])
+  })
+
+  /**
+   * The graph accepts exactly one shape, so a phone photo has to arrive already
+   * resized. Checking the colour as well as the length is what separates a real
+   * resize from a stride or channel-order bug that produces the right byte count.
+   */
+  it('resizes an image of any other size onto the shape the graph declares', async () => {
+    const pixels = await decodeImageToPixels(
+      await solidImage({
+        width: 320,
+        height: 180,
+        channels: 3,
+        background: { r: 200, g: 100, b: 50 },
+      })
+    )
+
+    expect(pixels).toHaveLength(DECODED_PIXEL_COUNT)
+    for (const offset of [0, DECODED_PIXEL_COUNT / 2, DECODED_PIXEL_COUNT - 3]) {
+      expect(pixelAt(pixels, offset)).toEqual([200, 100, 50])
+    }
+  })
+
+  /** Dropping the alpha channel would classify whatever colour it hid. */
+  it('flattens a fully transparent image onto black', async () => {
+    const pixels = await decodeImageToPixels(
+      await solidImage({
+        width: NSFW_MODEL_INPUT_SIZE,
+        height: NSFW_MODEL_INPUT_SIZE,
+        channels: 4,
+        background: { r: 255, g: 0, b: 255, alpha: 0 },
+      })
+    )
+
+    expect(pixelAt(pixels, 0)).toEqual([0, 0, 0])
+    expect(pixels.findIndex((value) => value !== 0)).toBe(-1)
+  })
+
+  it('rejects a buffer that is not an image at all', async () => {
+    const notAnImage = Buffer.from('not an image')
+
+    await expect(decodeImageToPixels(notAnImage)).rejects.toBeInstanceOf(
+      NsfwImageDecodeError
+    )
+    await expect(decodeImageToPixels(notAnImage)).rejects.toThrow(
+      /could not be decoded for inference/
+    )
+  })
+
+  /**
+   * The shape assertion inside the decoder is unreachable through real sharp,
+   * which is why it is worth pinning: a wrapped error would hide the dimensions
+   * from the operator reading the failure.
+   */
+  it('re-throws its own decode error with the measured dimensions intact', async () => {
+    vi.doMock('sharp', () => {
+      const pipeline: Record<string, unknown> = {}
+      for (const step of ['flatten', 'resize', 'toColourspace', 'raw']) {
+        pipeline[step] = () => pipeline
+      }
+      pipeline.toBuffer = () =>
+        Promise.resolve({
+          data: Buffer.alloc(12),
+          info: { width: 2, height: 2, channels: 3 },
+        })
+      return { default: () => pipeline }
+    })
+
+    try {
+      await expect(decodeImageToPixels(Buffer.from('mocked'))).rejects.toThrow(
+        'Decoded image is 2x2x3, expected 224x224x3'
+      )
+      await expect(decodeImageToPixels(Buffer.from('mocked'))).rejects.toBeInstanceOf(
+        NsfwImageDecodeError
+      )
+    } finally {
+      vi.doUnmock('sharp')
+    }
+  })
+})
+
+describe('verifyManifestFile', () => {
+  const ARTIFACT_BYTES = 'model-graph-bytes'
+
+  /** A package root nested inside the temp tree, so `..` stays cleanable. */
+  function installedPackage(relativePath = path.join('dist', 'model.bin')): {
+    root: string
+    file: NsfwManifestFile
+  } {
+    const root = path.join(temporaryDirectory('nsfw-install-'), 'node_modules', 'nsfwjs')
+    const target = path.join(root, relativePath)
+    fs.mkdirSync(path.dirname(target), { recursive: true })
+    fs.writeFileSync(target, ARTIFACT_BYTES)
+    return {
+      root,
+      file: { package: 'nsfwjs', path: relativePath, sha256: sha256Of(ARTIFACT_BYTES) },
+    }
+  }
+
+  it('returns the canonical path of a file whose bytes match the manifest', async () => {
+    const { root, file } = installedPackage()
+
+    await expect(verifyManifestFile(file, root)).resolves.toBe(
+      fs.realpathSync(path.join(root, file.path))
+    )
+  })
+
+  it('rejects a manifest entry whose file was never installed', async () => {
+    const { root, file } = installedPackage()
+
+    await expect(
+      verifyManifestFile({ ...file, path: path.join('dist', 'absent.bin') }, root)
+    ).rejects.toThrow(/declares a missing file/)
+  })
+
+  /** A file at the right path with the wrong bytes is why the hash is pinned. */
+  it('rejects a file whose bytes are not the ones the manifest pinned', async () => {
+    const { root, file } = installedPackage()
+    fs.writeFileSync(path.join(root, file.path), 'tampered-bytes')
+
+    await expect(verifyManifestFile(file, root)).rejects.toThrow(
+      /Model artifact checksum mismatch/
+    )
+  })
+
+  const invalidDigests: [string, string | undefined][] = [
+    ['a truncated digest', sha256Of(ARTIFACT_BYTES).slice(0, 32)],
+    ['a digest that is not hex', 'z'.repeat(64)],
+    ['no digest at all', undefined],
+  ]
+
+  it.each(invalidDigests)('rejects %s', async (_label, sha256) => {
+    const { root, file } = installedPackage()
+
+    await expect(
+      verifyManifestFile({ ...file, sha256: sha256 as string }, root)
+    ).rejects.toThrow(/64-character SHA-256 hex digest/)
+  })
+
+  const invalidPaths: [string, string | undefined][] = [
+    ['an empty path', ''],
+    ['no path at all', undefined],
+  ]
+
+  it.each(invalidPaths)('rejects a manifest entry with %s', async (_label, badPath) => {
+    const { root, file } = installedPackage()
+
+    await expect(
+      verifyManifestFile({ ...file, path: badPath as string }, root)
+    ).rejects.toThrow(/must declare a path/)
+  })
+
+  it('rejects a path that escapes its package root', async () => {
+    const { root, file } = installedPackage()
+    fs.writeFileSync(path.join(root, '..', 'outside.bin'), ARTIFACT_BYTES)
+
+    await expect(
+      verifyManifestFile({ ...file, path: path.join('..', 'outside.bin') }, root)
+    ).rejects.toThrow(/escapes its package root/)
+  })
+
+  /** A symlink satisfies the textual check, which is why realpath runs too. */
+  it('rejects a symlink that points out of its package root', async () => {
+    const { root, file } = installedPackage()
+    const outside = path.join(root, '..', 'outside.bin')
+    fs.writeFileSync(outside, ARTIFACT_BYTES)
+    fs.rmSync(path.join(root, file.path))
+    fs.symlinkSync(outside, path.join(root, file.path))
+
+    await expect(verifyManifestFile(file, root)).rejects.toThrow(
+      /escapes its package root/
+    )
+  })
+})
+
+describe('computeSha256', () => {
+  it.each([
+    ['a file with bytes in it', 'model-graph-bytes'],
+    ['an empty file', ''],
+  ])('hashes %s to the digest node:crypto computes', async (_label, contents) => {
+    const filePath = path.join(temporaryDirectory('nsfw-digest-'), 'artifact.bin')
+    fs.writeFileSync(filePath, contents)
+
+    await expect(computeSha256(filePath)).resolves.toBe(sha256Of(contents))
+  })
+})
+
+describe('isModelDefinition', () => {
+  it('accepts the shape nsfwjs/models/* exports', () => {
+    expect(isModelDefinition(modelDefinition())).toBe(true)
+  })
+
+  const nonDefinitions: [string, unknown][] = [
+    ['null', null],
+    ['undefined', undefined],
+    ['a string', 'nsfwjs/models/mobilenet_v2_mid'],
+    ['a number', 4],
+    ['an empty object', {}],
+    ['a modelJson that is not callable', { modelJson: 'nope', weightBundles: [] }],
+    [
+      'weightBundles that is not an array',
+      { modelJson: () => undefined, weightBundles: 'nope' },
+    ],
+  ]
+
+  it.each(nonDefinitions)('rejects %s', (_label, value) => {
+    expect(isModelDefinition(value)).toBe(false)
+  })
+})
+
+describe('selectModelDefinition', () => {
+  it('prefers the export the manifest names', () => {
+    const named = modelDefinition()
+    const other = modelDefinition()
+
+    expect(
+      selectModelDefinition({ named, other }, manifestFrom({ modelExport: 'named' }))
+    ).toBe(named)
+  })
+
+  it('finds the model structurally when the manifest names no export', () => {
+    const bundled = modelDefinition()
+
+    expect(selectModelDefinition({ notes: 'metadata', bundled }, manifestFrom())).toBe(
+      bundled
+    )
+  })
+
+  /**
+   * The manifest name is the audit trail; the structural fallback is what keeps
+   * a rename inside nsfwjs from taking image screening offline entirely.
+   */
+  it('survives a rename by falling back when the named export is not a model', () => {
+    const bundled = modelDefinition()
+
+    expect(
+      selectModelDefinition(
+        { mobilenetV2Mid: 'renamed away', bundled },
+        manifestFrom({ modelExport: 'mobilenetV2Mid' })
+      )
+    ).toBe(bundled)
+  })
+
+  it('throws naming the subpath when no export qualifies', () => {
+    expect(() =>
+      selectModelDefinition({ default: {}, version: '4.3.0' }, manifestFrom())
+    ).toThrow('nsfwjs/models/mobilenet_v2_mid did not export a usable model definition')
+  })
+})
+
+describe('assertWeightBundlesMatchManifest', () => {
+  const WEIGHTS_MANIFEST = [
+    { paths: ['group1-shard1of2'] },
+    { paths: ['group1-shard2of2'] },
+  ]
+  const BUNDLES = [Buffer.alloc(8), Buffer.alloc(16)]
+  const PINNED = {
+    manifestPaths: ['group1-shard1of2', 'group1-shard2of2'],
+    weightSpecCount: 4,
+    decodedBytes: [8, 16],
+  }
+
+  it('accepts bundles that agree with the manifest', () => {
+    expect(() =>
+      assertWeightBundlesMatchManifest(
+        manifestFrom({ weightBundles: PINNED }),
+        WEIGHTS_MANIFEST,
+        BUNDLES,
+        4
+      )
+    ).not.toThrow()
+  })
+
+  it('rejects a bundle count the bundled model does not declare', () => {
+    expect(() =>
+      assertWeightBundlesMatchManifest(
+        manifestFrom({ weightBundles: PINNED }),
+        WEIGHTS_MANIFEST,
+        [BUNDLES[0] as Buffer],
+        4
+      )
+    ).toThrow(/declares 2 weight paths but ships 1 bundles/)
+  })
+
+  /** The mirror is optional, so a manifest without it must still load. */
+  it('skips every mirror check when the manifest pins no weight bundles', () => {
+    expect(() =>
+      assertWeightBundlesMatchManifest(manifestFrom(), WEIGHTS_MANIFEST, BUNDLES, 99)
+    ).not.toThrow()
+  })
+
+  it('rejects weight paths the manifest does not name', () => {
+    expect(() =>
+      assertWeightBundlesMatchManifest(
+        manifestFrom({
+          weightBundles: { ...PINNED, manifestPaths: ['group1-shard1of2', 'renamed'] },
+        }),
+        WEIGHTS_MANIFEST,
+        BUNDLES,
+        4
+      )
+    ).toThrow(/do not match the manifest/)
+  })
+
+  it('rejects a weight spec count the manifest does not pin', () => {
+    expect(() =>
+      assertWeightBundlesMatchManifest(
+        manifestFrom({ weightBundles: PINNED }),
+        WEIGHTS_MANIFEST,
+        BUNDLES,
+        5
+      )
+    ).toThrow('Bundled model declares 5 weight specs, manifest pins 4')
+  })
+
+  /** A re-encoded or truncated bundle hashes fine on disk and fails here. */
+  it('rejects decoded bundle sizes the manifest does not pin', () => {
+    expect(() =>
+      assertWeightBundlesMatchManifest(
+        manifestFrom({ weightBundles: { ...PINNED, decodedBytes: [8, 32] } }),
+        WEIGHTS_MANIFEST,
+        BUNDLES,
+        4
+      )
+    ).toThrow(/Decoded weight bundle sizes \[8, 16\]/)
+  })
+})
+
+describe('assertManifestIdentity', () => {
+  const identity = {
+    modelFamily: 'mobilenet_v2_mid',
+    packageName: 'nsfwjs',
+    packageVersion: '4.3.0',
+    modelSubpath: 'nsfwjs/models/mobilenet_v2_mid',
+    backend: 'wasm',
+  }
+
+  it('accepts an identity that names its model, package and backend', () => {
+    expect(() => assertManifestIdentity(identity)).not.toThrow()
+  })
+
+  const brokenIdentities: [string, Partial<NsfwWorkerModule.NsfwModelManifest>][] = [
+    ['no model family', { modelFamily: undefined }],
+    ['no package name', { packageName: undefined }],
+    ['no package version', { packageVersion: undefined }],
+    ['no model subpath', { modelSubpath: undefined }],
+    ['a backend other than wasm', { backend: 'cpu' }],
+  ]
+
+  it.each(brokenIdentities)('rejects an identity with %s', (_label, overrides) => {
+    expect(() => assertManifestIdentity({ ...identity, ...overrides })).toThrow(
+      'Model manifest identity is invalid'
+    )
+  })
+})
+
+describe('findManifestIn', () => {
+  function manifestDirectory(...names: string[]): string {
+    const directory = temporaryDirectory('nsfw-lookup-')
+    for (const name of names) fs.writeFileSync(path.join(directory, name), '{}')
+    return directory
+  }
+
+  it('takes the alphabetically first manifest in the first directory that exists', () => {
+    const absent = path.join(temporaryDirectory('nsfw-lookup-'), 'never-created')
+    const directory = manifestDirectory(
+      'community-nsfw-mobilenet-v2-mid.json',
+      'community-nsfw-a-earlier.json'
+    )
+
+    expect(findManifestIn([absent, directory])).toBe(
+      path.join(directory, 'community-nsfw-a-earlier.json')
+    )
+  })
+
+  it('walks past a directory that holds nothing matching', () => {
+    const decoys = manifestDirectory(
+      'fashion-clip-7e3ba62.json',
+      'community-nsfw-notes.txt'
+    )
+    const directory = manifestDirectory('community-nsfw-mobilenet-v2-mid.json')
+
+    expect(findManifestIn([decoys, directory])).toBe(
+      path.join(directory, 'community-nsfw-mobilenet-v2-mid.json')
+    )
+  })
+
+  it('throws naming every directory it looked in', () => {
+    const first = manifestDirectory()
+    const second = manifestDirectory()
+
+    expect(() => findManifestIn([first, second])).toThrow(
+      `Community NSFW model manifest not found in: ${first}, ${second}`
+    )
+  })
+})
+
+describe('defaultManifestDirectories', () => {
+  it('offers the src and dist locations, three and four levels up', () => {
+    const fromDirectory = path.join(path.sep, 'srv', 'api', 'src', 'modules', 'community')
+
+    expect(defaultManifestDirectories(fromDirectory)).toEqual([
+      path.resolve(path.sep, 'srv', 'api', 'model-manifests'),
+      path.resolve(path.sep, 'srv', 'model-manifests'),
+    ])
+  })
+
+  /** The worker sits in this directory, so one candidate has to be the real one. */
+  it('resolves the checked-in manifest directory from the worker location', () => {
+    const candidates = defaultManifestDirectories(__dirname)
+
+    expect(candidates.filter((directory) => fs.existsSync(directory))).toHaveLength(1)
+    expect(findManifestIn(candidates)).toMatch(/community-nsfw-.+\.json$/)
+  })
+})
+
+describe('classifyPixels without a loaded model', () => {
+  it('refuses to classify before the runtime is initialized', async () => {
+    await expect(classifyPixels(new Uint8Array(DECODED_PIXEL_COUNT))).rejects.toThrow(
+      'NSFW inference worker is not initialized'
+    )
+  })
+
+  it('decodes a real image before it discovers there is no model to run', async () => {
+    await expect(runInferenceOnImage(await squareImage())).rejects.toThrow(
+      'NSFW inference worker is not initialized'
+    )
+  })
+
+  it('fails at the decode when the bytes are not an image', async () => {
+    await expect(runInferenceOnImage(Buffer.from('not an image'))).rejects.toBeInstanceOf(
+      NsfwImageDecodeError
+    )
+  })
+})
+
+describe('disposeInferenceWorker', () => {
+  it('is safe and idempotent when no model was ever loaded', () => {
+    expect(() => disposeInferenceWorker()).not.toThrow()
+    expect(() => disposeInferenceWorker()).not.toThrow()
+  })
+})
