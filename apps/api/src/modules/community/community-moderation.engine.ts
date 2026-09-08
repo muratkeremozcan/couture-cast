@@ -142,8 +142,14 @@ export interface NsfwImageScreener {
   /**
    * Loads and verifies whatever the screener needs before it can answer, and
    * reports the identity that will be persisted with every verdict.
+   *
+   * A screener that returns nothing still satisfies the seam and is treated as
+   * ready with only its `engineVersion` known. Reporting the policy hash, the
+   * model hash and the backend is what lets the readiness log answer AC 1's
+   * question about which artifacts actually loaded, so a screener that has
+   * those values should return them.
    */
-  ensureReady?(): Promise<NsfwScreenerReadiness>
+  ensureReady?(): Promise<NsfwScreenerReadiness | void>
   /** Releases the model process, tensors and handles the screener opened. */
   close?(): Promise<void>
 }
