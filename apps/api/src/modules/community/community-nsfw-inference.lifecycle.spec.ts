@@ -1447,3 +1447,345 @@ describe('disposeInferenceWorker', () => {
     expect(() => disposeInferenceWorker()).not.toThrow()
   })
 })
+
+// Story 6.2 Task 2 (continued). `assertManifestWeightBundles` is the newest of
+// the manifest gates; everything after it is a controller lifecycle path that
+// only the fake worker and a faked clock can reach.
+const { assertManifestWeightBundles } = NsfwWorkerModule
+const { NSFW_INITIALIZATION_TIMEOUT_MS, toWorkerError } =
+  TensorflowNsfwImageScreenerModule
+
+type NsfwWeightBundleMirror = NsfwWorkerModule.NsfwModelManifest['weightBundles']
+
+describe('assertManifestWeightBundles', () => {
+  const MIRROR = {
+    manifestPaths: ['group1-shard1of2', 'group1-shard2of2'],
+    weightSpecCount: 4,
+    decodedBytes: [8, 16],
+  }
+
+  it('returns silently when the manifest pins no weight bundles', () => {
+    expect(() => assertManifestWeightBundles({})).not.toThrow()
+  })
+
+  it('accepts a mirror whose paths, spec count and decoded sizes agree', () => {
+    expect(() => assertManifestWeightBundles({ weightBundles: MIRROR })).not.toThrow()
+  })
+
+  const malformedMirrors: [string, Record<string, unknown>][] = [
+    ['an empty object', {}],
+    ['no manifestPaths', { ...MIRROR, manifestPaths: undefined }],
+    ['an empty manifestPaths', { ...MIRROR, manifestPaths: [] }],
+    ['a manifestPaths that is not an array', { ...MIRROR, manifestPaths: 'shard1' }],
+    ['a manifest path that is an empty string', { ...MIRROR, manifestPaths: ['a', ''] }],
+    ['a manifest path that is not a string', { ...MIRROR, manifestPaths: ['a', 2] }],
+    ['no weightSpecCount', { ...MIRROR, weightSpecCount: undefined }],
+    ['a fractional weightSpecCount', { ...MIRROR, weightSpecCount: 4.5 }],
+    ['a zero weightSpecCount', { ...MIRROR, weightSpecCount: 0 }],
+    ['a negative weightSpecCount', { ...MIRROR, weightSpecCount: -4 }],
+    ['no decodedBytes', { ...MIRROR, decodedBytes: undefined }],
+    ['a decodedBytes that is not an array', { ...MIRROR, decodedBytes: 24 }],
+    ['fewer decodedBytes entries than paths', { ...MIRROR, decodedBytes: [8] }],
+    ['a zero decodedBytes entry', { ...MIRROR, decodedBytes: [8, 0] }],
+    ['a negative decodedBytes entry', { ...MIRROR, decodedBytes: [8, -16] }],
+    ['a fractional decodedBytes entry', { ...MIRROR, decodedBytes: [8, 16.5] }],
+  ]
+
+  it.each(malformedMirrors)('rejects a mirror with %s', (_label, mirror) => {
+    expect(() =>
+      assertManifestWeightBundles({ weightBundles: mirror as NsfwWeightBundleMirror })
+    ).toThrow(/weightBundles must declare/)
+  })
+
+  /**
+   * `"weightBundles": {}` used to clear every manifest gate and die inside
+   * `assertWeightBundlesMatchManifest` as `Cannot read properties of undefined
+   * (reading 'length')`, at model load, reaching the supervisor as a generic
+   * initialization failure that never mentioned the manifest.
+   */
+  it('is wired into readModelManifest, so a broken mirror fails manifest-shaped', () => {
+    const manifestPath = createManifestFixture({ weightBundles: {} })
+
+    expect(() => readModelManifest(manifestPath)).toThrow(/weightBundles must declare/)
+  })
+})
+
+describe('toWorkerError', () => {
+  const circular: Record<string, unknown> = {}
+  circular.self = circular
+
+  it('hands back the Error it was given', () => {
+    const original = new Error('already an error')
+
+    expect(toWorkerError(original, 'fallback')).toBe(original)
+  })
+
+  const nonErrors: [string, unknown, string][] = [
+    ['a message string', 'boom', 'boom'],
+    ['a number', 7, 'fallback: 7'],
+    ['a boolean', false, 'fallback: false'],
+    ['a bigint', BigInt(9), 'fallback: 9'],
+    ['an empty string', '', 'fallback'],
+    ['null', null, 'fallback'],
+    ['undefined', undefined, 'fallback'],
+    ['a value JSON cannot serialise', circular, 'fallback'],
+  ]
+
+  it.each(nonErrors)('turns %s into an Error', (_label, value, expected) => {
+    const error = toWorkerError(value, 'fallback')
+
+    expect(error).toBeInstanceOf(Error)
+    expect(error.message).toBe(expected)
+  })
+})
+
+describe('TensorflowNsfwImageScreener startup timeout', () => {
+  it('gives up and terminates the model process when ready never arrives', async () => {
+    const screener = new TensorflowNsfwImageScreener({
+      manifestPath: createManifestFixture(),
+    })
+    // The first attempt exists to get the policy cached on the real clock: the
+    // load is filesystem I/O, and the retry below must spawn without it so the
+    // only timer a faked clock stands in front of is the worker's own.
+    const first = screener.ensureReady()
+    await vi.waitFor(() => expect(workers()).toHaveLength(1))
+    latestWorker().emit('exit', 9)
+    await expect(first).rejects.toThrow(/exited before ready/)
+
+    vi.useFakeTimers()
+    vi.advanceTimersByTime(NSFW_FAILURE_COOLDOWN_MS + 1)
+    const retried = screener.ensureReady()
+    const settled = expect(retried).rejects.toThrow(/startup timed out after/)
+    await vi.advanceTimersByTimeAsync(0)
+    expect(workers()).toHaveLength(2)
+    const stalled = latestWorker()
+    await vi.advanceTimersByTimeAsync(NSFW_INITIALIZATION_TIMEOUT_MS)
+
+    await settled
+    expect(stalled.terminate).toHaveBeenCalled()
+  })
+})
+
+/**
+ * Node turns an unhandled rejection into a process exit, so a teardown that
+ * rejects while a startup is already failing has to stay swallowed. Capturing
+ * the event here makes that assertion belong to the test that provokes it.
+ */
+function captureUnhandledRejections(): { reasons: unknown[]; restore: () => void } {
+  const reasons: unknown[] = []
+  const listener = (reason: unknown): void => {
+    reasons.push(reason)
+  }
+  process.on('unhandledRejection', listener)
+  return {
+    reasons,
+    restore: () => {
+      process.off('unhandledRejection', listener)
+    },
+  }
+}
+
+describe('TensorflowNsfwImageScreener startup teardown', () => {
+  it('keeps the initialization cause when terminating the worker rejects', async () => {
+    const unhandled = captureUnhandledRejections()
+
+    try {
+      const screener = new TensorflowNsfwImageScreener({
+        manifestPath: createManifestFixture(),
+      })
+      const ready = screener.ensureReady()
+      await vi.waitFor(() => expect(workers()).toHaveLength(1))
+      latestWorker().terminate = vi
+        .fn<() => Promise<number>>()
+        .mockRejectedValue(new Error('terminate refused'))
+      send(latestWorker(), {
+        type: 'initialization_error',
+        error: 'wasm backend absent',
+      })
+
+      await expect(ready).rejects.toThrow('wasm backend absent')
+      await new Promise((resolve) => setTimeout(resolve, 0))
+      expect(unhandled.reasons).toEqual([])
+    } finally {
+      unhandled.restore()
+    }
+  })
+})
+
+describe('TensorflowNsfwImageScreener idle crash', () => {
+  it('restarts on an error event with no screening in flight', async () => {
+    const screener = await readyScreener()
+    const worker = latestWorker()
+
+    worker.emit('error', new Error('worker thread crashed'))
+
+    expect(worker.terminate).toHaveBeenCalledTimes(1)
+    await expect(screener.ensureReady()).rejects.toThrow('worker thread crashed')
+    expect(workers()).toHaveLength(1)
+
+    vi.useFakeTimers()
+    vi.advanceTimersByTime(NSFW_FAILURE_COOLDOWN_MS + 1)
+    const recovered = screener.ensureReady()
+    await vi.advanceTimersByTimeAsync(0)
+    expect(workers()).toHaveLength(2)
+    send(latestWorker(), readyMessage())
+
+    await expect(recovered).resolves.toBeUndefined()
+  })
+})
+
+describe('TensorflowNsfwImageScreener restart failure', () => {
+  const refusingTerminate = () =>
+    vi.fn<() => Promise<number>>().mockRejectedValue(new Error('terminate refused'))
+
+  it('rejects a crashed screening with the reason the restart failed', async () => {
+    const screener = await readyScreener()
+    const worker = latestWorker()
+    worker.terminate = refusingTerminate()
+
+    const pending = screener.screen(IMAGE)
+    await vi.waitFor(() => expect(worker.postMessage).toHaveBeenCalledTimes(1))
+    worker.emit('error', new Error('wasm heap exhausted'))
+
+    await expect(pending).rejects.toThrow('terminate refused')
+  })
+
+  it('rejects a timed-out screening with the reason the restart failed', async () => {
+    const screener = await readyScreener({ inferenceTimeoutMs: 200 })
+    const worker = latestWorker()
+    worker.terminate = refusingTerminate()
+    vi.useFakeTimers()
+
+    const pending = screener.screen(IMAGE)
+    const settled = expect(pending).rejects.toThrow('terminate refused')
+    await vi.advanceTimersByTimeAsync(0)
+    expect(worker.postMessage).toHaveBeenCalledTimes(1)
+    await vi.advanceTimersByTimeAsync(200)
+
+    await settled
+  })
+})
+
+/**
+ * A worker thread's `error` event carries whatever the thread threw, so a
+ * module-resolution failure arrives as a plain object rather than an Error.
+ * Rejecting with that value cost a peer session an hour: every case in the
+ * smoke suite printed `{}` while the true cause, a node_modules tree that
+ * predated the TensorFlow.js install, never once surfaced.
+ */
+describe('TensorflowNsfwImageScreener non-Error worker events', () => {
+  async function spawnedScreener(): Promise<{ ready: Promise<void> }> {
+    const screener = new TensorflowNsfwImageScreener({
+      manifestPath: createManifestFixture(),
+    })
+    const ready = screener.ensureReady()
+    await vi.waitFor(() => expect(workers()).toHaveLength(1))
+    return { ready }
+  }
+
+  it('names the module it could not find rather than rejecting with {}', async () => {
+    const { ready } = await spawnedScreener()
+
+    latestWorker().emit('error', {
+      message: "Cannot find module '@tensorflow/tfjs-core'",
+      code: 'MODULE_NOT_FOUND',
+    })
+
+    await expect(ready).rejects.toBeInstanceOf(Error)
+    await expect(ready).rejects.toThrow("Cannot find module '@tensorflow/tfjs-core'")
+    await expect(ready).rejects.toMatchObject({ name: 'MODULE_NOT_FOUND' })
+  })
+
+  it('rejects with a non-empty Error when the event carries no message', async () => {
+    const { ready } = await spawnedScreener()
+
+    latestWorker().emit('error', { stacks: [] })
+
+    await expect(ready).rejects.toBeInstanceOf(Error)
+    await expect(ready).rejects.toThrow(/failed to start: \{"stacks":\[\]\}/)
+  })
+})
+
+describe('TensorflowNsfwImageScreener response filtering', () => {
+  it('ignores handshakes and other requests while a screening is in flight', async () => {
+    const screener = await readyScreener()
+    const worker = latestWorker()
+
+    const pending = screener.screen(IMAGE)
+    await vi.waitFor(() => expect(worker.postMessage).toHaveBeenCalledTimes(1))
+    const requestId = lastRequestId(worker)
+    send(worker, readyMessage())
+    send(worker, { type: 'initialization_error', error: 'not this caller' })
+    send(worker, resultMessage(`${requestId}-stale`, UNSAFE_VECTOR))
+
+    const outcome = await Promise.race([
+      pending.then(
+        () => 'settled',
+        () => 'settled'
+      ),
+      new Promise<string>((resolve) => setTimeout(() => resolve('in flight'), 0)),
+    ])
+    expect(outcome).toBe('in flight')
+
+    send(worker, resultMessage(requestId, NEUTRAL_VECTOR))
+    await expect(pending).resolves.toMatchObject({ disposition: 'pass' })
+  })
+
+  it('rejects with the code and message a failed inference reported', async () => {
+    const screener = await readyScreener()
+    const worker = latestWorker()
+
+    const pending = screener.screen(IMAGE)
+    await vi.waitFor(() => expect(worker.postMessage).toHaveBeenCalledTimes(1))
+    send(worker, {
+      type: 'error',
+      id: lastRequestId(worker),
+      error: 'boom',
+      code: 'NSFW_OUTPUT_INVALID',
+    })
+
+    await expect(pending).rejects.toThrow(/NSFW_OUTPUT_INVALID: boom/)
+  })
+})
+
+describe('TensorflowNsfwImageScreener shutdown mid-lifecycle', () => {
+  it('waits for an in-flight restart before it finishes closing', async () => {
+    const screener = await readyScreener()
+    const worker = latestWorker()
+    let finishTerminate = (): void => undefined
+    worker.terminate = vi.fn<() => Promise<number>>(
+      () =>
+        new Promise<number>((resolve) => {
+          finishTerminate = () => resolve(0)
+        })
+    )
+
+    worker.emit('error', new Error('worker thread crashed'))
+    expect(worker.terminate).toHaveBeenCalledTimes(1)
+
+    let closed = false
+    const closing = screener.close().then(() => {
+      closed = true
+    })
+    await new Promise((resolve) => setTimeout(resolve, 0))
+    expect(closed).toBe(false)
+
+    finishTerminate()
+    await closing
+    expect(worker.terminate).toHaveBeenCalledTimes(1)
+  })
+
+  it('closes without stranding a caller when the model never became ready', async () => {
+    const screener = new TensorflowNsfwImageScreener({
+      manifestPath: createManifestFixture(),
+    })
+    const ready = screener.ensureReady()
+    await vi.waitFor(() => expect(workers()).toHaveLength(1))
+    const settled = expect(ready).rejects.toThrow(/closed before the model became ready/)
+
+    await expect(screener.close()).resolves.toBeUndefined()
+
+    await settled
+    expect(latestWorker().terminate).toHaveBeenCalledTimes(1)
+  })
+})

@@ -307,6 +307,43 @@ function assertManifestPolicy(manifest: Partial<NsfwModelManifest>): void {
   assertHex(policy.sha256, 'Manifest policy hash')
 }
 
+/**
+ * Validates the optional decoded-bundle mirror at manifest-read time.
+ *
+ * Without this, `assertWeightBundlesMatchManifest` dereferences
+ * `manifestPaths` and `decodedBytes` as soon as the key is present, so a
+ * manifest carrying `"weightBundles": {}`, or one that loses a field in an
+ * edit, dies at model load with a TypeError about reading `length` of
+ * undefined and reaches the supervisor as a generic initialization error. The
+ * manifest file is not itself hash-verified, only the artifacts and the policy
+ * it names are, so a hand-edit does reach this.
+ */
+export function assertManifestWeightBundles(manifest: Partial<NsfwModelManifest>): void {
+  const bundles = manifest.weightBundles
+  if (bundles === undefined) return
+
+  const paths = (bundles as { manifestPaths?: unknown }).manifestPaths
+  const specCount = (bundles as { weightSpecCount?: unknown }).weightSpecCount
+  const decoded = (bundles as { decodedBytes?: unknown }).decodedBytes
+  if (
+    !Array.isArray(paths) ||
+    paths.length === 0 ||
+    !paths.every((entry) => typeof entry === 'string' && entry.length > 0) ||
+    typeof specCount !== 'number' ||
+    !Number.isInteger(specCount) ||
+    specCount <= 0 ||
+    !Array.isArray(decoded) ||
+    decoded.length !== paths.length ||
+    !decoded.every(
+      (entry) => typeof entry === 'number' && Number.isInteger(entry) && entry > 0
+    )
+  ) {
+    throw new Error(
+      'Model manifest weightBundles must declare manifestPaths, a positive integer weightSpecCount, and one positive decodedBytes entry per path'
+    )
+  }
+}
+
 export function readModelManifest(manifestPath: string): NsfwModelManifest {
   if (!fs.existsSync(manifestPath)) {
     throw new Error(`Community NSFW model manifest not found: ${manifestPath}`)
@@ -319,6 +356,7 @@ export function readModelManifest(manifestPath: string): NsfwModelManifest {
   assertManifestIdentity(manifest)
   assertManifestTensorShape(manifest)
   assertManifestFiles(manifest)
+  assertManifestWeightBundles(manifest)
   assertManifestPolicy(manifest)
 
   return manifest as NsfwModelManifest
