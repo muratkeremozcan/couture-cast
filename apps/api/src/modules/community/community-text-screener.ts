@@ -111,7 +111,13 @@ export const CANONICAL_REPRESENTATIONS = [
 export interface CommunityTextPolicy {
   readonly categories: readonly TextScreeningCategory[]
   readonly severities?: readonly TextScreeningSeverity[]
-  readonly severityDisposition: Readonly<
+  /**
+   * Partial because the policy schema builds it with `z.record`, which cannot
+   * promise every key. Construction checks that all of them are present, since
+   * a missing severity would otherwise look up `undefined` and quietly leave a
+   * matched term publishable.
+   */
+  readonly severityDisposition: Partial<
     Record<TextScreeningSeverity, TextScreeningDisposition>
   >
   readonly unscreenableLocaleDisposition: TextScreeningDisposition
@@ -804,6 +810,14 @@ export class CommunityTextScreener {
     this.policy = options.policy ?? DEFAULT_COMMUNITY_TEXT_POLICY
     this.policyVersion = options.policyVersion ?? DEFAULT_COMMUNITY_TEXT_POLICY_VERSION
 
+    const ungraded = TEXT_SCREENING_SEVERITIES.filter(
+      (severity) => this.policy.severityDisposition[severity] === undefined
+    )
+    if (ungraded.length > 0) {
+      throw new CommunityTextScreenerConfigError(
+        `severityDisposition has no entry for ${ungraded.join(', ')}, so a term of that grade would have no disposition`
+      )
+    }
     if (!this.policy.allDictionariesAlwaysRun) {
       throw new CommunityTextScreenerConfigError(
         'allDictionariesAlwaysRun is false, which would let a declared locale bypass the other languages'
@@ -910,7 +924,7 @@ export class CommunityTextScreener {
       allowed,
       budget
     )) {
-      verdict.match(outcome, this.policy.severityDisposition[outcome.meta.severity])
+      verdict.match(outcome, this.dispositionFor(outcome.meta.severity))
     }
 
     const truncated = overLength || budget.exhausted
@@ -932,6 +946,11 @@ export class CommunityTextScreener {
       obfuscated: verdict.obfuscated,
       truncated,
     }
+  }
+
+  /** Safe because construction rejects a policy missing any severity. */
+  private dispositionFor(severity: TextScreeningSeverity): TextScreeningDisposition {
+    return this.policy.severityDisposition[severity] as TextScreeningDisposition
   }
 
   private applyScriptPolicy(observedScripts: string[], verdict: Verdict): void {

@@ -77,7 +77,21 @@ const allowLists = Object.fromEntries(
 const supportedLocaleConfig =
   readJson<Record<string, { language: string }>>(supportedLocalesPath)
 
-const approvedPolicy = readJson<{ text: Record<string, unknown> }>(
+interface ApprovedPolicy {
+  text: Record<string, unknown> & {
+    lists: {
+      language: string
+      terms: string
+      allowList: string
+      version: string
+      source: string
+      licence: string
+    }[]
+  }
+  reasonCodes: { text: Record<string, string>; cleanCodes: { text: string } }
+}
+
+const approvedPolicy = readJson<ApprovedPolicy>(
   path.join(policyDirectory, 'policy-v1.json')
 )
 
@@ -319,25 +333,16 @@ describe('CommunityTextScreener policy wiring (AC 7)', () => {
   })
 
   it('emits exactly the reason codes the approved policy declares', () => {
-    const declared = Object.keys(
-      (approvedPolicy as { reasonCodes: { text: Record<string, string> } }).reasonCodes
-        .text
-    )
+    const declared = Object.keys(approvedPolicy.reasonCodes.text)
     expect([...WITHHOLDING_REASONS].sort()).toEqual(declared.sort())
     // The pass code cannot live in that map, because the policy types every
     // entry there to a disposition that withholds a post. It has its own block.
     expect(declared).not.toContain(TEXT_CLEAN_REASON)
-    expect(
-      (
-        approvedPolicy as {
-          reasonCodes: { cleanCodes: { text: string } }
-        }
-      ).reasonCodes.cleanCodes.text
-    ).toBe(TEXT_CLEAN_REASON)
+    expect(approvedPolicy.reasonCodes.cleanCodes.text).toBe(TEXT_CLEAN_REASON)
   })
 
   it('names every shipped list file in the approved policy', () => {
-    const lists = approvedPolicy.text.lists as Record<string, string>[]
+    const lists = approvedPolicy.text.lists
     expect(lists.map((entry) => entry.language).sort()).toEqual(
       [...SCREENING_LANGUAGES].sort()
     )
@@ -841,7 +846,7 @@ describe('CommunityTextScreener startup validation (AC 3, AC 7)', () => {
   })
 
   it('rejects an allow list with no provenance at all', () => {
-    const broken = structuredClone(allowLists.pt) as Record<string, unknown>
+    const broken = structuredClone(allowLists.pt) as unknown as Record<string, unknown>
     delete broken.provenance
     const directory = writeListFixture({ 'allow-pt-v1.json': broken })
     expect(() => new CommunityTextScreener({ listsDirectory: directory })).toThrow(
@@ -850,7 +855,7 @@ describe('CommunityTextScreener startup validation (AC 3, AC 7)', () => {
   })
 
   it('rejects a terms file that claims to be an allow list', () => {
-    const broken = structuredClone(termLists.en) as Record<string, unknown>
+    const broken = structuredClone(termLists.en) as unknown as Record<string, unknown>
     broken.listType = 'allowList'
     const directory = writeListFixture({ 'en-v1.json': broken })
     expect(() => new CommunityTextScreener({ listsDirectory: directory })).toThrow(
