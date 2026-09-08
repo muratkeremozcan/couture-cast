@@ -8,10 +8,13 @@ import {
 import {
   COMMUNITY_NSFW_INCIDENT_MODE_ENV,
   COMMUNITY_NSFW_INCIDENT_REFERENCE_ENV,
+  COMMUNITY_NSFW_INFERENCE_TIMEOUT_ENV,
   COMMUNITY_NSFW_SCREENER_TENSORFLOW,
   COMMUNITY_NSFW_SCREENER_UNAVAILABLE,
+  DEFAULT_COMMUNITY_NSFW_INFERENCE_TIMEOUT_MS,
   createNsfwImageScreener,
   resolveCommunityNsfwSelector,
+  resolveNsfwInferenceTimeoutMs,
 } from './community-worker-runtime'
 import {
   IMAGE_SCREENING_UNAVAILABLE_VERSION,
@@ -110,6 +113,38 @@ describe('community NSFW screener selection', () => {
         'failed',
         expect.any(Number)
       )
+    })
+  })
+
+  describe('inference timeout', () => {
+    it('defaults to ten seconds', () => {
+      expect(resolveNsfwInferenceTimeoutMs({})).toBe(
+        DEFAULT_COMMUNITY_NSFW_INFERENCE_TIMEOUT_MS
+      )
+    })
+
+    it('accepts an explicit value below the outer screening ceiling', () => {
+      expect(
+        resolveNsfwInferenceTimeoutMs({ [COMMUNITY_NSFW_INFERENCE_TIMEOUT_ENV]: '4000' })
+      ).toBe(4000)
+    })
+
+    it('refuses a value at or above the outer ceiling', () => {
+      // The outer race would always win, so the inner termination that stops a
+      // wedged inference burning a core would never run.
+      expect(() =>
+        resolveNsfwInferenceTimeoutMs({ [COMMUNITY_NSFW_INFERENCE_TIMEOUT_ENV]: '30000' })
+      ).toThrow(/must be below the 30000ms outer screening ceiling/)
+    })
+
+    it('refuses a value that is not a positive integer', () => {
+      for (const value of ['0', '-1', '1.5', 'soon']) {
+        expect(() =>
+          resolveNsfwInferenceTimeoutMs({
+            [COMMUNITY_NSFW_INFERENCE_TIMEOUT_ENV]: value,
+          })
+        ).toThrow(/must be a positive integer of milliseconds/)
+      }
     })
   })
 

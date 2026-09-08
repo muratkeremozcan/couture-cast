@@ -58,18 +58,21 @@ export interface CommunityModerationAttemptContext {
 
 /**
  * The identity persisted on the post and its moderation event: which text
- * engine ran, which image engine ran, and the policy hash that turned the
- * image's class probabilities into a disposition.
+ * engine ran and which image engine ran.
  *
- * The policy segment is appended only when a screener reported one. A fixture
- * and the degraded adapter have no policy behind them, and a third segment
- * naming one anyway is the kind of truthful-looking identity AC 6 exists to
- * prevent.
+ * NO SEPARATE POLICY SEGMENT, deliberately. `deriveScreeningIdentity` already
+ * builds the policy version and the first twelve characters of the policy hash
+ * into both engine version strings, so appending `image.policyVersion` here
+ * would state the same fact a third time. That field stays on the result for
+ * the bounded evaluation payload and the operational metrics, where it is read
+ * as data rather than composed into an identity.
+ *
+ * A fixture keeps its `-fixture` marker because the screener that produced the
+ * verdict put it there, which is what makes a persisted
+ * `moderation_engine_version` answer "was this really screened".
  */
 export function buildModerationEngineVersion(result: CommunityModerationResult): string {
-  const base = `${result.engineVersions.text};${result.engineVersions.image}`
-  const policyVersion = result.image.policyVersion
-  return policyVersion ? `${base};${policyVersion}` : base
+  return `${result.engineVersions.text};${result.engineVersions.image}`
 }
 
 export async function withModerationTimeout<T>(

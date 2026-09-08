@@ -25,6 +25,7 @@ import {
   createSafeCommunityModerationMeter,
   type CommunityModerationMeter,
 } from './community-moderation.telemetry.js'
+import { MODERATION_SCREENING_TIMEOUT_MS } from './community-moderation.processor.js'
 import { SupabaseCommunityStorageAdapter } from './community-storage.adapter.js'
 import { createBaseLogger } from '../../logger/pino.config.js'
 
@@ -43,6 +44,40 @@ export const COMMUNITY_NSFW_SCREENER_UNAVAILABLE = 'unavailable'
 export const COMMUNITY_NSFW_INCIDENT_MODE_ENV = 'COMMUNITY_NSFW_INCIDENT_MODE'
 export const COMMUNITY_NSFW_INCIDENT_REFERENCE_ENV = 'COMMUNITY_NSFW_INCIDENT_REFERENCE'
 export const COMMUNITY_NSFW_INCIDENT_MODE_UNAVAILABLE = 'unavailable'
+
+/**
+ * Ceiling on ONE inference inside the supervised model runtime.
+ *
+ * Distinct from `MODERATION_SCREENING_TIMEOUT_MS`, which bounds the whole
+ * screening step from the outside and stays at thirty seconds. This one exists
+ * so a wedged inference is terminated and its CPU reclaimed before the outer
+ * race fires, which is why it is required to be strictly smaller: a value at or
+ * above the outer ceiling means the outer timer always wins and the inner
+ * termination never runs, leaving a pathological inference burning a core
+ * through every remaining BullMQ attempt.
+ */
+export const COMMUNITY_NSFW_INFERENCE_TIMEOUT_ENV = 'COMMUNITY_NSFW_INFERENCE_TIMEOUT_MS'
+export const DEFAULT_COMMUNITY_NSFW_INFERENCE_TIMEOUT_MS = 10_000
+
+export function resolveNsfwInferenceTimeoutMs(
+  env: Readonly<NodeJS.ProcessEnv> = process.env
+): number {
+  const raw = env[COMMUNITY_NSFW_INFERENCE_TIMEOUT_ENV]?.trim()
+  if (!raw) return DEFAULT_COMMUNITY_NSFW_INFERENCE_TIMEOUT_MS
+
+  const parsed = Number(raw)
+  if (!Number.isInteger(parsed) || parsed <= 0) {
+    throw new Error(
+      `${COMMUNITY_NSFW_INFERENCE_TIMEOUT_ENV} must be a positive integer of milliseconds, got: ${raw}`
+    )
+  }
+  if (parsed >= MODERATION_SCREENING_TIMEOUT_MS) {
+    throw new Error(
+      `${COMMUNITY_NSFW_INFERENCE_TIMEOUT_ENV} must be below the ${MODERATION_SCREENING_TIMEOUT_MS}ms outer screening ceiling, got: ${raw}`
+    )
+  }
+  return parsed
+}
 
 export type CommunityNsfwSelector =
   | typeof COMMUNITY_NSFW_SCREENER_TENSORFLOW

@@ -43,6 +43,7 @@ import {
 import { createWorker } from '../src/workers/base.worker.js'
 import { getRedisConfig, redisOptionsFromConfig } from '../src/config/redis.js'
 import { disconnectPrismaClient } from '../src/workers/prisma.js'
+import { FIXTURE_ENGINE_VERSION_SUFFIX } from '../src/modules/community/community-screening-policy.js'
 
 const databaseUrl =
   process.env.INTEGRATION_TEST_DATABASE_URL ??
@@ -954,7 +955,7 @@ describe('6.2 screening dispositions and attempt evidence', () => {
     expect(post.moderation_reason).toContain('image_disposition_conflict')
   })
 
-  it('6.2-INT-034 persists a policy hash only when a screener reported one', async (context) => {
+  it('6.2-INT-034 persists the screener identity without restating the policy hash', async (context) => {
     if (!requireSchema(context)) return
     const storage = new InMemoryCommunityStorage()
     const withPolicy = await createPendingPost(storage)
@@ -993,15 +994,16 @@ describe('6.2 screening dispositions and attempt evidence', () => {
     const stamped = await prisma.lookbookPost.findUniqueOrThrow({
       where: { id: withPolicy.postId },
     })
-    // Two segments when no policy exists, three when one does. A fixture that
-    // invented a policy hash would be a plausible-looking identity for a
-    // screening no policy governed.
-    expect(bare.moderation_engine_version).toBe(
-      'adr013-text-v2.0-fixture;adr013-nsfw-v1.0-fixture'
-    )
-    expect(stamped.moderation_engine_version).toBe(
-      'adr013-text-v2.0-fixture;adr013-nsfw-v1.0-fixture;sha256:deadbeef'
-    )
+    // Both rows carry the same two segments. `deriveScreeningIdentity` already
+    // builds the policy version and hash prefix into the engine version
+    // strings, so a screener's own `policyVersion` is bounded evaluation detail
+    // rather than a third identity segment to append.
+    const expected = `adr013-text-v2.0${FIXTURE_ENGINE_VERSION_SUFFIX};adr013-nsfw-v1.0${FIXTURE_ENGINE_VERSION_SUFFIX}`
+    expect(bare.moderation_engine_version).toBe(expected)
+    expect(stamped.moderation_engine_version).toBe(expected)
+    // The fixture marker survives into the persisted identity, which is what
+    // stops a test run being read as a real screening.
+    expect(stamped.moderation_engine_version).toContain(FIXTURE_ENGINE_VERSION_SUFFIX)
   })
 
   it('6.2-INT-035 leaves a post retryable when screening throws', async (context) => {

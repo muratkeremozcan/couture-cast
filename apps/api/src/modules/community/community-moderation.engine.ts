@@ -1,4 +1,5 @@
 import { allowsTestOnlySecrets } from '../../config/runtime-environment.js'
+import { FIXTURE_ENGINE_VERSION_SUFFIX } from './community-screening-policy.js'
 // Story 6.1 Task 4: ADR-013 automated content screening engine.
 // Dictionary-based text safety filtering and server-side NSFW image screening,
 // both with a deterministic, fail-closed verdict.
@@ -32,8 +33,8 @@ export const IMAGE_SCREENING_UNAVAILABLE_VERSION = 'adr013-nsfw-unavailable'
  * Versions a fixture reports, so a persisted `moderation_engine_version` can
  * never be mistaken for a real screening run.
  */
-export const FIXTURE_TEXT_ENGINE_VERSION = `${ADR013_TEXT_ENGINE_VERSION}-fixture`
-export const FIXTURE_IMAGE_ENGINE_VERSION = `${ADR013_IMAGE_ENGINE_VERSION}-fixture`
+export const FIXTURE_TEXT_ENGINE_VERSION = `${ADR013_TEXT_ENGINE_VERSION}${FIXTURE_ENGINE_VERSION_SUFFIX}`
+export const FIXTURE_IMAGE_ENGINE_VERSION = `${ADR013_IMAGE_ENGINE_VERSION}${FIXTURE_ENGINE_VERSION_SUFFIX}`
 
 /** Reason emitted when no NSFW model is wired, so the post cannot be cleared. */
 export const SCREENING_UNAVAILABLE_REASON = 'screening_unavailable'
