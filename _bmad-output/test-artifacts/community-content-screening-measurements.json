@@ -2,7 +2,7 @@
   "artifact": "community-content-screening-measurements",
   "artifactVersion": 1,
   "storyKey": "6-2-production-content-screening-readiness",
-  "generatedAt": "2026-09-08T22:05:31.252Z",
+  "generatedAt": "2026-09-08T22:22:20.688Z",
   "generatedBy": "npm run measure:community-screening",
   "scope": {
     "rendersVerdict": false,
@@ -16,11 +16,11 @@
     "statement": "The deterministic evaluation proves that unsafe class-probability vectors return block, that every threshold is crossed from both sides, and that no vector reaches pass without a confident Neutral. The lifecycle suite drives a fake inference runtime emitting an unsafe vector, which proves the transport from worker message through validation, class mapping, policy evaluation, reason codes, and engine identity to a block verdict. Neither establishes that the real model emits a high Porn or Hentai probability for genuinely unsafe input, and no synthetic vector can. That single link is what AC 7 assigns to Story 6.2b corpus-backed measurement."
   },
   "build": {
-    "commitSha": "604986b22328d368d6a6272139d7cb93dc079621",
-    "modelManifestSha256": "a61015d0d2036accdba2162267fcc5612cd3511da331bd313fe9aa75754af930",
-    "policySha256": "7adfb6cb357b4669db222192c917b412ba6e3a4a8fb09c045d7039801d5dfa81",
+    "commitSha": "bdc88b7664115fdf9b4c926965ace27189df2c8c",
+    "modelManifestSha256": "e9d6ea99c94aa454d10cd552e09e6eafa2e862d72225a887fff838aead78025a",
+    "policySha256": "f92aba6ddc0045681240e626e9867a6b4f6990fa030f292d031f495866ff0c26",
     "fixtureManifestSha256": "b8cd2cd08dd419024a2cdb3ca84d03b3be7a5df211a92cd200853200bcb13243",
-    "lockfileSha256": "deb793d5e5c9423460ecc4d067972cdaa654c5068832be7486b70f6b9e00ac45",
+    "lockfileSha256": "68b479987b242d657ed1de37c1c6a33aff4808e0e1af0b437f45ce5e1d8fc6a4",
     "workingTreeClean": false,
     "nodeVersion": "v24.20.0",
     "platform": "darwin-arm64"
@@ -35,15 +35,14 @@
     "inputHeight": 224
   },
   "modelVerification": {
-    "status": "unavailable",
+    "status": "skipped",
     "isEvidence": false,
-    "note": "The verification command did not complete, so no supply-chain evidence is recorded."
+    "note": "Verification was skipped because the selector is not tensorflow, so the model artifacts were never hashed. This is the absence of evidence, not a passing verification. COMMUNITY_NSFW_SCREENER=unset, so no real model is loaded and there is nothing to verify."
   },
   "engineIdentity": {
     "textEngineVersion": null,
-    "imageEngineVersion": null,
-    "source": null,
-    "note": "The engine identity is produced by the screening loader at runtime and is not composed here. Run `npm run test:community-screening-readiness --workspace api` to record it."
+    "imageEngineVersion": "adr013-nsfw-v1.0:mobilenet_v2_mid@4.3.0:model-a0c76f72db26:v1:policy-f92aba6ddc00",
+    "source": "screening loader, recorded by the readiness run"
   },
   "evidenceCorpus": {
     "variable": "COMMUNITY_SCREENING_EVIDENCE_CORPUS_DIR",
@@ -53,7 +52,7 @@
   "policyIdentity": {
     "policyId": "community-screening-policy-v1",
     "version": "v1",
-    "policySha256": "7adfb6cb357b4669db222192c917b412ba6e3a4a8fb09c045d7039801d5dfa81",
+    "policySha256": "f92aba6ddc0045681240e626e9867a6b4f6990fa030f292d031f495866ff0c26",
     "neutralPassMinimum": 0.85,
     "unsafeClasses": ["Hentai", "Porn"],
     "unsafeBlockMinimum": 0.35,
@@ -75,21 +74,240 @@
       "image/png": 3,
       "image/webp": 2
     },
-    "unsafeFixtureCount": 0
+    "allFixturesDeclaredSafe": true
   },
   "runtimeMeasurement": {
-    "available": false,
-    "screeningPath": null,
-    "reason": "No readiness measurement has been produced on this checkout. Run `npm run test:community-screening-readiness --workspace api`, which writes apps/api/.cache/community-screening/readiness-measurements.json.",
-    "staleness": null
+    "screening": {
+      "available": true,
+      "screeningPath": "tensorflow",
+      "measuredAt": "2026-09-08T22:22:12.469Z",
+      "modelDigest": "a0c76f72db261c54dc851b974c848dc9ce01576ca66b0f232f4848c950549322",
+      "policyVersion": "v1",
+      "policyDigest": "f92aba6ddc0045681240e626e9867a6b4f6990fa030f292d031f495866ff0c26",
+      "neutralRange": {
+        "min": 0.7521889209747314,
+        "max": 0.9991244673728943
+      },
+      "dispositionCounts": {
+        "pass": 10,
+        "review": 2
+      },
+      "corpusDispositions": [
+        {
+          "fixture": "safe-satin-plum-512x512.jpg",
+          "disposition": "pass",
+          "classProbabilities": {
+            "Drawing": 0.0002427424187771976,
+            "Hentai": 0.00009797471284400672,
+            "Neutral": 0.9991244673728943,
+            "Porn": 0.00052631925791502,
+            "Sexy": 0.000008504282959620468
+          },
+          "reasons": []
+        },
+        {
+          "fixture": "safe-linen-oat-768x512.jpg",
+          "disposition": "pass",
+          "classProbabilities": {
+            "Drawing": 0.013398231938481331,
+            "Hentai": 0.015129654668271542,
+            "Neutral": 0.9695661664009094,
+            "Porn": 0.0009511122480034828,
+            "Sexy": 0.0009548233938403428
+          },
+          "reasons": []
+        },
+        {
+          "fixture": "safe-pinstripe-slate-512x768.png",
+          "disposition": "pass",
+          "classProbabilities": {
+            "Drawing": 0.01442067138850689,
+            "Hentai": 0.005939358379691839,
+            "Neutral": 0.9722269177436829,
+            "Porn": 0.004433825146406889,
+            "Sexy": 0.0029793225694447756
+          },
+          "reasons": []
+        },
+        {
+          "fixture": "safe-check-navy-512x512.webp",
+          "disposition": "pass",
+          "classProbabilities": {
+            "Drawing": 0.051532261073589325,
+            "Hentai": 0.029437754303216934,
+            "Neutral": 0.9140307903289795,
+            "Porn": 0.0023520481772720814,
+            "Sexy": 0.0026471849996596575
+          },
+          "reasons": []
+        },
+        {
+          "fixture": "safe-knit-sage-512x512.jpg",
+          "disposition": "pass",
+          "classProbabilities": {
+            "Drawing": 0.03129097446799278,
+            "Hentai": 0.024890825152397156,
+            "Neutral": 0.9383296370506287,
+            "Porn": 0.00319466320797801,
+            "Sexy": 0.0022939033806324005
+          },
+          "reasons": []
+        },
+        {
+          "fixture": "safe-boucle-cream-512x512.jpg",
+          "disposition": "pass",
+          "classProbabilities": {
+            "Drawing": 0.025310909375548363,
+            "Hentai": 0.03368956223130226,
+            "Neutral": 0.940278172492981,
+            "Porn": 0.0001472584845032543,
+            "Sexy": 0.0005740808555856347
+          },
+          "reasons": []
+        },
+        {
+          "fixture": "safe-houndstooth-mono-512x512.png",
+          "disposition": "pass",
+          "classProbabilities": {
+            "Drawing": 0.06466282904148102,
+            "Hentai": 0.00951355416327715,
+            "Neutral": 0.9215112328529358,
+            "Porn": 0.0024886499159038067,
+            "Sexy": 0.0018237875774502754
+          },
+          "reasons": []
+        },
+        {
+          "fixture": "safe-denim-indigo-512x512.jpg",
+          "disposition": "pass",
+          "classProbabilities": {
+            "Drawing": 0.04944003000855446,
+            "Hentai": 0.03707378730177879,
+            "Neutral": 0.9106800556182861,
+            "Porn": 0.0010432869894430041,
+            "Sexy": 0.001762924250215292
+          },
+          "reasons": []
+        },
+        {
+          "fixture": "safe-neutral-grey-256x256.png",
+          "disposition": "pass",
+          "classProbabilities": {
+            "Drawing": 0.04841560125350952,
+            "Hentai": 0.0421307347714901,
+            "Neutral": 0.9063296914100647,
+            "Porn": 0.0015326595166698098,
+            "Sexy": 0.0015912291128188372
+          },
+          "reasons": []
+        },
+        {
+          "fixture": "safe-corduroy-rust-512x512.webp",
+          "disposition": "pass",
+          "classProbabilities": {
+            "Drawing": 0.06392449140548706,
+            "Hentai": 0.05224877968430519,
+            "Neutral": 0.8820895552635193,
+            "Porn": 0.0012339820386841893,
+            "Sexy": 0.0005032327608205378
+          },
+          "reasons": []
+        },
+        {
+          "fixture": "safe-twill-charcoal-512x512.jpg",
+          "disposition": "review",
+          "classProbabilities": {
+            "Drawing": 0.08849525451660156,
+            "Hentai": 0.08743124455213547,
+            "Neutral": 0.8177719116210938,
+            "Porn": 0.0027319451328366995,
+            "Sexy": 0.003569655120372772
+          },
+          "reasons": ["low_confidence"]
+        },
+        {
+          "fixture": "safe-herringbone-oat-512x512.jpg",
+          "disposition": "review",
+          "classProbabilities": {
+            "Drawing": 0.04833844304084778,
+            "Hentai": 0.19916078448295593,
+            "Neutral": 0.7521889209747314,
+            "Porn": 0.000016266632883343846,
+            "Sexy": 0.00029556130175478756
+          },
+          "reasons": ["low_confidence"]
+        }
+      ],
+      "staleness": {
+        "current": true,
+        "mismatches": [],
+        "note": "Every input that produced these numbers matches the working tree."
+      }
+    },
+    "performance": {
+      "available": true,
+      "source": "apps/api/model-manifests/community-nsfw-mobilenet-v2-mid-nsfwjs-4.3.0.json performance.measured",
+      "executedFrom": "compiled dist under plain node",
+      "measured": {
+        "coldStartupMs": 236.5,
+        "warmP50Ms": 23.95,
+        "warmP95Ms": 26.64,
+        "warmP99Ms": 31.21,
+        "warmMaxMs": 73.54,
+        "peakResidentMib": 339.4,
+        "baselineResidentMibBeforeModelLoad": 71.3,
+        "warmSamples": 1000,
+        "warmupSamples": 50,
+        "replicas": 1,
+        "concurrency": 1,
+        "environment": {
+          "node": "v24.20.0",
+          "platform": "darwin",
+          "arch": "arm64",
+          "cpu": "Apple M4 Pro",
+          "cpuCount": 14,
+          "memoryMib": 49152,
+          "image": "512x640 JPEG, quality 90, flat #beb4aa, generated in process",
+          "executedFrom": "compiled dist under plain node"
+        }
+      },
+      "absoluteCeilings": {
+        "coldStartupMs": 30000,
+        "warmP95Ms": 3000,
+        "warmP99Ms": 5000,
+        "singleInferenceTerminationMs": 10000,
+        "outerScreeningCeilingMs": 30000,
+        "peakResidentMib": 512
+      },
+      "regressionGate": {
+        "rule": "min(3 x measured, absolute ceiling)",
+        "coldStartupMs": 710,
+        "warmP95Ms": 80,
+        "warmP99Ms": 94,
+        "peakResidentMib": 512
+      },
+      "uncappedThreeTimesPeakResidentMib": 1018,
+      "caveats": [
+        {
+          "id": "peak-rss-is-process-wide",
+          "statement": "Peak resident set is measured process-wide. The inference runtime is a worker thread sharing its process with the supervisor, so the figure covers the whole worker process.",
+          "consequence": "It is the right number for setting a container memory limit and the wrong number for describing how large the model is."
+        },
+        {
+          "id": "compiled-output-only",
+          "statement": "The measurement is taken from compiled output under plain node. The same harness run under tsx measured roughly twice the peak resident set because the esbuild transform stayed resident.",
+          "consequence": "A measurement taken through a TypeScript runner is not comparable and must not be recorded as this metric."
+        }
+      ]
+    }
   },
-  "endToEndJourneys": [
+  "endToEndJourneysDeclared": [
     {
       "id": "6.2-E2E-01",
       "name": "safe upload publishes through the full stack",
       "refusedBy": null,
       "screeningPathIsRunSelected": true,
-      "proves": "the HTTP, storage, outbox, BullMQ, model and PostgreSQL path reaches a terminal published author state, and that the persisted engine identity matches the screening path the run declared",
+      "intent": "exercise the HTTP, storage, outbox, BullMQ, model and PostgreSQL path to a terminal published author state, and assert the persisted engine identity matches the screening path the run declared",
       "command": "npm run test:community-screening:e2e"
     },
     {
@@ -97,7 +315,7 @@
       "name": "disallowed caption never publishes and never reaches another feed",
       "refusedBy": "text-screener",
       "screeningPathIsRunSelected": true,
-      "proves": "non-publication, absence from a second member feed, and that no raw matched term or class probability appears in a client payload",
+      "intent": "exercise non-publication, absence from a second member feed, and the absence of any raw matched term or class probability in a client payload",
       "doesNotProve": "anything about image blocking. No unsafe imagery exists in this repository, so this journey is refused by the text screener and must not be read as end-to-end proof that the image model blocks anything.",
       "command": "npm run test:community-screening:e2e"
     }
@@ -118,7 +336,7 @@
     {
       "id": "synthetic-safe-corpus",
       "statement": "The committed fixture corpus is synthetic woven-textile imagery, not photographs of real submissions, so it does not describe the distribution of real Community uploads.",
-      "mitigation": "The corpus spans the model confidence range from Neutral 0.9991 to 0.7522, so it exercises both the pass and the review branch of the pinned policy.",
+      "mitigation": "The corpus spans a measured Neutral range from 0.9991 down to 0.7522, so it exercises both the pass and the review branch of the pinned policy.",
       "revisitWhen": "Story 6.2b measures the false-positive rate on at least 250 openly licensed real fashion photographs."
     },
     {
@@ -131,7 +349,8 @@
   "rollout": {
     "communityReadEnabled": false,
     "communityWriteEnabled": false,
-    "note": "Both production Community rollout controls remain disabled. Nothing in this story authorizes changing them."
+    "source": "packages/config/src/flags.ts defaultValue",
+    "note": "Read from the shared flag registry defaults. Both production Community rollout controls remain disabled, and nothing in this story authorizes changing them."
   },
   "commands": {
     "fixtureCorpus": {
@@ -140,6 +359,7 @@
     },
     "model": {
       "verifyArtifacts": "npm run verify:community-screening-model --workspace api",
+      "verifyArtifactsAsInvokedHere": "npm run --silent verify:community-screening-model --workspace api -- --json",
       "verifySupplyChain": "npm run verify:community-screening-supply-chain --workspace api",
       "smoke": "npm run test:community-screening-model:smoke --workspace api",
       "readiness": "npm run test:community-screening-readiness --workspace api"

@@ -505,8 +505,19 @@ async function verify() {
   if (!verifyManifestIdentity(manifest, failures)) return failures
 
   for (const [index, fileSpec] of manifest.files.entries()) {
-    if (verifyEntryShape(fileSpec, index, failures)) {
+    if (!verifyEntryShape(fileSpec, index, failures)) continue
+    try {
       await verifyEntryBytes(fileSpec, failures)
+    } catch (error) {
+      /*
+       * An unreadable file or an undecodable image throws rather than returning,
+       * and without this the exception escapes to the tail handler, which prints
+       * one raw error and discards every failure collected so far. This file
+       * promises to report all of them.
+       */
+      failures.push(
+        `[Verify] ${fileSpec.path} could not be read or decoded: ${error instanceof Error ? error.message : String(error)}`
+      )
     }
   }
   verifyCorpusInvariants(manifest, failures)

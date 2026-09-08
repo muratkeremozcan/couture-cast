@@ -324,7 +324,7 @@ export async function waitForTerminalAuthorState(
 ): Promise<CommunityAuthorState> {
   const { apiBaseUrl, userId, postId } = options
   const headers = { ...authHeaders(userId, 'guardian'), 'x-couture-platform': 'web' }
-  const deadline = Date.now() + (options.timeoutMs ?? 60_000)
+  const deadline = Date.now() + (options.timeoutMs ?? 90_000)
   let lastStatus = 'unknown'
 
   while (Date.now() < deadline) {
@@ -557,6 +557,25 @@ async function deleteCommunityRowsForUser(userId: string): Promise<void> {
      * changes what a later run's first report against that post does.
      */
     await prisma.communityPostReport.deleteMany({ where: { reporter_id: userId } })
+
+    /*
+     * Moderation events before posts, for the same `onDelete: SetNull` reason
+     * the reports carry, and with a sharper consequence. `content_snapshot`
+     * holds the caption and the confirmed alt text verbatim, so a row orphaned
+     * by deleting its post keeps a copy of the submission with nothing left to
+     * identify whose run left it. Nothing collects those afterwards: the erasure
+     * sweep deliberately retains moderation events, because the fact of a
+     * decision is meant to outlive the person.
+     */
+    const postIds = (
+      await prisma.lookbookPost.findMany({
+        where: { user_id: userId },
+        select: { id: true },
+      })
+    ).map((post) => post.id)
+    if (postIds.length > 0) {
+      await prisma.moderationEvent.deleteMany({ where: { post_id: { in: postIds } } })
+    }
     // Every community post this account could own, drafts and published alike, so a
     // test that later publishes needs no second cleanup path bolted on.
     await prisma.lookbookPost.deleteMany({ where: { user_id: userId } })
@@ -616,11 +635,28 @@ export const communityApiTest = test.extend<{ communityApi: CommunityApiContext 
     })
 
     /*
-     * Deliberately allowed to throw. A cleanup step that swallows its own failure
-     * is how the leak this exists to close came back unnoticed the first time.
+     * Every account is cleaned before any failure is raised. Failures still
+     * throw, because a cleanup step that swallows its own failure is how the
+     * leak this exists to close came back unnoticed the first time; but a bare
+     * `for await` that rethrows immediately skips every account after the first
+     * one, which turns one leak into several. The cross-user tests track a
+     * second account holding an allocated draft, so that account is exactly the
+     * one a rethrow would strand.
      */
+    const cleanupFailures: Error[] = []
     for (const trackedUserId of trackedUserIds) {
-      await deleteCommunityRowsForUser(trackedUserId)
+      try {
+        await deleteCommunityRowsForUser(trackedUserId)
+      } catch (error) {
+        cleanupFailures.push(error instanceof Error ? error : new Error(String(error)))
+      }
+    }
+    if (cleanupFailures.length > 0) {
+      throw new Error(
+        `Community cleanup failed for ${cleanupFailures.length} of ${trackedUserIds.size} account(s): ${cleanupFailures
+          .map((failure) => failure.message)
+          .join(' | ')}`
+      )
     }
   },
 })

@@ -17,7 +17,8 @@
  * absence, not as proof that the model detects anything.
  */
 import { log } from '@seontechnologies/playwright-utils/log'
-import type { APIRequestContext } from '@playwright/test'
+import type { APIRequestContext, TestInfo } from '@playwright/test'
+import { authHeaders, buildUniqueId } from '../support/helpers/api-test'
 import {
   communityApiTest,
   communityTest,
@@ -33,10 +34,15 @@ import {
 const COMMUNITY_ROUTE = '/'
 
 /*
- * The highest-confidence entry in the v1 corpus (Neutral 0.9991). Chosen so the
- * safe journey stays green once the real model replaces the fixture: a fixture
- * that only passes because the fixture screener passes everything would start
- * failing the moment this file became useful.
+ * The highest-confidence entry in the v1 corpus, measured at Neutral 0.9991.
+ *
+ * THE BROWSER JOURNEY DOES NOT SCREEN THESE EXACT BYTES. `prepareGarmentImage`
+ * centre-crops to 4:3 and re-encodes through a canvas before upload, so what
+ * the model scores in 6.2-E2E-01 is a Chromium re-encode of a crop and its
+ * hash is not the manifest hash. Starting from the widest-margin fixture is
+ * what keeps that transformed image comfortably inside the pass branch once the
+ * real model replaces the fixture. The API journey below uploads the raw bytes,
+ * so the two journeys deliberately screen different images.
  */
 const SAFE_FIXTURE = 'safe-satin-plum-512x512.jpg'
 
@@ -50,6 +56,15 @@ communityTest.describe('6.2 community publication journey', () => {
       },
     })
   })
+
+  /*
+   * Raised above the 60s default. `waitForTerminalAuthorState` polls for up to
+   * 60s on its own, and a real-model run adds a cold model start on top, so at
+   * the default the test times out before the helper can report which state the
+   * post was actually stuck in. The helper's diagnostic is the whole reason it
+   * has a deadline of its own.
+   */
+  communityTest.setTimeout(180_000)
 
   communityTest(
     '6.2-E2E-01 publishes an uploaded look through the real screening pipeline',
@@ -148,7 +163,7 @@ communityTest.describe('6.2 community publication journey', () => {
 communityApiTest.describe('6.2 community non-publication journey', () => {
   communityApiTest(
     '6.2-E2E-02 refuses a disallowed caption and keeps it out of another member feed',
-    async ({ request, communityApi }) => {
+    async ({ request, communityApi }, testInfo) => {
       const fixture = loadCommunityFixture(SAFE_FIXTURE)
 
       /*
@@ -181,14 +196,13 @@ communityApiTest.describe('6.2 community non-publication journey', () => {
       expect(terminal.moderationReason).toBeTruthy()
 
       await log.step('The refused look is absent from a second member feed')
-      const otherUserId = await signUpSecondMember(request, communityApi)
+      const otherUserId = await signUpSecondMember(request, communityApi, testInfo)
       const feedResponse = await request.get(
         `${communityApi.apiBaseUrl}${COMMUNITY_FEED_PATH}?mode=all`,
         {
           headers: {
-            ...communityApi.headers,
-            'x-user-id': otherUserId,
-            authorization: 'Bearer test-token-guardian',
+            ...authHeaders(otherUserId, 'guardian'),
+            'x-couture-platform': 'web',
           },
         }
       )
@@ -210,19 +224,70 @@ communityApiTest.describe('6.2 community non-publication journey', () => {
       ).not.toContain(postId)
 
       /*
-       * No raw safety data in a client response. The reason code is a stable
-       * identifier the author is meant to see; the matched term, the class
-       * probabilities and the signed URL are not, and none of them may appear
-       * anywhere in the payload.
+       * THE LEAK SURFACE IS THE AUTHOR'S OWN VIEW, NOT THE STRANGER'S. The
+       * assertions above already established the flagged post is absent from the
+       * second member's feed, so scanning that payload for a matched term proves
+       * nothing: a feed with no post trivially carries no term. The author's own
+       * `authorStates` entry is the one place the post genuinely appears
+       * alongside a moderation reason, so that is where a raw term or a class
+       * probability would actually escape.
        */
-      const rawFeed = JSON.stringify(feed)
-      expect(rawFeed).not.toContain('merde')
-      for (const leaked of ['Porn', 'Sexy', 'Hentai', 'Drawing', 'Neutral']) {
-        expect(
-          rawFeed,
-          `The feed payload must not carry the ${leaked} class probability.`
-        ).not.toContain(leaked)
+      const authorFeed = await request.get(
+        `${communityApi.apiBaseUrl}${COMMUNITY_FEED_PATH}`,
+        { headers: communityApi.headers }
+      )
+      expect(authorFeed.status()).toBe(200)
+      const authorBody = (await authorFeed.json()) as {
+        data: { authorStates: Record<string, unknown>[] }
       }
+      const ownState = authorBody.data.authorStates.find(
+        (state) => state.id === postId
+      ) as (Record<string, unknown> & { moderationReason: string | null }) | undefined
+      expect(
+        ownState,
+        'The author must still see their own refused post, otherwise this assertion scans nothing.'
+      ).toBeDefined()
+
+      /*
+       * ASSERTED ON THE SHAPE, NOT BY SCANNING THE PAYLOAD FOR SUBSTRINGS. Two
+       * earlier versions of this failed as false positives, and both were the
+       * test's fault rather than the product's: the author's own caption is
+       * echoed back to the author, which is not a leak, and their own
+       * `imageAccess.url` is a signed URL their feed needs in order to render.
+       * A substring scan is also flaky here, because `Porn` and `Sexy` are valid
+       * base64url four-grams and a signed-URL signature can contain either by
+       * chance.
+       *
+       * What AC 4 and AC 6 actually require is that the safety metadata carries
+       * a stable code and nothing else, so the key set is the assertion and the
+       * reason string is checked on its own.
+       */
+      expect(
+        ownState && Object.keys(ownState).sort(),
+        'The author state exposes a field outside the contract, which is how per-class scores would first escape.'
+      ).toEqual(
+        [
+          'altText',
+          'caption',
+          'challengeId',
+          'climateBand',
+          'createdAt',
+          'id',
+          'imageAccess',
+          'moderationReason',
+          'publishedAt',
+          'status',
+        ].sort()
+      )
+
+      expect(
+        ownState?.moderationReason ?? '',
+        'The moderation reason must carry a stable code, never the term that matched.'
+      ).not.toContain('merde')
+      expect(
+        ownState?.moderationReason ?? '',
+        'The moderation reason must not carry a class probability.'
+      ).not.toMatch(/Porn|Sexy|Hentai|Drawing|Neutral/)
     }
   )
 })
@@ -235,12 +300,16 @@ communityApiTest.describe('6.2 community non-publication journey', () => {
  */
 async function signUpSecondMember(
   request: APIRequestContext,
-  communityApi: { apiBaseUrl: string; trackUser: (userId: string) => void }
+  communityApi: { apiBaseUrl: string; trackUser: (userId: string) => void },
+  testInfo: TestInfo
 ): Promise<string> {
+  // `buildUniqueId` rather than a timestamp: it folds in the worker index and
+  // the repeat-each index, and `npm run test:pw:burn-in` runs three copies in
+  // parallel that would otherwise mint the same email in the same millisecond.
   const userId = await signUpCommunityUser(
     request,
     communityApi.apiBaseUrl,
-    `viewer-${Date.now()}`
+    buildUniqueId('viewer', testInfo)
   )
   communityApi.trackUser(userId)
   return userId

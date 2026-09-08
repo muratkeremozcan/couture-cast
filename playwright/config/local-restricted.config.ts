@@ -13,6 +13,11 @@ export const RESTRICTED_EVIDENCE_MODE = 'real-model'
 
 // Keyed on the same variable the E2E launcher reads to pick the real screener,
 // so the real model and the disabled captures cannot be selected apart.
+//
+// File logging is silenced by DISABLE_FILE_LOGS in the npm script rather than
+// here. `local.config.ts` calls `log.configure` at import time and this module
+// imports it at the top, so by the time any statement here runs the logger is
+// already armed.
 export function isRestrictedEvidenceRun() {
   return (
     process.env.COMMUNITY_SCREENING_EVIDENCE_MODE?.trim().toLowerCase() ===

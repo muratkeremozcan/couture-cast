@@ -50,6 +50,8 @@ const COMMANDS = {
   },
   model: {
     verifyArtifacts: 'npm run verify:community-screening-model --workspace api',
+    verifyArtifactsAsInvokedHere:
+      'npm run --silent verify:community-screening-model --workspace api -- --json',
     verifySupplyChain: 'npm run verify:community-screening-supply-chain --workspace api',
     smoke: 'npm run test:community-screening-model:smoke --workspace api',
     readiness: 'npm run test:community-screening-readiness --workspace api',
@@ -116,24 +118,37 @@ function gitWorkingTreeClean() {
  * `passed` run counts. Reading the exit code alone is the mistake this exists to
  * prevent.
  */
+const VERIFY_COMMAND = [
+  'run',
+  '--silent',
+  'verify:community-screening-model',
+  '--workspace',
+  'api',
+  '--',
+  '--json',
+]
+
+/** What the verify script reports when every artifact hashed clean. */
+const VERIFY_PASSED_STATUS = 'verified'
+
+function describeVerification(parsed) {
+  // `reason` and `failures` are the fields the verify script emits. Reading a
+  // `message` it never sets would silently discard the cause of a failure and
+  // record `null` in the evidence.
+  const detail = [parsed.reason, ...(parsed.failures ?? [])].filter(Boolean).join('; ')
+  return detail.length > 0 ? detail : null
+}
+
 function verifyModel() {
   const notEvidence = (status, note) => ({ status, isEvidence: false, note })
 
   let raw
   try {
-    raw = execFileSync(
-      'npm',
-      [
-        'run',
-        '--silent',
-        'verify:community-screening-model',
-        '--workspace',
-        'api',
-        '--',
-        '--json',
-      ],
-      { cwd: projectRoot, encoding: 'utf8', stdio: ['ignore', 'pipe', 'pipe'] }
-    )
+    raw = execFileSync('npm', VERIFY_COMMAND, {
+      cwd: projectRoot,
+      encoding: 'utf8',
+      stdio: ['ignore', 'pipe', 'pipe'],
+    })
   } catch (error) {
     const stdout = typeof error.stdout === 'string' ? error.stdout : ''
     const parsed = parseVerifyJson(stdout)
@@ -141,7 +156,7 @@ function verifyModel() {
       ? {
           status: parsed.status ?? 'failed',
           isEvidence: false,
-          note: parsed.message ?? null,
+          note: describeVerification(parsed),
         }
       : notEvidence(
           'unavailable',
@@ -159,13 +174,13 @@ function verifyModel() {
   if (parsed.status === 'skipped') {
     return notEvidence(
       'skipped',
-      `Verification was skipped because the selector is not tensorflow, so the model artifacts were never hashed. This is the absence of evidence, not a passing verification. ${parsed.message ?? ''}`.trim()
+      `Verification was skipped because the selector is not tensorflow, so the model artifacts were never hashed. This is the absence of evidence, not a passing verification. ${describeVerification(parsed) ?? ''}`.trim()
     )
   }
   return {
     status: parsed.status ?? 'unavailable',
-    isEvidence: parsed.status === 'passed',
-    note: parsed.message ?? null,
+    isEvidence: parsed.status === VERIFY_PASSED_STATUS,
+    note: describeVerification(parsed),
   }
 }
 
@@ -180,49 +195,6 @@ function parseVerifyJson(output) {
     return JSON.parse(output.slice(start, end + 1))
   } catch {
     return null
-  }
-}
-
-/**
- * Derives the committed regression gate from a measurement.
- *
- * AC 8 sets the gate at three times the measured value, but three times the
- * measured peak RSS is 1018 MiB against a 512 MiB absolute ceiling, so the
- * memory gate could never fire before the ceiling did. The gate is therefore
- * `min(3x measured, absolute ceiling)`. The uncapped value is still recorded,
- * labelled as uncapped, because it is what AC 8's arithmetic produces and a
- * reader comparing the two needs to see both rather than infer the capping.
- */
-function deriveRegressionGate(measurement, ceilings) {
-  if (!measurement || !ceilings) return null
-
-  const metrics = [
-    ['coldStartupMs', 'coldStartupMs'],
-    ['warmP95Ms', 'warmP95Ms'],
-    ['warmP99Ms', 'warmP99Ms'],
-    ['peakResidentMib', 'peakResidentMib'],
-  ]
-
-  const gate = {}
-  for (const [metric, ceilingKey] of metrics) {
-    const measured = measurement[metric]
-    const ceiling = ceilings[ceilingKey]
-    if (typeof measured !== 'number' || typeof ceiling !== 'number') continue
-    const uncapped = measured * 3
-    gate[metric] = {
-      measured,
-      uncappedThreeTimesMeasured: uncapped,
-      absoluteCeiling: ceiling,
-      adopted: Math.min(uncapped, ceiling),
-      cappedByAbsoluteCeiling: uncapped > ceiling,
-    }
-  }
-
-  return {
-    rule: 'min(3x measured, absolute ceiling)',
-    rationale:
-      'Three times the measured peak resident set exceeds the absolute ceiling, so an uncapped gate on that metric could never fire before the ceiling did. Capping at the ceiling keeps every gate able to fail.',
-    metrics: gate,
   }
 }
 
@@ -248,6 +220,49 @@ const MEASUREMENT_CAVEATS = [
   },
 ]
 
+/**
+ * Reads the two rollout defaults from the shared flag registry instead of
+ * restating them. AC 10 turns on both staying disabled, and a hardcoded `false`
+ * in an evidence artifact would keep claiming that after someone flipped the
+ * default.
+ */
+function readRolloutDefaults() {
+  const source = path.join(projectRoot, 'packages/config/src/flags.ts')
+  if (!fs.existsSync(source)) return null
+  const text = fs.readFileSync(source, 'utf8')
+  const read = (key) => {
+    const declaration = new RegExp(
+      `${key}\\s*:\\s*\\{[^}]*?defaultValue\\s*:\\s*(true|false)`,
+      's'
+    ).exec(text)
+    return declaration ? declaration[1] === 'true' : null
+  }
+  return {
+    communityReadEnabled: read('community_read_enabled'),
+    communityWriteEnabled: read('community_write_enabled'),
+    source: 'packages/config/src/flags.ts defaultValue',
+  }
+}
+
+/** The observed Neutral range, taken from the run product rather than restated. */
+function neutralRange(dispositions) {
+  if (!Array.isArray(dispositions) || dispositions.length === 0) return null
+  const values = dispositions
+    .map((entry) => entry.classProbabilities?.Neutral)
+    .filter((value) => typeof value === 'number')
+  if (values.length === 0) return null
+  return { min: Math.min(...values), max: Math.max(...values) }
+}
+
+function countDispositions(dispositions) {
+  if (!Array.isArray(dispositions)) return null
+  const counts = {}
+  for (const entry of dispositions) {
+    counts[entry.disposition] = (counts[entry.disposition] ?? 0) + 1
+  }
+  return counts
+}
+
 function summariseCorpus(manifest) {
   if (!manifest) return null
   const byBand = {}
@@ -263,8 +278,9 @@ function summariseCorpus(manifest) {
     fixtureCount: manifest.files.length,
     byNeutralConfidenceBand: byBand,
     byContentType,
-    // Recorded so a reader can see at a glance that no unsafe bytes are pinned.
-    unsafeFixtureCount: 0,
+    // Derived from the manifest's own safety class rather than asserted, so a
+    // corpus that ever stopped declaring itself synthetic-safe stops claiming it.
+    allFixturesDeclaredSafe: manifest.safetyClass === 'synthetic-safe',
   }
 }
 
@@ -310,6 +326,61 @@ function assessStaleness(intermediate, current) {
   }
 }
 
+/*
+ * Two independent sources, kept apart on purpose. `screening` is what the gated
+ * readiness run observed in this repository. `performance` is AC 8's
+ * 1,000-inference measurement, which is committed in the model manifest because
+ * it has to be taken from compiled output and a number taken inside a test
+ * transform is not comparable to it.
+ */
+function buildScreeningBlock(intermediate, usable, staleness) {
+  if (usable) {
+    return {
+      available: true,
+      screeningPath: intermediate.screeningPath,
+      measuredAt: intermediate.measuredAt,
+      modelDigest: intermediate.modelDigest ?? null,
+      policyVersion: intermediate.policyVersion ?? null,
+      policyDigest: intermediate.policyDigest ?? null,
+      neutralRange: neutralRange(intermediate.corpusDispositions),
+      dispositionCounts: countDispositions(intermediate.corpusDispositions),
+      corpusDispositions: intermediate.corpusDispositions ?? null,
+      staleness,
+    }
+  }
+  return {
+    available: false,
+    screeningPath: null,
+    reason: intermediate
+      ? 'A readiness measurement exists but was produced under different inputs, so it is withheld rather than reported as current.'
+      : `No readiness measurement has been produced on this checkout. Run \`${COMMANDS.model.readiness}\`, which writes ${INTERMEDIATE}.`,
+    staleness,
+  }
+}
+
+function buildPerformanceBlock(modelManifest) {
+  const performance = modelManifest?.performance
+  if (!performance?.measured) {
+    return {
+      available: false,
+      reason: 'The model manifest carries no measured performance block yet.',
+      absoluteCeilings: performance?.absoluteCeilings ?? null,
+      caveats: MEASUREMENT_CAVEATS,
+    }
+  }
+  return {
+    available: true,
+    source: `${MODEL_MANIFEST} performance.measured`,
+    executedFrom: performance.measured.environment?.executedFrom ?? null,
+    measured: performance.measured,
+    absoluteCeilings: performance.absoluteCeilings ?? null,
+    regressionGate: performance.regressionGate ?? null,
+    uncappedThreeTimesPeakResidentMib:
+      performance.uncappedThreeTimesPeakResidentMib ?? null,
+    caveats: MEASUREMENT_CAVEATS,
+  }
+}
+
 function buildPayload() {
   const current = {
     commitSha: gitCommitSha(),
@@ -324,6 +395,9 @@ function buildPayload() {
   const intermediate = readJson(INTERMEDIATE)
   const staleness = assessStaleness(intermediate, current)
   const measurementIsUsable = Boolean(intermediate) && staleness?.current === true
+  const observedRange = measurementIsUsable
+    ? neutralRange(intermediate.corpusDispositions)
+    : null
 
   return {
     artifact: 'community-content-screening-measurements',
@@ -417,47 +491,19 @@ function buildPayload() {
      * real-model run. It is never inferred: it is whatever the run that produced
      * the numbers recorded about itself.
      */
-    runtimeMeasurement: measurementIsUsable
-      ? {
-          available: true,
-          screeningPath: intermediate.screeningPath,
-          measuredAt: intermediate.measuredAt,
-          hardware: intermediate.hardware,
-          warmInferenceCount: intermediate.warmInferenceCount,
-          warmupCount: intermediate.warmupCount,
-          replicaCount: intermediate.replicaCount,
-          coldStartupMs: intermediate.coldStartupMs,
-          warmP50Ms: intermediate.warmP50Ms,
-          warmP95Ms: intermediate.warmP95Ms,
-          warmP99Ms: intermediate.warmP99Ms,
-          warmMaxMs: intermediate.warmMaxMs ?? null,
-          peakResidentMib: intermediate.peakResidentMib,
-          executionMode: intermediate.executionMode ?? null,
-          caveats: MEASUREMENT_CAVEATS,
-          regressionGate: deriveRegressionGate(
-            intermediate,
-            modelManifest?.performance?.absoluteCeilings
-          ),
-          corpusDispositions: intermediate.corpusDispositions ?? null,
-          staleness,
-        }
-      : {
-          available: false,
-          screeningPath: null,
-          reason: intermediate
-            ? 'A readiness measurement exists but was produced under different inputs, so it is withheld rather than reported as current.'
-            : `No readiness measurement has been produced on this checkout. Run \`${COMMANDS.model.readiness}\`, which writes ${INTERMEDIATE}.`,
-          staleness,
-        },
+    runtimeMeasurement: {
+      screening: buildScreeningBlock(intermediate, measurementIsUsable, staleness),
+      performance: buildPerformanceBlock(modelManifest),
+    },
 
-    endToEndJourneys: [
+    endToEndJourneysDeclared: [
       {
         id: '6.2-E2E-01',
         name: 'safe upload publishes through the full stack',
         refusedBy: null,
         screeningPathIsRunSelected: true,
-        proves:
-          'the HTTP, storage, outbox, BullMQ, model and PostgreSQL path reaches a terminal published author state, and that the persisted engine identity matches the screening path the run declared',
+        intent:
+          'exercise the HTTP, storage, outbox, BullMQ, model and PostgreSQL path to a terminal published author state, and assert the persisted engine identity matches the screening path the run declared',
         command: COMMANDS.pipeline.endToEnd,
       },
       {
@@ -465,8 +511,8 @@ function buildPayload() {
         name: 'disallowed caption never publishes and never reaches another feed',
         refusedBy: 'text-screener',
         screeningPathIsRunSelected: true,
-        proves:
-          'non-publication, absence from a second member feed, and that no raw matched term or class probability appears in a client payload',
+        intent:
+          'exercise non-publication, absence from a second member feed, and the absence of any raw matched term or class probability in a client payload',
         doesNotProve:
           'anything about image blocking. No unsafe imagery exists in this repository, so this journey is refused by the text screener and must not be read as end-to-end proof that the image model blocks anything.',
         command: COMMANDS.pipeline.endToEnd,
@@ -496,8 +542,9 @@ function buildPayload() {
         id: 'synthetic-safe-corpus',
         statement:
           'The committed fixture corpus is synthetic woven-textile imagery, not photographs of real submissions, so it does not describe the distribution of real Community uploads.',
-        mitigation:
-          'The corpus spans the model confidence range from Neutral 0.9991 to 0.7522, so it exercises both the pass and the review branch of the pinned policy.',
+        mitigation: observedRange
+          ? `The corpus spans a measured Neutral range from ${observedRange.max.toFixed(4)} down to ${observedRange.min.toFixed(4)}, so it exercises both the pass and the review branch of the pinned policy.`
+          : 'The corpus is designed to span the model confidence range so that both the pass and the review branch of the pinned policy are exercised. No measured range is available on this checkout.',
         revisitWhen:
           'Story 6.2b measures the false-positive rate on at least 250 openly licensed real fashion photographs.',
       },
@@ -512,9 +559,12 @@ function buildPayload() {
     ],
 
     rollout: {
-      communityReadEnabled: false,
-      communityWriteEnabled: false,
-      note: 'Both production Community rollout controls remain disabled. Nothing in this story authorizes changing them.',
+      ...(readRolloutDefaults() ?? {
+        communityReadEnabled: null,
+        communityWriteEnabled: null,
+        source: null,
+      }),
+      note: 'Read from the shared flag registry defaults. Both production Community rollout controls remain disabled, and nothing in this story authorizes changing them.',
     },
 
     commands: COMMANDS,
@@ -557,19 +607,24 @@ async function main() {
 
   await writeJson(OUTPUT, payload)
 
-  const runtime = payload.runtimeMeasurement
+  const { screening, performance } = payload.runtimeMeasurement
   console.log(`Wrote ${OUTPUT}`)
   console.log(
-    `  screening path: ${runtime.available ? runtime.screeningPath : 'none (no usable readiness measurement)'}`
+    `  screening path: ${screening.available ? screening.screeningPath : 'none (no usable readiness measurement)'}`
   )
-  if (!runtime.available) {
-    console.warn(`  ${runtime.reason}`)
+  if (screening.available) {
+    console.log(`  corpus dispositions: ${JSON.stringify(screening.dispositionCounts)}`)
+  } else {
+    console.warn(`  ${screening.reason}`)
   }
-  if (runtime.staleness && !runtime.staleness.current) {
-    for (const mismatch of runtime.staleness.mismatches) {
+  if (screening.staleness && !screening.staleness.current) {
+    for (const mismatch of screening.staleness.mismatches) {
       console.warn(`  stale input: ${mismatch.input}`)
     }
   }
+  console.log(
+    `  performance: ${performance.available ? `from ${performance.executedFrom}` : 'not measured'}`
+  )
   console.log('  verdict: none, by design. Story 6.2b renders it.')
 }
 

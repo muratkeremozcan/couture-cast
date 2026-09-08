@@ -48,8 +48,19 @@ if (restrictedRun) {
   // Two CLI paths outrank whatever a config file asks for: `--trace <mode>`
   // overwrites `use.trace`, and UI mode records a live trace of its own with
   // screenshots and snapshots in it. Refuse both.
-  const captureFlags = process.argv.filter(
-    (arg) => arg === '--trace' || arg.startsWith('--ui')
+  /*
+   * Both spellings of every flag, because commander accepts `--opt value` and
+   * `--opt=value` alike and matching only the bare form leaves the equals form
+   * as an open bypass on exactly the run whose purpose is that uploaded bytes
+   * never reach disk. `--reporter html` re-adds the attachment-copying bundle
+   * and `--output` redirects artifacts somewhere unmanaged, so both join
+   * `--trace` and UI mode rather than only the obvious one.
+   */
+  const forbidden = ['--trace', '--reporter', '--output', '--ui']
+  const captureFlags = process.argv.filter((arg) =>
+    forbidden.some(
+      (flag) => arg === flag || arg.startsWith(`${flag}=`) || arg.startsWith('--ui')
+    )
   )
   if (captureFlags.length > 0) {
     console.error(`Restricted evidence runs cannot use ${captureFlags.join(', ')}.`)
