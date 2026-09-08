@@ -36,10 +36,26 @@ if (!envConfigMap[desiredEnv]) {
 // what deletes the rows a real-model run leaves behind.
 const restrictedRun = isRestrictedEvidenceRun()
 
-if (restrictedRun && desiredEnv !== 'local') {
-  console.error(`Restricted evidence runs require TEST_ENV="local", got "${desiredEnv}".`)
-  console.error('Unset COMMUNITY_SCREENING_EVIDENCE_MODE to run that environment.')
-  process.exit(1)
+if (restrictedRun) {
+  if (desiredEnv !== 'local') {
+    console.error(
+      `Restricted evidence runs require TEST_ENV="local", got "${desiredEnv}".`
+    )
+    console.error('Unset COMMUNITY_SCREENING_EVIDENCE_MODE to run that environment.')
+    process.exit(1)
+  }
+
+  // Two CLI paths outrank whatever a config file asks for: `--trace <mode>`
+  // overwrites `use.trace`, and UI mode records a live trace of its own with
+  // screenshots and snapshots in it. Refuse both.
+  const captureFlags = process.argv.filter(
+    (arg) => arg === '--trace' || arg.startsWith('--ui')
+  )
+  if (captureFlags.length > 0) {
+    console.error(`Restricted evidence runs cannot use ${captureFlags.join(', ')}.`)
+    console.error('These re-enable the capture that Story 6.2 AC 9 requires to stay off.')
+    process.exit(1)
+  }
 }
 
 const config = restrictedRun ? localRestrictedConfig : envConfigMap[desiredEnv]
