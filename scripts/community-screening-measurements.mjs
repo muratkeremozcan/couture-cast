@@ -183,6 +183,71 @@ function parseVerifyJson(output) {
   }
 }
 
+/**
+ * Derives the committed regression gate from a measurement.
+ *
+ * AC 8 sets the gate at three times the measured value, but three times the
+ * measured peak RSS is 1018 MiB against a 512 MiB absolute ceiling, so the
+ * memory gate could never fire before the ceiling did. The gate is therefore
+ * `min(3x measured, absolute ceiling)`. The uncapped value is still recorded,
+ * labelled as uncapped, because it is what AC 8's arithmetic produces and a
+ * reader comparing the two needs to see both rather than infer the capping.
+ */
+function deriveRegressionGate(measurement, ceilings) {
+  if (!measurement || !ceilings) return null
+
+  const metrics = [
+    ['coldStartupMs', 'coldStartupMs'],
+    ['warmP95Ms', 'warmP95Ms'],
+    ['warmP99Ms', 'warmP99Ms'],
+    ['peakResidentMib', 'peakResidentMib'],
+  ]
+
+  const gate = {}
+  for (const [metric, ceilingKey] of metrics) {
+    const measured = measurement[metric]
+    const ceiling = ceilings[ceilingKey]
+    if (typeof measured !== 'number' || typeof ceiling !== 'number') continue
+    const uncapped = measured * 3
+    gate[metric] = {
+      measured,
+      uncappedThreeTimesMeasured: uncapped,
+      absoluteCeiling: ceiling,
+      adopted: Math.min(uncapped, ceiling),
+      cappedByAbsoluteCeiling: uncapped > ceiling,
+    }
+  }
+
+  return {
+    rule: 'min(3x measured, absolute ceiling)',
+    rationale:
+      'Three times the measured peak resident set exceeds the absolute ceiling, so an uncapped gate on that metric could never fire before the ceiling did. Capping at the ceiling keeps every gate able to fail.',
+    metrics: gate,
+  }
+}
+
+/**
+ * What the numbers do and do not describe. Both entries exist because the
+ * measurement was misreadable without them, and a reader who takes peak RSS for
+ * the model's size will size a container wrong in either direction.
+ */
+const MEASUREMENT_CAVEATS = [
+  {
+    id: 'peak-rss-is-process-wide',
+    statement:
+      'Peak resident set is measured process-wide. The inference runtime is a worker thread sharing its process with the supervisor, so the figure covers the whole worker process.',
+    consequence:
+      'It is the right number for setting a container memory limit and the wrong number for describing how large the model is.',
+  },
+  {
+    id: 'compiled-output-only',
+    statement:
+      'The measurement is taken from compiled output under plain node. The same harness run under tsx measured roughly twice the peak resident set because the esbuild transform stayed resident.',
+    consequence:
+      'A measurement taken through a TypeScript runner is not comparable and must not be recorded as this metric.',
+  },
+]
+
 function summariseCorpus(manifest) {
   if (!manifest) return null
   const byBand = {}
@@ -365,7 +430,14 @@ function buildPayload() {
           warmP50Ms: intermediate.warmP50Ms,
           warmP95Ms: intermediate.warmP95Ms,
           warmP99Ms: intermediate.warmP99Ms,
+          warmMaxMs: intermediate.warmMaxMs ?? null,
           peakResidentMib: intermediate.peakResidentMib,
+          executionMode: intermediate.executionMode ?? null,
+          caveats: MEASUREMENT_CAVEATS,
+          regressionGate: deriveRegressionGate(
+            intermediate,
+            modelManifest?.performance?.absoluteCeilings
+          ),
           corpusDispositions: intermediate.corpusDispositions ?? null,
           staleness,
         }
