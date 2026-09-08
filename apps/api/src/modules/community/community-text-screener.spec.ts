@@ -2,11 +2,12 @@
 import fs from 'node:fs'
 import os from 'node:os'
 import path from 'node:path'
-import { describe, expect, it } from 'vitest'
+import { describe, expect, it, vi } from 'vitest'
 import {
   communityPostAltTextSchema,
   communityPostCaptionSchema,
 } from '@couture/api-client/contracts/http'
+import { loadCommunityScreeningPolicy } from './community-screening-policy.js'
 import {
   CANONICAL_REPRESENTATIONS,
   CommunityTextScreener,
@@ -263,19 +264,23 @@ describe('CommunityTextScreener policy wiring (AC 7)', () => {
   it('carries the same text policy the approved policy file declares', () => {
     const approved = withoutProse(approvedPolicy.text) as Record<string, unknown>
     delete approved.lists
-    const approvedLimits = { ...(approved.limits as Record<string, unknown>) }
-    delete approvedLimits.maxInputCharacters
-    approved.limits = approvedLimits
+    expect(withoutProse(DEFAULT_COMMUNITY_TEXT_POLICY)).toEqual(approved)
+  })
 
-    const inScreener = withoutProse(DEFAULT_COMMUNITY_TEXT_POLICY) as Record<
-      string,
-      unknown
-    >
-    const screenerLimits = { ...(inScreener.limits as Record<string, unknown>) }
-    delete screenerLimits.maxInputCharacters
-    inScreener.limits = screenerLimits
+  it('screens the same way when driven by the loaded policy object', () => {
+    const loaded = loadCommunityScreeningPolicy()
+    const wired = new CommunityTextScreener({
+      policy: loaded.policy.text,
+      policyVersion: loaded.identity.textEngineVersion,
+    })
+    const abusive = `a jacket ${representatives.en.term} indeed`
 
-    expect(inScreener).toEqual(approved)
+    expect(wired.screen({ text: abusive, field: 'caption', locale: 'en-US' })).toEqual({
+      ...screenCaption(abusive),
+      policyVersion: loaded.identity.textEngineVersion,
+    })
+    expect(loaded.identity.textEngineVersion).toContain(loaded.policySha256.slice(0, 12))
+    expect(loaded.policy.text.limits.maxInputCharacters).toEqual(CONTRACT_FIELD_CEILINGS)
   })
 
   it('names every shipped list file in the approved policy', () => {
@@ -727,6 +732,28 @@ describe('CommunityTextScreener startup validation (AC 3, AC 7)', () => {
     expect(() => new CommunityTextScreener({ listsDirectory: directory })).toThrow(
       /declares language it/
     )
+  })
+
+  it('honours a multi-word allow-list entry over a multi-word term', () => {
+    const phraseAllowed = structuredClone(allowLists.en)
+    phraseAllowed.entries.push('kill yourself')
+    const directory = writeListFixture({ 'allow-en-v1.json': phraseAllowed })
+    const lenient = new CommunityTextScreener({ listsDirectory: directory })
+
+    expect(screenCaption('kill yourself').categories).toContain('self_harm')
+    expect(
+      lenient.screen({ text: 'kill yourself', field: 'caption', locale: 'en-US' })
+        .categories
+    ).toEqual([])
+  })
+
+  it('reports a policy directory it cannot find on disk', () => {
+    const exists = vi.spyOn(fs, 'existsSync').mockReturnValue(false)
+    try {
+      expect(() => new CommunityTextScreener()).toThrow(/term lists not found in/)
+    } finally {
+      exists.mockRestore()
+    }
   })
 
   it('rejects a directory that holds no lists at all', () => {
