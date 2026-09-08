@@ -35,6 +35,7 @@ import {
   type CommunityModerationEngine,
 } from '../src/modules/community/community-moderation.engine.js'
 import { InMemoryCommunityStorage } from '../src/modules/community/community-storage.fake.js'
+import { STALE_PENDING_REVIEW_MINUTES } from '../src/modules/community/community-maintenance.service.js'
 import { CommunityModerationActionsService } from '../src/modules/community/community-moderation.actions.js'
 import {
   buildCommunityModerationJobId,
@@ -556,17 +557,53 @@ describe('6.1 community moderation pipeline', () => {
         imageByteSize: jpegBytes.length,
         publishedAt: null,
         createdAt: draftedAt,
-        updatedAt: draftedAt,
         submittedAt: draftedAt,
+        // `updated_at` STAYS CURRENT, and that is load-bearing rather than
+        // incidental. `CommunityMaintenanceService.sweepStalePendingReview`
+        // claims every `pending_review` row in the database whose `updated_at`
+        // is older than fifteen minutes, with no namespace filter, because in
+        // production there is nothing to filter by. This suite shares one
+        // PostgreSQL with every other integration suite, and
+        // `community-lifecycle.integration.spec.ts` drives that sweep, so a row
+        // backdated by a year here was claimable the instant it was created:
+        // the sweep flipped it to `review_failed` with reason
+        // `moderation_stalled`, and `process` then found it already out of
+        // `pending_review` and returned without publishing. That is the
+        // intermittent "expected published, received review_failed" this test
+        // showed only under a full-suite run. `created_at` is what the ordering
+        // assertions read; `updated_at` is read by nothing here.
+        updatedAt: new Date(),
       })
       await prisma.lookbookPost.create({ data: buildLookbookPostCreateInput(late) })
       await prisma.communityModerationOutbox.create({ data: { post_id: latePostId } })
       storage.put(objectPath, jpegBytes)
 
+      // The tripwire for the comment above. If a future edit backdates
+      // `updated_at` again, this fails here with a clear cause instead of
+      // surfacing as an intermittent wrong status forty lines later.
+      const sweepable = await prisma.lookbookPost.findFirst({
+        where: {
+          id: latePostId,
+          status: 'pending_review',
+          updated_at: {
+            lt: new Date(Date.now() - STALE_PENDING_REVIEW_MINUTES * 60_000),
+          },
+        },
+        select: { id: true },
+      })
+      expect(
+        sweepable,
+        'this fixture is old enough for the stale sweep to claim it, so any suite running that sweep will fail it before this one publishes it'
+      ).toBeNull()
+
       await processor.process({ postId: latePostId, uploadSessionId })
       const publishedLate = await prisma.lookbookPost.findUniqueOrThrow({
         where: { id: latePostId },
       })
+      // The reason is asserted alongside the status so a future failure names
+      // the branch that claimed the row instead of only saying it was not
+      // published.
+      expect(publishedLate.moderation_reason).toBeNull()
       expect(publishedLate.status).toBe('published')
       // Drafted in 2024, published now: the two clocks disagree by years, which
       // is what makes the ordering choice observable at all.
