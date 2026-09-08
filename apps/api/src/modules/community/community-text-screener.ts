@@ -896,7 +896,7 @@ export class CommunityTextScreener {
       }
     }
 
-    for (const candidate of this.buildJoinCandidates(literalTokens, allowed, budget)) {
+    for (const candidate of this.buildJoinCandidates(literalTokens, budget)) {
       const outcome = this.matchCandidate(
         toFoldedForm(candidate),
         LEET_TRIGGER_PATTERN.test(candidate),
@@ -917,7 +917,6 @@ export class CommunityTextScreener {
    */
   private buildJoinCandidates(
     literalTokens: readonly string[],
-    allowed: readonly boolean[],
     budget: ExpansionBudget
   ): string[] {
     const candidates: string[] = []
@@ -931,19 +930,21 @@ export class CommunityTextScreener {
         for (let start = runStart; start + size <= endExclusive; start += 1) {
           const joined = literalTokens.slice(start, start + size).join('')
           if (joined.length < MIN_SINGLE_TERM_LENGTH) continue
+          if (this.allowSingles.has(joined)) continue
           if (!budget.spend(joined)) return
           candidates.push(joined)
         }
       }
     }
 
+    // The allow list is deliberately not consulted per token here. Ending a run
+    // at an allowed token would mean a short allow-list entry could be dropped
+    // between letters to split a spaced-letter form in two, and neither half
+    // would rebuild the term. The reconstructed candidate is checked against the
+    // allow list instead, which protects the ordinary word without the gap.
     for (let position = 0; position <= literalTokens.length; position += 1) {
       const token = literalTokens[position]
-      const joinable =
-        token !== undefined &&
-        token.length <= JOINABLE_TOKEN_LENGTH &&
-        allowed[position] !== true
-      if (joinable) continue
+      if (token !== undefined && token.length <= JOINABLE_TOKEN_LENGTH) continue
       flush(position)
       runStart = position + 1
     }

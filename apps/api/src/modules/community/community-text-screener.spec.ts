@@ -564,6 +564,22 @@ describe('CommunityTextScreener word boundaries and allow lists (AC 4)', () => {
     }
   })
 
+  it('rebuilds a spaced-letter form across an allow-listed single character', () => {
+    const term = representatives.en.term
+    const withShortEntry = structuredClone(allowLists.en)
+    withShortEntry.entries.push(term[1] as string)
+    const directory = writeListFixture({ 'allow-en-v1.json': withShortEntry })
+    const seeded = new CommunityTextScreener({ listsDirectory: directory })
+
+    expect(
+      seeded.screen({
+        text: withSpacedLetters(term),
+        field: 'caption',
+        locale: 'en-US',
+      }).categories
+    ).toContain(representatives.en.category)
+  })
+
   it('allows a literal spelling without allowing its accented vulgar twin', () => {
     expect(screenCaption('a puttee wrapped over the boot').disposition).toBe('pass')
     expect(screenCaption('quelle pute').categories).not.toEqual([])
