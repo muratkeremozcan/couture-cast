@@ -1,0 +1,125 @@
+{
+  "policyId": "community-screening-policy-v1",
+  "version": "v1",
+  "effectiveFrom": "2026-09-08",
+  "summary": "Conservative screening policy for Community Beta. Automatic publication requires a confident Neutral image and a clean result from every text dictionary; every other outcome, uncertainty included, routes to a human.",
+  "image": {
+    "modelFamily": "mobilenet_v2_mid",
+    "classNames": ["Drawing", "Hentai", "Neutral", "Porn", "Sexy"],
+    "classNamesRationale": "The exact NSFW_CLASSES set exported by nsfwjs@4.3.0, in the canonical order the model's output vector uses positionally. A vector of any other length, or a class-name set that does not match this list exactly, is invalid output and routes to review.",
+    "neutralPassMinimum": 0.85,
+    "neutralPassMinimumRationale": "Automatic publication requires a confident Neutral rather than merely the highest-scoring class. The benign reference image measured during story review scored Neutral 0.9063, so 0.85 leaves real headroom for ordinary fashion photography while still demanding clear model confidence. Anything at or below this value routes to review.",
+    "unsafeClasses": ["Hentai", "Porn"],
+    "unsafeClassesRationale": "Sexy is deliberately absent. On a fashion product, swimwear, lingerie and eveningwear score Sexy legitimately, and blocking them automatically would be the dominant false-positive source. A high Sexy probability still cannot reach pass, because it necessarily pushes Neutral below neutralPassMinimum, so such an image is withheld and shown to a human instead of being blocked outright. Drawing is not an unsafe class at all.",
+    "unsafeBlockMinimum": 0.35,
+    "unsafeBlockMinimumRationale": "The benign reference image scored Porn 0.0015 and Hentai 0.0421, so 0.35 sits an order of magnitude above the observed benign ceiling while staying below the 0.5 plurality point. A clearly unsafe image blocks; an ambiguous one falls through to review. Block and review both leave the post unpublished, so a low block threshold costs a moderator nothing beyond queue priority.",
+    "probabilitySumTolerance": 0.001,
+    "probabilitySumToleranceRationale": "The model output is already softmaxed and measured 0.99999992 on the reference input. A tolerance of 0.001 is three orders of magnitude above that float32 accumulation error and still small enough to catch a truncated, padded, or otherwise corrupted vector, which a permissive tolerance would wave through.",
+    "boundaryDisposition": "review",
+    "boundaryDispositionRationale": "Comparisons are strict. A probability exactly at a threshold has not passed it, so pass requires Neutral strictly greater than neutralPassMinimum and block requires an unsafe class strictly greater than unsafeBlockMinimum. Both boundaries therefore resolve to review, which is the fail-closed direction on each side."
+  },
+  "text": {
+    "categories": ["profanity", "sexual", "hate", "harassment", "violence", "self_harm"],
+    "categoriesRationale": "Six categories that a reviewed term list can actually be graded against. They subsume the two categories the Story 6.1 engine shipped: its profanity list maps to profanity, and its safety list splits across self_harm, violence and harassment, which is the distinction a moderator needs and the flat safety label hid.",
+    "severities": ["low", "medium", "high"],
+    "severityDisposition": {
+      "low": "review",
+      "medium": "review",
+      "high": "block"
+    },
+    "severityDispositionRationale": "No matched term can reach pass, so low and medium deliberately share the review disposition. The grade is still recorded because it drives moderator queue priority and because Story 6.2b measures the false-positive rate per severity; collapsing them into one level would destroy that signal without changing a single publication outcome.",
+    "unscreenableLocaleDisposition": "review",
+    "unscreenableLocaleDispositionRationale": "A locale this policy holds no dictionary for cannot be cleared by silence. The Story 6.1 engine already emits locale_unscreenable for that case and refuses the post; this policy keeps that behavior rather than rebuilding it.",
+    "allDictionariesAlwaysRun": true,
+    "allDictionariesAlwaysRunRationale": "Every language list runs against every submission regardless of the declared locale, so a client-controlled locale field cannot be used to bypass another language's terms.",
+    "scripts": {
+      "supported": ["Latin", "Common", "Inherited"],
+      "mixedScriptDisposition": "review",
+      "unsupportedScriptDisposition": "review",
+      "rationale": "All seven enabled languages are written in Latin script, so Common and Inherited cover punctuation, digits and combining marks. Observed script is determined by deterministic Unicode inspection; no probabilistic language detection runs anywhere in this policy. Mixed or unsupported scripts are the confusable-substitution attack surface, so both fail closed to a human."
+    },
+    "limits": {
+      "maxInputCharacters": 280,
+      "maxCanonicalRepresentations": 8,
+      "maxExpandedCharacters": 2048,
+      "rationale": "280 is the caption ceiling the public contract already enforces, and alt text is capped lower at 200, so bounding at the larger of the two needs no expansion of the contract. Capping the number of canonical representations and their combined length stops crafted input from amplifying normalization work without limit."
+    },
+    "lists": [
+      {
+        "language": "en",
+        "terms": "terms-v1/en-v1.json",
+        "allowList": "terms-v1/allow-en-v1.json",
+        "version": "v1",
+        "source": "repository-owned reviewed list",
+        "licence": "UNLICENSED (repository-owned)"
+      },
+      {
+        "language": "es",
+        "terms": "terms-v1/es-v1.json",
+        "allowList": "terms-v1/allow-es-v1.json",
+        "version": "v1",
+        "source": "repository-owned reviewed list",
+        "licence": "UNLICENSED (repository-owned)"
+      },
+      {
+        "language": "fr",
+        "terms": "terms-v1/fr-v1.json",
+        "allowList": "terms-v1/allow-fr-v1.json",
+        "version": "v1",
+        "source": "repository-owned reviewed list",
+        "licence": "UNLICENSED (repository-owned)"
+      },
+      {
+        "language": "de",
+        "terms": "terms-v1/de-v1.json",
+        "allowList": "terms-v1/allow-de-v1.json",
+        "version": "v1",
+        "source": "repository-owned reviewed list",
+        "licence": "UNLICENSED (repository-owned)"
+      },
+      {
+        "language": "it",
+        "terms": "terms-v1/it-v1.json",
+        "allowList": "terms-v1/allow-it-v1.json",
+        "version": "v1",
+        "source": "repository-owned reviewed list",
+        "licence": "UNLICENSED (repository-owned)"
+      },
+      {
+        "language": "pt",
+        "terms": "terms-v1/pt-v1.json",
+        "allowList": "terms-v1/allow-pt-v1.json",
+        "version": "v1",
+        "source": "repository-owned reviewed list",
+        "licence": "UNLICENSED (repository-owned)"
+      },
+      {
+        "language": "tr",
+        "terms": "terms-v1/tr-v1.json",
+        "allowList": "terms-v1/allow-tr-v1.json",
+        "version": "v1",
+        "source": "repository-owned reviewed list",
+        "licence": "UNLICENSED (repository-owned)"
+      }
+    ],
+    "listsRationale": "One reviewed list plus one allow list per enabled language, covering the seven languages the ten enabled Community Beta locales map to. Every entry carries source, version and licence, and a list missing any of the three fails startup. Story 6.2b replaces these repository-owned provenance records with the pinned upstream lists it vendors."
+  },
+  "reasonCodes": {
+    "image": {
+      "unsafe_class": "block",
+      "low_confidence": "review",
+      "output_invalid": "review",
+      "class_mismatch": "review",
+      "probability_sum_invalid": "review",
+      "inference_timeout": "review",
+      "screening_unavailable": "review"
+    },
+    "text": {
+      "text_policy_match": "review",
+      "locale_unscreenable": "review",
+      "script_mixed": "review",
+      "script_unsupported": "review"
+    },
+    "rationale": "Stable codes shared by the image adapter, the text screener and the durable pipeline, so a persisted reason means the same thing on every branch. The disposition recorded against each code is its floor: text_policy_match escalates to block when the matched term's severity maps to block, and no code here can ever yield pass."
+  }
+}

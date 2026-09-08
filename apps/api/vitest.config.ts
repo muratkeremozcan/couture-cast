@@ -51,6 +51,17 @@ export default defineConfig({
       ...(process.env.RUN_GARMENT_TAGGING_SMOKE === 'true'
         ? []
         : ['**/garment-tagging.smoke.spec.ts']),
+      // Story 6.2, Decision 6: these two load the real ADR-013 NSFW model. A
+      // normal unit, coverage or CI run must reach the fixture and unavailable
+      // adapters only, so the real model is reachable through its own commands
+      // and nothing else. Without these guards a plain `npm run test` would
+      // pull a 5.6 MB graph model and a WASM backend into every worker.
+      ...(process.env.RUN_COMMUNITY_SCREENING_SMOKE === 'true'
+        ? []
+        : ['**/community-content-screening.smoke.spec.ts']),
+      ...(process.env.RUN_COMMUNITY_SCREENING_READINESS === 'true'
+        ? []
+        : ['**/community-content-screening.readiness.spec.ts']),
     ],
     setupFiles: [resolve(__dirname, 'src/test-setup.ts')],
     // Both names are pinned so the lookup chain the integration suites share cannot
