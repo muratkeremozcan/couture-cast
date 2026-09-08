@@ -1,0 +1,152 @@
+{
+  "corpusId": "community-moderation-safe-v1",
+  "corpusVersion": "v1",
+  "safetyClass": "synthetic-safe",
+  "generator": {
+    "script": "scripts/community-moderation-fixtures.mjs",
+    "seed": 24301,
+    "encoder": "sharp",
+    "note": "Bytes are committed rather than rendered at test time. sharp output is deterministic for one libvips build but is not guaranteed byte-identical across versions, so the committed hashes are the authority."
+  },
+  "constraints": {
+    "minDimensionPx": 256,
+    "maxDimensionPx": 4096,
+    "maxBytes": 10485760,
+    "allowedContentTypes": ["image/jpeg", "image/png", "image/webp"]
+  },
+  "requiredBands": ["high", "moderate", "low"],
+  "files": [
+    {
+      "path": "safe-satin-plum-512x512.jpg",
+      "sha256": "b2ed2509ee63fa5a13aff99ece5603970b97b004c07ef930315267b0a79974a3",
+      "byteSize": 40848,
+      "contentType": "image/jpeg",
+      "widthPx": 512,
+      "heightPx": 512,
+      "pattern": "satin-plum",
+      "neutralBand": "high",
+      "required": true
+    },
+    {
+      "path": "safe-linen-oat-768x512.jpg",
+      "sha256": "e1f71e08a16a6b47af8153c1006f76c720e5ab75dc3b3c33e44801e02de24407",
+      "byteSize": 66047,
+      "contentType": "image/jpeg",
+      "widthPx": 768,
+      "heightPx": 512,
+      "pattern": "linen-oat",
+      "neutralBand": "high",
+      "required": true
+    },
+    {
+      "path": "safe-pinstripe-slate-512x768.png",
+      "sha256": "dd3a53f23f595b28f6e78a12587aaee5ba03ba092418905848ba1b07f3735aa2",
+      "byteSize": 148274,
+      "contentType": "image/png",
+      "widthPx": 512,
+      "heightPx": 768,
+      "pattern": "pinstripe-slate",
+      "neutralBand": "high",
+      "required": true
+    },
+    {
+      "path": "safe-check-navy-512x512.webp",
+      "sha256": "505a54c2b5c02e15b79832869954ccbcae6637152b3f1bbf478ddb35fa920a41",
+      "byteSize": 73466,
+      "contentType": "image/webp",
+      "widthPx": 512,
+      "heightPx": 512,
+      "pattern": "check-navy",
+      "neutralBand": "moderate",
+      "required": true
+    },
+    {
+      "path": "safe-knit-sage-512x512.jpg",
+      "sha256": "5cc800e5e73cfc7fd0be9bbe3ac18ab2f5851806caa439d2ac97d1cf8615d014",
+      "byteSize": 67597,
+      "contentType": "image/jpeg",
+      "widthPx": 512,
+      "heightPx": 512,
+      "pattern": "knit-sage",
+      "neutralBand": "high",
+      "required": true
+    },
+    {
+      "path": "safe-boucle-cream-512x512.jpg",
+      "sha256": "72db26dc791423caca059d574e5553908a40d3b3c54226bc1c3f585ca7849d53",
+      "byteSize": 92814,
+      "contentType": "image/jpeg",
+      "widthPx": 512,
+      "heightPx": 512,
+      "pattern": "boucle-cream",
+      "neutralBand": "high",
+      "required": true
+    },
+    {
+      "path": "safe-houndstooth-mono-512x512.png",
+      "sha256": "2367728c3d2d452451da77fff8e07fdf70af073c97b45b660d84d1950254d39f",
+      "byteSize": 151845,
+      "contentType": "image/png",
+      "widthPx": 512,
+      "heightPx": 512,
+      "pattern": "houndstooth-mono",
+      "neutralBand": "moderate",
+      "required": true
+    },
+    {
+      "path": "safe-denim-indigo-512x512.jpg",
+      "sha256": "6a9e10b3a05607cb017d13c063f470960a5c7351861d20f5fb7c031a5947ccd7",
+      "byteSize": 84158,
+      "contentType": "image/jpeg",
+      "widthPx": 512,
+      "heightPx": 512,
+      "pattern": "denim-indigo",
+      "neutralBand": "moderate",
+      "required": true
+    },
+    {
+      "path": "safe-neutral-grey-256x256.png",
+      "sha256": "d4506c34b8c06a259114c34358c7c30dc91e78f5acdfaf3547a4660e5e3dbebf",
+      "byteSize": 583,
+      "contentType": "image/png",
+      "widthPx": 256,
+      "heightPx": 256,
+      "pattern": "neutral-grey",
+      "neutralBand": "moderate",
+      "required": true
+    },
+    {
+      "path": "safe-corduroy-rust-512x512.webp",
+      "sha256": "07da3f5ff3d55d7b87b299e219c1a623b5843d475713110e0de5feb1678ced2a",
+      "byteSize": 73384,
+      "contentType": "image/webp",
+      "widthPx": 512,
+      "heightPx": 512,
+      "pattern": "corduroy-rust",
+      "neutralBand": "moderate",
+      "required": true
+    },
+    {
+      "path": "safe-twill-charcoal-512x512.jpg",
+      "sha256": "944df179996651f54bca1d65dc56933dc63a0d03dabac4dc40349db4e348ed8f",
+      "byteSize": 102156,
+      "contentType": "image/jpeg",
+      "widthPx": 512,
+      "heightPx": 512,
+      "pattern": "twill-charcoal",
+      "neutralBand": "low",
+      "required": true
+    },
+    {
+      "path": "safe-herringbone-oat-512x512.jpg",
+      "sha256": "aeb99883623ba24551cac9e4a2324fa55f2ba2ad2297e661aa86278b8abf909d",
+      "byteSize": 91673,
+      "contentType": "image/jpeg",
+      "widthPx": 512,
+      "heightPx": 512,
+      "pattern": "herringbone-oat",
+      "neutralBand": "low",
+      "required": true
+    }
+  ]
+}
