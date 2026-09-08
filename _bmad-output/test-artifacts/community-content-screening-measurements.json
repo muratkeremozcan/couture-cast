@@ -1,0 +1,143 @@
+{
+  "artifact": "community-content-screening-measurements",
+  "artifactVersion": 1,
+  "storyKey": "6-2-production-content-screening-readiness",
+  "generatedAt": "2026-09-08T21:56:27.571Z",
+  "generatedBy": "npm run measure:community-screening",
+  "scope": {
+    "rendersVerdict": false,
+    "carriesSignature": false,
+    "note": "Story 6.2 emits measurements and labels the path that produced each one. Story 6.2b owns the corpus-backed gates, the evidence payload, its hash and the single recorded signature. Nothing in this file is a release decision."
+  },
+  "divisionOfProof": {
+    "thisStoryProves": "the policy and the pipeline",
+    "story62bProves": "the model's accuracy",
+    "gateSignatureDependsOn": "both",
+    "statement": "The deterministic evaluation proves that unsafe class-probability vectors return block, that every threshold is crossed from both sides, and that no vector reaches pass without a confident Neutral. The lifecycle suite drives a fake inference runtime emitting an unsafe vector, which proves the transport from worker message through validation, class mapping, policy evaluation, reason codes, and engine identity to a block verdict. Neither establishes that the real model emits a high Porn or Hentai probability for genuinely unsafe input, and no synthetic vector can. That single link is what AC 7 assigns to Story 6.2b corpus-backed measurement."
+  },
+  "build": {
+    "commitSha": "0bac956ff19a340a9ebd09bf879c1a93a1345f89",
+    "modelManifestSha256": "a61015d0d2036accdba2162267fcc5612cd3511da331bd313fe9aa75754af930",
+    "policySha256": "7adfb6cb357b4669db222192c917b412ba6e3a4a8fb09c045d7039801d5dfa81",
+    "fixtureManifestSha256": "b8cd2cd08dd419024a2cdb3ca84d03b3be7a5df211a92cd200853200bcb13243",
+    "lockfileSha256": "deb793d5e5c9423460ecc4d067972cdaa654c5068832be7486b70f6b9e00ac45",
+    "workingTreeClean": false,
+    "nodeVersion": "v24.20.0",
+    "platform": "darwin-arm64"
+  },
+  "modelIdentity": {
+    "modelFamily": "mobilenet_v2_mid",
+    "packageName": "nsfwjs",
+    "packageVersion": "4.3.0",
+    "backend": "wasm",
+    "classNames": ["Drawing", "Hentai", "Neutral", "Porn", "Sexy"],
+    "inputWidth": 224,
+    "inputHeight": 224
+  },
+  "policyIdentity": {
+    "policyId": "community-screening-policy-v1",
+    "version": "v1",
+    "neutralPassMinimum": 0.85,
+    "unsafeClasses": ["Hentai", "Porn"],
+    "unsafeBlockMinimum": 0.35,
+    "probabilitySumTolerance": 0.001,
+    "boundaryDisposition": "review"
+  },
+  "fixtureCorpus": {
+    "corpusId": "community-moderation-safe-v1",
+    "corpusVersion": "v1",
+    "safetyClass": "synthetic-safe",
+    "fixtureCount": 12,
+    "byNeutralConfidenceBand": {
+      "high": 5,
+      "moderate": 5,
+      "low": 2
+    },
+    "byContentType": {
+      "image/jpeg": 7,
+      "image/png": 3,
+      "image/webp": 2
+    },
+    "unsafeFixtureCount": 0
+  },
+  "runtimeMeasurement": {
+    "available": false,
+    "screeningPath": null,
+    "reason": "No readiness measurement has been produced on this checkout. Run `npm run test:community-screening-readiness --workspace api`, which writes apps/api/.cache/community-screening/readiness-measurements.json.",
+    "staleness": null
+  },
+  "endToEndJourneys": [
+    {
+      "id": "6.2-E2E-01",
+      "name": "safe upload publishes through the full stack",
+      "refusedBy": null,
+      "screeningPathIsRunSelected": true,
+      "proves": "the HTTP, storage, outbox, BullMQ, model and PostgreSQL path reaches a terminal published author state, and that the persisted engine identity matches the screening path the run declared",
+      "command": "npm run test:community-screening:e2e"
+    },
+    {
+      "id": "6.2-E2E-02",
+      "name": "disallowed caption never publishes and never reaches another feed",
+      "refusedBy": "text-screener",
+      "screeningPathIsRunSelected": true,
+      "proves": "non-publication, absence from a second member feed, and that no raw matched term or class probability appears in a client payload",
+      "doesNotProve": "anything about image blocking. No unsafe imagery exists in this repository, so this journey is refused by the text screener and must not be read as end-to-end proof that the image model blocks anything.",
+      "command": "npm run test:community-screening:e2e"
+    }
+  ],
+  "limitations": [
+    {
+      "id": "no-unsafe-imagery-in-repository",
+      "statement": "No unsafe imagery may enter this repository, so no end-to-end journey and no fixture measures the image model against genuinely unsafe input.",
+      "mitigation": "Image blocking is proved at the disposition-function level against synthetic class-probability vectors, and the paired unsafe journey is refused by the text screener and labelled as such.",
+      "revisitWhen": "Story 6.2b measures the model against its corpora, which is where the model's own accuracy is established."
+    },
+    {
+      "id": "developer-hardware-only",
+      "statement": "Any runtime measurement in this payload was taken on developer hardware, which is a sanity floor rather than release evidence.",
+      "mitigation": "The absolute ceilings in the model manifest bound a pathological run, and the committed regression gate is set from a measured value at three times its size.",
+      "revisitWhen": "Story 6.2b measures on the named hosted target with its CPU allocation, memory limit and replica topology."
+    },
+    {
+      "id": "synthetic-safe-corpus",
+      "statement": "The committed fixture corpus is synthetic woven-textile imagery, not photographs of real submissions, so it does not describe the distribution of real Community uploads.",
+      "mitigation": "The corpus spans the model confidence range from Neutral 0.9991 to 0.7522, so it exercises both the pass and the review branch of the pinned policy.",
+      "revisitWhen": "Story 6.2b measures the false-positive rate on at least 250 openly licensed real fashion photographs."
+    },
+    {
+      "id": "local-dispatch-cadence",
+      "statement": "The end-to-end stack dispatches the moderation outbox once a second; production uses a one-minute scheduler.",
+      "mitigation": "The one-second cadence is a test-harness setting only and is never presented as latency evidence.",
+      "revisitWhen": "Story 6.2b measures queue latency against the deployed worker."
+    }
+  ],
+  "rollout": {
+    "communityReadEnabled": false,
+    "communityWriteEnabled": false,
+    "note": "Both production Community rollout controls remain disabled. Nothing in this story authorizes changing them."
+  },
+  "commands": {
+    "fixtureCorpus": {
+      "generate": "npm run fixtures:community-screening",
+      "verify": "npm run verify:community-screening-fixtures"
+    },
+    "model": {
+      "verifyArtifacts": "npm run verify:community-screening-model --workspace api",
+      "verifySupplyChain": "npm run verify:community-screening-supply-chain --workspace api",
+      "smoke": "npm run test:community-screening-model:smoke --workspace api",
+      "readiness": "npm run test:community-screening-readiness --workspace api"
+    },
+    "pipeline": {
+      "integration": "npm run test:integration --workspace api -- integration/community-moderation-pipeline.integration.spec.ts",
+      "endToEnd": "npm run test:community-screening:e2e"
+    },
+    "evidence": {
+      "emit": "npm run measure:community-screening"
+    },
+    "repository": {
+      "audit": "npm audit --omit=dev --audit-level=high",
+      "verifyChanged": "npm run verify:changed",
+      "validate": "npm run validate"
+    }
+  }
+}
