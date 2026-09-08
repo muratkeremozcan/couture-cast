@@ -115,9 +115,12 @@ export class CommunityModerationProcessor {
     meter?: CommunityModerationMeter
   ) {
     this.moderationEngine = engine ?? new DefaultCommunityModerationEngine()
-    this.meter =
-      meter ??
-      createSafeCommunityModerationMeter(createOpenTelemetryCommunityModerationMeter())
+    // Wrapped even when one is injected. A metrics fault after a post has
+    // already published would otherwise escape into the worker's catch, count
+    // as a failed attempt and burn a BullMQ retry on work that is finished.
+    this.meter = createSafeCommunityModerationMeter(
+      meter ?? createOpenTelemetryCommunityModerationMeter()
+    )
   }
 
   async process(

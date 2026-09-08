@@ -821,6 +821,53 @@ describe('CommunityModerationProcessor & Worker', () => {
       })
     })
 
+    it('publishes even when the meter throws on every call', async () => {
+      // A metrics fault after the post has already published would otherwise
+      // escape into the worker's catch, count as a failed attempt, and burn a
+      // BullMQ retry on work that is finished.
+      const exploding = () => {
+        throw new Error('metrics exporter unreachable')
+      }
+      createCommunityModerationWorker({
+        prisma: mockPrisma,
+        storage: mockStorage,
+        telemetryService: mockTelemetryService,
+        engine: new FixtureCommunityModerationEngine({
+          textOutcome: { passed: true, reasons: [] },
+          imageOutcome: { passed: true, reasons: [], disposition: 'pass' },
+        }),
+        meter: {
+          recordScreenerReadiness: exploding,
+          recordScreening: exploding,
+          recordAttemptFailure: exploding,
+          recordModelHealth: exploding,
+        },
+      })
+      mockFindUnique.mockResolvedValueOnce(
+        pendingPost({
+          id: 'post-metrics-fault',
+          user_id: 'user-metrics',
+          image_object_path: 'community/post-metrics-fault/session-e.jpg',
+        })
+      )
+
+      await expect(
+        workerHarness.registeredProcessor!(
+          asJob({
+            data: { postId: 'post-metrics-fault', uploadSessionId: 'sess-e' },
+            opts: { attempts: 3 },
+            attemptsMade: 0,
+          })
+        )
+      ).resolves.toBeUndefined()
+
+      expect(mockPostUpdateMany).toHaveBeenCalledWith(
+        expect.objectContaining({
+          data: expect.objectContaining({ status: 'published' }),
+        })
+      )
+    })
+
     it('refuses to publish a screener that contradicts its own disposition', async () => {
       // The fail-closed rule at the seam, exercised through the whole processor:
       // `passed: true` with a `block` disposition must flag, not publish.
