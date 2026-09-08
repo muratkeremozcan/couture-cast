@@ -1452,8 +1452,7 @@ describe('disposeInferenceWorker', () => {
 // the manifest gates; everything after it is a controller lifecycle path that
 // only the fake worker and a faked clock can reach.
 const { assertManifestWeightBundles } = NsfwWorkerModule
-const { NSFW_INITIALIZATION_TIMEOUT_MS, toWorkerError } =
-  TensorflowNsfwImageScreenerModule
+const { NSFW_INITIALIZATION_TIMEOUT_MS } = TensorflowNsfwImageScreenerModule
 
 type NsfwWeightBundleMirror = NsfwWorkerModule.NsfwModelManifest['weightBundles']
 
@@ -1507,35 +1506,6 @@ describe('assertManifestWeightBundles', () => {
     const manifestPath = createManifestFixture({ weightBundles: {} })
 
     expect(() => readModelManifest(manifestPath)).toThrow(/weightBundles must declare/)
-  })
-})
-
-describe('toWorkerError', () => {
-  const circular: Record<string, unknown> = {}
-  circular.self = circular
-
-  it('hands back the Error it was given', () => {
-    const original = new Error('already an error')
-
-    expect(toWorkerError(original, 'fallback')).toBe(original)
-  })
-
-  const nonErrors: [string, unknown, string][] = [
-    ['a message string', 'boom', 'boom'],
-    ['a number', 7, 'fallback: 7'],
-    ['a boolean', false, 'fallback: false'],
-    ['a bigint', BigInt(9), 'fallback: 9'],
-    ['an empty string', '', 'fallback'],
-    ['null', null, 'fallback'],
-    ['undefined', undefined, 'fallback'],
-    ['a value JSON cannot serialise', circular, 'fallback'],
-  ]
-
-  it.each(nonErrors)('turns %s into an Error', (_label, value, expected) => {
-    const error = toWorkerError(value, 'fallback')
-
-    expect(error).toBeInstanceOf(Error)
-    expect(error.message).toBe(expected)
   })
 })
 
