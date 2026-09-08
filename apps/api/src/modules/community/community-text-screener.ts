@@ -78,6 +78,15 @@ export const SCRIPT_MIXED_REASON = 'script_mixed'
 export const SCRIPT_UNSUPPORTED_REASON = 'script_unsupported'
 
 /**
+ * Emitted on a clean read. The policy's own `reasonCodes.text` cannot carry it,
+ * because that map is typed to dispositions that withhold a post and a pass is
+ * not one of them, so it lives here. It exists so a persisted result can tell
+ * "screened and clean" apart from "never screened", which an empty reason list
+ * cannot. Callers still decide from `disposition`, never from this list.
+ */
+export const TEXT_CLEAN_REASON = 'text_clean'
+
+/**
  * Emitted when input arrived longer than its own contract allows, or when a
  * crafted caption exhausted the expansion budget before every representation was
  * generated. Either way some of the text went unscreened, so it fails closed.
@@ -254,7 +263,16 @@ const MIN_SINGLE_TERM_LENGTH = 4
  */
 const SHORT_TERM_EXCEPTIONS: ReadonlySet<string> = new Set(['kys', 'amk'])
 
-const MAX_JOIN_WINDOW = 12
+/**
+ * A ceiling on the join window, so a pathological list cannot make the
+ * spaced-letter reconstruction quadratic in the caption length. The window
+ * itself is the longest single-word term the lists actually hold: a fixed
+ * window shorter than that is a silent fail-open, because a term of more
+ * characters than the window can never be rebuilt from its spaced form.
+ */
+const JOIN_WINDOW_CEILING = 32
+/** RFC 5646 caps a well-formed language tag well below this. */
+const MAX_LOCALE_TAG_LENGTH = 35
 /** Tokens this short are the raw material of a spaced-letter form, not words. */
 const JOINABLE_TOKEN_LENGTH = 2
 
@@ -464,6 +482,7 @@ interface PhraseEntry {
 interface LanguageIndex {
   readonly language: ScreeningLanguage
   readonly listVersion: string
+  readonly longestSingleTerm: number
   readonly single: ReadonlyMap<string, TermMeta>
   readonly singleCollapsed: ReadonlyMap<string, TermMeta>
   readonly singleLeet: ReadonlyMap<string, TermMeta>
@@ -577,6 +596,7 @@ function buildLanguageIndex(
   return {
     language: list.language,
     listVersion: list.listVersion,
+    longestSingleTerm: Math.max(0, ...[...single.keys()].map((term) => term.length)),
     single,
     singleCollapsed,
     singleLeet,
@@ -616,10 +636,16 @@ class Verdict {
   severity: TextScreeningSeverity | null = null
   obfuscated = false
 
+  /**
+   * Raises the disposition, never below `review`. The policy types every reason
+   * code to a disposition that withholds the post, so a reason that fired
+   * cannot leave the submission publishable however the knob it read is set.
+   */
   flag(reason: string, disposition: TextScreeningDisposition): void {
     this.reasons.add(reason)
-    if (DISPOSITION_RANK[disposition] > DISPOSITION_RANK[this.disposition]) {
-      this.disposition = disposition
+    const withheld = disposition === 'pass' ? 'review' : disposition
+    if (DISPOSITION_RANK[withheld] > DISPOSITION_RANK[this.disposition]) {
+      this.disposition = withheld
     }
   }
 
@@ -636,7 +662,7 @@ class Verdict {
   }
 
   get sortedReasons(): string[] {
-    return [...this.reasons].sort()
+    return this.reasons.size === 0 ? [TEXT_CLEAN_REASON] : [...this.reasons].sort()
   }
 
   get sortedCategories(): TextScreeningCategory[] {
@@ -661,6 +687,7 @@ export class CommunityTextScreener {
   private readonly loadedLanguages: readonly ScreeningLanguage[]
   private readonly englishFilter: Filter
   private readonly fieldLimits: Readonly<Record<TextScreeningField, number>>
+  private readonly maxJoinWindow: number
 
   constructor(options: CommunityTextScreenerOptions = {}) {
     this.policy = options.policy ?? DEFAULT_COMMUNITY_TEXT_POLICY
@@ -694,6 +721,10 @@ export class CommunityTextScreener {
     )
 
     this.indexes = termLists.map((list) => buildLanguageIndex(list, this.policy))
+    this.maxJoinWindow = Math.min(
+      JOIN_WINDOW_CEILING,
+      Math.max(MIN_SINGLE_TERM_LENGTH, ...this.indexes.map((i) => i.longestSingleTerm))
+    )
     this.loadedLanguages = Object.freeze(this.indexes.map((index) => index.language))
     this.listVersions = Object.freeze(
       Object.fromEntries(termLists.map((list) => [list.language, list.listVersion]))
@@ -737,7 +768,7 @@ export class CommunityTextScreener {
   }
 
   screen(input: CommunityTextScreeningInput): CommunityTextScreeningResult {
-    const declaredLocale = input.locale?.trim() ? input.locale.trim() : null
+    const declaredLocale = boundLocaleTag(input.locale)
     const verdict = new Verdict()
 
     if (declaredLocale && this.resolveLanguage(declaredLocale) === null) {
@@ -925,7 +956,7 @@ export class CommunityTextScreener {
     const flush = (endExclusive: number): void => {
       const length = endExclusive - runStart
       if (length < 2) return
-      const maxWindow = Math.min(length, MAX_JOIN_WINDOW)
+      const maxWindow = Math.min(length, this.maxJoinWindow)
       for (let size = 2; size <= maxWindow; size += 1) {
         for (let start = runStart; start + size <= endExclusive; start += 1) {
           const joined = literalTokens.slice(start, start + size).join('')
@@ -998,6 +1029,17 @@ export class CommunityTextScreener {
     }
     return worst
   }
+}
+
+/**
+ * The declared locale is echoed back for provenance, and whatever the caller
+ * logs it into gets client-supplied text. Control characters are dropped and
+ * the tag is cut at the longest BCP 47 tag the contract could produce, so a
+ * crafted `locale` cannot forge a log line or grow one without bound.
+ */
+function boundLocaleTag(locale: string | null | undefined): string | null {
+  const trimmed = locale?.replace(/\p{C}/gu, '').trim()
+  return trimmed ? trimmed.slice(0, MAX_LOCALE_TAG_LENGTH) : null
 }
 
 /** Slices to the contract ceiling without leaving a lone high surrogate behind. */

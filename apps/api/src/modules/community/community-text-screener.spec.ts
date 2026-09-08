@@ -19,6 +19,7 @@ import {
   SCREENING_LANGUAGES,
   SCRIPT_MIXED_REASON,
   SCRIPT_UNSUPPORTED_REASON,
+  TEXT_CLEAN_REASON,
   TEXT_INPUT_TRUNCATED_REASON,
   TEXT_POLICY_MATCH_REASON,
   toFoldedForm,
@@ -140,6 +141,19 @@ const withConfusables = (term: string) =>
     .replace(/x/g, 'х')
     .replace(/y/g, 'у')
     .replace(/t/g, 'т')
+const DIACRITICS: Record<string, string> = {
+  a: 'á',
+  e: 'é',
+  i: 'í',
+  o: 'ó',
+  u: 'ú',
+  c: 'ç',
+  n: 'ñ',
+  s: 'ş',
+  g: 'ğ',
+}
+const withDiacritics = (term: string) =>
+  [...term].map((character) => DIACRITICS[character] ?? character).join('')
 const withLeetspeak = (term: string) =>
   term
     .replace(/o/g, '0')
@@ -209,6 +223,11 @@ describe('CommunityTextScreener locale coverage (AC 3)', () => {
       ])
     )
     expect(derived).toEqual(canonical)
+    // Both directions. Keyed only off the JSON, an extra entry the built
+    // api-client had drifted into the map would go unseen.
+    expect(Object.keys(LOCALE_SCREENING_LANGUAGES).sort()).toEqual(
+      Object.keys(supportedLocaleConfig).sort()
+    )
   })
 
   it('screens exactly the set of languages the enabled locales require', () => {
@@ -406,7 +425,7 @@ describe('CommunityTextScreener field bounds (AC 4)', () => {
     for (const text of ['', '   ', null, undefined]) {
       const result = screener.screen({ text, field: 'caption', locale: 'en-US' })
       expect(result.disposition).toBe('pass')
-      expect(result.reasons).toEqual([])
+      expect(result.reasons).toEqual([TEXT_CLEAN_REASON])
       expect(result.severity).toBeNull()
     }
   })
@@ -415,6 +434,7 @@ describe('CommunityTextScreener field bounds (AC 4)', () => {
 describe('CommunityTextScreener obfuscation families (AC 4)', () => {
   const families: [string, (term: string) => string][] = [
     ['case folding', toUpper],
+    ['diacritic folding', withDiacritics],
     ['Unicode NFKC', toFullwidth],
     ['zero-width characters', withZeroWidth],
     ['repeated characters', withRepeats],
@@ -441,11 +461,17 @@ describe('CommunityTextScreener obfuscation families (AC 4)', () => {
         expect(result.categories).toEqual([])
       })
 
+      const plain = () => screenCaption(`a jacket ${entry.term} indeed`)
+
       for (const [family, disguise] of families) {
         it(`sees through ${family}`, () => {
           const result = screenCaption(`a jacket ${disguise(entry.term)} indeed`)
           expect(result.categories).toContain(entry.category)
-          expect(result.disposition).not.toBe('pass')
+          // Severity parity, not merely a non-pass. A long term whose disguised
+          // form only reaches some shorter, milder term inside it would satisfy
+          // a weaker assertion while the family itself stayed broken.
+          expect(result.severity).toBe(plain().severity)
+          expect(result.disposition).toBe(plain().disposition)
         })
       }
 
@@ -459,6 +485,23 @@ describe('CommunityTextScreener obfuscation families (AC 4)', () => {
       })
     })
   }
+
+  it('rebuilds the longest single-word term in every list from its spaced form', () => {
+    for (const language of SCREENING_LANGUAGES) {
+      const longest = termLists[language].entries
+        .filter((entry) => !entry.term.includes(' '))
+        .sort((left, right) => right.term.length - left.term.length)[0] as TermEntry
+      const plain = screenCaption(longest.term)
+      for (const disguised of [
+        withSpacedLetters(longest.term),
+        withPunctuation(longest.term),
+      ]) {
+        const result = screenCaption(disguised)
+        expect(result.severity, `${language}: ${disguised}`).toBe(plain.severity)
+        expect(result.categories, `${language}: ${disguised}`).toEqual(plain.categories)
+      }
+    }
+  })
 
   it('folds diacritics so an accented spelling cannot slip a term through', () => {
     expect(screenCaption('que coño de vestido').categories).not.toEqual([])
@@ -692,13 +735,16 @@ describe('CommunityTextScreener startup validation (AC 3, AC 7)', () => {
     )
   })
 
-  it('rejects a list whose provenance is missing a licence', () => {
-    const broken = structuredClone(termLists.de)
-    delete (broken.provenance as Record<string, unknown>).licence
-    const directory = writeListFixture({ 'de-v1.json': broken })
-    expect(() => new CommunityTextScreener({ listsDirectory: directory })).toThrow(
-      /provenance.licence/
-    )
+  it('rejects a list whose provenance omits source, version or licence', () => {
+    for (const field of ['source', 'version', 'licence']) {
+      const broken = structuredClone(termLists.de)
+      delete (broken.provenance as Record<string, unknown>)[field]
+      const directory = writeListFixture({ 'de-v1.json': broken })
+      expect(
+        () => new CommunityTextScreener({ listsDirectory: directory }),
+        field
+      ).toThrow(new RegExp(`provenance.${field}`))
+    }
   })
 
   it('rejects an allow list with no provenance at all', () => {
