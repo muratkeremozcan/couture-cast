@@ -360,7 +360,10 @@ describe('Weather API integration', () => {
       .get('/api/v1/weather/')
       .set(authHeaders)
 
-    expect(missingLocationResponse.status).toBe(400)
+    // The body travels with a status mismatch. This assertion once saw a 404
+    // that fifteen isolated runs never reproduced, and a bare status cannot say
+    // whether Nest's router answered or something else on the socket did.
+    expect(missingLocationResponse.status, missingLocationResponse.text).toBe(400)
 
     const response = await request(getHttpServer())
       .get(`/api/v1/weather/${locationKey}`)

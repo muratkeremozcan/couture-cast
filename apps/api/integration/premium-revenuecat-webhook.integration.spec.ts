@@ -495,7 +495,11 @@ describe('5.2 RevenueCat webhook rail against real PostgreSQL and real HTTP', ()
 
           const event = purchaseEvent({ type })
           const response = await postEvent(event)
-          expect(response.status, `${type} from ${prior}`).toBe(200)
+          // The body rides along so a status mismatch names its responder. One
+          // full-suite run answered `CANCELLATION from expired` with a 404 that
+          // no handler on this route can produce, and the status alone left
+          // nothing to tell Nest's router apart from anything else that answered.
+          expect(response.status, `${type} from ${prior}: ${response.text}`).toBe(200)
           expect(response.body).toEqual({ data: { received: true } })
 
           // Every authenticated event records, transition or not.
