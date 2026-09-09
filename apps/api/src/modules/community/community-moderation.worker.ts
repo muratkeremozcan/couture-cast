@@ -7,7 +7,9 @@ import { type CommunityStorage } from './community-storage.adapter.js'
 import {
   type CommunityModerationEngine,
   DefaultCommunityModerationEngine,
+  SCREENING_UNAVAILABLE_REASON,
 } from './community-moderation.engine.js'
+import { NsfwScreeningError } from './tensorflow-nsfw-image-screener.js'
 import {
   COMMUNITY_MODERATION_QUEUE,
   communityModerationJobSchema,
@@ -37,6 +39,24 @@ import type { CommunityModerationMeter } from './community-moderation.telemetry.
  * process serves every job either way.
  */
 export const COMMUNITY_MODERATION_CONCURRENCY = 1
+
+/**
+ * The reason persisted on `LookbookPost.moderation_reason` when BullMQ runs out
+ * of attempts.
+ *
+ * A raw error message is the wrong thing to store: it is free text nobody can
+ * query, it changes when a library reworks its wording, and it is the branch
+ * most likely to carry a path or an internal detail into a column an operator
+ * reads. `NsfwScreeningError` carries a stable code for the case that actually
+ * produces messages, an inference timeout, and everything else falls back to
+ * the same deterministic refusal the engine emits when no verdict was reached.
+ */
+export function terminalReason(error: unknown): string {
+  if (error instanceof NsfwScreeningError) {
+    return error.reasonCode
+  }
+  return SCREENING_UNAVAILABLE_REASON
+}
 
 export interface CommunityModerationWorkerDependencies {
   prisma: PrismaClient
@@ -78,9 +98,10 @@ export function createCommunityModerationWorker(
         await processor.process(data, { attempt, maxAttempts })
       } catch (error) {
         if (attempt >= maxAttempts) {
-          const errorMessage =
-            error instanceof Error ? error.message : 'Moderation execution failed'
-          await processor.markFailed(data.postId, errorMessage, { attempt, maxAttempts })
+          await processor.markFailed(data.postId, terminalReason(error), {
+            attempt,
+            maxAttempts,
+          })
         }
         throw error
       }

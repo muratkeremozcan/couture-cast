@@ -27,12 +27,14 @@ import {
 } from './community-moderation.telemetry.js'
 import { MODERATION_SCREENING_TIMEOUT_MS } from './community-moderation.processor.js'
 import { loadCommunityScreeningPolicy } from './community-screening-policy.js'
+import {
+  COMMUNITY_NSFW_INFERENCE_TIMEOUT_ENV,
+  COMMUNITY_NSFW_SCREENER_TENSORFLOW,
+  NSFW_INFERENCE_TIMEOUT_MS,
+} from './tensorflow-nsfw-image-screener.js'
 import { CommunityTextScreener } from './community-text-screener.js'
 import { SupabaseCommunityStorageAdapter } from './community-storage.adapter.js'
 import { createBaseLogger } from '../../logger/pino.config.js'
-
-/** The value that selects the ADR-013 TensorFlow.js screener. */
-export const COMMUNITY_NSFW_SCREENER_TENSORFLOW = 'tensorflow'
 
 /** The value that selects the fail-closed adapter with no model behind it. */
 export const COMMUNITY_NSFW_SCREENER_UNAVAILABLE = 'unavailable'
@@ -58,14 +60,12 @@ export const COMMUNITY_NSFW_INCIDENT_MODE_UNAVAILABLE = 'unavailable'
  * termination never runs, leaving a pathological inference burning a core
  * through every remaining BullMQ attempt.
  */
-export const COMMUNITY_NSFW_INFERENCE_TIMEOUT_ENV = 'COMMUNITY_NSFW_INFERENCE_TIMEOUT_MS'
-export const DEFAULT_COMMUNITY_NSFW_INFERENCE_TIMEOUT_MS = 10_000
 
 export function resolveNsfwInferenceTimeoutMs(
   env: Readonly<NodeJS.ProcessEnv> = process.env
 ): number {
   const raw = env[COMMUNITY_NSFW_INFERENCE_TIMEOUT_ENV]?.trim()
-  if (!raw) return DEFAULT_COMMUNITY_NSFW_INFERENCE_TIMEOUT_MS
+  if (!raw) return NSFW_INFERENCE_TIMEOUT_MS
 
   const parsed = Number(raw)
   if (!Number.isInteger(parsed) || parsed <= 0) {
@@ -274,14 +274,17 @@ async function selectScreener(
     return finalizeSelection(selector, screener, startedAt)
   }
 
-  // TENSORFLOW BRANCH LANDS WITH THE SCREENER ITSELF. This slice builds the
-  // lifecycle around the model; the model adapter arrives on its own branch and
-  // is wired in here. Until then the selector is refused rather than silently
-  // downgraded, so no deployment can read a fixture or a degraded adapter as
-  // the real thing.
-  throw new Error(
-    `${COMMUNITY_NSFW_SCREENER_ENV}=${COMMUNITY_NSFW_SCREENER_TENSORFLOW} is not available in this build`
+  // Imported dynamically so TensorFlow.js, its WASM backend and the 5.6 MB
+  // model bundle stay off the import graph of every process that does not
+  // select them. The API request app composes this module too, and it must
+  // never pay for a model it will not run.
+  const { TensorflowNsfwImageScreener } = await import(
+    './tensorflow-nsfw-image-screener.js'
   )
+  const screener = new TensorflowNsfwImageScreener({
+    inferenceTimeoutMs: resolveNsfwInferenceTimeoutMs(env),
+  })
+  return finalizeSelection(selector, screener, startedAt)
 }
 
 async function finalizeSelection(

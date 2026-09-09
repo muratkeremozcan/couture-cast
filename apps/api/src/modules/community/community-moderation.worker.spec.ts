@@ -7,7 +7,10 @@ import sharp from 'sharp'
 import type { PrismaClient } from '@prisma/client'
 import type { TelemetryService } from '../telemetry/telemetry.service'
 import type { CommunityStorage } from './community-storage.adapter'
-import { FixtureCommunityModerationEngine } from './community-moderation.engine'
+import {
+  FixtureCommunityModerationEngine,
+  SCREENING_UNAVAILABLE_REASON,
+} from './community-moderation.engine'
 import {
   CommunityModerationProcessor,
   MODERATION_DOWNLOAD_TIMEOUT_MS,
@@ -17,7 +20,9 @@ import {
 import {
   COMMUNITY_MODERATION_CONCURRENCY,
   createCommunityModerationWorker,
+  terminalReason,
 } from './community-moderation.worker'
+import { NsfwScreeningError } from './tensorflow-nsfw-image-screener'
 import type { CommunityModerationJob } from './community-moderation.queue'
 import type { CommunityModerationMeter } from './community-moderation.telemetry'
 import type { Job, WorkerOptions } from 'bullmq'
@@ -673,7 +678,7 @@ describe('CommunityModerationProcessor & Worker', () => {
         where: { id: 'post-exhausted', status: 'pending_review' },
         data: {
           status: 'review_failed',
-          moderation_reason: 'Permanent failure',
+          moderation_reason: SCREENING_UNAVAILABLE_REASON,
         },
       })
     })
@@ -817,7 +822,10 @@ describe('CommunityModerationProcessor & Worker', () => {
       expect(recordAttemptFailure).toHaveBeenCalledWith('error', 3)
       expect(mockPostUpdateMany).toHaveBeenCalledWith({
         where: { id: 'post-last', status: 'pending_review' },
-        data: { status: 'review_failed', moderation_reason: 'Permanent failure' },
+        data: {
+          status: 'review_failed',
+          moderation_reason: SCREENING_UNAVAILABLE_REASON,
+        },
       })
     })
 
@@ -907,6 +915,51 @@ describe('CommunityModerationProcessor & Worker', () => {
         expect.any(Number),
         1
       )
+    })
+  })
+
+  describe('terminal reason on retry exhaustion', () => {
+    it('persists the stable timeout code rather than an error message', async () => {
+      createCommunityModerationWorker({
+        prisma: mockPrisma,
+        storage: mockStorage,
+        telemetryService: mockTelemetryService,
+        engine: new FixtureCommunityModerationEngine({}),
+      })
+      mockFindUnique.mockResolvedValueOnce(
+        pendingPost({
+          id: 'post-wedged',
+          user_id: 'user-wedged',
+          image_object_path: 'community/post-wedged/session-f.jpg',
+        })
+      )
+      mockDownload.mockRejectedValueOnce(
+        new NsfwScreeningError('inference exceeded its ceiling', 'inference_timeout')
+      )
+
+      await expect(
+        workerHarness.registeredProcessor!(
+          asJob({
+            data: { postId: 'post-wedged', uploadSessionId: 'sess-f' },
+            opts: { attempts: 3 },
+            attemptsMade: 2,
+          })
+        )
+      ).rejects.toThrow()
+
+      // A stable code an operator can query, not free text that changes when a
+      // library rewords its message.
+      expect(mockPostUpdateMany).toHaveBeenCalledWith({
+        where: { id: 'post-wedged', status: 'pending_review' },
+        data: { status: 'review_failed', moderation_reason: 'inference_timeout' },
+      })
+    })
+
+    it('maps every other fault to the deterministic refusal', () => {
+      expect(terminalReason(new Error('socket hang up'))).toBe(
+        SCREENING_UNAVAILABLE_REASON
+      )
+      expect(terminalReason('not even an error')).toBe(SCREENING_UNAVAILABLE_REASON)
     })
   })
 
@@ -1135,7 +1188,10 @@ describe('CommunityModerationProcessor & Worker', () => {
 
       expect(mockPostUpdateMany).toHaveBeenCalledWith({
         where: { id: 'post-no-attempts', status: 'pending_review' },
-        data: { status: 'review_failed', moderation_reason: 'Permanent failure' },
+        data: {
+          status: 'review_failed',
+          moderation_reason: SCREENING_UNAVAILABLE_REASON,
+        },
       })
     })
 
@@ -1169,7 +1225,7 @@ describe('CommunityModerationProcessor & Worker', () => {
         where: { id: 'post-string-throw', status: 'pending_review' },
         data: {
           status: 'review_failed',
-          moderation_reason: 'Moderation execution failed',
+          moderation_reason: SCREENING_UNAVAILABLE_REASON,
         },
       })
     })

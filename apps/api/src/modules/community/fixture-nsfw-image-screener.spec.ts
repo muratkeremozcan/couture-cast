@@ -8,14 +8,16 @@ import {
 import {
   COMMUNITY_NSFW_INCIDENT_MODE_ENV,
   COMMUNITY_NSFW_INCIDENT_REFERENCE_ENV,
-  COMMUNITY_NSFW_INFERENCE_TIMEOUT_ENV,
-  COMMUNITY_NSFW_SCREENER_TENSORFLOW,
   COMMUNITY_NSFW_SCREENER_UNAVAILABLE,
-  DEFAULT_COMMUNITY_NSFW_INFERENCE_TIMEOUT_MS,
   createNsfwImageScreener,
   resolveCommunityNsfwSelector,
   resolveNsfwInferenceTimeoutMs,
 } from './community-worker-runtime'
+import {
+  COMMUNITY_NSFW_INFERENCE_TIMEOUT_ENV,
+  COMMUNITY_NSFW_SCREENER_TENSORFLOW,
+  NSFW_INFERENCE_TIMEOUT_MS,
+} from './tensorflow-nsfw-image-screener'
 import {
   IMAGE_SCREENING_UNAVAILABLE_VERSION,
   SCREENING_UNAVAILABLE_REASON,
@@ -118,9 +120,7 @@ describe('community NSFW screener selection', () => {
 
   describe('inference timeout', () => {
     it('defaults to ten seconds', () => {
-      expect(resolveNsfwInferenceTimeoutMs({})).toBe(
-        DEFAULT_COMMUNITY_NSFW_INFERENCE_TIMEOUT_MS
-      )
+      expect(resolveNsfwInferenceTimeoutMs({})).toBe(NSFW_INFERENCE_TIMEOUT_MS)
     })
 
     it('accepts an explicit value below the outer screening ceiling', () => {
