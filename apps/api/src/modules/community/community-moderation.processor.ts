@@ -60,12 +60,14 @@ export interface CommunityModerationAttemptContext {
  * The identity persisted on the post and its moderation event: which text
  * engine ran and which image engine ran.
  *
- * NO SEPARATE POLICY SEGMENT, deliberately. `deriveScreeningIdentity` already
- * builds the policy version and the first twelve characters of the policy hash
- * into both engine version strings, so appending `image.policyVersion` here
- * would state the same fact a third time. That field stays on the result for
- * the bounded evaluation payload and the operational metrics, where it is read
- * as data rather than composed into an identity.
+ * NO SEPARATE POLICY SEGMENT, deliberately. Each half already names the policy:
+ * `deriveScreeningIdentity` builds the policy version and the first twelve
+ * characters of its hash into the text version, and the image screener's
+ * `composeEngineVersion` builds the same hash beside the verified model digest.
+ * Appending `image.policyVersion` here would state the same fact a third time.
+ * That field stays on the result for the bounded evaluation payload and the
+ * operational metrics, where it is read as data rather than composed into an
+ * identity.
  *
  * A fixture keeps its `-fixture` marker because the screener that produced the
  * verdict put it there, which is what makes a persisted
