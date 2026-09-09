@@ -1,6 +1,8 @@
 import crypto from 'node:crypto'
 import fs from 'node:fs'
 import path from 'node:path'
+import { Readable } from 'node:stream'
+import { pipeline } from 'node:stream/promises'
 import { fileURLToPath } from 'node:url'
 
 const __filename = fileURLToPath(import.meta.url)
@@ -9,7 +11,7 @@ const projectRoot = path.resolve(__dirname, '..')
 const EXPECTED_ANALYSIS_VERSION =
   'fashion-clip:7e3ba62ce16b379a1ab479346b66f192e76f51b7:prompts-v1'
 const DOWNLOAD_ATTEMPTS = 3
-const DOWNLOAD_TIMEOUT_MS = 60_000
+const DOWNLOAD_STALL_TIMEOUT_MS = 60_000
 
 const manifestPath = path.join(
   projectRoot,
@@ -128,17 +130,41 @@ async function downloadFile(fileSpec) {
       if (fs.existsSync(fullPath) && fs.lstatSync(fullPath).isSymbolicLink()) {
         fs.unlinkSync(fullPath)
       }
-      const response = await fetch(downloadUrl, {
-        headers: {
-          'User-Agent': 'CoutureCast-Prepare-Script/1.0',
-        },
-        redirect: 'follow',
-        signal: AbortSignal.timeout(DOWNLOAD_TIMEOUT_MS),
-      })
-      if (!response.ok) {
-        throw new Error(`HTTP ${response.status} ${response.statusText}`)
+      // The budget is a STALL timeout, rearmed on every chunk, not a deadline for
+      // the whole transfer. `onnx/model.onnx` is 605 MB, so a fixed 60-second
+      // deadline needed roughly 80 Mbps sustained and otherwise aborted a perfectly
+      // healthy download; that is why `test:tagging-model:smoke` could not run at
+      // all on an ordinary connection. A stall timeout still fails fast on a dead
+      // connection, which is the case the budget exists for.
+      const controller = new AbortController()
+      let stallTimer
+      const rearmStallTimer = () => {
+        clearTimeout(stallTimer)
+        stallTimer = setTimeout(() => controller.abort(), DOWNLOAD_STALL_TIMEOUT_MS)
       }
-      fs.writeFileSync(fullPath, Buffer.from(await response.arrayBuffer()))
+      try {
+        rearmStallTimer()
+        const response = await fetch(downloadUrl, {
+          headers: {
+            'User-Agent': 'CoutureCast-Prepare-Script/1.0',
+          },
+          redirect: 'follow',
+          signal: controller.signal,
+        })
+        if (!response.ok) {
+          throw new Error(`HTTP ${response.status} ${response.statusText}`)
+        }
+        if (!response.body) {
+          throw new Error('Response carried no body to stream')
+        }
+        // Streamed rather than buffered: `arrayBuffer()` held the whole 605 MB in
+        // memory before the first byte reached disk.
+        const source = Readable.fromWeb(response.body)
+        source.on('data', rearmStallTimer)
+        await pipeline(source, fs.createWriteStream(fullPath))
+      } finally {
+        clearTimeout(stallTimer)
+      }
       const validation = await validateFile(fileSpec)
       if (!validation.valid) {
         throw new Error(
