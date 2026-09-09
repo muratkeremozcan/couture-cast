@@ -147,7 +147,7 @@
     "prettier": "3.6.2",
     "prisma": "6.19.0",
     "rimraf": "5.0.10",
-    "sharp": "^0.34.5",
+    "sharp": "^0.35.4",
     "start-server-and-test": "3.0.5",
     "supabase": "2.62.5",
     "tsx": "4.20.6",
@@ -176,5 +176,8 @@
     "workerDirectory": [
       "apps/web/public"
     ]
+  },
+  "overrides": {
+    "sharp": "$sharp"
   }
 }

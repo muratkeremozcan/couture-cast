@@ -29,7 +29,7 @@
     "@couture/api-client": "file:../../packages/api-client",
     "@couture/utils": "file:../../packages/utils",
     "i18next": "^23.11.0",
-    "next": "15.5.9",
+    "next": "15.5.25",
     "posthog-js": "^1.356.1",
     "react": "19.1.0",
     "react-dom": "19.1.0",
