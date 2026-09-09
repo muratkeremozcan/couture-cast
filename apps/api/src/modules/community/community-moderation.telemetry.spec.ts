@@ -1,4 +1,4 @@
-// Learning path Step 38: Community feed by climate band.
+// Learning path Step 39: Production content-screening readiness.
 // Story 6.2: Community moderation telemetry unit tests.
 import { describe, expect, it, vi } from 'vitest'
 import {

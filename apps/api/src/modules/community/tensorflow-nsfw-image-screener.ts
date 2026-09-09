@@ -1,3 +1,4 @@
+// Learning path Step 39: Production content-screening readiness.
 // Story 6.2 Task 2: the production ADR-013 NSFW image screener.
 //
 // It is split in two on purpose. This file is the supervisor: it owns the

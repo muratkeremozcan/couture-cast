@@ -1,3 +1,4 @@
+// Learning path Step 39: Production content-screening readiness.
 // Story 6.2 Task 2: the isolated inference entrypoint for ADR-013 NSFW image
 // screening. It runs in a worker thread so a CPU-bound classification can be
 // stopped by terminating the thread; a `Promise.race` in the main thread would

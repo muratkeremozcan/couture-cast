@@ -1,3 +1,4 @@
+// Learning path Step 39: Production content-screening readiness.
 // Story 6.2 Task 5: the general worker process closes what it opens.
 //
 // THIS FILE EXISTS BECAUSE OF A LIVE DEFECT, not to reach a coverage number.

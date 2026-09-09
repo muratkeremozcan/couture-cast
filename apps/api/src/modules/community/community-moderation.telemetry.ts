@@ -1,3 +1,4 @@
+// Learning path Step 39: Production content-screening readiness.
 // Story 6.2 Task 4: privacy-safe operational metrics for the community
 // moderation worker.
 //

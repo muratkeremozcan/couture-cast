@@ -1,3 +1,4 @@
+// Learning path Step 39: Production content-screening readiness.
 import crypto from 'node:crypto'
 import fs from 'node:fs'
 import os from 'node:os'

@@ -1,3 +1,4 @@
+// Learning path Step 39: Production content-screening readiness.
 /*
  * Story 6.2 Task 8: end-to-end publication evidence.
  *

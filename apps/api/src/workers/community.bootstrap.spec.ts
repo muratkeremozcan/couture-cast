@@ -1,3 +1,4 @@
+// Learning path Step 39: Production content-screening readiness.
 // Story 6.2 Task 5: the dedicated community process starts ready and closes clean.
 import { beforeEach, describe, expect, it, vi } from 'vitest'
 import type { WorkerShutdownResources } from './shutdown-resources'

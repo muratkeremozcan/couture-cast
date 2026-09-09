@@ -1,3 +1,4 @@
+// Learning path Step 39: Production content-screening readiness.
 // Story 6.2 Task 2: the real-model smoke run for the ADR-013 NSFW image screener.
 // It loads the installed nsfwjs graph and the TensorFlow.js WASM backend, so every
 // case is gated behind `RUN_COMMUNITY_SCREENING_SMOKE` and reachable only through

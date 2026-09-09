@@ -1,3 +1,4 @@
+// Learning path Step 39: Production content-screening readiness.
 /*
  * Story 6.2 AC 9, the separately gated readiness suite.
  *

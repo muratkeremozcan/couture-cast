@@ -1,3 +1,4 @@
+// Learning path Step 39: Production content-screening readiness.
 // Story 6.2 AC 9: the ADR-013 NSFW image screener's lifecycle, proven without
 // TensorFlow.js and without a single image byte.
 //

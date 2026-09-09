@@ -1,3 +1,4 @@
+// Learning path Step 39: Production content-screening readiness.
 // Story 6.2 Task 3: reusable multilingual community text screening (ADR-013).
 //
 // The boundary Story 6.4 reuses for comments. It holds the seven-language term
