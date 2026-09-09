@@ -239,13 +239,43 @@ export class UnavailableNsfwImageScreener implements NsfwImageScreener {
 }
 
 export class DefaultCommunityModerationEngine implements CommunityModerationEngine {
-  private readonly textScreener: CommunityTextScreener
+  private readonly injectedTextScreener: CommunityTextScreener | undefined
 
   constructor(
     private readonly imageScreener: NsfwImageScreener = new UnavailableNsfwImageScreener(),
     textScreener?: CommunityTextScreener
   ) {
-    this.textScreener = textScreener ?? defaultTextScreener()
+    this.injectedTextScreener = textScreener
+  }
+
+  /**
+   * The default screener, resolved on first use rather than in the constructor.
+   *
+   * THE DEPLOYED API REQUEST APP CONSTRUCTS THIS ENGINE AND NEVER SCREENS WITH
+   * IT. `CommunityModule` lists `CommunityModerationProcessor` as a provider, so
+   * Nest instantiates it during `NestFactory.create`, and its constructor builds
+   * this engine; nothing in the request path injects that processor, and the only
+   * consumer is `community-moderation.worker.ts`, which passes its own engine.
+   * Building the screener eagerly therefore read fourteen term lists out of
+   * `apps/api/policies` on every cold start of a function that cannot use them.
+   *
+   * That is not a latency argument, it is why the API preview returned
+   * `FUNCTION_INVOCATION_FAILED` on `/api/health` for twenty straight polls.
+   * `apps/api/policies` sits outside `dist` and is reached through
+   * `path.resolve(__dirname, ...)` plus `existsSync`, which no import trace can
+   * follow, so it is absent from the serverless bundle: measured on 2026-09-08 by
+   * booting the compiled Vercel entrypoint with that directory hidden, where
+   * `NestFactory.create` died with `CommunityTextScreenerConfigError: term lists
+   * not found` and every request 500ed. With it present, `/api/health` answers 200.
+   *
+   * Deferring the read makes the request app stop depending on a file it never
+   * needs. It does NOT weaken AC 1: `createCommunityWorkerRuntime` builds a
+   * screener explicitly from the loaded policy before the BullMQ consumer starts,
+   * which is where a malformed list is required to fail startup, and this
+   * fallback never runs in that process.
+   */
+  private get textScreener(): CommunityTextScreener {
+    return this.injectedTextScreener ?? defaultTextScreener()
   }
 
   /**

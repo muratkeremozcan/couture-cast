@@ -1,6 +1,6 @@
 // Learning path Step 38: Community feed by climate band.
 // Story 6.1: Community moderation engine unit tests (ADR-013).
-import { describe, expect, it } from 'vitest'
+import { describe, expect, it, vi } from 'vitest'
 import {
   ADR013_IMAGE_ENGINE_VERSION,
   ADR013_NSFW_CLASSES,
@@ -520,6 +520,50 @@ describe('CommunityModerationEngine (ADR-013)', () => {
 
       expect(result.outcome).toBe('flagged')
       expect(result.reasons).toEqual([SCREENING_UNAVAILABLE_REASON])
+    })
+  })
+
+  describe('construction reaches no filesystem', () => {
+    /**
+     * The regression that took the API preview down. `CommunityModule` lists
+     * `CommunityModerationProcessor` as a provider, so `NestFactory.create`
+     * builds it during boot and its constructor builds this engine. While the
+     * engine resolved its text screener eagerly, that boot read fourteen term
+     * lists out of `apps/api/policies`, a directory outside `dist` reached
+     * through `path.resolve(__dirname, ...)` that no import trace can follow and
+     * that the serverless bundle therefore does not carry. Measured on
+     * 2026-09-08 against the compiled Vercel entrypoint with the directory
+     * hidden: `NestFactory.create` died with `term lists not found` and
+     * `/api/health` 500ed, which is the `FUNCTION_INVOCATION_FAILED` the preview
+     * workflow polled twenty times. Nothing in the request path screens text,
+     * so the read belongs at first use.
+     *
+     * `vi.resetModules()` is load-bearing: the default screener is memoised at
+     * module scope, so a sibling test that already screened would leave a cached
+     * instance behind and let a re-broken constructor pass without reading
+     * anything.
+     */
+    it('6.2-UNIT-040 builds its default screener on first use, not at construction', async () => {
+      vi.resetModules()
+      const engineModule = await import('./community-moderation.engine.js')
+      const fsModule = await import('node:fs')
+      const existsSync = vi.spyOn(fsModule.default, 'existsSync').mockReturnValue(false)
+
+      try {
+        const engine = new engineModule.DefaultCommunityModerationEngine()
+
+        // With every candidate directory reported absent, a constructor that
+        // resolved the screener would throw here the way boot did.
+        expect(existsSync).not.toHaveBeenCalled()
+
+        // And the read really is deferred rather than removed: the same absent
+        // directory is still a hard failure the moment something screens.
+        expect(() =>
+          engine.screenText({ text: 'a linen dress', field: 'caption', locale: 'en-US' })
+        ).toThrow(/term lists not found/)
+      } finally {
+        existsSync.mockRestore()
+      }
     })
   })
 })
