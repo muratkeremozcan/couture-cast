@@ -234,4 +234,27 @@ describe('createCommunityWorkerRuntime', () => {
     // connection open for the life of the container.
     expect(harness.order).toEqual(['screenerClose', 'queueClose'])
   })
+
+  it('closes the queue even when the screener close rejects', async () => {
+    // Awaiting the screener close directly meant a model process that failed
+    // to terminate skipped the queue close entirely, which is the same leaked
+    // Redis connection the ordering above exists to prevent, reached by
+    // another route. Both are attempted; the failure is surfaced afterwards.
+    const closeFailure = new Error('worker terminate rejected')
+    harness.screenerClose.mockReset().mockImplementation(() => {
+      harness.order.push('screenerClose')
+      return Promise.reject(closeFailure)
+    })
+
+    const runtime = await createCommunityWorkerRuntime({
+      prisma,
+      telemetryService,
+      meter: meter(),
+    })
+    harness.order.length = 0
+
+    await expect(runtime.close()).rejects.toBe(closeFailure)
+    expect(harness.order).toEqual(['screenerClose', 'queueClose'])
+    expect(harness.queueClose).toHaveBeenCalledTimes(1)
+  })
 })

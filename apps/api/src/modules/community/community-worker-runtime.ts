@@ -392,8 +392,25 @@ export async function createCommunityWorkerRuntime(deps: {
       // connection the outbox dispatcher opens; the screener holds a model
       // process. Closing one and not the other is how `SIGTERM` used to leave a
       // connection open for the lifetime of the container.
-      await selection?.close()
+      //
+      // A rejecting screener close must not become that same leak by another
+      // route: awaiting it directly meant a model process that failed to
+      // terminate skipped the queue close entirely. Capture the failure, close
+      // the queue regardless, then surface it.
+      let screenerCloseFailure: Error | undefined
+      try {
+        await selection?.close()
+      } catch (error) {
+        screenerCloseFailure = error instanceof Error ? error : new Error(String(error))
+        logger.error(
+          { err: error, event: COMMUNITY_MODERATION_LOG_EVENTS.modelTerminated },
+          'Community screener failed to close; closing the queue anyway'
+        )
+      }
       await queue.onModuleDestroy()
+      if (screenerCloseFailure) {
+        throw screenerCloseFailure
+      }
     },
   }
 }

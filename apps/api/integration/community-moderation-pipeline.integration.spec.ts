@@ -1169,8 +1169,16 @@ describe('6.2 screening dispositions and attempt evidence', () => {
         return post.status === 'published'
       })
 
-      const failures = await prisma.jobFailure.findMany({
-        where: { queue_name: queueName },
+      // `base.worker.ts` writes the JobFailure row from a fire-and-forget
+      // handler on BullMQ's `failed` event, so the rows land after the post
+      // reaches its terminal state rather than before it. Reading them straight
+      // after the publish wait raced that write.
+      let failures: Awaited<ReturnType<typeof prisma.jobFailure.findMany>> = []
+      await waitUntil(async () => {
+        failures = await prisma.jobFailure.findMany({
+          where: { queue_name: queueName },
+        })
+        return failures.length === 2
       })
       // Two retryable attempts failed and the third published. The per-attempt
       // record and the final post state are different facts, and conflating

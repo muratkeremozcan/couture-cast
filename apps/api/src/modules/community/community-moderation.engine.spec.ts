@@ -334,6 +334,22 @@ describe('CommunityModerationEngine (ADR-013)', () => {
 
       expect(result.outcome).toBe('flagged')
       expect(result.image.disposition).toBe('pass')
+      expect(result.reasons).toContain(IMAGE_DISPOSITION_CONFLICT_REASON)
+    })
+
+    it('names the contradiction when a screener fails a passing image silently', async () => {
+      // The mirror of the case above, and the one that actually needed the
+      // reason code. With no reason of its own to carry, this contradiction
+      // held the post with an EMPTY reason list, so a moderator saw a refusal
+      // with nothing to explain it. The two halves disagreeing is the fact
+      // worth persisting, in whichever direction they disagree.
+      const silentlyContradicting = new DefaultCommunityModerationEngine(
+        new StubNsfwScreener({ passed: false, reasons: [], disposition: 'pass' })
+      )
+      const result = await silentlyContradicting.moderatePost(cleanPost)
+
+      expect(result.outcome).toBe('flagged')
+      expect(result.reasons).toEqual([IMAGE_DISPOSITION_CONFLICT_REASON])
     })
 
     it('flags a refusal that names no reason even when a disposition is present', async () => {

@@ -395,7 +395,13 @@ function combineScreeningResults(
   image: ImageScreeningResult
 ): CommunityModerationResult {
   const reasons = new Set<string>([...text.reasons, ...image.reasons])
-  if (image.passed && !imageCleared(image)) {
+  // A screener whose two halves disagree gets named in BOTH directions.
+  // `passed: true` beside a refusing disposition is the obvious case. The
+  // mirror, `passed: false` beside a `pass` disposition, also holds the post,
+  // and before it was named it held the post with an EMPTY reason list, which
+  // is the same unexplained refusal this reason code exists to remove.
+  const declaredDisposition = image.disposition ?? 'pass'
+  if (image.passed !== (declaredDisposition === 'pass')) {
     reasons.add(IMAGE_DISPOSITION_CONFLICT_REASON)
   }
   const publishes = text.passed && imageCleared(image)
