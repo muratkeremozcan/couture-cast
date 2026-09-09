@@ -3,12 +3,13 @@ import {
   ADR013_IMAGE_ENGINE_VERSION,
   type ImageScreeningResult,
   type NsfwImageScreener,
+  type NsfwScreenerReadiness,
 } from './community-moderation.engine.js'
 
 /** The environment variable that selects the image screener, mirroring `GARMENT_TAGGING_ENGINE`. */
 export const COMMUNITY_NSFW_SCREENER_ENV = 'COMMUNITY_NSFW_SCREENER'
 
-/** The only value that selects this fixture. Anything absent means the real screener. */
+/** The only value that selects this fixture; see `community-worker-runtime.ts`. */
 export const COMMUNITY_NSFW_SCREENER_FIXTURE = 'fixture'
 
 /**
@@ -52,7 +53,15 @@ export class FixtureNsfwImageScreener implements NsfwImageScreener {
       passed: true,
       reasons: [],
       engineVersion: this.engineVersion,
+      disposition: 'pass',
       score: 0,
     })
+  }
+
+  ensureReady(): Promise<NsfwScreenerReadiness> {
+    // No policy version and no model hash, deliberately. A fixture that
+    // reported either would put a real-looking identity on a readiness log and
+    // in the evidence payload built from it.
+    return Promise.resolve({ engineVersion: this.engineVersion })
   }
 }

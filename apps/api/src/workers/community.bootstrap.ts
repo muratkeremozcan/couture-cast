@@ -90,13 +90,16 @@ function schedule(name: string, intervalMs: number, sweep: () => Promise<unknown
   timers.push(timer)
 }
 
-function startCommunityWorkers() {
+export async function startCommunityWorkers() {
   try {
     const prisma = getPrismaClient()
     posthogService = new PostHogService()
     const telemetryService = new TelemetryService(prisma, posthogService)
 
-    const community = createCommunityWorkerRuntime({ prisma, telemetryService })
+    // Readiness first, consumption second. `createCommunityWorkerRuntime`
+    // resolves only once the selected screener has loaded and verified whatever
+    // it needs, so no job is ever screened by a half-built engine.
+    const community = await createCommunityWorkerRuntime({ prisma, telemetryService })
     workers.push(community.worker)
     closeRuntime = community.close
 
@@ -105,14 +108,22 @@ function startCommunityWorkers() {
     schedule('upload-expiry', SWEEP_INTERVAL_MS, community.sweeps.sweepExpiredUploads)
     schedule('erasure', SWEEP_INTERVAL_MS, community.sweeps.sweepErasureRequests)
 
-    logger.info({ queue: 'community-moderation' }, 'Dedicated community worker started')
+    logger.info(
+      {
+        queue: 'community-moderation',
+        selector: community.readiness?.selector ?? null,
+        engineVersion: community.readiness?.engineVersion ?? null,
+        startupDurationMs: community.readiness?.startupDurationMs ?? null,
+      },
+      'Dedicated community worker started'
+    )
   } catch (err) {
     logger.error(err, 'Failed to start community workers')
     process.exit(1)
   }
 }
 
-async function performShutdown() {
+export async function performShutdown() {
   logger.info('Shutting down community workers...')
   let exitCode = 0
   for (const timer of timers) {
@@ -148,7 +159,12 @@ function shutdown(): Promise<void> {
   return shutdownPromise
 }
 
-process.on('SIGTERM', () => void shutdown())
-process.on('SIGINT', () => void shutdown())
+// Guarded like `wardrobe.bootstrap.ts`, so importing this module in a spec does
+// not open a Redis connection, register signal handlers, or call `process.exit`
+// inside the test runner.
+if (require.main === module) {
+  process.on('SIGTERM', () => void shutdown())
+  process.on('SIGINT', () => void shutdown())
 
-startCommunityWorkers()
+  void startCommunityWorkers()
+}
