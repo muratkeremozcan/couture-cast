@@ -60,16 +60,29 @@ import {
 import { createBaseLogger } from '../logger/pino.config.js'
 import { createWorker, defaultWorkerOptions } from './base.worker'
 import { disconnectPrismaClient, getPrismaClient } from './prisma'
-import { shutdownWorkerResources } from './shutdown-resources'
+import { shutdownWorkerResources, type ShutdownQueue } from './shutdown-resources'
 
 // Flow ref S0.4/T5: track worker/queue instances for coordinated shutdown.
 const logger = createBaseLogger().child({ feature: 'workers' })
 const workers: Worker[] = []
 const queues: Queue[] = []
+/**
+ * Resources that close like a queue but are not BullMQ `Queue` objects.
+ *
+ * The community runtime is the one that matters: `CommunityModerationQueue`
+ * creates its own BullMQ `Queue`, and therefore its own Redis connection, the
+ * first time the outbox dispatcher enqueues. That connection is invisible to
+ * `createQueues()`, so before this list existed the process pushed
+ * `community.worker` onto the shutdown list and DISCARDED `community.close`,
+ * and `SIGTERM` closed the consumer while leaving the producer's connection
+ * open for the lifetime of the container. `community.bootstrap.ts` had always
+ * retained that hook; this process had not.
+ */
+const closeables: ShutdownQueue[] = []
 const redisClients: Redis[] = []
 let posthogService: PostHogService | undefined
 
-async function startWorkers() {
+export async function startWorkers() {
   try {
     // Flow ref S0.4/T5: create queue clients for the known queues before any
     // workers start consuming jobs.
@@ -247,7 +260,13 @@ async function startWorkers() {
     // Neither existed before, which is why every community post terminated at
     // `pending_review`. The composition is shared with `community.bootstrap.ts`
     // so the two process groups cannot drift.
-    const community = createCommunityWorkerRuntime({ prisma, telemetryService })
+    // Awaited, because a BullMQ worker consumes the moment it is constructed
+    // and the screener behind it may still be loading and verifying a model.
+    const community = await createCommunityWorkerRuntime({ prisma, telemetryService })
+    closeables.push({
+      close: () => community.close(),
+      disconnect: () => community.close(),
+    })
 
     const maintenanceProcessor = createMaintenanceProcessor({
       admin: new AdminService(),
@@ -287,10 +306,19 @@ async function startWorkers() {
       })
     )
 
-    // ADR-013 screening is CPU-bound (decode, re-encode, and eventually the
-    // NSFW model), so its concurrency stays low; the runtime caps it at five,
-    // matching the wardrobe silhouette worker for the same reason.
+    // ADR-013 screening is CPU-bound and runs one supervised model per process,
+    // so the runtime caps this consumer at one job at a time
+    // (`COMMUNITY_MODERATION_CONCURRENCY`). Throughput comes from replicas.
     workers.push(community.worker)
+
+    logger.info(
+      {
+        selector: community.readiness?.selector ?? null,
+        engineVersion: community.readiness?.engineVersion ?? null,
+        startupDurationMs: community.readiness?.startupDurationMs ?? null,
+      },
+      'Community moderation consumer started'
+    )
 
     // Story 4.4: the moderation-review consumer moved to
     // wardrobe.bootstrap.ts, the model-capable process gated by
@@ -307,7 +335,7 @@ async function startWorkers() {
   }
 }
 
-async function performShutdown() {
+export async function performShutdown() {
   logger.info('Shutting down workers and queues...')
   let exitCode = 0
   try {
@@ -320,7 +348,7 @@ async function performShutdown() {
     }
     await shutdownWorkerResources({
       workers,
-      queues,
+      queues: [...queues, ...closeables],
       redisClients,
       disconnectPrisma: disconnectPrismaClient,
     })
@@ -340,7 +368,12 @@ function shutdown(): Promise<void> {
 }
 
 // Flow ref S0.4/T5: handle SIGTERM/SIGINT and close resources cleanly.
-process.on('SIGTERM', () => void shutdown())
-process.on('SIGINT', () => void shutdown())
+// Guarded like `wardrobe.bootstrap.ts`, so a spec can import this module's
+// composition without the import itself opening Redis connections, registering
+// signal handlers, and calling `process.exit` inside the test runner.
+if (require.main === module) {
+  process.on('SIGTERM', () => void shutdown())
+  process.on('SIGINT', () => void shutdown())
 
-void startWorkers()
+  void startWorkers()
+}

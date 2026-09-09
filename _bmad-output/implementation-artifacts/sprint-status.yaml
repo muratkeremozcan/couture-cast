@@ -30,7 +30,7 @@
 # - Dev moves story to 'review', SM/Code-Review validates, then Dev moves to 'done'
 
 generated: 2026-07-07
-last_updated: 2026-09-06
+last_updated: 2026-09-08
 project: couture-cast
 project_key: couture-cast
 tracking_system: file-system
@@ -97,7 +97,8 @@ development_status:
   # Epic 6: Community & Moderation Loop (Phase 2)
   epic-6: in-progress
   6-1-community-feed-by-climate-band: done
-  6-2-production-content-screening-readiness: backlog
+  6-2-production-content-screening-readiness: in-progress
+  6-2b-community-screening-release-gate: ready-for-dev
   6-3-curated-reactions: backlog
   6-4-threaded-comments: backlog
   6-5-realtime-engagement-notifications: backlog

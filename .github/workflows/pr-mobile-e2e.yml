@@ -422,11 +422,13 @@ jobs:
       - name: Summarize the Maestro run and comment
         uses: ./.github/actions/mobile-e2e-report-comment
         with:
-          # Scoped to this attempt. Artifacts belong to the run rather than the
-          # attempt, so a re-run leaves the previous attempt's uploads in place
-          # and an unscoped pattern would report both, double-counting flows and
-          # producing two "shard 1" download links.
-          artifact-pattern: android-test-results-shard-*-attempt-${{ github.run_attempt }}
+          # Every attempt, not just this one. Artifacts belong to the run rather
+          # than the attempt, and a partial re-run uploads only the shards that
+          # re-ran, so scoping to `github.run_attempt` made the completeness
+          # guard fail every `gh run rerun --failed` of this workflow. The
+          # action keeps the newest attempt per shard instead, which still gives
+          # exactly one directory per shard.
+          artifact-pattern: android-test-results-shard-*-attempt-*
           suite-result: ${{ needs.mobile-e2e-android.result }}
           # Keep in step with the `shard:` matrix above. `strategy.job-total` is
           # not readable from a job that only `needs:` the matrix, so this is a

@@ -291,12 +291,100 @@ The general [bootstrap](../../apps/api/src/workers/bootstrap.ts):
 - creates the configured queues and Redis clients;
 - registers the weather refresh scheduler;
 - starts weather, alert fan-out, and moderation workers;
+- awaits community screening readiness before constructing the community consumer;
 - logs startup failure and exits nonzero; and
-- handles `SIGTERM` and `SIGINT` by closing workers, queues, Redis, PostHog, and Prisma.
+- handles `SIGTERM` and `SIGINT` by closing workers, queues, the community runtime, Redis, PostHog,
+  and Prisma.
 
 The dedicated [wardrobe bootstrap](../../apps/api/src/workers/wardrobe.bootstrap.ts) verifies the
 engine selection, rejects fixture mode outside test environments, loads the pinned model, and
 consumes `color-extraction` at concurrency one.
+
+### Community content screening (ADR-013)
+
+Two processes can consume `community-moderation`, and both compose it through the one
+[community worker runtime](../../apps/api/src/modules/community/community-worker-runtime.ts):
+
+- `npm run start:workers:prod --workspace api` runs the general
+  [bootstrap](../../apps/api/src/workers/bootstrap.ts), which also carries weather, alert fan-out,
+  billing reconciliation and the maintenance sweeps.
+- `npm run start:workers:community:prod --workspace api` runs the narrow
+  [community bootstrap](../../apps/api/src/workers/community.bootstrap.ts) and nothing else. It
+  pre-flights `verify:community-screening-model`, and it is the process Story 6.2b deploys.
+
+Run exactly one of them against a given Redis. BullMQ splits jobs across every worker subscribed to
+a queue name regardless of process, so running both would spread screening across two process groups
+and only one of them would be the one being measured.
+
+Set on whichever process consumes the queue:
+
+| Variable                              | Values                                 | Notes                                                                           |
+| ------------------------------------- | -------------------------------------- | ------------------------------------------------------------------------------- |
+| `COMMUNITY_NSFW_SCREENER`             | `tensorflow`, `fixture`, `unavailable` | Required. Absent or unrecognised exits before the consumer starts.              |
+| `COMMUNITY_NSFW_INCIDENT_MODE`        | `unavailable`                          | Required in production only when the selector is `unavailable`.                 |
+| `COMMUNITY_NSFW_INCIDENT_REFERENCE`   | non-empty incident identifier          | Required alongside the incident mode. Appears in the readiness log.             |
+| `COMMUNITY_NSFW_INFERENCE_TIMEOUT_MS` | positive integer, below 30000          | Defaults to 10000. Bounds one inference; the 30s pipeline ceiling is unchanged. |
+
+There is no model directory, no remote model host and no policy path variable. The model travels
+inside the pinned `nsfwjs` package and the policy is a committed file, both hash-pinned by the
+manifest.
+
+Deploy sequence:
+
+1. Set `COMMUNITY_NSFW_SCREENER=tensorflow` on the consuming process.
+2. Run `npm run verify:community-screening-model --workspace api` and
+   `npm run verify:community-screening-supply-chain --workspace api` against the built image. Both
+   exit nonzero on a hash, threshold, class-name or licence mismatch.
+3. Complete the migration checkpoint above.
+4. Start the process. Require the structured `community_moderation_screener_ready` log, carrying
+   the selector, engine version, policy version, model hash, backend and startup duration, before
+   enabling community writes.
+5. Leave `community_read_enabled` and `community_write_enabled` disabled. Model readiness authorizes
+   one gate signature and Story 6.2b records it; seven other signatures remain open.
+
+Startup rejects a missing artifact, a changed hash, a diverging threshold, an unexpected class-name
+set, an unapproved policy, or an unusable selector before the BullMQ consumer is constructed. That
+check lives in the process rather than only in the npm pre-hook, so it holds for `tsx`, for the
+compiled entrypoint, and for any launcher added later.
+
+Screening concurrency is one job per process
+(`COMMUNITY_MODERATION_CONCURRENCY`), because one process holds one supervised model. Throughput
+comes from adding replicas.
+
+#### Degraded mode: running without a working model
+
+`COMMUNITY_NSFW_SCREENER=unavailable` starts queue consumption, returns the deterministic
+`screening_unavailable` refusal for every submission, routes each one to human review, and performs
+no model retry because no model is constructed. Posts reach `flagged`, not `published`, and the
+existing five-minute moderation alert and 24-hour review SLA apply to all of them.
+
+In production it additionally requires `COMMUNITY_NSFW_INCIDENT_MODE=unavailable` and a non-empty
+`COMMUNITY_NSFW_INCIDENT_REFERENCE`. Both together are the authorization: `unavailable` on its own
+is indistinguishable from a half-finished deployment, and the process refuses to start without them.
+
+**Authorizing.** The incident owner records the incident, sets all three variables, and restarts the
+consuming process. The startup log line `community_moderation_screener_incident_mode` carries the
+incident reference and is emitted at error level so it is visible under production's `warn` floor.
+Expect the moderation review queue to grow at the full rate of community submissions for the
+duration, and staff for it.
+
+**Restoring.** Set `COMMUNITY_NSFW_SCREENER=tensorflow`, clear both incident variables, run the two
+verify commands, and restart. Require `community_moderation_screener_ready` before treating
+screening as restored.
+
+**Replaying retained jobs.** Jobs that ran during the incident completed rather than failed, so
+BullMQ will not retry them. `community-moderation` retains completed and failed jobs for seven days
+and `queue.add` with an existing job id returns the existing job instead of creating one, so
+re-arming an outbox row alone is a silent no-op inside that window. To genuinely re-screen a post,
+remove the retained job first (`queue.getJob(<postId>__<uploadSessionId>)` then `job.remove()`) and
+re-arm its outbox row by clearing `dispatched_at`, or give the post a new upload session, which
+changes the object path and therefore the job id.
+
+**Draining the review queue.** Posts refused during the incident carry
+`moderation_reason = 'screening_unavailable'` and
+`moderation_engine_version = '<text engine>;adr013-nsfw-unavailable'`, which is the query that
+separates them from posts a real model refused. Release or take down each one through the operator
+actions, or re-screen the batch using the replay above once the model is back.
 
 No Docker image, Vercel function, GitHub deployment workflow, process manifest, or other hosted
 worker target starts this command. The Vercel API function does not start the dedicated workers.

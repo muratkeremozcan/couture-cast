@@ -16,6 +16,13 @@ import {
   type CommunityModerationResult,
   DefaultCommunityModerationEngine,
 } from './community-moderation.engine.js'
+import {
+  COMMUNITY_MODERATION_LOG_EVENTS,
+  createOpenTelemetryCommunityModerationMeter,
+  createSafeCommunityModerationMeter,
+  type CommunityModerationMeter,
+  type ModerationOutcome,
+} from './community-moderation.telemetry.js'
 import { type CommunityModerationJob } from './community-moderation.queue.js'
 import { communitySubjectToken, postDedupeKey } from './community-analytics.js'
 import { buildCommunityContentSnapshot } from './community-audit-snapshot.js'
@@ -38,6 +45,37 @@ export const MODERATION_SCREENING_TIMEOUT_MS = 30_000
 /** Minutes an operator has to see a flagged post, per the moderation SLA. */
 const FLAGGED_ALERT_SLA_MINUTES = 5
 const FLAGGED_REVIEW_SLA_HOURS = 24
+
+/**
+ * Which BullMQ attempt is executing, so a metric and an evidence line can tell a
+ * first try from the last one. Optional because the processor is also driven
+ * directly by the integration suite, where there is no BullMQ job to ask.
+ */
+export interface CommunityModerationAttemptContext {
+  attempt: number
+  maxAttempts: number
+}
+
+/**
+ * The identity persisted on the post and its moderation event: which text
+ * engine ran and which image engine ran.
+ *
+ * NO SEPARATE POLICY SEGMENT, deliberately. Each half already names the policy:
+ * `deriveScreeningIdentity` builds the policy version and the first twelve
+ * characters of its hash into the text version, and the image screener's
+ * `composeEngineVersion` builds the same hash beside the verified model digest.
+ * Appending `image.policyVersion` here would state the same fact a third time.
+ * That field stays on the result for the bounded evaluation payload and the
+ * operational metrics, where it is read as data rather than composed into an
+ * identity.
+ *
+ * A fixture keeps its `-fixture` marker because the screener that produced the
+ * verdict put it there, which is what makes a persisted
+ * `moderation_engine_version` answer "was this really screened".
+ */
+export function buildModerationEngineVersion(result: CommunityModerationResult): string {
+  return `${result.engineVersions.text};${result.engineVersions.image}`
+}
 
 export async function withModerationTimeout<T>(
   work: Promise<T>,
@@ -64,6 +102,7 @@ export async function withModerationTimeout<T>(
 export class CommunityModerationProcessor {
   private readonly logger = new Logger(CommunityModerationProcessor.name)
   private readonly moderationEngine: CommunityModerationEngine
+  private readonly meter: CommunityModerationMeter
 
   constructor(
     @Inject(PrismaClient)
@@ -73,13 +112,43 @@ export class CommunityModerationProcessor {
     @Inject(TelemetryService)
     private readonly telemetryService: TelemetryService,
     @Optional()
-    engine?: CommunityModerationEngine
+    engine?: CommunityModerationEngine,
+    @Optional()
+    meter?: CommunityModerationMeter
   ) {
     this.moderationEngine = engine ?? new DefaultCommunityModerationEngine()
+    // Wrapped even when one is injected. A metrics fault after a post has
+    // already published would otherwise escape into the worker's catch, count
+    // as a failed attempt and burn a BullMQ retry on work that is finished.
+    this.meter = createSafeCommunityModerationMeter(
+      meter ?? createOpenTelemetryCommunityModerationMeter()
+    )
   }
 
-  async process(jobData: CommunityModerationJob): Promise<void> {
+  async process(
+    jobData: CommunityModerationJob,
+    context?: CommunityModerationAttemptContext
+  ): Promise<void> {
+    const attempt = context?.attempt ?? 1
+    try {
+      await this.screenPost(jobData, context, attempt)
+    } catch (error) {
+      // Every throw out of this processor is an attempt BullMQ will either
+      // retry or exhaust, and AC 5 wants those counted separately from the
+      // post's final state. One place to count them means a new throw site
+      // cannot forget.
+      this.meter.recordAttemptFailure('error', attempt)
+      throw error
+    }
+  }
+
+  private async screenPost(
+    jobData: CommunityModerationJob,
+    context: CommunityModerationAttemptContext | undefined,
+    attempt: number
+  ): Promise<void> {
     const { postId, platform } = jobData
+    const startedAt = Date.now()
 
     const post = await this.prisma.lookbookPost.findUnique({
       where: { id: postId },
@@ -128,7 +197,13 @@ export class CommunityModerationProcessor {
       imageBuffer = normalized
     } catch (error) {
       if (error instanceof CommunityImageValidationError) {
-        await this.markFailed(post.id, error.code)
+        await this.markFailed(post.id, error.code, context)
+        this.meter.recordScreening(
+          'review',
+          'review_failed',
+          Date.now() - startedAt,
+          attempt
+        )
         return
       }
       throw error
@@ -145,7 +220,9 @@ export class CommunityModerationProcessor {
       'community content screening'
     )
 
-    const engineVersion = `${screeningResult.engineVersions.text};${screeningResult.engineVersions.image}`
+    const engineVersion = buildModerationEngineVersion(screeningResult)
+    const outcome: ModerationOutcome =
+      screeningResult.outcome === 'passed' ? 'published' : 'flagged'
 
     if (screeningResult.outcome === 'passed') {
       await this.publishPost({
@@ -157,10 +234,33 @@ export class CommunityModerationProcessor {
         platform,
         post,
       })
-      return
+    } else {
+      await this.flagPost(post.id, post.user_id, screeningResult, engineVersion, post)
     }
 
-    await this.flagPost(post.id, post.user_id, screeningResult, engineVersion, post)
+    // Disposition, duration and attempt only. No post id, no author, no object
+    // path, no caption: these are attributes on a time series, and every one of
+    // them would be both a privacy leak and unbounded cardinality.
+    this.meter.recordScreening(
+      screeningResult.image.disposition ??
+        (screeningResult.image.passed ? 'pass' : 'review'),
+      outcome,
+      Date.now() - startedAt,
+      attempt
+    )
+    this.logger.debug(
+      {
+        event: COMMUNITY_MODERATION_LOG_EVENTS.screeningCompleted,
+        postId: post.id,
+        outcome,
+        disposition: screeningResult.image.disposition ?? null,
+        engineVersion,
+        attempt,
+        maxAttempts: context?.maxAttempts ?? null,
+        durationMs: Date.now() - startedAt,
+      },
+      'Community screening attempt completed'
+    )
   }
 
   private async emit<
@@ -397,7 +497,11 @@ export class CommunityModerationProcessor {
    * reason. The outbox row is stamped here too, for the same reason it is
    * stamped on the flagged branch.
    */
-  async markFailed(postId: string, reason: string): Promise<void> {
+  async markFailed(
+    postId: string,
+    reason: string,
+    context?: CommunityModerationAttemptContext
+  ): Promise<void> {
     const failedAt = new Date()
     await this.prisma.$transaction(async (tx) => {
       const updateResult = await tx.lookbookPost.updateMany({
@@ -423,6 +527,8 @@ export class CommunityModerationProcessor {
         event: 'community_moderation_review_failed',
         postId,
         reason,
+        attempt: context?.attempt ?? null,
+        maxAttempts: context?.maxAttempts ?? null,
       },
       'Post moderation retry attempts exhausted; status transitioned to review_failed'
     )

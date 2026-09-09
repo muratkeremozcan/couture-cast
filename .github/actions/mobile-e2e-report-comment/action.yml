@@ -80,6 +80,41 @@ runs:
         path: ${{ inputs.artifacts-path }}
         pattern: ${{ inputs.artifact-pattern }}
 
+    # A partial re-run (`gh run rerun --failed`) increments `run_attempt` but
+    # only the shards that re-ran upload under the new attempt, so an
+    # attempt-scoped pattern sees one shard out of seven and the completeness
+    # guard fails a suite whose shards all passed. Download every attempt and
+    # keep, per shard, only the highest attempt that uploaded. That restores the
+    # property the attempt scoping was protecting: exactly one directory per
+    # shard, so no flow is counted twice and no download link is duplicated.
+    - name: Keep the newest attempt per shard
+      shell: bash
+      env:
+        ARTIFACTS_PATH: ${{ inputs.artifacts-path }}
+      run: |
+        set -euo pipefail
+        [ -d "${ARTIFACTS_PATH}" ] || exit 0
+        node -e '
+          const fs = require("node:fs")
+          const path = require("node:path")
+          const root = process.env.ARTIFACTS_PATH
+          const best = new Map()
+          for (const name of fs.readdirSync(root)) {
+            const match = /-shard-(\d+)-attempt-(\d+)$/.exec(name)
+            if (!match) continue
+            const shard = match[1]
+            const attempt = Number(match[2])
+            const current = best.get(shard)
+            if (!current || attempt > current.attempt) best.set(shard, { attempt, name })
+          }
+          const keep = new Set([...best.values()].map((entry) => entry.name))
+          for (const name of fs.readdirSync(root)) {
+            if (!/-shard-\d+-attempt-\d+$/.test(name) || keep.has(name)) continue
+            fs.rmSync(path.join(root, name), { recursive: true, force: true })
+            console.log(`Superseded by a later attempt, dropped: ${name}`)
+          }
+        '
+
     # No `npm ci` here. The summariser uses only Node builtins, so this job
     # needs a checkout and nothing else, which keeps the reporting job at well
     # under a minute rather than paying an install to print a table.

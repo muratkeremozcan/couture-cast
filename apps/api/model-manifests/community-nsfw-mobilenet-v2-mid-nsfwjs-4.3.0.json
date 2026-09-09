@@ -1,0 +1,159 @@
+{
+  "manifestVersion": 1,
+  "modelFamily": "mobilenet_v2_mid",
+  "packageName": "nsfwjs",
+  "packageVersion": "4.3.0",
+  "modelSubpath": "nsfwjs/models/mobilenet_v2_mid",
+  "modelExport": "MobileNetV2MidModel",
+  "pathResolution": {
+    "rule": "Every modelFiles and wasmFiles entry carries its own package name, and its path is relative to that package s own resolved root. Resolve each distinct package once through createRequire, preferring require.resolve(<name>/package.json) and falling back, for a package such as nsfwjs whose exports map does not publish that path, to resolving a published export and walking up to the nearest package.json that claims the name.",
+    "rationale": "Never a hardcoded node_modules path. npm hoists @tensorflow/* to the workspace root today and places the nsfwjs peer alias under apps/api, and a future dedupe can move either. A manifest that verifies only one physical layout fails startup on a legitimate install; resolving through each package s own export map also fails loudly when a package is missing, which is the outcome we want."
+  },
+  "inputWidth": 224,
+  "inputHeight": 224,
+  "inputChannels": 3,
+  "inputDtype": "float32",
+  "inputScale": 255,
+  "outputShape": [1, 5],
+  "classNames": ["Drawing", "Hentai", "Neutral", "Porn", "Sexy"],
+  "backend": "wasm",
+  "modelFiles": [
+    {
+      "package": "nsfwjs",
+      "path": "dist/models/mobilenet_v2_mid/model.min.js",
+      "sha256": "a7a9e701491e2449b221dab7c424957f853e700602b5575da33cfd745616f964"
+    },
+    {
+      "package": "nsfwjs",
+      "path": "dist/models/mobilenet_v2_mid/group1-shard1of2.min.js",
+      "sha256": "f2e79a209e44d668220ec5f1533a98f2be954e3953685bf074d201b82fefc29a"
+    },
+    {
+      "package": "nsfwjs",
+      "path": "dist/models/mobilenet_v2_mid/group1-shard2of2.min.js",
+      "sha256": "f291df992a0131741372506a6072fb9f1645bff7c973c983fd6276f5f9625d5e"
+    }
+  ],
+  "weightBundles": {
+    "manifestPaths": ["group1-shard1of2", "group1-shard2of2"],
+    "weightSpecCount": 108,
+    "decodedBytes": [4194304, 106471],
+    "rationale": "The package ships the weights as base64 bundles rather than binary shards, so there is nothing on disk for a filesystem IOHandler to read and nothing to download. Pinning the decoded byte lengths and the weight-spec count catches a bundle that hashes differently only because it was re-encoded, and catches a truncated decode before it reaches loadGraphModel."
+  },
+  "wasmFiles": [
+    {
+      "package": "@tensorflow/tfjs-backend-wasm",
+      "binaryName": "tfjs-backend-wasm.wasm",
+      "path": "dist/tfjs-backend-wasm.wasm",
+      "sha256": "70a5d516060464e5269f01c74bac1772d6b8ab6cb612acf16b5cdaf61f78d892"
+    },
+    {
+      "package": "@tensorflow/tfjs-backend-wasm",
+      "binaryName": "tfjs-backend-wasm-simd.wasm",
+      "path": "dist/tfjs-backend-wasm-simd.wasm",
+      "sha256": "77ebb28a6d34f371dbbf2086b7f2de8994acd8ea5a3cf1fa24d2c26c840cac7b"
+    },
+    {
+      "package": "@tensorflow/tfjs-backend-wasm",
+      "binaryName": "tfjs-backend-wasm-threaded-simd.wasm",
+      "path": "dist/tfjs-backend-wasm-threaded-simd.wasm",
+      "sha256": "c052228d4bef185c27bbe59a9e029570c78bbb9f08b3cb46b597851650373de2"
+    }
+  ],
+  "dependencies": {
+    "nsfwjs": "4.3.0",
+    "@tensorflow/tfjs-core": "4.16.0",
+    "@tensorflow/tfjs-converter": "4.16.0",
+    "@tensorflow/tfjs-backend-wasm": "4.16.0",
+    "bad-words": "4.1.5",
+    "buffer": "6.0.3"
+  },
+  "forbiddenDependencies": ["@tensorflow/tfjs"],
+  "forbiddenDependenciesRationale": "The union package pulls tfjs-backend-webgl, tfjs-layers and tfjs-data, which this worker never uses, and measured 286 MB installed against 88 MB for the three packages actually needed. It produces identical class probabilities, so its only effect here is to triple the image the Story 6.2b worker has to fit inside a free hosting tier.",
+  "thresholds": {
+    "neutralPassMinimum": 0.85,
+    "unsafeAggregateMaximum": 0.1,
+    "unsafeBlockMinimum": 0.35,
+    "unsafeClasses": ["Hentai", "Porn"],
+    "probabilitySumTolerance": 0.001
+  },
+  "thresholdsMirrorOf": "the image block of the policy file named by manifest.policy",
+  "thresholdsRationale": "AC 1 requires the manifest to pin the thresholds, and the policy file owns them. This block therefore mirrors exactly four policy values and nothing else, so a consumer can assert it key-for-key against the same-named policy fields. The loader makes that assertion and fails startup on any divergence, so the duplication cannot silently drift.",
+  "policy": {
+    "path": "../policies/community-screening/policy-v1.json",
+    "pathRelativeTo": "the manifest file's own directory",
+    "version": "v1",
+    "hashAlgorithm": "sha256",
+    "hashInput": "file bytes",
+    "sha256": "467f139bba94f5131a652c597fe91867ad553dd0ef271fc3604da55f4e66a6e6"
+  },
+  "runtime": {
+    "node": ">=24.0.0",
+    "concurrency": 1,
+    "concurrencyRationale": "One inference per model process. Additional throughput comes from worker replicas, not from a higher per-process concurrency, until signed evidence shows a higher value stays inside the same memory and latency gates."
+  },
+  "performance": {
+    "absoluteCeilings": {
+      "coldStartupMs": 30000,
+      "warmP95Ms": 3000,
+      "warmP99Ms": 5000,
+      "singleInferenceTerminationMs": 10000,
+      "outerScreeningCeilingMs": 30000,
+      "peakResidentMib": 512
+    },
+    "measured": {
+      "coldStartupMs": 236.5,
+      "warmP50Ms": 23.95,
+      "warmP95Ms": 26.64,
+      "warmP99Ms": 31.21,
+      "warmMaxMs": 73.54,
+      "peakResidentMib": 339.4,
+      "baselineResidentMibBeforeModelLoad": 71.3,
+      "warmSamples": 1000,
+      "warmupSamples": 50,
+      "replicas": 1,
+      "concurrency": 1,
+      "environment": {
+        "node": "v24.20.0",
+        "platform": "darwin",
+        "arch": "arm64",
+        "cpu": "Apple M4 Pro",
+        "cpuCount": 14,
+        "memoryMib": 49152,
+        "image": "512x640 JPEG, quality 90, flat #beb4aa, generated in process",
+        "executedFrom": "compiled dist under plain node"
+      },
+      "runsTaken": 2,
+      "selectionRule": "slowest of the runs taken"
+    },
+    "measuredRationale": "Measured from compiled output under plain node, with the full production path in every sample, because the same script under tsx measured 670 MiB peak purely from esbuild being resident in the same process. peakResidentMib is process-wide: a worker thread shares its process with the supervisor, so 339.4 MiB is the whole worker process and is the right number for a container memory limit, which is what the gate is for. It is NOT the model’s own size and must not be quoted as one. Developer-laptop numbers are a sanity floor, and AC 8 still requires the real measurement on the named production target.",
+    "regressionGate": {
+      "rule": "min(3 x measured, absolute ceiling)",
+      "coldStartupMs": 710,
+      "warmP95Ms": 80,
+      "warmP99Ms": 94,
+      "peakResidentMib": 512
+    },
+    "regressionGateRationale": "Three times measured is the regression detector for the three timing gates, all of which land well inside their absolute ceilings. It fails for memory: three times 339.4 MiB is 1018 MiB, nearly double the 512 MiB ceiling, so a memory gate set there could never fire because the ceiling would always trip first. AC 8 exists so a later run can fail the gate while staying inside the ceiling, and a gate above its own ceiling cannot do that. Each gate is therefore the smaller of three times measured and the absolute ceiling.",
+    "uncappedThreeTimesPeakResidentMib": 1018,
+    "uncappedThreeTimesPeakResidentMibNote": "Recorded for traceability only. This is the uncapped three-times value, never the gate; the gate is 512. Reading it as headroom would be reading slack that does not exist.",
+    "measuredVariance": {
+      "note": "The same compiled measurement was run twice on the same machine with the same script and sample counts. Warm p95 is stable to two decimal places across runs and is the number the gate most depends on. Cold startup and peak RSS are not stable: cold startup moved 32 percent and peak RSS moved 17 percent, because peak RSS depends on when the garbage collector happens to run and cold startup depends on filesystem cache warmth for a 5.6 MB weight decode.",
+      "runs": [
+        {
+          "coldStartupMs": 236.5,
+          "warmP95Ms": 26.64,
+          "warmP99Ms": 31.21,
+          "peakResidentMib": 339.4
+        },
+        {
+          "coldStartupMs": 161.5,
+          "warmP95Ms": 26.61,
+          "warmP99Ms": 29.18,
+          "peakResidentMib": 282.3
+        }
+      ],
+      "selectionRationale": "The value recorded in measured is the SLOWEST of the runs taken, never the most recent, so the run-to-run variance sits inside the gate rather than outside it. Three times the faster cold start of 161.5 ms would set a gate of 485 ms, and a machine cold-starting at 236 ms on a cold filesystem cache would then fail a gate derived from a warm-cache run. A multi-sample cold-start p95 was considered and deliberately not taken: cold startup has 30 seconds of absolute headroom against a measured 161 to 237 ms, so this gate exists to catch a change of kind, such as a network fetch appearing or the union @tensorflow/tfjs package returning, and 710 ms catches that as well as a statistically tight number would."
+    }
+  }
+}

@@ -20,6 +20,7 @@
 import 'reflect-metadata'
 import { createHash, randomUUID } from 'node:crypto'
 import { PrismaClient } from '@prisma/client'
+import { Queue, type Worker } from 'bullmq'
 import sharp from 'sharp'
 import { afterAll, beforeAll, describe, expect, it, vi } from 'vitest'
 import { buildLookbookPostCreateInput, createLookbookPost } from '@couture/testing'
@@ -31,13 +32,19 @@ import {
   DefaultCommunityModerationEngine,
   FixtureCommunityModerationEngine,
   SCREENING_UNAVAILABLE_REASON,
+  type CommunityModerationEngine,
 } from '../src/modules/community/community-moderation.engine.js'
 import { InMemoryCommunityStorage } from '../src/modules/community/community-storage.fake.js'
+import { STALE_PENDING_REVIEW_MINUTES } from '../src/modules/community/community-maintenance.service.js'
 import { CommunityModerationActionsService } from '../src/modules/community/community-moderation.actions.js'
 import {
   buildCommunityModerationJobId,
   type CommunityModerationPublisher,
 } from '../src/modules/community/community-moderation.queue.js'
+import { createWorker } from '../src/workers/base.worker.js'
+import { getRedisConfig, redisOptionsFromConfig } from '../src/config/redis.js'
+import { disconnectPrismaClient } from '../src/workers/prisma.js'
+import { FIXTURE_ENGINE_VERSION_SUFFIX } from '../src/modules/community/community-screening-policy.js'
 
 const databaseUrl =
   process.env.INTEGRATION_TEST_DATABASE_URL ??
@@ -64,6 +71,19 @@ class RecordingQueue implements CommunityModerationPublisher {
     })
     return Promise.resolve()
   }
+}
+
+/** Polls `check` until it holds, so a BullMQ retry chain is awaited rather than slept on. */
+async function waitUntil(
+  check: () => Promise<boolean>,
+  timeoutMs = 15_000
+): Promise<void> {
+  const deadline = Date.now() + timeoutMs
+  while (Date.now() < deadline) {
+    if (await check()) return
+    await new Promise((resolve) => setTimeout(resolve, 50))
+  }
+  throw new Error(`condition was still false after ${timeoutMs}ms`)
 }
 
 let schemaReady = false
@@ -174,8 +194,14 @@ afterAll(async () => {
     await prisma.lookbookPost.deleteMany({ where: owned })
     await prisma.communityAlias.deleteMany({ where: owned })
     await prisma.user.deleteMany({ where: { email: { startsWith: namespace } } })
+    await prisma.jobFailure.deleteMany({
+      where: { queue_name: { startsWith: namespace } },
+    })
   }
   await prisma.$disconnect()
+  // `base.worker`'s failure listener writes through its own client, which stays
+  // open and keeps the runner alive if nothing closes it.
+  await disconnectPrismaClient()
 })
 
 describe('6.1 community moderation pipeline', () => {
@@ -531,17 +557,53 @@ describe('6.1 community moderation pipeline', () => {
         imageByteSize: jpegBytes.length,
         publishedAt: null,
         createdAt: draftedAt,
-        updatedAt: draftedAt,
         submittedAt: draftedAt,
+        // `updated_at` STAYS CURRENT, and that is load-bearing rather than
+        // incidental. `CommunityMaintenanceService.sweepStalePendingReview`
+        // claims every `pending_review` row in the database whose `updated_at`
+        // is older than fifteen minutes, with no namespace filter, because in
+        // production there is nothing to filter by. This suite shares one
+        // PostgreSQL with every other integration suite, and
+        // `community-lifecycle.integration.spec.ts` drives that sweep, so a row
+        // backdated by a year here was claimable the instant it was created:
+        // the sweep flipped it to `review_failed` with reason
+        // `moderation_stalled`, and `process` then found it already out of
+        // `pending_review` and returned without publishing. That is the
+        // intermittent "expected published, received review_failed" this test
+        // showed only under a full-suite run. `created_at` is what the ordering
+        // assertions read; `updated_at` is read by nothing here.
+        updatedAt: new Date(),
       })
       await prisma.lookbookPost.create({ data: buildLookbookPostCreateInput(late) })
       await prisma.communityModerationOutbox.create({ data: { post_id: latePostId } })
       storage.put(objectPath, jpegBytes)
 
+      // The tripwire for the comment above. If a future edit backdates
+      // `updated_at` again, this fails here with a clear cause instead of
+      // surfacing as an intermittent wrong status forty lines later.
+      const sweepable = await prisma.lookbookPost.findFirst({
+        where: {
+          id: latePostId,
+          status: 'pending_review',
+          updated_at: {
+            lt: new Date(Date.now() - STALE_PENDING_REVIEW_MINUTES * 60_000),
+          },
+        },
+        select: { id: true },
+      })
+      expect(
+        sweepable,
+        'this fixture is old enough for the stale sweep to claim it, so any suite running that sweep will fail it before this one publishes it'
+      ).toBeNull()
+
       await processor.process({ postId: latePostId, uploadSessionId })
       const publishedLate = await prisma.lookbookPost.findUniqueOrThrow({
         where: { id: latePostId },
       })
+      // The reason is asserted alongside the status so a future failure names
+      // the branch that claimed the row instead of only saying it was not
+      // published.
+      expect(publishedLate.moderation_reason).toBeNull()
       expect(publishedLate.status).toBe('published')
       // Drafted in 2024, published now: the two clocks disagree by years, which
       // is what makes the ordering choice observable at all.
@@ -823,5 +885,312 @@ describe('6.1 community moderation pipeline', () => {
       expect(await eventsFor(postId, 'released_by_operator')).toBeLessThanOrEqual(1)
       expect(await eventsFor(postId, 'taken_down_by_operator')).toBeLessThanOrEqual(1)
     })
+  })
+})
+
+/**
+ * Story 6.2: the branches the three-way disposition adds, and the per-attempt
+ * evidence AC 5 asks for.
+ *
+ * The disposition cases are pinned through `FixtureCommunityModerationEngine`
+ * rather than a real model, deliberately: what is under test here is that a
+ * `review` or a `block` reaches PostgreSQL as an unpublished post with an audit
+ * row and a stamped outbox, not that any particular image scores that way. The
+ * model's own accuracy is Story 6.2b's corpus run and nothing in this file
+ * speaks to it.
+ */
+describe('6.2 screening dispositions and attempt evidence', () => {
+  it('6.2-INT-030 executed against a migrated database', () => {
+    // The sibling suites skip when the schema is absent, which is right for a
+    // laptop with no database and useless as release evidence. This states the
+    // premise every assertion below rests on, so a run that proved nothing
+    // cannot be read as a run that proved something.
+    expect(
+      schemaReady,
+      'the Story 6.1 community schema did not resolve, so every case in this file skipped and produced no evidence'
+    ).toBe(true)
+  })
+
+  it('6.2-INT-031 holds a post whose image routes to human review', async (context) => {
+    if (!requireSchema(context)) return
+    const storage = new InMemoryCommunityStorage()
+    const { postId } = await createPendingPost(storage)
+
+    const processor = new CommunityModerationProcessor(
+      prisma,
+      storage,
+      telemetry,
+      new FixtureCommunityModerationEngine({
+        textOutcome: { passed: true, reasons: [] },
+        imageOutcome: {
+          passed: false,
+          reasons: ['low_confidence'],
+          disposition: 'review',
+        },
+      })
+    )
+    await processor.process({ postId, uploadSessionId: 'session' })
+
+    const post = await prisma.lookbookPost.findUniqueOrThrow({ where: { id: postId } })
+    expect(post.status).toBe('flagged')
+    expect(post.published_at).toBeNull()
+    expect(post.moderation_reason).toContain('low_confidence')
+
+    const events = await prisma.moderationEvent.findMany({ where: { post_id: postId } })
+    expect(events).toHaveLength(1)
+    expect(events[0]?.action).toBe('flagged')
+
+    const outbox = await prisma.communityModerationOutbox.findUniqueOrThrow({
+      where: { post_id: postId },
+    })
+    expect(outbox.dispatched_at).not.toBeNull()
+  })
+
+  it('6.2-INT-032 holds a post whose image is blocked outright', async (context) => {
+    if (!requireSchema(context)) return
+    const storage = new InMemoryCommunityStorage()
+    const { postId } = await createPendingPost(storage)
+
+    const processor = new CommunityModerationProcessor(
+      prisma,
+      storage,
+      telemetry,
+      new FixtureCommunityModerationEngine({
+        textOutcome: { passed: true, reasons: [] },
+        imageOutcome: { passed: false, reasons: ['unsafe_class'], disposition: 'block' },
+      })
+    )
+    await processor.process({ postId, uploadSessionId: 'session' })
+
+    const post = await prisma.lookbookPost.findUniqueOrThrow({ where: { id: postId } })
+    expect(post.status).toBe('flagged')
+    expect(post.moderation_reason).toContain('unsafe_class')
+    expect(await prisma.moderationEvent.count({ where: { post_id: postId } })).toBe(1)
+  })
+
+  it('6.2-INT-033 refuses to publish a screener that contradicts itself', async (context) => {
+    if (!requireSchema(context)) return
+    const storage = new InMemoryCommunityStorage()
+    const { postId } = await createPendingPost(storage)
+
+    const processor = new CommunityModerationProcessor(
+      prisma,
+      storage,
+      telemetry,
+      new FixtureCommunityModerationEngine({
+        textOutcome: { passed: true, reasons: [] },
+        // `passed: true` beside a blocking disposition. Reading either half
+        // alone publishes on whichever one is wrong.
+        imageOutcome: { passed: true, reasons: [], disposition: 'block' },
+      })
+    )
+    await processor.process({ postId, uploadSessionId: 'session' })
+
+    const post = await prisma.lookbookPost.findUniqueOrThrow({ where: { id: postId } })
+    expect(post.status).toBe('flagged')
+    expect(post.published_at).toBeNull()
+    expect(post.moderation_reason).toContain('image_disposition_conflict')
+  })
+
+  it('6.2-INT-034 persists the screener identity without restating the policy hash', async (context) => {
+    if (!requireSchema(context)) return
+    const storage = new InMemoryCommunityStorage()
+    const withPolicy = await createPendingPost(storage)
+    const withoutPolicy = await createPendingPost(storage)
+
+    const pinned = {
+      textOutcome: { passed: true, reasons: [] },
+      imageOutcome: { passed: true, reasons: [], disposition: 'pass' as const },
+    }
+    await new CommunityModerationProcessor(
+      prisma,
+      storage,
+      telemetry,
+      new FixtureCommunityModerationEngine(pinned)
+    ).process({ postId: withoutPolicy.postId, uploadSessionId: 'session' })
+
+    const base = new FixtureCommunityModerationEngine(pinned)
+    const policyBacked: CommunityModerationEngine = {
+      screenText: (input) => base.screenText(input),
+      screenImage: (bytes) => base.screenImage(bytes),
+      moderatePost: async (input) => {
+        const result = await base.moderatePost(input)
+        return { ...result, image: { ...result.image, policyVersion: 'sha256:deadbeef' } }
+      },
+    }
+    await new CommunityModerationProcessor(
+      prisma,
+      storage,
+      telemetry,
+      policyBacked
+    ).process({ postId: withPolicy.postId, uploadSessionId: 'session' })
+
+    const bare = await prisma.lookbookPost.findUniqueOrThrow({
+      where: { id: withoutPolicy.postId },
+    })
+    const stamped = await prisma.lookbookPost.findUniqueOrThrow({
+      where: { id: withPolicy.postId },
+    })
+    // Both rows carry the same two segments. A real run's halves already name
+    // the policy hash (the text loader and the image screener each build it
+    // into their own version), so a screener's own `policyVersion` is bounded
+    // evaluation detail rather than a third identity segment to append.
+    const expected = `adr013-text-v2.0${FIXTURE_ENGINE_VERSION_SUFFIX};adr013-nsfw-v1.0${FIXTURE_ENGINE_VERSION_SUFFIX}`
+    expect(bare.moderation_engine_version).toBe(expected)
+    expect(stamped.moderation_engine_version).toBe(expected)
+    // The fixture marker survives into the persisted identity, which is what
+    // stops a test run being read as a real screening.
+    expect(stamped.moderation_engine_version).toContain(FIXTURE_ENGINE_VERSION_SUFFIX)
+  })
+
+  it('6.2-INT-035 leaves a post retryable when screening throws', async (context) => {
+    if (!requireSchema(context)) return
+    const storage = new InMemoryCommunityStorage()
+    const { postId } = await createPendingPost(storage)
+
+    const wedged = new FixtureCommunityModerationEngine({})
+    wedged.moderatePost = () =>
+      Promise.reject(new Error('community content screening timed out after 30000ms'))
+
+    const processor = new CommunityModerationProcessor(prisma, storage, telemetry, wedged)
+    await expect(
+      processor.process(
+        { postId, uploadSessionId: 'session' },
+        { attempt: 1, maxAttempts: 3 }
+      )
+    ).rejects.toThrow(/timed out/)
+
+    const post = await prisma.lookbookPost.findUniqueOrThrow({ where: { id: postId } })
+    const outbox = await prisma.communityModerationOutbox.findUniqueOrThrow({
+      where: { post_id: postId },
+    })
+    // Untouched and unstamped, because BullMQ still owns two more attempts. A
+    // branch that stamped here would strand the post if the retry succeeded.
+    expect(post.status).toBe('pending_review')
+    expect(outbox.dispatched_at).toBeNull()
+  })
+
+  it('6.2-INT-036 terminates at review_failed on the last attempt and ignores redelivery', async (context) => {
+    if (!requireSchema(context)) return
+    const storage = new InMemoryCommunityStorage()
+    const { postId } = await createPendingPost(storage)
+
+    const processor = new CommunityModerationProcessor(
+      prisma,
+      storage,
+      telemetry,
+      new FixtureCommunityModerationEngine({})
+    )
+    await processor.markFailed(postId, 'inference_timeout', {
+      attempt: 3,
+      maxAttempts: 3,
+    })
+
+    const failed = await prisma.lookbookPost.findUniqueOrThrow({ where: { id: postId } })
+    expect(failed.status).toBe('review_failed')
+    expect(failed.moderation_reason).toBe('inference_timeout')
+
+    // A redelivery inside BullMQ's seven-day retention window must not restart
+    // screening on a post that has already left `pending_review`.
+    await processor.process({ postId, uploadSessionId: 'session' })
+    const afterRedelivery = await prisma.lookbookPost.findUniqueOrThrow({
+      where: { id: postId },
+    })
+    expect(afterRedelivery.status).toBe('review_failed')
+    expect(afterRedelivery.updated_at.getTime()).toBe(failed.updated_at.getTime())
+  })
+
+  describe('per-attempt dead-letter records', () => {
+    /**
+     * A real BullMQ worker on real Redis, because the fact under test belongs to
+     * the shared `createWorker` foundation's `failed` listener and a mocked
+     * queue cannot produce a `failed` event at all.
+     *
+     * THE QUEUE NAME IS NAMESPACED, not `community-moderation`. BullMQ splits
+     * jobs across every worker subscribed to a name regardless of process, so a
+     * suite using the real name would steal jobs from a developer's running
+     * stack and from every other shard of this suite.
+     */
+    const queueName = `${namespace}-attempts`
+    let queue: Queue | undefined
+    let worker: Worker | undefined
+
+    afterAll(async () => {
+      await worker?.close()
+      await queue?.obliterate({ force: true }).catch(() => undefined)
+      await queue?.close()
+    })
+
+    it('6.2-INT-037 writes one row per failed attempt and one terminal post state', async (context) => {
+      if (!requireSchema(context)) return
+      const storage = new InMemoryCommunityStorage()
+      const { postId } = await createPendingPost(storage)
+      const connection = redisOptionsFromConfig(getRedisConfig())
+
+      const processor = new CommunityModerationProcessor(
+        prisma,
+        storage,
+        telemetry,
+        new FixtureCommunityModerationEngine({
+          textOutcome: { passed: true, reasons: [] },
+          imageOutcome: { passed: true, reasons: [], disposition: 'pass' },
+        })
+      )
+
+      let attempts = 0
+      queue = new Queue(queueName, { connection })
+      worker = createWorker(
+        queueName,
+        async (job) => {
+          attempts += 1
+          const maxAttempts = job.opts.attempts ?? 3
+          const attempt = job.attemptsMade + 1
+          if (attempt < maxAttempts) {
+            throw new Error(`transient inference fault on attempt ${attempt}`)
+          }
+          await processor.process(
+            { postId, uploadSessionId: 'session' },
+            { attempt, maxAttempts }
+          )
+        },
+        { connection, concurrency: 1 }
+      )
+
+      await queue.add(
+        'community-moderation-screening',
+        { postId, uploadSessionId: 'session' },
+        { attempts: 3, backoff: { type: 'fixed', delay: 25 } }
+      )
+
+      await waitUntil(async () => {
+        const post = await prisma.lookbookPost.findUniqueOrThrow({
+          where: { id: postId },
+        })
+        return post.status === 'published'
+      })
+
+      // `base.worker.ts` writes the JobFailure row from a fire-and-forget
+      // handler on BullMQ's `failed` event, so the rows land after the post
+      // reaches its terminal state rather than before it. Reading them straight
+      // after the publish wait raced that write.
+      let failures: Awaited<ReturnType<typeof prisma.jobFailure.findMany>> = []
+      await waitUntil(async () => {
+        failures = await prisma.jobFailure.findMany({
+          where: { queue_name: queueName },
+        })
+        return failures.length === 2
+      })
+      // Two retryable attempts failed and the third published. The per-attempt
+      // record and the final post state are different facts, and conflating
+      // them hides a pipeline that succeeds only after retrying every time.
+      expect(attempts).toBe(3)
+      expect(failures).toHaveLength(2)
+      // BullMQ has already incremented `attemptsMade` by the time it emits
+      // `failed`, so the stored numbers are the 1-based attempt that failed.
+      expect(failures.map((row) => row.attempts).sort()).toEqual([1, 2])
+      const post = await prisma.lookbookPost.findUniqueOrThrow({ where: { id: postId } })
+      expect(post.status).toBe('published')
+      expect(post.moderation_reason).toBeNull()
+    }, 30_000)
   })
 })

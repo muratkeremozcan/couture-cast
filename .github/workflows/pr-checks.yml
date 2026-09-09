@@ -54,7 +54,7 @@ jobs:
       # `apps/api/integration` suites probe for the schema and take a
       # Redis-backed path only when they find it, so a job with PostgreSQL and
       # no Redis is the one combination that hangs: `wardrobe-silhouette`
-      # reaches `clearModerationQueue()` and its `beforeAll` dies on the 10s
+      # reaches `reapPreviousRunQueues()` and its `beforeAll` dies on the 10s
       # timeout. Verified locally against this exact pair, where that suite's
       # nine tests pass.
       redis:

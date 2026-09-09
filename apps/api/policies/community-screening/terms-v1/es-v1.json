@@ -1,0 +1,290 @@
+{
+  "language": "es",
+  "listVersion": "terms-v1",
+  "listType": "terms",
+  "provenance": {
+    "source": "repository-owned reviewed list",
+    "version": "v1",
+    "licence": "UNLICENSED (repository-owned)",
+    "retrievedAt": "2026-09-08",
+    "curator": "couture-cast trust and safety",
+    "notes": "Curated by hand for Spanish, seeded from the Spanish dictionary Story 6.1 shipped in community-moderation.engine.ts and extended to the category and severity model. Coverage spans the Peninsular, Mexican, Rioplatense, Chilean and Colombian registers the product serves. Every single-word term is at least four characters long, because each language's dictionary runs against every submission and a two or three character vulgarity in one language lands on an ordinary word in another; no entry here needed an exception to that floor. Entries that are also ordinary vocabulary in some register, such as capullo, hostia, polla and zorra, carry a low severity so a human reviewer makes the call on them. Hate slurs and self-harm incitement carry critical. Story 6.2b replaces this with a vendored, pinned upstream list under its own licence."
+  },
+  "entries": [
+    {
+      "term": "mierda",
+      "category": "profanity",
+      "severity": "medium"
+    },
+    {
+      "term": "joder",
+      "category": "profanity",
+      "severity": "medium"
+    },
+    {
+      "term": "jodido",
+      "category": "profanity",
+      "severity": "low"
+    },
+    {
+      "term": "puta",
+      "category": "harassment",
+      "severity": "medium"
+    },
+    {
+      "term": "puto",
+      "category": "profanity",
+      "severity": "medium"
+    },
+    {
+      "term": "coño",
+      "category": "profanity",
+      "severity": "medium"
+    },
+    {
+      "term": "cabrón",
+      "category": "profanity",
+      "severity": "medium"
+    },
+    {
+      "term": "cabrona",
+      "category": "profanity",
+      "severity": "medium"
+    },
+    {
+      "term": "pendejo",
+      "category": "profanity",
+      "severity": "medium"
+    },
+    {
+      "term": "pendeja",
+      "category": "profanity",
+      "severity": "medium"
+    },
+    {
+      "term": "chingar",
+      "category": "profanity",
+      "severity": "medium"
+    },
+    {
+      "term": "chinga",
+      "category": "profanity",
+      "severity": "medium"
+    },
+    {
+      "term": "chingado",
+      "category": "profanity",
+      "severity": "medium"
+    },
+    {
+      "term": "chingada",
+      "category": "profanity",
+      "severity": "medium"
+    },
+    {
+      "term": "culiao",
+      "category": "profanity",
+      "severity": "medium"
+    },
+    {
+      "term": "gilipollas",
+      "category": "profanity",
+      "severity": "medium"
+    },
+    {
+      "term": "me cago en",
+      "category": "profanity",
+      "severity": "medium"
+    },
+    {
+      "term": "capullo",
+      "category": "profanity",
+      "severity": "low"
+    },
+    {
+      "term": "huevón",
+      "category": "profanity",
+      "severity": "low"
+    },
+    {
+      "term": "boludo",
+      "category": "profanity",
+      "severity": "low"
+    },
+    {
+      "term": "pinche",
+      "category": "profanity",
+      "severity": "low"
+    },
+    {
+      "term": "mamón",
+      "category": "profanity",
+      "severity": "low"
+    },
+    {
+      "term": "cagada",
+      "category": "profanity",
+      "severity": "low"
+    },
+    {
+      "term": "hostia",
+      "category": "profanity",
+      "severity": "low"
+    },
+    {
+      "term": "chupapollas",
+      "category": "sexual",
+      "severity": "high"
+    },
+    {
+      "term": "follar",
+      "category": "sexual",
+      "severity": "medium"
+    },
+    {
+      "term": "mamada",
+      "category": "sexual",
+      "severity": "medium"
+    },
+    {
+      "term": "verga",
+      "category": "sexual",
+      "severity": "medium"
+    },
+    {
+      "term": "polla",
+      "category": "sexual",
+      "severity": "low"
+    },
+    {
+      "term": "pajero",
+      "category": "sexual",
+      "severity": "low"
+    },
+    {
+      "term": "hijo de puta",
+      "category": "harassment",
+      "severity": "high"
+    },
+    {
+      "term": "hija de puta",
+      "category": "harassment",
+      "severity": "high"
+    },
+    {
+      "term": "hijueputa",
+      "category": "harassment",
+      "severity": "high"
+    },
+    {
+      "term": "malparido",
+      "category": "harassment",
+      "severity": "medium"
+    },
+    {
+      "term": "zorra",
+      "category": "harassment",
+      "severity": "low"
+    },
+    {
+      "term": "perra",
+      "category": "harassment",
+      "severity": "low"
+    },
+    {
+      "term": "imbécil",
+      "category": "harassment",
+      "severity": "low"
+    },
+    {
+      "term": "maricón",
+      "category": "hate",
+      "severity": "high"
+    },
+    {
+      "term": "maricona",
+      "category": "hate",
+      "severity": "high"
+    },
+    {
+      "term": "marica",
+      "category": "hate",
+      "severity": "high"
+    },
+    {
+      "term": "bollera",
+      "category": "hate",
+      "severity": "high"
+    },
+    {
+      "term": "negrata",
+      "category": "hate",
+      "severity": "high"
+    },
+    {
+      "term": "sudaca",
+      "category": "hate",
+      "severity": "high"
+    },
+    {
+      "term": "subnormal",
+      "category": "hate",
+      "severity": "high"
+    },
+    {
+      "term": "mongólico",
+      "category": "hate",
+      "severity": "high"
+    },
+    {
+      "term": "retrasado mental",
+      "category": "hate",
+      "severity": "high"
+    },
+    {
+      "term": "nazi",
+      "category": "hate",
+      "severity": "high"
+    },
+    {
+      "term": "te voy a matar",
+      "category": "violence",
+      "severity": "high"
+    },
+    {
+      "term": "te voy a violar",
+      "category": "violence",
+      "severity": "high"
+    },
+    {
+      "term": "ojalá te mueras",
+      "category": "violence",
+      "severity": "high"
+    },
+    {
+      "term": "mátate",
+      "category": "self_harm",
+      "severity": "high"
+    },
+    {
+      "term": "suicídate",
+      "category": "self_harm",
+      "severity": "high"
+    },
+    {
+      "term": "ahórcate",
+      "category": "self_harm",
+      "severity": "high"
+    },
+    {
+      "term": "pégate un tiro",
+      "category": "self_harm",
+      "severity": "high"
+    },
+    {
+      "term": "quítate la vida",
+      "category": "self_harm",
+      "severity": "high"
+    }
+  ]
+}

@@ -1,0 +1,245 @@
+{
+  "language": "en",
+  "listVersion": "terms-v1",
+  "listType": "terms",
+  "provenance": {
+    "source": "repository-owned reviewed list",
+    "version": "v1",
+    "licence": "UNLICENSED (repository-owned)",
+    "retrievedAt": "2026-09-08",
+    "curator": "couture-cast trust and safety",
+    "notes": "Seeded from the English dictionary Story 6.1 shipped in community-moderation.engine.ts and extended to the category and severity model. Story 6.2b replaces this with a vendored, pinned upstream list under its own licence."
+  },
+  "entries": [
+    {
+      "term": "fuck",
+      "category": "profanity",
+      "severity": "medium"
+    },
+    {
+      "term": "fucking",
+      "category": "profanity",
+      "severity": "medium"
+    },
+    {
+      "term": "fucker",
+      "category": "profanity",
+      "severity": "medium"
+    },
+    {
+      "term": "motherfucker",
+      "category": "profanity",
+      "severity": "medium"
+    },
+    {
+      "term": "shit",
+      "category": "profanity",
+      "severity": "medium"
+    },
+    {
+      "term": "bullshit",
+      "category": "profanity",
+      "severity": "low"
+    },
+    {
+      "term": "bitch",
+      "category": "harassment",
+      "severity": "medium"
+    },
+    {
+      "term": "asshole",
+      "category": "profanity",
+      "severity": "medium"
+    },
+    {
+      "term": "arsehole",
+      "category": "profanity",
+      "severity": "medium"
+    },
+    {
+      "term": "bastard",
+      "category": "profanity",
+      "severity": "low"
+    },
+    {
+      "term": "cunt",
+      "category": "harassment",
+      "severity": "high"
+    },
+    {
+      "term": "dick",
+      "category": "sexual",
+      "severity": "low"
+    },
+    {
+      "term": "prick",
+      "category": "profanity",
+      "severity": "low"
+    },
+    {
+      "term": "wanker",
+      "category": "profanity",
+      "severity": "medium"
+    },
+    {
+      "term": "twat",
+      "category": "harassment",
+      "severity": "medium"
+    },
+    {
+      "term": "pussy",
+      "category": "sexual",
+      "severity": "medium"
+    },
+    {
+      "term": "cock",
+      "category": "sexual",
+      "severity": "low"
+    },
+    {
+      "term": "whore",
+      "category": "harassment",
+      "severity": "high"
+    },
+    {
+      "term": "slut",
+      "category": "harassment",
+      "severity": "high"
+    },
+    {
+      "term": "blowjob",
+      "category": "sexual",
+      "severity": "high"
+    },
+    {
+      "term": "handjob",
+      "category": "sexual",
+      "severity": "high"
+    },
+    {
+      "term": "gangbang",
+      "category": "sexual",
+      "severity": "high"
+    },
+    {
+      "term": "deepthroat",
+      "category": "sexual",
+      "severity": "high"
+    },
+    {
+      "term": "cumshot",
+      "category": "sexual",
+      "severity": "high"
+    },
+    {
+      "term": "nigger",
+      "category": "hate",
+      "severity": "high"
+    },
+    {
+      "term": "nigga",
+      "category": "hate",
+      "severity": "high"
+    },
+    {
+      "term": "faggot",
+      "category": "hate",
+      "severity": "high"
+    },
+    {
+      "term": "kike",
+      "category": "hate",
+      "severity": "high"
+    },
+    {
+      "term": "spic",
+      "category": "hate",
+      "severity": "high"
+    },
+    {
+      "term": "chink",
+      "category": "hate",
+      "severity": "high"
+    },
+    {
+      "term": "gook",
+      "category": "hate",
+      "severity": "high"
+    },
+    {
+      "term": "wetback",
+      "category": "hate",
+      "severity": "high"
+    },
+    {
+      "term": "towelhead",
+      "category": "hate",
+      "severity": "high"
+    },
+    {
+      "term": "tranny",
+      "category": "hate",
+      "severity": "high"
+    },
+    {
+      "term": "retard",
+      "category": "hate",
+      "severity": "high"
+    },
+    {
+      "term": "nazi",
+      "category": "hate",
+      "severity": "high"
+    },
+    {
+      "term": "heil hitler",
+      "category": "hate",
+      "severity": "high"
+    },
+    {
+      "term": "white power",
+      "category": "hate",
+      "severity": "high"
+    },
+    {
+      "term": "terrorist",
+      "category": "harassment",
+      "severity": "medium"
+    },
+    {
+      "term": "kill yourself",
+      "category": "self_harm",
+      "severity": "high"
+    },
+    {
+      "term": "kill urself",
+      "category": "self_harm",
+      "severity": "high"
+    },
+    {
+      "term": "kys",
+      "category": "self_harm",
+      "severity": "high"
+    },
+    {
+      "term": "hang yourself",
+      "category": "self_harm",
+      "severity": "high"
+    },
+    {
+      "term": "end your life",
+      "category": "self_harm",
+      "severity": "high"
+    },
+    {
+      "term": "i will kill you",
+      "category": "violence",
+      "severity": "high"
+    },
+    {
+      "term": "rape",
+      "category": "violence",
+      "severity": "high"
+    }
+  ]
+}

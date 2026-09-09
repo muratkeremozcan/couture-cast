@@ -1,0 +1,245 @@
+{
+  "language": "tr",
+  "listVersion": "terms-v1",
+  "listType": "terms",
+  "provenance": {
+    "source": "repository-owned reviewed list",
+    "version": "v1",
+    "licence": "UNLICENSED (repository-owned)",
+    "retrievedAt": "2026-09-08",
+    "curator": "couture-cast trust and safety",
+    "notes": "Built from scratch because Story 6.1 shipped no Turkish dictionary. Single-word terms are at least four characters long, which keeps the short vulgar roots out of the list, because each of them folds onto an ordinary word in one of the seven screened languages: göt folds to the English got, am folds to the English am, piç folds to the English pic, and sik is the folded form of the ordinary Turkish şık, meaning chic, and sits one letter from sıkı, meaning tight. Those roots are covered by their longer derived and compound forms, among them götveren, amcık, amına koyayım, sikiş and siktir. The single exception to the four-character floor is amk, the standard written abbreviation of amına koyayım and the most common shape this abuse takes online, which carries no ordinary reading in any of the seven languages once folded. mal and hıyar are left out because they are the everyday words for merchandise and cucumber, and the slurs top and dönme are left out for the same reason, since they mean a ball and a rotation. sokayım is left out because it is an ordinary form of sokmak, the verb sewing copy uses for putting a needle through cloth. kaşar and fahişe carry low severity so that they route to human review, because the first is a widely eaten cheese and the second is the clinical word for a prostitute. geber stays at moderate severity, and the German noun Geber is an accepted collision because it does not appear in garment copy. yarrak collapses onto yarak, an archaic word for a weapon that survives in falconry, and that collision is accepted at moderate severity, because allow-listing yarak would let the single-r spelling of the vulgarity through."
+  },
+  "entries": [
+    {
+      "term": "siktir",
+      "category": "profanity",
+      "severity": "medium"
+    },
+    {
+      "term": "sikeyim",
+      "category": "profanity",
+      "severity": "medium"
+    },
+    {
+      "term": "sikerim",
+      "category": "profanity",
+      "severity": "medium"
+    },
+    {
+      "term": "sikik",
+      "category": "profanity",
+      "severity": "medium"
+    },
+    {
+      "term": "hassiktir",
+      "category": "profanity",
+      "severity": "medium"
+    },
+    {
+      "term": "amk",
+      "category": "profanity",
+      "severity": "medium"
+    },
+    {
+      "term": "amına koyayım",
+      "category": "profanity",
+      "severity": "high"
+    },
+    {
+      "term": "amına koyim",
+      "category": "profanity",
+      "severity": "high"
+    },
+    {
+      "term": "boktan",
+      "category": "profanity",
+      "severity": "medium"
+    },
+    {
+      "term": "taşak",
+      "category": "profanity",
+      "severity": "medium"
+    },
+    {
+      "term": "siktir git",
+      "category": "harassment",
+      "severity": "medium"
+    },
+    {
+      "term": "ananı sikeyim",
+      "category": "harassment",
+      "severity": "high"
+    },
+    {
+      "term": "orospu",
+      "category": "harassment",
+      "severity": "high"
+    },
+    {
+      "term": "orospu çocuğu",
+      "category": "harassment",
+      "severity": "high"
+    },
+    {
+      "term": "kahpe",
+      "category": "harassment",
+      "severity": "high"
+    },
+    {
+      "term": "kaltak",
+      "category": "harassment",
+      "severity": "high"
+    },
+    {
+      "term": "sürtük",
+      "category": "harassment",
+      "severity": "high"
+    },
+    {
+      "term": "kancık",
+      "category": "harassment",
+      "severity": "high"
+    },
+    {
+      "term": "puşt",
+      "category": "harassment",
+      "severity": "medium"
+    },
+    {
+      "term": "pezevenk",
+      "category": "harassment",
+      "severity": "medium"
+    },
+    {
+      "term": "gavat",
+      "category": "harassment",
+      "severity": "medium"
+    },
+    {
+      "term": "yavşak",
+      "category": "harassment",
+      "severity": "medium"
+    },
+    {
+      "term": "şerefsiz",
+      "category": "harassment",
+      "severity": "medium"
+    },
+    {
+      "term": "namussuz",
+      "category": "harassment",
+      "severity": "medium"
+    },
+    {
+      "term": "sapık",
+      "category": "harassment",
+      "severity": "medium"
+    },
+    {
+      "term": "geber",
+      "category": "harassment",
+      "severity": "medium"
+    },
+    {
+      "term": "salak",
+      "category": "harassment",
+      "severity": "low"
+    },
+    {
+      "term": "aptal",
+      "category": "harassment",
+      "severity": "low"
+    },
+    {
+      "term": "dangalak",
+      "category": "harassment",
+      "severity": "low"
+    },
+    {
+      "term": "fahişe",
+      "category": "harassment",
+      "severity": "low"
+    },
+    {
+      "term": "kaşar",
+      "category": "harassment",
+      "severity": "low"
+    },
+    {
+      "term": "amcık",
+      "category": "sexual",
+      "severity": "high"
+    },
+    {
+      "term": "sikiş",
+      "category": "sexual",
+      "severity": "high"
+    },
+    {
+      "term": "yarrak",
+      "category": "sexual",
+      "severity": "medium"
+    },
+    {
+      "term": "ibne",
+      "category": "hate",
+      "severity": "high"
+    },
+    {
+      "term": "götveren",
+      "category": "hate",
+      "severity": "high"
+    },
+    {
+      "term": "gavur",
+      "category": "hate",
+      "severity": "high"
+    },
+    {
+      "term": "çıfıt",
+      "category": "hate",
+      "severity": "high"
+    },
+    {
+      "term": "gerizekalı",
+      "category": "hate",
+      "severity": "high"
+    },
+    {
+      "term": "tecavüz",
+      "category": "violence",
+      "severity": "high"
+    },
+    {
+      "term": "gebertirim",
+      "category": "violence",
+      "severity": "high"
+    },
+    {
+      "term": "seni öldüreceğim",
+      "category": "violence",
+      "severity": "high"
+    },
+    {
+      "term": "kendini öldür",
+      "category": "self_harm",
+      "severity": "high"
+    },
+    {
+      "term": "kendini as",
+      "category": "self_harm",
+      "severity": "high"
+    },
+    {
+      "term": "intihar et",
+      "category": "self_harm",
+      "severity": "high"
+    },
+    {
+      "term": "canına kıy",
+      "category": "self_harm",
+      "severity": "high"
+    }
+  ]
+}

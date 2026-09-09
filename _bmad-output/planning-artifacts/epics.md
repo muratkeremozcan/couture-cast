@@ -494,6 +494,20 @@ Beta can publish safe content without routing every submission to manual review.
    with versioned fixtures and produce the signed model-readiness evidence for the beta gate.
    **Prerequisites:** CC-6.1, CC-0.4, CC-1.4.
 
+**Story CC-6.2b: Community screening release gate and worker deployment**
+As the operator, I want the screening pipeline deployed and gated by evidence I can actually produce,
+so that Community Beta can open without waiting on assets and approvals this project cannot obtain.
+**Acceptance Criteria**
+
+1. Deploy the community moderation worker as a container on a long-running host, prove it with a
+   canary job, and document its readiness, rollback, and incident procedure.
+2. Replace the unobtainable release evidence with achievable equivalents: an exhaustive policy-surface
+   sweep in place of an unsafe-image corpus, a 250-image openly licensed safe corpus for the
+   false-positive gate, and text lists with pinned public provenance.
+3. Generate one immutable evidence payload with named limitations and record a single owner signature
+   bound to its hash, keeping both production rollout flags disabled.
+   **Prerequisites:** CC-6.2.
+
 **Story CC-6.3: Curated reactions**
 As a community member, I want to applaud a look with a curated reaction so that I can engage quickly
 and contribute a trustworthy ranking signal.

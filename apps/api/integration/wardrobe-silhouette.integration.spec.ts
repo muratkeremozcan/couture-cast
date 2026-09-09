@@ -20,6 +20,8 @@ import {
   PreconditionFailedException,
 } from '@nestjs/common'
 import { Queue, Worker } from 'bullmq'
+import IORedis from 'ioredis'
+import { queueConfigs } from '../src/config/queues.js'
 import { getRedisConfig, redisOptionsFromConfig } from '../src/config/redis.js'
 import {
   formatSilhouetteETag,
@@ -28,6 +30,7 @@ import {
 import type { GuardianService } from '../src/modules/guardian/guardian.service.js'
 import {
   buildSilhouettePhotoJobId,
+  SILHOUETTE_PHOTO_PROCESSING_QUEUE,
   SilhouettePhotoProcessingQueue,
   silhouettePhotoProcessingJobSchema,
 } from '../src/modules/wardrobe/silhouette-photo-processing.queue.js'
@@ -42,8 +45,9 @@ import type { SilhouettePhotoModerationEngine } from '../src/modules/wardrobe/si
  *
  * Risk 4.4-R01: two live consumers on moderation-review would silently drop
  * a fraction of jobs. The `4.4-INT-15` case runs one real BullMQ Worker
- * against the real queue and proves the job is actually processed
- * end-to-end (the row transitions), not just enqueued.
+ * against a real queue and proves the job is actually processed end-to-end
+ * (the row transitions), not just enqueued. The queue carries a per-run name
+ * for the reason given at `queueName` below.
  *
  * Risk 4.4-R02: revision-precondition races, same technique as the
  * onboarding suite (two Prisma connections, real advisory-lock
@@ -84,57 +88,108 @@ function requireSchema(context: { skip: () => void }): boolean {
 }
 
 /**
- * Redis, unlike the database, is not scoped per test *or* per run: the
- * `moderation-review` queue survives process exit, so a job left behind by
- * an aborted or failed earlier run is still waiting when the next run
- * starts, and the first `Worker` to come up consumes it -- inflating
- * `4.4-INT-15`'s "exactly one job" assertion with a job that has nothing to
- * do with this run. In-test draining alone cannot fix that (the run that
- * leaked the job is already over), so every run starts from an empty queue.
- * Only this suite touches `moderation-review`, so clearing it is safe.
+ * THE QUEUE NAME IS PER RUN, not the production `moderation-review`.
+ *
+ * BullMQ hands a job to whichever Worker subscribed to the queue name claims it
+ * first, in any process on the Redis, and this suite shares its local Redis
+ * with the end-to-end stack: `start-api-e2e-with-workers.mjs` starts
+ * `wardrobe.bootstrap.js`, which consumes `moderation-review` at concurrency 10
+ * with the real Supabase storage adapter. Measured on 2026-09-08 with that
+ * worker live alongside this file: it claimed the jobs first, `4.4-INT-17`'s
+ * drain never saw its job complete and failed on its 10 s hook timeout, and
+ * `4.4-INT-15` took 3,156 ms in place of ~100 ms because it only got the job
+ * back on BullMQ's second retry. Alone, the file passes in under a second,
+ * which is why this read as a load flake. The community pipeline suite
+ * namespaces its queue for the same reason; this suite now does too, through
+ * the producer's own binding seam so `4.4-INT-18` still exercises the real
+ * `enqueue`.
+ *
+ * `wardrobe.bootstrap.spec.ts` keeps the production fact this name used to
+ * carry: exactly one consumer is registered on `moderation-review`.
  */
-async function clearModerationQueue(): Promise<void> {
-  const queue = new Queue('moderation-review', {
-    connection: redisOptionsFromConfig(getRedisConfig()),
-  })
+const QUEUE_NAME_PREFIX = 'silhouette-it-'
+const QUEUE_NAME_SUFFIX = `-${SILHOUETTE_PHOTO_PROCESSING_QUEUE}`
+const namespace = `${QUEUE_NAME_PREFIX}${randomUUID().slice(0, 8)}`
+const queueName = `${namespace}${QUEUE_NAME_SUFFIX}`
+const redisOptions = redisOptionsFromConfig(getRedisConfig())
+
+function productionQueueOptions() {
+  const found = queueConfigs.find((c) => c.name === SILHOUETTE_PHOTO_PROCESSING_QUEUE)
+  if (!found) throw new Error('moderation-review queue configuration is missing')
+  return found.options
+}
+
+/**
+ * Redis is not scoped per run: a per-run queue that a killed or timed-out run
+ * never obliterated stays in Redis for good, and because nothing would ever
+ * look for it again it would accumulate silently. `afterAll` is the primary
+ * cleanup; this reaps what an earlier run left behind, so the suite heals
+ * itself the way `community-lifecycle`'s `reapPreviousRuns` does for rows.
+ *
+ * Scoped to this suite's own naming scheme and nothing else: the SCAN pattern
+ * carries both the prefix and the suffix, and the current run's name is
+ * excluded, so it cannot reach a production queue or another suite's.
+ */
+async function reapPreviousRunQueues(): Promise<void> {
+  const redis = new IORedis(redisOptions)
   try {
-    await queue.obliterate({ force: true })
+    const stale = new Set<string>()
+    let cursor = '0'
+    do {
+      const [next, keys] = await redis.scan(
+        cursor,
+        'MATCH',
+        `bull:${QUEUE_NAME_PREFIX}*${QUEUE_NAME_SUFFIX}:meta`,
+        'COUNT',
+        200
+      )
+      cursor = next
+      for (const key of keys) {
+        const name = key.slice('bull:'.length, -':meta'.length)
+        if (name !== queueName) stale.add(name)
+      }
+    } while (cursor !== '0')
+
+    for (const name of stale) {
+      const queue = new Queue(name, { connection: redisOptions })
+      try {
+        await queue.obliterate({ force: true })
+      } finally {
+        await queue.close().catch(() => undefined)
+      }
+    }
   } catch (error) {
+    // Never let tidying up fail `beforeAll` itself: that would take down all
+    // nine cases, including the six that need no Redis at all.
     // eslint-disable-next-line no-console
     console.warn(
-      '[wardrobe-silhouette.integration] Could not clear the moderation-review queue; ' +
-        'real-Redis cases may be affected by leftover jobs.',
+      '[wardrobe-silhouette.integration] Could not reap queues left by earlier runs.',
       error
     )
   } finally {
-    // Never let tidying up the probe connection fail `beforeAll` itself:
-    // that would take down all eight cases, including the six that need no
-    // Redis at all, over a queue this hook only ever tries to tidy.
-    await queue.close().catch(() => undefined)
+    await redis.quit().catch(() => undefined)
   }
 }
 
 /**
- * `moderation-review` is a real, persistent Redis-backed queue, so any test
- * that enqueues a job (any successful `commitMyForm`) must drain it before
- * finishing -- an un-drained job otherwise sits in Redis and gets picked up
- * by whichever *other* test's `Worker` happens to run next, breaking that
- * test's "exactly one job" assertion. This starts one short-lived real
- * `Worker`, waits for the specific profile's job to complete, and closes.
+ * Any test that enqueues a job (any successful `commitMyForm`) drains it before
+ * finishing, so the job is processed by THIS file's storage double rather than
+ * left for whichever Worker in this file comes up next. This starts one
+ * short-lived real `Worker`, waits for the specific profile's job to complete,
+ * and closes.
  */
 async function drainModerationJob(
   prisma: PrismaClient,
   storage: WardrobeStorage,
   profileId: string
 ): Promise<void> {
-  const redisOptions = redisOptionsFromConfig(getRedisConfig())
   const engine: SilhouettePhotoModerationEngine = {
     moderate: () => Promise.resolve({ outcome: 'ready' as const }),
   }
   const processor = new SilhouettePhotoProcessor(prisma, storage, engine)
 
   const worker = new Worker<{ silhouetteProfileId: string }>(
-    'moderation-review',
+    queueName,
     async (job) => {
       const data = silhouettePhotoProcessingJobSchema.parse(job.data)
       await processor.process(data.silhouetteProfileId)
@@ -222,17 +277,13 @@ class MemoryWardrobeStorage implements WardrobeStorage {
 }
 
 /**
- * `moderation-review` is a real, shared BullMQ queue on the developer's and
- * CI's real Redis. Every job this suite enqueues must be removed again before
- * the test ends: BullMQ retains completed jobs for `JOB_RETENTION_SECONDS`
- * (7 days), so an undrained job is shared external state that outlives the
- * run, and any leftover job is picked up by the next test's worker, which
- * subscribes to the queue name rather than to a single job.
+ * Every job this suite enqueues is removed again before the test ends: BullMQ
+ * retains completed jobs for `JOB_RETENTION_SECONDS` (7 days), and a leftover
+ * job is picked up by the next test's worker, which subscribes to the queue
+ * name rather than to a single job.
  */
 async function removeModerationJob(jobId: string): Promise<void> {
-  const queue = new Queue('moderation-review', {
-    connection: redisOptionsFromConfig(getRedisConfig()),
-  })
+  const queue = new Queue(queueName, { connection: redisOptions })
   try {
     await queue.remove(jobId)
   } finally {
@@ -241,7 +292,6 @@ async function removeModerationJob(jobId: string): Promise<void> {
 }
 
 describe('4.4 wardrobe silhouette against real PostgreSQL', () => {
-  const namespace = `silhouette-it-${randomUUID().slice(0, 8)}`
   // Captured so `afterAll` can restore it: `process.env` is a real Node
   // global, not something vitest's per-file isolation resets on its own for
   // a plain assignment (unlike `vi.stubEnv`, which this repo's other
@@ -262,7 +312,7 @@ describe('4.4 wardrobe silhouette against real PostgreSQL', () => {
   beforeAll(async () => {
     await probeSchema()
     process.env.WARDROBE_UPLOAD_TOKEN_SECRET = 'a'.repeat(32)
-    if (schemaReady) await clearModerationQueue()
+    if (schemaReady) await reapPreviousRunQueues()
   })
 
   beforeEach(async () => {
@@ -275,7 +325,12 @@ describe('4.4 wardrobe silhouette against real PostgreSQL', () => {
 
     guardian = new StubGuardianService()
     storage = new MemoryWardrobeStorage()
-    queue = new SilhouettePhotoProcessingQueue()
+    // The production job options (attempts, backoff, retention) on a per-run
+    // name: `4.4-INT-15`'s retry gate and `4.4-INT-18`'s dedupe both read them.
+    queue = new SilhouettePhotoProcessingQueue({
+      name: queueName,
+      options: productionQueueOptions(),
+    })
     serviceA = new WardrobeSilhouetteService(
       prismaA,
       guardian as unknown as GuardianService,
@@ -304,6 +359,13 @@ describe('4.4 wardrobe silhouette against real PostgreSQL', () => {
       await prismaA.$disconnect()
       await prismaB.$disconnect()
       return
+    }
+    // The per-run queue's keys would otherwise outlive the run in Redis.
+    const ownQueue = new Queue(queueName, { connection: redisOptions })
+    try {
+      await ownQueue.obliterate({ force: true })
+    } finally {
+      await ownQueue.close().catch(() => undefined)
     }
     await prismaA.$disconnect()
     await prismaB.$disconnect()
@@ -530,7 +592,6 @@ describe('4.4 wardrobe silhouette against real PostgreSQL', () => {
       uploadUrlResult.response.data.uploadSessionId
     )
 
-    const redisOptions = redisOptionsFromConfig(getRedisConfig())
     const processedJobIds: string[] = []
     const engine: SilhouettePhotoModerationEngine = {
       moderate: () => Promise.resolve({ outcome: 'ready' as const }),
@@ -538,7 +599,7 @@ describe('4.4 wardrobe silhouette against real PostgreSQL', () => {
     const processor = new SilhouettePhotoProcessor(prismaA, storage, engine)
 
     const worker = new Worker<{ silhouetteProfileId: string }>(
-      'moderation-review',
+      queueName,
       async (job) => {
         const data = silhouettePhotoProcessingJobSchema.parse(job.data)
         processedJobIds.push(job.id ?? 'unknown')
@@ -563,9 +624,9 @@ describe('4.4 wardrobe silhouette against real PostgreSQL', () => {
           20_000
         )
         // Both listeners filter on this test's own job. The worker subscribes
-        // to the shared `moderation-review` queue name, so an unrelated job
-        // left behind by another suite would otherwise resolve this promise
-        // early or reject the test with a failure that is not ours.
+        // to the queue name, so a job another test in this file enqueued and
+        // has not drained yet would otherwise resolve this promise early or
+        // reject the test with a failure that is not ours.
         worker.on('completed', (job) => {
           if (job.id === expectedJobId) {
             clearTimeout(timeout)
@@ -614,9 +675,7 @@ describe('4.4 wardrobe silhouette against real PostgreSQL', () => {
   it('4.4-INT-18 enqueues a distinct job for a second My Form commit on the same profile', async (context) => {
     if (!requireSchema(context)) return
 
-    const bullQueue = new Queue('moderation-review', {
-      connection: redisOptionsFromConfig(getRedisConfig()),
-    })
+    const bullQueue = new Queue(queueName, { connection: redisOptions })
     const enqueuedJobIds: string[] = []
 
     try {
@@ -788,12 +847,10 @@ describe('4.4 wardrobe silhouette against real PostgreSQL', () => {
       commitKey
     )
     expect(replay.replayed).toBe(true)
-    // Assumes no other consumer processes this profile's job before this
-    // assertion runs -- e.g. `npm run start:workers:wardrobe` pointed at the
-    // same Redis would flip the row to `ready` and bump the revision out
-    // from under this. Same shared-external-state class as everywhere else
-    // in this file; harmless in CI/local test runs where no such worker is
-    // started, but don't run this suite alongside a live wardrobe worker.
+    // Nothing else can process this profile's job before this assertion runs:
+    // the queue name is this run's own, so a live wardrobe worker on the same
+    // Redis (the end-to-end stack starts one) never sees it. Before the name
+    // was namespaced that worker flipped the row and bumped the revision.
     expect(replay.response.data.revision).toBe(first.response.data.revision)
 
     // Asserting the exception type too, not just the message: the whole point
