@@ -1031,10 +1031,10 @@ describe('6.2 screening dispositions and attempt evidence', () => {
     const stamped = await prisma.lookbookPost.findUniqueOrThrow({
       where: { id: withPolicy.postId },
     })
-    // Both rows carry the same two segments. `deriveScreeningIdentity` already
-    // builds the policy version and hash prefix into the engine version
-    // strings, so a screener's own `policyVersion` is bounded evaluation detail
-    // rather than a third identity segment to append.
+    // Both rows carry the same two segments. A real run's halves already name
+    // the policy hash (the text loader and the image screener each build it
+    // into their own version), so a screener's own `policyVersion` is bounded
+    // evaluation detail rather than a third identity segment to append.
     const expected = `adr013-text-v2.0${FIXTURE_ENGINE_VERSION_SUFFIX};adr013-nsfw-v1.0${FIXTURE_ENGINE_VERSION_SUFFIX}`
     expect(bare.moderation_engine_version).toBe(expected)
     expect(stamped.moderation_engine_version).toBe(expected)

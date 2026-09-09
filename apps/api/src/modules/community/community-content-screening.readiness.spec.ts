@@ -24,6 +24,8 @@ import fs from 'node:fs'
 import path from 'node:path'
 import { afterAll, beforeAll, describe, expect, it } from 'vitest'
 import { z } from 'zod'
+import { loadCommunityScreeningPolicy } from './community-screening-policy.js'
+import { CommunityTextScreener } from './community-text-screener.js'
 import {
   TensorflowNsfwImageScreener,
   type NsfwImageScreeningResult,
@@ -357,6 +359,27 @@ describe('community screening readiness: real model', () => {
       reasons: result.reasons,
     }))
 
+    /*
+     * The text half of the persisted identity, taken from a screening the
+     * production wiring actually performed rather than composed here. The
+     * worker runtime builds this screener from the loaded policy, and what it
+     * stamps on a row is the `policyVersion` it hands back, so that is what the
+     * evidence records. Until this ran, the payload carried `null` for the text
+     * half of an identity it described as recorded by the readiness run.
+     */
+    const loaded = loadCommunityScreeningPolicy()
+    const textScreener = new CommunityTextScreener({
+      policy: loaded.policy.text,
+      policyVersion: loaded.identity.textEngineVersion,
+    })
+    const textScreening = textScreener.screen({
+      text: 'A plum satin wrap dress.',
+      field: 'caption',
+      locale: 'en-US',
+    })
+    expect(textScreening.disposition).toBe('pass')
+    expect(textScreening.policyVersion).toContain(loaded.policySha256.slice(0, 12))
+
     fs.mkdirSync(intermediateDir, { recursive: true })
     fs.writeFileSync(
       intermediatePath,
@@ -372,7 +395,7 @@ describe('community screening readiness: real model', () => {
           screeningPath: 'tensorflow',
           measuredAt: new Date().toISOString(),
           identity: {
-            textEngineVersion: null,
+            textEngineVersion: textScreening.policyVersion,
             imageEngineVersion: screener.engineVersion,
           },
           modelDigest: identity?.modelDigest ?? null,

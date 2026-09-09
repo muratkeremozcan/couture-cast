@@ -117,6 +117,15 @@ function gitWorkingTreeClean() {
  * `isEvidence` is what carries that distinction into the payload: only a
  * `passed` run counts. Reading the exit code alone is the mistake this exists to
  * prevent.
+ *
+ * THE SELECTOR IS FORCED TO `tensorflow` FOR THIS ONE CHILD. The skip exists for
+ * the production worker's prestart hook, where an incident-mode start must not
+ * be refused by its own pre-flight. Here the question is different: this
+ * payload reports on the pinned artifacts, and an emitter that inherited an
+ * unset shell selector recorded `skipped` beside a current real-model
+ * measurement, which reads as a verified run whose artifacts nobody hashed. The
+ * real-model commands force the same value on their own pre-hooks for the same
+ * reason.
  */
 const VERIFY_COMMAND = [
   'run',
@@ -127,6 +136,7 @@ const VERIFY_COMMAND = [
   '--',
   '--json',
 ]
+const VERIFY_ENV = { ...process.env, COMMUNITY_NSFW_SCREENER: 'tensorflow' }
 
 /** What the verify script reports when every artifact hashed clean. */
 const VERIFY_PASSED_STATUS = 'verified'
@@ -147,6 +157,7 @@ function verifyModel() {
     raw = execFileSync('npm', VERIFY_COMMAND, {
       cwd: projectRoot,
       encoding: 'utf8',
+      env: VERIFY_ENV,
       stdio: ['ignore', 'pipe', 'pipe'],
     })
   } catch (error) {
@@ -616,6 +627,22 @@ async function main() {
   if (!payload.modelIdentity || !payload.policyIdentity) {
     console.error(
       '[measurements] The model manifest or the screening policy is missing, so no truthful identity can be recorded.'
+    )
+    process.exit(1)
+  }
+
+  /*
+   * A current real-model measurement beside anything but a verified supply
+   * chain is a payload that contradicts itself: the numbers say the pinned
+   * model ran, the verification says nobody hashed it. Neither half can be
+   * trusted over the other from inside the file, so the file is not written.
+   */
+  if (
+    payload.runtimeMeasurement.screening.available &&
+    !payload.modelVerification.isEvidence
+  ) {
+    console.error(
+      `[measurements] A current readiness measurement exists but the model verification reported "${payload.modelVerification.status}": ${payload.modelVerification.note ?? 'no detail'}. Refusing to write a payload that claims a real-model run over unverified artifacts.`
     )
     process.exit(1)
   }

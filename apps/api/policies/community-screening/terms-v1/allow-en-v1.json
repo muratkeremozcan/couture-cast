@@ -8,7 +8,7 @@
     "licence": "UNLICENSED (repository-owned)",
     "retrievedAt": "2026-09-08",
     "curator": "couture-cast trust and safety",
-    "notes": "Ordinary garment and styling vocabulary that collides with a term once repeated characters are collapsed or diacritics folded, plus the words the bad-words backstop flags that name real garments: a fanny pack, a boob tube and knob buttons. Allow-list lookup runs on the literal case-folded token, before diacritic and leet folding, so an accented spelling is still screened."
+    "notes": "Ordinary garment and styling vocabulary that collides with a term once repeated characters are collapsed or diacritics folded, plus the words the bad-words backstop flags that name real garments or describe them: a fanny pack, a boob tube, knob and screw-back fastenings, and sexy as the register eveningwear, lingerie and swimwear copy is written in. The image policy already declines to treat the model's Sexy class as unsafe for exactly that reason, and a text backstop that routed every caption using the word to a human would contradict it. Allow-list lookup runs on the literal case-folded token, before diacritic and leet folding, so an accented spelling is still screened."
   },
   "entries": [
     "boob",
@@ -20,6 +20,9 @@
     "peacock",
     "puttee",
     "puttees",
+    "screw",
+    "screws",
+    "sexy",
     "shirtdress"
   ]
 }

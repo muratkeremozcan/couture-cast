@@ -2,7 +2,7 @@
   "artifact": "community-content-screening-measurements",
   "artifactVersion": 1,
   "storyKey": "6-2-production-content-screening-readiness",
-  "generatedAt": "2026-09-08T22:53:33.573Z",
+  "generatedAt": "2026-09-09T01:56:44.876Z",
   "generatedBy": "npm run measure:community-screening",
   "scope": {
     "rendersVerdict": false,
@@ -16,11 +16,11 @@
     "statement": "The deterministic evaluation proves that unsafe class-probability vectors return block, that every threshold is crossed from both sides, and that no vector reaches pass without a confident Neutral. The lifecycle suite drives a fake inference runtime emitting an unsafe vector, which proves the transport from worker message through validation, class mapping, policy evaluation, reason codes, and engine identity to a block verdict. Neither establishes that the real model emits a high Porn or Hentai probability for genuinely unsafe input, and no synthetic vector can. That single link is what AC 7 assigns to Story 6.2b corpus-backed measurement."
   },
   "build": {
-    "commitSha": "fd3ec4520ae4f2a2e6c6ae347fb90e3e188d4ed7",
+    "commitSha": "863a349bae16126cb809fdfef46ff041659cb79b",
     "modelManifestSha256": "d2bd4c0ec65056ca13256a3645c4ea4a95a7e1d3af21bc886d9a2a4c7396357f",
     "policySha256": "467f139bba94f5131a652c597fe91867ad553dd0ef271fc3604da55f4e66a6e6",
     "fixtureManifestSha256": "b8cd2cd08dd419024a2cdb3ca84d03b3be7a5df211a92cd200853200bcb13243",
-    "lockfileSha256": "68b479987b242d657ed1de37c1c6a33aff4808e0e1af0b437f45ce5e1d8fc6a4",
+    "lockfileSha256": "2025e3f196ed2a7091eb5f7c034af8a00365b3a38826248b003a4ae609cdcf91",
     "workingTreeClean": true,
     "nodeVersion": "v24.20.0",
     "platform": "darwin-arm64"
@@ -35,12 +35,12 @@
     "inputHeight": 224
   },
   "modelVerification": {
-    "status": "skipped",
-    "isEvidence": false,
-    "note": "Verification was skipped because the selector is not tensorflow, so the model artifacts were never hashed. This is the absence of evidence, not a passing verification. COMMUNITY_NSFW_SCREENER=unset, so no real model is loaded and there is nothing to verify."
+    "status": "verified",
+    "isEvidence": true,
+    "note": null
   },
   "engineIdentity": {
-    "textEngineVersion": null,
+    "textEngineVersion": "adr013-text:policy-v1@467f139bba94",
     "imageEngineVersion": "adr013-nsfw-v1.0:mobilenet_v2_mid@4.3.0:model-a0c76f72db26:v1:policy-467f139bba94",
     "source": "screening loader, recorded by the readiness run"
   },
@@ -80,7 +80,7 @@
     "screening": {
       "available": true,
       "screeningPath": "tensorflow",
-      "measuredAt": "2026-09-08T22:53:22.622Z",
+      "measuredAt": "2026-09-09T01:56:25.238Z",
       "modelDigest": "a0c76f72db261c54dc851b974c848dc9ce01576ca66b0f232f4848c950549322",
       "policyVersion": "v1",
       "policyDigest": "467f139bba94f5131a652c597fe91867ad553dd0ef271fc3604da55f4e66a6e6",
@@ -246,7 +246,7 @@
           "fixtureManifestSha256",
           "lockfileSha256"
         ],
-        "commitShaAtMeasurement": "fd3ec4520ae4f2a2e6c6ae347fb90e3e188d4ed7",
+        "commitShaAtMeasurement": "863a349bae16126cb809fdfef46ff041659cb79b",
         "mismatches": [],
         "note": "Every input that produced these numbers matches the working tree."
       }

@@ -15,6 +15,7 @@ import {
   hashPolicyBytes,
   loadCommunityScreeningPolicy,
 } from './community-screening-policy'
+import { evaluateNsfwDisposition } from './tensorflow-nsfw-image-screener'
 
 const repoRoot = path.resolve(__dirname, '../../../../..')
 const apiRoot = path.join(repoRoot, 'apps/api')
@@ -56,15 +57,15 @@ describe('loadCommunityScreeningPolicy', () => {
     expect(loaded.manifest.policy.sha256).toBe(onDisk)
   })
 
-  it('derives an identity naming the model artifact and the policy hash', () => {
+  it('derives the text engine identity from the policy version and hash', () => {
     const loaded = loadCommunityScreeningPolicy()
 
-    expect(loaded.identity.imageEngineVersion).toBe(
-      `adr013-nsfw:nsfwjs-4.3.0/mobilenet_v2_mid:policy-v1@${loaded.policySha256.slice(0, 12)}`
-    )
     expect(loaded.identity.textEngineVersion).toBe(
       `adr013-text:policy-v1@${loaded.policySha256.slice(0, 12)}`
     )
+    // The image half is composed by the screener from the model digest it
+    // actually verified, so this identity deliberately carries none.
+    expect(loaded.identity).not.toHaveProperty('imageEngineVersion')
   })
 
   it('changes the derived identity when the policy hash changes', () => {
@@ -79,7 +80,6 @@ describe('loadCommunityScreeningPolicy', () => {
     )
 
     expect(manifest.policy).toBeDefined()
-    expect(first.imageEngineVersion).not.toBe(second.imageEngineVersion)
     expect(first.textEngineVersion).not.toBe(second.textEngineVersion)
   })
 })
@@ -108,21 +108,31 @@ describe('the committed policy is conservative by construction', () => {
   // The seam the coordinator found: Neutral 0.86 with Porn 0.13 clears the
   // Neutral gate and blocks on no single class, so the aggregate ceiling is the
   // only thing keeping thirteen percent unsafe mass out of automatic publication.
+  // Driven through the disposition function rather than restated as arithmetic
+  // on the thresholds: comparing the numbers to themselves passes whatever the
+  // evaluator does with them.
   it('keeps a confident Neutral carrying real unsafe mass out of pass', () => {
-    const neutral = 0.86
-    const unsafeAggregate = 0.13
+    const evaluation = evaluateNsfwDisposition(
+      [0.01, 0, 0.86, 0.13, 0],
+      policy.image.classNames,
+      policy.image
+    )
 
-    expect(neutral).toBeGreaterThan(policy.image.neutralPassMinimum)
-    expect(unsafeAggregate).toBeLessThan(policy.image.unsafeBlockMinimum)
-    expect(unsafeAggregate).toBeGreaterThanOrEqual(policy.image.unsafeAggregateMaximum)
+    expect(evaluation.classProbabilities.Neutral).toBeGreaterThan(
+      policy.image.neutralPassMinimum
+    )
+    expect(evaluation.disposition).toBe('review')
   })
 
   it('leaves the benign reference vector comfortably inside every pass gate', () => {
-    const reference = { Drawing: 0.0484, Hentai: 0.0421, Neutral: 0.9063, Porn: 0.0015 }
-    const unsafeAggregate = reference.Hentai + reference.Porn
+    const evaluation = evaluateNsfwDisposition(
+      [0.0484, 0.0421, 0.9063, 0.0015, 0.0016],
+      policy.image.classNames,
+      policy.image
+    )
 
-    expect(reference.Neutral).toBeGreaterThan(policy.image.neutralPassMinimum)
-    expect(unsafeAggregate).toBeLessThan(policy.image.unsafeAggregateMaximum)
+    expect(evaluation.disposition).toBe('pass')
+    expect(evaluation.reasons).toEqual([])
   })
 
   it('never lets a text severity or a reason code resolve to pass', () => {

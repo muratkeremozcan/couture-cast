@@ -254,9 +254,15 @@ export interface CommunityScreeningIdentity {
   modelFamily: string
   packageName: string
   packageVersion: string
-  /** Persisted in `LookbookPost.moderation_engine_version` alongside the image half. */
+  /**
+   * The text half of `LookbookPost.moderation_engine_version`. The image half
+   * is NOT derived here: `TensorflowNsfwImageScreener` composes it from the
+   * model digest its worker verified on disk, which this loader never hashes. A
+   * second image identity built from the manifest alone looked like the
+   * persisted one and was not, which is a drift a reader of an audit row cannot
+   * detect, so this type carries only the half it can state truthfully.
+   */
   textEngineVersion: string
-  imageEngineVersion: string
 }
 
 export interface LoadedCommunityScreeningPolicy {
@@ -291,7 +297,6 @@ export function deriveScreeningIdentity(
     packageName: manifest.packageName,
     packageVersion: manifest.packageVersion,
     textEngineVersion: `adr013-text:${policyTag}`,
-    imageEngineVersion: `adr013-nsfw:${manifest.packageName}-${manifest.packageVersion}/${manifest.modelFamily}:${policyTag}`,
   }
 }
 

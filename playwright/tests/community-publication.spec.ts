@@ -34,6 +34,14 @@ import {
 
 const COMMUNITY_ROUTE = '/'
 
+/**
+ * The stable code `reasonCodes.text` in `policy-v1.json` gives a matched term,
+ * and the only code a caption refusal may persist on its own. Restated here
+ * because the Playwright project does not compile against the API workspace;
+ * `6.2-E2E-02` fails by name if the policy ever renames it.
+ */
+const TEXT_POLICY_MATCH_REASON = 'text_policy_match'
+
 /*
  * The highest-confidence entry in the v1 corpus, measured at Neutral 0.9991.
  *
@@ -194,7 +202,20 @@ communityApiTest.describe('6.2 community non-publication journey', () => {
         terminal.status,
         'A caption carrying a disallowed term must never publish.'
       ).toBe('flagged')
-      expect(terminal.moderationReason).toBeTruthy()
+      /*
+       * THE SCREENER THAT REFUSED IT IS ASSERTED, NOT ASSUMED. Decision 7 lets
+       * this journey stand in for an unsafe-image journey only if it is
+       * labelled as a text refusal, and a truthy reason cannot tell the two
+       * apart: a stack whose image screener fell back to `unavailable` refuses
+       * every post with `screening_unavailable`, and this test would have gone
+       * green on that refusal while the caption was never the cause. The
+       * persisted reason is the joined list of every code that held the post,
+       * so equality here also proves the safe image cleared.
+       */
+      expect(
+        terminal.moderationReason,
+        'The refusal must come from the text screener alone; any other code means the image half refused too and this journey no longer proves what it claims.'
+      ).toBe(TEXT_POLICY_MATCH_REASON)
 
       await log.step('The refused look is absent from a second member feed')
       const otherUserId = await signUpSecondMember(request, communityApi, testInfo)
