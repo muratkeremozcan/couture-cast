@@ -468,6 +468,28 @@ export function toWorkerError(value: unknown, fallback: string): Error {
   return new Error(fallback)
 }
 
+/**
+ * What {@link TensorflowNsfwImageScreener.ensureReady} hands back, so the
+ * worker runtime can write the readiness log AC 1 requires without reaching
+ * into the screener or importing its types. Deliberately a plain object rather
+ * than a class instance, and deliberately free of local absolute paths, since
+ * these fields are logged in hosted environments.
+ */
+export interface NsfwReadiness {
+  engineVersion: string
+  policyVersion: string
+  /** The full model digest, not the truncated form inside `engineVersion`. */
+  modelHash: string
+  backend: string
+  /**
+   * Cold start as the supervisor experiences it: policy load and hash
+   * verification, thread spawn, artifact verification, backend selection,
+   * graph load and warmup. The worker's own measurement excludes everything
+   * before it started, which is why this is timed out here.
+   */
+  startupDurationMs: number
+}
+
 export interface TensorflowNsfwImageScreenerOptions {
   manifestPath?: string
   inferenceTimeoutMs?: number
@@ -485,6 +507,8 @@ export class TensorflowNsfwImageScreener implements NsfwImageScreener {
   private identity: NsfwRuntimeIdentity | null = null
   private policy: NsfwImagePolicy | null = null
   private resolvedEngineVersion: string | null = null
+  private readiness: NsfwReadiness | null = null
+  private readinessStartedAt: number | null = null
   private initializationFailure: { error: Error; failedAt: number } | null = null
   /** Settles an in-flight startup, so closing mid-startup cannot strand a caller. */
   private abortInitialization: ((error: unknown) => void) | null = null
@@ -514,11 +538,14 @@ export class TensorflowNsfwImageScreener implements NsfwImageScreener {
     return this.identity
   }
 
-  async ensureReady(): Promise<void> {
-    if (this.ready) return
+  async ensureReady(): Promise<NsfwReadiness> {
+    if (this.ready && this.readiness) return this.readiness
     if (this.closing) {
       throw new Error('Community NSFW screener is closing')
     }
+    // Timed from the first attempt of the current startup rather than from the
+    // spawn, so the policy load and hash verification are inside the number.
+    this.readinessStartedAt ??= Date.now()
     const failure = this.initializationFailure
     if (failure && Date.now() - failure.failedAt < NSFW_FAILURE_COOLDOWN_MS) {
       // Inside the cooldown the previous cause is replayed rather than a new
@@ -551,6 +578,11 @@ export class TensorflowNsfwImageScreener implements NsfwImageScreener {
     if (this.readyPromise) {
       await this.readyPromise
     }
+    const readiness = this.readiness
+    if (!readiness) {
+      throw new Error('Community NSFW screener reported ready without an identity')
+    }
+    return readiness
   }
 
   private async loadPolicy(): Promise<void> {
@@ -625,6 +657,7 @@ export class TensorflowNsfwImageScreener implements NsfwImageScreener {
           this.worker = null
           this.ready = false
           this.readyPromise = null
+          this.readiness = null
         }
         // The thread can outlive this rejection, because `terminate()` is
         // awaited in the background. An `error` emitted with no listener is
@@ -647,6 +680,14 @@ export class TensorflowNsfwImageScreener implements NsfwImageScreener {
           this.ready = true
           this.identity = message.identity
           this.resolvedEngineVersion = composeEngineVersion(message.identity)
+          this.readiness = {
+            engineVersion: this.resolvedEngineVersion,
+            policyVersion: message.identity.policyVersion,
+            modelHash: message.identity.modelDigest,
+            backend: message.identity.backend,
+            startupDurationMs: Date.now() - (this.readinessStartedAt ?? Date.now()),
+          }
+          this.readinessStartedAt = null
           this.initializationFailure = null
           this.abortInitialization = null
           cleanup()
@@ -828,5 +869,6 @@ export class TensorflowNsfwImageScreener implements NsfwImageScreener {
     }
     this.ready = false
     this.readyPromise = null
+    this.readiness = null
   }
 }

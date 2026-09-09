@@ -262,6 +262,28 @@ describe('Community NSFW image screening model smoke test', () => {
     MODEL_TEST_TIMEOUT_MS
   )
 
+  // The runtime logs this payload verbatim, so a real run has to produce all
+  // five fields with real values rather than the fake worker's fixtures.
+  smokeIt(
+    'returns a truthful readiness payload from the real model',
+    async () => {
+      const active = await readyScreener()
+      const readiness = await active.ensureReady()
+
+      expect(readiness.backend).toBe('wasm')
+      expect(readiness.policyVersion).toBe(manifest.policy.version)
+      expect(readiness.modelHash).toMatch(/^[a-f0-9]{64}$/)
+      expect(readiness.engineVersion).toBe(active.engineVersion)
+      expect(readiness.engineVersion).not.toContain('fixture')
+      expect(readiness.engineVersion).not.toContain('unresolved')
+      expect(readiness.startupDurationMs).toBeGreaterThan(0)
+      expect(readiness.startupDurationMs).toBeLessThan(NSFW_INITIALIZATION_TIMEOUT_MS)
+      // Hosted readiness logs must carry no local absolute path.
+      expect(JSON.stringify(readiness)).not.toContain('/')
+    },
+    MODEL_TEST_TIMEOUT_MS
+  )
+
   smokeIt(
     'shuts the model worker down on close',
     async () => {
