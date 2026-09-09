@@ -116,7 +116,18 @@ const TextPolicySchema = z
   .object({
     categories: z.array(CategorySchema).min(1),
     severities: z.array(SeveritySchema).min(1),
-    severityDisposition: z.record(SeveritySchema, WithheldDispositionSchema),
+    // Declared key by key rather than through z.record over the severity enum.
+    // z.record infers Partial<Record<...>>, because it cannot promise a key for
+    // every member, so every consumer either indexed into a possibly-undefined
+    // disposition or bridged the gap itself. An undefined disposition ranks as
+    // NaN, never raises the verdict, and leaves a matched term publishable, which
+    // is the fail-open the grading exists to prevent. The superRefine below still
+    // checks the data against the policy's own declared severities list.
+    severityDisposition: z.object({
+      low: WithheldDispositionSchema,
+      medium: WithheldDispositionSchema,
+      high: WithheldDispositionSchema,
+    }),
     unscreenableLocaleDisposition: WithheldDispositionSchema,
     allDictionariesAlwaysRun: z.literal(true),
     scripts: z.object({
