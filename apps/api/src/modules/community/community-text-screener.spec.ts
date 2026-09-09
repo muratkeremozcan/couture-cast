@@ -675,8 +675,35 @@ describe('CommunityTextScreener word boundaries and allow lists (AC 4)', () => {
       'a fanny pack in matte leather',
       'a boob tube under a sheer shirt',
       'brass knob buttons down the front',
+      'screw-back pearl earrings with a satin slip',
+      'a sexy black slip dress for the evening',
     ]) {
       expect(screenCaption(caption).disposition, caption).toBe('pass')
+    }
+  })
+
+  /*
+   * The backstop's vocabulary was never reviewed against fashion copy, so this
+   * pins what it still holds against the words a caption on this product
+   * actually uses. Measured on 2026-09-08 against bad-words 4.1.5: of the
+   * ordinary fashion vocabulary probed, `sexy` and `screw` were the two the
+   * filter flagged that name a register or a fastening rather than an insult,
+   * and the image policy already records why Sexy is not unsafe on this
+   * product. The intensifiers it also flags (`bloody`, `hell`, `damn`) stay
+   * routed to review at low severity, which is a moderator's call and not a
+   * defect. A new bad-words release that starts flagging one of these fails
+   * here by name instead of as a false-positive rate nobody measures.
+   */
+  it('lets the fashion register through the English backstop', () => {
+    for (const caption of [
+      'nude heels with a thong sandal strap',
+      'a lingerie-inspired bodysuit and bikini top',
+      'the crotch seam on the trousers sits high',
+      'sexy is the register, satin is the fabric',
+    ]) {
+      const result = screenCaption(caption)
+      expect(result.disposition, caption).toBe('pass')
+      expect(result.categories, caption).toEqual([])
     }
   })
 
