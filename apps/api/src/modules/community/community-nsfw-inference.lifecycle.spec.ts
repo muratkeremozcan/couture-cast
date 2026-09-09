@@ -522,7 +522,7 @@ describe('TensorflowNsfwImageScreener startup', () => {
     expect(latestWorker().options.workerData?.manifestPath).toBe(manifestPath)
     send(latestWorker(), readyMessage())
 
-    await expect(ready).resolves.toBeUndefined()
+    await expect(ready).resolves.toMatchObject({ backend: 'wasm' })
     expect(workers()).toHaveLength(1)
     expect(screener.runtimeIdentity).toEqual(RUNTIME_IDENTITY)
     expect(screener.engineVersion).toBe(composeEngineVersion(RUNTIME_IDENTITY))
@@ -538,7 +538,7 @@ describe('TensorflowNsfwImageScreener startup', () => {
     expect(latestWorker().options.workerData?.manifestPath).toBe(manifestPath)
     send(latestWorker(), readyMessage())
 
-    await expect(ready).resolves.toBeUndefined()
+    await expect(ready).resolves.toMatchObject({ backend: 'wasm' })
   })
 })
 
@@ -650,7 +650,7 @@ describe('TensorflowNsfwImageScreener failure cooldown', () => {
     expect(workers()).toHaveLength(2)
     send(latestWorker(), readyMessage())
 
-    await expect(retried).resolves.toBeUndefined()
+    await expect(retried).resolves.toMatchObject({ backend: 'wasm' })
   })
 })
 
@@ -1600,7 +1600,7 @@ describe('TensorflowNsfwImageScreener idle crash', () => {
     expect(workers()).toHaveLength(2)
     send(latestWorker(), readyMessage())
 
-    await expect(recovered).resolves.toBeUndefined()
+    await expect(recovered).resolves.toMatchObject({ backend: 'wasm' })
   })
 })
 
@@ -1644,7 +1644,7 @@ describe('TensorflowNsfwImageScreener restart failure', () => {
  * predated the TensorFlow.js install, never once surfaced.
  */
 describe('TensorflowNsfwImageScreener non-Error worker events', () => {
-  async function spawnedScreener(): Promise<{ ready: Promise<void> }> {
+  async function spawnedScreener(): Promise<{ ready: Promise<unknown> }> {
     const screener = new TensorflowNsfwImageScreener({
       manifestPath: createManifestFixture(),
     })
@@ -1824,5 +1824,53 @@ describe('startup timeout teardown', () => {
 
     worker.emit('exit', 1)
     expect(errorListeners()).toBe(0)
+  })
+})
+
+describe('ensureReady readiness payload', () => {
+  // AC 1 requires the readiness log to carry policy identity, backend, startup
+  // duration and model hash. The runtime can only log what this seam returns.
+  it('hands back the four identity fields plus a supervisor-timed duration', async () => {
+    const screener = new TensorflowNsfwImageScreener({
+      manifestPath: createManifestFixture(),
+    })
+    const ready = screener.ensureReady()
+    await vi.waitFor(() => expect(workers()).toHaveLength(1))
+    send(latestWorker(), readyMessage())
+
+    const readiness = await ready
+
+    expect(Object.keys(readiness).sort()).toEqual([
+      'backend',
+      'engineVersion',
+      'modelHash',
+      'policyVersion',
+      'startupDurationMs',
+    ])
+    expect(readiness.engineVersion).toBe(screener.engineVersion)
+    expect(readiness.policyVersion).toBe(RUNTIME_IDENTITY.policyVersion)
+    expect(readiness.modelHash).toBe(RUNTIME_IDENTITY.modelDigest)
+    expect(readiness.backend).toBe('wasm')
+    expect(typeof readiness.startupDurationMs).toBe('number')
+    // The full digest, not the twelve characters `engineVersion` truncates to.
+    expect(readiness.modelHash).toMatch(/^[a-f0-9]{64}$/)
+    expect(readiness.startupDurationMs).toBeGreaterThanOrEqual(0)
+    // No local absolute path may reach a hosted readiness log.
+    expect(JSON.stringify(readiness)).not.toContain('/')
+  })
+
+  it('returns the same payload on a second call without respawning', async () => {
+    const screener = new TensorflowNsfwImageScreener({
+      manifestPath: createManifestFixture(),
+    })
+    const ready = screener.ensureReady()
+    await vi.waitFor(() => expect(workers()).toHaveLength(1))
+    send(latestWorker(), readyMessage())
+    const first = await ready
+
+    const second = await screener.ensureReady()
+
+    expect(second).toBe(first)
+    expect(workers()).toHaveLength(1)
   })
 })
