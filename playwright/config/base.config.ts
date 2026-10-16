@@ -8,6 +8,8 @@ const testsDir = path.join(rootDir, 'tests')
 const artifactsDir = path.join(rootDir, 'artifacts')
 const reportDir = path.join(rootDir, 'playwright-report')
 const globalTeardown = path.join(rootDir, 'global-teardown.ts')
+// S6 measurement branch: duration balancing with the Flakiness reporter, offline.
+const flakinessTimings = process.env.PSP_FLAKINESS_TIMINGS
 
 export const baseConfig: PlaywrightTestConfig = defineConfig({
   testDir: testsDir,
@@ -20,7 +22,18 @@ export const baseConfig: PlaywrightTestConfig = defineConfig({
     timeout: 10_000,
   },
   outputDir: artifactsDir,
-  reporter: [['list'], ['html', { outputFolder: reportDir, open: 'never' }]],
+  reporter: flakinessTimings
+    ? [
+        ['blob'],
+        [
+          '@flakiness/playwright',
+          {
+            disableUpload: true,
+            shardBalancing: { timingsFile: path.resolve(flakinessTimings) },
+          },
+        ],
+      ]
+    : [['list'], ['html', { outputFolder: reportDir, open: 'never' }]],
   globalTeardown,
   use: {
     trace: 'retain-on-failure',

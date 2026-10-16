@@ -110,6 +110,7 @@
     "@axe-core/playwright": "^4.14.0",
     "@couture/eslint-config": "workspace:*",
     "@faker-js/faker": "10.1.0",
+    "@flakiness/playwright": "2.0.2",
     "@lhci/cli": "0.15.1",
     "@openapitools/openapi-generator-cli": "2.31.0",
     "@pact-foundation/pact": "16.4.0",

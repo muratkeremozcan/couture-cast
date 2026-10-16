@@ -122,10 +122,14 @@ jobs:
         run: npx playwright install chromium
 
       - name: Run Playwright local suite
-        run: npm run test:pw-local -- --shard=${{ matrix.shardIndex }}/${{ matrix.shardTotal }} --reporter=blob
+        # The config adds the blob and Flakiness reporters; a --reporter flag here
+        # would replace both and switch balancing off.
+        run: npm run test:pw-local -- --shard=${{ matrix.shardIndex }}/${{ matrix.shardTotal }}
         env:
           DATABASE_URL: ${{ env.LOCAL_DATABASE_URL }}
           GUARDIAN_INVITE_JWT_SECRET: ${{ secrets.GUARDIAN_INVITE_JWT_SECRET }}
+          PSP_FLAKINESS_TIMINGS: playwright/config/flakiness-timings.json
+          FLAKINESS_OUTPUT_DIR: flakiness-report
 
       - name: Copy trace files to blob-report
         if: always()
@@ -142,6 +146,33 @@ jobs:
           GUARDIAN_INVITE_JWT_SECRET: ${{ secrets.GUARDIAN_INVITE_JWT_SECRET }}
           GH_TOKEN: ${{ github.token }}
         run: node scripts/check-artifact-secrets.mjs --names GUARDIAN_INVITE_JWT_SECRET,GH_TOKEN blob-report
+
+      # Only the lean timings leave the job. The Flakiness report itself records the
+      # environment and the system, so it is never uploaded.
+      - name: Build Flakiness timings of the shard
+        if: always()
+        run: |
+          mkdir -p flakiness-timings
+          if [ -f flakiness-report/report.json ]; then
+            npx flakiness-playwright-timings build flakiness-report/report.json \
+              -o "flakiness-timings/timings-${{ matrix.shardIndex }}.json"
+          fi
+
+      - name: Check Flakiness timings for secret values
+        id: timings_scan
+        if: always()
+        env:
+          GUARDIAN_INVITE_JWT_SECRET: ${{ secrets.GUARDIAN_INVITE_JWT_SECRET }}
+          GH_TOKEN: ${{ github.token }}
+        run: node scripts/check-artifact-secrets.mjs --names GUARDIAN_INVITE_JWT_SECRET,GH_TOKEN flakiness-timings
+
+      - name: Upload Flakiness timings (shard)
+        if: always() && steps.timings_scan.outcome == 'success'
+        uses: actions/upload-artifact@v4
+        with:
+          name: flakiness-timings-${{ matrix.shardIndex }}
+          path: flakiness-timings
+          retention-days: 5
 
       - name: Upload Playwright artifacts (shard)
         if: always() && steps.secret_scan.outcome == 'success'
