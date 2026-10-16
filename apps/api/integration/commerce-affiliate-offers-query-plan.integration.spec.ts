@@ -704,16 +704,23 @@ describe('5.1 affiliate offer query plans', () => {
 })
 
 /**
- * The largest `shared hit=/read=` figure the plan reports, which is the buffer
- * count for the whole query.
+ * The largest `shared hit=/read=` figure the plan's execution nodes report, which
+ * is the buffer count for running the query.
  *
  * Deliberately a maximum and not a sum: every node reports the buffers of its
  * own subtree, so a parent's number already includes its children's. Summing
  * them counts the same pages once per level of the tree and inflates a five-node
  * plan by roughly a factor of five.
+ *
+ * The `Planning:` section is cut off first. Its buffers are catalog lookups, and
+ * how many a statement needs depends on how warm the pooled connection's catalog
+ * cache happens to be, not on the plan: a cold connection planning the indexed
+ * lookup read 274 catalog pages against a seq scan's 210 execution pages, and
+ * failed 5.1-PLAN-06 on a plan that was correct.
  */
 function peakBuffers(plan: string): number {
-  return [...plan.matchAll(/shared hit=(\d+)(?: read=(\d+))?/g)].reduce(
+  const execution = plan.split(/^Planning:/m)[0] ?? plan
+  return [...execution.matchAll(/shared hit=(\d+)(?: read=(\d+))?/g)].reduce(
     (max, match) => Math.max(max, Number(match[1] ?? 0) + Number(match[2] ?? 0)),
     0
   )

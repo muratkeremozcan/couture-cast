@@ -133,8 +133,18 @@ jobs:
           mkdir -p blob-report/trace
           cp -r playwright/test-results/**/*.zip blob-report/trace || true
 
-      - name: Upload Playwright artifacts (shard)
+      # Blocks the upload when a report or trace carries a secret this job
+      # holds. Fails closed: if the scan cannot run, nothing is uploaded.
+      - name: Check Playwright artifacts for secret values
+        id: secret_scan
         if: always()
+        env:
+          GUARDIAN_INVITE_JWT_SECRET: ${{ secrets.GUARDIAN_INVITE_JWT_SECRET }}
+          GH_TOKEN: ${{ github.token }}
+        run: node scripts/check-artifact-secrets.mjs --names GUARDIAN_INVITE_JWT_SECRET,GH_TOKEN blob-report
+
+      - name: Upload Playwright artifacts (shard)
+        if: always() && steps.secret_scan.outcome == 'success'
         uses: actions/upload-artifact@v4
         with:
           name: blob-report-${{ matrix.shardIndex }}

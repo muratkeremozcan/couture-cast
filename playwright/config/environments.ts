@@ -50,7 +50,12 @@ function firstDefined<T>(...values: (T | undefined)[]): T {
 }
 
 const supabaseServiceRoleKey = env('SUPABASE_SERVICE_ROLE_KEY') ?? ''
-const vercelBypassSecret = env('VERCEL_AUTOMATION_BYPASS_SECRET')
+const serviceRoleHeaders: Record<string, string> = supabaseServiceRoleKey
+  ? {
+      apikey: supabaseServiceRoleKey,
+      authorization: `Bearer ${supabaseServiceRoleKey}`,
+    }
+  : {}
 const apiProjectSlug = env('VERCEL_API_PROJECT_SLUG') ?? 'couture-cast-api'
 const webProjectSlug = env('VERCEL_WEB_PROJECT_SLUG') ?? 'couture-cast-web'
 const defaultTeamSlug = env('VERCEL_TEAM_SLUG') ?? 'muratkeremozcans-projects'
@@ -111,12 +116,7 @@ const environmentConfigs: Record<EnvironmentName, Omit<EnvironmentConfig, 'name'
         password: process.env.AUTH_PASSWORD ?? 'local-password',
       },
     },
-    apiHeaders: supabaseServiceRoleKey
-      ? {
-          apikey: supabaseServiceRoleKey,
-          authorization: `Bearer ${supabaseServiceRoleKey}`,
-        }
-      : {},
+    apiHeaders: serviceRoleHeaders,
   },
   preview: (() => {
     const webBaseUrl = firstDefined(
@@ -144,23 +144,10 @@ const environmentConfigs: Record<EnvironmentName, Omit<EnvironmentConfig, 'name'
           password: process.env.PREVIEW_AUTH_PASSWORD ?? 'preview-password',
         },
       },
-      apiHeaders:
-        supabaseServiceRoleKey || vercelBypassSecret
-          ? {
-              ...(supabaseServiceRoleKey
-                ? {
-                    apikey: supabaseServiceRoleKey,
-                    authorization: `Bearer ${supabaseServiceRoleKey}`,
-                  }
-                : {}),
-              ...(vercelBypassSecret
-                ? {
-                    'x-vercel-protection-bypass': vercelBypassSecret,
-                    'x-vercel-set-bypass-cookie': 'true',
-                  }
-                : {}),
-            }
-          : {},
+      // Everything in `extraHTTPHeaders` is copied into every trace, so the
+      // Vercel bypass secret travels as the cookie that
+      // global-setup-vercel-bypass.ts mints from it.
+      apiHeaders: serviceRoleHeaders,
     }
   })(),
   prod: {
@@ -179,12 +166,7 @@ const environmentConfigs: Record<EnvironmentName, Omit<EnvironmentConfig, 'name'
         password: process.env.PROD_AUTH_PASSWORD ?? 'strong-password',
       },
     },
-    apiHeaders: supabaseServiceRoleKey
-      ? {
-          apikey: supabaseServiceRoleKey,
-          authorization: `Bearer ${supabaseServiceRoleKey}`,
-        }
-      : {},
+    apiHeaders: serviceRoleHeaders,
   },
 }
 

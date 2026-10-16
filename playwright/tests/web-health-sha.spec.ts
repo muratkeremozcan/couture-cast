@@ -15,20 +15,16 @@ test.describe('Web health metadata', () => {
       metadata.healthEndpoint ?? new URL('/api/health', fallbackBaseUrl).toString()
 
     const healthUrl = new URL(healthEndpoint)
+    // Protected previews are reached through the bypass cookie global setup
+    // mints. No bypass header here and no `uiMode`: uiMode attaches the request,
+    // headers included, to the report, and a header sent from a test is recorded
+    // in its trace.
     const vercelBypassToken = process.env.VERCEL_AUTOMATION_BYPASS_SECRET?.trim()
-    const vercelBypassHeaders = vercelBypassToken
-      ? {
-          'x-vercel-protection-bypass': vercelBypassToken,
-          'x-vercel-set-bypass-cookie': 'true',
-        }
-      : undefined
 
     const response = await apiRequest({
       method: 'GET',
       baseUrl: healthUrl.origin,
       path: healthUrl.pathname + healthUrl.search,
-      headers: vercelBypassHeaders,
-      uiMode: true,
     })
 
     if (!response || typeof response !== 'object') {
@@ -44,7 +40,7 @@ test.describe('Web health metadata', () => {
         )
       }
       throw new Error(
-        'Health check returned 401 even with VERCEL_AUTOMATION_BYPASS_SECRET set. Verify the bypass token is valid.'
+        'Health check returned 401 even with VERCEL_AUTOMATION_BYPASS_SECRET set. The bypass cookie from global setup was not accepted.'
       )
     }
 

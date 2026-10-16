@@ -53,8 +53,11 @@ export default defineConfig(
       stdout: 'pipe',
       stderr: 'pipe',
       cwd: repoRoot,
+      // Only overrides belong here. Playwright already starts the web server
+      // with the runner's environment underneath these keys, and it serializes
+      // this object verbatim into every blob report, so spreading process.env
+      // here published the whole CI environment, secrets included.
       env: {
-        ...process.env,
         API_BASE_URL: environment.apiBaseUrl,
         PUBLIC_API_URL: environment.apiBaseUrl,
         REUSE_EXISTING_WEB_SERVER: process.env.CI ? 'false' : 'true',
