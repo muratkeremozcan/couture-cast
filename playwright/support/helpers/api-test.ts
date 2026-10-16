@@ -37,6 +37,20 @@ export function isProdEnvironment(testInfo: TestInfo): boolean {
   return projectMetadata(testInfo).environment === 'prod'
 }
 
+/**
+ * Skip a test that authenticates with `authHeaders` when it runs against
+ * production. The API honours synthetic `test-token-*` bearers only outside
+ * production (`AccessTokenIdentityService` gates them on `TEST_ENV` /
+ * `VERCEL_ENV`), and no production test identity is provisioned, so such a test
+ * can only ever see 401 there.
+ */
+export function skipSyntheticAuthInProd(testInfo: TestInfo): void {
+  testInfo.skip(
+    isProdEnvironment(testInfo),
+    'Production rejects synthetic test tokens and has no provisioned test identity.'
+  )
+}
+
 export function isNonLocalEnvironment(testInfo: TestInfo): boolean {
   return projectMetadata(testInfo).environment !== 'local'
 }

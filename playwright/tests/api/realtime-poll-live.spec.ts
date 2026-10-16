@@ -1,5 +1,9 @@
 import { test, expect } from '../../support/fixtures/merged-fixtures'
-import { resolveApiBaseUrl, authHeaders } from '../../support/helpers/api-test'
+import {
+  resolveApiBaseUrl,
+  authHeaders,
+  skipSyntheticAuthInProd,
+} from '../../support/helpers/api-test'
 import {
   eventsPollInvalidSinceResponseSchema,
   eventsPollResponseSchema,
@@ -13,6 +17,9 @@ type TypedResponse = {
 }
 
 test.describe('Realtime poll API', () => {
+  // Every test here authenticates with a synthetic token.
+  test.beforeEach(({}, testInfo) => skipSyntheticAuthInProd(testInfo))
+
   test('[P1] poll returns events array and nextSince shape', async ({
     apiRequest,
     validateSchema,
