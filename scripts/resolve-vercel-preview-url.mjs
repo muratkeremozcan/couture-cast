@@ -11,22 +11,27 @@ import fs from 'node:fs'
 import path from 'node:path'
 import { execFileSync, execSync } from 'node:child_process'
 
-// Load env for local Preview runs; CI passes env vars directly.
-try {
-  const { default: dotenv } = await import('dotenv')
-  const envSuffix = (process.env.TEST_ENV ?? 'preview').toLowerCase()
-  const envFiles = [`.env.${envSuffix}`, '.env']
-  for (const file of envFiles) {
-    const full = path.resolve(process.cwd(), file)
-    if (fs.existsSync(full)) {
-      // quiet: dotenv v17 announces itself on stdout, which would corrupt the URL this
-      // script contracts to print there and CI captures by command substitution.
-      dotenv.config({ path: full, quiet: true })
-      break
+/**
+ * Load env files for local Preview runs; CI passes env vars directly. Called from
+ * main() so importing this module (for tests) leaves process.env alone.
+ */
+async function loadLocalEnv() {
+  try {
+    const { default: dotenv } = await import('dotenv')
+    const envSuffix = (process.env.TEST_ENV ?? 'preview').toLowerCase()
+    const envFiles = [`.env.${envSuffix}`, '.env']
+    for (const file of envFiles) {
+      const full = path.resolve(process.cwd(), file)
+      if (fs.existsSync(full)) {
+        // quiet: dotenv v17 announces itself on stdout, which would corrupt the URL this
+        // script contracts to print there and CI captures by command substitution.
+        dotenv.config({ path: full, quiet: true })
+        break
+      }
     }
+  } catch {
+    // dotenv not available (CI) - env vars passed directly via workflow
   }
-} catch {
-  // dotenv not available (CI) - env vars passed directly via workflow
 }
 
 function logDebug(message) {
@@ -364,13 +369,20 @@ async function findUrlFromVercel(projectSlug, teamSlug, branch) {
   logDebug(`Project ID: ${projectId}`)
 
   const branchSlug = slugifyVercelGitRef(branch)
+  const fetchDeployments = () =>
+    fetchDeploymentsWithFallbacks(projectId, teamId, branch, branchSlug)
 
-  const deployments = await fetchDeploymentsWithFallbacks(
-    projectId,
-    teamId,
-    branch,
-    branchSlug
-  )
+  // A caller that names the commit gets that commit's deployment. Right after a
+  // push Vercel may not have created it yet, and the newest deployment listed is
+  // the previous commit's, whose canonical URL never changes; pinning it made
+  // the SHA wait time out. So poll until the expected deployment exists.
+  const expectedSha = env('EXPECTED_SHA')
+  if (expectedSha) {
+    const exactUrl = await waitForDeploymentWithSha(fetchDeployments, expectedSha)
+    if (exactUrl) return exactUrl
+  }
+
+  const deployments = await fetchDeployments()
 
   if (deployments.length === 0) {
     logDebug('No deployments found')
@@ -387,13 +399,61 @@ async function findUrlFromVercel(projectSlug, teamSlug, branch) {
     const aliasUrl = findGitBranchAliasUrl(deployment)
     if (aliasUrl) return aliasUrl
 
-    // Fallback to canonical URL (locked to this specific deployment)
+    // A canonical URL is locked to its commit, so it only helps when no
+    // particular commit was asked for.
+    if (expectedSha) continue
+
     const url = toAbsoluteUrl(deployment.url)
     logDebug(`Using canonical URL (locked to this deployment): ${url}`)
     return url
   }
 
   return undefined
+}
+
+/**
+ * Non-negative number of seconds from an env var; anything else gives the
+ * default, so a typo such as "10m" cannot turn the poll into an endless loop.
+ * @param {string} name
+ * @param {number} fallback
+ * @returns {number}
+ */
+function secondsFromEnv(name, fallback) {
+  const value = Number(env(name))
+  return Number.isFinite(value) && value >= 0 ? value : fallback
+}
+
+/**
+ * Poll until a deployment built from `expectedSha` is listed, then return its
+ * canonical URL. Gives up after RESOLVE_SHA_TIMEOUT_SECONDS (default 600).
+ * @param {() => Promise<Array<Record<string, any>>>} fetchDeployments
+ * @param {string} expectedSha
+ * @returns {Promise<string | undefined>}
+ */
+export async function waitForDeploymentWithSha(fetchDeployments, expectedSha) {
+  const timeoutMs = secondsFromEnv('RESOLVE_SHA_TIMEOUT_SECONDS', 600) * 1000
+  const intervalMs = secondsFromEnv('RESOLVE_SHA_INTERVAL_SECONDS', 15) * 1000
+  const deadline = Date.now() + timeoutMs
+  for (;;) {
+    const deployments = await fetchDeployments()
+    const match = deployments.find(
+      (deployment) =>
+        deployment?.url &&
+        typeof deployment.meta?.githubCommitSha === 'string' &&
+        deployment.meta.githubCommitSha.startsWith(expectedSha)
+    )
+    if (match) {
+      const url = toAbsoluteUrl(match.url)
+      logDebug(`Using exact deployment URL for SHA ${expectedSha.slice(0, 7)}: ${url}`)
+      return url
+    }
+    if (Date.now() + intervalMs > deadline) {
+      logDebug(`No deployment for SHA ${expectedSha.slice(0, 7)} appeared in time`)
+      return undefined
+    }
+    logDebug(`No deployment for SHA ${expectedSha.slice(0, 7)} yet; checking again`)
+    await new Promise((resolve) => setTimeout(resolve, intervalMs))
+  }
 }
 
 function getPreviewDeploymentsForBranch(owner, repo, branch) {
@@ -512,6 +572,7 @@ function failStrict(branch) {
 }
 
 async function main() {
+  await loadLocalEnv()
   const manual = getManualPreviewUrl()
   if (manual) {
     process.stdout.write(manual)
@@ -572,4 +633,8 @@ async function main() {
   process.stdout.write(url)
 }
 
-await main()
+// Run only as a script, so tests can import the helpers without resolving anything.
+// import.meta.main also holds when the script is reached through a symlink.
+if (import.meta.main) {
+  await main()
+}

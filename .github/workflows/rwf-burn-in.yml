@@ -21,8 +21,6 @@ on:
         description: Whether downstream E2E should run
         value: ${{ jobs.burn-in.outputs.runE2E }}
     secrets:
-      DATABASE_URL_PREVIEW:
-        required: false
       GUARDIAN_INVITE_JWT_SECRET:
         required: false
 
@@ -92,10 +90,10 @@ jobs:
           CHANGED=$(git diff "$BASE_REF"...HEAD --name-only | grep -E '^${{ inputs.test-directory }}.*\.(spec|test)\.(ts|tsx)$' || true)
 
           if [[ -z "$CHANGED" ]]; then
-            echo "changed=false" >> $GITHUB_OUTPUT
+            echo "changed=false" >> "$GITHUB_OUTPUT"
             echo "No changed Playwright specs. Skipping burn-in.";
           else
-            echo "changed=true" >> $GITHUB_OUTPUT
+            echo "changed=true" >> "$GITHUB_OUTPUT"
             echo "Changed specs:"; echo "$CHANGED"
           fi
 
@@ -169,13 +167,12 @@ jobs:
         id: secret-scan
         if: ${{ always() && steps.detect-changed.outputs.changed == 'true' && steps.burn-in-step.outcome == 'failure' }}
         env:
-          DATABASE_URL_PREVIEW: ${{ secrets.DATABASE_URL_PREVIEW }}
           GUARDIAN_INVITE_JWT_SECRET: ${{ secrets.GUARDIAN_INVITE_JWT_SECRET }}
           GH_TOKEN: ${{ github.token }}
           TEST_DIRECTORY: ${{ inputs.test-directory }}
         run: >-
           node scripts/check-artifact-secrets.mjs
-          --names DATABASE_URL_PREVIEW,GUARDIAN_INVITE_JWT_SECRET,GH_TOKEN
+          --names GUARDIAN_INVITE_JWT_SECRET,GH_TOKEN
           "$TEST_DIRECTORY/playwright-report" "$TEST_DIRECTORY/test-results"
 
       - name: Upload burn-in failure artifacts
