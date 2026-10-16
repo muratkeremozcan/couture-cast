@@ -209,7 +209,7 @@ function zipEntriesAfterPreamble(buffer) {
     return zipEntries(buffer)
   } catch (error) {
     const start = buffer.indexOf(ZIP_MAGIC)
-    if (start <= 0) throw error
+    if (error.ambiguous || start <= 0) throw error
     return zipEntries(buffer.subarray(start))
   }
 }

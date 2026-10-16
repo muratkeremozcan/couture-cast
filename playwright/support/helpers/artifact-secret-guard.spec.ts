@@ -51,6 +51,28 @@ function blobReportWith(env: Record<string, string>) {
   return zipSync({ 'report.jsonl': strToU8(`${configure}\n`) })
 }
 
+/**
+ * What appending a zip to an existing file produces: every central-directory
+ * offset counts the preamble, so the archive opens without being sliced.
+ */
+function withAdjustedPreamble(zip: Uint8Array, preamble: string) {
+  const prefix = Buffer.from(preamble)
+  const out = Buffer.concat([prefix, Buffer.from(zip)])
+  const eocd = out.lastIndexOf(Buffer.from([0x50, 0x4b, 0x05, 0x06]))
+  const entries = out.readUInt16LE(eocd + 10)
+  let header = out.readUInt32LE(eocd + 16) + prefix.length
+  out.writeUInt32LE(header, eocd + 16)
+  for (let entry = 0; entry < entries; entry += 1) {
+    out.writeUInt32LE(out.readUInt32LE(header + 42) + prefix.length, header + 42)
+    header +=
+      46 +
+      out.readUInt16LE(header + 28) +
+      out.readUInt16LE(header + 30) +
+      out.readUInt16LE(header + 32)
+  }
+  return out
+}
+
 beforeEach(() => {
   workDir = fs.mkdtempSync(path.join(os.tmpdir(), 'artifact-secret-guard-'))
 })
@@ -244,6 +266,44 @@ describe('check-artifact-secrets', () => {
     ])
   })
 
+  it.each([
+    [
+      'offsets relative to the first entry',
+      (zip: Buffer) => Buffer.concat([Buffer.from('preamble\n'), zip]),
+    ],
+    [
+      'offsets that count the preamble',
+      (zip: Buffer) => withAdjustedPreamble(zip, 'preamble\n'),
+    ],
+  ])('opens a zip behind a preamble with %s', (_, wrap) => {
+    const zip = Buffer.from(
+      zipSync({ 'a.json': strToU8(JSON.stringify({ key: DUMMY_SECRET })) })
+    )
+    const file = write('blob-report/report-1.zip', wrap(zip))
+
+    expect(scan(['DUMMY_SECRET']).findings).toEqual([
+      { location: `${file}!entry#1`, name: 'DUMMY_SECRET', encoding: 'raw' },
+    ])
+  })
+
+  it('refuses ambiguous entry names behind a preamble that the offsets count', () => {
+    const zip = Buffer.from(
+      zipSync({ 'aaaa.txt': strToU8(DUMMY_SECRET), 'bbbb.txt': strToU8('clean') })
+    )
+    const duplicated = Buffer.from(
+      zip.toString('latin1').replaceAll('bbbb.txt', 'aaaa.txt'),
+      'latin1'
+    )
+    const file = write(
+      'blob-report/report-1.zip',
+      withAdjustedPreamble(duplicated, 'preamble\n')
+    )
+
+    expect(scan(['DUMMY_SECRET']).unreadable).toEqual([
+      { location: file, reason: 'duplicate or reserved entry names' },
+    ])
+  })
+
   it('fails closed on archives nested past the depth limit', () => {
     let data: Uint8Array = strToU8(DUMMY_SECRET)
     for (let level = 0; level < 12; level += 1) data = zipSync({ 'inner.zip': data })
@@ -275,18 +335,6 @@ describe('check-artifact-secrets', () => {
 
     const { secrets } = resolveSecrets(['SHORT_DUMMY'], { SHORT_DUMMY: shortValue })
     expect(scanPaths([workDir], secrets).findings).toHaveLength(1)
-  })
-
-  it('opens a zip that carries a preamble before its first entry', () => {
-    const zip = zipSync({ 'report.json': strToU8(JSON.stringify({ key: DUMMY_SECRET })) })
-    const file = write(
-      'blob-report/report-1.zip',
-      Buffer.concat([Buffer.from('#!/bin/sh preamble\n'), Buffer.from(zip)])
-    )
-
-    expect(scan(['DUMMY_SECRET']).findings).toEqual([
-      { location: `${file}!entry#1`, name: 'DUMMY_SECRET', encoding: 'raw' },
-    ])
   })
 
   it('treats a stray directory signature in binary data as plain bytes', () => {
