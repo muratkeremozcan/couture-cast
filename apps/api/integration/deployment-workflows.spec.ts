@@ -12,6 +12,20 @@ const vercelPreviewSmokeWorkflow = path.join(
   'workflows',
   'pr-pw-e2e-vercel-preview.yml'
 )
+const previewReadyWorkflow = path.join(
+  repoRoot,
+  '.github',
+  'workflows',
+  'rwf-vercel-preview-ready.yml'
+)
+const manualE2eWorkflow = path.join(
+  repoRoot,
+  '.github',
+  'workflows',
+  'pw-e2e-trigger.yml'
+)
+const prodE2eWorkflow = path.join(repoRoot, '.github', 'workflows', 'pw-e2e-prod.yml')
+const previewReadyCall = /uses: \.\/\.github\/workflows\/rwf-vercel-preview-ready\.yml/
 const mobileWorkflow = path.join(repoRoot, '.github', 'workflows', 'deploy-mobile.yml')
 const vercelConfig = path.join(repoRoot, 'apps', 'api', 'vercel.json')
 const apiHandler = path.join(repoRoot, 'apps', 'api', 'api', 'index.ts')
@@ -23,10 +37,33 @@ describe('deployment workflows', () => {
     expect(fs.existsSync(vercelPreviewSmokeWorkflow)).toBe(true)
     const content = fs.readFileSync(vercelPreviewSmokeWorkflow, 'utf8')
     expect(content).toMatch(/on:\s*\n\s*pull_request:/)
-    expect(content).toMatch(/Resolve preview health URL/)
+    expect(content).toMatch(previewReadyCall)
+
+    const ready = fs.readFileSync(previewReadyWorkflow, 'utf8')
+    expect(ready).toMatch(/Resolve preview health URL/)
+    // Web and API are each waited on before any caller tests them.
+    expect(
+      ready.match(/uses: \.\/\.github\/workflows\/vercel-wait-for-deployment\.yml/g)
+    ).toHaveLength(2)
+  })
+
+  it('manual preview e2e waits for both previews and can mint an OIDC token', () => {
+    const content = fs.readFileSync(manualE2eWorkflow, 'utf8')
+    // rwf-e2e.yml requests id-token: write; a caller without it fails at startup.
+    expect(content).toMatch(/permissions:\s*\n\s*contents: read\s*\n\s*id-token: write/)
+    expect(content).toMatch(previewReadyCall)
     expect(content).toMatch(
-      /uses: \.\/\.github\/workflows\/vercel-wait-for-deployment.yml/
+      /custom_api_base_url: \$\{\{ needs\.preview-ready\.outputs\.api_url \}\}/
     )
+  })
+
+  it('prod e2e waits on public health endpoints only', () => {
+    const content = fs.readFileSync(prodE2eWorkflow, 'utf8')
+    expect(content).toMatch(
+      /secondary_url: https:\/\/couture-cast-api\.vercel\.app\/api\/health/
+    )
+    // /api/v1/events/poll needs a bearer token, so waiting for 200 on it never ends.
+    expect(content).not.toMatch(/secondary_url: \S*events\/poll/)
   })
 
   it('mobile workflow exists and deploys manually with Expo token (Android-only)', () => {

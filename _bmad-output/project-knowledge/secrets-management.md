@@ -46,6 +46,10 @@ Updated: 2026-03-27 - replaced third-party secret-manager plan with the existing
 4. Validate the application with the new value.
 5. Revoke the old secret after verification.
 
+The [secret rotation runbook](secret-rotation-runbook.md) covers how each store is changed without a
+value reaching logs or chat, the order for shared and signing secrets, and the rule against
+rerunning pre-fix workflow runs.
+
 ## Leak prevention
 
 - `gitleaks` is required in local workflows and CI.

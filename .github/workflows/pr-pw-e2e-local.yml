@@ -31,10 +31,10 @@ jobs:
         if: ${{ github.event_name == 'pull_request' || github.event_name == 'pull_request_target' }}
         run: |
           if [[ "${{ contains(github.event.pull_request.labels.*.name, 'SKIP_BURN_IN') }}" == "true" ]]; then
-            echo "SKIP_BURN_IN=true" >> $GITHUB_OUTPUT
+            echo "SKIP_BURN_IN=true" >> "$GITHUB_OUTPUT"
             echo "✅ Found SKIP_BURN_IN label; skipping burn-in."
           else
-            echo "SKIP_BURN_IN=false" >> $GITHUB_OUTPUT
+            echo "SKIP_BURN_IN=false" >> "$GITHUB_OUTPUT"
             echo "No SKIP_BURN_IN label; running burn-in."
           fi
 

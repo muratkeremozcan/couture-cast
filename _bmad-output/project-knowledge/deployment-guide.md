@@ -128,8 +128,10 @@ configured limit, rejects non-JSON responses, rejects missing SHA metadata, and 
 SHA differs from the expected commit.
 
 The reusable [Playwright workflow](../../.github/workflows/rwf-e2e.yml) checks out that same SHA,
-maps `DATABASE_URL_PREVIEW` into `DATABASE_URL`, pins the URLs resolved by the caller, and uploads
-Playwright artifacts. The
+leaves `DATABASE_URL` unset for preview (no preview database secret exists, so helpers that need
+direct database access skip), pins the URLs resolved by the caller, and uploads Playwright
+artifacts. The PR path and the manual trigger both resolve and wait through
+[the preview readiness workflow](../../.github/workflows/rwf-vercel-preview-ready.yml). The
 [web health test](../../playwright/tests/web-health-sha.spec.ts) independently checks health
 metadata and the expected SHA. The [API smoke test](../../playwright/tests/api/api-health.spec.ts)
 checks the API root response but does not assert API health metadata.
@@ -201,7 +203,8 @@ The implemented environment model has local, Preview, and production lanes:
 - Populated `.env`, `.env.local`, `.env.preview`, and `.env.prod` files are expected to remain
   gitignored.
 - [`.env.example`](../../.env.example) provides placeholders only.
-- GitHub Actions uses separate `DATABASE_URL_PREVIEW` and `DATABASE_URL_PROD` secrets.
+- GitHub Actions holds `DATABASE_URL_PROD` for production runs. Preview runs have no database
+  secret.
 - Hosted secrets are expected in provider-native stores, as summarized in
   [secrets management](secrets-management.md).
 - Playwright has explicit `local`, `preview`, and `prod` configurations in

@@ -114,23 +114,16 @@ These are fallback inputs for invitation link base URL, but they are not require
 
 ### GitHub Actions
 
-You do not need to add a new GitHub Actions secret for the current workflows.
+The repository secret `GUARDIAN_INVITE_JWT_SECRET` feeds the jobs that start the API on the runner
+against the local Supabase stack: `pr-pw-e2e-local.yml`, `rwf-burn-in.yml`, and
+`pr-mobile-e2e.yml`. Its value only has to be a strong random string; it never needs to match a
+Vercel value, because those jobs sign and verify invitations with the same local API process.
 
-Required additions right now:
+Preview and production Playwright runs (`rwf-e2e.yml`) test the deployed API, which reads its own
+Vercel value, so they do not receive this secret.
 
-- none
-
-Reason:
-
-- current workflows in `.github/workflows` reference `DATABASE_URL_*`, `VERCEL_TOKEN`,
-  `VERCEL_AUTOMATION_BYPASS_SECRET`, and related deployment/test variables
-- none of the current CI jobs boot the deployed API in a way that requires
-  `GUARDIAN_INVITE_JWT_SECRET`
-- the guardian tests added in Story 0.11 Task 3 set test env values inline inside the test process
-
-If you later add a workflow that deploys or smoke-tests the guardian invitation flow against a
-runtime that reads env vars, add the secret to the runner or environment that actually starts the
-API process, not to GitHub by default.
+Updated: 2026-10-16. The Vercel web project also held copies of this key; the web app never reads
+them. They were rotated with the rest on 2026-10-16 and can be removed.
 
 ### Supabase
 
