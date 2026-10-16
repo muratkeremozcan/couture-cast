@@ -12,19 +12,36 @@ inputs:
     default: '20'
   exclude:
     description: >-
-      Comma-separated containers not to start. CI pulls every image from a registry
-      that rate-limits anonymous data ("toomanyrequests: Data limit exceeded"), so
-      services no test uses are skipped: the dashboard and its metadata API, log
-      shipping, edge functions, the pooler, mail capture, and image transforms
-      (disabled in supabase/config.toml).
+      Comma-separated containers not to start. Services no test uses are skipped
+      to pull less: the dashboard and its metadata API, log shipping, edge
+      functions, the pooler, mail capture, and image transforms (disabled in
+      supabase/config.toml).
     required: false
     default: 'studio,postgres-meta,logflare,vector,edge-runtime,supavisor,mailpit,imgproxy'
+  image-registry:
+    description: >-
+      Registry the Supabase CLI pulls its images from. The CLI default,
+      public.ecr.aws, caps anonymous data per runner IP and fails shards with
+      "toomanyrequests: Data limit exceeded"; Supabase mirrors the same tags to
+      ghcr.io, which the job token authenticates against.
+    required: false
+    default: 'ghcr.io'
 
 runs:
   using: composite
   steps:
+    - name: Log in to the image registry
+      if: inputs.image-registry == 'ghcr.io'
+      shell: bash
+      env:
+        REGISTRY_TOKEN: ${{ github.token }}
+      # Anonymous pulls still work if the login fails, so it does not stop the job.
+      run: echo "$REGISTRY_TOKEN" | docker login ghcr.io -u "$GITHUB_ACTOR" --password-stdin || true
+
     - name: Start local Supabase with retry
       shell: bash
+      env:
+        SUPABASE_INTERNAL_IMAGE_REGISTRY: ${{ inputs.image-registry }}
       run: |
         set -u -o pipefail
 
