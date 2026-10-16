@@ -13,13 +13,11 @@
 #    healthy path still opens the link once — opening it again unconditionally
 #    re-triggers the developer sheet described below.
 #
-# 2. Expo Go raises its one-time developer-menu sheet *after* the app has
-#    mounted. It is a native modal with a dimmed backdrop over the top half and
-#    the sheet itself over the bottom half. The app stays fully visible behind
-#    it, so every `assertVisible` still passes — and then the backdrop eats the
-#    flow's first tap. This was diagnosed for a long time as "Maestro cannot tap
-#    this component", because the symptom is always the same: assertions fine,
-#    first gesture silently ineffective, second gesture works.
+# 2. Expo Go raises a developer sheet (onboarding or the full menu) *after*
+#    the app has mounted, on every launch that followed `clearState`. The app
+#    stays visible behind it, so assertions pass, and then the sheet eats the
+#    flow's next tap. The end of this subflow waits for the sheet and closes
+#    it; see the note there.
 #
 # Callers keep their own `launchApp` because `clearState` differs per flow, then
 # `- runFlow: subflows/open-app.yaml` immediately after it.
@@ -207,90 +205,32 @@ appId: ${MAESTRO_APP_ID}
           timeout: 45000
           label: 'App mounted and tab bar painted'
 
-# Dismiss the developer sheet by spending a throwaway tap on its backdrop.
+# Close the Expo Go developer sheet that rises after mount.
 #
-# It has to be a blind coordinate tap, and the reason is the whole reason this
-# defect survived so long: **Maestro cannot see this sheet.** It is drawn by
-# Expo Go itself rather than by the app under test, so it never appears in the
-# hierarchy Maestro queries. The step log shows the consequence plainly — with
-# the sheet filling the bottom half of the screen, `tapOn: text: 'Continue'`
-# still reports the element as not found, and an `assertNotVisible` on the
-# sheet's own body text passes. Nothing about the sheet can be asserted, which
-# is exactly why every symptom pointed at the app instead: assertions all green,
-# first gesture silently swallowed, second gesture fine.
+# On every launch that followed `clearState`, which is every flow, Expo Go
+# raises its developer-menu onboarding or the full developer menu over the app a
+# few seconds after `tab-home` paints. Both are in the accessibility hierarchy
+# once risen; `subflows/absorb-expo-dev-sheet.yaml` has the details and closes
+# whichever one is up. So this waits for a sheet to rise and then closes it,
+# rather than tapping before it exists.
 #
-# So the optional text taps below are kept only for the case where Expo Go
-# renders a variant Maestro *can* reach; the `point` tap is what actually does
-# the work. `50%,10%` is the navigation header, inert on the screen this subflow
-# always lands on, so it costs nothing when no sheet is present.
+# This replaces two unguarded `50%,10%` taps and their recovery block. The taps
+# raced the sheet, and in CI run 38934394685 the dimmed backdrop outlived all of
+# them and swallowed every later tab tap. The recovery pressed Android BACK,
+# which with a sheet up, or from the Home tab, exits Expo Go to the launcher.
 #
-# Two taps, separated by a settle, because the sheet rises a beat after
-# `tab-home` paints and a single tap can land just before it appears. This
-# cannot be replaced by a condition, for the reason above; `tab-home` is the
-# only real post-condition available.
-- tapOn:
-    text: 'Continue'
+# The wait is optional: a flow launched without `clearState` may find no sheet,
+# and then the wait costs its timeout once.
+- extendedWaitUntil:
+    visible:
+      text: 'This is the developer menu.*|Connected to expo-cli'
+    timeout: 15000
     optional: true
-    label: 'Finish Expo Go developer-menu onboarding if Maestro can reach it'
-- tapOn:
-    text: 'Open app'
-    optional: true
-    label: 'Dismiss the Expo Go developer sheet if Maestro can reach it'
-
-- tapOn:
-    point: '50%,10%'
-    label: 'Absorb the developer sheet backdrop; inert on the app itself'
-- waitForAnimationToEnd
-- tapOn:
-    point: '50%,10%'
-    label: 'Absorb a sheet that rose after the first absorb tap'
-
-# Recover from an absorb tap that took the app off screen.
-#
-# The two taps above are BLIND coordinate taps — they have to be, because the
-# Expo Go developer sheet is drawn outside the app's hierarchy and Maestro cannot
-# see it to guard on. The comment above calls `50%,10%` inert on the screen this
-# subflow lands on, and on a fast device it is. On a contended one it is not:
-# measured on 2026-09-05 across four parallel Android emulators running flows at
-# 4-5x their recorded durations, the per-step hierarchy dumps show the app fully
-# present at the step before these taps (`host.exp.exponent`,
-# `hero-experience-scrollview`, `mobile-chip-navigation`, `tab-home`) and, three
-# minutes later at the assertion below, NOTHING but `com.android.systemui` and
-# its notification entries. Nothing runs between them except the absorb taps.
-# Five flows across three shards and four unrelated stories failed that way in
-# one run, which is what made it a harness problem rather than four flow bugs.
-#
-# Removing the absorb taps is not the fix: they are load-bearing for a sheet that
-# eats the first real gesture of any flow that meets it, and trading a known
-# failure for an unknown one is a bad trade. So the taps stay and their known
-# side effect is recovered from instead — a stray tap now costs one re-entry
-# rather than the whole flow.
-#
-# Guarded on `tab-home`, so this is a no-op on the healthy path and never fires a
-# stray gesture. `back` is Android-only for the reason stated further up: its iOS
-# implementation is an empty method that reports COMPLETED without touching the
-# device. On Android it is the system BACK key, which is also what dismisses a
-# notification shade.
-- runFlow:
-    when:
-      notVisible:
-        id: 'tab-home'
-    commands:
-      - runFlow:
-          when:
-            platform: Android
-          commands:
-            - back
-      - waitForAnimationToEnd
-      - openLink: ${APP_URL}
-      - extendedWaitUntil:
-          visible:
-            id: 'tab-home'
-          timeout: 30000
-          label: 'Recovered the app after an absorb tap left it'
+    label: 'An Expo Go developer sheet has risen'
+- runFlow: absorb-expo-dev-sheet.yaml
 
 - assertVisible:
     id: 'tab-home'
-    label: 'Still on the app after the absorb taps'
+    label: 'Still on the app after the developer sheet'
 
 - waitForAnimationToEnd

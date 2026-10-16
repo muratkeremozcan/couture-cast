@@ -46,7 +46,7 @@ import { HourlyForecastRibbon } from '@/components/hero/hourly-forecast-ribbon'
 import { ScenarioToggles } from '@/components/hero/scenario-toggles'
 import { OutfitRecommendationCard } from '@/components/hero/outfit-recommendation-card'
 import { WeatherAlertBanner } from '@/components/hero/weather-alert-banner'
-import { parseGarmentId } from '@/components/hero/garment-item-tile'
+import { garmentTitle, parseGarmentId } from '@/components/hero/garment-item-tile'
 import { useHeroPalette } from '@/components/hero/hero-theme'
 import { MobileChipNavigation, type ChipCategory } from '@/components/chip-navigation'
 import { useAccessibilityAnnouncer } from '@/src/hooks/use-accessibility-announcer'
@@ -582,7 +582,7 @@ export default function TabOneScreen() {
       scenario: activeScenario,
       itemId: newGarmentId,
     })
-    announce('swap', parseGarmentId(newGarmentId).name)
+    announce('swap', garmentTitle(parseGarmentId(newGarmentId), t, activeLocale))
     setIsSwapModalVisible(false)
     setSwappingGarmentId(null)
     swapTriggerRef.current = null
@@ -776,7 +776,16 @@ export default function TabOneScreen() {
                 <ScrollView style={styles.modalScroll} accessibilityRole="radiogroup">
                   {swapOptions.map((option, index) => {
                     const isCurrent = option === swappingGarmentId
-                    const details = parseGarmentId(option)
+                    const optionTitle = garmentTitle(
+                      parseGarmentId(
+                        option,
+                        activeOutfit?.displayGarments?.find(
+                          (garment) => garment.id === option
+                        )?.category
+                      ),
+                      t,
+                      activeLocale
+                    )
                     return (
                       <Pressable
                         ref={index === 0 ? firstSwapOptionRef : undefined}
@@ -785,7 +794,7 @@ export default function TabOneScreen() {
                         onPress={() => performSwap(option)}
                         testID={`swap-option-${option}`}
                         accessibilityRole="radio"
-                        accessibilityLabel={details.name}
+                        accessibilityLabel={optionTitle}
                         accessibilityState={{ selected: isCurrent }}
                       >
                         <Text
@@ -794,7 +803,7 @@ export default function TabOneScreen() {
                             isCurrent && styles.modalItemTextCurrent,
                           ]}
                         >
-                          {details.name}
+                          {optionTitle}
                         </Text>
                         {isCurrent && <Text style={styles.modalItemCheck}>✓</Text>}
                       </Pressable>

@@ -179,6 +179,30 @@ jobs:
       # from the same inputs, so a step here only duplicated it and gave the two
       # a chance to drift apart.
 
+      # The emulator package is the exception. android-emulator-runner runs
+      # `sdkmanager --install emulator --channel=0` inside each emulator step, and
+      # when that one download arrives truncated sdkmanager only prints "An error
+      # occurred while preparing SDK package Android Emulator: Error on ZipFile
+      # unknown archive" and the job dies later with no emulator (#146 run
+      # 38930305333, #147 run 38934394685). Installing the same channel here, with
+      # retries and a check that it unpacked, makes the runner's install a
+      # no-op.
+      - name: Install Android Emulator package
+        shell: bash
+        run: |
+          for attempt in 1 2 3; do
+            sdkmanager --install emulator --channel=0 > /dev/null || true
+            # A truncated archive never unpacks, so these files are the check.
+            if [ -x "$ANDROID_HOME/emulator/emulator" ] && [ -f "$ANDROID_HOME/emulator/package.xml" ]; then
+              exit 0
+            fi
+            echo "Emulator package install attempt ${attempt} left no emulator; retrying."
+            rm -rf "$ANDROID_HOME/emulator"
+            sleep $(( attempt * 15 ))
+          done
+          echo "::error::Could not install the Android Emulator package after 3 attempts."
+          exit 1
+
       - name: Enable KVM
         run: |
           echo 'KERNEL=="kvm", GROUP="kvm", MODE="0666", OPTIONS+="static_node=kvm"' | sudo tee /etc/udev/rules.d/99-kvm4all.rules

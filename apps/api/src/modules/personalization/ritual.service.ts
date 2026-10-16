@@ -55,6 +55,7 @@ import {
   defaultSupportedLocale,
   resolveAcceptLanguage,
   resolveSupportedLocale,
+  type GarmentCategory,
   type RitualResponse,
   type ScenarioName,
   type ScenarioOutfit,
@@ -96,6 +97,21 @@ function buildMockForecastSegmentInputs(now: Date) {
       provider_weather_code: 'clear',
     }
   })
+}
+
+/**
+ * Display data for an outfit's real garments. Garments carry no name, so a
+ * client labels them by category; without this it title-cased the identifier
+ * and showed raw UUIDs on the card. Matches the planner's `displayGarments`: a
+ * starter-wardrobe placeholder id is not a garment and gets no entry.
+ */
+export function describeOutfitGarments(
+  garmentIds: readonly string[],
+  categoryById: ReadonlyMap<string, GarmentCategory | null>
+): { id: string; category: GarmentCategory | null }[] {
+  return garmentIds.flatMap((id) =>
+    categoryById.has(id) ? [{ id, category: categoryById.get(id) ?? null }] : []
+  )
 }
 
 function toIsoTimestamp(value: Date | string): string {
@@ -463,6 +479,14 @@ export class RitualService implements OnModuleDestroy {
           })
         : Promise.resolve([]),
     ])
+    const garmentCategoryById = new Map<string, GarmentCategory | null>([
+      ...userGarments.map((garment) => [garment.id, garment.category] as const),
+      ...(userCapsules as unknown as CapsuleWithJoins[]).flatMap((capsule) =>
+        capsule.garment_joins.map(
+          (join) => [join.garment_id, join.garment?.category ?? null] as const
+        )
+      ),
+    ])
 
     // Story 5.5 Decision 1: one engine call generates all three canonical
     // scenario results. Comfort notes are locale-baked (never persisted, so
@@ -613,6 +637,7 @@ export class RitualService implements OnModuleDestroy {
         // whole assembly-point decision exists to prevent. The controller adds
         // the key after this service returns.
         garmentIds: recGarmentIds,
+        displayGarments: describeOutfitGarments(recGarmentIds, garmentCategoryById),
         capsuleId: recCapsule?.id ?? null,
         capsuleName: recCapsule?.name ?? null,
         autoFilledGarmentIds,

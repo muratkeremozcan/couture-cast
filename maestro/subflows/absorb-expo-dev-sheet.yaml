@@ -1,45 +1,53 @@
-# Dismiss Expo Go's one-time developer-menu sheet before a tab-bar tap.
+# Close whichever Expo Go developer sheet is covering the app, if one is.
 #
-# Mirrors the fix already proven in `subflows/open-app.yaml`, which carries
-# the full writeup of why this exists: the sheet is native to Expo Go, is
-# drawn after the app has mounted, and never appears in the hierarchy Maestro
-# queries, so `tapOn: text: 'Continue'` reports it "not found" even while it
-# fills the bottom half of the screen. The only thing that reaches it is a
-# blind coordinate tap on its backdrop; `50%,10%` is the screen's own header,
-# inert whenever no sheet is present.
+# Expo Go raises one of two sheets over the app on a launch that followed
+# `clearState`, a few seconds after the app has mounted. Both were reproduced on
+# 2026-10-16 (Expo Go 54.0.8, Android emulator), and both are in the
+# accessibility hierarchy once they have risen:
 #
-# `open-app.yaml` runs this absorb sequence once, right after mount, and that
-# was believed to be the only window the sheet could rise in. PR #141 (story
-# 5.5) proved otherwise: `open-wardrobe-tab.yaml` failed CI with
-# `Assertion is false: id: wardrobe-screen is visible` after `tab-wardrobe`
-# reported its tap COMPLETED four times running. The hierarchy dump at the
-# failure showed `tab-home` and `tab-wardrobe` still present and
-# `wardrobe-screen` never having mounted -- the app never left Home, because
-# every tap landed on the sheet's backdrop instead of the tab bar beneath it.
-# The screenshot confirmed it directly: the same "This is the developer menu"
-# sheet from `open-app.yaml`'s own writeup, still on screen a story-5.5-sized
-# bundle's worth of extra load time after mount -- past the point
-# `open-app.yaml`'s own absorb taps had already run and passed.
+# - the onboarding sheet, "This is the developer menu ... Continue". Its own
+#   Continue button closes it and persists Expo Go's "onboarding finished"
+#   preference, so it does not return for the rest of the flow.
+# - the full developer menu, "Connected to expo-cli", Reload, Go Home. A tap on
+#   the dimmed backdrop above the sheet closes it.
 #
-# `open-wardrobe-tab.yaml` and `open-settings.yaml` had each independently
-# grown only the weak half of the fix -- an optional `tapOn: text: 'Continue'`
-# that cannot reach this sheet for the same reason `open-app.yaml`'s writeup
-# gives. This subflow is the strong half, shared, so any tab-bar navigation
-# added later gets the real fix rather than a repeat of this outage.
+# Android BACK closes neither: with either sheet up, it exits Expo Go to the
+# launcher.
+#
+# Each dismissal is guarded on its sheet actually being there. The old version
+# spent two unguarded `50%,10%` taps on the belief that Maestro cannot see these
+# sheets; it was looking for Continue on the full menu, which has none. The
+# unguarded taps raced the sheet, and in CI run 38934394685 a dimmed backdrop
+# outlived them and swallowed every Settings tap.
 appId: ${MAESTRO_APP_ID}
 ---
-- tapOn:
-    text: 'Continue'
-    optional: true
-    label: 'Dismiss the Expo Go developer sheet if Maestro can reach it'
+- runFlow:
+    when:
+      visible:
+        text: 'This is the developer menu.*'
+    commands:
+      - tapOn:
+          text: 'Continue'
+          label: 'Finish Expo Go developer-menu onboarding with its own button'
+      - extendedWaitUntil:
+          notVisible:
+            text: 'This is the developer menu.*'
+          timeout: 10000
+          label: 'Developer-menu onboarding is gone'
+- runFlow:
+    when:
+      visible:
+        text: 'Connected to expo-cli'
+    commands:
+      - tapOn:
+          point: '50%,10%'
+          label: 'Close the Expo Go developer menu with a tap on its backdrop'
+      - extendedWaitUntil:
+          notVisible:
+            text: 'Connected to expo-cli'
+          timeout: 10000
+          label: 'Developer menu is gone'
 - tapOn:
     text: 'Open app'
     optional: true
-    label: 'Dismiss the Expo Go developer sheet if Maestro can reach it'
-- tapOn:
-    point: '50%,10%'
-    label: 'Absorb the developer sheet backdrop; inert on the screen itself'
-- waitForAnimationToEnd
-- tapOn:
-    point: '50%,10%'
-    label: 'Absorb a sheet that rose after the first absorb tap'
+    label: 'Dismiss the Expo Go developer sheet variant that offers Open app'

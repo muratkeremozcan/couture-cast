@@ -17,6 +17,7 @@ import {
   RitualService,
   comfortNotesTranslations,
   badgeTranslations,
+  describeOutfitGarments,
 } from './ritual.service.js'
 import { BadRequestException, InternalServerErrorException } from '@nestjs/common'
 import { Prisma } from '@prisma/client'
@@ -1515,5 +1516,29 @@ describe('RitualService', () => {
 
       expect(result.weather.alerts).toEqual([])
     })
+  })
+})
+
+describe('describeOutfitGarments', () => {
+  it('describes every real garment by category and leaves placeholders out', () => {
+    const categoryById = new Map<string, 'outerwear' | null>([
+      ['df7d0868-37fd-45e9-b22e-f4d1cd69d5e4', 'outerwear'],
+      ['untagged-garment-id', null],
+    ])
+
+    expect(
+      describeOutfitGarments(
+        [
+          'df7d0868-37fd-45e9-b22e-f4d1cd69d5e4',
+          'default-shoes',
+          'untagged-garment-id',
+          'unknown-id',
+        ],
+        categoryById
+      )
+    ).toEqual([
+      { id: 'df7d0868-37fd-45e9-b22e-f4d1cd69d5e4', category: 'outerwear' },
+      { id: 'untagged-garment-id', category: null },
+    ])
   })
 })
