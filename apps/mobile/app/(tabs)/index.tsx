@@ -25,11 +25,11 @@ import {
 } from '@/src/lib/commerce'
 import { loadWidgetAlertPreferences } from '@/src/lib/widget-alert-preferences'
 import { resolveWidgetScenario, type WidgetSlot } from '@/src/lib/widget-share'
-import type {
-  GarmentCategory,
+import {
   defaultSupportedLocale,
   resolveSupportedLocale,
   ritualResponseSchema,
+  type GarmentCategory,
   type RitualResponse,
   type AlertPreferences,
 } from '@couture/api-client/contracts/http'
