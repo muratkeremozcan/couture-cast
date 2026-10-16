@@ -127,53 +127,139 @@ function searchLayer(buffer, location, secrets, findings) {
   }
 }
 
+/**
+ * Alternate spellings of one layer that the needles alone would miss: JSON whose
+ * writer escaped characters as `\uXXXX`, and base64 wrapped across lines (real or
+ * JSON-escaped newlines). Each is searched like the layer itself.
+ */
+function normalizedViews(text) {
+  const views = []
+  if (/\\u[0-9a-fA-F]{4}|\\\//.test(text)) {
+    views.push({
+      label: 'json-unescaped',
+      text: text
+        .replace(/\\u([0-9a-fA-F]{4})/g, (_, hex) =>
+          String.fromCharCode(parseInt(hex, 16))
+        )
+        .replace(/\\\//g, '/'),
+    })
+  }
+  if (/[\r\n]|\\[rn]/.test(text)) {
+    views.push({ label: 'unwrapped', text: text.replace(/\r|\n|\\r|\\n/g, '') })
+  }
+  return views
+}
+
+/**
+ * Archive entries in central-directory order, refusing names that would make two
+ * entries share a slot: a duplicate name keeps only the last copy, and `__proto__`
+ * never becomes an own property, so either would hide an entry from the scan.
+ */
+function zipEntries(buffer) {
+  const names = []
+  const entries = unzipSync(
+    new Uint8Array(buffer.buffer, buffer.byteOffset, buffer.length),
+    {
+      filter: (file) => {
+        names.push(file.name)
+        return true
+      },
+    }
+  )
+  if (new Set(names).size !== names.length || names.includes('__proto__')) {
+    throw new Error('duplicate or reserved entry names')
+  }
+  return names.map((name) => entries[name])
+}
+
+function isContainer(buffer) {
+  return (
+    startsWith(buffer, ZIP_MAGIC) ||
+    startsWith(buffer, EMPTY_ZIP_MAGIC) ||
+    startsWith(buffer, GZIP_MAGIC)
+  )
+}
+
+/** Short and opaque on purpose: entry names come from inside the artifact. */
+function entryLabel(index, buffer) {
+  if (startsWith(buffer, GZIP_MAGIC)) return `#${index}(gzip)`
+  return isContainer(buffer) ? `#${index}(zip)` : `#${index}`
+}
+
+/** The layers inside an archive. Throws when the archive cannot be read. */
+function archiveChildren(buffer) {
+  if (startsWith(buffer, GZIP_MAGIC))
+    return [{ label: 'gunzip', data: zlib.gunzipSync(buffer) }]
+  return zipEntries(buffer).map((entry, index) => {
+    const data = Buffer.from(entry)
+    return { label: `entry${entryLabel(index + 1, data)}`, data }
+  })
+}
+
+/**
+ * Searches the alternate spellings of a text layer, then returns any archive it
+ * carries as base64: the HTML report's embedded data, or an inline zip attachment
+ * inside a JSON line. Anything else that decodes is already covered by the base64
+ * needles.
+ */
+function textChildren(buffer, location, secrets, state) {
+  const text = buffer.toString('latin1')
+  const views = normalizedViews(text)
+  const notYetFound = () =>
+    secrets.filter(
+      (secret) =>
+        !state.findings.some(
+          (finding) =>
+            finding.name === secret.name &&
+            (finding.location === location || finding.location.startsWith(`${location}(`))
+        )
+    )
+  for (const view of views) {
+    // latin1 round-trips the original bytes; UTF-8 covers a `\uXXXX` escape
+    // that decoded past one byte.
+    for (const encoding of ['latin1', 'utf8']) {
+      const layer = Buffer.from(view.text, encoding)
+      searchLayer(layer, `${location}(${view.label})`, notYetFound(), state.findings)
+    }
+  }
+
+  const runs = new Set()
+  for (const candidate of [text, ...views.map((view) => view.text)]) {
+    if (candidate.length < MIN_EMBEDDED_BASE64_LENGTH) continue
+    for (const match of candidate.matchAll(BASE64_RUN)) runs.add(match[0])
+  }
+  const children = []
+  for (const run of runs) {
+    const decoded = Buffer.from(run.replace(/-/g, '+').replace(/_/g, '/'), 'base64')
+    if (isContainer(decoded)) {
+      children.push({ label: `base64#${children.length + 1}`, data: decoded })
+    }
+  }
+  return children
+}
+
 function scanBuffer(buffer, location, secrets, state, depth) {
   state.layers += 1
   searchLayer(buffer, location, secrets, state.findings)
-  if (depth >= MAX_DEPTH) return
 
-  if (startsWith(buffer, ZIP_MAGIC) || startsWith(buffer, EMPTY_ZIP_MAGIC)) {
-    let entries
+  let children
+  if (isContainer(buffer)) {
     try {
-      entries = unzipSync(new Uint8Array(buffer.buffer, buffer.byteOffset, buffer.length))
+      children = archiveChildren(buffer)
     } catch (error) {
-      state.unreadable.push({ location, reason: `zip: ${error.message}` })
+      state.unreadable.push({ location, reason: error.message })
       return
     }
-    for (const [entryName, data] of Object.entries(entries)) {
-      scanBuffer(Buffer.from(data), `${location}!${entryName}`, secrets, state, depth + 1)
-    }
-    return
+  } else {
+    children = textChildren(buffer, location, secrets, state)
   }
 
-  if (startsWith(buffer, GZIP_MAGIC)) {
-    let inflated
-    try {
-      inflated = zlib.gunzipSync(buffer)
-    } catch (error) {
-      state.unreadable.push({ location, reason: `gzip: ${error.message}` })
-      return
-    }
-    scanBuffer(inflated, `${location}!gunzip`, secrets, state, depth + 1)
+  if (children.length > 0 && depth >= MAX_DEPTH) {
+    state.unreadable.push({ location, reason: `nested deeper than ${MAX_DEPTH} levels` })
     return
   }
-
-  // An archive carried as base64 text: the HTML report's embedded data, or an
-  // inline zip attachment inside a JSON line. Anything else that decodes is
-  // already covered by the base64 needles.
-  const text = buffer.toString('latin1')
-  if (text.length < MIN_EMBEDDED_BASE64_LENGTH) return
-  let index = 0
-  for (const match of text.matchAll(BASE64_RUN)) {
-    const decoded = Buffer.from(match[0].replace(/-/g, '+').replace(/_/g, '/'), 'base64')
-    if (
-      startsWith(decoded, ZIP_MAGIC) ||
-      startsWith(decoded, EMPTY_ZIP_MAGIC) ||
-      startsWith(decoded, GZIP_MAGIC)
-    ) {
-      index += 1
-      scanBuffer(decoded, `${location}!base64[${index}]`, secrets, state, depth + 1)
-    }
+  for (const child of children) {
+    scanBuffer(child.data, `${location}!${child.label}`, secrets, state, depth + 1)
   }
 }
 
@@ -217,6 +303,7 @@ export function scanPaths(targets, secrets) {
 
 export function parseArgs(argv) {
   const names = []
+  const storageStates = []
   const targets = []
   for (let index = 0; index < argv.length; index += 1) {
     const arg = argv[index]
@@ -225,17 +312,52 @@ export function parseArgs(argv) {
       index += 1
     } else if (arg.startsWith('--names=')) {
       names.push(...arg.slice('--names='.length).split(/[\s,]+/))
+    } else if (arg === '--storage-state') {
+      storageStates.push(argv[index + 1] ?? '')
+      index += 1
+    } else if (arg.startsWith('--storage-state=')) {
+      storageStates.push(arg.slice('--storage-state='.length))
     } else {
       targets.push(arg)
     }
   }
-  return { names: [...new Set(names.filter(Boolean))], targets }
+  return {
+    names: [...new Set(names.filter(Boolean))],
+    storageStates: storageStates.filter(Boolean),
+    targets,
+  }
+}
+
+/**
+ * Credentials minted during the run rather than held as secrets: the cookies in a
+ * Playwright storage-state file, such as the Vercel bypass cookie that global setup
+ * exchanges VERCEL_AUTOMATION_BYPASS_SECRET for. Values too short to scan for are
+ * flags, not credentials, and are left out.
+ */
+export function resolveStorageStateSecrets(files) {
+  const secrets = []
+  const missing = []
+  for (const file of files) {
+    if (!fs.existsSync(file)) {
+      missing.push(file)
+      continue
+    }
+    const state = JSON.parse(fs.readFileSync(file, 'utf8'))
+    for (const cookie of state.cookies ?? []) {
+      const value = String(cookie.value ?? '')
+      if (value.trim().length < MIN_SECRET_LENGTH) continue
+      secrets.push({ name: `cookie ${cookie.name}`, needles: secretEncodings(value) })
+    }
+  }
+  return { secrets, missing }
 }
 
 export function main(argv = process.argv.slice(2), env = process.env, out = console) {
-  const { names, targets } = parseArgs(argv)
+  const { names, storageStates, targets } = parseArgs(argv)
   if (names.length === 0 || targets.length === 0) {
-    out.error('Usage: check-artifact-secrets.mjs --names NAME[,NAME...] <path>...')
+    out.error(
+      'Usage: check-artifact-secrets.mjs --names NAME[,NAME...] [--storage-state FILE] <path>...'
+    )
     return 2
   }
 
@@ -248,6 +370,19 @@ export function main(argv = process.argv.slice(2), env = process.env, out = cons
     return 2
   }
   if (unset.length > 0) out.log(`Not set in this job, skipped: ${unset.join(', ')}`)
+
+  let minted
+  try {
+    minted = resolveStorageStateSecrets(storageStates)
+  } catch {
+    // The parser's message quotes the input, and the input is credentials.
+    out.error(`Cannot read a storage-state file in ${storageStates.join(', ')} as JSON.`)
+    return 2
+  }
+  if (minted.missing.length > 0) {
+    out.log(`No storage state, skipped: ${minted.missing.join(', ')}`)
+  }
+  secrets.push(...minted.secrets)
 
   const result = scanPaths(targets, secrets)
   if (result.missing.length > 0)

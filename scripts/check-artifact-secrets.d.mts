@@ -29,8 +29,14 @@ export declare function scanPaths(
   secrets: readonly ScannableSecret[]
 ): ScanResult
 
+export declare function resolveStorageStateSecrets(files: readonly string[]): {
+  secrets: ScannableSecret[]
+  missing: string[]
+}
+
 export declare function parseArgs(argv: readonly string[]): {
   names: string[]
+  storageStates: string[]
   targets: string[]
 }
 

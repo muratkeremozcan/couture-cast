@@ -77,7 +77,7 @@ describe('check-artifact-secrets', () => {
     )
 
     expect(scan(['DUMMY_SECRET']).findings).toEqual([
-      { location: `${file}!report.jsonl`, name: 'DUMMY_SECRET', encoding: 'raw' },
+      { location: `${file}!entry#1`, name: 'DUMMY_SECRET', encoding: 'raw' },
     ])
   })
 
@@ -97,7 +97,7 @@ describe('check-artifact-secrets', () => {
 
     expect(scan(['DUMMY_SECRET']).findings).toEqual([
       {
-        location: `${file}!resources/abc.zip!trace.trace`,
+        location: `${file}!entry#2(zip)!entry#1`,
         name: 'DUMMY_SECRET',
         encoding: 'raw',
       },
@@ -116,7 +116,7 @@ describe('check-artifact-secrets', () => {
 
     const [finding] = scan(['DUMMY_SECRET']).findings
     expect(finding).toEqual({
-      location: `${file}!base64[1]!report.json`,
+      location: `${file}!base64#1!entry#1`,
       name: 'DUMMY_SECRET',
       encoding: 'raw',
     })
@@ -171,6 +171,68 @@ describe('check-artifact-secrets', () => {
     expect(result.unreadable.map((entry) => entry.location)).toEqual([file])
   })
 
+  it('finds a value whose JSON writer escaped it as \\uXXXX', () => {
+    const escaped = [...DUMMY_SECRET]
+      .map((character) => `\\u${character.charCodeAt(0).toString(16).padStart(4, '0')}`)
+      .join('')
+    const file = write('report.json', `{"key":"${escaped}"}`)
+
+    expect(scan(['DUMMY_SECRET']).findings).toEqual([
+      { location: `${file}(json-unescaped)`, name: 'DUMMY_SECRET', encoding: 'raw' },
+    ])
+  })
+
+  it('opens a base64 archive wrapped across lines', () => {
+    const data = zipSync({
+      'report.json': strToU8(JSON.stringify({ key: DUMMY_SECRET })),
+    })
+    const wrapped = (
+      Buffer.from(data)
+        .toString('base64')
+        .match(/.{1,76}/g) ?? []
+    ).join('\n')
+    write('playwright-report/index.html', `<script>const data = "${wrapped}"</script>`)
+
+    expect(scan(['DUMMY_SECRET']).findings).toHaveLength(1)
+  })
+
+  it('refuses an archive with duplicate entry names', () => {
+    const zip = Buffer.from(
+      zipSync({ 'aaaa.txt': strToU8(DUMMY_SECRET), 'bbbb.txt': strToU8('clean') })
+    )
+    const file = write(
+      'blob-report/report-1.zip',
+      Buffer.from(zip.toString('latin1').replaceAll('bbbb.txt', 'aaaa.txt'), 'latin1')
+    )
+
+    expect(scan(['DUMMY_SECRET']).unreadable).toEqual([
+      { location: file, reason: 'duplicate or reserved entry names' },
+    ])
+  })
+
+  it('refuses an archive with an entry named __proto__', () => {
+    const zip = Buffer.from(zipSync({ xxproto__: strToU8(DUMMY_SECRET) }))
+    const file = write(
+      'blob-report/report-1.zip',
+      Buffer.from(zip.toString('latin1').replaceAll('xxproto__', '__proto__'), 'latin1')
+    )
+
+    expect(scan(['DUMMY_SECRET']).unreadable).toEqual([
+      { location: file, reason: 'duplicate or reserved entry names' },
+    ])
+  })
+
+  it('fails closed on archives nested past the depth limit', () => {
+    let data: Uint8Array = strToU8(DUMMY_SECRET)
+    for (let level = 0; level < 12; level += 1) data = zipSync({ 'inner.zip': data })
+    write('blob-report/deep.zip', data)
+
+    const result = scan(['DUMMY_SECRET'])
+    expect(result.findings).toEqual([])
+    expect(result.unreadable).toHaveLength(1)
+    expect(result.unreadable[0]?.reason).toMatch(/nested deeper than/)
+  })
+
   it('reports missing targets and tolerates them', () => {
     const missing = path.join(workDir, 'absent')
     const result = scan(['DUMMY_SECRET'], [missing])
@@ -192,8 +254,19 @@ describe('check-artifact-secrets', () => {
   })
 
   it('parses comma and whitespace separated names', () => {
-    expect(parseArgs(['--names', 'A, B\nC', 'dir', '--names=D', 'other'])).toEqual({
+    expect(
+      parseArgs([
+        '--names',
+        'A, B\nC',
+        'dir',
+        '--names=D',
+        '--storage-state',
+        's.json',
+        'other',
+      ])
+    ).toEqual({
       names: ['A', 'B', 'C', 'D'],
+      storageStates: ['s.json'],
       targets: ['dir', 'other'],
     })
   })
@@ -217,13 +290,59 @@ describe('check-artifact-secrets', () => {
       const { code, output } = run(['--names', 'DUMMY_SECRET', workDir])
 
       expect(code).toBe(1)
-      expect(output).toContain(
-        `Secret value of DUMMY_SECRET found in ${file}!report.jsonl`
-      )
+      expect(output).toContain(`Secret value of DUMMY_SECRET found in ${file}!entry#1`)
       expect(output).not.toContain(DUMMY_SECRET)
       expect(output).not.toContain(
         Buffer.from(DUMMY_SECRET).toString('base64').slice(0, 12)
       )
+    })
+
+    it('names archive entries by position so an entry name cannot carry a value', () => {
+      const encodedName = Buffer.from(
+        Buffer.from(DUMMY_SECRET).toString('base64')
+      ).toString('base64')
+      write('blob-report/report-1.zip', zipSync({ [encodedName]: strToU8(DUMMY_SECRET) }))
+
+      const { code, output } = run(['--names', 'DUMMY_SECRET', workDir])
+
+      expect(code).toBe(1)
+      expect(output).not.toContain(encodedName)
+    })
+
+    it('scans for cookies minted into a storage-state file', () => {
+      const cookie = 'dummy-vercel-jwt-cookie-value-0123456789'
+      const state = write(
+        'auth/vercel-bypass.json',
+        JSON.stringify({ cookies: [{ name: '_vercel_jwt', value: cookie }], origins: [] })
+      )
+      write('artifacts/trace.network', `cookie: _vercel_jwt=${cookie}`)
+
+      const { code, output } = run([
+        '--names',
+        'DUMMY_SECRET',
+        '--storage-state',
+        state,
+        path.join(workDir, 'artifacts'),
+      ])
+
+      expect(code).toBe(1)
+      expect(output).toContain('Secret value of cookie _vercel_jwt found in')
+      expect(output).not.toContain(cookie)
+    })
+
+    it('rejects an unreadable storage-state file without echoing it', () => {
+      const state = write('auth/vercel-bypass.json', `{"cookies": [${DUMMY_SECRET}`)
+
+      const { code, output } = run([
+        '--names',
+        'DUMMY_SECRET',
+        '--storage-state',
+        state,
+        workDir,
+      ])
+
+      expect(code).toBe(2)
+      expect(output).not.toContain(DUMMY_SECRET)
     })
 
     it('passes a clean tree and names what it skipped', () => {

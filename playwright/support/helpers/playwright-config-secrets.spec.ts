@@ -79,6 +79,9 @@ describe('Playwright configs keep the environment out of reports', () => {
       const config = await loadConfig(`../../config/${name}.config`)
 
       expect(config.webServer).toBeUndefined()
+      // The bypass cookie minted from the secret is a credential too, and
+      // traces record cookies, so preview records none while it holds one.
+      if (name === 'preview') expect(config.use?.trace).toBe('off')
       expectNoDummySecret({
         metadata: config.metadata,
         extraHTTPHeaders: config.use?.extraHTTPHeaders,

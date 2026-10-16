@@ -138,7 +138,10 @@ jobs:
           EXPECTED_SHA: ${{ steps.expected_sha.outputs.sha }}
           GITHUB_SHA: ${{ steps.expected_sha.outputs.sha }}
           GH_TOKEN: ${{ github.token }}
-          VERCEL_AUTOMATION_BYPASS_SECRET: ${{ secrets.VERCEL_AUTOMATION_BYPASS_SECRET }}
+          # Preview only: production is not behind Vercel protection, and the
+          # preview config turns traces off whenever this is set because the
+          # bypass cookie it mints would be recorded in them.
+          VERCEL_AUTOMATION_BYPASS_SECRET: ${{ inputs.test_env == 'preview' && secrets.VERCEL_AUTOMATION_BYPASS_SECRET || '' }}
           VERCEL_TOKEN: ${{ secrets.VERCEL_TOKEN }}
           VERCEL_WEB_PROJECT_SLUG: ${{ inputs.vercel_web_project_slug }}
           VERCEL_API_PROJECT_SLUG: ${{ inputs.vercel_api_project_slug }}
@@ -218,6 +221,7 @@ jobs:
         run: >-
           node scripts/check-artifact-secrets.mjs
           --names VERCEL_AUTOMATION_BYPASS_SECRET,VERCEL_TOKEN,DATABASE_URL_PREVIEW,DATABASE_URL_PROD,GUARDIAN_INVITE_JWT_SECRET,GH_TOKEN
+          --storage-state playwright/.auth/vercel-bypass.json
           playwright/artifacts playwright/playwright-report
 
       - name: Upload Playwright artifacts
