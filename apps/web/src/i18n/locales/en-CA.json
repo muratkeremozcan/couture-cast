@@ -471,7 +471,7 @@
       "imageUnavailable": "Image unavailable",
       "imageRetry": "Reload image",
       "open": "View look",
-      "openLabel": "View the look by {{author}}",
+      "openLabel": "View look by {{author}}",
       "detailClose": "Close this look",
       "report": "Report",
       "reported": "Reported",

@@ -471,7 +471,7 @@
       "imageUnavailable": "Bild nicht verfügbar",
       "imageRetry": "Bild neu laden",
       "open": "Look ansehen",
-      "openLabel": "Look von {{author}} ansehen",
+      "openLabel": "Look ansehen ({{author}})",
       "detailClose": "Diesen Look schließen",
       "report": "Melden",
       "reported": "Gemeldet",
