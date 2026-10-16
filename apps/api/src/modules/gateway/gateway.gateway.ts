@@ -1,7 +1,11 @@
 import { alertWeatherEventSchema, type AlertWeatherEvent } from '@couture/api-client'
 import { Inject } from '@nestjs/common'
-import { WebSocketGateway, WebSocketServer } from '@nestjs/websockets'
-import type { OnGatewayConnection, OnGatewayDisconnect } from '@nestjs/websockets'
+import {
+  WebSocketGateway,
+  WebSocketServer,
+  type OnGatewayConnection,
+  type OnGatewayDisconnect,
+} from '@nestjs/websockets'
 import type { Logger } from 'pino'
 import type { ExtendedError, Namespace, Server, Socket } from 'socket.io'
 

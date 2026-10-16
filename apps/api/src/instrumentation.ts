@@ -4,8 +4,12 @@ import { getNodeAutoInstrumentations } from '@opentelemetry/auto-instrumentation
 import { OTLPMetricExporter } from '@opentelemetry/exporter-metrics-otlp-http'
 import { OTLPTraceExporter } from '@opentelemetry/exporter-trace-otlp-http'
 import { resourceFromAttributes } from '@opentelemetry/resources'
-import type { NodeSDKConfiguration } from '@opentelemetry/sdk-node'
-import { NodeSDK, core, metrics } from '@opentelemetry/sdk-node'
+import {
+  type NodeSDKConfiguration,
+  NodeSDK,
+  core,
+  metrics,
+} from '@opentelemetry/sdk-node'
 import {
   ATTR_SERVICE_NAME,
   ATTR_SERVICE_VERSION,

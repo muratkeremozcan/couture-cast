@@ -15,8 +15,7 @@
 //   the signer and verifier are different services (e.g. auth service signs,
 //   API gateway verifies with the public key).
 
-import crypto from 'k6/crypto'
-import type { Algorithm } from 'k6/crypto'
+import crypto, { type Algorithm } from 'k6/crypto'
 import encoding from 'k6/encoding'
 
 export type JwtAlgorithm = 'HS256' | 'HS384' | 'HS512' | 'RS256'

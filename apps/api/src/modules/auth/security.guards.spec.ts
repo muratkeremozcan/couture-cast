@@ -1,5 +1,8 @@
-import { ForbiddenException, UnauthorizedException } from '@nestjs/common'
-import type { ExecutionContext } from '@nestjs/common'
+import {
+  ForbiddenException,
+  UnauthorizedException,
+  type ExecutionContext,
+} from '@nestjs/common'
 import { describe, expect, it, vi } from 'vitest'
 import type {
   AccessTokenIdentity,

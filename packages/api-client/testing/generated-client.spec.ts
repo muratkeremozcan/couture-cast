@@ -1,8 +1,7 @@
 // Learning path Step 15: Validate, generate, and consume the canonical contract.
 // See _bmad-output/project-knowledge/learning-path-step-by-step.md#step-15-validate-generate-and-consume-the-canonical-contract
-import type { Configuration } from '../src'
 import { expect, test } from 'vitest'
-import { DefaultApi, createApiClient } from '../src'
+import { DefaultApi, createApiClient, type Configuration } from '../src'
 
 // Story 0.9 Task 3 step 5 owner:
 // prove that the package root exports produce the wrapped generated client shape we intend to ship.

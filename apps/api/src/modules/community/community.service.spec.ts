@@ -29,9 +29,11 @@ import type { GuardianService } from '../guardian/guardian.service'
 import type { TelemetryService } from '../telemetry/telemetry.service'
 import type { WeatherQueryService } from '../weather/weather-query.service'
 import { CommunityRateLimitException } from './community-rate-limit.exception'
-import { CommunityChallengeWindowError } from './community.repository'
+import {
+  CommunityChallengeWindowError,
+  type CommunityRepository,
+} from './community.repository'
 import type { CommunityStorage } from './community-storage.adapter'
-import type { CommunityRepository } from './community.repository'
 import { CommunityService } from './community.service'
 
 /**

@@ -1,7 +1,6 @@
 // Step 11 HTTP-boundary owner: searchable owner anchor
-import pinoHttp from 'pino-http'
+import pinoHttp, { type HttpLogger } from 'pino-http'
 import type { Request, Response } from 'express'
-import type { HttpLogger } from 'pino-http'
 import type { Logger } from 'pino'
 import { createBaseLogger } from './pino.config'
 import { extractUserId, inferFeatureFromPath, resolveRequestId } from './request-context'

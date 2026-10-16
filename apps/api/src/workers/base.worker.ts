@@ -1,5 +1,4 @@
-import { Worker } from 'bullmq'
-import type { WorkerOptions, JobsOptions, Job } from 'bullmq'
+import { Worker, type WorkerOptions, type JobsOptions, type Job } from 'bullmq'
 import { getRedisConfig, redisOptionsFromConfig } from '../config/redis'
 import { getPrismaClient } from './prisma'
 

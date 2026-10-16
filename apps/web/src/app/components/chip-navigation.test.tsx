@@ -6,8 +6,11 @@
 import { useState } from 'react'
 import { render, screen, fireEvent } from '@testing-library/react'
 import { describe, it, expect, vi, beforeEach } from 'vitest'
-import { CHIP_NAVIGATION_HEIGHT_PX, ChipNavigation } from './chip-navigation'
-import type { ChipCategory } from './chip-navigation'
+import {
+  CHIP_NAVIGATION_HEIGHT_PX,
+  ChipNavigation,
+  type ChipCategory,
+} from './chip-navigation'
 
 const posthogMocks = vi.hoisted(() => ({
   capture: vi.fn(),

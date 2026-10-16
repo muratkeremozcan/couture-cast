@@ -2,8 +2,8 @@ import type { PremiumThemeService } from '../../../../apps/api/src/modules/comme
 import {
   PREMIUM_THEMES_DISABLED_MESSAGE,
   PREMIUM_THEME_OWNER_NOT_FOUND_MESSAGE,
+  type PremiumThemeKey,
 } from '@couture/api-client/contracts/http'
-import type { PremiumThemeKey } from '@couture/api-client/contracts/http'
 import { NotFoundException, ServiceUnavailableException } from '@nestjs/common'
 import { getProviderPremiumThemeState } from '../state'
 

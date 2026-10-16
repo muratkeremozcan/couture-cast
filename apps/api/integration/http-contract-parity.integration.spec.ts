@@ -4,8 +4,7 @@
 // See _bmad-output/project-knowledge/learning-path-step-by-step.md#step-15-validate-generate-and-consume-the-canonical-contract
 import 'reflect-metadata'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
-import type { TestingModule } from '@nestjs/testing'
-import { Test } from '@nestjs/testing'
+import { type TestingModule, Test } from '@nestjs/testing'
 import { type INestApplication } from '@nestjs/common'
 import { PrismaClient } from '@prisma/client'
 import request from 'supertest'

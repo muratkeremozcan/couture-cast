@@ -6,8 +6,7 @@
 import React, { useState } from 'react'
 import { render, screen, fireEvent } from '@testing-library/react'
 import { describe, it, expect, vi } from 'vitest'
-import { MobileChipNavigation } from './chip-navigation'
-import type { ChipCategory } from './chip-navigation'
+import { MobileChipNavigation, type ChipCategory } from './chip-navigation'
 
 const analyticsMocks = vi.hoisted(() => ({
   capture: vi.fn(),

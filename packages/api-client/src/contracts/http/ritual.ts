@@ -3,7 +3,7 @@ import { z } from 'zod'
 import { nonEmptyStringSchema, type RegisteredCommonHttpSchemas } from './common'
 import { supportedLocaleSchema } from './localization'
 import { weatherSnapshotSchema } from './weather'
-import { capsuleOccasionEnum } from './wardrobe'
+import { capsuleOccasionEnum, garmentCategoryEnum } from './wardrobe'
 import { shopThisLookSchema } from './commerce'
 
 export const scenarioNameSchema = z.enum(['morning', 'midday', 'evening'])
@@ -16,6 +16,24 @@ export const scenarioOutfitSchema = z.object({
   garmentIds: z
     .array(z.string())
     .describe('The custom or fallback garment identifiers suggested.'),
+  // Garments carry no name, and an identifier is not a label: a client that
+  // title-cased `garmentIds` showed raw UUIDs on the card. Same name and meaning
+  // as the planner's `displayGarments`, which extends this schema with image
+  // access. Optional because cached ritual payloads predate it; clients fall
+  // back to a generic label, never to the identifier.
+  displayGarments: z
+    .array(
+      z.object({
+        id: nonEmptyStringSchema.describe('Matches an entry in garmentIds.'),
+        category: garmentCategoryEnum
+          .nullable()
+          .describe('Garment category, or null when the garment is untagged.'),
+      })
+    )
+    .optional()
+    .describe(
+      'Category for every real garment id in garmentIds. A starter-wardrobe placeholder id has no entry here.'
+    ),
   // Story 2.3 Task 1 step 1 owner: update reasoningBadges property in the HTTP contracts schema
   reasoningBadges: z
     .array(

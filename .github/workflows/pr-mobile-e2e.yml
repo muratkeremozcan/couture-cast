@@ -174,10 +174,43 @@ jobs:
           # and system image itself.
           packages: platform-tools
 
-      # No explicit system-image install step: android-emulator-runner's own SDK
-      # installer runs `sdkmanager --install "system-images;android-<api>;<target>;<arch>"`
-      # from the same inputs, so a step here only duplicated it and gave the two
-      # a chance to drift apart.
+      # android-emulator-runner downloads its SDK packages inside each emulator
+      # step, and when one archive arrives truncated sdkmanager only prints "An
+      # error occurred while preparing SDK package ...: Error on ZipFile unknown
+      # archive" and the job dies later with no emulator. It has hit the emulator
+      # package (#146 run 38930305333, #147 run 38934394685) and the system image
+      # (#147 run 38946032061). This step installs the same packages first, checks
+      # each one unpacked (its package.xml exists), and retries, so the runner's
+      # own installs become no-ops. The list mirrors the runner's: if a runner
+      # upgrade changes its build-tools or platform version, that package is
+      # simply downloaded unguarded again until this list catches up.
+      - name: Install Android SDK packages for the emulator
+        shell: bash
+        env:
+          SDK_PACKAGES: >-
+            build-tools;37.0.0
+            platform-tools
+            platforms;android-34
+            system-images;android-${{ env.ANDROID_API_LEVEL }};${{ env.ANDROID_TARGET }};${{ env.ANDROID_ARCH }}
+            emulator
+        run: |
+          read -r -a packages <<< "$SDK_PACKAGES"
+          for package in "${packages[@]}"; do
+            dir="$ANDROID_HOME/${package//;//}"
+            for attempt in 1 2 3; do
+              sdkmanager --install "$package" --channel=0 > /dev/null || true
+              # A truncated archive never unpacks, so package.xml is the check.
+              if [ -f "$dir/package.xml" ]; then
+                echo "Installed $package"
+                continue 2
+              fi
+              echo "Install attempt ${attempt} of $package left nothing behind; retrying."
+              rm -rf "$dir"
+              sleep $(( attempt * 15 ))
+            done
+            echo "::error::Could not install $package after 3 attempts."
+            exit 1
+          done
 
       - name: Enable KVM
         run: |

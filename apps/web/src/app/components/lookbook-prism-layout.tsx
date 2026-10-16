@@ -9,11 +9,13 @@ import { I18nextProvider } from 'react-i18next'
 import { getI18n } from '../../i18n'
 import { processWebDeepLink } from '../lib/deep-link-handler'
 import { LayoutControls } from './layout-controls'
-import { CommunityLookbookGrid, LookbookFilterNav } from './community-lookbook-grid'
-import type { FilterCategory } from './community-lookbook-grid'
+import {
+  CommunityLookbookGrid,
+  LookbookFilterNav,
+  type FilterCategory,
+} from './community-lookbook-grid'
 import { PlannerRail } from './planner-rail'
-import { ChipNavigation } from './chip-navigation'
-import type { ChipCategory } from './chip-navigation'
+import { ChipNavigation, type ChipCategory } from './chip-navigation'
 import { StickyBottomNav } from './sticky-bottom-nav'
 import { InfoBanner } from './info-banner'
 

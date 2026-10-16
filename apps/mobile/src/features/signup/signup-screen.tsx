@@ -1,12 +1,12 @@
 import { useEffect, useState } from 'react'
 import { Pressable, StyleSheet, TextInput } from 'react-native'
-import type {
-  GuardianInvitationInput,
-  GuardianInvitationResponse,
-  SignupInput,
-  SignupResponse,
+import {
+  type GuardianInvitationInput,
+  type GuardianInvitationResponse,
+  type SignupInput,
+  type SignupResponse,
+  guardianInvitationInputSchema,
 } from '@couture/api-client/contracts/http'
-import { guardianInvitationInputSchema } from '@couture/api-client/contracts/http'
 import {
   AGE_GATE_MESSAGES,
   evaluateBirthdateInput,

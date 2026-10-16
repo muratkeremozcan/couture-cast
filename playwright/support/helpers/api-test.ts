@@ -1,5 +1,6 @@
 // Centralizes Playwright API-test environment, identity, and payload helpers so specs
 // do not duplicate environment guards or generated user data.
+import { randomBytes } from 'node:crypto'
 import type { TestInfo } from '@playwright/test'
 
 export type ApiRole = 'guardian' | 'teen' | 'moderator' | 'admin'
@@ -83,7 +84,12 @@ export function authHeaders(userId: string, role: ApiRole): Record<string, strin
   }
 }
 
-const runStamp = process.env.PW_TEST_RUN_ID?.trim() || `pid-${process.pid}`
+// The pid alone is not unique across CI runs: fresh runners hand out the same pid
+// sequence, and runs share the preview database, so a "unique" signup email
+// could already be registered and come back 400 (flaky age-gate signup on #149).
+const runStamp =
+  process.env.PW_TEST_RUN_ID?.trim() ||
+  `pid-${process.pid}-${randomBytes(4).toString('hex')}`
 
 function slugify(value: string): string {
   return value

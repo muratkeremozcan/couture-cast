@@ -3217,6 +3217,40 @@
             },
             "description": "The custom or fallback garment identifiers suggested."
           },
+          "displayGarments": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "id": {
+                  "type": "string",
+                  "minLength": 1,
+                  "description": "Matches an entry in garmentIds."
+                },
+                "category": {
+                  "type": [
+                    "string",
+                    "null"
+                  ],
+                  "enum": [
+                    "top",
+                    "bottom",
+                    "outerwear",
+                    "dress",
+                    "shoes",
+                    "accessory",
+                    null
+                  ],
+                  "description": "Garment category, or null when the garment is untagged."
+                }
+              },
+              "required": [
+                "id",
+                "category"
+              ]
+            },
+            "description": "Category for every real garment id in garmentIds. A starter-wardrobe placeholder id has no entry here."
+          },
           "reasoningBadges": {
             "type": "array",
             "items": {
@@ -3552,6 +3586,40 @@
                         "type": "string"
                       },
                       "description": "The custom or fallback garment identifiers suggested."
+                    },
+                    "displayGarments": {
+                      "type": "array",
+                      "items": {
+                        "type": "object",
+                        "properties": {
+                          "id": {
+                            "type": "string",
+                            "minLength": 1,
+                            "description": "Matches an entry in garmentIds."
+                          },
+                          "category": {
+                            "type": [
+                              "string",
+                              "null"
+                            ],
+                            "enum": [
+                              "top",
+                              "bottom",
+                              "outerwear",
+                              "dress",
+                              "shoes",
+                              "accessory",
+                              null
+                            ],
+                            "description": "Garment category, or null when the garment is untagged."
+                          }
+                        },
+                        "required": [
+                          "id",
+                          "category"
+                        ]
+                      },
+                      "description": "Category for every real garment id in garmentIds. A starter-wardrobe placeholder id has no entry here."
                     },
                     "reasoningBadges": {
                       "type": "array",
@@ -10556,6 +10624,61 @@
                       },
                       "description": "The custom or fallback garment identifiers suggested."
                     },
+                    "displayGarments": {
+                      "type": "array",
+                      "items": {
+                        "type": "object",
+                        "properties": {
+                          "id": {
+                            "type": "string",
+                            "minLength": 1
+                          },
+                          "category": {
+                            "type": [
+                              "string",
+                              "null"
+                            ],
+                            "enum": [
+                              "top",
+                              "bottom",
+                              "outerwear",
+                              "dress",
+                              "shoes",
+                              "accessory",
+                              null
+                            ]
+                          },
+                          "imageAccess": {
+                            "type": [
+                              "object",
+                              "null"
+                            ],
+                            "properties": {
+                              "url": {
+                                "type": "string",
+                                "format": "uri"
+                              },
+                              "expiresAt": {
+                                "type": "string",
+                                "format": "date-time"
+                              }
+                            },
+                            "required": [
+                              "url",
+                              "expiresAt"
+                            ],
+                            "additionalProperties": false
+                          }
+                        },
+                        "required": [
+                          "id",
+                          "category",
+                          "imageAccess"
+                        ],
+                        "additionalProperties": false
+                      },
+                      "description": "Category and fresh signed image access for every real garment id in garmentIds, batched in one lookup per Decision 4 rather than resolved per garment. A starter-wardrobe placeholder id has no entry here."
+                    },
                     "reasoningBadges": {
                       "type": "array",
                       "items": {
@@ -10616,71 +10739,16 @@
                     "shopThisLook": {
                       "type": "null",
                       "description": "Always null. Planner cards never carry an affiliate CTA; this preserves the shared scenario contract while keeping planner affiliate behavior out of scope for this story."
-                    },
-                    "displayGarments": {
-                      "type": "array",
-                      "items": {
-                        "type": "object",
-                        "properties": {
-                          "id": {
-                            "type": "string",
-                            "minLength": 1
-                          },
-                          "category": {
-                            "type": [
-                              "string",
-                              "null"
-                            ],
-                            "enum": [
-                              "top",
-                              "bottom",
-                              "outerwear",
-                              "dress",
-                              "shoes",
-                              "accessory",
-                              null
-                            ]
-                          },
-                          "imageAccess": {
-                            "type": [
-                              "object",
-                              "null"
-                            ],
-                            "properties": {
-                              "url": {
-                                "type": "string",
-                                "format": "uri"
-                              },
-                              "expiresAt": {
-                                "type": "string",
-                                "format": "date-time"
-                              }
-                            },
-                            "required": [
-                              "url",
-                              "expiresAt"
-                            ],
-                            "additionalProperties": false
-                          }
-                        },
-                        "required": [
-                          "id",
-                          "category",
-                          "imageAccess"
-                        ],
-                        "additionalProperties": false
-                      },
-                      "description": "Category and fresh signed image access for every real garment id in garmentIds, batched in one lookup per Decision 4 rather than resolved per garment. A starter-wardrobe placeholder id has no entry here."
                     }
                   },
                   "required": [
                     "id",
                     "scenario",
                     "garmentIds",
+                    "displayGarments",
                     "reasoningBadges",
                     "comfortNotes",
-                    "shopThisLook",
-                    "displayGarments"
+                    "shopThisLook"
                   ]
                 },
                 "minItems": 3,
@@ -10878,6 +10946,61 @@
                                 },
                                 "description": "The custom or fallback garment identifiers suggested."
                               },
+                              "displayGarments": {
+                                "type": "array",
+                                "items": {
+                                  "type": "object",
+                                  "properties": {
+                                    "id": {
+                                      "type": "string",
+                                      "minLength": 1
+                                    },
+                                    "category": {
+                                      "type": [
+                                        "string",
+                                        "null"
+                                      ],
+                                      "enum": [
+                                        "top",
+                                        "bottom",
+                                        "outerwear",
+                                        "dress",
+                                        "shoes",
+                                        "accessory",
+                                        null
+                                      ]
+                                    },
+                                    "imageAccess": {
+                                      "type": [
+                                        "object",
+                                        "null"
+                                      ],
+                                      "properties": {
+                                        "url": {
+                                          "type": "string",
+                                          "format": "uri"
+                                        },
+                                        "expiresAt": {
+                                          "type": "string",
+                                          "format": "date-time"
+                                        }
+                                      },
+                                      "required": [
+                                        "url",
+                                        "expiresAt"
+                                      ],
+                                      "additionalProperties": false
+                                    }
+                                  },
+                                  "required": [
+                                    "id",
+                                    "category",
+                                    "imageAccess"
+                                  ],
+                                  "additionalProperties": false
+                                },
+                                "description": "Category and fresh signed image access for every real garment id in garmentIds, batched in one lookup per Decision 4 rather than resolved per garment. A starter-wardrobe placeholder id has no entry here."
+                              },
                               "reasoningBadges": {
                                 "type": "array",
                                 "items": {
@@ -10938,71 +11061,16 @@
                               "shopThisLook": {
                                 "type": "null",
                                 "description": "Always null. Planner cards never carry an affiliate CTA; this preserves the shared scenario contract while keeping planner affiliate behavior out of scope for this story."
-                              },
-                              "displayGarments": {
-                                "type": "array",
-                                "items": {
-                                  "type": "object",
-                                  "properties": {
-                                    "id": {
-                                      "type": "string",
-                                      "minLength": 1
-                                    },
-                                    "category": {
-                                      "type": [
-                                        "string",
-                                        "null"
-                                      ],
-                                      "enum": [
-                                        "top",
-                                        "bottom",
-                                        "outerwear",
-                                        "dress",
-                                        "shoes",
-                                        "accessory",
-                                        null
-                                      ]
-                                    },
-                                    "imageAccess": {
-                                      "type": [
-                                        "object",
-                                        "null"
-                                      ],
-                                      "properties": {
-                                        "url": {
-                                          "type": "string",
-                                          "format": "uri"
-                                        },
-                                        "expiresAt": {
-                                          "type": "string",
-                                          "format": "date-time"
-                                        }
-                                      },
-                                      "required": [
-                                        "url",
-                                        "expiresAt"
-                                      ],
-                                      "additionalProperties": false
-                                    }
-                                  },
-                                  "required": [
-                                    "id",
-                                    "category",
-                                    "imageAccess"
-                                  ],
-                                  "additionalProperties": false
-                                },
-                                "description": "Category and fresh signed image access for every real garment id in garmentIds, batched in one lookup per Decision 4 rather than resolved per garment. A starter-wardrobe placeholder id has no entry here."
                               }
                             },
                             "required": [
                               "id",
                               "scenario",
                               "garmentIds",
+                              "displayGarments",
                               "reasoningBadges",
                               "comfortNotes",
-                              "shopThisLook",
-                              "displayGarments"
+                              "shopThisLook"
                             ]
                           },
                           "minItems": 3,
@@ -11267,6 +11335,61 @@
                           },
                           "description": "The custom or fallback garment identifiers suggested."
                         },
+                        "displayGarments": {
+                          "type": "array",
+                          "items": {
+                            "type": "object",
+                            "properties": {
+                              "id": {
+                                "type": "string",
+                                "minLength": 1
+                              },
+                              "category": {
+                                "type": [
+                                  "string",
+                                  "null"
+                                ],
+                                "enum": [
+                                  "top",
+                                  "bottom",
+                                  "outerwear",
+                                  "dress",
+                                  "shoes",
+                                  "accessory",
+                                  null
+                                ]
+                              },
+                              "imageAccess": {
+                                "type": [
+                                  "object",
+                                  "null"
+                                ],
+                                "properties": {
+                                  "url": {
+                                    "type": "string",
+                                    "format": "uri"
+                                  },
+                                  "expiresAt": {
+                                    "type": "string",
+                                    "format": "date-time"
+                                  }
+                                },
+                                "required": [
+                                  "url",
+                                  "expiresAt"
+                                ],
+                                "additionalProperties": false
+                              }
+                            },
+                            "required": [
+                              "id",
+                              "category",
+                              "imageAccess"
+                            ],
+                            "additionalProperties": false
+                          },
+                          "description": "Category and fresh signed image access for every real garment id in garmentIds, batched in one lookup per Decision 4 rather than resolved per garment. A starter-wardrobe placeholder id has no entry here."
+                        },
                         "reasoningBadges": {
                           "type": "array",
                           "items": {
@@ -11327,71 +11450,16 @@
                         "shopThisLook": {
                           "type": "null",
                           "description": "Always null. Planner cards never carry an affiliate CTA; this preserves the shared scenario contract while keeping planner affiliate behavior out of scope for this story."
-                        },
-                        "displayGarments": {
-                          "type": "array",
-                          "items": {
-                            "type": "object",
-                            "properties": {
-                              "id": {
-                                "type": "string",
-                                "minLength": 1
-                              },
-                              "category": {
-                                "type": [
-                                  "string",
-                                  "null"
-                                ],
-                                "enum": [
-                                  "top",
-                                  "bottom",
-                                  "outerwear",
-                                  "dress",
-                                  "shoes",
-                                  "accessory",
-                                  null
-                                ]
-                              },
-                              "imageAccess": {
-                                "type": [
-                                  "object",
-                                  "null"
-                                ],
-                                "properties": {
-                                  "url": {
-                                    "type": "string",
-                                    "format": "uri"
-                                  },
-                                  "expiresAt": {
-                                    "type": "string",
-                                    "format": "date-time"
-                                  }
-                                },
-                                "required": [
-                                  "url",
-                                  "expiresAt"
-                                ],
-                                "additionalProperties": false
-                              }
-                            },
-                            "required": [
-                              "id",
-                              "category",
-                              "imageAccess"
-                            ],
-                            "additionalProperties": false
-                          },
-                          "description": "Category and fresh signed image access for every real garment id in garmentIds, batched in one lookup per Decision 4 rather than resolved per garment. A starter-wardrobe placeholder id has no entry here."
                         }
                       },
                       "required": [
                         "id",
                         "scenario",
                         "garmentIds",
+                        "displayGarments",
                         "reasoningBadges",
                         "comfortNotes",
-                        "shopThisLook",
-                        "displayGarments"
+                        "shopThisLook"
                       ]
                     },
                     "minItems": 3,

@@ -1,0 +1,27 @@
+# Restart the app in Expo Go without clearing its state, then mount it again.
+#
+# Recovery for a developer sheet that never finishes rendering. In CI runs
+# 38934394685 and 38959860317 Expo Go dimmed the whole screen for its developer
+# sheet, but the sheet itself never drew: no Continue, no menu text, nothing in
+# the hierarchy for `subflows/absorb-expo-dev-sheet.yaml` to act on, and every
+# tab tap was swallowed for the rest of the flow. A fresh launch raises the
+# sheet again, and `subflows/open-app.yaml` waits for it and closes it.
+#
+# Why relaunch instead of closing it: there is nothing to close. The dimming
+# window is not in the accessibility hierarchy (only the app is), its sheet has
+# no content to tap, and blind backdrop taps did not clear it in run
+# 38934394685. Whether it is an Expo Go sheet stuck mid-animation or a dialog
+# whose content never attached cannot be told from the screenshot and hierarchy
+# alone, so the runner now saves `dumpsys window windows` for every failed
+# Android flow (`<flow>-windows.txt` in the artifacts); the next occurrence will
+# name the window.
+#
+# `clearState: false` keeps the signed-in session and everything the flow has
+# already set up; the caller only loses its in-memory screen, which it is about
+# to navigate away from anyway.
+appId: ${MAESTRO_APP_ID}
+---
+- launchApp:
+    clearState: false
+    stopApp: true
+- runFlow: open-app.yaml

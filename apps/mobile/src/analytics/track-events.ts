@@ -6,10 +6,8 @@ import {
   trackPremiumSubscribeTapped,
   trackRitualCreated,
   trackWardrobeUploadStarted,
-} from '@couture/api-client'
-import type {
-  AffiliateCtaShownEvent,
-  PremiumSubscribeTappedEvent,
+  type AffiliateCtaShownEvent,
+  type PremiumSubscribeTappedEvent,
 } from '@couture/api-client'
 import type { MobileAnalyticsClient } from './mobile-analytics'
 

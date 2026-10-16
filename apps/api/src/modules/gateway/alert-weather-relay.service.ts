@@ -1,6 +1,10 @@
 import { alertWeatherEventSchema, type AlertWeatherEvent } from '@couture/api-client'
-import { Inject, Injectable } from '@nestjs/common'
-import type { OnModuleDestroy, OnModuleInit } from '@nestjs/common'
+import {
+  Inject,
+  Injectable,
+  type OnModuleDestroy,
+  type OnModuleInit,
+} from '@nestjs/common'
 import Redis from 'ioredis'
 import type { Logger } from 'pino'
 import { z } from 'zod'

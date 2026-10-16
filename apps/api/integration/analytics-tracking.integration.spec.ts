@@ -2,8 +2,7 @@
 // See _bmad-output/project-knowledge/learning-path-step-by-step.md#step-8-shared-analytics-contracts-and-event-tracking
 import 'reflect-metadata'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
-import type { TestingModule } from '@nestjs/testing'
-import { Test } from '@nestjs/testing'
+import { type TestingModule, Test } from '@nestjs/testing'
 import type { INestApplication } from '@nestjs/common'
 import request from 'supertest'
 import {

@@ -6263,6 +6263,12 @@ export interface PlannerDayResultOneOfOutfitsInner {
    */
   garmentIds: Array<string>
   /**
+   * Category and fresh signed image access for every real garment id in garmentIds, batched in one lookup per Decision 4 rather than resolved per garment. A starter-wardrobe placeholder id has no entry here.
+   * @type {Array<PlannerDayResultOneOfOutfitsInnerDisplayGarmentsInner>}
+   * @memberof PlannerDayResultOneOfOutfitsInner
+   */
+  displayGarments: Array<PlannerDayResultOneOfOutfitsInnerDisplayGarmentsInner>
+  /**
    * Reasoning badges justifying the garments chosen.
    * @type {Array<ScenarioOutfitReasoningBadgesInner>}
    * @memberof PlannerDayResultOneOfOutfitsInner
@@ -6298,12 +6304,6 @@ export interface PlannerDayResultOneOfOutfitsInner {
    * @memberof PlannerDayResultOneOfOutfitsInner
    */
   shopThisLook: null
-  /**
-   * Category and fresh signed image access for every real garment id in garmentIds, batched in one lookup per Decision 4 rather than resolved per garment. A starter-wardrobe placeholder id has no entry here.
-   * @type {Array<PlannerDayResultOneOfOutfitsInnerDisplayGarmentsInner>}
-   * @memberof PlannerDayResultOneOfOutfitsInner
-   */
-  displayGarments: Array<PlannerDayResultOneOfOutfitsInnerDisplayGarmentsInner>
 }
 
 /**
@@ -7111,6 +7111,12 @@ export interface RitualResponseDataOutfitsInner {
    */
   garmentIds: Array<string>
   /**
+   * Category for every real garment id in garmentIds. A starter-wardrobe placeholder id has no entry here.
+   * @type {Array<ScenarioOutfitDisplayGarmentsInner>}
+   * @memberof RitualResponseDataOutfitsInner
+   */
+  displayGarments?: Array<ScenarioOutfitDisplayGarmentsInner>
+  /**
    * Reasoning badges justifying the garments chosen.
    * @type {Array<ScenarioOutfitReasoningBadgesInner>}
    * @memberof RitualResponseDataOutfitsInner
@@ -7294,6 +7300,12 @@ export interface ScenarioOutfit {
    */
   garmentIds: Array<string>
   /**
+   * Category for every real garment id in garmentIds. A starter-wardrobe placeholder id has no entry here.
+   * @type {Array<ScenarioOutfitDisplayGarmentsInner>}
+   * @memberof ScenarioOutfit
+   */
+  displayGarments?: Array<ScenarioOutfitDisplayGarmentsInner>
+  /**
    * Reasoning badges justifying the garments chosen.
    * @type {Array<ScenarioOutfitReasoningBadgesInner>}
    * @memberof ScenarioOutfit
@@ -7341,6 +7353,40 @@ export const ScenarioOutfitScenarioEnum = {
 } as const
 export type ScenarioOutfitScenarioEnum =
   (typeof ScenarioOutfitScenarioEnum)[keyof typeof ScenarioOutfitScenarioEnum]
+
+/**
+ *
+ * @export
+ * @interface ScenarioOutfitDisplayGarmentsInner
+ */
+export interface ScenarioOutfitDisplayGarmentsInner {
+  /**
+   * Matches an entry in garmentIds.
+   * @type {string}
+   * @memberof ScenarioOutfitDisplayGarmentsInner
+   */
+  id: string
+  /**
+   * Garment category, or null when the garment is untagged.
+   * @type {ScenarioOutfitDisplayGarmentsInnerCategoryEnum}
+   * @memberof ScenarioOutfitDisplayGarmentsInner
+   */
+  category: ScenarioOutfitDisplayGarmentsInnerCategoryEnum | null
+}
+
+/**
+ * @export
+ */
+export const ScenarioOutfitDisplayGarmentsInnerCategoryEnum = {
+  top: 'top',
+  bottom: 'bottom',
+  outerwear: 'outerwear',
+  dress: 'dress',
+  shoes: 'shoes',
+  accessory: 'accessory',
+} as const
+export type ScenarioOutfitDisplayGarmentsInnerCategoryEnum =
+  (typeof ScenarioOutfitDisplayGarmentsInnerCategoryEnum)[keyof typeof ScenarioOutfitDisplayGarmentsInnerCategoryEnum]
 
 /**
  *

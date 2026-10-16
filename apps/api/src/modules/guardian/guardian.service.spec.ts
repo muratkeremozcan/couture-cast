@@ -2,8 +2,7 @@
 // See _bmad-output/project-knowledge/learning-path-step-by-step.md#step-29-garment-capture-flow
 import { createHmac } from 'node:crypto'
 import { ForbiddenException } from '@nestjs/common'
-import { Prisma } from '@prisma/client'
-import type { PrismaClient } from '@prisma/client'
+import { Prisma, type PrismaClient } from '@prisma/client'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import {
   createGuardianProfileFixture,

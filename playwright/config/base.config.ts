@@ -1,7 +1,6 @@
 // Step 12 step 1 owner: searchable owner anchor
 import path from 'node:path'
-import { defineConfig, devices } from '@playwright/test'
-import type { PlaywrightTestConfig } from '@playwright/test'
+import { defineConfig, devices, type PlaywrightTestConfig } from '@playwright/test'
 
 const rootDir = path.resolve(__dirname, '..')
 const testsDir = path.join(rootDir, 'tests')
