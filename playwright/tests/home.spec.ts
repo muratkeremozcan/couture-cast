@@ -34,17 +34,11 @@ test.describe('Web smoke', () => {
       new URL('/api/health', metadata.baseUrl ?? 'http://localhost:3005').toString()
 
     const healthUrl = new URL(healthEndpoint)
-    const vercelBypassToken = process.env.VERCEL_AUTOMATION_BYPASS_SECRET?.trim()
+    // Protected previews are reached through the bypass cookie global setup mints.
     const healthResponse = await apiRequest<{ status: string }>({
       method: 'GET',
       baseUrl: healthUrl.origin,
       path: healthUrl.pathname,
-      headers: vercelBypassToken
-        ? {
-            'x-vercel-protection-bypass': vercelBypassToken,
-            'x-vercel-set-bypass-cookie': 'true',
-          }
-        : undefined,
     })
     expect(healthResponse.status).toBe(200)
 

@@ -375,8 +375,18 @@ jobs:
           # lets a developer run the exact CI path locally.
           script: bash ./scripts/ci-mobile-e2e.sh ${{ steps.flows.outputs.list }}
 
-      - uses: actions/upload-artifact@v4
+      # Blocks the upload when a log or report carries a secret this job
+      # holds. Fails closed: if the scan cannot run, nothing is uploaded.
+      - name: Check Maestro artifacts for secret values
+        id: secret_scan
         if: always() && steps.flows.outputs.empty != 'true'
+        env:
+          GUARDIAN_INVITE_JWT_SECRET: ${{ secrets.GUARDIAN_INVITE_JWT_SECRET }}
+          GH_TOKEN: ${{ github.token }}
+        run: node scripts/check-artifact-secrets.mjs --names GUARDIAN_INVITE_JWT_SECRET,GH_TOKEN maestro/artifacts
+
+      - uses: actions/upload-artifact@v4
+        if: always() && steps.flows.outputs.empty != 'true' && steps.secret_scan.outcome == 'success'
         with:
           # Per shard, and per attempt. Four jobs uploading one name collide,
           # and upload-artifact v4 rejects the duplicate rather than merging, so
