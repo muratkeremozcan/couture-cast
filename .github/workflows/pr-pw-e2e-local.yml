@@ -73,8 +73,8 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        shardIndex: [1, 2]
-        shardTotal: [2]
+        shardIndex: [1, 2, 3]
+        shardTotal: [3]
     if: |
       always() && (
         github.event_name != 'pull_request' ||
@@ -174,6 +174,6 @@ jobs:
         with:
           environment: local
           burn-in-result: ${{ needs.burn-in.result || 'skipped' }}
-          shards: '2'
+          shards: '3'
           e2e-result: ${{ needs.pw-e2e.result || 'unknown' }}
           github-token: ${{ secrets.GITHUB_TOKEN }}
