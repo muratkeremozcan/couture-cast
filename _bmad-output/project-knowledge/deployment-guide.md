@@ -1,7 +1,8 @@
 # Deployment guide
 
-Updated: 2026-10-16 - preview readiness wait shared by PR and manual e2e, prod waits on both health
-SHAs, preview runs have no database secret.
+Updated: 2026-10-16 - preview readiness wait shared by PR and manual e2e, resolvers poll for the
+expected commit, prod waits on both health SHAs, preview runs have no database secret, CI Supabase
+pulls from ghcr.io.
 
 ## Scope and evidence boundary
 
@@ -122,6 +123,21 @@ tries branch aliases, GitHub deployment statuses, and the Vercel API, and may fa
 Preview unless strict mode is enabled. The
 [API URL resolver](../../scripts/resolve-api-preview-url.mjs) first prefers a Vercel deployment with
 the expected commit SHA, then a mutable branch alias, then a deterministic alias.
+
+When `EXPECTED_SHA` is set, both resolvers poll the Vercel API until the deployment for that commit
+is listed (`RESOLVE_SHA_TIMEOUT_SECONDS`, default 600; `RESOLVE_SHA_INTERVAL_SECONDS`, default 15),
+because right after a push the newest listed deployment still belongs to the previous commit. The
+web resolver never falls back to another commit's canonical URL in that mode, since such a URL never
+starts serving the expected SHA. The fallback resolution inside the reusable Playwright workflow caps
+the poll at 120 seconds.
+
+[Manual E2E](../../.github/workflows/pw-e2e-trigger.yml) runs the same readiness wait for the
+dispatched commit unless `custom_base_url` or `custom_api_base_url` names the target explicitly.
+
+CI starts local Supabase through
+[its composite action](../../.github/actions/start-local-supabase/action.yml), which pulls images from
+`ghcr.io` with the job token (the CLI default, `public.ecr.aws`, rate-limits anonymous data per
+runner IP) and skips containers no test uses.
 
 The SHA wait is implemented by
 [the Vercel waiter](../../.github/workflows/vercel-wait-for-deployment.yml). It retries for up to the

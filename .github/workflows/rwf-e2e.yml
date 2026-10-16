@@ -147,6 +147,9 @@ jobs:
           VERCEL_GIT_COMMIT_REF: ${{ steps.resolve_branch.outputs.branch }}
           # Enable debug logging for URL resolution scripts
           DEBUG: true
+          # Fallback resolution inside this 20-minute job polls for the commit's
+          # deployment for at most two minutes, then uses the branch alias.
+          RESOLVE_SHA_TIMEOUT_SECONDS: '120'
           # Dispatch inputs travel through env so they cannot inject shell.
           CUSTOM_BASE_URL: ${{ inputs.custom_base_url }}
           CUSTOM_API_BASE_URL: ${{ inputs.custom_api_base_url }}

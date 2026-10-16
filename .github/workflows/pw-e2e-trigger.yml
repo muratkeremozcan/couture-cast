@@ -32,8 +32,8 @@ jobs:
   preview-ready:
     # Without this wait a run dispatched right after a push pins deployments
     # that are still building and tests Vercel's placeholder pages. A custom
-    # web URL names its own target, so the branch previews are not awaited.
-    if: inputs.test_env == 'preview' && inputs.custom_base_url == ''
+    # URL names its own target, so the branch previews are not awaited.
+    if: inputs.test_env == 'preview' && inputs.custom_base_url == '' && inputs.custom_api_base_url == ''
     uses: ./.github/workflows/rwf-vercel-preview-ready.yml
     with:
       git_ref: ${{ github.ref_name }}
@@ -43,7 +43,7 @@ jobs:
   run-preview-tests:
     needs: preview-ready
     if: >-
-      always() && inputs.test_env == 'preview' &&
+      !cancelled() && inputs.test_env == 'preview' &&
       contains(fromJSON('["success","skipped"]'), needs.preview-ready.result)
     uses: ./.github/workflows/rwf-e2e.yml
     with:

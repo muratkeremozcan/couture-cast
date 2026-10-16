@@ -19,22 +19,27 @@ import fs from 'node:fs'
 import path from 'node:path'
 import process from 'node:process'
 
-// Load env for local Preview runs; CI passes env vars directly.
-try {
-  const { config } = await import('dotenv')
-  const envSuffix = (process.env.TEST_ENV ?? 'preview').toLowerCase()
-  const envFiles = [`.env.${envSuffix}`, '.env']
-  for (const file of envFiles) {
-    const full = path.resolve(process.cwd(), file)
-    if (fs.existsSync(full)) {
-      // quiet: dotenv v17 announces itself on stdout, which would corrupt the URL this
-      // script contracts to print there and CI captures by command substitution.
-      config({ path: full, quiet: true })
-      break
+/**
+ * Load env files for local Preview runs; CI passes env vars directly. Called from
+ * main() so importing this module (for tests) leaves process.env alone.
+ */
+async function loadLocalEnv() {
+  try {
+    const { config } = await import('dotenv')
+    const envSuffix = (process.env.TEST_ENV ?? 'preview').toLowerCase()
+    const envFiles = [`.env.${envSuffix}`, '.env']
+    for (const file of envFiles) {
+      const full = path.resolve(process.cwd(), file)
+      if (fs.existsSync(full)) {
+        // quiet: dotenv v17 announces itself on stdout, which would corrupt the URL this
+        // script contracts to print there and CI captures by command substitution.
+        config({ path: full, quiet: true })
+        break
+      }
     }
+  } catch {
+    // dotenv not available (CI) - env vars passed via workflow
   }
-} catch {
-  // dotenv not available (CI) - env vars passed via workflow
 }
 
 function logDebug(message) {
@@ -127,22 +132,45 @@ function getGitBranchAliasUrl(deployment) {
 }
 
 /**
+ * Non-negative number of seconds from an env var; anything else gives the
+ * default, so a typo such as "10m" cannot turn the poll into an endless loop.
+ */
+function secondsFromEnv(name, fallback) {
+  const value = Number(env(name))
+  return Number.isFinite(value) && value >= 0 ? value : fallback
+}
+
+/**
  * List deployments, polling while an explicit EXPECTED_SHA has no deployment yet.
  * Right after a push Vercel may not list it, and the caller waits for that exact
  * commit, so settling early for the branch alias only moves the wait elsewhere.
+ * A failed request is retried until the deadline instead of ending the poll.
+ * @param {() => Promise<Array<Record<string, any>>>} listDeployments
+ * @param {string | undefined} expectedSha
+ * @param {boolean} poll
  */
-async function listDeploymentsAwaitingSha(url, expectedSha, matchesSha) {
-  const timeoutMs = env('EXPECTED_SHA')
-    ? Number(env('RESOLVE_SHA_TIMEOUT_SECONDS') ?? 600) * 1000
-    : 0
-  const intervalMs = Number(env('RESOLVE_SHA_INTERVAL_SECONDS') ?? 15) * 1000
+export async function listDeploymentsAwaitingSha(listDeployments, expectedSha, poll) {
+  const timeoutMs = poll ? secondsFromEnv('RESOLVE_SHA_TIMEOUT_SECONDS', 600) * 1000 : 0
+  const intervalMs = secondsFromEnv('RESOLVE_SHA_INTERVAL_SECONDS', 15) * 1000
   const deadline = Date.now() + timeoutMs
+  const matchesSha = (deployment) =>
+    typeof deployment?.meta?.githubCommitSha === 'string' &&
+    deployment.meta.githubCommitSha.startsWith(expectedSha)
   for (;;) {
-    const result = await fetchJson(url)
-    const deployments = result?.deployments ?? []
-    if (!expectedSha || deployments.some(matchesSha)) return deployments
-    if (Date.now() + intervalMs > deadline) return deployments
-    logDebug(`No API deployment for SHA ${expectedSha.slice(0, 7)} yet; checking again`)
+    const outOfTime = !poll || Date.now() + intervalMs > deadline
+    let deployments
+    try {
+      deployments = await listDeployments()
+    } catch (error) {
+      if (outOfTime) throw error
+      logDebug(`Vercel deployments request failed; retrying (${error.message})`)
+    }
+    if (deployments && (!expectedSha || deployments.some(matchesSha) || outOfTime)) {
+      return deployments
+    }
+    if (deployments) {
+      logDebug(`No API deployment for SHA ${expectedSha.slice(0, 7)} yet; checking again`)
+    }
     await new Promise((resolve) => setTimeout(resolve, intervalMs))
   }
 }
@@ -166,7 +194,11 @@ async function findDeploymentUrl(projectId, teamId, branch) {
     return typeof deploymentSha === 'string' && deploymentSha.startsWith(expectedSha)
   }
 
-  const deployments = await listDeploymentsAwaitingSha(url, expectedSha, matchesSha)
+  const deployments = await listDeploymentsAwaitingSha(
+    async () => (await fetchJson(url))?.deployments ?? [],
+    expectedSha,
+    Boolean(env('EXPECTED_SHA'))
+  )
 
   // Commit matching is the critical safeguard for preview E2E: after a PR push,
   // the newest READY deployment on a branch is not always the one Playwright should test.
@@ -213,6 +245,7 @@ function deterministicUrl(projectSlug, branchSlug, teamSlug) {
 }
 
 async function main() {
+  await loadLocalEnv()
   const manual = env('PREVIEW_API_BASE_URL') ?? env('VERCEL_API_BASE_URL')
   if (manual) {
     logDebug(`Using manual API URL: ${manual}`)
@@ -264,4 +297,8 @@ async function main() {
   fail(`Could not resolve preview URL for ${projectSlug}`)
 }
 
-await main()
+// Run only as a script, so tests can import the helpers without resolving anything.
+// import.meta.main also holds when the script is reached through a symlink.
+if (import.meta.main) {
+  await main()
+}

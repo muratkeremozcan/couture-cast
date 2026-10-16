@@ -10,24 +10,28 @@
 import fs from 'node:fs'
 import path from 'node:path'
 import { execFileSync, execSync } from 'node:child_process'
-import { pathToFileURL } from 'node:url'
 
-// Load env for local Preview runs; CI passes env vars directly.
-try {
-  const { default: dotenv } = await import('dotenv')
-  const envSuffix = (process.env.TEST_ENV ?? 'preview').toLowerCase()
-  const envFiles = [`.env.${envSuffix}`, '.env']
-  for (const file of envFiles) {
-    const full = path.resolve(process.cwd(), file)
-    if (fs.existsSync(full)) {
-      // quiet: dotenv v17 announces itself on stdout, which would corrupt the URL this
-      // script contracts to print there and CI captures by command substitution.
-      dotenv.config({ path: full, quiet: true })
-      break
+/**
+ * Load env files for local Preview runs; CI passes env vars directly. Called from
+ * main() so importing this module (for tests) leaves process.env alone.
+ */
+async function loadLocalEnv() {
+  try {
+    const { default: dotenv } = await import('dotenv')
+    const envSuffix = (process.env.TEST_ENV ?? 'preview').toLowerCase()
+    const envFiles = [`.env.${envSuffix}`, '.env']
+    for (const file of envFiles) {
+      const full = path.resolve(process.cwd(), file)
+      if (fs.existsSync(full)) {
+        // quiet: dotenv v17 announces itself on stdout, which would corrupt the URL this
+        // script contracts to print there and CI captures by command substitution.
+        dotenv.config({ path: full, quiet: true })
+        break
+      }
     }
+  } catch {
+    // dotenv not available (CI) - env vars passed directly via workflow
   }
-} catch {
-  // dotenv not available (CI) - env vars passed directly via workflow
 }
 
 function logDebug(message) {
@@ -408,6 +412,18 @@ async function findUrlFromVercel(projectSlug, teamSlug, branch) {
 }
 
 /**
+ * Non-negative number of seconds from an env var; anything else gives the
+ * default, so a typo such as "10m" cannot turn the poll into an endless loop.
+ * @param {string} name
+ * @param {number} fallback
+ * @returns {number}
+ */
+function secondsFromEnv(name, fallback) {
+  const value = Number(env(name))
+  return Number.isFinite(value) && value >= 0 ? value : fallback
+}
+
+/**
  * Poll until a deployment built from `expectedSha` is listed, then return its
  * canonical URL. Gives up after RESOLVE_SHA_TIMEOUT_SECONDS (default 600).
  * @param {() => Promise<Array<Record<string, any>>>} fetchDeployments
@@ -415,8 +431,8 @@ async function findUrlFromVercel(projectSlug, teamSlug, branch) {
  * @returns {Promise<string | undefined>}
  */
 export async function waitForDeploymentWithSha(fetchDeployments, expectedSha) {
-  const timeoutMs = Number(env('RESOLVE_SHA_TIMEOUT_SECONDS') ?? 600) * 1000
-  const intervalMs = Number(env('RESOLVE_SHA_INTERVAL_SECONDS') ?? 15) * 1000
+  const timeoutMs = secondsFromEnv('RESOLVE_SHA_TIMEOUT_SECONDS', 600) * 1000
+  const intervalMs = secondsFromEnv('RESOLVE_SHA_INTERVAL_SECONDS', 15) * 1000
   const deadline = Date.now() + timeoutMs
   for (;;) {
     const deployments = await fetchDeployments()
@@ -556,6 +572,7 @@ function failStrict(branch) {
 }
 
 async function main() {
+  await loadLocalEnv()
   const manual = getManualPreviewUrl()
   if (manual) {
     process.stdout.write(manual)
@@ -617,9 +634,7 @@ async function main() {
 }
 
 // Run only as a script, so tests can import the helpers without resolving anything.
-if (
-  process.argv[1] &&
-  import.meta.url === pathToFileURL(path.resolve(process.argv[1])).href
-) {
+// import.meta.main also holds when the script is reached through a symlink.
+if (import.meta.main) {
   await main()
 }

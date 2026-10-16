@@ -14,10 +14,12 @@ inputs:
     description: >-
       Comma-separated containers not to start. Services no test uses are skipped
       to pull less: the dashboard and its metadata API, log shipping, edge
-      functions, the pooler, mail capture, and image transforms (disabled in
-      supabase/config.toml).
+      functions, the pooler, mail capture, image transforms (disabled in
+      supabase/config.toml), and Realtime (the app pushes through Redis). Keep
+      gotrue, postgrest and kong: CLI 2.62.5 leaves API_URL and the keys out of
+      `supabase status` without them.
     required: false
-    default: 'studio,postgres-meta,logflare,vector,edge-runtime,supavisor,mailpit,imgproxy'
+    default: 'realtime,studio,postgres-meta,logflare,vector,edge-runtime,supavisor,mailpit,imgproxy'
   image-registry:
     description: >-
       Registry the Supabase CLI pulls its images from. The CLI default,
@@ -42,12 +44,13 @@ runs:
       shell: bash
       env:
         SUPABASE_INTERNAL_IMAGE_REGISTRY: ${{ inputs.image-registry }}
+        EXCLUDE: ${{ inputs.exclude }}
       run: |
         set -u -o pipefail
 
         max_attempts='${{ inputs.max-attempts }}'
         base_delay='${{ inputs.base-delay-seconds }}'
-        exclude='${{ inputs.exclude }}'
+        exclude="$EXCLUDE"
         attempt=1
 
         diagnose_db_port() {
@@ -96,3 +99,9 @@ runs:
           sleep "$sleep_seconds"
           attempt=$(( attempt + 1 ))
         done
+
+    - name: Log out of the image registry
+      # Later steps run PR code; drop the stored credential once the images are pulled.
+      if: always() && inputs.image-registry == 'ghcr.io'
+      shell: bash
+      run: docker logout ghcr.io || true
