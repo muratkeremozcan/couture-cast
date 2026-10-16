@@ -212,7 +212,10 @@ describe('6.1 community locale parity', () => {
     // the text the pill shows (`open`), or a speech-input user who says what they
     // see reaches nothing. axe enforces it as `label-content-name-mismatch`.
     for (const locale of SUPPORTED_LOCALES) {
-      const card = (CATALOGS[locale].community as Catalog).card as Record<string, string>
+      const card = (CATALOGS[locale].community as Catalog).card as {
+        open: string
+        openLabel: string
+      }
       expect(
         card.openLabel.toLocaleLowerCase(locale),
         `${locale} openLabel contains "${card.open}"`
