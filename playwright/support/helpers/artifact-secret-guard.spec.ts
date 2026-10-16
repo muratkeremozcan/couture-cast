@@ -290,6 +290,22 @@ describe('check-artifact-secrets', () => {
     ])
   })
 
+  // Root reads a mode-000 file anyway, so the case cannot be staged there.
+  it.skipIf(process.getuid?.() === 0)(
+    'reports a listed file it cannot read and scans the rest',
+    () => {
+      const locked = write('artifacts/locked.txt', 'contents')
+      write('artifacts/open.txt', DUMMY_SECRET)
+      fs.chmodSync(locked, 0o000)
+
+      const result = scan(['DUMMY_SECRET'])
+      fs.chmodSync(locked, 0o600)
+
+      expect(result.unreadable).toEqual([{ location: locked, reason: 'EACCES' }])
+      expect(result.findings).toHaveLength(1)
+    }
+  )
+
   it('reports missing targets and tolerates them', () => {
     const missing = path.join(workDir, 'absent')
     const result = scan(['DUMMY_SECRET'], [missing])

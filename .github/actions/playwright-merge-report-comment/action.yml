@@ -100,7 +100,8 @@ runs:
       shell: bash
       env:
         GH_TOKEN: ${{ inputs.github-token || github.token }}
-      run: node scripts/check-artifact-secrets.mjs --names GH_TOKEN "${{ inputs.report-path }}"
+        REPORT_PATH: ${{ inputs.report-path }}
+      run: node scripts/check-artifact-secrets.mjs --names GH_TOKEN "$REPORT_PATH"
 
     - name: Upload merged report
       id: upload-report

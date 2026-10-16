@@ -325,7 +325,14 @@ export function scanPaths(targets, secrets) {
     const location = nameHits.length > 0 ? `file #${index + 1} of this scan` : file
     for (const hit of nameHits)
       state.findings.push({ ...hit, location: `${location}(name)` })
-    scanBuffer(fs.readFileSync(file), location, secrets, state, 0)
+    let contents
+    try {
+      contents = fs.readFileSync(file)
+    } catch (error) {
+      state.unreadable.push({ location, reason: error.code ?? 'read failed' })
+      continue
+    }
+    scanBuffer(contents, location, secrets, state, 0)
   }
   return { files: files.length, missing, ...state }
 }

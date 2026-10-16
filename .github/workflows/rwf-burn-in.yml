@@ -172,10 +172,11 @@ jobs:
           DATABASE_URL_PREVIEW: ${{ secrets.DATABASE_URL_PREVIEW }}
           GUARDIAN_INVITE_JWT_SECRET: ${{ secrets.GUARDIAN_INVITE_JWT_SECRET }}
           GH_TOKEN: ${{ github.token }}
+          TEST_DIRECTORY: ${{ inputs.test-directory }}
         run: >-
           node scripts/check-artifact-secrets.mjs
           --names DATABASE_URL_PREVIEW,GUARDIAN_INVITE_JWT_SECRET,GH_TOKEN
-          ${{ inputs.test-directory }}/playwright-report ${{ inputs.test-directory }}/test-results
+          "$TEST_DIRECTORY/playwright-report" "$TEST_DIRECTORY/test-results"
 
       - name: Upload burn-in failure artifacts
         id: upload-burn-in-artifacts
