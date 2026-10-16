@@ -170,7 +170,11 @@ function zipEntries(buffer) {
     }
   )
   if (new Set(names).size !== names.length || names.includes('__proto__')) {
-    throw new Error('duplicate or reserved entry names')
+    // Marked so a zip found only by its trailing record still fails closed: it
+    // opened, so it is a zip, and the ambiguity is real.
+    throw Object.assign(new Error('duplicate or reserved entry names'), {
+      ambiguous: true,
+    })
   }
   return names.map((name) => entries[name])
 }
@@ -268,7 +272,7 @@ function scanBuffer(buffer, location, secrets, state, depth) {
     try {
       children = archiveChildren(buffer, kind)
     } catch (error) {
-      if (kind !== 'zip-suffix') {
+      if (kind !== 'zip-suffix' || error.ambiguous) {
         state.unreadable.push({ location, reason: error.message })
         return
       }

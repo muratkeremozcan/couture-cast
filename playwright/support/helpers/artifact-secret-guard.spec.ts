@@ -226,6 +226,24 @@ describe('check-artifact-secrets', () => {
     ])
   })
 
+  it('refuses ambiguous entry names behind a preamble too', () => {
+    const zip = Buffer.from(
+      zipSync({ 'aaaa.txt': strToU8(DUMMY_SECRET), 'bbbb.txt': strToU8('clean') })
+    )
+    const duplicated = Buffer.from(
+      zip.toString('latin1').replaceAll('bbbb.txt', 'aaaa.txt'),
+      'latin1'
+    )
+    const file = write(
+      'blob-report/report-1.zip',
+      Buffer.concat([Buffer.from('preamble\n'), duplicated])
+    )
+
+    expect(scan(['DUMMY_SECRET']).unreadable).toEqual([
+      { location: file, reason: 'duplicate or reserved entry names' },
+    ])
+  })
+
   it('fails closed on archives nested past the depth limit', () => {
     let data: Uint8Array = strToU8(DUMMY_SECRET)
     for (let level = 0; level < 12; level += 1) data = zipSync({ 'inner.zip': data })

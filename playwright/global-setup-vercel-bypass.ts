@@ -15,6 +15,19 @@ export const VERCEL_BYPASS_STATE_PATH = path.resolve(
 const EMPTY_STATE = { cookies: [], origins: [] }
 
 /**
+ * The minted cookie is a credential GitHub knows nothing about, and a failed request
+ * prints its headers, cookies included, in the call log. Registering each value
+ * makes the runner mask it in every later line of the job's log. The workflow
+ * command itself is consumed by the runner, never shown.
+ */
+function maskInGitHubActions(values: string[]) {
+  if (process.env.GITHUB_ACTIONS !== 'true') return
+  for (const value of values) {
+    if (value) process.stdout.write(`::add-mask::${value}\n`)
+  }
+}
+
+/**
  * Exchanges VERCEL_AUTOMATION_BYPASS_SECRET for Vercel's bypass cookies before any
  * test starts, so the secret itself never travels inside a test.
  *
@@ -47,9 +60,16 @@ export default async function globalSetup(config: FullConfig) {
     })
     try {
       for (const origin of origins) {
-        const response = await context.get(`${origin}/api/health`, {
-          failOnStatusCode: false,
-        })
+        const response = await context
+          .get(`${origin}/api/health`, { failOnStatusCode: false })
+          .catch((error: unknown) => {
+            // Playwright's call log lists the request headers, the secret
+            // among them, so none of its message is passed on.
+            const name = error instanceof Error ? error.name : 'Error'
+            throw new Error(
+              `Could not reach ${origin} to mint the Vercel bypass cookie (${name}).`
+            )
+          })
         if (response.status() === 401 || response.status() === 403) {
           throw new Error(
             `Vercel rejected VERCEL_AUTOMATION_BYPASS_SECRET for ${origin} ` +
@@ -57,7 +77,9 @@ export default async function globalSetup(config: FullConfig) {
           )
         }
       }
-      state = await context.storageState()
+      const minted = await context.storageState()
+      maskInGitHubActions(minted.cookies.map((cookie) => cookie.value))
+      state = minted
     } finally {
       await context.dispose()
     }
