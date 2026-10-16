@@ -37,14 +37,14 @@ appId: ${MAESTRO_APP_ID}
 - runFlow:
     when:
       visible:
-        text: 'Connected to expo-cli'
+        text: 'Connected to expo-cli.*'
     commands:
       - tapOn:
           point: '50%,10%'
           label: 'Close the Expo Go developer menu with a tap on its backdrop'
       - extendedWaitUntil:
           notVisible:
-            text: 'Connected to expo-cli'
+            text: 'Connected to expo-cli.*'
           timeout: 10000
           label: 'Developer menu is gone'
 - tapOn:

@@ -25,7 +25,8 @@ import {
 } from '@/src/lib/commerce'
 import { loadWidgetAlertPreferences } from '@/src/lib/widget-alert-preferences'
 import { resolveWidgetScenario, type WidgetSlot } from '@/src/lib/widget-share'
-import {
+import type {
+  GarmentCategory,
   defaultSupportedLocale,
   resolveSupportedLocale,
   ritualResponseSchema,
@@ -46,7 +47,11 @@ import { HourlyForecastRibbon } from '@/components/hero/hourly-forecast-ribbon'
 import { ScenarioToggles } from '@/components/hero/scenario-toggles'
 import { OutfitRecommendationCard } from '@/components/hero/outfit-recommendation-card'
 import { WeatherAlertBanner } from '@/components/hero/weather-alert-banner'
-import { garmentTitle, parseGarmentId } from '@/components/hero/garment-item-tile'
+import {
+  SWAP_CATALOGUE,
+  garmentTitle,
+  parseGarmentId,
+} from '@/components/hero/garment-item-tile'
 import { useHeroPalette } from '@/components/hero/hero-theme'
 import { MobileChipNavigation, type ChipCategory } from '@/components/chip-navigation'
 import { useAccessibilityAnnouncer } from '@/src/hooks/use-accessibility-announcer'
@@ -120,25 +125,10 @@ function InvalidDeepLinkBanner({
   return <InfoBanner message={message} onDismiss={onDismiss} />
 }
 
-const alternateGarments: Record<string, string[]> = {
-  Outerwear: [
-    'classic-trench-coat',
-    'leather-jacket',
-    'denim-jacket',
-    'wool-coat',
-    'blazer',
-  ],
-  Bottoms: ['navy-chinos', 'denim-jeans', 'corduroy-pants', 'shorts', 'linen-trousers'],
-  Tops: ['crewneck-sweater', 'hoodie', 'casual-tee', 'button-down-shirt', 'knit-polo'],
-  Footwear: ['leather-boots', 'canvas-sneakers', 'loafers', 'derby-shoes'],
-  Accessories: ['umbrella', 'wool-scarf', 'leather-gloves', 'sunglasses', 'beanie'],
-  Garment: ['basic-socks', 'leather-belt'],
-}
-
 /**
  * The options offered in the garment swap modal, worn garment first.
  *
- * `alternateGarments` is a fixed catalogue, so a worn garment outside it --
+ * `SWAP_CATALOGUE` is a fixed catalogue, so a worn garment outside it --
  * every `default-*` placeholder a user with an empty wardrobe sees, which is
  * every new account -- was absent from its own swap modal. The modal declares
  * `accessibilityRole="radiogroup"` and marks the worn option
@@ -155,14 +145,17 @@ const alternateGarments: Record<string, string[]> = {
  * pure function of the garment id, and carrying them inside `TabOneScreen` put
  * that component over the repository's cyclomatic complexity limit.
  */
-function resolveGarmentSwap(swappingGarmentId: string | null): {
+function resolveGarmentSwap(
+  swappingGarmentId: string | null,
+  knownCategory?: GarmentCategory | null
+): {
   category: string
   options: string[]
 } {
   const category = swappingGarmentId
-    ? parseGarmentId(swappingGarmentId).category
+    ? parseGarmentId(swappingGarmentId, knownCategory).category
     : 'Garment'
-  const baseSwapOptions = alternateGarments[category] || alternateGarments.Garment || []
+  const baseSwapOptions = SWAP_CATALOGUE[category] || SWAP_CATALOGUE.Garment || []
 
   return {
     category,
@@ -582,7 +575,13 @@ export default function TabOneScreen() {
       scenario: activeScenario,
       itemId: newGarmentId,
     })
-    announce('swap', garmentTitle(parseGarmentId(newGarmentId), t, activeLocale))
+    const swappedInCategory = ritual.data.outfits
+      .find((outfit) => outfit.scenario === activeScenario)
+      ?.displayGarments?.find((garment) => garment.id === newGarmentId)?.category
+    announce(
+      'swap',
+      garmentTitle(parseGarmentId(newGarmentId, swappedInCategory), t, activeLocale)
+    )
     setIsSwapModalVisible(false)
     setSwappingGarmentId(null)
     swapTriggerRef.current = null
@@ -619,8 +618,11 @@ export default function TabOneScreen() {
     setActiveScenario(CHIP_SCENARIOS[category])
   }
 
-  const { category: swapCategory, options: swapOptions } =
-    resolveGarmentSwap(swappingGarmentId)
+  const { category: swapCategory, options: swapOptions } = resolveGarmentSwap(
+    swappingGarmentId,
+    activeOutfit?.displayGarments?.find((garment) => garment.id === swappingGarmentId)
+      ?.category
+  )
 
   return (
     <SafeAreaView style={[styles.safeContainer, { backgroundColor: palette.background }]}>

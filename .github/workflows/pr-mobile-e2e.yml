@@ -174,11 +174,6 @@ jobs:
           # and system image itself.
           packages: platform-tools
 
-      # No explicit system-image install step: android-emulator-runner's own SDK
-      # installer runs `sdkmanager --install "system-images;android-<api>;<target>;<arch>"`
-      # from the same inputs, so a step here only duplicated it and gave the two
-      # a chance to drift apart.
-
       # android-emulator-runner downloads its SDK packages inside each emulator
       # step, and when one archive arrives truncated sdkmanager only prints "An
       # error occurred while preparing SDK package ...: Error on ZipFile unknown

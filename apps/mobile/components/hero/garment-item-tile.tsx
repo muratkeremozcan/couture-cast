@@ -17,8 +17,37 @@ type GarmentItemTileProps = {
 
 const PLACEHOLDER_PREFIX = 'default-'
 
-/** A readable catalogue slug such as `trench-coat`; never a UUID or cuid. */
-const CATALOGUE_SLUG = /^[a-z]+(?:-[a-z]+)+$/
+/**
+ * The fixed swap catalogue, by tile group. Its ids are readable names
+ * (`blazer`, `classic-trench-coat`), unlike wardrobe ids (UUIDs, cuids).
+ */
+export const SWAP_CATALOGUE: Record<string, string[]> = {
+  Outerwear: [
+    'classic-trench-coat',
+    'leather-jacket',
+    'denim-jacket',
+    'wool-coat',
+    'blazer',
+  ],
+  Bottoms: ['navy-chinos', 'denim-jeans', 'corduroy-pants', 'shorts', 'linen-trousers'],
+  Tops: ['crewneck-sweater', 'hoodie', 'casual-tee', 'button-down-shirt', 'knit-polo'],
+  Footwear: ['leather-boots', 'canvas-sneakers', 'loafers', 'derby-shoes'],
+  Accessories: ['umbrella', 'wool-scarf', 'leather-gloves', 'sunglasses', 'beanie'],
+  Garment: ['basic-socks', 'leather-belt'],
+}
+
+const CATALOGUE_GROUP_BY_ID = new Map(
+  Object.entries(SWAP_CATALOGUE).flatMap(([group, ids]) =>
+    ids.map((id) => [id, group] as const)
+  )
+)
+
+/**
+ * A hyphenated readable slug such as `trench-coat`, for catalogue-style ids
+ * outside `SWAP_CATALOGUE`. A wardrobe id never matches: UUIDs carry digits and
+ * cuids carry no hyphen.
+ */
+const READABLE_SLUG = /^[a-z]+(?:-[a-z]+)+$/
 
 const CATEGORY_GROUP: Record<GarmentCategory, string> = {
   top: 'Tops',
@@ -60,7 +89,8 @@ export function parseGarmentId(
   if (wardrobeCategory) {
     return { name: null, category: CATEGORY_GROUP[wardrobeCategory], wardrobeCategory }
   }
-  if (!CATALOGUE_SLUG.test(id)) {
+  const catalogueGroup = CATALOGUE_GROUP_BY_ID.get(id)
+  if (!catalogueGroup && !READABLE_SLUG.test(id)) {
     return { name: null, category: 'Garment', wardrobeCategory: null }
   }
 
@@ -82,6 +112,10 @@ export function parseGarmentId(
     { keys: ['shoes', 'boots', 'sneakers', 'loafers'], category: 'Footwear' },
     { keys: ['scarf', 'beanie', 'umbrella', 'gloves', 'hat'], category: 'Accessories' },
   ]
+
+  if (catalogueGroup) {
+    return { name, category: catalogueGroup, wardrobeCategory: null }
+  }
 
   const matched = mapping.find((m) => m.keys.some((k) => id.includes(k)))
   return {
@@ -123,9 +157,11 @@ export function GarmentItemTile({
     `accessibility.garment_category_${parts.category.toLowerCase()}`,
     { defaultValue: parts.category }
   )
+  // A garment with no name is already titled by its category; repeating the
+  // group as a descriptor would read "Shoes: footwear".
   const label = formatGarmentAltText(
     t('accessibility.garment_item_alt', { title }),
-    [localizedCategory],
+    parts.name ? [localizedCategory] : [],
     locale
   )
 

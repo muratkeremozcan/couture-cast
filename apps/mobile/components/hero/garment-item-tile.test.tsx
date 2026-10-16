@@ -51,7 +51,10 @@ describe('garment tile titles', () => {
     const tile = screen.getByTestId(`garment-tile-${WARDROBE_ID}`)
     expect(tile.textContent).toContain('Outerwear')
     expect(tile.textContent).not.toMatch(/df7d0868/i)
-    expect(tile.getAttribute('aria-label') ?? '').not.toMatch(/df7d0868/i)
+    const label = tile.getAttribute('aria-label') ?? ''
+    expect(label).not.toMatch(/df7d0868/i)
+    // Titled by its category, so the group is not repeated as a descriptor.
+    expect(label.toLowerCase().split('outerwear')).toHaveLength(2)
   })
 
   it('falls back to a generic label for an id with no display data (cached payloads)', () => {
@@ -81,6 +84,14 @@ describe('garment tile titles', () => {
 
   it('derives a name only from readable catalogue slugs', () => {
     expect(parseGarmentId('leather-belt').name).toBe('Leather Belt')
+    // Single-word catalogue ids are names too, grouped by their catalogue slot.
+    expect(parseGarmentId('blazer')).toEqual({
+      name: 'Blazer',
+      category: 'Outerwear',
+      wardrobeCategory: null,
+    })
+    expect(parseGarmentId('sunglasses').category).toBe('Accessories')
+    expect(parseGarmentId(WARDROBE_ID, 'shoes').category).toBe('Footwear')
     expect(parseGarmentId(WARDROBE_ID).name).toBeNull()
     expect(parseGarmentId('clx3k9q2m0000abcd1234').name).toBeNull()
     expect(parseGarmentId('default-outerwear')).toEqual({

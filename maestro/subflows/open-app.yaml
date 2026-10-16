@@ -170,7 +170,7 @@ appId: ${MAESTRO_APP_ID}
                 when:
                   platform: Android
                   notVisible:
-                    text: 'Something went wrong.|Development servers|Couture Cast'
+                    text: 'Something went wrong.|Development servers|Couture Cast|This is the developer menu.*|Connected to expo-cli.*'
                 commands:
                   - back
             # Let the pop finish before the second block asks the same question.
@@ -192,7 +192,7 @@ appId: ${MAESTRO_APP_ID}
                 when:
                   platform: Android
                   notVisible:
-                    text: 'Something went wrong.|Development servers|Couture Cast'
+                    text: 'Something went wrong.|Development servers|Couture Cast|This is the developer menu.*|Connected to expo-cli.*'
                 commands:
                   - back
 
@@ -214,20 +214,37 @@ appId: ${MAESTRO_APP_ID}
 # whichever one is up. So this waits for a sheet to rise and then closes it,
 # rather than tapping before it exists.
 #
-# This replaces two unguarded `50%,10%` taps and their recovery block. The taps
-# raced the sheet, and in CI run 38934394685 the dimmed backdrop outlived all of
-# them and swallowed every later tab tap. The recovery pressed Android BACK,
-# which with a sheet up, or from the Home tab, exits Expo Go to the launcher.
+# This replaces two unguarded `50%,10%` taps whose recovery pressed Android
+# BACK. The taps raced the sheet, and in CI run 38934394685 the dimmed backdrop
+# outlived all of them and swallowed every later tab tap; BACK, with a sheet up
+# or from the Home tab, exits Expo Go to the launcher. The recovery below keeps
+# only the safe half, the deep-link re-entry.
 #
 # The wait is optional: a flow launched without `clearState` may find no sheet,
 # and then the wait costs its timeout once.
 - extendedWaitUntil:
     visible:
-      text: 'This is the developer menu.*|Connected to expo-cli'
+      text: 'This is the developer menu.*|Connected to expo-cli.*'
     timeout: 15000
     optional: true
     label: 'An Expo Go developer sheet has risen'
 - runFlow: absorb-expo-dev-sheet.yaml
+
+# If closing the sheet left the app off screen (the full menu's backdrop tap is
+# still a coordinate tap), re-enter it through the deep link. No BACK here: with
+# a sheet up, or from the Home tab, BACK exits Expo Go to the launcher.
+- runFlow:
+    when:
+      notVisible:
+        id: 'tab-home'
+    commands:
+      - openLink: ${APP_URL}
+      - extendedWaitUntil:
+          visible:
+            id: 'tab-home'
+          timeout: 30000
+          label: 'Re-entered the app after closing the developer sheet'
+      - runFlow: absorb-expo-dev-sheet.yaml
 
 - assertVisible:
     id: 'tab-home'

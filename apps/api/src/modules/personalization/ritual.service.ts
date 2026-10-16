@@ -637,7 +637,6 @@ export class RitualService implements OnModuleDestroy {
         // whole assembly-point decision exists to prevent. The controller adds
         // the key after this service returns.
         garmentIds: recGarmentIds,
-        displayGarments: describeOutfitGarments(recGarmentIds, garmentCategoryById),
         capsuleId: recCapsule?.id ?? null,
         capsuleName: recCapsule?.name ?? null,
         autoFilledGarmentIds,
@@ -661,6 +660,31 @@ export class RitualService implements OnModuleDestroy {
         // fresh, correctly localized text.
         comfortNotes: engineResult.scenarios[scenarioIndex]!.comfortNotes,
       })
+    }
+
+    // A reused recommendation can name a garment that has since left the
+    // engine's candidate set (archived, comfort cleared, upload reset), so look
+    // up whatever the candidates did not cover, in one query.
+    const uncoveredGarmentIds = [
+      ...new Set(
+        outfits
+          .flatMap((outfit) => outfit.garmentIds)
+          .filter((id) => !id.startsWith('default-') && !garmentCategoryById.has(id))
+      ),
+    ]
+    if (uncoveredGarmentIds.length > 0) {
+      const uncovered = await this.prisma.garmentItem.findMany({
+        where: { id: { in: uncoveredGarmentIds }, user_id: userId },
+        select: { id: true, category: true },
+      })
+      for (const garment of uncovered)
+        garmentCategoryById.set(garment.id, garment.category)
+    }
+    for (const outfit of outfits) {
+      outfit.displayGarments = describeOutfitGarments(
+        outfit.garmentIds,
+        garmentCategoryById
+      )
     }
 
     // 7. Compile Response data
