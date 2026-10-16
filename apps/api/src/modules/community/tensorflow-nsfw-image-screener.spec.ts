@@ -5,8 +5,11 @@ import os from 'node:os'
 import path from 'node:path'
 import { afterEach, describe, expect, it, vi } from 'vitest'
 import { ADR013_IMAGE_ENGINE_VERSION } from './community-moderation.engine.js'
-import { findManifestIn, readModelManifest } from './community-nsfw-inference.worker.js'
-import type { NsfwRuntimeIdentity } from './community-nsfw-inference.worker.js'
+import {
+  findManifestIn,
+  readModelManifest,
+  type NsfwRuntimeIdentity,
+} from './community-nsfw-inference.worker.js'
 import {
   COMMUNITY_NSFW_MANIFEST_ENV,
   COMMUNITY_NSFW_SCREENER_TENSORFLOW,
@@ -23,8 +26,8 @@ import {
   loadApprovedPolicy,
   resolveManifestPath,
   toWorkerError,
+  type NsfwImagePolicy,
 } from './tensorflow-nsfw-image-screener.js'
-import type { NsfwImagePolicy } from './tensorflow-nsfw-image-screener.js'
 
 const CLASS_NAMES = ['Drawing', 'Hentai', 'Neutral', 'Porn', 'Sexy']
 

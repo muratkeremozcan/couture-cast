@@ -1,6 +1,5 @@
 // Step 10 step 3 owner: searchable owner anchor
-import { Queue } from 'bullmq'
-import type { QueueOptions, JobsOptions } from 'bullmq'
+import { Queue, type QueueOptions, type JobsOptions } from 'bullmq'
 import { getRedisConfig, redisOptionsFromConfig } from './redis'
 
 /** Story 0.4 owner file: BullMQ queue configuration.

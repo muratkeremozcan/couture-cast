@@ -12,8 +12,7 @@
 // baseUrl/path separation from playwright-utils is intentionally omitted because k6 has no
 // config-level baseURL to pull from — it would just be an extra prop with no payoff.
 
-import type { Params, Response } from 'k6/http'
-import http from 'k6/http'
+import http, { type Params, type Response } from 'k6/http'
 
 export type HttpMethod = 'GET' | 'POST' | 'PUT' | 'PATCH' | 'DELETE' | 'HEAD'
 

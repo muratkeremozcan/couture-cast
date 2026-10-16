@@ -1,7 +1,6 @@
 import type { INestApplication } from '@nestjs/common'
 import { generateHttpOpenApiDocument } from '@couture/api-client/contracts/http'
-import type { OpenAPIObject } from '@nestjs/swagger'
-import { SwaggerModule } from '@nestjs/swagger'
+import { type OpenAPIObject, SwaggerModule } from '@nestjs/swagger'
 
 export const OPENAPI_DOCS_ROUTE = '/api/docs'
 export const OPENAPI_JSON_ROUTE = '/api/v1/openapi.json'

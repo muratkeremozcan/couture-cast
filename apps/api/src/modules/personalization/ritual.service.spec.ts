@@ -20,8 +20,7 @@ import {
   describeOutfitGarments,
 } from './ritual.service.js'
 import { BadRequestException, InternalServerErrorException } from '@nestjs/common'
-import { Prisma } from '@prisma/client'
-import type { PrismaClient, GarmentItem } from '@prisma/client'
+import { Prisma, type PrismaClient, type GarmentItem } from '@prisma/client'
 import type { WeatherQueryService } from '../weather/weather-query.service.js'
 import type { LocationPreferencesService } from '../location-preferences/location-preferences.service.js'
 import type { AnalyticsClient } from '../../analytics/analytics.service.js'

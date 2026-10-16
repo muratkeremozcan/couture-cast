@@ -1,7 +1,6 @@
 // Learning path Step 12: Cross-surface E2E confidence.
 // See _bmad-output/project-knowledge/learning-path-step-by-step.md#step-12-cross-surface-e2e-confidence
-import type { AxeResults } from 'axe-core'
-import type axe from 'axe-core'
+import { type AxeResults, type default as axe } from 'axe-core'
 import { z } from 'zod'
 import { test, expect } from '../support/fixtures/merged-fixtures'
 

@@ -1,5 +1,5 @@
-import type { WardrobeSilhouetteService } from '../../../../apps/api/src/modules/wardrobe/wardrobe-silhouette.service'
 import {
+  type WardrobeSilhouetteService,
   formatSilhouetteETag,
   parseSilhouetteIfMatchHeader,
 } from '../../../../apps/api/src/modules/wardrobe/wardrobe-silhouette.service'

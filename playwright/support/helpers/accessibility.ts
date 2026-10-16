@@ -1,6 +1,5 @@
 // Story 3.8 Task 5 step 3 owner: implement reusable AxeBuilder accessibility scanning helper in playwright/support/helpers/accessibility.ts
-import type { Page } from '@playwright/test'
-import { expect } from '@playwright/test'
+import { expect, type Page } from '@playwright/test'
 import AxeBuilder from '@axe-core/playwright'
 import { contrastRatio as hexContrastRatio } from '@couture/utils'
 

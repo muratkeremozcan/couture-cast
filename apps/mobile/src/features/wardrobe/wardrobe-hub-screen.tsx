@@ -3,8 +3,7 @@
 // app/(tabs)/wardrobe.tsx, so it's covered by the component test runner (see
 // wardrobe-silhouette-screen.tsx for why app/ route files stay thin
 // wrappers); apps/mobile/app/(tabs)/wardrobe.tsx now just re-exports this.
-import { useCallback, useEffect, useRef, useState } from 'react'
-import type React from 'react'
+import { useCallback, useEffect, useRef, useState, type ElementRef } from 'react'
 import { useTranslation } from 'react-i18next'
 import { router } from 'expo-router'
 import { ActivityIndicator, Image, Pressable, ScrollView, StyleSheet } from 'react-native'
@@ -45,7 +44,7 @@ export function WardrobeHubScreen({ pollOffsetsMs }: WardrobeHubScreenProps = {}
   const pollingAbortRef = useRef<AbortController | null>(null)
   const pendingTaggingGarmentIdRef = useRef<string | null>(null)
   const isCaptureOpenRef = useRef(false)
-  const addGarmentButtonRef = useRef<React.ElementRef<typeof Pressable> | null>(null)
+  const addGarmentButtonRef = useRef<ElementRef<typeof Pressable> | null>(null)
 
   useEffect(() => {
     isCaptureOpenRef.current = isCaptureOpen

@@ -12,8 +12,7 @@ import {
   onTestFinished,
   vi,
 } from 'vitest'
-import type { TestingModule } from '@nestjs/testing'
-import { Test } from '@nestjs/testing'
+import { type TestingModule, Test } from '@nestjs/testing'
 import type { INestApplication } from '@nestjs/common'
 import { HttpAdapterHost } from '@nestjs/core'
 import { PrismaClient } from '@prisma/client'

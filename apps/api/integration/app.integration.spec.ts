@@ -1,7 +1,6 @@
 import 'reflect-metadata'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
-import type { TestingModule } from '@nestjs/testing'
-import { Test } from '@nestjs/testing'
+import { type TestingModule, Test } from '@nestjs/testing'
 import type { INestApplication } from '@nestjs/common'
 
 vi.mock('@prisma/client', () => {

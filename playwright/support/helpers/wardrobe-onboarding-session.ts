@@ -9,8 +9,7 @@ import type { Page, TestInfo } from '@playwright/test'
 import { signupResponseSchema } from '@couture/api-client/contracts/http'
 import { expect, test as base } from '../fixtures/merged-fixtures'
 import { resolveEnvironmentConfig } from '../../config/environments'
-import { buildUniqueId } from './api-test'
-import type { ApiRequestFixture } from './api-test'
+import { buildUniqueId, type ApiRequestFixture } from './api-test'
 import { cleanupWardrobeUserTestData } from './user-test-data'
 
 const environment = resolveEnvironmentConfig('local')

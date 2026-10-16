@@ -11,11 +11,9 @@ import {
 } from './weather-provider.error.js'
 import type { IWeatherProvider } from './weather-provider.interface.js'
 import { WeatherApiForecastDaysSchema } from './weather.config.js'
-import type {
-  WeatherApiForecastDaySchema,
-  WeatherApiHourSchema,
-} from './weather.schemas.js'
 import {
+  type WeatherApiForecastDaySchema,
+  type WeatherApiHourSchema,
   LocalDateSchema,
   NormalizedDailyWeatherEntrySchema,
   NormalizedWeatherForecastSchema,

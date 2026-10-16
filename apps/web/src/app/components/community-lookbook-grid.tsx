@@ -62,8 +62,7 @@ import {
 } from '../../lib/community'
 import { getI18n } from '../../i18n'
 import { AccessibleModal } from './accessible-modal'
-import { CHIP_NAVIGATION_HEIGHT_PX } from './chip-navigation'
-import type { ChipCategory } from './chip-navigation'
+import { CHIP_NAVIGATION_HEIGHT_PX, type ChipCategory } from './chip-navigation'
 
 /**
  * The filter type is the contract's own enum. A local union here is what let

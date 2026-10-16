@@ -18,8 +18,10 @@ import { randomUUID } from 'node:crypto'
 import { afterAll, beforeAll, describe, expect, it } from 'vitest'
 import { PrismaClient } from '@prisma/client'
 import { buildLookbookPostCreateInput, createLookbookPost } from '@couture/testing'
-import { CommunityRepository } from '../src/modules/community/community.repository.js'
-import type { FindFeedPostsParams } from '../src/modules/community/community.repository.js'
+import {
+  CommunityRepository,
+  type FindFeedPostsParams,
+} from '../src/modules/community/community.repository.js'
 
 const databaseUrl =
   process.env.INTEGRATION_TEST_DATABASE_URL ??

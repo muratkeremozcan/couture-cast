@@ -30,7 +30,16 @@ module.exports = {
   ],
   ignorePatterns: ['dist', 'build', 'node_modules', '.turbo', 'coverage', '**/*.d.ts'],
   rules: {
-    '@typescript-eslint/consistent-type-imports': 'error',
+    // Both rules autofix imports, so they must agree on one style. Without
+    // `prefer-inline`, import/no-duplicates merged a module's value import into
+    // its `import type` statement, which turns the values type-only: TypeScript
+    // rejects it and Metro refuses to bundle (#149). Inline `type` specifiers on
+    // the value import are the one form both rules accept.
+    '@typescript-eslint/consistent-type-imports': [
+      'error',
+      { fixStyle: 'inline-type-imports' },
+    ],
+    'import/no-duplicates': ['error', { 'prefer-inline': true }],
     '@typescript-eslint/consistent-type-exports': 'error',
     '@typescript-eslint/consistent-type-definitions': 'off',
     '@typescript-eslint/await-thenable': 'error',

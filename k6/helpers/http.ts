@@ -1,5 +1,4 @@
-import type { ApiResponse } from '@couture/k6-utils'
-import { apiRequest } from '@couture/k6-utils'
+import { type ApiResponse, apiRequest } from '@couture/k6-utils'
 import type { RefinedResponse, ResponseType } from 'k6/http'
 
 type JsonObject = Record<string, unknown>

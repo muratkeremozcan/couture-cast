@@ -1,5 +1,8 @@
-import { ForbiddenException, UnauthorizedException } from '@nestjs/common'
-import type { ExecutionContext } from '@nestjs/common'
+import {
+  ForbiddenException,
+  UnauthorizedException,
+  type ExecutionContext,
+} from '@nestjs/common'
 import { describe, expect, it, vi } from 'vitest'
 import { PREMIUM_REQUIRED_MESSAGE } from '../../contracts/http.js'
 import { PremiumEntitlementGuard } from './premium-entitlement.guard.js'

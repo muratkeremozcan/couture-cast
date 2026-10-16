@@ -1,7 +1,11 @@
 import type { OpenAPIRegistry } from '@asteasolutions/zod-to-openapi'
 import { z } from 'zod'
-import { apiErrorSchema, isoTimestampSchema, nonEmptyStringSchema } from './common'
-import type { RegisteredCommonHttpSchemas } from './common'
+import {
+  apiErrorSchema,
+  isoTimestampSchema,
+  nonEmptyStringSchema,
+  type RegisteredCommonHttpSchemas,
+} from './common'
 
 // Story 0.9 Task 2 step 3 owner:
 // model the first non-trivial feature contract here, not just a health-check shape.

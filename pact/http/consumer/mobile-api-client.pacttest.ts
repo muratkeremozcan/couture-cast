@@ -14,8 +14,7 @@
 // See _bmad-output/project-knowledge/learning-path-step-by-step.md#step-32-wardrobe-onboarding-and-silhouette-setup
 // Learning path Step 33: Affiliate "Shop this look" CTA.
 // See _bmad-output/project-knowledge/learning-path-step-by-step.md#step-33-affiliate-shop-this-look-cta
-import type { V3MockServer } from '@pact-foundation/pact'
-import { PactV4 } from '@pact-foundation/pact'
+import { PactV4, type V3MockServer } from '@pact-foundation/pact'
 import path from 'node:path'
 import { describe, it } from 'vitest'
 import { createMobileApiClient } from '../../../apps/mobile/src/lib/api-client'

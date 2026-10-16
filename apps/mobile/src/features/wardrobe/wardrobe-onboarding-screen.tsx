@@ -6,8 +6,7 @@
 // src/features so it stays covered by the component test runner (see
 // wardrobe-silhouette-screen.tsx for why app/wardrobe-onboarding.tsx stays a
 // thin Stack.Screen wrapper instead).
-import { useCallback, useEffect, useRef, useState } from 'react'
-import type React from 'react'
+import { useCallback, useEffect, useRef, useState, type ElementRef } from 'react'
 import { useTranslation } from 'react-i18next'
 import { router } from 'expo-router'
 import {
@@ -71,8 +70,8 @@ export function WardrobeOnboardingScreen() {
   const userIdRef = useRef('')
   const revisionRef = useRef(0)
   const pollAbortRef = useRef<AbortController | null>(null)
-  const headingRef = useRef<React.ElementRef<typeof RNText> | null>(null)
-  const addGarmentButtonRef = useRef<React.ElementRef<typeof Pressable> | null>(null)
+  const headingRef = useRef<ElementRef<typeof RNText> | null>(null)
+  const addGarmentButtonRef = useRef<ElementRef<typeof Pressable> | null>(null)
 
   const load = useCallback(async () => {
     setIsLoading(true)

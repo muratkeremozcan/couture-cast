@@ -4,8 +4,8 @@ import {
   COMMERCE_SUBSCRIPTION_DISABLED_MESSAGE,
   SUBSCRIPTION_ALREADY_ACTIVE_MESSAGE,
   SUBSCRIPTION_NOT_FOUND_MESSAGE,
+  type Subscription,
 } from '@couture/api-client/contracts/http'
-import type { Subscription } from '@couture/api-client/contracts/http'
 import {
   ConflictException,
   NotFoundException,
