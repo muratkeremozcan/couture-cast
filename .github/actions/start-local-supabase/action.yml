@@ -64,10 +64,16 @@ runs:
         }
 
         export_supabase_environment() {
-          npx supabase status -o json | jq -r '
-            "SUPABASE_URL=\(.API_URL)",
-            "SUPABASE_ANON_KEY=\(.ANON_KEY)",
-            "SUPABASE_SERVICE_ROLE_KEY=\(.SERVICE_ROLE_KEY)"
+          # `supabase status` leaves a field out when the service behind it is
+          # excluded; a missing field must stop here, not reach $GITHUB_ENV as "null".
+          npx supabase status -o json | jq -er '
+            if (.API_URL and .ANON_KEY and .SERVICE_ROLE_KEY) then
+              "SUPABASE_URL=\(.API_URL)",
+              "SUPABASE_ANON_KEY=\(.ANON_KEY)",
+              "SUPABASE_SERVICE_ROLE_KEY=\(.SERVICE_ROLE_KEY)"
+            else
+              error("supabase status lacks API_URL, ANON_KEY or SERVICE_ROLE_KEY")
+            end
           ' >> "$GITHUB_ENV"
         }
 
