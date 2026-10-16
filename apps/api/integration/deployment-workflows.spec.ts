@@ -25,6 +25,7 @@ const manualE2eWorkflow = path.join(
   'pw-e2e-trigger.yml'
 )
 const prodE2eWorkflow = path.join(repoRoot, '.github', 'workflows', 'pw-e2e-prod.yml')
+const e2eReusableWorkflow = path.join(repoRoot, '.github', 'workflows', 'rwf-e2e.yml')
 const previewReadyCall = /uses: \.\/\.github\/workflows\/rwf-vercel-preview-ready\.yml/
 const mobileWorkflow = path.join(repoRoot, '.github', 'workflows', 'deploy-mobile.yml')
 const vercelConfig = path.join(repoRoot, 'apps', 'api', 'vercel.json')
@@ -47,23 +48,38 @@ describe('deployment workflows', () => {
     ).toHaveLength(2)
   })
 
-  it('manual preview e2e waits for both previews and can mint an OIDC token', () => {
+  it('manual preview e2e runs only after both previews serve the dispatched commit', () => {
     const content = fs.readFileSync(manualE2eWorkflow, 'utf8')
-    // rwf-e2e.yml requests id-token: write; a caller without it fails at startup.
-    expect(content).toMatch(/permissions:\s*\n\s*contents: read\s*\n\s*id-token: write/)
     expect(content).toMatch(previewReadyCall)
-    expect(content).toMatch(
-      /custom_api_base_url: \$\{\{ needs\.preview-ready\.outputs\.api_url \}\}/
-    )
+    // The ordering is the fix: tests used to start against still-building deployments.
+    expect(content).toMatch(/run-preview-tests:\s*\n\s*needs: preview-ready/)
+    expect(content).toMatch(/needs\.preview-ready\.outputs\.api_url/)
   })
 
-  it('prod e2e waits on public health endpoints only', () => {
+  it('e2e workflows request no OIDC token', () => {
+    // Nothing consumes one, and a reusable job that requests it fails at
+    // startup under any caller that does not grant it.
+    for (const workflow of [
+      e2eReusableWorkflow,
+      vercelPreviewSmokeWorkflow,
+      manualE2eWorkflow,
+      prodE2eWorkflow,
+    ]) {
+      expect(fs.readFileSync(workflow, 'utf8')).not.toMatch(/id-token:/)
+    }
+  })
+
+  it('prod e2e waits for web and API to serve the pushed commit', () => {
     const content = fs.readFileSync(prodE2eWorkflow, 'utf8')
     expect(content).toMatch(
-      /secondary_url: https:\/\/couture-cast-api\.vercel\.app\/api\/health/
+      /health_url: https:\/\/couture-cast-web\.vercel\.app\/api\/health/
     )
+    expect(content).toMatch(
+      /health_url: https:\/\/couture-cast-api\.vercel\.app\/api\/health/
+    )
+    expect(content).toMatch(/needs: \[wait-web, wait-api\]/)
     // /api/v1/events/poll needs a bearer token, so waiting for 200 on it never ends.
-    expect(content).not.toMatch(/secondary_url: \S*events\/poll/)
+    expect(content).not.toMatch(/_url: \S*events\/poll/)
   })
 
   it('mobile workflow exists and deploys manually with Expo token (Android-only)', () => {

@@ -1,6 +1,7 @@
 # Guardian invitation environment setup
 
-Updated: 2026-04-17 - documented the env and secret placement for Story 0.11 Task 3.
+Updated: 2026-10-16 - corrected the GitHub Actions placement and noted the unused web-project
+copies after the secret rotation.
 
 ## Purpose
 
@@ -122,8 +123,8 @@ Vercel value, because those jobs sign and verify invitations with the same local
 Preview and production Playwright runs (`rwf-e2e.yml`) test the deployed API, which reads its own
 Vercel value, so they do not receive this secret.
 
-Updated: 2026-10-16. The Vercel web project also held copies of this key; the web app never reads
-them. They were rotated with the rest on 2026-10-16 and can be removed.
+The Vercel web project also holds copies of this key that the web app never reads. They were
+rotated with the rest on 2026-10-16 and can be removed.
 
 ### Supabase
 

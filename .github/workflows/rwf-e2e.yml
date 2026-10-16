@@ -60,7 +60,6 @@ jobs:
       LOCAL_DATABASE_URL: postgresql://postgres:postgres@127.0.0.1:54322/postgres
     permissions:
       contents: read
-      id-token: write
     steps:
       - name: Checkout
         uses: actions/checkout@v4
@@ -94,11 +93,14 @@ jobs:
         shell: bash
         env:
           GH_TOKEN: ${{ github.token }}
+          # Inputs travel through env so a dispatched value cannot inject shell.
+          INPUT_GH_REF: ${{ inputs.gh_ref }}
+          INPUT_DEPLOYMENT_REF: ${{ inputs.deployment_ref }}
         run: |
           # deployment_ref might be a SHA, not a branch name
           # Query GitHub API to find which branch has this commit as HEAD
-          sha="${{ inputs.gh_ref }}"
-          deployment_ref="${{ inputs.deployment_ref }}"
+          sha="$INPUT_GH_REF"
+          deployment_ref="$INPUT_DEPLOYMENT_REF"
 
           branch_name=""
 
@@ -145,12 +147,15 @@ jobs:
           VERCEL_GIT_COMMIT_REF: ${{ steps.resolve_branch.outputs.branch }}
           # Enable debug logging for URL resolution scripts
           DEBUG: true
+          # Dispatch inputs travel through env so they cannot inject shell.
+          CUSTOM_BASE_URL: ${{ inputs.custom_base_url }}
+          CUSTOM_API_BASE_URL: ${{ inputs.custom_api_base_url }}
         run: |
           case "$TEST_ENV" in
             local) export DATABASE_URL="${LOCAL_DATABASE_URL}" ;;
             prod) export DATABASE_URL="${DATABASE_URL_PROD}" ;;
-            # Preview runs have no direct database access by design; helpers
-            # that need one skip. No preview database secret exists.
+            # Preview runs have no direct database access by design; specs that
+            # need one skip themselves. No preview database secret exists.
             preview) unset DATABASE_URL ;;
             *)
               echo "Unsupported TEST_ENV=$TEST_ENV. Expected local, preview, or prod."
@@ -162,12 +167,12 @@ jobs:
             echo "Warning: DATABASE_URL is empty for TEST_ENV=$TEST_ENV"
           fi
 
-          custom_base_url="${{ inputs.custom_base_url }}"
-          custom_api_base_url="${{ inputs.custom_api_base_url }}"
+          custom_base_url="$CUSTOM_BASE_URL"
+          custom_api_base_url="$CUSTOM_API_BASE_URL"
           # Callers can pin the exact URLs they already resolved and waited for.
           # That is stronger than letting the test command rediscover previews on its own.
           if [ -n "$custom_base_url" ]; then
-            case "${{ inputs.test_env }}" in
+            case "$TEST_ENV" in
               local) export WEB_E2E_BASE_URL="$custom_base_url" ;;
               preview)
                 export PREVIEW_WEB_E2E_BASE_URL="$custom_base_url"
@@ -177,7 +182,7 @@ jobs:
           fi
 
           if [ -n "$custom_api_base_url" ]; then
-            case "${{ inputs.test_env }}" in
+            case "$TEST_ENV" in
               local) export API_BASE_URL="$custom_api_base_url" ;;
               preview)
                 export PREVIEW_API_BASE_URL="$custom_api_base_url"
@@ -186,7 +191,7 @@ jobs:
                 ;;
               prod) export PROD_API_BASE_URL="$custom_api_base_url" ;;
             esac
-          elif [ "${{ inputs.test_env }}" = "preview" ] && [ -z "$PREVIEW_API_BASE_URL" ] && [ -z "$VERCEL_API_BASE_URL" ]; then
+          elif [ "$TEST_ENV" = "preview" ] && [ -z "$PREVIEW_API_BASE_URL" ] && [ -z "$VERCEL_API_BASE_URL" ]; then
             # Fallback path: if the caller did not pin an API preview URL, resolve one
             # here so preview tests still have an API origin to target.
             echo "Resolving API URL via Vercel REST API..."
@@ -211,7 +216,8 @@ jobs:
         env:
           VERCEL_AUTOMATION_BYPASS_SECRET: ${{ secrets.VERCEL_AUTOMATION_BYPASS_SECRET }}
           VERCEL_TOKEN: ${{ secrets.VERCEL_TOKEN }}
-          DATABASE_URL_PROD: ${{ secrets.DATABASE_URL_PROD }}
+          # Same scoping as the run step: preview never holds the prod credential.
+          DATABASE_URL_PROD: ${{ inputs.test_env == 'prod' && secrets.DATABASE_URL_PROD || '' }}
           GH_TOKEN: ${{ github.token }}
         run: >-
           node scripts/check-artifact-secrets.mjs

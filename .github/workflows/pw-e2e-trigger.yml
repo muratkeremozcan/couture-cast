@@ -15,12 +15,13 @@ on:
         description: "Custom base URL (optional override)"
         type: string
         required: false
+      custom_api_base_url:
+        description: "Custom API base URL (optional override)"
+        type: string
+        required: false
 
-# rwf-e2e.yml requests id-token: write, and a caller that does not grant it
-# fails at startup before any job runs.
 permissions:
   contents: read
-  id-token: write
 
 # if this workflow is triggered back to back, cancel the older run, but allow different test environments to run parallel
 concurrency:
@@ -30,8 +31,9 @@ concurrency:
 jobs:
   preview-ready:
     # Without this wait a run dispatched right after a push pins deployments
-    # that are still building and tests Vercel's placeholder pages.
-    if: inputs.test_env == 'preview'
+    # that are still building and tests Vercel's placeholder pages. A custom
+    # web URL names its own target, so the branch previews are not awaited.
+    if: inputs.test_env == 'preview' && inputs.custom_base_url == ''
     uses: ./.github/workflows/rwf-vercel-preview-ready.yml
     with:
       git_ref: ${{ github.ref_name }}
@@ -40,6 +42,9 @@ jobs:
 
   run-preview-tests:
     needs: preview-ready
+    if: >-
+      always() && inputs.test_env == 'preview' &&
+      contains(fromJSON('["success","skipped"]'), needs.preview-ready.result)
     uses: ./.github/workflows/rwf-e2e.yml
     with:
       test_env: ${{ inputs.test_env }}
@@ -47,7 +52,7 @@ jobs:
       gh_ref: ${{ github.sha }}
       deployment_ref: ${{ github.ref_name }}
       custom_base_url: ${{ inputs.custom_base_url || needs.preview-ready.outputs.web_url }}
-      custom_api_base_url: ${{ needs.preview-ready.outputs.api_url }}
+      custom_api_base_url: ${{ inputs.custom_api_base_url || needs.preview-ready.outputs.api_url }}
     secrets: inherit
 
   run-prod-tests:
@@ -56,6 +61,7 @@ jobs:
     with:
       test_env: ${{ inputs.test_env }}
       test_command: "npm run test:pw-prod"
-      gh_ref: ${{ github.ref_name }}
+      gh_ref: ${{ github.sha }}
       custom_base_url: ${{ inputs.custom_base_url }}
+      custom_api_base_url: ${{ inputs.custom_api_base_url }}
     secrets: inherit

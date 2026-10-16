@@ -1,6 +1,6 @@
 # Secrets management
 
-Updated: 2026-03-27 - replaced third-party secret-manager plan with the existing `.env` and GitHub/provider secret workflow.
+Updated: 2026-10-16 - linked the secret rotation runbook.
 
 ## Decision
 
