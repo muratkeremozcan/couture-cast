@@ -107,15 +107,15 @@
     "supabase:stop": "supabase stop"
   },
   "devDependencies": {
-    "@axe-core/playwright": "^4.12.1",
+    "@axe-core/playwright": "^4.14.0",
     "@couture/eslint-config": "workspace:*",
     "@faker-js/faker": "10.1.0",
     "@lhci/cli": "0.15.1",
     "@openapitools/openapi-generator-cli": "2.31.0",
     "@pact-foundation/pact": "16.4.0",
-    "@playwright/test": "1.58.2",
+    "@playwright/test": "1.64.1",
     "@seontechnologies/pactjs-utils": "1.1.0",
-    "@seontechnologies/playwright-utils": "3.14.0",
+    "@seontechnologies/playwright-utils": "4.4.1",
     "@supabase/supabase-js": "^2.112.0",
     "@types/k6": "2.0.0",
     "@types/lodash.merge": "4.6.9",

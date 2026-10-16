@@ -658,7 +658,14 @@ describe('WardrobeOnboardingPage', () => {
     await captureAndCommitGarment(user)
     await user.click(await screen.findByRole('button', { name: 'Done' }))
 
-    await screen.findByRole('button', { name: 'Garment 1: needs tags' })
+    // A garment that reaches `awaiting_tags` opens its tagging dialog on its
+    // own, and an open dialog hides the page behind it from role queries. The
+    // row is asserted with `hidden: true` so the test does not depend on
+    // catching it in the frame before the dialog opens.
+    await screen.findByRole('button', { name: 'Garment 1: needs tags', hidden: true })
+    expect(
+      await screen.findByRole('dialog', { name: 'Organize Garment Tags' })
+    ).toBeInTheDocument()
   })
 
   it('offers a manual recheck once every scheduled poll attempt still reports processing', async () => {

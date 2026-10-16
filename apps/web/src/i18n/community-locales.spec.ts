@@ -206,4 +206,20 @@ describe('6.1 community locale parity', () => {
       ).toEqual(expected)
     }
   })
+
+  it('6.1-I18N-WEB-09 names the card open button with its visible pill text', () => {
+    // WCAG 2.5.3 Label in Name: the button's aria-label (`openLabel`) must contain
+    // the text the pill shows (`open`), or a speech-input user who says what they
+    // see reaches nothing. axe enforces it as `label-content-name-mismatch`.
+    for (const locale of SUPPORTED_LOCALES) {
+      const card = (CATALOGS[locale].community as Catalog).card as {
+        open: string
+        openLabel: string
+      }
+      expect(
+        card.openLabel.toLocaleLowerCase(locale),
+        `${locale} openLabel contains "${card.open}"`
+      ).toContain(card.open.toLocaleLowerCase(locale))
+    }
+  })
 })
