@@ -126,6 +126,27 @@ function getGitBranchAliasUrl(deployment) {
     : `https://${gitBranchAlias}`
 }
 
+/**
+ * List deployments, polling while an explicit EXPECTED_SHA has no deployment yet.
+ * Right after a push Vercel may not list it, and the caller waits for that exact
+ * commit, so settling early for the branch alias only moves the wait elsewhere.
+ */
+async function listDeploymentsAwaitingSha(url, expectedSha, matchesSha) {
+  const timeoutMs = env('EXPECTED_SHA')
+    ? Number(env('RESOLVE_SHA_TIMEOUT_SECONDS') ?? 600) * 1000
+    : 0
+  const intervalMs = Number(env('RESOLVE_SHA_INTERVAL_SECONDS') ?? 15) * 1000
+  const deadline = Date.now() + timeoutMs
+  for (;;) {
+    const result = await fetchJson(url)
+    const deployments = result?.deployments ?? []
+    if (!expectedSha || deployments.some(matchesSha)) return deployments
+    if (Date.now() + intervalMs > deadline) return deployments
+    logDebug(`No API deployment for SHA ${expectedSha.slice(0, 7)} yet; checking again`)
+    await new Promise((resolve) => setTimeout(resolve, intervalMs))
+  }
+}
+
 async function findDeploymentUrl(projectId, teamId, branch) {
   const searchParams = new URLSearchParams({
     projectId,
@@ -135,24 +156,22 @@ async function findDeploymentUrl(projectId, teamId, branch) {
   const branchSlug = slugifyBranch(branch)
   if (branch) searchParams.set('meta', `githubCommitRef=${branch}`)
   const url = `https://api.vercel.com/v6/deployments?${searchParams.toString()}`
-  const result = await fetchJson(url)
-  const deployments = result?.deployments ?? []
   const expectedSha =
     env('EXPECTED_SHA') ??
     env('GITHUB_SHA') ??
     env('VERCEL_GIT_COMMIT_SHA') ??
     env('COMMIT_SHA')
+  const matchesSha = (deployment) => {
+    const deploymentSha = deployment?.meta?.githubCommitSha
+    return typeof deploymentSha === 'string' && deploymentSha.startsWith(expectedSha)
+  }
+
+  const deployments = await listDeploymentsAwaitingSha(url, expectedSha, matchesSha)
+
   // Commit matching is the critical safeguard for preview E2E: after a PR push,
   // the newest READY deployment on a branch is not always the one Playwright should test.
   const matchingDeployments =
-    expectedSha === undefined
-      ? deployments
-      : deployments.filter((deployment) => {
-          const deploymentSha = deployment?.meta?.githubCommitSha
-          return (
-            typeof deploymentSha === 'string' && deploymentSha.startsWith(expectedSha)
-          )
-        })
+    expectedSha === undefined ? deployments : deployments.filter(matchesSha)
 
   if (expectedSha && matchingDeployments.length > 0) {
     logDebug(
