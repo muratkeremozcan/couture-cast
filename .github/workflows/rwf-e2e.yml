@@ -128,7 +128,8 @@ jobs:
         shell: bash
         env:
           TEST_ENV: ${{ inputs.test_env }}
-          DATABASE_URL_PROD: ${{ secrets.DATABASE_URL_PROD }}
+          # Prod only: preview runs execute PR code and must not hold the prod credential.
+          DATABASE_URL_PROD: ${{ inputs.test_env == 'prod' && secrets.DATABASE_URL_PROD || '' }}
           EXPECTED_SHA: ${{ steps.expected_sha.outputs.sha }}
           GITHUB_SHA: ${{ steps.expected_sha.outputs.sha }}
           GH_TOKEN: ${{ github.token }}

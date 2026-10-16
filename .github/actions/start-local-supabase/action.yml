@@ -10,6 +10,15 @@ inputs:
     description: Base delay in seconds used for linear backoff between attempts
     required: false
     default: '20'
+  exclude:
+    description: >-
+      Comma-separated containers not to start. CI pulls every image from a registry
+      that rate-limits anonymous data ("toomanyrequests: Data limit exceeded"), so
+      services no test uses are skipped: the dashboard and its metadata API, log
+      shipping, edge functions, the pooler, mail capture, and image transforms
+      (disabled in supabase/config.toml).
+    required: false
+    default: 'studio,postgres-meta,logflare,vector,edge-runtime,supavisor,mailpit,imgproxy'
 
 runs:
   using: composite
@@ -21,6 +30,7 @@ runs:
 
         max_attempts='${{ inputs.max-attempts }}'
         base_delay='${{ inputs.base-delay-seconds }}'
+        exclude='${{ inputs.exclude }}'
         attempt=1
 
         diagnose_db_port() {
@@ -44,7 +54,7 @@ runs:
         while [ "$attempt" -le "$max_attempts" ]; do
           echo "::group::Start local Supabase (attempt ${attempt}/${max_attempts})"
 
-          if npx supabase start; then
+          if npx supabase start ${exclude:+--exclude "$exclude"}; then
             echo "Supabase services started successfully."
             npx supabase status || true
             export_supabase_environment
