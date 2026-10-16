@@ -48,4 +48,7 @@ regexes = [
   # between runs and reports as UNSTABLE.
   '''^8c1f2a6d-3b45-4e7a-9c02-1d5e6f708a91$''',
   '''^b47ac10b-58cc-4372-a567-0e02b2c3d479$''',
+  # Dummy secret the artifact secret guard's unit tests plant in fixture
+  # artifacts to prove the guard finds it (artifact-secret-guard.spec.ts).
+  '''^dummy-jwt-secret-0123456789abcdef$''',
 ]
