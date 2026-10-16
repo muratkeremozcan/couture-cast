@@ -36,13 +36,16 @@ export const MIN_SECRET_LENGTH = 8
 /** Real artifacts nest two or three archives deep; this only bounds a hostile file. */
 const MAX_DEPTH = 8
 
-/** Shorter base64 runs are ordinary identifiers and hashes, never an archive. */
-const MIN_EMBEDDED_BASE64_LENGTH = 64
+/** The shortest base64 run decoded and rescanned: 18 bytes, a minimal gzip member. */
+const MIN_EMBEDDED_BASE64_LENGTH = 24
+
+/** A zip's end-of-central-directory record sits within this many trailing bytes. */
+const EOCD_SEARCH_WINDOW = 22 + 0xffff
 
 const ZIP_MAGIC = Buffer.from([0x50, 0x4b, 0x03, 0x04])
 const EMPTY_ZIP_MAGIC = Buffer.from([0x50, 0x4b, 0x05, 0x06])
 const GZIP_MAGIC = Buffer.from([0x1f, 0x8b])
-const BASE64_RUN = /[A-Za-z0-9+/_-]{64,}={0,2}/g
+const BASE64_RUN = /[A-Za-z0-9+/_-]{24,}={0,2}/g
 
 function startsWith(buffer, magic) {
   return buffer.length >= magic.length && buffer.subarray(0, magic.length).equals(magic)
@@ -172,35 +175,56 @@ function zipEntries(buffer) {
   return names.map((name) => entries[name])
 }
 
-function isContainer(buffer) {
-  return (
-    startsWith(buffer, ZIP_MAGIC) ||
-    startsWith(buffer, EMPTY_ZIP_MAGIC) ||
-    startsWith(buffer, GZIP_MAGIC)
-  )
+/**
+ * `gzip` and `zip` are certain from the first bytes, so failing to open them fails
+ * the scan. `zip-suffix` is a zip found only by its trailing directory record, as
+ * with a preamble before the first entry; random binary can contain that record by
+ * chance, so a `zip-suffix` that does not open is scanned as plain bytes.
+ */
+function containerKind(buffer) {
+  if (startsWith(buffer, GZIP_MAGIC)) return 'gzip'
+  if (startsWith(buffer, ZIP_MAGIC) || startsWith(buffer, EMPTY_ZIP_MAGIC)) return 'zip'
+  const tail = buffer.subarray(Math.max(0, buffer.length - EOCD_SEARCH_WINDOW))
+  return tail.includes(EMPTY_ZIP_MAGIC) ? 'zip-suffix' : undefined
 }
 
 /** Short and opaque on purpose: entry names come from inside the artifact. */
 function entryLabel(index, buffer) {
-  if (startsWith(buffer, GZIP_MAGIC)) return `#${index}(gzip)`
-  return isContainer(buffer) ? `#${index}(zip)` : `#${index}`
+  const kind = containerKind(buffer)
+  return kind ? `#${index}(${kind === 'gzip' ? 'gzip' : 'zip'})` : `#${index}`
+}
+
+/**
+ * A zip behind a preamble either has offsets that count the preamble (what
+ * appending to a file produces) or offsets relative to its first entry (what
+ * concatenating produces). The first opens as is; the second opens from the first
+ * local header.
+ */
+function zipEntriesAfterPreamble(buffer) {
+  try {
+    return zipEntries(buffer)
+  } catch (error) {
+    const start = buffer.indexOf(ZIP_MAGIC)
+    if (start <= 0) throw error
+    return zipEntries(buffer.subarray(start))
+  }
 }
 
 /** The layers inside an archive. Throws when the archive cannot be read. */
-function archiveChildren(buffer) {
-  if (startsWith(buffer, GZIP_MAGIC))
-    return [{ label: 'gunzip', data: zlib.gunzipSync(buffer) }]
-  return zipEntries(buffer).map((entry, index) => {
+function archiveChildren(buffer, kind) {
+  if (kind === 'gzip') return [{ label: 'gunzip', data: zlib.gunzipSync(buffer) }]
+  const entries = kind === 'zip' ? zipEntries(buffer) : zipEntriesAfterPreamble(buffer)
+  return entries.map((entry, index) => {
     const data = Buffer.from(entry)
     return { label: `entry${entryLabel(index + 1, data)}`, data }
   })
 }
 
 /**
- * Searches the alternate spellings of a text layer, then returns any archive it
- * carries as base64: the HTML report's embedded data, or an inline zip attachment
- * inside a JSON line. Anything else that decodes is already covered by the base64
- * needles.
+ * Searches the alternate spellings of a text layer, then returns every base64 run
+ * it carries, decoded, as a layer of its own: the HTML report's embedded zip, an
+ * attachment body inside a JSON line, or anything else. A decoded layer gets the
+ * full treatment, so an escaped value inside an attachment is still found.
  */
 function textChildren(buffer, location, secrets, state) {
   const text = buffer.toString('latin1')
@@ -228,31 +252,29 @@ function textChildren(buffer, location, secrets, state) {
     if (candidate.length < MIN_EMBEDDED_BASE64_LENGTH) continue
     for (const match of candidate.matchAll(BASE64_RUN)) runs.add(match[0])
   }
-  const children = []
-  for (const run of runs) {
-    const decoded = Buffer.from(run.replace(/-/g, '+').replace(/_/g, '/'), 'base64')
-    if (isContainer(decoded)) {
-      children.push({ label: `base64#${children.length + 1}`, data: decoded })
-    }
-  }
-  return children
+  return [...runs].map((run, index) => ({
+    label: `base64#${index + 1}`,
+    data: Buffer.from(run.replace(/-/g, '+').replace(/_/g, '/'), 'base64'),
+  }))
 }
 
 function scanBuffer(buffer, location, secrets, state, depth) {
   state.layers += 1
   searchLayer(buffer, location, secrets, state.findings)
 
+  const kind = containerKind(buffer)
   let children
-  if (isContainer(buffer)) {
+  if (kind) {
     try {
-      children = archiveChildren(buffer)
+      children = archiveChildren(buffer, kind)
     } catch (error) {
-      state.unreadable.push({ location, reason: error.message })
-      return
+      if (kind !== 'zip-suffix') {
+        state.unreadable.push({ location, reason: error.message })
+        return
+      }
     }
-  } else {
-    children = textChildren(buffer, location, secrets, state)
   }
+  children ??= textChildren(buffer, location, secrets, state)
 
   if (children.length > 0 && depth >= MAX_DEPTH) {
     state.unreadable.push({ location, reason: `nested deeper than ${MAX_DEPTH} levels` })
@@ -295,8 +317,15 @@ export function scanPaths(targets, secrets) {
     if (!collectFiles(target, files, seen)) missing.push(target)
   }
   const state = { findings: [], unreadable: [], layers: 0 }
-  for (const file of files) {
-    scanBuffer(fs.readFileSync(file), file, secrets, state, 0)
+  for (const [index, file] of files.entries()) {
+    // The name is uploaded too. One that carries a value is never printed: every
+    // finding for that file is reported under its position instead.
+    const nameHits = []
+    searchLayer(Buffer.from(file), 'name', secrets, nameHits)
+    const location = nameHits.length > 0 ? `file #${index + 1} of this scan` : file
+    for (const hit of nameHits)
+      state.findings.push({ ...hit, location: `${location}(name)` })
+    scanBuffer(fs.readFileSync(file), location, secrets, state, 0)
   }
   return { files: files.length, missing, ...state }
 }

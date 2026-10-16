@@ -8,6 +8,7 @@
  * nested inside it, and the HTML report's index.html with its data embedded as a
  * base64 zip.
  */
+import { randomBytes } from 'node:crypto'
 import fs from 'node:fs'
 import os from 'node:os'
 import path from 'node:path'
@@ -135,9 +136,12 @@ describe('check-artifact-secrets', () => {
       const attachment = Buffer.from(`${prefix}${DUMMY_SECRET}suffix`).toString('base64')
       write('blob-report/report.jsonl', JSON.stringify({ body: attachment }))
 
-      const findings = scan(['DUMMY_SECRET']).findings
-      expect(findings).toHaveLength(1)
-      expect(findings[0]?.encoding).toBe('base64 of raw')
+      const file = path.join(workDir, 'blob-report/report.jsonl')
+      expect(scan(['DUMMY_SECRET']).findings).toContainEqual({
+        location: file,
+        name: 'DUMMY_SECRET',
+        encoding: 'base64 of raw',
+      })
     }
   )
 
@@ -231,6 +235,59 @@ describe('check-artifact-secrets', () => {
     expect(result.findings).toEqual([])
     expect(result.unreadable).toHaveLength(1)
     expect(result.unreadable[0]?.reason).toMatch(/nested deeper than/)
+  })
+
+  it('decodes a base64 attachment body and searches its escaped forms', () => {
+    const escaped = [...DUMMY_SECRET]
+      .map((character) => `\\u${character.charCodeAt(0).toString(16).padStart(4, '0')}`)
+      .join('')
+    const body = Buffer.from(`{"token":"${escaped}"}`).toString('base64')
+    write('blob-report/report.jsonl', JSON.stringify({ method: 'onAttach', body }))
+
+    expect(scan(['DUMMY_SECRET']).findings.map((finding) => finding.encoding)).toEqual([
+      'raw',
+    ])
+  })
+
+  it('opens a base64 gzip payload shorter than any archive threshold', () => {
+    const shortValue = 'dummy-0042'
+    const payload = zlib.gzipSync(Buffer.from(shortValue)).toString('base64')
+    expect(payload.length).toBeLessThan(64)
+    write('blob-report/report.jsonl', JSON.stringify({ body: payload }))
+
+    const { secrets } = resolveSecrets(['SHORT_DUMMY'], { SHORT_DUMMY: shortValue })
+    expect(scanPaths([workDir], secrets).findings).toHaveLength(1)
+  })
+
+  it('opens a zip that carries a preamble before its first entry', () => {
+    const zip = zipSync({ 'report.json': strToU8(JSON.stringify({ key: DUMMY_SECRET })) })
+    const file = write(
+      'blob-report/report-1.zip',
+      Buffer.concat([Buffer.from('#!/bin/sh preamble\n'), Buffer.from(zip)])
+    )
+
+    expect(scan(['DUMMY_SECRET']).findings).toEqual([
+      { location: `${file}!entry#1`, name: 'DUMMY_SECRET', encoding: 'raw' },
+    ])
+  })
+
+  it('treats a stray directory signature in binary data as plain bytes', () => {
+    write(
+      'artifacts/video.webm',
+      Buffer.concat([randomBytes(512), Buffer.from('PK\x05\x06')])
+    )
+
+    const result = scan(['DUMMY_SECRET'])
+    expect(result.unreadable).toEqual([])
+    expect(result.findings).toEqual([])
+  })
+
+  it('finds a value in a file name and reports that file by position', () => {
+    write(`artifacts/${DUMMY_SECRET}.txt`, 'clean contents')
+
+    expect(scan(['DUMMY_SECRET']).findings).toEqual([
+      { location: 'file #1 of this scan(name)', name: 'DUMMY_SECRET', encoding: 'raw' },
+    ])
   })
 
   it('reports missing targets and tolerates them', () => {
