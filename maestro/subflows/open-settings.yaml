@@ -16,9 +16,17 @@
 # same tab bar as the sibling `open-wardrobe-tab.yaml`.
 appId: ${MAESTRO_APP_ID}
 ---
+# Counts attempts so only a retry relaunches the app; see relaunch-app.yaml.
+- evalScript: ${output.settingsTabAttempt = 0}
 - retry:
     maxRetries: 3
     commands:
+      - evalScript: ${output.settingsTabAttempt = output.settingsTabAttempt + 1}
+      - runFlow:
+          when:
+            true: ${output.settingsTabAttempt > 1}
+          file: relaunch-app.yaml
+          label: 'A tab tap was swallowed; relaunch the app before trying again'
       - runFlow: absorb-expo-dev-sheet.yaml
       # Pop a pushed route first. The tab bar is not reachable from the capsule
       # library or the silhouette editor, and a caller can arrive here with one

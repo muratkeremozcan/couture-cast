@@ -1,0 +1,18 @@
+# Restart the app in Expo Go without clearing its state, then mount it again.
+#
+# Recovery for a developer sheet that never finishes rendering. In CI runs
+# 38934394685 and 38959860317 Expo Go dimmed the whole screen for its developer
+# sheet, but the sheet itself never drew: no Continue, no menu text, nothing in
+# the hierarchy for `subflows/absorb-expo-dev-sheet.yaml` to act on, and every
+# tab tap was swallowed for the rest of the flow. A fresh launch raises the
+# sheet again, and `subflows/open-app.yaml` waits for it and closes it.
+#
+# `clearState: false` keeps the signed-in session and everything the flow has
+# already set up; the caller only loses its in-memory screen, which it is about
+# to navigate away from anyway.
+appId: ${MAESTRO_APP_ID}
+---
+- launchApp:
+    clearState: false
+    stopApp: true
+- runFlow: open-app.yaml

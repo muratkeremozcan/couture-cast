@@ -17,9 +17,17 @@
 # specifically exercising tab navigation.
 appId: ${MAESTRO_APP_ID}
 ---
+# Counts attempts so only a retry relaunches the app; see relaunch-app.yaml.
+- evalScript: ${output.wardrobeTabAttempt = 0}
 - retry:
     maxRetries: 3
     commands:
+      - evalScript: ${output.wardrobeTabAttempt = output.wardrobeTabAttempt + 1}
+      - runFlow:
+          when:
+            true: ${output.wardrobeTabAttempt > 1}
+          file: relaunch-app.yaml
+          label: 'A tab tap was swallowed; relaunch the app before trying again'
       - runFlow: absorb-expo-dev-sheet.yaml
       - tapOn:
           id: 'tab-wardrobe'
