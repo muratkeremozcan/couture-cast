@@ -10,6 +10,13 @@
  * total, with the per-command breakdown. Its own statistics reads are
  * subtracted.
  *
+ * Story 6.2b peer review (CX6): an idle window with no worker connected costs
+ * almost nothing and would understate the budget. The worker is identified by
+ * the name the container gives itself (its baked commit), CLIENT LIST is sampled
+ * through the whole window, and the report records every sample; the readiness
+ * gate rejects an idle product whose worker was not connected throughout. The
+ * samples' own CLIENT LIST calls are subtracted like the statistics reads.
+ *
  * `--canary-runs <n>` measures traffic instead: it runs the local canary n times
  * and reports the commands one screened post costs, with the idle rate from
  * `--idle-baseline <file>` subtracted for the time the runs took. The canary's
@@ -17,13 +24,14 @@
  * figure is an upper bound on what a member's post costs.
  *
  * Usage:
- *   node scripts/measure-community-worker-redis.mjs [--minutes 10] [--redis-url redis://localhost:6379]
+ *   node scripts/measure-community-worker-redis.mjs [--minutes 10] [--redis-url redis://localhost:6379] [--container cc-community-worker]
  *   node scripts/measure-community-worker-redis.mjs --canary-runs 5 --idle-baseline <redis-idle.json>
  */
 import fs from 'node:fs'
 import { execFileSync } from 'node:child_process'
 import path from 'node:path'
 import { fileURLToPath } from 'node:url'
+import { workerNameFor } from './community-screening-canary.mjs'
 import { inputSetHash } from './lib/community-screening-input-set.mjs'
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url))
@@ -31,6 +39,8 @@ const projectRoot = path.resolve(__dirname, '..')
 
 const UPSTASH_FREE_MONTHLY_COMMANDS = 500_000
 const HOURS_PER_MONTH = 730
+/** How often the worker's connection is checked during the idle window. */
+export const PRESENCE_SAMPLE_INTERVAL_MS = 15_000
 
 function parseArgs(argv) {
   const options = {
@@ -38,9 +48,11 @@ function parseArgs(argv) {
     redisUrl: process.env.REDIS_URL || 'redis://localhost:6379',
     canaryRuns: 0,
     idleBaseline: null,
+    container: 'cc-community-worker',
   }
   for (let index = 0; index < argv.length; index += 1) {
     if (argv[index] === '--minutes') options.minutes = Number(argv[++index])
+    else if (argv[index] === '--container') options.container = argv[++index]
     else if (argv[index] === '--canary-runs') options.canaryRuns = Number(argv[++index])
     else if (argv[index] === '--idle-baseline') options.idleBaseline = argv[++index]
     else if (argv[index] === '--redis-url') options.redisUrl = argv[++index]
@@ -51,6 +63,61 @@ function parseArgs(argv) {
     throw new Error('--canary-runs must be a non-negative integer')
   }
   return options
+}
+
+/**
+ * The ids of the named worker's connections in a CLIENT LIST reply. BullMQ names
+ * a worker's connection `<prefix>:<base64 queue>:w:<worker name>`.
+ */
+export function workerClientIds(clientList, workerName) {
+  return clientList
+    .split('\n')
+    .map((line) => line.trim())
+    .filter(Boolean)
+    .map((line) =>
+      Object.fromEntries(line.split(' ').map((pair) => pair.split(/=(.*)/s)))
+    )
+    .filter((client) => client.name?.endsWith(`:w:${workerName}`))
+    .map((client) => client.id)
+}
+
+/** Whether the worker was connected at every sample, and what was seen. */
+export function summarizeWorkerPresence(workerName, samples) {
+  const connected = samples.filter((sample) => sample.clientIds.length > 0)
+  return {
+    name: workerName,
+    sampleIntervalSeconds: PRESENCE_SAMPLE_INTERVAL_MS / 1000,
+    samples: samples.length,
+    connectedSamples: connected.length,
+    connectedThroughout: samples.length >= 2 && connected.length === samples.length,
+    firstSampleAt: samples[0]?.at ?? null,
+    lastSampleAt: samples.at(-1)?.at ?? null,
+    clientIds: [...new Set(samples.flatMap((sample) => sample.clientIds))],
+  }
+}
+
+/** The worker the container runs, named from its baked commit. */
+function containerWorker(container) {
+  const env = Object.fromEntries(
+    JSON.parse(
+      execFileSync('docker', ['inspect', container, '--format', '{{json .Config.Env}}'], {
+        encoding: 'utf8',
+        stdio: ['ignore', 'pipe', 'pipe'],
+      })
+    ).map((line) => line.split(/=(.*)/s).slice(0, 2))
+  )
+  const commitSha = env.COMMUNITY_WORKER_COMMIT_SHA?.trim()
+  if (!commitSha || commitSha === 'unset') {
+    throw new Error(
+      `${container} has no baked COMMUNITY_WORKER_COMMIT_SHA to name its worker`
+    )
+  }
+  return {
+    container,
+    commitSha,
+    name: workerNameFor(commitSha),
+    containerInputSetHash: env.COMMUNITY_WORKER_INPUT_SET_HASH ?? null,
+  }
 }
 
 export function parseCommandStats(info) {
@@ -122,17 +189,37 @@ async function main() {
     console.log(JSON.stringify(report, null, 2))
     return
   }
+  const worker = containerWorker(options.container)
   const clients = (await redis.client('LIST')).trim().split('\n').length - 1
   await redis.config('RESETSTAT')
   const startedAt = Date.now()
-  await new Promise((resolve) => setTimeout(resolve, options.minutes * 60_000))
+  const windowEnd = startedAt + options.minutes * 60_000
+  const samples = []
+  const sample = async () => {
+    const clientIds = workerClientIds(await redis.client('LIST'), worker.name)
+    samples.push({ at: new Date().toISOString(), clientIds })
+  }
+  await sample()
+  while (Date.now() < windowEnd) {
+    const wait = Math.min(PRESENCE_SAMPLE_INTERVAL_MS, windowEnd - Date.now())
+    await new Promise((resolve) => setTimeout(resolve, wait))
+    await sample()
+  }
   const stats = parseCommandStats(await redis.info('commandstats'))
   await redis.quit()
   const elapsedHours = (Date.now() - startedAt) / 3_600_000
 
-  // This script issued one INFO and one CONFIG RESETSTAT; neither is the worker's.
+  // This script issued one INFO, one CONFIG RESETSTAT and one CLIENT LIST per
+  // presence sample; none of them is the worker's.
   if (stats.info) stats.info -= 1
+  if (stats['client|list']) stats['client|list'] -= samples.length
   delete stats['config|resetstat']
+  const presence = summarizeWorkerPresence(worker.name, samples)
+  if (!presence.connectedThroughout) {
+    throw new Error(
+      `${worker.name} was connected at ${presence.connectedSamples} of ${presence.samples} samples; an idle window without the worker measures nothing.`
+    )
+  }
   const total = Object.values(stats).reduce((sum, calls) => sum + calls, 0)
   const perHour = total / elapsedHours
   const perMonth = perHour * HOURS_PER_MONTH
@@ -141,6 +228,13 @@ async function main() {
     inputSetHash: inputSetHash(),
     windowMinutes: options.minutes,
     otherClientsAtStart: clients,
+    worker: {
+      ...presence,
+      container: worker.container,
+      commitSha: worker.commitSha,
+      containerInputSetHash: worker.containerInputSetHash,
+    },
+    presenceSamples: samples,
     commands: total,
     commandsPerHour: Math.round(perHour),
     commandsPerDay: Math.round(perHour * 24),

@@ -33,6 +33,8 @@
  *   Hosted runs verify the database's TLS certificate (verify-full) against the
  *   Supabase CA: pass --db-ca <path to prod-ca-2021.crt> or set DATABASE_CA_CERT_PATH,
  *   and require exactly one consumer named for --expect-sha (default: HEAD).
+ *   A local run given --expect-sha requires the job to be processed by the worker
+ *   named for it.
  *   Options: --timeout-ms <n> (default 120000), --json-out <path>, --keep,
  *            --fixture max (a generated 4096x4096 JPEG, the largest accepted upload),
  *            --no-worker-precheck (restart drill: enqueue while the worker is down,
@@ -138,6 +140,10 @@ export function parseCanaryArgs(argv) {
     }
   }
   validateCanaryOptions(options)
+  // A hosted run always proves which build consumed its job. A local run does
+  // when it is told which build to expect, which is how the container memory
+  // measurement proves the container it reads processed the upload.
+  options.requireProcessedBy = options.target === 'hosted' || options.expectSha !== null
   return options
 }
 
@@ -406,20 +412,58 @@ function canaryIdentifiers() {
   }
 }
 
-async function openClients(databaseHost, options) {
+/**
+ * The connection string with every libpq SSL parameter removed. pg parses the
+ * connection string after it receives the explicit `ssl` object, and any of these
+ * replaces it: `sslmode=require` drops the CA, `sslmode=no-verify` turns
+ * verification off and `sslmode=disable` turns TLS off. The deployment guide keeps
+ * Supabase's `sslmode=require` in DATABASE_URL, so a hosted canary would
+ * otherwise never verify the certificate it claims to.
+ */
+export function withoutSslParameters(databaseUrl) {
+  const url = new URL(databaseUrl)
+  for (const key of [...url.searchParams.keys()]) {
+    if (key.toLowerCase().startsWith('ssl')) url.searchParams.delete(key)
+  }
+  return url.toString()
+}
+
+/**
+ * The PostgreSQL client for a target. A hosted client verifies the server
+ * certificate against the Supabase CA and the host name (verify-full), and the
+ * effective configuration pg resolved is checked before anything connects.
+ */
+export function createDatabaseClient(pg, { target, databaseUrl, ca }) {
+  if (target !== 'hosted') return new pg.Client({ connectionString: databaseUrl })
+  const client = new pg.Client({
+    connectionString: withoutSslParameters(databaseUrl),
+    ssl: { ca, rejectUnauthorized: true },
+  })
+  const effective = client.connectionParameters?.ssl
+  if (
+    typeof effective !== 'object' ||
+    effective === null ||
+    effective.rejectUnauthorized !== true ||
+    effective.ca !== ca
+  ) {
+    throw new CanaryFailure(
+      'configuration',
+      'The hosted database connection would not verify the server certificate against the Supabase CA.'
+    )
+  }
+  return client
+}
+
+async function openClients(options) {
   const { supabaseUrl, serviceRoleKey } = requireStorageCredentials()
   const { default: pg } = await import('pg')
-  const ssl = LOCAL_HOSTS.has(databaseHost)
-    ? undefined
-    : // verify-full: the server certificate must chain to the Supabase CA and
-      // name the host the client asked for.
-      { ca: fs.readFileSync(options.dbCa, 'utf8'), rejectUnauthorized: true }
   const { Queue } = await import('bullmq')
   const { createClient } = await import('@supabase/supabase-js')
   return {
-    db: new pg.Client({
-      connectionString: process.env.DATABASE_URL,
-      ...(ssl ? { ssl } : {}),
+    db: createDatabaseClient(pg, {
+      target: options.target,
+      databaseUrl: process.env.DATABASE_URL,
+      ca: options.target === 'hosted' ? fs.readFileSync(options.dbCa, 'utf8') : null,
     }),
     storage: createClient(supabaseUrl, serviceRoleKey, {
       auth: { persistSession: false, autoRefreshToken: false },
@@ -546,7 +590,7 @@ async function driveCanary(context, options) {
 
   const assessed = assessTerminalPost(post)
   const processedBy = job?.processedBy ?? null
-  if (options.target === 'hosted' && processedBy !== workerNameFor(options.expectSha)) {
+  if (options.requireProcessedBy && processedBy !== workerNameFor(options.expectSha)) {
     throw new CanaryFailure(
       'worker_identity',
       `The canary job was processed by ${String(processedBy)}, not ${workerNameFor(options.expectSha)}.`
@@ -558,6 +602,7 @@ async function driveCanary(context, options) {
     target: options.target,
     inputSetHash: inputSetHash(),
     expectedSha: options.expectSha,
+    processedByRequired: options.requireProcessedBy === true,
     processedBy,
     startedAt: context.startedAt.toISOString(),
     finishedAt: new Date().toISOString(),
@@ -572,14 +617,28 @@ async function driveCanary(context, options) {
   }
 }
 
+/**
+ * Records what cleanup did on the report. A canary that left rows, an object or
+ * a job behind did not pass, and the report says so itself, so no reader has to
+ * know to look at the cleanup block.
+ */
+export function recordCleanup(report, { keep, problems }) {
+  report.cleanup = keep
+    ? { performed: false, note: '--keep left the canary rows, object and job in place' }
+    : { performed: true, problems }
+  if (problems.length > 0) {
+    report.ok = false
+    report.code = 'cleanup_failed'
+    report.message = `Cleanup left canary data behind: ${problems.join('; ')}`
+  }
+  return report
+}
+
 export async function runCanary(options) {
   loadEnvFile(options.envFile)
-  const databaseHost = assertTargetMatchesDatabase(
-    options.target,
-    process.env.DATABASE_URL
-  )
+  assertTargetMatchesDatabase(options.target, process.env.DATABASE_URL)
   options.expectSha ??= gitHeadSha()
-  const clients = await openClients(databaseHost, options)
+  const clients = await openClients(options)
   const context = {
     ...clients,
     ...canaryIdentifiers(),
@@ -608,14 +667,7 @@ export async function runCanary(options) {
       // also left rows or an object behind must say so.
       console.error(`[canary] cleanup problems: ${problems.join('; ')}`)
     }
-    if (report) {
-      report.cleanup = options.keep
-        ? {
-            performed: false,
-            note: '--keep left the canary rows, object and job in place',
-          }
-        : { performed: true, problems }
-    }
+    if (report) recordCleanup(report, { keep: options.keep, problems })
     await context.queue.close().catch(() => undefined)
     await context.db.end().catch(() => undefined)
   }
@@ -652,10 +704,13 @@ async function main() {
     const report = await runCanary(options)
     if (options.jsonOut) writeJson(options.jsonOut, report)
     console.log(JSON.stringify(report, null, 2))
+    if (report.ok !== true) {
+      console.error(`[canary] FAIL ${report.code}: ${report.message}`)
+      process.exit(1)
+    }
     console.log(
       `[canary] PASS ${report.target}: ${report.disposition} under ${report.engineIdentity}; queue latency ${report.timings.queueLatencyMs} ms, screening ${report.timings.screeningDurationMs} ms`
     )
-    if (report.cleanup?.problems?.length > 0) process.exit(1)
   } catch (error) {
     const failure =
       error instanceof CanaryFailure
@@ -666,6 +721,11 @@ async function main() {
             message: error instanceof Error ? error.message : String(error),
           }
     failure.target = options.target
+    // The same identity a passing report carries, so the readiness gate judges
+    // a failure as failed rather than discarding it as stale.
+    failure.expectedSha = options.expectSha ?? null
+    const { inputSetHash } = await import('./lib/community-screening-input-set.mjs')
+    failure.inputSetHash = inputSetHash()
     failure.finishedAt = new Date().toISOString()
     if (options.jsonOut) writeJson(options.jsonOut, failure)
     console.error(JSON.stringify(failure, null, 2))

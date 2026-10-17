@@ -9,16 +9,61 @@
  * canary with a generated 4096x4096 JPEG through the real pipeline and reads
  * `memory.peak` and `memory.max` from inside the container.
  *
+ * Story 6.2b peer review (CX4): the peak is evidence only if this container
+ * screened the upload. The canary therefore runs against the container's own
+ * Redis, PostgreSQL and storage, read from its environment, and requires the job
+ * to be processed by the worker named for the container's baked commit. Any other
+ * consumer on that Redis taking the job fails the measurement.
+ *
  * Usage: node scripts/measure-community-worker-memory.mjs [--container cc-community-worker]
  */
 import { execFileSync } from 'node:child_process'
 import path from 'node:path'
 import { fileURLToPath } from 'node:url'
+import { workerNameFor } from './community-screening-canary.mjs'
 import { inputSetHash } from './lib/community-screening-input-set.mjs'
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url))
 const projectRoot = path.resolve(__dirname, '..')
 const MIB = 1024 * 1024
+
+/** The variables the canary reads to reach the services the container uses. */
+export const CONTAINER_SERVICE_VARIABLES = [
+  'DATABASE_URL',
+  'REDIS_URL',
+  'REDIS_TLS',
+  'SUPABASE_URL',
+  'SUPABASE_SERVICE_ROLE_KEY',
+]
+
+/**
+ * The container's service endpoints, as this host reaches them. A container on
+ * Docker's bridge network reaches the host's published ports through
+ * host.docker.internal; from the host, the same ports are on the loopback.
+ */
+export function containerServiceEnv(containerEnv) {
+  const env = {}
+  for (const name of CONTAINER_SERVICE_VARIABLES) {
+    const value = containerEnv[name]
+    if (value === undefined) continue
+    env[name] = value.replaceAll('host.docker.internal', '127.0.0.1')
+  }
+  for (const name of ['DATABASE_URL', 'REDIS_URL']) {
+    if (!env[name]) throw new Error(`The container sets no ${name} to measure against.`)
+  }
+  return env
+}
+
+/** The worker name the container gives itself, from its baked commit. */
+export function containerWorkerName(containerEnv) {
+  const sha = containerEnv.COMMUNITY_WORKER_COMMIT_SHA?.trim()
+  if (!sha || sha === 'unset') {
+    throw new Error(
+      'The container has no baked COMMUNITY_WORKER_COMMIT_SHA, so the job it processes cannot be told apart from another consumer.'
+    )
+  }
+  return { sha, name: workerNameFor(sha) }
+}
 
 function docker(args) {
   return execFileSync('docker', args, {
@@ -40,6 +85,10 @@ function main() {
     docker(['inspect', container, '--format', '{{json .Config.Env}}'])
   )
   const imageEnv = Object.fromEntries(env.map((line) => line.split(/=(.*)/s).slice(0, 2)))
+  const worker = containerWorkerName(imageEnv)
+  const serviceEnv = containerServiceEnv(imageEnv)
+  const childEnv = { ...process.env }
+  for (const name of CONTAINER_SERVICE_VARIABLES) delete childEnv[name]
 
   const canaryOutput = execFileSync(
     process.execPath,
@@ -47,14 +96,24 @@ function main() {
       path.join(projectRoot, 'scripts/community-screening-canary.mjs'),
       '--target',
       'local',
-      '--env-file',
-      '.env.local',
       '--fixture',
       'max',
+      '--expect-sha',
+      worker.sha,
     ],
-    { cwd: projectRoot, encoding: 'utf8', stdio: ['ignore', 'pipe', 'inherit'] }
+    {
+      cwd: projectRoot,
+      encoding: 'utf8',
+      env: { ...childEnv, ...serviceEnv },
+      stdio: ['ignore', 'pipe', 'inherit'],
+    }
   )
   const canary = JSON.parse(canaryOutput.slice(0, canaryOutput.lastIndexOf('}') + 1))
+  if (canary.processedBy !== worker.name) {
+    throw new Error(
+      `The upload was processed by ${String(canary.processedBy)}, not ${worker.name}; the container's peak would describe a job it never ran.`
+    )
+  }
   const peak = readCgroup(container, 'memory.peak')
   const limit = readCgroup(container, 'memory.max')
   console.log(
@@ -68,6 +127,9 @@ function main() {
         source: 'cgroup v2 memory.peak inside the running worker container',
         memoryPeakMib: peak === null ? null : Number((peak / MIB).toFixed(1)),
         memoryLimitMib: limit === null ? null : Number((limit / MIB).toFixed(1)),
+        workerName: worker.name,
+        processedBy: canary.processedBy ?? null,
+        servicesFrom: 'the container environment (DATABASE_URL, REDIS_URL, SUPABASE_URL)',
         upload: canary.fixture,
         canaryDisposition: canary.disposition ?? null,
         canaryOk: canary.ok === true,

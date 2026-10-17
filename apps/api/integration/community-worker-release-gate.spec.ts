@@ -18,6 +18,38 @@ interface CanaryModule {
     engineIdentity: string
   }
   CanaryFailure: new (...args: unknown[]) => Error & { code: string }
+  withoutSslParameters: (databaseUrl: string) => string
+  createDatabaseClient: (
+    pg: unknown,
+    options: { target: string; databaseUrl: string; ca: string | null }
+  ) => { connectionParameters: { ssl: unknown; host: string } }
+  recordCleanup: (
+    report: Record<string, unknown>,
+    cleanup: { keep: boolean; problems: string[] }
+  ) => Record<string, unknown>
+  parseCanaryArgs: (argv: string[]) => Record<string, unknown>
+}
+interface MemoryMeasureModule {
+  containerServiceEnv: (env: Record<string, string>) => Record<string, string>
+  containerWorkerName: (env: Record<string, string>) => { sha: string; name: string }
+}
+interface RedisMeasureModule {
+  workerClientIds: (clientList: string, workerName: string) => string[]
+  summarizeWorkerPresence: (
+    workerName: string,
+    samples: { at: string; clientIds: string[] }[]
+  ) => Record<string, unknown>
+}
+interface InputSetModule {
+  INPUT_DIRECTORIES: string[]
+  INPUT_FILES: string[]
+  WORKER_SOURCE_ENTRIES: string[]
+  inputSetFiles: () => string[]
+  inputSetPathspecs: () => string[]
+  traceWorkerSourceGraph: () => {
+    files: string[]
+    unresolved: { from: string | null; specifier: string }[]
+  }
 }
 interface LauncherModule {
   resolveStartableSelector: (env: Record<string, string>) => {
@@ -171,6 +203,197 @@ describe('canary refusals', () => {
         moderation_engine_version: REAL_IDENTITY,
       })
     ).toEqual({ disposition: 'pass', engineIdentity: REAL_IDENTITY })
+  })
+})
+
+describe('hosted canary database TLS', () => {
+  // Story 6.2b peer review (CX1): pg parses the connection string after the
+  // explicit `ssl` object, so `sslmode=require` dropped the CA, `no-verify`
+  // turned verification off and `disable` turned TLS off.
+  const ca = '-----BEGIN CERTIFICATE-----\nsupabase\n-----END CERTIFICATE-----'
+  const base = 'postgresql://u:p@db.example.supabase.co:5432/postgres'
+
+  it.each([
+    ['no SSL parameter', ''],
+    ['sslmode=require', '?sslmode=require'],
+    ['sslmode=no-verify', '?sslmode=no-verify'],
+    ['sslmode=disable', '?sslmode=disable'],
+    ['ssl=false', '?ssl=false'],
+    ['verify-full with a missing root cert', '?sslmode=verify-full&sslrootcert=/absent'],
+  ])('verifies the certificate against the CA with %s', async (_label, query) => {
+    const { createDatabaseClient } = await load<CanaryModule>(
+      'scripts/community-screening-canary.mjs'
+    )
+    const pg = (await import('pg')).default
+    const client = createDatabaseClient(pg, {
+      target: 'hosted',
+      databaseUrl: `${base}${query}`,
+      ca,
+    })
+    expect(client.connectionParameters.ssl).toEqual({ ca, rejectUnauthorized: true })
+    expect(client.connectionParameters.host).toBe('db.example.supabase.co')
+  })
+
+  it('keeps every parameter that is not an SSL override', async () => {
+    const { withoutSslParameters } = await load<CanaryModule>(
+      'scripts/community-screening-canary.mjs'
+    )
+    expect(
+      withoutSslParameters(`${base}?sslmode=require&pgbouncer=true&SSLCERT=/x`)
+    ).toBe(`${base}?pgbouncer=true`)
+  })
+})
+
+describe('canary cleanup and worker identity', () => {
+  it('marks a report failed when cleanup left data behind', async () => {
+    // Story 6.2b peer review (CX9).
+    const { recordCleanup } = await load<CanaryModule>(
+      'scripts/community-screening-canary.mjs'
+    )
+    expect(recordCleanup({ ok: true }, { keep: false, problems: [] })).toEqual({
+      ok: true,
+      cleanup: { performed: true, problems: [] },
+    })
+    const failed = recordCleanup({ ok: true }, { keep: false, problems: ['job: gone'] })
+    expect(failed.ok).toBe(false)
+    expect(failed.code).toBe('cleanup_failed')
+  })
+
+  it('requires the named worker locally only when told which build to expect', async () => {
+    // Story 6.2b peer review (CX4).
+    const { parseCanaryArgs } = await load<CanaryModule>(
+      'scripts/community-screening-canary.mjs'
+    )
+    expect(parseCanaryArgs(['--target', 'local']).requireProcessedBy).toBe(false)
+    expect(
+      parseCanaryArgs(['--target', 'local', '--expect-sha', 'abc123']).requireProcessedBy
+    ).toBe(true)
+    expect(
+      parseCanaryArgs(['--target', 'hosted', '--db-ca', '/ca.crt']).requireProcessedBy
+    ).toBe(true)
+  })
+
+  it("measures memory against the container's own services and worker", async () => {
+    const { containerServiceEnv, containerWorkerName } = await load<MemoryMeasureModule>(
+      'scripts/measure-community-worker-memory.mjs'
+    )
+    expect(
+      containerServiceEnv({
+        DATABASE_URL: 'postgresql://p:p@host.docker.internal:54322/postgres',
+        REDIS_URL: 'redis://host.docker.internal:6379',
+        SUPABASE_URL: 'http://host.docker.internal:54321',
+        PATH: '/usr/bin',
+      })
+    ).toEqual({
+      DATABASE_URL: 'postgresql://p:p@127.0.0.1:54322/postgres',
+      REDIS_URL: 'redis://127.0.0.1:6379',
+      SUPABASE_URL: 'http://127.0.0.1:54321',
+    })
+    expect(() => containerServiceEnv({ REDIS_URL: 'redis://127.0.0.1:6379' })).toThrow(
+      /DATABASE_URL/
+    )
+    expect(containerWorkerName({ COMMUNITY_WORKER_COMMIT_SHA: 'abc123' })).toEqual({
+      sha: 'abc123',
+      name: 'community-worker@abc123',
+    })
+    expect(() => containerWorkerName({ COMMUNITY_WORKER_COMMIT_SHA: 'unset' })).toThrow(
+      /COMMIT_SHA/
+    )
+  })
+
+  it('records whether the idle worker was connected at every sample', async () => {
+    // Story 6.2b peer review (CX6).
+    const { workerClientIds, summarizeWorkerPresence } = await load<RedisMeasureModule>(
+      'scripts/measure-community-worker-redis.mjs'
+    )
+    const name = 'community-worker@abc123'
+    const list = `id=7 addr=1 name=bull:Y29t:w:${name} age=3\nid=8 addr=2 name= age=1\n`
+    expect(workerClientIds(list, name)).toEqual(['7'])
+    expect(workerClientIds(list, 'community-worker@zzz')).toEqual([])
+    const at = '2026-10-17T00:00:00.000Z'
+    expect(
+      summarizeWorkerPresence(name, [
+        { at, clientIds: ['7'] },
+        { at, clientIds: ['7'] },
+      ])
+    ).toMatchObject({ samples: 2, connectedSamples: 2, connectedThroughout: true })
+    expect(
+      summarizeWorkerPresence(name, [
+        { at, clientIds: ['7'] },
+        { at, clientIds: [] },
+      ])
+    ).toMatchObject({ connectedSamples: 1, connectedThroughout: false })
+  })
+})
+
+describe('evidence input set', () => {
+  // Story 6.2b peer review (CX3): a runtime import outside the hashed
+  // directories changed what the worker accepts without changing the hash.
+  const inputSet = () =>
+    load<InputSetModule>('scripts/lib/community-screening-input-set.mjs')
+
+  it('traces every repo-local import of the worker, including the wardrobe limits', async () => {
+    const { traceWorkerSourceGraph, inputSetFiles } = await inputSet()
+    const { files, unresolved } = traceWorkerSourceGraph()
+    expect(unresolved).toEqual([])
+    const set = new Set(inputSetFiles())
+    for (const file of files) expect(set.has(file)).toBe(true)
+    expect(set.has('apps/api/src/modules/wardrobe/wardrobe-image-validation.ts')).toBe(
+      true
+    )
+    expect(set.has('apps/api/src/logger/pino.config.ts')).toBe(true)
+    expect(set.has('packages/utils/src/index.ts')).toBe(true)
+    expect(set.has('packages/db/prisma/schema.prisma')).toBe(true)
+  })
+
+  it('reaches every relative import the TypeScript scanner finds from the worker entries', async () => {
+    // An independent parser (the compiler's own import scanner) over the same
+    // entries, so the trace cannot pass by sharing a blind spot with itself.
+    const ts = await import('typescript')
+    const { WORKER_SOURCE_ENTRIES, inputSetFiles } = await inputSet()
+    const set = new Set(inputSetFiles())
+    const seen = new Set<string>()
+    const queue = WORKER_SOURCE_ENTRIES.filter((entry) => entry.endsWith('.ts'))
+    while (queue.length > 0) {
+      const file = queue.shift() as string
+      if (seen.has(file)) continue
+      seen.add(file)
+      expect(set.has(file)).toBe(true)
+      const { importedFiles } = ts.preProcessFile(read(file), true, true)
+      for (const { fileName } of importedFiles) {
+        if (!fileName.startsWith('.')) continue
+        const base = path.join(path.dirname(file), fileName).replace(/\.js$/, '')
+        const resolved = [`${base}.ts`, base, `${base}/index.ts`].find((candidate) =>
+          fs.existsSync(path.join(repoRoot, candidate))
+        )
+        expect(resolved, `${file} imports ${fileName}`).toBeDefined()
+        if (resolved?.endsWith('.ts')) queue.push(resolved)
+      }
+    }
+    expect(seen.size).toBeGreaterThan(20)
+  })
+
+  it('carries the source of every entry the image prune trace starts from', async () => {
+    const { WORKER_SOURCE_ENTRIES } = await inputSet()
+    const prune = read('scripts/prune-community-worker-deps.mjs')
+    const entries = /const ENTRY_FILES = \[([\s\S]*?)\]/.exec(prune)?.[1] ?? ''
+    const compiled = [...entries.matchAll(/'([^']+)'/g)].map((match) => match[1] ?? '')
+    expect(compiled.length).toBeGreaterThan(0)
+    for (const entry of compiled) {
+      const source = entry
+        .replace(/^apps\/api\/dist\/src\//, 'apps/api/src/')
+        .replace(/\.js$/, '.ts')
+      expect(WORKER_SOURCE_ENTRIES).toContain(source)
+    }
+  })
+
+  it('names every input path as a git pathspec', async () => {
+    const { inputSetPathspecs, INPUT_DIRECTORIES } = await inputSet()
+    const pathspecs = inputSetPathspecs()
+    for (const directory of INPUT_DIRECTORIES) expect(pathspecs).toContain(directory)
+    expect(pathspecs).toContain(
+      'apps/api/src/modules/wardrobe/wardrobe-image-validation.ts'
+    )
   })
 })
 
@@ -524,6 +747,10 @@ interface GeneratorModule {
   verdictOf: (gates: Gate[]) => string
   wilsonInterval: (successes: number, trials: number) => [number, number]
   inputStaleness: (recorded: unknown, current: string) => string[]
+  deployedInputBinding: (
+    binding: { expectedSha: unknown; commitSha: unknown; pathspecs: string[] },
+    root?: string
+  ) => { status: string; reason?: string }
   TEXT_LANGUAGES: string[]
 }
 
@@ -560,6 +787,7 @@ describe('readiness verdict', () => {
       expectedSha: 'abc123',
       processedBy: 'community-worker@abc123',
       timings: { queueLatencyMs: 3, screeningDurationMs: 190 },
+      cleanup: { performed: true, problems: [] },
     })
     const clean = () => ({
       total: 420,
@@ -581,7 +809,10 @@ describe('readiness verdict', () => {
       canaries: {
         local: canary('local'),
         restart: canary('local'),
-        hosted: canary('hosted'),
+        hosted: {
+          ...canary('hosted'),
+          deployedInputs: { status: 'same', expectedSha: 'abc123', commitSha: 'def456' },
+        },
       },
       sweep: {
         available: true,
@@ -656,7 +887,9 @@ describe('readiness verdict', () => {
         latency: {
           available: true,
           stale: [],
+          warmupSamples: 50,
           warmSamples: 1000,
+          environment: { containerCpuQuota: 0.2, containerMemoryLimitMib: 512 },
           coldStartupMs: 2400,
           warmSupervisedMs: { p95: 300, p99: 400 },
         },
@@ -664,6 +897,9 @@ describe('readiness verdict', () => {
           available: true,
           stale: [],
           canaryOk: true,
+          commitSha: 'abc123',
+          workerName: 'community-worker@abc123',
+          processedBy: 'community-worker@abc123',
           upload: { name: 'generated-4096x4096.jpg' },
           memoryLimitMib: 512,
           memoryPeakMib: 300,
@@ -674,7 +910,16 @@ describe('readiness verdict', () => {
         stale: [],
         budgetShare: 0.5,
         projectedMonthly: { total: 150000, shareOfFreeTier: 0.3 },
-        idle: { commandsPerHour: 138 },
+        idle: {
+          commandsPerHour: 138,
+          worker: {
+            name: 'community-worker@abc123',
+            commitSha: 'abc123',
+            samples: 121,
+            connectedSamples: 121,
+            connectedThroughout: true,
+          },
+        },
         perPost: { commandsPerPost: 82 },
       },
       rollout: { communityReadEnabled: false, communityWriteEnabled: false },
@@ -727,6 +972,23 @@ describe('readiness verdict', () => {
     ],
   ])('is incomplete with %s', async (_label, patches) => {
     const { verdict } = await verdictAfter(patches)
+    expect(verdict).toBe('incomplete')
+  })
+
+  it.each<[string, Patch[]]>([
+    // Story 6.2b peer review (CX2): an older deployment passed the current gate.
+    [
+      'a deployed commit whose inputs differ',
+      [['canaries.hosted.deployedInputs', { status: 'differs', reason: 'x differs' }]],
+    ],
+    [
+      'a deployed commit git cannot compare',
+      [['canaries.hosted.deployedInputs', { status: 'unknown', reason: 'unknown' }]],
+    ],
+    ['no deployed commit comparison', [['canaries.hosted.deployedInputs', undefined]]],
+  ])('does not run the hosted canary gate with %s', async (_label, patches) => {
+    const { verdict, gates } = await verdictAfter(patches)
+    expect(statusOf(gates, 'canary-hosted')).toBe('not-run')
     expect(verdict).toBe('incomplete')
   })
 
@@ -826,6 +1088,83 @@ describe('readiness verdict', () => {
       [['sweep.sweep.passAtOrAboveAReviewThreshold', undefined]],
     ],
     ['a Redis count that is missing', 'redis-budget', [['redis.projectedMonthly', null]]],
+    // Story 6.2b peer review (CX9).
+    [
+      'canary cleanup problems',
+      'canary-local-container',
+      [['canaries.local.cleanup', { performed: true, problems: ['job: x'] }]],
+    ],
+    [
+      'a canary that reported its cleanup failure',
+      'canary-hosted',
+      [
+        ['canaries.hosted.ok', false],
+        ['canaries.hosted.code', 'cleanup_failed'],
+        ['canaries.hosted.cleanup', { performed: true, problems: ['account: x'] }],
+      ],
+    ],
+    [
+      'restart drill cleanup problems',
+      'restart-keeps-queued-jobs',
+      [['canaries.restart.cleanup', { performed: true, problems: ['object: x'] }]],
+    ],
+    [
+      'a canary with no cleanup record',
+      'canary-hosted',
+      [['canaries.hosted.cleanup', undefined]],
+    ],
+    // Story 6.2b peer review (CX5).
+    [
+      'latency measured with no CPU limit',
+      'runtime-latency',
+      [['runtime.latency.environment.containerCpuQuota', null]],
+    ],
+    [
+      'latency measured under another memory limit',
+      'runtime-latency',
+      [['runtime.latency.environment.containerMemoryLimitMib', 1024]],
+    ],
+    ['a single warm sample', 'runtime-latency', [['runtime.latency.warmSamples', 1]]],
+    ['999 warm samples', 'runtime-latency', [['runtime.latency.warmSamples', 999]]],
+    ['no warmup', 'runtime-latency', [['runtime.latency.warmupSamples', 0]]],
+    // Story 6.2b peer review (CX4).
+    [
+      'a memory upload processed by another worker',
+      'runtime-memory',
+      [['runtime.memory.processedBy', 'community-worker@zzz']],
+    ],
+    [
+      'a memory measurement with no worker identity',
+      'runtime-memory',
+      [
+        ['runtime.memory.workerName', undefined],
+        ['runtime.memory.processedBy', undefined],
+      ],
+    ],
+    [
+      'a memory measurement of an image with no commit',
+      'runtime-memory',
+      [['runtime.memory.commitSha', 'unset']],
+    ],
+    // Story 6.2b peer review (CX6).
+    [
+      'an idle window with no worker identity',
+      'redis-budget',
+      [['redis.idle.worker', undefined]],
+    ],
+    [
+      'an idle window the worker left',
+      'redis-budget',
+      [
+        ['redis.idle.worker.connectedSamples', 120],
+        ['redis.idle.worker.connectedThroughout', false],
+      ],
+    ],
+    [
+      'an idle window naming another worker',
+      'redis-budget',
+      [['redis.idle.worker.name', 'community-worker@zzz']],
+    ],
   ])('fails on %s', async (_label, gateId, patches) => {
     const { verdict, gates } = await verdictAfter(patches)
     expect(statusOf(gates, gateId)).toBe('failed')
@@ -841,6 +1180,37 @@ describe('readiness verdict', () => {
     expect(low2).toBeCloseTo(0.05523, 4)
     expect(high2).toBeCloseTo(0.17437, 4)
     expect(wilsonInterval(0, 0)).toEqual([0, 1])
+  })
+
+  it('binds a hosted canary to a deployment whose inputs match the evidence commit', async () => {
+    // Story 6.2b peer review (CX2), against a real repository.
+    const { deployedInputBinding } = await generator()
+    const repo = fs.mkdtempSync(path.join(os.tmpdir(), 'deployed-inputs-'))
+    const run = (...args: string[]) =>
+      execFileSync('git', args, { cwd: repo, encoding: 'utf8' }).trim()
+    const commit = (file: string, text: string) => {
+      fs.mkdirSync(path.dirname(path.join(repo, file)), { recursive: true })
+      fs.writeFileSync(path.join(repo, file), text)
+      run('add', '.')
+      run('-c', 'user.name=t', '-c', 'user.email=t@t.invalid', 'commit', '-qm', file)
+      return run('rev-parse', 'HEAD')
+    }
+    try {
+      run('init', '-q')
+      const deployed = commit('src/worker.ts', 'v1')
+      const docsOnly = commit('docs/readme.md', 'notes')
+      const changed = commit('src/worker.ts', 'v2')
+      const pathspecs = ['src']
+      const bind = (expectedSha: unknown, commitSha: unknown) =>
+        deployedInputBinding({ expectedSha, commitSha, pathspecs }, repo).status
+      expect(bind(deployed, docsOnly)).toBe('same')
+      expect(bind(deployed, changed)).toBe('differs')
+      expect(bind('0123456789abcdef0123456789abcdef01234567', changed)).toBe('unknown')
+      expect(bind('--output=/tmp/x', changed)).toBe('unknown')
+      expect(bind(null, changed)).toBe('unknown')
+    } finally {
+      fs.rmSync(repo, { recursive: true, force: true })
+    }
   })
 
   it('treats a product without a current input-set hash as stale', async () => {

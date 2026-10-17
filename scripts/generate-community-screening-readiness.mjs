@@ -43,7 +43,7 @@ import fs from 'node:fs'
 import path from 'node:path'
 import { execFileSync } from 'node:child_process'
 import { fileURLToPath } from 'node:url'
-import { inputSetHash } from './lib/community-screening-input-set.mjs'
+import { inputSetHash, inputSetPathspecs } from './lib/community-screening-input-set.mjs'
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url))
 const projectRoot = path.resolve(__dirname, '..')
@@ -95,6 +95,13 @@ const TEXT_CLEAN_UPPER_BOUND_GATE = 0.01
 const MAX_UPLOAD_FIXTURE = 'generated-4096x4096.jpg'
 /** Story 6.2 AC 8: a warm p95 above this for one 224x224 inference is a defect signal. */
 const WARM_P95_DEFECT_MS = 500
+/** Story 6.2 AC 8: at least 1,000 warm inferences after warmup. */
+const MINIMUM_WARM_SAMPLES = 1000
+/**
+ * The hosted worker's resource envelope (Northflank Developer Sandbox). Latency
+ * measured under any other cgroup limit, including none, says nothing about it.
+ */
+export const RELEASE_RESOURCE_PROFILE = { cpu: 0.2, memoryMib: 512 }
 /** The worker's BullMQ name, from the image's commit (community-moderation.worker.ts). */
 export const workerNameFor = (sha) => `community-worker@${sha}`
 /**
@@ -348,7 +355,54 @@ function imageSection(imageRef, current) {
   }
 }
 
-function canarySection(name, label, current) {
+const COMMIT_SHA = /^[0-9a-f]{7,40}$/
+
+/**
+ * Whether the build a hosted canary verified carries the same inputs as the
+ * commit this evidence describes. The canary records the deployed commit
+ * (`expectedSha`) and stamps the caller's input-set hash, which proves nothing
+ * about the deployed code: an older deployment could otherwise pass the current
+ * gate. `git diff --quiet` exits 0 when no input-set path differs between the
+ * two commits, 1 when one does, and anything else when either commit is unknown.
+ */
+export function deployedInputBinding(
+  { expectedSha, commitSha, pathspecs },
+  root = projectRoot
+) {
+  const base = { expectedSha: expectedSha ?? null, commitSha: commitSha ?? null }
+  if (typeof expectedSha !== 'string' || !COMMIT_SHA.test(expectedSha)) {
+    return {
+      ...base,
+      status: 'unknown',
+      reason: 'the canary recorded no deployed commit',
+    }
+  }
+  if (typeof commitSha !== 'string' || !COMMIT_SHA.test(commitSha)) {
+    return { ...base, status: 'unknown', reason: 'the evidence has no commit' }
+  }
+  try {
+    execFileSync('git', ['diff', '--quiet', expectedSha, commitSha, '--', ...pathspecs], {
+      cwd: root,
+      stdio: ['ignore', 'ignore', 'ignore'],
+    })
+    return { ...base, status: 'same' }
+  } catch (error) {
+    if (error?.status === 1) {
+      return {
+        ...base,
+        status: 'differs',
+        reason: `the deployed commit ${expectedSha} differs from ${commitSha} in the input set`,
+      }
+    }
+    return {
+      ...base,
+      status: 'unknown',
+      reason: `git could not compare ${expectedSha} with ${commitSha}; fetch the deployed commit`,
+    }
+  }
+}
+
+function canarySection(name, label, current, { hosted = false } = {}) {
   const product = runProduct(name)
   if (!product) return { label, available: false, stale: [] }
   return {
@@ -356,6 +410,15 @@ function canarySection(name, label, current) {
     available: true,
     stale: inputStaleness(product.inputSetHash, current.inputSetHash),
     ...product,
+    ...(hosted
+      ? {
+          deployedInputs: deployedInputBinding({
+            expectedSha: product.expectedSha,
+            commitSha: current.commitSha,
+            pathspecs: current.inputSetPathspecs,
+          }),
+        }
+      : {}),
   }
 }
 
@@ -705,13 +768,19 @@ function redisSection(dailySubmissions, current) {
     available: true,
     stale: [
       ...inputStaleness(idle.inputSetHash, current.inputSetHash).map((r) => `idle: ${r}`),
+      ...inputStaleness(idle.worker?.containerInputSetHash, current.inputSetHash).map(
+        (r) => `idle worker image: ${r}`
+      ),
       ...inputStaleness(perPost.inputSetHash, current.inputSetHash).map(
         (r) => `per post: ${r}`
       ),
     ],
     countingRule:
       'Every command Redis records, including the commands BullMQ Lua scripts run inside EVALSHA. Upstash does not document whether a script counts once or per inner command, so this is the upper bound.',
-    idle,
+    // The per-sample presence log stays in the run product; the summary is in `worker`.
+    idle: Object.fromEntries(
+      Object.entries(idle).filter(([key]) => key !== 'presenceSamples')
+    ),
     perPost,
     dailySubmissions,
     postsPerDayWithinBudget: usable
@@ -833,8 +902,18 @@ function workingTreeGate(tree) {
 
 const NON_MODEL_IDENTITY = /fixture|unavailable|unresolved/
 
+/** A canary that did not remove what it created did not pass, whatever it measured. */
+function cleanupProblems(canary) {
+  const cleanup = canary.cleanup
+  if (cleanup?.performed !== true) return ['the canary did not clean up after itself']
+  if (!Array.isArray(cleanup.problems)) return ['the canary recorded no cleanup result']
+  return cleanup.problems.length > 0
+    ? [`cleanup left canary data behind: ${cleanup.problems.join('; ')}`]
+    : []
+}
+
 function canaryProblems(canary, requireHosted) {
-  const problems = []
+  const problems = [...cleanupProblems(canary)]
   if (canary.disposition !== 'pass') {
     problems.push(`safe fixture reached ${String(canary.disposition)}`)
   }
@@ -889,15 +968,30 @@ export function canaryGate(id, name, canary, { requireHosted }) {
   }
   const pending = pendingGate(id, name, canary, command)
   if (pending) return pending
-  if (canary.ok !== true) {
-    return judged(id, name, [`canary failed: ${String(canary.code)}`], {
-      measured: { failure: canary.code ?? null, message: canary.message ?? null },
+  if (requireHosted && canary.deployedInputs?.status !== 'same') {
+    return gate(id, name, 'not-run', {
+      reason: `the deployed build is not the evidence's inputs: ${canary.deployedInputs?.reason ?? 'no deployed commit comparison'}`,
+      command,
     })
   }
+  if (canary.ok !== true) {
+    return judged(
+      id,
+      name,
+      [
+        `canary failed: ${String(canary.code)}`,
+        ...(canary.cleanup ? cleanupProblems(canary) : []),
+      ],
+      { measured: { failure: canary.code ?? null, message: canary.message ?? null } }
+    )
+  }
   return judged(id, name, canaryProblems(canary, requireHosted), {
-    measured: canaryMeasured(canary),
+    measured: {
+      ...canaryMeasured(canary),
+      ...(requireHosted ? { deployedInputs: canary.deployedInputs.status } : {}),
+    },
     threshold: requireHosted
-      ? 'safe fixture published under a real-model identity, on the hosted target, by exactly the worker built from the expected commit'
+      ? 'safe fixture published under a real-model identity, on the hosted target, by exactly the worker built from the expected commit, whose input set equals the evidence commit'
       : 'safe fixture published under a real-model identity within the bounded wait',
   })
 }
@@ -937,6 +1031,7 @@ function restartGate(restart) {
   else if (restart.disposition !== 'pass') {
     problems.push(`reached ${String(restart.disposition)}`)
   }
+  problems.push(...cleanupProblems(restart))
   return judged(id, name, problems, {
     measured: {
       queueLatencyMs: restart.timings?.queueLatencyMs ?? null,
@@ -1077,25 +1172,55 @@ export function calibrationGate(calibration) {
   })
 }
 
+/**
+ * An idle window measured with no worker connected costs almost nothing, so the
+ * idle figure counts only when the named worker was connected at every sample.
+ */
+function idlePresenceProblems(idle) {
+  const worker = idle?.worker
+  const expected =
+    typeof worker?.commitSha === 'string' && worker.commitSha !== 'unset'
+      ? workerNameFor(worker.commitSha)
+      : null
+  if (!expected || worker.name !== expected) {
+    return ['the idle measurement recorded no worker identity']
+  }
+  if (
+    worker.connectedThroughout !== true ||
+    !Number.isInteger(worker.samples) ||
+    worker.samples < 2 ||
+    worker.connectedSamples !== worker.samples
+  ) {
+    return [
+      `${expected} was connected at ${String(worker.connectedSamples)} of ${String(worker.samples)} idle samples`,
+    ]
+  }
+  return []
+}
+
 function redisGate(redis) {
   const id = 'redis-budget'
   const name = 'Idle worker plus expected traffic well within the Upstash free tier'
   const pending = pendingGate(id, name, redis, COMMANDS.measureRedis)
   if (pending) return pending
   const share = redis.projectedMonthly?.shareOfFreeTier
-  const problems = []
+  const problems = [...idlePresenceProblems(redis.idle)]
   if (!finite(share)) problems.push('idle or per-post command count missing')
   else if (share > redis.budgetShare) {
     problems.push(`projected ${percent(share)} of the free tier`)
   }
   return judged(id, name, problems, {
     measured: {
+      idleWorker: redis.idle?.worker?.name ?? null,
+      idleWorkerConnectedSamples: redis.idle?.worker
+        ? `${redis.idle.worker.connectedSamples} of ${redis.idle.worker.samples}`
+        : null,
       idleCommandsPerHour: redis.idle?.commandsPerHour ?? null,
       commandsPerPost: redis.perPost?.commandsPerPost ?? null,
       projectedMonthly: redis.projectedMonthly?.total ?? null,
       shareOfFreeTier: share ?? null,
     },
-    threshold: `projected monthly commands at or below ${redis.budgetShare * 100}% of ${UPSTASH_FREE_MONTHLY_COMMANDS.toLocaleString('en-US')}`,
+    threshold: `the named worker connected through the idle window, and projected monthly commands at or below ${redis.budgetShare * 100}% of ${UPSTASH_FREE_MONTHLY_COMMANDS.toLocaleString('en-US')}`,
   })
 }
 
@@ -1236,6 +1361,40 @@ function modelGate(model) {
 
 const LATENCY_CEILINGS = ['coldStartupMs', 'warmP95Ms', 'warmP99Ms']
 
+/**
+ * Story 6.2b peer review (CX5): timings are evidence for the sandbox only when
+ * they were taken under its cgroup limits, over Story 6.2 AC 8's 1,000 warm
+ * inferences after a warmup. An unrestricted container or a single sample
+ * certifies nothing.
+ */
+function latencySampleProblems(latency) {
+  const problems = []
+  if (
+    !Number.isInteger(latency.warmSamples) ||
+    latency.warmSamples < MINIMUM_WARM_SAMPLES
+  ) {
+    problems.push(
+      `${String(latency.warmSamples)} warm samples, fewer than ${MINIMUM_WARM_SAMPLES}`
+    )
+  }
+  if (!Number.isInteger(latency.warmupSamples) || latency.warmupSamples < 1) {
+    problems.push('no warmup before the warm samples')
+  }
+  const cpu = latency.environment?.containerCpuQuota
+  const memoryMib = latency.environment?.containerMemoryLimitMib
+  if (cpu !== RELEASE_RESOURCE_PROFILE.cpu) {
+    problems.push(
+      `measured under a CPU limit of ${String(cpu)}, not the ${RELEASE_RESOURCE_PROFILE.cpu} vCPU release profile`
+    )
+  }
+  if (memoryMib !== RELEASE_RESOURCE_PROFILE.memoryMib) {
+    problems.push(
+      `measured under a memory limit of ${String(memoryMib)} MiB, not the ${RELEASE_RESOURCE_PROFILE.memoryMib} MiB release profile`
+    )
+  }
+  return problems
+}
+
 function latencyGate(runtime) {
   const id = 'runtime-latency'
   const name =
@@ -1249,10 +1408,9 @@ function latencyGate(runtime) {
     warmP95Ms: latency.warmSupervisedMs?.p95,
     warmP99Ms: latency.warmSupervisedMs?.p99,
   }
-  const problems = []
-  if (!Number.isInteger(latency.warmSamples) || latency.warmSamples < 1) {
-    problems.push('no warm samples')
-  }
+  const cpu = latency.environment?.containerCpuQuota
+  const memoryMib = latency.environment?.containerMemoryLimitMib
+  const problems = latencySampleProblems(latency)
   for (const key of LATENCY_CEILINGS) {
     if (!finite(ceilings[key])) problems.push(`no ${key} ceiling in the model manifest`)
     else if (!finite(measured[key])) problems.push(`${key} not measured`)
@@ -1266,13 +1424,40 @@ function latencyGate(runtime) {
   return judged(id, name, problems, {
     measured: {
       profile: latency.profile ?? null,
+      cpuLimit: cpu ?? null,
+      memoryLimitMib: memoryMib ?? null,
+      warmupSamples: latency.warmupSamples ?? null,
       warmSamples: latency.warmSamples ?? null,
       ...measured,
     },
-    threshold: Object.fromEntries(
-      LATENCY_CEILINGS.map((key) => [key, ceilings[key] ?? null])
-    ),
+    threshold: {
+      ...Object.fromEntries(LATENCY_CEILINGS.map((key) => [key, ceilings[key] ?? null])),
+      cpuLimit: RELEASE_RESOURCE_PROFILE.cpu,
+      memoryLimitMib: RELEASE_RESOURCE_PROFILE.memoryMib,
+      minimumWarmSamples: MINIMUM_WARM_SAMPLES,
+    },
   })
+}
+
+/**
+ * Story 6.2b peer review (CX4): the container's peak describes the upload only
+ * if that container's worker, named for its baked commit, processed it.
+ */
+function memoryIdentityProblems(memory) {
+  const expectedWorker =
+    typeof memory.commitSha === 'string' && memory.commitSha !== 'unset'
+      ? workerNameFor(memory.commitSha)
+      : null
+  if (
+    expectedWorker &&
+    memory.workerName === expectedWorker &&
+    memory.processedBy === expectedWorker
+  ) {
+    return []
+  }
+  return [
+    `the upload was processed by ${String(memory.processedBy ?? 'an unrecorded worker')}, not the measured container's worker ${String(expectedWorker)}`,
+  ]
 }
 
 function memoryGate(runtime) {
@@ -1289,6 +1474,7 @@ function memoryGate(runtime) {
   if (memory.upload?.name !== MAX_UPLOAD_FIXTURE) {
     problems.push(`measured with ${String(memory.upload?.name)}, not the maximum upload`)
   }
+  problems.push(...memoryIdentityProblems(memory))
   if (!finite(memory.memoryLimitMib) || memory.memoryLimitMib > ceiling) {
     problems.push(
       `container limit ${String(memory.memoryLimitMib)} MiB is not the profile`
@@ -1304,8 +1490,9 @@ function memoryGate(runtime) {
       memoryLimitMib: memory.memoryLimitMib ?? null,
       upload: memory.upload?.name ?? null,
       canaryDisposition: memory.canaryDisposition ?? null,
+      processedBy: memory.processedBy ?? null,
     },
-    threshold: `cgroup memory.peak at or below ${String(ceiling)} MiB across startup and a ${MAX_UPLOAD_FIXTURE} screening`,
+    threshold: `cgroup memory.peak at or below ${String(ceiling)} MiB across startup and a ${MAX_UPLOAD_FIXTURE} screening processed by the measured container's own worker`,
   })
 }
 
@@ -1916,7 +2103,9 @@ function parseArgs(argv) {
 async function main() {
   const options = parseArgs(process.argv.slice(2))
   const current = {
+    commitSha: git(['rev-parse', 'HEAD']),
     inputSetHash: inputSetHash(),
+    inputSetPathspecs: inputSetPathspecs(),
     policySha256: sha256File(INPUTS.policy),
     safeCorpusManifestSha256: sha256File(INPUTS.safeCorpusManifest),
   }
@@ -1934,7 +2123,9 @@ async function main() {
         'local container restart drill',
         current
       ),
-      hosted: canarySection('canary-hosted.json', 'hosted target', current),
+      hosted: canarySection('canary-hosted.json', 'hosted target', current, {
+        hosted: true,
+      }),
     },
     sweep: sweepSection(current),
     calibration: calibrationSection(current, policy, manifest),
@@ -1960,7 +2151,7 @@ async function main() {
       'pass only when every gate ran against the current inputs from a committed tree and passed; fail when any gate that ran failed; incomplete otherwise',
     gates,
     build: {
-      commitSha: git(['rev-parse', 'HEAD']),
+      commitSha: current.commitSha,
       workingTreeClean: workingTree.clean,
       uncommittedPaths: workingTree.changedPaths,
       inputSetHash: current.inputSetHash,
@@ -2004,10 +2195,10 @@ async function main() {
         'Northflank Developer Sandbox (always-on combined service built from apps/api/Dockerfile.community-worker)',
       status: sections.canaries.hosted.available ? 'deployed' : 'not deployed yet',
       resourceProfile: {
-        cpu: 0.2,
+        cpu: RELEASE_RESOURCE_PROFILE.cpu,
         cpuSource:
           'the CPU share the local container emulated; confirm it against the sandbox plan once the service exists',
-        memoryMib: 512,
+        memoryMib: RELEASE_RESOURCE_PROFILE.memoryMib,
         replicas: 1,
         concurrency: 1,
       },

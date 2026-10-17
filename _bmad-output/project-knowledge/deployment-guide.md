@@ -441,7 +441,8 @@ baked into the image):
 
 `DATABASE_URL` keeps Supabase's `sslmode=require`. The canary, which reaches production from an
 operator's machine, goes further and verifies the certificate chain (`verify-full`) against the
-Supabase CA (`--db-ca`).
+Supabase CA (`--db-ca`). It strips every `ssl*` parameter from the connection string first,
+because `pg` lets those parameters replace the verified TLS settings.
 
 The canary's synthetic account (`canary-user-` prefix) is excluded from analytics in code
 (`isCommunityCanaryUser` in `community-analytics.ts`), so real posts report to PostHog and the
@@ -458,8 +459,11 @@ fractional vCPU. Latency is measured inside the worker image at 0.2 vCPU and 512
 (`npm run community:screening:measure:container`). Memory is the running container's cgroup
 `memory.peak`, the number the out-of-memory killer acts on: start the worker container fresh under
 `--memory=512m`, then run `npm run community:screening:measure:memory`, which drives the canary
-with a generated 4096x4096 JPEG, the largest accepted upload, through the real pipeline. The
-numbers and their gates are in the evidence payload's `runtime` section and in the rendered
+with a generated 4096x4096 JPEG, the largest accepted upload, through the real pipeline. It uses the
+container's own `DATABASE_URL`, `REDIS_URL` and Supabase settings, and requires the job to be
+processed by the container's worker (`community-worker@<baked commit>`); the gate rejects a peak
+without that identity. The latency gate requires the recorded cgroup limits to equal the 0.2 vCPU
+and 512 MiB profile and at least 1,000 warm samples after warmup. The numbers and their gates are in the evidence payload's `runtime` section and in the rendered
 evidence. Re-measure inside the hosted container after the first deploy.
 
 **Deploy on Northflank** (Developer Sandbox, free, always-on):
@@ -502,7 +506,9 @@ expires. `--target` is checked against the database host, so a `local` canary ca
 hosted database and a `hosted` one cannot run against a laptop. A hosted run also requires exactly
 one consumer on the queue, named `community-worker@<sha>` for the commit given by `--expect-sha`
 (default: `HEAD`), checks that this worker processed the job, and verifies the database
-certificate against the Supabase CA. Cleanup problems are printed whether or not the run passed.
+certificate against the Supabase CA. The evidence counts a hosted run only when no input-set file
+differs between `--expect-sha` and the evidence commit (`git diff --quiet`). Cleanup problems
+fail the run: the report records `ok: false` and the readiness gate fails.
 
 ```bash
 npm run community:screening:canary:local
@@ -531,7 +537,8 @@ the incident with the retained-job replay.
 allowance (the payload's `redis.beforeTuning`). The community worker now blocks for 300 seconds while idle and checks for stalled jobs
 every 600 seconds (`community-moderation.worker.ts`); a new job still wakes it at once, and a
 restart runs the stalled check immediately. `npm run community:screening:measure:redis` measures
-the idle cost against a local Redis only the worker uses, and
+the idle cost against a local Redis only the worker uses, sampling `CLIENT LIST` every 15 seconds
+to prove the container's named worker stayed connected for the whole window, and
 `node scripts/measure-community-worker-redis.mjs --canary-runs 5 --idle-baseline <idle product>`
 measures the cost of one screened post. Both count every command Redis records, including those
 BullMQ's Lua scripts run inside `EVALSHA`, because Upstash does not document whether a script
