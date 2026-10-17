@@ -34,6 +34,17 @@ interface CanaryModule {
     after: unknown,
     expectedWorker: string
   ) => { proven: boolean; problems: string[] }
+  liveFeedRefusal: (state: {
+    codeDefault: unknown
+    cachedValue?: unknown
+  }) => string | null
+}
+interface RolloutFlagsModule {
+  flagDefault: (source: string, key: string) => boolean | null
+  readCommunityRolloutDefaults: (source?: string) => {
+    communityReadEnabled: boolean | null
+    communityWriteEnabled: boolean | null
+  }
 }
 interface MemoryMeasureModule {
   containerServiceEnv: (env: Record<string, string>) => Record<string, string>
@@ -214,6 +225,44 @@ describe('canary refusals', () => {
         moderation_engine_version: REAL_IDENTITY,
       })
     ).toEqual({ disposition: 'pass', engineIdentity: REAL_IDENTITY })
+  })
+})
+
+describe('hosted canary and the live feed', () => {
+  // Story 6.2b final review (RF5): the canary's safe fixture publishes, so a
+  // hosted run must not start while the feed could serve it.
+  it('refuses while the feed flag defaults to anything but false or the cache holds it on', async () => {
+    const { liveFeedRefusal } = await load<CanaryModule>(
+      'scripts/community-screening-canary.mjs'
+    )
+    expect(liveFeedRefusal({ codeDefault: false })).toBeNull()
+    expect(liveFeedRefusal({ codeDefault: false, cachedValue: false })).toBeNull()
+    expect(liveFeedRefusal({ codeDefault: true })).toMatch(/defaults to true/)
+    expect(liveFeedRefusal({ codeDefault: null })).toMatch(/defaults to null/)
+    expect(liveFeedRefusal({ codeDefault: false, cachedValue: true })).toMatch(
+      /flag cache holds community_read_enabled = true/
+    )
+    expect(liveFeedRefusal({ codeDefault: false, cachedValue: 'on' })).toMatch(
+      /flag cache/
+    )
+  })
+
+  it('reads the flag defaults the canary and the rollout gate share', async () => {
+    const { flagDefault, readCommunityRolloutDefaults } = await load<RolloutFlagsModule>(
+      'scripts/lib/community-rollout-flags.mjs'
+    )
+    const source =
+      "community_read_enabled: {\n kind: 'boolean',\n defaultValue: true,\n },\ncommunity_write_enabled: { kind: 'boolean', defaultValue: false }"
+    expect(flagDefault(source, 'community_read_enabled')).toBe(true)
+    expect(flagDefault(source, 'community_write_enabled')).toBe(false)
+    expect(flagDefault(source, 'absent_flag')).toBeNull()
+    expect(readCommunityRolloutDefaults()).toMatchObject({
+      communityReadEnabled: false,
+      communityWriteEnabled: false,
+    })
+    expect(read('scripts/community-screening-canary.mjs')).toContain(
+      "if (options.target === 'hosted') {\n    refuseLiveFeed("
+    )
   })
 })
 

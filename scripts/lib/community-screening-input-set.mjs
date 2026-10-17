@@ -55,6 +55,7 @@ export const INPUT_FILES = [
   'scripts/calibrate-community-screening-models.mjs',
   'scripts/verify-community-screening-model.mjs',
   'scripts/lib/community-screening-input-set.mjs',
+  'scripts/lib/community-rollout-flags.mjs',
 ]
 
 /**

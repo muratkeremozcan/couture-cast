@@ -17,6 +17,11 @@
  *   4. the BullMQ timestamps and the persisted engine identity are read back, and
  *      every row, object and job the canary created is removed.
  *
+ * A hosted run refuses to start while the Community feed could be live: its
+ * safe fixture publishes, and a published post is served by the feed. It needs
+ * `community_read_enabled` to default to false in packages/config/src/flags.ts
+ * and the production flag cache not to hold anything else.
+ *
  * It exits nonzero, naming the cause, when no worker is consuming the queue,
  * when the persisted identity carries a `fixture` marker or comes from the
  * degraded `unavailable` adapter, when the safe fixture does not publish, or
@@ -49,6 +54,7 @@ import { execFileSync } from 'node:child_process'
 import fs from 'node:fs'
 import path from 'node:path'
 import { fileURLToPath } from 'node:url'
+import { readCommunityRolloutDefaults } from './lib/community-rollout-flags.mjs'
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url))
 const projectRoot = path.resolve(__dirname, '..')
@@ -202,6 +208,39 @@ export function assertTargetMatchesDatabase(target, databaseUrl) {
     )
   }
   return host
+}
+
+/** The flag that serves the feed the canary's synthetic post would publish into. */
+const FEED_FLAG = 'community_read_enabled'
+
+/**
+ * Why a hosted canary must not run against this feed, or null when it may. The
+ * canary's safe fixture publishes, and a published post is served by the feed,
+ * so a hosted run waits until nobody can be reading it (Story 6.2b final
+ * review, RF5): the flag's code default must be false, and the production
+ * flag cache (`feature_flags`, which the API keeps warm with PostHog's answer
+ * and falls back to before the code default) must not hold anything else.
+ */
+export function liveFeedRefusal({ codeDefault, cachedValue }) {
+  if (codeDefault !== false) {
+    return `${FEED_FLAG} defaults to ${String(codeDefault)} in packages/config/src/flags.ts, so the feed may be live and the canary's post would be served in it.`
+  }
+  if (cachedValue !== undefined && cachedValue !== false) {
+    return `The production flag cache holds ${FEED_FLAG} = ${JSON.stringify(cachedValue)}, so the feed may be live and the canary's post would be served in it.`
+  }
+  return null
+}
+
+function refuseLiveFeed(state) {
+  const refusal = liveFeedRefusal(state)
+  if (refusal) throw new CanaryFailure('feed_live', refusal, state)
+}
+
+async function cachedFeedFlag(db) {
+  const { rows } = await db.query('SELECT value FROM feature_flags WHERE key = $1', [
+    FEED_FLAG,
+  ])
+  return rows.length > 0 ? rows[0].value : undefined
 }
 
 /**
@@ -654,6 +693,12 @@ function jobTimings(job, enqueuedAt, observedTerminalAt) {
 async function driveCanary(context, options) {
   const { db, storage, queue, ids, objectPath, jobId, fixture } = context
   await db.connect()
+  if (options.target === 'hosted') {
+    refuseLiveFeed({
+      codeDefault: readCommunityRolloutDefaults().communityReadEnabled,
+      cachedValue: await cachedFeedFlag(db),
+    })
+  }
   const workers = await precheckWorkers(queue, options)
   await uploadFixture(storage, objectPath, fixture)
   context.created = true
@@ -730,6 +775,10 @@ export function recordCleanup(report, { keep, problems }) {
 export async function runCanary(options) {
   loadEnvFile(options.envFile)
   assertTargetMatchesDatabase(options.target, process.env.DATABASE_URL)
+  if (options.target === 'hosted') {
+    // Checked again against the production flag cache once the database is open.
+    refuseLiveFeed({ codeDefault: readCommunityRolloutDefaults().communityReadEnabled })
+  }
   options.expectSha ??= gitHeadSha()
   const clients = await openClients(options)
   const context = {

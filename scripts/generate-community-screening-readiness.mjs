@@ -44,6 +44,7 @@ import path from 'node:path'
 import { execFileSync } from 'node:child_process'
 import { fileURLToPath } from 'node:url'
 import { inputSetHash, inputSetPathspecs } from './lib/community-screening-input-set.mjs'
+import { readCommunityRolloutDefaults } from './lib/community-rollout-flags.mjs'
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url))
 const projectRoot = path.resolve(__dirname, '..')
@@ -910,19 +911,7 @@ function modelVerification() {
 }
 
 function rolloutSection() {
-  const source = fs.readFileSync(full('packages/config/src/flags.ts'), 'utf8')
-  const read = (key) => {
-    const match = new RegExp(
-      `${key}\\s*:\\s*\\{[^}]*?defaultValue\\s*:\\s*(true|false)`,
-      's'
-    ).exec(source)
-    return match ? match[1] === 'true' : null
-  }
-  return {
-    communityReadEnabled: read('community_read_enabled'),
-    communityWriteEnabled: read('community_write_enabled'),
-    source: 'packages/config/src/flags.ts defaultValue',
-  }
+  return readCommunityRolloutDefaults()
 }
 
 // ---------------------------------------------------------------- gates
