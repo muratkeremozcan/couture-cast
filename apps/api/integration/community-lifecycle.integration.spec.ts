@@ -86,9 +86,12 @@ const namespace = `community-lifecycle-${randomUUID().slice(0, 8)}`
  */
 const FIXTURE_PUBLISHED_AT = new Date('2025-06-01T00:00:00.000Z')
 
-async function createUser(label: string): Promise<string> {
+async function createUser(label: string, id?: string): Promise<string> {
   const user = await prisma.user.create({
-    data: { email: `${namespace}-${label}-${randomUUID().slice(0, 8)}@synthetic.test` },
+    data: {
+      ...(id ? { id } : {}),
+      email: `${namespace}-${label}-${randomUUID().slice(0, 8)}@synthetic.test`,
+    },
   })
   return user.id
 }
@@ -330,6 +333,96 @@ describe('6.1 community lifecycle sweeps', () => {
       // are already in the feed, and listing them twice would double them in the
       // client's merged view.
       expect(authorIds).not.toContain(live.id)
+    })
+  })
+
+  describe('operations canary', () => {
+    /*
+     * Story 6.2b final review (RF8). The hosted canary publishes a synthetic post
+     * through the real pipeline, and its refusal to run read the flag's code
+     * default and the database cache, but request-time evaluation asks PostHog
+     * for each viewer first, so a beta cohort could read the feed while both
+     * said off. The canary's account is therefore excluded wherever the public
+     * reads, in the same predicate that keeps a withdrawn or hidden post out,
+     * whatever the flags say.
+     *
+     * The canary post is stamped one millisecond after the member's and the
+     * cursor is anchored just after it, so a feed that served it would serve it
+     * first, at the head of its own window.
+     */
+    const MEMBER_PUBLISHED_AT = new Date('2025-05-01T00:00:00.000Z')
+    const CANARY_PUBLISHED_AT = new Date(MEMBER_PUBLISHED_AT.getTime() + 1)
+
+    async function publishCanaryAndMemberPosts(storage: InMemoryCommunityStorage) {
+      const canaryUserId = await createUser(
+        'canary',
+        `canary-user-${namespace}-${randomUUID().slice(0, 8)}`
+      )
+      const memberId = await createUser('member')
+      const canary = await createPost(storage, {
+        id: postId('canary'),
+        userId: canaryUserId,
+        status: 'published',
+        climateBand: 'warm_dry',
+        publishedAt: CANARY_PUBLISHED_AT,
+      })
+      const member = await createPost(storage, {
+        id: postId('member'),
+        userId: memberId,
+        status: 'published',
+        climateBand: 'warm_dry',
+        publishedAt: MEMBER_PUBLISHED_AT,
+      })
+      return { canaryUserId, memberId, canary, member }
+    }
+
+    it('6.2b-INT-001 never serves a published canary post in the feed, filtered or not', async (context) => {
+      if (!requireSchema(context)) return
+
+      const { canary, member } = await publishCanaryAndMemberPosts(
+        new InMemoryCommunityStorage()
+      )
+      const cursorAt = new Date(CANARY_PUBLISHED_AT.getTime() + 1).toISOString()
+
+      for (const filterBand of ['warm_dry', undefined] as const) {
+        const mode = filterBand ?? 'all'
+        const feed = await repository.findPublishedFeedPosts({
+          filterBand,
+          limit: 50,
+          mode,
+          cursor: {
+            publishedAt: cursorAt,
+            id: canary.id,
+            mode,
+            band: filterBand ?? null,
+          },
+        })
+        const feedIds = feed.posts.map((post) => post.id)
+        expect(feedIds[0]).toBe(member.id)
+        expect(feedIds).not.toContain(canary.id)
+      }
+    })
+
+    it('6.2b-INT-002 treats a published canary post as not visible to a reporter', async (context) => {
+      if (!requireSchema(context)) return
+
+      const { canary, member, memberId } = await publishCanaryAndMemberPosts(
+        new InMemoryCommunityStorage()
+      )
+      const report = (postIdValue: string) =>
+        repository.recordReport({
+          postId: postIdValue,
+          reporterId: memberId,
+          reason: 'spam',
+          abuseLimit: 50,
+          slaHours: 24,
+          subjectAlias: 'Style Explorer ABCD1234',
+        })
+
+      await expect(report(canary.id)).resolves.toEqual({ kind: 'post_not_visible' })
+      // The member's own post is published and visible, so the refusal above is
+      // the canary exclusion and not a visibility check that refuses everything.
+      await expect(report(member.id)).resolves.toEqual({ kind: 'self_report' })
     })
   })
 

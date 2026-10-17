@@ -962,6 +962,20 @@ describe('CommunityService', () => {
         service.getPost({ userId: viewerUserId, postId: 'nope' })
       ).rejects.toThrow(NotFoundException)
     })
+
+    it('answers 404 for a published post the operations canary wrote', async () => {
+      // Story 6.2b final review (RF8): the canary's synthetic post is published
+      // through the real pipeline and must never be served, whatever the flags.
+      const { service, findPostById } = createService()
+      findPostById.mockResolvedValueOnce({
+        ...publishedPost,
+        user_id: 'canary-user-run1',
+      })
+
+      await expect(
+        service.getPost({ userId: viewerUserId, postId: 'post-other-user' })
+      ).rejects.toThrow(NotFoundException)
+    })
   })
 
   describe('recordCardOpened', () => {
@@ -1000,6 +1014,25 @@ describe('CommunityService', () => {
         'community_card_opened',
         expect.objectContaining({ isSelf: true })
       )
+    })
+
+    it('rejects a card-open on a published post the operations canary wrote', async () => {
+      // Story 6.2b final review (RF8).
+      const { service, findPostById, captureEvent } = createService()
+      findPostById.mockResolvedValueOnce({
+        ...publishedPost,
+        user_id: 'canary-user-run1',
+      })
+
+      await expect(
+        service.recordCardOpened({
+          userId: viewerUserId,
+          postId: 'post-other-user',
+          platform: 'web',
+          input: { experimentVariant: 'auto' },
+        })
+      ).rejects.toThrow(NotFoundException)
+      expect(captureEvent).not.toHaveBeenCalled()
     })
 
     it('rejects a card-open on a post that is not published', async () => {
