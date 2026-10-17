@@ -402,13 +402,18 @@ and `queue.add` with an existing job id returns the existing job instead of crea
 re-arming an outbox row alone is a silent no-op inside that window. To genuinely re-screen a post,
 remove the retained job first (`queue.getJob(<postId>__<uploadSessionId>)` then `job.remove()`) and
 re-arm its outbox row by clearing `dispatched_at`, or give the post a new upload session, which
-changes the object path and therefore the job id.
+changes the object path and therefore the job id. The processor screens only a post in
+`pending_review` and skips every other status, so a replayed job leaves a post that is already
+`flagged` or `review_failed` as it is. No operator action moves a post back to `pending_review`
+yet, and the admin retry of a `JobFailure` row (`AdminService.retryFailedJob`) does not either:
+it adds a new job with a generated id, the job skips the post, and the row is deleted. Both are
+recorded in deferred work.
 
 **Draining the review queue.** Posts refused during the incident carry
 `moderation_reason = 'screening_unavailable'` and
 `moderation_engine_version = '<text engine>;adr013-nsfw-unavailable'`, which is the query that
 separates them from posts a real model refused. Release or take down each one through the operator
-actions, or re-screen the batch using the replay above once the model is back.
+actions. The replay above re-screens only posts still in `pending_review`.
 
 The community worker has a container image and the runbook below, and no hosted target runs it
 yet: the Northflank service is created once the owner adds `NORTHFLANK_API_TOKEN`. The general
@@ -445,11 +450,17 @@ bootstrap's graceful shutdown: the consumer stops taking jobs and waits for the 
 `SIGKILL` 30 seconds after `SIGTERM` by default (`gracePeriodSeconds`, 15 to 1,800 seconds,
 northflank.com/docs/v1/application/scale/scale-instances, read 2026-10-17); leave it at 30 or
 above. One screening may take up to 30 seconds, so a deploy can cut off a slow job. That job is
-abandoned: it neither completes nor fails, its lock expires, and BullMQ requeues it on the stalled
-check after the one that first finds it unlocked. The check runs when the new worker starts and
-every 600 seconds, so the job comes back 10 to 20 minutes after the restart. If the post's
-15-minute stale-review window runs out first, it moves to `review_failed` with a retryable
-`JobFailure` row, and the redelivered job skips it. Production otherwise logs at `warn`; the image
+abandoned, as is a job whose worker crashed: it neither completes nor fails, its 30-second lock
+expires, and a stalled check returns it to `waiting`. The check runs every 120 seconds across all
+workers and when a worker starts, and it requeues a job an earlier check marked, so the job is
+back at most two checks after the crash or the restart, whichever is later: 300 seconds with a
+three-minute restart. Counting the attempts the job may already have spent and the redelivered
+attempt, recovery takes at most 423 seconds, inside the 15-minute window after which the
+stale-review sweep fails a post (`communityCrashRecoveryMs` in `community-moderation.worker.ts`;
+`community-moderation-crash-recovery.integration.spec.ts` kills a worker mid-screening against
+real Redis). A post the sweep does fail moves to `review_failed` with a `JobFailure` row, the
+redelivered job skips it, and the admin retry of that row does not re-screen it (see the replay
+section above). Production otherwise logs at `warn`; the image
 sets `LOG_LEVEL=info` so the readiness line is visible, and `NO_COLOR=1` so the Nest logger writes
 no escape codes.
 
@@ -638,7 +649,8 @@ not restart evidence. The payload's `canary.restart` section holds the result.
 build on the host, or stop the service: queued jobs wait in Redis and the stale-review sweep moves
 anything pending past its window to `review_failed`. If the model is the problem, switch to the
 degraded mode above. Run the hosted canary after any rollback, then re-screen posts refused during
-the incident with the retained-job replay.
+the incident through the operator actions (the replay re-screens only posts still in
+`pending_review`).
 
 **Redis cost.** The production Upstash database (`couturecast-prod`) is on the Pay as You Go plan,
 which bills 0.20 USD per 100K commands and includes no free commands once a database is on a paid
@@ -646,8 +658,9 @@ plan (upstash.com/pricing/redis, read 2026-10-17). An idle BullMQ consumer polls
 continuously. With BullMQ's defaults (a 5-second idle block and a 30-second stalled check) an idle
 worker spent about 4.8 million commands a month, about 9.50 USD (the payload's
 `redis.beforeTuning`). The community worker now blocks for 300 seconds while idle and checks for
-stalled jobs every 600 seconds (`community-moderation.worker.ts`); a new job still wakes it at
-once. `npm run community:screening:measure:redis` measures the idle cost against a local Redis only the worker uses, sampling `CLIENT LIST` every 15 seconds
+stalled jobs every 120 seconds (`community-moderation.worker.ts`); a new job still wakes it at
+once. The stalled check was 600 seconds until Story 6.2b review RF13 shortened it so a crashed
+worker's job recovers before the stale-review sweep; the measured idle cost includes it. `npm run community:screening:measure:redis` measures the idle cost against a local Redis only the worker uses, sampling `CLIENT LIST` every 15 seconds
 to prove the container's named worker stayed connected for the whole window, and
 `node scripts/measure-community-worker-redis.mjs --canary-runs 5 --idle-baseline <idle product>`
 measures the cost of one screened post. Both count every command Redis records, including those
