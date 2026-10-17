@@ -2,7 +2,7 @@
 title: 'Story 6.2b: Community screening release gate and worker deployment'
 type: 'feature'
 created: '2026-09-07'
-status: 'in-progress'
+status: 'done'
 baseline_commit: '1a678c51b213b2c8fff6f2354e9556abf2f96fe7'
 story_key: '6-2b-community-screening-release-gate'
 review_loop_iteration: 1
@@ -16,7 +16,7 @@ context:
 
 ## Story 6.2b: Community screening release gate and worker deployment
 
-Status: in-progress
+Status: done
 
 **Story key:** `6-2b-community-screening-release-gate`
 **Epic:** 6, Community & Moderation Loop, Phase 2
