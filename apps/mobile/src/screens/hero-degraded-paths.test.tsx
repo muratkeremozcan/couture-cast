@@ -5,7 +5,7 @@
 import React from 'react'
 import type * as ReactNativeModule from 'react-native'
 import type * as RitualCacheModule from '@/src/lib/ritual-cache'
-import { act, fireEvent, screen, waitFor } from '@testing-library/react'
+import { act, configure, fireEvent, screen, waitFor } from '@testing-library/react'
 import { render } from 'vitest-browser-react'
 import { afterEach, beforeAll, beforeEach, describe, expect, it, vi } from 'vitest'
 import { http, HttpResponse } from 'msw'
@@ -92,6 +92,10 @@ describe('TabOneScreen degraded and native-only paths', () => {
   beforeAll(async () => {
     process.env.EXPO_PUBLIC_API_BASE_URL =
       typeof window !== 'undefined' ? window.location.origin : 'https://mock-api.test'
+    // The swap sheet's open and close each take a render and an MSW round trip,
+    // which outran the 1000ms default during a loaded `npm run validate`
+    // (3.3-MOB-HERO-21 timed out waiting for the sheet to close).
+    configure({ asyncUtilTimeout: 5_000 })
     await initI18n()
   })
 
