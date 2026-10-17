@@ -2,8 +2,9 @@
 // gate. The scripts under test are operations commands; what is asserted here is
 // the logic that decides whether they refuse, so a regression in a refusal
 // fails the ordinary suite instead of a deploy.
-import { execFileSync } from 'node:child_process'
+import { execFileSync, spawnSync } from 'node:child_process'
 import fs from 'node:fs'
+import os from 'node:os'
 import path from 'node:path'
 import { describe, expect, it } from 'vitest'
 
@@ -399,6 +400,117 @@ describe('committed corpora and lists, checked in the ordinary suite', () => {
       path.join(repoRoot, 'apps/api/.cache/no-such-store')
     )
     expect(result.problems).toEqual([])
+  })
+})
+
+interface RegressionGateModule {
+  assessRuntimeAgainstGates: (
+    report: Record<string, unknown>,
+    performance: Record<string, unknown>
+  ) => { ok: boolean; failures: string[] }
+}
+
+/**
+ * Story 6.2 Task 6: a runtime measurement above the committed regression gate
+ * or an absolute ceiling must fail the command, not just appear in a report.
+ */
+type GatedMetric = 'coldStartupMs' | 'warmP95Ms' | 'warmP99Ms' | 'peakResidentMib'
+
+describe('runtime regression gate', () => {
+  const manifestPath = path.join(
+    repoRoot,
+    'apps/api/model-manifests/community-nsfw-mobilenet-v2-mid-nsfwjs-4.3.0.json'
+  )
+  const performance = (
+    JSON.parse(fs.readFileSync(manifestPath, 'utf8')) as {
+      performance: {
+        regressionGate: Record<GatedMetric, number>
+        absoluteCeilings: Record<GatedMetric, number>
+      }
+    }
+  ).performance
+  const gate = performance.regressionGate
+
+  /** A report exactly at every regression gate, which must still pass. */
+  const atGate = () => ({
+    warmSamples: 1000,
+    coldStartupMs: gate.coldStartupMs,
+    warmSupervisedMs: { p95: gate.warmP95Ms, p99: gate.warmP99Ms },
+    peakResidentMib: gate.peakResidentMib,
+  })
+
+  function runGate(report: Record<string, unknown>) {
+    const directory = fs.mkdtempSync(path.join(os.tmpdir(), 'community-gate-'))
+    const reportPath = path.join(directory, 'runtime.json')
+    fs.writeFileSync(reportPath, JSON.stringify(report))
+    try {
+      return spawnSync(
+        process.execPath,
+        [
+          path.join(repoRoot, 'scripts/check-community-worker-regression-gate.mjs'),
+          reportPath,
+        ],
+        { cwd: repoRoot, encoding: 'utf8' }
+      )
+    } finally {
+      fs.rmSync(directory, { recursive: true, force: true })
+    }
+  }
+
+  it('commits a gate for every metric it checks, never above its ceiling', () => {
+    const metrics: GatedMetric[] = [
+      'coldStartupMs',
+      'warmP95Ms',
+      'warmP99Ms',
+      'peakResidentMib',
+    ]
+    for (const key of metrics) {
+      expect(gate[key]).toBeGreaterThan(0)
+      expect(gate[key]).toBeLessThanOrEqual(performance.absoluteCeilings[key])
+    }
+  })
+
+  it('exits 0 for a run at the gate and 1 for a run one step past it', () => {
+    const passing = runGate(atGate())
+    expect(passing.status, passing.stderr).toBe(0)
+
+    const slow = runGate({
+      ...atGate(),
+      warmSupervisedMs: { p95: gate.warmP95Ms + 0.01, p99: gate.warmP99Ms },
+    })
+    expect(slow.status).toBe(1)
+    expect(slow.stderr).toMatch(/warmP95Ms .* above the regression gate/)
+  })
+
+  it.each([
+    ['cold startup past its gate', { coldStartupMs: gate.coldStartupMs + 1 }],
+    ['warm p99 past its gate', { warmSupervisedMs: { p95: 1, p99: gate.warmP99Ms + 1 } }],
+    ['peak RSS past the memory ceiling', { peakResidentMib: gate.peakResidentMib + 1 }],
+    ['a missing measurement', { peakResidentMib: undefined }],
+    ['no warm samples', { warmSamples: 0 }],
+  ])('fails on %s', async (_label, patch) => {
+    const { assessRuntimeAgainstGates } = await load<RegressionGateModule>(
+      'scripts/check-community-worker-regression-gate.mjs'
+    )
+    const verdict = assessRuntimeAgainstGates({ ...atGate(), ...patch }, performance)
+    expect(verdict.ok).toBe(false)
+    expect(verdict.failures.length).toBeGreaterThan(0)
+  })
+
+  it('fails when the manifest drops a gate, so a deleted limit cannot pass silently', async () => {
+    const { assessRuntimeAgainstGates } = await load<RegressionGateModule>(
+      'scripts/check-community-worker-regression-gate.mjs'
+    )
+    const withoutP95 = Object.fromEntries(
+      Object.entries(gate).filter(([key]) => key !== 'warmP95Ms')
+    )
+    const verdict = assessRuntimeAgainstGates(atGate(), {
+      ...performance,
+      regressionGate: withoutP95,
+    })
+    expect(verdict.failures).toContain(
+      'the manifest has no regression gate for warmP95Ms'
+    )
   })
 })
 

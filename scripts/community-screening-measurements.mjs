@@ -55,6 +55,10 @@ const COMMANDS = {
     verifySupplyChain: 'npm run verify:community-screening-supply-chain --workspace api',
     smoke: 'npm run test:community-screening-model:smoke --workspace api',
     readiness: 'npm run test:community-screening-readiness --workspace api',
+    // Re-measures startup, warm latency and peak RSS from compiled output and
+    // exits 1 when any value is above performance.regressionGate or
+    // performance.absoluteCeilings in the model manifest.
+    runtimeGate: 'npm run community:screening:measure:gate',
   },
   pipeline: {
     integration:
@@ -397,6 +401,7 @@ function buildPerformanceBlock(modelManifest) {
   return {
     available: true,
     source: `${MODEL_MANIFEST} performance.measured`,
+    gatedBy: COMMANDS.model.runtimeGate,
     executedFrom: performance.measured.environment?.executedFrom ?? null,
     measured: performance.measured,
     absoluteCeilings: performance.absoluteCeilings ?? null,
