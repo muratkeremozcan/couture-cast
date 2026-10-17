@@ -673,7 +673,8 @@
       "textUnreadable": "Il controllo non è riuscito a verificare tutta la didascalia o la descrizione dell’immagine. Accorciala e scrivila in una sola lingua prima di condividere di nuovo questo look.",
       "photo": "Questa foto non rispetta le linee guida della community.",
       "photoUnconfirmed": "Il controllo non è riuscito a confermare che questa foto rispetti le linee guida della community. Una foto più nitida dell’outfit potrebbe essere accettata.",
-      "incomplete": "Il controllo di questo look non si è concluso."
+      "incomplete": "Il controllo di questo look non si è concluso.",
+      "upload": "Non è stato possibile elaborare questa foto così come è stata caricata. Condividi di nuovo questo look con una foto JPEG, PNG o WebP fino a 10 MB e da 256 a 4096 pixel per lato."
     },
     "challenge": {
       "eyebrow": "Sfida di stile settimanale",

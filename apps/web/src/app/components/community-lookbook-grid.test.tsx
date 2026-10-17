@@ -1241,6 +1241,33 @@ describe('CommunityLookbookGrid (Story 6.1)', () => {
       }
     })
 
+    it('6.2b-WEB-001 tells the author to upload again when the stored photo failed verification', async () => {
+      // Story 6.2b review (RF12): the worker persists the validation code it
+      // caught, and the five upload failures reached the author raw.
+      signIn()
+      useMswHandlers(
+        feedHandler({
+          authorStates: [
+            authorState({
+              id: 'as-checksum',
+              status: 'review_failed',
+              moderationReason: 'IMAGE_CHECKSUM_MISMATCH',
+            }),
+          ],
+        })
+      )
+      renderGrid()
+
+      const section = await screen.findByTestId('community-author-states')
+      expect(
+        within(section).getByTestId('author-state-reason-as-checksum')
+      ).toHaveTextContent(
+        'This photo could not be processed as it was uploaded. Share this look again with a JPEG, PNG or WebP photo up to 10 MB and between 256 and 4096 pixels on each side.'
+      )
+      expect(section).not.toHaveTextContent('IMAGE_CHECKSUM_MISMATCH')
+      expect(section).not.toHaveTextContent('Reason:')
+    })
+
     it('6.1-WEB-021 renders flagged content in deep merlot rather than success gold', async () => {
       signIn()
       useMswHandlers(feedHandler({ authorStates: states }))

@@ -1,4 +1,8 @@
 import { createHash } from 'node:crypto'
+import {
+  communityImageValidationCodeSchema,
+  type CommunityImageValidationCode,
+} from '@couture/api-client/contracts/http'
 import sharp from 'sharp'
 import {
   GarmentImageValidationError,
@@ -8,10 +12,23 @@ import {
   type GarmentMimeType,
 } from '../wardrobe/wardrobe-image-validation.js'
 
-export {
-  GarmentImageValidationError as CommunityImageValidationError,
-  type GarmentMimeType as CommunityMimeType,
+export { type GarmentMimeType as CommunityMimeType }
+
+/**
+ * An upload that failed verification. Its code is one of the shared
+ * `communityImageValidationCodeSchema` members, which the moderation worker
+ * persists and every client maps to localized recovery copy (Story 6.2b
+ * review, RF12). It stays a `GarmentImageValidationError`, the wardrobe
+ * pipeline's verification error it shares its checks with.
+ */
+export class CommunityImageValidationError extends GarmentImageValidationError {
+  constructor(override readonly code: CommunityImageValidationCode) {
+    super(code)
+    this.name = 'CommunityImageValidationError'
+  }
 }
+
+const CODE = communityImageValidationCodeSchema.enum
 
 export const MAX_COMMUNITY_IMAGE_BYTES = MAX_GARMENT_IMAGE_BYTES
 export const MIN_COMMUNITY_IMAGE_DIMENSION = MIN_GARMENT_IMAGE_DIMENSION
@@ -77,16 +94,16 @@ function verifyDeclaration(
     bytes.length > MAX_COMMUNITY_IMAGE_BYTES ||
     bytes.length !== declaration.byteSize
   ) {
-    throw new GarmentImageValidationError('IMAGE_SIZE_MISMATCH')
+    throw new CommunityImageValidationError(CODE.IMAGE_SIZE_MISMATCH)
   }
 
   const sniffedMime = detectMimeType(bytes)
   if (!sniffedMime || sniffedMime !== declaration.mimeType) {
-    throw new GarmentImageValidationError('UNSUPPORTED_IMAGE_TYPE')
+    throw new CommunityImageValidationError(CODE.UNSUPPORTED_IMAGE_TYPE)
   }
 
   if (createHash('sha256').update(bytes).digest('hex') !== declaration.sha256) {
-    throw new GarmentImageValidationError('IMAGE_CHECKSUM_MISMATCH')
+    throw new CommunityImageValidationError(CODE.IMAGE_CHECKSUM_MISMATCH)
   }
 
   return sniffedMime
@@ -99,7 +116,7 @@ function assertDimensionsInRange(width: number, height: number): void {
     width > MAX_COMMUNITY_IMAGE_DIMENSION ||
     height > MAX_COMMUNITY_IMAGE_DIMENSION
   ) {
-    throw new GarmentImageValidationError('IMAGE_DIMENSIONS_INVALID')
+    throw new CommunityImageValidationError(CODE.IMAGE_DIMENSIONS_INVALID)
   }
 }
 
@@ -138,7 +155,7 @@ export async function verifyAndNormalizeCommunityImage(
 
     const metadata = await pipeline.metadata()
     if (metadata.format !== format || (metadata.pages ?? 1) !== 1) {
-      throw new GarmentImageValidationError('IMAGE_DECODE_FAILED')
+      throw new CommunityImageValidationError(CODE.IMAGE_DECODE_FAILED)
     }
 
     const { data, info } = await pipeline
@@ -157,9 +174,9 @@ export async function verifyAndNormalizeCommunityImage(
       heightPx: info.height,
     }
   } catch (error) {
-    if (error instanceof GarmentImageValidationError) {
+    if (error instanceof CommunityImageValidationError) {
       throw error
     }
-    throw new GarmentImageValidationError('IMAGE_DECODE_FAILED')
+    throw new CommunityImageValidationError(CODE.IMAGE_DECODE_FAILED)
   }
 }

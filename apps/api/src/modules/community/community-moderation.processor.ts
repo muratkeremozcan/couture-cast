@@ -2,6 +2,7 @@
 // Implements ADR-013 transactional content screening, publishing, flagging,
 // SLA alert recording, and retry exhaustion handling.
 import { Inject, Injectable, Logger, Optional } from '@nestjs/common'
+import { communityImageValidationCodeSchema } from '@couture/api-client/contracts/http'
 import { PrismaClient, type ClimateBand, type LookbookPost } from '@prisma/client'
 import {
   TelemetryService,
@@ -101,6 +102,12 @@ export async function withModerationTimeout<T>(
     clearTimeout(timer)
   }
 }
+
+/**
+ * The reason a flag persists when screening flagged the post without naming a
+ * reason code.
+ */
+export const FLAGGED_BY_SCREENING_REASON = 'flagged_by_screening'
 
 @Injectable()
 export class CommunityModerationProcessor {
@@ -307,7 +314,9 @@ export class CommunityModerationProcessor {
     }
   ): Promise<Buffer> {
     if (!declared.byteSize || !declared.mimeType || !declared.sha256) {
-      throw new CommunityImageValidationError('IMAGE_DECLARATION_MISSING')
+      throw new CommunityImageValidationError(
+        communityImageValidationCodeSchema.enum.IMAGE_DECLARATION_MISSING
+      )
     }
 
     const normalized = await verifyAndNormalizeCommunityImage(rawBytes, {
@@ -435,7 +444,7 @@ export class CommunityModerationProcessor {
     engineVersion: string,
     post: LookbookPost
   ): Promise<void> {
-    const reason = screeningResult.reasons.join(', ') || 'flagged_by_screening'
+    const reason = screeningResult.reasons.join(', ') || FLAGGED_BY_SCREENING_REASON
     const flaggedAt = new Date()
 
     await this.prisma.$transaction(async (tx) => {

@@ -178,16 +178,38 @@ export const communityModerationReasonCategorySchema = z.enum([
   'photo',
   'photoUnconfirmed',
   'incomplete',
+  'upload',
 ])
 export type CommunityModerationReasonCategory = z.infer<
   typeof communityModerationReasonCategorySchema
 >
 
 /**
+ * The codes the moderation worker persists when the stored upload fails
+ * verification before anything screens it: a missing declaration, a size, type
+ * or checksum that differs from the declaration, dimensions outside the
+ * accepted range, or bytes that do not decode. The API's community image
+ * validation throws only these, and the processor persists the one it caught
+ * (Story 6.2b review, RF12). Each is the author's to fix by uploading again.
+ */
+export const communityImageValidationCodeSchema = z.enum([
+  'IMAGE_DECLARATION_MISSING',
+  'IMAGE_SIZE_MISMATCH',
+  'UNSUPPORTED_IMAGE_TYPE',
+  'IMAGE_CHECKSUM_MISMATCH',
+  'IMAGE_DIMENSIONS_INVALID',
+  'IMAGE_DECODE_FAILED',
+])
+export type CommunityImageValidationCode = z.infer<
+  typeof communityImageValidationCodeSchema
+>
+
+/**
  * Every stable code the moderation pipeline persists on `moderationReason`,
  * mapped to the category the author sees. The codes come from
  * `apps/api/policies/community-screening` (`reasonCodes.image` and
- * `reasonCodes.text`) plus the three the pipeline writes on its own;
+ * `reasonCodes.text`), the image validation codes, and the three the pipeline
+ * writes on its own;
  * `apps/api/integration/community-moderation-reason-codes.spec.ts` fails when
  * the API can emit a code this map does not name.
  */
@@ -209,6 +231,9 @@ export const COMMUNITY_MODERATION_REASON_CATEGORY: Readonly<
   screening_unavailable: 'incomplete',
   flagged_by_screening: 'incomplete',
   moderation_stalled: 'incomplete',
+  ...Object.fromEntries(
+    communityImageValidationCodeSchema.options.map((code) => [code, 'upload' as const])
+  ),
 })
 
 /**

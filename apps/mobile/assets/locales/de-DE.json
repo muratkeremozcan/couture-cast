@@ -673,7 +673,8 @@
       "textUnreadable": "Die Prüfung konnte deine Bildunterschrift oder Bildbeschreibung nicht vollständig prüfen. Fasse dich kürzer und schreibe in einer Sprache, bevor du diesen Look erneut teilst.",
       "photo": "Dieses Foto entspricht nicht den Community-Richtlinien.",
       "photoUnconfirmed": "Die Prüfung konnte nicht bestätigen, dass dieses Foto den Community-Richtlinien entspricht. Ein deutlicheres Foto des Outfits kann die Prüfung bestehen.",
-      "incomplete": "Die Prüfung dieses Looks konnte nicht abgeschlossen werden."
+      "incomplete": "Die Prüfung dieses Looks konnte nicht abgeschlossen werden.",
+      "upload": "Dieses Foto konnte so, wie es hochgeladen wurde, nicht verarbeitet werden. Teile diesen Look erneut mit einem JPEG-, PNG- oder WebP-Foto bis 10 MB und mit 256 bis 4096 Pixeln pro Seite."
     },
     "challenge": {
       "eyebrow": "Wöchentliche Style-Challenge",

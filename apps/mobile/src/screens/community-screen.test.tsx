@@ -814,6 +814,26 @@ describe('Mobile community screen (Story 6.1)', () => {
     )
   })
 
+  it('6.2b-MOB-001 tells the author to upload again when the stored photo failed verification', async () => {
+    // Story 6.2b review (RF12): the worker persists the validation code it
+    // caught, and the five upload failures reached the author raw.
+    serveFeed(() =>
+      feedJson({
+        authorStates: [
+          authorState('review_failed', { moderationReason: 'IMAGE_DECODE_FAILED' }),
+        ],
+      })
+    )
+
+    await render(<CommunityScreen />)
+
+    const section = await screen.findByTestId('community-author-states')
+    expect(
+      screen.getByTestId('community-author-state-reason-own-review_failed').textContent
+    ).toBe(enUS.community.moderationReason.upload)
+    expect(section.textContent).not.toContain('IMAGE_DECODE_FAILED')
+  })
+
   it('6.1-MOB-010 renders author states in their own section, never in the grid', async () => {
     const explained = [
       'flagged',

@@ -4,14 +4,26 @@
 // falls back to the raw string, which is how `text_policy_match` reached the
 // author verbatim before this map existed. This spec makes that fallback
 // reachable only by a moderator's free-text takedown reason.
+//
+// Story 6.2b review (RF12): the codes come from what the pipeline declares,
+// not from a scan of literal assignments. A literal scan missed the image
+// validation codes, which the processor persists from the error it caught;
+// they now come from `communityImageValidationCodeSchema`, the enumeration the
+// validation throws.
 import fs from 'node:fs'
 import path from 'node:path'
-import { COMMUNITY_MODERATION_REASON_CATEGORY } from '@couture/api-client/contracts/http'
+import {
+  COMMUNITY_MODERATION_REASON_CATEGORY,
+  communityImageValidationCodeSchema,
+  communityModerationReasonCategories,
+} from '@couture/api-client/contracts/http'
 import { describe, expect, it } from 'vitest'
+import { MODERATION_STALLED_REASON } from '../src/modules/community/community-maintenance.service'
 import {
   IMAGE_DISPOSITION_CONFLICT_REASON,
   SCREENING_UNAVAILABLE_REASON,
 } from '../src/modules/community/community-moderation.engine'
+import { FLAGGED_BY_SCREENING_REASON } from '../src/modules/community/community-moderation.processor'
 import {
   LOCALE_UNSCREENABLE_REASON,
   SCRIPT_MIXED_REASON,
@@ -22,7 +34,6 @@ import {
 import { NSFW_IMAGE_REASON_CODES } from '../src/modules/community/tensorflow-nsfw-image-screener'
 
 const apiRoot = path.resolve(__dirname, '..')
-const communitySource = path.join(apiRoot, 'src/modules/community')
 
 /** Reason codes declared by every committed screening policy. */
 function policyReasonCodes(): string[] {
@@ -41,36 +52,14 @@ function policyReasonCodes(): string[] {
     })
 }
 
-/**
- * Literal codes the pipeline writes outside the policy: the maintenance sweep's
- * `moderation_reason: 'moderation_stalled'` and the processor's
- * `|| 'flagged_by_screening'` fallback for an empty reason list.
- */
-function literalPipelineCodes(): string[] {
-  return fs
-    .readdirSync(communitySource)
-    .filter((name) => name.endsWith('.ts') && !name.endsWith('.spec.ts'))
-    .flatMap((name) => {
-      const source = fs.readFileSync(path.join(communitySource, name), 'utf8')
-      return [
-        ...source.matchAll(/moderation_reason:\s*'([a-z_]+)'/g),
-        ...source.matchAll(/reasons\.join\([^)]*\)\s*\|\|\s*'([a-z_]+)'/g),
-      ].map((match) => match[1] ?? '')
-    })
-}
-
 describe('6.2 moderation reason copy coverage', () => {
-  it('finds the literal codes it scans for, so an empty scan cannot pass', () => {
-    expect(new Set(literalPipelineCodes())).toEqual(
-      new Set(['moderation_stalled', 'flagged_by_screening'])
-    )
-  })
-
   it('gives every code the API can persist an author-facing category', () => {
     const emitted = new Set([
       ...policyReasonCodes(),
-      ...literalPipelineCodes(),
+      ...communityImageValidationCodeSchema.options,
       ...NSFW_IMAGE_REASON_CODES,
+      MODERATION_STALLED_REASON,
+      FLAGGED_BY_SCREENING_REASON,
       SCREENING_UNAVAILABLE_REASON,
       IMAGE_DISPOSITION_CONFLICT_REASON,
       TEXT_POLICY_MATCH_REASON,
@@ -83,5 +72,15 @@ describe('6.2 moderation reason copy coverage', () => {
       (code) => !Object.hasOwn(COMMUNITY_MODERATION_REASON_CATEGORY, code)
     )
     expect(uncovered).toEqual([])
+  })
+
+  it('tells the author to upload again for every image validation failure', () => {
+    // Story 6.2b review (RF12): these five reached authors as raw codes.
+    for (const code of communityImageValidationCodeSchema.options) {
+      expect({ code, categories: communityModerationReasonCategories(code) }).toEqual({
+        code,
+        categories: ['upload'],
+      })
+    }
   })
 })

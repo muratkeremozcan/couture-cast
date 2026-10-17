@@ -673,7 +673,8 @@
       "textUnreadable": "İnceleme, açıklama yazının veya görsel açıklamanın tamamını kontrol edemedi. Bu kombini yeniden paylaşmadan önce metni kısalt ve tek bir dilde yaz.",
       "photo": "Bu fotoğraf topluluk kurallarına uymuyor.",
       "photoUnconfirmed": "İnceleme, bu fotoğrafın topluluk kurallarına uyduğunu doğrulayamadı. Kıyafetin daha net bir fotoğrafı onaylanabilir.",
-      "incomplete": "Bu kombinin incelemesi tamamlanamadı."
+      "incomplete": "Bu kombinin incelemesi tamamlanamadı.",
+      "upload": "Bu fotoğraf yüklendiği hâliyle işlenemedi. Bu kombini en fazla 10 MB olan ve her kenarı 256 ile 4096 piksel arasında olan bir JPEG, PNG veya WebP fotoğrafla yeniden paylaş."
     },
     "challenge": {
       "eyebrow": "Haftalık stil yarışması",

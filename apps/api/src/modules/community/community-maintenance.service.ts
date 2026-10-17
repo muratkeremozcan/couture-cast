@@ -17,6 +17,8 @@ import { COMMUNITY_MODERATION_QUEUE } from './community-moderation.queue.js'
  * cycles plus the moderation queue's five-minute alert SLA.
  */
 export const STALE_PENDING_REVIEW_MINUTES = 15
+/** The reason the stale-review sweep persists on a post it fails. */
+export const MODERATION_STALLED_REASON = 'moderation_stalled'
 
 /**
  * The deadline the spec puts on erasure: "deletion completes within 72 hours".
@@ -84,7 +86,7 @@ export class CommunityMaintenanceService {
         where: { id: post.id, status: 'pending_review' },
         data: {
           status: 'review_failed',
-          moderation_reason: 'moderation_stalled',
+          moderation_reason: MODERATION_STALLED_REASON,
         },
       })
       if (updated.count !== 1) {
