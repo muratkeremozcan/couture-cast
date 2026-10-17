@@ -5,6 +5,7 @@ import { spawn } from 'node:child_process'
 import { config as loadEnv } from 'dotenv'
 import { applyLocalE2eDatabaseUrl, isLocalTestRun } from './local-e2e-database.mjs'
 import {
+  e2eStackLauncherPath,
   e2eStackRecordPath,
   removeE2eStackRecordIfOwned,
   writeE2eStackRecord,
@@ -219,13 +220,23 @@ for (const signal of ['SIGINT', 'SIGTERM']) {
 // the reset just dropped, so the teardown stops this process first, through the
 // ownership record written here. The record is keyed by this checkout and web
 // port, so another checkout's or another port's run never reads it, and it is
-// removed on exit only while it still carries this run's token. See
+// removed on exit only while it still carries this run's token. It also records
+// this process's OS start time and absolute launcher path, which the teardown
+// re-reads from the live process before it signals (CX8b). See
 // playwright/global-teardown.ts.
 const stackRecordPath = e2eStackRecordPath(repoRoot, webUrl.port || '3005')
-const stackRecord = writeE2eStackRecord(stackRecordPath)
-process.once('exit', () =>
-  removeE2eStackRecordIfOwned(stackRecordPath, stackRecord.token)
-)
+const stackRecord = writeE2eStackRecord(stackRecordPath, {
+  launcherPath: e2eStackLauncherPath(repoRoot),
+})
+if (stackRecord) {
+  process.once('exit', () =>
+    removeE2eStackRecordIfOwned(stackRecordPath, stackRecord.token)
+  )
+} else {
+  console.warn(
+    `[start-api-e2e-with-workers] Started without the absolute script path ${e2eStackLauncherPath(repoRoot)} on the command line, so no ownership record was written and the Playwright teardown cannot stop this stack before it resets the database. Start it as node ${e2eStackLauncherPath(repoRoot)} to get one.`
+  )
+}
 
 async function runPreparation(command, args) {
   const child = spawn(command, args, {

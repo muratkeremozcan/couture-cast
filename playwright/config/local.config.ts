@@ -4,6 +4,7 @@ import { defineConfig } from '@playwright/test'
 import { log } from '@seontechnologies/playwright-utils/log'
 import { baseConfig } from './base.config'
 import { resolveEnvironmentConfig } from './environments'
+import { e2eStackLauncherPath } from '../../scripts/e2e-stack-pid.mjs'
 
 const repoRoot = path.resolve(__dirname, '..', '..')
 const environment = resolveEnvironmentConfig('local')
@@ -46,7 +47,9 @@ export default defineConfig(
       healthEndpoint: new URL('/api/health', environment.webBaseUrl).toString(),
     },
     webServer: {
-      command: 'node scripts/start-api-e2e-with-workers.mjs --with-web',
+      // The absolute launcher path, so the global teardown can find it on this
+      // process's command line before it signals it (Story 6.2b, CX8b).
+      command: `node ${JSON.stringify(e2eStackLauncherPath(repoRoot))} --with-web`,
       url: environment.webBaseUrl,
       reuseExistingServer: false,
       timeout: 240_000,

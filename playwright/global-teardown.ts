@@ -1,6 +1,10 @@
 import { execSync } from 'node:child_process'
 import path from 'node:path'
-import { e2eStackRecordPath, stopE2eStack } from '../scripts/e2e-stack-pid.mjs'
+import {
+  e2eStackLauncherPath,
+  e2eStackRecordPath,
+  stopE2eStack,
+} from '../scripts/e2e-stack-pid.mjs'
 import { resolveEnvironmentConfig } from './config/environments'
 
 function isLocalDatabaseUrl(value: string): boolean {
@@ -27,13 +31,20 @@ function isLocalDatabaseUrl(value: string): boolean {
  * handler shuts its children down gracefully.
  *
  * Only this run's stack: the record is keyed by this checkout and the web port
- * the launcher served, and the pid is signalled only while it still runs the
- * launcher, so a stale record whose pid was reused stops nothing.
+ * the launcher served, and the pid is signalled only while the live process has
+ * the OS start time the launcher recorded and this checkout's absolute launcher
+ * path on its command line, so a stale record whose pid was reused, even by
+ * another checkout's launcher, stops nothing.
  */
 async function stopThisRunsE2eStack(): Promise<void> {
   const repoRoot = path.resolve(__dirname, '..')
   const webPort = new URL(resolveEnvironmentConfig('local').webBaseUrl).port || '3005'
-  await stopE2eStack(e2eStackRecordPath(repoRoot, webPort))
+  const outcome = await stopE2eStack(e2eStackRecordPath(repoRoot, webPort), {
+    expectedLauncherPath: e2eStackLauncherPath(repoRoot),
+  })
+  if (outcome !== 'stopped' && outcome !== 'no-record') {
+    console.warn(`E2E stack teardown signalled nothing: ${outcome}`)
+  }
 }
 
 export default async function globalTeardown() {
