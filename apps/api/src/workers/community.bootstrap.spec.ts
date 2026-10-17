@@ -1,14 +1,21 @@
 // Learning path Step 39: Production content-screening readiness.
 // Story 6.2 Task 5: the dedicated community process starts ready and closes clean.
 import { beforeEach, describe, expect, it, vi } from 'vitest'
-import type { WorkerShutdownResources } from './shutdown-resources'
+import type * as ShutdownResourcesModule from './shutdown-resources'
 import type * as CommunityBootstrapModule from './community.bootstrap.js'
+
+type WorkerShutdownResources = ShutdownResourcesModule.WorkerShutdownResources
+type RealShutdown = (
+  resources: WorkerShutdownResources,
+  options?: ShutdownResourcesModule.WorkerShutdownOptions
+) => Promise<void>
 
 const harness = vi.hoisted(() => ({
   order: [] as string[],
   communityClose: vi.fn(),
   createCommunityWorkerRuntime: vi.fn(),
   shutdownWorkerResources: vi.fn(),
+  realShutdownWorkerResources: undefined as RealShutdown | undefined,
   posthogShutdown: vi.fn(),
 }))
 
@@ -27,9 +34,12 @@ vi.mock('../modules/community/community-worker-runtime', () => ({
   createCommunityWorkerRuntime: harness.createCommunityWorkerRuntime,
 }))
 
-vi.mock('./shutdown-resources', () => ({
-  shutdownWorkerResources: harness.shutdownWorkerResources,
-}))
+vi.mock('./shutdown-resources', async (importOriginal) => {
+  const actual = await importOriginal<typeof ShutdownResourcesModule>()
+  harness.realShutdownWorkerResources = (resources, options) =>
+    actual.shutdownWorkerResources(resources, options)
+  return { shutdownWorkerResources: harness.shutdownWorkerResources }
+})
 
 /**
  * Imported fresh per test, because this module keeps its worker list, its timer
@@ -38,6 +48,13 @@ vi.mock('./shutdown-resources', () => ({
 async function loadBootstrap(): Promise<typeof CommunityBootstrapModule> {
   vi.resetModules()
   return import('./community.bootstrap.js')
+}
+
+/** Runs the real deadline-bounded shutdown sequence instead of the recorder. */
+function useRealShutdown(): void {
+  const real = harness.realShutdownWorkerResources
+  if (!real) throw new Error('the real shutdown helper was not loaded')
+  harness.shutdownWorkerResources.mockImplementation(real)
 }
 
 describe('dedicated community worker bootstrap', () => {
@@ -78,13 +95,88 @@ describe('dedicated community worker bootstrap', () => {
     expect(harness.createCommunityWorkerRuntime).toHaveBeenCalledTimes(1)
   })
 
-  it('closes the runtime before draining the worker', async () => {
+  it('drains the worker before it closes the runtime and telemetry', async () => {
+    const exit = vi.spyOn(process, 'exit').mockImplementation((() => undefined) as never)
+    useRealShutdown()
+    const workerClose = vi.fn(() => {
+      harness.order.push('workerClose')
+      return Promise.resolve()
+    })
+    harness.posthogShutdown.mockImplementation(() =>
+      harness.order.push('posthogShutdown')
+    )
+    harness.createCommunityWorkerRuntime.mockResolvedValueOnce({
+      worker: { on: vi.fn(), close: workerClose },
+      sweeps: {
+        dispatchPending: vi.fn().mockResolvedValue(undefined),
+        sweepStalePendingReview: vi.fn().mockResolvedValue(undefined),
+        sweepExpiredUploads: vi.fn().mockResolvedValue(undefined),
+        sweepErasureRequests: vi.fn().mockResolvedValue(undefined),
+      },
+      close: harness.communityClose,
+    })
     const bootstrap = await loadBootstrap()
 
     await bootstrap.startCommunityWorkers()
     await bootstrap.performShutdown()
 
-    expect(harness.order).toEqual(['communityClose', 'shutdownWorkerResources'])
+    expect(harness.order).toEqual(['workerClose', 'communityClose', 'posthogShutdown'])
+    expect(exit).toHaveBeenCalledWith(0)
+  })
+
+  it('lets a job screening at SIGTERM finish with its real disposition', async () => {
+    // Story 6.2b peer review (CX7), reproduced against the worker container: a
+    // SIGTERM during a screening closed the inference thread under the job, which
+    // failed with "Community NSFW screener is closing" and, on its final attempt,
+    // marked a valid post review_failed. The screener here behaves like the real
+    // one: closing it rejects every screen still in flight.
+    const exit = vi.spyOn(process, 'exit').mockImplementation((() => undefined) as never)
+    useRealShutdown()
+    let finishInference!: () => void
+    let screenerClosed = false
+    const inference = new Promise<void>((resolve) => {
+      finishInference = resolve
+    })
+    const screen = async (): Promise<'pass'> => {
+      await inference
+      if (screenerClosed) throw new Error('Community NSFW screener is closing')
+      return 'pass'
+    }
+    const worker = {
+      on: vi.fn(),
+      // BullMQ's close(): stop fetching, then wait for the active job.
+      close: vi.fn(async () => {
+        await activeJob
+      }),
+    }
+    harness.createCommunityWorkerRuntime.mockResolvedValueOnce({
+      worker,
+      sweeps: {
+        dispatchPending: vi.fn().mockResolvedValue(undefined),
+        sweepStalePendingReview: vi.fn().mockResolvedValue(undefined),
+        sweepExpiredUploads: vi.fn().mockResolvedValue(undefined),
+        sweepErasureRequests: vi.fn().mockResolvedValue(undefined),
+      },
+      close: vi.fn(() => {
+        screenerClosed = true
+        return Promise.resolve()
+      }),
+    })
+    const bootstrap = await loadBootstrap()
+    await bootstrap.startCommunityWorkers()
+
+    const activeJob = screen().then(
+      (disposition) => (disposition === 'pass' ? 'published' : 'flagged'),
+      () => 'review_failed'
+    )
+    const shutdown = bootstrap.performShutdown()
+    await Promise.resolve()
+    finishInference()
+    await shutdown
+
+    await expect(activeJob).resolves.toBe('published')
+    expect(screenerClosed).toBe(true)
+    expect(exit).toHaveBeenCalledWith(0)
   })
 
   it('hands the worker it started to the shutdown helper', async () => {

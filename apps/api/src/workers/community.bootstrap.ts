@@ -126,27 +126,43 @@ export async function startCommunityWorkers() {
   }
 }
 
+/**
+ * Stops consumption, lets the active job finish, then closes what that job was
+ * using, all under one deadline below the production launcher's 25 seconds.
+ *
+ * The order is the point. `Worker.close()` stops taking jobs and waits for the
+ * active one; only then do the model process, the moderation queue and the
+ * PostHog client close. Closing the runtime first (as this did until the Story
+ * 6.2b peer review, CX7) terminated the inference thread under a job still
+ * screening, so a deploy's SIGTERM failed that attempt with "Community NSFW
+ * screener is closing", and on a final attempt marked a valid post
+ * `review_failed`. The runtime and PostHog close in the queue phase, after every
+ * worker; when the deadline expires, `shutdownWorkerResources` force-closes the
+ * worker and the runtime and this process exits nonzero.
+ */
 export async function performShutdown() {
   logger.info('Shutting down community workers...')
   let exitCode = 0
   for (const timer of timers) {
     clearInterval(timer)
   }
+  const runtime = closeRuntime
+  const posthog = posthogService
   try {
-    if (posthogService) {
-      try {
-        posthogService.onApplicationShutdown()
-      } catch (err) {
-        logger.error(err, 'Error shutting down PostHogService')
-      }
-    }
-    await closeRuntime?.()
-    // Below the production launcher's 25-second deadline, so the bootstrap's own
-    // force-disconnect runs before the launcher gives up on it.
     await shutdownWorkerResources(
       {
         workers,
-        queues: [],
+        queues: [
+          ...(runtime ? [{ close: runtime, disconnect: runtime }] : []),
+          ...(posthog
+            ? [
+                {
+                  close: () => Promise.resolve(posthog.onApplicationShutdown()),
+                  disconnect: () => Promise.resolve(),
+                },
+              ]
+            : []),
+        ],
         redisClients: [],
         disconnectPrisma: disconnectPrismaClient,
       },
