@@ -5,7 +5,9 @@
  * things before the BullMQ consumer exists, and one thing at the end of its life:
  *
  *   1. refuses an unset, unknown, or `fixture` screener selector, so a hosted
- *      worker can never come up screening with something that is not a model;
+ *      worker can never come up screening with something that is not a model,
+ *      and, under NODE_ENV=production, a DATABASE_URL to a non-local host that
+ *      would not verify the database's certificate;
  *   2. verifies the pinned model artifacts, WASM binaries and policy hash with the
  *      Story 6.2 verifier, and exits nonzero on any mismatch;
  *   3. starts the compiled community bootstrap in this process, which awaits model
@@ -24,6 +26,7 @@
  * trace missed fails the build rather than the first job.
  */
 import { spawnSync } from 'node:child_process'
+import fs from 'node:fs'
 import path from 'node:path'
 import { fileURLToPath, pathToFileURL } from 'node:url'
 
@@ -89,6 +92,58 @@ export function resolveStartableSelector(env = process.env) {
     }
   }
   return { ok: true, selector }
+}
+
+/**
+ * The database hosts a local container reaches. A production-mode container run
+ * against the laptop's own PostgreSQL (the local canary, the restart drill and
+ * the memory measurement) has no TLS to verify.
+ */
+const LOCAL_DATABASE_HOSTS = new Set([
+  '127.0.0.1',
+  'localhost',
+  '::1',
+  'host.docker.internal',
+])
+/** The Supabase Root 2021 CA the image carries (apps/api/Dockerfile.community-worker). */
+export const IMAGE_DATABASE_CA = '/app/apps/api/certs/supabase-root-2021-ca.pem'
+
+/**
+ * Why a production worker must not connect with this DATABASE_URL, or null when
+ * it may (Story 6.2b final review, RF3). Prisma's `sslmode=require` alone
+ * encrypts without checking who answers; `sslaccept=strict` with `sslcert`
+ * naming the Supabase CA verifies the chain and the host name. Prisma resolves a
+ * relative `sslcert` against the generated client's directory, so the path must
+ * be absolute, and it must name a file that exists, or every connection fails.
+ */
+export function databaseTlsRefusal(env = process.env, fileExists = fs.existsSync) {
+  if (env.NODE_ENV !== 'production') return null
+  const raw = env.DATABASE_URL?.trim()
+  if (!raw) return 'DATABASE_URL is unset.'
+  let url
+  try {
+    url = new URL(raw)
+  } catch {
+    return 'DATABASE_URL is not a valid URL.'
+  }
+  const host = url.hostname.replace(/^\[(.*)\]$/, '$1')
+  if (LOCAL_DATABASE_HOSTS.has(host)) return null
+  const fix = `use sslmode=require&sslcert=${IMAGE_DATABASE_CA}&sslaccept=strict`
+  const param = (name) => url.searchParams.get(name)
+  if (param('sslmode') !== 'require') {
+    return `DATABASE_URL has sslmode=${String(param('sslmode'))}; ${fix}.`
+  }
+  if (param('sslaccept') !== 'strict') {
+    return `DATABASE_URL does not set sslaccept=strict, so the database certificate would not be verified; ${fix}.`
+  }
+  const sslcert = param('sslcert')
+  if (!sslcert || !path.isAbsolute(sslcert)) {
+    return `DATABASE_URL needs an absolute sslcert naming the Supabase CA; ${fix}.`
+  }
+  if (!fileExists(sslcert)) {
+    return `DATABASE_URL names sslcert=${sslcert}, which does not exist in this container; ${fix}.`
+  }
+  return null
 }
 
 function verifyModelArtifacts() {
@@ -243,6 +298,10 @@ async function main() {
     }
     await selfTest()
     process.exit(0)
+  }
+  const tlsRefusal = databaseTlsRefusal()
+  if (tlsRefusal) {
+    fail('community_worker_database_tls_refused', tlsRefusal)
   }
   await start(selection.selector)
 }

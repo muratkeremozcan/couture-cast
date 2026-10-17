@@ -88,6 +88,11 @@ ENV NODE_ENV=production \
     NO_COLOR=1
 WORKDIR /app
 COPY --from=assemble --chown=root:root /worker/ ./
+# The Supabase Root 2021 CA, which the hosted DATABASE_URL names through
+# `sslcert=/app/apps/api/certs/supabase-root-2021-ca.pem&sslaccept=strict`, so
+# Prisma verifies the database's certificate chain and host name. The launcher
+# refuses a production DATABASE_URL that does not (Story 6.2b final review, RF3).
+COPY --chown=root:root apps/api/certs/supabase-root-2021-ca.pem apps/api/certs/
 
 # The image is read-only to the user it runs as: the worker writes nothing to
 # disk, so nothing under /app needs to be writable by it.

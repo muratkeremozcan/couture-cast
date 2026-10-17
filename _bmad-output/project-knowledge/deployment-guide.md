@@ -451,7 +451,7 @@ baked into the image):
 | --------------------------- | ------------------------------------------------------- |
 | `NODE_ENV`                  | `production`                                            |
 | `COMMUNITY_NSFW_SCREENER`   | `tensorflow`                                            |
-| `DATABASE_URL`              | production Supabase connection string                   |
+| `DATABASE_URL`              | production Supabase connection string, verified (below) |
 | `REDIS_URL`                 | production Upstash `rediss://` URL                      |
 | `REDIS_TLS`                 | `true`                                                  |
 | `SUPABASE_URL`              | production Supabase project URL                         |
@@ -460,10 +460,32 @@ baked into the image):
 | `POSTHOG_API_KEY`           | the API's value; publication and refusal events         |
 | `POSTHOG_HOST`              | the API's value                                         |
 
-`DATABASE_URL` keeps Supabase's `sslmode=require`. The canary, which reaches production from an
-operator's machine, goes further and verifies the certificate chain (`verify-full`) against the
-Supabase CA (`--db-ca`). It strips every `ssl*` parameter from the connection string first,
-because `pg` lets those parameters replace the verified TLS settings.
+The worker verifies the database's certificate. Prisma's `sslmode=require` alone encrypts without
+checking who answers, so the image carries the Supabase Root 2021 CA
+([`apps/api/certs/supabase-root-2021-ca.pem`](../../apps/api/certs/supabase-root-2021-ca.pem),
+SHA-256 fingerprint `80:70:25:AD:...:E6:CA:FA`, valid to 2031-04-26) at
+`/app/apps/api/certs/supabase-root-2021-ca.pem`, and the hosted `DATABASE_URL` ends in:
+
+```text
+?sslmode=require&sslcert=/app/apps/api/certs/supabase-root-2021-ca.pem&sslaccept=strict
+```
+
+`sslaccept=strict` makes Prisma verify the chain and the host name; without it Prisma accepts any
+certificate. Prisma resolves a relative `sslcert` against the generated client's directory
+(`/app/node_modules/.prisma/client`), so the path is absolute. Both behaviours were checked
+against the worker image and a TLS PostgreSQL with a test CA: the right CA connects, another CA
+fails `unable to get local issuer certificate`, an IP address fails `IP address mismatch`, and
+without `sslaccept=strict` the connection succeeds unverified. Under `NODE_ENV=production` the
+launcher refuses to start when a non-local `DATABASE_URL` lacks `sslmode=require` or
+`sslaccept=strict`, or its `sslcert` is relative or names a missing file
+(`community_worker_database_tls_refused`). Local container runs against
+`host.docker.internal` are exempt. The Vercel API still connects with `sslmode=require` alone;
+that is recorded in deferred work.
+
+The canary, which reaches production from an operator's machine, verifies the certificate chain
+(`verify-full`) against the same committed CA (`--db-ca` names another). It strips every `ssl*`
+parameter from the connection string first, because `pg` lets those parameters replace the
+verified TLS settings.
 
 The canary's synthetic account (`canary-user-` prefix) is excluded from analytics in code
 (`isCommunityCanaryUser` in `community-analytics.ts`), so real posts report to PostHog and the
@@ -539,7 +561,6 @@ fail the run: the report records `ok: false` and the readiness gate fails.
 ```bash
 npm run community:screening:canary:local
 npm run community:screening:canary -- --target hosted --env-file <hosted env file> \
-  --db-ca <path to the Supabase CA> \
   --json-out apps/api/.cache/community-screening/canary-hosted.json
 ```
 

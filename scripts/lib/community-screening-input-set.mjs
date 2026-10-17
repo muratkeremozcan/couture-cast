@@ -46,6 +46,8 @@ export const INPUT_FILES = [
   '.dockerignore',
   // The generated Prisma client the worker queries through is built from it.
   'packages/db/prisma/schema.prisma',
+  // The CA the image verifies the hosted database against.
+  'apps/api/certs/supabase-root-2021-ca.pem',
   'scripts/start-community-worker-production.mjs',
   'scripts/prune-community-worker-deps.mjs',
   'scripts/community-screening-canary.mjs',

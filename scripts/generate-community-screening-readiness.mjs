@@ -119,7 +119,7 @@ export const COMMANDS = {
   canaryLocal: 'npm run community:screening:canary:local',
   canaryRestartDrill: 'npm run community:screening:canary:restart-drill',
   canaryHosted:
-    'npm run community:screening:canary -- --target hosted --env-file <hosted env file> --db-ca <Supabase CA> --json-out apps/api/.cache/community-screening/canary-hosted.json',
+    'npm run community:screening:canary -- --target hosted --env-file <hosted env file> --json-out apps/api/.cache/community-screening/canary-hosted.json',
   measureRuntimeContainer: 'npm run community:screening:measure:container',
   measureMemory:
     'start the worker container fresh under --memory=512m, then npm run community:screening:measure:memory',

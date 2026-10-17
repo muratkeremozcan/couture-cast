@@ -36,8 +36,9 @@
  *   node scripts/community-screening-canary.mjs --target local [--env-file .env.local]
  *   node scripts/community-screening-canary.mjs --target hosted --env-file <file>
  *   Hosted runs verify the database's TLS certificate (verify-full) against the
- *   Supabase CA: pass --db-ca <path to prod-ca-2021.crt> or set DATABASE_CA_CERT_PATH,
- *   and require exactly one consumer named for --expect-sha (default: HEAD).
+ *   Supabase Root 2021 CA committed at apps/api/certs/supabase-root-2021-ca.pem
+ *   (--db-ca or DATABASE_CA_CERT_PATH name another), and require exactly one
+ *   consumer named for --expect-sha (default: HEAD).
  *   A local run given --expect-sha requires the job to be processed by the worker
  *   named for it. A local run given --sole-consumer (which needs --expect-sha) also
  *   makes the hosted run's consumer check: exactly one consumer on the queue, named
@@ -70,6 +71,11 @@ const DEFAULT_TIMEOUT_MS = 120_000
 const POLL_INTERVAL_MS = 500
 const TERMINAL_STATUSES = new Set(['published', 'flagged', 'review_failed'])
 const LOCAL_HOSTS = new Set(['127.0.0.1', 'localhost', '::1', 'host.docker.internal'])
+/** The Supabase Root 2021 CA, committed beside the worker image that carries it. */
+export const COMMITTED_DATABASE_CA = path.join(
+  projectRoot,
+  'apps/api/certs/supabase-root-2021-ca.pem'
+)
 /** The canary account's id prefix; the API excludes it from analytics (community-analytics.ts). */
 export const CANARY_USER_ID_PREFIX = 'canary-user-'
 /** The BullMQ worker name the image gives itself (community-moderation.worker.ts). */
@@ -121,9 +127,9 @@ function validateCanaryOptions(options) {
 
 /** The options that decide how the canary checks which worker consumes. */
 function validateConsumerOptions(options) {
-  if (options.target === 'hosted' && !options.dbCa) {
+  if (options.target === 'hosted' && !(options.dbCa && fs.existsSync(options.dbCa))) {
     throw new Error(
-      '--target hosted needs the Supabase CA (--db-ca or DATABASE_CA_CERT_PATH): the database certificate is verified, never trusted blindly'
+      `--target hosted verifies the database certificate against the Supabase CA, and ${String(options.dbCa)} does not exist (--db-ca or DATABASE_CA_CERT_PATH name another)`
     )
   }
   if (options.target === 'hosted' && !options.workerPrecheck) {
@@ -150,7 +156,7 @@ export function parseCanaryArgs(argv) {
     keep: false,
     workerPrecheck: true,
     fixture: 'safe',
-    dbCa: process.env.DATABASE_CA_CERT_PATH ?? null,
+    dbCa: process.env.DATABASE_CA_CERT_PATH ?? COMMITTED_DATABASE_CA,
     expectSha: null,
     soleConsumer: false,
   }

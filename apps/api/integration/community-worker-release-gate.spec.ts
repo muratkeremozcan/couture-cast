@@ -78,6 +78,11 @@ interface LauncherModule {
     selector?: string
     reason?: string
   }
+  databaseTlsRefusal: (
+    env: Record<string, string>,
+    fileExists?: (file: string) => boolean
+  ) => string | null
+  IMAGE_DATABASE_CA: string
 }
 interface SignModule {
   signingRefusal: (context: {
@@ -146,6 +151,94 @@ describe('community worker image', () => {
     expect(ignore).toMatch(/^\.env\.\*$/m)
     expect(ignore).toMatch(/^!\.env\.example$/m)
     expect(ignore).toMatch(/^\*\*\/node_modules$/m)
+  })
+})
+
+describe('worker database TLS', () => {
+  // Story 6.2b final review (RF3): Prisma's sslmode=require encrypts without
+  // verifying the server, so the image carries the Supabase CA and the
+  // launcher refuses a production DATABASE_URL that does not verify against it.
+  const CA_PATH = 'apps/api/certs/supabase-root-2021-ca.pem'
+
+  it('commits the Supabase Root 2021 CA and copies it into the image', async () => {
+    const { X509Certificate } = await import('node:crypto')
+    const certificate = new X509Certificate(read(CA_PATH))
+    expect(certificate.subject).toContain('CN=Supabase Root 2021 CA')
+    expect(certificate.fingerprint256).toBe(
+      '80:70:25:AD:50:D4:ED:21:9D:2C:9C:7D:29:9C:00:4F:82:4E:B0:0C:F7:F6:5A:FE:F6:07:D0:7B:72:E6:CA:FA'
+    )
+    expect(new Date(certificate.validTo).toISOString()).toBe('2031-04-26T10:56:53.000Z')
+    const { IMAGE_DATABASE_CA } = await load<LauncherModule>(
+      'scripts/start-community-worker-production.mjs'
+    )
+    expect(IMAGE_DATABASE_CA).toBe(`/app/${CA_PATH}`)
+    expect(read('apps/api/Dockerfile.community-worker')).toMatch(
+      /^COPY --chown=root:root apps\/api\/certs\/supabase-root-2021-ca\.pem apps\/api\/certs\/$/m
+    )
+    expect(read('apps/api/Dockerfile.community-worker')).toMatch(/^WORKDIR \/app$/m)
+  })
+
+  it('refuses a production DATABASE_URL that would not verify the database certificate', async () => {
+    const { databaseTlsRefusal, IMAGE_DATABASE_CA } = await load<LauncherModule>(
+      'scripts/start-community-worker-production.mjs'
+    )
+    const exists = (file: string) => file === IMAGE_DATABASE_CA
+    const hosted = 'postgresql://u:p@aws-0-us-east-1.pooler.supabase.com:5432/postgres'
+    const env = (query: string, NODE_ENV = 'production') => ({
+      NODE_ENV,
+      DATABASE_URL: `${hosted}${query}`,
+    })
+    const verified = `?sslmode=require&sslcert=${IMAGE_DATABASE_CA}&sslaccept=strict`
+
+    expect(databaseTlsRefusal(env(verified), exists)).toBeNull()
+    expect(databaseTlsRefusal(env('?sslmode=require'), exists)).toMatch(
+      /sslaccept=strict/
+    )
+    expect(
+      databaseTlsRefusal(env(`?sslmode=require&sslcert=${IMAGE_DATABASE_CA}`), exists)
+    ).toMatch(/sslaccept=strict/)
+    expect(
+      databaseTlsRefusal(
+        env('?sslmode=require&sslcert=/app/missing.pem&sslaccept=strict'),
+        exists
+      )
+    ).toMatch(/does not exist/)
+    expect(
+      databaseTlsRefusal(env('?sslmode=require&sslcert=ca.pem&sslaccept=strict'), exists)
+    ).toMatch(/absolute sslcert/)
+    expect(databaseTlsRefusal(env('?sslmode=require&sslaccept=strict'), exists)).toMatch(
+      /absolute sslcert/
+    )
+    expect(
+      databaseTlsRefusal(
+        env(`?sslmode=prefer&sslcert=${IMAGE_DATABASE_CA}&sslaccept=strict`),
+        exists
+      )
+    ).toMatch(/sslmode=prefer/)
+    expect(databaseTlsRefusal({ NODE_ENV: 'production' }, exists)).toMatch(/unset/)
+    // A production-mode container against the laptop's own database has no TLS,
+    // and outside production the launcher leaves the URL alone.
+    expect(
+      databaseTlsRefusal(
+        {
+          NODE_ENV: 'production',
+          DATABASE_URL: 'postgresql://p:p@host.docker.internal:54322/postgres',
+        },
+        exists
+      )
+    ).toBeNull()
+    expect(databaseTlsRefusal(env('?sslmode=require', 'development'), exists)).toBeNull()
+  })
+
+  it('defaults the hosted canary to the committed CA and refuses a missing one', async () => {
+    const { parseCanaryArgs, COMMITTED_DATABASE_CA } = await load<
+      CanaryModule & { COMMITTED_DATABASE_CA: string }
+    >('scripts/community-screening-canary.mjs')
+    expect(COMMITTED_DATABASE_CA).toBe(path.join(repoRoot, CA_PATH))
+    expect(parseCanaryArgs(['--target', 'hosted']).dbCa).toBe(COMMITTED_DATABASE_CA)
+    expect(() =>
+      parseCanaryArgs(['--target', 'hosted', '--db-ca', '/absent/ca.pem'])
+    ).toThrow(/does not exist/)
   })
 })
 
@@ -328,9 +421,7 @@ describe('canary cleanup and worker identity', () => {
     expect(
       parseCanaryArgs(['--target', 'local', '--expect-sha', 'abc123']).requireProcessedBy
     ).toBe(true)
-    expect(
-      parseCanaryArgs(['--target', 'hosted', '--db-ca', '/ca.crt']).requireProcessedBy
-    ).toBe(true)
+    expect(parseCanaryArgs(['--target', 'hosted']).requireProcessedBy).toBe(true)
   })
 
   it('proves a sole consumer only from two matching single-consumer observations', async () => {
@@ -369,9 +460,7 @@ describe('canary cleanup and worker identity', () => {
       parseCanaryArgs(['--target', 'local', '--expect-sha', 'abc', '--sole-consumer'])
         .soleConsumer
     ).toBe(true)
-    expect(
-      parseCanaryArgs(['--target', 'hosted', '--db-ca', '/ca.crt']).soleConsumer
-    ).toBe(true)
+    expect(parseCanaryArgs(['--target', 'hosted']).soleConsumer).toBe(true)
     expect(() => parseCanaryArgs(['--target', 'local', '--sole-consumer'])).toThrow(
       /--expect-sha/
     )

@@ -419,6 +419,10 @@ docs require a payment method on every account before resources are created, to 
    | `SUPABASE_SERVICE_ROLE_KEY` | the Supabase service role key  |
    | `COMMUNITY_NSFW_SCREENER`   | `tensorflow`                   |
 
+   `DATABASE_URL` ends in
+   `?sslmode=require&sslcert=/app/apps/api/certs/supabase-root-2021-ca.pem&sslaccept=strict`, so
+   the worker verifies the database certificate; the launcher refuses to start without it.
+
 8. Deploy, and watch the build log. Success looks like the readiness line this story adds, naming the
    model hash, the policy version, and the startup duration.
 9. Tell the agent the service is up. The canary in Task 2 is what actually proves it, and that is

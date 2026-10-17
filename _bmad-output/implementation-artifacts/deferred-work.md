@@ -1395,5 +1395,8 @@ file's own Code Review Findings section.
   summary: Drop dolls, rendered avatars and AI-generated portraits from the safe photograph corpus (or filter them at fetch time) and refetch, so the corpus measures photographs of people.
   evidence: The holdout triage (`_bmad-output/test-artifacts/community-safe-corpus-holdout-triage.json`) found six such entries among the withheld photographs.
 - source_spec: `_bmad-output/implementation-artifacts/6-2b-community-screening-release-gate.md`
-  summary: Verify the hosted worker's database certificate (Prisma `sslmode` with the Supabase CA) the way the canary already does, and give the worker OTLP export once it fits the 150 MB dependency budget.
-  evidence: Review findings BH13 and BH18; the worker's `DATABASE_URL` uses Supabase's `sslmode=require`, and `@opentelemetry/sdk-node` with its exporters does not fit the pruned tree.
+  summary: Give the community worker OTLP export once it fits the 150 MB dependency budget. (The worker's database certificate is now verified: final review RF3.)
+  evidence: Review finding BH18; `@opentelemetry/sdk-node` with its exporters does not fit the pruned tree.
+- source_spec: `_bmad-output/implementation-artifacts/6-2b-community-screening-release-gate.md`
+  summary: Verify the Vercel API's database certificate the way the community worker now does (`sslcert` naming the Supabase Root 2021 CA with `sslaccept=strict`), and refuse an unverified production `DATABASE_URL` at startup.
+  evidence: Story 6.2b final review (RF3); the API's `DATABASE_URL` uses `sslmode=require` with no chain verification, so Prisma accepts any certificate. The CA is committed at `apps/api/certs/supabase-root-2021-ca.pem`; the Vercel function needs it bundled at a path Prisma can read.
