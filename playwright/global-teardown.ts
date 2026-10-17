@@ -1,7 +1,7 @@
 import { execSync } from 'node:child_process'
-import fs from 'node:fs'
 import path from 'node:path'
-import { E2E_STACK_PID_FILE } from '../scripts/e2e-stack-pid.mjs'
+import { e2eStackRecordPath, stopE2eStack } from '../scripts/e2e-stack-pid.mjs'
+import { resolveEnvironmentConfig } from './config/environments'
 
 function isLocalDatabaseUrl(value: string): boolean {
   try {
@@ -25,29 +25,15 @@ function isLocalDatabaseUrl(value: string): boolean {
  * stack's workers would still be polling tables that db:reset drops, and log
  * false `community_sweep_failed` errors. Stop the stack first; its SIGTERM
  * handler shuts its children down gracefully.
+ *
+ * Only this run's stack: the record is keyed by this checkout and the web port
+ * the launcher served, and the pid is signalled only while it still runs the
+ * launcher, so a stale record whose pid was reused stops nothing.
  */
-async function stopE2eStack(): Promise<void> {
-  let pid: number
-  try {
-    pid = Number(fs.readFileSync(E2E_STACK_PID_FILE, 'utf8').trim())
-  } catch {
-    return
-  }
-  if (!Number.isInteger(pid) || pid <= 0) return
-  try {
-    process.kill(pid, 'SIGTERM')
-  } catch {
-    return
-  }
-  const deadline = Date.now() + 10_000
-  while (Date.now() < deadline) {
-    try {
-      process.kill(pid, 0)
-    } catch {
-      return
-    }
-    await new Promise((resolve) => setTimeout(resolve, 100))
-  }
+async function stopThisRunsE2eStack(): Promise<void> {
+  const repoRoot = path.resolve(__dirname, '..')
+  const webPort = new URL(resolveEnvironmentConfig('local').webBaseUrl).port || '3005'
+  await stopE2eStack(e2eStackRecordPath(repoRoot, webPort))
 }
 
 export default async function globalTeardown() {
@@ -76,7 +62,7 @@ export default async function globalTeardown() {
     return
   }
 
-  await stopE2eStack()
+  await stopThisRunsE2eStack()
 
   try {
     execSync('npm run db:reset', {

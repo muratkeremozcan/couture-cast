@@ -1,10 +1,14 @@
-import fs, { existsSync } from 'node:fs'
+import { existsSync } from 'node:fs'
 import path from 'node:path'
 import { fileURLToPath } from 'node:url'
 import { spawn } from 'node:child_process'
 import { config as loadEnv } from 'dotenv'
 import { applyLocalE2eDatabaseUrl, isLocalTestRun } from './local-e2e-database.mjs'
-import { E2E_STACK_PID_FILE } from './e2e-stack-pid.mjs'
+import {
+  e2eStackRecordPath,
+  removeE2eStackRecordIfOwned,
+  writeE2eStackRecord,
+} from './e2e-stack-pid.mjs'
 
 const repoRoot = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..')
 const startWeb = process.argv.includes('--with-web')
@@ -213,9 +217,15 @@ for (const signal of ['SIGINT', 'SIGTERM']) {
 // Playwright runs globalTeardown before it stops this web server, and the local
 // teardown resets the database. The stack's workers would keep polling tables
 // the reset just dropped, so the teardown stops this process first, through the
-// pid it finds here. See playwright/global-teardown.ts.
-fs.writeFileSync(E2E_STACK_PID_FILE, String(process.pid))
-process.once('exit', () => fs.rmSync(E2E_STACK_PID_FILE, { force: true }))
+// ownership record written here. The record is keyed by this checkout and web
+// port, so another checkout's or another port's run never reads it, and it is
+// removed on exit only while it still carries this run's token. See
+// playwright/global-teardown.ts.
+const stackRecordPath = e2eStackRecordPath(repoRoot, webUrl.port || '3005')
+const stackRecord = writeE2eStackRecord(stackRecordPath)
+process.once('exit', () =>
+  removeE2eStackRecordIfOwned(stackRecordPath, stackRecord.token)
+)
 
 async function runPreparation(command, args) {
   const child = spawn(command, args, {
