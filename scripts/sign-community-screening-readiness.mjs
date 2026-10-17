@@ -40,7 +40,7 @@ import path from 'node:path'
 import readline from 'node:readline/promises'
 import { execFileSync } from 'node:child_process'
 import { fileURLToPath } from 'node:url'
-import { verdictOf } from './generate-community-screening-readiness.mjs'
+import { gateSetProblems, verdictOf } from './generate-community-screening-readiness.mjs'
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url))
 const projectRoot = path.resolve(__dirname, '..')
@@ -154,14 +154,19 @@ export function signingRefusal({ stdinIsTTY, stdoutIsTTY, env, delegated = false
  * Why a payload cannot be approved, or null when it can. The stored verdict is
  * a field anyone can edit, so it is recomputed from the payload's own gates with
  * the generator's rule, and both must say `pass` (Story 6.2b final review, RF6).
+ * The recomputation only means something over the whole gate set: a payload cut
+ * down to its passing gates would recompute to `pass`, so the payload must carry
+ * every mandatory gate the generator builds, exactly once, and no other (RF9).
  */
 export function approvalRefusal(payload) {
   if (payload?.verdict !== 'pass') {
     return `The payload's own verdict is ${String(payload?.verdict)}. Only a passing payload can be approved.`
   }
-  const recomputed = Array.isArray(payload.gates)
-    ? verdictOf(payload.gates)
-    : 'incomplete'
+  const setProblems = gateSetProblems(payload.gates)
+  if (setProblems.length > 0) {
+    return `The payload's gates are not the generator's mandatory set (${setProblems.join('; ')}), so the payload was edited after it was generated; regenerate it.`
+  }
+  const recomputed = verdictOf(payload.gates)
   if (recomputed !== payload.verdict) {
     return `The payload says pass, but its gates give ${recomputed}. The verdict does not match the gates, so the payload was edited after it was generated; regenerate it.`
   }

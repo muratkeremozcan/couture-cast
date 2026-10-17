@@ -947,14 +947,27 @@ function workingTreeGate(tree) {
 
 const NON_MODEL_IDENTITY = /fixture|unavailable|unresolved/
 
-/** A canary that did not remove what it created did not pass, whatever it measured. */
-function cleanupProblems(canary) {
+/**
+ * A canary that did not remove what it created did not pass, whatever it
+ * measured, and neither did one that cannot say whether it did (Story 6.2b final
+ * review, RF7): only a cleanup whose closing lookup found nothing is `clean`.
+ */
+export function cleanupProblems(canary) {
   const cleanup = canary.cleanup
   if (cleanup?.performed !== true) return ['the canary did not clean up after itself']
   if (!Array.isArray(cleanup.problems)) return ['the canary recorded no cleanup result']
-  return cleanup.problems.length > 0
-    ? [`cleanup left canary data behind: ${cleanup.problems.join('; ')}`]
-    : []
+  const affected = (cleanup.unresolved ?? []).join(', ')
+  if (cleanup.status === 'uncertain') {
+    return [
+      `cleanup is uncertain after a write of unknown outcome; canary data may remain: ${affected}`,
+    ]
+  }
+  if (cleanup.status !== 'clean' || cleanup.problems.length > 0) {
+    return [
+      `cleanup left canary data behind: ${[...cleanup.problems, affected].filter(Boolean).join('; ')}`,
+    ]
+  }
+  return []
 }
 
 function canaryProblems(canary, requireHosted) {
@@ -1650,7 +1663,65 @@ function rolloutGate(rollout) {
 }
 
 /** Every gate, from the sections alone, so the verdict is testable without any I/O. */
+/**
+ * Every gate the release verdict needs, in the order `buildGates` builds them:
+ * the one list both the generator and the sign command check a payload against
+ * (Story 6.2b final review, RF9). A payload missing one of them, repeating one,
+ * or carrying one this list does not name is not a payload the generator wrote.
+ */
+export const MANDATORY_GATE_IDS = Object.freeze([
+  'committed-tree',
+  'worker-image',
+  'canary-local-container',
+  'restart-keeps-queued-jobs',
+  'canary-hosted',
+  'policy-surface',
+  'model-calibration',
+  'safe-corpus',
+  'list-provenance',
+  'text-clean-copy',
+  'text-obfuscation',
+  'model-artifacts',
+  'runtime-latency',
+  'runtime-memory',
+  'redis-budget',
+  'rollout-closed',
+])
+
+/**
+ * Why a gate list is not the complete mandatory set, exactly once each: the
+ * missing, repeated and unknown ids. Empty when it is.
+ */
+export function gateSetProblems(gates) {
+  if (!Array.isArray(gates)) return ['the payload carries no gate list']
+  const counts = new Map()
+  for (const entry of gates) {
+    const id = typeof entry?.id === 'string' ? entry.id : String(entry?.id)
+    counts.set(id, (counts.get(id) ?? 0) + 1)
+  }
+  const mandatory = new Set(MANDATORY_GATE_IDS)
+  const missing = MANDATORY_GATE_IDS.filter((id) => !counts.has(id))
+  const repeated = [...counts].filter(([, count]) => count > 1).map(([id]) => id)
+  const unknown = [...counts.keys()].filter((id) => !mandatory.has(id))
+  return [
+    missing.length > 0 ? `missing ${missing.join(', ')}` : null,
+    repeated.length > 0 ? `repeated ${repeated.join(', ')}` : null,
+    unknown.length > 0 ? `unknown ${unknown.join(', ')}` : null,
+  ].filter(Boolean)
+}
+
 export function buildGates(sections) {
+  const gates = buildGateList(sections)
+  const problems = gateSetProblems(gates)
+  if (problems.length > 0) {
+    throw new Error(
+      `buildGates and MANDATORY_GATE_IDS disagree: ${problems.join('; ')}. Update the list with the gate.`
+    )
+  }
+  return gates
+}
+
+function buildGateList(sections) {
   const {
     workingTree,
     image,

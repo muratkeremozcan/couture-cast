@@ -28,8 +28,10 @@ interface CanaryModule {
   ) => { connectionParameters: { ssl: unknown; host: string } }
   recordCleanup: (
     report: Record<string, unknown>,
-    cleanup: { keep: boolean; problems: string[] }
+    cleanup: { keep: boolean; cleanup?: CleanupResult }
   ) => Record<string, unknown>
+  cleanCleanup: () => CleanupResult
+  outcomeUnknown: (error: unknown) => boolean
   parseCanaryArgs: (argv: string[]) => Record<string, unknown>
   soleConsumerProblems: (workers: unknown, expectedWorker: string) => string[]
   assessSoleConsumer: (
@@ -50,6 +52,14 @@ interface CanaryModule {
   ) => Promise<T>
   redisOptions: (redisUrl?: string) => Record<string, unknown>
   runCanary: (options: Record<string, unknown>) => Promise<Record<string, unknown>>
+}
+interface CleanupResult {
+  status: string
+  problems: string[]
+  unknownOutcomes: string[]
+  settleMs: number | null
+  lateFound: string[]
+  unresolved: string[]
 }
 interface RolloutFlagsModule {
   flagDefault: (source: string, key: string) => boolean | null
@@ -359,6 +369,18 @@ describe('canary refusals', () => {
 })
 
 describe('hosted canary and the live feed', () => {
+  it('names its account with the prefix the API keeps out of every public read', async () => {
+    // Story 6.2b final review (RF8): the API's feed, single-post, card-open and
+    // report reads exclude this prefix, so the two must never drift apart.
+    const { CANARY_USER_ID_PREFIX } = await load<{ CANARY_USER_ID_PREFIX: string }>(
+      'scripts/community-screening-canary.mjs'
+    )
+    const { COMMUNITY_CANARY_USER_ID_PREFIX } = await import(
+      '../src/modules/community/community-analytics.js'
+    )
+    expect(CANARY_USER_ID_PREFIX).toBe(COMMUNITY_CANARY_USER_ID_PREFIX)
+  })
+
   // Story 6.2b final review (RF5): the canary's safe fixture publishes, so a
   // hosted run must not start while the feed could serve it.
   it('refuses while the feed flag defaults to anything but false or the cache holds it on', async () => {
@@ -437,16 +459,66 @@ describe('hosted canary database TLS', () => {
 describe('canary cleanup and worker identity', () => {
   it('marks a report failed when cleanup left data behind', async () => {
     // Story 6.2b peer review (CX9).
-    const { recordCleanup } = await load<CanaryModule>(
+    const { recordCleanup, cleanCleanup } = await load<CanaryModule>(
       'scripts/community-screening-canary.mjs'
     )
-    expect(recordCleanup({ ok: true }, { keep: false, problems: [] })).toEqual({
-      ok: true,
-      cleanup: { performed: true, problems: [] },
-    })
-    const failed = recordCleanup({ ok: true }, { keep: false, problems: ['job: gone'] })
+    expect(recordCleanup({ ok: true }, { keep: false, cleanup: cleanCleanup() })).toEqual(
+      {
+        ok: true,
+        cleanup: { performed: true, ...cleanCleanup() },
+      }
+    )
+    const failed = recordCleanup(
+      { ok: true },
+      {
+        keep: false,
+        cleanup: { ...cleanCleanup(), status: 'failed', problems: ['job: gone'] },
+      }
+    )
     expect(failed.ok).toBe(false)
     expect(failed.code).toBe('cleanup_failed')
+  })
+
+  it('marks a report failed when cleanup cannot say whether data remains', async () => {
+    // Story 6.2b final review (RF7).
+    const { recordCleanup, cleanCleanup } = await load<CanaryModule>(
+      'scripts/community-screening-canary.mjs'
+    )
+    const uncertain = recordCleanup(
+      { ok: true },
+      {
+        keep: false,
+        cleanup: {
+          ...cleanCleanup(),
+          status: 'uncertain',
+          problems: ['The cleanup stage did not finish before the cleanup deadline'],
+          unknownOutcomes: ['account canary-user-x', 'post canary-post-x'],
+          unresolved: ['account canary-user-x', 'post canary-post-x'],
+        },
+      }
+    )
+    expect(uncertain).toMatchObject({ ok: false, code: 'cleanup_uncertain' })
+    expect(uncertain.message).toMatch(/canary-user-x, post canary-post-x/)
+  })
+
+  it('treats a write the server may not have seen as having an unknown outcome', async () => {
+    // Story 6.2b final review (RF7).
+    const { outcomeUnknown, CanaryFailure } = await load<CanaryModule>(
+      'scripts/community-screening-canary.mjs'
+    )
+    expect(outcomeUnknown(new CanaryFailure('deadline', 'cut off'))).toBe(true)
+    expect(outcomeUnknown(new Error('Query read timeout'))).toBe(true)
+    expect(outcomeUnknown(new Error('Command timed out'))).toBe(true)
+    expect(
+      outcomeUnknown(Object.assign(new Error('aborted'), { code: 'ABORT_ERR' }))
+    ).toBe(true)
+    // The server answered: a SQLSTATE, or a storage error response.
+    expect(outcomeUnknown(Object.assign(new Error('duplicate'), { code: '23505' }))).toBe(
+      false
+    )
+    expect(outcomeUnknown(new CanaryFailure('configuration', 'upload failed'))).toBe(
+      false
+    )
   })
 
   it('requires the named worker locally only when told which build to expect', async () => {
@@ -661,6 +733,7 @@ describe('canary deadlines', () => {
         from: () => ({
           upload: () => Promise.resolve({ error: null }),
           remove: () => Promise.resolve({ error: null }),
+          list: () => Promise.resolve({ data: [], error: null }),
         }),
       },
       queue: {
@@ -724,6 +797,8 @@ describe('canary deadlines', () => {
         '600',
         '--cleanup-timeout-ms',
         '500',
+        '--cleanup-settle-ms',
+        '50',
       ]),
       openClients: () => {
         opened.push(1)
@@ -747,7 +822,16 @@ describe('canary deadlines', () => {
       })
       expect(opened).toHaveLength(2)
       expect(fresh.calls.deleted).toHaveLength(2)
-      expect(failure.cleanup).toEqual({ performed: true, problems: [] })
+      // The enqueue was cut off, so its outcome is unknown: cleanup waited the
+      // settle window and looked again before it called the state clean.
+      expect(failure.cleanup).toMatchObject({
+        performed: true,
+        status: 'clean',
+        problems: [],
+        unknownOutcomes: [expect.stringMatching(/^job canary-post-/)],
+        settleMs: 50,
+        lateFound: [],
+      })
     } finally {
       process.env.DATABASE_URL = previous
     }
@@ -766,6 +850,8 @@ describe('canary deadlines', () => {
         '400',
         '--cleanup-timeout-ms',
         '300',
+        '--cleanup-settle-ms',
+        '50',
       ]),
       openClients: () => Promise.resolve(++opened === 1 ? first.clients : fresh.clients),
     }
@@ -775,19 +861,175 @@ describe('canary deadlines', () => {
     try {
       const failure = (await runCanary(options).catch((error: unknown) => error)) as {
         code: string
-        cleanup: { performed: boolean; problems: string[] }
+        cleanup: CleanupResult & { performed: boolean }
       }
       expect(Date.now() - startedAt).toBeLessThan(3000)
       expect(failure.code).toBe('deadline')
+      // The enqueue's outcome is unknown and cleanup could not finish, so the
+      // state is uncertain and every resource the run attempted is named.
+      expect(failure.cleanup.status).toBe('uncertain')
       expect(failure.cleanup.problems).toEqual([
-        expect.stringMatching(
-          /cleanup deadline.*It may have left: job canary-post-.*account canary-user-.*object community-images\//
-        ),
+        expect.stringMatching(/cleanup deadline/),
+      ])
+      expect(failure.cleanup.unresolved).toEqual([
+        expect.stringMatching(/^job canary-post-/),
+        expect.stringMatching(/^account canary-user-/),
+        expect.stringMatching(/^post canary-post-/),
+        expect.stringMatching(/^moderation events of post canary-post-/),
+        expect.stringMatching(/^object community-images\/community\/canary-post-/),
       ])
       expect(fresh.calls.redisDisconnect).toBe(1)
     } finally {
       process.env.DATABASE_URL = previous
     }
+  })
+
+  /**
+   * A database whose account INSERT reaches the server, stalls past the run
+   * deadline and then commits right after cleanup's DELETE, the way a write
+   * already on the server outlives its client (Story 6.2b final review, RF7).
+   * `survivorDeletes` decides whether a DELETE after that one succeeds.
+   */
+  function lateCommitDatabase(survivorDeletes: 'succeed' | 'fail') {
+    const accounts = new Set<string>()
+    const state = { pendingInsert: null as string | null, userDeletes: 0 }
+    const database = () => ({
+      connect: () => Promise.resolve(),
+      end: () => Promise.resolve(),
+      connection: { stream: { destroy: () => undefined } },
+      query: (sql: string, parameters: unknown[] = []) => {
+        const id = parameters[0] as string
+        if (sql.startsWith('INSERT INTO "User"')) {
+          state.pendingInsert = id
+          return new Promise(() => undefined)
+        }
+        if (sql.startsWith('DELETE FROM "User"')) {
+          state.userDeletes += 1
+          if (state.userDeletes > 1 && survivorDeletes === 'fail') {
+            return Promise.reject(
+              Object.assign(new Error('could not obtain lock on row'), { code: '55P03' })
+            )
+          }
+          accounts.delete(id)
+          const late = state.pendingInsert
+          state.pendingInsert = null
+          if (late) setTimeout(() => accounts.add(late), 20)
+          return Promise.resolve({ rows: [] })
+        }
+        if (sql.startsWith('SELECT id FROM "User"')) {
+          return Promise.resolve({ rows: accounts.has(id) ? [{ id }] : [] })
+        }
+        return Promise.resolve({ rows: [] })
+      },
+    })
+    return { accounts, state, database }
+  }
+
+  async function runLateCommit(survivorDeletes: 'succeed' | 'fail') {
+    const { runCanary, parseCanaryArgs } = await canaryModule()
+    const late = lateCommitDatabase(survivorDeletes)
+    const first = fakeClients('none')
+    const fresh = fakeClients('none')
+    let opened = 0
+    const options = {
+      ...parseCanaryArgs([
+        '--target',
+        'local',
+        '--timeout-ms',
+        '500',
+        '--cleanup-timeout-ms',
+        '1500',
+        '--cleanup-settle-ms',
+        '150',
+      ]),
+      openClients: () =>
+        Promise.resolve(
+          ++opened === 1
+            ? { ...first.clients, db: late.database() }
+            : { ...fresh.clients, db: late.database() }
+        ),
+    }
+    const previous = process.env.DATABASE_URL
+    process.env.DATABASE_URL = 'postgresql://p:p@127.0.0.1:54322/postgres'
+    try {
+      const failure = (await runCanary(options).catch((error: unknown) => error)) as {
+        code: string
+        details: { stage: string }
+        cleanup: CleanupResult & { performed: boolean }
+      }
+      return { failure, late }
+    } finally {
+      process.env.DATABASE_URL = previous
+    }
+  }
+
+  it('finds and removes an account whose INSERT commits after the cleanup DELETE', async () => {
+    // Story 6.2b final review (RF7). Codex's probe: the cleanup DELETE removed
+    // nothing, the delayed INSERT then committed, and cleanup still reported
+    // `problems: []`. The DELETE succeeding proves nothing about a later commit.
+    const { failure, late } = await runLateCommit('succeed')
+    expect(failure).toMatchObject({
+      code: 'deadline',
+      details: { stage: 'database write' },
+    })
+    expect(late.state.userDeletes).toBe(2)
+    expect(late.accounts.size).toBe(0)
+    expect(failure.cleanup).toMatchObject({
+      performed: true,
+      status: 'clean',
+      problems: [],
+      settleMs: 150,
+      unresolved: [],
+    })
+    expect(failure.cleanup.unknownOutcomes).toEqual([
+      expect.stringMatching(/^account canary-user-/),
+      expect.stringMatching(/^post canary-post-/),
+      expect.stringMatching(/^moderation events of post canary-post-/),
+    ])
+    expect(failure.cleanup.lateFound).toEqual([
+      expect.stringMatching(/^account canary-user-/),
+    ])
+  })
+
+  it('reports cleanup uncertain, naming every affected id, when the late account cannot be removed', async () => {
+    // Story 6.2b final review (RF7).
+    const { failure, late } = await runLateCommit('fail')
+    expect(failure.code).toBe('deadline')
+    expect(late.accounts.size).toBe(1)
+    expect(failure.cleanup.status).toBe('uncertain')
+    expect(failure.cleanup.problems).toEqual(
+      expect.arrayContaining([
+        expect.stringMatching(/canary account: could not obtain lock/),
+        expect.stringMatching(/still present after cleanup: account canary-user-/),
+      ])
+    )
+    expect(failure.cleanup.unresolved).toEqual([
+      expect.stringMatching(/^account canary-user-/),
+      expect.stringMatching(/^post canary-post-/),
+      expect.stringMatching(/^moderation events of post canary-post-/),
+      expect.stringMatching(/^object community-images\/community\/canary-post-/),
+    ])
+  })
+
+  it('refuses a settle window that does not fit inside the cleanup deadline', async () => {
+    const { parseCanaryArgs } = await canaryModule()
+    expect(() =>
+      parseCanaryArgs([
+        '--target',
+        'local',
+        '--cleanup-timeout-ms',
+        '1000',
+        '--cleanup-settle-ms',
+        '1000',
+      ])
+    ).toThrow(/--cleanup-settle-ms/)
+    expect(parseCanaryArgs(['--target', 'local'])).toMatchObject({
+      cleanupTimeoutMs: 30_000,
+      cleanupSettleMs: 10_000,
+    })
+    expect(
+      parseCanaryArgs(['--target', 'local', '--cleanup-timeout-ms', '1200'])
+    ).toMatchObject({ cleanupTimeoutMs: 1200, cleanupSettleMs: 400 })
   })
 
   it('gives up on a Redis that accepts the connection and never answers', async () => {
@@ -811,7 +1053,7 @@ describe('canary deadlines', () => {
       await expect(runCanary(options)).rejects.toMatchObject({
         code: 'deadline',
         details: { stage: 'connect' },
-        cleanup: { performed: true, problems: [] },
+        cleanup: { performed: true, status: 'clean', problems: [] },
       })
       expect(Date.now() - startedAt).toBeLessThan(3000)
       await vi.waitFor(() => expect(redis.status).toBe('end'), { timeout: 2000 })
@@ -865,7 +1107,7 @@ describe('canary deadlines', () => {
         ok: false,
         code: 'deadline',
         details: { stage: 'connect' },
-        cleanup: { performed: true, problems: [] },
+        cleanup: { performed: true, status: 'clean', problems: [] },
         mode: 'canary',
         target: 'local',
       })
@@ -1052,10 +1294,7 @@ describe('owner signature', () => {
     expect(
       delegatedSignature({ verdict: 'incomplete' }, 'a'.repeat(64)).record
     ).toBeUndefined()
-    const passedGates = [
-      { id: 'a', status: 'passed' },
-      { id: 'b', status: 'passed' },
-    ]
+    const passedGates = await mandatoryGates()
     const { record } = delegatedSignature(
       { verdict: 'pass', generatedAt: '2026-10-16T00:00:00.000Z', gates: passedGates },
       'b'.repeat(64),
@@ -1082,26 +1321,82 @@ describe('owner signature', () => {
       'scripts/sign-community-screening-readiness.mjs'
     )
     const digest = 'c'.repeat(64)
-    const tampered = {
-      verdict: 'pass',
-      gates: [
-        { id: 'a', status: 'passed' },
-        { id: 'safe-corpus', status: 'failed' },
-      ],
-    }
+    const withStatus = async (id: string, status: string) =>
+      (await mandatoryGates()).map((entry) =>
+        entry.id === id ? { ...entry, status } : entry
+      )
+    const tampered = { verdict: 'pass', gates: await withStatus('safe-corpus', 'failed') }
     expect(delegatedSignature(tampered, digest).refusal).toMatch(/its gates give fail/)
     expect(approvalRefusal(tampered)).toMatch(/its gates give fail/)
     expect(
       approvalRefusal({
         verdict: 'pass',
-        gates: [{ id: 'canary-hosted', status: 'not-run' }],
+        gates: await withStatus('canary-hosted', 'not-run'),
       })
     ).toMatch(/its gates give incomplete/)
-    expect(approvalRefusal({ verdict: 'pass', gates: [] })).toMatch(/incomplete/)
-    expect(approvalRefusal({ verdict: 'pass' })).toMatch(/incomplete/)
-    expect(approvalRefusal({ verdict: 'pass', gates: [{ status: 'passed' }] })).toBeNull()
+    expect(approvalRefusal({ verdict: 'pass', gates: await mandatoryGates() })).toBeNull()
+  })
+
+  it('refuses a payload that does not carry every mandatory gate exactly once', async () => {
+    // Story 6.2b final review (RF9). Codex's probe: a payload cut down to one
+    // passing `worker-image` gate recomputed to pass and could be approved.
+    const { approvalRefusal, delegatedSignature } = await load<SignModule>(
+      'scripts/sign-community-screening-readiness.mjs'
+    )
+    const { MANDATORY_GATE_IDS } = await load<GeneratorModule>(
+      'scripts/generate-community-screening-readiness.mjs'
+    )
+    const gates = await mandatoryGates()
+    const refusal = (edited: unknown) =>
+      approvalRefusal({ verdict: 'pass', gates: edited as Gate[] })
+
+    const cutDown = [{ id: 'worker-image', status: 'passed' }]
+    expect(refusal(cutDown)).toMatch(/not the generator's mandatory set/)
+    expect(refusal(cutDown)).toContain(
+      `missing ${MANDATORY_GATE_IDS.filter((id) => id !== 'worker-image').join(', ')}`
+    )
+    const delegated = delegatedSignature(
+      { verdict: 'pass', gates: cutDown },
+      'd'.repeat(64)
+    )
+    expect(delegated.record).toBeUndefined()
+    expect(delegated.refusal).toMatch(/missing committed-tree/)
+    expect(refusal(gates.filter((entry) => entry.id !== 'canary-hosted'))).toMatch(
+      /missing canary-hosted\)/
+    )
+    expect(refusal([...gates, { id: 'worker-image', status: 'passed' }])).toMatch(
+      /repeated worker-image\)/
+    )
+    expect(refusal([...gates, { id: 'extra-gate', status: 'passed' }])).toMatch(
+      /unknown extra-gate\)/
+    )
+    expect(refusal([...gates.slice(1), { status: 'passed' }])).toMatch(
+      /missing committed-tree; unknown undefined\)/
+    )
+    expect(refusal([])).toMatch(/missing committed-tree/)
+    expect(approvalRefusal({ verdict: 'pass' })).toMatch(/carries no gate list/)
+    expect(refusal(gates)).toBeNull()
+  })
+
+  it('takes the mandatory gate ids from the gates the generator builds', async () => {
+    // One source of truth: the list the sign command checks is the list
+    // buildGates produces, in order, whatever the sections hold.
+    const { buildGates, MANDATORY_GATE_IDS, gateSetProblems } =
+      await load<GeneratorModule>('scripts/generate-community-screening-readiness.mjs')
+    expect(buildGates({}).map((entry) => entry.id)).toEqual([...MANDATORY_GATE_IDS])
+    expect(new Set(MANDATORY_GATE_IDS).size).toBe(MANDATORY_GATE_IDS.length)
+    expect(Object.isFrozen(MANDATORY_GATE_IDS)).toBe(true)
+    expect(gateSetProblems(buildGates({}))).toEqual([])
   })
 })
+
+/** Every mandatory gate, passed, in the generator's order. */
+async function mandatoryGates(): Promise<Gate[]> {
+  const { MANDATORY_GATE_IDS } = await load<GeneratorModule>(
+    'scripts/generate-community-screening-readiness.mjs'
+  )
+  return MANDATORY_GATE_IDS.map((id) => ({ id, name: id, status: 'passed' }))
+}
 
 describe('safe corpus manifest checks', () => {
   it('refuses a missing, short, non-commercial or duplicated corpus', async () => {
@@ -1381,6 +1676,9 @@ interface Gate {
 interface GeneratorModule {
   buildGates: (sections: Record<string, unknown>) => Gate[]
   verdictOf: (gates: Gate[]) => string
+  MANDATORY_GATE_IDS: readonly string[]
+  gateSetProblems: (gates: unknown) => string[]
+  cleanupProblems: (canary: Record<string, unknown>) => string[]
   wilsonInterval: (successes: number, trials: number) => [number, number]
   inputStaleness: (recorded: unknown, current: string) => string[]
   deployedInputBinding: (
@@ -1447,7 +1745,7 @@ describe('readiness verdict', () => {
       processedBy: 'community-worker@abc123',
       soleConsumer: soleConsumer(),
       timings: { queueLatencyMs: 3, screeningDurationMs: 190 },
-      cleanup: { performed: true, problems: [] },
+      cleanup: { performed: true, status: 'clean', problems: [] },
     })
     const clean = () => ({
       total: 420,
@@ -1789,7 +2087,12 @@ describe('readiness verdict', () => {
     [
       'canary cleanup problems',
       'canary-local-container',
-      [['canaries.local.cleanup', { performed: true, problems: ['job: x'] }]],
+      [
+        [
+          'canaries.local.cleanup',
+          { performed: true, status: 'failed', problems: ['job: x'] },
+        ],
+      ],
     ],
     [
       'a canary that reported its cleanup failure',
@@ -1797,13 +2100,75 @@ describe('readiness verdict', () => {
       [
         ['canaries.hosted.ok', false],
         ['canaries.hosted.code', 'cleanup_failed'],
-        ['canaries.hosted.cleanup', { performed: true, problems: ['account: x'] }],
+        [
+          'canaries.hosted.cleanup',
+          { performed: true, status: 'failed', problems: ['account: x'] },
+        ],
       ],
     ],
     [
       'restart drill cleanup problems',
       'restart-keeps-queued-jobs',
-      [['canaries.restart.cleanup', { performed: true, problems: ['object: x'] }]],
+      [
+        [
+          'canaries.restart.cleanup',
+          { performed: true, status: 'failed', problems: ['object: x'] },
+        ],
+      ],
+    ],
+    // Story 6.2b final review (RF7): a cleanup that cannot say whether a late
+    // write left data behind is not a clean one, even with no problem listed.
+    [
+      'a canary whose cleanup is uncertain',
+      'canary-local-container',
+      [
+        [
+          'canaries.local.cleanup',
+          {
+            performed: true,
+            status: 'uncertain',
+            problems: [],
+            unresolved: ['account canary-user-x'],
+          },
+        ],
+      ],
+    ],
+    [
+      'a failed hosted canary whose cleanup is uncertain',
+      'canary-hosted',
+      [
+        ['canaries.hosted.ok', false],
+        ['canaries.hosted.code', 'deadline'],
+        [
+          'canaries.hosted.cleanup',
+          {
+            performed: true,
+            status: 'uncertain',
+            problems: ['cleanup deadline'],
+            unresolved: ['post canary-post-x'],
+          },
+        ],
+      ],
+    ],
+    [
+      'a restart drill whose cleanup is uncertain',
+      'restart-keeps-queued-jobs',
+      [
+        [
+          'canaries.restart.cleanup',
+          {
+            performed: true,
+            status: 'uncertain',
+            problems: [],
+            unresolved: ['job canary-post-x__canary-upload-x'],
+          },
+        ],
+      ],
+    ],
+    [
+      'a canary cleanup with no status',
+      'canary-local-container',
+      [['canaries.local.cleanup', { performed: true, problems: [] }]],
     ],
     // Story 6.2b final review (RF1): success alone proved no restart. Codex's
     // probe: an ordinary canary with the worker check skipped and 1 ms of queue

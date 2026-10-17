@@ -17,10 +17,13 @@
  *   4. the BullMQ timestamps and the persisted engine identity are read back, and
  *      every row, object and job the canary created is removed.
  *
- * A hosted run refuses to start while the Community feed could be live: its
- * safe fixture publishes, and a published post is served by the feed. It needs
- * `community_read_enabled` to default to false in packages/config/src/flags.ts
- * and the production flag cache not to hold anything else.
+ * Its safe fixture publishes. The API excludes the canary account
+ * (CANARY_USER_ID_PREFIX) from every public read, so the post is never served
+ * whatever the flags say (Story 6.2b final review, RF8). As defence in depth, a
+ * hosted run also refuses to start while the Community feed could be live: it
+ * needs `community_read_enabled` to default to false in
+ * packages/config/src/flags.ts and the production flag cache not to hold
+ * anything else.
  *
  * It exits nonzero, naming the cause, when no worker is consuming the queue,
  * when the persisted identity carries a `fixture` marker or comes from the
@@ -31,6 +34,14 @@
  * (`--cleanup-timeout-ms`). A run that hits either deadline force-closes its
  * connections, writes a failure report that includes the cleanup result, and
  * exits nonzero.
+ *
+ * A write cut off by a deadline or a client timeout may still commit after the
+ * canary stopped waiting for it, including after cleanup deleted it. Its outcome
+ * is recorded as unknown, and cleanup then waits a settle window
+ * (`--cleanup-settle-ms`), looks the canary's identifiers up again and removes
+ * whatever turned up. Cleanup reports `clean` only once a lookup finds nothing;
+ * a cleanup that cannot get there within its deadline after a write of unknown
+ * outcome reports `uncertain` with every affected identifier, and the run fails.
  *
  * It is an operations command, not a test, and it targets whatever environment
  * it is pointed at. `--target` is required and is checked against the database
@@ -51,7 +62,8 @@
  *   completes, on the same Redis connection both times. The report records both
  *   observations as `soleConsumer`.
  *   Options: --timeout-ms <n> (default 120000), --cleanup-timeout-ms <n> (default
- *            30000), --json-out <path>, --keep,
+ *            30000), --cleanup-settle-ms <n> (default 10000 or a third of the
+ *            cleanup timeout, whichever is less), --json-out <path>, --keep,
  *            --fixture max (a generated 4096x4096 JPEG, the largest accepted upload),
  *            --restart-drill (local only: requires zero consumers on the queue, enqueues,
  *            observes zero consumers again with the job waiting, then waits for a
@@ -77,6 +89,18 @@ const FIXTURE_DIRECTORY = 'apps/api/test/fixtures/community-moderation/v1'
 const FIXTURE_NAME = 'safe-satin-plum-512x512.jpg'
 const DEFAULT_TIMEOUT_MS = 120_000
 const DEFAULT_CLEANUP_TIMEOUT_MS = 30_000
+/**
+ * How long cleanup waits, after a write of unknown outcome, before it looks the
+ * canary's identifiers up again (Story 6.2b final review, RF7). It covers a
+ * write that was already on the server when its client gave up. Unless given,
+ * it is capped at a third of the cleanup deadline, so the lookups still fit.
+ */
+const DEFAULT_CLEANUP_SETTLE_MS = 10_000
+export function defaultCleanupSettleMs(cleanupTimeoutMs) {
+  return Math.min(DEFAULT_CLEANUP_SETTLE_MS, Math.floor(cleanupTimeoutMs / 3))
+}
+/** Lookup-and-remove rounds cleanup makes before it stops trusting the result. */
+const CLEANUP_VERIFY_ROUNDS = 3
 /** Per-client bounds, inside the run deadline (Story 6.2b final review, RF2). */
 const DB_CONNECT_TIMEOUT_MS = 10_000
 const DB_QUERY_TIMEOUT_MS = 15_000
@@ -92,7 +116,10 @@ export const COMMITTED_DATABASE_CA = path.join(
   projectRoot,
   'apps/api/certs/supabase-root-2021-ca.pem'
 )
-/** The canary account's id prefix; the API excludes it from analytics (community-analytics.ts). */
+/**
+ * The canary account's id prefix. The API excludes it from analytics
+ * (community-analytics.ts) and from every public read (community.repository.ts).
+ */
 export const CANARY_USER_ID_PREFIX = 'canary-user-'
 /** The BullMQ worker name the image gives itself (community-moderation.worker.ts). */
 export const workerNameFor = (sha) => `community-worker@${sha}`
@@ -118,6 +145,7 @@ const VALUE_FLAGS = {
   '--env-file': ['envFile', String],
   '--timeout-ms': ['timeoutMs', Number],
   '--cleanup-timeout-ms': ['cleanupTimeoutMs', Number],
+  '--cleanup-settle-ms': ['cleanupSettleMs', Number],
   '--json-out': ['jsonOut', String],
   '--fixture': ['fixture', String],
   '--db-ca': ['dbCa', String],
@@ -140,6 +168,16 @@ function validateCanaryOptions(options) {
     if (!Number.isInteger(options[key]) || options[key] <= 0) {
       throw new Error(`${flag} must be a positive integer`)
     }
+  }
+  options.cleanupSettleMs ??= defaultCleanupSettleMs(options.cleanupTimeoutMs)
+  if (
+    !Number.isInteger(options.cleanupSettleMs) ||
+    options.cleanupSettleMs < 0 ||
+    options.cleanupSettleMs >= options.cleanupTimeoutMs
+  ) {
+    throw new Error(
+      '--cleanup-settle-ms must be a non-negative integer below --cleanup-timeout-ms'
+    )
   }
   if (options.fixture !== 'safe' && options.fixture !== 'max') {
     throw new Error('--fixture must be safe or max')
@@ -177,6 +215,7 @@ export function parseCanaryArgs(argv) {
     envFile: null,
     timeoutMs: DEFAULT_TIMEOUT_MS,
     cleanupTimeoutMs: DEFAULT_CLEANUP_TIMEOUT_MS,
+    cleanupSettleMs: null,
     jsonOut: null,
     keep: false,
     restartDrill: false,
@@ -504,7 +543,69 @@ function createdNothing() {
   return { object: false, rows: false, job: false }
 }
 
-async function removeCreated({ db, storage, queue, ids, objectPath, jobId, created }) {
+/**
+ * Whether a failed write may still have taken effect (Story 6.2b final review,
+ * RF7). A deadline, a client timeout, a dropped connection or an aborted request
+ * leaves the server free to commit what it already received. A rejection the
+ * server itself sent is a known outcome: PostgreSQL names it with a SQLSTATE,
+ * and a storage error response surfaces as a CanaryFailure naming its cause.
+ */
+export function outcomeUnknown(error) {
+  if (error instanceof CanaryFailure) return error.code === 'deadline'
+  const sqlState = error?.code
+  return !(typeof sqlState === 'string' && /^[0-9A-Z]{5}$/.test(sqlState))
+}
+
+/**
+ * Runs one write, marking what it creates before it starts, and records the
+ * write's outcome as unknown when it fails in a way the server may not have
+ * seen.
+ */
+async function trackWrite(context, resource, write) {
+  context.created[resource] = true
+  try {
+    return await write()
+  } catch (error) {
+    if (outcomeUnknown(error)) context.unknownOutcomes.add(resource)
+    throw error
+  }
+}
+
+/** The folder the canary post's object lives in; nothing else is ever put there. */
+function objectFolder(ids) {
+  return `community/${ids.postId}`
+}
+
+/**
+ * Moderation events that describe the canary post: those still linked to it,
+ * and those whose link was nulled when the post went but whose snapshot still
+ * names the post's object folder.
+ */
+const CANARY_EVENTS_WHERE = 'post_id = $1 OR image_object_path LIKE $2'
+const canaryEventParameters = (ids) => [ids.postId, `${objectFolder(ids)}/%`]
+
+/** Every identifier a resource the canary created can carry, for the report. */
+function resourceNames(context, resources) {
+  const { ids, objectPath, jobId } = context
+  return [
+    resources.job ? `job ${jobId}` : null,
+    resources.rows ? `account ${ids.userId}` : null,
+    resources.rows ? `post ${ids.postId}` : null,
+    resources.rows ? `moderation events of post ${ids.postId}` : null,
+    resources.object ? `object ${BUCKET}/${objectPath}` : null,
+  ].filter(Boolean)
+}
+
+/**
+ * Removes the given resources by the canary's identifiers. Returns the problems.
+ * A job a worker is still processing means the worker's own writes (the
+ * publication, a moderation event, the re-encoded object) may land after this
+ * pass, so its outcome is recorded as unknown too.
+ */
+async function removeCreated(
+  { db, storage, queue, ids, objectPaths, jobId, unknownOutcomes },
+  resources
+) {
   const problems = []
   const attempt = async (label, work) => {
     try {
@@ -513,17 +614,22 @@ async function removeCreated({ db, storage, queue, ids, objectPath, jobId, creat
       problems.push(`${label}: ${error instanceof Error ? error.message : String(error)}`)
     }
   }
-  if (created.job) {
+  if (resources.job) {
     await attempt('job', async () => {
       const job = await queue.getJob(jobId)
-      if (job) await job.remove()
+      if (!job) return
+      if ((await job.getState()) === 'active') unknownOutcomes.add('job')
+      await job.remove()
     })
   }
-  if (created.rows) {
+  if (resources.rows) {
     // Moderation events first: their post reference is SET NULL on delete, so
     // deleting the post first would orphan a content snapshot no sweep collects.
     await attempt('moderation events', () =>
-      db.query('DELETE FROM "ModerationEvent" WHERE post_id = $1', [ids.postId])
+      db.query(
+        `DELETE FROM "ModerationEvent" WHERE ${CANARY_EVENTS_WHERE}`,
+        canaryEventParameters(ids)
+      )
     )
     // The user delete cascades to the post, its outbox row and any telemetry row
     // the publication wrote.
@@ -531,55 +637,170 @@ async function removeCreated({ db, storage, queue, ids, objectPath, jobId, creat
       db.query('DELETE FROM "User" WHERE id = $1', [ids.userId])
     )
   }
-  if (created.object) {
+  if (resources.object && objectPaths.length > 0) {
     await attempt('storage object', async () => {
-      const { error } = await storage.from(BUCKET).remove([objectPath])
+      const { error } = await storage.from(BUCKET).remove(objectPaths)
       if (error) throw new Error(error.message)
     })
   }
   return problems
 }
 
-/** Names what a cleanup that could not finish may have left, for the report. */
-function leftBehind(context) {
-  const { ids, objectPath, jobId, created } = context
-  return [
-    created.job ? `job ${jobId}` : null,
-    created.rows ? `account ${ids.userId} and post ${ids.postId}` : null,
-    created.object ? `object ${BUCKET}/${objectPath}` : null,
-  ].filter(Boolean)
+/**
+ * Looks every resource the canary attempted up again by its identifiers: the
+ * job, the account, any post of the account or with the post's id, any
+ * moderation event about the post, and any object in the post's folder. Returns
+ * what is still there; a lookup that fails throws, because it proves nothing.
+ */
+async function findSurvivors({ db, storage, queue, ids, jobId }, resources) {
+  const found = { job: false, rows: false, object: false, names: [], objectPaths: [] }
+  if (resources.job && (await queue.getJob(jobId))) {
+    found.job = true
+    found.names.push(`job ${jobId}`)
+  }
+  if (resources.rows) {
+    const lookups = [
+      ['account', 'SELECT id FROM "User" WHERE id = $1', [ids.userId]],
+      [
+        'post',
+        'SELECT id FROM "LookbookPost" WHERE id = $1 OR user_id = $2',
+        [ids.postId, ids.userId],
+      ],
+      [
+        'moderation event',
+        `SELECT id FROM "ModerationEvent" WHERE ${CANARY_EVENTS_WHERE}`,
+        canaryEventParameters(ids),
+      ],
+    ]
+    for (const [label, sql, parameters] of lookups) {
+      const { rows } = await db.query(sql, parameters)
+      for (const row of rows) found.names.push(`${label} ${row.id}`)
+      if (rows.length > 0) found.rows = true
+    }
+  }
+  if (resources.object) {
+    const { data, error } = await storage.from(BUCKET).list(objectFolder(ids))
+    if (error) throw new Error(`storage lookup: ${error.message}`)
+    for (const entry of data ?? []) {
+      const objectPath = `${objectFolder(ids)}/${entry.name}`
+      found.objectPaths.push(objectPath)
+      found.names.push(`object ${BUCKET}/${objectPath}`)
+    }
+    found.object = found.objectPaths.length > 0
+  }
+  return found
 }
 
 /**
- * Removes what the run created, under its own deadline. After a run deadline
- * the run's clients are already force-closed, so cleanup opens fresh ones: the
- * network may have recovered, and the rows and the object are still worth
- * removing. When cleanup cannot finish either, its clients are force-closed and
- * the problem names what may remain.
+ * Removes what the run created and proves it gone. A first pass deletes by the
+ * canary's identifiers. When a write's outcome is unknown, cleanup then waits
+ * the settle window, because that write may still commit. Then it looks every
+ * attempted resource up again, removes whatever it finds and looks again, until
+ * a lookup finds nothing: only that is a clean state. A successful DELETE alone
+ * proves nothing about a write that commits after it.
+ */
+async function removeAndVerify(context, clients, options, outcome) {
+  const scope = { ...context.created }
+  const base = { ...context, ...clients, objectPaths: [context.objectPath] }
+  outcome.problems = await removeCreated(base, scope)
+  if (context.unknownOutcomes.size > 0) {
+    outcome.settleMs = options.cleanupSettleMs
+    await sleep(options.cleanupSettleMs)
+  }
+  for (let round = 0; round < CLEANUP_VERIFY_ROUNDS; round += 1) {
+    const survivors = await findSurvivors(base, scope)
+    if (survivors.names.length === 0) {
+      outcome.status = 'clean'
+      outcome.problems = []
+      return
+    }
+    if (round > 0 || context.unknownOutcomes.size > 0) {
+      for (const name of survivors.names) {
+        if (!outcome.lateFound.includes(name)) outcome.lateFound.push(name)
+      }
+    }
+    outcome.problems = await removeCreated(
+      { ...base, objectPaths: survivors.objectPaths },
+      survivors
+    )
+  }
+  const remaining = await findSurvivors(base, scope)
+  if (remaining.names.length === 0) {
+    outcome.status = 'clean'
+    outcome.problems = []
+    return
+  }
+  outcome.problems.push(`still present after cleanup: ${remaining.names.join(', ')}`)
+}
+
+/** The cleanup result for a run that created nothing, or that cleaned up fully. */
+export function cleanCleanup() {
+  return {
+    status: 'clean',
+    problems: [],
+    unknownOutcomes: [],
+    settleMs: null,
+    lateFound: [],
+    unresolved: [],
+  }
+}
+
+/**
+ * Removes what the run created, under its own deadline, and proves it gone.
+ * After a run deadline the run's clients are already force-closed, so cleanup
+ * opens fresh ones: the network may have recovered, and the rows and the object
+ * are still worth removing. When cleanup cannot finish either, its clients are
+ * force-closed.
+ *
+ * The status is `clean` when a lookup found nothing left; `failed` when every
+ * write's outcome was known and something could not be removed or verified; and
+ * `uncertain` when a write's outcome was unknown and cleanup could not establish
+ * a clean state within its deadline. Anything but `clean` lists every affected
+ * identifier in `unresolved`.
  */
 async function cleanupWithin(context, options, { freshClients }) {
-  if (!Object.values(context.created).some(Boolean)) return []
+  if (!Object.values(context.created).some(Boolean)) return cleanCleanup()
+  // The work records its progress here. A deadline does not stop it, so the
+  // result is a copy taken when cleanup returns, which nothing still running
+  // can change afterwards.
+  const progress = { ...cleanCleanup(), status: 'failed' }
+  const snapshot = () => ({
+    ...progress,
+    problems: [...progress.problems],
+    lateFound: [...progress.lateFound],
+  })
+  let outcome
   let clients = context.clients
   const deadlineAt = Date.now() + options.cleanupTimeoutMs
   try {
     if (freshClients) clients = await options.openClients(options)
-    return await withinDeadline(
+    await withinDeadline(
       deadlineAt,
       'cleanup',
       async () => {
         await connectDatabase(clients.db)
-        return removeCreated({ ...context, ...clients })
+        await removeAndVerify(context, clients, options, progress)
       },
       'cleanup'
     )
+    outcome = snapshot()
   } catch (error) {
+    outcome = snapshot()
     if (clients) forceClose(clients)
-    return [
-      `${error instanceof Error ? error.message : String(error)} It may have left: ${leftBehind(context).join(', ')}.`,
-    ]
+    outcome.status = 'failed'
+    outcome.problems.push(error instanceof Error ? error.message : String(error))
   } finally {
     if (freshClients && clients) await closeClients(clients)
   }
+  outcome.unknownOutcomes = resourceNames(
+    context,
+    Object.fromEntries([...context.unknownOutcomes].map((resource) => [resource, true]))
+  )
+  if (outcome.status !== 'clean') {
+    if (context.unknownOutcomes.size > 0) outcome.status = 'uncertain'
+    outcome.unresolved = resourceNames(context, context.created)
+  }
+  return outcome
 }
 
 function requireStorageCredentials() {
@@ -1006,24 +1227,30 @@ async function openAndInspect(step, { db, queue }, options) {
   )
 }
 
-/** Uploads the fixture, writes the rows and enqueues the job, marking each first. */
+/**
+ * Uploads the fixture, writes the rows and enqueues the job, marking each first
+ * and recording any whose outcome the failure leaves unknown.
+ */
 async function createAndEnqueue(step, context) {
-  const { ids, objectPath, jobId, fixture, created } = context
+  const { ids, objectPath, jobId, fixture } = context
   const { db, storage, queue } = context.clients
-  created.object = true
-  await step('upload', () => uploadFixture(storage, objectPath, fixture))
-  created.rows = true
-  await step('database write', () => createCanaryRows(db, ids, fixture, objectPath))
-  created.job = true
-  await step('enqueue', () =>
-    queue.add(
-      JOB_NAME,
-      { postId: ids.postId, uploadSessionId: ids.uploadSessionId },
-      {
-        jobId,
-        removeOnComplete: { age: JOB_RETENTION_SECONDS },
-        removeOnFail: { age: JOB_RETENTION_SECONDS },
-      }
+  await trackWrite(context, 'object', () =>
+    step('upload', () => uploadFixture(storage, objectPath, fixture))
+  )
+  await trackWrite(context, 'rows', () =>
+    step('database write', () => createCanaryRows(db, ids, fixture, objectPath))
+  )
+  await trackWrite(context, 'job', () =>
+    step('enqueue', () =>
+      queue.add(
+        JOB_NAME,
+        { postId: ids.postId, uploadSessionId: ids.uploadSessionId },
+        {
+          jobId,
+          removeOnComplete: { age: JOB_RETENTION_SECONDS },
+          removeOnFail: { age: JOB_RETENTION_SECONDS },
+        }
+      )
     )
   )
 }
@@ -1133,17 +1360,25 @@ async function driveCanary(context, options) {
 
 /**
  * Records what cleanup did on the report. A canary that left rows, an object or
- * a job behind did not pass, and the report says so itself, so no reader has to
- * know to look at the cleanup block.
+ * a job behind, or that cannot say whether it did, did not pass, and the report
+ * says so itself, so no reader has to know to look at the cleanup block.
  */
-export function recordCleanup(report, { keep, problems }) {
-  report.cleanup = keep
-    ? { performed: false, note: '--keep left the canary rows, object and job in place' }
-    : { performed: true, problems }
-  if (problems.length > 0 && report.ok !== false) {
+export function recordCleanup(report, { keep, cleanup = cleanCleanup() }) {
+  if (keep) {
+    report.cleanup = {
+      performed: false,
+      note: '--keep left the canary rows, object and job in place',
+    }
+    return report
+  }
+  report.cleanup = { performed: true, ...cleanup }
+  if (cleanup.status !== 'clean' && report.ok !== false) {
     report.ok = false
-    report.code = 'cleanup_failed'
-    report.message = `Cleanup left canary data behind: ${problems.join('; ')}`
+    report.code = cleanup.status === 'uncertain' ? 'cleanup_uncertain' : 'cleanup_failed'
+    report.message =
+      cleanup.status === 'uncertain'
+        ? `Cleanup could not establish that no canary data remains after a write of unknown outcome: ${cleanup.unresolved.join(', ')} (${cleanup.problems.join('; ')})`
+        : `Cleanup left canary data behind: ${cleanup.problems.join('; ')}`
   }
   return report
 }
@@ -1166,6 +1401,7 @@ export async function runCanary(options) {
   options.expectSha ??= gitHeadSha()
   options.openClients ??= openClients
   options.cleanupTimeoutMs ??= DEFAULT_CLEANUP_TIMEOUT_MS
+  options.cleanupSettleMs ??= defaultCleanupSettleMs(options.cleanupTimeoutMs)
   const fixture = options.fixture === 'max' ? await generateMaxFixture() : readFixture()
   const clients = await options.openClients(options)
   const startedAt = new Date()
@@ -1176,6 +1412,7 @@ export async function runCanary(options) {
     startedAt,
     deadlineAt: startedAt.getTime() + options.timeoutMs,
     created: createdNothing(),
+    unknownOutcomes: new Set(),
   }
 
   let report
@@ -1193,23 +1430,25 @@ export async function runCanary(options) {
   }
   const deadlineExpired = failure?.code === 'deadline'
   if (deadlineExpired) forceClose(clients)
-  const problems = options.keep
-    ? []
+  const cleanup = options.keep
+    ? cleanCleanup()
     : await cleanupWithin(context, options, { freshClients: deadlineExpired })
-  if (problems.length > 0) {
+  if (cleanup.status !== 'clean') {
     // Printed whether or not the run produced a report: a failed canary that
-    // also left rows or an object behind must say so.
-    console.error(`[canary] cleanup problems: ${problems.join('; ')}`)
+    // also left rows or an object behind, or cannot say, must say so.
+    console.error(
+      `[canary] cleanup ${cleanup.status}: ${cleanup.problems.join('; ')}; affected: ${cleanup.unresolved.join(', ')}`
+    )
   }
   if (!deadlineExpired) await closeClients(clients)
   if (failure) {
     failure.cleanup = recordCleanup(
       { ok: false },
-      { keep: options.keep, problems }
+      { keep: options.keep, cleanup }
     ).cleanup
     throw failure
   }
-  return recordCleanup(report, { keep: options.keep, problems })
+  return recordCleanup(report, { keep: options.keep, cleanup })
 }
 
 function gitHeadSha() {
