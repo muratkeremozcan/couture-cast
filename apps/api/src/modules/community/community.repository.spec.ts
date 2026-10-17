@@ -1427,13 +1427,34 @@ describe('CommunityRepository', () => {
       ).rejects.toThrow('connection reset')
     })
 
-    it('rethrows when a P2002 alias race leaves nothing to re-read', async () => {
+    it('returns null when the P2002 winner was erased before the re-read', async () => {
+      // The feed resolves strangers' aliases, so a read can lose the mint to
+      // another request and then find the row gone: the author's erasure
+      // cascaded it away in between. Seen as a flaky 6.1-INT-070 when a
+      // parallel suite removed its own author mid-page.
       const { repo, aliasFindUnique, aliasCreate } = createRepo()
       aliasFindUnique.mockResolvedValueOnce(null).mockResolvedValueOnce(null)
       aliasCreate.mockRejectedValueOnce(
         new Prisma.PrismaClientKnownRequestError('unique violation', {
           code: 'P2002',
           clientVersion: 'test',
+          meta: { modelName: 'CommunityAlias', target: ['user_id'] },
+        })
+      )
+
+      await expect(
+        repo.resolveAlias('user-erased', () => 'Style Explorer NEW00001')
+      ).resolves.toBeNull()
+    })
+
+    it('rethrows a generated-alias collision that leaves nothing to re-read', async () => {
+      const { repo, aliasFindUnique, aliasCreate } = createRepo()
+      aliasFindUnique.mockResolvedValueOnce(null).mockResolvedValueOnce(null)
+      aliasCreate.mockRejectedValueOnce(
+        new Prisma.PrismaClientKnownRequestError('unique violation', {
+          code: 'P2002',
+          clientVersion: 'test',
+          meta: { modelName: 'CommunityAlias', target: ['alias'] },
         })
       )
 

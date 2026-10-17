@@ -90,6 +90,15 @@ const MAX_BAND_RESOLUTION_LOCATIONS = 5
 /** The rolling submission window, in hours, per the spec's `(now-24h, now]`. */
 export const SUBMISSION_WINDOW_HOURS = 24
 
+/** Whether a P2002 names `field` among the columns of the violated unique index. */
+function isUniqueViolationOn(
+  error: Prisma.PrismaClientKnownRequestError,
+  field: string
+): boolean {
+  const target = error.meta?.target
+  return Array.isArray(target) ? target.includes(field) : target === field
+}
+
 @Injectable()
 export class CommunityRepository {
   constructor(@Inject(PrismaClient) private readonly prisma: PrismaClient) {}
@@ -606,6 +615,14 @@ export class CommunityRepository {
           })
           if (raced) {
             return raced.alias
+          }
+          // The winner's row existed a moment ago and is gone now. Aliases are
+          // only ever removed with their author (the relation cascades), so the
+          // author was erased between the insert and this read: the same answer
+          // as P2003 below. A collision on the generated `alias` itself is not
+          // this case and still throws.
+          if (isUniqueViolationOn(error, 'user_id')) {
+            return null
           }
         }
 
