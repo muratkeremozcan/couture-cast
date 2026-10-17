@@ -660,6 +660,10 @@ the payload is current.
 - `apps/api/test/fixtures/community-text-corpus/{de,en,es,fr,it,pt,tr}.json` (new)
 - `apps/api/test/fixtures/community-text-corpus/holdout-v1/{de,en,es,fr,it,pt,tr}.json` (new)
 - `apps/api/integration/community-worker-release-gate.spec.ts` (new)
+- `apps/api/integration/e2e-stack-ownership.spec.ts` (new: Codex review CX8)
+- `scripts/e2e-stack-pid.mjs` and `e2e-stack-pid.d.mts` (new: E2E stack ownership record)
+- `scripts/start-api-e2e-with-workers.mjs` and `playwright/global-teardown.ts` (stop this run's
+  stack before the database reset)
 - `playwright/tests/community-publication.spec.ts` (policy file name)
 - `scripts/lib/community-screening-input-set.mjs` (new)
 - `scripts/prune-community-worker-deps.mjs` (new)
@@ -805,3 +809,26 @@ signature depends on the verdict being correct.
 | EC34 licence check only env-gated                         | medium  | patch (group 1)                                              |
 | EC36 canary duration label                                | false   | rejected: the field is documented as the whole pipeline      |
 | calibrationGate does not match the policy (triager)       | medium  | design (group 1)                                             |
+
+### Codex peer review
+
+Loop 2 (2026-10-17). A Codex peer review of `main...045b2dc1` raised nine findings. Each was
+verified at the cited code before it was fixed: CX1 with a `pg` probe (`?sslmode=require` resolved
+the TLS settings to `{}`), CX7 by stopping the worker container during a live screening (the
+attempt failed with "Community NSFW screener is closing"), the rest by reading the cited lines.
+None was false. Every fix has a regression test that fails on the code before it.
+
+| Finding                                                | Verdict | Route                                                                 |
+| ------------------------------------------------------ | ------- | --------------------------------------------------------------------- |
+| CX1 `sslmode` in `DATABASE_URL` overrides hosted TLS   | high    | patch: strip `ssl*` parameters, assert the effective `pg` config      |
+| CX2 an older deployment passes the current hosted gate | high    | patch: `git diff --quiet <expectedSha> <commit>` over the input set   |
+| CX3 input set omits the wardrobe image limits          | medium  | patch: trace the worker's repo-local import graph into the input set  |
+| CX4 memory peak from a container that ran no upload    | medium  | patch: container's own services, `processedBy` bound to its worker    |
+| CX5 unrestricted or single-sample latency passes       | medium  | patch: 0.2 vCPU and 512 MiB cgroup limits, 1,000 warm samples         |
+| CX6 idle Redis window measured with no worker          | medium  | patch: sample `CLIENT LIST`, require the named worker throughout      |
+| CX7 SIGTERM closes the model before active jobs drain  | medium  | patch: drain the consumer first, one 20-second deadline               |
+| CX8 shared E2E pid file stops another checkout's stack | medium  | patch: per-root and per-port record with a token and a `ps` check     |
+| CX9 canary with cleanup problems reported as passed    | medium  | patch: `ok: false` on cleanup problems, every canary gate fails on it |
+
+All run products were regenerated from the committed fixes, because the input set changed. The
+hosted canary stays not run until the worker is deployed.
