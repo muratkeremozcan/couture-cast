@@ -672,7 +672,11 @@ the payload is current.
 - `apps/api/integration/community-worker-release-gate.spec.ts` (new)
 - `apps/api/integration/e2e-stack-ownership.spec.ts` (new: Codex review CX8)
 - `apps/api/src/modules/community/community.repository.ts` and `.spec.ts` (alias race after an
-  erased author)
+  erased author; canary excluded from every public read)
+- `apps/api/src/modules/community/community.service.ts` and `.spec.ts` (single-post and card-open
+  reads share the public visibility rule)
+- `apps/api/integration/community-lifecycle.integration.spec.ts` (canary post never served or
+  reportable, against real PostgreSQL)
 - `scripts/e2e-stack-pid.mjs` and `e2e-stack-pid.d.mts` (new: E2E stack ownership record)
 - `scripts/start-api-e2e-with-workers.mjs` and `playwright/global-teardown.ts` (stop this run's
   stack before the database reset)
@@ -900,6 +904,9 @@ regression test that fails on the code before it.
 | RF4 shutdown budget below the screening ceiling  | low     | doc: host grace cited, budgets kept, slow tail written |
 | RF5 hosted canary can publish into a live feed   | low     | patch: refuse while the feed flag can be on            |
 | RF6 delegated sign trusts the stored verdict     | medium  | patch: recompute `verdictOf(payload.gates)`            |
+| RF7 cleanup passes before a late write commits   | medium  | patch: unknown outcomes, settle, re-query, `uncertain` |
+| RF8 a PostHog cohort can see the canary post     | medium  | patch: canary excluded from every public read          |
+| RF9 a cut-down gate set recomputes to pass       | medium  | patch: exact `MANDATORY_GATE_IDS` before `verdictOf`   |
 
 RF1: `--restart-drill` (local only, replacing `--no-worker-precheck`) requires zero consumers before
 and after the enqueue with the job waiting, then a returning consumer, and records them with the
@@ -912,3 +919,26 @@ own deadline before the failure report is written. RF3: the Vercel API's unverif
 interactive approval as well. The worker image, the launcher and the canary are inputs, so every run
 product was regenerated from the committed fixes; the hosted canary reads not run until the worker
 is redeployed from them.
+
+Loop 5 (2026-10-17). A Codex review of `e49ebf70..a3875f81` raised RF7 to RF9. Each was verified
+before it was fixed, and none was false. RF7: a write cut off by a deadline is abandoned, not
+cancelled, and `forceClose` only drops the socket, so an INSERT already on the server can commit
+after cleanup's DELETE; an injected client whose INSERT commits 20 ms after that DELETE reproduced it
+with `problems: []`. RF8: `FeatureFlagsService.isEnabled` asks PostHog per viewer before the cache
+and the code default, so a beta cohort can read the feed while both say off; against real
+PostgreSQL, a published canary post led the feed and accepted a report. RF9: `verdictOf` over a
+payload cut down to one passing `worker-image` gate returned `pass`, and the RF6 test asserted that
+a single passing gate was approvable.
+
+RF7: every write cut off by a deadline or a client timeout, and every job still active at cleanup,
+is recorded as an unknown outcome. Cleanup then waits a settle window (`--cleanup-settle-ms`,
+default 10 seconds or a third of the cleanup deadline), looks the job, account, posts, moderation
+events and storage folder up again by the canary's identifiers, removes what it finds and looks
+again; only an empty lookup is `clean`. Without one inside the cleanup deadline the status is
+`uncertain`, every affected identifier is listed, the report is `ok: false` (`cleanup_uncertain`),
+and every canary gate fails on it. RF8: `PUBLICLY_VISIBLE_POST_WHERE` and `isPubliclyVisiblePost`
+in `community.repository.ts` add the `canary-user-` exclusion to the published-status rule the
+feed, single-post, card-open and report reads already shared; the RF5 refusal stays. RF9: the
+generator exports `MANDATORY_GATE_IDS`, `buildGates` throws if its gates differ from it, and
+`approvalRefusal` rejects a missing, repeated or unknown id before it recomputes `verdictOf`. The
+canary and the community module are inputs, so every run product was regenerated again.

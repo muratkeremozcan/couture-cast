@@ -576,11 +576,27 @@ connections under a separate cleanup deadline (`--cleanup-timeout-ms`, default 3
 a failure report naming the stalled stage and any data cleanup could not remove, and exits
 nonzero.
 
-The canary's safe fixture publishes, and a published post is served by the Community feed. The
-hosted canary therefore runs only while the feed is closed: it refuses to start when
-`community_read_enabled` defaults to anything but `false` in `packages/config/src/flags.ts`, or
-when the production flag cache (`feature_flags`) holds anything else. Once the feed opens, stop
-running the hosted canary until it publishes somewhere members cannot see.
+A write the canary stopped waiting for can still commit on the server, after cleanup has deleted
+it. The canary records every write cut off by a deadline or a client timeout, and every job a
+worker was still processing at cleanup, as having an unknown outcome. Cleanup then waits a settle
+window (`--cleanup-settle-ms`, default 10 seconds or a third of the cleanup deadline, whichever is
+less), looks the canary's identifiers up again (the job, the account, its posts, the moderation
+events about the post, and the post's storage folder) and removes whatever it finds, until a lookup
+finds nothing. Every run ends with that lookup. The report's `cleanup.status` is `clean` only when
+the lookup came back empty, `failed` when something could not be removed, and `uncertain` when a
+write's outcome was unknown and no clean state was established within the cleanup deadline. Anything
+but `clean` lists every affected identifier in `cleanup.unresolved`, sets `ok: false`, and fails the
+readiness gate. Remove what an `uncertain` report names by hand before the next run.
+
+The canary's safe fixture publishes. The API never serves it: every public read (the feed query,
+the single-post read, the card-open record and the report path) excludes accounts whose id starts
+with `canary-user-`, in the same predicate that keeps withdrawn, hidden and unscreened posts out
+(`PUBLICLY_VISIBLE_POST_WHERE` in `community.repository.ts`). That holds whatever the flags say,
+including a PostHog cohort that sees the feed while the code default and the flag cache both read
+`false`. As defence in depth, the hosted canary still runs only while the feed is closed: it
+refuses to start when `community_read_enabled` defaults to anything but `false` in
+`packages/config/src/flags.ts`, or when the production flag cache (`feature_flags`) holds anything
+else.
 
 ```bash
 npm run community:screening:canary:local
@@ -644,7 +660,9 @@ The repository owner records one verdict against the payload's SHA-256 with
 `npm run community:screening:sign`, interactively. When the owner delegates it,
 `npm run community:screening:sign -- --delegated` may run from an agent session: it is refused
 under CI and unless the payload's verdict is `pass`, records only an approval, and marks the record
-`mode: "delegated-by-owner"`. `npm run community:screening:verify-signature` exits 0 only for a
+`mode: "delegated-by-owner"`. Either way, an approval is refused unless the payload carries every
+mandatory gate the generator builds exactly once and no other (`MANDATORY_GATE_IDS`), and the
+generator's rule over those gates also gives `pass`. `npm run community:screening:verify-signature` exits 0 only for a
 current signature that approves, and reports a signature as stale once the payload changes.
 
 [`GET /api/v1/health/queues`](../../apps/api/src/controllers/health.controller.ts) only reports
