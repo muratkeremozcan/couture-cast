@@ -551,6 +551,15 @@ function buildPayload() {
           'anything about image blocking. No unsafe imagery exists in this repository, so this journey is refused by the text screener and must not be read as end-to-end proof that the image model blocks anything.',
         command: COMMANDS.pipeline.endToEnd,
       },
+      {
+        id: '6.2-E2E-03',
+        name: 'the author of a refused look sees a localized recovery state',
+        refusedBy: 'text-screener',
+        screeningPathIsRunSelected: true,
+        intent:
+          'render the refused post in the author browser and assert the localized status, removal explanation, and reason copy for the stable text_policy_match code, with the raw code absent from the page',
+        command: COMMANDS.pipeline.endToEnd,
+      },
     ],
 
     limitations: [
