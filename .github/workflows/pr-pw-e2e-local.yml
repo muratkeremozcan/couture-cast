@@ -121,8 +121,18 @@ jobs:
       - name: Install Playwright Chromium only
         run: npx playwright install chromium
 
+      # Balances the shards by past test durations: it exports PSP_ARGS for the
+      # Playwright command below, and its post step publishes this shard's
+      # test times (from main only) and a run record for the finish step.
+      - name: Balance Playwright shards by duration
+        uses: muratkeremozcan/playwright-smart-parallelization@65d649d62779c544dd9d4f358f129a5651d6e063
+
       - name: Run Playwright local suite
-        run: npm run test:pw-local -- --shard=${{ matrix.shardIndex }}/${{ matrix.shardTotal }} --reporter=blob
+        # PSP_ARGS stays unquoted, as the Action requires: it is empty when
+        # balancing is off and can carry more than one argument.
+        run: |
+          # shellcheck disable=SC2086
+          npm run test:pw-local -- --shard=${{ matrix.shardIndex }}/${{ matrix.shardTotal }} --reporter=blob $PSP_ARGS
         env:
           DATABASE_URL: ${{ env.LOCAL_DATABASE_URL }}
           GUARDIAN_INVITE_JWT_SECRET: ${{ secrets.GUARDIAN_INVITE_JWT_SECRET }}
@@ -177,3 +187,9 @@ jobs:
           shards: '2'
           e2e-result: ${{ needs.pw-e2e.result || 'unknown' }}
           github-token: ${{ secrets.GITHUB_TOKEN }}
+
+      # Proves every test ran in exactly one shard and writes the shard times to
+      # the job summary. Reads the shards' psp-record-* artifacts and the jobs
+      # API, which is why this job keeps actions: read.
+      - name: Check shard coverage and timing
+        uses: muratkeremozcan/playwright-smart-parallelization/finish@65d649d62779c544dd9d4f358f129a5651d6e063
