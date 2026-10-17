@@ -2,7 +2,7 @@
   "artifact": "community-content-screening-model-readiness",
   "artifactVersion": 2,
   "storyKey": "6-2b-community-screening-release-gate",
-  "generatedAt": "2026-10-17T17:04:02.358Z",
+  "generatedAt": "2026-10-17T18:12:28.977Z",
   "generatedBy": "npm run community:screening:evidence",
   "verdict": "fail",
   "verdictRule": "pass only when every gate ran against the current inputs from a committed tree and passed; fail when any gate that ran failed; incomplete otherwise",
@@ -20,7 +20,7 @@
         "nodeModulesMb": 112,
         "user": "node",
         "entrypoint": ["/usr/bin/tini", "-s", "--"],
-        "commitSha": "0cd5f93657b70139de6e89df842f64156681fc41"
+        "commitSha": "88d325d68fa893970f7fdc688c2672ab7c4e44e7"
       },
       "threshold": "node_modules at or below 150 MB, unprivileged user, tini init, commit baked in; the model self-test runs during the build"
     },
@@ -32,10 +32,10 @@
         "target": "local",
         "disposition": "pass",
         "engineIdentity": "adr013-text:policy-v2@b0daab4ab9d1;adr013-nsfw-v1.0:mobilenet_v2_mid@4.3.0:model-a0c76f72db26:v2:policy-b0daab4ab9d1",
-        "processedBy": "community-worker@0cd5f93657b70139de6e89df842f64156681fc41",
+        "processedBy": "community-worker@88d325d68fa893970f7fdc688c2672ab7c4e44e7",
         "queueLatencyMs": 1,
-        "screeningDurationMs": 180,
-        "finishedAt": "2026-10-17T15:52:21.217Z"
+        "screeningDurationMs": 531,
+        "finishedAt": "2026-10-17T17:41:38.875Z"
       },
       "threshold": "safe fixture published under a real-model identity within the bounded wait"
     },
@@ -45,28 +45,19 @@
       "status": "passed",
       "measured": {
         "mode": "restart-drill",
-        "observedDowntimeMs": 13196,
-        "consumerReturnedAt": "2026-10-17T15:52:35.296Z",
-        "queueLatencyMs": 13202,
+        "observedDowntimeMs": 14693,
+        "consumerReturnedAt": "2026-10-17T17:42:02.442Z",
+        "queueLatencyMs": 14838,
         "disposition": "pass"
       },
-      "threshold": "a restart drill observed zero consumers before and after the job was enqueued with the job waiting, then a consumer coming back, and the safe fixture published with cleanup complete"
+      "threshold": "a restart drill observed zero consumer heartbeats before and after the job was enqueued with the job waiting, then a heartbeat coming back, and the safe fixture published with cleanup complete"
     },
     {
       "id": "canary-hosted",
       "name": "Canary against the deployed worker on the hosted target",
-      "status": "passed",
-      "measured": {
-        "target": "hosted",
-        "disposition": "pass",
-        "engineIdentity": "adr013-text:policy-v2@b0daab4ab9d1;adr013-nsfw-v1.0:mobilenet_v2_mid@4.3.0:model-a0c76f72db26:v2:policy-b0daab4ab9d1",
-        "processedBy": "community-worker@7fb68febbb2f75ef083fbcc091cf96690beccddb",
-        "queueLatencyMs": 75,
-        "screeningDurationMs": 2676,
-        "finishedAt": "2026-10-17T17:03:48.685Z",
-        "deployedInputs": "same"
-      },
-      "threshold": "safe fixture published under a real-model identity, on the hosted target, by exactly the worker built from the expected commit, whose input set equals the evidence commit"
+      "status": "not-run",
+      "reason": "stale against current inputs: inputs changed since the measurement",
+      "command": "npm run community:screening:canary -- --target hosted --env-file <hosted env file> --json-out apps/api/.cache/community-screening/canary-hosted.json"
     },
     {
       "id": "policy-surface",
@@ -247,9 +238,9 @@
         "memoryLimitMib": 512,
         "warmupSamples": 50,
         "warmSamples": 1000,
-        "coldStartupMs": 2697.3,
-        "warmP95Ms": 295.6,
-        "warmP99Ms": 312.64
+        "coldStartupMs": 2107.1,
+        "warmP95Ms": 305.08,
+        "warmP99Ms": 388.98
       },
       "threshold": {
         "coldStartupMs": 30000,
@@ -265,34 +256,35 @@
       "name": "Worker container memory peak while screening the largest accepted upload",
       "status": "passed",
       "measured": {
-        "memoryPeakMib": 341.4,
+        "memoryPeakMib": 338.2,
         "memoryLimitMib": 512,
         "upload": "generated-4096x4096.jpg",
         "canaryDisposition": "pass",
-        "processedBy": "community-worker@0cd5f93657b70139de6e89df842f64156681fc41",
+        "processedBy": "community-worker@88d325d68fa893970f7fdc688c2672ab7c4e44e7",
         "soleConsumerProven": true,
         "consumersBefore": 1,
         "consumersAfter": 1
       },
-      "threshold": "cgroup memory.peak at or below 512 MiB across startup and a generated-4096x4096.jpg screening processed by the measured container's own worker, the only consumer on the queue before the job was enqueued and after it completed"
+      "threshold": "cgroup memory.peak at or below 512 MiB across startup and a generated-4096x4096.jpg screening processed by the measured container's own worker, the only consumer heartbeat on Redis before the job was enqueued and after it completed"
     },
     {
       "id": "redis-budget",
       "name": "Idle worker plus expected traffic at or below 5 USD a month on Upstash Pay as You Go",
       "status": "passed",
       "measured": {
-        "idleWorker": "community-worker@0cd5f93657b70139de6e89df842f64156681fc41",
+        "idleWorker": "community-worker@88d325d68fa893970f7fdc688c2672ab7c4e44e7",
+        "idlePresenceSource": "heartbeat",
         "idleWorkerConnectedSamples": "121 of 121",
-        "idleCommandsPerHour": 306,
-        "commandsPerPost": 85,
-        "projectedMonthly": 481780,
-        "idleMonthlyUsd": 0.44676,
-        "trafficMonthlyUsd": 0.5168,
-        "projectedMonthlyUsd": 0.96356,
+        "idleCommandsPerHour": 426,
+        "commandsPerPost": 88,
+        "projectedMonthly": 578500,
+        "idleMonthlyUsd": 0.62196,
+        "trafficMonthlyUsd": 0.53504,
+        "projectedMonthlyUsd": 1.157,
         "dailySubmissions": 100,
-        "postsPerDayAtCostCeiling": 881
+        "postsPerDayAtCostCeiling": 818
       },
-      "threshold": "the named worker connected through the idle window, and the projected month at the assumed volume at or below 5 USD at 0.20 USD per 100K commands"
+      "threshold": "one process of the named worker holding its heartbeat through the idle window, and the projected month at the assumed volume at or below 5 USD at 0.20 USD per 100K commands"
     },
     {
       "id": "rollout-closed",
@@ -306,10 +298,10 @@
     }
   ],
   "build": {
-    "commitSha": "1a66be6317115757c4aa868864ff083843a277eb",
+    "commitSha": "88d325d68fa893970f7fdc688c2672ab7c4e44e7",
     "workingTreeClean": true,
     "uncommittedPaths": 0,
-    "inputSetHash": "b365bbf1c1320a25e5da1c6aa412a4da9db854f782ebc1a6e854565c8c07716f",
+    "inputSetHash": "26e38f3f2fc17e64e60667d7e5dc118b3c9666bf22e65a6ea7004fbc531d1019",
     "dependencyLockSha256": "06a1a1cc341181847975e3f677acbf59f40a75c5f1e498b7302c5c8377eb621e",
     "generatorNode": "v24.22.0"
   },
@@ -348,24 +340,28 @@
     },
     "workerSource": {
       "path": "apps/api/src/modules/community/community-moderation.worker.ts",
-      "sha256": "38acbcb9ac0e232915ca847b79096bff1ed4ce81f6d7d38379f15510808bd38c"
+      "sha256": "9590f37ffc13564b723791211ff211c1c77a74d985d611fe7a79ada1b888872d"
+    },
+    "heartbeatSource": {
+      "path": "apps/api/src/modules/community/community-worker-heartbeat.ts",
+      "sha256": "5d812cf907a0792c8746d50987f1618119fd5bb011044bb1356960136586059b"
     }
   },
   "image": {
     "available": true,
     "stale": [],
     "reference": "couture-cast-community-worker:local",
-    "imageId": "sha256:f9a2d8c75b54e13acaf3742e4b3633464072b61d5648afce2093f777136a967f",
+    "imageId": "sha256:c67e3121b651b96cd8b867b111199c33d19badf00220a79bcc09b304c6488ac3",
     "repoDigests": [
-      "couture-cast-community-worker@sha256:f9a2d8c75b54e13acaf3742e4b3633464072b61d5648afce2093f777136a967f"
+      "couture-cast-community-worker@sha256:c67e3121b651b96cd8b867b111199c33d19badf00220a79bcc09b304c6488ac3"
     ],
-    "created": "2026-10-17T15:46:07.017979762Z",
+    "created": "2026-10-17T17:37:40.59627743Z",
     "architecture": "linux/arm64",
     "user": "node",
     "entrypoint": ["/usr/bin/tini", "-s", "--"],
     "cmd": ["node", "scripts/start-community-worker-production.mjs"],
-    "commitSha": "0cd5f93657b70139de6e89df842f64156681fc41",
-    "inputSetHash": "b365bbf1c1320a25e5da1c6aa412a4da9db854f782ebc1a6e854565c8c07716f",
+    "commitSha": "88d325d68fa893970f7fdc688c2672ab7c4e44e7",
+    "inputSetHash": "26e38f3f2fc17e64e60667d7e5dc118b3c9666bf22e65a6ea7004fbc531d1019",
     "nodeModulesMb": 112,
     "nodeModulesBudgetMb": 150,
     "dockerfileSha256": "b840e4ba4212f5b03f88fcd68dc27a92d36bdf640bf69948c9e5d2b9805bb1e5",
@@ -437,27 +433,52 @@
       "ok": true,
       "mode": "canary",
       "target": "local",
-      "inputSetHash": "b365bbf1c1320a25e5da1c6aa412a4da9db854f782ebc1a6e854565c8c07716f",
-      "expectedSha": "0cd5f93657b70139de6e89df842f64156681fc41",
+      "inputSetHash": "26e38f3f2fc17e64e60667d7e5dc118b3c9666bf22e65a6ea7004fbc531d1019",
+      "expectedSha": "88d325d68fa893970f7fdc688c2672ab7c4e44e7",
       "processedByRequired": false,
-      "processedBy": "community-worker@0cd5f93657b70139de6e89df842f64156681fc41",
+      "processedBy": "community-worker@88d325d68fa893970f7fdc688c2672ab7c4e44e7",
       "soleConsumerRequired": false,
       "soleConsumer": null,
-      "startedAt": "2026-10-17T15:52:20.645Z",
-      "finishedAt": "2026-10-17T15:52:21.217Z",
+      "startedAt": "2026-10-17T17:41:37.777Z",
+      "finishedAt": "2026-10-17T17:41:38.875Z",
       "fixture": {
         "name": "safe-satin-plum-512x512.jpg",
         "sha256": "b2ed2509ee63fa5a13aff99ece5603970b97b004c07ef930315267b0a79974a3",
         "bytes": 40848
       },
       "workersConnected": {
+        "source": "heartbeat",
         "known": true,
         "count": 1,
-        "names": [
-          "bull:Y29tbXVuaXR5LW1vZGVyYXRpb24=:w:community-worker@0cd5f93657b70139de6e89df842f64156681fc41"
+        "names": ["community-worker@88d325d68fa893970f7fdc688c2672ab7c4e44e7"],
+        "instanceIds": ["308a7420-c07e-46df-97b0-be33479bd058"],
+        "heartbeats": [
+          {
+            "key": "community-worker:heartbeat:community-worker@88d325d68fa893970f7fdc688c2672ab7c4e44e7:308a7420-c07e-46df-97b0-be33479bd058",
+            "workerName": "community-worker@88d325d68fa893970f7fdc688c2672ab7c4e44e7",
+            "instanceId": "308a7420-c07e-46df-97b0-be33479bd058",
+            "commitSha": "88d325d68fa893970f7fdc688c2672ab7c4e44e7",
+            "startedAt": "2026-10-17T17:41:24.855Z",
+            "pid": 7,
+            "ttlMs": 77163,
+            "problems": []
+          }
         ],
-        "clientIds": ["179"],
-        "observedAt": "2026-10-17T15:52:20.658Z"
+        "commands": {
+          "scan": 1,
+          "get": 1,
+          "pttl": 1
+        },
+        "observedAt": "2026-10-17T17:41:37.796Z",
+        "clientList": {
+          "known": true,
+          "count": 1,
+          "names": [
+            "bull:Y29tbXVuaXR5LW1vZGVyYXRpb24=:w:community-worker@88d325d68fa893970f7fdc688c2672ab7c4e44e7"
+          ],
+          "clientIds": ["280"]
+        },
+        "clientListAgrees": true
       },
       "terminalStatus": "published",
       "disposition": "pass",
@@ -466,9 +487,9 @@
       "jobState": "completed",
       "timings": {
         "queueLatencyMs": 1,
-        "screeningDurationMs": 180,
+        "screeningDurationMs": 531,
         "screeningDurationCovers": "BullMQ processedOn to finishedOn: storage download, declaration check and re-encode, image inference, text screening, and the publish transaction",
-        "enqueueToObservedTerminalMs": 504,
+        "enqueueToObservedTerminalMs": 1011,
         "pollIntervalMs": 500
       },
       "cleanup": {
@@ -489,54 +510,121 @@
       "ok": true,
       "mode": "restart-drill",
       "target": "local",
-      "inputSetHash": "b365bbf1c1320a25e5da1c6aa412a4da9db854f782ebc1a6e854565c8c07716f",
-      "expectedSha": "0cd5f93657b70139de6e89df842f64156681fc41",
+      "inputSetHash": "26e38f3f2fc17e64e60667d7e5dc118b3c9666bf22e65a6ea7004fbc531d1019",
+      "expectedSha": "88d325d68fa893970f7fdc688c2672ab7c4e44e7",
       "processedByRequired": false,
-      "processedBy": "community-worker@0cd5f93657b70139de6e89df842f64156681fc41",
+      "processedBy": "community-worker@88d325d68fa893970f7fdc688c2672ab7c4e44e7",
       "soleConsumerRequired": false,
       "soleConsumer": null,
       "restartDrill": {
         "beforeEnqueue": {
+          "source": "heartbeat",
           "known": true,
           "count": 0,
           "names": [],
-          "clientIds": [],
-          "observedAt": "2026-10-17T15:52:21.597Z"
+          "instanceIds": [],
+          "heartbeats": [],
+          "commands": {
+            "scan": 1,
+            "get": 0,
+            "pttl": 0
+          },
+          "observedAt": "2026-10-17T17:41:47.243Z",
+          "clientList": {
+            "known": true,
+            "count": 0,
+            "names": [],
+            "clientIds": []
+          },
+          "clientListAgrees": true
         },
         "afterEnqueue": {
+          "source": "heartbeat",
           "known": true,
           "count": 0,
           "names": [],
-          "clientIds": [],
-          "observedAt": "2026-10-17T15:52:21.629Z",
+          "instanceIds": [],
+          "heartbeats": [],
+          "commands": {
+            "scan": 1,
+            "get": 0,
+            "pttl": 0
+          },
+          "observedAt": "2026-10-17T17:41:47.266Z",
+          "clientList": {
+            "known": true,
+            "count": 0,
+            "names": [],
+            "clientIds": []
+          },
+          "clientListAgrees": true,
           "jobState": "waiting"
         },
-        "lastDownObservedAt": "2026-10-17T15:52:34.793Z",
+        "lastDownObservedAt": "2026-10-17T17:42:01.936Z",
         "consumerReturned": {
+          "source": "heartbeat",
           "known": true,
           "count": 1,
-          "names": [
-            "bull:Y29tbXVuaXR5LW1vZGVyYXRpb24=:w:community-worker@0cd5f93657b70139de6e89df842f64156681fc41"
+          "names": ["community-worker@88d325d68fa893970f7fdc688c2672ab7c4e44e7"],
+          "instanceIds": ["633f69e8-09d8-4901-a051-05dc5479f8a0"],
+          "heartbeats": [
+            {
+              "key": "community-worker:heartbeat:community-worker@88d325d68fa893970f7fdc688c2672ab7c4e44e7:633f69e8-09d8-4901-a051-05dc5479f8a0",
+              "workerName": "community-worker@88d325d68fa893970f7fdc688c2672ab7c4e44e7",
+              "instanceId": "633f69e8-09d8-4901-a051-05dc5479f8a0",
+              "commitSha": "88d325d68fa893970f7fdc688c2672ab7c4e44e7",
+              "startedAt": "2026-10-17T17:42:01.990Z",
+              "pid": 7,
+              "ttlMs": 89661,
+              "problems": []
+            }
           ],
-          "clientIds": ["184"],
-          "observedAt": "2026-10-17T15:52:35.296Z"
+          "commands": {
+            "scan": 1,
+            "get": 1,
+            "pttl": 1
+          },
+          "observedAt": "2026-10-17T17:42:02.442Z",
+          "clientList": {
+            "known": true,
+            "count": 1,
+            "names": [
+              "bull:Y29tbXVuaXR5LW1vZGVyYXRpb24=:w:community-worker@88d325d68fa893970f7fdc688c2672ab7c4e44e7"
+            ],
+            "clientIds": ["287"]
+          },
+          "clientListAgrees": true
         },
-        "observedDowntimeMs": 13196,
+        "observedDowntimeMs": 14693,
         "observedDowntimeCovers": "from the zero-consumer observation before the job was enqueued to the last zero-consumer observation, a lower bound on the outage"
       },
-      "startedAt": "2026-10-17T15:52:21.584Z",
-      "finishedAt": "2026-10-17T15:52:36.841Z",
+      "startedAt": "2026-10-17T17:41:47.229Z",
+      "finishedAt": "2026-10-17T17:42:03.469Z",
       "fixture": {
         "name": "safe-satin-plum-512x512.jpg",
         "sha256": "b2ed2509ee63fa5a13aff99ece5603970b97b004c07ef930315267b0a79974a3",
         "bytes": 40848
       },
       "workersConnected": {
+        "source": "heartbeat",
         "known": true,
         "count": 0,
         "names": [],
-        "clientIds": [],
-        "observedAt": "2026-10-17T15:52:21.597Z"
+        "instanceIds": [],
+        "heartbeats": [],
+        "commands": {
+          "scan": 1,
+          "get": 0,
+          "pttl": 0
+        },
+        "observedAt": "2026-10-17T17:41:47.243Z",
+        "clientList": {
+          "known": true,
+          "count": 0,
+          "names": [],
+          "clientIds": []
+        },
+        "clientListAgrees": true
       },
       "terminalStatus": "published",
       "disposition": "pass",
@@ -544,10 +632,10 @@
       "attemptsMade": 1,
       "jobState": "completed",
       "timings": {
-        "queueLatencyMs": 13202,
-        "screeningDurationMs": 1608,
+        "queueLatencyMs": 14838,
+        "screeningDurationMs": 1298,
         "screeningDurationCovers": "BullMQ processedOn to finishedOn: storage download, declaration check and re-encode, image inference, text screening, and the publish transaction",
-        "enqueueToObservedTerminalMs": 15178,
+        "enqueueToObservedTerminalMs": 16183,
         "pollIntervalMs": 500
       },
       "cleanup": {
@@ -564,7 +652,7 @@
     "hosted": {
       "label": "hosted target",
       "available": true,
-      "stale": [],
+      "stale": ["inputs changed since the measurement"],
       "ok": true,
       "mode": "canary",
       "target": "hosted",
@@ -636,8 +724,9 @@
       },
       "deployedInputs": {
         "expectedSha": "7fb68febbb2f75ef083fbcc091cf96690beccddb",
-        "commitSha": "1a66be6317115757c4aa868864ff083843a277eb",
-        "status": "same"
+        "commitSha": "88d325d68fa893970f7fdc688c2672ab7c4e44e7",
+        "status": "differs",
+        "reason": "the deployed commit 7fb68febbb2f75ef083fbcc091cf96690beccddb differs from 88d325d68fa893970f7fdc688c2672ab7c4e44e7 in the input set"
       }
     }
   },
@@ -645,8 +734,8 @@
     "available": true,
     "stale": [],
     "sweep": {
-      "measuredAt": "2026-10-17T15:46:17.561Z",
-      "inputSetHash": "b365bbf1c1320a25e5da1c6aa412a4da9db854f782ebc1a6e854565c8c07716f",
+      "measuredAt": "2026-10-17T17:42:19.572Z",
+      "inputSetHash": "26e38f3f2fc17e64e60667d7e5dc118b3c9666bf22e65a6ea7004fbc531d1019",
       "policySha256": "b0daab4ab9d175cc018d88d7c37d3443a4d9425909394da3aee110e15ad98b65",
       "vectorCount": 10852,
       "byOutcome": {
@@ -714,8 +803,8 @@
       "sweepDigest": "2b211224d8cf3e45cda40065aa760c8e5d89266ee69794d77b4c04afe79cea17"
     },
     "coverage": {
-      "measuredAt": "2026-10-17T15:46:17.781Z",
-      "inputSetHash": "b365bbf1c1320a25e5da1c6aa412a4da9db854f782ebc1a6e854565c8c07716f",
+      "measuredAt": "2026-10-17T17:42:19.860Z",
+      "inputSetHash": "26e38f3f2fc17e64e60667d7e5dc118b3c9666bf22e65a6ea7004fbc531d1019",
       "policySha256": "b0daab4ab9d175cc018d88d7c37d3443a4d9425909394da3aee110e15ad98b65",
       "functions": [
         {
@@ -819,8 +908,8 @@
         "jointMaximum": 0.15
       }
     },
-    "measuredAt": "2026-10-17T15:48:36.025Z",
-    "inputSetHash": "b365bbf1c1320a25e5da1c6aa412a4da9db854f782ebc1a6e854565c8c07716f",
+    "measuredAt": "2026-10-17T17:44:51.742Z",
+    "inputSetHash": "26e38f3f2fc17e64e60667d7e5dc118b3c9666bf22e65a6ea7004fbc531d1019",
     "manifestSha256": "0f16a7e89da1d718660e6dfc25dc42fd255856eb0b6539e88ef40c9aeffeb159",
     "split": {
       "rule": "by creator: first hexadecimal digit of the SHA-256 of the creator key (source:creator, lower-cased), even is calibration, odd is holdout",
@@ -1275,8 +1364,8 @@
       },
       "manifestSha256": "0f16a7e89da1d718660e6dfc25dc42fd255856eb0b6539e88ef40c9aeffeb159"
     },
-    "measuredAt": "2026-10-17T15:47:00.393Z",
-    "inputSetHash": "b365bbf1c1320a25e5da1c6aa412a4da9db854f782ebc1a6e854565c8c07716f",
+    "measuredAt": "2026-10-17T17:43:09.447Z",
+    "inputSetHash": "26e38f3f2fc17e64e60667d7e5dc118b3c9666bf22e65a6ea7004fbc531d1019",
     "manifestSha256": "0f16a7e89da1d718660e6dfc25dc42fd255856eb0b6539e88ef40c9aeffeb159",
     "policySha256": "b0daab4ab9d175cc018d88d7c37d3443a4d9425909394da3aee110e15ad98b65",
     "engineVersion": "adr013-nsfw-v1.0:mobilenet_v2_mid@4.3.0:model-a0c76f72db26:v2:policy-b0daab4ab9d1",
@@ -1755,41 +1844,47 @@
     },
     "tuned": {
       "drainDelaySeconds": 300,
-      "stalledIntervalMs": 120000
+      "stalledIntervalMs": 120000,
+      "heartbeatIntervalMs": 30000,
+      "heartbeatTtlSeconds": 90
     },
     "sharedDatabase": "The worker uses the production Upstash database the API already uses for its own queues. These figures are the community worker alone; the API’s commands are billed on the same database.",
     "available": true,
     "stale": [],
     "countingRule": "Every command Redis records, including the commands BullMQ Lua scripts run inside EVALSHA. Upstash does not document whether a script counts once or per inner command, so this is the upper bound.",
     "idle": {
-      "measuredAt": "2026-10-17T16:22:45.302Z",
-      "inputSetHash": "b365bbf1c1320a25e5da1c6aa412a4da9db854f782ebc1a6e854565c8c07716f",
+      "measuredAt": "2026-10-17T18:12:09.802Z",
+      "inputSetHash": "26e38f3f2fc17e64e60667d7e5dc118b3c9666bf22e65a6ea7004fbc531d1019",
       "windowMinutes": 30,
       "otherClientsAtStart": 2,
       "worker": {
-        "name": "community-worker@0cd5f93657b70139de6e89df842f64156681fc41",
+        "name": "community-worker@88d325d68fa893970f7fdc688c2672ab7c4e44e7",
+        "presenceSource": "heartbeat",
         "sampleIntervalSeconds": 15,
         "samples": 121,
         "connectedSamples": 121,
         "connectedThroughout": true,
-        "firstSampleAt": "2026-10-17T15:52:45.298Z",
-        "lastSampleAt": "2026-10-17T16:22:45.300Z",
-        "clientIds": ["184"],
+        "instanceIds": ["633f69e8-09d8-4901-a051-05dc5479f8a0"],
+        "otherWorkers": [],
+        "firstSampleAt": "2026-10-17T17:42:09.795Z",
+        "lastSampleAt": "2026-10-17T18:12:09.799Z",
+        "clientListSamples": 121,
+        "clientIds": ["287"],
         "container": "cc-community-worker",
-        "commitSha": "0cd5f93657b70139de6e89df842f64156681fc41",
-        "containerInputSetHash": "b365bbf1c1320a25e5da1c6aa412a4da9db854f782ebc1a6e854565c8c07716f"
+        "commitSha": "88d325d68fa893970f7fdc688c2672ab7c4e44e7",
+        "containerInputSetHash": "26e38f3f2fc17e64e60667d7e5dc118b3c9666bf22e65a6ea7004fbc531d1019"
       },
-      "commands": 153,
-      "commandsPerHour": 306,
-      "commandsPerDay": 7344,
-      "projectedCommandsPerMonth": 223379,
+      "commands": 213,
+      "commandsPerHour": 426,
+      "commandsPerDay": 10224,
+      "projectedCommandsPerMonth": 310979,
       "byCommandPerHour": {
+        "set": 150,
         "evalsha": 42,
         "exists": 30,
         "hget": 30,
         "xtrim": 30,
         "lrange": 30,
-        "set": 30,
         "smembers": 30,
         "zrangebyscore": 12,
         "hmget": 12,
@@ -1801,12 +1896,12 @@
       }
     },
     "perPost": {
-      "measuredAt": "2026-10-17T16:22:49.151Z",
-      "inputSetHash": "b365bbf1c1320a25e5da1c6aa412a4da9db854f782ebc1a6e854565c8c07716f",
+      "measuredAt": "2026-10-17T18:12:22.207Z",
+      "inputSetHash": "26e38f3f2fc17e64e60667d7e5dc118b3c9666bf22e65a6ea7004fbc531d1019",
       "canaryRuns": 5,
-      "commandsDuringRuns": 424,
+      "commandsDuringRuns": 439,
       "idleCommandsSubtracted": 0,
-      "commandsPerPost": 85,
+      "commandsPerPost": 88,
       "byCommandPerPost": {
         "hgetall": 6,
         "hmget": 6,
@@ -1814,6 +1909,7 @@
         "hget": 5,
         "evalsha": 4,
         "del": 4,
+        "get": 3,
         "hmset": 3,
         "zadd": 3,
         "zrangebyscore": 3,
@@ -1821,7 +1917,6 @@
         "zrange": 3,
         "rpoplpush": 3,
         "eval": 3,
-        "get": 2,
         "client|setinfo": 2,
         "zcard": 2,
         "exists": 2,
@@ -1840,22 +1935,24 @@
         "quit": 1,
         "lrem": 1,
         "zrem": 1,
+        "scan": 1,
         "zremrangebyscore": 1,
         "xtrim": 1,
+        "pttl": 1,
         "scard": 1,
         "set": 1
       },
-      "note": "Upper bound: includes the canary’s own worker-count, job-state and job-removal lookups beside the dispatch-equivalent enqueue and the screening itself."
+      "note": "Upper bound: includes the canary’s own heartbeat scan, CLIENT LIST cross-check, job-state and job-removal lookups beside the dispatch-equivalent enqueue and the screening itself."
     },
     "dailySubmissions": 100,
-    "postsPerDayAtCostCeiling": 881,
+    "postsPerDayAtCostCeiling": 818,
     "projectedMonthly": {
-      "idle": 223380,
-      "traffic": 258400,
-      "total": 481780,
-      "idleUsd": 0.44676,
-      "trafficUsd": 0.5168,
-      "totalUsd": 0.96356
+      "idle": 310980,
+      "traffic": 267520,
+      "total": 578500,
+      "idleUsd": 0.62196,
+      "trafficUsd": 0.53504,
+      "totalUsd": 1.157
     }
   },
   "text": {
@@ -2587,33 +2684,33 @@
     "latency": {
       "available": true,
       "stale": [],
-      "measuredAt": "2026-10-17T15:52:10.413Z",
+      "measuredAt": "2026-10-17T17:41:15.136Z",
       "profile": "local container, 0.2 vCPU, 512 MiB (Northflank sandbox envelope)",
-      "commitSha": "0cd5f93657b70139de6e89df842f64156681fc41",
-      "inputSetHash": "b365bbf1c1320a25e5da1c6aa412a4da9db854f782ebc1a6e854565c8c07716f",
+      "commitSha": "88d325d68fa893970f7fdc688c2672ab7c4e44e7",
+      "inputSetHash": "26e38f3f2fc17e64e60667d7e5dc118b3c9666bf22e65a6ea7004fbc531d1019",
       "executedFrom": "compiled dist under plain node",
       "engineVersion": "adr013-nsfw-v1.0:mobilenet_v2_mid@4.3.0:model-a0c76f72db26:v2:policy-b0daab4ab9d1",
       "modelHash": "a0c76f72db261c54dc851b974c848dc9ce01576ca66b0f232f4848c950549322",
       "policyVersion": "v2",
       "backend": "wasm",
-      "coldStartupMs": 2697.3,
-      "readinessStartupDurationMs": 2697,
+      "coldStartupMs": 2107.1,
+      "readinessStartupDurationMs": 2107,
       "warmupSamples": 50,
       "warmSamples": 1000,
       "warmSupervisedMs": {
-        "p50": 195.79,
-        "p95": 295.6,
-        "p99": 312.64,
-        "max": 402.73
+        "p50": 194.19,
+        "p95": 305.08,
+        "p99": 388.98,
+        "max": 507.35
       },
       "warmInThreadMs": {
-        "p50": 195,
-        "p95": 295,
-        "p99": 308,
-        "max": 403
+        "p50": 193,
+        "p95": 304,
+        "p99": 387,
+        "max": 507
       },
-      "peakResidentMib": 238.8,
-      "baselineResidentMibBeforeModelLoad": 70.7,
+      "peakResidentMib": 238,
+      "baselineResidentMibBeforeModelLoad": 69.3,
       "dispositions": {
         "pass": 1000
       },
@@ -2633,36 +2730,86 @@
     "memory": {
       "available": true,
       "stale": [],
-      "measuredAt": "2026-10-17T15:52:20.420Z",
+      "measuredAt": "2026-10-17T17:41:33.357Z",
       "container": "cc-community-worker",
-      "commitSha": "0cd5f93657b70139de6e89df842f64156681fc41",
-      "inputSetHash": "b365bbf1c1320a25e5da1c6aa412a4da9db854f782ebc1a6e854565c8c07716f",
-      "hostInputSetHash": "b365bbf1c1320a25e5da1c6aa412a4da9db854f782ebc1a6e854565c8c07716f",
+      "commitSha": "88d325d68fa893970f7fdc688c2672ab7c4e44e7",
+      "inputSetHash": "26e38f3f2fc17e64e60667d7e5dc118b3c9666bf22e65a6ea7004fbc531d1019",
+      "hostInputSetHash": "26e38f3f2fc17e64e60667d7e5dc118b3c9666bf22e65a6ea7004fbc531d1019",
       "source": "cgroup v2 memory.peak inside the running worker container",
-      "memoryPeakMib": 341.4,
+      "memoryPeakMib": 338.2,
       "memoryLimitMib": 512,
-      "workerName": "community-worker@0cd5f93657b70139de6e89df842f64156681fc41",
-      "processedBy": "community-worker@0cd5f93657b70139de6e89df842f64156681fc41",
+      "workerName": "community-worker@88d325d68fa893970f7fdc688c2672ab7c4e44e7",
+      "processedBy": "community-worker@88d325d68fa893970f7fdc688c2672ab7c4e44e7",
       "soleConsumer": {
         "proven": true,
-        "expectedWorker": "community-worker@0cd5f93657b70139de6e89df842f64156681fc41",
+        "expectedWorker": "community-worker@88d325d68fa893970f7fdc688c2672ab7c4e44e7",
         "before": {
+          "source": "heartbeat",
           "known": true,
           "count": 1,
-          "names": [
-            "bull:Y29tbXVuaXR5LW1vZGVyYXRpb24=:w:community-worker@0cd5f93657b70139de6e89df842f64156681fc41"
+          "names": ["community-worker@88d325d68fa893970f7fdc688c2672ab7c4e44e7"],
+          "instanceIds": ["308a7420-c07e-46df-97b0-be33479bd058"],
+          "heartbeats": [
+            {
+              "key": "community-worker:heartbeat:community-worker@88d325d68fa893970f7fdc688c2672ab7c4e44e7:308a7420-c07e-46df-97b0-be33479bd058",
+              "workerName": "community-worker@88d325d68fa893970f7fdc688c2672ab7c4e44e7",
+              "instanceId": "308a7420-c07e-46df-97b0-be33479bd058",
+              "commitSha": "88d325d68fa893970f7fdc688c2672ab7c4e44e7",
+              "startedAt": "2026-10-17T17:41:24.855Z",
+              "pid": 7,
+              "ttlMs": 84916,
+              "problems": []
+            }
           ],
-          "clientIds": ["179"],
-          "observedAt": "2026-10-17T15:52:17.128Z"
+          "commands": {
+            "scan": 1,
+            "get": 1,
+            "pttl": 1
+          },
+          "observedAt": "2026-10-17T17:41:30.042Z",
+          "clientList": {
+            "known": true,
+            "count": 1,
+            "names": [
+              "bull:Y29tbXVuaXR5LW1vZGVyYXRpb24=:w:community-worker@88d325d68fa893970f7fdc688c2672ab7c4e44e7"
+            ],
+            "clientIds": ["280"]
+          },
+          "clientListAgrees": true
         },
         "after": {
+          "source": "heartbeat",
           "known": true,
           "count": 1,
-          "names": [
-            "bull:Y29tbXVuaXR5LW1vZGVyYXRpb24=:w:community-worker@0cd5f93657b70139de6e89df842f64156681fc41"
+          "names": ["community-worker@88d325d68fa893970f7fdc688c2672ab7c4e44e7"],
+          "instanceIds": ["308a7420-c07e-46df-97b0-be33479bd058"],
+          "heartbeats": [
+            {
+              "key": "community-worker:heartbeat:community-worker@88d325d68fa893970f7fdc688c2672ab7c4e44e7:308a7420-c07e-46df-97b0-be33479bd058",
+              "workerName": "community-worker@88d325d68fa893970f7fdc688c2672ab7c4e44e7",
+              "instanceId": "308a7420-c07e-46df-97b0-be33479bd058",
+              "commitSha": "88d325d68fa893970f7fdc688c2672ab7c4e44e7",
+              "startedAt": "2026-10-17T17:41:24.855Z",
+              "pid": 7,
+              "ttlMs": 81797,
+              "problems": []
+            }
           ],
-          "clientIds": ["179"],
-          "observedAt": "2026-10-17T15:52:20.241Z"
+          "commands": {
+            "scan": 1,
+            "get": 1,
+            "pttl": 1
+          },
+          "observedAt": "2026-10-17T17:41:33.161Z",
+          "clientList": {
+            "known": true,
+            "count": 1,
+            "names": [
+              "bull:Y29tbXVuaXR5LW1vZGVyYXRpb24=:w:community-worker@88d325d68fa893970f7fdc688c2672ab7c4e44e7"
+            ],
+            "clientIds": ["280"]
+          },
+          "clientListAgrees": true
         },
         "problems": []
       },
@@ -2779,9 +2926,9 @@
     {
       "id": "pay-as-you-go-redis-cost",
       "statement": "The production Upstash database is on Pay as You Go, which bills every command (0.20 USD per 100K). An idle BullMQ worker polls Redis continuously. With BullMQ defaults it measured 6,516 commands an hour, about 9.51 USD a month while idle; the worker now blocks for 300 seconds between idle polls and checks for stalled jobs every 120 seconds, and the measured idle cost plus projected traffic is in the Redis section. The worker uses the production Upstash database the API already uses for its own queues. These figures are the community worker alone; the API’s commands are billed on the same database.",
-      "residualRisk": "The bill grows with every command, the API’s own commands are billed on the same database and are not in this measurement, and a volume past 881 posts a day takes the worker alone past 5 USD a month. A connection that dies silently during a long block delays pickup until the block times out.",
+      "residualRisk": "The bill grows with every command, the API’s own commands are billed on the same database and are not in this measurement, and a volume past 818 posts a day takes the worker alone past 5 USD a month. A connection that dies silently during a long block delays pickup until the block times out.",
       "mitigation": "A new job wakes the blocked worker at once, so the long block costs no pickup latency; the outbox dispatcher and the stale-review sweep are the backstops for a dead connection; the deployment guide names the provider dashboard figures to watch after the first day (commands and cost, which count the API and the worker together).",
-      "revisitWhen": "The Upstash console projects the database past 5 USD for a month, or daily submissions approach 881."
+      "revisitWhen": "The Upstash console projects the database past 5 USD for a month, or daily submissions approach 818."
     }
   ],
   "rollback": {
