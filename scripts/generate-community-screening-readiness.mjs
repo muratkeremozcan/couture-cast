@@ -45,6 +45,7 @@ import { execFileSync } from 'node:child_process'
 import { fileURLToPath } from 'node:url'
 import { inputSetHash, inputSetPathspecs } from './lib/community-screening-input-set.mjs'
 import { readCommunityRolloutDefaults } from './lib/community-rollout-flags.mjs'
+import { restartDrillProblems } from './community-screening-canary.mjs'
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url))
 const projectRoot = path.resolve(__dirname, '..')
@@ -1071,22 +1072,47 @@ function imageGate(image) {
   })
 }
 
+/**
+ * The restart drill's gate (Story 6.2b final review, RF1). Success alone proves
+ * nothing about a restart: the product must be a restart drill whose recorded
+ * observations show zero consumers before and after the job was enqueued, the
+ * job still waiting, and a consumer that came back. An ordinary canary result
+ * carries none of that and fails here.
+ */
 function restartGate(restart) {
   const id = 'restart-keeps-queued-jobs'
   const name = 'A job queued while the worker is down completes after it restarts'
   const pending = pendingGate(id, name, restart, COMMANDS.canaryRestartDrill)
   if (pending) return pending
   const problems = []
+  if (restart.mode !== 'restart-drill') {
+    problems.push(
+      `the product is ${String(restart.mode ?? 'an ordinary canary')}, not a restart drill; an ordinary canary result is not restart evidence`
+    )
+  }
   if (restart.ok !== true) problems.push(`drill failed: ${restart.code ?? 'unknown'}`)
-  else if (restart.disposition !== 'pass') {
-    problems.push(`reached ${String(restart.disposition)}`)
+  else {
+    if (restart.target !== 'local') {
+      problems.push(`target is ${String(restart.target)}, not local`)
+    }
+    if (restart.disposition !== 'pass') {
+      problems.push(`reached ${String(restart.disposition)}`)
+    }
+    problems.push(
+      ...restartDrillProblems(restart.restartDrill).map((problem) => `drill: ${problem}`)
+    )
   }
   problems.push(...cleanupProblems(restart))
   return judged(id, name, problems, {
     measured: {
+      mode: restart.mode ?? null,
+      observedDowntimeMs: restart.restartDrill?.observedDowntimeMs ?? null,
+      consumerReturnedAt: restart.restartDrill?.consumerReturned?.observedAt ?? null,
       queueLatencyMs: restart.timings?.queueLatencyMs ?? null,
       disposition: restart.disposition ?? null,
     },
+    threshold:
+      'a restart drill observed zero consumers before and after the job was enqueued with the job waiting, then a consumer coming back, and the safe fixture published with cleanup complete',
   })
 }
 

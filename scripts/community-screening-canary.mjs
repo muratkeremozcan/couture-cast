@@ -25,7 +25,12 @@
  * It exits nonzero, naming the cause, when no worker is consuming the queue,
  * when the persisted identity carries a `fixture` marker or comes from the
  * degraded `unavailable` adapter, when the safe fixture does not publish, or
- * when the wait expires.
+ * when its deadline expires. One absolute deadline (`--timeout-ms`) covers every
+ * network stage, from connecting to the closing job reads, and every client is
+ * bounded on its own as well; cleanup runs under a deadline of its own
+ * (`--cleanup-timeout-ms`). A run that hits either deadline force-closes its
+ * connections, writes a failure report that includes the cleanup result, and
+ * exits nonzero.
  *
  * It is an operations command, not a test, and it targets whatever environment
  * it is pointed at. `--target` is required and is checked against the database
@@ -45,10 +50,13 @@
  *   for that commit, checked before the job is enqueued and again after it
  *   completes, on the same Redis connection both times. The report records both
  *   observations as `soleConsumer`.
- *   Options: --timeout-ms <n> (default 120000), --json-out <path>, --keep,
+ *   Options: --timeout-ms <n> (default 120000), --cleanup-timeout-ms <n> (default
+ *            30000), --json-out <path>, --keep,
  *            --fixture max (a generated 4096x4096 JPEG, the largest accepted upload),
- *            --no-worker-precheck (restart drill: enqueue while the worker is down,
- *            then start it, and the job must still complete)
+ *            --restart-drill (local only: requires zero consumers on the queue, enqueues,
+ *            observes zero consumers again with the job waiting, then waits for a
+ *            consumer to return and the job to complete; the report records those
+ *            observations and the observed downtime as `restartDrill`)
  */
 import crypto from 'node:crypto'
 import { execFileSync } from 'node:child_process'
@@ -68,6 +76,14 @@ const FIXTURE_DIRECTORY = 'apps/api/test/fixtures/community-moderation/v1'
 /** The corpus's most confident safe fixture, measured Neutral 0.9991. */
 const FIXTURE_NAME = 'safe-satin-plum-512x512.jpg'
 const DEFAULT_TIMEOUT_MS = 120_000
+const DEFAULT_CLEANUP_TIMEOUT_MS = 30_000
+/** Per-client bounds, inside the run deadline (Story 6.2b final review, RF2). */
+const DB_CONNECT_TIMEOUT_MS = 10_000
+const DB_QUERY_TIMEOUT_MS = 15_000
+const REDIS_CONNECT_TIMEOUT_MS = 10_000
+const REDIS_COMMAND_TIMEOUT_MS = 15_000
+/** How long a polite close may take before the sockets are dropped. */
+const CLOSE_TIMEOUT_MS = 5_000
 const POLL_INTERVAL_MS = 500
 const TERMINAL_STATUSES = new Set(['published', 'flagged', 'review_failed'])
 const LOCAL_HOSTS = new Set(['127.0.0.1', 'localhost', '::1', 'host.docker.internal'])
@@ -101,6 +117,7 @@ const VALUE_FLAGS = {
   '--target': ['target', String],
   '--env-file': ['envFile', String],
   '--timeout-ms': ['timeoutMs', Number],
+  '--cleanup-timeout-ms': ['cleanupTimeoutMs', Number],
   '--json-out': ['jsonOut', String],
   '--fixture': ['fixture', String],
   '--db-ca': ['dbCa', String],
@@ -108,7 +125,7 @@ const VALUE_FLAGS = {
 }
 const SWITCH_FLAGS = {
   '--keep': ['keep', true],
-  '--no-worker-precheck': ['workerPrecheck', false],
+  '--restart-drill': ['restartDrill', true],
   '--sole-consumer': ['soleConsumer', true],
 }
 
@@ -116,8 +133,13 @@ function validateCanaryOptions(options) {
   if (options.target !== 'local' && options.target !== 'hosted') {
     throw new Error('--target must be local or hosted')
   }
-  if (!Number.isInteger(options.timeoutMs) || options.timeoutMs <= 0) {
-    throw new Error('--timeout-ms must be a positive integer')
+  for (const [flag, key] of [
+    ['--timeout-ms', 'timeoutMs'],
+    ['--cleanup-timeout-ms', 'cleanupTimeoutMs'],
+  ]) {
+    if (!Number.isInteger(options[key]) || options[key] <= 0) {
+      throw new Error(`${flag} must be a positive integer`)
+    }
   }
   if (options.fixture !== 'safe' && options.fixture !== 'max') {
     throw new Error('--fixture must be safe or max')
@@ -132,12 +154,14 @@ function validateConsumerOptions(options) {
       `--target hosted verifies the database certificate against the Supabase CA, and ${String(options.dbCa)} does not exist (--db-ca or DATABASE_CA_CERT_PATH name another)`
     )
   }
-  if (options.target === 'hosted' && !options.workerPrecheck) {
-    throw new Error('--target hosted always checks which worker is consuming')
-  }
-  if (options.soleConsumer && !options.workerPrecheck) {
+  if (options.target === 'hosted' && options.restartDrill) {
     throw new Error(
-      '--sole-consumer checks the consumers, so it refuses --no-worker-precheck'
+      '--restart-drill stops the worker, so it runs against a local container only'
+    )
+  }
+  if (options.soleConsumer && options.restartDrill) {
+    throw new Error(
+      '--sole-consumer needs the worker running before the job is enqueued, so it refuses --restart-drill'
     )
   }
   if (options.soleConsumer && options.target === 'local' && options.expectSha === null) {
@@ -152,9 +176,10 @@ export function parseCanaryArgs(argv) {
     target: null,
     envFile: null,
     timeoutMs: DEFAULT_TIMEOUT_MS,
+    cleanupTimeoutMs: DEFAULT_CLEANUP_TIMEOUT_MS,
     jsonOut: null,
     keep: false,
-    workerPrecheck: true,
+    restartDrill: false,
     fixture: 'safe',
     dbCa: process.env.DATABASE_CA_CERT_PATH ?? COMMITTED_DATABASE_CA,
     expectSha: null,
@@ -295,20 +320,33 @@ function loadEnvFile(envFile) {
   }
 }
 
-function redisConnection() {
-  const redisUrl = process.env.REDIS_URL || 'redis://localhost:6379'
+/**
+ * The producer's Redis options. Every wait is bounded (Story 6.2b final review,
+ * RF2): a TCP connect gives up after `connectTimeout`, a command that gets no
+ * reply fails after `commandTimeout`, a command waiting for a lost connection
+ * fails after two reconnect attempts, and reconnection itself stops after three.
+ * A worker's connection needs `maxRetriesPerRequest: null` to block on Redis;
+ * this one is a producer and never blocks.
+ */
+export function redisOptions(
+  redisUrl = process.env.REDIS_URL || 'redis://localhost:6379'
+) {
   const url = new URL(redisUrl)
-  const connection = {
+  const options = {
     host: bareHostname(redisUrl),
     port: url.port ? Number(url.port) : 6379,
-    maxRetriesPerRequest: null,
+    connectTimeout: REDIS_CONNECT_TIMEOUT_MS,
+    commandTimeout: REDIS_COMMAND_TIMEOUT_MS,
+    maxRetriesPerRequest: 2,
+    retryStrategy: (attempt) => (attempt > 3 ? null : attempt * 250),
+    lazyConnect: true,
   }
-  if (url.password) connection.password = decodeURIComponent(url.password)
+  if (url.password) options.password = decodeURIComponent(url.password)
   if (url.username && url.username !== 'default') {
-    connection.username = decodeURIComponent(url.username)
+    options.username = decodeURIComponent(url.username)
   }
-  if (url.protocol === 'rediss:' || process.env.REDIS_TLS === 'true') connection.tls = {}
-  return connection
+  if (url.protocol === 'rediss:' || process.env.REDIS_TLS === 'true') options.tls = {}
+  return options
 }
 
 /**
@@ -379,12 +417,47 @@ async function countWorkers(queue) {
       known: false,
       count: null,
       note: `CLIENT LIST unavailable: ${error instanceof Error ? error.message : String(error)}`,
+      observedAt: new Date().toISOString(),
     }
   }
 }
 
 function sleep(ms) {
   return new Promise((resolve) => setTimeout(resolve, ms))
+}
+
+/**
+ * Runs one network stage of the canary, or rejects with a `deadline` failure
+ * naming the stage when the run's absolute deadline passes first (Story 6.2b
+ * final review, RF2). The losing operation is not cancelled here; the caller
+ * force-closes the clients, which is what makes a stalled socket give up.
+ */
+export async function withinDeadline(deadlineAt, stage, work, label = 'canary') {
+  const remainingMs = deadlineAt - Date.now()
+  if (remainingMs <= 0) {
+    throw new CanaryFailure(
+      'deadline',
+      `The ${label} deadline passed before the ${stage} stage started.`,
+      { stage }
+    )
+  }
+  let timer
+  const expiry = new Promise((_, reject) => {
+    timer = setTimeout(() => {
+      reject(
+        new CanaryFailure(
+          'deadline',
+          `The ${stage} stage did not finish before the ${label} deadline; the clients were force-closed.`,
+          { stage }
+        )
+      )
+    }, remainingMs)
+  })
+  try {
+    return await Promise.race([Promise.resolve().then(work), expiry])
+  } finally {
+    clearTimeout(timer)
+  }
 }
 
 async function createCanaryRows(db, ids, fixture, objectPath) {
@@ -422,7 +495,16 @@ async function readPost(db, postId) {
   return rows[0] ?? null
 }
 
-async function cleanup({ db, storage, queue, ids, objectPath, jobId }) {
+/**
+ * What the canary may have left behind: each flag is set before the operation
+ * that creates the thing starts, so a write cut off by the deadline still gets
+ * cleaned up, and nothing the run never attempted is touched.
+ */
+function createdNothing() {
+  return { object: false, rows: false, job: false }
+}
+
+async function removeCreated({ db, storage, queue, ids, objectPath, jobId, created }) {
   const problems = []
   const attempt = async (label, work) => {
     try {
@@ -431,13 +513,13 @@ async function cleanup({ db, storage, queue, ids, objectPath, jobId }) {
       problems.push(`${label}: ${error instanceof Error ? error.message : String(error)}`)
     }
   }
-  if (queue && jobId) {
+  if (created.job) {
     await attempt('job', async () => {
       const job = await queue.getJob(jobId)
       if (job) await job.remove()
     })
   }
-  if (db) {
+  if (created.rows) {
     // Moderation events first: their post reference is SET NULL on delete, so
     // deleting the post first would orphan a content snapshot no sweep collects.
     await attempt('moderation events', () =>
@@ -449,13 +531,55 @@ async function cleanup({ db, storage, queue, ids, objectPath, jobId }) {
       db.query('DELETE FROM "User" WHERE id = $1', [ids.userId])
     )
   }
-  if (storage && objectPath) {
+  if (created.object) {
     await attempt('storage object', async () => {
       const { error } = await storage.from(BUCKET).remove([objectPath])
       if (error) throw new Error(error.message)
     })
   }
   return problems
+}
+
+/** Names what a cleanup that could not finish may have left, for the report. */
+function leftBehind(context) {
+  const { ids, objectPath, jobId, created } = context
+  return [
+    created.job ? `job ${jobId}` : null,
+    created.rows ? `account ${ids.userId} and post ${ids.postId}` : null,
+    created.object ? `object ${BUCKET}/${objectPath}` : null,
+  ].filter(Boolean)
+}
+
+/**
+ * Removes what the run created, under its own deadline. After a run deadline
+ * the run's clients are already force-closed, so cleanup opens fresh ones: the
+ * network may have recovered, and the rows and the object are still worth
+ * removing. When cleanup cannot finish either, its clients are force-closed and
+ * the problem names what may remain.
+ */
+async function cleanupWithin(context, options, { freshClients }) {
+  if (!Object.values(context.created).some(Boolean)) return []
+  let clients = context.clients
+  const deadlineAt = Date.now() + options.cleanupTimeoutMs
+  try {
+    if (freshClients) clients = await options.openClients(options)
+    return await withinDeadline(
+      deadlineAt,
+      'cleanup',
+      async () => {
+        await connectDatabase(clients.db)
+        return removeCreated({ ...context, ...clients })
+      },
+      'cleanup'
+    )
+  } catch (error) {
+    if (clients) forceClose(clients)
+    return [
+      `${error instanceof Error ? error.message : String(error)} It may have left: ${leftBehind(context).join(', ')}.`,
+    ]
+  } finally {
+    if (freshClients && clients) await closeClients(clients)
+  }
 }
 
 function requireStorageCredentials() {
@@ -502,15 +626,24 @@ export function withoutSslParameters(databaseUrl) {
 }
 
 /**
- * The PostgreSQL client for a target. A hosted client verifies the server
- * certificate against the Supabase CA and the host name (verify-full), and the
- * effective configuration pg resolved is checked before anything connects.
+ * The PostgreSQL client for a target. Connecting and every query are bounded
+ * (`connectionTimeoutMillis`, `query_timeout`), so a database that accepts the
+ * connection and never answers fails the stage instead of holding it. A hosted
+ * client verifies the server certificate against the Supabase CA and the host
+ * name (verify-full), and the effective configuration pg resolved is checked
+ * before anything connects.
  */
 export function createDatabaseClient(pg, { target, databaseUrl, ca }) {
-  if (target !== 'hosted') return new pg.Client({ connectionString: databaseUrl })
+  const bounds = {
+    connectionTimeoutMillis: DB_CONNECT_TIMEOUT_MS,
+    query_timeout: DB_QUERY_TIMEOUT_MS,
+  }
+  if (target !== 'hosted')
+    return new pg.Client({ connectionString: databaseUrl, ...bounds })
   const client = new pg.Client({
     connectionString: withoutSslParameters(databaseUrl),
     ssl: { ca, rejectUnauthorized: true },
+    ...bounds,
   })
   const effective = client.connectionParameters?.ssl
   if (
@@ -527,25 +660,95 @@ export function createDatabaseClient(pg, { target, databaseUrl, ca }) {
   return client
 }
 
-async function openClients(options) {
+/**
+ * Opens the run's clients: PostgreSQL, Redis behind the BullMQ queue, and
+ * storage, whose requests share one abort signal. Nothing here waits on the
+ * network; each connection is made inside a bounded stage.
+ */
+export async function openClients(options) {
   const { supabaseUrl, serviceRoleKey } = requireStorageCredentials()
   const { default: pg } = await import('pg')
+  const { default: Redis } = await import('ioredis')
   const { Queue } = await import('bullmq')
   const { createClient } = await import('@supabase/supabase-js')
+  const abort = new AbortController()
+  const db = createDatabaseClient(pg, {
+    target: options.target,
+    databaseUrl: process.env.DATABASE_URL,
+    ca: options.target === 'hosted' ? fs.readFileSync(options.dbCa, 'utf8') : null,
+  })
+  // A destroyed socket surfaces as an 'error' event; the failure is already
+  // reported by the stage that was waiting on it.
+  db.on('error', () => undefined)
+  const redis = new Redis(redisOptions())
+  redis.on('error', () => undefined)
+  // The queue borrows the connection, so force-closing `redis` is what stops a
+  // stalled command.
+  const queue = new Queue(QUEUE_NAME, {
+    connection: redis,
+    defaultJobOptions: { attempts: 3, backoff: { type: 'exponential', delay: 1000 } },
+  })
+  queue.on('error', () => undefined)
   return {
-    db: createDatabaseClient(pg, {
-      target: options.target,
-      databaseUrl: process.env.DATABASE_URL,
-      ca: options.target === 'hosted' ? fs.readFileSync(options.dbCa, 'utf8') : null,
-    }),
+    db,
+    redis,
+    abort,
     storage: createClient(supabaseUrl, serviceRoleKey, {
       auth: { persistSession: false, autoRefreshToken: false },
+      global: {
+        fetch: (input, init = {}) =>
+          fetch(input, {
+            ...init,
+            signal: init.signal
+              ? AbortSignal.any([init.signal, abort.signal])
+              : abort.signal,
+          }),
+      },
     }).storage,
-    queue: new Queue(QUEUE_NAME, {
-      connection: redisConnection(),
-      defaultJobOptions: { attempts: 3, backoff: { type: 'exponential', delay: 1000 } },
-    }),
+    queue,
   }
+}
+
+/** Connects the database once, so cleanup can wait on the same connection. */
+function connectDatabase(db) {
+  db.connected ??= db.connect()
+  return db.connected
+}
+
+/** Drops every socket now, without waiting for a reply from anything stalled. */
+export function forceClose({ db, redis, abort }) {
+  try {
+    abort?.abort()
+  } catch {
+    // already aborted
+  }
+  try {
+    // `disconnect` only half-closes the socket, which a peer that never answers
+    // never finishes; destroying the stream is what drops it.
+    redis?.disconnect(false)
+    redis?.stream?.destroy()
+  } catch {
+    // already closed
+  }
+  try {
+    db?.connection?.stream?.destroy()
+  } catch {
+    // already closed
+  }
+}
+
+/** Closes the clients politely, and force-closes whatever does not close in time. */
+async function closeClients(clients) {
+  const politely = Promise.allSettled([
+    clients.queue.close(),
+    clients.redis.quit(),
+    clients.db.end(),
+  ])
+  const outcome = await Promise.race([
+    politely.then(() => 'closed'),
+    sleep(CLOSE_TIMEOUT_MS).then(() => 'stalled'),
+  ])
+  if (outcome === 'stalled') forceClose(clients)
 }
 
 /**
@@ -598,10 +801,23 @@ export function assessSoleConsumer(before, after, expectedWorker) {
   }
 }
 
-async function precheckWorkers(queue, options) {
-  const workers = options.workerPrecheck
-    ? await countWorkers(queue)
-    : { known: false, count: null, note: 'skipped by --no-worker-precheck' }
+async function precheckWorkers(workers, options) {
+  if (options.restartDrill) {
+    // The drill's premise: nobody is consuming when the job is queued.
+    if (!workers.known) {
+      throw new CanaryFailure(
+        'restart_drill_unobservable',
+        `The restart drill needs Redis to list its clients, to prove the worker was down when the job was queued (${workers.note}).`
+      )
+    }
+    if (workers.count !== 0) {
+      throw new CanaryFailure(
+        'worker_present',
+        `The restart drill found ${workers.count} consumer(s) on ${QUEUE_NAME} (${JSON.stringify(workers.names)}). Stop the worker first, then start the drill.`
+      )
+    }
+    return workers
+  }
   if (workers.known && workers.count === 0) {
     throw new CanaryFailure(
       'worker_absent',
@@ -625,10 +841,10 @@ async function precheckWorkers(queue, options) {
 }
 
 /** Repeats the consumer check after the job completed, against the first one. */
-async function postcheckSoleConsumer(queue, options, before) {
+async function postcheckSoleConsumer(after, options, before) {
   if (!options.soleConsumer) return null
   const expected = workerNameFor(options.expectSha)
-  const proof = assessSoleConsumer(before, await countWorkers(queue), expected)
+  const proof = assessSoleConsumer(before, after, expected)
   if (!proof.proven) {
     throw new CanaryFailure(
       'worker_identity',
@@ -652,12 +868,85 @@ async function uploadFixture(storage, objectPath, fixture) {
   }
 }
 
-/** Polls the post until it leaves pending_review or the bounded wait expires. */
-async function awaitTerminalPost(db, postId, deadline) {
-  let post = await readPost(db, postId)
-  while (!TERMINAL_STATUSES.has(post?.status) && Date.now() < deadline) {
+/**
+ * The restart drill's record of what it saw (Story 6.2b final review, RF1):
+ * zero consumers before the job was enqueued, zero again after it with the job
+ * still waiting, then the first observation of a consumer that came back. The
+ * observed downtime runs from the first zero-consumer observation to the last
+ * one, so it is a lower bound on the real outage.
+ */
+function restartDrillRecord(drill) {
+  const at = (observation) => Date.parse(observation?.observedAt ?? '')
+  return {
+    beforeEnqueue: drill.beforeEnqueue,
+    afterEnqueue: drill.afterEnqueue,
+    lastDownObservedAt: drill.lastDown?.observedAt ?? null,
+    consumerReturned: drill.returned,
+    observedDowntimeMs: at(drill.lastDown) - at(drill.beforeEnqueue),
+    observedDowntimeCovers:
+      'from the zero-consumer observation before the job was enqueued to the last zero-consumer observation, a lower bound on the outage',
+  }
+}
+
+/**
+ * Why a restart drill record does not prove a job queued while no worker ran
+ * completed once one came back, empty when it does. The readiness gate judges
+ * the recorded observations with this same rule, so an ordinary canary result,
+ * which carries none, is never restart evidence.
+ */
+export function restartDrillProblems(record) {
+  if (!record || typeof record !== 'object') return ['no restart drill observations']
+  const problems = []
+  const { beforeEnqueue, afterEnqueue, consumerReturned } = record
+  if (beforeEnqueue?.known !== true || beforeEnqueue.count !== 0) {
+    problems.push('zero consumers were not observed before the job was enqueued')
+  }
+  if (
+    afterEnqueue?.known !== true ||
+    afterEnqueue.count !== 0 ||
+    afterEnqueue.jobState !== 'waiting'
+  ) {
+    problems.push(
+      'zero consumers with the job waiting were not observed after the job was enqueued'
+    )
+  }
+  if (consumerReturned?.known !== true || !(consumerReturned.count >= 1)) {
+    problems.push('no consumer was observed coming back')
+  } else if (
+    !(Date.parse(consumerReturned.observedAt) > Date.parse(afterEnqueue?.observedAt))
+  ) {
+    problems.push('the returning consumer was not observed after the job was queued')
+  }
+  if (!Number.isFinite(record.observedDowntimeMs) || record.observedDowntimeMs <= 0) {
+    problems.push(`observed downtime ${String(record.observedDowntimeMs)} ms`)
+  }
+  return problems
+}
+
+/** One poll of the drill: is anyone consuming yet, and was the job still waiting? */
+async function observeRestart(step, queue, jobId, drill) {
+  if (drill.returned) return
+  const workers = await step('worker inspection', () => countWorkers(queue))
+  if (workers.known && workers.count > 0) {
+    drill.returned = workers
+    return
+  }
+  const job = await step('job read', () => queue.getJob(jobId))
+  const jobState = job ? await step('job read', () => job.getState()) : 'missing'
+  drill.lastDown = { ...workers, jobState }
+}
+
+/**
+ * Polls the post until it leaves pending_review or the poll window closes. The
+ * window ends a reserve before the run deadline, so the job reads that explain
+ * the outcome still fit inside it.
+ */
+async function awaitTerminalPost(step, db, postId, pollUntil, onPoll) {
+  let post = await step('polling', () => readPost(db, postId))
+  while (!TERMINAL_STATUSES.has(post?.status) && Date.now() < pollUntil) {
+    await onPoll?.()
     await sleep(POLL_INTERVAL_MS)
-    post = await readPost(db, postId)
+    post = await step('polling', () => readPost(db, postId))
   }
   return post
 }
@@ -667,13 +956,13 @@ function nonTerminalFailure(post, job, jobState, timeoutMs) {
   if (jobState === 'waiting' || jobState === 'prioritized') {
     return new CanaryFailure(
       'worker_absent',
-      `The job stayed ${jobState} for ${timeoutMs} ms, so no worker picked it up.`,
+      `The job stayed ${jobState} for the ${timeoutMs} ms run, so no worker picked it up.`,
       { jobState }
     )
   }
   return new CanaryFailure(
     'timeout',
-    `The post was still ${post?.status ?? 'missing'} after ${timeoutMs} ms (job ${jobState}).`,
+    `The post was still ${post?.status ?? 'missing'} at the end of the ${timeoutMs} ms run (job ${jobState}).`,
     { jobState, attemptsMade: job?.attemptsMade ?? null }
   )
 }
@@ -696,51 +985,131 @@ function jobTimings(job, enqueuedAt, observedTerminalAt) {
   }
 }
 
-async function driveCanary(context, options) {
-  const { db, storage, queue, ids, objectPath, jobId, fixture } = context
-  await db.connect()
+/** How long before the run deadline polling stops, so the closing reads fit. */
+export function closingReserveMs(timeoutMs) {
+  return Math.min(5_000, Math.floor(timeoutMs / 4))
+}
+
+/** Connects, refuses a live feed, and checks who is consuming before anything is created. */
+async function openAndInspect(step, { db, queue }, options) {
+  await step('connect', () => connectDatabase(db))
+  await step('connect', () => queue.waitUntilReady())
   if (options.target === 'hosted') {
     refuseLiveFeed({
       codeDefault: readCommunityRolloutDefaults().communityReadEnabled,
-      cachedValue: await cachedFeedFlag(db),
+      cachedValue: await step('connect', () => cachedFeedFlag(db)),
     })
   }
-  const workers = await precheckWorkers(queue, options)
-  await uploadFixture(storage, objectPath, fixture)
-  context.created = true
-  await createCanaryRows(db, ids, fixture, objectPath)
-
-  const enqueuedAt = Date.now()
-  await queue.add(
-    JOB_NAME,
-    { postId: ids.postId, uploadSessionId: ids.uploadSessionId },
-    {
-      jobId,
-      removeOnComplete: { age: JOB_RETENTION_SECONDS },
-      removeOnFail: { age: JOB_RETENTION_SECONDS },
-    }
+  return precheckWorkers(
+    await step('worker inspection', () => countWorkers(queue)),
+    options
   )
+}
 
-  const post = await awaitTerminalPost(db, ids.postId, enqueuedAt + options.timeoutMs)
+/** Uploads the fixture, writes the rows and enqueues the job, marking each first. */
+async function createAndEnqueue(step, context) {
+  const { ids, objectPath, jobId, fixture, created } = context
+  const { db, storage, queue } = context.clients
+  created.object = true
+  await step('upload', () => uploadFixture(storage, objectPath, fixture))
+  created.rows = true
+  await step('database write', () => createCanaryRows(db, ids, fixture, objectPath))
+  created.job = true
+  await step('enqueue', () =>
+    queue.add(
+      JOB_NAME,
+      { postId: ids.postId, uploadSessionId: ids.uploadSessionId },
+      {
+        jobId,
+        removeOnComplete: { age: JOB_RETENTION_SECONDS },
+        removeOnFail: { age: JOB_RETENTION_SECONDS },
+      }
+    )
+  )
+}
+
+/** Polls to a terminal post, observing the drill on the way, and reads the job back. */
+async function awaitOutcome(step, context, options, drill) {
+  const { ids, jobId } = context
+  const { db, queue } = context.clients
+  if (drill) {
+    await observeRestart(step, queue, jobId, drill)
+    drill.afterEnqueue = drill.lastDown ?? drill.returned
+  }
+  const post = await awaitTerminalPost(
+    step,
+    db,
+    ids.postId,
+    context.deadlineAt - closingReserveMs(options.timeoutMs),
+    drill ? () => observeRestart(step, queue, jobId, drill) : null
+  )
   const observedTerminalAt = Date.now()
-  const job = await queue.getJob(jobId)
-  const jobState = job ? await job.getState() : 'missing'
+  const job = await step('job read', () => queue.getJob(jobId))
+  const jobState = job ? await step('job read', () => job.getState()) : 'missing'
   if (!TERMINAL_STATUSES.has(post?.status)) {
     throw nonTerminalFailure(post, job, jobState, options.timeoutMs)
   }
+  return { post, job, jobState, observedTerminalAt }
+}
 
-  const assessed = assessTerminalPost(post)
-  const soleConsumer = await postcheckSoleConsumer(queue, options, workers)
-  const processedBy = job?.processedBy ?? null
+/**
+ * The consumer observation after the job completed: needed for the sole-consumer
+ * proof, and for a drill whose returning worker finished the job between polls.
+ */
+async function closingConsumers(step, queue, options, drill) {
+  if (!options.soleConsumer && !(drill && !drill.returned)) return null
+  const after = await step('worker inspection', () => countWorkers(queue))
+  if (drill && !drill.returned && after.known && after.count > 0) drill.returned = after
+  return after
+}
+
+function assertRestartDrillProven(record) {
+  const problems = restartDrillProblems(record)
+  if (problems.length > 0) {
+    throw new CanaryFailure(
+      'restart_drill_unproven',
+      `The restart drill could not prove the job waited for a restarted worker: ${problems.join('; ')}.`,
+      { restartDrill: record }
+    )
+  }
+}
+
+function assertProcessedBy(processedBy, options) {
   if (options.requireProcessedBy && processedBy !== workerNameFor(options.expectSha)) {
     throw new CanaryFailure(
       'worker_identity',
       `The canary job was processed by ${String(processedBy)}, not ${workerNameFor(options.expectSha)}.`
     )
   }
+}
+
+async function driveCanary(context, options) {
+  const { fixture } = context
+  const { queue } = context.clients
+  const step = (stage, work) => withinDeadline(context.deadlineAt, stage, work)
+
+  const workers = await openAndInspect(step, context.clients, options)
+  await createAndEnqueue(step, context)
+  const enqueuedAt = Date.now()
+  const drill = options.restartDrill ? { beforeEnqueue: workers } : null
+  const { post, job, jobState, observedTerminalAt } = await awaitOutcome(
+    step,
+    context,
+    options,
+    drill
+  )
+
+  const assessed = assessTerminalPost(post)
+  const after = await closingConsumers(step, queue, options, drill)
+  const soleConsumer = await postcheckSoleConsumer(after, options, workers)
+  const restartDrill = drill ? restartDrillRecord(drill) : null
+  if (restartDrill) assertRestartDrillProven(restartDrill)
+  const processedBy = job?.processedBy ?? null
+  assertProcessedBy(processedBy, options)
   const { inputSetHash } = await import('./lib/community-screening-input-set.mjs')
   return {
     ok: true,
+    mode: options.restartDrill ? 'restart-drill' : 'canary',
     target: options.target,
     inputSetHash: inputSetHash(),
     expectedSha: options.expectSha,
@@ -748,6 +1117,7 @@ async function driveCanary(context, options) {
     processedBy,
     soleConsumerRequired: options.soleConsumer === true,
     soleConsumer,
+    ...(restartDrill ? { restartDrill } : {}),
     startedAt: context.startedAt.toISOString(),
     finishedAt: new Date().toISOString(),
     fixture: { name: fixture.name, sha256: fixture.sha256, bytes: fixture.bytes.length },
@@ -770,7 +1140,7 @@ export function recordCleanup(report, { keep, problems }) {
   report.cleanup = keep
     ? { performed: false, note: '--keep left the canary rows, object and job in place' }
     : { performed: true, problems }
-  if (problems.length > 0) {
+  if (problems.length > 0 && report.ok !== false) {
     report.ok = false
     report.code = 'cleanup_failed'
     report.message = `Cleanup left canary data behind: ${problems.join('; ')}`
@@ -778,6 +1148,14 @@ export function recordCleanup(report, { keep, problems }) {
   return report
 }
 
+/**
+ * Runs the canary under one absolute deadline (`--timeout-ms`, from the moment
+ * it starts connecting) that covers connecting, inspecting the workers,
+ * uploading, writing, enqueueing, polling and the closing job reads. When the
+ * deadline passes, the clients are force-closed, cleanup runs under its own
+ * deadline (`--cleanup-timeout-ms`) on fresh clients, and the failure carries
+ * the cleanup result. Every failure is a CanaryFailure with `cleanup` set.
+ */
 export async function runCanary(options) {
   loadEnvFile(options.envFile)
   assertTargetMatchesDatabase(options.target, process.env.DATABASE_URL)
@@ -786,39 +1164,52 @@ export async function runCanary(options) {
     refuseLiveFeed({ codeDefault: readCommunityRolloutDefaults().communityReadEnabled })
   }
   options.expectSha ??= gitHeadSha()
-  const clients = await openClients(options)
+  options.openClients ??= openClients
+  options.cleanupTimeoutMs ??= DEFAULT_CLEANUP_TIMEOUT_MS
+  const fixture = options.fixture === 'max' ? await generateMaxFixture() : readFixture()
+  const clients = await options.openClients(options)
+  const startedAt = new Date()
   const context = {
-    ...clients,
+    clients,
     ...canaryIdentifiers(),
-    fixture: options.fixture === 'max' ? await generateMaxFixture() : readFixture(),
-    startedAt: new Date(),
-    created: false,
+    fixture,
+    startedAt,
+    deadlineAt: startedAt.getTime() + options.timeoutMs,
+    created: createdNothing(),
   }
 
   let report
+  let failure
   try {
     report = await driveCanary(context, options)
-    return report
-  } finally {
-    const problems = options.keep
-      ? []
-      : await cleanup({
-          db: context.db,
-          storage: context.storage,
-          queue: context.queue,
-          ids: context.ids,
-          objectPath: context.created ? context.objectPath : null,
-          jobId: context.jobId,
-        })
-    if (problems.length > 0) {
-      // Printed whether or not the run produced a report: a failed canary that
-      // also left rows or an object behind must say so.
-      console.error(`[canary] cleanup problems: ${problems.join('; ')}`)
-    }
-    if (report) recordCleanup(report, { keep: options.keep, problems })
-    await context.queue.close().catch(() => undefined)
-    await context.db.end().catch(() => undefined)
+  } catch (error) {
+    failure =
+      error instanceof CanaryFailure
+        ? error
+        : new CanaryFailure(
+            'error',
+            error instanceof Error ? error.message : String(error)
+          )
   }
+  const deadlineExpired = failure?.code === 'deadline'
+  if (deadlineExpired) forceClose(clients)
+  const problems = options.keep
+    ? []
+    : await cleanupWithin(context, options, { freshClients: deadlineExpired })
+  if (problems.length > 0) {
+    // Printed whether or not the run produced a report: a failed canary that
+    // also left rows or an object behind must say so.
+    console.error(`[canary] cleanup problems: ${problems.join('; ')}`)
+  }
+  if (!deadlineExpired) await closeClients(clients)
+  if (failure) {
+    failure.cleanup = recordCleanup(
+      { ok: false },
+      { keep: options.keep, problems }
+    ).cleanup
+    throw failure
+  }
+  return recordCleanup(report, { keep: options.keep, problems })
 }
 
 function gitHeadSha() {
@@ -837,6 +1228,28 @@ function writeJson(filePath, value) {
   const resolved = path.resolve(projectRoot, filePath)
   fs.mkdirSync(path.dirname(resolved), { recursive: true })
   fs.writeFileSync(resolved, `${JSON.stringify(value, null, 2)}\n`)
+}
+
+/** The report a failed run writes: the cause, the cleanup, and the run's identity. */
+export async function failureReport(error, options) {
+  const failure =
+    error instanceof CanaryFailure
+      ? { ok: false, code: error.code, message: error.message, details: error.details }
+      : {
+          ok: false,
+          code: 'error',
+          message: error instanceof Error ? error.message : String(error),
+        }
+  if (error?.cleanup) failure.cleanup = error.cleanup
+  failure.mode = options.restartDrill ? 'restart-drill' : 'canary'
+  failure.target = options.target
+  // The same identity a passing report carries, so the readiness gate judges
+  // a failure as failed rather than discarding it as stale.
+  failure.expectedSha = options.expectSha ?? null
+  const { inputSetHash } = await import('./lib/community-screening-input-set.mjs')
+  failure.inputSetHash = inputSetHash()
+  failure.finishedAt = new Date().toISOString()
+  return failure
 }
 
 async function main() {
@@ -859,22 +1272,9 @@ async function main() {
     console.log(
       `[canary] PASS ${report.target}: ${report.disposition} under ${report.engineIdentity}; queue latency ${report.timings.queueLatencyMs} ms, screening ${report.timings.screeningDurationMs} ms`
     )
+    process.exit(0)
   } catch (error) {
-    const failure =
-      error instanceof CanaryFailure
-        ? { ok: false, code: error.code, message: error.message, details: error.details }
-        : {
-            ok: false,
-            code: 'error',
-            message: error instanceof Error ? error.message : String(error),
-          }
-    failure.target = options.target
-    // The same identity a passing report carries, so the readiness gate judges
-    // a failure as failed rather than discarding it as stale.
-    failure.expectedSha = options.expectSha ?? null
-    const { inputSetHash } = await import('./lib/community-screening-input-set.mjs')
-    failure.inputSetHash = inputSetHash()
-    failure.finishedAt = new Date().toISOString()
+    const failure = await failureReport(error, options)
     if (options.jsonOut) writeJson(options.jsonOut, failure)
     console.error(JSON.stringify(failure, null, 2))
     console.error(`[canary] FAIL ${failure.code}: ${failure.message}`)

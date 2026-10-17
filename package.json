@@ -66,7 +66,7 @@
     "community:screening:measure:redis": "mkdir -p apps/api/.cache/community-screening && node scripts/measure-community-worker-redis.mjs --minutes 30 > apps/api/.cache/community-screening/redis-idle.json",
     "community:screening:canary": "node scripts/community-screening-canary.mjs",
     "community:screening:canary:local": "node scripts/community-screening-canary.mjs --target local --env-file .env.local --json-out apps/api/.cache/community-screening/canary-local.json",
-    "community:screening:canary:restart-drill": "node scripts/community-screening-canary.mjs --target local --env-file .env.local --no-worker-precheck --timeout-ms 180000 --json-out apps/api/.cache/community-screening/canary-restart-local.json",
+    "community:screening:canary:restart-drill": "node scripts/community-screening-canary.mjs --target local --env-file .env.local --restart-drill --timeout-ms 180000 --json-out apps/api/.cache/community-screening/canary-restart-local.json",
     "community:screening:sweep": "cross-env COMMUNITY_SCREENING_RUN_PRODUCT_DIR=.cache/community-screening npm run test --workspace api -- src/modules/community/community-screening-policy.sweep.spec.ts",
     "community:screening:text": "cross-env COMMUNITY_SCREENING_RUN_PRODUCT_DIR=.cache/community-screening npm run test --workspace api -- src/modules/community/community-text-corpus.evaluation.spec.ts",
     "community:screening:corpus:fetch": "node scripts/fetch-community-safe-corpus.mjs",

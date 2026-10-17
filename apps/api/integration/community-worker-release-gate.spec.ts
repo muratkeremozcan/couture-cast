@@ -2,11 +2,14 @@
 // gate. The scripts under test are operations commands; what is asserted here is
 // the logic that decides whether they refuse, so a regression in a refusal
 // fails the ordinary suite instead of a deploy.
-import { execFileSync, spawnSync } from 'node:child_process'
+import { execFileSync, spawn, spawnSync } from 'node:child_process'
 import fs from 'node:fs'
+import net from 'node:net'
 import os from 'node:os'
 import path from 'node:path'
-import { describe, expect, it } from 'vitest'
+import { Queue } from 'bullmq'
+import Redis, { type RedisOptions } from 'ioredis'
+import { describe, expect, it, vi } from 'vitest'
 
 const repoRoot = path.resolve(__dirname, '../../..')
 const read = (relative: string) => fs.readFileSync(path.join(repoRoot, relative), 'utf8')
@@ -38,6 +41,15 @@ interface CanaryModule {
     codeDefault: unknown
     cachedValue?: unknown
   }) => string | null
+  restartDrillProblems: (record: unknown) => string[]
+  withinDeadline: <T>(
+    deadlineAt: number,
+    stage: string,
+    work: () => Promise<T>,
+    label?: string
+  ) => Promise<T>
+  redisOptions: (redisUrl?: string) => Record<string, unknown>
+  runCanary: (options: Record<string, unknown>) => Promise<Record<string, unknown>>
 }
 interface RolloutFlagsModule {
   flagDefault: (source: string, key: string) => boolean | null
@@ -471,9 +483,9 @@ describe('canary cleanup and worker identity', () => {
         '--expect-sha',
         'abc',
         '--sole-consumer',
-        '--no-worker-precheck',
+        '--restart-drill',
       ])
-    ).toThrow(/--no-worker-precheck/)
+    ).toThrow(/refuses --restart-drill/)
   })
 
   it('refuses a memory peak without the sole-consumer proof', async () => {
@@ -558,6 +570,339 @@ describe('canary cleanup and worker identity', () => {
         { at, clientIds: [] },
       ])
     ).toMatchObject({ connectedSamples: 1, connectedThroughout: false })
+  })
+})
+
+describe('canary deadlines', () => {
+  // Story 6.2b final review (RF2): a Redis or PostgreSQL that accepts the
+  // connection and never answers held the canary forever, past --timeout-ms,
+  // with synthetic data already created and no failure report written.
+  const canaryModule = () => load<CanaryModule>('scripts/community-screening-canary.mjs')
+
+  async function stalledServer(): Promise<{ port: number; close: () => Promise<void> }> {
+    const sockets = new Set<net.Socket>()
+    const server = net.createServer((socket) => {
+      sockets.add(socket)
+      socket.on('error', () => undefined)
+    })
+    await new Promise<void>((resolve) => server.listen(0, '127.0.0.1', resolve))
+    return {
+      port: (server.address() as net.AddressInfo).port,
+      close: () =>
+        new Promise<void>((resolve) => {
+          for (const socket of sockets) socket.destroy()
+          server.close(() => resolve())
+        }),
+    }
+  }
+
+  /** A storage, database and queue that answer, except where told to stall. */
+  function fakeClients(stallAt: 'none' | 'enqueue' | 'getJob') {
+    const never = () => new Promise<never>(() => undefined)
+    const calls = {
+      redisDisconnect: 0,
+      streamDestroy: 0,
+      aborted: false,
+      deleted: [] as string[],
+    }
+    const abort = new AbortController()
+    abort.signal.addEventListener('abort', () => {
+      calls.aborted = true
+    })
+    const clients = {
+      abort,
+      redis: {
+        disconnect: () => {
+          calls.redisDisconnect += 1
+        },
+        quit: () => Promise.resolve('OK'),
+      },
+      db: {
+        connect: () => Promise.resolve(),
+        end: () => Promise.resolve(),
+        query: (sql: string) => {
+          if (sql.startsWith('DELETE')) calls.deleted.push(sql)
+          return Promise.resolve({ rows: [] })
+        },
+        connection: {
+          stream: {
+            destroy: () => {
+              calls.streamDestroy += 1
+            },
+          },
+        },
+      },
+      storage: {
+        from: () => ({
+          upload: () => Promise.resolve({ error: null }),
+          remove: () => Promise.resolve({ error: null }),
+        }),
+      },
+      queue: {
+        waitUntilReady: () => Promise.resolve(),
+        getWorkers: () => Promise.resolve([{ name: 'w', id: '1' }]),
+        add: () => (stallAt === 'enqueue' ? never() : Promise.resolve()),
+        getJob: () => (stallAt === 'getJob' ? never() : Promise.resolve(null)),
+        close: () => Promise.resolve(),
+      },
+    }
+    return { clients, calls }
+  }
+
+  it('rejects a stage that outlives the deadline, naming the stage', async () => {
+    const { withinDeadline } = await canaryModule()
+    await expect(
+      withinDeadline(Date.now() + 50, 'enqueue', () => new Promise(() => undefined))
+    ).rejects.toMatchObject({ code: 'deadline', details: { stage: 'enqueue' } })
+    await expect(
+      withinDeadline(Date.now() - 1, 'polling', () => Promise.resolve(1))
+    ).rejects.toMatchObject({ code: 'deadline' })
+    await expect(
+      withinDeadline(Date.now() + 1000, 'x', () => Promise.resolve(7))
+    ).resolves.toBe(7)
+  })
+
+  it('bounds the producer Redis and the database client', async () => {
+    const { redisOptions, createDatabaseClient } = await canaryModule()
+    const options = redisOptions('redis://127.0.0.1:6379')
+    expect(options.maxRetriesPerRequest).toBe(2)
+    expect(options.connectTimeout).toBeGreaterThan(0)
+    expect(options.commandTimeout).toBeGreaterThan(0)
+    const retry = options.retryStrategy as (attempt: number) => number | null
+    expect(retry(1)).toBeGreaterThan(0)
+    expect(retry(4)).toBeNull()
+    const pg = (await import('pg')).default
+    for (const target of ['local', 'hosted']) {
+      const client = createDatabaseClient(pg, {
+        target,
+        databaseUrl: 'postgresql://u:p@db.example.supabase.co:5432/postgres',
+        ca: 'ca',
+      }) as unknown as {
+        _connectionTimeoutMillis: number
+        connectionParameters: { query_timeout: number }
+      }
+      expect(client._connectionTimeoutMillis).toBeGreaterThan(0)
+      expect(client.connectionParameters.query_timeout).toBeGreaterThan(0)
+    }
+  })
+
+  it('force-closes a stalled enqueue, cleans up on fresh clients and reports the failure', async () => {
+    const { runCanary, parseCanaryArgs } = await canaryModule()
+    const first = fakeClients('enqueue')
+    const fresh = fakeClients('none')
+    const opened: unknown[] = []
+    const options = {
+      ...parseCanaryArgs([
+        '--target',
+        'local',
+        '--timeout-ms',
+        '600',
+        '--cleanup-timeout-ms',
+        '500',
+      ]),
+      openClients: () => {
+        opened.push(1)
+        return Promise.resolve(opened.length === 1 ? first.clients : fresh.clients)
+      },
+    }
+    const previous = process.env.DATABASE_URL
+    process.env.DATABASE_URL = 'postgresql://p:p@127.0.0.1:54322/postgres'
+    const startedAt = Date.now()
+    try {
+      const failure = (await runCanary(options).then(
+        () => null,
+        (error: unknown) => error
+      )) as { code: string; details: { stage: string }; cleanup: Record<string, unknown> }
+      expect(failure).toMatchObject({ code: 'deadline', details: { stage: 'enqueue' } })
+      expect(Date.now() - startedAt).toBeLessThan(3000)
+      expect(first.calls).toMatchObject({
+        redisDisconnect: 1,
+        streamDestroy: 1,
+        aborted: true,
+      })
+      expect(opened).toHaveLength(2)
+      expect(fresh.calls.deleted).toHaveLength(2)
+      expect(failure.cleanup).toEqual({ performed: true, problems: [] })
+    } finally {
+      process.env.DATABASE_URL = previous
+    }
+  })
+
+  it('bounds cleanup by its own deadline and names what may remain', async () => {
+    const { runCanary, parseCanaryArgs } = await canaryModule()
+    const first = fakeClients('enqueue')
+    const fresh = fakeClients('getJob')
+    let opened = 0
+    const options = {
+      ...parseCanaryArgs([
+        '--target',
+        'local',
+        '--timeout-ms',
+        '400',
+        '--cleanup-timeout-ms',
+        '300',
+      ]),
+      openClients: () => Promise.resolve(++opened === 1 ? first.clients : fresh.clients),
+    }
+    const previous = process.env.DATABASE_URL
+    process.env.DATABASE_URL = 'postgresql://p:p@127.0.0.1:54322/postgres'
+    const startedAt = Date.now()
+    try {
+      const failure = (await runCanary(options).catch((error: unknown) => error)) as {
+        code: string
+        cleanup: { performed: boolean; problems: string[] }
+      }
+      expect(Date.now() - startedAt).toBeLessThan(3000)
+      expect(failure.code).toBe('deadline')
+      expect(failure.cleanup.problems).toEqual([
+        expect.stringMatching(
+          /cleanup deadline.*It may have left: job canary-post-.*account canary-user-.*object community-images\//
+        ),
+      ])
+      expect(fresh.calls.redisDisconnect).toBe(1)
+    } finally {
+      process.env.DATABASE_URL = previous
+    }
+  })
+
+  it('gives up on a Redis that accepts the connection and never answers', async () => {
+    const { runCanary, parseCanaryArgs, redisOptions } = await canaryModule()
+    const server = await stalledServer()
+    const fake = fakeClients('none')
+    const redis = new Redis(
+      redisOptions(`redis://127.0.0.1:${server.port}`) as RedisOptions
+    )
+    redis.on('error', () => undefined)
+    const queue = new Queue('community-moderation', { connection: redis })
+    queue.on('error', () => undefined)
+    const options = {
+      ...parseCanaryArgs(['--target', 'local', '--timeout-ms', '800']),
+      openClients: () => Promise.resolve({ ...fake.clients, redis, queue }),
+    }
+    const previous = process.env.DATABASE_URL
+    process.env.DATABASE_URL = 'postgresql://p:p@127.0.0.1:54322/postgres'
+    const startedAt = Date.now()
+    try {
+      await expect(runCanary(options)).rejects.toMatchObject({
+        code: 'deadline',
+        details: { stage: 'connect' },
+        cleanup: { performed: true, problems: [] },
+      })
+      expect(Date.now() - startedAt).toBeLessThan(3000)
+      await vi.waitFor(() => expect(redis.status).toBe('end'), { timeout: 2000 })
+    } finally {
+      process.env.DATABASE_URL = previous
+      await server.close()
+    }
+  })
+
+  it('exits nonzero with a failure report when every service stalls', async () => {
+    const server = await stalledServer()
+    const directory = fs.mkdtempSync(path.join(os.tmpdir(), 'canary-stall-'))
+    const reportPath = path.join(directory, 'report.json')
+    try {
+      const startedAt = Date.now()
+      const child = await new Promise<{ status: number | null }>((resolve) => {
+        const spawned = spawn(
+          process.execPath,
+          [
+            path.join(repoRoot, 'scripts/community-screening-canary.mjs'),
+            '--target',
+            'local',
+            '--timeout-ms',
+            '1500',
+            '--cleanup-timeout-ms',
+            '1000',
+            '--json-out',
+            reportPath,
+          ],
+          {
+            cwd: repoRoot,
+            env: {
+              PATH: process.env.PATH ?? '',
+              DATABASE_URL: `postgresql://p:p@127.0.0.1:${server.port}/postgres`,
+              REDIS_URL: `redis://127.0.0.1:${server.port}`,
+              SUPABASE_URL: `http://127.0.0.1:${server.port}`,
+              SUPABASE_SERVICE_ROLE_KEY: 'stalled-service-role-key',
+            },
+            stdio: 'ignore',
+          }
+        )
+        spawned.on('exit', (status) => resolve({ status }))
+      })
+      expect(child.status).toBe(1)
+      expect(Date.now() - startedAt).toBeLessThan(15_000)
+      const report = JSON.parse(fs.readFileSync(reportPath, 'utf8')) as Record<
+        string,
+        unknown
+      >
+      expect(report).toMatchObject({
+        ok: false,
+        code: 'deadline',
+        details: { stage: 'connect' },
+        cleanup: { performed: true, problems: [] },
+        mode: 'canary',
+        target: 'local',
+      })
+    } finally {
+      fs.rmSync(directory, { recursive: true, force: true })
+      await server.close()
+    }
+  }, 30_000)
+})
+
+describe('restart drill evidence', () => {
+  it('requires zero consumers around the enqueue and a consumer that came back', async () => {
+    const { restartDrillProblems, parseCanaryArgs } = await load<CanaryModule>(
+      'scripts/community-screening-canary.mjs'
+    )
+    const down = (observedAt: string, jobState?: string) => ({
+      known: true,
+      count: 0,
+      names: [],
+      observedAt,
+      ...(jobState ? { jobState } : {}),
+    })
+    const proven = {
+      beforeEnqueue: down('2026-10-17T12:00:00.000Z'),
+      afterEnqueue: down('2026-10-17T12:00:00.300Z', 'waiting'),
+      consumerReturned: { known: true, count: 1, observedAt: '2026-10-17T12:00:05.000Z' },
+      observedDowntimeMs: 4500,
+    }
+    expect(restartDrillProblems(proven)).toEqual([])
+    expect(restartDrillProblems(undefined)).toEqual(['no restart drill observations'])
+    expect(
+      restartDrillProblems({ ...proven, beforeEnqueue: { known: false, count: null } })
+    ).toEqual([expect.stringMatching(/before the job was enqueued/)])
+    expect(
+      restartDrillProblems({ ...proven, afterEnqueue: proven.consumerReturned })
+    ).toContain(
+      'zero consumers with the job waiting were not observed after the job was enqueued'
+    )
+    expect(restartDrillProblems({ ...proven, consumerReturned: null })).toEqual([
+      'no consumer was observed coming back',
+    ])
+    expect(restartDrillProblems({ ...proven, observedDowntimeMs: Number.NaN })).toEqual([
+      'observed downtime NaN ms',
+    ])
+
+    expect(parseCanaryArgs(['--target', 'local', '--restart-drill']).restartDrill).toBe(
+      true
+    )
+    expect(() => parseCanaryArgs(['--target', 'hosted', '--restart-drill'])).toThrow(
+      /local container only/
+    )
+    expect(() => parseCanaryArgs(['--target', 'local', '--no-worker-precheck'])).toThrow(
+      /Unknown argument/
+    )
+    expect(() =>
+      parseCanaryArgs(['--target', 'local', '--cleanup-timeout-ms', '0'])
+    ).toThrow(/--cleanup-timeout-ms/)
+    expect(
+      (JSON.parse(read('package.json')) as { scripts: Record<string, string> }).scripts[
+        'community:screening:canary:restart-drill'
+      ]
+    ).toContain('--restart-drill')
   })
 })
 
@@ -1098,7 +1443,30 @@ describe('readiness verdict', () => {
       },
       canaries: {
         local: canary('local'),
-        restart: canary('local'),
+        restart: {
+          ...canary('local'),
+          mode: 'restart-drill',
+          restartDrill: {
+            beforeEnqueue: {
+              known: true,
+              count: 0,
+              names: [],
+              clientIds: [],
+              observedAt: '2026-10-17T12:00:00.000Z',
+            },
+            afterEnqueue: {
+              known: true,
+              count: 0,
+              names: [],
+              clientIds: [],
+              observedAt: '2026-10-17T12:00:00.200Z',
+              jobState: 'waiting',
+            },
+            lastDownObservedAt: '2026-10-17T12:00:09.000Z',
+            consumerReturned: { ...alone(), observedAt: '2026-10-17T12:00:09.500Z' },
+            observedDowntimeMs: 9000,
+          },
+        },
         hosted: {
           ...canary('hosted'),
           deployedInputs: { status: 'same', expectedSha: 'abc123', commitSha: 'def456' },
@@ -1411,6 +1779,59 @@ describe('readiness verdict', () => {
       'restart drill cleanup problems',
       'restart-keeps-queued-jobs',
       [['canaries.restart.cleanup', { performed: true, problems: ['object: x'] }]],
+    ],
+    // Story 6.2b final review (RF1): success alone proved no restart. Codex's
+    // probe: an ordinary canary with the worker check skipped and 1 ms of queue
+    // latency passed the restart gate.
+    [
+      'an ordinary canary offered as restart evidence',
+      'restart-keeps-queued-jobs',
+      [
+        ['canaries.restart.mode', 'canary'],
+        ['canaries.restart.restartDrill', undefined],
+        ['canaries.restart.workersConnected', { known: false, count: null }],
+        ['canaries.restart.timings', { queueLatencyMs: 1, screeningDurationMs: 190 }],
+      ],
+    ],
+    [
+      'a restart product with no mode',
+      'restart-keeps-queued-jobs',
+      [['canaries.restart.mode', undefined]],
+    ],
+    [
+      'a drill that found a consumer before it enqueued',
+      'restart-keeps-queued-jobs',
+      [['canaries.restart.restartDrill.beforeEnqueue.count', 1]],
+    ],
+    [
+      'a drill that could not list the consumers',
+      'restart-keeps-queued-jobs',
+      [['canaries.restart.restartDrill.beforeEnqueue.known', false]],
+    ],
+    [
+      'a drill whose job was not waiting after the enqueue',
+      'restart-keeps-queued-jobs',
+      [['canaries.restart.restartDrill.afterEnqueue.jobState', 'active']],
+    ],
+    [
+      'a drill that never saw a consumer come back',
+      'restart-keeps-queued-jobs',
+      [['canaries.restart.restartDrill.consumerReturned', undefined]],
+    ],
+    [
+      'a drill whose consumer came back before the job was queued',
+      'restart-keeps-queued-jobs',
+      [
+        [
+          'canaries.restart.restartDrill.consumerReturned.observedAt',
+          '2026-10-17T12:00:00.100Z',
+        ],
+      ],
+    ],
+    [
+      'a drill with no observed downtime',
+      'restart-keeps-queued-jobs',
+      [['canaries.restart.restartDrill.observedDowntimeMs', null]],
     ],
     [
       'a canary with no cleanup record',

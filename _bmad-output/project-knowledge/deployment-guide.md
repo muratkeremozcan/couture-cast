@@ -558,6 +558,21 @@ certificate against the Supabase CA. The evidence counts a hosted run only when 
 differs between `--expect-sha` and the evidence commit (`git diff --quiet`). Cleanup problems
 fail the run: the report records `ok: false` and the readiness gate fails.
 
+Every wait is bounded. One absolute deadline (`--timeout-ms`, default 120 seconds) covers
+connecting, the consumer check, the upload, the writes, the enqueue, polling and the closing job
+reads; PostgreSQL connects within 10 seconds and each query answers within 15, and Redis gives up
+a connect after 10 seconds, a command after 15 and reconnecting after three attempts. When the
+deadline passes, the canary force-closes its connections, removes what it created on fresh
+connections under a separate cleanup deadline (`--cleanup-timeout-ms`, default 30 seconds), writes
+a failure report naming the stalled stage and any data cleanup could not remove, and exits
+nonzero.
+
+The canary's safe fixture publishes, and a published post is served by the Community feed. The
+hosted canary therefore runs only while the feed is closed: it refuses to start when
+`community_read_enabled` defaults to anything but `false` in `packages/config/src/flags.ts`, or
+when the production flag cache (`feature_flags`) holds anything else. Once the feed opens, stop
+running the hosted canary until it publishes somewhere members cannot see.
+
 ```bash
 npm run community:screening:canary:local
 npm run community:screening:canary -- --target hosted --env-file <hosted env file> \
@@ -566,11 +581,14 @@ npm run community:screening:canary -- --target hosted --env-file <hosted env fil
 
 The canary is the deploy's acceptance check: run it after every deploy and every rollback.
 
-**Restart drill.** Stop the worker, start
-`npm run community:screening:canary:restart-drill` (which skips the connected-worker pre-check),
-then start the worker within three minutes. The job queued while the worker was down must
-complete after it returns; its queue latency is the downtime plus startup, recorded in the
-evidence payload's `canary.restart` section.
+**Restart drill.** Stop the worker, start `npm run community:screening:canary:restart-drill`
+(`--restart-drill`, local only), then start the worker within three minutes. The drill refuses
+to enqueue unless Redis lists zero consumers on the queue, observes zero consumers again after
+the enqueue with the job still `waiting`, then polls until a consumer comes back and the job
+completes. The report's `restartDrill` block records those observations and the observed
+downtime (from the first zero-consumer observation to the last, a lower bound on the outage), and
+the readiness gate re-judges them: an ordinary canary result carries no such observations and is
+not restart evidence. The payload's `canary.restart` section holds the result.
 
 **Rollback.** Leave both rollout flags disabled; they are disabled now. Redeploy the previous
 build on the host, or stop the service: queued jobs wait in Redis and the stale-review sweep moves
