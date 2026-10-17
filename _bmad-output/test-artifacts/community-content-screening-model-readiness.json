@@ -2,7 +2,7 @@
   "artifact": "community-content-screening-model-readiness",
   "artifactVersion": 2,
   "storyKey": "6-2b-community-screening-release-gate",
-  "generatedAt": "2026-10-17T16:23:15.130Z",
+  "generatedAt": "2026-10-17T17:04:02.358Z",
   "generatedBy": "npm run community:screening:evidence",
   "verdict": "fail",
   "verdictRule": "pass only when every gate ran against the current inputs from a committed tree and passed; fail when any gate that ran failed; incomplete otherwise",
@@ -55,9 +55,18 @@
     {
       "id": "canary-hosted",
       "name": "Canary against the deployed worker on the hosted target",
-      "status": "not-run",
-      "reason": "stale against current inputs: inputs changed since the measurement",
-      "command": "npm run community:screening:canary -- --target hosted --env-file <hosted env file> --json-out apps/api/.cache/community-screening/canary-hosted.json"
+      "status": "passed",
+      "measured": {
+        "target": "hosted",
+        "disposition": "pass",
+        "engineIdentity": "adr013-text:policy-v2@b0daab4ab9d1;adr013-nsfw-v1.0:mobilenet_v2_mid@4.3.0:model-a0c76f72db26:v2:policy-b0daab4ab9d1",
+        "processedBy": "community-worker@7fb68febbb2f75ef083fbcc091cf96690beccddb",
+        "queueLatencyMs": 75,
+        "screeningDurationMs": 2676,
+        "finishedAt": "2026-10-17T17:03:48.685Z",
+        "deployedInputs": "same"
+      },
+      "threshold": "safe fixture published under a real-model identity, on the hosted target, by exactly the worker built from the expected commit, whose input set equals the evidence commit"
     },
     {
       "id": "policy-surface",
@@ -297,7 +306,7 @@
     }
   ],
   "build": {
-    "commitSha": "0cd5f93657b70139de6e89df842f64156681fc41",
+    "commitSha": "1a66be6317115757c4aa868864ff083843a277eb",
     "workingTreeClean": true,
     "uncommittedPaths": 0,
     "inputSetHash": "b365bbf1c1320a25e5da1c6aa412a4da9db854f782ebc1a6e854565c8c07716f",
@@ -555,39 +564,40 @@
     "hosted": {
       "label": "hosted target",
       "available": true,
-      "stale": ["inputs changed since the measurement"],
+      "stale": [],
       "ok": true,
+      "mode": "canary",
       "target": "hosted",
-      "inputSetHash": "3a9e1271e897874775827f29a3defc577b16cc62e518026c28355dc020154422",
-      "expectedSha": "913a0d7927c5ef649fea4521a5fbd1ba6d080acf",
+      "inputSetHash": "b365bbf1c1320a25e5da1c6aa412a4da9db854f782ebc1a6e854565c8c07716f",
+      "expectedSha": "7fb68febbb2f75ef083fbcc091cf96690beccddb",
       "processedByRequired": true,
-      "processedBy": "community-worker@913a0d7927c5ef649fea4521a5fbd1ba6d080acf",
+      "processedBy": "community-worker@7fb68febbb2f75ef083fbcc091cf96690beccddb",
       "soleConsumerRequired": true,
       "soleConsumer": {
         "proven": true,
-        "expectedWorker": "community-worker@913a0d7927c5ef649fea4521a5fbd1ba6d080acf",
+        "expectedWorker": "community-worker@7fb68febbb2f75ef083fbcc091cf96690beccddb",
         "before": {
           "known": true,
           "count": 1,
           "names": [
-            "bull:Y29tbXVuaXR5LW1vZGVyYXRpb24=:w:community-worker@913a0d7927c5ef649fea4521a5fbd1ba6d080acf"
+            "bull:Y29tbXVuaXR5LW1vZGVyYXRpb24=:w:community-worker@7fb68febbb2f75ef083fbcc091cf96690beccddb"
           ],
-          "clientIds": ["4"],
-          "observedAt": "2026-10-17T12:18:18.075Z"
+          "clientIds": ["11"],
+          "observedAt": "2026-10-17T17:03:44.769Z"
         },
         "after": {
           "known": true,
           "count": 1,
           "names": [
-            "bull:Y29tbXVuaXR5LW1vZGVyYXRpb24=:w:community-worker@913a0d7927c5ef649fea4521a5fbd1ba6d080acf"
+            "bull:Y29tbXVuaXR5LW1vZGVyYXRpb24=:w:community-worker@7fb68febbb2f75ef083fbcc091cf96690beccddb"
           ],
-          "clientIds": ["4"],
-          "observedAt": "2026-10-17T12:18:21.285Z"
+          "clientIds": ["11"],
+          "observedAt": "2026-10-17T17:03:48.628Z"
         },
         "problems": []
       },
-      "startedAt": "2026-10-17T12:18:17.755Z",
-      "finishedAt": "2026-10-17T12:18:21.348Z",
+      "startedAt": "2026-10-17T17:03:44.366Z",
+      "finishedAt": "2026-10-17T17:03:48.685Z",
       "fixture": {
         "name": "safe-satin-plum-512x512.jpg",
         "sha256": "b2ed2509ee63fa5a13aff99ece5603970b97b004c07ef930315267b0a79974a3",
@@ -597,10 +607,10 @@
         "known": true,
         "count": 1,
         "names": [
-          "bull:Y29tbXVuaXR5LW1vZGVyYXRpb24=:w:community-worker@913a0d7927c5ef649fea4521a5fbd1ba6d080acf"
+          "bull:Y29tbXVuaXR5LW1vZGVyYXRpb24=:w:community-worker@7fb68febbb2f75ef083fbcc091cf96690beccddb"
         ],
-        "clientIds": ["4"],
-        "observedAt": "2026-10-17T12:18:18.075Z"
+        "clientIds": ["11"],
+        "observedAt": "2026-10-17T17:03:44.769Z"
       },
       "terminalStatus": "published",
       "disposition": "pass",
@@ -608,21 +618,26 @@
       "attemptsMade": 1,
       "jobState": "completed",
       "timings": {
-        "queueLatencyMs": 66,
-        "screeningDurationMs": 2098,
+        "queueLatencyMs": 75,
+        "screeningDurationMs": 2676,
         "screeningDurationCovers": "BullMQ processedOn to finishedOn: storage download, declaration check and re-encode, image inference, text screening, and the publish transaction",
-        "enqueueToObservedTerminalMs": 2251,
+        "enqueueToObservedTerminalMs": 2750,
         "pollIntervalMs": 500
       },
       "cleanup": {
         "performed": true,
-        "problems": []
+        "status": "clean",
+        "problems": [],
+        "unknownOutcomes": [],
+        "settleMs": null,
+        "databaseWrite": null,
+        "lateFound": [],
+        "unresolved": []
       },
       "deployedInputs": {
-        "expectedSha": "913a0d7927c5ef649fea4521a5fbd1ba6d080acf",
-        "commitSha": "0cd5f93657b70139de6e89df842f64156681fc41",
-        "status": "differs",
-        "reason": "the deployed commit 913a0d7927c5ef649fea4521a5fbd1ba6d080acf differs from 0cd5f93657b70139de6e89df842f64156681fc41 in the input set"
+        "expectedSha": "7fb68febbb2f75ef083fbcc091cf96690beccddb",
+        "commitSha": "1a66be6317115757c4aa868864ff083843a277eb",
+        "status": "same"
       }
     }
   },
