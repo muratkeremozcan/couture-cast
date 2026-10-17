@@ -645,9 +645,15 @@ the payload is current.
 - `apps/api/policies/community-screening/vendor/ldnoobw/source.json` (new)
 - `apps/api/src/modules/community/community-analytics.ts` (canary account exclusion)
 - `apps/api/src/modules/community/community-moderation.processor.ts` (canary excluded from
-  analytics)
-- `apps/api/src/modules/community/community-moderation.worker.ts` (idle block, stalled interval,
-  commit-named worker)
+  analytics; typed validation code, named flag reason)
+- `apps/api/src/modules/community/community-image-validation.ts` (`CommunityImageValidationError`
+  takes the shared validation codes)
+- `apps/api/src/modules/community/community-maintenance.service.ts` (named stalled reason, retry
+  comment)
+- `apps/api/src/modules/community/community-moderation.queue.ts` (retry comment)
+- `apps/api/src/admin/admin.service.ts` (retry comment)
+- `apps/api/src/modules/community/community-moderation.worker.ts` (idle block, stalled interval
+  from the crash-recovery budget, worker options, commit-named worker)
 - `apps/api/src/modules/community/community-moderation.worker.spec.ts` (updated)
 - `apps/api/src/modules/community/community-screening-policy.ts` (v2 schema, list pins kept)
 - `apps/api/src/modules/community/community-screening-policy.spec.ts` (updated)
@@ -671,6 +677,15 @@ the payload is current.
 - `apps/api/test/fixtures/community-text-corpus/{de,en,es,fr,it,pt,tr}.json` (new)
 - `apps/api/test/fixtures/community-text-corpus/holdout-v1/{de,en,es,fr,it,pt,tr}.json` (new)
 - `apps/api/integration/community-worker-release-gate.spec.ts` (new)
+- `apps/api/integration/community-moderation-crash-recovery.integration.spec.ts` and
+  `support/community-crash-worker.mjs` (new: review RF13)
+- `apps/api/integration/community-moderation-reason-codes.spec.ts` (imports the validation codes)
+- `packages/api-client/src/contracts/http/community.ts` (validation code enumeration, `upload`
+  category)
+- `apps/web/src/i18n/locales/*.json` and `apps/mobile/assets/locales/*.json` (`upload` reason
+  copy)
+- `apps/web/src/app/components/community-lookbook-grid.test.tsx` and
+  `apps/mobile/src/screens/community-screen.test.tsx` (validation failure rendered)
 - `apps/api/integration/e2e-stack-ownership.spec.ts` (new: Codex review CX8)
 - `apps/api/src/modules/community/community.repository.ts` and `.spec.ts` (alias race after an
   erased author; canary excluded from every public read)
@@ -910,6 +925,9 @@ regression test that fails on the code before it.
 | RF9 a cut-down gate set recomputes to pass       | medium  | patch: exact `MANDATORY_GATE_IDS` before `verdictOf`   |
 | RF10 an empty lookup resolves a running INSERT   | medium  | patch: `pg_cancel_backend`, seen to end, `uncertain`   |
 | RF11 a storage transport error counts as known   | medium  | patch: original error kept, unknown unless 4xx + body  |
+| RF12 upload validation codes reach authors raw   | medium  | patch: shared code enum, `upload` copy, 10 locales     |
+| RF13 a crashed job can outlast the stale sweep   | medium  | patch: 120 s stalled check, budget, crash test         |
+| RF14 admin retry does not re-screen the post     | low     | doc: comments and runbook corrected, deferred          |
 
 RF1: `--restart-drill` (local only, replacing `--no-worker-precheck`) requires zero consumers before
 and after the enqueue with the job waiting, then a returning consumer, and records them with the
@@ -973,3 +991,30 @@ probes and fail on the code before the fix. After the fix the RF10 repro cancell
 ended `clean` with no account left; the RF11 repro ended `uncertain`, or `clean` when a settle
 window longer than the late write let a lookup find and remove the object. The canary is an input,
 so every run product was regenerated again.
+
+Loop 6 also took an independent review of `d7867054`
+(`CoutureCast-PR-151-review-d7867054-2026-10-17.md`). Its F1 and F2 are RF11 and RF10, its EPIPE
+note is the `outcomeUnknown` fix above, and the RF11 tests run the real storage-js client, whose
+transport failure is a `StorageUnknownError`. RF12 (its F3): the processor persists the code of
+the upload verification it caught, and none of the five validation codes, nor
+`IMAGE_DECLARATION_MISSING` from the processor itself, was in the reason map, so web and mobile
+showed `Reason: IMAGE_CHECKSUM_MISMATCH`. `communityImageValidationCodeSchema` in the shared
+contract now names the six once, `CommunityImageValidationError` accepts only them, and each maps to
+a new `upload` category with recovery copy in all 10 locales on web and mobile. The coverage test
+imports the enumeration and named reason constants; the literal scan that missed these codes is
+gone. `6.2b-WEB-001` and `6.2b-MOB-001` render a persisted validation failure as the localized
+copy.
+
+RF13: a job abandoned by a crashed worker keeps its lock until it expires, and BullMQ requeues it
+on the stalled check after the one that marks it. With the check at 600 seconds the job came back
+up to 1,200 seconds after the crash, past the 15-minute stale-review sweep. The check is now 120
+seconds, chosen from the 30-second lock and the sweep: `communityCrashRecoveryMs` (three attempts
+at the screening ceiling, backoff, redelivery, and the redelivered attempt) is 423 seconds with a
+three-minute restart, against 1,323 at 600. `6.2b-INT-001` kills a worker with `SIGKILL`
+mid-screening against real Redis and PostgreSQL, scales the lock, check and sweep down 60 times
+through the worker's options, and requires the post published before the scaled sweep; it fails at
+the old interval. The idle block stays at 300 seconds, and the idle Redis cost was re-measured with
+the new check. RF14: the admin retry adds a job with a BullMQ-generated id, and the processor skips
+any post not in `pending_review`, so the retry re-screens no `review_failed` post. The comments
+that said it reuses the deterministic id, and the runbook steps that relied on it, now say what
+happens, and deferred work records making the retry work end to end.
