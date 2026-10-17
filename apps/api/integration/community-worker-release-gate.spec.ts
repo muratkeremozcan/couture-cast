@@ -28,10 +28,20 @@ interface CanaryModule {
     cleanup: { keep: boolean; problems: string[] }
   ) => Record<string, unknown>
   parseCanaryArgs: (argv: string[]) => Record<string, unknown>
+  soleConsumerProblems: (workers: unknown, expectedWorker: string) => string[]
+  assessSoleConsumer: (
+    before: unknown,
+    after: unknown,
+    expectedWorker: string
+  ) => { proven: boolean; problems: string[] }
 }
 interface MemoryMeasureModule {
   containerServiceEnv: (env: Record<string, string>) => Record<string, string>
   containerWorkerName: (env: Record<string, string>) => { sha: string; name: string }
+  requireSoleConsumerProof: (
+    canary: Record<string, unknown>,
+    workerName: string
+  ) => Record<string, unknown>
 }
 interface RedisMeasureModule {
   workerClientIds: (clientList: string, workerName: string) => string[]
@@ -271,6 +281,92 @@ describe('canary cleanup and worker identity', () => {
     expect(
       parseCanaryArgs(['--target', 'hosted', '--db-ca', '/ca.crt']).requireProcessedBy
     ).toBe(true)
+  })
+
+  it('proves a sole consumer only from two matching single-consumer observations', async () => {
+    // Story 6.2b second peer review (CX4b): replicas of one image share the
+    // worker name, so the measured container must be the only consumer.
+    const { soleConsumerProblems, assessSoleConsumer, parseCanaryArgs } =
+      await load<CanaryModule>('scripts/community-screening-canary.mjs')
+    const name = 'community-worker@abc123'
+    const seen = (
+      names: string[],
+      clientIds: string[] = names.map((_, i) => `${i + 7}`)
+    ) => ({
+      known: true,
+      count: names.length,
+      names: names.map((worker) => `bull:Y29t:w:${worker}`),
+      clientIds,
+    })
+
+    expect(soleConsumerProblems(seen([name]), name)).toEqual([])
+    expect(soleConsumerProblems(seen([name, name]), name)).not.toEqual([])
+    expect(soleConsumerProblems(seen(['community-worker@zzz']), name)).not.toEqual([])
+    expect(soleConsumerProblems(seen([]), name)).not.toEqual([])
+    expect(soleConsumerProblems({ known: false }, name)).not.toEqual([])
+    expect(soleConsumerProblems(seen([name], ['']), name)).not.toEqual([])
+
+    expect(assessSoleConsumer(seen([name]), seen([name]), name).proven).toBe(true)
+    // A second replica of the same image that connected while the job ran.
+    expect(assessSoleConsumer(seen([name]), seen([name, name]), name).proven).toBe(false)
+    // The one consumer before is not the one consumer after.
+    expect(
+      assessSoleConsumer(seen([name], ['7']), seen([name], ['9']), name).problems
+    ).toEqual([expect.stringMatching(/changed from client 7 to 9/)])
+
+    expect(parseCanaryArgs(['--target', 'local']).soleConsumer).toBe(false)
+    expect(
+      parseCanaryArgs(['--target', 'local', '--expect-sha', 'abc', '--sole-consumer'])
+        .soleConsumer
+    ).toBe(true)
+    expect(
+      parseCanaryArgs(['--target', 'hosted', '--db-ca', '/ca.crt']).soleConsumer
+    ).toBe(true)
+    expect(() => parseCanaryArgs(['--target', 'local', '--sole-consumer'])).toThrow(
+      /--expect-sha/
+    )
+    expect(() =>
+      parseCanaryArgs([
+        '--target',
+        'local',
+        '--expect-sha',
+        'abc',
+        '--sole-consumer',
+        '--no-worker-precheck',
+      ])
+    ).toThrow(/--no-worker-precheck/)
+  })
+
+  it('refuses a memory peak without the sole-consumer proof', async () => {
+    const { requireSoleConsumerProof } = await load<MemoryMeasureModule>(
+      'scripts/measure-community-worker-memory.mjs'
+    )
+    const name = 'community-worker@abc123'
+    const proof = { proven: true, expectedWorker: name, problems: [] }
+    expect(
+      requireSoleConsumerProof({ soleConsumerRequired: true, soleConsumer: proof }, name)
+    ).toBe(proof)
+    expect(() => requireSoleConsumerProof({ processedBy: name }, name)).toThrow(
+      /only consumer/
+    )
+    expect(() =>
+      requireSoleConsumerProof(
+        {
+          soleConsumerRequired: true,
+          soleConsumer: { proven: false, expectedWorker: name, problems: ['after: 2'] },
+        },
+        name
+      )
+    ).toThrow(/after: 2/)
+    expect(() =>
+      requireSoleConsumerProof(
+        { soleConsumerRequired: true, soleConsumer: { ...proof, expectedWorker: 'x' } },
+        name
+      )
+    ).toThrow(/only consumer/)
+    expect(read('scripts/measure-community-worker-memory.mjs')).toContain(
+      "'--sole-consumer'"
+    )
   })
 
   it("measures memory against the container's own services and worker", async () => {
@@ -777,6 +873,19 @@ describe('readiness verdict', () => {
 
   async function passingSections(): Promise<Record<string, unknown>> {
     const { wilsonInterval, TEXT_LANGUAGES } = await generator()
+    const alone = () => ({
+      known: true,
+      count: 1,
+      names: ['bull:Y29tbXVuaXR5LW1vZGVyYXRpb24=:w:community-worker@abc123'],
+      clientIds: ['378'],
+    })
+    const soleConsumer = () => ({
+      proven: true,
+      expectedWorker: 'community-worker@abc123',
+      before: alone(),
+      after: alone(),
+      problems: [],
+    })
     const canary = (target: string) => ({
       available: true,
       stale: [],
@@ -786,6 +895,7 @@ describe('readiness verdict', () => {
       engineIdentity: REAL_IDENTITY,
       expectedSha: 'abc123',
       processedBy: 'community-worker@abc123',
+      soleConsumer: soleConsumer(),
       timings: { queueLatencyMs: 3, screeningDurationMs: 190 },
       cleanup: { performed: true, problems: [] },
     })
@@ -900,6 +1010,7 @@ describe('readiness verdict', () => {
           commitSha: 'abc123',
           workerName: 'community-worker@abc123',
           processedBy: 'community-worker@abc123',
+          soleConsumer: soleConsumer(),
           upload: { name: 'generated-4096x4096.jpg' },
           memoryLimitMib: 512,
           memoryPeakMib: 300,
@@ -1145,6 +1256,47 @@ describe('readiness verdict', () => {
       'a memory measurement of an image with no commit',
       'runtime-memory',
       [['runtime.memory.commitSha', 'unset']],
+    ],
+    // Story 6.2b second peer review (CX4b).
+    [
+      'a memory peak with no sole-consumer proof',
+      'runtime-memory',
+      [['runtime.memory.soleConsumer', undefined]],
+    ],
+    [
+      'a memory peak whose canary did not prove a sole consumer',
+      'runtime-memory',
+      [['runtime.memory.soleConsumer.proven', false]],
+    ],
+    [
+      'a memory peak with a second replica connected after the job',
+      'runtime-memory',
+      [
+        ['runtime.memory.soleConsumer.after.count', 2],
+        [
+          'runtime.memory.soleConsumer.after.names',
+          [
+            'bull:Y29tbXVuaXR5LW1vZGVyYXRpb24=:w:community-worker@abc123',
+            'bull:Y29tbXVuaXR5LW1vZGVyYXRpb24=:w:community-worker@abc123',
+          ],
+        ],
+        ['runtime.memory.soleConsumer.after.clientIds', ['378', '402']],
+      ],
+    ],
+    [
+      'a memory peak whose one consumer changed connection during the run',
+      'runtime-memory',
+      [['runtime.memory.soleConsumer.after.clientIds', ['402']]],
+    ],
+    [
+      'a memory peak proven for another worker',
+      'runtime-memory',
+      [['runtime.memory.soleConsumer.expectedWorker', 'community-worker@zzz']],
+    ],
+    [
+      'a hosted canary with no sole-consumer proof',
+      'canary-hosted',
+      [['canaries.hosted.soleConsumer', undefined]],
     ],
     // Story 6.2b peer review (CX6).
     [

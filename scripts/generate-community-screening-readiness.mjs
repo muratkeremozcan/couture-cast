@@ -938,6 +938,12 @@ function canaryProblems(canary, requireHosted) {
       'the job was not processed by the worker built from the expected commit'
     )
   }
+  problems.push(
+    ...soleConsumerProofProblems(
+      canary.soleConsumer,
+      typeof canary.expectedSha === 'string' ? workerNameFor(canary.expectedSha) : null
+    )
+  )
   return problems
 }
 
@@ -1448,16 +1454,75 @@ function memoryIdentityProblems(memory) {
     typeof memory.commitSha === 'string' && memory.commitSha !== 'unset'
       ? workerNameFor(memory.commitSha)
       : null
+  const problems = soleConsumerProofProblems(memory.soleConsumer, expectedWorker)
   if (
     expectedWorker &&
     memory.workerName === expectedWorker &&
     memory.processedBy === expectedWorker
   ) {
-    return []
+    return problems
   }
   return [
     `the upload was processed by ${String(memory.processedBy ?? 'an unrecorded worker')}, not the measured container's worker ${String(expectedWorker)}`,
+    ...problems,
   ]
+}
+
+/** One observation of the queue: exactly one consumer, the expected worker. */
+function aloneOnQueue(observed, expectedWorker) {
+  const one = (list) => Array.isArray(list) && list.length === 1 && Boolean(list[0])
+  return (
+    observed?.known === true &&
+    observed.count === 1 &&
+    typeof expectedWorker === 'string' &&
+    one(observed.names) &&
+    observed.names[0].endsWith(`:w:${expectedWorker}`) &&
+    one(observed.clientIds)
+  )
+}
+
+/**
+ * Story 6.2b second peer review (CX4b): replicas of one image share the worker
+ * name, so `processedBy` cannot say which replica screened the upload. The
+ * memory product must carry the canary's sole-consumer proof: exactly one
+ * consumer, the measured container's worker, before the job was enqueued and
+ * after it completed, on the same Redis connection. The recorded observations
+ * are judged here, not the canary's own `proven` flag alone.
+ */
+export function soleConsumerProofProblems(proof, expectedWorker) {
+  if (!proof || typeof proof !== 'object') {
+    return ['no sole-consumer proof: another replica could have screened the upload']
+  }
+  const problems = []
+  if (proof.proven !== true) problems.push('the canary did not prove a sole consumer')
+  if (!expectedWorker || proof.expectedWorker !== expectedWorker) {
+    problems.push(
+      `the sole-consumer proof names ${String(proof.expectedWorker)}, not ${String(expectedWorker)}`
+    )
+  }
+  const observations = { before: proof.before, after: proof.after }
+  for (const [when, observed] of Object.entries(observations)) {
+    if (!aloneOnQueue(observed, expectedWorker)) {
+      problems.push(
+        `${when} the job, the queue did not have exactly one consumer named ${String(expectedWorker)}`
+      )
+    }
+  }
+  if (
+    problems.length === 0 &&
+    observations.before.clientIds[0] !== observations.after.clientIds[0]
+  ) {
+    problems.push('the consumer connection changed between the two observations')
+  }
+  return problems
+}
+
+function soleConsumerMeasured(proof) {
+  return {
+    soleConsumerProven: proof?.proven === true,
+    consumersBefore: proof?.before?.count ?? null,
+    consumersAfter: proof?.after?.count ?? null,
+  }
 }
 
 function memoryGate(runtime) {
@@ -1491,8 +1556,9 @@ function memoryGate(runtime) {
       upload: memory.upload?.name ?? null,
       canaryDisposition: memory.canaryDisposition ?? null,
       processedBy: memory.processedBy ?? null,
+      ...soleConsumerMeasured(memory.soleConsumer),
     },
-    threshold: `cgroup memory.peak at or below ${String(ceiling)} MiB across startup and a ${MAX_UPLOAD_FIXTURE} screening processed by the measured container's own worker`,
+    threshold: `cgroup memory.peak at or below ${String(ceiling)} MiB across startup and a ${MAX_UPLOAD_FIXTURE} screening processed by the measured container's own worker, the only consumer on the queue before the job was enqueued and after it completed`,
   })
 }
 
@@ -1952,7 +2018,7 @@ function renderRuntime(runtime) {
       : `Latency not measured on this checkout. Run \`${COMMANDS.measureRuntimeContainer}\`.`,
     '',
     memory.available
-      ? `Memory, the number the host's out-of-memory killer acts on: the running worker container's cgroup memory.peak was ${memory.memoryPeakMib} MiB of a ${memory.memoryLimitMib} MiB limit, across startup and the canary screening ${memory.upload?.name} (${memory.upload?.bytes ?? '?'} bytes) through the real pipeline.`
+      ? `Memory, the number the host's out-of-memory killer acts on: the running worker container's cgroup memory.peak was ${memory.memoryPeakMib} MiB of a ${memory.memoryLimitMib} MiB limit, across startup and the canary screening ${memory.upload?.name} (${memory.upload?.bytes ?? '?'} bytes) through the real pipeline.${memory.soleConsumer?.proven === true ? ` The container's worker was the only consumer on the queue before the job was enqueued and after it completed (Redis client ${memory.soleConsumer.before?.clientIds?.[0] ?? '?'} both times).` : ''}`
       : `Container memory not measured on this checkout: ${COMMANDS.measureMemory}.`
   )
   return lines

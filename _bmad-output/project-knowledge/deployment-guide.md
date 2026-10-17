@@ -482,8 +482,12 @@ fractional vCPU. Latency is measured inside the worker image at 0.2 vCPU and 512
 `--memory=512m`, then run `npm run community:screening:measure:memory`, which drives the canary
 with a generated 4096x4096 JPEG, the largest accepted upload, through the real pipeline. It uses the
 container's own `DATABASE_URL`, `REDIS_URL` and Supabase settings, and requires the job to be
-processed by the container's worker (`community-worker@<baked commit>`); the gate rejects a peak
-without that identity. The latency gate requires the recorded cgroup limits to equal the 0.2 vCPU
+processed by the container's worker (`community-worker@<baked commit>`). Replicas of one image share
+that name, so the canary also runs in sole-consumer mode (`--sole-consumer`): exactly one consumer on
+the queue, named for the container's commit, before the job is enqueued and again after it
+completes, on the same Redis connection. Stop every other consumer of that Redis first, including a
+local `start:workers` or E2E stack. The product records both observations as `soleConsumer`, and the
+gate rejects a peak without that identity and that proof. The latency gate requires the recorded cgroup limits to equal the 0.2 vCPU
 and 512 MiB profile and at least 1,000 warm samples after warmup. The numbers and their gates are in the evidence payload's `runtime` section and in the rendered
 evidence. Re-measure inside the hosted container after the first deploy.
 
@@ -526,7 +530,8 @@ when no worker is connected, when a job stays `waiting`, when the identity carri
 expires. `--target` is checked against the database host, so a `local` canary cannot write to a
 hosted database and a `hosted` one cannot run against a laptop. A hosted run also requires exactly
 one consumer on the queue, named `community-worker@<sha>` for the commit given by `--expect-sha`
-(default: `HEAD`), checks that this worker processed the job, and verifies the database
+(default: `HEAD`), before it enqueues the job and again after the job completes, on the same Redis
+connection, checks that this worker processed the job, and verifies the database
 certificate against the Supabase CA. The evidence counts a hosted run only when no input-set file
 differs between `--expect-sha` and the evidence commit (`git diff --quiet`). Cleanup problems
 fail the run: the report records `ok: false` and the readiness gate fails.

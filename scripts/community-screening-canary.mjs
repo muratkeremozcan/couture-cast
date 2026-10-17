@@ -34,7 +34,11 @@
  *   Supabase CA: pass --db-ca <path to prod-ca-2021.crt> or set DATABASE_CA_CERT_PATH,
  *   and require exactly one consumer named for --expect-sha (default: HEAD).
  *   A local run given --expect-sha requires the job to be processed by the worker
- *   named for it.
+ *   named for it. A local run given --sole-consumer (which needs --expect-sha) also
+ *   makes the hosted run's consumer check: exactly one consumer on the queue, named
+ *   for that commit, checked before the job is enqueued and again after it
+ *   completes, on the same Redis connection both times. The report records both
+ *   observations as `soleConsumer`.
  *   Options: --timeout-ms <n> (default 120000), --json-out <path>, --keep,
  *            --fixture max (a generated 4096x4096 JPEG, the largest accepted upload),
  *            --no-worker-precheck (restart drill: enqueue while the worker is down,
@@ -93,6 +97,7 @@ const VALUE_FLAGS = {
 const SWITCH_FLAGS = {
   '--keep': ['keep', true],
   '--no-worker-precheck': ['workerPrecheck', false],
+  '--sole-consumer': ['soleConsumer', true],
 }
 
 function validateCanaryOptions(options) {
@@ -105,6 +110,11 @@ function validateCanaryOptions(options) {
   if (options.fixture !== 'safe' && options.fixture !== 'max') {
     throw new Error('--fixture must be safe or max')
   }
+  validateConsumerOptions(options)
+}
+
+/** The options that decide how the canary checks which worker consumes. */
+function validateConsumerOptions(options) {
   if (options.target === 'hosted' && !options.dbCa) {
     throw new Error(
       '--target hosted needs the Supabase CA (--db-ca or DATABASE_CA_CERT_PATH): the database certificate is verified, never trusted blindly'
@@ -112,6 +122,16 @@ function validateCanaryOptions(options) {
   }
   if (options.target === 'hosted' && !options.workerPrecheck) {
     throw new Error('--target hosted always checks which worker is consuming')
+  }
+  if (options.soleConsumer && !options.workerPrecheck) {
+    throw new Error(
+      '--sole-consumer checks the consumers, so it refuses --no-worker-precheck'
+    )
+  }
+  if (options.soleConsumer && options.target === 'local' && options.expectSha === null) {
+    throw new Error(
+      '--sole-consumer needs --expect-sha: the one consumer must be named for a known build'
+    )
   }
 }
 
@@ -126,6 +146,7 @@ export function parseCanaryArgs(argv) {
     fixture: 'safe',
     dbCa: process.env.DATABASE_CA_CERT_PATH ?? null,
     expectSha: null,
+    soleConsumer: false,
   }
   for (let index = 0; index < argv.length; index += 1) {
     const arg = argv[index]
@@ -144,6 +165,11 @@ export function parseCanaryArgs(argv) {
   // when it is told which build to expect, which is how the container memory
   // measurement proves the container it reads processed the upload.
   options.requireProcessedBy = options.target === 'hosted' || options.expectSha !== null
+  // A hosted run always proves that one consumer, the expected one, was the only
+  // one for the whole run. A local run does when asked, which is how the
+  // container memory measurement proves the container it reads was the only
+  // worker that could have screened the upload (Story 6.2b peer review, CX4b).
+  options.soleConsumer = options.target === 'hosted' || options.soleConsumer
   return options
 }
 
@@ -300,6 +326,8 @@ async function countWorkers(queue) {
       known: true,
       count: workers.length,
       names: workers.map((worker) => worker.rawname ?? worker.name ?? null),
+      clientIds: workers.map((worker) => worker.id ?? null),
+      observedAt: new Date().toISOString(),
     }
   } catch (error) {
     return {
@@ -475,6 +503,56 @@ async function openClients(options) {
   }
 }
 
+/**
+ * Whether one observation of the queue's consumers shows exactly one consumer,
+ * named for the expected build, on a connection Redis identified. Returns the
+ * problems, empty when it does.
+ */
+export function soleConsumerProblems(workers, expectedWorker) {
+  if (!workers?.known) return ['Redis reported no client list']
+  const problems = []
+  if (workers.count !== 1 || workers.names?.length !== 1) {
+    problems.push(
+      `${String(workers.count)} consumers: ${JSON.stringify(workers.names ?? [])}`
+    )
+  } else if (!workers.names[0]?.endsWith(`:w:${expectedWorker}`)) {
+    problems.push(`the consumer is ${String(workers.names[0])}, not ${expectedWorker}`)
+  }
+  if (workers.clientIds?.length !== 1 || !workers.clientIds[0]) {
+    problems.push('the consumer connection has no Redis client id')
+  }
+  return problems
+}
+
+/**
+ * The proof that one consumer, the expected one, was the only consumer for the
+ * whole run: exactly one consumer named `expectedWorker` before the job was
+ * enqueued and after it completed, and the same Redis connection both times. A
+ * second consumer that connected and left again between the two observations
+ * would also have to beat the expected worker to the job and carry its name,
+ * and the job's `processedBy` is checked separately.
+ */
+export function assessSoleConsumer(before, after, expectedWorker) {
+  const problems = [
+    ...soleConsumerProblems(before, expectedWorker).map(
+      (problem) => `before: ${problem}`
+    ),
+    ...soleConsumerProblems(after, expectedWorker).map((problem) => `after: ${problem}`),
+  ]
+  if (problems.length === 0 && before.clientIds[0] !== after.clientIds[0]) {
+    problems.push(
+      `the consumer connection changed from client ${before.clientIds[0]} to ${after.clientIds[0]}`
+    )
+  }
+  return {
+    proven: problems.length === 0,
+    expectedWorker,
+    before: before ?? null,
+    after: after ?? null,
+    problems,
+  }
+}
+
 async function precheckWorkers(queue, options) {
   const workers = options.workerPrecheck
     ? await countWorkers(queue)
@@ -485,23 +563,35 @@ async function precheckWorkers(queue, options) {
       `No worker is connected to the ${QUEUE_NAME} queue on this Redis.`
     )
   }
-  if (options.target === 'hosted') {
+  if (options.soleConsumer) {
     // Exactly one consumer, and the one built from the commit under test. A
     // second consumer would take some jobs and its identity would go unproven.
     const expected = workerNameFor(options.expectSha)
-    if (
-      !workers.known ||
-      workers.count !== 1 ||
-      !workers.names[0]?.endsWith(`:w:${expected}`)
-    ) {
+    const problems = soleConsumerProblems(workers, expected)
+    if (problems.length > 0) {
       throw new CanaryFailure(
         'worker_identity',
-        `The hosted canary needs exactly one consumer named ${expected}; Redis reported ${workers.known ? JSON.stringify(workers.names) : 'no client list'}.`,
-        { expectedWorker: expected }
+        `The ${options.target} canary needs exactly one consumer named ${expected}; Redis reported ${workers.known ? JSON.stringify(workers.names) : 'no client list'}.`,
+        { expectedWorker: expected, problems }
       )
     }
   }
   return workers
+}
+
+/** Repeats the consumer check after the job completed, against the first one. */
+async function postcheckSoleConsumer(queue, options, before) {
+  if (!options.soleConsumer) return null
+  const expected = workerNameFor(options.expectSha)
+  const proof = assessSoleConsumer(before, await countWorkers(queue), expected)
+  if (!proof.proven) {
+    throw new CanaryFailure(
+      'worker_identity',
+      `The ${options.target} canary could not prove ${expected} was the only consumer for the whole run: ${proof.problems.join('; ')}.`,
+      { soleConsumer: proof }
+    )
+  }
+  return proof
 }
 
 async function uploadFixture(storage, objectPath, fixture) {
@@ -589,6 +679,7 @@ async function driveCanary(context, options) {
   }
 
   const assessed = assessTerminalPost(post)
+  const soleConsumer = await postcheckSoleConsumer(queue, options, workers)
   const processedBy = job?.processedBy ?? null
   if (options.requireProcessedBy && processedBy !== workerNameFor(options.expectSha)) {
     throw new CanaryFailure(
@@ -604,6 +695,8 @@ async function driveCanary(context, options) {
     expectedSha: options.expectSha,
     processedByRequired: options.requireProcessedBy === true,
     processedBy,
+    soleConsumerRequired: options.soleConsumer === true,
+    soleConsumer,
     startedAt: context.startedAt.toISOString(),
     finishedAt: new Date().toISOString(),
     fixture: { name: fixture.name, sha256: fixture.sha256, bytes: fixture.bytes.length },

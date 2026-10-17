@@ -15,6 +15,14 @@
  * to be processed by the worker named for the container's baked commit. Any other
  * consumer on that Redis taking the job fails the measurement.
  *
+ * Story 6.2b second peer review (CX4b): replicas of one image share that name,
+ * so the name alone cannot say which replica screened the upload. The canary
+ * runs in sole-consumer mode: exactly one consumer on the queue, named for the
+ * container's commit, before the job is enqueued and after it completes, on the
+ * same Redis connection. With one consumer for the whole run, it is the one
+ * whose container this reads. The product records both observations, and the
+ * readiness gate rejects a peak without them.
+ *
  * Usage: node scripts/measure-community-worker-memory.mjs [--container cc-community-worker]
  */
 import { execFileSync } from 'node:child_process'
@@ -65,6 +73,25 @@ export function containerWorkerName(containerEnv) {
   return { sha, name: workerNameFor(sha) }
 }
 
+/**
+ * The sole-consumer proof the canary recorded, checked against the container's
+ * worker. Throws when the canary did not prove that worker was the only consumer
+ * for the whole run.
+ */
+export function requireSoleConsumerProof(canary, workerName) {
+  const proof = canary?.soleConsumer
+  if (
+    canary?.soleConsumerRequired !== true ||
+    proof?.proven !== true ||
+    proof.expectedWorker !== workerName
+  ) {
+    throw new Error(
+      `The canary did not prove ${workerName} was the only consumer for the whole run${proof?.problems?.length ? `: ${proof.problems.join('; ')}` : ''}; the container's peak could describe a job another replica ran.`
+    )
+  }
+  return proof
+}
+
 function docker(args) {
   return execFileSync('docker', args, {
     encoding: 'utf8',
@@ -100,6 +127,7 @@ function main() {
       'max',
       '--expect-sha',
       worker.sha,
+      '--sole-consumer',
     ],
     {
       cwd: projectRoot,
@@ -114,6 +142,7 @@ function main() {
       `The upload was processed by ${String(canary.processedBy)}, not ${worker.name}; the container's peak would describe a job it never ran.`
     )
   }
+  const soleConsumer = requireSoleConsumerProof(canary, worker.name)
   const peak = readCgroup(container, 'memory.peak')
   const limit = readCgroup(container, 'memory.max')
   console.log(
@@ -129,6 +158,7 @@ function main() {
         memoryLimitMib: limit === null ? null : Number((limit / MIB).toFixed(1)),
         workerName: worker.name,
         processedBy: canary.processedBy ?? null,
+        soleConsumer,
         servicesFrom: 'the container environment (DATABASE_URL, REDIS_URL, SUPABASE_URL)',
         upload: canary.fixture,
         canaryDisposition: canary.disposition ?? null,
