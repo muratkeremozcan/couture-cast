@@ -20,11 +20,14 @@ import {
 import {
   COMMUNITY_MODERATION_CONCURRENCY,
   COMMUNITY_MODERATION_DRAIN_DELAY_SECONDS,
+  COMMUNITY_MODERATION_LOCK_DURATION_MS,
   COMMUNITY_MODERATION_STALLED_INTERVAL_MS,
+  communityCrashRecoveryMs,
   communityWorkerName,
   createCommunityModerationWorker,
   terminalReason,
 } from './community-moderation.worker'
+import { STALE_PENDING_REVIEW_MINUTES } from './community-maintenance.service'
 import { NsfwScreeningError } from './tensorflow-nsfw-image-screener'
 import type { CommunityModerationJob } from './community-moderation.queue'
 import type { CommunityModerationMeter } from './community-moderation.telemetry'
@@ -801,7 +804,31 @@ describe('CommunityModerationProcessor & Worker', () => {
       expect(options.drainDelay).toBe(COMMUNITY_MODERATION_DRAIN_DELAY_SECONDS)
       expect(options.stalledInterval).toBe(COMMUNITY_MODERATION_STALLED_INTERVAL_MS)
       expect(COMMUNITY_MODERATION_DRAIN_DELAY_SECONDS).toBeGreaterThanOrEqual(300)
-      expect(COMMUNITY_MODERATION_STALLED_INTERVAL_MS).toBeGreaterThanOrEqual(300_000)
+    })
+
+    it('recovers a crashed job before the stale-review sweep fails its post', () => {
+      // Story 6.2b review (RF13): with a 600-second stalled check, a job
+      // abandoned by a crash came back after the 15-minute sweep had already
+      // failed its post.
+      buildWorker()
+      const options = workerHarness.mockCreateWorker.mock.calls.at(-1)?.[2] as {
+        lockDuration?: number
+        stalledInterval?: number
+        maxStalledCount?: number
+      }
+      expect(options).toMatchObject({
+        lockDuration: COMMUNITY_MODERATION_LOCK_DURATION_MS,
+        stalledInterval: COMMUNITY_MODERATION_STALLED_INTERVAL_MS,
+        maxStalledCount: 1,
+      })
+      // The redelivery bound holds only once the lock has expired by the check.
+      expect(COMMUNITY_MODERATION_STALLED_INTERVAL_MS).toBeGreaterThanOrEqual(
+        COMMUNITY_MODERATION_LOCK_DURATION_MS
+      )
+      const sweepMs = STALE_PENDING_REVIEW_MINUTES * 60_000
+      expect(communityCrashRecoveryMs()).toBe(423_000)
+      expect(communityCrashRecoveryMs()).toBeLessThan(sweepMs)
+      expect(communityCrashRecoveryMs(600_000)).toBeGreaterThan(sweepMs)
     })
 
     it('counts the attempt being executed, not the attempts already made', async () => {
