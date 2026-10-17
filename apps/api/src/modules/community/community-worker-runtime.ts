@@ -5,7 +5,15 @@ import { allowsTestOnlySecrets } from '../../config/runtime-environment.js'
 import { CommunityMaintenanceService } from './community-maintenance.service.js'
 import { CommunityModerationOutboxDispatcher } from './community-moderation.outbox.js'
 import { CommunityModerationQueue } from './community-moderation.queue.js'
-import { createCommunityModerationWorker } from './community-moderation.worker.js'
+import {
+  communityWorkerIdentity,
+  createCommunityModerationWorker,
+} from './community-moderation.worker.js'
+import {
+  closeWithHeartbeat,
+  CommunityWorkerHeartbeat,
+  type HeartbeatRedis,
+} from './community-worker-heartbeat.js'
 import {
   DefaultCommunityModerationEngine,
   UnavailableNsfwImageScreener,
@@ -116,6 +124,8 @@ export interface CommunityScreeningReadiness extends NsfwScreenerReadiness {
 
 export interface CommunityWorkerRuntime {
   worker: Worker
+  /** Written on start, removed when `worker` closes (Story 6.2b review, RF15). */
+  heartbeat: CommunityWorkerHeartbeat
   sweeps: CommunitySweeps
   /**
    * Absent when the caller pinned an engine instead of letting the runtime
@@ -378,8 +388,21 @@ export async function createCommunityWorkerRuntime(deps: {
     meter,
   })
 
+  // Story 6.2b review (RF15): the presence the canary and the measurements
+  // count, on the worker's own connection. Closing the worker removes it first.
+  const identity = communityWorkerIdentity()
+  const heartbeat = new CommunityWorkerHeartbeat({
+    redis: () => worker.client as Promise<HeartbeatRedis>,
+    workerName: identity.name,
+    commitSha: identity.commitSha,
+    logger,
+  })
+  closeWithHeartbeat(worker, heartbeat)
+  void heartbeat.start()
+
   return {
     worker,
+    heartbeat,
     sweeps: {
       dispatchPending: () => dispatcher.dispatchPending(),
       sweepStalePendingReview: () => maintenance.sweepStalePendingReview(),

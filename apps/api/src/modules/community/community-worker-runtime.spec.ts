@@ -16,22 +16,45 @@ import type * as FixtureScreenerModule from './fixture-nsfw-image-screener.js'
  * `tensorflow` branch is unreachable from this spec by construction rather than
  * by whichever adapter happens to be wired today.
  */
-const harness = vi.hoisted(() => ({
-  order: [] as string[],
-  createWorker: vi.fn(() => ({ on: vi.fn(), close: vi.fn() })),
-  queueClose: vi.fn().mockResolvedValue(undefined),
-  screenerEnsureReady: vi.fn(),
-  screenerClose: vi.fn(),
-  dispatchPending: vi.fn().mockResolvedValue({ dispatched: 1, failed: 0 }),
-  sweepStalePendingReview: vi.fn().mockResolvedValue({ stalled: 0 }),
-  sweepExpiredUploads: vi.fn().mockResolvedValue({ objectsDeleted: 0, draftsDeleted: 0 }),
-  sweepErasureRequests: vi.fn().mockResolvedValue({
-    hidden: 0,
-    anonymized: 0,
-    objectsPurged: 0,
-    overdue: 0,
-  }),
-}))
+const harness = vi.hoisted(() => {
+  /** What reached the worker's own Redis connection, and when the worker closed. */
+  const connection: unknown[][] = []
+  return {
+    order: [] as string[],
+    connection,
+    createWorker: vi.fn(() => ({
+      on: vi.fn(),
+      close: vi.fn(() => {
+        connection.push(['worker.close'])
+        return Promise.resolve()
+      }),
+      client: Promise.resolve({
+        set: (...args: unknown[]) => {
+          connection.push(['set', ...args])
+          return Promise.resolve('OK')
+        },
+        del: (...args: unknown[]) => {
+          connection.push(['del', ...args])
+          return Promise.resolve(1)
+        },
+      }),
+    })),
+    queueClose: vi.fn().mockResolvedValue(undefined),
+    screenerEnsureReady: vi.fn(),
+    screenerClose: vi.fn(),
+    dispatchPending: vi.fn().mockResolvedValue({ dispatched: 1, failed: 0 }),
+    sweepStalePendingReview: vi.fn().mockResolvedValue({ stalled: 0 }),
+    sweepExpiredUploads: vi
+      .fn()
+      .mockResolvedValue({ objectsDeleted: 0, draftsDeleted: 0 }),
+    sweepErasureRequests: vi.fn().mockResolvedValue({
+      hidden: 0,
+      anonymized: 0,
+      objectsPurged: 0,
+      overdue: 0,
+    }),
+  }
+})
 
 vi.mock('../../workers/base.worker.js', () => ({
   createWorker: (...args: unknown[]) => {
@@ -123,6 +146,7 @@ describe('createCommunityWorkerRuntime', () => {
   })
 
   afterEach(() => {
+    delete process.env.COMMUNITY_WORKER_COMMIT_SHA
     if (originalScreener === undefined) {
       delete process.env[COMMUNITY_NSFW_SCREENER_ENV]
     } else {
@@ -217,6 +241,29 @@ describe('createCommunityWorkerRuntime', () => {
     expect(harness.sweepStalePendingReview).toHaveBeenCalled()
     expect(harness.sweepExpiredUploads).toHaveBeenCalled()
     expect(harness.sweepErasureRequests).toHaveBeenCalled()
+  })
+
+  it('writes its presence heartbeat on the worker connection and removes it before the worker closes', async () => {
+    // Story 6.2b review (RF15): the canary counts consumers by these keys,
+    // because Upstash answers CLIENT LIST from one node.
+    process.env.COMMUNITY_WORKER_COMMIT_SHA = 'abc123'
+    harness.connection.length = 0
+    const runtime = await createCommunityWorkerRuntime({
+      prisma,
+      telemetryService,
+      meter: meter(),
+    })
+    await runtime.heartbeat.beat()
+
+    const key = `community-worker:heartbeat:community-worker@abc123:${runtime.heartbeat.instanceId}`
+    expect(runtime.heartbeat.key).toBe(key)
+    expect(harness.connection).toEqual([
+      ['set', key, expect.stringContaining('"commitSha":"abc123"'), 'EX', 90],
+    ])
+
+    await runtime.worker.close()
+
+    expect(harness.connection.slice(1)).toEqual([['del', key], ['worker.close']])
   })
 
   it('closes the screener and the queue client it opened', async () => {

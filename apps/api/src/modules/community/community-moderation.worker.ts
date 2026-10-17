@@ -165,6 +165,21 @@ function workerNameOption(): Partial<WorkerOptions> {
 }
 
 /**
+ * The name and commit the worker's heartbeat carries (Story 6.2b review, RF15):
+ * the BullMQ worker name when the image baked a commit, and plain
+ * `community-worker` otherwise, which no canary expecting a build accepts.
+ */
+export function communityWorkerIdentity(env: Readonly<NodeJS.ProcessEnv> = process.env): {
+  name: string
+  commitSha: string | null
+} {
+  const sha = env.COMMUNITY_WORKER_COMMIT_SHA?.trim()
+  return sha
+    ? { name: communityWorkerName(sha), commitSha: sha }
+    : { name: 'community-worker', commitSha: null }
+}
+
+/**
  * The reason persisted on `LookbookPost.moderation_reason` when BullMQ runs out
  * of attempts.
  *

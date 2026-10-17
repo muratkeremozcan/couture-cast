@@ -58,6 +58,7 @@ export const INPUT_FILES = [
   'scripts/verify-community-screening-model.mjs',
   'scripts/lib/community-screening-input-set.mjs',
   'scripts/lib/community-rollout-flags.mjs',
+  'scripts/lib/community-worker-heartbeat.mjs',
 ]
 
 /**

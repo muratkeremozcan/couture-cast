@@ -28,7 +28,8 @@ import { shutdownWorkerResources } from './shutdown-resources'
  * The outbox dispatch reads PostgreSQL and touches Redis only when a post is
  * waiting, so the one-second cadence costs no Redis commands while idle; the
  * idle Redis cost is BullMQ's blocking poll and stalled check, tuned in
- * `community-moderation.worker.ts` and measured in the deployment guide.
+ * `community-moderation.worker.ts`, plus the worker's presence heartbeat
+ * (`community-worker-heartbeat.ts`), all measured in the deployment guide.
  *
  * The pipeline itself is composed by `createCommunityWorkerRuntime`, the same
  * factory `bootstrap.ts` uses, so this process cannot drift from production.
@@ -130,9 +131,11 @@ export async function startCommunityWorkers() {
  * Stops consumption, lets the active job finish, then closes what that job was
  * using, all under one deadline below the production launcher's 25 seconds.
  *
- * The order is the point. `Worker.close()` stops taking jobs and waits for the
- * active one; only then do the model process, the moderation queue and the
- * PostHog client close. Closing the runtime first (as this did until the Story
+ * The order is the point. Closing the worker first removes its presence
+ * heartbeat (at most `COMMUNITY_WORKER_HEARTBEAT_STOP_TIMEOUT_MS` of the
+ * deadline; Story 6.2b review, RF15), then `Worker.close()` stops taking jobs
+ * and waits for the active one; only then do the model process, the moderation
+ * queue and the PostHog client close. Closing the runtime first (as this did until the Story
  * 6.2b peer review, CX7) terminated the inference thread under a job still
  * screening, so a deploy's SIGTERM failed that attempt with "Community NSFW
  * screener is closing", and on a final attempt marked a valid post

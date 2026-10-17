@@ -17,11 +17,13 @@
  *
  * Story 6.2b second peer review (CX4b): replicas of one image share that name,
  * so the name alone cannot say which replica screened the upload. The canary
- * runs in sole-consumer mode: exactly one consumer on the queue, named for the
- * container's commit, before the job is enqueued and after it completes, on the
- * same Redis connection. With one consumer for the whole run, it is the one
+ * runs in sole-consumer mode: exactly one consumer heartbeat, named for the
+ * container's commit, before the job is enqueued and after it completes, from
+ * the same worker process. With one consumer for the whole run, it is the one
  * whose container this reads. The product records both observations, and the
- * readiness gate rejects a peak without them.
+ * readiness gate rejects a peak without them. The consumers are counted from
+ * the workers' Redis heartbeats, because CLIENT LIST on Upstash shows one
+ * node's clients (Story 6.2b review, RF15).
  *
  * Usage: node scripts/measure-community-worker-memory.mjs [--container cc-community-worker]
  */
@@ -83,7 +85,9 @@ export function requireSoleConsumerProof(canary, workerName) {
   if (
     canary?.soleConsumerRequired !== true ||
     proof?.proven !== true ||
-    proof.expectedWorker !== workerName
+    proof.expectedWorker !== workerName ||
+    proof.before?.source !== 'heartbeat' ||
+    proof.after?.source !== 'heartbeat'
   ) {
     throw new Error(
       `The canary did not prove ${workerName} was the only consumer for the whole run${proof?.problems?.length ? `: ${proof.problems.join('; ')}` : ''}; the container's peak could describe a job another replica ran.`

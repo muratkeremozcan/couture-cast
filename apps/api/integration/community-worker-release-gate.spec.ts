@@ -61,6 +61,10 @@ interface CanaryModule {
   ) => Promise<T>
   redisOptions: (redisUrl?: string) => Record<string, unknown>
   runCanary: (options: Record<string, unknown>) => Promise<Record<string, unknown>>
+  observeConsumers: (
+    clients: { redis: unknown; queue: unknown },
+    options: { target: string }
+  ) => Promise<Record<string, unknown>>
 }
 interface CleanupResult {
   status: string
@@ -96,10 +100,25 @@ interface MemoryMeasureModule {
 }
 interface RedisMeasureModule {
   workerClientIds: (clientList: string, workerName: string) => string[]
+  presenceSample: (
+    at: string,
+    heartbeats: Record<string, unknown>,
+    clientIds: string[],
+    workerName: string
+  ) => Record<string, unknown>
   summarizeWorkerPresence: (
     workerName: string,
-    samples: { at: string; clientIds: string[] }[]
+    samples: Record<string, unknown>[]
   ) => Record<string, unknown>
+}
+interface HeartbeatLibModule {
+  HEARTBEAT_KEY_PREFIX: string
+  HEARTBEAT_KEY_PATTERN: string
+  parseHeartbeatKey: (key: string) => { workerName: string; instanceId: string } | null
+  readHeartbeats: (
+    redis: unknown,
+    options?: { count?: number; maxCalls?: number }
+  ) => Promise<Record<string, unknown>>
 }
 interface InputSetModule {
   INPUT_DIRECTORIES: string[]
@@ -162,6 +181,34 @@ async function load<T>(relative: string): Promise<T> {
 
 const REAL_IDENTITY =
   'adr013-text:policy-v1@abc;adr013-nsfw-v1.0:mobilenet_v2_mid@4.3.0:model-1:v1:policy-1'
+
+/**
+ * One observation of consumers as the canary records it (Story 6.2b review,
+ * RF15): the live worker heartbeats, one per worker process.
+ */
+function heartbeatsSeen(
+  workers: { name: string; instanceId: string; problems?: string[] }[],
+  extra: Record<string, unknown> = {}
+) {
+  return {
+    source: 'heartbeat',
+    known: true,
+    count: workers.length,
+    names: workers.map((worker) => worker.name),
+    instanceIds: workers.map((worker) => worker.instanceId),
+    heartbeats: workers.map((worker) => ({
+      key: `community-worker:heartbeat:${worker.name}:${worker.instanceId}`,
+      workerName: worker.name,
+      instanceId: worker.instanceId,
+      commitSha: worker.name.split('@')[1] ?? null,
+      startedAt: '2026-10-17T11:00:00.000Z',
+      pid: 7,
+      ttlMs: 80_000,
+      problems: worker.problems ?? [],
+    })),
+    ...extra,
+  }
+}
 
 describe('community worker image', () => {
   const dockerfile = read('apps/api/Dockerfile.community-worker')
@@ -563,36 +610,46 @@ describe('canary cleanup and worker identity', () => {
     expect(parseCanaryArgs(['--target', 'hosted']).requireProcessedBy).toBe(true)
   })
 
-  it('proves a sole consumer only from two matching single-consumer observations', async () => {
+  it('proves a sole consumer only from two matching single-heartbeat observations', async () => {
     // Story 6.2b second peer review (CX4b): replicas of one image share the
-    // worker name, so the measured container must be the only consumer.
+    // worker name, so the measured container must be the only consumer. Story
+    // 6.2b review (RF15): consumers are counted from heartbeats, one per worker
+    // process, because Upstash answers CLIENT LIST from one node.
     const { soleConsumerProblems, assessSoleConsumer, parseCanaryArgs } =
       await load<CanaryModule>('scripts/community-screening-canary.mjs')
     const name = 'community-worker@abc123'
-    const seen = (
-      names: string[],
-      clientIds: string[] = names.map((_, i) => `${i + 7}`)
-    ) => ({
-      known: true,
-      count: names.length,
-      names: names.map((worker) => `bull:Y29t:w:${worker}`),
-      clientIds,
-    })
+    const seen = (names: string[], instanceIds = names.map((_, i) => `instance-${i}`)) =>
+      heartbeatsSeen(
+        names.map((worker, i) => ({ name: worker, instanceId: instanceIds[i] ?? '' }))
+      )
 
     expect(soleConsumerProblems(seen([name]), name)).toEqual([])
     expect(soleConsumerProblems(seen([name, name]), name)).not.toEqual([])
     expect(soleConsumerProblems(seen(['community-worker@zzz']), name)).not.toEqual([])
     expect(soleConsumerProblems(seen([]), name)).not.toEqual([])
-    expect(soleConsumerProblems({ known: false }, name)).not.toEqual([])
+    expect(soleConsumerProblems({ ...seen([name]), known: false }, name)).not.toEqual([])
     expect(soleConsumerProblems(seen([name], ['']), name)).not.toEqual([])
+    // A CLIENT LIST observation is not a heartbeat count, however it reads.
+    expect(
+      soleConsumerProblems(
+        { known: true, count: 1, names: [`bull:Y29t:w:${name}`], clientIds: ['7'] },
+        name
+      )
+    ).toEqual(['the observation is not a heartbeat count'])
+    expect(
+      soleConsumerProblems(
+        heartbeatsSeen([{ name, instanceId: 'a', problems: ['the key has no TTL'] }]),
+        name
+      )
+    ).toEqual(['the key has no TTL'])
 
     expect(assessSoleConsumer(seen([name]), seen([name]), name).proven).toBe(true)
-    // A second replica of the same image that connected while the job ran.
+    // A second replica of the same image that started while the job ran.
     expect(assessSoleConsumer(seen([name]), seen([name, name]), name).proven).toBe(false)
     // The one consumer before is not the one consumer after.
     expect(
-      assessSoleConsumer(seen([name], ['7']), seen([name], ['9']), name).problems
-    ).toEqual([expect.stringMatching(/changed from client 7 to 9/)])
+      assessSoleConsumer(seen([name], ['a']), seen([name], ['b']), name).problems
+    ).toEqual([expect.stringMatching(/instance changed from a to b/)])
 
     expect(parseCanaryArgs(['--target', 'local']).soleConsumer).toBe(false)
     expect(
@@ -620,10 +677,27 @@ describe('canary cleanup and worker identity', () => {
       'scripts/measure-community-worker-memory.mjs'
     )
     const name = 'community-worker@abc123'
-    const proof = { proven: true, expectedWorker: name, problems: [] }
+    const alone = heartbeatsSeen([{ name, instanceId: 'a' }])
+    const proof = {
+      proven: true,
+      expectedWorker: name,
+      before: alone,
+      after: alone,
+      problems: [],
+    }
     expect(
       requireSoleConsumerProof({ soleConsumerRequired: true, soleConsumer: proof }, name)
     ).toBe(proof)
+    // Story 6.2b review (RF15): a proof made from CLIENT LIST is not accepted.
+    expect(() =>
+      requireSoleConsumerProof(
+        {
+          soleConsumerRequired: true,
+          soleConsumer: { ...proof, after: { known: true, count: 1 } },
+        },
+        name
+      )
+    ).toThrow(/only consumer/)
     expect(() => requireSoleConsumerProof({ processedBy: name }, name)).toThrow(
       /only consumer/
     )
@@ -675,28 +749,359 @@ describe('canary cleanup and worker identity', () => {
     )
   })
 
-  it('records whether the idle worker was connected at every sample', async () => {
-    // Story 6.2b peer review (CX6).
-    const { workerClientIds, summarizeWorkerPresence } = await load<RedisMeasureModule>(
-      'scripts/measure-community-worker-redis.mjs'
-    )
+  it('records whether one idle worker process held its heartbeat at every sample', async () => {
+    // Story 6.2b peer review (CX6), and review RF15: presence is the worker's
+    // heartbeat; CLIENT LIST is kept beside it as a cross-check.
+    const { workerClientIds, presenceSample, summarizeWorkerPresence } =
+      await load<RedisMeasureModule>('scripts/measure-community-worker-redis.mjs')
     const name = 'community-worker@abc123'
     const list = `id=7 addr=1 name=bull:Y29t:w:${name} age=3\nid=8 addr=2 name= age=1\n`
     expect(workerClientIds(list, name)).toEqual(['7'])
     expect(workerClientIds(list, 'community-worker@zzz')).toEqual([])
     const at = '2026-10-17T00:00:00.000Z'
+    const sample = (instances: string[], clientIds: string[] = ['7']) =>
+      presenceSample(
+        at,
+        heartbeatsSeen([
+          ...instances.map((instanceId) => ({ name, instanceId })),
+          { name: 'community-worker@other', instanceId: 'z' },
+        ]),
+        clientIds,
+        name
+      )
+    expect(sample(['a'])).toEqual({
+      at,
+      heartbeatKnown: true,
+      instanceIds: ['a'],
+      otherWorkers: ['community-worker@other'],
+      clientIds: ['7'],
+    })
+    // CLIENT LIST missing the worker does not make it absent.
+    expect(
+      summarizeWorkerPresence(name, [sample(['a']), sample(['a'], [])])
+    ).toMatchObject({
+      presenceSource: 'heartbeat',
+      samples: 2,
+      connectedSamples: 2,
+      connectedThroughout: true,
+      instanceIds: ['a'],
+      clientListSamples: 1,
+    })
+    expect(summarizeWorkerPresence(name, [sample(['a']), sample([])])).toMatchObject({
+      connectedSamples: 1,
+      connectedThroughout: false,
+    })
+    // A worker that restarted mid-window is two processes, not one idle one.
+    expect(summarizeWorkerPresence(name, [sample(['a']), sample(['b'])])).toMatchObject({
+      connectedSamples: 2,
+      connectedThroughout: false,
+      instanceIds: ['a', 'b'],
+    })
     expect(
       summarizeWorkerPresence(name, [
-        { at, clientIds: ['7'] },
-        { at, clientIds: ['7'] },
-      ])
-    ).toMatchObject({ samples: 2, connectedSamples: 2, connectedThroughout: true })
-    expect(
-      summarizeWorkerPresence(name, [
-        { at, clientIds: ['7'] },
-        { at, clientIds: [] },
+        sample(['a']),
+        presenceSample(
+          at,
+          { source: 'heartbeat', known: false, count: null },
+          ['7'],
+          name
+        ),
       ])
     ).toMatchObject({ connectedSamples: 1, connectedThroughout: false })
+  })
+})
+
+/**
+ * The heartbeat side of a Redis (Story 6.2b review, RF15): SCAN pages through
+ * the given workers' heartbeat keys one per call, and GET and PTTL answer for
+ * them. `calls` counts what the read sent.
+ */
+function heartbeatRedis(
+  workers: { name: string; instanceId: string }[],
+  calls: Record<string, number> = {}
+) {
+  const keys = workers.map(
+    (worker) => `community-worker:heartbeat:${worker.name}:${worker.instanceId}`
+  )
+  const count = (command: string) => {
+    calls[command] = (calls[command] ?? 0) + 1
+  }
+  return {
+    scan: (cursor: string, ...args: unknown[]) => {
+      count('scan')
+      expect(args.slice(0, 2)).toEqual(['MATCH', 'community-worker:heartbeat:*'])
+      const index = Number(cursor)
+      const next = index + 1 >= keys.length ? '0' : String(index + 1)
+      return Promise.resolve([next, keys.slice(index, index + 1)])
+    },
+    get: (key: string) => {
+      count('get')
+      const worker = workers[keys.indexOf(key)]
+      return Promise.resolve(
+        worker
+          ? JSON.stringify({
+              name: worker.name,
+              commitSha: worker.name.split('@')[1] ?? null,
+              startedAt: '2026-10-17T11:00:00.000Z',
+              pid: 7,
+            })
+          : null
+      )
+    },
+    pttl: (key: string) => {
+      count('pttl')
+      return Promise.resolve(keys.includes(key) ? 80_000 : -2)
+    },
+  }
+}
+
+describe('worker heartbeat reads (RF15)', () => {
+  const heartbeatLib = () =>
+    load<HeartbeatLibModule>('scripts/lib/community-worker-heartbeat.mjs')
+
+  it('reads the key the worker writes', async () => {
+    const { HEARTBEAT_KEY_PREFIX, parseHeartbeatKey } = await heartbeatLib()
+    const worker = await import('../src/modules/community/community-worker-heartbeat.js')
+    expect(HEARTBEAT_KEY_PREFIX).toBe(worker.COMMUNITY_WORKER_HEARTBEAT_PREFIX)
+    const key = worker.communityWorkerHeartbeatKey(
+      'community-worker@abc123',
+      '7b0c8d5e-2f1a-4c4e-9f0e-6a1b2c3d4e5f'
+    )
+    expect(parseHeartbeatKey(key)).toEqual({
+      workerName: 'community-worker@abc123',
+      instanceId: '7b0c8d5e-2f1a-4c4e-9f0e-6a1b2c3d4e5f',
+    })
+    expect(parseHeartbeatKey('community-worker:heartbeat:')).toBeNull()
+    expect(parseHeartbeatKey('bull:community-moderation:id')).toBeNull()
+  })
+
+  it('counts live heartbeats across SCAN pages and reports what the read cost', async () => {
+    const { readHeartbeats } = await heartbeatLib()
+    const calls: Record<string, number> = {}
+    const workers = [
+      { name: 'community-worker@abc123', instanceId: 'a' },
+      { name: 'community-worker@abc123', instanceId: 'b' },
+    ]
+    const observed = await readHeartbeats(heartbeatRedis(workers, calls))
+    expect(observed).toMatchObject({
+      source: 'heartbeat',
+      known: true,
+      count: 2,
+      names: ['community-worker@abc123', 'community-worker@abc123'],
+      instanceIds: ['a', 'b'],
+      commands: { scan: 2, get: 2, pttl: 2 },
+    })
+    expect(calls).toEqual({ scan: 2, get: 2, pttl: 2 })
+  })
+
+  it('reports an unfinished or refused scan as unknown, never as a count', async () => {
+    const { readHeartbeats } = await heartbeatLib()
+    const workers = ['a', 'b', 'c'].map((instanceId) => ({
+      name: 'community-worker@abc123',
+      instanceId,
+    }))
+    const unfinished = await readHeartbeats(heartbeatRedis(workers), { maxCalls: 2 })
+    expect(unfinished).toMatchObject({ known: false, count: null })
+    expect(unfinished.note).toMatch(/did not finish/)
+    const refused = await readHeartbeats({
+      scan: () => Promise.reject(new Error('NOPERM')),
+    })
+    expect(refused).toMatchObject({ known: false, count: null })
+    expect(refused.note).toMatch(/NOPERM/)
+  })
+
+  it('skips a key that expired between the scan and its read, and flags one with no TTL', async () => {
+    const { readHeartbeats } = await heartbeatLib()
+    const redis = {
+      ...heartbeatRedis([
+        { name: 'community-worker@abc123', instanceId: 'gone' },
+        { name: 'community-worker@abc123', instanceId: 'forever' },
+      ]),
+      pttl: (key: string) => Promise.resolve(key.endsWith(':gone') ? -2 : -1),
+    }
+    const observed = (await readHeartbeats(redis)) as {
+      count: number
+      heartbeats: { instanceId: string; problems: string[] }[]
+    }
+    expect(observed.count).toBe(1)
+    expect(observed.heartbeats).toEqual([
+      expect.objectContaining({
+        instanceId: 'forever',
+        problems: ['the key has no TTL, so it never expires'],
+      }),
+    ])
+  })
+})
+
+/**
+ * Story 6.2b review (RF15), reproduced as measured: Upstash answers CLIENT LIST
+ * from one node, so on most connections the hosted worker is not listed while
+ * it is connected and consuming. These runs give the canary a Redis whose
+ * CLIENT LIST shows no worker and whose heartbeats show the real one.
+ */
+describe('canary consumers counted from heartbeats', () => {
+  const canaryModule = () => load<CanaryModule>('scripts/community-screening-canary.mjs')
+  const sha = 'abc123'
+  const workerName = `community-worker@${sha}`
+
+  /** Every service the canary uses, answering as a healthy run would. */
+  function healthyClients(heartbeats: { name: string; instanceId: string }[]) {
+    const clientList = vi.fn(() => Promise.resolve([]))
+    let removed = false
+    const startedAt = Date.now()
+    const job = {
+      processedBy: workerName,
+      timestamp: startedAt,
+      processedOn: startedAt + 3,
+      finishedOn: startedAt + 190,
+      attemptsMade: 1,
+      getState: () => Promise.resolve('completed'),
+      remove: () => {
+        removed = true
+        return Promise.resolve()
+      },
+    }
+    const clients = {
+      abort: new AbortController(),
+      redis: {
+        ...heartbeatRedis(heartbeats),
+        disconnect: () => undefined,
+        quit: () => Promise.resolve('OK'),
+      },
+      db: {
+        connect: () => Promise.resolve(),
+        end: () => Promise.resolve(),
+        connection: { stream: { destroy: () => undefined } },
+        query: (sql: string) => {
+          if (sql.includes('pg_backend_pid()'))
+            return Promise.resolve({ rows: [{ pid: 1 }] })
+          if (sql.includes('SELECT status')) {
+            return Promise.resolve({
+              rows: [
+                {
+                  status: 'published',
+                  moderation_reason: null,
+                  moderation_engine_version: REAL_IDENTITY,
+                  published_at: new Date(),
+                },
+              ],
+            })
+          }
+          return Promise.resolve({ rows: [] })
+        },
+      },
+      storage: {
+        from: () => ({
+          upload: () => Promise.resolve({ error: null }),
+          remove: () => Promise.resolve({ data: [], error: null }),
+          list: () => Promise.resolve({ data: [], error: null }),
+        }),
+      },
+      queue: {
+        waitUntilReady: () => Promise.resolve(),
+        getWorkers: clientList,
+        add: () => Promise.resolve(),
+        getJob: () => Promise.resolve(removed ? null : job),
+        close: () => Promise.resolve(),
+      },
+    }
+    return { clients, clientList }
+  }
+
+  async function run(target: 'local' | 'hosted', clients: unknown) {
+    const { runCanary, parseCanaryArgs } = await canaryModule()
+    const options = {
+      ...parseCanaryArgs([
+        '--target',
+        target,
+        '--expect-sha',
+        sha,
+        ...(target === 'local' ? ['--sole-consumer'] : []),
+        '--cleanup-settle-ms',
+        '0',
+      ]),
+      openClients: () => Promise.resolve(clients),
+    }
+    const previous = process.env.DATABASE_URL
+    process.env.DATABASE_URL =
+      target === 'local'
+        ? 'postgresql://p:p@127.0.0.1:54322/postgres'
+        : 'postgresql://u:p@db.example.supabase.co:5432/postgres'
+    try {
+      return await runCanary(options).then(
+        (report) => ({ report, failure: null }),
+        (failure: unknown) => ({
+          report: null,
+          failure: failure as Record<string, unknown>,
+        })
+      )
+    } finally {
+      process.env.DATABASE_URL = previous
+    }
+  }
+
+  it('passes a hosted run whose CLIENT LIST misses the worker its heartbeat shows', async () => {
+    const { clients, clientList } = healthyClients([
+      { name: workerName, instanceId: 'a' },
+    ])
+    const { report, failure } = await run('hosted', clients)
+
+    expect(failure).toBeNull()
+    expect(report).toMatchObject({
+      ok: true,
+      target: 'hosted',
+      processedBy: workerName,
+      soleConsumer: { proven: true, problems: [] },
+      workersConnected: { source: 'heartbeat', count: 1, clientList: null },
+    })
+    // A hosted run never asks CLIENT LIST: on Upstash it answers for one node.
+    expect(clientList).not.toHaveBeenCalled()
+  })
+
+  it('passes a local sole-consumer run, recording CLIENT LIST as a disagreeing cross-check', async () => {
+    const { clients, clientList } = healthyClients([
+      { name: workerName, instanceId: 'a' },
+    ])
+    const { report, failure } = await run('local', clients)
+
+    expect(failure).toBeNull()
+    expect(report).toMatchObject({
+      ok: true,
+      soleConsumer: { proven: true },
+      workersConnected: {
+        source: 'heartbeat',
+        count: 1,
+        clientList: { known: true, count: 0 },
+        clientListAgrees: false,
+      },
+    })
+    expect(clientList).toHaveBeenCalled()
+  })
+
+  it('fails the sole-consumer proof on a second heartbeat CLIENT LIST cannot see', async () => {
+    const { clients } = healthyClients([
+      { name: workerName, instanceId: 'a' },
+      { name: workerName, instanceId: 'b' },
+    ])
+    for (const target of ['hosted', 'local'] as const) {
+      const { report, failure } = await run(target, clients)
+      expect(report).toBeNull()
+      expect(failure?.message).toMatch(/exactly one consumer heartbeat/)
+      expect(failure).toMatchObject({
+        code: 'worker_identity',
+        details: { problems: [expect.stringMatching(/^2 consumer heartbeats/)] },
+        cleanup: { performed: true, status: 'clean' },
+      })
+    }
+  })
+
+  it('fails worker_absent with no heartbeat, whatever CLIENT LIST says', async () => {
+    const { clients } = healthyClients([])
+    clients.queue.getWorkers = vi.fn(() =>
+      Promise.resolve([{ name: `bull:Y29t:w:${workerName}`, id: '7' }])
+    ) as unknown as typeof clients.queue.getWorkers
+    const { failure } = await run('local', clients)
+    expect(failure).toMatchObject({ code: 'worker_absent' })
   })
 })
 
@@ -739,6 +1144,7 @@ describe('canary deadlines', () => {
     const clients = {
       abort,
       redis: {
+        ...heartbeatRedis([{ name: 'w', instanceId: '1' }]),
         disconnect: () => {
           calls.redisDisconnect += 1
         },
@@ -1580,23 +1986,36 @@ describe('restart drill evidence', () => {
     const { restartDrillProblems, parseCanaryArgs } = await load<CanaryModule>(
       'scripts/community-screening-canary.mjs'
     )
-    const down = (observedAt: string, jobState?: string) => ({
-      known: true,
-      count: 0,
-      names: [],
-      observedAt,
-      ...(jobState ? { jobState } : {}),
-    })
+    const down = (observedAt: string, jobState?: string) =>
+      heartbeatsSeen([], { observedAt, ...(jobState ? { jobState } : {}) })
     const proven = {
       beforeEnqueue: down('2026-10-17T12:00:00.000Z'),
       afterEnqueue: down('2026-10-17T12:00:00.300Z', 'waiting'),
-      consumerReturned: { known: true, count: 1, observedAt: '2026-10-17T12:00:05.000Z' },
+      consumerReturned: heartbeatsSeen(
+        [{ name: 'community-worker@abc123', instanceId: 'a' }],
+        { observedAt: '2026-10-17T12:00:05.000Z' }
+      ),
       observedDowntimeMs: 4500,
     }
     expect(restartDrillProblems(proven)).toEqual([])
     expect(restartDrillProblems(undefined)).toEqual(['no restart drill observations'])
+    // Story 6.2b review (RF15): zero in CLIENT LIST is not zero consumers.
     expect(
-      restartDrillProblems({ ...proven, beforeEnqueue: { known: false, count: null } })
+      restartDrillProblems({
+        ...proven,
+        beforeEnqueue: {
+          known: true,
+          count: 0,
+          names: [],
+          observedAt: '2026-10-17T12:00:00.000Z',
+        },
+      })
+    ).toEqual(['not counted from worker heartbeats: beforeEnqueue'])
+    expect(
+      restartDrillProblems({
+        ...proven,
+        beforeEnqueue: { ...proven.beforeEnqueue, known: false, count: null },
+      })
     ).toEqual([expect.stringMatching(/before the job was enqueued/)])
     expect(
       restartDrillProblems({ ...proven, afterEnqueue: proven.consumerReturned })
@@ -2178,12 +2597,8 @@ describe('readiness verdict', () => {
 
   async function passingSections(): Promise<Record<string, unknown>> {
     const { wilsonInterval, TEXT_LANGUAGES } = await generator()
-    const alone = () => ({
-      known: true,
-      count: 1,
-      names: ['bull:Y29tbXVuaXR5LW1vZGVyYXRpb24=:w:community-worker@abc123'],
-      clientIds: ['378'],
-    })
+    const alone = () =>
+      heartbeatsSeen([{ name: 'community-worker@abc123', instanceId: 'instance-a' }])
     const soleConsumer = () => ({
       proven: true,
       expectedWorker: 'community-worker@abc123',
@@ -2227,21 +2642,13 @@ describe('readiness verdict', () => {
           ...canary('local'),
           mode: 'restart-drill',
           restartDrill: {
-            beforeEnqueue: {
-              known: true,
-              count: 0,
-              names: [],
-              clientIds: [],
+            beforeEnqueue: heartbeatsSeen([], {
               observedAt: '2026-10-17T12:00:00.000Z',
-            },
-            afterEnqueue: {
-              known: true,
-              count: 0,
-              names: [],
-              clientIds: [],
+            }),
+            afterEnqueue: heartbeatsSeen([], {
               observedAt: '2026-10-17T12:00:00.200Z',
               jobState: 'waiting',
-            },
+            }),
             lastDownObservedAt: '2026-10-17T12:00:09.000Z',
             consumerReturned: { ...alone(), observedAt: '2026-10-17T12:00:09.500Z' },
             observedDowntimeMs: 9000,
@@ -2361,9 +2768,11 @@ describe('readiness verdict', () => {
           worker: {
             name: 'community-worker@abc123',
             commitSha: 'abc123',
+            presenceSource: 'heartbeat',
             samples: 121,
             connectedSamples: 121,
             connectedThroughout: true,
+            instanceIds: ['instance-a'],
           },
         },
         perPost: { commandsPerPost: 82 },
@@ -2733,21 +3142,67 @@ describe('readiness verdict', () => {
       'a memory peak with a second replica connected after the job',
       'runtime-memory',
       [
-        ['runtime.memory.soleConsumer.after.count', 2],
         [
-          'runtime.memory.soleConsumer.after.names',
-          [
-            'bull:Y29tbXVuaXR5LW1vZGVyYXRpb24=:w:community-worker@abc123',
-            'bull:Y29tbXVuaXR5LW1vZGVyYXRpb24=:w:community-worker@abc123',
-          ],
+          'runtime.memory.soleConsumer.after',
+          heartbeatsSeen([
+            { name: 'community-worker@abc123', instanceId: 'instance-a' },
+            { name: 'community-worker@abc123', instanceId: 'instance-b' },
+          ]),
         ],
-        ['runtime.memory.soleConsumer.after.clientIds', ['378', '402']],
       ],
     ],
     [
-      'a memory peak whose one consumer changed connection during the run',
+      'a memory peak whose one consumer was another process after the run',
       'runtime-memory',
-      [['runtime.memory.soleConsumer.after.clientIds', ['402']]],
+      [
+        [
+          'runtime.memory.soleConsumer.after',
+          heartbeatsSeen([{ name: 'community-worker@abc123', instanceId: 'instance-b' }]),
+        ],
+      ],
+    ],
+    // Story 6.2b review (RF15): CLIENT LIST on Upstash shows one node, so a
+    // recorded observation must be a heartbeat count.
+    [
+      'a memory peak proven from CLIENT LIST',
+      'runtime-memory',
+      [
+        [
+          'runtime.memory.soleConsumer.before',
+          {
+            known: true,
+            count: 1,
+            names: ['bull:Y29tbXVuaXR5LW1vZGVyYXRpb24=:w:community-worker@abc123'],
+            clientIds: ['378'],
+          },
+        ],
+      ],
+    ],
+    [
+      'a hosted canary proven from CLIENT LIST',
+      'canary-hosted',
+      [['canaries.hosted.soleConsumer.after.source', undefined]],
+    ],
+    [
+      'a hosted canary whose consumer heartbeat had no TTL',
+      'canary-hosted',
+      [
+        [
+          'canaries.hosted.soleConsumer.after',
+          heartbeatsSeen([
+            {
+              name: 'community-worker@abc123',
+              instanceId: 'instance-a',
+              problems: ['the key has no TTL, so it never expires'],
+            },
+          ]),
+        ],
+      ],
+    ],
+    [
+      'a drill whose returning consumer came from CLIENT LIST',
+      'restart-keeps-queued-jobs',
+      [['canaries.restart.restartDrill.consumerReturned.source', undefined]],
     ],
     [
       'a memory peak proven for another worker',
@@ -2777,6 +3232,16 @@ describe('readiness verdict', () => {
       'an idle window naming another worker',
       'redis-budget',
       [['redis.idle.worker.name', 'community-worker@zzz']],
+    ],
+    [
+      'an idle window sampled from CLIENT LIST',
+      'redis-budget',
+      [['redis.idle.worker.presenceSource', undefined]],
+    ],
+    [
+      'an idle window across a worker restart',
+      'redis-budget',
+      [['redis.idle.worker.instanceIds', ['instance-a', 'instance-b']]],
     ],
   ])('fails on %s', async (_label, gateId, patches) => {
     const { verdict, gates } = await verdictAfter(patches)

@@ -13,10 +13,16 @@
  *
  * Story 6.2b peer review (CX6): an idle window with no worker connected costs
  * almost nothing and would understate the budget. The worker is identified by
- * the name the container gives itself (its baked commit), CLIENT LIST is sampled
- * through the whole window, and the report records every sample; the readiness
- * gate rejects an idle product whose worker was not connected throughout. The
- * samples' own CLIENT LIST calls are subtracted like the statistics reads.
+ * the name the container gives itself (its baked commit), and its presence is
+ * sampled through the whole window from its Redis heartbeat
+ * (`community-worker:heartbeat:<name>:<instance>`); the report records every
+ * sample, and the readiness gate rejects an idle product whose worker process
+ * did not hold one heartbeat throughout. The heartbeat is the authority because
+ * CLIENT LIST on Upstash shows one node's clients (Story 6.2b review, RF15);
+ * CLIENT LIST is still sampled here, on a one-node local Redis, as a
+ * cross-check. The samples' own SCAN, GET, PTTL and CLIENT LIST calls are
+ * subtracted like the statistics reads. The worker's heartbeat refreshes are
+ * the worker's own cost and stay in.
  *
  * `--canary-runs <n>` measures traffic instead: it runs the local canary n times
  * and reports the commands one screened post costs, with the idle rate from
@@ -33,6 +39,7 @@ import { execFileSync } from 'node:child_process'
 import path from 'node:path'
 import { fileURLToPath } from 'node:url'
 import { workerNameFor } from './community-screening-canary.mjs'
+import { readHeartbeats } from './lib/community-worker-heartbeat.mjs'
 import { inputSetHash } from './lib/community-screening-input-set.mjs'
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url))
@@ -81,18 +88,53 @@ export function workerClientIds(clientList, workerName) {
     .map((client) => client.id)
 }
 
-/** Whether the worker was connected at every sample, and what was seen. */
+/**
+ * One presence sample: the named worker's heartbeat instances, the other
+ * workers' heartbeats, and the named worker's CLIENT LIST connections.
+ */
+export function presenceSample(at, heartbeats, clientIds, workerName) {
+  const live = heartbeats.known ? heartbeats.heartbeats : []
+  return {
+    at,
+    heartbeatKnown: heartbeats.known === true,
+    instanceIds: live
+      .filter((heartbeat) => heartbeat.workerName === workerName)
+      .map((heartbeat) => heartbeat.instanceId),
+    otherWorkers: live
+      .filter((heartbeat) => heartbeat.workerName !== workerName)
+      .map((heartbeat) => heartbeat.workerName),
+    clientIds,
+  }
+}
+
+/**
+ * Whether one worker process, the named one, held its heartbeat at every
+ * sample, and what was seen. A sample counts when the heartbeat scan finished
+ * and found exactly one heartbeat of the named worker; the window counts when
+ * every sample did and they all name the same instance, so a worker that
+ * restarted mid-window does not pass as one idle process.
+ */
 export function summarizeWorkerPresence(workerName, samples) {
-  const connected = samples.filter((sample) => sample.clientIds.length > 0)
+  const connected = samples.filter(
+    (sample) => sample.heartbeatKnown === true && sample.instanceIds?.length === 1
+  )
+  const instanceIds = [...new Set(samples.flatMap((sample) => sample.instanceIds ?? []))]
   return {
     name: workerName,
+    presenceSource: 'heartbeat',
     sampleIntervalSeconds: PRESENCE_SAMPLE_INTERVAL_MS / 1000,
     samples: samples.length,
     connectedSamples: connected.length,
-    connectedThroughout: samples.length >= 2 && connected.length === samples.length,
+    connectedThroughout:
+      samples.length >= 2 &&
+      connected.length === samples.length &&
+      instanceIds.length === 1,
+    instanceIds,
+    otherWorkers: [...new Set(samples.flatMap((sample) => sample.otherWorkers ?? []))],
     firstSampleAt: samples[0]?.at ?? null,
     lastSampleAt: samples.at(-1)?.at ?? null,
-    clientIds: [...new Set(samples.flatMap((sample) => sample.clientIds))],
+    clientListSamples: samples.filter((sample) => sample.clientIds?.length > 0).length,
+    clientIds: [...new Set(samples.flatMap((sample) => sample.clientIds ?? []))],
   }
 }
 
@@ -175,7 +217,7 @@ async function measurePerPost(redis, options) {
           Number((calls / options.canaryRuns).toFixed(1)),
         ])
     ),
-    note: 'Upper bound: includes the canary’s own worker-count, job-state and job-removal lookups beside the dispatch-equivalent enqueue and the screening itself.',
+    note: 'Upper bound: includes the canary’s own heartbeat scan, CLIENT LIST cross-check, job-state and job-removal lookups beside the dispatch-equivalent enqueue and the screening itself.',
   }
 }
 
@@ -195,9 +237,14 @@ async function main() {
   const startedAt = Date.now()
   const windowEnd = startedAt + options.minutes * 60_000
   const samples = []
+  const own = { scan: 0, get: 0, pttl: 0 }
   const sample = async () => {
+    const heartbeats = await readHeartbeats(redis)
+    for (const command of Object.keys(own)) own[command] += heartbeats.commands[command]
     const clientIds = workerClientIds(await redis.client('LIST'), worker.name)
-    samples.push({ at: new Date().toISOString(), clientIds })
+    samples.push(
+      presenceSample(new Date().toISOString(), heartbeats, clientIds, worker.name)
+    )
   }
   await sample()
   while (Date.now() < windowEnd) {
@@ -209,15 +256,19 @@ async function main() {
   await redis.quit()
   const elapsedHours = (Date.now() - startedAt) / 3_600_000
 
-  // This script issued one INFO, one CONFIG RESETSTAT and one CLIENT LIST per
-  // presence sample; none of them is the worker's.
+  // This script issued one INFO, one CONFIG RESETSTAT, and per presence sample
+  // the heartbeat scan's SCAN, GET and PTTL calls and one CLIENT LIST; none of
+  // them is the worker's.
   if (stats.info) stats.info -= 1
   if (stats['client|list']) stats['client|list'] -= samples.length
+  for (const [command, calls] of Object.entries(own)) {
+    if (stats[command]) stats[command] -= calls
+  }
   delete stats['config|resetstat']
   const presence = summarizeWorkerPresence(worker.name, samples)
   if (!presence.connectedThroughout) {
     throw new Error(
-      `${worker.name} was connected at ${presence.connectedSamples} of ${presence.samples} samples; an idle window without the worker measures nothing.`
+      `${worker.name} held one heartbeat at ${presence.connectedSamples} of ${presence.samples} samples (instances ${JSON.stringify(presence.instanceIds)}); an idle window without the worker measures nothing.`
     )
   }
   const total = Object.values(stats).reduce((sum, calls) => sum + calls, 0)

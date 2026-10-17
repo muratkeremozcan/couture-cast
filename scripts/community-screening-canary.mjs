@@ -25,6 +25,16 @@
  * packages/config/src/flags.ts and the production flag cache not to hold
  * anything else.
  *
+ * Who consumes is read from the workers' presence heartbeats
+ * (`community-worker:heartbeat:<worker name>:<instance id>`, a TTL'd key each
+ * worker process refreshes), never from CLIENT LIST alone. Upstash answers
+ * CLIENT LIST per node: measured against production on 2026-10-17, 5 of 12 fresh
+ * connections listed the hosted worker and 7 did not, while it stayed connected,
+ * so `queue.getWorkers()` failed the canary `worker_absent` against a healthy
+ * worker and could hide a second consumer from the sole-consumer proof (Story
+ * 6.2b review, RF15). A local run also records CLIENT LIST beside the heartbeats
+ * as a cross-check; the heartbeats decide.
+ *
  * It exits nonzero, naming the cause, when no worker is consuming the queue,
  * when the persisted identity carries a `fixture` marker or comes from the
  * degraded `unavailable` adapter, when the safe fixture does not publish, or
@@ -58,21 +68,21 @@
  *   Hosted runs verify the database's TLS certificate (verify-full) against the
  *   Supabase Root 2021 CA committed at apps/api/certs/supabase-root-2021-ca.pem
  *   (--db-ca or DATABASE_CA_CERT_PATH name another), and require exactly one
- *   consumer named for --expect-sha (default: HEAD).
+ *   consumer heartbeat, named for --expect-sha (default: HEAD).
  *   A local run given --expect-sha requires the job to be processed by the worker
  *   named for it. A local run given --sole-consumer (which needs --expect-sha) also
- *   makes the hosted run's consumer check: exactly one consumer on the queue, named
+ *   makes the hosted run's consumer check: exactly one consumer heartbeat, named
  *   for that commit, checked before the job is enqueued and again after it
- *   completes, on the same Redis connection both times. The report records both
- *   observations as `soleConsumer`.
+ *   completes, from the same worker process (instance id) both times. The report
+ *   records both observations as `soleConsumer`.
  *   Options: --timeout-ms <n> (default 120000), --cleanup-timeout-ms <n> (default
  *            30000), --cleanup-settle-ms <n> (default 10000 or a third of the
  *            cleanup timeout, whichever is less), --json-out <path>, --keep,
  *            --fixture max (a generated 4096x4096 JPEG, the largest accepted upload),
- *            --restart-drill (local only: requires zero consumers on the queue, enqueues,
- *            observes zero consumers again with the job waiting, then waits for a
- *            consumer to return and the job to complete; the report records those
- *            observations and the observed downtime as `restartDrill`)
+ *            --restart-drill (local only: requires zero consumer heartbeats, enqueues,
+ *            observes zero again with the job waiting, then waits for a heartbeat to
+ *            return and the job to complete; the report records those observations
+ *            and the observed downtime as `restartDrill`)
  */
 import crypto from 'node:crypto'
 import { execFileSync } from 'node:child_process'
@@ -80,6 +90,7 @@ import fs from 'node:fs'
 import path from 'node:path'
 import { fileURLToPath } from 'node:url'
 import { readCommunityRolloutDefaults } from './lib/community-rollout-flags.mjs'
+import { readHeartbeats } from './lib/community-worker-heartbeat.mjs'
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url))
 const projectRoot = path.resolve(__dirname, '..')
@@ -450,13 +461,11 @@ function readFixture() {
 }
 
 /**
- * Asks Redis which clients are subscribed as workers. BullMQ names every worker
- * connection, so an empty list is a definite "nobody is consuming". Some managed
- * Redis services do not implement CLIENT LIST; then the answer is unknown and the
- * bounded wait decides, which is why a job that never leaves `waiting` is
- * reported as an absent worker rather than as a timeout.
+ * BullMQ's own answer to who consumes: the clients CLIENT LIST shows subscribed
+ * as workers. A local run records it beside the heartbeats as a cross-check. A
+ * hosted run does not ask: Upstash answers it from one node (RF15).
  */
-async function countWorkers(queue) {
+async function listWorkerClients(queue) {
   try {
     const workers = await queue.getWorkers()
     return {
@@ -464,16 +473,39 @@ async function countWorkers(queue) {
       count: workers.length,
       names: workers.map((worker) => worker.rawname ?? worker.name ?? null),
       clientIds: workers.map((worker) => worker.id ?? null),
-      observedAt: new Date().toISOString(),
     }
   } catch (error) {
     return {
       known: false,
       count: null,
       note: `CLIENT LIST unavailable: ${error instanceof Error ? error.message : String(error)}`,
-      observedAt: new Date().toISOString(),
     }
   }
+}
+
+/**
+ * One observation of who consumes the queue: the live worker heartbeats (Story
+ * 6.2b review, RF15). An empty, complete scan is a definite "nobody is
+ * consuming"; an incomplete or refused one is unknown, and then the bounded
+ * wait decides, which is why a job that never leaves `waiting` is reported as an
+ * absent worker rather than as a timeout.
+ *
+ * A local run also lists the worker clients and records whether that count
+ * agrees (`clientListAgrees`). It decides nothing: the heartbeat is the answer,
+ * and a disagreement is printed so an operator can look.
+ */
+export async function observeConsumers({ redis, queue }, options) {
+  const observed = await readHeartbeats(redis)
+  if (options.target !== 'local') return { ...observed, clientList: null }
+  const clientList = await listWorkerClients(queue)
+  const clientListAgrees =
+    observed.known && clientList.known ? clientList.count === observed.count : null
+  if (clientListAgrees === false) {
+    console.error(
+      `[canary] cross-check: ${observed.count} worker heartbeat(s) but CLIENT LIST shows ${clientList.count} worker client(s); the heartbeats decide`
+    )
+  }
+  return { ...observed, clientList, clientListAgrees }
 }
 
 function sleep(ms) {
@@ -1219,33 +1251,42 @@ async function closeClients(clients) {
 }
 
 /**
- * Whether one observation of the queue's consumers shows exactly one consumer,
- * named for the expected build, on a connection Redis identified. Returns the
- * problems, empty when it does.
+ * Whether one observation of the queue's consumers shows exactly one consumer
+ * heartbeat, named for the expected build, from an identified worker process.
+ * Returns the problems, empty when it does.
  */
 export function soleConsumerProblems(workers, expectedWorker) {
-  if (!workers?.known) return ['Redis reported no client list']
+  if (workers?.source !== 'heartbeat') return ['the observation is not a heartbeat count']
+  if (!workers.known) {
+    return [`Redis did not answer the heartbeat scan (${String(workers.note)})`]
+  }
+  const heartbeats = Array.isArray(workers.heartbeats) ? workers.heartbeats : []
+  if (workers.count !== 1 || heartbeats.length !== 1) {
+    return [
+      `${String(workers.count)} consumer heartbeats: ${JSON.stringify(workers.names ?? [])}`,
+    ]
+  }
+  const [heartbeat] = heartbeats
   const problems = []
-  if (workers.count !== 1 || workers.names?.length !== 1) {
+  if (heartbeat.workerName !== expectedWorker) {
     problems.push(
-      `${String(workers.count)} consumers: ${JSON.stringify(workers.names ?? [])}`
+      `the consumer is ${String(heartbeat.workerName)}, not ${expectedWorker}`
     )
-  } else if (!workers.names[0]?.endsWith(`:w:${expectedWorker}`)) {
-    problems.push(`the consumer is ${String(workers.names[0])}, not ${expectedWorker}`)
   }
-  if (workers.clientIds?.length !== 1 || !workers.clientIds[0]) {
-    problems.push('the consumer connection has no Redis client id')
-  }
+  if (!heartbeat.instanceId) problems.push('the consumer heartbeat names no instance')
+  problems.push(...(heartbeat.problems ?? []))
   return problems
 }
 
 /**
  * The proof that one consumer, the expected one, was the only consumer for the
- * whole run: exactly one consumer named `expectedWorker` before the job was
- * enqueued and after it completed, and the same Redis connection both times. A
- * second consumer that connected and left again between the two observations
- * would also have to beat the expected worker to the job and carry its name,
- * and the job's `processedBy` is checked separately.
+ * whole run: exactly one heartbeat, named `expectedWorker`, before the job was
+ * enqueued and after it completed, written by the same worker process (its
+ * instance id) both times. Replicas of one image share the name and differ in
+ * instance id, so a second replica is a second heartbeat. A second consumer
+ * that started and stopped again between the two observations would also have
+ * to beat the expected worker to the job and carry its name, and the job's
+ * `processedBy` is checked separately.
  */
 export function assessSoleConsumer(before, after, expectedWorker) {
   const problems = [
@@ -1254,9 +1295,9 @@ export function assessSoleConsumer(before, after, expectedWorker) {
     ),
     ...soleConsumerProblems(after, expectedWorker).map((problem) => `after: ${problem}`),
   ]
-  if (problems.length === 0 && before.clientIds[0] !== after.clientIds[0]) {
+  if (problems.length === 0 && before.instanceIds[0] !== after.instanceIds[0]) {
     problems.push(
-      `the consumer connection changed from client ${before.clientIds[0]} to ${after.clientIds[0]}`
+      `the consumer instance changed from ${before.instanceIds[0]} to ${after.instanceIds[0]}`
     )
   }
   return {
@@ -1274,13 +1315,13 @@ async function precheckWorkers(workers, options) {
     if (!workers.known) {
       throw new CanaryFailure(
         'restart_drill_unobservable',
-        `The restart drill needs Redis to list its clients, to prove the worker was down when the job was queued (${workers.note}).`
+        `The restart drill needs the worker heartbeats, to prove the worker was down when the job was queued (${workers.note}).`
       )
     }
     if (workers.count !== 0) {
       throw new CanaryFailure(
         'worker_present',
-        `The restart drill found ${workers.count} consumer(s) on ${QUEUE_NAME} (${JSON.stringify(workers.names)}). Stop the worker first, then start the drill.`
+        `The restart drill found ${workers.count} consumer heartbeat(s) (${JSON.stringify(workers.names)}). Stop the worker first, then start the drill; a worker killed without a graceful shutdown reads as present until its heartbeat expires.`
       )
     }
     return workers
@@ -1288,7 +1329,7 @@ async function precheckWorkers(workers, options) {
   if (workers.known && workers.count === 0) {
     throw new CanaryFailure(
       'worker_absent',
-      `No worker is connected to the ${QUEUE_NAME} queue on this Redis.`
+      `No community worker heartbeat is live on this Redis, so nothing consumes ${QUEUE_NAME}.`
     )
   }
   if (options.soleConsumer) {
@@ -1299,7 +1340,7 @@ async function precheckWorkers(workers, options) {
     if (problems.length > 0) {
       throw new CanaryFailure(
         'worker_identity',
-        `The ${options.target} canary needs exactly one consumer named ${expected}; Redis reported ${workers.known ? JSON.stringify(workers.names) : 'no client list'}.`,
+        `The ${options.target} canary needs exactly one consumer heartbeat, named ${expected}; Redis reported ${workers.known ? JSON.stringify(workers.names) : `no complete heartbeat scan (${String(workers.note)})`}.`,
         { expectedWorker: expected, problems }
       )
     }
@@ -1355,8 +1396,9 @@ async function uploadFixture(storage, objectPath, fixture) {
 
 /**
  * The restart drill's record of what it saw (Story 6.2b final review, RF1):
- * zero consumers before the job was enqueued, zero again after it with the job
- * still waiting, then the first observation of a consumer that came back. The
+ * zero consumer heartbeats before the job was enqueued, zero again after it with
+ * the job still waiting, then the first observation of a heartbeat that came
+ * back (RF15). The
  * observed downtime runs from the first zero-consumer observation to the last
  * one, so it is a lower bound on the real outage.
  */
@@ -1383,6 +1425,12 @@ export function restartDrillProblems(record) {
   if (!record || typeof record !== 'object') return ['no restart drill observations']
   const problems = []
   const { beforeEnqueue, afterEnqueue, consumerReturned } = record
+  const notHeartbeat = Object.entries({ beforeEnqueue, afterEnqueue, consumerReturned })
+    .filter(([, observed]) => observed && observed.source !== 'heartbeat')
+    .map(([when]) => when)
+  if (notHeartbeat.length > 0) {
+    problems.push(`not counted from worker heartbeats: ${notHeartbeat.join(', ')}`)
+  }
   if (beforeEnqueue?.known !== true || beforeEnqueue.count !== 0) {
     problems.push('zero consumers were not observed before the job was enqueued')
   }
@@ -1409,9 +1457,12 @@ export function restartDrillProblems(record) {
 }
 
 /** One poll of the drill: is anyone consuming yet, and was the job still waiting? */
-async function observeRestart(step, queue, jobId, drill) {
+async function observeRestart(step, clients, options, jobId, drill) {
   if (drill.returned) return
-  const workers = await step('worker inspection', () => countWorkers(queue))
+  const { queue } = clients
+  const workers = await step('worker inspection', () =>
+    observeConsumers(clients, options)
+  )
   if (workers.known && workers.count > 0) {
     drill.returned = workers
     return
@@ -1476,7 +1527,7 @@ export function closingReserveMs(timeoutMs) {
 }
 
 /** Connects, refuses a live feed, and checks who is consuming before anything is created. */
-async function openAndInspect(step, { db, queue }, options) {
+async function openAndInspect(step, { db, redis, queue }, options) {
   await step('connect', () => connectDatabase(db))
   await step('connect', () => queue.waitUntilReady())
   if (options.target === 'hosted') {
@@ -1486,7 +1537,7 @@ async function openAndInspect(step, { db, queue }, options) {
     })
   }
   return precheckWorkers(
-    await step('worker inspection', () => countWorkers(queue)),
+    await step('worker inspection', () => observeConsumers({ redis, queue }, options)),
     options
   )
 }
@@ -1527,7 +1578,7 @@ async function awaitOutcome(step, context, options, drill) {
   const { ids, jobId } = context
   const { db, queue } = context.clients
   if (drill) {
-    await observeRestart(step, queue, jobId, drill)
+    await observeRestart(step, context.clients, options, jobId, drill)
     drill.afterEnqueue = drill.lastDown ?? drill.returned
   }
   const post = await awaitTerminalPost(
@@ -1535,7 +1586,7 @@ async function awaitOutcome(step, context, options, drill) {
     db,
     ids.postId,
     context.deadlineAt - closingReserveMs(options.timeoutMs),
-    drill ? () => observeRestart(step, queue, jobId, drill) : null
+    drill ? () => observeRestart(step, context.clients, options, jobId, drill) : null
   )
   const observedTerminalAt = Date.now()
   const job = await step('job read', () => queue.getJob(jobId))
@@ -1550,9 +1601,9 @@ async function awaitOutcome(step, context, options, drill) {
  * The consumer observation after the job completed: needed for the sole-consumer
  * proof, and for a drill whose returning worker finished the job between polls.
  */
-async function closingConsumers(step, queue, options, drill) {
+async function closingConsumers(step, clients, options, drill) {
   if (!options.soleConsumer && !(drill && !drill.returned)) return null
-  const after = await step('worker inspection', () => countWorkers(queue))
+  const after = await step('worker inspection', () => observeConsumers(clients, options))
   if (drill && !drill.returned && after.known && after.count > 0) drill.returned = after
   return after
 }
@@ -1579,7 +1630,6 @@ function assertProcessedBy(processedBy, options) {
 
 async function driveCanary(context, options) {
   const { fixture } = context
-  const { queue } = context.clients
   const step = (stage, work) => withinDeadline(context.deadlineAt, stage, work)
 
   const workers = await openAndInspect(step, context.clients, options)
@@ -1594,7 +1644,7 @@ async function driveCanary(context, options) {
   )
 
   const assessed = assessTerminalPost(post)
-  const after = await closingConsumers(step, queue, options, drill)
+  const after = await closingConsumers(step, context.clients, options, drill)
   const soleConsumer = await postcheckSoleConsumer(after, options, workers)
   const restartDrill = drill ? restartDrillRecord(drill) : null
   if (restartDrill) assertRestartDrillProven(restartDrill)

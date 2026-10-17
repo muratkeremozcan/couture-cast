@@ -84,6 +84,7 @@ const INPUTS = {
   safeCorpusManifest: 'apps/api/test/fixtures/community-safe-corpus/manifest.json',
   fixtureManifest: 'apps/api/test/fixtures/community-moderation/v1/manifest.json',
   workerSource: 'apps/api/src/modules/community/community-moderation.worker.ts',
+  heartbeatSource: 'apps/api/src/modules/community/community-worker-heartbeat.ts',
 }
 export const TEXT_LANGUAGES = ['de', 'en', 'es', 'fr', 'it', 'pt', 'tr']
 const DEFAULT_IMAGE = 'couture-cast-community-worker:local'
@@ -757,9 +758,10 @@ const REDIS_BEFORE_TUNING = {
 
 /** The tuned settings, read from the worker source so the payload cannot drift from it. */
 function tunedRedisSettings() {
-  const source = fs.existsSync(full(INPUTS.workerSource))
-    ? fs.readFileSync(full(INPUTS.workerSource), 'utf8')
-    : ''
+  const source = [INPUTS.workerSource, INPUTS.heartbeatSource]
+    .filter((file) => fs.existsSync(full(file)))
+    .map((file) => fs.readFileSync(full(file), 'utf8'))
+    .join('\n')
   const read = (name) => {
     const match = new RegExp(`${name}\\s*=\\s*([\\d_]+)`).exec(source)
     return match ? Number(match[1].replaceAll('_', '')) : null
@@ -767,6 +769,8 @@ function tunedRedisSettings() {
   return {
     drainDelaySeconds: read('COMMUNITY_MODERATION_DRAIN_DELAY_SECONDS'),
     stalledIntervalMs: read('COMMUNITY_MODERATION_STALLED_INTERVAL_MS'),
+    heartbeatIntervalMs: read('COMMUNITY_WORKER_HEARTBEAT_INTERVAL_MS'),
+    heartbeatTtlSeconds: read('COMMUNITY_WORKER_HEARTBEAT_TTL_SECONDS'),
   }
 }
 
@@ -1055,7 +1059,7 @@ export function canaryGate(id, name, canary, { requireHosted }) {
       ...(requireHosted ? { deployedInputs: canary.deployedInputs.status } : {}),
     },
     threshold: requireHosted
-      ? 'safe fixture published under a real-model identity, on the hosted target, by exactly the worker built from the expected commit, whose input set equals the evidence commit'
+      ? 'safe fixture published under a real-model identity, on the hosted target, by exactly the worker built from the expected commit, the only consumer heartbeat before and after the job, whose input set equals the evidence commit'
       : 'safe fixture published under a real-model identity within the bounded wait',
   })
 }
@@ -1088,8 +1092,9 @@ function imageGate(image) {
 /**
  * The restart drill's gate (Story 6.2b final review, RF1). Success alone proves
  * nothing about a restart: the product must be a restart drill whose recorded
- * observations show zero consumers before and after the job was enqueued, the
- * job still waiting, and a consumer that came back. An ordinary canary result
+ * observations, counted from the worker heartbeats (RF15), show zero consumers
+ * before and after the job was enqueued, the job still waiting, and a consumer
+ * that came back. An ordinary canary result
  * carries none of that and fails here.
  */
 function restartGate(restart) {
@@ -1125,7 +1130,7 @@ function restartGate(restart) {
       disposition: restart.disposition ?? null,
     },
     threshold:
-      'a restart drill observed zero consumers before and after the job was enqueued with the job waiting, then a consumer coming back, and the safe fixture published with cleanup complete',
+      'a restart drill observed zero consumer heartbeats before and after the job was enqueued with the job waiting, then a heartbeat coming back, and the safe fixture published with cleanup complete',
   })
 }
 
@@ -1263,7 +1268,9 @@ export function calibrationGate(calibration) {
 
 /**
  * An idle window measured with no worker connected costs almost nothing, so the
- * idle figure counts only when the named worker was connected at every sample.
+ * idle figure counts only when one process of the named worker held its Redis
+ * heartbeat at every sample (Story 6.2b review, RF15: CLIENT LIST, which the
+ * window used to be sampled with, shows one Upstash node's clients).
  */
 function idlePresenceProblems(idle) {
   const worker = idle?.worker
@@ -1274,14 +1281,19 @@ function idlePresenceProblems(idle) {
   if (!expected || worker.name !== expected) {
     return ['the idle measurement recorded no worker identity']
   }
+  if (worker.presenceSource !== 'heartbeat') {
+    return ['the idle presence was not sampled from the worker heartbeat']
+  }
   if (
     worker.connectedThroughout !== true ||
     !Number.isInteger(worker.samples) ||
     worker.samples < 2 ||
-    worker.connectedSamples !== worker.samples
+    worker.connectedSamples !== worker.samples ||
+    !Array.isArray(worker.instanceIds) ||
+    worker.instanceIds.length !== 1
   ) {
     return [
-      `${expected} was connected at ${String(worker.connectedSamples)} of ${String(worker.samples)} idle samples`,
+      `${expected} held one heartbeat at ${String(worker.connectedSamples)} of ${String(worker.samples)} idle samples, from instances ${JSON.stringify(worker.instanceIds ?? null)}`,
     ]
   }
   return []
@@ -1303,6 +1315,7 @@ function redisGate(redis) {
   return judged(id, name, problems, {
     measured: {
       idleWorker: redis.idle?.worker?.name ?? null,
+      idlePresenceSource: redis.idle?.worker?.presenceSource ?? null,
       idleWorkerConnectedSamples: redis.idle?.worker
         ? `${redis.idle.worker.connectedSamples} of ${redis.idle.worker.samples}`
         : null,
@@ -1315,7 +1328,7 @@ function redisGate(redis) {
       dailySubmissions: redis.dailySubmissions ?? null,
       postsPerDayAtCostCeiling: redis.postsPerDayAtCostCeiling ?? null,
     },
-    threshold: `the named worker connected through the idle window, and the projected month at the assumed volume at or below ${REDIS_MONTHLY_COST_CEILING_USD} USD at ${UPSTASH_PAY_AS_YOU_GO.usdPer100kCommands.toFixed(2)} USD per 100K commands`,
+    threshold: `one process of the named worker holding its heartbeat through the idle window, and the projected month at the assumed volume at or below ${REDIS_MONTHLY_COST_CEILING_USD} USD at ${UPSTASH_PAY_AS_YOU_GO.usdPer100kCommands.toFixed(2)} USD per 100K commands`,
   })
 }
 
@@ -1557,16 +1570,23 @@ function memoryIdentityProblems(memory) {
   ]
 }
 
-/** One observation of the queue: exactly one consumer, the expected worker. */
+/**
+ * One observation of the queue: exactly one consumer heartbeat, the expected
+ * worker's, from an identified process (Story 6.2b review, RF15).
+ */
 function aloneOnQueue(observed, expectedWorker) {
   const one = (list) => Array.isArray(list) && list.length === 1 && Boolean(list[0])
+  const heartbeat = observed?.heartbeats?.[0]
   return (
-    observed?.known === true &&
+    observed?.source === 'heartbeat' &&
+    observed.known === true &&
     observed.count === 1 &&
     typeof expectedWorker === 'string' &&
-    one(observed.names) &&
-    observed.names[0].endsWith(`:w:${expectedWorker}`) &&
-    one(observed.clientIds)
+    one(observed.heartbeats) &&
+    one(observed.instanceIds) &&
+    heartbeat.workerName === expectedWorker &&
+    heartbeat.instanceId === observed.instanceIds[0] &&
+    (heartbeat.problems ?? []).length === 0
   )
 }
 
@@ -1574,9 +1594,9 @@ function aloneOnQueue(observed, expectedWorker) {
  * Story 6.2b second peer review (CX4b): replicas of one image share the worker
  * name, so `processedBy` cannot say which replica screened the upload. The
  * memory product must carry the canary's sole-consumer proof: exactly one
- * consumer, the measured container's worker, before the job was enqueued and
- * after it completed, on the same Redis connection. This re-judges the recorded
- * observations themselves, beyond the canary's own `proven` flag.
+ * consumer heartbeat, the measured container's worker, before the job was
+ * enqueued and after it completed, from the same worker process. This re-judges
+ * the recorded observations themselves, beyond the canary's own `proven` flag.
  */
 export function soleConsumerProofProblems(proof, expectedWorker) {
   if (!proof || typeof proof !== 'object') {
@@ -1593,15 +1613,15 @@ export function soleConsumerProofProblems(proof, expectedWorker) {
   for (const [when, observed] of Object.entries(observations)) {
     if (!aloneOnQueue(observed, expectedWorker)) {
       problems.push(
-        `${when} the job, the queue did not have exactly one consumer named ${String(expectedWorker)}`
+        `${when} the job, Redis did not hold exactly one consumer heartbeat, named ${String(expectedWorker)}`
       )
     }
   }
   if (
     problems.length === 0 &&
-    observations.before.clientIds[0] !== observations.after.clientIds[0]
+    observations.before.instanceIds[0] !== observations.after.instanceIds[0]
   ) {
-    problems.push('the consumer connection changed between the two observations')
+    problems.push('the consumer process changed between the two observations')
   }
   return problems
 }
@@ -1647,7 +1667,7 @@ function memoryGate(runtime) {
       processedBy: memory.processedBy ?? null,
       ...soleConsumerMeasured(memory.soleConsumer),
     },
-    threshold: `cgroup memory.peak at or below ${String(ceiling)} MiB across startup and a ${MAX_UPLOAD_FIXTURE} screening processed by the measured container's own worker, the only consumer on the queue before the job was enqueued and after it completed`,
+    threshold: `cgroup memory.peak at or below ${String(ceiling)} MiB across startup and a ${MAX_UPLOAD_FIXTURE} screening processed by the measured container's own worker, the only consumer heartbeat on Redis before the job was enqueued and after it completed`,
   })
 }
 
@@ -2163,7 +2183,7 @@ function renderRuntime(runtime) {
       : `Latency not measured on this checkout. Run \`${COMMANDS.measureRuntimeContainer}\`.`,
     '',
     memory.available
-      ? `Memory, the number the host's out-of-memory killer acts on: the running worker container's cgroup memory.peak was ${memory.memoryPeakMib} MiB of a ${memory.memoryLimitMib} MiB limit, across startup and the canary screening ${memory.upload?.name} (${memory.upload?.bytes ?? '?'} bytes) through the real pipeline.${memory.soleConsumer?.proven === true ? ` The container's worker was the only consumer on the queue before the job was enqueued and after it completed (Redis client ${memory.soleConsumer.before?.clientIds?.[0] ?? '?'} both times).` : ''}`
+      ? `Memory, the number the host's out-of-memory killer acts on: the running worker container's cgroup memory.peak was ${memory.memoryPeakMib} MiB of a ${memory.memoryLimitMib} MiB limit, across startup and the canary screening ${memory.upload?.name} (${memory.upload?.bytes ?? '?'} bytes) through the real pipeline.${memory.soleConsumer?.proven === true ? ` The container's worker was the only consumer heartbeat on Redis before the job was enqueued and after it completed (worker process ${memory.soleConsumer.before?.instanceIds?.[0] ?? '?'} both times).` : ''}`
       : `Container memory not measured on this checkout: ${COMMANDS.measureMemory}.`
   )
   return lines
@@ -2180,7 +2200,7 @@ function renderRedis(redis) {
     '',
     `Idle worker: ${redis.idle.commandsPerHour} commands an hour (${redis.idle.commandsPerDay} a day), measured over ${redis.idle.windowMinutes} minutes against a local Redis only the worker used. One screened post: ${redis.perPost.commandsPerPost} commands. At ${redis.dailySubmissions} posts a day the projected month is ${redis.projectedMonthly.total.toLocaleString('en-US')} commands, ${redis.projectedMonthly.totalUsd.toFixed(2)} USD: ${redis.projectedMonthly.idle.toLocaleString('en-US')} idle (${redis.projectedMonthly.idleUsd.toFixed(2)} USD) and ${redis.projectedMonthly.traffic.toLocaleString('en-US')} traffic (${redis.projectedMonthly.trafficUsd.toFixed(2)} USD). The gate is ${redis.monthlyCostCeilingUsd} USD a month; the worker alone stays at or below it up to ${redis.postsPerDayAtCostCeiling.toLocaleString('en-US')} posts a day and crosses it above that, at this per-post cost. ${redis.countingRule}`,
     '',
-    `Before tuning, BullMQ's defaults (a ${redis.beforeTuning.drainDelaySeconds}-second idle block, a ${redis.beforeTuning.stalledIntervalMs / 1000}-second stalled check) measured ${redis.beforeTuning.commandsPerHour.toLocaleString('en-US')} commands an hour idle (${redis.beforeTuning.measuredAt}), ${redis.beforeTuning.monthlyUsd.toFixed(2)} USD a month at this price. The worker now blocks for ${redis.tuned.drainDelaySeconds} seconds and checks for stalled jobs every ${redis.tuned.stalledIntervalMs / 1000} seconds.`,
+    `Before tuning, BullMQ's defaults (a ${redis.beforeTuning.drainDelaySeconds}-second idle block, a ${redis.beforeTuning.stalledIntervalMs / 1000}-second stalled check) measured ${redis.beforeTuning.commandsPerHour.toLocaleString('en-US')} commands an hour idle (${redis.beforeTuning.measuredAt}), ${redis.beforeTuning.monthlyUsd.toFixed(2)} USD a month at this price. The worker now blocks for ${redis.tuned.drainDelaySeconds} seconds and checks for stalled jobs every ${redis.tuned.stalledIntervalMs / 1000} seconds. It also refreshes its presence heartbeat every ${(redis.tuned.heartbeatIntervalMs ?? 0) / 1000} seconds (a ${redis.tuned.heartbeatTtlSeconds ?? '?'}-second TTL), which the idle figure includes and the canary counts consumers by, because Upstash answers CLIENT LIST from one node.`,
     '',
     redis.sharedDatabase,
   ]
