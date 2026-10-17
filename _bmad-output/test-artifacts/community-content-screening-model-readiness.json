@@ -2,7 +2,7 @@
   "artifact": "community-content-screening-model-readiness",
   "artifactVersion": 2,
   "storyKey": "6-2b-community-screening-release-gate",
-  "generatedAt": "2026-10-17T01:37:10.149Z",
+  "generatedAt": "2026-10-17T08:34:38.760Z",
   "generatedBy": "npm run community:screening:evidence",
   "verdict": "fail",
   "verdictRule": "pass only when every gate ran against the current inputs from a committed tree and passed; fail when any gate that ran failed; incomplete otherwise",
@@ -10,8 +10,7 @@
     {
       "id": "committed-tree",
       "name": "Evidence generated from a committed working tree",
-      "status": "not-run",
-      "reason": "98 uncommitted paths (for example .dockerignore, .env.example, _bmad-output/implementation-artifacts/6-2-production-content-screening-readiness.md, _bmad-output/implementation-artifacts/6-2b-community-screening-release-gate.md, _bmad-output/implementation-artifacts/deferred-work.md, _bmad-output/implementation-artifacts/sprint-status.yaml, _bmad-output/planning-artifacts/architecture.md, _bmad-output/project-knowledge/deployment-guide.md, _bmad-output/test-artifacts/community-content-screening-measurements.json, apps/api/Dockerfile.community-worker); commit the code, re-run the products, then regenerate"
+      "status": "passed"
     },
     {
       "id": "worker-image",
@@ -20,8 +19,8 @@
       "measured": {
         "nodeModulesMb": 112,
         "user": "node",
-        "entrypoint": ["/usr/bin/tini", "--"],
-        "commitSha": "1a678c51b213b2c8fff6f2354e9556abf2f96fe7"
+        "entrypoint": ["/usr/bin/tini", "-s", "--"],
+        "commitSha": "2640f3b921c841fa219038b510fa6849b9331f4d"
       },
       "threshold": "node_modules at or below 150 MB, unprivileged user, tini init, commit baked in; the model self-test runs during the build"
     },
@@ -33,10 +32,10 @@
         "target": "local",
         "disposition": "pass",
         "engineIdentity": "adr013-text:policy-v2@b0daab4ab9d1;adr013-nsfw-v1.0:mobilenet_v2_mid@4.3.0:model-a0c76f72db26:v2:policy-b0daab4ab9d1",
-        "processedBy": "community-worker@1a678c51b213b2c8fff6f2354e9556abf2f96fe7",
+        "processedBy": "community-worker@2640f3b921c841fa219038b510fa6849b9331f4d",
         "queueLatencyMs": 1,
-        "screeningDurationMs": 215,
-        "finishedAt": "2026-10-17T01:06:30.642Z"
+        "screeningDurationMs": 907,
+        "finishedAt": "2026-10-17T08:03:46.694Z"
       },
       "threshold": "safe fixture published under a real-model identity within the bounded wait"
     },
@@ -45,7 +44,7 @@
       "name": "A job queued while the worker is down completes after it restarts",
       "status": "passed",
       "measured": {
-        "queueLatencyMs": 15636,
+        "queueLatencyMs": 16380,
         "disposition": "pass"
       }
     },
@@ -231,15 +230,21 @@
       "status": "passed",
       "measured": {
         "profile": "local container, 0.2 vCPU, 512 MiB (Northflank sandbox envelope)",
+        "cpuLimit": 0.2,
+        "memoryLimitMib": 512,
+        "warmupSamples": 50,
         "warmSamples": 1000,
-        "coldStartupMs": 2987.7,
-        "warmP95Ms": 308.42,
-        "warmP99Ms": 391.02
+        "coldStartupMs": 2213.2,
+        "warmP95Ms": 207.36,
+        "warmP99Ms": 292.14
       },
       "threshold": {
         "coldStartupMs": 30000,
         "warmP95Ms": 3000,
-        "warmP99Ms": 5000
+        "warmP99Ms": 5000,
+        "cpuLimit": 0.2,
+        "memoryLimitMib": 512,
+        "minimumWarmSamples": 1000
       }
     },
     {
@@ -247,12 +252,13 @@
       "name": "Worker container memory peak while screening the largest accepted upload",
       "status": "passed",
       "measured": {
-        "memoryPeakMib": 339.5,
+        "memoryPeakMib": 346.9,
         "memoryLimitMib": 512,
         "upload": "generated-4096x4096.jpg",
-        "canaryDisposition": "pass"
+        "canaryDisposition": "pass",
+        "processedBy": "community-worker@2640f3b921c841fa219038b510fa6849b9331f4d"
       },
-      "threshold": "cgroup memory.peak at or below 512 MiB across startup and a generated-4096x4096.jpg screening"
+      "threshold": "cgroup memory.peak at or below 512 MiB across startup and a generated-4096x4096.jpg screening processed by the measured container's own worker"
     },
     {
       "id": "redis-budget",
@@ -260,12 +266,14 @@
       "status": "failed",
       "problems": ["projected 70.0% of the free tier"],
       "measured": {
+        "idleWorker": "community-worker@2640f3b921c841fa219038b510fa6849b9331f4d",
+        "idleWorkerConnectedSamples": "121 of 121",
         "idleCommandsPerHour": 138,
         "commandsPerPost": 82,
         "projectedMonthly": 350020,
         "shareOfFreeTier": 0.7
       },
-      "threshold": "projected monthly commands at or below 50% of 500,000"
+      "threshold": "the named worker connected through the idle window, and projected monthly commands at or below 50% of 500,000"
     },
     {
       "id": "rollout-closed",
@@ -279,10 +287,10 @@
     }
   ],
   "build": {
-    "commitSha": "1a678c51b213b2c8fff6f2354e9556abf2f96fe7",
-    "workingTreeClean": false,
-    "uncommittedPaths": 98,
-    "inputSetHash": "c8333517a267c4bf6f4781ed8bddc2e53725a2705c1686129f2b86fb0841a42c",
+    "commitSha": "a43eb380f61f75a825408b42ccdd13b1b3b038e3",
+    "workingTreeClean": true,
+    "uncommittedPaths": 0,
+    "inputSetHash": "f4793b21cbe34c50ab461f65a6e9b35752957da2fa56563766f61c6348461fa3",
     "dependencyLockSha256": "2025e3f196ed2a7091eb5f7c034af8a00365b3a38826248b003a4ae609cdcf91",
     "generatorNode": "v24.22.0"
   },
@@ -293,7 +301,7 @@
     },
     "dockerfile": {
       "path": "apps/api/Dockerfile.community-worker",
-      "sha256": "4061dffa2e67897d98c8b56d4f6bbb1445c7594f4cd9fbeb78dcb73c320bce50"
+      "sha256": "c6216e53014d71f83eff037c0449ec137d87cdff65dba35828fda21759e70d56"
     },
     "modelManifest": {
       "path": "apps/api/model-manifests/community-nsfw-mobilenet-v2-mid-nsfwjs-4.3.0.json",
@@ -328,20 +336,20 @@
     "available": true,
     "stale": [],
     "reference": "couture-cast-community-worker:local",
-    "imageId": "sha256:366d64d4994bc2ceeb46f12b1bc79732454ab8220a0a547cbcbd183eec02548e",
+    "imageId": "sha256:402e825eb69bc5dd1940e8710dbe2fa68a9969febad9e0750b61dc86f3fdacb1",
     "repoDigests": [
-      "couture-cast-community-worker@sha256:366d64d4994bc2ceeb46f12b1bc79732454ab8220a0a547cbcbd183eec02548e"
+      "couture-cast-community-worker@sha256:402e825eb69bc5dd1940e8710dbe2fa68a9969febad9e0750b61dc86f3fdacb1"
     ],
-    "created": "2026-10-17T00:43:51.015161925Z",
+    "created": "2026-10-17T08:01:11.382215209Z",
     "architecture": "linux/arm64",
     "user": "node",
-    "entrypoint": ["/usr/bin/tini", "--"],
+    "entrypoint": ["/usr/bin/tini", "-s", "--"],
     "cmd": ["node", "scripts/start-community-worker-production.mjs"],
-    "commitSha": "1a678c51b213b2c8fff6f2354e9556abf2f96fe7",
-    "inputSetHash": "c8333517a267c4bf6f4781ed8bddc2e53725a2705c1686129f2b86fb0841a42c",
+    "commitSha": "2640f3b921c841fa219038b510fa6849b9331f4d",
+    "inputSetHash": "f4793b21cbe34c50ab461f65a6e9b35752957da2fa56563766f61c6348461fa3",
     "nodeModulesMb": 112,
     "nodeModulesBudgetMb": 150,
-    "dockerfileSha256": "4061dffa2e67897d98c8b56d4f6bbb1445c7594f4cd9fbeb78dcb73c320bce50",
+    "dockerfileSha256": "c6216e53014d71f83eff037c0449ec137d87cdff65dba35828fda21759e70d56",
     "note": "Image digest is the locally built image id. The hosted build produces its own digest on the target architecture; the hosted canary records the worker name, which carries the commit the hosted image was built from."
   },
   "model": {
@@ -409,11 +417,12 @@
       "stale": [],
       "ok": true,
       "target": "local",
-      "inputSetHash": "c8333517a267c4bf6f4781ed8bddc2e53725a2705c1686129f2b86fb0841a42c",
-      "expectedSha": "1a678c51b213b2c8fff6f2354e9556abf2f96fe7",
-      "processedBy": "community-worker@1a678c51b213b2c8fff6f2354e9556abf2f96fe7",
-      "startedAt": "2026-10-17T01:06:30.078Z",
-      "finishedAt": "2026-10-17T01:06:30.642Z",
+      "inputSetHash": "f4793b21cbe34c50ab461f65a6e9b35752957da2fa56563766f61c6348461fa3",
+      "expectedSha": "2640f3b921c841fa219038b510fa6849b9331f4d",
+      "processedByRequired": false,
+      "processedBy": "community-worker@2640f3b921c841fa219038b510fa6849b9331f4d",
+      "startedAt": "2026-10-17T08:03:45.623Z",
+      "finishedAt": "2026-10-17T08:03:46.694Z",
       "fixture": {
         "name": "safe-satin-plum-512x512.jpg",
         "sha256": "b2ed2509ee63fa5a13aff99ece5603970b97b004c07ef930315267b0a79974a3",
@@ -423,7 +432,7 @@
         "known": true,
         "count": 1,
         "names": [
-          "bull:Y29tbXVuaXR5LW1vZGVyYXRpb24=:w:community-worker@1a678c51b213b2c8fff6f2354e9556abf2f96fe7"
+          "bull:Y29tbXVuaXR5LW1vZGVyYXRpb24=:w:community-worker@2640f3b921c841fa219038b510fa6849b9331f4d"
         ]
       },
       "terminalStatus": "published",
@@ -433,9 +442,9 @@
       "jobState": "completed",
       "timings": {
         "queueLatencyMs": 1,
-        "screeningDurationMs": 215,
+        "screeningDurationMs": 907,
         "screeningDurationCovers": "BullMQ processedOn to finishedOn: storage download, declaration check and re-encode, image inference, text screening, and the publish transaction",
-        "enqueueToObservedTerminalMs": 507,
+        "enqueueToObservedTerminalMs": 1007,
         "pollIntervalMs": 500
       },
       "cleanup": {
@@ -449,11 +458,12 @@
       "stale": [],
       "ok": true,
       "target": "local",
-      "inputSetHash": "c8333517a267c4bf6f4781ed8bddc2e53725a2705c1686129f2b86fb0841a42c",
-      "expectedSha": "1a678c51b213b2c8fff6f2354e9556abf2f96fe7",
-      "processedBy": "community-worker@1a678c51b213b2c8fff6f2354e9556abf2f96fe7",
-      "startedAt": "2026-10-17T01:06:31.093Z",
-      "finishedAt": "2026-10-17T01:06:48.781Z",
+      "inputSetHash": "f4793b21cbe34c50ab461f65a6e9b35752957da2fa56563766f61c6348461fa3",
+      "expectedSha": "2640f3b921c841fa219038b510fa6849b9331f4d",
+      "processedByRequired": false,
+      "processedBy": "community-worker@2640f3b921c841fa219038b510fa6849b9331f4d",
+      "startedAt": "2026-10-17T08:03:52.804Z",
+      "finishedAt": "2026-10-17T08:04:11.532Z",
       "fixture": {
         "name": "safe-satin-plum-512x512.jpg",
         "sha256": "b2ed2509ee63fa5a13aff99ece5603970b97b004c07ef930315267b0a79974a3",
@@ -470,10 +480,10 @@
       "attemptsMade": 1,
       "jobState": "completed",
       "timings": {
-        "queueLatencyMs": 15636,
-        "screeningDurationMs": 1809,
+        "queueLatencyMs": 16380,
+        "screeningDurationMs": 1806,
         "screeningDurationCovers": "BullMQ processedOn to finishedOn: storage download, declaration check and re-encode, image inference, text screening, and the publish transaction",
-        "enqueueToObservedTerminalMs": 17634,
+        "enqueueToObservedTerminalMs": 18625,
         "pollIntervalMs": 500
       },
       "cleanup": {
@@ -491,8 +501,8 @@
     "available": true,
     "stale": [],
     "sweep": {
-      "measuredAt": "2026-10-17T01:00:15.553Z",
-      "inputSetHash": "c8333517a267c4bf6f4781ed8bddc2e53725a2705c1686129f2b86fb0841a42c",
+      "measuredAt": "2026-10-17T08:07:43.619Z",
+      "inputSetHash": "f4793b21cbe34c50ab461f65a6e9b35752957da2fa56563766f61c6348461fa3",
       "policySha256": "b0daab4ab9d175cc018d88d7c37d3443a4d9425909394da3aee110e15ad98b65",
       "vectorCount": 10852,
       "byOutcome": {
@@ -560,8 +570,8 @@
       "sweepDigest": "2b211224d8cf3e45cda40065aa760c8e5d89266ee69794d77b4c04afe79cea17"
     },
     "coverage": {
-      "measuredAt": "2026-10-17T01:00:15.758Z",
-      "inputSetHash": "c8333517a267c4bf6f4781ed8bddc2e53725a2705c1686129f2b86fb0841a42c",
+      "measuredAt": "2026-10-17T08:07:43.872Z",
+      "inputSetHash": "f4793b21cbe34c50ab461f65a6e9b35752957da2fa56563766f61c6348461fa3",
       "policySha256": "b0daab4ab9d175cc018d88d7c37d3443a4d9425909394da3aee110e15ad98b65",
       "functions": [
         {
@@ -665,8 +675,8 @@
         "jointMaximum": 0.15
       }
     },
-    "measuredAt": "2026-10-17T01:00:07.973Z",
-    "inputSetHash": "c8333517a267c4bf6f4781ed8bddc2e53725a2705c1686129f2b86fb0841a42c",
+    "measuredAt": "2026-10-17T08:10:12.402Z",
+    "inputSetHash": "f4793b21cbe34c50ab461f65a6e9b35752957da2fa56563766f61c6348461fa3",
     "manifestSha256": "0f16a7e89da1d718660e6dfc25dc42fd255856eb0b6539e88ef40c9aeffeb159",
     "split": {
       "rule": "by creator: first hexadecimal digit of the SHA-256 of the creator key (source:creator, lower-cased), even is calibration, odd is holdout",
@@ -1121,8 +1131,8 @@
       },
       "manifestSha256": "0f16a7e89da1d718660e6dfc25dc42fd255856eb0b6539e88ef40c9aeffeb159"
     },
-    "measuredAt": "2026-10-17T01:00:54.842Z",
-    "inputSetHash": "c8333517a267c4bf6f4781ed8bddc2e53725a2705c1686129f2b86fb0841a42c",
+    "measuredAt": "2026-10-17T08:08:28.752Z",
+    "inputSetHash": "f4793b21cbe34c50ab461f65a6e9b35752957da2fa56563766f61c6348461fa3",
     "manifestSha256": "0f16a7e89da1d718660e6dfc25dc42fd255856eb0b6539e88ef40c9aeffeb159",
     "policySha256": "b0daab4ab9d175cc018d88d7c37d3443a4d9425909394da3aee110e15ad98b65",
     "engineVersion": "adr013-nsfw-v1.0:mobilenet_v2_mid@4.3.0:model-a0c76f72db26:v2:policy-b0daab4ab9d1",
@@ -1601,14 +1611,27 @@
     "stale": [],
     "countingRule": "Every command Redis records, including the commands BullMQ Lua scripts run inside EVALSHA. Upstash does not document whether a script counts once or per inner command, so this is the upper bound.",
     "idle": {
-      "measuredAt": "2026-10-17T01:36:55.422Z",
-      "inputSetHash": "c8333517a267c4bf6f4781ed8bddc2e53725a2705c1686129f2b86fb0841a42c",
+      "measuredAt": "2026-10-17T08:34:22.837Z",
+      "inputSetHash": "f4793b21cbe34c50ab461f65a6e9b35752957da2fa56563766f61c6348461fa3",
       "windowMinutes": 30,
       "otherClientsAtStart": 2,
+      "worker": {
+        "name": "community-worker@2640f3b921c841fa219038b510fa6849b9331f4d",
+        "sampleIntervalSeconds": 15,
+        "samples": 121,
+        "connectedSamples": 121,
+        "connectedThroughout": true,
+        "firstSampleAt": "2026-10-17T08:04:22.834Z",
+        "lastSampleAt": "2026-10-17T08:34:22.834Z",
+        "clientIds": ["274"],
+        "container": "cc-community-worker",
+        "commitSha": "2640f3b921c841fa219038b510fa6849b9331f4d",
+        "containerInputSetHash": "f4793b21cbe34c50ab461f65a6e9b35752957da2fa56563766f61c6348461fa3"
+      },
       "commands": 69,
       "commandsPerHour": 138,
       "commandsPerDay": 3312,
-      "projectedCommandsPerMonth": 100739,
+      "projectedCommandsPerMonth": 100740,
       "upstashFreeMonthlyCommands": 500000,
       "shareOfFreeTier": 0.201,
       "byCommandPerHour": {
@@ -1629,8 +1652,8 @@
       }
     },
     "perPost": {
-      "measuredAt": "2026-10-17T01:37:05.774Z",
-      "inputSetHash": "c8333517a267c4bf6f4781ed8bddc2e53725a2705c1686129f2b86fb0841a42c",
+      "measuredAt": "2026-10-17T08:34:31.991Z",
+      "inputSetHash": "f4793b21cbe34c50ab461f65a6e9b35752957da2fa56563766f61c6348461fa3",
       "canaryRuns": 5,
       "commandsDuringRuns": 409,
       "idleCommandsSubtracted": 0,
@@ -2414,33 +2437,33 @@
     "latency": {
       "available": true,
       "stale": [],
-      "measuredAt": "2026-10-17T01:10:40.606Z",
+      "measuredAt": "2026-10-17T08:07:31.818Z",
       "profile": "local container, 0.2 vCPU, 512 MiB (Northflank sandbox envelope)",
-      "commitSha": "1a678c51b213b2c8fff6f2354e9556abf2f96fe7",
-      "inputSetHash": "c8333517a267c4bf6f4781ed8bddc2e53725a2705c1686129f2b86fb0841a42c",
+      "commitSha": "2640f3b921c841fa219038b510fa6849b9331f4d",
+      "inputSetHash": "f4793b21cbe34c50ab461f65a6e9b35752957da2fa56563766f61c6348461fa3",
       "executedFrom": "compiled dist under plain node",
       "engineVersion": "adr013-nsfw-v1.0:mobilenet_v2_mid@4.3.0:model-a0c76f72db26:v2:policy-b0daab4ab9d1",
       "modelHash": "a0c76f72db261c54dc851b974c848dc9ce01576ca66b0f232f4848c950549322",
       "policyVersion": "v2",
       "backend": "wasm",
-      "coldStartupMs": 2987.7,
-      "readinessStartupDurationMs": 2988,
+      "coldStartupMs": 2213.2,
+      "readinessStartupDurationMs": 2213,
       "warmupSamples": 50,
       "warmSamples": 1000,
       "warmSupervisedMs": {
-        "p50": 199.64,
-        "p95": 308.42,
-        "p99": 391.02,
-        "max": 594.97
+        "p50": 192.99,
+        "p95": 207.36,
+        "p99": 292.14,
+        "max": 491.98
       },
       "warmInThreadMs": {
-        "p50": 199,
-        "p95": 308,
-        "p99": 391,
-        "max": 595
+        "p50": 192,
+        "p95": 207,
+        "p99": 292,
+        "max": 491
       },
-      "peakResidentMib": 236.3,
-      "baselineResidentMibBeforeModelLoad": 68.7,
+      "peakResidentMib": 235.2,
+      "baselineResidentMibBeforeModelLoad": 67.1,
       "dispositions": {
         "pass": 1000
       },
@@ -2460,14 +2483,17 @@
     "memory": {
       "available": true,
       "stale": [],
-      "measuredAt": "2026-10-17T01:06:29.854Z",
+      "measuredAt": "2026-10-17T08:01:37.431Z",
       "container": "cc-community-worker",
-      "commitSha": "1a678c51b213b2c8fff6f2354e9556abf2f96fe7",
-      "inputSetHash": "c8333517a267c4bf6f4781ed8bddc2e53725a2705c1686129f2b86fb0841a42c",
-      "hostInputSetHash": "c8333517a267c4bf6f4781ed8bddc2e53725a2705c1686129f2b86fb0841a42c",
+      "commitSha": "2640f3b921c841fa219038b510fa6849b9331f4d",
+      "inputSetHash": "f4793b21cbe34c50ab461f65a6e9b35752957da2fa56563766f61c6348461fa3",
+      "hostInputSetHash": "f4793b21cbe34c50ab461f65a6e9b35752957da2fa56563766f61c6348461fa3",
       "source": "cgroup v2 memory.peak inside the running worker container",
-      "memoryPeakMib": 339.5,
+      "memoryPeakMib": 346.9,
       "memoryLimitMib": 512,
+      "workerName": "community-worker@2640f3b921c841fa219038b510fa6849b9331f4d",
+      "processedBy": "community-worker@2640f3b921c841fa219038b510fa6849b9331f4d",
+      "servicesFrom": "the container environment (DATABASE_URL, REDIS_URL, SUPABASE_URL)",
       "upload": {
         "name": "generated-4096x4096.jpg",
         "sha256": "53c2e237a8b94f429efcde4632c9824e1e8b0ff7359217afb8e7dee8e7b55842",
