@@ -525,9 +525,9 @@ fractional vCPU. Latency is measured inside the worker image at 0.2 vCPU and 512
 with a generated 4096x4096 JPEG, the largest accepted upload, through the real pipeline. It uses the
 container's own `DATABASE_URL`, `REDIS_URL` and Supabase settings, and requires the job to be
 processed by the container's worker (`community-worker@<baked commit>`). Replicas of one image share
-that name, so the canary also runs in sole-consumer mode (`--sole-consumer`): exactly one consumer on
-the queue, named for the container's commit, before the job is enqueued and again after it
-completes, on the same Redis connection. Stop every other consumer of that Redis first, including a
+that name, so the canary also runs in sole-consumer mode (`--sole-consumer`): exactly one consumer
+heartbeat (below), named for the container's commit, before the job is enqueued and again after it
+completes, from the same worker process. Stop every other consumer of that Redis first, including a
 local `start:workers` or E2E stack. The product records both observations as `soleConsumer`, and the
 gate rejects a peak without that identity and that proof. The latency gate requires the recorded cgroup limits to equal the 0.2 vCPU
 and 512 MiB profile and at least 1,000 warm samples after warmup. The numbers and their gates are in the evidence payload's `runtime` section and in the rendered
@@ -560,6 +560,43 @@ Run exactly one consumer per Redis. Once the hosted worker runs, nothing else ma
 `community-moderation` against production Redis, including a local `start:workers` pointed at
 it.
 
+**Worker presence: the heartbeat, because Upstash `CLIENT LIST` is per node.** BullMQ's
+`queue.getWorkers()` finds consumers with `CLIENT LIST`, and Upstash answers `CLIENT LIST` from the
+node that took the connection, listing only that node's clients. Measured against the production
+database on 2026-10-17 (Story 6.2b review, RF15): of 12 fresh connections, 5 listed the hosted
+worker's named BullMQ connection and 7 did not, while the worker stayed connected throughout. The
+hosted canary failed `worker_absent` twice against a healthy worker that way, and the same blind
+spot would hide a second consumer on another node from the sole-consumer proof. A local Redis is one
+node, so local measurements never showed it. Do not use `CLIENT LIST` or `queue.getWorkers()` to
+decide who consumes production Redis.
+
+Every community worker process therefore writes a heartbeat key, which every node answers the same
+([`community-worker-heartbeat.ts`](../../apps/api/src/modules/community/community-worker-heartbeat.ts)):
+
+- Key `community-worker:heartbeat:<worker name>:<instance id>`, where the instance id is a random
+  UUID per process, so two replicas of one image are two keys. The value is JSON: `name`,
+  `commitSha`, `startedAt`, `pid`.
+- Written when the worker starts, on the worker's own BullMQ connection, with a 90-second TTL,
+  refreshed every 30 seconds. Two refreshes in a row can be lost before the worker reads as absent.
+  A missed refresh is logged at `warn` (`community_worker_heartbeat_refresh_failed`) and never stops
+  the worker.
+- Removed on a graceful shutdown before the worker stops taking jobs and closes its connection,
+  within 2 of the 20 seconds of the shutdown deadline (`community_worker_heartbeat_removed`). A
+  worker killed with `SIGKILL` or out of memory removes nothing, and reads as present until the TTL
+  passes, at most 90 seconds.
+- Cost: one `SET` per refresh, 120 commands an hour, part of the measured idle figure below.
+
+The canary, the restart drill, the memory measurement and the idle Redis measurement count live
+heartbeat keys with `SCAN` and a `MATCH` pattern in a bounded loop
+([`scripts/lib/community-worker-heartbeat.mjs`](../../scripts/lib/community-worker-heartbeat.mjs));
+a scan that does not finish is reported as unknown, never as a count. A local run also records
+`CLIENT LIST` beside the heartbeats as a cross-check (`clientList`, `clientListAgrees`); the
+heartbeats decide. To see what consumes production Redis by hand:
+
+```bash
+redis-cli --tls -u "$REDIS_URL" --scan --pattern 'community-worker:heartbeat:*'
+```
+
 **Canary.** [`scripts/community-screening-canary.mjs`](../../scripts/community-screening-canary.mjs)
 creates a namespaced canary account and one `pending_review` post carrying a committed,
 manifest-pinned safe fixture, enqueues one screening job exactly as the outbox dispatcher would,
@@ -567,13 +604,13 @@ polls until the post leaves `pending_review`, and then removes every row, object
 created. It reports queue latency (BullMQ `processedOn - timestamp`), screening duration
 (`finishedOn - processedOn`: download, re-encode, inference, text screening and the publish
 transaction), the persisted engine identity and the worker that processed the job. It exits nonzero
-when no worker is connected, when a job stays `waiting`, when the identity carries a `fixture`,
+when no worker heartbeat is live, when a job stays `waiting`, when the identity carries a `fixture`,
 `unavailable` or `unresolved` marker, when the safe fixture does not publish, or when the wait
 expires. `--target` is checked against the database host, so a `local` canary cannot write to a
 hosted database and a `hosted` one cannot run against a laptop. A hosted run also requires exactly
-one consumer on the queue, named `community-worker@<sha>` for the commit given by `--expect-sha`
-(default: `HEAD`), before it enqueues the job and again after the job completes, on the same Redis
-connection, checks that this worker processed the job, and verifies the database
+one consumer heartbeat, named `community-worker@<sha>` for the commit given by `--expect-sha`
+(default: `HEAD`), before it enqueues the job and again after the job completes, from the same worker
+process (instance id), checks that this worker processed the job, and verifies the database
 certificate against the Supabase CA. The evidence counts a hosted run only when no input-set file
 differs between `--expect-sha` and the evidence commit (`git diff --quiet`). Cleanup problems
 fail the run: the report records `ok: false` and the readiness gate fails.
@@ -636,11 +673,11 @@ npm run community:screening:canary -- --target hosted --env-file <hosted env fil
 
 The canary is the deploy's acceptance check: run it after every deploy and every rollback.
 
-**Restart drill.** Stop the worker, start `npm run community:screening:canary:restart-drill`
-(`--restart-drill`, local only), then start the worker within three minutes. The drill refuses
-to enqueue unless Redis lists zero consumers on the queue, observes zero consumers again after
-the enqueue with the job still `waiting`, then polls until a consumer comes back and the job
-completes. The report's `restartDrill` block records those observations and the observed
+**Restart drill.** Stop the worker (gracefully, so its heartbeat is removed), start
+`npm run community:screening:canary:restart-drill` (`--restart-drill`, local only), then start the
+worker within three minutes. The drill refuses to enqueue unless Redis holds zero worker
+heartbeats, observes zero again after the enqueue with the job still `waiting`, then polls until a
+heartbeat comes back and the job completes. The report's `restartDrill` block records those observations and the observed
 downtime (from the first zero-consumer observation to the last, a lower bound on the outage), and
 the readiness gate re-judges them: an ordinary canary result carries no such observations and is
 not restart evidence. The payload's `canary.restart` section holds the result.
@@ -660,8 +697,9 @@ worker spent about 4.8 million commands a month, about 9.50 USD (the payload's
 `redis.beforeTuning`). The community worker now blocks for 300 seconds while idle and checks for
 stalled jobs every 120 seconds (`community-moderation.worker.ts`); a new job still wakes it at
 once. The stalled check was 600 seconds until Story 6.2b review RF13 shortened it so a crashed
-worker's job recovers before the stale-review sweep; the measured idle cost includes it. `npm run community:screening:measure:redis` measures the idle cost against a local Redis only the worker uses, sampling `CLIENT LIST` every 15 seconds
-to prove the container's named worker stayed connected for the whole window, and
+worker's job recovers before the stale-review sweep; the measured idle cost includes it. `npm run community:screening:measure:redis` measures the idle cost against a local Redis only the worker uses, sampling the worker heartbeats every 15 seconds
+to prove one process of the container's named worker held its heartbeat for the whole window (`CLIENT LIST`
+is sampled beside it as a cross-check, and the samples' own commands are subtracted), and
 `node scripts/measure-community-worker-redis.mjs --canary-runs 5 --idle-baseline <idle product>`
 measures the cost of one screened post. Both count every command Redis records, including those
 BullMQ's Lua scripts run inside `EVALSHA`, because Upstash does not document whether a script
