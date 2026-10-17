@@ -67,7 +67,7 @@ describe('community worker image', () => {
 
   it('runs as the unprivileged node user under tini', () => {
     expect(dockerfile).toMatch(/^USER node$/m)
-    expect(dockerfile).toMatch(/^ENTRYPOINT \["\/usr\/bin\/tini", "--"\]$/m)
+    expect(dockerfile).toMatch(/^ENTRYPOINT \["\/usr\/bin\/tini", "-s", "--"\]$/m)
     expect(dockerfile).toMatch(
       /^CMD \["node", "scripts\/start-community-worker-production\.mjs"\]$/m
     )

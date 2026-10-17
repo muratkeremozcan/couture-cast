@@ -65,7 +65,8 @@ RUN node scripts/prune-community-worker-deps.mjs --out /worker --max-node-module
 
 FROM ${NODE_IMAGE} AS runtime
 # tini reaps zombies and forwards SIGTERM to the worker, which Node does not do
-# as PID 1. openssl and ca-certificates are what the Prisma engine needs to
+# as PID 1. `-s` registers it as a subreaper, because hosts such as Northflank
+# run their own entrypoint as PID 1 and tini would otherwise reap nothing. openssl and ca-certificates are what the Prisma engine needs to
 # detect its TLS library and open a verified connection to a hosted database.
 RUN apt-get update \
  && apt-get install -y --no-install-recommends tini openssl ca-certificates \
@@ -111,5 +112,5 @@ ARG INPUT_SET_HASH=unset
 ENV COMMUNITY_WORKER_COMMIT_SHA=${COMMIT_SHA} \
     COMMUNITY_WORKER_INPUT_SET_HASH=${INPUT_SET_HASH}
 
-ENTRYPOINT ["/usr/bin/tini", "--"]
+ENTRYPOINT ["/usr/bin/tini", "-s", "--"]
 CMD ["node", "scripts/start-community-worker-production.mjs"]
