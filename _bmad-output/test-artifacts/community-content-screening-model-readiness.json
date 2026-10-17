@@ -2,7 +2,7 @@
   "artifact": "community-content-screening-model-readiness",
   "artifactVersion": 2,
   "storyKey": "6-2b-community-screening-release-gate",
-  "generatedAt": "2026-10-17T12:09:03.899Z",
+  "generatedAt": "2026-10-17T12:18:27.025Z",
   "generatedBy": "npm run community:screening:evidence",
   "verdict": "fail",
   "verdictRule": "pass only when every gate ran against the current inputs from a committed tree and passed; fail when any gate that ran failed; incomplete otherwise",
@@ -51,9 +51,18 @@
     {
       "id": "canary-hosted",
       "name": "Canary against the deployed worker on the hosted target",
-      "status": "not-run",
-      "reason": "No hosted canary has run: the worker is not yet deployed to a hosted target.",
-      "command": "npm run community:screening:canary -- --target hosted --env-file <hosted env file> --db-ca <Supabase CA> --json-out apps/api/.cache/community-screening/canary-hosted.json"
+      "status": "passed",
+      "measured": {
+        "target": "hosted",
+        "disposition": "pass",
+        "engineIdentity": "adr013-text:policy-v2@b0daab4ab9d1;adr013-nsfw-v1.0:mobilenet_v2_mid@4.3.0:model-a0c76f72db26:v2:policy-b0daab4ab9d1",
+        "processedBy": "community-worker@913a0d7927c5ef649fea4521a5fbd1ba6d080acf",
+        "queueLatencyMs": 66,
+        "screeningDurationMs": 2098,
+        "finishedAt": "2026-10-17T12:18:21.348Z",
+        "deployedInputs": "same"
+      },
+      "threshold": "safe fixture published under a real-model identity, on the hosted target, by exactly the worker built from the expected commit, whose input set equals the evidence commit"
     },
     {
       "id": "policy-surface",
@@ -293,7 +302,7 @@
     }
   ],
   "build": {
-    "commitSha": "47c3db81ff410487f82cc0b69cecc87f7cfbe8a4",
+    "commitSha": "913a0d7927c5ef649fea4521a5fbd1ba6d080acf",
     "workingTreeClean": true,
     "uncommittedPaths": 0,
     "inputSetHash": "3a9e1271e897874775827f29a3defc577b16cc62e518026c28355dc020154422",
@@ -396,7 +405,7 @@
   },
   "deployment": {
     "target": "Northflank Developer Sandbox (always-on combined service built from apps/api/Dockerfile.community-worker)",
-    "status": "not deployed yet",
+    "status": "deployed",
     "resourceProfile": {
       "cpu": 0.2,
       "cpuSource": "the CPU share the local container emulated; confirm it against the sandbox plan once the service exists",
@@ -505,8 +514,75 @@
     },
     "hosted": {
       "label": "hosted target",
-      "available": false,
-      "stale": []
+      "available": true,
+      "stale": [],
+      "ok": true,
+      "target": "hosted",
+      "inputSetHash": "3a9e1271e897874775827f29a3defc577b16cc62e518026c28355dc020154422",
+      "expectedSha": "913a0d7927c5ef649fea4521a5fbd1ba6d080acf",
+      "processedByRequired": true,
+      "processedBy": "community-worker@913a0d7927c5ef649fea4521a5fbd1ba6d080acf",
+      "soleConsumerRequired": true,
+      "soleConsumer": {
+        "proven": true,
+        "expectedWorker": "community-worker@913a0d7927c5ef649fea4521a5fbd1ba6d080acf",
+        "before": {
+          "known": true,
+          "count": 1,
+          "names": [
+            "bull:Y29tbXVuaXR5LW1vZGVyYXRpb24=:w:community-worker@913a0d7927c5ef649fea4521a5fbd1ba6d080acf"
+          ],
+          "clientIds": ["4"],
+          "observedAt": "2026-10-17T12:18:18.075Z"
+        },
+        "after": {
+          "known": true,
+          "count": 1,
+          "names": [
+            "bull:Y29tbXVuaXR5LW1vZGVyYXRpb24=:w:community-worker@913a0d7927c5ef649fea4521a5fbd1ba6d080acf"
+          ],
+          "clientIds": ["4"],
+          "observedAt": "2026-10-17T12:18:21.285Z"
+        },
+        "problems": []
+      },
+      "startedAt": "2026-10-17T12:18:17.755Z",
+      "finishedAt": "2026-10-17T12:18:21.348Z",
+      "fixture": {
+        "name": "safe-satin-plum-512x512.jpg",
+        "sha256": "b2ed2509ee63fa5a13aff99ece5603970b97b004c07ef930315267b0a79974a3",
+        "bytes": 40848
+      },
+      "workersConnected": {
+        "known": true,
+        "count": 1,
+        "names": [
+          "bull:Y29tbXVuaXR5LW1vZGVyYXRpb24=:w:community-worker@913a0d7927c5ef649fea4521a5fbd1ba6d080acf"
+        ],
+        "clientIds": ["4"],
+        "observedAt": "2026-10-17T12:18:18.075Z"
+      },
+      "terminalStatus": "published",
+      "disposition": "pass",
+      "engineIdentity": "adr013-text:policy-v2@b0daab4ab9d1;adr013-nsfw-v1.0:mobilenet_v2_mid@4.3.0:model-a0c76f72db26:v2:policy-b0daab4ab9d1",
+      "attemptsMade": 1,
+      "jobState": "completed",
+      "timings": {
+        "queueLatencyMs": 66,
+        "screeningDurationMs": 2098,
+        "screeningDurationCovers": "BullMQ processedOn to finishedOn: storage download, declaration check and re-encode, image inference, text screening, and the publish transaction",
+        "enqueueToObservedTerminalMs": 2251,
+        "pollIntervalMs": 500
+      },
+      "cleanup": {
+        "performed": true,
+        "problems": []
+      },
+      "deployedInputs": {
+        "expectedSha": "913a0d7927c5ef649fea4521a5fbd1ba6d080acf",
+        "commitSha": "913a0d7927c5ef649fea4521a5fbd1ba6d080acf",
+        "status": "same"
+      }
     }
   },
   "policySurface": {
@@ -2639,7 +2715,7 @@
     },
     {
       "id": "hosted-measurement-pending",
-      "statement": "Runtime latency and memory were measured in the local container under the sandbox resource limits (0.2 vCPU, 512 MiB), not on the hosted target, and the regression gate committed in the model manifest comes from developer hardware.",
+      "statement": "The hosted canary has run; runtime latency and memory are still from the local container under the sandbox resource limits, and the regression gate committed in the model manifest comes from developer hardware.",
       "residualRisk": "The hosted CPU may be slower or noisier than the emulation, and the regression gate does not yet describe production hardware.",
       "mitigation": "The latency and memory gates run on the emulated profile, the memory gate reads the real container’s cgroup peak at the largest accepted upload, and the hosted canary records real queue latency and screening duration.",
       "revisitWhen": "The worker is deployed: run the measurements inside the hosted container and re-baseline the regression gate from them."
