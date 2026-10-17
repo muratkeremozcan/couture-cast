@@ -753,6 +753,22 @@ the payload is current.
   - **Memory gate.** Split from latency: `runtime-latency` reads the in-image measurement and
     `runtime-memory` the container's cgroup `memory.peak` at the maximum upload.
 
+- 2026-10-17, Redis budget gate premise corrected: production DB is on Pay as You Go.
+  - **What changed.** The Upstash console shows the production database `couturecast-prod` on the
+    Pay as You Go plan. It had hibernated after 60 days without traffic, which is why it answered
+    "rate-limited"; it is active again. The `redis-budget` gate assumed the free plan's 500,000
+    commands a month and required the worker to stay within half of it. That allowance does not
+    apply to this database.
+  - **New gate.** The plan bills 0.20 USD per 100K commands with no free command allowance on a
+    paid plan (upstash.com/pricing/redis, read 2026-10-17). The gate prices the worker's projected
+    month at the assumed volume, idle plus traffic, and passes at or below 5 USD. The payload
+    reports the idle and per-post components in commands and USD, and the daily volume above which
+    the worker alone crosses 5 USD.
+  - **Updated with it.** The deployment guide, the ADR-013 amendment, the worker's drain-delay
+    docblock and the Redis measurement script, which now reports commands only and leaves pricing
+    to the generator. The script and the worker are in the input set, so every run product was
+    re-measured.
+
 ## Review Triage Log
 
 Loop 1 (2026-10-16). Verdicts come from code verification. Group 1 is the priority: the delegated
@@ -832,9 +848,23 @@ None was false. Every fix has a regression test that fails on the code before it
 | CX7 SIGTERM closes the model before active jobs drain  | medium  | patch: drain the consumer first, one 20-second deadline               |
 | CX8 shared E2E pid file stops another checkout's stack | medium  | patch: per-root and per-port record with a token and a `ps` check     |
 | CX9 canary with cleanup problems reported as passed    | medium  | patch: `ok: false` on cleanup problems, every canary gate fails on it |
+| CX4b replicas of one image share the worker name       | medium  | patch: sole-consumer canary mode, proof checked before and after      |
+| CX8b a reused pid passes as another checkout's stack   | medium  | patch: record OS start time and absolute path, re-read before signal  |
 
 All run products were regenerated from the committed fixes, because the input set changed. The
 hosted canary stays not run until the worker is deployed.
+
+Loop 3 (2026-10-17). A second Codex review closed CX1 to CX3, CX5 to CX7 and CX9, and left CX4 and
+CX8 partly open (rows CX4b and CX8b above). CX4b: two replicas built from one commit both call
+themselves `community-worker@<sha>`, so `processedBy` could not say which one screened the memory
+upload. The canary's `--sole-consumer` mode, always on for hosted runs, requires exactly one
+consumer named for the expected commit before the job is enqueued and after it completes, on the
+same Redis client id; the memory measurement runs in it and records both observations, and the
+readiness gate re-judges them. CX8b: the launcher records `ps -o lstart` and its absolute script
+path, Playwright starts it through that path, and the teardown re-reads both from the live process
+immediately before signalling. The tests spawn real processes, including one carrying another
+checkout's launcher path and one whose path only ends with this checkout's. The new tests fail on
+the code before the fix.
 
 Fixed along the way: `npm run validate` failed once on 6.1-INT-070. The table-wide feed lost a
 `user_id` alias race to a parallel suite whose cleanup then removed the winning row, and
