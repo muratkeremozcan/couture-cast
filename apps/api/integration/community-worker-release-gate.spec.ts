@@ -848,6 +848,16 @@ interface GeneratorModule {
     root?: string
   ) => { status: string; reason?: string }
   TEXT_LANGUAGES: string[]
+  payAsYouGoMonthlyUsd: (commands: number) => number
+  projectRedisCost: (inputs: {
+    idleCommandsPerHour: unknown
+    commandsPerPost: unknown
+    dailySubmissions: number
+  }) => {
+    postsPerDayAtCostCeiling: number | null
+    projectedMonthly: Record<string, number> | null
+  }
+  REDIS_MONTHLY_COST_CEILING_USD: number
 }
 
 /** One change to the passing sections: a dotted path and its new value (undefined deletes). */
@@ -1019,8 +1029,15 @@ describe('readiness verdict', () => {
       redis: {
         available: true,
         stale: [],
-        budgetShare: 0.5,
-        projectedMonthly: { total: 150000, shareOfFreeTier: 0.3 },
+        monthlyCostCeilingUsd: 5,
+        dailySubmissions: 100,
+        postsPerDayAtCostCeiling: 962,
+        projectedMonthly: {
+          total: 350000,
+          idleUsd: 0.2,
+          trafficUsd: 0.5,
+          totalUsd: 0.7,
+        },
         idle: {
           commandsPerHour: 138,
           worker: {
@@ -1199,6 +1216,12 @@ describe('readiness verdict', () => {
       [['sweep.sweep.passAtOrAboveAReviewThreshold', undefined]],
     ],
     ['a Redis count that is missing', 'redis-budget', [['redis.projectedMonthly', null]]],
+    // The production database is on Upstash Pay as You Go: the gate is the bill.
+    [
+      'a projected Redis month a cent above 5 USD',
+      'redis-budget',
+      [['redis.projectedMonthly.totalUsd', 5.0001]],
+    ],
     // Story 6.2b peer review (CX9).
     [
       'canary cleanup problems',
@@ -1321,6 +1344,50 @@ describe('readiness verdict', () => {
     const { verdict, gates } = await verdictAfter(patches)
     expect(statusOf(gates, gateId)).toBe('failed')
     expect(verdict).toBe('fail')
+  })
+
+  it('passes a projected Redis month of exactly 5 USD', async () => {
+    const { gates } = await verdictAfter([['redis.projectedMonthly.totalUsd', 5]])
+    expect(statusOf(gates, 'redis-budget')).toBe('passed')
+  })
+
+  it('prices Redis commands at Upstash Pay as You Go', async () => {
+    const { payAsYouGoMonthlyUsd, projectRedisCost, REDIS_MONTHLY_COST_CEILING_USD } =
+      await generator()
+    // 0.20 USD per 100K commands, no included commands on a paid plan.
+    expect(payAsYouGoMonthlyUsd(100_000)).toBeCloseTo(0.2, 10)
+    expect(payAsYouGoMonthlyUsd(2_500_000)).toBeCloseTo(
+      REDIS_MONTHLY_COST_CEILING_USD,
+      10
+    )
+
+    const at = (dailySubmissions: number) =>
+      projectRedisCost({
+        idleCommandsPerHour: 138,
+        commandsPerPost: 82,
+        dailySubmissions,
+      })
+    const { postsPerDayAtCostCeiling, projectedMonthly } = at(100)
+    // 138 an hour for 730 hours is 100,740 idle commands, 0.20 USD; 82 a post
+    // at 100 posts for 30.4 days is 249,280 commands, 0.50 USD.
+    expect(projectedMonthly).toMatchObject({ idle: 100_740, traffic: 249_280 })
+    expect(projectedMonthly!.idleUsd).toBeCloseTo(0.20148, 5)
+    expect(projectedMonthly!.trafficUsd).toBeCloseTo(0.49856, 5)
+    expect(projectedMonthly!.totalUsd).toBeCloseTo(0.70004, 5)
+    // The ceiling volume stays at or below 5 USD; one more post a day crosses it.
+    expect(at(postsPerDayAtCostCeiling!).projectedMonthly!.totalUsd).toBeLessThanOrEqual(
+      5
+    )
+    expect(at(postsPerDayAtCostCeiling! + 1).projectedMonthly!.totalUsd).toBeGreaterThan(
+      5
+    )
+    expect(
+      projectRedisCost({
+        idleCommandsPerHour: null,
+        commandsPerPost: 82,
+        dailySubmissions: 1,
+      })
+    ).toEqual({ postsPerDayAtCostCeiling: null, projectedMonthly: null })
   })
 
   it('computes the Wilson interval to published reference values', async () => {

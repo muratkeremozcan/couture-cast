@@ -557,10 +557,12 @@ anything pending past its window to `review_failed`. If the model is the problem
 degraded mode above. Run the hosted canary after any rollback, then re-screen posts refused during
 the incident with the retained-job replay.
 
-**Redis budget.** An idle BullMQ consumer polls Redis continuously, and the Upstash free plan allows
-500,000 commands a month (upstash.com/pricing/redis, read 2026-10-16). With BullMQ's defaults (a
-5-second idle block and a 30-second stalled check) an idle worker spent several times that
-allowance (the payload's `redis.beforeTuning`). The community worker now blocks for 300 seconds while idle and checks for stalled jobs
+**Redis cost.** The production Upstash database (`couturecast-prod`) is on the Pay as You Go plan,
+which bills 0.20 USD per 100K commands and includes no free commands once a database is on a paid
+plan (upstash.com/pricing/redis, read 2026-10-17). An idle BullMQ consumer polls Redis
+continuously. With BullMQ's defaults (a 5-second idle block and a 30-second stalled check) an idle
+worker spent about 4.8 million commands a month, about 9.50 USD (the payload's
+`redis.beforeTuning`). The community worker now blocks for 300 seconds while idle and checks for stalled jobs
 every 600 seconds (`community-moderation.worker.ts`); a new job still wakes it at once, and a
 restart runs the stalled check immediately. `npm run community:screening:measure:redis` measures
 the idle cost against a local Redis only the worker uses, sampling `CLIENT LIST` every 15 seconds
@@ -568,16 +570,18 @@ to prove the container's named worker stayed connected for the whole window, and
 `node scripts/measure-community-worker-redis.mjs --canary-runs 5 --idle-baseline <idle product>`
 measures the cost of one screened post. Both count every command Redis records, including those
 BullMQ's Lua scripts run inside `EVALSHA`, because Upstash does not document whether a script
-counts once. The measured figures, the projection at the assumed daily volume, and the volume at
-which the worker alone stays within half of the free plan are in the evidence payload's `redis`
-section.
+counts once. The release gate prices the projected month at the assumed daily volume, idle plus
+traffic, and passes at or below 5 USD. The idle and per-post components, their cost, and the daily
+volume above which the worker alone crosses 5 USD are in the evidence payload's `redis` section.
 
 The production Upstash database is shared: the worker uses the same database the API already uses
-for its own queues, so the monthly allowance pays for both, and the measurement above covers the
-worker alone. After the first day, read the provider's command count, which covers both, and
-budget for the pay-as-you-go rate if it trends past half the allowance. The worker's one-second
-outbox dispatch reads PostgreSQL, not Redis: about 86,400 small queries a day against Supabase,
-which its plan does not meter per query.
+for its own queues, so one bill covers both, and the measurement above covers the worker alone.
+After the first day, read the provider's command count and month-to-date cost, which cover both. If
+the month projects past 5 USD, set a maximum monthly budget on the database in the Upstash console
+and revisit the polling settings. Upstash hibernates a database after a long stretch with no traffic
+(this one answered "rate-limited" after 60 idle days until it was reactivated); a connected worker
+keeps it active. The worker's one-second outbox dispatch reads PostgreSQL: about 86,400 small
+queries a day against Supabase, which its plan does not meter per query.
 
 **Evidence.** `npm run community:screening:evidence` writes
 `_bmad-output/test-artifacts/community-content-screening-model-readiness.{json,md}` from the run

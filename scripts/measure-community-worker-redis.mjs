@@ -2,9 +2,10 @@
  * Measures how many Redis commands an idle community worker spends, against a
  * Redis the worker alone is connected to.
  *
- * Story 6.2b. A BullMQ consumer polls Redis whether or not anyone posts, and a
- * metered free tier counts every command: the Upstash free plan allows 500,000
- * commands a month. Start the worker container against a local Redis that
+ * Story 6.2b. A BullMQ consumer polls Redis whether or not anyone posts, and
+ * the production database's Upstash Pay as You Go plan bills every command. This
+ * reports commands; the readiness generator prices them. Start the worker
+ * container against a local Redis that
  * nothing else uses, then run this for a window; it resets Redis's command
  * statistics, waits, and reports commands per hour and the projected monthly
  * total, with the per-command breakdown. Its own statistics reads are
@@ -37,7 +38,6 @@ import { inputSetHash } from './lib/community-screening-input-set.mjs'
 const __dirname = path.dirname(fileURLToPath(import.meta.url))
 const projectRoot = path.resolve(__dirname, '..')
 
-const UPSTASH_FREE_MONTHLY_COMMANDS = 500_000
 const HOURS_PER_MONTH = 730
 /** How often the worker's connection is checked during the idle window. */
 export const PRESENCE_SAMPLE_INTERVAL_MS = 15_000
@@ -239,8 +239,6 @@ async function main() {
     commandsPerHour: Math.round(perHour),
     commandsPerDay: Math.round(perHour * 24),
     projectedCommandsPerMonth: Math.round(perMonth),
-    upstashFreeMonthlyCommands: UPSTASH_FREE_MONTHLY_COMMANDS,
-    shareOfFreeTier: Number((perMonth / UPSTASH_FREE_MONTHLY_COMMANDS).toFixed(3)),
     byCommandPerHour: Object.fromEntries(
       Object.entries(stats)
         .filter(([, calls]) => calls > 0)

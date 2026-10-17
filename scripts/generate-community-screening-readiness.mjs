@@ -702,11 +702,42 @@ function textSection(current) {
   }
 }
 
-/** Upstash's free plan, read from upstash.com/pricing/redis on 2026-10-16. */
-const UPSTASH_FREE_MONTHLY_COMMANDS = 500_000
-/** "Well within" the free tier: idle plus expected traffic at or below half of it. */
-const REDIS_BUDGET_SHARE = 0.5
+/**
+ * The production Upstash database (couturecast-prod) is on Pay as You Go, so
+ * the constraint is the monthly bill.
+ * Read from upstash.com/pricing/redis on 2026-10-17: 0.20 USD per 100K
+ * commands, and no free command allowance once a database is on a paid plan
+ * ("Once you upgrade to a paid tier, you will be charged for data size and
+ * commands according to that plan"). Storage (first 1 GB free per database) and
+ * bandwidth (free up to 200 GB a month) are not driven by the worker's polling
+ * and are left out.
+ */
+export const UPSTASH_PAY_AS_YOU_GO = {
+  plan: 'Pay as You Go',
+  usdPer100kCommands: 0.2,
+  includedMonthlyCommands: 0,
+  source:
+    'https://upstash.com/pricing/redis, read 2026-10-17: Pay as You Go, $0.20 per 100K commands; no free command allowance on a paid plan; first 1 GB storage free, then $0.25/GB; bandwidth free up to 200 GB a month',
+}
+/** The worker's Redis cost ceiling at the assumed volume, in USD a month. */
+export const REDIS_MONTHLY_COST_CEILING_USD = 5
 const HOURS_PER_MONTH = 730
+const DAYS_PER_MONTH = 30.4
+
+/** What `commands` a month cost under Pay as You Go, in USD. */
+export function payAsYouGoMonthlyUsd(commands) {
+  const billable = Math.max(0, commands - UPSTASH_PAY_AS_YOU_GO.includedMonthlyCommands)
+  return (billable / 100_000) * UPSTASH_PAY_AS_YOU_GO.usdPer100kCommands
+}
+
+/** The commands a month that cost exactly `usd`. */
+function commandsForMonthlyUsd(usd) {
+  return (
+    (usd / UPSTASH_PAY_AS_YOU_GO.usdPer100kCommands) * 100_000 +
+    UPSTASH_PAY_AS_YOU_GO.includedMonthlyCommands
+  )
+}
+
 /**
  * BullMQ's defaults before the worker was tuned, measured once on 2026-10-16
  * with scripts/measure-community-worker-redis.mjs over five minutes. A recorded
@@ -739,14 +770,17 @@ function redisSection(dailySubmissions, current) {
   const idle = runProduct('redis-idle.json')
   const perPost = runProduct('redis-per-post.json')
   const base = {
-    upstashFreeMonthlyCommands: UPSTASH_FREE_MONTHLY_COMMANDS,
-    limitSource:
-      'https://upstash.com/pricing/redis, read 2026-10-16: Free plan, 500K commands a month',
-    budgetShare: REDIS_BUDGET_SHARE,
-    beforeTuning: REDIS_BEFORE_TUNING,
+    pricing: UPSTASH_PAY_AS_YOU_GO,
+    monthlyCostCeilingUsd: REDIS_MONTHLY_COST_CEILING_USD,
+    beforeTuning: {
+      ...REDIS_BEFORE_TUNING,
+      monthlyUsd: payAsYouGoMonthlyUsd(
+        REDIS_BEFORE_TUNING.commandsPerHour * HOURS_PER_MONTH
+      ),
+    },
     tuned: tunedRedisSettings(),
     sharedDatabase:
-      'The worker uses the production Upstash database the API already uses for its own queues. These figures are the community worker alone; the API’s commands come out of the same monthly allowance.',
+      'The worker uses the production Upstash database the API already uses for its own queues. These figures are the community worker alone; the API’s commands are billed on the same database.',
   }
   if (!idle || !perPost) {
     return {
@@ -757,12 +791,6 @@ function redisSection(dailySubmissions, current) {
       perPost: perPost ?? null,
     }
   }
-  const usable = finite(idle.commandsPerHour) && finite(perPost.commandsPerPost)
-  const idlePerMonth = usable ? idle.commandsPerHour * HOURS_PER_MONTH : null
-  const trafficPerMonth = usable
-    ? perPost.commandsPerPost * dailySubmissions * 30.4
-    : null
-  const projected = usable ? idlePerMonth + trafficPerMonth : null
   return {
     ...base,
     available: true,
@@ -783,26 +811,46 @@ function redisSection(dailySubmissions, current) {
     ),
     perPost,
     dailySubmissions,
-    postsPerDayWithinBudget: usable
-      ? Math.floor(
-          (UPSTASH_FREE_MONTHLY_COMMANDS * REDIS_BUDGET_SHARE - idlePerMonth) /
-            (perPost.commandsPerPost * 30.4)
-        )
-      : null,
-    postsPerDayWithinFreeTier: usable
-      ? Math.floor(
-          (UPSTASH_FREE_MONTHLY_COMMANDS - idlePerMonth) /
-            (perPost.commandsPerPost * 30.4)
-        )
-      : null,
-    projectedMonthly: usable
-      ? {
-          idle: Math.round(idlePerMonth),
-          traffic: Math.round(trafficPerMonth),
-          total: Math.round(projected),
-          shareOfFreeTier: round(projected / UPSTASH_FREE_MONTHLY_COMMANDS, 3),
-        }
-      : null,
+    ...projectRedisCost({
+      idleCommandsPerHour: idle.commandsPerHour,
+      commandsPerPost: perPost.commandsPerPost,
+      dailySubmissions,
+    }),
+  }
+}
+
+/**
+ * The worker's projected month at `dailySubmissions` posts a day, in commands
+ * and in Pay as You Go USD, and the largest daily volume whose month stays at or
+ * below the cost ceiling (one more post a day crosses it). Dollar figures are
+ * kept unrounded so the gate compares the real projection; the report rounds.
+ */
+export function projectRedisCost({
+  idleCommandsPerHour,
+  commandsPerPost,
+  dailySubmissions,
+}) {
+  if (!finite(idleCommandsPerHour) || !finite(commandsPerPost) || commandsPerPost <= 0) {
+    return { postsPerDayAtCostCeiling: null, projectedMonthly: null }
+  }
+  const idlePerMonth = idleCommandsPerHour * HOURS_PER_MONTH
+  const trafficPerMonth = commandsPerPost * dailySubmissions * DAYS_PER_MONTH
+  const ceilingCommands = commandsForMonthlyUsd(REDIS_MONTHLY_COST_CEILING_USD)
+  const idleUsd = payAsYouGoMonthlyUsd(idlePerMonth)
+  const totalUsd = payAsYouGoMonthlyUsd(idlePerMonth + trafficPerMonth)
+  return {
+    postsPerDayAtCostCeiling: Math.max(
+      0,
+      Math.floor((ceilingCommands - idlePerMonth) / (commandsPerPost * DAYS_PER_MONTH))
+    ),
+    projectedMonthly: {
+      idle: Math.round(idlePerMonth),
+      traffic: Math.round(trafficPerMonth),
+      total: Math.round(idlePerMonth + trafficPerMonth),
+      idleUsd,
+      trafficUsd: totalUsd - idleUsd,
+      totalUsd,
+    },
   }
 }
 
@@ -1206,14 +1254,16 @@ function idlePresenceProblems(idle) {
 
 function redisGate(redis) {
   const id = 'redis-budget'
-  const name = 'Idle worker plus expected traffic well within the Upstash free tier'
+  const name = `Idle worker plus expected traffic at or below ${REDIS_MONTHLY_COST_CEILING_USD} USD a month on Upstash Pay as You Go`
   const pending = pendingGate(id, name, redis, COMMANDS.measureRedis)
   if (pending) return pending
-  const share = redis.projectedMonthly?.shareOfFreeTier
+  const usd = redis.projectedMonthly?.totalUsd
   const problems = [...idlePresenceProblems(redis.idle)]
-  if (!finite(share)) problems.push('idle or per-post command count missing')
-  else if (share > redis.budgetShare) {
-    problems.push(`projected ${percent(share)} of the free tier`)
+  if (!finite(usd)) problems.push('idle or per-post command count missing')
+  else if (usd > REDIS_MONTHLY_COST_CEILING_USD) {
+    problems.push(
+      `projected ${usd.toFixed(2)} USD a month, above ${REDIS_MONTHLY_COST_CEILING_USD} USD`
+    )
   }
   return judged(id, name, problems, {
     measured: {
@@ -1224,9 +1274,13 @@ function redisGate(redis) {
       idleCommandsPerHour: redis.idle?.commandsPerHour ?? null,
       commandsPerPost: redis.perPost?.commandsPerPost ?? null,
       projectedMonthly: redis.projectedMonthly?.total ?? null,
-      shareOfFreeTier: share ?? null,
+      idleMonthlyUsd: redis.projectedMonthly?.idleUsd ?? null,
+      trafficMonthlyUsd: redis.projectedMonthly?.trafficUsd ?? null,
+      projectedMonthlyUsd: usd ?? null,
+      dailySubmissions: redis.dailySubmissions ?? null,
+      postsPerDayAtCostCeiling: redis.postsPerDayAtCostCeiling ?? null,
     },
-    threshold: `the named worker connected through the idle window, and projected monthly commands at or below ${redis.budgetShare * 100}% of ${UPSTASH_FREE_MONTHLY_COMMANDS.toLocaleString('en-US')}`,
+    threshold: `the named worker connected through the idle window, and the projected month at the assumed volume at or below ${REDIS_MONTHLY_COST_CEILING_USD} USD at ${UPSTASH_PAY_AS_YOU_GO.usdPer100kCommands.toFixed(2)} USD per 100K commands`,
   })
 }
 
@@ -1486,8 +1540,8 @@ function aloneOnQueue(observed, expectedWorker) {
  * name, so `processedBy` cannot say which replica screened the upload. The
  * memory product must carry the canary's sole-consumer proof: exactly one
  * consumer, the measured container's worker, before the job was enqueued and
- * after it completed, on the same Redis connection. The recorded observations
- * are judged here, not the canary's own `proven` flag alone.
+ * after it completed, on the same Redis connection. This re-judges the recorded
+ * observations themselves, beyond the canary's own `proven` flag.
  */
 export function soleConsumerProofProblems(proof, expectedWorker) {
   if (!proof || typeof proof !== 'object') {
@@ -1655,11 +1709,11 @@ function hostedMeasurementStatement(sections) {
 }
 
 function redisBudgetStatement(redis) {
-  const multiple =
-    (REDIS_BEFORE_TUNING.commandsPerHour * HOURS_PER_MONTH) /
-    UPSTASH_FREE_MONTHLY_COMMANDS
+  const beforeUsd = payAsYouGoMonthlyUsd(
+    REDIS_BEFORE_TUNING.commandsPerHour * HOURS_PER_MONTH
+  )
   const tuned = redis?.tuned ?? {}
-  return `An idle BullMQ worker polls Redis continuously. With BullMQ defaults it measured ${REDIS_BEFORE_TUNING.commandsPerHour.toLocaleString('en-US')} commands an hour, about ${multiple.toFixed(1)} times the Upstash free tier; the worker now blocks for ${tuned.drainDelaySeconds ?? '?'} seconds between idle polls and checks for stalled jobs every ${(tuned.stalledIntervalMs ?? 0) / 1000} seconds, and the measured idle cost plus projected traffic is in the Redis section. ${redis?.sharedDatabase ?? ''}`
+  return `The production Upstash database is on Pay as You Go, which bills every command (${UPSTASH_PAY_AS_YOU_GO.usdPer100kCommands.toFixed(2)} USD per 100K). An idle BullMQ worker polls Redis continuously. With BullMQ defaults it measured ${REDIS_BEFORE_TUNING.commandsPerHour.toLocaleString('en-US')} commands an hour, about ${beforeUsd.toFixed(2)} USD a month while idle; the worker now blocks for ${tuned.drainDelaySeconds ?? '?'} seconds between idle polls and checks for stalled jobs every ${(tuned.stalledIntervalMs ?? 0) / 1000} seconds, and the measured idle cost plus projected traffic is in the Redis section. ${redis?.sharedDatabase ?? ''}`
 }
 
 /**
@@ -1729,14 +1783,12 @@ function limitationsFor(sections, policy, manifest) {
         'The worker is deployed: run the measurements inside the hosted container and re-baseline the regression gate from them.',
     },
     {
-      id: 'free-tier-redis-budget',
+      id: 'pay-as-you-go-redis-cost',
       statement: redisBudgetStatement(sections.redis),
-      residualRisk:
-        'Exhausting the Redis allowance stops every queue the application uses, not only moderation, and the API’s own commands are not in this measurement. A connection that dies silently during a long block delays pickup until the block times out.',
+      residualRisk: `The bill grows with every command, the API’s own commands are billed on the same database and are not in this measurement, and a volume past ${sections.redis?.postsPerDayAtCostCeiling ?? '?'} posts a day takes the worker alone past ${REDIS_MONTHLY_COST_CEILING_USD} USD a month. A connection that dies silently during a long block delays pickup until the block times out.`,
       mitigation:
-        'A new job wakes the blocked worker at once, so the long block costs no pickup latency; the outbox dispatcher and the stale-review sweep are the backstops for a dead connection; the deployment guide names the provider dashboard figure to watch after the first day, which counts the API and the worker together.',
-      revisitWhen:
-        'The Redis provider reports more than half the monthly allowance used in the first week.',
+        'A new job wakes the blocked worker at once, so the long block costs no pickup latency; the outbox dispatcher and the stale-review sweep are the backstops for a dead connection; the deployment guide names the provider dashboard figures to watch after the first day (commands and cost, which count the API and the worker together).',
+      revisitWhen: `The Upstash console projects the database past ${REDIS_MONTHLY_COST_CEILING_USD} USD for a month, or daily submissions approach ${sections.redis?.postsPerDayAtCostCeiling ?? 'the ceiling volume'}.`,
     },
   ]
 }
@@ -2025,15 +2077,17 @@ function renderRuntime(runtime) {
 }
 
 function renderRedis(redis) {
-  const lines = ['', '## Redis command budget', '']
+  const lines = ['', '## Redis cost', '']
   if (!redis.available || !redis.projectedMonthly) {
     return [...lines, `Not measured on this checkout. Run \`${COMMANDS.measureRedis}\`.`]
   }
   return [
     ...lines,
-    `Idle worker: ${redis.idle.commandsPerHour} commands an hour (${redis.idle.commandsPerDay} a day), measured over ${redis.idle.windowMinutes} minutes against a local Redis only the worker used. One screened post: ${redis.perPost.commandsPerPost} commands. At ${redis.dailySubmissions} posts a day the projected month is ${redis.projectedMonthly.total.toLocaleString('en-US')} commands (${redis.projectedMonthly.idle.toLocaleString('en-US')} idle, ${redis.projectedMonthly.traffic.toLocaleString('en-US')} traffic), ${percent(redis.projectedMonthly.shareOfFreeTier)} of the Upstash free tier's ${redis.upstashFreeMonthlyCommands.toLocaleString('en-US')}. ${redis.countingRule}`,
+    `The production database is on Upstash ${redis.pricing.plan}: ${redis.pricing.usdPer100kCommands.toFixed(2)} USD per 100K commands, with no free command allowance on a paid plan (${redis.pricing.source}).`,
     '',
-    `Before tuning, BullMQ's defaults (a ${redis.beforeTuning.drainDelaySeconds}-second idle block, a ${redis.beforeTuning.stalledIntervalMs / 1000}-second stalled check) measured ${redis.beforeTuning.commandsPerHour.toLocaleString('en-US')} commands an hour idle (${redis.beforeTuning.measuredAt}). The worker now blocks for ${redis.tuned.drainDelaySeconds} seconds and checks for stalled jobs every ${redis.tuned.stalledIntervalMs / 1000} seconds. The worker alone stays within half of the free tier up to ${redis.postsPerDayWithinBudget} posts a day and within the whole tier up to ${redis.postsPerDayWithinFreeTier}, at this per-post cost.`,
+    `Idle worker: ${redis.idle.commandsPerHour} commands an hour (${redis.idle.commandsPerDay} a day), measured over ${redis.idle.windowMinutes} minutes against a local Redis only the worker used. One screened post: ${redis.perPost.commandsPerPost} commands. At ${redis.dailySubmissions} posts a day the projected month is ${redis.projectedMonthly.total.toLocaleString('en-US')} commands, ${redis.projectedMonthly.totalUsd.toFixed(2)} USD: ${redis.projectedMonthly.idle.toLocaleString('en-US')} idle (${redis.projectedMonthly.idleUsd.toFixed(2)} USD) and ${redis.projectedMonthly.traffic.toLocaleString('en-US')} traffic (${redis.projectedMonthly.trafficUsd.toFixed(2)} USD). The gate is ${redis.monthlyCostCeilingUsd} USD a month; the worker alone stays at or below it up to ${redis.postsPerDayAtCostCeiling.toLocaleString('en-US')} posts a day and crosses it above that, at this per-post cost. ${redis.countingRule}`,
+    '',
+    `Before tuning, BullMQ's defaults (a ${redis.beforeTuning.drainDelaySeconds}-second idle block, a ${redis.beforeTuning.stalledIntervalMs / 1000}-second stalled check) measured ${redis.beforeTuning.commandsPerHour.toLocaleString('en-US')} commands an hour idle (${redis.beforeTuning.measuredAt}), ${redis.beforeTuning.monthlyUsd.toFixed(2)} USD a month at this price. The worker now blocks for ${redis.tuned.drainDelaySeconds} seconds and checks for stalled jobs every ${redis.tuned.stalledIntervalMs / 1000} seconds.`,
     '',
     redis.sharedDatabase,
   ]

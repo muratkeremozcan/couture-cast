@@ -45,8 +45,10 @@ export const COMMUNITY_MODERATION_CONCURRENCY = 1
  * BullMQ's default is 5, and a new job wakes the blocked call at once whatever
  * this is set to, so the value costs no pickup latency; what it sets is how
  * often an idle worker spends commands. Story 6.2b measured the default at about
- * 6,500 Redis commands an hour from an idle worker, nine times the Upstash free
- * tier's 500,000 a month. The cost of a long block is only felt when a
+ * 6,500 Redis commands an hour from an idle worker, about 4.8 million a month,
+ * which the production database's Upstash Pay as You Go plan bills at 0.20 USD
+ * per 100K commands (upstash.com/pricing/redis, read 2026-10-17): about 9.50
+ * USD a month for an idle worker. The cost of a long block is only felt when a
  * connection dies silently mid-block, and the outbox dispatcher and the stale
  * review sweep are the backstops for that case.
  */
