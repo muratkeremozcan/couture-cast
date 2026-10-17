@@ -85,6 +85,7 @@ interface SignModule {
     signature: Record<string, unknown> | null
   ) => { status: string }
   payloadDigest: (bytes: Buffer) => string
+  approvalRefusal: (payload: Record<string, unknown>) => string | null
 }
 interface CorpusModule {
   verifyManifest: (
@@ -543,8 +544,12 @@ describe('owner signature', () => {
     expect(
       delegatedSignature({ verdict: 'incomplete' }, 'a'.repeat(64)).record
     ).toBeUndefined()
+    const passedGates = [
+      { id: 'a', status: 'passed' },
+      { id: 'b', status: 'passed' },
+    ]
     const { record } = delegatedSignature(
-      { verdict: 'pass', generatedAt: '2026-10-16T00:00:00.000Z' },
+      { verdict: 'pass', generatedAt: '2026-10-16T00:00:00.000Z', gates: passedGates },
       'b'.repeat(64),
       new Date('2026-10-17T00:00:00.000Z')
     )
@@ -560,6 +565,33 @@ describe('owner signature', () => {
       ownerVerdict: 'approved',
       signedAt: '2026-10-17T00:00:00.000Z',
     })
+  })
+
+  it('refuses a payload whose stored verdict disagrees with its own gates', async () => {
+    // Story 6.2b final review (RF6): the stored verdict is an editable field, so a
+    // payload edited to say pass over a failed or missing gate must not be signed.
+    const { delegatedSignature, approvalRefusal } = await load<SignModule>(
+      'scripts/sign-community-screening-readiness.mjs'
+    )
+    const digest = 'c'.repeat(64)
+    const tampered = {
+      verdict: 'pass',
+      gates: [
+        { id: 'a', status: 'passed' },
+        { id: 'safe-corpus', status: 'failed' },
+      ],
+    }
+    expect(delegatedSignature(tampered, digest).refusal).toMatch(/its gates give fail/)
+    expect(approvalRefusal(tampered)).toMatch(/its gates give fail/)
+    expect(
+      approvalRefusal({
+        verdict: 'pass',
+        gates: [{ id: 'canary-hosted', status: 'not-run' }],
+      })
+    ).toMatch(/its gates give incomplete/)
+    expect(approvalRefusal({ verdict: 'pass', gates: [] })).toMatch(/incomplete/)
+    expect(approvalRefusal({ verdict: 'pass' })).toMatch(/incomplete/)
+    expect(approvalRefusal({ verdict: 'pass', gates: [{ status: 'passed' }] })).toBeNull()
   })
 })
 

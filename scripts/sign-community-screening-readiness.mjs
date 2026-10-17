@@ -20,7 +20,8 @@
  * agent session, for the case where the owner has read the evidence and asked an
  * agent to record the result. It may run without a terminal and inside an agent
  * session, but it is still refused under CI, it is still refused unless the
- * payload's own verdict is `pass`, and it can only record an approval. The record
+ * payload's own verdict is `pass` and the generator's rule, rerun over the
+ * payload's gates, also gives `pass`, and it can only record an approval. The record
  * says `mode: "delegated-by-owner"` beside the verdict and the payload hash, and
  * carries no name, statement or note, so nothing in it can read as the owner's
  * own words.
@@ -39,6 +40,7 @@ import path from 'node:path'
 import readline from 'node:readline/promises'
 import { execFileSync } from 'node:child_process'
 import { fileURLToPath } from 'node:url'
+import { verdictOf } from './generate-community-screening-readiness.mjs'
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url))
 const projectRoot = path.resolve(__dirname, '..')
@@ -149,14 +151,31 @@ export function signingRefusal({ stdinIsTTY, stdoutIsTTY, env, delegated = false
 }
 
 /**
+ * Why a payload cannot be approved, or null when it can. The stored verdict is
+ * a field anyone can edit, so it is recomputed from the payload's own gates with
+ * the generator's rule, and both must say `pass` (Story 6.2b final review, RF6).
+ */
+export function approvalRefusal(payload) {
+  if (payload?.verdict !== 'pass') {
+    return `The payload's own verdict is ${String(payload?.verdict)}. Only a passing payload can be approved.`
+  }
+  const recomputed = Array.isArray(payload.gates)
+    ? verdictOf(payload.gates)
+    : 'incomplete'
+  if (recomputed !== payload.verdict) {
+    return `The payload says pass, but its gates give ${recomputed}. The verdict does not match the gates, so the payload was edited after it was generated; regenerate it.`
+  }
+  return null
+}
+
+/**
  * The delegated record, or the reason it cannot be made. Only a passing payload
  * can be approved, by delegation or otherwise.
  */
 export function delegatedSignature(payload, digest, now = new Date()) {
-  if (payload.verdict !== 'pass') {
-    return {
-      refusal: `The payload's own verdict is ${payload.verdict}. A delegated approval can only be recorded against a passing payload.`,
-    }
+  const refusal = approvalRefusal(payload)
+  if (refusal) {
+    return { refusal: `${refusal} A delegated approval needs a passing payload.` }
   }
   return {
     record: {
@@ -271,9 +290,10 @@ async function sign() {
       console.error('The verdict must be approve or reject. Nothing was recorded.')
       process.exit(1)
     }
-    if (choice === 'approve' && payload.verdict !== 'pass') {
+    const refusal = choice === 'approve' ? approvalRefusal(payload) : null
+    if (refusal) {
       console.error(
-        `The payload's own verdict is ${payload.verdict}. Only a passing payload can be approved; record a rejection or regenerate the evidence once every gate passes.`
+        `${refusal} Record a rejection, or regenerate the evidence once every gate passes.`
       )
       process.exit(1)
     }
