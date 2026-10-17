@@ -1,14 +1,35 @@
 {
   "language": "pt",
-  "listVersion": "terms-v1",
+  "listVersion": "allow-list-v1",
   "listType": "allowList",
   "provenance": {
-    "source": "repository-owned reviewed list",
+    "source": "repository-owned allow list, allow-list-v1.json",
     "version": "v1",
     "licence": "UNLICENSED (repository-owned)",
-    "retrievedAt": "2026-09-08",
-    "curator": "couture-cast trust and safety",
-    "notes": "Ordinary Portuguese vocabulary that collides with a term in this or another language once diacritics fold or repeated characters collapse. Allow-list lookup runs on the literal case-folded token before either transform, so pica stays clean for sewing copy while the European spelling piça still folds onto the low-severity term, and the country name Niger stays clean in its Portuguese and its unaccented form while the English slur still collapses onto it. pera is the pear that Portuguese styling copy uses for a body shape, and it collapses onto the Spanish perra. putto is the cherub of Baroque prints and embroidery, and it collapses onto the Spanish puto. Every entry here was checked against the terms all seven files actually ship."
+    "retrievedAt": "2026-10-16",
+    "curator": "couture-cast repository owner",
+    "notes": "GENERATED from allow-list-v1.json, where every entry records why it exists; do not edit by hand. Allow lists apply across all seven languages, so an entry here clears the word whichever list would have flagged it."
   },
-  "entries": ["pica", "pera", "putto", "niger", "níger"]
+  "generated": {
+    "generator": "scripts/verify-community-screening-lists.mjs",
+    "allowListSha256": "22d1f261f3666cf37369e67359aeabc383ac0a689babe04f87023ba1aee70256"
+  },
+  "entries": [
+    "aranha",
+    "bissexual",
+    "camisinha",
+    "cerveja",
+    "fica",
+    "heterosexual",
+    "homem gay",
+    "homosexual",
+    "inferno",
+    "lésbica",
+    "mama",
+    "niger",
+    "níger",
+    "pede",
+    "pera",
+    "pica"
+  ]
 }

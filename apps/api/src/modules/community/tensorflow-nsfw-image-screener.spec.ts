@@ -28,10 +28,14 @@ import type { NsfwImagePolicy } from './tensorflow-nsfw-image-screener.js'
 
 const CLASS_NAMES = ['Drawing', 'Hentai', 'Neutral', 'Porn', 'Sexy']
 
-/** The thresholds `policies/community-screening/policy-v1.json` ships. */
+/** The thresholds `policies/community-screening/policy-v2.json` ships. */
 const POLICY: NsfwImagePolicy = {
   classNames: CLASS_NAMES,
-  neutralPassMinimum: 0.85,
+  safeClasses: ['Drawing', 'Neutral'],
+  safeMassMinimum: 0.85,
+  reviewClasses: ['Sexy'],
+  reviewClassMaximum: 0.15,
+  unsafeAndReviewAggregateMaximum: 0.15,
   unsafeAggregateMaximum: 0.1,
   unsafeBlockMinimum: 0.35,
   unsafeClasses: ['Hentai', 'Porn'],
@@ -78,7 +82,7 @@ function manifestFixture(
   fs.mkdirSync(manifestDirectory, { recursive: true })
   fs.mkdirSync(policyDirectory, { recursive: true })
 
-  const policyPath = path.join(policyDirectory, 'policy-v1.json')
+  const policyPath = path.join(policyDirectory, 'policy-v2.json')
   fs.writeFileSync(
     policyPath,
     JSON.stringify({
@@ -118,7 +122,7 @@ function manifestFixture(
         },
       ],
       policy: {
-        path: '../policies/community-screening/policy-v1.json',
+        path: '../policies/community-screening/policy-v2.json',
         version: 'v1',
         sha256,
       },
@@ -161,13 +165,64 @@ describe('evaluateNsfwDisposition', () => {
 
   // AC 2 routes a threshold-boundary result to review, so every comparison is
   // strict and each boundary below is crossed from both sides.
+  // The safe mass is Neutral plus Drawing; the rest sits in Hentai, Porn and
+  // Sexy inside their own bounds. The shipped joint ceiling of 0.15 already
+  // implies a safe mass near 0.85, so each bound is isolated here under a looser
+  // joint ceiling and, for the Sexy ceiling, a lower floor.
+  const isolated: NsfwImagePolicy = {
+    ...POLICY,
+    safeMassMinimum: 0.8,
+    unsafeAndReviewAggregateMaximum: 0.5,
+  }
   it.each([
-    ['above the Neutral floor', 0.8500001, 'pass'],
-    ['exactly on the Neutral floor', 0.85, 'review'],
-    ['below the Neutral floor', 0.8499999, 'review'],
-  ])('treats Neutral %s as %s', (_label, neutral, disposition) => {
+    ['above the safe-mass floor', 0.8000001, 'pass'],
+    ['exactly on the safe-mass floor', 0.8, 'review'],
+    ['below the safe-mass floor', 0.7999999, 'review'],
+  ])('treats a safe mass %s as %s', (_label, mass, disposition) => {
+    const drawing = 0.3
     const result = evaluateNsfwDisposition(
-      vector({ Neutral: neutral }),
+      [drawing, 0.04, mass - drawing, 0.04, 1 - mass - 0.08],
+      CLASS_NAMES,
+      isolated
+    )
+
+    expect(result.disposition).toBe(disposition)
+  })
+
+  it('counts Drawing toward the safe mass, as NSFWJS classes it safe for work', () => {
+    const result = evaluateNsfwDisposition(
+      [0.7, 0.01, 0.27, 0.01, 0.01],
+      CLASS_NAMES,
+      POLICY
+    )
+
+    expect(result.disposition).toBe('pass')
+  })
+
+  it.each([
+    ['below the Sexy ceiling', 0.1499999, 'pass'],
+    ['exactly on the Sexy ceiling', 0.15, 'review'],
+    ['above the Sexy ceiling', 0.1500001, 'review'],
+  ])('treats Sexy %s as %s', (_label, sexy, disposition) => {
+    const result = evaluateNsfwDisposition(
+      vector({ Sexy: sexy, Neutral: 0.8, Porn: 0.01 }),
+      CLASS_NAMES,
+      isolated
+    )
+
+    expect(result.disposition).toBe(disposition)
+  })
+
+  // The bound the original Neutral floor implied: everything that is not safe
+  // for work, together, strictly below 0.15, even when each class is inside its
+  // own ceiling.
+  it.each([
+    ['below the joint ceiling', 0.0699999, 'pass'],
+    ['exactly on the joint ceiling', 0.07, 'review'],
+    ['above the joint ceiling', 0.0700001, 'review'],
+  ])('treats Hentai, Porn and Sexy together %s as %s', (_label, sexy, disposition) => {
+    const result = evaluateNsfwDisposition(
+      vector({ Hentai: 0.04, Porn: 0.04, Sexy: sexy, Neutral: 0.5 }),
       CLASS_NAMES,
       POLICY
     )
@@ -217,7 +272,9 @@ describe('evaluateNsfwDisposition', () => {
       POLICY
     )
 
-    expect(result.classProbabilities.Neutral).toBeGreaterThan(POLICY.neutralPassMinimum)
+    expect(
+      (result.classProbabilities.Neutral ?? 0) + (result.classProbabilities.Drawing ?? 0)
+    ).toBeGreaterThan(POLICY.safeMassMinimum)
     expect(result.classProbabilities.Porn).toBeLessThan(POLICY.unsafeBlockMinimum)
     expect(result.disposition).toBe('review')
     expect(result.reasons).toEqual([NSFW_REASON_LOW_CONFIDENCE])
@@ -235,8 +292,8 @@ describe('evaluateNsfwDisposition', () => {
   })
 
   // Sexy is deliberately not a blocking class, because swimwear and eveningwear
-  // score it legitimately. It still cannot publish, because the Neutral it
-  // displaces is what the pass gate needs.
+  // score it legitimately. At or above its review ceiling it still cannot
+  // publish.
   it('withholds rather than blocks a high Sexy score', () => {
     const result = evaluateNsfwDisposition(
       vector({ Sexy: 0.7, Neutral: 0.25 }),
@@ -254,7 +311,7 @@ describe('evaluateNsfwDisposition', () => {
   it('lets an unsafe class veto an otherwise publishable vector', () => {
     const overlapping: NsfwImagePolicy = {
       ...POLICY,
-      neutralPassMinimum: 0.4,
+      safeMassMinimum: 0.4,
       unsafeBlockMinimum: 0.3,
       unsafeAggregateMaximum: 0.9,
     }
@@ -347,9 +404,10 @@ describe('evaluateNsfwDisposition', () => {
           )
           if (result.disposition !== 'pass') continue
           passes += 1
-          expect(result.classProbabilities.Neutral).toBeGreaterThan(
-            POLICY.neutralPassMinimum
-          )
+          expect(
+            (result.classProbabilities.Neutral ?? 0) +
+              (result.classProbabilities.Drawing ?? 0)
+          ).toBeGreaterThan(POLICY.safeMassMinimum)
           expect(porn + hentai).toBeLessThan(POLICY.unsafeAggregateMaximum)
           expect(Math.max(porn, hentai)).toBeLessThan(POLICY.unsafeBlockMinimum)
         }
@@ -358,6 +416,28 @@ describe('evaluateNsfwDisposition', () => {
 
     // A grid that produced no passes would satisfy the implication vacuously.
     expect(passes).toBeGreaterThan(0)
+  })
+
+  it('refuses a duplicated class name instead of letting one slot overwrite another', () => {
+    // Story 6.2b's policy-surface sweep found this: with Neutral named twice,
+    // the second position overwrote the first, so a vector whose canonical
+    // Neutral slot was low could publish on another slot's value.
+    const names = ['Neutral', 'Hentai', 'Neutral', 'Porn', 'Sexy']
+    const result = evaluateNsfwDisposition(
+      [0.02, 0.002, 0.95, 0.002, 0.026],
+      names,
+      POLICY
+    )
+
+    expect(result.disposition).toBe('review')
+    expect(result.reasons).toEqual(['class_mismatch'])
+  })
+
+  it('refuses a class-name set the policy does not declare, even with every class it reads', () => {
+    const names = ['Cartoon', 'Hentai', 'Neutral', 'Porn', 'Sexy']
+    const result = evaluateNsfwDisposition(vector({ Neutral: 0.95 }), names, POLICY)
+
+    expect(result.reasons).toEqual(['class_mismatch'])
   })
 })
 
@@ -414,7 +494,7 @@ describe('loadApprovedPolicy', () => {
     const tampered = JSON.parse(fs.readFileSync(policyPath, 'utf8')) as {
       image: NsfwImagePolicy
     }
-    tampered.image.neutralPassMinimum = 0.05
+    tampered.image.safeMassMinimum = 0.05
     fs.writeFileSync(policyPath, JSON.stringify(tampered))
 
     await expect(
@@ -440,7 +520,7 @@ describe('loadApprovedPolicy', () => {
   })
 
   it.each([
-    ['a threshold above one', { neutralPassMinimum: 1.2 }],
+    ['a threshold above one', { safeMassMinimum: 1.2 }],
     ['a threshold at zero', { unsafeBlockMinimum: 0 }],
     ['a missing aggregate ceiling', { unsafeAggregateMaximum: undefined }],
     ['an empty unsafe class list', { unsafeClasses: [] }],

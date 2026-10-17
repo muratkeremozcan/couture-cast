@@ -1,0 +1,2728 @@
+{
+  "language": "es",
+  "corpusVersion": "v1",
+  "clean": {
+    "description": "Ordinary fashion captions and alt text, written natively in the language as community members would write them, without reference to the term lists. Every entry is expected to pass text screening, except entries labelled expected review, which carry one of the policy's deliberate review terms and the reason it is kept.",
+    "expected": "pass",
+    "entries": [
+      {
+        "id": "es-clean-001",
+        "field": "caption",
+        "text": "Hoy amaneció con 9 grados y niebla, pero el pronóstico anunciaba 23 para la tarde. Salí con camiseta de algodón, camisa de franela abierta y un saco de lana liviano. A las tres ya llevaba el saco en la mano y la camisa atada a la cintura. Las capas siempre ganan."
+      },
+      {
+        "id": "es-clean-002",
+        "field": "caption",
+        "text": "Para la boda de mi prima en la playa elegí un vestido largo de lino color terracota, sandalias planas de cuero y un sombrero de paja. Nada de tacones en la arena. Llevé un chal fino por si refrescaba con la brisa de la noche y lo terminé usando en el baile."
+      },
+      {
+        "id": "es-clean-003",
+        "field": "caption",
+        "text": "Consejo para cuerpo tipo pera que me dio una amiga costurera: marcá la cintura, sumá volumen arriba con mangas abullonadas o estampados, y dejá la parte de abajo en colores oscuros y cortes rectos. Lo probé con una falda negra y una blusa rosa y me encantó."
+      },
+      {
+        "id": "es-clean-004",
+        "field": "caption",
+        "text": "Semana de lluvia en Bogotá y aprendí la lección: botines de cuero encerado, gabardina con capucha, paraguas plegable en la cartera y nada de pantalones que arrastren. Hoy llegué seca a la oficina por primera vez en días y con el look intacto."
+      },
+      {
+        "id": "es-clean-005",
+        "field": "caption",
+        "text": "Me preguntaron cómo combino el negro sin que se vea aburrido. Mi truco es mezclar materiales: pantalón de lana, suéter de punto, cinturón de cuero y una cartera de charol. Después sumo un solo detalle de color, como unos aretes rojos o una bufanda rosa."
+      },
+      {
+        "id": "es-clean-006",
+        "field": "caption",
+        "text": "Primera vez que armo una valija solo con equipaje de mano para diez días. Llevé dos pantalones, un vestido negro, cuatro camisetas, un saco, un suéter y dos pares de zapatos. Todo combinaba entre sí y no extrañé nada. El secreto fue elegir una paleta de tres colores."
+      },
+      {
+        "id": "es-clean-007",
+        "field": "caption",
+        "text": "Día de playa con mi mamá y mis sobrinos. Yo con bikini azul marino, camisa de lino blanca encima y sombrero de ala ancha; ella con traje de baño enterizo y pareo de flores. Protector solar cada dos horas y sombrilla grande, porque el sol de febrero no perdona."
+      },
+      {
+        "id": "es-clean-008",
+        "field": "caption",
+        "text": "Fui a la fiesta del pueblo con bombacha de campo, alpargatas, camisa blanca y pañuelo al cuello. Hacía 27 grados a la tarde y bajó a 14 de noche, así que agradecí haber llevado el poncho. Bailamos chacarera hasta tarde y la ropa aguantó todo."
+      },
+      {
+        "id": "es-clean-009",
+        "field": "caption",
+        "text": "Hoy hacía un infierno de calor en Mérida, 39 grados a la sombra. Guayabera de lino, pantalón de algodón claro y sandalias de cuero. Evité el negro y las telas sintéticas, tomé mucha agua y busqué la sombra de los portales para caminar por el centro."
+      },
+      {
+        "id": "es-clean-010",
+        "field": "caption",
+        "text": "Para la entrevista de trabajo elegí un saco azul marino, blusa de seda color marfil, pantalón recto gris y mocasines. Quería verme seria pero cercana. Me dijeron que la empresa es informal, así que dejé el traje completo en casa. Me fue muy bien, crucemos los dedos."
+      },
+      {
+        "id": "es-clean-011",
+        "field": "caption",
+        "text": "Arreglé el armario por estaciones y descubrí que tenía tres sacos negros casi iguales. Doné dos, me quedé con el de mejor corte y con lo ahorrado me compré un abrigo de lana color camel que hacía años quería. Menos prendas, más combinaciones."
+      },
+      {
+        "id": "es-clean-012",
+        "field": "caption",
+        "text": "Aretes de concha nácar, collar fino dorado y vestido blanco de algodón para la cena en la costa. A la noche corría una brisa fresca, así que sumé un cárdigan beige de punto. Me encanta cómo la concha refleja la luz del atardecer en las fotos."
+      },
+      {
+        "id": "es-clean-013",
+        "field": "caption",
+        "text": "La cerveza fría y el asado del domingo piden ropa cómoda: jeans gastados, camiseta de algodón, camisa de cuadros por si refresca y zapatillas de lona. Mi mamá llegó con un vestido floreado y sandalias, y quedamos combinadas sin habernos puesto de acuerdo."
+      },
+      {
+        "id": "es-clean-014",
+        "field": "caption",
+        "text": "Preguntaban por el brasier que uso con vestidos de espalda descubierta: es uno adhesivo color nude, sin tirantes. Para el escote barco uso uno de tirantes transparentes. Lo importante es que la prenda luzca como fue pensada y que una se sienta cómoda todo el día."
+      },
+      {
+        "id": "es-clean-015",
+        "field": "caption",
+        "text": "Viajé de Lima a Cusco y el cambio de clima fue tremendo. En la costa usé camisa liviana y pantalón de lino; arriba necesité chompa de alpaca, chalina, gorro y guantes. Mi consejo: llevar capas finas que abriguen mucho y un rompeviento que ocupe poco lugar."
+      },
+      {
+        "id": "es-clean-016",
+        "field": "caption",
+        "text": "Me animé a usar el traje de baño estilo tanga que compré el verano pasado, con una falda pareo anudada a la cadera y una camisa de rayas. Ideal para ir de la playa al chiringuito sin cambiarse. El sol estaba fuerte, así que gorra y gafas siempre."
+      },
+      {
+        "id": "es-clean-017",
+        "field": "caption",
+        "text": "Saco gris, camisa blanca y jeans. Hoy amaneció fresquito pero a mediodía ya se podía andar sin abrigo."
+      },
+      {
+        "id": "es-clean-018",
+        "field": "caption",
+        "text": "Look de hoy: todo negro con un toque de rosa en la cartera."
+      },
+      {
+        "id": "es-clean-019",
+        "field": "caption",
+        "text": "¿Alguien más sacó el saco de lana hoy? 12 grados en Bogotá y llovizna toda la tarde."
+      },
+      {
+        "id": "es-clean-020",
+        "field": "caption",
+        "text": "Vestido nude con sandalias doradas para la boda de mi prima. Elegí telas livianas porque el pronóstico decía 30 grados."
+      },
+      {
+        "id": "es-clean-021",
+        "field": "caption",
+        "text": "Aretes de concha nácar que me regaló mi mamá. Combinan con todo lo blanco."
+      },
+      {
+        "id": "es-clean-022",
+        "field": "caption",
+        "text": "Botones de concha en una camisa de lino. Detalles chiquitos que hacen la diferencia."
+      },
+      {
+        "id": "es-clean-023",
+        "field": "caption",
+        "text": "Bikini negro, pareo y sombrero de paja. Domingo de playa ☀️"
+      },
+      {
+        "id": "es-clean-024",
+        "field": "caption",
+        "text": "La parte de abajo es una tanga clásica y arriba un top deportivo. Me encanta mezclar piezas de distintos bikinis."
+      },
+      {
+        "id": "es-clean-025",
+        "field": "caption",
+        "text": "Bombacha de campo, alpargatas y camisa a cuadros para el asado del domingo."
+      },
+      {
+        "id": "es-clean-026",
+        "field": "caption",
+        "text": "Un infierno de calor hoy en Sevilla. Lino, lino y más lino."
+      },
+      {
+        "id": "es-clean-027",
+        "field": "caption",
+        "text": "Falda culotte azul marino con mocasines. Ideal para el viento de esta mañana."
+      },
+      {
+        "id": "es-clean-028",
+        "field": "caption",
+        "text": "Tengo cuerpo tipo pera y estos pantalones de tiro alto me quedan perfectos. El truco: ajustados en la cintura y rectos abajo."
+      },
+      {
+        "id": "es-clean-029",
+        "field": "caption",
+        "text": "Salimos a comer con mi mamá y elegí un vestido midi verde oliva. Hacía 22 grados, perfecto para algodón."
+      },
+      {
+        "id": "es-clean-030",
+        "field": "caption",
+        "text": "Tarde de cerveza con amigos en la terraza. Camiseta de rayas, short de mezclilla y tenis blancos."
+      },
+      {
+        "id": "es-clean-031",
+        "field": "caption",
+        "text": "Brasier de encaje color piel debajo de una blusa semitransparente. Discreto y cómodo."
+      },
+      {
+        "id": "es-clean-032",
+        "field": "caption",
+        "text": "Regalo de cumpleaños: una bufanda de cachemira color camel. Llegó justo a tiempo para el frío."
+      },
+      {
+        "id": "es-clean-033",
+        "field": "caption",
+        "text": "Fiesta de fin de año en la oficina. Vestido de lentejuelas plateado y saco negro encima por si refresca."
+      },
+      {
+        "id": "es-clean-034",
+        "field": "caption",
+        "text": "Abrigo pata de gallo, mi favorito para los días grises."
+      },
+      {
+        "id": "es-clean-035",
+        "field": "caption",
+        "text": "Llevo la computadora en la mochila todos los días, así que busco looks cómodos que aguanten la caminata."
+      },
+      {
+        "id": "es-clean-036",
+        "field": "caption",
+        "text": "Ningún look es ridículo si te sentís bien con él. ¡Animate a los colores!"
+      },
+      {
+        "id": "es-clean-037",
+        "field": "caption",
+        "text": "Leí un artículo sobre vestirse por capas y me salvó la semana: camiseta térmica, suéter y abrigo."
+      },
+      {
+        "id": "es-clean-038",
+        "field": "caption",
+        "text": "Dejé el vehículo en casa y fui caminando al trabajo, así que zapatillas y gabardina."
+      },
+      {
+        "id": "es-clean-039",
+        "field": "caption",
+        "text": "Chaqueta de mezclilla sobre vestido floreado. Primavera en Buenos Aires 🌸"
+      },
+      {
+        "id": "es-clean-040",
+        "field": "caption",
+        "text": "Hoy tocó paraguas, botas de lluvia y trench beige. Llovió todo el día en Santiago."
+      },
+      {
+        "id": "es-clean-041",
+        "field": "caption",
+        "text": "Pajarita de terciopelo para la cena de gala. ¿Demasiado atrevido?"
+      },
+      {
+        "id": "es-clean-042",
+        "field": "caption",
+        "text": "Mono de lino color arena: una sola prenda y listo."
+      },
+      {
+        "id": "es-clean-043",
+        "field": "caption",
+        "text": "Braga de cuello polar porque el viento en la montaña no perdona."
+      },
+      {
+        "id": "es-clean-044",
+        "field": "caption",
+        "text": "Sombrero de paja y vestido blanco. Verano, quedate un rato más."
+      },
+      {
+        "id": "es-clean-045",
+        "field": "caption",
+        "text": "Mi mamá me prestó su saco de tweed de los años ochenta y me queda perfecto."
+      },
+      {
+        "id": "es-clean-046",
+        "field": "caption",
+        "text": "Combinar negro y azul marino sí se puede. Prueben con texturas distintas."
+      },
+      {
+        "id": "es-clean-047",
+        "field": "caption",
+        "text": "Outfit del día #ootd"
+      },
+      {
+        "id": "es-clean-048",
+        "field": "caption",
+        "text": "Frío de verdad hoy 🥶"
+      },
+      {
+        "id": "es-clean-049",
+        "field": "caption",
+        "text": "Lunes de gabardina."
+      },
+      {
+        "id": "es-clean-050",
+        "field": "caption",
+        "text": "Botines nuevos, por fin."
+      },
+      {
+        "id": "es-clean-051",
+        "field": "caption",
+        "text": "Rosa con rojo, ¿sí o no?"
+      },
+      {
+        "id": "es-clean-052",
+        "field": "caption",
+        "text": "Día de jeans y suéter."
+      },
+      {
+        "id": "es-clean-053",
+        "field": "caption",
+        "text": "Me encanta tu abrigo 😍"
+      },
+      {
+        "id": "es-clean-054",
+        "field": "caption",
+        "text": "Calor seco, lino suelto."
+      },
+      {
+        "id": "es-clean-055",
+        "field": "caption",
+        "text": "¿Dónde conseguiste esa falda? ¡Está divina!"
+      },
+      {
+        "id": "es-clean-056",
+        "field": "caption",
+        "text": "Qué buena combinación de colores, me la guardo para inspirarme."
+      },
+      {
+        "id": "es-clean-057",
+        "field": "caption",
+        "text": "Ese saco camel te queda pintado. Muy elegante."
+      },
+      {
+        "id": "es-clean-058",
+        "field": "caption",
+        "text": "Me encantan tus aretes, ¿son de concha?"
+      },
+      {
+        "id": "es-clean-059",
+        "field": "caption",
+        "text": "Lluvia toda la mañana y yo con mis botas amarillas felices."
+      },
+      {
+        "id": "es-clean-060",
+        "field": "caption",
+        "text": "Pronóstico: 4 grados y viento del sur. Saqué el abrigo largo, gorro de lana y guantes."
+      },
+      {
+        "id": "es-clean-061",
+        "field": "caption",
+        "text": "El cielo nublado pedía colores tierra: pantalón marrón, suéter mostaza y botas café."
+      },
+      {
+        "id": "es-clean-062",
+        "field": "caption",
+        "text": "Primer día de otoño con chaqueta de cuero. Huele a hojas secas y a café."
+      },
+      {
+        "id": "es-clean-063",
+        "field": "caption",
+        "text": "Hace 35 grados en Monterrey. Vestido de algodón, sandalias planas y mucho protector solar."
+      },
+      {
+        "id": "es-clean-064",
+        "field": "caption",
+        "text": "Humedad al 90 % en Guayaquil. Evito el poliéster y uso camisas de lino holgadas."
+      },
+      {
+        "id": "es-clean-065",
+        "field": "caption",
+        "text": "En Lima la garúa no para, así que capas finas y una chaqueta impermeable liviana."
+      },
+      {
+        "id": "es-clean-066",
+        "field": "caption",
+        "text": "Mañana fresca en Ciudad de México, tarde calurosa. Siempre llevo un suéter amarrado a la cintura."
+      },
+      {
+        "id": "es-clean-067",
+        "field": "caption",
+        "text": "En Madrid ya refresca por la noche. Vaqueros, camiseta blanca y cazadora de ante."
+      },
+      {
+        "id": "es-clean-068",
+        "field": "caption",
+        "text": "Viento fuerte en la costa: nada de faldas sueltas hoy. Pantalón palazzo y top ajustado."
+      },
+      {
+        "id": "es-clean-069",
+        "field": "caption",
+        "text": "Nieve en Bariloche ❄️ Parka, pantalón térmico y botas con suela de goma."
+      },
+      {
+        "id": "es-clean-070",
+        "field": "caption",
+        "text": "Sol de invierno en Montevideo. Abrigo de paño azul y bufanda roja para darle vida."
+      },
+      {
+        "id": "es-clean-071",
+        "field": "caption",
+        "text": "Mi regla para la lluvia: nada de gamuza y siempre un bolso que se pueda limpiar."
+      },
+      {
+        "id": "es-clean-072",
+        "field": "caption",
+        "text": "Cuando el pronóstico dice 18 grados nunca sé qué ponerme. Hoy fui con camisa de manga larga y chaleco de punto."
+      },
+      {
+        "id": "es-clean-073",
+        "field": "caption",
+        "text": "Tip rápido: si vas a pasar del aire acondicionado al calor de la calle, llevá un cárdigan fino en la cartera."
+      },
+      {
+        "id": "es-clean-074",
+        "field": "caption",
+        "text": "Para cuerpo tipo pera recomiendo blusas con detalles en los hombros y faldas en línea A."
+      },
+      {
+        "id": "es-clean-075",
+        "field": "caption",
+        "text": "Si tenés hombros anchos, los escotes en V alargan muchísimo la figura."
+      },
+      {
+        "id": "es-clean-076",
+        "field": "caption",
+        "text": "Truco de estilismo: arremangá la camisa dos vueltas y metela solo por delante del pantalón."
+      },
+      {
+        "id": "es-clean-077",
+        "field": "caption",
+        "text": "Para no pasar frío con vestido, medias térmicas color piel. Nadie se da cuenta y salvan el día."
+      },
+      {
+        "id": "es-clean-078",
+        "field": "caption",
+        "text": "Tres prendas que nunca fallan en entretiempo: trench, camisa blanca y mocasines."
+      },
+      {
+        "id": "es-clean-079",
+        "field": "caption",
+        "text": "Negro total pero con texturas: cuero, punto y seda. Así no se ve plano."
+      },
+      {
+        "id": "es-clean-080",
+        "field": "caption",
+        "text": "Si dudás entre dos colores, elegí el que combine con tus zapatos favoritos."
+      },
+      {
+        "id": "es-clean-081",
+        "field": "caption",
+        "text": "Aprendí a planchar camisas de lino al vapor y cambió mi vida. Quedan mucho más frescas."
+      },
+      {
+        "id": "es-clean-082",
+        "field": "caption",
+        "text": "El rosa empolvado con gris perla es una combinación que no falla en días nublados."
+      },
+      {
+        "id": "es-clean-083",
+        "field": "caption",
+        "text": "Saco azul marino, polera blanca y pantalón de vestir gris. Uniforme de reuniones."
+      },
+      {
+        "id": "es-clean-084",
+        "field": "caption",
+        "text": "Mi saco favorito tiene coderas de gamuza. Lo heredé de mi abuelo y lo uso cada invierno."
+      },
+      {
+        "id": "es-clean-085",
+        "field": "caption",
+        "text": "¿Saco cruzado o recto para una entrevista? Yo voto por el recto, se ve más moderno."
+      },
+      {
+        "id": "es-clean-086",
+        "field": "caption",
+        "text": "Saco de lino crudo para el casamiento de mis amigos en la playa. Fresco y prolijo."
+      },
+      {
+        "id": "es-clean-087",
+        "field": "caption",
+        "text": "Hoy probé el saco oversize con shorts de ciclista y zapatillas. Me gustó el contraste."
+      },
+      {
+        "id": "es-clean-088",
+        "field": "caption",
+        "text": "Saco negro sobre vestido lencero. Fácil y elegante para una cena."
+      },
+      {
+        "id": "es-clean-089",
+        "field": "caption",
+        "text": "El saco a cuadros le da un aire académico a cualquier jean."
+      },
+      {
+        "id": "es-clean-090",
+        "field": "caption",
+        "text": "Cartera de concha de mar tejida, hecha por artesanas de la costa. Perfecta para el verano."
+      },
+      {
+        "id": "es-clean-091",
+        "field": "caption",
+        "text": "Collar de conchas que armé con mi hija en las vacaciones. Lo uso con orgullo."
+      },
+      {
+        "id": "es-clean-092",
+        "field": "caption",
+        "text": "Vestido con estampado de conchas marinas y fondo celeste. Tan veraniego que dan ganas de ir al mar."
+      },
+      {
+        "id": "es-clean-093",
+        "field": "caption",
+        "text": "El broche con forma de concha le da un toque especial a este blazer liso."
+      },
+      {
+        "id": "es-clean-094",
+        "field": "caption",
+        "text": "Hebilla de concha en el cinturón de cuero marrón. Detalle vintage que encontré en una feria."
+      },
+      {
+        "id": "es-clean-095",
+        "field": "caption",
+        "text": "Mi bikini favorito es el de lunares, aunque este año me compré uno liso color terracota."
+      },
+      {
+        "id": "es-clean-096",
+        "field": "caption",
+        "text": "Bikini de tiro alto con top de tirantes cruzados. Cómodo para nadar y para tomar sol."
+      },
+      {
+        "id": "es-clean-097",
+        "field": "caption",
+        "text": "Llevé dos bikinis al viaje y terminé usando solo el negro. Combina con todos los pareos."
+      },
+      {
+        "id": "es-clean-098",
+        "field": "caption",
+        "text": "Bikini verde esmeralda, camisa de lino abierta encima y sandalias de cuero. Look de chiringuito."
+      },
+      {
+        "id": "es-clean-099",
+        "field": "caption",
+        "text": "Tanga de bikini con tiras laterales anudadas y top triangular a juego. Vacaciones en el Caribe."
+      },
+      {
+        "id": "es-clean-100",
+        "field": "caption",
+        "text": "Ojo con el sol de mediodía: sombrero de ala ancha, camisa de manga larga sobre el bikini y mucha agua."
+      },
+      {
+        "id": "es-clean-101",
+        "field": "caption",
+        "text": "Bombacha de campo gris con faja tejida. Así se va a la fiesta del pueblo."
+      },
+      {
+        "id": "es-clean-102",
+        "field": "caption",
+        "text": "Mi abuelo usaba bombachas de campo todos los días. Hoy me puse una con botas y me sentí en el campo."
+      },
+      {
+        "id": "es-clean-103",
+        "field": "caption",
+        "text": "Culotte de lino blanco con sandalias de tiras. Fresco para pasear por el centro."
+      },
+      {
+        "id": "es-clean-104",
+        "field": "caption",
+        "text": "La falda culotte es perfecta para andar en bici sin preocuparse por el viento."
+      },
+      {
+        "id": "es-clean-105",
+        "field": "caption",
+        "text": "Pantalón culotte negro con blusa de seda rosa. Para la oficina en pleno verano."
+      },
+      {
+        "id": "es-clean-106",
+        "field": "caption",
+        "text": "Para los que preguntaron: el brasier es sin aros y de algodón orgánico. Ideal para los días de calor."
+      },
+      {
+        "id": "es-clean-107",
+        "field": "caption",
+        "text": "Brasier deportivo debajo de una camiseta suelta para ir al gimnasio y después a desayunar."
+      },
+      {
+        "id": "es-clean-108",
+        "field": "caption",
+        "text": "Un brasier de tirantes transparentes cambia todo con un vestido de escote barco."
+      },
+      {
+        "id": "es-clean-109",
+        "field": "caption",
+        "text": "Vestido nude de punto con botas negras. Contraste que me encanta para el otoño."
+      },
+      {
+        "id": "es-clean-110",
+        "field": "caption",
+        "text": "Labios nude, vestido nude y accesorios dorados. Monocromo suave para la tarde."
+      },
+      {
+        "id": "es-clean-111",
+        "field": "caption",
+        "text": "Los zapatos nude alargan la pierna, comprobado."
+      },
+      {
+        "id": "es-clean-112",
+        "field": "caption",
+        "text": "Tonos nude para el trabajo: pantalón beige, blusa crema y saco camel."
+      },
+      {
+        "id": "es-clean-113",
+        "field": "caption",
+        "text": "El negro adelgaza, dicen. Yo lo uso porque me hace sentir segura."
+      },
+      {
+        "id": "es-clean-114",
+        "field": "caption",
+        "text": "Vestido negro corto, medias negras y botines. Clásico de invierno."
+      },
+      {
+        "id": "es-clean-115",
+        "field": "caption",
+        "text": "Pantalón negro de vestir con camisa rosa chicle. Serio pero divertido."
+      },
+      {
+        "id": "es-clean-116",
+        "field": "caption",
+        "text": "Zapatos negros con hebilla plateada. Los saco solo para ocasiones especiales."
+      },
+      {
+        "id": "es-clean-117",
+        "field": "caption",
+        "text": "Abrigo negro de lana y bufanda rosa. Contraste perfecto para un día gris."
+      },
+      {
+        "id": "es-clean-118",
+        "field": "caption",
+        "text": "Rosa palo, rosa fucsia y rosa pastel en un mismo look. ¿Mucho rosa? Nunca es demasiado."
+      },
+      {
+        "id": "es-clean-119",
+        "field": "caption",
+        "text": "Suéter rosa con jeans grises. Comodidad de domingo."
+      },
+      {
+        "id": "es-clean-120",
+        "field": "caption",
+        "text": "Falda plisada rosa y camiseta blanca básica. Fácil y fresco."
+      },
+      {
+        "id": "es-clean-121",
+        "field": "caption",
+        "text": "El rosa no es solo para primavera. Este abrigo rosa empolvado me acompaña todo el invierno."
+      },
+      {
+        "id": "es-clean-122",
+        "field": "caption",
+        "text": "Camisa rosa con traje gris para la oficina. Siempre recibo cumplidos."
+      },
+      {
+        "id": "es-clean-123",
+        "field": "caption",
+        "text": "Fuimos a comer tacos después del trabajo y por suerte iba con ropa cómoda."
+      },
+      {
+        "id": "es-clean-124",
+        "field": "caption",
+        "text": "Para salir a comer con amigos elegí pantalón ancho, top negro y sandalias de tacón bajo."
+      },
+      {
+        "id": "es-clean-125",
+        "field": "caption",
+        "text": "Hoy no sé qué comer, pero sí sé qué ponerme: vestido de lino amarillo."
+      },
+      {
+        "id": "es-clean-126",
+        "field": "caption",
+        "text": "Me gusta vestirme bien hasta para ir a comer un helado. Short blanco y camisa celeste."
+      },
+      {
+        "id": "es-clean-127",
+        "field": "caption",
+        "text": "Brindis con cerveza artesanal y un look relajado: camisa de franela, jeans y botas."
+      },
+      {
+        "id": "es-clean-128",
+        "field": "caption",
+        "text": "Festival de la cerveza en el parque. Camiseta, gorra y zapatillas cómodas para todo el día."
+      },
+      {
+        "id": "es-clean-129",
+        "field": "caption",
+        "text": "Cervecería al aire libre y 25 grados. Vestido camisero de rayas y alpargatas."
+      },
+      {
+        "id": "es-clean-130",
+        "field": "caption",
+        "text": "Mi mamá dice que siempre hay que llevar un abrigo por si acaso. Hoy tenía razón."
+      },
+      {
+        "id": "es-clean-131",
+        "field": "caption",
+        "text": "Look combinado con mi mamá para su cumpleaños: las dos de blanco y dorado."
+      },
+      {
+        "id": "es-clean-132",
+        "field": "caption",
+        "text": "Gracias, mamá, por enseñarme a planchar bien una camisa. Hoy lo aprecio más que nunca."
+      },
+      {
+        "id": "es-clean-133",
+        "field": "caption",
+        "text": "Ropa de mamá: vestido con bolsillos, zapatillas y una cartera grande donde entra todo."
+      },
+      {
+        "id": "es-clean-134",
+        "field": "caption",
+        "text": "Día de la madre con mi mamá. Ella de azul, yo de rosa."
+      },
+      {
+        "id": "es-clean-135",
+        "field": "caption",
+        "text": "Mi regalo para el amigo invisible: un gorro de lana tejido a mano. Le encantó."
+      },
+      {
+        "id": "es-clean-136",
+        "field": "caption",
+        "text": "Me hicieron un regalo hermoso: un pañuelo de seda con estampado de golondrinas."
+      },
+      {
+        "id": "es-clean-137",
+        "field": "caption",
+        "text": "¿Ideas de regalo para alguien que solo usa negro? Pensaba en guantes de cuero."
+      },
+      {
+        "id": "es-clean-138",
+        "field": "caption",
+        "text": "Fiesta de quince de mi sobrina. Vestido largo color lavanda y sandalias plateadas."
+      },
+      {
+        "id": "es-clean-139",
+        "field": "caption",
+        "text": "Fiesta en la terraza con 28 grados. Elegí un mono de seda verde agua."
+      },
+      {
+        "id": "es-clean-140",
+        "field": "caption",
+        "text": "Para la fiesta temática de los setenta: pantalón acampanado y camisa con cuello grande."
+      },
+      {
+        "id": "es-clean-141",
+        "field": "caption",
+        "text": "Fiesta de cumpleaños al aire libre. Vestido floreado, chaqueta de mezclilla y tenis blancos."
+      },
+      {
+        "id": "es-clean-142",
+        "field": "caption",
+        "text": "Un infierno de calor en Asunción hoy. Salí con vestido suelto, sombrero y abanico en mano."
+      },
+      {
+        "id": "es-clean-143",
+        "field": "caption",
+        "text": "Este verano es un infierno de calor. Mi uniforme: short de lino y camiseta de algodón."
+      },
+      {
+        "id": "es-clean-144",
+        "field": "caption",
+        "text": "Qué calor infernal en Córdoba. Musculosa blanca, pollera larga y ojotas."
+      },
+      {
+        "id": "es-clean-145",
+        "field": "caption",
+        "text": "Lo bueno de vivir en la sierra es que nunca hace un calor infernal. Hoy suéter liviano y jeans."
+      },
+      {
+        "id": "es-clean-146",
+        "field": "caption",
+        "text": "Estampado de cebra en la falda, todo lo demás liso. Así el animal print no se come el look."
+      },
+      {
+        "id": "es-clean-147",
+        "field": "caption",
+        "text": "Leopardo en los zapatos y lo demás neutro. Mi forma favorita de usar animal print."
+      },
+      {
+        "id": "es-clean-148",
+        "field": "caption",
+        "text": "Prendedor con forma de burrito de felpa en la mochila de mi hijo. Le da personalidad al uniforme escolar."
+      },
+      {
+        "id": "es-clean-149",
+        "field": "caption",
+        "text": "Pantalón con estampado de patitos para la casa. Comodidad ante todo."
+      },
+      {
+        "id": "es-clean-150",
+        "field": "caption",
+        "text": "Gorro de lana con pompón para el partido de la tarde. Hacía un frío tremendo en la tribuna."
+      },
+      {
+        "id": "es-clean-151",
+        "field": "caption",
+        "text": "Ruana de lana virgen para la neblina de la mañana en Tunja."
+      },
+      {
+        "id": "es-clean-152",
+        "field": "caption",
+        "text": "Poncho tejido en telar y sombrero de ala corta. Domingo en el mercado artesanal."
+      },
+      {
+        "id": "es-clean-153",
+        "field": "caption",
+        "text": "Guayabera blanca para la cena familiar en Mérida. Fresca y elegante."
+      },
+      {
+        "id": "es-clean-154",
+        "field": "caption",
+        "text": "Huipil bordado a mano con jeans y sandalias. Mi forma de llevar la tradición al día a día."
+      },
+      {
+        "id": "es-clean-155",
+        "field": "caption",
+        "text": "Chompa de alpaca color natural para el frío de Cusco. Abriga muchísimo."
+      },
+      {
+        "id": "es-clean-156",
+        "field": "caption",
+        "text": "Polera de cuello alto bajo el vestido de tirantes. Así lo uso también en invierno."
+      },
+      {
+        "id": "es-clean-157",
+        "field": "caption",
+        "text": "Pollera de jean, remera blanca y zapatillas. Sábado de mercado."
+      },
+      {
+        "id": "es-clean-158",
+        "field": "caption",
+        "text": "Remera rayada y pantalón rojo. Hoy me sentí marinera."
+      },
+      {
+        "id": "es-clean-159",
+        "field": "caption",
+        "text": "Musculosa de lino y pantalón ancho para el calor de enero."
+      },
+      {
+        "id": "es-clean-160",
+        "field": "caption",
+        "text": "Campera inflable y gorro de lana. La ola polar llegó en serio."
+      },
+      {
+        "id": "es-clean-161",
+        "field": "caption",
+        "text": "Chamarra de mezclilla con forro de borrega. Abriga y combina con todo."
+      },
+      {
+        "id": "es-clean-162",
+        "field": "caption",
+        "text": "Playera blanca, pantalón caqui y tenis. Cuando no hay tiempo de pensar."
+      },
+      {
+        "id": "es-clean-163",
+        "field": "caption",
+        "text": "Jersey de ochos y vaqueros rectos. Otoño en Valladolid."
+      },
+      {
+        "id": "es-clean-164",
+        "field": "caption",
+        "text": "Cazadora vaquera y falda midi de cuadros. Cambio de estación en Barcelona."
+      },
+      {
+        "id": "es-clean-165",
+        "field": "caption",
+        "text": "Gabardina, paraguas y botas de agua. Bilbao fiel a su estilo."
+      },
+      {
+        "id": "es-clean-166",
+        "field": "caption",
+        "text": "Rebeca de punto fino sobre vestido de flores. Primavera en Valencia."
+      },
+      {
+        "id": "es-clean-167",
+        "field": "caption",
+        "text": "Americana azul y pantalón blanco para la comunión de mi sobrino."
+      },
+      {
+        "id": "es-clean-168",
+        "field": "caption",
+        "text": "Bañador de rayas y camisa de lino. Primer chapuzón del año en Cádiz."
+      },
+      {
+        "id": "es-clean-169",
+        "field": "caption",
+        "text": "Chubasquero amarillo para el paseo por Santiago de Compostela. Llueve como siempre."
+      },
+      {
+        "id": "es-clean-170",
+        "field": "caption",
+        "text": "Abrigo de paño gris y botines de piel. Diciembre en Zaragoza."
+      },
+      {
+        "id": "es-clean-171",
+        "field": "caption",
+        "text": "El vestido camisero es mi básico de verano. Lo uso abierto como kimono o cerrado con cinturón."
+      },
+      {
+        "id": "es-clean-172",
+        "field": "caption",
+        "text": "Sumé un cinturón de cuero al vestido suelto y cambió toda la silueta."
+      },
+      {
+        "id": "es-clean-173",
+        "field": "caption",
+        "text": "¿Qué opinan de mezclar estampados? Hoy probé rayas con flores pequeñas."
+      },
+      {
+        "id": "es-clean-174",
+        "field": "caption",
+        "text": "¿Qué zapatos usarían con un vestido rosa palo para una boda de día?"
+      },
+      {
+        "id": "es-clean-175",
+        "field": "caption",
+        "text": "¿Alguien tiene tips para que el lino no se arrugue tanto?"
+      },
+      {
+        "id": "es-clean-176",
+        "field": "caption",
+        "text": "¿Botas o mocasines con este pantalón de vestir? No me decido."
+      },
+      {
+        "id": "es-clean-177",
+        "field": "caption",
+        "text": "¿Abrigo largo o corto para alguien de 1,55? Acepto consejos."
+      },
+      {
+        "id": "es-clean-178",
+        "field": "caption",
+        "text": "¿Cómo lavan los suéteres de lana sin que se encojan?"
+      },
+      {
+        "id": "es-clean-179",
+        "field": "caption",
+        "text": "¿Se puede usar blanco después del verano? Yo digo que sí, siempre."
+      },
+      {
+        "id": "es-clean-180",
+        "field": "caption",
+        "text": "¿Qué color de bolso combina con un abrigo verde botella?"
+      },
+      {
+        "id": "es-clean-181",
+        "field": "caption",
+        "text": "¿Les parece que el saco queda muy grande? Lo compré una talla más a propósito."
+      },
+      {
+        "id": "es-clean-182",
+        "field": "caption",
+        "text": "¿Cuál es su prenda infaltable para viajar? La mía es un pantalón ancho que no se arruga."
+      },
+      {
+        "id": "es-clean-183",
+        "field": "caption",
+        "text": "Pregunta seria: ¿cuántos abrigos son demasiados? Tengo cinco y quiero otro."
+      },
+      {
+        "id": "es-clean-184",
+        "field": "caption",
+        "text": "¡Qué lindo te queda el verde! Deberías usarlo más seguido."
+      },
+      {
+        "id": "es-clean-185",
+        "field": "caption",
+        "text": "Ese vestido es hermoso. El corte te favorece muchísimo."
+      },
+      {
+        "id": "es-clean-186",
+        "field": "caption",
+        "text": "Me encanta cómo combinaste el mostaza con el azul. Muy buena idea."
+      },
+      {
+        "id": "es-clean-187",
+        "field": "caption",
+        "text": "Qué estilo tenés para mezclar texturas, siempre aprendo algo de tus fotos."
+      },
+      {
+        "id": "es-clean-188",
+        "field": "caption",
+        "text": "¡Te queda increíble ese pantalón! El largo es perfecto."
+      },
+      {
+        "id": "es-clean-189",
+        "field": "caption",
+        "text": "Copiando este look para el viernes, gracias por la inspiración."
+      },
+      {
+        "id": "es-clean-190",
+        "field": "caption",
+        "text": "Qué elegante ese abrigo, parece hecho a medida."
+      },
+      {
+        "id": "es-clean-191",
+        "field": "caption",
+        "text": "Las botas son un acierto total. Le dan otro aire a la falda."
+      },
+      {
+        "id": "es-clean-192",
+        "field": "caption",
+        "text": "Tu forma de usar el negro es una lección de estilo."
+      },
+      {
+        "id": "es-clean-193",
+        "field": "caption",
+        "text": "El color del suéter resalta tus ojos. Precioso."
+      },
+      {
+        "id": "es-clean-194",
+        "field": "caption",
+        "text": "Hoy me animé con el rojo de pies a cabeza. Me sentí poderosa."
+      },
+      {
+        "id": "es-clean-195",
+        "field": "caption",
+        "text": "Primera vez que me pongo un traje de tres piezas. Boda de mi hermano, cero nervios."
+      },
+      {
+        "id": "es-clean-196",
+        "field": "caption",
+        "text": "Volví a la oficina después de las vacaciones y saqué el blazer de lino del placard."
+      },
+      {
+        "id": "es-clean-197",
+        "field": "caption",
+        "text": "Corte de pelo nuevo y ganas de estrenar algo. Elegí un vestido verde menta."
+      },
+      {
+        "id": "es-clean-198",
+        "field": "caption",
+        "text": "Un look viejo con un accesorio nuevo: pañuelo de seda atado en la cartera."
+      },
+      {
+        "id": "es-clean-199",
+        "field": "caption",
+        "text": "Mi abuela me tejió este chaleco y es lo más abrigado que tengo."
+      },
+      {
+        "id": "es-clean-200",
+        "field": "caption",
+        "text": "Arreglé el ruedo del pantalón yo misma y quedó perfecto para usar con zapatillas."
+      },
+      {
+        "id": "es-clean-201",
+        "field": "caption",
+        "text": "Llevé este saco a la modista para ajustar las mangas. Ahora sí me queda como quiero."
+      },
+      {
+        "id": "es-clean-202",
+        "field": "caption",
+        "text": "Ropa de segunda mano: chaqueta de pana marrón por casi nada. Gran hallazgo."
+      },
+      {
+        "id": "es-clean-203",
+        "field": "caption",
+        "text": "Feria americana del sábado: encontré una falda plisada de lana en perfecto estado."
+      },
+      {
+        "id": "es-clean-204",
+        "field": "caption",
+        "text": "Intercambio de ropa con amigas. Me llevé una blusa de seda y dejé dos suéteres."
+      },
+      {
+        "id": "es-clean-205",
+        "field": "caption",
+        "text": "Tercera temporada con las mismas botas. Las cuido mucho y siguen como nuevas."
+      },
+      {
+        "id": "es-clean-206",
+        "field": "caption",
+        "text": "Este año quiero comprar menos y mejor. Empiezo con un buen abrigo de lana."
+      },
+      {
+        "id": "es-clean-207",
+        "field": "caption",
+        "text": "Armario cápsula de otoño: 25 prendas, todas combinables entre sí."
+      },
+      {
+        "id": "es-clean-208",
+        "field": "caption",
+        "text": "Ordené el placard por colores y ahora me visto el doble de rápido."
+      },
+      {
+        "id": "es-clean-209",
+        "field": "caption",
+        "text": "Guardé la ropa de verano y saqué la de invierno. Ritual de cambio de temporada."
+      },
+      {
+        "id": "es-clean-210",
+        "field": "caption",
+        "text": "La lana merino es mi mejor amiga: abriga, respira y no pica."
+      },
+      {
+        "id": "es-clean-211",
+        "field": "caption",
+        "text": "El algodón orgánico se siente distinto. Más suave después de cada lavado."
+      },
+      {
+        "id": "es-clean-212",
+        "field": "caption",
+        "text": "Prefiero el lino aunque se arrugue. Esas arrugas son parte del encanto."
+      },
+      {
+        "id": "es-clean-213",
+        "field": "caption",
+        "text": "La seda en verano es un lujo fresco. Esta blusa la uso con todo."
+      },
+      {
+        "id": "es-clean-214",
+        "field": "caption",
+        "text": "La pana volvió y yo feliz. Pantalón de pana color vino con suéter crema."
+      },
+      {
+        "id": "es-clean-215",
+        "field": "caption",
+        "text": "El tweed es perfecto para días de 10 grados: abriga sin ser pesado."
+      },
+      {
+        "id": "es-clean-216",
+        "field": "caption",
+        "text": "Franela a cuadros, el abrazo que necesito los domingos de frío."
+      },
+      {
+        "id": "es-clean-217",
+        "field": "caption",
+        "text": "El cuero vegano de esta chaqueta aguantó la llovizna sin problemas."
+      },
+      {
+        "id": "es-clean-218",
+        "field": "caption",
+        "text": "Prendas de punto grueso para la ola de frío. Suéter, gorro y bufanda haciendo juego."
+      },
+      {
+        "id": "es-clean-219",
+        "field": "caption",
+        "text": "Gasa liviana para el calor húmedo. Se seca en minutos."
+      },
+      {
+        "id": "es-clean-220",
+        "field": "caption",
+        "text": "Mezclilla cruda, sin lavados. Va tomando la forma de mi cuerpo con el uso."
+      },
+      {
+        "id": "es-clean-221",
+        "field": "caption",
+        "text": "Lunes nublado, abrigo verde oliva, ánimo arriba."
+      },
+      {
+        "id": "es-clean-222",
+        "field": "caption",
+        "text": "Martes de lluvia y botas de goma color mostaza."
+      },
+      {
+        "id": "es-clean-223",
+        "field": "caption",
+        "text": "Miércoles de oficina: pantalón gris, camisa celeste y mocasines."
+      },
+      {
+        "id": "es-clean-224",
+        "field": "caption",
+        "text": "Jueves de sol inesperado. Me sobró la chaqueta todo el día."
+      },
+      {
+        "id": "es-clean-225",
+        "field": "caption",
+        "text": "Viernes casual: jeans, camisa de rayas y zapatillas blancas."
+      },
+      {
+        "id": "es-clean-226",
+        "field": "caption",
+        "text": "Sábado de feria con canasta de mimbre y vestido de algodón."
+      },
+      {
+        "id": "es-clean-227",
+        "field": "caption",
+        "text": "Domingo en casa con conjunto de punto suave y medias de lana."
+      },
+      {
+        "id": "es-clean-228",
+        "field": "caption",
+        "text": "Hoy hizo 8 grados a la mañana y 24 a la tarde. Me vestí en capas y fui sacándome cosas."
+      },
+      {
+        "id": "es-clean-229",
+        "field": "caption",
+        "text": "Granizo a la tarde en Mendoza. Por suerte llevaba el impermeable."
+      },
+      {
+        "id": "es-clean-230",
+        "field": "caption",
+        "text": "Tormenta tropical en Panamá. Sandalias de goma y vestido que se seque rápido."
+      },
+      {
+        "id": "es-clean-231",
+        "field": "caption",
+        "text": "Niebla espesa en San Francisco de Quito, así que saqué la chaqueta acolchada."
+      },
+      {
+        "id": "es-clean-232",
+        "field": "caption",
+        "text": "Brisa del mar en Cartagena, ropa blanca y sombrero de paja toquilla."
+      },
+      {
+        "id": "es-clean-233",
+        "field": "caption",
+        "text": "Primer día de nieve en Madrid en años. Abrigo largo, botas y orejeras."
+      },
+      {
+        "id": "es-clean-234",
+        "field": "caption",
+        "text": "Ola de calor en Buenos Aires: vestido suelto de algodón, sandalias y agua siempre a mano."
+      },
+      {
+        "id": "es-clean-235",
+        "field": "caption",
+        "text": "Día perfecto de 20 grados en Medellín, la ciudad de la eterna primavera. Camisa de manga corta y jeans."
+      },
+      {
+        "id": "es-clean-236",
+        "field": "caption",
+        "text": "Viento patagónico en Río Gallegos. Campera rompeviento, gorro y guantes, sin discusión."
+      },
+      {
+        "id": "es-clean-237",
+        "field": "caption",
+        "text": "En San José llovió a las tres en punto, como todos los días. Siempre llevo paraguas plegable."
+      },
+      {
+        "id": "es-clean-238",
+        "field": "caption",
+        "text": "Calor de 38 grados en Hermosillo. Ropa de colores claros y telas naturales, siempre."
+      },
+      {
+        "id": "es-clean-239",
+        "field": "caption",
+        "text": "La Paz amaneció helada. Chompa de alpaca, chalina y gorro con orejeras."
+      },
+      {
+        "id": "es-clean-240",
+        "field": "caption",
+        "text": "Sol fuerte en Santo Domingo. Vestido amarillo y sombrero de ala ancha."
+      },
+      {
+        "id": "es-clean-241",
+        "field": "caption",
+        "text": "Clima templado en Guadalajara. Pantalón de lino y blusa de manga tres cuartos."
+      },
+      {
+        "id": "es-clean-242",
+        "field": "caption",
+        "text": "Tarde gris en Valparaíso. Impermeable azul y botas cortas para subir los cerros."
+      },
+      {
+        "id": "es-clean-243",
+        "field": "caption",
+        "text": "Bruma matinal en Montevideo, sol a la tarde. Trench beige y lentes de sol en la cartera."
+      },
+      {
+        "id": "es-clean-244",
+        "field": "caption",
+        "text": "Para la entrevista elegí un traje azul marino, camisa blanca y zapatos negros. Simple y seguro."
+      },
+      {
+        "id": "es-clean-245",
+        "field": "caption",
+        "text": "Graduación de mi hija: vestido azul eléctrico y sandalias doradas. Estoy orgullosísima."
+      },
+      {
+        "id": "es-clean-246",
+        "field": "caption",
+        "text": "Bautismo de mi ahijado. Vestido celeste pastel y tocado pequeño."
+      },
+      {
+        "id": "es-clean-247",
+        "field": "caption",
+        "text": "Cena de aniversario: vestido rojo, labios rojos y abrigo negro."
+      },
+      {
+        "id": "es-clean-248",
+        "field": "caption",
+        "text": "Reunión familiar en el campo. Botas, jeans y camisa de franela."
+      },
+      {
+        "id": "es-clean-249",
+        "field": "caption",
+        "text": "Picnic en el parque con vestido de cuadros vichy y alpargatas."
+      },
+      {
+        "id": "es-clean-250",
+        "field": "caption",
+        "text": "Concierto al aire libre: jeans, camiseta, chaqueta de cuero y zapatillas cómodas."
+      },
+      {
+        "id": "es-clean-251",
+        "field": "caption",
+        "text": "Primer día de clases como profesora. Pantalón ancho, blusa y zapatos bajos."
+      },
+      {
+        "id": "es-clean-252",
+        "field": "caption",
+        "text": "Paseo en bicicleta por la rambla. Calzas, remera técnica y rompeviento."
+      },
+      {
+        "id": "es-clean-253",
+        "field": "caption",
+        "text": "Viaje en tren de seis horas: todo de punto suave para ir cómoda."
+      },
+      {
+        "id": "es-clean-254",
+        "field": "caption",
+        "text": "Vuelo largo y aire acondicionado al máximo. Siempre llevo un pañuelo grande para taparme."
+      },
+      {
+        "id": "es-clean-255",
+        "field": "caption",
+        "text": "Visita al museo con zapatillas blancas, pantalón negro y suéter de cuello alto."
+      },
+      {
+        "id": "es-clean-256",
+        "field": "caption",
+        "text": "Caminata en la sierra: pantalón técnico, camiseta de manga larga y sombrero."
+      },
+      {
+        "id": "es-clean-257",
+        "field": "caption",
+        "text": "Partido de fútbol con mi sobrino. Ropa deportiva y gorra para el sol."
+      },
+      {
+        "id": "es-clean-258",
+        "field": "caption",
+        "text": "Mañana de mercado con canasta y vestido de tirantes. El sol pega fuerte temprano."
+      },
+      {
+        "id": "es-clean-259",
+        "field": "caption",
+        "text": "Brunch con amigas: falda midi plisada, camiseta blanca y zapatillas."
+      },
+      {
+        "id": "es-clean-260",
+        "field": "caption",
+        "text": "Turno médico tempranito, así que conjunto de punto cómodo y abrigo largo."
+      },
+      {
+        "id": "es-clean-261",
+        "field": "caption",
+        "text": "Tarde de lectura en el café: pantalón de pana, suéter beige y anteojos de carey."
+      },
+      {
+        "id": "es-clean-262",
+        "field": "caption",
+        "text": "Tengo una boda en la playa en marzo. ¿Qué tela me recomiendan para que no dé calor?"
+      },
+      {
+        "id": "es-clean-263",
+        "field": "caption",
+        "text": "Para las bodas de día prefiero colores claros y vestidos que se puedan bailar."
+      },
+      {
+        "id": "es-clean-264",
+        "field": "caption",
+        "text": "Para las bodas de noche me gusta el azul profundo. El negro lo dejo para otras ocasiones."
+      },
+      {
+        "id": "es-clean-265",
+        "field": "caption",
+        "text": "Look de invitada: vestido largo verde esmeralda con aretes dorados."
+      },
+      {
+        "id": "es-clean-266",
+        "field": "caption",
+        "text": "Cuando el código de vestimenta dice cóctel, siempre elijo un vestido midi y tacón medio."
+      },
+      {
+        "id": "es-clean-267",
+        "field": "caption",
+        "text": "Me encanta cómo queda el blanco roto con el café. Combinación cálida para otoño."
+      },
+      {
+        "id": "es-clean-268",
+        "field": "caption",
+        "text": "El verde oliva con el camel es una dupla que nunca me falla."
+      },
+      {
+        "id": "es-clean-269",
+        "field": "caption",
+        "text": "Azul cobalto y naranja: colores complementarios que dan alegría al día."
+      },
+      {
+        "id": "es-clean-270",
+        "field": "caption",
+        "text": "El gris es un neutro muy subestimado. Hoy todo gris, con texturas diferentes."
+      },
+      {
+        "id": "es-clean-271",
+        "field": "caption",
+        "text": "Morado y verde juntos. Me lo recomendó una amiga y tenía razón."
+      },
+      {
+        "id": "es-clean-272",
+        "field": "caption",
+        "text": "Total white para el calor. Lino blanco de pies a cabeza."
+      },
+      {
+        "id": "es-clean-273",
+        "field": "caption",
+        "text": "El amarillo mostaza le queda bien a casi todo el mundo, en serio."
+      },
+      {
+        "id": "es-clean-274",
+        "field": "caption",
+        "text": "Burdeos para el otoño: suéter, labial y botines del mismo tono."
+      },
+      {
+        "id": "es-clean-275",
+        "field": "caption",
+        "text": "Lila y gris perla, una paleta suave para días de llovizna."
+      },
+      {
+        "id": "es-clean-276",
+        "field": "caption",
+        "text": "Celeste y blanco, colores de cielo para un día de sol."
+      },
+      {
+        "id": "es-clean-277",
+        "field": "caption",
+        "text": "Terracota, crema y marrón. Así se ve mi armario de otoño."
+      },
+      {
+        "id": "es-clean-278",
+        "field": "caption",
+        "text": "Pantalón de vestir con zapatillas: el combo que me acompaña desde hace años."
+      },
+      {
+        "id": "es-clean-279",
+        "field": "caption",
+        "text": "Blazer con jeans rotos. Formal e informal al mismo tiempo."
+      },
+      {
+        "id": "es-clean-280",
+        "field": "caption",
+        "text": "Falda larga de seda con suéter grueso. Mezcla de temporadas que funciona."
+      },
+      {
+        "id": "es-clean-281",
+        "field": "caption",
+        "text": "Vestido de verano con botas camperas para los días de entretiempo."
+      },
+      {
+        "id": "es-clean-282",
+        "field": "caption",
+        "text": "Camisa de hombre prestada, cinturón y sandalias. Look de verano sin esfuerzo."
+      },
+      {
+        "id": "es-clean-283",
+        "field": "caption",
+        "text": "Chaleco sastrero sin nada debajo y pantalón a juego. Ideal para una noche cálida."
+      },
+      {
+        "id": "es-clean-284",
+        "field": "caption",
+        "text": "Calcetines blancos con mocasines negros. Sí, los volví a usar."
+      },
+      {
+        "id": "es-clean-285",
+        "field": "caption",
+        "text": "Suéter sobre los hombros, como lo usaba mi papá en los noventa."
+      },
+      {
+        "id": "es-clean-286",
+        "field": "caption",
+        "text": "Mocasines con medias de colores. Detalle divertido para un look serio."
+      },
+      {
+        "id": "es-clean-287",
+        "field": "caption",
+        "text": "Gorro de pescador y gafas de sol. Accesorios que salvan cualquier look de verano."
+      },
+      {
+        "id": "es-clean-288",
+        "field": "caption",
+        "text": "Pañuelo de seda en el cuello y camisa blanca. Así de simple."
+      },
+      {
+        "id": "es-clean-289",
+        "field": "caption",
+        "text": "Collar de perlas con camiseta de algodón. Mezcla de alta y baja que me encanta."
+      },
+      {
+        "id": "es-clean-290",
+        "field": "caption",
+        "text": "Cinturón ancho sobre abrigo largo para marcar la cintura."
+      },
+      {
+        "id": "es-clean-291",
+        "field": "caption",
+        "text": "Cartera de mimbre en pleno otoño, porque la amo y punto."
+      },
+      {
+        "id": "es-clean-292",
+        "field": "caption",
+        "text": "Mochila de cuero para ir al trabajo en bici. Práctica y elegante."
+      },
+      {
+        "id": "es-clean-293",
+        "field": "caption",
+        "text": "Anillos de plata en todos los dedos. Mi único accesorio del día."
+      },
+      {
+        "id": "es-clean-294",
+        "field": "caption",
+        "text": "Reloj de mi abuelo con correa nueva de cuero marrón."
+      },
+      {
+        "id": "es-clean-295",
+        "field": "caption",
+        "text": "Gafas de sol de carey para un día luminoso de invierno."
+      },
+      {
+        "id": "es-clean-296",
+        "field": "caption",
+        "text": "Bufanda gigante de lana que también uso como manta en la oficina."
+      },
+      {
+        "id": "es-clean-297",
+        "field": "caption",
+        "text": "Guantes de cuero forrados. Indispensables para andar en bici en julio."
+      },
+      {
+        "id": "es-clean-298",
+        "field": "caption",
+        "text": "Paraguas transparente para que se vea el look aunque llueva."
+      },
+      {
+        "id": "es-clean-299",
+        "field": "caption",
+        "text": "Este abrigo tiene diez años y sigue impecable. Comprar calidad vale la pena."
+      },
+      {
+        "id": "es-clean-300",
+        "field": "caption",
+        "text": "Lavar a mano la ropa de lana con agua fría y secarla en horizontal. Así duran años."
+      },
+      {
+        "id": "es-clean-301",
+        "field": "caption",
+        "text": "Cepillar el abrigo de paño después de cada uso lo mantiene como nuevo."
+      },
+      {
+        "id": "es-clean-302",
+        "field": "caption",
+        "text": "Guardar los suéteres doblados, nunca colgados, para que no se estiren."
+      },
+      {
+        "id": "es-clean-303",
+        "field": "caption",
+        "text": "Un buen sastre puede transformar una prenda barata en algo que parece hecho a medida."
+      },
+      {
+        "id": "es-clean-304",
+        "field": "caption",
+        "text": "Los zapatos de cuero merecen crema y cepillo cada dos semanas. Mis botas lo agradecen."
+      },
+      {
+        "id": "es-clean-305",
+        "field": "caption",
+        "text": "Siempre leo la etiqueta antes de comprar. Si tiene más de 50 % de fibras naturales, me interesa."
+      },
+      {
+        "id": "es-clean-306",
+        "field": "caption",
+        "text": "Me puse el mismo vestido tres veces esta semana con accesorios diferentes. Nadie lo notó."
+      },
+      {
+        "id": "es-clean-307",
+        "field": "caption",
+        "text": "Repetir ropa es estilo, no descuido. Este suéter ya va por su quinta foto."
+      },
+      {
+        "id": "es-clean-308",
+        "field": "caption",
+        "text": "Pantalón ancho de lino color crudo, sandalias de cuero y top negro. Verano en Mallorca. #lookdeldia"
+      },
+      {
+        "id": "es-clean-309",
+        "field": "caption",
+        "text": "Abrigo camel y bufanda a cuadros. #otoño #estilo"
+      },
+      {
+        "id": "es-clean-310",
+        "field": "caption",
+        "text": "Lluvia, botas y buen humor. #díadelluvia"
+      },
+      {
+        "id": "es-clean-311",
+        "field": "caption",
+        "text": "Mi look para el frío de hoy: capas, capas y más capas. #invierno #ootd"
+      },
+      {
+        "id": "es-clean-312",
+        "field": "caption",
+        "text": "Vestido de lunares y sandalias rojas. #veranoenlaciudad ☀️"
+      },
+      {
+        "id": "es-clean-313",
+        "field": "caption",
+        "text": "Primer día de calor del año y ya saqué las sandalias. #primavera"
+      },
+      {
+        "id": "es-clean-314",
+        "field": "caption",
+        "text": "Gabardina y paraguas, mi uniforme de octubre. #lluvia #estilo"
+      },
+      {
+        "id": "es-clean-315",
+        "field": "caption",
+        "text": "Look de oficina con un toque de color. #modalaboral"
+      },
+      {
+        "id": "es-clean-316",
+        "field": "altText",
+        "text": "Mujer de pie en una vereda arbolada con saco de lana gris, camisa de franela abierta sobre camiseta blanca, jeans rectos y botines marrones, sosteniendo un paraguas plegable cerrado."
+      },
+      {
+        "id": "es-clean-317",
+        "field": "altText",
+        "text": "Hombre con guayabera de lino blanca de manga larga, pantalón de algodón beige y sandalias de cuero marrón, caminando bajo los arcos de una plaza colonial con luz fuerte de mediodía."
+      },
+      {
+        "id": "es-clean-318",
+        "field": "altText",
+        "text": "Foto de cuerpo entero frente a un espejo de pie: vestido largo de lino terracota, sandalias planas de cuero, sombrero de paja de ala ancha y un chal fino color crema sobre el brazo."
+      },
+      {
+        "id": "es-clean-319",
+        "field": "altText",
+        "text": "Prendas de una valija de viaje extendidas sobre una cama: dos pantalones, un vestido negro, cuatro camisetas, un saco beige, un suéter gris y dos pares de zapatos en tonos neutros."
+      },
+      {
+        "id": "es-clean-320",
+        "field": "altText",
+        "text": "Persona con chompa de alpaca marrón, chalina tejida roja, gorro con orejeras y guantes de lana, de pie en una calle empedrada con montañas nevadas al fondo y cielo despejado."
+      },
+      {
+        "id": "es-clean-321",
+        "field": "altText",
+        "text": "Mujer con bikini azul marino, camisa de lino blanca abierta y sombrero de ala ancha sentada bajo una sombrilla a rayas, junto a una bolsa de playa tejida y una botella de agua."
+      },
+      {
+        "id": "es-clean-322",
+        "field": "altText",
+        "text": "Primer plano de un vestido blanco de algodón con collar fino dorado y aretes de concha nácar, iluminado por la luz cálida del atardecer en una terraza frente al mar."
+      },
+      {
+        "id": "es-clean-323",
+        "field": "altText",
+        "text": "Hombre con bombacha de campo gris, alpargatas negras, camisa blanca y pañuelo rojo al cuello, con un poncho de lana doblado sobre el hombro, en un patio con guirnaldas de luces."
+      },
+      {
+        "id": "es-clean-324",
+        "field": "altText",
+        "text": "Persona con saco gris, camisa blanca y jeans de corte recto, de pie frente a una pared de ladrillo."
+      },
+      {
+        "id": "es-clean-325",
+        "field": "altText",
+        "text": "Mujer con vestido nude hasta la rodilla y sandalias doradas en un jardín con flores."
+      },
+      {
+        "id": "es-clean-326",
+        "field": "altText",
+        "text": "Primer plano de aretes de concha nácar sobre una mano con anillos de plata."
+      },
+      {
+        "id": "es-clean-327",
+        "field": "altText",
+        "text": "Bikini negro, pareo blanco y sombrero de paja extendidos sobre una toalla de rayas en la arena."
+      },
+      {
+        "id": "es-clean-328",
+        "field": "altText",
+        "text": "Hombre con bombacha de campo gris, camisa a cuadros y alpargatas negras junto a una tranquera."
+      },
+      {
+        "id": "es-clean-329",
+        "field": "altText",
+        "text": "Falda culotte azul marino con mocasines marrones, foto tomada de la cintura para abajo."
+      },
+      {
+        "id": "es-clean-330",
+        "field": "altText",
+        "text": "Mujer con abrigo negro largo y bufanda rosa caminando por una vereda mojada."
+      },
+      {
+        "id": "es-clean-331",
+        "field": "altText",
+        "text": "Saco a cuadros sobre una camiseta blanca, colgado en una percha de madera."
+      },
+      {
+        "id": "es-clean-332",
+        "field": "altText",
+        "text": "Persona con trench beige y botas de lluvia sosteniendo un paraguas transparente."
+      },
+      {
+        "id": "es-clean-333",
+        "field": "altText",
+        "text": "Vestido de lentejuelas plateado con saco negro sobre los hombros, frente a un espejo."
+      },
+      {
+        "id": "es-clean-334",
+        "field": "altText",
+        "text": "Abrigo pata de gallo en blanco y negro con botones grandes, visto de frente."
+      },
+      {
+        "id": "es-clean-335",
+        "field": "altText",
+        "text": "Mono de lino color arena con cinturón de la misma tela, sobre una silla de mimbre."
+      },
+      {
+        "id": "es-clean-336",
+        "field": "altText",
+        "text": "Camisa de lino blanca con botones de concha, en primer plano sobre una mesa."
+      },
+      {
+        "id": "es-clean-337",
+        "field": "altText",
+        "text": "Brasier de encaje color piel junto a una blusa semitransparente doblada."
+      },
+      {
+        "id": "es-clean-338",
+        "field": "altText",
+        "text": "Tanga de bikini verde con tiras laterales y top triangular a juego sobre una toalla."
+      },
+      {
+        "id": "es-clean-339",
+        "field": "altText",
+        "text": "Hombre con guayabera blanca, pantalón beige y zapatos de cuero claro en una plaza soleada."
+      },
+      {
+        "id": "es-clean-340",
+        "field": "altText",
+        "text": "Mujer con huipil bordado de flores rojas y azules, jeans y sandalias de cuero."
+      },
+      {
+        "id": "es-clean-341",
+        "field": "altText",
+        "text": "Persona con chompa de alpaca color natural y gorro tejido frente a montañas."
+      },
+      {
+        "id": "es-clean-342",
+        "field": "altText",
+        "text": "Look extendido en el piso: jeans, suéter mostaza, botas marrones y bolso de cuero."
+      },
+      {
+        "id": "es-clean-343",
+        "field": "altText",
+        "text": "Niña con pantalón verde, suéter rosa y medias con estrellas sentada en un banco."
+      },
+      {
+        "id": "es-clean-344",
+        "field": "altText",
+        "text": "Mujer mayor con falda de lana gris y blusa con lazo, sonriendo en un balcón."
+      },
+      {
+        "id": "es-clean-345",
+        "field": "altText",
+        "text": "Hombre con chaqueta de cuero marrón, camiseta blanca y jeans oscuros apoyado en una moto."
+      },
+      {
+        "id": "es-clean-346",
+        "field": "altText",
+        "text": "Vestido rojo largo, labial rojo y abrigo negro, foto de cuerpo entero en un salón."
+      },
+      {
+        "id": "es-clean-347",
+        "field": "altText",
+        "text": "Sombrero de paja con cinta negra sobre una mesa junto a lentes de sol de carey."
+      },
+      {
+        "id": "es-clean-348",
+        "field": "altText",
+        "text": "Persona con parka azul, pantalón térmico negro y botas de nieve en un paisaje nevado."
+      },
+      {
+        "id": "es-clean-349",
+        "field": "altText",
+        "text": "Pantalón de pana color vino y suéter crema de punto grueso, foto de espejo."
+      },
+      {
+        "id": "es-clean-350",
+        "field": "altText",
+        "text": "Mujer con vestido camisero de rayas azules y alpargatas en una terraza con plantas."
+      },
+      {
+        "id": "es-clean-351",
+        "field": "altText",
+        "text": "Hombre con traje azul marino, camisa blanca y corbata gris en un pasillo de oficina."
+      },
+      {
+        "id": "es-clean-352",
+        "field": "altText",
+        "text": "Collar de conchas marinas blancas sobre un vestido celeste."
+      },
+      {
+        "id": "es-clean-353",
+        "field": "altText",
+        "text": "Cartera tejida en forma de concha de mar, color natural, colgada de una silla."
+      },
+      {
+        "id": "es-clean-354",
+        "field": "altText",
+        "text": "Botines negros, medias negras y vestido negro corto, visto desde la rodilla hacia abajo."
+      },
+      {
+        "id": "es-clean-355",
+        "field": "altText",
+        "text": "Suéter rosa empolvado y jeans grises con zapatillas blancas, foto de espejo en un dormitorio."
+      },
+      {
+        "id": "es-clean-356",
+        "field": "altText",
+        "text": "Mujer con falda plisada rosa, camiseta blanca y zapatillas caminando por un parque."
+      },
+      {
+        "id": "es-clean-357",
+        "field": "altText",
+        "text": "Gorro de lana con pompón, bufanda a juego y guantes rojos sobre un abrigo gris."
+      },
+      {
+        "id": "es-clean-358",
+        "field": "altText",
+        "text": "Persona con ruana de lana a rayas y sombrero de fieltro en una calle empedrada."
+      },
+      {
+        "id": "es-clean-359",
+        "field": "altText",
+        "text": "Conjunto de dos piezas verde salvia de lino colgado en una percha de madera."
+      },
+      {
+        "id": "es-clean-360",
+        "field": "altText",
+        "text": "Overol de mezclilla con camiseta de rayas y zapatillas de lona blancas."
+      },
+      {
+        "id": "es-clean-361",
+        "field": "altText",
+        "text": "Kimono de seda floreado sobre top negro y jeans claros, con sandalias planas."
+      },
+      {
+        "id": "es-clean-362",
+        "field": "altText",
+        "text": "Mujer con traje de pantalón rosa pastel y zapatos blancos en la entrada de un edificio."
+      },
+      {
+        "id": "es-clean-363",
+        "field": "altText",
+        "text": "Camisa hawaiana con estampado de hojas verdes y short beige sobre una cama."
+      },
+      {
+        "id": "es-clean-364",
+        "field": "altText",
+        "text": "Hombre con camisa de franela a cuadros rojos, jeans y botas de trabajo en un bosque."
+      },
+      {
+        "id": "es-clean-365",
+        "field": "altText",
+        "text": "Pantalón ancho de lino crudo, top negro y sandalias de cuero en una calle blanca."
+      },
+      {
+        "id": "es-clean-366",
+        "field": "altText",
+        "text": "Vestido de lunares blancos sobre fondo azul y sandalias rojas, de cuerpo entero."
+      },
+      {
+        "id": "es-clean-367",
+        "field": "altText",
+        "text": "Persona con chubasquero amarillo y botas de agua verdes en una plaza mojada."
+      },
+      {
+        "id": "es-clean-368",
+        "field": "altText",
+        "text": "Abrigo verde oliva con bufanda camel y botas marrones, foto tomada en un parque otoñal."
+      },
+      {
+        "id": "es-clean-369",
+        "field": "altText",
+        "text": "Mujer con vestido largo verde esmeralda y aretes dorados en un jardín iluminado."
+      },
+      {
+        "id": "es-clean-370",
+        "field": "altText",
+        "text": "Niño y adulto vestidos igual con camisa azul y pantalón beige, tomados de la mano."
+      },
+      {
+        "id": "es-clean-371",
+        "field": "altText",
+        "text": "Bañador de rayas azules y blancas con camisa de lino abierta en una playa."
+      },
+      {
+        "id": "es-clean-372",
+        "field": "altText",
+        "text": "Persona con camiseta térmica negra, guantes finos y gorro corriendo junto a un río."
+      },
+      {
+        "id": "es-clean-373",
+        "field": "altText",
+        "text": "Traje de nieve rojo y casco blanco de esquí en una pista con nieve."
+      },
+      {
+        "id": "es-clean-374",
+        "field": "altText",
+        "text": "Conjunto deportivo color salvia y abrigo largo beige frente a un estudio de yoga."
+      },
+      {
+        "id": "es-clean-375",
+        "field": "altText",
+        "text": "Mochila de cuero marrón colgada del manubrio de una bicicleta."
+      },
+      {
+        "id": "es-clean-376",
+        "field": "altText",
+        "text": "Paraguas transparente sobre una persona con abrigo rojo en una calle lluviosa."
+      },
+      {
+        "id": "es-clean-377",
+        "field": "altText",
+        "text": "Reloj con correa de cuero marrón en la muñeca de alguien con camisa celeste."
+      },
+      {
+        "id": "es-clean-378",
+        "field": "altText",
+        "text": "Gafas de sol de carey sobre un suéter de cuello alto gris."
+      },
+      {
+        "id": "es-clean-379",
+        "field": "altText",
+        "text": "Bufanda gigante de lana a cuadros envolviendo a una persona con abrigo negro."
+      },
+      {
+        "id": "es-clean-380",
+        "field": "altText",
+        "text": "Anillos de plata en varios dedos de una mano apoyada sobre un jean."
+      },
+      {
+        "id": "es-clean-381",
+        "field": "altText",
+        "text": "Collar de perlas sobre una camiseta blanca de algodón, en primer plano."
+      },
+      {
+        "id": "es-clean-382",
+        "field": "altText",
+        "text": "Cinturón ancho de cuero negro marcando la cintura sobre un abrigo largo camel."
+      },
+      {
+        "id": "es-clean-383",
+        "field": "altText",
+        "text": "Cartera de mimbre junto a botas de cuero marrón sobre hojas secas."
+      },
+      {
+        "id": "es-clean-384",
+        "field": "altText",
+        "text": "Falda de cuero marrón, suéter crema de cuello alto y botas del mismo tono."
+      },
+      {
+        "id": "es-clean-385",
+        "field": "altText",
+        "text": "Vestido de punto acanalado gris con abrigo largo negro y botas altas."
+      },
+      {
+        "id": "es-clean-386",
+        "field": "altText",
+        "text": "Pañuelo de seda azul atado al cuello de una camisa blanca."
+      },
+      {
+        "id": "es-clean-387",
+        "field": "altText",
+        "text": "Mocasines negros con calcetines blancos sobre un piso de madera."
+      },
+      {
+        "id": "es-clean-388",
+        "field": "altText",
+        "text": "Pantalón cargo verde con blusa de seda color marfil y sandalias negras."
+      },
+      {
+        "id": "es-clean-389",
+        "field": "altText",
+        "text": "Camisa de cuadros abierta sobre camiseta gris y vestido largo negro."
+      },
+      {
+        "id": "es-clean-390",
+        "field": "altText",
+        "text": "Persona con gorro de pescador beige, lentes de sol y camiseta blanca en la playa."
+      },
+      {
+        "id": "es-clean-391",
+        "field": "altText",
+        "text": "Hombre con chaleco de punto azul sobre camisa de manga larga blanca y pantalón gris."
+      },
+      {
+        "id": "es-clean-392",
+        "field": "altText",
+        "text": "Mujer con pantalón negro de vestir y camisa rosa chicle frente a una vidriera."
+      },
+      {
+        "id": "es-clean-393",
+        "field": "altText",
+        "text": "Mujer con jersey de ochos color crema y vaqueros rectos en una calle con árboles."
+      },
+      {
+        "id": "es-clean-394",
+        "field": "altText",
+        "text": "Cazadora vaquera sobre falda midi de cuadros rojos y botines negros."
+      },
+      {
+        "id": "es-clean-395",
+        "field": "altText",
+        "text": "Persona con rebeca de punto fino lila sobre vestido de flores pequeñas."
+      },
+      {
+        "id": "es-clean-396",
+        "field": "altText",
+        "text": "Americana azul marino y pantalón blanco con zapatos de cuero marrón."
+      },
+      {
+        "id": "es-clean-397",
+        "field": "altText",
+        "text": "Campera inflable negra y gorro de lana gris en una parada de colectivo."
+      },
+      {
+        "id": "es-clean-398",
+        "field": "altText",
+        "text": "Chamarra de mezclilla con forro de borrega blanco sobre playera negra."
+      },
+      {
+        "id": "es-clean-399",
+        "field": "altText",
+        "text": "Poncho tejido en tonos tierra y sombrero de ala corta en un mercado artesanal."
+      },
+      {
+        "id": "es-clean-400",
+        "field": "altText",
+        "text": "Polera negra de cuello alto debajo de un vestido de tirantes a cuadros."
+      },
+      {
+        "id": "es-clean-401",
+        "field": "altText",
+        "text": "Musculosa de lino blanca y pantalón ancho color arena con ojotas."
+      },
+      {
+        "id": "es-clean-402",
+        "field": "altText",
+        "text": "Hombre con camisa de lino celeste arremangada y pantalón chino caqui."
+      },
+      {
+        "id": "es-clean-403",
+        "field": "altText",
+        "text": "Persona con remera rayada azul y blanca y pantalón rojo recto."
+      },
+      {
+        "id": "es-clean-404",
+        "field": "altText",
+        "text": "Mujer con abrigo rosa empolvado y botas blancas en una calle con nieve."
+      },
+      {
+        "id": "es-clean-405",
+        "field": "altText",
+        "text": "Vestido de cuadros vichy rojo y blanco sobre un mantel de picnic en el pasto."
+      },
+      {
+        "id": "es-clean-406",
+        "field": "altText",
+        "text": "Mujer joven con vestido azul eléctrico y sandalias doradas en una ceremonia de graduación."
+      },
+      {
+        "id": "es-clean-407",
+        "field": "altText",
+        "text": "Vestido celeste pastel y tocado pequeño de flores blancas en la entrada de una iglesia."
+      },
+      {
+        "id": "es-clean-408",
+        "field": "altText",
+        "text": "Persona con jeans, camiseta negra, chaqueta de cuero y zapatillas en un concierto al aire libre."
+      },
+      {
+        "id": "es-clean-409",
+        "field": "altText",
+        "text": "Prendas de un armario cápsula de otoño colgadas en un perchero, en tonos tierra."
+      },
+      {
+        "id": "es-clean-410",
+        "field": "altText",
+        "text": "Placard ordenado por colores, desde el blanco hasta el negro."
+      },
+      {
+        "id": "es-clean-411",
+        "field": "altText",
+        "text": "Chaqueta de pana marrón con botones dorados colgada en una feria de ropa usada."
+      },
+      {
+        "id": "es-clean-412",
+        "field": "altText",
+        "text": "Suéter tejido a mano color mostaza con trenzas, doblado sobre una cama."
+      },
+      {
+        "id": "es-clean-413",
+        "field": "altText",
+        "text": "Cárdigan beige con botones de madera, visto de cerca."
+      },
+      {
+        "id": "es-clean-414",
+        "field": "altText",
+        "text": "Camiseta teñida color mostaza secándose en una soga al sol."
+      },
+      {
+        "id": "es-clean-415",
+        "field": "altText",
+        "text": "Falda floreada hecha a mano con cintura elástica, extendida sobre una mesa de costura."
+      },
+      {
+        "id": "es-clean-416",
+        "field": "altText",
+        "text": "Botas de cuero marrón recién lustradas junto a una lata de crema y un cepillo."
+      },
+      {
+        "id": "es-clean-417",
+        "field": "altText",
+        "text": "Suéteres de lana doblados y apilados por color en un estante."
+      },
+      {
+        "id": "es-clean-418",
+        "field": "altText",
+        "text": "Persona con vestido suelto de algodón, sombrero de ala ancha y abanico en una calle soleada."
+      },
+      {
+        "id": "es-clean-419",
+        "field": "altText",
+        "text": "Hombre con camisa de manga corta estampada y jeans en una calle con flores en Medellín."
+      },
+      {
+        "id": "es-clean-420",
+        "field": "altText",
+        "text": "Persona con campera rompeviento roja, gorro y guantes en un paisaje patagónico con viento."
+      }
+    ]
+  },
+  "disallowed": {
+    "description": "Disguised forms of terms from this language’s runtime list, ten per obfuscation family named in Story 6.2 AC 4, each inside an otherwise clean caption. Every entry is expected to be withheld (review or block). Generated by scripts/build-community-text-corpus.mjs.",
+    "expected": "withheld",
+    "families": [
+      "nfkc-fullwidth",
+      "case-mixing",
+      "diacritics-added",
+      "zero-width",
+      "cyrillic-confusable",
+      "leetspeak",
+      "repeated-characters",
+      "internal-punctuation",
+      "spaced-letters",
+      "leet-and-spaced"
+    ],
+    "entries": [
+      {
+        "id": "es-nfkc-fullwidth-01",
+        "family": "nfkc-fullwidth",
+        "field": "caption",
+        "text": "Mi look de hoy: ＡＳＥＳＩＮＡＴＯ"
+      },
+      {
+        "id": "es-nfkc-fullwidth-02",
+        "family": "nfkc-fullwidth",
+        "field": "caption",
+        "text": "ＣＡＰＵＬＬＯ con chaqueta vaquera"
+      },
+      {
+        "id": "es-nfkc-fullwidth-03",
+        "family": "nfkc-fullwidth",
+        "field": "altText",
+        "text": "Mi look de hoy: ＣＨＵＰＡＰＯＬＬＡＳ"
+      },
+      {
+        "id": "es-nfkc-fullwidth-04",
+        "family": "nfkc-fullwidth",
+        "field": "caption",
+        "text": "ＧＩＬＩＰＩＣＨＩＳ con chaqueta vaquera"
+      },
+      {
+        "id": "es-nfkc-fullwidth-05",
+        "family": "nfkc-fullwidth",
+        "field": "caption",
+        "text": "Mi look de hoy: ＩＤＩＯＴＡ"
+      },
+      {
+        "id": "es-nfkc-fullwidth-06",
+        "family": "nfkc-fullwidth",
+        "field": "altText",
+        "text": "ＭＡＣＩＺＡ con chaqueta vaquera"
+      },
+      {
+        "id": "es-nfkc-fullwidth-07",
+        "family": "nfkc-fullwidth",
+        "field": "caption",
+        "text": "Mi look de hoy: ＭＡＲＩＣＯＮＡ"
+      },
+      {
+        "id": "es-nfkc-fullwidth-08",
+        "family": "nfkc-fullwidth",
+        "field": "caption",
+        "text": "ＰＡＪＥＲＯ con chaqueta vaquera"
+      },
+      {
+        "id": "es-nfkc-fullwidth-09",
+        "family": "nfkc-fullwidth",
+        "field": "altText",
+        "text": "Mi look de hoy: ＰＯＬＬＡ"
+      },
+      {
+        "id": "es-nfkc-fullwidth-10",
+        "family": "nfkc-fullwidth",
+        "field": "caption",
+        "text": "ＳＯＰＬＡＰＯＬＬＡＳ con chaqueta vaquera"
+      },
+      {
+        "id": "es-case-mixing-01",
+        "family": "case-mixing",
+        "field": "caption",
+        "text": "Mi look de hoy: BaStArDo"
+      },
+      {
+        "id": "es-case-mixing-02",
+        "family": "case-mixing",
+        "field": "caption",
+        "text": "ChInGa con chaqueta vaquera"
+      },
+      {
+        "id": "es-case-mixing-03",
+        "family": "case-mixing",
+        "field": "altText",
+        "text": "Mi look de hoy: CuLiAo"
+      },
+      {
+        "id": "es-case-mixing-04",
+        "family": "case-mixing",
+        "field": "caption",
+        "text": "GiLiPoLlAs con chaqueta vaquera"
+      },
+      {
+        "id": "es-case-mixing-05",
+        "family": "case-mixing",
+        "field": "caption",
+        "text": "Mi look de hoy: JiLiPoLlAs"
+      },
+      {
+        "id": "es-case-mixing-06",
+        "family": "case-mixing",
+        "field": "altText",
+        "text": "MaCiZoRrA con chaqueta vaquera"
+      },
+      {
+        "id": "es-case-mixing-07",
+        "family": "case-mixing",
+        "field": "caption",
+        "text": "Mi look de hoy: MaRiCoNaZo"
+      },
+      {
+        "id": "es-case-mixing-08",
+        "family": "case-mixing",
+        "field": "caption",
+        "text": "PeNdEjA con chaqueta vaquera"
+      },
+      {
+        "id": "es-case-mixing-09",
+        "family": "case-mixing",
+        "field": "altText",
+        "text": "Mi look de hoy: PrOsTiTuTa"
+      },
+      {
+        "id": "es-case-mixing-10",
+        "family": "case-mixing",
+        "field": "caption",
+        "text": "SuBnOrMaL con chaqueta vaquera"
+      },
+      {
+        "id": "es-diacritics-added-01",
+        "family": "diacritics-added",
+        "field": "caption",
+        "text": "Mi look de hoy: bölléra"
+      },
+      {
+        "id": "es-diacritics-added-02",
+        "family": "diacritics-added",
+        "field": "caption",
+        "text": "chíngáda con chaqueta vaquera"
+      },
+      {
+        "id": "es-diacritics-added-03",
+        "family": "diacritics-added",
+        "field": "altText",
+        "text": "Mi look de hoy: drögás"
+      },
+      {
+        "id": "es-diacritics-added-04",
+        "family": "diacritics-added",
+        "field": "caption",
+        "text": "híjáputa con chaqueta vaquera"
+      },
+      {
+        "id": "es-diacritics-added-05",
+        "family": "diacritics-added",
+        "field": "caption",
+        "text": "Mi look de hoy: jödér"
+      },
+      {
+        "id": "es-diacritics-added-06",
+        "family": "diacritics-added",
+        "field": "altText",
+        "text": "máldíto con chaqueta vaquera"
+      },
+      {
+        "id": "es-diacritics-added-07",
+        "family": "diacritics-added",
+        "field": "caption",
+        "text": "Mi look de hoy: mártíllo"
+      },
+      {
+        "id": "es-diacritics-added-08",
+        "family": "diacritics-added",
+        "field": "caption",
+        "text": "péndéjo con chaqueta vaquera"
+      },
+      {
+        "id": "es-diacritics-added-09",
+        "family": "diacritics-added",
+        "field": "altText",
+        "text": "Mi look de hoy: rácísta"
+      },
+      {
+        "id": "es-diacritics-added-10",
+        "family": "diacritics-added",
+        "field": "caption",
+        "text": "südáca con chaqueta vaquera"
+      },
+      {
+        "id": "es-zero-width-01",
+        "family": "zero-width",
+        "field": "caption",
+        "text": "Mi look de hoy: b​o​l​u​d​o"
+      },
+      {
+        "id": "es-zero-width-02",
+        "family": "zero-width",
+        "field": "caption",
+        "text": "c​h​i​n​g​a​d​o con chaqueta vaquera"
+      },
+      {
+        "id": "es-zero-width-03",
+        "family": "zero-width",
+        "field": "altText",
+        "text": "Mi look de hoy: e​s​p​e​r​m​a"
+      },
+      {
+        "id": "es-zero-width-04",
+        "family": "zero-width",
+        "field": "caption",
+        "text": "h​i​j​o​p​u​t​a con chaqueta vaquera"
+      },
+      {
+        "id": "es-zero-width-05",
+        "family": "zero-width",
+        "field": "caption",
+        "text": "Mi look de hoy: j​o​d​i​d​o"
+      },
+      {
+        "id": "es-zero-width-06",
+        "family": "zero-width",
+        "field": "altText",
+        "text": "m​a​l​p​a​r​i​d​o con chaqueta vaquera"
+      },
+      {
+        "id": "es-zero-width-07",
+        "family": "zero-width",
+        "field": "caption",
+        "text": "Mi look de hoy: m​i​e​r​d​a"
+      },
+      {
+        "id": "es-zero-width-08",
+        "family": "zero-width",
+        "field": "caption",
+        "text": "p​e​r​r​a con chaqueta vaquera"
+      },
+      {
+        "id": "es-zero-width-09",
+        "family": "zero-width",
+        "field": "altText",
+        "text": "Mi look de hoy: r​a​m​e​r​a"
+      },
+      {
+        "id": "es-zero-width-10",
+        "family": "zero-width",
+        "field": "caption",
+        "text": "t​r​a​v​e​s​t​i con chaqueta vaquera"
+      },
+      {
+        "id": "es-cyrillic-confusable-01",
+        "family": "cyrillic-confusable",
+        "field": "caption",
+        "text": "Mi look de hoy: саbrona"
+      },
+      {
+        "id": "es-cyrillic-confusable-02",
+        "family": "cyrillic-confusable",
+        "field": "caption",
+        "text": "сhingаr con chaqueta vaquera"
+      },
+      {
+        "id": "es-cyrillic-confusable-03",
+        "family": "cyrillic-confusable",
+        "field": "altText",
+        "text": "Mi look de hoy: fоllаdor"
+      },
+      {
+        "id": "es-cyrillic-confusable-04",
+        "family": "cyrillic-confusable",
+        "field": "caption",
+        "text": "hijuерuta con chaqueta vaquera"
+      },
+      {
+        "id": "es-cyrillic-confusable-05",
+        "family": "cyrillic-confusable",
+        "field": "caption",
+        "text": "Mi look de hoy: kарullo"
+      },
+      {
+        "id": "es-cyrillic-confusable-06",
+        "family": "cyrillic-confusable",
+        "field": "altText",
+        "text": "mаmаda con chaqueta vaquera"
+      },
+      {
+        "id": "es-cyrillic-confusable-07",
+        "family": "cyrillic-confusable",
+        "field": "caption",
+        "text": "Mi look de hoy: nеgrаta"
+      },
+      {
+        "id": "es-cyrillic-confusable-08",
+        "family": "cyrillic-confusable",
+        "field": "caption",
+        "text": "реrvertido con chaqueta vaquera"
+      },
+      {
+        "id": "es-cyrillic-confusable-09",
+        "family": "cyrillic-confusable",
+        "field": "altText",
+        "text": "Mi look de hoy: sеmеn"
+      },
+      {
+        "id": "es-cyrillic-confusable-10",
+        "family": "cyrillic-confusable",
+        "field": "caption",
+        "text": "vеrgа con chaqueta vaquera"
+      },
+      {
+        "id": "es-leetspeak-01",
+        "family": "leetspeak",
+        "field": "caption",
+        "text": "Mi look de hoy: c4g4d4"
+      },
+      {
+        "id": "es-leetspeak-02",
+        "family": "leetspeak",
+        "field": "caption",
+        "text": "chup4d4 con chaqueta vaquera"
+      },
+      {
+        "id": "es-leetspeak-03",
+        "family": "leetspeak",
+        "field": "altText",
+        "text": "Mi look de hoy: f0ll4r"
+      },
+      {
+        "id": "es-leetspeak-04",
+        "family": "leetspeak",
+        "field": "caption",
+        "text": "h05714 con chaqueta vaquera"
+      },
+      {
+        "id": "es-leetspeak-05",
+        "family": "leetspeak",
+        "field": "caption",
+        "text": "Mi look de hoy: l4m3cul05"
+      },
+      {
+        "id": "es-leetspeak-06",
+        "family": "leetspeak",
+        "field": "altText",
+        "text": "m4r1c4 con chaqueta vaquera"
+      },
+      {
+        "id": "es-leetspeak-07",
+        "family": "leetspeak",
+        "field": "caption",
+        "text": "Mi look de hoy: 0r1n4"
+      },
+      {
+        "id": "es-leetspeak-08",
+        "family": "leetspeak",
+        "field": "caption",
+        "text": "p1nch3 con chaqueta vaquera"
+      },
+      {
+        "id": "es-leetspeak-09",
+        "family": "leetspeak",
+        "field": "altText",
+        "text": "Mi look de hoy: 50pl4g41745"
+      },
+      {
+        "id": "es-leetspeak-10",
+        "family": "leetspeak",
+        "field": "caption",
+        "text": "vulv4 con chaqueta vaquera"
+      },
+      {
+        "id": "es-repeated-characters-01",
+        "family": "repeated-characters",
+        "field": "caption",
+        "text": "Mi look de hoy: caaaapullo"
+      },
+      {
+        "id": "es-repeated-characters-02",
+        "family": "repeated-characters",
+        "field": "caption",
+        "text": "chhhhupapollas con chaqueta vaquera"
+      },
+      {
+        "id": "es-repeated-characters-03",
+        "family": "repeated-characters",
+        "field": "altText",
+        "text": "Mi look de hoy: giiiilipichis"
+      },
+      {
+        "id": "es-repeated-characters-04",
+        "family": "repeated-characters",
+        "field": "caption",
+        "text": "iddddiota con chaqueta vaquera"
+      },
+      {
+        "id": "es-repeated-characters-05",
+        "family": "repeated-characters",
+        "field": "caption",
+        "text": "Mi look de hoy: maaaaciza"
+      },
+      {
+        "id": "es-repeated-characters-06",
+        "family": "repeated-characters",
+        "field": "altText",
+        "text": "maaaaricona con chaqueta vaquera"
+      },
+      {
+        "id": "es-repeated-characters-07",
+        "family": "repeated-characters",
+        "field": "caption",
+        "text": "Mi look de hoy: paaaajero"
+      },
+      {
+        "id": "es-repeated-characters-08",
+        "family": "repeated-characters",
+        "field": "caption",
+        "text": "poooolla con chaqueta vaquera"
+      },
+      {
+        "id": "es-repeated-characters-09",
+        "family": "repeated-characters",
+        "field": "altText",
+        "text": "Mi look de hoy: sooooplapollas"
+      },
+      {
+        "id": "es-repeated-characters-10",
+        "family": "repeated-characters",
+        "field": "caption",
+        "text": "zoooorra con chaqueta vaquera"
+      },
+      {
+        "id": "es-internal-punctuation-01",
+        "family": "internal-punctuation",
+        "field": "caption",
+        "text": "Mi look de hoy: c.h.i.n.g.a"
+      },
+      {
+        "id": "es-internal-punctuation-02",
+        "family": "internal-punctuation",
+        "field": "caption",
+        "text": "c.u.l.i.a.o con chaqueta vaquera"
+      },
+      {
+        "id": "es-internal-punctuation-03",
+        "family": "internal-punctuation",
+        "field": "altText",
+        "text": "Mi look de hoy: g.i.l.i.p.o.l.l.a.s"
+      },
+      {
+        "id": "es-internal-punctuation-04",
+        "family": "internal-punctuation",
+        "field": "caption",
+        "text": "j.i.l.i.p.o.l.l.a.s con chaqueta vaquera"
+      },
+      {
+        "id": "es-internal-punctuation-05",
+        "family": "internal-punctuation",
+        "field": "caption",
+        "text": "Mi look de hoy: m.a.c.i.z.o.r.r.a"
+      },
+      {
+        "id": "es-internal-punctuation-06",
+        "family": "internal-punctuation",
+        "field": "altText",
+        "text": "m.a.r.i.c.o.n.a.z.o con chaqueta vaquera"
+      },
+      {
+        "id": "es-internal-punctuation-07",
+        "family": "internal-punctuation",
+        "field": "caption",
+        "text": "Mi look de hoy: p.e.n.d.e.j.a"
+      },
+      {
+        "id": "es-internal-punctuation-08",
+        "family": "internal-punctuation",
+        "field": "caption",
+        "text": "p.r.o.s.t.i.t.u.t.a con chaqueta vaquera"
+      },
+      {
+        "id": "es-internal-punctuation-09",
+        "family": "internal-punctuation",
+        "field": "altText",
+        "text": "Mi look de hoy: s.u.b.n.o.r.m.a.l"
+      },
+      {
+        "id": "es-internal-punctuation-10",
+        "family": "internal-punctuation",
+        "field": "caption",
+        "text": "a.s.e.s.i.n.a.t.o con chaqueta vaquera"
+      },
+      {
+        "id": "es-spaced-letters-01",
+        "family": "spaced-letters",
+        "field": "caption",
+        "text": "Mi look de hoy: c h i n g a d a"
+      },
+      {
+        "id": "es-spaced-letters-02",
+        "family": "spaced-letters",
+        "field": "caption",
+        "text": "d r o g a s con chaqueta vaquera"
+      },
+      {
+        "id": "es-spaced-letters-03",
+        "family": "spaced-letters",
+        "field": "altText",
+        "text": "Mi look de hoy: h i j a p u t a"
+      },
+      {
+        "id": "es-spaced-letters-04",
+        "family": "spaced-letters",
+        "field": "caption",
+        "text": "j o d e r con chaqueta vaquera"
+      },
+      {
+        "id": "es-spaced-letters-05",
+        "family": "spaced-letters",
+        "field": "caption",
+        "text": "Mi look de hoy: m a l d i t o"
+      },
+      {
+        "id": "es-spaced-letters-06",
+        "family": "spaced-letters",
+        "field": "altText",
+        "text": "m a r t i l l o con chaqueta vaquera"
+      },
+      {
+        "id": "es-spaced-letters-07",
+        "family": "spaced-letters",
+        "field": "caption",
+        "text": "Mi look de hoy: p e n d e j o"
+      },
+      {
+        "id": "es-spaced-letters-08",
+        "family": "spaced-letters",
+        "field": "caption",
+        "text": "r a c i s t a con chaqueta vaquera"
+      },
+      {
+        "id": "es-spaced-letters-09",
+        "family": "spaced-letters",
+        "field": "altText",
+        "text": "Mi look de hoy: s u d a c a"
+      },
+      {
+        "id": "es-spaced-letters-10",
+        "family": "spaced-letters",
+        "field": "caption",
+        "text": "b a s t a r d o con chaqueta vaquera"
+      },
+      {
+        "id": "es-leet-and-spaced-01",
+        "family": "leet-and-spaced",
+        "field": "caption",
+        "text": "Mi look de hoy: c h 1 n g 4 d o"
+      },
+      {
+        "id": "es-leet-and-spaced-02",
+        "family": "leet-and-spaced",
+        "field": "caption",
+        "text": "3 5 p e r m a con chaqueta vaquera"
+      },
+      {
+        "id": "es-leet-and-spaced-03",
+        "family": "leet-and-spaced",
+        "field": "altText",
+        "text": "Mi look de hoy: h 1 j 0 p u t a"
+      },
+      {
+        "id": "es-leet-and-spaced-04",
+        "family": "leet-and-spaced",
+        "field": "caption",
+        "text": "j 0 d 1 d o con chaqueta vaquera"
+      },
+      {
+        "id": "es-leet-and-spaced-05",
+        "family": "leet-and-spaced",
+        "field": "caption",
+        "text": "Mi look de hoy: m 4 l p 4 r i d o"
+      },
+      {
+        "id": "es-leet-and-spaced-06",
+        "family": "leet-and-spaced",
+        "field": "altText",
+        "text": "m 1 3 r d a con chaqueta vaquera"
+      },
+      {
+        "id": "es-leet-and-spaced-07",
+        "family": "leet-and-spaced",
+        "field": "caption",
+        "text": "Mi look de hoy: p 3 r r 4"
+      },
+      {
+        "id": "es-leet-and-spaced-08",
+        "family": "leet-and-spaced",
+        "field": "caption",
+        "text": "r 4 m 3 r a con chaqueta vaquera"
+      },
+      {
+        "id": "es-leet-and-spaced-09",
+        "family": "leet-and-spaced",
+        "field": "altText",
+        "text": "Mi look de hoy: 7 r 4 v e s t i"
+      },
+      {
+        "id": "es-leet-and-spaced-10",
+        "family": "leet-and-spaced",
+        "field": "caption",
+        "text": "b 0 l l 3 r a con chaqueta vaquera"
+      }
+    ]
+  }
+}

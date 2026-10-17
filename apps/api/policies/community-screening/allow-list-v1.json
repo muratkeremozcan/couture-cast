@@ -1,0 +1,444 @@
+{
+  "listId": "community-screening-allow-list-v1",
+  "version": "v1",
+  "updated": "2026-10-16",
+  "summary": "Ordinary words that the vendored LDNOOBW lists, the graded overlay or the bad-words backstop would otherwise flag. Allow lists apply across all seven languages, because every language's list runs against every submission. Lookup runs on the literal case-folded token, before diacritic, confusable and leet folding, so an accented, stretched or disguised spelling of a flagged word still screens.",
+  "rules": "Every entry names the language it is ordinary in and why it is here. An entry that clears an upstream term outright says what it costs. Remove an entry rather than leave one whose reason no longer holds.",
+  "entries": [
+    {
+      "entry": "boob",
+      "language": "en",
+      "reason": "Names the boob tube, a strapless tube top. The bad-words backstop flags the word, and the LDNOOBW English list carries it; the plural and every stretched or disguised spelling still screen."
+    },
+    {
+      "entry": "cockade",
+      "language": "en",
+      "reason": "A rosette or knot of ribbon worn on a hat. Contains the indexed term cock, so any substring or stem matching added later would flag it."
+    },
+    {
+      "entry": "cockades",
+      "language": "en",
+      "reason": "Plural of cockade, the ribbon rosette worn on a hat; held out for the same reason as the singular."
+    },
+    {
+      "entry": "fanny",
+      "language": "en",
+      "reason": "Names the fanny pack, a belt bag. The bad-words backstop flags the word."
+    },
+    {
+      "entry": "knob",
+      "language": "en",
+      "reason": "Knob buttons and knob closures are fastenings. The bad-words backstop flags the word."
+    },
+    {
+      "entry": "knobs",
+      "language": "en",
+      "reason": "Plural of knob, as in knob fastenings; the bad-words backstop flags it."
+    },
+    {
+      "entry": "peacock",
+      "language": "en",
+      "reason": "Peacock blue and peacock-feather prints are ordinary fashion vocabulary. Contains the indexed term cock."
+    },
+    {
+      "entry": "puttee",
+      "language": "en",
+      "reason": "The wrapped cloth legging of military and workwear dress. Collapses onto the French term pute once its doubled letters are reduced."
+    },
+    {
+      "entry": "puttees",
+      "language": "en",
+      "reason": "Plural of puttee, the wrapped legging; held out for the same reason as the singular."
+    },
+    {
+      "entry": "screw",
+      "language": "en",
+      "reason": "Screw-back earrings and screw fastenings. The bad-words backstop flags the word."
+    },
+    {
+      "entry": "screws",
+      "language": "en",
+      "reason": "Plural of screw, as in screw-back fastenings; the bad-words backstop flags it."
+    },
+    {
+      "entry": "sexy",
+      "language": "en",
+      "reason": "The register eveningwear, lingerie and swimwear copy is written in. The image policy already declines to treat the model's Sexy class as unsafe for the same reason, and the LDNOOBW English list and the bad-words backstop both carry the word."
+    },
+    {
+      "entry": "shirtdress",
+      "language": "en",
+      "reason": "A garment name the bad-words backstop flags."
+    },
+    {
+      "entry": "cocktailkleid",
+      "language": "de",
+      "reason": "German for cocktail dress. Contains the indexed English term cock."
+    },
+    {
+      "entry": "culotte",
+      "language": "de",
+      "reason": "The divided skirt, in German and French copy. Contains the indexed Italian term culo."
+    },
+    {
+      "entry": "culottes",
+      "language": "it",
+      "reason": "Plural of culotte, the divided skirt, used in Italian, French and English copy. Contains the indexed Italian term culo."
+    },
+    {
+      "entry": "dicke",
+      "language": "de",
+      "reason": "German for thick, as in dicke Strickjacke. Contains the indexed English term dick."
+    },
+    {
+      "entry": "dicker",
+      "language": "de",
+      "reason": "German for thicker, the comparative of dick. Contains the indexed English term dick."
+    },
+    {
+      "entry": "marsch",
+      "language": "de",
+      "reason": "German for march, as in a marching-band jacket. Contains the indexed German term arsch."
+    },
+    {
+      "entry": "pferdeschwanz",
+      "language": "de",
+      "reason": "German for ponytail. Contains the indexed German term schwanz."
+    },
+    {
+      "entry": "cono",
+      "language": "es",
+      "reason": "Spanish and Italian for cone, as in a cone heel. The accented coño folds onto it, and allow-list lookup runs on the literal spelling, so coño still screens."
+    },
+    {
+      "entry": "negro",
+      "language": "es",
+      "reason": "The colour black in Spanish, Portuguese and Italian, the most common colour word in their fashion copy. LDNOOBW lists it in English and French; the French négro and the English slur still screen through the graded overlay."
+    },
+    {
+      "entry": "mongolico",
+      "language": "it",
+      "reason": "The Italian adjective for Mongolian. The accented Spanish mongólico still screens because allow-list lookup runs on the literal spelling."
+    },
+    {
+      "entry": "putto",
+      "language": "it",
+      "reason": "The Renaissance cherub motif printed on silks and embroidered on jackets. Collapses onto the Spanish term puto."
+    },
+    {
+      "entry": "bitte",
+      "language": "de",
+      "reason": "German for please, and the French word for a mooring bollard. Collapses onto the French term bite."
+    },
+    {
+      "entry": "salopette",
+      "language": "fr",
+      "reason": "French for dungarees. Begins with the letters of the French term salope."
+    },
+    {
+      "entry": "salopettes",
+      "language": "fr",
+      "reason": "Plural of salopette, French for dungarees; held out for the same reason as the singular."
+    },
+    {
+      "entry": "cocktail",
+      "language": "it",
+      "reason": "Abito da cocktail, a cocktail dress, in Italian and English copy. Contains the indexed English term cock."
+    },
+    {
+      "entry": "figaro",
+      "language": "it",
+      "reason": "The Figaro, a cropped bolero jacket. Contains the indexed Italian term figa."
+    },
+    {
+      "entry": "puttanesca",
+      "language": "it",
+      "reason": "A pasta dish named in Italian lifestyle copy. Contains the indexed Italian term puttana."
+    },
+    {
+      "entry": "pica",
+      "language": "pt",
+      "reason": "Portuguese sewing vocabulary. The European spelling piça still folds onto the graded term."
+    },
+    {
+      "entry": "pera",
+      "language": "pt",
+      "reason": "Portuguese for pear, the body shape styling copy names. Collapses onto the Spanish term perra."
+    },
+    {
+      "entry": "niger",
+      "language": "pt",
+      "reason": "The country, in Portuguese and English copy. The English slur collapses onto it once its doubled letter is reduced; the slur itself still screens."
+    },
+    {
+      "entry": "níger",
+      "language": "pt",
+      "reason": "The country name with its Portuguese accent; held out for the same reason as niger."
+    },
+    {
+      "entry": "fagot",
+      "language": "tr",
+      "reason": "Turkish for the bassoon and for the openwork stitch that joins two fabric edges, fagot dikişi. The English slur collapses onto it; the slur itself still screens."
+    },
+    {
+      "entry": "gok",
+      "language": "tr",
+      "reason": "Turkish for sky written without its umlaut, as in gok mavisi, sky blue. The English slur gook collapses onto it; clearing the literal spelling is what keeps gook and its stretched forms indexed."
+    },
+    {
+      "entry": "gök",
+      "language": "tr",
+      "reason": "Turkish for sky, as in gök mavisi, sky blue."
+    },
+    {
+      "entry": "kasar",
+      "language": "tr",
+      "reason": "The textile bleaching process, and the folded form of the graded term kaşar, which still screens in its accented spelling."
+    },
+    {
+      "entry": "sıkış",
+      "language": "tr",
+      "reason": "Turkish for a squeeze. Folds onto the graded term sikiş."
+    },
+    {
+      "entry": "şıktır",
+      "language": "tr",
+      "reason": "Turkish for it is chic. Folds onto the graded term siktir."
+    },
+    {
+      "entry": "con",
+      "language": "es",
+      "reason": "Spanish and Italian for with, the commonest preposition in their captions. The LDNOOBW slur coon collapses onto it, and clearing this ordinary spelling is what keeps coon and its stretched spellings indexed. The French vulgar con is three letters and is below the screener's floor either way."
+    },
+    {
+      "entry": "pon",
+      "language": "es",
+      "reason": "Spanish for put, as in pon color a tu look. The LDNOOBW term poon collapses onto it; clearing this spelling keeps poon and its stretched spellings indexed."
+    },
+    {
+      "entry": "jiz",
+      "language": "en",
+      "reason": "Not a word. It is the collapsed spelling of the LDNOOBW term jizz, and clearing these three letters is the only way the screener will index jizz and its stretched spellings; the cost is that this exact three-letter misspelling is not screened."
+    },
+    {
+      "entry": "pof",
+      "language": "en",
+      "reason": "Not a word. It is the collapsed spelling of the LDNOOBW slur poof, and clearing these three letters is the only way the screener will index poof and its stretched spellings; the cost is that this exact three-letter spelling is not screened."
+    },
+    {
+      "entry": "nude",
+      "language": "en",
+      "reason": "Nude is a colour family in fashion copy: nude heels, nude lipstick, a nude slip. LDNOOBW lists it for image-search autocomplete; nudity and every other upstream entry built on it still screen."
+    },
+    {
+      "entry": "butt",
+      "language": "en",
+      "reason": "Product vocabulary in denim and shapewear copy: butt-lifting jeans, butt pads. LDNOOBW lists it as a mild upstream-only term; buttcheeks, butthole and every disguised or stretched spelling of butt still screen."
+    },
+    {
+      "entry": "big black",
+      "language": "en",
+      "reason": "A phrase LDNOOBW lists for its pornographic sense that ordinary copy uses all the time: a big black bag, big black boots. Cleared as a phrase only; neither word is a term on its own."
+    },
+    {
+      "entry": "tight white",
+      "language": "en",
+      "reason": "A phrase LDNOOBW lists that fashion copy uses literally: a tight white tee, tight white jeans. Cleared as a phrase only."
+    },
+    {
+      "entry": "tied up",
+      "language": "en",
+      "reason": "A phrase LDNOOBW lists that styling copy uses literally: hair tied up, a top tied up at the waist. Cleared as a phrase only."
+    },
+    {
+      "entry": "pale",
+      "language": "en",
+      "reason": "Pale pink, pale blue: a colour qualifier. It is the repeat-collapsed spelling of the Italian term palle, so without this entry every pale colour flagged. palle itself and its stretched spellings still screen."
+    },
+    {
+      "entry": "büro",
+      "language": "de",
+      "reason": "German for office, as in Büro-Outfit. It folds onto the collapsed spelling of the Portuguese term burro; burro itself still screens."
+    },
+    {
+      "entry": "rosette",
+      "language": "de",
+      "reason": "A rosette is a trim and a hat ornament in fashion copy in German, French and English. LDNOOBW's German list carries the slang sense."
+    },
+    {
+      "entry": "schmuck",
+      "language": "de",
+      "reason": "German for jewellery, one of the commonest nouns in German fashion copy. The bad-words backstop flags the unrelated English insult."
+    },
+    {
+      "entry": "comer",
+      "language": "es",
+      "reason": "Spanish and Portuguese for to eat, as in salir a comer. LDNOOBW's Portuguese list carries a slang sense."
+    },
+    {
+      "entry": "concha",
+      "language": "es",
+      "reason": "A shell, a shell motif and a shell-shaped bread. LDNOOBW's Spanish list carries the regional vulgar sense; the insult phrase concha de tu madre still screens, because a single allow-listed word no longer clears a multi-word term."
+    },
+    {
+      "entry": "infierno",
+      "language": "es",
+      "reason": "Spanish for hell, used for weather in every summer caption: un infierno de calor."
+    },
+    {
+      "entry": "inferno",
+      "language": "pt",
+      "reason": "Portuguese for hell, used for weather: um inferno de calor."
+    },
+    {
+      "entry": "mamá",
+      "language": "es",
+      "reason": "Spanish for mum. It folds onto mama, which LDNOOBW's Portuguese list carries."
+    },
+    {
+      "entry": "mama",
+      "language": "pt",
+      "reason": "Mum in Portuguese, Spanish without its accent, and English; the LDNOOBW Portuguese entry is the anatomical sense."
+    },
+    {
+      "entry": "mamma",
+      "language": "it",
+      "reason": "Italian for mum. It collapses onto mama."
+    },
+    {
+      "entry": "saco",
+      "language": "es",
+      "reason": "A blazer or jacket in Latin American Spanish and a sack or bag in Portuguese and Spanish. LDNOOBW's Portuguese list carries a slang sense."
+    },
+    {
+      "entry": "sacó",
+      "language": "es",
+      "reason": "Spanish for took out, as in sacó el abrigo. It folds onto saco."
+    },
+    {
+      "entry": "sacco",
+      "language": "it",
+      "reason": "Italian for a sack or bag, as in sacco a pelo. It collapses onto saco."
+    },
+    {
+      "entry": "cerveja",
+      "language": "pt",
+      "reason": "Portuguese for beer, in summer and weekend captions."
+    },
+    {
+      "entry": "aranha",
+      "language": "pt",
+      "reason": "Portuguese for spider, as in a spider print or a spider brooch."
+    },
+    {
+      "entry": "fica",
+      "language": "pt",
+      "reason": "One of the commonest Portuguese verbs: fica lindo, fica bem. The cost is that the Italian vulgar spelling fica is not screened; figa, its usual spelling, still is."
+    },
+    {
+      "entry": "pede",
+      "language": "pt",
+      "reason": "Portuguese for asks, as in o tempo pede casaco. It folds onto the French slur pédé, which still screens in its accented spelling."
+    },
+    {
+      "entry": "camisinha",
+      "language": "pt",
+      "reason": "A small shirt in Brazilian Portuguese, and the everyday word for a condom; neither is abusive."
+    },
+    {
+      "entry": "heroína",
+      "language": "es",
+      "reason": "Heroine in Spanish and Portuguese, as in mi heroína de estilo. LDNOOBW carries the drug sense."
+    },
+    {
+      "entry": "bissexual",
+      "language": "pt",
+      "reason": "An identity a member may use to describe themselves. LDNOOBW's Portuguese list carries orientation words, and routing a member's self-description to review would single out LGBTQ members."
+    },
+    {
+      "entry": "homosexual",
+      "language": "pt",
+      "reason": "An identity word in Portuguese and Spanish; held out for the same reason as bissexual."
+    },
+    {
+      "entry": "heterosexual",
+      "language": "pt",
+      "reason": "An identity word in Portuguese and Spanish; held out for the same reason as bissexual."
+    },
+    {
+      "entry": "lésbica",
+      "language": "pt",
+      "reason": "An identity word in Portuguese and Spanish; held out for the same reason as bissexual."
+    },
+    {
+      "entry": "homem gay",
+      "language": "pt",
+      "reason": "Portuguese for a gay man; an identity phrase held out for the same reason as bissexual."
+    },
+    {
+      "entry": "pesce",
+      "language": "it",
+      "reason": "Italian for fish, and the herringbone weave: a spina di pesce."
+    },
+    {
+      "entry": "regina",
+      "language": "it",
+      "reason": "Italian for queen, as in regina del vintage."
+    },
+    {
+      "entry": "tirare",
+      "language": "it",
+      "reason": "Italian for to pull, as in tirare fuori il cappotto."
+    },
+    {
+      "entry": "battere",
+      "language": "it",
+      "reason": "Italian for to beat, as in battere il freddo."
+    },
+    {
+      "entry": "spagnola",
+      "language": "it",
+      "reason": "Italian for Spanish, of a woman or a style: alla spagnola. LDNOOBW's Italian list carries a slang sense."
+    },
+    {
+      "entry": "peter",
+      "language": "it",
+      "reason": "The Peter Pan collar, colletto Peter Pan. It folds onto the French term péter, which still screens in its accented spelling."
+    },
+    {
+      "entry": "folle",
+      "language": "fr",
+      "reason": "French for mad or wild, as in la folle journée."
+    },
+    {
+      "entry": "gerbe",
+      "language": "fr",
+      "reason": "French for a sheaf or spray, as in une gerbe de fleurs."
+    },
+    {
+      "entry": "pâle",
+      "language": "fr",
+      "reason": "French for pale, as in rose pâle. It folds onto pale, the collapsed spelling of the Italian term palle."
+    },
+    {
+      "entry": "tête",
+      "language": "fr",
+      "reason": "French for head, as in de la tête aux pieds. It folds onto tete, the collapsed spelling of the Italian term tette, which still screens."
+    },
+    {
+      "entry": "tete",
+      "language": "fr",
+      "reason": "Tête typed without its accent, as French writers often do on a phone; held out for the same reason."
+    },
+    {
+      "entry": "sikke",
+      "language": "tr",
+      "reason": "Turkish for coin, as in a sikke kolye, a coin necklace. It collapses onto the Turkish term sike."
+    },
+    {
+      "entry": "sıkı",
+      "language": "tr",
+      "reason": "Turkish for tight or firm, written with a dotless ı. It folds onto the Turkish term siki, which still screens in its dotted spelling."
+    }
+  ]
+}

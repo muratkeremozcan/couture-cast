@@ -1,0 +1,2728 @@
+{
+  "language": "it",
+  "corpusVersion": "v1",
+  "clean": {
+    "description": "Ordinary fashion captions and alt text, written natively in the language as community members would write them, without reference to the term lists. Every entry is expected to pass text screening, except entries labelled expected review, which carry one of the policy's deliberate review terms and the reason it is kept.",
+    "expected": "pass",
+    "entries": [
+      {
+        "id": "it-clean-001",
+        "field": "caption",
+        "text": "Outfit di oggi: trench beige, jeans dritti e sneakers bianche. 15 gradi e un po' di vento, perfetto."
+      },
+      {
+        "id": "it-clean-002",
+        "field": "caption",
+        "text": "Piove da stamattina, quindi stivali di gomma gialli e impermeabile blu. Almeno mi vedono!"
+      },
+      {
+        "id": "it-clean-003",
+        "field": "caption",
+        "text": "Cappotto a spina di pesce grigio, dolcevita nero e mocassini. Classico intramontabile."
+      },
+      {
+        "id": "it-clean-004",
+        "field": "caption",
+        "text": "La regina del vintage ha colpito ancora: giacca anni '70 trovata al mercatino per dieci euro 👑"
+      },
+      {
+        "id": "it-clean-005",
+        "field": "caption",
+        "text": "Camicetta a palline bianche su fondo blu e gonna midi rossa. Un tocco rétro per la domenica."
+      },
+      {
+        "id": "it-clean-006",
+        "field": "caption",
+        "text": "Fa un freddo cane stamattina, ho tirato fuori il piumino lungo e la sciarpa di lana."
+      },
+      {
+        "id": "it-clean-007",
+        "field": "caption",
+        "text": "Abito da cocktail nero con scollo a barchetta per la cena aziendale. Semplice ed elegante."
+      },
+      {
+        "id": "it-clean-008",
+        "field": "caption",
+        "text": "Sopra l'abito lungo ho messo un figaro in maglia, perfetto per le serate di maggio."
+      },
+      {
+        "id": "it-clean-009",
+        "field": "caption",
+        "text": "Il color nudo con il marrone cioccolato è un abbinamento che adoro in autunno."
+      },
+      {
+        "id": "it-clean-010",
+        "field": "caption",
+        "text": "Vestito sexy ma raffinato per l'anniversario: raso verde bottiglia, maniche lunghe, lunghezza al ginocchio."
+      },
+      {
+        "id": "it-clean-011",
+        "field": "caption",
+        "text": "Mia mamma mi ha regalato il suo vecchio cappotto di cammello, è ancora perfetto."
+      },
+      {
+        "id": "it-clean-012",
+        "field": "caption",
+        "text": "Ho tirato fuori i sandali, finalmente fa caldo! 26 gradi a Napoli."
+      },
+      {
+        "id": "it-clean-013",
+        "field": "caption",
+        "text": "Per battere il freddo di gennaio: calzamaglia termica sotto i jeans e calzini di lana. Funziona!"
+      },
+      {
+        "id": "it-clean-014",
+        "field": "caption",
+        "text": "Look da ufficio per un martedì grigio: pantaloni a sigaretta antracite, camicia bianca e mocassini bordeaux."
+      },
+      {
+        "id": "it-clean-015",
+        "field": "caption",
+        "text": "Qualcuno ha consigli per una giacca di mezza stagione che non faccia sembrare un sacco?"
+      },
+      {
+        "id": "it-clean-016",
+        "field": "caption",
+        "text": "Gonna culotte in crêpe nera e maglioncino crema, comodissima anche in bicicletta."
+      },
+      {
+        "id": "it-clean-017",
+        "field": "caption",
+        "text": "Camicia di lino bianca larga e shorts a vita alta. Oggi si va al mare 🌊"
+      },
+      {
+        "id": "it-clean-018",
+        "field": "caption",
+        "text": "Che bello il tuo cappotto verde, il colore ti illumina il viso!"
+      },
+      {
+        "id": "it-clean-019",
+        "field": "caption",
+        "text": "Consiglio del giorno: con l'umidità evitate la seta, segna tutto. Il cotone lavato è vostro amico."
+      },
+      {
+        "id": "it-clean-020",
+        "field": "caption",
+        "text": "Vestito lungo a fiori e giubbotto di jeans, la combo che non delude mai a maggio."
+      },
+      {
+        "id": "it-clean-021",
+        "field": "caption",
+        "text": "Prima neve a Bolzano! Stivali imbottiti, parka e berretto fatto a mano dalla nonna. #inverno"
+      },
+      {
+        "id": "it-clean-022",
+        "field": "caption",
+        "text": "Maglione a collo alto panna e gonna a pieghe color cammello. Un classico dell'autunno."
+      },
+      {
+        "id": "it-clean-023",
+        "field": "caption",
+        "text": "Tubino aderente nero e blazer oversize per smorzare l'effetto troppo elegante."
+      },
+      {
+        "id": "it-clean-024",
+        "field": "caption",
+        "text": "L'abito con la schiena scoperta è bellissimo, ma la sera metto un coprispalle perché rinfresca."
+      },
+      {
+        "id": "it-clean-025",
+        "field": "caption",
+        "text": "Vacanze al lago: costume intero a righe, cappello di paglia e camicia di lino aperta sopra."
+      },
+      {
+        "id": "it-clean-026",
+        "field": "caption",
+        "text": "Una scollatura quadrata con una catenina sottile, semplice e subito elegante."
+      },
+      {
+        "id": "it-clean-027",
+        "field": "caption",
+        "text": "Cielo sereno ma 3 gradi. Gilet imbottito sotto il cappotto di lana, trucco della mamma che funziona sempre."
+      },
+      {
+        "id": "it-clean-028",
+        "field": "caption",
+        "text": "Total look bordeaux, dal maglione agli stivaletti. Monocromo autunnale 🍂"
+      },
+      {
+        "id": "it-clean-029",
+        "field": "caption",
+        "text": "Ho indossato le scarpe nuove tutto il giorno senza vesciche, miracolo!"
+      },
+      {
+        "id": "it-clean-030",
+        "field": "caption",
+        "text": "Qualcuno sa come lavare un cappotto in lana cotta senza rovinarlo?"
+      },
+      {
+        "id": "it-clean-031",
+        "field": "caption",
+        "text": "Per il battesimo di mio nipote: abito midi azzurro, sandali color nudo e pochette di rafia."
+      },
+      {
+        "id": "it-clean-032",
+        "field": "caption",
+        "text": "La bora a Trieste non perdona: giacca a vento tecnica e strati sovrapposti."
+      },
+      {
+        "id": "it-clean-033",
+        "field": "caption",
+        "text": "Stai benissimo con questo tailleur, il taglio ti valorizza tantissimo."
+      },
+      {
+        "id": "it-clean-034",
+        "field": "caption",
+        "text": "Regola per l'estate: un solo colore forte per outfit, il resto neutro."
+      },
+      {
+        "id": "it-clean-035",
+        "field": "caption",
+        "text": "Camicia a quadri, jeans grezzo e scarponcini. Giornata in montagna!"
+      },
+      {
+        "id": "it-clean-036",
+        "field": "caption",
+        "text": "Nebbia stamattina in pianura, sole nel pomeriggio. Ho puntato su un cardigan facile da togliere."
+      },
+      {
+        "id": "it-clean-037",
+        "field": "caption",
+        "text": "Salopette di velluto a coste, morbidissima, con una t-shirt a righe sotto."
+      },
+      {
+        "id": "it-clean-038",
+        "field": "caption",
+        "text": "Mocassini senza calze sì o no con 18 gradi?"
+      },
+      {
+        "id": "it-clean-039",
+        "field": "caption",
+        "text": "Ho riciclato l'abito da damigella dell'anno scorso con una cintura e un blazer. Seconda vita riuscita."
+      },
+      {
+        "id": "it-clean-040",
+        "field": "caption",
+        "text": "Outfit da trekking: leggings termici, pile, giacca antivento e scarpe impermeabili. Sentieri fangosi oggi."
+      },
+      {
+        "id": "it-clean-041",
+        "field": "caption",
+        "text": "Luce dorata del tramonto sul mio cappotto color cammello, la foto si è fatta da sola."
+      },
+      {
+        "id": "it-clean-042",
+        "field": "caption",
+        "text": "37 gradi a Roma, vivo in abiti di cotone e sandali bassi."
+      },
+      {
+        "id": "it-clean-043",
+        "field": "caption",
+        "text": "Parliamo di questi pantaloni larghi di lino? Li ho comprati in tre colori."
+      },
+      {
+        "id": "it-clean-044",
+        "field": "caption",
+        "text": "Gonna a tubino, camicetta di seta e trench. Look da rientro in ufficio."
+      },
+      {
+        "id": "it-clean-045",
+        "field": "caption",
+        "text": "Stivali da neve e pantaloni da sci per andare al lavoro. Pazienza per l'eleganza, sono caduti 30 cm."
+      },
+      {
+        "id": "it-clean-046",
+        "field": "caption",
+        "text": "Il kaki si abbina al bordeaux? Vorrei provare ma sono indecisa."
+      },
+      {
+        "id": "it-clean-047",
+        "field": "caption",
+        "text": "Completo in maglia a coste grigio melange, perfetto per lo smart working quando fa freddo."
+      },
+      {
+        "id": "it-clean-048",
+        "field": "caption",
+        "text": "Pioggerella su Firenze, impermeabile leggero e ombrello trasparente."
+      },
+      {
+        "id": "it-clean-049",
+        "field": "caption",
+        "text": "Grazie per i consigli sull'abito da cerimonia, ho scelto quello blu notte e non me ne pento!"
+      },
+      {
+        "id": "it-clean-050",
+        "field": "caption",
+        "text": "Outfit della domenica: felpa oversize, leggings e calzettoni di lana. Restare a casa è una scelta."
+      },
+      {
+        "id": "it-clean-051",
+        "field": "caption",
+        "text": "Il mio abito a portafoglio preferito si adatta a tutto e in valigia non si stropiccia."
+      },
+      {
+        "id": "it-clean-052",
+        "field": "caption",
+        "text": "Le palline sono tornate! Camicia a pois bianchi e jeans chiari, semplice e allegra."
+      },
+      {
+        "id": "it-clean-053",
+        "field": "caption",
+        "text": "Cappotto doppiopetto blu, berretto a coste e guanti di pelle. 2 gradi, percepiti -4."
+      },
+      {
+        "id": "it-clean-054",
+        "field": "caption",
+        "text": "Il body a maniche lunghe sotto la gonna a vita alta: la camicia non esce mai."
+      },
+      {
+        "id": "it-clean-055",
+        "field": "caption",
+        "text": "Mattina al mercato: cesta di vimini, abito a quadretti e espadrillas. Estate in Puglia ❤️"
+      },
+      {
+        "id": "it-clean-056",
+        "field": "caption",
+        "text": "Lo scollo a V allunga il collo, soprattutto con i capelli raccolti."
+      },
+      {
+        "id": "it-clean-057",
+        "field": "caption",
+        "text": "Abitino aderente in maglia a coste: la comodità di un maglione con l'aria di un vestito."
+      },
+      {
+        "id": "it-clean-058",
+        "field": "caption",
+        "text": "Allerta gelo, ramponcini sugli stivali e cappotto lungo. Fate attenzione!"
+      },
+      {
+        "id": "it-clean-059",
+        "field": "caption",
+        "text": "Bellissima la tua gonna a fiori, l'hai trovata in un negozio dell'usato?"
+      },
+      {
+        "id": "it-clean-060",
+        "field": "caption",
+        "text": "Camicia di jeans su jeans, il doppio denim funziona con due lavaggi diversi."
+      },
+      {
+        "id": "it-clean-061",
+        "field": "caption",
+        "text": "Quando è grigio compenso con il colore: maglione giallo senape oggi."
+      },
+      {
+        "id": "it-clean-062",
+        "field": "caption",
+        "text": "Shorts di lino, canotta a coste e sandali di cuoio. 30 gradi all'ombra."
+      },
+      {
+        "id": "it-clean-063",
+        "field": "caption",
+        "text": "Pantaloni a palazzo in seta, top a spalline sottili e sabot dorati per la cena in terrazza."
+      },
+      {
+        "id": "it-clean-064",
+        "field": "caption",
+        "text": "Il bikini a palline rosse è il mio portafortuna, lo porto in ogni vacanza al mare."
+      },
+      {
+        "id": "it-clean-065",
+        "field": "caption",
+        "text": "Fa freschino, la giacca di pelle è tornata in servizio."
+      },
+      {
+        "id": "it-clean-066",
+        "field": "caption",
+        "text": "Domanda alle mamme: come vi vestite per uscire col passeggino sotto la pioggia senza rinunciare allo stile?"
+      },
+      {
+        "id": "it-clean-067",
+        "field": "caption",
+        "text": "Look minimal: tutto bianco latte con una borsa nera strutturata."
+      },
+      {
+        "id": "it-clean-068",
+        "field": "caption",
+        "text": "Mia zia mi ha dato il suo vecchio cappotto di tweed, il vintage di famiglia è il migliore."
+      },
+      {
+        "id": "it-clean-069",
+        "field": "caption",
+        "text": "Per un colloquio d'estate: tailleur pantalone di lino beige e camicetta bianca."
+      },
+      {
+        "id": "it-clean-070",
+        "field": "caption",
+        "text": "Abito color nudo e décolleté abbinate, allunga sempre la gamba."
+      },
+      {
+        "id": "it-clean-071",
+        "field": "caption",
+        "text": "Fa mite per novembre, solo un blazer di lana su un dolcevita sottile."
+      },
+      {
+        "id": "it-clean-072",
+        "field": "caption",
+        "text": "La giacca trapuntata è il compromesso giusto tra trench e piumino."
+      },
+      {
+        "id": "it-clean-073",
+        "field": "caption",
+        "text": "Complimenti a tutte quelle che hanno partecipato alla sfida \"niente acquisti\" questo mese!"
+      },
+      {
+        "id": "it-clean-074",
+        "field": "caption",
+        "text": "Pantaloni cargo, camicia oversize e sneakers alte. Weekend rilassato."
+      },
+      {
+        "id": "it-clean-075",
+        "field": "caption",
+        "text": "Stasera c'è la sagra del paese, metto il vestito rosso a balze."
+      },
+      {
+        "id": "it-clean-076",
+        "field": "caption",
+        "text": "Pantaloni a sigaretta e giacca a spina di pesce, l'abbinamento che porto in ufficio da anni."
+      },
+      {
+        "id": "it-clean-077",
+        "field": "caption",
+        "text": "Il freddo secco di febbraio: collant pesanti, gonna di lana e stivali alti. Bella calda."
+      },
+      {
+        "id": "it-clean-078",
+        "field": "caption",
+        "text": "Cappotto rosa cipria, illumina le giornate grigie di gennaio."
+      },
+      {
+        "id": "it-clean-079",
+        "field": "caption",
+        "text": "Non riesco a scegliere tra questi due abiti per la laurea di mia sorella. Che ne pensate?"
+      },
+      {
+        "id": "it-clean-080",
+        "field": "caption",
+        "text": "Maglione a trecce e jeans, outfit perfetto per una passeggiata sul lungolago."
+      },
+      {
+        "id": "it-clean-081",
+        "field": "caption",
+        "text": "Completo shorts e blazer in cotone, ideale per un aperitivo in terrazza."
+      },
+      {
+        "id": "it-clean-082",
+        "field": "caption",
+        "text": "Maglia a righe marinière, pantaloni bianchi e ballerine. Non mi stanca mai."
+      },
+      {
+        "id": "it-clean-083",
+        "field": "caption",
+        "text": "Si alza il vento, foulard di seta al collo e occhiali da sole. Molto anni '60."
+      },
+      {
+        "id": "it-clean-084",
+        "field": "caption",
+        "text": "Abito sexy ma comodo per San Valentino: rosso profondo, gonna svasata, maniche a tre quarti."
+      },
+      {
+        "id": "it-clean-085",
+        "field": "caption",
+        "text": "40 gradi a Palermo, non esco senza cappello a tesa larga e abito di voile."
+      },
+      {
+        "id": "it-clean-086",
+        "field": "caption",
+        "text": "I tuoi stivaletti bordeaux sono stupendi, danno carattere a tutto il look."
+      },
+      {
+        "id": "it-clean-087",
+        "field": "caption",
+        "text": "Tuta intera in crêpe verde bottiglia per la cena di compleanno."
+      },
+      {
+        "id": "it-clean-088",
+        "field": "caption",
+        "text": "Outfit per andare al lavoro in bici: pantaloni elasticizzati, giacca antivento fluo e zaino impermeabile."
+      },
+      {
+        "id": "it-clean-089",
+        "field": "caption",
+        "text": "Per i piedi freddolosi: calze di merino negli stivali, cambia la vita."
+      },
+      {
+        "id": "it-clean-090",
+        "field": "caption",
+        "text": "Piumino lungo e stivali foderati, in Valle d'Aosta stamattina -12. Buona giornata comunque!"
+      },
+      {
+        "id": "it-clean-091",
+        "field": "caption",
+        "text": "Quando non so cosa mettere metto la maglia a righe. Sta bene con tutto."
+      },
+      {
+        "id": "it-clean-092",
+        "field": "caption",
+        "text": "Abito di lino stropicciato e sandali intrecciati, lo stropicciato fa parte del fascino."
+      },
+      {
+        "id": "it-clean-093",
+        "field": "caption",
+        "text": "Voi stirate le camicie di lino o accettate le pieghe?"
+      },
+      {
+        "id": "it-clean-094",
+        "field": "caption",
+        "text": "Una bella rugiada stamattina, ho preferito gli stivaletti alle sneakers di tela."
+      },
+      {
+        "id": "it-clean-095",
+        "field": "caption",
+        "text": "Grazie a chi mi ha consigliato il grigio perla, mi sta meglio del nero!"
+      },
+      {
+        "id": "it-clean-096",
+        "field": "caption",
+        "text": "Finalmente ho trovato il jeans perfetto: vita alta, gamba dritta, lunghezza alla caviglia."
+      },
+      {
+        "id": "it-clean-097",
+        "field": "caption",
+        "text": "Il blu elettrico con il bianco è l'abbinamento più fresco dell'estate."
+      },
+      {
+        "id": "it-clean-098",
+        "field": "caption",
+        "text": "Camicetta con fiocco al collo e gonna midi plissé. Un po' rétro, la adoro."
+      },
+      {
+        "id": "it-clean-099",
+        "field": "caption",
+        "text": "Primo giorno di scuola col sole: abito t-shirt e sneakers per correre dietro ai bambini."
+      },
+      {
+        "id": "it-clean-100",
+        "field": "caption",
+        "text": "Il mio cappotto cammello ha dieci anni ed è ancora bellissimo. Investire nella qualità paga."
+      },
+      {
+        "id": "it-clean-101",
+        "field": "caption",
+        "text": "Strati d'autunno: t-shirt, camicia di flanella, gilet smanicato e giacca."
+      },
+      {
+        "id": "it-clean-102",
+        "field": "caption",
+        "text": "#ootd maglione di mohair lilla e jeans bianchi, sì, il bianco si porta anche d'inverno!"
+      },
+      {
+        "id": "it-clean-103",
+        "field": "caption",
+        "text": "Per andare in baita: pantaloni di velluto, maglione grosso e pantofole di lana cotta."
+      },
+      {
+        "id": "it-clean-104",
+        "field": "caption",
+        "text": "Piove, tira vento, ma il mio trench con cappuccio resiste."
+      },
+      {
+        "id": "it-clean-105",
+        "field": "caption",
+        "text": "Abito da cocktail in velluto bordeaux per la vigilia di Capodanno. Semplice e festoso."
+      },
+      {
+        "id": "it-clean-106",
+        "field": "caption",
+        "text": "Sono l'unica che tiene gli occhiali da sole anche d'inverno con la neve che abbaglia?"
+      },
+      {
+        "id": "it-clean-107",
+        "field": "caption",
+        "text": "Nebbia sul lago, ho preso il caban e la sciarpa di cashmere."
+      },
+      {
+        "id": "it-clean-108",
+        "field": "caption",
+        "text": "Elegantissimo il tuo look monocromo!"
+      },
+      {
+        "id": "it-clean-109",
+        "field": "caption",
+        "text": "I sandali con tacco largo sono il miglior compromesso per camminare sui sampietrini d'estate."
+      },
+      {
+        "id": "it-clean-110",
+        "field": "caption",
+        "text": "Giornata di afa: abito di cotone molto largo, niente cintura e tanta acqua in borsa."
+      },
+      {
+        "id": "it-clean-111",
+        "field": "caption",
+        "text": "Oggi mescolo leopardato e righe. Audace? Forse, ma mi mette di buon umore."
+      },
+      {
+        "id": "it-clean-112",
+        "field": "caption",
+        "text": "Per una cerimonia in chiesa: abito midi a maniche corte e un figaro coordinato. Scollatura discreta."
+      },
+      {
+        "id": "it-clean-113",
+        "field": "caption",
+        "text": "Quanti strati per -10? Io: maglia termica, maglione di lana, piumino e giacca antivento."
+      },
+      {
+        "id": "it-clean-114",
+        "field": "caption",
+        "text": "La salopette nera si porta anche in versione elegante con una camicetta di seta e décolleté."
+      },
+      {
+        "id": "it-clean-115",
+        "field": "caption",
+        "text": "Mia figlia mi ha prestato il giubbotto di jeans ricamato, mi sento giovanissima 😄"
+      },
+      {
+        "id": "it-clean-116",
+        "field": "caption",
+        "text": "Gonna di pelle color cuoio, maglione con scollo a V e stivali da cavallerizza."
+      },
+      {
+        "id": "it-clean-117",
+        "field": "caption",
+        "text": "Hai un vero talento per gli abbinamenti, il tuo outfit di stamattina è una lezione."
+      },
+      {
+        "id": "it-clean-118",
+        "field": "caption",
+        "text": "Tempo da lupi, ma avevo un appuntamento. Stivali, impermeabile e cappuccio!"
+      },
+      {
+        "id": "it-clean-119",
+        "field": "caption",
+        "text": "Mini guida: per una silhouette dritta, una cintura in vita fa miracoli."
+      },
+      {
+        "id": "it-clean-120",
+        "field": "caption",
+        "text": "Il blazer a quadri su un tubino nero è il pezzo che fa la differenza."
+      },
+      {
+        "id": "it-clean-121",
+        "field": "caption",
+        "text": "Primo sole di ottobre in terrazza con un cardigan a maglia grossa. Felicità."
+      },
+      {
+        "id": "it-clean-122",
+        "field": "caption",
+        "text": "Canotta di lino, pantaloni fluidi e sandali bassi, outfit da smart working a luglio."
+      },
+      {
+        "id": "it-clean-123",
+        "field": "caption",
+        "text": "Idee per portare un vestito estivo in autunno? Non ho voglia di metterlo via."
+      },
+      {
+        "id": "it-clean-124",
+        "field": "caption",
+        "text": "Ho messo collant a pois sotto il vestitino estivo con gli stivaletti. Funziona!"
+      },
+      {
+        "id": "it-clean-125",
+        "field": "caption",
+        "text": "Grandinata improvvisa a Milano, per fortuna avevo il giubbotto impermeabile."
+      },
+      {
+        "id": "it-clean-126",
+        "field": "caption",
+        "text": "Il quadretto vichy rosa e bianco mi fa tornare in mente le estati dalla nonna."
+      },
+      {
+        "id": "it-clean-127",
+        "field": "caption",
+        "text": "Tubino bordeaux e cappotto lungo nero per l'opera stasera 🎭"
+      },
+      {
+        "id": "it-clean-128",
+        "field": "caption",
+        "text": "La mia regola: prima le scarpe comode, il resto viene da sé."
+      },
+      {
+        "id": "it-clean-129",
+        "field": "caption",
+        "text": "La camicia bianca oversize la porto come vestito, come giacca, annodata in vita. Pezzo magico."
+      },
+      {
+        "id": "it-clean-130",
+        "field": "caption",
+        "text": "Preferite il girocollo o lo scollo a V sotto il blazer?"
+      },
+      {
+        "id": "it-clean-131",
+        "field": "caption",
+        "text": "Trench color sabbia, foulard a fantasia e borsa a tracolla. Torino sotto un acquazzone."
+      },
+      {
+        "id": "it-clean-132",
+        "field": "caption",
+        "text": "Tuta di jeans e zoccoli, atmosfera anni '70 per questo sabato di sole."
+      },
+      {
+        "id": "it-clean-133",
+        "field": "caption",
+        "text": "Ho trovato un vestito vintage a motivo cachemire al mercato di Porta Portese, cinque euro!"
+      },
+      {
+        "id": "it-clean-134",
+        "field": "caption",
+        "text": "9 gradi, sono ancora indecisa tra giubbotto di pelle e cappotto."
+      },
+      {
+        "id": "it-clean-135",
+        "field": "caption",
+        "text": "Calzini a vista con i mocassini, ci ho messo tempo ad abituarmi, ora li adoro."
+      },
+      {
+        "id": "it-clean-136",
+        "field": "caption",
+        "text": "Top con spalle scoperte e gonna lunga di voile per una festa in giardino."
+      },
+      {
+        "id": "it-clean-137",
+        "field": "caption",
+        "text": "Il grigio e il cammello insieme sono l'abbinamento più dolce dell'inverno."
+      },
+      {
+        "id": "it-clean-138",
+        "field": "caption",
+        "text": "Parka verde militare con interno in pelliccia sintetica e stivali di pelle, settimana gelida."
+      },
+      {
+        "id": "it-clean-139",
+        "field": "caption",
+        "text": "Stamattina abito in maglia e stivali bassi, massimo comfort per un lungo viaggio in treno."
+      },
+      {
+        "id": "it-clean-140",
+        "field": "caption",
+        "text": "Ho paura di portare il giallo. Consigli per cominciare piano?"
+      },
+      {
+        "id": "it-clean-141",
+        "field": "caption",
+        "text": "Comincia da un accessorio: una borsa o una sciarpa gialla con il grigio, è molto delicato."
+      },
+      {
+        "id": "it-clean-142",
+        "field": "caption",
+        "text": "I pantaloni di velluto a coste sono i re delle giornate fresche."
+      },
+      {
+        "id": "it-clean-143",
+        "field": "caption",
+        "text": "Matrimonio civile: tailleur bianco panna, camicetta di seta e un mazzolino di peonie."
+      },
+      {
+        "id": "it-clean-144",
+        "field": "caption",
+        "text": "La rugiada di stamattina ha rovinato le mie sneakers di camoscio. Lezione imparata."
+      },
+      {
+        "id": "it-clean-145",
+        "field": "caption",
+        "text": "Abito di chiffon stampato, cardigan corto e ballerine. Primavera dolce."
+      },
+      {
+        "id": "it-clean-146",
+        "field": "caption",
+        "text": "Look anni '90: jeans a vita alta, t-shirt bianca e camicia a quadri annodata in vita."
+      },
+      {
+        "id": "it-clean-147",
+        "field": "caption",
+        "text": "Mezza stagione complicata: 7 gradi la mattina, 20 il pomeriggio. Viva gli strati!"
+      },
+      {
+        "id": "it-clean-148",
+        "field": "caption",
+        "text": "Trovo che l'abito color nudo stia meglio con un rossetto acceso, così non sembra spento."
+      },
+      {
+        "id": "it-clean-149",
+        "field": "caption",
+        "text": "Costume intero con schiena scoperta, il mio pezzo preferito per l'estate."
+      },
+      {
+        "id": "it-clean-150",
+        "field": "caption",
+        "text": "Si parla sempre del top, ma il paio di occhiali giusto fa l'outfit!"
+      },
+      {
+        "id": "it-clean-151",
+        "field": "caption",
+        "text": "Maglione jacquard e gonna di lana, pronta per il mercatino di Natale."
+      },
+      {
+        "id": "it-clean-152",
+        "field": "caption",
+        "text": "Vestito nero, collant neri, stivali neri. E un cappotto rosso acceso per svegliare tutto."
+      },
+      {
+        "id": "it-clean-153",
+        "field": "caption",
+        "text": "La tua salopette giallo senape è il raggio di sole della mia bacheca."
+      },
+      {
+        "id": "it-clean-154",
+        "field": "caption",
+        "text": "Sfida: indossare la stessa giacca cinque giorni di fila in cinque modi diversi. Giorno 3, regge!"
+      },
+      {
+        "id": "it-clean-155",
+        "field": "caption",
+        "text": "Camicia di popeline a righe azzurre, freschissima per andare in ufficio in bici."
+      },
+      {
+        "id": "it-clean-156",
+        "field": "caption",
+        "text": "Nevica a grandi fiocchi, che meraviglia. Cappotto di lana cotta e berretto con pompon."
+      },
+      {
+        "id": "it-clean-157",
+        "field": "caption",
+        "text": "Il kimono di seta su jeans e canotta bianca, semplice e un po' bohémien."
+      },
+      {
+        "id": "it-clean-158",
+        "field": "caption",
+        "text": "Libeccio forte sulla costa toscana, cerata e maglia a righe d'obbligo."
+      },
+      {
+        "id": "it-clean-159",
+        "field": "caption",
+        "text": "I miei orecchini dorati hanno fatto tutto l'outfit oggi, basta un tubino nero."
+      },
+      {
+        "id": "it-clean-160",
+        "field": "caption",
+        "text": "Domandina: che lunghezza di cappotto con una gonna midi?"
+      },
+      {
+        "id": "it-clean-161",
+        "field": "caption",
+        "text": "Un cappotto più lungo della gonna, sempre. Così la linea è pulita."
+      },
+      {
+        "id": "it-clean-162",
+        "field": "caption",
+        "text": "Abito chemisier kaki con cintura e sneakers bianche. Look facile per un sabato di commissioni."
+      },
+      {
+        "id": "it-clean-163",
+        "field": "caption",
+        "text": "Cena al ristorante: pantaloni dritti neri, top di raso verde smeraldo e sabot col tacco."
+      },
+      {
+        "id": "it-clean-164",
+        "field": "caption",
+        "text": "Provo il total look beige. Non è facile, bisogna giocare con le texture."
+      },
+      {
+        "id": "it-clean-165",
+        "field": "caption",
+        "text": "Tutina corta a fiori per il festival, con stivali di gomma per sicurezza!"
+      },
+      {
+        "id": "it-clean-166",
+        "field": "caption",
+        "text": "26 gradi e umido, il lino è l'unico tessuto che sopporto."
+      },
+      {
+        "id": "it-clean-167",
+        "field": "caption",
+        "text": "Benvenute alle nuove iscritte, i vostri primi outfit sono super ispiranti 👏"
+      },
+      {
+        "id": "it-clean-168",
+        "field": "caption",
+        "text": "Il mio outfit sportivo di stamattina: top, leggings e giacca antivento leggera. 6 km sotto la pioggerella."
+      },
+      {
+        "id": "it-clean-169",
+        "field": "caption",
+        "text": "Il basco torna ogni autunno nella mia vita. Oggi rosso mattone."
+      },
+      {
+        "id": "it-clean-170",
+        "field": "caption",
+        "text": "Tailleur con gonna in tweed rosa, mi sento in vacanza anche in ufficio."
+      },
+      {
+        "id": "it-clean-171",
+        "field": "caption",
+        "text": "Fa meno freddo di ieri, ho sostituito il piumino con il cappotto di lana."
+      },
+      {
+        "id": "it-clean-172",
+        "field": "caption",
+        "text": "Il mio maglione preferito ha i buchi sui gomiti, ci cucirò delle toppe di pelle."
+      },
+      {
+        "id": "it-clean-173",
+        "field": "caption",
+        "text": "Look da sera sexy e chic: abito a portafoglio in jersey prugna, décolleté nude e pochette dorata."
+      },
+      {
+        "id": "it-clean-174",
+        "field": "caption",
+        "text": "Shorts di jeans, camicia di lino bianca e infradito. Il minimo sindacale per 34 gradi."
+      },
+      {
+        "id": "it-clean-175",
+        "field": "caption",
+        "text": "Il cerchietto di velluto nero rende elegante anche una semplice maglia."
+      },
+      {
+        "id": "it-clean-176",
+        "field": "caption",
+        "text": "Da anni metto solette di lana negli stivali, imbattibili contro il freddo."
+      },
+      {
+        "id": "it-clean-177",
+        "field": "caption",
+        "text": "Vestito lungo a stampa floreale e cappello di paglia. Brunch domenicale al sole."
+      },
+      {
+        "id": "it-clean-178",
+        "field": "caption",
+        "text": "Gonna pantalone di lino blu: sembra una gonna, è un pantaloncino. Conquistata."
+      },
+      {
+        "id": "it-clean-179",
+        "field": "caption",
+        "text": "Questo rosso ciliegia ti sta d'incanto, dovresti metterlo più spesso!"
+      },
+      {
+        "id": "it-clean-180",
+        "field": "caption",
+        "text": "Il berretto di lana con risvolto, indispensabile per le mie orecchie sensibili."
+      },
+      {
+        "id": "it-clean-181",
+        "field": "caption",
+        "text": "Un mazzetto di lavanda secca nell'armadio e i maglioni profumano tutto l'inverno."
+      },
+      {
+        "id": "it-clean-182",
+        "field": "caption",
+        "text": "Look da gala: abito lungo spacco laterale in raso blu notte, spalle scoperte, capelli raccolti."
+      },
+      {
+        "id": "it-clean-183",
+        "field": "caption",
+        "text": "Giacca di velluto verde abete per le feste, con jeans e stivaletti."
+      },
+      {
+        "id": "it-clean-184",
+        "field": "caption",
+        "text": "Pioggerella e 12 gradi, trench e maglioncino leggero."
+      },
+      {
+        "id": "it-clean-185",
+        "field": "caption",
+        "text": "Nessuno mette via gli occhiali da sole, che autunno luminoso!"
+      },
+      {
+        "id": "it-clean-186",
+        "field": "caption",
+        "text": "Cerco dei pantaloni impermeabili eleganti, esistono?"
+      },
+      {
+        "id": "it-clean-187",
+        "field": "caption",
+        "text": "Ho trovato pantaloni impermeabili dritti neri, non si nota la differenza."
+      },
+      {
+        "id": "it-clean-188",
+        "field": "caption",
+        "text": "La camicia hawaiana è tornata nel mio armadio. Con pantaloni beige resta sobria."
+      },
+      {
+        "id": "it-clean-189",
+        "field": "caption",
+        "text": "Abito per Capodanno? Pensavo a un vestito di paillettes argento al ginocchio."
+      },
+      {
+        "id": "it-clean-190",
+        "field": "caption",
+        "text": "Amo i tessuti naturali: lana, lino, cotone, seta. Respirano e invecchiano bene."
+      },
+      {
+        "id": "it-clean-191",
+        "field": "caption",
+        "text": "Una giacca da completo troppo grande trovata nell'armadio di papà, la porto con la cintura."
+      },
+      {
+        "id": "it-clean-192",
+        "field": "caption",
+        "text": "Per una giornata in città con 31 gradi la gonna midi di cotone è imbattibile."
+      },
+      {
+        "id": "it-clean-193",
+        "field": "caption",
+        "text": "Bufera di neve, resto al caldo col pigiama di flanella. Outfit approvato."
+      },
+      {
+        "id": "it-clean-194",
+        "field": "caption",
+        "text": "Il bianco d'inverno, che passione: cappotto bianco, maglione panna, jeans écru."
+      },
+      {
+        "id": "it-clean-195",
+        "field": "caption",
+        "text": "I toni della terra ti stanno benissimo, fanno risaltare gli occhi!"
+      },
+      {
+        "id": "it-clean-196",
+        "field": "caption",
+        "text": "Abito di tulle rosa cipria per il compleanno di mia figlia, voleva che fossimo coordinate."
+      },
+      {
+        "id": "it-clean-197",
+        "field": "caption",
+        "text": "Outfit da aereo: pantaloni morbidi, maglione di cashmere, sneakers e una sciarpa grande che fa da coperta."
+      },
+      {
+        "id": "it-clean-198",
+        "field": "caption",
+        "text": "Piove a catinelle. Stivali di gomma, impermeabile e buon umore lo stesso."
+      },
+      {
+        "id": "it-clean-199",
+        "field": "caption",
+        "text": "Il marrone cioccolato è il colore dell'autunno quest'anno."
+      },
+      {
+        "id": "it-clean-200",
+        "field": "caption",
+        "text": "Un vestitino a spalline con una t-shirt bianca sotto, allunga la stagione."
+      },
+      {
+        "id": "it-clean-201",
+        "field": "caption",
+        "text": "La salopette di lino è la mia divisa estiva, ce l'ho in tre colori."
+      },
+      {
+        "id": "it-clean-202",
+        "field": "caption",
+        "text": "Non capisco chi porta i pantaloncini a 5 gradi, ma rispetto!"
+      },
+      {
+        "id": "it-clean-203",
+        "field": "caption",
+        "text": "Ho tinto il mio vecchio vestito beige di verde oliva, ha una nuova vita."
+      },
+      {
+        "id": "it-clean-204",
+        "field": "caption",
+        "text": "Look estivo per l'ufficio con l'aria condizionata: abito di cotone e cardigan sottile sempre in borsa."
+      },
+      {
+        "id": "it-clean-205",
+        "field": "caption",
+        "text": "Primo sole di marzo, ho tirato fuori la giacca di pelle e gli occhiali tondi."
+      },
+      {
+        "id": "it-clean-206",
+        "field": "caption",
+        "text": "Completo pigiama di seta portato in città, con i mocassini. Si osa!"
+      },
+      {
+        "id": "it-clean-207",
+        "field": "caption",
+        "text": "Scamiciato di velluto a coste con un maglioncino sottile sotto. Molto scolaretta, lo ammetto."
+      },
+      {
+        "id": "it-clean-208",
+        "field": "caption",
+        "text": "Mia mamma mi ha insegnato ad avere sempre un ombrello in borsa. Oggi aveva ragione."
+      },
+      {
+        "id": "it-clean-209",
+        "field": "caption",
+        "text": "Puoi dirci dove hai trovato l'abito bordeaux? La caduta è perfetta."
+      },
+      {
+        "id": "it-clean-210",
+        "field": "caption",
+        "text": "Nessun marchio, una sarta del mio quartiere! Fa meraviglie."
+      },
+      {
+        "id": "it-clean-211",
+        "field": "caption",
+        "text": "Cucio le mie gonne da un anno, ecco l'ultima in lana grigio melange."
+      },
+      {
+        "id": "it-clean-212",
+        "field": "caption",
+        "text": "Il duo pantaloni bianchi e camicia celeste è l'estate in uno sguardo."
+      },
+      {
+        "id": "it-clean-213",
+        "field": "caption",
+        "text": "Stivali texani e vestito a fiori, look da festival country del weekend."
+      },
+      {
+        "id": "it-clean-214",
+        "field": "caption",
+        "text": "Annunciano temporali, tengo la giacca antivento in borsa anche se il cielo è azzurro."
+      },
+      {
+        "id": "it-clean-215",
+        "field": "caption",
+        "text": "Abito asimmetrico in jersey nero, una spalla sola, per l'inaugurazione della mostra stasera."
+      },
+      {
+        "id": "it-clean-216",
+        "field": "caption",
+        "text": "Maglione oversize e minigonna di tweed, con collant coprenti e mocassini."
+      },
+      {
+        "id": "it-clean-217",
+        "field": "caption",
+        "text": "Consiglio per chi è minuta: stesso colore per pantaloni e scarpe."
+      },
+      {
+        "id": "it-clean-218",
+        "field": "caption",
+        "text": "Una sciarpa XXL fa da scialle la sera in terrazza. Versatilità!"
+      },
+      {
+        "id": "it-clean-219",
+        "field": "caption",
+        "text": "Guanti di pelle foderati di cashmere, un lusso che non rimpiango."
+      },
+      {
+        "id": "it-clean-220",
+        "field": "caption",
+        "text": "Oggi abbiamo avuto quattro stagioni in un giorno. Ho cambiato giacca tre volte."
+      },
+      {
+        "id": "it-clean-221",
+        "field": "caption",
+        "text": "Abito di pizzo color nudo per la cerimonia, con una stola azzurra per il tocco di colore."
+      },
+      {
+        "id": "it-clean-222",
+        "field": "caption",
+        "text": "Il jeans a zampa è tornato. Con gli zoccoli è molto anni '70."
+      },
+      {
+        "id": "it-clean-223",
+        "field": "caption",
+        "text": "Piumino corto e pantaloni ampi, il contrasto di volumi mi piace molto."
+      },
+      {
+        "id": "it-clean-224",
+        "field": "caption",
+        "text": "Una camicia di flanella a quadri rossi è l'autunno in baita."
+      },
+      {
+        "id": "it-clean-225",
+        "field": "caption",
+        "text": "La tua pettinatura sta benissimo con questo dolcevita, bellissima foto."
+      },
+      {
+        "id": "it-clean-226",
+        "field": "caption",
+        "text": "4 gradi e sole pieno, cappotto aperto e sciarpa grossa."
+      },
+      {
+        "id": "it-clean-227",
+        "field": "caption",
+        "text": "I bermuda di lino sono il capo che ho indossato di più quest'estate."
+      },
+      {
+        "id": "it-clean-228",
+        "field": "caption",
+        "text": "Outfit da giardinaggio: salopette consumata, cappello di paglia e stivali di gomma. I pomodori mi aspettano."
+      },
+      {
+        "id": "it-clean-229",
+        "field": "caption",
+        "text": "Cerco di comprare meno ma meglio. Questo cappotto di lana mi accompagnerà a lungo."
+      },
+      {
+        "id": "it-clean-230",
+        "field": "caption",
+        "text": "Giacchina di tweed e jeans grezzo, chic informale per un pranzo tra amiche."
+      },
+      {
+        "id": "it-clean-231",
+        "field": "caption",
+        "text": "Vestito lungo in maglia e stivali di camoscio, mi ricorda gli autunni di quand'ero bambina."
+      },
+      {
+        "id": "it-clean-232",
+        "field": "caption",
+        "text": "Dopo una settimana di pioggia, il sole! Ho tirato fuori la gonna gialla."
+      },
+      {
+        "id": "it-clean-233",
+        "field": "caption",
+        "text": "I miei collant rossi fanno sorridere la gente in metro, missione compiuta."
+      },
+      {
+        "id": "it-clean-234",
+        "field": "caption",
+        "text": "Sono vestita di nero dalla testa ai piedi, ma con texture diverse: lana, pelle, seta."
+      },
+      {
+        "id": "it-clean-235",
+        "field": "caption",
+        "text": "Leggings in maglia spessa: caldi come una calzamaglia ma più eleganti."
+      },
+      {
+        "id": "it-clean-236",
+        "field": "caption",
+        "text": "Giorno di trasloco, outfit speciale: salopette, t-shirt e sneakers comode."
+      },
+      {
+        "id": "it-clean-237",
+        "field": "caption",
+        "text": "La pochette ricamata della nonna esce per le grandi occasioni. Oggi il matrimonio di mio fratello."
+      },
+      {
+        "id": "it-clean-238",
+        "field": "caption",
+        "text": "Abito midi blu a palline bianche e sandali rossi. Look rétro della domenica."
+      },
+      {
+        "id": "it-clean-239",
+        "field": "caption",
+        "text": "Stamattina brina sulle macchine. Guanti, berretto e cappotto abbottonato fino in cima."
+      },
+      {
+        "id": "it-clean-240",
+        "field": "caption",
+        "text": "Kaki e rosa cipria insieme, hai ragione, è un abbinamento bellissimo!"
+      },
+      {
+        "id": "it-clean-241",
+        "field": "caption",
+        "text": "Viva le tasche nei vestiti! Tutti i vestiti dovrebbero averle."
+      },
+      {
+        "id": "it-clean-242",
+        "field": "caption",
+        "text": "Gilet imbottito su una felpa con cappuccio, ideale per una passeggiata nel bosco."
+      },
+      {
+        "id": "it-clean-243",
+        "field": "caption",
+        "text": "Outfit da luna park: jeans, maglietta a righe e giacchina leggera. Semplice e pratico."
+      },
+      {
+        "id": "it-clean-244",
+        "field": "caption",
+        "text": "Abito di raso color champagne per il gala. Un po' di luce, non troppa."
+      },
+      {
+        "id": "it-clean-245",
+        "field": "caption",
+        "text": "Cerco stivali impermeabili che non sembrino stivali da pesca. Suggerimenti?"
+      },
+      {
+        "id": "it-clean-246",
+        "field": "caption",
+        "text": "Il sole picchia forte, ho messo una camicia di lino a maniche lunghe per proteggermi."
+      },
+      {
+        "id": "it-clean-247",
+        "field": "caption",
+        "text": "Cardigan lungo grigio e pantaloni fluidi, look da coccole per una domenica piovosa."
+      },
+      {
+        "id": "it-clean-248",
+        "field": "caption",
+        "text": "Stagione di mele, zucche e maglioni a trecce. Il mio momento preferito."
+      },
+      {
+        "id": "it-clean-249",
+        "field": "caption",
+        "text": "Abito in maglia rosso e stivali neri per la festa in ufficio. Caldo e festoso."
+      },
+      {
+        "id": "it-clean-250",
+        "field": "caption",
+        "text": "Il perizoma da bagno lo tengo per la piscina, in spiaggia con i bambini preferisco un bikini più coprente."
+      },
+      {
+        "id": "it-clean-251",
+        "field": "caption",
+        "text": "I miei scarponi da trekking hanno fatto 500 km, ancora impermeabili. Si meritano un bacio!"
+      },
+      {
+        "id": "it-clean-252",
+        "field": "caption",
+        "text": "Vestito estivo e giacca di lino, perfetto per una serata in riva al mare."
+      },
+      {
+        "id": "it-clean-253",
+        "field": "caption",
+        "text": "Bel tempo ma fresco: trench aperto, maglioncino leggero e foulard."
+      },
+      {
+        "id": "it-clean-254",
+        "field": "caption",
+        "text": "Ho ritrovato il mio vecchio giubbotto di jeans in soffitta, è perfetto."
+      },
+      {
+        "id": "it-clean-255",
+        "field": "caption",
+        "text": "Niente più tacchi al lavoro, ballerine e mocassini per sempre."
+      },
+      {
+        "id": "it-clean-256",
+        "field": "caption",
+        "text": "La gonna plissé metallizzata la porto con un maglione grosso per renderla più quotidiana."
+      },
+      {
+        "id": "it-clean-257",
+        "field": "caption",
+        "text": "Look in montagna: pantaloni da sci, maglia termica di lana merino e doposci imbottiti."
+      },
+      {
+        "id": "it-clean-258",
+        "field": "caption",
+        "text": "Consigli per un dress code \"abito da pomeriggio\" a un matrimonio di giugno?"
+      },
+      {
+        "id": "it-clean-259",
+        "field": "caption",
+        "text": "Tailleur leggero o abito midi, scarpe chiuse o sandali eleganti. Evita il bianco!"
+      },
+      {
+        "id": "it-clean-260",
+        "field": "caption",
+        "text": "Cardigan corto di mohair e gonna lunga fluida, atmosfera romantica."
+      },
+      {
+        "id": "it-clean-261",
+        "field": "caption",
+        "text": "Completo di lino verde acqua, fresco e va bene ovunque."
+      },
+      {
+        "id": "it-clean-262",
+        "field": "caption",
+        "text": "Il berretto di lana del nonno, lo porto con orgoglio ogni inverno."
+      },
+      {
+        "id": "it-clean-263",
+        "field": "caption",
+        "text": "Oggi jeans, maglione blu e sneakers. A volte il più semplice è il migliore."
+      },
+      {
+        "id": "it-clean-264",
+        "field": "caption",
+        "text": "Tubino in maglia, cappotto lungo e stivali bassi. Silhouette slanciata."
+      },
+      {
+        "id": "it-clean-265",
+        "field": "caption",
+        "text": "Per il rientro ho investito in una buona borsa di pelle e due pantaloni di qualità."
+      },
+      {
+        "id": "it-clean-266",
+        "field": "caption",
+        "text": "La mia bambina vuole lo stesso cappotto giallo che ho io, andremo a scuola coordinate."
+      },
+      {
+        "id": "it-clean-267",
+        "field": "caption",
+        "text": "Tramontana a Genova, sciarpa di lana ben stretta e guanti di pelle."
+      },
+      {
+        "id": "it-clean-268",
+        "field": "caption",
+        "text": "Brezza serale, mi butto un maglione sulle spalle. Molto chic di campagna."
+      },
+      {
+        "id": "it-clean-269",
+        "field": "caption",
+        "text": "Ho provato i pantaloni di pelle per la prima volta, conquistata."
+      },
+      {
+        "id": "it-clean-270",
+        "field": "caption",
+        "text": "Shorts di jeans, canotta bianca e cappello da sole. Si parte per la spiaggia!"
+      },
+      {
+        "id": "it-clean-271",
+        "field": "caption",
+        "text": "Camicia rosa chiaro e completo grigio chiaro per mio marito, era elegantissimo al matrimonio."
+      },
+      {
+        "id": "it-clean-272",
+        "field": "caption",
+        "text": "Hai l'arte di rendere speciale un outfit semplice. Brava!"
+      },
+      {
+        "id": "it-clean-273",
+        "field": "caption",
+        "text": "Abito a portafoglio a fantasia geometrica, perfetto per la silhouette a clessidra."
+      },
+      {
+        "id": "it-clean-274",
+        "field": "caption",
+        "text": "I calzettoni di lana che spuntano dagli stivali, carini e caldi."
+      },
+      {
+        "id": "it-clean-275",
+        "field": "caption",
+        "text": "Mattina fresca, pomeriggio mite, sera fresca. Il cardigan è il mio migliore amico."
+      },
+      {
+        "id": "it-clean-276",
+        "field": "caption",
+        "text": "Abito da sera lungo con scollatura profonda sulla schiena e una giacchina per la cerimonia."
+      },
+      {
+        "id": "it-clean-277",
+        "field": "caption",
+        "text": "I miei stivali di gomma foderati mi hanno salvato la giornata, c'era fango ovunque."
+      },
+      {
+        "id": "it-clean-278",
+        "field": "caption",
+        "text": "Il colletto alla Peter Pan è così grazioso su un vestito nero."
+      },
+      {
+        "id": "it-clean-279",
+        "field": "caption",
+        "text": "Sfilata di fine anno alla scuola di moda, ecco il mio modello in lino bordeaux!"
+      },
+      {
+        "id": "it-clean-280",
+        "field": "caption",
+        "text": "19 gradi e sole, giornata ideale per un abito chemisier."
+      },
+      {
+        "id": "it-clean-281",
+        "field": "caption",
+        "text": "Fuori il costume: bikini a balze con stampa limoni, allegrissimo."
+      },
+      {
+        "id": "it-clean-282",
+        "field": "caption",
+        "text": "Le tute da sci rétro, che amore. Intera colorata e occhiali a mascherina."
+      },
+      {
+        "id": "it-clean-283",
+        "field": "caption",
+        "text": "Per un primo appuntamento: gonna midi di raso, maglioncino sottile e stivaletti. Né troppo né troppo poco."
+      },
+      {
+        "id": "it-clean-284",
+        "field": "caption",
+        "text": "Jeans bianchi in autunno con un maglione cammello, perfetto."
+      },
+      {
+        "id": "it-clean-285",
+        "field": "caption",
+        "text": "Bel completo, la lunghezza della gonna è ideale con i tuoi stivali!"
+      },
+      {
+        "id": "it-clean-286",
+        "field": "caption",
+        "text": "Domenica di pioggia, outfit da casa: pantaloni ampi in maglia e pantofole grosse."
+      },
+      {
+        "id": "it-clean-287",
+        "field": "caption",
+        "text": "Il rossetto abbinato al cappotto fa sempre la sua figura."
+      },
+      {
+        "id": "it-clean-288",
+        "field": "caption",
+        "text": "Il mio vestito preferito è quello con le tasche che si lava in lavatrice."
+      },
+      {
+        "id": "it-clean-289",
+        "field": "caption",
+        "text": "Il trucco del giorno: arrotolare le maniche di una camicia troppo lunga, ed è fatta."
+      },
+      {
+        "id": "it-clean-290",
+        "field": "caption",
+        "text": "Per una giornata di neve consiglio il cappotto a metà coscia con cappuccio staccabile."
+      },
+      {
+        "id": "it-clean-291",
+        "field": "caption",
+        "text": "Nelle giornate di caldo porto abiti larghi di cotone leggero. Niente che si appiccichi!"
+      },
+      {
+        "id": "it-clean-292",
+        "field": "caption",
+        "text": "Completo di velluto rosa per il brunch di compleanno della mia migliore amica."
+      },
+      {
+        "id": "it-clean-293",
+        "field": "caption",
+        "text": "Giacca di tweed, jeans dritti e décolleté con cinturino. Chic da settembre."
+      },
+      {
+        "id": "it-clean-294",
+        "field": "caption",
+        "text": "Caldo afoso a Bari, abito di lino bianco e espadrillas."
+      },
+      {
+        "id": "it-clean-295",
+        "field": "caption",
+        "text": "Il cappello alla pescatora è tornato, ce l'ho impermeabile per i temporali estivi."
+      },
+      {
+        "id": "it-clean-296",
+        "field": "caption",
+        "text": "Vestito lungo di cotone indiano e sandali bassi, le mie vacanze in un outfit."
+      },
+      {
+        "id": "it-clean-297",
+        "field": "caption",
+        "text": "La giacca trapuntata verde bottiglia, me ne sono innamorata quest'autunno."
+      },
+      {
+        "id": "it-clean-298",
+        "field": "caption",
+        "text": "Il tocco in più di oggi: un fiocco di velluto tra i capelli."
+      },
+      {
+        "id": "it-clean-299",
+        "field": "caption",
+        "text": "Stivali sopra il ginocchio in camoscio nero con un abito in maglia grigio, per una giornata di freddo secco."
+      },
+      {
+        "id": "it-clean-300",
+        "field": "caption",
+        "text": "Maglioncino di cashmere color pistacchio, ravviva tutti i miei outfit grigi."
+      },
+      {
+        "id": "it-clean-301",
+        "field": "caption",
+        "text": "Pantaloni neri, camicia bianca, mocassini. La divisa che non tradisce mai."
+      },
+      {
+        "id": "it-clean-302",
+        "field": "caption",
+        "text": "Giro al museo con abito midi e sneakers, comode per camminare ore."
+      },
+      {
+        "id": "it-clean-303",
+        "field": "caption",
+        "text": "Weekend sul lago: camicia di lino, bermuda e sandali. Il paradiso."
+      },
+      {
+        "id": "it-clean-304",
+        "field": "caption",
+        "text": "Annunciano 35 cm di neve domani in Trentino, preparate stivali e berretti!"
+      },
+      {
+        "id": "it-clean-305",
+        "field": "caption",
+        "text": "Bilancio dopo un inverno intero a Cortina: piumino lungo fino al ginocchio, scarponi imbottiti e berretto foderato in pile. Ho avuto freddo solo due volte, nei giorni di vento forte in quota. Lo consiglio a chi si trasferisce in montagna per la prima volta!"
+      },
+      {
+        "id": "it-clean-306",
+        "field": "caption",
+        "text": "Per chi chiedeva come porto l'abito color nudo in ufficio: sopra metto un blazer cioccolato, collant velati e mocassini marroni. Resta sobrio e professionale, e il colore non sembra spento grazie al contrasto con il marrone."
+      },
+      {
+        "id": "it-clean-307",
+        "field": "caption",
+        "text": "Giornata al mercato sotto un sole cocente a Lecce. Ho scelto un abito di lino bianco molto ampio, cappello grande, sandali bassi e cesta. Trucco: uno spray d'acqua in borsa e una sciarpina di cotone per coprire le spalle a fine mattinata."
+      },
+      {
+        "id": "it-clean-308",
+        "field": "caption",
+        "text": "Piccolo bilancio del mio guardaroba capsula d'autunno: 3 pantaloni, 2 gonne, 6 top, 2 maglioni, 1 trench e 1 cappotto. Tutto si abbina in beige, blu e bordeaux. Non ho mai avuto così tanti outfit con così pochi capi, e la mattina risparmio un sacco di tempo."
+      },
+      {
+        "id": "it-clean-309",
+        "field": "caption",
+        "text": "Ho sempre pensato che la salopette non facesse per me perché sono alta. Basta scegliere bretelle regolabili e una gamba ampia che cada bene sulla scarpa. Oggi la porto con un dolcevita nero e mi sento benissimo."
+      },
+      {
+        "id": "it-clean-310",
+        "field": "caption",
+        "text": "Domanda seria per chi vive in Val Pusteria: cosa indossate per andare al lavoro a piedi con -18? Ho un buon piumino ma ho sempre freddo alle gambe. Pensavo a pantaloni foderati o a una calzamaglia di lana sotto i jeans. Grazie in anticipo!"
+      },
+      {
+        "id": "it-clean-311",
+        "field": "caption",
+        "text": "Il mio look per una giornata pienissima: accompagnare i bimbi, riunione con un cliente, dentista e cena da amici. Jeans neri, camicia di seta avorio, blazer blu e stivaletti con tacco basso. Un solo outfit per tutto e nessuno se n'è accorto 😉"
+      },
+      {
+        "id": "it-clean-312",
+        "field": "caption",
+        "text": "Per il matrimonio in campagna di sabato ci saranno circa 25 gradi con possibili rovesci. Ho preparato un abito midi a fiori con maniche svolazzanti, sandali a tacco largo per non affondare nel prato e un trench corto color crema. Aggiungereste un cappello?"
+      },
+      {
+        "id": "it-clean-313",
+        "field": "caption",
+        "text": "Tirare fuori i maglioni dal sottovuoto è il mio rito di ottobre. Quest'anno la regina dell'armadio è una maglia a trecce color ruggine, lavata a mano e asciugata in piano. Con jeans chiari e stivaletti marroni è il look perfetto per le prime giornate fresche."
+      },
+      {
+        "id": "it-clean-314",
+        "field": "caption",
+        "text": "Le palline sono il motivo più versatile che esista: le porto su una camicetta di seta per l'ufficio, su un vestito a portafoglio per l'aperitivo e su un foulard annodato alla borsa nel weekend. Voi come le abbinate? Io con il rosso non sbaglio mai."
+      },
+      {
+        "id": "it-clean-315",
+        "field": "caption",
+        "text": "Giornata ventosa e umida a Venezia, 11 gradi. Ho scelto un cappotto di lana a spina di pesce lungo fino al polpaccio, sciarpa grossa, stivali di gomma bassi neri per l'acqua alta e un ombrello robusto. Elegante e asciutta anche sulle passerelle!"
+      },
+      {
+        "id": "it-clean-316",
+        "field": "altText",
+        "text": "Donna in piedi su un marciapiede bagnato con trench beige, jeans dritti e sneakers bianche."
+      },
+      {
+        "id": "it-clean-317",
+        "field": "altText",
+        "text": "Cappotto a spina di pesce grigio indossato su un dolcevita nero, con mocassini marroni."
+      },
+      {
+        "id": "it-clean-318",
+        "field": "altText",
+        "text": "Camicetta a palline bianche su fondo blu e gonna midi rossa, foto in un cortile."
+      },
+      {
+        "id": "it-clean-319",
+        "field": "altText",
+        "text": "Abito da cocktail nero con scollo a barchetta e décolleté nere, davanti a uno specchio."
+      },
+      {
+        "id": "it-clean-320",
+        "field": "altText",
+        "text": "Abito lungo azzurro con figaro in maglia bianca e sandali bassi."
+      },
+      {
+        "id": "it-clean-321",
+        "field": "altText",
+        "text": "Abito color nudo a spalline sottili, lunghezza midi, con sandali dorati e pochette."
+      },
+      {
+        "id": "it-clean-322",
+        "field": "altText",
+        "text": "Persona con cappotto lungo grigio, berretto rosso e guanti, in una strada innevata."
+      },
+      {
+        "id": "it-clean-323",
+        "field": "altText",
+        "text": "Look da ufficio: pantaloni a sigaretta antracite, camicia bianca e mocassini bordeaux."
+      },
+      {
+        "id": "it-clean-324",
+        "field": "altText",
+        "text": "Gonna culotte nera in crêpe con maglioncino crema e stivaletti."
+      },
+      {
+        "id": "it-clean-325",
+        "field": "altText",
+        "text": "Camicia di lino bianca ampia e shorts a vita alta beige su un muro soleggiato."
+      },
+      {
+        "id": "it-clean-326",
+        "field": "altText",
+        "text": "Vestito lungo a fiori blu e giubbotto di jeans corto, foto scattata in un parco."
+      },
+      {
+        "id": "it-clean-327",
+        "field": "altText",
+        "text": "Parka nera, berretto fatto a mano verde e stivali imbottiti su una strada innevata."
+      },
+      {
+        "id": "it-clean-328",
+        "field": "altText",
+        "text": "Maglione a collo alto panna e gonna a pieghe cammello, con stivali marroni a tacco basso."
+      },
+      {
+        "id": "it-clean-329",
+        "field": "altText",
+        "text": "Tubino aderente nero e blazer grigio oversize, outfit fotografato davanti a uno specchio."
+      },
+      {
+        "id": "it-clean-330",
+        "field": "altText",
+        "text": "Abito estivo con schiena scoperta a stampa floreale, visto di spalle su una terrazza."
+      },
+      {
+        "id": "it-clean-331",
+        "field": "altText",
+        "text": "Costume intero a righe blu e bianche, cappello di paglia e camicia di lino aperta."
+      },
+      {
+        "id": "it-clean-332",
+        "field": "altText",
+        "text": "Top nero con scollatura quadrata, catenina dorata sottile e jeans a vita alta."
+      },
+      {
+        "id": "it-clean-333",
+        "field": "altText",
+        "text": "Total look bordeaux: maglione in maglia, pantaloni dritti e stivaletti di pelle."
+      },
+      {
+        "id": "it-clean-334",
+        "field": "altText",
+        "text": "Abito midi azzurro, sandali color nudo e pochette di rafia su sfondo di giardino."
+      },
+      {
+        "id": "it-clean-335",
+        "field": "altText",
+        "text": "Camicia a quadri rossi, jeans grezzo e scarponcini davanti a una baita di legno."
+      },
+      {
+        "id": "it-clean-336",
+        "field": "altText",
+        "text": "Abito di raso verde bottiglia a maniche lunghe, lunghezza al ginocchio."
+      },
+      {
+        "id": "it-clean-337",
+        "field": "altText",
+        "text": "Salopette di velluto a coste marrone con t-shirt a righe sotto."
+      },
+      {
+        "id": "it-clean-338",
+        "field": "altText",
+        "text": "Leggings termici, pile grigio e giacca antivento blu su un sentiero fangoso nel bosco."
+      },
+      {
+        "id": "it-clean-339",
+        "field": "altText",
+        "text": "Cappotto cammello illuminato dalla luce dorata del tramonto, persona di profilo."
+      },
+      {
+        "id": "it-clean-340",
+        "field": "altText",
+        "text": "Abito di cotone bianco leggero e sandali bassi di cuoio sotto un cielo azzurro."
+      },
+      {
+        "id": "it-clean-341",
+        "field": "altText",
+        "text": "Pantaloni larghi di lino in tre colori, beige, bianco e verde oliva, appoggiati su un letto."
+      },
+      {
+        "id": "it-clean-342",
+        "field": "altText",
+        "text": "Pantaloni da sci neri, stivali da neve e parka rossa davanti a un palazzo di uffici."
+      },
+      {
+        "id": "it-clean-343",
+        "field": "altText",
+        "text": "Completo in maglia a coste grigio melange, maglione e pantaloni coordinati, su un divano."
+      },
+      {
+        "id": "it-clean-344",
+        "field": "altText",
+        "text": "Impermeabile leggero beige e ombrello trasparente in una strada lastricata sotto la pioggia."
+      },
+      {
+        "id": "it-clean-345",
+        "field": "altText",
+        "text": "Abito lungo blu notte a maniche corte, fotografato in una sala ricevimenti."
+      },
+      {
+        "id": "it-clean-346",
+        "field": "altText",
+        "text": "Felpa grigia oversize, leggings neri e calzettoni di lana su un parquet."
+      },
+      {
+        "id": "it-clean-347",
+        "field": "altText",
+        "text": "Camicia a pois bianchi su fondo blu, jeans chiari e ballerine."
+      },
+      {
+        "id": "it-clean-348",
+        "field": "altText",
+        "text": "Cappotto doppiopetto blu, berretto a coste grigio e guanti di pelle neri."
+      },
+      {
+        "id": "it-clean-349",
+        "field": "altText",
+        "text": "Abito a quadretti rossi e bianchi, cesta di vimini ed espadrillas in un mercato."
+      },
+      {
+        "id": "it-clean-350",
+        "field": "altText",
+        "text": "Abitino aderente in maglia a coste beige con stivaletti marroni."
+      },
+      {
+        "id": "it-clean-351",
+        "field": "altText",
+        "text": "Ramponcini sugli stivali e cappotto lungo nero su un marciapiede ghiacciato."
+      },
+      {
+        "id": "it-clean-352",
+        "field": "altText",
+        "text": "Doppio denim: camicia di jeans chiara e jeans scuri con cintura di pelle."
+      },
+      {
+        "id": "it-clean-353",
+        "field": "altText",
+        "text": "Maglione giallo senape e pantaloni grigi, foto sotto un cielo nuvoloso."
+      },
+      {
+        "id": "it-clean-354",
+        "field": "altText",
+        "text": "Shorts di lino bianchi, canotta a coste nera e sandali di cuoio naturale."
+      },
+      {
+        "id": "it-clean-355",
+        "field": "altText",
+        "text": "Pantaloni a palazzo in seta nera, top a spalline sottili e sabot dorati."
+      },
+      {
+        "id": "it-clean-356",
+        "field": "altText",
+        "text": "Bikini rosso a palline bianche e telo da mare a righe su una spiaggia di sabbia."
+      },
+      {
+        "id": "it-clean-357",
+        "field": "altText",
+        "text": "Salopette corta di jeans e maglia a righe, seduta su una coperta da picnic."
+      },
+      {
+        "id": "it-clean-358",
+        "field": "altText",
+        "text": "Outfit tutto bianco latte con una borsa nera strutturata in mano."
+      },
+      {
+        "id": "it-clean-359",
+        "field": "altText",
+        "text": "Cappotto di tweed vintage spigato grigio e marrone, abbottonato, con sciarpa nera."
+      },
+      {
+        "id": "it-clean-360",
+        "field": "altText",
+        "text": "Tailleur pantalone di lino beige e camicetta bianca, con décolleté nude."
+      },
+      {
+        "id": "it-clean-361",
+        "field": "altText",
+        "text": "Blazer di lana grigio su dolcevita sottile nero, con pantaloni dritti."
+      },
+      {
+        "id": "it-clean-362",
+        "field": "altText",
+        "text": "Pantaloni cargo kaki, camicia bianca oversize e sneakers alte."
+      },
+      {
+        "id": "it-clean-363",
+        "field": "altText",
+        "text": "Vestito rosso a balze, lunghezza al ginocchio, con sandali neri col tacco."
+      },
+      {
+        "id": "it-clean-364",
+        "field": "altText",
+        "text": "Collant pesanti neri, gonna di lana grigia e stivali alti di pelle."
+      },
+      {
+        "id": "it-clean-365",
+        "field": "altText",
+        "text": "Cappotto rosa cipria lungo indossato su un maglione grigio e jeans."
+      },
+      {
+        "id": "it-clean-366",
+        "field": "altText",
+        "text": "Maglione a trecce color panna e jeans blu sul lungolago."
+      },
+      {
+        "id": "it-clean-367",
+        "field": "altText",
+        "text": "Maglia marinière a righe, pantaloni bianchi e ballerine rosse su un molo."
+      },
+      {
+        "id": "it-clean-368",
+        "field": "altText",
+        "text": "Foulard di seta a fantasia annodato al collo e occhiali da sole tondi."
+      },
+      {
+        "id": "it-clean-369",
+        "field": "altText",
+        "text": "Abito rosso svasato a maniche tre quarti con décolleté nere."
+      },
+      {
+        "id": "it-clean-370",
+        "field": "altText",
+        "text": "Cappello di paglia a tesa larga e abito di voile di cotone bianco."
+      },
+      {
+        "id": "it-clean-371",
+        "field": "altText",
+        "text": "Stivaletti bordeaux di pelle con jeans neri e cappotto grigio."
+      },
+      {
+        "id": "it-clean-372",
+        "field": "altText",
+        "text": "Tuta intera in crêpe verde bottiglia con sabot neri."
+      },
+      {
+        "id": "it-clean-373",
+        "field": "altText",
+        "text": "Pantaloni elasticizzati neri, giacca antivento giallo fluo e zaino impermeabile accanto a una bici."
+      },
+      {
+        "id": "it-clean-374",
+        "field": "altText",
+        "text": "Piumino lungo nero, stivali foderati e berretto bianco in un paesaggio innevato."
+      },
+      {
+        "id": "it-clean-375",
+        "field": "altText",
+        "text": "Abito di lino stropicciato verde salvia e sandali intrecciati marroni."
+      },
+      {
+        "id": "it-clean-376",
+        "field": "altText",
+        "text": "Jeans blu a vita alta e gamba dritta, alla caviglia, con mocassini."
+      },
+      {
+        "id": "it-clean-377",
+        "field": "altText",
+        "text": "Camicia blu elettrico e pantaloni bianchi ampi su sfondo di muro bianco a calce."
+      },
+      {
+        "id": "it-clean-378",
+        "field": "altText",
+        "text": "Camicetta verde con fiocco al collo e gonna midi plissé nera."
+      },
+      {
+        "id": "it-clean-379",
+        "field": "altText",
+        "text": "Strati: t-shirt bianca, camicia di flanella, gilet trapuntato e giacca."
+      },
+      {
+        "id": "it-clean-380",
+        "field": "altText",
+        "text": "Maglione di mohair lilla e jeans bianchi con stivaletti beige."
+      },
+      {
+        "id": "it-clean-381",
+        "field": "altText",
+        "text": "Pantaloni di velluto, maglione di lana grosso e pantofole accanto a una stufa."
+      },
+      {
+        "id": "it-clean-382",
+        "field": "altText",
+        "text": "Abito da cocktail in velluto bordeaux al ginocchio e décolleté nere."
+      },
+      {
+        "id": "it-clean-383",
+        "field": "altText",
+        "text": "Caban blu e sciarpa di cashmere grigia sulla riva di un lago nebbioso."
+      },
+      {
+        "id": "it-clean-384",
+        "field": "altText",
+        "text": "Abito midi bianco con figaro corto coordinato e sandali beige."
+      },
+      {
+        "id": "it-clean-385",
+        "field": "altText",
+        "text": "Tuta di jeans blu e zoccoli di legno sotto un cielo soleggiato."
+      },
+      {
+        "id": "it-clean-386",
+        "field": "altText",
+        "text": "Vestito vintage a motivo cachemire rosso e ocra, sciancrato in vita."
+      },
+      {
+        "id": "it-clean-387",
+        "field": "altText",
+        "text": "Top bianco con spalle scoperte e gonna lunga di voile verde chiaro."
+      },
+      {
+        "id": "it-clean-388",
+        "field": "altText",
+        "text": "Parka verde militare con interno in pelliccia sintetica e stivali di pelle marroni."
+      },
+      {
+        "id": "it-clean-389",
+        "field": "altText",
+        "text": "Abito in maglia grigio e stivali bassi neri, borsa a tracolla."
+      },
+      {
+        "id": "it-clean-390",
+        "field": "altText",
+        "text": "Tailleur bianco panna, camicetta di seta e mazzolino di peonie rosa."
+      },
+      {
+        "id": "it-clean-391",
+        "field": "altText",
+        "text": "Jeans a vita alta, t-shirt bianca e camicia a quadri annodata in vita."
+      },
+      {
+        "id": "it-clean-392",
+        "field": "altText",
+        "text": "Costume intero nero con schiena scoperta, in riva a un lago."
+      },
+      {
+        "id": "it-clean-393",
+        "field": "altText",
+        "text": "Maglione jacquard rosso e bianco e gonna di lana, davanti a bancarelle illuminate."
+      },
+      {
+        "id": "it-clean-394",
+        "field": "altText",
+        "text": "Vestito nero, collant neri, stivali neri e cappotto rosso acceso."
+      },
+      {
+        "id": "it-clean-395",
+        "field": "altText",
+        "text": "Salopette giallo senape con t-shirt bianca e sneakers."
+      },
+      {
+        "id": "it-clean-396",
+        "field": "altText",
+        "text": "Kimono di seta a fiori su jeans blu e canotta bianca."
+      },
+      {
+        "id": "it-clean-397",
+        "field": "altText",
+        "text": "Cerata gialla e maglia a righe blu e bianche su un molo ventoso."
+      },
+      {
+        "id": "it-clean-398",
+        "field": "altText",
+        "text": "Abito chemisier kaki con cintura in vita e sneakers bianche."
+      },
+      {
+        "id": "it-clean-399",
+        "field": "altText",
+        "text": "Pantaloni dritti neri, top di raso verde smeraldo e sabot col tacco."
+      },
+      {
+        "id": "it-clean-400",
+        "field": "altText",
+        "text": "Tutina corta a fiori e stivali di gomma verdi in un prato."
+      },
+      {
+        "id": "it-clean-401",
+        "field": "altText",
+        "text": "Top sportivo, leggings neri e giacca antivento leggera grigia, durante una corsa."
+      },
+      {
+        "id": "it-clean-402",
+        "field": "altText",
+        "text": "Basco rosso mattone, maglione panna e cappotto cammello."
+      },
+      {
+        "id": "it-clean-403",
+        "field": "altText",
+        "text": "Tailleur con gonna di tweed rosa e décolleté beige."
+      },
+      {
+        "id": "it-clean-404",
+        "field": "altText",
+        "text": "Abito a portafoglio in jersey prugna, décolleté nude e pochette dorata."
+      },
+      {
+        "id": "it-clean-405",
+        "field": "altText",
+        "text": "Gonna pantalone di lino azzurro con camicia bianca infilata dentro."
+      },
+      {
+        "id": "it-clean-406",
+        "field": "altText",
+        "text": "Abito lungo di raso blu notte con spacco, spalle scoperte e capelli raccolti."
+      },
+      {
+        "id": "it-clean-407",
+        "field": "altText",
+        "text": "Giacca di velluto verde abete, jeans blu scuro e stivaletti neri."
+      },
+      {
+        "id": "it-clean-408",
+        "field": "altText",
+        "text": "Vestito di paillettes argento al ginocchio e décolleté nere."
+      },
+      {
+        "id": "it-clean-409",
+        "field": "altText",
+        "text": "Cappotto bianco, maglione panna e jeans écru su sfondo innevato."
+      },
+      {
+        "id": "it-clean-410",
+        "field": "altText",
+        "text": "Abito di tulle rosa cipria indossato da un'adulta e una bambina, coordinate."
+      },
+      {
+        "id": "it-clean-411",
+        "field": "altText",
+        "text": "Pantaloni morbidi, maglione di cashmere grigio, sneakers e sciarpa grande in aeroporto."
+      },
+      {
+        "id": "it-clean-412",
+        "field": "altText",
+        "text": "Vestitino nero a spalline su t-shirt bianca, con sneakers."
+      },
+      {
+        "id": "it-clean-413",
+        "field": "altText",
+        "text": "Scamiciato di velluto a coste blu su maglioncino sottile bianco."
+      },
+      {
+        "id": "it-clean-414",
+        "field": "altText",
+        "text": "Stivali texani marroni e vestito a fiori al ginocchio."
+      },
+      {
+        "id": "it-clean-415",
+        "field": "altText",
+        "text": "Abito asimmetrico in jersey nero monospalla e orecchini dorati."
+      },
+      {
+        "id": "it-clean-416",
+        "field": "altText",
+        "text": "Stivali sopra il ginocchio in camoscio nero e abito in maglia grigio, in una via d'inverno."
+      },
+      {
+        "id": "it-clean-417",
+        "field": "altText",
+        "text": "Foto a figura intera in una calle veneziana: cappotto lungo di lana a spina di pesce, sciarpa grossa grigia, stivali di gomma bassi neri e ombrello robusto blu scuro chiuso in mano."
+      },
+      {
+        "id": "it-clean-418",
+        "field": "altText",
+        "text": "Outfit per un matrimonio in campagna steso su un letto: abito midi a fiori con maniche svolazzanti, trench corto color crema, sandali a tacco largo beige e pochette di paglia intrecciata."
+      },
+      {
+        "id": "it-clean-419",
+        "field": "altText",
+        "text": "Donna seduta a un tavolino all'aperto con abito di lino bianco ampio, cappello di paglia grande, sandali bassi di cuoio e una cesta di vimini piena di frutta appoggiata ai piedi."
+      },
+      {
+        "id": "it-clean-420",
+        "field": "altText",
+        "text": "Salopette di jeans a gamba ampia indossata su un dolcevita nero, con stivaletti di pelle marroni e borsa a tracolla color cammello, davanti a un portone di legno dipinto di verde."
+      }
+    ]
+  },
+  "disallowed": {
+    "description": "Disguised forms of terms from this language’s runtime list, ten per obfuscation family named in Story 6.2 AC 4, each inside an otherwise clean caption. Every entry is expected to be withheld (review or block). Generated by scripts/build-community-text-corpus.mjs.",
+    "expected": "withheld",
+    "families": [
+      "nfkc-fullwidth",
+      "case-mixing",
+      "diacritics-added",
+      "zero-width",
+      "cyrillic-confusable",
+      "leetspeak",
+      "repeated-characters",
+      "internal-punctuation",
+      "spaced-letters",
+      "leet-and-spaced"
+    ],
+    "entries": [
+      {
+        "id": "it-nfkc-fullwidth-01",
+        "family": "nfkc-fullwidth",
+        "field": "caption",
+        "text": "Il look di oggi: ＡＦＦＡＮＣＵＬＯ"
+      },
+      {
+        "id": "it-nfkc-fullwidth-02",
+        "family": "nfkc-fullwidth",
+        "field": "caption",
+        "text": "ＢＥＬＩＮＯ con giacca di jeans"
+      },
+      {
+        "id": "it-nfkc-fullwidth-03",
+        "family": "nfkc-fullwidth",
+        "field": "altText",
+        "text": "Il look di oggi: ＣＡＺＺＡＴＡ"
+      },
+      {
+        "id": "it-nfkc-fullwidth-04",
+        "family": "nfkc-fullwidth",
+        "field": "caption",
+        "text": "ＣＵＬＡＴＴＩＮＡ con giacca di jeans"
+      },
+      {
+        "id": "it-nfkc-fullwidth-05",
+        "family": "nfkc-fullwidth",
+        "field": "caption",
+        "text": "Il look di oggi: ＩＤＩＯＴＡ"
+      },
+      {
+        "id": "it-nfkc-fullwidth-06",
+        "family": "nfkc-fullwidth",
+        "field": "altText",
+        "text": "ＭＩＧＮＯＴＴＡ con giacca di jeans"
+      },
+      {
+        "id": "it-nfkc-fullwidth-07",
+        "family": "nfkc-fullwidth",
+        "field": "caption",
+        "text": "Il look di oggi: ＰＩＮＮＯＬＯＮＥ"
+      },
+      {
+        "id": "it-nfkc-fullwidth-08",
+        "family": "nfkc-fullwidth",
+        "field": "caption",
+        "text": "ＱＵＡＧＬＩＡ con giacca di jeans"
+      },
+      {
+        "id": "it-nfkc-fullwidth-09",
+        "family": "nfkc-fullwidth",
+        "field": "altText",
+        "text": "Il look di oggi: ＳＣＯＰＡＴＡ"
+      },
+      {
+        "id": "it-nfkc-fullwidth-10",
+        "family": "nfkc-fullwidth",
+        "field": "caption",
+        "text": "ＳＵＣＣＨＩＯＮＥ con giacca di jeans"
+      },
+      {
+        "id": "it-case-mixing-01",
+        "family": "case-mixing",
+        "field": "caption",
+        "text": "Il look di oggi: AlLuPaTo"
+      },
+      {
+        "id": "it-case-mixing-02",
+        "family": "case-mixing",
+        "field": "caption",
+        "text": "BoCcHiNaRa con giacca di jeans"
+      },
+      {
+        "id": "it-case-mixing-03",
+        "family": "case-mixing",
+        "field": "altText",
+        "text": "Il look di oggi: CaZzAtE"
+      },
+      {
+        "id": "it-case-mixing-04",
+        "family": "case-mixing",
+        "field": "caption",
+        "text": "CuLaTtOnE con giacca di jeans"
+      },
+      {
+        "id": "it-case-mixing-05",
+        "family": "case-mixing",
+        "field": "caption",
+        "text": "Il look di oggi: ImBeCiLlE"
+      },
+      {
+        "id": "it-case-mixing-06",
+        "family": "case-mixing",
+        "field": "altText",
+        "text": "MiNcHiA con giacca di jeans"
+      },
+      {
+        "id": "it-case-mixing-07",
+        "family": "case-mixing",
+        "field": "caption",
+        "text": "Il look di oggi: PiPpA"
+      },
+      {
+        "id": "it-case-mixing-08",
+        "family": "case-mixing",
+        "field": "caption",
+        "text": "ReCcHiOnE con giacca di jeans"
+      },
+      {
+        "id": "it-case-mixing-09",
+        "family": "case-mixing",
+        "field": "altText",
+        "text": "Il look di oggi: ScOrReGgIaRe"
+      },
+      {
+        "id": "it-case-mixing-10",
+        "family": "case-mixing",
+        "field": "caption",
+        "text": "SuIcIdAtI con giacca di jeans"
+      },
+      {
+        "id": "it-diacritics-added-01",
+        "family": "diacritics-added",
+        "field": "caption",
+        "text": "Il look di oggi: ámmázzati"
+      },
+      {
+        "id": "it-diacritics-added-02",
+        "family": "diacritics-added",
+        "field": "caption",
+        "text": "böcchíno con giacca di jeans"
+      },
+      {
+        "id": "it-diacritics-added-03",
+        "family": "diacritics-added",
+        "field": "altText",
+        "text": "Il look di oggi: cázzímma"
+      },
+      {
+        "id": "it-diacritics-added-04",
+        "family": "diacritics-added",
+        "field": "caption",
+        "text": "défíciente con giacca di jeans"
+      },
+      {
+        "id": "it-diacritics-added-05",
+        "family": "diacritics-added",
+        "field": "caption",
+        "text": "Il look di oggi: ímpíccati"
+      },
+      {
+        "id": "it-diacritics-added-06",
+        "family": "diacritics-added",
+        "field": "altText",
+        "text": "mínchíone con giacca di jeans"
+      },
+      {
+        "id": "it-diacritics-added-07",
+        "family": "diacritics-added",
+        "field": "caption",
+        "text": "Il look di oggi: píppöne"
+      },
+      {
+        "id": "it-diacritics-added-08",
+        "family": "diacritics-added",
+        "field": "caption",
+        "text": "rícchíone con giacca di jeans"
+      },
+      {
+        "id": "it-diacritics-added-09",
+        "family": "diacritics-added",
+        "field": "altText",
+        "text": "Il look di oggi: slíngüare"
+      },
+      {
+        "id": "it-diacritics-added-10",
+        "family": "diacritics-added",
+        "field": "caption",
+        "text": "svéltína con giacca di jeans"
+      },
+      {
+        "id": "it-zero-width-01",
+        "family": "zero-width",
+        "field": "caption",
+        "text": "Il look di oggi: a​m​m​u​c​c​h​i​a​t​a"
+      },
+      {
+        "id": "it-zero-width-02",
+        "family": "zero-width",
+        "field": "caption",
+        "text": "b​o​f​i​l​o con giacca di jeans"
+      },
+      {
+        "id": "it-zero-width-03",
+        "family": "zero-width",
+        "field": "altText",
+        "text": "Il look di oggi: c​a​z​z​o"
+      },
+      {
+        "id": "it-zero-width-04",
+        "family": "zero-width",
+        "field": "caption",
+        "text": "d​i​t​a​l​i​n​o con giacca di jeans"
+      },
+      {
+        "id": "it-zero-width-05",
+        "family": "zero-width",
+        "field": "caption",
+        "text": "Il look di oggi: i​n​c​a​z​z​a​r​s​i"
+      },
+      {
+        "id": "it-zero-width-06",
+        "family": "zero-width",
+        "field": "altText",
+        "text": "m​o​n​g​o​l​o​i​d​e con giacca di jeans"
+      },
+      {
+        "id": "it-zero-width-07",
+        "family": "zero-width",
+        "field": "caption",
+        "text": "Il look di oggi: p​i​r​l​a"
+      },
+      {
+        "id": "it-zero-width-08",
+        "family": "zero-width",
+        "field": "caption",
+        "text": "r​i​n​c​o​g​l​i​o​n​i​r​e con giacca di jeans"
+      },
+      {
+        "id": "it-zero-width-09",
+        "family": "zero-width",
+        "field": "altText",
+        "text": "Il look di oggi: s​l​i​n​g​u​a​t​a"
+      },
+      {
+        "id": "it-zero-width-10",
+        "family": "zero-width",
+        "field": "caption",
+        "text": "s​v​e​r​g​i​n​a​r​e con giacca di jeans"
+      },
+      {
+        "id": "it-cyrillic-confusable-01",
+        "family": "cyrillic-confusable",
+        "field": "caption",
+        "text": "Il look di oggi: аnаle"
+      },
+      {
+        "id": "it-cyrillic-confusable-02",
+        "family": "cyrillic-confusable",
+        "field": "caption",
+        "text": "bоiаta con giacca di jeans"
+      },
+      {
+        "id": "it-cyrillic-confusable-03",
+        "family": "cyrillic-confusable",
+        "field": "altText",
+        "text": "Il look di oggi: саzzone"
+      },
+      {
+        "id": "it-cyrillic-confusable-04",
+        "family": "cyrillic-confusable",
+        "field": "caption",
+        "text": "fаnсulo con giacca di jeans"
+      },
+      {
+        "id": "it-cyrillic-confusable-05",
+        "family": "cyrillic-confusable",
+        "field": "caption",
+        "text": "Il look di oggi: inсоglionirsi"
+      },
+      {
+        "id": "it-cyrillic-confusable-06",
+        "family": "cyrillic-confusable",
+        "field": "altText",
+        "text": "mоntа con giacca di jeans"
+      },
+      {
+        "id": "it-cyrillic-confusable-07",
+        "family": "cyrillic-confusable",
+        "field": "caption",
+        "text": "Il look di oggi: рisсiare"
+      },
+      {
+        "id": "it-cyrillic-confusable-08",
+        "family": "cyrillic-confusable",
+        "field": "caption",
+        "text": "ritаrdаto con giacca di jeans"
+      },
+      {
+        "id": "it-cyrillic-confusable-09",
+        "family": "cyrillic-confusable",
+        "field": "altText",
+        "text": "Il look di oggi: smаndrаppata"
+      },
+      {
+        "id": "it-cyrillic-confusable-10",
+        "family": "cyrillic-confusable",
+        "field": "caption",
+        "text": "tаrzаnello con giacca di jeans"
+      },
+      {
+        "id": "it-leetspeak-01",
+        "family": "leetspeak",
+        "field": "caption",
+        "text": "Il look di oggi: 4rr4p470"
+      },
+      {
+        "id": "it-leetspeak-02",
+        "family": "leetspeak",
+        "field": "caption",
+        "text": "b0rd3ll0 con giacca di jeans"
+      },
+      {
+        "id": "it-leetspeak-03",
+        "family": "leetspeak",
+        "field": "altText",
+        "text": "Il look di oggi: c3550"
+      },
+      {
+        "id": "it-leetspeak-04",
+        "family": "leetspeak",
+        "field": "caption",
+        "text": "f3mm1nucc14 con giacca di jeans"
+      },
+      {
+        "id": "it-leetspeak-05",
+        "family": "leetspeak",
+        "field": "caption",
+        "text": "Il look di oggi: 1ncul4r3"
+      },
+      {
+        "id": "it-leetspeak-06",
+        "family": "leetspeak",
+        "field": "altText",
+        "text": "m0n74r3 con giacca di jeans"
+      },
+      {
+        "id": "it-leetspeak-07",
+        "family": "leetspeak",
+        "field": "caption",
+        "text": "Il look di oggi: p15c10"
+      },
+      {
+        "id": "it-leetspeak-08",
+        "family": "leetspeak",
+        "field": "caption",
+        "text": "r1zz4r51 con giacca di jeans"
+      },
+      {
+        "id": "it-leetspeak-09",
+        "family": "leetspeak",
+        "field": "altText",
+        "text": "Il look di oggi: 50cc14"
+      },
+      {
+        "id": "it-leetspeak-10",
+        "family": "leetspeak",
+        "field": "caption",
+        "text": "73rr0n3 con giacca di jeans"
+      },
+      {
+        "id": "it-repeated-characters-01",
+        "family": "repeated-characters",
+        "field": "caption",
+        "text": "Il look di oggi: arrrrrusa"
+      },
+      {
+        "id": "it-repeated-characters-02",
+        "family": "repeated-characters",
+        "field": "caption",
+        "text": "brrrrinca con giacca di jeans"
+      },
+      {
+        "id": "it-repeated-characters-03",
+        "family": "repeated-characters",
+        "field": "altText",
+        "text": "Il look di oggi: chhhhecca"
+      },
+      {
+        "id": "it-repeated-characters-04",
+        "family": "repeated-characters",
+        "field": "caption",
+        "text": "fiiiigone con giacca di jeans"
+      },
+      {
+        "id": "it-repeated-characters-05",
+        "family": "repeated-characters",
+        "field": "caption",
+        "text": "Il look di oggi: innnngoio"
+      },
+      {
+        "id": "it-repeated-characters-06",
+        "family": "repeated-characters",
+        "field": "altText",
+        "text": "muuuussa con giacca di jeans"
+      },
+      {
+        "id": "it-repeated-characters-07",
+        "family": "repeated-characters",
+        "field": "caption",
+        "text": "Il look di oggi: piiiisello"
+      },
+      {
+        "id": "it-repeated-characters-08",
+        "family": "repeated-characters",
+        "field": "caption",
+        "text": "roooompiballe con giacca di jeans"
+      },
+      {
+        "id": "it-repeated-characters-09",
+        "family": "repeated-characters",
+        "field": "altText",
+        "text": "Il look di oggi: soooocmel"
+      },
+      {
+        "id": "it-repeated-characters-10",
+        "family": "repeated-characters",
+        "field": "caption",
+        "text": "teeeette con giacca di jeans"
+      },
+      {
+        "id": "it-internal-punctuation-01",
+        "family": "internal-punctuation",
+        "field": "caption",
+        "text": "Il look di oggi: a.r.r.u.s.o"
+      },
+      {
+        "id": "it-internal-punctuation-02",
+        "family": "internal-punctuation",
+        "field": "caption",
+        "text": "b.u.c.a.i.o.l.o con giacca di jeans"
+      },
+      {
+        "id": "it-internal-punctuation-03",
+        "family": "internal-punctuation",
+        "field": "altText",
+        "text": "Il look di oggi: c.h.i.a.p.p.a"
+      },
+      {
+        "id": "it-internal-punctuation-04",
+        "family": "internal-punctuation",
+        "field": "caption",
+        "text": "f.i.n.o.c.c.h.i.o con giacca di jeans"
+      },
+      {
+        "id": "it-internal-punctuation-05",
+        "family": "internal-punctuation",
+        "field": "caption",
+        "text": "Il look di oggi: l.e.c.c.a.c.u.l.o"
+      },
+      {
+        "id": "it-internal-punctuation-06",
+        "family": "internal-punctuation",
+        "field": "altText",
+        "text": "n.e.r.c.h.i.a con giacca di jeans"
+      },
+      {
+        "id": "it-internal-punctuation-07",
+        "family": "internal-punctuation",
+        "field": "caption",
+        "text": "Il look di oggi: p.i.s.t.o.l.o.t.t.o"
+      },
+      {
+        "id": "it-internal-punctuation-08",
+        "family": "internal-punctuation",
+        "field": "caption",
+        "text": "r.o.m.p.i.p.a.l.l.e con giacca di jeans"
+      },
+      {
+        "id": "it-internal-punctuation-09",
+        "family": "internal-punctuation",
+        "field": "altText",
+        "text": "Il look di oggi: s.o.r.c.a"
+      },
+      {
+        "id": "it-internal-punctuation-10",
+        "family": "internal-punctuation",
+        "field": "caption",
+        "text": "t.r.o.i.a con giacca di jeans"
+      },
+      {
+        "id": "it-spaced-letters-01",
+        "family": "spaced-letters",
+        "field": "caption",
+        "text": "Il look di oggi: a s s a t a n a t o"
+      },
+      {
+        "id": "it-spaced-letters-02",
+        "family": "spaced-letters",
+        "field": "caption",
+        "text": "b u s o n e con giacca di jeans"
+      },
+      {
+        "id": "it-spaced-letters-03",
+        "family": "spaced-letters",
+        "field": "altText",
+        "text": "Il look di oggi: c h i a v a r e"
+      },
+      {
+        "id": "it-spaced-letters-04",
+        "family": "spaced-letters",
+        "field": "caption",
+        "text": "f o t t e r e con giacca di jeans"
+      },
+      {
+        "id": "it-spaced-letters-05",
+        "family": "spaced-letters",
+        "field": "caption",
+        "text": "Il look di oggi: l e c c h i n o"
+      },
+      {
+        "id": "it-spaced-letters-06",
+        "family": "spaced-letters",
+        "field": "altText",
+        "text": "p a d u l o con giacca di jeans"
+      },
+      {
+        "id": "it-spaced-letters-07",
+        "family": "spaced-letters",
+        "field": "caption",
+        "text": "Il look di oggi: p o m i c i a r e"
+      },
+      {
+        "id": "it-spaced-letters-08",
+        "family": "spaced-letters",
+        "field": "caption",
+        "text": "r u f f i a n o con giacca di jeans"
+      },
+      {
+        "id": "it-spaced-letters-09",
+        "family": "spaced-letters",
+        "field": "altText",
+        "text": "Il look di oggi: s p o m p i n a r e"
+      },
+      {
+        "id": "it-spaced-letters-10",
+        "family": "spaced-letters",
+        "field": "caption",
+        "text": "t r o m b a r e con giacca di jeans"
+      },
+      {
+        "id": "it-leet-and-spaced-01",
+        "family": "leet-and-spaced",
+        "field": "caption",
+        "text": "Il look di oggi: b 4 g 4 s c i a"
+      },
+      {
+        "id": "it-leet-and-spaced-02",
+        "family": "leet-and-spaced",
+        "field": "caption",
+        "text": "c 4 c c 4 con giacca di jeans"
+      },
+      {
+        "id": "it-leet-and-spaced-03",
+        "family": "leet-and-spaced",
+        "field": "altText",
+        "text": "Il look di oggi: c h 1 4 v a t a"
+      },
+      {
+        "id": "it-leet-and-spaced-04",
+        "family": "leet-and-spaced",
+        "field": "caption",
+        "text": "f 0 7 t e r s i con giacca di jeans"
+      },
+      {
+        "id": "it-leet-and-spaced-05",
+        "family": "leet-and-spaced",
+        "field": "caption",
+        "text": "Il look di oggi: l 0 f 4 r e"
+      },
+      {
+        "id": "it-leet-and-spaced-06",
+        "family": "leet-and-spaced",
+        "field": "altText",
+        "text": "p 4 l l 3 con giacca di jeans"
+      },
+      {
+        "id": "it-leet-and-spaced-07",
+        "family": "leet-and-spaced",
+        "field": "caption",
+        "text": "Il look di oggi: p 0 m p 4"
+      },
+      {
+        "id": "it-leet-and-spaced-08",
+        "family": "leet-and-spaced",
+        "field": "caption",
+        "text": "5 b 4 t t e r e con giacca di jeans"
+      },
+      {
+        "id": "it-leet-and-spaced-09",
+        "family": "leet-and-spaced",
+        "field": "altText",
+        "text": "Il look di oggi: 5 7 i c c h i o"
+      },
+      {
+        "id": "it-leet-and-spaced-10",
+        "family": "leet-and-spaced",
+        "field": "caption",
+        "text": "u c c 1 d 1 t i con giacca di jeans"
+      }
+    ]
+  }
+}

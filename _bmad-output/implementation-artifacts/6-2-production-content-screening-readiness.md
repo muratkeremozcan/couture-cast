@@ -348,130 +348,130 @@ read as end-to-end proof of image blocking.
 
 ## Tasks / Subtasks
 
-- [ ] Task 0: Write the versioned policy file (AC: 1, 2, 7)
-  - [ ] Encode the image thresholds, boundary behavior, text categories, severity-to-disposition map,
+- [x] Task 0: Write the versioned policy file (AC: 1, 2, 7)
+  - [x] Encode the image thresholds, boundary behavior, text categories, severity-to-disposition map,
         and list provenance in one versioned, hashed policy file, with the reasoning for each
         threshold recorded next to it.
-  - [ ] Default the policy to conservative: automatic publication requires a confident `Neutral`, and
+  - [x] Default the policy to conservative: automatic publication requires a confident `Neutral`, and
         every other outcome, uncertainty included, routes to a human.
-  - [ ] Do not wait on an external approval. Story 6.2b measures this policy against corpora and
+  - [x] Do not wait on an external approval. Story 6.2b measures this policy against corpora and
         records the single owner signature.
 
-- [ ] Task 1: Pin the model, text library, policy, and artifact supply chain (AC: 1, 3, 7)
-  - [ ] Add the exact ADR-013 dependencies to `apps/api/package.json` through npm and commit the
+- [x] Task 1: Pin the model, text library, policy, and artifact supply chain (AC: 1, 3, 7)
+  - [x] Add the exact ADR-013 dependencies to `apps/api/package.json` through npm and commit the
         generated `package-lock.json` changes.
-  - [ ] Add a model manifest naming the `nsfwjs` version that carries the model, the three
+  - [x] Add a model manifest naming the `nsfwjs` version that carries the model, the three
         `dist/models/mobilenet_v2_mid` artifact paths and their SHA-256 hashes, the three WASM binary
         paths and hashes, class names, input dimensions, backend, thresholds, and policy identity.
-  - [ ] Add one verify command that resolves those paths from the installed package, hashes them,
+  - [x] Add one verify command that resolves those paths from the installed package, hashes them,
         compares them to the manifest, and exits nonzero on any mismatch. There is nothing to
         download, extract, or atomically replace.
-  - [ ] Assert in test that the inference process opens no socket, and that no model-directory or
+  - [x] Assert in test that the inference process opens no socket, and that no model-directory or
         remote-model-host variable exists.
-  - [ ] Add environment documentation for the selector and incident variables.
+  - [x] Add environment documentation for the selector and incident variables.
 
-- [ ] Task 2: Implement supervised production image inference (AC: 1, 2, 8)
-  - [ ] Add the TensorFlow.js NSFW screener behind the existing `NsfwImageScreener` seam.
-  - [ ] Add the isolated inference entrypoint, typed message protocol, readiness handshake, warmup,
+- [x] Task 2: Implement supervised production image inference (AC: 1, 2, 8)
+  - [x] Add the TensorFlow.js NSFW screener behind the existing `NsfwImageScreener` seam.
+  - [x] Add the isolated inference entrypoint, typed message protocol, readiness handshake, warmup,
         class-name mapping, probability and sum validation, tensor disposal, timeout termination,
         cooldown, respawn, and close.
-  - [ ] Add three-way policy evaluation with stable reason codes and a manifest-derived version.
-  - [ ] Keep the unavailable and fixture adapters truthful and fail closed.
-  - [ ] Set worker concurrency to one per model process unless signed evidence supports a higher
+  - [x] Add three-way policy evaluation with stable reason codes and a manifest-derived version.
+  - [x] Keep the unavailable and fixture adapters truthful and fail closed.
+  - [x] Set worker concurrency to one per model process unless signed evidence supports a higher
         value within the same memory and latency gates.
 
-- [ ] Task 3: Implement reusable multilingual text screening (AC: 3, 4, 7)
-  - [ ] Add `CommunityTextScreener` and versioned dictionaries plus allow lists for all seven enabled
+- [x] Task 3: Implement reusable multilingual text screening (AC: 3, 4, 7)
+  - [x] Add `CommunityTextScreener` and versioned dictionaries plus allow lists for all seven enabled
         languages.
-  - [ ] Derive locale coverage from the canonical supported-locale JSON and add set-equality tests.
-  - [ ] Implement bounded canonical representations for every required obfuscation family.
-  - [ ] Preserve field provenance and define stable pass, review, and block reason codes.
-  - [ ] Give each list a provenance record naming its source, version, and licence, and fail startup
+  - [x] Derive locale coverage from the canonical supported-locale JSON and add set-equality tests.
+  - [x] Implement bounded canonical representations for every required obfuscation family.
+  - [x] Preserve field provenance and define stable pass, review, and block reason codes.
+  - [x] Give each list a provenance record naming its source, version, and licence, and fail startup
         when a list is missing one. Story 6.2b vendors the pinned upstream lists that fill it.
-  - [ ] Expose the boundary for Story 6.4 without adding comment behavior in this story.
+  - [x] Expose the boundary for Story 6.4 without adding comment behavior in this story.
 
-- [ ] Task 4: Wire the combined policy into the durable post pipeline (AC: 2, 5, 6)
-  - [ ] Extend result types while preserving the rule that both engine verdicts must explicitly pass.
-  - [ ] Keep image validation and metadata removal before inference.
-  - [ ] Persist the combined engine and policy version plus stable terminal reason through the
+- [x] Task 4: Wire the combined policy into the durable post pipeline (AC: 2, 5, 6)
+  - [x] Extend result types while preserving the rule that both engine verdicts must explicitly pass.
+  - [x] Keep image validation and metadata removal before inference.
+  - [x] Persist the combined engine and policy version plus stable terminal reason through the
         existing post and moderation-event fields.
-  - [ ] Preserve guarded terminal transitions, audit and outbox atomicity, telemetry isolation,
+  - [x] Preserve guarded terminal transitions, audit and outbox atomicity, telemetry isolation,
         deterministic job IDs, and retry exhaustion.
-  - [ ] Pass `job.attemptsMade + 1` into processor context and add privacy-safe operational metrics
+  - [x] Pass `job.attemptsMade + 1` into processor context and add privacy-safe operational metrics
         for readiness, duration, disposition, retries, termination, and model health.
 
-- [ ] Task 5: Harden worker startup, deployment, and shutdown (AC: 1, 5, 8, 10)
-  - [ ] Make the process correct locally. The repository deploys no long-running BullMQ consumer at
+- [x] Task 5: Harden worker startup, deployment, and shutdown (AC: 1, 5, 8, 10)
+  - [x] Make the process correct locally. The repository deploys no long-running BullMQ consumer at
         all today: `_bmad-output/project-knowledge/deployment-guide.md:302-305` states that no Docker
         image, Vercel function, GitHub workflow, or process manifest starts `start:workers`, and the
         same is true of the wardrobe FashionCLIP worker from Epic 4. Story 6.2b builds and deploys the
         container. This story makes the process it will run correct, and proves it against the local
         Docker Compose stack.
-  - [ ] Make runtime construction await model readiness before queue consumption.
-  - [ ] Update both bootstraps and retain every close hook during graceful shutdown. This is a live
+  - [x] Make runtime construction await model readiness before queue consumption.
+  - [x] Update both bootstraps and retain every close hook during graceful shutdown. This is a live
         defect, not a refactor: `apps/api/src/workers/bootstrap.ts` pushes `community.worker` onto the
         shutdown list but discards `community.close`, so the community moderation queue and its Redis
         connection are never closed on `SIGTERM` in the production worker process.
-  - [ ] Add production scripts that verify the model before starting the community-capable worker.
-  - [ ] Document the incident-mode authorization, restoration, retained-job replay, and review-queue
+  - [x] Add production scripts that verify the model before starting the community-capable worker.
+  - [x] Document the incident-mode authorization, restoration, retained-job replay, and review-queue
         drain procedure. Story 6.2b adds the container image, the hosted target, the canary, and the
         rollback runbook.
-  - [ ] Prove the whole worker path against the local Docker Compose Redis and PostgreSQL, including a
+  - [x] Prove the whole worker path against the local Docker Compose Redis and PostgreSQL, including a
         clean `SIGTERM` shutdown, before handing the process to Story 6.2b.
 
 - [ ] Task 6: Add versioned fixtures and local measurement (AC: 4, 7, 8)
-  - [ ] Add manifest-backed synthetic safe fixtures to the repository, with non-vacuity,
+  - [x] Add manifest-backed synthetic safe fixtures to the repository, with non-vacuity,
         duplicate-hash, and manifest-integrity checks.
-  - [ ] Measure startup, warm latency, timeout behavior, throughput, and peak RSS on the development
+  - [x] Measure startup, warm latency, timeout behavior, throughput, and peak RSS on the development
         machine, and commit those numbers as the provisional regression gate that AC 8 requires.
   - [ ] Make every threshold failure return a nonzero exit code.
-  - [ ] Leave the licensed corpora, the statistical release gates, and the production-hardware
+  - [x] Leave the licensed corpora, the statistical release gates, and the production-hardware
         measurement to Story 6.2b.
 
-- [ ] Task 7: Expand unit, integration, and lifecycle tests (AC: 1 through 9)
-  - [ ] Extend engine tests for all dispositions, classes, fields, languages, obfuscations, allow-list
+- [x] Task 7: Expand unit, integration, and lifecycle tests (AC: 1 through 9)
+  - [x] Extend engine tests for all dispositions, classes, fields, languages, obfuscations, allow-list
         cases, and empty-reason fail-closed behavior.
-  - [ ] Add inference lifecycle tests for startup failure, hash mismatch, malformed output, crash,
+  - [x] Add inference lifecycle tests for startup failure, hash mismatch, malformed output, crash,
         timeout termination, cooldown, respawn, shutdown, and compiled worker-path resolution.
-  - [ ] Extend worker tests for three attempts, eventual success, exhaustion, concurrency,
+  - [x] Extend worker tests for three attempts, eventual success, exhaustion, concurrency,
         per-attempt `JobFailure` rows, final post transition, and truthful identities.
-  - [ ] Extend the real PostgreSQL pipeline suite for passing, review, block, timeout, retry, and
+  - [x] Extend the real PostgreSQL pipeline suite for passing, review, block, timeout, retry, and
         idempotent redelivery. Assert that the suite executed against a migrated database.
-  - [ ] Preserve the explicit unavailable-mode degraded test.
+  - [x] Preserve the explicit unavailable-mode degraded test.
 
 - [ ] Task 8: Add end-to-end publication evidence (AC: 5, 9)
-  - [ ] Update `scripts/start-api-e2e-with-workers.mjs`, root `package.json`,
+  - [x] Update `scripts/start-api-e2e-with-workers.mjs`, root `package.json`,
         `playwright/tests/community-feed.spec.ts`, and
         `playwright/support/helpers/community-session.ts` for an explicit double-gated real-model
         mode. Caller-selected real mode must survive environment loading.
-  - [ ] Extend the web journey to upload bytes, confirm alt text, publish, poll the author state, and
+  - [x] Extend the web journey to upload bytes, confirm alt text, publish, poll the author state, and
         verify a safe terminal state through the fixture-backed full stack.
-  - [ ] Add the separate real-model command that runs the safe journey and paired unsafe
+  - [x] Add the separate real-model command that runs the safe journey and paired unsafe
         non-publication journey on an isolated access-controlled runner.
   - [ ] Assert cross-user feed absence, stable localized recovery state, and no raw safety data in
         client responses.
-  - [ ] Disable trace, screenshot, and video capture for restricted cases. Guaranteed teardown must
+  - [x] Disable trace, screenshot, and video capture for restricted cases. Guaranteed teardown must
         delete uploaded storage objects and database rows after pass or failure.
-  - [ ] Record production dispatch cadence. The one-second local dispatcher is not latency evidence
+  - [x] Record production dispatch cadence. The one-second local dispatcher is not latency evidence
         for the production one-minute scheduler.
 
-- [ ] Task 9: Emit machine-readable measurements for the release gate (AC: 7, 8, 9)
-  - [ ] Emit the local measurements, hashes, environment, and commands as structured JSON that Story
+- [x] Task 9: Emit machine-readable measurements for the release gate (AC: 7, 8, 9)
+  - [x] Emit the local measurements, hashes, environment, and commands as structured JSON that Story
         6.2b's evidence generator consumes without re-deriving them.
-  - [ ] Label every report with the path that produced it, so a fixture run can never be read as a
+  - [x] Label every report with the path that produced it, so a fixture run can never be read as a
         real-model run.
-  - [ ] Keep both production Community flags disabled. Story 6.2b owns the verdict and the
+  - [x] Keep both production Community flags disabled. Story 6.2b owns the verdict and the
         signature.
 
 - [ ] Task 10: Run all applicable quality gates (AC: 1 through 10)
   - [ ] Run model verify, smoke, evaluation, and real-model end-to-end commands.
-  - [ ] Run focused API unit and PostgreSQL integration suites.
-  - [ ] Run `npm run verify:changed` and `npm run validate`.
+  - [x] Run focused API unit and PostgreSQL integration suites.
+  - [x] Run `npm run verify:changed` and `npm run validate`.
   - [ ] Run `npm audit --omit=dev --audit-level=high` and
         `npm run verify:community-screening-supply-chain --workspace api`. The supply-chain command
         validates dependency SPDX data plus model-weight license and redistribution clearance, then
         emits machine-readable evidence.
-  - [ ] Confirm generated REST artifacts have no diff because this story adds no public operation.
+  - [x] Confirm generated REST artifacts have no diff because this story adds no public operation.
 
 ## Dev Notes
 
@@ -753,6 +753,17 @@ GPT-5 Codex
 - Task 0 blocks policy constants and production measurements until human-owned inputs are approved.
 - Checklist corrections resolve version, local loading, class mapping, evaluation, signing, retry,
   deployment, and restricted E2E requirements.
+- 2026-10-16 post-merge audit against `1a678c51` (#144): checkboxes now reflect the merged code. The
+  story stays `in-progress` because four subtasks have no evidence in the repository. Task 6: the
+  AC 8 harness behind the committed 1,000-inference numbers in
+  `apps/api/model-manifests/community-nsfw-mobilenet-v2-mid-nsfwjs-4.3.0.json` (`performance`) is
+  not committed, and no command fails a run that exceeds `performance.regressionGate`; the
+  measurements payload lists no command for those numbers. Task 8: neither journey in
+  `playwright/tests/community-publication.spec.ts` asserts the localized recovery state the author
+  sees for a refused post. Task 10: no record shows `npm run test:community-screening:e2e` executed
+  in real-model mode, and `npm audit --omit=dev --audit-level=high` exits 1 (44 high or critical
+  advisories at merge, recorded under Step 39 `Evidence boundaries` in
+  `_bmad-output/project-knowledge/learning-path-step-by-step.md`).
 
 ### File list
 

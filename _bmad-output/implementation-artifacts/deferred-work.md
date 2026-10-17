@@ -1379,3 +1379,21 @@ file's own Code Review Findings section.
   and obfuscation handling was never specified, so widening it is a product
   decision rather than a defect fix. Worth pairing with the decision about the
   five supported locales that have no dictionary at all.
+- source_spec: `_bmad-output/implementation-artifacts/6-2b-community-screening-release-gate.md`
+  summary: Add a dependency vulnerability scan (npm audit on the pruned production tree, or an image scan) to CI for the API and the community worker image.
+  evidence: Review finding BH22; `npm audit --omit=dev --audit-level=high` exits 1 with 54 high and 4 critical advisories (2026-10-16), and fixing them needs major expo, OpenTelemetry and Next upgrades.
+- source_spec: `_bmad-output/implementation-artifacts/6-2b-community-screening-release-gate.md`
+  summary: Alert from outside the community worker on the age of the oldest `pending_review` post, so a dead hosted worker is noticed.
+  evidence: Review finding BH18; the hosted worker has no health check and the stale-review sweep runs inside the worker itself. Belongs with Story 6.12 SLA monitoring.
+- source_spec: `_bmad-output/implementation-artifacts/6-2b-community-screening-release-gate.md`
+  summary: Close the image safe-corpus gate (holdout withheld rate at or below 5%) with a stronger SFW classifier, for example CLIP zero-shot through the existing FashionCLIP stack.
+  evidence: The creator-split holdout still fails the 5% gate and blocks ordinary photographs with mobilenet_v2_mid under policy v2 (figures and a description of every withheld photograph in `_bmad-output/test-artifacts/community-content-screening-model-readiness.json`, `safeCorpus`); the other bundled NSFWJS models withheld more on the calibration half.
+- source_spec: `_bmad-output/implementation-artifacts/6-2b-community-screening-release-gate.md`
+  summary: Fix the clean captions the frozen text holdout withholds (es, fr, it, pt), then freeze a new holdout version to measure the fix, because tuning against `holdout-v1` would make it a second tuning set.
+  evidence: Story 6.2b review loop 1 (BH10); the withheld holdout ids are in the readiness payload's `text` section. One French caption blocks at high severity on an ordinary verb form.
+- source_spec: `_bmad-output/implementation-artifacts/6-2b-community-screening-release-gate.md`
+  summary: Drop dolls, rendered avatars and AI-generated portraits from the safe photograph corpus (or filter them at fetch time) and refetch, so the corpus measures photographs of people.
+  evidence: The holdout triage (`_bmad-output/test-artifacts/community-safe-corpus-holdout-triage.json`) found six such entries among the withheld photographs.
+- source_spec: `_bmad-output/implementation-artifacts/6-2b-community-screening-release-gate.md`
+  summary: Verify the hosted worker's database certificate (Prisma `sslmode` with the Supabase CA) the way the canary already does, and give the worker OTLP export once it fits the 150 MB dependency budget.
+  evidence: Review findings BH13 and BH18; the worker's `DATABASE_URL` uses Supabase's `sslmode=require`, and `@opentelemetry/sdk-node` with its exporters does not fit the pruned tree.

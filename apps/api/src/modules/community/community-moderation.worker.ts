@@ -41,6 +41,42 @@ import type { CommunityModerationMeter } from './community-moderation.telemetry.
 export const COMMUNITY_MODERATION_CONCURRENCY = 1
 
 /**
+ * How long an idle worker blocks on Redis before it asks again, in seconds.
+ * BullMQ's default is 5, and a new job wakes the blocked call at once whatever
+ * this is set to, so the value costs no pickup latency; what it sets is how
+ * often an idle worker spends commands. Story 6.2b measured the default at about
+ * 6,500 Redis commands an hour from an idle worker, nine times the Upstash free
+ * tier's 500,000 a month. The cost of a long block is only felt when a
+ * connection dies silently mid-block, and the outbox dispatcher and the stale
+ * review sweep are the backstops for that case.
+ */
+export const COMMUNITY_MODERATION_DRAIN_DELAY_SECONDS = 300
+
+/**
+ * How often the worker looks for jobs whose lock expired because a worker died
+ * mid-job, in milliseconds. BullMQ's default is 30 seconds. A worker also runs
+ * this check when it starts, so a restarted container recovers a stalled job at
+ * once; the interval only bounds recovery while the same process stays up, and
+ * the stale-review sweep bounds it again for the post.
+ */
+export const COMMUNITY_MODERATION_STALLED_INTERVAL_MS = 600_000
+
+/**
+ * The BullMQ worker name, from the commit the image was built from
+ * (`COMMUNITY_WORKER_COMMIT_SHA`, a build argument of the worker image). BullMQ
+ * puts it in the Redis client name and on every job the worker processes, so
+ * the hosted canary can prove which build consumed its job.
+ */
+export function communityWorkerName(commitSha: string): string {
+  return `community-worker@${commitSha}`
+}
+
+function workerNameOption(): Partial<WorkerOptions> {
+  const sha = process.env.COMMUNITY_WORKER_COMMIT_SHA?.trim()
+  return sha ? { name: communityWorkerName(sha) } : {}
+}
+
+/**
  * The reason persisted on `LookbookPost.moderation_reason` when BullMQ runs out
  * of attempts.
  *
@@ -82,6 +118,9 @@ export function createCommunityModerationWorker(
   const defaultOpts = defaultWorkerOptions(COMMUNITY_MODERATION_CONCURRENCY)
   const workerOpts: WorkerOptions = {
     ...defaultOpts,
+    drainDelay: COMMUNITY_MODERATION_DRAIN_DELAY_SECONDS,
+    stalledInterval: COMMUNITY_MODERATION_STALLED_INTERVAL_MS,
+    ...workerNameOption(),
     ...options,
   }
 

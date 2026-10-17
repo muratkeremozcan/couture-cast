@@ -24,7 +24,11 @@ import {
   type ModerationOutcome,
 } from './community-moderation.telemetry.js'
 import { type CommunityModerationJob } from './community-moderation.queue.js'
-import { communitySubjectToken, postDedupeKey } from './community-analytics.js'
+import {
+  communitySubjectToken,
+  isCommunityCanaryUser,
+  postDedupeKey,
+} from './community-analytics.js'
 import { buildCommunityContentSnapshot } from './community-audit-snapshot.js'
 import {
   CommunityImageValidationError,
@@ -277,6 +281,9 @@ export class CommunityModerationProcessor {
     // error at this call site instead of an emission that is quietly wrong.
     properties: TelemetryPropertiesMap[T]
   ): Promise<void> {
+    // The operations canary is not a member; its publications stay out of the
+    // beta's analytics.
+    if (isCommunityCanaryUser(userId)) return
     try {
       await this.telemetryService.captureEvent(userId, eventType, properties)
     } catch (err) {

@@ -1,0 +1,245 @@
+{
+  "language": "tr",
+  "listVersion": "graded-overlay-v1",
+  "listType": "gradedOverlay",
+  "provenance": {
+    "source": "repository-owned graded list",
+    "version": "v1",
+    "licence": "UNLICENSED (repository-owned)",
+    "retrievedAt": "2026-09-08",
+    "curator": "couture-cast repository owner",
+    "notes": "The graded entries Story 6.2 shipped as the whole tr list, kept as an overlay on the vendored LDNOOBW list. Every entry here carries a category and a severity that were assigned deliberately, so where a term is in both lists this grading wins over the generic grade an upstream-only term receives. Self-harm, violence and hate phrases live here because LDNOOBW does not carry them. No entry here has had native-speaker review; see the limitations in the readiness evidence."
+  },
+  "entries": [
+    {
+      "term": "siktir",
+      "category": "profanity",
+      "severity": "medium"
+    },
+    {
+      "term": "sikeyim",
+      "category": "profanity",
+      "severity": "medium"
+    },
+    {
+      "term": "sikerim",
+      "category": "profanity",
+      "severity": "medium"
+    },
+    {
+      "term": "sikik",
+      "category": "profanity",
+      "severity": "medium"
+    },
+    {
+      "term": "hassiktir",
+      "category": "profanity",
+      "severity": "medium"
+    },
+    {
+      "term": "amk",
+      "category": "profanity",
+      "severity": "medium"
+    },
+    {
+      "term": "amına koyayım",
+      "category": "profanity",
+      "severity": "high"
+    },
+    {
+      "term": "amına koyim",
+      "category": "profanity",
+      "severity": "high"
+    },
+    {
+      "term": "boktan",
+      "category": "profanity",
+      "severity": "medium"
+    },
+    {
+      "term": "taşak",
+      "category": "profanity",
+      "severity": "medium"
+    },
+    {
+      "term": "siktir git",
+      "category": "harassment",
+      "severity": "medium"
+    },
+    {
+      "term": "ananı sikeyim",
+      "category": "harassment",
+      "severity": "high"
+    },
+    {
+      "term": "orospu",
+      "category": "harassment",
+      "severity": "high"
+    },
+    {
+      "term": "orospu çocuğu",
+      "category": "harassment",
+      "severity": "high"
+    },
+    {
+      "term": "kahpe",
+      "category": "harassment",
+      "severity": "high"
+    },
+    {
+      "term": "kaltak",
+      "category": "harassment",
+      "severity": "high"
+    },
+    {
+      "term": "sürtük",
+      "category": "harassment",
+      "severity": "high"
+    },
+    {
+      "term": "kancık",
+      "category": "harassment",
+      "severity": "high"
+    },
+    {
+      "term": "puşt",
+      "category": "harassment",
+      "severity": "medium"
+    },
+    {
+      "term": "pezevenk",
+      "category": "harassment",
+      "severity": "medium"
+    },
+    {
+      "term": "gavat",
+      "category": "harassment",
+      "severity": "medium"
+    },
+    {
+      "term": "yavşak",
+      "category": "harassment",
+      "severity": "medium"
+    },
+    {
+      "term": "şerefsiz",
+      "category": "harassment",
+      "severity": "medium"
+    },
+    {
+      "term": "namussuz",
+      "category": "harassment",
+      "severity": "medium"
+    },
+    {
+      "term": "sapık",
+      "category": "harassment",
+      "severity": "medium"
+    },
+    {
+      "term": "geber",
+      "category": "harassment",
+      "severity": "medium"
+    },
+    {
+      "term": "salak",
+      "category": "harassment",
+      "severity": "low"
+    },
+    {
+      "term": "aptal",
+      "category": "harassment",
+      "severity": "low"
+    },
+    {
+      "term": "dangalak",
+      "category": "harassment",
+      "severity": "low"
+    },
+    {
+      "term": "fahişe",
+      "category": "harassment",
+      "severity": "low"
+    },
+    {
+      "term": "kaşar",
+      "category": "harassment",
+      "severity": "low"
+    },
+    {
+      "term": "amcık",
+      "category": "sexual",
+      "severity": "high"
+    },
+    {
+      "term": "sikiş",
+      "category": "sexual",
+      "severity": "high"
+    },
+    {
+      "term": "yarrak",
+      "category": "sexual",
+      "severity": "medium"
+    },
+    {
+      "term": "ibne",
+      "category": "hate",
+      "severity": "high"
+    },
+    {
+      "term": "götveren",
+      "category": "hate",
+      "severity": "high"
+    },
+    {
+      "term": "gavur",
+      "category": "hate",
+      "severity": "high"
+    },
+    {
+      "term": "çıfıt",
+      "category": "hate",
+      "severity": "high"
+    },
+    {
+      "term": "gerizekalı",
+      "category": "hate",
+      "severity": "high"
+    },
+    {
+      "term": "tecavüz",
+      "category": "violence",
+      "severity": "high"
+    },
+    {
+      "term": "gebertirim",
+      "category": "violence",
+      "severity": "high"
+    },
+    {
+      "term": "seni öldüreceğim",
+      "category": "violence",
+      "severity": "high"
+    },
+    {
+      "term": "kendini öldür",
+      "category": "self_harm",
+      "severity": "high"
+    },
+    {
+      "term": "kendini as",
+      "category": "self_harm",
+      "severity": "high"
+    },
+    {
+      "term": "intihar et",
+      "category": "self_harm",
+      "severity": "high"
+    },
+    {
+      "term": "canına kıy",
+      "category": "self_harm",
+      "severity": "high"
+    }
+  ]
+}

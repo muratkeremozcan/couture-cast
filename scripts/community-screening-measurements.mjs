@@ -24,7 +24,7 @@ const projectRoot = path.resolve(__dirname, '..')
 
 const MODEL_MANIFEST =
   'apps/api/model-manifests/community-nsfw-mobilenet-v2-mid-nsfwjs-4.3.0.json'
-const POLICY = 'apps/api/policies/community-screening/policy-v1.json'
+const POLICY = 'apps/api/policies/community-screening/policy-v2.json'
 const FIXTURE_MANIFEST = 'apps/api/test/fixtures/community-moderation/v1/manifest.json'
 const LOCKFILE = 'package-lock.json'
 
@@ -503,7 +503,10 @@ function buildPayload() {
       policyId: policy.policyId,
       version: policy.version,
       policySha256: current.policySha256,
-      neutralPassMinimum: policy.image?.neutralPassMinimum,
+      safeClasses: policy.image?.safeClasses,
+      safeMassMinimum: policy.image?.safeMassMinimum,
+      reviewClasses: policy.image?.reviewClasses,
+      reviewClassMaximum: policy.image?.reviewClassMaximum,
       unsafeClasses: policy.image?.unsafeClasses,
       unsafeBlockMinimum: policy.image?.unsafeBlockMinimum,
       probabilitySumTolerance: policy.image?.probabilitySumTolerance,
@@ -577,10 +580,10 @@ function buildPayload() {
       {
         id: 'local-dispatch-cadence',
         statement:
-          'The end-to-end stack dispatches the moderation outbox once a second; production uses a one-minute scheduler.',
+          'The end-to-end stack dispatches the moderation outbox once a second. The hosted community worker Story 6.2b deploys runs the same community bootstrap and therefore the same one-second dispatch; the one-minute scheduler belongs to the general bootstrap, which no hosted target runs.',
         mitigation:
-          'The one-second cadence is a test-harness setting only and is never presented as latency evidence.',
-        revisitWhen: 'Story 6.2b measures queue latency against the deployed worker.',
+          'No number in this payload is presented as production latency. Story 6.2b measures queue latency against the worker through its canary.',
+        revisitWhen: 'The hosted canary has run against the deployed worker.',
       },
     ],
 

@@ -1,0 +1,2731 @@
+{
+  "language": "fr",
+  "corpusVersion": "v1",
+  "clean": {
+    "description": "Ordinary fashion captions and alt text, written natively in the language as community members would write them, without reference to the term lists. Every entry is expected to pass text screening, except entries labelled expected review, which carry one of the policy's deliberate review terms and the reason it is kept.",
+    "expected": "pass",
+    "entries": [
+      {
+        "id": "fr-clean-001",
+        "field": "caption",
+        "text": "Tenue du jour : trench beige, jean droit et baskets blanches. 14 degrés et un petit vent, parfait."
+      },
+      {
+        "id": "fr-clean-002",
+        "field": "caption",
+        "text": "Il pleut depuis ce matin, alors bottes de pluie jaunes et ciré marine. Au moins je suis visible !"
+      },
+      {
+        "id": "fr-clean-003",
+        "field": "caption",
+        "text": "Ma salopette en jean ressort enfin du placard, le printemps est là 🌷"
+      },
+      {
+        "id": "fr-clean-004",
+        "field": "caption",
+        "text": "Petite robe nude pour le mariage de ma cousine samedi. Vous la porteriez avec des sandales dorées ou argentées ?"
+      },
+      {
+        "id": "fr-clean-005",
+        "field": "caption",
+        "text": "Il fait frette à matin, j'ai sorti la tuque et les mitaines. Manteau long en laine par-dessus un chandail épais."
+      },
+      {
+        "id": "fr-clean-006",
+        "field": "caption",
+        "text": "Look de bureau pour un mardi gris : pantalon à pinces gris anthracite, chemise blanche, mocassins bordeaux."
+      },
+      {
+        "id": "fr-clean-007",
+        "field": "caption",
+        "text": "Qui d'autre adore les jupes-culottes ? Ça bouge bien, c'est confortable et on peut faire du vélo avec."
+      },
+      {
+        "id": "fr-clean-008",
+        "field": "caption",
+        "text": "22 degrés annoncés, je tente le lin. Chemise ample écrue et short taille haute."
+      },
+      {
+        "id": "fr-clean-009",
+        "field": "caption",
+        "text": "Bravo pour ta tenue d'hier, le vert sauge te va super bien !"
+      },
+      {
+        "id": "fr-clean-010",
+        "field": "caption",
+        "text": "Conseil du jour : quand il fait humide, évitez la soie, elle marque tout. Le coton lavé est votre ami."
+      },
+      {
+        "id": "fr-clean-011",
+        "field": "caption",
+        "text": "Robe longue à fleurs et veste en jean, le combo qui ne me déçoit jamais au mois de mai."
+      },
+      {
+        "id": "fr-clean-012",
+        "field": "caption",
+        "text": "Premier jour de neige à Montréal ! Bottes doublées, parka et foulard tricoté par ma grand-mère. #hiver"
+      },
+      {
+        "id": "fr-clean-013",
+        "field": "caption",
+        "text": "Je cherche un manteau mi-saison qui ne fasse pas trop sac. Des idées de coupe pour une silhouette menue ?"
+      },
+      {
+        "id": "fr-clean-014",
+        "field": "caption",
+        "text": "Pull à col roulé crème et jupe plissée camel. Un classique de l'automne."
+      },
+      {
+        "id": "fr-clean-015",
+        "field": "caption",
+        "text": "Robe moulante noire pour la soirée d'entreprise, avec un blazer oversize pour casser le côté trop habillé."
+      },
+      {
+        "id": "fr-clean-016",
+        "field": "caption",
+        "text": "Le dos nu de cette robe d'été est magnifique, mais je mets un petit gilet le soir parce que ça fraîchit vite."
+      },
+      {
+        "id": "fr-clean-017",
+        "field": "caption",
+        "text": "Vacances à la mer : maillot une pièce rayé, chapeau de paille et chemise en lin ouverte par-dessus."
+      },
+      {
+        "id": "fr-clean-018",
+        "field": "caption",
+        "text": "Bas de maillot string ou culotte classique ? Pour la plage, je reste sur la culotte taille haute, plus pratique pour nager."
+      },
+      {
+        "id": "fr-clean-019",
+        "field": "caption",
+        "text": "Un décolleté carré avec une chaîne fine, c'est simple et ça fait tout de suite habillé."
+      },
+      {
+        "id": "fr-clean-020",
+        "field": "caption",
+        "text": "Ciel bleu mais 3 degrés. Doudoune sans manches sous un manteau en laine, astuce de maman qui marche."
+      },
+      {
+        "id": "fr-clean-021",
+        "field": "caption",
+        "text": "OOTD : tout en bordeaux, du pull aux bottines. Monochrome d'automne assumé 🍂"
+      },
+      {
+        "id": "fr-clean-022",
+        "field": "caption",
+        "text": "J'ai porté mes nouvelles chaussures toute la journée sans ampoule, miracle !"
+      },
+      {
+        "id": "fr-clean-023",
+        "field": "caption",
+        "text": "Quelqu'un sait comment entretenir un manteau en laine bouillie ? Je ne veux pas le rétrécir."
+      },
+      {
+        "id": "fr-clean-024",
+        "field": "caption",
+        "text": "La folle journée : réunion le matin, apéro le soir. Robe chemise et baskets, puis escarpins dans le sac."
+      },
+      {
+        "id": "fr-clean-025",
+        "field": "caption",
+        "text": "Pour le baptême de mon neveu : robe midi bleu ciel, sandales nude et une pochette en raphia."
+      },
+      {
+        "id": "fr-clean-026",
+        "field": "caption",
+        "text": "Le vent de la Côte-Nord ne pardonne pas. Coupe-vent technique et couches superposées, c'est la seule solution."
+      },
+      {
+        "id": "fr-clean-027",
+        "field": "caption",
+        "text": "Tu es superbe dans ce tailleur, la coupe est parfaite sur toi."
+      },
+      {
+        "id": "fr-clean-028",
+        "field": "caption",
+        "text": "Mon conseil pour l'été : une seule couleur forte par tenue, le reste en neutres."
+      },
+      {
+        "id": "fr-clean-029",
+        "field": "caption",
+        "text": "Chemise à carreaux, jean brut et bottes de travail. Journée cabane à sucre ! 🍁"
+      },
+      {
+        "id": "fr-clean-030",
+        "field": "caption",
+        "text": "Sexy et élégante sans en faire trop : robe en satin noir, manches longues, longueur genou."
+      },
+      {
+        "id": "fr-clean-031",
+        "field": "caption",
+        "text": "Brume ce matin, soleil cet après-midi. J'ai misé sur un cardigan facile à retirer."
+      },
+      {
+        "id": "fr-clean-032",
+        "field": "caption",
+        "text": "Ma nouvelle salopette en velours côtelé est d'une douceur incroyable."
+      },
+      {
+        "id": "fr-clean-033",
+        "field": "caption",
+        "text": "Les mocassins sans chaussettes, oui ou non quand il fait 18 degrés ?"
+      },
+      {
+        "id": "fr-clean-034",
+        "field": "caption",
+        "text": "Je recycle la robe de demoiselle d'honneur de l'an dernier avec une ceinture et un blazer. Seconde vie réussie."
+      },
+      {
+        "id": "fr-clean-035",
+        "field": "caption",
+        "text": "Tenue de randonnée : legging thermique, polaire, coupe-vent et chaussures imperméables. Les sentiers étaient boueux."
+      },
+      {
+        "id": "fr-clean-036",
+        "field": "caption",
+        "text": "Joli baiser de la lumière dorée sur mon manteau camel ce soir, la photo s'est faite toute seule.",
+        "expected": "review",
+        "deliberateReviewTerm": "baiser",
+        "reason": "French for a kiss as a noun, and the commonest vulgar French verb for sex. The two senses cannot be told apart token by token, so it stays routed to review at low severity and never blocks."
+      },
+      {
+        "id": "fr-clean-037",
+        "field": "caption",
+        "text": "Il fait 31 degrés à Lyon, je vis en robe en coton et sandales plates."
+      },
+      {
+        "id": "fr-clean-038",
+        "field": "caption",
+        "text": "On en parle de ce pantalon large en lin ? Je l'ai acheté en trois couleurs."
+      },
+      {
+        "id": "fr-clean-039",
+        "field": "caption",
+        "text": "Jupe crayon, chemisier en soie et trench. Look de rentrée pour le bureau."
+      },
+      {
+        "id": "fr-clean-040",
+        "field": "caption",
+        "text": "Une tenue qui tue pour le concert de ce soir : pantalon en cuir synthétique, débardeur noir et veste courte."
+      },
+      {
+        "id": "fr-clean-041",
+        "field": "caption",
+        "text": "La gerbe de fleurs du mariage allait parfaitement avec ma robe pêche, j'étais ravie."
+      },
+      {
+        "id": "fr-clean-042",
+        "field": "caption",
+        "text": "Bottes de neige et pantalon de ski pour aller au travail. Tant pis pour l'élégance, il est tombé 30 cm."
+      },
+      {
+        "id": "fr-clean-043",
+        "field": "caption",
+        "text": "Est-ce que le kaki se porte avec du bordeaux ? J'ai envie d'essayer mais j'hésite."
+      },
+      {
+        "id": "fr-clean-044",
+        "field": "caption",
+        "text": "Ensemble en maille côtelée gris chiné, parfait pour télétravailler par temps froid."
+      },
+      {
+        "id": "fr-clean-045",
+        "field": "caption",
+        "text": "Petite pluie fine sur Bordeaux, imperméable léger et parapluie transparent."
+      },
+      {
+        "id": "fr-clean-046",
+        "field": "caption",
+        "text": "Merci pour vos conseils sur la robe de gala, j'ai choisi la bleu nuit et je ne le regrette pas !"
+      },
+      {
+        "id": "fr-clean-047",
+        "field": "caption",
+        "text": "Tenue du dimanche : sweat oversize, legging et chaussettes en laine. Ne pas sortir, c'est aussi un choix."
+      },
+      {
+        "id": "fr-clean-048",
+        "field": "caption",
+        "text": "Ma robe portefeuille préférée, elle s'adapte à tout et elle voyage sans se froisser."
+      },
+      {
+        "id": "fr-clean-049",
+        "field": "caption",
+        "text": "Les petits pois sont de retour ! Chemisier à pois blancs sur fond marine avec un jean clair."
+      },
+      {
+        "id": "fr-clean-050",
+        "field": "caption",
+        "text": "Manteau croisé bleu marine, bonnet côtelé et gants en cuir. 2 degrés ressentis -5."
+      },
+      {
+        "id": "fr-clean-051",
+        "field": "caption",
+        "text": "Le body à manches longues sous une jupe taille haute, c'est l'astuce pour ne jamais avoir la chemise qui sort."
+      },
+      {
+        "id": "fr-clean-052",
+        "field": "caption",
+        "text": "Matinée au marché : panier en osier, robe vichy et espadrilles. L'été en Provence ❤️"
+      },
+      {
+        "id": "fr-clean-053",
+        "field": "caption",
+        "text": "Je trouve que le décolleté en V allonge le cou, surtout avec des cheveux attachés."
+      },
+      {
+        "id": "fr-clean-054",
+        "field": "caption",
+        "text": "Une petite robe moulante en maille côtelée, c'est le confort d'un pull avec l'allure d'une robe."
+      },
+      {
+        "id": "fr-clean-055",
+        "field": "caption",
+        "text": "Tempête de verglas annoncée, crampons sur les bottes et manteau long. Soyez prudents !"
+      },
+      {
+        "id": "fr-clean-056",
+        "field": "caption",
+        "text": "Trop belle ta jupe à fleurs, tu l'as trouvée en friperie ?"
+      },
+      {
+        "id": "fr-clean-057",
+        "field": "caption",
+        "text": "Chemise en jean sur chemise en jean, le double denim assumé. Ça passe avec deux nuances différentes."
+      },
+      {
+        "id": "fr-clean-058",
+        "field": "caption",
+        "text": "Quand il fait gris, je compense avec de la couleur : pull jaune moutarde aujourd'hui."
+      },
+      {
+        "id": "fr-clean-059",
+        "field": "caption",
+        "text": "Short en lin, débardeur côtelé et sandales en cuir. 28 degrés à l'ombre."
+      },
+      {
+        "id": "fr-clean-060",
+        "field": "caption",
+        "text": "Robe dos nu pour la soirée sur la terrasse. Un châle en cachemire pour quand le soleil se couche."
+      },
+      {
+        "id": "fr-clean-061",
+        "field": "caption",
+        "text": "Les culottes de cheval reviennent dans les défilés, mais je préfère encore les pantalons droits."
+      },
+      {
+        "id": "fr-clean-062",
+        "field": "caption",
+        "text": "J'ai mis ma salopette courte avec un t-shirt rayé, ambiance pique-nique au parc."
+      },
+      {
+        "id": "fr-clean-063",
+        "field": "caption",
+        "text": "Question aux mamans : vos astuces pour une tenue pratique mais jolie avec une poussette sous la pluie ?"
+      },
+      {
+        "id": "fr-clean-064",
+        "field": "caption",
+        "text": "Look minimaliste : tout en blanc cassé, avec un sac noir pour structurer."
+      },
+      {
+        "id": "fr-clean-065",
+        "field": "caption",
+        "text": "Ma tante m'a donné son vieux manteau en tweed, il est en parfait état. Le vintage a du bon."
+      },
+      {
+        "id": "fr-clean-066",
+        "field": "caption",
+        "text": "Pour un entretien d'embauche en été, tailleur pantalon en lin beige et chemisier blanc."
+      },
+      {
+        "id": "fr-clean-067",
+        "field": "caption",
+        "text": "Robe nude et escarpins assortis, ça allonge la jambe à tous les coups."
+      },
+      {
+        "id": "fr-clean-068",
+        "field": "caption",
+        "text": "Il fait doux pour novembre, juste un blazer en laine sur un col roulé fin."
+      },
+      {
+        "id": "fr-clean-069",
+        "field": "caption",
+        "text": "La veste matelassée, c'est vraiment le bon compromis entre le trench et la doudoune."
+      },
+      {
+        "id": "fr-clean-070",
+        "field": "caption",
+        "text": "Félicitations à toutes celles qui ont participé au défi tenue sans achat ce mois-ci !"
+      },
+      {
+        "id": "fr-clean-071",
+        "field": "caption",
+        "text": "Pantalon cargo, chemise oversize et baskets montantes. Week-end décontracté."
+      },
+      {
+        "id": "fr-clean-072",
+        "field": "caption",
+        "text": "Ce soir c'est la fête de quartier, je mets ma robe à volants rouge."
+      },
+      {
+        "id": "fr-clean-073",
+        "field": "caption",
+        "text": "Comment porter le string de bain sans se sentir trop exposée ? Moi j'ajoute un paréo noué à la taille pour la plage."
+      },
+      {
+        "id": "fr-clean-074",
+        "field": "caption",
+        "text": "Le froid sec de février : collants épais, jupe en laine et bottes hautes. Bien au chaud."
+      },
+      {
+        "id": "fr-clean-075",
+        "field": "caption",
+        "text": "Manteau rose poudré, ça illumine les journées grises de janvier."
+      },
+      {
+        "id": "fr-clean-076",
+        "field": "caption",
+        "text": "Je n'arrive pas à choisir entre ces deux robes pour la remise des diplômes. Votre avis ?"
+      },
+      {
+        "id": "fr-clean-077",
+        "field": "caption",
+        "text": "Chandail en tricot irlandais et jean, la tenue parfaite pour une balade au bord du fleuve."
+      },
+      {
+        "id": "fr-clean-078",
+        "field": "caption",
+        "text": "Ensemble short et blazer en coton, idéal pour un afterwork en terrasse."
+      },
+      {
+        "id": "fr-clean-079",
+        "field": "caption",
+        "text": "Pull marin, pantalon blanc et ballerines. Je ne m'en lasse pas."
+      },
+      {
+        "id": "fr-clean-080",
+        "field": "caption",
+        "text": "Le vent se lève, foulard en soie noué autour du cou et lunettes de soleil. Très années 60."
+      },
+      {
+        "id": "fr-clean-081",
+        "field": "caption",
+        "text": "Robe sexy mais confortable pour la Saint-Valentin : rouge profond, coupe évasée, manches trois quarts."
+      },
+      {
+        "id": "fr-clean-082",
+        "field": "caption",
+        "text": "Il fait 38 degrés, je ne sors plus sans chapeau à larges bords et robe en voile de coton."
+      },
+      {
+        "id": "fr-clean-083",
+        "field": "caption",
+        "text": "Tes bottines bordeaux sont magnifiques, elles donnent du peps à toute la tenue."
+      },
+      {
+        "id": "fr-clean-084",
+        "field": "caption",
+        "text": "Combinaison pantalon en crêpe vert bouteille pour le dîner d'anniversaire."
+      },
+      {
+        "id": "fr-clean-085",
+        "field": "caption",
+        "text": "Tenue de vélo pour aller au travail : pantalon stretch, coupe-vent fluo et sac imperméable."
+      },
+      {
+        "id": "fr-clean-086",
+        "field": "caption",
+        "text": "Pour les pieds frileux : chaussettes en mérinos dans les bottes, ça change la vie."
+      },
+      {
+        "id": "fr-clean-087",
+        "field": "caption",
+        "text": "Doudoune longue et bottes fourrées, il fait -22 avec le facteur vent. Bonne journée quand même !"
+      },
+      {
+        "id": "fr-clean-088",
+        "field": "caption",
+        "text": "Quand je ne sais pas quoi mettre, je mets une marinière. Elle va avec tout."
+      },
+      {
+        "id": "fr-clean-089",
+        "field": "caption",
+        "text": "Robe en lin froissé et sandales tressées, le froissé fait partie du charme."
+      },
+      {
+        "id": "fr-clean-090",
+        "field": "caption",
+        "text": "Est-ce que vous repassez vos chemises en lin ou vous assumez le froissé ?"
+      },
+      {
+        "id": "fr-clean-091",
+        "field": "caption",
+        "text": "Look du soir : pantalon palazzo en soie, top à fines bretelles et mules dorées."
+      },
+      {
+        "id": "fr-clean-092",
+        "field": "caption",
+        "text": "Une jolie rosée ce matin, j'ai préféré les bottines aux baskets en toile."
+      },
+      {
+        "id": "fr-clean-093",
+        "field": "caption",
+        "text": "Merci à celle qui m'a conseillé le gris perle, il me va mieux que le noir !"
+      },
+      {
+        "id": "fr-clean-094",
+        "field": "caption",
+        "text": "J'ai enfin trouvé le jean parfait : taille haute, coupe droite, longueur cheville."
+      },
+      {
+        "id": "fr-clean-095",
+        "field": "caption",
+        "text": "Le bleu klein avec du blanc, c'est la combinaison la plus fraîche de l'été."
+      },
+      {
+        "id": "fr-clean-096",
+        "field": "caption",
+        "text": "Chemisier à lavallière et jupe midi plissée. Un peu rétro, j'adore."
+      },
+      {
+        "id": "fr-clean-097",
+        "field": "caption",
+        "text": "Rentrée scolaire sous le soleil : robe t-shirt et sneakers pour courir après les petits."
+      },
+      {
+        "id": "fr-clean-098",
+        "field": "caption",
+        "text": "Mon manteau camel a 10 ans et il est toujours aussi beau. Investir dans la qualité, ça paie."
+      },
+      {
+        "id": "fr-clean-099",
+        "field": "caption",
+        "text": "Superpositions d'automne : t-shirt, chemise en flanelle, gilet sans manches et veste."
+      },
+      {
+        "id": "fr-clean-100",
+        "field": "caption",
+        "text": "#ootd pull en mohair lavande et jean blanc, oui on peut porter du blanc en hiver !"
+      },
+      {
+        "id": "fr-clean-101",
+        "field": "caption",
+        "text": "Pour aller au chalet : pantalon en velours, gros pull et pantoufles en laine bouillie."
+      },
+      {
+        "id": "fr-clean-102",
+        "field": "caption",
+        "text": "Il pleut, il vente, mais mon trench à capuche tient le coup."
+      },
+      {
+        "id": "fr-clean-103",
+        "field": "caption",
+        "text": "Robe de cocktail en velours bordeaux pour le réveillon. Simple et festif."
+      },
+      {
+        "id": "fr-clean-104",
+        "field": "caption",
+        "text": "Je suis la seule à garder mes lunettes de soleil même en hiver avec la neige qui éblouit ?"
+      },
+      {
+        "id": "fr-clean-105",
+        "field": "caption",
+        "text": "Brouillard sur le lac, j'ai pris le caban et l'écharpe en cachemire."
+      },
+      {
+        "id": "fr-clean-106",
+        "field": "caption",
+        "text": "Trop chic ton look monochrome !"
+      },
+      {
+        "id": "fr-clean-107",
+        "field": "caption",
+        "text": "Les sandales à talons carrés, c'est le meilleur compromis pour marcher sur les pavés en été."
+      },
+      {
+        "id": "fr-clean-108",
+        "field": "caption",
+        "text": "Jour de canicule : robe en coton bio très ample, aucune ceinture, et beaucoup d'eau dans le sac."
+      },
+      {
+        "id": "fr-clean-109",
+        "field": "caption",
+        "text": "Je mixe le léopard et le rayé aujourd'hui. Audacieux ? Peut-être, mais ça me rend de bonne humeur."
+      },
+      {
+        "id": "fr-clean-110",
+        "field": "caption",
+        "text": "Pour une cérémonie à l'église, robe midi à manches courtes et petit boléro. Le décolleté reste discret."
+      },
+      {
+        "id": "fr-clean-111",
+        "field": "caption",
+        "text": "Combien de couches pour -15 ? Moi : t-shirt thermique, pull en laine, doudoune et coupe-vent. On survit."
+      },
+      {
+        "id": "fr-clean-112",
+        "field": "caption",
+        "text": "La salopette noire se porte aussi en version chic avec un chemisier en soie et des escarpins."
+      },
+      {
+        "id": "fr-clean-113",
+        "field": "caption",
+        "text": "Ma fille m'a prêté sa veste en jean brodée, je me sens jeune 😄"
+      },
+      {
+        "id": "fr-clean-114",
+        "field": "caption",
+        "text": "Jupe en cuir camel, pull col V et bottes cavalières. L'automne parfait."
+      },
+      {
+        "id": "fr-clean-115",
+        "field": "caption",
+        "text": "Tu as un vrai talent pour associer les couleurs, ta tenue de ce matin est une leçon."
+      },
+      {
+        "id": "fr-clean-116",
+        "field": "caption",
+        "text": "Un temps à ne pas mettre le nez dehors, mais j'avais un rendez-vous. Bottes, imper et capuche !"
+      },
+      {
+        "id": "fr-clean-117",
+        "field": "caption",
+        "text": "Mini-guide : pour une silhouette en H, une ceinture à la taille fait des merveilles."
+      },
+      {
+        "id": "fr-clean-118",
+        "field": "caption",
+        "text": "Le blazer à carreaux sur une robe noire simple, c'est la pièce qui fait tout."
+      },
+      {
+        "id": "fr-clean-119",
+        "field": "caption",
+        "text": "Je découvre le soleil d'octobre en terrasse avec un gilet en grosse maille. Bonheur."
+      },
+      {
+        "id": "fr-clean-120",
+        "field": "caption",
+        "text": "Débardeur en lin, pantalon fluide et sandales plates, tenue de télétravail de juillet."
+      },
+      {
+        "id": "fr-clean-121",
+        "field": "caption",
+        "text": "Avez-vous des idées pour porter une robe d'été en automne ? Je n'ai pas envie de la ranger."
+      },
+      {
+        "id": "fr-clean-122",
+        "field": "caption",
+        "text": "J'ai mis un collant en plumetis sous ma robe d'été avec des bottines. Ça marche !"
+      },
+      {
+        "id": "fr-clean-123",
+        "field": "caption",
+        "text": "Pluie verglaçante ce matin à Québec. J'ai sorti les bottes antidérapantes et le manteau long."
+      },
+      {
+        "id": "fr-clean-124",
+        "field": "caption",
+        "text": "Le vichy rose et blanc, c'est le motif qui me rend nostalgique des étés chez ma grand-mère."
+      },
+      {
+        "id": "fr-clean-125",
+        "field": "caption",
+        "text": "Robe moulante bordeaux et manteau long noir pour l'opéra ce soir 🎭"
+      },
+      {
+        "id": "fr-clean-126",
+        "field": "caption",
+        "text": "Ma règle : chaussures confortables d'abord, le reste suit."
+      },
+      {
+        "id": "fr-clean-127",
+        "field": "caption",
+        "text": "La chemise blanche oversize, je la porte en robe, en veste, nouée à la taille. Pièce magique."
+      },
+      {
+        "id": "fr-clean-128",
+        "field": "caption",
+        "text": "Vous préférez les cols ronds ou les cols en V sous un blazer ?"
+      },
+      {
+        "id": "fr-clean-129",
+        "field": "caption",
+        "text": "Taille unique ? Jamais pour moi, j'ai besoin d'une coupe ajustée aux épaules."
+      },
+      {
+        "id": "fr-clean-130",
+        "field": "caption",
+        "text": "Trench mastic, foulard à motifs et sac bandoulière. Paris sous une petite averse."
+      },
+      {
+        "id": "fr-clean-131",
+        "field": "caption",
+        "text": "Combinaison en jean et sabots, ambiance années 70 pour ce samedi ensoleillé."
+      },
+      {
+        "id": "fr-clean-132",
+        "field": "caption",
+        "text": "J'ai trouvé une robe vintage à motif cachemire au marché aux puces, cinq euros !"
+      },
+      {
+        "id": "fr-clean-133",
+        "field": "caption",
+        "text": "Il fait 9 degrés, j'hésite encore entre la veste en cuir et le manteau."
+      },
+      {
+        "id": "fr-clean-134",
+        "field": "caption",
+        "text": "Les chaussettes visibles avec des mocassins, j'ai mis du temps à adopter, maintenant j'adore."
+      },
+      {
+        "id": "fr-clean-135",
+        "field": "caption",
+        "text": "Haut à épaules dénudées et jupe longue en voile pour une fête d'été au jardin."
+      },
+      {
+        "id": "fr-clean-136",
+        "field": "caption",
+        "text": "Ton manteau vert est sublime, quelle couleur !"
+      },
+      {
+        "id": "fr-clean-137",
+        "field": "caption",
+        "text": "Le gris et le camel, c'est l'association la plus douce de l'hiver."
+      },
+      {
+        "id": "fr-clean-138",
+        "field": "caption",
+        "text": "Parka kaki doublée de fausse fourrure et bottes en cuir, tenue de semaine glaciale."
+      },
+      {
+        "id": "fr-clean-139",
+        "field": "caption",
+        "text": "Ce matin j'ai choisi une robe pull et des bottes plates, confort maximal pour un long trajet en train."
+      },
+      {
+        "id": "fr-clean-140",
+        "field": "caption",
+        "text": "J'ai peur de porter du jaune. Des conseils pour commencer en douceur ?"
+      },
+      {
+        "id": "fr-clean-141",
+        "field": "caption",
+        "text": "Commence par un accessoire : un sac ou une écharpe jaune avec du gris, c'est très doux."
+      },
+      {
+        "id": "fr-clean-142",
+        "field": "caption",
+        "text": "Le pantalon en velours côtelé, roi absolu des journées fraîches."
+      },
+      {
+        "id": "fr-clean-143",
+        "field": "caption",
+        "text": "Tenue de mariage civil : tailleur blanc cassé, chemisier en soie et petit bouquet de pivoines."
+      },
+      {
+        "id": "fr-clean-144",
+        "field": "caption",
+        "text": "La rosée du matin a ruiné mes baskets en daim. Leçon apprise."
+      },
+      {
+        "id": "fr-clean-145",
+        "field": "caption",
+        "text": "Robe en mousseline imprimée, gilet court et ballerines. Printemps en douceur."
+      },
+      {
+        "id": "fr-clean-146",
+        "field": "caption",
+        "text": "Look du jour inspiré des années 90 : jean mom, t-shirt blanc et chemise à carreaux nouée."
+      },
+      {
+        "id": "fr-clean-147",
+        "field": "caption",
+        "text": "Mi-saison compliquée : 7 degrés le matin, 19 l'après-midi. Vive les couches !"
+      },
+      {
+        "id": "fr-clean-148",
+        "field": "caption",
+        "text": "Je trouve que les robes nude vont mieux avec un rouge à lèvres coloré, pour ne pas paraître terne."
+      },
+      {
+        "id": "fr-clean-149",
+        "field": "caption",
+        "text": "Maillot de bain une pièce dos nu, c'est ma pièce préférée pour l'été au lac."
+      },
+      {
+        "id": "fr-clean-150",
+        "field": "caption",
+        "text": "On parle souvent du petit haut, mais la bonne paire de lunettes fait la tenue !"
+      },
+      {
+        "id": "fr-clean-151",
+        "field": "caption",
+        "text": "Pull jacquard et jupe en laine, prête pour le marché de Noël."
+      },
+      {
+        "id": "fr-clean-152",
+        "field": "caption",
+        "text": "Robe noire, collants noirs, bottes noires. Et un manteau rouge vif pour réveiller tout ça."
+      },
+      {
+        "id": "fr-clean-153",
+        "field": "caption",
+        "text": "Ta salopette jaune moutarde, c'est le rayon de soleil de mon fil d'actualité."
+      },
+      {
+        "id": "fr-clean-154",
+        "field": "caption",
+        "text": "La légèreté du coton seersucker est parfaite pour l'humidité de la Floride, de retour de voyage."
+      },
+      {
+        "id": "fr-clean-155",
+        "field": "caption",
+        "text": "Défi : porter la même veste cinq jours de suite avec cinq styles différents. Jour 3, ça tient !"
+      },
+      {
+        "id": "fr-clean-156",
+        "field": "caption",
+        "text": "Chemise en popeline rayée bleue, très fraîche pour aller au bureau à vélo."
+      },
+      {
+        "id": "fr-clean-157",
+        "field": "caption",
+        "text": "Il neige à gros flocons, c'est magnifique. Manteau en laine bouillie et bonnet à pompon."
+      },
+      {
+        "id": "fr-clean-158",
+        "field": "caption",
+        "text": "Le kimono en soie sur un jean et un débardeur blanc, simple et un peu bohème."
+      },
+      {
+        "id": "fr-clean-159",
+        "field": "caption",
+        "text": "Gros coup de vent sur la côte bretonne, ciré et marinière obligatoires."
+      },
+      {
+        "id": "fr-clean-160",
+        "field": "caption",
+        "text": "Mes boucles d'oreilles dorées ont fait toute la tenue aujourd'hui, une petite robe noire suffit."
+      },
+      {
+        "id": "fr-clean-161",
+        "field": "caption",
+        "text": "Petite question : quelle longueur de manteau avec une jupe midi ?"
+      },
+      {
+        "id": "fr-clean-162",
+        "field": "caption",
+        "text": "Un manteau plus long que la jupe, toujours. Ça fait une ligne nette."
+      },
+      {
+        "id": "fr-clean-163",
+        "field": "caption",
+        "text": "Robe chemise kaki ceinturée et baskets blanches. Look facile pour un samedi de courses."
+      },
+      {
+        "id": "fr-clean-164",
+        "field": "caption",
+        "text": "Soirée au restaurant : pantalon droit noir, top en satin vert émeraude et mules à talons."
+      },
+      {
+        "id": "fr-clean-165",
+        "field": "caption",
+        "text": "Je teste le total look beige. Pas facile, il faut jouer sur les textures."
+      },
+      {
+        "id": "fr-clean-166",
+        "field": "caption",
+        "text": "Combinaison courte fleurie pour le festival, avec bottes de pluie au cas où !"
+      },
+      {
+        "id": "fr-clean-167",
+        "field": "caption",
+        "text": "Il fait 26 degrés et humide, le lin est le seul tissu que je supporte."
+      },
+      {
+        "id": "fr-clean-168",
+        "field": "caption",
+        "text": "Bravo à toutes les nouvelles membres, vos premières tenues sont super inspirantes 👏"
+      },
+      {
+        "id": "fr-clean-169",
+        "field": "caption",
+        "text": "Ma tenue sport de ce matin : brassière, legging et coupe-vent léger. 6 km sous la bruine."
+      },
+      {
+        "id": "fr-clean-170",
+        "field": "caption",
+        "text": "Le béret revient chaque automne dans ma vie. Aujourd'hui en rouge brique."
+      },
+      {
+        "id": "fr-clean-171",
+        "field": "caption",
+        "text": "Le tailleur jupe en tweed rose, ça me donne l'impression d'être en vacances à Paris même au bureau."
+      },
+      {
+        "id": "fr-clean-172",
+        "field": "caption",
+        "text": "Il fait moins froid qu'hier, j'ai remplacé la doudoune par un manteau en laine."
+      },
+      {
+        "id": "fr-clean-173",
+        "field": "caption",
+        "text": "Mon chandail préféré a des trous aux coudes, je vais y coudre des pièces en cuir."
+      },
+      {
+        "id": "fr-clean-174",
+        "field": "caption",
+        "text": "Look de soirée sexy et chic : robe portefeuille en jersey prune, escarpins nude et pochette dorée."
+      },
+      {
+        "id": "fr-clean-175",
+        "field": "caption",
+        "text": "Short en jean, chemise en lin blanche et tongs. Le minimum syndical pour 33 degrés."
+      },
+      {
+        "id": "fr-clean-176",
+        "field": "caption",
+        "text": "Pantalon rouge et pull bleu marine, petite touche patriotique pour le 14 juillet."
+      },
+      {
+        "id": "fr-clean-177",
+        "field": "caption",
+        "text": "Je mets des semelles en laine dans mes bottes depuis des années, c'est imbattable pour le froid."
+      },
+      {
+        "id": "fr-clean-178",
+        "field": "caption",
+        "text": "Robe longue à imprimé floral et chapeau en paille. Brunch du dimanche au soleil."
+      },
+      {
+        "id": "fr-clean-179",
+        "field": "caption",
+        "text": "Robe culotte en lin bleu : on dirait une robe, c'est un short. Je suis conquise."
+      },
+      {
+        "id": "fr-clean-180",
+        "field": "caption",
+        "text": "Ce rouge cerise te va à merveille, tu devrais en porter plus souvent !"
+      },
+      {
+        "id": "fr-clean-181",
+        "field": "caption",
+        "text": "Le bonnet en laine à revers, indispensable pour mes oreilles sensibles."
+      },
+      {
+        "id": "fr-clean-182",
+        "field": "caption",
+        "text": "Une gerbe de lavande séchée dans mon placard, et mes pulls sentent bon tout l'hiver."
+      },
+      {
+        "id": "fr-clean-183",
+        "field": "caption",
+        "text": "Look gala : robe longue fendue en satin bleu nuit, épaules dénudées, cheveux relevés."
+      },
+      {
+        "id": "fr-clean-184",
+        "field": "caption",
+        "text": "Une veste en velours vert sapin pour les fêtes, avec un jean et des bottines."
+      },
+      {
+        "id": "fr-clean-185",
+        "field": "caption",
+        "text": "Petite bruine et 12 degrés, trench et pull léger."
+      },
+      {
+        "id": "fr-clean-186",
+        "field": "caption",
+        "text": "Plus personne ne range ses lunettes de soleil, quel automne lumineux !"
+      },
+      {
+        "id": "fr-clean-187",
+        "field": "caption",
+        "text": "Je cherche un pantalon de pluie élégant, ça existe ?"
+      },
+      {
+        "id": "fr-clean-188",
+        "field": "caption",
+        "text": "J'ai trouvé un pantalon imperméable coupe droite noire, on ne voit pas la différence."
+      },
+      {
+        "id": "fr-clean-189",
+        "field": "caption",
+        "text": "La chemise hawaïenne est revenue dans ma garde-robe. Avec un pantalon beige, ça reste sobre."
+      },
+      {
+        "id": "fr-clean-190",
+        "field": "caption",
+        "text": "Robe sexy pour le réveillon ? Je pense à une robe à paillettes argentées, longueur genou."
+      },
+      {
+        "id": "fr-clean-191",
+        "field": "caption",
+        "text": "J'aime les tissus naturels : laine, lin, coton, soie. Ils respirent et vieillissent bien."
+      },
+      {
+        "id": "fr-clean-192",
+        "field": "caption",
+        "text": "Une veste de costume trop grande trouvée chez mon père, je la porte ceinturée."
+      },
+      {
+        "id": "fr-clean-193",
+        "field": "caption",
+        "text": "Pour une journée en ville sous 30 degrés, la jupe midi en coton est imbattable."
+      },
+      {
+        "id": "fr-clean-194",
+        "field": "caption",
+        "text": "Grosse journée de tempête de neige, je reste au chaud avec mon pyjama en flanelle. Tenue validée."
+      },
+      {
+        "id": "fr-clean-195",
+        "field": "caption",
+        "text": "Le blanc en hiver, j'adore : manteau blanc, pull crème, jean écru."
+      },
+      {
+        "id": "fr-clean-196",
+        "field": "caption",
+        "text": "Les tons terre te vont tellement bien, ça fait ressortir tes yeux !"
+      },
+      {
+        "id": "fr-clean-197",
+        "field": "caption",
+        "text": "Robe en tulle rose pâle pour l'anniversaire de ma fille, elle voulait qu'on soit assorties."
+      },
+      {
+        "id": "fr-clean-198",
+        "field": "caption",
+        "text": "Tenue de voyage en avion : pantalon ample, pull en cachemire, baskets et grande écharpe qui sert de couverture."
+      },
+      {
+        "id": "fr-clean-199",
+        "field": "caption",
+        "text": "Il pleut à boire debout. Bottes de pluie, imperméable et bonne humeur quand même."
+      },
+      {
+        "id": "fr-clean-200",
+        "field": "caption",
+        "text": "Le marron chocolat, la couleur de l'automne cette année."
+      },
+      {
+        "id": "fr-clean-201",
+        "field": "caption",
+        "text": "Une petite robe à bretelles avec un t-shirt blanc dessous, ça rallonge la saison."
+      },
+      {
+        "id": "fr-clean-202",
+        "field": "caption",
+        "text": "La salopette en lin, c'est mon uniforme d'été, je l'ai en trois couleurs."
+      },
+      {
+        "id": "fr-clean-203",
+        "field": "caption",
+        "text": "Je ne comprends pas les gens qui portent des shorts à 5 degrés, mais respect !"
+      },
+      {
+        "id": "fr-clean-204",
+        "field": "caption",
+        "text": "J'ai teint ma vieille robe beige en vert olive, elle a une nouvelle vie."
+      },
+      {
+        "id": "fr-clean-205",
+        "field": "caption",
+        "text": "Look d'été au bureau climatisé : robe en coton et cardigan fin toujours dans le sac."
+      },
+      {
+        "id": "fr-clean-206",
+        "field": "caption",
+        "text": "Premier soleil de mars, j'ai sorti la veste en cuir et les lunettes rondes."
+      },
+      {
+        "id": "fr-clean-207",
+        "field": "caption",
+        "text": "Ensemble pyjama en soie porté en ville, avec des mocassins. On ose !"
+      },
+      {
+        "id": "fr-clean-208",
+        "field": "caption",
+        "text": "La robe tablier en velours côtelé et un pull fin en dessous. Très écolière, j'assume."
+      },
+      {
+        "id": "fr-clean-209",
+        "field": "caption",
+        "text": "Ma maman m'a appris à toujours avoir un parapluie dans le sac. Aujourd'hui elle avait raison."
+      },
+      {
+        "id": "fr-clean-210",
+        "field": "caption",
+        "text": "Tu peux partager où tu as trouvé ta robe bordeaux ? Le tombé est parfait."
+      },
+      {
+        "id": "fr-clean-211",
+        "field": "caption",
+        "text": "Pas de marque, une petite couturière de mon quartier ! Elle fait des merveilles."
+      },
+      {
+        "id": "fr-clean-212",
+        "field": "caption",
+        "text": "Je couds mes propres jupes depuis un an, voici la dernière en lainage gris chiné."
+      },
+      {
+        "id": "fr-clean-213",
+        "field": "caption",
+        "text": "Le duo pantalon blanc et chemise bleu ciel, c'est l'été en un regard."
+      },
+      {
+        "id": "fr-clean-214",
+        "field": "caption",
+        "text": "Bottes de cowboy et robe fleurie, look festival country du week-end."
+      },
+      {
+        "id": "fr-clean-215",
+        "field": "caption",
+        "text": "L'hiver québécois m'a appris une chose : le style commence par des pieds au sec."
+      },
+      {
+        "id": "fr-clean-216",
+        "field": "caption",
+        "text": "On annonce de l'orage, je garde le coupe-vent dans le sac même si le ciel est bleu."
+      },
+      {
+        "id": "fr-clean-217",
+        "field": "caption",
+        "text": "Robe asymétrique en jersey noir, une seule épaule, pour le vernissage ce soir."
+      },
+      {
+        "id": "fr-clean-218",
+        "field": "caption",
+        "text": "Pull oversize et minijupe en tweed, avec des collants opaques et des mocassins."
+      },
+      {
+        "id": "fr-clean-219",
+        "field": "caption",
+        "text": "Mon conseil pour les petites tailles : même couleur pour le pantalon et les chaussures."
+      },
+      {
+        "id": "fr-clean-220",
+        "field": "caption",
+        "text": "Une écharpe XXL fait office de châle le soir en terrasse. Polyvalence !"
+      },
+      {
+        "id": "fr-clean-221",
+        "field": "caption",
+        "text": "Les gants en cuir doublés cachemire, c'est un luxe que je ne regrette pas."
+      },
+      {
+        "id": "fr-clean-222",
+        "field": "caption",
+        "text": "On a eu les quatre saisons en une journée. J'ai changé de veste trois fois."
+      },
+      {
+        "id": "fr-clean-223",
+        "field": "caption",
+        "text": "Robe nude en dentelle pour la cérémonie, avec une étole bleu ciel pour la touche de couleur."
+      },
+      {
+        "id": "fr-clean-224",
+        "field": "caption",
+        "text": "Le jean flare revient. Avec des sabots, ça fait très années 70."
+      },
+      {
+        "id": "fr-clean-225",
+        "field": "caption",
+        "text": "Doudoune courte et pantalon large, le contraste de volume me plaît beaucoup."
+      },
+      {
+        "id": "fr-clean-226",
+        "field": "caption",
+        "text": "Une chemise en flanelle à carreaux rouges, c'est l'automne au chalet."
+      },
+      {
+        "id": "fr-clean-227",
+        "field": "caption",
+        "text": "Ta coiffure va tellement bien avec ce col roulé, superbe photo."
+      },
+      {
+        "id": "fr-clean-228",
+        "field": "caption",
+        "text": "Il fait 4 degrés et grand soleil, manteau ouvert et grosse écharpe."
+      },
+      {
+        "id": "fr-clean-229",
+        "field": "caption",
+        "text": "Les shorts en lin longueur genou, la pièce que j'ai le plus portée cet été."
+      },
+      {
+        "id": "fr-clean-230",
+        "field": "caption",
+        "text": "Tenue de jardinage : salopette usée, chapeau de paille et bottes en caoutchouc. Mes tomates m'attendent."
+      },
+      {
+        "id": "fr-clean-231",
+        "field": "caption",
+        "text": "J'essaie d'acheter moins mais mieux. Ce manteau en laine va m'accompagner longtemps."
+      },
+      {
+        "id": "fr-clean-232",
+        "field": "caption",
+        "text": "Petite veste en tweed et jean brut, chic décontracté pour un déjeuner entre amies."
+      },
+      {
+        "id": "fr-clean-233",
+        "field": "caption",
+        "text": "Robe longue en maille et bottes en daim, ça me rappelle les automnes de mon enfance."
+      },
+      {
+        "id": "fr-clean-234",
+        "field": "caption",
+        "text": "Après une semaine de pluie, le soleil ! J'ai sorti la jupe jaune."
+      },
+      {
+        "id": "fr-clean-235",
+        "field": "caption",
+        "text": "Mes collants rouges font sourire les gens dans le métro, mission accomplie."
+      },
+      {
+        "id": "fr-clean-236",
+        "field": "caption",
+        "text": "Je porte du noir de la tête aux pieds, mais avec des textures : laine, cuir, soie."
+      },
+      {
+        "id": "fr-clean-237",
+        "field": "caption",
+        "text": "Une robe chasuble à porter avec ou sans chemisier, idéale pour les températures changeantes."
+      },
+      {
+        "id": "fr-clean-238",
+        "field": "caption",
+        "text": "Ce pantalon moulant en maille épaisse est chaud comme un legging mais plus habillé."
+      },
+      {
+        "id": "fr-clean-239",
+        "field": "caption",
+        "text": "Jour de déménagement, tenue spéciale : salopette, t-shirt et baskets confortables."
+      },
+      {
+        "id": "fr-clean-240",
+        "field": "caption",
+        "text": "La pochette brodée de ma grand-mère sort pour les grandes occasions. Aujourd'hui, le mariage de mon frère."
+      },
+      {
+        "id": "fr-clean-241",
+        "field": "caption",
+        "text": "Robe midi bleu marine à pois blancs et sandales rouges. Look rétro du dimanche."
+      },
+      {
+        "id": "fr-clean-242",
+        "field": "caption",
+        "text": "Ce matin, givre sur les voitures. Gants, bonnet et manteau boutonné jusqu'en haut."
+      },
+      {
+        "id": "fr-clean-243",
+        "field": "caption",
+        "text": "Le kaki et le rose poudré ensemble, tu as raison, c'est une super association !"
+      },
+      {
+        "id": "fr-clean-244",
+        "field": "caption",
+        "text": "Vive les poches dans les robes ! Toutes les robes devraient en avoir."
+      },
+      {
+        "id": "fr-clean-245",
+        "field": "caption",
+        "text": "Doudoune sans manches sur un sweat à capuche, idéal pour une balade en forêt."
+      },
+      {
+        "id": "fr-clean-246",
+        "field": "caption",
+        "text": "Tenue de fête foraine : jean, t-shirt rayé et veste légère. Simple et pratique."
+      },
+      {
+        "id": "fr-clean-247",
+        "field": "caption",
+        "text": "Robe en satin couleur champagne pour le gala. Un peu de brillant, pas trop."
+      },
+      {
+        "id": "fr-clean-248",
+        "field": "caption",
+        "text": "Je cherche des bottes imperméables qui ne ressemblent pas à des bottes de pêche. Des suggestions ?"
+      },
+      {
+        "id": "fr-clean-249",
+        "field": "caption",
+        "text": "Le soleil tape fort, j'ai mis une chemise à manches longues en lin pour me protéger."
+      },
+      {
+        "id": "fr-clean-250",
+        "field": "caption",
+        "text": "Cardigan long gris et pantalon fluide, look cocooning pour un dimanche pluvieux."
+      },
+      {
+        "id": "fr-clean-251",
+        "field": "caption",
+        "text": "La saison des pommes, des citrouilles et des pulls en grosse maille. Mon moment préféré."
+      },
+      {
+        "id": "fr-clean-252",
+        "field": "caption",
+        "text": "Robe pull rouge et bottes noires pour la fête de bureau. Chaud et festif."
+      },
+      {
+        "id": "fr-clean-253",
+        "field": "caption",
+        "text": "Le string ficelle, je le garde pour la piscine. À la plage familiale, je préfère un bikini plus couvrant."
+      },
+      {
+        "id": "fr-clean-254",
+        "field": "caption",
+        "text": "Mes bottes de randonnée ont fait 500 km, toujours étanches. Elles méritent un bisou !"
+      },
+      {
+        "id": "fr-clean-255",
+        "field": "caption",
+        "text": "Robe d'été et veste en lin, parfait pour une soirée en bord de mer."
+      },
+      {
+        "id": "fr-clean-256",
+        "field": "caption",
+        "text": "Il fait beau mais frais : trench ouvert, pull fin et foulard."
+      },
+      {
+        "id": "fr-clean-257",
+        "field": "caption",
+        "text": "J'ai retrouvé mon vieux blouson en jean au grenier, il est parfait."
+      },
+      {
+        "id": "fr-clean-258",
+        "field": "caption",
+        "text": "Je ne mets plus de talons au travail, ballerines et mocassins pour toujours."
+      },
+      {
+        "id": "fr-clean-259",
+        "field": "caption",
+        "text": "La jupe en satin plissée métallisée, je la porte avec un gros pull pour la rendre plus quotidienne."
+      },
+      {
+        "id": "fr-clean-260",
+        "field": "caption",
+        "text": "Look au chalet : pantalon de ski, sous-pull en laine mérinos, et après-ski fourrés."
+      },
+      {
+        "id": "fr-clean-261",
+        "field": "caption",
+        "text": "Vos conseils pour un dress code « tenue de ville » pour un mariage en juin ?"
+      },
+      {
+        "id": "fr-clean-262",
+        "field": "caption",
+        "text": "Tailleur léger ou robe midi, chaussures fermées ou sandales élégantes. Évite le blanc !"
+      },
+      {
+        "id": "fr-clean-263",
+        "field": "caption",
+        "text": "Petit gilet court en mohair et jupe longue fluide, ambiance romantique."
+      },
+      {
+        "id": "fr-clean-264",
+        "field": "caption",
+        "text": "Ensemble en lin vert d'eau, il est frais et passe partout."
+      },
+      {
+        "id": "fr-clean-265",
+        "field": "caption",
+        "text": "Le bonnet de laine de mon grand-père, je le porte avec fierté chaque hiver."
+      },
+      {
+        "id": "fr-clean-266",
+        "field": "caption",
+        "text": "Aujourd'hui c'est jean, pull marine et baskets. Parfois le plus simple est le meilleur."
+      },
+      {
+        "id": "fr-clean-267",
+        "field": "caption",
+        "text": "Robe moulante en maille, manteau long et bottes plates. Silhouette allongée."
+      },
+      {
+        "id": "fr-clean-268",
+        "field": "caption",
+        "text": "Pour la rentrée, j'ai investi dans un bon sac en cuir et deux pantalons de qualité."
+      },
+      {
+        "id": "fr-clean-269",
+        "field": "caption",
+        "text": "Ma petite fille veut le même manteau jaune que moi, on sera assorties pour aller à l'école."
+      },
+      {
+        "id": "fr-clean-270",
+        "field": "caption",
+        "text": "La bise souffle à Genève, écharpe en laine bien serrée et gants en cuir."
+      },
+      {
+        "id": "fr-clean-271",
+        "field": "caption",
+        "text": "Petite brise du soir, je jette un pull sur mes épaules. Très chic campagne."
+      },
+      {
+        "id": "fr-clean-272",
+        "field": "caption",
+        "text": "J'ai essayé le pantalon en cuir pour la première fois, je suis conquise."
+      },
+      {
+        "id": "fr-clean-273",
+        "field": "caption",
+        "text": "Short en jean, débardeur blanc et chapeau de soleil. On part à la plage !"
+      },
+      {
+        "id": "fr-clean-274",
+        "field": "caption",
+        "text": "Chemise rose pâle et costume gris clair pour mon mari, il était très élégant au mariage."
+      },
+      {
+        "id": "fr-clean-275",
+        "field": "caption",
+        "text": "Tu as l'art de rendre une tenue simple vraiment spéciale. Bravo !"
+      },
+      {
+        "id": "fr-clean-276",
+        "field": "caption",
+        "text": "Une robe portefeuille à motifs géométriques, idéale pour les morphologies en sablier."
+      },
+      {
+        "id": "fr-clean-277",
+        "field": "caption",
+        "text": "Les chaussettes en laine dépassant des bottes, c'est mignon et ça tient chaud."
+      },
+      {
+        "id": "fr-clean-278",
+        "field": "caption",
+        "text": "Matin frais, après-midi doux, soirée fraîche. Le gilet est mon meilleur ami."
+      },
+      {
+        "id": "fr-clean-279",
+        "field": "caption",
+        "text": "Robe de soirée longue avec dos nu plongeant, et une petite veste pour la cérémonie."
+      },
+      {
+        "id": "fr-clean-280",
+        "field": "caption",
+        "text": "Mes bottes en caoutchouc doublées ont sauvé ma journée, il y avait de la gadoue partout."
+      },
+      {
+        "id": "fr-clean-281",
+        "field": "caption",
+        "text": "Le col claudine, c'est tellement mignon sur une robe noire."
+      },
+      {
+        "id": "fr-clean-282",
+        "field": "caption",
+        "text": "Défilé de fin d'année à l'école de couture, voici mon modèle en lin bordeaux !"
+      },
+      {
+        "id": "fr-clean-283",
+        "field": "caption",
+        "text": "Il fait 19 degrés et ensoleillé, la journée idéale pour une robe chemise."
+      },
+      {
+        "id": "fr-clean-284",
+        "field": "caption",
+        "text": "On sort le maillot de bain : bikini à volants imprimé citrons, très gai."
+      },
+      {
+        "id": "fr-clean-285",
+        "field": "caption",
+        "text": "Les tenues de ski rétro, j'adore. Combinaison une pièce colorée et lunettes de soleil."
+      },
+      {
+        "id": "fr-clean-286",
+        "field": "caption",
+        "text": "Pour un rendez-vous galant : jupe midi en satin, pull fin et bottines. Ni trop, ni trop peu."
+      },
+      {
+        "id": "fr-clean-287",
+        "field": "caption",
+        "text": "Le jean blanc en automne avec un pull camel, c'est parfait."
+      },
+      {
+        "id": "fr-clean-288",
+        "field": "caption",
+        "text": "Bel ensemble, la longueur de la jupe est idéale avec tes bottes !"
+      },
+      {
+        "id": "fr-clean-289",
+        "field": "caption",
+        "text": "Dimanche de pluie, tenue d'intérieur : pantalon large en maille et gros chaussons."
+      },
+      {
+        "id": "fr-clean-290",
+        "field": "caption",
+        "text": "Le rouge à lèvres assorti au manteau, ça fait toujours son petit effet."
+      },
+      {
+        "id": "fr-clean-291",
+        "field": "caption",
+        "text": "Ma robe préférée est celle qui a des poches et qu'on peut laver en machine."
+      },
+      {
+        "id": "fr-clean-292",
+        "field": "caption",
+        "text": "L'astuce du jour : retrousser les manches d'une chemise trop longue, et le tour est joué."
+      },
+      {
+        "id": "fr-clean-293",
+        "field": "caption",
+        "text": "Pour une journée de neige, je recommande le manteau mi-long avec capuche amovible."
+      },
+      {
+        "id": "fr-clean-294",
+        "field": "caption",
+        "text": "Les journées de chaleur, je porte des robes amples en coton léger. Rien qui colle !"
+      },
+      {
+        "id": "fr-clean-295",
+        "field": "caption",
+        "text": "Ensemble en velours rose pour le brunch d'anniversaire de ma meilleure amie."
+      },
+      {
+        "id": "fr-clean-296",
+        "field": "caption",
+        "text": "Une veste en tweed, un jean droit et des escarpins à bride. Chic de la rentrée."
+      },
+      {
+        "id": "fr-clean-297",
+        "field": "caption",
+        "text": "Chaleur écrasante à Marseille, robe en lin blanche et espadrilles."
+      },
+      {
+        "id": "fr-clean-298",
+        "field": "caption",
+        "text": "Le bob est revenu, je l'ai en version imperméable pour les averses d'été."
+      },
+      {
+        "id": "fr-clean-299",
+        "field": "caption",
+        "text": "Robe longue en coton indien et sandales plates, mes vacances en tenue."
+      },
+      {
+        "id": "fr-clean-300",
+        "field": "caption",
+        "text": "La veste matelassée vert bouteille, j'en suis tombée amoureuse cet automne."
+      },
+      {
+        "id": "fr-clean-301",
+        "field": "caption",
+        "text": "Le petit plus du jour : un nœud en velours dans les cheveux."
+      },
+      {
+        "id": "fr-clean-302",
+        "field": "caption",
+        "text": "Mes cuissardes en daim noir avec une robe pull grise, pour une journée de froid sec."
+      },
+      {
+        "id": "fr-clean-303",
+        "field": "caption",
+        "text": "Petit pull en cachemire couleur pistache, il égaie toutes mes tenues grises."
+      },
+      {
+        "id": "fr-clean-304",
+        "field": "caption",
+        "text": "Pantalon noir, chemise blanche, mocassins. L'uniforme qui ne trahit jamais."
+      },
+      {
+        "id": "fr-clean-305",
+        "field": "caption",
+        "text": "J'ai fait un tour au musée en robe midi et baskets, pratique pour marcher des heures."
+      },
+      {
+        "id": "fr-clean-306",
+        "field": "caption",
+        "text": "Tenue de week-end en bord de lac : chemise en lin, short et sandales. Le paradis."
+      },
+      {
+        "id": "fr-clean-307",
+        "field": "caption",
+        "text": "On annonce 35 cm de neige demain, préparez vos bottes et vos tuques !"
+      },
+      {
+        "id": "fr-clean-308",
+        "field": "caption",
+        "text": "Retour d'expérience après un hiver complet à Montréal : le manteau en duvet long jusqu'aux genoux, des bottes cotées -30 et une tuque doublée en polaire. J'ai eu froid seulement deux fois, les jours de grand vent sur le pont. Je recommande à toutes les nouvelles arrivantes !"
+      },
+      {
+        "id": "fr-clean-309",
+        "field": "caption",
+        "text": "Pour celles qui demandaient comment je porte ma robe nude au bureau : je mets un blazer chocolat par-dessus, des collants couleur chair fins et des mocassins marron. Ça reste sobre, professionnel, et la couleur ne fait pas fade grâce au contraste avec le marron."
+      },
+      {
+        "id": "fr-clean-310",
+        "field": "caption",
+        "text": "Journée de marché sous un soleil de plomb à Avignon. J'ai choisi une robe en lin blanc très ample, un grand chapeau, des sandales plates et un panier. Astuce : un brumisateur dans le sac et une petite écharpe en coton pour protéger les épaules en fin de matinée."
+      },
+      {
+        "id": "fr-clean-311",
+        "field": "caption",
+        "text": "Petit bilan de ma garde-robe capsule d'automne : 3 pantalons, 2 jupes, 6 hauts, 2 pulls, 1 trench et 1 manteau. Tout se marie en beige, marine et bordeaux. Je n'ai jamais eu autant de tenues différentes avec si peu de pièces, et le matin je gagne un temps fou."
+      },
+      {
+        "id": "fr-clean-312",
+        "field": "caption",
+        "text": "J'ai longtemps cru que la salopette n'était pas pour moi parce que je suis grande. Finalement il suffit de choisir des bretelles réglables et une jambe large qui tombe bien sur la chaussure. Aujourd'hui je la porte avec un col roulé noir et je me sens super bien."
+      },
+      {
+        "id": "fr-clean-313",
+        "field": "caption",
+        "text": "Question sérieuse pour les gens du Saguenay : vous portez quoi pour aller travailler à pied quand il fait -35 ? J'ai une bonne parka mais j'ai toujours froid aux cuisses. Je pense à un pantalon doublé ou à un legging en laine sous le jean. Merci d'avance !"
+      },
+      {
+        "id": "fr-clean-314",
+        "field": "caption",
+        "text": "Mon look pour la folle journée d'aujourd'hui : déposer les enfants, réunion client, rendez-vous chez le dentiste et souper chez des amis. Jean noir, chemise en soie ivoire, blazer marine et bottines à petit talon. Une seule tenue pour tout, et personne n'a rien remarqué 😉"
+      },
+      {
+        "id": "fr-clean-315",
+        "field": "caption",
+        "text": "Pour le mariage champêtre de samedi, il fera environ 24 degrés avec un risque d'averse. J'ai prévu une robe midi fleurie à manches flottantes, des sandales à talon carré pour ne pas m'enfoncer dans l'herbe et un petit trench crème au cas où. Vous ajouteriez un chapeau ?"
+      },
+      {
+        "id": "fr-clean-316",
+        "field": "altText",
+        "text": "Femme debout sur un trottoir mouillé, portant un trench beige, un jean droit et des baskets blanches."
+      },
+      {
+        "id": "fr-clean-317",
+        "field": "altText",
+        "text": "Salopette en jean délavé portée sur un t-shirt rayé blanc et bleu, avec des sandales plates."
+      },
+      {
+        "id": "fr-clean-318",
+        "field": "altText",
+        "text": "Robe nude à bretelles fines, longueur midi, accompagnée de sandales dorées et d'une pochette."
+      },
+      {
+        "id": "fr-clean-319",
+        "field": "altText",
+        "text": "Personne en manteau long gris, tuque rouge et mitaines, debout dans une rue enneigée."
+      },
+      {
+        "id": "fr-clean-320",
+        "field": "altText",
+        "text": "Tenue de bureau : pantalon à pinces anthracite, chemise blanche et mocassins bordeaux."
+      },
+      {
+        "id": "fr-clean-321",
+        "field": "altText",
+        "text": "Jupe-culotte noire en crêpe portée avec un pull fin crème et des bottines."
+      },
+      {
+        "id": "fr-clean-322",
+        "field": "altText",
+        "text": "Chemise en lin écrue ample et short taille haute beige, sur fond de mur ensoleillé."
+      },
+      {
+        "id": "fr-clean-323",
+        "field": "altText",
+        "text": "Robe longue à fleurs bleues et veste en jean courte, photo prise dans un parc."
+      },
+      {
+        "id": "fr-clean-324",
+        "field": "altText",
+        "text": "Parka noire, foulard tricoté vert et bottes doublées sur une rue couverte de neige."
+      },
+      {
+        "id": "fr-clean-325",
+        "field": "altText",
+        "text": "Pull col roulé crème et jupe plissée camel, avec des bottes marron à talon bas."
+      },
+      {
+        "id": "fr-clean-326",
+        "field": "altText",
+        "text": "Robe moulante noire et blazer gris oversize, tenue photographiée devant un miroir."
+      },
+      {
+        "id": "fr-clean-327",
+        "field": "altText",
+        "text": "Robe d'été dos nu à imprimé floral, vue de dos sur une terrasse au coucher du soleil."
+      },
+      {
+        "id": "fr-clean-328",
+        "field": "altText",
+        "text": "Maillot de bain une pièce rayé bleu et blanc, chapeau de paille et chemise en lin ouverte."
+      },
+      {
+        "id": "fr-clean-329",
+        "field": "altText",
+        "text": "Haut à décolleté carré noir avec une fine chaîne dorée et un jean taille haute."
+      },
+      {
+        "id": "fr-clean-330",
+        "field": "altText",
+        "text": "Ensemble tout en bordeaux : pull en maille, pantalon droit et bottines en cuir."
+      },
+      {
+        "id": "fr-clean-331",
+        "field": "altText",
+        "text": "Robe chemise bleue et baskets blanches, avec une paire d'escarpins visibles dans un sac."
+      },
+      {
+        "id": "fr-clean-332",
+        "field": "altText",
+        "text": "Robe midi bleu ciel, sandales nude et pochette en raphia sur fond de jardin."
+      },
+      {
+        "id": "fr-clean-333",
+        "field": "altText",
+        "text": "Chemise à carreaux rouges, jean brut et bottes de travail devant une cabane en bois."
+      },
+      {
+        "id": "fr-clean-334",
+        "field": "altText",
+        "text": "Robe en satin noir à manches longues, longueur genou, avec escarpins noirs."
+      },
+      {
+        "id": "fr-clean-335",
+        "field": "altText",
+        "text": "Salopette en velours côtelé brun portée avec un col roulé blanc."
+      },
+      {
+        "id": "fr-clean-336",
+        "field": "altText",
+        "text": "Mocassins en cuir marron portés sans chaussettes avec un pantalon chino beige."
+      },
+      {
+        "id": "fr-clean-337",
+        "field": "altText",
+        "text": "Legging thermique, veste polaire grise et coupe-vent bleu sur un sentier forestier boueux."
+      },
+      {
+        "id": "fr-clean-338",
+        "field": "altText",
+        "text": "Manteau camel éclairé par la lumière dorée du soir, personne de profil dans la rue."
+      },
+      {
+        "id": "fr-clean-339",
+        "field": "altText",
+        "text": "Robe en coton blanc légère et sandales plates en cuir, sous un ciel bleu."
+      },
+      {
+        "id": "fr-clean-340",
+        "field": "altText",
+        "text": "Pantalons larges en lin dans trois couleurs, beige, blanc et vert olive, posés sur un lit."
+      },
+      {
+        "id": "fr-clean-341",
+        "field": "altText",
+        "text": "Pantalon en cuir synthétique noir, débardeur noir et veste courte cloutée."
+      },
+      {
+        "id": "fr-clean-342",
+        "field": "altText",
+        "text": "Robe pêche midi et bouquet de fleurs blanches tenu à la main lors d'un mariage."
+      },
+      {
+        "id": "fr-clean-343",
+        "field": "altText",
+        "text": "Pantalon de ski noir, bottes de neige et parka rouge devant un immeuble de bureaux."
+      },
+      {
+        "id": "fr-clean-344",
+        "field": "altText",
+        "text": "Ensemble en maille côtelée gris chiné, pull et pantalon assortis, sur un canapé."
+      },
+      {
+        "id": "fr-clean-345",
+        "field": "altText",
+        "text": "Imperméable léger beige et parapluie transparent dans une rue pavée sous la pluie."
+      },
+      {
+        "id": "fr-clean-346",
+        "field": "altText",
+        "text": "Robe longue bleu nuit à manches courtes, photographiée dans une salle de réception."
+      },
+      {
+        "id": "fr-clean-347",
+        "field": "altText",
+        "text": "Sweat oversize gris, legging noir et chaussettes en laine épaisses sur un parquet."
+      },
+      {
+        "id": "fr-clean-348",
+        "field": "altText",
+        "text": "Chemisier blanc à pois marine porté avec un jean clair et des ballerines."
+      },
+      {
+        "id": "fr-clean-349",
+        "field": "altText",
+        "text": "Manteau croisé bleu marine, bonnet côtelé gris et gants en cuir noir."
+      },
+      {
+        "id": "fr-clean-350",
+        "field": "altText",
+        "text": "Robe vichy rouge et blanche, panier en osier et espadrilles dans un marché."
+      },
+      {
+        "id": "fr-clean-351",
+        "field": "altText",
+        "text": "Robe moulante en maille côtelée beige, portée avec des bottines marron."
+      },
+      {
+        "id": "fr-clean-352",
+        "field": "altText",
+        "text": "Bottes à crampons et manteau long noir sur un trottoir recouvert de glace."
+      },
+      {
+        "id": "fr-clean-353",
+        "field": "altText",
+        "text": "Double denim : chemise en jean clair et jean foncé, avec une ceinture en cuir."
+      },
+      {
+        "id": "fr-clean-354",
+        "field": "altText",
+        "text": "Pull jaune moutarde et pantalon gris, photo prise sous un ciel nuageux."
+      },
+      {
+        "id": "fr-clean-355",
+        "field": "altText",
+        "text": "Short en lin blanc, débardeur côtelé noir et sandales en cuir naturel."
+      },
+      {
+        "id": "fr-clean-356",
+        "field": "altText",
+        "text": "Robe longue dos nu bleue et châle en cachemire gris posé sur les épaules."
+      },
+      {
+        "id": "fr-clean-357",
+        "field": "altText",
+        "text": "Salopette courte en jean et t-shirt marinière, assise sur une couverture de pique-nique."
+      },
+      {
+        "id": "fr-clean-358",
+        "field": "altText",
+        "text": "Tenue toute en blanc cassé avec un sac noir structuré à la main."
+      },
+      {
+        "id": "fr-clean-359",
+        "field": "altText",
+        "text": "Manteau en tweed vintage à chevrons gris et brun, boutonné, avec une écharpe noire."
+      },
+      {
+        "id": "fr-clean-360",
+        "field": "altText",
+        "text": "Tailleur pantalon en lin beige et chemisier blanc, avec des escarpins nude."
+      },
+      {
+        "id": "fr-clean-361",
+        "field": "altText",
+        "text": "Blazer en laine gris sur un col roulé fin noir, avec un pantalon droit."
+      },
+      {
+        "id": "fr-clean-362",
+        "field": "altText",
+        "text": "Pantalon cargo kaki, chemise blanche oversize et baskets montantes."
+      },
+      {
+        "id": "fr-clean-363",
+        "field": "altText",
+        "text": "Robe rouge à volants, longueur genou, avec des sandales à talons noirs."
+      },
+      {
+        "id": "fr-clean-364",
+        "field": "altText",
+        "text": "Paréo à motifs noué à la taille sur un maillot de bain noir, sur une plage de sable."
+      },
+      {
+        "id": "fr-clean-365",
+        "field": "altText",
+        "text": "Collants épais noirs, jupe en laine grise et bottes hautes en cuir."
+      },
+      {
+        "id": "fr-clean-366",
+        "field": "altText",
+        "text": "Manteau rose poudré long porté sur un pull gris et un jean."
+      },
+      {
+        "id": "fr-clean-367",
+        "field": "altText",
+        "text": "Pull irlandais en tricot écru et jean bleu, au bord d'un fleuve."
+      },
+      {
+        "id": "fr-clean-368",
+        "field": "altText",
+        "text": "Pull marin rayé, pantalon blanc et ballerines rouges sur un quai."
+      },
+      {
+        "id": "fr-clean-369",
+        "field": "altText",
+        "text": "Foulard en soie à motifs noué autour du cou et lunettes de soleil rondes."
+      },
+      {
+        "id": "fr-clean-370",
+        "field": "altText",
+        "text": "Robe rouge évasée à manches trois quarts portée avec des escarpins noirs."
+      },
+      {
+        "id": "fr-clean-371",
+        "field": "altText",
+        "text": "Chapeau de paille à larges bords et robe en voile de coton blanc."
+      },
+      {
+        "id": "fr-clean-372",
+        "field": "altText",
+        "text": "Bottines bordeaux en cuir avec un jean noir et un manteau gris."
+      },
+      {
+        "id": "fr-clean-373",
+        "field": "altText",
+        "text": "Combinaison pantalon en crêpe vert bouteille avec des mules noires."
+      },
+      {
+        "id": "fr-clean-374",
+        "field": "altText",
+        "text": "Pantalon stretch noir, coupe-vent jaune fluo et sac à dos imperméable, à côté d'un vélo."
+      },
+      {
+        "id": "fr-clean-375",
+        "field": "altText",
+        "text": "Doudoune longue noire, bottes fourrées et bonnet blanc dans un paysage enneigé."
+      },
+      {
+        "id": "fr-clean-376",
+        "field": "altText",
+        "text": "Robe en lin froissé vert sauge et sandales tressées marron."
+      },
+      {
+        "id": "fr-clean-377",
+        "field": "altText",
+        "text": "Pantalon palazzo en soie noire, top à fines bretelles et mules dorées."
+      },
+      {
+        "id": "fr-clean-378",
+        "field": "altText",
+        "text": "Jean bleu taille haute coupe droite, longueur cheville, porté avec des mocassins."
+      },
+      {
+        "id": "fr-clean-379",
+        "field": "altText",
+        "text": "Chemise bleu klein et pantalon blanc large, sur fond de mur blanchi à la chaux."
+      },
+      {
+        "id": "fr-clean-380",
+        "field": "altText",
+        "text": "Chemisier à lavallière vert et jupe midi plissée noire."
+      },
+      {
+        "id": "fr-clean-381",
+        "field": "altText",
+        "text": "Superposition : t-shirt blanc, chemise en flanelle, gilet sans manches matelassé et veste."
+      },
+      {
+        "id": "fr-clean-382",
+        "field": "altText",
+        "text": "Pull en mohair lavande et jean blanc, avec des bottines beiges."
+      },
+      {
+        "id": "fr-clean-383",
+        "field": "altText",
+        "text": "Pantalon en velours, gros pull en laine et pantoufles en laine bouillie près d'un poêle."
+      },
+      {
+        "id": "fr-clean-384",
+        "field": "altText",
+        "text": "Robe de cocktail en velours bordeaux, longueur genou, et escarpins noirs."
+      },
+      {
+        "id": "fr-clean-385",
+        "field": "altText",
+        "text": "Caban bleu marine et écharpe en cachemire grise au bord d'un lac brumeux."
+      },
+      {
+        "id": "fr-clean-386",
+        "field": "altText",
+        "text": "Robe midi blanche avec petit boléro court et sandales beiges."
+      },
+      {
+        "id": "fr-clean-387",
+        "field": "altText",
+        "text": "Combinaison en jean bleu et sabots en bois, sous un ciel ensoleillé."
+      },
+      {
+        "id": "fr-clean-388",
+        "field": "altText",
+        "text": "Robe vintage à motif cachemire rouge et ocre, cintrée à la taille."
+      },
+      {
+        "id": "fr-clean-389",
+        "field": "altText",
+        "text": "Haut à épaules dénudées blanc et jupe longue en voile vert pâle."
+      },
+      {
+        "id": "fr-clean-390",
+        "field": "altText",
+        "text": "Parka kaki doublée de fausse fourrure et bottes en cuir marron."
+      },
+      {
+        "id": "fr-clean-391",
+        "field": "altText",
+        "text": "Robe pull grise et bottes plates noires, sac en bandoulière."
+      },
+      {
+        "id": "fr-clean-392",
+        "field": "altText",
+        "text": "Tailleur blanc cassé, chemisier en soie et bouquet de pivoines roses."
+      },
+      {
+        "id": "fr-clean-393",
+        "field": "altText",
+        "text": "Jean mom, t-shirt blanc et chemise à carreaux nouée à la taille."
+      },
+      {
+        "id": "fr-clean-394",
+        "field": "altText",
+        "text": "Maillot de bain une pièce noir dos nu, au bord d'un lac."
+      },
+      {
+        "id": "fr-clean-395",
+        "field": "altText",
+        "text": "Pull jacquard rouge et blanc et jupe en laine, devant des chalets illuminés."
+      },
+      {
+        "id": "fr-clean-396",
+        "field": "altText",
+        "text": "Robe noire, collants noirs, bottes noires et manteau rouge vif."
+      },
+      {
+        "id": "fr-clean-397",
+        "field": "altText",
+        "text": "Salopette jaune moutarde portée avec un t-shirt blanc et des baskets."
+      },
+      {
+        "id": "fr-clean-398",
+        "field": "altText",
+        "text": "Kimono en soie fleuri sur un jean bleu et un débardeur blanc."
+      },
+      {
+        "id": "fr-clean-399",
+        "field": "altText",
+        "text": "Ciré jaune et marinière bleue et blanche sur une jetée venteuse."
+      },
+      {
+        "id": "fr-clean-400",
+        "field": "altText",
+        "text": "Robe chemise kaki ceinturée à la taille et baskets blanches."
+      },
+      {
+        "id": "fr-clean-401",
+        "field": "altText",
+        "text": "Pantalon droit noir, top en satin vert émeraude et mules à talons."
+      },
+      {
+        "id": "fr-clean-402",
+        "field": "altText",
+        "text": "Combinaison courte fleurie et bottes de pluie vertes dans un champ."
+      },
+      {
+        "id": "fr-clean-403",
+        "field": "altText",
+        "text": "Brassière, legging noir et coupe-vent léger gris, en course sous la bruine."
+      },
+      {
+        "id": "fr-clean-404",
+        "field": "altText",
+        "text": "Béret rouge brique, pull crème et manteau camel."
+      },
+      {
+        "id": "fr-clean-405",
+        "field": "altText",
+        "text": "Tailleur jupe en tweed rose et escarpins beiges."
+      },
+      {
+        "id": "fr-clean-406",
+        "field": "altText",
+        "text": "Robe portefeuille en jersey prune, escarpins nude et pochette dorée."
+      },
+      {
+        "id": "fr-clean-407",
+        "field": "altText",
+        "text": "Jupe culotte en lin bleu clair portée avec une chemise blanche rentrée."
+      },
+      {
+        "id": "fr-clean-408",
+        "field": "altText",
+        "text": "Robe longue en satin bleu nuit fendue, épaules dénudées, cheveux relevés."
+      },
+      {
+        "id": "fr-clean-409",
+        "field": "altText",
+        "text": "Veste en velours vert sapin, jean bleu foncé et bottines noires."
+      },
+      {
+        "id": "fr-clean-410",
+        "field": "altText",
+        "text": "Robe à paillettes argentées longueur genou et escarpins noirs."
+      },
+      {
+        "id": "fr-clean-411",
+        "field": "altText",
+        "text": "Manteau blanc, pull crème et jean écru sur un fond enneigé."
+      },
+      {
+        "id": "fr-clean-412",
+        "field": "altText",
+        "text": "Robe en tulle rose pâle portée par une adulte et une enfant, assorties."
+      },
+      {
+        "id": "fr-clean-413",
+        "field": "altText",
+        "text": "Pantalon ample, pull en cachemire gris, baskets et grande écharpe dans un aéroport."
+      },
+      {
+        "id": "fr-clean-414",
+        "field": "altText",
+        "text": "Robe à bretelles noire portée sur un t-shirt blanc, avec des baskets."
+      },
+      {
+        "id": "fr-clean-415",
+        "field": "altText",
+        "text": "Robe tablier en velours côtelé bleu marine sur un pull fin blanc."
+      },
+      {
+        "id": "fr-clean-416",
+        "field": "altText",
+        "text": "Bottes de cowboy marron et robe fleurie longueur genou."
+      },
+      {
+        "id": "fr-clean-417",
+        "field": "altText",
+        "text": "Photo en pied dans une rue enneigée : parka kaki longue à capuche bordée de fausse fourrure, pantalon doublé noir, bottes d'hiver lacées, tuque grise à pompon et mitaines rouges en laine."
+      },
+      {
+        "id": "fr-clean-418",
+        "field": "altText",
+        "text": "Tenue de mariage champêtre posée sur un lit : robe midi fleurie à manches flottantes, trench court crème, sandales à talon carré beiges et petite pochette en paille tressée."
+      },
+      {
+        "id": "fr-clean-419",
+        "field": "altText",
+        "text": "Femme assise à une terrasse ensoleillée en robe en lin blanc ample, grand chapeau de paille, sandales plates en cuir et panier en osier rempli de fruits posé à ses pieds."
+      },
+      {
+        "id": "fr-clean-420",
+        "field": "altText",
+        "text": "Salopette en jean à jambe large portée sur un col roulé noir, avec des bottines en cuir marron et un sac en bandoulière camel, photo prise devant une porte en bois peinte en vert."
+      }
+    ]
+  },
+  "disallowed": {
+    "description": "Disguised forms of terms from this language’s runtime list, ten per obfuscation family named in Story 6.2 AC 4, each inside an otherwise clean caption. Every entry is expected to be withheld (review or block). Generated by scripts/build-community-text-corpus.mjs.",
+    "expected": "withheld",
+    "families": [
+      "nfkc-fullwidth",
+      "case-mixing",
+      "diacritics-added",
+      "zero-width",
+      "cyrillic-confusable",
+      "leetspeak",
+      "repeated-characters",
+      "internal-punctuation",
+      "spaced-letters",
+      "leet-and-spaced"
+    ],
+    "entries": [
+      {
+        "id": "fr-nfkc-fullwidth-01",
+        "family": "nfkc-fullwidth",
+        "field": "caption",
+        "text": "Ma tenue du jour : ＡＢＲＵＴＩ"
+      },
+      {
+        "id": "fr-nfkc-fullwidth-02",
+        "family": "nfkc-fullwidth",
+        "field": "caption",
+        "text": "ＢＯＲＤＥＬ avec une veste en jean"
+      },
+      {
+        "id": "fr-nfkc-fullwidth-03",
+        "family": "nfkc-fullwidth",
+        "field": "altText",
+        "text": "Ma tenue du jour : ＢＲＡＮＬＥＵＲ"
+      },
+      {
+        "id": "fr-nfkc-fullwidth-04",
+        "family": "nfkc-fullwidth",
+        "field": "caption",
+        "text": "ＣＨＩＮＥＴＯＱＵＥ avec une veste en jean"
+      },
+      {
+        "id": "fr-nfkc-fullwidth-05",
+        "family": "nfkc-fullwidth",
+        "field": "caption",
+        "text": "Ma tenue du jour : ＣＯＮＮＥ"
+      },
+      {
+        "id": "fr-nfkc-fullwidth-06",
+        "family": "nfkc-fullwidth",
+        "field": "altText",
+        "text": "ＥＭＭＥＲＤＥＲ avec une veste en jean"
+      },
+      {
+        "id": "fr-nfkc-fullwidth-07",
+        "family": "nfkc-fullwidth",
+        "field": "caption",
+        "text": "Ma tenue du jour : ＦＯＵＴＲＥ"
+      },
+      {
+        "id": "fr-nfkc-fullwidth-08",
+        "family": "nfkc-fullwidth",
+        "field": "caption",
+        "text": "ＪＯＵＩＲ avec une veste en jean"
+      },
+      {
+        "id": "fr-nfkc-fullwidth-09",
+        "family": "nfkc-fullwidth",
+        "field": "altText",
+        "text": "Ma tenue du jour : ＮＩＱＵＥＲ"
+      },
+      {
+        "id": "fr-nfkc-fullwidth-10",
+        "family": "nfkc-fullwidth",
+        "field": "caption",
+        "text": "ＲＡＭＯＮＥＲ avec une veste en jean"
+      },
+      {
+        "id": "fr-case-mixing-01",
+        "family": "case-mixing",
+        "field": "caption",
+        "text": "Ma tenue du jour : BaIsEr"
+      },
+      {
+        "id": "fr-case-mixing-02",
+        "family": "case-mixing",
+        "field": "caption",
+        "text": "BoUgNoUlE avec une veste en jean"
+      },
+      {
+        "id": "fr-case-mixing-03",
+        "family": "case-mixing",
+        "field": "altText",
+        "text": "Ma tenue du jour : BrAnLeUsE"
+      },
+      {
+        "id": "fr-case-mixing-04",
+        "family": "case-mixing",
+        "field": "caption",
+        "text": "ChIoTtEs avec une veste en jean"
+      },
+      {
+        "id": "fr-case-mixing-05",
+        "family": "case-mixing",
+        "field": "caption",
+        "text": "Ma tenue du jour : CoNnErIe"
+      },
+      {
+        "id": "fr-case-mixing-06",
+        "family": "case-mixing",
+        "field": "altText",
+        "text": "EmMeRdEuR avec une veste en jean"
+      },
+      {
+        "id": "fr-case-mixing-07",
+        "family": "case-mixing",
+        "field": "caption",
+        "text": "Ma tenue du jour : FoUtU"
+      },
+      {
+        "id": "fr-case-mixing-08",
+        "family": "case-mixing",
+        "field": "caption",
+        "text": "MaLpT avec une veste en jean"
+      },
+      {
+        "id": "fr-case-mixing-09",
+        "family": "case-mixing",
+        "field": "altText",
+        "text": "Ma tenue du jour : OrDuRe"
+      },
+      {
+        "id": "fr-case-mixing-10",
+        "family": "case-mixing",
+        "field": "caption",
+        "text": "SaLaUd avec une veste en jean"
+      },
+      {
+        "id": "fr-diacritics-added-01",
+        "family": "diacritics-added",
+        "field": "caption",
+        "text": "Ma tenue du jour : bándér"
+      },
+      {
+        "id": "fr-diacritics-added-02",
+        "family": "diacritics-added",
+        "field": "caption",
+        "text": "bráckmárd avec une veste en jean"
+      },
+      {
+        "id": "fr-diacritics-added-03",
+        "family": "diacritics-added",
+        "field": "altText",
+        "text": "Ma tenue du jour : chátté"
+      },
+      {
+        "id": "fr-diacritics-added-04",
+        "family": "diacritics-added",
+        "field": "caption",
+        "text": "clítö avec une veste en jean"
+      },
+      {
+        "id": "fr-diacritics-added-05",
+        "family": "diacritics-added",
+        "field": "caption",
+        "text": "Ma tenue du jour : cöüilles"
+      },
+      {
+        "id": "fr-diacritics-added-06",
+        "family": "diacritics-added",
+        "field": "altText",
+        "text": "émmérdeuse avec une veste en jean"
+      },
+      {
+        "id": "fr-diacritics-added-07",
+        "family": "diacritics-added",
+        "field": "caption",
+        "text": "Ma tenue du jour : gérbér"
+      },
+      {
+        "id": "fr-diacritics-added-08",
+        "family": "diacritics-added",
+        "field": "caption",
+        "text": "mérdé avec une veste en jean"
+      },
+      {
+        "id": "fr-diacritics-added-09",
+        "family": "diacritics-added",
+        "field": "altText",
+        "text": "Ma tenue du jour : pálücher"
+      },
+      {
+        "id": "fr-diacritics-added-10",
+        "family": "diacritics-added",
+        "field": "caption",
+        "text": "sálöpard avec une veste en jean"
+      },
+      {
+        "id": "fr-zero-width-01",
+        "family": "zero-width",
+        "field": "caption",
+        "text": "Ma tenue du jour : b​i​c​o​t"
+      },
+      {
+        "id": "fr-zero-width-02",
+        "family": "zero-width",
+        "field": "caption",
+        "text": "b​r​a​n​l​a​g​e avec une veste en jean"
+      },
+      {
+        "id": "fr-zero-width-03",
+        "family": "zero-width",
+        "field": "altText",
+        "text": "Ma tenue du jour : c​h​i​a​n​t"
+      },
+      {
+        "id": "fr-zero-width-04",
+        "family": "zero-width",
+        "field": "caption",
+        "text": "c​l​i​t​o​r​i​s avec une veste en jean"
+      },
+      {
+        "id": "fr-zero-width-05",
+        "family": "zero-width",
+        "field": "caption",
+        "text": "Ma tenue du jour : c​o​u​i​l​l​o​n"
+      },
+      {
+        "id": "fr-zero-width-06",
+        "family": "zero-width",
+        "field": "altText",
+        "text": "e​n​c​u​l​e​r avec une veste en jean"
+      },
+      {
+        "id": "fr-zero-width-07",
+        "family": "zero-width",
+        "field": "caption",
+        "text": "Ma tenue du jour : g​o​u​i​n​e"
+      },
+      {
+        "id": "fr-zero-width-08",
+        "family": "zero-width",
+        "field": "caption",
+        "text": "m​e​r​d​e​u​s​e avec une veste en jean"
+      },
+      {
+        "id": "fr-zero-width-09",
+        "family": "zero-width",
+        "field": "altText",
+        "text": "Ma tenue du jour : p​i​s​s​e​r"
+      },
+      {
+        "id": "fr-zero-width-10",
+        "family": "zero-width",
+        "field": "caption",
+        "text": "s​a​l​o​p​e avec une veste en jean"
+      },
+      {
+        "id": "fr-cyrillic-confusable-01",
+        "family": "cyrillic-confusable",
+        "field": "caption",
+        "text": "Ma tenue du jour : bigоrnеtte"
+      },
+      {
+        "id": "fr-cyrillic-confusable-02",
+        "family": "cyrillic-confusable",
+        "field": "caption",
+        "text": "brаnlеr avec une veste en jean"
+      },
+      {
+        "id": "fr-cyrillic-confusable-03",
+        "family": "cyrillic-confusable",
+        "field": "altText",
+        "text": "Ma tenue du jour : сhiаsse"
+      },
+      {
+        "id": "fr-cyrillic-confusable-04",
+        "family": "cyrillic-confusable",
+        "field": "caption",
+        "text": "соnnard avec une veste en jean"
+      },
+      {
+        "id": "fr-cyrillic-confusable-05",
+        "family": "cyrillic-confusable",
+        "field": "caption",
+        "text": "Ma tenue du jour : сrаmouille"
+      },
+      {
+        "id": "fr-cyrillic-confusable-06",
+        "family": "cyrillic-confusable",
+        "field": "altText",
+        "text": "еnсuleur avec une veste en jean"
+      },
+      {
+        "id": "fr-cyrillic-confusable-07",
+        "family": "cyrillic-confusable",
+        "field": "caption",
+        "text": "Ma tenue du jour : grоgniаsse"
+      },
+      {
+        "id": "fr-cyrillic-confusable-08",
+        "family": "cyrillic-confusable",
+        "field": "caption",
+        "text": "mеrdеux avec une veste en jean"
+      },
+      {
+        "id": "fr-cyrillic-confusable-09",
+        "family": "cyrillic-confusable",
+        "field": "altText",
+        "text": "Ma tenue du jour : роuffiasse"
+      },
+      {
+        "id": "fr-cyrillic-confusable-10",
+        "family": "cyrillic-confusable",
+        "field": "caption",
+        "text": "tаnсhe avec une veste en jean"
+      },
+      {
+        "id": "fr-leetspeak-01",
+        "family": "leetspeak",
+        "field": "caption",
+        "text": "Ma tenue du jour : bl0bl05"
+      },
+      {
+        "id": "fr-leetspeak-02",
+        "family": "leetspeak",
+        "field": "caption",
+        "text": "br4nl3773 avec une veste en jean"
+      },
+      {
+        "id": "fr-leetspeak-03",
+        "family": "leetspeak",
+        "field": "altText",
+        "text": "Ma tenue du jour : ch13r"
+      },
+      {
+        "id": "fr-leetspeak-04",
+        "family": "leetspeak",
+        "field": "caption",
+        "text": "c0nn4553 avec une veste en jean"
+      },
+      {
+        "id": "fr-leetspeak-05",
+        "family": "leetspeak",
+        "field": "caption",
+        "text": "Ma tenue du jour : 3mm3rd4n7"
+      },
+      {
+        "id": "fr-leetspeak-06",
+        "family": "leetspeak",
+        "field": "altText",
+        "text": "3ncul3ur5 avec une veste en jean"
+      },
+      {
+        "id": "fr-leetspeak-07",
+        "family": "leetspeak",
+        "field": "caption",
+        "text": "Ma tenue du jour : gu3ul3"
+      },
+      {
+        "id": "fr-leetspeak-08",
+        "family": "leetspeak",
+        "field": "caption",
+        "text": "m3rd1qu3 avec une veste en jean"
+      },
+      {
+        "id": "fr-leetspeak-09",
+        "family": "leetspeak",
+        "field": "altText",
+        "text": "Ma tenue du jour : pu741n"
+      },
+      {
+        "id": "fr-leetspeak-10",
+        "family": "leetspeak",
+        "field": "caption",
+        "text": "74p3773 avec une veste en jean"
+      },
+      {
+        "id": "fr-repeated-characters-01",
+        "family": "repeated-characters",
+        "field": "caption",
+        "text": "Ma tenue du jour : boooordel"
+      },
+      {
+        "id": "fr-repeated-characters-02",
+        "family": "repeated-characters",
+        "field": "caption",
+        "text": "brrrranleur avec une veste en jean"
+      },
+      {
+        "id": "fr-repeated-characters-03",
+        "family": "repeated-characters",
+        "field": "altText",
+        "text": "Ma tenue du jour : chhhhinetoque"
+      },
+      {
+        "id": "fr-repeated-characters-04",
+        "family": "repeated-characters",
+        "field": "caption",
+        "text": "coooonne avec une veste en jean"
+      },
+      {
+        "id": "fr-repeated-characters-05",
+        "family": "repeated-characters",
+        "field": "caption",
+        "text": "Ma tenue du jour : emmmmmerder"
+      },
+      {
+        "id": "fr-repeated-characters-06",
+        "family": "repeated-characters",
+        "field": "altText",
+        "text": "fooooutre avec une veste en jean"
+      },
+      {
+        "id": "fr-repeated-characters-07",
+        "family": "repeated-characters",
+        "field": "caption",
+        "text": "Ma tenue du jour : joooouir"
+      },
+      {
+        "id": "fr-repeated-characters-08",
+        "family": "repeated-characters",
+        "field": "caption",
+        "text": "niiiiquer avec une veste en jean"
+      },
+      {
+        "id": "fr-repeated-characters-09",
+        "family": "repeated-characters",
+        "field": "altText",
+        "text": "Ma tenue du jour : raaaamoner"
+      },
+      {
+        "id": "fr-repeated-characters-10",
+        "family": "repeated-characters",
+        "field": "caption",
+        "text": "teeeeuch avec une veste en jean"
+      },
+      {
+        "id": "fr-internal-punctuation-01",
+        "family": "internal-punctuation",
+        "field": "caption",
+        "text": "Ma tenue du jour : b.o.u.g.n.o.u.l.e"
+      },
+      {
+        "id": "fr-internal-punctuation-02",
+        "family": "internal-punctuation",
+        "field": "caption",
+        "text": "b.r.a.n.l.e.u.s.e avec une veste en jean"
+      },
+      {
+        "id": "fr-internal-punctuation-03",
+        "family": "internal-punctuation",
+        "field": "altText",
+        "text": "Ma tenue du jour : c.h.i.o.t.t.e.s"
+      },
+      {
+        "id": "fr-internal-punctuation-04",
+        "family": "internal-punctuation",
+        "field": "caption",
+        "text": "c.o.n.n.e.r.i.e avec une veste en jean"
+      },
+      {
+        "id": "fr-internal-punctuation-05",
+        "family": "internal-punctuation",
+        "field": "caption",
+        "text": "Ma tenue du jour : e.m.m.e.r.d.e.u.r"
+      },
+      {
+        "id": "fr-internal-punctuation-06",
+        "family": "internal-punctuation",
+        "field": "altText",
+        "text": "f.o.u.t.u avec une veste en jean"
+      },
+      {
+        "id": "fr-internal-punctuation-07",
+        "family": "internal-punctuation",
+        "field": "caption",
+        "text": "Ma tenue du jour : m.a.l.p.t"
+      },
+      {
+        "id": "fr-internal-punctuation-08",
+        "family": "internal-punctuation",
+        "field": "caption",
+        "text": "o.r.d.u.r.e avec une veste en jean"
+      },
+      {
+        "id": "fr-internal-punctuation-09",
+        "family": "internal-punctuation",
+        "field": "altText",
+        "text": "Ma tenue du jour : s.a.l.a.u.d"
+      },
+      {
+        "id": "fr-internal-punctuation-10",
+        "family": "internal-punctuation",
+        "field": "caption",
+        "text": "t.r.i.n.g.l.e.r avec une veste en jean"
+      },
+      {
+        "id": "fr-spaced-letters-01",
+        "family": "spaced-letters",
+        "field": "caption",
+        "text": "Ma tenue du jour : b r a c k m a r d"
+      },
+      {
+        "id": "fr-spaced-letters-02",
+        "family": "spaced-letters",
+        "field": "caption",
+        "text": "c h a t t e avec une veste en jean"
+      },
+      {
+        "id": "fr-spaced-letters-03",
+        "family": "spaced-letters",
+        "field": "altText",
+        "text": "Ma tenue du jour : c l i t o"
+      },
+      {
+        "id": "fr-spaced-letters-04",
+        "family": "spaced-letters",
+        "field": "caption",
+        "text": "c o u i l l e s avec une veste en jean"
+      },
+      {
+        "id": "fr-spaced-letters-05",
+        "family": "spaced-letters",
+        "field": "caption",
+        "text": "Ma tenue du jour : e m m e r d e u s e"
+      },
+      {
+        "id": "fr-spaced-letters-06",
+        "family": "spaced-letters",
+        "field": "altText",
+        "text": "g e r b e r avec une veste en jean"
+      },
+      {
+        "id": "fr-spaced-letters-07",
+        "family": "spaced-letters",
+        "field": "caption",
+        "text": "Ma tenue du jour : m e r d e"
+      },
+      {
+        "id": "fr-spaced-letters-08",
+        "family": "spaced-letters",
+        "field": "caption",
+        "text": "p a l u c h e r avec une veste en jean"
+      },
+      {
+        "id": "fr-spaced-letters-09",
+        "family": "spaced-letters",
+        "field": "altText",
+        "text": "Ma tenue du jour : s a l o p a r d"
+      },
+      {
+        "id": "fr-spaced-letters-10",
+        "family": "spaced-letters",
+        "field": "caption",
+        "text": "t r i q u e avec une veste en jean"
+      },
+      {
+        "id": "fr-leet-and-spaced-01",
+        "family": "leet-and-spaced",
+        "field": "caption",
+        "text": "Ma tenue du jour : b r 4 n l 4 g e"
+      },
+      {
+        "id": "fr-leet-and-spaced-02",
+        "family": "leet-and-spaced",
+        "field": "caption",
+        "text": "c h 1 4 n t avec une veste en jean"
+      },
+      {
+        "id": "fr-leet-and-spaced-03",
+        "family": "leet-and-spaced",
+        "field": "altText",
+        "text": "Ma tenue du jour : c l 1 7 o r i s"
+      },
+      {
+        "id": "fr-leet-and-spaced-04",
+        "family": "leet-and-spaced",
+        "field": "caption",
+        "text": "c 0 u 1 l l o n avec une veste en jean"
+      },
+      {
+        "id": "fr-leet-and-spaced-05",
+        "family": "leet-and-spaced",
+        "field": "caption",
+        "text": "Ma tenue du jour : 3 n c u l 3 r"
+      },
+      {
+        "id": "fr-leet-and-spaced-06",
+        "family": "leet-and-spaced",
+        "field": "altText",
+        "text": "g 0 u 1 n e avec une veste en jean"
+      },
+      {
+        "id": "fr-leet-and-spaced-07",
+        "family": "leet-and-spaced",
+        "field": "caption",
+        "text": "Ma tenue du jour : m 3 r d 3 u s e"
+      },
+      {
+        "id": "fr-leet-and-spaced-08",
+        "family": "leet-and-spaced",
+        "field": "caption",
+        "text": "p 1 5 s e r avec une veste en jean"
+      },
+      {
+        "id": "fr-leet-and-spaced-09",
+        "family": "leet-and-spaced",
+        "field": "altText",
+        "text": "Ma tenue du jour : 5 4 l o p e"
+      },
+      {
+        "id": "fr-leet-and-spaced-10",
+        "family": "leet-and-spaced",
+        "field": "caption",
+        "text": "7 r 0 n c h e r avec une veste en jean"
+      }
+    ]
+  }
+}

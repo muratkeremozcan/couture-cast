@@ -96,6 +96,13 @@ describe('dedicated community worker bootstrap', () => {
     const resources = harness.shutdownWorkerResources.mock
       .calls[0]?.[0] as WorkerShutdownResources
     expect(resources.workers).toHaveLength(1)
+    // Below the production launcher's 25-second deadline, so the bootstrap's
+    // own force-disconnect runs before the launcher gives up on it.
+    const options = harness.shutdownWorkerResources.mock.calls[0]?.[1] as {
+      timeoutMs?: number
+    }
+    expect(options.timeoutMs).toBe(bootstrap.COMMUNITY_SHUTDOWN_TIMEOUT_MS)
+    expect(bootstrap.COMMUNITY_SHUTDOWN_TIMEOUT_MS).toBeLessThan(25_000)
   })
 
   it('exits nonzero when the screener refuses to start', async () => {

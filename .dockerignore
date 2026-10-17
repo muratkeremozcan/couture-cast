@@ -1,0 +1,56 @@
+# Build context for apps/api/Dockerfile.community-worker, which builds from the
+# repository root. Everything the image needs is a source file or a lockfile;
+# everything else is excluded so a secret or a local build product can never be
+# copied into a layer.
+
+# Secrets and local environment. The worker reads its configuration from the
+# host's environment variables; an env file baked into a layer would be both a
+# leak and a silent override of what the host injects.
+.env
+.env.*
+!.env.example
+**/.env
+**/.env.*
+
+# Installed dependencies and build products. The image installs from the
+# lockfile and builds from source inside its own build stage.
+**/node_modules
+**/dist
+**/.turbo
+**/.next
+**/.cache
+**/coverage
+**/*.tsbuildinfo
+
+# Version control, editor, and agent state.
+.git
+.github
+.husky/_
+.vscode
+.idea
+.claude
+.agents
+.codex
+.cursor
+.DS_Store
+
+# Test, evidence, and tooling output that the worker never runs.
+playwright-report
+playwright-logs
+playwright/artifacts
+test-results
+blob-report
+pacts
+pact/artifacts
+maestro/artifacts
+.lighthouseci
+.playwright-cli
+.auth
+k6/summary-*.json
+*.log
+
+# Planning and evidence documents. They are large, change often, and would
+# invalidate the dependency layer cache for no runtime benefit.
+_bmad
+_bmad-output
+docs

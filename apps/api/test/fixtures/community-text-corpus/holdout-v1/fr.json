@@ -1,0 +1,2113 @@
+{
+  "language": "fr",
+  "corpusVersion": "holdout-v1",
+  "description": "Frozen clean holdout: ordinary fashion captions and alt text written natively in the language after the allow list froze, independently of the clean half, and never used to tune the screener, the lists or the allow list. The release gate's clean-copy figure is computed here. Entries labelled expected review carry one of the policy's deliberate review terms.",
+  "expected": "pass",
+  "frozenAgainst": {
+    "allowListSha256": "22d1f261f3666cf37369e67359aeabc383ac0a689babe04f87023ba1aee70256",
+    "termsSha256": "7aa19d35380523111ee2d4c6d0bad7db8e088a3df647afa18a5324ade6ce628d",
+    "languageAllowListSha256": "12fcaedef188405a7d6f9383bf312a16412b06bbefb54ce37349b5c9c5e0db7c"
+  },
+  "entries": [
+    {
+      "id": "fr-holdout-001",
+      "field": "caption",
+      "text": "Pluie fine ce matin, j'ai pris le trench et les bottines imperméables pour aller au marché. Bonne décision."
+    },
+    {
+      "id": "fr-holdout-002",
+      "field": "caption",
+      "text": "Métro bondé, 24 degrés dehors, et moi en pull en laine. L'appli avait raison, j'aurais dû l'écouter."
+    },
+    {
+      "id": "fr-holdout-003",
+      "field": "caption",
+      "text": "-18 avec le facteur vent en attendant l'autobus. Tuque, mitaines, cache-cou. Je survis."
+    },
+    {
+      "id": "fr-holdout-004",
+      "field": "caption",
+      "text": "Petit tour à la boulangerie en sandales, le soleil est enfin revenu ☀️"
+    },
+    {
+      "id": "fr-holdout-005",
+      "field": "caption",
+      "text": "Vent de face sur le vélo ce matin, la doudoune sans manches était parfaite."
+    },
+    {
+      "id": "fr-holdout-006",
+      "field": "caption",
+      "text": "Course rapide au dépanneur en coton ouaté, il fait frette mais c'est juste deux coins de rue."
+    },
+    {
+      "id": "fr-holdout-007",
+      "field": "caption",
+      "text": "Journée de bureau, ciel gris, 12 degrés : chemise en flanelle et blazer marine."
+    },
+    {
+      "id": "fr-holdout-008",
+      "field": "caption",
+      "text": "Le mistral souffle fort aujourd'hui. Foulard bien noué, cheveux attachés, c'est tout ce que je demande."
+    },
+    {
+      "id": "fr-holdout-009",
+      "field": "caption",
+      "text": "Slush partout sur le trottoir. Les bottes d'hiver sont de retour, les belles chaussures restent à la maison."
+    },
+    {
+      "id": "fr-holdout-010",
+      "field": "caption",
+      "text": "Tram en retard, averse soudaine, heureusement le parapluie pliant vit dans mon sac."
+    },
+    {
+      "id": "fr-holdout-011",
+      "field": "caption",
+      "text": "Matin brumeux à Lyon, j'ai superposé un col roulé fin sous la chemise. Assez chaud sans étouffer."
+    },
+    {
+      "id": "fr-holdout-012",
+      "field": "caption",
+      "text": "Pharmacie, poste, épicerie. Trois arrêts, un seul imperméable. Efficace."
+    },
+    {
+      "id": "fr-holdout-013",
+      "field": "caption",
+      "text": "Il fait 31 à l'ombre, j'ai sorti la robe en lin et le chapeau de paille pour aller chercher les enfants."
+    },
+    {
+      "id": "fr-holdout-014",
+      "field": "caption",
+      "text": "Premier matin où je vois ma respiration en sortant. Le manteau de laine reprend du service."
+    },
+    {
+      "id": "fr-holdout-015",
+      "field": "caption",
+      "text": "Pas pire comme température pour marcher jusqu'au bureau, 14 degrés et soleil. Veste en jean suffit."
+    },
+    {
+      "id": "fr-holdout-016",
+      "field": "caption",
+      "text": "Grêle à 17h, soleil à 17h20. Je ne sais plus comment m'habiller dans cette ville."
+    },
+    {
+      "id": "fr-holdout-017",
+      "field": "caption",
+      "text": "Rendez-vous chez le dentiste sous la canicule : t-shirt blanc, pantalon large, sandales plates."
+    },
+    {
+      "id": "fr-holdout-018",
+      "field": "caption",
+      "text": "Brouillard givrant sur le pont ce matin. Gants tactiles indispensables pour vérifier l'horaire du bus."
+    },
+    {
+      "id": "fr-holdout-019",
+      "field": "caption",
+      "text": "Aller-retour à la laverie sous la neige, j'ai mis les vieilles bottes et un pantalon de pluie par-dessus le jean."
+    },
+    {
+      "id": "fr-holdout-020",
+      "field": "caption",
+      "text": "Ciel bleu mais 3 degrés. Lunettes de soleil ET écharpe, combo étrange mais nécessaire."
+    },
+    {
+      "id": "fr-holdout-021",
+      "field": "caption",
+      "text": "Marché du samedi, petite bruine. Ciré jaune et panier en osier, je me sens en Bretagne même si je suis à Paris."
+    },
+    {
+      "id": "fr-holdout-022",
+      "field": "caption",
+      "text": "Le char ne démarre pas, donc marche de 25 minutes à -12. Content d'avoir mis les sous-vêtements thermiques."
+    },
+    {
+      "id": "fr-holdout-023",
+      "field": "caption",
+      "text": "Humidité à 90 %, j'ai renoncé au chemisier en soie. Coton léger pour la journée."
+    },
+    {
+      "id": "fr-holdout-024",
+      "field": "caption",
+      "text": "Bref : pluie, vent, tram. Capuche relevée et je ne parle à personne avant mon café."
+    },
+    {
+      "id": "fr-holdout-025",
+      "field": "caption",
+      "text": "Petit café en terrasse, 19 degrés, cardigan sur les épaules au cas où le soleil se cache."
+    },
+    {
+      "id": "fr-holdout-026",
+      "field": "caption",
+      "text": "Journée orageuse annoncée, j'ai laissé la veste en daim à la maison."
+    },
+    {
+      "id": "fr-holdout-027",
+      "field": "caption",
+      "text": "Livraison de colis à pied dans le quartier, chaussures de marche et coupe-vent. Rien de glamour mais tout est sec."
+    },
+    {
+      "id": "fr-holdout-028",
+      "field": "caption",
+      "text": "Premier gel de la saison sur le pare-brise. Je ressors mes gants en cuir doublés."
+    },
+    {
+      "id": "fr-holdout-029",
+      "field": "caption",
+      "text": "Ce matin en traversant le parc, les feuilles collaient aux bottines. Automne officiel."
+    },
+    {
+      "id": "fr-holdout-030",
+      "field": "caption",
+      "text": "Chaleur lourde, je fais mes courses tôt avant 9h. Short en lin, chemise ouverte, casquette."
+    },
+    {
+      "id": "fr-holdout-031",
+      "field": "caption",
+      "text": "Le vent du nord est revenu à Québec. Parka longue, et je ne regrette rien."
+    },
+    {
+      "id": "fr-holdout-032",
+      "field": "caption",
+      "text": "Bus de nuit, pluie froide. Le sweat à capuche sous l'imper a sauvé la soirée."
+    },
+    {
+      "id": "fr-holdout-033",
+      "field": "caption",
+      "text": "Réunion à l'autre bout de la ville, 8 degrés et soleil. Manteau camel, baskets blanches pour marcher."
+    },
+    {
+      "id": "fr-holdout-034",
+      "field": "caption",
+      "text": "Météo parfaite pour une balade au bord du canal, un pull marin suffit 🌤️"
+    },
+    {
+      "id": "fr-holdout-035",
+      "field": "caption",
+      "text": "Il neige à gros flocons et j'ai oublié ma tuque. Leçon apprise."
+    },
+    {
+      "id": "fr-holdout-036",
+      "field": "caption",
+      "text": "Dépôt à la poste avant midi, il fait déjà 28. Jupe midi et débardeur en coton."
+    },
+    {
+      "id": "fr-holdout-037",
+      "field": "caption",
+      "text": "Sortie au parc avec le chien sous la pluie : bottes de caoutchouc et vieux ciré, rien de plus."
+    },
+    {
+      "id": "fr-holdout-038",
+      "field": "caption",
+      "text": "Je descends à la station suivante pour marcher un peu, le soleil d'octobre est trop beau."
+    },
+    {
+      "id": "fr-holdout-039",
+      "field": "caption",
+      "text": "Matin à 6 degrés, après-midi à 21. J'ai fait l'oignon : t-shirt, chemise, gilet, veste. J'ai tout enlevé à 14h."
+    },
+    {
+      "id": "fr-holdout-040",
+      "field": "caption",
+      "text": "Neige mouillée et trottoirs glacés. Crampons sur les bottes pour aller à l'épicerie."
+    },
+    {
+      "id": "fr-holdout-041",
+      "field": "caption",
+      "text": "Rentrée du travail sous une averse d'été, la robe a séché en dix minutes. Merci la viscose."
+    },
+    {
+      "id": "fr-holdout-042",
+      "field": "caption",
+      "text": "Petit-déj chez ma mère, 16 degrés, trench beige et mocassins."
+    },
+    {
+      "id": "fr-holdout-043",
+      "field": "caption",
+      "text": "Aujourd'hui la météo annonçait 20 % de pluie. J'ai été dans les 20 %."
+    },
+    {
+      "id": "fr-holdout-044",
+      "field": "caption",
+      "text": "Le vent fait danser les jupes plissées, j'ai opté pour un pantalon cigarette."
+    },
+    {
+      "id": "fr-holdout-045",
+      "field": "caption",
+      "text": "Promenade du dimanche au bord du fleuve, il faisait plus froid que prévu. Heureusement j'avais un bonnet dans la poche."
+    },
+    {
+      "id": "fr-holdout-046",
+      "field": "caption",
+      "text": "Rendez-vous chez l'opticien à vélo. Pantalon retroussé, pince à mollet, imper court."
+    },
+    {
+      "id": "fr-holdout-047",
+      "field": "caption",
+      "text": "Chaleur sèche à Marseille, j'ai ressorti les espadrilles."
+    },
+    {
+      "id": "fr-holdout-048",
+      "field": "caption",
+      "text": "Verglas ce matin à Sherbrooke, j'ai marché comme un pingouin jusqu'à l'arrêt."
+    },
+    {
+      "id": "fr-holdout-049",
+      "field": "caption",
+      "text": "Courses de dernière minute, pluie battante, j'ai enfilé le premier manteau trouvé. Il était à mon frère."
+    },
+    {
+      "id": "fr-holdout-050",
+      "field": "caption",
+      "text": "Il fait doux pour novembre, je profite de la veste matelassée légère."
+    },
+    {
+      "id": "fr-holdout-051",
+      "field": "caption",
+      "text": "Ciel de plomb, 10 degrés, je mets du jaune pour compenser."
+    },
+    {
+      "id": "fr-holdout-052",
+      "field": "caption",
+      "text": "Trajet de 40 minutes en RER sous la clim glaciale. Toujours un gilet dans le sac, même en juillet."
+    },
+    {
+      "id": "fr-holdout-053",
+      "field": "caption",
+      "text": "Soleil bas, vent froid, je sors le long manteau gris et le foulard rouille."
+    },
+    {
+      "id": "fr-holdout-054",
+      "field": "caption",
+      "text": "Petite marche jusqu'à la bibliothèque, il fait 22 et l'air sent le tilleul."
+    },
+    {
+      "id": "fr-holdout-055",
+      "field": "caption",
+      "text": "Tempête annoncée pour ce soir, j'ai fait le plein de courses en bottes et pantalon de neige."
+    },
+    {
+      "id": "fr-holdout-056",
+      "field": "caption",
+      "text": "Question pour la communauté : quelle couleur de pantalon va avec un manteau vert sapin ? Je bloque."
+    },
+    {
+      "id": "fr-holdout-057",
+      "field": "caption",
+      "text": "Vous portez quoi pour un mariage en extérieur fin septembre ? Il peut faire 12 comme 25."
+    },
+    {
+      "id": "fr-holdout-058",
+      "field": "caption",
+      "text": "Besoin d'idées : comment rendre des bottes d'hiver un peu plus élégantes pour le bureau ?"
+    },
+    {
+      "id": "fr-holdout-059",
+      "field": "caption",
+      "text": "Est-ce que le lin froissé passe au travail ou ça fait négligé ? Vos avis m'intéressent."
+    },
+    {
+      "id": "fr-holdout-060",
+      "field": "caption",
+      "text": "Je pars à Montréal en janvier, je viens du sud de la France. Je dois acheter quoi en priorité ?"
+    },
+    {
+      "id": "fr-holdout-061",
+      "field": "caption",
+      "text": "Quelqu'un a des astuces pour ne pas avoir les cheveux aplatis par la tuque ?"
+    },
+    {
+      "id": "fr-holdout-062",
+      "field": "caption",
+      "text": "Chemise rayée et pull à motifs, ça passe ou c'est trop chargé ?"
+    },
+    {
+      "id": "fr-holdout-063",
+      "field": "caption",
+      "text": "Vos conseils pour un manteau de pluie qui ne fait pas sac poubelle ? 😅"
+    },
+    {
+      "id": "fr-holdout-064",
+      "field": "caption",
+      "text": "Comment vous superposez sous une robe quand il fait 8 degrés ? Collants épais, legging, autre chose ?"
+    },
+    {
+      "id": "fr-holdout-065",
+      "field": "caption",
+      "text": "Baskets blanches en novembre : oui ou non ?"
+    },
+    {
+      "id": "fr-holdout-066",
+      "field": "caption",
+      "text": "J'ai un entretien d'embauche jeudi, pluie prévue. Je garde le blazer sous l'imper ou je prends un manteau ?"
+    },
+    {
+      "id": "fr-holdout-067",
+      "field": "caption",
+      "text": "Petite question : vous rangez vos pulls pliés ou sur cintre ? Les miens se déforment."
+    },
+    {
+      "id": "fr-holdout-068",
+      "field": "caption",
+      "text": "Qui a déjà porté du velours côtelé en pleine pluie ? Ça sèche vite ou pas du tout ?"
+    },
+    {
+      "id": "fr-holdout-069",
+      "field": "caption",
+      "text": "Quel genre de chaussures pour visiter Rome en août sans avoir mal aux pieds ?"
+    },
+    {
+      "id": "fr-holdout-070",
+      "field": "caption",
+      "text": "Aidez-moi à choisir : écharpe moutarde ou bordeaux avec un manteau gris chiné ?"
+    },
+    {
+      "id": "fr-holdout-071",
+      "field": "caption",
+      "text": "Je n'arrive jamais à porter le beige sans avoir l'air fade. Des idées de couleurs pour réveiller ?"
+    },
+    {
+      "id": "fr-holdout-072",
+      "field": "caption",
+      "text": "Est-ce que quelqu'un porte des shorts avec des collants en automne ? Je suis tentée."
+    },
+    {
+      "id": "fr-holdout-073",
+      "field": "caption",
+      "text": "Sur une échelle de 1 à 10, les chaussettes visibles avec des sandales, on en est où ? 🧦"
+    },
+    {
+      "id": "fr-holdout-074",
+      "field": "caption",
+      "text": "Conseil demandé : quelle longueur de manteau avec un pantalon large ?"
+    },
+    {
+      "id": "fr-holdout-075",
+      "field": "caption",
+      "text": "Vous faites comment pour les journées à 5 degrés le matin et 20 l'après-midi sans trimbaler trois couches ?"
+    },
+    {
+      "id": "fr-holdout-076",
+      "field": "caption",
+      "text": "Mon fils grandit trop vite pour ses habits d'hiver. Vous achetez une taille au-dessus ou vous attendez ?"
+    },
+    {
+      "id": "fr-holdout-077",
+      "field": "caption",
+      "text": "Quelle matière pour un pull qui ne gratte pas ? J'ai la peau sensible."
+    },
+    {
+      "id": "fr-holdout-078",
+      "field": "caption",
+      "text": "Je cherche un look simple pour un baptême en mai, rien de trop habillé. Des pistes ?"
+    },
+    {
+      "id": "fr-holdout-079",
+      "field": "caption",
+      "text": "Les mitaines ou les gants pour faire du vélo l'hiver ? Je n'arrive pas à me décider."
+    },
+    {
+      "id": "fr-holdout-080",
+      "field": "caption",
+      "text": "Quelqu'un sait comment porter un trench quand on est petite sans disparaître dedans ?"
+    },
+    {
+      "id": "fr-holdout-081",
+      "field": "caption",
+      "text": "Vous mettez quoi sous une parka pour ne pas transpirer dans le métro ?"
+    },
+    {
+      "id": "fr-holdout-082",
+      "field": "caption",
+      "text": "Rouge et rose ensemble, vous osez ?"
+    },
+    {
+      "id": "fr-holdout-083",
+      "field": "caption",
+      "text": "Je veux arrêter le noir intégral cet hiver. Par quoi commencer en douceur ?"
+    },
+    {
+      "id": "fr-holdout-084",
+      "field": "caption",
+      "text": "Comment vous gardez vos pieds au sec sans porter de bottes de pluie tous les jours ?"
+    },
+    {
+      "id": "fr-holdout-085",
+      "field": "caption",
+      "text": "Une jupe longue en laine avec des baskets, c'est une bonne idée pour marcher en ville ?"
+    },
+    {
+      "id": "fr-holdout-086",
+      "field": "caption",
+      "text": "Avis aux gens de Québec : la doudoune longue ou la courte pour attendre le bus ?"
+    },
+    {
+      "id": "fr-holdout-087",
+      "field": "caption",
+      "text": "J'ai reçu un blazer à carreaux en cadeau. Je le porte avec quoi sans ressembler à un prof d'histoire ?"
+    },
+    {
+      "id": "fr-holdout-088",
+      "field": "caption",
+      "text": "Quelle est votre pièce préférée pour la mi-saison ? Je cherche de l'inspiration."
+    },
+    {
+      "id": "fr-holdout-089",
+      "field": "caption",
+      "text": "Chapeau ou casquette pour une semaine de soleil en Provence ?"
+    },
+    {
+      "id": "fr-holdout-090",
+      "field": "caption",
+      "text": "Est-ce raisonnable de porter des mocassins en daim s'il y a 30 % de risque d'averse ?"
+    },
+    {
+      "id": "fr-holdout-091",
+      "field": "caption",
+      "text": "Vous lavez vos jeans tous les combien ? Débat à la maison."
+    },
+    {
+      "id": "fr-holdout-092",
+      "field": "caption",
+      "text": "Petite colle : tenue pour un pique-nique quand le vent se lève à 16h. Je prévois quoi ?"
+    },
+    {
+      "id": "fr-holdout-093",
+      "field": "caption",
+      "text": "Comment habiller un enfant pour l'école quand la météo change trois fois dans la journée ?"
+    },
+    {
+      "id": "fr-holdout-094",
+      "field": "caption",
+      "text": "Les pantalons de ski pour aller au travail en tempête, quelqu'un d'autre fait ça ou je suis seule ?"
+    },
+    {
+      "id": "fr-holdout-095",
+      "field": "caption",
+      "text": "Qu'est-ce que vous mettez dans votre sac pour les journées où il pleut par intermittence ?"
+    },
+    {
+      "id": "fr-holdout-096",
+      "field": "caption",
+      "text": "Je ne sais jamais comment porter un col roulé sous une chemise. Le col dépasse toujours mal. Des astuces ?"
+    },
+    {
+      "id": "fr-holdout-097",
+      "field": "caption",
+      "text": "Couleur de chaussures pour un costume bleu nuit à un mariage d'été ?"
+    },
+    {
+      "id": "fr-holdout-098",
+      "field": "caption",
+      "text": "Est-ce que les bottes de randonnée en ville, ça passe pour vous ?"
+    },
+    {
+      "id": "fr-holdout-099",
+      "field": "caption",
+      "text": "Bonjour à tous, je débute avec l'appli. Comment vous utilisez les suggestions météo au quotidien ?"
+    },
+    {
+      "id": "fr-holdout-100",
+      "field": "caption",
+      "text": "Une veste en cuir par 15 degrés et pluie fine, trop risqué ?"
+    },
+    {
+      "id": "fr-holdout-101",
+      "field": "caption",
+      "text": "Vous avez des idées de tenues pour un musée quand dehors il fait -20 et dedans 24 ?"
+    },
+    {
+      "id": "fr-holdout-102",
+      "field": "caption",
+      "text": "Je veux des chaussures confortables qui tiennent la gadoue et vont avec une robe. Ça existe ?"
+    },
+    {
+      "id": "fr-holdout-103",
+      "field": "caption",
+      "text": "Comment éviter l'effet bonhomme de neige avec une doudoune quand on est grand et mince ?"
+    },
+    {
+      "id": "fr-holdout-104",
+      "field": "caption",
+      "text": "Qui porte encore des guêtres ? J'en ai trouvé chez ma grand-mère et je suis curieuse."
+    },
+    {
+      "id": "fr-holdout-105",
+      "field": "caption",
+      "text": "Est-ce que le kaki va avec le marine ou c'est trop sombre ?"
+    },
+    {
+      "id": "fr-holdout-106",
+      "field": "caption",
+      "text": "Tissu pour une chemise d'été qui ne colle pas au dos dans le bus : lin, coton, autre ?"
+    },
+    {
+      "id": "fr-holdout-107",
+      "field": "caption",
+      "text": "Vous gardez vos manteaux d'hiver au placard ou sous vide pendant l'été ?"
+    },
+    {
+      "id": "fr-holdout-108",
+      "field": "caption",
+      "text": "Petit sondage : imperméable classique ou cape de pluie pour le vélo ?"
+    },
+    {
+      "id": "fr-holdout-109",
+      "field": "caption",
+      "text": "Je n'ai jamais porté de chapeau de feutre. Par où commencer ?"
+    },
+    {
+      "id": "fr-holdout-110",
+      "field": "caption",
+      "text": "Quelle tenue pour marcher toute une journée à Paris en mars ? Il paraît que tout peut arriver."
+    },
+    {
+      "id": "fr-holdout-111",
+      "field": "caption",
+      "text": "Merci pour le conseil du pantalon gris, je l'ai essayé ce matin et c'est exactement ce qu'il me fallait !"
+    },
+    {
+      "id": "fr-holdout-112",
+      "field": "caption",
+      "text": "Trop belle ta veste ! La couleur rouille te va super bien."
+    },
+    {
+      "id": "fr-holdout-113",
+      "field": "caption",
+      "text": "Ton idée de mettre un gilet sous le trench, je la vole pour demain 😊"
+    },
+    {
+      "id": "fr-holdout-114",
+      "field": "caption",
+      "text": "Merci à tous pour vos réponses d'hier, j'ai finalement opté pour les bottines marron."
+    },
+    {
+      "id": "fr-holdout-115",
+      "field": "caption",
+      "text": "J'adore comment tu as associé le vert et le bleu, ça me donne envie d'essayer."
+    },
+    {
+      "id": "fr-holdout-116",
+      "field": "caption",
+      "text": "Super inspirant, merci de partager tes tenues de pluie. On en voit trop peu."
+    },
+    {
+      "id": "fr-holdout-117",
+      "field": "caption",
+      "text": "Bravo pour la retouche, on dirait que le pantalon a été fait sur mesure."
+    },
+    {
+      "id": "fr-holdout-118",
+      "field": "caption",
+      "text": "Merci beaucoup ! Je ne pensais pas qu'un simple foulard changerait autant la tenue."
+    },
+    {
+      "id": "fr-holdout-119",
+      "field": "caption",
+      "text": "Ton manteau de seconde main est magnifique, quelle trouvaille."
+    },
+    {
+      "id": "fr-holdout-120",
+      "field": "caption",
+      "text": "Grâce à ton post sur les doublures polaires, j'ai enfin eu chaud aux mains ce matin. Merci !"
+    },
+    {
+      "id": "fr-holdout-121",
+      "field": "caption",
+      "text": "Ah oui, la ceinture marque bien la taille, très joli."
+    },
+    {
+      "id": "fr-holdout-122",
+      "field": "caption",
+      "text": "Merci pour la recommandation de la cordonnerie, mes bottes ont l'air neuves."
+    },
+    {
+      "id": "fr-holdout-123",
+      "field": "caption",
+      "text": "Tu as toujours des combinaisons de couleurs auxquelles je n'aurais jamais pensé. Continue !"
+    },
+    {
+      "id": "fr-holdout-124",
+      "field": "caption",
+      "text": "Merci d'avoir répondu si vite, je pars plus sereine avec ta liste."
+    },
+    {
+      "id": "fr-holdout-125",
+      "field": "caption",
+      "text": "Très chic, le col roulé crème sous la veste marine."
+    },
+    {
+      "id": "fr-holdout-126",
+      "field": "caption",
+      "text": "Je viens de tester ton astuce pour ranger les écharpes, ça change tout."
+    },
+    {
+      "id": "fr-holdout-127",
+      "field": "caption",
+      "text": "Félicitations pour ton premier ourlet à la main, c'est très propre !"
+    },
+    {
+      "id": "fr-holdout-128",
+      "field": "caption",
+      "text": "Merci pour ta réponse détaillée sur la laine mérinos, j'ai commandé deux t-shirts."
+    },
+    {
+      "id": "fr-holdout-129",
+      "field": "caption",
+      "text": "Ta photo m'a convaincue de ressortir ma jupe plissée. Merci !"
+    },
+    {
+      "id": "fr-holdout-130",
+      "field": "caption",
+      "text": "Le contraste entre la chemise blanche et le manteau chocolat est superbe."
+    },
+    {
+      "id": "fr-holdout-131",
+      "field": "caption",
+      "text": "Merci tout le monde, finalement le chapeau de paille a fait l'unanimité."
+    },
+    {
+      "id": "fr-holdout-132",
+      "field": "caption",
+      "text": "Belle idée de mettre des chaussettes colorées avec les mocassins, ça réveille tout."
+    },
+    {
+      "id": "fr-holdout-133",
+      "field": "caption",
+      "text": "Ton conseil pour le séchage à plat a sauvé mon pull préféré. Mille mercis."
+    },
+    {
+      "id": "fr-holdout-134",
+      "field": "caption",
+      "text": "J'ai suivi ta liste pour le voyage en Islande, rien ne m'a manqué. Merci encore."
+    },
+    {
+      "id": "fr-holdout-135",
+      "field": "caption",
+      "text": "C'est fou comme ce cardigan te va bien. Il a l'air tellement doux."
+    },
+    {
+      "id": "fr-holdout-136",
+      "field": "caption",
+      "text": "Merci pour l'encouragement, je me suis enfin lancée avec le jaune !"
+    },
+    {
+      "id": "fr-holdout-137",
+      "field": "caption",
+      "text": "Ta tenue de vélo sous la pluie est géniale, pratique et jolie en même temps."
+    },
+    {
+      "id": "fr-holdout-138",
+      "field": "caption",
+      "text": "Merci pour la recette du détachant maison, la tache de café a disparu."
+    },
+    {
+      "id": "fr-holdout-139",
+      "field": "caption",
+      "text": "Tes bottes de friperie sont incroyables, tu as l'œil."
+    },
+    {
+      "id": "fr-holdout-140",
+      "field": "caption",
+      "text": "Merci d'avoir partagé ton look de mi-saison, c'est tout à fait ce que je cherchais."
+    },
+    {
+      "id": "fr-holdout-141",
+      "field": "caption",
+      "text": "Je trouve que la longueur de ton manteau est parfaite avec le pantalon large. Bien vu."
+    },
+    {
+      "id": "fr-holdout-142",
+      "field": "caption",
+      "text": "Merci pour ta patience avec mes questions sur les tailles, tu es adorable."
+    },
+    {
+      "id": "fr-holdout-143",
+      "field": "caption",
+      "text": "Wow, l'ensemble tout en gris avec la touche de bleu, c'est très réussi."
+    },
+    {
+      "id": "fr-holdout-144",
+      "field": "caption",
+      "text": "Merci pour ton retour sur la parka, je l'ai commandée en vert."
+    },
+    {
+      "id": "fr-holdout-145",
+      "field": "caption",
+      "text": "Ta façon de nouer le foulard, il faut absolument que tu fasses un petit tuto !"
+    },
+    {
+      "id": "fr-holdout-146",
+      "field": "caption",
+      "text": "Ça fait plaisir de voir des tenues réalistes pour la neige, merci."
+    },
+    {
+      "id": "fr-holdout-147",
+      "field": "caption",
+      "text": "Merci pour l'idée des pinces à linge en bois pour suspendre les jupes, très pratique."
+    },
+    {
+      "id": "fr-holdout-148",
+      "field": "caption",
+      "text": "Tellement beau, ce mélange de textures. Le velours et la maille vont si bien ensemble."
+    },
+    {
+      "id": "fr-holdout-149",
+      "field": "caption",
+      "text": "Tu m'as convaincue de faire reprendre mon vieux blazer au lieu d'en racheter un. Merci !"
+    },
+    {
+      "id": "fr-holdout-150",
+      "field": "caption",
+      "text": "Merci pour le partage, je ne connaissais pas cette façon de rouler les manches."
+    },
+    {
+      "id": "fr-holdout-151",
+      "field": "caption",
+      "text": "Superbe, la jupe midi avec les bottes hautes. Très élégant pour l'automne."
+    },
+    {
+      "id": "fr-holdout-152",
+      "field": "caption",
+      "text": "Je te remercie pour ta liste de valise, je l'ai imprimée et collée sur mon placard."
+    },
+    {
+      "id": "fr-holdout-153",
+      "field": "caption",
+      "text": "Ton imperméable jaune illumine mon fil d'actualité, merci 🌧️💛"
+    },
+    {
+      "id": "fr-holdout-154",
+      "field": "caption",
+      "text": "Grâce à toi, j'ai osé le pantalon à carreaux. Je ne le regrette pas."
+    },
+    {
+      "id": "fr-holdout-155",
+      "field": "caption",
+      "text": "Merci à la personne qui m'a conseillé les semelles en feutre, mes pieds sont au chaud."
+    },
+    {
+      "id": "fr-holdout-156",
+      "field": "caption",
+      "text": "Super choix de couleurs, le bordeaux et le rose poudré c'est doux et chic."
+    },
+    {
+      "id": "fr-holdout-157",
+      "field": "caption",
+      "text": "Merci pour ta réponse, je vais essayer avec la ceinture fine."
+    },
+    {
+      "id": "fr-holdout-158",
+      "field": "caption",
+      "text": "Ta veste matelassée est trop mignonne avec ce petit col en velours."
+    },
+    {
+      "id": "fr-holdout-159",
+      "field": "caption",
+      "text": "Merci pour ton honnêteté sur la qualité de ces bottes, ça m'évite une erreur."
+    },
+    {
+      "id": "fr-holdout-160",
+      "field": "caption",
+      "text": "Je trouve ton style super apaisant, que des tons naturels. Ça me plaît beaucoup."
+    },
+    {
+      "id": "fr-holdout-161",
+      "field": "caption",
+      "text": "Valise pour Lisbonne, 5 jours, prévisions entre 16 et 24 : deux pantalons, quatre hauts, un gilet, une veste légère, des baskets et des sandales."
+    },
+    {
+      "id": "fr-holdout-162",
+      "field": "caption",
+      "text": "Je prépare mon sac pour une fin de semaine au chalet. Bas de laine, tuque, deux chandails et des pantoufles."
+    },
+    {
+      "id": "fr-holdout-163",
+      "field": "caption",
+      "text": "Voyage d'affaires à Bruxelles, pluie tous les jours. Un trench, deux chemises, un pull, des chaussures en cuir imperméabilisées."
+    },
+    {
+      "id": "fr-holdout-164",
+      "field": "caption",
+      "text": "Bagage cabine seulement pour 10 jours en Grèce. Tout en lin et coton, une seule paire de sandales, défi accepté."
+    },
+    {
+      "id": "fr-holdout-165",
+      "field": "caption",
+      "text": "Ma règle pour les voyages : trois couleurs maximum, tout doit aller avec tout."
+    },
+    {
+      "id": "fr-holdout-166",
+      "field": "caption",
+      "text": "Petit sac pour la Gaspésie en juillet. Il paraît qu'il fait frais le soir, je prends quand même une polaire."
+    },
+    {
+      "id": "fr-holdout-167",
+      "field": "caption",
+      "text": "Départ demain pour Édimbourg. Imper, pull épais, bottines et parapluie, rien de plus optimiste."
+    },
+    {
+      "id": "fr-holdout-168",
+      "field": "caption",
+      "text": "Valise de ma fille pour la colonie : j'ai étiqueté chaque vêtement, même les chaussettes."
+    },
+    {
+      "id": "fr-holdout-169",
+      "field": "caption",
+      "text": "Je pars en randonnée trois jours, je mise sur le système des trois couches : mérinos, polaire, coquille."
+    },
+    {
+      "id": "fr-holdout-170",
+      "field": "caption",
+      "text": "Liste pour un mariage à la campagne : robe, gilet, sandales à talons larges, et des ballerines pour la soirée."
+    },
+    {
+      "id": "fr-holdout-171",
+      "field": "caption",
+      "text": "Je ne sais jamais quoi prendre pour la Bretagne. Résultat : tout. Encore."
+    },
+    {
+      "id": "fr-holdout-172",
+      "field": "caption",
+      "text": "Week-end à Montréal en octobre, ma valise : jean, pull torsadé, veste de pluie, bottes. Simple."
+    },
+    {
+      "id": "fr-holdout-173",
+      "field": "caption",
+      "text": "J'ai roulé tous mes t-shirts au lieu de les plier, il me reste de la place pour une paire de chaussures."
+    },
+    {
+      "id": "fr-holdout-174",
+      "field": "caption",
+      "text": "Destination Marrakech en avril : pantalons fluides, chemises légères, foulard pour le soleil, une veste pour le soir."
+    },
+    {
+      "id": "fr-holdout-175",
+      "field": "caption",
+      "text": "Je laisse un coin de valise vide pour les trouvailles en friperie là-bas."
+    },
+    {
+      "id": "fr-holdout-176",
+      "field": "caption",
+      "text": "Prévisions pour Berlin : 2 degrés et neige possible. Je glisse un sous-pull et des chaussettes en laine en plus."
+    },
+    {
+      "id": "fr-holdout-177",
+      "field": "caption",
+      "text": "Sac de voyage pour un road-trip en Islande. Imperméable, bonnet, gants, et un maillot pour les sources chaudes."
+    },
+    {
+      "id": "fr-holdout-178",
+      "field": "caption",
+      "text": "Je pars à la mer pour une semaine. Trois maillots, deux robes, un short, un pull pour le soir, ça suffira."
+    },
+    {
+      "id": "fr-holdout-179",
+      "field": "caption",
+      "text": "Astuce bagage : les chaussures dans des sacs en tissu, les chaussettes dedans."
+    },
+    {
+      "id": "fr-holdout-180",
+      "field": "caption",
+      "text": "Valise pour un congrès à Toronto : deux tailleurs à combiner et un manteau qui va sur tout."
+    },
+    {
+      "id": "fr-holdout-181",
+      "field": "caption",
+      "text": "Je préfère porter mes vêtements les plus lourds dans l'avion pour gagner de la place. Manteau, bottes, pull."
+    },
+    {
+      "id": "fr-holdout-182",
+      "field": "caption",
+      "text": "Prochain arrêt : Nice. La météo dit 25, j'ai quand même pris un cardigan pour le soir."
+    },
+    {
+      "id": "fr-holdout-183",
+      "field": "caption",
+      "text": "Ma trousse de voyage contient toujours un petit kit de couture et un détachant en stylo."
+    },
+    {
+      "id": "fr-holdout-184",
+      "field": "caption",
+      "text": "Escapade dans Charlevoix, je prends des couches parce que la météo change d'une heure à l'autre là-bas."
+    },
+    {
+      "id": "fr-holdout-185",
+      "field": "caption",
+      "text": "Valise prête pour Naples ! Robe en coton, chemise oversize, et mes sandales les plus confortables."
+    },
+    {
+      "id": "fr-holdout-186",
+      "field": "caption",
+      "text": "Deux semaines au Japon en novembre. Je compte laver à mi-parcours, donc sept jours de tenues seulement."
+    },
+    {
+      "id": "fr-holdout-187",
+      "field": "caption",
+      "text": "Week-end camping avec les enfants, j'ai prévu deux rechanges complets par personne. Ils trouvent toujours une flaque."
+    },
+    {
+      "id": "fr-holdout-188",
+      "field": "caption",
+      "text": "Liste du ski : sous-vêtements thermiques, deux cagoules, lunettes, chaussettes épaisses, et une tenue d'après-ski."
+    },
+    {
+      "id": "fr-holdout-189",
+      "field": "caption",
+      "text": "Petite valise de printemps pour Amsterdam : imper léger, jean, deux pulls fins et des baskets imperméables."
+    },
+    {
+      "id": "fr-holdout-190",
+      "field": "caption",
+      "text": "Je prends toujours une écharpe large en voyage, elle sert de couverture dans le train."
+    },
+    {
+      "id": "fr-holdout-191",
+      "field": "caption",
+      "text": "Croisière sur le Saguenay : coupe-vent, tuque légère et lunettes de soleil, même en août."
+    },
+    {
+      "id": "fr-holdout-192",
+      "field": "caption",
+      "text": "Aéroport dans 3 heures et je viens de me rendre compte que ma valise ne contient que du noir. Ça ira."
+    },
+    {
+      "id": "fr-holdout-193",
+      "field": "caption",
+      "text": "Mes indispensables pour un vol long-courrier : pantalon souple, chaussettes de contention, gros gilet."
+    },
+    {
+      "id": "fr-holdout-194",
+      "field": "caption",
+      "text": "Je prépare une capsule de 12 pièces pour un mois à Barcelone. Je vous montre le résultat bientôt."
+    },
+    {
+      "id": "fr-holdout-195",
+      "field": "caption",
+      "text": "Visite chez ma tante en Normandie : bottes de pluie obligatoires, elle habite au bout d'un chemin."
+    },
+    {
+      "id": "fr-holdout-196",
+      "field": "caption",
+      "text": "Prévisions contradictoires pour Prague, j'ai mis un parapluie ET des lunettes de soleil."
+    },
+    {
+      "id": "fr-holdout-197",
+      "field": "caption",
+      "text": "Je pars en Laponie. Conseil de ceux qui y sont allés : jamais de coton près de la peau. Noté."
+    },
+    {
+      "id": "fr-holdout-198",
+      "field": "caption",
+      "text": "Valise d'été pour la Corse, mais les soirées en montagne sont fraîches. Une veste en jean fera l'affaire."
+    },
+    {
+      "id": "fr-holdout-199",
+      "field": "caption",
+      "text": "J'ai pesé ma valise : 9,8 kg. J'ai sacrifié une paire de chaussures pour passer en cabine."
+    },
+    {
+      "id": "fr-holdout-200",
+      "field": "caption",
+      "text": "Fin de semaine à Québec en février, je pars avec ma plus grosse parka et des chaufferettes."
+    },
+    {
+      "id": "fr-holdout-201",
+      "field": "caption",
+      "text": "Mini-sac pour un aller-retour à Lyon : une chemise de rechange et c'est tout."
+    },
+    {
+      "id": "fr-holdout-202",
+      "field": "caption",
+      "text": "Je teste les cubes de rangement pour la première fois. Mes pulls n'ont jamais été aussi bien rangés."
+    },
+    {
+      "id": "fr-holdout-203",
+      "field": "caption",
+      "text": "Séjour linguistique de mon ado à Dublin : imperméable, imperméable et encore imperméable."
+    },
+    {
+      "id": "fr-holdout-204",
+      "field": "caption",
+      "text": "Valise de retour plus lourde qu'à l'aller, j'ai trouvé deux pulls en laine au marché."
+    },
+    {
+      "id": "fr-holdout-205",
+      "field": "caption",
+      "text": "Prochain voyage : Vancouver en novembre. On me dit pluie non-stop, je prends les bottes de caoutchouc."
+    },
+    {
+      "id": "fr-holdout-206",
+      "field": "caption",
+      "text": "Trouvaille du jour en friperie : un manteau en laine bouillie pour 15 euros. Il lui faut juste des boutons."
+    },
+    {
+      "id": "fr-holdout-207",
+      "field": "caption",
+      "text": "J'ai enfin recousu l'ourlet de mon pantalon préféré. Trois mois qu'il traînait sur la chaise."
+    },
+    {
+      "id": "fr-holdout-208",
+      "field": "caption",
+      "text": "Ressemelage des bottines chez le cordonnier, elles repartent pour cinq hivers."
+    },
+    {
+      "id": "fr-holdout-209",
+      "field": "caption",
+      "text": "Journée lessive. Tous les pulls en laine à la main, puis séchage à plat sur des serviettes."
+    },
+    {
+      "id": "fr-holdout-210",
+      "field": "caption",
+      "text": "Petit trou au coude de mon chandail, je teste le reprisage visible avec une laine bleue."
+    },
+    {
+      "id": "fr-holdout-211",
+      "field": "caption",
+      "text": "Friperie de quartier ce matin : chemise en lin, ceinture tressée et une jupe en velours. Le tout pour moins de 20 $."
+    },
+    {
+      "id": "fr-holdout-212",
+      "field": "caption",
+      "text": "J'ai fait raccourcir les manches de ce blazer vintage. Il tombe enfin comme il faut."
+    },
+    {
+      "id": "fr-holdout-213",
+      "field": "caption",
+      "text": "Conseil laverie : retourner les jeans foncés avant le lavage, ils gardent leur couleur bien plus longtemps."
+    },
+    {
+      "id": "fr-holdout-214",
+      "field": "caption",
+      "text": "Rien de plus satisfaisant qu'un rasoir anti-bouloches sur un vieux pull."
+    },
+    {
+      "id": "fr-holdout-215",
+      "field": "caption",
+      "text": "Ma voisine m'a appris à remplacer une fermeture éclair. Ma parka est sauvée !"
+    },
+    {
+      "id": "fr-holdout-216",
+      "field": "caption",
+      "text": "Vide-grenier dimanche : j'ai trouvé un trench des années 80 en parfait état."
+    },
+    {
+      "id": "fr-holdout-217",
+      "field": "caption",
+      "text": "Teinture maison réussie : mon pantalon beige délavé est maintenant vert olive."
+    },
+    {
+      "id": "fr-holdout-218",
+      "field": "caption",
+      "text": "J'ai fait reprendre la taille d'une jupe de ma grand-mère. Elle me va parfaitement maintenant."
+    },
+    {
+      "id": "fr-holdout-219",
+      "field": "caption",
+      "text": "Le pressing m'a rendu ma veste en daim comme neuve. Ça valait le coup."
+    },
+    {
+      "id": "fr-holdout-220",
+      "field": "caption",
+      "text": "Les chaussettes orphelines, je les transforme en chiffons pour cirer les chaussures."
+    },
+    {
+      "id": "fr-holdout-221",
+      "field": "caption",
+      "text": "Boutons changés sur mon caban : laiton à la place du plastique noir. Petit détail, grand effet."
+    },
+    {
+      "id": "fr-holdout-222",
+      "field": "caption",
+      "text": "Séchage à l'air libre aujourd'hui, il fait 25 et du vent. Le linge sent tellement bon."
+    },
+    {
+      "id": "fr-holdout-223",
+      "field": "caption",
+      "text": "J'ai appris à faire un ourlet invisible grâce à une vidéo. Pas parfait, mais ça tient."
+    },
+    {
+      "id": "fr-holdout-224",
+      "field": "caption",
+      "text": "Grosse session de tri : trois sacs pour le don, un pour les retouches, et une seule pièce jetée."
+    },
+    {
+      "id": "fr-holdout-225",
+      "field": "caption",
+      "text": "Ma première fois au comptoir de réparation du quartier. Les bénévoles sont d'une gentillesse."
+    },
+    {
+      "id": "fr-holdout-226",
+      "field": "caption",
+      "text": "Imperméabilisant passé sur toutes les chaussures avant la saison des pluies."
+    },
+    {
+      "id": "fr-holdout-227",
+      "field": "caption",
+      "text": "Cette chemise de friperie avait une tache de rouille. Jus de citron et sel, au soleil, disparue."
+    },
+    {
+      "id": "fr-holdout-228",
+      "field": "caption",
+      "text": "Les coudières en cuir sur mon vieux pull, c'est fait. Il a un deuxième souffle."
+    },
+    {
+      "id": "fr-holdout-229",
+      "field": "caption",
+      "text": "J'ai rallongé les bretelles de ma robe d'été avec du ruban. Plus confortable."
+    },
+    {
+      "id": "fr-holdout-230",
+      "field": "caption",
+      "text": "Lavage des doudounes : basse température, et trois balles de tennis dans la sécheuse pour regonfler le duvet."
+    },
+    {
+      "id": "fr-holdout-231",
+      "field": "caption",
+      "text": "Trouvé en friperie : des mitaines tricotées à la main, rouges avec des flocons. Je fonds."
+    },
+    {
+      "id": "fr-holdout-232",
+      "field": "caption",
+      "text": "La couturière a transformé mon jean trop long en jean cropped. Parfait pour le printemps."
+    },
+    {
+      "id": "fr-holdout-233",
+      "field": "caption",
+      "text": "Petite astuce : vinaigre blanc dans le dernier rinçage, les serviettes sont plus douces."
+    },
+    {
+      "id": "fr-holdout-234",
+      "field": "caption",
+      "text": "J'ai recousu tous les boutons qui pendaient. Oui, tous. Ça m'a pris la soirée."
+    },
+    {
+      "id": "fr-holdout-235",
+      "field": "caption",
+      "text": "Achat d'occasion de la semaine : des bottes en cuir à peine portées. Un petit cirage et c'est reparti."
+    },
+    {
+      "id": "fr-holdout-236",
+      "field": "caption",
+      "text": "Repassage du dimanche, avec une série en fond. Cinq chemises prêtes pour la semaine."
+    },
+    {
+      "id": "fr-holdout-237",
+      "field": "caption",
+      "text": "Mon manteau avait perdu sa ceinture. J'en ai cousu une nouvelle avec un reste de tissu."
+    },
+    {
+      "id": "fr-holdout-238",
+      "field": "caption",
+      "text": "Friperie solidaire ce midi, j'en ressors avec une veste en tweed et la conscience tranquille."
+    },
+    {
+      "id": "fr-holdout-239",
+      "field": "caption",
+      "text": "Les taches de sel sur les bottes : eau tiède et un peu de vinaigre, puis graisse. Rituel de février."
+    },
+    {
+      "id": "fr-holdout-240",
+      "field": "caption",
+      "text": "J'ai découvert le patch thermocollant. Les genoux des pantalons de mes enfants me remercient."
+    },
+    {
+      "id": "fr-holdout-241",
+      "field": "caption",
+      "text": "Un pull troué par les mites... je le reprise ou je l'abandonne ? Je tente le reprisage."
+    },
+    {
+      "id": "fr-holdout-242",
+      "field": "caption",
+      "text": "Mon cordonnier a remis des talons neufs à mes escarpins, et il m'a conseillé de les protéger avec des patins."
+    },
+    {
+      "id": "fr-holdout-243",
+      "field": "caption",
+      "text": "Je lave mes soutiens-gorge dans un filet, ça change vraiment leur durée de vie."
+    },
+    {
+      "id": "fr-holdout-244",
+      "field": "caption",
+      "text": "J'ai enfin fait ajuster la longueur de mon pantalon de costume. Il ne traîne plus par terre."
+    },
+    {
+      "id": "fr-holdout-245",
+      "field": "caption",
+      "text": "Brocante en plein air ce matin, petite pluie, mais j'ai trouvé un gilet en cachemire pour 8 euros."
+    },
+    {
+      "id": "fr-holdout-246",
+      "field": "caption",
+      "text": "Séchoir à linge installé sur le balcon. Fini la sécheuse en été."
+    },
+    {
+      "id": "fr-holdout-247",
+      "field": "caption",
+      "text": "Mes collants filés deviennent des chaussettes de nuit. Rien ne se perd."
+    },
+    {
+      "id": "fr-holdout-248",
+      "field": "caption",
+      "text": "Retouche de la semaine : pinces dans le dos d'une chemise trop large. Je l'ai faite moi-même !"
+    },
+    {
+      "id": "fr-holdout-249",
+      "field": "caption",
+      "text": "Friperie sur le Plateau, une heure à fouiller, un seul achat : une chemise en flanelle parfaite."
+    },
+    {
+      "id": "fr-holdout-250",
+      "field": "caption",
+      "text": "Je teste le lavage à froid pour tout. Pour l'instant, aucune différence de propreté."
+    },
+    {
+      "id": "fr-holdout-251",
+      "field": "caption",
+      "text": "J'ai cousu une poche intérieure dans mon manteau pour le téléphone. Pratique quand il pleut."
+    },
+    {
+      "id": "fr-holdout-252",
+      "field": "caption",
+      "text": "Un peu de cire d'abeille sur ma veste en coton huilé, elle est de nouveau imperméable."
+    },
+    {
+      "id": "fr-holdout-253",
+      "field": "caption",
+      "text": "Les cols de chemise jaunis : bicarbonate et vieille brosse à dents. Ça marche !"
+    },
+    {
+      "id": "fr-holdout-254",
+      "field": "caption",
+      "text": "Raccommodage d'une couverture en laine avant l'hiver. Petit plaisir du soir."
+    },
+    {
+      "id": "fr-holdout-255",
+      "field": "caption",
+      "text": "Je n'achète plus neuf depuis six mois. Ma plus belle découverte : un imperméable vintage bleu marine."
+    },
+    {
+      "id": "fr-holdout-256",
+      "field": "caption",
+      "text": "Le zip de mes bottes a lâché ce matin. Direction cordonnier demain."
+    },
+    {
+      "id": "fr-holdout-257",
+      "field": "caption",
+      "text": "Tri de la penderie avec ma sœur, on s'échange des pièces au lieu de les donner."
+    },
+    {
+      "id": "fr-holdout-258",
+      "field": "caption",
+      "text": "Lessive spéciale laine : je mets un peu d'après-shampooing, la maille reste douce."
+    },
+    {
+      "id": "fr-holdout-259",
+      "field": "caption",
+      "text": "Bottines sans marque trouvées pour 6 $, mais le cuir est d'une qualité folle."
+    },
+    {
+      "id": "fr-holdout-260",
+      "field": "caption",
+      "text": "J'ai remplacé l'élastique fatigué de mon pantalon de jogging. Dix minutes et il est comme neuf."
+    },
+    {
+      "id": "fr-holdout-261",
+      "field": "caption",
+      "text": "Grand changement de saison ce week-end : les maillots et robes d'été montent au grenier, les pulls redescendent."
+    },
+    {
+      "id": "fr-holdout-262",
+      "field": "caption",
+      "text": "Les bottes d'hiver sont sorties du sous-sol. Elles sentent un peu le carton mais elles sont prêtes."
+    },
+    {
+      "id": "fr-holdout-263",
+      "field": "caption",
+      "text": "Rangement des manteaux d'hiver dans des housses en coton, avec des sachets de lavande."
+    },
+    {
+      "id": "fr-holdout-264",
+      "field": "caption",
+      "text": "Changement de garde-robe fait. J'ai découvert que j'avais quatre pulls gris presque identiques."
+    },
+    {
+      "id": "fr-holdout-265",
+      "field": "caption",
+      "text": "Premier jour de printemps : je range les tuques, mais je garde un bonnet à portée de main. On ne sait jamais."
+    },
+    {
+      "id": "fr-holdout-266",
+      "field": "caption",
+      "text": "Je fais la rotation de saison et j'en profite pour laver tout avant de ranger."
+    },
+    {
+      "id": "fr-holdout-267",
+      "field": "caption",
+      "text": "Été terminé, je range les sandales après un bon nettoyage. À l'année prochaine."
+    },
+    {
+      "id": "fr-holdout-268",
+      "field": "caption",
+      "text": "Ma technique : je retourne les cintres en début de saison et je vois ce que je n'ai jamais porté."
+    },
+    {
+      "id": "fr-holdout-269",
+      "field": "caption",
+      "text": "Les pneus d'hiver sont installés et les mitaines sont dans l'entrée. On est prêts."
+    },
+    {
+      "id": "fr-holdout-270",
+      "field": "caption",
+      "text": "Petite boîte sous le lit pour les foulards d'hiver, une pour les chapeaux d'été. Ça libère tellement d'espace."
+    },
+    {
+      "id": "fr-holdout-271",
+      "field": "caption",
+      "text": "Je ressors les pulls et je retrouve des billets de bus de l'an dernier dans les poches."
+    },
+    {
+      "id": "fr-holdout-272",
+      "field": "caption",
+      "text": "La saison des feuilles mortes commence, place aux tons rouille et moutarde dans le placard."
+    },
+    {
+      "id": "fr-holdout-273",
+      "field": "caption",
+      "text": "Garde-robe d'automne prête : trois pulls, deux pantalons en laine, une veste, deux paires de bottines."
+    },
+    {
+      "id": "fr-holdout-274",
+      "field": "caption",
+      "text": "Le changement d'heure me rappelle toujours de faire le changement de saison dans mon placard."
+    },
+    {
+      "id": "fr-holdout-275",
+      "field": "caption",
+      "text": "Je garde quelques t-shirts d'été en couche de base pour l'hiver. Ils ne partent pas au grenier."
+    },
+    {
+      "id": "fr-holdout-276",
+      "field": "caption",
+      "text": "Retour des longues soirées, retour des gilets épais. Je ne m'en plains pas."
+    },
+    {
+      "id": "fr-holdout-277",
+      "field": "caption",
+      "text": "Rangement des vêtements de neige des enfants. La moitié est trop petite, direction l'échange de quartier."
+    },
+    {
+      "id": "fr-holdout-278",
+      "field": "caption",
+      "text": "Sortie des imperméables : avril arrive, et avec lui les giboulées."
+    },
+    {
+      "id": "fr-holdout-279",
+      "field": "caption",
+      "text": "J'ai mis les vêtements d'été sous vide pour la première fois. Gain de place impressionnant."
+    },
+    {
+      "id": "fr-holdout-280",
+      "field": "caption",
+      "text": "Inventaire de mes chaussures avant l'hiver : deux paires à réparer, une à donner."
+    },
+    {
+      "id": "fr-holdout-281",
+      "field": "caption",
+      "text": "C'est la semaine du grand basculement : les lainages au premier rang, le lin au fond."
+    },
+    {
+      "id": "fr-holdout-282",
+      "field": "caption",
+      "text": "Je n'ai pas encore osé ranger les manteaux. Mai à Québec, c'est imprévisible."
+    },
+    {
+      "id": "fr-holdout-283",
+      "field": "caption",
+      "text": "Le placard sent le cèdre, les pulls sont pliés, l'automne peut arriver 🍂"
+    },
+    {
+      "id": "fr-holdout-284",
+      "field": "caption",
+      "text": "Je profite du changement de saison pour photographier chaque pièce dans l'appli. Ça m'aide à planifier."
+    },
+    {
+      "id": "fr-holdout-285",
+      "field": "caption",
+      "text": "Tous les cotons légers en haut de la penderie, les lainages à hauteur des yeux. Mon nouveau système."
+    },
+    {
+      "id": "fr-holdout-286",
+      "field": "caption",
+      "text": "Ma règle : si je n'ai pas porté un vêtement de toute la saison, il part en don."
+    },
+    {
+      "id": "fr-holdout-287",
+      "field": "caption",
+      "text": "Rangement de l'été terminé. J'ai gardé une robe légère sortie, pour les redoux d'octobre."
+    },
+    {
+      "id": "fr-holdout-288",
+      "field": "caption",
+      "text": "Les bottes de pluie reprennent leur place près de la porte. Automne, je suis prête."
+    },
+    {
+      "id": "fr-holdout-289",
+      "field": "caption",
+      "text": "Je viens de trouver mon écharpe préférée oubliée dans une boîte d'été. Retrouvailles émues."
+    },
+    {
+      "id": "fr-holdout-290",
+      "field": "caption",
+      "text": "Grand ménage de printemps dans la penderie, avec de la musique et beaucoup de thé."
+    },
+    {
+      "id": "fr-holdout-291",
+      "field": "caption",
+      "text": "Changement de saison express : 30 minutes chrono, deux bacs, aucune hésitation."
+    },
+    {
+      "id": "fr-holdout-292",
+      "field": "caption",
+      "text": "Je range mes chapeaux de paille dans une boîte ronde avec du papier de soie pour qu'ils gardent leur forme."
+    },
+    {
+      "id": "fr-holdout-293",
+      "field": "caption",
+      "text": "Les journées raccourcissent, j'ai sorti les couleurs chaudes et rangé le blanc."
+    },
+    {
+      "id": "fr-holdout-294",
+      "field": "caption",
+      "text": "Chaque printemps je me promets d'acheter moins. Cette année, liste écrite : une veste légère et c'est tout."
+    },
+    {
+      "id": "fr-holdout-295",
+      "field": "caption",
+      "text": "J'ai enfin trouvé un endroit pour les doudounes l'été : le haut du placard de l'entrée."
+    },
+    {
+      "id": "fr-holdout-296",
+      "field": "caption",
+      "text": "Bascule hiver-printemps : les collants épais partent, les chaussettes fines arrivent."
+    },
+    {
+      "id": "fr-holdout-297",
+      "field": "caption",
+      "text": "Avant de ranger mes pulls, je les brosse et je les plie avec des feuilles de papier."
+    },
+    {
+      "id": "fr-holdout-298",
+      "field": "caption",
+      "text": "Je redécouvre mes vêtements d'il y a un an comme si c'étaient de nouveaux achats. Le plaisir du changement de saison."
+    },
+    {
+      "id": "fr-holdout-299",
+      "field": "caption",
+      "text": "Petite pause dans le rangement pour essayer tous mes vieux manteaux. Deux partent, un revient en grâce."
+    },
+    {
+      "id": "fr-holdout-300",
+      "field": "caption",
+      "text": "J'adore ce moment où le placard est enfin adapté à la météo du dehors."
+    },
+    {
+      "id": "fr-holdout-301",
+      "field": "caption",
+      "text": "Je fais le tri des maillots de bain : élastiques fatigués, on remplace. Le reste repart au tiroir."
+    },
+    {
+      "id": "fr-holdout-302",
+      "field": "caption",
+      "text": "Dépôt des pantalons de neige trop petits à l'école pour l'échange annuel. Super initiative."
+    },
+    {
+      "id": "fr-holdout-303",
+      "field": "caption",
+      "text": "Changement de saison chez nous : les enfants essaient tout, je note ce qui manque."
+    },
+    {
+      "id": "fr-holdout-304",
+      "field": "caption",
+      "text": "Encore de la pluie. #teamimper"
+    },
+    {
+      "id": "fr-holdout-305",
+      "field": "caption",
+      "text": "Mitaines retrouvées, hiver accepté ❄️"
+    },
+    {
+      "id": "fr-holdout-306",
+      "field": "caption",
+      "text": "Petit rappel : regarder la météo avant de choisir ses chaussures 😉"
+    },
+    {
+      "id": "fr-holdout-307",
+      "field": "caption",
+      "text": "Soleil d'hiver et col roulé #matindefroid"
+    },
+    {
+      "id": "fr-holdout-308",
+      "field": "caption",
+      "text": "Qui d'autre a ressorti la polaire aujourd'hui ?"
+    },
+    {
+      "id": "fr-holdout-309",
+      "field": "caption",
+      "text": "Bonne journée à tous, couvrez-vous bien ce matin !"
+    },
+    {
+      "id": "fr-holdout-310",
+      "field": "caption",
+      "text": "Les jours de bruine, c'est le béret qui sauve tout."
+    },
+    {
+      "id": "fr-holdout-311",
+      "field": "caption",
+      "text": "Bientôt le printemps, je le sens dans mes chaussettes."
+    },
+    {
+      "id": "fr-holdout-312",
+      "field": "caption",
+      "text": "Aujourd'hui, j'ai suivi la suggestion de l'appli à la lettre et je n'ai eu ni chaud ni froid. Une première !"
+    },
+    {
+      "id": "fr-holdout-313",
+      "field": "caption",
+      "text": "#friperie #secondemain belle récolte ce midi"
+    },
+    {
+      "id": "fr-holdout-314",
+      "field": "caption",
+      "text": "Longue journée dehors : départ à 7h par 2 degrés, retour à 19h sous une petite pluie. J'avais une chemise en flanelle, un pull fin, une doudoune légère et un imper roulé dans le sac. Tout a servi, à un moment ou un autre. Je suis fière de mon organisation."
+    },
+    {
+      "id": "fr-holdout-315",
+      "field": "caption",
+      "text": "Question un peu longue : je pars trois semaines entre Montréal, Québec et Halifax en octobre, avec un seul sac à dos. Je pensais à un manteau mi-saison, deux pantalons, quatre hauts et une paire de bottines. Est-ce que j'oublie quelque chose d'essentiel selon vous ?"
+    },
+    {
+      "id": "fr-holdout-316",
+      "field": "altText",
+      "text": "Photo à plat d'un pull crème, d'un jean brut et de bottines marron posés sur un parquet clair."
+    },
+    {
+      "id": "fr-holdout-317",
+      "field": "altText",
+      "text": "Selfie dans le miroir d'une entrée : manteau long camel, écharpe grise et sac en cuir noir."
+    },
+    {
+      "id": "fr-holdout-318",
+      "field": "altText",
+      "text": "Gros plan sur des bottes d'hiver noires couvertes de neige sur un trottoir."
+    },
+    {
+      "id": "fr-holdout-319",
+      "field": "altText",
+      "text": "Personne de dos dans une rue pavée, imperméable jaune et parapluie transparent."
+    },
+    {
+      "id": "fr-holdout-320",
+      "field": "altText",
+      "text": "Détail d'un tissu en tweed gris et bleu avec des boutons en corne."
+    },
+    {
+      "id": "fr-holdout-321",
+      "field": "altText",
+      "text": "Vêtements pliés dans une valise ouverte : chemises en lin, short beige et sandales."
+    },
+    {
+      "id": "fr-holdout-322",
+      "field": "altText",
+      "text": "Paire de baskets blanches posées sur un paillasson mouillé à côté d'un parapluie fermé."
+    },
+    {
+      "id": "fr-holdout-323",
+      "field": "altText",
+      "text": "Photo de rue : personne en parka verte et tuque rouge attendant à un arrêt de bus enneigé."
+    },
+    {
+      "id": "fr-holdout-324",
+      "field": "altText",
+      "text": "Tenue étalée sur un lit : robe midi à fleurs, cardigan bleu et ballerines beiges."
+    },
+    {
+      "id": "fr-holdout-325",
+      "field": "altText",
+      "text": "Gros plan sur un reprisage visible en laine jaune sur le coude d'un pull marine."
+    },
+    {
+      "id": "fr-holdout-326",
+      "field": "altText",
+      "text": "Miroir de cabine d'essayage : veste en jean oversize sur une robe noire."
+    },
+    {
+      "id": "fr-holdout-327",
+      "field": "altText",
+      "text": "Mitaines en laine rouge et blanche posées sur une table en bois."
+    },
+    {
+      "id": "fr-holdout-328",
+      "field": "altText",
+      "text": "Pieds en mocassins bruns et chaussettes moutarde sur un sol en carrelage."
+    },
+    {
+      "id": "fr-holdout-329",
+      "field": "altText",
+      "text": "Portant de friperie avec des chemises à carreaux et une veste en velours côtelé au premier plan."
+    },
+    {
+      "id": "fr-holdout-330",
+      "field": "altText",
+      "text": "Personne assise sur un banc de parc en trench beige, feuilles orange au sol."
+    },
+    {
+      "id": "fr-holdout-331",
+      "field": "altText",
+      "text": "Flat lay estival : chapeau de paille, lunettes de soleil, robe en lin blanche et espadrilles."
+    },
+    {
+      "id": "fr-holdout-332",
+      "field": "altText",
+      "text": "Gros plan sur un ourlet fraîchement cousu sur un pantalon gris."
+    },
+    {
+      "id": "fr-holdout-333",
+      "field": "altText",
+      "text": "Selfie miroir dans un ascenseur : blazer marine, chemise blanche, pantalon chino."
+    },
+    {
+      "id": "fr-holdout-334",
+      "field": "altText",
+      "text": "Bottes de pluie vertes à côté d'une porte d'entrée, gouttes d'eau sur le sol."
+    },
+    {
+      "id": "fr-holdout-335",
+      "field": "altText",
+      "text": "Personne marchant sur un pont, doudoune noire, bonnet gris et sac à dos."
+    },
+    {
+      "id": "fr-holdout-336",
+      "field": "altText",
+      "text": "Texture d'un pull torsadé couleur avoine photographiée de très près."
+    },
+    {
+      "id": "fr-holdout-337",
+      "field": "altText",
+      "text": "Penderie ouverte avec des pulls pliés sur l'étagère et des manteaux sur cintres."
+    },
+    {
+      "id": "fr-holdout-338",
+      "field": "altText",
+      "text": "Linge en train de sécher sur un étendoir au soleil sur un balcon."
+    },
+    {
+      "id": "fr-holdout-339",
+      "field": "altText",
+      "text": "Vue de haut de trois paires de chaussures alignées : bottines, baskets et sandales."
+    },
+    {
+      "id": "fr-holdout-340",
+      "field": "altText",
+      "text": "Photo de rue sous la pluie : manteau bleu marine, parapluie noir, reflets sur le trottoir."
+    },
+    {
+      "id": "fr-holdout-341",
+      "field": "altText",
+      "text": "Gros plan sur une étiquette d'entretien avec les symboles de lavage."
+    },
+    {
+      "id": "fr-holdout-342",
+      "field": "altText",
+      "text": "Enfant en habit de neige bleu debout dans une cour enneigée."
+    },
+    {
+      "id": "fr-holdout-343",
+      "field": "altText",
+      "text": "Veste matelassée kaki posée sur une chaise, écharpe à carreaux sur le dossier."
+    },
+    {
+      "id": "fr-holdout-344",
+      "field": "altText",
+      "text": "Miroir de chambre : pantalon large crème, pull côtelé brun et ceinture fine."
+    },
+    {
+      "id": "fr-holdout-345",
+      "field": "altText",
+      "text": "Gros plan sur des boutons en laiton cousus sur un caban bleu marine."
+    },
+    {
+      "id": "fr-holdout-346",
+      "field": "altText",
+      "text": "Bacs de rangement étiquetés « été » et « hiver » empilés dans un placard."
+    },
+    {
+      "id": "fr-holdout-347",
+      "field": "altText",
+      "text": "Personne à vélo en imperméable court et pantalon retroussé, rue mouillée."
+    },
+    {
+      "id": "fr-holdout-348",
+      "field": "altText",
+      "text": "Flat lay de voyage : passeport, foulard léger, pantalon fluide et baskets en toile."
+    },
+    {
+      "id": "fr-holdout-349",
+      "field": "altText",
+      "text": "Détail d'une fermeture éclair neuve cousue sur une parka grise."
+    },
+    {
+      "id": "fr-holdout-350",
+      "field": "altText",
+      "text": "Selfie miroir avec chemise en flanelle rouge, jean et bottes de travail."
+    },
+    {
+      "id": "fr-holdout-351",
+      "field": "altText",
+      "text": "Robe longue imprimée suspendue à une porte, lumière du matin."
+    },
+    {
+      "id": "fr-holdout-352",
+      "field": "altText",
+      "text": "Paire de bottines en cuir fraîchement cirées posées sur du papier journal."
+    },
+    {
+      "id": "fr-holdout-353",
+      "field": "altText",
+      "text": "Photo de rue en été : robe jaune, sandales plates et sac en osier."
+    },
+    {
+      "id": "fr-holdout-354",
+      "field": "altText",
+      "text": "Gros plan d'un tissu en lin froissé couleur sauge."
+    },
+    {
+      "id": "fr-holdout-355",
+      "field": "altText",
+      "text": "Pile de pulls pliés par couleur, du blanc au bleu foncé."
+    },
+    {
+      "id": "fr-holdout-356",
+      "field": "altText",
+      "text": "Personne debout devant un mur de briques en manteau de laine gris et bonnet."
+    },
+    {
+      "id": "fr-holdout-357",
+      "field": "altText",
+      "text": "Valise cabine ouverte avec des cubes de rangement de couleurs différentes."
+    },
+    {
+      "id": "fr-holdout-358",
+      "field": "altText",
+      "text": "Mains tenant une aiguille et du fil au-dessus d'une chemise blanche."
+    },
+    {
+      "id": "fr-holdout-359",
+      "field": "altText",
+      "text": "Bottes de randonnée boueuses sur un tapis à l'entrée d'un chalet."
+    },
+    {
+      "id": "fr-holdout-360",
+      "field": "altText",
+      "text": "Miroir d'entrée : tenue tout en noir éclairée par une écharpe orange."
+    },
+    {
+      "id": "fr-holdout-361",
+      "field": "altText",
+      "text": "Gros plan sur des chaussettes en laine épaisse sur un plancher de bois."
+    },
+    {
+      "id": "fr-holdout-362",
+      "field": "altText",
+      "text": "Écharpes roulées dans un panier en osier près d'une porte."
+    },
+    {
+      "id": "fr-holdout-363",
+      "field": "altText",
+      "text": "Personne attendant le tram en veste en cuir et jean clair, ciel nuageux."
+    },
+    {
+      "id": "fr-holdout-364",
+      "field": "altText",
+      "text": "Flat lay hivernal : tuque, mitaines, cache-cou et chaufferettes."
+    },
+    {
+      "id": "fr-holdout-365",
+      "field": "altText",
+      "text": "Chemise rayée bleue et blanche sur cintre, accrochée à une fenêtre."
+    },
+    {
+      "id": "fr-holdout-366",
+      "field": "altText",
+      "text": "Jupe plissée verte et collants noirs vus dans un miroir en pied."
+    },
+    {
+      "id": "fr-holdout-367",
+      "field": "altText",
+      "text": "Gros plan sur un col en velours côtelé d'une veste de travail."
+    },
+    {
+      "id": "fr-holdout-368",
+      "field": "altText",
+      "text": "Sandales en cuir posées sur du sable, ombre d'un parasol."
+    },
+    {
+      "id": "fr-holdout-369",
+      "field": "altText",
+      "text": "Enfant en ciré jaune sautant dans une flaque sur un trottoir."
+    },
+    {
+      "id": "fr-holdout-370",
+      "field": "altText",
+      "text": "Housse de vêtement transparente contenant un manteau long beige."
+    },
+    {
+      "id": "fr-holdout-371",
+      "field": "altText",
+      "text": "Pull à rayures marinières posé sur une table avec une tasse de café."
+    },
+    {
+      "id": "fr-holdout-372",
+      "field": "altText",
+      "text": "Photo de dos : sac à dos de randonnée, coupe-vent rouge, sentier forestier."
+    },
+    {
+      "id": "fr-holdout-373",
+      "field": "altText",
+      "text": "Miroir de salle de bain : t-shirt blanc, salopette en jean et baskets."
+    },
+    {
+      "id": "fr-holdout-374",
+      "field": "altText",
+      "text": "Gros plan sur un tissu à carreaux écossais rouge et vert."
+    },
+    {
+      "id": "fr-holdout-375",
+      "field": "altText",
+      "text": "Imperméable bleu suspendu à une patère, gouttes qui tombent sur le sol."
+    },
+    {
+      "id": "fr-holdout-376",
+      "field": "altText",
+      "text": "Assortiment de boutons dépareillés dans une boîte en métal."
+    },
+    {
+      "id": "fr-holdout-377",
+      "field": "altText",
+      "text": "Personne marchant dans la neige en bottes hautes et manteau long noir."
+    },
+    {
+      "id": "fr-holdout-378",
+      "field": "altText",
+      "text": "Flat lay de mi-saison : trench, pull fin gris, jean droit et mocassins."
+    },
+    {
+      "id": "fr-holdout-379",
+      "field": "altText",
+      "text": "Gros plan sur des semelles neuves fixées à des bottines usées."
+    },
+    {
+      "id": "fr-holdout-380",
+      "field": "altText",
+      "text": "Robe d'été en coton blanc sur un cintre en bois devant un mur bleu."
+    },
+    {
+      "id": "fr-holdout-381",
+      "field": "altText",
+      "text": "Selfie miroir dans un vestiaire : tenue de sport, veste coupe-vent et casquette."
+    },
+    {
+      "id": "fr-holdout-382",
+      "field": "altText",
+      "text": "Vêtements triés en trois piles sur un lit : garder, donner, réparer."
+    },
+    {
+      "id": "fr-holdout-383",
+      "field": "altText",
+      "text": "Bonnet en laine côtelée vert sapin sur une étagère."
+    },
+    {
+      "id": "fr-holdout-384",
+      "field": "altText",
+      "text": "Personne sur un quai de gare, valise à roulettes, manteau camel et baskets."
+    },
+    {
+      "id": "fr-holdout-385",
+      "field": "altText",
+      "text": "Gros plan d'un détachant appliqué sur une tache de café sur un chemisier."
+    },
+    {
+      "id": "fr-holdout-386",
+      "field": "altText",
+      "text": "Ceinture en cuir tressé enroulée sur une table en marbre."
+    },
+    {
+      "id": "fr-holdout-387",
+      "field": "altText",
+      "text": "Photo de rue d'automne : veste en velours côtelé rouille, jean noir, feuilles au sol."
+    },
+    {
+      "id": "fr-holdout-388",
+      "field": "altText",
+      "text": "Chaussures de ville en cuir bordeaux avec des embauchoirs en bois."
+    },
+    {
+      "id": "fr-holdout-389",
+      "field": "altText",
+      "text": "Miroir d'hôtel : robe portefeuille bleu nuit et sandales à talons larges."
+    },
+    {
+      "id": "fr-holdout-390",
+      "field": "altText",
+      "text": "Rangée de manteaux d'hiver sur un portant avant le rangement de printemps."
+    },
+    {
+      "id": "fr-holdout-391",
+      "field": "altText",
+      "text": "Gros plan d'une maille fine en mérinos gris chiné."
+    },
+    {
+      "id": "fr-holdout-392",
+      "field": "altText",
+      "text": "Petit sac à dos ouvert contenant un imperméable plié et un pull."
+    },
+    {
+      "id": "fr-holdout-393",
+      "field": "altText",
+      "text": "Personne en chemise en lin et pantalon beige sur une terrasse ensoleillée."
+    },
+    {
+      "id": "fr-holdout-394",
+      "field": "altText",
+      "text": "Gants en cuir brun posés sur le rebord d'une fenêtre givrée."
+    },
+    {
+      "id": "fr-holdout-395",
+      "field": "altText",
+      "text": "Flat lay printanier : veste en jean, t-shirt rayé, jupe midi et baskets blanches."
+    },
+    {
+      "id": "fr-holdout-396",
+      "field": "altText",
+      "text": "Gros plan sur une poche intérieure cousue dans la doublure d'un manteau."
+    },
+    {
+      "id": "fr-holdout-397",
+      "field": "altText",
+      "text": "Paire de bottes d'hiver avec des traces de sel, à côté d'une brosse et d'un chiffon."
+    },
+    {
+      "id": "fr-holdout-398",
+      "field": "altText",
+      "text": "Selfie miroir en pied : costume gris clair, chemise bleue sans cravate."
+    },
+    {
+      "id": "fr-holdout-399",
+      "field": "altText",
+      "text": "Chapeau de feutre brun posé sur une valise vintage."
+    },
+    {
+      "id": "fr-holdout-400",
+      "field": "altText",
+      "text": "Vue de dessus d'une machine à laver ouverte avec un filet à linge."
+    },
+    {
+      "id": "fr-holdout-401",
+      "field": "altText",
+      "text": "Personne debout sous un abribus, parka longue, capuche bordée, neige qui tombe."
+    },
+    {
+      "id": "fr-holdout-402",
+      "field": "altText",
+      "text": "Deux pulls comparés côte à côte sur un lit, l'un vert, l'autre bleu."
+    },
+    {
+      "id": "fr-holdout-403",
+      "field": "altText",
+      "text": "Gros plan sur une étiquette de prix de friperie attachée à un manteau en laine."
+    },
+    {
+      "id": "fr-holdout-404",
+      "field": "altText",
+      "text": "Tenue d'enfant étalée : pantalon imperméable, bottes en caoutchouc et polaire orange."
+    },
+    {
+      "id": "fr-holdout-405",
+      "field": "altText",
+      "text": "Rue ensoleillée, personne en short en lin, chemise ouverte et casquette."
+    },
+    {
+      "id": "fr-holdout-406",
+      "field": "altText",
+      "text": "Tissu en velours côtelé bordeaux plié, vu de près sous une lumière rasante."
+    },
+    {
+      "id": "fr-holdout-407",
+      "field": "altText",
+      "text": "Miroir de chambre : robe pull grise, collants épais et bottes à mi-mollet."
+    },
+    {
+      "id": "fr-holdout-408",
+      "field": "altText",
+      "text": "Sachets de lavande posés sur une pile de pulls dans un tiroir."
+    },
+    {
+      "id": "fr-holdout-409",
+      "field": "altText",
+      "text": "Escarpins noirs avec des talons neufs sur le comptoir d'un cordonnier."
+    },
+    {
+      "id": "fr-holdout-410",
+      "field": "altText",
+      "text": "Photo à plat d'une tenue de randonnée : t-shirt mérinos, polaire, coquille et bâtons."
+    },
+    {
+      "id": "fr-holdout-411",
+      "field": "altText",
+      "text": "Personne traversant un passage piéton sous la neige, manteau rouge et bottes noires."
+    },
+    {
+      "id": "fr-holdout-412",
+      "field": "altText",
+      "text": "Gros plan sur une ceinture nouée autour d'un trench beige."
+    },
+    {
+      "id": "fr-holdout-413",
+      "field": "altText",
+      "text": "Photo de rue par temps de neige : personne en parka bleu marine à capuche bordée, pantalon de neige noir et bottes à lacets, qui tient un sac d'épicerie devant une vitrine éclairée."
+    },
+    {
+      "id": "fr-holdout-414",
+      "field": "altText",
+      "text": "Vue de dessus d'une tenue de mi-saison posée sur un drap blanc : trench beige, pull fin couleur sauge, jean droit délavé, mocassins bruns et une écharpe légère à motifs."
+    },
+    {
+      "id": "fr-holdout-415",
+      "field": "altText",
+      "text": "Selfie dans un grand miroir de couloir : robe midi en velours bordeaux, collants noirs opaques, bottines à petit talon et manteau gris tenu sur le bras."
+    },
+    {
+      "id": "fr-holdout-416",
+      "field": "altText",
+      "text": "Gros plan sur la manche d'un pull bleu marine reprisée en laine jaune moutarde, avec l'aiguille à laine et la pelote posées à côté sur une table en bois."
+    },
+    {
+      "id": "fr-holdout-417",
+      "field": "altText",
+      "text": "Valise cabine ouverte sur un lit : chemises en lin roulées, deux robes légères, une paire de sandales dans un sac en tissu et une trousse de toilette transparente."
+    },
+    {
+      "id": "fr-holdout-418",
+      "field": "altText",
+      "text": "Personne de dos sur un trottoir mouillé, imperméable vert olive, capuche relevée, bottes de pluie noires et parapluie transparent ouvert au-dessus de la tête."
+    },
+    {
+      "id": "fr-holdout-419",
+      "field": "altText",
+      "text": "Portant de friperie vu de face : manteaux en laine aux tons camel, gris et marine, un caban à boutons dorés au centre et des foulards suspendus à un crochet."
+    },
+    {
+      "id": "fr-holdout-420",
+      "field": "altText",
+      "text": "Gros plan sur une paire de bottes en cuir brun posées sur un journal, l'une cirée et brillante, l'autre encore marquée par des traces de sel blanches."
+    }
+  ]
+}

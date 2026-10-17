@@ -1,0 +1,2113 @@
+{
+  "language": "de",
+  "corpusVersion": "holdout-v1",
+  "description": "Frozen clean holdout: ordinary fashion captions and alt text written natively in the language after the allow list froze, independently of the clean half, and never used to tune the screener, the lists or the allow list. The release gate's clean-copy figure is computed here. Entries labelled expected review carry one of the policy's deliberate review terms.",
+  "expected": "pass",
+  "frozenAgainst": {
+    "allowListSha256": "22d1f261f3666cf37369e67359aeabc383ac0a689babe04f87023ba1aee70256",
+    "termsSha256": "517c05fbc7bb46189cc23c532e1acbf46a73342dd2a2a8976cb6a99ea065e434",
+    "languageAllowListSha256": "7f0a9548ddc645a189fc832cc16a815f4816e744c2f92e7f0ba9bd876ee95ea4"
+  },
+  "entries": [
+    {
+      "id": "de-holdout-001",
+      "field": "caption",
+      "text": "Schon wieder Regen. Die Wildlederschuhe bleiben zu Hause, heute sind die Gummistiefel dran."
+    },
+    {
+      "id": "de-holdout-002",
+      "field": "caption",
+      "text": "Laut Vorhersage 12 Grad, an der Bushaltestelle gefühlt eher 6. Zum Glück hab ich den Schal noch geschnappt."
+    },
+    {
+      "id": "de-holdout-003",
+      "field": "caption",
+      "text": "Auf der Brücke hat es heute so gezogen, dass mein langer Mantel fast zum Segel wurde."
+    },
+    {
+      "id": "de-holdout-004",
+      "field": "caption",
+      "text": "Kurz einkaufen in Kapuzenpulli und alter Jeansjacke. Der Nieselregen hörte natürlich genau auf, als ich zu Hause war."
+    },
+    {
+      "id": "de-holdout-005",
+      "field": "caption",
+      "text": "Schwül und grau. Leinenhemd, kurze Chino, Stoffsneaker. Um neun trotzdem schon durchgeschwitzt."
+    },
+    {
+      "id": "de-holdout-006",
+      "field": "caption",
+      "text": "Erster Frost auf dem Auto. Die Wollhandschuhe sind wieder aus der Flurschublade aufgetaucht."
+    },
+    {
+      "id": "de-holdout-007",
+      "field": "caption",
+      "text": "Mit dem Rad zur Arbeit bei leichtem Regen: Regenjacke über Merinoshirt, schnell trocknende Hose, Hosenklammern."
+    },
+    {
+      "id": "de-holdout-008",
+      "field": "caption",
+      "text": "Sonnig, aber nur 4 Grad. Die Daunenweste unter dem Trenchcoat hat besser funktioniert als gedacht."
+    },
+    {
+      "id": "de-holdout-009",
+      "field": "caption",
+      "text": "post, apotheke, bäcker. drei stopps, zwei schauer, eine ziemlich nasse stofftasche"
+    },
+    {
+      "id": "de-holdout-010",
+      "field": "caption",
+      "text": "Hitzewarnung heute, also ganz simpel: weites Baumwollkleid, Strohhut, Sandalen mit Fersenriemen."
+    },
+    {
+      "id": "de-holdout-011",
+      "field": "caption",
+      "text": "Nebel so dicht, dass ich die Straßenbahn kaum gesehen habe. Die gelbe Regenjacke hat sich heute gelohnt."
+    },
+    {
+      "id": "de-holdout-012",
+      "field": "caption",
+      "text": "Absätze in die Tasche, flache Schuhe an. Kopfsteinpflaster mit nassem Laub ist mir zu riskant."
+    },
+    {
+      "id": "de-holdout-013",
+      "field": "caption",
+      "text": "Die Klimaanlage im Büro steht wieder auf Polarkreis. Ab jetzt hängt eine Strickjacke an meinem Stuhl."
+    },
+    {
+      "id": "de-holdout-014",
+      "field": "caption",
+      "text": "Schulweg im plötzlichen Hagelschauer. Die Kinder fanden es großartig, meine Frisur eher nicht."
+    },
+    {
+      "id": "de-holdout-015",
+      "field": "caption",
+      "text": "Leichter Schnee, matschige Gehwege. Stiefel mit Profilsohle und Wollsocken, fertig."
+    },
+    {
+      "id": "de-holdout-016",
+      "field": "caption",
+      "text": "Bei blauem Himmel zum Markt, bei Platzregen zurück. Die faltbare Jacke hat mich gerettet."
+    },
+    {
+      "id": "de-holdout-017",
+      "field": "caption",
+      "text": "Mittags schon 28 Grad. In der Pause die Jeans gegen den Rock aus meiner Schreibtischschublade getauscht."
+    },
+    {
+      "id": "de-holdout-018",
+      "field": "caption",
+      "text": "Morgens 3 Grad, nachmittags 17. Thermoshirt, Hemd, Pulli, Mantel. Jede Stunde eine Schicht weniger."
+    },
+    {
+      "id": "de-holdout-019",
+      "field": "caption",
+      "text": "Gassi um sechs in Wachsjacke und Mütze. Die Nachbarn joggen in kurzen Hosen. Wer hat recht?"
+    },
+    {
+      "id": "de-holdout-020",
+      "field": "caption",
+      "text": "So windig, dass die weite Hose heute im Schrank bleibt. Gerader Schnitt flattert nicht."
+    },
+    {
+      "id": "de-holdout-021",
+      "field": "caption",
+      "text": "Erledigungstag: Gummistiefel, kurzer Trench, Umhängetasche, damit beide Hände für den Schirm frei sind."
+    },
+    {
+      "id": "de-holdout-022",
+      "field": "caption",
+      "text": "Die App hat Regen angesagt, ich hab den Schirm vergessen. Dritte Lektion in diesem Monat ☔"
+    },
+    {
+      "id": "de-holdout-023",
+      "field": "caption",
+      "text": "Am Bahnsteig war es eiskalt. Nächstes Mal den dicken langen Schal statt des hübschen dünnen."
+    },
+    {
+      "id": "de-holdout-024",
+      "field": "caption",
+      "text": "Den ganzen Tag Niesel. Wasserabweisender Parka und Strickmütze, trocken und warm angekommen."
+    },
+    {
+      "id": "de-holdout-025",
+      "field": "caption",
+      "text": "Endlich Sonne! Die Jeansjacke ist offiziell zurück."
+    },
+    {
+      "id": "de-holdout-026",
+      "field": "caption",
+      "text": "Glatteiswarnung. Trailschuhe mit gutem Grip für den Weg, Büroschuhe im Rucksack."
+    },
+    {
+      "id": "de-holdout-027",
+      "field": "caption",
+      "text": "Zu warm für den Mantel, zu kalt ohne. Hab ihn den ganzen Weg über dem Arm getragen."
+    },
+    {
+      "id": "de-holdout-028",
+      "field": "caption",
+      "text": "Regenmontag-Uniform: dunkle Jeans, grauer Rollkragen, Stiefel mit Gummisohle, marineblaue Regenjacke."
+    },
+    {
+      "id": "de-holdout-029",
+      "field": "caption",
+      "text": "Pollenflug hoch, 22 Grad. Sonnenbrille, leichtes Overshirt und eine Packung Taschentücher."
+    },
+    {
+      "id": "de-holdout-030",
+      "field": "caption",
+      "text": "Auf dem Heimweg die Reinigung abgeholt. Der Himmel klarte genau auf, als ich rauskam."
+    },
+    {
+      "id": "de-holdout-031",
+      "field": "caption",
+      "text": "Gewitter in der Mittagspause. Im Café gewartet, bis es vorbei war. Hat sich gelohnt."
+    },
+    {
+      "id": "de-holdout-032",
+      "field": "caption",
+      "text": "Kälteeinbruch. Zwei Paar Socken und Thermoleggings unter der Hose, im Büro hat es keiner gemerkt."
+    },
+    {
+      "id": "de-holdout-033",
+      "field": "caption",
+      "text": "Frisch und sonnig. Perfekt für das gestreifte Shirt mit U-Boot-Ausschnitt und die weiße Jeans."
+    },
+    {
+      "id": "de-holdout-034",
+      "field": "caption",
+      "text": "Besorgungen am Schneetag in meiner alten Skijacke. Nicht schick, aber sehr warm."
+    },
+    {
+      "id": "de-holdout-035",
+      "field": "caption",
+      "text": "Schwüler Weg zur Apotheke. Das leichteste Hemd an und trotzdem gefühlt in der Suppe gelaufen."
+    },
+    {
+      "id": "de-holdout-036",
+      "field": "caption",
+      "text": "Niesel, Sonne, Niesel. Meine Haare haben aufgegeben, meine Stiefel halten tapfer durch."
+    },
+    {
+      "id": "de-holdout-037",
+      "field": "caption",
+      "text": "Frühschicht bei 2 Grad. Reflektorband am Ärmel für den dunklen Weg."
+    },
+    {
+      "id": "de-holdout-038",
+      "field": "caption",
+      "text": "Immer wieder Schauer. Fischerhut statt Schirm, hat super geklappt."
+    },
+    {
+      "id": "de-holdout-039",
+      "field": "caption",
+      "text": "Frühlingswind ist kein Spaß. Der Hut ist zweimal weggeflogen, jetzt liegt er in der Tasche."
+    },
+    {
+      "id": "de-holdout-040",
+      "field": "caption",
+      "text": "Bedeckt und mild. Arbeitsjacke über Hoodie, meine liebste Übergangskombi."
+    },
+    {
+      "id": "de-holdout-041",
+      "field": "caption",
+      "text": "Bibliothek, Baumarkt, nach Hause. Bewölkt bei 14 Grad, also Steppjacke und Jeans."
+    },
+    {
+      "id": "de-holdout-042",
+      "field": "caption",
+      "text": "Schneeregen. Nur Schneeregen. Wollmantel, Schirm, Stiefel und eine Thermoskanne Tee."
+    },
+    {
+      "id": "de-holdout-043",
+      "field": "caption",
+      "text": "An der Haltestelle gemerkt, dass ich eine blaue und eine schwarze Socke trage. In Stiefeln sieht das keiner 😅"
+    },
+    {
+      "id": "de-holdout-044",
+      "field": "caption",
+      "text": "Auf dem Heimweg 31 Grad. Ärmel und Hosenbeine hochgekrempelt, Blazer über der Schulter."
+    },
+    {
+      "id": "de-holdout-045",
+      "field": "caption",
+      "text": "Leichter Regen auf dem Weg zur Kita. Die Kinder in Matschhosen, ich im langen Regenmantel."
+    },
+    {
+      "id": "de-holdout-046",
+      "field": "caption",
+      "text": "Klar und sonnig, perfektes Cordwetter."
+    },
+    {
+      "id": "de-holdout-047",
+      "field": "caption",
+      "text": "Feuchte Kälte, die in die Knochen geht. Mittags den Baumwollpulli gegen den dicken Wollpulli getauscht."
+    },
+    {
+      "id": "de-holdout-048",
+      "field": "caption",
+      "text": "Windiger Spaziergang am Deich zum Bäcker. Fischerpulli, Mütze, fertig."
+    },
+    {
+      "id": "de-holdout-049",
+      "field": "caption",
+      "text": "Regen ab 16 Uhr angesagt, also Lederstiefel statt Stoffsneaker."
+    },
+    {
+      "id": "de-holdout-050",
+      "field": "caption",
+      "text": "Im Stau mit dickem Pulli und voll aufgedrehter Heizung. Hätte zweimal auf die Vorhersage schauen sollen."
+    },
+    {
+      "id": "de-holdout-051",
+      "field": "caption",
+      "text": "Der erste warme Morgen, an dem der Mantel am Haken bleibt und man es nicht bereut."
+    },
+    {
+      "id": "de-holdout-052",
+      "field": "caption",
+      "text": "Überall Schneematsch. Die weißen Sneaker haben Winterpause bis April."
+    },
+    {
+      "id": "de-holdout-053",
+      "field": "caption",
+      "text": "Grauer Himmel, knalliger Mantel. Heute den roten angezogen, einfach für die Laune."
+    },
+    {
+      "id": "de-holdout-054",
+      "field": "caption",
+      "text": "Mit dem Hund zum Tierarzt, beide in Regenjacken. Nicht geplant, ist einfach passiert."
+    },
+    {
+      "id": "de-holdout-055",
+      "field": "caption",
+      "text": "Warme Bahn, kaltes Büro, warme Bahn. Die dünne Strickjacke ist diese Woche die Heldin."
+    },
+    {
+      "id": "de-holdout-056",
+      "field": "caption",
+      "text": "Erst in der alten Parka die Einfahrt freigeschaufelt, dann in den richtigen Mantel für den Zug."
+    },
+    {
+      "id": "de-holdout-057",
+      "field": "caption",
+      "text": "9 Grad und Niesel. Merinopulli, Wollhose, wasserdichte Stiefel, Taschenschirm."
+    },
+    {
+      "id": "de-holdout-058",
+      "field": "caption",
+      "text": "Mittagsspaziergang in der Sonne, Jacke um die Hüfte gebunden wie in den Neunzigern."
+    },
+    {
+      "id": "de-holdout-059",
+      "field": "caption",
+      "text": "Den ganzen Vormittag Starkregen. Ersatzsocken in der Schreibtischschublade, ich fühle mich sehr klug."
+    },
+    {
+      "id": "de-holdout-060",
+      "field": "caption",
+      "text": "Starke Böen am Bahnsteig. Gut, dass ich Hose und nicht den Plisseerock angezogen hab."
+    },
+    {
+      "id": "de-holdout-061",
+      "field": "caption",
+      "text": "Kurz Milch holen in Schlafanzughose unter dem langen Mantel. Zählt als Outfit."
+    },
+    {
+      "id": "de-holdout-062",
+      "field": "caption",
+      "text": "Morgennebel, ab zehn volle Sonne. Die Sonnenbrille war zum Glück eingepackt."
+    },
+    {
+      "id": "de-holdout-063",
+      "field": "caption",
+      "text": "Bus zu spät, Regen zu früh. Kapuze auf, Musik an, geht schon."
+    },
+    {
+      "id": "de-holdout-064",
+      "field": "caption",
+      "text": "16 Grad und bewölkt: Hemdjacken-Wetter, mein liebstes."
+    },
+    {
+      "id": "de-holdout-065",
+      "field": "caption",
+      "text": "Regenjacke an, Schirm dabei und trotzdem von einem Auto nassgespritzt worden. Man kann nicht alles haben."
+    },
+    {
+      "id": "de-holdout-066",
+      "field": "caption",
+      "text": "Kalter Wind vom Fluss, also noch einen Schlauchschal unter den Mantelkragen. Riesiger Unterschied."
+    },
+    {
+      "id": "de-holdout-067",
+      "field": "caption",
+      "text": "Wochenmarkt in der Sonne, alles aus Leinen, großer Korb. Perfekter Samstag."
+    },
+    {
+      "id": "de-holdout-068",
+      "field": "caption",
+      "text": "Über Nacht geschneit und meine Stiefel trocknen noch von gestern an der Heizung. Heute das Ersatzpaar."
+    },
+    {
+      "id": "de-holdout-069",
+      "field": "caption",
+      "text": "Matschiger Weg zum Bahnhof nach dem vielen Regen. Gut, dass ich die dunkle Hose gewählt hab."
+    },
+    {
+      "id": "de-holdout-070",
+      "field": "caption",
+      "text": "Zu warm für eine Jacke, zu nass für keine. Dünner Nylon-Anorak war die Lösung."
+    },
+    {
+      "id": "de-holdout-071",
+      "field": "caption",
+      "text": "Besorgungen mit Baby in der Trage, der Mantel geht über uns beide. Ich liebe den Einsatz."
+    },
+    {
+      "id": "de-holdout-072",
+      "field": "caption",
+      "text": "Im Gewitter schnell ein Paket zur Post gebracht. Gummiclogs werden unterschätzt."
+    },
+    {
+      "id": "de-holdout-073",
+      "field": "caption",
+      "text": "Kalt, klar und windstill. Das beste Wetter für meinen langen Wollmantel."
+    },
+    {
+      "id": "de-holdout-074",
+      "field": "caption",
+      "text": "Plötzlicher Sommerschauer und die ganze Straße rennt unter die Markisen 🌦️"
+    },
+    {
+      "id": "de-holdout-075",
+      "field": "caption",
+      "text": "Vorhersage: Regen. Realität: Sonne. Ich: in voller Regenmontur in der Straßenbahn."
+    },
+    {
+      "id": "de-holdout-076",
+      "field": "caption",
+      "text": "Bürotag in der Hitzewelle. Kurzarmhemd, leichte Hose, Loafer ohne Socken."
+    },
+    {
+      "id": "de-holdout-077",
+      "field": "caption",
+      "text": "Raschelndes Laub, kalte Nase, warme Hände. Die fingerlosen Handschuhe sind wieder im Einsatz."
+    },
+    {
+      "id": "de-holdout-078",
+      "field": "caption",
+      "text": "Meine Eltern bei Niesel zum Arzt begleitet. Papa hat meine Ersatzmütze bekommen und will sie nicht zurückgeben."
+    },
+    {
+      "id": "de-holdout-079",
+      "field": "caption",
+      "text": "Mit langem Rock gegen den Wind Rad fahren mache ich nie wieder."
+    },
+    {
+      "id": "de-holdout-080",
+      "field": "caption",
+      "text": "Erledigungen bei 35 Grad. Breitkrempiger Hut, weite Hose, Wasserflasche, möglichst im Schatten."
+    },
+    {
+      "id": "de-holdout-081",
+      "field": "caption",
+      "text": "Ein Schirm ist auf dem Hinweg kaputtgegangen, der zweite hat überlebt. Der Wind gewinnt diese Woche."
+    },
+    {
+      "id": "de-holdout-082",
+      "field": "caption",
+      "text": "Heute die Stiefel mit tiefem Profil an und ganz entspannt durch den Matsch gelaufen."
+    },
+    {
+      "id": "de-holdout-083",
+      "field": "caption",
+      "text": "Von den Knien abwärts durchnässt im Büro angekommen. Nächstes Mal der lange Regenmantel."
+    },
+    {
+      "id": "de-holdout-084",
+      "field": "caption",
+      "text": "Ein sanfter grauer Morgen. Cremefarbener Strick, anthrazitfarbene Hose, braune Stiefel."
+    },
+    {
+      "id": "de-holdout-085",
+      "field": "caption",
+      "text": "Hagelkörner so groß wie Erbsen auf dem Heimweg. Kapuze und Kragen hoch, einfach weitergelaufen."
+    },
+    {
+      "id": "de-holdout-086",
+      "field": "caption",
+      "text": "Sonne, aber kalter Wind. Steppfutter unter dem Trench, Schal in der Tasche."
+    },
+    {
+      "id": "de-holdout-087",
+      "field": "caption",
+      "text": "Pendeln im Schnee #regenwetterlook #winterlagen"
+    },
+    {
+      "id": "de-holdout-088",
+      "field": "caption",
+      "text": "Bank, Schuster, Kaffee. Mild und sonnig, also nur Pulli und Lieblingsjeans."
+    },
+    {
+      "id": "de-holdout-089",
+      "field": "caption",
+      "text": "Gummistiefel zum Baumwollkleid fand ich erst komisch, ist aber eine super Kombi für Sommergewitter."
+    },
+    {
+      "id": "de-holdout-090",
+      "field": "caption",
+      "text": "Dichter Nebel, feuchte Luft. Mein Wollmantel riecht heute ein bisschen nach Schaf und ich hab mich damit abgefunden."
+    },
+    {
+      "id": "de-holdout-091",
+      "field": "caption",
+      "text": "Nasse Socken. Schon wieder."
+    },
+    {
+      "id": "de-holdout-092",
+      "field": "caption",
+      "text": "Endlich Mantelwetter."
+    },
+    {
+      "id": "de-holdout-093",
+      "field": "caption",
+      "text": "Habt ihr Tipps, wie weite Hosen im Regen trocken bleiben? Meine saugen sich bis zum Knie voll."
+    },
+    {
+      "id": "de-holdout-094",
+      "field": "caption",
+      "text": "Welche Schuhe tragt ihr für 20 Minuten Fußweg im Schneematsch, wenn ihr danach bürotauglich aussehen müsst?"
+    },
+    {
+      "id": "de-holdout-095",
+      "field": "caption",
+      "text": "Wie zieht ihr euch für einen Tag an, der bei 2 Grad startet und bei 15 endet? Mir ist mittags immer zu warm."
+    },
+    {
+      "id": "de-holdout-096",
+      "field": "caption",
+      "text": "Frage an alle aus kalten Gegenden: Wolle oder Daune für den Alltagsmantel? Es ist nur Budget für einen da."
+    },
+    {
+      "id": "de-holdout-097",
+      "field": "caption",
+      "text": "Was tragt ihr bei Schwüle zu Meetings? Leinen knittert, Kunstfaser staut die Hitze, ich bin ratlos."
+    },
+    {
+      "id": "de-holdout-098",
+      "field": "caption",
+      "text": "Geht ein dunkelblauer Mantel zu einer schwarzen Hose? Frage, bevor ich etwas Neues kaufe."
+    },
+    {
+      "id": "de-holdout-099",
+      "field": "caption",
+      "text": "Wie tragt ihr lange Röcke bei Wind? Meiner wickelt sich auf dem Weg ständig um die Beine."
+    },
+    {
+      "id": "de-holdout-100",
+      "field": "caption",
+      "text": "Hilfe: Outfit als Gast bei einer Trauung im Freien, 30 Prozent Schauerrisiko. Was würdet ihr anziehen?"
+    },
+    {
+      "id": "de-holdout-101",
+      "field": "caption",
+      "text": "Welche Schalfarbe passt zu einem kamelfarbenen Mantel, wenn ich Grau und Creme schon habe?"
+    },
+    {
+      "id": "de-holdout-102",
+      "field": "caption",
+      "text": "Gibt es Gummistiefel, die nicht nach Gartenarbeit aussehen? Suche Formen und Details, auf die ich achten kann."
+    },
+    {
+      "id": "de-holdout-103",
+      "field": "caption",
+      "text": "Wie warm ist ein gefütterter Trench wirklich? Kann der bei 5 Grad den Wintermantel ersetzen?"
+    },
+    {
+      "id": "de-holdout-104",
+      "field": "caption",
+      "text": "Tragt ihr im Sommer kurze Hosen im Büro? Mich interessiert, wie ihr das bei einer Hitzewelle handhabt."
+    },
+    {
+      "id": "de-holdout-105",
+      "field": "caption",
+      "text": "An die Kleinen unter uns: Wie tragt ihr einen Midimantel, ohne darin zu verschwinden?"
+    },
+    {
+      "id": "de-holdout-106",
+      "field": "caption",
+      "text": "Was habt ihr für plötzliche Wetterwechsel immer in der Tasche? Ich stelle mir gerade ein kleines Set zusammen."
+    },
+    {
+      "id": "de-holdout-107",
+      "field": "caption",
+      "text": "Ist es komisch, im frühen Frühling Sandalen mit Socken zu tragen? Frage für mich selbst."
+    },
+    {
+      "id": "de-holdout-108",
+      "field": "caption",
+      "text": "Welcher Stoff trocknet nach einem Regenguss am schnellsten? Brauche das fürs Radpendeln."
+    },
+    {
+      "id": "de-holdout-109",
+      "field": "caption",
+      "text": "Was haltet ihr von weißen Sneakern im Winter? Meine sind nach einer Woche grau."
+    },
+    {
+      "id": "de-holdout-110",
+      "field": "caption",
+      "text": "Ideen für ein erstes Vorstellungsgespräch bei 33 Grad?"
+    },
+    {
+      "id": "de-holdout-111",
+      "field": "caption",
+      "text": "Wie haltet ihr die Hände warm und könnt an der Haltestelle trotzdem aufs Handy schauen?"
+    },
+    {
+      "id": "de-holdout-112",
+      "field": "caption",
+      "text": "Soll ich die Hose für flache Schuhe oder für Stiefel kürzen lassen? Ich trage je nach Wetter beides."
+    },
+    {
+      "id": "de-holdout-113",
+      "field": "caption",
+      "text": "Welche Mützenform passt zu langen Haaren und einer Kapuze?"
+    },
+    {
+      "id": "de-holdout-114",
+      "field": "caption",
+      "text": "Was tragt ihr bei Frühlingswanderungen unter der Regenjacke?"
+    },
+    {
+      "id": "de-holdout-115",
+      "field": "caption",
+      "text": "Brauche ich wirklich eine eigene Übergangsjacke oder reichen Jeansjacke plus Hoodie?"
+    },
+    {
+      "id": "de-holdout-116",
+      "field": "caption",
+      "text": "Oliv oder Rostrot für eine Herbststrickjacke? Ich trage viel Dunkelblau und Denim."
+    },
+    {
+      "id": "de-holdout-117",
+      "field": "caption",
+      "text": "Was macht ihr gegen statische Aufladung bei Wollpullis an trockenen Wintertagen?"
+    },
+    {
+      "id": "de-holdout-118",
+      "field": "caption",
+      "text": "Wie geht ihr in Regenstädten mit Wildleder um? Bleibt das von Oktober bis April einfach im Schrank?"
+    },
+    {
+      "id": "de-holdout-119",
+      "field": "caption",
+      "text": "Habt ihr Tipps, wie man ein Kleinkind für einen windigen Strandtag anzieht?"
+    },
+    {
+      "id": "de-holdout-120",
+      "field": "caption",
+      "text": "Große Menschen: Worauf achtet ihr, damit die Ärmel wirklich bis zum Handgelenk reichen?"
+    },
+    {
+      "id": "de-holdout-121",
+      "field": "caption",
+      "text": "Ist ein Rollkragen unter dem Sakko zu viel für einen lockeren Freitag?"
+    },
+    {
+      "id": "de-holdout-122",
+      "field": "caption",
+      "text": "Wie viele Mäntel habt ihr eigentlich? Ich überlege, ob drei übertrieben sind."
+    },
+    {
+      "id": "de-holdout-123",
+      "field": "caption",
+      "text": "Was ist euer Lieblingsoutfit für einen Tag mit 60 Prozent Regenrisiko und Abendessen danach?"
+    },
+    {
+      "id": "de-holdout-124",
+      "field": "caption",
+      "text": "Lohnt sich Merino für jemanden, dem schnell warm wird? Man hört ja, dass es die Temperatur ausgleicht."
+    },
+    {
+      "id": "de-holdout-125",
+      "field": "caption",
+      "text": "Wie verhindert ihr, dass der Wollmantel dort Knötchen bekommt, wo der Taschengurt reibt?"
+    },
+    {
+      "id": "de-holdout-126",
+      "field": "caption",
+      "text": "Braune Schuhe zum grauen Anzug im Herbst, ja oder nein?"
+    },
+    {
+      "id": "de-holdout-127",
+      "field": "caption",
+      "text": "Ideen gesucht: Wie sieht eine schlichte schwarze Daunenjacke weniger wie ein Schlafsack aus?"
+    },
+    {
+      "id": "de-holdout-128",
+      "field": "caption",
+      "text": "Kauft ihr Winterstiefel eine Nummer größer für dicke Socken? Mein erster richtiger Winter hier."
+    },
+    {
+      "id": "de-holdout-129",
+      "field": "caption",
+      "text": "Wie fahrt ihr im Regen im Rock Rad? Ernst gemeinte Frage, ich will es ausprobieren."
+    },
+    {
+      "id": "de-holdout-130",
+      "field": "caption",
+      "text": "Gute Alternative zum Schal für Leute, denen Wolle am Hals zu kratzig ist?"
+    },
+    {
+      "id": "de-holdout-131",
+      "field": "caption",
+      "text": "Werden bei euch die Haare unter der Mütze auch komplett platt? Wie geht ihr damit im Büro um?"
+    },
+    {
+      "id": "de-holdout-132",
+      "field": "caption",
+      "text": "Welche Farbe für eine Regenjacke passt zu allem? Ich schwanke zwischen Marine und Oliv."
+    },
+    {
+      "id": "de-holdout-133",
+      "field": "caption",
+      "text": "Wie lagert ihr dicke Pullis im Sommer in einer kleinen Wohnung?"
+    },
+    {
+      "id": "de-holdout-134",
+      "field": "caption",
+      "text": "Hat jemand schon Strumpfhosen unter der Hose probiert? Hilft das wirklich gegen Kälte?"
+    },
+    {
+      "id": "de-holdout-135",
+      "field": "caption",
+      "text": "Was würdet ihr zu einer senfgelben Regenjacke kombinieren? Spontan gekauft, jetzt bin ich ratlos."
+    },
+    {
+      "id": "de-holdout-136",
+      "field": "caption",
+      "text": "Wie kurz darf ein Mantel über einem Midikleid sein?"
+    },
+    {
+      "id": "de-holdout-137",
+      "field": "caption",
+      "text": "Frage zur App: Richtet ihr euch nach der gefühlten oder der echten Temperatur?"
+    },
+    {
+      "id": "de-holdout-138",
+      "field": "caption",
+      "text": "Leinen oder Seersucker für einen schwülen Sommer? Baumwolle ist bei mir mittags durch."
+    },
+    {
+      "id": "de-holdout-139",
+      "field": "caption",
+      "text": "Brauche Hilfe: dasselbe Outfit für eine Morgenwanderung und ein Mittagessen in der Stadt, 10 bis 19 Grad."
+    },
+    {
+      "id": "de-holdout-140",
+      "field": "caption",
+      "text": "Gibt es einen Trick, damit die Brille unter dem Schal nicht beschlägt?"
+    },
+    {
+      "id": "de-holdout-141",
+      "field": "caption",
+      "text": "Wie tragt ihr Stiefeletten zu weiten Jeans, ohne dass sich der Saum staut?"
+    },
+    {
+      "id": "de-holdout-142",
+      "field": "caption",
+      "text": "Tipps fürs Anziehen bei einem langen Fußballspiel im November? Zwei Stunden still auf der Tribüne."
+    },
+    {
+      "id": "de-holdout-143",
+      "field": "caption",
+      "text": "Welche Mützenform ist am wärmsten für jemanden, der keine Bommel mag?"
+    },
+    {
+      "id": "de-holdout-144",
+      "field": "caption",
+      "text": "Kann man im Frühling einen leichten Blazer als Jacke tragen oder sieht das aus, als hätte man den Mantel vergessen?"
+    },
+    {
+      "id": "de-holdout-145",
+      "field": "caption",
+      "text": "Wie verhindert ihr, dass die Füße in Stiefeln im geheizten Zug kochen?"
+    },
+    {
+      "id": "de-holdout-146",
+      "field": "caption",
+      "text": "Regenjacke mit Kapuze oder lieber Mütze? Ich kann mich nie entscheiden."
+    },
+    {
+      "id": "de-holdout-147",
+      "field": "caption",
+      "text": "Blöde Frage, aber wie fahrt ihr mit langem Mantel Rad, ohne dass er sich im Rad verfängt?"
+    },
+    {
+      "id": "de-holdout-148",
+      "field": "caption",
+      "text": "Was tragt ihr gerade in der Übergangszeit? Ich rate jeden Morgen aufs Neue."
+    },
+    {
+      "id": "de-holdout-149",
+      "field": "caption",
+      "text": "Danke für all eure Antworten zu meiner Hochzeitsfrage! Midikleid plus leichter Trench war perfekt."
+    },
+    {
+      "id": "de-holdout-150",
+      "field": "caption",
+      "text": "Die Farbkombi ist so schön, das Senfgelb bringt das Grau richtig zum Leuchten."
+    },
+    {
+      "id": "de-holdout-151",
+      "field": "caption",
+      "text": "Danke für den Tipp mit dem Wachsen der Canvastasche, sie hat den Regen gestern super überstanden!"
+    },
+    {
+      "id": "de-holdout-152",
+      "field": "caption",
+      "text": "Wie du den Oversize-Blazer stylst, sieht total mühelos aus."
+    },
+    {
+      "id": "de-holdout-153",
+      "field": "caption",
+      "text": "Du hattest recht mit den Wollsocken. Meine Füße waren den ganzen Weg warm."
+    },
+    {
+      "id": "de-holdout-154",
+      "field": "caption",
+      "text": "Genau die Inspiration, die ich für eine graue Woche gebraucht habe. Danke fürs Teilen!"
+    },
+    {
+      "id": "de-holdout-155",
+      "field": "caption",
+      "text": "Dein Regenlook ist so stimmig. Ich komme immer an, als wäre ich hingeschwommen."
+    },
+    {
+      "id": "de-holdout-156",
+      "field": "caption",
+      "text": "Vielen Dank für die Antwort auf meine Lagen-Frage, der Thermo-Tipp hat meine Morgen verändert."
+    },
+    {
+      "id": "de-holdout-157",
+      "field": "caption",
+      "text": "Okay, dieser Trench ist perfekt. Die Länge stimmt genau."
+    },
+    {
+      "id": "de-holdout-158",
+      "field": "caption",
+      "text": "Für die nächste Reise gespeichert. Danke!"
+    },
+    {
+      "id": "de-holdout-159",
+      "field": "caption",
+      "text": "So clever, das Sommerkleid mit Strumpfhose und dickem Strick in den Herbst zu holen."
+    },
+    {
+      "id": "de-holdout-160",
+      "field": "caption",
+      "text": "Dank deiner Packliste hat alles ins Handgepäck gepasst. Sehr dankbar!"
+    },
+    {
+      "id": "de-holdout-161",
+      "field": "caption",
+      "text": "Wunderschöne Farben. Der grüne Mantel sieht im Schnee fantastisch aus."
+    },
+    {
+      "id": "de-holdout-162",
+      "field": "caption",
+      "text": "Danke für den Tipp zum Kürzen, meine Schneiderin wusste sofort, was ich meine."
+    },
+    {
+      "id": "de-holdout-163",
+      "field": "caption",
+      "text": "Deinen Trick mit dem einmal umgeschlagenen Saum über Stiefeln ausprobiert, sieht viel sauberer aus."
+    },
+    {
+      "id": "de-holdout-164",
+      "field": "caption",
+      "text": "Dieser Schalknoten ist genial, probiere ich morgen aus."
+    },
+    {
+      "id": "de-holdout-165",
+      "field": "caption",
+      "text": "Schön, dass du auch das echte Pendelfoto zeigst und nicht nur das perfekte."
+    },
+    {
+      "id": "de-holdout-166",
+      "field": "caption",
+      "text": "Hat meinen Morgen gerettet. Du findest immer die gemütlichsten Kombis."
+    },
+    {
+      "id": "de-holdout-167",
+      "field": "caption",
+      "text": "Danke für die Antwort! Nichts Neues gekauft, einfach umgestylt, wie du es vorgeschlagen hast."
+    },
+    {
+      "id": "de-holdout-168",
+      "field": "caption",
+      "text": "Wie mutig du hier Streifen und Karos mischst. Großartig."
+    },
+    {
+      "id": "de-holdout-169",
+      "field": "caption",
+      "text": "Danke an alle, die bei meiner Stiefelfrage geholfen haben. Es wurden die mit Profilsohle, keine Reue."
+    },
+    {
+      "id": "de-holdout-170",
+      "field": "caption",
+      "text": "Deine Flick-Beiträge haben mich endlich dazu gebracht, meinen Lieblingspulli zu reparieren. Danke!"
+    },
+    {
+      "id": "de-holdout-171",
+      "field": "caption",
+      "text": "Das Blau steht dir so gut."
+    },
+    {
+      "id": "de-holdout-172",
+      "field": "caption",
+      "text": "Danke, dass du erklärt hast, was du unter der Regenjacke trägst. Heute ausprobiert, warm und kein bisschen verschwitzt."
+    },
+    {
+      "id": "de-holdout-173",
+      "field": "caption",
+      "text": "Rostrot und Creme zusammen, wow."
+    },
+    {
+      "id": "de-holdout-174",
+      "field": "caption",
+      "text": "Ich mag, dass du in jedem Beitrag denselben Mantel trägst. Der Beweis, dass ein guter Mantel reicht."
+    },
+    {
+      "id": "de-holdout-175",
+      "field": "caption",
+      "text": "Danke! Dein Hinweis mit den hochgekrempelten Ärmeln hat das Hemd für mich gerettet."
+    },
+    {
+      "id": "de-holdout-176",
+      "field": "caption",
+      "text": "Bei dir sieht Regenwetter nach Spaß aus. Folge dir ab jetzt."
+    },
+    {
+      "id": "de-holdout-177",
+      "field": "caption",
+      "text": "Die Mütze passt perfekt zum langen Mantel. Tolle Proportionen."
+    },
+    {
+      "id": "de-holdout-178",
+      "field": "caption",
+      "text": "Danke für die ehrliche Einschätzung, wie sich die Jacke im Sturm geschlagen hat."
+    },
+    {
+      "id": "de-holdout-179",
+      "field": "caption",
+      "text": "Willkommen in der Community! Dein erster Beitrag ist wunderschön."
+    },
+    {
+      "id": "de-holdout-180",
+      "field": "caption",
+      "text": "Danke für die Erinnerung, auch die Abendvorhersage zu checken. Hat mich gestern gerettet."
+    },
+    {
+      "id": "de-holdout-181",
+      "field": "caption",
+      "text": "Schönes Flatlay und so hilfreich, alles Gepackte auf einen Blick zu sehen."
+    },
+    {
+      "id": "de-holdout-182",
+      "field": "caption",
+      "text": "Diese Kombination wandert direkt in meine Herbstnotizen."
+    },
+    {
+      "id": "de-holdout-183",
+      "field": "caption",
+      "text": "Danke für die schnelle Antwort, der Tipp mit dem Imprägnierspray war genau richtig."
+    },
+    {
+      "id": "de-holdout-184",
+      "field": "caption",
+      "text": "Ich stimme allen zu, die kurze Jacke ist der Star dieses Looks."
+    },
+    {
+      "id": "de-holdout-185",
+      "field": "caption",
+      "text": "Hoodie unter Wollmantel, darauf wäre ich nie gekommen. Probiere ich diese Woche."
+    },
+    {
+      "id": "de-holdout-186",
+      "field": "caption",
+      "text": "Deine Secondhand-Funde sind immer so gut. Die Jacke sieht aus wie für dich gemacht."
+    },
+    {
+      "id": "de-holdout-187",
+      "field": "caption",
+      "text": "Danke, dass du Größe und Passform dazuschreibst, das hilft so sehr."
+    },
+    {
+      "id": "de-holdout-188",
+      "field": "caption",
+      "text": "Der ganze Look ist so gemütlich ☕"
+    },
+    {
+      "id": "de-holdout-189",
+      "field": "caption",
+      "text": "Ich bin so dankbar für diese Community. Eine kleine Frage zu Socken gestellt und zwölf durchdachte Antworten bekommen."
+    },
+    {
+      "id": "de-holdout-190",
+      "field": "caption",
+      "text": "Wie der Schal die Farbe deiner Tasche aufgreift, ist so ein schönes Detail."
+    },
+    {
+      "id": "de-holdout-191",
+      "field": "caption",
+      "text": "Danke für die Ermutigung zu meinem ersten Reparaturbeitrag! Die nächste Reparatur ist schon geplant."
+    },
+    {
+      "id": "de-holdout-192",
+      "field": "caption",
+      "text": "Vielen Dank für deine ausführliche Antwort zur Wollpflege. Ich habe meine zwei Lieblingspullis genau so von Hand gewaschen, im Handtuch ausgedrückt und liegend getrocknet. Kein Einlaufen, ganz weich. Dein Kommentar ist für jeden Winter gespeichert."
+    },
+    {
+      "id": "de-holdout-193",
+      "field": "caption",
+      "text": "Frage an alle, die mit der Fähre pendeln: Wie zieht ihr euch für 40 Minuten im kalten Wind an Deck an, wenn das Büro danach den ganzen Tag überheizt ist? Dünne Daunenweste unterm Trench probiert: Entweder friere ich draußen oder schwitze am Schreibtisch."
+    },
+    {
+      "id": "de-holdout-194",
+      "field": "caption",
+      "text": "Fünf Tage in einer Stadt, in der es täglich regnet: eine Regenjacke, zwei Pullis, drei Shirts, ein Paar Stiefel für Pfützen."
+    },
+    {
+      "id": "de-holdout-195",
+      "field": "caption",
+      "text": "Wochenendtrip, 18 bis 24 Grad. Leinenhose, zwei Hemden, ein leichter Strick und Sneaker kommen mit."
+    },
+    {
+      "id": "de-holdout-196",
+      "field": "caption",
+      "text": "Eine Woche Bergwetter nur mit Handgepäck. Merino überall."
+    },
+    {
+      "id": "de-holdout-197",
+      "field": "caption",
+      "text": "Badeanzug, Sonnenhut, ein Kleid fürs Abendessen, Sandalen. Die Strandtasche ist fertig."
+    },
+    {
+      "id": "de-holdout-198",
+      "field": "caption",
+      "text": "Geschäftsreise, zwei Tage, 3 Grad. Der dickste Mantel kommt im Flieger an, damit der Koffer leicht bleibt."
+    },
+    {
+      "id": "de-holdout-199",
+      "field": "caption",
+      "text": "Diesmal eine Capsule für die Reise: alles in Marine, Weiß und Beige, damit sich alles kombinieren lässt."
+    },
+    {
+      "id": "de-holdout-200",
+      "field": "caption",
+      "text": "Notiz an mich: ein zweites Paar Schuhe einpacken. Letztes Mal war das einzige Paar am ersten Tag durchnässt."
+    },
+    {
+      "id": "de-holdout-201",
+      "field": "caption",
+      "text": "Die Vorhersage ist von sonnig auf stürmisch umgesprungen. Sandalen raus, Gummistiefel rein."
+    },
+    {
+      "id": "de-holdout-202",
+      "field": "caption",
+      "text": "Zehn Tage, zwei Klimazonen. Die Strandsachen werden in der kalten Hälfte unter dem Fleece getragen."
+    },
+    {
+      "id": "de-holdout-203",
+      "field": "caption",
+      "text": "Packen für den Familienbesuch im Norden. Die Thermoleggings kommen als Erstes in den Koffer."
+    },
+    {
+      "id": "de-holdout-204",
+      "field": "caption",
+      "text": "Übernachtungstasche für eine Konferenz: ein Blazer, zwei Oberteile, eine Hose für beide Tage."
+    },
+    {
+      "id": "de-holdout-205",
+      "field": "caption",
+      "text": "Rollen oder falten? Ich rolle Strick und falte Hemden."
+    },
+    {
+      "id": "de-holdout-206",
+      "field": "caption",
+      "text": "Packliste für ein verregnetes langes Wochenende #leichtreisen #reisecapsule"
+    },
+    {
+      "id": "de-holdout-207",
+      "field": "caption",
+      "text": "Fünf Oberteile, zwei Hosen, ein Kleid, eine Strickjacke. Reicht für eine Woche, wenn das Wetter mitspielt."
+    },
+    {
+      "id": "de-holdout-208",
+      "field": "caption",
+      "text": "Nächste Woche an die Küste. 15 Grad und windig angesagt, die Windjacke kommt mit."
+    },
+    {
+      "id": "de-holdout-209",
+      "field": "caption",
+      "text": "Die leichteste Daunenjacke in ihre eigene Tasche gestopft. Passt in die Ecke vom Rucksack."
+    },
+    {
+      "id": "de-holdout-210",
+      "field": "caption",
+      "text": "Skiurlaub-Vorbereitung: Funktionswäsche gewaschen, Handschuhe gefunden, ein Handschuh fehlt. Suche läuft."
+    },
+    {
+      "id": "de-holdout-211",
+      "field": "caption",
+      "text": "Nur ein Paar Schuhe für diesen Städtetrip. Bequeme Sneaker in neutraler Farbe, drückt mir die Daumen."
+    },
+    {
+      "id": "de-holdout-212",
+      "field": "caption",
+      "text": "Ich packe jedes Mal zu viel. Diesmal alles hingelegt und ein Drittel wieder rausgenommen."
+    },
+    {
+      "id": "de-holdout-213",
+      "field": "caption",
+      "text": "Es geht an einen Ort mit 80 Prozent Luftfeuchtigkeit. Alles aus Denim bleibt zu Hause."
+    },
+    {
+      "id": "de-holdout-214",
+      "field": "caption",
+      "text": "Wanderurlaub mit einem Kleid für den letzten Abend. Das Kleid wiegt weniger als meine Socken."
+    },
+    {
+      "id": "de-holdout-215",
+      "field": "caption",
+      "text": "Tipp von einer Vielreisenden: die klobigsten Schuhe und den Mantel im Flugzeug tragen."
+    },
+    {
+      "id": "de-holdout-216",
+      "field": "caption",
+      "text": "Morgen Nachtzug, also bequeme Lagen und ein großer Schal, der auch als Decke durchgeht."
+    },
+    {
+      "id": "de-holdout-217",
+      "field": "caption",
+      "text": "Die Vorhersage für meine Reise ändert sich täglich, also packe ich drei Jahreszeiten in eine kleine Tasche."
+    },
+    {
+      "id": "de-holdout-218",
+      "field": "caption",
+      "text": "Familienbesuch in den Tropen. Leichte Baumwolle, ein Langarmshirt für den Flug, ein faltbarer Hut."
+    },
+    {
+      "id": "de-holdout-219",
+      "field": "caption",
+      "text": "Diesmal die Packwürfel nach Tagen sortiert. Mal sehen, ob es wirklich hilft."
+    },
+    {
+      "id": "de-holdout-220",
+      "field": "caption",
+      "text": "Eine Woche Dienstreise ins Trockene und Sonnige. Lippenpflege, Sonnencreme, leichter Blazer, zwei Paar Loafer."
+    },
+    {
+      "id": "de-holdout-221",
+      "field": "caption",
+      "text": "Nicht vergessen: einen Wäschebeutel einpacken. Nasse Badesachen im Koffer machen keinen Spaß."
+    },
+    {
+      "id": "de-holdout-222",
+      "field": "caption",
+      "text": "Campingwochenende mit kühlen Nächten. Wollsocken, Fleece, Mütze und eine Daunenjacke fürs Lagerfeuer."
+    },
+    {
+      "id": "de-holdout-223",
+      "field": "caption",
+      "text": "Die Regenjacke kommt ins Außenfach, damit ich sie am Flughafen schnell greifen kann."
+    },
+    {
+      "id": "de-holdout-224",
+      "field": "caption",
+      "text": "Bergdorf im Oktober: dicker Strick, Wanderschuhe und eine warme Mütze für die Abende."
+    },
+    {
+      "id": "de-holdout-225",
+      "field": "caption",
+      "text": "Ein Schal kommt jetzt auf jede Reise mit. Flugzeug, Zug, Strand, Abendessen, er kann alles."
+    },
+    {
+      "id": "de-holdout-226",
+      "field": "caption",
+      "text": "Zum zweiten Mal dieses Jahr in dieser Stadt und ich packe immer noch zu viele Oberteile ein."
+    },
+    {
+      "id": "de-holdout-227",
+      "field": "caption",
+      "text": "Hochzeit im Ausland: Anzug im Kleidersack, der Rest im Handgepäck. Hoffentlich ohne Falten."
+    },
+    {
+      "id": "de-holdout-228",
+      "field": "caption",
+      "text": "Notiz für mein zukünftiges Ich: Die Stadt war wärmer als angesagt, die Abende kühler, und die Strickjacke, die fast zu Hause geblieben wäre, war täglich im Einsatz. Immer die Strickjacke einpacken. Und zwei Paar bequeme Schuhe schlagen ein schönes plus ein bequemes."
+    },
+    {
+      "id": "de-holdout-229",
+      "field": "caption",
+      "text": "Im Secondhandladen eine Strickjacke für weniger als einen Kaffee gefunden. Reine Wolle, keine Löcher, perfekte Ärmellänge."
+    },
+    {
+      "id": "de-holdout-230",
+      "field": "caption",
+      "text": "Meine Lieblingshose beim Schneider schmaler machen lassen. Fühlt sich an wie ein neues Paar."
+    },
+    {
+      "id": "de-holdout-231",
+      "field": "caption",
+      "text": "Waschtag-Tipp: dunkle Jeans auf links und kalt waschen, dann aufhängen. Die Farbe hält viel länger."
+    },
+    {
+      "id": "de-holdout-232",
+      "field": "caption",
+      "text": "Den losen Knopf am Mantel angenäht, bevor das Wetter umschlägt. Kleiner Erfolg."
+    },
+    {
+      "id": "de-holdout-233",
+      "field": "caption",
+      "text": "Flohmarktbeute: ein Tweedsakko, ein gestreifter Schal und Lederstiefel, die nur neue Schnürsenkel brauchen."
+    },
+    {
+      "id": "de-holdout-234",
+      "field": "caption",
+      "text": "Zum ersten Mal die Ferse meiner Wollsocken gestopft. Nicht hübsch, aber warm und hält."
+    },
+    {
+      "id": "de-holdout-235",
+      "field": "caption",
+      "text": "Pullis mit Wollwaschmittel von Hand gewaschen und liegend auf einem Handtuch getrocknet. Riechen jetzt nach Wiese."
+    },
+    {
+      "id": "de-holdout-236",
+      "field": "caption",
+      "text": "Die Schneiderin hat die Ärmel meines Secondhandmantels gekürzt, jetzt sitzt er wie maßgeschneidert."
+    },
+    {
+      "id": "de-holdout-237",
+      "field": "caption",
+      "text": "Den Reißverschluss meiner alten Regenjacke ersetzt statt eine neue zu kaufen. Bereit für die nächste Saison."
+    },
+    {
+      "id": "de-holdout-238",
+      "field": "caption",
+      "text": "Das Repair-Café am Wochenende war wunderbar. Hilfe beim Flicken der Ellbogen meines Lieblingspullis bekommen."
+    },
+    {
+      "id": "de-holdout-239",
+      "field": "caption",
+      "text": "Secondhand-Tipp: zuerst Nähte und Futter prüfen, dann erst den Preis."
+    },
+    {
+      "id": "de-holdout-240",
+      "field": "caption",
+      "text": "Meine alte Baumwolljacke neu gewachst. Die Küche riecht seltsam, die Jacke sieht toll aus."
+    },
+    {
+      "id": "de-holdout-241",
+      "field": "caption",
+      "text": "Stiefel neu besohlen lassen. Der Schuster meint, die halten noch mindestens fünf Winter."
+    },
+    {
+      "id": "de-holdout-242",
+      "field": "caption",
+      "text": "Waschfrage: Wie trocknet ihr eine Daunenjacke, ohne dass sie verklumpt? Meine ist ganz platt rausgekommen."
+    },
+    {
+      "id": "de-holdout-243",
+      "field": "caption",
+      "text": "Sichtbares Flicken an den Knien meiner Jeans mit blauem Garn. Bin zufrieden mit dem Ergebnis."
+    },
+    {
+      "id": "de-holdout-244",
+      "field": "caption",
+      "text": "Die weißen Stoffsneaker mit weicher Bürste und Seife geschrubbt. Fast wie neu."
+    },
+    {
+      "id": "de-holdout-245",
+      "field": "caption",
+      "text": "Fund im Sozialkaufhaus: ein langer grauer Mantel mit etwas abgewetzten Ärmelsäumen. Umnähen lassen, sieht wieder frisch aus."
+    },
+    {
+      "id": "de-holdout-246",
+      "field": "caption",
+      "text": "Ein Leinenhemd in sanftem Grün ergattert. Wird zweimal gewaschen, damit es noch weicher wird."
+    },
+    {
+      "id": "de-holdout-247",
+      "field": "caption",
+      "text": "Bei einer Vintage-Hose den Bund enger gemacht. Das erste Mal selbst, hat zwei Abende gedauert."
+    },
+    {
+      "id": "de-holdout-248",
+      "field": "caption",
+      "text": "Der Fusselkamm ist mein bester Kauf dieses Jahr. Die Pullis sehen wieder neu aus."
+    },
+    {
+      "id": "de-holdout-249",
+      "field": "caption",
+      "text": "Das zerknitterte Hemd beim Duschen im Bad aushängen lassen. Alter Trick, funktioniert immer noch."
+    },
+    {
+      "id": "de-holdout-250",
+      "field": "caption",
+      "text": "Das Futter in der Manteltasche mit ein paar Handstichen geflickt. Keine verlorenen Schlüssel mehr."
+    },
+    {
+      "id": "de-holdout-251",
+      "field": "caption",
+      "text": "Gebrauchte Gummistiefel, kaum getragen, genau meine Größe. Pünktlich zur Regenwoche."
+    },
+    {
+      "id": "de-holdout-252",
+      "field": "caption",
+      "text": "Heute selbst Hosen gesäumt, mit einem Video und sehr vielen Stecknadeln."
+    },
+    {
+      "id": "de-holdout-253",
+      "field": "caption",
+      "text": "Wäscheberg besiegt. Alles nach Stoff sortiert, Feines im Wäschenetz."
+    },
+    {
+      "id": "de-holdout-254",
+      "field": "caption",
+      "text": "Schneider-Tipp: etwas mehr Weite in den Schultern einplanen, wenn man dicke Pullis darunter trägt."
+    },
+    {
+      "id": "de-holdout-255",
+      "field": "caption",
+      "text": "Das Loch im Handschuh mit einer Kontrastfarbe geflickt. Sieht jetzt gewollt aus."
+    },
+    {
+      "id": "de-holdout-256",
+      "field": "caption",
+      "text": "Den Wollmantel zum ersten Mal zu Hause gewaschen, ganz vorsichtig, und alles ist gut gegangen. Erleichtert."
+    },
+    {
+      "id": "de-holdout-257",
+      "field": "caption",
+      "text": "Neue Absatzflecken für die Pumps vor der Regenzeit. Viel besserer Halt auf nassem Pflaster."
+    },
+    {
+      "id": "de-holdout-258",
+      "field": "caption",
+      "text": "Im Secondhandladen gab es heute so viel Strick. Mit nur einem Teil raus, ich bin stolz auf mich."
+    },
+    {
+      "id": "de-holdout-259",
+      "field": "caption",
+      "text": "Den Kragen von Papas altem Hemd ausgebessert, jetzt trage ich es jedes Wochenende."
+    },
+    {
+      "id": "de-holdout-260",
+      "field": "caption",
+      "text": "Salzränder auf Lederstiefeln mit etwas Essigwasser entfernt. Klappt jedes Mal."
+    },
+    {
+      "id": "de-holdout-261",
+      "field": "caption",
+      "text": "An einem Secondhand-Blazer die Knöpfe gegen Hornknöpfe getauscht. Sieht gleich viel hochwertiger aus."
+    },
+    {
+      "id": "de-holdout-262",
+      "field": "caption",
+      "text": "Ein verblichenes schwarzes Shirt nachgefärbt. Kleiner Aufwand, großer Unterschied."
+    },
+    {
+      "id": "de-holdout-263",
+      "field": "caption",
+      "text": "Sonntag Hemden für die Woche gebügelt und dem Regen zugehört. Seltsam entspannend."
+    },
+    {
+      "id": "de-holdout-264",
+      "field": "caption",
+      "text": "Tipp: Regenjacken auf links zum Trocknen aufhängen, dann bleibt das Futter nicht feucht."
+    },
+    {
+      "id": "de-holdout-265",
+      "field": "caption",
+      "text": "Die Schneiderin hat den Saum meines alten Wollrocks ausgelassen. Jetzt hat er die perfekte Winterlänge."
+    },
+    {
+      "id": "de-holdout-266",
+      "field": "caption",
+      "text": "Den Wollmantel nach einer staubigen Woche ausgebürstet. Fusselbürste und ein bisschen Geduld."
+    },
+    {
+      "id": "de-holdout-267",
+      "field": "caption",
+      "text": "Auf dem Flohmarkt eine abgenutzte Ledertasche gekauft, gereinigt und gepflegt. Wunderschön geworden."
+    },
+    {
+      "id": "de-holdout-268",
+      "field": "caption",
+      "text": "Einen Ziehfaden in der Strickjacke mit einer Häkelnadel nach innen gezogen. Jetzt unsichtbar."
+    },
+    {
+      "id": "de-holdout-269",
+      "field": "caption",
+      "text": "Der Schuster hat meine neuen Stiefel vorne etwas geweitet. Ein Unterschied wie Tag und Nacht."
+    },
+    {
+      "id": "de-holdout-270",
+      "field": "caption",
+      "text": "Wie faltet ihr ein Sakko für den Koffer? Meins kommt immer mit einer Falte im Rücken an."
+    },
+    {
+      "id": "de-holdout-271",
+      "field": "caption",
+      "text": "Darf man eine Wachsjacke waschen? Meine hat einen Matschfleck vom letzten Spaziergang."
+    },
+    {
+      "id": "de-holdout-272",
+      "field": "caption",
+      "text": "Kleidertausch zum Saisonwechsel erledigt! Sommersachen in die Kisten unterm Bett, Winterstrick zurück ins Regal."
+    },
+    {
+      "id": "de-holdout-273",
+      "field": "caption",
+      "text": "Heute die Stiefel aus dem Keller geholt. Daran merkt man, dass der Herbst da ist."
+    },
+    {
+      "id": "de-holdout-274",
+      "field": "caption",
+      "text": "Das Leinen mit Lavendelsäckchen bis zum nächsten Sommer verstaut. Bis Mai!"
+    },
+    {
+      "id": "de-holdout-275",
+      "field": "caption",
+      "text": "Frühlingswechsel: dicke Mäntel in die Reinigung, leichte Jacken an die Haken."
+    },
+    {
+      "id": "de-holdout-276",
+      "field": "caption",
+      "text": "Die Pullikiste aufgemacht und drei gefunden, die ich ganz vergessen hatte. Die beste Art Shopping."
+    },
+    {
+      "id": "de-holdout-277",
+      "field": "caption",
+      "text": "Flanellbettwäsche gegen Baumwolle und Wollsocken gegen dünne getauscht. Der Frühling ist offiziell."
+    },
+    {
+      "id": "de-holdout-278",
+      "field": "caption",
+      "text": "Halb durch den Schrankwechsel und das Bett ist voller Kleidung. Bitte Snacks schicken."
+    },
+    {
+      "id": "de-holdout-279",
+      "field": "caption",
+      "text": "Beim Saisonwechsel fünf Teile aussortiert, den Rest behalten. Fortschritt ist Fortschritt."
+    },
+    {
+      "id": "de-holdout-280",
+      "field": "caption",
+      "text": "Herbstlicher Schrank-Neustart: diesmal alles nach Farben sortiert, Outfits planen ist so viel leichter."
+    },
+    {
+      "id": "de-holdout-281",
+      "field": "caption",
+      "text": "Der Saisonwechsel im Schrank ist mein liebster Neustart. Fühlt sich an wie neue Kleidung, nur gratis."
+    },
+    {
+      "id": "de-holdout-282",
+      "field": "caption",
+      "text": "Sandalen ins obere Fach, Stiefel nach unten. Winterumbau abgeschlossen."
+    },
+    {
+      "id": "de-holdout-283",
+      "field": "caption",
+      "text": "Zeit, die Sommerhüte bis nächstes Jahr wegzuräumen. Vorher noch ein letzter Sonnenspaziergang mit dem Strohhut."
+    },
+    {
+      "id": "de-holdout-284",
+      "field": "caption",
+      "text": "Zedernholzblöcke in den Pullikisten dieses Jahr. Hoffentlich knabbert diesmal nichts."
+    },
+    {
+      "id": "de-holdout-285",
+      "field": "caption",
+      "text": "Halber Saisonwechsel: ein paar Sommerkleider bleiben draußen, die gehen mit Strumpfhose und Strickjacke."
+    },
+    {
+      "id": "de-holdout-286",
+      "field": "caption",
+      "text": "Der erste kühle Morgen heißt: Der Trench wandert von hinten im Schrank nach vorne."
+    },
+    {
+      "id": "de-holdout-287",
+      "field": "caption",
+      "text": "Die Daunenjacke verstaut, die Weste bleibt für kühle Frühlingsabende draußen."
+    },
+    {
+      "id": "de-holdout-288",
+      "field": "caption",
+      "text": "Alles rausgeholt, alles anprobiert und einen Spendenstapel gemacht, bevor die Wintersachen verschwinden."
+    },
+    {
+      "id": "de-holdout-289",
+      "field": "caption",
+      "text": "Erinnerung zum Herbstwechsel: Taschen vor dem Einlagern leeren. Einen alten Kassenbon und Sand vom August gefunden."
+    },
+    {
+      "id": "de-holdout-290",
+      "field": "caption",
+      "text": "Alle Winterschals werden gewaschen, bevor sie eingelagert werden. Die verdienen auch einen Neustart."
+    },
+    {
+      "id": "de-holdout-291",
+      "field": "caption",
+      "text": "Saisonwechsel, aber schrittweise. Immer ein paar warme Teile, bis das Wetter sich wirklich festlegt."
+    },
+    {
+      "id": "de-holdout-292",
+      "field": "caption",
+      "text": "Heute die Regensachen zurückgeholt. Der Schirmständer ist offiziell wieder voll."
+    },
+    {
+      "id": "de-holdout-293",
+      "field": "caption",
+      "text": "Heute Abend Schrankwechsel: Leinen nach oben, Cord nach unten."
+    },
+    {
+      "id": "de-holdout-294",
+      "field": "caption",
+      "text": "Die Sommertasche aus Canvas gegen die Ledertasche getauscht, die Regen aushält. Kleines Saisonritual."
+    },
+    {
+      "id": "de-holdout-295",
+      "field": "caption",
+      "text": "7 Grad und meine guten Handschuhe in der Tasche vom Wintermantel gefunden. Wechsel abgeschlossen."
+    },
+    {
+      "id": "de-holdout-296",
+      "field": "caption",
+      "text": "Die dicken Pullis wandern in Vakuumbeutel. Die schrumpfen auf fast nichts, wie Zauberei."
+    },
+    {
+      "id": "de-holdout-297",
+      "field": "caption",
+      "text": "Frühling: Die Wollsocken werden gewaschen, gefaltet und bis November in die obere Schublade gelegt."
+    },
+    {
+      "id": "de-holdout-298",
+      "field": "caption",
+      "text": "Die Langarmshirts sind zurück. Der Sommer ist eindeutig vorbei."
+    },
+    {
+      "id": "de-holdout-299",
+      "field": "caption",
+      "text": "Ich wechsle den Schrank, wenn es morgens eine Woche lang über 10 Grad bleibt. Klappt jedes Jahr."
+    },
+    {
+      "id": "de-holdout-300",
+      "field": "caption",
+      "text": "Die leichte Regenjacke hängt wieder neben der Tür. Die dicke kommt ins Lager."
+    },
+    {
+      "id": "de-holdout-301",
+      "field": "caption",
+      "text": "Alle Pullis rausgeholt und festgestellt, dass ich sechs graue habe. Diese Woche jeden Tag einen anderen."
+    },
+    {
+      "id": "de-holdout-302",
+      "field": "caption",
+      "text": "Die Wintermäntel sind verstaut, der Schal bleibt. Die Frühlingsabende sind hier noch kühl."
+    },
+    {
+      "id": "de-holdout-303",
+      "field": "caption",
+      "text": "Die gemütliche Saison ist zurück. Dicke Socken, weite Hose, Oversize-Strick. Herrlich."
+    },
+    {
+      "id": "de-holdout-304",
+      "field": "caption",
+      "text": "Spaziergang im ersten Schnee. Strickmütze, Fäustlinge, der wärmste Mantel, den ich habe."
+    },
+    {
+      "id": "de-holdout-305",
+      "field": "caption",
+      "text": "Kleiner Schrank, große Pläne. Immer nur 30 Teile draußen, der Rest wartet auf seine Saison."
+    },
+    {
+      "id": "de-holdout-306",
+      "field": "caption",
+      "text": "Das letzte warme Wochenende vor dem Herbst. Alle Sommerlieblinge noch einmal ausführen."
+    },
+    {
+      "id": "de-holdout-307",
+      "field": "caption",
+      "text": "Meine Wintercapsule in der App aktualisiert: 4 Pullis, 3 Hosen, 2 Mäntel, 2 Paar Stiefel."
+    },
+    {
+      "id": "de-holdout-308",
+      "field": "caption",
+      "text": "Danke, liebe Community, dass ihr mir endlich bei der Regenjacke geholfen habt. Schon zweimal getestet."
+    },
+    {
+      "id": "de-holdout-309",
+      "field": "caption",
+      "text": "Die Sommerkleider vor dem Einlagern zur Schneiderin gebracht, sie bekommen Taschen. Mein Ich im nächsten Sommer wird jubeln."
+    },
+    {
+      "id": "de-holdout-310",
+      "field": "caption",
+      "text": "Ehrlich gesagt ist das Beste an Regenwetter, dass ich meine Lieblingsstiefel tragen kann."
+    },
+    {
+      "id": "de-holdout-311",
+      "field": "caption",
+      "text": "Sonntags mit meiner Schwester im Secondhandladen. Jetzt haben wir zufällig die gleichen Mäntel."
+    },
+    {
+      "id": "de-holdout-312",
+      "field": "caption",
+      "text": "Kaum zu glauben, wie warm dieser Vintage-Wollmantel ist. Letzten Frühling für ein paar Euro gefunden."
+    },
+    {
+      "id": "de-holdout-313",
+      "field": "caption",
+      "text": "Heute gelernt: Der Windchill ist wichtiger als die Zahl auf dem Thermometer."
+    },
+    {
+      "id": "de-holdout-314",
+      "field": "caption",
+      "text": "Zum ersten Mal in dieser Saison den cremefarbenen Pulli an und direkt Kaffee drauf. Fleckentfernung vor der Arbeit."
+    },
+    {
+      "id": "de-holdout-315",
+      "field": "caption",
+      "text": "Spät dran, den ersten Mantel vom Haken gegriffen. Zum Glück war es der wasserdichte."
+    },
+    {
+      "id": "de-holdout-316",
+      "field": "altText",
+      "text": "Nahaufnahme eines rostroten Wollschals auf einem Stuhl."
+    },
+    {
+      "id": "de-holdout-317",
+      "field": "altText",
+      "text": "Spiegelfoto mit dunkelblauem Hoodie und Jeans."
+    },
+    {
+      "id": "de-holdout-318",
+      "field": "altText",
+      "text": "Flatlay mit weißem Shirt und Khaki-Shorts."
+    },
+    {
+      "id": "de-holdout-319",
+      "field": "altText",
+      "text": "Nahaufnahme eines ausgefransten Jeanssaums."
+    },
+    {
+      "id": "de-holdout-320",
+      "field": "altText",
+      "text": "Straßenfoto einer Person unter rotem Schirm."
+    },
+    {
+      "id": "de-holdout-321",
+      "field": "altText",
+      "text": "Braune Wollsocken auf einem Teppich, von oben."
+    },
+    {
+      "id": "de-holdout-322",
+      "field": "altText",
+      "text": "Flatlay auf einem Leinenlaken mit Kleidung für eine ganze Reisewoche: vier Oberteile, zwei Hosen, ein Strickkleid, eine leichte Strickjacke, weiße Sneaker und braune Sandalen."
+    },
+    {
+      "id": "de-holdout-323",
+      "field": "altText",
+      "text": "Spiegelfoto in einem hellen Eingangsbereich: Person in cremefarbenem Zopfstrickpulli, gerader dunkler Jeans und hellbraunen Schnürstiefeln, Stofftasche über der Schulter."
+    },
+    {
+      "id": "de-holdout-324",
+      "field": "altText",
+      "text": "Nahaufnahme eines getragenen dunkelblauen Wollmantels auf dem Bügelbrett mit frisch geflickter Taschennaht, daneben ein Nadelkissen und eine Garnrolle in passender Farbe."
+    },
+    {
+      "id": "de-holdout-325",
+      "field": "altText",
+      "text": "Draufsicht auf einen offenen Schrank beim Saisonwechsel: Sommerkleider liegen gefaltet in einer Kiste am Boden, dicke Pullis werden zurück ins obere Fach gestapelt."
+    },
+    {
+      "id": "de-holdout-326",
+      "field": "altText",
+      "text": "Straßenfoto an einem verschneiten Morgen: Person in schwarzem Steppparka mit Kapuze, grauem Strickschal, Fäustlingen und hohen wasserdichten Stiefeln tritt vom Bordstein."
+    },
+    {
+      "id": "de-holdout-327",
+      "field": "altText",
+      "text": "Nahaufnahme zweier Schuhpaare auf einer nassen Fußmatte: links matschige Gummistiefel, rechts saubere braune Lederloafer, auf dem Boden Regentropfen."
+    },
+    {
+      "id": "de-holdout-328",
+      "field": "altText",
+      "text": "Flatlay mit Secondhand-Funden auf einem Holztisch: Tweedsakko, gestreifter Strickpulli, Ledergürtel und Wildlederstiefel, jeweils mit kleinem Preisschild aus Papier."
+    },
+    {
+      "id": "de-holdout-329",
+      "field": "altText",
+      "text": "Flatlay mit dunkelblauem Wollmantel, grauem Strickpulli, dunkler Jeans und braunen Lederstiefeln auf Holzboden."
+    },
+    {
+      "id": "de-holdout-330",
+      "field": "altText",
+      "text": "Spiegelfoto einer Person in langem kamelfarbenem Mantel und weißen Sneakern im Flur, Handy in der Hand."
+    },
+    {
+      "id": "de-holdout-331",
+      "field": "altText",
+      "text": "Nahaufnahme schwarzer Gummistiefel in einer flachen Pfütze auf grauem Gehweg."
+    },
+    {
+      "id": "de-holdout-332",
+      "field": "altText",
+      "text": "Straßenfoto einer Person in gelber Regenjacke und Jeans, die an Schaufenstern vorbeigeht."
+    },
+    {
+      "id": "de-holdout-333",
+      "field": "altText",
+      "text": "Gefaltete Leinenhemden in Weiß, Salbeigrün und Sand gestapelt auf einem Bett neben einem Strohhut."
+    },
+    {
+      "id": "de-holdout-334",
+      "field": "altText",
+      "text": "Nahaufnahme eines dicken cremefarbenen Strickpullis mit Zopfmuster und kleinem Holzknopf."
+    },
+    {
+      "id": "de-holdout-335",
+      "field": "altText",
+      "text": "Braune Wildlederloafer auf einer Fußmatte neben hohen grünen Gummistiefeln."
+    },
+    {
+      "id": "de-holdout-336",
+      "field": "altText",
+      "text": "Offener Koffer mit gerollten Shirts, gefaltetem Blazer, Sneakern im Schuhbeutel und Kulturtasche."
+    },
+    {
+      "id": "de-holdout-337",
+      "field": "altText",
+      "text": "Person auf einer Brücke in dunklem Parka mit aufgesetzter Kapuze, im Hintergrund leichter Regen."
+    },
+    {
+      "id": "de-holdout-338",
+      "field": "altText",
+      "text": "Spiegelselfie mit grauem Oversize-Blazer über schwarzem Rollkragen und weiter Hose."
+    },
+    {
+      "id": "de-holdout-339",
+      "field": "altText",
+      "text": "Flatlay mit gestreiftem Shirt, weißer Jeans, Stoffsneakern und runder Sonnenbrille auf weißem Laken."
+    },
+    {
+      "id": "de-holdout-340",
+      "field": "altText",
+      "text": "Nahaufnahme von Händen, die mit Nadel und dunklem Garn einen Knopf an einen Wollmantel nähen."
+    },
+    {
+      "id": "de-holdout-341",
+      "field": "altText",
+      "text": "Ein Paar getragene braune Lederstiefel mit neuen Sohlen auf der Werkbank eines Schusters."
+    },
+    {
+      "id": "de-holdout-342",
+      "field": "altText",
+      "text": "Straßenfoto einer radfahrenden Person in Regenjacke und hochgekrempelter Hose vor nassen Autos."
+    },
+    {
+      "id": "de-holdout-343",
+      "field": "altText",
+      "text": "Kleiderstange mit Mänteln links und leichten Jacken rechts, nach Farben sortiert."
+    },
+    {
+      "id": "de-holdout-344",
+      "field": "altText",
+      "text": "Nahaufnahme eines Jeansknies, sichtbar geflickt mit blauem Garn im Kreuzstich."
+    },
+    {
+      "id": "de-holdout-345",
+      "field": "altText",
+      "text": "Spiegelfoto einer Person in Midikleid, Strumpfhose und Stiefeletten mit kurzer Strickjacke."
+    },
+    {
+      "id": "de-holdout-346",
+      "field": "altText",
+      "text": "Flatlay mit Winteraccessoires: rote Mütze, graue Fäustlinge, karierter Schal und Wollsocken."
+    },
+    {
+      "id": "de-holdout-347",
+      "field": "altText",
+      "text": "Nahaufnahme von Etikett und Innennaht eines Tweedsakkos aus dem Secondhandladen."
+    },
+    {
+      "id": "de-holdout-348",
+      "field": "altText",
+      "text": "Person auf verschneiter Straße in langer schwarzer Daunenjacke, Strickmütze und Stiefeln mit Profilsohle."
+    },
+    {
+      "id": "de-holdout-349",
+      "field": "altText",
+      "text": "Zwei Paar Sneaker trocknen auf der Heizung unter einem Fenster mit Regentropfen."
+    },
+    {
+      "id": "de-holdout-350",
+      "field": "altText",
+      "text": "Draufsicht auf einen Wäschekorb mit ordentlich gefalteten Handtüchern und Pullis."
+    },
+    {
+      "id": "de-holdout-351",
+      "field": "altText",
+      "text": "Nahaufnahme einer gewachsten Baumwolljacke mit glänzendem Stoff und Cordkragen."
+    },
+    {
+      "id": "de-holdout-352",
+      "field": "altText",
+      "text": "Spiegelfoto einer Person in kurzärmeligem Leinenhemd und heller Chino in einem hellen Schlafzimmer."
+    },
+    {
+      "id": "de-holdout-353",
+      "field": "altText",
+      "text": "Flatlay einer Reisecapsule: drei Oberteile, zwei Hosen, ein Kleid, eine Strickjacke, zwei Paar Schuhe."
+    },
+    {
+      "id": "de-holdout-354",
+      "field": "altText",
+      "text": "Nahaufnahme weißer Stoffsneaker, die mit weicher Bürste und Seifenwasser gereinigt werden."
+    },
+    {
+      "id": "de-holdout-355",
+      "field": "altText",
+      "text": "Person an einer Bushaltestelle in beigem Trenchcoat mit durchsichtigem Regenschirm."
+    },
+    {
+      "id": "de-holdout-356",
+      "field": "altText",
+      "text": "Grüne Regenjacke auf einem Bügel an der Tür, an den Ärmeln noch Wassertropfen."
+    },
+    {
+      "id": "de-holdout-357",
+      "field": "altText",
+      "text": "Flatlay eines Sommeroutfits: geblümtes Kleid, geflochtene Sandalen, Korbtasche und Sonnenhut."
+    },
+    {
+      "id": "de-holdout-358",
+      "field": "altText",
+      "text": "Nahaufnahme schwarzer Chelsea-Boots mit etwas Schnee auf den Spitzen."
+    },
+    {
+      "id": "de-holdout-359",
+      "field": "altText",
+      "text": "Straßenfoto einer Person in olivgrüner Steppjacke und grauer Hose an einer Fußgängerampel."
+    },
+    {
+      "id": "de-holdout-360",
+      "field": "altText",
+      "text": "Gefaltete Wollpullis gestapelt in durchsichtigen Aufbewahrungsboxen auf einem Schrankregal."
+    },
+    {
+      "id": "de-holdout-361",
+      "field": "altText",
+      "text": "Nahaufnahme eines Maßbands am Saum einer dunkelblauen Hose."
+    },
+    {
+      "id": "de-holdout-362",
+      "field": "altText",
+      "text": "Spiegelfoto einer Person mit Hoodie unter anthrazitfarbenem Wollmantel und Rucksack."
+    },
+    {
+      "id": "de-holdout-363",
+      "field": "altText",
+      "text": "Flatlay mit Regenausrüstung: Gummistiefel, faltbare Regenjacke, Taschenschirm und Strickmütze."
+    },
+    {
+      "id": "de-holdout-364",
+      "field": "altText",
+      "text": "Nahaufnahme des Rippbündchens einer senfgelben Strickjacke auf einem dunklen Holztisch."
+    },
+    {
+      "id": "de-holdout-365",
+      "field": "altText",
+      "text": "Person in Fischerpulli und dunkler Jeans auf einem windigen Strandweg."
+    },
+    {
+      "id": "de-holdout-366",
+      "field": "altText",
+      "text": "Offener Kleiderschrank mit Sommerkleidern auf Bügeln und Wintermänteln in Kleidersäcken."
+    },
+    {
+      "id": "de-holdout-367",
+      "field": "altText",
+      "text": "Nahaufnahme brauner Lederhandschuhe mit gestopfter Naht an einem Finger."
+    },
+    {
+      "id": "de-holdout-368",
+      "field": "altText",
+      "text": "Spiegelfoto eines Kindes in roter Regenjacke und gemusterten Gummistiefeln vor der Schule."
+    },
+    {
+      "id": "de-holdout-369",
+      "field": "altText",
+      "text": "Flatlay für eine Dienstreise: graues Sakko, zwei Hemden, Krawatte und Lederschuhe."
+    },
+    {
+      "id": "de-holdout-370",
+      "field": "altText",
+      "text": "Nahaufnahme einer weichen rostbraunen Cordjacke mit Messingknopf."
+    },
+    {
+      "id": "de-holdout-371",
+      "field": "altText",
+      "text": "Straßenfoto zweier Personen in gleichen dunkelblauen Cabanjacken auf einer Kopfsteinpflastergasse."
+    },
+    {
+      "id": "de-holdout-372",
+      "field": "altText",
+      "text": "Ein Paar Sandalen und ein Paar Stiefel nebeneinander im Schuhregal an der Tür."
+    },
+    {
+      "id": "de-holdout-373",
+      "field": "altText",
+      "text": "Nahaufnahme einer heidegrauen Strickmütze mit umgeschlagenem Rand."
+    },
+    {
+      "id": "de-holdout-374",
+      "field": "altText",
+      "text": "Spiegelfoto einer Person in weißem Shirt, Jeansjacke und schwarzer Jeans in einem schmalen Flur."
+    },
+    {
+      "id": "de-holdout-375",
+      "field": "altText",
+      "text": "Flatlay für den Skiurlaub: Funktionswäsche, dicke Socken, Handschuhe, Halswärmer und Skibrille."
+    },
+    {
+      "id": "de-holdout-376",
+      "field": "altText",
+      "text": "Nahaufnahme eines gestreiften Schals um den Kragen eines kamelfarbenen Mantels."
+    },
+    {
+      "id": "de-holdout-377",
+      "field": "altText",
+      "text": "Person mit Hund in Wachsjacke und Gummistiefeln auf einem matschigen Feldweg."
+    },
+    {
+      "id": "de-holdout-378",
+      "field": "altText",
+      "text": "Kleidersack mit Anzug an der Schranktür eines Hotelzimmers, daneben ein zusammengeklappter Schirm."
+    },
+    {
+      "id": "de-holdout-379",
+      "field": "altText",
+      "text": "Nahaufnahme eines Leinenhemdärmels mit natürlichen Knitterfalten im Morgenlicht."
+    },
+    {
+      "id": "de-holdout-380",
+      "field": "altText",
+      "text": "Flatlay mit Secondhand-Funden: Tweedsakko, Wollschal und braune Lederstiefel."
+    },
+    {
+      "id": "de-holdout-381",
+      "field": "altText",
+      "text": "Spiegelfoto einer Person in plissiertem Midirock, eingestecktem Strickpulli und Loafern."
+    },
+    {
+      "id": "de-holdout-382",
+      "field": "altText",
+      "text": "Nahaufnahme von Salzrändern auf dunklen Lederstiefeln neben einem Tuch und einer Schale Wasser."
+    },
+    {
+      "id": "de-holdout-383",
+      "field": "altText",
+      "text": "Straßenfoto einer Person mit knallorangefarbener Mütze und schwarzem Parka im Schneefall."
+    },
+    {
+      "id": "de-holdout-384",
+      "field": "altText",
+      "text": "Frisch gebügelte Hemden auf Bügeln an einer Kleiderstange aufgereiht."
+    },
+    {
+      "id": "de-holdout-385",
+      "field": "altText",
+      "text": "Nahaufnahme einer Daunenjacke, die vor dem Trockner aufgeschüttelt wird."
+    },
+    {
+      "id": "de-holdout-386",
+      "field": "altText",
+      "text": "Flatlay für ein Strandwochenende: Badeshorts, Leinenhemd, Flip-Flops und Handtuch."
+    },
+    {
+      "id": "de-holdout-387",
+      "field": "altText",
+      "text": "Person auf einer Parkbank in grünem Trenchcoat und weißen Sneakern unter grauem Himmel."
+    },
+    {
+      "id": "de-holdout-388",
+      "field": "altText",
+      "text": "Nahaufnahme eines geflickten Pulliellbogens mit rundem Strickflicken in Kontrastfarbe."
+    },
+    {
+      "id": "de-holdout-389",
+      "field": "altText",
+      "text": "Spiegelfoto einer Person zu Hause in Thermoleggings, Oversize-Pulli und Wollsocken."
+    },
+    {
+      "id": "de-holdout-390",
+      "field": "altText",
+      "text": "Zwei Mäntel an Wandhaken: eine leichte dunkelblaue Regenjacke und ein schwerer brauner Wollmantel."
+    },
+    {
+      "id": "de-holdout-391",
+      "field": "altText",
+      "text": "Nahaufnahme von Loafern mit neuen Gummiabsätzen auf Holzboden."
+    },
+    {
+      "id": "de-holdout-392",
+      "field": "altText",
+      "text": "Flatlay eines Herbstoutfits: weinroter Pulli, olivgrüne Hose, brauner Gürtel und Wildlederstiefel."
+    },
+    {
+      "id": "de-holdout-393",
+      "field": "altText",
+      "text": "Straßenfoto einer Person mit Rucksack und Regenponcho, die in der Dämmerung eine nasse Straße überquert."
+    },
+    {
+      "id": "de-holdout-394",
+      "field": "altText",
+      "text": "Nahaufnahme einer Pullitasche, in der eine zusammengeklappte Sonnenbrille steckt."
+    },
+    {
+      "id": "de-holdout-395",
+      "field": "altText",
+      "text": "Spiegelfoto einer Person in kurzer Daunenjacke, Highwaist-Jeans und weißen Sneakern."
+    },
+    {
+      "id": "de-holdout-396",
+      "field": "altText",
+      "text": "Kleiner Koffer mit gerollter Kleidung in bunten Packwürfeln."
+    },
+    {
+      "id": "de-holdout-397",
+      "field": "altText",
+      "text": "Nahaufnahme grüner Gummistiefel mit Matsch an den Sohlen vor einem Gartentor."
+    },
+    {
+      "id": "de-holdout-398",
+      "field": "altText",
+      "text": "Flatlay eines Bürooutfits: cremefarbene Bluse, dunkelblaue Hose, Blockabsätze und Shopper."
+    },
+    {
+      "id": "de-holdout-399",
+      "field": "altText",
+      "text": "Person in langem Strickmantel und weiter Hose vor einer roten Backsteinmauer."
+    },
+    {
+      "id": "de-holdout-400",
+      "field": "altText",
+      "text": "Nahaufnahme von Hornknöpfen auf der Vorderseite eines grauen Blazers."
+    },
+    {
+      "id": "de-holdout-401",
+      "field": "altText",
+      "text": "Gefaltete Sommerkleidung wird in eine Aufbewahrungsbox gelegt, obenauf ein Lavendelsäckchen."
+    },
+    {
+      "id": "de-holdout-402",
+      "field": "altText",
+      "text": "Straßenfoto einer Person mit Einkaufstüten in Steppweste und Langarmshirt."
+    },
+    {
+      "id": "de-holdout-403",
+      "field": "altText",
+      "text": "Nahaufnahme der Innenseite einer Regenjackenkapuze mit Netzfutter."
+    },
+    {
+      "id": "de-holdout-404",
+      "field": "altText",
+      "text": "Spiegelfoto einer Person in Jeanshemd, Khakihose und braunen Stiefeln vor der Arbeit."
+    },
+    {
+      "id": "de-holdout-405",
+      "field": "altText",
+      "text": "Flatlay mit Campinglagen: Fleecejacke, Wandersocken, Mütze und leichte Daunenjacke."
+    },
+    {
+      "id": "de-holdout-406",
+      "field": "altText",
+      "text": "Nahaufnahme geschnürter Wanderschuhe auf einem steinigen Pfad."
+    },
+    {
+      "id": "de-holdout-407",
+      "field": "altText",
+      "text": "Person am Bahnsteig mit langem Schal, grauem Mantel und schwarzen Stiefeletten."
+    },
+    {
+      "id": "de-holdout-408",
+      "field": "altText",
+      "text": "Nahaufnahme einer gepflegten Vintage-Ledertasche mit Schnallenriemen."
+    },
+    {
+      "id": "de-holdout-409",
+      "field": "altText",
+      "text": "Wäscheständer aus Holz am Fenster mit Socken, Pullis und einer Hose."
+    },
+    {
+      "id": "de-holdout-410",
+      "field": "altText",
+      "text": "Spiegelfoto einer Person in kurzärmeligem Kleid mit leichter Strickjacke und Sandalen."
+    },
+    {
+      "id": "de-holdout-411",
+      "field": "altText",
+      "text": "Flatlay mit Regentags-Set: Taschenschirm, Hut, Schal und ein Paar Ersatzsocken."
+    },
+    {
+      "id": "de-holdout-412",
+      "field": "altText",
+      "text": "Nahaufnahme einer braunen Cordhose, am Knöchel umgeschlagen, über weißen Socken."
+    },
+    {
+      "id": "de-holdout-413",
+      "field": "altText",
+      "text": "Straßenfoto einer Person in cremefarbenem Trenchcoat mit gebundenem Gürtel unter Bäumen."
+    },
+    {
+      "id": "de-holdout-414",
+      "field": "altText",
+      "text": "Nahaufnahme einer dunkelblauen Regenjacke, auf deren Schulter Wasser abperlt."
+    },
+    {
+      "id": "de-holdout-415",
+      "field": "altText",
+      "text": "Schuhregal mit drei Paar Winterstiefeln, einem Paar Loafern und Hausschuhen."
+    },
+    {
+      "id": "de-holdout-416",
+      "field": "altText",
+      "text": "Spiegelfoto einer Person, die in einer Umkleide im Secondhandladen einen Blazer anprobiert."
+    },
+    {
+      "id": "de-holdout-417",
+      "field": "altText",
+      "text": "Flatlay mit Wollaccessoires: gestrickte Fäustlinge, gerippte Mütze und langer Zopfmusterschal."
+    },
+    {
+      "id": "de-holdout-418",
+      "field": "altText",
+      "text": "Nahaufnahme einer gestopften Ferse an einer grauen Wollsocke mit gelbem Garn."
+    },
+    {
+      "id": "de-holdout-419",
+      "field": "altText",
+      "text": "Person in leichter Windjacke und kurzer Hose joggt an einem bewölkten Morgen am See entlang."
+    },
+    {
+      "id": "de-holdout-420",
+      "field": "altText",
+      "text": "Nahaufnahme einer Nähmaschine, die den Saum einer blauen Hose näht."
+    }
+  ]
+}

@@ -35,7 +35,7 @@ import {
 const COMMUNITY_ROUTE = '/'
 
 /**
- * The stable code `reasonCodes.text` in `policy-v1.json` gives a matched term,
+ * The stable code `reasonCodes.text` in `policy-v2.json` gives a matched term,
  * and the only code a caption refusal may persist on its own. Restated here
  * because the Playwright project does not compile against the API workspace;
  * `6.2-E2E-02` fails by name if the policy ever renames it.

@@ -1,0 +1,2627 @@
+{
+  "artifact": "community-content-screening-model-readiness",
+  "artifactVersion": 2,
+  "storyKey": "6-2b-community-screening-release-gate",
+  "generatedAt": "2026-10-17T01:37:10.149Z",
+  "generatedBy": "npm run community:screening:evidence",
+  "verdict": "fail",
+  "verdictRule": "pass only when every gate ran against the current inputs from a committed tree and passed; fail when any gate that ran failed; incomplete otherwise",
+  "gates": [
+    {
+      "id": "committed-tree",
+      "name": "Evidence generated from a committed working tree",
+      "status": "not-run",
+      "reason": "98 uncommitted paths (for example .dockerignore, .env.example, _bmad-output/implementation-artifacts/6-2-production-content-screening-readiness.md, _bmad-output/implementation-artifacts/6-2b-community-screening-release-gate.md, _bmad-output/implementation-artifacts/deferred-work.md, _bmad-output/implementation-artifacts/sprint-status.yaml, _bmad-output/planning-artifacts/architecture.md, _bmad-output/project-knowledge/deployment-guide.md, _bmad-output/test-artifacts/community-content-screening-measurements.json, apps/api/Dockerfile.community-worker); commit the code, re-run the products, then regenerate"
+    },
+    {
+      "id": "worker-image",
+      "name": "Worker image builds, verifies the model, and fits the dependency budget",
+      "status": "passed",
+      "measured": {
+        "nodeModulesMb": 112,
+        "user": "node",
+        "entrypoint": ["/usr/bin/tini", "--"],
+        "commitSha": "1a678c51b213b2c8fff6f2354e9556abf2f96fe7"
+      },
+      "threshold": "node_modules at or below 150 MB, unprivileged user, tini init, commit baked in; the model self-test runs during the build"
+    },
+    {
+      "id": "canary-local-container",
+      "name": "Canary against the local container",
+      "status": "passed",
+      "measured": {
+        "target": "local",
+        "disposition": "pass",
+        "engineIdentity": "adr013-text:policy-v2@b0daab4ab9d1;adr013-nsfw-v1.0:mobilenet_v2_mid@4.3.0:model-a0c76f72db26:v2:policy-b0daab4ab9d1",
+        "processedBy": "community-worker@1a678c51b213b2c8fff6f2354e9556abf2f96fe7",
+        "queueLatencyMs": 1,
+        "screeningDurationMs": 215,
+        "finishedAt": "2026-10-17T01:06:30.642Z"
+      },
+      "threshold": "safe fixture published under a real-model identity within the bounded wait"
+    },
+    {
+      "id": "restart-keeps-queued-jobs",
+      "name": "A job queued while the worker is down completes after it restarts",
+      "status": "passed",
+      "measured": {
+        "queueLatencyMs": 15636,
+        "disposition": "pass"
+      }
+    },
+    {
+      "id": "canary-hosted",
+      "name": "Canary against the deployed worker on the hosted target",
+      "status": "not-run",
+      "reason": "No hosted canary has run: the worker is not yet deployed to a hosted target.",
+      "command": "npm run community:screening:canary -- --target hosted --env-file <hosted env file> --db-ca <Supabase CA> --json-out apps/api/.cache/community-screening/canary-hosted.json"
+    },
+    {
+      "id": "policy-surface",
+      "name": "Policy-surface sweep: one disposition per vector, no pass at or above any review threshold, full block coverage",
+      "status": "passed",
+      "measured": {
+        "vectors": 10852,
+        "byOutcome": {
+          "review:low_confidence": 6996,
+          "block:unsafe_class": 3594,
+          "pass:none": 172,
+          "review:probability_sum_invalid": 6,
+          "review:output_invalid": 43,
+          "review:class_mismatch": 41
+        },
+        "uncoveredBlocks": 0
+      }
+    },
+    {
+      "id": "model-calibration",
+      "name": "Model and policy chosen on the calibration half, shipped as chosen",
+      "status": "passed",
+      "measured": {
+        "family": "mobilenet_v2_mid",
+        "variant": "safe-mass@0.85",
+        "calibrationEntries": 341,
+        "calibrationWithheldRate": 0.1672
+      },
+      "threshold": "lowest calibration withheld rate among families inside 512 MiB and the 150 MB budget, with no unsafe bound looser than v1; the shipped family, floor and bounds equal the choice"
+    },
+    {
+      "id": "safe-corpus",
+      "name": "Safe photograph withheld rate on the holdout half (Wilson 95% upper bound)",
+      "status": "failed",
+      "problems": ["7 safe photographs blocked", "upper bound 0.128613 above 0.05"],
+      "measured": {
+        "evaluated": 298,
+        "validationRejected": 0,
+        "withheld": 27,
+        "rate": 0.0906,
+        "wilson95": [0.063015, 0.128613],
+        "blocked": 7
+      },
+      "threshold": "upper bound <= 5% on the holdout half, at least 250 holdout photographs, every holdout photograph accounted for, none blocked, every withheld one described"
+    },
+    {
+      "id": "list-provenance",
+      "name": "Vendored LDNOOBW lists match the pinned commit and every allow-list entry has a reason",
+      "status": "passed",
+      "measured": {
+        "status": "verified",
+        "upstreamCommit": "5faf2ba42d7b1c0977169ec3611df25a3c08eb13",
+        "problems": []
+      }
+    },
+    {
+      "id": "text-clean-copy",
+      "name": "Clean fashion copy withheld rate per language on the frozen holdout (Wilson 95% upper bound)",
+      "status": "failed",
+      "problems": [
+        "es: 1 of 420 holdout entries withheld, upper bound 1.34%",
+        "fr: 1 of 420 holdout entries withheld, upper bound 1.34%",
+        "it: 2 of 420 holdout entries withheld, upper bound 1.72%",
+        "pt: 4 of 420 holdout entries withheld, upper bound 2.42%"
+      ],
+      "measured": {
+        "de": {
+          "holdout": 420,
+          "holdoutWithheld": 0,
+          "upperBound": 0.009063,
+          "inSample": 416,
+          "inSampleWithheld": 0,
+          "deliberateReview": 4
+        },
+        "en": {
+          "holdout": 420,
+          "holdoutWithheld": 0,
+          "upperBound": 0.009063,
+          "inSample": 416,
+          "inSampleWithheld": 0,
+          "deliberateReview": 4
+        },
+        "es": {
+          "holdout": 420,
+          "holdoutWithheld": 1,
+          "upperBound": 0.013362,
+          "inSample": 420,
+          "inSampleWithheld": 0,
+          "deliberateReview": 0
+        },
+        "fr": {
+          "holdout": 420,
+          "holdoutWithheld": 1,
+          "upperBound": 0.013362,
+          "inSample": 419,
+          "inSampleWithheld": 0,
+          "deliberateReview": 1
+        },
+        "it": {
+          "holdout": 420,
+          "holdoutWithheld": 2,
+          "upperBound": 0.017194,
+          "inSample": 420,
+          "inSampleWithheld": 0,
+          "deliberateReview": 0
+        },
+        "pt": {
+          "holdout": 420,
+          "holdoutWithheld": 4,
+          "upperBound": 0.024229,
+          "inSample": 420,
+          "inSampleWithheld": 0,
+          "deliberateReview": 0
+        },
+        "tr": {
+          "holdout": 420,
+          "holdoutWithheld": 0,
+          "upperBound": 0.009063,
+          "inSample": 420,
+          "inSampleWithheld": 0,
+          "deliberateReview": 0
+        }
+      },
+      "threshold": "upper bound <= 1% in every language over the frozen holdout, at least 200 each; the in-sample clean half and the captions carrying a deliberate review term are reported beside it, not gated"
+    },
+    {
+      "id": "text-obfuscation",
+      "name": "Disguised terms withheld in every obfuscation family",
+      "status": "passed",
+      "measured": {
+        "de": {
+          "total": 100,
+          "bypasses": 0
+        },
+        "en": {
+          "total": 100,
+          "bypasses": 0
+        },
+        "es": {
+          "total": 100,
+          "bypasses": 0
+        },
+        "fr": {
+          "total": 100,
+          "bypasses": 0
+        },
+        "it": {
+          "total": 100,
+          "bypasses": 0
+        },
+        "pt": {
+          "total": 100,
+          "bypasses": 0
+        },
+        "tr": {
+          "total": 100,
+          "bypasses": 0
+        }
+      },
+      "threshold": "zero bypasses, at least 100 cases per language covering every family"
+    },
+    {
+      "id": "model-artifacts",
+      "name": "Pinned model artifacts, WASM binaries and policy hash verified",
+      "status": "passed",
+      "measured": {
+        "status": "verified",
+        "failures": []
+      }
+    },
+    {
+      "id": "runtime-latency",
+      "name": "Startup and warm inference latency inside the absolute ceilings on the sandbox resource profile",
+      "status": "passed",
+      "measured": {
+        "profile": "local container, 0.2 vCPU, 512 MiB (Northflank sandbox envelope)",
+        "warmSamples": 1000,
+        "coldStartupMs": 2987.7,
+        "warmP95Ms": 308.42,
+        "warmP99Ms": 391.02
+      },
+      "threshold": {
+        "coldStartupMs": 30000,
+        "warmP95Ms": 3000,
+        "warmP99Ms": 5000
+      }
+    },
+    {
+      "id": "runtime-memory",
+      "name": "Worker container memory peak while screening the largest accepted upload",
+      "status": "passed",
+      "measured": {
+        "memoryPeakMib": 339.5,
+        "memoryLimitMib": 512,
+        "upload": "generated-4096x4096.jpg",
+        "canaryDisposition": "pass"
+      },
+      "threshold": "cgroup memory.peak at or below 512 MiB across startup and a generated-4096x4096.jpg screening"
+    },
+    {
+      "id": "redis-budget",
+      "name": "Idle worker plus expected traffic well within the Upstash free tier",
+      "status": "failed",
+      "problems": ["projected 70.0% of the free tier"],
+      "measured": {
+        "idleCommandsPerHour": 138,
+        "commandsPerPost": 82,
+        "projectedMonthly": 350020,
+        "shareOfFreeTier": 0.7
+      },
+      "threshold": "projected monthly commands at or below 50% of 500,000"
+    },
+    {
+      "id": "rollout-closed",
+      "name": "Both production Community rollout flags remain disabled",
+      "status": "passed",
+      "measured": {
+        "communityReadEnabled": false,
+        "communityWriteEnabled": false,
+        "source": "packages/config/src/flags.ts defaultValue"
+      }
+    }
+  ],
+  "build": {
+    "commitSha": "1a678c51b213b2c8fff6f2354e9556abf2f96fe7",
+    "workingTreeClean": false,
+    "uncommittedPaths": 98,
+    "inputSetHash": "c8333517a267c4bf6f4781ed8bddc2e53725a2705c1686129f2b86fb0841a42c",
+    "dependencyLockSha256": "2025e3f196ed2a7091eb5f7c034af8a00365b3a38826248b003a4ae609cdcf91",
+    "generatorNode": "v24.22.0"
+  },
+  "inputs": {
+    "lockfile": {
+      "path": "package-lock.json",
+      "sha256": "2025e3f196ed2a7091eb5f7c034af8a00365b3a38826248b003a4ae609cdcf91"
+    },
+    "dockerfile": {
+      "path": "apps/api/Dockerfile.community-worker",
+      "sha256": "4061dffa2e67897d98c8b56d4f6bbb1445c7594f4cd9fbeb78dcb73c320bce50"
+    },
+    "modelManifest": {
+      "path": "apps/api/model-manifests/community-nsfw-mobilenet-v2-mid-nsfwjs-4.3.0.json",
+      "sha256": "28d715ef177c3322b25393be9f1ee3e1d3344d6170af0f55df4a57414c44b206"
+    },
+    "policy": {
+      "path": "apps/api/policies/community-screening/policy-v2.json",
+      "sha256": "b0daab4ab9d175cc018d88d7c37d3443a4d9425909394da3aee110e15ad98b65"
+    },
+    "allowList": {
+      "path": "apps/api/policies/community-screening/allow-list-v1.json",
+      "sha256": "22d1f261f3666cf37369e67359aeabc383ac0a689babe04f87023ba1aee70256"
+    },
+    "vendorSource": {
+      "path": "apps/api/policies/community-screening/vendor/ldnoobw/source.json",
+      "sha256": "5e7a6957dbbc1fecbb9a541ad3a9bb0b68a9741cef8d6c2f2cc41d126222f184"
+    },
+    "safeCorpusManifest": {
+      "path": "apps/api/test/fixtures/community-safe-corpus/manifest.json",
+      "sha256": "0f16a7e89da1d718660e6dfc25dc42fd255856eb0b6539e88ef40c9aeffeb159"
+    },
+    "fixtureManifest": {
+      "path": "apps/api/test/fixtures/community-moderation/v1/manifest.json",
+      "sha256": "b8cd2cd08dd419024a2cdb3ca84d03b3be7a5df211a92cd200853200bcb13243"
+    },
+    "workerSource": {
+      "path": "apps/api/src/modules/community/community-moderation.worker.ts",
+      "sha256": "f5cc001b0cd5650219b3aa4fdb3840db1a7b803300dadc1b965f3a03d642bbcc"
+    }
+  },
+  "image": {
+    "available": true,
+    "stale": [],
+    "reference": "couture-cast-community-worker:local",
+    "imageId": "sha256:366d64d4994bc2ceeb46f12b1bc79732454ab8220a0a547cbcbd183eec02548e",
+    "repoDigests": [
+      "couture-cast-community-worker@sha256:366d64d4994bc2ceeb46f12b1bc79732454ab8220a0a547cbcbd183eec02548e"
+    ],
+    "created": "2026-10-17T00:43:51.015161925Z",
+    "architecture": "linux/arm64",
+    "user": "node",
+    "entrypoint": ["/usr/bin/tini", "--"],
+    "cmd": ["node", "scripts/start-community-worker-production.mjs"],
+    "commitSha": "1a678c51b213b2c8fff6f2354e9556abf2f96fe7",
+    "inputSetHash": "c8333517a267c4bf6f4781ed8bddc2e53725a2705c1686129f2b86fb0841a42c",
+    "nodeModulesMb": 112,
+    "nodeModulesBudgetMb": 150,
+    "dockerfileSha256": "4061dffa2e67897d98c8b56d4f6bbb1445c7594f4cd9fbeb78dcb73c320bce50",
+    "note": "Image digest is the locally built image id. The hosted build produces its own digest on the target architecture; the hosted canary records the worker name, which carries the commit the hosted image was built from."
+  },
+  "model": {
+    "family": "mobilenet_v2_mid",
+    "package": "nsfwjs@4.3.0",
+    "backend": "wasm",
+    "classNames": ["Drawing", "Hentai", "Neutral", "Porn", "Sexy"],
+    "manifestSha256": "28d715ef177c3322b25393be9f1ee3e1d3344d6170af0f55df4a57414c44b206",
+    "verification": {
+      "status": "verified",
+      "failures": [],
+      "policy": {
+        "path": "apps/api/policies/community-screening/policy-v2.json",
+        "expectedSha256": "b0daab4ab9d175cc018d88d7c37d3443a4d9425909394da3aee110e15ad98b65",
+        "expectedVersion": "v2",
+        "sha256": "b0daab4ab9d175cc018d88d7c37d3443a4d9425909394da3aee110e15ad98b65",
+        "version": "v2",
+        "ok": true
+      }
+    }
+  },
+  "policy": {
+    "policyId": "community-screening-policy-v2",
+    "version": "v2",
+    "effectiveFrom": "2026-10-16",
+    "sha256": "b0daab4ab9d175cc018d88d7c37d3443a4d9425909394da3aee110e15ad98b65",
+    "thresholds": {
+      "safeClasses": ["Drawing", "Neutral"],
+      "safeMassMinimum": 0.85,
+      "reviewClasses": ["Sexy"],
+      "reviewClassMaximum": 0.15,
+      "unsafeAggregateMaximum": 0.1,
+      "unsafeAndReviewAggregateMaximum": 0.15,
+      "unsafeClasses": ["Hentai", "Porn"],
+      "unsafeBlockMinimum": 0.35,
+      "probabilitySumTolerance": 0.001
+    }
+  },
+  "deployment": {
+    "target": "Northflank Developer Sandbox (always-on combined service built from apps/api/Dockerfile.community-worker)",
+    "status": "not deployed yet",
+    "resourceProfile": {
+      "cpu": 0.2,
+      "cpuSource": "the CPU share the local container emulated; confirm it against the sandbox plan once the service exists",
+      "memoryMib": 512,
+      "replicas": 1,
+      "concurrency": 1
+    },
+    "fallbacks": [
+      {
+        "name": "Oracle Cloud Always Free (ARM VM)",
+        "when": "the sandbox memory envelope proves too small"
+      },
+      {
+        "name": "Railway (paid, from 5 USD a month)",
+        "when": "neither free option is worth the setup time"
+      }
+    ],
+    "excluded": "Vercel: it runs no long-running process, which a BullMQ consumer is."
+  },
+  "canary": {
+    "local": {
+      "label": "local container",
+      "available": true,
+      "stale": [],
+      "ok": true,
+      "target": "local",
+      "inputSetHash": "c8333517a267c4bf6f4781ed8bddc2e53725a2705c1686129f2b86fb0841a42c",
+      "expectedSha": "1a678c51b213b2c8fff6f2354e9556abf2f96fe7",
+      "processedBy": "community-worker@1a678c51b213b2c8fff6f2354e9556abf2f96fe7",
+      "startedAt": "2026-10-17T01:06:30.078Z",
+      "finishedAt": "2026-10-17T01:06:30.642Z",
+      "fixture": {
+        "name": "safe-satin-plum-512x512.jpg",
+        "sha256": "b2ed2509ee63fa5a13aff99ece5603970b97b004c07ef930315267b0a79974a3",
+        "bytes": 40848
+      },
+      "workersConnected": {
+        "known": true,
+        "count": 1,
+        "names": [
+          "bull:Y29tbXVuaXR5LW1vZGVyYXRpb24=:w:community-worker@1a678c51b213b2c8fff6f2354e9556abf2f96fe7"
+        ]
+      },
+      "terminalStatus": "published",
+      "disposition": "pass",
+      "engineIdentity": "adr013-text:policy-v2@b0daab4ab9d1;adr013-nsfw-v1.0:mobilenet_v2_mid@4.3.0:model-a0c76f72db26:v2:policy-b0daab4ab9d1",
+      "attemptsMade": 1,
+      "jobState": "completed",
+      "timings": {
+        "queueLatencyMs": 1,
+        "screeningDurationMs": 215,
+        "screeningDurationCovers": "BullMQ processedOn to finishedOn: storage download, declaration check and re-encode, image inference, text screening, and the publish transaction",
+        "enqueueToObservedTerminalMs": 507,
+        "pollIntervalMs": 500
+      },
+      "cleanup": {
+        "performed": true,
+        "problems": []
+      }
+    },
+    "restart": {
+      "label": "local container restart drill",
+      "available": true,
+      "stale": [],
+      "ok": true,
+      "target": "local",
+      "inputSetHash": "c8333517a267c4bf6f4781ed8bddc2e53725a2705c1686129f2b86fb0841a42c",
+      "expectedSha": "1a678c51b213b2c8fff6f2354e9556abf2f96fe7",
+      "processedBy": "community-worker@1a678c51b213b2c8fff6f2354e9556abf2f96fe7",
+      "startedAt": "2026-10-17T01:06:31.093Z",
+      "finishedAt": "2026-10-17T01:06:48.781Z",
+      "fixture": {
+        "name": "safe-satin-plum-512x512.jpg",
+        "sha256": "b2ed2509ee63fa5a13aff99ece5603970b97b004c07ef930315267b0a79974a3",
+        "bytes": 40848
+      },
+      "workersConnected": {
+        "known": false,
+        "count": null,
+        "note": "skipped by --no-worker-precheck"
+      },
+      "terminalStatus": "published",
+      "disposition": "pass",
+      "engineIdentity": "adr013-text:policy-v2@b0daab4ab9d1;adr013-nsfw-v1.0:mobilenet_v2_mid@4.3.0:model-a0c76f72db26:v2:policy-b0daab4ab9d1",
+      "attemptsMade": 1,
+      "jobState": "completed",
+      "timings": {
+        "queueLatencyMs": 15636,
+        "screeningDurationMs": 1809,
+        "screeningDurationCovers": "BullMQ processedOn to finishedOn: storage download, declaration check and re-encode, image inference, text screening, and the publish transaction",
+        "enqueueToObservedTerminalMs": 17634,
+        "pollIntervalMs": 500
+      },
+      "cleanup": {
+        "performed": true,
+        "problems": []
+      }
+    },
+    "hosted": {
+      "label": "hosted target",
+      "available": false,
+      "stale": []
+    }
+  },
+  "policySurface": {
+    "available": true,
+    "stale": [],
+    "sweep": {
+      "measuredAt": "2026-10-17T01:00:15.553Z",
+      "inputSetHash": "c8333517a267c4bf6f4781ed8bddc2e53725a2705c1686129f2b86fb0841a42c",
+      "policySha256": "b0daab4ab9d175cc018d88d7c37d3443a4d9425909394da3aee110e15ad98b65",
+      "vectorCount": 10852,
+      "byOutcome": {
+        "review:low_confidence": 6996,
+        "block:unsafe_class": 3594,
+        "pass:none": 172,
+        "review:probability_sum_invalid": 6,
+        "review:output_invalid": 43,
+        "review:class_mismatch": 41
+      },
+      "byFamily": {
+        "simplex-grid": {
+          "review": 6918,
+          "block": 3570,
+          "pass": 138
+        },
+        "threshold-boundary": {
+          "review": 39,
+          "pass": 18,
+          "block": 6
+        },
+        "single-class-maximum": {
+          "pass": 4,
+          "review": 5,
+          "block": 6
+        },
+        "uniform": {
+          "review": 16
+        },
+        "tie": {
+          "block": 12,
+          "review": 18
+        },
+        "sum-tolerance": {
+          "pass": 8,
+          "review": 6
+        },
+        "non-finite": {
+          "review": 15
+        },
+        "out-of-range": {
+          "review": 25
+        },
+        "missing-class": {
+          "review": 5
+        },
+        "duplicated-class": {
+          "review": 20
+        },
+        "wrong-class-set": {
+          "review": 15
+        },
+        "permuted-class-order": {
+          "pass": 4
+        },
+        "length-mismatch": {
+          "review": 2
+        },
+        "empty": {
+          "review": 2
+        }
+      },
+      "oracleDisagreements": 0,
+      "passAtOrAboveAReviewThreshold": 0,
+      "sweepDigest": "2b211224d8cf3e45cda40065aa760c8e5d89266ee69794d77b4c04afe79cea17"
+    },
+    "coverage": {
+      "measuredAt": "2026-10-17T01:00:15.758Z",
+      "inputSetHash": "c8333517a267c4bf6f4781ed8bddc2e53725a2705c1686129f2b86fb0841a42c",
+      "policySha256": "b0daab4ab9d175cc018d88d7c37d3443a4d9425909394da3aee110e15ad98b65",
+      "functions": [
+        {
+          "functionName": "evaluateNsfwDisposition",
+          "blocks": 1,
+          "uncoveredBlocks": 0
+        },
+        {
+          "functionName": "emptyEvaluation",
+          "blocks": 1,
+          "uncoveredBlocks": 0
+        },
+        {
+          "functionName": "review",
+          "blocks": 1,
+          "uncoveredBlocks": 0
+        },
+        {
+          "functionName": "validateVector",
+          "blocks": 10,
+          "uncoveredBlocks": 0
+        },
+        {
+          "functionName": "evaluateNsfwDisposition",
+          "blocks": 12,
+          "uncoveredBlocks": 0
+        },
+        {
+          "functionName": "(anonymous callback)",
+          "blocks": 1,
+          "uncoveredBlocks": 0
+        },
+        {
+          "functionName": "(anonymous callback)",
+          "blocks": 1,
+          "uncoveredBlocks": 0
+        },
+        {
+          "functionName": "(anonymous callback)",
+          "blocks": 3,
+          "uncoveredBlocks": 0
+        },
+        {
+          "functionName": "(anonymous callback)",
+          "blocks": 1,
+          "uncoveredBlocks": 0
+        },
+        {
+          "functionName": "(anonymous callback)",
+          "blocks": 1,
+          "uncoveredBlocks": 0
+        },
+        {
+          "functionName": "(anonymous callback)",
+          "blocks": 1,
+          "uncoveredBlocks": 0
+        },
+        {
+          "functionName": "(anonymous callback)",
+          "blocks": 1,
+          "uncoveredBlocks": 0
+        },
+        {
+          "functionName": "(anonymous callback)",
+          "blocks": 1,
+          "uncoveredBlocks": 0
+        },
+        {
+          "functionName": "(anonymous callback)",
+          "blocks": 1,
+          "uncoveredBlocks": 0
+        },
+        {
+          "functionName": "(anonymous callback)",
+          "blocks": 1,
+          "uncoveredBlocks": 0
+        },
+        {
+          "functionName": "(anonymous callback)",
+          "blocks": 1,
+          "uncoveredBlocks": 0
+        },
+        {
+          "functionName": "(anonymous callback)",
+          "blocks": 1,
+          "uncoveredBlocks": 0
+        }
+      ]
+    }
+  },
+  "calibration": {
+    "available": true,
+    "stale": [],
+    "shipped": {
+      "family": "mobilenet_v2_mid",
+      "safeMassMinimum": 0.85,
+      "bounds": {
+        "blockMinimum": 0.35,
+        "unsafeAggregateMaximum": 0.1,
+        "sexyPassMaximum": 0.15,
+        "jointMaximum": 0.15
+      }
+    },
+    "measuredAt": "2026-10-17T01:00:07.973Z",
+    "inputSetHash": "c8333517a267c4bf6f4781ed8bddc2e53725a2705c1686129f2b86fb0841a42c",
+    "manifestSha256": "0f16a7e89da1d718660e6dfc25dc42fd255856eb0b6539e88ef40c9aeffeb159",
+    "split": {
+      "rule": "by creator: first hexadecimal digit of the SHA-256 of the creator key (source:creator, lower-cased), even is calibration, odd is holdout",
+      "creatorCapShare": 0.05,
+      "creators": 199,
+      "calibration": 342,
+      "holdout": 298
+    },
+    "calibrationEntries": 341,
+    "validationRejected": [
+      {
+        "id": "7796d7e8-f413-46a4-ab21-cb1ef7e984c1",
+        "code": "IMAGE_DIMENSIONS_INVALID"
+      }
+    ],
+    "unsafeBounds": {
+      "blockMinimum": 0.35,
+      "unsafeAggregateMaximum": 0.1,
+      "sexyPassMaximum": 0.15,
+      "jointMaximum": 0.15
+    },
+    "selectionRule": "lowest calibration withheld rate among families that fit 512 MiB peak RSS and the 150 MB node_modules budget; ties to the stricter threshold, then the smaller model",
+    "familyModelBytes": {
+      "mobilenet_v2": 3600073,
+      "mobilenet_v2_mid": 5864553,
+      "inception_v3": 29997085
+    },
+    "measurements": {
+      "mobilenet_v2": {
+        "family": "mobilenet_v2",
+        "inputSize": 224,
+        "modelBytes": 3600073,
+        "coldStartupMs": 2289.2,
+        "warmSamples": 100,
+        "warmP50Ms": 283.2,
+        "warmP95Ms": 397.3,
+        "warmP99Ms": 489.1,
+        "peakResidentMib": 198.1,
+        "baselineResidentMib": 46.6,
+        "cpuCount": 14,
+        "nodeModulesMb": 120.4,
+        "nodeModulesSource": "measured 112.0 MB image, minus mobilenet_v2_mid (5.9 MB), plus this family and @tensorflow/tfjs-layers pruned the same way (10.7 MB)",
+        "profile": "node:24.21.0-bookworm-slim container, --cpus=0.2, --memory=512m, calibration harness (model on the main thread, no worker graph)"
+      },
+      "mobilenet_v2_mid": {
+        "family": "mobilenet_v2_mid",
+        "inputSize": 224,
+        "modelBytes": 5864553,
+        "coldStartupMs": 2280.2,
+        "warmSamples": 100,
+        "warmP50Ms": 203.7,
+        "warmP95Ms": 311.9,
+        "warmP99Ms": 396.5,
+        "peakResidentMib": 219.2,
+        "baselineResidentMib": 46.9,
+        "cpuCount": 14,
+        "nodeModulesMb": 112,
+        "nodeModulesSource": "measured image",
+        "profile": "node:24.21.0-bookworm-slim container, --cpus=0.2, --memory=512m, calibration harness (model on the main thread, no worker graph)"
+      },
+      "inception_v3": {
+        "family": "inception_v3",
+        "inputSize": 299,
+        "modelBytes": 29997085,
+        "coldStartupMs": 7690.7,
+        "warmSamples": 100,
+        "warmP50Ms": 1681.7,
+        "warmP95Ms": 2088.9,
+        "warmP99Ms": 2108.4,
+        "peakResidentMib": 479.4,
+        "baselineResidentMib": 48.8,
+        "cpuCount": 14,
+        "nodeModulesMb": 146.8,
+        "nodeModulesSource": "measured 112.0 MB image, minus mobilenet_v2_mid (5.9 MB), plus this family and @tensorflow/tfjs-layers pruned the same way (10.7 MB)",
+        "profile": "node:24.21.0-bookworm-slim container, --cpus=0.2, --memory=512m, calibration harness (model on the main thread, no worker graph)"
+      }
+    },
+    "scores": {
+      "mobilenet_v2": [
+        {
+          "id": "current",
+          "kind": "current",
+          "pass": 104,
+          "review": 223,
+          "block": 14,
+          "withheld": 237,
+          "withheldRate": 0.6950146627565983
+        },
+        {
+          "id": "safe-mass@0.95",
+          "kind": "safe-mass",
+          "safeMassMinimum": 0.95,
+          "pass": 156,
+          "review": 171,
+          "block": 14,
+          "withheld": 185,
+          "withheldRate": 0.5425219941348973
+        },
+        {
+          "id": "safe-mass@0.9",
+          "kind": "safe-mass",
+          "safeMassMinimum": 0.9,
+          "pass": 183,
+          "review": 144,
+          "block": 14,
+          "withheld": 158,
+          "withheldRate": 0.4633431085043988
+        },
+        {
+          "id": "safe-mass@0.85",
+          "kind": "safe-mass",
+          "safeMassMinimum": 0.85,
+          "pass": 203,
+          "review": 124,
+          "block": 14,
+          "withheld": 138,
+          "withheldRate": 0.4046920821114369
+        },
+        {
+          "id": "safe-mass@0.8",
+          "kind": "safe-mass",
+          "safeMassMinimum": 0.8,
+          "pass": 203,
+          "review": 124,
+          "block": 14,
+          "withheld": 138,
+          "withheldRate": 0.4046920821114369
+        },
+        {
+          "id": "safe-mass@0.75",
+          "kind": "safe-mass",
+          "safeMassMinimum": 0.75,
+          "pass": 203,
+          "review": 124,
+          "block": 14,
+          "withheld": 138,
+          "withheldRate": 0.4046920821114369
+        },
+        {
+          "id": "safe-mass@0.7",
+          "kind": "safe-mass",
+          "safeMassMinimum": 0.7,
+          "pass": 203,
+          "review": 124,
+          "block": 14,
+          "withheld": 138,
+          "withheldRate": 0.4046920821114369
+        },
+        {
+          "id": "safe-mass@0.65",
+          "kind": "safe-mass",
+          "safeMassMinimum": 0.65,
+          "pass": 203,
+          "review": 124,
+          "block": 14,
+          "withheld": 138,
+          "withheldRate": 0.4046920821114369
+        },
+        {
+          "id": "safe-mass@0.6",
+          "kind": "safe-mass",
+          "safeMassMinimum": 0.6,
+          "pass": 203,
+          "review": 124,
+          "block": 14,
+          "withheld": 138,
+          "withheldRate": 0.4046920821114369
+        },
+        {
+          "id": "safe-mass@0.55",
+          "kind": "safe-mass",
+          "safeMassMinimum": 0.55,
+          "pass": 203,
+          "review": 124,
+          "block": 14,
+          "withheld": 138,
+          "withheldRate": 0.4046920821114369
+        },
+        {
+          "id": "safe-mass@0.5",
+          "kind": "safe-mass",
+          "safeMassMinimum": 0.5,
+          "pass": 203,
+          "review": 124,
+          "block": 14,
+          "withheld": 138,
+          "withheldRate": 0.4046920821114369
+        }
+      ],
+      "mobilenet_v2_mid": [
+        {
+          "id": "current",
+          "kind": "current",
+          "pass": 29,
+          "review": 302,
+          "block": 10,
+          "withheld": 312,
+          "withheldRate": 0.9149560117302052
+        },
+        {
+          "id": "safe-mass@0.95",
+          "kind": "safe-mass",
+          "safeMassMinimum": 0.95,
+          "pass": 241,
+          "review": 90,
+          "block": 10,
+          "withheld": 100,
+          "withheldRate": 0.2932551319648094
+        },
+        {
+          "id": "safe-mass@0.9",
+          "kind": "safe-mass",
+          "safeMassMinimum": 0.9,
+          "pass": 279,
+          "review": 52,
+          "block": 10,
+          "withheld": 62,
+          "withheldRate": 0.18181818181818182
+        },
+        {
+          "id": "safe-mass@0.85",
+          "kind": "safe-mass",
+          "safeMassMinimum": 0.85,
+          "pass": 284,
+          "review": 47,
+          "block": 10,
+          "withheld": 57,
+          "withheldRate": 0.16715542521994134
+        },
+        {
+          "id": "safe-mass@0.8",
+          "kind": "safe-mass",
+          "safeMassMinimum": 0.8,
+          "pass": 284,
+          "review": 47,
+          "block": 10,
+          "withheld": 57,
+          "withheldRate": 0.16715542521994134
+        },
+        {
+          "id": "safe-mass@0.75",
+          "kind": "safe-mass",
+          "safeMassMinimum": 0.75,
+          "pass": 284,
+          "review": 47,
+          "block": 10,
+          "withheld": 57,
+          "withheldRate": 0.16715542521994134
+        },
+        {
+          "id": "safe-mass@0.7",
+          "kind": "safe-mass",
+          "safeMassMinimum": 0.7,
+          "pass": 284,
+          "review": 47,
+          "block": 10,
+          "withheld": 57,
+          "withheldRate": 0.16715542521994134
+        },
+        {
+          "id": "safe-mass@0.65",
+          "kind": "safe-mass",
+          "safeMassMinimum": 0.65,
+          "pass": 284,
+          "review": 47,
+          "block": 10,
+          "withheld": 57,
+          "withheldRate": 0.16715542521994134
+        },
+        {
+          "id": "safe-mass@0.6",
+          "kind": "safe-mass",
+          "safeMassMinimum": 0.6,
+          "pass": 284,
+          "review": 47,
+          "block": 10,
+          "withheld": 57,
+          "withheldRate": 0.16715542521994134
+        },
+        {
+          "id": "safe-mass@0.55",
+          "kind": "safe-mass",
+          "safeMassMinimum": 0.55,
+          "pass": 284,
+          "review": 47,
+          "block": 10,
+          "withheld": 57,
+          "withheldRate": 0.16715542521994134
+        },
+        {
+          "id": "safe-mass@0.5",
+          "kind": "safe-mass",
+          "safeMassMinimum": 0.5,
+          "pass": 284,
+          "review": 47,
+          "block": 10,
+          "withheld": 57,
+          "withheldRate": 0.16715542521994134
+        }
+      ],
+      "inception_v3": [
+        {
+          "id": "current",
+          "kind": "current",
+          "pass": 123,
+          "review": 181,
+          "block": 37,
+          "withheld": 218,
+          "withheldRate": 0.6392961876832844
+        },
+        {
+          "id": "safe-mass@0.95",
+          "kind": "safe-mass",
+          "safeMassMinimum": 0.95,
+          "pass": 168,
+          "review": 136,
+          "block": 37,
+          "withheld": 173,
+          "withheldRate": 0.5073313782991202
+        },
+        {
+          "id": "safe-mass@0.9",
+          "kind": "safe-mass",
+          "safeMassMinimum": 0.9,
+          "pass": 187,
+          "review": 117,
+          "block": 37,
+          "withheld": 154,
+          "withheldRate": 0.45161290322580644
+        },
+        {
+          "id": "safe-mass@0.85",
+          "kind": "safe-mass",
+          "safeMassMinimum": 0.85,
+          "pass": 194,
+          "review": 110,
+          "block": 37,
+          "withheld": 147,
+          "withheldRate": 0.4310850439882698
+        },
+        {
+          "id": "safe-mass@0.8",
+          "kind": "safe-mass",
+          "safeMassMinimum": 0.8,
+          "pass": 194,
+          "review": 110,
+          "block": 37,
+          "withheld": 147,
+          "withheldRate": 0.4310850439882698
+        },
+        {
+          "id": "safe-mass@0.75",
+          "kind": "safe-mass",
+          "safeMassMinimum": 0.75,
+          "pass": 194,
+          "review": 110,
+          "block": 37,
+          "withheld": 147,
+          "withheldRate": 0.4310850439882698
+        },
+        {
+          "id": "safe-mass@0.7",
+          "kind": "safe-mass",
+          "safeMassMinimum": 0.7,
+          "pass": 194,
+          "review": 110,
+          "block": 37,
+          "withheld": 147,
+          "withheldRate": 0.4310850439882698
+        },
+        {
+          "id": "safe-mass@0.65",
+          "kind": "safe-mass",
+          "safeMassMinimum": 0.65,
+          "pass": 194,
+          "review": 110,
+          "block": 37,
+          "withheld": 147,
+          "withheldRate": 0.4310850439882698
+        },
+        {
+          "id": "safe-mass@0.6",
+          "kind": "safe-mass",
+          "safeMassMinimum": 0.6,
+          "pass": 194,
+          "review": 110,
+          "block": 37,
+          "withheld": 147,
+          "withheldRate": 0.4310850439882698
+        },
+        {
+          "id": "safe-mass@0.55",
+          "kind": "safe-mass",
+          "safeMassMinimum": 0.55,
+          "pass": 194,
+          "review": 110,
+          "block": 37,
+          "withheld": 147,
+          "withheldRate": 0.4310850439882698
+        },
+        {
+          "id": "safe-mass@0.5",
+          "kind": "safe-mass",
+          "safeMassMinimum": 0.5,
+          "pass": 194,
+          "review": 110,
+          "block": 37,
+          "withheld": 147,
+          "withheldRate": 0.4310850439882698
+        }
+      ]
+    },
+    "chosen": {
+      "family": "mobilenet_v2_mid",
+      "id": "safe-mass@0.85",
+      "kind": "safe-mass",
+      "safeMassMinimum": 0.85,
+      "pass": 284,
+      "review": 47,
+      "block": 10,
+      "withheld": 57,
+      "withheldRate": 0.16715542521994134
+    }
+  },
+  "safeCorpus": {
+    "available": true,
+    "stale": [],
+    "manifest": {
+      "corpusId": "community-safe-photographs-v1",
+      "entries": 640,
+      "holdoutEntries": 298,
+      "calibrationEntries": 342,
+      "minimumCount": 500,
+      "split": {
+        "rule": "by creator: first hexadecimal digit of the SHA-256 of the creator key (source:creator, lower-cased), even is calibration, odd is holdout",
+        "creatorCapShare": 0.05,
+        "creators": 199,
+        "calibration": 342,
+        "holdout": 298
+      },
+      "licences": {
+        "by": 320,
+        "pdm": 69,
+        "by-sa": 101,
+        "cc0": 139,
+        "by-nd": 11
+      },
+      "sources": {
+        "flickr": 552,
+        "rawpixel": 32,
+        "stocksnap": 56
+      },
+      "manifestSha256": "0f16a7e89da1d718660e6dfc25dc42fd255856eb0b6539e88ef40c9aeffeb159"
+    },
+    "measuredAt": "2026-10-17T01:00:54.842Z",
+    "inputSetHash": "c8333517a267c4bf6f4781ed8bddc2e53725a2705c1686129f2b86fb0841a42c",
+    "manifestSha256": "0f16a7e89da1d718660e6dfc25dc42fd255856eb0b6539e88ef40c9aeffeb159",
+    "policySha256": "b0daab4ab9d175cc018d88d7c37d3443a4d9425909394da3aee110e15ad98b65",
+    "engineVersion": "adr013-nsfw-v1.0:mobilenet_v2_mid@4.3.0:model-a0c76f72db26:v2:policy-b0daab4ab9d1",
+    "modelDigest": "a0c76f72db261c54dc851b974c848dc9ce01576ca66b0f232f4848c950549322",
+    "corpusEntries": 640,
+    "split": "holdout",
+    "holdoutEntries": 298,
+    "evaluated": 298,
+    "validationRejected": [],
+    "counts": {
+      "pass": 271,
+      "review": 20,
+      "block": 7
+    },
+    "withheld": 27,
+    "withheldRate": 0.09060402684563758,
+    "wilson95": [0.06301542906412286, 0.1286131796985132],
+    "gate": {
+      "metric": "Wilson 95% upper bound of the withheld (review or block) rate",
+      "maximum": 0.05,
+      "passed": false
+    },
+    "recomputedWilson95": [0.063015, 0.128613],
+    "withheldByBound": {
+      "blocked: an unsafe class above the block floor": 7,
+      "unsafe aggregate at or above its ceiling": 17,
+      "review class at or above its ceiling": 3
+    },
+    "withheldEntries": [
+      {
+        "id": "01da9472-af82-4def-ace4-8535e794a5ce",
+        "disposition": "block",
+        "reasons": ["unsafe_class"],
+        "bound": "blocked: an unsafe class above the block floor",
+        "classProbabilities": {
+          "Drawing": 0.166,
+          "Hentai": 0.046,
+          "Neutral": 0.004,
+          "Porn": 0.781,
+          "Sexy": 0.004
+        },
+        "description": "Close-up profile of a woman with pink and blonde hair and a camel coat; head and shoulders, fully clothed."
+      },
+      {
+        "id": "01df40b3-9a45-4f25-b38b-b0d9f9c48742",
+        "disposition": "review",
+        "reasons": ["low_confidence"],
+        "bound": "unsafe aggregate at or above its ceiling",
+        "classProbabilities": {
+          "Drawing": 0.485,
+          "Hentai": 0.169,
+          "Neutral": 0.228,
+          "Porn": 0.088,
+          "Sexy": 0.03
+        },
+        "description": "Woman on a stage in a white tulle ball gown with a sheer high neckline; studio watermark."
+      },
+      {
+        "id": "01f79a05-6f46-4584-bf61-a77b005d969c",
+        "disposition": "review",
+        "reasons": ["low_confidence"],
+        "bound": "unsafe aggregate at or above its ceiling",
+        "classProbabilities": {
+          "Drawing": 0.315,
+          "Hentai": 0.295,
+          "Neutral": 0.035,
+          "Porn": 0.134,
+          "Sexy": 0.221
+        },
+        "description": "Studio shot of a woman in a pink plaid shirt dress, hands on hips."
+      },
+      {
+        "id": "08cb4351-3f29-4b1b-adc9-436ca4462e96",
+        "disposition": "review",
+        "reasons": ["low_confidence"],
+        "bound": "unsafe aggregate at or above its ceiling",
+        "classProbabilities": {
+          "Drawing": 0.231,
+          "Hentai": 0.033,
+          "Neutral": 0.514,
+          "Porn": 0.156,
+          "Sexy": 0.067
+        },
+        "description": "Antique sepia cabinet card of a woman in a long Victorian dress."
+      },
+      {
+        "id": "0b880dc1-c544-4d42-9d8c-89f84f2afc14",
+        "disposition": "review",
+        "reasons": ["low_confidence"],
+        "bound": "unsafe aggregate at or above its ceiling",
+        "classProbabilities": {
+          "Drawing": 0.637,
+          "Hentai": 0.158,
+          "Neutral": 0.176,
+          "Porn": 0.003,
+          "Sexy": 0.026
+        },
+        "description": "Woman with blonde curls against a graffiti wall in a cropped bandeau top and matching skirt; midriff visible."
+      },
+      {
+        "id": "1b39c651-f54e-473e-8ed0-5cb7fd391349",
+        "disposition": "review",
+        "reasons": ["low_confidence"],
+        "bound": "review class at or above its ceiling",
+        "classProbabilities": {
+          "Drawing": 0.068,
+          "Hentai": 0.005,
+          "Neutral": 0.381,
+          "Porn": 0.029,
+          "Sexy": 0.517
+        },
+        "description": "Woman in a polka-dot sundress on a pool lounger beside a cat, holding a glass of wine."
+      },
+      {
+        "id": "1eb897a5-46e6-4e23-847c-3db5c6c0470f",
+        "disposition": "review",
+        "reasons": ["low_confidence"],
+        "bound": "unsafe aggregate at or above its ceiling",
+        "classProbabilities": {
+          "Drawing": 0.165,
+          "Hentai": 0.05,
+          "Neutral": 0.647,
+          "Porn": 0.09,
+          "Sexy": 0.049
+        },
+        "description": "Legs in orange high heels against an adobe wall with a pink skirt hem in frame; no torso."
+      },
+      {
+        "id": "1fc04cd5-60a5-44a0-b927-031ab79e7c2e",
+        "disposition": "review",
+        "reasons": ["low_confidence"],
+        "bound": "unsafe aggregate at or above its ceiling",
+        "classProbabilities": {
+          "Drawing": 0.22,
+          "Hentai": 0.044,
+          "Neutral": 0.452,
+          "Porn": 0.107,
+          "Sexy": 0.176
+        },
+        "description": "Black-and-white wedding photograph of a bride in a strapless gown with pearls and a bouquet."
+      },
+      {
+        "id": "2e5ac408-0b2a-423b-93c9-739db5dcd2e6",
+        "disposition": "block",
+        "reasons": ["unsafe_class"],
+        "bound": "blocked: an unsafe class above the block floor",
+        "classProbabilities": {
+          "Drawing": 0.082,
+          "Hentai": 0.022,
+          "Neutral": 0.14,
+          "Porn": 0.738,
+          "Sexy": 0.018
+        },
+        "description": "Close-up of a white naval dress-uniform sleeve with its shoulder tab; sailors blurred behind."
+      },
+      {
+        "id": "377d225b-60d6-4ccb-905e-dc22f07e1537",
+        "disposition": "block",
+        "reasons": ["unsafe_class"],
+        "bound": "blocked: an unsafe class above the block floor",
+        "classProbabilities": {
+          "Drawing": 0.115,
+          "Hentai": 0.356,
+          "Neutral": 0.219,
+          "Porn": 0.058,
+          "Sexy": 0.252
+        },
+        "description": "A fashion doll in a striped top and white skirt lying on a wooden floor."
+      },
+      {
+        "id": "40b7cf60-8240-435d-8bbf-757905dc2f06",
+        "disposition": "review",
+        "reasons": ["low_confidence"],
+        "bound": "review class at or above its ceiling",
+        "classProbabilities": {
+          "Drawing": 0.634,
+          "Hentai": 0.075,
+          "Neutral": 0.117,
+          "Porn": 0.001,
+          "Sexy": 0.173
+        },
+        "description": "Woman lying on pavement in a white blouse and velvet trousers, hand on her forehead."
+      },
+      {
+        "id": "518ee1d8-a2f8-4d9d-8221-515293f4caf1",
+        "disposition": "block",
+        "reasons": ["unsafe_class"],
+        "bound": "blocked: an unsafe class above the block floor",
+        "classProbabilities": {
+          "Drawing": 0.164,
+          "Hentai": 0.661,
+          "Neutral": 0.056,
+          "Porn": 0.045,
+          "Sexy": 0.073
+        },
+        "description": "Smiling woman at an evening event in a black halter bikini-style top and low cargo trousers; bare midriff."
+      },
+      {
+        "id": "51f99b8c-8f20-4889-b2c5-8e3bb7d86bc2",
+        "disposition": "block",
+        "reasons": ["unsafe_class"],
+        "bound": "blocked: an unsafe class above the block floor",
+        "classProbabilities": {
+          "Drawing": 0.526,
+          "Hentai": 0.425,
+          "Neutral": 0.006,
+          "Porn": 0.02,
+          "Sexy": 0.023
+        },
+        "description": "Same graffiti-wall shoot as 0b880dc1: a woman in a bandeau top and skirt, midriff visible."
+      },
+      {
+        "id": "594a6945-d7e3-4b13-bb0b-552e3acc089c",
+        "disposition": "review",
+        "reasons": ["low_confidence"],
+        "bound": "unsafe aggregate at or above its ceiling",
+        "classProbabilities": {
+          "Drawing": 0.304,
+          "Hentai": 0.048,
+          "Neutral": 0.201,
+          "Porn": 0.12,
+          "Sexy": 0.327
+        },
+        "description": "Woman in an off-the-shoulder floral prairie dress leaning on a stone well at sunset."
+      },
+      {
+        "id": "6f7eeb9d-20ed-4c44-83c9-2ad5a86e7dc8",
+        "disposition": "review",
+        "reasons": ["low_confidence"],
+        "bound": "review class at or above its ceiling",
+        "classProbabilities": {
+          "Drawing": 0.023,
+          "Hentai": 0.006,
+          "Neutral": 0.262,
+          "Porn": 0.08,
+          "Sexy": 0.629
+        },
+        "description": "Woman on a bridge walkway in a white strapless top, skinny jeans and platform sandals."
+      },
+      {
+        "id": "8043ea7e-aa5b-411f-b36e-776e239d9855",
+        "disposition": "block",
+        "reasons": ["unsafe_class"],
+        "bound": "blocked: an unsafe class above the block floor",
+        "classProbabilities": {
+          "Drawing": 0.19,
+          "Hentai": 0.044,
+          "Neutral": 0.143,
+          "Porn": 0.555,
+          "Sexy": 0.068
+        },
+        "description": "Woman in sunglasses and a long fringed ivory boho dress leaning on a white column."
+      },
+      {
+        "id": "8e5c6604-c7d6-4e9e-a486-2a5ca9b468d4",
+        "disposition": "block",
+        "reasons": ["unsafe_class"],
+        "bound": "blocked: an unsafe class above the block floor",
+        "classProbabilities": {
+          "Drawing": 0.321,
+          "Hentai": 0.375,
+          "Neutral": 0.123,
+          "Porn": 0.041,
+          "Sexy": 0.14
+        },
+        "description": "Woman in a floral puff-sleeve ruffled gown twirling beside a stone pillar."
+      },
+      {
+        "id": "94660d67-bbe4-49ec-aaf9-b87972d1eb75",
+        "disposition": "review",
+        "reasons": ["low_confidence"],
+        "bound": "unsafe aggregate at or above its ceiling",
+        "classProbabilities": {
+          "Drawing": 0.614,
+          "Hentai": 0.036,
+          "Neutral": 0.208,
+          "Porn": 0.094,
+          "Sexy": 0.047
+        },
+        "description": "Older man in Union Jack swim briefs flexing on a beach in front of breaking waves."
+      },
+      {
+        "id": "98cd7877-d6a3-4ed3-b4b6-071685b0dabb",
+        "disposition": "review",
+        "reasons": ["low_confidence"],
+        "bound": "unsafe aggregate at or above its ceiling",
+        "classProbabilities": {
+          "Drawing": 0.648,
+          "Hentai": 0.117,
+          "Neutral": 0.131,
+          "Porn": 0.04,
+          "Sexy": 0.064
+        },
+        "description": "Woman lying on a yellow sofa in a pink camisole slip dress; looks rendered or AI-generated."
+      },
+      {
+        "id": "aa1f82b5-6755-4e72-a320-eb6116e5fd6c",
+        "disposition": "review",
+        "reasons": ["low_confidence"],
+        "bound": "unsafe aggregate at or above its ceiling",
+        "classProbabilities": {
+          "Drawing": 0.466,
+          "Hentai": 0.04,
+          "Neutral": 0.181,
+          "Porn": 0.301,
+          "Sexy": 0.012
+        },
+        "description": "Back view of a woman in an off-the-shoulder striped shirt dress on a street; head cropped out."
+      },
+      {
+        "id": "af260d91-c3cb-4174-b7ef-cdd8fa9c4fec",
+        "disposition": "review",
+        "reasons": ["low_confidence"],
+        "bound": "unsafe aggregate at or above its ceiling",
+        "classProbabilities": {
+          "Drawing": 0.461,
+          "Hentai": 0.127,
+          "Neutral": 0.41,
+          "Porn": 0,
+          "Sexy": 0.001
+        },
+        "description": "Two ball-jointed dolls with red and green hair in knitwear."
+      },
+      {
+        "id": "b28674a9-3c82-4e9a-a9f8-156e2113e245",
+        "disposition": "review",
+        "reasons": ["low_confidence"],
+        "bound": "unsafe aggregate at or above its ceiling",
+        "classProbabilities": {
+          "Drawing": 0.452,
+          "Hentai": 0.215,
+          "Neutral": 0.295,
+          "Porn": 0.011,
+          "Sexy": 0.027
+        },
+        "description": "Rendered 3D avatar in a cropped red sweater and plaid mini skirt against a rainbow background."
+      },
+      {
+        "id": "c272bcc0-aab3-4514-8c66-dd9cc45cef40",
+        "disposition": "review",
+        "reasons": ["low_confidence"],
+        "bound": "unsafe aggregate at or above its ceiling",
+        "classProbabilities": {
+          "Drawing": 0.182,
+          "Hentai": 0.157,
+          "Neutral": 0.526,
+          "Porn": 0.001,
+          "Sexy": 0.133
+        },
+        "description": "Studio shot of a woman in a plaid sleeveless sheath dress and white sunglasses."
+      },
+      {
+        "id": "db9d878d-d918-4cd3-bec8-9cf439acede7",
+        "disposition": "review",
+        "reasons": ["low_confidence"],
+        "bound": "unsafe aggregate at or above its ceiling",
+        "classProbabilities": {
+          "Drawing": 0.685,
+          "Hentai": 0.1,
+          "Neutral": 0.159,
+          "Porn": 0.023,
+          "Sexy": 0.032
+        },
+        "description": "Smiling woman in a sleeveless brown jumpsuit beside a red scooter on a street."
+      },
+      {
+        "id": "dc48ba50-0478-453f-831b-d0f7a92d1491",
+        "disposition": "review",
+        "reasons": ["low_confidence"],
+        "bound": "unsafe aggregate at or above its ceiling",
+        "classProbabilities": {
+          "Drawing": 0.199,
+          "Hentai": 0.1,
+          "Neutral": 0.644,
+          "Porn": 0.043,
+          "Sexy": 0.013
+        },
+        "description": "Black-and-white street portrait of a woman in a satin camisole; looks AI-generated."
+      },
+      {
+        "id": "ddc39919-7768-454a-82bf-4b8c678ede7e",
+        "disposition": "review",
+        "reasons": ["low_confidence"],
+        "bound": "unsafe aggregate at or above its ceiling",
+        "classProbabilities": {
+          "Drawing": 0.368,
+          "Hentai": 0.127,
+          "Neutral": 0.38,
+          "Porn": 0.049,
+          "Sexy": 0.076
+        },
+        "description": "Ball-jointed doll in a white tank top, denim mini skirt and fluffy boots, beside its box."
+      },
+      {
+        "id": "e437ea01-74ac-4c05-a7f2-00bca8067dba",
+        "disposition": "review",
+        "reasons": ["low_confidence"],
+        "bound": "unsafe aggregate at or above its ceiling",
+        "classProbabilities": {
+          "Drawing": 0.713,
+          "Hentai": 0.009,
+          "Neutral": 0.095,
+          "Porn": 0.177,
+          "Sexy": 0.006
+        },
+        "description": "Man in a bowler hat, grey overcoat and tie looking down; head and shoulders."
+      }
+    ],
+    "triageSummary": "None of the 27 shows nudity or sexual content. The 7 blocked photographs are ordinary fashion, wedding, uniform and doll pictures, so the block floor fires on benign input. Six entries are dolls, a rendered avatar or AI-generated portraits rather than photographs of people, which the Openverse query admitted.",
+    "triageMissing": [],
+    "reviewLoad": {
+      "assumption": {
+        "dailySubmissions": 100,
+        "source": "assumption: no planning document records an expected Community Beta submission volume; replace with --beta-daily-submissions once the cohort size is known",
+        "moderators": 2,
+        "moderatorsSource": "ADR-013 staffing plan: two moderators during beta"
+      },
+      "atAssumedVolume": {
+        "dailySubmissions": 100,
+        "expectedWithheldPerDay": 9.1,
+        "upperBoundWithheldPerDay": 12.9,
+        "perModeratorPerDayAtUpperBound": 6.4
+      },
+      "range": [
+        {
+          "dailySubmissions": 50,
+          "expectedWithheldPerDay": 4.5,
+          "upperBoundWithheldPerDay": 6.4,
+          "perModeratorPerDayAtUpperBound": 3.2
+        },
+        {
+          "dailySubmissions": 100,
+          "expectedWithheldPerDay": 9.1,
+          "upperBoundWithheldPerDay": 12.9,
+          "perModeratorPerDayAtUpperBound": 6.4
+        },
+        {
+          "dailySubmissions": 250,
+          "expectedWithheldPerDay": 22.7,
+          "upperBoundWithheldPerDay": 32.2,
+          "perModeratorPerDayAtUpperBound": 16.1
+        },
+        {
+          "dailySubmissions": 500,
+          "expectedWithheldPerDay": 45.3,
+          "upperBoundWithheldPerDay": 64.3,
+          "perModeratorPerDayAtUpperBound": 32.2
+        },
+        {
+          "dailySubmissions": 1000,
+          "expectedWithheldPerDay": 90.6,
+          "upperBoundWithheldPerDay": 128.6,
+          "perModeratorPerDayAtUpperBound": 64.3
+        }
+      ],
+      "note": "Withheld images are the review load from image screening alone on ordinary photographs; text refusals, reports and genuinely unsafe uploads add to it."
+    }
+  },
+  "redis": {
+    "upstashFreeMonthlyCommands": 500000,
+    "limitSource": "https://upstash.com/pricing/redis, read 2026-10-16: Free plan, 500K commands a month",
+    "budgetShare": 0.5,
+    "beforeTuning": {
+      "commandsPerHour": 6516,
+      "windowMinutes": 5,
+      "drainDelaySeconds": 5,
+      "stalledIntervalMs": 30000,
+      "measuredAt": "2026-10-16T23:09:47.853Z"
+    },
+    "tuned": {
+      "drainDelaySeconds": 300,
+      "stalledIntervalMs": 600000
+    },
+    "sharedDatabase": "The worker uses the production Upstash database the API already uses for its own queues. These figures are the community worker alone; the API’s commands come out of the same monthly allowance.",
+    "available": true,
+    "stale": [],
+    "countingRule": "Every command Redis records, including the commands BullMQ Lua scripts run inside EVALSHA. Upstash does not document whether a script counts once or per inner command, so this is the upper bound.",
+    "idle": {
+      "measuredAt": "2026-10-17T01:36:55.422Z",
+      "inputSetHash": "c8333517a267c4bf6f4781ed8bddc2e53725a2705c1686129f2b86fb0841a42c",
+      "windowMinutes": 30,
+      "otherClientsAtStart": 2,
+      "commands": 69,
+      "commandsPerHour": 138,
+      "commandsPerDay": 3312,
+      "projectedCommandsPerMonth": 100739,
+      "upstashFreeMonthlyCommands": 500000,
+      "shareOfFreeTier": 0.201,
+      "byCommandPerHour": {
+        "evalsha": 18,
+        "zrange": 12,
+        "zpopmin": 12,
+        "bzpopmin": 12,
+        "zrangebyscore": 12,
+        "del": 12,
+        "rpoplpush": 12,
+        "hmget": 12,
+        "xtrim": 6,
+        "set": 6,
+        "exists": 6,
+        "lrange": 6,
+        "smembers": 6,
+        "hget": 6
+      }
+    },
+    "perPost": {
+      "measuredAt": "2026-10-17T01:37:05.774Z",
+      "inputSetHash": "c8333517a267c4bf6f4781ed8bddc2e53725a2705c1686129f2b86fb0841a42c",
+      "canaryRuns": 5,
+      "commandsDuringRuns": 409,
+      "idleCommandsSubtracted": 0,
+      "commandsPerPost": 82,
+      "byCommandPerPost": {
+        "xadd": 6,
+        "hmget": 6,
+        "hgetall": 5,
+        "hget": 5,
+        "del": 4,
+        "evalsha": 3,
+        "eval": 3,
+        "zrange": 3,
+        "hmset": 3,
+        "zadd": 3,
+        "zrangebyscore": 3,
+        "rpoplpush": 3,
+        "llen": 2,
+        "zscore": 2,
+        "get": 2,
+        "client|setinfo": 2,
+        "exists": 2,
+        "hincrby": 2,
+        "zpopmin": 2,
+        "bzpopmin": 2,
+        "smembers": 2,
+        "zcard": 2,
+        "info": 1.8,
+        "xtrim": 1,
+        "set": 1,
+        "zrem": 1,
+        "client|list": 1,
+        "scard": 1,
+        "incr": 1,
+        "srem": 1,
+        "quit": 1,
+        "lpush": 1,
+        "zrevrangebyscore": 1,
+        "lrem": 1,
+        "hset": 1,
+        "zremrangebyscore": 1
+      },
+      "note": "Upper bound: includes the canary’s own worker-count, job-state and job-removal lookups beside the dispatch-equivalent enqueue and the screening itself."
+    },
+    "dailySubmissions": 100,
+    "postsPerDayWithinBudget": 59,
+    "postsPerDayWithinFreeTier": 160,
+    "projectedMonthly": {
+      "idle": 100740,
+      "traffic": 249280,
+      "total": 350020,
+      "shareOfFreeTier": 0.7
+    }
+  },
+  "text": {
+    "available": true,
+    "stale": [],
+    "textEngineVersion": "adr013-text:policy-v2@b0daab4ab9d1",
+    "gates": {
+      "cleanGatedOn": "holdout-v1",
+      "cleanWilson95UpperBoundMaximum": 0.01,
+      "disallowedBypassesMaximum": 0,
+      "minimumClean": 200,
+      "minimumDisallowed": 100
+    },
+    "corpusSha256": {
+      "de": "6c0e3bfcbcc459bd3bb0e13a3be03668db937af1189d85e7ab4ca08dd28067ba",
+      "de-holdout": "293a13675913cc08e8cc9b36d93ca7c731e605c5e41b238c217dd5534e24b8df",
+      "en": "87b82942efd0c19f07c0f12fd8bd1770c04574478096e38c6e155b118f839fc3",
+      "en-holdout": "def0c67a1ed1665d3684658542456ed749f6306a63360a4a786c1561785ae961",
+      "es": "69fc6716328963d930044412f409dbe0e494ebdf547be85904a4ea6c559652b3",
+      "es-holdout": "1813ee53111c35ca54a1aefe26bb3fc49ce2a34ee5e3281336b6022269afdea3",
+      "fr": "2dc96c4eca25b1cb60a9d40e86833f249f4260b38033dc8d7043d63ce2a8b2b8",
+      "fr-holdout": "ad39bdc231fd59c6a561f89049cbe72cd511255ce3cc8986b12d2994343eff0a",
+      "it": "1d2a6c7cc62e9b36bcb3f872da1248f795c5974a6671f7e22b020166610edbc1",
+      "it-holdout": "d36932f32b62ee61c47fee8f88ae77a83c1268abd9876a3f51ea76ff88fe8e25",
+      "pt": "b32b8fc24c2c43e766089b20b70996f1921fb625d5d0c666455a9e4ab404f1b7",
+      "pt-holdout": "d63103233dc99abca22a44cb7a6efa8e7fec3f2d0f1ec931ddc015e4d4c765e2",
+      "tr": "611852f4393a0b045397d86c4cf879aa12e08f015df24f9464a122af88fb70ae",
+      "tr-holdout": "344f03c4d9a31a416c73a9c815e33331fe5b46ac30561aaf6f26b0667653c34b"
+    },
+    "missingLanguages": [],
+    "languages": {
+      "de": {
+        "clean": {
+          "total": 420,
+          "withheld": 0,
+          "rate": 0,
+          "wilson95": [0, 0.009063],
+          "recomputedUpperBound": 0.009063,
+          "withheldBySeverity": {},
+          "withheldIds": [],
+          "expectedReviewIds": [],
+          "expectedReviewThatPassed": []
+        },
+        "cleanInSample": {
+          "total": 416,
+          "withheld": 0,
+          "rate": 0,
+          "wilson95": [0, 0.00915],
+          "recomputedUpperBound": 0.00915,
+          "withheldBySeverity": {},
+          "withheldIds": [],
+          "expectedReviewIds": [
+            "de-clean-015",
+            "de-clean-038",
+            "de-clean-331",
+            "de-clean-414"
+          ],
+          "expectedReviewThatPassed": []
+        },
+        "disallowed": {
+          "total": 100,
+          "withheld": 100,
+          "bypassIds": [],
+          "byFamily": {
+            "nfkc-fullwidth": {
+              "total": 10,
+              "withheld": 10
+            },
+            "case-mixing": {
+              "total": 10,
+              "withheld": 10
+            },
+            "diacritics-added": {
+              "total": 10,
+              "withheld": 10
+            },
+            "zero-width": {
+              "total": 10,
+              "withheld": 10
+            },
+            "cyrillic-confusable": {
+              "total": 10,
+              "withheld": 10
+            },
+            "leetspeak": {
+              "total": 10,
+              "withheld": 10
+            },
+            "repeated-characters": {
+              "total": 10,
+              "withheld": 10
+            },
+            "internal-punctuation": {
+              "total": 10,
+              "withheld": 10
+            },
+            "spaced-letters": {
+              "total": 10,
+              "withheld": 10
+            },
+            "leet-and-spaced": {
+              "total": 10,
+              "withheld": 10
+            }
+          },
+          "byDisposition": {
+            "review": 74,
+            "block": 26
+          }
+        }
+      },
+      "en": {
+        "clean": {
+          "total": 420,
+          "withheld": 0,
+          "rate": 0,
+          "wilson95": [0, 0.009063],
+          "recomputedUpperBound": 0.009063,
+          "withheldBySeverity": {},
+          "withheldIds": [],
+          "expectedReviewIds": [],
+          "expectedReviewThatPassed": []
+        },
+        "cleanInSample": {
+          "total": 416,
+          "withheld": 0,
+          "rate": 0,
+          "wilson95": [0, 0.00915],
+          "recomputedUpperBound": 0.00915,
+          "withheldBySeverity": {},
+          "withheldIds": [],
+          "expectedReviewIds": [
+            "en-clean-015",
+            "en-clean-039",
+            "en-clean-331",
+            "en-clean-414"
+          ],
+          "expectedReviewThatPassed": []
+        },
+        "disallowed": {
+          "total": 100,
+          "withheld": 100,
+          "bypassIds": [],
+          "byFamily": {
+            "nfkc-fullwidth": {
+              "total": 10,
+              "withheld": 10
+            },
+            "case-mixing": {
+              "total": 10,
+              "withheld": 10
+            },
+            "diacritics-added": {
+              "total": 10,
+              "withheld": 10
+            },
+            "zero-width": {
+              "total": 10,
+              "withheld": 10
+            },
+            "cyrillic-confusable": {
+              "total": 10,
+              "withheld": 10
+            },
+            "leetspeak": {
+              "total": 10,
+              "withheld": 10
+            },
+            "repeated-characters": {
+              "total": 10,
+              "withheld": 10
+            },
+            "internal-punctuation": {
+              "total": 10,
+              "withheld": 10
+            },
+            "spaced-letters": {
+              "total": 10,
+              "withheld": 10
+            },
+            "leet-and-spaced": {
+              "total": 10,
+              "withheld": 10
+            }
+          },
+          "byDisposition": {
+            "review": 90,
+            "block": 10
+          }
+        }
+      },
+      "es": {
+        "clean": {
+          "total": 420,
+          "withheld": 1,
+          "rate": 0.002381,
+          "wilson95": [0.00042, 0.013362],
+          "recomputedUpperBound": 0.013362,
+          "withheldBySeverity": {
+            "medium": 1
+          },
+          "withheldIds": ["es-holdout-376"],
+          "expectedReviewIds": [],
+          "expectedReviewThatPassed": []
+        },
+        "cleanInSample": {
+          "total": 420,
+          "withheld": 0,
+          "rate": 0,
+          "wilson95": [0, 0.009063],
+          "recomputedUpperBound": 0.009063,
+          "withheldBySeverity": {},
+          "withheldIds": [],
+          "expectedReviewIds": [],
+          "expectedReviewThatPassed": []
+        },
+        "disallowed": {
+          "total": 100,
+          "withheld": 100,
+          "bypassIds": [],
+          "byFamily": {
+            "nfkc-fullwidth": {
+              "total": 10,
+              "withheld": 10
+            },
+            "case-mixing": {
+              "total": 10,
+              "withheld": 10
+            },
+            "diacritics-added": {
+              "total": 10,
+              "withheld": 10
+            },
+            "zero-width": {
+              "total": 10,
+              "withheld": 10
+            },
+            "cyrillic-confusable": {
+              "total": 10,
+              "withheld": 10
+            },
+            "leetspeak": {
+              "total": 10,
+              "withheld": 10
+            },
+            "repeated-characters": {
+              "total": 10,
+              "withheld": 10
+            },
+            "internal-punctuation": {
+              "total": 10,
+              "withheld": 10
+            },
+            "spaced-letters": {
+              "total": 10,
+              "withheld": 10
+            },
+            "leet-and-spaced": {
+              "total": 10,
+              "withheld": 10
+            }
+          },
+          "byDisposition": {
+            "review": 83,
+            "block": 17
+          }
+        }
+      },
+      "fr": {
+        "clean": {
+          "total": 420,
+          "withheld": 1,
+          "rate": 0.002381,
+          "wilson95": [0.00042, 0.013362],
+          "recomputedUpperBound": 0.013362,
+          "withheldBySeverity": {
+            "high": 1
+          },
+          "withheldIds": ["fr-holdout-010"],
+          "expectedReviewIds": [],
+          "expectedReviewThatPassed": []
+        },
+        "cleanInSample": {
+          "total": 419,
+          "withheld": 0,
+          "rate": 0,
+          "wilson95": [0, 0.009085],
+          "recomputedUpperBound": 0.009085,
+          "withheldBySeverity": {},
+          "withheldIds": [],
+          "expectedReviewIds": ["fr-clean-036"],
+          "expectedReviewThatPassed": []
+        },
+        "disallowed": {
+          "total": 100,
+          "withheld": 100,
+          "bypassIds": [],
+          "byFamily": {
+            "nfkc-fullwidth": {
+              "total": 10,
+              "withheld": 10
+            },
+            "case-mixing": {
+              "total": 10,
+              "withheld": 10
+            },
+            "diacritics-added": {
+              "total": 10,
+              "withheld": 10
+            },
+            "zero-width": {
+              "total": 10,
+              "withheld": 10
+            },
+            "cyrillic-confusable": {
+              "total": 10,
+              "withheld": 10
+            },
+            "leetspeak": {
+              "total": 10,
+              "withheld": 10
+            },
+            "repeated-characters": {
+              "total": 10,
+              "withheld": 10
+            },
+            "internal-punctuation": {
+              "total": 10,
+              "withheld": 10
+            },
+            "spaced-letters": {
+              "total": 10,
+              "withheld": 10
+            },
+            "leet-and-spaced": {
+              "total": 10,
+              "withheld": 10
+            }
+          },
+          "byDisposition": {
+            "review": 87,
+            "block": 13
+          }
+        }
+      },
+      "it": {
+        "clean": {
+          "total": 420,
+          "withheld": 2,
+          "rate": 0.004762,
+          "wilson95": [0.001307, 0.017194],
+          "recomputedUpperBound": 0.017194,
+          "withheldBySeverity": {
+            "medium": 2
+          },
+          "withheldIds": ["it-holdout-094", "it-holdout-320"],
+          "expectedReviewIds": [],
+          "expectedReviewThatPassed": []
+        },
+        "cleanInSample": {
+          "total": 420,
+          "withheld": 0,
+          "rate": 0,
+          "wilson95": [0, 0.009063],
+          "recomputedUpperBound": 0.009063,
+          "withheldBySeverity": {},
+          "withheldIds": [],
+          "expectedReviewIds": [],
+          "expectedReviewThatPassed": []
+        },
+        "disallowed": {
+          "total": 100,
+          "withheld": 100,
+          "bypassIds": [],
+          "byFamily": {
+            "nfkc-fullwidth": {
+              "total": 10,
+              "withheld": 10
+            },
+            "case-mixing": {
+              "total": 10,
+              "withheld": 10
+            },
+            "diacritics-added": {
+              "total": 10,
+              "withheld": 10
+            },
+            "zero-width": {
+              "total": 10,
+              "withheld": 10
+            },
+            "cyrillic-confusable": {
+              "total": 10,
+              "withheld": 10
+            },
+            "leetspeak": {
+              "total": 10,
+              "withheld": 10
+            },
+            "repeated-characters": {
+              "total": 10,
+              "withheld": 10
+            },
+            "internal-punctuation": {
+              "total": 10,
+              "withheld": 10
+            },
+            "spaced-letters": {
+              "total": 10,
+              "withheld": 10
+            },
+            "leet-and-spaced": {
+              "total": 10,
+              "withheld": 10
+            }
+          },
+          "byDisposition": {
+            "review": 90,
+            "block": 10
+          }
+        }
+      },
+      "pt": {
+        "clean": {
+          "total": 420,
+          "withheld": 4,
+          "rate": 0.009524,
+          "wilson95": [0.00371, 0.024229],
+          "recomputedUpperBound": 0.024229,
+          "withheldBySeverity": {
+            "low": 4
+          },
+          "withheldIds": [
+            "pt-holdout-186",
+            "pt-holdout-206",
+            "pt-holdout-238",
+            "pt-holdout-410"
+          ],
+          "expectedReviewIds": [],
+          "expectedReviewThatPassed": []
+        },
+        "cleanInSample": {
+          "total": 420,
+          "withheld": 0,
+          "rate": 0,
+          "wilson95": [0, 0.009063],
+          "recomputedUpperBound": 0.009063,
+          "withheldBySeverity": {},
+          "withheldIds": [],
+          "expectedReviewIds": [],
+          "expectedReviewThatPassed": []
+        },
+        "disallowed": {
+          "total": 100,
+          "withheld": 100,
+          "bypassIds": [],
+          "byFamily": {
+            "nfkc-fullwidth": {
+              "total": 10,
+              "withheld": 10
+            },
+            "case-mixing": {
+              "total": 10,
+              "withheld": 10
+            },
+            "diacritics-added": {
+              "total": 10,
+              "withheld": 10
+            },
+            "zero-width": {
+              "total": 10,
+              "withheld": 10
+            },
+            "cyrillic-confusable": {
+              "total": 10,
+              "withheld": 10
+            },
+            "leetspeak": {
+              "total": 10,
+              "withheld": 10
+            },
+            "repeated-characters": {
+              "total": 10,
+              "withheld": 10
+            },
+            "internal-punctuation": {
+              "total": 10,
+              "withheld": 10
+            },
+            "spaced-letters": {
+              "total": 10,
+              "withheld": 10
+            },
+            "leet-and-spaced": {
+              "total": 10,
+              "withheld": 10
+            }
+          },
+          "byDisposition": {
+            "review": 77,
+            "block": 23
+          }
+        }
+      },
+      "tr": {
+        "clean": {
+          "total": 420,
+          "withheld": 0,
+          "rate": 0,
+          "wilson95": [0, 0.009063],
+          "recomputedUpperBound": 0.009063,
+          "withheldBySeverity": {},
+          "withheldIds": [],
+          "expectedReviewIds": [],
+          "expectedReviewThatPassed": []
+        },
+        "cleanInSample": {
+          "total": 420,
+          "withheld": 0,
+          "rate": 0,
+          "wilson95": [0, 0.009063],
+          "recomputedUpperBound": 0.009063,
+          "withheldBySeverity": {},
+          "withheldIds": [],
+          "expectedReviewIds": [],
+          "expectedReviewThatPassed": []
+        },
+        "disallowed": {
+          "total": 100,
+          "withheld": 100,
+          "bypassIds": [],
+          "byFamily": {
+            "nfkc-fullwidth": {
+              "total": 10,
+              "withheld": 10
+            },
+            "case-mixing": {
+              "total": 10,
+              "withheld": 10
+            },
+            "diacritics-added": {
+              "total": 10,
+              "withheld": 10
+            },
+            "zero-width": {
+              "total": 10,
+              "withheld": 10
+            },
+            "cyrillic-confusable": {
+              "total": 10,
+              "withheld": 10
+            },
+            "leetspeak": {
+              "total": 10,
+              "withheld": 10
+            },
+            "repeated-characters": {
+              "total": 10,
+              "withheld": 10
+            },
+            "internal-punctuation": {
+              "total": 10,
+              "withheld": 10
+            },
+            "spaced-letters": {
+              "total": 10,
+              "withheld": 10
+            },
+            "leet-and-spaced": {
+              "total": 10,
+              "withheld": 10
+            }
+          },
+          "byDisposition": {
+            "review": 66,
+            "block": 34
+          }
+        }
+      }
+    },
+    "note": "Case ids and counts only. No caption text and no matched term enters this payload. `clean` is the frozen holdout the gate runs on; `cleanInSample` is the clean half the allow list was built against."
+  },
+  "lists": {
+    "verification": {
+      "status": "verified",
+      "upstreamCommit": "5faf2ba42d7b1c0977169ec3611df25a3c08eb13",
+      "remoteChecked": false,
+      "languages": {
+        "de": {
+          "upstreamLines": 66,
+          "overlayEntries": 53,
+          "entries": 99,
+          "excludedUpstreamTerms": 1
+        },
+        "en": {
+          "upstreamLines": 403,
+          "overlayEntries": 46,
+          "entries": 400,
+          "excludedUpstreamTerms": 18
+        },
+        "es": {
+          "upstreamLines": 68,
+          "overlayEntries": 55,
+          "entries": 101,
+          "excludedUpstreamTerms": 4
+        },
+        "fr": {
+          "upstreamLines": 91,
+          "overlayEntries": 55,
+          "entries": 114,
+          "excludedUpstreamTerms": 6
+        },
+        "it": {
+          "upstreamLines": 168,
+          "overlayEntries": 53,
+          "entries": 188,
+          "excludedUpstreamTerms": 6
+        },
+        "pt": {
+          "upstreamLines": 76,
+          "overlayEntries": 50,
+          "entries": 98,
+          "excludedUpstreamTerms": 16
+        },
+        "tr": {
+          "upstreamLines": 142,
+          "overlayEntries": 46,
+          "entries": 178,
+          "excludedUpstreamTerms": 4
+        }
+      },
+      "allowListEntries": 87,
+      "problems": []
+    },
+    "upstream": {
+      "source": "https://github.com/LDNOOBW/List-of-Dirty-Naughty-Obscene-and-Otherwise-Bad-Words",
+      "commit": "5faf2ba42d7b1c0977169ec3611df25a3c08eb13",
+      "licence": "CC-BY-4.0",
+      "files": {
+        "de": {
+          "sha256": "ebe44d7772897390e27f7bec412fdcdf0efc294e4db157f8487c4cd8d4fabd55",
+          "gitBlobSha1": "2dd0b246018d34c1d65abe591a54739a0d4dc907",
+          "bytes": 534,
+          "entries": 66
+        },
+        "en": {
+          "sha256": "af851ecef1d5f212caba17339b12ac39cc2fef7d78c74876f67237644fcee8bd",
+          "gitBlobSha1": "a438b9ca33af77341768bd6c63ce3e48e726b76e",
+          "bytes": 3777,
+          "entries": 403
+        },
+        "es": {
+          "sha256": "073334261cc2e7c08339faefd2f19f9623e8240a0ac18fe2a26c368b897496ce",
+          "gitBlobSha1": "895202656db287402f9908430b3befcb62bef936",
+          "bytes": 617,
+          "entries": 68
+        },
+        "fr": {
+          "sha256": "79763a705e08256b393952852bb63aa903f4485e0ef02f70735f5e50efff213c",
+          "gitBlobSha1": "1b7cc1d8142b4a6c92b21cc7e382d067535e36ac",
+          "bytes": 793,
+          "entries": 91
+        },
+        "it": {
+          "sha256": "d413f41018d58aa79d2c4809d0161f29ffd5652c4dc34c5b7b9ade680ee5599a",
+          "gitBlobSha1": "013763d18751bb83382e0804b713c75dab171654",
+          "bytes": 1451,
+          "entries": 168
+        },
+        "pt": {
+          "sha256": "05ef524b0bb7f83f87257f6ec4dabf70e16b8bb6930f769fb93deaf608ff196d",
+          "gitBlobSha1": "8fb06b3b5946bd1dfc397bc9977c5a720a449df9",
+          "bytes": 629,
+          "entries": 76
+        },
+        "tr": {
+          "sha256": "6c7ae03baee0f3fdc22eed169030567669005dad9a1923e0b571c4bd4f2f2ab5",
+          "gitBlobSha1": "b1ff3f793b570d7c84141941dcc64cb842f64caf",
+          "bytes": 1509,
+          "entries": 142
+        },
+        "LICENSE": {
+          "sha256": "55bfbc1759943f7d19acfc68e35644b7fbe10cd8d39ab3551ce5ecff5dda9979",
+          "gitBlobSha1": "230507dedabfb19439931305ef498b827a978087",
+          "bytes": 18523
+        }
+      }
+    },
+    "allowList": {
+      "entries": 87,
+      "everyEntryHasReason": true,
+      "sha256": "22d1f261f3666cf37369e67359aeabc383ac0a689babe04f87023ba1aee70256"
+    }
+  },
+  "runtime": {
+    "ceilings": {
+      "coldStartupMs": 30000,
+      "warmP95Ms": 3000,
+      "warmP99Ms": 5000,
+      "singleInferenceTerminationMs": 10000,
+      "outerScreeningCeilingMs": 30000,
+      "peakResidentMib": 512
+    },
+    "developerMeasurement": {
+      "coldStartupMs": 236.5,
+      "warmP50Ms": 23.95,
+      "warmP95Ms": 26.64,
+      "warmP99Ms": 31.21,
+      "warmMaxMs": 73.54,
+      "peakResidentMib": 339.4,
+      "baselineResidentMibBeforeModelLoad": 71.3,
+      "warmSamples": 1000,
+      "warmupSamples": 50,
+      "replicas": 1,
+      "concurrency": 1,
+      "environment": {
+        "node": "v24.20.0",
+        "platform": "darwin",
+        "arch": "arm64",
+        "cpu": "Apple M4 Pro",
+        "cpuCount": 14,
+        "memoryMib": 49152,
+        "image": "512x640 JPEG, quality 90, flat #beb4aa, generated in process",
+        "executedFrom": "compiled dist under plain node"
+      },
+      "runsTaken": 2,
+      "selectionRule": "slowest of the runs taken"
+    },
+    "latency": {
+      "available": true,
+      "stale": [],
+      "measuredAt": "2026-10-17T01:10:40.606Z",
+      "profile": "local container, 0.2 vCPU, 512 MiB (Northflank sandbox envelope)",
+      "commitSha": "1a678c51b213b2c8fff6f2354e9556abf2f96fe7",
+      "inputSetHash": "c8333517a267c4bf6f4781ed8bddc2e53725a2705c1686129f2b86fb0841a42c",
+      "executedFrom": "compiled dist under plain node",
+      "engineVersion": "adr013-nsfw-v1.0:mobilenet_v2_mid@4.3.0:model-a0c76f72db26:v2:policy-b0daab4ab9d1",
+      "modelHash": "a0c76f72db261c54dc851b974c848dc9ce01576ca66b0f232f4848c950549322",
+      "policyVersion": "v2",
+      "backend": "wasm",
+      "coldStartupMs": 2987.7,
+      "readinessStartupDurationMs": 2988,
+      "warmupSamples": 50,
+      "warmSamples": 1000,
+      "warmSupervisedMs": {
+        "p50": 199.64,
+        "p95": 308.42,
+        "p99": 391.02,
+        "max": 594.97
+      },
+      "warmInThreadMs": {
+        "p50": 199,
+        "p95": 308,
+        "p99": 391,
+        "max": 595
+      },
+      "peakResidentMib": 236.3,
+      "baselineResidentMibBeforeModelLoad": 68.7,
+      "dispositions": {
+        "pass": 1000
+      },
+      "environment": {
+        "node": "v24.21.0",
+        "platform": "linux",
+        "arch": "arm64",
+        "cpu": "unknown",
+        "cpuCount": 14,
+        "containerCpuQuota": 0.2,
+        "containerMemoryLimitMib": 512,
+        "image": "512x640 JPEG, quality 90, flat #beb4aa, generated in process",
+        "replicas": 1,
+        "concurrency": 1
+      }
+    },
+    "memory": {
+      "available": true,
+      "stale": [],
+      "measuredAt": "2026-10-17T01:06:29.854Z",
+      "container": "cc-community-worker",
+      "commitSha": "1a678c51b213b2c8fff6f2354e9556abf2f96fe7",
+      "inputSetHash": "c8333517a267c4bf6f4781ed8bddc2e53725a2705c1686129f2b86fb0841a42c",
+      "hostInputSetHash": "c8333517a267c4bf6f4781ed8bddc2e53725a2705c1686129f2b86fb0841a42c",
+      "source": "cgroup v2 memory.peak inside the running worker container",
+      "memoryPeakMib": 339.5,
+      "memoryLimitMib": 512,
+      "upload": {
+        "name": "generated-4096x4096.jpg",
+        "sha256": "53c2e237a8b94f429efcde4632c9824e1e8b0ff7359217afb8e7dee8e7b55842",
+        "bytes": 5355810
+      },
+      "canaryDisposition": "pass",
+      "canaryOk": true
+    },
+    "regressionGate": {
+      "committed": {
+        "rule": "min(3 x measured, absolute ceiling)",
+        "coldStartupMs": 710,
+        "warmP95Ms": 80,
+        "warmP99Ms": 94,
+        "peakResidentMib": 512
+      },
+      "comparable": false,
+      "note": "The committed regression gate was set at three times a developer-laptop measurement. It applies to the hardware it was measured on; a 0.2 vCPU container is several times slower by construction, so comparing the two would fail on hardware, not on a regression. Story 6.2 AC 8 re-baselines the gate on the named production worker size, which happens with the hosted measurement."
+    }
+  },
+  "commands": {
+    "buildImage": "npm run community:screening:image:build",
+    "canaryLocal": "npm run community:screening:canary:local",
+    "canaryRestartDrill": "npm run community:screening:canary:restart-drill",
+    "canaryHosted": "npm run community:screening:canary -- --target hosted --env-file <hosted env file> --db-ca <Supabase CA> --json-out apps/api/.cache/community-screening/canary-hosted.json",
+    "measureRuntimeContainer": "npm run community:screening:measure:container",
+    "measureMemory": "start the worker container fresh under --memory=512m, then npm run community:screening:measure:memory",
+    "policySweep": "npm run community:screening:sweep",
+    "textEvaluation": "npm run community:screening:text",
+    "verifyLists": "npm run verify:community-screening-lists",
+    "verifyListsRemote": "npm run verify:community-screening-lists -- --remote",
+    "fetchSafeCorpus": "npm run community:screening:corpus:fetch",
+    "verifySafeCorpus": "npm run community:screening:corpus:verify",
+    "evaluateSafeCorpus": "npm run community:screening:corpus:evaluate",
+    "calibrateModels": "node scripts/calibrate-community-screening-models.mjs --tfjs-from <evaluation install> --measurements apps/api/.cache/community-screening/model-measurements.json",
+    "measureModelsContainer": "docker run --rm --memory=512m --cpus=0.2 -v $PWD/scripts:/repo/scripts:ro -v <linux evaluation install>:/eval:ro node:24.21.0-bookworm-slim node /repo/scripts/calibrate-community-screening-models.mjs --tfjs-from /eval --measure <family>",
+    "measureRedis": "npm run community:screening:measure:redis",
+    "measureRedisPerPost": "node scripts/measure-community-worker-redis.mjs --canary-runs 5 --idle-baseline apps/api/.cache/community-screening/redis-idle.json > apps/api/.cache/community-screening/redis-per-post.json",
+    "verifyModel": "npm run verify:community-screening-model --workspace api",
+    "generateEvidence": "npm run community:screening:evidence",
+    "sign": "npm run community:screening:sign",
+    "signDelegated": "npm run community:screening:sign -- --delegated",
+    "verifySignature": "npm run community:screening:verify-signature",
+    "verifyChanged": "npm run verify:changed",
+    "validate": "npm run validate"
+  },
+  "findings": [
+    {
+      "id": "model-labels-real-photographs-as-drawing",
+      "statement": "On real photographs of people the NSFWJS models put most of their probability on Drawing rather than Neutral, so the v1 confident-Neutral policy withheld almost every ordinary fashion photograph (91.5% of the 341 calibration photographs). The synthetic fabric fixtures Story 6.2 used scored Neutral near 1 and could not show this.",
+      "crossCheck": "Recorded once, 2026-10-16: 65 corpus photographs were also classified through the upstream nsfwjs.load(\"MobileNetV2Mid\") classify path with the union @tensorflow/tfjs CPU backend, in a throwaway install outside this repository, and 62 of 65 reached the same disposition, so the effect is the model and the policy, not this repository’s preprocessing.",
+      "consequence": "Policy v2 was calibrated on the calibration half only: Neutral plus Drawing (NSFWJS’s safe-for-work classes) above a floor, with every unsafe bound, including the joint bound on Hentai, Porn and Sexy, held at its v1 value. The holdout half measures the result, and the gate is computed there."
+    },
+    {
+      "id": "holdout-versus-calibration",
+      "statement": "On the 298 holdout photographs (split by creator) the policy withheld 9.1% (Wilson 95% upper bound 12.9%), against 16.7% on the 341 calibration photographs it was chosen on; 7 holdout photographs were blocked. The gate's ceiling is 5%, so it fails. The commonest cause is unsafe aggregate at or above its ceiling (17 of 27). Every withheld and blocked holdout photograph is listed with what it shows. Closing the gate needs a different model or a decision to loosen an unsafe bound, and neither was taken here."
+    },
+    {
+      "id": "text-holdout-versus-tuning-half",
+      "statement": "The frozen text holdout, written after the allow list froze and never tuned against, withheld clean captions in 4 of 7 languages (es 1 of 420, fr 1 of 420, it 2 of 420, pt 4 of 420; by severity medium 3, high 1, low 4), where the in-sample clean half the allow list was built against withheld 0. The in-sample figure overstated the list quality; the holdout is the honest one. Fixing these means changing the lists or the allow list and then freezing a new holdout, because tuning against this one would turn it into a second tuning set."
+    },
+    {
+      "id": "screener-defects-fixed",
+      "statement": "The sweep, the corpora and the review found 5 defects in the Story 6.2 screening code, each fixed with a regression test: a duplicated class name could overwrite another class’s slot and publish (now class_mismatch); leet classing could create a doubled letter the index had already collapsed, so f r 3 5 s e published; a multi-word term cut at a different place, vai-tefoder, reached no matching pass; one allow-listed word disabled every multi-word term containing it; a re-split multi-word term written in leetspeak (k1ll yours elf) published, because the re-split pass compared plain letters only."
+    }
+  ],
+  "limitations": [
+    {
+      "id": "model-recall-inherited",
+      "statement": "Recall against real unsafe imagery is inherited from the upstream NSFWJS mobilenet_v2_mid model at nsfwjs@4.3.0 and is not measured in this repository. No unsafe imagery may enter it, so no corpus here establishes that the model emits a high Hentai or Porn probability for genuinely unsafe input.",
+      "residualRisk": "An unsafe image that the model reads as safe for work (Drawing plus Neutral above 0.85, Hentai plus Porn below 0.1, Sexy below 0.15, all of them together below 0.15) publishes automatically, and how often that happens has not been measured here. Counting Drawing toward the safe mass, which the calibration chose, widens what publishes compared with the v1 Neutral-only floor; no unsafe bound, joint or single, is looser than v1.",
+      "mitigation": "Automatic publication requires a confident safe-for-work reading with every unsafe bound at its v1 value, and every other outcome routes to a human, so a recall failure on uncertain input becomes review load rather than a published post. The report action (Story 6.4), the moderator queue (Story 6.10) and both rollout flags staying closed until the moderator rota is real cover the confident-miss case.",
+      "revisitWhen": "A moderator confirms a published post that should have been withheld, the model or its version changes, or the beta cohort grows past what two moderators can watch reactively."
+    },
+    {
+      "id": "term-lists-without-native-review",
+      "statement": "The 7 term lists have pinned, attributable community provenance (LDNOOBW at one commit, CC-BY-4.0) and a repository-graded overlay, but no native-speaker review. LDNOOBW was compiled to keep words out of image-search autocomplete, which is broader than abuse screening, and the lists are uneven: en carries 403 upstream entries and de 66.",
+      "residualRisk": "Abuse written with words outside the lists publishes; ordinary words the lists carry route captions to review, and the frozen text holdout measures how often that happens on copy nobody tuned against. Upstream-only entries are graded profanity at medium severity, so none of them blocks on its own.",
+      "mitigation": "Every language runs against every submission, obfuscation families are normalised before matching, mixed scripts route to review, the repository allow list records why each exemption exists, and the clean-copy gate measures the false-positive cost per language on a holdout.",
+      "revisitWhen": "A native-speaker reviewer is available for any of the seven languages, moderators report a missed term or a recurring false positive, or a new locale is enabled."
+    },
+    {
+      "id": "fashion-term-lolita-always-goes-to-review",
+      "statement": "Fashion term 'lolita' always goes to review. It names a fashion subculture and is also a child-sexualisation keyword, and on a 13+ product the policy keeps it as a deliberate review term rather than allow-listing it. The French 'baiser' is kept the same way: a kiss as a noun, the commonest vulgar verb otherwise.",
+      "residualRisk": "Every Lolita-fashion caption and every caption using the French noun waits for a moderator, which delays those members and adds to review load.",
+      "mitigation": "Both are recorded with their reasons in the policy (text.deliberateReviewTerms); startup refuses a policy that allow-lists or drops either; the corpora label the captions carrying them as expected review and report them beside the clean-copy gate; and a moderator clears an ordinary post in one action.",
+      "revisitWhen": "Moderators find these captions are almost always cleared, or the platform raises its minimum age."
+    },
+    {
+      "id": "stock-photography-distribution",
+      "statement": "The safe corpus is drawn from openly licensed stock and community photography on Openverse, filtered to fashion titles and tags. It may not match the distribution of what members actually upload: phone photos, mirror selfies, low light, partial bodies, swimwear.",
+      "residualRisk": "The real review rate on member uploads may be higher than the measured rate, which would raise the moderators’ daily load above the projection.",
+      "mitigation": "The corpus is split by creator and caps any creator at 5% of it, the projection is reported at the Wilson upper bound and across a range of volumes, and the moderator queue shows the actual rate from the first beta day.",
+      "revisitWhen": "The first two weeks of beta traffic exist: replace the projection with the observed withheld rate and re-measure if it differs from the corpus rate by more than its interval."
+    },
+    {
+      "id": "two-moderators",
+      "statement": "The beta operates with 2 moderators (ADR-013 staffing plan) covering a 24-hour review SLA through rotating shifts.",
+      "residualRisk": "A spike in withheld posts, an incident-mode period where every submission routes to review, or one moderator’s absence can breach the SLA.",
+      "mitigation": "Rollout flags open reading and writing separately, the daily posting cap bounds per-account volume, the projected review load is in this payload, and the SLA monitor (Story 6.12) alerts before a breach.",
+      "revisitWhen": "The projected or observed daily review load exceeds what 2 people can clear inside the 24-hour SLA, or the cohort is widened."
+    },
+    {
+      "id": "hosted-measurement-pending",
+      "statement": "Runtime latency and memory were measured in the local container under the sandbox resource limits (0.2 vCPU, 512 MiB), not on the hosted target, and the regression gate committed in the model manifest comes from developer hardware.",
+      "residualRisk": "The hosted CPU may be slower or noisier than the emulation, and the regression gate does not yet describe production hardware.",
+      "mitigation": "The latency and memory gates run on the emulated profile, the memory gate reads the real container’s cgroup peak at the largest accepted upload, and the hosted canary records real queue latency and screening duration.",
+      "revisitWhen": "The worker is deployed: run the measurements inside the hosted container and re-baseline the regression gate from them."
+    },
+    {
+      "id": "free-tier-redis-budget",
+      "statement": "An idle BullMQ worker polls Redis continuously. With BullMQ defaults it measured 6,516 commands an hour, about 9.5 times the Upstash free tier; the worker now blocks for 300 seconds between idle polls and checks for stalled jobs every 600 seconds, and the measured idle cost plus projected traffic is in the Redis section. The worker uses the production Upstash database the API already uses for its own queues. These figures are the community worker alone; the API’s commands come out of the same monthly allowance.",
+      "residualRisk": "Exhausting the Redis allowance stops every queue the application uses, not only moderation, and the API’s own commands are not in this measurement. A connection that dies silently during a long block delays pickup until the block times out.",
+      "mitigation": "A new job wakes the blocked worker at once, so the long block costs no pickup latency; the outbox dispatcher and the stale-review sweep are the backstops for a dead connection; the deployment guide names the provider dashboard figure to watch after the first day, which counts the API and the worker together.",
+      "revisitWhen": "The Redis provider reports more than half the monthly allowance used in the first week."
+    }
+  ],
+  "rollback": {
+    "scope": "The hosted community worker. The API, web and mobile surfaces are not deployed by this story.",
+    "steps": [
+      "Leave community_read_enabled and community_write_enabled disabled; they are disabled now and nothing in this story changes them.",
+      "Redeploy the previous image on the host (Northflank keeps prior builds per commit), or stop the service. A stopped worker leaves queued jobs in Redis; they run when a worker returns, and the stale-review sweep moves anything pending too long to review_failed.",
+      "If the model itself is the problem, set COMMUNITY_NSFW_SCREENER=unavailable with COMMUNITY_NSFW_INCIDENT_MODE=unavailable and COMMUNITY_NSFW_INCIDENT_REFERENCE, and restart: every submission routes to human review and nothing auto-publishes.",
+      "Run the hosted canary after any rollback to confirm the restored worker publishes the safe fixture under a real-model identity, and that the worker name carries the commit you rolled back to.",
+      "Re-screen posts refused during the incident with the retained-job replay procedure in the deployment guide."
+    ]
+  },
+  "communityBetaGate": {
+    "closesHere": [
+      {
+        "gate": "model",
+        "note": "The Community Beta model-readiness signature, recorded once against this payload’s SHA-256 by the repository owner, or by an agent session the owner delegated it to, which may record only an approval of a payload whose verdict is pass."
+      }
+    ],
+    "remainOpen": [
+      "moderation staffing",
+      "SLA alerts",
+      "privacy",
+      "deletion",
+      "localization",
+      "accessibility",
+      "rollback"
+    ],
+    "statement": "A model-readiness signature is not a launch decision. Community Beta opens only when all eight gate signatures are recorded, and the rollout flags stay disabled until then."
+  },
+  "rollout": {
+    "communityReadEnabled": false,
+    "communityWriteEnabled": false,
+    "source": "packages/config/src/flags.ts defaultValue"
+  },
+  "signature": {
+    "recordedBy": "npm run community:screening:sign",
+    "delegatedBy": "npm run community:screening:sign -- --delegated",
+    "bindsTo": "the SHA-256 of this file’s bytes",
+    "note": "This payload carries no signature and never will. The verdict lives in community-content-screening-signature.json, written only by the sign command."
+  }
+}

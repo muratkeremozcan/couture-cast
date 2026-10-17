@@ -20,6 +20,16 @@ import { shutdownWorkerResources } from './shutdown-resources'
  * `pending_review` forever and the story's core loop cannot be exercised end to
  * end by anyone — which is exactly what was happening.
  *
+ * IT IS ALSO THE HOSTED WORKER. Story 6.2b's container
+ * (`apps/api/Dockerfile.community-worker`) runs this module through
+ * `scripts/start-community-worker-production.mjs`, and nothing else consumes
+ * `community-moderation` in production, so the interval sweeps below are the
+ * production sweeps and the one-second dispatch below is production's cadence.
+ * The outbox dispatch reads PostgreSQL and touches Redis only when a post is
+ * waiting, so the one-second cadence costs no Redis commands while idle; the
+ * idle Redis cost is BullMQ's blocking poll and stalled check, tuned in
+ * `community-moderation.worker.ts` and measured in the deployment guide.
+ *
  * The pipeline itself is composed by `createCommunityWorkerRuntime`, the same
  * factory `bootstrap.ts` uses, so this process cannot drift from production.
  *
@@ -32,29 +42,22 @@ import { shutdownWorkerResources } from './shutdown-resources'
  * plain interval instead, and the trigger is the one thing this process must
  * not share with `bootstrap.ts`.
  *
- * THE WORK MATCHES PRODUCTION. THE CADENCE DIFFERS BY SIXTY TIMES. An outbox
- * row becoming a job, a job screening a post, a post reaching a terminal
- * state: all of that runs through the exact same
- * `createCommunityWorkerRuntime` code path production uses. Production polls
- * moderation dispatch once a minute, via the cron in
- * `community-maintenance.scheduler.ts`
- * (`COMMUNITY_MODERATION_DISPATCH_CRON_PATTERN`, `* * * * *`); this process
- * polls it once a second (`DISPATCH_INTERVAL_MS` below). A Playwright spec
- * built on this process's timing exercises the pipeline correctly. It says
- * nothing about how fast an author sees that happen in production, where the
- * wait to leave `pending_review` runs up to a minute against this process's
- * one second.
+ * THE WORK AND THE CADENCE MATCH PRODUCTION. An outbox row becoming a job, a
+ * job screening a post, a post reaching a terminal state: all of that runs
+ * through the same `createCommunityWorkerRuntime` code path, at the same
+ * one-second dispatch interval, locally and on the hosted worker. The general
+ * bootstrap's one-minute dispatch cron (`COMMUNITY_MODERATION_DISPATCH_CRON_PATTERN`
+ * in `community-maintenance.scheduler.ts`) belongs to a process no hosted target
+ * runs.
  */
 const logger = createBaseLogger().child({ feature: 'community-workers' })
 
 /**
- * Sixty times faster than production's one-minute moderation-dispatch cron
- * (`COMMUNITY_MODERATION_DISPATCH_CRON_PATTERN` in
- * `community-maintenance.scheduler.ts`), so a Playwright spec does not wait on
- * it. A passing E2E run on this interval is not evidence of production
- * latency.
+ * The outbox dispatch interval, locally and on the hosted worker alike. It reads
+ * PostgreSQL only; Redis is touched when a waiting post is enqueued.
  */
 const DISPATCH_INTERVAL_MS = 1_000
+export const COMMUNITY_SHUTDOWN_TIMEOUT_MS = 20_000
 const SWEEP_INTERVAL_MS = 30_000
 
 const workers: Worker[] = []
@@ -138,12 +141,17 @@ export async function performShutdown() {
       }
     }
     await closeRuntime?.()
-    await shutdownWorkerResources({
-      workers,
-      queues: [],
-      redisClients: [],
-      disconnectPrisma: disconnectPrismaClient,
-    })
+    // Below the production launcher's 25-second deadline, so the bootstrap's own
+    // force-disconnect runs before the launcher gives up on it.
+    await shutdownWorkerResources(
+      {
+        workers,
+        queues: [],
+        redisClients: [],
+        disconnectPrisma: disconnectPrismaClient,
+      },
+      { timeoutMs: COMMUNITY_SHUTDOWN_TIMEOUT_MS }
+    )
   } catch (err) {
     logger.error(err, 'Error closing community workers')
     exitCode = 1

@@ -71,21 +71,25 @@
   "forbiddenDependencies": ["@tensorflow/tfjs"],
   "forbiddenDependenciesRationale": "The union package pulls tfjs-backend-webgl, tfjs-layers and tfjs-data, which this worker never uses, and measured 286 MB installed against 88 MB for the three packages actually needed. It produces identical class probabilities, so its only effect here is to triple the image the Story 6.2b worker has to fit inside a free hosting tier.",
   "thresholds": {
-    "neutralPassMinimum": 0.85,
+    "safeClasses": ["Drawing", "Neutral"],
+    "safeMassMinimum": 0.85,
     "unsafeAggregateMaximum": 0.1,
     "unsafeBlockMinimum": 0.35,
     "unsafeClasses": ["Hentai", "Porn"],
+    "reviewClasses": ["Sexy"],
+    "reviewClassMaximum": 0.15,
+    "unsafeAndReviewAggregateMaximum": 0.15,
     "probabilitySumTolerance": 0.001
   },
   "thresholdsMirrorOf": "the image block of the policy file named by manifest.policy",
-  "thresholdsRationale": "AC 1 requires the manifest to pin the thresholds, and the policy file owns them. This block therefore mirrors exactly four policy values and nothing else, so a consumer can assert it key-for-key against the same-named policy fields. The loader makes that assertion and fails startup on any divergence, so the duplication cannot silently drift.",
+  "thresholdsRationale": "AC 1 requires the manifest to pin the thresholds, and the policy file owns them. This block therefore mirrors exactly the nine threshold values of the policy image block and nothing else, so a consumer can assert it key-for-key against the same-named policy fields. The loader makes that assertion and fails startup on any divergence, so the duplication cannot silently drift.",
   "policy": {
-    "path": "../policies/community-screening/policy-v1.json",
+    "path": "../policies/community-screening/policy-v2.json",
     "pathRelativeTo": "the manifest file's own directory",
-    "version": "v1",
+    "version": "v2",
     "hashAlgorithm": "sha256",
     "hashInput": "file bytes",
-    "sha256": "467f139bba94f5131a652c597fe91867ad553dd0ef271fc3604da55f4e66a6e6"
+    "sha256": "b0daab4ab9d175cc018d88d7c37d3443a4d9425909394da3aee110e15ad98b65"
   },
   "runtime": {
     "node": ">=24.0.0",

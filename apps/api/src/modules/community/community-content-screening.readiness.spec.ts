@@ -37,7 +37,7 @@ const corpusDir = path.resolve(
 )
 const policyPath = path.resolve(
   __dirname,
-  '../../../policies/community-screening/policy-v1.json'
+  '../../../policies/community-screening/policy-v2.json'
 )
 
 const NEUTRAL_BANDS = ['high', 'moderate', 'low'] as const
@@ -122,32 +122,26 @@ describe('community screening readiness: fixture corpus', () => {
   })
 
   /*
-   * The assertion that makes the corpus worth having. The policy publishes
-   * automatically only above `neutralPassMinimum`, so a corpus sitting entirely
-   * on one side of that line exercises exactly one branch while still reporting
-   * a healthy fixture count. `low` is defined as below the threshold and the
-   * other two bands above it, so a corpus that straddles it reaches both `pass`
-   * and `review` from safe input alone, with no unsafe bytes in the repository.
+   * The assertion that makes the corpus worth having: it spans the model's
+   * confidence range. `low` fixtures sit below Neutral 0.85 and the other two
+   * bands above it. Story 6.2b moved the pass rule from a Neutral floor to a
+   * safe-mass floor, so whether each band passes is now decided by the model run
+   * below ("reaches both the pass and the review branch"); this check keeps the
+   * spread itself from silently collapsing.
    */
-  it('straddles the policy pass threshold so both dispositions are reachable', () => {
+  it('spans the Neutral confidence range from the low band to the high band', () => {
     const manifest = readManifest()
-    const policy = JSON.parse(fs.readFileSync(policyPath, 'utf8')) as {
-      image: { neutralPassMinimum: number }
-    }
-
-    expect(policy.image.neutralPassMinimum).toBeGreaterThan(0)
-    expect(policy.image.neutralPassMinimum).toBeLessThan(1)
 
     const belowThreshold = manifest.files.filter((entry) => entry.neutralBand === 'low')
     const aboveThreshold = manifest.files.filter((entry) => entry.neutralBand !== 'low')
 
     expect(
       belowThreshold.length,
-      'No fixture sits below the policy pass threshold, so the review branch is unreachable from this corpus.'
+      'No fixture sits in the low Neutral band, so the corpus no longer spans the confidence range.'
     ).toBeGreaterThan(0)
     expect(
       aboveThreshold.length,
-      'No fixture sits above the policy pass threshold, so the pass branch is unreachable from this corpus.'
+      'No fixture sits above the low Neutral band, so the corpus no longer spans the confidence range.'
     ).toBeGreaterThan(0)
   })
 

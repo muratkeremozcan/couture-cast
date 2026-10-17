@@ -1,0 +1,2113 @@
+{
+  "language": "tr",
+  "corpusVersion": "holdout-v1",
+  "description": "Frozen clean holdout: ordinary fashion captions and alt text written natively in the language after the allow list froze, independently of the clean half, and never used to tune the screener, the lists or the allow list. The release gate's clean-copy figure is computed here. Entries labelled expected review carry one of the policy's deliberate review terms.",
+  "expected": "pass",
+  "frozenAgainst": {
+    "allowListSha256": "22d1f261f3666cf37369e67359aeabc383ac0a689babe04f87023ba1aee70256",
+    "termsSha256": "e87f504e9adeea7bbbcb9ce87516d937a636d579612c2448fe7853d282ef3547",
+    "languageAllowListSha256": "865b5547537e7a204ceb38cdc34be81ef68a11d6c99f694e0d2e8ad49bc2338e"
+  },
+  "entries": [
+    {
+      "id": "tr-holdout-001",
+      "field": "caption",
+      "text": "Yine yağmur. Süet makosenleri bırakıp lastik çizmeleri giydim."
+    },
+    {
+      "id": "tr-holdout-002",
+      "field": "caption",
+      "text": "Hava durumu 12 derece diyordu, durakta 6 gibi hissettirdi. Çıkarken atkıyı kaptığıma iyi ki."
+    },
+    {
+      "id": "tr-holdout-003",
+      "field": "caption",
+      "text": "Köprüde rüzgar öyle esti ki uzun kabanım yelkene döndü."
+    },
+    {
+      "id": "tr-holdout-004",
+      "field": "caption",
+      "text": "Kapüşonlu sweatshirt ve eski kot ceketle hızlıca markete gittim. Çisenti tabii ki eve girince durdu."
+    },
+    {
+      "id": "tr-holdout-005",
+      "field": "caption",
+      "text": "Nemli ve kapalı. Keten gömlek, kısa paça chino, bez ayakkabı. Saat dokuzda yine de terlemiştim."
+    },
+    {
+      "id": "tr-holdout-006",
+      "field": "caption",
+      "text": "Arabanın camında ilk kırağı. Yün eldivenler antredeki çekmeceden çıktı."
+    },
+    {
+      "id": "tr-holdout-007",
+      "field": "caption",
+      "text": "Hafif yağmurda bisikletle işe: merino tişört üstüne yağmurluk, çabuk kuruyan pantolon, paça klipsleri."
+    },
+    {
+      "id": "tr-holdout-008",
+      "field": "caption",
+      "text": "Güneşli ama sadece 4 derece. Trençkotun altına şişme yelek giydim, beklediğimden iyi oldu."
+    },
+    {
+      "id": "tr-holdout-009",
+      "field": "caption",
+      "text": "postane, eczane, fırın. üç durak, iki sağanak, sırılsıklam bir bez çanta"
+    },
+    {
+      "id": "tr-holdout-010",
+      "field": "caption",
+      "text": "Bugün sıcak uyarısı var, sade tuttum: bol pamuklu elbise, hasır şapka, arkası bantlı sandalet."
+    },
+    {
+      "id": "tr-holdout-011",
+      "field": "caption",
+      "text": "Sis o kadar yoğundu ki tramvayı zor gördüm. Sarı yağmurluğum sonunda işe yaradı."
+    },
+    {
+      "id": "tr-holdout-012",
+      "field": "caption",
+      "text": "Topukluları çantaya koyup düz ayakkabıyla çıktım. Arnavut kaldırımı ve ıslak yapraklar bana güven vermiyor."
+    },
+    {
+      "id": "tr-holdout-013",
+      "field": "caption",
+      "text": "Ofiste klima yine kutup ayarında. Bundan sonra sandalyemin arkasında bir hırka duracak."
+    },
+    {
+      "id": "tr-holdout-014",
+      "field": "caption",
+      "text": "Okul yolunda ani dolu. Çocuklar bayıldı, saçlarım pek memnun kalmadı."
+    },
+    {
+      "id": "tr-holdout-015",
+      "field": "caption",
+      "text": "Hafif kar, çamurlu kaldırımlar. Tırtıklı tabanlı botlar ve yün çoraplar, tamam."
+    },
+    {
+      "id": "tr-holdout-016",
+      "field": "caption",
+      "text": "Pazara açık havada gittim, dönüşte sağanak başladı. Katlanabilir ceketim kurtardı."
+    },
+    {
+      "id": "tr-holdout-017",
+      "field": "caption",
+      "text": "Öğlen 28 dereceyi buldu. Öğle arasında kotu çıkarıp masamda duran yedek eteği giydim."
+    },
+    {
+      "id": "tr-holdout-018",
+      "field": "caption",
+      "text": "Sabah 3, öğleden sonra 17 derece. Termal içlik, gömlek, kazak, mont. Her saat bir kat eksildi."
+    },
+    {
+      "id": "tr-holdout-019",
+      "field": "caption",
+      "text": "Sabah altıda köpek gezdirme: mumlu ceket ve bere. Komşular şortla koşuyor. Hangimiz haklıyız?"
+    },
+    {
+      "id": "tr-holdout-020",
+      "field": "caption",
+      "text": "Rüzgar öyle sert ki bol paça pantolonu bugün dolapta bıraktım. Düz kesim yerinde duruyor."
+    },
+    {
+      "id": "tr-holdout-021",
+      "field": "caption",
+      "text": "Ayak işleri günü. Lastik çizme, kısa trençkot, iki elim şemsiyeye kalsın diye çapraz çanta."
+    },
+    {
+      "id": "tr-holdout-022",
+      "field": "caption",
+      "text": "Uygulama şemsiye al dedi, almadım. Bu ay üçüncü kez ders aldım ☔"
+    },
+    {
+      "id": "tr-holdout-023",
+      "field": "caption",
+      "text": "Peron buz gibiydi. Bir dahaki sefere süs atkısını değil kalın uzun atkıyı takacağım."
+    },
+    {
+      "id": "tr-holdout-024",
+      "field": "caption",
+      "text": "Bütün gün çiseledi. Su itici parka ve örgü bere sayesinde kuru ve sıcak kaldım."
+    },
+    {
+      "id": "tr-holdout-025",
+      "field": "caption",
+      "text": "Sonunda güneş çıktı! Kot ceket mevsimi resmen geri döndü."
+    },
+    {
+      "id": "tr-holdout-026",
+      "field": "caption",
+      "text": "Buzlanma uyarısı var. Yol için tutuşu iyi patika ayakkabıları, ofis ayakkabıları sırt çantasında."
+    },
+    {
+      "id": "tr-holdout-027",
+      "field": "caption",
+      "text": "Mont için çok sıcak, montsuz çok soğuk. Bütün yol kolumda taşıdım."
+    },
+    {
+      "id": "tr-holdout-028",
+      "field": "caption",
+      "text": "Yağmurlu pazartesi üniforması: koyu kot, gri balıkçı yaka, kauçuk tabanlı bot, lacivert yağmurluk."
+    },
+    {
+      "id": "tr-holdout-029",
+      "field": "caption",
+      "text": "Polen yoğun, hava 22 derece. Güneş gözlüğü, ince gömlek ceket ve cepte bir paket mendil."
+    },
+    {
+      "id": "tr-holdout-030",
+      "field": "caption",
+      "text": "Eve dönerken kuru temizlemeciden kıyafetleri aldım. Dükkandan çıkar çıkmaz hava açtı."
+    },
+    {
+      "id": "tr-holdout-031",
+      "field": "caption",
+      "text": "Öğle arasında gök gürültülü sağanak. Geçene kadar kafede oturdum, değdi."
+    },
+    {
+      "id": "tr-holdout-032",
+      "field": "caption",
+      "text": "Ani soğuk. İki kat çorap, pantolonun altına termal tayt, işte kimse fark etmedi."
+    },
+    {
+      "id": "tr-holdout-033",
+      "field": "caption",
+      "text": "Serin ve güneşli. Çizgili kayık yaka tişört ve beyaz kot için harika bir gün."
+    },
+    {
+      "id": "tr-holdout-034",
+      "field": "caption",
+      "text": "Karlı günde eski kayak montumla işlerimi hallettim. Şık değil ama çok sıcak."
+    },
+    {
+      "id": "tr-holdout-035",
+      "field": "caption",
+      "text": "Eczaneye kadar bunaltıcı bir yürüyüş. En ince gömleğimi giydim, yine de çorbanın içinde gibiydim."
+    },
+    {
+      "id": "tr-holdout-036",
+      "field": "caption",
+      "text": "Çisenti, güneş, yine çisenti. Saçlarım pes etti, botlarım dimdik ayakta."
+    },
+    {
+      "id": "tr-holdout-037",
+      "field": "caption",
+      "text": "Sabah vardiyası, hava 2 derece. Karanlık yol için kolumda reflektör bant."
+    },
+    {
+      "id": "tr-holdout-038",
+      "field": "caption",
+      "text": "Yağmur bir yağıp bir duruyor. Şemsiye yerine balıkçı şapkası taktım, çok iyi oldu."
+    },
+    {
+      "id": "tr-holdout-039",
+      "field": "caption",
+      "text": "İlkbahar rüzgarı şaka değil. Şapkam iki kez uçtu, sonunda çantaya koydum."
+    },
+    {
+      "id": "tr-holdout-040",
+      "field": "caption",
+      "text": "Kapalı ve ılık. Kapüşonlunun üstüne iş ceketi, en sevdiğim ara mevsim kombini."
+    },
+    {
+      "id": "tr-holdout-041",
+      "field": "caption",
+      "text": "Kütüphane, nalbur, sonra ev. Bulutlu ve 14 derece, kapitone ceket ve kot yeterli."
+    },
+    {
+      "id": "tr-holdout-042",
+      "field": "caption",
+      "text": "Sulu kar. Sadece sulu kar. Yün kaban, şemsiye, bot ve bir termos çay."
+    },
+    {
+      "id": "tr-holdout-043",
+      "field": "caption",
+      "text": "Durakta bir çorabımın lacivert, diğerinin siyah olduğunu fark ettim. Bot içinde kimse anlamaz 😅"
+    },
+    {
+      "id": "tr-holdout-044",
+      "field": "caption",
+      "text": "Eve dönüşte 31 derece. Kollarımı ve paçalarımı kıvırdım, blazer omzumda."
+    },
+    {
+      "id": "tr-holdout-045",
+      "field": "caption",
+      "text": "Kreş yolunda hafif yağmur. Çocuklar yağmur tulumunda, ben uzun yağmurlukta."
+    },
+    {
+      "id": "tr-holdout-046",
+      "field": "caption",
+      "text": "Serin ve güneşli, tam kadife pantolon havası."
+    },
+    {
+      "id": "tr-holdout-047",
+      "field": "caption",
+      "text": "İliklere işleyen nemli bir soğuk. Öğlen pamuklu kazağı kalın yün kazakla değiştirdim."
+    },
+    {
+      "id": "tr-holdout-048",
+      "field": "caption",
+      "text": "Sahil yolunda rüzgarlı bir fırın yürüyüşü. Balıkçı kazağı, bere, tamam."
+    },
+    {
+      "id": "tr-holdout-049",
+      "field": "caption",
+      "text": "Saat 16'da yağmur bekleniyor, bez ayakkabıları bırakıp deri botları giydim."
+    },
+    {
+      "id": "tr-holdout-050",
+      "field": "caption",
+      "text": "Kalın kazakla trafikte, kalorifer sonuna kadar açık. Hava durumuna iki kez bakmam gerekirdi."
+    },
+    {
+      "id": "tr-holdout-051",
+      "field": "caption",
+      "text": "Montu askıda bırakıp pişman olmadığın o ilk sıcak sabah."
+    },
+    {
+      "id": "tr-holdout-052",
+      "field": "caption",
+      "text": "Her yer kar çamuru. Beyaz spor ayakkabılar bahara kadar emekliye ayrıldı."
+    },
+    {
+      "id": "tr-holdout-053",
+      "field": "caption",
+      "text": "Gri gökyüzü, canlı renkli kaban. Moralim düzelsin diye bugün kırmızısını giydim."
+    },
+    {
+      "id": "tr-holdout-054",
+      "field": "caption",
+      "text": "Köpekle veterinere gittik, ikimiz de yağmurlukluyduk. Planlamadık, öyle oldu."
+    },
+    {
+      "id": "tr-holdout-055",
+      "field": "caption",
+      "text": "Sıcak metro, soğuk ofis, yine sıcak metro. Bu haftanın kahramanı ince hırka."
+    },
+    {
+      "id": "tr-holdout-056",
+      "field": "caption",
+      "text": "Önce eski parkamla kapının önündeki karı küredim, sonra trene düzgün bir kabanla gittim."
+    },
+    {
+      "id": "tr-holdout-057",
+      "field": "caption",
+      "text": "9 derece ve çisenti. Merino kazak, yün pantolon, su geçirmez bot, cep şemsiyesi."
+    },
+    {
+      "id": "tr-holdout-058",
+      "field": "caption",
+      "text": "Öğle yürüyüşü güneşte, ceket doksanlardaki gibi belde bağlı."
+    },
+    {
+      "id": "tr-holdout-059",
+      "field": "caption",
+      "text": "Sabah boyunca sağanak. Masamın çekmecesinde yedek çorap vardı, kendimi çok akıllı hissettim."
+    },
+    {
+      "id": "tr-holdout-060",
+      "field": "caption",
+      "text": "Peronda sert rüzgar. Pliseli etek yerine pantolon giydiğime iyi ki."
+    },
+    {
+      "id": "tr-holdout-061",
+      "field": "caption",
+      "text": "Pijama altının üstüne uzun kaban giyip süt almaya indim. Bu da bir kombin sayılır."
+    },
+    {
+      "id": "tr-holdout-062",
+      "field": "caption",
+      "text": "Sabah sis, saat ondan sonra tam güneş. Neyse ki güneş gözlüğünü yanıma almıştım."
+    },
+    {
+      "id": "tr-holdout-063",
+      "field": "caption",
+      "text": "Otobüs geç kaldı, yağmur erken geldi. Kapüşon kafada, müzik kulakta, idare ettim."
+    },
+    {
+      "id": "tr-holdout-064",
+      "field": "caption",
+      "text": "16 derece ve bulutlu: gömlek ceket havası, en sevdiğim."
+    },
+    {
+      "id": "tr-holdout-065",
+      "field": "caption",
+      "text": "Yağmurluk giydim, şemsiye aldım, yine de geçen bir araba üstüme su sıçrattı. Her şey olmuyor."
+    },
+    {
+      "id": "tr-holdout-066",
+      "field": "caption",
+      "text": "Nehirden soğuk rüzgar esiyordu, kaban yakasının altına boyunluk ekledim. Fark muazzam."
+    },
+    {
+      "id": "tr-holdout-067",
+      "field": "caption",
+      "text": "Güneşte semt pazarı, tepeden tırnağa keten, kocaman hasır sepet. Mükemmel bir cumartesi."
+    },
+    {
+      "id": "tr-holdout-068",
+      "field": "caption",
+      "text": "Gece kar yağmış, botlarım dünden beri kaloriferin önünde kuruyor. Bugün yedek çift."
+    },
+    {
+      "id": "tr-holdout-069",
+      "field": "caption",
+      "text": "Bunca yağmurdan sonra istasyon yolu çamur içinde. Koyu renk pantolonu seçtiğim iyi oldu."
+    },
+    {
+      "id": "tr-holdout-070",
+      "field": "caption",
+      "text": "Ceket için fazla sıcak, ceketsiz için fazla yağmurlu. İnce naylon rüzgarlık işimi gördü."
+    },
+    {
+      "id": "tr-holdout-071",
+      "field": "caption",
+      "text": "Kanguruda bebekle ayak işleri. Kaban ikimizin de üstünde, ek parçasına bayılıyorum."
+    },
+    {
+      "id": "tr-holdout-072",
+      "field": "caption",
+      "text": "Fırtınada koşa koşa kargo gönderdim. Lastik terlikler hafife alınıyor."
+    },
+    {
+      "id": "tr-holdout-073",
+      "field": "caption",
+      "text": "Soğuk, açık ve rüzgarsız. Uzun yün kabanım için en güzel hava."
+    },
+    {
+      "id": "tr-holdout-074",
+      "field": "caption",
+      "text": "Ani yaz sağanağı, bütün sokak tentelerin altına koştu 🌦️"
+    },
+    {
+      "id": "tr-holdout-075",
+      "field": "caption",
+      "text": "Tahmin: yağmur. Gerçek: güneş. Ben: tramvayda baştan aşağı yağmur kıyafetiyle."
+    },
+    {
+      "id": "tr-holdout-076",
+      "field": "caption",
+      "text": "Sıcak dalgasında ofis günü. Kısa kollu gömlek, ince pantolon, çorapsız loafer."
+    },
+    {
+      "id": "tr-holdout-077",
+      "field": "caption",
+      "text": "Hışırdayan yapraklar, üşüyen burun, sıcak eller. Parmaksız eldivenler geri döndü."
+    },
+    {
+      "id": "tr-holdout-078",
+      "field": "caption",
+      "text": "Çiseleyen yağmurda annemle babamı doktora götürdüm. Babam yedek beremi aldı, geri vermiyor."
+    },
+    {
+      "id": "tr-holdout-079",
+      "field": "caption",
+      "text": "Uzun etekle rüzgara karşı bisiklet sürmek bir daha yapmayacağım şeyler listesinde."
+    },
+    {
+      "id": "tr-holdout-080",
+      "field": "caption",
+      "text": "35 derecede ayak işleri. Geniş kenarlı şapka, bol pantolon, su şişesi, mümkün olduğunca gölge."
+    },
+    {
+      "id": "tr-holdout-081",
+      "field": "caption",
+      "text": "Gelirken bir şemsiye kırıldı, yedeği dayandı. Bu hafta rüzgar önde."
+    },
+    {
+      "id": "tr-holdout-082",
+      "field": "caption",
+      "text": "Bugün derin tabanlı botlarımı giydim, çamurun içinden gönül rahatlığıyla geçtim."
+    },
+    {
+      "id": "tr-holdout-083",
+      "field": "caption",
+      "text": "Ofise dizlerimden aşağısı sırılsıklam vardım. Bir dahakine uzun yağmurluk."
+    },
+    {
+      "id": "tr-holdout-084",
+      "field": "caption",
+      "text": "Yumuşak, gri bir sabah. Krem örgü, antrasit pantolon, kahverengi bot."
+    },
+    {
+      "id": "tr-holdout-085",
+      "field": "caption",
+      "text": "Eve dönerken nohut büyüklüğünde dolu. Kapüşon ve yaka yukarı, yürümeye devam."
+    },
+    {
+      "id": "tr-holdout-086",
+      "field": "caption",
+      "text": "Güneş var ama rüzgar soğuk. Trençin altına kapitone astar, atkı cepte."
+    },
+    {
+      "id": "tr-holdout-087",
+      "field": "caption",
+      "text": "Karlı işe gidiş #yağmurlugünkombini #kışkatmanları"
+    },
+    {
+      "id": "tr-holdout-088",
+      "field": "caption",
+      "text": "Banka, ayakkabı tamircisi, kahve. Ilık ve güneşli, sadece kazak ve en sevdiğim kot."
+    },
+    {
+      "id": "tr-holdout-089",
+      "field": "caption",
+      "text": "Pamuklu elbiseyle lastik çizme ilk başta tuhaf geldi ama yaz fırtınaları için harika bir ikili."
+    },
+    {
+      "id": "tr-holdout-090",
+      "field": "caption",
+      "text": "Yoğun sis, nemli hava. Yün kabanım bugün hafifçe koyun kokuyor ve bunu kabullendim."
+    },
+    {
+      "id": "tr-holdout-091",
+      "field": "caption",
+      "text": "Yine ıslak çoraplar."
+    },
+    {
+      "id": "tr-holdout-092",
+      "field": "caption",
+      "text": "Sonunda kaban havası."
+    },
+    {
+      "id": "tr-holdout-093",
+      "field": "caption",
+      "text": "Bol paça pantolonları yağmurda kuru tutmak için öneriniz var mı? Benimkiler dizime kadar su çekiyor."
+    },
+    {
+      "id": "tr-holdout-094",
+      "field": "caption",
+      "text": "Kar çamurunda 20 dakika yürüyüp ofise düzgün görünerek varmak için hangi ayakkabıları giyiyorsunuz?"
+    },
+    {
+      "id": "tr-holdout-095",
+      "field": "caption",
+      "text": "Sabah 2 derece başlayıp 15 derecede biten bir gün için nasıl katmanlıyorsunuz? Öğlene doğru hep terliyorum."
+    },
+    {
+      "id": "tr-holdout-096",
+      "field": "caption",
+      "text": "Soğuk yerlerde yaşayanlara soru: günlük kaban için yün mü, kaz tüyü mü? Bütçe sadece birine yetiyor."
+    },
+    {
+      "id": "tr-holdout-097",
+      "field": "caption",
+      "text": "Nemli sıcakta toplantılara ne giyiyorsunuz? Keten kırışıyor, sentetik ısıyı hapsediyor, fikrim kalmadı."
+    },
+    {
+      "id": "tr-holdout-098",
+      "field": "caption",
+      "text": "Lacivert kaban siyah pantolonla olur mu? Yeni bir şey almadan önce sormak istedim."
+    },
+    {
+      "id": "tr-holdout-099",
+      "field": "caption",
+      "text": "Rüzgarlı havada uzun eteği nasıl giyiyorsunuz? Benimki yürürken sürekli bacaklarıma dolanıyor."
+    },
+    {
+      "id": "tr-holdout-100",
+      "field": "caption",
+      "text": "Yardım: açık havada bir nikaha davetliyim, yüzde 30 sağanak ihtimali var. Siz ne giyerdiniz?"
+    },
+    {
+      "id": "tr-holdout-101",
+      "field": "caption",
+      "text": "Gri ve krem atkım zaten varsa deve tüyü kabana hangi renk atkı yakışır?"
+    },
+    {
+      "id": "tr-holdout-102",
+      "field": "caption",
+      "text": "Bahçe çizmesi gibi görünmeyen yağmur çizmesi var mı? Hangi kesim ve detaylara bakmalıyım?"
+    },
+    {
+      "id": "tr-holdout-103",
+      "field": "caption",
+      "text": "Astarlı trençkot gerçekte ne kadar sıcak tutuyor? 5 derecede kışlık kabanın yerini tutar mı?"
+    },
+    {
+      "id": "tr-holdout-104",
+      "field": "caption",
+      "text": "Yazın ofise şort giyen var mı? Sıcak dalgasında kıyafet kuralını nasıl hallettiğinizi merak ediyorum."
+    },
+    {
+      "id": "tr-holdout-105",
+      "field": "caption",
+      "text": "Minyon arkadaşlar, midi boy kabanı içinde kaybolmadan nasıl giyiyorsunuz?"
+    },
+    {
+      "id": "tr-holdout-106",
+      "field": "caption",
+      "text": "Ani hava değişimleri için çantanızda neler taşıyorsunuz? Kendime küçük bir set hazırlıyorum."
+    },
+    {
+      "id": "tr-holdout-107",
+      "field": "caption",
+      "text": "İlkbaharın başında çorapla sandalet giymek tuhaf mı? Kendim için soruyorum."
+    },
+    {
+      "id": "tr-holdout-108",
+      "field": "caption",
+      "text": "Yağmura yakalanınca en hızlı kuruyan kumaş hangisi? Bisikletle işe gidiş için lazım."
+    },
+    {
+      "id": "tr-holdout-109",
+      "field": "caption",
+      "text": "Kışın beyaz spor ayakkabı hakkında ne düşünüyorsunuz? Benimkiler bir haftada griye dönüyor."
+    },
+    {
+      "id": "tr-holdout-110",
+      "field": "caption",
+      "text": "Hava 33 dereceyken ilk iş görüşmesi için kıyafet önerisi olan var mı?"
+    },
+    {
+      "id": "tr-holdout-111",
+      "field": "caption",
+      "text": "Durakta hem ellerinizi sıcak tutup hem telefonu nasıl kullanıyorsunuz?"
+    },
+    {
+      "id": "tr-holdout-112",
+      "field": "caption",
+      "text": "Bu pantolonun paçasını düz ayakkabıya göre mi, bota göre mi kısalttırayım? Havaya göre ikisini de giyiyorum."
+    },
+    {
+      "id": "tr-holdout-113",
+      "field": "caption",
+      "text": "Uzun saçla ve kapüşonla uyumlu bir şapka modeli önerebilir misiniz?"
+    },
+    {
+      "id": "tr-holdout-114",
+      "field": "caption",
+      "text": "İlkbahar yürüyüşlerinde yağmurluğun altına neler giyiyorsunuz?"
+    },
+    {
+      "id": "tr-holdout-115",
+      "field": "caption",
+      "text": "Ayrı bir mevsimlik cekete gerçekten ihtiyacım var mı, yoksa kot ceket artı kapüşonlu yeter mi?"
+    },
+    {
+      "id": "tr-holdout-116",
+      "field": "caption",
+      "text": "Sonbahar hırkası için haki mi, kiremit mi? Çok lacivert ve kot giyiyorum."
+    },
+    {
+      "id": "tr-holdout-117",
+      "field": "caption",
+      "text": "Kuru kış günlerinde yün kazakların elektriklenmesine ne yapıyorsunuz?"
+    },
+    {
+      "id": "tr-holdout-118",
+      "field": "caption",
+      "text": "Yağmurlu şehirlerde yaşayanlar süeti ne yapıyor? Ekimden nisana kadar dolapta mı kalıyor?"
+    },
+    {
+      "id": "tr-holdout-119",
+      "field": "caption",
+      "text": "Rüzgarlı bir plaj günü için küçük çocuğu nasıl giydirirsiniz? Önerilere açığım."
+    },
+    {
+      "id": "tr-holdout-120",
+      "field": "caption",
+      "text": "Uzun boylular, kolların gerçekten bileğe kadar gelmesi için nelere dikkat ediyorsunuz?"
+    },
+    {
+      "id": "tr-holdout-121",
+      "field": "caption",
+      "text": "Rahat bir cuma günü için blazerın altına balıkçı yaka fazla mı olur?"
+    },
+    {
+      "id": "tr-holdout-122",
+      "field": "caption",
+      "text": "Kaç tane kabanınız var? Üç tanenin fazla olup olmadığını düşünüyorum."
+    },
+    {
+      "id": "tr-holdout-123",
+      "field": "caption",
+      "text": "Yüzde 60 yağmur ihtimali olan ve akşamında yemek olan bir gün için favori kombininiz ne?"
+    },
+    {
+      "id": "tr-holdout-124",
+      "field": "caption",
+      "text": "Çabuk ısınan biri için merino değer mi? Isıyı dengelediğini duyuyorum."
+    },
+    {
+      "id": "tr-holdout-125",
+      "field": "caption",
+      "text": "Çanta askısının sürtündüğü yerde yün kabanın tüylenmesini nasıl önlüyorsunuz?"
+    },
+    {
+      "id": "tr-holdout-126",
+      "field": "caption",
+      "text": "Sonbaharda gri takım elbiseyle kahverengi ayakkabı, evet mi hayır mı?"
+    },
+    {
+      "id": "tr-holdout-127",
+      "field": "caption",
+      "text": "Fikir arıyorum: düz siyah şişme mont nasıl uyku tulumu gibi görünmez?"
+    },
+    {
+      "id": "tr-holdout-128",
+      "field": "caption",
+      "text": "Kalın çorap için kış botunu bir numara büyük mü alıyorsunuz? Burada ilk gerçek kışım."
+    },
+    {
+      "id": "tr-holdout-129",
+      "field": "caption",
+      "text": "Yağmurda etekle nasıl bisiklete biniyorsunuz? Ciddi soruyorum, denemek istiyorum."
+    },
+    {
+      "id": "tr-holdout-130",
+      "field": "caption",
+      "text": "Atkıyı boynunda kaşındırıcı bulan biri için iyi bir alternatif ne olabilir?"
+    },
+    {
+      "id": "tr-holdout-131",
+      "field": "caption",
+      "text": "Berenin altında saçınız da dümdüz oluyor mu? İşte bununla nasıl başa çıkıyorsunuz?"
+    },
+    {
+      "id": "tr-holdout-132",
+      "field": "caption",
+      "text": "Her şeyle uyumlu bir yağmurluk için hangi renk? Lacivert ile haki arasında kaldım."
+    },
+    {
+      "id": "tr-holdout-133",
+      "field": "caption",
+      "text": "Küçük bir evde kalın kazakları yaz boyunca nasıl saklıyorsunuz?"
+    },
+    {
+      "id": "tr-holdout-134",
+      "field": "caption",
+      "text": "Pantolonun altına külotlu çorap giyen oldu mu? Soğukta gerçekten işe yarıyor mu?"
+    },
+    {
+      "id": "tr-holdout-135",
+      "field": "caption",
+      "text": "Hardal sarısı yağmurluğu neyle kombinlerdiniz? Anlık bir kararla aldım, şimdi şaşkınım."
+    },
+    {
+      "id": "tr-holdout-136",
+      "field": "caption",
+      "text": "Midi elbisenin üstüne giyilen kaban en fazla ne kadar kısa olabilir?"
+    },
+    {
+      "id": "tr-holdout-137",
+      "field": "caption",
+      "text": "Uygulamayla ilgili soru: katman seçerken hissedilen sıcaklığa mı bakıyorsunuz, gerçek dereceye mi?"
+    },
+    {
+      "id": "tr-holdout-138",
+      "field": "caption",
+      "text": "Nemli bir yaz için keten mi, krinkıl kumaş mı? Pamuklu gömlek öğlene kadar sırılsıklam oluyor."
+    },
+    {
+      "id": "tr-holdout-139",
+      "field": "caption",
+      "text": "Yardım lazım: sabah doğa yürüyüşü ve öğlen şehirde yemek için tek kombin, 10 ile 19 derece arası."
+    },
+    {
+      "id": "tr-holdout-140",
+      "field": "caption",
+      "text": "Atkı ağzımın üstündeyken gözlüğün buğulanmaması için bir püf noktası var mı?"
+    },
+    {
+      "id": "tr-holdout-141",
+      "field": "caption",
+      "text": "Bol paça kotla bilekte bot giyince paça toplanmasın diye ne yapıyorsunuz?"
+    },
+    {
+      "id": "tr-holdout-142",
+      "field": "caption",
+      "text": "Kasımda uzun bir açık hava maçı için nasıl giyinmeli? İki saat tribünde kıpırdamadan oturacağım."
+    },
+    {
+      "id": "tr-holdout-143",
+      "field": "caption",
+      "text": "Ponpon sevmeyen biri için en sıcak bere modeli hangisi?"
+    },
+    {
+      "id": "tr-holdout-144",
+      "field": "caption",
+      "text": "İlkbaharda ince blazer dış giyim olarak giyilir mi, yoksa montu unutmuşum gibi mi durur?"
+    },
+    {
+      "id": "tr-holdout-145",
+      "field": "caption",
+      "text": "Kaloriferli trende bot içinde ayaklarınız pişmesin diye ne yapıyorsunuz?"
+    },
+    {
+      "id": "tr-holdout-146",
+      "field": "caption",
+      "text": "Kapüşonlu yağmurluk mu, şapka mı? Bir türlü karar veremiyorum."
+    },
+    {
+      "id": "tr-holdout-147",
+      "field": "caption",
+      "text": "Belki saçma bir soru ama uzun kabanla bisiklete binerken etek kısmının tekerleğe takılmasını nasıl önlüyorsunuz?"
+    },
+    {
+      "id": "tr-holdout-148",
+      "field": "caption",
+      "text": "Ara mevsimde neler giyiyorsunuz? Her sabah tahminle hareket ediyorum."
+    },
+    {
+      "id": "tr-holdout-149",
+      "field": "caption",
+      "text": "Nikah sorumu yanıtlayan herkese teşekkürler! Midi elbise ve ince trençkot mükemmeldi."
+    },
+    {
+      "id": "tr-holdout-150",
+      "field": "caption",
+      "text": "Renk uyumu harika, hardal sarısı griyi bambaşka bir yere taşımış."
+    },
+    {
+      "id": "tr-holdout-151",
+      "field": "caption",
+      "text": "Bez çantayı mumlama önerin için teşekkürler, dünkü yağmurda hiç su almadı!"
+    },
+    {
+      "id": "tr-holdout-152",
+      "field": "caption",
+      "text": "Oversize blazerı öyle güzel kombinlemişsin ki zahmetsiz görünüyor."
+    },
+    {
+      "id": "tr-holdout-153",
+      "field": "caption",
+      "text": "Yün çorap konusunda haklıymışsın. Bütün yol ayaklarım sıcacıktı."
+    },
+    {
+      "id": "tr-holdout-154",
+      "field": "caption",
+      "text": "Gri bir hafta için tam da ihtiyacım olan ilham. Paylaştığın için teşekkürler!"
+    },
+    {
+      "id": "tr-holdout-155",
+      "field": "caption",
+      "text": "Yağmurlu gün kombinin çok derli toplu. Ben her seferinde yüzerek gelmiş gibi varıyorum."
+    },
+    {
+      "id": "tr-holdout-156",
+      "field": "caption",
+      "text": "Katman sorumu yanıtladığın için çok teşekkürler, termal önerisi sabahlarımı değiştirdi."
+    },
+    {
+      "id": "tr-holdout-157",
+      "field": "caption",
+      "text": "Tamam, bu trençkot kusursuz. Boyu tam yerinde."
+    },
+    {
+      "id": "tr-holdout-158",
+      "field": "caption",
+      "text": "Bir sonraki seyahatim için kaydettim. Teşekkürler!"
+    },
+    {
+      "id": "tr-holdout-159",
+      "field": "caption",
+      "text": "Yazlık elbiseyi külotlu çorap ve kalın örgüyle sonbahara taşıman çok akıllıca."
+    },
+    {
+      "id": "tr-holdout-160",
+      "field": "caption",
+      "text": "Bavul listen sayesinde her şey kabin bavuluna sığdı. Çok minnettarım!"
+    },
+    {
+      "id": "tr-holdout-161",
+      "field": "caption",
+      "text": "Renkler büyüleyici. Yeşil kaban karın içinde muhteşem görünüyor."
+    },
+    {
+      "id": "tr-holdout-162",
+      "field": "caption",
+      "text": "Paça kısaltma önerin için teşekkürler, terzim ne demek istediğimi hemen anladı."
+    },
+    {
+      "id": "tr-holdout-163",
+      "field": "caption",
+      "text": "Paçayı botun üstünde bir kez kıvırma tüyonu denedim, çok daha derli toplu duruyor."
+    },
+    {
+      "id": "tr-holdout-164",
+      "field": "caption",
+      "text": "O atkı bağlama şekli dahice, yarın deneyeceğim."
+    },
+    {
+      "id": "tr-holdout-165",
+      "field": "caption",
+      "text": "Kusursuz fotoğrafın yanında gerçek işe gidiş fotoğrafını da paylaşman çok hoş."
+    },
+    {
+      "id": "tr-holdout-166",
+      "field": "caption",
+      "text": "Sabahımı güzelleştirdi. Her zaman en rahat kombinleri buluyorsun."
+    },
+    {
+      "id": "tr-holdout-167",
+      "field": "caption",
+      "text": "Cevabın için teşekkürler! Yeni bir şey almadım, önerdiğin gibi elimdekileri yeniden kombinledim."
+    },
+    {
+      "id": "tr-holdout-168",
+      "field": "caption",
+      "text": "Çizgi ile ekoseyi bu kadar cesurca karıştırman harika."
+    },
+    {
+      "id": "tr-holdout-169",
+      "field": "caption",
+      "text": "Bot soruma cevap veren herkese kocaman teşekkürler. Tırtıklı tabanlıları aldım, hiç pişman değilim."
+    },
+    {
+      "id": "tr-holdout-170",
+      "field": "caption",
+      "text": "Tamir paylaşımların sayesinde en sevdiğim kazağı sonunda onardım. Teşekkürler!"
+    },
+    {
+      "id": "tr-holdout-171",
+      "field": "caption",
+      "text": "O mavi tonu sana çok yakışıyor."
+    },
+    {
+      "id": "tr-holdout-172",
+      "field": "caption",
+      "text": "Yağmurluğun altına ne giydiğini anlattığın için teşekkürler. Bugünkü yürüyüşte denedim, terlemeden sıcak kaldım."
+    },
+    {
+      "id": "tr-holdout-173",
+      "field": "caption",
+      "text": "Kiremit ve krem bir arada, harika."
+    },
+    {
+      "id": "tr-holdout-174",
+      "field": "caption",
+      "text": "Her paylaşımında aynı kabanı giymene bayılıyorum. İyi bir kabanın yettiğinin kanıtı."
+    },
+    {
+      "id": "tr-holdout-175",
+      "field": "caption",
+      "text": "Teşekkürler! Kolları kıvırma önerin o gömleği benim için kurtardı."
+    },
+    {
+      "id": "tr-holdout-176",
+      "field": "caption",
+      "text": "Yağmurlu günleri eğlenceli gösteriyorsun. Artık takipteyim."
+    },
+    {
+      "id": "tr-holdout-177",
+      "field": "caption",
+      "text": "O bere uzun kabanla çok uyumlu. Oranlar harika."
+    },
+    {
+      "id": "tr-holdout-178",
+      "field": "caption",
+      "text": "Ceketin fırtınada nasıl dayandığını dürüstçe anlattığın için teşekkürler."
+    },
+    {
+      "id": "tr-holdout-179",
+      "field": "caption",
+      "text": "Topluluğa hoş geldin! İlk paylaşımın çok güzel."
+    },
+    {
+      "id": "tr-holdout-180",
+      "field": "caption",
+      "text": "Akşam tahminine de bakmayı hatırlattığın için sağ ol. Dün akşam işime yaradı."
+    },
+    {
+      "id": "tr-holdout-181",
+      "field": "caption",
+      "text": "Güzel bir serme fotoğraf, bavula koyduğun her şeyi bir arada görmek çok faydalı."
+    },
+    {
+      "id": "tr-holdout-182",
+      "field": "caption",
+      "text": "Bu kombin doğrudan sonbahar notlarıma gidiyor."
+    },
+    {
+      "id": "tr-holdout-183",
+      "field": "caption",
+      "text": "Hızlı cevabın için teşekkürler, su itici sprey önerisi tam aradığım şeydi."
+    },
+    {
+      "id": "tr-holdout-184",
+      "field": "caption",
+      "text": "Herkese katılıyorum, bu görünümün yıldızı kısa ceket."
+    },
+    {
+      "id": "tr-holdout-185",
+      "field": "caption",
+      "text": "Yün kabanın altına kapüşonlu hiç aklıma gelmezdi. Bu hafta deneyeceğim."
+    },
+    {
+      "id": "tr-holdout-186",
+      "field": "caption",
+      "text": "İkinci el buluntuların hep çok iyi. O ceket sanki senin için dikilmiş."
+    },
+    {
+      "id": "tr-holdout-187",
+      "field": "caption",
+      "text": "Beden ve kalıp notlarını yazman çok yardımcı oluyor, teşekkürler."
+    },
+    {
+      "id": "tr-holdout-188",
+      "field": "caption",
+      "text": "Bu kombinin tamamı çok sıcacık ☕"
+    },
+    {
+      "id": "tr-holdout-189",
+      "field": "caption",
+      "text": "Bu topluluk için minnettarım. Çorapla ilgili küçük bir soru sordum, on iki özenli cevap geldi."
+    },
+    {
+      "id": "tr-holdout-190",
+      "field": "caption",
+      "text": "Atkının çantandaki rengi tekrar etmesi çok hoş bir detay."
+    },
+    {
+      "id": "tr-holdout-191",
+      "field": "caption",
+      "text": "İlk tamir paylaşımıma verdiğin destek için teşekkürler! Bir sonrakini şimdiden planlıyorum."
+    },
+    {
+      "id": "tr-holdout-192",
+      "field": "caption",
+      "text": "Yün bakımıyla ilgili detaylı cevabın için çok teşekkür ederim. En sevdiğim iki kazağı tam anlattığın gibi elde yıkadım, havluya sarıp suyunu aldım ve düz serip kuruttum. Hiç çekmediler, yumuşacık oldular. Yorumunu her kış için kaydettim."
+    },
+    {
+      "id": "tr-holdout-193",
+      "field": "caption",
+      "text": "Vapurla işe gidenlere soru: 40 dakika güvertede soğuk rüzgarda durup sonra bütün gün aşırı ısıtılan bir ofiste nasıl giyiniyorsunuz? Trençin altına ince kaz tüyü yelek denedim, ya dışarıda üşüyorum ya masada terliyorum."
+    },
+    {
+      "id": "tr-holdout-194",
+      "field": "caption",
+      "text": "Her gün yağmur yağan bir şehirde 5 gün: bir yağmurluk, iki kazak, üç tişört, su birikintisine dayanıklı bir çift bot."
+    },
+    {
+      "id": "tr-holdout-195",
+      "field": "caption",
+      "text": "Hafta sonu kaçamağı, 18 ile 24 derece. Keten pantolon, iki gömlek, ince bir örgü ve spor ayakkabı geliyor."
+    },
+    {
+      "id": "tr-holdout-196",
+      "field": "caption",
+      "text": "Dağ havasında bir hafta, sadece kabin bavulu. Her şey merino."
+    },
+    {
+      "id": "tr-holdout-197",
+      "field": "caption",
+      "text": "Mayo, güneş şapkası, akşam yemeğine uyan bir elbise, sandalet. Plaj çantası hazır."
+    },
+    {
+      "id": "tr-holdout-198",
+      "field": "caption",
+      "text": "İş seyahati, iki gün, 3 derece. Bavul hafif kalsın diye en kalın kabanı uçakta giyeceğim."
+    },
+    {
+      "id": "tr-holdout-199",
+      "field": "caption",
+      "text": "Bu seyahat için kapsül dolap deniyorum: her şey lacivert, beyaz ve bej, hepsi birbiriyle uyumlu."
+    },
+    {
+      "id": "tr-holdout-200",
+      "field": "caption",
+      "text": "Kendime not: ikinci bir çift ayakkabı al. Geçen sefer tek çiftim ilk gün sırılsıklam oldu."
+    },
+    {
+      "id": "tr-holdout-201",
+      "field": "caption",
+      "text": "Tahmin güneşliden fırtınalıya döndü. Sandaletler çıktı, lastik çizmeler girdi."
+    },
+    {
+      "id": "tr-holdout-202",
+      "field": "caption",
+      "text": "On gün, iki farklı iklim. Soğuk yarıda plaj kıyafetlerini poların altına giymeyi planlıyorum."
+    },
+    {
+      "id": "tr-holdout-203",
+      "field": "caption",
+      "text": "Kuzeydeki aile ziyareti için bavul hazırlığı. İlk giren termal taytlar."
+    },
+    {
+      "id": "tr-holdout-204",
+      "field": "caption",
+      "text": "Konferans için bir gecelik çanta: bir blazer, iki üst, iki gün de giyilebilecek bir pantolon."
+    },
+    {
+      "id": "tr-holdout-205",
+      "field": "caption",
+      "text": "Rulo mu katlama mı? Örgüleri rulo yapıyorum, gömlekleri katlıyorum."
+    },
+    {
+      "id": "tr-holdout-206",
+      "field": "caption",
+      "text": "Yağmurlu uzun hafta sonu için bavul listesi #hafifseyahat #kapsüldolap"
+    },
+    {
+      "id": "tr-holdout-207",
+      "field": "caption",
+      "text": "Beş üst, iki alt, bir elbise, bir hırka. Hava uslu durursa bir haftaya yeter."
+    },
+    {
+      "id": "tr-holdout-208",
+      "field": "caption",
+      "text": "Gelecek hafta sahile gidiyorum. 15 derece ve rüzgarlı deniyor, rüzgarlık da geliyor."
+    },
+    {
+      "id": "tr-holdout-209",
+      "field": "caption",
+      "text": "En hafif kaz tüyü montumu kendi cebine sıkıştırdım. Sırt çantasının köşesine sığıyor."
+    },
+    {
+      "id": "tr-holdout-210",
+      "field": "caption",
+      "text": "Kayak tatili hazırlığı: içlikler yıkandı, eldivenler bulundu, bir teki kayıp. Arama sürüyor."
+    },
+    {
+      "id": "tr-holdout-211",
+      "field": "caption",
+      "text": "Bu şehir gezisinde tek çift ayakkabı. Nötr renk, rahat bir spor ayakkabı, bana şans dileyin."
+    },
+    {
+      "id": "tr-holdout-212",
+      "field": "caption",
+      "text": "Her seferinde fazla eşya alıyorum. Bu kez her şeyi yere serip üçte birini geri çıkardım."
+    },
+    {
+      "id": "tr-holdout-213",
+      "field": "caption",
+      "text": "Nemin yüzde 80 olduğu bir yere gidiyorum. Kot olan her şey evde kalıyor."
+    },
+    {
+      "id": "tr-holdout-214",
+      "field": "caption",
+      "text": "Son akşam için bir elbiseyle doğa yürüyüşü tatili. Elbise çoraplarımdan hafif."
+    },
+    {
+      "id": "tr-holdout-215",
+      "field": "caption",
+      "text": "Sık seyahat edenden tüyo: en hantal ayakkabıyı ve kabanı uçakta giy."
+    },
+    {
+      "id": "tr-holdout-216",
+      "field": "caption",
+      "text": "Yarın gece treni, rahat katmanlar ve battaniye yerine de geçen büyük bir atkı alıyorum."
+    },
+    {
+      "id": "tr-holdout-217",
+      "field": "caption",
+      "text": "Gideceğim yerin hava durumu her gün değişiyor, küçük bir çantaya üç mevsim sığdırıyorum."
+    },
+    {
+      "id": "tr-holdout-218",
+      "field": "caption",
+      "text": "Tropiklerde aile ziyareti. İnce pamuklular, uçak için uzun kollu bir üst ve katlanabilir şapka."
+    },
+    {
+      "id": "tr-holdout-219",
+      "field": "caption",
+      "text": "Bu sefer bavul düzenleyicileri günlere göre ayırdım. Bakalım gerçekten işe yarayacak mı."
+    },
+    {
+      "id": "tr-holdout-220",
+      "field": "caption",
+      "text": "Kuru ve güneşli bir yere bir haftalık iş seyahati. Dudak kremi, güneş kremi, ince blazer, iki çift loafer."
+    },
+    {
+      "id": "tr-holdout-221",
+      "field": "caption",
+      "text": "Kirli çamaşır torbasını unutma. Islak mayo bavulda hiç hoş değil."
+    },
+    {
+      "id": "tr-holdout-222",
+      "field": "caption",
+      "text": "Geceleri serin geçecek bir kamp hafta sonu. Yün çorap, polar, bere ve ateş başı için şişme mont."
+    },
+    {
+      "id": "tr-holdout-223",
+      "field": "caption",
+      "text": "Yağmurluk dış cepte, havalimanında gerekirse hemen çıkarabileyim."
+    },
+    {
+      "id": "tr-holdout-224",
+      "field": "caption",
+      "text": "Ekimde dağ kasabası: kalın örgü, yürüyüş botu ve akşamlar için sıcacık bir bere."
+    },
+    {
+      "id": "tr-holdout-225",
+      "field": "caption",
+      "text": "Artık her seyahate bir atkı götürüyorum. Uçak, tren, plaj, akşam yemeği, her işe yarıyor."
+    },
+    {
+      "id": "tr-holdout-226",
+      "field": "caption",
+      "text": "Bu yıl bu şehre ikinci gelişim ve hâlâ fazla üst giyim koyuyorum."
+    },
+    {
+      "id": "tr-holdout-227",
+      "field": "caption",
+      "text": "Yurt dışında düğün: takım elbise askılı kılıfta, gerisi kabin bavulunda. Umarım kırışmaz."
+    },
+    {
+      "id": "tr-holdout-228",
+      "field": "caption",
+      "text": "Gelecekteki bana not: şehir tahminden sıcak, akşamlar tahminden serindi ve az kalsın evde bırakacağım hırkayı her gün giydim. Hırkayı hep al. Bir de iki çift rahat ayakkabı, bir şık bir rahat çiftten iyidir."
+    },
+    {
+      "id": "tr-holdout-229",
+      "field": "caption",
+      "text": "İkinci el dükkanında bir kahve fiyatına hırka buldum. Saf yün, deliksiz, kol boyu tam."
+    },
+    {
+      "id": "tr-holdout-230",
+      "field": "caption",
+      "text": "En sevdiğim pantolonun paçalarını terzide daralttırdım. Yepyeni gibi oldu."
+    },
+    {
+      "id": "tr-holdout-231",
+      "field": "caption",
+      "text": "Çamaşır günü tüyosu: koyu kotu ters çevirip soğuk suda yıka, asarak kurut. Rengi çok daha uzun dayanıyor."
+    },
+    {
+      "id": "tr-holdout-232",
+      "field": "caption",
+      "text": "Hava bozmadan önce kabanımın sallanan düğmesini diktim. Küçük bir zafer."
+    },
+    {
+      "id": "tr-holdout-233",
+      "field": "caption",
+      "text": "Bitpazarı ganimeti: tüvit ceket, çizgili atkı ve sadece yeni bağcık isteyen deri botlar."
+    },
+    {
+      "id": "tr-holdout-234",
+      "field": "caption",
+      "text": "Yün çorabımın topuğunu ilk kez ördüm. Güzel olmadı ama sıcak ve sağlam."
+    },
+    {
+      "id": "tr-holdout-235",
+      "field": "caption",
+      "text": "Kazakları yün şampuanıyla elde yıkayıp havlu üstünde düz kuruttum. Şimdi çayır gibi kokuyorlar."
+    },
+    {
+      "id": "tr-holdout-236",
+      "field": "caption",
+      "text": "Terzi ikinci el kabanımın kollarını kısalttı, şimdi ölçüme dikilmiş gibi oturuyor."
+    },
+    {
+      "id": "tr-holdout-237",
+      "field": "caption",
+      "text": "Yeni yağmurluk almak yerine eskisinin fermuarını değiştirttim. Bir sezon daha hazır."
+    },
+    {
+      "id": "tr-holdout-238",
+      "field": "caption",
+      "text": "Hafta sonu tamir kafesi çok güzeldi. En sevdiğim kazağın dirseklerine yama yapmama yardım ettiler."
+    },
+    {
+      "id": "tr-holdout-239",
+      "field": "caption",
+      "text": "İkinci el tüyosu: fiyata bakmadan önce dikişlere ve astara bak."
+    },
+    {
+      "id": "tr-holdout-240",
+      "field": "caption",
+      "text": "Eski pamuklu ceketimi yeniden mumladım. Mutfak tuhaf kokuyor, ceket harika görünüyor."
+    },
+    {
+      "id": "tr-holdout-241",
+      "field": "caption",
+      "text": "Botlarıma pençe yaptırdım. Ayakkabıcı en az beş kış daha gider dedi."
+    },
+    {
+      "id": "tr-holdout-242",
+      "field": "caption",
+      "text": "Çamaşır sorusu: kaz tüyü montu topaklanmadan nasıl kurutuyorsunuz? Benimki dümdüz çıktı."
+    },
+    {
+      "id": "tr-holdout-243",
+      "field": "caption",
+      "text": "Kotumun dizlerine mavi iplikle görünür yama yaptım. Sonuçtan çok memnunum."
+    },
+    {
+      "id": "tr-holdout-244",
+      "field": "caption",
+      "text": "Beyaz bez ayakkabıları yumuşak fırça ve sabunla temizledim. Neredeyse yeni gibi."
+    },
+    {
+      "id": "tr-holdout-245",
+      "field": "caption",
+      "text": "Hayır mağazasından bulma: kol ağızları biraz yıpranmış uzun gri kaban. Kol ağızlarını çevirttim, tertemiz duruyor."
+    },
+    {
+      "id": "tr-holdout-246",
+      "field": "caption",
+      "text": "Yumuşak yeşil tonda keten gömlek buldum. Giymeden önce daha da yumuşasın diye iki kez yıkayacağım."
+    },
+    {
+      "id": "tr-holdout-247",
+      "field": "caption",
+      "text": "Vintage bir pantolonun belini daralttım. İlk kez kendim yaptım, iki akşam sürdü."
+    },
+    {
+      "id": "tr-holdout-248",
+      "field": "caption",
+      "text": "Tüy toplama tarağı bu yılın en iyi alışverişi. Kazaklar yeniden yeni gibi."
+    },
+    {
+      "id": "tr-holdout-249",
+      "field": "caption",
+      "text": "Kırışık gömleği duş alırken banyoda astım. Eski bir yöntem ama hâlâ işe yarıyor."
+    },
+    {
+      "id": "tr-holdout-250",
+      "field": "caption",
+      "text": "Kaban cebinin astarını birkaç el dikişiyle onardım. Artık anahtar kaybı yok."
+    },
+    {
+      "id": "tr-holdout-251",
+      "field": "caption",
+      "text": "İkinci el lastik çizme, neredeyse hiç giyilmemiş, tam numaram. Tam da yağmurlu haftaya denk geldi."
+    },
+    {
+      "id": "tr-holdout-252",
+      "field": "caption",
+      "text": "Bugün kendi pantolonumun paçasını kıvırıp diktim, bir video ve bir sürü toplu iğne yardımıyla."
+    },
+    {
+      "id": "tr-holdout-253",
+      "field": "caption",
+      "text": "Çamaşır dağı fethedildi. Her şey kumaşa göre ayrıldı, hassaslar file torbada."
+    },
+    {
+      "id": "tr-holdout-254",
+      "field": "caption",
+      "text": "Terzi tüyosu: altına kalın kazak giyeceksen omuzlarda biraz pay iste."
+    },
+    {
+      "id": "tr-holdout-255",
+      "field": "caption",
+      "text": "Eldivenimdeki deliği zıt renk iplikle onardım. Şimdi bilerek yapılmış gibi duruyor."
+    },
+    {
+      "id": "tr-holdout-256",
+      "field": "caption",
+      "text": "Yün kabanımı ilk kez evde, çok dikkatli yıkadım ve sorunsuz çıktı. Rahatladım."
+    },
+    {
+      "id": "tr-holdout-257",
+      "field": "caption",
+      "text": "Yağmur sezonu öncesi topuklularıma yeni topuk lastiği taktırdım. Islak kaldırımda çok daha iyi tutuyor."
+    },
+    {
+      "id": "tr-holdout-258",
+      "field": "caption",
+      "text": "İkinci el dükkanında bugün örgü bolluğu vardı. Sadece birini aldım, kendimle gurur duyuyorum."
+    },
+    {
+      "id": "tr-holdout-259",
+      "field": "caption",
+      "text": "Babamın eski gömleğinin yakasını onardım, şimdi her hafta sonu ben giyiyorum."
+    },
+    {
+      "id": "tr-holdout-260",
+      "field": "caption",
+      "text": "Deri botlardaki tuz lekelerini biraz sirkeli suyla temizledim. Her seferinde işe yarıyor."
+    },
+    {
+      "id": "tr-holdout-261",
+      "field": "caption",
+      "text": "İkinci el blazerın düğmelerini boynuz düğmelerle değiştirdim, çok daha kaliteli görünüyor."
+    },
+    {
+      "id": "tr-holdout-262",
+      "field": "caption",
+      "text": "Solmuş siyah tişörtü yeniden boyadım. Küçük bir zahmet, büyük bir fark."
+    },
+    {
+      "id": "tr-holdout-263",
+      "field": "caption",
+      "text": "Pazar günü haftanın gömleklerini ütüleyip yağmuru dinledim. Garip bir şekilde rahatlatıcı."
+    },
+    {
+      "id": "tr-holdout-264",
+      "field": "caption",
+      "text": "Tüyo: yağmurlukları ters çevirip asın, astar nemli kalmasın."
+    },
+    {
+      "id": "tr-holdout-265",
+      "field": "caption",
+      "text": "Terzi eski yün eteğimin paçasını açtı, şimdi tam kışlık boyda."
+    },
+    {
+      "id": "tr-holdout-266",
+      "field": "caption",
+      "text": "Tozlu bir haftadan sonra yün kabanımı fırçaladım. Tüy fırçası ve biraz sabır."
+    },
+    {
+      "id": "tr-holdout-267",
+      "field": "caption",
+      "text": "Bitpazarından eskimiş bir deri çanta aldım, temizleyip bakımını yaptım. Harika oldu."
+    },
+    {
+      "id": "tr-holdout-268",
+      "field": "caption",
+      "text": "Hırkamdaki kaçan ilmeği tığla içeri çektim. Artık görünmüyor."
+    },
+    {
+      "id": "tr-holdout-269",
+      "field": "caption",
+      "text": "Ayakkabıcı yeni botlarımın burnunu biraz genişletti. Gece ile gündüz kadar fark var."
+    },
+    {
+      "id": "tr-holdout-270",
+      "field": "caption",
+      "text": "Bavul için blazerı nasıl katlıyorsunuz? Benimki hep sırtında bir kırışıkla çıkıyor."
+    },
+    {
+      "id": "tr-holdout-271",
+      "field": "caption",
+      "text": "Mumlu ceket yıkanır mı? Son yürüyüşten kalma bir çamur lekesi var."
+    },
+    {
+      "id": "tr-holdout-272",
+      "field": "caption",
+      "text": "Mevsimlik dolap değişimi tamam! Yazlıklar yatak altı kutularına, kışlık örgüler raflara döndü."
+    },
+    {
+      "id": "tr-holdout-273",
+      "field": "caption",
+      "text": "Bugün botları bodrumdan çıkardım. Sonbaharın geldiği böyle anlaşılıyor."
+    },
+    {
+      "id": "tr-holdout-274",
+      "field": "caption",
+      "text": "Ketenleri lavanta keseleriyle gelecek yaza kadar kaldırdım. Mayısta görüşürüz."
+    },
+    {
+      "id": "tr-holdout-275",
+      "field": "caption",
+      "text": "İlkbahar değişimi: kalın kabanlar kuru temizlemeye, ince ceketler askılara."
+    },
+    {
+      "id": "tr-holdout-276",
+      "field": "caption",
+      "text": "Kazak kutusunu açtım, unuttuğum üç kazak çıktı. Alışverişin en güzel hali."
+    },
+    {
+      "id": "tr-holdout-277",
+      "field": "caption",
+      "text": "Pazen nevresimi pamukluyla, yün çorapları ince olanlarla değiştirdim. Bahar resmen geldi."
+    },
+    {
+      "id": "tr-holdout-278",
+      "field": "caption",
+      "text": "Dolap değişiminin yarısındayım, yatak kıyafetle kaplı. Biri atıştırmalık getirsin."
+    },
+    {
+      "id": "tr-holdout-279",
+      "field": "caption",
+      "text": "Mevsim değişiminde beş parça ayırdım, gerisini tuttum. Az da olsa ilerleme."
+    },
+    {
+      "id": "tr-holdout-280",
+      "field": "caption",
+      "text": "Sonbahar dolap düzeni: bu kez her şeyi renge göre dizdim, kombin planlamak çok daha kolay."
+    },
+    {
+      "id": "tr-holdout-281",
+      "field": "caption",
+      "text": "Mevsime göre dolap değiştirmek en sevdiğim yenilenme. Bedava yeni kıyafet almak gibi."
+    },
+    {
+      "id": "tr-holdout-282",
+      "field": "caption",
+      "text": "Sandaletler üst rafa, botlar aşağıya. Kış düzeni tamamlandı."
+    },
+    {
+      "id": "tr-holdout-283",
+      "field": "caption",
+      "text": "Yaz şapkalarını gelecek yıla kadar kaldırma vakti. Önce hasır şapkayla son bir güneşli yürüyüş."
+    },
+    {
+      "id": "tr-holdout-284",
+      "field": "caption",
+      "text": "Bu yıl kazak kutularında sedir blokları var. Umarım bu sefer güveler uzak durur."
+    },
+    {
+      "id": "tr-holdout-285",
+      "field": "caption",
+      "text": "Yarım mevsim değişimi: birkaç yazlık elbise dışarıda kalıyor, külotlu çorap ve hırkayla oluyorlar."
+    },
+    {
+      "id": "tr-holdout-286",
+      "field": "caption",
+      "text": "İlk serin sabah demek, trençkotun dolabın arkasından önüne geçmesi demek."
+    },
+    {
+      "id": "tr-holdout-287",
+      "field": "caption",
+      "text": "Şişme mont kaldırıldı, yelek serin bahar akşamları için dışarıda kaldı."
+    },
+    {
+      "id": "tr-holdout-288",
+      "field": "caption",
+      "text": "Kışlıkları kaldırmadan önce her şeyi çıkarıp denedim ve bağış yığını yaptım."
+    },
+    {
+      "id": "tr-holdout-289",
+      "field": "caption",
+      "text": "Sonbahar değişimi hatırlatması: kaldırmadan önce cepleri kontrol edin. Eski bir fiş ve ağustostan kalma kum buldum."
+    },
+    {
+      "id": "tr-holdout-290",
+      "field": "caption",
+      "text": "Bütün kış atkılarını kaldırmadan önce yıkıyorum. Onlar da temiz bir başlangıcı hak ediyor."
+    },
+    {
+      "id": "tr-holdout-291",
+      "field": "caption",
+      "text": "Mevsim değişimi ama yavaş yavaş. Hava kesin karar verene kadar her seferinde birkaç kalın parça."
+    },
+    {
+      "id": "tr-holdout-292",
+      "field": "caption",
+      "text": "Bugün yağmur kıyafetlerini geri getirdim. Şemsiyelik resmen yine dolu."
+    },
+    {
+      "id": "tr-holdout-293",
+      "field": "caption",
+      "text": "Bu akşam dolap değişimi: ketenler üst rafa, kadifeler aşağı."
+    },
+    {
+      "id": "tr-holdout-294",
+      "field": "caption",
+      "text": "Yazlık bez çantayı yağmura dayanıklı deri çantayla değiştirdim. Küçük bir mevsim ritüeli."
+    },
+    {
+      "id": "tr-holdout-295",
+      "field": "caption",
+      "text": "Hava 7 derece ve iyi eldivenlerimi geçen kışın kaban cebinde buldum. Değişim tamamlandı."
+    },
+    {
+      "id": "tr-holdout-296",
+      "field": "caption",
+      "text": "Kalın kazaklar vakumlu torbalara giriyor. Neredeyse yok oluyorlar, sihir gibi."
+    },
+    {
+      "id": "tr-holdout-297",
+      "field": "caption",
+      "text": "Bahar geldi: yün çoraplar yıkanıp katlanıyor ve kasıma kadar üst çekmeceye kalkıyor."
+    },
+    {
+      "id": "tr-holdout-298",
+      "field": "caption",
+      "text": "Uzun kollu tişörtler geri döndü. Yaz resmen bitti."
+    },
+    {
+      "id": "tr-holdout-299",
+      "field": "caption",
+      "text": "Sabahları bir hafta boyunca 10 derecenin üstünde kalınca dolabı değiştiriyorum. Her yıl işe yarıyor."
+    },
+    {
+      "id": "tr-holdout-300",
+      "field": "caption",
+      "text": "İnce yağmurluk yeniden kapının yanındaki askıda. Kalın olan depoya gidiyor."
+    },
+    {
+      "id": "tr-holdout-301",
+      "field": "caption",
+      "text": "Bütün kazakları çıkardım ve altı tane gri kazağım olduğunu fark ettim. Bu hafta her gün farklı biri."
+    },
+    {
+      "id": "tr-holdout-302",
+      "field": "caption",
+      "text": "Kışlık kabanlar kalktı ama atkı kalıyor. Burada bahar akşamları hâlâ serin."
+    },
+    {
+      "id": "tr-holdout-303",
+      "field": "caption",
+      "text": "Rahat giyim sezonu geri döndü. Kalın çoraplar, bol pantolon, oversize örgü. Bayılıyorum."
+    },
+    {
+      "id": "tr-holdout-304",
+      "field": "caption",
+      "text": "İlk karda yürüyüş. Örgü bere, tek parmaklı eldiven, en sıcak kabanım."
+    },
+    {
+      "id": "tr-holdout-305",
+      "field": "caption",
+      "text": "Küçük dolap, büyük planlar. Dışarıda aynı anda sadece 30 parça, gerisi kendi mevsimini bekliyor."
+    },
+    {
+      "id": "tr-holdout-306",
+      "field": "caption",
+      "text": "Sonbahar öncesi son sıcak hafta sonu. Bütün yaz favorilerini bir kez daha giyiyorum."
+    },
+    {
+      "id": "tr-holdout-307",
+      "field": "caption",
+      "text": "Uygulamada kış kapsülümü güncelledim: 4 örgü, 3 pantolon, 2 kaban, 2 çift bot."
+    },
+    {
+      "id": "tr-holdout-308",
+      "field": "caption",
+      "text": "Sevgili topluluk, sonunda yağmurluk kararını vermeme yardım ettiğiniz için teşekkürler. İki kez test edildi bile."
+    },
+    {
+      "id": "tr-holdout-309",
+      "field": "caption",
+      "text": "Yazlık elbiseleri kaldırmadan önce cep eklesin diye terziye götürdüm. Gelecek yazki ben çok sevinecek."
+    },
+    {
+      "id": "tr-holdout-310",
+      "field": "caption",
+      "text": "Açıkçası yağmurlu havanın en güzel yanı en sevdiğim botları giyebilmek."
+    },
+    {
+      "id": "tr-holdout-311",
+      "field": "caption",
+      "text": "Pazar günü kız kardeşimle ikinci el turu. Tamamen tesadüfen artık aynı kabanlarımız var."
+    },
+    {
+      "id": "tr-holdout-312",
+      "field": "caption",
+      "text": "Bu vintage yün kabanın ne kadar sıcak tuttuğuna inanamıyorum. Geçen bahar üç kuruşa almıştım."
+    },
+    {
+      "id": "tr-holdout-313",
+      "field": "caption",
+      "text": "Bugün öğrendim: rüzgar soğutması termometredeki rakamdan daha önemli."
+    },
+    {
+      "id": "tr-holdout-314",
+      "field": "caption",
+      "text": "Krem kazağı bu sezon ilk kez giydim ve hemen üstüne kahve damladı. İşten önce leke temizliği."
+    },
+    {
+      "id": "tr-holdout-315",
+      "field": "caption",
+      "text": "Geç kalmıştım, askıdaki ilk kabanı kaptım. Neyse ki su geçirmez olanmış."
+    },
+    {
+      "id": "tr-holdout-316",
+      "field": "altText",
+      "text": "Sandalyede duran kiremit rengi yün atkının yakın çekimi."
+    },
+    {
+      "id": "tr-holdout-317",
+      "field": "altText",
+      "text": "Lacivert kapüşonlu ve kot giyilmiş ayna fotoğrafı."
+    },
+    {
+      "id": "tr-holdout-318",
+      "field": "altText",
+      "text": "Beyaz tişört ve bej şort serme fotoğrafı."
+    },
+    {
+      "id": "tr-holdout-319",
+      "field": "altText",
+      "text": "Püsküllenmiş bir kot paçasının yakın çekimi."
+    },
+    {
+      "id": "tr-holdout-320",
+      "field": "altText",
+      "text": "Ahşap askıda asılı duran bej bir trençkot."
+    },
+    {
+      "id": "tr-holdout-321",
+      "field": "altText",
+      "text": "Kırmızı şemsiye altındaki bir kişinin sokak fotoğrafı."
+    },
+    {
+      "id": "tr-holdout-322",
+      "field": "altText",
+      "text": "Halı üzerinde kahverengi yün çoraplar, yukarıdan."
+    },
+    {
+      "id": "tr-holdout-323",
+      "field": "altText",
+      "text": "Yağmurlu bir meydanın karşısından çekilmiş sokak fotoğrafı: uzun haki yağmurluk, bol antrasit pantolon ve siyah bot giymiş bir kişi, elinde şemsiye ve kağıt poşetle bir kafenin önünden geçiyor."
+    },
+    {
+      "id": "tr-holdout-324",
+      "field": "altText",
+      "text": "Keten çarşaf üzerinde bir haftalık seyahat kıyafetleri: dört üst, iki pantolon, bir örgü elbise, ince bir hırka, beyaz spor ayakkabı ve kahverengi sandalet."
+    },
+    {
+      "id": "tr-holdout-325",
+      "field": "altText",
+      "text": "Aydınlık bir antrede krem saç örgü kazak, düz kesim koyu kot ve açık kahve bağcıklı bot giymiş, omzunda bez çanta olan bir kişinin ayna fotoğrafı."
+    },
+    {
+      "id": "tr-holdout-326",
+      "field": "altText",
+      "text": "Ütü masasında eskimiş lacivert yün kabanın yeni onarılmış cep dikişinin yakın çekimi, yanında iğnelik ve aynı renkte bir makara iplik."
+    },
+    {
+      "id": "tr-holdout-327",
+      "field": "altText",
+      "text": "Mevsim değişimi sırasında açık dolabın yukarıdan görünümü: yazlık elbiseler yerdeki kutuya katlanmış, kalın kazaklar üst rafa geri diziliyor."
+    },
+    {
+      "id": "tr-holdout-328",
+      "field": "altText",
+      "text": "Karlı bir sabah sokak fotoğrafı: kapüşonlu siyah kapitone parka, gri örgü atkı, tek parmaklı eldiven ve uzun su geçirmez bot giymiş bir kişi kaldırımdan iniyor."
+    },
+    {
+      "id": "tr-holdout-329",
+      "field": "altText",
+      "text": "Islak paspas üzerinde yan yana iki çift ayakkabı: solda çamurlu lastik çizmeler, sağda temiz kahverengi deri loaferlar, yerde yağmur damlaları."
+    },
+    {
+      "id": "tr-holdout-330",
+      "field": "altText",
+      "text": "Ahşap masada ikinci el buluntular: tüvit ceket, çizgili örgü, deri kemer ve süet botlar, her birinde küçük kağıt fiyat etiketi."
+    },
+    {
+      "id": "tr-holdout-331",
+      "field": "altText",
+      "text": "Ahşap zemin üzerinde lacivert yün kaban, gri örgü kazak, koyu kot ve kahverengi deri botlardan oluşan serme fotoğraf."
+    },
+    {
+      "id": "tr-holdout-332",
+      "field": "altText",
+      "text": "Koridorda uzun deve tüyü kaban ve beyaz spor ayakkabı giymiş, elinde telefon tutan bir kişinin ayna fotoğrafı."
+    },
+    {
+      "id": "tr-holdout-333",
+      "field": "altText",
+      "text": "Gri kaldırımda sığ bir su birikintisinde duran siyah lastik çizmelerin yakın çekimi."
+    },
+    {
+      "id": "tr-holdout-334",
+      "field": "altText",
+      "text": "Sarı yağmurluk ve kot giymiş bir kişinin vitrinlerin önünden geçerken çekilmiş sokak fotoğrafı."
+    },
+    {
+      "id": "tr-holdout-335",
+      "field": "altText",
+      "text": "Hasır şapkanın yanında yatak üzerine üst üste katlanmış beyaz, adaçayı yeşili ve kum rengi keten gömlekler."
+    },
+    {
+      "id": "tr-holdout-336",
+      "field": "altText",
+      "text": "Saç örgü desenli ve küçük ahşap düğmeli kalın krem kazağın yakın çekimi."
+    },
+    {
+      "id": "tr-holdout-337",
+      "field": "altText",
+      "text": "Paspasın üzerinde uzun yeşil lastik çizmelerin yanında duran kahverengi süet makosenler."
+    },
+    {
+      "id": "tr-holdout-338",
+      "field": "altText",
+      "text": "İçinde rulo tişörtler, katlanmış blazer, torbada spor ayakkabı ve makyaj çantası olan açık bavul."
+    },
+    {
+      "id": "tr-holdout-339",
+      "field": "altText",
+      "text": "Kapüşonu başında koyu parka giymiş, köprüde duran bir kişi, arka planda hafif yağmur."
+    },
+    {
+      "id": "tr-holdout-340",
+      "field": "altText",
+      "text": "Siyah balıkçı yaka üzerine gri oversize blazer ve bol paça pantolon giyilmiş ayna selfiesi."
+    },
+    {
+      "id": "tr-holdout-341",
+      "field": "altText",
+      "text": "Beyaz çarşaf üzerinde çizgili tişört, beyaz kot, bez ayakkabı ve yuvarlak güneş gözlüğü serilmiş."
+    },
+    {
+      "id": "tr-holdout-342",
+      "field": "altText",
+      "text": "Lacivert yün kabana iğne ve koyu iplikle düğme diken ellerin yakın çekimi."
+    },
+    {
+      "id": "tr-holdout-343",
+      "field": "altText",
+      "text": "Ayakkabı tamircisinin tezgahında yeni tabanlı, eskimiş kahverengi deri botlar."
+    },
+    {
+      "id": "tr-holdout-344",
+      "field": "altText",
+      "text": "Islak park halindeki arabaların yanından geçen, yağmurluklu ve paçaları kıvrık bir bisikletlinin sokak fotoğrafı."
+    },
+    {
+      "id": "tr-holdout-345",
+      "field": "altText",
+      "text": "Solda kabanlar, sağda ince ceketler olmak üzere renklerine göre dizilmiş bir askılık."
+    },
+    {
+      "id": "tr-holdout-346",
+      "field": "altText",
+      "text": "Çapraz desende mavi iplikle görünür şekilde yamanmış bir kot diz kısmının yakın çekimi."
+    },
+    {
+      "id": "tr-holdout-347",
+      "field": "altText",
+      "text": "Midi elbise, külotlu çorap, bilek bot ve kısa örgü hırka giymiş bir kişinin ayna fotoğrafı."
+    },
+    {
+      "id": "tr-holdout-348",
+      "field": "altText",
+      "text": "Kış aksesuarları serme fotoğrafı: kırmızı bere, gri eldiven, ekose atkı ve yün çoraplar."
+    },
+    {
+      "id": "tr-holdout-349",
+      "field": "altText",
+      "text": "İkinci el tüvit bir ceketin etiketi ve iç dikişinin yakın çekimi."
+    },
+    {
+      "id": "tr-holdout-350",
+      "field": "altText",
+      "text": "Karlı bir sokakta uzun siyah şişme mont, örgü bere ve tırtıklı tabanlı bot giymiş bir kişi."
+    },
+    {
+      "id": "tr-holdout-351",
+      "field": "altText",
+      "text": "Camında yağmur damlaları olan pencerenin altında kaloriferin üstünde kuruyan iki çift spor ayakkabı."
+    },
+    {
+      "id": "tr-holdout-352",
+      "field": "altText",
+      "text": "Düzgünce katlanmış havlu ve kazaklarla dolu bir çamaşır sepetinin yukarıdan görünümü."
+    },
+    {
+      "id": "tr-holdout-353",
+      "field": "altText",
+      "text": "Kadife yakalı mumlu pamuklu ceketin kumaş parlaklığını gösteren yakın çekim."
+    },
+    {
+      "id": "tr-holdout-354",
+      "field": "altText",
+      "text": "Aydınlık bir yatak odasında kısa kollu keten gömlek ve açık renk chino giymiş bir kişinin ayna fotoğrafı."
+    },
+    {
+      "id": "tr-holdout-355",
+      "field": "altText",
+      "text": "Seyahat kapsülü serme fotoğrafı: üç üst, iki pantolon, bir elbise, bir hırka ve iki çift ayakkabı."
+    },
+    {
+      "id": "tr-holdout-356",
+      "field": "altText",
+      "text": "Beyaz bez ayakkabıların yumuşak fırça ve sabunlu suyla temizlenişinin yakın çekimi."
+    },
+    {
+      "id": "tr-holdout-357",
+      "field": "altText",
+      "text": "Bej trençkot giymiş, şeffaf şemsiye tutan ve otobüs durağında bekleyen bir kişi."
+    },
+    {
+      "id": "tr-holdout-358",
+      "field": "altText",
+      "text": "Kollarında hâlâ su damlaları olan, kapıya asılı yeşil bir yağmurluk."
+    },
+    {
+      "id": "tr-holdout-359",
+      "field": "altText",
+      "text": "Yaz kombini serme fotoğrafı: çiçekli elbise, örme sandalet, hasır çanta ve güneş şapkası."
+    },
+    {
+      "id": "tr-holdout-360",
+      "field": "altText",
+      "text": "Burunlarında biraz kar olan siyah chelsea botların yakın çekimi."
+    },
+    {
+      "id": "tr-holdout-361",
+      "field": "altText",
+      "text": "Yaya geçidinde bekleyen, haki kapitone ceket ve gri pantolon giymiş bir kişinin sokak fotoğrafı."
+    },
+    {
+      "id": "tr-holdout-362",
+      "field": "altText",
+      "text": "Dolap rafında şeffaf saklama kutularında üst üste katlanmış yün kazaklar."
+    },
+    {
+      "id": "tr-holdout-363",
+      "field": "altText",
+      "text": "Lacivert bir pantolonun paçası üzerinde terzi mezurasının yakın çekimi."
+    },
+    {
+      "id": "tr-holdout-364",
+      "field": "altText",
+      "text": "Antrasit yün kabanın altına kapüşonlu giymiş, sırt çantalı bir kişinin ayna fotoğrafı."
+    },
+    {
+      "id": "tr-holdout-365",
+      "field": "altText",
+      "text": "Yağmur ekipmanı serme fotoğrafı: lastik çizme, katlanabilir yağmurluk, cep şemsiyesi ve örgü bere."
+    },
+    {
+      "id": "tr-holdout-366",
+      "field": "altText",
+      "text": "Koyu ahşap masada duran hardal sarısı bir hırkanın ribanalı kol ağzının yakın çekimi."
+    },
+    {
+      "id": "tr-holdout-367",
+      "field": "altText",
+      "text": "Rüzgarlı bir sahil yolunda balıkçı kazağı ve koyu kot giymiş yürüyen bir kişi."
+    },
+    {
+      "id": "tr-holdout-368",
+      "field": "altText",
+      "text": "Askıda yazlık elbiseler ve kılıflarda kışlık kabanlar görünen açık bir dolap."
+    },
+    {
+      "id": "tr-holdout-369",
+      "field": "altText",
+      "text": "Bir parmağında örülerek onarılmış dikiş olan kahverengi deri eldivenlerin yakın çekimi."
+    },
+    {
+      "id": "tr-holdout-370",
+      "field": "altText",
+      "text": "Okul öncesi kırmızı yağmurluk ve desenli lastik çizme giymiş bir çocuğun ayna fotoğrafı."
+    },
+    {
+      "id": "tr-holdout-371",
+      "field": "altText",
+      "text": "İş seyahati serme fotoğrafı: gri ceket, iki gömlek, kravat ve deri ayakkabılar."
+    },
+    {
+      "id": "tr-holdout-372",
+      "field": "altText",
+      "text": "Pirinç düğmeli, yumuşak kiremit kahverengi kadife ceketin yakın çekimi."
+    },
+    {
+      "id": "tr-holdout-373",
+      "field": "altText",
+      "text": "Arnavut kaldırımlı dar bir sokakta aynı lacivert kabanları giymiş iki kişinin sokak fotoğrafı."
+    },
+    {
+      "id": "tr-holdout-374",
+      "field": "altText",
+      "text": "Kapının yanındaki ayakkabılıkta yan yana duran bir çift sandalet ve bir çift bot."
+    },
+    {
+      "id": "tr-holdout-375",
+      "field": "altText",
+      "text": "Kenarı kıvrık, melanj gri örgü berenin yakın çekimi."
+    },
+    {
+      "id": "tr-holdout-376",
+      "field": "altText",
+      "text": "Dar bir koridorda beyaz tişört, kot ceket ve siyah kot giymiş bir kişinin ayna fotoğrafı."
+    },
+    {
+      "id": "tr-holdout-377",
+      "field": "altText",
+      "text": "Kayak tatili serme fotoğrafı: içlikler, kalın çoraplar, eldivenler, boyunluk ve kayak gözlüğü."
+    },
+    {
+      "id": "tr-holdout-378",
+      "field": "altText",
+      "text": "Deve tüyü kabanın yakasına sarılmış çizgili atkının yakın çekimi."
+    },
+    {
+      "id": "tr-holdout-379",
+      "field": "altText",
+      "text": "Çamurlu bir patikada mumlu ceket ve lastik çizmeyle köpek gezdiren bir kişi."
+    },
+    {
+      "id": "tr-holdout-380",
+      "field": "altText",
+      "text": "Otel dolabının kapısına asılı takım elbise kılıfı ve yanında katlı bir şemsiye."
+    },
+    {
+      "id": "tr-holdout-381",
+      "field": "altText",
+      "text": "Sabah ışığında doğal kırışıkları görünen keten gömlek kolunun yakın çekimi."
+    },
+    {
+      "id": "tr-holdout-382",
+      "field": "altText",
+      "text": "İkinci el buluntular serme fotoğrafı: tüvit ceket, yün atkı ve kahverengi deri botlar."
+    },
+    {
+      "id": "tr-holdout-383",
+      "field": "altText",
+      "text": "Pliseli midi etek, içine sokulmuş örgü ve loafer giymiş bir kişinin ayna fotoğrafı."
+    },
+    {
+      "id": "tr-holdout-384",
+      "field": "altText",
+      "text": "Koyu deri botlardaki tuz lekeleri, yanında bir bez ve küçük bir kase su."
+    },
+    {
+      "id": "tr-holdout-385",
+      "field": "altText",
+      "text": "Kar yağarken parlak turuncu bere ve siyah parka giymiş bir kişinin sokak fotoğrafı."
+    },
+    {
+      "id": "tr-holdout-386",
+      "field": "altText",
+      "text": "Dolap askısına sıralanmış yeni ütülenmiş gömlekler."
+    },
+    {
+      "id": "tr-holdout-387",
+      "field": "altText",
+      "text": "Kurutma makinesinin önünde kabartılan kaz tüyü montun yakın çekimi."
+    },
+    {
+      "id": "tr-holdout-388",
+      "field": "altText",
+      "text": "Plaj hafta sonu serme fotoğrafı: deniz şortu, keten gömlek, parmak arası terlik ve havlu."
+    },
+    {
+      "id": "tr-holdout-389",
+      "field": "altText",
+      "text": "Gri gökyüzü altında parkta bankta oturan, yeşil trençkot ve beyaz spor ayakkabılı bir kişi."
+    },
+    {
+      "id": "tr-holdout-390",
+      "field": "altText",
+      "text": "Zıt renkte yuvarlak örgü yamayla onarılmış kazak dirseğinin yakın çekimi."
+    },
+    {
+      "id": "tr-holdout-391",
+      "field": "altText",
+      "text": "Evde termal tayt, oversize kazak ve yün çorap giymiş bir kişinin ayna fotoğrafı."
+    },
+    {
+      "id": "tr-holdout-392",
+      "field": "altText",
+      "text": "Duvar askısında iki kaban: ince lacivert bir yağmurluk ve kalın kahverengi bir yün kaban."
+    },
+    {
+      "id": "tr-holdout-393",
+      "field": "altText",
+      "text": "Ahşap zemin üzerinde yeni lastik topuk takılmış loaferların yakın çekimi."
+    },
+    {
+      "id": "tr-holdout-394",
+      "field": "altText",
+      "text": "Sonbahar kombini serme fotoğrafı: bordo kazak, haki pantolon, kahverengi kemer ve süet botlar."
+    },
+    {
+      "id": "tr-holdout-395",
+      "field": "altText",
+      "text": "Alacakaranlıkta ıslak bir caddeden geçen, sırt çantalı ve yağmur pançolu bir kişinin sokak fotoğrafı."
+    },
+    {
+      "id": "tr-holdout-396",
+      "field": "altText",
+      "text": "Örgü kazağın cebinde duran katlanmış güneş gözlüğünün yakın çekimi."
+    },
+    {
+      "id": "tr-holdout-397",
+      "field": "altText",
+      "text": "Kısa şişme mont, yüksek bel kot ve beyaz spor ayakkabı giymiş bir kişinin ayna fotoğrafı."
+    },
+    {
+      "id": "tr-holdout-398",
+      "field": "altText",
+      "text": "Farklı renklerde bavul düzenleyicilerine rulo yapılmış kıyafetlerle dolu küçük bir bavul."
+    },
+    {
+      "id": "tr-holdout-399",
+      "field": "altText",
+      "text": "Bahçe kapısının yanında tabanları çamurlu yeşil lastik çizmelerin yakın çekimi."
+    },
+    {
+      "id": "tr-holdout-400",
+      "field": "altText",
+      "text": "Ofis kombini serme fotoğrafı: krem bluz, lacivert pantolon, kalın topuklu ayakkabı ve omuz çantası."
+    },
+    {
+      "id": "tr-holdout-401",
+      "field": "altText",
+      "text": "Kırmızı tuğla duvarın önünde uzun örgü hırka ve bol pantolon giymiş bir kişi."
+    },
+    {
+      "id": "tr-holdout-402",
+      "field": "altText",
+      "text": "Gri blazerın önüne dikilmiş boynuz düğmelerin yakın çekimi."
+    },
+    {
+      "id": "tr-holdout-403",
+      "field": "altText",
+      "text": "Üstünde lavanta kesesi olan saklama kutusuna yerleştirilen katlanmış yazlık kıyafetler."
+    },
+    {
+      "id": "tr-holdout-404",
+      "field": "altText",
+      "text": "Kapitone yelek ve uzun kollu tişörtle market poşetleri taşıyan bir kişinin sokak fotoğrafı."
+    },
+    {
+      "id": "tr-holdout-405",
+      "field": "altText",
+      "text": "File astarı görünen bir yağmurluk kapüşonunun iç kısmının yakın çekimi."
+    },
+    {
+      "id": "tr-holdout-406",
+      "field": "altText",
+      "text": "İşe çıkmadan önce kot gömlek, bej pantolon ve kahverengi bot giymiş bir kişinin ayna fotoğrafı."
+    },
+    {
+      "id": "tr-holdout-407",
+      "field": "altText",
+      "text": "Kamp katmanları serme fotoğrafı: polar, yürüyüş çorabı, bere ve hafif kaz tüyü mont."
+    },
+    {
+      "id": "tr-holdout-408",
+      "field": "altText",
+      "text": "Taşlı bir patikada bağcıkları bağlı yürüyüş botlarının yakın çekimi."
+    },
+    {
+      "id": "tr-holdout-409",
+      "field": "altText",
+      "text": "Uzun atkı, gri kaban ve siyah bilek bot giymiş, tren peronunda bekleyen bir kişi."
+    },
+    {
+      "id": "tr-holdout-410",
+      "field": "altText",
+      "text": "Bakımı yapılmış tokalı askılı vintage deri çantanın yakın çekimi."
+    },
+    {
+      "id": "tr-holdout-411",
+      "field": "altText",
+      "text": "Pencere kenarındaki ahşap kurutmalıkta çoraplar, kazaklar ve bir pantolon."
+    },
+    {
+      "id": "tr-holdout-412",
+      "field": "altText",
+      "text": "Kısa kollu elbise, ince hırka ve sandalet giymiş bir kişinin ayna fotoğrafı."
+    },
+    {
+      "id": "tr-holdout-413",
+      "field": "altText",
+      "text": "Yağmurlu gün seti serme fotoğrafı: katlanır şemsiye, şapka, atkı ve bir çift yedek çorap."
+    },
+    {
+      "id": "tr-holdout-414",
+      "field": "altText",
+      "text": "Beyaz çorapların üstünde bilekten kıvrılmış kahverengi kadife pantolonun yakın çekimi."
+    },
+    {
+      "id": "tr-holdout-415",
+      "field": "altText",
+      "text": "Ağaçların altında yürüyen, kemeri bağlı krem trençkotlu bir kişinin sokak fotoğrafı."
+    },
+    {
+      "id": "tr-holdout-416",
+      "field": "altText",
+      "text": "Omzunda su damlaları boncuklanan lacivert yağmurluğun yakın çekimi."
+    },
+    {
+      "id": "tr-holdout-417",
+      "field": "altText",
+      "text": "Üç çift kış botu, bir çift loafer ve bir çift terlik olan ayakkabılık."
+    },
+    {
+      "id": "tr-holdout-418",
+      "field": "altText",
+      "text": "İkinci el dükkanının kabininde blazer deneyen bir kişinin ayna fotoğrafı."
+    },
+    {
+      "id": "tr-holdout-419",
+      "field": "altText",
+      "text": "Yün aksesuarlar serme fotoğrafı: örgü eldiven, fitilli bere ve uzun saç örgü desenli atkı."
+    },
+    {
+      "id": "tr-holdout-420",
+      "field": "altText",
+      "text": "Gri yün çorabın sarı iplikle örülerek onarılmış topuğunun yakın çekimi."
+    }
+  ]
+}

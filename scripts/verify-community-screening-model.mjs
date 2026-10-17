@@ -30,10 +30,14 @@ const TFJS_ALIAS_TARGET = '@tensorflow/tfjs-core'
 // supply-chain checks that disagree about what counts as drift are worse than one.
 // Adding a threshold means editing both files and this list together, on purpose.
 const MIRRORED_THRESHOLD_KEYS = [
-  'neutralPassMinimum',
+  'safeClasses',
+  'safeMassMinimum',
   'unsafeAggregateMaximum',
   'unsafeBlockMinimum',
   'unsafeClasses',
+  'reviewClasses',
+  'reviewClassMaximum',
+  'unsafeAndReviewAggregateMaximum',
   'probabilitySumTolerance',
 ]
 const EXPECTED_CLASS_COUNT = 5

@@ -117,8 +117,12 @@ const POLICY_VERSION = 'v1'
 /** Mirrors the checked-in policy's thresholds so the fixture stays believable. */
 const IMAGE_POLICY = {
   classNames: [...NSFW_CLASS_NAMES],
-  neutralPassMinimum: 0.85,
-  unsafeAggregateMaximum: 0.15,
+  safeClasses: ['Drawing', 'Neutral'],
+  safeMassMinimum: 0.85,
+  reviewClasses: ['Sexy'],
+  reviewClassMaximum: 0.15,
+  unsafeAndReviewAggregateMaximum: 0.15,
+  unsafeAggregateMaximum: 0.1,
   unsafeBlockMinimum: 0.35,
   unsafeClasses: ['Hentai', 'Porn'],
   probabilitySumTolerance: 0.001,
@@ -603,7 +607,7 @@ describe('TensorflowNsfwImageScreener startup failure', () => {
       path.join(path.dirname(manifestPath), POLICY_FILENAME),
       JSON.stringify({
         version: POLICY_VERSION,
-        image: { ...IMAGE_POLICY, neutralPassMinimum: 0.1 },
+        image: { ...IMAGE_POLICY, safeMassMinimum: 0.1 },
         reasonCodes: { image: IMAGE_REASON_CODES },
       })
     )

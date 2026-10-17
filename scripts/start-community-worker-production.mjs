@@ -1,0 +1,259 @@
+/*
+ * Production entrypoint for the hosted community worker container.
+ *
+ * Story 6.2b, Task 1. The container's CMD, run under tini as PID 1. It does three
+ * things before the BullMQ consumer exists, and one thing at the end of its life:
+ *
+ *   1. refuses an unset, unknown, or `fixture` screener selector, so a hosted
+ *      worker can never come up screening with something that is not a model;
+ *   2. verifies the pinned model artifacts, WASM binaries and policy hash with the
+ *      Story 6.2 verifier, and exits nonzero on any mismatch;
+ *   3. starts the compiled community bootstrap in this process, which awaits model
+ *      readiness before constructing the consumer and logs the readiness line;
+ *   4. turns SIGTERM and SIGINT into the bootstrap's graceful shutdown, which
+ *      closes the consumer, the moderation queue, the model process, Redis and
+ *      Prisma, with a hard deadline so a wedged close cannot outlive the host's
+ *      grace period silently.
+ *
+ * In-process rather than a child: one Node runtime is roughly 40 MiB the 512 MiB
+ * sandbox envelope does not have to spend twice.
+ *
+ * `--self-test` loads the real model from the installed tree, screens a generated
+ * image, validates the text lists, prints the identity, and exits. The Docker
+ * build runs it against the pruned dependency tree, so a dependency the prune
+ * trace missed fails the build rather than the first job.
+ */
+import { spawnSync } from 'node:child_process'
+import path from 'node:path'
+import { fileURLToPath, pathToFileURL } from 'node:url'
+
+const __dirname = path.dirname(fileURLToPath(import.meta.url))
+const projectRoot = path.resolve(__dirname, '..')
+const apiDist = path.join(projectRoot, 'apps/api/dist/src')
+
+const SELECTOR_ENV = 'COMMUNITY_NSFW_SCREENER'
+const STARTABLE_SELECTORS = new Set(['tensorflow', 'unavailable'])
+/**
+ * Comfortably above the bootstrap's own shutdown deadline and below the 30
+ * seconds most container hosts allow between SIGTERM and SIGKILL, so the log says
+ * which one gave up.
+ */
+const SHUTDOWN_DEADLINE_MS = 25_000
+
+function log(event, fields = {}) {
+  // One JSON line, the same shape pino emits, so a host's log search treats the
+  // launcher's lines and the worker's lines alike.
+  console.log(
+    JSON.stringify({
+      level: 30,
+      time: new Date().toISOString(),
+      feature: 'community-worker-launcher',
+      event,
+      ...fields,
+    })
+  )
+}
+
+function fail(event, message, fields = {}) {
+  console.error(
+    JSON.stringify({
+      level: 50,
+      time: new Date().toISOString(),
+      feature: 'community-worker-launcher',
+      event,
+      msg: message,
+      ...fields,
+    })
+  )
+  process.exit(1)
+}
+
+export function resolveStartableSelector(env = process.env) {
+  const selector = (env[SELECTOR_ENV] ?? '').trim()
+  if (!selector) {
+    return {
+      ok: false,
+      reason: `${SELECTOR_ENV} is unset. A hosted worker must name its screener; set it to tensorflow.`,
+    }
+  }
+  if (selector === 'fixture') {
+    return {
+      ok: false,
+      reason: `${SELECTOR_ENV}=fixture clears every image and proves nothing. It is never valid on a hosted worker.`,
+    }
+  }
+  if (!STARTABLE_SELECTORS.has(selector)) {
+    return {
+      ok: false,
+      reason: `${SELECTOR_ENV}=${selector} is not a supported selector.`,
+    }
+  }
+  return { ok: true, selector }
+}
+
+function verifyModelArtifacts() {
+  const result = spawnSync(
+    process.execPath,
+    [path.join(projectRoot, 'scripts/verify-community-screening-model.mjs')],
+    { stdio: 'inherit', env: process.env }
+  )
+  if (result.status !== 0) {
+    fail(
+      'community_worker_model_verification_failed',
+      'Model artifact verification failed; the consumer will not start.',
+      { exitCode: result.status }
+    )
+  }
+}
+
+async function importCompiled(relativePath) {
+  return import(pathToFileURL(path.join(apiDist, relativePath)).href)
+}
+
+async function loadBootstrap() {
+  const bootstrap = await importCompiled('workers/community.bootstrap.js')
+  const startCommunityWorkers =
+    bootstrap.startCommunityWorkers ?? bootstrap.default?.startCommunityWorkers
+  const performShutdown = bootstrap.performShutdown ?? bootstrap.default?.performShutdown
+  if (
+    typeof startCommunityWorkers !== 'function' ||
+    typeof performShutdown !== 'function'
+  ) {
+    fail(
+      'community_worker_bootstrap_invalid',
+      'The compiled community bootstrap does not export startCommunityWorkers and performShutdown.'
+    )
+  }
+  return { startCommunityWorkers, performShutdown }
+}
+
+async function selfTest() {
+  const startedAt = Date.now()
+  // Loads the whole consumer graph (Nest decorators, Prisma, BullMQ, storage)
+  // without starting it: the bootstrap only starts when it is the main module.
+  // The model check below never touches that graph, so without this a package
+  // the prune trace missed there would surface only at container start.
+  await loadBootstrap()
+  const { default: sharp } = await import('sharp')
+  const policyModule = await importCompiled(
+    'modules/community/community-screening-policy.js'
+  )
+  const textModule = await importCompiled('modules/community/community-text-screener.js')
+  const screenerModule = await importCompiled(
+    'modules/community/tensorflow-nsfw-image-screener.js'
+  )
+
+  const loaded = policyModule.loadCommunityScreeningPolicy()
+  const textScreener = new textModule.CommunityTextScreener({
+    policy: loaded.policy.text,
+    policyVersion: loaded.identity.textEngineVersion,
+  })
+  const text = textScreener.screen({
+    text: 'A plum satin wrap dress with a cropped linen jacket.',
+    field: 'caption',
+    locale: 'en-US',
+  })
+
+  const screener = new screenerModule.TensorflowNsfwImageScreener()
+  try {
+    const readiness = await screener.ensureReady()
+    const image = await sharp({
+      create: { width: 512, height: 640, channels: 3, background: '#beb4aa' },
+    })
+      .jpeg({ quality: 90 })
+      .toBuffer()
+    const result = await screener.screen(image)
+    const engineVersion = screener.engineVersion
+    const problems = []
+    // A flat neutral swatch must publish. Anything else means the model, the
+    // policy or the preprocessing in this image disagrees with the evidence.
+    if (result.disposition !== 'pass') {
+      problems.push(
+        `the safe self-test image reached ${String(result.disposition)}, not pass`
+      )
+    }
+    if (/fixture|unresolved/.test(engineVersion)) {
+      problems.push(`engine identity ${engineVersion} is not a real-model identity`)
+    }
+    if (text.disposition !== 'pass') {
+      problems.push(
+        `the text screener refused ordinary copy (${text.reasons.join(', ')})`
+      )
+    }
+    const report = {
+      engineVersion,
+      textEngineVersion: text.policyVersion,
+      policyVersion: readiness?.policyVersion ?? null,
+      modelHash: readiness?.modelHash ?? null,
+      backend: readiness?.backend ?? null,
+      disposition: result.disposition,
+      inferenceMs: result.inferenceMs,
+      rssMib: Number((process.memoryUsage().rss / 1048576).toFixed(1)),
+      durationMs: Date.now() - startedAt,
+    }
+    if (problems.length > 0) {
+      fail('community_worker_self_test_failed', problems.join('; '), report)
+    }
+    log('community_worker_self_test_passed', report)
+  } finally {
+    await screener.close()
+  }
+}
+
+async function start(selector) {
+  const { startCommunityWorkers, performShutdown } = await loadBootstrap()
+
+  let shuttingDown = false
+  const shutdown = (signal) => {
+    if (shuttingDown) return
+    shuttingDown = true
+    log('community_worker_shutdown_requested', { signal })
+    const deadline = setTimeout(() => {
+      fail(
+        'community_worker_shutdown_deadline_exceeded',
+        `Graceful shutdown did not finish within ${SHUTDOWN_DEADLINE_MS} ms; exiting.`,
+        { signal }
+      )
+    }, SHUTDOWN_DEADLINE_MS)
+    deadline.unref()
+    // performShutdown closes everything and calls process.exit itself.
+    void performShutdown()
+  }
+  process.on('SIGTERM', () => shutdown('SIGTERM'))
+  process.on('SIGINT', () => shutdown('SIGINT'))
+
+  log('community_worker_starting', { selector, node: process.version })
+  await startCommunityWorkers()
+}
+
+async function main() {
+  const selection = resolveStartableSelector()
+  if (!selection.ok) {
+    fail('community_worker_selector_refused', selection.reason)
+  }
+  if (selection.selector === 'tensorflow') {
+    verifyModelArtifacts()
+  }
+  if (process.argv.includes('--self-test')) {
+    if (selection.selector !== 'tensorflow') {
+      fail(
+        'community_worker_self_test_refused',
+        'The self-test needs the tensorflow selector.'
+      )
+    }
+    await selfTest()
+    process.exit(0)
+  }
+  await start(selection.selector)
+}
+
+const invokedDirectly =
+  process.argv[1] && path.resolve(process.argv[1]) === fileURLToPath(import.meta.url)
+if (invokedDirectly) {
+  main().catch((error) => {
+    fail(
+      'community_worker_launcher_error',
+      error instanceof Error ? error.message : String(error)
+    )
+  })
+}
