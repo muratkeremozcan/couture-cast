@@ -2,6 +2,7 @@ import { describe, expect, it } from 'vitest'
 import { CLIMATE_BANDS } from '@couture/utils'
 import {
   COMMUNITY_CURSOR_INVALID_MESSAGE,
+  COMMUNITY_MODERATION_REASON_CATEGORY,
   climateBandSchema,
   communityAuthorPostStateSchema,
   communityFeedAuthorSchema,
@@ -10,6 +11,8 @@ import {
   communityFeedModeSchema,
   communityFeedQuerySchema,
   communityHeadersSchema,
+  communityModerationReasonCategories,
+  communityModerationReasonCategorySchema,
   communityPostAltTextSchema,
   communityPostCaptionSchema,
   createCommunityChallengeInputSchema,
@@ -1033,5 +1036,39 @@ describe('community HTTP contracts', () => {
         '503',
       ])
     })
+  })
+})
+
+describe('6.2 moderation reason categories', () => {
+  it('maps one stable code to the category its author sees', () => {
+    expect(communityModerationReasonCategories('text_policy_match')).toEqual(['language'])
+    expect(communityModerationReasonCategories('moderation_stalled')).toEqual([
+      'incomplete',
+    ])
+  })
+
+  it('reads a joined reason list in schema order without repeats', () => {
+    expect(
+      communityModerationReasonCategories(
+        'screening_unavailable, text_policy_match, script_mixed, locale_unscreenable'
+      )
+    ).toEqual(['language', 'textUnreadable', 'incomplete'])
+  })
+
+  it('returns null for a moderator free-text reason, an inherited key, or nothing', () => {
+    expect(communityModerationReasonCategories('Nudity detected by a moderator.')).toBe(
+      null
+    )
+    expect(communityModerationReasonCategories('text_policy_match, spam')).toBe(null)
+    expect(communityModerationReasonCategories('constructor')).toBe(null)
+    expect(communityModerationReasonCategories('')).toBe(null)
+    expect(communityModerationReasonCategories(null)).toBe(null)
+  })
+
+  it('maps every code to a schema member, and uses every member', () => {
+    const used = new Set(Object.values(COMMUNITY_MODERATION_REASON_CATEGORY))
+    expect([...used].sort()).toEqual(
+      [...communityModerationReasonCategorySchema.options].sort()
+    )
   })
 })

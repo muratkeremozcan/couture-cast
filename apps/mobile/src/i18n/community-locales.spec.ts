@@ -20,6 +20,7 @@
 import { CLIMATE_BANDS } from '@couture/utils'
 import {
   communityBandUnresolvedReasonSchema,
+  communityModerationReasonCategorySchema,
   communityPostStatusSchema,
   communityReportReasonSchema,
 } from '@couture/api-client/contracts/http'
@@ -240,6 +241,16 @@ describe('6.1 community locale parity', () => {
    * satisfy the comparison would be worse than the asymmetry it papers over.
    */
   const WEB_ONLY_KEYS = ['card.detailClose', 'card.open', 'card.openLabel']
+
+  it('6.2-I18N-MOB-11 explains every moderation reason category in every locale', () => {
+    const expected = [...communityModerationReasonCategorySchema.options].sort()
+    for (const locale of SUPPORTED_LOCALES) {
+      expect(
+        childKeys(CATALOGS[locale], 'moderationReason'),
+        `${locale} moderation reasons`
+      ).toEqual(expected)
+    }
+  })
 
   /**
    * The spec requires identical localized states on both surfaces. Comparing

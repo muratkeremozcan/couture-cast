@@ -668,6 +668,13 @@
       "withdrawn": "Retiraste este look del feed.",
       "consent_suspended": "Este look queda oculto hasta que una persona tutora renueve el consentimiento. Compártelo de nuevo cuando el consentimiento esté activo."
     },
+    "moderationReason": {
+      "language": "Tu comentario o la descripción de la imagen usa palabras que las normas de la comunidad no permiten. Cambia la redacción antes de volver a compartir este look.",
+      "textUnreadable": "La revisión no pudo comprobar todo tu comentario o la descripción de la imagen. Hazlo más corto y en un solo idioma antes de volver a compartir este look.",
+      "photo": "Esta foto no cumple las normas de la comunidad.",
+      "photoUnconfirmed": "La revisión no pudo confirmar que esta foto cumpla las normas de la comunidad. Una foto más clara del atuendo podría aprobarse.",
+      "incomplete": "La revisión de este look no pudo completarse."
+    },
     "challenge": {
       "eyebrow": "Reto de estilo semanal",
       "allClimates": "Todos los climas",

@@ -13,15 +13,16 @@ import {
 } from 'react-native'
 import { useLocalSearchParams } from 'expo-router'
 import { hasDeepLinkIntent, parseDeepLink } from '@couture/utils'
-import type {
-  ClimateBand,
-  CommunityAuthorPostState,
-  CommunityBandUnresolvedReason,
-  CommunityExperimentVariant,
-  CommunityFeedItem,
-  CommunityFeedMode,
-  CommunityReportReason,
-  EmbeddedCommunityChallenge,
+import {
+  communityModerationReasonCategories,
+  type ClimateBand,
+  type CommunityAuthorPostState,
+  type CommunityBandUnresolvedReason,
+  type CommunityExperimentVariant,
+  type CommunityFeedItem,
+  type CommunityFeedMode,
+  type CommunityReportReason,
+  type EmbeddedCommunityChallenge,
 } from '@couture/api-client/contracts/http'
 import { InfoBanner } from '@/components/info-banner'
 import { useMobileAnalytics } from '@/src/analytics/mobile-analytics'
@@ -67,6 +68,25 @@ const EXPLAINED_AUTHOR_STATES = new Set([
 ])
 
 type FeedState = 'loading' | 'ready' | 'error'
+
+/**
+ * What the author reads about a held post. A stable pipeline code such as
+ * `text_policy_match` becomes localized copy that says what to change; only a
+ * moderator's free-text takedown reason is shown as written. Mirrors the web
+ * author-states section, which reads the same shared category map.
+ */
+function moderationReasonText(
+  reason: string,
+  t: ReturnType<typeof useTranslation>['t']
+): string {
+  const categories = communityModerationReasonCategories(reason)
+  if (categories === null) {
+    return t('community.status.reason', { reason })
+  }
+  return categories
+    .map((category) => t(`community.moderationReason.${category}`))
+    .join(' ')
+}
 
 export function CommunityScreen() {
   const { t, i18n } = useTranslation()
@@ -666,7 +686,7 @@ export function CommunityScreen() {
                 testID={`community-author-state-reason-${authorState.id}`}
                 style={[styles.stateBody, { color: palette.mutedText }]}
               >
-                {t('community.status.reason', { reason: authorState.moderationReason })}
+                {moderationReasonText(authorState.moderationReason, t)}
               </Text>
             ) : null}
           </View>

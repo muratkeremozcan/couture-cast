@@ -27,6 +27,7 @@
 import { CLIMATE_BANDS } from '@couture/utils'
 import {
   communityBandUnresolvedReasonSchema,
+  communityModerationReasonCategorySchema,
   communityPostStatusSchema,
   communityReportReasonSchema,
 } from '@couture/api-client/contracts/http'
@@ -203,6 +204,16 @@ describe('6.1 community locale parity', () => {
       expect(
         childKeys(CATALOGS[locale], 'band.unresolved'),
         `${locale} band-unresolved banners`
+      ).toEqual(expected)
+    }
+  })
+
+  it('6.2-I18N-WEB-09 explains every moderation reason category in every locale', () => {
+    const expected = [...communityModerationReasonCategorySchema.options].sort()
+    for (const locale of SUPPORTED_LOCALES) {
+      expect(
+        childKeys(CATALOGS[locale], 'moderationReason'),
+        `${locale} moderation reasons`
       ).toEqual(expected)
     }
   })

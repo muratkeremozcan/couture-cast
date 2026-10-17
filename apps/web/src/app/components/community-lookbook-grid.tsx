@@ -31,6 +31,7 @@ import posthog from 'posthog-js'
 import { useTranslation } from 'react-i18next'
 import { CLIMATE_BANDS } from '@couture/utils'
 import {
+  communityModerationReasonCategories,
   communityPostCaptionSchema,
   communityReportReasonSchema,
   defaultSupportedLocale,
@@ -847,6 +848,21 @@ interface AuthorStatesSectionProps {
  * merlot, matching the premium accent system's assignment of merlot to errors
  * and destructive states including flagged content.
  */
+/**
+ * What the author reads about a held post. A stable pipeline code such as
+ * `text_policy_match` becomes localized copy that says what to change; only a
+ * moderator's free-text takedown reason is shown as written.
+ */
+function moderationReasonText(reason: string, t: Translate): string {
+  const categories = communityModerationReasonCategories(reason)
+  if (categories === null) {
+    return t('community.status.reason', { reason })
+  }
+  return categories
+    .map((category) => t(`community.moderationReason.${category}`))
+    .join(' ')
+}
+
 function AuthorStatesSection({ states, t }: AuthorStatesSectionProps) {
   if (states.length === 0) {
     return null
@@ -902,7 +918,7 @@ function AuthorStatesSection({ states, t }: AuthorStatesSectionProps) {
                   data-testid={`author-state-reason-${state.id}`}
                   className="text-xs text-neutral-600"
                 >
-                  {t('community.status.reason', { reason: state.moderationReason })}
+                  {moderationReasonText(state.moderationReason, t)}
                 </p>
               )}
               {state.caption && (

@@ -788,6 +788,32 @@ describe('Mobile community screen (Story 6.1)', () => {
 
   // --- Author states --------------------------------------------------------
 
+  it('6.2-MOB-001 explains a stable screening code in words, never as the raw code', async () => {
+    serveFeed(() =>
+      feedJson({
+        authorStates: [
+          authorState('flagged', { moderationReason: 'text_policy_match' }),
+          authorState('review_failed', {
+            moderationReason: 'inference_timeout, low_confidence',
+          }),
+        ],
+      })
+    )
+
+    await render(<CommunityScreen />)
+
+    await screen.findByTestId('community-author-states')
+    expect(
+      screen.getByTestId('community-author-state-reason-own-flagged').textContent
+    ).toBe(enUS.community.moderationReason.language)
+    // A joined list reads as one sentence per category, in schema order.
+    expect(
+      screen.getByTestId('community-author-state-reason-own-review_failed').textContent
+    ).toBe(
+      `${enUS.community.moderationReason.photoUnconfirmed} ${enUS.community.moderationReason.incomplete}`
+    )
+  })
+
   it('6.1-MOB-010 renders author states in their own section, never in the grid', async () => {
     const explained = [
       'flagged',

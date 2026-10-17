@@ -496,6 +496,13 @@
       "withdrawn": "Du hast diesen Look aus dem Feed zurückgezogen.",
       "consent_suspended": "Dieser Look bleibt ausgeblendet, bis eine erziehungsberechtigte Person die Einwilligung erneuert. Teile ihn erneut, sobald die Einwilligung wieder gilt."
     },
+    "moderationReason": {
+      "language": "Deine Bildunterschrift oder Bildbeschreibung enthält Wörter, die die Community-Richtlinien nicht erlauben. Ändere die Formulierung, bevor du diesen Look erneut teilst.",
+      "textUnreadable": "Die Prüfung konnte deine Bildunterschrift oder Bildbeschreibung nicht vollständig prüfen. Fasse dich kürzer und schreibe in einer Sprache, bevor du diesen Look erneut teilst.",
+      "photo": "Dieses Foto entspricht nicht den Community-Richtlinien.",
+      "photoUnconfirmed": "Die Prüfung konnte nicht bestätigen, dass dieses Foto den Community-Richtlinien entspricht. Ein deutlicheres Foto des Outfits kann die Prüfung bestehen.",
+      "incomplete": "Die Prüfung dieses Looks konnte nicht abgeschlossen werden."
+    },
     "challenge": {
       "eyebrow": "Wöchentliche Style-Challenge",
       "allClimates": "Alle Klimazonen",

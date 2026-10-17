@@ -668,6 +668,13 @@
       "withdrawn": "Bu kombini akıştan geri çektin.",
       "consent_suspended": "Bir veli onayı yenileyene kadar bu kombin gizli kalır. Onay etkinleştiğinde tekrar paylaş."
     },
+    "moderationReason": {
+      "language": "Açıklama yazın veya görsel açıklaman topluluk kurallarının izin vermediği kelimeler içeriyor. Bu kombini yeniden paylaşmadan önce ifadeyi değiştir.",
+      "textUnreadable": "İnceleme, açıklama yazının veya görsel açıklamanın tamamını kontrol edemedi. Bu kombini yeniden paylaşmadan önce metni kısalt ve tek bir dilde yaz.",
+      "photo": "Bu fotoğraf topluluk kurallarına uymuyor.",
+      "photoUnconfirmed": "İnceleme, bu fotoğrafın topluluk kurallarına uyduğunu doğrulayamadı. Kıyafetin daha net bir fotoğrafı onaylanabilir.",
+      "incomplete": "Bu kombinin incelemesi tamamlanamadı."
+    },
     "challenge": {
       "eyebrow": "Haftalık stil yarışması",
       "allClimates": "Tüm iklimler",

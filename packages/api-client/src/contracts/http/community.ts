@@ -167,6 +167,82 @@ export const communityReportReasonSchema = z.enum([
 ])
 export type CommunityReportReason = z.infer<typeof communityReportReasonSchema>
 
+/**
+ * What an author is told about a post the pipeline held. Each member is one
+ * localized sentence under `community.moderationReason.*`, so a member reads
+ * "change the wording" and never a raw `text_policy_match`.
+ */
+export const communityModerationReasonCategorySchema = z.enum([
+  'language',
+  'textUnreadable',
+  'photo',
+  'photoUnconfirmed',
+  'incomplete',
+])
+export type CommunityModerationReasonCategory = z.infer<
+  typeof communityModerationReasonCategorySchema
+>
+
+/**
+ * Every stable code the moderation pipeline persists on `moderationReason`,
+ * mapped to the category the author sees. The codes come from
+ * `apps/api/policies/community-screening` (`reasonCodes.image` and
+ * `reasonCodes.text`) plus the three the pipeline writes on its own;
+ * `apps/api/integration/community-moderation-reason-codes.spec.ts` fails when
+ * the API can emit a code this map does not name.
+ */
+export const COMMUNITY_MODERATION_REASON_CATEGORY: Readonly<
+  Record<string, CommunityModerationReasonCategory>
+> = Object.freeze({
+  text_policy_match: 'language',
+  text_input_truncated: 'textUnreadable',
+  locale_unscreenable: 'textUnreadable',
+  script_mixed: 'textUnreadable',
+  script_unsupported: 'textUnreadable',
+  unsafe_class: 'photo',
+  low_confidence: 'photoUnconfirmed',
+  output_invalid: 'photoUnconfirmed',
+  class_mismatch: 'photoUnconfirmed',
+  probability_sum_invalid: 'photoUnconfirmed',
+  image_disposition_conflict: 'photoUnconfirmed',
+  inference_timeout: 'incomplete',
+  screening_unavailable: 'incomplete',
+  flagged_by_screening: 'incomplete',
+  moderation_stalled: 'incomplete',
+})
+
+/**
+ * Reads a persisted `moderationReason` (one code, or several joined by `, `)
+ * into the categories to show its author, in schema order and without
+ * repeats. Returns `null` when any part is not a known code, which is the
+ * free-text reason a human moderator wrote on a takedown; the caller shows that
+ * verbatim instead.
+ */
+export function communityModerationReasonCategories(
+  reason: string | null | undefined
+): CommunityModerationReasonCategory[] | null {
+  const codes = (reason ?? '')
+    .split(',')
+    .map((code) => code.trim())
+    .filter((code) => code.length > 0)
+  if (codes.length === 0) return null
+  const found = new Set<CommunityModerationReasonCategory>()
+  for (const code of codes) {
+    // This module also loads under Hermes, where older builds lack `Object.hasOwn`.
+    const category = Object.prototype.hasOwnProperty.call(
+      COMMUNITY_MODERATION_REASON_CATEGORY,
+      code
+    )
+      ? COMMUNITY_MODERATION_REASON_CATEGORY[code]
+      : undefined
+    if (category === undefined) return null
+    found.add(category)
+  }
+  return communityModerationReasonCategorySchema.options.filter((category) =>
+    found.has(category)
+  )
+}
+
 // --- Validation helpers: Cursor, Caption, Alt-text --------------------------
 
 /**
