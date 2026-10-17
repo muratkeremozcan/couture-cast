@@ -716,6 +716,8 @@ export const UPSTASH_PAY_AS_YOU_GO = {
   plan: 'Pay as You Go',
   usdPer100kCommands: 0.2,
   includedMonthlyCommands: 0,
+  sourceUrl: 'https://upstash.com/pricing/redis',
+  readOn: '2026-10-17',
   source:
     'https://upstash.com/pricing/redis, read 2026-10-17: Pay as You Go, $0.20 per 100K commands; no free command allowance on a paid plan; first 1 GB storage free, then $0.25/GB; bandwidth free up to 200 GB a month',
 }
@@ -774,9 +776,11 @@ function redisSection(dailySubmissions, current) {
     monthlyCostCeilingUsd: REDIS_MONTHLY_COST_CEILING_USD,
     beforeTuning: {
       ...REDIS_BEFORE_TUNING,
-      monthlyUsd: payAsYouGoMonthlyUsd(
-        REDIS_BEFORE_TUNING.commandsPerHour * HOURS_PER_MONTH
-      ),
+      monthlyUsd:
+        Math.round(
+          payAsYouGoMonthlyUsd(REDIS_BEFORE_TUNING.commandsPerHour * HOURS_PER_MONTH) *
+            1e6
+        ) / 1e6,
     },
     tuned: tunedRedisSettings(),
     sharedDatabase:
@@ -836,8 +840,11 @@ export function projectRedisCost({
   const idlePerMonth = idleCommandsPerHour * HOURS_PER_MONTH
   const trafficPerMonth = commandsPerPost * dailySubmissions * DAYS_PER_MONTH
   const ceilingCommands = commandsForMonthlyUsd(REDIS_MONTHLY_COST_CEILING_USD)
-  const idleUsd = payAsYouGoMonthlyUsd(idlePerMonth)
-  const totalUsd = payAsYouGoMonthlyUsd(idlePerMonth + trafficPerMonth)
+  // Rounded to a millionth of a dollar, half a command at this price, to drop
+  // floating-point noise without moving the comparison with the ceiling.
+  const micro = (usd) => Math.round(usd * 1e6) / 1e6
+  const idleUsd = micro(payAsYouGoMonthlyUsd(idlePerMonth))
+  const totalUsd = micro(payAsYouGoMonthlyUsd(idlePerMonth + trafficPerMonth))
   return {
     postsPerDayAtCostCeiling: Math.max(
       0,
@@ -848,7 +855,7 @@ export function projectRedisCost({
       traffic: Math.round(trafficPerMonth),
       total: Math.round(idlePerMonth + trafficPerMonth),
       idleUsd,
-      trafficUsd: totalUsd - idleUsd,
+      trafficUsd: micro(totalUsd - idleUsd),
       totalUsd,
     },
   }
@@ -2083,7 +2090,7 @@ function renderRedis(redis) {
   }
   return [
     ...lines,
-    `The production database is on Upstash ${redis.pricing.plan}: ${redis.pricing.usdPer100kCommands.toFixed(2)} USD per 100K commands, with no free command allowance on a paid plan (${redis.pricing.source}).`,
+    `The production database is on Upstash ${redis.pricing.plan}: ${redis.pricing.usdPer100kCommands.toFixed(2)} USD per 100K commands, with no free command allowance on a paid plan (${redis.pricing.sourceUrl}, read ${redis.pricing.readOn}).`,
     '',
     `Idle worker: ${redis.idle.commandsPerHour} commands an hour (${redis.idle.commandsPerDay} a day), measured over ${redis.idle.windowMinutes} minutes against a local Redis only the worker used. One screened post: ${redis.perPost.commandsPerPost} commands. At ${redis.dailySubmissions} posts a day the projected month is ${redis.projectedMonthly.total.toLocaleString('en-US')} commands, ${redis.projectedMonthly.totalUsd.toFixed(2)} USD: ${redis.projectedMonthly.idle.toLocaleString('en-US')} idle (${redis.projectedMonthly.idleUsd.toFixed(2)} USD) and ${redis.projectedMonthly.traffic.toLocaleString('en-US')} traffic (${redis.projectedMonthly.trafficUsd.toFixed(2)} USD). The gate is ${redis.monthlyCostCeilingUsd} USD a month; the worker alone stays at or below it up to ${redis.postsPerDayAtCostCeiling.toLocaleString('en-US')} posts a day and crosses it above that, at this per-post cost. ${redis.countingRule}`,
     '',
