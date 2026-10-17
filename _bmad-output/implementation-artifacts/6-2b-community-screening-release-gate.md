@@ -170,15 +170,15 @@ Every other service in this project is freemium: Vercel, Supabase, and Upstash a
 until they scale. The worker should match that, so the options were checked rather than assumed. As
 of September 2026:
 
-| Option                              | Free?                                                                                            | Verdict for this worker                                                                                                                                                   |
-| ----------------------------------- | ------------------------------------------------------------------------------------------------ | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| Northflank Developer Sandbox        | Yes, free forever; 2 services, always-on, no sleeping; no card asked at signup on 2026-10-16     | **Chosen.** Measured 205 MiB RSS fits the roughly 512 MB sandbox envelope, and it runs a plain container, so Story 6.2's BullMQ design is unchanged                       |
-| Oracle Cloud Always Free            | Yes, genuinely free, 4 ARM cores and 24 GB RAM                                                   | Most headroom, most operations burden: it is an unmanaged VM needing patching, Docker, and a process supervisor. Keep as the fallback if the sandbox proves too small     |
-| Vercel Function plus Upstash QStash | Yes: 98 MB fits the 250 MB limit, QStash free tier is 1,000 messages a day with built-in retries | Real, and it adds no vendor, but it replaces BullMQ's retry and stalled-job semantics, which Story 6.2 AC 5 requires preserving. Documented as an alternative, not chosen |
-| Fly.io                              | No                                                                                               | Free tier withdrawn for new accounts                                                                                                                                      |
-| Render                              | No                                                                                               | Background workers are paid only, from 7 USD a month; the free tier covers web services, which sleep                                                                      |
-| Koyeb                               | No                                                                                               | Free Starter tier closed to new users in early 2026, and it excluded worker services anyway                                                                               |
-| Railway                             | No, 5 USD a month minimum, realistically more with usage                                         | Simplest deploy of the set. Keep as the paid fallback if a free tier fails                                                                                                |
+| Option                              | Free?                                                                                                                               | Verdict for this worker                                                                                                                                                   |
+| ----------------------------------- | ----------------------------------------------------------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| Northflank Developer Sandbox        | Yes, free forever; 2 services, always-on, no sleeping; no card at signup, but one is required before the first service (2026-10-16) | **Chosen.** Measured 205 MiB RSS fits the roughly 512 MB sandbox envelope, and it runs a plain container, so Story 6.2's BullMQ design is unchanged                       |
+| Oracle Cloud Always Free            | Yes, genuinely free, 4 ARM cores and 24 GB RAM                                                                                      | Most headroom, most operations burden: it is an unmanaged VM needing patching, Docker, and a process supervisor. Keep as the fallback if the sandbox proves too small     |
+| Vercel Function plus Upstash QStash | Yes: 98 MB fits the 250 MB limit, QStash free tier is 1,000 messages a day with built-in retries                                    | Real, and it adds no vendor, but it replaces BullMQ's retry and stalled-job semantics, which Story 6.2 AC 5 requires preserving. Documented as an alternative, not chosen |
+| Fly.io                              | No                                                                                                                                  | Free tier withdrawn for new accounts                                                                                                                                      |
+| Render                              | No                                                                                                                                  | Background workers are paid only, from 7 USD a month; the free tier covers web services, which sleep                                                                      |
+| Koyeb                               | No                                                                                                                                  | Free Starter tier closed to new users in early 2026, and it excluded worker services anyway                                                                               |
+| Railway                             | No, 5 USD a month minimum, realistically more with usage                                                                            | Simplest deploy of the set. Keep as the paid fallback if a free tier fails                                                                                                |
 
 So: Northflank first, Oracle Always Free if the sandbox is too small, Railway if neither is worth the
 time. Nothing in the application code knows which host it runs on, and the runbook records the
@@ -390,7 +390,9 @@ external approval.
 #### 1. Stand up the free worker host (about 15 minutes, 0 USD)
 
 Northflank's Developer Sandbox is free forever and runs an always-on container, which is what a
-BullMQ consumer needs. Signup on 2026-10-16 asked for no card.
+BullMQ consumer needs. Signup on 2026-10-16 asked for no card, but creating the first service
+returned 409 "Please complete your account by adding a default payment method". Northflank's billing
+docs require a payment method on every account before resources are created, to verify identity.
 
 1. Go to <https://northflank.com> and sign up with the GitHub account that owns this repository.
    Choose the free Developer Sandbox plan.
@@ -692,7 +694,7 @@ the payload is current.
   - **AC 6 signing.** The owner delegated the signature. `npm run community:screening:sign --
 --delegated` may run from an agent session only when the verdict is `pass` and never under CI.
     It records `mode: "delegated-by-owner"`. The interactive owner path is unchanged.
-  - **Hosting.** Northflank signup asked for no card. The owner created the team and the API token,
+  - **Hosting.** Northflank signup asked for no card; the first service creation requires one. The owner created the team and the API token,
     and the agent drives the deploy through the API.
 - 2026-10-16, review loop 1 (deviation from the bmad-build revert rule, recorded deliberately): this
   spec has no frozen section, and the needs-design findings were settled by the owner's delegate.
