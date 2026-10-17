@@ -20,6 +20,17 @@ import { shutdownWorkerResources } from './shutdown-resources'
  * `pending_review` forever and the story's core loop cannot be exercised end to
  * end by anyone — which is exactly what was happening.
  *
+ * IT IS ALSO THE HOSTED WORKER. Story 6.2b's container
+ * (`apps/api/Dockerfile.community-worker`) runs this module through
+ * `scripts/start-community-worker-production.mjs`, and nothing else consumes
+ * `community-moderation` in production, so the interval sweeps below are the
+ * production sweeps and the one-second dispatch below is production's cadence.
+ * The outbox dispatch reads PostgreSQL and touches Redis only when a post is
+ * waiting, so the one-second cadence costs no Redis commands while idle; the
+ * idle Redis cost is BullMQ's blocking poll and stalled check, tuned in
+ * `community-moderation.worker.ts`, plus the worker's presence heartbeat
+ * (`community-worker-heartbeat.ts`), all measured in the deployment guide.
+ *
  * The pipeline itself is composed by `createCommunityWorkerRuntime`, the same
  * factory `bootstrap.ts` uses, so this process cannot drift from production.
  *
@@ -32,29 +43,22 @@ import { shutdownWorkerResources } from './shutdown-resources'
  * plain interval instead, and the trigger is the one thing this process must
  * not share with `bootstrap.ts`.
  *
- * THE WORK MATCHES PRODUCTION. THE CADENCE DIFFERS BY SIXTY TIMES. An outbox
- * row becoming a job, a job screening a post, a post reaching a terminal
- * state: all of that runs through the exact same
- * `createCommunityWorkerRuntime` code path production uses. Production polls
- * moderation dispatch once a minute, via the cron in
- * `community-maintenance.scheduler.ts`
- * (`COMMUNITY_MODERATION_DISPATCH_CRON_PATTERN`, `* * * * *`); this process
- * polls it once a second (`DISPATCH_INTERVAL_MS` below). A Playwright spec
- * built on this process's timing exercises the pipeline correctly. It says
- * nothing about how fast an author sees that happen in production, where the
- * wait to leave `pending_review` runs up to a minute against this process's
- * one second.
+ * THE WORK AND THE CADENCE MATCH PRODUCTION. An outbox row becoming a job, a
+ * job screening a post, a post reaching a terminal state: all of that runs
+ * through the same `createCommunityWorkerRuntime` code path, at the same
+ * one-second dispatch interval, locally and on the hosted worker. The general
+ * bootstrap's one-minute dispatch cron (`COMMUNITY_MODERATION_DISPATCH_CRON_PATTERN`
+ * in `community-maintenance.scheduler.ts`) belongs to a process no hosted target
+ * runs.
  */
 const logger = createBaseLogger().child({ feature: 'community-workers' })
 
 /**
- * Sixty times faster than production's one-minute moderation-dispatch cron
- * (`COMMUNITY_MODERATION_DISPATCH_CRON_PATTERN` in
- * `community-maintenance.scheduler.ts`), so a Playwright spec does not wait on
- * it. A passing E2E run on this interval is not evidence of production
- * latency.
+ * The outbox dispatch interval, locally and on the hosted worker alike. It reads
+ * PostgreSQL only; Redis is touched when a waiting post is enqueued.
  */
 const DISPATCH_INTERVAL_MS = 1_000
+export const COMMUNITY_SHUTDOWN_TIMEOUT_MS = 20_000
 const SWEEP_INTERVAL_MS = 30_000
 
 const workers: Worker[] = []
@@ -123,27 +127,80 @@ export async function startCommunityWorkers() {
   }
 }
 
+/**
+ * Stops consumption, lets the active job finish, then closes what that job was
+ * using, all under one deadline below the production launcher's 25 seconds.
+ *
+ * The order is the point. Closing the worker first removes its presence
+ * heartbeat (at most `COMMUNITY_WORKER_HEARTBEAT_STOP_TIMEOUT_MS` of the
+ * deadline; Story 6.2b review, RF15), then `Worker.close()` stops taking jobs
+ * and waits for the active one; only then do the model process, the moderation
+ * queue and the PostHog client close. Closing the runtime first (as this did until the Story
+ * 6.2b peer review, CX7) terminated the inference thread under a job still
+ * screening, so a deploy's SIGTERM failed that attempt with "Community NSFW
+ * screener is closing", and on a final attempt marked a valid post
+ * `review_failed`. The runtime and PostHog close in the queue phase, after every
+ * worker; when the deadline expires, `shutdownWorkerResources` force-closes the
+ * worker and the runtime and this process exits nonzero.
+ *
+ * THE BUDGETS AND THE HOST. Northflank sends SIGKILL 30 seconds after SIGTERM
+ * by default (`gracePeriodSeconds`, 15 to 1,800; northflank.com/docs/v1/
+ * application/scale/scale-instances, read 2026-10-17). This deadline is 20
+ * seconds and the launcher's is 25, so both give up, and log it, before the
+ * host's kill.
+ *
+ * THE SLOW TAIL. One screening may take up to 30 seconds
+ * (`MODERATION_SCREENING_TIMEOUT_MS`), longer than this deadline. A job still
+ * screening when the deadline expires is abandoned, as is a job whose worker
+ * crashed: it neither completes nor fails, its BullMQ lock
+ * (`COMMUNITY_MODERATION_LOCK_DURATION_MS`, 30 seconds) expires, and a stalled
+ * check returns it to `waiting`. The check runs once per
+ * `COMMUNITY_MODERATION_STALLED_INTERVAL_MS` (120 seconds) across all workers
+ * and when a worker starts; a check requeues a job an earlier check marked, so
+ * the job is back at most `max(interval, restart) + interval` after the crash
+ * (`communityCrashRedeliveryMs`), 300 seconds with a three-minute restart, and
+ * a requeued job wakes the worker's 300-second idle block at once. A first stall
+ * (`maxStalledCount` 1) does not use up one of the job's attempts. The post
+ * waits in `pending_review` meanwhile, and the whole recovery
+ * (`communityCrashRecoveryMs`, 423 seconds) ends before the stale-review sweep
+ * fails the post at 15 minutes (Story 6.2b review, RF13;
+ * `community-moderation-crash-recovery.integration.spec.ts` kills a worker
+ * mid-screening against real Redis). If a post does reach `review_failed`
+ * through the sweep, the sweep writes a `JobFailure` row and the redelivered
+ * job skips the post. The admin retry of that row does not re-screen it either:
+ * the processor screens only `pending_review` posts, so the post stays
+ * `review_failed`, visible to its author with the stalled-review copy, until
+ * an operator releases or removes it (Story 6.2b review, RF14; recorded in
+ * deferred work).
+ */
 export async function performShutdown() {
   logger.info('Shutting down community workers...')
   let exitCode = 0
   for (const timer of timers) {
     clearInterval(timer)
   }
+  const runtime = closeRuntime
+  const posthog = posthogService
   try {
-    if (posthogService) {
-      try {
-        posthogService.onApplicationShutdown()
-      } catch (err) {
-        logger.error(err, 'Error shutting down PostHogService')
-      }
-    }
-    await closeRuntime?.()
-    await shutdownWorkerResources({
-      workers,
-      queues: [],
-      redisClients: [],
-      disconnectPrisma: disconnectPrismaClient,
-    })
+    await shutdownWorkerResources(
+      {
+        workers,
+        queues: [
+          ...(runtime ? [{ close: runtime, disconnect: runtime }] : []),
+          ...(posthog
+            ? [
+                {
+                  close: () => Promise.resolve(posthog.onApplicationShutdown()),
+                  disconnect: () => Promise.resolve(),
+                },
+              ]
+            : []),
+        ],
+        redisClients: [],
+        disconnectPrisma: disconnectPrismaClient,
+      },
+      { timeoutMs: COMMUNITY_SHUTDOWN_TIMEOUT_MS }
+    )
   } catch (err) {
     logger.error(err, 'Error closing community workers')
     exitCode = 1

@@ -668,6 +668,14 @@
       "withdrawn": "You withdrew this look from the feed.",
       "consent_suspended": "This look is hidden until a guardian renews consent. Share it again once consent is active."
     },
+    "moderationReason": {
+      "language": "Your caption or image description uses words the community guidelines do not allow. Change the wording before you share this look again.",
+      "textUnreadable": "Screening could not check all of your caption or image description. Keep it shorter and in one language before you share this look again.",
+      "photo": "This photo does not meet the community guidelines.",
+      "photoUnconfirmed": "Screening could not confirm that this photo meets the community guidelines. A clearer photo of the outfit may pass.",
+      "incomplete": "Screening could not finish checking this look.",
+      "upload": "This photo could not be processed as it was uploaded. Share this look again with a JPEG, PNG or WebP photo up to 10 MB and between 256 and 4096 pixels on each side."
+    },
     "challenge": {
       "eyebrow": "Weekly style challenge",
       "allClimates": "Every climate",

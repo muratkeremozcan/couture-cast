@@ -1,0 +1,2740 @@
+{
+  "language": "de",
+  "corpusVersion": "v1",
+  "clean": {
+    "description": "Ordinary fashion captions and alt text, written natively in the language as community members would write them, without reference to the term lists. Every entry is expected to pass text screening, except entries labelled expected review, which carry one of the policy's deliberate review terms and the reason it is kept.",
+    "expected": "pass",
+    "entries": [
+      {
+        "id": "de-clean-001",
+        "field": "caption",
+        "text": "Wettercheck vor dem Anziehen: 7 °C um 8 Uhr, 16 °C um 14 Uhr, ab 17 Uhr Regen. Also dünner Merinopulli, wasserdichter Trench, Stiefeletten, die Pfützen aushalten, und eine Tasche, groß genug für den Schal, sobald die Sonne rauskommt."
+      },
+      {
+        "id": "de-clean-002",
+        "field": "caption",
+        "text": "Langer Post, aber ich brauche Rat. Die Hochzeit meiner besten Freundin ist Ende September draußen, und die Vorhersage schwankt zwischen 14 und 24 °C. Ich habe ein trägerloses Satinkleid in Salbei. Stola, kurze Jacke oder einfach ein Pashmina?"
+      },
+      {
+        "id": "de-clean-003",
+        "field": "caption",
+        "text": "Endlich die Capsule Wardrobe geschafft: zwei Hosen, eine Jeans, fünf Oberteile, zwei Pullis, ein Blazer, ein Trench und ein Mantel. Alles passt zu allem, und an einem verregneten Montag brauche ich jetzt vier Minuten zum Anziehen."
+      },
+      {
+        "id": "de-clean-004",
+        "field": "caption",
+        "text": "Packliste für eine Woche am Meer: zwei Bikinis, ein Badeanzug, drei Leinenhemden, ein Slipdress fürs Abendessen, Zehensandalen, weiße Sneaker und eine Strickjacke, weil es an der Küste abends auch im Juli frisch werden kann."
+      },
+      {
+        "id": "de-clean-005",
+        "field": "caption",
+        "text": "Heute hat sich das Wetter stündlich geändert. Angefangen mit Nebel und dickem Mantel, geendet mit Sonne und dem Mantel überm Arm. Nächstes Mal nehme ich die dünne Steppjacke."
+      },
+      {
+        "id": "de-clean-006",
+        "field": "caption",
+        "text": "Ich dachte immer, figurbetonte Kleider sind nichts für mich. Dann habe ich eins aus dickem Rippstrick mit langen Ärmeln gefunden, dazu klobige Boots und einen langen Mantel. Gemütlich und unkompliziert. Manchmal liegt es einfach am Stoff."
+      },
+      {
+        "id": "de-clean-007",
+        "field": "caption",
+        "text": "Kleiner Styling-Tipp für heiße Tage: lockere Naturfasern, helle Farben und immer ein dünnes Hemd in der Tasche für klimatisierte Räume. Im eiskalten Kino werdet ihr mir danken."
+      },
+      {
+        "id": "de-clean-008",
+        "field": "caption",
+        "text": "An alle, die gestern meinen grünen Mantel kommentiert haben: Er ist secondhand, etwa zwanzig Jahre alt, und das Futter war kaputt, bis meine Nachbarin mir beim Austauschen geholfen hat. Gute Verarbeitung hält."
+      },
+      {
+        "id": "de-clean-009",
+        "field": "caption",
+        "text": "Meine Winter-Pendleruniform nach Jahren des Ausprobierens: Thermoleggings unter weiter Hose, Merinoshirt, Daunenjacke über die Hüfte, wasserdichte Stiefel mit griffiger Sohle und Fäustlinge. Hübsch? Vielleicht nicht. Warm? Immer."
+      },
+      {
+        "id": "de-clean-010",
+        "field": "caption",
+        "text": "Kleiderschrank auf Frühling umgestellt! Dicke Strickpullis und Wollmäntel verstaut, Baumwollkleider gewaschen und einen Rock gefunden, den ich vergessen hatte. Heute trage ich ihn mit Jeansjacke und weißen Sneakern."
+      },
+      {
+        "id": "de-clean-011",
+        "field": "caption",
+        "text": "Frage an die Kleinen unter uns: Wie tragt ihr Midiröcke, ohne darin zu versinken? Ich bin 1,55 m und laufe zu viel für Absätze. Helfen spitze Ballerinas oder ein höherer Bund?"
+      },
+      {
+        "id": "de-clean-012",
+        "field": "caption",
+        "text": "Heute die Tweedmütze meines verstorbenen Opas zum dunkelblauen Mantel getragen. Sie riecht noch ein bisschen nach seiner Werkstatt, und ich finde, sie steht mir. Manche Teile sind so viel mehr wert, als sie gekostet haben."
+      },
+      {
+        "id": "de-clean-013",
+        "field": "caption",
+        "text": "Laut Vorhersage 30 °C und schwül, also ein ärmelloses Leinenkleid in Nude, flache Sandalen und eine geflochtene Tasche. Haare hochgebunden, Sonnenbrille auf und ein kleiner Fächer für die Straßenbahn."
+      },
+      {
+        "id": "de-clean-014",
+        "field": "caption",
+        "text": "Bewertet mein Regenoutfit: olivgrüner Parka, grauer Hoodie, schwarze Jeans, schwarze Gummistiefel und eine dunkelblaue Mütze. Nicht glamourös, aber ich bin auf dem Schulweg mit den Kindern komplett trocken geblieben."
+      },
+      {
+        "id": "de-clean-015",
+        "field": "caption",
+        "text": "Lolita-Treffen im Park heute Nachmittag! Alle sahen toll aus. Ich trug ein cremefarbenes Kleid mit Spitzenkragen, eine große Schleife am Rücken, weiße Strumpfhose und runde Schuhe. Das Wetter war gnädig, 21 °C und Sonne.",
+        "expected": "review",
+        "deliberateReviewTerm": "lolita",
+        "reason": "Names a fashion subculture and is also a child-sexualisation keyword. On a 13+ product every caption or alt text carrying it goes to a moderator, who can clear a fashion post; it is never allow-listed. The cost is review load for that style's posts, recorded as a named limitation."
+      },
+      {
+        "id": "de-clean-016",
+        "field": "caption",
+        "text": "Bürodresscodes bei Hitzewelle sind knifflig. Meiner heute: ärmelloses Seidentop, verkürzte weite Hose, offene Mules und ein leichter Blazer, der bis zum Kundentermin auf dem Stuhl bleibt."
+      },
+      {
+        "id": "de-clean-017",
+        "field": "caption",
+        "text": "Bauchfrei mit 40? Ich habe einen leicht kurzen Strickpulli mit sehr hoch geschnittener Hose probiert, und ehrlich, es wirkt ausgewogen und erwachsen. Proportionen sind wichtiger als das Alter."
+      },
+      {
+        "id": "de-clean-018",
+        "field": "caption",
+        "text": "Heute Abend gebe ich eine Dinnerparty. Rückenfreier Jumpsuit in tiefem Dunkelblau und flache Sandalen, damit ich zwischen Küche und Tisch hin und her laufen kann. Goldene Ohrringe und ein glatter tiefer Dutt."
+      },
+      {
+        "id": "de-clean-019",
+        "field": "caption",
+        "text": "Erster Schnee der Saison! Die Kinder haben einen Schneemann gebaut, während ich meinen neuen langen Daunenmantel getestet habe. Reicht bis übers Knie, Zwei-Wege-Reißverschluss, tiefe Taschen. Endlich warm an der Bushaltestelle."
+      },
+      {
+        "id": "de-clean-020",
+        "field": "caption",
+        "text": "OOTD: Kamelhaarmantel, grauer Pulli, gerade Jeans. 8 °C und windig, der Schal blieb den ganzen Tag dran."
+      },
+      {
+        "id": "de-clean-021",
+        "field": "caption",
+        "text": "Den ganzen Morgen Regen, also Trenchcoat und Gummistiefel."
+      },
+      {
+        "id": "de-clean-022",
+        "field": "caption",
+        "text": "Endlich warm genug fürs Leinenhemd!"
+      },
+      {
+        "id": "de-clean-023",
+        "field": "caption",
+        "text": "Mein Outfit für heiße Tage: weiße Leinenhose, lockeres Top und flache Zehensandalen."
+      },
+      {
+        "id": "de-clean-024",
+        "field": "caption",
+        "text": "Nude Pumps zum dunkelblauen Kleid gehen immer, vom Büro direkt zum Abendessen."
+      },
+      {
+        "id": "de-clean-025",
+        "field": "caption",
+        "text": "Fühle mich heute Abend richtig sexy im schwarzen Slipdress. Darüber eine kurze Strickjacke, weil es abends frisch wurde."
+      },
+      {
+        "id": "de-clean-026",
+        "field": "caption",
+        "text": "Geht eine Skinny Jeans noch zu klobigen Boots oder lieber gerades Bein?"
+      },
+      {
+        "id": "de-clean-027",
+        "field": "caption",
+        "text": "Enges weißes T-Shirt, Highwaist-Jeans, große schwarze Tasche. Einfach und klappt immer."
+      },
+      {
+        "id": "de-clean-028",
+        "field": "caption",
+        "text": "Strandtag! Gestreifter Bikini, weites Leinenhemd drüber und ein Strohhut. 31 °C und keine Wolke."
+      },
+      {
+        "id": "de-clean-029",
+        "field": "caption",
+        "text": "Diese High Heels sind der Hammer. Wo hast du die her?"
+      },
+      {
+        "id": "de-clean-030",
+        "field": "caption",
+        "text": "Du siehst umwerfend aus in dem smaragdgrünen Abendkleid 😍"
+      },
+      {
+        "id": "de-clean-031",
+        "field": "caption",
+        "text": "Oberteil und Hose im gleichen Salbeigrün. Zweiteiler sparen mir morgens so viel Zeit."
+      },
+      {
+        "id": "de-clean-032",
+        "field": "caption",
+        "text": "Cocktailkleid in Pfauenblau für die Verlobungsfeier meiner Cousine. Schmuck ganz dezent gehalten."
+      },
+      {
+        "id": "de-clean-033",
+        "field": "caption",
+        "text": "Ein Farbtupfer an einem grauen Tag: senfgelbe Mütze zum anthrazitfarbenen Mantel."
+      },
+      {
+        "id": "de-clean-034",
+        "field": "caption",
+        "text": "Diese Push-up-Jeans ist ehrlich die bequemste Hose, die ich besitze. Hoher Bund, viel Stretch."
+      },
+      {
+        "id": "de-clean-035",
+        "field": "caption",
+        "text": "Ohrstecker mit Schraubverschluss gegen kleine Creolen getauscht, damit ich im Nachtzug darin schlafen kann."
+      },
+      {
+        "id": "de-clean-036",
+        "field": "caption",
+        "text": "Bauchtasche quer über der Brust für den Wochenmarkt. Hände frei für Kaffee und Pfirsiche."
+      },
+      {
+        "id": "de-clean-037",
+        "field": "caption",
+        "text": "Tipp für schwüle Tage: Haare hochbinden und ein luftiges Baumwollkleid wählen."
+      },
+      {
+        "id": "de-clean-038",
+        "field": "caption",
+        "text": "Zum ersten Mal Lolita-Mode auf einer Convention ausprobiert. Petticoat, Spitzenkragen und eine rosa Rosette am Haarschmuck.",
+        "expected": "review",
+        "deliberateReviewTerm": "lolita",
+        "reason": "Names a fashion subculture and is also a child-sexualisation keyword. On a 13+ product every caption or alt text carrying it goes to a moderator, who can clear a fashion post; it is never allow-listed. The cost is review load for that style's posts, recorded as a named limitation."
+      },
+      {
+        "id": "de-clean-039",
+        "field": "caption",
+        "text": "Figurbetontes Midikleid mit langem Blazer, so wirkt es eher nach Büro als nach Abend."
+      },
+      {
+        "id": "de-clean-040",
+        "field": "caption",
+        "text": "Transparente Bluse über einem Spitzen-Bralette fürs Konzert. Warm drinnen, kalt auf dem Heimweg, also kam die Jeansjacke mit."
+      },
+      {
+        "id": "de-clean-041",
+        "field": "caption",
+        "text": "Rückenfreies Kleid für die Hochzeit. Hatte Sorge wegen des Windes auf der Terrasse, also Pashmina eingepackt."
+      },
+      {
+        "id": "de-clean-042",
+        "field": "caption",
+        "text": "Für trägerlose Tops braucht man einen guten trägerlosen BH. Hat Jahre gedauert, bis ich das gelernt habe."
+      },
+      {
+        "id": "de-clean-043",
+        "field": "caption",
+        "text": "Camisole im Wäsche-Look unter einem groben Blazer. Gerade total angesagt und überraschend praktisch."
+      },
+      {
+        "id": "de-clean-044",
+        "field": "caption",
+        "text": "Kurze Daunenjacke, weite Hose, Sneaker. 3 °C und Sonne."
+      },
+      {
+        "id": "de-clean-045",
+        "field": "caption",
+        "text": "Hotpants und Sport-BH für die Morgenrunde. Um 7 Uhr schon 24 °C."
+      },
+      {
+        "id": "de-clean-046",
+        "field": "caption",
+        "text": "Zehensandalen sind zurück! Meine sind flach, aus hellbraunem Leder."
+      },
+      {
+        "id": "de-clean-047",
+        "field": "caption",
+        "text": "Welche Taschenfarbe passt zu einem bordeauxroten Mantel? Ich greife immer zu Schwarz, will aber mal was anderes."
+      },
+      {
+        "id": "de-clean-048",
+        "field": "caption",
+        "text": "Schneetag-Outfit: langer Daunenmantel, Thermoleggings, gefütterte Stiefel und eine Mütze, die meine Oma gestrickt hat."
+      },
+      {
+        "id": "de-clean-049",
+        "field": "caption",
+        "text": "Ich liebe, wie du den Oversize-Blazer mit Radlerhose kombiniert hast. Wirkt total mühelos."
+      },
+      {
+        "id": "de-clean-050",
+        "field": "caption",
+        "text": "Heute die Vintage-Brosche meiner Großmutter am schwarzen Rollkragenpulli getragen. Drei Komplimente bekommen!"
+      },
+      {
+        "id": "de-clean-051",
+        "field": "caption",
+        "text": "Leichter Nieselregen, 14 °C. Wasserdichter Parka über dem Hoodie."
+      },
+      {
+        "id": "de-clean-052",
+        "field": "caption",
+        "text": "Alles aus Leinen."
+      },
+      {
+        "id": "de-clean-053",
+        "field": "caption",
+        "text": "Ton in Ton in Creme: Rippstrickpulli, weite Hose, cremefarbene Loafer. Nur chemische Reinigung, drückt mir die Daumen."
+      },
+      {
+        "id": "de-clean-054",
+        "field": "caption",
+        "text": "Profi-Tipp: Ein hautfarbener BH ist unter weißen Blusen viel unsichtbarer als ein weißer."
+      },
+      {
+        "id": "de-clean-055",
+        "field": "caption",
+        "text": "Sexy heißt nicht automatisch viel Haut. Ein gut geschnittener schwarzer Hosenanzug reicht mir völlig."
+      },
+      {
+        "id": "de-clean-056",
+        "field": "caption",
+        "text": "Wer hat gesagt, Cord ist zurück? Rostrote Cordhose und cremefarbener Fischerpulli heute."
+      },
+      {
+        "id": "de-clean-057",
+        "field": "caption",
+        "text": "#ootd #regentag gelbe Regenjacke und grüne Gummistiefel ☔"
+      },
+      {
+        "id": "de-clean-058",
+        "field": "caption",
+        "text": "Draußen heiß, im Büro eiskalt. Die Strickjacke wohnt auf meiner Stuhllehne."
+      },
+      {
+        "id": "de-clean-059",
+        "field": "caption",
+        "text": "Der Wind vom See hat aus 22 °C ganz schnell 17 °C gemacht. Zum Glück hatte ich eine leichte Jacke dabei."
+      },
+      {
+        "id": "de-clean-060",
+        "field": "caption",
+        "text": "Seidenrock, dicker Strickpulli, Stiefeletten. Meine liebste Herbstformel."
+      },
+      {
+        "id": "de-clean-061",
+        "field": "caption",
+        "text": "Tipps, wie man weiße Sneaker sauber hält in einer Stadt, in der es ständig regnet?"
+      },
+      {
+        "id": "de-clean-062",
+        "field": "caption",
+        "text": "Schwarze Feinstrumpfhose zum Tweed-Minirock. Ein bisschen Internat, ein bisschen Bibliothek, und ich liebe es."
+      },
+      {
+        "id": "de-clean-063",
+        "field": "caption",
+        "text": "Fliederfarbenes Hemdblusenkleid zum Brunch. Die Ärmel haben kleine Falten an den Bündchen."
+      },
+      {
+        "id": "de-clean-064",
+        "field": "caption",
+        "text": "Schwüle 33 °C in der Stadt. Weite Baumwoll-Culotte und ärmelloses Top haben mich gerettet."
+      },
+      {
+        "id": "de-clean-065",
+        "field": "caption",
+        "text": "Cocktailkleid im Secondhand-Laden für den Preis eines Brötchens gefunden. Dunkelblauer Satin, passt perfekt."
+      },
+      {
+        "id": "de-clean-066",
+        "field": "caption",
+        "text": "Mustermix heute: Leorock und Ringelshirt. Regeln sind zum Dehnen da."
+      },
+      {
+        "id": "de-clean-067",
+        "field": "caption",
+        "text": "Wollsocken in Clogs. Erst ausprobieren, dann urteilen."
+      },
+      {
+        "id": "de-clean-068",
+        "field": "caption",
+        "text": "Zum ersten Mal ein bauchfreies Top im Büro. Mit Highwaist-Hose, beim Sitzen sieht man nichts."
+      },
+      {
+        "id": "de-clean-069",
+        "field": "caption",
+        "text": "BH-Träger absichtlich zeigen? Mit dem richtigen Spitzen-BH sieht das gewollt aus."
+      },
+      {
+        "id": "de-clean-070",
+        "field": "caption",
+        "text": "Pinker Blazer mit passender Hose. Grauer Himmel, knalliger Anzug."
+      },
+      {
+        "id": "de-clean-071",
+        "field": "caption",
+        "text": "Ein guter Trenchcoat ist jeden Cent wert. Meiner ist zehn Jahre alt und sieht immer noch top aus."
+      },
+      {
+        "id": "de-clean-072",
+        "field": "caption",
+        "text": "Look für Drinks auf der Dachterrasse: schwarzes Neckholder-Top, weite Hose, goldener Armreif."
+      },
+      {
+        "id": "de-clean-073",
+        "field": "caption",
+        "text": "Böen bis 50 km/h. Den weiten Rock zu Hause gelassen und die Schlaghose angezogen."
+      },
+      {
+        "id": "de-clean-074",
+        "field": "caption",
+        "text": "Toll! Camel und Navy ist einfach zeitlos."
+      },
+      {
+        "id": "de-clean-075",
+        "field": "caption",
+        "text": "Seidenhemd im Pyjama-Stil zur Jeans für einen faulen Sonntag, der trotzdem schick war."
+      },
+      {
+        "id": "de-clean-076",
+        "field": "caption",
+        "text": "Erster Frost. Der Mantel mit Lammfellkragen ist wieder draußen."
+      },
+      {
+        "id": "de-clean-077",
+        "field": "caption",
+        "text": "Kann mir jemand erklären, wie man ein Bandana als Haarband trägt, ohne dass es rutscht?"
+      },
+      {
+        "id": "de-clean-078",
+        "field": "caption",
+        "text": "Zweiteiler aus terrakottafarbenem Leinen. Shorts und Hemd, total Urlaubsgefühl."
+      },
+      {
+        "id": "de-clean-079",
+        "field": "caption",
+        "text": "Mit einem Body unterm Highwaist-Rock rutscht den ganzen Tag nichts raus. Gamechanger."
+      },
+      {
+        "id": "de-clean-080",
+        "field": "caption",
+        "text": "Immer wieder Schauer, also eine dünne Regenjacke über den Blazer."
+      },
+      {
+        "id": "de-clean-081",
+        "field": "caption",
+        "text": "Nude Lippenstift, nude Schuhe und ein roter Farbtupfer bei der Tasche."
+      },
+      {
+        "id": "de-clean-082",
+        "field": "caption",
+        "text": "Auf dem Arbeitsweg gesehen: ein Mann im perfekt sitzenden olivgrünen Anzug mit weißen Sneakern. Sofort inspiriert."
+      },
+      {
+        "id": "de-clean-083",
+        "field": "caption",
+        "text": "Klarer Himmel und 19 °C. Endlich Jeansjackenwetter 🌤️"
+      },
+      {
+        "id": "de-clean-084",
+        "field": "caption",
+        "text": "Geripptes Tanktop, Cargohose mit tiefem Bund, klobige Sandalen. Generalprobe fürs Festival."
+      },
+      {
+        "id": "de-clean-085",
+        "field": "caption",
+        "text": "Rückenfreies Top und ein lockerer Blazer zum An- und Ausziehen. Passt für die heiße Terrasse und die klimatisierte Bar."
+      },
+      {
+        "id": "de-clean-086",
+        "field": "caption",
+        "text": "Daunenweste über dem Hoodie für die Hunderunde. 6 °C und feucht."
+      },
+      {
+        "id": "de-clean-087",
+        "field": "caption",
+        "text": "Ich hab euch gefragt, welche Ohrringe, und alle sagten Perlen. Ihr hattet recht."
+      },
+      {
+        "id": "de-clean-088",
+        "field": "caption",
+        "text": "Silberne Pailletten um 10 Uhr morgens? Ich hab Geburtstag, also ja."
+      },
+      {
+        "id": "de-clean-089",
+        "field": "caption",
+        "text": "Badeanzug-Saison. Hab mich für einen kobaltblauen Einteiler mit tiefem Rückenausschnitt entschieden."
+      },
+      {
+        "id": "de-clean-090",
+        "field": "caption",
+        "text": "Lauer Abend am Hafen. Luftiger Maxirock und kurzer Strickpulli."
+      },
+      {
+        "id": "de-clean-091",
+        "field": "caption",
+        "text": "Schwarz, Schwarz, Schwarz. Lederjacke, Jeans, Boots. Geht nie schief."
+      },
+      {
+        "id": "de-clean-092",
+        "field": "caption",
+        "text": "Transparente Organza-Ärmel machen aus einem schlichten Kleid so viel."
+      },
+      {
+        "id": "de-clean-093",
+        "field": "caption",
+        "text": "Gummistiefel sind die unterschätztesten Schuhe überhaupt."
+      },
+      {
+        "id": "de-clean-094",
+        "field": "caption",
+        "text": "Danke für den Tipp, Seide zu dämpfen und nicht zu bügeln!"
+      },
+      {
+        "id": "de-clean-095",
+        "field": "caption",
+        "text": "Khakifarbener Jumpsuit, weiße Sneaker und ein Canvas-Shopper. Entspannter Freitag."
+      },
+      {
+        "id": "de-clean-096",
+        "field": "caption",
+        "text": "Frühlings-Zwiebellook: T-Shirt, Overshirt, leichter Trench. Ablegen, wenn es wärmer wird."
+      },
+      {
+        "id": "de-clean-097",
+        "field": "caption",
+        "text": "Mit Wildleder-Loafern in einen Platzregen geraten. Lektion gelernt."
+      },
+      {
+        "id": "de-clean-098",
+        "field": "caption",
+        "text": "#hitzewelle 36 °C. Luftiges Baumwollkleid, große Sonnenbrille und Sonnencreme."
+      },
+      {
+        "id": "de-clean-099",
+        "field": "caption",
+        "text": "Diese buttergelbe Strickjacke ist ein Traum."
+      },
+      {
+        "id": "de-clean-100",
+        "field": "caption",
+        "text": "Ist es komisch, ein Cocktailkleid mit Blazer und Ballerinas im Büro zu tragen? Eigentlich war es für gestern Abend gedacht, aber ich mag es."
+      },
+      {
+        "id": "de-clean-101",
+        "field": "caption",
+        "text": "Seidentuch unterm Kinn gebunden für die windige Fahrt an der Küste entlang."
+      },
+      {
+        "id": "de-clean-102",
+        "field": "caption",
+        "text": "Samtblazer in tiefem Pflaumenlila für ein Abendessen im Dezember."
+      },
+      {
+        "id": "de-clean-103",
+        "field": "caption",
+        "text": "Enger Rollkragenpulli unter einem Trägerkleid. Sehr 70er."
+      },
+      {
+        "id": "de-clean-104",
+        "field": "caption",
+        "text": "Wer wie ich breite Schultern hat: probiert einen V-Ausschnitt mit weichem Fall. Steht so gut."
+      },
+      {
+        "id": "de-clean-105",
+        "field": "caption",
+        "text": "Hosen mit Paperbag-Bund lassen jedes Oberteil schön eingesteckt aussehen."
+      },
+      {
+        "id": "de-clean-106",
+        "field": "caption",
+        "text": "Die Wetter-App sagte sonnig. Es hagelt. Kapuze auf."
+      },
+      {
+        "id": "de-clean-107",
+        "field": "caption",
+        "text": "Riemchensandalen und korallrote Fußnägel. Der Sommer ist offiziell da."
+      },
+      {
+        "id": "de-clean-108",
+        "field": "caption",
+        "text": "Gemütliches Strickkleid mit Strumpfhose und kniehohen Stiefeln für einen kalten, sonnigen Samstag."
+      },
+      {
+        "id": "de-clean-109",
+        "field": "caption",
+        "text": "Wer trägt im Oktober noch Shorts? Heute 18 °C!"
+      },
+      {
+        "id": "de-clean-110",
+        "field": "caption",
+        "text": "Graues Sweatshirt, Faltenrock und Loafer. Bequem trifft schick."
+      },
+      {
+        "id": "de-clean-111",
+        "field": "caption",
+        "text": "Slipdress über einem weißen T-Shirt ist meine Antwort auf warme Tage mit kühlen Abenden."
+      },
+      {
+        "id": "de-clean-112",
+        "field": "caption",
+        "text": "Meinen Leinenblazer zum Schneider gebracht, um die Ärmel kürzen zu lassen. Hat sich gelohnt."
+      },
+      {
+        "id": "de-clean-113",
+        "field": "caption",
+        "text": "Wie tragt ihr eine kurze Strickjacke zur Highwaist-Jeans? Bei mir sieht es immer zu kastig aus."
+      },
+      {
+        "id": "de-clean-114",
+        "field": "caption",
+        "text": "Ich trage meine hautfarbenen Blockabsätze, bis sie auseinanderfallen."
+      },
+      {
+        "id": "de-clean-115",
+        "field": "caption",
+        "text": "Regentropfen auf einer gewachsten Jacke sehen einfach schön aus."
+      },
+      {
+        "id": "de-clean-116",
+        "field": "caption",
+        "text": "Plissierter Midirock, der beim Gehen schwingt. Sofort gute Laune."
+      },
+      {
+        "id": "de-clean-117",
+        "field": "caption",
+        "text": "#homeoffice Outfit: weiche Jogginghose, schönes Hemd für Videocalls, Hausschuhe außerhalb der Kamera."
+      },
+      {
+        "id": "de-clean-118",
+        "field": "caption",
+        "text": "Navy und Schwarz zusammen? Ja! Am besten mit unterschiedlichen Materialien."
+      },
+      {
+        "id": "de-clean-119",
+        "field": "caption",
+        "text": "Schwül und grau. Lockerer Leinen-Jumpsuit und Ledersandalen."
+      },
+      {
+        "id": "de-clean-120",
+        "field": "caption",
+        "text": "Zopfmusterpulli in den Cordrock gesteckt. Herbst pur."
+      },
+      {
+        "id": "de-clean-121",
+        "field": "caption",
+        "text": "Du hast immer die besten Accessoires. Dieser geflochtene Gürtel!"
+      },
+      {
+        "id": "de-clean-122",
+        "field": "caption",
+        "text": "Trick für heiße Tage: ein dünnes Tuch für überklimatisierte Züge einpacken."
+      },
+      {
+        "id": "de-clean-123",
+        "field": "caption",
+        "text": "Hochzeitsgast-Look: salbeigrünes Satin-Midikleid, goldene Sandalen, kleine Clutch."
+      },
+      {
+        "id": "de-clean-124",
+        "field": "caption",
+        "text": "Bomberjacke, Hoodie drunter, weite Jeans. Kalt, aber trocken."
+      },
+      {
+        "id": "de-clean-125",
+        "field": "caption",
+        "text": "Ich habe immer faltbare Ballerinas in der Tasche, falls die Absätze zu viel werden."
+      },
+      {
+        "id": "de-clean-126",
+        "field": "caption",
+        "text": "Schwarzer Plisseerock mit engem Rippshirt. Ausgewogene Proportionen."
+      },
+      {
+        "id": "de-clean-127",
+        "field": "caption",
+        "text": "Wunderschöne Farbpalette auf dem Foto. Rost, Oliv und Creme."
+      },
+      {
+        "id": "de-clean-128",
+        "field": "caption",
+        "text": "Bluse mit Punkten zur roten Hose. Mutig, aber funktioniert."
+      },
+      {
+        "id": "de-clean-129",
+        "field": "caption",
+        "text": "Wanderung zum Sonnenaufgang: Merino-Unterwäsche, Fleece, Hardshell. Zwei Schichten am Gipfel ausgezogen."
+      },
+      {
+        "id": "de-clean-130",
+        "field": "caption",
+        "text": "Zehensandalen oder Pantoletten für einen Städtetrip? Wir laufen viel."
+      },
+      {
+        "id": "de-clean-131",
+        "field": "caption",
+        "text": "Lederhandschuhe sind wieder in der Tasche. Der Herbst ist da."
+      },
+      {
+        "id": "de-clean-132",
+        "field": "caption",
+        "text": "Lippenstift passend zum Schal heute. Kirschrot."
+      },
+      {
+        "id": "de-clean-133",
+        "field": "caption",
+        "text": "Wenig Zeit heute Morgen, also schnell das bewährte Strickkleid übergeworfen."
+      },
+      {
+        "id": "de-clean-134",
+        "field": "caption",
+        "text": "Transparente schwarze Bluse über schwarzem Unterkleid, dazu weite Hose. Abendlook ohne Aufwand."
+      },
+      {
+        "id": "de-clean-135",
+        "field": "caption",
+        "text": "Nichts geht über eine frische weiße Bluse."
+      },
+      {
+        "id": "de-clean-136",
+        "field": "caption",
+        "text": "11 °C, Sonne, kein Wind. Leichter Wollmantel offen über dem Strickpulli."
+      },
+      {
+        "id": "de-clean-137",
+        "field": "caption",
+        "text": "Das figurbetonte Kleid war mir allein etwas zu viel, also ein weites Jeanshemd drüber."
+      },
+      {
+        "id": "de-clean-138",
+        "field": "caption",
+        "text": "Verkürzte weite Hosen zeigen Stiefeletten richtig gut."
+      },
+      {
+        "id": "de-clean-139",
+        "field": "caption",
+        "text": "Regen auf dem Arbeitsweg? Wasserdichte Sneaker. Ernsthaft, holt euch welche."
+      },
+      {
+        "id": "de-clean-140",
+        "field": "caption",
+        "text": "Bluse mit Spitzenkragen unter einem dunkelblauen Pulli. Süß für den Elternabend."
+      },
+      {
+        "id": "de-clean-141",
+        "field": "caption",
+        "text": "Zum ersten Mal einen Fischerhut probiert. Fazit: perfekt für sonnige Nachmittage."
+      },
+      {
+        "id": "de-clean-142",
+        "field": "caption",
+        "text": "In einen Deckenschal gewickelt, Latte in der Hand. November vom Feinsten."
+      },
+      {
+        "id": "de-clean-143",
+        "field": "caption",
+        "text": "Trägerloser Jumpsuit für die Gala, mit einem kleinen Bolero, falls es kalt wird."
+      },
+      {
+        "id": "de-clean-144",
+        "field": "caption",
+        "text": "Geblümtes Teekleid, Strickjacke, Spangenschuhe. Süß und praktisch."
+      },
+      {
+        "id": "de-clean-145",
+        "field": "caption",
+        "text": "Wie lagert ihr dicke Strickpullis, damit sie nicht ausleiern?"
+      },
+      {
+        "id": "de-clean-146",
+        "field": "caption",
+        "text": "Leichte Steppjacke, die in die eigene Tasche passt. Perfekt für den launischen Frühling."
+      },
+      {
+        "id": "de-clean-147",
+        "field": "caption",
+        "text": "Trage eine Rosette vom Reitturnier an meiner Jeansjacke. Stolz auf mein Pony!"
+      },
+      {
+        "id": "de-clean-148",
+        "field": "caption",
+        "text": "Retro-Trainingsjacke zum Midirock. Unerwartet, aber macht Spaß."
+      },
+      {
+        "id": "de-clean-149",
+        "field": "caption",
+        "text": "Brütende 38 °C. Das weiteste Teil angezogen, das ich besitze, und im Schatten geblieben."
+      },
+      {
+        "id": "de-clean-150",
+        "field": "caption",
+        "text": "Ballerinas im Leoprint sind für mich ein neutrales Basic."
+      },
+      {
+        "id": "de-clean-151",
+        "field": "caption",
+        "text": "Elfenbeinfarbener Anzug fürs Standesamt, darunter ein Seidentop."
+      },
+      {
+        "id": "de-clean-152",
+        "field": "caption",
+        "text": "Wie du die Weste als Oberteil stylst, ist so clever."
+      },
+      {
+        "id": "de-clean-153",
+        "field": "caption",
+        "text": "Haare mit einem Seidenhaargummi hochbinden, dann gibt es keine Knicke."
+      },
+      {
+        "id": "de-clean-154",
+        "field": "caption",
+        "text": "Kalter Nordwind. Doppelt Schal."
+      },
+      {
+        "id": "de-clean-155",
+        "field": "caption",
+        "text": "Chambrayhemd, weiße Jeans, Espadrilles. Seebrise-geprüft."
+      },
+      {
+        "id": "de-clean-156",
+        "field": "caption",
+        "text": "In die große schwarze Tasche passen Laptop, Mittagessen und Regenschirm. Bester Kauf des Jahres."
+      },
+      {
+        "id": "de-clean-157",
+        "field": "caption",
+        "text": "Cremefarbener Zopfpulli, braune Cordhose und Loafer mit dicken Socken."
+      },
+      {
+        "id": "de-clean-158",
+        "field": "caption",
+        "text": "Dunkelblaues Wickelkleid fürs Vorstellungsgespräch. Job bekommen! 🎉"
+      },
+      {
+        "id": "de-clean-159",
+        "field": "caption",
+        "text": "Welcher Stoff eignet sich für eine schwüle Sommerhochzeit? Leinen knittert, auf Seide sieht man jeden Schweißtropfen."
+      },
+      {
+        "id": "de-clean-160",
+        "field": "caption",
+        "text": "Der breitkrempige Hut hat heute mein Gesicht vor der Sonne gerettet."
+      },
+      {
+        "id": "de-clean-161",
+        "field": "caption",
+        "text": "Warmer Wollmantel und dünne Handschuhe für den Morgenfrost, mittags nur noch der Mantel."
+      },
+      {
+        "id": "de-clean-162",
+        "field": "caption",
+        "text": "Die taillierte Weste sieht super zum weißen T-Shirt aus."
+      },
+      {
+        "id": "de-clean-163",
+        "field": "caption",
+        "text": "Babyblauer Pullunder über einem gestreiften Hemd. Der Frühling kommt."
+      },
+      {
+        "id": "de-clean-164",
+        "field": "caption",
+        "text": "Sportlich: Trainingsjacke mit Reißverschluss, Radlerhose, klobige Sneaker."
+      },
+      {
+        "id": "de-clean-165",
+        "field": "caption",
+        "text": "Wildlederschuhe vor dem ersten Unwetter imprägnieren!"
+      },
+      {
+        "id": "de-clean-166",
+        "field": "caption",
+        "text": "Die alte Lederjacke meiner Mutter passt mir jetzt perfekt. Was für ein Glück."
+      },
+      {
+        "id": "de-clean-167",
+        "field": "caption",
+        "text": "Vichy-Kleid und rote Sandalen fürs Picknick."
+      },
+      {
+        "id": "de-clean-168",
+        "field": "caption",
+        "text": "Heiß, heiß, heiß in diesem roten Jumpsuit (und bei 34 °C draußen sowieso)."
+      },
+      {
+        "id": "de-clean-169",
+        "field": "caption",
+        "text": "Ausbeute vom Flohmarkt: ein Seidentuch, ein Vintage-Gürtel und eine Mütze aus Lammwolle."
+      },
+      {
+        "id": "de-clean-170",
+        "field": "caption",
+        "text": "Grauer Tag, grauer Anzug, gelbe Socken."
+      },
+      {
+        "id": "de-clean-171",
+        "field": "caption",
+        "text": "Ich liebe, wie du Vintage und Neues mischst. Tolles Auge."
+      },
+      {
+        "id": "de-clean-172",
+        "field": "caption",
+        "text": "Schulterfreie Bluse fürs Gartenfest. Nackte Schultern bei etwas Wind, also kam ein leichter Bolero mit."
+      },
+      {
+        "id": "de-clean-173",
+        "field": "caption",
+        "text": "Neckholder-Top mit langem Rock fürs Sommerkonzert im Park."
+      },
+      {
+        "id": "de-clean-174",
+        "field": "caption",
+        "text": "Der Trick bei schmalen Gürteln: etwas über der natürlichen Taille tragen."
+      },
+      {
+        "id": "de-clean-175",
+        "field": "caption",
+        "text": "Montagslaune: grauer Oversize-Blazer, schwarzes Shirt, gerade Jeans und Loafer."
+      },
+      {
+        "id": "de-clean-176",
+        "field": "caption",
+        "text": "So stark geregnet, dass meine Socken immer noch nass sind. Nächstes Mal wasserdichte Stiefel."
+      },
+      {
+        "id": "de-clean-177",
+        "field": "caption",
+        "text": "Chiffonbluse mit Puffärmeln. Fühlt sich an wie eine Wolke."
+      },
+      {
+        "id": "de-clean-178",
+        "field": "caption",
+        "text": "Schulterpolster sind zurück und ich beschwere mich nicht."
+      },
+      {
+        "id": "de-clean-179",
+        "field": "caption",
+        "text": "Waffelstrick-Henley und weite Chinos für einen ruhigen Sonntag."
+      },
+      {
+        "id": "de-clean-180",
+        "field": "caption",
+        "text": "Knöchellanger Mantel in Anthrazit. Hat mich 40 Minuten am Bahnsteig warm gehalten."
+      },
+      {
+        "id": "de-clean-181",
+        "field": "caption",
+        "text": "Sonnig und 26 °C. Sommerkleid in Kornblumenblau."
+      },
+      {
+        "id": "de-clean-182",
+        "field": "caption",
+        "text": "Was zieht man zu einer Sommerhochzeit in den Bergen an? Nach Sonnenuntergang nur noch 12 °C."
+      },
+      {
+        "id": "de-clean-183",
+        "field": "caption",
+        "text": "Karohemd als Jacke über dem Tanktop. Einfacher Zwiebellook."
+      },
+      {
+        "id": "de-clean-184",
+        "field": "caption",
+        "text": "Rostroter Wildlederrock, cremefarbene Bluse, hellbraune Stiefel. Herbst in Dauerschleife."
+      },
+      {
+        "id": "de-clean-185",
+        "field": "caption",
+        "text": "Auf der Konferenz High Heels getragen und es bis zum Mittag bereut. Morgen Sneaker."
+      },
+      {
+        "id": "de-clean-186",
+        "field": "caption",
+        "text": "Dieser Petrolton steht dir unglaublich gut."
+      },
+      {
+        "id": "de-clean-187",
+        "field": "caption",
+        "text": "Hautfarbene Mesh-Ballerinas sind so bequem für Reisetage."
+      },
+      {
+        "id": "de-clean-188",
+        "field": "caption",
+        "text": "Mintgrüne Hose mit weißem Strickpulli. Der Frühling ist endlich da."
+      },
+      {
+        "id": "de-clean-189",
+        "field": "caption",
+        "text": "Gefütterte Strumpfhosen sind der einzige Grund, warum ich im Januar Röcke tragen kann."
+      },
+      {
+        "id": "de-clean-190",
+        "field": "caption",
+        "text": "Hemd mit Zitronenprint fürs lange Wochenende 🍋"
+      },
+      {
+        "id": "de-clean-191",
+        "field": "caption",
+        "text": "Senfgelbe Cordjacke, schwarze Jeans, Chelsea Boots. Klassiker."
+      },
+      {
+        "id": "de-clean-192",
+        "field": "caption",
+        "text": "Badeanzug und Sarong für den See. Wasser kalt, Sonne stark."
+      },
+      {
+        "id": "de-clean-193",
+        "field": "caption",
+        "text": "Büro-Gewinner: Anzughose mit Stretchbund."
+      },
+      {
+        "id": "de-clean-194",
+        "field": "caption",
+        "text": "2 °C, leichter Schnee und trotzdem Sneaker. Nasse Zehen, keine Reue."
+      },
+      {
+        "id": "de-clean-195",
+        "field": "caption",
+        "text": "Silberschmuck zum dunkelblauen Kleid sieht so frisch aus."
+      },
+      {
+        "id": "de-clean-196",
+        "field": "caption",
+        "text": "Meine liebste Kombi bei Kälte: Rollkragenpulli unter einem Slipdress."
+      },
+      {
+        "id": "de-clean-197",
+        "field": "caption",
+        "text": "Polokleid, weiße Sneaker, Pferdeschwanz. Easy."
+      },
+      {
+        "id": "de-clean-198",
+        "field": "caption",
+        "text": "Man kann nie genug weiße T-Shirts haben. Unpopuläre Meinung?"
+      },
+      {
+        "id": "de-clean-199",
+        "field": "caption",
+        "text": "Bestickte Jacke vom Markt in der Altstadt. Tragbare Kunst."
+      },
+      {
+        "id": "de-clean-200",
+        "field": "caption",
+        "text": "Taillierter Blazer in Kobaltblau mit schwarzer Hose. Im Meeting fühlte ich mich wie die Chefin."
+      },
+      {
+        "id": "de-clean-201",
+        "field": "caption",
+        "text": "Bikinioberteil und Highwaist-Shorts für die Bootstour. Viel Sonnencreme."
+      },
+      {
+        "id": "de-clean-202",
+        "field": "caption",
+        "text": "Danke für eure Tipps zum Abschlussballkleid meiner Schwester. Sie hat das altrosa genommen."
+      },
+      {
+        "id": "de-clean-203",
+        "field": "caption",
+        "text": "Neonfarbene Sneaker zum komplett grauen Outfit. Ein bisschen Spaß muss sein."
+      },
+      {
+        "id": "de-clean-204",
+        "field": "caption",
+        "text": "Gebürstete Wollhosen halten wärmer als Jeans."
+      },
+      {
+        "id": "de-clean-205",
+        "field": "caption",
+        "text": "Frühlingsregen heißt: Der Trench darf wieder raus."
+      },
+      {
+        "id": "de-clean-206",
+        "field": "caption",
+        "text": "Verkürzte Hose und Loafer ohne Socken. Endlich warm genug."
+      },
+      {
+        "id": "de-clean-207",
+        "field": "caption",
+        "text": "Viel Tau heute früh, also lieber Lederstiefel."
+      },
+      {
+        "id": "de-clean-208",
+        "field": "caption",
+        "text": "Strick in gebranntem Orange und dunkle Jeans. Meine Herbstuniform."
+      },
+      {
+        "id": "de-clean-209",
+        "field": "caption",
+        "text": "Gemustertes Seidenhemd unter einem schlichten Anzug. Dezent, aber verspielt."
+      },
+      {
+        "id": "de-clean-210",
+        "field": "caption",
+        "text": "Wie dieser Mantel fällt, ist perfekt."
+      },
+      {
+        "id": "de-clean-211",
+        "field": "caption",
+        "text": "Frisuren für heiße Tage: flechten, hochstecken, fertig."
+      },
+      {
+        "id": "de-clean-212",
+        "field": "caption",
+        "text": "Samt-Slipdress, schwarze Feinstrumpfhose und Stiefeletten für die Weihnachtsfeier."
+      },
+      {
+        "id": "de-clean-213",
+        "field": "caption",
+        "text": "9 °C und Sonne. Lederjackenzeit."
+      },
+      {
+        "id": "de-clean-214",
+        "field": "caption",
+        "text": "Probiere einen Look komplett in Rosé. Meinungen?"
+      },
+      {
+        "id": "de-clean-215",
+        "field": "caption",
+        "text": "Latzhose und Ringelshirt. Gärtnern mit Stil."
+      },
+      {
+        "id": "de-clean-216",
+        "field": "caption",
+        "text": "Jedes Jahr vergesse ich, wie sehr ich Flanellhemden liebe."
+      },
+      {
+        "id": "de-clean-217",
+        "field": "caption",
+        "text": "Kunstfellmantel in der kältesten Nacht des Jahres. Mollig warm."
+      },
+      {
+        "id": "de-clean-218",
+        "field": "caption",
+        "text": "Enge Jeans gegen weite getauscht und ich will nie wieder zurück."
+      },
+      {
+        "id": "de-clean-219",
+        "field": "caption",
+        "text": "Hellblaues Hemdblusenkleid mit hellbraunem Gürtel und Sandalen fürs Mittagessen im Garten."
+      },
+      {
+        "id": "de-clean-220",
+        "field": "caption",
+        "text": "Sehr windig, also heute der enge Midirock."
+      },
+      {
+        "id": "de-clean-221",
+        "field": "caption",
+        "text": "Samtblazer in Pfauenblau. Wurde zweimal auf der Straße angesprochen."
+      },
+      {
+        "id": "de-clean-222",
+        "field": "caption",
+        "text": "Dieses Outfit hebe ich mir fürs nächste Date auf."
+      },
+      {
+        "id": "de-clean-223",
+        "field": "caption",
+        "text": "Oliv und Flieder sollte eigentlich nicht funktionieren, tut es aber."
+      },
+      {
+        "id": "de-clean-224",
+        "field": "caption",
+        "text": "Klobige Loafer mit weißen Socken und Faltenrock."
+      },
+      {
+        "id": "de-clean-225",
+        "field": "caption",
+        "text": "Mein erster maßgeschneiderter Anzug für die Abschlussfeier. Dunkelblau mit Nadelstreifen."
+      },
+      {
+        "id": "de-clean-226",
+        "field": "caption",
+        "text": "Musselinhemd für den heißesten Tag des Jahres. Atmet wie nichts anderes."
+      },
+      {
+        "id": "de-clean-227",
+        "field": "caption",
+        "text": "Zieht noch jemand zwei Strickjacken übereinander, wenn im Büro die Heizung aus ist?"
+      },
+      {
+        "id": "de-clean-228",
+        "field": "caption",
+        "text": "Roter Lippenstift, schwarzes Kleid, kleine goldene Creolen. Zeitlos."
+      },
+      {
+        "id": "de-clean-229",
+        "field": "caption",
+        "text": "Knallgelber Regenmantel, weil graue Tage das brauchen."
+      },
+      {
+        "id": "de-clean-230",
+        "field": "caption",
+        "text": "Rüschenbluse mit Anzugshorts und Blockabsätzen. Sommer im Büro."
+      },
+      {
+        "id": "de-clean-231",
+        "field": "caption",
+        "text": "Stürmischer Nachmittag. Anorak und Regenhose für die Radfahrt nach Hause."
+      },
+      {
+        "id": "de-clean-232",
+        "field": "caption",
+        "text": "Deine Schuhsammlung ist ein Traum."
+      },
+      {
+        "id": "de-clean-233",
+        "field": "caption",
+        "text": "Wollbaskenmütze und langer Mantel. Sehr Paris."
+      },
+      {
+        "id": "de-clean-234",
+        "field": "caption",
+        "text": "Die Falten im Rock haben die Waschmaschine überlebt!"
+      },
+      {
+        "id": "de-clean-235",
+        "field": "caption",
+        "text": "Schwarzes Spitzentop, weite Jeans und goldene Creolen für den Geburtstag einer Freundin."
+      },
+      {
+        "id": "de-clean-236",
+        "field": "caption",
+        "text": "Steht eine kurze Jacke bei kurzem Oberkörper? Frage für mich selbst."
+      },
+      {
+        "id": "de-clean-237",
+        "field": "caption",
+        "text": "Lange Strickjacke, schmale Hose, Ballerinas. Gemütlicher Bürolook."
+      },
+      {
+        "id": "de-clean-238",
+        "field": "caption",
+        "text": "15 °C und bewölkt mit Regenrisiko. Schirm vorsichtshalber eingepackt."
+      },
+      {
+        "id": "de-clean-239",
+        "field": "caption",
+        "text": "Meine neuen nudefarbenen Stiefeletten passen zu absolut allem."
+      },
+      {
+        "id": "de-clean-240",
+        "field": "caption",
+        "text": "Urlaub packen: Leinen, Leinen und noch mehr Leinen."
+      },
+      {
+        "id": "de-clean-241",
+        "field": "caption",
+        "text": "Sportlich-schick: Hoodie unterm Kamelhaarmantel."
+      },
+      {
+        "id": "de-clean-242",
+        "field": "caption",
+        "text": "Langärmelige Bluse mit Mini-Blümchen. Fühlt sich nach Frühling an."
+      },
+      {
+        "id": "de-clean-243",
+        "field": "caption",
+        "text": "Kurze Ärmel und Shorts im Mai. Zu früh? Die Sonne sagt nein."
+      },
+      {
+        "id": "de-clean-244",
+        "field": "caption",
+        "text": "Seidentuch am Taschengriff. Sofort aufgewertet."
+      },
+      {
+        "id": "de-clean-245",
+        "field": "caption",
+        "text": "Trägerkleid über einem weißen Shirt für einen Museumstag."
+      },
+      {
+        "id": "de-clean-246",
+        "field": "caption",
+        "text": "Das ist der Mantel, den ich letzten Winter wollte. Endlich im Sale gefunden."
+      },
+      {
+        "id": "de-clean-247",
+        "field": "caption",
+        "text": "Sexy, elegant und bequem. Dieses Wickelkleid kann alles."
+      },
+      {
+        "id": "de-clean-248",
+        "field": "caption",
+        "text": "Dunkle Jeans für abends, helle fürs Wochenende."
+      },
+      {
+        "id": "de-clean-249",
+        "field": "caption",
+        "text": "Netztop über einem schwarzen Bandeau fürs Festival. Sonnenbrille natürlich."
+      },
+      {
+        "id": "de-clean-250",
+        "field": "caption",
+        "text": "Die Sonne ist da, Ärmel hochgekrempelt."
+      },
+      {
+        "id": "de-clean-251",
+        "field": "caption",
+        "text": "Pastelltrench in Puderblau. Der Frühling ist da 🌸"
+      },
+      {
+        "id": "de-clean-252",
+        "field": "caption",
+        "text": "Merino-Schichten unter einer leichten Jacke sind mein Geheimnis für Winterreisen."
+      },
+      {
+        "id": "de-clean-253",
+        "field": "caption",
+        "text": "Die Farbe steht dir fantastisch!"
+      },
+      {
+        "id": "de-clean-254",
+        "field": "caption",
+        "text": "Verregneter Dienstag. Kniehohe Stiefel, Strickkleid und ein großer Schirm."
+      },
+      {
+        "id": "de-clean-255",
+        "field": "caption",
+        "text": "Wie verhindert ihr, dass transparente Oberteile zu abendlich wirken? Blazer und Loafer?"
+      },
+      {
+        "id": "de-clean-256",
+        "field": "caption",
+        "text": "Flache Zehensandalen sind mein Sommer-Basic. Am Strand schnell an- und ausgezogen."
+      },
+      {
+        "id": "de-clean-257",
+        "field": "caption",
+        "text": "Dieser taillierte Jumpsuit ist so chic."
+      },
+      {
+        "id": "de-clean-258",
+        "field": "caption",
+        "text": "Korsagen-Top über einer weißen Bluse. Viktorianischer Touch."
+      },
+      {
+        "id": "de-clean-259",
+        "field": "caption",
+        "text": "Fellkapuze auf, Handschuhe an, Schal zweimal rum. Minus 10 Grad."
+      },
+      {
+        "id": "de-clean-260",
+        "field": "caption",
+        "text": "Seidenbandana als Halstuch zur weißen Bluse."
+      },
+      {
+        "id": "de-clean-261",
+        "field": "caption",
+        "text": "Taupefarbene Hose, cremefarbener Pulli und brauner Ledergürtel. Neutrale Töne für immer."
+      },
+      {
+        "id": "de-clean-262",
+        "field": "caption",
+        "text": "Overall aus Denim. Praktisch, lässig und jede Menge Taschen."
+      },
+      {
+        "id": "de-clean-263",
+        "field": "caption",
+        "text": "Wärmster Tag des Jahres bisher. Der Bikini durfte mit ins Freibad."
+      },
+      {
+        "id": "de-clean-264",
+        "field": "caption",
+        "text": "Kann jemand eine Regenjacke empfehlen, die wirklich atmungsaktiv ist?"
+      },
+      {
+        "id": "de-clean-265",
+        "field": "caption",
+        "text": "Bundfaltenhose in Camel mit schwarzem Rollkragen."
+      },
+      {
+        "id": "de-clean-266",
+        "field": "caption",
+        "text": "Der Regen hörte genau rechtzeitig zum Mittagessen auf der Terrasse auf."
+      },
+      {
+        "id": "de-clean-267",
+        "field": "caption",
+        "text": "Tweedblazer, Jeans, Stiefeletten. Wochenende auf dem Land."
+      },
+      {
+        "id": "de-clean-268",
+        "field": "caption",
+        "text": "Rosa Leinenanzug für eine Frühlingshochzeit."
+      },
+      {
+        "id": "de-clean-269",
+        "field": "caption",
+        "text": "Lederrock und grauer Hoodie. Hart trifft weich."
+      },
+      {
+        "id": "de-clean-270",
+        "field": "caption",
+        "text": "Luftige Marlenehose ist meine beste Freundin bei Hitze."
+      },
+      {
+        "id": "de-clean-271",
+        "field": "caption",
+        "text": "Schneeflocken und ein knallroter Mantel."
+      },
+      {
+        "id": "de-clean-272",
+        "field": "caption",
+        "text": "Kleid mit Kirschmuster und weiße Strickjacke. Retro-Picknick."
+      },
+      {
+        "id": "de-clean-273",
+        "field": "caption",
+        "text": "Auffällige Ärmel für die Präsentation im Job. Hab mich selbstbewusst gefühlt."
+      },
+      {
+        "id": "de-clean-274",
+        "field": "caption",
+        "text": "Diesen beigen Pulli hatte ich dieses Jahr auf jeder Reise dabei."
+      },
+      {
+        "id": "de-clean-275",
+        "field": "caption",
+        "text": "Weiße Jeans vor Ostern? Wenn die Sonne scheint, ja."
+      },
+      {
+        "id": "de-clean-276",
+        "field": "caption",
+        "text": "Toller Haarschmuck! Woher ist die Spange?"
+      },
+      {
+        "id": "de-clean-277",
+        "field": "caption",
+        "text": "Bürooutfit bei Hitze: ärmelloses Top, Leinenhose und ein leichter Blazer für Meetings."
+      },
+      {
+        "id": "de-clean-278",
+        "field": "caption",
+        "text": "Kräftige Streifen an einem Regentag."
+      },
+      {
+        "id": "de-clean-279",
+        "field": "caption",
+        "text": "Weites Hemd, Radlerhose und Cap für Besorgungen."
+      },
+      {
+        "id": "de-clean-280",
+        "field": "caption",
+        "text": "In Seide nass geregnet. Tipp: tupfen, nicht reiben."
+      },
+      {
+        "id": "de-clean-281",
+        "field": "caption",
+        "text": "Schwarze Jeans und schwarzes Shirt. Die Uniform."
+      },
+      {
+        "id": "de-clean-282",
+        "field": "caption",
+        "text": "Habe mich wie ein Filmstar gefühlt in diesem Satinkleid."
+      },
+      {
+        "id": "de-clean-283",
+        "field": "caption",
+        "text": "Hitzewelle-Regel: je weniger Stoff am Körper klebt, desto besser. Lockere Schnitte!"
+      },
+      {
+        "id": "de-clean-284",
+        "field": "caption",
+        "text": "Cord-Overshirt für die kühlen Morgen."
+      },
+      {
+        "id": "de-clean-285",
+        "field": "caption",
+        "text": "Pulli von meinem Freund, meine Jeans, meine Sneaker. Kuschelig."
+      },
+      {
+        "id": "de-clean-286",
+        "field": "caption",
+        "text": "Hose mit Vichykaro und weißes T-Shirt. So frisch."
+      },
+      {
+        "id": "de-clean-287",
+        "field": "caption",
+        "text": "Samt-Scrunchie und hoher Pferdeschwanz. 90er-Feeling."
+      },
+      {
+        "id": "de-clean-288",
+        "field": "caption",
+        "text": "Jeder Regentag braucht einen fröhlichen Schirm. Meiner hat Enten drauf."
+      },
+      {
+        "id": "de-clean-289",
+        "field": "caption",
+        "text": "Bügelt oder dampft ihr euer Leinen? Ich hab beides aufgegeben."
+      },
+      {
+        "id": "de-clean-290",
+        "field": "caption",
+        "text": "Rollkragen und Perlen. Heute fühle ich mich elegant."
+      },
+      {
+        "id": "de-clean-291",
+        "field": "caption",
+        "text": "Die Ärmel an deinem Mantel sind wunderschön."
+      },
+      {
+        "id": "de-clean-292",
+        "field": "caption",
+        "text": "Bikerboots und Blumenkleid. Mein liebster Kontrast."
+      },
+      {
+        "id": "de-clean-293",
+        "field": "caption",
+        "text": "27 °C und schwül. Kurze Ärmel, Leinenhose, Sandalen."
+      },
+      {
+        "id": "de-clean-294",
+        "field": "caption",
+        "text": "Fischerhut, Sonnenbrille, Sonnencreme. Strandtag."
+      },
+      {
+        "id": "de-clean-295",
+        "field": "caption",
+        "text": "Blümchenbluse in Anzugshorts gesteckt."
+      },
+      {
+        "id": "de-clean-296",
+        "field": "caption",
+        "text": "Dunkelblauer Caban für den ersten kalten Morgen."
+      },
+      {
+        "id": "de-clean-297",
+        "field": "caption",
+        "text": "Zwei verschiedene Ohrringe, warum auch nicht."
+      },
+      {
+        "id": "de-clean-298",
+        "field": "caption",
+        "text": "Tanktop unter einer transparenten Bluse. Leicht und luftig."
+      },
+      {
+        "id": "de-clean-299",
+        "field": "caption",
+        "text": "Ein grauer Kaschmirschal macht jedes Winteroutfit weicher."
+      },
+      {
+        "id": "de-clean-300",
+        "field": "caption",
+        "text": "Der karierte Mantel passt perfekt zu diesem Wetter."
+      },
+      {
+        "id": "de-clean-301",
+        "field": "caption",
+        "text": "Cocktailkleid auf meiner eigenen Party. Um Mitternacht noch 20 °C auf dem Balkon."
+      },
+      {
+        "id": "de-clean-302",
+        "field": "caption",
+        "text": "Thermo-Unterhemd unter dem Leinenhemd im Winter? Funktioniert."
+      },
+      {
+        "id": "de-clean-303",
+        "field": "caption",
+        "text": "Weißes T-Shirt, verkürzte Hose, Ballerinas. Pariser Schlichtheit."
+      },
+      {
+        "id": "de-clean-304",
+        "field": "caption",
+        "text": "Häkeltop für die Strandbar. Bikini drunter."
+      },
+      {
+        "id": "de-clean-305",
+        "field": "caption",
+        "text": "Erst Schauer, dann Sonne. Die leichte Jacke war den ganzen Nachmittag um die Hüfte geknotet."
+      },
+      {
+        "id": "de-clean-306",
+        "field": "caption",
+        "text": "Kurze Daunenjacke und langer Rock: unerwartete Kombi, die ich liebe."
+      },
+      {
+        "id": "de-clean-307",
+        "field": "caption",
+        "text": "Erster Schultag. Neuer Rucksack, neue Sneaker."
+      },
+      {
+        "id": "de-clean-308",
+        "field": "caption",
+        "text": "Schnürstiefel und Wollsocken. Matschige Felder voraus."
+      },
+      {
+        "id": "de-clean-309",
+        "field": "caption",
+        "text": "Das Seidenkleid fällt wie Wasser."
+      },
+      {
+        "id": "de-clean-310",
+        "field": "caption",
+        "text": "Popelinehemd in Hellblau. Das vielseitigste Teil in meinem Kleiderschrank."
+      },
+      {
+        "id": "de-clean-311",
+        "field": "caption",
+        "text": "Laufcap mit Netzrücken für die Hitze."
+      },
+      {
+        "id": "de-clean-312",
+        "field": "caption",
+        "text": "Meine Schwester hat mir ihre roten Pumps geliehen und jetzt will ich eigene."
+      },
+      {
+        "id": "de-clean-313",
+        "field": "caption",
+        "text": "Schneestiefel und langes Strickkleid fürs Hüttenwochenende."
+      },
+      {
+        "id": "de-clean-314",
+        "field": "caption",
+        "text": "Frühjahrsputz im Kleiderschrank. Vier Säcke gespendet."
+      },
+      {
+        "id": "de-clean-315",
+        "field": "caption",
+        "text": "Black-Tie-Event: bodenlanges Samtkleid, transparente schwarze Handschuhe."
+      },
+      {
+        "id": "de-clean-316",
+        "field": "altText",
+        "text": "Eine Frau in einem Kamelhaarmantel und weißen Sneakern auf einer verregneten Straße."
+      },
+      {
+        "id": "de-clean-317",
+        "field": "altText",
+        "text": "Ein Mann in dunkelblauem Caban, grauem Schal und dunkler Jeans auf einem Gehweg."
+      },
+      {
+        "id": "de-clean-318",
+        "field": "altText",
+        "text": "Nahaufnahme von nudefarbenen Lederpumps mit spitzer Kappe auf einem Holzboden."
+      },
+      {
+        "id": "de-clean-319",
+        "field": "altText",
+        "text": "Eine Person in einem schwarzen Slipdress und kurzer Strickjacke vor einer Backsteinwand."
+      },
+      {
+        "id": "de-clean-320",
+        "field": "altText",
+        "text": "Eine Frau in einem gestreiften Bikini mit Strohhut an einem Sandstrand."
+      },
+      {
+        "id": "de-clean-321",
+        "field": "altText",
+        "text": "Flatlay mit einem engen weißen T-Shirt, heller Jeans und einer großen schwarzen Ledertasche."
+      },
+      {
+        "id": "de-clean-322",
+        "field": "altText",
+        "text": "Ein Mann in hellem Leinenhemd und beigen Shorts mit einem Eiskaffee in der Sonne."
+      },
+      {
+        "id": "de-clean-323",
+        "field": "altText",
+        "text": "Spiegelselfie einer Frau in einem pfauenblauen Cocktailkleid mit silbernen Ohrringen."
+      },
+      {
+        "id": "de-clean-324",
+        "field": "altText",
+        "text": "Eine Person in gelber Regenjacke und grünen Gummistiefeln neben einer Pfütze."
+      },
+      {
+        "id": "de-clean-325",
+        "field": "altText",
+        "text": "Eine Frau in transparenter schwarzer Bluse und weiter Hose in einer Bahnhofshalle."
+      },
+      {
+        "id": "de-clean-326",
+        "field": "altText",
+        "text": "Ein Teenager in kurzer Daunenjacke, weiter Jeans und klobigen Sneakern auf einem verschneiten Weg."
+      },
+      {
+        "id": "de-clean-327",
+        "field": "altText",
+        "text": "Zwei Freundinnen in passenden salbeigrünen Zweiteilern lachen vor einem Café."
+      },
+      {
+        "id": "de-clean-328",
+        "field": "altText",
+        "text": "Eine Frau in einem rückenfreien smaragdgrünen Abendkleid, von hinten fotografiert, bei einer Hochzeit im Freien."
+      },
+      {
+        "id": "de-clean-329",
+        "field": "altText",
+        "text": "Nahaufnahme goldener Ohrstecker mit Schraubverschluss auf einem Samttablett."
+      },
+      {
+        "id": "de-clean-330",
+        "field": "altText",
+        "text": "Ein Mann mit einer Bauchtasche quer über der Brust auf einem Wochenmarkt."
+      },
+      {
+        "id": "de-clean-331",
+        "field": "altText",
+        "text": "Eine Person in einem pastellfarbenen Lolita-Kleid mit Spitzenkragen und einer Rosette im Haar.",
+        "expected": "review",
+        "deliberateReviewTerm": "lolita",
+        "reason": "Names a fashion subculture and is also a child-sexualisation keyword. On a 13+ product every caption or alt text carrying it goes to a moderator, who can clear a fashion post; it is never allow-listed. The cost is review load for that style's posts, recorded as a named limitation."
+      },
+      {
+        "id": "de-clean-332",
+        "field": "altText",
+        "text": "Eine Frau in einem roten figurbetonten Midikleid und langem Camel-Blazer in einer Bürolobby."
+      },
+      {
+        "id": "de-clean-333",
+        "field": "altText",
+        "text": "Flache Zehensandalen aus hellbraunem Leder neben einem Strandtuch."
+      },
+      {
+        "id": "de-clean-334",
+        "field": "altText",
+        "text": "Eine Frau mit Spitzen-Bralette unter einem offenen Oversize-Blazer bei einer Abendveranstaltung."
+      },
+      {
+        "id": "de-clean-335",
+        "field": "altText",
+        "text": "Ein Mann in Steppweste über einem Hoodie beim Gassigehen im Nieselregen."
+      },
+      {
+        "id": "de-clean-336",
+        "field": "altText",
+        "text": "Eine Frau mit hochgebundenen Haaren in einem weißen Sommerkleid aus Baumwolle."
+      },
+      {
+        "id": "de-clean-337",
+        "field": "altText",
+        "text": "Eine Person in einem trägerlosen dunkelblauen Jumpsuit mit einer kleinen goldenen Clutch."
+      },
+      {
+        "id": "de-clean-338",
+        "field": "altText",
+        "text": "Schwarze Feinstrumpfhose und bordeauxrote Loafer, vom Knie abwärts fotografiert."
+      },
+      {
+        "id": "de-clean-339",
+        "field": "altText",
+        "text": "Eine Frau in Push-up-Jeans mit hohem Bund und eingestecktem grauem T-Shirt, Seitenansicht."
+      },
+      {
+        "id": "de-clean-340",
+        "field": "altText",
+        "text": "Ein Mann in schwarzer Lederjacke, schwarzer Jeans und schwarzen Boots vor einer grauen Wand."
+      },
+      {
+        "id": "de-clean-341",
+        "field": "altText",
+        "text": "Eine Frau in langem Daunenmantel, Strickmütze und gefütterten Stiefeln auf einer verschneiten Straße."
+      },
+      {
+        "id": "de-clean-342",
+        "field": "altText",
+        "text": "Eine Person mit senfgelber Mütze und anthrazitfarbenem Mantel unter einem Regenschirm."
+      },
+      {
+        "id": "de-clean-343",
+        "field": "altText",
+        "text": "Eine Frau in einem kobaltblauen Badeanzug mit tiefem Rückenausschnitt am Pool."
+      },
+      {
+        "id": "de-clean-344",
+        "field": "altText",
+        "text": "Ein Mann in einem olivgrünen Anzug und weißen Sneakern beim Überqueren einer Straße."
+      },
+      {
+        "id": "de-clean-345",
+        "field": "altText",
+        "text": "Eine Person in einer Seiden-Camisole im Wäsche-Look und weiter Hose in einem sonnigen Zimmer."
+      },
+      {
+        "id": "de-clean-346",
+        "field": "altText",
+        "text": "Eine Frau in Neckholder-Top und langem Plisseerock bei einem Konzert im Park."
+      },
+      {
+        "id": "de-clean-347",
+        "field": "altText",
+        "text": "Ein Mädchen in einem Vichy-Kleid und roten Sandalen auf einer Picknickdecke."
+      },
+      {
+        "id": "de-clean-348",
+        "field": "altText",
+        "text": "Ein Mann in einem pflaumenfarbenen Samtblazer und weißem Hemd an einem gedeckten Tisch."
+      },
+      {
+        "id": "de-clean-349",
+        "field": "altText",
+        "text": "Eine Frau mit Seidentuch und Sonnenbrille auf dem Beifahrersitz eines Cabrios."
+      },
+      {
+        "id": "de-clean-350",
+        "field": "altText",
+        "text": "Eine Läuferin in kurzen Hotpants und Sport-BH auf einem Uferweg bei Sonnenaufgang."
+      },
+      {
+        "id": "de-clean-351",
+        "field": "altText",
+        "text": "Flatlay mit einem hautfarbenen nahtlosen BH neben einer weißen Bluse."
+      },
+      {
+        "id": "de-clean-352",
+        "field": "altText",
+        "text": "Eine Frau in einem geblümten Trägerkleid und flachen Sandalen mit korallroten Fußnägeln."
+      },
+      {
+        "id": "de-clean-353",
+        "field": "altText",
+        "text": "Ein Mann in einem Zopfmusterpulli und brauner Cordhose in einem herbstlichen Park."
+      },
+      {
+        "id": "de-clean-354",
+        "field": "altText",
+        "text": "Eine Frau in silbernem Paillettentop und schwarzer Hose mit einer Geburtstagstorte."
+      },
+      {
+        "id": "de-clean-355",
+        "field": "altText",
+        "text": "Nahaufnahme des Ärmels einer gewachsten Jacke mit Regentropfen."
+      },
+      {
+        "id": "de-clean-356",
+        "field": "altText",
+        "text": "Eine Frau mit breitkrempigem Strohhut und weißem Leinenkleid auf einer Kopfsteinpflasterstraße."
+      },
+      {
+        "id": "de-clean-357",
+        "field": "altText",
+        "text": "Ein Mann in Daunenjacke und Mütze wartet bei Schneefall an einer Bushaltestelle."
+      },
+      {
+        "id": "de-clean-358",
+        "field": "altText",
+        "text": "Eine Frau in Samt-Slipdress, Feinstrumpfhose und Stiefeletten auf einer Weihnachtsfeier."
+      },
+      {
+        "id": "de-clean-359",
+        "field": "altText",
+        "text": "Ein Teenager in Print-Shirt, Blazer und weißen Sneakern auf einer Schultreppe."
+      },
+      {
+        "id": "de-clean-360",
+        "field": "altText",
+        "text": "Eine Frau in terrakottafarbenem Leinenhemd und passenden Shorts auf einem Balkon."
+      },
+      {
+        "id": "de-clean-361",
+        "field": "altText",
+        "text": "Flatlay mit cremefarbenem Rippstrickpulli, weiter Hose und cremefarbenen Loafern."
+      },
+      {
+        "id": "de-clean-362",
+        "field": "altText",
+        "text": "Eine Person in einem Netztop über schwarzem Bandeau und Jeansshorts auf einem Festival."
+      },
+      {
+        "id": "de-clean-363",
+        "field": "altText",
+        "text": "Eine Frau in Rüschenbluse, Anzugshorts und Blockabsätzen an einem Schreibtisch."
+      },
+      {
+        "id": "de-clean-364",
+        "field": "altText",
+        "text": "Ein Mann in einem Denim-Overall und Arbeitsstiefeln in einer Werkstatt."
+      },
+      {
+        "id": "de-clean-365",
+        "field": "altText",
+        "text": "Eine Frau in einem schwarzen Wickelkleid mit tiefem Ausschnitt und goldenem Anhänger in einem Restaurant."
+      },
+      {
+        "id": "de-clean-366",
+        "field": "altText",
+        "text": "Ein Paar in passenden dunkelblauen Regenjacken unter einem durchsichtigen Schirm."
+      },
+      {
+        "id": "de-clean-367",
+        "field": "altText",
+        "text": "Eine Frau in kurzem Strickpulli und Highwaist-Hose im Profil."
+      },
+      {
+        "id": "de-clean-368",
+        "field": "altText",
+        "text": "Eine Frau in einem knallroten Mantel bei leichtem Schneefall."
+      },
+      {
+        "id": "de-clean-369",
+        "field": "altText",
+        "text": "Ein Mann in einem rosa Leinenanzug bei einer Frühlingshochzeit im Freien."
+      },
+      {
+        "id": "de-clean-370",
+        "field": "altText",
+        "text": "Nahaufnahme schwarzer High Heels aus Lackleder auf Marmorstufen."
+      },
+      {
+        "id": "de-clean-371",
+        "field": "altText",
+        "text": "Eine Frau in dicker Strickjacke und Satinrock mit einer Tasse in der Hand."
+      },
+      {
+        "id": "de-clean-372",
+        "field": "altText",
+        "text": "Ein Kind in gelber Regenjacke und Gummistiefeln mit Entenmuster springt in eine Pfütze."
+      },
+      {
+        "id": "de-clean-373",
+        "field": "altText",
+        "text": "Eine Frau in Tweedblazer, Jeans und Stiefeletten an einer Steinmauer."
+      },
+      {
+        "id": "de-clean-374",
+        "field": "altText",
+        "text": "Eine Person in Häkeltop und weißer weiter Hose an einer Strandbar."
+      },
+      {
+        "id": "de-clean-375",
+        "field": "altText",
+        "text": "Eine Frau in Leorock und Ringelshirt auf einer Parkbank in der Stadt."
+      },
+      {
+        "id": "de-clean-376",
+        "field": "altText",
+        "text": "Ein Mann in Merino-Funktionsshirt und Fleecejacke auf einem Bergpfad."
+      },
+      {
+        "id": "de-clean-377",
+        "field": "altText",
+        "text": "Eine Frau in elfenbeinfarbenem Hosenanzug mit Seidentop vor einem Standesamt."
+      },
+      {
+        "id": "de-clean-378",
+        "field": "altText",
+        "text": "Eine Frau mit Korsagen-Top über einer weißen Bluse mit Puffärmeln."
+      },
+      {
+        "id": "de-clean-379",
+        "field": "altText",
+        "text": "Eine Person in einem Parka mit Fellkapuze in einer verschneiten Landschaft."
+      },
+      {
+        "id": "de-clean-380",
+        "field": "altText",
+        "text": "Ein Mädchen in einem altrosa Ballkleid mit einem kleinen Blumenstrauß."
+      },
+      {
+        "id": "de-clean-381",
+        "field": "altText",
+        "text": "Ein Mann in dunkelblauem Nadelstreifenanzug mit Absolventenhut in der Hand."
+      },
+      {
+        "id": "de-clean-382",
+        "field": "altText",
+        "text": "Eine Frau mit nackten Schultern in einer schulterfreien Bluse und geblümtem Midirock im Garten."
+      },
+      {
+        "id": "de-clean-383",
+        "field": "altText",
+        "text": "Eine Frau in schwarzem Spitzentop, weiter Jeans und goldenen Creolen am Abend."
+      },
+      {
+        "id": "de-clean-384",
+        "field": "altText",
+        "text": "Ein Mann in cremefarbenem Fischerpulli und rostroter Cordhose auf einer Holzveranda."
+      },
+      {
+        "id": "de-clean-385",
+        "field": "altText",
+        "text": "Eine Frau in fliederfarbenem Hemdblusenkleid an einem Brunchtisch."
+      },
+      {
+        "id": "de-clean-386",
+        "field": "altText",
+        "text": "Eine Person in einem pinken Anzug unter einem grauen, bewölkten Himmel."
+      },
+      {
+        "id": "de-clean-387",
+        "field": "altText",
+        "text": "Porträt einer Frau in schwarzem Rollkragenpulli mit einer Vintage-Brosche."
+      },
+      {
+        "id": "de-clean-388",
+        "field": "altText",
+        "text": "Eine Frau in einem Kleid mit transparenten Organza-Ärmeln auf einem Gartenfest."
+      },
+      {
+        "id": "de-clean-389",
+        "field": "altText",
+        "text": "Ein Mann in Chambrayhemd, weißer Jeans und Espadrilles auf einer Hafenmauer."
+      },
+      {
+        "id": "de-clean-390",
+        "field": "altText",
+        "text": "Eine Frau in salbeigrünem Satin-Midikleid und goldenen Sandalen bei einer Hochzeit."
+      },
+      {
+        "id": "de-clean-391",
+        "field": "altText",
+        "text": "Eine Person mit Fischerhut, Sonnenbrille und Ringelshirt am Strand."
+      },
+      {
+        "id": "de-clean-392",
+        "field": "altText",
+        "text": "Eine Frau in buttergelber Strickjacke und Jeansrock neben einem Blumenstand."
+      },
+      {
+        "id": "de-clean-393",
+        "field": "altText",
+        "text": "Ein Mann in Bomberjacke, Hoodie und weiter Jeans auf einer leeren Straße."
+      },
+      {
+        "id": "de-clean-394",
+        "field": "altText",
+        "text": "Eine Frau in kniehohen Stiefeln und grauem Strickkleid mit einem großen Schirm."
+      },
+      {
+        "id": "de-clean-395",
+        "field": "altText",
+        "text": "Eine Frau in engem Rippshirt und schwarzem Plisseerock vor einem Flurspiegel."
+      },
+      {
+        "id": "de-clean-396",
+        "field": "altText",
+        "text": "Ein Teenager in Latzhose und Ringelshirt kniet in einem Gemüsebeet."
+      },
+      {
+        "id": "de-clean-397",
+        "field": "altText",
+        "text": "Eine Frau in Kunstfellmantel und schwarzen Stiefeln an einem frostigen Abend."
+      },
+      {
+        "id": "de-clean-398",
+        "field": "altText",
+        "text": "Ein Mann in kariertem Flanellhemd und Arbeitshose stapelt Brennholz."
+      },
+      {
+        "id": "de-clean-399",
+        "field": "altText",
+        "text": "Eine Frau in einem Hemd mit Zitronenprint und weißen Shorts in einem Strandcafé."
+      },
+      {
+        "id": "de-clean-400",
+        "field": "altText",
+        "text": "Eine Frau mit einem schmalen Schal, zweimal geschlungen und in den dunkelblauen Mantel gesteckt."
+      },
+      {
+        "id": "de-clean-401",
+        "field": "altText",
+        "text": "Eine Person in puderblauem Trenchcoat unter blühenden Kirschbäumen."
+      },
+      {
+        "id": "de-clean-402",
+        "field": "altText",
+        "text": "Eine Frau in Bikinioberteil und Highwaist-Shorts an Deck eines Bootes."
+      },
+      {
+        "id": "de-clean-403",
+        "field": "altText",
+        "text": "Ein Mann in kurzärmeligem Strickpolo und Bundfaltenhose in einer Dachbar."
+      },
+      {
+        "id": "de-clean-404",
+        "field": "altText",
+        "text": "Eine Frau in bodenlangem schwarzem Samtkleid mit transparenten Handschuhen auf einer Gala."
+      },
+      {
+        "id": "de-clean-405",
+        "field": "altText",
+        "text": "Eine Frau mit Seidenbandana und weißer Bluse an einem sonnigen Fenster."
+      },
+      {
+        "id": "de-clean-406",
+        "field": "altText",
+        "text": "Eine Frau in trägerlosem Top und weiter Hose auf einer Terrasse am Abend."
+      },
+      {
+        "id": "de-clean-407",
+        "field": "altText",
+        "text": "Nahaufnahme einer pastellrosa Rosette an einer Jeansjacke."
+      },
+      {
+        "id": "de-clean-408",
+        "field": "altText",
+        "text": "Eine Frau in einem langen Daunenmantel an einer verschneiten Bushaltestelle."
+      },
+      {
+        "id": "de-clean-409",
+        "field": "altText",
+        "text": "Flatlay mit Slipdress, Strickjacke, Zehensandalen und Korbtasche für den Urlaub."
+      },
+      {
+        "id": "de-clean-410",
+        "field": "altText",
+        "text": "Ein Mann in leichtem Trenchcoat und grauem Anzug mit einem Kaffeebecher."
+      },
+      {
+        "id": "de-clean-411",
+        "field": "altText",
+        "text": "Eine Frau in rückenfreiem dunkelblauem Jumpsuit in einem Esszimmer mit Kerzenlicht."
+      },
+      {
+        "id": "de-clean-412",
+        "field": "altText",
+        "text": "Eine Frau in ärmellosem nudefarbenem Leinenkleid mit Korbtasche an einer Straßenbahnhaltestelle."
+      },
+      {
+        "id": "de-clean-413",
+        "field": "altText",
+        "text": "Eine Person in olivgrünem Parka und schwarzen Gummistiefeln vor einem Schultor."
+      },
+      {
+        "id": "de-clean-414",
+        "field": "altText",
+        "text": "Eine Frau in cremefarbenem Lolita-Kleid mit großer Schleife und weißer Strumpfhose im Park.",
+        "expected": "review",
+        "deliberateReviewTerm": "lolita",
+        "reason": "Names a fashion subculture and is also a child-sexualisation keyword. On a 13+ product every caption or alt text carrying it goes to a moderator, who can clear a fashion post; it is never allow-listed. The cost is review load for that style's posts, recorded as a named limitation."
+      },
+      {
+        "id": "de-clean-415",
+        "field": "altText",
+        "text": "Eine Frau mit Tweedmütze und dunkelblauem Mantel lächelt auf einem windigen Steg."
+      },
+      {
+        "id": "de-clean-416",
+        "field": "altText",
+        "text": "Ein Mann in Anorak und Regenhose mit Fahrrad im Regen."
+      },
+      {
+        "id": "de-clean-417",
+        "field": "altText",
+        "text": "Eine Frau im Cocktailkleid mit Blazer und Ballerinas an einem Bürotisch."
+      },
+      {
+        "id": "de-clean-418",
+        "field": "altText",
+        "text": "Eine Gruppe von Freundinnen in Sommerkleidern und Sandalen bei einem Konzert im Freien."
+      },
+      {
+        "id": "de-clean-419",
+        "field": "altText",
+        "text": "Eine Frau in Thermoleggings, Daunenjacke und Fäustlingen auf einem Bahnsteig."
+      },
+      {
+        "id": "de-clean-420",
+        "field": "altText",
+        "text": "Eine Frau in weiter Culotte und ärmellosem Top unter einem Sonnenschirm an einem heißen Tag."
+      }
+    ]
+  },
+  "disallowed": {
+    "description": "Disguised forms of terms from this language’s runtime list, ten per obfuscation family named in Story 6.2 AC 4, each inside an otherwise clean caption. Every entry is expected to be withheld (review or block). Generated by scripts/build-community-text-corpus.mjs.",
+    "expected": "withheld",
+    "families": [
+      "nfkc-fullwidth",
+      "case-mixing",
+      "diacritics-added",
+      "zero-width",
+      "cyrillic-confusable",
+      "leetspeak",
+      "repeated-characters",
+      "internal-punctuation",
+      "spaced-letters",
+      "leet-and-spaced"
+    ],
+    "entries": [
+      {
+        "id": "de-nfkc-fullwidth-01",
+        "family": "nfkc-fullwidth",
+        "field": "caption",
+        "text": "Heute im Park: ＡＮＡＬＲＩＴＴＥＲ"
+      },
+      {
+        "id": "de-nfkc-fullwidth-02",
+        "family": "nfkc-fullwidth",
+        "field": "caption",
+        "text": "ＢＩＭＢＯ und eine Jeansjacke"
+      },
+      {
+        "id": "de-nfkc-fullwidth-03",
+        "family": "nfkc-fullwidth",
+        "field": "altText",
+        "text": "Heute im Park: ＦＯＴＺＥ"
+      },
+      {
+        "id": "de-nfkc-fullwidth-04",
+        "family": "nfkc-fullwidth",
+        "field": "caption",
+        "text": "ＫＡＣＫＢＲＡＴＺＥ und eine Jeansjacke"
+      },
+      {
+        "id": "de-nfkc-fullwidth-05",
+        "family": "nfkc-fullwidth",
+        "field": "caption",
+        "text": "Heute im Park: ＭＯＲＧＥＮＬＡＴＴＥ"
+      },
+      {
+        "id": "de-nfkc-fullwidth-06",
+        "family": "nfkc-fullwidth",
+        "field": "altText",
+        "text": "ＮＵＴＴＥ und eine Jeansjacke"
+      },
+      {
+        "id": "de-nfkc-fullwidth-07",
+        "family": "nfkc-fullwidth",
+        "field": "caption",
+        "text": "Heute im Park: ＰＩＮＫＥＬＮ"
+      },
+      {
+        "id": "de-nfkc-fullwidth-08",
+        "family": "nfkc-fullwidth",
+        "field": "caption",
+        "text": "ＳＣＨＡＢＲＡＣＫＥ und eine Jeansjacke"
+      },
+      {
+        "id": "de-nfkc-fullwidth-09",
+        "family": "nfkc-fullwidth",
+        "field": "altText",
+        "text": "Heute im Park: ＳＣＨＷＡＮＺＬＵＴＳＣＨＥＲ"
+      },
+      {
+        "id": "de-nfkc-fullwidth-10",
+        "family": "nfkc-fullwidth",
+        "field": "caption",
+        "text": "ＴＵＮＴＥ und eine Jeansjacke"
+      },
+      {
+        "id": "de-case-mixing-01",
+        "family": "case-mixing",
+        "field": "caption",
+        "text": "Heute im Park: ArScH"
+      },
+      {
+        "id": "de-case-mixing-02",
+        "family": "case-mixing",
+        "field": "caption",
+        "text": "BoNzE und eine Jeansjacke"
+      },
+      {
+        "id": "de-case-mixing-03",
+        "family": "case-mixing",
+        "field": "altText",
+        "text": "Heute im Park: FrAtZe"
+      },
+      {
+        "id": "de-case-mixing-04",
+        "family": "case-mixing",
+        "field": "caption",
+        "text": "KaCkE und eine Jeansjacke"
+      },
+      {
+        "id": "de-case-mixing-05",
+        "family": "case-mixing",
+        "field": "caption",
+        "text": "Heute im Park: MuFtI"
+      },
+      {
+        "id": "de-case-mixing-06",
+        "family": "case-mixing",
+        "field": "altText",
+        "text": "OnAnIeReN und eine Jeansjacke"
+      },
+      {
+        "id": "de-case-mixing-07",
+        "family": "case-mixing",
+        "field": "caption",
+        "text": "Heute im Park: PiSsEn"
+      },
+      {
+        "id": "de-case-mixing-08",
+        "family": "case-mixing",
+        "field": "caption",
+        "text": "ScHeIsSe und eine Jeansjacke"
+      },
+      {
+        "id": "de-case-mixing-09",
+        "family": "case-mixing",
+        "field": "altText",
+        "text": "Heute im Park: ScHwUcHtEl"
+      },
+      {
+        "id": "de-case-mixing-10",
+        "family": "case-mixing",
+        "field": "caption",
+        "text": "UnTeRmEnScH und eine Jeansjacke"
+      },
+      {
+        "id": "de-diacritics-added-01",
+        "family": "diacritics-added",
+        "field": "caption",
+        "text": "Heute im Park: árschfícker"
+      },
+      {
+        "id": "de-diacritics-added-02",
+        "family": "diacritics-added",
+        "field": "caption",
+        "text": "brátzé und eine Jeansjacke"
+      },
+      {
+        "id": "de-diacritics-added-03",
+        "family": "diacritics-added",
+        "field": "altText",
+        "text": "Heute im Park: fréssé"
+      },
+      {
+        "id": "de-diacritics-added-04",
+        "family": "diacritics-added",
+        "field": "caption",
+        "text": "káckén und eine Jeansjacke"
+      },
+      {
+        "id": "de-diacritics-added-05",
+        "family": "diacritics-added",
+        "field": "caption",
+        "text": "Heute im Park: müschí"
+      },
+      {
+        "id": "de-diacritics-added-06",
+        "family": "diacritics-added",
+        "field": "altText",
+        "text": "örgásmus und eine Jeansjacke"
+      },
+      {
+        "id": "de-diacritics-added-07",
+        "family": "diacritics-added",
+        "field": "caption",
+        "text": "Heute im Park: píssér"
+      },
+      {
+        "id": "de-diacritics-added-08",
+        "family": "diacritics-added",
+        "field": "caption",
+        "text": "schéísser und eine Jeansjacke"
+      },
+      {
+        "id": "de-diacritics-added-09",
+        "family": "diacritics-added",
+        "field": "altText",
+        "text": "Heute im Park: spást"
+      },
+      {
+        "id": "de-diacritics-added-10",
+        "family": "diacritics-added",
+        "field": "caption",
+        "text": "vérgéwaltigen und eine Jeansjacke"
+      },
+      {
+        "id": "de-zero-width-01",
+        "family": "zero-width",
+        "field": "caption",
+        "text": "Heute im Park: a​r​s​c​h​g​e​i​g​e"
+      },
+      {
+        "id": "de-zero-width-02",
+        "family": "zero-width",
+        "field": "caption",
+        "text": "b​u​m​s​e​n und eine Jeansjacke"
+      },
+      {
+        "id": "de-zero-width-03",
+        "family": "zero-width",
+        "field": "altText",
+        "text": "Heute im Park: h​a​c​k​f​r​e​s​s​e"
+      },
+      {
+        "id": "de-zero-width-04",
+        "family": "zero-width",
+        "field": "caption",
+        "text": "k​a​c​k​w​u​r​s​t und eine Jeansjacke"
+      },
+      {
+        "id": "de-zero-width-05",
+        "family": "zero-width",
+        "field": "caption",
+        "text": "Heute im Park: n​a​c​k​t"
+      },
+      {
+        "id": "de-zero-width-06",
+        "family": "zero-width",
+        "field": "altText",
+        "text": "p​e​n​i​s und eine Jeansjacke"
+      },
+      {
+        "id": "de-zero-width-07",
+        "family": "zero-width",
+        "field": "caption",
+        "text": "Heute im Park: p​o​p​e​l"
+      },
+      {
+        "id": "de-zero-width-08",
+        "family": "zero-width",
+        "field": "caption",
+        "text": "s​c​h​i​e​s​s​e​r und eine Jeansjacke"
+      },
+      {
+        "id": "de-zero-width-09",
+        "family": "zero-width",
+        "field": "altText",
+        "text": "Heute im Park: s​p​a​s​t​i"
+      },
+      {
+        "id": "de-zero-width-10",
+        "family": "zero-width",
+        "field": "caption",
+        "text": "v​e​r​g​e​w​a​l​t​i​g​u​n​g und eine Jeansjacke"
+      },
+      {
+        "id": "de-cyrillic-confusable-01",
+        "family": "cyrillic-confusable",
+        "field": "caption",
+        "text": "Heute im Park: аrsсhlecker"
+      },
+      {
+        "id": "de-cyrillic-confusable-02",
+        "family": "cyrillic-confusable",
+        "field": "caption",
+        "text": "drесksau und eine Jeansjacke"
+      },
+      {
+        "id": "de-cyrillic-confusable-03",
+        "family": "cyrillic-confusable",
+        "field": "altText",
+        "text": "Heute im Park: hurеnsоhn"
+      },
+      {
+        "id": "de-cyrillic-confusable-04",
+        "family": "cyrillic-confusable",
+        "field": "caption",
+        "text": "kаmрflesbe und eine Jeansjacke"
+      },
+      {
+        "id": "de-cyrillic-confusable-05",
+        "family": "cyrillic-confusable",
+        "field": "caption",
+        "text": "Heute im Park: nеgеr"
+      },
+      {
+        "id": "de-cyrillic-confusable-06",
+        "family": "cyrillic-confusable",
+        "field": "altText",
+        "text": "реnner und eine Jeansjacke"
+      },
+      {
+        "id": "de-cyrillic-confusable-07",
+        "family": "cyrillic-confusable",
+        "field": "caption",
+        "text": "Heute im Park: роppen"
+      },
+      {
+        "id": "de-cyrillic-confusable-08",
+        "family": "cyrillic-confusable",
+        "field": "caption",
+        "text": "sсhlаmpe und eine Jeansjacke"
+      },
+      {
+        "id": "de-cyrillic-confusable-09",
+        "family": "cyrillic-confusable",
+        "field": "altText",
+        "text": "Heute im Park: tittсhеn"
+      },
+      {
+        "id": "de-cyrillic-confusable-10",
+        "family": "cyrillic-confusable",
+        "field": "caption",
+        "text": "vеrrеcke und eine Jeansjacke"
+      },
+      {
+        "id": "de-leetspeak-01",
+        "family": "leetspeak",
+        "field": "caption",
+        "text": "Heute im Park: 4r5chl0ch"
+      },
+      {
+        "id": "de-leetspeak-02",
+        "family": "leetspeak",
+        "field": "caption",
+        "text": "f1ck3n und eine Jeansjacke"
+      },
+      {
+        "id": "de-leetspeak-03",
+        "family": "leetspeak",
+        "field": "altText",
+        "text": "Heute im Park: 15ch3"
+      },
+      {
+        "id": "de-leetspeak-04",
+        "family": "leetspeak",
+        "field": "caption",
+        "text": "k4n4k3 und eine Jeansjacke"
+      },
+      {
+        "id": "de-leetspeak-05",
+        "family": "leetspeak",
+        "field": "caption",
+        "text": "Heute im Park: n1gg3r"
+      },
+      {
+        "id": "de-leetspeak-06",
+        "family": "leetspeak",
+        "field": "altText",
+        "text": "p1mm3l und eine Jeansjacke"
+      },
+      {
+        "id": "de-leetspeak-07",
+        "family": "leetspeak",
+        "field": "caption",
+        "text": "Heute im Park: p0rn0"
+      },
+      {
+        "id": "de-leetspeak-08",
+        "family": "leetspeak",
+        "field": "caption",
+        "text": "5chn4ck3ln und eine Jeansjacke"
+      },
+      {
+        "id": "de-leetspeak-09",
+        "family": "leetspeak",
+        "field": "altText",
+        "text": "Heute im Park: 71773n"
+      },
+      {
+        "id": "de-leetspeak-10",
+        "family": "leetspeak",
+        "field": "caption",
+        "text": "v0ll1d107 und eine Jeansjacke"
+      },
+      {
+        "id": "de-repeated-characters-01",
+        "family": "repeated-characters",
+        "field": "caption",
+        "text": "Heute im Park: baaaastard"
+      },
+      {
+        "id": "de-repeated-characters-02",
+        "family": "repeated-characters",
+        "field": "caption",
+        "text": "fllllittchen und eine Jeansjacke"
+      },
+      {
+        "id": "de-repeated-characters-03",
+        "family": "repeated-characters",
+        "field": "altText",
+        "text": "Heute im Park: juuuudensau"
+      },
+      {
+        "id": "de-repeated-characters-04",
+        "family": "repeated-characters",
+        "field": "caption",
+        "text": "kiiiimme und eine Jeansjacke"
+      },
+      {
+        "id": "de-repeated-characters-05",
+        "family": "repeated-characters",
+        "field": "caption",
+        "text": "Heute im Park: niiiippel"
+      },
+      {
+        "id": "de-repeated-characters-06",
+        "family": "repeated-characters",
+        "field": "altText",
+        "text": "piiiimpern und eine Jeansjacke"
+      },
+      {
+        "id": "de-repeated-characters-07",
+        "family": "repeated-characters",
+        "field": "caption",
+        "text": "Heute im Park: reeeeudig"
+      },
+      {
+        "id": "de-repeated-characters-08",
+        "family": "repeated-characters",
+        "field": "caption",
+        "text": "scccchwanz und eine Jeansjacke"
+      },
+      {
+        "id": "de-repeated-characters-09",
+        "family": "repeated-characters",
+        "field": "altText",
+        "text": "Heute im Park: trrrrottel"
+      },
+      {
+        "id": "de-repeated-characters-10",
+        "family": "repeated-characters",
+        "field": "caption",
+        "text": "voooollpfosten und eine Jeansjacke"
+      },
+      {
+        "id": "de-internal-punctuation-01",
+        "family": "internal-punctuation",
+        "field": "caption",
+        "text": "Heute im Park: b.i.m.b.o"
+      },
+      {
+        "id": "de-internal-punctuation-02",
+        "family": "internal-punctuation",
+        "field": "caption",
+        "text": "f.o.t.z.e und eine Jeansjacke"
+      },
+      {
+        "id": "de-internal-punctuation-03",
+        "family": "internal-punctuation",
+        "field": "altText",
+        "text": "Heute im Park: k.a.c.k.b.r.a.t.z.e"
+      },
+      {
+        "id": "de-internal-punctuation-04",
+        "family": "internal-punctuation",
+        "field": "caption",
+        "text": "m.o.r.g.e.n.l.a.t.t.e und eine Jeansjacke"
+      },
+      {
+        "id": "de-internal-punctuation-05",
+        "family": "internal-punctuation",
+        "field": "caption",
+        "text": "Heute im Park: n.u.t.t.e"
+      },
+      {
+        "id": "de-internal-punctuation-06",
+        "family": "internal-punctuation",
+        "field": "altText",
+        "text": "p.i.n.k.e.l.n und eine Jeansjacke"
+      },
+      {
+        "id": "de-internal-punctuation-07",
+        "family": "internal-punctuation",
+        "field": "caption",
+        "text": "Heute im Park: s.c.h.a.b.r.a.c.k.e"
+      },
+      {
+        "id": "de-internal-punctuation-08",
+        "family": "internal-punctuation",
+        "field": "caption",
+        "text": "s.c.h.w.a.n.z.l.u.t.s.c.h.e.r und eine Jeansjacke"
+      },
+      {
+        "id": "de-internal-punctuation-09",
+        "family": "internal-punctuation",
+        "field": "altText",
+        "text": "Heute im Park: t.u.n.t.e"
+      },
+      {
+        "id": "de-internal-punctuation-10",
+        "family": "internal-punctuation",
+        "field": "caption",
+        "text": "w.i.c.h.s.e und eine Jeansjacke"
+      },
+      {
+        "id": "de-spaced-letters-01",
+        "family": "spaced-letters",
+        "field": "caption",
+        "text": "Heute im Park: b o n z e"
+      },
+      {
+        "id": "de-spaced-letters-02",
+        "family": "spaced-letters",
+        "field": "caption",
+        "text": "f r a t z e und eine Jeansjacke"
+      },
+      {
+        "id": "de-spaced-letters-03",
+        "family": "spaced-letters",
+        "field": "altText",
+        "text": "Heute im Park: k a c k e"
+      },
+      {
+        "id": "de-spaced-letters-04",
+        "family": "spaced-letters",
+        "field": "caption",
+        "text": "m u f t i und eine Jeansjacke"
+      },
+      {
+        "id": "de-spaced-letters-05",
+        "family": "spaced-letters",
+        "field": "caption",
+        "text": "Heute im Park: o n a n i e r e n"
+      },
+      {
+        "id": "de-spaced-letters-06",
+        "family": "spaced-letters",
+        "field": "altText",
+        "text": "p i s s e n und eine Jeansjacke"
+      },
+      {
+        "id": "de-spaced-letters-07",
+        "family": "spaced-letters",
+        "field": "caption",
+        "text": "Heute im Park: s c h e i s s e"
+      },
+      {
+        "id": "de-spaced-letters-08",
+        "family": "spaced-letters",
+        "field": "caption",
+        "text": "s c h w u c h t e l und eine Jeansjacke"
+      },
+      {
+        "id": "de-spaced-letters-09",
+        "family": "spaced-letters",
+        "field": "altText",
+        "text": "Heute im Park: u n t e r m e n s c h"
+      },
+      {
+        "id": "de-spaced-letters-10",
+        "family": "spaced-letters",
+        "field": "caption",
+        "text": "w i c h s e n und eine Jeansjacke"
+      },
+      {
+        "id": "de-leet-and-spaced-01",
+        "family": "leet-and-spaced",
+        "field": "caption",
+        "text": "Heute im Park: b r 4 7 z e"
+      },
+      {
+        "id": "de-leet-and-spaced-02",
+        "family": "leet-and-spaced",
+        "field": "caption",
+        "text": "f r 3 5 s e und eine Jeansjacke"
+      },
+      {
+        "id": "de-leet-and-spaced-03",
+        "family": "leet-and-spaced",
+        "field": "altText",
+        "text": "Heute im Park: k 4 c k 3 n"
+      },
+      {
+        "id": "de-leet-and-spaced-04",
+        "family": "leet-and-spaced",
+        "field": "caption",
+        "text": "m u 5 c h 1 und eine Jeansjacke"
+      },
+      {
+        "id": "de-leet-and-spaced-05",
+        "family": "leet-and-spaced",
+        "field": "caption",
+        "text": "Heute im Park: 0 r g 4 s m u s"
+      },
+      {
+        "id": "de-leet-and-spaced-06",
+        "family": "leet-and-spaced",
+        "field": "altText",
+        "text": "p 1 5 s e r und eine Jeansjacke"
+      },
+      {
+        "id": "de-leet-and-spaced-07",
+        "family": "leet-and-spaced",
+        "field": "caption",
+        "text": "Heute im Park: 5 c h 3 i s s e r"
+      },
+      {
+        "id": "de-leet-and-spaced-08",
+        "family": "leet-and-spaced",
+        "field": "caption",
+        "text": "5 p 4 s t und eine Jeansjacke"
+      },
+      {
+        "id": "de-leet-and-spaced-09",
+        "family": "leet-and-spaced",
+        "field": "altText",
+        "text": "Heute im Park: v 3 r g 3 w a l t i g e n"
+      },
+      {
+        "id": "de-leet-and-spaced-10",
+        "family": "leet-and-spaced",
+        "field": "caption",
+        "text": "w 1 c h 5 e r und eine Jeansjacke"
+      }
+    ]
+  }
+}

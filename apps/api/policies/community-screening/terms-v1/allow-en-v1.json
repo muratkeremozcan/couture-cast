@@ -1,28 +1,40 @@
 {
   "language": "en",
-  "listVersion": "terms-v1",
+  "listVersion": "allow-list-v1",
   "listType": "allowList",
   "provenance": {
-    "source": "repository-owned reviewed list",
+    "source": "repository-owned allow list, allow-list-v1.json",
     "version": "v1",
     "licence": "UNLICENSED (repository-owned)",
-    "retrievedAt": "2026-09-08",
-    "curator": "couture-cast trust and safety",
-    "notes": "Ordinary garment and styling vocabulary that collides with a term once repeated characters are collapsed or diacritics folded, plus the words the bad-words backstop flags that name real garments or describe them: a fanny pack, a boob tube, knob and screw-back fastenings, and sexy as the register eveningwear, lingerie and swimwear copy is written in. The image policy already declines to treat the model's Sexy class as unsafe for exactly that reason, and a text backstop that routed every caption using the word to a human would contradict it. Allow-list lookup runs on the literal case-folded token, before diacritic and leet folding, so an accented spelling is still screened."
+    "retrievedAt": "2026-10-16",
+    "curator": "couture-cast repository owner",
+    "notes": "GENERATED from allow-list-v1.json, where every entry records why it exists; do not edit by hand. Allow lists apply across all seven languages, so an entry here clears the word whichever list would have flagged it."
+  },
+  "generated": {
+    "generator": "scripts/verify-community-screening-lists.mjs",
+    "allowListSha256": "22d1f261f3666cf37369e67359aeabc383ac0a689babe04f87023ba1aee70256"
   },
   "entries": [
+    "big black",
     "boob",
+    "butt",
     "cockade",
     "cockades",
     "fanny",
+    "jiz",
     "knob",
     "knobs",
+    "nude",
+    "pale",
     "peacock",
+    "pof",
     "puttee",
     "puttees",
     "screw",
     "screws",
     "sexy",
-    "shirtdress"
+    "shirtdress",
+    "tied up",
+    "tight white"
   ]
 }

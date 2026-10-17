@@ -2,7 +2,7 @@
   "artifact": "community-content-screening-measurements",
   "artifactVersion": 1,
   "storyKey": "6-2-production-content-screening-readiness",
-  "generatedAt": "2026-09-09T01:56:44.876Z",
+  "generatedAt": "2026-10-17T01:53:56.280Z",
   "generatedBy": "npm run measure:community-screening",
   "scope": {
     "rendersVerdict": false,
@@ -16,13 +16,13 @@
     "statement": "The deterministic evaluation proves that unsafe class-probability vectors return block, that every threshold is crossed from both sides, and that no vector reaches pass without a confident Neutral. The lifecycle suite drives a fake inference runtime emitting an unsafe vector, which proves the transport from worker message through validation, class mapping, policy evaluation, reason codes, and engine identity to a block verdict. Neither establishes that the real model emits a high Porn or Hentai probability for genuinely unsafe input, and no synthetic vector can. That single link is what AC 7 assigns to Story 6.2b corpus-backed measurement."
   },
   "build": {
-    "commitSha": "863a349bae16126cb809fdfef46ff041659cb79b",
-    "modelManifestSha256": "d2bd4c0ec65056ca13256a3645c4ea4a95a7e1d3af21bc886d9a2a4c7396357f",
-    "policySha256": "467f139bba94f5131a652c597fe91867ad553dd0ef271fc3604da55f4e66a6e6",
+    "commitSha": "72b434c6760f15f9e01f331b94ef9a16018c111e",
+    "modelManifestSha256": "28d715ef177c3322b25393be9f1ee3e1d3344d6170af0f55df4a57414c44b206",
+    "policySha256": "b0daab4ab9d175cc018d88d7c37d3443a4d9425909394da3aee110e15ad98b65",
     "fixtureManifestSha256": "b8cd2cd08dd419024a2cdb3ca84d03b3be7a5df211a92cd200853200bcb13243",
     "lockfileSha256": "2025e3f196ed2a7091eb5f7c034af8a00365b3a38826248b003a4ae609cdcf91",
-    "workingTreeClean": true,
-    "nodeVersion": "v24.20.0",
+    "workingTreeClean": false,
+    "nodeVersion": "v24.22.0",
     "platform": "darwin-arm64"
   },
   "modelIdentity": {
@@ -40,8 +40,8 @@
     "note": null
   },
   "engineIdentity": {
-    "textEngineVersion": "adr013-text:policy-v1@467f139bba94",
-    "imageEngineVersion": "adr013-nsfw-v1.0:mobilenet_v2_mid@4.3.0:model-a0c76f72db26:v1:policy-467f139bba94",
+    "textEngineVersion": "adr013-text:policy-v2@b0daab4ab9d1",
+    "imageEngineVersion": "adr013-nsfw-v1.0:mobilenet_v2_mid@4.3.0:model-a0c76f72db26:v2:policy-b0daab4ab9d1",
     "source": "screening loader, recorded by the readiness run"
   },
   "evidenceCorpus": {
@@ -50,10 +50,13 @@
     "note": "Restricted evaluation assets stay outside Git; only their versioned manifest and hashes are committed. Story 6.2b owns those corpora."
   },
   "policyIdentity": {
-    "policyId": "community-screening-policy-v1",
-    "version": "v1",
-    "policySha256": "467f139bba94f5131a652c597fe91867ad553dd0ef271fc3604da55f4e66a6e6",
-    "neutralPassMinimum": 0.85,
+    "policyId": "community-screening-policy-v2",
+    "version": "v2",
+    "policySha256": "b0daab4ab9d175cc018d88d7c37d3443a4d9425909394da3aee110e15ad98b65",
+    "safeClasses": ["Drawing", "Neutral"],
+    "safeMassMinimum": 0.85,
+    "reviewClasses": ["Sexy"],
+    "reviewClassMaximum": 0.15,
     "unsafeClasses": ["Hentai", "Porn"],
     "unsafeBlockMinimum": 0.35,
     "probabilitySumTolerance": 0.001,
@@ -80,17 +83,17 @@
     "screening": {
       "available": true,
       "screeningPath": "tensorflow",
-      "measuredAt": "2026-09-09T01:56:25.238Z",
+      "measuredAt": "2026-10-17T01:53:34.971Z",
       "modelDigest": "a0c76f72db261c54dc851b974c848dc9ce01576ca66b0f232f4848c950549322",
-      "policyVersion": "v1",
-      "policyDigest": "467f139bba94f5131a652c597fe91867ad553dd0ef271fc3604da55f4e66a6e6",
+      "policyVersion": "v2",
+      "policyDigest": "b0daab4ab9d175cc018d88d7c37d3443a4d9425909394da3aee110e15ad98b65",
       "neutralRange": {
         "min": 0.7521889209747314,
         "max": 0.9991244673728943
       },
       "dispositionCounts": {
-        "pass": 10,
-        "review": 2
+        "pass": 11,
+        "review": 1
       },
       "corpusDispositions": [
         {
@@ -215,7 +218,7 @@
         },
         {
           "fixture": "safe-twill-charcoal-512x512.jpg",
-          "disposition": "review",
+          "disposition": "pass",
           "classProbabilities": {
             "Drawing": 0.08849525451660156,
             "Hentai": 0.08743124455213547,
@@ -223,7 +226,7 @@
             "Porn": 0.0027319451328366995,
             "Sexy": 0.003569655120372772
           },
-          "reasons": ["low_confidence"]
+          "reasons": []
         },
         {
           "fixture": "safe-herringbone-oat-512x512.jpg",
@@ -246,7 +249,7 @@
           "fixtureManifestSha256",
           "lockfileSha256"
         ],
-        "commitShaAtMeasurement": "863a349bae16126cb809fdfef46ff041659cb79b",
+        "commitShaAtMeasurement": "72b434c6760f15f9e01f331b94ef9a16018c111e",
         "mismatches": [],
         "note": "Every input that produced these numbers matches the working tree."
       }
@@ -254,6 +257,7 @@
     "performance": {
       "available": true,
       "source": "apps/api/model-manifests/community-nsfw-mobilenet-v2-mid-nsfwjs-4.3.0.json performance.measured",
+      "gatedBy": "npm run community:screening:measure:gate",
       "executedFrom": "compiled dist under plain node",
       "measured": {
         "coldStartupMs": 236.5,
@@ -327,6 +331,14 @@
       "intent": "exercise non-publication, absence from a second member feed, and the absence of any raw matched term or class probability in a client payload",
       "doesNotProve": "anything about image blocking. No unsafe imagery exists in this repository, so this journey is refused by the text screener and must not be read as end-to-end proof that the image model blocks anything.",
       "command": "npm run test:community-screening:e2e"
+    },
+    {
+      "id": "6.2-E2E-03",
+      "name": "the author of a refused look sees a localized recovery state",
+      "refusedBy": "text-screener",
+      "screeningPathIsRunSelected": true,
+      "intent": "render the refused post in the author browser and assert the localized status, removal explanation, and reason copy for the stable text_policy_match code, with the raw code absent from the page",
+      "command": "npm run test:community-screening:e2e"
     }
   ],
   "limitations": [
@@ -350,9 +362,9 @@
     },
     {
       "id": "local-dispatch-cadence",
-      "statement": "The end-to-end stack dispatches the moderation outbox once a second; production uses a one-minute scheduler.",
-      "mitigation": "The one-second cadence is a test-harness setting only and is never presented as latency evidence.",
-      "revisitWhen": "Story 6.2b measures queue latency against the deployed worker."
+      "statement": "The end-to-end stack dispatches the moderation outbox once a second. The hosted community worker Story 6.2b deploys runs the same community bootstrap and therefore the same one-second dispatch; the one-minute scheduler belongs to the general bootstrap, which no hosted target runs.",
+      "mitigation": "No number in this payload is presented as production latency. Story 6.2b measures queue latency against the worker through its canary.",
+      "revisitWhen": "The hosted canary has run against the deployed worker."
     }
   ],
   "rollout": {
@@ -371,7 +383,8 @@
       "verifyArtifactsAsInvokedHere": "npm run --silent verify:community-screening-model --workspace api -- --json",
       "verifySupplyChain": "npm run verify:community-screening-supply-chain --workspace api",
       "smoke": "npm run test:community-screening-model:smoke --workspace api",
-      "readiness": "npm run test:community-screening-readiness --workspace api"
+      "readiness": "npm run test:community-screening-readiness --workspace api",
+      "runtimeGate": "npm run community:screening:measure:gate"
     },
     "pipeline": {
       "integration": "npm run test:integration --workspace api -- integration/community-moderation-pipeline.integration.spec.ts",

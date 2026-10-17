@@ -1,0 +1,181 @@
+{
+  "policyId": "community-screening-policy-v2",
+  "version": "v2",
+  "effectiveFrom": "2026-10-16",
+  "supersedes": "community-screening-policy-v1 (effective 2026-09-08), whose pass rule required Neutral above 0.85. v2 passes on the safe mass (Neutral plus Drawing) above a floor chosen on the calibration half of the safe photograph corpus, and keeps every unsafe bound v1 implied, including the joint bound on Hentai, Porn and Sexy together.",
+  "summary": "Screening policy for Community Beta. Automatic publication requires a confident safe-for-work reading of the image (Neutral plus Drawing above the calibrated floor, with every unsafe bound at or tighter than v1) and a clean result from every text dictionary; every other outcome, uncertainty included, routes to a human.",
+  "image": {
+    "modelFamily": "mobilenet_v2_mid",
+    "classNames": ["Drawing", "Hentai", "Neutral", "Porn", "Sexy"],
+    "classNamesRationale": "The exact NSFW_CLASSES set exported by nsfwjs@4.3.0, in the canonical order the model's output vector uses positionally. A vector of any other length, or a class-name set that does not match this list exactly, is invalid output and routes to review.",
+    "safeClasses": ["Drawing", "Neutral"],
+    "safeClassesRationale": "The classes NSFWJS's own taxonomy marks safe for work. Story 6.2b measured that the model puts most of a real photograph's probability on Drawing, not Neutral: on the calibration half of the safe photograph corpus the Neutral-only floor withheld 94.6% of ordinary fashion photographs. Counting both safe classes measures what the policy meant, a confident safe-for-work reading, without loosening any unsafe bound.",
+    "safeMassMinimum": 0.85,
+    "safeMassMinimumRationale": "Chosen on the calibration half of the safe photograph corpus only (the corpus is split by creator) by scripts/calibrate-community-screening-models.mjs: the floor with the lowest withheld rate across the three NSFWJS model families and a grid from 0.95 down to 0.50, every unsafe bound held at its v1 value, ties broken toward the stricter floor. Because Hentai, Porn and Sexy must stay below 0.15 together and the five probabilities sum to one, every floor at or below 0.85 withholds the same photographs, so the stricter tie-break lands on 0.85. The holdout half was not read to choose it; the release gate is computed there. The calibration and holdout figures live in the readiness evidence payload, not here, so this file never carries a number that can drift from the measurement. Comparisons are strict, so a safe mass exactly on the floor routes to review.",
+    "unsafeAggregateMaximum": 0.1,
+    "unsafeAggregateMaximumRationale": "A confident safe mass alone is not enough to publish. A safe mass of 0.86 with Porn 0.13 clears the safe-mass gate and sits below the per-class block threshold, so without this third condition a vector carrying thirteen percent unsafe mass would reach automatic publication. Pass therefore also requires the sum of the unsafeClasses probabilities to be strictly below 0.10. The benign reference image sums Hentai 0.0421 and Porn 0.0015 to 0.0436, so an ordinary fashion photograph keeps better than a factor of two in hand, while any vector where unsafe mass is a real share of the distribution falls to review.",
+    "unsafeClasses": ["Hentai", "Porn"],
+    "unsafeClassesRationale": "Sexy is deliberately absent. On a fashion product, swimwear, lingerie and eveningwear score Sexy legitimately, and blocking them automatically would be the dominant false-positive source. A Sexy probability at or above reviewClassMaximum cannot reach pass, so such an image is withheld and shown to a human instead of being blocked outright. Drawing is not an unsafe class at all.",
+    "unsafeBlockMinimum": 0.35,
+    "unsafeBlockMinimumRationale": "The benign reference image scored Porn 0.0015 and Hentai 0.0421, so 0.35 sits an order of magnitude above the observed benign ceiling while staying below the 0.5 plurality point. A clearly unsafe image blocks; an ambiguous one falls through to review. Block and review both leave the post unpublished, so a low block threshold costs a moderator nothing beyond queue priority.",
+    "reviewClasses": ["Sexy"],
+    "reviewClassMaximum": 0.15,
+    "reviewClassMaximumRationale": "Sexy never blocks, because swimwear, lingerie and eveningwear score it legitimately, but at or above 0.15 a human looks. v1 bounded Sexy only jointly, through its Neutral floor; v2 states the single-class ceiling explicitly and keeps the joint bound in unsafeAndReviewAggregateMaximum.",
+    "unsafeAndReviewAggregateMaximum": 0.15,
+    "unsafeAndReviewAggregateMaximumRationale": "The joint ceiling on everything that is not safe for work: Hentai, Porn and Sexy together must stay strictly below 0.15 for automatic publication. Under v1 a publishable vector had Neutral above 0.85, so the three together were necessarily below 0.15; a safe-mass floor of 0.80 alone would have let up to 0.20 through. Restating the joint bound keeps v2 no looser than v1 on any unsafe mass.",
+    "probabilitySumTolerance": 0.001,
+    "probabilitySumToleranceRationale": "The model output is already softmaxed and measured 0.99999992 on the reference input. A tolerance of 0.001 is three orders of magnitude above that float32 accumulation error and still small enough to catch a truncated, padded, or otherwise corrupted vector, which a permissive tolerance would wave through.",
+    "boundaryDisposition": "review",
+    "boundaryDispositionRationale": "Comparisons are strict. A probability exactly at a threshold has not passed it, so pass requires the safe mass strictly greater than safeMassMinimum and Sexy strictly below reviewClassMaximum and block requires an unsafe class strictly greater than unsafeBlockMinimum. Both boundaries therefore resolve to review, which is the fail-closed direction on each side.",
+    "openQuestions": [
+      "Resolved by Story 6.2b: an aggregate BLOCK threshold stays unset. On the safe photograph corpus every withheld photograph routed to review or was blocked by the single-class floor, and an aggregate block would only move review load into blocks without publishing anything. Revisit if moderators report review-queue saturation from clearly unsafe images."
+    ]
+  },
+  "text": {
+    "categories": ["profanity", "sexual", "hate", "harassment", "violence", "self_harm"],
+    "categoriesRationale": "Six categories that a reviewed term list can actually be graded against. They subsume the two categories the Story 6.1 engine shipped: its profanity list maps to profanity, and its safety list splits across self_harm, violence and harassment, which is the distinction a moderator needs and the flat safety label hid.",
+    "severities": ["low", "medium", "high"],
+    "severityDisposition": {
+      "low": "review",
+      "medium": "review",
+      "high": "block"
+    },
+    "severityDispositionRationale": "No matched term can reach pass, so low and medium deliberately share the review disposition. The grade is still recorded because it drives moderator queue priority and because Story 6.2b measures the false-positive rate per severity; collapsing them into one level would destroy that signal without changing a single publication outcome.",
+    "unscreenableLocaleDisposition": "review",
+    "unscreenableLocaleDispositionRationale": "A locale this policy holds no dictionary for cannot be cleared by silence. The Story 6.1 engine already emits locale_unscreenable for that case and refuses the post; this policy keeps that behavior rather than rebuilding it.",
+    "allDictionariesAlwaysRun": true,
+    "allDictionariesAlwaysRunRationale": "Every language list runs against every submission regardless of the declared locale, so a client-controlled locale field cannot be used to bypass another language's terms.",
+    "scripts": {
+      "supported": ["Latin", "Common", "Inherited"],
+      "mixedScriptDisposition": "review",
+      "unsupportedScriptDisposition": "review",
+      "rationale": "All seven enabled languages are written in Latin script, so Common and Inherited cover punctuation, digits and combining marks. Observed script is determined by deterministic Unicode inspection; no probabilistic language detection runs anywhere in this policy. Mixed or unsupported scripts are the confusable-substitution attack surface, so both fail closed to a human."
+    },
+    "limits": {
+      "maxInputCharacters": {
+        "caption": 280,
+        "altText": 200
+      },
+      "maxCanonicalRepresentations": 8,
+      "maxExpandedCharacters": 2048,
+      "rationale": "Per field, because the screener is field-aware and the public contract already enforces both ceilings: communityPostCaptionSchema caps a caption at 280 characters and communityPostAltTextSchema caps alt text at 200. Screening a longer value would mean normalising input the API had no business accepting. Capping the number of canonical representations and their combined length stops crafted input from amplifying normalization work without limit."
+    },
+    "lists": [
+      {
+        "language": "de",
+        "terms": "terms-v1/de-v1.json",
+        "allowList": "terms-v1/allow-de-v1.json",
+        "version": "ldnoobw-5faf2ba4+overlay-v1",
+        "source": "LDNOOBW at 5faf2ba42d7b1c0977169ec3611df25a3c08eb13 merged with graded-overlay-v1/de.json; allow list allow-list-v1.json",
+        "licence": "CC-BY-4.0 (LDNOOBW upstream entries); UNLICENSED repository-owned (overlay and allow list)",
+        "upstreamCommit": "5faf2ba42d7b1c0977169ec3611df25a3c08eb13",
+        "termsSha256": "517c05fbc7bb46189cc23c532e1acbf46a73342dd2a2a8976cb6a99ea065e434",
+        "allowListSha256": "7f0a9548ddc645a189fc832cc16a815f4816e744c2f92e7f0ba9bd876ee95ea4"
+      },
+      {
+        "language": "en",
+        "terms": "terms-v1/en-v1.json",
+        "allowList": "terms-v1/allow-en-v1.json",
+        "version": "ldnoobw-5faf2ba4+overlay-v1",
+        "source": "LDNOOBW at 5faf2ba42d7b1c0977169ec3611df25a3c08eb13 merged with graded-overlay-v1/en.json; allow list allow-list-v1.json",
+        "licence": "CC-BY-4.0 (LDNOOBW upstream entries); UNLICENSED repository-owned (overlay and allow list)",
+        "upstreamCommit": "5faf2ba42d7b1c0977169ec3611df25a3c08eb13",
+        "termsSha256": "6f1aed8d5bdaeeedb4c01e4904e43aaa414de1829468120a4593ad4b7508bbac",
+        "allowListSha256": "bebf551640dcbf64b3887736083f2a1f798fc0fe2f86f793cc54a00979abbdd3"
+      },
+      {
+        "language": "es",
+        "terms": "terms-v1/es-v1.json",
+        "allowList": "terms-v1/allow-es-v1.json",
+        "version": "ldnoobw-5faf2ba4+overlay-v1",
+        "source": "LDNOOBW at 5faf2ba42d7b1c0977169ec3611df25a3c08eb13 merged with graded-overlay-v1/es.json; allow list allow-list-v1.json",
+        "licence": "CC-BY-4.0 (LDNOOBW upstream entries); UNLICENSED repository-owned (overlay and allow list)",
+        "upstreamCommit": "5faf2ba42d7b1c0977169ec3611df25a3c08eb13",
+        "termsSha256": "0dda50c51821e455569501da8651f1a2a8be929318fc2bbd4d61be0fd8d7a1ee",
+        "allowListSha256": "058a7744b9407e5e0c26f3e0c6a885c86925e996bbff4ba2ae267acde0521b44"
+      },
+      {
+        "language": "fr",
+        "terms": "terms-v1/fr-v1.json",
+        "allowList": "terms-v1/allow-fr-v1.json",
+        "version": "ldnoobw-5faf2ba4+overlay-v1",
+        "source": "LDNOOBW at 5faf2ba42d7b1c0977169ec3611df25a3c08eb13 merged with graded-overlay-v1/fr.json; allow list allow-list-v1.json",
+        "licence": "CC-BY-4.0 (LDNOOBW upstream entries); UNLICENSED repository-owned (overlay and allow list)",
+        "upstreamCommit": "5faf2ba42d7b1c0977169ec3611df25a3c08eb13",
+        "termsSha256": "7aa19d35380523111ee2d4c6d0bad7db8e088a3df647afa18a5324ade6ce628d",
+        "allowListSha256": "12fcaedef188405a7d6f9383bf312a16412b06bbefb54ce37349b5c9c5e0db7c"
+      },
+      {
+        "language": "it",
+        "terms": "terms-v1/it-v1.json",
+        "allowList": "terms-v1/allow-it-v1.json",
+        "version": "ldnoobw-5faf2ba4+overlay-v1",
+        "source": "LDNOOBW at 5faf2ba42d7b1c0977169ec3611df25a3c08eb13 merged with graded-overlay-v1/it.json; allow list allow-list-v1.json",
+        "licence": "CC-BY-4.0 (LDNOOBW upstream entries); UNLICENSED repository-owned (overlay and allow list)",
+        "upstreamCommit": "5faf2ba42d7b1c0977169ec3611df25a3c08eb13",
+        "termsSha256": "b3a3510f8a33119b0c9d85c87909932c07a3fac2fb36a701855546f81faf5abf",
+        "allowListSha256": "86ee53373d448d06216edd4eb3ad44b66404f585cf0fd54a80d06318c1bef7e6"
+      },
+      {
+        "language": "pt",
+        "terms": "terms-v1/pt-v1.json",
+        "allowList": "terms-v1/allow-pt-v1.json",
+        "version": "ldnoobw-5faf2ba4+overlay-v1",
+        "source": "LDNOOBW at 5faf2ba42d7b1c0977169ec3611df25a3c08eb13 merged with graded-overlay-v1/pt.json; allow list allow-list-v1.json",
+        "licence": "CC-BY-4.0 (LDNOOBW upstream entries); UNLICENSED repository-owned (overlay and allow list)",
+        "upstreamCommit": "5faf2ba42d7b1c0977169ec3611df25a3c08eb13",
+        "termsSha256": "67d0fc63c1cbcb7630258f092596e46970de001c726db31a35762112c6148752",
+        "allowListSha256": "418b7ebec286600f7dc9c42867fd5da9f35fb03c24f7516fc9ad5342ebad9929"
+      },
+      {
+        "language": "tr",
+        "terms": "terms-v1/tr-v1.json",
+        "allowList": "terms-v1/allow-tr-v1.json",
+        "version": "ldnoobw-5faf2ba4+overlay-v1",
+        "source": "LDNOOBW at 5faf2ba42d7b1c0977169ec3611df25a3c08eb13 merged with graded-overlay-v1/tr.json; allow list allow-list-v1.json",
+        "licence": "CC-BY-4.0 (LDNOOBW upstream entries); UNLICENSED repository-owned (overlay and allow list)",
+        "upstreamCommit": "5faf2ba42d7b1c0977169ec3611df25a3c08eb13",
+        "termsSha256": "e87f504e9adeea7bbbcb9ce87516d937a636d579612c2448fe7853d282ef3547",
+        "allowListSha256": "865b5547537e7a204ceb38cdc34be81ef68a11d6c99f694e0d2e8ad49bc2338e"
+      }
+    ],
+    "listsRationale": "One generated list plus one allow list per enabled language, covering the seven languages the ten enabled Community Beta locales map to. Each list is LDNOOBW vendored at one pinned commit merged with the repository's graded overlay, the allow list is repository-owned with a reason per entry, and termsSha256 and allowListSha256 pin every generated file: the screener refuses to start when a loaded list does not hash to its pin.",
+    "deliberateReviewTerms": [
+      {
+        "term": "lolita",
+        "reason": "Names a fashion subculture and is also a child-sexualisation keyword. On a 13+ product every caption or alt text carrying it goes to a moderator, who can clear a fashion post; it is never allow-listed. The cost is review load for that style's posts, recorded as a named limitation."
+      },
+      {
+        "term": "baiser",
+        "reason": "French for a kiss as a noun, and the commonest vulgar French verb for sex. The two senses cannot be told apart token by token, so it stays routed to review at low severity and never blocks."
+      }
+    ],
+    "deliberateReviewTermsRationale": "Ordinary copy that is withheld on purpose. Startup refuses a policy that allow-lists one of these or loses it from every list, so a later allow-list edit cannot reverse the decision unnoticed. The clean text corpus labels the captions carrying them as expected review, and the clean-copy gate is computed on every other caption.",
+    "openQuestions": [
+      "Resolved by Story 6.2b: three severity levels stay. On the clean text corpora no caption outside the deliberate review terms was withheld at any severity, so the measurement gives no signal that a fourth level would separate. Revisit when moderators need to rank a hate slur above ordinary strong profanity in the queue."
+    ]
+  },
+  "reasonCodes": {
+    "image": {
+      "unsafe_class": "block",
+      "image_disposition_conflict": "review",
+      "low_confidence": "review",
+      "output_invalid": "review",
+      "class_mismatch": "review",
+      "probability_sum_invalid": "review",
+      "inference_timeout": "review",
+      "screening_unavailable": "review"
+    },
+    "text": {
+      "text_policy_match": "review",
+      "text_input_truncated": "review",
+      "locale_unscreenable": "review",
+      "script_mixed": "review",
+      "script_unsupported": "review"
+    },
+    "cleanCodes": {
+      "text": "text_clean"
+    },
+    "rationale": "Stable codes shared by the image adapter, the text screener and the durable pipeline, so a persisted reason means the same thing on every branch. The disposition recorded against each code is its floor: text_policy_match escalates to block when the matched term severity maps to block, and no code here can ever yield pass. text_input_truncated is its own code because it describes a different failure from the others: input past a per-field ceiling, or input that exhausted maxExpandedCharacters before every canonical representation was built, means part of the text was never screened at all. A clean result over a partial reading is not a clean result, so it fails closed to review under its own name instead of borrowing one that would misdescribe it. image_disposition_conflict covers a screener that reports passed true beside a refusing disposition: the two halves of its own verdict contradict each other, so the safe reading is the refusing one, and without a named code that case held a post with an empty reason list. text_clean sits in cleanCodes rather than in this table, because every code under image and text must resolve to review or block and the schema makes pass unrepresentable there. It still has to be named: a screener that states a clean verdict is auditable, whereas one that merely returns an empty reason list is indistinguishable from a screener that refused without explaining itself."
+  }
+}

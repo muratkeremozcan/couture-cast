@@ -74,23 +74,43 @@ const ImagePolicySchema = z
   .object({
     modelFamily: NonEmptySchema,
     classNames: z.array(NonEmptySchema).length(5),
-    neutralPassMinimum: ProbabilitySchema,
+    safeClasses: z.array(NonEmptySchema).min(1),
+    safeMassMinimum: ProbabilitySchema,
     unsafeAggregateMaximum: ProbabilitySchema,
     unsafeClasses: z.array(NonEmptySchema).min(1),
     unsafeBlockMinimum: ProbabilitySchema,
+    reviewClasses: z.array(NonEmptySchema),
+    reviewClassMaximum: ProbabilitySchema,
+    unsafeAndReviewAggregateMaximum: ProbabilitySchema,
     probabilitySumTolerance: z.number().gt(0).lte(0.01),
     boundaryDisposition: z.literal('review'),
     openQuestions: z.array(NonEmptySchema).optional(),
   })
   .catchall(z.union([z.string(), z.array(z.string())]))
   .superRefine((image, ctx) => {
-    for (const unsafeClass of image.unsafeClasses) {
-      if (!image.classNames.includes(unsafeClass)) {
-        ctx.addIssue({
-          code: z.ZodIssueCode.custom,
-          message: `unsafeClasses names ${unsafeClass}, which is not one of the model's class names`,
-        })
+    for (const [field, names] of [
+      ['safeClasses', image.safeClasses],
+      ['unsafeClasses', image.unsafeClasses],
+      ['reviewClasses', image.reviewClasses],
+    ] as const) {
+      for (const name of names) {
+        if (!image.classNames.includes(name)) {
+          ctx.addIssue({
+            code: z.ZodIssueCode.custom,
+            message: `${field} names ${name}, which is not one of the model's class names`,
+          })
+        }
       }
+    }
+    // A class may be counted toward one side only. A safe class that is also
+    // unsafe or held for review would let one probability both clear and
+    // withhold the same image.
+    const roles = [...image.safeClasses, ...image.unsafeClasses, ...image.reviewClasses]
+    if (new Set(roles).size !== roles.length) {
+      ctx.addIssue({
+        code: z.ZodIssueCode.custom,
+        message: 'safeClasses, unsafeClasses and reviewClasses must not share a class',
+      })
     }
     if (image.unsafeAggregateMaximum > image.unsafeBlockMinimum) {
       ctx.addIssue({
@@ -110,6 +130,11 @@ const TextListSchema = z.object({
   // these are required and non-empty rather than optional metadata.
   source: NonEmptySchema,
   licence: NonEmptySchema,
+  // Kept rather than stripped: the text screener hashes each loaded list
+  // against these and refuses to start on a mismatch.
+  upstreamCommit: NonEmptySchema.optional(),
+  termsSha256: Sha256Schema.optional(),
+  allowListSha256: Sha256Schema.optional(),
 })
 
 const TextPolicySchema = z
@@ -146,6 +171,9 @@ const TextPolicySchema = z
       rationale: NonEmptySchema,
     }),
     lists: z.array(TextListSchema).min(1),
+    deliberateReviewTerms: z
+      .array(z.object({ term: NonEmptySchema, reason: NonEmptySchema }).strict())
+      .optional(),
     openQuestions: z.array(NonEmptySchema).optional(),
   })
   .catchall(z.string())
@@ -201,12 +229,16 @@ const ManifestFileSchema = z.object({
   sha256: Sha256Schema,
 })
 
-/** The five values the manifest mirrors out of the policy, and nothing else. */
+/** The values the manifest mirrors out of the policy, and nothing else. */
 const MIRRORED_THRESHOLD_KEYS = [
-  'neutralPassMinimum',
+  'safeClasses',
+  'safeMassMinimum',
   'unsafeAggregateMaximum',
   'unsafeBlockMinimum',
   'unsafeClasses',
+  'reviewClasses',
+  'reviewClassMaximum',
+  'unsafeAndReviewAggregateMaximum',
   'probabilitySumTolerance',
 ] as const
 
@@ -228,10 +260,14 @@ const ManifestSchema = z.object({
   dependencies: z.record(z.string(), NonEmptySchema),
   forbiddenDependencies: z.array(NonEmptySchema),
   thresholds: z.object({
-    neutralPassMinimum: ProbabilitySchema,
+    safeClasses: z.array(NonEmptySchema).min(1),
+    safeMassMinimum: ProbabilitySchema,
     unsafeAggregateMaximum: ProbabilitySchema,
     unsafeBlockMinimum: ProbabilitySchema,
     unsafeClasses: z.array(NonEmptySchema).min(1),
+    reviewClasses: z.array(NonEmptySchema),
+    reviewClassMaximum: ProbabilitySchema,
+    unsafeAndReviewAggregateMaximum: ProbabilitySchema,
     probabilitySumTolerance: z.number().gt(0),
   }),
   policy: z.object({

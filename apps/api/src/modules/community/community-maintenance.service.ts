@@ -17,6 +17,8 @@ import { COMMUNITY_MODERATION_QUEUE } from './community-moderation.queue.js'
  * cycles plus the moderation queue's five-minute alert SLA.
  */
 export const STALE_PENDING_REVIEW_MINUTES = 15
+/** The reason the stale-review sweep persists on a post it fails. */
+export const MODERATION_STALLED_REASON = 'moderation_stalled'
 
 /**
  * The deadline the spec puts on erasure: "deletion completes within 72 hours".
@@ -62,9 +64,11 @@ export class CommunityMaintenanceService {
    *
    * The operator record is a `JobFailure` row on the moderation queue, which is
    * this repository's existing dead-letter surface: `AdminService.listFailedJobs`
-   * lists it, `retryFailedJob` re-drives the exact screening job, and
-   * `pruneFailedJobs` ages it out. Writing the alert anywhere else would invent a
-   * second operator inbox for the same class of problem.
+   * lists it and `pruneFailedJobs` ages it out. Writing the alert anywhere else
+   * would invent a second operator inbox for the same class of problem.
+   * `retryFailedJob` does not re-screen the post: the post is `review_failed` by
+   * then, and the processor skips any post not in `pending_review` (Story 6.2b
+   * review, RF14; recorded in deferred work).
    */
   async sweepStalePendingReview(
     now: Date = new Date()
@@ -84,7 +88,7 @@ export class CommunityMaintenanceService {
         where: { id: post.id, status: 'pending_review' },
         data: {
           status: 'review_failed',
-          moderation_reason: 'moderation_stalled',
+          moderation_reason: MODERATION_STALLED_REASON,
         },
       })
       if (updated.count !== 1) {

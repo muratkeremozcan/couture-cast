@@ -82,6 +82,7 @@ import {
 import {
   CommunityChallengeWindowError,
   CommunityRepository,
+  isPubliclyVisiblePost,
   type ChallengeRowWithZone,
   type CommunityChallengeWriteData,
 } from './community.repository.js'
@@ -250,7 +251,7 @@ export class CommunityService {
     await this.assertReadEnabled(userId)
 
     const post = await this.repository.findPostById(postId)
-    const isVisible = post && (post.status === 'published' || post.user_id === userId)
+    const isVisible = post && (isPubliclyVisiblePost(post) || post.user_id === userId)
     if (!post || !isVisible) {
       throw new NotFoundException(COMMUNITY_POST_NOT_FOUND_MESSAGE)
     }
@@ -757,7 +758,7 @@ export class CommunityService {
     await this.assertReadEnabled(params.userId)
 
     const post = await this.repository.findPostById(params.postId)
-    if (!post || post.status !== 'published') {
+    if (!post || !isPubliclyVisiblePost(post)) {
       throw new NotFoundException(COMMUNITY_POST_NOT_FOUND_MESSAGE)
     }
 

@@ -176,7 +176,17 @@ describe('CommunityRepository', () => {
       expect(lookbookPostFindMany).toHaveBeenCalledWith(
         expect.objectContaining({
           where: {
-            AND: [{ status: 'published', published_at: { not: null } }, {}, {}],
+            AND: [
+              {
+                status: 'published',
+                published_at: { not: null },
+                // Story 6.2b final review (RF8): the operations canary's
+                // synthetic posts are never served, whatever the flags say.
+                NOT: { user_id: { startsWith: 'canary-user-' } },
+              },
+              {},
+              {},
+            ],
           },
           orderBy: [{ published_at: 'desc' }, { id: 'desc' }],
           take: 11,
@@ -629,6 +639,7 @@ describe('CommunityRepository', () => {
       {
         user_id: 'author-other',
         status: 'published',
+        published_at: new Date('2026-09-01T00:00:00.000Z'),
         image_object_path: 'community/post-1/session.jpg',
         // Read under the same FOR UPDATE lock that decides visibility, so the
         // audit snapshot is the content the reporter actually saw.
@@ -674,12 +685,30 @@ describe('CommunityRepository', () => {
     it('returns self_report when the reporter owns the post', async () => {
       const { repo, queryRaw } = createRepo()
       queryRaw.mockResolvedValueOnce([
-        { user_id: viewerUserId, status: 'published', image_object_path: null },
+        {
+          user_id: viewerUserId,
+          status: 'published',
+          published_at: new Date('2026-09-01T00:00:00.000Z'),
+          image_object_path: null,
+        },
       ])
 
       const result = await repo.recordReport(reportParams())
 
       expect(result.kind).toBe('self_report')
+    })
+
+    it('returns post_not_visible for a published post the operations canary wrote', async () => {
+      // Story 6.2b final review (RF8).
+      const { repo, queryRaw, reportCreate } = createRepo()
+      queryRaw.mockResolvedValueOnce([
+        { ...lockedPublishedPost[0], user_id: 'canary-user-run1' },
+      ])
+
+      const result = await repo.recordReport(reportParams())
+
+      expect(result.kind).toBe('post_not_visible')
+      expect(reportCreate).not.toHaveBeenCalled()
     })
 
     it('treats a same-reason replay as idempotent', async () => {
@@ -1427,13 +1456,34 @@ describe('CommunityRepository', () => {
       ).rejects.toThrow('connection reset')
     })
 
-    it('rethrows when a P2002 alias race leaves nothing to re-read', async () => {
+    it('returns null when the P2002 winner was erased before the re-read', async () => {
+      // The feed resolves strangers' aliases, so a read can lose the mint to
+      // another request and then find the row gone: the author's erasure
+      // cascaded it away in between. Seen as a flaky 6.1-INT-070 when a
+      // parallel suite removed its own author mid-page.
       const { repo, aliasFindUnique, aliasCreate } = createRepo()
       aliasFindUnique.mockResolvedValueOnce(null).mockResolvedValueOnce(null)
       aliasCreate.mockRejectedValueOnce(
         new Prisma.PrismaClientKnownRequestError('unique violation', {
           code: 'P2002',
           clientVersion: 'test',
+          meta: { modelName: 'CommunityAlias', target: ['user_id'] },
+        })
+      )
+
+      await expect(
+        repo.resolveAlias('user-erased', () => 'Style Explorer NEW00001')
+      ).resolves.toBeNull()
+    })
+
+    it('rethrows a generated-alias collision that leaves nothing to re-read', async () => {
+      const { repo, aliasFindUnique, aliasCreate } = createRepo()
+      aliasFindUnique.mockResolvedValueOnce(null).mockResolvedValueOnce(null)
+      aliasCreate.mockRejectedValueOnce(
+        new Prisma.PrismaClientKnownRequestError('unique violation', {
+          code: 'P2002',
+          clientVersion: 'test',
+          meta: { modelName: 'CommunityAlias', target: ['alias'] },
         })
       )
 

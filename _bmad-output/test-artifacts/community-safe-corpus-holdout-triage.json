@@ -1,0 +1,145 @@
+{
+  "artifact": "community-safe-corpus-holdout-triage",
+  "storyKey": "6-2b-community-screening-release-gate",
+  "describedAt": "2026-10-16",
+  "method": "Each withheld or blocked holdout photograph was opened and looked at by the person recording it. A description is bound to the SHA-256 of the bytes it describes; the readiness generator ignores a description whose hash no longer matches the manifest.",
+  "policySha256": "b0daab4ab9d175cc018d88d7c37d3443a4d9425909394da3aee110e15ad98b65",
+  "summary": "None of the 27 shows nudity or sexual content. The 7 blocked photographs are ordinary fashion, wedding, uniform and doll pictures, so the block floor fires on benign input. Six entries are dolls, a rendered avatar or AI-generated portraits rather than photographs of people, which the Openverse query admitted.",
+  "entries": {
+    "01da9472-af82-4def-ace4-8535e794a5ce": {
+      "sha256": "8c1a356f896737e550a0642ea5ee8530e18ef0e25befdd0a0b8a081013f27b0a",
+      "disposition": "block",
+      "description": "Close-up profile of a woman with pink and blonde hair and a camel coat; head and shoulders, fully clothed."
+    },
+    "01df40b3-9a45-4f25-b38b-b0d9f9c48742": {
+      "sha256": "d38764cfface36d3c382400d690b6e183be66f28a8c4755def6011940e8f79df",
+      "disposition": "review",
+      "description": "Woman on a stage in a white tulle ball gown with a sheer high neckline; studio watermark."
+    },
+    "01f79a05-6f46-4584-bf61-a77b005d969c": {
+      "sha256": "4ad2dc880b04108686f5af8cafe08480ed657fba632eb8955c512b9ef94c055f",
+      "disposition": "review",
+      "description": "Studio shot of a woman in a pink plaid shirt dress, hands on hips."
+    },
+    "08cb4351-3f29-4b1b-adc9-436ca4462e96": {
+      "sha256": "b6ab2fb1c78dd77b3052cbf16f131f00de5b8f40c4ac196f89e5c0180c090009",
+      "disposition": "review",
+      "description": "Antique sepia cabinet card of a woman in a long Victorian dress."
+    },
+    "0b880dc1-c544-4d42-9d8c-89f84f2afc14": {
+      "sha256": "bf29667fcd0aeb90f847f31042ec9b1ce6af6b1aed9e736fea77df5d0e590aee",
+      "disposition": "review",
+      "description": "Woman with blonde curls against a graffiti wall in a cropped bandeau top and matching skirt; midriff visible."
+    },
+    "1b39c651-f54e-473e-8ed0-5cb7fd391349": {
+      "sha256": "de79eb17e8f12ac757bd5d43fbb7a14cff09ed64af5b6a0742a3be69a20ad0f4",
+      "disposition": "review",
+      "description": "Woman in a polka-dot sundress on a pool lounger beside a cat, holding a glass of wine."
+    },
+    "1eb897a5-46e6-4e23-847c-3db5c6c0470f": {
+      "sha256": "016c77cda0d627780656090a0d1810dc0da21409be66a894afd08edbbc9d4da8",
+      "disposition": "review",
+      "description": "Legs in orange high heels against an adobe wall with a pink skirt hem in frame; no torso."
+    },
+    "1fc04cd5-60a5-44a0-b927-031ab79e7c2e": {
+      "sha256": "a10c412bd4eb0e5334ecac99a9c349dfa31b11f00629d87878ace3c071778635",
+      "disposition": "review",
+      "description": "Black-and-white wedding photograph of a bride in a strapless gown with pearls and a bouquet."
+    },
+    "2e5ac408-0b2a-423b-93c9-739db5dcd2e6": {
+      "sha256": "b3e3a0de95b801c03e98b65c7186ba60537e881e51e50a6e14a26cb8ee3a90f0",
+      "disposition": "block",
+      "description": "Close-up of a white naval dress-uniform sleeve with its shoulder tab; sailors blurred behind."
+    },
+    "377d225b-60d6-4ccb-905e-dc22f07e1537": {
+      "sha256": "165bb1eca45a9a0ceafd9d584d536a14d57345da8b98ebf730f5d94518ff61f9",
+      "disposition": "block",
+      "description": "A fashion doll in a striped top and white skirt lying on a wooden floor."
+    },
+    "40b7cf60-8240-435d-8bbf-757905dc2f06": {
+      "sha256": "57a02a7eea71cd4025b0aabcfebac88efc65a4ed9b28d6992cb00e17c730d070",
+      "disposition": "review",
+      "description": "Woman lying on pavement in a white blouse and velvet trousers, hand on her forehead."
+    },
+    "518ee1d8-a2f8-4d9d-8221-515293f4caf1": {
+      "sha256": "a2654945e3ed56d6df9ec770556c1efba8962736697d0df00c53daa53556dfc9",
+      "disposition": "block",
+      "description": "Smiling woman at an evening event in a black halter bikini-style top and low cargo trousers; bare midriff."
+    },
+    "51f99b8c-8f20-4889-b2c5-8e3bb7d86bc2": {
+      "sha256": "4e0cb482503c5704d2cf9a232491950e4ab0173ad892b910a5012a1eee41b948",
+      "disposition": "block",
+      "description": "Same graffiti-wall shoot as 0b880dc1: a woman in a bandeau top and skirt, midriff visible."
+    },
+    "594a6945-d7e3-4b13-bb0b-552e3acc089c": {
+      "sha256": "8ef7c8657cee9ebdacf45fc03a0d2185faf75d15927caeb9344a1387dd0f3e66",
+      "disposition": "review",
+      "description": "Woman in an off-the-shoulder floral prairie dress leaning on a stone well at sunset."
+    },
+    "6f7eeb9d-20ed-4c44-83c9-2ad5a86e7dc8": {
+      "sha256": "e143a980443c68a54d9b6236fe72b2fe46f1caaacadf0585e60172e4d2a995ea",
+      "disposition": "review",
+      "description": "Woman on a bridge walkway in a white strapless top, skinny jeans and platform sandals."
+    },
+    "8043ea7e-aa5b-411f-b36e-776e239d9855": {
+      "sha256": "6964b4313a016d6e92bf242dc52602d90b96faa5cdbfc96e5f1b2d69c41c31d8",
+      "disposition": "block",
+      "description": "Woman in sunglasses and a long fringed ivory boho dress leaning on a white column."
+    },
+    "8e5c6604-c7d6-4e9e-a486-2a5ca9b468d4": {
+      "sha256": "20cad79b52a0322c7195c75e8622c194accb0e47da3895723e78398d6fd2f909",
+      "disposition": "block",
+      "description": "Woman in a floral puff-sleeve ruffled gown twirling beside a stone pillar."
+    },
+    "94660d67-bbe4-49ec-aaf9-b87972d1eb75": {
+      "sha256": "ec73e9dba8d6e778cff9649ac81a792138c1b7d97197d12f724fac04604951f5",
+      "disposition": "review",
+      "description": "Older man in Union Jack swim briefs flexing on a beach in front of breaking waves."
+    },
+    "98cd7877-d6a3-4ed3-b4b6-071685b0dabb": {
+      "sha256": "c91bb6ccda681eed7d39676914c2d7129983d68f7560deb3a6eee85a82e1cc45",
+      "disposition": "review",
+      "description": "Woman lying on a yellow sofa in a pink camisole slip dress; looks rendered or AI-generated."
+    },
+    "aa1f82b5-6755-4e72-a320-eb6116e5fd6c": {
+      "sha256": "bd5ef732f794d334387f6a8fd90ec0e2e9fee614b787e5750fea5f6667fbc3bb",
+      "disposition": "review",
+      "description": "Back view of a woman in an off-the-shoulder striped shirt dress on a street; head cropped out."
+    },
+    "af260d91-c3cb-4174-b7ef-cdd8fa9c4fec": {
+      "sha256": "f88be96eb704fb9d23b5ce86b8a9c6c595cfed600653ace2ae5c11712741ada2",
+      "disposition": "review",
+      "description": "Two ball-jointed dolls with red and green hair in knitwear."
+    },
+    "b28674a9-3c82-4e9a-a9f8-156e2113e245": {
+      "sha256": "50103f946e0662c9a66e3c043df5af101e73112b59d71b5a44b70e4281c305dc",
+      "disposition": "review",
+      "description": "Rendered 3D avatar in a cropped red sweater and plaid mini skirt against a rainbow background."
+    },
+    "c272bcc0-aab3-4514-8c66-dd9cc45cef40": {
+      "sha256": "437aef46583d9ef2ffd602b0d0bfd238a39d27ce08d14d47928f1e7b97125e2a",
+      "disposition": "review",
+      "description": "Studio shot of a woman in a plaid sleeveless sheath dress and white sunglasses."
+    },
+    "db9d878d-d918-4cd3-bec8-9cf439acede7": {
+      "sha256": "c56715f0ba9ebda888dfa93f2f9f5f869a25871160365b12cc9a70e0b6d0d5e2",
+      "disposition": "review",
+      "description": "Smiling woman in a sleeveless brown jumpsuit beside a red scooter on a street."
+    },
+    "dc48ba50-0478-453f-831b-d0f7a92d1491": {
+      "sha256": "deb9de960e7a5229377176ba57b2304587cb42627c2f098ea70785689ec959e0",
+      "disposition": "review",
+      "description": "Black-and-white street portrait of a woman in a satin camisole; looks AI-generated."
+    },
+    "ddc39919-7768-454a-82bf-4b8c678ede7e": {
+      "sha256": "3b869863d39b0aa1e00ef43281977a0890d9511e2303ba5548f0ae2d3ec1d95d",
+      "disposition": "review",
+      "description": "Ball-jointed doll in a white tank top, denim mini skirt and fluffy boots, beside its box."
+    },
+    "e437ea01-74ac-4c05-a7f2-00bca8067dba": {
+      "sha256": "e5f0243b897239e47dd42da517bac4e22b8844cf01dc5cff963437976dcfce37",
+      "disposition": "review",
+      "description": "Man in a bowler hat, grey overcoat and tie looking down; head and shoulders."
+    }
+  }
+}

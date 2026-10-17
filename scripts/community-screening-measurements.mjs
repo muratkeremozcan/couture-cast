@@ -24,7 +24,7 @@ const projectRoot = path.resolve(__dirname, '..')
 
 const MODEL_MANIFEST =
   'apps/api/model-manifests/community-nsfw-mobilenet-v2-mid-nsfwjs-4.3.0.json'
-const POLICY = 'apps/api/policies/community-screening/policy-v1.json'
+const POLICY = 'apps/api/policies/community-screening/policy-v2.json'
 const FIXTURE_MANIFEST = 'apps/api/test/fixtures/community-moderation/v1/manifest.json'
 const LOCKFILE = 'package-lock.json'
 
@@ -55,6 +55,10 @@ const COMMANDS = {
     verifySupplyChain: 'npm run verify:community-screening-supply-chain --workspace api',
     smoke: 'npm run test:community-screening-model:smoke --workspace api',
     readiness: 'npm run test:community-screening-readiness --workspace api',
+    // Re-measures startup, warm latency and peak RSS from compiled output and
+    // exits 1 when any value is above performance.regressionGate or
+    // performance.absoluteCeilings in the model manifest.
+    runtimeGate: 'npm run community:screening:measure:gate',
   },
   pipeline: {
     integration:
@@ -397,6 +401,7 @@ function buildPerformanceBlock(modelManifest) {
   return {
     available: true,
     source: `${MODEL_MANIFEST} performance.measured`,
+    gatedBy: COMMANDS.model.runtimeGate,
     executedFrom: performance.measured.environment?.executedFrom ?? null,
     measured: performance.measured,
     absoluteCeilings: performance.absoluteCeilings ?? null,
@@ -503,7 +508,10 @@ function buildPayload() {
       policyId: policy.policyId,
       version: policy.version,
       policySha256: current.policySha256,
-      neutralPassMinimum: policy.image?.neutralPassMinimum,
+      safeClasses: policy.image?.safeClasses,
+      safeMassMinimum: policy.image?.safeMassMinimum,
+      reviewClasses: policy.image?.reviewClasses,
+      reviewClassMaximum: policy.image?.reviewClassMaximum,
       unsafeClasses: policy.image?.unsafeClasses,
       unsafeBlockMinimum: policy.image?.unsafeBlockMinimum,
       probabilitySumTolerance: policy.image?.probabilitySumTolerance,
@@ -543,6 +551,15 @@ function buildPayload() {
           'anything about image blocking. No unsafe imagery exists in this repository, so this journey is refused by the text screener and must not be read as end-to-end proof that the image model blocks anything.',
         command: COMMANDS.pipeline.endToEnd,
       },
+      {
+        id: '6.2-E2E-03',
+        name: 'the author of a refused look sees a localized recovery state',
+        refusedBy: 'text-screener',
+        screeningPathIsRunSelected: true,
+        intent:
+          'render the refused post in the author browser and assert the localized status, removal explanation, and reason copy for the stable text_policy_match code, with the raw code absent from the page',
+        command: COMMANDS.pipeline.endToEnd,
+      },
     ],
 
     limitations: [
@@ -577,10 +594,10 @@ function buildPayload() {
       {
         id: 'local-dispatch-cadence',
         statement:
-          'The end-to-end stack dispatches the moderation outbox once a second; production uses a one-minute scheduler.',
+          'The end-to-end stack dispatches the moderation outbox once a second. The hosted community worker Story 6.2b deploys runs the same community bootstrap and therefore the same one-second dispatch; the one-minute scheduler belongs to the general bootstrap, which no hosted target runs.',
         mitigation:
-          'The one-second cadence is a test-harness setting only and is never presented as latency evidence.',
-        revisitWhen: 'Story 6.2b measures queue latency against the deployed worker.',
+          'No number in this payload is presented as production latency. Story 6.2b measures queue latency against the worker through its canary.',
+        revisitWhen: 'The hosted canary has run against the deployed worker.',
       },
     ],
 

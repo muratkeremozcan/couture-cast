@@ -1,0 +1,280 @@
+{
+  "language": "it",
+  "listVersion": "graded-overlay-v1",
+  "listType": "gradedOverlay",
+  "provenance": {
+    "source": "repository-owned graded list",
+    "version": "v1",
+    "licence": "UNLICENSED (repository-owned)",
+    "retrievedAt": "2026-09-08",
+    "curator": "couture-cast repository owner",
+    "notes": "The graded entries Story 6.2 shipped as the whole it list, kept as an overlay on the vendored LDNOOBW list. Every entry here carries a category and a severity that were assigned deliberately, so where a term is in both lists this grading wins over the generic grade an upstream-only term receives. Self-harm, violence and hate phrases live here because LDNOOBW does not carry them. No entry here has had native-speaker review; see the limitations in the readiness evidence."
+  },
+  "entries": [
+    {
+      "term": "cazzo",
+      "category": "profanity",
+      "severity": "medium"
+    },
+    {
+      "term": "cazzate",
+      "category": "profanity",
+      "severity": "low"
+    },
+    {
+      "term": "minchia",
+      "category": "profanity",
+      "severity": "medium"
+    },
+    {
+      "term": "stronzo",
+      "category": "profanity",
+      "severity": "medium"
+    },
+    {
+      "term": "stronza",
+      "category": "profanity",
+      "severity": "medium"
+    },
+    {
+      "term": "stronzata",
+      "category": "profanity",
+      "severity": "low"
+    },
+    {
+      "term": "merda",
+      "category": "profanity",
+      "severity": "medium"
+    },
+    {
+      "term": "vaffanculo",
+      "category": "profanity",
+      "severity": "medium"
+    },
+    {
+      "term": "affanculo",
+      "category": "profanity",
+      "severity": "medium"
+    },
+    {
+      "term": "fanculo",
+      "category": "profanity",
+      "severity": "medium"
+    },
+    {
+      "term": "coglione",
+      "category": "profanity",
+      "severity": "medium"
+    },
+    {
+      "term": "coglioni",
+      "category": "profanity",
+      "severity": "medium"
+    },
+    {
+      "term": "culo",
+      "category": "profanity",
+      "severity": "low"
+    },
+    {
+      "term": "bastardo",
+      "category": "profanity",
+      "severity": "low"
+    },
+    {
+      "term": "porca puttana",
+      "category": "profanity",
+      "severity": "medium"
+    },
+    {
+      "term": "porca madonna",
+      "category": "profanity",
+      "severity": "medium"
+    },
+    {
+      "term": "porco dio",
+      "category": "profanity",
+      "severity": "medium"
+    },
+    {
+      "term": "dio cane",
+      "category": "profanity",
+      "severity": "medium"
+    },
+    {
+      "term": "pezzo di merda",
+      "category": "harassment",
+      "severity": "medium"
+    },
+    {
+      "term": "cretino",
+      "category": "harassment",
+      "severity": "low"
+    },
+    {
+      "term": "idiota",
+      "category": "harassment",
+      "severity": "low"
+    },
+    {
+      "term": "imbecille",
+      "category": "harassment",
+      "severity": "low"
+    },
+    {
+      "term": "deficiente",
+      "category": "harassment",
+      "severity": "low"
+    },
+    {
+      "term": "puttana",
+      "category": "harassment",
+      "severity": "high"
+    },
+    {
+      "term": "figlio di puttana",
+      "category": "harassment",
+      "severity": "high"
+    },
+    {
+      "term": "mignotta",
+      "category": "harassment",
+      "severity": "high"
+    },
+    {
+      "term": "zoccola",
+      "category": "harassment",
+      "severity": "high"
+    },
+    {
+      "term": "troia",
+      "category": "harassment",
+      "severity": "high"
+    },
+    {
+      "term": "tette",
+      "category": "sexual",
+      "severity": "medium"
+    },
+    {
+      "term": "inculare",
+      "category": "sexual",
+      "severity": "medium"
+    },
+    {
+      "term": "pompino",
+      "category": "sexual",
+      "severity": "high"
+    },
+    {
+      "term": "sborra",
+      "category": "sexual",
+      "severity": "high"
+    },
+    {
+      "term": "figa",
+      "category": "sexual",
+      "severity": "low"
+    },
+    {
+      "term": "scopare",
+      "category": "sexual",
+      "severity": "low"
+    },
+    {
+      "term": "frocio",
+      "category": "hate",
+      "severity": "high"
+    },
+    {
+      "term": "culattone",
+      "category": "hate",
+      "severity": "high"
+    },
+    {
+      "term": "ricchione",
+      "category": "hate",
+      "severity": "high"
+    },
+    {
+      "term": "sporco ebreo",
+      "category": "hate",
+      "severity": "high"
+    },
+    {
+      "term": "morte agli ebrei",
+      "category": "hate",
+      "severity": "high"
+    },
+    {
+      "term": "terrone",
+      "category": "hate",
+      "severity": "high"
+    },
+    {
+      "term": "zingaro",
+      "category": "hate",
+      "severity": "high"
+    },
+    {
+      "term": "mongoloide",
+      "category": "hate",
+      "severity": "high"
+    },
+    {
+      "term": "finocchio",
+      "category": "hate",
+      "severity": "low"
+    },
+    {
+      "term": "ritardato",
+      "category": "hate",
+      "severity": "low"
+    },
+    {
+      "term": "ammazzati",
+      "category": "self_harm",
+      "severity": "high"
+    },
+    {
+      "term": "ucciditi",
+      "category": "self_harm",
+      "severity": "high"
+    },
+    {
+      "term": "impiccati",
+      "category": "self_harm",
+      "severity": "high"
+    },
+    {
+      "term": "suicidati",
+      "category": "self_harm",
+      "severity": "high"
+    },
+    {
+      "term": "vai a morire",
+      "category": "self_harm",
+      "severity": "high"
+    },
+    {
+      "term": "ti ammazzo",
+      "category": "violence",
+      "severity": "high"
+    },
+    {
+      "term": "ti uccido",
+      "category": "violence",
+      "severity": "high"
+    },
+    {
+      "term": "stupro",
+      "category": "violence",
+      "severity": "high"
+    },
+    {
+      "term": "stuprare",
+      "category": "violence",
+      "severity": "high"
+    }
+  ]
+}

@@ -26,7 +26,7 @@ const committedManifestPath = path.join(
 )
 const committedPolicyPath = path.join(
   apiRoot,
-  'policies/community-screening/policy-v1.json'
+  'policies/community-screening/policy-v2.json'
 )
 
 type JsonRecord = Record<string, unknown>
@@ -41,7 +41,7 @@ describe('loadCommunityScreeningPolicy', () => {
 
     expect(loaded.manifestPath).toBe(committedManifestPath)
     expect(loaded.policyPath).toBe(committedPolicyPath)
-    expect(loaded.policy.version).toBe('v1')
+    expect(loaded.policy.version).toBe('v2')
     expect(loaded.manifest.packageName).toBe('nsfwjs')
     expect(loaded.manifest.packageVersion).toBe('4.3.0')
     expect(loaded.manifest.backend).toBe('wasm')
@@ -61,7 +61,7 @@ describe('loadCommunityScreeningPolicy', () => {
     const loaded = loadCommunityScreeningPolicy()
 
     expect(loaded.identity.textEngineVersion).toBe(
-      `adr013-text:policy-v1@${loaded.policySha256.slice(0, 12)}`
+      `adr013-text:policy-v2@${loaded.policySha256.slice(0, 12)}`
     )
     // The image half is composed by the screener from the model digest it
     // actually verified, so this identity deliberately carries none.
@@ -87,8 +87,12 @@ describe('loadCommunityScreeningPolicy', () => {
 describe('the committed policy is conservative by construction', () => {
   const { policy } = loadCommunityScreeningPolicy()
 
-  it('requires a confident Neutral, a bounded unsafe aggregate, and a block ceiling', () => {
-    expect(policy.image.neutralPassMinimum).toBe(0.85)
+  it('requires a confident safe mass, a bounded unsafe aggregate, a Sexy ceiling and a block ceiling', () => {
+    expect(policy.image.safeClasses).toEqual(['Drawing', 'Neutral'])
+    expect(policy.image.safeMassMinimum).toBe(0.85)
+    expect(policy.image.reviewClasses).toEqual(['Sexy'])
+    expect(policy.image.reviewClassMaximum).toBe(0.15)
+    expect(policy.image.unsafeAndReviewAggregateMaximum).toBe(0.15)
     expect(policy.image.unsafeAggregateMaximum).toBe(0.1)
     expect(policy.image.unsafeBlockMinimum).toBe(0.35)
     expect(policy.image.unsafeClasses).toEqual(['Hentai', 'Porn'])
@@ -106,21 +110,22 @@ describe('the committed policy is conservative by construction', () => {
   })
 
   // The seam the coordinator found: Neutral 0.86 with Porn 0.13 clears the
-  // Neutral gate and blocks on no single class, so the aggregate ceiling is the
+  // safe-mass gate and blocks on no single class, so the aggregate ceiling is the
   // only thing keeping thirteen percent unsafe mass out of automatic publication.
   // Driven through the disposition function rather than restated as arithmetic
   // on the thresholds: comparing the numbers to themselves passes whatever the
   // evaluator does with them.
-  it('keeps a confident Neutral carrying real unsafe mass out of pass', () => {
+  it('keeps a confident safe mass carrying real unsafe mass out of pass', () => {
     const evaluation = evaluateNsfwDisposition(
       [0.01, 0, 0.86, 0.13, 0],
       policy.image.classNames,
       policy.image
     )
 
-    expect(evaluation.classProbabilities.Neutral).toBeGreaterThan(
-      policy.image.neutralPassMinimum
-    )
+    expect(
+      (evaluation.classProbabilities.Neutral ?? 0) +
+        (evaluation.classProbabilities.Drawing ?? 0)
+    ).toBeGreaterThan(policy.image.safeMassMinimum)
     expect(evaluation.disposition).toBe('review')
   })
 
@@ -209,7 +214,7 @@ describe('startup rejects an unapproved policy', () => {
     fs.mkdirSync(policyDir, { recursive: true })
     fs.mkdirSync(manifestDir, { recursive: true })
 
-    const policyPath = path.join(policyDir, 'policy-v1.json')
+    const policyPath = path.join(policyDir, 'policy-v2.json')
     const policyBytes = `${JSON.stringify(policy, null, 2)}\n`
     fs.writeFileSync(policyPath, policyBytes)
 
@@ -245,11 +250,11 @@ describe('startup rejects an unapproved policy', () => {
 
   it('rejects a threshold that drifted between the manifest and the policy', () => {
     const manifestPath = writePair((manifest) => {
-      ;(manifest.thresholds as JsonRecord).neutralPassMinimum = 0.5
+      ;(manifest.thresholds as JsonRecord).safeMassMinimum = 0.5
     })
 
     expect(() => loadCommunityScreeningPolicy({ manifestPath })).toThrow(
-      /threshold neutralPassMinimum is 0.5 but the policy says 0.85/
+      /threshold safeMassMinimum is 0.5 but the policy says 0.85/
     )
   })
 
@@ -313,6 +318,35 @@ describe('startup rejects an unapproved policy', () => {
 
     expect(() => loadCommunityScreeningPolicy({ manifestPath })).toThrow(
       /not one of the model's class names/
+    )
+  })
+
+  it.each([
+    ['safeClasses', ['Neutral', 'Nudity']],
+    ['reviewClasses', ['Nudity']],
+  ])('rejects a %s entry the model does not emit', (field, names) => {
+    const manifestPath = writePair((manifest, policy) => {
+      ;(policy.image as JsonRecord)[field] = names
+      ;(manifest.thresholds as JsonRecord)[field] = names
+    })
+
+    expect(() => loadCommunityScreeningPolicy({ manifestPath })).toThrow(
+      new RegExp(`${field} names Nudity, which is not one of the model's class names`)
+    )
+  })
+
+  it.each([
+    ['safe and unsafe', 'safeClasses', ['Drawing', 'Neutral', 'Porn']],
+    ['safe and review', 'safeClasses', ['Drawing', 'Neutral', 'Sexy']],
+    ['unsafe and review', 'reviewClasses', ['Sexy', 'Hentai']],
+  ])('rejects a class counted as both %s', (_label, field, names) => {
+    const manifestPath = writePair((manifest, policy) => {
+      ;(policy.image as JsonRecord)[field] = names
+      ;(manifest.thresholds as JsonRecord)[field] = names
+    })
+
+    expect(() => loadCommunityScreeningPolicy({ manifestPath })).toThrow(
+      /must not share a class/
     )
   })
 

@@ -668,6 +668,14 @@
       "withdrawn": "Retirou este visual do feed.",
       "consent_suspended": "Este visual fica oculto até que um responsável renove o consentimento. Partilhe-o novamente quando o consentimento estiver ativo."
     },
+    "moderationReason": {
+      "language": "A sua legenda ou descrição da imagem usa palavras que as regras da comunidade não permitem. Altere o texto antes de partilhar este visual novamente.",
+      "textUnreadable": "A verificação não conseguiu analisar toda a sua legenda ou descrição da imagem. Torne o texto mais curto e escreva-o num só idioma antes de partilhar este visual novamente.",
+      "photo": "Esta fotografia não cumpre as regras da comunidade.",
+      "photoUnconfirmed": "A verificação não conseguiu confirmar que esta fotografia cumpre as regras da comunidade. Uma fotografia mais nítida do visual poderá ser aprovada.",
+      "incomplete": "A verificação deste visual não terminou.",
+      "upload": "Não foi possível processar esta fotografia tal como foi carregada. Partilhe este visual novamente com uma fotografia JPEG, PNG ou WebP até 10 MB e entre 256 e 4096 pixéis de cada lado."
+    },
     "challenge": {
       "eyebrow": "Desafio de estilo da semana",
       "allClimates": "Todos os climas",

@@ -37,15 +37,20 @@ export interface CommunityModerationPublisher {
  * `queue.add` with a jobId that already exists returns the existing job instead
  * of creating one. So re-driving a post that has already been screened is a
  * SILENT no-op for seven days: the outbox row is stamped as dispatched, no job
- * runs, and the post stays wherever it was. `AdminService.retryFailedJob` on a
- * community post inside that window does nothing visible either.
+ * runs, and the post stays wherever it was.
  *
  * That is the correct behaviour — it is what makes a duplicate dispatch safe —
  * but an operator who needs a genuine re-screen has to do one of two things:
  * remove the retained job from the queue first (`queue.getJob(id)` then
  * `job.remove()`), or give the post a new upload session, which changes the
  * object path and therefore the job id. Re-arming the outbox row alone is not
- * enough and looks like it worked.
+ * enough and looks like it worked. Either way the post must still be in
+ * `pending_review`, because the processor skips every other status.
+ *
+ * `AdminService.retryFailedJob` does not go through this id: it adds a job
+ * with an id BullMQ generates. It still re-screens nothing, because a post
+ * whose job was dead-lettered is already `review_failed` (Story 6.2b review,
+ * RF14; recorded in deferred work).
  */
 export function buildCommunityModerationJobId(
   postId: string,

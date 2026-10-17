@@ -1,0 +1,2501 @@
+/*
+ * Generates the Community Beta model-readiness evidence: one JSON payload and the
+ * Markdown view of it, from the same run.
+ *
+ * Story 6.2b, AC 6, 7 and 8. The payload gathers every measurement the release
+ * gate rests on (the deployment, the canary, the policy-surface sweep, the safe
+ * photograph corpus, the text corpus, the list provenance, the model and runtime
+ * measurements) together with the hashes of every input that produced them, the
+ * commands that produced them, the named limitations and the rollback procedure,
+ * and renders one `verdict`:
+ *
+ *   pass        every gate ran against the current inputs and passed;
+ *   fail        at least one gate that ran failed;
+ *   incomplete  nothing failed, but at least one gate has not run, its
+ *               measurement is stale against the current inputs, or the
+ *               working tree held uncommitted changes.
+ *
+ * The verdict fails closed (Story 6.2b review, BH20, EC11 to EC15). Every run
+ * product under apps/api/.cache/community-screening records the input-set hash
+ * scripts/lib/community-screening-input-set.mjs computes over the screening and
+ * worker sources, the policy, lists and manifests, every corpus and fixture, the
+ * Dockerfile, the lockfile and the measuring scripts. This command recomputes it
+ * and reports a product whose hash differs, or that records none, as not run. A
+ * measurement that is missing, null, partial or not finite fails its gate rather
+ * than passing vacuously. Limitation and finding numbers are derived from the
+ * sections, so the narrative cannot contradict the gates.
+ *
+ * The intended order: commit the code, run the products, generate the evidence,
+ * commit the evidence. The clean-tree check ignores this command's own outputs,
+ * the signature, the holdout image triage and the run-product cache.
+ *
+ * This command never signs. The owner records one verdict against the payload's
+ * SHA-256 with `npm run community:screening:sign` (or, when the owner delegated
+ * it, `-- --delegated`, which is refused unless the verdict is `pass`);
+ * regenerating the payload changes its hash and makes any earlier signature
+ * stale.
+ *
+ * Usage: node scripts/generate-community-screening-readiness.mjs
+ *          [--image <docker image ref>] [--beta-daily-submissions <n>]
+ */
+import crypto from 'node:crypto'
+import fs from 'node:fs'
+import path from 'node:path'
+import { execFileSync } from 'node:child_process'
+import { fileURLToPath } from 'node:url'
+import { inputSetHash, inputSetPathspecs } from './lib/community-screening-input-set.mjs'
+import { readCommunityRolloutDefaults } from './lib/community-rollout-flags.mjs'
+import { restartDrillProblems } from './community-screening-canary.mjs'
+
+const __dirname = path.dirname(fileURLToPath(import.meta.url))
+const projectRoot = path.resolve(__dirname, '..')
+
+export const OUTPUT_JSON =
+  '_bmad-output/test-artifacts/community-content-screening-model-readiness.json'
+export const OUTPUT_MARKDOWN =
+  '_bmad-output/test-artifacts/community-content-screening-model-readiness.md'
+const SIGNATURE = '_bmad-output/test-artifacts/community-content-screening-signature.json'
+/**
+ * One short description per withheld or blocked holdout photograph, written by
+ * a person who looked at it, keyed by manifest id and bound to its SHA-256. It
+ * is evidence the generator reads, not a run product: the photographs it
+ * describes are known only after the evaluation ran.
+ */
+export const HOLDOUT_TRIAGE =
+  '_bmad-output/test-artifacts/community-safe-corpus-holdout-triage.json'
+const RUN_PRODUCTS = 'apps/api/.cache/community-screening'
+/** What the clean-tree check ignores: outputs of this flow, never its inputs. */
+const CLEAN_TREE_EXEMPT = [
+  OUTPUT_JSON,
+  OUTPUT_MARKDOWN,
+  SIGNATURE,
+  HOLDOUT_TRIAGE,
+  `${RUN_PRODUCTS}/`,
+]
+
+const INPUTS = {
+  lockfile: 'package-lock.json',
+  dockerfile: 'apps/api/Dockerfile.community-worker',
+  modelManifest:
+    'apps/api/model-manifests/community-nsfw-mobilenet-v2-mid-nsfwjs-4.3.0.json',
+  policy: 'apps/api/policies/community-screening/policy-v2.json',
+  allowList: 'apps/api/policies/community-screening/allow-list-v1.json',
+  vendorSource: 'apps/api/policies/community-screening/vendor/ldnoobw/source.json',
+  safeCorpusManifest: 'apps/api/test/fixtures/community-safe-corpus/manifest.json',
+  fixtureManifest: 'apps/api/test/fixtures/community-moderation/v1/manifest.json',
+  workerSource: 'apps/api/src/modules/community/community-moderation.worker.ts',
+  heartbeatSource: 'apps/api/src/modules/community/community-worker-heartbeat.ts',
+}
+export const TEXT_LANGUAGES = ['de', 'en', 'es', 'fr', 'it', 'pt', 'tr']
+const DEFAULT_IMAGE = 'couture-cast-community-worker:local'
+const NODE_MODULES_BUDGET_MB = 150
+const SAFE_CORPUS_MINIMUM_HOLDOUT = 250
+const SAFE_CORPUS_UPPER_BOUND_GATE = 0.05
+const TEXT_MINIMUM_CLEAN = 200
+const TEXT_MINIMUM_DISALLOWED = 100
+const TEXT_CLEAN_UPPER_BOUND_GATE = 0.01
+/** The largest upload the pipeline accepts, generated by the canary's `--fixture max`. */
+const MAX_UPLOAD_FIXTURE = 'generated-4096x4096.jpg'
+/** Story 6.2 AC 8: a warm p95 above this for one 224x224 inference is a defect signal. */
+const WARM_P95_DEFECT_MS = 500
+/** Story 6.2 AC 8: at least 1,000 warm inferences after warmup. */
+const MINIMUM_WARM_SAMPLES = 1000
+/**
+ * The hosted worker's resource envelope (Northflank Developer Sandbox). Latency
+ * measured under any other cgroup limit, including none, says nothing about it.
+ */
+export const RELEASE_RESOURCE_PROFILE = { cpu: 0.2, memoryMib: 512 }
+/** The worker's BullMQ name, from the image's commit (community-moderation.worker.ts). */
+export const workerNameFor = (sha) => `community-worker@${sha}`
+/**
+ * The planning documents name no expected Community Beta submission volume, so
+ * the projection takes it as an input, labels it an assumption, and also shows a
+ * range. The owner confirms or replaces it before signing.
+ */
+const DEFAULT_BETA_DAILY_SUBMISSIONS = 100
+const VOLUME_RANGE = [50, 100, 250, 500, 1000]
+const BETA_MODERATORS = 2
+
+export const COMMANDS = {
+  buildImage: 'npm run community:screening:image:build',
+  canaryLocal: 'npm run community:screening:canary:local',
+  canaryRestartDrill: 'npm run community:screening:canary:restart-drill',
+  canaryHosted:
+    'npm run community:screening:canary -- --target hosted --env-file <hosted env file> --json-out apps/api/.cache/community-screening/canary-hosted.json',
+  measureRuntimeContainer: 'npm run community:screening:measure:container',
+  measureMemory:
+    'start the worker container fresh under --memory=512m, then npm run community:screening:measure:memory',
+  policySweep: 'npm run community:screening:sweep',
+  textEvaluation: 'npm run community:screening:text',
+  verifyLists: 'npm run verify:community-screening-lists',
+  verifyListsRemote: 'npm run verify:community-screening-lists -- --remote',
+  fetchSafeCorpus: 'npm run community:screening:corpus:fetch',
+  verifySafeCorpus: 'npm run community:screening:corpus:verify',
+  evaluateSafeCorpus: 'npm run community:screening:corpus:evaluate',
+  calibrateModels:
+    'node scripts/calibrate-community-screening-models.mjs --tfjs-from <evaluation install> --measurements apps/api/.cache/community-screening/model-measurements.json',
+  measureModelsContainer:
+    'docker run --rm --memory=512m --cpus=0.2 -v $PWD/scripts:/repo/scripts:ro -v <linux evaluation install>:/eval:ro node:24.21.0-bookworm-slim node /repo/scripts/calibrate-community-screening-models.mjs --tfjs-from /eval --measure <family>',
+  measureRedis: 'npm run community:screening:measure:redis',
+  measureRedisPerPost:
+    'node scripts/measure-community-worker-redis.mjs --canary-runs 5 --idle-baseline apps/api/.cache/community-screening/redis-idle.json > apps/api/.cache/community-screening/redis-per-post.json',
+  verifyModel: 'npm run verify:community-screening-model --workspace api',
+  generateEvidence: 'npm run community:screening:evidence',
+  sign: 'npm run community:screening:sign',
+  signDelegated: 'npm run community:screening:sign -- --delegated',
+  verifySignature: 'npm run community:screening:verify-signature',
+  verifyChanged: 'npm run verify:changed',
+  validate: 'npm run validate',
+}
+
+// ---------------------------------------------------------------- helpers
+
+function full(relativePath) {
+  return path.join(projectRoot, relativePath)
+}
+
+function sha256File(relativePath) {
+  const filePath = full(relativePath)
+  return fs.existsSync(filePath)
+    ? crypto.createHash('sha256').update(fs.readFileSync(filePath)).digest('hex')
+    : null
+}
+
+function readJson(relativePath) {
+  const filePath = full(relativePath)
+  return fs.existsSync(filePath) ? JSON.parse(fs.readFileSync(filePath, 'utf8')) : null
+}
+
+/**
+ * A run product, or null when absent. A product that does not parse (a
+ * measurement still writing, or one cut short) carries no input-set hash, so
+ * every gate that reads it reports it as not run.
+ */
+function runProduct(name) {
+  try {
+    return readJson(path.join(RUN_PRODUCTS, name))
+  } catch {
+    return { unreadable: `${name} is not valid JSON` }
+  }
+}
+
+function git(args, { trim = true } = {}) {
+  try {
+    const output = execFileSync('git', args, {
+      cwd: projectRoot,
+      encoding: 'utf8',
+      stdio: ['ignore', 'pipe', 'ignore'],
+    })
+    return trim ? output.trim() : output
+  } catch {
+    return null
+  }
+}
+
+function runJsonCommand(command, args, env = process.env) {
+  try {
+    const output = execFileSync(command, args, {
+      cwd: projectRoot,
+      encoding: 'utf8',
+      env,
+      stdio: ['ignore', 'pipe', 'pipe'],
+    })
+    return parseJsonObject(output)
+  } catch (error) {
+    return parseJsonObject(typeof error.stdout === 'string' ? error.stdout : '')
+  }
+}
+
+function parseJsonObject(output) {
+  const start = output.indexOf('{')
+  const end = output.lastIndexOf('}')
+  if (start === -1 || end <= start) return null
+  try {
+    return JSON.parse(output.slice(start, end + 1))
+  } catch {
+    return null
+  }
+}
+
+/** Wilson score interval at 95% confidence. */
+export function wilsonInterval(successes, trials) {
+  if (trials === 0) return [0, 1]
+  const z = 1.959963984540054
+  const proportion = successes / trials
+  const denominator = 1 + (z * z) / trials
+  const centre = (proportion + (z * z) / (2 * trials)) / denominator
+  const half =
+    (z *
+      Math.sqrt(
+        (proportion * (1 - proportion)) / trials + (z * z) / (4 * trials * trials)
+      )) /
+    denominator
+  return [Math.max(0, centre - half), Math.min(1, centre + half)]
+}
+
+const round = (value, digits = 4) =>
+  typeof value === 'number' ? Number(value.toFixed(digits)) : value
+
+const finite = (value) => typeof value === 'number' && Number.isFinite(value)
+const percent = (value, digits = 1) => `${(value * 100).toFixed(digits)}%`
+
+function gate(id, name, status, details) {
+  return { id, name, status, ...details }
+}
+
+function staleness(product, expected) {
+  return Object.entries(expected)
+    .filter(([key, value]) => product?.[key] !== value)
+    .map(([key]) => key)
+}
+
+/**
+ * Why a run product is not evidence for the current inputs, or nothing. A
+ * product with no recorded hash, or one an image built without its build
+ * argument carries (`unset`), is never current.
+ */
+export function inputStaleness(recorded, currentHash) {
+  if (typeof recorded !== 'string' || recorded === '' || recorded === 'unset') {
+    return ['no input-set hash recorded']
+  }
+  return recorded === currentHash ? [] : ['inputs changed since the measurement']
+}
+
+/** Uncommitted paths, minus this flow's own outputs. */
+function workingTreeState() {
+  // Untrimmed: each porcelain line starts with a two-column status that may
+  // begin with a space, and the path starts at the fourth character.
+  const status = git(['status', '--porcelain', '--untracked-files=all'], { trim: false })
+  if (status === null) {
+    return { clean: false, changedPaths: 0, sample: ['git status unavailable'] }
+  }
+  const changed = status
+    .split('\n')
+    .filter(Boolean)
+    .map((line) =>
+      line
+        .slice(3)
+        .replace(/^.* -> /, '')
+        .replace(/^"|"$/g, '')
+    )
+    .filter(
+      (file) =>
+        !CLEAN_TREE_EXEMPT.some((exempt) =>
+          exempt.endsWith('/') ? file.startsWith(exempt) : file === exempt
+        )
+    )
+  return {
+    clean: changed.length === 0,
+    changedPaths: changed.length,
+    sample: changed.slice(0, 10),
+  }
+}
+
+// ---------------------------------------------------------------- sections
+
+function imageEnvironment(inspect) {
+  return Object.fromEntries(
+    (inspect.Config?.Env ?? []).map((line) => {
+      const separator = line.indexOf('=')
+      return [line.slice(0, separator), line.slice(separator + 1)]
+    })
+  )
+}
+
+function imageSection(imageRef, current) {
+  try {
+    const inspect = JSON.parse(
+      execFileSync('docker', ['image', 'inspect', imageRef], {
+        encoding: 'utf8',
+        stdio: ['ignore', 'pipe', 'ignore'],
+      })
+    )[0]
+    const sizes = execFileSync(
+      'docker',
+      [
+        'run',
+        '--rm',
+        '--entrypoint',
+        'sh',
+        imageRef,
+        '-c',
+        'du -sb /app/node_modules /app/apps/api/node_modules /app/packages 2>/dev/null',
+      ],
+      { encoding: 'utf8', stdio: ['ignore', 'pipe', 'ignore'] }
+    )
+    const nodeModulesBytes = sizes
+      .trim()
+      .split('\n')
+      .filter((line) => line.includes('node_modules'))
+      .reduce((sum, line) => sum + Number(line.split(/\s+/)[0]), 0)
+    const env = imageEnvironment(inspect)
+    return {
+      available: true,
+      stale: inputStaleness(env.COMMUNITY_WORKER_INPUT_SET_HASH, current.inputSetHash),
+      reference: imageRef,
+      imageId: inspect.Id,
+      repoDigests: inspect.RepoDigests ?? [],
+      created: inspect.Created,
+      architecture: `${inspect.Os}/${inspect.Architecture}`,
+      user: inspect.Config?.User ?? null,
+      entrypoint: inspect.Config?.Entrypoint ?? null,
+      cmd: inspect.Config?.Cmd ?? null,
+      commitSha: env.COMMUNITY_WORKER_COMMIT_SHA ?? null,
+      inputSetHash: env.COMMUNITY_WORKER_INPUT_SET_HASH ?? null,
+      nodeModulesMb: round(nodeModulesBytes / 1_000_000, 1),
+      nodeModulesBudgetMb: NODE_MODULES_BUDGET_MB,
+      dockerfileSha256: sha256File(INPUTS.dockerfile),
+      note: 'Image digest is the locally built image id. The hosted build produces its own digest on the target architecture; the hosted canary records the worker name, which carries the commit the hosted image was built from.',
+    }
+  } catch {
+    return {
+      available: false,
+      stale: [],
+      reference: imageRef,
+      dockerfileSha256: sha256File(INPUTS.dockerfile),
+      note: `No local image ${imageRef} could be inspected. Build it with \`${COMMANDS.buildImage}\`.`,
+    }
+  }
+}
+
+const COMMIT_SHA = /^[0-9a-f]{7,40}$/
+
+/**
+ * Whether the build a hosted canary verified carries the same inputs as the
+ * commit this evidence describes. The canary records the deployed commit
+ * (`expectedSha`) and stamps the caller's input-set hash, which proves nothing
+ * about the deployed code: an older deployment could otherwise pass the current
+ * gate. `git diff --quiet` exits 0 when no input-set path differs between the
+ * two commits, 1 when one does, and anything else when either commit is unknown.
+ */
+export function deployedInputBinding(
+  { expectedSha, commitSha, pathspecs },
+  root = projectRoot
+) {
+  const base = { expectedSha: expectedSha ?? null, commitSha: commitSha ?? null }
+  if (typeof expectedSha !== 'string' || !COMMIT_SHA.test(expectedSha)) {
+    return {
+      ...base,
+      status: 'unknown',
+      reason: 'the canary recorded no deployed commit',
+    }
+  }
+  if (typeof commitSha !== 'string' || !COMMIT_SHA.test(commitSha)) {
+    return { ...base, status: 'unknown', reason: 'the evidence has no commit' }
+  }
+  try {
+    execFileSync('git', ['diff', '--quiet', expectedSha, commitSha, '--', ...pathspecs], {
+      cwd: root,
+      stdio: ['ignore', 'ignore', 'ignore'],
+    })
+    return { ...base, status: 'same' }
+  } catch (error) {
+    if (error?.status === 1) {
+      return {
+        ...base,
+        status: 'differs',
+        reason: `the deployed commit ${expectedSha} differs from ${commitSha} in the input set`,
+      }
+    }
+    return {
+      ...base,
+      status: 'unknown',
+      reason: `git could not compare ${expectedSha} with ${commitSha}; fetch the deployed commit`,
+    }
+  }
+}
+
+function canarySection(name, label, current, { hosted = false } = {}) {
+  const product = runProduct(name)
+  if (!product) return { label, available: false, stale: [] }
+  return {
+    label,
+    available: true,
+    stale: inputStaleness(product.inputSetHash, current.inputSetHash),
+    ...product,
+    ...(hosted
+      ? {
+          deployedInputs: deployedInputBinding({
+            expectedSha: product.expectedSha,
+            commitSha: current.commitSha,
+            pathspecs: current.inputSetPathspecs,
+          }),
+        }
+      : {}),
+  }
+}
+
+function runtimeSection(manifest, current) {
+  const container = runProduct('runtime-container.json')
+  const memory = runProduct('container-memory.json')
+  const ceilings = manifest?.performance?.absoluteCeilings ?? null
+  const regressionGate = manifest?.performance?.regressionGate ?? null
+  return {
+    ceilings,
+    developerMeasurement: manifest?.performance?.measured ?? null,
+    latency: container
+      ? {
+          available: true,
+          // The image's own build argument, so a measurement of a stale image is stale.
+          stale: inputStaleness(container.inputSetHash, current.inputSetHash),
+          ...container,
+        }
+      : { available: false, stale: [] },
+    memory: memory
+      ? {
+          available: true,
+          stale: [
+            ...inputStaleness(memory.inputSetHash, current.inputSetHash).map(
+              (reason) => `image: ${reason}`
+            ),
+            ...inputStaleness(memory.hostInputSetHash, current.inputSetHash).map(
+              (reason) => `host: ${reason}`
+            ),
+          ],
+          ...memory,
+        }
+      : { available: false, stale: [] },
+    regressionGate: {
+      committed: regressionGate,
+      comparable: false,
+      note: 'The committed regression gate was set at three times a developer-laptop measurement. It applies to the hardware it was measured on; a 0.2 vCPU container is several times slower by construction, so comparing the two would fail on hardware, not on a regression. Story 6.2 AC 8 re-baselines the gate on the named production worker size, which happens with the hosted measurement.',
+    },
+  }
+}
+
+function sweepSection(current) {
+  const sweep = runProduct('policy-sweep.json')
+  const coverage = runProduct('policy-sweep-coverage.json')
+  return {
+    available: Boolean(sweep && coverage),
+    stale: [
+      ...(sweep ? staleness(sweep, { policySha256: current.policySha256 }) : []),
+      ...(coverage ? staleness(coverage, { policySha256: current.policySha256 }) : []),
+      ...(sweep ? inputStaleness(sweep.inputSetHash, current.inputSetHash) : []),
+      ...(coverage ? inputStaleness(coverage.inputSetHash, current.inputSetHash) : []),
+    ],
+    sweep,
+    coverage,
+  }
+}
+
+/**
+ * The model and policy choice, made on the calibration half only by
+ * scripts/calibrate-community-screening-models.mjs. Current only when it was
+ * made against today's inputs; whether the shipped policy is the configuration
+ * it chose is the gate's question, and a mismatch fails it.
+ */
+function calibrationSection(current, policy, manifest) {
+  const calibration = runProduct('model-calibration.json')
+  if (!calibration) return { available: false, stale: [] }
+  // Per-photograph vectors stay in the run product; the payload carries the scores.
+  const summary = Object.fromEntries(
+    Object.entries(calibration).filter(([key]) => key !== 'vectors')
+  )
+  return {
+    available: true,
+    stale: [
+      ...staleness(calibration, { manifestSha256: current.safeCorpusManifestSha256 }),
+      ...inputStaleness(calibration.inputSetHash, current.inputSetHash),
+    ],
+    shipped: {
+      family: manifest?.modelFamily ?? null,
+      safeMassMinimum: policy?.image?.safeMassMinimum ?? null,
+      bounds: {
+        blockMinimum: policy?.image?.unsafeBlockMinimum ?? null,
+        unsafeAggregateMaximum: policy?.image?.unsafeAggregateMaximum ?? null,
+        sexyPassMaximum: policy?.image?.reviewClassMaximum ?? null,
+        jointMaximum: policy?.image?.unsafeAndReviewAggregateMaximum ?? null,
+      },
+    },
+    ...summary,
+  }
+}
+
+/** Which bound withheld each photograph, so the remaining review load has a cause. */
+function boundFor(entry, image) {
+  const p = entry.classProbabilities ?? {}
+  const sum = (names) => (names ?? []).reduce((total, name) => total + (p[name] ?? 0), 0)
+  if (entry.disposition === 'block')
+    return 'blocked: an unsafe class above the block floor'
+  if (sum(image?.unsafeClasses) >= image?.unsafeAggregateMaximum) {
+    return 'unsafe aggregate at or above its ceiling'
+  }
+  if (
+    (image?.reviewClasses ?? []).some(
+      (name) => (p[name] ?? 0) >= image?.reviewClassMaximum
+    )
+  ) {
+    return 'review class at or above its ceiling'
+  }
+  if (
+    sum([...(image?.unsafeClasses ?? []), ...(image?.reviewClasses ?? [])]) >=
+    image?.unsafeAndReviewAggregateMaximum
+  ) {
+    return 'unsafe and review classes together at or above the joint ceiling'
+  }
+  if (sum(image?.safeClasses) <= image?.safeMassMinimum)
+    return 'safe mass at or below its floor'
+  return `other: ${(entry.reasons ?? []).join(',')}`
+}
+
+function countBy(items, key) {
+  return items.reduce((counts, item) => {
+    const value = key(item)
+    return { ...counts, [value]: (counts[value] ?? 0) + 1 }
+  }, {})
+}
+
+function safeCorpusSection(current, dailySubmissions, policy) {
+  const evaluation = runProduct('safe-corpus-evaluation.json')
+  const manifest = readJson(INPUTS.safeCorpusManifest)
+  const manifestSummary = manifest && {
+    corpusId: manifest.corpusId,
+    entries: manifest.entries.length,
+    holdoutEntries: manifest.entries.filter((entry) => entry.split === 'holdout').length,
+    calibrationEntries: manifest.entries.filter((entry) => entry.split === 'calibration')
+      .length,
+    minimumCount: manifest.minimumCount,
+    split: manifest.split,
+    licences: countBy(manifest.entries, (entry) => entry.license),
+    sources: countBy(manifest.entries, (entry) => entry.source),
+    manifestSha256: current.safeCorpusManifestSha256,
+  }
+  if (!evaluation) return { available: false, stale: [], manifest: manifestSummary }
+
+  const { perEntry = [], ...summary } = evaluation
+  const evaluated = summary.evaluated
+  const withheldCount = summary.withheld
+  // Recomputed here with an independent implementation, so the payload does not
+  // simply repeat the interval the evaluation reported.
+  const [lower, upper] =
+    finite(evaluated) && finite(withheldCount) && evaluated > 0
+      ? wilsonInterval(withheldCount, evaluated)
+      : [null, null]
+  const projection = (volume) => ({
+    dailySubmissions: volume,
+    expectedWithheldPerDay: round(summary.withheldRate * volume, 1),
+    upperBoundWithheldPerDay: round(upper * volume, 1),
+    perModeratorPerDayAtUpperBound: round((upper * volume) / BETA_MODERATORS, 1),
+  })
+
+  // Every withheld or blocked holdout photograph, with what a person who looked
+  // at it saw (Story 6.2b review, BH8). The description counts only while the
+  // triage still names the bytes the manifest pins.
+  const triage = readJson(HOLDOUT_TRIAGE)?.entries ?? {}
+  const pinned = new Map(
+    (manifest?.entries ?? []).map((entry) => [entry.id, entry.sha256])
+  )
+  const withheldEntries = perEntry
+    .filter((entry) => entry.disposition !== 'pass')
+    .map((entry) => {
+      const described = triage[entry.id]
+      const stillPinned = described && described.sha256 === pinned.get(entry.id)
+      return {
+        id: entry.id,
+        disposition: entry.disposition,
+        reasons: entry.reasons,
+        bound: boundFor(entry, policy?.image),
+        classProbabilities: Object.fromEntries(
+          Object.entries(entry.classProbabilities ?? {}).map(([name, value]) => [
+            name,
+            round(value, 3),
+          ])
+        ),
+        description: stillPinned ? described.description : null,
+      }
+    })
+
+  return {
+    available: true,
+    stale: [
+      ...staleness(evaluation, {
+        manifestSha256: current.safeCorpusManifestSha256,
+        policySha256: current.policySha256,
+      }),
+      ...inputStaleness(evaluation.inputSetHash, current.inputSetHash),
+    ],
+    manifest: manifestSummary,
+    ...summary,
+    recomputedWilson95: [round(lower, 6), round(upper, 6)],
+    withheldByBound: countBy(withheldEntries, (entry) => entry.bound),
+    withheldEntries,
+    triageSummary: readJson(HOLDOUT_TRIAGE)?.summary ?? null,
+    triageMissing: withheldEntries
+      .filter((entry) => entry.description === null)
+      .map((entry) => entry.id),
+    reviewLoad: {
+      assumption: {
+        dailySubmissions,
+        source:
+          dailySubmissions === DEFAULT_BETA_DAILY_SUBMISSIONS
+            ? 'assumption: no planning document records an expected Community Beta submission volume; replace with --beta-daily-submissions once the cohort size is known'
+            : 'supplied with --beta-daily-submissions',
+        moderators: BETA_MODERATORS,
+        moderatorsSource: 'ADR-013 staffing plan: two moderators during beta',
+      },
+      atAssumedVolume: upper === null ? null : projection(dailySubmissions),
+      range: upper === null ? [] : VOLUME_RANGE.map(projection),
+      note: 'Withheld images are the review load from image screening alone on ordinary photographs; text refusals, reports and genuinely unsafe uploads add to it.',
+    },
+  }
+}
+
+function summariseClean(result) {
+  if (!result) return null
+  const [, upper] = wilsonInterval(result.withheld, result.total)
+  return {
+    total: result.total,
+    withheld: result.withheld,
+    rate: round(result.rate, 6),
+    wilson95: (result.wilson95 ?? []).map((value) => round(value, 6)),
+    recomputedUpperBound: round(upper, 6),
+    withheldBySeverity: result.bySeverity,
+    withheldIds: (result.withheldIds ?? []).map((entry) => entry.id),
+    expectedReviewIds: result.expectedReviewIds ?? [],
+    expectedReviewThatPassed: result.expectedReviewPassed ?? [],
+  }
+}
+
+function textSection(current) {
+  const evaluation = runProduct('text-corpus-evaluation.json')
+  const corpusHashes = Object.fromEntries(
+    TEXT_LANGUAGES.flatMap((language) => [
+      [
+        language,
+        sha256File(`apps/api/test/fixtures/community-text-corpus/${language}.json`),
+      ],
+      [
+        `${language}-holdout`,
+        sha256File(
+          `apps/api/test/fixtures/community-text-corpus/holdout-v1/${language}.json`
+        ),
+      ],
+    ])
+  )
+  if (!evaluation) return { available: false, stale: [], corpusSha256: corpusHashes }
+  const languages = Object.fromEntries(
+    Object.entries(evaluation.languages ?? {}).map(([language, result]) => [
+      language,
+      {
+        clean: summariseClean(result.clean),
+        cleanInSample: summariseClean(result.cleanInSample),
+        disallowed: {
+          total: result.disallowed.total,
+          withheld: result.disallowed.withheld,
+          bypassIds: result.disallowed.bypassIds,
+          byFamily: result.disallowed.byFamily,
+          byDisposition: result.disallowed.byDisposition,
+        },
+      },
+    ])
+  )
+  return {
+    available: true,
+    stale: [
+      ...staleness(evaluation, { policySha256: current.policySha256 }),
+      ...inputStaleness(evaluation.inputSetHash, current.inputSetHash),
+    ],
+    textEngineVersion: evaluation.textEngineVersion,
+    gates: evaluation.gates,
+    corpusSha256: corpusHashes,
+    missingLanguages: TEXT_LANGUAGES.filter((language) => !languages[language]),
+    languages,
+    note: 'Case ids and counts only. No caption text and no matched term enters this payload. `clean` is the frozen holdout the gate runs on; `cleanInSample` is the clean half the allow list was built against.',
+  }
+}
+
+/**
+ * The production Upstash database (couturecast-prod) is on Pay as You Go, so
+ * the constraint is the monthly bill.
+ * Read from upstash.com/pricing/redis on 2026-10-17: 0.20 USD per 100K
+ * commands, and no free command allowance once a database is on a paid plan
+ * ("Once you upgrade to a paid tier, you will be charged for data size and
+ * commands according to that plan"). Storage (first 1 GB free per database) and
+ * bandwidth (free up to 200 GB a month) are not driven by the worker's polling
+ * and are left out.
+ */
+export const UPSTASH_PAY_AS_YOU_GO = {
+  plan: 'Pay as You Go',
+  usdPer100kCommands: 0.2,
+  includedMonthlyCommands: 0,
+  sourceUrl: 'https://upstash.com/pricing/redis',
+  readOn: '2026-10-17',
+  source:
+    'https://upstash.com/pricing/redis, read 2026-10-17: Pay as You Go, $0.20 per 100K commands; no free command allowance on a paid plan; first 1 GB storage free, then $0.25/GB; bandwidth free up to 200 GB a month',
+}
+/** The worker's Redis cost ceiling at the assumed volume, in USD a month. */
+export const REDIS_MONTHLY_COST_CEILING_USD = 5
+const HOURS_PER_MONTH = 730
+const DAYS_PER_MONTH = 30.4
+
+/** What `commands` a month cost under Pay as You Go, in USD. */
+export function payAsYouGoMonthlyUsd(commands) {
+  const billable = Math.max(0, commands - UPSTASH_PAY_AS_YOU_GO.includedMonthlyCommands)
+  return (billable / 100_000) * UPSTASH_PAY_AS_YOU_GO.usdPer100kCommands
+}
+
+/** The commands a month that cost exactly `usd`. */
+function commandsForMonthlyUsd(usd) {
+  return (
+    (usd / UPSTASH_PAY_AS_YOU_GO.usdPer100kCommands) * 100_000 +
+    UPSTASH_PAY_AS_YOU_GO.includedMonthlyCommands
+  )
+}
+
+/**
+ * BullMQ's defaults before the worker was tuned, measured once on 2026-10-16
+ * with scripts/measure-community-worker-redis.mjs over five minutes. A recorded
+ * baseline, not a gate input: the defaults no longer ship, so it is not re-run.
+ */
+const REDIS_BEFORE_TUNING = {
+  commandsPerHour: 6516,
+  windowMinutes: 5,
+  drainDelaySeconds: 5,
+  stalledIntervalMs: 30_000,
+  measuredAt: '2026-10-16T23:09:47.853Z',
+}
+
+/** The tuned settings, read from the worker source so the payload cannot drift from it. */
+function tunedRedisSettings() {
+  const source = [INPUTS.workerSource, INPUTS.heartbeatSource]
+    .filter((file) => fs.existsSync(full(file)))
+    .map((file) => fs.readFileSync(full(file), 'utf8'))
+    .join('\n')
+  const read = (name) => {
+    const match = new RegExp(`${name}\\s*=\\s*([\\d_]+)`).exec(source)
+    return match ? Number(match[1].replaceAll('_', '')) : null
+  }
+  return {
+    drainDelaySeconds: read('COMMUNITY_MODERATION_DRAIN_DELAY_SECONDS'),
+    stalledIntervalMs: read('COMMUNITY_MODERATION_STALLED_INTERVAL_MS'),
+    heartbeatIntervalMs: read('COMMUNITY_WORKER_HEARTBEAT_INTERVAL_MS'),
+    heartbeatTtlSeconds: read('COMMUNITY_WORKER_HEARTBEAT_TTL_SECONDS'),
+  }
+}
+
+function redisSection(dailySubmissions, current) {
+  const idle = runProduct('redis-idle.json')
+  const perPost = runProduct('redis-per-post.json')
+  const base = {
+    pricing: UPSTASH_PAY_AS_YOU_GO,
+    monthlyCostCeilingUsd: REDIS_MONTHLY_COST_CEILING_USD,
+    beforeTuning: {
+      ...REDIS_BEFORE_TUNING,
+      monthlyUsd:
+        Math.round(
+          payAsYouGoMonthlyUsd(REDIS_BEFORE_TUNING.commandsPerHour * HOURS_PER_MONTH) *
+            1e6
+        ) / 1e6,
+    },
+    tuned: tunedRedisSettings(),
+    sharedDatabase:
+      'The worker uses the production Upstash database the API already uses for its own queues. These figures are the community worker alone; the API’s commands are billed on the same database.',
+  }
+  if (!idle || !perPost) {
+    return {
+      ...base,
+      available: false,
+      stale: [],
+      idle: idle ?? null,
+      perPost: perPost ?? null,
+    }
+  }
+  return {
+    ...base,
+    available: true,
+    stale: [
+      ...inputStaleness(idle.inputSetHash, current.inputSetHash).map((r) => `idle: ${r}`),
+      ...inputStaleness(idle.worker?.containerInputSetHash, current.inputSetHash).map(
+        (r) => `idle worker image: ${r}`
+      ),
+      ...inputStaleness(perPost.inputSetHash, current.inputSetHash).map(
+        (r) => `per post: ${r}`
+      ),
+    ],
+    countingRule:
+      'Every command Redis records, including the commands BullMQ Lua scripts run inside EVALSHA. Upstash does not document whether a script counts once or per inner command, so this is the upper bound.',
+    // The per-sample presence log stays in the run product; the summary is in `worker`.
+    idle: Object.fromEntries(
+      Object.entries(idle).filter(([key]) => key !== 'presenceSamples')
+    ),
+    perPost,
+    dailySubmissions,
+    ...projectRedisCost({
+      idleCommandsPerHour: idle.commandsPerHour,
+      commandsPerPost: perPost.commandsPerPost,
+      dailySubmissions,
+    }),
+  }
+}
+
+/**
+ * The worker's projected month at `dailySubmissions` posts a day, in commands
+ * and in Pay as You Go USD, and the largest daily volume whose month stays at or
+ * below the cost ceiling (one more post a day crosses it). Dollar figures are
+ * kept unrounded so the gate compares the real projection; the report rounds.
+ */
+export function projectRedisCost({
+  idleCommandsPerHour,
+  commandsPerPost,
+  dailySubmissions,
+}) {
+  if (!finite(idleCommandsPerHour) || !finite(commandsPerPost) || commandsPerPost <= 0) {
+    return { postsPerDayAtCostCeiling: null, projectedMonthly: null }
+  }
+  const idlePerMonth = idleCommandsPerHour * HOURS_PER_MONTH
+  const trafficPerMonth = commandsPerPost * dailySubmissions * DAYS_PER_MONTH
+  const ceilingCommands = commandsForMonthlyUsd(REDIS_MONTHLY_COST_CEILING_USD)
+  // Rounded to a millionth of a dollar, half a command at this price, to drop
+  // floating-point noise without moving the comparison with the ceiling.
+  const micro = (usd) => Math.round(usd * 1e6) / 1e6
+  const idleUsd = micro(payAsYouGoMonthlyUsd(idlePerMonth))
+  const totalUsd = micro(payAsYouGoMonthlyUsd(idlePerMonth + trafficPerMonth))
+  return {
+    postsPerDayAtCostCeiling: Math.max(
+      0,
+      Math.floor((ceilingCommands - idlePerMonth) / (commandsPerPost * DAYS_PER_MONTH))
+    ),
+    projectedMonthly: {
+      idle: Math.round(idlePerMonth),
+      traffic: Math.round(trafficPerMonth),
+      total: Math.round(idlePerMonth + trafficPerMonth),
+      idleUsd,
+      trafficUsd: micro(totalUsd - idleUsd),
+      totalUsd,
+    },
+  }
+}
+
+function listsSection() {
+  const report = runJsonCommand(process.execPath, [
+    'scripts/verify-community-screening-lists.mjs',
+    '--json',
+  ])
+  const source = readJson(INPUTS.vendorSource)
+  const allow = readJson(INPUTS.allowList)
+  return {
+    verification: report,
+    upstream: source && {
+      source: source.source,
+      commit: source.commit,
+      licence: source.licence,
+      files: source.files,
+    },
+    allowList: allow && {
+      entries: allow.entries.length,
+      everyEntryHasReason: allow.entries.every(
+        (entry) => typeof entry.reason === 'string' && entry.reason.length >= 20
+      ),
+      sha256: sha256File(INPUTS.allowList),
+    },
+  }
+}
+
+function modelVerification() {
+  const report = runJsonCommand(
+    'npm',
+    [
+      'run',
+      '--silent',
+      'verify:community-screening-model',
+      '--workspace',
+      'api',
+      '--',
+      '--json',
+    ],
+    { ...process.env, COMMUNITY_NSFW_SCREENER: 'tensorflow' }
+  )
+  return report
+    ? {
+        status: report.status,
+        failures: report.failures ?? [],
+        policy: report.policy ?? null,
+      }
+    : { status: 'unavailable', failures: ['the verification command produced no JSON'] }
+}
+
+function rolloutSection() {
+  return readCommunityRolloutDefaults()
+}
+
+// ---------------------------------------------------------------- gates
+
+/** A gate that has not run, or whose product no longer describes the inputs. */
+function pendingGate(id, name, section, command) {
+  if (!section?.available) return gate(id, name, 'not-run', { command })
+  if (section.stale.length > 0) {
+    return gate(id, name, 'not-run', {
+      reason: `stale against current inputs: ${section.stale.join(', ')}`,
+      command,
+    })
+  }
+  return null
+}
+
+/** Failed when any problem is listed, otherwise passed. */
+function judged(id, name, problems, details) {
+  return gate(id, name, problems.length === 0 ? 'passed' : 'failed', {
+    ...(problems.length > 0 ? { problems } : {}),
+    ...details,
+  })
+}
+
+function workingTreeGate(tree) {
+  const name = 'Evidence generated from a committed working tree'
+  if (tree?.clean === true) return gate('committed-tree', name, 'passed', {})
+  return gate('committed-tree', name, 'not-run', {
+    reason: `${tree?.changedPaths ?? 'unknown'} uncommitted paths (for example ${(tree?.sample ?? []).join(', ')}); commit the code, re-run the products, then regenerate`,
+  })
+}
+
+const NON_MODEL_IDENTITY = /fixture|unavailable|unresolved/
+
+/**
+ * A canary that did not remove what it created did not pass, whatever it
+ * measured, and neither did one that cannot say whether it did (Story 6.2b final
+ * review, RF7): only a cleanup whose closing lookup found nothing is `clean`.
+ */
+export function cleanupProblems(canary) {
+  const cleanup = canary.cleanup
+  if (cleanup?.performed !== true) return ['the canary did not clean up after itself']
+  if (!Array.isArray(cleanup.problems)) return ['the canary recorded no cleanup result']
+  const affected = (cleanup.unresolved ?? []).join(', ')
+  if (cleanup.status === 'uncertain') {
+    return [
+      `cleanup is uncertain after a write of unknown outcome; canary data may remain: ${affected}`,
+    ]
+  }
+  if (cleanup.status !== 'clean' || cleanup.problems.length > 0) {
+    return [
+      `cleanup left canary data behind: ${[...cleanup.problems, affected].filter(Boolean).join('; ')}`,
+    ]
+  }
+  return []
+}
+
+function canaryProblems(canary, requireHosted) {
+  const problems = [...cleanupProblems(canary)]
+  if (canary.disposition !== 'pass') {
+    problems.push(`safe fixture reached ${String(canary.disposition)}`)
+  }
+  if (
+    typeof canary.engineIdentity !== 'string' ||
+    NON_MODEL_IDENTITY.test(canary.engineIdentity)
+  ) {
+    problems.push('the persisted identity is not a real model')
+  }
+  if (!requireHosted) {
+    if (canary.target !== 'local')
+      problems.push(`target is ${String(canary.target)}, not local`)
+    return problems
+  }
+  if (canary.target !== 'hosted')
+    problems.push(`target is ${String(canary.target)}, not hosted`)
+  if (
+    typeof canary.expectedSha !== 'string' ||
+    canary.processedBy !== workerNameFor(canary.expectedSha)
+  ) {
+    problems.push(
+      'the job was not processed by the worker built from the expected commit'
+    )
+  }
+  problems.push(
+    ...soleConsumerProofProblems(
+      canary.soleConsumer,
+      typeof canary.expectedSha === 'string' ? workerNameFor(canary.expectedSha) : null
+    )
+  )
+  return problems
+}
+
+function canaryMeasured(canary) {
+  const timings = canary.timings ?? {}
+  return Object.fromEntries(
+    Object.entries({
+      target: canary.target,
+      disposition: canary.disposition,
+      engineIdentity: canary.engineIdentity,
+      processedBy: canary.processedBy,
+      queueLatencyMs: timings.queueLatencyMs,
+      screeningDurationMs: timings.screeningDurationMs,
+      finishedAt: canary.finishedAt,
+    }).map(([key, value]) => [key, value ?? null])
+  )
+}
+
+export function canaryGate(id, name, canary, { requireHosted }) {
+  const command = requireHosted ? COMMANDS.canaryHosted : COMMANDS.canaryLocal
+  if (!canary?.available) {
+    return gate(id, name, 'not-run', {
+      reason: requireHosted
+        ? 'No hosted canary has run: the worker is not yet deployed to a hosted target.'
+        : 'No canary run product is present.',
+      command,
+    })
+  }
+  const pending = pendingGate(id, name, canary, command)
+  if (pending) return pending
+  if (requireHosted && canary.deployedInputs?.status !== 'same') {
+    return gate(id, name, 'not-run', {
+      reason: `the deployed build is not the evidence's inputs: ${canary.deployedInputs?.reason ?? 'no deployed commit comparison'}`,
+      command,
+    })
+  }
+  if (canary.ok !== true) {
+    return judged(
+      id,
+      name,
+      [
+        `canary failed: ${String(canary.code)}`,
+        ...(canary.cleanup ? cleanupProblems(canary) : []),
+      ],
+      { measured: { failure: canary.code ?? null, message: canary.message ?? null } }
+    )
+  }
+  return judged(id, name, canaryProblems(canary, requireHosted), {
+    measured: {
+      ...canaryMeasured(canary),
+      ...(requireHosted ? { deployedInputs: canary.deployedInputs.status } : {}),
+    },
+    threshold: requireHosted
+      ? 'safe fixture published under a real-model identity, on the hosted target, by exactly the worker built from the expected commit, the only consumer heartbeat before and after the job, whose input set equals the evidence commit'
+      : 'safe fixture published under a real-model identity within the bounded wait',
+  })
+}
+
+function imageGate(image) {
+  const id = 'worker-image'
+  const name = 'Worker image builds, verifies the model, and fits the dependency budget'
+  const pending = pendingGate(id, name, image, COMMANDS.buildImage)
+  if (pending) return pending
+  const problems = []
+  if (!finite(image.nodeModulesMb) || image.nodeModulesMb > NODE_MODULES_BUDGET_MB) {
+    problems.push(`node_modules ${String(image.nodeModulesMb)} MB`)
+  }
+  if (image.user !== 'node') problems.push(`runs as ${String(image.user)}`)
+  if (!(image.entrypoint ?? []).some((part) => part.includes('tini'))) {
+    problems.push('no tini init')
+  }
+  if (!image.commitSha || image.commitSha === 'unset') problems.push('no commit baked in')
+  return judged(id, name, problems, {
+    measured: {
+      nodeModulesMb: image.nodeModulesMb,
+      user: image.user,
+      entrypoint: image.entrypoint,
+      commitSha: image.commitSha,
+    },
+    threshold: `node_modules at or below ${NODE_MODULES_BUDGET_MB} MB, unprivileged user, tini init, commit baked in; the model self-test runs during the build`,
+  })
+}
+
+/**
+ * The restart drill's gate (Story 6.2b final review, RF1). Success alone proves
+ * nothing about a restart: the product must be a restart drill whose recorded
+ * observations, counted from the worker heartbeats (RF15), show zero consumers
+ * before and after the job was enqueued, the job still waiting, and a consumer
+ * that came back. An ordinary canary result
+ * carries none of that and fails here.
+ */
+function restartGate(restart) {
+  const id = 'restart-keeps-queued-jobs'
+  const name = 'A job queued while the worker is down completes after it restarts'
+  const pending = pendingGate(id, name, restart, COMMANDS.canaryRestartDrill)
+  if (pending) return pending
+  const problems = []
+  if (restart.mode !== 'restart-drill') {
+    problems.push(
+      `the product is ${String(restart.mode ?? 'an ordinary canary')}, not a restart drill; an ordinary canary result is not restart evidence`
+    )
+  }
+  if (restart.ok !== true) problems.push(`drill failed: ${restart.code ?? 'unknown'}`)
+  else {
+    if (restart.target !== 'local') {
+      problems.push(`target is ${String(restart.target)}, not local`)
+    }
+    if (restart.disposition !== 'pass') {
+      problems.push(`reached ${String(restart.disposition)}`)
+    }
+    problems.push(
+      ...restartDrillProblems(restart.restartDrill).map((problem) => `drill: ${problem}`)
+    )
+  }
+  problems.push(...cleanupProblems(restart))
+  return judged(id, name, problems, {
+    measured: {
+      mode: restart.mode ?? null,
+      observedDowntimeMs: restart.restartDrill?.observedDowntimeMs ?? null,
+      consumerReturnedAt: restart.restartDrill?.consumerReturned?.observedAt ?? null,
+      queueLatencyMs: restart.timings?.queueLatencyMs ?? null,
+      disposition: restart.disposition ?? null,
+    },
+    threshold:
+      'a restart drill observed zero consumer heartbeats before and after the job was enqueued with the job waiting, then a heartbeat coming back, and the safe fixture published with cleanup complete',
+  })
+}
+
+function sweepGate(sweep) {
+  const id = 'policy-surface'
+  const name =
+    'Policy-surface sweep: one disposition per vector, no pass at or above any review threshold, full block coverage'
+  const pending = pendingGate(id, name, sweep, COMMANDS.policySweep)
+  if (pending) return pending
+  const functions = sweep.coverage?.functions ?? []
+  const uncoveredBlocks = functions.reduce(
+    (sum, fn) => sum + (finite(fn.uncoveredBlocks) ? fn.uncoveredBlocks : Number.NaN),
+    0
+  )
+  const problems = []
+  if (!finite(sweep.sweep?.vectorCount) || sweep.sweep.vectorCount < 1) {
+    problems.push('no vectors recorded')
+  }
+  if (sweep.sweep?.oracleDisagreements !== 0) {
+    problems.push(`oracle disagreements: ${String(sweep.sweep?.oracleDisagreements)}`)
+  }
+  if (sweep.sweep?.passAtOrAboveAReviewThreshold !== 0) {
+    problems.push(
+      `passes at or above a review threshold: ${String(sweep.sweep?.passAtOrAboveAReviewThreshold)}`
+    )
+  }
+  if (functions.length === 0 || uncoveredBlocks !== 0) {
+    problems.push(`uncovered blocks: ${String(uncoveredBlocks)}`)
+  }
+  return judged(id, name, problems, {
+    measured: {
+      vectors: sweep.sweep?.vectorCount ?? null,
+      byOutcome: sweep.sweep?.byOutcome ?? null,
+      uncoveredBlocks,
+    },
+  })
+}
+
+function safeCorpusProblems(safeCorpus, rejected) {
+  const upper = safeCorpus.recomputedWilson95?.[1]
+  const problems = []
+  if (safeCorpus.split !== 'holdout') problems.push('not measured on the holdout half')
+  if (
+    !finite(safeCorpus.evaluated) ||
+    safeCorpus.evaluated < SAFE_CORPUS_MINIMUM_HOLDOUT
+  ) {
+    problems.push(
+      `${String(safeCorpus.evaluated)} photographs evaluated, below ${SAFE_CORPUS_MINIMUM_HOLDOUT}`
+    )
+  }
+  const manifestHoldout = safeCorpus.manifest?.holdoutEntries
+  if (
+    safeCorpus.evaluated + rejected !== safeCorpus.holdoutEntries ||
+    safeCorpus.holdoutEntries !== manifestHoldout
+  ) {
+    problems.push('partial run: evaluated plus rejected does not cover the holdout half')
+  }
+  if (safeCorpus.counts?.block !== 0) {
+    problems.push(`${String(safeCorpus.counts?.block)} safe photographs blocked`)
+  }
+  if (!finite(upper) || upper > SAFE_CORPUS_UPPER_BOUND_GATE) {
+    problems.push(`upper bound ${String(upper)} above ${SAFE_CORPUS_UPPER_BOUND_GATE}`)
+  }
+  return problems
+}
+
+export function safeCorpusGate(safeCorpus) {
+  const id = 'safe-corpus'
+  const name =
+    'Safe photograph withheld rate on the holdout half (Wilson 95% upper bound)'
+  const pending = pendingGate(id, name, safeCorpus, COMMANDS.evaluateSafeCorpus)
+  if (pending) return pending
+  const rejected = Array.isArray(safeCorpus.validationRejected)
+    ? safeCorpus.validationRejected.length
+    : Number.NaN
+  const problems = safeCorpusProblems(safeCorpus, rejected)
+  const details = {
+    measured: {
+      evaluated: safeCorpus.evaluated ?? null,
+      validationRejected: rejected,
+      withheld: safeCorpus.withheld ?? null,
+      rate: round(safeCorpus.withheldRate, 4),
+      wilson95: safeCorpus.recomputedWilson95 ?? null,
+      blocked: safeCorpus.counts?.block ?? null,
+    },
+    threshold: `upper bound <= ${SAFE_CORPUS_UPPER_BOUND_GATE * 100}% on the holdout half, at least ${SAFE_CORPUS_MINIMUM_HOLDOUT} holdout photographs, every holdout photograph accounted for, none blocked, every withheld one described`,
+  }
+  const undescribed = safeCorpus.triageMissing ?? []
+  if (problems.length === 0 && undescribed.length > 0) {
+    return gate(id, name, 'not-run', {
+      ...details,
+      reason: `withheld holdout photographs not yet described in ${HOLDOUT_TRIAGE}: ${undescribed.join(', ')}`,
+    })
+  }
+  return judged(id, name, problems, details)
+}
+
+export function calibrationGate(calibration) {
+  const id = 'model-calibration'
+  const name = 'Model and policy chosen on the calibration half, shipped as chosen'
+  const pending = pendingGate(id, name, calibration, COMMANDS.calibrateModels)
+  if (pending) return pending
+  const chosen = calibration.chosen
+  const shipped = calibration.shipped ?? {}
+  const problems = []
+  if (!chosen) problems.push('no configuration fits')
+  else {
+    if (chosen.family !== shipped.family) {
+      problems.push(`chose ${chosen.family}, ships ${String(shipped.family)}`)
+    }
+    if (chosen.safeMassMinimum !== shipped.safeMassMinimum) {
+      problems.push(
+        `chose safe-mass floor ${String(chosen.safeMassMinimum)}, ships ${String(shipped.safeMassMinimum)}`
+      )
+    }
+  }
+  for (const [bound, value] of Object.entries(shipped.bounds ?? {})) {
+    if (calibration.unsafeBounds?.[bound] !== value) {
+      problems.push(
+        `calibrated with ${bound} ${String(calibration.unsafeBounds?.[bound])}, the policy has ${String(value)}`
+      )
+    }
+  }
+  return judged(id, name, problems, {
+    measured: {
+      family: chosen?.family ?? null,
+      variant: chosen?.id ?? null,
+      calibrationEntries: calibration.calibrationEntries ?? null,
+      calibrationWithheldRate: chosen ? round(chosen.withheldRate, 4) : null,
+    },
+    threshold:
+      'lowest calibration withheld rate among families inside 512 MiB and the 150 MB budget, with no unsafe bound looser than v1; the shipped family, floor and bounds equal the choice',
+  })
+}
+
+/**
+ * An idle window measured with no worker connected costs almost nothing, so the
+ * idle figure counts only when one process of the named worker held its Redis
+ * heartbeat at every sample (Story 6.2b review, RF15: CLIENT LIST, which the
+ * window used to be sampled with, shows one Upstash node's clients).
+ */
+function idlePresenceProblems(idle) {
+  const worker = idle?.worker
+  const expected =
+    typeof worker?.commitSha === 'string' && worker.commitSha !== 'unset'
+      ? workerNameFor(worker.commitSha)
+      : null
+  if (!expected || worker.name !== expected) {
+    return ['the idle measurement recorded no worker identity']
+  }
+  if (worker.presenceSource !== 'heartbeat') {
+    return ['the idle presence was not sampled from the worker heartbeat']
+  }
+  if (
+    worker.connectedThroughout !== true ||
+    !Number.isInteger(worker.samples) ||
+    worker.samples < 2 ||
+    worker.connectedSamples !== worker.samples ||
+    !Array.isArray(worker.instanceIds) ||
+    worker.instanceIds.length !== 1
+  ) {
+    return [
+      `${expected} held one heartbeat at ${String(worker.connectedSamples)} of ${String(worker.samples)} idle samples, from instances ${JSON.stringify(worker.instanceIds ?? null)}`,
+    ]
+  }
+  return []
+}
+
+function redisGate(redis) {
+  const id = 'redis-budget'
+  const name = `Idle worker plus expected traffic at or below ${REDIS_MONTHLY_COST_CEILING_USD} USD a month on Upstash Pay as You Go`
+  const pending = pendingGate(id, name, redis, COMMANDS.measureRedis)
+  if (pending) return pending
+  const usd = redis.projectedMonthly?.totalUsd
+  const problems = [...idlePresenceProblems(redis.idle)]
+  if (!finite(usd)) problems.push('idle or per-post command count missing')
+  else if (usd > REDIS_MONTHLY_COST_CEILING_USD) {
+    problems.push(
+      `projected ${usd.toFixed(2)} USD a month, above ${REDIS_MONTHLY_COST_CEILING_USD} USD`
+    )
+  }
+  return judged(id, name, problems, {
+    measured: {
+      idleWorker: redis.idle?.worker?.name ?? null,
+      idlePresenceSource: redis.idle?.worker?.presenceSource ?? null,
+      idleWorkerConnectedSamples: redis.idle?.worker
+        ? `${redis.idle.worker.connectedSamples} of ${redis.idle.worker.samples}`
+        : null,
+      idleCommandsPerHour: redis.idle?.commandsPerHour ?? null,
+      commandsPerPost: redis.perPost?.commandsPerPost ?? null,
+      projectedMonthly: redis.projectedMonthly?.total ?? null,
+      idleMonthlyUsd: redis.projectedMonthly?.idleUsd ?? null,
+      trafficMonthlyUsd: redis.projectedMonthly?.trafficUsd ?? null,
+      projectedMonthlyUsd: usd ?? null,
+      dailySubmissions: redis.dailySubmissions ?? null,
+      postsPerDayAtCostCeiling: redis.postsPerDayAtCostCeiling ?? null,
+    },
+    threshold: `one process of the named worker holding its heartbeat through the idle window, and the projected month at the assumed volume at or below ${REDIS_MONTHLY_COST_CEILING_USD} USD at ${UPSTASH_PAY_AS_YOU_GO.usdPer100kCommands.toFixed(2)} USD per 100K commands`,
+  })
+}
+
+function listsGate(lists) {
+  const problems = []
+  if (lists.verification?.status !== 'verified') {
+    problems.push(`list verification: ${lists.verification?.status ?? 'unavailable'}`)
+  }
+  if (lists.allowList?.everyEntryHasReason !== true) {
+    problems.push('an allow-list entry has no reason')
+  }
+  return judged(
+    'list-provenance',
+    'Vendored LDNOOBW lists match the pinned commit and every allow-list entry has a reason',
+    problems,
+    {
+      measured: {
+        status: lists.verification?.status ?? 'unavailable',
+        upstreamCommit: lists.upstream?.commit ?? null,
+        problems: lists.verification?.problems ?? [],
+      },
+    }
+  )
+}
+
+function missingLanguageProblems(text) {
+  return (text.missingLanguages ?? TEXT_LANGUAGES).map(
+    (language) => `${language} has no result`
+  )
+}
+
+function textCleanGate(text) {
+  const problems = missingLanguageProblems(text)
+  for (const [language, result] of Object.entries(text.languages ?? {})) {
+    const clean = result.clean
+    if (!clean || !finite(clean.total) || clean.total < TEXT_MINIMUM_CLEAN) {
+      problems.push(`${language}: fewer than ${TEXT_MINIMUM_CLEAN} holdout entries`)
+      continue
+    }
+    if (
+      !finite(clean.recomputedUpperBound) ||
+      clean.recomputedUpperBound > TEXT_CLEAN_UPPER_BOUND_GATE
+    ) {
+      problems.push(
+        `${language}: ${clean.withheld} of ${clean.total} holdout entries withheld, upper bound ${percent(clean.recomputedUpperBound, 2)}`
+      )
+    }
+    if (
+      clean.expectedReviewThatPassed.length > 0 ||
+      (result.cleanInSample?.expectedReviewThatPassed ?? []).length > 0
+    ) {
+      problems.push(`${language}: a deliberate review term published`)
+    }
+  }
+  return judged(
+    'text-clean-copy',
+    'Clean fashion copy withheld rate per language on the frozen holdout (Wilson 95% upper bound)',
+    problems,
+    {
+      measured: Object.fromEntries(
+        Object.entries(text.languages ?? {}).map(([language, result]) => [
+          language,
+          {
+            holdout: result.clean?.total ?? null,
+            holdoutWithheld: result.clean?.withheld ?? null,
+            upperBound: result.clean?.recomputedUpperBound ?? null,
+            inSample: result.cleanInSample?.total ?? null,
+            inSampleWithheld: result.cleanInSample?.withheld ?? null,
+            deliberateReview: result.cleanInSample?.expectedReviewIds.length ?? null,
+          },
+        ])
+      ),
+      threshold: `upper bound <= ${TEXT_CLEAN_UPPER_BOUND_GATE * 100}% in every language over the frozen holdout, at least ${TEXT_MINIMUM_CLEAN} each; the in-sample clean half and the captions carrying a deliberate review term are reported beside it, not gated`,
+    }
+  )
+}
+
+function textObfuscationGate(text) {
+  const problems = missingLanguageProblems(text)
+  for (const [language, result] of Object.entries(text.languages ?? {})) {
+    if (
+      !finite(result.disallowed?.total) ||
+      result.disallowed.total < TEXT_MINIMUM_DISALLOWED
+    ) {
+      problems.push(`${language}: fewer than ${TEXT_MINIMUM_DISALLOWED} cases`)
+    }
+    if ((result.disallowed?.bypassIds ?? [null]).length > 0) {
+      problems.push(
+        `${language}: ${(result.disallowed?.bypassIds ?? []).length} bypasses`
+      )
+    }
+  }
+  return judged(
+    'text-obfuscation',
+    'Disguised terms withheld in every obfuscation family',
+    problems,
+    {
+      measured: Object.fromEntries(
+        Object.entries(text.languages ?? {}).map(([language, result]) => [
+          language,
+          {
+            total: result.disallowed?.total ?? null,
+            bypasses: result.disallowed?.bypassIds?.length ?? null,
+          },
+        ])
+      ),
+      threshold: `zero bypasses, at least ${TEXT_MINIMUM_DISALLOWED} cases per language covering every family`,
+    }
+  )
+}
+
+function textGates(text) {
+  const clean = pendingGate(
+    'text-clean-copy',
+    'Text clean-copy rate',
+    text,
+    COMMANDS.textEvaluation
+  )
+  const obfuscation = pendingGate(
+    'text-obfuscation',
+    'Text obfuscation',
+    text,
+    COMMANDS.textEvaluation
+  )
+  return [clean ?? textCleanGate(text), obfuscation ?? textObfuscationGate(text)]
+}
+
+function modelGate(model) {
+  return judged(
+    'model-artifacts',
+    'Pinned model artifacts, WASM binaries and policy hash verified',
+    model?.status === 'verified'
+      ? []
+      : [`model verification: ${model?.status ?? 'unavailable'}`],
+    { measured: { status: model?.status ?? null, failures: model?.failures ?? [] } }
+  )
+}
+
+const LATENCY_CEILINGS = ['coldStartupMs', 'warmP95Ms', 'warmP99Ms']
+
+/**
+ * Story 6.2b peer review (CX5): timings are evidence for the sandbox only when
+ * they were taken under its cgroup limits, over Story 6.2 AC 8's 1,000 warm
+ * inferences after a warmup. An unrestricted container or a single sample
+ * certifies nothing.
+ */
+function latencySampleProblems(latency) {
+  const problems = []
+  if (
+    !Number.isInteger(latency.warmSamples) ||
+    latency.warmSamples < MINIMUM_WARM_SAMPLES
+  ) {
+    problems.push(
+      `${String(latency.warmSamples)} warm samples, fewer than ${MINIMUM_WARM_SAMPLES}`
+    )
+  }
+  if (!Number.isInteger(latency.warmupSamples) || latency.warmupSamples < 1) {
+    problems.push('no warmup before the warm samples')
+  }
+  const cpu = latency.environment?.containerCpuQuota
+  const memoryMib = latency.environment?.containerMemoryLimitMib
+  if (cpu !== RELEASE_RESOURCE_PROFILE.cpu) {
+    problems.push(
+      `measured under a CPU limit of ${String(cpu)}, not the ${RELEASE_RESOURCE_PROFILE.cpu} vCPU release profile`
+    )
+  }
+  if (memoryMib !== RELEASE_RESOURCE_PROFILE.memoryMib) {
+    problems.push(
+      `measured under a memory limit of ${String(memoryMib)} MiB, not the ${RELEASE_RESOURCE_PROFILE.memoryMib} MiB release profile`
+    )
+  }
+  return problems
+}
+
+function latencyGate(runtime) {
+  const id = 'runtime-latency'
+  const name =
+    'Startup and warm inference latency inside the absolute ceilings on the sandbox resource profile'
+  const latency = runtime?.latency
+  const pending = pendingGate(id, name, latency, COMMANDS.measureRuntimeContainer)
+  if (pending) return pending
+  const ceilings = runtime.ceilings ?? {}
+  const measured = {
+    coldStartupMs: latency.coldStartupMs,
+    warmP95Ms: latency.warmSupervisedMs?.p95,
+    warmP99Ms: latency.warmSupervisedMs?.p99,
+  }
+  const cpu = latency.environment?.containerCpuQuota
+  const memoryMib = latency.environment?.containerMemoryLimitMib
+  const problems = latencySampleProblems(latency)
+  for (const key of LATENCY_CEILINGS) {
+    if (!finite(ceilings[key])) problems.push(`no ${key} ceiling in the model manifest`)
+    else if (!finite(measured[key])) problems.push(`${key} not measured`)
+    else if (measured[key] > ceilings[key]) {
+      problems.push(`${key} ${measured[key]} above ${ceilings[key]}`)
+    }
+  }
+  if (finite(measured.warmP95Ms) && measured.warmP95Ms > WARM_P95_DEFECT_MS) {
+    problems.push(`warm p95 above the ${WARM_P95_DEFECT_MS} ms defect signal`)
+  }
+  return judged(id, name, problems, {
+    measured: {
+      profile: latency.profile ?? null,
+      cpuLimit: cpu ?? null,
+      memoryLimitMib: memoryMib ?? null,
+      warmupSamples: latency.warmupSamples ?? null,
+      warmSamples: latency.warmSamples ?? null,
+      ...measured,
+    },
+    threshold: {
+      ...Object.fromEntries(LATENCY_CEILINGS.map((key) => [key, ceilings[key] ?? null])),
+      cpuLimit: RELEASE_RESOURCE_PROFILE.cpu,
+      memoryLimitMib: RELEASE_RESOURCE_PROFILE.memoryMib,
+      minimumWarmSamples: MINIMUM_WARM_SAMPLES,
+    },
+  })
+}
+
+/**
+ * Story 6.2b peer review (CX4): the container's peak describes the upload only
+ * if that container's worker, named for its baked commit, processed it.
+ */
+function memoryIdentityProblems(memory) {
+  const expectedWorker =
+    typeof memory.commitSha === 'string' && memory.commitSha !== 'unset'
+      ? workerNameFor(memory.commitSha)
+      : null
+  const problems = soleConsumerProofProblems(memory.soleConsumer, expectedWorker)
+  if (
+    expectedWorker &&
+    memory.workerName === expectedWorker &&
+    memory.processedBy === expectedWorker
+  ) {
+    return problems
+  }
+  return [
+    `the upload was processed by ${String(memory.processedBy ?? 'an unrecorded worker')}, not the measured container's worker ${String(expectedWorker)}`,
+    ...problems,
+  ]
+}
+
+/**
+ * One observation of the queue: exactly one consumer heartbeat, the expected
+ * worker's, from an identified process (Story 6.2b review, RF15).
+ */
+function aloneOnQueue(observed, expectedWorker) {
+  const one = (list) => Array.isArray(list) && list.length === 1 && Boolean(list[0])
+  const heartbeat = observed?.heartbeats?.[0]
+  return (
+    observed?.source === 'heartbeat' &&
+    observed.known === true &&
+    observed.count === 1 &&
+    typeof expectedWorker === 'string' &&
+    one(observed.heartbeats) &&
+    one(observed.instanceIds) &&
+    heartbeat.workerName === expectedWorker &&
+    heartbeat.instanceId === observed.instanceIds[0] &&
+    (heartbeat.problems ?? []).length === 0
+  )
+}
+
+/**
+ * Story 6.2b second peer review (CX4b): replicas of one image share the worker
+ * name, so `processedBy` cannot say which replica screened the upload. The
+ * memory product must carry the canary's sole-consumer proof: exactly one
+ * consumer heartbeat, the measured container's worker, before the job was
+ * enqueued and after it completed, from the same worker process. This re-judges
+ * the recorded observations themselves, beyond the canary's own `proven` flag.
+ */
+export function soleConsumerProofProblems(proof, expectedWorker) {
+  if (!proof || typeof proof !== 'object') {
+    return ['no sole-consumer proof: another replica could have screened the upload']
+  }
+  const problems = []
+  if (proof.proven !== true) problems.push('the canary did not prove a sole consumer')
+  if (!expectedWorker || proof.expectedWorker !== expectedWorker) {
+    problems.push(
+      `the sole-consumer proof names ${String(proof.expectedWorker)}, not ${String(expectedWorker)}`
+    )
+  }
+  const observations = { before: proof.before, after: proof.after }
+  for (const [when, observed] of Object.entries(observations)) {
+    if (!aloneOnQueue(observed, expectedWorker)) {
+      problems.push(
+        `${when} the job, Redis did not hold exactly one consumer heartbeat, named ${String(expectedWorker)}`
+      )
+    }
+  }
+  if (
+    problems.length === 0 &&
+    observations.before.instanceIds[0] !== observations.after.instanceIds[0]
+  ) {
+    problems.push('the consumer process changed between the two observations')
+  }
+  return problems
+}
+
+function soleConsumerMeasured(proof) {
+  return {
+    soleConsumerProven: proof?.proven === true,
+    consumersBefore: proof?.before?.count ?? null,
+    consumersAfter: proof?.after?.count ?? null,
+  }
+}
+
+function memoryGate(runtime) {
+  const id = 'runtime-memory'
+  const name = 'Worker container memory peak while screening the largest accepted upload'
+  const memory = runtime?.memory
+  const pending = pendingGate(id, name, memory, COMMANDS.measureMemory)
+  if (pending) return pending
+  const ceiling = runtime.ceilings?.peakResidentMib
+  const problems = []
+  if (!finite(ceiling)) problems.push('no peakResidentMib ceiling in the model manifest')
+  if (memory.canaryOk !== true)
+    problems.push('the canary did not complete inside the container')
+  if (memory.upload?.name !== MAX_UPLOAD_FIXTURE) {
+    problems.push(`measured with ${String(memory.upload?.name)}, not the maximum upload`)
+  }
+  problems.push(...memoryIdentityProblems(memory))
+  if (!finite(memory.memoryLimitMib) || memory.memoryLimitMib > ceiling) {
+    problems.push(
+      `container limit ${String(memory.memoryLimitMib)} MiB is not the profile`
+    )
+  }
+  if (!finite(memory.memoryPeakMib)) problems.push('memory.peak not read')
+  else if (finite(ceiling) && memory.memoryPeakMib > ceiling) {
+    problems.push(`memory.peak ${memory.memoryPeakMib} MiB above ${ceiling} MiB`)
+  }
+  return judged(id, name, problems, {
+    measured: {
+      memoryPeakMib: memory.memoryPeakMib ?? null,
+      memoryLimitMib: memory.memoryLimitMib ?? null,
+      upload: memory.upload?.name ?? null,
+      canaryDisposition: memory.canaryDisposition ?? null,
+      processedBy: memory.processedBy ?? null,
+      ...soleConsumerMeasured(memory.soleConsumer),
+    },
+    threshold: `cgroup memory.peak at or below ${String(ceiling)} MiB across startup and a ${MAX_UPLOAD_FIXTURE} screening processed by the measured container's own worker, the only consumer heartbeat on Redis before the job was enqueued and after it completed`,
+  })
+}
+
+function rolloutGate(rollout) {
+  const closed =
+    rollout?.communityReadEnabled === false && rollout?.communityWriteEnabled === false
+  return judged(
+    'rollout-closed',
+    'Both production Community rollout flags remain disabled',
+    closed ? [] : ['a rollout flag is not disabled'],
+    { measured: rollout ?? null }
+  )
+}
+
+/** Every gate, from the sections alone, so the verdict is testable without any I/O. */
+/**
+ * Every gate the release verdict needs, in the order `buildGates` builds them:
+ * the one list both the generator and the sign command check a payload against
+ * (Story 6.2b final review, RF9). A payload missing one of them, repeating one,
+ * or carrying one this list does not name is not a payload the generator wrote.
+ */
+export const MANDATORY_GATE_IDS = Object.freeze([
+  'committed-tree',
+  'worker-image',
+  'canary-local-container',
+  'restart-keeps-queued-jobs',
+  'canary-hosted',
+  'policy-surface',
+  'model-calibration',
+  'safe-corpus',
+  'list-provenance',
+  'text-clean-copy',
+  'text-obfuscation',
+  'model-artifacts',
+  'runtime-latency',
+  'runtime-memory',
+  'redis-budget',
+  'rollout-closed',
+])
+
+/**
+ * Why a gate list is not the complete mandatory set, exactly once each: the
+ * missing, repeated and unknown ids. Empty when it is.
+ */
+export function gateSetProblems(gates) {
+  if (!Array.isArray(gates)) return ['the payload carries no gate list']
+  const counts = new Map()
+  for (const entry of gates) {
+    const id = typeof entry?.id === 'string' ? entry.id : String(entry?.id)
+    counts.set(id, (counts.get(id) ?? 0) + 1)
+  }
+  const mandatory = new Set(MANDATORY_GATE_IDS)
+  const missing = MANDATORY_GATE_IDS.filter((id) => !counts.has(id))
+  const repeated = [...counts].filter(([, count]) => count > 1).map(([id]) => id)
+  const unknown = [...counts.keys()].filter((id) => !mandatory.has(id))
+  return [
+    missing.length > 0 ? `missing ${missing.join(', ')}` : null,
+    repeated.length > 0 ? `repeated ${repeated.join(', ')}` : null,
+    unknown.length > 0 ? `unknown ${unknown.join(', ')}` : null,
+  ].filter(Boolean)
+}
+
+export function buildGates(sections) {
+  const gates = buildGateList(sections)
+  const problems = gateSetProblems(gates)
+  if (problems.length > 0) {
+    throw new Error(
+      `buildGates and MANDATORY_GATE_IDS disagree: ${problems.join('; ')}. Update the list with the gate.`
+    )
+  }
+  return gates
+}
+
+function buildGateList(sections) {
+  const {
+    workingTree,
+    image,
+    canaries,
+    sweep,
+    calibration,
+    safeCorpus,
+    text,
+    lists,
+    model,
+    runtime,
+    redis,
+    rollout,
+  } = sections
+  return [
+    workingTreeGate(workingTree),
+    imageGate(image),
+    canaryGate(
+      'canary-local-container',
+      'Canary against the local container',
+      canaries?.local,
+      {
+        requireHosted: false,
+      }
+    ),
+    restartGate(canaries?.restart),
+    canaryGate(
+      'canary-hosted',
+      'Canary against the deployed worker on the hosted target',
+      canaries?.hosted,
+      { requireHosted: true }
+    ),
+    sweepGate(sweep),
+    calibrationGate(calibration),
+    safeCorpusGate(safeCorpus),
+    listsGate(lists ?? {}),
+    ...textGates(text),
+    modelGate(model),
+    latencyGate(runtime),
+    memoryGate(runtime),
+    redisGate(redis),
+    rolloutGate(rollout),
+  ]
+}
+
+export function verdictOf(gates) {
+  if (gates.length === 0) return 'incomplete'
+  if (gates.some((entry) => entry.status === 'failed')) return 'fail'
+  if (gates.some((entry) => entry.status !== 'passed')) return 'incomplete'
+  return 'pass'
+}
+
+// ---------------------------------------------------------------- narrative
+
+/** The publication rule in words, from the policy. */
+function passRuleWords(image) {
+  const join = (names, word) => (names ?? []).join(word)
+  return `${join(image.safeClasses, ' plus ')} above ${image.safeMassMinimum}, ${join(image.unsafeClasses, ' plus ')} below ${image.unsafeAggregateMaximum}, ${join(image.reviewClasses, ' and ')} below ${image.reviewClassMaximum}, all of them together below ${image.unsafeAndReviewAggregateMaximum}`
+}
+
+/** The largest and smallest upstream list, from the vendored source record. */
+function listUnevenness(lists) {
+  const upstream = lists?.upstream?.files ?? {}
+  const sizes = TEXT_LANGUAGES.map((language) => [language, upstream[language]?.entries])
+    .filter(([, entries]) => finite(entries))
+    .toSorted((a, b) => b[1] - a[1])
+  if (sizes.length === 0) return 'their sizes are in the lists section'
+  const [largest, smallest] = [sizes[0], sizes.at(-1)]
+  return `${largest[0]} carries ${largest[1]} upstream entries and ${smallest[0]} ${smallest[1]}`
+}
+
+function hostedMeasurementStatement(sections) {
+  if (sections.canaries?.hosted?.available === true) {
+    return 'The hosted canary has run; runtime latency and memory are still from the local container under the sandbox resource limits, and the regression gate committed in the model manifest comes from developer hardware.'
+  }
+  const environment = sections.runtime?.latency?.environment ?? {}
+  return `Runtime latency and memory were measured in the local container under the sandbox resource limits (${environment.containerCpuQuota ?? '?'} vCPU, ${environment.containerMemoryLimitMib ?? '?'} MiB), not on the hosted target, and the regression gate committed in the model manifest comes from developer hardware.`
+}
+
+function redisBudgetStatement(redis) {
+  const beforeUsd = payAsYouGoMonthlyUsd(
+    REDIS_BEFORE_TUNING.commandsPerHour * HOURS_PER_MONTH
+  )
+  const tuned = redis?.tuned ?? {}
+  return `The production Upstash database is on Pay as You Go, which bills every command (${UPSTASH_PAY_AS_YOU_GO.usdPer100kCommands.toFixed(2)} USD per 100K). An idle BullMQ worker polls Redis continuously. With BullMQ defaults it measured ${REDIS_BEFORE_TUNING.commandsPerHour.toLocaleString('en-US')} commands an hour, about ${beforeUsd.toFixed(2)} USD a month while idle; the worker now blocks for ${tuned.drainDelaySeconds ?? '?'} seconds between idle polls and checks for stalled jobs every ${(tuned.stalledIntervalMs ?? 0) / 1000} seconds, and the measured idle cost plus projected traffic is in the Redis section. ${redis?.sharedDatabase ?? ''}`
+}
+
+/**
+ * The named limitations (AC 7). Every number in them comes from the policy, the
+ * manifest or a section, so a re-measurement cannot leave a stale figure here.
+ */
+function limitationsFor(sections, policy, manifest) {
+  const image = policy?.image ?? {}
+  return [
+    {
+      id: 'model-recall-inherited',
+      statement: `Recall against real unsafe imagery is inherited from the upstream NSFWJS ${manifest?.modelFamily} model at ${manifest?.packageName}@${manifest?.packageVersion} and is not measured in this repository. No unsafe imagery may enter it, so no corpus here establishes that the model emits a high ${(image.unsafeClasses ?? []).join(' or ')} probability for genuinely unsafe input.`,
+      residualRisk: `An unsafe image that the model reads as safe for work (${passRuleWords(image)}) publishes automatically, and how often that happens has not been measured here. Counting Drawing toward the safe mass, which the calibration chose, widens what publishes compared with the v1 Neutral-only floor; no unsafe bound, joint or single, is looser than v1.`,
+      mitigation:
+        'Automatic publication requires a confident safe-for-work reading with every unsafe bound at its v1 value, and every other outcome routes to a human, so a recall failure on uncertain input becomes review load rather than a published post. The report action (Story 6.4), the moderator queue (Story 6.10) and both rollout flags staying closed until the moderator rota is real cover the confident-miss case.',
+      revisitWhen:
+        'A moderator confirms a published post that should have been withheld, the model or its version changes, or the beta cohort grows past what two moderators can watch reactively.',
+    },
+    {
+      id: 'term-lists-without-native-review',
+      statement: `The ${TEXT_LANGUAGES.length} term lists have pinned, attributable community provenance (LDNOOBW at one commit, ${sections.lists?.upstream?.licence ?? 'CC-BY-4.0'}) and a repository-graded overlay, but no native-speaker review. LDNOOBW was compiled to keep words out of image-search autocomplete, which is broader than abuse screening, and the lists are uneven: ${listUnevenness(sections.lists)}.`,
+      residualRisk:
+        'Abuse written with words outside the lists publishes; ordinary words the lists carry route captions to review, and the frozen text holdout measures how often that happens on copy nobody tuned against. Upstream-only entries are graded profanity at medium severity, so none of them blocks on its own.',
+      mitigation:
+        'Every language runs against every submission, obfuscation families are normalised before matching, mixed scripts route to review, the repository allow list records why each exemption exists, and the clean-copy gate measures the false-positive cost per language on a holdout.',
+      revisitWhen:
+        'A native-speaker reviewer is available for any of the seven languages, moderators report a missed term or a recurring false positive, or a new locale is enabled.',
+    },
+    {
+      id: 'fashion-term-lolita-always-goes-to-review',
+      statement:
+        "Fashion term 'lolita' always goes to review. It names a fashion subculture and is also a child-sexualisation keyword, and on a 13+ product the policy keeps it as a deliberate review term rather than allow-listing it. The French 'baiser' is kept the same way: a kiss as a noun, the commonest vulgar verb otherwise.",
+      residualRisk:
+        'Every Lolita-fashion caption and every caption using the French noun waits for a moderator, which delays those members and adds to review load.',
+      mitigation:
+        'Both are recorded with their reasons in the policy (text.deliberateReviewTerms); startup refuses a policy that allow-lists or drops either; the corpora label the captions carrying them as expected review and report them beside the clean-copy gate; and a moderator clears an ordinary post in one action.',
+      revisitWhen:
+        'Moderators find these captions are almost always cleared, or the platform raises its minimum age.',
+    },
+    {
+      id: 'stock-photography-distribution',
+      statement:
+        'The safe corpus is drawn from openly licensed stock and community photography on Openverse, filtered to fashion titles and tags. It may not match the distribution of what members actually upload: phone photos, mirror selfies, low light, partial bodies, swimwear.',
+      residualRisk:
+        'The real review rate on member uploads may be higher than the measured rate, which would raise the moderators’ daily load above the projection.',
+      mitigation: `The corpus is split by creator and caps any creator at ${percent(sections.safeCorpus?.manifest?.split?.creatorCapShare ?? Number.NaN, 0)} of it, the projection is reported at the Wilson upper bound and across a range of volumes, and the moderator queue shows the actual rate from the first beta day.`,
+      revisitWhen:
+        'The first two weeks of beta traffic exist: replace the projection with the observed withheld rate and re-measure if it differs from the corpus rate by more than its interval.',
+    },
+    {
+      id: 'two-moderators',
+      statement: `The beta operates with ${BETA_MODERATORS} moderators (ADR-013 staffing plan) covering a 24-hour review SLA through rotating shifts.`,
+      residualRisk:
+        'A spike in withheld posts, an incident-mode period where every submission routes to review, or one moderator’s absence can breach the SLA.',
+      mitigation:
+        'Rollout flags open reading and writing separately, the daily posting cap bounds per-account volume, the projected review load is in this payload, and the SLA monitor (Story 6.12) alerts before a breach.',
+      revisitWhen: `The projected or observed daily review load exceeds what ${BETA_MODERATORS} people can clear inside the 24-hour SLA, or the cohort is widened.`,
+    },
+    {
+      id: 'hosted-measurement-pending',
+      statement: hostedMeasurementStatement(sections),
+      residualRisk:
+        'The hosted CPU may be slower or noisier than the emulation, and the regression gate does not yet describe production hardware.',
+      mitigation:
+        'The latency and memory gates run on the emulated profile, the memory gate reads the real container’s cgroup peak at the largest accepted upload, and the hosted canary records real queue latency and screening duration.',
+      revisitWhen:
+        'The worker is deployed: run the measurements inside the hosted container and re-baseline the regression gate from them.',
+    },
+    {
+      id: 'pay-as-you-go-redis-cost',
+      statement: redisBudgetStatement(sections.redis),
+      residualRisk: `The bill grows with every command, the API’s own commands are billed on the same database and are not in this measurement, and a volume past ${sections.redis?.postsPerDayAtCostCeiling ?? '?'} posts a day takes the worker alone past ${REDIS_MONTHLY_COST_CEILING_USD} USD a month. A connection that dies silently during a long block delays pickup until the block times out.`,
+      mitigation:
+        'A new job wakes the blocked worker at once, so the long block costs no pickup latency; the outbox dispatcher and the stale-review sweep are the backstops for a dead connection; the deployment guide names the provider dashboard figures to watch after the first day (commands and cost, which count the API and the worker together).',
+      revisitWhen: `The Upstash console projects the database past ${REDIS_MONTHLY_COST_CEILING_USD} USD for a month, or daily submissions approach ${sections.redis?.postsPerDayAtCostCeiling ?? 'the ceiling volume'}.`,
+    },
+  ]
+}
+
+/** Defects the sweep, the corpora and the review found in the screening code, each fixed with a regression test. */
+const SCREENER_DEFECTS = [
+  'a duplicated class name could overwrite another class’s slot and publish (now class_mismatch)',
+  'leet classing could create a doubled letter the index had already collapsed, so f r 3 5 s e published',
+  'a multi-word term cut at a different place, vai-tefoder, reached no matching pass',
+  'one allow-listed word disabled every multi-word term containing it',
+  'a re-split multi-word term written in leetspeak (k1ll yours elf) published, because the re-split pass compared plain letters only',
+]
+
+function drawingFinding(calibration) {
+  const chosenVariants =
+    calibration?.available && calibration.chosen
+      ? (calibration.scores?.[calibration.chosen.family] ?? [])
+      : []
+  const v1Variant = chosenVariants.find((variant) => variant.id === 'current')
+  const v1Rate =
+    v1Variant && finite(v1Variant.withheldRate)
+      ? ` (${percent(v1Variant.withheldRate)} of the ${calibration.calibrationEntries} calibration photographs)`
+      : ''
+  return {
+    id: 'model-labels-real-photographs-as-drawing',
+    statement: `On real photographs of people the NSFWJS models put most of their probability on Drawing rather than Neutral, so the v1 confident-Neutral policy withheld almost every ordinary fashion photograph${v1Rate}. The synthetic fabric fixtures Story 6.2 used scored Neutral near 1 and could not show this.`,
+    crossCheck:
+      'Recorded once, 2026-10-16: 65 corpus photographs were also classified through the upstream nsfwjs.load("MobileNetV2Mid") classify path with the union @tensorflow/tfjs CPU backend, in a throwaway install outside this repository, and 62 of 65 reached the same disposition, so the effect is the model and the policy, not this repository’s preprocessing.',
+    consequence:
+      'Policy v2 was calibrated on the calibration half only: Neutral plus Drawing (NSFWJS’s safe-for-work classes) above a floor, with every unsafe bound, including the joint bound on Hentai, Porn and Sexy, held at its v1 value. The holdout half measures the result, and the gate is computed there.',
+  }
+}
+
+function holdoutFinding(safe, calibration) {
+  if (!safe?.available || !finite(safe.withheldRate) || !calibration?.chosen) return null
+  const dominant = Object.entries(safe.withheldByBound ?? {}).toSorted(
+    (a, b) => b[1] - a[1]
+  )[0]
+  const upper = safe.recomputedWilson95?.[1]
+  const passes = finite(upper) && upper <= SAFE_CORPUS_UPPER_BOUND_GATE
+  const cause = dominant
+    ? ` The commonest cause is ${dominant[0]} (${dominant[1]} of ${safe.withheld}).`
+    : ''
+  return {
+    id: 'holdout-versus-calibration',
+    statement: `On the ${safe.evaluated} holdout photographs (split by creator) the policy withheld ${percent(safe.withheldRate)} (Wilson 95% upper bound ${percent(upper)}), against ${percent(calibration.chosen.withheldRate)} on the ${calibration.calibrationEntries} calibration photographs it was chosen on; ${safe.counts?.block ?? 0} holdout photographs were blocked. The gate's ceiling is ${percent(SAFE_CORPUS_UPPER_BOUND_GATE, 0)}, so it ${passes ? 'passes' : 'fails'}.${cause} Every withheld and blocked holdout photograph is listed with what it shows.${passes ? '' : ' Closing the gate needs a different model or a decision to loosen an unsafe bound, and neither was taken here.'}`,
+  }
+}
+
+function textFinding(text) {
+  if (!text?.available) return null
+  const results = Object.entries(text.languages ?? {})
+  const withheld = results.filter(([, result]) => (result.clean?.withheld ?? 0) > 0)
+  const inSampleWithheld = results.reduce(
+    (sum, [, result]) => sum + (result.cleanInSample?.withheld ?? 0),
+    0
+  )
+  if (withheld.length === 0) {
+    return {
+      id: 'text-holdout-versus-tuning-half',
+      statement: `The frozen text holdout, written after the allow list froze and never tuned against, withheld no clean caption in any language; the in-sample clean half withheld ${inSampleWithheld}.`,
+    }
+  }
+  const severities = {}
+  for (const [, result] of withheld) {
+    for (const [severity, count] of Object.entries(
+      result.clean.withheldBySeverity ?? {}
+    )) {
+      severities[severity] = (severities[severity] ?? 0) + count
+    }
+  }
+  const perLanguage = withheld
+    .map(
+      ([language, result]) =>
+        `${language} ${result.clean.withheld} of ${result.clean.total}`
+    )
+    .join(', ')
+  const bySeverity = Object.entries(severities)
+    .map(([severity, count]) => `${severity} ${count}`)
+    .join(', ')
+  return {
+    id: 'text-holdout-versus-tuning-half',
+    statement: `The frozen text holdout, written after the allow list froze and never tuned against, withheld clean captions in ${withheld.length} of ${TEXT_LANGUAGES.length} languages (${perLanguage}; by severity ${bySeverity}), where the in-sample clean half the allow list was built against withheld ${inSampleWithheld}. The in-sample figure overstated the list quality; the holdout is the honest one. Fixing these means changing the lists or the allow list and then freezing a new holdout, because tuning against this one would turn it into a second tuning set.`,
+  }
+}
+
+/**
+ * What the measurements turned up, recorded beside the gates so a reader does not
+ * have to reconstruct them from numbers. Every figure is read from a section.
+ * Raw matched terms and caption text stay out of this file.
+ */
+function findingsFor(sections) {
+  return [
+    drawingFinding(sections.calibration),
+    holdoutFinding(sections.safeCorpus, sections.calibration),
+    textFinding(sections.text),
+    {
+      id: 'screener-defects-fixed',
+      statement: `The sweep, the corpora and the review found ${SCREENER_DEFECTS.length} defects in the Story 6.2 screening code, each fixed with a regression test: ${SCREENER_DEFECTS.join('; ')}.`,
+    },
+  ].filter(Boolean)
+}
+
+const ROLLBACK = {
+  scope:
+    'The hosted community worker. The API, web and mobile surfaces are not deployed by this story.',
+  steps: [
+    'Leave community_read_enabled and community_write_enabled disabled; they are disabled now and nothing in this story changes them.',
+    'Redeploy the previous image on the host (Northflank keeps prior builds per commit), or stop the service. A stopped worker leaves queued jobs in Redis; they run when a worker returns, and the stale-review sweep moves anything pending too long to review_failed.',
+    'If the model itself is the problem, set COMMUNITY_NSFW_SCREENER=unavailable with COMMUNITY_NSFW_INCIDENT_MODE=unavailable and COMMUNITY_NSFW_INCIDENT_REFERENCE, and restart: every submission routes to human review and nothing auto-publishes.',
+    'Run the hosted canary after any rollback to confirm the restored worker publishes the safe fixture under a real-model identity, and that the worker name carries the commit you rolled back to.',
+    'Re-screen posts refused during the incident with the retained-job replay procedure in the deployment guide.',
+  ],
+}
+
+const GATE_SIGNATURES = {
+  closesHere: [
+    {
+      gate: 'model',
+      note: 'The Community Beta model-readiness signature, recorded once against this payload’s SHA-256 by the repository owner, or by an agent session the owner delegated it to, which may record only an approval of a payload whose verdict is pass.',
+    },
+  ],
+  remainOpen: [
+    'moderation staffing',
+    'SLA alerts',
+    'privacy',
+    'deletion',
+    'localization',
+    'accessibility',
+    'rollback',
+  ],
+  statement:
+    'A model-readiness signature is not a launch decision. Community Beta opens only when all eight gate signatures are recorded, and the rollout flags stay disabled until then.',
+}
+
+// ---------------------------------------------------------------- render
+
+const STATUS_LABEL = { passed: 'passed', failed: '**FAILED**', 'not-run': 'not run' }
+
+/** One readable line for a gate's measured block, without dumping raw JSON. */
+function describeMeasured(entry) {
+  const parts = []
+  if (entry.problems?.length > 0) parts.push(`problems: ${entry.problems.join('; ')}`)
+  if (entry.reason) parts.push(entry.reason)
+  if (entry.measured) {
+    const format = (value) =>
+      value !== null && typeof value === 'object' ? JSON.stringify(value) : String(value)
+    parts.push(
+      Object.entries(entry.measured)
+        .map(([key, value]) => `${key}: ${format(value)}`)
+        .join('; ')
+    )
+  } else if (!entry.reason && entry.command) {
+    parts.push(`run \`${entry.command}\``)
+  }
+  return parts.join('. ').replaceAll('|', '\\|')
+}
+
+function renderHeader(payload, payloadSha256) {
+  const dirty = payload.build.workingTreeClean
+    ? ''
+    : ' (working tree had uncommitted changes, so the verdict cannot be pass)'
+  return [
+    '<!-- markdownlint-disable MD013 MD024 -->',
+    '',
+    '# Community content screening: model readiness evidence',
+    '',
+    `Generated: ${payload.generatedAt} by \`${payload.generatedBy}\`. Do not edit by hand; this view and the JSON payload come from the same run.`,
+    '',
+    `- Payload: \`${OUTPUT_JSON}\``,
+    `- Payload SHA-256: \`${payloadSha256}\``,
+    `- Verdict: **${payload.verdict}** (${payload.verdictRule})`,
+    `- Commit: \`${payload.build.commitSha}\`${dirty}`,
+    `- Input-set hash: \`${payload.build.inputSetHash}\``,
+    '',
+    'This payload authorizes, at most, the Community Beta model-readiness signature. It is not a launch decision. Signing is a separate step: the repository owner runs `npm run community:screening:sign` interactively, or an agent session the owner delegated it to runs `npm run community:screening:sign -- --delegated`, which records only an approval and only of a payload whose verdict is `pass`.',
+  ]
+}
+
+function renderGates(payload) {
+  return [
+    '',
+    '## Gates',
+    '',
+    '| Gate | Status | Measured |',
+    '| ---- | ------ | -------- |',
+    ...payload.gates.map(
+      (entry) =>
+        `| ${entry.name} | ${STATUS_LABEL[entry.status] ?? entry.status} | ${describeMeasured(entry)} |`
+    ),
+  ]
+}
+
+function renderSafeCorpus(safe) {
+  const lines = ['', '## Safe photograph corpus and projected review load', '']
+  if (!safe.available) {
+    return [
+      ...lines,
+      `Not measured on this checkout. Run \`${COMMANDS.evaluateSafeCorpus}\`.`,
+    ]
+  }
+  const load = safe.reviewLoad
+  const [lower, upper] = safe.recomputedWilson95
+  lines.push(
+    `The corpus holds ${safe.manifest?.entries ?? '?'} openly licensed fashion photographs from ${safe.manifest?.split?.creators ?? '?'} creators, split by creator (${safe.manifest?.split?.rule ?? 'see the manifest'}) into a calibration half of ${safe.manifest?.calibrationEntries ?? '?'} and a holdout half of ${safe.manifest?.holdoutEntries ?? '?'}, with no creator above ${percent(safe.manifest?.split?.creatorCapShare ?? 0, 0)} of the corpus. The ${safe.evaluated} holdout photographs, which played no part in choosing the policy, were screened through the production normalization path and screener (${safe.validationRejected?.length ?? 0} rejected by validation): ${safe.withheld} were withheld (${percent(safe.withheldRate, 2)}, Wilson 95% interval ${percent(lower, 2)} to ${percent(upper, 2)}), ${safe.counts.block} of them blocked. By the bound that withheld them: ${Object.entries(
+      safe.withheldByBound
+    )
+      .map(([bound, count]) => `${count} ${bound}`)
+      .join('; ')}.`,
+    ''
+  )
+  if (load.atAssumedVolume) {
+    lines.push(
+      `At ${load.assumption.dailySubmissions} submissions a day (${load.assumption.source}), the image policy alone sends an expected ${load.atAssumedVolume.expectedWithheldPerDay} and at most ${load.atAssumedVolume.upperBoundWithheldPerDay} posts a day to the ${BETA_MODERATORS} moderators, ${load.atAssumedVolume.perModeratorPerDayAtUpperBound} each at the upper bound.`,
+      '',
+      '| Submissions a day | Expected withheld a day | Upper bound a day | Per moderator at upper bound |',
+      '| ----------------- | ----------------------- | ----------------- | ---------------------------- |',
+      ...load.range.map(
+        (row) =>
+          `| ${row.dailySubmissions} | ${row.expectedWithheldPerDay} | ${row.upperBoundWithheldPerDay} | ${row.perModeratorPerDayAtUpperBound} |`
+      ),
+      ''
+    )
+  }
+  lines.push(
+    `Every withheld or blocked holdout photograph, with what it shows (from \`${HOLDOUT_TRIAGE}\`).${safe.triageSummary ? ` ${safe.triageSummary}` : ''}`,
+    '',
+    '| Photograph | Disposition | Bound | Neutral / Drawing / Sexy / Hentai / Porn | What it shows |',
+    '| ---------- | ----------- | ----- | ---------------------------------------- | ------------- |',
+    ...safe.withheldEntries.map((entry) => {
+      const p = entry.classProbabilities
+      return `| ${entry.id} | ${entry.disposition} | ${entry.bound} | ${[p.Neutral, p.Drawing, p.Sexy, p.Hentai, p.Porn].map((value) => value ?? '?').join(' / ')} | ${(entry.description ?? '**not yet described**').replaceAll('|', '\\|')} |`
+    })
+  )
+  return lines
+}
+
+function renderCalibration(calibration) {
+  const lines = ['', '## Model and policy calibration', '']
+  if (!calibration.available) {
+    return [...lines, `Not run on this checkout. Run \`${COMMANDS.calibrateModels}\`.`]
+  }
+  if (!calibration.chosen) return [...lines, 'No configuration fits the resource budget.']
+  lines.push(
+    `Chosen on the ${calibration.calibrationEntries} calibration photographs only: ${calibration.chosen.family} with ${calibration.chosen.id}, withholding ${percent(calibration.chosen.withheldRate)} of them. Selection rule: ${calibration.selectionRule}. Unsafe bounds held for every variant: Hentai or Porn above ${calibration.unsafeBounds.blockMinimum} blocks, Hentai plus Porn must stay below ${calibration.unsafeBounds.unsafeAggregateMaximum}, Sexy must stay below ${calibration.unsafeBounds.sexyPassMaximum}, and Hentai, Porn and Sexy together must stay below ${calibration.unsafeBounds.jointMaximum}.`,
+    '',
+    '| Family | Installed model | node_modules | Peak RSS at 512 MiB | Warm p95 at 0.2 vCPU | Cold start | v1 policy | Best variant | Best withheld |',
+    '| ------ | --------------- | ------------ | ------------------- | -------------------- | ---------- | --------- | ------------ | ------------- |'
+  )
+  for (const [family, variants] of Object.entries(calibration.scores)) {
+    const measured = calibration.measurements?.[family] ?? {}
+    const best = [...variants].toSorted((a, b) => a.withheldRate - b.withheldRate)[0]
+    lines.push(
+      `| ${family} | ${(calibration.familyModelBytes[family] / 1e6).toFixed(1)} MB | ${measured.nodeModulesMb ?? '?'} MB | ${measured.peakResidentMib ?? '?'} MiB | ${measured.warmP95Ms ?? '?'} ms | ${measured.coldStartupMs ?? '?'} ms | ${percent(variants[0].withheldRate)} | ${best.id} | ${percent(best.withheldRate)} |`
+    )
+  }
+  const chosenVariants = calibration.scores[calibration.chosen.family]
+  lines.push(
+    '',
+    `Every variant for ${calibration.chosen.family} on the calibration half:`,
+    '',
+    '| Variant | Pass | Review | Block | Withheld |',
+    '| ------- | ---- | ------ | ----- | -------- |',
+    ...chosenVariants.map(
+      (row) =>
+        `| ${row.id} | ${row.pass} | ${row.review} | ${row.block} | ${percent(row.withheldRate)} |`
+    )
+  )
+  return lines
+}
+
+function renderRuntime(runtime) {
+  const lines = ['', '## Runtime latency and memory', '']
+  const latency = runtime.latency
+  const memory = runtime.memory
+  lines.push(
+    latency.available
+      ? `Latency, measured inside the worker image (${latency.profile}): cold startup ${latency.coldStartupMs} ms, warm p50 ${latency.warmSupervisedMs?.p50} ms, p95 ${latency.warmSupervisedMs?.p95} ms, p99 ${latency.warmSupervisedMs?.p99} ms over ${latency.warmSamples} samples of a 512x640 JPEG.`
+      : `Latency not measured on this checkout. Run \`${COMMANDS.measureRuntimeContainer}\`.`,
+    '',
+    memory.available
+      ? `Memory, the number the host's out-of-memory killer acts on: the running worker container's cgroup memory.peak was ${memory.memoryPeakMib} MiB of a ${memory.memoryLimitMib} MiB limit, across startup and the canary screening ${memory.upload?.name} (${memory.upload?.bytes ?? '?'} bytes) through the real pipeline.${memory.soleConsumer?.proven === true ? ` The container's worker was the only consumer heartbeat on Redis before the job was enqueued and after it completed (worker process ${memory.soleConsumer.before?.instanceIds?.[0] ?? '?'} both times).` : ''}`
+      : `Container memory not measured on this checkout: ${COMMANDS.measureMemory}.`
+  )
+  return lines
+}
+
+function renderRedis(redis) {
+  const lines = ['', '## Redis cost', '']
+  if (!redis.available || !redis.projectedMonthly) {
+    return [...lines, `Not measured on this checkout. Run \`${COMMANDS.measureRedis}\`.`]
+  }
+  return [
+    ...lines,
+    `The production database is on Upstash ${redis.pricing.plan}: ${redis.pricing.usdPer100kCommands.toFixed(2)} USD per 100K commands, with no free command allowance on a paid plan (${redis.pricing.sourceUrl}, read ${redis.pricing.readOn}).`,
+    '',
+    `Idle worker: ${redis.idle.commandsPerHour} commands an hour (${redis.idle.commandsPerDay} a day), measured over ${redis.idle.windowMinutes} minutes against a local Redis only the worker used. One screened post: ${redis.perPost.commandsPerPost} commands. At ${redis.dailySubmissions} posts a day the projected month is ${redis.projectedMonthly.total.toLocaleString('en-US')} commands, ${redis.projectedMonthly.totalUsd.toFixed(2)} USD: ${redis.projectedMonthly.idle.toLocaleString('en-US')} idle (${redis.projectedMonthly.idleUsd.toFixed(2)} USD) and ${redis.projectedMonthly.traffic.toLocaleString('en-US')} traffic (${redis.projectedMonthly.trafficUsd.toFixed(2)} USD). The gate is ${redis.monthlyCostCeilingUsd} USD a month; the worker alone stays at or below it up to ${redis.postsPerDayAtCostCeiling.toLocaleString('en-US')} posts a day and crosses it above that, at this per-post cost. ${redis.countingRule}`,
+    '',
+    `Before tuning, BullMQ's defaults (a ${redis.beforeTuning.drainDelaySeconds}-second idle block, a ${redis.beforeTuning.stalledIntervalMs / 1000}-second stalled check) measured ${redis.beforeTuning.commandsPerHour.toLocaleString('en-US')} commands an hour idle (${redis.beforeTuning.measuredAt}), ${redis.beforeTuning.monthlyUsd.toFixed(2)} USD a month at this price. The worker now blocks for ${redis.tuned.drainDelaySeconds} seconds and checks for stalled jobs every ${redis.tuned.stalledIntervalMs / 1000} seconds. It also refreshes its presence heartbeat every ${(redis.tuned.heartbeatIntervalMs ?? 0) / 1000} seconds (a ${redis.tuned.heartbeatTtlSeconds ?? '?'}-second TTL), which the idle figure includes and the canary counts consumers by, because Upstash answers CLIENT LIST from one node.`,
+    '',
+    redis.sharedDatabase,
+  ]
+}
+
+function renderText(text) {
+  const lines = ['', '## Text screening', '']
+  if (!text.available) {
+    return [
+      ...lines,
+      `Not measured on this checkout. Run \`${COMMANDS.textEvaluation}\`.`,
+    ]
+  }
+  return [
+    ...lines,
+    'The clean-copy gate runs on the frozen holdout. The in-sample clean half, which the allow list was built against, and the captions carrying a deliberate review term are reported beside it.',
+    '',
+    '| Language | Holdout gated | Holdout withheld | Upper bound | In-sample gated | In-sample withheld | Deliberate review | Disguised cases | Bypasses |',
+    '| -------- | ------------- | ---------------- | ----------- | --------------- | ------------------ | ----------------- | --------------- | -------- |',
+    ...Object.entries(text.languages).map(
+      ([language, result]) =>
+        `| ${language} | ${result.clean?.total ?? '?'} | ${result.clean?.withheld ?? '?'} | ${finite(result.clean?.recomputedUpperBound) ? percent(result.clean.recomputedUpperBound, 2) : '?'} | ${result.cleanInSample?.total ?? '?'} | ${result.cleanInSample?.withheld ?? '?'} | ${result.cleanInSample?.expectedReviewIds.length ?? '?'} | ${result.disallowed.total} | ${result.disallowed.bypassIds.length} |`
+    ),
+    '',
+    `Withheld holdout entries: ${
+      Object.entries(text.languages)
+        .flatMap(([, result]) => result.clean?.withheldIds ?? [])
+        .join(', ') || 'none'
+    }.`,
+  ]
+}
+
+function renderDeployment(payload) {
+  const { deployment, image } = payload
+  const profile = deployment.resourceProfile
+  const imageLine = image.available
+    ? `\`${image.imageId}\` (${image.architecture}), commit ${image.commitSha}, node_modules ${image.nodeModulesMb} MB of ${image.nodeModulesBudgetMb} MB`
+    : 'not built on this checkout'
+  return [
+    '',
+    '## Deployment',
+    '',
+    `- Target: ${deployment.target} (${deployment.status})`,
+    `- Resource profile: ${profile.memoryMib} MiB, ${profile.replicas} replica at concurrency ${profile.concurrency}; ${profile.cpu} vCPU is ${profile.cpuSource}`,
+    `- Fallbacks: ${deployment.fallbacks.map((entry) => entry.name).join('; ')}`,
+    `- Image: ${imageLine}`,
+  ]
+}
+
+function renderNarrative(payload) {
+  const lines = ['', '## Findings', '']
+  for (const finding of payload.findings) {
+    lines.push(`### ${finding.id}`, '', finding.statement, '')
+    if (finding.crossCheck) lines.push(`Cross-check: ${finding.crossCheck}`, '')
+    if (finding.consequence) lines.push(`Consequence: ${finding.consequence}`, '')
+  }
+  lines.push('## Limitations', '')
+  for (const limitation of payload.limitations) {
+    lines.push(
+      `### ${limitation.id}`,
+      '',
+      limitation.statement,
+      '',
+      `- Residual risk: ${limitation.residualRisk}`,
+      `- Mitigation: ${limitation.mitigation}`,
+      `- Revisit when: ${limitation.revisitWhen}`,
+      ''
+    )
+  }
+  lines.push(
+    '## Rollback',
+    '',
+    payload.rollback.scope,
+    '',
+    ...payload.rollback.steps.map((step, index) => `${index + 1}. ${step}`),
+    '',
+    '## Community Beta gate signatures',
+    '',
+    `- Closes here: ${payload.communityBetaGate.closesHere.map((entry) => entry.gate).join(', ')}`,
+    `- Remain open: ${payload.communityBetaGate.remainOpen.join(', ')}`,
+    `- Rollout: community_read_enabled=${payload.rollout.communityReadEnabled}, community_write_enabled=${payload.rollout.communityWriteEnabled}`,
+    '',
+    payload.communityBetaGate.statement,
+    '',
+    '## Commands',
+    '',
+    ...Object.entries(payload.commands).map(
+      ([name, command]) => `- ${name}: \`${command}\``
+    ),
+    ''
+  )
+  return lines
+}
+
+function renderMarkdown(payload, payloadSha256) {
+  return [
+    ...renderHeader(payload, payloadSha256),
+    ...renderGates(payload),
+    ...renderCalibration(payload.calibration),
+    ...renderSafeCorpus(payload.safeCorpus),
+    ...renderRuntime(payload.runtime),
+    ...renderRedis(payload.redis),
+    ...renderText(payload.text),
+    ...renderDeployment(payload),
+    ...renderNarrative(payload),
+  ].join('\n')
+}
+
+async function formatWith(parser, filePath, text) {
+  const prettier = await import('prettier')
+  const options = (await prettier.resolveConfig(full(filePath))) ?? {}
+  return prettier.format(text, { ...options, parser })
+}
+
+function parseArgs(argv) {
+  const options = {
+    image: DEFAULT_IMAGE,
+    dailySubmissions: DEFAULT_BETA_DAILY_SUBMISSIONS,
+  }
+  for (let index = 0; index < argv.length; index += 1) {
+    const arg = argv[index]
+    if (arg === '--image') options.image = argv[++index]
+    else if (arg === '--beta-daily-submissions')
+      options.dailySubmissions = Number(argv[++index])
+    else throw new Error(`Unknown argument: ${arg}`)
+  }
+  if (!Number.isInteger(options.dailySubmissions) || options.dailySubmissions <= 0) {
+    throw new Error('--beta-daily-submissions must be a positive integer')
+  }
+  return options
+}
+
+async function main() {
+  const options = parseArgs(process.argv.slice(2))
+  const current = {
+    commitSha: git(['rev-parse', 'HEAD']),
+    inputSetHash: inputSetHash(),
+    inputSetPathspecs: inputSetPathspecs(),
+    policySha256: sha256File(INPUTS.policy),
+    safeCorpusManifestSha256: sha256File(INPUTS.safeCorpusManifest),
+  }
+  const manifest = readJson(INPUTS.modelManifest)
+  const policy = readJson(INPUTS.policy)
+  const workingTree = workingTreeState()
+
+  const sections = {
+    workingTree,
+    image: imageSection(options.image, current),
+    canaries: {
+      local: canarySection('canary-local.json', 'local container', current),
+      restart: canarySection(
+        'canary-restart-local.json',
+        'local container restart drill',
+        current
+      ),
+      hosted: canarySection('canary-hosted.json', 'hosted target', current, {
+        hosted: true,
+      }),
+    },
+    sweep: sweepSection(current),
+    calibration: calibrationSection(current, policy, manifest),
+    safeCorpus: safeCorpusSection(current, options.dailySubmissions, policy),
+    text: textSection(current),
+    lists: listsSection(),
+    model: modelVerification(),
+    runtime: runtimeSection(manifest, current),
+    redis: redisSection(options.dailySubmissions, current),
+    rollout: rolloutSection(),
+  }
+  const gates = buildGates(sections)
+  const verdict = verdictOf(gates)
+
+  const payload = {
+    artifact: 'community-content-screening-model-readiness',
+    artifactVersion: 2,
+    storyKey: '6-2b-community-screening-release-gate',
+    generatedAt: new Date().toISOString(),
+    generatedBy: COMMANDS.generateEvidence,
+    verdict,
+    verdictRule:
+      'pass only when every gate ran against the current inputs from a committed tree and passed; fail when any gate that ran failed; incomplete otherwise',
+    gates,
+    build: {
+      commitSha: current.commitSha,
+      workingTreeClean: workingTree.clean,
+      uncommittedPaths: workingTree.changedPaths,
+      inputSetHash: current.inputSetHash,
+      dependencyLockSha256: sha256File(INPUTS.lockfile),
+      generatorNode: process.version,
+    },
+    inputs: Object.fromEntries(
+      Object.entries(INPUTS).map(([key, relativePath]) => [
+        key,
+        { path: relativePath, sha256: sha256File(relativePath) },
+      ])
+    ),
+    image: sections.image,
+    model: {
+      family: manifest?.modelFamily,
+      package: `${manifest?.packageName}@${manifest?.packageVersion}`,
+      backend: manifest?.backend,
+      classNames: manifest?.classNames,
+      manifestSha256: sha256File(INPUTS.modelManifest),
+      verification: sections.model,
+    },
+    policy: {
+      policyId: policy?.policyId,
+      version: policy?.version,
+      effectiveFrom: policy?.effectiveFrom,
+      sha256: current.policySha256,
+      thresholds: {
+        safeClasses: policy?.image?.safeClasses,
+        safeMassMinimum: policy?.image?.safeMassMinimum,
+        reviewClasses: policy?.image?.reviewClasses,
+        reviewClassMaximum: policy?.image?.reviewClassMaximum,
+        unsafeAggregateMaximum: policy?.image?.unsafeAggregateMaximum,
+        unsafeAndReviewAggregateMaximum: policy?.image?.unsafeAndReviewAggregateMaximum,
+        unsafeClasses: policy?.image?.unsafeClasses,
+        unsafeBlockMinimum: policy?.image?.unsafeBlockMinimum,
+        probabilitySumTolerance: policy?.image?.probabilitySumTolerance,
+      },
+    },
+    deployment: {
+      target:
+        'Northflank Developer Sandbox (always-on combined service built from apps/api/Dockerfile.community-worker)',
+      status: sections.canaries.hosted.available ? 'deployed' : 'not deployed yet',
+      resourceProfile: {
+        cpu: RELEASE_RESOURCE_PROFILE.cpu,
+        cpuSource:
+          'the CPU share the local container emulated; confirm it against the sandbox plan once the service exists',
+        memoryMib: RELEASE_RESOURCE_PROFILE.memoryMib,
+        replicas: 1,
+        concurrency: 1,
+      },
+      fallbacks: [
+        {
+          name: 'Oracle Cloud Always Free (ARM VM)',
+          when: 'the sandbox memory envelope proves too small',
+        },
+        {
+          name: 'Railway (paid, from 5 USD a month)',
+          when: 'neither free option is worth the setup time',
+        },
+      ],
+      excluded: 'Vercel: it runs no long-running process, which a BullMQ consumer is.',
+    },
+    canary: sections.canaries,
+    policySurface: sections.sweep,
+    calibration: sections.calibration,
+    safeCorpus: sections.safeCorpus,
+    redis: sections.redis,
+    text: sections.text,
+    lists: sections.lists,
+    runtime: sections.runtime,
+    commands: COMMANDS,
+    findings: findingsFor(sections),
+    limitations: limitationsFor(sections, policy, manifest),
+    rollback: ROLLBACK,
+    communityBetaGate: GATE_SIGNATURES,
+    rollout: sections.rollout,
+    signature: {
+      recordedBy: COMMANDS.sign,
+      delegatedBy: COMMANDS.signDelegated,
+      bindsTo: 'the SHA-256 of this file’s bytes',
+      note: 'This payload carries no signature and never will. The verdict lives in community-content-screening-signature.json, written only by the sign command.',
+    },
+  }
+
+  const jsonText = await formatWith(
+    'json',
+    OUTPUT_JSON,
+    `${JSON.stringify(payload, null, 2)}\n`
+  )
+  fs.mkdirSync(path.dirname(full(OUTPUT_JSON)), { recursive: true })
+  fs.writeFileSync(full(OUTPUT_JSON), jsonText)
+  const payloadSha256 = crypto.createHash('sha256').update(jsonText).digest('hex')
+  const markdown = await formatWith(
+    'markdown',
+    OUTPUT_MARKDOWN,
+    renderMarkdown(payload, payloadSha256)
+  )
+  fs.writeFileSync(full(OUTPUT_MARKDOWN), markdown)
+
+  console.log(`Wrote ${OUTPUT_JSON}`)
+  console.log(`Wrote ${OUTPUT_MARKDOWN}`)
+  console.log(`Payload SHA-256: ${payloadSha256}`)
+  for (const entry of gates) console.log(`  ${entry.status.padEnd(8)} ${entry.id}`)
+  console.log(`Verdict: ${verdict}`)
+}
+
+const invokedDirectly =
+  process.argv[1] && path.resolve(process.argv[1]) === fileURLToPath(import.meta.url)
+if (invokedDirectly) {
+  main().catch((error) => {
+    console.error('Community screening readiness generation error:', error)
+    process.exit(1)
+  })
+}

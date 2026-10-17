@@ -130,7 +130,7 @@ describe('Community NSFW image screening model smoke test', () => {
   )
 
   smokeIt(
-    'clears a synthetic safe image with a confident Neutral',
+    'clears a synthetic safe image with a confident safe mass',
     async () => {
       const active = await readyScreener()
       const result = await active.screen(safeImage)
@@ -138,8 +138,12 @@ describe('Community NSFW image screening model smoke test', () => {
       expect(result.disposition).toBe('pass')
       expect(result.passed).toBe(true)
       expect(result.reasons).toEqual([])
-      expect(result.classProbabilities.Neutral).toBeGreaterThan(policy.neutralPassMinimum)
-      expect(result.score).toBe(result.classProbabilities.Neutral)
+      const safeMass = policy.safeClasses.reduce(
+        (sum, className) => sum + (result.classProbabilities[className] ?? 0),
+        0
+      )
+      expect(safeMass).toBeGreaterThan(policy.safeMassMinimum)
+      expect(result.score).toBeCloseTo(safeMass, 10)
     },
     MODEL_TEST_TIMEOUT_MS
   )

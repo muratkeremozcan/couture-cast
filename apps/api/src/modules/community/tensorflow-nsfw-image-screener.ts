@@ -65,16 +65,20 @@ export const NSFW_INFERENCE_TIMEOUT_MS = 10_000
 export const NSFW_FAILURE_COOLDOWN_MS = 5_000
 
 /**
- * The five threshold keys the manifest mirrors, in the order it lists them.
+ * The threshold keys the manifest mirrors, in the order it lists them.
  * They are named once here because both the mirror assertion and the policy
  * schema have to agree on exactly which keys are the pinned thresholds and
  * which are the rationale prose sitting beside them.
  */
 export const NSFW_MIRRORED_THRESHOLD_KEYS = [
-  'neutralPassMinimum',
+  'safeClasses',
+  'safeMassMinimum',
   'unsafeAggregateMaximum',
   'unsafeBlockMinimum',
   'unsafeClasses',
+  'reviewClasses',
+  'reviewClassMaximum',
+  'unsafeAndReviewAggregateMaximum',
   'probabilitySumTolerance',
 ] as const
 
@@ -83,8 +87,13 @@ const probability = z.number().gt(0).lte(1)
 const imagePolicySchema = z
   .object({
     classNames: z.array(z.string().min(1)).min(1),
-    /** `Neutral` must exceed this for automatic publication. */
-    neutralPassMinimum: probability,
+    /**
+     * The classes NSFWJS's taxonomy counts as safe for work: `Neutral` and
+     * `Drawing`. Their summed probability must exceed {@link safeMassMinimum}.
+     */
+    safeClasses: z.array(z.string().min(1)).min(1),
+    /** The safe classes' combined probability must exceed this for publication. */
+    safeMassMinimum: probability,
     /**
      * The unsafe probabilities must sum strictly below this for automatic
      * publication. Without it a vector could clear every single-class floor
@@ -94,6 +103,18 @@ const imagePolicySchema = z
     /** An unsafe class above this blocks outright. */
     unsafeBlockMinimum: probability,
     unsafeClasses: z.array(z.string().min(1)).min(1),
+    /**
+     * Classes that never block but route to review at or above
+     * {@link reviewClassMaximum}: `Sexy`, which swimwear and eveningwear score
+     * legitimately and which a human should still look at.
+     */
+    reviewClasses: z.array(z.string().min(1)),
+    reviewClassMaximum: probability,
+    /**
+     * The unsafe and review classes together must stay strictly below this for
+     * publication: the joint bound the original Neutral floor implied.
+     */
+    unsafeAndReviewAggregateMaximum: probability,
     /** How far the probabilities may sum away from 1 before the vector is untrusted. */
     probabilitySumTolerance: z.number().gt(0).lte(0.5),
     /**
@@ -137,16 +158,29 @@ function review(
 /**
  * Validates the vector before any threshold is consulted. A vector that fails
  * here is not merely uncertain, it is untrustworthy, so no amount of confident
- * Neutral in it can be believed.
+ * safe mass in it can be believed.
  */
 function validateVector(
   probabilities: readonly number[],
+  classNames: readonly string[],
   mapped: Record<string, number>,
   policy: NsfwImagePolicy
 ): NsfwEvaluation | null {
+  // The exact class-name set, not merely the presence of the classes the
+  // thresholds read. Story 6.2b's policy-surface sweep found that a duplicated
+  // name passed the presence check: with `Neutral` named twice, the second
+  // position silently overwrote the first in `mapped`, and a vector whose
+  // canonical `Neutral` slot was low could publish on the other slot's value.
+  const distinct = new Set(classNames)
+  const exactSet =
+    classNames.length === policy.classNames.length &&
+    distinct.size === classNames.length &&
+    policy.classNames.every((className) => distinct.has(className))
   const missingClass =
-    !policy.unsafeClasses.every((className) => className in mapped) ||
-    !('Neutral' in mapped)
+    !exactSet ||
+    ![...policy.safeClasses, ...policy.unsafeClasses, ...policy.reviewClasses].every(
+      (className) => className in mapped
+    )
   if (missingClass) {
     return review(NSFW_REASON_CLASS_MISMATCH, mapped)
   }
@@ -165,9 +199,17 @@ function validateVector(
  * prove it without a model.
  *
  * `block` needs one unsafe class strictly above its floor. `pass` needs all
- * three of a confident `Neutral`, an unsafe aggregate strictly below its
- * ceiling, and every unsafe class strictly below the block floor.
- * Everything else, uncertainty included, is a human's problem.
+ * four of a confident safe mass (`Neutral` plus `Drawing`), an unsafe aggregate
+ * strictly below its ceiling, every unsafe class strictly below the block
+ * floor, and every review class strictly below its ceiling. Everything else,
+ * uncertainty included, is a human's problem.
+ *
+ * Story 6.2b replaced the original confident-`Neutral` floor with the safe mass
+ * after measuring real fashion photographs: the model puts most of a real
+ * photograph's probability on `Drawing`, so the Neutral floor withheld almost
+ * every one. `Drawing` is a safe class in NSFWJS's own taxonomy. The unsafe
+ * bounds did not move, and `Sexy`, which the Neutral floor capped implicitly
+ * below 0.15, is now capped explicitly at the same value.
  *
  * Every comparison is strict, so a probability sitting exactly on a threshold
  * has not crossed it and the case resolves to review from both sides. That is
@@ -194,7 +236,7 @@ export function evaluateNsfwDisposition(
     mapped[className] = probabilities[index] as number
   })
 
-  const invalid = validateVector(probabilities, mapped, policy)
+  const invalid = validateVector(probabilities, classNames, mapped, policy)
   if (invalid) return invalid
 
   const unsafeScores = policy.unsafeClasses.map(
@@ -209,10 +251,21 @@ export function evaluateNsfwDisposition(
   }
 
   const unsafeAggregate = unsafeScores.reduce((total, score) => total + score, 0)
+  const safeMass = policy.safeClasses.reduce(
+    (total, className) => total + (mapped[className] as number),
+    0
+  )
   const publishable =
-    (mapped.Neutral as number) > policy.neutralPassMinimum &&
+    safeMass > policy.safeMassMinimum &&
     unsafeAggregate < policy.unsafeAggregateMaximum &&
-    unsafeScores.every((score) => score < policy.unsafeBlockMinimum)
+    unsafeScores.every((score) => score < policy.unsafeBlockMinimum) &&
+    policy.reviewClasses.every(
+      (className) => (mapped[className] as number) < policy.reviewClassMaximum
+    ) &&
+    [...policy.unsafeClasses, ...policy.reviewClasses].reduce(
+      (total, className) => total + (mapped[className] as number),
+      0
+    ) < policy.unsafeAndReviewAggregateMaximum
   if (publishable) {
     return { disposition: 'pass', reasons: [], classProbabilities: mapped }
   }
@@ -778,7 +831,12 @@ export class TensorflowNsfwImageScreener implements NsfwImageScreener {
       passed: evaluation.disposition === 'pass',
       reasons: evaluation.reasons,
       engineVersion,
-      score: evaluation.classProbabilities.Neutral,
+      // The safe mass the pass rule reads, so a persisted score means the same
+      // thing as the disposition beside it.
+      score: policy.safeClasses.reduce(
+        (total, className) => total + (evaluation.classProbabilities[className] ?? 0),
+        0
+      ),
       disposition: evaluation.disposition,
       classProbabilities: evaluation.classProbabilities,
       modelDigest: identity.modelDigest,

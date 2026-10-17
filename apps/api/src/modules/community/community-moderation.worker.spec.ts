@@ -19,9 +19,15 @@ import {
 } from './community-moderation.processor'
 import {
   COMMUNITY_MODERATION_CONCURRENCY,
+  COMMUNITY_MODERATION_DRAIN_DELAY_SECONDS,
+  COMMUNITY_MODERATION_LOCK_DURATION_MS,
+  COMMUNITY_MODERATION_STALLED_INTERVAL_MS,
+  communityCrashRecoveryMs,
+  communityWorkerName,
   createCommunityModerationWorker,
   terminalReason,
 } from './community-moderation.worker'
+import { STALE_PENDING_REVIEW_MINUTES } from './community-maintenance.service'
 import { NsfwScreeningError } from './tensorflow-nsfw-image-screener'
 import type { CommunityModerationJob } from './community-moderation.queue'
 import type { CommunityModerationMeter } from './community-moderation.telemetry'
@@ -164,6 +170,33 @@ describe('CommunityModerationProcessor & Worker', () => {
       mockTelemetryService,
       engine
     )
+
+  describe('Operations canary', () => {
+    it('publishes the canary post but keeps it out of analytics', async () => {
+      mockFindUnique.mockResolvedValueOnce(
+        pendingPost({
+          id: 'post-canary',
+          user_id: 'canary-user-abc123',
+          image_object_path: 'community/post-canary/session-1.jpg',
+        })
+      )
+      const processor = createProcessor(
+        new FixtureCommunityModerationEngine({
+          textOutcome: { passed: true, reasons: [] },
+          imageOutcome: { passed: true, reasons: [] },
+        })
+      )
+
+      await processor.process({ postId: 'post-canary', uploadSessionId: 'session-1' })
+
+      expect(mockPostUpdateMany).toHaveBeenCalledWith(
+        expect.objectContaining({
+          data: expect.objectContaining({ status: 'published' }),
+        })
+      )
+      expect(mockCaptureEvent).not.toHaveBeenCalled()
+    })
+  })
 
   describe('Clean path -> published', () => {
     it('transitions pending_review post to published, stamps published_at, and emits telemetry', async () => {
@@ -739,6 +772,63 @@ describe('CommunityModerationProcessor & Worker', () => {
         COMMUNITY_MODERATION_CONCURRENCY
       )
       expect(COMMUNITY_MODERATION_CONCURRENCY).toBe(1)
+    })
+
+    // Story 6.2b: BullMQ's defaults (a 5-second block, a 30-second stalled
+    // check) measured about 6,500 Redis commands an hour from an idle worker,
+    // nine times a free Upstash plan. A new job still wakes the blocked call
+    // immediately, so the longer block costs no pickup latency.
+    it('names itself after the commit the image was built from', () => {
+      const previous = process.env.COMMUNITY_WORKER_COMMIT_SHA
+      process.env.COMMUNITY_WORKER_COMMIT_SHA = 'abc123'
+      try {
+        buildWorker()
+        const options = workerHarness.mockCreateWorker.mock.calls.at(-1)?.[2] as {
+          name?: string
+        }
+        expect(options.name).toBe(communityWorkerName('abc123'))
+        expect(options.name).toBe('community-worker@abc123')
+      } finally {
+        if (previous === undefined) delete process.env.COMMUNITY_WORKER_COMMIT_SHA
+        else process.env.COMMUNITY_WORKER_COMMIT_SHA = previous
+      }
+    })
+
+    it('polls Redis sparingly while idle without delaying a new job', () => {
+      buildWorker()
+
+      const options = workerHarness.mockCreateWorker.mock.calls.at(-1)?.[2] as {
+        drainDelay?: number
+        stalledInterval?: number
+      }
+      expect(options.drainDelay).toBe(COMMUNITY_MODERATION_DRAIN_DELAY_SECONDS)
+      expect(options.stalledInterval).toBe(COMMUNITY_MODERATION_STALLED_INTERVAL_MS)
+      expect(COMMUNITY_MODERATION_DRAIN_DELAY_SECONDS).toBeGreaterThanOrEqual(300)
+    })
+
+    it('recovers a crashed job before the stale-review sweep fails its post', () => {
+      // Story 6.2b review (RF13): with a 600-second stalled check, a job
+      // abandoned by a crash came back after the 15-minute sweep had already
+      // failed its post.
+      buildWorker()
+      const options = workerHarness.mockCreateWorker.mock.calls.at(-1)?.[2] as {
+        lockDuration?: number
+        stalledInterval?: number
+        maxStalledCount?: number
+      }
+      expect(options).toMatchObject({
+        lockDuration: COMMUNITY_MODERATION_LOCK_DURATION_MS,
+        stalledInterval: COMMUNITY_MODERATION_STALLED_INTERVAL_MS,
+        maxStalledCount: 1,
+      })
+      // The redelivery bound holds only once the lock has expired by the check.
+      expect(COMMUNITY_MODERATION_STALLED_INTERVAL_MS).toBeGreaterThanOrEqual(
+        COMMUNITY_MODERATION_LOCK_DURATION_MS
+      )
+      const sweepMs = STALE_PENDING_REVIEW_MINUTES * 60_000
+      expect(communityCrashRecoveryMs()).toBe(423_000)
+      expect(communityCrashRecoveryMs()).toBeLessThan(sweepMs)
+      expect(communityCrashRecoveryMs(600_000)).toBeGreaterThan(sweepMs)
     })
 
     it('counts the attempt being executed, not the attempts already made', async () => {

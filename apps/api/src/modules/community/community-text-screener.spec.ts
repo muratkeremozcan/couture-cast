@@ -93,7 +93,7 @@ interface ApprovedPolicy {
 }
 
 const approvedPolicy = readJson<ApprovedPolicy>(
-  path.join(policyDirectory, 'policy-v1.json')
+  path.join(policyDirectory, 'policy-v2.json')
 )
 
 const allowedEverywhere = new Set(
@@ -287,7 +287,7 @@ describe('CommunityTextScreener locale coverage (AC 3)', () => {
     })
     expect(result.field).toBe('altText')
     expect(result.declaredLocale).toBe('fr-CA')
-    expect(result.policyVersion).toBe('community-screening-policy-v1')
+    expect(result.policyVersion).toBe('community-screening-policy-v2')
     expect(Object.keys(result.listVersions).sort()).toEqual(
       [...SCREENING_LANGUAGES].sort()
     )
@@ -313,7 +313,11 @@ describe('CommunityTextScreener policy wiring (AC 7)', () => {
 
   it('carries the same text policy the approved policy file declares', () => {
     const approved = withoutProse(approvedPolicy.text) as Record<string, unknown>
+    // Lists and deliberate review terms are file-backed data the policy names,
+    // not structure the default can mirror; the screener reads both from the
+    // loaded policy and the lists directory.
     delete approved.lists
+    delete approved.deliberateReviewTerms
     expect(withoutProse(DEFAULT_COMMUNITY_TEXT_POLICY)).toEqual(approved)
   })
 
@@ -331,6 +335,55 @@ describe('CommunityTextScreener policy wiring (AC 7)', () => {
     })
     expect(loaded.identity.textEngineVersion).toContain(loaded.policySha256.slice(0, 12))
     expect(loaded.policy.text.limits.maxInputCharacters).toEqual(CONTRACT_FIELD_CEILINGS)
+  })
+
+  it('refuses a policy that allow-lists or drops a deliberate review term', () => {
+    const loaded = loadCommunityScreeningPolicy()
+    const allowedTerm = allowLists.en.entries.find((entry) => !entry.includes(' '))
+    expect(allowedTerm).toBeDefined()
+    expect(
+      () =>
+        new CommunityTextScreener({
+          policy: {
+            ...loaded.policy.text,
+            deliberateReviewTerms: [{ term: allowedTerm as string, reason: 'test' }],
+          },
+        })
+    ).toThrow(/deliberate review term is allow-listed/)
+    expect(
+      () =>
+        new CommunityTextScreener({
+          policy: {
+            ...loaded.policy.text,
+            deliberateReviewTerms: [{ term: 'gabardine', reason: 'test' }],
+          },
+        })
+    ).toThrow(/indexed by no list/)
+  })
+
+  it('refuses to start when a loaded list no longer hashes to its policy pin', () => {
+    const loaded = loadCommunityScreeningPolicy()
+    expect(loaded.policy.text.lists.every((list) => list.termsSha256)).toBe(true)
+    const tampered = loaded.policy.text.lists.map((list, index) =>
+      index === 0 ? { ...list, termsSha256: '0'.repeat(64) } : list
+    )
+    expect(
+      () =>
+        new CommunityTextScreener({ policy: { ...loaded.policy.text, lists: tampered } })
+    ).toThrow(/does not hash to the SHA-256 the policy pins/)
+  })
+
+  it('routes the deliberate review terms to review in ordinary copy', () => {
+    const loaded = loadCommunityScreeningPolicy()
+    const wired = new CommunityTextScreener({ policy: loaded.policy.text })
+    for (const entry of loaded.policy.text.deliberateReviewTerms ?? []) {
+      const result = wired.screen({
+        text: `a ${entry.term} look for spring`,
+        field: 'caption',
+        locale: 'en-US',
+      })
+      expect(result.disposition).toBe('review')
+    }
   })
 
   it('emits exactly the reason codes the approved policy declares', () => {
@@ -715,6 +768,67 @@ describe('CommunityTextScreener word boundaries and allow lists (AC 4)', () => {
     expect(screenCaption('gok mavisi bir elbise').disposition).toBe('pass')
     expect(screenCaption('you gook').categories).toContain('hate')
     expect(screenCaption('you gooook').categories).toContain('hate')
+  })
+
+  it('matches a multi-word term whose letters are cut at different places', () => {
+    // Story 6.2b: `vai-te foder` written `vai-tefoder` slipped past every pass
+    // before the re-split pass existed, because no token matched a phrase word.
+    const plain = screenCaption('vai te foder')
+    expect(plain.disposition).not.toBe('pass')
+    expect(plain.obfuscated).toBe(false)
+
+    for (const resplit of [
+      'vai-tefoder',
+      'vaite foder',
+      'vait efoder',
+      'kill yours elf',
+    ]) {
+      const result = screenCaption(resplit)
+      expect(result.disposition, resplit).not.toBe('pass')
+      expect(result.obfuscated, resplit).toBe(true)
+    }
+  })
+
+  it('sees through a leet spelling whose classing creates a doubled letter', () => {
+    // Story 6.2b's corpus found these publishing: `3` and `5` class to `e` and
+    // `s`, so `fr35se` only has its `ss` after classing, while the index had
+    // collapsed `fresse` to `frese` before classing it.
+    for (const disguised of [
+      'f r 3 5 s e',
+      'fr35se',
+      'p 1 5 s e r',
+      'u n d r 3 5 s i n g',
+    ]) {
+      expect(screenCaption(disguised).disposition, disguised).not.toBe('pass')
+    }
+  })
+
+  it('keeps screening a multi-word term when one of its words is allow-listed', () => {
+    // `concha` is allow-listed as a shell; the insult phrase built on it is not.
+    expect(screenCaption('una concha de nácar').disposition).toBe('pass')
+    expect(screenCaption('concha de tu madre').disposition).not.toBe('pass')
+  })
+
+  it('matches a re-split multi-word term written in leetspeak', () => {
+    // Story 6.2b review (EC5): each of these published before the re-split pass
+    // compared leet-class forms.
+    for (const disguised of [
+      'k1ll yours elf',
+      'bl0 wjob',
+      'vai-tef0der',
+      'k1llyours3lf',
+    ]) {
+      expect(screenCaption(disguised).disposition, disguised).not.toBe('pass')
+    }
+  })
+
+  it('never rebuilds a single-word term out of two ordinary words', () => {
+    // The re-split pass compares against phrase concatenations only, so ordinary
+    // words that happen to spell a single-word term stay clean.
+    for (const caption of ['a pen is all you need', 'which pen is yours']) {
+      const result = screenCaption(caption)
+      expect(result.disposition, caption).toBe('pass')
+    }
   })
 
   it('records which terms are deliberately allow-listed as well', () => {

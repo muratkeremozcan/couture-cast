@@ -167,6 +167,107 @@ export const communityReportReasonSchema = z.enum([
 ])
 export type CommunityReportReason = z.infer<typeof communityReportReasonSchema>
 
+/**
+ * What an author is told about a post the pipeline held. Each member is one
+ * localized sentence under `community.moderationReason.*`, so a member reads
+ * "change the wording" and never a raw `text_policy_match`.
+ */
+export const communityModerationReasonCategorySchema = z.enum([
+  'language',
+  'textUnreadable',
+  'photo',
+  'photoUnconfirmed',
+  'incomplete',
+  'upload',
+])
+export type CommunityModerationReasonCategory = z.infer<
+  typeof communityModerationReasonCategorySchema
+>
+
+/**
+ * The codes the moderation worker persists when the stored upload fails
+ * verification before anything screens it: a missing declaration, a size, type
+ * or checksum that differs from the declaration, dimensions outside the
+ * accepted range, or bytes that do not decode. The API's community image
+ * validation throws only these, and the processor persists the one it caught
+ * (Story 6.2b review, RF12). Each is the author's to fix by uploading again.
+ */
+export const communityImageValidationCodeSchema = z.enum([
+  'IMAGE_DECLARATION_MISSING',
+  'IMAGE_SIZE_MISMATCH',
+  'UNSUPPORTED_IMAGE_TYPE',
+  'IMAGE_CHECKSUM_MISMATCH',
+  'IMAGE_DIMENSIONS_INVALID',
+  'IMAGE_DECODE_FAILED',
+])
+export type CommunityImageValidationCode = z.infer<
+  typeof communityImageValidationCodeSchema
+>
+
+/**
+ * Every stable code the moderation pipeline persists on `moderationReason`,
+ * mapped to the category the author sees. The codes come from
+ * `apps/api/policies/community-screening` (`reasonCodes.image` and
+ * `reasonCodes.text`), the image validation codes, and the three the pipeline
+ * writes on its own;
+ * `apps/api/integration/community-moderation-reason-codes.spec.ts` fails when
+ * the API can emit a code this map does not name.
+ */
+export const COMMUNITY_MODERATION_REASON_CATEGORY: Readonly<
+  Record<string, CommunityModerationReasonCategory>
+> = Object.freeze({
+  text_policy_match: 'language',
+  text_input_truncated: 'textUnreadable',
+  locale_unscreenable: 'textUnreadable',
+  script_mixed: 'textUnreadable',
+  script_unsupported: 'textUnreadable',
+  unsafe_class: 'photo',
+  low_confidence: 'photoUnconfirmed',
+  output_invalid: 'photoUnconfirmed',
+  class_mismatch: 'photoUnconfirmed',
+  probability_sum_invalid: 'photoUnconfirmed',
+  image_disposition_conflict: 'photoUnconfirmed',
+  inference_timeout: 'incomplete',
+  screening_unavailable: 'incomplete',
+  flagged_by_screening: 'incomplete',
+  moderation_stalled: 'incomplete',
+  ...Object.fromEntries(
+    communityImageValidationCodeSchema.options.map((code) => [code, 'upload' as const])
+  ),
+})
+
+/**
+ * Reads a persisted `moderationReason` (one code, or several joined by `, `)
+ * into the categories to show its author, in schema order and without
+ * repeats. Returns `null` when any part is not a known code, which is the
+ * free-text reason a human moderator wrote on a takedown; the caller shows that
+ * verbatim instead.
+ */
+export function communityModerationReasonCategories(
+  reason: string | null | undefined
+): CommunityModerationReasonCategory[] | null {
+  const codes = (reason ?? '')
+    .split(',')
+    .map((code) => code.trim())
+    .filter((code) => code.length > 0)
+  if (codes.length === 0) return null
+  const found = new Set<CommunityModerationReasonCategory>()
+  for (const code of codes) {
+    // This module also loads under Hermes, where older builds lack `Object.hasOwn`.
+    const category = Object.prototype.hasOwnProperty.call(
+      COMMUNITY_MODERATION_REASON_CATEGORY,
+      code
+    )
+      ? COMMUNITY_MODERATION_REASON_CATEGORY[code]
+      : undefined
+    if (category === undefined) return null
+    found.add(category)
+  }
+  return communityModerationReasonCategorySchema.options.filter((category) =>
+    found.has(category)
+  )
+}
+
 // --- Validation helpers: Cursor, Caption, Alt-text --------------------------
 
 /**

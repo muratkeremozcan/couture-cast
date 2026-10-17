@@ -79,3 +79,15 @@ export function resolveCommunityExperimentVariant(
   const digest = createHash('sha256').update(`community-experiment:${userId}`).digest()
   return digest.readUInt8(0) % 2 === 0 ? 'auto' : 'all'
 }
+
+/**
+ * The id prefix of the operations canary's synthetic account
+ * (`scripts/community-screening-canary.mjs`). Its posts run the real pipeline
+ * end to end, including publication, so its events would otherwise count as
+ * member activity in the beta's own metrics.
+ */
+export const COMMUNITY_CANARY_USER_ID_PREFIX = 'canary-user-'
+
+export function isCommunityCanaryUser(userId: string): boolean {
+  return userId.startsWith(COMMUNITY_CANARY_USER_ID_PREFIX)
+}

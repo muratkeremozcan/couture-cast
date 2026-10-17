@@ -1379,3 +1379,30 @@ file's own Code Review Findings section.
   and obfuscation handling was never specified, so widening it is a product
   decision rather than a defect fix. Worth pairing with the decision about the
   five supported locales that have no dictionary at all.
+- source_spec: `_bmad-output/implementation-artifacts/6-2b-community-screening-release-gate.md`
+  summary: Add a dependency vulnerability scan (npm audit on the pruned production tree, or an image scan) to CI for the API and the community worker image.
+  evidence: Review finding BH22; `npm audit --omit=dev --audit-level=high` exits 1 with 54 high and 4 critical advisories (2026-10-16), and fixing them needs major expo, OpenTelemetry and Next upgrades.
+- source_spec: `_bmad-output/implementation-artifacts/6-2b-community-screening-release-gate.md`
+  summary: Alert from outside the community worker on the age of the oldest `pending_review` post, so a dead hosted worker is noticed.
+  evidence: Review finding BH18; the hosted worker has no health check and the stale-review sweep runs inside the worker itself. Belongs with Story 6.12 SLA monitoring.
+- source_spec: `_bmad-output/implementation-artifacts/6-2b-community-screening-release-gate.md`
+  summary: Close the image safe-corpus gate (holdout withheld rate at or below 5%) with a stronger SFW classifier, for example CLIP zero-shot through the existing FashionCLIP stack.
+  evidence: The creator-split holdout still fails the 5% gate and blocks ordinary photographs with mobilenet_v2_mid under policy v2 (figures and a description of every withheld photograph in `_bmad-output/test-artifacts/community-content-screening-model-readiness.json`, `safeCorpus`); the other bundled NSFWJS models withheld more on the calibration half.
+- source_spec: `_bmad-output/implementation-artifacts/6-2b-community-screening-release-gate.md`
+  summary: Fix the clean captions the frozen text holdout withholds (es, fr, it, pt), then freeze a new holdout version to measure the fix, because tuning against `holdout-v1` would make it a second tuning set.
+  evidence: Story 6.2b review loop 1 (BH10); the withheld holdout ids are in the readiness payload's `text` section. One French caption blocks at high severity on an ordinary verb form.
+- source_spec: `_bmad-output/implementation-artifacts/6-2b-community-screening-release-gate.md`
+  summary: Drop dolls, rendered avatars and AI-generated portraits from the safe photograph corpus (or filter them at fetch time) and refetch, so the corpus measures photographs of people.
+  evidence: The holdout triage (`_bmad-output/test-artifacts/community-safe-corpus-holdout-triage.json`) found six such entries among the withheld photographs.
+- source_spec: `_bmad-output/implementation-artifacts/6-2b-community-screening-release-gate.md`
+  summary: Give the community worker OTLP export once it fits the 150 MB dependency budget. (The worker's database certificate is now verified: final review RF3.)
+  evidence: Review finding BH18; `@opentelemetry/sdk-node` with its exporters does not fit the pruned tree.
+- source_spec: `_bmad-output/implementation-artifacts/6-2b-community-screening-release-gate.md`
+  summary: Verify the Vercel API's database certificate the way the community worker now does (`sslcert` naming the Supabase Root 2021 CA with `sslaccept=strict`), and refuse an unverified production `DATABASE_URL` at startup.
+  evidence: Story 6.2b final review (RF3); the API's `DATABASE_URL` uses `sslmode=require` with no chain verification, so Prisma accepts any certificate. The CA is committed at `apps/api/certs/supabase-root-2021-ca.pem`; the Vercel function needs it bundled at a path Prisma can read.
+- source_spec: `_bmad-output/implementation-artifacts/6-2b-community-screening-release-gate.md`
+  summary: Make the admin retry re-screen a `review_failed` community post end to end: move the post back to `pending_review` (and re-arm its outbox row) in the same transaction that queues the job, under the deterministic job id after removing any retained job, and prove it with an integration test against real Redis and PostgreSQL.
+  evidence: Story 6.2b review (RF14). `AdminService.retryFailedJob` adds a job named `retry` with a BullMQ-generated id and changes no post; the processor skips any post not in `pending_review`, so retrying a stalled or exhausted community post reports `retried: true`, deletes the `JobFailure` row and re-screens nothing. The same holds for the retained-job replay in the deployment guide, which needs the post in `pending_review` too.
+- source_spec: `_bmad-output/implementation-artifacts/6-2b-community-screening-release-gate.md`
+  summary: Correct the crash-recovery ceiling stated in `community-moderation.worker.ts` (423 s) so it counts every bounded processing stage (download 20 s, normalization/upload 30 s, screening 30 s) plus database and queue assumptions.
+  evidence: Final Codex review of PR #151 (2026-10-17) traced the stage timeouts; the comment counts only one 30-second stage. Documentation only; deferred because the file is in the screening input set and editing it forces a full evidence re-measurement.

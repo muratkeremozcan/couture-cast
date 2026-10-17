@@ -1,0 +1,121 @@
+# syntax=docker/dockerfile:1.7
+#
+# Community moderation worker (Story 6.2b, ADR-013).
+#
+# Build from the repository root:
+#   docker build -f apps/api/Dockerfile.community-worker -t couture-cast-community-worker .
+#
+# Three stages. `build` installs the workspaces the API build needs and compiles
+# them. `assemble` derives the worker's own runtime tree from its import graph
+# and fails when node_modules exceeds the 150 MB free-tier budget. `runtime`
+# carries only that tree, verifies the pinned model during the build, and runs
+# the worker as the unprivileged `node` user under tini.
+#
+# The base image is pinned by digest so a rebuild of the same commit installs
+# onto the same operating system and Node build.
+ARG NODE_IMAGE=node:24.21.0-bookworm-slim@sha256:d6aa754f16b3197301076f047b5def2f02ea1dbbc2ca920407d46d7ec7f87b20
+
+FROM ${NODE_IMAGE} AS build
+# `prisma generate` picks the query engine by probing the OpenSSL it finds. The
+# slim base has none, so without this it generates for OpenSSL 1.1 and the
+# runtime stage, which does install OpenSSL 3, cannot load the engine.
+RUN apt-get update \
+ && apt-get install -y --no-install-recommends openssl \
+ && rm -rf /var/lib/apt/lists/*
+WORKDIR /repo
+ENV CI=true \
+    NPM_CONFIG_AUDIT=false \
+    NPM_CONFIG_FUND=false \
+    NPM_CONFIG_UPDATE_NOTIFIER=false
+
+# Manifests first, so the dependency layer survives a source-only change. Every
+# workspace manifest is copied because npm validates the lockfile against all of
+# them, even when only some are installed.
+COPY package.json package-lock.json .npmrc ./
+COPY apps/api/package.json apps/api/
+COPY apps/web/package.json apps/web/
+COPY apps/mobile/package.json apps/mobile/
+COPY packages/api-client/package.json packages/api-client/
+COPY packages/config/package.json packages/config/
+COPY packages/db/package.json packages/db/
+COPY packages/eslint-config/package.json packages/eslint-config/
+COPY packages/k6-utils/package.json packages/k6-utils/
+COPY packages/testing/package.json packages/testing/
+COPY packages/utils/package.json packages/utils/
+
+# Only the workspaces the API build reaches, plus the root toolchain (TypeScript
+# and the Prisma CLI). Install scripts are skipped: nothing this build needs runs
+# one, sharp resolves its platform binary through optional dependencies, and the
+# Prisma engine is fetched by `prisma generate` below.
+RUN npm ci --ignore-scripts --include-workspace-root \
+      --workspace api \
+      --workspace @couture/api-client \
+      --workspace @couture/config \
+      --workspace @couture/db \
+      --workspace @couture/testing \
+      --workspace @couture/utils
+
+COPY . .
+RUN npx prisma generate --schema packages/db/prisma/schema.prisma \
+ && npm run build --workspace api
+
+FROM build AS assemble
+# Fails the build when the worker's node_modules passes 150 MB.
+RUN node scripts/prune-community-worker-deps.mjs --out /worker --max-node-modules-mb 150
+
+FROM ${NODE_IMAGE} AS runtime
+# tini reaps zombies and forwards SIGTERM to the worker, which Node does not do
+# as PID 1. `-s` registers it as a subreaper, because hosts such as Northflank
+# run their own entrypoint as PID 1 and tini would otherwise reap nothing. openssl and ca-certificates are what the Prisma engine needs to
+# detect its TLS library and open a verified connection to a hosted database.
+RUN apt-get update \
+ && apt-get install -y --no-install-recommends tini openssl ca-certificates \
+ && rm -rf /var/lib/apt/lists/*
+
+# The screener selector is deliberately not baked in. The host names it, and the
+# launcher refuses to start when it is unset, so a deployment that forgot the
+# variable cannot look like one that chose a screener.
+#
+# LOG_LEVEL=info because production otherwise logs at warn, which would hide the
+# `community_moderation_screener_ready` line the deploy runbook waits for. The
+# worker logs nothing per job above debug, so this costs a handful of lines per
+# start and per publication.
+#
+# NO_COLOR because the Nest logger the queue classes use writes ANSI colour codes
+# otherwise, which a host's log viewer shows as escape sequences.
+ENV NODE_ENV=production \
+    LOG_LEVEL=info \
+    NO_COLOR=1
+WORKDIR /app
+COPY --from=assemble --chown=root:root /worker/ ./
+# The Supabase Root 2021 CA, which the hosted DATABASE_URL names through
+# `sslcert=/app/apps/api/certs/supabase-root-2021-ca.pem&sslaccept=strict`, so
+# Prisma verifies the database's certificate chain and host name. The launcher
+# refuses a production DATABASE_URL that does not (Story 6.2b final review, RF3).
+COPY --chown=root:root apps/api/certs/supabase-root-2021-ca.pem apps/api/certs/
+
+# The image is read-only to the user it runs as: the worker writes nothing to
+# disk, so nothing under /app needs to be writable by it.
+USER node
+
+# Proves, at build time and against the pruned tree, that the pinned artifacts
+# hash clean, the model loads, an image screens, and the text lists validate. A
+# dependency the prune trace missed fails here rather than on the first job.
+RUN COMMUNITY_NSFW_SCREENER=tensorflow node scripts/start-community-worker-production.mjs --self-test
+
+# Identity of the build, last so a new commit reuses every cached layer above.
+# COMMIT_SHA names the BullMQ worker (community-worker@<sha>), which is how the
+# hosted canary proves which build consumed its job. INPUT_SET_HASH is the hash
+# scripts/lib/community-screening-input-set.mjs computes over the inputs, which
+# the readiness generator compares with the working tree. A hosted builder sets
+# COMMIT_SHA from the commit it builds; Northflank injects NF_GIT_SHA, which
+# COMMIT_SHA defaults to. Both default to "unset" otherwise, which the canary
+# and the generator treat as unproven.
+ARG NF_GIT_SHA=unset
+ARG COMMIT_SHA=${NF_GIT_SHA}
+ARG INPUT_SET_HASH=unset
+ENV COMMUNITY_WORKER_COMMIT_SHA=${COMMIT_SHA} \
+    COMMUNITY_WORKER_INPUT_SET_HASH=${INPUT_SET_HASH}
+
+ENTRYPOINT ["/usr/bin/tini", "-s", "--"]
+CMD ["node", "scripts/start-community-worker-production.mjs"]

@@ -1189,6 +1189,85 @@ describe('CommunityLookbookGrid (Story 6.1)', () => {
       ).not.toBeInTheDocument()
     })
 
+    it('6.2-WEB-001 explains a stable screening code in words, never as the raw code', async () => {
+      signIn()
+      useMswHandlers(
+        feedHandler({
+          authorStates: [
+            authorState({
+              id: 'as-text',
+              status: 'flagged',
+              moderationReason: 'text_policy_match',
+            }),
+            authorState({
+              id: 'as-joined',
+              status: 'flagged',
+              moderationReason: 'screening_unavailable, script_mixed',
+            }),
+            authorState({
+              id: 'as-stalled',
+              status: 'review_failed',
+              moderationReason: 'moderation_stalled',
+            }),
+          ],
+        })
+      )
+      renderGrid()
+
+      const section = await screen.findByTestId('community-author-states')
+      expect(
+        within(section).getByTestId('author-state-reason-as-text')
+      ).toHaveTextContent(
+        'Your caption or image description uses words the community guidelines do not allow. Change the wording before you share this look again.'
+      )
+      // A joined list reads as one sentence per category, in a fixed order.
+      expect(
+        within(section).getByTestId('author-state-reason-as-joined')
+      ).toHaveTextContent(
+        'Screening could not check all of your caption or image description. Keep it shorter and in one language before you share this look again. Screening could not finish checking this look.'
+      )
+      expect(
+        within(section).getByTestId('author-state-reason-as-stalled')
+      ).toHaveTextContent('Screening could not finish checking this look.')
+
+      for (const raw of [
+        'text_policy_match',
+        'screening_unavailable',
+        'script_mixed',
+        'moderation_stalled',
+        'Reason:',
+      ]) {
+        expect(section).not.toHaveTextContent(raw)
+      }
+    })
+
+    it('6.2b-WEB-001 tells the author to upload again when the stored photo failed verification', async () => {
+      // Story 6.2b review (RF12): the worker persists the validation code it
+      // caught, and the five upload failures reached the author raw.
+      signIn()
+      useMswHandlers(
+        feedHandler({
+          authorStates: [
+            authorState({
+              id: 'as-checksum',
+              status: 'review_failed',
+              moderationReason: 'IMAGE_CHECKSUM_MISMATCH',
+            }),
+          ],
+        })
+      )
+      renderGrid()
+
+      const section = await screen.findByTestId('community-author-states')
+      expect(
+        within(section).getByTestId('author-state-reason-as-checksum')
+      ).toHaveTextContent(
+        'This photo could not be processed as it was uploaded. Share this look again with a JPEG, PNG or WebP photo up to 10 MB and between 256 and 4096 pixels on each side.'
+      )
+      expect(section).not.toHaveTextContent('IMAGE_CHECKSUM_MISMATCH')
+      expect(section).not.toHaveTextContent('Reason:')
+    })
+
     it('6.1-WEB-021 renders flagged content in deep merlot rather than success gold', async () => {
       signIn()
       useMswHandlers(feedHandler({ authorStates: states }))

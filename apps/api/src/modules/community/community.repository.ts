@@ -10,6 +10,7 @@ import {
   type SavedLocation,
 } from '@prisma/client'
 import type { ClimateBand } from '@couture/utils'
+import { COMMUNITY_CANARY_USER_ID_PREFIX } from './community-analytics.js'
 import { buildCommunityContentSnapshot } from './community-audit-snapshot.js'
 import {
   encodeCommunityFeedCursor,
@@ -70,6 +71,38 @@ export type RecordReportResult =
   | { kind: 'post_not_visible' }
   | { kind: 'self_report' }
 
+/**
+ * The posts the public may see: published, with the publication time the feed
+ * keys on, and not written by the operations canary.
+ *
+ * Every public read goes through this one rule, the feed's query and the
+ * single-post, card-open and report checks alike, so a withdrawn, hidden or
+ * still-screening post and a canary post are kept out by the same predicate.
+ * The canary (`scripts/community-screening-canary.mjs`) publishes a synthetic
+ * post through the real pipeline, and its refusal to run while the feed flag is
+ * on cannot see a PostHog cohort that the flag service asks per viewer (Story
+ * 6.2b final review, RF8). Excluding its account here keeps its post invisible
+ * whatever the flags say; the refusal stays as defence in depth.
+ */
+export const PUBLICLY_VISIBLE_POST_WHERE = {
+  status: 'published',
+  published_at: { not: null },
+  NOT: { user_id: { startsWith: COMMUNITY_CANARY_USER_ID_PREFIX } },
+} as const satisfies Prisma.LookbookPostWhereInput
+
+/** The same rule as `PUBLICLY_VISIBLE_POST_WHERE`, for a row already read. */
+export function isPubliclyVisiblePost(post: {
+  status: string
+  published_at: Date | null
+  user_id: string
+}): boolean {
+  return (
+    post.status === 'published' &&
+    post.published_at !== null &&
+    !post.user_id.startsWith(COMMUNITY_CANARY_USER_ID_PREFIX)
+  )
+}
+
 /** Author-owned states that never appear in the public `items` array. */
 const AUTHOR_STATE_STATUSES = [
   'draft',
@@ -89,6 +122,15 @@ const MAX_BAND_RESOLUTION_LOCATIONS = 5
 
 /** The rolling submission window, in hours, per the spec's `(now-24h, now]`. */
 export const SUBMISSION_WINDOW_HOURS = 24
+
+/** Whether a P2002 names `field` among the columns of the violated unique index. */
+function isUniqueViolationOn(
+  error: Prisma.PrismaClientKnownRequestError,
+  field: string
+): boolean {
+  const target = error.meta?.target
+  return Array.isArray(target) ? target.includes(field) : target === field
+}
 
 @Injectable()
 export class CommunityRepository {
@@ -137,11 +179,7 @@ export class CommunityRepository {
 
     const rows = await this.prisma.lookbookPost.findMany({
       where: {
-        AND: [
-          { status: 'published' as const, published_at: { not: null } },
-          bandCondition,
-          cursorCondition,
-        ],
+        AND: [PUBLICLY_VISIBLE_POST_WHERE, bandCondition, cursorCondition],
       },
       orderBy: [{ published_at: 'desc' }, { id: 'desc' }],
       take: limit + 1,
@@ -455,6 +493,7 @@ export class CommunityRepository {
           {
             user_id: string
             status: string
+            published_at: Date | null
             image_object_path: string | null
             caption: string | null
             alt_text: string | null
@@ -464,6 +503,7 @@ export class CommunityRepository {
         >`
           SELECT user_id,
                  status::text AS status,
+                 published_at,
                  image_object_path,
                  caption,
                  alt_text,
@@ -475,7 +515,7 @@ export class CommunityRepository {
         `
 
         const post = locked[0]
-        if (!post || post.status !== 'published') {
+        if (!post || !isPubliclyVisiblePost(post)) {
           return { kind: 'post_not_visible' as const }
         }
 
@@ -606,6 +646,14 @@ export class CommunityRepository {
           })
           if (raced) {
             return raced.alias
+          }
+          // The winner's row existed a moment ago and is gone now. Aliases are
+          // only ever removed with their author (the relation cascades), so the
+          // author was erased between the insert and this read: the same answer
+          // as P2003 below. A collision on the generated `alias` itself is not
+          // this case and still throws.
+          if (isUniqueViolationOn(error, 'user_id')) {
+            return null
           }
         }
 

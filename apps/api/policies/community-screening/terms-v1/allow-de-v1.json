@@ -1,22 +1,29 @@
 {
   "language": "de",
-  "listVersion": "terms-v1",
+  "listVersion": "allow-list-v1",
   "listType": "allowList",
   "provenance": {
-    "source": "repository-owned reviewed list",
+    "source": "repository-owned allow list, allow-list-v1.json",
     "version": "v1",
     "licence": "UNLICENSED (repository-owned)",
-    "retrievedAt": "2026-09-08",
-    "curator": "couture-cast trust and safety",
-    "notes": "These are ordinary German garment, styling and general words that collide with a term in this file or in another language file once the screener folds diacritics or collapses repeated characters. Cocktailkleid contains the English entry cock, Culotte and Culottes contain the Italian entry culo, dicke and dicker contain the English entry dick, Marsch contains the German entry arsch, and Pferdeschwanz, the German word for a ponytail, contains the German entry schwanz. Allow-list lookup runs on the literal case-folded token, before diacritic and leet folding, so an accented or vulgar spelling is still screened."
+    "retrievedAt": "2026-10-16",
+    "curator": "couture-cast repository owner",
+    "notes": "GENERATED from allow-list-v1.json, where every entry records why it exists; do not edit by hand. Allow lists apply across all seven languages, so an entry here clears the word whichever list would have flagged it."
+  },
+  "generated": {
+    "generator": "scripts/verify-community-screening-lists.mjs",
+    "allowListSha256": "22d1f261f3666cf37369e67359aeabc383ac0a689babe04f87023ba1aee70256"
   },
   "entries": [
+    "bitte",
+    "büro",
     "cocktailkleid",
     "culotte",
-    "culottes",
     "dicke",
     "dicker",
     "marsch",
-    "pferdeschwanz"
+    "pferdeschwanz",
+    "rosette",
+    "schmuck"
   ]
 }

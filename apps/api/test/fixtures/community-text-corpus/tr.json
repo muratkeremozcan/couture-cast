@@ -1,0 +1,2728 @@
+{
+  "language": "tr",
+  "corpusVersion": "v1",
+  "clean": {
+    "description": "Ordinary fashion captions and alt text, written natively in the language as community members would write them, without reference to the term lists. Every entry is expected to pass text screening, except entries labelled expected review, which carry one of the policy's deliberate review terms and the reason it is kept.",
+    "expected": "pass",
+    "entries": [
+      {
+        "id": "tr-clean-001",
+        "field": "caption",
+        "text": "Günün kombini: gök mavisi gömlek, bej keten pantolon ve hasır çanta. Hava 27 derece, hafif rüzgar var."
+      },
+      {
+        "id": "tr-clean-002",
+        "field": "caption",
+        "text": "Bugün çok sıcak, sadece pamuklu elbise ve sandalet. Başka bir şey giymeye takatim yok."
+      },
+      {
+        "id": "tr-clean-003",
+        "field": "caption",
+        "text": "Sabah serin, öğlen sıcak. Katmanlı giyinmek şart: ince triko hırka çantada."
+      },
+      {
+        "id": "tr-clean-004",
+        "field": "caption",
+        "text": "Yağmur yağacak dediler, trençkotu kaptım çıktım. #gününkombini"
+      },
+      {
+        "id": "tr-clean-005",
+        "field": "caption",
+        "text": "Ofis kombini: lacivert blazer, beyaz tişört, düz paça jean. Basit ama şık."
+      },
+      {
+        "id": "tr-clean-006",
+        "field": "caption",
+        "text": "Bu ceket çok şık olmuş, kumaşı nedir acaba?"
+      },
+      {
+        "id": "tr-clean-007",
+        "field": "caption",
+        "text": "Kardeşimin mezuniyeti için pudra rengi saten elbise seçtim, üstüne krem bir ceket aldım çünkü akşam serinliyor."
+      },
+      {
+        "id": "tr-clean-008",
+        "field": "caption",
+        "text": "Amacım bu kış daha az parça ile daha çok kombin yapmak. Kapsül gardırop denemesi 1. gün."
+      },
+      {
+        "id": "tr-clean-009",
+        "field": "caption",
+        "text": "Lodos var, saçlar zaten mahvoldu, en azından mont sıcak tutuyor 😅"
+      },
+      {
+        "id": "tr-clean-010",
+        "field": "caption",
+        "text": "Kar yağıyor! Kaz tüyü mont, yün atkı ve su geçirmez bot. Eldivenleri unutmayın."
+      },
+      {
+        "id": "tr-clean-011",
+        "field": "caption",
+        "text": "Bu pantolon biraz sıkı geldi, bir beden büyüğünü deneyeceğim."
+      },
+      {
+        "id": "tr-clean-012",
+        "field": "caption",
+        "text": "Amber rengi kazak sonbaharın en güzel tonu bence. Hardal etekle çok yakıştı."
+      },
+      {
+        "id": "tr-clean-013",
+        "field": "caption",
+        "text": "Amiral yaka ceketimi nihayet giydim, düğmeleri altın rengi. Nasıl olmuş?"
+      },
+      {
+        "id": "tr-clean-014",
+        "field": "caption",
+        "text": "Sahil kombini: bikini üstüne keten gömlek, geniş şapka ve güneş gözlüğü. Kremi unutmayın!"
+      },
+      {
+        "id": "tr-clean-015",
+        "field": "caption",
+        "text": "Mayo alırken en çok neye dikkat ediyorsunuz? Ben astarına bakıyorum."
+      },
+      {
+        "id": "tr-clean-016",
+        "field": "caption",
+        "text": "Bugün kahve randevusu için rahat ama özenli bir şey istedim: krem triko, kahverengi süet etek."
+      },
+      {
+        "id": "tr-clean-017",
+        "field": "caption",
+        "text": "sabah 8 derece aksam 18 derece, bu sehirde ne giyecegimi sasirdim"
+      },
+      {
+        "id": "tr-clean-018",
+        "field": "caption",
+        "text": "gok mavisi bu sezon her yerde, ben de bir gomlek aldim sonunda"
+      },
+      {
+        "id": "tr-clean-019",
+        "field": "caption",
+        "text": "Rüzgar çok sert, ince ceket yetmedi, yarın mutlaka kalın bir şey giyeceğim."
+      },
+      {
+        "id": "tr-clean-020",
+        "field": "caption",
+        "text": "Paltomu kuru temizlemeden almayı unuttum, bugün eski kabanla idare ediyorum."
+      },
+      {
+        "id": "tr-clean-021",
+        "field": "caption",
+        "text": "Fagot dikişli bluzumu çok seviyorum, anneannemin el işi. Beyaz pantolonla giydim."
+      },
+      {
+        "id": "tr-clean-022",
+        "field": "caption",
+        "text": "Hava kapalı ama yağmur yok. Gri tonlarında bir kombin yaptım, havaya uydum."
+      },
+      {
+        "id": "tr-clean-023",
+        "field": "caption",
+        "text": "Tatlı bir pazar kahvaltısı kombini: çiçekli midi elbise ve beyaz spor ayakkabı 🌼"
+      },
+      {
+        "id": "tr-clean-024",
+        "field": "caption",
+        "text": "Kaç derecede mont giymeye başlıyorsunuz? Ben 12 derecenin altında."
+      },
+      {
+        "id": "tr-clean-025",
+        "field": "caption",
+        "text": "İş görüşmem var, koyu lacivert takım ve açık mavi gömlek giydim. Dilek tutun!"
+      },
+      {
+        "id": "tr-clean-026",
+        "field": "caption",
+        "text": "Nem yüzde 80, keten dışında hiçbir şey giyilmez bu havada."
+      },
+      {
+        "id": "tr-clean-027",
+        "field": "caption",
+        "text": "Bu kadar sıcakta siyah giymek cesaret ister, ama bence çok iyi durmuş."
+      },
+      {
+        "id": "tr-clean-028",
+        "field": "caption",
+        "text": "Ambalajından yeni çıkardığım kaşmir atkıyı ilk kez taktım, inanılmaz yumuşak."
+      },
+      {
+        "id": "tr-clean-029",
+        "field": "caption",
+        "text": "Kombin sorusu: bordo kadife pantolonla hangi renk üst giyilir? Krem mi, gri mi?"
+      },
+      {
+        "id": "tr-clean-030",
+        "field": "caption",
+        "text": "Yarım boğazlı triko + yüksek bel kumaş pantolon = ofiste en sevdiğim ikili."
+      },
+      {
+        "id": "tr-clean-031",
+        "field": "caption",
+        "text": "Sıkılmıştım hep aynı renklerden, bugün fuşya bir kazak denedim. Moralim yerine geldi!"
+      },
+      {
+        "id": "tr-clean-032",
+        "field": "caption",
+        "text": "Yağmurda süet ayakkabı giymeyin, ben dün öğrendim 🙃"
+      },
+      {
+        "id": "tr-clean-033",
+        "field": "caption",
+        "text": "kombin cok guzel olmus, ozellikle cantanin rengi"
+      },
+      {
+        "id": "tr-clean-034",
+        "field": "caption",
+        "text": "Hafta sonu yürüyüş için polar, rüzgarlık ve tayt. Hava güneşli ama esintili."
+      },
+      {
+        "id": "tr-clean-035",
+        "field": "caption",
+        "text": "Bayram ziyaretleri için annemin hediye ettiği zümrüt yeşili elbiseyi giydim."
+      },
+      {
+        "id": "tr-clean-036",
+        "field": "caption",
+        "text": "Kına gecesine ne giyilir diye çok düşündüm, sonunda mor kadife bir elbisede karar kıldım."
+      },
+      {
+        "id": "tr-clean-037",
+        "field": "caption",
+        "text": "Bu sabah ayaz vardı, termal içlik giymeseydim donardım."
+      },
+      {
+        "id": "tr-clean-038",
+        "field": "caption",
+        "text": "Çok şık görünüyorsunuz, ceketin kesimi harika!"
+      },
+      {
+        "id": "tr-clean-039",
+        "field": "caption",
+        "text": "Haki kargo pantolon, beyaz atlet ve keten gömlek. Yazın en rahat kombini."
+      },
+      {
+        "id": "tr-clean-040",
+        "field": "caption",
+        "text": "Bugün otuz bir derece, sokakta yürümek imkansız. Şort ve geniş tişört, o kadar."
+      },
+      {
+        "id": "tr-clean-041",
+        "field": "caption",
+        "text": "Pazar pazarına giderken bile şık olmak lazım, hasır sepet çanta dönüşümü yaptım."
+      },
+      {
+        "id": "tr-clean-042",
+        "field": "caption",
+        "text": "Kemer meselesi: yüksek bel pantolonda ince kemer mi, kalın kemer mi?"
+      },
+      {
+        "id": "tr-clean-043",
+        "field": "caption",
+        "text": "Uçuşta rahat olsun diye eşofman takımı giydim ama üstüne uzun bir kaban aldım, şık durdu."
+      },
+      {
+        "id": "tr-clean-044",
+        "field": "caption",
+        "text": "Kar botlarımı nihayet çıkardım, bu kış ilk kez lazım oldu."
+      },
+      {
+        "id": "tr-clean-045",
+        "field": "caption",
+        "text": "Kumaş önerisi: yazın viskon yerine keten ya da pamuk tercih edin, ter yapmıyor."
+      },
+      {
+        "id": "tr-clean-046",
+        "field": "caption",
+        "text": "İnce dokuma bir gömlekle sıcak havada bile ofis şıklığı mümkün."
+      },
+      {
+        "id": "tr-clean-047",
+        "field": "caption",
+        "text": "Gece yürüyüşü için hafif bir hırka şart, deniz kenarı serin oluyor."
+      },
+      {
+        "id": "tr-clean-048",
+        "field": "caption",
+        "text": "Renk paleti: ekru, bej, kahve. Toprak tonları sonbaharda hiç yanıltmaz."
+      },
+      {
+        "id": "tr-clean-049",
+        "field": "caption",
+        "text": "bugun cok ruzgarli, etek giyen pisman olur bence"
+      },
+      {
+        "id": "tr-clean-050",
+        "field": "caption",
+        "text": "Yeni aldığım deri ceket biraz sert, giydikçe yumuşar diyorlar. Doğru mu?"
+      },
+      {
+        "id": "tr-clean-051",
+        "field": "caption",
+        "text": "Mezuniyet sonrası kutlama için şifon bluz ve palazzo pantolon. Çok rahattı."
+      },
+      {
+        "id": "tr-clean-052",
+        "field": "caption",
+        "text": "Kızımın okul gösterisi için pratik ama özenli bir şey istedim: çizgili gömlek elbise."
+      },
+      {
+        "id": "tr-clean-053",
+        "field": "caption",
+        "text": "Bu havada iç çamaşırı bile ince pamuklu olmalı, sentetik kumaş tam bir işkence."
+      },
+      {
+        "id": "tr-clean-054",
+        "field": "caption",
+        "text": "Annemin eski broşunu yakaya taktım, kombinin yıldızı oldu."
+      },
+      {
+        "id": "tr-clean-055",
+        "field": "caption",
+        "text": "Tvid ceket + siyah balıkçı yaka. Kışın klasik ama hiç eskimiyor."
+      },
+      {
+        "id": "tr-clean-056",
+        "field": "caption",
+        "text": "Mint yeşili ile lila yan yana çok tatlı duruyor, bahar kombini hazır."
+      },
+      {
+        "id": "tr-clean-057",
+        "field": "caption",
+        "text": "Ayakkabılar sıkıştırıyor, akşama kadar dayanabilir miyim bilmiyorum."
+      },
+      {
+        "id": "tr-clean-058",
+        "field": "caption",
+        "text": "Metrobüste sıkış tıkış, ama en azından paltom kırışmadı."
+      },
+      {
+        "id": "tr-clean-059",
+        "field": "caption",
+        "text": "Hava 15 derece, güneşli. Kot ceket için ideal gün! #kotceket"
+      },
+      {
+        "id": "tr-clean-060",
+        "field": "caption",
+        "text": "Bisikletle işe gidiyorum, bu yüzden esnek kumaşlı pantolonlar hayat kurtarıyor."
+      },
+      {
+        "id": "tr-clean-061",
+        "field": "caption",
+        "text": "Keşke bu kazağın bir de bej rengi olsa, ikisini birden alırdım."
+      },
+      {
+        "id": "tr-clean-062",
+        "field": "caption",
+        "text": "Uzun boylu olanlar için midi etek önerisi olan var mı? Hep kısa kalıyor."
+      },
+      {
+        "id": "tr-clean-063",
+        "field": "caption",
+        "text": "Geniş paça pantolonla topuklu mu, düz ayakkabı mı? Bugün düz giydim, gayet iyi oldu."
+      },
+      {
+        "id": "tr-clean-064",
+        "field": "caption",
+        "text": "Sıcak çikolata rengi kaban aldım, her şeyle uyuyor."
+      },
+      {
+        "id": "tr-clean-065",
+        "field": "caption",
+        "text": "Sabah sisli, yollar ıslak. Bot ve yağmurluk en doğru seçim."
+      },
+      {
+        "id": "tr-clean-066",
+        "field": "caption",
+        "text": "Pijama gibi rahat, ama dışarı çıkılacak kadar şık: saten takım kombinim."
+      },
+      {
+        "id": "tr-clean-067",
+        "field": "caption",
+        "text": "Çocukları okula götürmek için hızlı bir kombin: jean, sweatshirt, spor ayakkabı. Saç dağınık ama olsun."
+      },
+      {
+        "id": "tr-clean-068",
+        "field": "caption",
+        "text": "Bu elbiseyi düğüne götürmek istiyorum, üstüne ne alayım? Akşam serin olacakmış."
+      },
+      {
+        "id": "tr-clean-069",
+        "field": "caption",
+        "text": "Kombininizdeki renk geçişi çok başarılı, eline sağlık."
+      },
+      {
+        "id": "tr-clean-070",
+        "field": "caption",
+        "text": "Antrasit gri takım elbise ve beyaz gömlek. Kravat yok, daha rahat."
+      },
+      {
+        "id": "tr-clean-071",
+        "field": "caption",
+        "text": "Hafif yağmur, 18 derece. Su itici trençkot ve loafer. #yağmurlugün"
+      },
+      {
+        "id": "tr-clean-072",
+        "field": "caption",
+        "text": "Kumaş pantolonun ütüsü bozulmasın diye askıda taşıdım, ofiste giydim 😄"
+      },
+      {
+        "id": "tr-clean-073",
+        "field": "caption",
+        "text": "Sıkı dokuma yün kazak gerçekten rüzgar geçirmiyor, tavsiye ederim."
+      },
+      {
+        "id": "tr-clean-074",
+        "field": "caption",
+        "text": "Bu çantanın sapı ayarlanabiliyor mu? Çapraz takmak istiyorum."
+      },
+      {
+        "id": "tr-clean-075",
+        "field": "caption",
+        "text": "Doğum günü yemeği için siyah elbise, kırmızı ruj ve altın küpe. Klasikten şaşmadım."
+      },
+      {
+        "id": "tr-clean-076",
+        "field": "caption",
+        "text": "Puantiyeli elbise sezonu açıldı! Hava 24 derece, güneşli. ☀️"
+      },
+      {
+        "id": "tr-clean-077",
+        "field": "caption",
+        "text": "Yaz düğünü için keten takım giymek mantıklı mı? Kırışır diye korkuyorum."
+      },
+      {
+        "id": "tr-clean-078",
+        "field": "caption",
+        "text": "Kar yağışı sonrası güneş çıktı. Beyaz mont ve krem bere ile kar gibi bir kombin."
+      },
+      {
+        "id": "tr-clean-079",
+        "field": "caption",
+        "text": "Ayakkabı ile çantayı aynı renk yapmak eski moda mı sizce?"
+      },
+      {
+        "id": "tr-clean-080",
+        "field": "caption",
+        "text": "Bu sabah bahçede çay içerken üşüdüm, kalın çorap giymeye karar verdim."
+      },
+      {
+        "id": "tr-clean-081",
+        "field": "caption",
+        "text": "Kırmızı bir atkı bütün gri kış kombinini canlandırıyor."
+      },
+      {
+        "id": "tr-clean-082",
+        "field": "caption",
+        "text": "Yazın beyaz pantolon giymek cesaret istiyor ama değiyor."
+      },
+      {
+        "id": "tr-clean-083",
+        "field": "caption",
+        "text": "Hasır şapka ve keten elbise ile pazar gezmesi. Rüzgar şapkayı iki kez uçurdu 😂"
+      },
+      {
+        "id": "tr-clean-084",
+        "field": "caption",
+        "text": "Bugün sadece 10 dakikam vardı hazırlanmak için, siyah tulum kurtardı."
+      },
+      {
+        "id": "tr-clean-085",
+        "field": "caption",
+        "text": "Kahverengi ile siyahı birlikte giyemezsin diyorlardı, bence gayet uyumlu. Bugün siyah balıkçı yaka kazak, kahverengi kadife pantolon ve siyah deri bot giydim. Kemeri de kahverengi seçtim ki iki renk arasında bir köprü olsun. Sizce olmuş mu?"
+      },
+      {
+        "id": "tr-clean-086",
+        "field": "caption",
+        "text": "Ofiste klima çok soğuk, yazın bile çantamda hırka taşıyorum."
+      },
+      {
+        "id": "tr-clean-087",
+        "field": "caption",
+        "text": "Su geçirmez mont tavsiyesi olan? Bu kış yağmur hiç durmadı."
+      },
+      {
+        "id": "tr-clean-088",
+        "field": "caption",
+        "text": "Kombinimin ilham kaynağı sonbahar yaprakları: kiremit, hardal, kahve."
+      },
+      {
+        "id": "tr-clean-089",
+        "field": "caption",
+        "text": "Akşam konserine gidiyoruz, deri ceket ve siyah jean klasiği."
+      },
+      {
+        "id": "tr-clean-090",
+        "field": "caption",
+        "text": "Sıcaklık 35, nem yüksek, ben de tamamen pamuk ve keten modundayım. #yazkombini"
+      },
+      {
+        "id": "tr-clean-091",
+        "field": "caption",
+        "text": "İlk kez yeşil ayakkabı denedim, beklediğimden çok daha kolay kombinleniyor."
+      },
+      {
+        "id": "tr-clean-092",
+        "field": "caption",
+        "text": "Bu gömlek bol kesim, belden düğümleyince bambaşka bir hava kattı."
+      },
+      {
+        "id": "tr-clean-093",
+        "field": "caption",
+        "text": "Tavsiye: kazakları askıya asmayın, katlayın. Omuzları bozulmuyor."
+      },
+      {
+        "id": "tr-clean-094",
+        "field": "caption",
+        "text": "Saten etek ve kalın örgü kazak. Kontrast dokular bayıldığım şey."
+      },
+      {
+        "id": "tr-clean-095",
+        "field": "caption",
+        "text": "sicak havada en sevdigim parca bu bol keten elbise, hic yapismiyor"
+      },
+      {
+        "id": "tr-clean-096",
+        "field": "caption",
+        "text": "ofis icin cok guzel bir kombin, ayakkabilar nereden?"
+      },
+      {
+        "id": "tr-clean-097",
+        "field": "caption",
+        "text": "Bebeğimi parka götürürken bile rahat ve şık olmak istiyorum, tulum en iyi çözüm."
+      },
+      {
+        "id": "tr-clean-098",
+        "field": "caption",
+        "text": "Eşimle yıldönümü yemeği. Lacivert saten elbise ve inci küpeler. ✨"
+      },
+      {
+        "id": "tr-clean-099",
+        "field": "caption",
+        "text": "Bugün işten sonra spor salonuna gideceğim, o yüzden tayt ve uzun gömlek giydim."
+      },
+      {
+        "id": "tr-clean-100",
+        "field": "caption",
+        "text": "Rüzgarlı havada pileli etek giymek tam bir macera oldu."
+      },
+      {
+        "id": "tr-clean-101",
+        "field": "caption",
+        "text": "Kışlık botların içine yün çorap koyunca ayaklar hiç üşümüyor."
+      },
+      {
+        "id": "tr-clean-102",
+        "field": "caption",
+        "text": "Kadife ceketin rengi gerçekten çok güzel, tam bir orman yeşili."
+      },
+      {
+        "id": "tr-clean-103",
+        "field": "caption",
+        "text": "Sabah kahvesi için kısa bir yürüyüş: oversize kaban, beyaz sneaker, bere."
+      },
+      {
+        "id": "tr-clean-104",
+        "field": "caption",
+        "text": "Yazlık sandalet aldım ama bu hafta hava soğudu, sabırsızlıkla bekliyorum."
+      },
+      {
+        "id": "tr-clean-105",
+        "field": "caption",
+        "text": "Kombinde tek bir renk vurgusu yeter: bugün turuncu çanta."
+      },
+      {
+        "id": "tr-clean-106",
+        "field": "caption",
+        "text": "Bu hırka anneannemden kaldı, hâlâ en sıcak tutan parçam."
+      },
+      {
+        "id": "tr-clean-107",
+        "field": "caption",
+        "text": "İzmir'de ekim sonu hâlâ tişört havası. Herkes mont giymiş, ben kısa kollu."
+      },
+      {
+        "id": "tr-clean-108",
+        "field": "caption",
+        "text": "Ankara ayazı başladı! Palto, eldiven, boyunluk. Hepsi tamam."
+      },
+      {
+        "id": "tr-clean-109",
+        "field": "caption",
+        "text": "Karadeniz'de yağmur bitmez, yağmurluk gardırobun vazgeçilmezi."
+      },
+      {
+        "id": "tr-clean-110",
+        "field": "caption",
+        "text": "Mavi tonlarında monokrom bir kombin: açık mavi gömlek, lacivert pantolon, gök mavisi kazak omuzda."
+      },
+      {
+        "id": "tr-clean-111",
+        "field": "caption",
+        "text": "Mayo üstüne giyilecek pareo önerisi olan var mı? Uzun ve ince olsun."
+      },
+      {
+        "id": "tr-clean-112",
+        "field": "caption",
+        "text": "Plaj çantama ne koyuyorum: havlu, güneş kremi, yedek bikini, kitap ve şapka."
+      },
+      {
+        "id": "tr-clean-113",
+        "field": "caption",
+        "text": "Bu ceketin astarı ipek mi? Çok zarif duruyor."
+      },
+      {
+        "id": "tr-clean-114",
+        "field": "caption",
+        "text": "Bugün işyerinde sunum vardı, biraz daha resmi giyindim: krem takım ve ipek bluz."
+      },
+      {
+        "id": "tr-clean-115",
+        "field": "caption",
+        "text": "Üstünüzdeki trençkot efsane, kemerini nasıl bağladınız?"
+      },
+      {
+        "id": "tr-clean-116",
+        "field": "caption",
+        "text": "İlkbahar geldi, ağır montları kaldırma zamanı. Kapsül gardırobum yarıya indi."
+      },
+      {
+        "id": "tr-clean-117",
+        "field": "caption",
+        "text": "Yağmur botlarım sarı, gri havada tek renkli nokta ben oluyorum 😊"
+      },
+      {
+        "id": "tr-clean-118",
+        "field": "caption",
+        "text": "Kendime not: beyaz elbiseyle kırmızı şarap içilmez."
+      },
+      {
+        "id": "tr-clean-119",
+        "field": "caption",
+        "text": "Kot üstüne kot giyilir mi? Bugün denedim, tonları farklı olunca çok iyi duruyor."
+      },
+      {
+        "id": "tr-clean-120",
+        "field": "caption",
+        "text": "Ucuz bir trikoyu üç yıldır giyiyorum, kalite her zaman fiyatla ölçülmüyor."
+      },
+      {
+        "id": "tr-clean-121",
+        "field": "caption",
+        "text": "Hafif çiseliyor, şemsiye taşımak istemedim, kapüşonlu mont giydim."
+      },
+      {
+        "id": "tr-clean-122",
+        "field": "caption",
+        "text": "Topuklu ayakkabıyla Arnavut kaldırımında yürümek gerçek bir spor dalı."
+      },
+      {
+        "id": "tr-clean-123",
+        "field": "caption",
+        "text": "Ekose gömlek sezonu açıldı. İçine beyaz tişört, altına siyah jean."
+      },
+      {
+        "id": "tr-clean-124",
+        "field": "caption",
+        "text": "Kombin ilhamı arıyorum: kırmızı pantolonla ne giyilir?"
+      },
+      {
+        "id": "tr-clean-125",
+        "field": "caption",
+        "text": "Gabardin pantolon gerçekten kırışmıyor mu? Uzun yolculukta deneyeceğim."
+      },
+      {
+        "id": "tr-clean-126",
+        "field": "caption",
+        "text": "Akşam yemeği davetine şık ama abartısız gitmek istedim, siyah dökümlü pantolon ve krem bluz yeterli oldu."
+      },
+      {
+        "id": "tr-clean-127",
+        "field": "caption",
+        "text": "Bugün 2 derece. Üç kat giyindim, hâlâ üşüyorum."
+      },
+      {
+        "id": "tr-clean-128",
+        "field": "caption",
+        "text": "Bu kadar tatlı bir elbiseye hayır diyemedim, pembe kareli ve fırfırlı."
+      },
+      {
+        "id": "tr-clean-129",
+        "field": "caption",
+        "text": "Bahar temizliği yaptım, giymediğim her şeyi bağışladım. Dolap ferahladı."
+      },
+      {
+        "id": "tr-clean-130",
+        "field": "caption",
+        "text": "Haftanın en sevdiğim kombini: zeytin yeşili tulum ve kahverengi sandalet."
+      },
+      {
+        "id": "tr-clean-131",
+        "field": "caption",
+        "text": "Vizon rengi kaban ve siyah çizme, kışın en güvenli kombinim."
+      },
+      {
+        "id": "tr-clean-132",
+        "field": "caption",
+        "text": "Sıcak havada bol pantolon dar pantolondan çok daha serin tutuyor, denemeyen kalmasın."
+      },
+      {
+        "id": "tr-clean-133",
+        "field": "caption",
+        "text": "Bu sabah termometre eksi 5'i gösterdi. Kaşmir bere ve uzun kaban ile çıktım. #kış"
+      },
+      {
+        "id": "tr-clean-134",
+        "field": "caption",
+        "text": "Tasarımcının kumaş seçimi çok yerinde, ipek ve keten karışımı mı?"
+      },
+      {
+        "id": "tr-clean-135",
+        "field": "caption",
+        "text": "Sabah koşusundan sonra direkt kahveye: tayt, rüzgarlık ve şapka."
+      },
+      {
+        "id": "tr-clean-136",
+        "field": "caption",
+        "text": "Kardeşimin düğünü için nedime elbiselerini seçtik, hepsi adaçayı yeşili."
+      },
+      {
+        "id": "tr-clean-137",
+        "field": "caption",
+        "text": "Sıcak ama rüzgarlı bir gün, uzun elbise yerine şort tulum daha mantıklıydı. Hava 26 derece, sahilde rüzgar sertti. Tulumun beli lastikli, keten karışımlı kumaşı da terletmiyor. Ayağıma düz sandalet, başıma da rüzgarda uçmasın diye bağcıklı hasır şapka taktım."
+      },
+      {
+        "id": "tr-clean-138",
+        "field": "caption",
+        "text": "Ne güzel bir kaban!"
+      },
+      {
+        "id": "tr-clean-139",
+        "field": "caption",
+        "text": "Saçımı topladım, büyük halka küpe taktım, beyaz tişört ve jean. İşte bu kadar."
+      },
+      {
+        "id": "tr-clean-140",
+        "field": "caption",
+        "text": "Ofiste cuma günleri rahat giyim var, ben de keten gömlek ve chino pantolonu seçtim."
+      },
+      {
+        "id": "tr-clean-141",
+        "field": "caption",
+        "text": "Nem nedeniyle saçlarım kabarıyor, en azından şapka kombini tamamladı."
+      },
+      {
+        "id": "tr-clean-142",
+        "field": "caption",
+        "text": "Yağmur durunca güneş çıktı, trençkotu çıkarıp koluma attım."
+      },
+      {
+        "id": "tr-clean-143",
+        "field": "caption",
+        "text": "Hangi beden olduğunu söyleyebilir misiniz? Kalıbı küçük mü?"
+      },
+      {
+        "id": "tr-clean-144",
+        "field": "caption",
+        "text": "Ambalajında gelen kumaş kokusu bile güzeldi, yeni yün paltomu çok sevdim."
+      },
+      {
+        "id": "tr-clean-145",
+        "field": "caption",
+        "text": "Bu yaz en çok giydiğim parça: beyaz poplin gömlek elbise."
+      },
+      {
+        "id": "tr-clean-146",
+        "field": "caption",
+        "text": "Güneş gözlüğü olmadan dışarı çıkmıyorum, bugün kahverengi çerçeveli olanı seçtim."
+      },
+      {
+        "id": "tr-clean-147",
+        "field": "caption",
+        "text": "Hava 20 derece, güzel bir eylül günü. İnce trençkot, çizgili tişört. #sonbahar"
+      },
+      {
+        "id": "tr-clean-148",
+        "field": "caption",
+        "text": "Yarış gününe gider gibi şık olmuş! Şapka çok yakışmış."
+      },
+      {
+        "id": "tr-clean-149",
+        "field": "caption",
+        "text": "Okuldaki ilk günüm, rahat ama derli toplu görünmek istedim: gömlek, kazak, kumaş pantolon."
+      },
+      {
+        "id": "tr-clean-150",
+        "field": "caption",
+        "text": "Geniş kemerli trençkot yağmurda bile şık durmayı başarıyor."
+      },
+      {
+        "id": "tr-clean-151",
+        "field": "caption",
+        "text": "pazartesi sendromu: tamamen siyah giydim, kimse bana bir sey sormasin 😄"
+      },
+      {
+        "id": "tr-clean-152",
+        "field": "caption",
+        "text": "hava cok sicak, klima olmasa ofiste yasamak imkansiz"
+      },
+      {
+        "id": "tr-clean-153",
+        "field": "caption",
+        "text": "Saten gömleğin kırışmaması için ütü yerine buhar kullanıyorum."
+      },
+      {
+        "id": "tr-clean-154",
+        "field": "caption",
+        "text": "Kombini tamamlayan detay: ince altın zincir kolye."
+      },
+      {
+        "id": "tr-clean-155",
+        "field": "caption",
+        "text": "Bu kazağın örgü deseni çok özel, el örgüsü mü?"
+      },
+      {
+        "id": "tr-clean-156",
+        "field": "caption",
+        "text": "Kızlarla piknik: çiçekli elbise, hasır çanta, hasır şapka. Bir de kaşarlı tost tabii!"
+      },
+      {
+        "id": "tr-clean-157",
+        "field": "caption",
+        "text": "Kombininiz sıcak bir sonbahar günü gibi, renkler çok uyumlu."
+      },
+      {
+        "id": "tr-clean-158",
+        "field": "caption",
+        "text": "Bu ayakkabılar sıkmıyor mu? Ben genelde bu modelde zorlanıyorum."
+      },
+      {
+        "id": "tr-clean-159",
+        "field": "caption",
+        "text": "Kalın taban botlar hem sıcak hem de kaygan zeminde güven veriyor."
+      },
+      {
+        "id": "tr-clean-160",
+        "field": "caption",
+        "text": "Ofisin kıyafet kuralı çok katı değil, ama toplantı günleri ceket şart."
+      },
+      {
+        "id": "tr-clean-161",
+        "field": "caption",
+        "text": "Gökyüzü masmavi, ben de gök mavisi giydim. Sabah hava 16 dereceydi, o yüzden gömleğin üstüne ince bir krem hırka aldım. Öğlen güneş iyice ısıtınca hırkayı çantaya koydum, akşam sahilde yeniden giydim. Bu mevsimde katman yapmadan çıkmak bence büyük hata, hava her saat değişiyor."
+      },
+      {
+        "id": "tr-clean-162",
+        "field": "caption",
+        "text": "Şıktır diye aldım, ama rahatlığı da şaşırttı. Yeni favori pantolonum."
+      },
+      {
+        "id": "tr-clean-163",
+        "field": "caption",
+        "text": "Çok şık olmuşsun!"
+      },
+      {
+        "id": "tr-clean-164",
+        "field": "caption",
+        "text": "Sıkı örgü bere rüzgarda bile kaymadı, harika bir alışveriş oldu."
+      },
+      {
+        "id": "tr-clean-165",
+        "field": "caption",
+        "text": "Kalabalık bir otobüste sıkışınca keten gömlek buruştu, ama yine de mutluyum."
+      },
+      {
+        "id": "tr-clean-166",
+        "field": "caption",
+        "text": "Amacım bu yıl hiç hızlı moda ürünü almamak. Şimdilik başarılıyım: sekiz aydır sadece iki parça aldım, ikisi de ikinci el. Bunun yerine eski kıyafetlerimi terziye götürüp yeniledim, paça kısalttım, düğme değiştirdim. Dolabım sadeleşti."
+      },
+      {
+        "id": "tr-clean-167",
+        "field": "caption",
+        "text": "Amber rengi küpeler ve krem kazak, sade ama sıcak bir kış kombini."
+      },
+      {
+        "id": "tr-clean-168",
+        "field": "caption",
+        "text": "Amiral yakalı lacivert kaban, beyaz pantolon ve kırmızı fular. Denizci havası!"
+      },
+      {
+        "id": "tr-clean-169",
+        "field": "caption",
+        "text": "Sikke kolyemi bugün de taktım, sade bir siyah elbiseyle çok güzel duruyor."
+      },
+      {
+        "id": "tr-clean-170",
+        "field": "caption",
+        "text": "Renk çok yakışmış!"
+      },
+      {
+        "id": "tr-clean-171",
+        "field": "caption",
+        "text": "Yarım kollu triko bahar için ideal, altına keten etek giydim."
+      },
+      {
+        "id": "tr-clean-172",
+        "field": "caption",
+        "text": "Göğüs cebi olan gömlekleri çok seviyorum, hem kullanışlı hem şık."
+      },
+      {
+        "id": "tr-clean-173",
+        "field": "caption",
+        "text": "Sıcak havada iç çamaşırı seçimi bile önemli, dikişsiz pamuklu modeller en iyisi."
+      },
+      {
+        "id": "tr-clean-174",
+        "field": "caption",
+        "text": "Bikini mi mayo mu? Bu yaz ikisini de denedim, mayo daha rahat geldi."
+      },
+      {
+        "id": "tr-clean-175",
+        "field": "caption",
+        "text": "Hafta sonu kayak tatili! Kayak montu, polar içlik, termal tayt. Hazırız."
+      },
+      {
+        "id": "tr-clean-176",
+        "field": "caption",
+        "text": "Bu ceketi kuru temizlemeye götürmem gerek ama vazgeçemiyorum, her gün giyiyorum."
+      },
+      {
+        "id": "tr-clean-177",
+        "field": "caption",
+        "text": "Elbisenin fagot dikişleri el işi mi? Çok emek var gibi görünüyor."
+      },
+      {
+        "id": "tr-clean-178",
+        "field": "caption",
+        "text": "Ayın otuz biri, ay sonu yorgunluğu var ama kombin yine de özenli 😊"
+      },
+      {
+        "id": "tr-clean-179",
+        "field": "caption",
+        "text": "Yarışa katılan arkadaşımı desteklemeye gittik, spor ama renkli bir kombin seçtim."
+      },
+      {
+        "id": "tr-clean-180",
+        "field": "caption",
+        "text": "Gün batımında sahil yürüyüşü: beyaz keten pantolon, gök mavisi gömlek."
+      },
+      {
+        "id": "tr-clean-181",
+        "field": "caption",
+        "text": "Bu sabah sıkılıp eski kot ceketimi yeniden giydim, unuttuğum bir aşk."
+      },
+      {
+        "id": "tr-clean-182",
+        "field": "caption",
+        "text": "Ama bu kadar güzel bir trençkotu nasıl kaçırmışım?"
+      },
+      {
+        "id": "tr-clean-183",
+        "field": "caption",
+        "text": "Kombin önerisi istiyorum: amber rengi saten etekle hangi ayakkabı?"
+      },
+      {
+        "id": "tr-clean-184",
+        "field": "caption",
+        "text": "Sıcak tutan ama kalın görünmeyen bir mont arıyorum, öneriniz var mı?"
+      },
+      {
+        "id": "tr-clean-185",
+        "field": "caption",
+        "text": "Kırmızı ve pembe birlikte mi? Evet, bugün bunu denedim ve bayıldım."
+      },
+      {
+        "id": "tr-clean-186",
+        "field": "caption",
+        "text": "Pastel tonlar bahara çok yakışıyor. Lila gömlek ve krem pantolon."
+      },
+      {
+        "id": "tr-clean-187",
+        "field": "caption",
+        "text": "Fermuarlı kazak ve kargo pantolon. Hafta sonu modu açık."
+      },
+      {
+        "id": "tr-clean-188",
+        "field": "caption",
+        "text": "Annemle alışverişe çıktık, bana bordo kaban aldı. Çok teşekkür ederim anneciğim ❤️"
+      },
+      {
+        "id": "tr-clean-189",
+        "field": "caption",
+        "text": "Bu tarzınız çok güzel, hep ilham alıyorum. Özellikle renkleri cesurca bir araya getirmeniz beni çok etkiliyor. Ben genelde lacivert, gri ve bej arasında kalıyorum ama sizin kombinlerinizi gördükten sonra hardal bir kazak ve yeşil bir etek aldım."
+      },
+      {
+        "id": "tr-clean-190",
+        "field": "caption",
+        "text": "Ayakkabılarımın tabanı kaydı, yağmurda dikkatli olun arkadaşlar."
+      },
+      {
+        "id": "tr-clean-191",
+        "field": "caption",
+        "text": "Eski bir pantolonu terziye götürüp paçasını daralttım, bambaşka oldu."
+      },
+      {
+        "id": "tr-clean-192",
+        "field": "caption",
+        "text": "Kot etek ve çizgili gömlek, bu bahar en sık giydiğim ikili."
+      },
+      {
+        "id": "tr-clean-193",
+        "field": "caption",
+        "text": "Toplantı, kahve, akşam yemeği. Tek kombinle günü bitirmek için siyah dökümlü elbise."
+      },
+      {
+        "id": "tr-clean-194",
+        "field": "caption",
+        "text": "Bu hafta hava hep bulutlu, ben de kombinlere renkli aksesuar ekleyerek denge kuruyorum."
+      },
+      {
+        "id": "tr-clean-195",
+        "field": "caption",
+        "text": "Kabanın omuz dikişi biraz düşük, bilerek mi böyle tasarlanmış?"
+      },
+      {
+        "id": "tr-clean-196",
+        "field": "caption",
+        "text": "Ofise giderken rahat bir babet, toplantıda topuklu. Çantada iki ayakkabı."
+      },
+      {
+        "id": "tr-clean-197",
+        "field": "caption",
+        "text": "Lacivert ve kahverengi: klasik ama hep işe yarayan bir ikili."
+      },
+      {
+        "id": "tr-clean-198",
+        "field": "caption",
+        "text": "Kadife pantolon kışın en sıcak tutan alternatif bence."
+      },
+      {
+        "id": "tr-clean-199",
+        "field": "caption",
+        "text": "Hava 11 derece, hafif rüzgarlı. İnce mont ve atkı yeterli. #gününkombini"
+      },
+      {
+        "id": "tr-clean-200",
+        "field": "caption",
+        "text": "Bir gömleği üç farklı şekilde giydim, kaydırarak hepsini görebilirsiniz."
+      },
+      {
+        "id": "tr-clean-201",
+        "field": "caption",
+        "text": "Kazak çok tatlı 🧸"
+      },
+      {
+        "id": "tr-clean-202",
+        "field": "caption",
+        "text": "Çocuklar için kışlık mont alırken nelere dikkat ediyorsunuz?"
+      },
+      {
+        "id": "tr-clean-203",
+        "field": "caption",
+        "text": "Bu kombinin anahtarı katmanlar: tişört, gömlek, yelek, kaban."
+      },
+      {
+        "id": "tr-clean-204",
+        "field": "caption",
+        "text": "Bahçede çalışırken bile tarzımdan ödün vermiyorum: denim tulum ve hasır şapka."
+      },
+      {
+        "id": "tr-clean-205",
+        "field": "caption",
+        "text": "Mevsim geçişlerinde trençkot en çok iş gören parça."
+      },
+      {
+        "id": "tr-clean-206",
+        "field": "caption",
+        "text": "Bugün güneş açınca kaban yerine blazer giydim, hiç pişman değilim."
+      },
+      {
+        "id": "tr-clean-207",
+        "field": "caption",
+        "text": "Polen mevsimi başladı, güneş gözlüğü artık aksesuar değil ihtiyaç."
+      },
+      {
+        "id": "tr-clean-208",
+        "field": "caption",
+        "text": "İnce kazak, gömlek yaka dışarıda. Okul havası."
+      },
+      {
+        "id": "tr-clean-209",
+        "field": "caption",
+        "text": "Uzun süre ayakta kalacağım bir gün, rahat ayakkabı şart."
+      },
+      {
+        "id": "tr-clean-210",
+        "field": "caption",
+        "text": "Kahve lekesi gömleğimde, ama hırkayla kapattım, kimse fark etmedi 🙈"
+      },
+      {
+        "id": "tr-clean-211",
+        "field": "caption",
+        "text": "Sıcaklık düştü, kalın pijama ve yün çorap zamanı. Evde de şıklık!"
+      },
+      {
+        "id": "tr-clean-212",
+        "field": "caption",
+        "text": "Bugün tam bir sonbahar kombini: kahverengi deri ceket, krem kazak, haki pantolon."
+      },
+      {
+        "id": "tr-clean-213",
+        "field": "caption",
+        "text": "Bu ayakkabılar yürüyüş için gerçekten rahat mı? Önümüzdeki ay bir hafta boyunca şehir gezisi yapacağız, günde yirmi bin adımdan az yürümeyiz. Hem şık görünsün hem de akşama kadar ayağımı yormasın istiyorum. Taban ne kadar yumuşak, kalıbı dar mı geniş mi?"
+      },
+      {
+        "id": "tr-clean-214",
+        "field": "caption",
+        "text": "Yeni sezon kazakları geldi, hepsi o kadar yumuşak ki!"
+      },
+      {
+        "id": "tr-clean-215",
+        "field": "caption",
+        "text": "Saçlarımla uyumlu olsun diye bakır tonlarında bir şal seçtim."
+      },
+      {
+        "id": "tr-clean-216",
+        "field": "caption",
+        "text": "Haftaya düğün var, hâlâ elbise seçemedim. Saten mi, kadife mi?"
+      },
+      {
+        "id": "tr-clean-217",
+        "field": "caption",
+        "text": "Siz de ayakkabılarınızı kombinlerden önce mi seçiyorsunuz?"
+      },
+      {
+        "id": "tr-clean-218",
+        "field": "caption",
+        "text": "Bu ceketi alırken iki beden arasında kaldım, büyük olanı aldım, kollar biraz uzun."
+      },
+      {
+        "id": "tr-clean-219",
+        "field": "caption",
+        "text": "Sabah otobüste herkes siyah giymişti, ben sarı trençkotla öne çıktım."
+      },
+      {
+        "id": "tr-clean-220",
+        "field": "caption",
+        "text": "Askılı elbise üstüne ince bir gömlek, yaz akşamları için ideal."
+      },
+      {
+        "id": "tr-clean-221",
+        "field": "caption",
+        "text": "Kar durdu, güneş çıktı, ama ayaz devam ediyor. Kalın eldiven şart."
+      },
+      {
+        "id": "tr-clean-222",
+        "field": "caption",
+        "text": "Tatil dönüşü bavuldan çıkan kırışık kıyafetlerle ilgili bir ipucu: duş buharı."
+      },
+      {
+        "id": "tr-clean-223",
+        "field": "caption",
+        "text": "Fular ile saç bağladım, hem şık hem rüzgara karşı önlem."
+      },
+      {
+        "id": "tr-clean-224",
+        "field": "caption",
+        "text": "Kombin: beyaz gömlek, siyah yelek, gri pantolon. Sade ama etkili."
+      },
+      {
+        "id": "tr-clean-225",
+        "field": "caption",
+        "text": "Ekru renkli kazak ve bej pantolon, ton sür ton bayılıyorum."
+      },
+      {
+        "id": "tr-clean-226",
+        "field": "caption",
+        "text": "Bu yaz gök mavisi ve beyaz çizgili her şey alınır."
+      },
+      {
+        "id": "tr-clean-227",
+        "field": "caption",
+        "text": "Okula götürmek için çocuğuma yağmurluk aldım, sarı ve çok tatlı."
+      },
+      {
+        "id": "tr-clean-228",
+        "field": "caption",
+        "text": "Yeni triko eteğim biraz sıkı ama hareket ettikçe esniyor."
+      },
+      {
+        "id": "tr-clean-229",
+        "field": "caption",
+        "text": "Bu kombinde neyi değiştirirdiniz? Ayakkabı biraz ağır mı duruyor?"
+      },
+      {
+        "id": "tr-clean-230",
+        "field": "caption",
+        "text": "Kışın açık renk giymek cesaret istiyor, ama krem kaban gerçekten çok güzel."
+      },
+      {
+        "id": "tr-clean-231",
+        "field": "caption",
+        "text": "Uzun kollu keten gömlek güneşten de koruyor, yazın vazgeçilmezim."
+      },
+      {
+        "id": "tr-clean-232",
+        "field": "caption",
+        "text": "Puf kollu bluz ve düz siyah pantolon, sade ama dikkat çekici."
+      },
+      {
+        "id": "tr-clean-233",
+        "field": "caption",
+        "text": "Bugün sadece eve kadar yürüyeceğim ama yine de şık olmak istedim 😄"
+      },
+      {
+        "id": "tr-clean-234",
+        "field": "caption",
+        "text": "Bu tonu nasıl tarif edersiniz? Ben adaçayı yeşili diyorum."
+      },
+      {
+        "id": "tr-clean-235",
+        "field": "caption",
+        "text": "Benim için konfor her şeyden önce gelir, ama bu kombin ikisini de başardı."
+      },
+      {
+        "id": "tr-clean-236",
+        "field": "caption",
+        "text": "Hafif sisli bir sabah, gri yün kaban ve beyaz kazak."
+      },
+      {
+        "id": "tr-clean-237",
+        "field": "caption",
+        "text": "Bayramda giymek için yeni gömlek aldım, gök mavisi ve ince çizgili."
+      },
+      {
+        "id": "tr-clean-238",
+        "field": "caption",
+        "text": "Akşam esintisi için ince ceket. Gündüz 28 derece, akşam 19 derece."
+      },
+      {
+        "id": "tr-clean-239",
+        "field": "caption",
+        "text": "Kumaşın dokusunu daha yakından görebilir miyiz? Çok güzel görünüyor."
+      },
+      {
+        "id": "tr-clean-240",
+        "field": "caption",
+        "text": "Islak havada süet çanta yerine deri çanta taşıyorum."
+      },
+      {
+        "id": "tr-clean-241",
+        "field": "caption",
+        "text": "ilk kez kadife ceket aldim, gercekten cok sicak tutuyor"
+      },
+      {
+        "id": "tr-clean-242",
+        "field": "caption",
+        "text": "yagmur yagiyor ama trenckotum sayesinde kuru kaldim"
+      },
+      {
+        "id": "tr-clean-243",
+        "field": "caption",
+        "text": "bu renk cok yakismis, gozlerini ortaya cikarmis"
+      },
+      {
+        "id": "tr-clean-244",
+        "field": "caption",
+        "text": "kombin icin tesekkurler, ben de ayni sekilde giyecegim yarin"
+      },
+      {
+        "id": "tr-clean-245",
+        "field": "caption",
+        "text": "sabah serin, ince bir hirka yeterli oldu. ogleden sonra hava 24 dereceye cikti, hirkayi beline baglayip oyle gezdim. aksam ustu yine serinledi ama deniz kenarinda yuruyus yaptik, tekrar giydim. bu mevsimde en cok ise yarayan parca kesinlikle ince pamuklu bir hirka"
+      },
+      {
+        "id": "tr-clean-246",
+        "field": "caption",
+        "text": "gunun kombini: siyah tulum, beyaz spor ayakkabi, hasir canta #kombin"
+      },
+      {
+        "id": "tr-clean-247",
+        "field": "caption",
+        "text": "kis geldi, bot zamani"
+      },
+      {
+        "id": "tr-clean-248",
+        "field": "caption",
+        "text": "bu cantayi nereden aldin? cok sade ve kullanisli"
+      },
+      {
+        "id": "tr-clean-249",
+        "field": "caption",
+        "text": "amacim bu yaz daha cok renk giymek, bugun turuncu gomlek"
+      },
+      {
+        "id": "tr-clean-250",
+        "field": "caption",
+        "text": "ambalaj kagidi rengi pantolon diye bir sey varmis, ben de aldim 😄"
+      },
+      {
+        "id": "tr-clean-251",
+        "field": "caption",
+        "text": "Bugün 29 derece ve gökyüzü bulutsuz. Pamuklu bir elbise ve hasır sandaletle çıktım, akşam için çantada ince bir şal var."
+      },
+      {
+        "id": "tr-clean-252",
+        "field": "caption",
+        "text": "Kışın en çok neye ihtiyaç duyuyorsunuz? Benim için iyi bir bot ve kaliteli bir yün palto her şey demek. Gerisi katmanlarla çözülüyor."
+      },
+      {
+        "id": "tr-clean-253",
+        "field": "caption",
+        "text": "Yağmurlu bir günde neşeli olmak için sarı yağmurluk ve lacivert lastik çizmeler. Şemsiyem de puantiyeli, bütün gün gülümseyerek yürüdüm."
+      },
+      {
+        "id": "tr-clean-254",
+        "field": "caption",
+        "text": "Bu sabah meteoroloji 14 derece dedi ama güneş çok güçlüydü, kalın kazağı çıkarıp sadece gömlekle kaldım. Bahar böyle işte, her saat başka."
+      },
+      {
+        "id": "tr-clean-255",
+        "field": "caption",
+        "text": "Yaz düğünü için kombin önerim: hafif dökümlü midi elbise, açık renk sandalet ve küçük bir el çantası. Akşam için ince bir şal ekleyin."
+      },
+      {
+        "id": "tr-clean-256",
+        "field": "caption",
+        "text": "Kapsül gardırobumun temel parçaları: beyaz gömlek, lacivert blazer, düz jean, siyah pantolon, bej trençkot, krem triko ve iki çift ayakkabı."
+      },
+      {
+        "id": "tr-clean-257",
+        "field": "caption",
+        "text": "İş seyahatinde bavulu hafif tutmak için tüm kombinleri aynı renk paletinde planladım: lacivert, beyaz ve gri. Her parça birbiriyle uyumlu."
+      },
+      {
+        "id": "tr-clean-258",
+        "field": "caption",
+        "text": "Hava aniden soğudu, sabah 6 derece. Yün palto, kalın atkı ve deri eldivenle çıktım, öğlene kadar hiç üşümedim."
+      },
+      {
+        "id": "tr-clean-259",
+        "field": "caption",
+        "text": "Arkadaşımın kına gecesi için kırmızı kadife elbise seçtim. Uzun kollu ve diz altı, yanına altın küpeler taktım. Çok keyifli bir geceydi."
+      },
+      {
+        "id": "tr-clean-260",
+        "field": "caption",
+        "text": "Annemin yıllar önce diktiği fagot dikişli beyaz bluz hâlâ gardırobumun en değerli parçası. Bugün keten pantolonla giydim, herkes nereden aldığımı sordu."
+      },
+      {
+        "id": "tr-clean-261",
+        "field": "caption",
+        "text": "Sıcak havalarda saçımı toplayıp geniş kenarlı şapka takıyorum, hem güneşten koruyor hem kombine şıklık katıyor."
+      },
+      {
+        "id": "tr-clean-262",
+        "field": "caption",
+        "text": "Bir gün içinde dört mevsim yaşadık: sabah yağmur, öğlen güneş, akşamüstü dolu, gece ayaz. Katmanlı giyinmek beni kurtardı."
+      },
+      {
+        "id": "tr-clean-263",
+        "field": "caption",
+        "text": "Bu sonbahar kendime söz verdim, her kombine bir renk ekleyeceğim. Bugün bordo bere ve bordo çanta ile gri kabanı canlandırdım."
+      },
+      {
+        "id": "tr-clean-264",
+        "field": "caption",
+        "text": "Yaz tatili bavulu: iki mayo, bir bikini, üç keten gömlek, iki şort, bir uzun elbise ve bir çift sandalet. Bu kadar yeter, değil mi?"
+      },
+      {
+        "id": "tr-clean-265",
+        "field": "caption",
+        "text": "Kaç kişi kışın yün çorap giyiyor? Ben bu yıl başladım ve ayaklarımın üşümesi tamamen bitti. Botlarla da çok rahat."
+      },
+      {
+        "id": "tr-clean-266",
+        "field": "caption",
+        "text": "Ofiste sabah toplantısı, öğlen müşteri ziyareti, akşam doğum günü yemeği. Lacivert takım ve ipek bluz, akşam için sadece ruj ve küpe değiştirdim."
+      },
+      {
+        "id": "tr-clean-267",
+        "field": "caption",
+        "text": "Sonbaharın ilk yağmuru yağdı, toprak kokusu ve trençkot. Bundan daha güzel bir kombin olamaz."
+      },
+      {
+        "id": "tr-clean-268",
+        "field": "caption",
+        "text": "Kızım ilk kez kendi kombinini seçti: pembe etek, yeşil kazak, mor çorap. Bence harika bir renk cesareti!"
+      },
+      {
+        "id": "tr-clean-269",
+        "field": "caption",
+        "text": "Kar yağarken dışarı çıktık, çocuklar kardan adam yaptı. Ben de su geçirmez pantolon ve uzun mont giydim, hiç ıslanmadım."
+      },
+      {
+        "id": "tr-clean-270",
+        "field": "caption",
+        "text": "Deniz kenarında akşam yemeği için beyaz keten elbise ve düz sandalet seçtim, rüzgar için de ince bir hırka aldım."
+      },
+      {
+        "id": "tr-clean-271",
+        "field": "caption",
+        "text": "Kombinlerimde artık daha çok ikinci el parça kullanıyorum, bu ceket de bitpazarından, sadece birkaç düğmesini değiştirdim."
+      },
+      {
+        "id": "tr-clean-272",
+        "field": "caption",
+        "text": "İlkbaharın ilk sıcak günü, montları dolaba kaldırdım. Kot ceket ve çiçekli elbise ile güne merhaba dedim. 🌸"
+      },
+      {
+        "id": "tr-clean-273",
+        "field": "caption",
+        "text": "Yağmurda saçlarım kabarmasın diye kapüşonlu trençkot aldım, gerçekten işe yarıyor."
+      },
+      {
+        "id": "tr-clean-274",
+        "field": "caption",
+        "text": "Yeni işimdeki ilk haftam. Her gün farklı bir gömlek ve iki pantolonu döndürerek giydim, kimse fark etmedi bile."
+      },
+      {
+        "id": "tr-clean-275",
+        "field": "caption",
+        "text": "Bu kumaşı çok merak ettim, dokusu keten gibi ama parlaklığı ipek gibi. Bilgisi olan var mı?"
+      },
+      {
+        "id": "tr-clean-276",
+        "field": "caption",
+        "text": "Kışın renkli giyinmekten korkmayın. Bugün hardal kazak, lacivert pantolon ve kırmızı atkı ile çıktım."
+      },
+      {
+        "id": "tr-clean-277",
+        "field": "caption",
+        "text": "Hafta sonu bağ evine gittik, kareli gömlek, kot ve lastik çizme. Tam bir kır kombini oldu."
+      },
+      {
+        "id": "tr-clean-278",
+        "field": "caption",
+        "text": "Doğa yürüyüşü kombini: nefes alan tişört, polar hırka, su geçirmez ceket ve iyi tabanlı bot. Unutmayın, pamuk ıslanınca kurumaz."
+      },
+      {
+        "id": "tr-clean-279",
+        "field": "caption",
+        "text": "Uzun süre aradığım amber rengi bir kemer buldum sonunda, kahverengi botlarla tam uyuyor."
+      },
+      {
+        "id": "tr-clean-280",
+        "field": "caption",
+        "text": "Gece yarısı uçuşu için rahat bir kombin: geniş paça eşofman, kaşmir kazak ve büyük bir şal. Uçakta da battaniye görevi görüyor."
+      },
+      {
+        "id": "tr-clean-281",
+        "field": "caption",
+        "text": "Sabah kızımı okula götürdükten sonra direkt ofise geçtim. Rahat loafer, kumaş pantolon ve ince triko. Pratik ve şık."
+      },
+      {
+        "id": "tr-clean-282",
+        "field": "caption",
+        "text": "Haftalık kombin planlaması yapıyorum, pazar akşamı hava durumuna bakıp her günün kıyafetini askıya asıyorum. Sabahlar çok rahatladı."
+      },
+      {
+        "id": "tr-clean-283",
+        "field": "caption",
+        "text": "Bu sezonun favori rengi kesinlikle tereyağı sarısı. Gömlek, kazak, hatta çanta bile aldım."
+      },
+      {
+        "id": "tr-clean-284",
+        "field": "caption",
+        "text": "Yağmurlu havada en sevdiğim kombin: siyah trençkot, gri balıkçı yaka ve siyah bot. Hepsi kolay temizleniyor."
+      },
+      {
+        "id": "tr-clean-285",
+        "field": "caption",
+        "text": "Sıcak çay, kalın kazak, pencereden kar izlemek. Bugün dışarı çıkmıyorum ama evde de rahat ve güzel giyindim."
+      },
+      {
+        "id": "tr-clean-286",
+        "field": "caption",
+        "text": "İki yıl önce aldığım kaban hâlâ ilk günkü gibi. İyi yün gerçekten uzun ömürlü."
+      },
+      {
+        "id": "tr-clean-287",
+        "field": "caption",
+        "text": "Bugün güneş çok yakıcıydı, uzun kollu ince keten gömlek ve şapkayla hem serin kaldım hem yanmadım."
+      },
+      {
+        "id": "tr-clean-288",
+        "field": "caption",
+        "text": "Kardeşimin nişanı için zümrüt yeşili saten elbise giydim, altına nude topuklu ve küçük bir altın çanta."
+      },
+      {
+        "id": "tr-clean-289",
+        "field": "caption",
+        "text": "Gün boyu ayakta kalacağım bir fuar günü. Rahat spor ayakkabı ama şık görünmesi için siyah takım elbiseyle kombinledim."
+      },
+      {
+        "id": "tr-clean-290",
+        "field": "caption",
+        "text": "Bu tişörtün yakası birkaç yıkamadan sonra bozuldu, pamuk kalitesi önemli arkadaşlar."
+      },
+      {
+        "id": "tr-clean-291",
+        "field": "caption",
+        "text": "Rüzgar o kadar sertti ki şemsiyem ters döndü. Yarın kesinlikle kapüşonlu mont giyiyorum."
+      },
+      {
+        "id": "tr-clean-292",
+        "field": "caption",
+        "text": "Evden çalışırken bile giyinmek motivasyonumu artırıyor. Bugün rahat bir triko takım seçtim."
+      },
+      {
+        "id": "tr-clean-293",
+        "field": "caption",
+        "text": "Siyah beyaz kareli ceket ve siyah balıkçı yaka. Kışın klasik bir şıklık."
+      },
+      {
+        "id": "tr-clean-294",
+        "field": "caption",
+        "text": "Mevsim normallerinin üstünde sıcaklık var, kasımda tişörtle dolaşıyorum."
+      },
+      {
+        "id": "tr-clean-295",
+        "field": "caption",
+        "text": "Bu kombinin rengi gerçekten huzur veriyor, deniz kenarına çok yakışmış."
+      },
+      {
+        "id": "tr-clean-296",
+        "field": "caption",
+        "text": "Bugünkü hava durumu: parçalı bulutlu, 17 derece. Kombinim: çizgili kazak, bej trençkot, kot."
+      },
+      {
+        "id": "tr-clean-297",
+        "field": "caption",
+        "text": "Yeni aldığım botlar biraz sıkıyor, birkaç gün evde giyip alıştırmaya çalışıyorum."
+      },
+      {
+        "id": "tr-clean-298",
+        "field": "caption",
+        "text": "Dökümlü kumaşlar uzun boylu görünmeye yardımcı oluyor, özellikle tek renk kombinlerde."
+      },
+      {
+        "id": "tr-clean-299",
+        "field": "caption",
+        "text": "Kombinlerinizdeki aksesuar seçimleri çok başarılı, özellikle kemerler."
+      },
+      {
+        "id": "tr-clean-300",
+        "field": "caption",
+        "text": "Hava 22 derece, rüzgar yok. Ne güzel bir gün! Açık mavi gömlek elbise ve beyaz sneaker. #bahar"
+      },
+      {
+        "id": "tr-clean-301",
+        "field": "caption",
+        "text": "Bayram sabahı için aile kombini: hepimiz beyaz ve gök mavisi tonlarında giyindik."
+      },
+      {
+        "id": "tr-clean-302",
+        "field": "caption",
+        "text": "Bu gece ilk konserime gidiyorum, rahat ama dikkat çekici olsun istedim: parlak ceket ve siyah jean."
+      },
+      {
+        "id": "tr-clean-303",
+        "field": "caption",
+        "text": "Kışın elbise giymek istiyorum ama üşüyorum. Kalın külotlu çorap ve uzun bot ile mümkün mü?"
+      },
+      {
+        "id": "tr-clean-304",
+        "field": "caption",
+        "text": "Geçen yıl aldığım kaşe kaban bu yıl da çok işime yarıyor."
+      },
+      {
+        "id": "tr-clean-305",
+        "field": "caption",
+        "text": "Bugün size en sevdiğim 3 kış kombinini gösteriyorum. Kaydırın!"
+      },
+      {
+        "id": "tr-clean-306",
+        "field": "caption",
+        "text": "Zeytin yeşili bir kaban mı, deve tüyü bir kaban mı? Kararsız kaldım, fikirleriniz?"
+      },
+      {
+        "id": "tr-clean-307",
+        "field": "caption",
+        "text": "Sabah yürüyüşü kombini: rüzgarlık, tayt ve bere. 5 derece ama güneşli."
+      },
+      {
+        "id": "tr-clean-308",
+        "field": "caption",
+        "text": "Bu çizmeler yağmurda su alıyor mu? Görünüşü çok güzel ama emin olamadım."
+      },
+      {
+        "id": "tr-clean-309",
+        "field": "caption",
+        "text": "Yağmurdan sonra çıkan gökkuşağına renkli bir kombinle eşlik ettim 🌈"
+      },
+      {
+        "id": "tr-clean-310",
+        "field": "caption",
+        "text": "Bugün tamamen beyaz giydim, kahve içmeye çok korktum."
+      },
+      {
+        "id": "tr-clean-311",
+        "field": "caption",
+        "text": "Yarım saatte hazırlanmam gerekiyordu, beyaz gömlek ve siyah pantolon her zaman kurtarır."
+      },
+      {
+        "id": "tr-clean-312",
+        "field": "caption",
+        "text": "Bir sonraki alışverişimde kesinlikle keten karışımlı bir takım alacağım."
+      },
+      {
+        "id": "tr-clean-313",
+        "field": "caption",
+        "text": "Hafta içi okul, hafta sonu kamp. Rahat kombinler zamanı."
+      },
+      {
+        "id": "tr-clean-314",
+        "field": "caption",
+        "text": "Sıcaklık 26 derece, deniz suyu 22. Mayo ve pareo ile sahildeyiz. #tatil 🌊"
+      },
+      {
+        "id": "tr-clean-315",
+        "field": "caption",
+        "text": "Kumaş seçimi her şeydir: aynı model elbise pamukta başka, satende bambaşka duruyor. Pamuklu olan gündüz için rahat ve nefes alıyor, saten olan ise akşam ışığında çok zarif parlıyor. Bu yüzden sevdiğim kalıpları iki farklı kumaşta diktirmeyi alışkanlık haline getirdim."
+      },
+      {
+        "id": "tr-clean-316",
+        "field": "altText",
+        "text": "Gök mavisi gömlek ve bej keten pantolon giymiş bir kişi, elinde hasır çanta, güneşli bir sokakta duruyor."
+      },
+      {
+        "id": "tr-clean-317",
+        "field": "altText",
+        "text": "Bej trençkot, beyaz tişört ve düz paça mavi jean ile tamamlanmış bir sonbahar kombini."
+      },
+      {
+        "id": "tr-clean-318",
+        "field": "altText",
+        "text": "Lacivert blazer, beyaz gömlek ve gri kumaş pantolon giymiş bir kişi ofis koridorunda."
+      },
+      {
+        "id": "tr-clean-319",
+        "field": "altText",
+        "text": "Pudra rengi saten midi elbise ve krem rengi kısa ceket, ayakta pudra topuklu ayakkabılar."
+      },
+      {
+        "id": "tr-clean-320",
+        "field": "altText",
+        "text": "Kar yağışı altında uzun siyah kaz tüyü mont, gri yün atkı ve kahverengi bot giymiş bir kişi."
+      },
+      {
+        "id": "tr-clean-321",
+        "field": "altText",
+        "text": "Amber rengi kalın örgü kazak ve hardal sarısı midi etek, kahverengi deri çizmelerle."
+      },
+      {
+        "id": "tr-clean-322",
+        "field": "altText",
+        "text": "Amiral yakalı lacivert ceket, altın düğmeler ve beyaz pantolon, deniz kenarında çekilmiş fotoğraf."
+      },
+      {
+        "id": "tr-clean-323",
+        "field": "altText",
+        "text": "Kumsalda çizgili bikini üzerine açık beyaz keten gömlek ve geniş kenarlı hasır şapka."
+      },
+      {
+        "id": "tr-clean-324",
+        "field": "altText",
+        "text": "Tek parça lacivert mayo ve beline bağlanmış çiçek desenli pareo, arkada deniz görünüyor."
+      },
+      {
+        "id": "tr-clean-325",
+        "field": "altText",
+        "text": "Krem rengi triko kazak ve kahverengi süet etek, yanında küçük deri omuz çantası."
+      },
+      {
+        "id": "tr-clean-326",
+        "field": "altText",
+        "text": "Yağmurlu bir caddede sarı yağmurluk ve lacivert lastik çizme giymiş bir kişi, elinde puantiyeli şemsiye."
+      },
+      {
+        "id": "tr-clean-327",
+        "field": "altText",
+        "text": "Fagot dikişli beyaz bluz ve krem keten pantolon, bluzun yaka detayları yakın planda."
+      },
+      {
+        "id": "tr-clean-328",
+        "field": "altText",
+        "text": "Gri tonlarında katmanlı kombin: açık gri tişört, koyu gri hırka ve antrasit pantolon."
+      },
+      {
+        "id": "tr-clean-329",
+        "field": "altText",
+        "text": "Çiçek desenli midi elbise ve beyaz spor ayakkabı, bir kafe önünde ayakta çekilmiş."
+      },
+      {
+        "id": "tr-clean-330",
+        "field": "altText",
+        "text": "Koyu lacivert takım elbise, açık mavi gömlek ve kahverengi deri ayakkabılar."
+      },
+      {
+        "id": "tr-clean-331",
+        "field": "altText",
+        "text": "Bordo kadife pantolon ve krem rengi balıkçı yaka kazak, ayna karşısında çekilmiş tam boy fotoğraf."
+      },
+      {
+        "id": "tr-clean-332",
+        "field": "altText",
+        "text": "Yarım boğazlı siyah triko ve yüksek bel bej kumaş pantolon, ince altın kolye ile."
+      },
+      {
+        "id": "tr-clean-333",
+        "field": "altText",
+        "text": "Fuşya renkli oversize kazak ve açık mavi jean, beyaz sneaker ile günlük bir kombin."
+      },
+      {
+        "id": "tr-clean-334",
+        "field": "altText",
+        "text": "Mor kadife uzun elbise ve altın rengi küpeler, sıcak ışıklı bir salonda çekilmiş."
+      },
+      {
+        "id": "tr-clean-335",
+        "field": "altText",
+        "text": "Zümrüt yeşili saten elbise ve ten rengi topuklu ayakkabılar, elde küçük altın çanta."
+      },
+      {
+        "id": "tr-clean-336",
+        "field": "altText",
+        "text": "Haki kargo pantolon, beyaz atlet ve açık bırakılmış keten gömlek, güneşli bir parkta."
+      },
+      {
+        "id": "tr-clean-337",
+        "field": "altText",
+        "text": "Kısa kot şort, bol beyaz tişört ve hasır sandalet, arka planda yaz güneşi altında bir sokak."
+      },
+      {
+        "id": "tr-clean-338",
+        "field": "altText",
+        "text": "Hasır sepet çanta, beyaz keten elbise ve düz sandaletten oluşan pazar kombini."
+      },
+      {
+        "id": "tr-clean-339",
+        "field": "altText",
+        "text": "Gri eşofman takımı üzerine uzun deve tüyü kaban ve beyaz spor ayakkabı."
+      },
+      {
+        "id": "tr-clean-340",
+        "field": "altText",
+        "text": "Tvid desenli ceket ve siyah balıkçı yaka kazak, siyah düz pantolon ile."
+      },
+      {
+        "id": "tr-clean-341",
+        "field": "altText",
+        "text": "Mint yeşili bluz ve lila pileli etek, beyaz babet ayakkabılarla bahar kombini."
+      },
+      {
+        "id": "tr-clean-342",
+        "field": "altText",
+        "text": "Saten pijama tarzı lacivert gömlek ve pantolon takımı, ayakta siyah düz terlik."
+      },
+      {
+        "id": "tr-clean-343",
+        "field": "altText",
+        "text": "Çizgili gömlek elbise, beline bağlanmış ince kahverengi kemer ve beyaz spor ayakkabı."
+      },
+      {
+        "id": "tr-clean-344",
+        "field": "altText",
+        "text": "Antrasit gri takım elbise ve beyaz gömlek giymiş bir kişi, kravatsız ve yakası açık; ayakta siyah deri ayakkabılar, arka planda cam cepheli bir ofis binası görünüyor."
+      },
+      {
+        "id": "tr-clean-345",
+        "field": "altText",
+        "text": "Bej su itici trençkot ve kahverengi loafer, ıslak kaldırım üzerinde çekilmiş."
+      },
+      {
+        "id": "tr-clean-346",
+        "field": "altText",
+        "text": "Kırmızı puantiyeli beyaz elbise ve kırmızı sandaletler, güneşli bir bahçede."
+      },
+      {
+        "id": "tr-clean-347",
+        "field": "altText",
+        "text": "Beyaz uzun mont, krem bere ve krem atkı, karla kaplı bir parkta ayakta duran bir kişi."
+      },
+      {
+        "id": "tr-clean-348",
+        "field": "altText",
+        "text": "Siyah dökümlü elbise, kırmızı ruj ve altın halka küpeler, akşam yemeği öncesi."
+      },
+      {
+        "id": "tr-clean-349",
+        "field": "altText",
+        "text": "Kahverengi deri ceket, krem kazak ve haki pantolon, sonbahar yaprakları arasında."
+      },
+      {
+        "id": "tr-clean-350",
+        "field": "altText",
+        "text": "Siyah deri ceket, siyah jean ve beyaz tişört, akşam ışığında konser alanı önünde."
+      },
+      {
+        "id": "tr-clean-351",
+        "field": "altText",
+        "text": "Turuncu deri çanta, gri kaban ve siyah pantolon; çanta kombinin tek renkli vurgusu."
+      },
+      {
+        "id": "tr-clean-352",
+        "field": "altText",
+        "text": "Tamamen mavi tonlarında kombin: açık mavi gömlek, lacivert pantolon ve omuza atılmış gök mavisi kazak."
+      },
+      {
+        "id": "tr-clean-353",
+        "field": "altText",
+        "text": "Kot ceket ve koyu ton kot pantolon, farklı mavi tonlarıyla kot üstüne kot kombini."
+      },
+      {
+        "id": "tr-clean-354",
+        "field": "altText",
+        "text": "Kırmızı ekose gömlek, içinde beyaz tişört ve siyah jean, kahverengi bot ile."
+      },
+      {
+        "id": "tr-clean-355",
+        "field": "altText",
+        "text": "Pembe kareli fırfırlı yazlık elbise ve beyaz sandalet, çiçekli bir duvar önünde."
+      },
+      {
+        "id": "tr-clean-356",
+        "field": "altText",
+        "text": "Zeytin yeşili keten tulum ve kahverengi deri sandalet, elde hasır çanta."
+      },
+      {
+        "id": "tr-clean-357",
+        "field": "altText",
+        "text": "Vizon rengi uzun kaban ve siyah diz altı çizme, kışlık bir sokakta."
+      },
+      {
+        "id": "tr-clean-358",
+        "field": "altText",
+        "text": "Kaşmir bere, uzun gri kaban ve siyah eldiven giymiş bir kişi, karlı bir caddede."
+      },
+      {
+        "id": "tr-clean-359",
+        "field": "altText",
+        "text": "Adaçayı yeşili uzun nedime elbiseleri giymiş üç kişi yan yana duruyor."
+      },
+      {
+        "id": "tr-clean-360",
+        "field": "altText",
+        "text": "Beyaz tişört, yüksek bel jean ve büyük altın halka küpeler, saçlar topuz."
+      },
+      {
+        "id": "tr-clean-361",
+        "field": "altText",
+        "text": "Açık mavi keten gömlek ve bej chino pantolon, ayakta süet loafer."
+      },
+      {
+        "id": "tr-clean-362",
+        "field": "altText",
+        "text": "Yeşil süet ayakkabılar ve krem pantolon paçasının yakın plan fotoğrafı, taş döşeli bir zeminde."
+      },
+      {
+        "id": "tr-clean-363",
+        "field": "altText",
+        "text": "Beyaz bol kesim gömlek bel kısmından düğümlenmiş, altında mavi yüksek bel jean."
+      },
+      {
+        "id": "tr-clean-364",
+        "field": "altText",
+        "text": "Bordo kaban, siyah pantolon ve siyah bot, elinde alışveriş çantaları taşıyan bir kişi."
+      },
+      {
+        "id": "tr-clean-365",
+        "field": "altText",
+        "text": "Askılı çiçekli elbise ve üzerinde açık bırakılmış ince beyaz gömlek."
+      },
+      {
+        "id": "tr-clean-366",
+        "field": "altText",
+        "text": "Sarı trençkot giymiş bir kişi, gri renkli kalabalık bir otobüs durağında."
+      },
+      {
+        "id": "tr-clean-367",
+        "field": "altText",
+        "text": "Siyah trençkot, gri balıkçı yaka kazak ve siyah bot, yağmurlu bir caddede."
+      },
+      {
+        "id": "tr-clean-368",
+        "field": "altText",
+        "text": "Hardal sarısı kazak, lacivert pantolon ve kırmızı atkı ile renkli bir kış kombini."
+      },
+      {
+        "id": "tr-clean-369",
+        "field": "altText",
+        "text": "Kareli flanel gömlek, mavi jean ve yeşil lastik çizme, kırsal bir bahçede."
+      },
+      {
+        "id": "tr-clean-370",
+        "field": "altText",
+        "text": "Rüzgarlık, polar hırka ve yürüyüş botu giymiş bir kişi, ormanda patika üzerinde."
+      },
+      {
+        "id": "tr-clean-371",
+        "field": "altText",
+        "text": "Geniş paça gri eşofman, krem kaşmir kazak ve omuzlara atılmış büyük bir şal."
+      },
+      {
+        "id": "tr-clean-372",
+        "field": "altText",
+        "text": "Tereyağı sarısı gömlek ve beyaz pantolon, güneşli bir terasta çekilmiş."
+      },
+      {
+        "id": "tr-clean-373",
+        "field": "altText",
+        "text": "Siyah beyaz kareli ceket ve siyah balıkçı yaka, siyah düz pantolon ile."
+      },
+      {
+        "id": "tr-clean-374",
+        "field": "altText",
+        "text": "Zeytin yeşili kaban ve deve tüyü kaban yan yana asılmış, karşılaştırma fotoğrafı."
+      },
+      {
+        "id": "tr-clean-375",
+        "field": "altText",
+        "text": "Tamamen beyaz kombin: beyaz gömlek, beyaz geniş paça pantolon ve beyaz spor ayakkabı."
+      },
+      {
+        "id": "tr-clean-376",
+        "field": "altText",
+        "text": "Keten karışımlı açık bej takım elbise, içinde beyaz tişört ve beyaz sneaker."
+      },
+      {
+        "id": "tr-clean-377",
+        "field": "altText",
+        "text": "Lacivert tek parça mayo ve beyaz pareo giymiş bir kişi kumsalda, arkada sakin deniz."
+      },
+      {
+        "id": "tr-clean-378",
+        "field": "altText",
+        "text": "Kırmızı kadife diz altı elbise ve altın küpeler, kına gecesi süslemeleri arasında."
+      },
+      {
+        "id": "tr-clean-379",
+        "field": "altText",
+        "text": "Piknik kombini: çiçekli elbiseler, hasır şapkalar ve çimenlere serilmiş kareli bir örtü."
+      },
+      {
+        "id": "tr-clean-380",
+        "field": "altText",
+        "text": "Puf kollu beyaz bluz ve düz siyah pantolon, siyah sivri burun babet ile."
+      },
+      {
+        "id": "tr-clean-381",
+        "field": "altText",
+        "text": "Ekru kazak ve bej kumaş pantolon, ton sür ton bir kombin, krem çanta ile."
+      },
+      {
+        "id": "tr-clean-382",
+        "field": "altText",
+        "text": "Uzun kollu ince keten gömlek, geniş kenarlı şapka ve keten şort, sahil yolunda."
+      },
+      {
+        "id": "tr-clean-383",
+        "field": "altText",
+        "text": "Kot etek, mavi beyaz çizgili gömlek ve beyaz kanvas ayakkabılar."
+      },
+      {
+        "id": "tr-clean-384",
+        "field": "altText",
+        "text": "Denim tulum ve hasır şapka giymiş bir kişi, sebze bahçesinde çalışırken."
+      },
+      {
+        "id": "tr-clean-385",
+        "field": "altText",
+        "text": "Bebek mavisi kalın örgü kazak ve krem rengi geniş paça pantolon giymiş bir kişi, elinde bej bir omuz çantası tutuyor; aydınlık bir odada, pencere önünde tam boy çekilmiş bir fotoğraf."
+      },
+      {
+        "id": "tr-clean-386",
+        "field": "altText",
+        "text": "Sikke detaylı altın kolye ve sade siyah elbise, yaka kısmının yakın plan görüntüsü."
+      },
+      {
+        "id": "tr-clean-387",
+        "field": "altText",
+        "text": "Göğüs cebi olan haki gömlek ve koyu lacivert jean, kahverengi kemer ile."
+      },
+      {
+        "id": "tr-clean-388",
+        "field": "altText",
+        "text": "Yarım kollu krem triko ve açık bej keten etek, ayakta hasır taban espadril."
+      },
+      {
+        "id": "tr-clean-389",
+        "field": "altText",
+        "text": "Kayak montu, polar içlik ve termal tayt giymiş bir kişi karlı yamaçta duruyor."
+      },
+      {
+        "id": "tr-clean-390",
+        "field": "altText",
+        "text": "Gök mavisi ve beyaz ince çizgili gömlek ve lacivert kumaş pantolon, bayram sabahı."
+      },
+      {
+        "id": "tr-clean-391",
+        "field": "altText",
+        "text": "Beyaz yaka dışarıda kalan lacivert ince kazak ve gri kumaş pantolon, okul havasında."
+      },
+      {
+        "id": "tr-clean-392",
+        "field": "altText",
+        "text": "Siyah takım elbise ve beyaz spor ayakkabı, fuar alanında ayakta duran bir kişi."
+      },
+      {
+        "id": "tr-clean-393",
+        "field": "altText",
+        "text": "Parlak gümüş renkli ceket ve siyah jean, siyah bot ile gece kombini."
+      },
+      {
+        "id": "tr-clean-394",
+        "field": "altText",
+        "text": "Kalın siyah külotlu çorap, gri yün elbise ve diz altı siyah çizme."
+      },
+      {
+        "id": "tr-clean-395",
+        "field": "altText",
+        "text": "Kaşe deve tüyü kaban, beyaz kazak ve mavi jean, sonbahar sabahı."
+      },
+      {
+        "id": "tr-clean-396",
+        "field": "altText",
+        "text": "Puantiyeli yeşil midi elbise, kahverengi sandalet ve hasır omuz çantası."
+      },
+      {
+        "id": "tr-clean-397",
+        "field": "altText",
+        "text": "Sıkı örgü gri bere ve aynı renk atkı, kırmızı mont ile karlı bir gün."
+      },
+      {
+        "id": "tr-clean-398",
+        "field": "altText",
+        "text": "Gri yün kaban ve beyaz balıkçı yaka kazak, sisli bir sahil yolunda."
+      },
+      {
+        "id": "tr-clean-399",
+        "field": "altText",
+        "text": "Beyaz poplin gömlek elbise ve kahverengi deri sandalet, güneşli bir sokakta."
+      },
+      {
+        "id": "tr-clean-400",
+        "field": "altText",
+        "text": "Kahverengi çerçeveli güneş gözlüğü, krem tişört ve bej keten pantolon."
+      },
+      {
+        "id": "tr-clean-401",
+        "field": "altText",
+        "text": "Oversize siyah kaban, beyaz sneaker ve siyah bere ile sabah kahvesi kombini."
+      },
+      {
+        "id": "tr-clean-402",
+        "field": "altText",
+        "text": "Krem takım elbise ve fildişi ipek bluz, toplantı odası önünde çekilmiş."
+      },
+      {
+        "id": "tr-clean-403",
+        "field": "altText",
+        "text": "Lacivert saten elbise ve inci küpeler, mum ışıklı bir restoranda."
+      },
+      {
+        "id": "tr-clean-404",
+        "field": "altText",
+        "text": "Pileli bordo midi etek ve krem gömlek, rüzgarda hafif dalgalanan etek."
+      },
+      {
+        "id": "tr-clean-405",
+        "field": "altText",
+        "text": "Siyah tulum, beyaz spor ayakkabı ve hasır çanta, sade bir yaz kombini."
+      },
+      {
+        "id": "tr-clean-406",
+        "field": "altText",
+        "text": "Zeytin yeşili polar, siyah tayt ve gri koşu ayakkabısı, sabah yürüyüşü sırasında."
+      },
+      {
+        "id": "tr-clean-407",
+        "field": "altText",
+        "text": "Kahverengi süet çanta, ıslak bir bankın üzerinde; yanında katlanmış şemsiye."
+      },
+      {
+        "id": "tr-clean-408",
+        "field": "altText",
+        "text": "Çocuk boyu sarı yağmurluk ve mavi lastik çizme, okul kapısı önünde."
+      },
+      {
+        "id": "tr-clean-409",
+        "field": "altText",
+        "text": "Amber rengi deri kemer ve kahverengi bot, kemer tokasının yakın plan fotoğrafı."
+      },
+      {
+        "id": "tr-clean-410",
+        "field": "altText",
+        "text": "Askıya asılmış haftalık kombinler: beş gömlek, üç pantolon ve iki kazak sıralı duruyor."
+      },
+      {
+        "id": "tr-clean-411",
+        "field": "altText",
+        "text": "Saten bordo etek ve kalın örgü krem kazak, farklı dokuların bir arada kullanıldığı kombin."
+      },
+      {
+        "id": "tr-clean-412",
+        "field": "altText",
+        "text": "gok mavisi gomlek ve beyaz pantolon giymis bir kisi, deniz kenarinda gun batiminda."
+      },
+      {
+        "id": "tr-clean-413",
+        "field": "altText",
+        "text": "siyah deri ceket, gri tisort ve koyu jean ile sade bir sehir kombini."
+      },
+      {
+        "id": "tr-clean-414",
+        "field": "altText",
+        "text": "ekru triko hirka ve kahverengi kadife pantolon, ahsap bir sandalyede oturan bir kisi."
+      },
+      {
+        "id": "tr-clean-415",
+        "field": "altText",
+        "text": "Katlanmış beyaz pamuklu iç çamaşırları ve gri pijama takımı, açık bir bavulun içinde düzenli şekilde."
+      },
+      {
+        "id": "tr-clean-416",
+        "field": "altText",
+        "text": "Lila gömlek ve krem pantolon, pastel tonlarda bir bahar kombini, beyaz çantayla."
+      },
+      {
+        "id": "tr-clean-417",
+        "field": "altText",
+        "text": "Sarı fermuarlı kazak ve haki kargo pantolon, siyah spor ayakkabı ile."
+      },
+      {
+        "id": "tr-clean-418",
+        "field": "altText",
+        "text": "Ambalajından yeni çıkarılmış kaşmir atkı, kutu ve kağıt yanında yakın plan."
+      },
+      {
+        "id": "tr-clean-419",
+        "field": "altText",
+        "text": "Kırmızı ve pembe renklerin bir arada kullanıldığı kombin: pembe gömlek, kırmızı pantolon."
+      },
+      {
+        "id": "tr-clean-420",
+        "field": "altText",
+        "text": "Gabardin bej pantolon, lacivert polo yaka tişört ve beyaz spor ayakkabı giymiş bir kişi havalimanında duruyor; yanında gri bir kabin bavulu, kolunda katlanmış ince bir trençkot var."
+      }
+    ]
+  },
+  "disallowed": {
+    "description": "Disguised forms of terms from this language’s runtime list, ten per obfuscation family named in Story 6.2 AC 4, each inside an otherwise clean caption. Every entry is expected to be withheld (review or block). Generated by scripts/build-community-text-corpus.mjs.",
+    "expected": "withheld",
+    "families": [
+      "nfkc-fullwidth",
+      "case-mixing",
+      "diacritics-added",
+      "zero-width",
+      "cyrillic-confusable",
+      "leetspeak",
+      "repeated-characters",
+      "internal-punctuation",
+      "spaced-letters",
+      "leet-and-spaced"
+    ],
+    "entries": [
+      {
+        "id": "tr-nfkc-fullwidth-01",
+        "family": "nfkc-fullwidth",
+        "field": "caption",
+        "text": "Bugünkü kombinim: ＡＭＬＡＲ"
+      },
+      {
+        "id": "tr-nfkc-fullwidth-02",
+        "family": "nfkc-fullwidth",
+        "field": "caption",
+        "text": "ＧＥＢＥＲ ve kot ceket"
+      },
+      {
+        "id": "tr-nfkc-fullwidth-03",
+        "family": "nfkc-fullwidth",
+        "field": "altText",
+        "text": "Bugünkü kombinim: ＫＡＬＴＡＫＬＡＲＡ"
+      },
+      {
+        "id": "tr-nfkc-fullwidth-04",
+        "family": "nfkc-fullwidth",
+        "field": "caption",
+        "text": "ＯＲＯＳＰＵ ve kot ceket"
+      },
+      {
+        "id": "tr-nfkc-fullwidth-05",
+        "family": "nfkc-fullwidth",
+        "field": "caption",
+        "text": "Bugünkü kombinim: ＯＲＯＳＰＵＬＡＲＤＡＮ"
+      },
+      {
+        "id": "tr-nfkc-fullwidth-06",
+        "family": "nfkc-fullwidth",
+        "field": "altText",
+        "text": "ＳＡＫＳＯＣＵＤＡ ve kot ceket"
+      },
+      {
+        "id": "tr-nfkc-fullwidth-07",
+        "family": "nfkc-fullwidth",
+        "field": "caption",
+        "text": "Bugünkü kombinim: ＳＡＫＳＯＣＵＮＵＮ"
+      },
+      {
+        "id": "tr-nfkc-fullwidth-08",
+        "family": "nfkc-fullwidth",
+        "field": "caption",
+        "text": "ＳＩＫＩＫ ve kot ceket"
+      },
+      {
+        "id": "tr-nfkc-fullwidth-09",
+        "family": "nfkc-fullwidth",
+        "field": "altText",
+        "text": "Bugünkü kombinim: ＳＩＫＬＥＲＩ"
+      },
+      {
+        "id": "tr-nfkc-fullwidth-10",
+        "family": "nfkc-fullwidth",
+        "field": "caption",
+        "text": "ＳＩＫＴＩＲ ve kot ceket"
+      },
+      {
+        "id": "tr-case-mixing-01",
+        "family": "case-mixing",
+        "field": "caption",
+        "text": "Bugünkü kombinim: ApTaL"
+      },
+      {
+        "id": "tr-case-mixing-02",
+        "family": "case-mixing",
+        "field": "caption",
+        "text": "GeBeRtIrIm ve kot ceket"
+      },
+      {
+        "id": "tr-case-mixing-03",
+        "family": "case-mixing",
+        "field": "altText",
+        "text": "Bugünkü kombinim: KaLtAkLaRdA"
+      },
+      {
+        "id": "tr-case-mixing-04",
+        "family": "case-mixing",
+        "field": "caption",
+        "text": "OrOsPuDa ve kot ceket"
+      },
+      {
+        "id": "tr-case-mixing-05",
+        "family": "case-mixing",
+        "field": "caption",
+        "text": "Bugünkü kombinim: OrOsPuNuN"
+      },
+      {
+        "id": "tr-case-mixing-06",
+        "family": "case-mixing",
+        "field": "altText",
+        "text": "SaKsOcUdAn ve kot ceket"
+      },
+      {
+        "id": "tr-case-mixing-07",
+        "family": "case-mixing",
+        "field": "caption",
+        "text": "Bugünkü kombinim: SaKsOcUyA"
+      },
+      {
+        "id": "tr-case-mixing-08",
+        "family": "case-mixing",
+        "field": "caption",
+        "text": "SiKiN ve kot ceket"
+      },
+      {
+        "id": "tr-case-mixing-09",
+        "family": "case-mixing",
+        "field": "altText",
+        "text": "Bugünkü kombinim: SiKlErIn"
+      },
+      {
+        "id": "tr-case-mixing-10",
+        "family": "case-mixing",
+        "field": "caption",
+        "text": "YaRaK ve kot ceket"
+      },
+      {
+        "id": "tr-diacritics-added-01",
+        "family": "diacritics-added",
+        "field": "caption",
+        "text": "Bugünkü kombinim: böktán"
+      },
+      {
+        "id": "tr-diacritics-added-02",
+        "family": "diacritics-added",
+        "field": "caption",
+        "text": "hássíktir ve kot ceket"
+      },
+      {
+        "id": "tr-diacritics-added-03",
+        "family": "diacritics-added",
+        "field": "altText",
+        "text": "Bugünkü kombinim: káltáklardan"
+      },
+      {
+        "id": "tr-diacritics-added-04",
+        "family": "diacritics-added",
+        "field": "caption",
+        "text": "öröspudan ve kot ceket"
+      },
+      {
+        "id": "tr-diacritics-added-05",
+        "family": "diacritics-added",
+        "field": "caption",
+        "text": "Bugünkü kombinim: öröspuya"
+      },
+      {
+        "id": "tr-diacritics-added-06",
+        "family": "diacritics-added",
+        "field": "altText",
+        "text": "sáksöcular ve kot ceket"
+      },
+      {
+        "id": "tr-diacritics-added-07",
+        "family": "diacritics-added",
+        "field": "caption",
+        "text": "Bugünkü kombinim: sáksöcuyu"
+      },
+      {
+        "id": "tr-diacritics-added-08",
+        "family": "diacritics-added",
+        "field": "caption",
+        "text": "síklér ve kot ceket"
+      },
+      {
+        "id": "tr-diacritics-added-09",
+        "family": "diacritics-added",
+        "field": "altText",
+        "text": "Bugünkü kombinim: síkmék"
+      },
+      {
+        "id": "tr-diacritics-added-10",
+        "family": "diacritics-added",
+        "field": "caption",
+        "text": "yáráklar ve kot ceket"
+      },
+      {
+        "id": "tr-zero-width-01",
+        "family": "zero-width",
+        "field": "caption",
+        "text": "Bugünkü kombinim: d​a​n​g​a​l​a​k"
+      },
+      {
+        "id": "tr-zero-width-02",
+        "family": "zero-width",
+        "field": "caption",
+        "text": "k​a​h​p​e ve kot ceket"
+      },
+      {
+        "id": "tr-zero-width-03",
+        "family": "zero-width",
+        "field": "altText",
+        "text": "Bugünkü kombinim: k​a​l​t​a​k​t​a"
+      },
+      {
+        "id": "tr-zero-width-04",
+        "family": "zero-width",
+        "field": "caption",
+        "text": "o​r​o​s​p​u​l​a​r ve kot ceket"
+      },
+      {
+        "id": "tr-zero-width-05",
+        "family": "zero-width",
+        "field": "caption",
+        "text": "Bugünkü kombinim: o​r​o​s​p​u​y​u"
+      },
+      {
+        "id": "tr-zero-width-06",
+        "family": "zero-width",
+        "field": "altText",
+        "text": "s​a​k​s​o​c​u​l​a​r​a ve kot ceket"
+      },
+      {
+        "id": "tr-zero-width-07",
+        "family": "zero-width",
+        "field": "caption",
+        "text": "Bugünkü kombinim: s​a​l​a​k"
+      },
+      {
+        "id": "tr-zero-width-08",
+        "family": "zero-width",
+        "field": "caption",
+        "text": "s​i​k​l​e​r​d​e ve kot ceket"
+      },
+      {
+        "id": "tr-zero-width-09",
+        "family": "zero-width",
+        "field": "altText",
+        "text": "Bugünkü kombinim: s​i​k​m​e​m​e​k"
+      },
+      {
+        "id": "tr-zero-width-10",
+        "family": "zero-width",
+        "field": "caption",
+        "text": "y​a​r​a​k​l​a​r​a ve kot ceket"
+      },
+      {
+        "id": "tr-cyrillic-confusable-01",
+        "family": "cyrillic-confusable",
+        "field": "caption",
+        "text": "Bugünkü kombinim: gаvаt"
+      },
+      {
+        "id": "tr-cyrillic-confusable-02",
+        "family": "cyrillic-confusable",
+        "field": "caption",
+        "text": "kаltаk ve kot ceket"
+      },
+      {
+        "id": "tr-cyrillic-confusable-03",
+        "family": "cyrillic-confusable",
+        "field": "altText",
+        "text": "Bugünkü kombinim: kаltаktan"
+      },
+      {
+        "id": "tr-cyrillic-confusable-04",
+        "family": "cyrillic-confusable",
+        "field": "caption",
+        "text": "оrоspulara ve kot ceket"
+      },
+      {
+        "id": "tr-cyrillic-confusable-05",
+        "family": "cyrillic-confusable",
+        "field": "caption",
+        "text": "Bugünkü kombinim: реzevenk"
+      },
+      {
+        "id": "tr-cyrillic-confusable-06",
+        "family": "cyrillic-confusable",
+        "field": "altText",
+        "text": "sаksоcularda ve kot ceket"
+      },
+      {
+        "id": "tr-cyrillic-confusable-07",
+        "family": "cyrillic-confusable",
+        "field": "caption",
+        "text": "Bugünkü kombinim: sikеrim"
+      },
+      {
+        "id": "tr-cyrillic-confusable-08",
+        "family": "cyrillic-confusable",
+        "field": "caption",
+        "text": "siklеrdеn ve kot ceket"
+      },
+      {
+        "id": "tr-cyrillic-confusable-09",
+        "family": "cyrillic-confusable",
+        "field": "altText",
+        "text": "Bugünkü kombinim: siktе"
+      },
+      {
+        "id": "tr-cyrillic-confusable-10",
+        "family": "cyrillic-confusable",
+        "field": "caption",
+        "text": "уаraklarda ve kot ceket"
+      },
+      {
+        "id": "tr-leetspeak-01",
+        "family": "leetspeak",
+        "field": "caption",
+        "text": "Bugünkü kombinim: g4vur"
+      },
+      {
+        "id": "tr-leetspeak-02",
+        "family": "leetspeak",
+        "field": "caption",
+        "text": "k4l74kl4r ve kot ceket"
+      },
+      {
+        "id": "tr-leetspeak-03",
+        "family": "leetspeak",
+        "field": "altText",
+        "text": "Bugünkü kombinim: n4mu55uz"
+      },
+      {
+        "id": "tr-leetspeak-04",
+        "family": "leetspeak",
+        "field": "caption",
+        "text": "0r05pul4rd4 ve kot ceket"
+      },
+      {
+        "id": "tr-leetspeak-05",
+        "family": "leetspeak",
+        "field": "caption",
+        "text": "Bugünkü kombinim: 54k50cu"
+      },
+      {
+        "id": "tr-leetspeak-06",
+        "family": "leetspeak",
+        "field": "altText",
+        "text": "54k50cul4rd4n ve kot ceket"
+      },
+      {
+        "id": "tr-leetspeak-07",
+        "family": "leetspeak",
+        "field": "caption",
+        "text": "Bugünkü kombinim: 51k3y1m"
+      },
+      {
+        "id": "tr-leetspeak-08",
+        "family": "leetspeak",
+        "field": "caption",
+        "text": "51kl3r3 ve kot ceket"
+      },
+      {
+        "id": "tr-leetspeak-09",
+        "family": "leetspeak",
+        "field": "altText",
+        "text": "Bugünkü kombinim: 51k73n"
+      },
+      {
+        "id": "tr-leetspeak-10",
+        "family": "leetspeak",
+        "field": "caption",
+        "text": "y4r4kl4rd4n ve kot ceket"
+      },
+      {
+        "id": "tr-repeated-characters-01",
+        "family": "repeated-characters",
+        "field": "caption",
+        "text": "Bugünkü kombinim: geeeeber"
+      },
+      {
+        "id": "tr-repeated-characters-02",
+        "family": "repeated-characters",
+        "field": "caption",
+        "text": "kaaaaltaklara ve kot ceket"
+      },
+      {
+        "id": "tr-repeated-characters-03",
+        "family": "repeated-characters",
+        "field": "altText",
+        "text": "Bugünkü kombinim: orrrrospu"
+      },
+      {
+        "id": "tr-repeated-characters-04",
+        "family": "repeated-characters",
+        "field": "caption",
+        "text": "orrrrospulardan ve kot ceket"
+      },
+      {
+        "id": "tr-repeated-characters-05",
+        "family": "repeated-characters",
+        "field": "caption",
+        "text": "Bugünkü kombinim: saaaaksocuda"
+      },
+      {
+        "id": "tr-repeated-characters-06",
+        "family": "repeated-characters",
+        "field": "altText",
+        "text": "saaaaksocunun ve kot ceket"
+      },
+      {
+        "id": "tr-repeated-characters-07",
+        "family": "repeated-characters",
+        "field": "caption",
+        "text": "Bugünkü kombinim: siiiikik"
+      },
+      {
+        "id": "tr-repeated-characters-08",
+        "family": "repeated-characters",
+        "field": "caption",
+        "text": "siiiikleri ve kot ceket"
+      },
+      {
+        "id": "tr-repeated-characters-09",
+        "family": "repeated-characters",
+        "field": "altText",
+        "text": "Bugünkü kombinim: siiiiktir"
+      },
+      {
+        "id": "tr-repeated-characters-10",
+        "family": "repeated-characters",
+        "field": "caption",
+        "text": "yaaaarakta ve kot ceket"
+      },
+      {
+        "id": "tr-internal-punctuation-01",
+        "family": "internal-punctuation",
+        "field": "caption",
+        "text": "Bugünkü kombinim: g.e.b.e.r.t.i.r.i.m"
+      },
+      {
+        "id": "tr-internal-punctuation-02",
+        "family": "internal-punctuation",
+        "field": "caption",
+        "text": "k.a.l.t.a.k.l.a.r.d.a ve kot ceket"
+      },
+      {
+        "id": "tr-internal-punctuation-03",
+        "family": "internal-punctuation",
+        "field": "altText",
+        "text": "Bugünkü kombinim: o.r.o.s.p.u.d.a"
+      },
+      {
+        "id": "tr-internal-punctuation-04",
+        "family": "internal-punctuation",
+        "field": "caption",
+        "text": "o.r.o.s.p.u.n.u.n ve kot ceket"
+      },
+      {
+        "id": "tr-internal-punctuation-05",
+        "family": "internal-punctuation",
+        "field": "caption",
+        "text": "Bugünkü kombinim: s.a.k.s.o.c.u.d.a.n"
+      },
+      {
+        "id": "tr-internal-punctuation-06",
+        "family": "internal-punctuation",
+        "field": "altText",
+        "text": "s.a.k.s.o.c.u.y.a ve kot ceket"
+      },
+      {
+        "id": "tr-internal-punctuation-07",
+        "family": "internal-punctuation",
+        "field": "caption",
+        "text": "Bugünkü kombinim: s.i.k.i.n"
+      },
+      {
+        "id": "tr-internal-punctuation-08",
+        "family": "internal-punctuation",
+        "field": "caption",
+        "text": "s.i.k.l.e.r.i.n ve kot ceket"
+      },
+      {
+        "id": "tr-internal-punctuation-09",
+        "family": "internal-punctuation",
+        "field": "altText",
+        "text": "Bugünkü kombinim: y.a.r.a.k"
+      },
+      {
+        "id": "tr-internal-punctuation-10",
+        "family": "internal-punctuation",
+        "field": "caption",
+        "text": "y.a.r.a.k.t.a.n ve kot ceket"
+      },
+      {
+        "id": "tr-spaced-letters-01",
+        "family": "spaced-letters",
+        "field": "caption",
+        "text": "Bugünkü kombinim: h a s s i k t i r"
+      },
+      {
+        "id": "tr-spaced-letters-02",
+        "family": "spaced-letters",
+        "field": "caption",
+        "text": "k a l t a k l a r d a n ve kot ceket"
+      },
+      {
+        "id": "tr-spaced-letters-03",
+        "family": "spaced-letters",
+        "field": "altText",
+        "text": "Bugünkü kombinim: o r o s p u d a n"
+      },
+      {
+        "id": "tr-spaced-letters-04",
+        "family": "spaced-letters",
+        "field": "caption",
+        "text": "o r o s p u y a ve kot ceket"
+      },
+      {
+        "id": "tr-spaced-letters-05",
+        "family": "spaced-letters",
+        "field": "caption",
+        "text": "Bugünkü kombinim: s a k s o c u l a r"
+      },
+      {
+        "id": "tr-spaced-letters-06",
+        "family": "spaced-letters",
+        "field": "altText",
+        "text": "s a k s o c u y u ve kot ceket"
+      },
+      {
+        "id": "tr-spaced-letters-07",
+        "family": "spaced-letters",
+        "field": "caption",
+        "text": "Bugünkü kombinim: s i k l e r"
+      },
+      {
+        "id": "tr-spaced-letters-08",
+        "family": "spaced-letters",
+        "field": "caption",
+        "text": "s i k m e k ve kot ceket"
+      },
+      {
+        "id": "tr-spaced-letters-09",
+        "family": "spaced-letters",
+        "field": "altText",
+        "text": "Bugünkü kombinim: y a r a k l a r"
+      },
+      {
+        "id": "tr-spaced-letters-10",
+        "family": "spaced-letters",
+        "field": "caption",
+        "text": "y a r r a k ve kot ceket"
+      },
+      {
+        "id": "tr-leet-and-spaced-01",
+        "family": "leet-and-spaced",
+        "field": "caption",
+        "text": "Bugünkü kombinim: k 4 h p 3"
+      },
+      {
+        "id": "tr-leet-and-spaced-02",
+        "family": "leet-and-spaced",
+        "field": "caption",
+        "text": "k 4 l 7 a k t a ve kot ceket"
+      },
+      {
+        "id": "tr-leet-and-spaced-03",
+        "family": "leet-and-spaced",
+        "field": "altText",
+        "text": "Bugünkü kombinim: 0 r 0 s p u l a r"
+      },
+      {
+        "id": "tr-leet-and-spaced-04",
+        "family": "leet-and-spaced",
+        "field": "caption",
+        "text": "0 r 0 s p u y u ve kot ceket"
+      },
+      {
+        "id": "tr-leet-and-spaced-05",
+        "family": "leet-and-spaced",
+        "field": "caption",
+        "text": "Bugünkü kombinim: 5 4 k s o c u l a r a"
+      },
+      {
+        "id": "tr-leet-and-spaced-06",
+        "family": "leet-and-spaced",
+        "field": "altText",
+        "text": "5 4 l a k ve kot ceket"
+      },
+      {
+        "id": "tr-leet-and-spaced-07",
+        "family": "leet-and-spaced",
+        "field": "caption",
+        "text": "Bugünkü kombinim: 5 1 k l e r d e"
+      },
+      {
+        "id": "tr-leet-and-spaced-08",
+        "family": "leet-and-spaced",
+        "field": "caption",
+        "text": "5 1 k m e m e k ve kot ceket"
+      },
+      {
+        "id": "tr-leet-and-spaced-09",
+        "family": "leet-and-spaced",
+        "field": "altText",
+        "text": "Bugünkü kombinim: y 4 r 4 k l a r a"
+      },
+      {
+        "id": "tr-leet-and-spaced-10",
+        "family": "leet-and-spaced",
+        "field": "caption",
+        "text": "4 m l 4 r ve kot ceket"
+      }
+    ]
+  }
+}

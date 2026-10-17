@@ -15,7 +15,9 @@
  * No unsafe imagery exists in this repository and none may be added, so image
  * blocking is proved at the disposition-function level in the API workspace
  * instead. Read `6.2-E2E-02` as proof of non-publication and cross-user feed
- * absence, not as proof that the model detects anything.
+ * absence, not as proof that the model detects anything. `6.2-E2E-03` renders
+ * the same refusal in the author's browser and asserts the localized recovery
+ * copy for its stable reason code.
  */
 import { log } from '@seontechnologies/playwright-utils/log'
 import type { APIRequestContext, TestInfo } from '@playwright/test'
@@ -35,7 +37,7 @@ import {
 const COMMUNITY_ROUTE = '/'
 
 /**
- * The stable code `reasonCodes.text` in `policy-v1.json` gives a matched term,
+ * The stable code `reasonCodes.text` in `policy-v2.json` gives a matched term,
  * and the only code a caption refusal may persist on its own. Restated here
  * because the Playwright project does not compile against the API workspace;
  * `6.2-E2E-02` fails by name if the policy ever renames it.
@@ -165,6 +167,52 @@ communityTest.describe('6.2 community publication journey', () => {
       await log.step('The published look is visible to its author on the feed')
       await page.goto(COMMUNITY_ROUTE)
       await expect(page.getByTestId(`lookbook-card-${postId}`)).toBeVisible()
+    }
+  )
+
+  communityTest(
+    '6.2-E2E-03 shows the author a localized recovery state for a refused look',
+    async ({ page, request, communitySession }) => {
+      expect(communitySession.userId).toBeTruthy()
+
+      // The same text refusal as 6.2-E2E-02, published over HTTP so this test
+      // spends its time on what the author sees rather than on the composer.
+      const { postId } = await publishCommunityLook(request, {
+        apiBaseUrl: communitySession.apiBaseUrl,
+        userId: communitySession.userId,
+        fixture: loadCommunityFixture(SAFE_FIXTURE),
+        altText: 'A plum satin wrap dress.',
+        caption: 'merde what a night',
+        locale: 'en-US',
+      })
+      const terminal = await waitForTerminalAuthorState(request, {
+        apiBaseUrl: communitySession.apiBaseUrl,
+        userId: communitySession.userId,
+        postId,
+      })
+      expect(terminal.status).toBe('flagged')
+      expect(terminal.moderationReason).toBe(TEXT_POLICY_MATCH_REASON)
+
+      await log.step('The author sees the refusal, why, and what to change')
+      await page.goto(COMMUNITY_ROUTE)
+      const ownState = page.getByTestId(`author-state-${postId}`)
+      await expect(ownState).toBeVisible()
+      await expect(page.getByTestId(`status-badge-${postId}`)).toHaveText(
+        'Removed by moderation'
+      )
+      await expect(page.getByTestId(`author-state-explanation-${postId}`)).toHaveText(
+        'Moderation removed this look. Nobody else can see it.'
+      )
+      /*
+       * THE STABLE CODE IS FOR OPERATORS; THE AUTHOR READS WHAT TO CHANGE. The
+       * persisted reason is `text_policy_match`, and before the shared
+       * reason-category map this line rendered "Reason: text_policy_match".
+       */
+      await expect(page.getByTestId(`author-state-reason-${postId}`)).toHaveText(
+        'Your caption or image description uses words the community guidelines do not allow. Change the wording before you share this look again.'
+      )
+      await expect(ownState).not.toContainText(TEXT_POLICY_MATCH_REASON)
+      await expect(page.getByTestId(`lookbook-card-${postId}`)).toHaveCount(0)
     }
   )
 })

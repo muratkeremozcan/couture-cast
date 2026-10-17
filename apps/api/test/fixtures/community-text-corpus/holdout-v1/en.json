@@ -1,0 +1,2113 @@
+{
+  "language": "en",
+  "corpusVersion": "holdout-v1",
+  "description": "Frozen clean holdout: ordinary fashion captions and alt text written natively in the language after the allow list froze, independently of the clean half, and never used to tune the screener, the lists or the allow list. The release gate's clean-copy figure is computed here. Entries labelled expected review carry one of the policy's deliberate review terms.",
+  "expected": "pass",
+  "frozenAgainst": {
+    "allowListSha256": "22d1f261f3666cf37369e67359aeabc383ac0a689babe04f87023ba1aee70256",
+    "termsSha256": "6f1aed8d5bdaeeedb4c01e4904e43aaa414de1829468120a4593ad4b7508bbac",
+    "languageAllowListSha256": "bebf551640dcbf64b3887736083f2a1f798fc0fe2f86f793cc54a00979abbdd3"
+  },
+  "entries": [
+    {
+      "id": "en-holdout-001",
+      "field": "caption",
+      "text": "rain again, swapped the suede loafers for rubber boots"
+    },
+    {
+      "id": "en-holdout-002",
+      "field": "caption",
+      "text": "Forecast said 12 degrees, felt like 6 at the bus stop. Glad I grabbed the scarf on the way out."
+    },
+    {
+      "id": "en-holdout-003",
+      "field": "caption",
+      "text": "Wind tunnel on the bridge this morning. Long coat was a mistake, it turned into a sail."
+    },
+    {
+      "id": "en-holdout-004",
+      "field": "caption",
+      "text": "Quick grocery run in a hoodie and the old denim jacket. Drizzle stopped right as I got home, of course."
+    },
+    {
+      "id": "en-holdout-005",
+      "field": "caption",
+      "text": "Humid and gray. Linen shirt, cropped chinos, canvas sneakers. Still sticky by 9am."
+    },
+    {
+      "id": "en-holdout-006",
+      "field": "caption",
+      "text": "First frost on the car. Dug the wool gloves out of the hall drawer."
+    },
+    {
+      "id": "en-holdout-007",
+      "field": "caption",
+      "text": "Bike commute in light rain: waterproof shell over a merino tee, quick-dry trousers, clips on the cuffs."
+    },
+    {
+      "id": "en-holdout-008",
+      "field": "caption",
+      "text": "Sunny but 4 degrees. Wore the puffer vest under the trench and it worked better than expected."
+    },
+    {
+      "id": "en-holdout-009",
+      "field": "caption",
+      "text": "post office, pharmacy, bakery. three stops, two showers, one very damp tote bag"
+    },
+    {
+      "id": "en-holdout-010",
+      "field": "caption",
+      "text": "Heat warning today so I kept it simple: loose cotton dress, straw hat, sandals with a back strap for the walk."
+    },
+    {
+      "id": "en-holdout-011",
+      "field": "caption",
+      "text": "Fog so thick I could barely see the tram. Bright yellow raincoat finally earning its keep."
+    },
+    {
+      "id": "en-holdout-012",
+      "field": "caption",
+      "text": "Swapped heels for flats in my bag before leaving. Cobblestones plus wet leaves is not a combo I trust."
+    },
+    {
+      "id": "en-holdout-013",
+      "field": "caption",
+      "text": "Office AC is set to arctic again. Keeping a cardigan on the back of my chair from now on."
+    },
+    {
+      "id": "en-holdout-014",
+      "field": "caption",
+      "text": "School run in a sudden hailstorm. The kids thought it was the best morning ever. My hair disagrees."
+    },
+    {
+      "id": "en-holdout-015",
+      "field": "caption",
+      "text": "Light snow, slushy sidewalks. Lug-sole boots and wool socks, done."
+    },
+    {
+      "id": "en-holdout-016",
+      "field": "caption",
+      "text": "Walked to the market under a clear sky, came back in a downpour. Packable jacket saved the day."
+    },
+    {
+      "id": "en-holdout-017",
+      "field": "caption",
+      "text": "28 degrees by noon. Changed out of my jeans at lunch and into the spare skirt I keep at my desk."
+    },
+    {
+      "id": "en-holdout-018",
+      "field": "caption",
+      "text": "Morning was 3 degrees, afternoon was 17. Thermal top, shirt, sweater, coat. Shed one layer per hour."
+    },
+    {
+      "id": "en-holdout-019",
+      "field": "caption",
+      "text": "Dog walk at 6am in a waxed jacket and a beanie. Neighbors out in shorts. Who is right here?"
+    },
+    {
+      "id": "en-holdout-020",
+      "field": "caption",
+      "text": "Windy enough that I skipped the wide-leg trousers today. Slim cut stays put."
+    },
+    {
+      "id": "en-holdout-021",
+      "field": "caption",
+      "text": "Errand day. Rain boots, cropped trench, crossbody bag so both hands are free for the umbrella."
+    },
+    {
+      "id": "en-holdout-022",
+      "field": "caption",
+      "text": "The app said bring an umbrella. I didn't. Lesson learned for the third time this month ☔"
+    },
+    {
+      "id": "en-holdout-023",
+      "field": "caption",
+      "text": "Train platform was freezing. Next time I'm wearing the long scarf and leaving the decorative one at home."
+    },
+    {
+      "id": "en-holdout-024",
+      "field": "caption",
+      "text": "Drizzle all day. Water-resistant parka and a knit cap kept me dry and warm."
+    },
+    {
+      "id": "en-holdout-025",
+      "field": "caption",
+      "text": "Sun out finally! Denim jacket weather has officially returned."
+    },
+    {
+      "id": "en-holdout-026",
+      "field": "caption",
+      "text": "Ice warning. Trail runners with good grip for the walk, office shoes in the backpack."
+    },
+    {
+      "id": "en-holdout-027",
+      "field": "caption",
+      "text": "Too warm for my coat, too cold without it. Spent the whole commute carrying it over my arm."
+    },
+    {
+      "id": "en-holdout-028",
+      "field": "caption",
+      "text": "Rainy Monday uniform: dark jeans, gray rollneck, rubber-soled boots, navy raincoat."
+    },
+    {
+      "id": "en-holdout-029",
+      "field": "caption",
+      "text": "Pollen count high and 22 degrees. Sunglasses, light overshirt, and a pocket full of tissues."
+    },
+    {
+      "id": "en-holdout-030",
+      "field": "caption",
+      "text": "Picked up the dry cleaning on the way home. Sky cleared just as I left the shop."
+    },
+    {
+      "id": "en-holdout-031",
+      "field": "caption",
+      "text": "Thunderstorm rolled in during my lunch break. Stayed in the café until it passed. Worth it."
+    },
+    {
+      "id": "en-holdout-032",
+      "field": "caption",
+      "text": "Cold snap. Two pairs of socks and thermal leggings under my trousers, and nobody at work noticed."
+    },
+    {
+      "id": "en-holdout-033",
+      "field": "caption",
+      "text": "Breezy and bright. Perfect for the striped boat-neck tee and white jeans."
+    },
+    {
+      "id": "en-holdout-034",
+      "field": "caption",
+      "text": "Snow day errands in my old ski jacket. Not stylish, very warm."
+    },
+    {
+      "id": "en-holdout-035",
+      "field": "caption",
+      "text": "Muggy walk to the pharmacy. Wore my lightest shirt and still felt like soup."
+    },
+    {
+      "id": "en-holdout-036",
+      "field": "caption",
+      "text": "Drizzle, then sun, then drizzle. My hair has given up. My boots are holding strong."
+    },
+    {
+      "id": "en-holdout-037",
+      "field": "caption",
+      "text": "Early shift commute at 2 degrees. Reflective band on my sleeve for the dark walk."
+    },
+    {
+      "id": "en-holdout-038",
+      "field": "caption",
+      "text": "Rain on and off. Wore the bucket hat and left the umbrella at home, worked perfectly."
+    },
+    {
+      "id": "en-holdout-039",
+      "field": "caption",
+      "text": "Spring wind is serious business. Hat flew off twice before I put it in my bag."
+    },
+    {
+      "id": "en-holdout-040",
+      "field": "caption",
+      "text": "Overcast and mild. Chore coat over a hoodie, my favorite in-between combo."
+    },
+    {
+      "id": "en-holdout-041",
+      "field": "caption",
+      "text": "Library, then the hardware store, then home. Cloudy and 14, so a quilted jacket and jeans."
+    },
+    {
+      "id": "en-holdout-042",
+      "field": "caption",
+      "text": "Sleet. Just sleet. Wool coat, umbrella, boots, and a thermos of tea for the walk."
+    },
+    {
+      "id": "en-holdout-043",
+      "field": "caption",
+      "text": "Got to the bus stop and realized I was wearing one navy sock and one black sock. Nobody can tell under boots 😅"
+    },
+    {
+      "id": "en-holdout-044",
+      "field": "caption",
+      "text": "It hit 31 on the way home. Rolled up my sleeves and my trouser hems and carried the blazer."
+    },
+    {
+      "id": "en-holdout-045",
+      "field": "caption",
+      "text": "Light rain on the school run, so the kids got their puddle suits and I got my long shell."
+    },
+    {
+      "id": "en-holdout-046",
+      "field": "caption",
+      "text": "Crisp and sunny, perfect corduroy weather."
+    },
+    {
+      "id": "en-holdout-047",
+      "field": "caption",
+      "text": "Damp chill that gets into your bones. Swapped my cotton sweater for the thick wool one at lunch."
+    },
+    {
+      "id": "en-holdout-048",
+      "field": "caption",
+      "text": "Windy coastal walk to the bakery. Fisherman sweater, beanie, done."
+    },
+    {
+      "id": "en-holdout-049",
+      "field": "caption",
+      "text": "Rain forecast at 4pm, so I left the canvas sneakers at home and went with leather boots."
+    },
+    {
+      "id": "en-holdout-050",
+      "field": "caption",
+      "text": "Stuck in traffic in a heavy sweater with the car heater on full. Should have checked the forecast twice."
+    },
+    {
+      "id": "en-holdout-051",
+      "field": "caption",
+      "text": "That first warm morning where you leave the coat on the hook and don't regret it."
+    },
+    {
+      "id": "en-holdout-052",
+      "field": "caption",
+      "text": "Slush everywhere. My white trainers are retired until spring."
+    },
+    {
+      "id": "en-holdout-053",
+      "field": "caption",
+      "text": "Gray sky, bright coat. Wore the red one just to cheer myself up on the way to work."
+    },
+    {
+      "id": "en-holdout-054",
+      "field": "caption",
+      "text": "Walked to the vet with the dog in matching raincoats. Not planned, just happened."
+    },
+    {
+      "id": "en-holdout-055",
+      "field": "caption",
+      "text": "Hot tram, cold office, hot tram again. Lightweight cardigan is the hero of this week."
+    },
+    {
+      "id": "en-holdout-056",
+      "field": "caption",
+      "text": "Shoveled the driveway in my old parka, then changed into a proper coat for the train."
+    },
+    {
+      "id": "en-holdout-057",
+      "field": "caption",
+      "text": "9 degrees and drizzly. Merino crewneck, wool trousers, waterproof boots, compact umbrella."
+    },
+    {
+      "id": "en-holdout-058",
+      "field": "caption",
+      "text": "Lunch walk in the sun with my jacket tied around my waist like it's the nineties."
+    },
+    {
+      "id": "en-holdout-059",
+      "field": "caption",
+      "text": "Heavy rain all morning. Kept spare socks in my desk drawer and I have never felt smarter."
+    },
+    {
+      "id": "en-holdout-060",
+      "field": "caption",
+      "text": "Strong gusts on the platform. Glad I wore trousers and not the pleated skirt."
+    },
+    {
+      "id": "en-holdout-061",
+      "field": "caption",
+      "text": "Out for milk in pajama trousers under a long coat. It counts as an outfit."
+    },
+    {
+      "id": "en-holdout-062",
+      "field": "caption",
+      "text": "Morning mist turned into full sun by ten. Packed sunglasses just in case and needed them."
+    },
+    {
+      "id": "en-holdout-063",
+      "field": "caption",
+      "text": "Bus was late, rain was early. Hood up, music on, made it work."
+    },
+    {
+      "id": "en-holdout-064",
+      "field": "caption",
+      "text": "16 degrees and cloudy: overshirt weather, my favorite kind."
+    },
+    {
+      "id": "en-holdout-065",
+      "field": "caption",
+      "text": "Wore a raincoat, carried an umbrella, still got splashed by a passing car. Can't win them all."
+    },
+    {
+      "id": "en-holdout-066",
+      "field": "caption",
+      "text": "Cold wind off the river so I added a neck warmer under the coat collar. Huge difference."
+    },
+    {
+      "id": "en-holdout-067",
+      "field": "caption",
+      "text": "Farmers market in the sun, linen everything, big basket. Perfect Saturday."
+    },
+    {
+      "id": "en-holdout-068",
+      "field": "caption",
+      "text": "It snowed overnight and my boots are still drying by the radiator from yesterday. Wearing the backup pair."
+    },
+    {
+      "id": "en-holdout-069",
+      "field": "caption",
+      "text": "Muddy path to the station after all the rain. Glad I chose the dark trousers."
+    },
+    {
+      "id": "en-holdout-070",
+      "field": "caption",
+      "text": "Too hot for a jacket, too rainy for none. Went with a thin nylon anorak."
+    },
+    {
+      "id": "en-holdout-071",
+      "field": "caption",
+      "text": "Errands with a newborn in a carrier, so the coat goes over both of us. Love the extension panel."
+    },
+    {
+      "id": "en-holdout-072",
+      "field": "caption",
+      "text": "Ran out to post a parcel in a thunderstorm. Rubber clogs are underrated."
+    },
+    {
+      "id": "en-holdout-073",
+      "field": "caption",
+      "text": "Cold, clear and still. The best weather for my long wool coat."
+    },
+    {
+      "id": "en-holdout-074",
+      "field": "caption",
+      "text": "Sudden summer shower and the whole street ran for the awnings 🌦️"
+    },
+    {
+      "id": "en-holdout-075",
+      "field": "caption",
+      "text": "Forecast: rain. Reality: sunshine. Me: in full waterproofs on the tram."
+    },
+    {
+      "id": "en-holdout-076",
+      "field": "caption",
+      "text": "Office day in a heatwave. Short-sleeve shirt, light trousers, loafers without socks."
+    },
+    {
+      "id": "en-holdout-077",
+      "field": "caption",
+      "text": "Crunchy leaves, cold nose, warm hands. Fingerless gloves are back in rotation."
+    },
+    {
+      "id": "en-holdout-078",
+      "field": "caption",
+      "text": "Walked my parents to the clinic in drizzle. Lent my dad my spare hat, he refused to give it back."
+    },
+    {
+      "id": "en-holdout-079",
+      "field": "caption",
+      "text": "Cycling into a headwind in a long skirt is not something I will be doing again."
+    },
+    {
+      "id": "en-holdout-080",
+      "field": "caption",
+      "text": "Errands in 35 degrees. Wide-brim hat, loose trousers, water bottle, shade where possible."
+    },
+    {
+      "id": "en-holdout-081",
+      "field": "caption",
+      "text": "One umbrella broke on the way in, the backup one survived. Wind is winning this week."
+    },
+    {
+      "id": "en-holdout-082",
+      "field": "caption",
+      "text": "Wore my boots with the deep tread today and walked straight through the slush with confidence."
+    },
+    {
+      "id": "en-holdout-083",
+      "field": "caption",
+      "text": "Got to the office soaked from the knees down. Next time, the long raincoat."
+    },
+    {
+      "id": "en-holdout-084",
+      "field": "caption",
+      "text": "A soft gray morning. Cream knit, charcoal trousers, brown boots."
+    },
+    {
+      "id": "en-holdout-085",
+      "field": "caption",
+      "text": "Hailstones the size of peas during the walk home. Hood and collar up, kept moving."
+    },
+    {
+      "id": "en-holdout-086",
+      "field": "caption",
+      "text": "Sun's out but the wind is cold. Quilted liner under the trench, scarf in the pocket."
+    },
+    {
+      "id": "en-holdout-087",
+      "field": "caption",
+      "text": "Snowy commute #rainydaystyle #winterlayers"
+    },
+    {
+      "id": "en-holdout-088",
+      "field": "caption",
+      "text": "Bank, cobbler, coffee. Mild and sunny, so just a sweater and my favorite jeans."
+    },
+    {
+      "id": "en-holdout-089",
+      "field": "caption",
+      "text": "Rain boots and a cotton dress felt odd at first but it's actually a great summer storm combo."
+    },
+    {
+      "id": "en-holdout-090",
+      "field": "caption",
+      "text": "Thick fog, damp air. My wool coat smells faintly of sheep today and I've made peace with it."
+    },
+    {
+      "id": "en-holdout-091",
+      "field": "caption",
+      "text": "Wet socks again."
+    },
+    {
+      "id": "en-holdout-092",
+      "field": "caption",
+      "text": "Coat weather. Finally."
+    },
+    {
+      "id": "en-holdout-093",
+      "field": "caption",
+      "text": "Long day of errands in changeable weather: started in a wool coat at 8, swapped to the quilted vest at noon, and walked home in just a shirt with the coat over my arm. Next time I'm leaving the heavy coat in the car and trusting the forecast a little more."
+    },
+    {
+      "id": "en-holdout-094",
+      "field": "caption",
+      "text": "Question for anyone who commutes by ferry: how do you dress for a 40 minute crossing in a cold wind and then an office that runs warm all day? I've tried a thin down liner under my trench, but I still end up either freezing on deck or roasting at my desk."
+    },
+    {
+      "id": "en-holdout-095",
+      "field": "caption",
+      "text": "Thank you so much for the detailed reply about caring for wool. I hand-washed my two favorite sweaters exactly the way you described, rolled them in a towel and dried them flat, and they came out soft with no shrinking at all. Saving your comment for every winter."
+    },
+    {
+      "id": "en-holdout-096",
+      "field": "caption",
+      "text": "Packing note for future me: the city was warmer than forecast, the evenings were cooler than forecast, and the one cardigan I nearly left behind got worn every single day. Always pack the cardigan. Also, two pairs of comfortable shoes beat one nice and one comfortable."
+    },
+    {
+      "id": "en-holdout-097",
+      "field": "caption",
+      "text": "Anyone have tips for keeping wide trousers dry in the rain? Mine soak up puddle water to the knee."
+    },
+    {
+      "id": "en-holdout-098",
+      "field": "caption",
+      "text": "What shoes do you wear for a 20 minute walk to work when it's slushy but you need to look office-ready?"
+    },
+    {
+      "id": "en-holdout-099",
+      "field": "caption",
+      "text": "How do you layer for a day that starts at 2 degrees and ends at 15? I always end up overheating by lunch."
+    },
+    {
+      "id": "en-holdout-100",
+      "field": "caption",
+      "text": "Question for the cold-climate crowd: wool or down for a daily coat? Budget for one only."
+    },
+    {
+      "id": "en-holdout-101",
+      "field": "caption",
+      "text": "How do you dress for meetings in humid heat? Linen wrinkles, synthetics trap heat, I'm out of ideas."
+    },
+    {
+      "id": "en-holdout-102",
+      "field": "caption",
+      "text": "Can a navy coat work with black trousers? Asking before I buy anything new."
+    },
+    {
+      "id": "en-holdout-103",
+      "field": "caption",
+      "text": "Best way to wear a long skirt in windy weather? Mine keeps wrapping around my legs on the walk."
+    },
+    {
+      "id": "en-holdout-104",
+      "field": "caption",
+      "text": "Help: guest outfit for an outdoor ceremony, forecast says 30% chance of showers. What would you wear?"
+    },
+    {
+      "id": "en-holdout-105",
+      "field": "caption",
+      "text": "What color scarf goes with a camel coat if I already own gray and cream?"
+    },
+    {
+      "id": "en-holdout-106",
+      "field": "caption",
+      "text": "Rain boots that don't look like garden boots, do they exist? Looking for shapes and details to search for."
+    },
+    {
+      "id": "en-holdout-107",
+      "field": "caption",
+      "text": "How warm is a lined trench in practice? Could it replace a winter coat at 5 degrees?"
+    },
+    {
+      "id": "en-holdout-108",
+      "field": "caption",
+      "text": "Anyone wear shorts to the office in summer? Curious how others handle dress codes in a heatwave."
+    },
+    {
+      "id": "en-holdout-109",
+      "field": "caption",
+      "text": "Petite folks, how do you wear a midi coat without it swallowing you?"
+    },
+    {
+      "id": "en-holdout-110",
+      "field": "caption",
+      "text": "What do you keep in your bag for sudden weather changes? Building a little kit."
+    },
+    {
+      "id": "en-holdout-111",
+      "field": "caption",
+      "text": "Is it weird to wear sandals with socks in early spring? Asking for myself."
+    },
+    {
+      "id": "en-holdout-112",
+      "field": "caption",
+      "text": "Which fabric dries fastest after getting caught in the rain? Need it for a cycling commute."
+    },
+    {
+      "id": "en-holdout-113",
+      "field": "caption",
+      "text": "Thoughts on white sneakers in winter? Mine turn gray within a week."
+    },
+    {
+      "id": "en-holdout-114",
+      "field": "caption",
+      "text": "Suggestions for a first job interview outfit when it's 33 degrees out?"
+    },
+    {
+      "id": "en-holdout-115",
+      "field": "caption",
+      "text": "How do you keep your hands warm and still use your phone at the bus stop?"
+    },
+    {
+      "id": "en-holdout-116",
+      "field": "caption",
+      "text": "Should I hem these trousers for flats or for boots? I wear both depending on the weather."
+    },
+    {
+      "id": "en-holdout-117",
+      "field": "caption",
+      "text": "Can anyone recommend a hat style that works with long hair and a hood?"
+    },
+    {
+      "id": "en-holdout-118",
+      "field": "caption",
+      "text": "What layers do you wear under a rain shell for spring hikes?"
+    },
+    {
+      "id": "en-holdout-119",
+      "field": "caption",
+      "text": "Do I really need a separate spring jacket or can a denim jacket plus a hoodie cover it?"
+    },
+    {
+      "id": "en-holdout-120",
+      "field": "caption",
+      "text": "Olive or rust for an autumn cardigan? I wear a lot of navy and denim."
+    },
+    {
+      "id": "en-holdout-121",
+      "field": "caption",
+      "text": "How do you deal with static in wool sweaters during dry winter days?"
+    },
+    {
+      "id": "en-holdout-122",
+      "field": "caption",
+      "text": "Curious how people in rainy cities handle suede. Do you just pack it away from October to April?"
+    },
+    {
+      "id": "en-holdout-123",
+      "field": "caption",
+      "text": "Any tips for dressing a toddler for a windy beach day?"
+    },
+    {
+      "id": "en-holdout-124",
+      "field": "caption",
+      "text": "Tall people: what do you look for to make sure sleeves actually reach your wrists?"
+    },
+    {
+      "id": "en-holdout-125",
+      "field": "caption",
+      "text": "Is a turtleneck under a blazer too much for a casual Friday?"
+    },
+    {
+      "id": "en-holdout-126",
+      "field": "caption",
+      "text": "How many coats do you actually own? Trying to figure out if three is excessive."
+    },
+    {
+      "id": "en-holdout-127",
+      "field": "caption",
+      "text": "What's your go-to outfit for a day with a 60% chance of rain and a dinner afterwards?"
+    },
+    {
+      "id": "en-holdout-128",
+      "field": "caption",
+      "text": "Is merino worth it for someone who runs warm? I keep hearing it regulates temperature."
+    },
+    {
+      "id": "en-holdout-129",
+      "field": "caption",
+      "text": "How do you keep a wool coat from pilling where the bag strap rubs?"
+    },
+    {
+      "id": "en-holdout-130",
+      "field": "caption",
+      "text": "Brown shoes with a gray suit in autumn, yes or no?"
+    },
+    {
+      "id": "en-holdout-131",
+      "field": "caption",
+      "text": "Looking for ideas: how to make a plain black puffer look less like a sleeping bag."
+    },
+    {
+      "id": "en-holdout-132",
+      "field": "caption",
+      "text": "Do you size up for winter boots to fit thicker socks? First real winter here."
+    },
+    {
+      "id": "en-holdout-133",
+      "field": "caption",
+      "text": "How do people bike in skirts in the rain? Genuine question, I want to try it."
+    },
+    {
+      "id": "en-holdout-134",
+      "field": "caption",
+      "text": "What's a good alternative to a scarf for someone who finds them itchy?"
+    },
+    {
+      "id": "en-holdout-135",
+      "field": "caption",
+      "text": "Anyone else's hair go completely flat under a beanie? How do you handle it at work?"
+    },
+    {
+      "id": "en-holdout-136",
+      "field": "caption",
+      "text": "Best colors for a rain jacket if I want it to go with everything? Currently torn between navy and olive."
+    },
+    {
+      "id": "en-holdout-137",
+      "field": "caption",
+      "text": "How do you store bulky sweaters in a tiny apartment over the summer?"
+    },
+    {
+      "id": "en-holdout-138",
+      "field": "caption",
+      "text": "Anyone tried wearing tights under trousers? Does it actually help in the cold?"
+    },
+    {
+      "id": "en-holdout-139",
+      "field": "caption",
+      "text": "What would you pair with a mustard raincoat? I bought it on impulse and now I'm lost."
+    },
+    {
+      "id": "en-holdout-140",
+      "field": "caption",
+      "text": "How short is too short for a coat over a midi dress?"
+    },
+    {
+      "id": "en-holdout-141",
+      "field": "caption",
+      "text": "Question about the app: do you trust the feels-like temperature or the actual number when choosing layers?"
+    },
+    {
+      "id": "en-holdout-142",
+      "field": "caption",
+      "text": "Linen or seersucker for a humid summer? I sweat through cotton by noon."
+    },
+    {
+      "id": "en-holdout-143",
+      "field": "caption",
+      "text": "Need help: same outfit has to work for a morning hike and a lunch in town. 10 to 19 degrees."
+    },
+    {
+      "id": "en-holdout-144",
+      "field": "caption",
+      "text": "Is there a trick to keeping glasses from fogging up with a scarf over your mouth?"
+    },
+    {
+      "id": "en-holdout-145",
+      "field": "caption",
+      "text": "How do you style ankle boots with wide jeans without the hem bunching?"
+    },
+    {
+      "id": "en-holdout-146",
+      "field": "caption",
+      "text": "Any advice for dressing for a long outdoor football match in November? Sitting still for two hours."
+    },
+    {
+      "id": "en-holdout-147",
+      "field": "caption",
+      "text": "What's the warmest hat shape for someone who doesn't like pom-poms?"
+    },
+    {
+      "id": "en-holdout-148",
+      "field": "caption",
+      "text": "Can you wear a light blazer as outerwear in spring or does it look like you forgot your coat?"
+    },
+    {
+      "id": "en-holdout-149",
+      "field": "caption",
+      "text": "How do you keep your feet from overheating in boots on a heated train?"
+    },
+    {
+      "id": "en-holdout-150",
+      "field": "caption",
+      "text": "Should I get a raincoat with a hood or wear a hat? I can never decide."
+    },
+    {
+      "id": "en-holdout-151",
+      "field": "caption",
+      "text": "Silly question, but how do you sit on a bike with a long coat without it catching on the wheel?"
+    },
+    {
+      "id": "en-holdout-152",
+      "field": "caption",
+      "text": "What's everyone wearing for the shoulder season? I feel like I'm guessing every single morning."
+    },
+    {
+      "id": "en-holdout-153",
+      "field": "caption",
+      "text": "Thank you all for the advice on my wedding guest question! Went with the midi dress plus a light trench and it was perfect."
+    },
+    {
+      "id": "en-holdout-154",
+      "field": "caption",
+      "text": "That color combo is so good, the mustard really lifts the gray."
+    },
+    {
+      "id": "en-holdout-155",
+      "field": "caption",
+      "text": "Thank you for the tip about waxing the canvas bag, it held up perfectly in yesterday's rain!"
+    },
+    {
+      "id": "en-holdout-156",
+      "field": "caption",
+      "text": "Love how you styled the oversized blazer, it looks completely effortless."
+    },
+    {
+      "id": "en-holdout-157",
+      "field": "caption",
+      "text": "You were right about the wool socks. My feet stayed warm the whole walk."
+    },
+    {
+      "id": "en-holdout-158",
+      "field": "caption",
+      "text": "This is exactly the outfit inspiration I needed for a gray week. Thanks for sharing!"
+    },
+    {
+      "id": "en-holdout-159",
+      "field": "caption",
+      "text": "Your rain look is so put together. I always arrive looking like I swam there."
+    },
+    {
+      "id": "en-holdout-160",
+      "field": "caption",
+      "text": "Thanks so much for answering my layering question, the thermal tip changed my mornings."
+    },
+    {
+      "id": "en-holdout-161",
+      "field": "caption",
+      "text": "Okay that trench is perfect. The length is spot on."
+    },
+    {
+      "id": "en-holdout-162",
+      "field": "caption",
+      "text": "Saving this for my next trip. Thank you!"
+    },
+    {
+      "id": "en-holdout-163",
+      "field": "caption",
+      "text": "Such a smart way to bring the summer dress into autumn with tights and a chunky knit."
+    },
+    {
+      "id": "en-holdout-164",
+      "field": "caption",
+      "text": "Your packing list helped me fit everything into a carry-on. So grateful!"
+    },
+    {
+      "id": "en-holdout-165",
+      "field": "caption",
+      "text": "Gorgeous colors. The green coat looks stunning against the snow."
+    },
+    {
+      "id": "en-holdout-166",
+      "field": "caption",
+      "text": "Thanks for the hemming advice, my tailor knew exactly what I meant."
+    },
+    {
+      "id": "en-holdout-167",
+      "field": "caption",
+      "text": "Tried your trick of cuffing the jeans once over boots and it looks so much cleaner."
+    },
+    {
+      "id": "en-holdout-168",
+      "field": "caption",
+      "text": "That scarf knot is genius, trying it tomorrow."
+    },
+    {
+      "id": "en-holdout-169",
+      "field": "caption",
+      "text": "Appreciate you posting the real commute photo along with the polished one."
+    },
+    {
+      "id": "en-holdout-170",
+      "field": "caption",
+      "text": "This made my morning. You always find the coziest combinations."
+    },
+    {
+      "id": "en-holdout-171",
+      "field": "caption",
+      "text": "Thank you for the reply! Bought nothing new, just restyled what I had like you suggested."
+    },
+    {
+      "id": "en-holdout-172",
+      "field": "caption",
+      "text": "The way you mixed stripes and checks here is so confident. Love it."
+    },
+    {
+      "id": "en-holdout-173",
+      "field": "caption",
+      "text": "Big thanks to everyone who answered my boots question. Went with the lug soles and zero regrets."
+    },
+    {
+      "id": "en-holdout-174",
+      "field": "caption",
+      "text": "Your mending posts got me to finally fix my favorite sweater. Thank you!"
+    },
+    {
+      "id": "en-holdout-175",
+      "field": "caption",
+      "text": "That shade of blue suits you so well."
+    },
+    {
+      "id": "en-holdout-176",
+      "field": "caption",
+      "text": "Thank you for explaining how you layer under the shell. Tried it on today's walk and stayed warm without sweating."
+    },
+    {
+      "id": "en-holdout-177",
+      "field": "caption",
+      "text": "The rust and cream together, wow."
+    },
+    {
+      "id": "en-holdout-178",
+      "field": "caption",
+      "text": "Love that you rewear the same coat in every post. Proof that one good coat really is enough."
+    },
+    {
+      "id": "en-holdout-179",
+      "field": "caption",
+      "text": "Thank you! Your comment about rolling the sleeves made the shirt work for me."
+    },
+    {
+      "id": "en-holdout-180",
+      "field": "caption",
+      "text": "You make rainy days look like fun. Following for more of this."
+    },
+    {
+      "id": "en-holdout-181",
+      "field": "caption",
+      "text": "That hat is perfect with the long coat. Great proportions."
+    },
+    {
+      "id": "en-holdout-182",
+      "field": "caption",
+      "text": "Really appreciate the honest review of how the jacket handled the storm."
+    },
+    {
+      "id": "en-holdout-183",
+      "field": "caption",
+      "text": "Welcome to the community! Your first post is lovely."
+    },
+    {
+      "id": "en-holdout-184",
+      "field": "caption",
+      "text": "Thanks for the reminder to check the evening forecast too. Saved me last night."
+    },
+    {
+      "id": "en-holdout-185",
+      "field": "caption",
+      "text": "Beautiful flat lay, and so helpful to see everything you packed in one place."
+    },
+    {
+      "id": "en-holdout-186",
+      "field": "caption",
+      "text": "This combination is going straight into my autumn notes."
+    },
+    {
+      "id": "en-holdout-187",
+      "field": "caption",
+      "text": "Thank you for answering so quickly, the tip about weatherproofing spray was exactly what I needed."
+    },
+    {
+      "id": "en-holdout-188",
+      "field": "caption",
+      "text": "Agree with everyone here, the cropped jacket is the star of this look."
+    },
+    {
+      "id": "en-holdout-189",
+      "field": "caption",
+      "text": "Wow, I never thought to pair a hoodie under a wool coat. Trying it this week."
+    },
+    {
+      "id": "en-holdout-190",
+      "field": "caption",
+      "text": "Your thrift finds are always so good. That jacket looks like it was made for you."
+    },
+    {
+      "id": "en-holdout-191",
+      "field": "caption",
+      "text": "Thank you for sharing your size and fit notes, it helps so much."
+    },
+    {
+      "id": "en-holdout-192",
+      "field": "caption",
+      "text": "Love the cozy vibe of this whole outfit ☕"
+    },
+    {
+      "id": "en-holdout-193",
+      "field": "caption",
+      "text": "Grateful for this community. Asked a silly question about socks and got twelve thoughtful answers."
+    },
+    {
+      "id": "en-holdout-194",
+      "field": "caption",
+      "text": "The way the scarf picks up the color in your bag is such a nice detail."
+    },
+    {
+      "id": "en-holdout-195",
+      "field": "caption",
+      "text": "Thanks for the encouragement on my first repair post! Already planning the next one."
+    },
+    {
+      "id": "en-holdout-196",
+      "field": "caption",
+      "text": "Packing for 5 days in a city where it rains daily: one shell, two sweaters, three tees, one pair of boots that can handle puddles."
+    },
+    {
+      "id": "en-holdout-197",
+      "field": "caption",
+      "text": "Weekend trip, forecast 18 to 24. Bringing linen trousers, two shirts, a light knit and sneakers."
+    },
+    {
+      "id": "en-holdout-198",
+      "field": "caption",
+      "text": "Carry-on only for a week of mountain weather. Merino everything."
+    },
+    {
+      "id": "en-holdout-199",
+      "field": "caption",
+      "text": "Swimsuit, sun hat, one dress that works for dinner, sandals. Beach bag is done."
+    },
+    {
+      "id": "en-holdout-200",
+      "field": "caption",
+      "text": "Business trip, two days, 3 degrees. Wearing the heaviest coat on the plane so the bag stays light."
+    },
+    {
+      "id": "en-holdout-201",
+      "field": "caption",
+      "text": "Trying a capsule for this trip: everything in navy, white and tan so it all mixes."
+    },
+    {
+      "id": "en-holdout-202",
+      "field": "caption",
+      "text": "Note to self: bring a second pair of shoes. Last trip my only pair got soaked on day one."
+    },
+    {
+      "id": "en-holdout-203",
+      "field": "caption",
+      "text": "Forecast flipped from sunny to stormy. Unpacking the sandals, adding the rain boots."
+    },
+    {
+      "id": "en-holdout-204",
+      "field": "caption",
+      "text": "Ten days, two climates. Planning to layer the beach clothes under a fleece for the cold half."
+    },
+    {
+      "id": "en-holdout-205",
+      "field": "caption",
+      "text": "Packing for a family visit up north. Thermal leggings are going in first."
+    },
+    {
+      "id": "en-holdout-206",
+      "field": "caption",
+      "text": "Overnight bag for a conference: one blazer, two tops, one pair of trousers that work for both days."
+    },
+    {
+      "id": "en-holdout-207",
+      "field": "caption",
+      "text": "Rolled vs folded? I'm team rolled for knits and folded for shirts."
+    },
+    {
+      "id": "en-holdout-208",
+      "field": "caption",
+      "text": "Packing list for a rainy long weekend #packinglight #travelcapsule"
+    },
+    {
+      "id": "en-holdout-209",
+      "field": "caption",
+      "text": "Five tops, two bottoms, one dress, one cardigan. Should cover a week if the weather behaves."
+    },
+    {
+      "id": "en-holdout-210",
+      "field": "caption",
+      "text": "Trip to the coast next week. Forecast says 15 and windy, so the windbreaker is coming along."
+    },
+    {
+      "id": "en-holdout-211",
+      "field": "caption",
+      "text": "Packed my lightest down jacket into its own pocket. Fits in the corner of my backpack."
+    },
+    {
+      "id": "en-holdout-212",
+      "field": "caption",
+      "text": "Ski trip prep: base layers washed, gloves found, one glove missing. Searching the house."
+    },
+    {
+      "id": "en-holdout-213",
+      "field": "caption",
+      "text": "Bringing one pair of shoes only for this city break. Walking sneakers in a neutral color, wish me luck."
+    },
+    {
+      "id": "en-holdout-214",
+      "field": "caption",
+      "text": "Every time I overpack. This time I laid everything out and removed a third before closing the suitcase."
+    },
+    {
+      "id": "en-holdout-215",
+      "field": "caption",
+      "text": "Going somewhere with 80% humidity. Leaving every denim item at home."
+    },
+    {
+      "id": "en-holdout-216",
+      "field": "caption",
+      "text": "Packing for a hiking trip with a dress for the last night. The dress weighs less than my socks."
+    },
+    {
+      "id": "en-holdout-217",
+      "field": "caption",
+      "text": "Tip from a frequent traveler: wear your bulkiest shoes and coat on the plane."
+    },
+    {
+      "id": "en-holdout-218",
+      "field": "caption",
+      "text": "Night train tomorrow, so packing comfy layers and a big scarf that doubles as a blanket."
+    },
+    {
+      "id": "en-holdout-219",
+      "field": "caption",
+      "text": "The forecast for my trip changes every day so I'm packing for three seasons in one small bag."
+    },
+    {
+      "id": "en-holdout-220",
+      "field": "caption",
+      "text": "Visiting family in the tropics. Packed light cotton, one long-sleeve for the plane, and a fold-up hat."
+    },
+    {
+      "id": "en-holdout-221",
+      "field": "caption",
+      "text": "Packing cubes sorted by day this time. Let's see if it actually helps."
+    },
+    {
+      "id": "en-holdout-222",
+      "field": "caption",
+      "text": "Week-long work trip in a dry, sunny place. Lip balm, sunscreen, light blazer, two pairs of loafers."
+    },
+    {
+      "id": "en-holdout-223",
+      "field": "caption",
+      "text": "Remember to pack a laundry bag. Wet swimsuits in a suitcase are never fun."
+    },
+    {
+      "id": "en-holdout-224",
+      "field": "caption",
+      "text": "Camping weekend with chilly nights. Wool socks, fleece, hat, and a puffy for the campfire."
+    },
+    {
+      "id": "en-holdout-225",
+      "field": "caption",
+      "text": "Packing my rain shell in the outside pocket so I can grab it at the airport if needed."
+    },
+    {
+      "id": "en-holdout-226",
+      "field": "caption",
+      "text": "Mountain town in October: thick knit, hiking boots, a cozy hat for the evenings."
+    },
+    {
+      "id": "en-holdout-227",
+      "field": "caption",
+      "text": "Bringing a scarf on every trip now. Plane, train, beach, dinner, it does everything."
+    },
+    {
+      "id": "en-holdout-228",
+      "field": "caption",
+      "text": "Second time to this city this year and I'm still packing too many tops."
+    },
+    {
+      "id": "en-holdout-229",
+      "field": "caption",
+      "text": "Wedding abroad: suit in a garment bag, everything else in a carry-on. Fingers crossed for no wrinkles."
+    },
+    {
+      "id": "en-holdout-230",
+      "field": "caption",
+      "text": "Found a cardigan at the thrift shop for less than a coffee. Pure wool, no holes, perfect sleeve length."
+    },
+    {
+      "id": "en-holdout-231",
+      "field": "caption",
+      "text": "Took my favorite trousers to the tailor to taper the legs. Feels like a brand new pair."
+    },
+    {
+      "id": "en-holdout-232",
+      "field": "caption",
+      "text": "Laundry day tip: wash dark denim inside out in cold water and hang it to dry. Color lasts so much longer."
+    },
+    {
+      "id": "en-holdout-233",
+      "field": "caption",
+      "text": "Sewed the loose button back on my coat before the weather turned. Small win."
+    },
+    {
+      "id": "en-holdout-234",
+      "field": "caption",
+      "text": "Thrift haul: a tweed blazer, a striped scarf, and a pair of leather boots that just need new laces."
+    },
+    {
+      "id": "en-holdout-235",
+      "field": "caption",
+      "text": "Darned the heel of my wool socks for the first time. Not pretty, but warm and holding."
+    },
+    {
+      "id": "en-holdout-236",
+      "field": "caption",
+      "text": "Hand-washed my sweaters with wool wash and dried them flat on a towel. They smell like a meadow now."
+    },
+    {
+      "id": "en-holdout-237",
+      "field": "caption",
+      "text": "The tailor shortened the sleeves on my secondhand coat and now it fits like it was made for me."
+    },
+    {
+      "id": "en-holdout-238",
+      "field": "caption",
+      "text": "Replaced the zipper on my old rain jacket instead of buying a new one. Ready for another season."
+    },
+    {
+      "id": "en-holdout-239",
+      "field": "caption",
+      "text": "Repair cafe this weekend was lovely. Got help patching the elbows of my favorite knit."
+    },
+    {
+      "id": "en-holdout-240",
+      "field": "caption",
+      "text": "Thrift tip: check the seams and the lining before you check the price."
+    },
+    {
+      "id": "en-holdout-241",
+      "field": "caption",
+      "text": "Re-waxed my old cotton jacket today. Kitchen smells odd, jacket looks great."
+    },
+    {
+      "id": "en-holdout-242",
+      "field": "caption",
+      "text": "Resoled my boots. The cobbler said they have at least five more winters in them."
+    },
+    {
+      "id": "en-holdout-243",
+      "field": "caption",
+      "text": "Laundry advice needed: how do you dry a down jacket without it clumping? Mine came out flat."
+    },
+    {
+      "id": "en-holdout-244",
+      "field": "caption",
+      "text": "Visible mending on the knees of my jeans with a bit of blue thread. Happy with how it turned out."
+    },
+    {
+      "id": "en-holdout-245",
+      "field": "caption",
+      "text": "Washed the white canvas sneakers with a soft brush and some soap. Almost back to new."
+    },
+    {
+      "id": "en-holdout-246",
+      "field": "caption",
+      "text": "Charity shop find: a long gray coat with a little wear on the cuffs. Had them turned and it looks fresh."
+    },
+    {
+      "id": "en-holdout-247",
+      "field": "caption",
+      "text": "Thrifted a linen shirt in a soft green. Washing it twice before wearing to soften it up even more."
+    },
+    {
+      "id": "en-holdout-248",
+      "field": "caption",
+      "text": "Took in the waist on a pair of vintage trousers. First time doing it myself, took two evenings."
+    },
+    {
+      "id": "en-holdout-249",
+      "field": "caption",
+      "text": "Pilling comb is the best thing I bought this year. Sweaters look new again."
+    },
+    {
+      "id": "en-holdout-250",
+      "field": "caption",
+      "text": "Steaming my wrinkled shirt in the bathroom while I shower. Old trick, still works."
+    },
+    {
+      "id": "en-holdout-251",
+      "field": "caption",
+      "text": "Fixed the lining of my coat pocket with a quick hand stitch. No more lost keys."
+    },
+    {
+      "id": "en-holdout-252",
+      "field": "caption",
+      "text": "Secondhand rain boots, barely worn, perfect size. The universe knew it was going to rain this week."
+    },
+    {
+      "id": "en-holdout-253",
+      "field": "caption",
+      "text": "Hemmed my own trousers today with a little help from a video and a lot of pins."
+    },
+    {
+      "id": "en-holdout-254",
+      "field": "caption",
+      "text": "Laundry pile conquered. Everything sorted by fabric, delicates in mesh bags."
+    },
+    {
+      "id": "en-holdout-255",
+      "field": "caption",
+      "text": "Tailor tip: ask for a little extra room in the shoulders if you layer heavy knits underneath."
+    },
+    {
+      "id": "en-holdout-256",
+      "field": "caption",
+      "text": "Patched the hole in my gloves with a contrasting color. Looks intentional now."
+    },
+    {
+      "id": "en-holdout-257",
+      "field": "caption",
+      "text": "Washed my wool coat at home for the first time, very carefully, and it came out fine. Relieved."
+    },
+    {
+      "id": "en-holdout-258",
+      "field": "caption",
+      "text": "Took my heels in for new tips before the wet season. Way better grip on wet pavements now."
+    },
+    {
+      "id": "en-holdout-259",
+      "field": "caption",
+      "text": "Thrift store was overflowing with knitwear today. Left with only one, which feels like great restraint."
+    },
+    {
+      "id": "en-holdout-260",
+      "field": "caption",
+      "text": "Mended the collar on my dad's old shirt and now I wear it every weekend."
+    },
+    {
+      "id": "en-holdout-261",
+      "field": "caption",
+      "text": "Cleaning salt stains off leather boots with a bit of vinegar and water. Works every time."
+    },
+    {
+      "id": "en-holdout-262",
+      "field": "caption",
+      "text": "Swapped buttons on a thrifted blazer for horn ones and it looks so much more expensive."
+    },
+    {
+      "id": "en-holdout-263",
+      "field": "caption",
+      "text": "Dyed a faded black t-shirt back to deep black. Cheap fix, big difference."
+    },
+    {
+      "id": "en-holdout-264",
+      "field": "caption",
+      "text": "Spent Sunday ironing shirts for the week and listening to the rain. Oddly relaxing."
+    },
+    {
+      "id": "en-holdout-265",
+      "field": "caption",
+      "text": "Tip: hang rain jackets inside out to dry so the lining doesn't stay damp."
+    },
+    {
+      "id": "en-holdout-266",
+      "field": "caption",
+      "text": "The tailor let out the hem on my old wool skirt and now it's a perfect winter length."
+    },
+    {
+      "id": "en-holdout-267",
+      "field": "caption",
+      "text": "Brushed my wool coat after a dusty week. Lint brush and a little patience."
+    },
+    {
+      "id": "en-holdout-268",
+      "field": "caption",
+      "text": "Bought a worn leather satchel at a flea market, cleaned it and conditioned it. Looks gorgeous."
+    },
+    {
+      "id": "en-holdout-269",
+      "field": "caption",
+      "text": "Seasonal swap done! Summer clothes in the bins under the bed, winter knits back on the shelves."
+    },
+    {
+      "id": "en-holdout-270",
+      "field": "caption",
+      "text": "Brought the boots up from the basement today. That's how you know autumn is here."
+    },
+    {
+      "id": "en-holdout-271",
+      "field": "caption",
+      "text": "Storing linen with lavender sachets until next summer. See you in May."
+    },
+    {
+      "id": "en-holdout-272",
+      "field": "caption",
+      "text": "Spring swap: heavy coats to the cleaner, light jackets on the hooks."
+    },
+    {
+      "id": "en-holdout-273",
+      "field": "caption",
+      "text": "Pulled out the sweater box and found three I forgot I owned. Best kind of shopping."
+    },
+    {
+      "id": "en-holdout-274",
+      "field": "caption",
+      "text": "Swapped the flannel sheets for cotton and the wool socks for cotton ones. Spring is official."
+    },
+    {
+      "id": "en-holdout-275",
+      "field": "caption",
+      "text": "Halfway through the closet swap and the bed is covered in clothes. Send snacks."
+    },
+    {
+      "id": "en-holdout-276",
+      "field": "caption",
+      "text": "Got rid of five things during the seasonal swap and kept everything else. Progress is progress."
+    },
+    {
+      "id": "en-holdout-277",
+      "field": "caption",
+      "text": "Autumn closet refresh: grouped everything by color this time, so much easier to plan outfits."
+    },
+    {
+      "id": "en-holdout-278",
+      "field": "caption",
+      "text": "Swapping wardrobes with the seasons is my favorite reset. Feels like getting new clothes for free."
+    },
+    {
+      "id": "en-holdout-279",
+      "field": "caption",
+      "text": "Moved the sandals to the top shelf and the boots to the floor. Winter rearrangement complete."
+    },
+    {
+      "id": "en-holdout-280",
+      "field": "caption",
+      "text": "Time to retire the summer hats until next year. One last sunny walk with the straw one first."
+    },
+    {
+      "id": "en-holdout-281",
+      "field": "caption",
+      "text": "Cedar blocks in the sweater bins this year. Fingers crossed nothing gets nibbled."
+    },
+    {
+      "id": "en-holdout-282",
+      "field": "caption",
+      "text": "Mid-season swap: kept a few summer dresses out because they work with tights and a cardigan."
+    },
+    {
+      "id": "en-holdout-283",
+      "field": "caption",
+      "text": "The first cool morning means my trench moves from the back of the closet to the front."
+    },
+    {
+      "id": "en-holdout-284",
+      "field": "caption",
+      "text": "Packed away the puffer, kept the vest out for chilly spring evenings."
+    },
+    {
+      "id": "en-holdout-285",
+      "field": "caption",
+      "text": "Took everything out, tried it all on, and made a donate pile before putting winter clothes away."
+    },
+    {
+      "id": "en-holdout-286",
+      "field": "caption",
+      "text": "Fall swap reminder: check pockets before storing. Found a forgotten receipt and some sand from August."
+    },
+    {
+      "id": "en-holdout-287",
+      "field": "caption",
+      "text": "Washing all the winter scarves before storing them. They deserve a fresh start too."
+    },
+    {
+      "id": "en-holdout-288",
+      "field": "caption",
+      "text": "Seasonal swap but make it gradual. A few warm pieces at a time until the weather really commits."
+    },
+    {
+      "id": "en-holdout-289",
+      "field": "caption",
+      "text": "Rotated in my rain gear today. The umbrella stand is officially full again."
+    },
+    {
+      "id": "en-holdout-290",
+      "field": "caption",
+      "text": "Wardrobe swap tonight: all the linen goes to the top shelf, all the corduroy comes down."
+    },
+    {
+      "id": "en-holdout-291",
+      "field": "caption",
+      "text": "Swapped my summer canvas tote for the leather one that can handle rain. Small seasonal ritual."
+    },
+    {
+      "id": "en-holdout-292",
+      "field": "caption",
+      "text": "It's 7 degrees and I just found my good gloves in last winter's coat pocket. Swap complete."
+    },
+    {
+      "id": "en-holdout-293",
+      "field": "caption",
+      "text": "Moving the heavy knits to the vacuum bags. They shrink to almost nothing, it's like magic."
+    },
+    {
+      "id": "en-holdout-294",
+      "field": "caption",
+      "text": "Spring is here, so the wool socks get washed, folded and put in the top drawer until November."
+    },
+    {
+      "id": "en-holdout-295",
+      "field": "caption",
+      "text": "Bringing back the long-sleeve tees. Summer is clearly over."
+    },
+    {
+      "id": "en-holdout-296",
+      "field": "caption",
+      "text": "I swap my wardrobe when the morning temperature stays above 10 for a week. Works every year."
+    },
+    {
+      "id": "en-holdout-297",
+      "field": "caption",
+      "text": "Hung the light rain jacket next to the door again. The heavy one is going into storage."
+    },
+    {
+      "id": "en-holdout-298",
+      "field": "caption",
+      "text": "Got all my sweaters out and realized I own six gray ones. Wearing a different one each day this week."
+    },
+    {
+      "id": "en-holdout-299",
+      "field": "caption",
+      "text": "Packing away the winter coats, but the scarf stays. Spring evenings are still cool here."
+    },
+    {
+      "id": "en-holdout-300",
+      "field": "caption",
+      "text": "Cozy season is back. Thick socks, wide trousers, oversized knit. Love it."
+    },
+    {
+      "id": "en-holdout-301",
+      "field": "caption",
+      "text": "Heading out for a walk in the first snow. Knit hat, mittens, the warmest coat I own."
+    },
+    {
+      "id": "en-holdout-302",
+      "field": "caption",
+      "text": "Small closet, big plans. Only 30 pieces out at a time and the rest waits for its season."
+    },
+    {
+      "id": "en-holdout-303",
+      "field": "caption",
+      "text": "That last warm weekend before autumn. Wearing every summer favorite one more time."
+    },
+    {
+      "id": "en-holdout-304",
+      "field": "caption",
+      "text": "Updated my winter capsule list in the app: 4 knits, 3 trousers, 2 coats, 2 pairs of boots."
+    },
+    {
+      "id": "en-holdout-305",
+      "field": "caption",
+      "text": "Thank you, community, for helping me finally decide on a raincoat. It's been tested twice already."
+    },
+    {
+      "id": "en-holdout-306",
+      "field": "caption",
+      "text": "Took the summer dresses to the tailor to add pockets before storing them. Next summer me will be thrilled."
+    },
+    {
+      "id": "en-holdout-307",
+      "field": "caption",
+      "text": "What's the best way to fold a blazer for a suitcase? Mine always arrives with a crease down the back."
+    },
+    {
+      "id": "en-holdout-308",
+      "field": "caption",
+      "text": "Is it okay to wash a waxed jacket? Mine has a mud stain from the last walk."
+    },
+    {
+      "id": "en-holdout-309",
+      "field": "caption",
+      "text": "Honestly the best part of rainy weather is wearing my favorite boots."
+    },
+    {
+      "id": "en-holdout-310",
+      "field": "caption",
+      "text": "Sunday thrift run with my sister. Matching coats now, completely by accident."
+    },
+    {
+      "id": "en-holdout-311",
+      "field": "caption",
+      "text": "Fixed a snag in my cardigan by pulling it through to the inside with a crochet hook. Invisible now."
+    },
+    {
+      "id": "en-holdout-312",
+      "field": "caption",
+      "text": "The cobbler stretched my new boots a little at the toe. Night and day."
+    },
+    {
+      "id": "en-holdout-313",
+      "field": "caption",
+      "text": "A little rain never stopped a good outfit."
+    },
+    {
+      "id": "en-holdout-314",
+      "field": "caption",
+      "text": "Can't believe how warm this vintage wool coat is. Thrifted for a song last spring."
+    },
+    {
+      "id": "en-holdout-315",
+      "field": "caption",
+      "text": "Today I learned that the wind chill matters more than the number on the thermometer."
+    },
+    {
+      "id": "en-holdout-316",
+      "field": "altText",
+      "text": "Close-up of a rust wool scarf on a chair."
+    },
+    {
+      "id": "en-holdout-317",
+      "field": "altText",
+      "text": "Mirror photo of a navy hoodie and jeans."
+    },
+    {
+      "id": "en-holdout-318",
+      "field": "altText",
+      "text": "Flat lay of a white tee and khaki shorts."
+    },
+    {
+      "id": "en-holdout-319",
+      "field": "altText",
+      "text": "Street photo of a person under a red umbrella."
+    },
+    {
+      "id": "en-holdout-320",
+      "field": "altText",
+      "text": "Street photo taken from across a rainy square: a person in a long olive raincoat, wide charcoal trousers and black boots walks past a café, holding a folded umbrella and a paper bag."
+    },
+    {
+      "id": "en-holdout-321",
+      "field": "altText",
+      "text": "Flat lay on a linen bedsheet showing a full week of travel clothes: four tops, two pairs of trousers, a knit dress, a light cardigan, white sneakers and brown sandals."
+    },
+    {
+      "id": "en-holdout-322",
+      "field": "altText",
+      "text": "Mirror photo in a bright entryway of a person wearing a cream cable knit sweater, straight dark jeans and tan lace-up boots, with a canvas tote hanging from one shoulder."
+    },
+    {
+      "id": "en-holdout-323",
+      "field": "altText",
+      "text": "Close-up of a worn navy wool coat on an ironing board, showing a freshly mended pocket seam, a pincushion and a spool of matching thread beside it."
+    },
+    {
+      "id": "en-holdout-324",
+      "field": "altText",
+      "text": "Overhead view of an open closet during a seasonal swap, with summer dresses folded into a box on the floor and heavy knits being stacked back onto the top shelf."
+    },
+    {
+      "id": "en-holdout-325",
+      "field": "altText",
+      "text": "Street photo on a snowy morning of a person in a quilted black parka with the hood up, a gray knit scarf, mittens and tall waterproof boots stepping off a curb."
+    },
+    {
+      "id": "en-holdout-326",
+      "field": "altText",
+      "text": "Close-up of two pairs of shoes side by side on a wet doormat: muddy rubber boots on the left, clean brown leather loafers on the right, with raindrops on the floor."
+    },
+    {
+      "id": "en-holdout-327",
+      "field": "altText",
+      "text": "Flat lay of thrift shop finds on a wooden table: a tweed blazer, a striped knit, a leather belt and a pair of suede boots, each with a small paper price tag attached."
+    },
+    {
+      "id": "en-holdout-328",
+      "field": "altText",
+      "text": "Flat lay of a navy wool coat, gray knit sweater, dark jeans and brown leather boots on a wooden floor."
+    },
+    {
+      "id": "en-holdout-329",
+      "field": "altText",
+      "text": "Mirror photo of a person in a long camel coat and white sneakers holding a phone in a hallway."
+    },
+    {
+      "id": "en-holdout-330",
+      "field": "altText",
+      "text": "Close-up of black rubber rain boots standing in a shallow puddle on a gray sidewalk."
+    },
+    {
+      "id": "en-holdout-331",
+      "field": "altText",
+      "text": "Street photo of a person in a yellow raincoat and jeans walking past a row of shop windows."
+    },
+    {
+      "id": "en-holdout-332",
+      "field": "altText",
+      "text": "Folded linen shirts in white, sage and sand stacked on a bed next to a straw hat."
+    },
+    {
+      "id": "en-holdout-333",
+      "field": "altText",
+      "text": "Close-up of a chunky cream knit showing a cable pattern and a small wooden button."
+    },
+    {
+      "id": "en-holdout-334",
+      "field": "altText",
+      "text": "Brown suede loafers on a doormat beside a pair of tall green rubber boots."
+    },
+    {
+      "id": "en-holdout-335",
+      "field": "altText",
+      "text": "Open suitcase with rolled t-shirts, a folded blazer, sneakers in a shoe bag and a toiletry pouch."
+    },
+    {
+      "id": "en-holdout-336",
+      "field": "altText",
+      "text": "Person standing on a bridge in a dark parka with the hood up, light rain visible in the background."
+    },
+    {
+      "id": "en-holdout-337",
+      "field": "altText",
+      "text": "Mirror selfie showing an oversized gray blazer over a black turtleneck and wide-leg trousers."
+    },
+    {
+      "id": "en-holdout-338",
+      "field": "altText",
+      "text": "Flat lay of a striped breton top, white jeans, canvas sneakers and round sunglasses on a white sheet."
+    },
+    {
+      "id": "en-holdout-339",
+      "field": "altText",
+      "text": "Close-up of hands sewing a button onto a navy wool coat with a needle and dark thread."
+    },
+    {
+      "id": "en-holdout-340",
+      "field": "altText",
+      "text": "Pair of worn brown leather boots with new soles sitting on a cobbler's workbench."
+    },
+    {
+      "id": "en-holdout-341",
+      "field": "altText",
+      "text": "Street photo of a cyclist in a waterproof jacket and rolled trousers riding past wet parked cars."
+    },
+    {
+      "id": "en-holdout-342",
+      "field": "altText",
+      "text": "Wardrobe rail with coats on the left and light jackets on the right, sorted by color."
+    },
+    {
+      "id": "en-holdout-343",
+      "field": "altText",
+      "text": "Close-up of a denim knee patch stitched with visible blue thread in a crosshatch pattern."
+    },
+    {
+      "id": "en-holdout-344",
+      "field": "altText",
+      "text": "Mirror photo of a person in a midi dress, tights and ankle boots with a cropped knit cardigan."
+    },
+    {
+      "id": "en-holdout-345",
+      "field": "altText",
+      "text": "Flat lay of winter accessories: a red beanie, gray mittens, a plaid scarf and wool socks."
+    },
+    {
+      "id": "en-holdout-346",
+      "field": "altText",
+      "text": "Close-up of a fabric label and the inside seam of a thrifted tweed blazer."
+    },
+    {
+      "id": "en-holdout-347",
+      "field": "altText",
+      "text": "Person on a snowy street in a long black puffer coat, knit hat and lug-sole boots."
+    },
+    {
+      "id": "en-holdout-348",
+      "field": "altText",
+      "text": "Two pairs of sneakers drying on a radiator under a window with rain on the glass."
+    },
+    {
+      "id": "en-holdout-349",
+      "field": "altText",
+      "text": "Overhead view of a laundry basket with neatly folded towels and sweaters."
+    },
+    {
+      "id": "en-holdout-350",
+      "field": "altText",
+      "text": "Close-up of a waxed cotton jacket showing the sheen of the fabric and a corduroy collar."
+    },
+    {
+      "id": "en-holdout-351",
+      "field": "altText",
+      "text": "Mirror photo of a person in a short-sleeve linen shirt and light chinos in a bright bedroom."
+    },
+    {
+      "id": "en-holdout-352",
+      "field": "altText",
+      "text": "Flat lay of a packing capsule: three tops, two trousers, a dress, a cardigan and two pairs of shoes."
+    },
+    {
+      "id": "en-holdout-353",
+      "field": "altText",
+      "text": "Close-up of white canvas sneakers being cleaned with a soft brush and soapy water."
+    },
+    {
+      "id": "en-holdout-354",
+      "field": "altText",
+      "text": "Person standing at a bus stop in a beige trench coat holding a clear umbrella."
+    },
+    {
+      "id": "en-holdout-355",
+      "field": "altText",
+      "text": "Hanger with a green rain jacket hanging on a door, water droplets still on the sleeves."
+    },
+    {
+      "id": "en-holdout-356",
+      "field": "altText",
+      "text": "Flat lay of a summer outfit: floral sundress, woven sandals, straw bag and a sun hat."
+    },
+    {
+      "id": "en-holdout-357",
+      "field": "altText",
+      "text": "Close-up of a pair of black chelsea boots with a light dusting of snow on the toes."
+    },
+    {
+      "id": "en-holdout-358",
+      "field": "altText",
+      "text": "Street photo of a person in a quilted olive jacket and gray trousers waiting at a crosswalk."
+    },
+    {
+      "id": "en-holdout-359",
+      "field": "altText",
+      "text": "Folded wool sweaters stacked in clear storage bins on a closet shelf."
+    },
+    {
+      "id": "en-holdout-360",
+      "field": "altText",
+      "text": "Close-up of a tailor's measuring tape across the hem of a pair of navy trousers."
+    },
+    {
+      "id": "en-holdout-361",
+      "field": "altText",
+      "text": "Mirror photo of a person in a hoodie layered under a charcoal wool coat with a backpack."
+    },
+    {
+      "id": "en-holdout-362",
+      "field": "altText",
+      "text": "Flat lay of rain gear: rubber boots, a packable shell, a compact umbrella and a knit cap."
+    },
+    {
+      "id": "en-holdout-363",
+      "field": "altText",
+      "text": "Close-up of the ribbed cuff of a mustard yellow cardigan resting on a dark wood table."
+    },
+    {
+      "id": "en-holdout-364",
+      "field": "altText",
+      "text": "Person in a fisherman sweater and dark jeans walking along a windy beach path."
+    },
+    {
+      "id": "en-holdout-365",
+      "field": "altText",
+      "text": "Open closet showing summer dresses on hangers and winter coats in garment bags."
+    },
+    {
+      "id": "en-holdout-366",
+      "field": "altText",
+      "text": "Close-up of brown leather gloves with a darned seam on one finger."
+    },
+    {
+      "id": "en-holdout-367",
+      "field": "altText",
+      "text": "Mirror photo of a child in a red raincoat and patterned rain boots ready for school."
+    },
+    {
+      "id": "en-holdout-368",
+      "field": "altText",
+      "text": "Flat lay of business travel clothes: a gray suit jacket, two shirts, a tie and leather shoes."
+    },
+    {
+      "id": "en-holdout-369",
+      "field": "altText",
+      "text": "Close-up of a soft corduroy jacket in rust brown with a brass button."
+    },
+    {
+      "id": "en-holdout-370",
+      "field": "altText",
+      "text": "Street photo of two people in matching navy peacoats on a cobblestone lane."
+    },
+    {
+      "id": "en-holdout-371",
+      "field": "altText",
+      "text": "A pair of sandals and a pair of boots side by side on a shoe rack near the door."
+    },
+    {
+      "id": "en-holdout-372",
+      "field": "altText",
+      "text": "Close-up of a knitted hat in heather gray with a folded brim."
+    },
+    {
+      "id": "en-holdout-373",
+      "field": "altText",
+      "text": "Mirror photo of a person in a white t-shirt, denim jacket and black jeans in a narrow hallway."
+    },
+    {
+      "id": "en-holdout-374",
+      "field": "altText",
+      "text": "Flat lay of a ski trip pack: base layers, thick socks, gloves, a neck warmer and goggles."
+    },
+    {
+      "id": "en-holdout-375",
+      "field": "altText",
+      "text": "Close-up of a striped scarf wrapped around the collar of a camel coat."
+    },
+    {
+      "id": "en-holdout-376",
+      "field": "altText",
+      "text": "Person walking a dog in a waxed jacket and rubber boots along a muddy path."
+    },
+    {
+      "id": "en-holdout-377",
+      "field": "altText",
+      "text": "Garment bag with a suit hanging on a hotel wardrobe door next to a folded umbrella."
+    },
+    {
+      "id": "en-holdout-378",
+      "field": "altText",
+      "text": "Close-up of a linen shirt sleeve with natural creases in bright morning light."
+    },
+    {
+      "id": "en-holdout-379",
+      "field": "altText",
+      "text": "Flat lay of thrifted finds: a tweed blazer, a wool scarf and a pair of brown leather boots."
+    },
+    {
+      "id": "en-holdout-380",
+      "field": "altText",
+      "text": "Mirror photo showing a person in a pleated midi skirt, tucked-in knit and loafers."
+    },
+    {
+      "id": "en-holdout-381",
+      "field": "altText",
+      "text": "Close-up of salt stains on dark leather boots next to a cloth and a small bowl of water."
+    },
+    {
+      "id": "en-holdout-382",
+      "field": "altText",
+      "text": "Street photo of a person in a bright orange beanie and black parka in falling snow."
+    },
+    {
+      "id": "en-holdout-383",
+      "field": "altText",
+      "text": "Neatly ironed shirts on hangers lined up along a wardrobe rail."
+    },
+    {
+      "id": "en-holdout-384",
+      "field": "altText",
+      "text": "Close-up of a down jacket being fluffed in front of a clothes dryer."
+    },
+    {
+      "id": "en-holdout-385",
+      "field": "altText",
+      "text": "Flat lay of a beach weekend: swim shorts, a linen shirt, flip flops and a towel."
+    },
+    {
+      "id": "en-holdout-386",
+      "field": "altText",
+      "text": "Person seated on a park bench in a green trench coat and white sneakers under a gray sky."
+    },
+    {
+      "id": "en-holdout-387",
+      "field": "altText",
+      "text": "Close-up of a mended sweater elbow with a round knitted patch in a contrasting color."
+    },
+    {
+      "id": "en-holdout-388",
+      "field": "altText",
+      "text": "Mirror photo of a person in thermal leggings, oversized sweater and wool socks at home."
+    },
+    {
+      "id": "en-holdout-389",
+      "field": "altText",
+      "text": "Two coats on wall hooks: a light navy rain jacket and a heavy brown wool coat."
+    },
+    {
+      "id": "en-holdout-390",
+      "field": "altText",
+      "text": "Close-up of loafers with fresh rubber heel tips on a wooden floor."
+    },
+    {
+      "id": "en-holdout-391",
+      "field": "altText",
+      "text": "Flat lay of an autumn outfit: burgundy sweater, olive trousers, brown belt and suede boots."
+    },
+    {
+      "id": "en-holdout-392",
+      "field": "altText",
+      "text": "Street photo of a person with a backpack and rain poncho crossing a wet street at dusk."
+    },
+    {
+      "id": "en-holdout-393",
+      "field": "altText",
+      "text": "Close-up of a knit sweater pocket holding a pair of folded sunglasses."
+    },
+    {
+      "id": "en-holdout-394",
+      "field": "altText",
+      "text": "Mirror photo of a person in a short puffer jacket, high-waisted jeans and white sneakers."
+    },
+    {
+      "id": "en-holdout-395",
+      "field": "altText",
+      "text": "Small suitcase packed with clothing rolled in packing cubes of different colors."
+    },
+    {
+      "id": "en-holdout-396",
+      "field": "altText",
+      "text": "Close-up of a pair of green wellies with mud on the soles next to a garden gate."
+    },
+    {
+      "id": "en-holdout-397",
+      "field": "altText",
+      "text": "Flat lay of a work-from-office outfit: cream blouse, navy trousers, block heels and a tote."
+    },
+    {
+      "id": "en-holdout-398",
+      "field": "altText",
+      "text": "Person in a long knit coat and wide trousers standing in front of a red brick wall."
+    },
+    {
+      "id": "en-holdout-399",
+      "field": "altText",
+      "text": "Close-up of horn buttons sewn onto the front of a gray blazer."
+    },
+    {
+      "id": "en-holdout-400",
+      "field": "altText",
+      "text": "Folded summer clothes going into a storage box with a lavender sachet on top."
+    },
+    {
+      "id": "en-holdout-401",
+      "field": "altText",
+      "text": "Street photo of a person carrying grocery bags in a quilted vest and a long-sleeve shirt."
+    },
+    {
+      "id": "en-holdout-402",
+      "field": "altText",
+      "text": "Close-up of the inside of a rain jacket hood showing a mesh lining."
+    },
+    {
+      "id": "en-holdout-403",
+      "field": "altText",
+      "text": "Mirror photo of a person in a denim shirt, khaki trousers and brown boots before work."
+    },
+    {
+      "id": "en-holdout-404",
+      "field": "altText",
+      "text": "Flat lay of camping layers: a fleece, hiking socks, a beanie and a lightweight down jacket."
+    },
+    {
+      "id": "en-holdout-405",
+      "field": "altText",
+      "text": "Close-up of a pair of hiking boots with laces tied, resting on a rocky trail."
+    },
+    {
+      "id": "en-holdout-406",
+      "field": "altText",
+      "text": "Person on a train platform wearing a long scarf, gray coat and black ankle boots."
+    },
+    {
+      "id": "en-holdout-407",
+      "field": "altText",
+      "text": "Close-up of a vintage leather satchel with a buckle strap after being conditioned."
+    },
+    {
+      "id": "en-holdout-408",
+      "field": "altText",
+      "text": "Clothes drying on a wooden rack by a window: socks, sweaters and a pair of trousers."
+    },
+    {
+      "id": "en-holdout-409",
+      "field": "altText",
+      "text": "Mirror photo showing a person in a short-sleeve dress with a light cardigan and sandals."
+    },
+    {
+      "id": "en-holdout-410",
+      "field": "altText",
+      "text": "Flat lay of a rainy day kit: a foldable umbrella, a hat, a scarf and a spare pair of socks."
+    },
+    {
+      "id": "en-holdout-411",
+      "field": "altText",
+      "text": "Close-up of soft brown corduroy trousers rolled at the ankle above white socks."
+    },
+    {
+      "id": "en-holdout-412",
+      "field": "altText",
+      "text": "Street photo of a person in a cream trench coat with the belt tied, walking under trees."
+    },
+    {
+      "id": "en-holdout-413",
+      "field": "altText",
+      "text": "Close-up of a navy rain jacket with water beading on the shoulder."
+    },
+    {
+      "id": "en-holdout-414",
+      "field": "altText",
+      "text": "Shoe rack with three pairs of winter boots, one pair of loafers and one pair of slippers."
+    },
+    {
+      "id": "en-holdout-415",
+      "field": "altText",
+      "text": "Mirror photo of a person trying on a thrifted blazer in a secondhand shop fitting room."
+    },
+    {
+      "id": "en-holdout-416",
+      "field": "altText",
+      "text": "Flat lay of wool accessories: knitted mittens, a ribbed hat and a long cable scarf."
+    },
+    {
+      "id": "en-holdout-417",
+      "field": "altText",
+      "text": "Close-up of a darned wool sock heel with yellow thread on a gray sock."
+    },
+    {
+      "id": "en-holdout-418",
+      "field": "altText",
+      "text": "Person in a light windbreaker and shorts jogging past a lake on an overcast morning."
+    },
+    {
+      "id": "en-holdout-419",
+      "field": "altText",
+      "text": "Close-up of a sewing machine stitching the hem of a pair of blue trousers."
+    },
+    {
+      "id": "en-holdout-420",
+      "field": "altText",
+      "text": "Mirror photo of a person in a cozy fleece, cargo trousers and trail shoes ready for a hike."
+    }
+  ]
+}

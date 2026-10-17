@@ -496,6 +496,14 @@
       "withdrawn": "Você retirou este look do feed.",
       "consent_suspended": "Este look fica oculto até que um responsável renove o consentimento. Compartilhe de novo quando o consentimento estiver ativo."
     },
+    "moderationReason": {
+      "language": "Sua legenda ou descrição da imagem usa palavras que as diretrizes da comunidade não permitem. Mude o texto antes de compartilhar este look de novo.",
+      "textUnreadable": "A triagem não conseguiu verificar toda a sua legenda ou descrição da imagem. Deixe o texto mais curto e em um só idioma antes de compartilhar este look de novo.",
+      "photo": "Esta foto não segue as diretrizes da comunidade.",
+      "photoUnconfirmed": "A triagem não conseguiu confirmar que esta foto segue as diretrizes da comunidade. Uma foto mais nítida do look pode ser aprovada.",
+      "incomplete": "A triagem deste look não foi concluída.",
+      "upload": "Não foi possível processar esta foto do jeito que ela foi enviada. Compartilhe este look de novo com uma foto JPEG, PNG ou WebP de até 10 MB e de 256 a 4096 pixels de cada lado."
+    },
     "challenge": {
       "eyebrow": "Desafio de estilo da semana",
       "allClimates": "Todos os climas",

@@ -1,14 +1,30 @@
 {
   "language": "es",
-  "listVersion": "terms-v1",
+  "listVersion": "allow-list-v1",
   "listType": "allowList",
   "provenance": {
-    "source": "repository-owned reviewed list",
+    "source": "repository-owned allow list, allow-list-v1.json",
     "version": "v1",
     "licence": "UNLICENSED (repository-owned)",
-    "retrievedAt": "2026-09-08",
-    "curator": "couture-cast trust and safety",
-    "notes": "Ordinary garment, styling and general vocabulary that collides with a term in one of the seven supported languages once diacritics are folded or repeated characters are collapsed. Allow-list lookup runs on the literal case-folded token, before diacritic and repeated-character folding, so cono keeps the Spanish and Italian word for cone while coño still flags, negro keeps the Spanish, Portuguese and Italian colour name while the French négro still flags, and mongolico keeps the Italian adjective for Mongolian while mongólico still flags. Putto is the Renaissance cherub motif that decorates printed silks, puttee is the wrapped legging, and bitte is German for please as well as the French word for a mooring bollard; each of those three collapses onto puto, pute or bite once a repeated letter pair is reduced."
+    "retrievedAt": "2026-10-16",
+    "curator": "couture-cast repository owner",
+    "notes": "GENERATED from allow-list-v1.json, where every entry records why it exists; do not edit by hand. Allow lists apply across all seven languages, so an entry here clears the word whichever list would have flagged it."
   },
-  "entries": ["cono", "negro", "mongolico", "putto", "puttee", "bitte"]
+  "generated": {
+    "generator": "scripts/verify-community-screening-lists.mjs",
+    "allowListSha256": "22d1f261f3666cf37369e67359aeabc383ac0a689babe04f87023ba1aee70256"
+  },
+  "entries": [
+    "comer",
+    "con",
+    "concha",
+    "cono",
+    "heroína",
+    "infierno",
+    "mamá",
+    "negro",
+    "pon",
+    "saco",
+    "sacó"
+  ]
 }

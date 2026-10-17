@@ -1,5 +1,7 @@
 # Deployment guide
 
+Updated: 2026-07-17 - Brownfield deep scan of deployment and operational configuration.
+Updated: 2026-10-16 (Story 6.2b): community worker container, canary, restart drill and rollback.
 Updated: 2026-10-16 - preview readiness wait shared by PR and manual e2e, resolvers poll for the
 expected commit, prod waits on both health SHAs, preview runs have no database secret, CI Supabase
 pulls from ghcr.io.
@@ -21,7 +23,7 @@ tests.
 | Web           | Separate Vercel project                              | Vercel Git integration is expected; no deploy workflow is stored here | Preview web health/SHA, production web health/SHA, Playwright                |
 | API           | Separate Vercel project and Node serverless function | Vercel Git integration is expected; no deploy workflow is stored here | Preview API health/SHA; production only checks a secondary API route         |
 | Mobile        | Expo EAS Android production build                    | Manual GitHub `workflow_dispatch` or local npm command                | EAS authentication and build submission only; Maestro is separate and manual |
-| Workers       | None recorded                                        | Local or manually started process only                                | Startup logging and automated unit/integration coverage                      |
+| Workers       | Community worker container, Northflank (pending)     | `apps/api/Dockerfile.community-worker`; general and wardrobe: none    | Build-time model self-test, readiness log, `community:screening:canary`      |
 | Database      | Supabase PostgreSQL through `DATABASE_URL`           | API Vercel build and local/API E2E startup paths                      | Prisma command exit status; no post-migration deployment probe               |
 | Observability | Optional Grafana OTLP endpoint; local LGTM stack     | API process startup when OTLP configuration is complete               | OTEL bootstrap log, integration test, dashboards and local manual checks     |
 
@@ -330,7 +332,9 @@ Two processes can consume `community-moderation`, and both compose it through th
   billing reconciliation and the maintenance sweeps.
 - `npm run start:workers:community:prod --workspace api` runs the narrow
   [community bootstrap](../../apps/api/src/workers/community.bootstrap.ts) and nothing else. It
-  pre-flights `verify:community-screening-model`, and it is the process Story 6.2b deploys.
+  pre-flights `verify:community-screening-model`. The hosted container runs the same bootstrap
+  through [the production launcher](../../scripts/start-community-worker-production.mjs); see
+  "Hosted community worker" below.
 
 Run exactly one of them against a given Redis. BullMQ splits jobs across every worker subscribed to
 a queue name regardless of process, so running both would spread screening across two process groups
@@ -398,18 +402,338 @@ and `queue.add` with an existing job id returns the existing job instead of crea
 re-arming an outbox row alone is a silent no-op inside that window. To genuinely re-screen a post,
 remove the retained job first (`queue.getJob(<postId>__<uploadSessionId>)` then `job.remove()`) and
 re-arm its outbox row by clearing `dispatched_at`, or give the post a new upload session, which
-changes the object path and therefore the job id.
+changes the object path and therefore the job id. The processor screens only a post in
+`pending_review` and skips every other status, so a replayed job leaves a post that is already
+`flagged` or `review_failed` as it is. No operator action moves a post back to `pending_review`
+yet, and the admin retry of a `JobFailure` row (`AdminService.retryFailedJob`) does not either:
+it adds a new job with a generated id, the job skips the post, and the row is deleted. Both are
+recorded in deferred work.
 
 **Draining the review queue.** Posts refused during the incident carry
 `moderation_reason = 'screening_unavailable'` and
 `moderation_engine_version = '<text engine>;adr013-nsfw-unavailable'`, which is the query that
 separates them from posts a real model refused. Release or take down each one through the operator
-actions, or re-screen the batch using the replay above once the model is back.
+actions. The replay above re-screens only posts still in `pending_review`.
 
-No Docker image, Vercel function, GitHub deployment workflow, process manifest, or other hosted
-worker target starts this command. The Vercel API function does not start the dedicated workers.
-Queue producers and scheduling code exist, but the repository does not currently deploy a
-long-running consumer.
+The community worker has a container image and the runbook below, and no hosted target runs it
+yet: the Northflank service is created once the owner adds `NORTHFLANK_API_TOKEN`. The general
+bootstrap (`start:workers:prod`) and the wardrobe worker still have no hosted target at all: no
+Docker image, Vercel function, GitHub deployment workflow or process manifest starts either of
+them, and the Vercel API function does not start the dedicated workers.
+
+#### Hosted community worker (Story 6.2b)
+
+**Image.** [`apps/api/Dockerfile.community-worker`](../../apps/api/Dockerfile.community-worker)
+builds from the repository root (`npm run community:screening:image:build`). The build stage
+installs the API workspaces and compiles them; the assemble stage runs
+[`scripts/prune-community-worker-deps.mjs`](../../scripts/prune-community-worker-deps.mjs), which
+derives the worker's dependency tree from its compiled import graph and fails the build when
+`node_modules` passes 150 MB (the measured size is in the evidence payload's `image` section); the
+runtime stage runs as the unprivileged `node` user under `tini`, and the build itself runs the
+launcher's `--self-test`, which verifies the pinned model artifacts, loads the model, screens the
+committed safe fixture and requires it to publish, validates the term lists, and loads the whole
+consumer graph. A dependency the trace misses fails the build rather than the first job.
+
+The build takes two arguments, which `npm run community:screening:image:build` sets and a hosted
+builder must set too: `COMMIT_SHA`, the commit being built, and `INPUT_SET_HASH`, the output of
+`node scripts/lib/community-screening-input-set.mjs` at that commit. The worker names itself
+`community-worker@<COMMIT_SHA>` in BullMQ, which is how the hosted canary proves which build
+consumed its job. An image built without them is named `community-worker@unset`, and the hosted
+canary refuses it.
+
+**Process.** The container's command is
+[`scripts/start-community-worker-production.mjs`](../../scripts/start-community-worker-production.mjs).
+It refuses an unset, unknown or `fixture` selector, runs `verify:community-screening-model`,
+starts the compiled community bootstrap in-process, and turns `SIGTERM` and `SIGINT` into the
+bootstrap's graceful shutdown: the consumer stops taking jobs and waits for the active one under a
+20-second deadline, and the launcher exits at 25 seconds whatever happens. Northflank sends
+`SIGKILL` 30 seconds after `SIGTERM` by default (`gracePeriodSeconds`, 15 to 1,800 seconds,
+northflank.com/docs/v1/application/scale/scale-instances, read 2026-10-17); leave it at 30 or
+above. One screening may take up to 30 seconds, so a deploy can cut off a slow job. That job is
+abandoned, as is a job whose worker crashed: it neither completes nor fails, its 30-second lock
+expires, and a stalled check returns it to `waiting`. The check runs every 120 seconds across all
+workers and when a worker starts, and it requeues a job an earlier check marked, so the job is
+back at most two checks after the crash or the restart, whichever is later: 300 seconds with a
+three-minute restart. Counting the attempts the job may already have spent and the redelivered
+attempt, recovery takes at most 423 seconds, inside the 15-minute window after which the
+stale-review sweep fails a post (`communityCrashRecoveryMs` in `community-moderation.worker.ts`;
+`community-moderation-crash-recovery.integration.spec.ts` kills a worker mid-screening against
+real Redis). A post the sweep does fail moves to `review_failed` with a `JobFailure` row, the
+redelivered job skips it, and the admin retry of that row does not re-screen it (see the replay
+section above). Production otherwise logs at `warn`; the image
+sets `LOG_LEVEL=info` so the readiness line is visible, and `NO_COLOR=1` so the Nest logger writes
+no escape codes.
+
+**Variables the host injects** (values from the same stores the Vercel API uses; nothing is
+baked into the image):
+
+| Variable                    | Value                                                   |
+| --------------------------- | ------------------------------------------------------- |
+| `NODE_ENV`                  | `production`                                            |
+| `COMMUNITY_NSFW_SCREENER`   | `tensorflow`                                            |
+| `DATABASE_URL`              | production Supabase connection string, verified (below) |
+| `REDIS_URL`                 | production Upstash `rediss://` URL                      |
+| `REDIS_TLS`                 | `true`                                                  |
+| `SUPABASE_URL`              | production Supabase project URL                         |
+| `SUPABASE_SERVICE_ROLE_KEY` | production service role key                             |
+| `ANALYTICS_ID_SECRET`       | the API's value; the worker exits at startup without it |
+| `POSTHOG_API_KEY`           | the API's value; publication and refusal events         |
+| `POSTHOG_HOST`              | the API's value                                         |
+
+The worker verifies the database's certificate. Prisma's `sslmode=require` alone encrypts without
+checking who answers, so the image carries the Supabase Root 2021 CA
+([`apps/api/certs/supabase-root-2021-ca.pem`](../../apps/api/certs/supabase-root-2021-ca.pem),
+SHA-256 fingerprint `80:70:25:AD:...:E6:CA:FA`, valid to 2031-04-26) at
+`/app/apps/api/certs/supabase-root-2021-ca.pem`, and the hosted `DATABASE_URL` ends in:
+
+```text
+?sslmode=require&sslcert=/app/apps/api/certs/supabase-root-2021-ca.pem&sslaccept=strict
+```
+
+`sslaccept=strict` makes Prisma verify the chain and the host name; without it Prisma accepts any
+certificate. Prisma resolves a relative `sslcert` against the generated client's directory
+(`/app/node_modules/.prisma/client`), so the path is absolute. Both behaviours were checked
+against the worker image and a TLS PostgreSQL with a test CA: the right CA connects, another CA
+fails `unable to get local issuer certificate`, an IP address fails `IP address mismatch`, and
+without `sslaccept=strict` the connection succeeds unverified. Under `NODE_ENV=production` the
+launcher refuses to start when a non-local `DATABASE_URL` lacks `sslmode=require` or
+`sslaccept=strict`, or its `sslcert` is relative or names a missing file
+(`community_worker_database_tls_refused`). Local container runs against
+`host.docker.internal` are exempt. The Vercel API still connects with `sslmode=require` alone;
+that is recorded in deferred work.
+
+The canary, which reaches production from an operator's machine, verifies the certificate chain
+(`verify-full`) against the same committed CA (`--db-ca` names another). It strips every `ssl*`
+parameter from the connection string first, because `pg` lets those parameters replace the
+verified TLS settings.
+
+The canary's synthetic account (`canary-user-` prefix) is excluded from analytics in code
+(`isCommunityCanaryUser` in `community-analytics.ts`), so real posts report to PostHog and the
+canary's publication does not.
+
+`GRAFANA_OTLP_ENDPOINT` and its credentials are deliberately absent. The worker image does not
+start the OpenTelemetry SDK: `@opentelemetry/sdk-node` and its exporters would push `node_modules`
+past the 150 MB budget, so the variables would do nothing there. Until Story 6.12 adds an external
+alert on the oldest `pending_review` age, worker liveness rests on the host's restart policy, the
+readiness log line and the hosted canary.
+
+**Resource profile.** One replica at concurrency one, 512 MiB memory limit, the sandbox's
+fractional vCPU. Latency is measured inside the worker image at 0.2 vCPU and 512 MiB
+(`npm run community:screening:measure:container`). Memory is the running container's cgroup
+`memory.peak`, the number the out-of-memory killer acts on: start the worker container fresh under
+`--memory=512m`, then run `npm run community:screening:measure:memory`, which drives the canary
+with a generated 4096x4096 JPEG, the largest accepted upload, through the real pipeline. It uses the
+container's own `DATABASE_URL`, `REDIS_URL` and Supabase settings, and requires the job to be
+processed by the container's worker (`community-worker@<baked commit>`). Replicas of one image share
+that name, so the canary also runs in sole-consumer mode (`--sole-consumer`): exactly one consumer
+heartbeat (below), named for the container's commit, before the job is enqueued and again after it
+completes, from the same worker process. Stop every other consumer of that Redis first, including a
+local `start:workers` or E2E stack. The product records both observations as `soleConsumer`, and the
+gate rejects a peak without that identity and that proof. The latency gate requires the recorded cgroup limits to equal the 0.2 vCPU
+and 512 MiB profile and at least 1,000 warm samples after warmup. The numbers and their gates are in the evidence payload's `runtime` section and in the rendered
+evidence. Re-measure inside the hosted container after the first deploy.
+
+**Deploy on Northflank** (Developer Sandbox, free, always-on):
+
+1. The owner signs up with the GitHub account that owns the repository, picks the Developer
+   Sandbox, authorises the Northflank GitHub app for `couture-cast` only, and adds
+   `NORTHFLANK_API_TOKEN` to `.env.local`. The remaining steps can be driven through the
+   Northflank API from there.
+2. Create a project in the region closest to the Supabase project.
+3. Create a combined service on `couture-cast`, branch `main`, build type Dockerfile, Dockerfile
+   path `/apps/api/Dockerfile.community-worker`, build context `/`. Northflank injects
+   `NF_GIT_SHA`, which `COMMIT_SHA` defaults to; `INPUT_SET_HASH` stays `unset` on the hosted
+   image, because only the local measurement products record it.
+4. Leave ports empty: the worker serves no HTTP, and a port would add a health check that can
+   never pass.
+5. Add the variables above as runtime secrets and deploy.
+6. Require `community_moderation_screener_ready` (selector, engine version, policy version, model
+   hash, backend, startup duration) and `Dedicated community worker started` in the runtime log.
+7. Run the hosted canary (below).
+
+Fallbacks, in order: Oracle Cloud Always Free (an ARM VM with headroom; install Docker, run the
+same image under a restart policy, and patch the VM) if the sandbox memory envelope proves too
+small, then Railway (paid, from 5 USD a month, same Dockerfile) if neither free option is worth
+the time. Vercel cannot host it: it runs no long-running process.
+
+Run exactly one consumer per Redis. Once the hosted worker runs, nothing else may consume
+`community-moderation` against production Redis, including a local `start:workers` pointed at
+it.
+
+**Worker presence: the heartbeat, because Upstash `CLIENT LIST` is per node.** BullMQ's
+`queue.getWorkers()` finds consumers with `CLIENT LIST`, and Upstash answers `CLIENT LIST` from the
+node that took the connection, listing only that node's clients. Measured against the production
+database on 2026-10-17 (Story 6.2b review, RF15): of 12 fresh connections, 5 listed the hosted
+worker's named BullMQ connection and 7 did not, while the worker stayed connected throughout. The
+hosted canary failed `worker_absent` twice against a healthy worker that way, and the same blind
+spot would hide a second consumer on another node from the sole-consumer proof. A local Redis is one
+node, so local measurements never showed it. Do not use `CLIENT LIST` or `queue.getWorkers()` to
+decide who consumes production Redis.
+
+Every community worker process therefore writes a heartbeat key, which every node answers the same
+([`community-worker-heartbeat.ts`](../../apps/api/src/modules/community/community-worker-heartbeat.ts)):
+
+- Key `community-worker:heartbeat:<worker name>:<instance id>`, where the instance id is a random
+  UUID per process, so two replicas of one image are two keys. The value is JSON: `name`,
+  `commitSha`, `startedAt`, `pid`.
+- Written when the worker starts, on the worker's own BullMQ connection, with a 90-second TTL,
+  refreshed every 30 seconds. Two refreshes in a row can be lost before the worker reads as absent.
+  A missed refresh is logged at `warn` (`community_worker_heartbeat_refresh_failed`) and never stops
+  the worker.
+- Removed on a graceful shutdown before the worker stops taking jobs and closes its connection,
+  within 2 of the 20 seconds of the shutdown deadline (`community_worker_heartbeat_removed`). A
+  worker killed with `SIGKILL` or out of memory removes nothing, and reads as present until the TTL
+  passes, at most 90 seconds.
+- Cost: one `SET` per refresh, 120 commands an hour, part of the measured idle figure below.
+
+The canary, the restart drill, the memory measurement and the idle Redis measurement count live
+heartbeat keys with `SCAN` and a `MATCH` pattern in a bounded loop
+([`scripts/lib/community-worker-heartbeat.mjs`](../../scripts/lib/community-worker-heartbeat.mjs));
+a scan that does not finish is reported as unknown, never as a count. A local run also records
+`CLIENT LIST` beside the heartbeats as a cross-check (`clientList`, `clientListAgrees`); the
+heartbeats decide. To see what consumes production Redis by hand:
+
+```bash
+redis-cli --tls -u "$REDIS_URL" --scan --pattern 'community-worker:heartbeat:*'
+```
+
+**Canary.** [`scripts/community-screening-canary.mjs`](../../scripts/community-screening-canary.mjs)
+creates a namespaced canary account and one `pending_review` post carrying a committed,
+manifest-pinned safe fixture, enqueues one screening job exactly as the outbox dispatcher would,
+polls until the post leaves `pending_review`, and then removes every row, object and job it
+created. It reports queue latency (BullMQ `processedOn - timestamp`), screening duration
+(`finishedOn - processedOn`: download, re-encode, inference, text screening and the publish
+transaction), the persisted engine identity and the worker that processed the job. It exits nonzero
+when no worker heartbeat is live, when a job stays `waiting`, when the identity carries a `fixture`,
+`unavailable` or `unresolved` marker, when the safe fixture does not publish, or when the wait
+expires. `--target` is checked against the database host, so a `local` canary cannot write to a
+hosted database and a `hosted` one cannot run against a laptop. A hosted run also requires exactly
+one consumer heartbeat, named `community-worker@<sha>` for the commit given by `--expect-sha`
+(default: `HEAD`), before it enqueues the job and again after the job completes, from the same worker
+process (instance id), checks that this worker processed the job, and verifies the database
+certificate against the Supabase CA. The evidence counts a hosted run only when no input-set file
+differs between `--expect-sha` and the evidence commit (`git diff --quiet`). Cleanup problems
+fail the run: the report records `ok: false` and the readiness gate fails.
+
+Every wait is bounded. One absolute deadline (`--timeout-ms`, default 120 seconds) covers
+connecting, the consumer check, the upload, the writes, the enqueue, polling and the closing job
+reads; PostgreSQL connects within 10 seconds and each query answers within 15, and Redis gives up
+a connect after 10 seconds, a command after 15 and reconnecting after three attempts. When the
+deadline passes, the canary force-closes its connections, removes what it created on fresh
+connections under a separate cleanup deadline (`--cleanup-timeout-ms`, default 30 seconds), writes
+a failure report naming the stalled stage and any data cleanup could not remove, and exits
+nonzero.
+
+A write the canary stopped waiting for can still commit on the server, after cleanup has deleted
+it. The canary records every write cut off by a deadline or a client timeout, every upload that
+ended without a storage answer, and every job a worker was still processing at cleanup, as having an
+unknown outcome, and then cleans up on fresh connections. An empty lookup never resolves an unknown
+outcome on its own:
+
+- A database write: the canary records its connection's server process (`pg_backend_pid()`) when
+  it connects, and every canary statement starts with a comment naming the run. Cleanup cancels the
+  write with `pg_cancel_backend` and polls `pg_stat_activity` until that process is gone, idle or
+  running another statement, within two thirds of the cleanup deadline. Only then does it delete and
+  look again. A refused cancel, a process `pg_stat_activity` does not describe, the write showing
+  on another process, or the budget running out leaves the write unresolved. Production connects
+  through Supabase's session pooler (port 5432), which keeps one server process per client
+  session; the transaction pooler (port 6543) does not, and the canary reports that mismatch.
+- An upload: storage cannot cancel one, so it is resolved only when a lookup finds the object and
+  removes it. Only a 4xx carrying the storage server's error body counts as a rejection; a
+  transport failure (`StorageUnknownError`, `fetch failed`), a 5xx and a bare 4xx leave the
+  outcome unknown. The report keeps the original storage error under `details.storageError`.
+- An enqueue or an active job: cleanup waits a settle window (`--cleanup-settle-ms`, default 10
+  seconds or a third of the cleanup deadline, whichever is less) before it looks.
+
+Cleanup then looks the canary's identifiers up again (the job, the account, its posts, the
+moderation events about the post, and the post's storage folder) and removes whatever it finds,
+until a lookup finds nothing. Every run ends with that lookup. The report's `cleanup.status` is
+`clean` only when the lookup came back empty and every unknown outcome was resolved, `failed` when
+something could not be removed, and `uncertain` when a write's outcome was unknown and no clean
+state was established within the cleanup deadline. `cleanup.databaseWrite` records what cleanup saw
+of a cut-off database write. Anything but `clean` lists every affected identifier in
+`cleanup.unresolved`, sets `ok: false`, and fails the readiness gate. Remove what an `uncertain`
+report names by hand before the next run.
+
+The canary's safe fixture publishes. The API never serves it: every public read (the feed query,
+the single-post read, the card-open record and the report path) excludes accounts whose id starts
+with `canary-user-`, in the same predicate that keeps withdrawn, hidden and unscreened posts out
+(`PUBLICLY_VISIBLE_POST_WHERE` in `community.repository.ts`). That holds whatever the flags say,
+including a PostHog cohort that sees the feed while the code default and the flag cache both read
+`false`. As defence in depth, the hosted canary still runs only while the feed is closed: it
+refuses to start when `community_read_enabled` defaults to anything but `false` in
+`packages/config/src/flags.ts`, or when the production flag cache (`feature_flags`) holds anything
+else.
+
+```bash
+npm run community:screening:canary:local
+npm run community:screening:canary -- --target hosted --env-file <hosted env file> \
+  --json-out apps/api/.cache/community-screening/canary-hosted.json
+```
+
+The canary is the deploy's acceptance check: run it after every deploy and every rollback.
+
+**Restart drill.** Stop the worker (gracefully, so its heartbeat is removed), start
+`npm run community:screening:canary:restart-drill` (`--restart-drill`, local only), then start the
+worker within three minutes. The drill refuses to enqueue unless Redis holds zero worker
+heartbeats, observes zero again after the enqueue with the job still `waiting`, then polls until a
+heartbeat comes back and the job completes. The report's `restartDrill` block records those observations and the observed
+downtime (from the first zero-consumer observation to the last, a lower bound on the outage), and
+the readiness gate re-judges them: an ordinary canary result carries no such observations and is
+not restart evidence. The payload's `canary.restart` section holds the result.
+
+**Rollback.** Leave both rollout flags disabled; they are disabled now. Redeploy the previous
+build on the host, or stop the service: queued jobs wait in Redis and the stale-review sweep moves
+anything pending past its window to `review_failed`. If the model is the problem, switch to the
+degraded mode above. Run the hosted canary after any rollback, then re-screen posts refused during
+the incident through the operator actions (the replay re-screens only posts still in
+`pending_review`).
+
+**Redis cost.** The production Upstash database (`couturecast-prod`) is on the Pay as You Go plan,
+which bills 0.20 USD per 100K commands and includes no free commands once a database is on a paid
+plan (upstash.com/pricing/redis, read 2026-10-17). An idle BullMQ consumer polls Redis
+continuously. With BullMQ's defaults (a 5-second idle block and a 30-second stalled check) an idle
+worker spent about 4.8 million commands a month, about 9.50 USD (the payload's
+`redis.beforeTuning`). The community worker now blocks for 300 seconds while idle and checks for
+stalled jobs every 120 seconds (`community-moderation.worker.ts`); a new job still wakes it at
+once. The stalled check was 600 seconds until Story 6.2b review RF13 shortened it so a crashed
+worker's job recovers before the stale-review sweep; the measured idle cost includes it. `npm run community:screening:measure:redis` measures the idle cost against a local Redis only the worker uses, sampling the worker heartbeats every 15 seconds
+to prove one process of the container's named worker held its heartbeat for the whole window (`CLIENT LIST`
+is sampled beside it as a cross-check, and the samples' own commands are subtracted), and
+`node scripts/measure-community-worker-redis.mjs --canary-runs 5 --idle-baseline <idle product>`
+measures the cost of one screened post. Both count every command Redis records, including those
+BullMQ's Lua scripts run inside `EVALSHA`, because Upstash does not document whether a script
+counts once. The release gate prices the projected month at the assumed daily volume, idle plus
+traffic, and passes at or below 5 USD. The idle and per-post components, their cost, and the daily
+volume above which the worker alone crosses 5 USD are in the evidence payload's `redis` section.
+
+The production Upstash database is shared: the worker uses the same database the API already uses
+for its own queues, so one bill covers both, and the measurement above covers the worker alone.
+After the first day, read the provider's command count and month-to-date cost, which cover both. If
+the month projects past 5 USD, set a maximum monthly budget on the database in the Upstash console
+and revisit the polling settings. Upstash hibernates a database after a long stretch with no traffic
+(this one answered "rate-limited" after 60 idle days until it was reactivated); a connected worker
+keeps it active. The worker's one-second outbox dispatch reads PostgreSQL: about 86,400 small
+queries a day against Supabase, which its plan does not meter per query.
+
+**Evidence.** `npm run community:screening:evidence` writes
+`_bmad-output/test-artifacts/community-content-screening-model-readiness.{json,md}` from the run
+products the commands above leave in `apps/api/.cache/community-screening`, and from
+`_bmad-output/test-artifacts/community-safe-corpus-holdout-triage.json`, which describes every
+withheld or blocked holdout photograph after a person has looked at it. The verdict fails closed:
+every run product records the input-set hash, and a product measured against other inputs, a
+missing or partial measurement, or an uncommitted working tree keeps the verdict from `pass`. The
+order is: commit the code, run the products, describe the withheld photographs, generate the
+evidence, commit the evidence.
+
+The repository owner records one verdict against the payload's SHA-256 with
+`npm run community:screening:sign`, interactively. When the owner delegates it,
+`npm run community:screening:sign -- --delegated` may run from an agent session: it is refused
+under CI and unless the payload's verdict is `pass`, records only an approval, and marks the record
+`mode: "delegated-by-owner"`. Either way, an approval is refused unless the payload carries every
+mandatory gate the generator builds exactly once and no other (`MANDATORY_GATE_IDS`), and the
+generator's rule over those gates also gives `pass`. `npm run community:screening:verify-signature` exits 0 only for a
+current signature that approves, and reports a signature as stale once the payload changes.
 
 [`GET /api/v1/health/queues`](../../apps/api/src/controllers/health.controller.ts) only reports
 configured queue names. Queue depth, failure count, latency, worker liveness, and Redis reachability
@@ -488,16 +812,19 @@ Repository-supported operational checks are:
 - inspect durable worker failure records through the implemented admin API; and
 - stop workers gracefully on process signals.
 
-No rollback command or workflow is present for Vercel, EAS, Supabase/Prisma, workers, or
-configuration. The repository does not encode deployment promotion, traffic shifting, previous
+No rollback command or workflow is present for Vercel, EAS, Supabase/Prisma, or configuration.
+The community worker's rollback is a documented procedure (see "Hosted community worker"), not
+an automated command. The repository does not encode deployment promotion, traffic shifting, previous
 deployment selection, database restore, release tagging, or rollback verification. Any
 provider-console rollback capability is outside the evidence in this scan and must not be treated
 as a repository procedure.
 
 ## Concrete gaps
 
-1. **Workers have no deployment target.** Production scripts exist, but no hosted process starts
-   them or verifies worker liveness.
+1. **Workers have no deployment target yet.** The community worker has a container image, a
+   canary and a runbook; its hosted service waits on the owner's Northflank account. The general
+   and wardrobe workers have no image or hosted target, and no process verifies worker liveness
+   continuously.
 2. **Root Expo configuration conflicts with the mobile app.** Two `app.json` files name different
    EAS projects, and root invocation behavior is undocumented.
 3. **Mobile delivery is Android-only and manual.** The workflow queues a build without waiting or

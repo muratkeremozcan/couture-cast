@@ -27,6 +27,7 @@
 // call that produced the decision, because everything the caller persists ends
 // up in logs, metrics and readiness evidence.
 
+import { createHash } from 'node:crypto'
 import fs from 'node:fs'
 import path from 'node:path'
 import { Filter } from 'bad-words'
@@ -35,7 +36,7 @@ import { supportedLocales } from '@couture/api-client/contracts/http'
 
 export const SCREENING_LANGUAGES = ['de', 'en', 'es', 'fr', 'it', 'pt', 'tr'] as const
 
-/** The six categories `policies/community-screening/policy-v1.json` defines. */
+/** The six categories `policies/community-screening/policy-v2.json` defines. */
 export const TEXT_SCREENING_CATEGORIES = [
   'profanity',
   'sexual',
@@ -72,7 +73,7 @@ export const LOCALE_SCREENING_LANGUAGES: Readonly<Record<string, string>> = Obje
   )
 )
 
-/** Stable reason codes, mirroring `policy-v1.json`'s `reasonCodes.text`. */
+/** Stable reason codes, mirroring `policy-v2.json`'s `reasonCodes.text`. */
 export const TEXT_POLICY_MATCH_REASON = 'text_policy_match'
 export const LOCALE_UNSCREENABLE_REASON = 'locale_unscreenable'
 export const SCRIPT_MIXED_REASON = 'script_mixed'
@@ -139,6 +140,26 @@ export interface CommunityTextPolicy {
     readonly maxCanonicalRepresentations: number
     readonly maxExpandedCharacters: number
   }
+  /**
+   * Terms kept routed to review on purpose although ordinary copy uses them,
+   * each with the reason. Construction refuses a policy whose deliberate term is
+   * allow-listed or indexed by no list, so a later allow-list edit cannot
+   * quietly reverse the decision.
+   */
+  readonly deliberateReviewTerms?: readonly {
+    readonly term: string
+    readonly reason: string
+  }[]
+  /**
+   * The policy's list records. When they carry SHA-256 pins, every loaded list
+   * file must hash to its pin, so an edited list cannot run under a policy
+   * hash, and therefore an engine identity, that describes different lists.
+   */
+  readonly lists?: readonly {
+    readonly language: string
+    readonly termsSha256?: string
+    readonly allowListSha256?: string
+  }[]
 }
 
 /**
@@ -164,7 +185,7 @@ function resolveFieldLimits(
 }
 
 /**
- * A structural copy of `policy-v1.json`'s `text` section, so this boundary is
+ * A structural copy of `policy-v2.json`'s `text` section, so this boundary is
  * usable and testable on its own. The spec asserts the two are identical, which
  * is what stops the default drifting away from the approved policy.
  */
@@ -190,7 +211,7 @@ export const DEFAULT_COMMUNITY_TEXT_POLICY: CommunityTextPolicy = Object.freeze(
   }),
 })
 
-export const DEFAULT_COMMUNITY_TEXT_POLICY_VERSION = 'community-screening-policy-v1'
+export const DEFAULT_COMMUNITY_TEXT_POLICY_VERSION = 'community-screening-policy-v2'
 
 export interface CommunityTextScreeningInput {
   text: string | null | undefined
@@ -472,12 +493,19 @@ function collapseRepeats(value: string): string {
   return value.replace(REPEAT_PATTERN, '$1')
 }
 
+/**
+ * Repeats are collapsed again after classing, because classing can create them:
+ * `fr35se` has no doubled letter until `5` and `s` both class to `s`, and the
+ * indexed `fresse` was collapsed to `frese` before it was classed. Without the
+ * second collapse the two never met, and Story 6.2b's corpus found five such
+ * leet spellings that published (`f r 3 5 s e`, `p 1 5 s e r`, `u n d r 3 5 s i n g`).
+ */
 function toLeetClassForm(value: string): string {
   let classed = ''
   for (const character of value) {
     classed += LEET_CLASSES[character] ?? character
   }
-  return classed
+  return collapseRepeats(classed)
 }
 
 function tokenize(value: string): string[] {
@@ -513,10 +541,19 @@ interface LanguageIndex {
   readonly singleCollapsed: ReadonlyMap<string, TermMeta>
   readonly singleLeet: ReadonlyMap<string, TermMeta>
   readonly phrases: readonly PhraseEntry[]
+  /**
+   * Each phrase's repeat-collapsed concatenation, for the re-split pass: the
+   * same letters as the phrase, cut into tokens at different places.
+   */
+  readonly phraseConcatenations: ReadonlyMap<string, TermMeta>
+  /** The same concatenations in leet-class form, for a re-split phrase written in leet. */
+  readonly phraseLeetConcatenations: ReadonlyMap<string, TermMeta>
+  /** Each phrase's own collapsed tokens joined by a space, which that pass skips. */
+  readonly phraseForms: ReadonlySet<string>
 }
 
 export interface CommunityTextScreenerOptions {
-  /** Structurally `policy.text` from the loaded `policy-v1.json`. */
+  /** Structurally `policy.text` from the loaded `policy-v2.json`. */
   readonly policy?: CommunityTextPolicy
   readonly policyVersion?: string
   /** Overridden by tests that need a deliberately malformed list directory. */
@@ -546,15 +583,26 @@ function resolveListsDirectory(): string {
 function readListFile<Parsed extends { language: ScreeningLanguage }>(
   filePath: string,
   schema: z.ZodType<Parsed>,
-  language: ScreeningLanguage
+  language: ScreeningLanguage,
+  pinnedSha256?: string
 ): Parsed {
   if (!fs.existsSync(filePath)) {
     throw new CommunityTextScreenerConfigError(`missing list file ${filePath}`)
   }
 
+  const bytes = fs.readFileSync(filePath)
+  if (pinnedSha256 !== undefined) {
+    const actual = createHash('sha256').update(bytes).digest('hex')
+    if (actual !== pinnedSha256.toLowerCase()) {
+      throw new CommunityTextScreenerConfigError(
+        `${path.basename(filePath)} does not hash to the SHA-256 the policy pins`
+      )
+    }
+  }
+
   let parsed: unknown
   try {
-    parsed = JSON.parse(fs.readFileSync(filePath, 'utf8'))
+    parsed = JSON.parse(bytes.toString('utf8'))
   } catch {
     throw new CommunityTextScreenerConfigError(`${filePath} is not valid JSON`)
   }
@@ -620,6 +668,9 @@ function buildLanguageIndex(
   const singleCollapsed = new Map<string, TermMeta>()
   const singleLeet = new Map<string, TermMeta>()
   const phrases: PhraseEntry[] = []
+  const phraseConcatenations = new Map<string, TermMeta>()
+  const phraseLeetConcatenations = new Map<string, TermMeta>()
+  const phraseForms = new Set<string>()
 
   for (const entry of list.entries) {
     if (!policy.categories.includes(entry.category)) {
@@ -644,6 +695,12 @@ function buildLanguageIndex(
         leet: collapsedTokens.map(toLeetClassForm),
         meta,
       })
+      phraseConcatenations.set(collapseRepeats(foldedTokens.join('')), meta)
+      phraseLeetConcatenations.set(
+        toLeetClassForm(collapseRepeats(foldedTokens.join(''))),
+        meta
+      )
+      phraseForms.add(collapsedTokens.join(' '))
       // A phrase also has to be findable with its spaces gone. `killyourself`
       // written as one word, or spelled out letter by letter, arrives as a
       // single reconstructed token that no window comparison can see, so the
@@ -686,6 +743,9 @@ function buildLanguageIndex(
     singleCollapsed,
     singleLeet,
     phrases,
+    phraseConcatenations,
+    phraseLeetConcatenations,
+    phraseForms,
   }
 }
 
@@ -835,14 +895,22 @@ export class CommunityTextScreener {
     this.fieldLimits = resolveFieldLimits(this.policy.limits.maxInputCharacters)
 
     const directory = options.listsDirectory ?? resolveListsDirectory()
+    const pinFor = (language: ScreeningLanguage) =>
+      this.policy.lists?.find((list) => list.language === language)
     const termLists = SCREENING_LANGUAGES.map((language) =>
-      readListFile(path.join(directory, `${language}-v1.json`), termsFileSchema, language)
+      readListFile(
+        path.join(directory, `${language}-v1.json`),
+        termsFileSchema,
+        language,
+        pinFor(language)?.termsSha256
+      )
     )
     const allowLists = SCREENING_LANGUAGES.map((language) =>
       readListFile(
         path.join(directory, `allow-${language}-v1.json`),
         allowFileSchema,
-        language
+        language,
+        pinFor(language)?.allowListSha256
       )
     )
 
@@ -872,6 +940,7 @@ export class CommunityTextScreener {
     this.indexes = termLists.map((list) =>
       buildLanguageIndex(list, this.policy, allowSingles)
     )
+    this.assertDeliberateReviewTerms()
     this.longestTerm = Math.max(
       MIN_SINGLE_TERM_LENGTH,
       ...this.indexes.map((index) => index.longestSingleTerm)
@@ -890,6 +959,23 @@ export class CommunityTextScreener {
     const allowed = [...allowSingles]
     if (allowed.length > 0) {
       this.englishFilter.removeWords(...allowed)
+    }
+  }
+
+  private assertDeliberateReviewTerms(): void {
+    for (const entry of this.policy.deliberateReviewTerms ?? []) {
+      const literal = toLiteralForm(entry.term)
+      if (this.allowSingles.has(literal)) {
+        throw new CommunityTextScreenerConfigError(
+          'a deliberate review term is allow-listed, which would silently reverse the policy decision'
+        )
+      }
+      const folded = toFoldedForm(literal)
+      if (!this.indexes.some((index) => index.single.has(folded))) {
+        throw new CommunityTextScreenerConfigError(
+          'a deliberate review term is indexed by no list, so it would not route to review'
+        )
+      }
     }
   }
 
@@ -916,13 +1002,21 @@ export class CommunityTextScreener {
 
     const budget = new ExpansionBudget(this.policy.limits.maxExpandedCharacters)
     const { literalTokens, foldedTokens } = this.foldTokens(literal, budget)
-    const allowed = literalTokens.map((token) => this.allowSingles.has(token))
-    this.markAllowedPhrases(literalTokens, allowed)
+    // Two allowances, kept apart. A single allow-listed word clears that word
+    // as a term on its own; an allow-listed phrase clears the words it covers.
+    // Multi-word terms honour only the second. Story 6.2b found that one array
+    // for both let an ordinary word disable every phrase it appears in: clearing
+    // `concha` (a shell) also cleared `concha de tu madre`.
+    const phraseAllowed = literalTokens.map(() => false)
+    this.markAllowedPhrases(literalTokens, phraseAllowed)
+    const allowed = literalTokens.map(
+      (token, index) => this.allowSingles.has(token) || (phraseAllowed[index] as boolean)
+    )
 
     for (const outcome of this.collectMatches(
       literalTokens,
       foldedTokens,
-      allowed,
+      { allowed, phraseAllowed },
       budget
     )) {
       verdict.match(outcome, this.dispositionFor(outcome.meta.severity))
@@ -1017,9 +1111,10 @@ export class CommunityTextScreener {
   private collectMatches(
     literalTokens: readonly string[],
     foldedTokens: readonly string[],
-    allowed: readonly boolean[],
+    allowances: { allowed: readonly boolean[]; phraseAllowed: readonly boolean[] },
     budget: ExpansionBudget
   ): MatchOutcome[] {
+    const { allowed, phraseAllowed } = allowances
     const outcomes: MatchOutcome[] = []
 
     for (let position = 0; position < foldedTokens.length; position += 1) {
@@ -1046,7 +1141,12 @@ export class CommunityTextScreener {
       }
     }
 
-    outcomes.push(...this.collectPhraseMatches(literalTokens, foldedTokens, allowed))
+    outcomes.push(
+      ...this.collectPhraseMatches(literalTokens, foldedTokens, phraseAllowed)
+    )
+    outcomes.push(
+      ...this.collectResplitPhraseMatches(foldedTokens, phraseAllowed, literalTokens)
+    )
 
     for (const candidate of this.buildJoinCandidates(literalTokens, budget)) {
       const outcome = this.matchCandidate(
@@ -1092,6 +1192,61 @@ export class CommunityTextScreener {
           })
           if (hit !== null) outcomes.push({ meta: phrase.meta, obfuscated: hit })
         }
+      }
+    }
+    return outcomes
+  }
+
+  /**
+   * A multi-word term whose letters arrive cut at different places: `vai-tefoder`
+   * for `vai-te foder`, `kill yours elf`, `blo wjob`. The window pass compares
+   * token for token, the concatenation index sees only a single joined token,
+   * and the spaced-letter rejoin only joins fragments of two characters, so a
+   * phrase re-split between words of three or more letters reached none of them
+   * and published. Found by Story 6.2b, when the vendored LDNOOBW lists brought
+   * hyphenated phrases the earlier lists did not carry.
+   *
+   * Adjacent tokens are joined and compared against phrase concatenations only,
+   * never against single terms, so two ordinary words that happen to spell a
+   * single-word term (`pen is`) are not rebuilt into it. A window that is the
+   * phrase in its own tokenization is skipped, because the window pass already
+   * reported it as an unobfuscated match.
+   */
+  private collectResplitPhraseMatches(
+    foldedTokens: readonly string[],
+    allowed: readonly boolean[],
+    literalTokens: readonly string[]
+  ): MatchOutcome[] {
+    const outcomes: MatchOutcome[] = []
+    const collapsed = foldedTokens.map(collapseRepeats)
+    const carriesLeet = literalTokens.map((token) => LEET_TRIGGER_PATTERN.test(token))
+    for (let start = 0; start < collapsed.length; start += 1) {
+      let joined = ''
+      let leetInWindow = false
+      for (
+        let end = start;
+        end < collapsed.length && end - start < JOIN_WINDOW_CEILING;
+        end += 1
+      ) {
+        if (allowed[end]) break
+        joined = collapseRepeats(joined + (collapsed[end] as string))
+        leetInWindow = leetInWindow || (carriesLeet[end] as boolean)
+        if (joined.length > this.longestTerm) break
+        if (end === start) continue
+        // Story 6.2b review (EC5): `k1ll yours elf` and `bl0 wjob` published,
+        // because the re-split pass compared repeat-collapsed letters only. The
+        // leet-class comparison runs only when the window carries a digit or
+        // symbol, the same gate the single-token pass uses.
+        const leetJoined = leetInWindow ? toLeetClassForm(joined) : null
+        const meta =
+          this.worstAcross((index) => index.phraseConcatenations.get(joined)) ??
+          (leetJoined === null
+            ? null
+            : this.worstAcross((index) => index.phraseLeetConcatenations.get(leetJoined)))
+        if (!meta) continue
+        const form = collapsed.slice(start, end + 1).join(' ')
+        if (this.indexes.some((index) => index.phraseForms.has(form))) continue
+        outcomes.push({ meta, obfuscated: true })
       }
     }
     return outcomes

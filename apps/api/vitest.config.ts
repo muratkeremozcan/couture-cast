@@ -62,6 +62,11 @@ export default defineConfig({
       ...(process.env.RUN_COMMUNITY_SCREENING_READINESS === 'true'
         ? []
         : ['**/community-content-screening.readiness.spec.ts']),
+      // Story 6.2b, AC 4: loads the real model and reads licensed photographs
+      // that live outside Git, so it runs only through its own release command.
+      ...(process.env.RUN_COMMUNITY_SAFE_CORPUS_EVALUATION === 'true'
+        ? []
+        : ['**/community-safe-corpus.evaluation.spec.ts']),
     ],
     setupFiles: [resolve(__dirname, 'src/test-setup.ts')],
     // Both names are pinned so the lookup chain the integration suites share cannot

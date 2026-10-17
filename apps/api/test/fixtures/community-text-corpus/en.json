@@ -1,0 +1,2740 @@
+{
+  "language": "en",
+  "corpusVersion": "v1",
+  "clean": {
+    "description": "Ordinary fashion captions and alt text, written natively in the language as community members would write them, without reference to the term lists. Every entry is expected to pass text screening, except entries labelled expected review, which carry one of the policy's deliberate review terms and the reason it is kept.",
+    "expected": "pass",
+    "entries": [
+      {
+        "id": "en-clean-001",
+        "field": "caption",
+        "text": "Weather check before getting dressed: 7°C at 8am, 16°C by 2pm, rain after 5. So it's a light merino jumper, a waterproof trench, ankle boots that can handle puddles, and a tote big enough to stash the scarf once the sun comes out. Layers win again."
+      },
+      {
+        "id": "en-clean-002",
+        "field": "caption",
+        "text": "Long post but I need advice. My best friend's wedding is outdoors in late September and the forecast keeps flipping between 14°C and 24°C. I have a strapless satin midi in sage but I'm worried about getting cold. Wrap, cropped jacket, or just bring a pashmina?"
+      },
+      {
+        "id": "en-clean-003",
+        "field": "caption",
+        "text": "Finally nailed the capsule wardrobe: two pairs of trousers, one pair of jeans, five tops, two knits, a blazer, a trench and a coat. Everything goes with everything, and getting dressed on a rainy Monday takes about four minutes now."
+      },
+      {
+        "id": "en-clean-004",
+        "field": "caption",
+        "text": "Packing for a week by the sea: two bikinis, one swimsuit, three linen shirts, a slip dress for dinners, thong sandals, white trainers, and a cardigan because evenings on the coast can be surprisingly cool even in July."
+      },
+      {
+        "id": "en-clean-005",
+        "field": "caption",
+        "text": "Today was one of those days where the weather changed every hour. Started with fog and a heavy coat, ended with sunshine and the coat over my arm. Next time I'm taking the thin quilted jacket."
+      },
+      {
+        "id": "en-clean-006",
+        "field": "caption",
+        "text": "I used to think bodycon dresses weren't for me. Then I found one in a thick ribbed knit with long sleeves, paired it with chunky boots and a long coat, and it felt cosy and easy. Sometimes it's all about the fabric."
+      },
+      {
+        "id": "en-clean-007",
+        "field": "caption",
+        "text": "Small styling tip for hot weather: choose loose natural fibres, lighter colours, and keep a thin shirt in your bag for air-conditioned rooms. Your future self in the freezing cinema will thank you."
+      },
+      {
+        "id": "en-clean-008",
+        "field": "caption",
+        "text": "To everyone who commented on my green coat yesterday: it's secondhand, about twenty years old, and the lining was falling apart until my neighbour helped me replace it. Proof that good tailoring lasts."
+      },
+      {
+        "id": "en-clean-009",
+        "field": "caption",
+        "text": "My winter commute uniform after years of trial and error: thermal leggings under wide trousers, a merino top, a down jacket that covers my hips, waterproof boots with grippy soles, and mittens. Pretty? Maybe not. Warm? Always."
+      },
+      {
+        "id": "en-clean-010",
+        "field": "caption",
+        "text": "Spring wardrobe swap done! Packed away the chunky knits and wool coats, washed the cotton dresses, and found a skirt I forgot I owned. Wearing it today with a denim jacket and white trainers."
+      },
+      {
+        "id": "en-clean-011",
+        "field": "caption",
+        "text": "Question for the petite folks: how do you wear midi skirts without feeling swamped? I'm 155 cm and I've tried heels, but I walk too much for them. Would a pointed flat or a higher waist help?"
+      },
+      {
+        "id": "en-clean-012",
+        "field": "caption",
+        "text": "Wore my late grandfather's tweed cap today with a navy coat. It still smells a little like his shed and I think it suits me. Some pieces are worth so much more than what they cost."
+      },
+      {
+        "id": "en-clean-013",
+        "field": "caption",
+        "text": "The forecast said 30°C and humid, so I went with a sleeveless linen dress in nude, flat sandals and a woven bag. Hair tied up, sunglasses on, and a little fan in my bag for the tram."
+      },
+      {
+        "id": "en-clean-014",
+        "field": "caption",
+        "text": "Rate my rainy day outfit: olive parka, grey hoodie, black jeans, black rubber boots and a navy beanie. Not glamorous but I stayed completely dry walking the kids to school."
+      },
+      {
+        "id": "en-clean-015",
+        "field": "caption",
+        "text": "Lolita fashion meetup in the park this afternoon! Everyone looked amazing. I wore a cream dress with a lace collar, a big bow at the back, white tights and round-toe shoes. The weather was kind to us, 21°C and sunny.",
+        "expected": "review",
+        "deliberateReviewTerm": "lolita",
+        "reason": "Names a fashion subculture and is also a child-sexualisation keyword. On a 13+ product every caption or alt text carrying it goes to a moderator, who can clear a fashion post; it is never allow-listed. The cost is review load for that style's posts, recorded as a named limitation."
+      },
+      {
+        "id": "en-clean-016",
+        "field": "caption",
+        "text": "Black slip dress for the evening, oversized knit cardigan on top, and ankle boots. When it's 15°C after sunset this is my favourite way to stay comfortable and still look dressed up."
+      },
+      {
+        "id": "en-clean-017",
+        "field": "caption",
+        "text": "Office dress codes are tricky in a heatwave. Mine today: sleeveless silk top, cropped wide trousers, open-toe mules and a lightweight blazer that stays on the chair until the client call."
+      },
+      {
+        "id": "en-clean-018",
+        "field": "caption",
+        "text": "Not sure about cropped tops at 40, but I tried a slightly cropped knit with very high-waisted trousers and honestly it looks balanced and grown-up. Proportions matter more than age."
+      },
+      {
+        "id": "en-clean-019",
+        "field": "caption",
+        "text": "Hosting a dinner party tonight. Went with a backless jumpsuit in deep navy and flat sandals so I can run between kitchen and table. Gold earrings and a sleek low bun to finish it off."
+      },
+      {
+        "id": "en-clean-020",
+        "field": "caption",
+        "text": "Our first snow of the season! The kids built a snowman while I tried my new long down coat. It covers my knees, has a two-way zip and deep pockets. I'm finally warm while waiting at the bus stop."
+      },
+      {
+        "id": "en-clean-021",
+        "field": "caption",
+        "text": "OOTD: camel coat, grey knit, straight jeans. 8°C and windy so the scarf stayed on all day."
+      },
+      {
+        "id": "en-clean-022",
+        "field": "caption",
+        "text": "Rain all morning, so trench and rubber boots it is."
+      },
+      {
+        "id": "en-clean-023",
+        "field": "caption",
+        "text": "Finally warm enough for the linen shirt!"
+      },
+      {
+        "id": "en-clean-024",
+        "field": "caption",
+        "text": "Hot weather uniform: white linen trousers, a loose tank and flat thong sandals. Nothing sticks to you."
+      },
+      {
+        "id": "en-clean-025",
+        "field": "caption",
+        "text": "Nude heels with a navy dress is my go-to for office days that end with dinner plans."
+      },
+      {
+        "id": "en-clean-026",
+        "field": "caption",
+        "text": "Feeling a bit sexy in this black slip dress tonight. Layered a cropped cardigan over it because the evening got chilly."
+      },
+      {
+        "id": "en-clean-027",
+        "field": "caption",
+        "text": "Is a skinny jean still okay with chunky boots or should I switch to straight leg?"
+      },
+      {
+        "id": "en-clean-028",
+        "field": "caption",
+        "text": "Tight white tee, high-waisted jeans, big black bag. Simple and it works every time."
+      },
+      {
+        "id": "en-clean-029",
+        "field": "caption",
+        "text": "Beach day! Striped bikini, oversized linen shirt as a cover-up and a straw hat. 31°C and not a cloud."
+      },
+      {
+        "id": "en-clean-030",
+        "field": "caption",
+        "text": "Those killer heels deserve a standing ovation. Where did you find them?"
+      },
+      {
+        "id": "en-clean-031",
+        "field": "caption",
+        "text": "You look drop-dead gorgeous in that emerald gown 😍"
+      },
+      {
+        "id": "en-clean-032",
+        "field": "caption",
+        "text": "Tops and bottoms in matching sage green. Co-ord sets save me so much time in the morning."
+      },
+      {
+        "id": "en-clean-033",
+        "field": "caption",
+        "text": "Cocktail dress in peacock blue for my cousin's engagement party. Kept the jewellery minimal."
+      },
+      {
+        "id": "en-clean-034",
+        "field": "caption",
+        "text": "A pop of colour on a grey day: mustard beanie with my charcoal coat."
+      },
+      {
+        "id": "en-clean-035",
+        "field": "caption",
+        "text": "These butt-lifting jeans are honestly the most comfortable denim I own. High rise, lots of stretch."
+      },
+      {
+        "id": "en-clean-036",
+        "field": "caption",
+        "text": "Swapped my screw-back earrings for little hoops so I could sleep in them on the overnight train."
+      },
+      {
+        "id": "en-clean-037",
+        "field": "caption",
+        "text": "Fanny pack worn crossbody for the farmers market. Hands free for coffee and peaches."
+      },
+      {
+        "id": "en-clean-038",
+        "field": "caption",
+        "text": "Humid day tip: tie up your hair in a low bun and pick a breathable cotton dress."
+      },
+      {
+        "id": "en-clean-039",
+        "field": "caption",
+        "text": "Tried Lolita fashion for the first time at a convention. Petticoat, lace collar, and a pastel pink rosette on the headpiece.",
+        "expected": "review",
+        "deliberateReviewTerm": "lolita",
+        "reason": "Names a fashion subculture and is also a child-sexualisation keyword. On a 13+ product every caption or alt text carrying it goes to a moderator, who can clear a fashion post; it is never allow-listed. The cost is review load for that style's posts, recorded as a named limitation."
+      },
+      {
+        "id": "en-clean-040",
+        "field": "caption",
+        "text": "Bodycon midi with a long blazer so it reads more office than evening."
+      },
+      {
+        "id": "en-clean-041",
+        "field": "caption",
+        "text": "Sheer blouse over a lace bralette for a gig. Warm venue, cold walk home, so I brought a denim jacket."
+      },
+      {
+        "id": "en-clean-042",
+        "field": "caption",
+        "text": "Low-cut necklines and high necklines both work with this layered chain, just adjust the length."
+      },
+      {
+        "id": "en-clean-043",
+        "field": "caption",
+        "text": "Backless dress for the wedding. Worried about the wind on the terrace so I packed a pashmina."
+      },
+      {
+        "id": "en-clean-044",
+        "field": "caption",
+        "text": "Strapless tops need a good strapless bra. Took me years to learn that."
+      },
+      {
+        "id": "en-clean-045",
+        "field": "caption",
+        "text": "Lingerie-inspired camisole under a chunky blazer. Very in right now and surprisingly practical."
+      },
+      {
+        "id": "en-clean-046",
+        "field": "caption",
+        "text": "Cropped puffer, wide trousers, trainers. 3°C and sunny."
+      },
+      {
+        "id": "en-clean-047",
+        "field": "caption",
+        "text": "Booty shorts and a sports bra for my morning run. It was already 24°C at 7am."
+      },
+      {
+        "id": "en-clean-048",
+        "field": "caption",
+        "text": "Thong sandals are back for the summer! Mine are flat leather in tan."
+      },
+      {
+        "id": "en-clean-049",
+        "field": "caption",
+        "text": "What colour bag goes with a burgundy coat? I keep reaching for black but want something different."
+      },
+      {
+        "id": "en-clean-050",
+        "field": "caption",
+        "text": "Snow day fit: long down coat, thermal leggings, fleece-lined boots, and a hat my gran knitted."
+      },
+      {
+        "id": "en-clean-051",
+        "field": "caption",
+        "text": "Love how you styled the oversized blazer with cycling shorts. Very effortless."
+      },
+      {
+        "id": "en-clean-052",
+        "field": "caption",
+        "text": "Wore my grandmother's vintage brooch on a black turtleneck today. Got three compliments!"
+      },
+      {
+        "id": "en-clean-053",
+        "field": "caption",
+        "text": "Light drizzle, 14°C. Waterproof parka over a hoodie."
+      },
+      {
+        "id": "en-clean-054",
+        "field": "caption",
+        "text": "Linen everything."
+      },
+      {
+        "id": "en-clean-055",
+        "field": "caption",
+        "text": "Monochrome cream look: ribbed knit, wide-leg trousers, cream loafers. Dry clean only, wish me luck."
+      },
+      {
+        "id": "en-clean-056",
+        "field": "caption",
+        "text": "Pro tip: a nude bra disappears under white shirts much better than a white one."
+      },
+      {
+        "id": "en-clean-057",
+        "field": "caption",
+        "text": "Fog this morning so I went with a reflective trim on my cycling jacket. Safety first, style second."
+      },
+      {
+        "id": "en-clean-058",
+        "field": "caption",
+        "text": "Sexy does not have to mean revealing. A well-cut black trouser suit does it for me."
+      },
+      {
+        "id": "en-clean-059",
+        "field": "caption",
+        "text": "Shoutout to whoever said corduroy is back. Rust cords with a cream fisherman jumper today."
+      },
+      {
+        "id": "en-clean-060",
+        "field": "caption",
+        "text": "#ootd #rainyday yellow raincoat and green wellies ☔"
+      },
+      {
+        "id": "en-clean-061",
+        "field": "caption",
+        "text": "Hot weather, cold office. Cardigan lives on the back of my chair."
+      },
+      {
+        "id": "en-clean-062",
+        "field": "caption",
+        "text": "Skinny scarf trick: loop it twice and tuck the ends under your coat lapel."
+      },
+      {
+        "id": "en-clean-063",
+        "field": "caption",
+        "text": "The breeze off the lake turned 22°C into 17°C real fast. Glad I brought a light jacket."
+      },
+      {
+        "id": "en-clean-064",
+        "field": "caption",
+        "text": "Silk slip skirt, chunky knit, ankle boots. My favourite autumn formula."
+      },
+      {
+        "id": "en-clean-065",
+        "field": "caption",
+        "text": "Any tips for keeping white trainers clean in a city that rains 200 days a year?"
+      },
+      {
+        "id": "en-clean-066",
+        "field": "caption",
+        "text": "Sheer tights in black with a tweed mini. Very schoolgirl-meets-librarian and I love it."
+      },
+      {
+        "id": "en-clean-067",
+        "field": "caption",
+        "text": "Pastel lilac shirt dress for brunch. The sleeves have little pleats at the cuffs."
+      },
+      {
+        "id": "en-clean-068",
+        "field": "caption",
+        "text": "Sticky 33°C day in the city. Loose cotton culottes and a sleeveless top kept me sane."
+      },
+      {
+        "id": "en-clean-069",
+        "field": "caption",
+        "text": "Found a cocktail dress at the charity shop for the price of a sandwich. Navy satin, perfect fit."
+      },
+      {
+        "id": "en-clean-070",
+        "field": "caption",
+        "text": "Mixing prints today: leopard skirt, striped tee. Rules are made to be bent."
+      },
+      {
+        "id": "en-clean-071",
+        "field": "caption",
+        "text": "Wool socks with clogs. Don't knock it until you've tried it."
+      },
+      {
+        "id": "en-clean-072",
+        "field": "caption",
+        "text": "My first time wearing a crop top to work. Paired it with high-waisted trousers so no skin showed when I sat down."
+      },
+      {
+        "id": "en-clean-073",
+        "field": "caption",
+        "text": "Bra straps showing on purpose? With the right lace one it looks intentional."
+      },
+      {
+        "id": "en-clean-074",
+        "field": "caption",
+        "text": "Hot pink blazer and matching trousers. Grey sky, bright suit."
+      },
+      {
+        "id": "en-clean-075",
+        "field": "caption",
+        "text": "A good trench coat is worth every penny. Mine is ten years old and still looks sharp."
+      },
+      {
+        "id": "en-clean-076",
+        "field": "caption",
+        "text": "Rooftop drinks look: black halter neck, wide trousers, gold cuff."
+      },
+      {
+        "id": "en-clean-077",
+        "field": "caption",
+        "text": "Wind gusts up to 50 km/h. Left the full skirt at home and wore cropped flares."
+      },
+      {
+        "id": "en-clean-078",
+        "field": "caption",
+        "text": "Love this! The camel and navy combo is timeless."
+      },
+      {
+        "id": "en-clean-079",
+        "field": "caption",
+        "text": "Pyjama-style silk shirt with jeans for a lazy Sunday that still felt put together."
+      },
+      {
+        "id": "en-clean-080",
+        "field": "caption",
+        "text": "First frost. Out came the shearling collar coat."
+      },
+      {
+        "id": "en-clean-081",
+        "field": "caption",
+        "text": "Can someone explain how to wear a bandana as a headband without it slipping?"
+      },
+      {
+        "id": "en-clean-082",
+        "field": "caption",
+        "text": "Matching set in terracotta linen. Shorts and a button-up, very holiday."
+      },
+      {
+        "id": "en-clean-083",
+        "field": "caption",
+        "text": "Bodysuit under a high-waisted skirt means nothing untucks all day. Game changer."
+      },
+      {
+        "id": "en-clean-084",
+        "field": "caption",
+        "text": "Showers on and off, so I layered a packable rain shell over my blazer."
+      },
+      {
+        "id": "en-clean-085",
+        "field": "caption",
+        "text": "Nude lipstick, nude shoes, and a pop of red on the bag."
+      },
+      {
+        "id": "en-clean-086",
+        "field": "caption",
+        "text": "Spotted on my commute: a man in a perfectly tailored olive suit with white sneakers. Instant inspo."
+      },
+      {
+        "id": "en-clean-087",
+        "field": "caption",
+        "text": "Clear skies and 19°C. Denim jacket weather at last 🌤️"
+      },
+      {
+        "id": "en-clean-088",
+        "field": "caption",
+        "text": "Ribbed tank, low-rise cargos, chunky sandals. Festival practice run."
+      },
+      {
+        "id": "en-clean-089",
+        "field": "caption",
+        "text": "Backless top + a loose blazer you can slip on and off. Works for both the hot terrace and the air-conditioned bar."
+      },
+      {
+        "id": "en-clean-090",
+        "field": "caption",
+        "text": "My hack for a tight waistband after a big dinner: wear a long cardigan and nobody knows."
+      },
+      {
+        "id": "en-clean-091",
+        "field": "caption",
+        "text": "Quilted vest over a hoodie for the dog walk. 6°C and damp."
+      },
+      {
+        "id": "en-clean-092",
+        "field": "caption",
+        "text": "I asked for your help choosing earrings and you all said pearls. You were right."
+      },
+      {
+        "id": "en-clean-093",
+        "field": "caption",
+        "text": "Silver sequins at 10am? It's my birthday, so yes."
+      },
+      {
+        "id": "en-clean-094",
+        "field": "caption",
+        "text": "Swimsuit season. Went with a one-piece in cobalt with a low back."
+      },
+      {
+        "id": "en-clean-095",
+        "field": "caption",
+        "text": "Balmy evening by the harbour. Wore a gauzy maxi skirt and a cropped knit."
+      },
+      {
+        "id": "en-clean-096",
+        "field": "caption",
+        "text": "Black on black on black. Leather jacket, jeans, boots. Never fails."
+      },
+      {
+        "id": "en-clean-097",
+        "field": "caption",
+        "text": "Sheer organza sleeves add so much to a simple dress."
+      },
+      {
+        "id": "en-clean-098",
+        "field": "caption",
+        "text": "Rain boots are the most underrated footwear. Change my mind."
+      },
+      {
+        "id": "en-clean-099",
+        "field": "caption",
+        "text": "Thank you for the tip about steaming silk instead of ironing it!"
+      },
+      {
+        "id": "en-clean-100",
+        "field": "caption",
+        "text": "Muted khaki jumpsuit, white trainers and a canvas tote. Easy Friday."
+      },
+      {
+        "id": "en-clean-101",
+        "field": "caption",
+        "text": "Spring layering: tee, overshirt, light trench. Peel off as the day warms."
+      },
+      {
+        "id": "en-clean-102",
+        "field": "caption",
+        "text": "Got caught in a downpour in suede loafers. Lesson learned."
+      },
+      {
+        "id": "en-clean-103",
+        "field": "caption",
+        "text": "#heatwave 36°C. Breezy cotton dress, big sunglasses, and SPF."
+      },
+      {
+        "id": "en-clean-104",
+        "field": "caption",
+        "text": "That butter-yellow cardigan is everything."
+      },
+      {
+        "id": "en-clean-105",
+        "field": "caption",
+        "text": "Is it weird to wear a cocktail dress to the office with a blazer and flats? It was meant for last night, but I like it."
+      },
+      {
+        "id": "en-clean-106",
+        "field": "caption",
+        "text": "Silk headscarf tied under the chin for a windy drive along the coast."
+      },
+      {
+        "id": "en-clean-107",
+        "field": "caption",
+        "text": "Velvet blazer in deep plum for a December dinner."
+      },
+      {
+        "id": "en-clean-108",
+        "field": "caption",
+        "text": "Fitted rollneck under a pinafore dress. Very 70s."
+      },
+      {
+        "id": "en-clean-109",
+        "field": "caption",
+        "text": "If you have broad shoulders like me, try a V-neck with a soft drape. So flattering."
+      },
+      {
+        "id": "en-clean-110",
+        "field": "caption",
+        "text": "Paper bag waist trousers make any top look tucked in nicely."
+      },
+      {
+        "id": "en-clean-111",
+        "field": "caption",
+        "text": "The weather app said sunny. It is hailing. Hood up."
+      },
+      {
+        "id": "en-clean-112",
+        "field": "caption",
+        "text": "Strappy sandals plus a pedicure in coral. Summer has officially started."
+      },
+      {
+        "id": "en-clean-113",
+        "field": "caption",
+        "text": "Cosy knit dress with tights and knee boots for a cold, bright Saturday."
+      },
+      {
+        "id": "en-clean-114",
+        "field": "caption",
+        "text": "Who else is still wearing shorts in October? 18°C today!"
+      },
+      {
+        "id": "en-clean-115",
+        "field": "caption",
+        "text": "Grey marl sweatshirt, pleated skirt and loafers. Comfort meets polished."
+      },
+      {
+        "id": "en-clean-116",
+        "field": "caption",
+        "text": "A slip dress over a white tee is my answer to warm days that end cool."
+      },
+      {
+        "id": "en-clean-117",
+        "field": "caption",
+        "text": "Took my linen blazer to the tailor to shorten the sleeves. Worth it."
+      },
+      {
+        "id": "en-clean-118",
+        "field": "caption",
+        "text": "Anyone have a favourite way to wear a cropped cardigan with high-rise jeans? Mine always looks too boxy."
+      },
+      {
+        "id": "en-clean-119",
+        "field": "caption",
+        "text": "Wearing my nude block heels until they fall apart."
+      },
+      {
+        "id": "en-clean-120",
+        "field": "caption",
+        "text": "Raindrops on a waxed jacket look so good."
+      },
+      {
+        "id": "en-clean-121",
+        "field": "caption",
+        "text": "Mid-length pleated skirt that moves when you walk. Instant mood boost."
+      },
+      {
+        "id": "en-clean-122",
+        "field": "caption",
+        "text": "#wfh fit: soft joggers, a nice shirt for video calls, slippers off camera."
+      },
+      {
+        "id": "en-clean-123",
+        "field": "caption",
+        "text": "Navy and black together? Yes. Try it with different textures."
+      },
+      {
+        "id": "en-clean-124",
+        "field": "caption",
+        "text": "Muggy and grey. Went for a loose linen jumpsuit and leather slides."
+      },
+      {
+        "id": "en-clean-125",
+        "field": "caption",
+        "text": "Cable knit jumper tucked into a corduroy skirt. Peak autumn."
+      },
+      {
+        "id": "en-clean-126",
+        "field": "caption",
+        "text": "You always pick the best accessories. That woven belt!"
+      },
+      {
+        "id": "en-clean-127",
+        "field": "caption",
+        "text": "Hot day hack: carry a light shawl for over-air-conditioned trains."
+      },
+      {
+        "id": "en-clean-128",
+        "field": "caption",
+        "text": "Wedding guest look: sage green satin midi, gold sandals, small clutch."
+      },
+      {
+        "id": "en-clean-129",
+        "field": "caption",
+        "text": "Bomber jacket, hoodie under, wide jeans. Cold but dry."
+      },
+      {
+        "id": "en-clean-130",
+        "field": "caption",
+        "text": "I keep a pair of foldable flats in my bag for when the heels get too much."
+      },
+      {
+        "id": "en-clean-131",
+        "field": "caption",
+        "text": "Pleated midi in black with a tight ribbed top. Balanced proportions."
+      },
+      {
+        "id": "en-clean-132",
+        "field": "caption",
+        "text": "Gorgeous colour palette in this photo. Rust, olive and cream."
+      },
+      {
+        "id": "en-clean-133",
+        "field": "caption",
+        "text": "Polka dot blouse with red trousers. Bold but it works."
+      },
+      {
+        "id": "en-clean-134",
+        "field": "caption",
+        "text": "Sunrise hike: merino base layer, fleece, shell. Took two off by the summit."
+      },
+      {
+        "id": "en-clean-135",
+        "field": "caption",
+        "text": "Thong sandals or slides for a city break? Lots of walking expected."
+      },
+      {
+        "id": "en-clean-136",
+        "field": "caption",
+        "text": "Leather gloves are back in my bag. Autumn is here."
+      },
+      {
+        "id": "en-clean-137",
+        "field": "caption",
+        "text": "Matching my lipstick to my scarf today. Cherry red."
+      },
+      {
+        "id": "en-clean-138",
+        "field": "caption",
+        "text": "Tight on time this morning so I threw on my trusty knit dress."
+      },
+      {
+        "id": "en-clean-139",
+        "field": "caption",
+        "text": "Sheer black blouse over a black slip, plus wide trousers. Evening without fuss."
+      },
+      {
+        "id": "en-clean-140",
+        "field": "caption",
+        "text": "Nothing beats a crisp white shirt."
+      },
+      {
+        "id": "en-clean-141",
+        "field": "caption",
+        "text": "11°C, sunshine, no wind. Light wool coat open over a knit."
+      },
+      {
+        "id": "en-clean-142",
+        "field": "caption",
+        "text": "The bodycon dress felt a bit much on its own so I added an oversized denim shirt."
+      },
+      {
+        "id": "en-clean-143",
+        "field": "caption",
+        "text": "Cropped wide-leg trousers show off ankle boots really well."
+      },
+      {
+        "id": "en-clean-144",
+        "field": "caption",
+        "text": "Rainy commute? Waterproof trainers. Seriously, get some."
+      },
+      {
+        "id": "en-clean-145",
+        "field": "caption",
+        "text": "Lace collar blouse under a navy jumper. Cute for parent-teacher evening."
+      },
+      {
+        "id": "en-clean-146",
+        "field": "caption",
+        "text": "First time trying a bucket hat. Verdict: love it for sunny afternoons."
+      },
+      {
+        "id": "en-clean-147",
+        "field": "caption",
+        "text": "Wrapped in a blanket scarf, latte in hand. Peak November."
+      },
+      {
+        "id": "en-clean-148",
+        "field": "caption",
+        "text": "Strapless jumpsuit for the gala, with a little bolero in case it got cold."
+      },
+      {
+        "id": "en-clean-149",
+        "field": "caption",
+        "text": "Floral tea dress, cardigan, Mary Janes. Sweet and practical."
+      },
+      {
+        "id": "en-clean-150",
+        "field": "caption",
+        "text": "How do you all store chunky knits so they don't stretch?"
+      },
+      {
+        "id": "en-clean-151",
+        "field": "caption",
+        "text": "Lightweight puffer packs into its own pocket. Perfect for unpredictable spring."
+      },
+      {
+        "id": "en-clean-152",
+        "field": "caption",
+        "text": "Wearing a rosette from the county show on my denim jacket. Proud of my pony!"
+      },
+      {
+        "id": "en-clean-153",
+        "field": "caption",
+        "text": "Retro track jacket with a midi skirt. Unexpected but fun."
+      },
+      {
+        "id": "en-clean-154",
+        "field": "caption",
+        "text": "Scorching 38°C. Wore the loosest thing I own and stayed in the shade."
+      },
+      {
+        "id": "en-clean-155",
+        "field": "caption",
+        "text": "Leopard flats are a neutral, I am sure of it."
+      },
+      {
+        "id": "en-clean-156",
+        "field": "caption",
+        "text": "Ivory suit for the civil ceremony, with a silk camisole underneath."
+      },
+      {
+        "id": "en-clean-157",
+        "field": "caption",
+        "text": "Your styling of the vest as a top is so clever."
+      },
+      {
+        "id": "en-clean-158",
+        "field": "caption",
+        "text": "Tie up your hair with a silk scrunchie to avoid creases."
+      },
+      {
+        "id": "en-clean-159",
+        "field": "caption",
+        "text": "Cold wind from the north. Doubled up on scarves."
+      },
+      {
+        "id": "en-clean-160",
+        "field": "caption",
+        "text": "Chambray shirt, white jeans, espadrilles. Sea breeze approved."
+      },
+      {
+        "id": "en-clean-161",
+        "field": "caption",
+        "text": "Big black bag fits my laptop, lunch and an umbrella. Best purchase of the year."
+      },
+      {
+        "id": "en-clean-162",
+        "field": "caption",
+        "text": "Cream cable knit, brown cords, and loafers with thick socks."
+      },
+      {
+        "id": "en-clean-163",
+        "field": "caption",
+        "text": "Navy wrap dress for a job interview. Got the job! 🎉"
+      },
+      {
+        "id": "en-clean-164",
+        "field": "caption",
+        "text": "What's the best fabric for a muggy summer wedding? Linen creases, silk shows every drop of sweat."
+      },
+      {
+        "id": "en-clean-165",
+        "field": "caption",
+        "text": "Wide-brim hat saved my face from the sun today."
+      },
+      {
+        "id": "en-clean-166",
+        "field": "caption",
+        "text": "Warm wool coat and thin gloves for the morning frost, then just the coat by noon."
+      },
+      {
+        "id": "en-clean-167",
+        "field": "caption",
+        "text": "That tailored waistcoat looks fantastic with the white tee."
+      },
+      {
+        "id": "en-clean-168",
+        "field": "caption",
+        "text": "Baby blue knit vest over a striped shirt. Spring is coming."
+      },
+      {
+        "id": "en-clean-169",
+        "field": "caption",
+        "text": "Sporty look: zip-up track top, bike shorts, chunky trainers."
+      },
+      {
+        "id": "en-clean-170",
+        "field": "caption",
+        "text": "Rain-proofing: spray your suede shoes before the first storm."
+      },
+      {
+        "id": "en-clean-171",
+        "field": "caption",
+        "text": "My mum's old leather jacket fits me perfectly now. Feeling very lucky."
+      },
+      {
+        "id": "en-clean-172",
+        "field": "caption",
+        "text": "Gingham dress and red sandals for the picnic."
+      },
+      {
+        "id": "en-clean-173",
+        "field": "caption",
+        "text": "Feeling hot hot hot in this red jumpsuit (and the actual heat, 34°C)."
+      },
+      {
+        "id": "en-clean-174",
+        "field": "caption",
+        "text": "Weekend market haul: a silk scarf, a vintage belt and a lambswool beanie."
+      },
+      {
+        "id": "en-clean-175",
+        "field": "caption",
+        "text": "Grey day, grey suit, yellow socks."
+      },
+      {
+        "id": "en-clean-176",
+        "field": "caption",
+        "text": "Sheets of rain all afternoon. Wore my longest raincoat."
+      },
+      {
+        "id": "en-clean-177",
+        "field": "caption",
+        "text": "I love how you mix vintage and new. Great eye."
+      },
+      {
+        "id": "en-clean-178",
+        "field": "caption",
+        "text": "Off-shoulder blouse for the garden party. Bit breezy, so a light shrug came along."
+      },
+      {
+        "id": "en-clean-179",
+        "field": "caption",
+        "text": "Halter top with a long skirt for the summer concert in the park."
+      },
+      {
+        "id": "en-clean-180",
+        "field": "caption",
+        "text": "The trick with a skinny belt is to wear it slightly above the natural waist."
+      },
+      {
+        "id": "en-clean-181",
+        "field": "caption",
+        "text": "Monday mood: oversized grey blazer, black tee, straight jeans, and loafers."
+      },
+      {
+        "id": "en-clean-182",
+        "field": "caption",
+        "text": "Rained so hard my socks are still wet. Next time: waterproof boots."
+      },
+      {
+        "id": "en-clean-183",
+        "field": "caption",
+        "text": "Chiffon blouse with puffed sleeves. Feels like a cloud."
+      },
+      {
+        "id": "en-clean-184",
+        "field": "caption",
+        "text": "Shoulder pads are back and I'm not complaining."
+      },
+      {
+        "id": "en-clean-185",
+        "field": "caption",
+        "text": "Waffle knit henley and wide chinos for a slow Sunday."
+      },
+      {
+        "id": "en-clean-186",
+        "field": "caption",
+        "text": "Ankle-length coat in charcoal. Kept me warm on the platform for 40 minutes."
+      },
+      {
+        "id": "en-clean-187",
+        "field": "caption",
+        "text": "Sunny and 26°C. Sundress in cornflower blue."
+      },
+      {
+        "id": "en-clean-188",
+        "field": "caption",
+        "text": "What do you wear to a summer evening wedding in the mountains? Temperature drops to 12°C after sunset."
+      },
+      {
+        "id": "en-clean-189",
+        "field": "caption",
+        "text": "Plaid shirt as a jacket over a tank top. Easy layering."
+      },
+      {
+        "id": "en-clean-190",
+        "field": "caption",
+        "text": "Rust suede skirt, cream blouse, tan boots. Autumn on repeat."
+      },
+      {
+        "id": "en-clean-191",
+        "field": "caption",
+        "text": "Wore heels to the conference and regretted it by lunch. Trainers tomorrow."
+      },
+      {
+        "id": "en-clean-192",
+        "field": "caption",
+        "text": "That shade of teal is stunning on you."
+      },
+      {
+        "id": "en-clean-193",
+        "field": "caption",
+        "text": "Nude mesh flats are so comfy for travel days."
+      },
+      {
+        "id": "en-clean-194",
+        "field": "caption",
+        "text": "Mint green trousers with a white knit. Spring finally showed up."
+      },
+      {
+        "id": "en-clean-195",
+        "field": "caption",
+        "text": "Fleece-lined tights are the only reason I can wear skirts in January."
+      },
+      {
+        "id": "en-clean-196",
+        "field": "caption",
+        "text": "Lemon print shirt for the long weekend 🍋"
+      },
+      {
+        "id": "en-clean-197",
+        "field": "caption",
+        "text": "Mustard cord jacket, black jeans, chelsea boots. Classic."
+      },
+      {
+        "id": "en-clean-198",
+        "field": "caption",
+        "text": "Swimsuit plus sarong for the lake. Water was cold but the sun was strong."
+      },
+      {
+        "id": "en-clean-199",
+        "field": "caption",
+        "text": "Workwear win: tailored trousers with a stretch waist."
+      },
+      {
+        "id": "en-clean-200",
+        "field": "caption",
+        "text": "2°C, light snow, and I still wore my trainers. Wet toes, no regrets."
+      },
+      {
+        "id": "en-clean-201",
+        "field": "caption",
+        "text": "Silver jewellery with a navy dress looks so crisp."
+      },
+      {
+        "id": "en-clean-202",
+        "field": "caption",
+        "text": "My favourite cold-weather combo is a roll neck under a slip dress."
+      },
+      {
+        "id": "en-clean-203",
+        "field": "caption",
+        "text": "Polo shirt dress, white trainers, a ponytail. Easy."
+      },
+      {
+        "id": "en-clean-204",
+        "field": "caption",
+        "text": "You can never have too many white tees. Unpopular opinion?"
+      },
+      {
+        "id": "en-clean-205",
+        "field": "caption",
+        "text": "Embroidered jacket from a market in the old town. Feels like wearable art."
+      },
+      {
+        "id": "en-clean-206",
+        "field": "caption",
+        "text": "Fitted blazer in cobalt with black trousers. Felt like the boss in the meeting."
+      },
+      {
+        "id": "en-clean-207",
+        "field": "caption",
+        "text": "Bikini top and high-waisted shorts for the boat trip. Lots of sunscreen."
+      },
+      {
+        "id": "en-clean-208",
+        "field": "caption",
+        "text": "Thank you all for the advice on my sister's prom dress. She went with the dusty rose."
+      },
+      {
+        "id": "en-clean-209",
+        "field": "caption",
+        "text": "Neon trainers with an all-grey outfit. Little bit of fun."
+      },
+      {
+        "id": "en-clean-210",
+        "field": "caption",
+        "text": "Brushed wool trousers keep me warmer than jeans."
+      },
+      {
+        "id": "en-clean-211",
+        "field": "caption",
+        "text": "Spring rain means my trench gets to come out again."
+      },
+      {
+        "id": "en-clean-212",
+        "field": "caption",
+        "text": "Cropped trousers and loafers without socks. It's warm enough now."
+      },
+      {
+        "id": "en-clean-213",
+        "field": "caption",
+        "text": "Heavy dew this morning so I went with leather boots."
+      },
+      {
+        "id": "en-clean-214",
+        "field": "caption",
+        "text": "Burnt orange knit and dark denim. My autumn uniform."
+      },
+      {
+        "id": "en-clean-215",
+        "field": "caption",
+        "text": "Patterned silk shirt under a plain suit. Subtle but fun."
+      },
+      {
+        "id": "en-clean-216",
+        "field": "caption",
+        "text": "The way that coat drapes is perfect."
+      },
+      {
+        "id": "en-clean-217",
+        "field": "caption",
+        "text": "Hot weather hairstyles: braid it, pin it, done."
+      },
+      {
+        "id": "en-clean-218",
+        "field": "caption",
+        "text": "Velvet slip dress, sheer black tights, and ankle boots for a holiday party."
+      },
+      {
+        "id": "en-clean-219",
+        "field": "caption",
+        "text": "It's 9°C and the sun is out. Leather jacket time."
+      },
+      {
+        "id": "en-clean-220",
+        "field": "caption",
+        "text": "Trying a monochrome blush pink look. Thoughts?"
+      },
+      {
+        "id": "en-clean-221",
+        "field": "caption",
+        "text": "Dungarees with a striped tee. Gardening in style."
+      },
+      {
+        "id": "en-clean-222",
+        "field": "caption",
+        "text": "Every year I forget how much I love a good flannel shirt."
+      },
+      {
+        "id": "en-clean-223",
+        "field": "caption",
+        "text": "Faux fur coat on the coldest night of the year. Toasty."
+      },
+      {
+        "id": "en-clean-224",
+        "field": "caption",
+        "text": "Swapped my tight jeans for wide-leg ones and I'm never going back."
+      },
+      {
+        "id": "en-clean-225",
+        "field": "caption",
+        "text": "Light blue shirt dress with a tan belt and sandals for a garden lunch."
+      },
+      {
+        "id": "en-clean-226",
+        "field": "caption",
+        "text": "Super windy, so I picked the fitted midi skirt today."
+      },
+      {
+        "id": "en-clean-227",
+        "field": "caption",
+        "text": "Peacock blue velvet blazer. Got stopped twice on the street."
+      },
+      {
+        "id": "en-clean-228",
+        "field": "caption",
+        "text": "Saving this outfit for my next date night."
+      },
+      {
+        "id": "en-clean-229",
+        "field": "caption",
+        "text": "That combination of olive and lilac should not work but it really does."
+      },
+      {
+        "id": "en-clean-230",
+        "field": "caption",
+        "text": "Chunky loafers with white socks and a pleated skirt."
+      },
+      {
+        "id": "en-clean-231",
+        "field": "caption",
+        "text": "Got my first tailored suit for my graduation. Navy pinstripe."
+      },
+      {
+        "id": "en-clean-232",
+        "field": "caption",
+        "text": "Muslin shirt for the hottest day of the year. Breathes like nothing else."
+      },
+      {
+        "id": "en-clean-233",
+        "field": "caption",
+        "text": "Anyone else layer two cardigans when the heating is off at work?"
+      },
+      {
+        "id": "en-clean-234",
+        "field": "caption",
+        "text": "Red lip, black dress, little gold hoops. Timeless."
+      },
+      {
+        "id": "en-clean-235",
+        "field": "caption",
+        "text": "Bright yellow raincoat because grey days need it."
+      },
+      {
+        "id": "en-clean-236",
+        "field": "caption",
+        "text": "Ruffled blouse with tailored shorts and block heels. Summer office."
+      },
+      {
+        "id": "en-clean-237",
+        "field": "caption",
+        "text": "Stormy afternoon. Wore my anorak and waterproof trousers to cycle home."
+      },
+      {
+        "id": "en-clean-238",
+        "field": "caption",
+        "text": "Your shoe collection is a dream."
+      },
+      {
+        "id": "en-clean-239",
+        "field": "caption",
+        "text": "Wool beret and long coat. Very Paris mood."
+      },
+      {
+        "id": "en-clean-240",
+        "field": "caption",
+        "text": "The pleats on this skirt survived the washing machine!"
+      },
+      {
+        "id": "en-clean-241",
+        "field": "caption",
+        "text": "Black lace top, wide jeans and gold hoops for a friend's birthday."
+      },
+      {
+        "id": "en-clean-242",
+        "field": "caption",
+        "text": "Is a cropped jacket flattering for a short torso? Asking for me."
+      },
+      {
+        "id": "en-clean-243",
+        "field": "caption",
+        "text": "Long cardigan, slim trousers, ballet flats. Cosy office look."
+      },
+      {
+        "id": "en-clean-244",
+        "field": "caption",
+        "text": "15°C and cloudy with a chance of rain. Packed an umbrella just in case."
+      },
+      {
+        "id": "en-clean-245",
+        "field": "caption",
+        "text": "My new nude ankle boots go with absolutely everything."
+      },
+      {
+        "id": "en-clean-246",
+        "field": "caption",
+        "text": "Holiday packing: linen, linen and more linen."
+      },
+      {
+        "id": "en-clean-247",
+        "field": "caption",
+        "text": "Sporty-chic: hoodie under a camel coat."
+      },
+      {
+        "id": "en-clean-248",
+        "field": "caption",
+        "text": "Tiny floral print on a long-sleeve blouse. Feels like spring."
+      },
+      {
+        "id": "en-clean-249",
+        "field": "caption",
+        "text": "Short sleeves and shorts in May. Too early? The sun says no."
+      },
+      {
+        "id": "en-clean-250",
+        "field": "caption",
+        "text": "A silk scarf tied on my bag handle. Instant upgrade."
+      },
+      {
+        "id": "en-clean-251",
+        "field": "caption",
+        "text": "Pinafore dress over a white tee for a museum day."
+      },
+      {
+        "id": "en-clean-252",
+        "field": "caption",
+        "text": "This is the coat I wanted last winter. Finally found it in the sale."
+      },
+      {
+        "id": "en-clean-253",
+        "field": "caption",
+        "text": "Sexy, classy and comfy. This wrap dress does all three."
+      },
+      {
+        "id": "en-clean-254",
+        "field": "caption",
+        "text": "Dark wash jeans for evenings, light wash for weekends."
+      },
+      {
+        "id": "en-clean-255",
+        "field": "caption",
+        "text": "Mesh top over a black bandeau for the festival. Sunglasses obviously."
+      },
+      {
+        "id": "en-clean-256",
+        "field": "caption",
+        "text": "Sun's out, sleeves rolled up."
+      },
+      {
+        "id": "en-clean-257",
+        "field": "caption",
+        "text": "Pastel trench in powder blue. Spring has arrived 🌸"
+      },
+      {
+        "id": "en-clean-258",
+        "field": "caption",
+        "text": "Merino layers under a light jacket are my winter travel secret."
+      },
+      {
+        "id": "en-clean-259",
+        "field": "caption",
+        "text": "You look amazing in that colour!"
+      },
+      {
+        "id": "en-clean-260",
+        "field": "caption",
+        "text": "Rainy Tuesday. Knee boots, knit dress, and a big umbrella."
+      },
+      {
+        "id": "en-clean-261",
+        "field": "caption",
+        "text": "How do you keep sheer tops from looking too evening? Blazer and loafers?"
+      },
+      {
+        "id": "en-clean-262",
+        "field": "caption",
+        "text": "Flat thong sandals are my summer staple. Easy to slip on at the beach."
+      },
+      {
+        "id": "en-clean-263",
+        "field": "caption",
+        "text": "That tailored jumpsuit is so chic."
+      },
+      {
+        "id": "en-clean-264",
+        "field": "caption",
+        "text": "Corset-style top over a white shirt. Victorian vibes."
+      },
+      {
+        "id": "en-clean-265",
+        "field": "caption",
+        "text": "Fur-lined hood up, gloves on, scarf around twice. -10°C."
+      },
+      {
+        "id": "en-clean-266",
+        "field": "caption",
+        "text": "Silk bandana as a neck scarf with a white shirt."
+      },
+      {
+        "id": "en-clean-267",
+        "field": "caption",
+        "text": "Taupe trousers, cream knit and a brown leather belt. Neutrals forever."
+      },
+      {
+        "id": "en-clean-268",
+        "field": "caption",
+        "text": "Boiler suit in denim. Practical, cool, and loads of pockets."
+      },
+      {
+        "id": "en-clean-269",
+        "field": "caption",
+        "text": "Warmest day of the year so far. Out came the bikini for the lido."
+      },
+      {
+        "id": "en-clean-270",
+        "field": "caption",
+        "text": "Can anyone recommend a raincoat that actually breathes?"
+      },
+      {
+        "id": "en-clean-271",
+        "field": "caption",
+        "text": "Pleated trousers in camel with a black rollneck."
+      },
+      {
+        "id": "en-clean-272",
+        "field": "caption",
+        "text": "Rain stopped just in time for lunch on the terrace."
+      },
+      {
+        "id": "en-clean-273",
+        "field": "caption",
+        "text": "Tweed blazer, jeans, ankle boots. Country weekend."
+      },
+      {
+        "id": "en-clean-274",
+        "field": "caption",
+        "text": "Light pink linen suit for a spring wedding."
+      },
+      {
+        "id": "en-clean-275",
+        "field": "caption",
+        "text": "Leather skirt and grey hoodie. Mixing tough and soft."
+      },
+      {
+        "id": "en-clean-276",
+        "field": "caption",
+        "text": "Breezy palazzo pants are my best friend in the heat."
+      },
+      {
+        "id": "en-clean-277",
+        "field": "caption",
+        "text": "Snowflakes and a bright red coat."
+      },
+      {
+        "id": "en-clean-278",
+        "field": "caption",
+        "text": "Cherry print dress with a white cardigan. Retro picnic vibe."
+      },
+      {
+        "id": "en-clean-279",
+        "field": "caption",
+        "text": "Statement sleeves for a work presentation. Felt confident."
+      },
+      {
+        "id": "en-clean-280",
+        "field": "caption",
+        "text": "Took this beige jumper on every trip this year. Worth the price."
+      },
+      {
+        "id": "en-clean-281",
+        "field": "caption",
+        "text": "White jeans before Easter? I say yes if it's sunny."
+      },
+      {
+        "id": "en-clean-282",
+        "field": "caption",
+        "text": "Love the hair accessory! Where's the clip from?"
+      },
+      {
+        "id": "en-clean-283",
+        "field": "caption",
+        "text": "Hot weather outfit for the office: sleeveless shell top, linen trousers, a light blazer for meetings."
+      },
+      {
+        "id": "en-clean-284",
+        "field": "caption",
+        "text": "Bold stripes on a rainy day."
+      },
+      {
+        "id": "en-clean-285",
+        "field": "caption",
+        "text": "Oversized shirt, bike shorts and a cap for errands."
+      },
+      {
+        "id": "en-clean-286",
+        "field": "caption",
+        "text": "Got rained on wearing silk. Tip: blot, don't rub."
+      },
+      {
+        "id": "en-clean-287",
+        "field": "caption",
+        "text": "Black jeans with a black tee. The uniform."
+      },
+      {
+        "id": "en-clean-288",
+        "field": "caption",
+        "text": "Felt like a movie star in this satin gown."
+      },
+      {
+        "id": "en-clean-289",
+        "field": "caption",
+        "text": "Heatwave dressing: the less fabric touching you, the better. Loose cuts all the way."
+      },
+      {
+        "id": "en-clean-290",
+        "field": "caption",
+        "text": "Corduroy overshirt for the cool mornings."
+      },
+      {
+        "id": "en-clean-291",
+        "field": "caption",
+        "text": "My boyfriend's jumper, my jeans, my trainers. Cosy."
+      },
+      {
+        "id": "en-clean-292",
+        "field": "caption",
+        "text": "Gingham trousers with a white tee. So fresh."
+      },
+      {
+        "id": "en-clean-293",
+        "field": "caption",
+        "text": "Velvet scrunchie and a high ponytail. 90s mood."
+      },
+      {
+        "id": "en-clean-294",
+        "field": "caption",
+        "text": "Every rainy day needs a cheerful umbrella. Mine has ducks on it."
+      },
+      {
+        "id": "en-clean-295",
+        "field": "caption",
+        "text": "Do you iron or steam your linen? I've given up on both."
+      },
+      {
+        "id": "en-clean-296",
+        "field": "caption",
+        "text": "Turtleneck and pearls. Feeling elegant today."
+      },
+      {
+        "id": "en-clean-297",
+        "field": "caption",
+        "text": "The sleeves on your coat are gorgeous."
+      },
+      {
+        "id": "en-clean-298",
+        "field": "caption",
+        "text": "Biker boots and a floral dress. My favourite contrast."
+      },
+      {
+        "id": "en-clean-299",
+        "field": "caption",
+        "text": "27°C and sticky. Short sleeves, linen trousers, sandals."
+      },
+      {
+        "id": "en-clean-300",
+        "field": "caption",
+        "text": "Bucket hat, sunglasses, sunscreen. Day at the beach."
+      },
+      {
+        "id": "en-clean-301",
+        "field": "caption",
+        "text": "Ditsy floral blouse tucked into tailored shorts."
+      },
+      {
+        "id": "en-clean-302",
+        "field": "caption",
+        "text": "Navy peacoat for the first cold morning."
+      },
+      {
+        "id": "en-clean-303",
+        "field": "caption",
+        "text": "Mismatched earrings because why not."
+      },
+      {
+        "id": "en-clean-304",
+        "field": "caption",
+        "text": "Tank top layered under a sheer blouse. Easy, airy."
+      },
+      {
+        "id": "en-clean-305",
+        "field": "caption",
+        "text": "A grey cashmere scarf softens every winter outfit."
+      },
+      {
+        "id": "en-clean-306",
+        "field": "caption",
+        "text": "That plaid coat is perfect for this weather."
+      },
+      {
+        "id": "en-clean-307",
+        "field": "caption",
+        "text": "Wore a cocktail dress to my own party. 20°C on the balcony at midnight."
+      },
+      {
+        "id": "en-clean-308",
+        "field": "caption",
+        "text": "Thermal undershirt under a linen shirt in winter? Yes, it works."
+      },
+      {
+        "id": "en-clean-309",
+        "field": "caption",
+        "text": "White tee, cropped trousers, ballet flats. Parisian simplicity."
+      },
+      {
+        "id": "en-clean-310",
+        "field": "caption",
+        "text": "Crochet top for the beach bar. Bikini underneath."
+      },
+      {
+        "id": "en-clean-311",
+        "field": "caption",
+        "text": "Rain shower then sunshine. Light jacket tied around my waist all afternoon."
+      },
+      {
+        "id": "en-clean-312",
+        "field": "caption",
+        "text": "Short puffer and long skirt: an unexpected combo I love."
+      },
+      {
+        "id": "en-clean-313",
+        "field": "caption",
+        "text": "First day back at school. New backpack, new trainers, same uniform."
+      },
+      {
+        "id": "en-clean-314",
+        "field": "caption",
+        "text": "Lace-up boots and wool socks. Muddy fields ahead."
+      },
+      {
+        "id": "en-clean-315",
+        "field": "caption",
+        "text": "That silk dress drapes like water."
+      },
+      {
+        "id": "en-clean-316",
+        "field": "altText",
+        "text": "A woman in a camel wool coat and white trainers standing on a rainy street."
+      },
+      {
+        "id": "en-clean-317",
+        "field": "altText",
+        "text": "A man wearing a navy peacoat, grey scarf and dark jeans on a city pavement."
+      },
+      {
+        "id": "en-clean-318",
+        "field": "altText",
+        "text": "Close-up of nude leather pumps with a pointed toe on a wooden floor."
+      },
+      {
+        "id": "en-clean-319",
+        "field": "altText",
+        "text": "A person in a black slip dress and cropped cardigan posing in front of a brick wall."
+      },
+      {
+        "id": "en-clean-320",
+        "field": "altText",
+        "text": "A woman in a striped bikini and straw hat standing on a sandy beach."
+      },
+      {
+        "id": "en-clean-321",
+        "field": "altText",
+        "text": "Flat-lay of a tight white tee, light-wash jeans and a big black leather bag."
+      },
+      {
+        "id": "en-clean-322",
+        "field": "altText",
+        "text": "A man in a light linen shirt and beige shorts holding an iced coffee in the sun."
+      },
+      {
+        "id": "en-clean-323",
+        "field": "altText",
+        "text": "Mirror selfie of a woman in a peacock blue cocktail dress with silver earrings."
+      },
+      {
+        "id": "en-clean-324",
+        "field": "altText",
+        "text": "A person wearing a yellow raincoat and green rubber boots beside a puddle."
+      },
+      {
+        "id": "en-clean-325",
+        "field": "altText",
+        "text": "A woman in a sheer black blouse and wide trousers walking through a train station."
+      },
+      {
+        "id": "en-clean-326",
+        "field": "altText",
+        "text": "A teenager in a cropped puffer jacket, wide jeans and chunky trainers on a snowy path."
+      },
+      {
+        "id": "en-clean-327",
+        "field": "altText",
+        "text": "Two friends in matching sage green co-ord sets laughing outside a café."
+      },
+      {
+        "id": "en-clean-328",
+        "field": "altText",
+        "text": "A woman in a backless emerald gown photographed from behind at an outdoor wedding."
+      },
+      {
+        "id": "en-clean-329",
+        "field": "altText",
+        "text": "Close-up of screw-back gold stud earrings on a velvet tray."
+      },
+      {
+        "id": "en-clean-330",
+        "field": "altText",
+        "text": "A man wearing a fanny pack across his chest at an outdoor market."
+      },
+      {
+        "id": "en-clean-331",
+        "field": "altText",
+        "text": "A person in a Lolita-style pastel dress with a lace collar and a rosette headpiece.",
+        "expected": "review",
+        "deliberateReviewTerm": "lolita",
+        "reason": "Names a fashion subculture and is also a child-sexualisation keyword. On a 13+ product every caption or alt text carrying it goes to a moderator, who can clear a fashion post; it is never allow-listed. The cost is review load for that style's posts, recorded as a named limitation."
+      },
+      {
+        "id": "en-clean-332",
+        "field": "altText",
+        "text": "A woman in a red bodycon midi and long camel blazer standing in an office lobby."
+      },
+      {
+        "id": "en-clean-333",
+        "field": "altText",
+        "text": "Flat thong sandals in tan leather next to a beach towel."
+      },
+      {
+        "id": "en-clean-334",
+        "field": "altText",
+        "text": "A woman in a lace bralette under an open oversized blazer at an evening event."
+      },
+      {
+        "id": "en-clean-335",
+        "field": "altText",
+        "text": "A man in a quilted vest over a hoodie walking a dog in light drizzle."
+      },
+      {
+        "id": "en-clean-336",
+        "field": "altText",
+        "text": "A woman with her hair tied up in a low bun wearing a white cotton sundress."
+      },
+      {
+        "id": "en-clean-337",
+        "field": "altText",
+        "text": "A person in a strapless navy jumpsuit holding a small gold clutch."
+      },
+      {
+        "id": "en-clean-338",
+        "field": "altText",
+        "text": "Black sheer tights and burgundy loafers photographed from the knee down."
+      },
+      {
+        "id": "en-clean-339",
+        "field": "altText",
+        "text": "Side view of a woman in high-rise butt-lifting jeans and a tucked-in grey tee."
+      },
+      {
+        "id": "en-clean-340",
+        "field": "altText",
+        "text": "A man in a black leather jacket, black jeans and black boots against a grey wall."
+      },
+      {
+        "id": "en-clean-341",
+        "field": "altText",
+        "text": "A woman in a long down coat, knitted hat and fleece-lined boots on a snowy street."
+      },
+      {
+        "id": "en-clean-342",
+        "field": "altText",
+        "text": "A person in a mustard beanie and charcoal coat holding an umbrella."
+      },
+      {
+        "id": "en-clean-343",
+        "field": "altText",
+        "text": "A woman in a one-piece cobalt swimsuit with a low back standing by a pool."
+      },
+      {
+        "id": "en-clean-344",
+        "field": "altText",
+        "text": "A man in an olive tailored suit and white trainers crossing a street."
+      },
+      {
+        "id": "en-clean-345",
+        "field": "altText",
+        "text": "A person in a lingerie-inspired silk camisole and wide-leg trousers in a sunny room."
+      },
+      {
+        "id": "en-clean-346",
+        "field": "altText",
+        "text": "A woman in a halter neck top and long pleated skirt at a park concert."
+      },
+      {
+        "id": "en-clean-347",
+        "field": "altText",
+        "text": "A girl in a gingham dress and red sandals sitting on a picnic blanket."
+      },
+      {
+        "id": "en-clean-348",
+        "field": "altText",
+        "text": "A man in a velvet plum blazer and white shirt at a dinner table."
+      },
+      {
+        "id": "en-clean-349",
+        "field": "altText",
+        "text": "A woman wearing a silk headscarf and sunglasses in the passenger seat of an open-top car."
+      },
+      {
+        "id": "en-clean-350",
+        "field": "altText",
+        "text": "A runner in black booty shorts and a sports bra on a seaside path at sunrise."
+      },
+      {
+        "id": "en-clean-351",
+        "field": "altText",
+        "text": "Flat-lay of a nude seamless bra next to a crisp white shirt."
+      },
+      {
+        "id": "en-clean-352",
+        "field": "altText",
+        "text": "A woman in a strappy floral sundress and flat sandals with coral-painted toenails."
+      },
+      {
+        "id": "en-clean-353",
+        "field": "altText",
+        "text": "A man in a cable knit jumper and brown corduroy trousers in an autumn park."
+      },
+      {
+        "id": "en-clean-354",
+        "field": "altText",
+        "text": "A woman in a silver sequin top and black trousers holding a birthday cake."
+      },
+      {
+        "id": "en-clean-355",
+        "field": "altText",
+        "text": "Close-up of a waxed jacket sleeve covered in raindrops."
+      },
+      {
+        "id": "en-clean-356",
+        "field": "altText",
+        "text": "A woman in a wide-brim straw hat and white linen dress on a cobbled street."
+      },
+      {
+        "id": "en-clean-357",
+        "field": "altText",
+        "text": "A man in a puffer jacket and beanie waiting at a bus stop in falling snow."
+      },
+      {
+        "id": "en-clean-358",
+        "field": "altText",
+        "text": "A woman in a velvet slip dress, sheer tights and ankle boots at a holiday party."
+      },
+      {
+        "id": "en-clean-359",
+        "field": "altText",
+        "text": "A teenager in a graphic tee, tailored blazer and white sneakers on school steps."
+      },
+      {
+        "id": "en-clean-360",
+        "field": "altText",
+        "text": "A woman in a terracotta linen shirt and matching shorts on a balcony."
+      },
+      {
+        "id": "en-clean-361",
+        "field": "altText",
+        "text": "Flat-lay of a cream ribbed knit, wide-leg trousers and cream loafers."
+      },
+      {
+        "id": "en-clean-362",
+        "field": "altText",
+        "text": "A person in a mesh top over a black bandeau and denim shorts at a festival."
+      },
+      {
+        "id": "en-clean-363",
+        "field": "altText",
+        "text": "A woman in a ruffled blouse, tailored shorts and block heels at an office desk."
+      },
+      {
+        "id": "en-clean-364",
+        "field": "altText",
+        "text": "A man in a denim boiler suit and work boots in a workshop."
+      },
+      {
+        "id": "en-clean-365",
+        "field": "altText",
+        "text": "A woman in a low-cut black wrap dress and gold pendant at a restaurant."
+      },
+      {
+        "id": "en-clean-366",
+        "field": "altText",
+        "text": "A couple in matching navy raincoats under a clear umbrella."
+      },
+      {
+        "id": "en-clean-367",
+        "field": "altText",
+        "text": "A woman in a cropped knit and high-waisted trousers, shown in side profile."
+      },
+      {
+        "id": "en-clean-368",
+        "field": "altText",
+        "text": "A woman in a bright red coat walking through light snowfall."
+      },
+      {
+        "id": "en-clean-369",
+        "field": "altText",
+        "text": "A man in a light pink linen suit at an outdoor spring wedding."
+      },
+      {
+        "id": "en-clean-370",
+        "field": "altText",
+        "text": "Close-up of black patent stiletto heels on marble steps."
+      },
+      {
+        "id": "en-clean-371",
+        "field": "altText",
+        "text": "A woman in a chunky knit cardigan and satin slip skirt holding a mug."
+      },
+      {
+        "id": "en-clean-372",
+        "field": "altText",
+        "text": "A child in a yellow raincoat and duck-print wellies jumping in a puddle."
+      },
+      {
+        "id": "en-clean-373",
+        "field": "altText",
+        "text": "A woman in a tweed blazer, jeans and ankle boots by a stone wall."
+      },
+      {
+        "id": "en-clean-374",
+        "field": "altText",
+        "text": "A person in a crochet top and white wide-leg trousers at a beach bar."
+      },
+      {
+        "id": "en-clean-375",
+        "field": "altText",
+        "text": "A woman wearing a leopard print skirt and striped tee on a city bench."
+      },
+      {
+        "id": "en-clean-376",
+        "field": "altText",
+        "text": "A man in a merino base layer and fleece on a mountain trail."
+      },
+      {
+        "id": "en-clean-377",
+        "field": "altText",
+        "text": "A woman in an ivory trouser suit with a silk camisole outside a registry office."
+      },
+      {
+        "id": "en-clean-378",
+        "field": "altText",
+        "text": "A woman in a corset-style top layered over a white shirt with puff sleeves."
+      },
+      {
+        "id": "en-clean-379",
+        "field": "altText",
+        "text": "A person in a fur-lined parka with the hood up in a snowy landscape."
+      },
+      {
+        "id": "en-clean-380",
+        "field": "altText",
+        "text": "A girl in a dusty rose prom dress holding a small bouquet of flowers."
+      },
+      {
+        "id": "en-clean-381",
+        "field": "altText",
+        "text": "A man in a navy pinstripe suit holding a graduation cap."
+      },
+      {
+        "id": "en-clean-382",
+        "field": "altText",
+        "text": "A woman in an off-shoulder blouse and floral midi skirt in a garden."
+      },
+      {
+        "id": "en-clean-383",
+        "field": "altText",
+        "text": "A woman in a black lace top, wide jeans and gold hoop earrings at night."
+      },
+      {
+        "id": "en-clean-384",
+        "field": "altText",
+        "text": "A man in a cream fisherman jumper and rust corduroy trousers on a wooden porch."
+      },
+      {
+        "id": "en-clean-385",
+        "field": "altText",
+        "text": "A woman in a pastel lilac shirt dress with pleated cuffs at a brunch table."
+      },
+      {
+        "id": "en-clean-386",
+        "field": "altText",
+        "text": "A person in a hot pink suit standing under a grey cloudy sky."
+      },
+      {
+        "id": "en-clean-387",
+        "field": "altText",
+        "text": "Close-up portrait of a woman in a black turtleneck with a vintage brooch."
+      },
+      {
+        "id": "en-clean-388",
+        "field": "altText",
+        "text": "A woman in a dress with sheer organza sleeves at a garden party."
+      },
+      {
+        "id": "en-clean-389",
+        "field": "altText",
+        "text": "A man in a chambray shirt, white jeans and espadrilles on a harbour wall."
+      },
+      {
+        "id": "en-clean-390",
+        "field": "altText",
+        "text": "A woman in a sage green satin midi and gold sandals at an outdoor wedding."
+      },
+      {
+        "id": "en-clean-391",
+        "field": "altText",
+        "text": "A person wearing a bucket hat, sunglasses and a striped tee at the beach."
+      },
+      {
+        "id": "en-clean-392",
+        "field": "altText",
+        "text": "A woman in a butter-yellow cardigan and denim skirt beside a flower stall."
+      },
+      {
+        "id": "en-clean-393",
+        "field": "altText",
+        "text": "A man in a bomber jacket, hoodie and wide jeans on an empty street."
+      },
+      {
+        "id": "en-clean-394",
+        "field": "altText",
+        "text": "A woman in knee-high boots and a grey knit dress holding a large umbrella."
+      },
+      {
+        "id": "en-clean-395",
+        "field": "altText",
+        "text": "A woman in a tight ribbed top and black pleated midi skirt in a hallway mirror."
+      },
+      {
+        "id": "en-clean-396",
+        "field": "altText",
+        "text": "A teenager in dungarees and a striped tee kneeling in a vegetable patch."
+      },
+      {
+        "id": "en-clean-397",
+        "field": "altText",
+        "text": "A woman in a faux fur coat and black boots on a frosty evening."
+      },
+      {
+        "id": "en-clean-398",
+        "field": "altText",
+        "text": "A man in a plaid flannel shirt and work trousers stacking firewood."
+      },
+      {
+        "id": "en-clean-399",
+        "field": "altText",
+        "text": "A woman in a lemon print shirt and white shorts at a seaside café."
+      },
+      {
+        "id": "en-clean-400",
+        "field": "altText",
+        "text": "A woman with a skinny scarf looped twice and tucked into a navy coat."
+      },
+      {
+        "id": "en-clean-401",
+        "field": "altText",
+        "text": "A person in a powder blue trench coat walking past cherry blossom trees."
+      },
+      {
+        "id": "en-clean-402",
+        "field": "altText",
+        "text": "A woman in a bikini top and high-waisted shorts on the deck of a boat."
+      },
+      {
+        "id": "en-clean-403",
+        "field": "altText",
+        "text": "A man in a short-sleeve knit polo and pleated trousers at a rooftop bar."
+      },
+      {
+        "id": "en-clean-404",
+        "field": "altText",
+        "text": "A woman in a black floor-length velvet gown and sheer gloves at a gala."
+      },
+      {
+        "id": "en-clean-405",
+        "field": "altText",
+        "text": "A woman in a silk bandana and white shirt sitting by a sunny window."
+      },
+      {
+        "id": "en-clean-406",
+        "field": "altText",
+        "text": "A woman wearing a strapless top and wide trousers on an evening terrace."
+      },
+      {
+        "id": "en-clean-407",
+        "field": "altText",
+        "text": "Close-up of a pastel pink rosette pinned to a denim jacket."
+      },
+      {
+        "id": "en-clean-408",
+        "field": "altText",
+        "text": "A woman in a long down coat with a two-way zip at a snowy bus stop."
+      },
+      {
+        "id": "en-clean-409",
+        "field": "altText",
+        "text": "Flat-lay of a slip dress, cardigan, thong sandals and a straw bag for a holiday."
+      },
+      {
+        "id": "en-clean-410",
+        "field": "altText",
+        "text": "A man in a light trench coat and grey suit holding a coffee cup."
+      },
+      {
+        "id": "en-clean-411",
+        "field": "altText",
+        "text": "A woman in a backless navy jumpsuit and flat sandals in a candlelit dining room."
+      },
+      {
+        "id": "en-clean-412",
+        "field": "altText",
+        "text": "A woman in a nude sleeveless linen dress with a woven bag on a tram platform."
+      },
+      {
+        "id": "en-clean-413",
+        "field": "altText",
+        "text": "A person in an olive parka, grey hoodie and black rubber boots outside a school gate."
+      },
+      {
+        "id": "en-clean-414",
+        "field": "altText",
+        "text": "A woman in a cream Lolita dress with a large bow, white tights and round-toe shoes in a park.",
+        "expected": "review",
+        "deliberateReviewTerm": "lolita",
+        "reason": "Names a fashion subculture and is also a child-sexualisation keyword. On a 13+ product every caption or alt text carrying it goes to a moderator, who can clear a fashion post; it is never allow-listed. The cost is review load for that style's posts, recorded as a named limitation."
+      },
+      {
+        "id": "en-clean-415",
+        "field": "altText",
+        "text": "A woman in a tweed cap and navy coat smiling on a windy pier."
+      },
+      {
+        "id": "en-clean-416",
+        "field": "altText",
+        "text": "A man in waterproof trousers and an anorak with a bicycle in the rain."
+      },
+      {
+        "id": "en-clean-417",
+        "field": "altText",
+        "text": "A woman wearing a cocktail dress, blazer and flats at an office desk."
+      },
+      {
+        "id": "en-clean-418",
+        "field": "altText",
+        "text": "A group of friends in summer dresses and sandals at an outdoor concert."
+      },
+      {
+        "id": "en-clean-419",
+        "field": "altText",
+        "text": "A woman in thermal leggings, a down jacket and mittens waiting on a platform."
+      },
+      {
+        "id": "en-clean-420",
+        "field": "altText",
+        "text": "A woman in loose culottes and a sleeveless top under a parasol on a hot day."
+      }
+    ]
+  },
+  "disallowed": {
+    "description": "Disguised forms of terms from this language’s runtime list, ten per obfuscation family named in Story 6.2 AC 4, each inside an otherwise clean caption. Every entry is expected to be withheld (review or block). Generated by scripts/build-community-text-corpus.mjs.",
+    "expected": "withheld",
+    "families": [
+      "nfkc-fullwidth",
+      "case-mixing",
+      "diacritics-added",
+      "zero-width",
+      "cyrillic-confusable",
+      "leetspeak",
+      "repeated-characters",
+      "internal-punctuation",
+      "spaced-letters",
+      "leet-and-spaced"
+    ],
+    "entries": [
+      {
+        "id": "en-nfkc-fullwidth-01",
+        "family": "nfkc-fullwidth",
+        "field": "caption",
+        "text": "Sunday market look: ＡＣＲＯＴＯＭＯＰＨＩＬＩＡ"
+      },
+      {
+        "id": "en-nfkc-fullwidth-02",
+        "family": "nfkc-fullwidth",
+        "field": "caption",
+        "text": "ＢＬＯＷＪＯＢ with a denim jacket"
+      },
+      {
+        "id": "en-nfkc-fullwidth-03",
+        "family": "nfkc-fullwidth",
+        "field": "altText",
+        "text": "Sunday market look: ＣＯＯＮＳ"
+      },
+      {
+        "id": "en-nfkc-fullwidth-04",
+        "family": "nfkc-fullwidth",
+        "field": "caption",
+        "text": "ＥＪＡＣＵＬＡＴＩＯＮ with a denim jacket"
+      },
+      {
+        "id": "en-nfkc-fullwidth-05",
+        "family": "nfkc-fullwidth",
+        "field": "caption",
+        "text": "Sunday market look: ＧＡＮＧＢＡＮＧ"
+      },
+      {
+        "id": "en-nfkc-fullwidth-06",
+        "family": "nfkc-fullwidth",
+        "field": "altText",
+        "text": "ＫＩＮＢＡＫＵ with a denim jacket"
+      },
+      {
+        "id": "en-nfkc-fullwidth-07",
+        "family": "nfkc-fullwidth",
+        "field": "caption",
+        "text": "Sunday market look: ＮＹＭＰＨＯＭＡＮＩＡ"
+      },
+      {
+        "id": "en-nfkc-fullwidth-08",
+        "family": "nfkc-fullwidth",
+        "field": "caption",
+        "text": "ＰＵＳＳＹ with a denim jacket"
+      },
+      {
+        "id": "en-nfkc-fullwidth-09",
+        "family": "nfkc-fullwidth",
+        "field": "altText",
+        "text": "Sunday market look: ＳＨＯＴＡ"
+      },
+      {
+        "id": "en-nfkc-fullwidth-10",
+        "family": "nfkc-fullwidth",
+        "field": "caption",
+        "text": "ＴＯＰＬＥＳＳ with a denim jacket"
+      },
+      {
+        "id": "en-case-mixing-01",
+        "family": "case-mixing",
+        "field": "caption",
+        "text": "Sunday market look: AnIlInGuS"
+      },
+      {
+        "id": "en-case-mixing-02",
+        "family": "case-mixing",
+        "field": "caption",
+        "text": "BlUmPkIn with a denim jacket"
+      },
+      {
+        "id": "en-case-mixing-03",
+        "family": "case-mixing",
+        "field": "altText",
+        "text": "Sunday market look: CoPrOlAgNiA"
+      },
+      {
+        "id": "en-case-mixing-04",
+        "family": "case-mixing",
+        "field": "caption",
+        "text": "ErOtIc with a denim jacket"
+      },
+      {
+        "id": "en-case-mixing-05",
+        "family": "case-mixing",
+        "field": "caption",
+        "text": "Sunday market look: GeNiTaLs"
+      },
+      {
+        "id": "en-case-mixing-06",
+        "family": "case-mixing",
+        "field": "altText",
+        "text": "KiNkStEr with a denim jacket"
+      },
+      {
+        "id": "en-case-mixing-07",
+        "family": "case-mixing",
+        "field": "caption",
+        "text": "Sunday market look: OcToPuSsY"
+      },
+      {
+        "id": "en-case-mixing-08",
+        "family": "case-mixing",
+        "field": "caption",
+        "text": "QuEaF with a denim jacket"
+      },
+      {
+        "id": "en-case-mixing-09",
+        "family": "case-mixing",
+        "field": "altText",
+        "text": "Sunday market look: ShRiMpInG"
+      },
+      {
+        "id": "en-case-mixing-10",
+        "family": "case-mixing",
+        "field": "caption",
+        "text": "ToSsEr with a denim jacket"
+      },
+      {
+        "id": "en-diacritics-added-01",
+        "family": "diacritics-added",
+        "field": "caption",
+        "text": "Sunday market look: ápéshit"
+      },
+      {
+        "id": "en-diacritics-added-02",
+        "family": "diacritics-added",
+        "field": "caption",
+        "text": "böllöcks with a denim jacket"
+      },
+      {
+        "id": "en-diacritics-added-03",
+        "family": "diacritics-added",
+        "field": "altText",
+        "text": "Sunday market look: cöpröphilia"
+      },
+      {
+        "id": "en-diacritics-added-04",
+        "family": "diacritics-added",
+        "field": "caption",
+        "text": "érötism with a denim jacket"
+      },
+      {
+        "id": "en-diacritics-added-05",
+        "family": "diacritics-added",
+        "field": "caption",
+        "text": "Sunday market look: göátcx"
+      },
+      {
+        "id": "en-diacritics-added-06",
+        "family": "diacritics-added",
+        "field": "altText",
+        "text": "kínky with a denim jacket"
+      },
+      {
+        "id": "en-diacritics-added-07",
+        "family": "diacritics-added",
+        "field": "caption",
+        "text": "Sunday market look: ömörashi"
+      },
+      {
+        "id": "en-diacritics-added-08",
+        "family": "diacritics-added",
+        "field": "caption",
+        "text": "qüéef with a denim jacket"
+      },
+      {
+        "id": "en-diacritics-added-09",
+        "family": "diacritics-added",
+        "field": "altText",
+        "text": "Sunday market look: skéét"
+      },
+      {
+        "id": "en-diacritics-added-10",
+        "family": "diacritics-added",
+        "field": "caption",
+        "text": "töwélhead with a denim jacket"
+      },
+      {
+        "id": "en-zero-width-01",
+        "family": "zero-width",
+        "field": "caption",
+        "text": "Sunday market look: a​r​s​e​h​o​l​e"
+      },
+      {
+        "id": "en-zero-width-02",
+        "family": "zero-width",
+        "field": "caption",
+        "text": "b​o​n​d​a​g​e with a denim jacket"
+      },
+      {
+        "id": "en-zero-width-03",
+        "family": "zero-width",
+        "field": "altText",
+        "text": "Sunday market look: c​o​r​n​h​o​l​e"
+      },
+      {
+        "id": "en-zero-width-04",
+        "family": "zero-width",
+        "field": "caption",
+        "text": "e​s​c​o​r​t with a denim jacket"
+      },
+      {
+        "id": "en-zero-width-05",
+        "family": "zero-width",
+        "field": "caption",
+        "text": "Sunday market look: g​o​a​t​s​e"
+      },
+      {
+        "id": "en-zero-width-06",
+        "family": "zero-width",
+        "field": "altText",
+        "text": "k​n​o​b​b​i​n​g with a denim jacket"
+      },
+      {
+        "id": "en-zero-width-07",
+        "family": "zero-width",
+        "field": "caption",
+        "text": "Sunday market look: o​r​g​a​s​m"
+      },
+      {
+        "id": "en-zero-width-08",
+        "family": "zero-width",
+        "field": "caption",
+        "text": "r​a​g​h​e​a​d with a denim jacket"
+      },
+      {
+        "id": "en-zero-width-09",
+        "family": "zero-width",
+        "field": "altText",
+        "text": "Sunday market look: s​l​a​n​t​e​y​e"
+      },
+      {
+        "id": "en-zero-width-10",
+        "family": "zero-width",
+        "field": "caption",
+        "text": "t​r​a​n​n​y with a denim jacket"
+      },
+      {
+        "id": "en-cyrillic-confusable-01",
+        "family": "cyrillic-confusable",
+        "field": "caption",
+        "text": "Sunday market look: аsshоle"
+      },
+      {
+        "id": "en-cyrillic-confusable-02",
+        "family": "cyrillic-confusable",
+        "field": "caption",
+        "text": "bоnеr with a denim jacket"
+      },
+      {
+        "id": "en-cyrillic-confusable-03",
+        "family": "cyrillic-confusable",
+        "field": "altText",
+        "text": "Sunday market look: сrеampie"
+      },
+      {
+        "id": "en-cyrillic-confusable-04",
+        "family": "cyrillic-confusable",
+        "field": "caption",
+        "text": "еunuсh with a denim jacket"
+      },
+      {
+        "id": "en-cyrillic-confusable-05",
+        "family": "cyrillic-confusable",
+        "field": "caption",
+        "text": "Sunday market look: gоkkun"
+      },
+      {
+        "id": "en-cyrillic-confusable-06",
+        "family": "cyrillic-confusable",
+        "field": "altText",
+        "text": "livеsеx with a denim jacket"
+      },
+      {
+        "id": "en-cyrillic-confusable-07",
+        "family": "cyrillic-confusable",
+        "field": "caption",
+        "text": "Sunday market look: раedophile"
+      },
+      {
+        "id": "en-cyrillic-confusable-08",
+        "family": "cyrillic-confusable",
+        "field": "caption",
+        "text": "rарing with a denim jacket"
+      },
+      {
+        "id": "en-cyrillic-confusable-09",
+        "family": "cyrillic-confusable",
+        "field": "altText",
+        "text": "Sunday market look: snаtсh"
+      },
+      {
+        "id": "en-cyrillic-confusable-10",
+        "family": "cyrillic-confusable",
+        "field": "caption",
+        "text": "tribаdism with a denim jacket"
+      },
+      {
+        "id": "en-leetspeak-01",
+        "family": "leetspeak",
+        "field": "caption",
+        "text": "Sunday market look: 455munch"
+      },
+      {
+        "id": "en-leetspeak-02",
+        "family": "leetspeak",
+        "field": "caption",
+        "text": "b00b5 with a denim jacket"
+      },
+      {
+        "id": "en-leetspeak-03",
+        "family": "leetspeak",
+        "field": "altText",
+        "text": "Sunday market look: cumm1ng"
+      },
+      {
+        "id": "en-leetspeak-04",
+        "family": "leetspeak",
+        "field": "caption",
+        "text": "f4gg07 with a denim jacket"
+      },
+      {
+        "id": "en-leetspeak-05",
+        "family": "leetspeak",
+        "field": "caption",
+        "text": "Sunday market look: g00dp00p"
+      },
+      {
+        "id": "en-leetspeak-06",
+        "family": "leetspeak",
+        "field": "altText",
+        "text": "l0l174 with a denim jacket"
+      },
+      {
+        "id": "en-leetspeak-07",
+        "family": "leetspeak",
+        "field": "caption",
+        "text": "Sunday market look: p4n7135"
+      },
+      {
+        "id": "en-leetspeak-08",
+        "family": "leetspeak",
+        "field": "caption",
+        "text": "r4p157 with a denim jacket"
+      },
+      {
+        "id": "en-leetspeak-09",
+        "family": "leetspeak",
+        "field": "altText",
+        "text": "Sunday market look: 5n0wb4ll1ng"
+      },
+      {
+        "id": "en-leetspeak-10",
+        "family": "leetspeak",
+        "field": "caption",
+        "text": "7ubg1rl with a denim jacket"
+      },
+      {
+        "id": "en-repeated-characters-01",
+        "family": "repeated-characters",
+        "field": "caption",
+        "text": "Sunday market look: auuuutoerotic"
+      },
+      {
+        "id": "en-repeated-characters-02",
+        "family": "repeated-characters",
+        "field": "caption",
+        "text": "buuuukkake with a denim jacket"
+      },
+      {
+        "id": "en-repeated-characters-03",
+        "family": "repeated-characters",
+        "field": "altText",
+        "text": "Sunday market look: cuuuumshot"
+      },
+      {
+        "id": "en-repeated-characters-04",
+        "family": "repeated-characters",
+        "field": "caption",
+        "text": "feeeecal with a denim jacket"
+      },
+      {
+        "id": "en-repeated-characters-05",
+        "family": "repeated-characters",
+        "field": "caption",
+        "text": "Sunday market look: gooooregasm"
+      },
+      {
+        "id": "en-repeated-characters-06",
+        "family": "repeated-characters",
+        "field": "altText",
+        "text": "loooovemaking with a denim jacket"
+      },
+      {
+        "id": "en-repeated-characters-07",
+        "family": "repeated-characters",
+        "field": "caption",
+        "text": "Sunday market look: paaaanty"
+      },
+      {
+        "id": "en-repeated-characters-08",
+        "family": "repeated-characters",
+        "field": "caption",
+        "text": "reeeectum with a denim jacket"
+      },
+      {
+        "id": "en-repeated-characters-09",
+        "family": "repeated-characters",
+        "field": "altText",
+        "text": "Sunday market look: soooodomize"
+      },
+      {
+        "id": "en-repeated-characters-10",
+        "family": "repeated-characters",
+        "field": "caption",
+        "text": "tuuuushy with a denim jacket"
+      },
+      {
+        "id": "en-internal-punctuation-01",
+        "family": "internal-punctuation",
+        "field": "caption",
+        "text": "Sunday market look: b.a.b.e.l.a.n.d"
+      },
+      {
+        "id": "en-internal-punctuation-02",
+        "family": "internal-punctuation",
+        "field": "caption",
+        "text": "b.u.l.l.d.y.k.e with a denim jacket"
+      },
+      {
+        "id": "en-internal-punctuation-03",
+        "family": "internal-punctuation",
+        "field": "altText",
+        "text": "Sunday market look: c.u.m.s.h.o.t.s"
+      },
+      {
+        "id": "en-internal-punctuation-04",
+        "family": "internal-punctuation",
+        "field": "caption",
+        "text": "f.e.l.c.h with a denim jacket"
+      },
+      {
+        "id": "en-internal-punctuation-05",
+        "family": "internal-punctuation",
+        "field": "caption",
+        "text": "Sunday market look: g.r.o.p.e"
+      },
+      {
+        "id": "en-internal-punctuation-06",
+        "family": "internal-punctuation",
+        "field": "altText",
+        "text": "m.a.s.t.u.r.b.a.t.e with a denim jacket"
+      },
+      {
+        "id": "en-internal-punctuation-07",
+        "family": "internal-punctuation",
+        "field": "caption",
+        "text": "Sunday market look: p.e.d.o.b.e.a.r"
+      },
+      {
+        "id": "en-internal-punctuation-08",
+        "family": "internal-punctuation",
+        "field": "caption",
+        "text": "r.e.t.a.r.d with a denim jacket"
+      },
+      {
+        "id": "en-internal-punctuation-09",
+        "family": "internal-punctuation",
+        "field": "altText",
+        "text": "Sunday market look: s.o.d.o.m.y"
+      },
+      {
+        "id": "en-internal-punctuation-10",
+        "family": "internal-punctuation",
+        "field": "caption",
+        "text": "t.w.i.n.k with a denim jacket"
+      },
+      {
+        "id": "en-spaced-letters-01",
+        "family": "spaced-letters",
+        "field": "caption",
+        "text": "Sunday market look: b a n g b r o s"
+      },
+      {
+        "id": "en-spaced-letters-02",
+        "family": "spaced-letters",
+        "field": "caption",
+        "text": "b u l l s h i t with a denim jacket"
+      },
+      {
+        "id": "en-spaced-letters-03",
+        "family": "spaced-letters",
+        "field": "altText",
+        "text": "Sunday market look: c u n n i l i n g u s"
+      },
+      {
+        "id": "en-spaced-letters-04",
+        "family": "spaced-letters",
+        "field": "caption",
+        "text": "f e l l a t i o with a denim jacket"
+      },
+      {
+        "id": "en-spaced-letters-05",
+        "family": "spaced-letters",
+        "field": "caption",
+        "text": "Sunday market look: h a n d j o b"
+      },
+      {
+        "id": "en-spaced-letters-06",
+        "family": "spaced-letters",
+        "field": "altText",
+        "text": "m a s t u r b a t i n g with a denim jacket"
+      },
+      {
+        "id": "en-spaced-letters-07",
+        "family": "spaced-letters",
+        "field": "caption",
+        "text": "Sunday market look: p e d o p h i l e"
+      },
+      {
+        "id": "en-spaced-letters-08",
+        "family": "spaced-letters",
+        "field": "caption",
+        "text": "r i m j o b with a denim jacket"
+      },
+      {
+        "id": "en-spaced-letters-09",
+        "family": "spaced-letters",
+        "field": "altText",
+        "text": "Sunday market look: s p a s t i c"
+      },
+      {
+        "id": "en-spaced-letters-10",
+        "family": "spaced-letters",
+        "field": "caption",
+        "text": "t w i n k i e with a denim jacket"
+      },
+      {
+        "id": "en-leet-and-spaced-01",
+        "family": "leet-and-spaced",
+        "field": "caption",
+        "text": "Sunday market look: b 4 n g b u 5"
+      },
+      {
+        "id": "en-leet-and-spaced-02",
+        "family": "leet-and-spaced",
+        "field": "caption",
+        "text": "b u n g h 0 l 3 with a denim jacket"
+      },
+      {
+        "id": "en-leet-and-spaced-03",
+        "family": "leet-and-spaced",
+        "field": "altText",
+        "text": "Sunday market look: d 4 r k 1 e"
+      },
+      {
+        "id": "en-leet-and-spaced-04",
+        "family": "leet-and-spaced",
+        "field": "caption",
+        "text": "f 3 l 7 c h with a denim jacket"
+      },
+      {
+        "id": "en-leet-and-spaced-05",
+        "family": "leet-and-spaced",
+        "field": "caption",
+        "text": "Sunday market look: h 4 r d c 0 r e"
+      },
+      {
+        "id": "en-leet-and-spaced-06",
+        "family": "leet-and-spaced",
+        "field": "altText",
+        "text": "m 4 5 t u r b a t i o n with a denim jacket"
+      },
+      {
+        "id": "en-leet-and-spaced-07",
+        "family": "leet-and-spaced",
+        "field": "caption",
+        "text": "Sunday market look: p 3 g g 1 n g"
+      },
+      {
+        "id": "en-leet-and-spaced-08",
+        "family": "leet-and-spaced",
+        "field": "caption",
+        "text": "r 1 m m 1 n g with a denim jacket"
+      },
+      {
+        "id": "en-leet-and-spaced-09",
+        "family": "leet-and-spaced",
+        "field": "altText",
+        "text": "Sunday market look: 5 p l 0 o g e"
+      },
+      {
+        "id": "en-leet-and-spaced-10",
+        "family": "leet-and-spaced",
+        "field": "caption",
+        "text": "u n d r 3 5 s i n g with a denim jacket"
+      }
+    ]
+  }
+}

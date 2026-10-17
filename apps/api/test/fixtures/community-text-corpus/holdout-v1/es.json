@@ -1,0 +1,2113 @@
+{
+  "language": "es",
+  "corpusVersion": "holdout-v1",
+  "description": "Frozen clean holdout: ordinary fashion captions and alt text written natively in the language after the allow list froze, independently of the clean half, and never used to tune the screener, the lists or the allow list. The release gate's clean-copy figure is computed here. Entries labelled expected review carry one of the policy's deliberate review terms.",
+  "expected": "pass",
+  "frozenAgainst": {
+    "allowListSha256": "22d1f261f3666cf37369e67359aeabc383ac0a689babe04f87023ba1aee70256",
+    "termsSha256": "0dda50c51821e455569501da8651f1a2a8be929318fc2bbd4d61be0fd8d7a1ee",
+    "languageAllowListSha256": "058a7744b9407e5e0c26f3e0c6a885c86925e996bbff4ba2ae267acde0521b44"
+  },
+  "entries": [
+    {
+      "id": "es-holdout-001",
+      "field": "caption",
+      "text": "Llovizna fina toda la mañana. Gabardina y botas de agua para ir al súper, y aun así llegué con el bajo del pantalón empapado."
+    },
+    {
+      "id": "es-holdout-002",
+      "field": "caption",
+      "text": "¿Alguien sabe cómo combinar un abrigo camel con zapatillas blancas sin que parezca que voy al gimnasio?"
+    },
+    {
+      "id": "es-holdout-003",
+      "field": "caption",
+      "text": "Gracias por el consejo del pañuelo, hoy el viento no me despeinó nada 🙌"
+    },
+    {
+      "id": "es-holdout-004",
+      "field": "caption",
+      "text": "Maleta para Lisboa: tres camisetas, un jersey fino, un chubasquero plegable y unas zapatillas cómodas. Nada más."
+    },
+    {
+      "id": "es-holdout-005",
+      "field": "caption",
+      "text": "Por fin llevé mi chaqueta vaquera a que le cambiaran la cremallera. Quedó como nueva y me costó menos de lo que pensaba."
+    },
+    {
+      "id": "es-holdout-006",
+      "field": "caption",
+      "text": "Cambio de armario hecho. Los jerséis gordos ya están en cajas debajo de la cama y las camisas de lino al frente."
+    },
+    {
+      "id": "es-holdout-007",
+      "field": "caption",
+      "text": "8 grados y sol. Salí con bufanda y me sobró a mediodía."
+    },
+    {
+      "id": "es-holdout-008",
+      "field": "caption",
+      "text": "Que alguien me explique cómo se lleva un chaleco acolchado encima de una camisa sin que se arrugue todo."
+    },
+    {
+      "id": "es-holdout-009",
+      "field": "caption",
+      "text": "Qué bien te queda ese verde oliva, de verdad. Me diste ganas de sacar mi falda del mismo tono."
+    },
+    {
+      "id": "es-holdout-010",
+      "field": "caption",
+      "text": "Fui a la tintorería con el saco de lana y me dijeron que mejor solo cepillarlo y airearlo. Consejo aceptado."
+    },
+    {
+      "id": "es-holdout-011",
+      "field": "caption",
+      "text": "Hoy en el metro todos con paraguas y yo con capucha. Error de principiante."
+    },
+    {
+      "id": "es-holdout-012",
+      "field": "caption",
+      "text": "Encontré una chompa de alpaca en la feria de segunda mano por casi nada. Tiene un huequito en el codo pero lo zurzo este finde."
+    },
+    {
+      "id": "es-holdout-013",
+      "field": "caption",
+      "text": "¿Qué zapatos usan ustedes para caminar mucho cuando hace 30 grados? Las sandalias me hacen ampollas."
+    },
+    {
+      "id": "es-holdout-014",
+      "field": "caption",
+      "text": "Mañana se viene el frente frío. Ya dejé la campera y los guantes junto a la puerta."
+    },
+    {
+      "id": "es-holdout-015",
+      "field": "caption",
+      "text": "Tu idea de enrollar las camisetas en la maleta me salvó el viaje. Cupo todo en equipaje de mano."
+    },
+    {
+      "id": "es-holdout-016",
+      "field": "caption",
+      "text": "Lavé por primera vez el suéter de lana a mano, con agua fría y secado en plano. No encogió. Pequeñas victorias."
+    },
+    {
+      "id": "es-holdout-017",
+      "field": "caption",
+      "text": "Ayer 25 grados, hoy 12. Mi armario no entiende nada y yo tampoco."
+    },
+    {
+      "id": "es-holdout-018",
+      "field": "caption",
+      "text": "¿Se puede usar una gabardina beige con pantalón beige o es demasiado tono sobre tono?"
+    },
+    {
+      "id": "es-holdout-019",
+      "field": "caption",
+      "text": "Compré tela para alargar las mangas de la chaqueta de mi hijo. Ya veremos cómo sale el experimento."
+    },
+    {
+      "id": "es-holdout-020",
+      "field": "caption",
+      "text": "Fui a la panadería en pijama y abrigo largo. Nadie notó nada, creo."
+    },
+    {
+      "id": "es-holdout-021",
+      "field": "caption",
+      "text": "Precioso ese abrigo de cuadros, ¿es heredado? Tiene un corte que ya no se ve."
+    },
+    {
+      "id": "es-holdout-022",
+      "field": "caption",
+      "text": "Para el viaje a la montaña: capas, capas y más capas. Térmica, forro polar, cortavientos y gorro."
+    },
+    {
+      "id": "es-holdout-023",
+      "field": "caption",
+      "text": "Hoy toca cambiar los botones del abrigo gris por unos de madera que encontré en un mercadillo."
+    },
+    {
+      "id": "es-holdout-024",
+      "field": "caption",
+      "text": "Sol engañoso. Salí en camiseta y a los diez minutos volví por la sudadera."
+    },
+    {
+      "id": "es-holdout-025",
+      "field": "caption",
+      "text": "¿Cómo evitan que los vaqueros oscuros destiñan en la lavadora? Ya teñí de azul dos camisetas blancas."
+    },
+    {
+      "id": "es-holdout-026",
+      "field": "caption",
+      "text": "Gracias a todas por las recomendaciones de impermeables. Me quedé con el largo con capucha y fue la mejor decisión."
+    },
+    {
+      "id": "es-holdout-027",
+      "field": "caption",
+      "text": "Recogiendo a los niños del cole bajo un aguacero. Botas de goma para toda la familia #díadelluvia"
+    },
+    {
+      "id": "es-holdout-028",
+      "field": "caption",
+      "text": "Me animé con el dobladillo yo sola. Quedó un poquito torcido pero nadie lo va a ver."
+    },
+    {
+      "id": "es-holdout-029",
+      "field": "caption",
+      "text": "Primer día de otoño de verdad. Saqué los calcetines de lana y casi lloro de felicidad."
+    },
+    {
+      "id": "es-holdout-030",
+      "field": "caption",
+      "text": "¿Ideas para vestir a una boda de día en la playa sin pasar calor y sin parecer que voy a la playa?"
+    },
+    {
+      "id": "es-holdout-031",
+      "field": "caption",
+      "text": "Qué combinación tan bonita, el mostaza con el gris nunca falla."
+    },
+    {
+      "id": "es-holdout-032",
+      "field": "caption",
+      "text": "Viaje de trabajo a Bogotá: chaqueta ligera, dos camisas, un pantalón de vestir y paraguas compacto porque allí llueve cuando quiere."
+    },
+    {
+      "id": "es-holdout-033",
+      "field": "caption",
+      "text": "La sastrería del barrio me ajustó la cintura del pantalón en un día. Mano de santo."
+    },
+    {
+      "id": "es-holdout-034",
+      "field": "caption",
+      "text": "Guardando los vestidos de verano con bolsitas de lavanda. El año que viene van a oler de maravilla."
+    },
+    {
+      "id": "es-holdout-035",
+      "field": "caption",
+      "text": "Viento fuerte en la costanera. La falda plisada fue una mala elección, lo admito."
+    },
+    {
+      "id": "es-holdout-036",
+      "field": "caption",
+      "text": "Hoy fui al mercado con la chamarra de mezclilla y una playera de rayas. Clima perfecto, ni frío ni calor."
+    },
+    {
+      "id": "es-holdout-037",
+      "field": "caption",
+      "text": "¿Alguien ha probado a teñir en casa una camisa de lino? La mía está manchada y no quiero tirarla."
+    },
+    {
+      "id": "es-holdout-038",
+      "field": "caption",
+      "text": "Tienes un ojo increíble para los accesorios. Ese cinturón le cambia todo al vestido."
+    },
+    {
+      "id": "es-holdout-039",
+      "field": "caption",
+      "text": "Lista para Buenos Aires en invierno: tapado, dos sweaters, botas cortas y un gorro que ocupe poco."
+    },
+    {
+      "id": "es-holdout-040",
+      "field": "caption",
+      "text": "Arreglé el forro roto del abrigo con un retazo de satén. No es perfecto pero abriga igual."
+    },
+    {
+      "id": "es-holdout-041",
+      "field": "caption",
+      "text": "Rotación de primavera: fuera las botas altas, dentro los mocasines. Todavía con calcetín por si acaso."
+    },
+    {
+      "id": "es-holdout-042",
+      "field": "caption",
+      "text": "Humedad al 90%. Todo lo que me pongo se pega. Mañana pruebo con algodón y nada más."
+    },
+    {
+      "id": "es-holdout-043",
+      "field": "caption",
+      "text": "¿Cómo se plancha una camisa de seda sin quemarla? Pregunto antes de cometer una tragedia."
+    },
+    {
+      "id": "es-holdout-044",
+      "field": "caption",
+      "text": "Gracias por animarme a probar el color. Llevo toda la semana con el jersey rojo y me siento otra persona."
+    },
+    {
+      "id": "es-holdout-045",
+      "field": "caption",
+      "text": "Caminé al trabajo con niebla espesa y el abrigo quedó cubierto de gotitas. Parecía escarchado."
+    },
+    {
+      "id": "es-holdout-046",
+      "field": "caption",
+      "text": "Segunda mano de hoy: una gabardina de los noventa con hombreras. Las voy a quitar y queda perfecta."
+    },
+    {
+      "id": "es-holdout-047",
+      "field": "caption",
+      "text": "Antes de guardar los abrigos los llevo a lavar. Este año me organicé con tiempo, cosa rara."
+    },
+    {
+      "id": "es-holdout-048",
+      "field": "caption",
+      "text": "Fresquito por la mañana, calor por la tarde. Hoy la clave fue una camisa abierta sobre camiseta."
+    },
+    {
+      "id": "es-holdout-049",
+      "field": "caption",
+      "text": "¿Botines con falda midi en otoño sí o no? Necesito opiniones sinceras."
+    },
+    {
+      "id": "es-holdout-050",
+      "field": "caption",
+      "text": "Ese corte de pantalón te queda espectacular, ¿me pasas el nombre de la sastra?"
+    },
+    {
+      "id": "es-holdout-051",
+      "field": "caption",
+      "text": "Para el fin de semana en la sierra metí dos pares de calcetines extra. Aprendí la lección la última vez."
+    },
+    {
+      "id": "es-holdout-052",
+      "field": "caption",
+      "text": "Mi lavadora tiene un programa de lana que nunca había usado. Hoy lo estrené y el cárdigan sobrevivió."
+    },
+    {
+      "id": "es-holdout-053",
+      "field": "caption",
+      "text": "Granizo a las seis de la tarde, en pleno mayo. Corrí a refugiarme en un portal con la chaqueta en la cabeza."
+    },
+    {
+      "id": "es-holdout-054",
+      "field": "caption",
+      "text": "Pregunta seria: ¿cuántos abrigos necesita una persona que vive en una ciudad con inviernos suaves?"
+    },
+    {
+      "id": "es-holdout-055",
+      "field": "caption",
+      "text": "Qué foto tan linda, y el pañuelo atado así queda precioso. Voy a copiarlo mañana."
+    },
+    {
+      "id": "es-holdout-056",
+      "field": "caption",
+      "text": "Me cosieron un parche de pana en la rodilla del pantalón favorito. Ahora me gusta todavía más."
+    },
+    {
+      "id": "es-holdout-057",
+      "field": "caption",
+      "text": "Bajé las cajas de invierno del altillo. Encontré un gorro que creía perdido desde hace dos años."
+    },
+    {
+      "id": "es-holdout-058",
+      "field": "caption",
+      "text": "Vuelta al cole, vuelta a los uniformes. Todo planchado y etiquetado con el nombre."
+    },
+    {
+      "id": "es-holdout-059",
+      "field": "caption",
+      "text": "¿Qué hacen con los jerséis que hacen bolitas? ¿Quitapelusas eléctrico o paciencia y tijera?"
+    },
+    {
+      "id": "es-holdout-060",
+      "field": "caption",
+      "text": "Gracias por el truco del vinagre en el aclarado. Los colores salen mucho más vivos."
+    },
+    {
+      "id": "es-holdout-061",
+      "field": "caption",
+      "text": "Hoy hizo un calor de esos que pegan. Vestido de algodón suelto y sombrero de ala ancha para hacer recados."
+    },
+    {
+      "id": "es-holdout-062",
+      "field": "caption",
+      "text": "Viaje relámpago a Valparaíso. Llevé solo una mochila: dos poleras, un polerón y la parka."
+    },
+    {
+      "id": "es-holdout-063",
+      "field": "caption",
+      "text": "Tejí mi primera bufanda. Es un poco irregular pero es mía y abriga."
+    },
+    {
+      "id": "es-holdout-064",
+      "field": "caption",
+      "text": "Quinto día de lluvia seguido. Mis zapatillas de lona piden vacaciones."
+    },
+    {
+      "id": "es-holdout-065",
+      "field": "caption",
+      "text": "¿Cómo combinan el marrón con el negro? Siempre me dijeron que no, pero veo que muchas lo hacen."
+    },
+    {
+      "id": "es-holdout-066",
+      "field": "caption",
+      "text": "Bellísima esa chaqueta bordada, se nota el trabajo a mano."
+    },
+    {
+      "id": "es-holdout-067",
+      "field": "caption",
+      "text": "Para el viaje en tren de noche: pantalón de chándal suave, camiseta larga y un cárdigan que hace de manta."
+    },
+    {
+      "id": "es-holdout-068",
+      "field": "caption",
+      "text": "Vendí en un mercadillo tres pares de zapatos que nunca usaba. Con lo que saqué me compré unas botas de segunda mano preciosas."
+    },
+    {
+      "id": "es-holdout-069",
+      "field": "caption",
+      "text": "Tormenta de verano a la hora de salir del trabajo. Esperé en la oficina media hora y salí con todo seco."
+    },
+    {
+      "id": "es-holdout-070",
+      "field": "caption",
+      "text": "Cambio de temporada a medias: abrigo ligero arriba, sandalias abajo. Así vivimos en abril."
+    },
+    {
+      "id": "es-holdout-071",
+      "field": "caption",
+      "text": "¿Recomiendan algún tipo de calcetín para que las botas de agua no hagan sudar los pies?"
+    },
+    {
+      "id": "es-holdout-072",
+      "field": "caption",
+      "text": "Te quedó genial el arreglo del vestido, nadie diría que antes te quedaba grande."
+    },
+    {
+      "id": "es-holdout-073",
+      "field": "caption",
+      "text": "Salí con 3 grados. Gorro, guantes, bufanda y doble calcetín. Parecía una cebolla pero llegué calentita."
+    },
+    {
+      "id": "es-holdout-074",
+      "field": "caption",
+      "text": "Planchar no es lo mío, así que cuelgo las camisas en el baño mientras me ducho. El vapor hace magia."
+    },
+    {
+      "id": "es-holdout-075",
+      "field": "caption",
+      "text": "Hoy toca llevar a coser el bolsillo del abrigo. Ya perdí dos llaves por ese agujero."
+    },
+    {
+      "id": "es-holdout-076",
+      "field": "caption",
+      "text": "¿Alguien tiene ideas para un look de oficina cuando afuera hay 35 grados y adentro el aire acondicionado está a 19?"
+    },
+    {
+      "id": "es-holdout-077",
+      "field": "caption",
+      "text": "Me encantan tus fotos de los lunes, siempre me dan ideas para empezar la semana."
+    },
+    {
+      "id": "es-holdout-078",
+      "field": "caption",
+      "text": "Maleta de fin de semana en la playa: dos vestidos, un bañador, una camisa grande que sirve para todo y chanclas."
+    },
+    {
+      "id": "es-holdout-079",
+      "field": "caption",
+      "text": "Encontré en la tienda solidaria un abrigo de paño azul marino que me queda como hecho a medida. Día redondo."
+    },
+    {
+      "id": "es-holdout-080",
+      "field": "caption",
+      "text": "Los primeros días de calor y ya extraño mis suéteres. Nunca estoy contenta."
+    },
+    {
+      "id": "es-holdout-081",
+      "field": "caption",
+      "text": "Llueve de lado. El paraguas no sirvió de nada, la capucha sí."
+    },
+    {
+      "id": "es-holdout-082",
+      "field": "caption",
+      "text": "¿Cómo se guardan las botas altas para que no se doblen? Las mías tienen arrugas en la caña."
+    },
+    {
+      "id": "es-holdout-083",
+      "field": "caption",
+      "text": "Muchas gracias por la receta para quitar manchas de café. Funcionó en mi camisa blanca de siempre."
+    },
+    {
+      "id": "es-holdout-084",
+      "field": "caption",
+      "text": "Hoy a la feria con canasta, sombrero de paja y vestido de lino. Y protector solar, claro."
+    },
+    {
+      "id": "es-holdout-085",
+      "field": "caption",
+      "text": "Mi abuela me enseñó a poner coderas en los jerséis. Hoy lo hice yo sola por primera vez."
+    },
+    {
+      "id": "es-holdout-086",
+      "field": "caption",
+      "text": "Rotación de otoño terminada. Doné dos bolsas de ropa que llevaba años sin ponerme."
+    },
+    {
+      "id": "es-holdout-087",
+      "field": "caption",
+      "text": "Viento del norte toda la tarde. Cortavientos cerrado hasta arriba y gafas de sol."
+    },
+    {
+      "id": "es-holdout-088",
+      "field": "caption",
+      "text": "Pregunta para quienes viven en ciudades con mucha altura: ¿cómo se visten para el sol fuerte y el frío a la vez?"
+    },
+    {
+      "id": "es-holdout-089",
+      "field": "caption",
+      "text": "Qué buena idea usar la camisa como chaqueta ligera, lo voy a probar."
+    },
+    {
+      "id": "es-holdout-090",
+      "field": "caption",
+      "text": "Para la escapada a Cusco: capas finas, gorro de lana, protector solar y zapatos ya usados para no sufrir."
+    },
+    {
+      "id": "es-holdout-091",
+      "field": "caption",
+      "text": "Le cambié el elástico a la cintura de la falda vieja. Diez minutos de costura y vuelve a la rotación."
+    },
+    {
+      "id": "es-holdout-092",
+      "field": "caption",
+      "text": "Cielo gris pero sin lluvia. Fui a hacer trámites con el abrigo de lana y un paraguas por si las moscas."
+    },
+    {
+      "id": "es-holdout-093",
+      "field": "caption",
+      "text": "¿Qué color de abrigo es más versátil, gris o azul marino? Solo me puedo permitir uno este año."
+    },
+    {
+      "id": "es-holdout-094",
+      "field": "caption",
+      "text": "Gracias por la paciencia respondiendo a mis preguntas de principiante. Este grupo es lo mejor."
+    },
+    {
+      "id": "es-holdout-095",
+      "field": "caption",
+      "text": "Ropa tendida en el balcón y empezó a llover. Corrí como nunca."
+    },
+    {
+      "id": "es-holdout-096",
+      "field": "caption",
+      "text": "Saqué las camisas de manga corta. Oficialmente es verano en mi casa, aunque el calendario diga otra cosa."
+    },
+    {
+      "id": "es-holdout-097",
+      "field": "caption",
+      "text": "Calor seco a las tres de la tarde. Pantalón ancho de lino y camisa blanca, y aun así buscando sombra en cada esquina."
+    },
+    {
+      "id": "es-holdout-098",
+      "field": "caption",
+      "text": "¿Les pasa que en otoño nunca saben si llevar chaqueta o no? Yo llevo una atada a la cintura todos los días."
+    },
+    {
+      "id": "es-holdout-099",
+      "field": "caption",
+      "text": "Tu chaqueta de pana me tiene enamorada. Ese tono teja es precioso."
+    },
+    {
+      "id": "es-holdout-100",
+      "field": "caption",
+      "text": "Para el congreso en Ciudad de México: blazer ligero, dos blusas, pantalón negro y un rebozo para las noches frescas."
+    },
+    {
+      "id": "es-holdout-101",
+      "field": "caption",
+      "text": "El zapatero me puso tapas nuevas a los tacones y me dio un consejo para cuidar el cuero. Volveré seguro."
+    },
+    {
+      "id": "es-holdout-102",
+      "field": "caption",
+      "text": "Ya huele a otoño. Hoy saqué la gabardina y el paraguas pequeño al bolso."
+    },
+    {
+      "id": "es-holdout-103",
+      "field": "caption",
+      "text": "Bruma en el río y frío húmedo de los que calan. Hoy abrigo largo, bufanda gruesa y botas de suela de goma para ir a la oficina caminando."
+    },
+    {
+      "id": "es-holdout-104",
+      "field": "caption",
+      "text": "¿Algún truco para que los pantalones de lino no se arruguen en cuanto me siento?"
+    },
+    {
+      "id": "es-holdout-105",
+      "field": "caption",
+      "text": "Gracias por pasar la dirección de la modista, me arregló el vestido de mi madre y ahora puedo usarlo."
+    },
+    {
+      "id": "es-holdout-106",
+      "field": "caption",
+      "text": "Equipaje para una semana en Madrid en octubre: gabardina, dos pantalones, cuatro camisetas, un jersey de punto y botines."
+    },
+    {
+      "id": "es-holdout-107",
+      "field": "caption",
+      "text": "Fui a una tienda de segunda mano buscando un cinturón y salí con un cinturón, una boina y un bolso de mimbre."
+    },
+    {
+      "id": "es-holdout-108",
+      "field": "caption",
+      "text": "Ya cambié las mantas de la cama y la ropa del armario el mismo día. Domingo productivo."
+    },
+    {
+      "id": "es-holdout-109",
+      "field": "caption",
+      "text": "13 grados al salir, 24 al volver. Esto del entretiempo es un deporte."
+    },
+    {
+      "id": "es-holdout-110",
+      "field": "caption",
+      "text": "¿Una falda larga de punto queda bien con zapatillas? Es para ir a la uni en invierno."
+    },
+    {
+      "id": "es-holdout-111",
+      "field": "caption",
+      "text": "Me encanta cómo mezclaste estampados, nunca me habría atrevido. ¡Bravo!"
+    },
+    {
+      "id": "es-holdout-112",
+      "field": "caption",
+      "text": "Me salió un descosido en la costura lateral de la camisa en plena reunión. Hoy la arreglé con aguja e hilo en cinco minutos."
+    },
+    {
+      "id": "es-holdout-113",
+      "field": "caption",
+      "text": "Calor y sin viento en el andén. Llevaba una camisa de algodón y aun así se me pegaba a la espalda."
+    },
+    {
+      "id": "es-holdout-114",
+      "field": "caption",
+      "text": "Encontré en la feria americana un saco de tweed con coderas originales. Ya tiene un lugar fijo en el perchero."
+    },
+    {
+      "id": "es-holdout-115",
+      "field": "caption",
+      "text": "¿Mochila o bolso para ir en bici al trabajo en días de lluvia? La mochila me deja la espalda mojada de sudor."
+    },
+    {
+      "id": "es-holdout-116",
+      "field": "caption",
+      "text": "Pronóstico de hoy: nublado con chubascos. Me puse el impermeable amarillo para que al menos el día tenga color."
+    },
+    {
+      "id": "es-holdout-117",
+      "field": "caption",
+      "text": "Muy útil tu lista para viajar con niños, la imprimí y la pegué en la puerta del armario."
+    },
+    {
+      "id": "es-holdout-118",
+      "field": "caption",
+      "text": "Probé a secar las camisas en percha en vez de en la secadora. Casi no hay que plancharlas."
+    },
+    {
+      "id": "es-holdout-119",
+      "field": "caption",
+      "text": "Mañana de escarcha. Los coches blancos, el césped blanco y yo con el gorro hasta las cejas."
+    },
+    {
+      "id": "es-holdout-120",
+      "field": "caption",
+      "text": "Duda existencial: ¿los calcetines blancos con mocasines están de vuelta o me lo estoy imaginando?"
+    },
+    {
+      "id": "es-holdout-121",
+      "field": "caption",
+      "text": "Me cosieron una presilla nueva en el abrigo para colgarlo. Detalles que alegran el día."
+    },
+    {
+      "id": "es-holdout-122",
+      "field": "caption",
+      "text": "Fin de semana en la costa con pronóstico de lluvia. Llevo el chubasquero, un jersey de lana gruesa y un libro."
+    },
+    {
+      "id": "es-holdout-123",
+      "field": "caption",
+      "text": "Te quedó precioso el bordado en el cuello de la camisa. ¿Es un patrón tuyo?"
+    },
+    {
+      "id": "es-holdout-124",
+      "field": "caption",
+      "text": "Cambio de temporada en dos fases: primero los zapatos, luego la ropa. Este finde tocan los zapatos."
+    },
+    {
+      "id": "es-holdout-125",
+      "field": "caption",
+      "text": "Cielo despejado y sol fuerte. Salí con gorra y camisa de manga larga fina para no quemarme los brazos."
+    },
+    {
+      "id": "es-holdout-126",
+      "field": "caption",
+      "text": "¿Cómo lavan los gorros de lana sin que pierdan la forma?"
+    },
+    {
+      "id": "es-holdout-127",
+      "field": "caption",
+      "text": "Gracias por la recomendación del cepillo para ante. Mis botas marrones parecen recién compradas."
+    },
+    {
+      "id": "es-holdout-128",
+      "field": "caption",
+      "text": "Valija para Montevideo: un buzo, una campera rompevientos y el mate, claro."
+    },
+    {
+      "id": "es-holdout-129",
+      "field": "caption",
+      "text": "Llevé a acortar las mangas de la gabardina. La costurera dijo que iba a quedar mejor sin tocar los botones del puño."
+    },
+    {
+      "id": "es-holdout-130",
+      "field": "caption",
+      "text": "Tiempo raro: sol con nubes que van y vienen. Cárdigan puesto, cárdigan quitado, cárdigan puesto otra vez."
+    },
+    {
+      "id": "es-holdout-131",
+      "field": "caption",
+      "text": "La lluvia empezó justo cuando salí del súper con cuatro bolsas. Llegué a casa como si me hubiera metido en la ducha vestida."
+    },
+    {
+      "id": "es-holdout-132",
+      "field": "caption",
+      "text": "¿Qué tela es mejor para el verano tropical, algodón o lino? Vivo en un sitio con humedad todo el año."
+    },
+    {
+      "id": "es-holdout-133",
+      "field": "caption",
+      "text": "Qué elegante ese conjunto en gris. Sencillo y perfecto."
+    },
+    {
+      "id": "es-holdout-134",
+      "field": "caption",
+      "text": "Arreglando la cremallera del bolso con unos alicates y mucha fe."
+    },
+    {
+      "id": "es-holdout-135",
+      "field": "caption",
+      "text": "Sacando el abrigo del año pasado y encontrando un billete en el bolsillo. Lo mejor del otoño."
+    },
+    {
+      "id": "es-holdout-136",
+      "field": "caption",
+      "text": "Hoy hace tanto viento que el paraguas se dio la vuelta dos veces. Me quedo con el impermeable con capucha."
+    },
+    {
+      "id": "es-holdout-137",
+      "field": "caption",
+      "text": "Pregunta para las que usan falda en bici: ¿shorts debajo o falda pantalón directamente?"
+    },
+    {
+      "id": "es-holdout-138",
+      "field": "caption",
+      "text": "Gracias por subir el paso a paso del nudo de la bufanda. Ya lo domino."
+    },
+    {
+      "id": "es-holdout-139",
+      "field": "caption",
+      "text": "Para el viaje a Medellín: ropa ligera, una chaqueta para la noche y un paraguas pequeño. Primavera eterna, dicen."
+    },
+    {
+      "id": "es-holdout-140",
+      "field": "caption",
+      "text": "Hoy llevé a teñir de negro un vestido que se había quedado desvaído. Ya veremos el resultado la semana que viene."
+    },
+    {
+      "id": "es-holdout-141",
+      "field": "caption",
+      "text": "Fresco por la mañana. La primera capa del día fue una camiseta térmica bajo la camisa."
+    },
+    {
+      "id": "es-holdout-142",
+      "field": "caption",
+      "text": "Mi pantalón favorito se rompió por la entrepierna de tanto usarlo. Lo llevé a la modista y lo salvó con un refuerzo."
+    },
+    {
+      "id": "es-holdout-143",
+      "field": "caption",
+      "text": "Saqué los pañuelos de seda del cajón. Se viene la temporada de anudar cosas al cuello."
+    },
+    {
+      "id": "es-holdout-144",
+      "field": "caption",
+      "text": "¿Con qué color de zapatos combina un vestido verde botella? Tengo una boda y no me decido."
+    },
+    {
+      "id": "es-holdout-145",
+      "field": "caption",
+      "text": "Vi tu foto con el impermeable rojo y me compré uno igual de segunda mano. Gracias por la inspiración."
+    },
+    {
+      "id": "es-holdout-146",
+      "field": "caption",
+      "text": "Caminata al centro con 28 grados. Camiseta, falda vaporosa y sandalias planas."
+    },
+    {
+      "id": "es-holdout-147",
+      "field": "caption",
+      "text": "Me puse a ordenar los cajones y descubrí que tengo nueve camisetas negras casi iguales. Me lo tomaré como estilo personal."
+    },
+    {
+      "id": "es-holdout-148",
+      "field": "caption",
+      "text": "Lista para la nieve: botas impermeables, pantalón de esquí prestado, guantes dobles y crema para los labios."
+    },
+    {
+      "id": "es-holdout-149",
+      "field": "caption",
+      "text": "El sastre me convenció de no estrechar tanto la chaqueta. Tenía razón, así se mueve mejor."
+    },
+    {
+      "id": "es-holdout-150",
+      "field": "caption",
+      "text": "Lluvia fina, de la que no moja hasta que te das cuenta de que estás empapada."
+    },
+    {
+      "id": "es-holdout-151",
+      "field": "caption",
+      "text": "¿Cuál es su prenda más versátil para el entretiempo? La mía es una camisa vaquera."
+    },
+    {
+      "id": "es-holdout-152",
+      "field": "caption",
+      "text": "Muy bonita la combinación de azul marino y crema, transmite calma."
+    },
+    {
+      "id": "es-holdout-153",
+      "field": "caption",
+      "text": "Primer lavado de la chaqueta impermeable con el producto especial. Ahora el agua resbala otra vez."
+    },
+    {
+      "id": "es-holdout-154",
+      "field": "caption",
+      "text": "Domingo de cambio de armario con música y café. Las sandalias ya están en el fondo del zapatero."
+    },
+    {
+      "id": "es-holdout-155",
+      "field": "caption",
+      "text": "Me tocó esperar el camión media hora con lluvia. Menos mal que traía la chamarra con capucha."
+    },
+    {
+      "id": "es-holdout-156",
+      "field": "caption",
+      "text": "¿Cómo se lleva un traje de lino sin parecer arrugado a los diez minutos? ¿O es parte del encanto?"
+    },
+    {
+      "id": "es-holdout-157",
+      "field": "caption",
+      "text": "Gracias a quien me recomendó hacer una lista antes de ir al mercado de segunda mano. Por fin no compré nada que no necesitara."
+    },
+    {
+      "id": "es-holdout-158",
+      "field": "caption",
+      "text": "Una semana en Ámsterdam: chubasquero, botas cómodas, dos jerséis y una bufanda. La bici ya me la alquilan allí."
+    },
+    {
+      "id": "es-holdout-159",
+      "field": "caption",
+      "text": "Cosí el bajo de unas cortinas viejas para hacerme una falda. Quedó rústica y me encanta."
+    },
+    {
+      "id": "es-holdout-160",
+      "field": "caption",
+      "text": "Hoy hay alerta por calor. Ropa clara, sombrero, botella de agua y salir lo justo."
+    },
+    {
+      "id": "es-holdout-161",
+      "field": "caption",
+      "text": "Mis zapatillas blancas volvieron a ser blancas con bicarbonato y un cepillo de dientes viejo."
+    },
+    {
+      "id": "es-holdout-162",
+      "field": "caption",
+      "text": "¿Alguien sabe cómo arreglar el tirón de un jersey sin que se note?"
+    },
+    {
+      "id": "es-holdout-163",
+      "field": "caption",
+      "text": "Te sienta increíble el pelo recogido con ese cuello alto."
+    },
+    {
+      "id": "es-holdout-164",
+      "field": "caption",
+      "text": "Calentito en casa, gélido en la calle. Siempre me olvido de lo que tarda en calentarse el cuerpo."
+    },
+    {
+      "id": "es-holdout-165",
+      "field": "caption",
+      "text": "Mudé la ropa de verano al trastero y la de invierno al armario. Una tarde entera y una espalda dolorida."
+    },
+    {
+      "id": "es-holdout-166",
+      "field": "caption",
+      "text": "Para el trabajo de campo en la selva llevo camisas de manga larga ligeras, pantalones que se secan rápido y botas de caña."
+    },
+    {
+      "id": "es-holdout-167",
+      "field": "caption",
+      "text": "La lavandería del barrio me devolvió las sábanas dobladas como un hotel. Quiero aprender ese truco."
+    },
+    {
+      "id": "es-holdout-168",
+      "field": "caption",
+      "text": "Mañana de neblina en la ciudad. Me puse el abrigo gris y me sentí parte del paisaje."
+    },
+    {
+      "id": "es-holdout-169",
+      "field": "caption",
+      "text": "Ayuda: ¿un blazer negro sirve para una entrevista de trabajo en verano o es demasiado?"
+    },
+    {
+      "id": "es-holdout-170",
+      "field": "caption",
+      "text": "Me alegra que el consejo de las capas te haya servido. ¡Esa combinación te queda perfecta!"
+    },
+    {
+      "id": "es-holdout-171",
+      "field": "caption",
+      "text": "Primeras manchas de barro de la temporada en el pantalón. Ya sé que toca lavarlo hoy."
+    },
+    {
+      "id": "es-holdout-172",
+      "field": "caption",
+      "text": "Descubrí que el abrigo que compré de segunda mano tiene un forro de seda pintado a mano. Qué sorpresa tan bonita."
+    },
+    {
+      "id": "es-holdout-173",
+      "field": "caption",
+      "text": "Hoy hizo un día de esos que no sabes si es verano o invierno. Llevé jersey fino y gafas de sol."
+    },
+    {
+      "id": "es-holdout-174",
+      "field": "caption",
+      "text": "¿Cada cuánto lavan los vaqueros? Mi madre dice que cada semana, en internet dicen que casi nunca."
+    },
+    {
+      "id": "es-holdout-175",
+      "field": "caption",
+      "text": "Gracias por la reseña de las botas impermeables. Me ahorraste una compra que no me iba a servir."
+    },
+    {
+      "id": "es-holdout-176",
+      "field": "caption",
+      "text": "Escapada a Granada: pantalón cómodo para subir cuestas, camiseta, chaqueta ligera y un pañuelo para el sol."
+    },
+    {
+      "id": "es-holdout-177",
+      "field": "caption",
+      "text": "Los puños de mi camisa estaban deshilachados y la modista les dio la vuelta. Parecen nuevos."
+    },
+    {
+      "id": "es-holdout-178",
+      "field": "caption",
+      "text": "Ya apareció el primer abrigo en la percha del recibidor. Bienvenido, otoño."
+    },
+    {
+      "id": "es-holdout-179",
+      "field": "caption",
+      "text": "Paseando al perro bajo una lluvia que no estaba en el pronóstico. Ni él ni yo estábamos preparados."
+    },
+    {
+      "id": "es-holdout-180",
+      "field": "caption",
+      "text": "¿Cómo saben si una prenda de segunda mano merece la pena? Me cuesta ver la calidad de la tela."
+    },
+    {
+      "id": "es-holdout-181",
+      "field": "caption",
+      "text": "Esa camisa de rayas tiene un aire marinero precioso. Te queda de cine."
+    },
+    {
+      "id": "es-holdout-182",
+      "field": "caption",
+      "text": "Doblé toda la ropa al estilo cajón vertical. Ahora veo todo de un vistazo."
+    },
+    {
+      "id": "es-holdout-183",
+      "field": "caption",
+      "text": "Sol radiante después de tres días grises. Hoy tocó vestido amarillo y sandalias, aunque el aire todavía estuviera fresco."
+    },
+    {
+      "id": "es-holdout-184",
+      "field": "caption",
+      "text": "Necesito ideas para vestir en una oficina sin calefacción en invierno. Ya llevo térmica y no es suficiente."
+    },
+    {
+      "id": "es-holdout-185",
+      "field": "caption",
+      "text": "Muchas gracias por tu comentario tan amable, me alegraste la mañana."
+    },
+    {
+      "id": "es-holdout-186",
+      "field": "caption",
+      "text": "Viaje a Santiago con cambios de temperatura enormes entre el día y la noche. Llevo una parka ligera y un chaleco de pluma."
+    },
+    {
+      "id": "es-holdout-187",
+      "field": "caption",
+      "text": "Reparé la suela despegada de las botas con pegamento especial y una noche bajo libros pesados."
+    },
+    {
+      "id": "es-holdout-188",
+      "field": "caption",
+      "text": "Hoy la ciudad estaba helada. Me puse dos pares de medias bajo el pantalón y no me arrepiento."
+    },
+    {
+      "id": "es-holdout-189",
+      "field": "caption",
+      "text": "Encontré el sombrero perfecto en el puesto del rastro. El vendedor me contó que era de su abuelo."
+    },
+    {
+      "id": "es-holdout-190",
+      "field": "caption",
+      "text": "¿Cómo combinan una chaqueta de cuero marrón? Siento que siempre la llevo igual."
+    },
+    {
+      "id": "es-holdout-191",
+      "field": "caption",
+      "text": "Te ha quedado muy bien la falda que hiciste. Se nota mucho cariño en cada costura."
+    },
+    {
+      "id": "es-holdout-192",
+      "field": "caption",
+      "text": "Lavé a mano la blusa de encaje con champú suave. Quedó limpia y sin un hilo fuera de sitio."
+    },
+    {
+      "id": "es-holdout-193",
+      "field": "caption",
+      "text": "Toca guardar el bañador hasta el año que viene. Qué rápido pasó el verano."
+    },
+    {
+      "id": "es-holdout-194",
+      "field": "caption",
+      "text": "Bochorno total en el autobús. Lección aprendida: nada de poliéster en agosto."
+    },
+    {
+      "id": "es-holdout-195",
+      "field": "caption",
+      "text": "¿Alguien usa bolsas al vacío para guardar los abrigos? Me da miedo que se arruguen para siempre."
+    },
+    {
+      "id": "es-holdout-196",
+      "field": "caption",
+      "text": "Me encantó tu idea de hacer una cápsula de diez prendas para el viaje. Voy a intentarlo en mi próximo viaje."
+    },
+    {
+      "id": "es-holdout-197",
+      "field": "caption",
+      "text": "Cambio de armario exprés porque mañana bajan las temperaturas de golpe."
+    },
+    {
+      "id": "es-holdout-198",
+      "field": "caption",
+      "text": "La bufanda que tejiste es preciosa, me encanta el color mostaza con ese gris."
+    },
+    {
+      "id": "es-holdout-199",
+      "field": "caption",
+      "text": "Salí con chaqueta de entretiempo y fue la decisión correcta: viento suave y sol."
+    },
+    {
+      "id": "es-holdout-200",
+      "field": "caption",
+      "text": "Hoy llovió a ratos y el suelo resbalaba. Botas con buena suela, gabardina y paraguas en el bolso por si acaso."
+    },
+    {
+      "id": "es-holdout-201",
+      "field": "caption",
+      "text": "¿Qué abrigo recomiendan para una ciudad con viento constante pero poco frío? Algo que no pese."
+    },
+    {
+      "id": "es-holdout-202",
+      "field": "caption",
+      "text": "Mil gracias por el consejo de la talla, me quedó perfecta la chaqueta."
+    },
+    {
+      "id": "es-holdout-203",
+      "field": "caption",
+      "text": "Para el viaje a Oaxaca: blusas frescas, un rebozo, sandalias cómodas y una chamarra ligera para la noche."
+    },
+    {
+      "id": "es-holdout-204",
+      "field": "caption",
+      "text": "Mi suéter favorito tenía un agujero de polilla. Le bordé una florecita encima y ahora es otra prenda."
+    },
+    {
+      "id": "es-holdout-205",
+      "field": "caption",
+      "text": "Por fin la ropa de invierno al fondo y la de verano a mano. Huele a lavanda todo el cuarto."
+    },
+    {
+      "id": "es-holdout-206",
+      "field": "caption",
+      "text": "Termómetro en 2 grados y sol brillante. Mi plumífero y yo somos uno."
+    },
+    {
+      "id": "es-holdout-207",
+      "field": "caption",
+      "text": "¿Cómo llevan el color en invierno? Mi armario es todo negro, gris y azul y me aburro."
+    },
+    {
+      "id": "es-holdout-208",
+      "field": "caption",
+      "text": "Ese estampado de flores pequeñas te queda dulcísimo."
+    },
+    {
+      "id": "es-holdout-209",
+      "field": "caption",
+      "text": "Fui a recoger los zapatos al zapatero y me cobró muy poco por coser la puntera. Gente buena aún hay."
+    },
+    {
+      "id": "es-holdout-210",
+      "field": "caption",
+      "text": "Nubarrones toda la tarde pero no cayó ni una gota. Llevé el paraguas de paseo."
+    },
+    {
+      "id": "es-holdout-211",
+      "field": "caption",
+      "text": "Hallazgo del día en la tienda de segunda mano: una camisa de lino blanca sin una sola mancha."
+    },
+    {
+      "id": "es-holdout-212",
+      "field": "caption",
+      "text": "¿Shorts en la oficina con calor extremo, sí o no? En la mía nadie se anima."
+    },
+    {
+      "id": "es-holdout-213",
+      "field": "caption",
+      "text": "Ya puse el impermeable de los niños en la entrada. Esta semana viene movida."
+    },
+    {
+      "id": "es-holdout-214",
+      "field": "caption",
+      "text": "Gracias por compartir cómo organizas los accesorios, el cajón con separadores es otra cosa."
+    },
+    {
+      "id": "es-holdout-215",
+      "field": "caption",
+      "text": "Probé lavar los jerséis del revés y salen con muchas menos bolitas. Gran descubrimiento."
+    },
+    {
+      "id": "es-holdout-216",
+      "field": "caption",
+      "text": "Mañana gris y templada, ideal para el cárdigan largo que casi no uso."
+    },
+    {
+      "id": "es-holdout-217",
+      "field": "caption",
+      "text": "¿Botas de lluvia altas o bajas para la ciudad? Las altas me cuestan de poner."
+    },
+    {
+      "id": "es-holdout-218",
+      "field": "caption",
+      "text": "Le quité las hombreras a un saco de segunda mano y ahora me queda moderno."
+    },
+    {
+      "id": "es-holdout-219",
+      "field": "caption",
+      "text": "Lista para el viaje a Roma en verano: vestidos ligeros, pañuelo para entrar en iglesias, sandalias planas y gorra."
+    },
+    {
+      "id": "es-holdout-220",
+      "field": "caption",
+      "text": "Hermoso el color de tu abrigo, como un cielo de invierno."
+    },
+    {
+      "id": "es-holdout-221",
+      "field": "caption",
+      "text": "Día de lavandería: separando blancos, oscuros y lo delicado. Música y paciencia."
+    },
+    {
+      "id": "es-holdout-222",
+      "field": "caption",
+      "text": "Calor húmedo de tormenta. Al final la tormenta llegó a las cinco y me pilló con zapatillas de lona."
+    },
+    {
+      "id": "es-holdout-223",
+      "field": "caption",
+      "text": "¿Qué tipo de zapato llevan con pantalones de pinza? Siempre me quedo en duda."
+    },
+    {
+      "id": "es-holdout-224",
+      "field": "caption",
+      "text": "Cosí botones nuevos en la camisa de mi padre y se la regalé otra vez. Le hizo mucha gracia."
+    },
+    {
+      "id": "es-holdout-225",
+      "field": "caption",
+      "text": "Bajó la temperatura de golpe. Ayer camiseta, hoy abrigo. Así es esta ciudad."
+    },
+    {
+      "id": "es-holdout-226",
+      "field": "caption",
+      "text": "Viaje corto a Córdoba con mucho calor: ropa de algodón, sombrero y abanico en el bolso."
+    },
+    {
+      "id": "es-holdout-227",
+      "field": "caption",
+      "text": "Gracias por el truco del secador para quitar arrugas de la chaqueta. Funciona de maravilla."
+    },
+    {
+      "id": "es-holdout-228",
+      "field": "caption",
+      "text": "¿Hay alguna manera de suavizar unos vaqueros muy rígidos sin estropearlos?"
+    },
+    {
+      "id": "es-holdout-229",
+      "field": "caption",
+      "text": "Muy linda tu foto con el impermeable verde, alegra cualquier día de lluvia."
+    },
+    {
+      "id": "es-holdout-230",
+      "field": "caption",
+      "text": "Doblando la ropa de bebé que ya no le cabe a mi hija. Va para la prima que nace en primavera."
+    },
+    {
+      "id": "es-holdout-231",
+      "field": "caption",
+      "text": "Hoy hubo sol de invierno, de ese que calienta poco pero anima mucho."
+    },
+    {
+      "id": "es-holdout-232",
+      "field": "caption",
+      "text": "El forro de mi chaqueta se rompió y la costurera me ofreció cambiarlo entero. Será otra chaqueta."
+    },
+    {
+      "id": "es-holdout-233",
+      "field": "caption",
+      "text": "¿Alguien combina sandalias con calcetines en otoño? Lo estoy pensando seriamente."
+    },
+    {
+      "id": "es-holdout-234",
+      "field": "caption",
+      "text": "Precioso ese cinturón trenzado, le da un toque distinto al vestido."
+    },
+    {
+      "id": "es-holdout-235",
+      "field": "caption",
+      "text": "Me llevé la chaqueta equivocada al trabajo y pasé frío todo el día. Mañana miro la previsión antes de salir."
+    },
+    {
+      "id": "es-holdout-236",
+      "field": "caption",
+      "text": "Cambié las perchas de alambre por unas de madera. Los hombros de los abrigos lo agradecen."
+    },
+    {
+      "id": "es-holdout-237",
+      "field": "caption",
+      "text": "Viaje en coche de diez horas: ropa cómoda, capas para el aire acondicionado y una manta en el asiento de atrás."
+    },
+    {
+      "id": "es-holdout-238",
+      "field": "caption",
+      "text": "¿Cómo quitan el olor a humedad de la ropa guardada? Mis camisetas de verano huelen a armario cerrado."
+    },
+    {
+      "id": "es-holdout-239",
+      "field": "caption",
+      "text": "Gracias por la paciencia con mis preguntas sobre telas, ahora entiendo mucho mejor las etiquetas."
+    },
+    {
+      "id": "es-holdout-240",
+      "field": "caption",
+      "text": "Me animé a usar el vestido largo con botas y jersey encima. Clima de transición perfecto."
+    },
+    {
+      "id": "es-holdout-241",
+      "field": "caption",
+      "text": "Remendé los vaqueros por dentro con una pieza de tela vieja. Duran otro año seguro."
+    },
+    {
+      "id": "es-holdout-242",
+      "field": "caption",
+      "text": "Lluvia intensa y calles inundadas. Hoy teletrabajo en pantuflas y jersey gordo."
+    },
+    {
+      "id": "es-holdout-243",
+      "field": "caption",
+      "text": "Organicé un intercambio de ropa con amigas. Me llevé dos camisas y dejé tres jerséis."
+    },
+    {
+      "id": "es-holdout-244",
+      "field": "caption",
+      "text": "¿Prendas que nunca guardan aunque cambie la temporada? Yo nunca guardo mi camisa vaquera."
+    },
+    {
+      "id": "es-holdout-245",
+      "field": "caption",
+      "text": "Qué foto tan luminosa, se nota el sol de la mañana. Y la falda es una preciosidad."
+    },
+    {
+      "id": "es-holdout-246",
+      "field": "caption",
+      "text": "Pasé por la mercería a comprar hilo del mismo tono que mi abrigo. La señora tardó un minuto en encontrarlo."
+    },
+    {
+      "id": "es-holdout-247",
+      "field": "caption",
+      "text": "Las botas de invierno ya salieron del armario. Les di crema antes de estrenarlas esta temporada."
+    },
+    {
+      "id": "es-holdout-248",
+      "field": "caption",
+      "text": "Fui al trabajo en bici con 30 grados. Camiseta de repuesto en la mochila, siempre."
+    },
+    {
+      "id": "es-holdout-249",
+      "field": "caption",
+      "text": "Maleta para Cartagena de Indias: todo de lino y algodón, sandalias, gafas de sol y sombrero."
+    },
+    {
+      "id": "es-holdout-250",
+      "field": "caption",
+      "text": "¿Cuál es la mejor forma de doblar camisas para que no se arruguen en la maleta?"
+    },
+    {
+      "id": "es-holdout-251",
+      "field": "caption",
+      "text": "Te quedan genial los colores tierra, deberías usarlos más."
+    },
+    {
+      "id": "es-holdout-252",
+      "field": "caption",
+      "text": "Lavé el edredón y la manta de lana en la lavandería de autoservicio. Tres horas y un café."
+    },
+    {
+      "id": "es-holdout-253",
+      "field": "caption",
+      "text": "Hoy ventea con fuerza y el polvo se mete en todas partes. Gafas grandes y pañuelo al cuello."
+    },
+    {
+      "id": "es-holdout-254",
+      "field": "caption",
+      "text": "Me arreglaron el reloj y de paso le cambiaron la correa. Combina con el cinturón marrón."
+    },
+    {
+      "id": "es-holdout-255",
+      "field": "caption",
+      "text": "Pregunto en serio: ¿cuántos pares de zapatos llevan para un viaje de dos semanas?"
+    },
+    {
+      "id": "es-holdout-256",
+      "field": "caption",
+      "text": "Gracias por avisar del cambio de tiempo en tu ciudad, me ayudó a hacer la maleta."
+    },
+    {
+      "id": "es-holdout-257",
+      "field": "caption",
+      "text": "Sacando los abanicos y los vestidos sueltos. La ola de calor viene con fuerza."
+    },
+    {
+      "id": "es-holdout-258",
+      "field": "caption",
+      "text": "Una chaqueta de punto heredada de mi tía, con botones de nácar. La cuido como un tesoro."
+    },
+    {
+      "id": "es-holdout-259",
+      "field": "caption",
+      "text": "Llueve y hace calor a la vez. Me rindo y salgo con chanclas y paraguas."
+    },
+    {
+      "id": "es-holdout-260",
+      "field": "caption",
+      "text": "¿Qué opinan de llevar el pantalón un poco por encima del tobillo en invierno?"
+    },
+    {
+      "id": "es-holdout-261",
+      "field": "caption",
+      "text": "Me encanta lo bien que planchas, esa camisa parece recién salida de la tienda."
+    },
+    {
+      "id": "es-holdout-262",
+      "field": "caption",
+      "text": "El tinte natural con cáscara de cebolla dejó mi camiseta de un tono dorado precioso."
+    },
+    {
+      "id": "es-holdout-263",
+      "field": "caption",
+      "text": "Mañana gélida en la parada. Con las manos en los bolsillos del abrigo y la nariz dentro de la bufanda."
+    },
+    {
+      "id": "es-holdout-264",
+      "field": "caption",
+      "text": "Lista para la feria del libro: zapatillas cómodas, bolso de tela grande y una chaqueta fina para la tarde."
+    },
+    {
+      "id": "es-holdout-265",
+      "field": "caption",
+      "text": "Le cambié el cierre al vestido y ahora puedo ponérmelo sola. Gran avance."
+    },
+    {
+      "id": "es-holdout-266",
+      "field": "caption",
+      "text": "Ya estamos en esa época en la que salgo con abrigo y vuelvo con él en la mano."
+    },
+    {
+      "id": "es-holdout-267",
+      "field": "caption",
+      "text": "¿Tienen algún consejo para que el pelo no se electrice con los jerséis de lana?"
+    },
+    {
+      "id": "es-holdout-268",
+      "field": "caption",
+      "text": "Muy buena idea combinar la falda de tul con una sudadera, me encanta el contraste."
+    },
+    {
+      "id": "es-holdout-269",
+      "field": "caption",
+      "text": "Rescaté unos mocasines de la tienda solidaria. Con un poco de crema quedaron perfectos."
+    },
+    {
+      "id": "es-holdout-270",
+      "field": "caption",
+      "text": "Cielo despejado pero helada fuerte. Las botas resbalan un poco en la acera."
+    },
+    {
+      "id": "es-holdout-271",
+      "field": "caption",
+      "text": "Guardé los abrigos con fundas de tela transpirable. Me lo recomendaron en una tintorería."
+    },
+    {
+      "id": "es-holdout-272",
+      "field": "caption",
+      "text": "Para la reunión familiar en el campo: vaqueros, camisa de franela y botas que se puedan ensuciar."
+    },
+    {
+      "id": "es-holdout-273",
+      "field": "caption",
+      "text": "¿Qué hacen con la ropa que tiene valor sentimental pero ya no usan?"
+    },
+    {
+      "id": "es-holdout-274",
+      "field": "caption",
+      "text": "Tu armario cápsula me inspiró a donar la mitad del mío. Gracias, de verdad."
+    },
+    {
+      "id": "es-holdout-275",
+      "field": "caption",
+      "text": "La previsión dijo sol y salió una tarde nublada y fresca. Menos mal que llevaba la camisa de franela."
+    },
+    {
+      "id": "es-holdout-276",
+      "field": "caption",
+      "text": "Una amiga me enseñó a hacer el dobladillo invisible. Hoy lo apliqué a tres pantalones seguidos."
+    },
+    {
+      "id": "es-holdout-277",
+      "field": "caption",
+      "text": "Quitándome capas a lo largo del día: abrigo a las once, jersey a la una, camiseta hasta la tarde."
+    },
+    {
+      "id": "es-holdout-278",
+      "field": "caption",
+      "text": "Recién llegada del viaje y ya poniendo la segunda lavadora. Esto es lo menos bonito de viajar."
+    },
+    {
+      "id": "es-holdout-279",
+      "field": "caption",
+      "text": "¿Algún consejo para usar boina sin parecer disfrazada?"
+    },
+    {
+      "id": "es-holdout-280",
+      "field": "caption",
+      "text": "Me alegra muchísimo que te haya servido la lista de imprescindibles para el invierno."
+    },
+    {
+      "id": "es-holdout-281",
+      "field": "caption",
+      "text": "Cambio de temporada también para los niños. Todo les queda pequeño, como cada año."
+    },
+    {
+      "id": "es-holdout-282",
+      "field": "caption",
+      "text": "Día húmedo y templado, de esos que el pelo hace lo que quiere. Gorra y listo."
+    },
+    {
+      "id": "es-holdout-283",
+      "field": "caption",
+      "text": "Encontré tres pañuelos de seda en una caja de un mercadillo. Uno ya está en mi bolso."
+    },
+    {
+      "id": "es-holdout-284",
+      "field": "caption",
+      "text": "Para el festival al aire libre: sombrero, botas cómodas, chubasquero plegable y riñonera."
+    },
+    {
+      "id": "es-holdout-285",
+      "field": "caption",
+      "text": "Le puse refuerzos a las rodilleras del pantalón de trabajo. Mi rodilla también lo agradece."
+    },
+    {
+      "id": "es-holdout-286",
+      "field": "caption",
+      "text": "¿Cuánto tiempo puede estar una prenda de lana sin lavarse? Pregunto por mi abrigo."
+    },
+    {
+      "id": "es-holdout-287",
+      "field": "caption",
+      "text": "Gracias por la foto del detalle de la costura, ahora entiendo cómo hacerlo."
+    },
+    {
+      "id": "es-holdout-288",
+      "field": "caption",
+      "text": "Salí a hacer recados con la parka nueva de segunda mano y no sentí nada de frío. Inversión acertada."
+    },
+    {
+      "id": "es-holdout-289",
+      "field": "caption",
+      "text": "Vacié el armario por completo, limpié las baldas y volví a colocar todo por colores. Me siento ligera."
+    },
+    {
+      "id": "es-holdout-290",
+      "field": "caption",
+      "text": "#lluvia #botas Día de charcos y risas con los peques de camino al cole."
+    },
+    {
+      "id": "es-holdout-291",
+      "field": "caption",
+      "text": "Paraguas olvidado en la oficina, otra vez. Mañana lo pongo en la entrada de casa."
+    },
+    {
+      "id": "es-holdout-292",
+      "field": "caption",
+      "text": "¿Recomiendan lavar los zapatos de lona en la lavadora o mejor a mano?"
+    },
+    {
+      "id": "es-holdout-293",
+      "field": "caption",
+      "text": "Mi primer remiendo visible con hilo de colores. Me gusta más que la prenda original."
+    },
+    {
+      "id": "es-holdout-294",
+      "field": "caption",
+      "text": "Me compré un paraguas grande de los que aguantan el viento. Ya iba siendo hora."
+    },
+    {
+      "id": "es-holdout-295",
+      "field": "caption",
+      "text": "Maleta para Ciudad de Panamá: ligera, fresca y con una chaqueta fina para el aire acondicionado de los centros comerciales."
+    },
+    {
+      "id": "es-holdout-296",
+      "field": "caption",
+      "text": "Tu pregunta sobre los colores me hizo revisar mi armario. Buenísima conversación en los comentarios."
+    },
+    {
+      "id": "es-holdout-297",
+      "field": "caption",
+      "text": "Hoy la tarde se puso fresca de repente. Ojalá hubiera traído la chaqueta en vez de ir confiada."
+    },
+    {
+      "id": "es-holdout-298",
+      "field": "caption",
+      "text": "Saqué la plancha de vapor para las cortinas y acabé planchando todas las camisas de la semana. #domingo"
+    },
+    {
+      "id": "es-holdout-299",
+      "field": "caption",
+      "text": "¿Alguien más guarda la ropa de verano en maletas? Así aprovecho el espacio."
+    },
+    {
+      "id": "es-holdout-300",
+      "field": "caption",
+      "text": "Qué detalle tan lindo el broche en la solapa, me encanta."
+    },
+    {
+      "id": "es-holdout-301",
+      "field": "caption",
+      "text": "Mañana de sol y brisa en la plaza. Camisa de lino arremangada y alpargatas."
+    },
+    {
+      "id": "es-holdout-302",
+      "field": "caption",
+      "text": "Hoy, paraguas. Mañana, ya veremos."
+    },
+    {
+      "id": "es-holdout-303",
+      "field": "caption",
+      "text": "Gracias, qué amable 💛"
+    },
+    {
+      "id": "es-holdout-304",
+      "field": "caption",
+      "text": "¿Gris o beige? Ayuda rápida."
+    },
+    {
+      "id": "es-holdout-305",
+      "field": "caption",
+      "text": "Frío seco y sol. Perfecto."
+    },
+    {
+      "id": "es-holdout-306",
+      "field": "caption",
+      "text": "Lunes de lluvia #botas"
+    },
+    {
+      "id": "es-holdout-307",
+      "field": "caption",
+      "text": "Me encantó, gracias por compartir."
+    },
+    {
+      "id": "es-holdout-308",
+      "field": "caption",
+      "text": "Esta mañana salí a las siete con 4 grados y niebla, así que fui con abrigo de paño, jersey de cuello alto y guantes. A mediodía el sol calentaba tanto que comí en la terraza con el abrigo doblado en la silla. Mañana pruebo con capas más finas."
+    },
+    {
+      "id": "es-holdout-309",
+      "field": "caption",
+      "text": "Pregunta larga, perdón: me mudo a una ciudad donde llueve casi todo el año y nunca he tenido ropa impermeable de verdad. ¿Por dónde empiezo? ¿Chaqueta, botas, paraguas bueno? ¿Qué priorizan ustedes con poco presupuesto? Cualquier consejo me viene bien."
+    },
+    {
+      "id": "es-holdout-310",
+      "field": "caption",
+      "text": "Quería dar las gracias a todas las personas que respondieron a mi pregunta sobre cómo vestirme para la graduación de mi hermana con tanto calor. Al final fui con un vestido de lino azul, sandalias planas y un chal fino para la tarde, y estuve cómoda todo el día."
+    },
+    {
+      "id": "es-holdout-311",
+      "field": "caption",
+      "text": "Notas para el viaje de dos semanas por el sur: el día es caluroso pero las noches refrescan, así que llevo ropa clara de algodón, una chaqueta vaquera, un pañuelo grande que sirve de chal y de toalla, dos pares de zapatos ya domados y una bolsa plegable para la ropa sucia."
+    },
+    {
+      "id": "es-holdout-312",
+      "field": "caption",
+      "text": "Hoy dediqué la tarde entera a arreglos pendientes: cosí tres botones, cambié la goma de un pantalón de casa, zurcí dos calcetines de lana y le puse un parche al codo de mi sudadera favorita. La cesta de costura por fin está vacía y yo muy satisfecha."
+    },
+    {
+      "id": "es-holdout-313",
+      "field": "caption",
+      "text": "Cambio de armario completado: saqué todo, probé cada prenda, separé lo que va para arreglos, lo que dono y lo que vendo en el mercadillo del barrio. Lo que se queda está ordenado por tipo y color. Me siento con la cabeza más despejada que el armario."
+    },
+    {
+      "id": "es-holdout-314",
+      "field": "caption",
+      "text": "Ida al trabajo bajo un cielo naranja de atardecer en pleno invierno, porque salgo tardísimo. Abrigo largo, bufanda doble y unas botas forradas que compré de segunda mano el año pasado. Siguen como el primer día."
+    },
+    {
+      "id": "es-holdout-315",
+      "field": "caption",
+      "text": "En la tienda solidaria de mi barrio encontré una gabardina azul oscuro con el cinturón original y todos los botones. Me la probé y me quedaba bien de hombros, solo hay que subirle un poco el bajo. La costurera de la esquina ya la tiene."
+    },
+    {
+      "id": "es-holdout-316",
+      "field": "altText",
+      "text": "Prendas dobladas sobre una cama blanca: jersey gris, vaqueros oscuros, bufanda a cuadros y botines marrones. La luz entra por una ventana lateral y el suelo es de parqué claro."
+    },
+    {
+      "id": "es-holdout-317",
+      "field": "altText",
+      "text": "Foto en un espejo de cuerpo entero con gabardina beige, pantalón negro y zapatillas blancas."
+    },
+    {
+      "id": "es-holdout-318",
+      "field": "altText",
+      "text": "Primer plano de unas botas de agua verdes con gotas de lluvia sobre una acera mojada."
+    },
+    {
+      "id": "es-holdout-319",
+      "field": "altText",
+      "text": "Persona caminando por una calle empedrada con abrigo azul marino y paraguas transparente."
+    },
+    {
+      "id": "es-holdout-320",
+      "field": "altText",
+      "text": "Detalle de un tejido de lana en espiga gris y crema con un botón de madera. Al lado hay unas zapatillas grises dentro de una bolsa de tela y un paraguas plegable."
+    },
+    {
+      "id": "es-holdout-321",
+      "field": "altText",
+      "text": "Maleta abierta con camisetas enrolladas, un chubasquero plegado y un neceser azul."
+    },
+    {
+      "id": "es-holdout-322",
+      "field": "altText",
+      "text": "Vestido de lino blanco colgado en una percha de madera junto a una ventana con luz natural."
+    },
+    {
+      "id": "es-holdout-323",
+      "field": "altText",
+      "text": "Zapatillas de lona rojas sobre un suelo de baldosas hidráulicas."
+    },
+    {
+      "id": "es-holdout-324",
+      "field": "altText",
+      "text": "Flat lay de una falda midi plisada verde, blusa crema y bolso de mimbre sobre fondo de madera. Al fondo se ve un perchero con un abrigo y una lámpara encendida."
+    },
+    {
+      "id": "es-holdout-325",
+      "field": "altText",
+      "text": "Foto de espejo en un recibidor con chamarra de mezclilla, playera de rayas y tenis blancos."
+    },
+    {
+      "id": "es-holdout-326",
+      "field": "altText",
+      "text": "Primer plano de un remiendo visible con hilo azul en la rodilla de unos vaqueros."
+    },
+    {
+      "id": "es-holdout-327",
+      "field": "altText",
+      "text": "Persona esperando en una parada de autobús con parka verde, gorro de lana y guantes negros."
+    },
+    {
+      "id": "es-holdout-328",
+      "field": "altText",
+      "text": "Sandalias de cuero marrón junto a un sombrero de paja sobre una toalla de rayas."
+    },
+    {
+      "id": "es-holdout-329",
+      "field": "altText",
+      "text": "Chaqueta de pana color teja colgada en una puerta, con un pañuelo estampado en el bolsillo."
+    },
+    {
+      "id": "es-holdout-330",
+      "field": "altText",
+      "text": "Abrigo largo de cuadros grises sobre una silla, con unos guantes de cuero encima. Las prendas están colocadas en diagonal sobre una sábana de lino arrugada."
+    },
+    {
+      "id": "es-holdout-331",
+      "field": "altText",
+      "text": "Zapatos tipo mocasín color burdeos con calcetines blancos, vistos desde arriba."
+    },
+    {
+      "id": "es-holdout-332",
+      "field": "altText",
+      "text": "Montón de jerséis de colores apilados en una estantería, ordenados del claro al oscuro."
+    },
+    {
+      "id": "es-holdout-333",
+      "field": "altText",
+      "text": "Foto de calle: persona con camisa blanca arremangada, pantalón de lino beige y alpargatas."
+    },
+    {
+      "id": "es-holdout-334",
+      "field": "altText",
+      "text": "Detalle de una cremallera metálica nueva cosida en una chaqueta vaquera clara."
+    },
+    {
+      "id": "es-holdout-335",
+      "field": "altText",
+      "text": "Flat lay para un viaje: dos camisetas, un pantalón chino, un cárdigan y zapatillas grises."
+    },
+    {
+      "id": "es-holdout-336",
+      "field": "altText",
+      "text": "Bufanda de punto mostaza enrollada sobre un abrigo gris en una percha. La foto está tomada desde un ángulo bajo y se ve parte de una puerta azul."
+    },
+    {
+      "id": "es-holdout-337",
+      "field": "altText",
+      "text": "Botines negros de ante con la suela de goma, apoyados en un escalón de piedra."
+    },
+    {
+      "id": "es-holdout-338",
+      "field": "altText",
+      "text": "Foto en espejo de un probador con blazer azul, camiseta blanca y vaqueros rectos."
+    },
+    {
+      "id": "es-holdout-339",
+      "field": "altText",
+      "text": "Primer plano de la etiqueta de cuidado de un jersey de lana sobre una mesa."
+    },
+    {
+      "id": "es-holdout-340",
+      "field": "altText",
+      "text": "Camisas colgadas en perchas de madera dentro de un armario, todas en tonos azules y blancos."
+    },
+    {
+      "id": "es-holdout-341",
+      "field": "altText",
+      "text": "Persona con impermeable amarillo y botas negras cruzando un paso de peatones mojado."
+    },
+    {
+      "id": "es-holdout-342",
+      "field": "altText",
+      "text": "Cesta de mimbre con ropa recién lavada y doblada junto a un tendedero."
+    },
+    {
+      "id": "es-holdout-343",
+      "field": "altText",
+      "text": "Tela de algodón estampada con flores pequeñas, cortada sobre una mesa de costura con tijeras. La persona sostiene el teléfono a la altura del pecho y lleva un bolso pequeño cruzado."
+    },
+    {
+      "id": "es-holdout-344",
+      "field": "altText",
+      "text": "Vestido de punto marrón con cinturón trenzado, fotografiado sobre un fondo liso claro."
+    },
+    {
+      "id": "es-holdout-345",
+      "field": "altText",
+      "text": "Foto de espejo con abrigo camel, jersey de cuello alto negro y botas altas."
+    },
+    {
+      "id": "es-holdout-346",
+      "field": "altText",
+      "text": "Primer plano de unos botones de nácar en un cárdigan color crema."
+    },
+    {
+      "id": "es-holdout-347",
+      "field": "altText",
+      "text": "Calcetines de lana de colores apilados junto a unas botas de montaña."
+    },
+    {
+      "id": "es-holdout-348",
+      "field": "altText",
+      "text": "Calle con niebla y una persona de espaldas vestida con abrigo largo gris y bufanda roja. Hay charcos en la acera y las farolas todavía están encendidas al fondo."
+    },
+    {
+      "id": "es-holdout-349",
+      "field": "altText",
+      "text": "Flat lay de una camisa de franela a cuadros, vaqueros, gorro de lana y botas de trabajo."
+    },
+    {
+      "id": "es-holdout-350",
+      "field": "altText",
+      "text": "Primer plano de unas zapatillas blancas recién limpiadas sobre papel de periódico."
+    },
+    {
+      "id": "es-holdout-351",
+      "field": "altText",
+      "text": "Mochila abierta con un polerón, una parka plegada, una botella de agua y un gorro."
+    },
+    {
+      "id": "es-holdout-352",
+      "field": "altText",
+      "text": "Falda larga de punto gris con zapatillas blancas en una foto de cuerpo entero."
+    },
+    {
+      "id": "es-holdout-353",
+      "field": "altText",
+      "text": "Detalle de un bordado de flores rojas en el cuello de una camisa blanca."
+    },
+    {
+      "id": "es-holdout-354",
+      "field": "altText",
+      "text": "Persona en bicicleta con chaqueta impermeable azul y pantalones remangados."
+    },
+    {
+      "id": "es-holdout-355",
+      "field": "altText",
+      "text": "Pantalón de traje gris colgado con alfileres marcando el nuevo largo del bajo."
+    },
+    {
+      "id": "es-holdout-356",
+      "field": "altText",
+      "text": "Gabardina beige colgada en un perchero de pared junto a un paraguas negro."
+    },
+    {
+      "id": "es-holdout-357",
+      "field": "altText",
+      "text": "Primer plano de la textura de un tejido de lino natural con algunas arrugas."
+    },
+    {
+      "id": "es-holdout-358",
+      "field": "altText",
+      "text": "Foto de espejo en un pasillo con vestido amarillo, chaqueta vaquera y sandalias planas."
+    },
+    {
+      "id": "es-holdout-359",
+      "field": "altText",
+      "text": "Cajas de plástico con ropa de invierno etiquetadas, apiladas debajo de una cama. La luz de la tarde proyecta sombras largas sobre los puestos de fruta del fondo."
+    },
+    {
+      "id": "es-holdout-360",
+      "field": "altText",
+      "text": "Tres pañuelos de seda estampados extendidos sobre una mesa de madera."
+    },
+    {
+      "id": "es-holdout-361",
+      "field": "altText",
+      "text": "Persona con sombrero de ala ancha, vestido de algodón blanco y cesta en un mercado al aire libre."
+    },
+    {
+      "id": "es-holdout-362",
+      "field": "altText",
+      "text": "Botas de cuero marrón recién engrasadas con un paño y una lata de crema al lado."
+    },
+    {
+      "id": "es-holdout-363",
+      "field": "altText",
+      "text": "Chaleco acolchado negro sobre una camisa de cuadros, fotografiado en una percha."
+    },
+    {
+      "id": "es-holdout-364",
+      "field": "altText",
+      "text": "Flat lay de playa: bañador azul, camisa de lino grande, chanclas y gafas de sol."
+    },
+    {
+      "id": "es-holdout-365",
+      "field": "altText",
+      "text": "Primer plano de unas manos cosiendo un botón en un abrigo de paño azul marino."
+    },
+    {
+      "id": "es-holdout-366",
+      "field": "altText",
+      "text": "Foto de cuerpo entero en la calle: pantalón ancho negro, camisa de rayas y mocasines."
+    },
+    {
+      "id": "es-holdout-367",
+      "field": "altText",
+      "text": "Detalle de un jersey de punto trenzado color crudo con una codera de ante. Detrás se ven escaleras mecánicas y un cartel de horarios desenfocado."
+    },
+    {
+      "id": "es-holdout-368",
+      "field": "altText",
+      "text": "Gorro de lana rojo, guantes y bufanda a juego sobre una mesa junto a la puerta."
+    },
+    {
+      "id": "es-holdout-369",
+      "field": "altText",
+      "text": "Persona esperando el metro con abrigo largo camel y botines negros."
+    },
+    {
+      "id": "es-holdout-370",
+      "field": "altText",
+      "text": "Camiseta teñida en tonos dorados secándose en una cuerda al sol."
+    },
+    {
+      "id": "es-holdout-371",
+      "field": "altText",
+      "text": "Flat lay de oficina: blazer negro, blusa de seda crema, pantalón de pinzas y bolso estructurado."
+    },
+    {
+      "id": "es-holdout-372",
+      "field": "altText",
+      "text": "Zapatos de tacón bajo con tapas nuevas sobre un mostrador de zapatería."
+    },
+    {
+      "id": "es-holdout-373",
+      "field": "altText",
+      "text": "Foto de espejo de un dormitorio con jersey rojo, falda gris y medias negras."
+    },
+    {
+      "id": "es-holdout-374",
+      "field": "altText",
+      "text": "Detalle de una cinta métrica alrededor de la cintura de un pantalón vaquero."
+    },
+    {
+      "id": "es-holdout-375",
+      "field": "altText",
+      "text": "Persona caminando por la playa con camisa abierta, camiseta blanca y pantalón corto beige."
+    },
+    {
+      "id": "es-holdout-376",
+      "field": "altText",
+      "text": "Vestidos de verano colgados en un burro de ropa junto a una ventana luminosa."
+    },
+    {
+      "id": "es-holdout-377",
+      "field": "altText",
+      "text": "Primer plano de la suela de unas botas de goma con barro seco."
+    },
+    {
+      "id": "es-holdout-378",
+      "field": "altText",
+      "text": "Flat lay de nieve: chaqueta acolchada, pantalón impermeable, guantes gruesos y gafas."
+    },
+    {
+      "id": "es-holdout-379",
+      "field": "altText",
+      "text": "Abrigo de tweed con coderas sobre el respaldo de una silla de madera. Las hojas secas cubren el suelo y la persona camina de espaldas hacia un puente."
+    },
+    {
+      "id": "es-holdout-380",
+      "field": "altText",
+      "text": "Persona con boina negra, abrigo gris y bufanda de cuadros en una calle con árboles sin hojas."
+    },
+    {
+      "id": "es-holdout-381",
+      "field": "altText",
+      "text": "Primer plano de tela vaquera con costuras de hilo naranja."
+    },
+    {
+      "id": "es-holdout-382",
+      "field": "altText",
+      "text": "Sandalias planas de cuero trenzado sobre el suelo de terracota de una terraza."
+    },
+    {
+      "id": "es-holdout-383",
+      "field": "altText",
+      "text": "Foto de espejo en un ascensor con traje de lino claro y camisa azul."
+    },
+    {
+      "id": "es-holdout-384",
+      "field": "altText",
+      "text": "Pila de camisetas blancas, negras y grises dobladas en un cajón con separadores."
+    },
+    {
+      "id": "es-holdout-385",
+      "field": "altText",
+      "text": "Detalle de un forro de seda estampado dentro de un abrigo oscuro."
+    },
+    {
+      "id": "es-holdout-386",
+      "field": "altText",
+      "text": "Persona en un andén con chubasquero rojo y botas negras, con lluvia de fondo."
+    },
+    {
+      "id": "es-holdout-387",
+      "field": "altText",
+      "text": "Flat lay de entretiempo: cárdigan largo verde, camiseta blanca, vaqueros y mocasines."
+    },
+    {
+      "id": "es-holdout-388",
+      "field": "altText",
+      "text": "Chanclas, sombrero y pareo de colores sobre la arena junto a una bolsa de tela."
+    },
+    {
+      "id": "es-holdout-389",
+      "field": "altText",
+      "text": "Primer plano de un tirón en un jersey azul con una aguja de lana al lado."
+    },
+    {
+      "id": "es-holdout-390",
+      "field": "altText",
+      "text": "Foto de cuerpo entero frente a una pared de ladrillo: vestido largo, botas y jersey corto."
+    },
+    {
+      "id": "es-holdout-391",
+      "field": "altText",
+      "text": "Zapatillas de montaña sobre una roca con un pantalón técnico gris."
+    },
+    {
+      "id": "es-holdout-392",
+      "field": "altText",
+      "text": "Camisas planchadas colgadas en el baño con vapor en el espejo. Cada camisa tiene un tono distinto de blanco y el vapor empaña la mitad del espejo."
+    },
+    {
+      "id": "es-holdout-393",
+      "field": "altText",
+      "text": "Persona con rebozo de colores, blusa blanca y falda larga en una calle colonial."
+    },
+    {
+      "id": "es-holdout-394",
+      "field": "altText",
+      "text": "Detalle de unas perchas de madera con abrigos de colores neutros."
+    },
+    {
+      "id": "es-holdout-395",
+      "field": "altText",
+      "text": "Flat lay de ropa infantil: impermeable pequeño, botas de agua amarillas y gorro."
+    },
+    {
+      "id": "es-holdout-396",
+      "field": "altText",
+      "text": "Foto de espejo con chaqueta de cuero marrón, camiseta gris y pantalón negro."
+    },
+    {
+      "id": "es-holdout-397",
+      "field": "altText",
+      "text": "Primer plano de una bufanda tejida a mano con puntos un poco irregulares."
+    },
+    {
+      "id": "es-holdout-398",
+      "field": "altText",
+      "text": "Mesa de mercadillo con sombreros, cinturones y bolsos de segunda mano."
+    },
+    {
+      "id": "es-holdout-399",
+      "field": "altText",
+      "text": "Persona con cortavientos negro cerrado y gafas de sol en un paseo marítimo con viento."
+    },
+    {
+      "id": "es-holdout-400",
+      "field": "altText",
+      "text": "Vestido verde botella extendido sobre la cama con zapatos dorados al lado."
+    },
+    {
+      "id": "es-holdout-401",
+      "field": "altText",
+      "text": "Detalle de un dobladillo cosido a mano en una falda de algodón azul."
+    },
+    {
+      "id": "es-holdout-402",
+      "field": "altText",
+      "text": "Foto de calle con niebla: abrigo gris, pantalón gris y paraguas negro cerrado."
+    },
+    {
+      "id": "es-holdout-403",
+      "field": "altText",
+      "text": "Botines de ante marrón al lado de un cepillo especial y un trapo."
+    },
+    {
+      "id": "es-holdout-404",
+      "field": "altText",
+      "text": "Flat lay en tonos tierra: camisa de lino, pantalón marrón, cinturón de cuero y sandalias."
+    },
+    {
+      "id": "es-holdout-405",
+      "field": "altText",
+      "text": "Persona sentada en un banco con jersey de cuello alto, falda larga y botas. Sobre la mesa también hay un cuaderno con medidas apuntadas a lápiz y una tiza de sastre."
+    },
+    {
+      "id": "es-holdout-406",
+      "field": "altText",
+      "text": "Primer plano de una costura lateral rota en una camisa blanca."
+    },
+    {
+      "id": "es-holdout-407",
+      "field": "altText",
+      "text": "Armario abierto con la ropa ordenada por colores, de blancos a negros."
+    },
+    {
+      "id": "es-holdout-408",
+      "field": "altText",
+      "text": "Foto de espejo con camiseta térmica, camisa de franela abierta y vaqueros."
+    },
+    {
+      "id": "es-holdout-409",
+      "field": "altText",
+      "text": "Detalle de pañuelo de seda anudado al asa de un bolso de cuero."
+    },
+    {
+      "id": "es-holdout-410",
+      "field": "altText",
+      "text": "Persona con abrigo de plumas largo y gorro esperando en una calle nevada."
+    },
+    {
+      "id": "es-holdout-411",
+      "field": "altText",
+      "text": "Maleta de mano con ropa doblada en vertical y un par de zapatillas en bolsas de tela."
+    },
+    {
+      "id": "es-holdout-412",
+      "field": "altText",
+      "text": "Camisa de rayas azules y blancas sobre una silla de jardín al sol."
+    },
+    {
+      "id": "es-holdout-413",
+      "field": "altText",
+      "text": "Primer plano de unas medias negras con botas cortas de tacón ancho."
+    },
+    {
+      "id": "es-holdout-414",
+      "field": "altText",
+      "text": "Flat lay de oficina en verano: blusa sin mangas, pantalón ancho de lino y sandalias. Un rayo de sol cruza la estantería y se ven pequeñas etiquetas escritas a mano."
+    },
+    {
+      "id": "es-holdout-415",
+      "field": "altText",
+      "text": "Persona con chaqueta vaquera atada a la cintura, camiseta blanca y falda de flores."
+    },
+    {
+      "id": "es-holdout-416",
+      "field": "altText",
+      "text": "Detalle de las bolsitas de lavanda entre jerséis doblados en una estantería."
+    },
+    {
+      "id": "es-holdout-417",
+      "field": "altText",
+      "text": "Foto de cuerpo entero en un parque otoñal con gabardina, jersey y botines."
+    },
+    {
+      "id": "es-holdout-418",
+      "field": "altText",
+      "text": "Primer plano de la tela de pana color teja con la luz rozando la textura."
+    },
+    {
+      "id": "es-holdout-419",
+      "field": "altText",
+      "text": "Rodillera de pantalón de trabajo reforzada con un parche de lona gris."
+    },
+    {
+      "id": "es-holdout-420",
+      "field": "altText",
+      "text": "Paraguas transparente con gotas y un abrigo rojo visto desde abajo."
+    }
+  ]
+}

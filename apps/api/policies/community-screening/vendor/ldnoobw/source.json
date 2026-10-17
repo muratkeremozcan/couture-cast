@@ -1,0 +1,58 @@
+{
+  "source": "https://github.com/LDNOOBW/List-of-Dirty-Naughty-Obscene-and-Otherwise-Bad-Words",
+  "commit": "5faf2ba42d7b1c0977169ec3611df25a3c08eb13",
+  "commitDate": "2020-07-13T13:30:40Z",
+  "retrievedAt": "2026-10-16",
+  "licence": "CC-BY-4.0",
+  "rawUrlTemplate": "https://raw.githubusercontent.com/LDNOOBW/List-of-Dirty-Naughty-Obscene-and-Otherwise-Bad-Words/{commit}/{file}",
+  "gitBlobSha1Note": "git hash-object of each file; equal to the blob sha the upstream tree at the pinned commit reports, which is how the vendored bytes were matched to that commit when they were retrieved",
+  "files": {
+    "de": {
+      "sha256": "ebe44d7772897390e27f7bec412fdcdf0efc294e4db157f8487c4cd8d4fabd55",
+      "gitBlobSha1": "2dd0b246018d34c1d65abe591a54739a0d4dc907",
+      "bytes": 534,
+      "entries": 66
+    },
+    "en": {
+      "sha256": "af851ecef1d5f212caba17339b12ac39cc2fef7d78c74876f67237644fcee8bd",
+      "gitBlobSha1": "a438b9ca33af77341768bd6c63ce3e48e726b76e",
+      "bytes": 3777,
+      "entries": 403
+    },
+    "es": {
+      "sha256": "073334261cc2e7c08339faefd2f19f9623e8240a0ac18fe2a26c368b897496ce",
+      "gitBlobSha1": "895202656db287402f9908430b3befcb62bef936",
+      "bytes": 617,
+      "entries": 68
+    },
+    "fr": {
+      "sha256": "79763a705e08256b393952852bb63aa903f4485e0ef02f70735f5e50efff213c",
+      "gitBlobSha1": "1b7cc1d8142b4a6c92b21cc7e382d067535e36ac",
+      "bytes": 793,
+      "entries": 91
+    },
+    "it": {
+      "sha256": "d413f41018d58aa79d2c4809d0161f29ffd5652c4dc34c5b7b9ade680ee5599a",
+      "gitBlobSha1": "013763d18751bb83382e0804b713c75dab171654",
+      "bytes": 1451,
+      "entries": 168
+    },
+    "pt": {
+      "sha256": "05ef524b0bb7f83f87257f6ec4dabf70e16b8bb6930f769fb93deaf608ff196d",
+      "gitBlobSha1": "8fb06b3b5946bd1dfc397bc9977c5a720a449df9",
+      "bytes": 629,
+      "entries": 76
+    },
+    "tr": {
+      "sha256": "6c7ae03baee0f3fdc22eed169030567669005dad9a1923e0b571c4bd4f2f2ab5",
+      "gitBlobSha1": "b1ff3f793b570d7c84141941dcc64cb842f64caf",
+      "bytes": 1509,
+      "entries": 142
+    },
+    "LICENSE": {
+      "sha256": "55bfbc1759943f7d19acfc68e35644b7fbe10cd8d39ab3551ce5ecff5dda9979",
+      "gitBlobSha1": "230507dedabfb19439931305ef498b827a978087",
+      "bytes": 18523
+    }
+  }
+}
