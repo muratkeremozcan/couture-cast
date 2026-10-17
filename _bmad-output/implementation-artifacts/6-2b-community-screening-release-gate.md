@@ -593,26 +593,30 @@ the payload is current.
 - Not done as the fix list worded it: the OTLP variables were not added to the host table, because
   the worker image does not start the OpenTelemetry SDK and `@opentelemetry/sdk-node` does not fit
   the 150 MB budget. The guide says so, and the external liveness alert stays with Story 6.12.
-- Redis: the tuned idle worker spends 138 commands an hour and one screened post at most 85,
+- Redis: the tuned idle worker spends 306 commands an hour and one screened post at most 85,
   measured against a local Redis only the worker used (the upper bound includes the canary's own
-  closing lookups). The production database is on Upstash Pay as You Go (0.20 USD per 100K
-  commands, no free allowance), so at the assumed 100 posts a day the worker alone projects to
-  359,140 commands a month, 0.72 USD (0.20 idle, 0.52 traffic), inside the 5 USD gate up to 928
-  posts a day. The API's commands are billed on the same database.
+  closing lookups). The idle figure rose from 138 when review RF13 shortened the stalled check from
+  600 to 120 seconds so a crashed worker's job recovers before the stale-review sweep. The
+  production database is on Upstash Pay as You Go (0.20 USD per 100K commands, no free allowance),
+  so at the assumed 100 posts a day the worker alone projects to 481,780 commands a month, 0.96 USD
+  (0.45 idle, 0.52 traffic), inside the 5 USD gate up to 881 posts a day. The API's commands are
+  billed on the same database.
 - Evidence verdict: `fail`, on two gates: the safe photograph holdout (27 of 298 withheld, 7
   blocked, upper bound 12.86%) and the text clean-copy holdout in four languages (es, fr, it, pt).
   The hosted canary reads not run: the deployed worker was built from `913a0d79`, whose input set
   differs from the review fixes, so it waits on a redeploy. Every other gate passes against input
-  set `cb0bdf15`, from a committed tree: image, local canary (cleanup `clean`), restart drill (zero
-  consumers observed before and after the enqueue with the job waiting, the worker back after
-  16.8 s of observed downtime, queue latency 16.9 s), sweep, calibration, list provenance,
-  obfuscation, model artifacts, latency (warm p95 284 ms over 1,000 samples at 0.2 vCPU and 512
-  MiB), memory (cgroup peak 340.7 MiB of 512 MiB at a 4096x4096 upload, the container's worker the
-  only consumer before and after the job) and Redis cost (138 commands an hour idle with the worker
-  connected at 121 of 121 samples, 85 per post, 0.72 USD a month at 100 posts a day). Regenerated
-  on 2026-10-17 after the RF7 to RF9 fixes.
-- `npm run verify:changed` and `npm run validate` both exit 0 (api coverage 95.09 statements,
-  89.19 branches, 95.57 functions, 95.26 lines against 94/88/95/94).
+  set `b365bbf1`, from a committed tree at `0cd5f936`: image, local canary (cleanup `clean`),
+  restart drill (zero consumers observed before and after the enqueue with the job waiting, the
+  worker back after 13.2 s of observed downtime, queue latency 13.2 s), sweep, calibration, list
+  provenance, obfuscation, model artifacts, latency (warm p95 296 ms over 1,000 samples at 0.2 vCPU
+  and 512 MiB), memory (cgroup peak 341.4 MiB of 512 MiB at a 4096x4096 upload, the container's
+  worker the only consumer before and after the job) and Redis cost (306 commands an hour idle with
+  the worker connected at 121 of 121 samples, 85 per post, 0.96 USD a month at 100 posts a day).
+  Regenerated on 2026-10-17 after the RF10 to RF14 fixes.
+- `npm run validate` exits 0 (api coverage 95.07 statements, 89.15 branches, 95.6 functions,
+  95.25 lines against 94/88/95/94), and `npm run test:pw-local --
+playwright/tests/community-publication.spec.ts` passes 3 of 3 with no `community_sweep_failed`
+  in its log.
 - No signature file is committed and no sign command ran. Both rollout flags remain disabled.
 
 ### File list
