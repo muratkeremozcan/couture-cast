@@ -596,10 +596,11 @@ the payload is current.
   with the API, whose commands come out of the same allowance.
 - Evidence verdict: `fail`, on three gates: the safe photograph holdout, the text clean-copy
   holdout in four languages, and the Redis budget at the assumed volume. The hosted canary has not
-  run and the tree is uncommitted, so those two gates read not run. Every other gate passes against
-  the current input set: image, local canary, restart drill, sweep, calibration, list provenance,
-  obfuscation, model artifacts, latency (warm p95 308 ms at 0.2 vCPU) and memory (cgroup peak
-  339.5 MiB of 512 MiB at a 4096x4096 upload).
+  run, so that gate reads not run. Every other gate passes against the current input set, from a
+  committed tree: image, local canary, restart drill, sweep, calibration, list provenance,
+  obfuscation, model artifacts, latency (warm p95 308 ms over 1,000 samples at 0.2 vCPU and
+  512 MiB) and memory (cgroup peak 375.4 MiB of 512 MiB at a 4096x4096 upload processed by the
+  measured container's own worker). Regenerated on 2026-10-17 after the Codex peer review fixes.
 - `npm run verify:changed` and `npm run validate` both exit 0 (api coverage 95.09 statements,
   89.19 branches, 95.57 functions, 95.26 lines against 94/88/95/94).
 - No signature file is committed and no sign command ran. Both rollout flags remain disabled.
@@ -661,6 +662,8 @@ the payload is current.
 - `apps/api/test/fixtures/community-text-corpus/holdout-v1/{de,en,es,fr,it,pt,tr}.json` (new)
 - `apps/api/integration/community-worker-release-gate.spec.ts` (new)
 - `apps/api/integration/e2e-stack-ownership.spec.ts` (new: Codex review CX8)
+- `apps/api/src/modules/community/community.repository.ts` and `.spec.ts` (alias race after an
+  erased author)
 - `scripts/e2e-stack-pid.mjs` and `e2e-stack-pid.d.mts` (new: E2E stack ownership record)
 - `scripts/start-api-e2e-with-workers.mjs` and `playwright/global-teardown.ts` (stop this run's
   stack before the database reset)
@@ -832,3 +835,8 @@ None was false. Every fix has a regression test that fails on the code before it
 
 All run products were regenerated from the committed fixes, because the input set changed. The
 hosted canary stays not run until the worker is deployed.
+
+Fixed along the way: `npm run validate` failed once on 6.1-INT-070. The table-wide feed lost a
+`user_id` alias race to a parallel suite whose cleanup then removed the winning row, and
+`resolveAlias` rethrew the P2002. It now returns null for that case, as it already did for an
+author erased mid-page (P2003); a collision on the generated alias still throws.
