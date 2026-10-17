@@ -876,3 +876,36 @@ Fixed along the way: `npm run validate` failed once on 6.1-INT-070. The table-wi
 `user_id` alias race to a parallel suite whose cleanup then removed the winning row, and
 `resolveAlias` rethrew the P2002. It now returns null for that case, as it already did for an
 author erased mid-page (P2003); a collision on the generated alias still throws.
+
+### Final review (Codex + Fable)
+
+Loop 4 (2026-10-17). A final Codex review of `origin/main...913a0d79` raised RF1 and RF2; a Fable
+review raised RF3 to RF6. Each was verified at the cited code before it was fixed, and none was
+false: a `buildGates()` probe passed the restart gate on an ordinary canary with the worker check
+skipped and 1 ms of queue latency (RF1); the producer used `maxRetriesPerRequest: null` and the
+timeout bounded only the polling (RF2); Prisma accepted any certificate under `sslmode=require`,
+shown against the worker image and a TLS PostgreSQL signed by a test CA (RF3); the 30-second
+screening ceiling exceeds the 20-second shutdown deadline (RF4); the canary read no flag before
+publishing (RF5); and `delegatedSignature` checked only the stored `verdict` (RF6). Every fix has a
+regression test that fails on the code before it.
+
+| Finding                                          | Verdict | Route                                                  |
+| ------------------------------------------------ | ------- | ------------------------------------------------------ |
+| RF1 restart gate passes with no observed restart | medium  | patch: `--restart-drill` observations, gate re-judges  |
+| RF2 network stalls outlive the canary timeout    | medium  | patch: absolute deadline, bounded clients, force-close |
+| RF3 worker trusts any database certificate       | medium  | patch: committed CA, `sslaccept=strict`, refusal       |
+| RF4 shutdown budget below the screening ceiling  | low     | doc: host grace cited, budgets kept, slow tail written |
+| RF5 hosted canary can publish into a live feed   | low     | patch: refuse while the feed flag can be on            |
+| RF6 delegated sign trusts the stored verdict     | medium  | patch: recompute `verdictOf(payload.gates)`            |
+
+RF1: `--restart-drill` (local only, replacing `--no-worker-precheck`) requires zero consumers before
+and after the enqueue with the job waiting, then a returning consumer, and records them with the
+observed downtime. RF2: one deadline covers connect to the closing job reads, pg and Redis are
+bounded on their own, a stall force-closes the clients, and cleanup runs on fresh clients under its
+own deadline before the failure report is written. RF3: the Vercel API's unverified
+`sslmode=require` is recorded in deferred work. RF4: Northflank sends `SIGKILL` 30 seconds after
+`SIGTERM` by default, above the 20 and 25-second deadlines. RF5 also reads the production
+`feature_flags` cache row, which the API falls back to before the code default. RF6 applies to the
+interactive approval as well. The worker image, the launcher and the canary are inputs, so every run
+product was regenerated from the committed fixes; the hosted canary reads not run until the worker
+is redeployed from them.
