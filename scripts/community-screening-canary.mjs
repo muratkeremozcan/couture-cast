@@ -37,11 +37,15 @@
  *
  * A write cut off by a deadline or a client timeout may still commit after the
  * canary stopped waiting for it, including after cleanup deleted it. Its outcome
- * is recorded as unknown, and cleanup then waits a settle window
- * (`--cleanup-settle-ms`), looks the canary's identifiers up again and removes
- * whatever turned up. Cleanup reports `clean` only once a lookup finds nothing;
- * a cleanup that cannot get there within its deadline after a write of unknown
- * outcome reports `uncertain` with every affected identifier, and the run fails.
+ * is recorded as unknown, and an empty lookup never resolves it on its own
+ * (Story 6.2b final review, RF10 and RF11). A PostgreSQL write is cancelled with
+ * `pg_cancel_backend` on the server process the canary recorded when it
+ * connected, and cleanup reconciles only once `pg_stat_activity` shows that
+ * process no longer running it. A storage upload has no cancel path, so it is
+ * resolved only when a lookup finds the object and removes it. Cleanup reports
+ * `clean` when every unknown outcome is resolved and a closing lookup finds
+ * nothing; otherwise it reports `uncertain` with every affected identifier, and
+ * the run fails.
  *
  * It is an operations command, not a test, and it targets whatever environment
  * it is pointed at. `--target` is required and is checked against the database
@@ -90,10 +94,12 @@ const FIXTURE_NAME = 'safe-satin-plum-512x512.jpg'
 const DEFAULT_TIMEOUT_MS = 120_000
 const DEFAULT_CLEANUP_TIMEOUT_MS = 30_000
 /**
- * How long cleanup waits, after a write of unknown outcome, before it looks the
- * canary's identifiers up again (Story 6.2b final review, RF7). It covers a
- * write that was already on the server when its client gave up. Unless given,
- * it is capped at a third of the cleanup deadline, so the lookups still fit.
+ * How long cleanup waits, after an upload or an enqueue of unknown outcome or a
+ * job still active, before it looks the canary's identifiers up again (Story
+ * 6.2b final review, RF7). It gives a write that was already on the server a
+ * chance to land where the lookup can find and remove it; it resolves nothing by
+ * itself (RF10, RF11). Unless given, it is capped at a third of the cleanup
+ * deadline, so the lookups still fit.
  */
 const DEFAULT_CLEANUP_SETTLE_MS = 10_000
 export function defaultCleanupSettleMs(cleanupTimeoutMs) {
@@ -101,6 +107,15 @@ export function defaultCleanupSettleMs(cleanupTimeoutMs) {
 }
 /** Lookup-and-remove rounds cleanup makes before it stops trusting the result. */
 const CLEANUP_VERIFY_ROUNDS = 3
+/** How often cleanup looks at the server process a cut-off write ran on. */
+const WRITE_END_POLL_MS = 100
+/**
+ * The share of the cleanup deadline kept for reconciling after a cut-off
+ * database write was seen to end: the deletes and the closing lookups.
+ */
+export function reconcileReserveMs(cleanupTimeoutMs) {
+  return Math.floor(cleanupTimeoutMs / 3)
+}
 /** Per-client bounds, inside the run deadline (Story 6.2b final review, RF2). */
 const DB_CONNECT_TIMEOUT_MS = 10_000
 const DB_QUERY_TIMEOUT_MS = 15_000
@@ -132,8 +147,8 @@ export function bareHostname(url) {
 const NON_MODEL_MARKERS = ['fixture', 'unavailable', 'unresolved']
 
 export class CanaryFailure extends Error {
-  constructor(code, message, details = {}) {
-    super(message)
+  constructor(code, message, details = {}, options = undefined) {
+    super(message, options)
     this.name = 'CanaryFailure'
     this.code = code
     this.details = details
@@ -499,14 +514,24 @@ export async function withinDeadline(deadlineAt, stage, work, label = 'canary') 
   }
 }
 
+/**
+ * The comment every canary write starts with. `pg_stat_activity.query` shows a
+ * statement's text from its first byte, so cleanup can tell the canary's own
+ * write from anything else a server process runs, and cancels nothing else.
+ */
+export function canaryStatementTag(ids) {
+  return `/* community-screening-canary ${ids.postId} */`
+}
+
 async function createCanaryRows(db, ids, fixture, objectPath) {
   const now = new Date()
+  const tag = canaryStatementTag(ids)
   await db.query(
-    'INSERT INTO "User" (id, email, created_at, updated_at) VALUES ($1, $2, $3, $3)',
+    `${tag} INSERT INTO "User" (id, email, created_at, updated_at) VALUES ($1, $2, $3, $3)`,
     [ids.userId, ids.email, now]
   )
   await db.query(
-    `INSERT INTO "LookbookPost" (
+    `${tag} INSERT INTO "LookbookPost" (
        id, user_id, status, caption, alt_text, alt_text_confirmed_at, submitted_at,
        image_object_path, image_content_type, image_checksum, image_byte_size,
        locale, created_at, updated_at
@@ -543,17 +568,64 @@ function createdNothing() {
   return { object: false, rows: false, job: false }
 }
 
+/** CanaryFailure codes that leave the write they ended free to take effect. */
+const UNKNOWN_OUTCOME_CODES = new Set(['deadline', 'storage_outcome_unknown'])
+
 /**
  * Whether a failed write may still have taken effect (Story 6.2b final review,
  * RF7). A deadline, a client timeout, a dropped connection or an aborted request
  * leaves the server free to commit what it already received. A rejection the
- * server itself sent is a known outcome: PostgreSQL names it with a SQLSTATE,
- * and a storage error response surfaces as a CanaryFailure naming its cause.
+ * server itself sent is a known outcome: PostgreSQL's carries its severity and a
+ * SQLSTATE (a Node socket error such as EPIPE has a five-letter code too, and no
+ * severity), and a storage rejection surfaces as `storage_rejected` (RF11).
  */
 export function outcomeUnknown(error) {
-  if (error instanceof CanaryFailure) return error.code === 'deadline'
+  if (error instanceof CanaryFailure) return UNKNOWN_OUTCOME_CODES.has(error.code)
   const sqlState = error?.code
-  return !(typeof sqlState === 'string' && /^[0-9A-Z]{5}$/.test(sqlState))
+  return !(
+    typeof error?.severity === 'string' &&
+    typeof sqlState === 'string' &&
+    /^[0-9A-Z]{5}$/.test(sqlState)
+  )
+}
+
+/**
+ * Whether a storage write's error leaves its outcome unknown (Story 6.2b final
+ * review, RF11). storage-js returns a `StorageApiError` only for an HTTP
+ * response, and the canary's storage fetch (`storageFetch`) lets a 4xx through
+ * only with the storage server's error body, so a 4xx `StorageApiError` is a
+ * definitive rejection. Everything else is unknown: a `StorageUnknownError` (a
+ * fetch failure, a reset connection, an aborted request), a 5xx, which a gateway
+ * can send while the storage server still finishes the write, and any other
+ * error.
+ */
+export function storageOutcomeUnknown(error) {
+  const status = Number(error?.status)
+  return !(
+    error?.__isStorageError === true &&
+    error.name === 'StorageApiError' &&
+    status >= 400 &&
+    status < 500
+  )
+}
+
+/** The original storage error, as the report records it. */
+export function describeStorageError(error) {
+  const original = error?.originalError
+  const cause = original?.cause
+  return {
+    name: error?.name ?? null,
+    message: error?.message ?? String(error),
+    status: error?.status ?? null,
+    statusCode: error?.statusCode ?? null,
+    originalError: original
+      ? {
+          name: original.name ?? null,
+          message: original.message ?? String(original),
+          cause: cause ? (cause.code ?? cause.message ?? String(cause)) : null,
+        }
+      : null,
+  }
 }
 
 /**
@@ -597,13 +669,14 @@ function resourceNames(context, resources) {
 }
 
 /**
- * Removes the given resources by the canary's identifiers. Returns the problems.
- * A job a worker is still processing means the worker's own writes (the
- * publication, a moderation event, the re-encoded object) may land after this
- * pass, so its outcome is recorded as unknown too.
+ * Removes the given resources by the canary's identifiers. Returns the problems,
+ * and adds every object storage reports it removed to `removedObjects`. A job a
+ * worker is still processing means the worker's own writes (the publication, a
+ * moderation event, the re-encoded object) may land after this pass, so its
+ * outcome is recorded as unknown too.
  */
 async function removeCreated(
-  { db, storage, queue, ids, objectPaths, jobId, unknownOutcomes },
+  { db, storage, queue, ids, objectPaths, jobId, unknownOutcomes, removedObjects },
   resources
 ) {
   const problems = []
@@ -639,8 +712,11 @@ async function removeCreated(
   }
   if (resources.object && objectPaths.length > 0) {
     await attempt('storage object', async () => {
-      const { error } = await storage.from(BUCKET).remove(objectPaths)
+      const { data, error } = await storage.from(BUCKET).remove(objectPaths)
       if (error) throw new Error(error.message)
+      for (const entry of data ?? []) {
+        if (typeof entry?.name === 'string') removedObjects.push(entry.name)
+      }
     })
   }
   return problems
@@ -692,28 +768,165 @@ async function findSurvivors({ db, storage, queue, ids, jobId }, resources) {
 }
 
 /**
- * Removes what the run created and proves it gone. A first pass deletes by the
- * canary's identifiers. When a write's outcome is unknown, cleanup then waits
- * the settle window, because that write may still commit. Then it looks every
- * attempted resource up again, removes whatever it finds and looks again, until
- * a lookup finds nothing: only that is a clean state. A successful DELETE alone
- * proves nothing about a write that commits after it.
+ * What cleanup reads to see whether a cut-off canary write still runs: the
+ * server process the write was sent on, and any other process running a
+ * statement that starts with the canary's tag.
  */
-async function removeAndVerify(context, clients, options, outcome) {
-  const scope = { ...context.created }
-  const base = { ...context, ...clients, objectPaths: [context.objectPath] }
-  outcome.problems = await removeCreated(base, scope)
-  if (context.unknownOutcomes.size > 0) {
-    outcome.settleMs = options.cleanupSettleMs
-    await sleep(options.cleanupSettleMs)
+const WRITE_ACTIVITY_SQL = `SELECT pid, state, query FROM pg_stat_activity
+   WHERE pid = $1 OR starts_with(query, $2)`
+/** Cancels the canary's write on the recorded process, and nothing else it may run. */
+const CANCEL_WRITE_SQL = `SELECT pg_cancel_backend(pid) AS cancelled FROM pg_stat_activity
+   WHERE pid = $1 AND state <> 'idle' AND starts_with(query, $2)`
+
+/**
+ * Cancels the canary's cut-off database write and waits, until `until`, to see
+ * it end (Story 6.2b final review, RF10). The write ran on the server process
+ * recorded when the run connected (`pg_backend_pid()`). It has ended when that
+ * process is gone, idle, or running a statement that is not the canary's; until
+ * then it is cancelled with `pg_cancel_backend` and looked at again. A refused
+ * cancel is recorded and the wait goes on, because the write may still end on
+ * its own. The write is not seen to end when no process was recorded, when
+ * `pg_stat_activity` does not describe the process, when a canary write runs on
+ * a process the canary did not record (a pooler that moved the session), or
+ * when the budget runs out. Returns what was seen; only `ended: true` lets
+ * cleanup reconcile the write.
+ *
+ * Production reaches PostgreSQL through Supabase's Supavisor session pooler:
+ * the `.env.prod` DATABASE_URL the deployment guide names follows the Story 0.7
+ * pattern, `<project>.pooler.supabase.com` on port 5432, which is session mode.
+ * A session-mode client connection keeps one server process for its whole
+ * session, so the recorded pid is the process the write ran on. The transaction
+ * pooler (port 6543) does not keep one; there the write would show on another
+ * process, and this reports the mismatch.
+ */
+export async function confirmWriteEnded(db, { pid, tag }, until) {
+  const record = {
+    pid: Number.isInteger(pid) ? pid : null,
+    ended: false,
+    observed: null,
+    cancelRequests: 0,
+    cancelRefused: null,
+    problem: null,
   }
-  for (let round = 0; round < CLEANUP_VERIFY_ROUNDS; round += 1) {
-    const survivors = await findSurvivors(base, scope)
-    if (survivors.names.length === 0) {
-      outcome.status = 'clean'
-      outcome.problems = []
-      return
+  if (record.pid === null) {
+    record.problem = 'no server process was recorded for the connection it ran on'
+    return record
+  }
+  for (;;) {
+    let rows
+    try {
+      ;({ rows } = await db.query(WRITE_ACTIVITY_SQL, [pid, tag]))
+    } catch (error) {
+      record.problem = `pg_stat_activity: ${error instanceof Error ? error.message : String(error)}`
+      return record
     }
+    const seen = readWriteActivity(rows, pid, tag)
+    if (!seen.running) return Object.assign(record, seen)
+    if (Date.now() >= until) {
+      record.problem = `server process ${pid} was still running it (${String(seen.state)}) when the cleanup budget for it ran out`
+      return record
+    }
+    if (record.cancelRefused === null) {
+      try {
+        await db.query(CANCEL_WRITE_SQL, [pid, tag])
+        record.cancelRequests += 1
+      } catch (error) {
+        record.cancelRefused = error instanceof Error ? error.message : String(error)
+      }
+    }
+    await sleep(WRITE_END_POLL_MS)
+  }
+}
+
+/**
+ * What one look at `pg_stat_activity` says about the canary's write: still
+ * running on the recorded process, ended (`observed` names how), or not
+ * knowable (`problem`).
+ */
+function readWriteActivity(rows, pid, tag) {
+  const elsewhere = rows.filter((row) => row.pid !== pid && row.state !== 'idle')
+  if (elsewhere.length > 0) {
+    return {
+      problem: `it runs on server process ${elsewhere.map((row) => row.pid).join(', ')}, not the recorded ${pid}, so the pooler did not keep the session on one process`,
+    }
+  }
+  const own = rows.find((row) => row.pid === pid)
+  if (!own) return { ended: true, observed: 'process gone' }
+  if (typeof own.query !== 'string' || own.query === '<insufficient privilege>') {
+    return { problem: `pg_stat_activity does not show what server process ${pid} runs` }
+  }
+  if (!own.query.startsWith(tag)) {
+    return { ended: true, observed: 'process running another statement' }
+  }
+  if (own.state === 'idle') return { ended: true, observed: 'process idle' }
+  return { running: true, state: own.state }
+}
+
+/** Unknown outcomes after which cleanup waits the settle window before it looks. */
+const SETTLING_RESOURCES = ['object', 'job']
+
+/**
+ * The unknown outcomes cleanup has not resolved, as problems. An empty lookup
+ * resolves none of them (Story 6.2b final review, RF10 and RF11): a database
+ * write is resolved only once it was seen to end, and an upload, which storage
+ * cannot cancel, only once a lookup found the object and it was removed.
+ */
+function unresolvedOutcomes(context, outcome, removedObjects) {
+  const problems = []
+  if (context.unknownOutcomes.has('rows') && outcome.databaseWrite?.ended !== true) {
+    problems.push(
+      `the canary's database write was not seen to end: ${outcome.databaseWrite?.problem ?? 'it was not checked'}`
+    )
+  }
+  if (
+    context.unknownOutcomes.has('object') &&
+    !removedObjects.includes(context.objectPath)
+  ) {
+    problems.push(
+      `the upload of ${BUCKET}/${context.objectPath} has an unknown outcome and no lookup found the object to remove; storage cannot cancel an upload, so it may still be written`
+    )
+  }
+  return problems
+}
+
+/**
+ * Removes what the run created and proves it gone. A database write whose
+ * outcome is unknown is cancelled and seen to end first, so no DELETE runs ahead
+ * of a write that commits after it. A first pass then deletes by the canary's
+ * identifiers. After an upload or enqueue of unknown outcome, or with a job
+ * still active, cleanup waits out the settle window, because that write may
+ * still land. Then it looks every attempted resource up again, removes whatever
+ * it finds and looks again, until a lookup finds nothing. The state is clean
+ * only when that lookup is empty and every unknown outcome is resolved.
+ */
+async function removeAndVerify(context, clients, options, outcome, deadlineAt) {
+  const startedAt = Date.now()
+  const scope = { ...context.created }
+  const removedObjects = []
+  const base = {
+    ...context,
+    ...clients,
+    objectPaths: [context.objectPath],
+    removedObjects,
+  }
+  if (context.unknownOutcomes.has('rows')) {
+    outcome.databaseWrite = await confirmWriteEnded(
+      clients.db,
+      context.writeSession ?? {},
+      deadlineAt - reconcileReserveMs(options.cleanupTimeoutMs)
+    )
+  }
+  outcome.problems = await removeCreated(base, scope)
+  if (SETTLING_RESOURCES.some((resource) => context.unknownOutcomes.has(resource))) {
+    outcome.settleMs = options.cleanupSettleMs
+    await sleep(Math.max(0, startedAt + options.cleanupSettleMs - Date.now()))
+  }
+  let survivors = await findSurvivors(base, scope)
+  for (
+    let round = 0;
+    survivors.names.length > 0 && round < CLEANUP_VERIFY_ROUNDS;
+    round += 1
+  ) {
     if (round > 0 || context.unknownOutcomes.size > 0) {
       for (const name of survivors.names) {
         if (!outcome.lateFound.includes(name)) outcome.lateFound.push(name)
@@ -723,14 +936,18 @@ async function removeAndVerify(context, clients, options, outcome) {
       { ...base, objectPaths: survivors.objectPaths },
       survivors
     )
+    survivors = await findSurvivors(base, scope)
   }
-  const remaining = await findSurvivors(base, scope)
-  if (remaining.names.length === 0) {
-    outcome.status = 'clean'
-    outcome.problems = []
+  const unresolved = unresolvedOutcomes(context, outcome, removedObjects)
+  if (survivors.names.length === 0) {
+    outcome.problems = unresolved
+    if (unresolved.length === 0) outcome.status = 'clean'
     return
   }
-  outcome.problems.push(`still present after cleanup: ${remaining.names.join(', ')}`)
+  outcome.problems.push(
+    `still present after cleanup: ${survivors.names.join(', ')}`,
+    ...unresolved
+  )
 }
 
 /** The cleanup result for a run that created nothing, or that cleaned up fully. */
@@ -740,6 +957,7 @@ export function cleanCleanup() {
     problems: [],
     unknownOutcomes: [],
     settleMs: null,
+    databaseWrite: null,
     lateFound: [],
     unresolved: [],
   }
@@ -747,16 +965,18 @@ export function cleanCleanup() {
 
 /**
  * Removes what the run created, under its own deadline, and proves it gone.
- * After a run deadline the run's clients are already force-closed, so cleanup
- * opens fresh ones: the network may have recovered, and the rows and the object
- * are still worth removing. When cleanup cannot finish either, its clients are
- * force-closed.
+ * After a run deadline, or after any write of unknown outcome, the run's clients
+ * are force-closed and cleanup opens fresh ones: the network may have recovered,
+ * the rows and the object are still worth removing, and a cut-off write is
+ * cancelled from a connection it does not hold. When cleanup cannot finish
+ * either, its clients are force-closed.
  *
- * The status is `clean` when a lookup found nothing left; `failed` when every
- * write's outcome was known and something could not be removed or verified; and
- * `uncertain` when a write's outcome was unknown and cleanup could not establish
- * a clean state within its deadline. Anything but `clean` lists every affected
- * identifier in `unresolved`.
+ * The status is `clean` when a lookup found nothing left and every write of
+ * unknown outcome was resolved; `failed` when every write's outcome was known
+ * and something could not be removed or verified; and `uncertain` when a write's
+ * outcome was unknown and cleanup could not establish a clean state within its
+ * deadline. Anything but `clean` lists every affected identifier in
+ * `unresolved`.
  */
 async function cleanupWithin(context, options, { freshClients }) {
   if (!Object.values(context.created).some(Boolean)) return cleanCleanup()
@@ -768,6 +988,7 @@ async function cleanupWithin(context, options, { freshClients }) {
     ...progress,
     problems: [...progress.problems],
     lateFound: [...progress.lateFound],
+    databaseWrite: progress.databaseWrite ? { ...progress.databaseWrite } : null,
   })
   let outcome
   let clients = context.clients
@@ -779,7 +1000,7 @@ async function cleanupWithin(context, options, { freshClients }) {
       'cleanup',
       async () => {
         await connectDatabase(clients.db)
-        await removeAndVerify(context, clients, options, progress)
+        await removeAndVerify(context, clients, options, progress, deadlineAt)
       },
       'cleanup'
     )
@@ -882,6 +1103,31 @@ export function createDatabaseClient(pg, { target, databaseUrl, ca }) {
 }
 
 /**
+ * The storage client's fetch. Every request shares the run's abort signal. A
+ * 4xx reaches storage-js as a response only when it carries the storage server's
+ * JSON error body; a bare 4xx (a proxy's page, an empty reply) becomes a
+ * transport failure, because it does not show that the storage server refused
+ * the write (Story 6.2b final review, RF11).
+ */
+export function storageFetch(abortSignal, fetchImpl = fetch) {
+  return async (input, init = {}) => {
+    const response = await fetchImpl(input, {
+      ...init,
+      signal: init.signal ? AbortSignal.any([init.signal, abortSignal]) : abortSignal,
+    })
+    if (response.status < 400 || response.status >= 500) return response
+    const body = await response
+      .clone()
+      .json()
+      .catch(() => null)
+    if (typeof body?.message === 'string' || typeof body?.error === 'string') {
+      return response
+    }
+    throw new Error(`storage answered HTTP ${response.status} without an error body`)
+  }
+}
+
+/**
  * Opens the run's clients: PostgreSQL, Redis behind the BullMQ queue, and
  * storage, whose requests share one abort signal. Nothing here waits on the
  * network; each connection is made inside a bounded stage.
@@ -916,23 +1162,23 @@ export async function openClients(options) {
     abort,
     storage: createClient(supabaseUrl, serviceRoleKey, {
       auth: { persistSession: false, autoRefreshToken: false },
-      global: {
-        fetch: (input, init = {}) =>
-          fetch(input, {
-            ...init,
-            signal: init.signal
-              ? AbortSignal.any([init.signal, abort.signal])
-              : abort.signal,
-          }),
-      },
+      global: { fetch: storageFetch(abort.signal) },
     }).storage,
     queue,
   }
 }
 
-/** Connects the database once, so cleanup can wait on the same connection. */
+/**
+ * Connects the database once, so cleanup can wait on the same connection, and
+ * records the server process serving it (`pg_backend_pid()`), so a write cut off
+ * on it can be cancelled and seen to end (Story 6.2b final review, RF10).
+ */
 function connectDatabase(db) {
-  db.connected ??= db.connect()
+  db.connected ??= (async () => {
+    await db.connect()
+    const { rows } = await db.query('SELECT pg_backend_pid() AS pid')
+    db.backendPid = Number.isInteger(rows?.[0]?.pid) ? rows[0].pid : null
+  })()
   return db.connected
 }
 
@@ -1076,17 +1322,35 @@ async function postcheckSoleConsumer(after, options, before) {
   return proof
 }
 
+/**
+ * Uploads the fixture. A failure keeps the original storage error, as the cause
+ * and in the details, and says whether storage rejected the upload or the
+ * outcome is unknown (Story 6.2b final review, RF11).
+ */
 async function uploadFixture(storage, objectPath, fixture) {
-  const upload = await storage.from(BUCKET).upload(objectPath, fixture.bytes, {
+  const { error } = await storage.from(BUCKET).upload(objectPath, fixture.bytes, {
     contentType: fixture.contentType,
     upsert: false,
   })
-  if (upload.error) {
+  if (!error) return
+  const storageError = describeStorageError(error)
+  const summary = `${String(storageError.name)}: ${storageError.message}${
+    storageError.originalError ? ` (${storageError.originalError.message})` : ''
+  }`
+  if (storageOutcomeUnknown(error)) {
     throw new CanaryFailure(
-      'configuration',
-      `Fixture upload failed: ${upload.error.message}`
+      'storage_outcome_unknown',
+      `The fixture upload ended without a storage answer, so the object may still be written: ${summary}`,
+      { storageError },
+      { cause: error }
     )
   }
+  throw new CanaryFailure(
+    'storage_rejected',
+    `Storage rejected the fixture upload with HTTP ${String(storageError.status)}: ${summary}`,
+    { storageError },
+    { cause: error }
+  )
 }
 
 /**
@@ -1237,6 +1501,9 @@ async function createAndEnqueue(step, context) {
   await trackWrite(context, 'object', () =>
     step('upload', () => uploadFixture(storage, objectPath, fixture))
   )
+  // The server process the rows are written on, and the tag their statements
+  // carry: what cleanup cancels and watches when the write is cut off (RF10).
+  context.writeSession = { pid: db.backendPid ?? null, tag: canaryStatementTag(ids) }
   await trackWrite(context, 'rows', () =>
     step('database write', () => createCanaryRows(db, ids, fixture, objectPath))
   )
@@ -1384,12 +1651,36 @@ export function recordCleanup(report, { keep, cleanup = cleanCleanup() }) {
 }
 
 /**
+ * Cleans up after a run and closes its clients. After a deadline, or after any
+ * write of unknown outcome, the run's clients are force-closed and cleanup uses
+ * fresh ones: a write of unknown outcome may still hold its connection (pg runs
+ * one query at a time on a client), and the server process behind it is
+ * cancelled from another connection (RF10).
+ */
+async function cleanUpAfterRun(context, options, failure) {
+  const freshClients = failure?.code === 'deadline' || context.unknownOutcomes.size > 0
+  if (freshClients) forceClose(context.clients)
+  const cleanup = options.keep
+    ? cleanCleanup()
+    : await cleanupWithin(context, options, { freshClients })
+  if (cleanup.status !== 'clean') {
+    // Printed whether or not the run produced a report: a failed canary that
+    // also left rows or an object behind, or cannot say, must say so.
+    console.error(
+      `[canary] cleanup ${cleanup.status}: ${cleanup.problems.join('; ')}; affected: ${cleanup.unresolved.join(', ')}`
+    )
+  }
+  if (!freshClients) await closeClients(context.clients)
+  return cleanup
+}
+
+/**
  * Runs the canary under one absolute deadline (`--timeout-ms`, from the moment
  * it starts connecting) that covers connecting, inspecting the workers,
  * uploading, writing, enqueueing, polling and the closing job reads. When the
- * deadline passes, the clients are force-closed, cleanup runs under its own
- * deadline (`--cleanup-timeout-ms`) on fresh clients, and the failure carries
- * the cleanup result. Every failure is a CanaryFailure with `cleanup` set.
+ * deadline passes, or a write's outcome is unknown, the clients are
+ * force-closed, cleanup runs under its own deadline (`--cleanup-timeout-ms`) on
+ * fresh clients, and the failure carries the cleanup result. Every failure is a CanaryFailure with `cleanup` set.
  */
 export async function runCanary(options) {
   loadEnvFile(options.envFile)
@@ -1428,19 +1719,7 @@ export async function runCanary(options) {
             error instanceof Error ? error.message : String(error)
           )
   }
-  const deadlineExpired = failure?.code === 'deadline'
-  if (deadlineExpired) forceClose(clients)
-  const cleanup = options.keep
-    ? cleanCleanup()
-    : await cleanupWithin(context, options, { freshClients: deadlineExpired })
-  if (cleanup.status !== 'clean') {
-    // Printed whether or not the run produced a report: a failed canary that
-    // also left rows or an object behind, or cannot say, must say so.
-    console.error(
-      `[canary] cleanup ${cleanup.status}: ${cleanup.problems.join('; ')}; affected: ${cleanup.unresolved.join(', ')}`
-    )
-  }
-  if (!deadlineExpired) await closeClients(clients)
+  const cleanup = await cleanUpAfterRun(context, options, failure)
   if (failure) {
     failure.cleanup = recordCleanup(
       { ok: false },

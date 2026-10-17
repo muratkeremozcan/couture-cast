@@ -32,6 +32,15 @@ interface CanaryModule {
   ) => Record<string, unknown>
   cleanCleanup: () => CleanupResult
   outcomeUnknown: (error: unknown) => boolean
+  storageOutcomeUnknown: (error: unknown) => boolean
+  describeStorageError: (error: unknown) => Record<string, unknown>
+  storageFetch: (signal: AbortSignal, fetchImpl: typeof fetch) => typeof fetch
+  confirmWriteEnded: (
+    db: { query: (sql: string, parameters?: unknown[]) => Promise<{ rows: unknown[] }> },
+    session: { pid?: number | null; tag?: string },
+    until: number
+  ) => Promise<DatabaseWrite>
+  canaryStatementTag: (ids: { postId: string }) => string
   parseCanaryArgs: (argv: string[]) => Record<string, unknown>
   soleConsumerProblems: (workers: unknown, expectedWorker: string) => string[]
   assessSoleConsumer: (
@@ -58,8 +67,17 @@ interface CleanupResult {
   problems: string[]
   unknownOutcomes: string[]
   settleMs: number | null
+  databaseWrite: DatabaseWrite | null
   lateFound: string[]
   unresolved: string[]
+}
+interface DatabaseWrite {
+  pid: number | null
+  ended: boolean
+  observed: string | null
+  cancelRequests: number
+  cancelRefused: string | null
+  problem: string | null
 }
 interface RolloutFlagsModule {
   flagDefault: (source: string, key: string) => boolean | null
@@ -512,11 +530,23 @@ describe('canary cleanup and worker identity', () => {
     expect(
       outcomeUnknown(Object.assign(new Error('aborted'), { code: 'ABORT_ERR' }))
     ).toBe(true)
-    // The server answered: a SQLSTATE, or a storage error response.
-    expect(outcomeUnknown(Object.assign(new Error('duplicate'), { code: '23505' }))).toBe(
-      false
-    )
-    expect(outcomeUnknown(new CanaryFailure('configuration', 'upload failed'))).toBe(
+    // A Node socket error code can look like a SQLSTATE; only the server's
+    // error carries a severity.
+    expect(
+      outcomeUnknown(Object.assign(new Error('write EPIPE'), { code: 'EPIPE' }))
+    ).toBe(true)
+    // An upload that ended without a storage answer (Story 6.2b final review, RF11).
+    expect(
+      outcomeUnknown(new CanaryFailure('storage_outcome_unknown', 'fetch failed'))
+    ).toBe(true)
+    // The server answered: a SQLSTATE with its severity, or a storage rejection.
+    expect(
+      outcomeUnknown(
+        Object.assign(new Error('duplicate'), { code: '23505', severity: 'ERROR' })
+      )
+    ).toBe(false)
+    expect(outcomeUnknown(new CanaryFailure('storage_rejected', 'duplicate'))).toBe(false)
+    expect(outcomeUnknown(new CanaryFailure('configuration', 'no credentials'))).toBe(
       false
     )
   })
@@ -885,117 +915,272 @@ describe('canary deadlines', () => {
   })
 
   /**
-   * A database whose account INSERT reaches the server, stalls past the run
-   * deadline and then commits right after cleanup's DELETE, the way a write
-   * already on the server outlives its client (Story 6.2b final review, RF7).
-   * `survivorDeletes` decides whether a DELETE after that one succeeds.
+   * A PostgreSQL server as far as the canary's cleanup can see it (Story 6.2b
+   * final review, RF7 and RF10). Each connection gets a server process with a
+   * pid, pg_stat_activity shows what each process runs, and pg_cancel_backend
+   * cancels the canary's running statement unless `cancel` is 'denied'. The
+   * account INSERT reaches the server and holds its process for
+   * `commitAfterMs`, then commits whether or not its client still waits, the way
+   * a write already on the server outlives its client: dropping the client's
+   * socket does not stop it. `deletes: 'fail'` makes every account DELETE fail
+   * on a lock.
    */
-  function lateCommitDatabase(survivorDeletes: 'succeed' | 'fail') {
+  function fakeDatabaseServer(options: {
+    commitAfterMs: number
+    cancel: 'allowed' | 'denied'
+    deletes?: 'succeed' | 'fail'
+  }) {
     const accounts = new Set<string>()
-    const state = { pendingInsert: null as string | null, userDeletes: 0 }
-    const database = () => ({
-      connect: () => Promise.resolve(),
-      end: () => Promise.resolve(),
-      connection: { stream: { destroy: () => undefined } },
-      query: (sql: string, parameters: unknown[] = []) => {
-        const id = parameters[0] as string
-        if (sql.startsWith('INSERT INTO "User"')) {
-          state.pendingInsert = id
-          return new Promise(() => undefined)
-        }
-        if (sql.startsWith('DELETE FROM "User"')) {
-          state.userDeletes += 1
-          if (state.userDeletes > 1 && survivorDeletes === 'fail') {
-            return Promise.reject(
-              Object.assign(new Error('could not obtain lock on row'), { code: '55P03' })
-            )
+    const processes = new Map<number, { state: string; query: string }>()
+    const running = new Map<number, () => void>()
+    const state = {
+      nextPid: 4100,
+      userDeletes: 0,
+      firstUserDeleteAt: null as number | null,
+      committedAt: null as number | null,
+      cancelledAt: null as number | null,
+    }
+    const serverError = (message: string, code: string) =>
+      Object.assign(new Error(message), { code, severity: 'ERROR' })
+    const insertAccount = (pid: number, sql: string, id: string) => {
+      processes.set(pid, { state: 'active', query: sql })
+      return new Promise((resolve, reject) => {
+        const timer = setTimeout(() => {
+          running.delete(pid)
+          accounts.add(id)
+          state.committedAt = Date.now()
+          processes.set(pid, { state: 'idle', query: sql })
+          resolve({ rows: [] })
+        }, options.commitAfterMs)
+        running.set(pid, () => {
+          clearTimeout(timer)
+          running.delete(pid)
+          state.cancelledAt = Date.now()
+          processes.set(pid, { state: 'idle', query: sql })
+          reject(serverError('canceling statement due to user request', '57014'))
+        })
+      })
+    }
+    const database = () => {
+      let pid = 0
+      return {
+        connect: () => Promise.resolve(),
+        end: () => Promise.resolve(),
+        connection: { stream: { destroy: () => undefined } },
+        query: (sql: string, parameters: unknown[] = []) => {
+          if (sql.includes('pg_backend_pid()')) {
+            pid = state.nextPid++
+            processes.set(pid, { state: 'idle', query: sql })
+            return Promise.resolve({ rows: [{ pid }] })
           }
-          accounts.delete(id)
-          const late = state.pendingInsert
-          state.pendingInsert = null
-          if (late) setTimeout(() => accounts.add(late), 20)
+          if (sql.includes('INSERT INTO "User"')) {
+            return insertAccount(pid, sql, parameters[0] as string)
+          }
+          if (sql.includes('pg_cancel_backend')) {
+            if (options.cancel === 'denied') {
+              return Promise.reject(
+                serverError('permission denied to cancel query', '42501')
+              )
+            }
+            const [target, tag] = parameters as [number, string]
+            const process = processes.get(target)
+            if (process && process.state !== 'idle' && process.query.startsWith(tag)) {
+              running.get(target)?.()
+            }
+            return Promise.resolve({ rows: [{ cancelled: true }] })
+          }
+          if (sql.includes('pg_stat_activity')) {
+            const [target, tag] = parameters as [number, string]
+            const rows = [...processes]
+              .filter(([id, process]) => id === target || process.query.startsWith(tag))
+              .map(([id, process]) => ({ pid: id, ...process }))
+            return Promise.resolve({ rows })
+          }
+          if (sql.startsWith('DELETE FROM "User"')) {
+            state.userDeletes += 1
+            state.firstUserDeleteAt ??= Date.now()
+            if (options.deletes === 'fail') {
+              return Promise.reject(serverError('could not obtain lock on row', '55P03'))
+            }
+            accounts.delete(parameters[0] as string)
+            return Promise.resolve({ rows: [] })
+          }
+          if (sql.startsWith('SELECT id FROM "User"')) {
+            const id = parameters[0] as string
+            return Promise.resolve({ rows: accounts.has(id) ? [{ id }] : [] })
+          }
           return Promise.resolve({ rows: [] })
-        }
-        if (sql.startsWith('SELECT id FROM "User"')) {
-          return Promise.resolve({ rows: accounts.has(id) ? [{ id }] : [] })
-        }
-        return Promise.resolve({ rows: [] })
-      },
-    })
+        },
+      }
+    }
     return { accounts, state, database }
   }
 
-  async function runLateCommit(survivorDeletes: 'succeed' | 'fail') {
+  /** Runs the local canary against fakes, with the given clients in place. */
+  async function runWith(
+    args: { timeoutMs: number; cleanupTimeoutMs: number; settleMs: number },
+    clients: (opened: number) => Record<string, unknown>
+  ) {
     const { runCanary, parseCanaryArgs } = await canaryModule()
-    const late = lateCommitDatabase(survivorDeletes)
-    const first = fakeClients('none')
-    const fresh = fakeClients('none')
     let opened = 0
     const options = {
       ...parseCanaryArgs([
         '--target',
         'local',
         '--timeout-ms',
-        '500',
+        String(args.timeoutMs),
         '--cleanup-timeout-ms',
-        '1500',
+        String(args.cleanupTimeoutMs),
         '--cleanup-settle-ms',
-        '150',
+        String(args.settleMs),
       ]),
-      openClients: () =>
-        Promise.resolve(
-          ++opened === 1
-            ? { ...first.clients, db: late.database() }
-            : { ...fresh.clients, db: late.database() }
-        ),
+      openClients: () => Promise.resolve(clients(++opened)),
     }
     const previous = process.env.DATABASE_URL
     process.env.DATABASE_URL = 'postgresql://p:p@127.0.0.1:54322/postgres'
     try {
       const failure = (await runCanary(options).catch((error: unknown) => error)) as {
         code: string
-        details: { stage: string }
+        message: string
+        cause?: unknown
+        details: Record<string, unknown>
         cleanup: CleanupResult & { performed: boolean }
       }
-      return { failure, late }
+      return { failure, returnedAt: Date.now() }
     } finally {
       process.env.DATABASE_URL = previous
     }
   }
 
-  it('finds and removes an account whose INSERT commits after the cleanup DELETE', async () => {
-    // Story 6.2b final review (RF7). Codex's probe: the cleanup DELETE removed
-    // nothing, the delayed INSERT then committed, and cleanup still reported
-    // `problems: []`. The DELETE succeeding proves nothing about a later commit.
-    const { failure, late } = await runLateCommit('succeed')
+  function runAgainstDatabase(
+    server: ReturnType<typeof fakeDatabaseServer>,
+    args: { timeoutMs: number; cleanupTimeoutMs: number; settleMs: number }
+  ) {
+    const first = fakeClients('none')
+    const fresh = fakeClients('none')
+    return runWith(args, (opened) => ({
+      ...(opened === 1 ? first.clients : fresh.clients),
+      db: server.database(),
+    }))
+  }
+
+  const everyCanaryResource = [
+    expect.stringMatching(/^account canary-user-/),
+    expect.stringMatching(/^post canary-post-/),
+    expect.stringMatching(/^moderation events of post canary-post-/),
+    expect.stringMatching(/^object community-images\/community\/canary-post-/),
+  ]
+
+  it('keeps cleanup uncertain while a cut-off INSERT it cannot cancel outlives the settle window', async () => {
+    // Story 6.2b final review (RF10). Codex's probe: the INSERT was still on
+    // the server after the settle window, the lookup found nothing, cleanup
+    // reported `clean`, and the account committed afterwards.
+    const server = fakeDatabaseServer({ commitAfterMs: 1500, cancel: 'denied' })
+    const { failure, returnedAt } = await runAgainstDatabase(server, {
+      timeoutMs: 300,
+      cleanupTimeoutMs: 600,
+      settleMs: 50,
+    })
     expect(failure).toMatchObject({
       code: 'deadline',
       details: { stage: 'database write' },
     })
-    expect(late.state.userDeletes).toBe(2)
-    expect(late.accounts.size).toBe(0)
+    expect(failure.cleanup.status).toBe('uncertain')
+    expect(failure.cleanup.unresolved).toEqual(everyCanaryResource)
+    expect(failure.cleanup.databaseWrite).toMatchObject({
+      pid: 4100,
+      ended: false,
+      cancelRefused: 'permission denied to cancel query',
+    })
+    expect(failure.cleanup.databaseWrite?.problem).toMatch(
+      /server process 4100 was still running it/
+    )
+    expect(failure.cleanup.problems).toEqual([
+      expect.stringMatching(/database write was not seen to end/),
+    ])
+    // The report was right not to say `clean`: the account lands after it.
+    expect(server.accounts.size).toBe(0)
+    await vi.waitFor(() => expect(server.accounts.size).toBe(1), { timeout: 3000 })
+    expect(server.state.committedAt).toBeGreaterThan(returnedAt)
+  })
+
+  it('cancels a cut-off INSERT and reconciles only once it ended', async () => {
+    // Story 6.2b final review (RF10).
+    const server = fakeDatabaseServer({ commitAfterMs: 1500, cancel: 'allowed' })
+    const { failure } = await runAgainstDatabase(server, {
+      timeoutMs: 300,
+      cleanupTimeoutMs: 1200,
+      settleMs: 50,
+    })
+    expect(failure.code).toBe('deadline')
+    expect(failure.cleanup).toMatchObject({
+      status: 'clean',
+      problems: [],
+      settleMs: null,
+      unresolved: [],
+      databaseWrite: {
+        pid: 4100,
+        ended: true,
+        observed: 'process idle',
+        cancelRequests: 1,
+        cancelRefused: null,
+      },
+    })
+    expect(server.state.cancelledAt).not.toBeNull()
+    expect(server.state.firstUserDeleteAt).toBeGreaterThanOrEqual(
+      server.state.cancelledAt as number
+    )
+    await new Promise((resolve) => setTimeout(resolve, 1600))
+    expect(server.state.committedAt).toBeNull()
+    expect(server.accounts.size).toBe(0)
+  })
+
+  it('waits for a late INSERT it cannot cancel to commit, then removes it', async () => {
+    // Story 6.2b final review (RF7, RF10): the INSERT commits after the settle
+    // window. Cleanup deletes nothing until the INSERT's process is idle, so
+    // the DELETE runs after the commit and removes the account.
+    const server = fakeDatabaseServer({ commitAfterMs: 600, cancel: 'denied' })
+    const { failure } = await runAgainstDatabase(server, {
+      timeoutMs: 300,
+      cleanupTimeoutMs: 2000,
+      settleMs: 50,
+    })
+    expect(failure).toMatchObject({
+      code: 'deadline',
+      details: { stage: 'database write' },
+    })
     expect(failure.cleanup).toMatchObject({
       performed: true,
       status: 'clean',
       problems: [],
-      settleMs: 150,
       unresolved: [],
+      databaseWrite: {
+        ended: true,
+        observed: 'process idle',
+        cancelRefused: 'permission denied to cancel query',
+      },
     })
-    expect(failure.cleanup.unknownOutcomes).toEqual([
-      expect.stringMatching(/^account canary-user-/),
-      expect.stringMatching(/^post canary-post-/),
-      expect.stringMatching(/^moderation events of post canary-post-/),
-    ])
-    expect(failure.cleanup.lateFound).toEqual([
-      expect.stringMatching(/^account canary-user-/),
-    ])
+    expect(failure.cleanup.unknownOutcomes).toEqual(everyCanaryResource.slice(0, 3))
+    expect(server.state.firstUserDeleteAt).toBeGreaterThanOrEqual(
+      server.state.committedAt as number
+    )
+    expect(server.accounts.size).toBe(0)
   })
 
   it('reports cleanup uncertain, naming every affected id, when the late account cannot be removed', async () => {
     // Story 6.2b final review (RF7).
-    const { failure, late } = await runLateCommit('fail')
+    const server = fakeDatabaseServer({
+      commitAfterMs: 500,
+      cancel: 'denied',
+      deletes: 'fail',
+    })
+    const { failure } = await runAgainstDatabase(server, {
+      timeoutMs: 300,
+      cleanupTimeoutMs: 1500,
+      settleMs: 50,
+    })
     expect(failure.code).toBe('deadline')
-    expect(late.accounts.size).toBe(1)
+    expect(server.accounts.size).toBe(1)
     expect(failure.cleanup.status).toBe('uncertain')
     expect(failure.cleanup.problems).toEqual(
       expect.arrayContaining([
@@ -1003,12 +1188,284 @@ describe('canary deadlines', () => {
         expect.stringMatching(/still present after cleanup: account canary-user-/),
       ])
     )
-    expect(failure.cleanup.unresolved).toEqual([
-      expect.stringMatching(/^account canary-user-/),
-      expect.stringMatching(/^post canary-post-/),
-      expect.stringMatching(/^moderation events of post canary-post-/),
-      expect.stringMatching(/^object community-images\/community\/canary-post-/),
-    ])
+    expect(failure.cleanup.unresolved).toEqual(everyCanaryResource)
+  })
+
+  it('sees a cut-off write end only on the process it was sent on', async () => {
+    // Story 6.2b final review (RF10).
+    const { confirmWriteEnded, canaryStatementTag } = await canaryModule()
+    const tag = canaryStatementTag({ postId: 'canary-post-x' })
+    const running = { pid: 7, state: 'active', query: `${tag} INSERT INTO "User"` }
+    const confirm = (
+      rows: Record<string, unknown>[],
+      pid: number | null = 7,
+      until = Date.now() + 1000
+    ) =>
+      confirmWriteEnded(
+        {
+          query: (sql: string) =>
+            Promise.resolve({ rows: sql.includes('pg_cancel_backend') ? [] : rows }),
+        },
+        { pid, tag },
+        until
+      )
+    const unconfirmed = async (record: Promise<DatabaseWrite>, problem: RegExp) => {
+      const seen = await record
+      expect(seen.ended).toBe(false)
+      expect(seen.problem).toMatch(problem)
+      return seen
+    }
+    await unconfirmed(confirm([], null), /no server process was recorded/)
+    await expect(confirm([])).resolves.toMatchObject({
+      ended: true,
+      observed: 'process gone',
+    })
+    await expect(
+      confirm([{ pid: 7, state: 'active', query: 'SELECT 1' }])
+    ).resolves.toMatchObject({
+      ended: true,
+      observed: 'process running another statement',
+    })
+    await unconfirmed(
+      confirm([{ pid: 7, state: 'active', query: '<insufficient privilege>' }]),
+      /does not show what server process 7 runs/
+    )
+    // A transaction pooler ran the canary's write on another process.
+    await unconfirmed(
+      confirm([
+        { pid: 7, state: 'idle', query: 'SELECT 1' },
+        { ...running, pid: 9 },
+      ]),
+      /runs on server process 9, not the recorded 7/
+    )
+    const outlasting = await unconfirmed(
+      confirm([running], 7, Date.now() + 250),
+      /still running it \(active\)/
+    )
+    expect(outlasting.cancelRequests).toBeGreaterThan(0)
+  })
+
+  /**
+   * The storage server behind the real storage-js client, reached through the
+   * canary's own storage fetch (Story 6.2b final review, RF11). In
+   * 'lost-connection' mode the upload reaches the server and the connection
+   * then fails, so the client sees a transport error while the server writes
+   * the object `commitAfterMs` later. In 'rejected' mode the server refuses the
+   * upload with its error body.
+   */
+  function fakeStorageServer(options: {
+    upload: 'lost-connection' | 'rejected'
+    commitAfterMs?: number
+  }) {
+    const objects = new Set<string>()
+    const state = { committedAt: null as number | null }
+    const json = (body: unknown, status = 200) =>
+      new Response(JSON.stringify(body), {
+        status,
+        headers: { 'content-type': 'application/json' },
+      })
+    const serve = (input: RequestInfo | URL, init: RequestInit = {}) => {
+      const url = new URL(input instanceof Request ? input.url : input)
+      const method = init.method ?? 'GET'
+      const objectRoute = '/storage/v1/object/community-images/'
+      if (
+        method === 'POST' &&
+        url.pathname === '/storage/v1/object/list/community-images'
+      ) {
+        const { prefix } = JSON.parse(init.body as string) as { prefix: string }
+        return Promise.resolve(
+          json(
+            [...objects]
+              .filter((objectPath) => objectPath.startsWith(`${prefix}/`))
+              .map((objectPath) => ({ name: objectPath.slice(prefix.length + 1) }))
+          )
+        )
+      }
+      if (method === 'DELETE' && url.pathname === '/storage/v1/object/community-images') {
+        const { prefixes } = JSON.parse(init.body as string) as { prefixes: string[] }
+        const removed = prefixes.filter((objectPath) => objects.delete(objectPath))
+        return Promise.resolve(json(removed.map((name) => ({ name }))))
+      }
+      if (method === 'POST' && url.pathname.startsWith(objectRoute)) {
+        if (options.upload === 'rejected') {
+          return Promise.resolve(
+            json(
+              {
+                statusCode: '409',
+                error: 'Duplicate',
+                message: 'The resource already exists',
+              },
+              400
+            )
+          )
+        }
+        const objectPath = decodeURIComponent(url.pathname.slice(objectRoute.length))
+        setTimeout(() => {
+          objects.add(objectPath)
+          state.committedAt = Date.now()
+        }, options.commitAfterMs)
+        const reset = Object.assign(new Error('other side closed'), {
+          code: 'UND_ERR_SOCKET',
+        })
+        return Promise.reject(new TypeError('fetch failed', { cause: reset }))
+      }
+      return Promise.resolve(json({ error: 'unexpected', message: url.pathname }, 400))
+    }
+    return { objects, state, serve }
+  }
+
+  async function storageClient(serve: typeof fetch) {
+    const { storageFetch } = await canaryModule()
+    const { createClient } = await import('@supabase/supabase-js')
+    return createClient('http://storage.test', 'service-role-key', {
+      auth: { persistSession: false, autoRefreshToken: false },
+      global: { fetch: storageFetch(new AbortController().signal, serve) },
+    }).storage
+  }
+
+  async function runAgainstStorage(
+    server: ReturnType<typeof fakeStorageServer>,
+    args: { timeoutMs: number; cleanupTimeoutMs: number; settleMs: number }
+  ) {
+    const storage = await storageClient(server.serve)
+    const first = fakeClients('none')
+    const fresh = fakeClients('none')
+    return runWith(args, (opened) => ({
+      ...(opened === 1 ? first.clients : fresh.clients),
+      storage,
+    }))
+  }
+
+  it('keeps cleanup uncertain when an upload lost its connection and the object lands later', async () => {
+    // Story 6.2b final review (RF11). Codex's probe: storage-js returned a
+    // transport error, the canary called it a configuration failure with a
+    // known outcome, cleanup reported `clean` with no settle, and the object was
+    // written 60 ms later.
+    const server = fakeStorageServer({ upload: 'lost-connection', commitAfterMs: 900 })
+    const { failure, returnedAt } = await runAgainstStorage(server, {
+      timeoutMs: 2000,
+      cleanupTimeoutMs: 500,
+      settleMs: 50,
+    })
+    expect(failure.code).toBe('storage_outcome_unknown')
+    expect((failure.cause as Error).name).toBe('StorageUnknownError')
+    expect(failure.details.storageError).toEqual({
+      name: 'StorageUnknownError',
+      message: 'fetch failed',
+      status: null,
+      statusCode: null,
+      originalError: {
+        name: 'TypeError',
+        message: 'fetch failed',
+        cause: 'UND_ERR_SOCKET',
+      },
+    })
+    expect(failure.cleanup).toMatchObject({
+      status: 'uncertain',
+      settleMs: 50,
+      unknownOutcomes: [expect.stringMatching(/^object community-images\/community\//)],
+      unresolved: [expect.stringMatching(/^object community-images\/community\//)],
+      problems: [expect.stringMatching(/storage cannot cancel an upload/)],
+    })
+    await vi.waitFor(() => expect(server.objects.size).toBe(1), { timeout: 3000 })
+    expect(server.state.committedAt).toBeGreaterThan(returnedAt)
+  })
+
+  it('calls an upload of unknown outcome resolved only once a lookup found and removed it', async () => {
+    // Story 6.2b final review (RF11): the object lands 60 ms after the
+    // transport error, inside the settle window.
+    const server = fakeStorageServer({ upload: 'lost-connection', commitAfterMs: 60 })
+    const { failure } = await runAgainstStorage(server, {
+      timeoutMs: 2000,
+      cleanupTimeoutMs: 1500,
+      settleMs: 300,
+    })
+    expect(failure.code).toBe('storage_outcome_unknown')
+    expect(failure.cleanup).toMatchObject({
+      status: 'clean',
+      problems: [],
+      settleMs: 300,
+      lateFound: [expect.stringMatching(/^object community-images\/community\//)],
+      unresolved: [],
+    })
+    expect(server.state.committedAt).not.toBeNull()
+    expect(server.objects.size).toBe(0)
+  })
+
+  it('treats a storage rejection with its error body as a known failure', async () => {
+    // Story 6.2b final review (RF11).
+    const server = fakeStorageServer({ upload: 'rejected' })
+    const { failure } = await runAgainstStorage(server, {
+      timeoutMs: 2000,
+      cleanupTimeoutMs: 500,
+      settleMs: 50,
+    })
+    expect(failure).toMatchObject({
+      code: 'storage_rejected',
+      details: {
+        storageError: {
+          name: 'StorageApiError',
+          message: 'The resource already exists',
+          status: 400,
+          statusCode: '409',
+        },
+      },
+    })
+    expect(failure.cleanup).toMatchObject({
+      status: 'clean',
+      unknownOutcomes: [],
+      settleMs: null,
+    })
+  })
+
+  it('classifies a storage error as known only for a 4xx with the server error body', async () => {
+    // Story 6.2b final review (RF11).
+    const { storageOutcomeUnknown } = await canaryModule()
+    const uploadError = async (answer: () => Promise<Response>) => {
+      const storage = await storageClient(answer)
+      const { error } = await storage
+        .from('community-images')
+        .upload('community/canary-post-x/a.jpg', Buffer.from('jpeg'))
+      return error
+    }
+    const answer =
+      (status: number, body: string, contentType = 'application/json') =>
+      () =>
+        Promise.resolve(
+          new Response(body, { status, headers: { 'content-type': contentType } })
+        )
+    const cases: [string, () => Promise<Response>, boolean][] = [
+      [
+        'a 400 with the error body',
+        answer(400, '{"statusCode":"409","error":"Duplicate","message":"exists"}'),
+        false,
+      ],
+      [
+        'a 413 with the error body',
+        answer(
+          413,
+          '{"statusCode":"413","error":"Payload too large","message":"too large"}'
+        ),
+        false,
+      ],
+      [
+        'a 400 from a proxy, no error body',
+        answer(400, '<html>Bad Request</html>', 'text/html'),
+        true,
+      ],
+      ['a 502 from a gateway', answer(502, '{"message":"bad gateway"}'), true],
+      [
+        'a 500 with the error body',
+        answer(500, '{"statusCode":"500","error":"internal","message":"x"}'),
+        true,
+      ],
+      ['a reset connection', () => Promise.reject(new TypeError('fetch failed')), true],
+    ]
+    for (const [label, respond, unknown] of cases) {
+      const error = await uploadError(respond)
+      expect({ label, unknown: storageOutcomeUnknown(error) }).toEqual({ label, unknown })
+    }
+    expect(storageOutcomeUnknown(new Error('anything else'))).toBe(true)
   })
 
   it('refuses a settle window that does not fit inside the cleanup deadline', async () => {
