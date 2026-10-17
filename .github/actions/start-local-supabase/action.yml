@@ -10,17 +10,47 @@ inputs:
     description: Base delay in seconds used for linear backoff between attempts
     required: false
     default: '20'
+  exclude:
+    description: >-
+      Comma-separated containers not to start. Services no test uses are skipped
+      to pull less: the dashboard and its metadata API, log shipping, edge
+      functions, the pooler, mail capture, image transforms (disabled in
+      supabase/config.toml), and Realtime (the app pushes through Redis). Keep
+      gotrue, postgrest and kong: CLI 2.62.5 leaves API_URL and the keys out of
+      `supabase status` without them.
+    required: false
+    default: 'realtime,studio,postgres-meta,logflare,vector,edge-runtime,supavisor,mailpit,imgproxy'
+  image-registry:
+    description: >-
+      Registry the Supabase CLI pulls its images from. The CLI default,
+      public.ecr.aws, caps anonymous data per runner IP and fails shards with
+      "toomanyrequests: Data limit exceeded"; Supabase mirrors the same tags to
+      ghcr.io, which the job token authenticates against.
+    required: false
+    default: 'ghcr.io'
 
 runs:
   using: composite
   steps:
+    - name: Log in to the image registry
+      if: inputs.image-registry == 'ghcr.io'
+      shell: bash
+      env:
+        REGISTRY_TOKEN: ${{ github.token }}
+      # Anonymous pulls still work if the login fails, so it does not stop the job.
+      run: echo "$REGISTRY_TOKEN" | docker login ghcr.io -u "$GITHUB_ACTOR" --password-stdin || true
+
     - name: Start local Supabase with retry
       shell: bash
+      env:
+        SUPABASE_INTERNAL_IMAGE_REGISTRY: ${{ inputs.image-registry }}
+        EXCLUDE: ${{ inputs.exclude }}
       run: |
         set -u -o pipefail
 
         max_attempts='${{ inputs.max-attempts }}'
         base_delay='${{ inputs.base-delay-seconds }}'
+        exclude="$EXCLUDE"
         attempt=1
 
         diagnose_db_port() {
@@ -34,17 +64,23 @@ runs:
         }
 
         export_supabase_environment() {
-          npx supabase status -o json | jq -r '
-            "SUPABASE_URL=\(.API_URL)",
-            "SUPABASE_ANON_KEY=\(.ANON_KEY)",
-            "SUPABASE_SERVICE_ROLE_KEY=\(.SERVICE_ROLE_KEY)"
+          # `supabase status` leaves a field out when the service behind it is
+          # excluded; a missing field must stop here, not reach $GITHUB_ENV as "null".
+          npx supabase status -o json | jq -er '
+            if (.API_URL and .ANON_KEY and .SERVICE_ROLE_KEY) then
+              "SUPABASE_URL=\(.API_URL)",
+              "SUPABASE_ANON_KEY=\(.ANON_KEY)",
+              "SUPABASE_SERVICE_ROLE_KEY=\(.SERVICE_ROLE_KEY)"
+            else
+              error("supabase status lacks API_URL, ANON_KEY or SERVICE_ROLE_KEY")
+            end
           ' >> "$GITHUB_ENV"
         }
 
         while [ "$attempt" -le "$max_attempts" ]; do
           echo "::group::Start local Supabase (attempt ${attempt}/${max_attempts})"
 
-          if npx supabase start; then
+          if npx supabase start ${exclude:+--exclude "$exclude"}; then
             echo "Supabase services started successfully."
             npx supabase status || true
             export_supabase_environment
@@ -69,3 +105,9 @@ runs:
           sleep "$sleep_seconds"
           attempt=$(( attempt + 1 ))
         done
+
+    - name: Log out of the image registry
+      # Later steps run PR code; drop the stored credential once the images are pulled.
+      if: always() && inputs.image-registry == 'ghcr.io'
+      shell: bash
+      run: docker logout ghcr.io || true

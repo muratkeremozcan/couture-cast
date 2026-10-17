@@ -21,8 +21,6 @@ on:
         description: Whether downstream E2E should run
         value: ${{ jobs.burn-in.outputs.runE2E }}
     secrets:
-      DATABASE_URL_PREVIEW:
-        required: false
       GUARDIAN_INVITE_JWT_SECRET:
         required: false
 
@@ -92,10 +90,10 @@ jobs:
           CHANGED=$(git diff "$BASE_REF"...HEAD --name-only | grep -E '^${{ inputs.test-directory }}.*\.(spec|test)\.(ts|tsx)$' || true)
 
           if [[ -z "$CHANGED" ]]; then
-            echo "changed=false" >> $GITHUB_OUTPUT
+            echo "changed=false" >> "$GITHUB_OUTPUT"
             echo "No changed Playwright specs. Skipping burn-in.";
           else
-            echo "changed=true" >> $GITHUB_OUTPUT
+            echo "changed=true" >> "$GITHUB_OUTPUT"
             echo "Changed specs:"; echo "$CHANGED"
           fi
 
@@ -163,9 +161,23 @@ jobs:
           DATABASE_URL: ${{ env.LOCAL_DATABASE_URL }}
           GUARDIAN_INVITE_JWT_SECRET: ${{ secrets.GUARDIAN_INVITE_JWT_SECRET }}
 
+      # Blocks the upload when a report or trace carries a secret this job
+      # holds. Fails closed: if the scan cannot run, nothing is uploaded.
+      - name: Check burn-in artifacts for secret values
+        id: secret-scan
+        if: ${{ always() && steps.detect-changed.outputs.changed == 'true' && steps.burn-in-step.outcome == 'failure' }}
+        env:
+          GUARDIAN_INVITE_JWT_SECRET: ${{ secrets.GUARDIAN_INVITE_JWT_SECRET }}
+          GH_TOKEN: ${{ github.token }}
+          TEST_DIRECTORY: ${{ inputs.test-directory }}
+        run: >-
+          node scripts/check-artifact-secrets.mjs
+          --names GUARDIAN_INVITE_JWT_SECRET,GH_TOKEN
+          "$TEST_DIRECTORY/playwright-report" "$TEST_DIRECTORY/test-results"
+
       - name: Upload burn-in failure artifacts
         id: upload-burn-in-artifacts
-        if: ${{ always() && steps.detect-changed.outputs.changed == 'true' && steps.burn-in-step.outcome == 'failure' }}
+        if: ${{ always() && steps.detect-changed.outputs.changed == 'true' && steps.burn-in-step.outcome == 'failure' && steps.secret-scan.outcome == 'success' }}
         uses: actions/upload-artifact@v4
         with:
           name: playwright-report

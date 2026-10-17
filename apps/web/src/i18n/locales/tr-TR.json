@@ -471,7 +471,7 @@
       "imageUnavailable": "Görsel kullanılamıyor",
       "imageRetry": "Görseli yeniden yükle",
       "open": "Kombini gör",
-      "openLabel": "{{author}} tarafından paylaşılan kombini gör",
+      "openLabel": "Kombini gör ({{author}})",
       "detailClose": "Bu kombini kapat",
       "report": "Şikayet et",
       "reported": "Şikayet edildi",

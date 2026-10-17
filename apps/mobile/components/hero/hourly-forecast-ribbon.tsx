@@ -1,17 +1,17 @@
 import React, { useState } from 'react'
 import { StyleSheet, ScrollView, Pressable, Platform } from 'react-native'
 import { Text, View } from '@/components/themed'
-import type { WeatherHourlyEntry } from '@couture/api-client/contracts/http'
+import {
+  type WeatherHourlyEntry,
+  defaultSupportedLocale,
+  resolveSupportedLocale,
+} from '@couture/api-client/contracts/http'
 import { formatTemperature } from './weather-header'
 import { useHeroPalette } from './hero-theme'
 import { weatherConditionGlyphs } from './weather-glyphs'
 import { useTranslation } from 'react-i18next'
 import i18n from '@/src/lib/i18n'
 import { formatWeatherAltText } from '@couture/utils'
-import {
-  defaultSupportedLocale,
-  resolveSupportedLocale,
-} from '@couture/api-client/contracts/http'
 import { getTemperatureUnit } from '@/src/lib/formatters'
 
 type HourlyForecastRibbonProps = {

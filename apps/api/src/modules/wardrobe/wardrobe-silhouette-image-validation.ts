@@ -2,11 +2,11 @@
 // with an added portrait-framing constraint.
 import { createHash } from 'node:crypto'
 import sharp, { type Metadata } from 'sharp'
-import type {
-  GarmentImageDeclaration,
-  GarmentMimeType,
+import {
+  type GarmentImageDeclaration,
+  type GarmentMimeType,
+  GarmentImageValidationError,
 } from './wardrobe-image-validation'
-import { GarmentImageValidationError } from './wardrobe-image-validation'
 
 export const MAX_SILHOUETTE_PHOTO_BYTES = 10_485_760
 export const MIN_SILHOUETTE_PHOTO_DIMENSION = 256

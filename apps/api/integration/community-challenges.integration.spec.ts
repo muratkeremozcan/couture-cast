@@ -16,8 +16,7 @@
 // PostgreSQL to reject a real INSERT.
 import 'reflect-metadata'
 import { randomUUID } from 'node:crypto'
-import { PrismaClient } from '@prisma/client'
-import type { Prisma } from '@prisma/client'
+import { PrismaClient, type Prisma } from '@prisma/client'
 import { afterAll, beforeAll, describe, expect, it } from 'vitest'
 import { buildLookbookPostCreateInput, createLookbookPost } from '@couture/testing'
 import {

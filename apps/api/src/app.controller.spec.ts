@@ -1,7 +1,6 @@
 import 'reflect-metadata'
 import { beforeEach, describe, expect, it } from 'vitest'
-import type { TestingModule } from '@nestjs/testing'
-import { Test } from '@nestjs/testing'
+import { type TestingModule, Test } from '@nestjs/testing'
 import { AppController } from './app.controller'
 import { AppService } from './app.service'
 

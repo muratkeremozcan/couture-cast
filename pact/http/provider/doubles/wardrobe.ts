@@ -1,11 +1,11 @@
 import type { ApiRole } from '../../../../apps/api/src/modules/auth/security.types'
 import type { WardrobeRetentionService } from '../../../../apps/api/src/modules/wardrobe/wardrobe-retention.service'
 import type { WardrobeService } from '../../../../apps/api/src/modules/wardrobe/wardrobe.service'
-import { GARMENT_TAGGING_ANALYSIS_VERSION } from '@couture/api-client'
-import type {
-  GarmentCategory,
-  GarmentComfortRange,
-  GarmentMaterial,
+import {
+  GARMENT_TAGGING_ANALYSIS_VERSION,
+  type GarmentCategory,
+  type GarmentComfortRange,
+  type GarmentMaterial,
 } from '@couture/api-client'
 import {
   ConflictException,

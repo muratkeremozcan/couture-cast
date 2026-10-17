@@ -5,8 +5,8 @@ import {
   COMMUNITY_MODERATION_LOG_EVENTS,
   createOpenTelemetryCommunityModerationMeter,
   createSafeCommunityModerationMeter,
+  type CommunityModerationMeter,
 } from './community-moderation.telemetry'
-import type { CommunityModerationMeter } from './community-moderation.telemetry'
 
 // Each fake is handed back in the order the module asks for its instruments, so the
 // `mockReturnValueOnce` chains below follow creation order.

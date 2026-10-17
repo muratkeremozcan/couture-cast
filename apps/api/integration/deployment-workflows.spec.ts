@@ -12,6 +12,21 @@ const vercelPreviewSmokeWorkflow = path.join(
   'workflows',
   'pr-pw-e2e-vercel-preview.yml'
 )
+const previewReadyWorkflow = path.join(
+  repoRoot,
+  '.github',
+  'workflows',
+  'rwf-vercel-preview-ready.yml'
+)
+const manualE2eWorkflow = path.join(
+  repoRoot,
+  '.github',
+  'workflows',
+  'pw-e2e-trigger.yml'
+)
+const prodE2eWorkflow = path.join(repoRoot, '.github', 'workflows', 'pw-e2e-prod.yml')
+const e2eReusableWorkflow = path.join(repoRoot, '.github', 'workflows', 'rwf-e2e.yml')
+const previewReadyCall = /uses: \.\/\.github\/workflows\/rwf-vercel-preview-ready\.yml/
 const mobileWorkflow = path.join(repoRoot, '.github', 'workflows', 'deploy-mobile.yml')
 const vercelConfig = path.join(repoRoot, 'apps', 'api', 'vercel.json')
 const apiHandler = path.join(repoRoot, 'apps', 'api', 'api', 'index.ts')
@@ -23,10 +38,48 @@ describe('deployment workflows', () => {
     expect(fs.existsSync(vercelPreviewSmokeWorkflow)).toBe(true)
     const content = fs.readFileSync(vercelPreviewSmokeWorkflow, 'utf8')
     expect(content).toMatch(/on:\s*\n\s*pull_request:/)
-    expect(content).toMatch(/Resolve preview health URL/)
+    expect(content).toMatch(previewReadyCall)
+
+    const ready = fs.readFileSync(previewReadyWorkflow, 'utf8')
+    expect(ready).toMatch(/Resolve preview health URL/)
+    // Web and API are each waited on before any caller tests them.
+    expect(
+      ready.match(/uses: \.\/\.github\/workflows\/vercel-wait-for-deployment\.yml/g)
+    ).toHaveLength(2)
+  })
+
+  it('manual preview e2e runs only after both previews serve the dispatched commit', () => {
+    const content = fs.readFileSync(manualE2eWorkflow, 'utf8')
+    expect(content).toMatch(previewReadyCall)
+    // The ordering is the fix: tests used to start against still-building deployments.
+    expect(content).toMatch(/run-preview-tests:\s*\n\s*needs: preview-ready/)
+    expect(content).toMatch(/needs\.preview-ready\.outputs\.api_url/)
+  })
+
+  it('e2e workflows request no OIDC token', () => {
+    // Nothing consumes one, and a reusable job that requests it fails at
+    // startup under any caller that does not grant it.
+    for (const workflow of [
+      e2eReusableWorkflow,
+      vercelPreviewSmokeWorkflow,
+      manualE2eWorkflow,
+      prodE2eWorkflow,
+    ]) {
+      expect(fs.readFileSync(workflow, 'utf8')).not.toMatch(/id-token:/)
+    }
+  })
+
+  it('prod e2e waits for web and API to serve the pushed commit', () => {
+    const content = fs.readFileSync(prodE2eWorkflow, 'utf8')
     expect(content).toMatch(
-      /uses: \.\/\.github\/workflows\/vercel-wait-for-deployment.yml/
+      /health_url: https:\/\/couture-cast-web\.vercel\.app\/api\/health/
     )
+    expect(content).toMatch(
+      /health_url: https:\/\/couture-cast-api\.vercel\.app\/api\/health/
+    )
+    expect(content).toMatch(/needs: \[wait-web, wait-api\]/)
+    // /api/v1/events/poll needs a bearer token, so waiting for 200 on it never ends.
+    expect(content).not.toMatch(/_url: \S*events\/poll/)
   })
 
   it('mobile workflow exists and deploys manually with Expo token (Android-only)', () => {

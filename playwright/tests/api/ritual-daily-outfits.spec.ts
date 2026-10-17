@@ -7,6 +7,8 @@ import {
   resolveApiBaseUrl,
   authHeaders,
   createTeenSignupPayload,
+  isProdEnvironment,
+  skipSyntheticAuthInProd,
 } from '../../support/helpers/api-test'
 import { log } from '@seontechnologies/playwright-utils/log'
 import {
@@ -42,6 +44,10 @@ test.describe('Ritual API – daily scenario outfit recommendations', () => {
       overrideEnvVar: 'LIVE_RITUAL_BASE_URL',
       fallback: 'http://localhost:4000',
     })
+
+    // Only the authenticated tests use this account, and they skip in production,
+    // so production gets no signup (or location) written by this suite.
+    if (isProdEnvironment(testInfo)) return
 
     const signupPayload = createTeenSignupPayload(testInfo, 'ritual-e2e-user')
     const signupResponse = await apiRequest({
@@ -108,6 +114,7 @@ test.describe('Ritual API – daily scenario outfit recommendations', () => {
     apiRequest,
     validateSchema,
   }, testInfo) => {
+    skipSyntheticAuthInProd(testInfo)
     const baseUrl = resolveApiBaseUrl(testInfo, {
       overrideEnvVar: 'LIVE_RITUAL_BASE_URL',
       fallback: 'http://localhost:4000',
@@ -167,6 +174,7 @@ test.describe('Ritual API – daily scenario outfit recommendations', () => {
   test('[P2] optional locationId query param is accepted', async ({
     apiRequest,
   }, testInfo) => {
+    skipSyntheticAuthInProd(testInfo)
     const baseUrl = resolveApiBaseUrl(testInfo, {
       overrideEnvVar: 'LIVE_RITUAL_BASE_URL',
       fallback: 'http://localhost:4000',

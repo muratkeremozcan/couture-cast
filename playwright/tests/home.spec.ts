@@ -1,7 +1,6 @@
 // Learning path Step 12: Cross-surface E2E confidence.
 // See _bmad-output/project-knowledge/learning-path-step-by-step.md#step-12-cross-surface-e2e-confidence
-import type { AxeResults } from 'axe-core'
-import type axe from 'axe-core'
+import { type AxeResults, type default as axe } from 'axe-core'
 import { z } from 'zod'
 import { test, expect } from '../support/fixtures/merged-fixtures'
 
@@ -34,17 +33,11 @@ test.describe('Web smoke', () => {
       new URL('/api/health', metadata.baseUrl ?? 'http://localhost:3005').toString()
 
     const healthUrl = new URL(healthEndpoint)
-    const vercelBypassToken = process.env.VERCEL_AUTOMATION_BYPASS_SECRET?.trim()
+    // Protected previews are reached through the bypass cookie global setup mints.
     const healthResponse = await apiRequest<{ status: string }>({
       method: 'GET',
       baseUrl: healthUrl.origin,
       path: healthUrl.pathname,
-      headers: vercelBypassToken
-        ? {
-            'x-vercel-protection-bypass': vercelBypassToken,
-            'x-vercel-set-bypass-cookie': 'true',
-          }
-        : undefined,
     })
     expect(healthResponse.status).toBe(200)
 

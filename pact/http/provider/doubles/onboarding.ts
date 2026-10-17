@@ -1,5 +1,5 @@
-import type { WardrobeOnboardingService } from '../../../../apps/api/src/modules/wardrobe/wardrobe-onboarding.service'
 import {
+  type WardrobeOnboardingService,
   formatOnboardingETag,
   parseOnboardingIfMatchHeader,
 } from '../../../../apps/api/src/modules/wardrobe/wardrobe-onboarding.service'

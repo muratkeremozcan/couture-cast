@@ -86,6 +86,7 @@ export {
   type RitualResponse,
   type RitualQueryParams,
   type ScenarioOutfit,
+  type GarmentCategory,
   type ScenarioName,
   scenarioOutfitSchema,
   scenarioNameSchema,

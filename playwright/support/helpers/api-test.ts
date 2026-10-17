@@ -1,5 +1,6 @@
 // Centralizes Playwright API-test environment, identity, and payload helpers so specs
 // do not duplicate environment guards or generated user data.
+import { randomBytes } from 'node:crypto'
 import type { TestInfo } from '@playwright/test'
 
 export type ApiRole = 'guardian' | 'teen' | 'moderator' | 'admin'
@@ -37,6 +38,20 @@ export function isProdEnvironment(testInfo: TestInfo): boolean {
   return projectMetadata(testInfo).environment === 'prod'
 }
 
+/**
+ * Skip a test that authenticates with `authHeaders` when it runs against
+ * production. The API honours synthetic `test-token-*` bearers only outside
+ * production (`AccessTokenIdentityService` gates them on `TEST_ENV` /
+ * `VERCEL_ENV`), and no production test identity is provisioned, so such a test
+ * can only ever see 401 there.
+ */
+export function skipSyntheticAuthInProd(testInfo: TestInfo): void {
+  testInfo.skip(
+    isProdEnvironment(testInfo),
+    'Production rejects synthetic test tokens and has no provisioned test identity.'
+  )
+}
+
 export function isNonLocalEnvironment(testInfo: TestInfo): boolean {
   return projectMetadata(testInfo).environment !== 'local'
 }
@@ -69,7 +84,12 @@ export function authHeaders(userId: string, role: ApiRole): Record<string, strin
   }
 }
 
-const runStamp = process.env.PW_TEST_RUN_ID?.trim() || `pid-${process.pid}`
+// The pid alone is not unique across CI runs: fresh runners hand out the same pid
+// sequence, and runs share the preview database, so a "unique" signup email
+// could already be registered and come back 400 (flaky age-gate signup on #149).
+const runStamp =
+  process.env.PW_TEST_RUN_ID?.trim() ||
+  `pid-${process.pid}-${randomBytes(4).toString('hex')}`
 
 function slugify(value: string): string {
   return value

@@ -7,8 +7,12 @@ import {
   ForbiddenException,
   ServiceUnavailableException,
 } from '@nestjs/common'
-import { Prisma } from '@prisma/client'
-import type { PrismaClient, GarmentItem, PlannerDayPlan } from '@prisma/client'
+import {
+  Prisma,
+  type PrismaClient,
+  type GarmentItem,
+  type PlannerDayPlan,
+} from '@prisma/client'
 import type { WeatherQueryService } from '../weather/weather-query.service.js'
 import type { LocationPreferencesService } from '../location-preferences/location-preferences.service.js'
 import type { FeatureFlagsService } from '../feature-flags/feature-flags.service.js'

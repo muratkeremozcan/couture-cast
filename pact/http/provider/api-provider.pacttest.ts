@@ -16,8 +16,7 @@
 // See _bmad-output/project-knowledge/learning-path-step-by-step.md#step-33-affiliate-shop-this-look-cta
 import 'reflect-metadata'
 import path from 'node:path'
-import { Verifier } from '@pact-foundation/pact'
-import type { VerifierOptions } from '@pact-foundation/pact'
+import { Verifier, type VerifierOptions } from '@pact-foundation/pact'
 import { buildVerifierOptions } from '@seontechnologies/pactjs-utils'
 import type { INestApplication } from '@nestjs/common'
 import { afterAll, beforeAll, describe, expect, it } from 'vitest'

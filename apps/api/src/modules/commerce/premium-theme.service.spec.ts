@@ -1,8 +1,7 @@
 // Learning path Step 35: Premium theme switcher.
 // See _bmad-output/project-knowledge/learning-path-step-by-step.md#step-35-premium-theme-switcher
 import { NotFoundException, ServiceUnavailableException } from '@nestjs/common'
-import { Prisma } from '@prisma/client'
-import type { PrismaClient } from '@prisma/client'
+import { Prisma, type PrismaClient } from '@prisma/client'
 import { describe, expect, it, vi } from 'vitest'
 import {
   PREMIUM_THEME_OWNER_NOT_FOUND_MESSAGE,

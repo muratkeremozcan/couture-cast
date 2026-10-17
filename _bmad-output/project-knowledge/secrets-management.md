@@ -1,6 +1,6 @@
 # Secrets management
 
-Updated: 2026-03-27 - replaced third-party secret-manager plan with the existing `.env` and GitHub/provider secret workflow.
+Updated: 2026-10-16 - linked the secret rotation runbook.
 
 ## Decision
 
@@ -45,6 +45,10 @@ Updated: 2026-03-27 - replaced third-party secret-manager plan with the existing
 3. Redeploy or restart the affected environment.
 4. Validate the application with the new value.
 5. Revoke the old secret after verification.
+
+The [secret rotation runbook](secret-rotation-runbook.md) covers how each store is changed without a
+value reaching logs or chat, the order for shared and signing secrets, and the rule against
+rerunning pre-fix workflow runs.
 
 ## Leak prevention
 

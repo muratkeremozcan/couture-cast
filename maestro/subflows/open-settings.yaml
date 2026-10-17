@@ -11,17 +11,22 @@
 # is retried. `settings-screen` is the testID on the settings container in
 # `app/(tabs)/settings.tsx`.
 #
-# `subflows/absorb-expo-dev-sheet.yaml` runs before the tap rather than a bare
-# `tapOn: text: 'Continue'`, which PR #141 (story 5.5) proved insufficient on
-# the sibling `open-wardrobe-tab.yaml`: the sheet never appears in the
-# hierarchy Maestro queries, so the text tap cannot dismiss it and only the
-# shared subflow's blind backdrop tap can. Same sheet, same tab bar, so the
-# same gap applied here even though it had not yet flaked this way.
+# `subflows/absorb-expo-dev-sheet.yaml` runs before the tap; it closes the
+# Expo Go onboarding sheet or full developer menu, whichever is up. Same sheets,
+# same tab bar as the sibling `open-wardrobe-tab.yaml`.
 appId: ${MAESTRO_APP_ID}
 ---
+# Counts attempts so only a retry relaunches the app; see relaunch-app.yaml.
+- evalScript: ${output.settingsTabAttempt = 0}
 - retry:
     maxRetries: 3
     commands:
+      - evalScript: ${output.settingsTabAttempt = output.settingsTabAttempt + 1}
+      - runFlow:
+          when:
+            true: ${output.settingsTabAttempt > 1}
+          file: relaunch-app.yaml
+          label: 'A tab tap was swallowed; relaunch the app before trying again'
       - runFlow: absorb-expo-dev-sheet.yaml
       # Pop a pushed route first. The tab bar is not reachable from the capsule
       # library or the silhouette editor, and a caller can arrive here with one

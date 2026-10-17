@@ -8,8 +8,8 @@ import {
   WeatherProviderError,
 } from './weather-provider.error.js'
 import type { IWeatherProvider } from './weather-provider.interface.js'
-import type { OpenWeatherHourlySchema } from './weather.schemas.js'
 import {
+  type OpenWeatherHourlySchema,
   NormalizedDailyWeatherEntrySchema,
   NormalizedWeatherForecastSchema,
   OpenWeatherDailySchema,

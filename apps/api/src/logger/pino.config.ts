@@ -1,6 +1,5 @@
 import { context, trace } from '@opentelemetry/api'
-import pino from 'pino'
-import type { DestinationStream, LevelWithSilent } from 'pino'
+import pino, { type DestinationStream, type LevelWithSilent } from 'pino'
 import { getRequestContext } from './request-context'
 
 type EnvVars = Record<string, string | undefined>

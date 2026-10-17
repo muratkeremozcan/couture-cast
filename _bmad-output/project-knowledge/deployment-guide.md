@@ -2,6 +2,9 @@
 
 Updated: 2026-07-17 - Brownfield deep scan of deployment and operational configuration.
 Updated: 2026-10-16 (Story 6.2b): community worker container, canary, restart drill and rollback.
+Updated: 2026-10-16 - preview readiness wait shared by PR and manual e2e, resolvers poll for the
+expected commit, prod waits on both health SHAs, preview runs have no database secret, CI Supabase
+pulls from ghcr.io.
 
 ## Scope and evidence boundary
 
@@ -123,14 +126,31 @@ Preview unless strict mode is enabled. The
 [API URL resolver](../../scripts/resolve-api-preview-url.mjs) first prefers a Vercel deployment with
 the expected commit SHA, then a mutable branch alias, then a deterministic alias.
 
+When `EXPECTED_SHA` is set, both resolvers poll the Vercel API until the deployment for that commit
+is listed (`RESOLVE_SHA_TIMEOUT_SECONDS`, default 600; `RESOLVE_SHA_INTERVAL_SECONDS`, default 15),
+because right after a push the newest listed deployment still belongs to the previous commit. The
+web resolver never falls back to another commit's canonical URL in that mode, since such a URL never
+starts serving the expected SHA. The fallback resolution inside the reusable Playwright workflow caps
+the poll at 120 seconds.
+
+[Manual E2E](../../.github/workflows/pw-e2e-trigger.yml) runs the same readiness wait for the
+dispatched commit unless `custom_base_url` or `custom_api_base_url` names the target explicitly.
+
+CI starts local Supabase through
+[its composite action](../../.github/actions/start-local-supabase/action.yml), which pulls images from
+`ghcr.io` with the job token (the CLI default, `public.ecr.aws`, rate-limits anonymous data per
+runner IP) and skips containers no test uses.
+
 The SHA wait is implemented by
 [the Vercel waiter](../../.github/workflows/vercel-wait-for-deployment.yml). It retries for up to the
 configured limit, rejects non-JSON responses, rejects missing SHA metadata, and fails if the final
 SHA differs from the expected commit.
 
 The reusable [Playwright workflow](../../.github/workflows/rwf-e2e.yml) checks out that same SHA,
-maps `DATABASE_URL_PREVIEW` into `DATABASE_URL`, pins the URLs resolved by the caller, and uploads
-Playwright artifacts. The
+leaves `DATABASE_URL` unset for preview (no preview database secret exists, so specs that need
+direct database access skip themselves), pins the URLs resolved by the caller, and uploads Playwright
+artifacts. The PR path and the manual trigger both resolve and wait through
+[the preview readiness workflow](../../.github/workflows/rwf-vercel-preview-ready.yml). The
 [web health test](../../playwright/tests/web-health-sha.spec.ts) independently checks health
 metadata and the expected SHA. The [API smoke test](../../playwright/tests/api/api-health.spec.ts)
 checks the API root response but does not assert API health metadata.
@@ -141,11 +161,10 @@ checks the API root response but does not assert API health metadata.
 uses fixed Vercel production domains and the
 [generic deployment waiter](../../.github/workflows/rwf-wait-for-deployment.yml).
 
-Current checks are asymmetric:
+Both projects are held to the pushed commit before tests start:
 
 - The web `/api/health` must report `status: ok` and match the pushed SHA.
-- The API `/api/v1/events/poll` must return HTTP 200.
-- The API production deployment is not required to report the expected SHA before tests start.
+- The API `/api/health` must report `status: ok` and match the pushed SHA.
 - Playwright uses `DATABASE_URL_PROD` and fixed production web/API defaults unless overridden.
 
 The production workflow is a post-push verifier, not a deployment job or promotion gate. It does
@@ -202,7 +221,8 @@ The implemented environment model has local, Preview, and production lanes:
 - Populated `.env`, `.env.local`, `.env.preview`, and `.env.prod` files are expected to remain
   gitignored.
 - [`.env.example`](../../.env.example) provides placeholders only.
-- GitHub Actions uses separate `DATABASE_URL_PREVIEW` and `DATABASE_URL_PROD` secrets.
+- GitHub Actions holds `DATABASE_URL_PROD` for production runs. Preview runs have no database
+  secret.
 - Hosted secrets are expected in provider-native stores, as summarized in
   [secrets management](secrets-management.md).
 - Playwright has explicit `local`, `preview`, and `prod` configurations in
@@ -215,8 +235,9 @@ build systems commonly set `NODE_ENV=production` for both Preview and production
 on hosted builds depends on provider-injected variables winning over files. No populated env files
 should be shipped with the repository.
 
-[PR checks](../../.github/workflows/pr-checks.yml) use the Preview database secret. The reusable E2E
-workflow maps its database URL according to `TEST_ENV`. Manual
+[PR checks](../../.github/workflows/pr-checks.yml) run integration tests against an ephemeral
+PostgreSQL service container. The reusable E2E workflow maps its database URL according to
+`TEST_ENV`: the local stack, `DATABASE_URL_PROD` for prod only, and none for preview. Manual
 [k6 load testing](../../.github/workflows/k6-load.yml) similarly requires distinct Preview and
 production API URL secrets or an explicit URL.
 

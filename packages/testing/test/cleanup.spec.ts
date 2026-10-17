@@ -6,8 +6,8 @@
 // See _bmad-output/project-knowledge/learning-path-step-by-step.md#step-35-premium-theme-switcher
 import { afterEach, describe, expect, it, vi } from 'vitest'
 
-import type { CleanupPrismaClient } from '../src/cleanup.js'
 import {
+  type CleanupPrismaClient,
   cleanup,
   configureCleanup,
   registerForCleanup,

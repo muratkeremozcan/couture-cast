@@ -4,8 +4,7 @@
 // This lets the new wardrobe-onboarding screen reuse the exact same capture/crop/upload
 // state machine instead of duplicating it (project-context.md: avoid duplicate utility
 // implementations across apps).
-import { useEffect, useRef, useState } from 'react'
-import type React from 'react'
+import { useEffect, useRef, useState, type ElementRef } from 'react'
 import { useTranslation } from 'react-i18next'
 import * as Crypto from 'expo-crypto'
 import { File, Paths } from 'expo-file-system'
@@ -92,7 +91,7 @@ export function MobileGarmentCaptureModal({
   const [uploadStatus, setUploadStatus] = useState('')
   const [errorMessage, setErrorMessage] = useState<string | null>(null)
   const uploadAbortRef = useRef<AbortController | null>(null)
-  const titleRef = useRef<React.ElementRef<typeof Text> | null>(null)
+  const titleRef = useRef<ElementRef<typeof Text> | null>(null)
   const invokingNodeHandleRef = useRef(invokingNodeHandle)
   invokingNodeHandleRef.current = invokingNodeHandle
 

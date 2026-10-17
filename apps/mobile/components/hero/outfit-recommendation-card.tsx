@@ -198,6 +198,10 @@ export function OutfitRecommendationCard({
           <GarmentItemTile
             key={garmentId}
             garmentId={garmentId}
+            category={
+              outfit.displayGarments?.find((garment) => garment.id === garmentId)
+                ?.category
+            }
             onSwap={onSwapGarment}
             onRef={onGarmentRef}
           />

@@ -91,10 +91,12 @@ jobs:
       - name: Summarize k6 load
         if: always()
         run: |
-          echo "## k6 load - ${{ inputs.profile }} @ ${{ inputs.environment }}" >> "$GITHUB_STEP_SUMMARY"
-          echo "" >> "$GITHUB_STEP_SUMMARY"
-          echo "Test ID: \`${TEST_ID}\`" >> "$GITHUB_STEP_SUMMARY"
-          echo "" >> "$GITHUB_STEP_SUMMARY"
+          {
+            echo "## k6 load - ${{ inputs.profile }} @ ${{ inputs.environment }}"
+            echo ""
+            echo "Test ID: \`${TEST_ID}\`"
+            echo ""
+          } >> "$GITHUB_STEP_SUMMARY"
 
           for summary_file in k6/summary-*.json; do
             [ -f "$summary_file" ] || continue
@@ -111,12 +113,14 @@ jobs:
           done
 
           # head -1: safe while exactly one .k6test.ts file exists; update to iterate all files if a second test is added
-          summary_file=$(ls k6/summary-*.json 2>/dev/null | head -1 || true)
+          summary_file=$(find k6 -maxdepth 1 -name 'summary-*.json' 2>/dev/null | sort | head -1 || true)
           if [ -n "$summary_file" ]; then
-            echo "" >> "$GITHUB_STEP_SUMMARY"
-            echo "| Metric | p95 | p99 | avg | max |" >> "$GITHUB_STEP_SUMMARY"
-            echo "| --- | --- | --- | --- | --- |" >> "$GITHUB_STEP_SUMMARY"
-            jq -r '.metrics | to_entries[] | "| \(.key) | \(.value.p95 // "-")ms | \(.value.p99 // "-")ms | \(.value.avg // "-")ms | \(.value.max // "-")ms |"' "$summary_file" >> "$GITHUB_STEP_SUMMARY"
+            {
+              echo ""
+              echo "| Metric | p95 | p99 | avg | max |"
+              echo "| --- | --- | --- | --- | --- |"
+              jq -r '.metrics | to_entries[] | "| \(.key) | \(.value.p95 // "-")ms | \(.value.p99 // "-")ms | \(.value.avg // "-")ms | \(.value.max // "-")ms |"' "$summary_file"
+            } >> "$GITHUB_STEP_SUMMARY"
           fi
 
       - name: Upload k6 load artifacts

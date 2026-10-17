@@ -1,5 +1,9 @@
-import { ComfortRun, PrecipPreparedness, WindTolerance } from '@prisma/client'
-import type { PrismaClient } from '@prisma/client'
+import {
+  ComfortRun,
+  PrecipPreparedness,
+  WindTolerance,
+  type PrismaClient,
+} from '@prisma/client'
 import { afterEach, describe, expect, it, vi } from 'vitest'
 
 import {

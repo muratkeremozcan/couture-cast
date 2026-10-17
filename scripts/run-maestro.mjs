@@ -16,7 +16,7 @@
  * - We keep that orchestration here so the npm scripts stay small and the flow is
  *   readable in one place.
  */
-import { spawn } from 'node:child_process'
+import { spawn, spawnSync } from 'node:child_process'
 import { createHash, randomUUID } from 'node:crypto'
 import { createRequire } from 'node:module'
 import fs from 'node:fs'
@@ -3295,6 +3295,53 @@ const buildSingleFlowMaestroArgs = (flowPath, target) => {
  * @returns {void}
  */
 const recordSingleFlowOutcome = (flowPath, maestroExitError, flowFailures) => {
+  const failuresBefore = flowFailures.length
+  recordFlowOutcome(flowPath, maestroExitError, flowFailures)
+  if (flowFailures.length > failuresBefore) captureAndroidWindowStack(flowPath)
+}
+
+/**
+ * Save the Android window stack next to a failed flow's artifacts.
+ *
+ * Expo Go sometimes dims the whole screen for a developer sheet that never
+ * draws (CI runs 38934394685 and 38959860317). The dimming window is not in the
+ * accessibility hierarchy Maestro records, so the screenshot and hierarchy
+ * cannot say what it is. `dumpsys window windows` lists every window with its
+ * owner, type and flags, which can. It carries window and package names only.
+ *
+ * @param {string} flowPath
+ * @returns {void}
+ */
+const captureAndroidWindowStack = (flowPath) => {
+  if (!WRITE_ARTIFACTS || IOS_UDIDS.length > 0) return
+  const result = spawnSync(
+    resolveAdbBinary(),
+    ['shell', 'dumpsys', 'window', 'windows'],
+    {
+      encoding: 'utf8',
+      timeout: 15_000,
+      env: androidSerial
+        ? { ...process.env, ANDROID_SERIAL: androidSerial }
+        : process.env,
+    }
+  )
+  if (result.status !== 0 || !result.stdout) {
+    log(`Could not capture the Android window stack for ${flowPath}`)
+    return
+  }
+  const target = path.join(MAESTRO_ARTIFACT_DIR, `${getFlowName(flowPath)}-windows.txt`)
+  fs.mkdirSync(path.dirname(target), { recursive: true })
+  fs.writeFileSync(target, result.stdout)
+  log(`Saved the Android window stack for ${flowPath} to ${target}`)
+}
+
+/**
+ * @param {string} flowPath
+ * @param {Error | undefined} maestroExitError
+ * @param {string[]} flowFailures collected in place
+ * @returns {void}
+ */
+const recordFlowOutcome = (flowPath, maestroExitError, flowFailures) => {
   if (WRITE_ARTIFACTS) {
     const resolvedReportPath =
       resolveReportPath(getFlowReportPath(flowPath)) ?? getFlowReportPath(flowPath)

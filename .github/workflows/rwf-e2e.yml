@@ -49,11 +49,7 @@ on:
         required: false
       VERCEL_TOKEN:
         required: false
-      DATABASE_URL_PREVIEW:
-        required: false
       DATABASE_URL_PROD:
-        required: false
-      GUARDIAN_INVITE_JWT_SECRET:
         required: false
 
 jobs:
@@ -64,7 +60,6 @@ jobs:
       LOCAL_DATABASE_URL: postgresql://postgres:postgres@127.0.0.1:54322/postgres
     permissions:
       contents: read
-      id-token: write
     steps:
       - name: Checkout
         uses: actions/checkout@v4
@@ -98,11 +93,14 @@ jobs:
         shell: bash
         env:
           GH_TOKEN: ${{ github.token }}
+          # Inputs travel through env so a dispatched value cannot inject shell.
+          INPUT_GH_REF: ${{ inputs.gh_ref }}
+          INPUT_DEPLOYMENT_REF: ${{ inputs.deployment_ref }}
         run: |
           # deployment_ref might be a SHA, not a branch name
           # Query GitHub API to find which branch has this commit as HEAD
-          sha="${{ inputs.gh_ref }}"
-          deployment_ref="${{ inputs.deployment_ref }}"
+          sha="$INPUT_GH_REF"
+          deployment_ref="$INPUT_DEPLOYMENT_REF"
 
           branch_name=""
 
@@ -132,13 +130,15 @@ jobs:
         shell: bash
         env:
           TEST_ENV: ${{ inputs.test_env }}
-          DATABASE_URL_PREVIEW: ${{ secrets.DATABASE_URL_PREVIEW }}
-          DATABASE_URL_PROD: ${{ secrets.DATABASE_URL_PROD }}
-          GUARDIAN_INVITE_JWT_SECRET: ${{ secrets.GUARDIAN_INVITE_JWT_SECRET }}
+          # Prod only: preview runs execute PR code and must not hold the prod credential.
+          DATABASE_URL_PROD: ${{ inputs.test_env == 'prod' && secrets.DATABASE_URL_PROD || '' }}
           EXPECTED_SHA: ${{ steps.expected_sha.outputs.sha }}
           GITHUB_SHA: ${{ steps.expected_sha.outputs.sha }}
           GH_TOKEN: ${{ github.token }}
-          VERCEL_AUTOMATION_BYPASS_SECRET: ${{ secrets.VERCEL_AUTOMATION_BYPASS_SECRET }}
+          # Preview only: production is not behind Vercel protection, and the
+          # preview config turns traces off whenever this is set because the
+          # bypass cookie it mints would be recorded in them.
+          VERCEL_AUTOMATION_BYPASS_SECRET: ${{ inputs.test_env == 'preview' && secrets.VERCEL_AUTOMATION_BYPASS_SECRET || '' }}
           VERCEL_TOKEN: ${{ secrets.VERCEL_TOKEN }}
           VERCEL_WEB_PROJECT_SLUG: ${{ inputs.vercel_web_project_slug }}
           VERCEL_API_PROJECT_SLUG: ${{ inputs.vercel_api_project_slug }}
@@ -147,27 +147,35 @@ jobs:
           VERCEL_GIT_COMMIT_REF: ${{ steps.resolve_branch.outputs.branch }}
           # Enable debug logging for URL resolution scripts
           DEBUG: true
+          # Fallback resolution inside this 20-minute job polls for the commit's
+          # deployment for at most two minutes, then uses the branch alias.
+          RESOLVE_SHA_TIMEOUT_SECONDS: '120'
+          # Dispatch inputs travel through env so they cannot inject shell.
+          CUSTOM_BASE_URL: ${{ inputs.custom_base_url }}
+          CUSTOM_API_BASE_URL: ${{ inputs.custom_api_base_url }}
         run: |
           case "$TEST_ENV" in
             local) export DATABASE_URL="${LOCAL_DATABASE_URL}" ;;
             prod) export DATABASE_URL="${DATABASE_URL_PROD}" ;;
-            preview) export DATABASE_URL="${DATABASE_URL_PREVIEW}" ;;
+            # Preview runs have no direct database access by design; specs that
+            # need one skip themselves. No preview database secret exists.
+            preview) unset DATABASE_URL ;;
             *)
               echo "Unsupported TEST_ENV=$TEST_ENV. Expected local, preview, or prod."
               exit 1
               ;;
           esac
 
-          if [ -z "$DATABASE_URL" ]; then
+          if [ "$TEST_ENV" != "preview" ] && [ -z "$DATABASE_URL" ]; then
             echo "Warning: DATABASE_URL is empty for TEST_ENV=$TEST_ENV"
           fi
 
-          custom_base_url="${{ inputs.custom_base_url }}"
-          custom_api_base_url="${{ inputs.custom_api_base_url }}"
+          custom_base_url="$CUSTOM_BASE_URL"
+          custom_api_base_url="$CUSTOM_API_BASE_URL"
           # Callers can pin the exact URLs they already resolved and waited for.
           # That is stronger than letting the test command rediscover previews on its own.
           if [ -n "$custom_base_url" ]; then
-            case "${{ inputs.test_env }}" in
+            case "$TEST_ENV" in
               local) export WEB_E2E_BASE_URL="$custom_base_url" ;;
               preview)
                 export PREVIEW_WEB_E2E_BASE_URL="$custom_base_url"
@@ -177,7 +185,7 @@ jobs:
           fi
 
           if [ -n "$custom_api_base_url" ]; then
-            case "${{ inputs.test_env }}" in
+            case "$TEST_ENV" in
               local) export API_BASE_URL="$custom_api_base_url" ;;
               preview)
                 export PREVIEW_API_BASE_URL="$custom_api_base_url"
@@ -186,7 +194,7 @@ jobs:
                 ;;
               prod) export PROD_API_BASE_URL="$custom_api_base_url" ;;
             esac
-          elif [ "${{ inputs.test_env }}" = "preview" ] && [ -z "$PREVIEW_API_BASE_URL" ] && [ -z "$VERCEL_API_BASE_URL" ]; then
+          elif [ "$TEST_ENV" = "preview" ] && [ -z "$PREVIEW_API_BASE_URL" ] && [ -z "$VERCEL_API_BASE_URL" ]; then
             # Fallback path: if the caller did not pin an API preview URL, resolve one
             # here so preview tests still have an API origin to target.
             echo "Resolving API URL via Vercel REST API..."
@@ -203,8 +211,25 @@ jobs:
           # DEBUG env var already set at workflow level
           ${{ inputs.test_command }}
 
-      - name: Upload Playwright artifacts
+      # Blocks the upload when a report or trace carries a secret this job
+      # holds. Fails closed: if the scan cannot run, nothing is uploaded.
+      - name: Check Playwright artifacts for secret values
+        id: secret_scan
         if: always()
+        env:
+          VERCEL_AUTOMATION_BYPASS_SECRET: ${{ secrets.VERCEL_AUTOMATION_BYPASS_SECRET }}
+          VERCEL_TOKEN: ${{ secrets.VERCEL_TOKEN }}
+          # Same scoping as the run step: preview never holds the prod credential.
+          DATABASE_URL_PROD: ${{ inputs.test_env == 'prod' && secrets.DATABASE_URL_PROD || '' }}
+          GH_TOKEN: ${{ github.token }}
+        run: >-
+          node scripts/check-artifact-secrets.mjs
+          --names VERCEL_AUTOMATION_BYPASS_SECRET,VERCEL_TOKEN,DATABASE_URL_PROD,GH_TOKEN
+          --storage-state playwright/.auth/vercel-bypass.json
+          playwright/artifacts playwright/playwright-report
+
+      - name: Upload Playwright artifacts
+        if: always() && steps.secret_scan.outcome == 'success'
         uses: actions/upload-artifact@v4
         with:
           name: pw-artifacts-${{ inputs.test_env }}
