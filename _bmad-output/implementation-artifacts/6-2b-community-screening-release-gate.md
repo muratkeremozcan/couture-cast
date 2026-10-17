@@ -600,13 +600,16 @@ the payload is current.
   the 5 USD gate up to 962 posts a day. The API's commands are billed on the same database.
 - Evidence verdict: `fail`, on two gates: the safe photograph holdout (27 of 298 withheld, 7
   blocked, upper bound 12.86%) and the text clean-copy holdout in four languages (es, fr, it, pt).
-  The hosted canary has not run, so that gate reads not run. Every other gate passes against
-  input set `3a9e1271`, from a committed tree: image, local canary, restart drill, sweep,
-  calibration, list provenance, obfuscation, model artifacts, latency (warm p95 290 ms over 1,000
-  samples at 0.2 vCPU and 512 MiB), memory (cgroup peak 342.4 MiB of 512 MiB at a 4096x4096
-  upload, the container's worker the only consumer before and after the job) and Redis cost.
-  Regenerated on 2026-10-17 after the second Codex review fixes and the Redis gate correction,
-  with every Docker-backed product re-run after a Docker Desktop restart.
+  The hosted canary reads not run: the deployed worker was built from `913a0d79`, whose input set
+  differs from the final review fixes, so it waits on a redeploy. Every other gate passes against
+  input set `ecc64423`, from a committed tree: image, local canary, restart drill (zero consumers
+  observed before and after the enqueue with the job waiting, the worker back after 16.7 s of
+  observed downtime, queue latency 17.0 s), sweep, calibration, list provenance, obfuscation, model
+  artifacts, latency (warm p95 287 ms over 1,000 samples at 0.2 vCPU and 512 MiB), memory (cgroup
+  peak 339.6 MiB of 512 MiB at a 4096x4096 upload, the container's worker the only consumer before
+  and after the job) and Redis cost (138 commands an hour idle with the worker connected at 121 of
+  121 samples, 82 per post, 0.70 USD a month at 100 posts a day). Regenerated on 2026-10-17 after
+  the final review fixes (RF1 to RF6).
 - `npm run verify:changed` and `npm run validate` both exit 0 (api coverage 95.09 statements,
   89.19 branches, 95.57 functions, 95.26 lines against 94/88/95/94).
 - No signature file is committed and no sign command ran. Both rollout flags remain disabled.
