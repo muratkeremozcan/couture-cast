@@ -440,9 +440,18 @@ canary refuses it.
 [`scripts/start-community-worker-production.mjs`](../../scripts/start-community-worker-production.mjs).
 It refuses an unset, unknown or `fixture` selector, runs `verify:community-screening-model`,
 starts the compiled community bootstrap in-process, and turns `SIGTERM` and `SIGINT` into the
-bootstrap's graceful shutdown with a 25-second hard deadline. Production otherwise logs at
-`warn`; the image sets `LOG_LEVEL=info` so the readiness line is visible, and `NO_COLOR=1` so
-the Nest logger writes no escape codes.
+bootstrap's graceful shutdown: the consumer stops taking jobs and waits for the active one under a
+20-second deadline, and the launcher exits at 25 seconds whatever happens. Northflank sends
+`SIGKILL` 30 seconds after `SIGTERM` by default (`gracePeriodSeconds`, 15 to 1,800 seconds,
+northflank.com/docs/v1/application/scale/scale-instances, read 2026-10-17); leave it at 30 or
+above. One screening may take up to 30 seconds, so a deploy can cut off a slow job. That job is
+abandoned: it neither completes nor fails, its lock expires, and BullMQ requeues it on the stalled
+check after the one that first finds it unlocked. The check runs when the new worker starts and
+every 600 seconds, so the job comes back 10 to 20 minutes after the restart. If the post's
+15-minute stale-review window runs out first, it moves to `review_failed` with a retryable
+`JobFailure` row, and the redelivered job skips it. Production otherwise logs at `warn`; the image
+sets `LOG_LEVEL=info` so the readiness line is visible, and `NO_COLOR=1` so the Nest logger writes
+no escape codes.
 
 **Variables the host injects** (values from the same stores the Vercel API uses; nothing is
 baked into the image):
@@ -601,10 +610,9 @@ which bills 0.20 USD per 100K commands and includes no free commands once a data
 plan (upstash.com/pricing/redis, read 2026-10-17). An idle BullMQ consumer polls Redis
 continuously. With BullMQ's defaults (a 5-second idle block and a 30-second stalled check) an idle
 worker spent about 4.8 million commands a month, about 9.50 USD (the payload's
-`redis.beforeTuning`). The community worker now blocks for 300 seconds while idle and checks for stalled jobs
-every 600 seconds (`community-moderation.worker.ts`); a new job still wakes it at once, and a
-restart runs the stalled check immediately. `npm run community:screening:measure:redis` measures
-the idle cost against a local Redis only the worker uses, sampling `CLIENT LIST` every 15 seconds
+`redis.beforeTuning`). The community worker now blocks for 300 seconds while idle and checks for
+stalled jobs every 600 seconds (`community-moderation.worker.ts`); a new job still wakes it at
+once. `npm run community:screening:measure:redis` measures the idle cost against a local Redis only the worker uses, sampling `CLIENT LIST` every 15 seconds
 to prove the container's named worker stayed connected for the whole window, and
 `node scripts/measure-community-worker-redis.mjs --canary-runs 5 --idle-baseline <idle product>`
 measures the cost of one screened post. Both count every command Redis records, including those

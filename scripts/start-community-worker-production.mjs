@@ -37,11 +37,15 @@ const apiDist = path.join(projectRoot, 'apps/api/dist/src')
 const SELECTOR_ENV = 'COMMUNITY_NSFW_SCREENER'
 const STARTABLE_SELECTORS = new Set(['tensorflow', 'unavailable'])
 /**
- * Comfortably above the bootstrap's own shutdown deadline and below the 30
- * seconds most container hosts allow between SIGTERM and SIGKILL, so the log says
- * which one gave up.
+ * Above the bootstrap's own 20-second shutdown deadline and below Northflank's
+ * default 30-second grace period between SIGTERM and SIGKILL
+ * (`gracePeriodSeconds`; northflank.com/docs/v1/application/scale/scale-instances,
+ * read 2026-10-17), so the log says which one gave up. A job still screening
+ * when it expires is redelivered by BullMQ's stalled check (community.bootstrap.ts).
  */
-const SHUTDOWN_DEADLINE_MS = 25_000
+export const SHUTDOWN_DEADLINE_MS = 25_000
+/** Northflank's default `gracePeriodSeconds`, in milliseconds. */
+export const HOST_GRACE_PERIOD_MS = 30_000
 
 function log(event, fields = {}) {
   // One JSON line, the same shape pino emits, so a host's log search treats the

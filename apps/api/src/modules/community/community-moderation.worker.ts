@@ -57,9 +57,10 @@ export const COMMUNITY_MODERATION_DRAIN_DELAY_SECONDS = 300
 /**
  * How often the worker looks for jobs whose lock expired because a worker died
  * mid-job, in milliseconds. BullMQ's default is 30 seconds. A worker also runs
- * this check when it starts, so a restarted container recovers a stalled job at
- * once; the interval only bounds recovery while the same process stays up, and
- * the stale-review sweep bounds it again for the post.
+ * this check when it starts, but BullMQ requeues a job only on the check after
+ * the one that first finds it active without a lock, so a job abandoned by a
+ * restart is redelivered 10 to 20 minutes later (community.bootstrap.ts,
+ * `performShutdown`). The stale-review sweep bounds the wait for the post.
  */
 export const COMMUNITY_MODERATION_STALLED_INTERVAL_MS = 600_000
 

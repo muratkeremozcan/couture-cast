@@ -95,6 +95,8 @@ interface LauncherModule {
     fileExists?: (file: string) => boolean
   ) => string | null
   IMAGE_DATABASE_CA: string
+  SHUTDOWN_DEADLINE_MS: number
+  HOST_GRACE_PERIOD_MS: number
 }
 interface SignModule {
   signingRefusal: (context: {
@@ -270,6 +272,29 @@ describe('production launcher selector', () => {
     })
     expect(resolveStartableSelector({ COMMUNITY_NSFW_SCREENER: 'unavailable' }).ok).toBe(
       true
+    )
+  })
+})
+
+describe('shutdown budgets', () => {
+  // Story 6.2b final review (RF4): the bootstrap's deadline, then the
+  // launcher's, then the host's SIGKILL, each logged by the one that gives up.
+  it('gives up inside the host grace period, bootstrap first', async () => {
+    const { SHUTDOWN_DEADLINE_MS, HOST_GRACE_PERIOD_MS } = await load<LauncherModule>(
+      'scripts/start-community-worker-production.mjs'
+    )
+    const bootstrap = read('apps/api/src/workers/community.bootstrap.ts')
+    const bootstrapMs = Number(
+      /COMMUNITY_SHUTDOWN_TIMEOUT_MS = ([\d_]+)/.exec(bootstrap)?.[1]?.replace(/_/g, '')
+    )
+    expect(bootstrapMs).toBe(20_000)
+    expect(bootstrapMs).toBeLessThan(SHUTDOWN_DEADLINE_MS)
+    expect(SHUTDOWN_DEADLINE_MS).toBeLessThan(HOST_GRACE_PERIOD_MS)
+    expect(HOST_GRACE_PERIOD_MS).toBe(30_000)
+    // The slow tail is documented where an operator and a maintainer look.
+    expect(bootstrap).toContain('THE SLOW TAIL')
+    expect(read('_bmad-output/project-knowledge/deployment-guide.md')).toContain(
+      'gracePeriodSeconds'
     )
   })
 })

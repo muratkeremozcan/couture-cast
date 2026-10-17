@@ -139,6 +139,27 @@ export async function startCommunityWorkers() {
  * `review_failed`. The runtime and PostHog close in the queue phase, after every
  * worker; when the deadline expires, `shutdownWorkerResources` force-closes the
  * worker and the runtime and this process exits nonzero.
+ *
+ * THE BUDGETS AND THE HOST. Northflank sends SIGKILL 30 seconds after SIGTERM
+ * by default (`gracePeriodSeconds`, 15 to 1,800; northflank.com/docs/v1/
+ * application/scale/scale-instances, read 2026-10-17). This deadline is 20
+ * seconds and the launcher's is 25, so both give up, and log it, before the
+ * host's kill.
+ *
+ * THE SLOW TAIL. One screening may take up to 30 seconds
+ * (`MODERATION_SCREENING_TIMEOUT_MS`), longer than this deadline. A job still
+ * screening when the deadline expires is abandoned: it neither completes nor
+ * fails, its BullMQ lock (30 seconds) expires, and the next worker's stalled
+ * check returns it to `waiting`. BullMQ requeues a job on the check after the
+ * one that first finds it active without a lock, and the check runs when a
+ * worker starts and every 600 seconds after
+ * (`COMMUNITY_MODERATION_STALLED_INTERVAL_MS`), so the job is redelivered 10
+ * to 20 minutes after the restart. A first stall (`maxStalledCount` 1) does
+ * not use up one of the job's attempts. The post waits in `pending_review` meanwhile. When
+ * the stale-review sweep's 15 minutes run out first, the post moves to
+ * `review_failed` with a `JobFailure` row an operator can retry, and the
+ * redelivered job then skips it. Either way the post is screened or reaches
+ * human review; it is never lost.
  */
 export async function performShutdown() {
   logger.info('Shutting down community workers...')
