@@ -1,5 +1,7 @@
 import { execSync } from 'node:child_process'
+import fs from 'node:fs'
 import path from 'node:path'
+import { E2E_STACK_PID_FILE } from '../scripts/e2e-stack-pid.mjs'
 
 function isLocalDatabaseUrl(value: string): boolean {
   try {
@@ -18,7 +20,37 @@ function isLocalDatabaseUrl(value: string): boolean {
   }
 }
 
-export default function globalTeardown() {
+/**
+ * Playwright stops its web server only after this teardown returns, so the E2E
+ * stack's workers would still be polling tables that db:reset drops, and log
+ * false `community_sweep_failed` errors. Stop the stack first; its SIGTERM
+ * handler shuts its children down gracefully.
+ */
+async function stopE2eStack(): Promise<void> {
+  let pid: number
+  try {
+    pid = Number(fs.readFileSync(E2E_STACK_PID_FILE, 'utf8').trim())
+  } catch {
+    return
+  }
+  if (!Number.isInteger(pid) || pid <= 0) return
+  try {
+    process.kill(pid, 'SIGTERM')
+  } catch {
+    return
+  }
+  const deadline = Date.now() + 10_000
+  while (Date.now() < deadline) {
+    try {
+      process.kill(pid, 0)
+    } catch {
+      return
+    }
+    await new Promise((resolve) => setTimeout(resolve, 100))
+  }
+}
+
+export default async function globalTeardown() {
   const env = { ...process.env }
   // Allow local Postgres path if available (non-fatal if missing)
   const postgresPaths = [
@@ -43,6 +75,8 @@ export default function globalTeardown() {
     )
     return
   }
+
+  await stopE2eStack()
 
   try {
     execSync('npm run db:reset', {

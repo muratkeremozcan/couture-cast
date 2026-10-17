@@ -1,9 +1,10 @@
-import { existsSync } from 'node:fs'
+import fs, { existsSync } from 'node:fs'
 import path from 'node:path'
 import { fileURLToPath } from 'node:url'
 import { spawn } from 'node:child_process'
 import { config as loadEnv } from 'dotenv'
 import { applyLocalE2eDatabaseUrl, isLocalTestRun } from './local-e2e-database.mjs'
+import { E2E_STACK_PID_FILE } from './e2e-stack-pid.mjs'
 
 const repoRoot = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..')
 const startWeb = process.argv.includes('--with-web')
@@ -208,6 +209,13 @@ async function shutdown(code = 0) {
 for (const signal of ['SIGINT', 'SIGTERM']) {
   process.on(signal, () => void shutdown(0))
 }
+
+// Playwright runs globalTeardown before it stops this web server, and the local
+// teardown resets the database. The stack's workers would keep polling tables
+// the reset just dropped, so the teardown stops this process first, through the
+// pid it finds here. See playwright/global-teardown.ts.
+fs.writeFileSync(E2E_STACK_PID_FILE, String(process.pid))
+process.once('exit', () => fs.rmSync(E2E_STACK_PID_FILE, { force: true }))
 
 async function runPreparation(command, args) {
   const child = spawn(command, args, {
