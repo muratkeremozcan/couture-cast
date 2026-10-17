@@ -683,6 +683,13 @@ playwright/tests/community-publication.spec.ts` passes 3 of 3 with no `community
 - `apps/api/integration/community-worker-release-gate.spec.ts` (new)
 - `apps/api/integration/community-moderation-crash-recovery.integration.spec.ts` and
   `support/community-crash-worker.mjs` (new: review RF13)
+- `apps/api/src/modules/community/community-worker-heartbeat.ts` and `.spec.ts` (new: review
+  RF15 presence heartbeat), `community-worker-runtime.ts` and `.spec.ts` (heartbeat wired on the
+  worker's connection)
+- `apps/api/integration/community-worker-heartbeat.integration.spec.ts` and
+  `support/community-heartbeat-worker.ts` (new: review RF15, graceful removal and SIGKILL expiry
+  against real Redis)
+- `scripts/lib/community-worker-heartbeat.mjs` (new: review RF15 heartbeat reader)
 - `apps/api/integration/community-moderation-reason-codes.spec.ts` (imports the validation codes)
 - `packages/api-client/src/contracts/http/community.ts` (validation code enumeration, `upload`
   category)
@@ -932,6 +939,7 @@ regression test that fails on the code before it.
 | RF12 upload validation codes reach authors raw   | medium  | patch: shared code enum, `upload` copy, 10 locales     |
 | RF13 a crashed job can outlast the stale sweep   | medium  | patch: 120 s stalled check, budget, crash test         |
 | RF14 admin retry does not re-screen the post     | low     | doc: comments and runbook corrected, deferred          |
+| RF15 Upstash CLIENT LIST hides the hosted worker | high    | patch: TTL'd heartbeat key per process, SCAN counts it |
 
 RF1: `--restart-drill` (local only, replacing `--no-worker-precheck`) requires zero consumers before
 and after the enqueue with the job waiting, then a returning consumer, and records them with the
@@ -1022,3 +1030,31 @@ the new check. RF14: the admin retry adds a job with a BullMQ-generated id, and 
 any post not in `pending_review`, so the retry re-screens no `review_failed` post. The comments
 that said it reuses the deterministic id, and the runbook steps that relied on it, now say what
 happens, and deferred work records making the retry work end to end.
+
+Loop 7 (2026-10-17). RF15 was found in production, not in review: the hosted canary for input set
+`b365bbf1` failed `worker_absent` twice against a healthy worker. Upstash answers `CLIENT LIST` from
+the node that took the connection, so BullMQ's `queue.getWorkers()` sees only that node's clients.
+Measured against the production database, 5 of 12 fresh connections listed the hosted worker's
+named BullMQ connection and 7 did not, while the worker stayed connected throughout. The same blind
+spot gives false positives too: a second consumer on another node is invisible to the
+sole-consumer proof. A local Redis is one node, which is why no local measurement showed it.
+
+Each community worker process now writes `community-worker:heartbeat:<worker name>:<instance
+id>`, the instance id a UUID per process, valued with its name, commit, start time and pid, on the
+worker's own BullMQ connection with a 90-second TTL refreshed every 30 seconds. A missed refresh
+logs at `warn` and never stops the worker. Closing the worker removes the key first, within 2 of the
+20 seconds of the shutdown deadline; a forced close does not wait for it. The canary
+(`--sole-consumer` and the hosted run), the restart drill, the memory measurement and the idle Redis
+measurement count live keys by `SCAN` with a `MATCH` pattern in a bounded loop, report an
+unfinished scan as unknown, and prove a sole consumer by one heartbeat of the expected name from the
+same instance before and after the job. A hosted run no longer asks `CLIENT LIST`; a local run
+records it beside the heartbeats as a cross-check that decides nothing. The generator re-judges the
+recorded observations and now requires the heartbeat fields: a sole-consumer proof, a restart drill
+or an idle window recorded from `CLIENT LIST` fails its gate, and an idle window across a worker
+restart (two instances) fails the Redis gate. `6.2b-INT-002` and `6.2b-INT-003` run a worker with
+its heartbeat against real Redis: the key stays live across three TTLs, a `SIGTERM` removes it at
+once, and after a `SIGKILL` it stays until its TTL passes and no longer. The canary test that gives
+the canary a Redis whose `CLIENT LIST` shows no worker and whose heartbeat shows the real one fails
+`worker_absent` on the code before the fix. The heartbeat adds 120 `SET` commands an hour to the
+idle cost, re-measured below. The worker, the canary and the measuring scripts are inputs, so every
+run product was regenerated.
