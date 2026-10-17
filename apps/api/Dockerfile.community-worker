@@ -102,9 +102,11 @@ RUN COMMUNITY_NSFW_SCREENER=tensorflow node scripts/start-community-worker-produ
 # hosted canary proves which build consumed its job. INPUT_SET_HASH is the hash
 # scripts/lib/community-screening-input-set.mjs computes over the inputs, which
 # the readiness generator compares with the working tree. A hosted builder sets
-# COMMIT_SHA from the commit it builds; both default to "unset", which the
-# canary and the generator treat as unproven.
-ARG COMMIT_SHA=unset
+# COMMIT_SHA from the commit it builds; Northflank injects NF_GIT_SHA, which
+# COMMIT_SHA defaults to. Both default to "unset" otherwise, which the canary
+# and the generator treat as unproven.
+ARG NF_GIT_SHA=unset
+ARG COMMIT_SHA=${NF_GIT_SHA}
 ARG INPUT_SET_HASH=unset
 ENV COMMUNITY_WORKER_COMMIT_SHA=${COMMIT_SHA} \
     COMMUNITY_WORKER_INPUT_SET_HASH=${INPUT_SET_HASH}

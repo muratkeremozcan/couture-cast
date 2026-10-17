@@ -470,8 +470,9 @@ evidence. Re-measure inside the hosted container after the first deploy.
    Northflank API from there.
 2. Create a project in the region closest to the Supabase project.
 3. Create a combined service on `couture-cast`, branch `main`, build type Dockerfile, Dockerfile
-   path `/apps/api/Dockerfile.community-worker`, build context `/`, and the build arguments
-   `COMMIT_SHA` and `INPUT_SET_HASH` described under **Image**.
+   path `/apps/api/Dockerfile.community-worker`, build context `/`. Northflank injects
+   `NF_GIT_SHA`, which `COMMIT_SHA` defaults to; `INPUT_SET_HASH` stays `unset` on the hosted
+   image, because only the local measurement products record it.
 4. Leave ports empty: the worker serves no HTTP, and a port would add a health check that can
    never pass.
 5. Add the variables above as runtime secrets and deploy.
