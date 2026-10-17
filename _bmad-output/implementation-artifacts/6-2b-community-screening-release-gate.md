@@ -908,6 +908,8 @@ regression test that fails on the code before it.
 | RF7 cleanup passes before a late write commits   | medium  | patch: unknown outcomes, settle, re-query, `uncertain` |
 | RF8 a PostHog cohort can see the canary post     | medium  | patch: canary excluded from every public read          |
 | RF9 a cut-down gate set recomputes to pass       | medium  | patch: exact `MANDATORY_GATE_IDS` before `verdictOf`   |
+| RF10 an empty lookup resolves a running INSERT   | medium  | patch: `pg_cancel_backend`, seen to end, `uncertain`   |
+| RF11 a storage transport error counts as known   | medium  | patch: original error kept, unknown unless 4xx + body  |
 
 RF1: `--restart-drill` (local only, replacing `--no-worker-precheck`) requires zero consumers before
 and after the enqueue with the job waiting, then a returning consumer, and records them with the
@@ -943,3 +945,31 @@ feed, single-post, card-open and report reads already shared; the RF5 refusal st
 generator exports `MANDATORY_GATE_IDS`, `buildGates` throws if its gates differ from it, and
 `approvalRefusal` rejects a missing, repeated or unknown id before it recomputes `verdictOf`. The
 canary and the community module are inputs, so every run product was regenerated again.
+
+Loop 6 (2026-10-17). A Codex review of `a3875f81..d7867054` raised RF10 and RF11 against the RF7
+cleanup. Both were reproduced end to end against the local stack before they were fixed. RF10: a
+`BEFORE INSERT` trigger held the canary's account INSERT for 4 seconds, past the 2.5-second run
+deadline and the 300 ms settle window; cleanup reported `clean`, and the account committed
+afterwards. RF11: a proxy took the canary's upload, dropped the client connection and forwarded the
+upload 1.5 seconds later; the canary reported `configuration` with `unknownOutcomes: []` and
+cleanup `clean`, and the object landed afterwards.
+
+RF10: the canary records its connection's server process (`pg_backend_pid()`) when it connects,
+and every canary statement starts with a comment naming the run. Cleanup cancels a cut-off write
+with `pg_cancel_backend` on that process and polls `pg_stat_activity` until the process is gone,
+idle or running another statement, within two thirds of the cleanup deadline; only then does it
+delete and look again. A refused cancel, a process `pg_stat_activity` does not describe, the
+canary's write showing on another process, or an expired budget leaves cleanup `uncertain` with
+every affected id. Production reaches PostgreSQL through the Supavisor session pooler (the
+`.env.prod` pattern, port 5432), which keeps one server process per client session, so the
+recorded pid holds. RF11: `uploadFixture` keeps the original storage error as the failure's cause
+and in `details.storageError`. Only a 4xx `StorageApiError` carrying the storage server's error
+body is `storage_rejected`; the canary's storage fetch turns a bare 4xx into a transport failure,
+and a transport failure, a 5xx or any other error is `storage_outcome_unknown`. An upload of
+unknown outcome is resolved only when a lookup finds the object and removes it. Fixed along the way:
+`outcomeUnknown` took any five-character error code for a SQLSTATE, so a socket `EPIPE` counted as
+a server answer; it now also requires the server's severity. Both regression tests build on Codex's
+probes and fail on the code before the fix. After the fix the RF10 repro cancelled the INSERT and
+ended `clean` with no account left; the RF11 repro ended `uncertain`, or `clean` when a settle
+window longer than the late write let a lookup find and remove the object. The canary is an input,
+so every run product was regenerated again.

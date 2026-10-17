@@ -577,16 +577,35 @@ a failure report naming the stalled stage and any data cleanup could not remove,
 nonzero.
 
 A write the canary stopped waiting for can still commit on the server, after cleanup has deleted
-it. The canary records every write cut off by a deadline or a client timeout, and every job a
-worker was still processing at cleanup, as having an unknown outcome. Cleanup then waits a settle
-window (`--cleanup-settle-ms`, default 10 seconds or a third of the cleanup deadline, whichever is
-less), looks the canary's identifiers up again (the job, the account, its posts, the moderation
-events about the post, and the post's storage folder) and removes whatever it finds, until a lookup
-finds nothing. Every run ends with that lookup. The report's `cleanup.status` is `clean` only when
-the lookup came back empty, `failed` when something could not be removed, and `uncertain` when a
-write's outcome was unknown and no clean state was established within the cleanup deadline. Anything
-but `clean` lists every affected identifier in `cleanup.unresolved`, sets `ok: false`, and fails the
-readiness gate. Remove what an `uncertain` report names by hand before the next run.
+it. The canary records every write cut off by a deadline or a client timeout, every upload that
+ended without a storage answer, and every job a worker was still processing at cleanup, as having an
+unknown outcome, and then cleans up on fresh connections. An empty lookup never resolves an unknown
+outcome on its own:
+
+- A database write: the canary records its connection's server process (`pg_backend_pid()`) when
+  it connects, and every canary statement starts with a comment naming the run. Cleanup cancels the
+  write with `pg_cancel_backend` and polls `pg_stat_activity` until that process is gone, idle or
+  running another statement, within two thirds of the cleanup deadline. Only then does it delete and
+  look again. A refused cancel, a process `pg_stat_activity` does not describe, the write showing
+  on another process, or the budget running out leaves the write unresolved. Production connects
+  through Supabase's session pooler (port 5432), which keeps one server process per client
+  session; the transaction pooler (port 6543) does not, and the canary reports that mismatch.
+- An upload: storage cannot cancel one, so it is resolved only when a lookup finds the object and
+  removes it. Only a 4xx carrying the storage server's error body counts as a rejection; a
+  transport failure (`StorageUnknownError`, `fetch failed`), a 5xx and a bare 4xx leave the
+  outcome unknown. The report keeps the original storage error under `details.storageError`.
+- An enqueue or an active job: cleanup waits a settle window (`--cleanup-settle-ms`, default 10
+  seconds or a third of the cleanup deadline, whichever is less) before it looks.
+
+Cleanup then looks the canary's identifiers up again (the job, the account, its posts, the
+moderation events about the post, and the post's storage folder) and removes whatever it finds,
+until a lookup finds nothing. Every run ends with that lookup. The report's `cleanup.status` is
+`clean` only when the lookup came back empty and every unknown outcome was resolved, `failed` when
+something could not be removed, and `uncertain` when a write's outcome was unknown and no clean
+state was established within the cleanup deadline. `cleanup.databaseWrite` records what cleanup saw
+of a cut-off database write. Anything but `clean` lists every affected identifier in
+`cleanup.unresolved`, sets `ok: false`, and fails the readiness gate. Remove what an `uncertain`
+report names by hand before the next run.
 
 The canary's safe fixture publishes. The API never serves it: every public read (the feed query,
 the single-post read, the card-open record and the report path) excludes accounts whose id starts
