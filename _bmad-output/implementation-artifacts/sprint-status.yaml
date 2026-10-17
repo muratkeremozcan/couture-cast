@@ -97,7 +97,7 @@ development_status:
   # Epic 6: Community & Moderation Loop (Phase 2)
   epic-6: in-progress
   6-1-community-feed-by-climate-band: done
-  6-2-production-content-screening-readiness: in-progress
+  6-2-production-content-screening-readiness: done
   6-2b-community-screening-release-gate: in-progress
   6-3-curated-reactions: backlog
   6-4-threaded-comments: backlog
