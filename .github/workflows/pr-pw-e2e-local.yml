@@ -125,7 +125,7 @@ jobs:
       # Playwright command below, and its post step publishes this shard's
       # test times (from main only) and a run record for the finish step.
       - name: Balance Playwright shards by duration
-        uses: muratkeremozcan/playwright-smart-parallelization@65d649d62779c544dd9d4f358f129a5651d6e063
+        uses: muratkeremozcan/playwright-smart-parallelization@v1
 
       - name: Run Playwright local suite
         # PSP_ARGS stays unquoted, as the Action requires: it is empty when
@@ -192,4 +192,4 @@ jobs:
       # the job summary. Reads the shards' psp-record-* artifacts and the jobs
       # API, which is why this job keeps actions: read.
       - name: Check shard coverage and timing
-        uses: muratkeremozcan/playwright-smart-parallelization/finish@65d649d62779c544dd9d4f358f129a5651d6e063
+        uses: muratkeremozcan/playwright-smart-parallelization/finish@v1
