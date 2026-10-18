@@ -20,6 +20,9 @@ import {
   communityBandUnresolvedReasonSchema,
   communityFeedModeSchema,
   communityFeedResponseSchema,
+  communityReactionFeedResponseSchema,
+  type CommunityReactionSummary,
+  type SetCommunityReactionInput,
   communityPostResponseSchema,
   communityPostStatusSchema,
   encodeCommunityFeedCursor,
@@ -2339,7 +2342,10 @@ describe('CommunityLookbookGrid (Story 6.1)', () => {
 
     it('6.1-WEB-049 focuses and announces the card a deep link points at', async () => {
       signIn()
-      useMswHandlers(feedHandler({ items: [item(), item({ id: 'post-2' })] }))
+      useMswHandlers(
+        feedHandler({ items: [item(), item({ id: 'post-2' })] }),
+        http.get(POST_PATH, () => postBody({ id: 'post-2' }))
+      )
       renderGrid({ highlightedCardId: 'post-2' })
 
       const card = await screen.findByTestId('lookbook-card-post-2')
@@ -2552,4 +2558,578 @@ describe('CommunityLookbookGrid (Story 6.1)', () => {
       ).toEqual([])
     })
   })
+})
+
+describe('Story 6.3 reactions through the web client', () => {
+  const initial: CommunityReactionSummary = {
+    counts: { applause: 0, love: 0, inspiration: 0 },
+    total: 0,
+    revision: 0,
+    generation: 0,
+    viewerReaction: null,
+  }
+  beforeEach(() => {
+    window.sessionStorage.clear()
+    signIn()
+  })
+  function useReactionHandlers(failFirst = false) {
+    let summary = initial
+    const requests: SetCommunityReactionInput[] = []
+    useMswHandlers(
+      http.get(FEED_PATH, ({ request }) => {
+        expect(request.headers.get('x-couture-reactions')).toBe('1')
+        expect(request.headers.get('x-couture-platform')).toBe('web')
+        return HttpResponse.json(
+          communityReactionFeedResponseSchema.parse({
+            data: feed({ items: [Object.assign(item(), { reactions: summary })] }),
+          })
+        )
+      }),
+      http.put('/api/v1/community/posts/:postId/reaction', async ({ request }) => {
+        const intent = (await request.json()) as SetCommunityReactionInput
+        requests.push(intent)
+        if (failFirst && requests.length === 1) return HttpResponse.error()
+        summary = {
+          counts: {
+            applause: intent.selection === 'applause' ? 1 : 0,
+            love: intent.selection === 'love' ? 1 : 0,
+            inspiration: intent.selection === 'inspiration' ? 1 : 0,
+          },
+          total: intent.selection === null ? 0 : 1,
+          revision: summary.revision + 1,
+          generation: summary.generation + 1,
+          viewerReaction: intent.selection,
+        }
+        return HttpResponse.json({ data: summary })
+      })
+    )
+    return requests
+  }
+  it('uses labeled toggles and keeps the card and detail in sync for add, replace and removal', async () => {
+    const requests = useReactionHandlers()
+    const user = userEvent.setup()
+    renderGrid()
+    const controls = await screen.findByTestId('community-reactions-post-1')
+    const applause = within(controls).getByRole('button', { name: 'Applaud, 0' })
+    applause.focus()
+    await user.keyboard(' ')
+    await waitFor(() => expect(applause).toHaveAttribute('aria-pressed', 'true'))
+    await user.click(within(controls).getByRole('button', { name: 'Love, 0' }))
+    await waitFor(() =>
+      expect(within(controls).getByRole('button', { name: 'Love, 1' })).toHaveAttribute(
+        'aria-pressed',
+        'true'
+      )
+    )
+    await user.click(screen.getByTestId('lookbook-open-post-1'))
+    const detail = await screen.findByTestId('community-detail')
+    await user.click(within(detail).getByRole('button', { name: 'Love, 1' }))
+    await waitFor(() =>
+      expect(within(controls).getByRole('button', { name: 'Love, 0' })).toHaveAttribute(
+        'aria-pressed',
+        'false'
+      )
+    )
+    expect(requests.map((request) => request.selection)).toEqual([
+      'applause',
+      'love',
+      null,
+    ])
+    expect(requests.map((request) => request.baseRevision)).toEqual([0, 1, 2])
+  })
+  it('updates each repeated success announcement only on the active surface', async () => {
+    useReactionHandlers()
+    const user = userEvent.setup()
+    renderGrid()
+    const controls = await screen.findByTestId('community-reactions-post-1')
+    const live = screen.getByTestId('community-live-region')
+    await user.click(within(controls).getByRole('button', { name: 'Applaud, 0' }))
+    await waitFor(() => expect(live.textContent).toBe('Reaction saved.'))
+    const first = live.firstChild
+    await user.click(within(controls).getByRole('button', { name: 'Love, 0' }))
+    await within(controls).findByRole('button', { name: 'Love, 1' })
+    expect(screen.getByTestId('community-live-region')).toBe(live)
+    expect(live.textContent).toBe('Reaction saved.')
+    expect(live.firstChild).not.toBe(first)
+    await user.click(screen.getByTestId('lookbook-open-post-1'))
+    const detail = screen.getByTestId('community-detail')
+    const feedback = screen.getByTestId('community-detail-feedback')
+    await user.click(within(detail).getByRole('button', { name: 'Love, 1' }))
+    await waitFor(() => expect(feedback.textContent).toBe('Reaction saved.'))
+    const second = feedback.firstChild
+    await user.click(within(detail).getByRole('button', { name: 'Applaud, 0' }))
+    await within(detail).findByRole('button', { name: 'Applaud, 1' })
+    expect(screen.getByTestId('community-detail-feedback')).toBe(feedback)
+    expect(feedback.textContent).toBe('Reaction saved.')
+    expect(feedback.firstChild).not.toBe(second)
+    expect(live.textContent).toBe('')
+  })
+  it('bounds malformed conflict fallback and retries the original intent after timeout', async () => {
+    const requests = useReactionHandlers()
+    const signals: AbortController[] = []
+    const timeout = vi.spyOn(AbortSignal, 'timeout').mockImplementation(() => {
+      const controller = new AbortController()
+      signals.push(controller)
+      return controller.signal
+    })
+    let detailStarted = false
+    let first = true
+    useMswHandlers(
+      http.put('/api/v1/community/posts/:postId/reaction', async ({ request }) => {
+        const intent = (await request.json()) as SetCommunityReactionInput
+        requests.push(intent)
+        if (first) {
+          first = false
+          return HttpResponse.json({ message: 'Malformed conflict' }, { status: 409 })
+        }
+        return HttpResponse.json({
+          data: {
+            ...initial,
+            counts: { applause: 1, love: 0, inspiration: 0 },
+            total: 1,
+            viewerReaction: 'applause',
+            revision: 1,
+            generation: 1,
+          },
+        })
+      }),
+      http.get(POST_PATH, async () => {
+        detailStarted = true
+        await delay(200)
+        return HttpResponse.json({ data: { ...item(), reactions: initial } })
+      })
+    )
+    try {
+      const user = userEvent.setup()
+      renderGrid()
+      const controls = await screen.findByTestId('community-reactions-post-1')
+      await user.click(within(controls).getByRole('button', { name: 'Applaud, 0' }))
+      await waitFor(() => expect(detailStarted).toBe(true))
+      expect(timeout).toHaveBeenNthCalledWith(2, 15000)
+      signals[1]!.abort(new DOMException('Timed out', 'TimeoutError'))
+      await user.click(
+        await within(controls).findByRole('button', { name: 'Retry reaction' })
+      )
+      await within(controls).findByRole('button', { name: 'Applaud, 1' })
+      expect(requests[1]).toEqual(requests[0])
+    } finally {
+      timeout.mockRestore()
+    }
+  })
+  it('keeps confirmed counts on failure and retains the mutation ID for retry', async () => {
+    const requests = useReactionHandlers(true)
+    const user = userEvent.setup()
+    renderGrid()
+    const controls = await screen.findByTestId('community-reactions-post-1')
+    await user.click(within(controls).getByRole('button', { name: 'Applaud, 0' }))
+    await user.click(
+      await within(controls).findByRole('button', { name: 'Retry reaction' })
+    )
+    await waitFor(() =>
+      expect(
+        within(controls).getByRole('button', { name: 'Applaud, 1' })
+      ).toHaveAttribute('aria-pressed', 'true')
+    )
+    expect(requests[0]).toEqual(requests[1])
+  })
+  it('reconciles a conflict and evicts a post that becomes hidden', async () => {
+    useReactionHandlers()
+    const newer: CommunityReactionSummary = {
+      counts: { applause: 0, love: 1, inspiration: 0 },
+      total: 1,
+      revision: 2,
+      generation: 2,
+      viewerReaction: 'love',
+    }
+    useMswHandlers(
+      http.put('/api/v1/community/posts/:postId/reaction', () =>
+        HttpResponse.json(
+          {
+            statusCode: 409,
+            error: 'Conflict',
+            message: 'Reaction changed. Refresh and try again.',
+            data: newer,
+          },
+          { status: 409 }
+        )
+      )
+    )
+    const user = userEvent.setup()
+    renderGrid()
+    const controls = await screen.findByTestId('community-reactions-post-1')
+    await user.click(within(controls).getByRole('button', { name: 'Applaud, 0' }))
+    await waitFor(() =>
+      expect(within(controls).getByRole('button', { name: 'Love, 1' })).toHaveAttribute(
+        'aria-pressed',
+        'true'
+      )
+    )
+    expect(
+      within(controls).getByText('Your reaction changed on another device. Choose again.')
+    ).toBeVisible()
+    useMswHandlers(
+      http.put('/api/v1/community/posts/:postId/reaction', () =>
+        errorBody(404, COMMUNITY_POST_NOT_FOUND_MESSAGE, 'Not Found')
+      )
+    )
+    await user.click(within(controls).getByRole('button', { name: 'Love, 1' }))
+    await waitFor(() =>
+      expect(screen.queryByTestId('lookbook-card-post-1')).not.toBeInTheDocument()
+    )
+  })
+
+  it('allows retraction after a write freeze refuses a replacement', async () => {
+    const requests = useReactionHandlers()
+    const user = userEvent.setup()
+    renderGrid()
+    const controls = await screen.findByTestId('community-reactions-post-1')
+    await user.click(within(controls).getByRole('button', { name: 'Applaud, 0' }))
+    await waitFor(() =>
+      expect(
+        within(controls).getByRole('button', { name: 'Applaud, 1' })
+      ).toHaveAttribute('aria-pressed', 'true')
+    )
+    useMswHandlers(
+      http.put('/api/v1/community/posts/:postId/reaction', async ({ request }) => {
+        const intent = (await request.json()) as SetCommunityReactionInput
+        requests.push(intent)
+        if (intent.selection !== null)
+          return errorBody(503, COMMUNITY_FEED_DISABLED_MESSAGE, 'Service Unavailable')
+        return HttpResponse.json({ data: { ...initial, revision: 2, generation: 2 } })
+      })
+    )
+    await user.click(within(controls).getByRole('button', { name: 'Love, 0' }))
+    await within(controls).findByText('The community feed is temporarily unavailable.')
+    await user.click(within(controls).getByRole('button', { name: 'Applaud, 1' }))
+    await waitFor(() =>
+      expect(
+        within(controls).getByRole('button', { name: 'Applaud, 0' })
+      ).toHaveAttribute('aria-pressed', 'false')
+    )
+    expect(requests.map((request) => request.selection)).toEqual([
+      'applause',
+      'love',
+      null,
+    ])
+  })
+})
+
+describe('Story 6.3 screen request ownership', () => {
+  const zero: CommunityReactionSummary = {
+    counts: { applause: 0, love: 0, inspiration: 0 },
+    total: 0,
+    revision: 0,
+    generation: 0,
+    viewerReaction: null,
+  }
+  const one: CommunityReactionSummary = {
+    counts: { applause: 1, love: 0, inspiration: 0 },
+    total: 1,
+    revision: 1,
+    generation: 1,
+    viewerReaction: 'applause',
+  }
+  const post = () => ({ ...item(), reactions: zero })
+  beforeEach(() => {
+    window.sessionStorage.clear()
+    signIn()
+  })
+  function deferred() {
+    let release!: () => void
+    const promise = new Promise<void>((resolve) => {
+      release = resolve
+    })
+    return { promise, release }
+  }
+  it('6.3-WEB closing detail during PUT retains accepted parent update', async () => {
+    const gate = deferred()
+    let returned = false
+    let sent = false
+    useMswHandlers(
+      http.get(FEED_PATH, () => HttpResponse.json({ data: feed({ items: [post()] }) })),
+      http.put('/api/v1/community/posts/:postId/reaction', async () => {
+        sent = true
+        await gate.promise
+        returned = true
+        return HttpResponse.json({ data: one })
+      })
+    )
+    const user = userEvent.setup()
+    renderGrid()
+    await user.click(await screen.findByTestId('lookbook-open-post-1'))
+    const detail = await screen.findByTestId('community-detail')
+    await user.click(within(detail).getByRole('button', { name: 'Applaud, 0' }))
+    await waitFor(() => expect(sent).toBe(true))
+    await user.click(screen.getByRole('button', { name: 'Close this look' }))
+    expect(screen.queryByTestId('community-detail')).toBeNull()
+    gate.release()
+    await waitFor(() => expect(returned).toBe(true))
+    await delay(80)
+    const controls = screen.getByTestId('community-reactions-post-1')
+    expect(within(controls).getByRole('button', { name: 'Applaud, 1' })).toHaveAttribute(
+      'aria-pressed',
+      'true'
+    )
+  })
+  it('6.3-WEB card and detail serialize intents for the same post', async () => {
+    const gate = deferred()
+    const requests: SetCommunityReactionInput[] = []
+    useMswHandlers(
+      http.get(FEED_PATH, () => HttpResponse.json({ data: feed({ items: [post()] }) })),
+      http.put('/api/v1/community/posts/:postId/reaction', async ({ request }) => {
+        requests.push((await request.json()) as SetCommunityReactionInput)
+        await gate.promise
+        return HttpResponse.json({ data: one })
+      })
+    )
+    const user = userEvent.setup()
+    renderGrid()
+    await user.click(await screen.findByRole('button', { name: 'Applaud, 0' }))
+    await waitFor(() => expect(requests).toHaveLength(1))
+    await user.click(screen.getByTestId('lookbook-open-post-1'))
+    const detail = await screen.findByTestId('community-detail')
+    await user.click(within(detail).getByRole('button', { name: 'Love, 0' }))
+    await delay(80)
+    gate.release()
+    expect(requests).toHaveLength(1)
+  })
+  it('6.3-WEB a feed started before mutation 404 cannot resurrect the post', async () => {
+    const gate = deferred()
+    let reads = 0
+    let returned = false
+    useMswHandlers(
+      http.get(FEED_PATH, async () => {
+        reads++
+        if (reads > 1) {
+          await gate.promise
+          returned = true
+        }
+        return HttpResponse.json({
+          data: feed({ items: [post()], mode: reads > 1 ? 'all' : 'auto' }),
+        })
+      }),
+      http.put('/api/v1/community/posts/:postId/reaction', () =>
+        errorBody(404, COMMUNITY_POST_NOT_FOUND_MESSAGE, 'Not Found')
+      )
+    )
+    const user = userEvent.setup()
+    renderGrid()
+    const controls = await screen.findByTestId('community-reactions-post-1')
+    await user.click(screen.getByTestId('community-filter-all'))
+    await waitFor(() => expect(reads).toBe(2))
+    await user.click(within(controls).getByRole('button', { name: 'Applaud, 0' }))
+    await waitFor(() => expect(screen.queryByTestId('lookbook-card-post-1')).toBeNull())
+    gate.release()
+    await waitFor(() => expect(returned).toBe(true))
+    await delay(80)
+    expect(screen.queryByTestId('lookbook-card-post-1')).toBeNull()
+  })
+  it('6.3-WEB retained feed item protects confirmed summary against older feed', async () => {
+    const gate = deferred()
+    let reads = 0
+    let returned = false
+    useMswHandlers(
+      http.get(FEED_PATH, async () => {
+        reads++
+        if (reads > 1) {
+          await gate.promise
+          returned = true
+        }
+        return HttpResponse.json({
+          data: feed({ items: [post()], mode: reads > 1 ? 'all' : 'auto' }),
+        })
+      }),
+      http.put('/api/v1/community/posts/:postId/reaction', () =>
+        HttpResponse.json({ data: one })
+      )
+    )
+    const user = userEvent.setup()
+    renderGrid()
+    const controls = await screen.findByTestId('community-reactions-post-1')
+    await user.click(screen.getByTestId('community-filter-all'))
+    await waitFor(() => expect(reads).toBe(2))
+    await user.click(within(controls).getByRole('button', { name: 'Applaud, 0' }))
+    await within(controls).findByRole('button', { name: 'Applaud, 1' })
+    gate.release()
+    await waitFor(() => expect(returned).toBe(true))
+    await delay(80)
+    expect(within(controls).getByRole('button', { name: 'Applaud, 1' })).toHaveAttribute(
+      'aria-pressed',
+      'true'
+    )
+  })
+
+  it('6.3-WEB-021 reconciles an older detail response with the feed-confirmed reaction', async () => {
+    const gate = deferred()
+    let started = false
+    useMswHandlers(
+      http.get(FEED_PATH, () => HttpResponse.json({ data: feed({ items: [post()] }) })),
+      http.get(POST_PATH, async () => {
+        started = true
+        await gate.promise
+        return HttpResponse.json({ data: post() })
+      }),
+      http.put('/api/v1/community/posts/:postId/reaction', () =>
+        HttpResponse.json({ data: one })
+      )
+    )
+    const user = userEvent.setup()
+    renderGrid({ highlightedCardId: 'post-1' })
+    const controls = await screen.findByTestId('community-reactions-post-1')
+    await waitFor(() => expect(started).toBe(true))
+    await user.click(within(controls).getByRole('button', { name: 'Applaud, 0' }))
+    await within(controls).findByRole('button', { name: 'Applaud, 1' })
+    gate.release()
+    await waitFor(() =>
+      expect(screen.getAllByRole('button', { name: 'Applaud, 1' })).toHaveLength(1)
+    )
+    expect(within(controls).getByRole('button', { name: 'Applaud, 1' })).toHaveAttribute(
+      'aria-pressed',
+      'true'
+    )
+  })
+
+  it('6.3-WEB-022 preserves highlighted reaction focus and announces inside the modal', async () => {
+    useMswHandlers(
+      http.get(FEED_PATH, () => HttpResponse.json({ data: feed({ items: [post()] }) })),
+      http.get(POST_PATH, () => HttpResponse.json({ data: post() })),
+      http.put('/api/v1/community/posts/:postId/reaction', () =>
+        HttpResponse.json({ data: one })
+      )
+    )
+    const user = userEvent.setup()
+    renderGrid({ highlightedCardId: 'post-1' })
+    const card = await screen.findByTestId('lookbook-card-post-1')
+    await waitFor(() => expect(card).toHaveFocus())
+    const applause = within(card).getByRole('button', { name: 'Applaud, 0' })
+    await user.click(applause)
+    await within(card).findByRole('button', { name: 'Applaud, 1' })
+    expect(applause).toHaveFocus()
+    expect(screen.getByTestId('community-live-region')).toHaveTextContent(
+      'Reaction saved.'
+    )
+    await user.click(screen.getByTestId('lookbook-open-post-1'))
+    const detail = screen.getByTestId('community-detail')
+    await user.click(within(detail).getByRole('button', { name: 'Love, 0' }))
+    await waitFor(() =>
+      expect(screen.getByTestId('community-detail-feedback')).toHaveTextContent(
+        'Reaction saved.'
+      )
+    )
+  })
+
+  it('6.3-WEB-023 refreshes an off-page highlighted target and clears it on detail 404', async () => {
+    let hidden = false
+    useMswHandlers(
+      http.get(FEED_PATH, () =>
+        HttpResponse.json({ data: feed({ items: [], mode: hidden ? 'all' : 'auto' }) })
+      ),
+      http.get(POST_PATH, () =>
+        hidden
+          ? errorBody(404, COMMUNITY_POST_NOT_FOUND_MESSAGE, 'Not Found')
+          : HttpResponse.json({ data: post() })
+      )
+    )
+    const user = userEvent.setup()
+    renderGrid({ highlightedCardId: 'post-1' })
+    await screen.findByTestId('lookbook-card-post-1')
+    hidden = true
+    await user.click(screen.getByTestId('community-filter-all'))
+    await waitFor(() => expect(screen.queryByTestId('lookbook-card-post-1')).toBeNull())
+  })
+  it('6.3-WEB-026 refresh evicts an ordinary open modal when detail returns 404', async () => {
+    const gate = deferred()
+    let hidden = false
+    let detailStarted = false
+    useMswHandlers(
+      http.get(FEED_PATH, () =>
+        HttpResponse.json({ data: feed({ items: hidden ? [] : [post()] }) })
+      ),
+      http.get(POST_PATH, async () => {
+        detailStarted = true
+        await gate.promise
+        return errorBody(404, COMMUNITY_POST_NOT_FOUND_MESSAGE, 'Not Found')
+      })
+    )
+    const user = userEvent.setup()
+    renderGrid()
+    await user.click(await screen.findByTestId('lookbook-open-post-1'))
+    expect(detailStarted).toBe(false)
+    hidden = true
+    fireEvent.error(within(screen.getByTestId('lookbook-card-post-1')).getByRole('img'))
+    await waitFor(() => expect(detailStarted).toBe(true))
+    expect(screen.getByTestId('community-detail')).toBeVisible()
+    gate.release()
+    await waitFor(() => expect(screen.queryByTestId('community-detail')).toBeNull())
+    expect(screen.queryByTestId('lookbook-card-post-1')).toBeNull()
+  })
+  it('6.3-WEB-024 rejects an older detail after mutation 404', async () => {
+    const gate = deferred()
+    let started = false
+    let returned = false
+    useMswHandlers(
+      http.get(FEED_PATH, () => HttpResponse.json({ data: feed({ items: [post()] }) })),
+      http.get(POST_PATH, async () => {
+        started = true
+        await gate.promise
+        returned = true
+        return HttpResponse.json({ data: post() })
+      }),
+      http.put('/api/v1/community/posts/:postId/reaction', () =>
+        errorBody(404, COMMUNITY_POST_NOT_FOUND_MESSAGE, 'Not Found')
+      )
+    )
+    const user = userEvent.setup()
+    renderGrid({ highlightedCardId: 'post-1' })
+    const controls = await screen.findByTestId('community-reactions-post-1')
+    await waitFor(() => expect(started).toBe(true))
+    await user.click(within(controls).getByRole('button', { name: 'Applaud, 0' }))
+    await waitFor(() => expect(screen.queryByTestId('lookbook-card-post-1')).toBeNull())
+    gate.release()
+    await waitFor(() => expect(returned).toBe(true))
+    await delay(80)
+    expect(screen.queryByTestId('lookbook-card-post-1')).toBeNull()
+  })
+  it.each(['withdrawn', 'published'] as const)(
+    '6.3-WEB-025 clears cached aggregates when refresh returns an owner post with status %s and omitted reactions',
+    async (status) => {
+      let hidden = false
+      const publicOwner = { ...post(), author: { displayName: 'You', isSelf: true } }
+      const hiddenOwner = { ...publicOwner, status, reactions: undefined }
+      useMswHandlers(
+        http.get(FEED_PATH, () =>
+          HttpResponse.json({
+            data: feed({
+              items: hidden ? [] : [publicOwner],
+              mode: hidden ? 'all' : 'auto',
+            }),
+          })
+        ),
+        http.get(POST_PATH, () =>
+          HttpResponse.json({ data: hidden ? hiddenOwner : publicOwner })
+        )
+      )
+      const user = userEvent.setup()
+      renderGrid({ highlightedCardId: 'post-1' })
+      await user.click(await screen.findByTestId('lookbook-open-post-1'))
+      const dialog = screen.getByTestId('community-detail')
+      expect(within(dialog).getByTestId('community-reactions-post-1')).toBeVisible()
+      hidden = true
+      fireEvent.error(within(screen.getByTestId('lookbook-card-post-1')).getByRole('img'))
+      await waitFor(() =>
+        expect(
+          screen
+            .queryByTestId('community-card-grid')
+            ?.querySelector('[data-testid="community-reactions-post-1"]')
+        ).toBeNull()
+      )
+      await waitFor(() =>
+        expect(
+          screen
+            .queryByTestId('community-detail')
+            ?.querySelector('[data-testid="community-reactions-post-1"]') ?? null
+        ).toBeNull()
+      )
+    }
+  )
 })

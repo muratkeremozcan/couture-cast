@@ -585,6 +585,22 @@
       "disabled": "Topluluk akışı geçici olarak kullanılamıyor.",
       "mediaUnavailable": "Bu kombin geçici olarak kullanılamıyor. Kısa süre sonra tekrar dene.",
       "generic": "Bir şeyler ters gitti. Tekrar dene."
+    },
+    "reactions": {
+      "label": "Tepkiler",
+      "applause": "Alkışla",
+      "love": "Sevdim",
+      "inspiration": "İlham aldım",
+      "total": "{{count}} tepki",
+      "pending": "Tepki kaydediliyor…",
+      "updated": "Tepki kaydedildi.",
+      "conflict": "Tepkiniz başka bir cihazda değişti. Yeniden seçin.",
+      "failed": "Tepkiniz kaydedilemedi. Onaylamak için yeniden deneyin.",
+      "retry": "Tepkiyi yeniden gönder",
+      "rateLimited": "Çok fazla tepki. Bir dakika sonra yeniden deneyin.",
+      "total_one": "{{count}} tepki",
+      "total_other": "{{count}} tepki",
+      "ineligible": "Tepki vermek için en az 13 yaşında olmalısınız. 16 yaşından küçükler için geçerli veli onayı gerekir."
     }
   }
 }

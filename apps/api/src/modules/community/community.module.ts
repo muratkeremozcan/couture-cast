@@ -1,4 +1,6 @@
-import { Module } from '@nestjs/common'
+import { CommunityReactionOutboxDispatcher } from './community-reaction.outbox.js'
+import { Module, type NestModule, type MiddlewareConsumer } from '@nestjs/common'
+import { CommunityCacheHeadersMiddleware } from './community-cache-headers.middleware.js'
 import { PrismaModule } from '../../prisma/prisma.module.js'
 import { AuthStateModule } from '../auth/auth-state.module.js'
 import { RequestAuthGuard, RolesGuard } from '../auth/security.guards.js'
@@ -51,6 +53,7 @@ import { CommunityModerationActionsService } from './community-moderation.action
   ],
   controllers: [CommunityController],
   providers: [
+    CommunityReactionOutboxDispatcher,
     CommunityRepository,
     CommunityService,
     CommunityMaintenanceService,
@@ -71,4 +74,8 @@ import { CommunityModerationActionsService } from './community-moderation.action
     CommunityModerationActionsService,
   ],
 })
-export class CommunityModule {}
+export class CommunityModule implements NestModule {
+  configure(consumer: MiddlewareConsumer): void {
+    consumer.apply(CommunityCacheHeadersMiddleware).forRoutes(CommunityController)
+  }
+}

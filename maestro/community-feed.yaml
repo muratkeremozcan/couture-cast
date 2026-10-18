@@ -271,6 +271,105 @@ tags:
 - assertNotVisible:
     id: 'community-action-error'
 
+# Story 6.3: desired-state add, replace, reload, and remove against the real API.
+- scrollUntilVisible:
+    element:
+      id: 'community-reaction-total-lookbook-5'
+    direction: DOWN
+- copyTextFrom:
+    id: 'community-reaction-count-applause-lookbook-5'
+- evalScript: ${output.initialApplause = Number(maestro.copiedText.replace(/[^0-9]/g, ''))}
+- copyTextFrom:
+    id: 'community-reaction-count-love-lookbook-5'
+- evalScript: ${output.initialLove = Number(maestro.copiedText.replace(/[^0-9]/g, ''))}
+- copyTextFrom:
+    id: 'community-reaction-count-inspiration-lookbook-5'
+- evalScript: ${output.initialInspired = Number(maestro.copiedText.replace(/[^0-9]/g, ''))}
+- copyTextFrom:
+    id: 'community-reaction-total-lookbook-5'
+- evalScript: ${output.initialTotal = Number(maestro.copiedText.replace(/[^0-9]/g, ''))}
+- tapOn:
+    id: 'community-reaction-applause-lookbook-5'
+- extendedWaitUntil:
+    visible:
+      id: 'community-reaction-applause-lookbook-5'
+      selected: true
+    timeout: 10000
+- assertVisible:
+    id: 'community-reaction-count-applause-lookbook-5'
+    text: ${'👏 ' + (output.initialApplause + 1)}
+- assertVisible:
+    id: 'community-reaction-count-love-lookbook-5'
+    text: ${'❤️ ' + output.initialLove}
+- assertVisible:
+    id: 'community-reaction-count-inspiration-lookbook-5'
+    text: ${'✨ ' + output.initialInspired}
+- assertVisible:
+    id: 'community-reaction-total-lookbook-5'
+    text: ${String(output.initialTotal + 1) + ' reactions?'}
+- tapOn:
+    id: 'community-reaction-love-lookbook-5'
+- assertVisible:
+    id: 'community-reaction-love-lookbook-5'
+    selected: true
+- assertVisible:
+    id: 'community-reaction-count-applause-lookbook-5'
+    text: ${'👏 ' + output.initialApplause}
+- assertVisible:
+    id: 'community-reaction-count-love-lookbook-5'
+    text: ${'❤️ ' + (output.initialLove + 1)}
+- assertVisible:
+    id: 'community-reaction-count-inspiration-lookbook-5'
+    text: ${'✨ ' + output.initialInspired}
+- assertVisible:
+    id: 'community-reaction-total-lookbook-5'
+    text: ${String(output.initialTotal + 1) + ' reactions?'}
+- launchApp:
+    appId: ${MAESTRO_APP_ID}
+    clearState: false
+    stopApp: true
+- runFlow: subflows/open-app.yaml
+- tapOn:
+    id: 'tab-community'
+- tapOn:
+    id: 'community-filter-chip-all'
+- scrollUntilVisible:
+    element:
+      id: 'community-reaction-total-lookbook-5'
+    direction: DOWN
+- assertVisible:
+    id: 'community-reaction-love-lookbook-5'
+    selected: true
+- assertVisible:
+    id: 'community-reaction-count-applause-lookbook-5'
+    text: ${'👏 ' + output.initialApplause}
+- assertVisible:
+    id: 'community-reaction-count-love-lookbook-5'
+    text: ${'❤️ ' + (output.initialLove + 1)}
+- assertVisible:
+    id: 'community-reaction-count-inspiration-lookbook-5'
+    text: ${'✨ ' + output.initialInspired}
+- assertVisible:
+    id: 'community-reaction-total-lookbook-5'
+    text: ${String(output.initialTotal + 1) + ' reactions?'}
+- tapOn:
+    id: 'community-reaction-love-lookbook-5'
+- assertVisible:
+    id: 'community-reaction-love-lookbook-5'
+    selected: false
+- assertVisible:
+    id: 'community-reaction-count-applause-lookbook-5'
+    text: ${'👏 ' + output.initialApplause}
+- assertVisible:
+    id: 'community-reaction-count-love-lookbook-5'
+    text: ${'❤️ ' + output.initialLove}
+- assertVisible:
+    id: 'community-reaction-count-inspiration-lookbook-5'
+    text: ${'✨ ' + output.initialInspired}
+- assertVisible:
+    id: 'community-reaction-total-lookbook-5'
+    text: ${String(output.initialTotal) + ' reactions?'}
+
 - takeScreenshot:
     path: maestro/artifacts/community-feed-populated
 
@@ -283,7 +382,7 @@ tags:
 
 - extendedWaitUntil:
     visible:
-      id: 'community-post-sheet'
+      id: 'community-post-sheet-content'
     timeout: 15000
     label: 'Compose sheet is presented'
 
@@ -315,7 +414,7 @@ tags:
     label: 'Close the sheet without publishing'
 
 - assertNotVisible:
-    id: 'community-post-sheet'
+    id: 'community-post-sheet-content'
 
 # Nothing was published, so nothing needs cleaning up: the filter selection is
 # component state that the next flow's `launchApp: clearState: true` discards,

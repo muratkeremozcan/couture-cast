@@ -1,3 +1,5 @@
+import { userEvent as browserUser } from '@vitest/browser/context'
+vi.mock('expo-haptics', () => ({ selectionAsync: vi.fn().mockResolvedValue(undefined) }))
 // Learning path Step 38: Community feed by climate band.
 // Story 6.1 Task 8 owner: the mobile community feed screen and its HTTP client.
 //
@@ -46,11 +48,13 @@ import {
   COMMUNITY_REPORT_REASON_CHANGED_MESSAGE,
   COMMUNITY_SELF_REPORT_MESSAGE,
   communityBandUnresolvedReasonSchema,
+  type CommunityReactionSummary,
+  type SetCommunityReactionInput,
   encodeCommunityFeedCursor,
   type ClimateBand,
   type CommunityAuthorPostState,
-  type CommunityFeed,
-  type CommunityFeedItem,
+  type CommunityReactionFeed as CommunityFeed,
+  type CommunityReactionFeedItem as CommunityFeedItem,
   type CommunityFeedMode,
   type CommunityPostStatus,
 } from '@couture/api-client/contracts/http'
@@ -1347,6 +1351,441 @@ describe('Mobile community screen (Story 6.1)', () => {
     await delay(500)
     expect(feedUrls).toHaveLength(settled)
   }, 20_000)
+  it('6.3-MOB-001 adds, replaces and retracts with independently focusable labeled controls', async () => {
+    let summary: CommunityReactionSummary = {
+      counts: { applause: 0, love: 0, inspiration: 0 },
+      total: 0,
+      viewerReaction: null,
+      revision: 0,
+      generation: 0,
+    }
+    const requests: SetCommunityReactionInput[] = []
+    serveFeed(() => {
+      const reactionItem = { ...item(), reactions: summary }
+      return HttpResponse.json({ data: feed({ items: [reactionItem] }) })
+    })
+    server.use(
+      http.put('*/api/v1/community/posts/:postId/reaction', async ({ request }) => {
+        const intent = (await request.json()) as SetCommunityReactionInput
+        requests.push(intent)
+        summary = {
+          counts: {
+            applause: intent.selection === 'applause' ? 1 : 0,
+            love: intent.selection === 'love' ? 1 : 0,
+            inspiration: 0,
+          },
+          total: intent.selection === null ? 0 : 1,
+          viewerReaction: intent.selection,
+          revision: summary.revision + 1,
+          generation: summary.generation + 1,
+        }
+        return HttpResponse.json({ data: summary })
+      })
+    )
+    await render(<CommunityScreen />)
+    const applause = await screen.findByRole('button', { name: 'Applaud, 0' })
+    await browserUser.click(applause)
+    await waitFor(() => expect(applause.getAttribute('aria-pressed')).toBe('true'))
+    const love = screen.getByRole('button', { name: 'Love, 0' })
+    await browserUser.click(love)
+    await waitFor(() => expect(love.getAttribute('aria-pressed')).toBe('true'))
+    await browserUser.click(love)
+    await waitFor(() => expect(love.getAttribute('aria-pressed')).toBe('false'))
+    expect(requests.map((request) => request.selection)).toEqual([
+      'applause',
+      'love',
+      null,
+    ])
+    expect(requests.map((request) => request.baseRevision)).toEqual([0, 1, 2])
+  })
+  function raceDeferred() {
+    let release!: () => void
+    const promise = new Promise<void>((resolve) => {
+      release = resolve
+    })
+    return { promise, release }
+  }
+  const raceZero: CommunityReactionSummary = {
+    counts: { applause: 0, love: 0, inspiration: 0 },
+    total: 0,
+    revision: 0,
+    generation: 0,
+    viewerReaction: null,
+  }
+  const raceOne: CommunityReactionSummary = {
+    counts: { applause: 1, love: 0, inspiration: 0 },
+    total: 1,
+    revision: 1,
+    generation: 1,
+    viewerReaction: 'applause',
+  }
+  it('6.3-MOB delayed detail cannot overwrite confirmed feed mutation', async () => {
+    mockParams = { source: 'notification', type: 'community', cardId: 'post-a' }
+    const gate = raceDeferred()
+    let detailSent = false
+    let returned = false
+    serveFeed(() =>
+      HttpResponse.json({ data: feed({ items: [{ ...item(), reactions: raceZero }] }) })
+    )
+    server.use(
+      http.get('*/api/v1/community/posts/:postId', async () => {
+        detailSent = true
+        await gate.promise
+        returned = true
+        return HttpResponse.json({ data: { ...item(), reactions: raceZero } })
+      }),
+      http.put('*/api/v1/community/posts/:postId/reaction', () =>
+        HttpResponse.json({ data: raceOne })
+      )
+    )
+    await render(<CommunityScreen />)
+    const button = await screen.findByRole('button', { name: 'Applaud, 0' })
+    await waitFor(() => expect(detailSent).toBe(true))
+    await browserUser.click(button)
+    await screen.findByRole('button', { name: 'Applaud, 1' })
+    gate.release()
+    await waitFor(() => expect(returned).toBe(true))
+    await screen.findByTestId('highlighted-community-card-post-a')
+    await delay(80)
+    expect(
+      screen.getByRole('button', { name: 'Applaud, 1' }).getAttribute('aria-pressed')
+    ).toBe('true')
+  })
+  it('6.3-MOB delayed detail cannot resurrect a mutation 404', async () => {
+    mockParams = { source: 'notification', type: 'community', cardId: 'post-a' }
+    const gate = raceDeferred()
+    let detailSent = false
+    let returned = false
+    serveFeed(() =>
+      HttpResponse.json({ data: feed({ items: [{ ...item(), reactions: raceZero }] }) })
+    )
+    server.use(
+      http.get('*/api/v1/community/posts/:postId', async () => {
+        detailSent = true
+        await gate.promise
+        returned = true
+        return HttpResponse.json({ data: { ...item(), reactions: raceZero } })
+      }),
+      http.put('*/api/v1/community/posts/:postId/reaction', () =>
+        errorEnvelope(404, 'Community post not found.')
+      )
+    )
+    await render(<CommunityScreen />)
+    const button = await screen.findByRole('button', { name: 'Applaud, 0' })
+    await waitFor(() => expect(detailSent).toBe(true))
+    await browserUser.click(button)
+    await waitFor(() =>
+      expect(screen.queryByTestId('community-post-card-post-a')).toBeNull()
+    )
+    gate.release()
+    await waitFor(() => expect(returned).toBe(true))
+    await delay(80)
+    expect(screen.queryByTestId('community-post-card-post-a')).toBeNull()
+  })
+  it('6.3-MOB refreshed feed summary updates highlighted deep-link copy', async () => {
+    mockParams = { source: 'notification', type: 'community', cardId: 'post-a' }
+    serveFeed((_url, index) =>
+      HttpResponse.json({
+        data: feed({
+          mode: index ? 'all' : 'auto',
+          items: [{ ...item(), reactions: index ? raceOne : raceZero }],
+        }),
+      })
+    )
+    server.use(
+      http.get('*/api/v1/community/posts/:postId', () =>
+        HttpResponse.json({ data: { ...item(), reactions: raceZero } })
+      )
+    )
+    await render(<CommunityScreen />)
+    await screen.findByTestId('highlighted-community-card-post-a')
+    await browserUser.click(screen.getByTestId('community-filter-chip-all'))
+    await waitFor(() => expect(feedUrls).toHaveLength(2))
+    await delay(100)
+    expect(
+      screen.getByRole('button', { name: 'Applaud, 1' }).getAttribute('aria-pressed')
+    ).toBe('true')
+  })
+  it('6.3-MOB filter unmount retains accepted in-flight mutation result', async () => {
+    const gate = raceDeferred()
+    const feedGate = raceDeferred()
+    let sent = false
+    let returned = false
+    serveFeed(async (_url, index) => {
+      if (index) await feedGate.promise
+      return HttpResponse.json({
+        data: feed({
+          mode: index ? 'all' : 'auto',
+          items: [{ ...item(), reactions: raceZero }],
+        }),
+      })
+    })
+    server.use(
+      http.put('*/api/v1/community/posts/:postId/reaction', async () => {
+        sent = true
+        await gate.promise
+        returned = true
+        return HttpResponse.json({ data: raceOne })
+      })
+    )
+    await render(<CommunityScreen />)
+    await browserUser.click(await screen.findByRole('button', { name: 'Applaud, 0' }))
+    await waitFor(() => expect(sent).toBe(true))
+    await browserUser.click(screen.getByTestId('community-filter-chip-all'))
+    await waitFor(() =>
+      expect(screen.queryByTestId('community-post-card-post-a')).toBeNull()
+    )
+    gate.release()
+    await waitFor(() => expect(returned).toBe(true))
+    await delay(80)
+    feedGate.release()
+    await screen.findByTestId('community-post-card-post-a')
+    expect(
+      screen.getByRole('button', { name: 'Applaud, 1' }).getAttribute('aria-pressed')
+    ).toBe('true')
+  })
+
+  it('6.3-MOB-021 retries a failed native PUT with the exact original payload', async () => {
+    serveFeed(() =>
+      HttpResponse.json({ data: feed({ items: [{ ...item(), reactions: raceZero }] }) })
+    )
+    const requests: SetCommunityReactionInput[] = []
+    server.use(
+      http.put('*/api/v1/community/posts/:postId/reaction', async ({ request }) => {
+        requests.push((await request.json()) as SetCommunityReactionInput)
+        return requests.length === 1
+          ? HttpResponse.error()
+          : HttpResponse.json({ data: raceOne })
+      })
+    )
+    await render(<CommunityScreen />)
+    await browserUser.click(await screen.findByRole('button', { name: 'Applaud, 0' }))
+    await browserUser.click(await screen.findByRole('button', { name: 'Retry reaction' }))
+    await screen.findByRole('button', { name: 'Applaud, 1' })
+    expect(requests).toHaveLength(2)
+    expect(requests[1]).toEqual(requests[0])
+    expect(
+      screen.getByRole('button', { name: 'Applaud, 1' }).getAttribute('aria-pressed')
+    ).toBe('true')
+  })
+
+  it('6.3-MOB-022 keeps confirmed counts when an older feed arrives after a mutation', async () => {
+    const gate = raceDeferred()
+    serveFeed(async (_url, index) => {
+      if (index) await gate.promise
+      return HttpResponse.json({
+        data: feed({
+          mode: index ? 'all' : 'auto',
+          items: [{ ...item(), reactions: raceZero }],
+        }),
+      })
+    })
+    server.use(
+      http.put('*/api/v1/community/posts/:postId/reaction', () =>
+        HttpResponse.json({ data: raceOne })
+      )
+    )
+    await render(<CommunityScreen />)
+    await browserUser.click(await screen.findByRole('button', { name: 'Applaud, 0' }))
+    await screen.findByRole('button', { name: 'Applaud, 1' })
+    await browserUser.click(screen.getByTestId('community-filter-chip-all'))
+    await waitFor(() => expect(feedUrls).toHaveLength(2))
+    gate.release()
+    expect(
+      (await screen.findByRole('button', { name: 'Applaud, 1' })).getAttribute(
+        'aria-pressed'
+      )
+    ).toBe('true')
+  })
+
+  it('6.3-MOB-023 wraps controls on narrow cards with large text and counts', async () => {
+    serveFeed(() =>
+      HttpResponse.json({
+        data: feed({
+          items: [
+            {
+              ...item(),
+              reactions: {
+                ...raceZero,
+                counts: { applause: 999999, love: 999999, inspiration: 999999 },
+                total: 2999997,
+              },
+            },
+          ],
+        }),
+      })
+    )
+    await render(<CommunityScreen />)
+    const controls = await screen.findByTestId('community-reactions-post-a')
+    controls.style.width = '260px'
+    controls.querySelectorAll<HTMLElement>('[role="button"]').forEach((button) => {
+      button.style.fontSize = '32px'
+      button.querySelectorAll<HTMLElement>('*').forEach((child) => {
+        child.style.fontSize = '32px'
+      })
+    })
+    const buttons = Array.from(controls.querySelectorAll<HTMLElement>('[role="button"]'))
+    expect(buttons).toHaveLength(3)
+    expect(buttons[2]!.getBoundingClientRect().top).toBeGreaterThan(
+      buttons[0]!.getBoundingClientRect().top
+    )
+    for (const button of buttons) {
+      const bounds = button.getBoundingClientRect()
+      expect(bounds.width).toBeGreaterThanOrEqual(44)
+      expect(bounds.height).toBeGreaterThanOrEqual(44)
+      expect(bounds.right).toBeLessThanOrEqual(controls.getBoundingClientRect().right)
+    }
+  })
+  it('6.3-MOB-024 revalidates highlighted visibility on an image-triggered refresh', async () => {
+    mockParams = { source: 'notification', type: 'community', cardId: 'post-a' }
+    let hidden = false
+    let detailReads = 0
+    serveFeed(() => HttpResponse.json({ data: feed({ items: [] }) }))
+    server.use(
+      http.get('*/api/v1/community/posts/:postId', () => {
+        detailReads += 1
+        return hidden
+          ? errorEnvelope(404, 'Community post not found.')
+          : HttpResponse.json({
+              data: { ...item({ imageAccess: imageAccess(250) }), reactions: raceZero },
+            })
+      })
+    )
+    await render(<CommunityScreen />)
+    await screen.findByTestId('highlighted-community-card-post-a')
+    hidden = true
+    await waitFor(() => expect(detailReads).toBeGreaterThan(1))
+    await waitFor(() =>
+      expect(screen.queryByTestId('highlighted-community-card-post-a')).toBeNull()
+    )
+  })
+
+  it('6.3-MOB-027 ignores refresh metadata after a filter change during detail revalidation', async () => {
+    mockParams = { source: 'notification', type: 'community', cardId: 'post-a' }
+    const gate = raceDeferred()
+    let reads = 0
+    let returned = false
+    serveFeed((url, index) =>
+      HttpResponse.json({
+        data: feed({
+          mode: url.searchParams.get('mode') === 'all' ? 'all' : 'auto',
+          items: [],
+          nextCursor:
+            index === 0 || url.searchParams.has('cursor')
+              ? null
+              : url.searchParams.get('mode') === 'all'
+                ? 'current-filter-cursor'
+                : 'stale-refresh-cursor',
+        }),
+      })
+    )
+    server.use(
+      http.get('*/api/v1/community/posts/:postId', async () => {
+        reads += 1
+        if (reads > 1) {
+          await gate.promise
+          returned = true
+        }
+        return HttpResponse.json({
+          data: { ...item({ imageAccess: imageAccess(300) }), reactions: raceZero },
+        })
+      })
+    )
+    await render(<CommunityScreen />)
+    await screen.findByTestId('highlighted-community-card-post-a')
+    await waitFor(() => expect(reads).toBe(2))
+    await browserUser.click(screen.getByTestId('community-filter-chip-all'))
+    await waitFor(() =>
+      expect(
+        screen.getByTestId('community-filter-chip-all').getAttribute('aria-pressed')
+      ).toBe('true')
+    )
+    gate.release()
+    await waitFor(() => expect(returned).toBe(true))
+    await delay(80)
+    expect(
+      screen.getByTestId('community-filter-chip-all').getAttribute('aria-pressed')
+    ).toBe('true')
+    await waitFor(() =>
+      expect(
+        feedUrls.some((url) => url.searchParams.get('cursor') === 'current-filter-cursor')
+      ).toBe(true)
+    )
+    expect(
+      feedUrls.some((url) => url.searchParams.get('cursor') === 'stale-refresh-cursor')
+    ).toBe(false)
+  })
+  it('6.3-MOB-025 an older feed cannot resurrect a post after a mutation 404', async () => {
+    const gate = raceDeferred()
+    const first = { ...item(), reactions: raceZero }
+    serveFeed(async (_url, index) => {
+      if (index) await gate.promise
+      return HttpResponse.json({
+        data: feed({ mode: index ? 'all' : 'auto', items: [first] }),
+      })
+    })
+    server.use(
+      http.put('*/api/v1/community/posts/:postId/reaction', () =>
+        errorEnvelope(404, 'Community post not found.')
+      )
+    )
+    await render(<CommunityScreen />)
+    // Keep an independently mounted highlighted copy while the list remounts for filtering.
+    mockParams = { source: 'notification', type: 'community', cardId: 'post-a' }
+    server.use(
+      http.get('*/api/v1/community/posts/:postId', () =>
+        HttpResponse.json({ data: first })
+      )
+    )
+    await browserUser.click(await screen.findByTestId('community-filter-chip-all'))
+    await screen.findByTestId('highlighted-community-card-post-a')
+    await waitFor(() => expect(feedUrls).toHaveLength(2))
+    await browserUser.click(screen.getByRole('button', { name: 'Applaud, 0' }))
+    await waitFor(() =>
+      expect(screen.queryByTestId('community-post-card-post-a')).toBeNull()
+    )
+    gate.release()
+    await delay(80)
+    expect(screen.queryByTestId('community-post-card-post-a')).toBeNull()
+  })
+  it('6.3-MOB-026 shares pending ownership when detail replaces the feed card', async () => {
+    mockParams = { source: 'notification', type: 'community', cardId: 'post-a' }
+    const detail = raceDeferred()
+    const mutation = raceDeferred()
+    const requests: SetCommunityReactionInput[] = []
+    serveFeed(() =>
+      HttpResponse.json({ data: feed({ items: [{ ...item(), reactions: raceZero }] }) })
+    )
+    server.use(
+      http.get('*/api/v1/community/posts/:postId', async () => {
+        await detail.promise
+        return HttpResponse.json({ data: { ...item(), reactions: raceZero } })
+      }),
+      http.put('*/api/v1/community/posts/:postId/reaction', async ({ request }) => {
+        requests.push((await request.json()) as SetCommunityReactionInput)
+        await mutation.promise
+        return HttpResponse.json({ data: raceOne })
+      })
+    )
+    await render(<CommunityScreen />)
+    await browserUser.click(await screen.findByRole('button', { name: 'Applaud, 0' }))
+    await waitFor(() => expect(requests).toHaveLength(1))
+    detail.release()
+    await screen.findByTestId('highlighted-community-card-post-a')
+    expect(
+      screen.getByRole('button', { name: 'Love, 0' }).getAttribute('aria-disabled')
+    ).toBe('true')
+    await browserUser.click(screen.getByRole('button', { name: 'Love, 0' }), {
+      force: true,
+    })
+    expect(requests).toHaveLength(1)
+    mutation.release()
+    expect(
+      (await screen.findByRole('button', { name: 'Applaud, 1' })).getAttribute(
+        'aria-pressed'
+      )
+    ).toBe('true')
+  })
 })
 
 /**

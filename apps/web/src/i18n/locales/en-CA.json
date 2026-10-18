@@ -585,6 +585,22 @@
       "disabled": "The community feed is temporarily unavailable.",
       "mediaUnavailable": "This look is temporarily unavailable. Try again shortly.",
       "generic": "Something went wrong. Try again."
+    },
+    "reactions": {
+      "label": "Reactions",
+      "applause": "Applaud",
+      "love": "Love",
+      "inspiration": "Inspired",
+      "total": "{{count}} reactions",
+      "pending": "Saving reaction…",
+      "updated": "Reaction saved.",
+      "conflict": "Your reaction changed on another device. Choose again.",
+      "failed": "We could not save your reaction. Retry to confirm.",
+      "retry": "Retry reaction",
+      "rateLimited": "Too many reactions. Try again in a minute.",
+      "total_one": "{{count}} reaction",
+      "total_other": "{{count}} reactions",
+      "ineligible": "Reactions require age 13 or older. Members under 16 need active guardian consent."
     }
   }
 }

@@ -269,6 +269,9 @@ model User {
   palette_profile               PaletteProfile?
   advisor_recommendation_states AdvisorRecommendationState[]
   planner_day_plans             PlannerDayPlan[]
+  community_reactions           CommunityReaction[]
+  community_reaction_receipts   CommunityReactionReceipt[]
+  community_reaction_outbox     CommunityReactionOutbox[]
   community_alias               CommunityAlias?
   community_reports_filed       CommunityPostReport[]        @relation("CommunityReporter")
 }
@@ -609,6 +612,10 @@ model LookbookPost {
   engagement_events         EngagementEvent[]
   moderation_events         ModerationEvent[]
   reports                   CommunityPostReport[]
+  reaction_generation       Int                        @default(0)
+  reactions                 CommunityReaction[]
+  reaction_receipts         CommunityReactionReceipt[]
+  reaction_outbox           CommunityReactionOutbox[]
 
   @@unique([user_id, idempotency_key])
   @@index([user_id])
@@ -879,30 +886,30 @@ model SilhouetteProfile {
 /// zero grants; the story names ModerationEvent among the tables no
 /// authenticated client may read.
 model ModerationEvent {
-  id                    String             @id @default(cuid())
+  id                        String             @id @default(cuid())
   /// SetNull, deliberately not Cascade. LookbookPost.user_id cascades from
   /// User, so chaining a second cascade here made account erasure destroy other
   /// people's abuse reports: a third party reports a post, the author deletes
   /// their account, and the report goes with it. Same reasoning as
   /// BillingEvent.user_id — the audit fact outlives its subject.
-  post                  LookbookPost?      @relation(fields: [post_id], references: [id], onDelete: SetNull)
-  post_id               String?
-  garment               GarmentItem?       @relation(fields: [garment_item_id], references: [id])
-  garment_item_id       String?
-  silhouette_profile    SilhouetteProfile? @relation(fields: [silhouette_profile_id], references: [id])
-  silhouette_profile_id String?
-  flagged_by            User?              @relation("FlaggedByRelation", fields: [flagged_by_id], references: [id])
-  flagged_by_id         String?
-  reviewed_by           User?              @relation("ReviewedByRelation", fields: [reviewed_by_id], references: [id])
-  reviewed_by_id        String?
-  action                String?
-  reason                String?
+  post                      LookbookPost?      @relation(fields: [post_id], references: [id], onDelete: SetNull)
+  post_id                   String?
+  garment                   GarmentItem?       @relation(fields: [garment_item_id], references: [id])
+  garment_item_id           String?
+  silhouette_profile        SilhouetteProfile? @relation(fields: [silhouette_profile_id], references: [id])
+  silhouette_profile_id     String?
+  flagged_by                User?              @relation("FlaggedByRelation", fields: [flagged_by_id], references: [id])
+  flagged_by_id             String?
+  reviewed_by               User?              @relation("ReviewedByRelation", fields: [reviewed_by_id], references: [id])
+  reviewed_by_id            String?
+  action                    String?
+  reason                    String?
   /// Denormalized so the row still says something once post_id is nulled: who
   /// it was about (pseudonymously), what the content was, and where the image
   /// object lives so an orphaned object stays findable for purging.
-  subject_alias         String?
-  content_snapshot      Json?
-  image_object_path     String?
+  subject_alias             String?
+  content_snapshot          Json?
+  image_object_path         String?
   /// The engine version an operator's release overrode. Releasing a flagged post
   /// is a human overruling a machine verdict, and the audit trail must never
   /// imply the model passed something it did not. Structured rather than
@@ -911,7 +918,7 @@ model ModerationEvent {
   /// was going there. The operator is `reviewed_by_id` on the same row, so this
   /// does not repeat identity, and NULL is the ordinary case.
   overridden_engine_version String?
-  created_at            DateTime           @default(now())
+  created_at                DateTime           @default(now())
 
   @@index([post_id])
   @@index([flagged_by_id])
@@ -1449,4 +1456,55 @@ model PlannerDayPlan {
   @@unique([user_id, location_id, plan_date])
   @@index([user_id, plan_date])
   @@map("PlannerDayPlan")
+}
+
+/// API-only current desired state. Null selections retain the revision forever.
+model CommunityReaction {
+  user_id    String
+  post_id    String
+  selection  String?
+  revision   Int          @default(0)
+  user       User         @relation(fields: [user_id], references: [id], onDelete: Cascade)
+  post       LookbookPost @relation(fields: [post_id], references: [id], onDelete: Cascade)
+  updated_at DateTime     @default(now()) @updatedAt
+
+  @@id([user_id, post_id])
+  @@index([post_id, selection])
+}
+
+/// Payload-bound accepted requests. Retention is 30 days.
+model CommunityReactionReceipt {
+  user_id       String
+  mutation_id   String       @db.Uuid
+  post_id       String
+  selection     String?
+  base_revision Int
+  created_at    DateTime     @default(now())
+  user          User         @relation(fields: [user_id], references: [id], onDelete: Cascade)
+  post          LookbookPost @relation(fields: [post_id], references: [id], onDelete: Cascade)
+
+  @@id([user_id, mutation_id])
+  @@index([user_id, created_at])
+  @@index([post_id])
+  @@index([created_at])
+}
+
+/// Transactional analytics handoff. Sink deduplication uses this stable UUID.
+model CommunityReactionOutbox {
+  id               String       @id @db.Uuid
+  user_id          String
+  post_id          String
+  event_type       String
+  payload          Json
+  attempts         Int          @default(0)
+  next_attempt_at  DateTime     @default(now())
+  delivered_at     DateTime?
+  lease_id         String?      @db.Uuid
+  lease_expires_at DateTime?
+  created_at       DateTime     @default(now())
+  user             User         @relation(fields: [user_id], references: [id], onDelete: Cascade)
+  post             LookbookPost @relation(fields: [post_id], references: [id], onDelete: Cascade)
+
+  @@index([delivered_at, next_attempt_at])
+  @@index([post_id])
 }

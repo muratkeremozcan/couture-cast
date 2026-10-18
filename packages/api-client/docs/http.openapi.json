@@ -11492,6 +11492,967 @@
           "data"
         ]
       },
+      "SetCommunityReactionInput": {
+        "type": "object",
+        "properties": {
+          "selection": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "enum": [
+              "applause",
+              "love",
+              "inspiration",
+              null
+            ]
+          },
+          "mutationId": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "baseRevision": {
+            "type": "integer",
+            "minimum": 0
+          }
+        },
+        "required": [
+          "selection",
+          "mutationId",
+          "baseRevision"
+        ],
+        "additionalProperties": false
+      },
+      "CommunityReactionResponse": {
+        "type": "object",
+        "properties": {
+          "data": {
+            "type": "object",
+            "properties": {
+              "counts": {
+                "type": "object",
+                "properties": {
+                  "applause": {
+                    "type": "integer",
+                    "minimum": 0
+                  },
+                  "love": {
+                    "type": "integer",
+                    "minimum": 0
+                  },
+                  "inspiration": {
+                    "type": "integer",
+                    "minimum": 0
+                  }
+                },
+                "required": [
+                  "applause",
+                  "love",
+                  "inspiration"
+                ],
+                "additionalProperties": false
+              },
+              "total": {
+                "type": "integer",
+                "minimum": 0
+              },
+              "viewerReaction": {
+                "type": [
+                  "string",
+                  "null"
+                ],
+                "enum": [
+                  "applause",
+                  "love",
+                  "inspiration",
+                  null
+                ]
+              },
+              "revision": {
+                "type": "integer",
+                "minimum": 0
+              },
+              "generation": {
+                "type": "integer",
+                "minimum": 0
+              }
+            },
+            "required": [
+              "counts",
+              "total",
+              "viewerReaction",
+              "revision",
+              "generation"
+            ],
+            "additionalProperties": false,
+            "description": "An authoritative single-snapshot reaction summary. total must equal the sum of applause, love and inspiration counts. revision persists after removal; generation advances on reactions, visibility and erasure changes."
+          }
+        },
+        "required": [
+          "data"
+        ],
+        "additionalProperties": false
+      },
+      "CommunityReactionSummary": {
+        "type": "object",
+        "properties": {
+          "counts": {
+            "type": "object",
+            "properties": {
+              "applause": {
+                "type": "integer",
+                "minimum": 0
+              },
+              "love": {
+                "type": "integer",
+                "minimum": 0
+              },
+              "inspiration": {
+                "type": "integer",
+                "minimum": 0
+              }
+            },
+            "required": [
+              "applause",
+              "love",
+              "inspiration"
+            ],
+            "additionalProperties": false
+          },
+          "total": {
+            "type": "integer",
+            "minimum": 0
+          },
+          "viewerReaction": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "enum": [
+              "applause",
+              "love",
+              "inspiration",
+              null
+            ]
+          },
+          "revision": {
+            "type": "integer",
+            "minimum": 0
+          },
+          "generation": {
+            "type": "integer",
+            "minimum": 0
+          }
+        },
+        "required": [
+          "counts",
+          "total",
+          "viewerReaction",
+          "revision",
+          "generation"
+        ],
+        "additionalProperties": false,
+        "description": "An authoritative single-snapshot reaction summary. total must equal the sum of applause, love and inspiration counts. revision persists after removal; generation advances on reactions, visibility and erasure changes."
+      },
+      "CommunityReactionFeedItem": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string",
+            "minLength": 1
+          },
+          "caption": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "altText": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "climateBand": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "description": "The climate band stamped when the post was published, or null if unclassified.",
+            "enum": [
+              "cold_wet",
+              "cold_dry",
+              "temperate_wet",
+              "temperate_dry",
+              "warm_wet",
+              "warm_dry",
+              null
+            ]
+          },
+          "imageAccess": {
+            "type": "object",
+            "properties": {
+              "url": {
+                "type": "string",
+                "format": "uri"
+              },
+              "expiresAt": {
+                "type": "string",
+                "format": "date-time"
+              }
+            },
+            "required": [
+              "url",
+              "expiresAt"
+            ],
+            "additionalProperties": false
+          },
+          "publishedAt": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "format": "date-time"
+          },
+          "createdAt": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "status": {
+            "type": "string",
+            "enum": [
+              "draft",
+              "uploading",
+              "pending_review",
+              "published",
+              "flagged",
+              "review_failed",
+              "withdrawn",
+              "consent_suspended"
+            ]
+          },
+          "challengeId": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "author": {
+            "type": "object",
+            "properties": {
+              "displayName": {
+                "type": "string",
+                "minLength": 1
+              },
+              "isSelf": {
+                "type": "boolean"
+              }
+            },
+            "required": [
+              "displayName",
+              "isSelf"
+            ],
+            "additionalProperties": false
+          },
+          "reactions": {
+            "type": "object",
+            "properties": {
+              "counts": {
+                "type": "object",
+                "properties": {
+                  "applause": {
+                    "type": "integer",
+                    "minimum": 0
+                  },
+                  "love": {
+                    "type": "integer",
+                    "minimum": 0
+                  },
+                  "inspiration": {
+                    "type": "integer",
+                    "minimum": 0
+                  }
+                },
+                "required": [
+                  "applause",
+                  "love",
+                  "inspiration"
+                ],
+                "additionalProperties": false
+              },
+              "total": {
+                "type": "integer",
+                "minimum": 0
+              },
+              "viewerReaction": {
+                "type": [
+                  "string",
+                  "null"
+                ],
+                "enum": [
+                  "applause",
+                  "love",
+                  "inspiration",
+                  null
+                ]
+              },
+              "revision": {
+                "type": "integer",
+                "minimum": 0
+              },
+              "generation": {
+                "type": "integer",
+                "minimum": 0
+              }
+            },
+            "required": [
+              "counts",
+              "total",
+              "viewerReaction",
+              "revision",
+              "generation"
+            ],
+            "additionalProperties": false,
+            "description": "An authoritative single-snapshot reaction summary. total must equal the sum of applause, love and inspiration counts. revision persists after removal; generation advances on reactions, visibility and erasure changes."
+          }
+        },
+        "required": [
+          "id",
+          "caption",
+          "altText",
+          "climateBand",
+          "imageAccess",
+          "publishedAt",
+          "createdAt",
+          "status",
+          "challengeId",
+          "author"
+        ],
+        "additionalProperties": false
+      },
+      "CommunityReactionFeedResponse": {
+        "type": "object",
+        "properties": {
+          "data": {
+            "type": "object",
+            "properties": {
+              "items": {
+                "type": "array",
+                "items": {
+                  "type": "object",
+                  "properties": {
+                    "id": {
+                      "type": "string",
+                      "minLength": 1
+                    },
+                    "caption": {
+                      "type": [
+                        "string",
+                        "null"
+                      ]
+                    },
+                    "altText": {
+                      "type": [
+                        "string",
+                        "null"
+                      ]
+                    },
+                    "climateBand": {
+                      "type": [
+                        "string",
+                        "null"
+                      ],
+                      "description": "The climate band stamped when the post was published, or null if unclassified.",
+                      "enum": [
+                        "cold_wet",
+                        "cold_dry",
+                        "temperate_wet",
+                        "temperate_dry",
+                        "warm_wet",
+                        "warm_dry",
+                        null
+                      ]
+                    },
+                    "imageAccess": {
+                      "type": "object",
+                      "properties": {
+                        "url": {
+                          "type": "string",
+                          "format": "uri"
+                        },
+                        "expiresAt": {
+                          "type": "string",
+                          "format": "date-time"
+                        }
+                      },
+                      "required": [
+                        "url",
+                        "expiresAt"
+                      ],
+                      "additionalProperties": false
+                    },
+                    "publishedAt": {
+                      "type": [
+                        "string",
+                        "null"
+                      ],
+                      "format": "date-time"
+                    },
+                    "createdAt": {
+                      "type": "string",
+                      "format": "date-time"
+                    },
+                    "status": {
+                      "type": "string",
+                      "enum": [
+                        "draft",
+                        "uploading",
+                        "pending_review",
+                        "published",
+                        "flagged",
+                        "review_failed",
+                        "withdrawn",
+                        "consent_suspended"
+                      ]
+                    },
+                    "challengeId": {
+                      "type": [
+                        "string",
+                        "null"
+                      ]
+                    },
+                    "author": {
+                      "type": "object",
+                      "properties": {
+                        "displayName": {
+                          "type": "string",
+                          "minLength": 1
+                        },
+                        "isSelf": {
+                          "type": "boolean"
+                        }
+                      },
+                      "required": [
+                        "displayName",
+                        "isSelf"
+                      ],
+                      "additionalProperties": false
+                    },
+                    "reactions": {
+                      "type": "object",
+                      "properties": {
+                        "counts": {
+                          "type": "object",
+                          "properties": {
+                            "applause": {
+                              "type": "integer",
+                              "minimum": 0
+                            },
+                            "love": {
+                              "type": "integer",
+                              "minimum": 0
+                            },
+                            "inspiration": {
+                              "type": "integer",
+                              "minimum": 0
+                            }
+                          },
+                          "required": [
+                            "applause",
+                            "love",
+                            "inspiration"
+                          ],
+                          "additionalProperties": false
+                        },
+                        "total": {
+                          "type": "integer",
+                          "minimum": 0
+                        },
+                        "viewerReaction": {
+                          "type": [
+                            "string",
+                            "null"
+                          ],
+                          "enum": [
+                            "applause",
+                            "love",
+                            "inspiration",
+                            null
+                          ]
+                        },
+                        "revision": {
+                          "type": "integer",
+                          "minimum": 0
+                        },
+                        "generation": {
+                          "type": "integer",
+                          "minimum": 0
+                        }
+                      },
+                      "required": [
+                        "counts",
+                        "total",
+                        "viewerReaction",
+                        "revision",
+                        "generation"
+                      ],
+                      "additionalProperties": false,
+                      "description": "An authoritative single-snapshot reaction summary. total must equal the sum of applause, love and inspiration counts. revision persists after removal; generation advances on reactions, visibility and erasure changes."
+                    }
+                  },
+                  "required": [
+                    "id",
+                    "caption",
+                    "altText",
+                    "climateBand",
+                    "imageAccess",
+                    "publishedAt",
+                    "createdAt",
+                    "status",
+                    "challengeId",
+                    "author"
+                  ],
+                  "additionalProperties": false
+                }
+              },
+              "authorStates": {
+                "type": "array",
+                "items": {
+                  "type": "object",
+                  "properties": {
+                    "id": {
+                      "type": "string",
+                      "minLength": 1
+                    },
+                    "caption": {
+                      "type": [
+                        "string",
+                        "null"
+                      ]
+                    },
+                    "altText": {
+                      "type": [
+                        "string",
+                        "null"
+                      ]
+                    },
+                    "climateBand": {
+                      "type": [
+                        "string",
+                        "null"
+                      ],
+                      "description": "The climate band stamped when the post was classified, or null if unclassified.",
+                      "enum": [
+                        "cold_wet",
+                        "cold_dry",
+                        "temperate_wet",
+                        "temperate_dry",
+                        "warm_wet",
+                        "warm_dry",
+                        null
+                      ]
+                    },
+                    "imageAccess": {
+                      "type": [
+                        "object",
+                        "null"
+                      ],
+                      "properties": {
+                        "url": {
+                          "type": "string",
+                          "format": "uri"
+                        },
+                        "expiresAt": {
+                          "type": "string",
+                          "format": "date-time"
+                        }
+                      },
+                      "required": [
+                        "url",
+                        "expiresAt"
+                      ],
+                      "additionalProperties": false
+                    },
+                    "createdAt": {
+                      "type": "string",
+                      "format": "date-time"
+                    },
+                    "publishedAt": {
+                      "type": [
+                        "string",
+                        "null"
+                      ],
+                      "format": "date-time"
+                    },
+                    "status": {
+                      "type": "string",
+                      "enum": [
+                        "draft",
+                        "uploading",
+                        "pending_review",
+                        "published",
+                        "flagged",
+                        "review_failed",
+                        "withdrawn",
+                        "consent_suspended"
+                      ]
+                    },
+                    "challengeId": {
+                      "type": [
+                        "string",
+                        "null"
+                      ]
+                    },
+                    "moderationReason": {
+                      "type": [
+                        "string",
+                        "null"
+                      ]
+                    }
+                  },
+                  "required": [
+                    "id",
+                    "caption",
+                    "altText",
+                    "climateBand",
+                    "imageAccess",
+                    "createdAt",
+                    "publishedAt",
+                    "status",
+                    "challengeId",
+                    "moderationReason"
+                  ],
+                  "additionalProperties": false
+                }
+              },
+              "nextCursor": {
+                "type": [
+                  "string",
+                  "null"
+                ]
+              },
+              "mode": {
+                "type": "string",
+                "enum": [
+                  "auto",
+                  "all",
+                  "cold_wet",
+                  "cold_dry",
+                  "temperate_wet",
+                  "temperate_dry",
+                  "warm_wet",
+                  "warm_dry"
+                ]
+              },
+              "viewerBand": {
+                "type": [
+                  "string",
+                  "null"
+                ],
+                "description": "The climate band resolved for the viewer, or null if unresolvable.",
+                "enum": [
+                  "cold_wet",
+                  "cold_dry",
+                  "temperate_wet",
+                  "temperate_dry",
+                  "warm_wet",
+                  "warm_dry",
+                  null
+                ]
+              },
+              "bandResolved": {
+                "type": "boolean"
+              },
+              "bandUnresolvedReason": {
+                "type": [
+                  "string",
+                  "null"
+                ],
+                "description": "Why the viewer band could not be resolved, or null when it resolved. Clients render a localized banner from this.",
+                "enum": [
+                  "no_location",
+                  "weather_unavailable",
+                  "weather_stale",
+                  "weather_malformed",
+                  "insufficient_usable_days",
+                  null
+                ]
+              },
+              "experimentVariant": {
+                "type": "string",
+                "enum": [
+                  "auto",
+                  "all"
+                ]
+              },
+              "activeChallenge": {
+                "type": [
+                  "object",
+                  "null"
+                ],
+                "properties": {
+                  "id": {
+                    "type": "string",
+                    "minLength": 1
+                  },
+                  "slug": {
+                    "type": "string",
+                    "minLength": 1
+                  },
+                  "climateBand": {
+                    "type": [
+                      "string",
+                      "null"
+                    ],
+                    "description": "The climate band this challenge is restricted to, or null if unrestricted.",
+                    "enum": [
+                      "cold_wet",
+                      "cold_dry",
+                      "temperate_wet",
+                      "temperate_dry",
+                      "warm_wet",
+                      "warm_dry",
+                      null
+                    ]
+                  },
+                  "title": {
+                    "type": "string",
+                    "minLength": 1
+                  },
+                  "body": {
+                    "type": "string",
+                    "minLength": 1
+                  },
+                  "startsAt": {
+                    "type": "string",
+                    "format": "date-time"
+                  },
+                  "endsAt": {
+                    "type": "string",
+                    "format": "date-time"
+                  },
+                  "timeZone": {
+                    "type": "string",
+                    "minLength": 1
+                  }
+                },
+                "required": [
+                  "id",
+                  "slug",
+                  "climateBand",
+                  "title",
+                  "body",
+                  "startsAt",
+                  "endsAt",
+                  "timeZone"
+                ],
+                "additionalProperties": false
+              }
+            },
+            "required": [
+              "items",
+              "authorStates",
+              "nextCursor",
+              "mode",
+              "viewerBand",
+              "bandResolved",
+              "bandUnresolvedReason",
+              "experimentVariant",
+              "activeChallenge"
+            ],
+            "additionalProperties": false
+          }
+        },
+        "required": [
+          "data"
+        ],
+        "additionalProperties": false
+      },
+      "CommunityReactionPostResponse": {
+        "type": "object",
+        "properties": {
+          "data": {
+            "type": "object",
+            "properties": {
+              "id": {
+                "type": "string",
+                "minLength": 1
+              },
+              "caption": {
+                "type": [
+                  "string",
+                  "null"
+                ]
+              },
+              "altText": {
+                "type": [
+                  "string",
+                  "null"
+                ]
+              },
+              "climateBand": {
+                "type": [
+                  "string",
+                  "null"
+                ],
+                "description": "The climate band stamped when the post was published, or null if unclassified.",
+                "enum": [
+                  "cold_wet",
+                  "cold_dry",
+                  "temperate_wet",
+                  "temperate_dry",
+                  "warm_wet",
+                  "warm_dry",
+                  null
+                ]
+              },
+              "imageAccess": {
+                "type": "object",
+                "properties": {
+                  "url": {
+                    "type": "string",
+                    "format": "uri"
+                  },
+                  "expiresAt": {
+                    "type": "string",
+                    "format": "date-time"
+                  }
+                },
+                "required": [
+                  "url",
+                  "expiresAt"
+                ],
+                "additionalProperties": false
+              },
+              "publishedAt": {
+                "type": [
+                  "string",
+                  "null"
+                ],
+                "format": "date-time"
+              },
+              "createdAt": {
+                "type": "string",
+                "format": "date-time"
+              },
+              "status": {
+                "type": "string",
+                "enum": [
+                  "draft",
+                  "uploading",
+                  "pending_review",
+                  "published",
+                  "flagged",
+                  "review_failed",
+                  "withdrawn",
+                  "consent_suspended"
+                ]
+              },
+              "challengeId": {
+                "type": [
+                  "string",
+                  "null"
+                ]
+              },
+              "author": {
+                "type": "object",
+                "properties": {
+                  "displayName": {
+                    "type": "string",
+                    "minLength": 1
+                  },
+                  "isSelf": {
+                    "type": "boolean"
+                  }
+                },
+                "required": [
+                  "displayName",
+                  "isSelf"
+                ],
+                "additionalProperties": false
+              },
+              "reactions": {
+                "type": "object",
+                "properties": {
+                  "counts": {
+                    "type": "object",
+                    "properties": {
+                      "applause": {
+                        "type": "integer",
+                        "minimum": 0
+                      },
+                      "love": {
+                        "type": "integer",
+                        "minimum": 0
+                      },
+                      "inspiration": {
+                        "type": "integer",
+                        "minimum": 0
+                      }
+                    },
+                    "required": [
+                      "applause",
+                      "love",
+                      "inspiration"
+                    ],
+                    "additionalProperties": false
+                  },
+                  "total": {
+                    "type": "integer",
+                    "minimum": 0
+                  },
+                  "viewerReaction": {
+                    "type": [
+                      "string",
+                      "null"
+                    ],
+                    "enum": [
+                      "applause",
+                      "love",
+                      "inspiration",
+                      null
+                    ]
+                  },
+                  "revision": {
+                    "type": "integer",
+                    "minimum": 0
+                  },
+                  "generation": {
+                    "type": "integer",
+                    "minimum": 0
+                  }
+                },
+                "required": [
+                  "counts",
+                  "total",
+                  "viewerReaction",
+                  "revision",
+                  "generation"
+                ],
+                "additionalProperties": false,
+                "description": "An authoritative single-snapshot reaction summary. total must equal the sum of applause, love and inspiration counts. revision persists after removal; generation advances on reactions, visibility and erasure changes."
+              }
+            },
+            "required": [
+              "id",
+              "caption",
+              "altText",
+              "climateBand",
+              "imageAccess",
+              "publishedAt",
+              "createdAt",
+              "status",
+              "challengeId",
+              "author"
+            ],
+            "additionalProperties": false
+          }
+        },
+        "required": [
+          "data"
+        ],
+        "additionalProperties": false
+      },
       "ClimateBand": {
         "type": "string",
         "enum": [
@@ -18565,6 +19526,177 @@
         }
       }
     },
+    "/api/v1/community/posts/{postId}/reaction": {
+      "put": {
+        "tags": [
+          "community"
+        ],
+        "summary": "Set or retract the current member reaction",
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "postId",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "x-couture-platform",
+            "in": "header",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "enum": [
+                "web",
+                "mobile"
+              ]
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/SetCommunityReactionInput"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Authoritative current state, including accepted retries.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/CommunityReactionResponse"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Invalid input."
+          },
+          "401": {
+            "description": "Authentication required."
+          },
+          "403": {
+            "description": "Age or guardian consent prevents participation."
+          },
+          "404": {
+            "description": "Post is hidden or deleted."
+          },
+          "409": {
+            "description": "Stale revision or changed receipt payload. Authoritative current state is returned.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "statusCode": {
+                      "type": "number",
+                      "enum": [
+                        409
+                      ]
+                    },
+                    "message": {
+                      "type": "string",
+                      "minLength": 1
+                    },
+                    "error": {
+                      "type": "string",
+                      "enum": [
+                        "Conflict"
+                      ]
+                    },
+                    "data": {
+                      "type": "object",
+                      "properties": {
+                        "counts": {
+                          "type": "object",
+                          "properties": {
+                            "applause": {
+                              "type": "integer",
+                              "minimum": 0
+                            },
+                            "love": {
+                              "type": "integer",
+                              "minimum": 0
+                            },
+                            "inspiration": {
+                              "type": "integer",
+                              "minimum": 0
+                            }
+                          },
+                          "required": [
+                            "applause",
+                            "love",
+                            "inspiration"
+                          ],
+                          "additionalProperties": false
+                        },
+                        "total": {
+                          "type": "integer",
+                          "minimum": 0
+                        },
+                        "viewerReaction": {
+                          "type": [
+                            "string",
+                            "null"
+                          ],
+                          "enum": [
+                            "applause",
+                            "love",
+                            "inspiration",
+                            null
+                          ]
+                        },
+                        "revision": {
+                          "type": "integer",
+                          "minimum": 0
+                        },
+                        "generation": {
+                          "type": "integer",
+                          "minimum": 0
+                        }
+                      },
+                      "required": [
+                        "counts",
+                        "total",
+                        "viewerReaction",
+                        "revision",
+                        "generation"
+                      ],
+                      "additionalProperties": false,
+                      "description": "An authoritative single-snapshot reaction summary. total must equal the sum of applause, love and inspiration counts. revision persists after removal; generation advances on reactions, visibility and erasure changes."
+                    }
+                  },
+                  "required": [
+                    "statusCode",
+                    "message",
+                    "error",
+                    "data"
+                  ],
+                  "additionalProperties": false
+                }
+              }
+            }
+          },
+          "429": {
+            "description": "60 new mutations per member per minute."
+          },
+          "503": {
+            "description": "Community rollout disabled."
+          }
+        }
+      }
+    },
     "/api/v1/community/feed": {
       "get": {
         "tags": [
@@ -18578,6 +19710,18 @@
           }
         ],
         "parameters": [
+          {
+            "name": "x-couture-reactions",
+            "in": "header",
+            "required": false,
+            "schema": {
+              "type": "string",
+              "enum": [
+                "1"
+              ]
+            },
+            "description": "Opt in to reaction summaries. Omission preserves the strict legacy response."
+          },
           {
             "name": "x-couture-platform",
             "in": "header",
@@ -18639,7 +19783,449 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "$ref": "#/components/schemas/CommunityFeedResponse"
+                  "anyOf": [
+                    {
+                      "$ref": "#/components/schemas/CommunityFeedResponse"
+                    },
+                    {
+                      "type": "object",
+                      "properties": {
+                        "data": {
+                          "type": "object",
+                          "properties": {
+                            "items": {
+                              "type": "array",
+                              "items": {
+                                "type": "object",
+                                "properties": {
+                                  "id": {
+                                    "type": "string",
+                                    "minLength": 1
+                                  },
+                                  "caption": {
+                                    "type": [
+                                      "string",
+                                      "null"
+                                    ]
+                                  },
+                                  "altText": {
+                                    "type": [
+                                      "string",
+                                      "null"
+                                    ]
+                                  },
+                                  "climateBand": {
+                                    "type": [
+                                      "string",
+                                      "null"
+                                    ],
+                                    "description": "The climate band stamped when the post was published, or null if unclassified.",
+                                    "enum": [
+                                      "cold_wet",
+                                      "cold_dry",
+                                      "temperate_wet",
+                                      "temperate_dry",
+                                      "warm_wet",
+                                      "warm_dry",
+                                      null
+                                    ]
+                                  },
+                                  "imageAccess": {
+                                    "type": "object",
+                                    "properties": {
+                                      "url": {
+                                        "type": "string",
+                                        "format": "uri"
+                                      },
+                                      "expiresAt": {
+                                        "type": "string",
+                                        "format": "date-time"
+                                      }
+                                    },
+                                    "required": [
+                                      "url",
+                                      "expiresAt"
+                                    ],
+                                    "additionalProperties": false
+                                  },
+                                  "publishedAt": {
+                                    "type": [
+                                      "string",
+                                      "null"
+                                    ],
+                                    "format": "date-time"
+                                  },
+                                  "createdAt": {
+                                    "type": "string",
+                                    "format": "date-time"
+                                  },
+                                  "status": {
+                                    "type": "string",
+                                    "enum": [
+                                      "draft",
+                                      "uploading",
+                                      "pending_review",
+                                      "published",
+                                      "flagged",
+                                      "review_failed",
+                                      "withdrawn",
+                                      "consent_suspended"
+                                    ]
+                                  },
+                                  "challengeId": {
+                                    "type": [
+                                      "string",
+                                      "null"
+                                    ]
+                                  },
+                                  "author": {
+                                    "type": "object",
+                                    "properties": {
+                                      "displayName": {
+                                        "type": "string",
+                                        "minLength": 1
+                                      },
+                                      "isSelf": {
+                                        "type": "boolean"
+                                      }
+                                    },
+                                    "required": [
+                                      "displayName",
+                                      "isSelf"
+                                    ],
+                                    "additionalProperties": false
+                                  },
+                                  "reactions": {
+                                    "type": "object",
+                                    "properties": {
+                                      "counts": {
+                                        "type": "object",
+                                        "properties": {
+                                          "applause": {
+                                            "type": "integer",
+                                            "minimum": 0
+                                          },
+                                          "love": {
+                                            "type": "integer",
+                                            "minimum": 0
+                                          },
+                                          "inspiration": {
+                                            "type": "integer",
+                                            "minimum": 0
+                                          }
+                                        },
+                                        "required": [
+                                          "applause",
+                                          "love",
+                                          "inspiration"
+                                        ],
+                                        "additionalProperties": false
+                                      },
+                                      "total": {
+                                        "type": "integer",
+                                        "minimum": 0
+                                      },
+                                      "viewerReaction": {
+                                        "type": [
+                                          "string",
+                                          "null"
+                                        ],
+                                        "enum": [
+                                          "applause",
+                                          "love",
+                                          "inspiration",
+                                          null
+                                        ]
+                                      },
+                                      "revision": {
+                                        "type": "integer",
+                                        "minimum": 0
+                                      },
+                                      "generation": {
+                                        "type": "integer",
+                                        "minimum": 0
+                                      }
+                                    },
+                                    "required": [
+                                      "counts",
+                                      "total",
+                                      "viewerReaction",
+                                      "revision",
+                                      "generation"
+                                    ],
+                                    "additionalProperties": false,
+                                    "description": "An authoritative single-snapshot reaction summary. total must equal the sum of applause, love and inspiration counts. revision persists after removal; generation advances on reactions, visibility and erasure changes."
+                                  }
+                                },
+                                "required": [
+                                  "id",
+                                  "caption",
+                                  "altText",
+                                  "climateBand",
+                                  "imageAccess",
+                                  "publishedAt",
+                                  "createdAt",
+                                  "status",
+                                  "challengeId",
+                                  "author"
+                                ],
+                                "additionalProperties": false
+                              }
+                            },
+                            "authorStates": {
+                              "type": "array",
+                              "items": {
+                                "type": "object",
+                                "properties": {
+                                  "id": {
+                                    "type": "string",
+                                    "minLength": 1
+                                  },
+                                  "caption": {
+                                    "type": [
+                                      "string",
+                                      "null"
+                                    ]
+                                  },
+                                  "altText": {
+                                    "type": [
+                                      "string",
+                                      "null"
+                                    ]
+                                  },
+                                  "climateBand": {
+                                    "type": [
+                                      "string",
+                                      "null"
+                                    ],
+                                    "description": "The climate band stamped when the post was classified, or null if unclassified.",
+                                    "enum": [
+                                      "cold_wet",
+                                      "cold_dry",
+                                      "temperate_wet",
+                                      "temperate_dry",
+                                      "warm_wet",
+                                      "warm_dry",
+                                      null
+                                    ]
+                                  },
+                                  "imageAccess": {
+                                    "type": [
+                                      "object",
+                                      "null"
+                                    ],
+                                    "properties": {
+                                      "url": {
+                                        "type": "string",
+                                        "format": "uri"
+                                      },
+                                      "expiresAt": {
+                                        "type": "string",
+                                        "format": "date-time"
+                                      }
+                                    },
+                                    "required": [
+                                      "url",
+                                      "expiresAt"
+                                    ],
+                                    "additionalProperties": false
+                                  },
+                                  "createdAt": {
+                                    "type": "string",
+                                    "format": "date-time"
+                                  },
+                                  "publishedAt": {
+                                    "type": [
+                                      "string",
+                                      "null"
+                                    ],
+                                    "format": "date-time"
+                                  },
+                                  "status": {
+                                    "type": "string",
+                                    "enum": [
+                                      "draft",
+                                      "uploading",
+                                      "pending_review",
+                                      "published",
+                                      "flagged",
+                                      "review_failed",
+                                      "withdrawn",
+                                      "consent_suspended"
+                                    ]
+                                  },
+                                  "challengeId": {
+                                    "type": [
+                                      "string",
+                                      "null"
+                                    ]
+                                  },
+                                  "moderationReason": {
+                                    "type": [
+                                      "string",
+                                      "null"
+                                    ]
+                                  }
+                                },
+                                "required": [
+                                  "id",
+                                  "caption",
+                                  "altText",
+                                  "climateBand",
+                                  "imageAccess",
+                                  "createdAt",
+                                  "publishedAt",
+                                  "status",
+                                  "challengeId",
+                                  "moderationReason"
+                                ],
+                                "additionalProperties": false
+                              }
+                            },
+                            "nextCursor": {
+                              "type": [
+                                "string",
+                                "null"
+                              ]
+                            },
+                            "mode": {
+                              "type": "string",
+                              "enum": [
+                                "auto",
+                                "all",
+                                "cold_wet",
+                                "cold_dry",
+                                "temperate_wet",
+                                "temperate_dry",
+                                "warm_wet",
+                                "warm_dry"
+                              ]
+                            },
+                            "viewerBand": {
+                              "type": [
+                                "string",
+                                "null"
+                              ],
+                              "description": "The climate band resolved for the viewer, or null if unresolvable.",
+                              "enum": [
+                                "cold_wet",
+                                "cold_dry",
+                                "temperate_wet",
+                                "temperate_dry",
+                                "warm_wet",
+                                "warm_dry",
+                                null
+                              ]
+                            },
+                            "bandResolved": {
+                              "type": "boolean"
+                            },
+                            "bandUnresolvedReason": {
+                              "type": [
+                                "string",
+                                "null"
+                              ],
+                              "description": "Why the viewer band could not be resolved, or null when it resolved. Clients render a localized banner from this.",
+                              "enum": [
+                                "no_location",
+                                "weather_unavailable",
+                                "weather_stale",
+                                "weather_malformed",
+                                "insufficient_usable_days",
+                                null
+                              ]
+                            },
+                            "experimentVariant": {
+                              "type": "string",
+                              "enum": [
+                                "auto",
+                                "all"
+                              ]
+                            },
+                            "activeChallenge": {
+                              "type": [
+                                "object",
+                                "null"
+                              ],
+                              "properties": {
+                                "id": {
+                                  "type": "string",
+                                  "minLength": 1
+                                },
+                                "slug": {
+                                  "type": "string",
+                                  "minLength": 1
+                                },
+                                "climateBand": {
+                                  "type": [
+                                    "string",
+                                    "null"
+                                  ],
+                                  "description": "The climate band this challenge is restricted to, or null if unrestricted.",
+                                  "enum": [
+                                    "cold_wet",
+                                    "cold_dry",
+                                    "temperate_wet",
+                                    "temperate_dry",
+                                    "warm_wet",
+                                    "warm_dry",
+                                    null
+                                  ]
+                                },
+                                "title": {
+                                  "type": "string",
+                                  "minLength": 1
+                                },
+                                "body": {
+                                  "type": "string",
+                                  "minLength": 1
+                                },
+                                "startsAt": {
+                                  "type": "string",
+                                  "format": "date-time"
+                                },
+                                "endsAt": {
+                                  "type": "string",
+                                  "format": "date-time"
+                                },
+                                "timeZone": {
+                                  "type": "string",
+                                  "minLength": 1
+                                }
+                              },
+                              "required": [
+                                "id",
+                                "slug",
+                                "climateBand",
+                                "title",
+                                "body",
+                                "startsAt",
+                                "endsAt",
+                                "timeZone"
+                              ],
+                              "additionalProperties": false
+                            }
+                          },
+                          "required": [
+                            "items",
+                            "authorStates",
+                            "nextCursor",
+                            "mode",
+                            "viewerBand",
+                            "bandResolved",
+                            "bandUnresolvedReason",
+                            "experimentVariant",
+                            "activeChallenge"
+                          ],
+                          "additionalProperties": false
+                        }
+                      },
+                      "required": [
+                        "data"
+                      ],
+                      "additionalProperties": false
+                    }
+                  ]
                 }
               }
             }
@@ -18822,6 +20408,18 @@
         ],
         "parameters": [
           {
+            "name": "x-couture-reactions",
+            "in": "header",
+            "required": false,
+            "schema": {
+              "type": "string",
+              "enum": [
+                "1"
+              ]
+            },
+            "description": "Opt in to reaction summaries. Omission preserves the strict legacy response."
+          },
+          {
             "name": "postId",
             "in": "path",
             "required": true,
@@ -18850,7 +20448,196 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "$ref": "#/components/schemas/CommunityPostResponse"
+                  "anyOf": [
+                    {
+                      "$ref": "#/components/schemas/CommunityPostResponse"
+                    },
+                    {
+                      "type": "object",
+                      "properties": {
+                        "data": {
+                          "type": "object",
+                          "properties": {
+                            "id": {
+                              "type": "string",
+                              "minLength": 1
+                            },
+                            "caption": {
+                              "type": [
+                                "string",
+                                "null"
+                              ]
+                            },
+                            "altText": {
+                              "type": [
+                                "string",
+                                "null"
+                              ]
+                            },
+                            "climateBand": {
+                              "type": [
+                                "string",
+                                "null"
+                              ],
+                              "description": "The climate band stamped when the post was published, or null if unclassified.",
+                              "enum": [
+                                "cold_wet",
+                                "cold_dry",
+                                "temperate_wet",
+                                "temperate_dry",
+                                "warm_wet",
+                                "warm_dry",
+                                null
+                              ]
+                            },
+                            "imageAccess": {
+                              "type": "object",
+                              "properties": {
+                                "url": {
+                                  "type": "string",
+                                  "format": "uri"
+                                },
+                                "expiresAt": {
+                                  "type": "string",
+                                  "format": "date-time"
+                                }
+                              },
+                              "required": [
+                                "url",
+                                "expiresAt"
+                              ],
+                              "additionalProperties": false
+                            },
+                            "publishedAt": {
+                              "type": [
+                                "string",
+                                "null"
+                              ],
+                              "format": "date-time"
+                            },
+                            "createdAt": {
+                              "type": "string",
+                              "format": "date-time"
+                            },
+                            "status": {
+                              "type": "string",
+                              "enum": [
+                                "draft",
+                                "uploading",
+                                "pending_review",
+                                "published",
+                                "flagged",
+                                "review_failed",
+                                "withdrawn",
+                                "consent_suspended"
+                              ]
+                            },
+                            "challengeId": {
+                              "type": [
+                                "string",
+                                "null"
+                              ]
+                            },
+                            "author": {
+                              "type": "object",
+                              "properties": {
+                                "displayName": {
+                                  "type": "string",
+                                  "minLength": 1
+                                },
+                                "isSelf": {
+                                  "type": "boolean"
+                                }
+                              },
+                              "required": [
+                                "displayName",
+                                "isSelf"
+                              ],
+                              "additionalProperties": false
+                            },
+                            "reactions": {
+                              "type": "object",
+                              "properties": {
+                                "counts": {
+                                  "type": "object",
+                                  "properties": {
+                                    "applause": {
+                                      "type": "integer",
+                                      "minimum": 0
+                                    },
+                                    "love": {
+                                      "type": "integer",
+                                      "minimum": 0
+                                    },
+                                    "inspiration": {
+                                      "type": "integer",
+                                      "minimum": 0
+                                    }
+                                  },
+                                  "required": [
+                                    "applause",
+                                    "love",
+                                    "inspiration"
+                                  ],
+                                  "additionalProperties": false
+                                },
+                                "total": {
+                                  "type": "integer",
+                                  "minimum": 0
+                                },
+                                "viewerReaction": {
+                                  "type": [
+                                    "string",
+                                    "null"
+                                  ],
+                                  "enum": [
+                                    "applause",
+                                    "love",
+                                    "inspiration",
+                                    null
+                                  ]
+                                },
+                                "revision": {
+                                  "type": "integer",
+                                  "minimum": 0
+                                },
+                                "generation": {
+                                  "type": "integer",
+                                  "minimum": 0
+                                }
+                              },
+                              "required": [
+                                "counts",
+                                "total",
+                                "viewerReaction",
+                                "revision",
+                                "generation"
+                              ],
+                              "additionalProperties": false,
+                              "description": "An authoritative single-snapshot reaction summary. total must equal the sum of applause, love and inspiration counts. revision persists after removal; generation advances on reactions, visibility and erasure changes."
+                            }
+                          },
+                          "required": [
+                            "id",
+                            "caption",
+                            "altText",
+                            "climateBand",
+                            "imageAccess",
+                            "publishedAt",
+                            "createdAt",
+                            "status",
+                            "challengeId",
+                            "author"
+                          ],
+                          "additionalProperties": false
+                        }
+                      },
+                      "required": [
+                        "data"
+                      ],
+                      "additionalProperties": false
+                    }
+                  ]
                 }
               }
             }

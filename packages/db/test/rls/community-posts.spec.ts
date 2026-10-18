@@ -267,6 +267,9 @@ describe.concurrent('community table RLS policies', () => {
         'CommunityAlias',
         'CommunityPostReport',
         'CommunityModerationOutbox',
+        'CommunityReaction',
+        'CommunityReactionReceipt',
+        'CommunityReactionOutbox',
       ] as const
 
       for (const table of tables) {

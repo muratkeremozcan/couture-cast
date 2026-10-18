@@ -5,11 +5,13 @@ export type AnalyticsEventProperties = Record<string, unknown>
 export type AnalyticsCaptureEvent = {
   distinctId: string
   event: string
+  timestamp?: string
   properties?: AnalyticsEventProperties
 }
 
 export interface AnalyticsClient {
   capture(event: AnalyticsCaptureEvent): void
+  captureAcknowledged?(event: AnalyticsCaptureEvent): Promise<void>
 }
 
 export const ANALYTICS_CLIENT = Symbol('ANALYTICS_CLIENT')

@@ -37,8 +37,9 @@
     "test:coverage": "vitest run --config vitest.config.ts --coverage"
   },
   "dependencies": {
+    "@couture/api-client": "file:../api-client",
+    "@couture/utils": "file:../utils",
     "@faker-js/faker": "10.1.0",
-    "@prisma/client": "6.19.0",
-    "@couture/utils": "file:../utils"
+    "@prisma/client": "6.19.0"
   }
 }

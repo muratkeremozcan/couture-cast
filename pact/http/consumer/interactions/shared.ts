@@ -134,6 +134,7 @@ export type ContractApiClient = Pick<
   // throws on non-2xx responses.
   | 'apiV1CommunityFeedGet'
   | 'apiV1CommunityPostsPostIdGet'
+  | 'apiV1CommunityPostsPostIdReactionPut'
   | 'apiV1CommunityPostsAllocatePost'
   | 'apiV1CommunityPostsPublishPost'
   | 'apiV1CommunityPostsPostIdReportPost'

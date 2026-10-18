@@ -73,6 +73,9 @@ type AnalyticsCapturePayload = {
 }
 
 class InMemoryGuardianPrisma {
+  $executeRaw = vi.fn().mockResolvedValue(1)
+  $queryRaw = vi.fn().mockResolvedValue([])
+  communityReaction = { updateMany: vi.fn().mockResolvedValue({ count: 0 }) }
   users = new Map<string, StoredUser>()
   invitations = new Map<string, StoredInvitation>()
   consents = new Map<string, StoredConsent>()
@@ -1162,7 +1165,7 @@ describe('GuardianService', () => {
     prisma.$transaction = vi.fn(async (callback, options) => {
       attempts += 1
       expect(options).toMatchObject({
-        isolationLevel: 'Serializable',
+        isolationLevel: 'ReadCommitted',
       })
 
       if (attempts === 1) {

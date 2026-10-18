@@ -1,4 +1,5 @@
-import { Inject, Injectable } from '@nestjs/common'
+import { randomUUID } from 'node:crypto'
+import { Inject, Injectable, ConflictException, NotFoundException } from '@nestjs/common'
 import {
   Prisma,
   PrismaClient,
@@ -16,6 +17,12 @@ import {
   encodeCommunityFeedCursor,
   type CommunityFeedCursorPayload,
   type CommunityFeedMode,
+  type CommunityReactionSummary,
+  type SetCommunityReactionInput,
+  type CommunityPlatform,
+  communityReactionSummarySchema,
+  COMMUNITY_REACTION_CONFLICT_MESSAGE,
+  COMMUNITY_POST_NOT_FOUND_MESSAGE,
 } from '@couture/api-client/contracts/http'
 
 export interface FindFeedPostsParams {
@@ -87,6 +94,8 @@ export type RecordReportResult =
 export const PUBLICLY_VISIBLE_POST_WHERE = {
   status: 'published',
   published_at: { not: null },
+  erasure_requested_at: null,
+  anonymized_at: null,
   NOT: { user_id: { startsWith: COMMUNITY_CANARY_USER_ID_PREFIX } },
 } as const satisfies Prisma.LookbookPostWhereInput
 
@@ -95,10 +104,14 @@ export function isPubliclyVisiblePost(post: {
   status: string
   published_at: Date | null
   user_id: string
+  erasure_requested_at: Date | null
+  anonymized_at: Date | null
 }): boolean {
   return (
     post.status === 'published' &&
     post.published_at !== null &&
+    post.erasure_requested_at == null &&
+    post.anonymized_at == null &&
     !post.user_id.startsWith(COMMUNITY_CANARY_USER_ID_PREFIX)
   )
 }
@@ -132,9 +145,144 @@ function isUniqueViolationOn(
   return Array.isArray(target) ? target.includes(field) : target === field
 }
 
+function reactionEventType(previous: string | null, selection: string | null): string {
+  if (selection === null) return 'community_reaction_removed'
+  return previous === null ? 'community_reaction_added' : 'community_reaction_replaced'
+}
+
 @Injectable()
 export class CommunityRepository {
   constructor(@Inject(PrismaClient) private readonly prisma: PrismaClient) {}
+
+  /** One statement supplies every aggregate and viewer revision from one MVCC snapshot. */
+  async reactionSummaries(
+    postIds: string[],
+    userId: string,
+    tx: Prisma.TransactionClient = this.prisma
+  ): Promise<Map<string, CommunityReactionSummary>> {
+    if (postIds.length === 0) return new Map()
+    const rows = await tx.$queryRaw<{ id: string; summary: unknown }[]>(Prisma.sql`
+      SELECT p.id, jsonb_build_object(
+        'counts', jsonb_build_object(
+          'applause', COUNT(*) FILTER (WHERE r.selection = 'applause')::int,
+          'love', COUNT(*) FILTER (WHERE r.selection = 'love')::int,
+          'inspiration', COUNT(*) FILTER (WHERE r.selection = 'inspiration')::int),
+        'total', COUNT(r.selection)::int,
+        'viewerReaction', (SELECT v.selection FROM "CommunityReaction" v WHERE v.post_id = p.id AND v.user_id = ${userId}),
+        'revision', COALESCE((SELECT v.revision FROM "CommunityReaction" v WHERE v.post_id = p.id AND v.user_id = ${userId}), 0),
+        'generation', p.reaction_generation) AS summary
+      FROM "LookbookPost" p LEFT JOIN "CommunityReaction" r ON r.post_id = p.id AND r.selection IS NOT NULL
+      WHERE p.id IN (${Prisma.join(postIds)}) AND p.status = 'published' AND p.published_at IS NOT NULL
+        AND p.erasure_requested_at IS NULL AND p.anonymized_at IS NULL
+        AND p.user_id NOT LIKE 'canary-user-%'
+      GROUP BY p.id
+    `)
+    return new Map(
+      rows.map((row) => [row.id, communityReactionSummarySchema.parse(row.summary)])
+    )
+  }
+
+  async setReaction(params: {
+    userId: string
+    postId: string
+    input: SetCommunityReactionInput
+    platform: CommunityPlatform
+    assertEligible: (
+      tx: Prisma.TransactionClient,
+      participation: boolean
+    ) => Promise<void>
+  }): Promise<{ summary: CommunityReactionSummary } | { retryAfterSeconds: number }> {
+    const { userId, postId, input, platform } = params
+    return this.prisma.$transaction(async (tx) => {
+      await tx.$executeRaw`SELECT pg_advisory_xact_lock(hashtext('community_member:' || ${userId}))`
+      await tx.$queryRaw`SELECT id FROM "LookbookPost" WHERE id = ${postId} FOR UPDATE`
+      await params.assertEligible(tx, false)
+      const post = await tx.lookbookPost.findUnique({ where: { id: postId } })
+      if (!post || !isPubliclyVisiblePost(post))
+        throw new NotFoundException(COMMUNITY_POST_NOT_FOUND_MESSAGE)
+      const receipt = await tx.communityReactionReceipt.findUnique({
+        where: {
+          user_id_mutation_id: { user_id: userId, mutation_id: input.mutationId },
+        },
+      })
+      const current = (await this.reactionSummaries([postId], userId, tx)).get(postId)
+      if (!current) throw new NotFoundException(COMMUNITY_POST_NOT_FOUND_MESSAGE)
+      const conflict = () =>
+        new ConflictException({
+          statusCode: 409,
+          error: 'Conflict',
+          message: COMMUNITY_REACTION_CONFLICT_MESSAGE,
+          data: current,
+        })
+      if (receipt) {
+        if (
+          receipt.post_id !== postId ||
+          receipt.selection !== input.selection ||
+          receipt.base_revision !== input.baseRevision
+        )
+          throw conflict()
+        return { summary: current }
+      }
+      if (current.revision !== input.baseRevision) throw conflict()
+      const recent = await tx.communityReactionReceipt.findMany({
+        where: { user_id: userId, created_at: { gt: new Date(Date.now() - 60_000) } },
+        orderBy: { created_at: 'asc' },
+        select: { created_at: true },
+      })
+      if (recent.length >= 60)
+        return {
+          retryAfterSeconds: Math.max(
+            1,
+            Math.ceil(
+              ((recent[0]?.created_at.getTime() ?? Date.now()) + 60_000 - Date.now()) /
+                1000
+            )
+          ),
+        }
+      await params.assertEligible(tx, true)
+      const changed = current.viewerReaction !== input.selection
+      await tx.communityReaction.upsert({
+        where: { user_id_post_id: { user_id: userId, post_id: postId } },
+        create: {
+          user_id: userId,
+          post_id: postId,
+          selection: input.selection,
+          revision: 1,
+        },
+        update: { selection: input.selection, revision: { increment: 1 } },
+      })
+      if (changed) {
+        if (!userId.startsWith(COMMUNITY_CANARY_USER_ID_PREFIX)) {
+          await tx.communityReactionOutbox.create({
+            data: {
+              id: randomUUID(),
+              user_id: userId,
+              post_id: postId,
+              event_type: reactionEventType(current.viewerReaction, input.selection),
+              payload: {
+                platform,
+                isSelf: post.user_id === userId,
+                selection: input.selection,
+                previousSelection: current.viewerReaction,
+              },
+            },
+          })
+        }
+      }
+      await tx.communityReactionReceipt.create({
+        data: {
+          user_id: userId,
+          post_id: postId,
+          mutation_id: input.mutationId,
+          selection: input.selection,
+          base_revision: input.baseRevision,
+        },
+      })
+      const summary = (await this.reactionSummaries([postId], userId, tx)).get(postId)
+      if (!summary) throw new NotFoundException(COMMUNITY_POST_NOT_FOUND_MESSAGE)
+      return { summary }
+    })
+  }
 
   /**
    * The viewer's saved locations in preference order. The spec's band-resolution
@@ -328,16 +476,18 @@ export class CommunityRepository {
    * bytes the request was about.
    */
   async requestErasureForUser(userId: string, requestedAt: Date): Promise<number> {
-    const { count } = await this.prisma.lookbookPost.updateMany({
-      where: {
-        user_id: userId,
-        erasure_requested_at: null,
-      },
-      data: {
-        erasure_requested_at: requestedAt,
-      },
+    return this.prisma.$transaction(async (tx) => {
+      await tx.$executeRaw`SELECT pg_advisory_xact_lock(hashtext('community_member:' || ${userId}))`
+      await tx.$queryRaw`SELECT id FROM "LookbookPost" WHERE id IN (SELECT post_id FROM "CommunityReaction" WHERE user_id = ${userId}) OR user_id = ${userId} ORDER BY id FOR UPDATE`
+      await tx.communityReaction.deleteMany({ where: { user_id: userId } })
+      await tx.communityReactionReceipt.deleteMany({ where: { user_id: userId } })
+      await tx.communityReactionOutbox.deleteMany({ where: { user_id: userId } })
+      const { count } = await tx.lookbookPost.updateMany({
+        where: { user_id: userId, erasure_requested_at: null },
+        data: { erasure_requested_at: requestedAt },
+      })
+      return count
     })
-    return count
   }
 
   async updatePost(
@@ -494,6 +644,8 @@ export class CommunityRepository {
             user_id: string
             status: string
             published_at: Date | null
+            erasure_requested_at: Date | null
+            anonymized_at: Date | null
             image_object_path: string | null
             caption: string | null
             alt_text: string | null
@@ -504,6 +656,8 @@ export class CommunityRepository {
           SELECT user_id,
                  status::text AS status,
                  published_at,
+                 erasure_requested_at,
+                 anonymized_at,
                  image_object_path,
                  caption,
                  alt_text,

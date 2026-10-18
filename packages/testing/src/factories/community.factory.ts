@@ -1,3 +1,4 @@
+import type { CommunityReactionSummary } from '@couture/api-client/contracts/http'
 import type {
   ClimateBand,
   CommunityAlias,
@@ -469,4 +470,18 @@ export async function persistCommunityModerationOutbox(
 
   registerCreatedEntity('communityModerationOutboxEntries', entry.id)
   return entry
+}
+
+/** Story 6.3 owner: deterministic reaction snapshots for API and component tests. */
+export function createCommunityReactionSummary(
+  overrides: Partial<CommunityReactionSummary> = {}
+): CommunityReactionSummary {
+  return {
+    counts: { applause: 0, love: 0, inspiration: 0 },
+    total: 0,
+    viewerReaction: null,
+    revision: 0,
+    generation: 0,
+    ...overrides,
+  }
 }

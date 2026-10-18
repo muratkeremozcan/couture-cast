@@ -840,7 +840,7 @@ describe('community HTTP contracts', () => {
         (postPath?.get?.parameters ?? []).map(
           (parameter) => (parameter as { name?: string }).name
         )
-      ).toEqual(['postId', 'x-couture-platform'])
+      ).toEqual(['x-couture-reactions', 'postId', 'x-couture-platform'])
     })
 
     it('6.1-CON-038 registers the new community components', () => {

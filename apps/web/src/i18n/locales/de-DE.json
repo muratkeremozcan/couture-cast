@@ -585,6 +585,22 @@
       "disabled": "Der Community-Feed ist vorübergehend nicht verfügbar.",
       "mediaUnavailable": "Dieser Look ist vorübergehend nicht verfügbar. Versuche es in Kürze erneut.",
       "generic": "Etwas ist schiefgelaufen. Versuche es erneut."
+    },
+    "reactions": {
+      "label": "Reaktionen",
+      "applause": "Applaudieren",
+      "love": "Gefällt mir sehr",
+      "inspiration": "Inspirierend",
+      "total": "{{count}} Reaktionen",
+      "pending": "Reaktion wird gespeichert…",
+      "updated": "Reaktion gespeichert.",
+      "conflict": "Deine Reaktion wurde auf einem anderen Gerät geändert. Wähle erneut.",
+      "failed": "Deine Reaktion konnte nicht gespeichert werden. Versuche es zur Bestätigung erneut.",
+      "retry": "Reaktion erneut senden",
+      "rateLimited": "Zu viele Reaktionen. Versuche es in einer Minute erneut.",
+      "total_one": "{{count}} Reaktion",
+      "total_other": "{{count}} Reaktionen",
+      "ineligible": "Reaktionen sind ab 13 Jahren möglich. Unter 16 ist eine gültige Zustimmung eines Erziehungsberechtigten erforderlich."
     }
   }
 }

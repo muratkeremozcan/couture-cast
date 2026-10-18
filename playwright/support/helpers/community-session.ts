@@ -556,6 +556,9 @@ async function deleteCommunityRowsForUser(userId: string): Promise<void> {
      * run, and `@@unique([post_id, reporter_id])` means a survivor silently
      * changes what a later run's first report against that post does.
      */
+    await prisma.communityReactionOutbox.deleteMany({ where: { user_id: userId } })
+    await prisma.communityReactionReceipt.deleteMany({ where: { user_id: userId } })
+    await prisma.communityReaction.deleteMany({ where: { user_id: userId } })
     await prisma.communityPostReport.deleteMany({ where: { reporter_id: userId } })
 
     /*

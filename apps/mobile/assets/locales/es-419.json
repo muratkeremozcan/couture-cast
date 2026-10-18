@@ -757,6 +757,22 @@
       "disabled": "El feed de la comunidad no está disponible por el momento.",
       "mediaUnavailable": "Este look no está disponible por el momento. Inténtalo de nuevo en unos minutos.",
       "generic": "Algo salió mal. Inténtalo de nuevo."
+    },
+    "reactions": {
+      "label": "Reacciones",
+      "applause": "Aplaudir",
+      "love": "Me encanta",
+      "inspiration": "Me inspira",
+      "total": "{{count}} reacciones",
+      "pending": "Guardando reacción…",
+      "updated": "Reacción guardada.",
+      "conflict": "Tu reacción cambió en otro dispositivo. Elige de nuevo.",
+      "failed": "No pudimos guardar tu reacción. Vuelve a intentarlo para confirmar.",
+      "retry": "Reintentar reacción",
+      "rateLimited": "Demasiadas reacciones. Inténtalo en un minuto.",
+      "total_one": "{{count}} reacción",
+      "total_other": "{{count}} reacciones",
+      "ineligible": "Debes tener al menos 13 años para reaccionar. Los menores de 16 necesitan consentimiento vigente de su tutor."
     }
   }
 }

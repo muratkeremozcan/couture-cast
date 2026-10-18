@@ -1,27 +1,20 @@
-# Epic 6 Context: Community & Moderation Loop
+# Epic 6 Context: Community & Moderation Loop (Phase 2)
 
 <!-- Compiled from planning artifacts. Edit freely. Regenerate with compile-epic-context if planning docs change. -->
 
-_Updated: 2026-09-06: re-sliced remaining work from the shipped Story 6.1 baseline._
-
 ## Goal
 
-Turn CoutureCast from a private daily ritual into a social one. This epic delivers the community
-feed grouped by climate band, the engagement mechanics that let members react and comment, curated
-locale highlight modules that surface standout looks, outbound social sharing of outfit cards, and
-the moderation queue that keeps all of it safe. It matters because community participation is a
-primary retention lever, and because none of the social surface can ship without moderation,
-age-gating, and audit controls landing alongside it.
-
-Community Beta is Phase 2 per the roadmap and opens only on the signed safety gate: moderation
-staffing, SLA alerts, privacy, deletion, localization, accessibility, model, and rollback
-evidence. Production read and write rollout controls stay off until every one of those eight is
-signed.
+Deliver climate-relevant community inspiration through posts, reactions, comments, ranked highlights,
+and branded sharing, backed by safe publication and accountable moderation. Community Beta opens
+only when staffing, SLA alerts, privacy, deletion, localization, accessibility, model, and rollback
+evidence are signed. Production read and write rollout controls remain disabled until all eight
+release gates close.
 
 ## Stories
 
 - Story 6.1: Community feed by climate band
 - Story 6.2: Production content-screening readiness
+- Story 6.2b: Community screening release gate and worker deployment
 - Story 6.3: Curated reactions
 - Story 6.4: Threaded comments
 - Story 6.5: Realtime engagement and notifications
@@ -36,111 +29,74 @@ signed.
 
 ## Requirements & Constraints
 
-- Feed content groups by climate band derived from the member's current location, supports photo
-  post creation with caption and locale metadata, and carries an editorially curated weekly
-  challenge banner.
-- Engagement is limited to a curated emoji palette plus threaded comments. Every post and comment
-  exposes a report action. Aggregated reactions combined with recency drive highlight ranking.
-- Social participation is gated at 13+. Age-gate enforcement and the guardian-consent scaffolding
-  already used for wardrobe media apply to posting and commenting.
-- Flagged content must reach the moderation queue within five minutes of the flag, and must be
-  reviewed within a 24-hour SLA with alerting when that window is at risk. Review actions cover
-  resolve, escalate, and ban, each with a review timestamp.
-- Moderation decisions write to an immutable audit trail retained for twelve months. Planning
-  material also carries a shorter 90-day figure for the moderation action history; treat twelve
-  months as the retention floor and confirm before implementing anything shorter.
-- Exported outfit cards use native share sheets for Pinterest, Instagram, Facebook, and TikTok,
-  carry CoutureCast branding with an optional watermark, and strip personal data from the generated
-  asset. Cancelling a share must not lose the composed post. A failed platform share falls back to
-  saving to the camera roll or downloading, with a user-visible notice.
-- Community pushes (mentions, engagement pings) are opt-in, respect quiet hours, and dispatch within
-  60 seconds of the trigger.
-- Moderation must handle multilingual content with per-language keyword detection and escalation to
-  native-language reviewers inside the same SLA. Highlight and feed copy flows through the existing
-  localization pipeline with fallback strings.
-- Community uploads need auto-suggested alternative text. All community surfaces meet WCAG 2.2 AA
-  for contrast, focus, and semantic structure.
-- Analytics covers community actions in a privacy-safe, anonymous shape and feeds the weekly-active
-  participation metric. Sharing workflows sit inside the 99.5% core-service uptime target.
-- The Community Beta launch gate governs release: production read and write rollout controls stay
-  disabled until moderation staffing, SLA alerts, privacy, deletion, localization, accessibility,
-  model, and rollback evidence are signed.
+- Main CoutureCast and community participation require age 13+. Uploads additionally enforce the
+  applicable guardian-consent policy for under-16 members.
+- Climate-band feeds support photo posts, locale metadata, and editorial weekly challenges.
+  Reactions use a closed emoji palette, one current reaction per member and post, exact aggregates,
+  and retry-safe replacement and removal. Visibility changes invalidate feed and highlight caches.
+- Comments support one reply level, stable pagination, screening before publication, deletion
+  tombstones, and reporting. Accepted reports reach moderation within five minutes; human review
+  has a 24-hour SLA with at-risk and breach escalation.
+- Moderator access is role restricted. Decisions require an attributed reason, serialize conflicts,
+  and preserve immutable history for at least 12 months. Account erasure removes personal content
+  and anonymizes subject and reporter identities within 72 hours.
+- Spotlight ranking is deterministic from reactions and recency, uses coarse location and a defined
+  privacy cohort, and offers sponsored affiliate CTAs only when eligible sponsorship exists.
+- Exported cards preserve luxury branding and optional watermark while removing personal data,
+  exact location, source metadata, identifiers, and signed media URLs. Cancellation preserves the
+  composition; failed sharing offers camera-roll save or web download.
+- Engagement pushes require opt-in and quiet-hour controls, dispatch within 60 seconds, and clean
+  up invalid tokens. Community analytics use anonymous, privacy-safe, deduplicated signals.
+- English, Spanish, and French are launch locales. Screening handles obfuscation and escalates
+  unsupported language or uncertain results. Localized, accessible web and mobile controls include
+  upload alternative text, clear focus, and screen-reader feedback.
 
 ## Technical Decisions
 
-- Community and moderation live in a NestJS community module with a Next.js admin console for
-  moderator review and a BullMQ queue for moderation work. Data lands in `lookbook_posts`,
-  `engagement_events`, `moderation_events`, and `audit_log`, with moderation events linking back to
-  either a post or a garment item.
-- Moderation runs in-house on a NestJS console so the audit trail stays fully under our control.
-  Automated image screening uses a server-side NSFW model executed in a background worker; text
-  screening uses a profanity filter. Anything flagged short-circuits the publish flow and notifies
-  the moderator and guardian channels. Humans review from the admin console; SLA tracking reports
-  through product analytics.
-- Public endpoints stay under `/api/v1`. Canonical request and response schemas start life as shared
-  Zod contracts in `packages/api-client/src/contracts/http`; controllers, OpenAPI, generated SDK,
-  and client wrappers derive from them. Success payloads use the shared data envelope, lists add
-  pagination metadata, errors use stable codes.
-- The feed streams over Socket.io using the namespaced event convention with `version` and
-  `timestamp` on every payload. Socket disconnect degrades to a cached feed marked visibly stale.
-- Supabase Auth plus PostgreSQL RLS enforce tenant isolation; NestJS guards enforce the role model,
-  including the moderator role. Moderation decisions and data exports append immutable audit rows.
-- Highlight ranking is deterministic server-side logic over reactions and recency, cached in Redis
-  the way other personalization payloads are. Cache keys must not let a removed or moderated post
-  survive its removal.
-- Community, wardrobe, and commerce metadata aggregate into the shared search view with
-  locale-specific tokens.
-- Tests use deterministic factories from `@couture/testing`. Vitest owns unit, component, API,
-  database, and RLS evidence. Pact protects HTTP consumer and provider understanding. Playwright and
-  Maestro cover focused cross-surface journeys.
+- NestJS owns community decisions; Supabase PostgreSQL and Prisma provide persistence, with RLS
+  isolation and authenticated role guards. Next.js supplies the moderator console. Audit records
+  are append-only at the database boundary.
+- Public HTTP contracts start in shared Zod schemas under `packages/api-client/src/contracts/http`.
+  Controllers, OpenAPI, SDKs, and wrappers derive from them. `/api/v1` remains stable; incompatible
+  changes require `/api/v2`. Use shared success, pagination, and stable error envelopes.
+- Moderation uses an in-house console and a standalone BullMQ worker. The worker deploys as an
+  unprivileged container under `tini` on an always-on host: Northflank first, Oracle Always Free
+  if memory requires it, then Railway. HTTP serverless instances cannot host its process.
+- The screening worker uses a pinned NSFWJS model with TensorFlow.js WASM, bounded execution, and
+  fail-closed unavailability. Its container has a traced dependency budget, one replica at
+  concurrency one, and a 512 MiB resource envelope. Build identity must be provable through a
+  deployed canary.
+- Model readiness uses a policy-surface sweep, a creator-separated licensed safe-image holdout,
+  pinned public text lists with provenance, obfuscation checks, and an immutable evidence payload
+  signed by the repository owner against its hash. Stale or partial evidence fails closed. Recorded
+  limitations include unmeasured real-unsafe-image recall, stock-photo coverage, community text-list
+  provenance, and two-moderator beta staffing. Detailed thresholds and measurements belong to the
+  generated model-readiness evidence.
+- Production Redis uses Upstash Pay as You Go. Worker blocking and stalled checks are tuned for
+  that billing model; the screening worker's projected idle-plus-traffic cost ceiling is USD 5 per
+  month. Shared API queue commands are outside that measurement.
+- Highlight read models use Redis with engagement and moderation invalidation. Realtime events
+  publish after durable commits with version and timestamp; reconnect and ordered polling fallback
+  suppress duplicates. Community reads remain independent of ritual loading.
 
 ## UX & Interaction Patterns
 
-- The community surface is the Lookbook Prism split layout: hero ritual and community feed are
-  co-present on desktop, stacked with a two-column grid on tablet, and a single column with sticky
-  chips on mobile. Community fetches must never block ritual rendering.
-- Chips switch between Personal, Community, and Sponsored views and filter the feed (New,
-  Following, Near me, Brands) without a page reload. Only the filters with defined server behavior
-  are enabled in 6.1; the rest render disabled.
-- The Lookbook Card carries hero image, weather and location pill, outfit description, engagement
-  counts, and a CTA cluster covering save, import, applaud, and flag. It needs default, hover,
-  saved, flagged, reported-with-moderation-status, and loading-skeleton states, plus a sponsorship
-  label variant that is announced to screen readers.
-- Feedback follows the premium accent system: gold for success confirmations, deep merlot for errors
-  and destructive states including flagged content, fog neutrals for informational and sync states.
-- A community push notification deep-links into the feed with the referenced card highlighted, and
-  both keyboard focus and the screen-reader cursor land on that card. An invalid deep-link payload
-  falls back to the hero ritual with an informational banner.
-- Screen-reader and tab order run hero, chips, garments, community cards. Each card is a labelled
-  region with its CTAs in the tab order. Visible gold focus rings apply throughout.
-- Named edge cases: flagged content removes with a toast, network hiccups show a retry banner, and a
-  failed import shows an inline error with a ghost fallback image.
+- Lookbook Prism shows ritual and community together on desktop and stacks them on smaller
+  screens. Loading, empty, stale, disabled, and failed community states preserve the daily ritual.
+- Cards expose weather/location context, engagement counts, accessible applause and report actions,
+  and sponsorship disclosure. Use gold success and focus cues, merlot errors, and fog informational
+  states. Screen-reader and keyboard order follows hero, chips, garments, community cards.
+- Community deep links focus the referenced visible card. Invalid targets fall back to the ritual
+  with informational feedback. Disabled filters clearly communicate availability.
 
 ## Cross-Story Dependencies
 
-- Story 6.1 is the foundation for every remaining lane. Production read and write controls stay
-  disabled while those lanes are built and verified.
-- Story 6.2 replaces the unavailable image-screener adapter and closes the model-readiness gate. It
-  also supplies the text-screening boundary consumed by comments in Story 6.4.
-- Story 6.3 creates reaction aggregates. Story 6.6 consumes them for deterministic spotlight
-  ranking, and Story 6.7 projects that result onto Home.
-- Story 6.5 consumes the durable reaction and comment writes from Stories 6.3 and 6.4. It owns
-  Socket.io publication, reconnect behavior, engagement pushes, and focused deep links.
-- Story 6.8 creates and saves the privacy-safe export asset. Story 6.9 owns native platform handoff
-  and recovery while preserving that prepared asset.
-- Story 6.10 exposes existing report snapshots through the moderator queue. Story 6.11 routes
-  decisions and sanctions through the operator boundary, Story 6.12 monitors the SLA, and Story
-  6.13 enforces immutable retention and evidence export.
-- Epic 3 supplies the responsive split layout, chip and bottom navigation, localization, deep-link
-  handling, and accessibility hardening. Epic 4 supplies the garment and image capture pipeline that
-  community posts reuse, including its consent, retention, and NSFW screening path.
-- Delivery note (2026-09-05): Epics 4 and 5 were built ahead of their Phase 3 label; CC-4.1 through
-  CC-5.5 are already `done`. Cross-phase prerequisites recorded on CC-3.7 and CC-6.1 are satisfied
-  by that early delivery and do not gate the Phase 2 Community Beta.
-
-## Open refinement decision
-
-- The product brief requires follow and unfollow from feed and profile views. FR4 and the former
-  Story 6.2 omit a follow graph and public community profile. Keep the Following filter disabled
-  until product adds separately sized stories or amends the brief and UX promise. Close this
-  decision before Community Beta sign-off.
+- Story 6.1 supplies the community foundation. Stories 6.2 and 6.2b supply production screening and
+  release evidence; comments consume that screening boundary.
+- Reactions feed City Spotlight, then the Home teaser. Realtime consumes durable reaction and
+  comment writes. Safe export precedes native sharing.
+- Moderator queue precedes decisions and SLA monitoring; decisions precede immutable-history proof.
+  Localization, accessibility, deep links, consent, image capture, and affiliate infrastructure come
+  from earlier epics, including already-delivered Epics 4 and 5.
+- Following remains disabled pending separately sized follow-graph and profile stories or a product
+  amendment removing that promise. Resolve this before Community Beta sign-off.

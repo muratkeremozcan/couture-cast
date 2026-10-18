@@ -1,4 +1,12 @@
-import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
+import { CommunityReactionState } from '@couture/api-client'
+import {
+  useCallback,
+  useEffect,
+  useMemo,
+  useRef,
+  useState,
+  useSyncExternalStore,
+} from 'react'
 import { useTranslation } from 'react-i18next'
 import {
   AccessibilityInfo,
@@ -15,11 +23,12 @@ import { useLocalSearchParams } from 'expo-router'
 import { hasDeepLinkIntent, parseDeepLink } from '@couture/utils'
 import {
   communityModerationReasonCategories,
+  type CommunityReactionSummary,
   type ClimateBand,
   type CommunityAuthorPostState,
   type CommunityBandUnresolvedReason,
   type CommunityExperimentVariant,
-  type CommunityFeedItem,
+  type CommunityReactionFeedItem as CommunityFeedItem,
   type CommunityFeedMode,
   type CommunityReportReason,
   type EmbeddedCommunityChallenge,
@@ -29,6 +38,8 @@ import { useMobileAnalytics } from '@/src/analytics/mobile-analytics'
 import { safeFindNodeHandle } from '@/src/lib/accessibility-focus'
 import {
   communityFailureReason,
+  generateIdempotencyKey,
+  setCommunityReactionFromMobile,
   getCommunityFeedFromMobile,
   getCommunityPostFromMobile,
   recordCommunityCardOpenedFromMobile,
@@ -68,6 +79,10 @@ const EXPLAINED_AUTHOR_STATES = new Set([
 ])
 
 type FeedState = 'loading' | 'ready' | 'error'
+
+function isInitialFeedRequest(cursor: string | undefined, refresh: boolean): boolean {
+  return cursor === undefined && !refresh
+}
 
 /**
  * What the author reads about a held post. A stable pipeline code such as
@@ -114,6 +129,56 @@ export function CommunityScreen() {
   const [experimentVariant, setExperimentVariant] =
     useState<CommunityExperimentVariant | null>(null)
   const [items, setItems] = useState<CommunityFeedItem[]>([])
+  const handleReactionChange = useCallback(
+    (postId: string, summary: CommunityReactionSummary | null | undefined) => {
+      const update = (post: CommunityFeedItem | null): CommunityFeedItem | null => {
+        if (!post || post.id !== postId) return post
+        if (summary === null) return null
+        if (summary === undefined) return { ...post, reactions: undefined }
+        if (post.status !== 'published') return post
+        if (
+          post.reactions &&
+          (post.reactions.revision > summary.revision ||
+            post.reactions.generation > summary.generation)
+        )
+          return post
+        return { ...post, reactions: summary }
+      }
+      setItems((previous) =>
+        previous.flatMap((post) => {
+          const next = update(post)
+          return next ? [next] : []
+        })
+      )
+      setDeepLinkPost(update)
+    },
+    []
+  )
+  const translationRef = useRef(t)
+  translationRef.current = t
+  const [reactionState] = useState(
+    () =>
+      new CommunityReactionState({
+        mutate: setCommunityReactionFromMobile,
+        newId: generateIdempotencyKey,
+        failureReason: communityFailureReason,
+        onChange: handleReactionChange,
+        onAnnounce: (key, success) => {
+          AccessibilityInfo.announceForAccessibility(translationRef.current(key))
+          if (success)
+            void import('expo-haptics')
+              .then((haptics) => haptics.selectionAsync())
+              .catch(() => undefined)
+        },
+      })
+  )
+  useSyncExternalStore(
+    reactionState.subscribe,
+    reactionState.getVersion,
+    reactionState.getVersion
+  )
+  const highlightedTargetRef = useRef<string | null>(null)
+  const detailGenerationRef = useRef(0)
   const [authorStates, setAuthorStates] = useState<CommunityAuthorPostState[]>([])
   const [nextCursor, setNextCursor] = useState<string | null>(null)
   const [viewerBand, setViewerBand] = useState<ClimateBand | null>(null)
@@ -149,6 +214,7 @@ export function CommunityScreen() {
   } | null>(null)
 
   useEffect(() => {
+    highlightedTargetRef.current = null
     const rawParams = { source, type, cardId, expiresAt }
     const fail = (reason: string) => {
       setIsInvalidDeepLink(true)
@@ -173,6 +239,9 @@ export function CommunityScreen() {
       return
     }
 
+    highlightedTargetRef.current = parsed.payload.cardId
+    const detailGeneration = ++detailGenerationRef.current
+    const readTicket = reactionState.beginRead()
     let active = true
     const controller = new AbortController()
     /*
@@ -186,10 +255,10 @@ export function CommunityScreen() {
      */
     void getCommunityPostFromMobile(parsed.payload.cardId, controller.signal)
       .then((post) => {
-        if (!active) {
+        if (!active || detailGeneration !== detailGenerationRef.current) {
           return
         }
-        setDeepLinkPost(post)
+        setDeepLinkPost(reactionState.read(post, readTicket))
         setIsInvalidDeepLink(false)
         analytics.capture('deep_link_handled', {
           source: 'notification',
@@ -199,9 +268,12 @@ export function CommunityScreen() {
         })
       })
       .catch((error: unknown) => {
-        if (!active) {
+        if (!active || detailGeneration !== detailGenerationRef.current) {
           return
         }
+        setDeepLinkPost(null)
+        if (communityFailureReason(error) === 'not_found' && parsed.payload?.cardId)
+          reactionState.evict(parsed.payload.cardId)
         fail(
           communityFailureReason(error) === 'not_found'
             ? 'Community card target was not found'
@@ -213,7 +285,7 @@ export function CommunityScreen() {
       active = false
       controller.abort()
     }
-  }, [source, type, cardId, expiresAt, analytics])
+  }, [source, type, cardId, expiresAt, analytics, reactionState])
 
   const focusNode = useCallback((node: View | null) => {
     if (Platform.OS === 'web' || !node) {
@@ -236,10 +308,13 @@ export function CommunityScreen() {
    * border treatment, which is what `CommunityCard`'s `isHighlighted` prop gives
    * mobile already.
    */
+  const focusedTargetRef = useRef<string | null>(null)
   useEffect(() => {
     if (!deepLinkPost) {
       return
     }
+    if (focusedTargetRef.current === deepLinkPost.id) return
+    focusedTargetRef.current = deepLinkPost.id
     AccessibilityInfo.announceForAccessibility(t('community.feed.announceFocused'))
     focusNode(targetRef.current)
   }, [focusNode, deepLinkPost, t])
@@ -260,11 +335,37 @@ export function CommunityScreen() {
    */
   const rejectedCursorsRef = useRef(new Set<string>())
 
+  const revalidateHighlighted = useCallback(
+    async (
+      target: string | null,
+      readTicket: number,
+      signal: AbortSignal,
+      generation: number
+    ) => {
+      if (!target) return
+      const detailGeneration = ++detailGenerationRef.current
+      const isCurrent = () =>
+        generation === requestGenerationRef.current &&
+        detailGeneration === detailGenerationRef.current
+      try {
+        const post = await getCommunityPostFromMobile(target, signal)
+        if (isCurrent()) setDeepLinkPost(reactionState.read(post, readTicket))
+      } catch (error: unknown) {
+        if (isCurrent() && communityFailureReason(error) === 'not_found') {
+          reactionState.evict(target)
+          setIsInvalidDeepLink(true)
+        }
+      }
+    },
+    [reactionState]
+  )
+
   const loadFeed = useCallback(
     async (
       targetMode: CommunityFeedMode,
       { cursor, refresh = false }: { cursor?: string; refresh?: boolean } = {}
     ): Promise<void> => {
+      const readTicket = reactionState.beginRead()
       if (cursor !== undefined && rejectedCursorsRef.current.has(cursor)) {
         return
       }
@@ -273,8 +374,10 @@ export function CommunityScreen() {
       controllerRef.current = controller
       const generation = requestGenerationRef.current + 1
       requestGenerationRef.current = generation
+      const isCurrent = () =>
+        !controller.signal.aborted && generation === requestGenerationRef.current
 
-      const isFirstPage = !cursor && !refresh
+      const isFirstPage = isInitialFeedRequest(cursor, refresh)
       if (refresh) {
         setIsRefreshing(true)
       } else if (cursor) {
@@ -295,17 +398,32 @@ export function CommunityScreen() {
               limit: FEED_PAGE_SIZE,
               signal: controller.signal,
             })
-            if (generation !== requestGenerationRef.current) {
+            if (!isCurrent()) {
               return
             }
             const isAppend = pageCursor !== undefined
-            setItems((previous) => {
-              if (!isAppend) {
-                return feed.items
-              }
-              const seen = new Set(previous.map((item) => item.id))
-              return [...previous, ...feed.items.filter((item) => !seen.has(item.id))]
+            const page = feed.items.flatMap((post) => {
+              const current = reactionState.read(post, readTicket)
+              return current ? [current] : []
             })
+            setItems((previous) => {
+              const seen = new Set(previous.map((item) => item.id))
+              return (
+                isAppend
+                  ? [...previous, ...page.filter((item) => !seen.has(item.id))]
+                  : page
+              ).map((post) => reactionState.current(post))
+            })
+            setDeepLinkPost((post) => (post ? reactionState.current(post) : null))
+            await revalidateHighlighted(
+              refresh ? highlightedTargetRef.current : null,
+              readTicket,
+              controller.signal,
+              generation
+            )
+            if (!isCurrent()) {
+              return
+            }
             setAuthorStates(feed.authorStates)
             setNextCursor(feed.nextCursor)
             setServedMode(feed.mode)
@@ -318,10 +436,7 @@ export function CommunityScreen() {
             setFeedState('ready')
             return
           } catch (error: unknown) {
-            if (
-              generation !== requestGenerationRef.current ||
-              controller.signal.aborted
-            ) {
+            if (!isCurrent()) {
               return
             }
             if (
@@ -359,7 +474,7 @@ export function CommunityScreen() {
         }
       }
     },
-    []
+    [reactionState, revalidateHighlighted]
   )
 
   useEffect(() => {
@@ -743,6 +858,7 @@ export function CommunityScreen() {
           style={styles.highlightSection}
         >
           <CommunityCard
+            reactionControls={reactionState.controls(deepLinkPost.id)}
             item={deepLinkPost}
             isHighlighted
             containerRef={targetRef}
@@ -829,6 +945,7 @@ export function CommunityScreen() {
         keyExtractor={(item) => item.id}
         renderItem={({ item }) => (
           <CommunityCard
+            reactionControls={reactionState.controls(item.id)}
             item={item}
             isReported={reportedPostIds.has(item.id)}
             containerRef={(node) => {
@@ -849,7 +966,7 @@ export function CommunityScreen() {
         }
         onEndReached={handleLoadMore}
         onEndReachedThreshold={0.5}
-        ListHeaderComponent={renderHeaderComponent}
+        ListHeaderComponent={renderHeaderComponent()}
         ListEmptyComponent={renderEmptyComponent}
         ListFooterComponent={renderFooterComponent}
         contentContainerStyle={styles.listContent}

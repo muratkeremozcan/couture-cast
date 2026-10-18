@@ -36,6 +36,9 @@ describe('CommunityRepository', () => {
     const transaction = vi.fn()
 
     const client = {
+      communityReaction: { deleteMany: vi.fn().mockResolvedValue({ count: 0 }) },
+      communityReactionReceipt: { deleteMany: vi.fn().mockResolvedValue({ count: 0 }) },
+      communityReactionOutbox: { deleteMany: vi.fn().mockResolvedValue({ count: 0 }) },
       savedLocation: { findMany: savedLocationFindMany },
       lookbookPost: {
         findMany: lookbookPostFindMany,
@@ -179,6 +182,8 @@ describe('CommunityRepository', () => {
             AND: [
               {
                 status: 'published',
+                erasure_requested_at: null,
+                anonymized_at: null,
                 published_at: { not: null },
                 // Story 6.2b final review (RF8): the operations canary's
                 // synthetic posts are never served, whatever the flags say.

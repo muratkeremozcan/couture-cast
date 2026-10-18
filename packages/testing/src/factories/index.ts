@@ -101,6 +101,7 @@ export {
   buildCommunityObjectPath,
   COMMUNITY_OBJECT_PATH_PATTERN,
   communityObjectPathContainsIdentifier,
+  createCommunityReactionSummary,
   buildCommunityPostReportCreateInput,
   buildLookbookPostCreateInput,
   createCommunityAlias,

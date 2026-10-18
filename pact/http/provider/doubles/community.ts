@@ -15,6 +15,7 @@ import {
   safeDecodeCommunityFeedCursor,
   type ClimateBand,
   type CommunityFeedMode,
+  type SetCommunityReactionInput,
   type AllocateCommunityPostInput,
   type AllocateCommunityPostSession,
   type CommunityFeed,
@@ -293,6 +294,18 @@ export function createCommunityDoubles() {
   const scenarioOf = () => getProviderCommunityState()?.scenario ?? 'feed-resolved'
 
   const mockCommunityService = {
+    setReaction: ({ input }: { input: SetCommunityReactionInput }) =>
+      Promise.resolve({
+        counts: {
+          applause: input.selection === 'applause' ? 1 : 0,
+          love: input.selection === 'love' ? 1 : 0,
+          inspiration: input.selection === 'inspiration' ? 1 : 0,
+        },
+        total: input.selection === null ? 0 : 1,
+        viewerReaction: input.selection,
+        revision: input.baseRevision + 1,
+        generation: input.baseRevision + 1,
+      }),
     /*
      * THE CURSOR DECISION IS MADE BY THE REAL CODEC, not by the scenario.
      *
@@ -338,11 +351,24 @@ export function createCommunityDoubles() {
       }
     },
 
-    getPost: (): Promise<CommunityFeedItem> => {
+    getPost: (params: { reactions?: boolean }): Promise<CommunityFeedItem> => {
       if (scenarioOf() === 'post-not-found') {
         return Promise.reject(new NotFoundException(COMMUNITY_POST_NOT_FOUND_MESSAGE))
       }
-      return Promise.resolve(buildPublishedItem())
+      return Promise.resolve({
+        ...buildPublishedItem(),
+        ...(params.reactions
+          ? {
+              reactions: {
+                counts: { applause: 0, love: 0, inspiration: 0 },
+                total: 0,
+                viewerReaction: null,
+                revision: 0,
+                generation: 0,
+              },
+            }
+          : {}),
+      })
     },
 
     /*

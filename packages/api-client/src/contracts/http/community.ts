@@ -3,6 +3,7 @@ import type { OpenAPIRegistry } from '@asteasolutions/zod-to-openapi'
 import { z } from 'zod'
 import { CLIMATE_BANDS } from '@couture/utils'
 import {
+  conflictHttpErrorSchema,
   isoTimestampSchema,
   nonEmptyStringSchema,
   type RegisteredCommonHttpSchemas,
@@ -446,6 +447,59 @@ export const communityChallengeSchema = z
   .strict()
 export type CommunityChallenge = z.infer<typeof communityChallengeSchema>
 
+// Story 6.3 owner: opt-in reactions preserve strict installed client projections.
+export const communityReactionSelectionSchema = z.enum([
+  'applause',
+  'love',
+  'inspiration',
+])
+export type CommunityReactionSelection = z.infer<typeof communityReactionSelectionSchema>
+export const communityReactionSummarySchema = z
+  .object({
+    counts: z
+      .object({
+        applause: z.number().int().nonnegative(),
+        love: z.number().int().nonnegative(),
+        inspiration: z.number().int().nonnegative(),
+      })
+      .strict(),
+    total: z.number().int().nonnegative(),
+    viewerReaction: communityReactionSelectionSchema.nullable(),
+    revision: z.number().int().nonnegative(),
+    generation: z.number().int().nonnegative(),
+  })
+  .strict()
+  .refine(
+    (summary) =>
+      summary.total ===
+      summary.counts.applause + summary.counts.love + summary.counts.inspiration,
+    { message: 'Reaction total must equal its palette counts.' }
+  )
+  .openapi({
+    description:
+      'An authoritative single-snapshot reaction summary. total must equal the sum of applause, love and inspiration counts. revision persists after removal; generation advances on reactions, visibility and erasure changes.',
+  })
+export type CommunityReactionSummary = z.infer<typeof communityReactionSummarySchema>
+export const setCommunityReactionInputSchema = z
+  .object({
+    selection: communityReactionSelectionSchema.nullable(),
+    mutationId: z.string().uuid(),
+    baseRevision: z.number().int().nonnegative(),
+  })
+  .strict()
+export type SetCommunityReactionInput = z.infer<typeof setCommunityReactionInputSchema>
+export const communityReactionResponseSchema = z
+  .object({ data: communityReactionSummarySchema })
+  .strict()
+export type CommunityReactionResponse = z.infer<typeof communityReactionResponseSchema>
+export const communityReactionConflictResponseSchema = conflictHttpErrorSchema
+  .extend({ data: communityReactionSummarySchema })
+  .strict()
+export const COMMUNITY_REACTION_CONFLICT_MESSAGE =
+  'Reaction changed. Refresh and try again.'
+export const COMMUNITY_REACTION_RATE_LIMITED_MESSAGE =
+  'Too many reactions. Please try again in a minute.'
+
 // --- Feed Read Schemas ------------------------------------------------------
 
 export const communityFeedAuthorSchema = z
@@ -555,6 +609,36 @@ export const communityPostResponseSchema = z
   })
   .strict()
 export type CommunityPostResponse = z.infer<typeof communityPostResponseSchema>
+
+export const communityReactionFeedItemSchema = communityFeedItemSchema
+  .extend({ reactions: communityReactionSummarySchema.optional() })
+  .strict()
+export type CommunityReactionFeedItem = z.infer<typeof communityReactionFeedItemSchema>
+/** Older HTTP responses cannot overwrite a confirmed mutation or newer snapshot. */
+export function reconcileCommunityReactionItem(
+  incoming: CommunityReactionFeedItem,
+  previous?: CommunityReactionFeedItem | null
+): CommunityReactionFeedItem {
+  if (
+    previous?.id === incoming.id &&
+    previous.reactions &&
+    incoming.reactions &&
+    (previous.reactions.revision > incoming.reactions.revision ||
+      previous.reactions.generation > incoming.reactions.generation)
+  )
+    return { ...incoming, reactions: previous.reactions }
+  return incoming
+}
+export const communityReactionFeedSchema = communityFeedSchema
+  .extend({ items: z.array(communityReactionFeedItemSchema) })
+  .strict()
+export type CommunityReactionFeed = z.infer<typeof communityReactionFeedSchema>
+export const communityReactionFeedResponseSchema = z
+  .object({ data: communityReactionFeedSchema })
+  .strict()
+export const communityReactionPostResponseSchema = z
+  .object({ data: communityReactionFeedItemSchema })
+  .strict()
 
 // --- Post Upload & Creation Schemas -----------------------------------------
 
@@ -944,6 +1028,59 @@ export function registerCommunityContracts(
   registry: OpenAPIRegistry,
   commonSchemas: RegisteredCommonHttpSchemas
 ) {
+  const reactionInput = registry.register(
+    'SetCommunityReactionInput',
+    setCommunityReactionInputSchema
+  )
+  const reactionResponse = registry.register(
+    'CommunityReactionResponse',
+    communityReactionResponseSchema
+  )
+  registry.register('CommunityReactionSummary', communityReactionSummarySchema)
+  registry.register('CommunityReactionFeedItem', communityReactionFeedItemSchema)
+  registry.register('CommunityReactionFeedResponse', communityReactionFeedResponseSchema)
+  registry.register('CommunityReactionPostResponse', communityReactionPostResponseSchema)
+  registry.registerPath({
+    method: 'put',
+    path: '/api/v1/community/posts/{postId}/reaction',
+    tags: ['community'],
+    summary: 'Set or retract the current member reaction',
+    security: [{ bearerAuth: [] }],
+    parameters: [
+      { name: 'postId', in: 'path', required: true, schema: { type: 'string' } },
+      {
+        name: 'x-couture-platform',
+        in: 'header',
+        required: true,
+        schema: { type: 'string', enum: ['web', 'mobile'] },
+      },
+    ],
+    request: {
+      body: {
+        required: true,
+        content: { 'application/json': { schema: reactionInput } },
+      },
+    },
+    responses: {
+      200: {
+        description: 'Authoritative current state, including accepted retries.',
+        content: { 'application/json': { schema: reactionResponse } },
+      },
+      400: { description: 'Invalid input.' },
+      401: { description: 'Authentication required.' },
+      403: { description: 'Age or guardian consent prevents participation.' },
+      404: { description: 'Post is hidden or deleted.' },
+      409: {
+        description:
+          'Stale revision or changed receipt payload. Authoritative current state is returned.',
+        content: {
+          'application/json': { schema: communityReactionConflictResponseSchema },
+        },
+      },
+      429: { description: '60 new mutations per member per minute.' },
+      503: { description: 'Community rollout disabled.' },
+    },
+  })
   registry.register('ClimateBand', climateBandSchema)
   registry.register('CommunityPostStatus', communityPostStatusSchema)
   registry.register('CommunityFeedMode', communityFeedModeSchema)
@@ -1005,6 +1142,14 @@ export function registerCommunityContracts(
     security: [{ bearerAuth: [] }],
     parameters: [
       {
+        name: 'x-couture-reactions',
+        in: 'header',
+        required: false,
+        schema: { type: 'string', enum: ['1'] },
+        description:
+          'Opt in to reaction summaries. Omission preserves the strict legacy response.',
+      },
+      {
         name: 'x-couture-platform',
         in: 'header',
         required: true,
@@ -1043,7 +1188,12 @@ export function registerCommunityContracts(
       200: {
         description: 'Community feed retrieved successfully.',
         content: {
-          'application/json': { schema: registeredFeedResponse },
+          'application/json': {
+            schema: z.union([
+              registeredFeedResponse,
+              communityReactionFeedResponseSchema,
+            ]),
+          },
         },
       },
       400: {
@@ -1166,6 +1316,14 @@ export function registerCommunityContracts(
     security: [{ bearerAuth: [] }],
     parameters: [
       {
+        name: 'x-couture-reactions',
+        in: 'header',
+        required: false,
+        schema: { type: 'string', enum: ['1'] },
+        description:
+          'Opt in to reaction summaries. Omission preserves the strict legacy response.',
+      },
+      {
         name: 'postId',
         in: 'path',
         required: true,
@@ -1184,7 +1342,12 @@ export function registerCommunityContracts(
       200: {
         description: 'Post retrieved successfully.',
         content: {
-          'application/json': { schema: registeredPostResponse },
+          'application/json': {
+            schema: z.union([
+              registeredPostResponse,
+              communityReactionPostResponseSchema,
+            ]),
+          },
         },
       },
       400: {

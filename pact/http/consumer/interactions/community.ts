@@ -1661,3 +1661,100 @@ export async function verifyCreateCommunityChallengeRejectionInteraction(
       expect(payload.error).toBe(rejection.error)
     })
 }
+
+// Story 6.3 owner: desired-state add, replacement and retraction wire contracts.
+export const communityReactionInteractions = [
+  { selection: 'applause', baseRevision: 0 },
+  { selection: 'love', baseRevision: 1 },
+  { selection: null, baseRevision: 2 },
+] as const
+export async function verifyCommunityReactionInteraction(
+  pact: PactV4,
+  createClient: CreateClient,
+  platform: CommunityPlatform,
+  interaction: (typeof communityReactionInteractions)[number]
+) {
+  const intent = { ...interaction, mutationId: '63100000-0000-4000-8000-000000000001' }
+  const summary = {
+    counts: {
+      applause: interaction.selection === 'applause' ? 1 : 0,
+      love: interaction.selection === 'love' ? 1 : 0,
+      inspiration: 0,
+    },
+    total: interaction.selection === null ? 0 : 1,
+    viewerReaction: interaction.selection,
+    revision: interaction.baseRevision + 1,
+    generation: interaction.baseRevision + 1,
+  }
+  await pact
+    .addInteraction()
+    .given(
+      ...createProviderState({
+        name: 'A resolved climate band feed page exists for user',
+        params: { userId: pactEventAuth.userId },
+      })
+    )
+    .uponReceiving(
+      `a ${platform} desired-state reaction ${String(interaction.selection)}`
+    )
+    .withRequest(
+      'PUT',
+      `/api/v1/community/posts/${PUBLISHED_POST_ID}/reaction`,
+      setJsonContent({ headers: communityHeaders(platform), body: intent })
+    )
+    .willRespondWith(200, setJsonContent({ body: { data: summary } }))
+    .executeTest(async (mockServer: V3MockServer) => {
+      const response = await createClient(
+        mockServer
+      ).apiV1CommunityPostsPostIdReactionPut({
+        postId: PUBLISHED_POST_ID,
+        xCouturePlatform: platform,
+        setCommunityReactionInput: intent,
+      })
+      expect(response.data).toEqual(summary)
+    })
+}
+
+export async function verifyCommunityReactionPostInteraction(
+  pact: PactV4,
+  createClient: CreateClient,
+  platform: CommunityPlatform
+) {
+  const summary = {
+    counts: { applause: 0, love: 0, inspiration: 0 },
+    total: 0,
+    viewerReaction: null,
+    revision: 0,
+    generation: 0,
+  }
+  await pact
+    .addInteraction()
+    .given(
+      ...createProviderState({
+        name: 'A published community post is visible to the caller',
+        params: { userId: pactEventAuth.userId, postId: PUBLISHED_POST_ID },
+      })
+    )
+    .uponReceiving(`a ${platform} negotiated reaction detail request`)
+    .withRequest(
+      'GET',
+      `/api/v1/community/posts/${PUBLISHED_POST_ID}`,
+      setJsonContent({
+        headers: { ...communityHeaders(platform), 'x-couture-reactions': '1' },
+      })
+    )
+    .willRespondWith(
+      200,
+      setJsonContent({ body: { data: { ...publishedItemBody(), reactions: summary } } })
+    )
+    .executeTest(async (mockServer: V3MockServer) => {
+      const response = await createClient(mockServer).apiV1CommunityPostsPostIdGet({
+        postId: PUBLISHED_POST_ID,
+        xCouturePlatform: platform,
+        xCoutureReactions: '1',
+      })
+      expect('reactions' in response.data ? response.data.reactions : undefined).toEqual(
+        summary
+      )
+    })
+}

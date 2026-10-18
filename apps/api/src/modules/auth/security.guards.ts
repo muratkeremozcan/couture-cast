@@ -10,7 +10,7 @@ import { Reflector } from '@nestjs/core'
 import { updateRequestContext } from '../../logger/request-context'
 import { AccessTokenIdentityService } from './access-token-identity.service.js'
 import { GuardianConsentStateService } from './guardian-consent-state.service'
-import { API_ROLES_KEY } from './security.decorators'
+import { API_ROLES_KEY, API_TRANSACTIONAL_CONSENT_KEY } from './security.decorators'
 import { type ApiRole, type AuthenticatedRequest } from './security.types'
 
 const normalizeHeaderValue = (
@@ -69,8 +69,14 @@ export class RequestAuthGuard implements CanActivate {
     request.auth = { token, userId, role }
     updateRequestContext({ userId })
 
+    const consentCheckedInTransaction =
+      new Reflector().get<boolean>(
+        API_TRANSACTIONAL_CONSENT_KEY,
+        context.getHandler()
+      ) === true
     if (
       role === 'teen' &&
+      !consentCheckedInTransaction &&
       !(await this.guardianConsentStateService.canTeenAccess(userId))
     ) {
       throw new ForbiddenException('Guardian consent required before continuing')

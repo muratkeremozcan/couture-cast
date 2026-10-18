@@ -21,8 +21,12 @@
 // shape for `expo-web-browser`.
 import {
   allocateCommunityPostResponseSchema,
-  communityFeedResponseSchema,
-  communityPostResponseSchema,
+  communityReactionFeedResponseSchema,
+  communityReactionPostResponseSchema,
+  communityReactionResponseSchema,
+  communityReactionConflictResponseSchema,
+  type SetCommunityReactionInput,
+  type CommunityReactionSummary,
   openCommunityPostResponseSchema,
   publishCommunityPostResponseSchema,
   reportCommunityPostResponseSchema,
@@ -35,8 +39,8 @@ import {
   COMMUNITY_REPORT_REASON_CHANGED_MESSAGE,
   COMMUNITY_SELF_REPORT_MESSAGE,
   type CommunityExperimentVariant,
-  type CommunityFeed,
-  type CommunityFeedItem,
+  type CommunityReactionFeed as CommunityFeed,
+  type CommunityReactionFeedItem as CommunityFeedItem,
   type CommunityFeedMode,
   type CommunityReportReason,
   type SupportedLocale,
@@ -216,11 +220,11 @@ export async function getCommunityFeedFromMobile({
   try {
     const response = await withRequestTimeout(signal, (requestSignal) =>
       communityClient(accessToken).apiV1CommunityFeedGet(
-        { xCouturePlatform: 'mobile', mode, cursor, limit },
+        { xCouturePlatform: 'mobile', xCoutureReactions: '1', mode, cursor, limit },
         { signal: requestSignal }
       )
     )
-    return communityFeedResponseSchema.parse(response).data
+    return communityReactionFeedResponseSchema.parse(response).data
   } catch (error: unknown) {
     throw await communityError(error, 'Unable to load the community feed.')
   }
@@ -234,11 +238,11 @@ export async function getCommunityPostFromMobile(
   try {
     const response = await withRequestTimeout(signal, (requestSignal) =>
       communityClient(accessToken).apiV1CommunityPostsPostIdGet(
-        { postId, xCouturePlatform: 'mobile' },
+        { postId, xCouturePlatform: 'mobile', xCoutureReactions: '1' },
         { signal: requestSignal }
       )
     )
-    return communityPostResponseSchema.parse(response).data
+    return communityReactionPostResponseSchema.parse(response).data
   } catch (error: unknown) {
     throw await communityError(error, 'Unable to load this community post.')
   }
@@ -571,5 +575,37 @@ export async function publishCommunityLookFromMobile({
     return publishCommunityPostResponseSchema.parse(response).data
   } catch (error: unknown) {
     throw await communityError(error, 'Unable to publish this look.')
+  }
+}
+
+/** The input is retained by the UI until a response or conflict confirms its fate. */
+export async function setCommunityReactionFromMobile(
+  postId: string,
+  input: SetCommunityReactionInput
+): Promise<{ summary: CommunityReactionSummary; conflict: boolean }> {
+  const accessToken = await readAccessToken()
+  try {
+    const response = await withRequestTimeout(undefined, (requestSignal) =>
+      communityClient(accessToken).apiV1CommunityPostsPostIdReactionPut(
+        { postId, xCouturePlatform: 'mobile', setCommunityReactionInput: input },
+        { signal: requestSignal }
+      )
+    )
+    return {
+      summary: communityReactionResponseSchema.parse(response).data,
+      conflict: false,
+    }
+  } catch (error: unknown) {
+    if (error instanceof ResponseError && error.response.status === 403)
+      throw new CommunityRequestError('age_gate', 'Reaction eligibility required.')
+    if (error instanceof ResponseError && error.response.status === 409) {
+      const conflict = communityReactionConflictResponseSchema.safeParse(
+        await error.response.clone().json()
+      )
+      if (conflict.success) return { summary: conflict.data.data, conflict: true }
+      const post = await getCommunityPostFromMobile(postId)
+      if (post.reactions) return { summary: post.reactions, conflict: true }
+    }
+    throw await communityError(error, 'Unable to update this reaction.')
   }
 }

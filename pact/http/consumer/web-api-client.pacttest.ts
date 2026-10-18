@@ -1,3 +1,8 @@
+import {
+  communityReactionInteractions,
+  verifyCommunityReactionPostInteraction,
+  verifyCommunityReactionInteraction,
+} from './interactions/community'
 // Learning path Step 19: Scenario outfit generator.
 // See _bmad-output/project-knowledge/learning-path-step-by-step.md#step-19-scenario-outfit-generator
 // Learning path Step 20: Comfort calibration settings.
@@ -419,6 +424,26 @@ describe('CoutureCastWeb -> CoutureCastApi HTTP contract', () => {
 
   // Story 5.4: both surfaces read the profile on mount and write consent, an
   // analysis and a save/dismiss from the same screen.
+  it('negotiates reaction fields without changing legacy detail', async () => {
+    await verifyCommunityReactionPostInteraction(
+      pact,
+      createWebClientForMockServer,
+      'web'
+    )
+  })
+
+  it.each(communityReactionInteractions)(
+    'sets a desired reaction $selection',
+    async (interaction) => {
+      await verifyCommunityReactionInteraction(
+        pact,
+        createWebClientForMockServer,
+        'web',
+        interaction
+      )
+    }
+  )
+
   it('reads the palette advisor profile of an entitled user', async () => {
     await verifyEntitledPaletteReadInteraction(pact, createWebClientForMockServer)
   })

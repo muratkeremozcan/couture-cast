@@ -1,15 +1,7 @@
-import { randomUUID } from 'node:crypto'
 import {
-  BadRequestException,
-  ConflictException,
-  ForbiddenException,
-  Inject,
-  Injectable,
-  Logger,
-  NotFoundException,
-  ServiceUnavailableException,
-} from '@nestjs/common'
-import {
+  type SetCommunityReactionInput,
+  type CommunityReactionSummary,
+  COMMUNITY_REACTION_RATE_LIMITED_MESSAGE,
   COMMUNITY_ALT_TEXT_UNCONFIRMED_MESSAGE,
   COMMUNITY_CHALLENGE_NOT_FOUND_MESSAGE,
   COMMUNITY_CHALLENGE_OVERLAP_MESSAGE,
@@ -55,6 +47,17 @@ import {
   type UpdateCommunityChallengeInput,
   type WithdrawCommunityPostResponse,
 } from '@couture/api-client/contracts/http'
+import { randomUUID } from 'node:crypto'
+import {
+  BadRequestException,
+  ConflictException,
+  ForbiddenException,
+  Inject,
+  Injectable,
+  Logger,
+  NotFoundException,
+  ServiceUnavailableException,
+} from '@nestjs/common'
 import {
   buildCommunityObjectPath,
   classifyClimateBand,
@@ -94,6 +97,7 @@ export interface GetFeedParams {
   cursor?: string
   limit?: number
   acceptLanguage?: string
+  reactions?: boolean
 }
 
 const READ_URL_EXPIRES_IN_SECONDS = 900
@@ -126,6 +130,14 @@ const EXTENSION_BY_CONTENT_TYPE = {
   'image/webp': 'webp',
 } as const
 
+function missingReactionSnapshot(
+  include: boolean,
+  post: LookbookPost,
+  summary: CommunityReactionSummary | undefined
+): boolean {
+  return include && isPubliclyVisiblePost(post) && summary === undefined
+}
+
 @Injectable()
 export class CommunityService {
   private readonly logger = new Logger(CommunityService.name)
@@ -144,6 +156,49 @@ export class CommunityService {
     @Inject(GuardianService)
     private readonly guardianService: GuardianService
   ) {}
+
+  async setReaction(params: {
+    userId: string
+    postId: string
+    input: SetCommunityReactionInput
+    platform: CommunityPlatform
+  }): Promise<CommunityReactionSummary> {
+    await this.assertReadEnabled(params.userId)
+    // Flags are external state. Resolve them before taking member/post locks;
+    // a receipt replay still bypasses participation checks inside the repository.
+    const writeEnabled =
+      params.input.selection === null ||
+      (await this.featureFlagsService.getFeatureFlag(
+        'community_write_enabled',
+        params.userId
+      ))
+    const result = await this.repository.setReaction({
+      ...params,
+      assertEligible: async (tx: Prisma.TransactionClient, participation: boolean) => {
+        if (participation && params.input.selection !== null) {
+          if (!writeEnabled)
+            throw new ServiceUnavailableException(COMMUNITY_FEED_DISABLED_MESSAGE)
+          try {
+            await this.guardianService.assertWardrobeUploadAllowed(
+              params.userId,
+              undefined,
+              tx
+            )
+          } catch (error) {
+            if (error instanceof ForbiddenException)
+              throw new ForbiddenException(COMMUNITY_AGE_GATE_DENIED_MESSAGE)
+            throw error
+          }
+        }
+      },
+    })
+    if ('retryAfterSeconds' in result)
+      throw new CommunityRateLimitException(
+        COMMUNITY_REACTION_RATE_LIMITED_MESSAGE,
+        result.retryAfterSeconds
+      )
+    return result.summary
+  }
 
   async getFeed(params: GetFeedParams): Promise<CommunityFeed> {
     const { userId, platform, mode = 'auto', cursor, limit = 12, acceptLanguage } = params
@@ -200,7 +255,7 @@ export class CommunityService {
     const authorPosts = await this.repository.findAuthorPostStates(userId)
 
     const [items, authorStates] = await Promise.all([
-      this.buildFeedItems(posts, userId),
+      this.buildFeedItems(posts, userId, params.reactions),
       this.buildAuthorStates(authorPosts),
     ])
 
@@ -245,7 +300,11 @@ export class CommunityService {
    * cannot see is a 404 rather than a 403, so the endpoint does not confirm that
    * a hidden post exists.
    */
-  async getPost(params: { userId: string; postId: string }): Promise<CommunityFeedItem> {
+  async getPost(params: {
+    userId: string
+    postId: string
+    reactions?: boolean
+  }): Promise<CommunityFeedItem> {
     const { userId, postId } = params
 
     await this.assertReadEnabled(userId)
@@ -256,7 +315,7 @@ export class CommunityService {
       throw new NotFoundException(COMMUNITY_POST_NOT_FOUND_MESSAGE)
     }
 
-    const [item] = await this.buildFeedItems([post], userId)
+    const [item] = await this.buildFeedItems([post], userId, params.reactions)
     if (!item) {
       // NOT a 404. The row exists and the caller is allowed to see it; what
       // failed is our own storage. Answering "not found" tells a client the post
@@ -462,7 +521,8 @@ export class CommunityService {
    */
   private async buildFeedItems(
     posts: LookbookPost[],
-    viewerUserId: string
+    viewerUserId: string,
+    includeReactions = false
   ): Promise<CommunityFeedItem[]> {
     if (posts.length === 0) {
       return []
@@ -477,6 +537,12 @@ export class CommunityService {
       ),
     ])
 
+    const summaries = includeReactions
+      ? await this.repository.reactionSummaries(
+          posts.map((post) => post.id),
+          viewerUserId
+        )
+      : new Map<string, CommunityReactionSummary>()
     const items: CommunityFeedItem[] = []
     for (const post of posts) {
       const signedUrl = post.image_object_path
@@ -534,7 +600,10 @@ export class CommunityService {
         displayName = alias
       }
 
+      const reactions = summaries.get(post.id)
+      if (missingReactionSnapshot(includeReactions, post, reactions)) continue
       items.push({
+        ...(reactions ? { reactions } : {}),
         id: post.id,
         caption: post.caption ?? null,
         altText: post.alt_text ?? null,
