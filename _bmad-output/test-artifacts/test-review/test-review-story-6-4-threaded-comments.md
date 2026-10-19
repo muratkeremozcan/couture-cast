@@ -85,6 +85,22 @@ device probe. P10 removes an unreachable centering requirement; interaction/save
 checks remain and passed on the device. Current test-quality findings remain zero. Remote CI and
 PR review resolution remain root-owned gates.
 
+P11 pairs Community entry with a required destination assertion and bounds recovery to two retries.
+Only a failed attempt triggers the existing state-preserving relaunch. TEA inspected the actual CI
+scrim screenshot and independently verified the injected missed-tap probe: first destination check
+failed, actual relaunch completed, then the real tab tap and destination checks passed. P12 removes
+centering from only the initial Comments action search after the real device reported full
+visibility while that search timed out. The exact target, search timeout, tap and all downstream
+comment assertions remain intact. A fresh real-device prefix passed entry, opening and closing
+the sheet, and return to Community; TEA inspected its readable sheet screenshot.
+
+Fresh full-flow execution remains incomplete: both Pixel attempts failed during the unchanged
+273-unit input after a 120-second device-server deadline; the Medium attempt exposed P12 before
+its repair. These failures remain recorded separately in the automation summary. The passing
+entry and visible-action probes establish their bounded scopes. A complete comments journey on
+the new remote head is still required. Test-quality approval remains **100/100 (A), Approve**;
+it does not establish a passing release gate.
+
 playwright-utils is installed and `tea_use_playwright_utils` is true. The retained Claude baseline
 found adoption in 0 of 8 files outside its original review set. This continuation checks the added
 files against that recorded baseline. The reviewed Playwright specs
@@ -186,6 +202,7 @@ No additional recommendations.
 - playwright/tests/community-reactions.spec.ts
 - playwright/support/helpers/install-expo-go.spec.ts
 - maestro/community-comments.yaml
+- maestro/subflows/open-community-tab.yaml
 - maestro/wardrobe-onboarding-my-form-flow.yaml
 - maestro/garment-capsule-create-flow.yaml
 

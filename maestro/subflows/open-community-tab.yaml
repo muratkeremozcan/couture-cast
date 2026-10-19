@@ -1,0 +1,26 @@
+# CI39310429421 left a gray Expo Go backdrop over Home after its menu closed.
+# The enabled Community tab tap completed while Home remained on top. Recover
+# this transition through the same state-preserving relaunch as Wardrobe entry.
+appId: ${MAESTRO_APP_ID}
+---
+- evalScript: ${output.communityTabAttempt = 0}
+- retry:
+    maxRetries: 2
+    commands:
+      - evalScript: ${output.communityTabAttempt = output.communityTabAttempt + 1}
+      - runFlow:
+          when:
+            true: ${output.communityTabAttempt > 1}
+          file: relaunch-app.yaml
+          label: 'A Community tab tap was swallowed; relaunch before trying again'
+      - runFlow: absorb-expo-dev-sheet.yaml
+      - tapOn:
+          id: 'tab-community'
+          retryTapIfNoChange: true
+          label: 'Open Community'
+      - extendedWaitUntil:
+          visible:
+            id: 'community-screen'
+          timeout: 15000
+          label: 'Community screen is the one on top'
+- waitForAnimationToEnd

@@ -430,3 +430,51 @@ the saved capsule identity and restored reorder list; it does not compare the ex
 
 All execution windows returned to root. The RV remains **100/100 (A), Approve**, with zero remaining
 test-quality findings in the reviewed changes.
+
+## P11 and P12: Community entry and visible action recovery
+
+Actual Android CI run `39310429421`, shard 5, job `118258269076`, failed at the first
+`community-screen` assertion before any comment action. TEA independently inspected the CI
+screenshot and command trace: Home remained under a uniform gray scrim after the enabled Community
+tab tap completed. The exact unattached developer-sheet mechanism is inferred from the matching
+documented Expo Go recovery incidents. The actual failure evidence is
+`/tmp/story64-ci-22b9-android5.log` and its downloaded artifacts.
+
+P11 replaces the single entry tap/wait with `maestro/subflows/open-community-tab.yaml`. It resets
+its own attempt counter, allows two retries, and requires the real tab tap plus the 15-second
+destination assertion on every attempt. After a failed attempt it uses the existing
+`clearState: false` relaunch and developer-sheet absorber. P12 changes only the initial Comments
+action search to `centerElement: false`. Its exact ID, 15-second search, real tap and all remaining
+compose, draft, publication, reply, discussion and close assertions stay unchanged. Parsed command
+comparison confirms that scope in `/tmp/story64-p11-yaml-static.log`.
+
+| Attempt                               | Result                                                                                                                                            | Evidence                                                                                  |
+| ------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------- | ----------------------------------------------------------------------------------------- |
+| Unpatched Pixel full flow             | Entry passed; later failed during unchanged 273-unit input with a 120-second `DeviceServerDiedException` deadline                                 | `/tmp/story64-p11-comments-baseline.log`, `/tmp/story64-p11-baseline-report.xml`          |
+| Patched Pixel full flow               | Entry passed; later failed with the same input transport deadline                                                                                 | `/tmp/story64-p11-comments-green.log`, `/tmp/story64-p11-pixel-input-failure-report.xml`  |
+| Injected missed-tap entry probe       | 1/1 passed in 3m34s; failed first destination check, actual state-preserving relaunch, second real tab tap and required destination/filter checks | `/tmp/story64-p11-entry-probe-report.xml`, `/tmp/story64-p11-entry-trace-proof.log`       |
+| Medium full flow before P12           | Entry and Every climate passed; centering search failed with the exact Comments target fully visible, enabled and clickable                       | `/tmp/story64-p11-medium-comments.log`, `/tmp/story64-p11-medium-report.xml`              |
+| Final visible-action prefix on Medium | 1/1 passed in 1m1s; final entry helper, exact Comments search/tap, sheet opening, real close and return to Community                              | `/tmp/story64-p11-visible-action-green.log`, `/tmp/story64-p11-visible-action-report.xml` |
+
+The missed-tap probe lives outside the repository. It deliberately omits the first tab tap and
+retains the actual destination assertion, then executes the real recovery path. It does not
+recreate the invisible CI overlay. TEA independently inspected its source, completed trace and
+passing JUnit. Its recovered Community screenshot is clear and readable under
+`maestro/artifacts/2026-10-19_144805/Community entry injected recovery/`.
+
+P12 has separate real-device red evidence. The measured Maestro log reports
+`Visibility Percent: 1.0`, distinct from the configured visibility requirement. The initial target
+bounds `[563,2029][814,2144]` fit the 1080x2400 screen; the failure screenshot and hierarchy show
+the exact target at `[563,893][814,1008]`. TEA independently inspected that visible control and
+the final centering-only diff. The final short prefix uses the real helper and Comments action,
+then closes the sheet and requires Community again. TEA inspected its screenshot under
+`maestro/artifacts/2026-10-19_145922/Community entry and visible Comments action/`: header,
+Close, Refresh, composer, counter and Send are readable. This image has no open keyboard.
+
+The implementation agent completed both probes and full harness teardown. TEA ran no additional
+builds, backend suites or mutation batch for these flow-only repairs. The existing source/API
+regressions and historical device evidence retain their original scopes. The two Pixel input
+failures and Medium centering failure remain failed local attempts; the short probes establish
+entry recovery and visible-action behavior only. **A complete comments journey on the new remote
+head remains required.** RV test quality remains **100/100 (A), Approve**, with zero remaining
+findings; remote CI and PR review are separate pending gates owned by root.

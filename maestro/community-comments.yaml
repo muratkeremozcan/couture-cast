@@ -19,19 +19,15 @@ tags:
     clearState: true
     stopApp: false
 - runFlow: subflows/open-app.yaml
-- tapOn:
-    id: 'tab-community'
-- extendedWaitUntil:
-    visible:
-      id: 'community-screen'
-    timeout: 15000
+- runFlow: subflows/open-community-tab.yaml
 - tapOn:
     id: 'community-filter-chip-all'
 - scrollUntilVisible:
     element:
       id: 'community-card-comments-lookbook-5'
     direction: DOWN
-    centerElement: true
+    # A fully visible action can remain below center at the scroll boundary.
+    centerElement: false
     timeout: 15000
 - tapOn:
     id: 'community-card-comments-lookbook-5'
