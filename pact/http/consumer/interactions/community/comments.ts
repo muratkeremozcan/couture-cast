@@ -1,8 +1,19 @@
+import {
+  type CommunityPlatform,
+  COMMUNITY_CURSOR_INVALID_MESSAGE,
+  COMMUNITY_AGE_GATE_DENIED_MESSAGE,
+  COMMUNITY_COMMENT_SELF_REPORT_MESSAGE,
+  COMMUNITY_IDEMPOTENCY_MISMATCH_MESSAGE,
+  COMMUNITY_COMMENT_REPORT_REASON_CHANGED_MESSAGE,
+  COMMUNITY_COMMENT_SUBMISSION_RATE_LIMITED_MESSAGE,
+  COMMUNITY_REPORT_RATE_LIMITED_MESSAGE,
+  COMMUNITY_FEED_DISABLED_MESSAGE,
+  COMMUNITY_POST_NOT_FOUND_MESSAGE,
+} from '@couture/api-client/contracts/http'
 import type { PactV4, V3MockServer } from '@pact-foundation/pact'
 import { createProviderState, setJsonContent } from '@seontechnologies/pactjs-utils'
 import { expect } from 'vitest'
 import { communityCommentsClient, ResponseError } from '@couture/api-client'
-import type { CommunityPlatform } from '@couture/api-client/contracts/http'
 import {
   createCommunityComment,
   createCommunityCommentSubmission,
@@ -156,7 +167,7 @@ export async function verifyCommunityCommentMissing(
       setJsonContent({
         body: {
           statusCode: 404,
-          message: 'Community post not found.',
+          message: COMMUNITY_POST_NOT_FOUND_MESSAGE,
           error: 'Not Found',
         },
       })
@@ -173,7 +184,7 @@ export async function verifyCommunityCommentMissing(
       expect(response.status).toBe(404)
       expect(await response.json()).toEqual({
         statusCode: 404,
-        message: 'Community post not found.',
+        message: COMMUNITY_POST_NOT_FOUND_MESSAGE,
         error: 'Not Found',
       })
     })
@@ -185,7 +196,7 @@ export const commentFailureCases = [
     operation: 'roots',
     status: 400,
     error: 'Bad Request',
-    message: 'Invalid pagination cursor.',
+    message: COMMUNITY_CURSOR_INVALID_MESSAGE,
     cursor: 'invalid',
   },
   {
@@ -201,35 +212,35 @@ export const commentFailureCases = [
     operation: 'create',
     status: 403,
     error: 'Forbidden',
-    message: 'You must be at least 13 years old to post to the community feed.',
+    message: COMMUNITY_AGE_GATE_DENIED_MESSAGE,
   },
   {
     name: 'self report',
     operation: 'report',
     status: 403,
     error: 'Forbidden',
-    message: 'You cannot report your own comment.',
+    message: COMMUNITY_COMMENT_SELF_REPORT_MESSAGE,
   },
   {
     name: 'changed mutation',
     operation: 'create',
     status: 409,
     error: 'Conflict',
-    message: 'Idempotency key was reused with a different payload.',
+    message: COMMUNITY_IDEMPOTENCY_MISMATCH_MESSAGE,
   },
   {
     name: 'changed report',
     operation: 'report',
     status: 409,
     error: 'Conflict',
-    message: 'You already reported this post for a different reason.',
+    message: COMMUNITY_COMMENT_REPORT_REASON_CHANGED_MESSAGE,
   },
   {
     name: 'limited create',
     operation: 'create',
     status: 429,
     error: 'Too Many Requests',
-    message: 'Comment submission limit reached.',
+    message: COMMUNITY_COMMENT_SUBMISSION_RATE_LIMITED_MESSAGE,
     retry: '60',
   },
   {
@@ -237,7 +248,7 @@ export const commentFailureCases = [
     operation: 'report',
     status: 429,
     error: 'Too Many Requests',
-    message: 'You have reached the daily report limit. Please try again tomorrow.',
+    message: COMMUNITY_REPORT_RATE_LIMITED_MESSAGE,
     retry: '3600',
   },
   {
@@ -245,7 +256,7 @@ export const commentFailureCases = [
     operation: 'roots',
     status: 503,
     error: 'Service Unavailable',
-    message: 'Community feed is temporarily unavailable.',
+    message: COMMUNITY_FEED_DISABLED_MESSAGE,
   },
 ] as const
 

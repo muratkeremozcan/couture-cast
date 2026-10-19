@@ -11,7 +11,7 @@ stepsCompleted:
   - step-04-generate-report
   - codex-maintenance-rescore
 lastStep: 'codex-maintenance-rescore'
-lastSaved: '2026-10-19T18:24:10Z'
+lastSaved: '2026-10-19T19:20:20Z'
 ---
 
 # Test quality review: Story 6.4 threaded comments
@@ -74,9 +74,21 @@ journey's ambiguous close query was reproduced against the real local stack, the
 queries were scoped to the labelled modal header with explicit dismissal assertions. All six real
 reaction browser cases passed. The repairs preserve existing UI controls and reaction assertions.
 
-playwright-utils is installed and `tea_use_playwright_utils` is true; 0 of 8 sampled files outside
-the review set use it. Adoption has not spread past the reviewed set. The reviewed Playwright spec
-uses the merged fixtures, `apiRequest`, `interceptNetworkCall` and `recurse`. Pact broker tools were
+The CR1–CR8 follow-up reproduces and verifies dispatch backoff, original worker error ownership,
+over-cap report expiry, safe sweep rejection, no-cursor append races, transport classification and
+six internal-error responses. Every new defect has red-to-green evidence. Four request-ownership
+regressions also kill a targeted mutant on current source `9c1b4a4526a2`; the earlier 42-variant
+report remains historical evidence for source `8daf88b7f169`.
+
+P9 retains mandatory navigation/editor checks and passes an injected first-navigation-failure
+device probe. P10 removes an unreachable centering requirement; interaction/save/reopen/cleanup
+checks remain and passed on the device. Current test-quality findings remain zero. Remote CI and
+PR review resolution remain root-owned gates.
+
+playwright-utils is installed and `tea_use_playwright_utils` is true. The retained Claude baseline
+found adoption in 0 of 8 files outside its original review set. This continuation checks the added
+files against that recorded baseline. The reviewed Playwright specs
+use the merged fixtures, `apiRequest`, `interceptNetworkCall` and `recurse`. Pact broker tools were
 unreachable; scrutiny used the provider implementation and generated OpenAPI contract.
 
 ## Quality Criteria Assessment
@@ -151,6 +163,8 @@ No additional recommendations.
 - apps/api/integration/community-comments-delivery.integration.spec.ts
 - apps/api/integration/premium-revenuecat-webhook.integration.spec.ts
 - apps/api/src/modules/community/community-worker-runtime.spec.ts
+- apps/api/src/modules/community/community-comment-worker-errors.spec.ts
+- apps/api/src/modules/community/community-comments.outbox.spec.ts
 - apps/mobile/components/community/community-comments-sheet.test.tsx
 - apps/mobile/src/screens/community-screen.test.tsx
 - apps/web/src/app/components/accessible-modal.test.tsx
@@ -161,6 +175,7 @@ No additional recommendations.
 - packages/api-client/testing/community-comments-client.spec.ts
 - packages/api-client/testing/community-comments-state.spec.ts
 - packages/api-client/testing/community-comments-state-outcomes.spec.ts
+- packages/api-client/testing/community-openapi-contract.spec.ts
 - packages/db/test/rls/community-posts.spec.ts
 - packages/testing/test/community-comments-fixtures.spec.ts
 - pact/http/consumer/web-api-client.pacttest.ts
@@ -171,6 +186,8 @@ No additional recommendations.
 - playwright/tests/community-reactions.spec.ts
 - playwright/support/helpers/install-expo-go.spec.ts
 - maestro/community-comments.yaml
+- maestro/wardrobe-onboarding-my-form-flow.yaml
+- maestro/garment-capsule-create-flow.yaml
 
 ## Review Context
 
@@ -178,3 +195,4 @@ No additional recommendations.
 - \_bmad-output/implementation-artifacts/6-4-threaded-comments-design.md
 - \_bmad-output/test-artifacts/test-review/story-6-4-evidence/claude-quality-review-before-maintenance.md
 - \_bmad-output/test-artifacts/automate/automation-summary-story-6-4-threaded-comments.md
+- \_bmad-output/implementation-artifacts/reviews/story-6-4-coderabbit-backend-review.md

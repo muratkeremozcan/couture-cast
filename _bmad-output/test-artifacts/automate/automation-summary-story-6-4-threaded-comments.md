@@ -20,7 +20,7 @@ stepsCompleted:
     'step-04-validate-and-summarize',
   ]
 lastStep: 'step-04-validate-and-summarize'
-lastSaved: '2026-10-19T18:24:10Z'
+lastSaved: '2026-10-19T19:20:20Z'
 inputDocuments:
   - _bmad-output/implementation-artifacts/spec-6-4-threaded-comments.md
   - _bmad-output/implementation-artifacts/6-4-threaded-comments-design.md
@@ -359,3 +359,74 @@ CI and PR review gates owned by root.
 Both configured utility packages remain in use. No new library deviations were introduced. Pact
 broker MCP tools were unreachable in the original review; contract scrutiny used provider source
 and generated OpenAPI. Codex preserved that limitation and made no broker verification claim.
+
+## CodeRabbit regressions and final CI flake maintenance
+
+Root triaged the archived backend review in
+`_bmad-output/implementation-artifacts/reviews/story-6-4-coderabbit-backend-review.md`.
+The implementation agent owned source/Pact changes; Codex TEA owned regressions. Source stayed
+unchanged until the red runs completed. Execution status: **passed locally**. Remote CI and final
+PR review resolution remain root-owned.
+
+| Finding | Red proof before repair                                                         | Green regression                                                                                                         |
+| ------- | ------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------ |
+| CR1     | Real outbox/SQL retried a failed generation-0 enqueue at 29.999 seconds         | Fresh initial dispatch is immediate; retry waits until exactly 30 seconds; persisted attempts/dispatched state checked   |
+| CR2     | Guarded HTTP returned post-specific text for a changed comment report           | Exact comment-specific 409 envelope and accepted replay pass                                                             |
+| CR3     | Final `markFailed` rejection replaced the screening error                       | Exact original error identity and safe secondary warning pass, alongside successful settlement and remaining-retry cases |
+| CR4     | Over-cap post-only, comment-only and mixed histories returned early Retry-After | Guarded HTTP selects the limit-th newest receipt across both ledgers                                                     |
+| CR5     | Sweep runner and runtime composition resolved after failures                    | All steps run, safe per-step warnings remain, then rejection contains only failed step names                             |
+| CR6     | Four deferred root/reply reads lost ownership after a no-cursor append          | First loads and cached last-page refreshes accept data and clear loading, with no additional fetch                       |
+| CR7     | Six comment operations lacked reachable 500 metadata                            | Exact standard description and internal-error schema reference pass for each operation                                   |
+| CR8     | Both platform wrappers classified new comment 409/403 messages as `unknown`     | Comment and existing post classifications pass; real HTTP and Pact preserve accepted refusal text                        |
+
+CR6's demonstrated boundary is the exported shared client. Both UIs disable More while loading and
+omit it without a cursor. These regressions directly exercise stale pager calls. The over-cap
+fixtures seed 75 post reports, 75 comment reports, or both. The 50 newest receipts govern expiry.
+Date-only control fixes time while the real database exercises selection and truncation.
+
+| Scope                     | Red                                                  | Green                                                | Logs                                                                                    |
+| ------------------------- | ---------------------------------------------------- | ---------------------------------------------------- | --------------------------------------------------------------------------------------- |
+| Client races and OpenAPI  | 10 failed, 40 passed                                 | Four files, 123 passed                               | `/tmp/story64-cr-tea-client-{red,green}.log`                                            |
+| Worker/runtime            | 3 failed, 11 passed                                  | Three files, 16 passed                               | `/tmp/story64-cr-tea-api-unit-{red,green}.log`                                          |
+| Guarded HTTP/recovery SQL | All five new cases failed for intended behavior      | Both complete files, 23 passed                       | `/tmp/story64-cr-tea-http-recovery-{red,green}.log`                                     |
+| Web transport             | Two new classifiers failed; unrelated cases filtered | Comments plus post-moderation, 41 passed             | `/tmp/story64-cr-tea-web-classifier-red.log`, `/tmp/story64-cr-tea-web-green.log`       |
+| Native transport          | Two new classifiers failed; unrelated cases filtered | Sheet plus screen/client cases, 93 passed            | `/tmp/story64-cr-tea-native-classifier-red.log`, `/tmp/story64-cr-tea-native-green.log` |
+| Comment Pact              | Existing assertions retained                         | 38 consumer cases and 1 provider verification passed | `/tmp/story64-cr-pact-{consumer,provider}.log`                                          |
+
+The implementation agent ran filtered Pact, source lint and type checks; TEA independently ran the
+other rows. Scoped test lint passed after one formatting-only indentation repair. Shared generation
+and builds passed. No assertion, accepted threshold or private-data safeguard was weakened.
+
+### Current-source mutation proof
+
+The original `story-6-4-evidence/mutation-client.{json,md}` stays unchanged: 42 variants on state
+source `8daf88b7f169`, with 31 killed and 11 explained equivalent survivors. This is historical
+evidence for that snapshot.
+
+The separate `story-6-4-evidence/mutation-client-cr6.{json,md}` records state source
+**`9c1b4a4526a2`** and contract source **`dab6fbbd07c5`**. The scratch baseline passes 111/111 tests.
+One mutation reintroduces request invalidation in the no-cursor return; all four new race cases
+kill it. The historical 42-variant batch was not rerun.
+
+```sh
+python3 -I _bmad-output/test-artifacts/automate/story-6-4-evidence/mutation-client.py --only-cr6
+```
+
+The runner resolves the repo from its own path, requires a passing baseline, mutates a scratch copy
+and removes it in `finally`. Production source stays unchanged.
+Log: `/tmp/story64-cr-tea-mutation-cr6.log`.
+
+### P9 and P10 device maintenance
+
+The original CI My Form overlay did not recur spontaneously in the clean local baseline. P9 keeps
+destination/editor/ready/removal checks mandatory. Normal My Form passed in 1m51s; an injected
+first-navigation failure exercised the actual state-preserving relaunch and passed in 2m33s. Root
+inspected its clean recovery screenshot.
+
+P10's trace showed `Visibility Percent: 1.0` while centering a capsule reorder control at the scroll
+boundary timed out. Only that search changes to `centerElement: false`; checkbox centering and
+subsequent tap/save/reopen/cleanup checks remain. The real capsule flow passed in 3m33s. It verifies
+the saved capsule identity and restored reorder list; it does not compare the exact garment order.
+
+All execution windows returned to root. The RV remains **100/100 (A), Approve**, with zero remaining
+test-quality findings in the reviewed changes.

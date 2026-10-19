@@ -5,12 +5,15 @@ import {
   commentsTestContext,
   MINUTE_MS,
   pinClock,
+  SECOND_MS,
 } from './helpers/community-comments-context.js'
 
 const { prisma, processor, fixture, create } = commentsTestContext()
 
 // Accepted contract value: pending screening older than 15 minutes fails privately.
 const STALE_SCREENING_MS = 15 * MINUTE_MS
+// Accepted contract: a failed screening enqueue waits 30 seconds before retrying.
+const ENQUEUE_RETRY_MS = 30 * SECOND_MS
 const NOW = new Date('2026-10-19T12:00:00.000Z')
 
 function gate() {
@@ -20,10 +23,13 @@ function gate() {
   })
   return { promise, release }
 }
-function outbox(telemetry: unknown = { captureCommentEvent: vi.fn() }) {
+function outbox(
+  telemetry: unknown = { captureCommentEvent: vi.fn() },
+  queue: unknown = { enqueueComment: vi.fn().mockResolvedValue(undefined) }
+) {
   return new CommunityCommentsOutbox(
     prisma,
-    { enqueueComment: vi.fn().mockResolvedValue(undefined) } as never,
+    queue as never,
     telemetry as never,
     processor
   )
@@ -42,7 +48,57 @@ beforeEach(async () => {
   await prisma.communityComment.deleteMany()
 })
 
-describe('Story 6.4 stale screening and analytics recovery', () => {
+describe('Story 6.4 screening dispatch and recovery', () => {
+  it('dispatches a fresh first generation immediately, then backs off its failed enqueue until the exact retry boundary', async () => {
+    const { userId, postId } = await fixture()
+    const pending = await create(userId, postId)
+    const enqueueComment = vi
+      .fn()
+      .mockRejectedValueOnce(new Error('synthetic Redis unavailable'))
+      .mockResolvedValue(undefined)
+    const recovery = outbox(undefined, { enqueueComment })
+    await prisma.communityCommentScreeningOutbox.update({
+      where: { comment_id: pending.id },
+      data: { updated_at: NOW },
+    })
+    pinClock(NOW)
+    try {
+      await recovery.dispatchPending()
+      expect(enqueueComment).toHaveBeenCalledExactlyOnceWith(pending.id, 0)
+      expect(
+        await prisma.communityCommentScreeningOutbox.findUniqueOrThrow({
+          where: { comment_id: pending.id },
+        })
+      ).toMatchObject({ attempts: 1, generation: 0, dispatched_at: null })
+      // Preserve the failed attempt while fixing Prisma's database-side update clock.
+      await prisma.communityCommentScreeningOutbox.update({
+        where: { comment_id: pending.id },
+        data: { updated_at: NOW },
+      })
+      vi.setSystemTime(new Date(NOW.getTime() + ENQUEUE_RETRY_MS - 1))
+      await recovery.dispatchPending()
+      expect(enqueueComment).toHaveBeenCalledTimes(1)
+
+      vi.setSystemTime(new Date(NOW.getTime() + ENQUEUE_RETRY_MS))
+      await recovery.dispatchPending()
+      expect(enqueueComment.mock.calls).toEqual([
+        [pending.id, 0],
+        [pending.id, 0],
+      ])
+      expect(
+        await prisma.communityCommentScreeningOutbox.findUniqueOrThrow({
+          where: { comment_id: pending.id },
+        })
+      ).toMatchObject({
+        attempts: 2,
+        generation: 0,
+        dispatched_at: new Date(NOW.getTime() + ENQUEUE_RETRY_MS),
+      })
+    } finally {
+      vi.useRealTimers()
+    }
+  })
+
   it('fails a 16-minute-old pending row once and leaves a 14-minute-old row pending', async () => {
     const { userId, postId } = await fixture()
     const stale = await create(userId, postId)

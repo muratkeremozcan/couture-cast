@@ -323,9 +323,9 @@ export class CommunityCommentsState {
   ): Promise<void> {
     const state = this.current(postId)
     const key = `${postId}/${parentId ?? ''}`
-    const isCurrent = this.ownRequest(postId, key)
     const current = parentId ? state.replies.get(parentId) : state.roots
     if (append && !current?.nextCursor) return
+    const isCurrent = this.ownRequest(postId, key)
     if (!parentId && !append) {
       this.clearReplies(postId, state)
     }

@@ -11,13 +11,13 @@ export async function sharedCommunityReportRetryAfter(
   const [posts, comments] = await Promise.all([
     tx.communityPostReport.findMany({
       where: { reporter_id: reporterId, created_at: { gt: windowStart } },
-      orderBy: { created_at: 'asc' },
+      orderBy: { created_at: 'desc' },
       select: { created_at: true },
       take: limit,
     }),
     tx.communityCommentReport.findMany({
       where: { reporter_id: reporterId, accepted_at: { gt: windowStart } },
-      orderBy: { accepted_at: 'asc' },
+      orderBy: { accepted_at: 'desc' },
       select: { accepted_at: true },
       take: limit,
     }),
@@ -25,9 +25,9 @@ export async function sharedCommunityReportRetryAfter(
   const dates = [
     ...posts.map((row) => row.created_at.getTime()),
     ...comments.map((row) => row.accepted_at.getTime()),
-  ].sort((a, b) => a - b)
+  ].sort((a, b) => b - a)
   if (dates.length < limit) return null
   // If historic data already exceeds the current cap, enough receipts must expire.
-  const expiry = dates[dates.length - limit] ?? now.getTime()
+  const expiry = dates[limit - 1] ?? now.getTime()
   return Math.max(1, Math.ceil((expiry + 86_400_000 - now.getTime()) / 1000))
 }

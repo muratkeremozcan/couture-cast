@@ -202,6 +202,16 @@ Paths below are relative to `apps/api/src/modules/community/` unless prefixed ot
 | P6      | medium  | patch  | Final real Android run with the software keyboard and273unit root clips the primary Send button beneath Gboard. Parent inspected /tmp/story64-postreview-android-current.png. Correct the existing native keyboard-avoidance layout using measured window geometry and verify root/reply keyboard controls on devices; iOS currently passes.                                                                                      |
 | P7      | medium  | defer  | CI Android shard6 fails before app flows: the baseline Expo Go installer asynchronously unlinks a redirect destination and immediately opens the same path for the next response. The unlink can remove that new file; stat then throws ENOENT. This pre-existing setup flake is being repaired under the standing instruction to fix observed CI failures, with a controlled cold-installer regression.                          |
 | P8      | medium  | patch  | Real CI burn-in proves the existing reaction journey selects two same-purpose Close this look controls after adding the comments surface. Preserve their consistent accessible labels; scope the existing test to the dialog header close control, assert dismissal, and rerun reaction E2E.                                                                                                                                      |
+| P9      | medium  | defer  | Real Android CI My Form navigation is intercepted by an invisible Expo Go developer-sheet backdrop. Existing relaunch recovery documents this exact state. Apply bounded transition recovery under the standing instruction to fix observed flakes; preserve destination and editor assertions.                                                                                                                                   |
+| P10     | medium  | defer  | A local Android predecessor capsule flow fails while Maestro keeps centering an already fully visible reorder control at the scroll boundary (step077, Visibility Percent1.0, no fatal/JS error). Remove the centering requirement only from that search, preserve visibility/tap/reorder/save assertions, and verify the capsule journey under the standing instruction to fix observed flakes.                                  |
+| CR1     | medium  | patch  | CodeRabbit4317569746: generation0 dispatch bypass ignores prior failed attempts, so a Redis outage retries every second. Restrict immediate first dispatch to attempts0 and retain30second backoff thereafter.                                                                                                                                                                                                                    |
+| CR2     | low     | patch  | CodeRabbit4317569800: changed comment report reason uses the post-specific message. Add a comment-specific contract constant and keep API/Pact consumer/provider expectations aligned. Both web/mobile error classifiers must also recognize the corrected comment message while preserving post mappings.                                                                                                                        |
+| CR3     | medium  | patch  | CodeRabbit4317569808: final-attempt markFailed rejection masks the original screening failure. Preserve the original cause while recording the secondary settlement failure safely.                                                                                                                                                                                                                                               |
+| CR4     | medium  | patch  | CodeRabbit4317569815: oldest-per-table truncation returns early Retry-After when historic reports exceed the cap. Select newest reports and expire the limit-th newest receipt across both tables.                                                                                                                                                                                                                                |
+| CR5     | medium  | patch  | CodeRabbit4317569834: independent sweep steps now hide aggregate failure from existing maintenance job/error observability. Run all steps, then reject with safe failed-step names; retain individual warnings.                                                                                                                                                                                                                   |
+| CR6     | high    | patch  | CodeRabbit4317569845: no-cursor append takes request ownership before returning and can invalidate an in-flight refresh. Return before registering a request. Add root/reply deferred-response regressions at the shared client boundary. Current UI guards also need verification.                                                                                                                                               |
+| CR7     | low     | patch  | CodeRabbit4317569858: six comment routes omit reachable500 responses from the shared contract. Add standard internal-error response metadata, regenerate owned artifacts, and validate contract parity.                                                                                                                                                                                                                           |
+| CR8     | low     | patch  | CodeRabbit review5576185696 nitpick: comment provider double pins duplicated refusal literals. Use shared constants, including distinct comment self-report/submission-limit constants, across runtime and Pact without changing accepted message text.                                                                                                                                                                           |
 
 Review provenance: the existing user-owned Claude Code session `couture-cast-cd` used `claude-opus-5-5`; its verified peer-origin reply arrived 2026-10-19T16:33:48.068Z. Full report: [archived Opus review](reviews/story-6-4-opus-implementation-review.md). Findings above are classified individually before grouping.
 
@@ -405,3 +415,41 @@ and `/tmp/story64-t4-{lint,web-types,native-types}.log`. Broader TEA reruns foll
 - Own source/diff audit and the Codex test architect's bounded follow-up found no further issue.
   These local repairs still require a new green remote CI run. CodeRabbit's review service is
   reporting a partial outage, and its requested PR review has not returned.
+
+### CodeRabbit backend repair and native follow-up, 2026-10-19
+
+- CodeRabbit refused the complete PR because its eligible file count exceeded the100file limit.
+  Temporary review PR155 covers backend/shared code; PR156 covers web/mobile. Their combined
+  diffs preserve complete review coverage. PR154 remains the delivery PR.
+- Actual backend review5576185696 returned seven inline findings and one constants cleanup.
+  [Archived review](reviews/story-6-4-coderabbit-backend-review.md). Parent verified and triaged
+  CR1–CR8 individually above. The same implementation agent applied the source/Pact corrections;
+  the Codex test architect owned regressions and the independent test-quality follow-up.
+- All new defects reproduced before patching: four deferred client races, six500metadata cases,
+  worker/sweep rejection behavior, five guarded HTTP/PostgreSQL/outbox cases, and two transport
+  classifiers on each platform. Focused green results: client123, API units16, web41, native93,
+  guarded HTTP/recovery23. Comment consumer Pact38 and filtered provider verification1 also pass.
+  Logs `/tmp/story64-cr-tea-*-{red,green}.log` and `/tmp/story64-cr-pact-{consumer,provider}.log`.
+- Contracts were regenerated through `npm run generate:api-client`. The SDK has no resulting
+  delta; the OpenAPI repair adds standard500responses to the six new comment operations. Parent
+  independently compared the complete generated document to the canonical baseline: five added
+  paths, six added schemas, zero changed or removed existing paths/schemas.
+  `/tmp/story64-cr-openapi-baseline-audit.json`. Edited source/Pact lint and all five affected
+  TypeScript boundaries pass. Frozen intent retains its approved SHA256.
+- P9: actual Android CI artifacts prove an invisible developer-sheet backdrop swallowed the
+  Silhouette tap. The clean local baseline passed. The patched sequence passed localization and
+  My Form1m51s, while its preceding capsule exposed P10. An owned temporary probe then injected
+  only the first navigation failure and proved actual state-preserving relaunch, destination,
+  loaded editor, My Form ready and removal;2m33s pass. This is injected recovery evidence and
+  does not claim the original overlay reproduced spontaneously locally. Parent inspected the
+  clear final screenshot. `/tmp/story64-ci3-probe-capsule-green.log` and
+  `/tmp/story64-ci3-recovery-trace-proof.log`.
+- P10: the capsule trace reported a fully visible reorder control while centering kept scrolling
+  at the boundary. Only that search now accepts full visibility. Checkbox centering and all
+  later tap/save/reopen/cleanup checks remain. The final capsule journey passed3m33s.
+  `/tmp/story64-p10-capsule-report.xml`. The earlier mixed sequence failure remains in the ledger.
+- Remote verification of commit191b5941 passed the complete quality/coverage/accessibility gate,
+  full browser suite and168burn-in tests, contracts, previews, watchOS, k6 and secret scans. Six
+  Android shards passed. One corrupt SDK download cleared on a fresh runner; the remaining
+  My Form failure is addressed locally above. The repair commit still needs its own full CI run.
+  CodeRabbit's web/mobile review is waiting for the included hourly allowance around19:38UTC.

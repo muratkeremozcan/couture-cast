@@ -1419,3 +1419,15 @@ file's own Code Review Findings section.
 - source_spec: `_bmad-output/implementation-artifacts/spec-6-4-threaded-comments.md`
   summary: Locally resolved the previously recorded Expo Go redirect cleanup race during PR154 hardening.
   evidence: The real installer CLI reproduces ENOENT before repair. Final-response-only file creation and stream pipeline cleanup pass five deterministic regression cases; all50Playwright helper tests pass. Remote CI verification follows the repair push.
+- source_spec: `_bmad-output/implementation-artifacts/spec-6-4-threaded-comments.md`
+  summary: The existing My Form Maestro transition can be intercepted by an invisible Expo Go developer-sheet backdrop.
+  evidence: PR154 run39302588027 shard3 retained a discoverable Silhouette control under a gray scrim; its tap produced no navigation. The existing relaunch helper documents the same state. Repair follows the standing instruction to fix observed test flakes.
+- source_spec: `_bmad-output/implementation-artifacts/spec-6-4-threaded-comments.md`
+  summary: Locally resolved the recorded My Form navigation flake with bounded state-preserving recovery.
+  evidence: The transition reuses the existing relaunch helper on retries and retains destination/editor/ready/removal checks. Normal My Form passed1m51s; an injected first navigation failure exercised actual relaunch and passed2m33s. The original CI overlay did not recur spontaneously in the clean local baseline. Final remote CI follows the repair push.
+- source_spec: `_bmad-output/implementation-artifacts/spec-6-4-threaded-comments.md`
+  summary: The existing capsule Maestro reorder search can keep centering a fully visible control at a scroll boundary.
+  evidence: Local Android trace2026-10-19_135711 step077 reports Visibility Percent1.0 while centerElement:true keeps scrolling until timeout. The My Form patch had not executed. Repair follows the standing instruction to fix observed test flakes.
+- source_spec: `_bmad-output/implementation-artifacts/spec-6-4-threaded-comments.md`
+  summary: Locally resolved the recorded capsule reorder-search flake by accepting full visibility.
+  evidence: Only the reorder search uses centerElement:false. Checkbox centering, tap/save/reopen and cleanup checks remain. The final real capsule journey passed3m33s. Final remote CI follows the repair push.

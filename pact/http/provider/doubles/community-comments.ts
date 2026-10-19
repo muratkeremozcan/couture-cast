@@ -1,3 +1,14 @@
+import {
+  COMMUNITY_CURSOR_INVALID_MESSAGE,
+  COMMUNITY_AGE_GATE_DENIED_MESSAGE,
+  COMMUNITY_COMMENT_SELF_REPORT_MESSAGE,
+  COMMUNITY_IDEMPOTENCY_MISMATCH_MESSAGE,
+  COMMUNITY_COMMENT_REPORT_REASON_CHANGED_MESSAGE,
+  COMMUNITY_COMMENT_SUBMISSION_RATE_LIMITED_MESSAGE,
+  COMMUNITY_REPORT_RATE_LIMITED_MESSAGE,
+  COMMUNITY_FEED_DISABLED_MESSAGE,
+  COMMUNITY_POST_NOT_FOUND_MESSAGE,
+} from '@couture/api-client/contracts/http'
 // Story 6.4 owner: transport provider doubles keep real comment controllers/guards.
 import {
   BadRequestException,
@@ -33,36 +44,31 @@ export function createCommunityCommentsDouble(): Pick<
     if (state?.scenario === 'comment-refusal') {
       switch (state.refusal) {
         case 'invalid cursor':
-          throw new BadRequestException('Invalid pagination cursor.')
+          throw new BadRequestException(COMMUNITY_CURSOR_INVALID_MESSAGE)
         case 'ineligible author':
-          throw new ForbiddenException(
-            'You must be at least 13 years old to post to the community feed.'
-          )
+          throw new ForbiddenException(COMMUNITY_AGE_GATE_DENIED_MESSAGE)
         case 'self report':
-          throw new ForbiddenException('You cannot report your own comment.')
+          throw new ForbiddenException(COMMUNITY_COMMENT_SELF_REPORT_MESSAGE)
         case 'changed mutation':
-          throw new ConflictException(
-            'Idempotency key was reused with a different payload.'
-          )
+          throw new ConflictException(COMMUNITY_IDEMPOTENCY_MISMATCH_MESSAGE)
         case 'changed report':
-          throw new ConflictException(
-            'You already reported this post for a different reason.'
-          )
+          throw new ConflictException(COMMUNITY_COMMENT_REPORT_REASON_CHANGED_MESSAGE)
         case 'limited create':
-          throw new CommunityRateLimitException('Comment submission limit reached.', 60)
+          throw new CommunityRateLimitException(
+            COMMUNITY_COMMENT_SUBMISSION_RATE_LIMITED_MESSAGE,
+            60
+          )
         case 'limited report':
           throw new CommunityRateLimitException(
-            'You have reached the daily report limit. Please try again tomorrow.',
+            COMMUNITY_REPORT_RATE_LIMITED_MESSAGE,
             3600
           )
         case 'disabled thread':
-          throw new ServiceUnavailableException(
-            'Community feed is temporarily unavailable.'
-          )
+          throw new ServiceUnavailableException(COMMUNITY_FEED_DISABLED_MESSAGE)
       }
     }
     if (state?.scenario === 'post-not-found')
-      throw new NotFoundException('Community post not found.')
+      throw new NotFoundException(COMMUNITY_POST_NOT_FOUND_MESSAGE)
   }
   return {
     list: (params) => {
