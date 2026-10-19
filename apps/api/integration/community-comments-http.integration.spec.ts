@@ -24,12 +24,117 @@ const { prisma, repository, flags, guardian, input, fixture, publish, bootApp } 
 // Accepted contract values: 50 shared reports per rolling day, 60 comments per minute,
 // and at most 50 comments per page.
 const REPORT_LIMIT = 50
+const HISTORIC_REPORTS_OVER_CAP = 25
 const COMMENT_MINUTE_LIMIT = 60
 const PAGE_LIMIT = 50
 const NOW = new Date('2026-10-19T12:00:00.000Z')
 const postPath = (postId: string) => `/api/v1/community/posts/${postId}`
 
 describe('Story 6.4 guarded comment HTTP routes', () => {
+  it('returns comment-specific self-report and changed-reason envelopes through the real guards', async () => {
+    const author = await fixture()
+    const reporter = await fixture()
+    const target = await publish(author.userId, author.postId)
+    const { app, authorized, identities } = await bootApp({ userId: author.userId })
+    const url = `${postPath(author.postId)}/comments/${target.id}/report`
+    try {
+      const self = await authorized('post', url).send({ reason: 'spam' })
+      expect(self.status).toBe(403)
+      expect(self.body).toEqual({
+        statusCode: 403,
+        error: 'Forbidden',
+        message: 'You cannot report your own comment.',
+      })
+      identities.resolveIdentity.mockResolvedValue({
+        userId: reporter.userId,
+        role: 'adult',
+      })
+      const accepted = await authorized('post', url).send({ reason: 'spam' })
+      expect(accepted.status).toBe(200)
+      const changed = await authorized('post', url).send({ reason: 'other' })
+      expect(changed.status).toBe(409)
+      expect(changed.body).toEqual({
+        statusCode: 409,
+        error: 'Conflict',
+        message: 'You already reported this comment for a different reason.',
+      })
+      const replay = await authorized('post', url).send({ reason: 'spam' })
+      expect(replay.status).toBe(200)
+      expect(replay.body).toEqual(accepted.body)
+    } finally {
+      await app.close()
+    }
+  })
+
+  it.each([
+    ['post reports', true, false, 23],
+    ['comment reports', false, true, 22],
+    ['combined post and comment reports', true, true, 23],
+  ] as const)(
+    'uses the limit-th newest receipt for over-cap %s over guarded HTTP',
+    async (_label, posts, comments, retryHours) => {
+      const author = await fixture()
+      const reporter = await fixture()
+      const target = await publish(author.userId, author.postId)
+      const old = new Date(NOW.getTime() - 23 * HOUR_MS)
+      if (posts)
+        await prisma.communityPostReport.createMany({
+          data: Array.from(
+            { length: REPORT_LIMIT + HISTORIC_REPORTS_OVER_CAP },
+            (_, index) =>
+              buildCommunityPostReportCreateInput(
+                createCommunityPostReport(
+                  { reporterId: reporter.userId, postId: null, reason: 'spam' },
+                  {
+                    now:
+                      index < HISTORIC_REPORTS_OVER_CAP
+                        ? old
+                        : new Date(NOW.getTime() - HOUR_MS),
+                  }
+                )
+              )
+          ),
+        })
+      if (comments)
+        await prisma.communityCommentReport.createMany({
+          data: Array.from(
+            { length: REPORT_LIMIT + HISTORIC_REPORTS_OVER_CAP },
+            (_, index) => {
+              const acceptedAt =
+                index < HISTORIC_REPORTS_OVER_CAP
+                  ? old
+                  : new Date(NOW.getTime() - 2 * HOUR_MS)
+              return {
+                reporter_id: reporter.userId,
+                reason: 'spam' as const,
+                accepted_at: acceptedAt,
+                routed_at: acceptedAt,
+                sla_due_at: new Date(acceptedAt.getTime() + DAY_MS),
+              }
+            }
+          ),
+        })
+      const { app, authorized } = await bootApp({ userId: reporter.userId })
+      pinClock(NOW)
+      try {
+        const response = await authorized(
+          'post',
+          `${postPath(author.postId)}/comments/${target.id}/report`
+        ).send({ reason: 'spam' })
+        expect(response.status).toBe(429)
+        expect(response.headers['retry-after']).toBe(
+          String((retryHours * HOUR_MS) / SECOND_MS)
+        )
+        expect(response.body).toMatchObject({
+          message: 'You have reached the daily report limit. Please try again tomorrow.',
+        })
+      } finally {
+        vi.useRealTimers()
+        await app.close()
+      }
+    }
+  )
+
   it('answers an unauthenticated read with 401 and private cache headers', async () => {
     const owner = await fixture()
     const { app, server } = await bootApp({ userId: owner.userId, cacheHeaders: true })
@@ -180,6 +285,9 @@ describe('Story 6.4 guarded comment HTTP routes', () => {
         reason: 'spam',
       })
       expect(limited.status).toBe(429)
+      expect(limited.body).toMatchObject({
+        message: 'You have reached the daily report limit. Please try again tomorrow.',
+      })
       // The oldest of the 50 counted reports is one hour old, so it expires in 23 hours.
       expect(limited.headers['retry-after']).toBe(String((DAY_MS - HOUR_MS) / SECOND_MS))
       expect(limited.headers['cache-control']).toBe('private, no-store')
@@ -406,6 +514,7 @@ describe('Story 6.4 comment eligibility at the HTTP boundary', () => {
       pinClock(NOW)
       const limited = await authorized('post', url).send(input())
       expect(limited.status).toBe(429)
+      expect(limited.body).toMatchObject({ message: 'Comment submission limit reached.' })
       // The oldest counted row is 30 seconds old and leaves the 60-second window in 30 seconds.
       expect(limited.headers['retry-after']).toBe('30')
       expect(limited.headers['cache-control']).toBe('private, no-store')

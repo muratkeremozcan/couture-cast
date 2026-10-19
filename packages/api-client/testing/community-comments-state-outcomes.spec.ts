@@ -17,6 +17,38 @@ import {
 } from './community-comments-state-fixtures'
 
 describe('screen-owned comments state', () => {
+  it.each([
+    ['initial roots', null, false],
+    ['refreshed roots at the last page', null, true],
+    ['first reply expansion', 'root', false],
+    ['refreshed replies at the last page', 'root', true],
+  ] as const)(
+    'preserves a deferred %s read when no-cursor append is requested',
+    async (_label, parentId, cached) => {
+      const { state, transport } = setup()
+      const read = parentId ? transport.replies : transport.roots
+      if (cached) await state.load('post', parentId)
+      const refresh = deferred<CommunityCommentsPage>()
+      read.mockReturnValueOnce(refresh.promise)
+      const refreshing = state.load('post', parentId)
+      expect(state.current('post').loading).toBe(true)
+
+      // The public client accepts calls from any consumer, including stale pager callbacks.
+      await state.load('post', parentId, true)
+      expect(state.current('post').loading).toBe(true)
+      const accepted = page([{ ...item('fresh', 6), parentId }], null, 6)
+      refresh.resolve(accepted)
+      await refreshing
+
+      const result = parentId
+        ? state.current('post').replies.get(parentId)
+        : state.current('post').roots
+      expect(result).toEqual(accepted)
+      expect(state.current('post')).toMatchObject({ loading: false, error: null })
+      expect(read).toHaveBeenCalledTimes(cached ? 2 : 1)
+    }
+  )
+
   // not_found evicts only this post; signed_out resets every cached thread.
   it.each([
     ['not_found', null, 'other draft'],

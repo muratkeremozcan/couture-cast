@@ -110,7 +110,10 @@ vi.mock('./community-maintenance.service.js', () => ({
   },
 }))
 
-import { createCommunityWorkerRuntime } from './community-worker-runtime'
+import {
+  createCommunityWorkerRuntime,
+  runCommunitySweepSteps,
+} from './community-worker-runtime'
 import {
   COMMUNITY_NSFW_SCREENER_ENV,
   COMMUNITY_NSFW_SCREENER_FIXTURE,
@@ -122,6 +125,47 @@ import {
  * like it exercises screening while running different wiring from production.
  * This asserts the one composition both call.
  */
+describe('runCommunitySweepSteps', () => {
+  it('runs every independent step before rejecting with safe failed-step names', async () => {
+    const names = [
+      'post_dispatch',
+      'reaction_dispatch',
+      'comment_dispatch',
+      'post_stale',
+      'comment_stale',
+    ] as const
+    const failed = ['post_dispatch', 'comment_dispatch', 'post_stale']
+    const order: string[] = []
+    const warn = vi.fn()
+    const result = await runCommunitySweepSteps(
+      names.map((name) => ({
+        name,
+        run: () => {
+          order.push(name)
+          return failed.includes(name)
+            ? Promise.reject(new Error('private member content and confidential SQL'))
+            : Promise.resolve()
+        },
+      })),
+      { warn }
+    ).catch((error: unknown) => error)
+
+    expect(result).toBeInstanceOf(Error)
+    expect(result).toMatchObject({
+      message:
+        'Community sweep steps failed: post_dispatch, comment_dispatch, post_stale',
+    })
+    expect(order).toEqual(names)
+    expect(warn.mock.calls).toEqual(
+      failed.map((step) => [
+        { event: 'community_sweep_step_failed', step, reason: 'sweep_failed' },
+        'Community sweep step deferred',
+      ])
+    )
+    expect(JSON.stringify(warn.mock.calls)).not.toMatch(/private|member|confidential|SQL/)
+  })
+})
+
 describe('createCommunityWorkerRuntime', () => {
   const claim = vi.fn().mockResolvedValue([])
   const settle = vi.fn().mockResolvedValue({ count: 1 })
@@ -263,16 +307,27 @@ describe('createCommunityWorkerRuntime', () => {
       order.push('reaction')
       return Promise.resolve([])
     })
-    await expect(runtime.sweeps.dispatchPending()).resolves.toBeUndefined()
-    expect(order).toEqual(['post', 'reaction', 'comment'])
-    await expect(runtime.sweeps.sweepStalePendingReview()).resolves.toBeUndefined()
-    expect(harness.sweepStalePendingReview).toHaveBeenCalledOnce()
-    expect(harness.commentStale).toHaveBeenCalledOnce()
-    await runtime.sweeps.dispatchPending()
-    await runtime.sweeps.sweepStalePendingReview()
-    expect(harness.dispatchPending).toHaveBeenCalledTimes(2)
-    expect(harness.sweepStalePendingReview).toHaveBeenCalledTimes(2)
-    await runtime.close()
+    try {
+      await expect(runtime.sweeps.dispatchPending()).rejects.toThrow(
+        'Community sweep steps failed: comment_dispatch'
+      )
+      expect(order).toEqual(['post', 'reaction', 'comment'])
+      await expect(runtime.sweeps.sweepStalePendingReview()).rejects.toThrow(
+        'Community sweep steps failed: comment_stale'
+      )
+      expect(harness.sweepStalePendingReview).toHaveBeenCalledOnce()
+      expect(harness.commentStale).toHaveBeenCalledOnce()
+      await expect(runtime.sweeps.dispatchPending()).rejects.toThrow(
+        'Community sweep steps failed: comment_dispatch'
+      )
+      await expect(runtime.sweeps.sweepStalePendingReview()).rejects.toThrow(
+        'Community sweep steps failed: comment_stale'
+      )
+      expect(harness.dispatchPending).toHaveBeenCalledTimes(2)
+      expect(harness.sweepStalePendingReview).toHaveBeenCalledTimes(2)
+    } finally {
+      await runtime.close()
+    }
   })
 
   it('exposes exactly the four sweeps both process groups drive', async () => {

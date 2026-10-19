@@ -21,7 +21,11 @@ import {
   type CommunityReportReason,
   COMMUNITY_CURSOR_INVALID_MESSAGE,
   COMMUNITY_IDEMPOTENCY_MISMATCH_MESSAGE,
-  COMMUNITY_REPORT_REASON_CHANGED_MESSAGE,
+  COMMUNITY_COMMENT_REPORT_REASON_CHANGED_MESSAGE,
+  COMMUNITY_COMMENT_SELF_REPORT_MESSAGE,
+  COMMUNITY_COMMENT_SUBMISSION_RATE_LIMITED_MESSAGE,
+  COMMUNITY_REPORT_RATE_LIMITED_MESSAGE,
+  COMMUNITY_POST_NOT_FOUND_MESSAGE,
 } from '@couture/api-client/contracts/http'
 import {
   PUBLICLY_VISIBLE_POST_WHERE,
@@ -124,7 +128,7 @@ export class CommunityCommentsRepository {
           where: { id: postId, ...PUBLICLY_VISIBLE_POST_WHERE },
         })
         if (!post || !isPubliclyVisiblePost(post))
-          throw new NotFoundException('Community post not found.')
+          throw new NotFoundException(COMMUNITY_POST_NOT_FOUND_MESSAGE)
         await eligible(tx, false)
         return work(tx, post)
       },
@@ -342,7 +346,7 @@ export class CommunityCommentsRepository {
             : null
       if (exceeded)
         throw new CommunityRateLimitException(
-          'Comment submission limit reached.',
+          COMMUNITY_COMMENT_SUBMISSION_RATE_LIMITED_MESSAGE,
           Math.max(
             1,
             Math.ceil(
@@ -444,11 +448,11 @@ export class CommunityCommentsRepository {
         const post = await tx.lookbookPost.findFirst({
           where: { id: params.postId, ...PUBLICLY_VISIBLE_POST_WHERE },
         })
-        if (!post) throw new NotFoundException('Community post not found.')
+        if (!post) throw new NotFoundException(COMMUNITY_POST_NOT_FOUND_MESSAGE)
         await params.eligible(tx, false)
         const row = await this.visibleComment(tx, params.postId, params.commentId)
         if (row.user_id === params.userId)
-          throw new ForbiddenException('You cannot report your own comment.')
+          throw new ForbiddenException(COMMUNITY_COMMENT_SELF_REPORT_MESSAGE)
         const existing = await tx.communityCommentReport.findUnique({
           where: {
             comment_id_reporter_id: {
@@ -459,7 +463,7 @@ export class CommunityCommentsRepository {
         })
         if (existing) {
           if (existing.reason !== params.reason)
-            throw new ConflictException(COMMUNITY_REPORT_REASON_CHANGED_MESSAGE)
+            throw new ConflictException(COMMUNITY_COMMENT_REPORT_REASON_CHANGED_MESSAGE)
           return this.reportResult(existing)
         }
         const now = new Date()
@@ -471,7 +475,7 @@ export class CommunityCommentsRepository {
         )
         if (retryAfterSeconds !== null)
           throw new CommunityRateLimitException(
-            'You have reached the daily report limit. Please try again tomorrow.',
+            COMMUNITY_REPORT_RATE_LIMITED_MESSAGE,
             retryAfterSeconds
           )
         const report = await tx.communityCommentReport.create({

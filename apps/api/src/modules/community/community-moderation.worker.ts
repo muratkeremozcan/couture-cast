@@ -1,3 +1,4 @@
+import { createBaseLogger } from '../../logger/pino.config.js'
 import type { FeatureFlagsService } from '../feature-flags/feature-flags.service.js'
 import { CommunityCommentsProcessor } from './community-comments.processor.js'
 // Story 6.1 Task 4: BullMQ worker for community content moderation (ADR-013).
@@ -23,6 +24,8 @@ import {
   MODERATION_SCREENING_TIMEOUT_MS,
 } from './community-moderation.processor.js'
 import type { CommunityModerationMeter } from './community-moderation.telemetry.js'
+
+const logger = createBaseLogger().child({ feature: 'community-moderation' })
 
 /**
  * One screening job at a time per process, matching `runtime.concurrency` in the
@@ -239,8 +242,20 @@ export function createCommunityModerationWorker(
         try {
           await comments.process(data.commentId, data.generation)
         } catch (error) {
-          if (job.attemptsMade + 1 >= (job.opts.attempts ?? 3))
-            await comments.markFailed(data.commentId, false, data.generation)
+          if (job.attemptsMade + 1 >= (job.opts.attempts ?? 3)) {
+            try {
+              await comments.markFailed(data.commentId, false, data.generation)
+            } catch {
+              logger.warn(
+                {
+                  event: 'community_comment_failure_settlement_failed',
+                  reason: 'settlement_failed',
+                  attempt: job.attemptsMade + 1,
+                },
+                'Comment screening failure settlement deferred'
+              )
+            }
+          }
           throw error
         }
         return

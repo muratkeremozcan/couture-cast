@@ -161,16 +161,20 @@ export async function runCommunitySweepSteps(
   }[],
   log: Pick<typeof logger, 'warn'> = logger
 ): Promise<void> {
+  const failed: string[] = []
   for (const step of steps) {
     try {
       await step.run()
     } catch {
+      failed.push(step.name)
       log.warn(
         { event: 'community_sweep_step_failed', step: step.name, reason: 'sweep_failed' },
         'Community sweep step deferred'
       )
     }
   }
+  if (failed.length > 0)
+    throw new Error(`Community sweep steps failed: ${failed.join(', ')}`)
 }
 
 /**

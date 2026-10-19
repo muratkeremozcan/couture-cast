@@ -4,9 +4,11 @@
 Copies packages/api-client into a scratch work tree, mutates the COPY only, runs the real
 spec files with the real vitest config, and records per mutant: file:line, original and
 mutated snippet, killing tests (tests that pass on the unmutated copy and fail on the
-mutant), and killed/survived. The repository is never written.
+mutant), and killed/survived. Production source is never written. Evidence files are
+refreshed beside this script.
 
 Usage: python3 -I mutation-client.py
+Target only the CR6 guard regression: python3 -I mutation-client.py --only-cr6
 """
 import hashlib
 import json
@@ -16,7 +18,7 @@ import shutil
 import subprocess
 import sys
 
-REPO = '/Users/murat/opensource/couture-cast'
+REPO = os.path.abspath(os.path.join(os.path.dirname(__file__), '../../../..'))
 PKG = os.path.join(REPO, 'packages/api-client')
 HERE = os.path.dirname(os.path.abspath(__file__))
 WORK = os.path.join(HERE, 'mutation-client-work')
@@ -144,6 +146,12 @@ MUTANTS = [
     ('M22 recovered poll keeps error', STATE,
      '    this.reconcileSubmissions(state, collected, append)\n    state.error = null\n',
      '    this.reconcileSubmissions(state, collected, append)\n'),
+    # CR6: reproduce request invalidation by an append that performs no network read.
+    ('M27 no-cursor append invalidates refresh', STATE,
+     '    if (append && !current?.nextCursor) return\n',
+     "    if (append && !current?.nextCursor) {\n"
+     "      this.ownRequest(postId, `${postId}/${parentId ?? ''}`)\n"
+     "      return\n    }\n"),
 ]
 
 # Analysis for mutants expected to survive: each removes one half of a redundant guard pair,
@@ -211,6 +219,11 @@ def flat(snippet):
 
 
 def main():
+    if sys.argv[1:] not in ([], ['--only-cr6']):
+        sys.exit('Usage: mutation-client.py [--only-cr6]')
+    only_cr6 = sys.argv[1:] == ['--only-cr6']
+    mutants = [m for m in MUTANTS if m[0].startswith('M27 ')] if only_cr6 else MUTANTS
+    evidence_name = 'mutation-client-cr6' if only_cr6 else 'mutation-client'
     prepare()
     sha = {p: hashlib.sha256(open(os.path.join(COPY, p), 'rb').read()).hexdigest()[:12]
            for p in (STATE, CONTRACT)}
@@ -223,8 +236,10 @@ def main():
     if not baseline or broken:
         sys.exit(f'baseline did not load: tests={len(baseline)} broken={broken}')
     base_failed = sorted(n for n, s in baseline.items() if s != 'passed')
+    if base_failed:
+        sys.exit(f'baseline has failing tests: {base_failed}')
     rows = []
-    for mid, rel, original, mutated in MUTANTS:
+    for mid, rel, original, mutated in mutants:
         path = os.path.join(COPY, rel)
         pristine = snapshot[rel]
         count = pristine.count(original)
@@ -251,7 +266,7 @@ def main():
                          killers=killers, verdict='killed' if killers else 'survived'))
     killed = sum(r['verdict'] == 'killed' for r in rows)
     json.dump(dict(sha=sha, baseline_total=len(baseline), baseline_failed=base_failed,
-                   rows=rows), open(os.path.join(HERE, 'mutation-client.json'), 'w'), indent=2)
+                   rows=rows), open(os.path.join(HERE, evidence_name + '.json'), 'w'), indent=2)
     md = [
         '# Mutation evidence: Story 6.4 shared comments client',
         '',
@@ -260,7 +275,7 @@ def main():
         'Reproduce:',
         '',
         '```sh',
-        'python3 -I ' + os.path.join(HERE, 'mutation-client.py'),
+        'python3 -I ' + os.path.join(HERE, 'mutation-client.py') + (' --only-cr6' if only_cr6 else ''),
         '```',
         '',
         'What it runs per mutant, inside the scratch copy `' + COPY + '` '
@@ -289,11 +304,14 @@ def main():
         md.append(f"| {r['id']} | `{r['where']}` | `{flat(r['original'])}` | "
                   f"`{flat(r['mutated']) or '(deleted)'}` | {r['verdict']} | {killers} | "
                   f"{NOTES.get(r['id'], '-') if r['verdict'] != 'killed' else '-'} |")
-    open(os.path.join(HERE, 'mutation-client.md'), 'w').write('\n'.join(md) + '\n')
+    open(os.path.join(HERE, evidence_name + '.md'), 'w').write('\n'.join(md) + '\n')
     print(f'{killed}/{len(rows)} killed')
     for r in rows:
         print(f"{r['verdict']:>10}  {r['id']}  {r['where']}  killers={len(r['killers'])}")
 
 
 if __name__ == '__main__':
-    main()
+    try:
+        main()
+    finally:
+        shutil.rmtree(WORK, ignore_errors=True)
