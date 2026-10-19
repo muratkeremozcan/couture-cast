@@ -601,6 +601,48 @@
       "total_one": "{{count}} réaction",
       "total_other": "{{count}} réactions",
       "ineligible": "Les réactions sont réservées aux 13 ans et plus. Avant 16 ans, un consentement parental actif est nécessaire."
+    },
+    "comments": {
+      "title": "Commentaires",
+      "reply": "Répondre",
+      "delete": "Supprimer",
+      "replies": "Réponses ({{count}})",
+      "sendReport": "Envoyer le signalement",
+      "cancel": "Annuler",
+      "refresh": "Actualiser",
+      "newer": "De nouveaux commentaires sont disponibles. Actualisez pour les voir.",
+      "loading": "Chargement des commentaires…",
+      "empty": "Soyez la première personne à commenter.",
+      "moreReplies": "Plus de réponses",
+      "more": "Plus de commentaires",
+      "private": "Vos envois. Vous seul pouvez les voir.",
+      "recovery": "Supprimez cet envoi et rédigez un nouveau commentaire.",
+      "morePrivate": "Plus d’envois",
+      "replying": "Réponse à un commentaire",
+      "compose": "Ajouter un commentaire",
+      "count": "{{count}} / 280 caractères",
+      "unresolved": "Une demande précédente attend une confirmation. Réessayez avant d’envoyer le brouillon modifié.",
+      "sending": "Envoi…",
+      "retry": "Réessayer l’envoi",
+      "send": "Envoyer le commentaire",
+      "rateLimited": "Vous avez atteint la limite de commentaires. Réessayez plus tard.",
+      "failed": "Impossible de mettre à jour les commentaires. Réessayez.",
+      "invalid": "Saisissez de 1 à 280 caractères visibles sur une seule ligne.",
+      "submitted": "Commentaire envoyé pour vérification.",
+      "deleted": "Commentaire supprimé.",
+      "reported": "Signalement reçu.",
+      "status": {
+        "pending_screening": "Vérification en cours. Vous seul pouvez le voir.",
+        "published": "Publié. Actualisez le fil pour le voir.",
+        "held_for_review": "En attente de révision. Vous seul pouvez le voir.",
+        "blocked": "Retenu lors de la vérification. Vous seul pouvez le voir.",
+        "screening_failed": "La vérification a échoué. Vous seul pouvez le voir.",
+        "author_deleted": "Supprimé.",
+        "consent_suspended": "Indisponible.",
+        "erased": "Indisponible."
+      },
+      "unavailable": "Indisponible.",
+      "close": "Fermer les commentaires"
     }
   }
 }

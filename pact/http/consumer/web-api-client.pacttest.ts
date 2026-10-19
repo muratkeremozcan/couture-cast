@@ -1,4 +1,10 @@
 import {
+  commentOperations,
+  commentFailureCases,
+  verifyCommunityCommentFailure,
+  verifyCommunityCommentPage,
+  verifyCommunityComment,
+  verifyCommunityCommentMissing,
   communityReactionConflictInteractions,
   verifyCommunityReactionConflictInteraction,
   verifyCommunityReactionRateLimitInteraction,
@@ -426,8 +432,36 @@ describe('CoutureCastWeb -> CoutureCastApi HTTP contract', () => {
     }
   )
 
-  // Story 5.4: both surfaces read the profile on mount and write consent, an
-  // analysis and a save/dismiss from the same screen.
+  // Story 6.4: both surfaces preserve screened thread, refusal and paging contracts.
+  it.each(commentOperations)(
+    'preserves screened comment %s contracts',
+    async (operation) => {
+      await verifyCommunityComment(pact, createWebClientForMockServer, 'web', operation)
+    }
+  )
+  it.each(commentFailureCases)('preserves comment refusal $name', async (failure) => {
+    await verifyCommunityCommentFailure(
+      pact,
+      createWebClientForMockServer,
+      'web',
+      failure
+    )
+  })
+  it.each(['roots', 'replies', 'submissions'] as const)(
+    'preserves paginated comment %s contracts',
+    async (operation) => {
+      await verifyCommunityCommentPage(
+        pact,
+        createWebClientForMockServer,
+        'web',
+        operation
+      )
+    }
+  )
+  it('refuses an unavailable comment thread', async () => {
+    await verifyCommunityCommentMissing(pact, createWebClientForMockServer, 'web')
+  })
+
   it('[P0] preserves the current summary when a reaction revision is stale', async () => {
     await verifyCommunityReactionConflictInteraction(
       pact,

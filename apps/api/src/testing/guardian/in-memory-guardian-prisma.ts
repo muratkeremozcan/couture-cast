@@ -63,6 +63,7 @@ export type AnalyticsCapturePayload = {
 export class InMemoryGuardianPrisma {
   $executeRaw = vi.fn().mockResolvedValue(1)
   $queryRaw = vi.fn().mockResolvedValue([])
+  communityComment = { updateMany: vi.fn().mockResolvedValue({ count: 0 }) }
   communityReaction = { updateMany: vi.fn().mockResolvedValue({ count: 0 }) }
   users = new Map<string, StoredUser>()
   invitations = new Map<string, StoredInvitation>()

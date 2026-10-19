@@ -1,0 +1,23 @@
+{
+  "sha": {
+    "src/community-comments-state.ts": "9c1b4a4526a2",
+    "src/contracts/http/community.ts": "dab6fbbd07c5"
+  },
+  "baseline_total": 111,
+  "baseline_failed": [],
+  "rows": [
+    {
+      "id": "M27 no-cursor append invalidates refresh",
+      "where": "src/community-comments-state.ts:327",
+      "original": "    if (append && !current?.nextCursor) return\n",
+      "mutated": "    if (append && !current?.nextCursor) {\n      this.ownRequest(postId, `${postId}/${parentId ?? ''}`)\n      return\n    }\n",
+      "killers": [
+        "community-comments-state-outcomes.spec.ts > screen-owned comments state preserves a deferred first reply expansion read when no-cursor append is requested",
+        "community-comments-state-outcomes.spec.ts > screen-owned comments state preserves a deferred initial roots read when no-cursor append is requested",
+        "community-comments-state-outcomes.spec.ts > screen-owned comments state preserves a deferred refreshed replies at the last page read when no-cursor append is requested",
+        "community-comments-state-outcomes.spec.ts > screen-owned comments state preserves a deferred refreshed roots at the last page read when no-cursor append is requested"
+      ],
+      "verdict": "killed"
+    }
+  ]
+}

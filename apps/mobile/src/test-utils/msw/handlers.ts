@@ -3,6 +3,8 @@ import type { z } from 'zod'
 import {
   allocateCommunityPostResponseSchema,
   communityFeedResponseSchema,
+  communityCommentsResponseSchema,
+  communityCommentSubmissionsResponseSchema,
   communityPostResponseSchema,
   publishCommunityPostResponseSchema,
   reportCommunityPostResponseSchema,
@@ -362,6 +364,16 @@ const localizedOutfits: Record<string, typeof mockRitualResponse.data.outfits> =
 }
 
 export const handlers = [
+  http.get('*/api/v1/community/posts/:postId/comments', () =>
+    communityJson(communityCommentsResponseSchema, {
+      data: { items: [], nextCursor: null, snapshot: 0, hasNewer: false },
+    })
+  ),
+  http.get('*/api/v1/community/posts/:postId/comment-submissions', () =>
+    communityJson(communityCommentSubmissionsResponseSchema, {
+      data: { items: [], nextCursor: null },
+    })
+  ),
   http.get('*/api/health', () =>
     HttpResponse.json({
       status: 'ok',

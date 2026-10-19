@@ -1,3 +1,4 @@
+import { listenHttpApp, httpTestUrl } from './helpers/loopback-http-app.js'
 // Learning path Step 8: Shared analytics contracts and event tracking.
 // See _bmad-output/project-knowledge/learning-path-step-by-step.md#step-8-shared-analytics-contracts-and-event-tracking
 import 'reflect-metadata'
@@ -107,7 +108,7 @@ describe('Analytics tracking endpoints (integration)', () => {
     if (!app) {
       throw new Error('App is not initialized')
     }
-    return app.getHttpServer() as Parameters<typeof request>[0]
+    return httpTestUrl(app)
   }
 
   // Flow ref S0.7/T3/1: boot Nest with capture mocked so HTTP routes can be
@@ -129,7 +130,7 @@ describe('Analytics tracking endpoints (integration)', () => {
       .compile()
 
     app = moduleFixture.createNestApplication()
-    await app.init()
+    await listenHttpApp(app)
   })
 
   afterEach(async () => {

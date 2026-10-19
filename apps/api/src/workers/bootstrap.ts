@@ -262,7 +262,14 @@ export async function startWorkers() {
     // so the two process groups cannot drift.
     // Awaited, because a BullMQ worker consumes the moment it is constructed
     // and the screener behind it may still be loading and verifying a model.
-    const community = await createCommunityWorkerRuntime({ prisma, telemetryService })
+    const community = await createCommunityWorkerRuntime({
+      prisma,
+      telemetryService,
+      featureFlags: new FeatureFlagsService(
+        new FeatureFlagsRepository(prisma),
+        posthogService
+      ),
+    })
     closeables.push({
       close: () => community.close(),
       disconnect: () => community.close(),

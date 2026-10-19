@@ -601,6 +601,48 @@
       "total_one": "{{count}} reaction",
       "total_other": "{{count}} reactions",
       "ineligible": "Reactions require age 13 or older. Members under 16 need active guardian consent."
+    },
+    "comments": {
+      "title": "Comments",
+      "reply": "Reply",
+      "delete": "Delete",
+      "replies": "Replies ({{count}})",
+      "sendReport": "Send report",
+      "cancel": "Cancel",
+      "refresh": "Refresh",
+      "newer": "New comments are available. Refresh to see them.",
+      "loading": "Loading comments…",
+      "empty": "Be the first to comment.",
+      "moreReplies": "More replies",
+      "more": "More comments",
+      "private": "Your submissions. Only you can see these.",
+      "recovery": "Delete this submission and try again with a new comment.",
+      "morePrivate": "More submissions",
+      "replying": "Replying to a comment",
+      "compose": "Add a comment",
+      "count": "{{count}} / 280 characters",
+      "unresolved": "An earlier request needs confirmation. Retry it before sending your edited draft.",
+      "sending": "Sending…",
+      "retry": "Retry submission",
+      "send": "Send comment",
+      "rateLimited": "You have reached the comment limit. Try again later.",
+      "failed": "Comments could not be updated. Try again.",
+      "invalid": "Enter 1–280 visible characters on one line.",
+      "submitted": "Comment submitted for screening.",
+      "deleted": "Comment deleted.",
+      "reported": "Report received.",
+      "status": {
+        "pending_screening": "Screening. Only you can see this.",
+        "published": "Published. Refresh the thread to view it.",
+        "held_for_review": "Held for review. Only you can see this.",
+        "blocked": "Withheld by screening. Only you can see this.",
+        "screening_failed": "Screening could not finish. Only you can see this.",
+        "author_deleted": "Deleted.",
+        "consent_suspended": "Unavailable.",
+        "erased": "Unavailable."
+      },
+      "unavailable": "Unavailable.",
+      "close": "Close comments"
     }
   }
 }

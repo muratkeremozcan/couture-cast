@@ -1,12 +1,14 @@
 'use client'
 
 import React, { useLayoutEffect, useRef } from 'react'
+import { createPortal } from 'react-dom'
 
 export interface AccessibleModalProps {
   isOpen: boolean
   onClose: () => void
   titleId: string
   title: string
+  surface?: 'default' | 'theme'
   descriptionId?: string
   description?: string
   invokingElementRef?: React.RefObject<HTMLElement | null>
@@ -22,6 +24,7 @@ export function AccessibleModal({
   onClose,
   titleId,
   title,
+  surface = 'default',
   descriptionId,
   description,
   invokingElementRef,
@@ -45,12 +48,26 @@ export function AccessibleModal({
     // Lock body scroll
     const originalStyle = document.body.style.overflow
     document.body.style.overflow = 'hidden'
-    const appShell = document.querySelector<HTMLElement>('[data-app-shell]')
-    const wasInert = appShell?.inert ?? false
-    const priorAriaHidden = appShell?.getAttribute('aria-hidden')
-    if (appShell) {
-      appShell.inert = true
-      appShell.setAttribute('aria-hidden', 'true')
+    const overlay = dialogRef.current?.parentElement
+    const background = new Set<HTMLElement>([
+      ...Array.from(document.body.children).filter(
+        (element): element is HTMLElement =>
+          element instanceof HTMLElement &&
+          element !== overlay &&
+          !element.matches('script,style,link')
+      ),
+      ...Array.from(document.querySelectorAll<HTMLElement>('[data-app-shell]')).filter(
+        (element) => !element.contains(overlay ?? null)
+      ),
+    ])
+    const priorBackground = [...background].map((element) => ({
+      element,
+      inert: element.inert ?? false,
+      hidden: element.getAttribute('aria-hidden'),
+    }))
+    for (const { element } of priorBackground) {
+      element.inert = true
+      element.setAttribute('aria-hidden', 'true')
     }
 
     // Establish modal focus before paint so a user action cannot race delayed focus setup.
@@ -59,13 +76,10 @@ export function AccessibleModal({
 
     return () => {
       document.body.style.overflow = originalStyle
-      if (appShell) {
-        appShell.inert = wasInert
-        if (priorAriaHidden === null || priorAriaHidden === undefined) {
-          appShell.removeAttribute('aria-hidden')
-        } else {
-          appShell.setAttribute('aria-hidden', priorAriaHidden)
-        }
+      for (const { element, inert, hidden } of priorBackground) {
+        element.inert = inert
+        if (hidden === null) element.removeAttribute('aria-hidden')
+        else element.setAttribute('aria-hidden', hidden)
       }
 
       // Restore focus to invoking element or previous active element
@@ -79,7 +93,7 @@ export function AccessibleModal({
     }
   }, [initialFocusRef, isOpen, invokingElementRef])
 
-  if (!isOpen) {
+  if (!isOpen || typeof document === 'undefined') {
     return null
   }
 
@@ -122,7 +136,7 @@ export function AccessibleModal({
     }
   }
 
-  return (
+  return createPortal(
     <div
       role="dialog"
       aria-modal="true"
@@ -133,15 +147,13 @@ export function AccessibleModal({
     >
       <div
         ref={dialogRef}
+        data-focus-surface={surface === 'theme' ? 'light' : undefined}
         tabIndex={-1}
-        className="max-h-[calc(100dvh-2rem)] w-full max-w-lg overflow-y-auto rounded-xl bg-white p-6 shadow-2xl dark:bg-zinc-900 dark:text-zinc-100"
+        className={`max-h-[calc(100dvh-2rem)] w-full max-w-lg overflow-y-auto rounded-xl p-6 shadow-2xl ${surface === 'theme' ? 'bg-[var(--theme-card-bg)] text-[color:var(--theme-card-text)]' : 'bg-white text-zinc-900 dark:bg-zinc-900 dark:text-zinc-100'}`}
       >
         <div className="flex items-center justify-between border-b border-zinc-200 pb-3 dark:border-zinc-800">
           <div>
-            <h2
-              id={titleId}
-              className="text-xl font-bold text-zinc-900 dark:text-zinc-50"
-            >
+            <h2 id={titleId} className="text-xl font-bold">
               {title}
             </h2>
             {description && (
@@ -156,7 +168,7 @@ export function AccessibleModal({
           <button
             ref={closeButtonRef}
             onClick={onClose}
-            className="flex min-h-[44px] min-w-[44px] items-center justify-center rounded-lg text-zinc-500 hover:bg-zinc-100 dark:hover:bg-zinc-800"
+            className={`flex min-h-[44px] min-w-[44px] items-center justify-center rounded-lg ${surface === 'theme' ? 'text-[color:var(--theme-card-text)] hover:bg-black/5' : 'text-zinc-500 hover:bg-zinc-100 dark:hover:bg-zinc-800'}`}
             aria-label={closeLabel}
           >
             ✕
@@ -181,6 +193,7 @@ export function AccessibleModal({
 
         {children}
       </div>
-    </div>
+    </div>,
+    document.body
   )
 }

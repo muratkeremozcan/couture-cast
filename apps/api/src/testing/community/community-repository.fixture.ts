@@ -58,6 +58,21 @@ export const createRepo = () => {
       findMany: moderationEventFindMany,
       create: moderationEventCreate,
     },
+    communityComment: {
+      findMany: vi.fn().mockResolvedValue([]),
+      updateMany: vi.fn().mockResolvedValue({ count: 0 }),
+    },
+    communityCommentReceipt: { deleteMany: vi.fn().mockResolvedValue({ count: 0 }) },
+    communityCommentScreeningOutbox: {
+      deleteMany: vi.fn().mockResolvedValue({ count: 0 }),
+    },
+    communityCommentAnalyticsSubject: {
+      deleteMany: vi.fn().mockResolvedValue({ count: 0 }),
+    },
+    communityCommentReport: {
+      findMany: vi.fn().mockResolvedValue([]),
+      updateMany: vi.fn().mockResolvedValue({ count: 0 }),
+    },
     communityPostReport: {
       findUnique: reportFindUnique,
       findMany: reportFindMany,

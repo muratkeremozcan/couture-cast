@@ -601,6 +601,48 @@
       "total_one": "{{count}} reacción",
       "total_other": "{{count}} reacciones",
       "ineligible": "Debes tener al menos 13 años para reaccionar. Los menores de 16 necesitan consentimiento vigente de su tutor."
+    },
+    "comments": {
+      "title": "Comentarios",
+      "reply": "Responder",
+      "delete": "Eliminar",
+      "replies": "Respuestas ({{count}})",
+      "sendReport": "Enviar denuncia",
+      "cancel": "Cancelar",
+      "refresh": "Actualizar",
+      "newer": "Hay comentarios nuevos. Actualiza para verlos.",
+      "loading": "Cargando comentarios…",
+      "empty": "Sé la primera persona en comentar.",
+      "moreReplies": "Más respuestas",
+      "more": "Más comentarios",
+      "private": "Tus envíos. Solo tú puedes verlos.",
+      "recovery": "Elimina este envío y prueba con un comentario nuevo.",
+      "morePrivate": "Más envíos",
+      "replying": "Respondiendo a un comentario",
+      "compose": "Añade un comentario",
+      "count": "{{count}} / 280 caracteres",
+      "unresolved": "Una solicitud anterior necesita confirmación. Reinténtala antes de enviar el borrador editado.",
+      "sending": "Enviando…",
+      "retry": "Reintentar envío",
+      "send": "Enviar comentario",
+      "rateLimited": "Has alcanzado el límite de comentarios. Inténtalo más tarde.",
+      "failed": "No se pudieron actualizar los comentarios. Inténtalo de nuevo.",
+      "invalid": "Escribe entre 1 y 280 caracteres visibles en una sola línea.",
+      "submitted": "Comentario enviado para revisión automática.",
+      "deleted": "Comentario eliminado.",
+      "reported": "Denuncia recibida.",
+      "status": {
+        "pending_screening": "En revisión automática. Solo tú puedes verlo.",
+        "published": "Publicado. Actualiza el hilo para verlo.",
+        "held_for_review": "Pendiente de revisión. Solo tú puedes verlo.",
+        "blocked": "Retenido por la revisión automática. Solo tú puedes verlo.",
+        "screening_failed": "La revisión automática no pudo terminar. Solo tú puedes verlo.",
+        "author_deleted": "Eliminado.",
+        "consent_suspended": "No disponible.",
+        "erased": "No disponible."
+      },
+      "unavailable": "No disponible.",
+      "close": "Cerrar comentarios"
     }
   }
 }

@@ -35,6 +35,7 @@ export default defineConfig({
     // benefit.
     include: [
       '@testing-library/react',
+      '@couture/testing/factories/community.factory',
       'expo-background-fetch',
       'expo-localization',
       'expo-router',

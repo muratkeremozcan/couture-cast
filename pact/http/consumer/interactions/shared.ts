@@ -66,6 +66,12 @@ export const pactAdminHeaders = {
 
 export type ContractApiClient = Pick<
   DefaultApi,
+  | 'getCommunityComments'
+  | 'getCommunityCommentReplies'
+  | 'getCommunityCommentSubmissions'
+  | 'createCommunityComment'
+  | 'deleteCommunityComment'
+  | 'reportCommunityComment'
   | 'apiHealthGet'
   | 'apiV1EventsPollGet'
   | 'apiV1RitualGet'

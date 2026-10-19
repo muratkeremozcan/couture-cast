@@ -7,6 +7,15 @@ import { z } from 'zod'
 import { queueConfigs, type QueueConfig } from '../../config/queues.js'
 
 export const COMMUNITY_MODERATION_QUEUE = 'community-moderation'
+export const COMMUNITY_COMMENT_JOB = 'community-comment-screening'
+export const communityCommentJobSchema = z
+  .object({
+    commentId: z.string().min(1).max(128),
+    generation: z.number().int().nonnegative(),
+  })
+  .strict()
+type CommentJob = z.infer<typeof communityCommentJobSchema>
+
 export const COMMUNITY_MODERATION_JOB = 'community-moderation-screening'
 const JOB_RETENTION_SECONDS = 7 * 24 * 60 * 60
 
@@ -70,7 +79,7 @@ export class CommunityModerationQueue
 {
   private readonly logger = new Logger(CommunityModerationQueue.name)
   private readonly config: QueueConfig
-  private queue: Queue<CommunityModerationJob> | null = null
+  private queue: Queue<CommunityModerationJob | CommentJob> | null = null
 
   constructor() {
     const found = queueConfigs.find((c) => c.name === COMMUNITY_MODERATION_QUEUE)
@@ -80,9 +89,9 @@ export class CommunityModerationQueue
     this.config = found
   }
 
-  private getQueue(): Queue<CommunityModerationJob> {
+  private getQueue(): Queue<CommunityModerationJob | CommentJob> {
     if (!this.queue) {
-      this.queue = new Queue<CommunityModerationJob>(
+      this.queue = new Queue<CommunityModerationJob | CommentJob>(
         this.config.name,
         this.config.options
       )
@@ -102,6 +111,22 @@ export class CommunityModerationQueue
     })
     await this.getQueue().add(COMMUNITY_MODERATION_JOB, data, {
       jobId: buildCommunityModerationJobId(postId, uploadSessionId),
+      removeOnComplete: { age: JOB_RETENTION_SECONDS },
+      removeOnFail: { age: JOB_RETENTION_SECONDS },
+    })
+  }
+
+  async enqueueComment(commentId: string, generation: number): Promise<void> {
+    const data = communityCommentJobSchema.parse({ commentId, generation })
+    const queue = this.getQueue()
+    const jobId = `comment__${commentId}__${generation}`
+    const retained = await queue.getJob(jobId)
+    if (retained) {
+      const state = await retained.getState()
+      if (state === 'completed' || state === 'failed') await retained.remove()
+    }
+    await queue.add(COMMUNITY_COMMENT_JOB, data, {
+      jobId,
       removeOnComplete: { age: JOB_RETENTION_SECONDS },
       removeOnFail: { age: JOB_RETENTION_SECONDS },
     })

@@ -1,3 +1,4 @@
+import { listenHttpApp, httpTestUrl } from './helpers/loopback-http-app.js'
 // Learning path Step 33: Affiliate "Shop this look" CTA.
 // See _bmad-output/project-knowledge/learning-path-step-by-step.md#step-33-affiliate-shop-this-look-cta
 import 'reflect-metadata'
@@ -120,7 +121,7 @@ describe('Story 5.1 affiliate conversion webhook against real PostgreSQL', () =>
     if (!app) {
       throw new Error('App is not initialized')
     }
-    return app.getHttpServer() as Parameters<typeof request>[0]
+    return httpTestUrl(app)
   }
 
   /**
@@ -256,7 +257,7 @@ describe('Story 5.1 affiliate conversion webhook against real PostgreSQL', () =>
     app.useGlobalFilters(
       new ApiExceptionFilter(app.get(HttpAdapterHost), app.get(TelemetryService))
     )
-    await app.init()
+    await listenHttpApp(app)
   })
 
   beforeEach(() => {

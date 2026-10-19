@@ -1,3 +1,4 @@
+import { listenHttpApp, httpTestUrl } from './helpers/loopback-http-app.js'
 // Story 5.5 Task 10: the premium 7-day outfit planner against real PostgreSQL
 // and real HTTP.
 import 'reflect-metadata'
@@ -213,7 +214,7 @@ describe('5.5 premium planner against real PostgreSQL and real HTTP', () => {
     if (!app) {
       throw new Error('App is not initialized')
     }
-    return app.getHttpServer() as Parameters<typeof request>[0]
+    return httpTestUrl(app)
   }
 
   function getPlanner(
@@ -341,7 +342,7 @@ describe('5.5 premium planner against real PostgreSQL and real HTTP', () => {
       .compile()
 
     app = moduleFixture.createNestApplication()
-    await app.init()
+    await listenHttpApp(app)
 
     featureFlags.getFeatureFlag.mockResolvedValue(true)
     telemetry.captureEvent.mockResolvedValue(undefined)

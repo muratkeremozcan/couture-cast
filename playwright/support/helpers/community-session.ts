@@ -3,7 +3,8 @@
 import { createHash, randomUUID } from 'node:crypto'
 import fs from 'node:fs'
 import path from 'node:path'
-import { PrismaClient } from '@prisma/client'
+import { PrismaClient, Prisma } from '@prisma/client'
+import { cleanupCommunityCommentFixtures } from '@couture/testing'
 import { createClient } from '@supabase/supabase-js'
 import type { APIRequestContext } from '@playwright/test'
 import type {
@@ -571,6 +572,27 @@ async function deleteCommunityRowsForUser(userId: string): Promise<void> {
      * run, and `@@unique([post_id, reporter_id])` means a survivor silently
      * changes what a later run's first report against that post does.
      */
+    const comments = await prisma.communityComment.findMany({
+      where: { user_id: userId },
+      select: { id: true },
+    })
+    const commentIds = comments.map((row) => row.id)
+    await prisma.communityCommentReport.updateMany({
+      where: { OR: [{ reporter_id: userId }, { comment_id: { in: commentIds } }] },
+      data: { reporter_id: null, content_snapshot: Prisma.DbNull },
+    })
+    await prisma.communityCommentReceipt.deleteMany({ where: { user_id: userId } })
+    await prisma.communityCommentScreeningOutbox.deleteMany({
+      where: { comment_id: { in: commentIds } },
+    })
+    await prisma.communityCommentAnalyticsSubject.deleteMany({
+      where: { user_id: userId },
+    })
+    await prisma.communityComment.updateMany({
+      where: { id: { in: commentIds } },
+      data: { user_id: null, body: null, status: 'erased', screening_reason: null },
+    })
+    await prisma.$transaction((tx) => cleanupCommunityCommentFixtures(tx, commentIds))
     await prisma.communityReactionOutbox.deleteMany({ where: { user_id: userId } })
     await prisma.communityReactionReceipt.deleteMany({ where: { user_id: userId } })
     await prisma.communityReaction.deleteMany({ where: { user_id: userId } })

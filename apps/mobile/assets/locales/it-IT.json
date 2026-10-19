@@ -773,6 +773,48 @@
       "total_one": "{{count}} reazione",
       "total_other": "{{count}} reazioni",
       "ineligible": "Per reagire devi avere almeno 13 anni. Sotto i 16 anni serve il consenso attivo di un tutore."
+    },
+    "comments": {
+      "title": "Commenti",
+      "reply": "Rispondi",
+      "delete": "Elimina",
+      "replies": "Risposte ({{count}})",
+      "sendReport": "Invia segnalazione",
+      "cancel": "Annulla",
+      "refresh": "Aggiorna",
+      "newer": "Ci sono nuovi commenti. Aggiorna per leggerli.",
+      "loading": "Caricamento commenti…",
+      "empty": "Scrivi il primo commento.",
+      "moreReplies": "Altre risposte",
+      "more": "Altri commenti",
+      "private": "I tuoi invii. Solo tu puoi vederli.",
+      "recovery": "Elimina questo invio e scrivi un nuovo commento.",
+      "morePrivate": "Altri invii",
+      "replying": "Risposta a un commento",
+      "compose": "Aggiungi un commento",
+      "count": "{{count}} / 280 caratteri",
+      "unresolved": "Una richiesta precedente attende conferma. Riprovala prima di inviare la bozza modificata.",
+      "sending": "Invio…",
+      "retry": "Riprova invio",
+      "send": "Invia commento",
+      "rateLimited": "Hai raggiunto il limite dei commenti. Riprova più tardi.",
+      "failed": "Impossibile aggiornare i commenti. Riprova.",
+      "invalid": "Inserisci da 1 a 280 caratteri visibili su una sola riga.",
+      "submitted": "Commento inviato per la verifica.",
+      "deleted": "Commento eliminato.",
+      "reported": "Segnalazione ricevuta.",
+      "status": {
+        "pending_screening": "Verifica in corso. Solo tu puoi vederlo.",
+        "published": "Pubblicato. Aggiorna la discussione per vederlo.",
+        "held_for_review": "In attesa di revisione. Solo tu puoi vederlo.",
+        "blocked": "Trattenuto dalla verifica. Solo tu puoi vederlo.",
+        "screening_failed": "Verifica non completata. Solo tu puoi vederlo.",
+        "author_deleted": "Eliminato.",
+        "consent_suspended": "Non disponibile.",
+        "erased": "Non disponibile."
+      },
+      "unavailable": "Non disponibile.",
+      "close": "Chiudi commenti"
     }
   }
 }

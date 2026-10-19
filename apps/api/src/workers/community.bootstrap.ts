@@ -1,4 +1,6 @@
 import '../load-env'
+import { FeatureFlagsService } from '../modules/feature-flags/feature-flags.service.js'
+import { FeatureFlagsRepository } from '../modules/feature-flags/feature-flags.repository.js'
 import type { Worker } from 'bullmq'
 import { createCommunityWorkerRuntime } from '../modules/community/community-worker-runtime'
 import { PostHogService } from '../posthog/posthog.service.js'
@@ -103,7 +105,14 @@ export async function startCommunityWorkers() {
     // Readiness first, consumption second. `createCommunityWorkerRuntime`
     // resolves only once the selected screener has loaded and verified whatever
     // it needs, so no job is ever screened by a half-built engine.
-    const community = await createCommunityWorkerRuntime({ prisma, telemetryService })
+    const community = await createCommunityWorkerRuntime({
+      prisma,
+      telemetryService,
+      featureFlags: new FeatureFlagsService(
+        new FeatureFlagsRepository(prisma),
+        posthogService
+      ),
+    })
     workers.push(community.worker)
     closeRuntime = community.close
 

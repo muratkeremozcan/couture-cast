@@ -1,7 +1,7 @@
+import { assertWardrobeParticipationAllowed } from './guardian-participation.js'
 import { createHmac, timingSafeEqual } from 'node:crypto'
 import {
   BadRequestException,
-  ForbiddenException,
   Inject,
   Injectable,
   NotFoundException,
@@ -813,7 +813,14 @@ export class GuardianService {
             // happens to exist.
             if (sessionInvalidated) {
               // Serialize reaction withdrawal and publication changes with member mutations.
-              await tx.$queryRaw`SELECT id FROM "LookbookPost" WHERE id IN (SELECT post_id FROM "CommunityReaction" WHERE user_id = ${teenId}) OR user_id = ${teenId} ORDER BY id FOR UPDATE`
+              await tx.$queryRaw`SELECT id FROM "LookbookPost" WHERE id IN (SELECT post_id FROM "CommunityReaction" WHERE user_id = ${teenId}) OR id IN (SELECT post_id FROM "CommunityComment" WHERE user_id = ${teenId}) OR user_id = ${teenId} ORDER BY id FOR UPDATE`
+              await tx.communityComment.updateMany({
+                where: {
+                  user_id: teenId,
+                  status: { in: ['published', 'pending_screening'] },
+                },
+                data: { status: 'consent_suspended', body: null },
+              })
               await tx.communityReaction.updateMany({
                 where: { user_id: teenId, selection: { not: null } },
                 data: { selection: null, revision: { increment: 1 } },
@@ -1249,56 +1256,6 @@ export class GuardianService {
     role?: string,
     tx: Prisma.TransactionClient = this.prisma
   ): Promise<void> {
-    const user = await tx.user.findUnique({
-      where: { id: userId },
-      include: {
-        profile: true,
-        teen_roles: {
-          where: { status: 'granted', revoked_at: null },
-        },
-      },
-    })
-
-    if (!user || !user.profile) {
-      throw new ForbiddenException('GUARDIAN_CONSENT_REQUIRED')
-    }
-
-    if (!user.profile.birthdate) {
-      throw new ForbiddenException('GUARDIAN_CONSENT_REQUIRED')
-    }
-
-    const age = calculateAge(user.profile.birthdate)
-
-    // The age check moved AHEAD of the compliance check when the claim-based
-    // early return was removed, and the order is load-bearing.
-    //
-    // `compliance.accountStatus` is a GUARDIAN-CONSENT state: signup writes
-    // `pending_guardian_consent` or `active`, and revocation rewrites it. It is
-    // the right question to ask about a 13-to-15-year-old and a meaningless one
-    // to ask about an adult. Reading it before the age check would fail closed
-    // for every adult whose `preferences` carries no compliance block at all,
-    // because `extractComplianceState` returns `{}` for a legacy or absent
-    // value and `{}.accountStatus` is not `'active'`. That would lock adults out
-    // of their own wardrobe for a reason that has nothing to do with age, which
-    // is a different change from the one this guard needed.
-    //
-    // Teen behaviour is unchanged by the reorder: anyone under 16 still reaches
-    // every check below in the same sequence as before.
-    if (age >= 16) {
-      return
-    }
-
-    const compliance = extractComplianceState(user.profile.preferences)
-    if (compliance.accountStatus !== 'active') {
-      throw new ForbiddenException('GUARDIAN_CONSENT_REQUIRED')
-    }
-
-    if (age < 13) {
-      throw new ForbiddenException('GUARDIAN_CONSENT_REQUIRED')
-    }
-
-    if (user.teen_roles.length === 0) {
-      throw new ForbiddenException('GUARDIAN_CONSENT_REQUIRED')
-    }
+    await assertWardrobeParticipationAllowed(tx, userId)
   }
 }

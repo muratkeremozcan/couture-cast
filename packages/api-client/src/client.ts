@@ -1,3 +1,11 @@
+import {
+  communityCommentsResponseSchema,
+  communityCommentSubmissionResponseSchema,
+  communityCommentSubmissionsResponseSchema,
+  reportCommunityCommentResponseSchema,
+  type CreateCommunityCommentInput,
+  type CommunityReportReason,
+} from './contracts/http/community'
 import { Configuration, DefaultApi, type ConfigurationParameters } from './generated'
 
 export type ApiClientAccessToken = Exclude<
@@ -61,4 +69,88 @@ export function createApiClient(
   })
 
   return new DefaultApi(config)
+}
+
+type CommunityCommentsApi = Pick<
+  DefaultApi,
+  | 'getCommunityComments'
+  | 'getCommunityCommentReplies'
+  | 'getCommunityCommentSubmissions'
+  | 'createCommunityComment'
+  | 'deleteCommunityComment'
+  | 'reportCommunityComment'
+>
+
+// Story 6.4 owner: apps consume generated transport through validated thread operations.
+export function communityCommentsClient(
+  api: CommunityCommentsApi,
+  platform: 'web' | 'mobile',
+  requestInit?: RequestInit
+) {
+  return {
+    roots: async (postId: string, cursor?: string) =>
+      communityCommentsResponseSchema.parse(
+        await api.getCommunityComments(
+          { postId, cursor, xCouturePlatform: platform },
+          requestInit
+        )
+      ).data,
+    replies: async (postId: string, parentId: string, cursor?: string) =>
+      communityCommentsResponseSchema.parse(
+        await api.getCommunityCommentReplies(
+          {
+            postId,
+            commentId: parentId,
+            cursor,
+            xCouturePlatform: platform,
+          },
+          requestInit
+        )
+      ).data,
+    submissions: async (postId: string, cursor?: string) =>
+      communityCommentSubmissionsResponseSchema.parse(
+        await api.getCommunityCommentSubmissions(
+          {
+            postId,
+            cursor,
+            xCouturePlatform: platform,
+          },
+          requestInit
+        )
+      ).data,
+    create: async (postId: string, input: CreateCommunityCommentInput) =>
+      communityCommentSubmissionResponseSchema.parse(
+        await api.createCommunityComment(
+          {
+            postId,
+            xCouturePlatform: platform,
+            createCommunityCommentInput: input,
+          },
+          requestInit
+        )
+      ).data,
+    delete: async (postId: string, commentId: string) =>
+      communityCommentSubmissionResponseSchema.parse(
+        await api.deleteCommunityComment(
+          {
+            postId,
+            commentId,
+            xCouturePlatform: platform,
+          },
+          requestInit
+        )
+      ).data,
+    report: async (postId: string, commentId: string, reason: CommunityReportReason) =>
+      reportCommunityCommentResponseSchema.parse(
+        await api.reportCommunityComment(
+          {
+            postId,
+            commentId,
+            xCouturePlatform: platform,
+            reportCommunityCommentInput: { reason },
+          },
+          requestInit
+        )
+      ).data,
+  }
 }

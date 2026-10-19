@@ -1,0 +1,518 @@
+---
+title: 'Story 6.4: Threaded comments'
+type: 'feature'
+created: '2026-10-19'
+status: 'done'
+baseline_commit: '989d101785d2fdec203e63d05213862442475e4c'
+route: 'dispatch'
+story_key: '6-4-threaded-comments'
+review_loop_iteration: 0
+context:
+  - '{project-root}/_bmad-output/project-context.md'
+  - '{project-root}/_bmad-output/implementation-artifacts/epic-6-context.md'
+  - '{project-root}/_bmad-output/implementation-artifacts/6-4-threaded-comments-design.md'
+---
+
+<!-- prettier-ignore-start -->
+
+<frozen-after-approval reason="human-owned intent">
+
+## Intent
+
+Members can discuss public looks through screened comments and one reply level.
+Deliver persistent threads with deletion tombstones, reporting, and accessible web/mobile controls.
+
+## Boundaries & Constraints
+
+Comments contain 1-280 trimmed characters and a supported locale.
+Roots/replies appear oldest first with independent bounded keyset pages.
+Creation requires authentication, both community flags, age 13+, and existing under-16 consent.
+Read, report, and author deletion require the read flag; deletion survives consent loss.
+Every operation checks parent-post visibility and applicable ownership.
+The standalone worker screens before publication; pending status stays author-private.
+Deletion clears text/attribution and preserves replies through tombstones.
+Consent revocation hides affected contributions atomically; erasure scrubs personal content within 72 hours.
+Every visible comment exposes reporting; accepted reports reach durable moderation intake within five minutes.
+Preserve strict feed/detail contracts and disabled production flags.
+Realtime, notifications, and moderator UI belong to later stories.
+
+## I/O & Edge-Case Matrix
+
+| Input/state                         | Result                                                               |
+| ----------------------------------- | -------------------------------------------------------------------- |
+| Root/reply to root                  | Private pending; passing screening publishes once                    |
+| Deeper reply or invalid text/cursor | Validation error; unchanged thread                                   |
+| Retried create UUID                 | Same submission; changed payload conflicts; deletion survives replay |
+| Concurrent publish/pages            | Scoped snapshot cursor prevents gaps/duplicates                      |
+| Review/block/screening failure      | Withheld text; private status/recovery; moderation record            |
+| Author deletion                     | Idempotent tombstone; replies survive                                |
+| Report/retry                        | Durable case/audit; dedupe and shared abuse limits                   |
+| Consent loss/hidden post/erasure    | Content disappears; delayed responses cannot restore it              |
+| Network failure/close               | Confirmed state, draft and retry identity survive                    |
+
+</frozen-after-approval>
+
+<!-- prettier-ignore-end -->
+
+## Code Map
+
+Paths below are relative to `apps/api/src/modules/community/` unless prefixed otherwise.
+
+- `community.repository.ts`: canonical visibility predicate, member-before-post locks, report transactions.
+- `community.module.ts`: enforced request import boundary excludes screening code.
+- `community-text-screener.ts`: multilingual obfuscation-aware screening; caption ceiling 280.
+- `community-moderation.worker.ts`: worker lifecycle and pinned screening policy.
+- `apps/api/src/modules/guardian/guardian.service.ts`: consent and revocation transaction.
+- Web `community-lookbook-grid.tsx`: screen-owned state, detail dialog and modal announcements.
+- Mobile `community-screen.tsx`: screen-owned state; add a dedicated comments sheet.
+
+## Tasks & Acceptance
+
+**Execution:**
+
+- [x] `packages/db/prisma/schema.prisma`, new migration: comments, same-post root constraint, publication order, payload-bound receipts, screening/analytics outboxes and report/audit records; API-only RLS, indexes, tombstone/erasure cleanup.
+- [x] `packages/api-client/src/contracts/http/community.ts`, `packages/api-client/src/client.ts`: separate root/reply pages, private submission status, create/delete/report endpoints; post/parent/snapshot-bound cursors; regenerate SDK/OpenAPI.
+- [x] New `community-comments.repository.ts`, `community-comments.service.ts`, existing controller/module: eligibility under shared locks, paging, replay protection, bounded submission/report rates and transactional moderation intake with a five-minute deadline.
+- [x] Community queue/outbox/worker and `apps/api/src/workers/community.bootstrap.ts`: text-only jobs, existing policy, conditional publication, bounded retries and stale-job recovery; preserve request import boundary.
+- [x] Guardian service, community maintenance/analytics and `packages/api-client/src/types/analytics-events.ts`: atomic consent suppression, erasure, durable deduplicated create/delete/report telemetry; exclude text/raw identities/canaries.
+- [x] New `packages/api-client/src/community-comments-state.ts`, `apps/web/src/lib/community.ts`, `apps/mobile/src/lib/community.ts`: shared request/draft/retry ownership, page merge and late-response visibility fences.
+- [x] `apps/web/src/app/components/community-lookbook-grid.tsx`, new adjacent `community-comments.tsx`; mobile screen/card and new `apps/mobile/components/community/community-comments-sheet.tsx`: Comments action, root/reply compose, private status, report/delete/tombstones, load-more, focus/announcements, 44px targets and theme contrast.
+- [x] Web/mobile locale catalogs and `packages/testing/src/factories/community.factory.ts`: all ten translations, deterministic thread fixtures and cleanup.
+- [x] Colocated API/client/component tests, `apps/api/integration/community-comments-*.integration.spec.ts`, `packages/db/test/rls/community-posts.spec.ts`, Pact interactions/provider doubles, new `playwright/tests/community-comments.spec.ts` and `maestro/community-comments.yaml`: matrix, real worker, concurrency, consent races, privacy, report timing, accessibility and recovery.
+
+**Acceptance Criteria:**
+
+- Given concurrent submissions, when screening and traversal finish, then every eligible published item appears once within its snapshot and nesting stays one level deep.
+- Given deletion, consent change, or erasure, when committed/refreshed, then safe thread shape survives and ineligible content disappears.
+- Given an accepted report, when its response succeeds, then durable moderation intake exists with a routing deadline within five minutes.
+- Given either platform and supported locales, when using keyboard/screen reader, then all thread actions and recovery are usable.
+
+## Implementation Notes
+
+- 2026-10-19: User approved handling the Opus spec findings and continuing the requested delivery workflow.
+- The supporting design records the resolved review details. Complete local implementation and validation before remote delivery.
+
+- Schema, API, worker, shared client, web and mobile thread surfaces are implemented. Read paths use shared member/post locks with batched aliases and reply counts; writes retain exclusive member-before-post order.
+- Database text checks match NFC UTF-16 validation, including supplementary emoji, invisible-only format characters and Unicode line/paragraph separators. Direct User erasure scrubs report JSON and pending analytics.
+- Shared report quota returns the earliest expiry from the combined post/comment ledger; guarded HTTP tests pin the clock and cover both routes.
+- Shared state fences stale failures, invalidates cached replies on refresh and reconciles all loaded private pages through serialized polling. Web Comments focuses the thread heading; native uses keyboard avoidance and localized close controls.
+- Latest source additions include PostHog-backed worker flag wiring, accurate shared quota Retry-After, dedicated Comments focus, native keyboard avoidance/primary Send styling, a fixed composer footer for reply keyboard access, and scoped synthetic fixture cleanup. Final validation and fresh browser/iOS/Android evidence below include these additions.
+
+- Final own-review regressions reproduced and fixed: first reply expansions finishing after reopen, own unavailable placeholder deletion, and deep-link network failures clearing discussion drafts. Focused rendered evidence is retained in `/tmp/story64-inflight-reply-repro.log`, `/tmp/story64-own-delete-web-repro.log`, `/tmp/story64-own-delete-mobile-repro.log` and `/tmp/story64-deep-link-repro.log`; fixed journeys pass.
+- All six shared comment operations now forward RequestInit cancellation. Mobile uses the existing 15-second request timeout; web uses its existing 15-second AbortSignal deadline pattern. A deferred generated-fetch regression proves pending releases, drafts survive, and the immutable retry payload is retained. Logs: `/tmp/story64-deadline-repro.log` and `/tmp/story64-deadline-fixed.log`.
+- Restored four unrelated commerce FK relations to Restrict and regenerated the first comment migration with Prisma from the baseline schema. Fresh disposable migration/API verification passed 36 tests; custom invariant migration is preserved.
+
+- Analytics secret rotation reproduced a guarded HTTP create 500 for a returning member. Outbox events now use the durable actor returned from the subject upsert. Regression log `/tmp/story64-rotation-repro.log`; fixed full integration evidence `/tmp/story64-comments-integration-final.log`.
+
+## Spec Change Log
+
+## Review Triage Log
+
+| Finding | Verdict | Route  | Evidence                                                                                                                                                                                                                                                                                                                                                                                                                          |
+| ------- | ------- | ------ | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| B1      | medium  | patch  | Shared submit retains unresolved after a definite HTTP rejection. A deleted reply root returns 400; editing the draft or cancelling reply still resends the rejected body/parent. Clear only confirmed rejected attempts; preserve transport-uncertain identity.                                                                                                                                                                  |
+| B2      | medium  | patch  | delete increments the post fence after its response. Two deletes started under the same ticket both succeed at the API, but the second response fails valid() and leaves its text cached. Invalidate outstanding reads without invalidating independent mutations.                                                                                                                                                                |
+| B3      | medium  | patch  | readStatuses captures a request before submit completes and replaces submissions with its older empty result. The successful create does not invalidate that private read, so its confirmed submission disappears.                                                                                                                                                                                                                |
+| B4      | high    | patch  | reconcileSubmissions drops every item whose ID is already public. An author_deleted or consent_suspended private status therefore leaves cached public body and alias visible. Apply authoritative suppression before public-ID deduplication and fence older reads.                                                                                                                                                              |
+| B5      | high    | patch  | deliverAnalytics leases a row into memory, then invokes captureCommentEvent after erasure may delete the subject/outbox. The capture upserts TelemetryEvent and sends the erased actor. Serialize delivery with live subject deletion and verify both race orderings.                                                                                                                                                             |
+| B6      | medium  | patch  | Worker DB checks reject author-targeted true when the synthetic fallback identity is false. Opus traced syncFlags and the documented cohort rollout: these rows are a fallback cache. Remove the extra cache-as-global-switch checks and retain the per-author FeatureFlagsService authority. This corrects the initial proposed triage fix after tracing the cache owner.                                                        |
+| B7      | false   | reject | The alleged committed freeze is an update to the synthetic fallback cache, which does not establish that the caller's per-user flag is false. FeatureFlagsService intentionally evaluates remote per user and the design resolves external calls before locks. Using cache rows as an authoritative switch would break cohort rollout; O-B1 supplies that concrete counterexample. Initial proposed global-gate fix is withdrawn. |
+| B8      | medium  | patch  | report catches transport rejection and resolves void. Both platform forms close in then() after a failed report, losing the selected recovery surface. Return an explicit accepted result and close only on acceptance.                                                                                                                                                                                                           |
+| B9      | medium  | patch  | The inline web report form neither focuses its reason selector on open nor restores the originating Report control after cancel/success. Removing the focused Cancel button sends focus to body. Retain and restore the actual invoking control.                                                                                                                                                                                  |
+| B10     | medium  | patch  | Comment Pact interactions cover success and unavailable reads only. Invalid input, eligibility, changed mutation/report intent and shared quota Retry-After lack consumer/provider contract assertions. Add deterministic negative interactions to the existing contract path.                                                                                                                                                    |
+| E1      | medium  | patch  | Independent edge tracing confirms the B2 two-delete race: the first response changes the whole-post fence and rejects the second successful mutation response. Each finding is retained separately before grouping.                                                                                                                                                                                                               |
+| E2      | medium  | patch  | Independent edge tracing confirms B1: a definitive rejected reply remains the immutable unresolved payload after reply cancellation and draft editing.                                                                                                                                                                                                                                                                            |
+| E3      | high    | patch  | Independent edge tracing confirms B4: author-private suppression is ignored for already-public IDs, preserving cached body and attribution.                                                                                                                                                                                                                                                                                       |
+| E4      | high    | patch  | Independent edge tracing confirms B5: a leased in-memory analytics row remains deliverable after erasure commits and deletes its durable subject/outbox.                                                                                                                                                                                                                                                                          |
+| V1      | medium  | patch  | Pre-verified gap: integration recovery mocks the entire captureCommentEvent method. Removing its acknowledged sink call still passes. Exercise the real TelemetryService with PostgreSQL and an acknowledged fail/retry sink; assert stable dedupe ID, snake_case properties and durable receipts.                                                                                                                                |
+| V2      | medium  | patch  | Pre-verified gap: failure coverage calls processor.markFailed directly and the real Redis worker case covers success only. Removing the worker exhaustion branch still passes. Exercise actual comment retries through Redis and assert private pending until exhaustion, then one screening_failed intake/audit.                                                                                                                 |
+| O-B1    | high    | patch  | Verified syncFlags uses FEATURE_FLAG_SYNC_DISTINCT_ID and request flags resolve per member. Worker adds an incompatible global cache check. A targeted true member with false synthetic fallback cannot publish; remove only the redundant DB checks and retain per-author evaluation.                                                                                                                                            |
+| O-B2    | high    | patch  | Worker catch invokes markFailed after three generic thrown freeze errors. Outbox stale sweep also fails every old pending row regardless of rollout. Existing generation/dispatched fields can defer frozen work without content failure/intake; test a freeze spanning retries and stale age, then recovery.                                                                                                                     |
+| O-B3    | false   | reject | Mobile CI runs root db:reset at pr-mobile-e2e.yml:288. That invokes the db workspace predb:reset hook, whose prepare:shared-deps builds testing, client and utils before Maestro starts; baseline package scripts and .npmrc preserve lifecycle execution. This directly refutes the claimed clean-CI missing dist. O-LM8 standalone mobile tests remain a separate real build-order gap.                                         |
+| O-H1    | medium  | patch  | Verified same definite-rejection unresolved-payload defect as B1/E2. The retained exact retry is appropriate for uncertain outcomes; confirmed 4xx requires release of the rejected attempt.                                                                                                                                                                                                                                      |
+| O-M1    | medium  | patch  | Comment service throws raw age/guardian refusals while platform classifiers recognize COMMUNITY_AGE_GATE_DENIED_MESSAGE. The rendered state maps age_gate to generic failure. Reuse the established surface message and translation.                                                                                                                                                                                              |
+| O-M2    | medium  | patch  | Author delete explicitly clears every report snapshot. Reports already accepted before deletion lose their moderation evidence; the design requires scrubbing on erasure and consent. Preserve accepted snapshots through ordinary author deletion; retain erasure scrubbing.                                                                                                                                                     |
+| O-M3    | medium  | patch  | Private Delete, report close, reply cancellation and completed pagination remove focused controls. AccessibleModal handles keys on its subtree; body focus bypasses Escape/Tab handling. Focus stable existing status/composer/item or trigger targets after these actions.                                                                                                                                                       |
+| O-M4    | medium  | patch  | Both components poll every three seconds even without pending screening. Each rejected poll creates a new announcement and success leaves stale error. Poll active pending work with bounded backoff, announce error transitions once and clear recovered errors.                                                                                                                                                                 |
+| O-M5    | medium  | patch  | The delete post fence also invalidates concurrent create/report tickets, leaving accepted creates unresolved and suppressing report confirmations. This shares the B2/E1 fence root cause.                                                                                                                                                                                                                                        |
+| O-M6    | medium  | patch  | Screen-owned announcement persists after close. Mount effects replay it and native renders the stale live text visibly beside newer status. Consume announcement IDs once and use one accessible announcement channel without persistent duplicate visual copy.                                                                                                                                                                   |
+| O-M7    | medium  | patch  | Both comment enqueue and analytics catches only mutate attempts/backoff. An unavailable acknowledged sink has no operator signal. Reuse content-free reason/attempt/age logging from the reaction outbox.                                                                                                                                                                                                                         |
+| O-M8    | medium  | patch  | Runtime sequentially awaits comment dispatch before reaction dispatch and comment stale sweep before post stale sweep. A comment exception skips existing work. Isolate steps and retain existing-work progress when comments fail.                                                                                                                                                                                               |
+| O-M9a   | medium  | patch  | Review/block tests accept either state for both samples. Pin exact engine disposition and matching intake/audit, and exercise withheld status in a rendered browser journey.                                                                                                                                                                                                                                                      |
+| O-M9b   | medium  | patch  | Pact lacks negative envelopes and paginated requests. Same negative-contract root as B10, with additional disabled and pagination cases. Extend existing utility-based interactions and provider states.                                                                                                                                                                                                                          |
+| O-M9c   | medium  | patch  | Report and consent have real HTTP/DB tests but no browser/device path. Add an end-user report journey and consent suppression refresh/recovery with real worker/API boundaries.                                                                                                                                                                                                                                                   |
+| O-M9d   | medium  | patch  | Mobile tests replace announcement/focus APIs without assertions, and omit screen-level close/reset/404 ownership. Assert observable focus/announcements and screen ownership during the corresponding fixes.                                                                                                                                                                                                                      |
+| O-M9e   | medium  | patch  | The private-paging refresh assertion can pass against pre-refresh text before the request lands. Wait for a controlled response boundary and assert retained second-page content after reconciliation.                                                                                                                                                                                                                            |
+| O-M10   | medium  | patch  | The comments suite still passes an unbound Nest server to supertest, whose implicit dual-stack port may collide with a live IPv4 fixture on macOS. Bind once to 127.0.0.1:0 using a shared helper; migrate the observed HTTP fixtures so one suite cannot answer another.                                                                                                                                                         |
+| O-LB1   | low     | reject | Publication ineligibility uses consent_suspended for hidden post/deleted root too. Public placeholders intentionally hide cause; private copy is generic recovery. A distinct status adds schema/contract branches for rare cause detail with negligible everyday harm.                                                                                                                                                           |
+| O-LB2   | low     | reject | Technical failure intake uses inappropriate_content as the report reason, but audit.action=screening_failed and reason=screening_unavailable already distinguish the actual outcome for the future operator query. A new reason expands shared contracts for negligible current harm.                                                                                                                                             |
+| O-LB3   | low     | reject | Payload receipts retain a SHA-256 after author deletion, allowing a database reader to test candidate text. Erasure already deletes receipts and the hash is never exposed publicly. HMAC introduces secret lifetime/rotation coupling for an unlikely privileged confirmation scenario.                                                                                                                                          |
+| O-LB4   | low     | reject | Deleting a report with audit would attempt SET NULL and is rejected by the append-only trigger. Reports have no deletion path; audited retention is enforced. A regenerated schema migration to change the FK action adds work without changing reachable behavior.                                                                                                                                                               |
+| O-LB5   | low     | patch  | The guardian extraction preserved behavior but dropped explanation for the age-before-compliance order. Restore a short affirmative rationale at the shared rule; do not duplicate policy.                                                                                                                                                                                                                                        |
+| O-LB6   | low     | reject | Shared post reads serialize against writes as required for coherent visibility snapshots; batched read locks already allow readers together. Alternative lock protocols add complexity for an unmeasured hot-post issue, and active-only polling reduces load.                                                                                                                                                                    |
+| O-LW1   | medium  | patch  | The visible-text refinement excludes whitespace/Cf but allows Default_Ignorable fillers and braille blank as sole body. These yield blank-looking published comments. Extend the existing JS and DB visible-text tests consistently, preserving ordinary international/emoji text.                                                                                                                                                |
+| O-LW2a  | medium  | patch  | A pre-create private poll wipes a confirmed create, matching B3. Keep a separate row before grouping.                                                                                                                                                                                                                                                                                                                             |
+| O-LW2b  | medium  | patch  | submit prepends a replayed published result even when publicIds already contains it, so one contribution renders twice. Apply the existing public-ID dedup rule to accepted create results.                                                                                                                                                                                                                                       |
+| O-LW3   | false   | reject | There is no account-erasure UI/action producer in this application. The listener is an observation hook; session polling resets on sign-out and observed 401 resets state, while private/public refresh suppresses erased content. The cited absence alone does not demonstrate an erased account operation being observed and ignored.                                                                                           |
+| O-LW4   | medium  | defer  | Pre-existing AccessibleModal app-shell lookup finds no matching lookbook ancestor, so background content remains interactive behind its portal. The source predates Story 6.4. User engineering instructions authorize fixing the observed accessibility defect during this delivery; record it as pre-existing and handle alongside focus verification.                                                                          |
+| O-LW5a  | low     | reject | Delete is a single author action with an explicit tombstone result. A confirmation UI adds a new interaction and focus state for accidental-click prevention beyond the current requested flow; no defective deletion behavior is demonstrated.                                                                                                                                                                                   |
+| O-LW5b  | low     | patch  | Close comments closes the entire look detail dialog, so its label understates the action. Reuse the existing localized dialog Close label; preserve the established dialog close/focus behavior.                                                                                                                                                                                                                                  |
+| O-LW5c  | low     | reject | Replies accurately reports that its requested content is expanded; another click refreshes that content. Collapsing would add an interaction and request-ownership state with negligible everyday harm from the existing refresh behavior.                                                                                                                                                                                        |
+| O-LW5d  | medium  | patch  | Repeated action labels provide no item context to assistive users. Give existing controls contextual accessible names while retaining visible translations and tests.                                                                                                                                                                                                                                                             |
+| O-LW5e  | medium  | patch  | Web report failure closes the reason form, matching B8. Keep the chosen reason and report surface available for retry.                                                                                                                                                                                                                                                                                                            |
+| O-LM1   | medium  | patch  | Native report failure closes the form and reason carries between targets. Same outcome as B8; reset default on a newly selected report target, preserve selection during failure retry.                                                                                                                                                                                                                                           |
+| O-LM2   | medium  | patch  | Deep-link/highlight 404 calls unconditional setCommentsPostId(null) after the scoped evict callback, closing a sheet for another post. Remove the unconditional close and test active-post ownership.                                                                                                                                                                                                                             |
+| O-LM3   | medium  | patch  | Highlighted and feed copies share a post-keyed ref map and overwrite each other; unmount can clear the actual invoking control. Capture the actual Comments trigger instance when opening and restore that node on close.                                                                                                                                                                                                         |
+| O-LM4   | medium  | patch  | The one-second session sync awaits token resolution without a catch. A storage rejection becomes an unhandled promise and repeats. Handle failure safely while keeping existing state/session ownership.                                                                                                                                                                                                                          |
+| O-LM5a  | false   | reject | Selected report reasons already expose accessibilityRole=radio and accessibilityState.checked in the cited native JSX. The selection is conveyed beyond colour; preserve these semantics.                                                                                                                                                                                                                                         |
+| O-LM5b  | medium  | patch  | Native Reply/Delete/Report labels repeat across entries without item context, matching the web action-naming gap. Add contextual accessible labels to existing controls.                                                                                                                                                                                                                                                          |
+| O-LM5c  | medium  | patch  | Replying copy omits the selected root context, making the destination ambiguous after scrolling. Name the existing selected root in the accessible reply context on both surfaces.                                                                                                                                                                                                                                                |
+| O-LM6   | medium  | patch  | Maestro selects Reply/Replies by shared text on seeded lookbook-5. Other roots can redirect the test. Scope actions to the submitted root via stable item/test identifiers.                                                                                                                                                                                                                                                       |
+| O-LM7   | medium  | patch  | Fixture cleanup retains roots referenced by other members but leaves their body/user intact; later replica-mode user cleanup bypasses erasure triggers. Scrub retained owned roots before identity deletion, preserving other replies.                                                                                                                                                                                            |
+| O-LM8   | medium  | patch  | Mobile pretest builds utils/client but new factory import resolves testing/dist. Cold standalone mobile tests fail before execution. Build the existing shared testing dependency in the prepare hook or resolve the factory from its established source convention.                                                                                                                                                              |
+| P1      | medium  | patch  | Parent audit of the first review patch found confirmed create invalidated all public reads, leaving an initial roots request ignored and roots null until refresh. Limit the new acceptance fence to private polling; retain public-read ownership and add the explicit ordering regression.                                                                                                                                      |
+| P2      | medium  | patch  | Parent audit found token-storage rejection was treated as resolved sign-out, clearing draft/sheet on a transient storage failure. Catch the rejection while retaining the last confirmed identity; clear on resolved null or changed identity, and assert both outcomes.                                                                                                                                                          |
+| T1      | medium  | patch  | TEA traced comment response registration: it omits the required Retry-After header on create/report 429s and advertises 409/429 on read operations that cannot emit them. Correct operation-specific metadata and regenerate the tool-owned OpenAPI/SDK; Pact negatives verify the real envelopes.                                                                                                                                |
+| P3      | medium  | patch  | Parent backend audit found worker exhaustion does not pass the job generation to markFailed. A held final old-generation attempt can reject after a freeze sweep rearms and rollout reopens, terminal-failing the new generation. Carry and transactionally compare expected generation before failure settlement; reproduce with a controlled final attempt and defer/reopen.                                                    |
+| P4      | medium  | patch  | Parent audit found sweepStale repeatedly selects the oldest 100 frozen pending comments by immutable created_at. Their deferrals leave later eligible stale rows unexamined. Apply the existing outbox freshness predicate during candidate selection as well as locked settlement; prove progress past 100 frozen rows in a second bounded sweep.                                                                                |
+| T2      | medium  | patch  | TEA executed three failing lifecycle cases: an armed watchSubmissions timer survives account switch, reset or eviction and sends a second request for the old post. Clear/recheck pending work before the callback sends; preserve the failing tests and verify stop/reset/eviction all cancel further polling.                                                                                                                   |
+| T3      | medium  | patch  | TEA executed a red follow-on: the watch-level ticket captured by the T2 patch stays invalid after account switch, so a mounted web thread never polls the next account's new pending work. Derive timer ownership per scheduling cycle while rejecting old timer/completion work; retain cancellation and resume regressions together.                                                                                            |
+| T4      | medium  | patch  | TEA reproduced on web and native: hold report A, open report B and select its reason, then accept A. A's callback closes B's newer form; web also targets A for focus. Close/restore only when the accepted request still owns the current report target, preserving B and A's receipt announcement.                                                                                                                              |
+| P5      | medium  | patch  | Parent requested delayed deep-link success reproduction. TEA rendered test and parent full mobile gate prove the feed invoker unmounts when the same highlighted post appears; close focuses stale handle 501 instead of live same-post handle 502. Keep actual invocation when live and fall back to the current same-post Comments control after replacement.                                                                   |
+| T5      | medium  | patch  | TEA separately confirmed the same delayed-success focus replacement with the detached feed node disconnected and exactly one live Comments control. This is grouped with P5 for the same source repair; the rendered regression remains unchanged.                                                                                                                                                                                |
+| RV1     | low     | patch  | Worker stale-backlog fixtures derive Date.now although these cases test freeze/generation/fairness, not the exact cutoff. A fixed ancient backlog timestamp removes that setup clock dependency while real BullMQ scheduling remains live.                                                                                                                                                                                        |
+| RV2     | low     | patch  | Recovery mixes deterministic stale cutoff and real database analytics scheduling. Pin Date only for the sweep phase, then restore live time before dispatch; keep the retry assertions.                                                                                                                                                                                                                                           |
+| RV3     | medium  | patch  | Worker member/comment payloads duplicate existing factory shapes. Reuse shared builders so compliance defaults and accepted contract values evolve consistently.                                                                                                                                                                                                                                                                  |
+| RV4     | medium  | patch  | Delivery repeats the worker member/comment seed shape. Share the builder and keep its isolated database lifecycle.                                                                                                                                                                                                                                                                                                                |
+| RV5     | medium  | patch  | Web repeats report receipts and submissions envelopes. Reuse named local builders so report deadlines and envelope changes update every case.                                                                                                                                                                                                                                                                                     |
+| RV6     | medium  | patch  | Client contract tests duplicate item/submission shapes already provided by sibling fixture helpers. Reuse those helpers without introducing a testing-to-client dependency cycle.                                                                                                                                                                                                                                                 |
+| RV7     | medium  | patch  | State tests repeat private pages and deferred page types despite importing the existing builders/types. Apply those imports consistently.                                                                                                                                                                                                                                                                                         |
+| RV8     | low     | patch  | Web rendered journey combines paging, composer cancellation and report cancellation/submission. Separate the independent subjects while preserving every assertion.                                                                                                                                                                                                                                                               |
+| RV9     | low     | patch  | Native rendered journey combines the same independent subjects. Separate cases for clearer regression failures while preserving behavior coverage.                                                                                                                                                                                                                                                                                |
+| RV10    | low     | patch  | HTTP page maximum plus one is an unnamed boundary. Name the accepted maximum locally and derive the refused request.                                                                                                                                                                                                                                                                                                              |
+| RV11    | low     | patch  | HTTP report Retry-After3600 lacks a named derivation. Derive it from the existing hour/second constants and explain the accepted window.                                                                                                                                                                                                                                                                                          |
+| RV12    | low     | patch  | Database Unicode parity uses unnamed140/141emoji boundaries. Name the local accepted UTF16 cap and derive the probes.                                                                                                                                                                                                                                                                                                             |
+| RV13    | low     | patch  | Worker16minute fixture age is unnamed. Covered by the fixed stale-backlog timestamp in RV1; remove the redundant moving boundary.                                                                                                                                                                                                                                                                                                 |
+| RV14    | low     | patch  | Worker fairness case encodes sweep batch100 in several places. Name the bounded batch and derive count/index expectations.                                                                                                                                                                                                                                                                                                        |
+| RV15    | low     | patch  | Client schema emoji probes encode unnamed limits. Name and derive the local accepted UTF16 cap as in the parity suite.                                                                                                                                                                                                                                                                                                            |
+| RV16    | low     | patch  | Browser focus-contrast assertion uses unnamed WCAG threshold3. Name it locally with the criterion reference after the active browser run.                                                                                                                                                                                                                                                                                         |
+| RV17    | low     | patch  | HTTP status assertions mix supertest and Vitest styles. Use consistent Vitest response status assertions while keeping exact error bodies.                                                                                                                                                                                                                                                                                        |
+| RV18    | low     | patch  | Web live-region text assertions mix raw textContent and semantic text matchers. Standardize exact text matching.                                                                                                                                                                                                                                                                                                                  |
+| RV19    | low     | patch  | Native absence and disabled-state assertions mix DOM attribute access and semantic matchers. Use the existing semantic matcher style consistently.                                                                                                                                                                                                                                                                                |
+| P6      | medium  | patch  | Final real Android run with the software keyboard and273unit root clips the primary Send button beneath Gboard. Parent inspected /tmp/story64-postreview-android-current.png. Correct the existing native keyboard-avoidance layout using measured window geometry and verify root/reply keyboard controls on devices; iOS currently passes.                                                                                      |
+| P7      | medium  | defer  | CI Android shard6 fails before app flows: the baseline Expo Go installer asynchronously unlinks a redirect destination and immediately opens the same path for the next response. The unlink can remove that new file; stat then throws ENOENT. This pre-existing setup flake is being repaired under the standing instruction to fix observed CI failures, with a controlled cold-installer regression.                          |
+| P8      | medium  | patch  | Real CI burn-in proves the existing reaction journey selects two same-purpose Close this look controls after adding the comments surface. Preserve their consistent accessible labels; scope the existing test to the dialog header close control, assert dismissal, and rerun reaction E2E.                                                                                                                                      |
+| P9      | medium  | defer  | Real Android CI My Form navigation is intercepted by an invisible Expo Go developer-sheet backdrop. Existing relaunch recovery documents this exact state. Apply bounded transition recovery under the standing instruction to fix observed flakes; preserve destination and editor assertions.                                                                                                                                   |
+| P10     | medium  | defer  | A local Android predecessor capsule flow fails while Maestro keeps centering an already fully visible reorder control at the scroll boundary (step077, Visibility Percent1.0, no fatal/JS error). Remove the centering requirement only from that search, preserve visibility/tap/reorder/save assertions, and verify the capsule journey under the standing instruction to fix observed flakes.                                  |
+| P11     | medium  | patch  | Final-head Android run39310429421 shard5 fails the new comments journey before comment actions: tapping the community tab does not reach community-screen. Inspect actual failure artifacts and repair the entry transition with established bounded state-preserving recovery if the Expo Go overlay is confirmed; retain all comment assertions and verify the real device journey.                                             |
+| P12     | medium  | patch  | The local Medium phone reaches Community and selects Every climate, then its centered scroll search rejects the fully visible exact Look5 Comments button. Screenshot, enabled target bounds and Maestro's measured Visibility Percent1.0 confirm the same centering false failure seen in P10. Accept full visibility only for this search; retain the exact target, real tap and all subsequent assertions.                     |
+| CR1     | medium  | patch  | CodeRabbit4317569746: generation0 dispatch bypass ignores prior failed attempts, so a Redis outage retries every second. Restrict immediate first dispatch to attempts0 and retain30second backoff thereafter.                                                                                                                                                                                                                    |
+| CR2     | low     | patch  | CodeRabbit4317569800: changed comment report reason uses the post-specific message. Add a comment-specific contract constant and keep API/Pact consumer/provider expectations aligned. Both web/mobile error classifiers must also recognize the corrected comment message while preserving post mappings.                                                                                                                        |
+| CR3     | medium  | patch  | CodeRabbit4317569808: final-attempt markFailed rejection masks the original screening failure. Preserve the original cause while recording the secondary settlement failure safely.                                                                                                                                                                                                                                               |
+| CR4     | medium  | patch  | CodeRabbit4317569815: oldest-per-table truncation returns early Retry-After when historic reports exceed the cap. Select newest reports and expire the limit-th newest receipt across both tables.                                                                                                                                                                                                                                |
+| CR5     | medium  | patch  | CodeRabbit4317569834: independent sweep steps now hide aggregate failure from existing maintenance job/error observability. Run all steps, then reject with safe failed-step names; retain individual warnings.                                                                                                                                                                                                                   |
+| CR6     | high    | patch  | CodeRabbit4317569845: no-cursor append takes request ownership before returning and can invalidate an in-flight refresh. Return before registering a request. Add root/reply deferred-response regressions at the shared client boundary. Current UI guards also need verification.                                                                                                                                               |
+| CR7     | low     | patch  | CodeRabbit4317569858: six comment routes omit reachable500 responses from the shared contract. Add standard internal-error response metadata, regenerate owned artifacts, and validate contract parity.                                                                                                                                                                                                                           |
+| CR8     | low     | patch  | CodeRabbit review5576185696 nitpick: comment provider double pins duplicated refusal literals. Use shared constants, including distinct comment self-report/submission-limit constants, across runtime and Pact without changing accepted message text.                                                                                                                                                                           |
+| CR9     | low     | patch  | CodeRabbit4318342687: web Comments opens the dialog through handleOpenCard and also records community_card_opened, while native Comments records no card-open event. Reproduce through the browser, suppress the recording for commentsFocus, and retain ordinary card-open measurement.                                                                                                                                          |
+| CR10    | medium  | patch  | CodeRabbit4318342700: the runner imports @couture/testing before local entrypoint preparation can build its untracked dist. Verify the cold local path and add robust shared preparation where required. Its CI premise is already covered by workflow db:reset -> predb:reset -> prepare:shared-deps, which builds testing before Maestro.                                                                                       |
+
+Review provenance: the existing user-owned Claude Code session `couture-cast-cd` used `claude-opus-5-5`; its verified peer-origin reply arrived 2026-10-19T16:33:48.068Z. Full report: [archived Opus review](reviews/story-6-4-opus-implementation-review.md). Findings above are classified individually before grouping.
+
+Groups: immutable rejected intent (B1/E2/O-H1); read/mutation ownership (B2/E1/O-M5); private poll ordering (B3/O-LW2a); suppression reconciliation (B4/E3); erasure/delivery serialization (B5/E4); rollout authority (B6/O-B1); report acceptance (B8/O-LW5e/O-LM1); report focus (B9/O-M3 report subset); negative contracts (B10/O-M9b). Other surviving rows retain separate root causes. All patch rows use existing state, endpoints, rollout authority or fixture mechanisms.
+
+## Design Notes
+
+Assign publication order under the post lock and capture a cursor watermark to prevent delayed screening from inserting behind traversed pages.
+Keep owner-only submissions separate from public pagination.
+Create moderation intake inside the report transaction for queue-outage resilience.
+Apply the supporting design loaded through `context` for lifecycle, privacy, rates, and verification details.
+
+## Verification
+
+### Executed local evidence as of 2026-10-19
+
+- Complete `npm run typecheck` passed, including workspace, Playwright, Pact and k6 boundaries. Log: `/tmp/story64-typecheck-final.log`.
+- Full `npm run validate` exited 0: typecheck, lint/format, coverage and production builds. Log: `/tmp/story64-validate.log`. API 3331 passed/11 skipped, native 881 passed, web 786 passed, client 864 passed, config 23 passed, database 223 passed/1 skipped, testing 97 passed and utils 188 passed. Original coverage thresholds are unchanged.
+- The first full validation failure is preserved at `/tmp/story64-validate-coverage-blockers.log`. Added meaningful rendered root/reply/private paging and report reason/cancel/send journeys to clear the web/native function ratchets. Migration hygiene uses a freshly migrated disposable UUID-named database; shared developer databases were preserved.
+- Final API comment integration: 36 passed, 1 optional workload measurement skipped. Includes real guarded HTTP consent/read/report/delete, lone surrogate 400/emoji success, shared report Retry-After, durable analytics identity through secret rotation, real PostgreSQL/Redis worker, publication locks, Unicode parity, erasure and analytics recovery. Log: `/tmp/story64-comments-integration-final.log`.
+- Complete API suite passed twice after binding the RevenueCat HTTP fixture once for its suite lifetime. Original wrong-responder failures remain in `/tmp/story64-revenuecat-broad-failure.txt`, `/tmp/story64-verify-changed-revenuecat-cancellation.log` and `/tmp/story64-revenuecat-repro.log`; passing logs `/tmp/story64-api-full-bound-server.log` and `/tmp/story64-api-full-bound-server-repeat.log`. Final validation also passed the complete API suite.
+- Database RLS community suite: 11 passed, including direct anon/authenticated denial on every comment table. API-client coverage: 864 passed; 99.86% statements, 98.47% branches, 100% functions, 99.86% lines.
+- Rendered MSW comment journeys: web 8 passed and native 4 passed; deep-link draft recovery passed. Stale replies, old 404 ordering, unavailable-own deletion, unresolved retry identity, cancellation, NFC/IME counters, report selection/cancellation and pagination are covered.
+- Final Pact command exited 0, including generation, Optic lint, three deterministic consumer runs (123 mobile and 132 web interactions), and complete provider verification. Log: `/tmp/story64-pact-final.log`.
+- Fresh browser real-worker journey: 2 passed after modal viewport containment and dark-scheme text contrast fixes. Light/dark axe scans and desktop/narrow heading, Close and Send viewport assertions passed. Log: `/tmp/story64-browser-final.log`; screenshots in `playwright/artifacts/community-comments-Story-6-85070-covery-in-the-detail-dialog-chromium/`: `comments-tombstone-replies.png`, `comments-dark-viewport.png`, `comments-mobile-viewport.png`.
+- Pixel inspection reproduced transformed-ancestor clipping and dark text contrast 1.06:1. AccessibleModal now portals outside the transformed/inert page, retains SSR/focus restoration, and pairs the look detail panel with theme card foreground/background. Evidence: `/tmp/story64-modal-viewport-repro.log`, `/tmp/story64-browser-dark-repro.log`, `/tmp/story64-browser-dark-repro.png`. Latest complete web coverage after these changes: 789 passed, with focused lint/types green. Log: `/tmp/story64-web-modal-final-coverage.log`. Actual dark-scheme Tab reproduction measured keyboard outline contrast 1.08884:1. Theme panels now use the existing light-surface focus token. Reproduction: `/tmp/story64-browser-focus-repro.log` and PNG. Final real browser keyboard rerun passed with 17.34:1 outline contrast; final web production build passed. Logs: `/tmp/story64-browser-final.log`, `/tmp/story64-web-build-final.log`, `/tmp/story64-modal-typecheck.log`, `/tmp/story64-modal-focused-lint.log`.
+- iOS complete Maestro flow passed on iPhone 17/iOS 26.1. Verified draft reopen, private screening, published root/reply, primary Send above the software keyboard and independent readable controls. Log `/tmp/story64-maestro-ios.log`; JUnit `/tmp/story64-maestro-ios-report.xml`. Inspected screenshots: `maestro/artifacts/2026-10-19_110617/Screened community comments/takeScreenshot/maestro/artifacts/community-comments-reply-keyboard.png` and `community-comments-discussion.png`.
+- Android complete Maestro flow passed on Pixel 9 Pro XL, including draft reopen, publication, reply submission with Gboard open, and root/reply traversal. Log `/tmp/story64-maestro-android.log`; JUnit `/tmp/story64-maestro-android-report.xml`. Inspected screenshots: `maestro/artifacts/2026-10-19_111332/Screened community comments/takeScreenshot/maestro/artifacts/community-comments-reply-keyboard.png` and `community-comments-discussion.png`. Native and browser harnesses ran sequentially from fresh bootstraps.
+- Mixed workload measurement passed using the real pinned TensorFlow model, real Redis and PostgreSQL: one image then ten comments on concurrency 1; image 75ms processing, comments 8-15ms processing and 104-182ms end-to-end. Pending comment jobs used 312 Redis bytes each with 56-byte identifier-only payloads. Process peak RSS was 702.83 MiB including Vitest/model; CPU was 201.67ms user and 12.99ms system. No extra worker processes or queue connections were introduced. This developer-machine sample does not certify the 512 MiB hosted container envelope. Evidence: `apps/api/.cache/community-screening/comments-mixed-workload.json`.
+- `verify:changed` exited 0 before final focused audit fixes. Log `/tmp/story64-verify-changed.log`. Full validation and the scoped checks above cover later source changes.
+- Production community flags remain disabled. Previous screening readiness signature predates these inputs and does not certify this change.
+
+### Reusable local verification commands
+
+The current disposable database environment is in `/tmp/story64-review-verification-env.json` (mode 0600; only DATABASE_URL, RLS_TEST_DATABASE_URL and INTEGRATION_TEST_DATABASE_URL). `/tmp/story64-run-review-gate.cjs` applies that freshly migrated environment without printing it. Commands run from the repository root, sequentially:
+
+```sh
+node /tmp/story64-run-review-gate.cjs npm run validate
+npm run test:pact
+npm run test:pw-local -- playwright/tests/community-comments.spec.ts
+env MOBILE_E2E_PLATFORM=ios MOBILE_E2E_EXPO_NO_OPEN=1 node scripts/run-maestro.mjs maestro/community-comments.yaml --artifacts
+env PATH="/Users/murat/Library/Android/sdk/platform-tools:/Users/murat/Library/Android/sdk/emulator:$PATH" MOBILE_E2E_PLATFORM=android MOBILE_E2E_EXPO_NO_OPEN=1 node scripts/run-maestro.mjs maestro/community-comments.yaml --artifacts
+```
+
+### Delivery owned by the parent build workflow
+
+Complete own review, Claude Code Opus 5.5 peer review, then separate `bmad-tea` peer testing review/enhancements. Open concise PR, address CodeRabbit, and finish with green CI.
+
+### Review repair verification, 2026-10-19
+
+The initial full-gate and device evidence above predates peer-review repairs. Source remains
+in progress for parent verification and delivery. Only focused checks were run for this batch.
+
+- Rendered MSW red evidence: `/tmp/story64-review-rendered-red.log` (three failures),
+  `/tmp/story64-review-state-red.log` (six deferred-state failures),
+  `/tmp/story64-review-inert-red.log` and `/tmp/story64-review-screen-red.log`.
+  Before TEA enhancements, the repaired state suite passed 53 tests; rendered web comments/modal
+  passed 35 tests; native sheet/screen passed 79 tests. Logs:
+  `/tmp/story64-review-state-green.log`, `/tmp/story64-review-rendered-green.log`,
+  `/tmp/story64-review-native-green.log`. TEA owns subsequent test enhancements and final counts.
+- TEA lifecycle regressions were reproduced and fixed in source. Armed polls cancel on account
+  change/reset/eviction, and the same watch resumes for current-session pending work.
+  Combined targeted run: five passed. Logs `/tmp/story64-review-poll-lifecycle-red.log` and
+  `/tmp/story64-review-poll-lifecycle-session-green.log`.
+- Real PostgreSQL erasure-before-delivery reproduction captured a leased erased event:
+  `/tmp/story64-review-analytics-erasure-red.log`. Live subject/lease ownership repair passed
+  both race orderings and real acknowledged fail/retry telemetry: three passed,
+  `/tmp/story64-review-analytics-green.log`. Persisted event properties are snake_case,
+  content-free and deduplicated; a delivered receipt requires sink acknowledgement.
+- Main comments integration: 36 passed, one resource-measurement skip. Real Redis worker:
+  four passed, covering frozen work beyond retries/stale age, once-only unfreeze publication,
+  real engine exhaustion with one intake/audit, generation rearm ownership, and bounded stale
+  backlog progress. Logs `/tmp/story64-review-comments-api.log` and
+  `/tmp/story64-review-worker.log`. These files are released to TEA for test enhancements.
+- Actual pinned text engine corpus, unchanged policy: `Beautiful layers.` passes; `damn` and
+  `fuck` route to review; `kill yourself` blocks. `/tmp/story64-review-corpus.log`.
+- Shared IPv4 lifetime listener fixture is used by all integration HTTP request suites.
+  Focused edited suites: ten files, 65 passed/two existing skips, then five files, 81 passed.
+  Logs `/tmp/story64-review-http-fixtures.log`, `/tmp/story64-review-http-remaining.log`.
+  Guard/status/body assertions remain strict.
+- Safe outbox warnings and returned runtime sweep wiring: 12 passed,
+  `/tmp/story64-review-sweep-logging.log`. Telemetry/runtime/PostHog focused checks previously
+  passed 96 tests: `/tmp/story64-review-runtime-telemetry.log`.
+- Cleanup reproduction and repair: `/tmp/story64-review-cleanup-red.log`,
+  `/tmp/story64-review-cleanup-green.log` (two passed). Retained synthetic roots lose body,
+  author and screening attribution; other members' replies remain. Cold standalone mobile
+  preparation builds all shared dependencies in an owned temporary copy without removing
+  local outputs: `/tmp/story64-review-cold-mobile.log`.
+- Focused comment Pact consumers: 38 interactions passed, including deterministic refusals and
+  scoped public/reply/private pagination for both consumers. Provider verified both generated
+  comment pacts. Logs `/tmp/story64-review-pact-consumer.log`,
+  `/tmp/story64-review-pact-provider-green.log`. Local pacts currently contain the focused
+  interactions; parent full consumer verification regenerates complete consumer files.
+- Fresh custom-invariant database: migrated and seeded without changing shared or prior owned
+  databases. Env `/tmp/story64-review-verification-env.json` (0600) contains only database URLs;
+  wrapper `/tmp/story64-run-review-gate.cjs` applies it without printing credentials.
+  Provision log `/tmp/story64-review-fresh-db.log`. Focused DB schema/RLS: 39 passed, one
+  storage-schema skip, `/tmp/story64-review-db.log`.
+- Pact/client/testing typechecks and production/backend/Pact/cleanup/runner lint passed.
+  API typecheck currently reports only an untyped fake in the released worker test;
+  TEA owns that correction. Logs `/tmp/story64-review-{api,pact,client,testing}-types.log`,
+  `/tmp/story64-review-final-lint.log`, `/tmp/story64-review-lint-corrections.log`.
+- Maestro now selects Reply/Replies using stable IDs plus the submitted root's current visible
+  text, and asserts real private status. Its post-review device run awaits the parent-granted
+  sequential harness window. Browser/device evidence above remains the earlier baseline.
+
+No commits or pushes were made. Parent owns complete validation, browser/native final sequencing,
+peer acceptance, PR and CI. The frozen approved intent and all thresholds remain unchanged.
+
+### Test architect backend enhancements, 2026-10-19
+
+The separate Claude Code Opus 5.5 TEA peer returned its real backend execution window.
+Ten comment integration files passed 85 tests, with one documented opt-in resource measurement
+skipped. Community RLS passed 11 tests, and the five worker cases passed three additional runs.
+The original large integration file was split into concern files sharing the isolated database
+harness. Added exact quota boundaries, changed-payload replay conflicts and concurrent receipts,
+consent/erasure paths, publication snapshots, locked freshness and actual producer dispatch cases.
+The test architect's final review and complete parent gates remain pending.
+
+T4 report ownership was reproduced red and repaired on both rendered surfaces. Both named tests
+pass, along with source lint and web/native types. Logs `/tmp/story64-t4-{web,native}-{red,green}.log`
+and `/tmp/story64-t4-{lint,web-types,native-types}.log`. Broader TEA reruns follow the source repair.
+
+### Parent post-review verification, 2026-10-19
+
+- Full workspace and boundary typechecks and all ESLint checks passed. The validation command then
+  stopped on formatting in four TEA artifacts; the peer owns their final formatter pass.
+  `/tmp/story64-postreview-validate.log`.
+- Complete coverage passed API 3383/11 documented skips, web 802, client 933, config 23,
+  database 223/one storage-schema skip, testing 97 and utils 188. The new delayed-success native
+  focus regression failed in this run, then the same implementation agent repaired the source.
+  `/tmp/story64-postreview-coverage-build.log`.
+- Mobile full coverage after the focus repair passed 895 tests with original thresholds.
+  `/tmp/story64-postreview-mobile-coverage.log`. The three focused close-focus cases passed,
+  alongside source lint and mobile types. The original invoking node is used while live;
+  replacing it with the same highlighted post restores focus to its current Comments control.
+- Production package, API and web builds passed. `/tmp/story64-postreview-build.log`.
+- Recovery tests after TEA's clock-domain correction passed all three cases.
+  `/tmp/story64-postreview-recovery-final.log`. Date-only pinned stale checks remain deterministic;
+  the analytics lease/backoff test uses the live clock shared with PostgreSQL.
+- Maestro uses a unique 273-unit root and unique reply for each run, with anchored contextual
+  selectors. Fresh device execution will exercise the long reply context with the keyboard open.
+
+- Full post-review Pact passed: three deterministic complete consumer runs, valid OpenAPI and
+  provider verification of both consumer files. `/tmp/story64-postreview-pact.log`.
+- Real browser post-review suite passed all eight journeys in 46 seconds. This includes the real
+  worker's private dispositions, immutable create retry, durable report/retry/focus and routing,
+  guardian revocation with neutral suppression, root/reply tombstones, and light/dark/phone
+  accessibility. `/tmp/story64-postreview-browser.log`. Parent visually inspected fresh
+  `comments-light-viewport.png`, `comments-dark-viewport.png` and `comments-mobile-viewport.png`
+  in the current Playwright artifact directory. Controls, text and primary action are visible.
+- The separate TEA review identified additional test-maintenance corrections after its first
+  final rescore. RV1-RV19 record each finding independently; the peer is applying test-only
+  fixture/clock/assertion corrections and focused-case splits before its updated verdict.
+
+### Final local acceptance, 2026-10-19
+
+- Own audit, three independent BMad review layers and the actual Claude Code Opus 5.5
+  implementation review are complete. Every finding is individually triaged above.
+  The raw Opus report is archived under `reviews/` with its repair follow-up.
+- A separate actual Claude Opus 5.5 `bmad-tea` peer reviewed and expanded tests. At the user's
+  request, a Codex TEA continuation conserved Claude allowance and completed the remaining
+  test-maintenance repairs. Current RV is 100/100, Approve, with zero remaining findings.
+  Historical review and verified peer handoff are retained with current provenance.
+- Final scoped test-architect checks passed client107, web20, native14 and real backend85,
+  with one documented opt-in measurement skip. API types, lint and formatting pass.
+  Full mobile coverage after the final Android keyboard repair passed897tests across81files;
+  original coverage thresholds remain unchanged.
+- Final iOS Maestro passed1/1 in2m44s with273unitroot and long reply context.
+  `/tmp/story64-postreview-maestro-ios-final.log` and its JUnit report.
+- Final Android Maestro passed1/1 in2m28s after a real screenshot reproduced Gboard clipping
+  the primary Send action. The existing keyboard-avoidance offset now uses native Android
+  status-bar height; iOS retains its previous geometry. Scoped sheet tests, types and lint pass.
+  `/tmp/story64-postreview-maestro-android-p6.log` and its JUnit report.
+- Parent visually inspected fresh iOS125148 and Android130157 root/reply keyboard and
+  discussion screenshots. Full primary action, heading, close, reply context/cancel, input
+  and counter are readable above the keyboards. Automated visibility/submission alone did
+  not establish full pixel visibility; the pre-fix Android flow passed while clipped.
+- All real harnesses ran sequentially and are stopped. The temporary Claude relay is stopped;
+  both work peers remain open with context. Production community flags remain disabled.
+- PR154 is open at the user's explicit request. CodeRabbit and green final-head CI remain
+  parent-owned delivery requirements; this local workflow completion does not certify them.
+
+### CI hardening after the first PR run, 2026-10-19
+
+- P7: Real Android shard6 failed before app tests when asynchronous redirect cleanup deleted the
+  next Expo Go APK stream. The same installer CLI reproduced the exact ENOENT through controlled
+  HTTP redirects, streams, isolated cache and a synthetic ADB process. The downloader now opens
+  a file only for the final HTTP200 and uses Node's stream pipeline for completion and error
+  ownership; failed partial files are removed. Five regression cases pass, including cache reuse,
+  selected device, HTTP refusal, interrupted transfer, write error and bounded redirects.
+  Logs `/tmp/story64-installer-red.log`, `/tmp/story64-installer-green.log`.
+- The new installer regression uses the existing Playwright helper runner, so CI executes it during
+  preparation. Parent ran the complete helper command: six files, 50 tests passed.
+  `/tmp/story64-p7-parent-helper-unit.log`. Source/helper lint, syntax and Playwright types pass.
+- P8: Real browser burn-in and a local red run reproduced the existing reaction test's ambiguous
+  Close query. Both same-purpose UI controls retain consistent accessible labels. The test now
+  selects the dialog header's explicitly labelled control and asserts dismissal at all three
+  close points. The complete reaction browser suite passed six tests in42.3seconds; types and
+  lint pass. `/tmp/story64-ci-reactions-selector-{red,green}.log`.
+- Own source/diff audit and the Codex test architect's bounded follow-up found no further issue.
+  These local repairs still require a new green remote CI run. CodeRabbit's review service is
+  reporting a partial outage, and its requested PR review has not returned.
+
+### CodeRabbit backend repair and native follow-up, 2026-10-19
+
+- CodeRabbit refused the complete PR because its eligible file count exceeded the100file limit.
+  Temporary review PR155 covers backend/shared code; PR156 covers web/mobile. Their combined
+  diffs preserve complete review coverage. PR154 remains the delivery PR.
+- Actual backend review5576185696 returned seven inline findings and one constants cleanup.
+  [Archived review](reviews/story-6-4-coderabbit-backend-review.md). Parent verified and triaged
+  CR1–CR8 individually above. The same implementation agent applied the source/Pact corrections;
+  the Codex test architect owned regressions and the independent test-quality follow-up.
+- All new defects reproduced before patching: four deferred client races, six500metadata cases,
+  worker/sweep rejection behavior, five guarded HTTP/PostgreSQL/outbox cases, and two transport
+  classifiers on each platform. Focused green results: client123, API units16, web41, native93,
+  guarded HTTP/recovery23. Comment consumer Pact38 and filtered provider verification1 also pass.
+  Logs `/tmp/story64-cr-tea-*-{red,green}.log` and `/tmp/story64-cr-pact-{consumer,provider}.log`.
+- Contracts were regenerated through `npm run generate:api-client`. The SDK has no resulting
+  delta; the OpenAPI repair adds standard500responses to the six new comment operations. Parent
+  independently compared the complete generated document to the canonical baseline: five added
+  paths, six added schemas, zero changed or removed existing paths/schemas.
+  `/tmp/story64-cr-openapi-baseline-audit.json`. Edited source/Pact lint and all five affected
+  TypeScript boundaries pass. Frozen intent retains its approved SHA256.
+- P9: actual Android CI artifacts prove an invisible developer-sheet backdrop swallowed the
+  Silhouette tap. The clean local baseline passed. The patched sequence passed localization and
+  My Form1m51s, while its preceding capsule exposed P10. An owned temporary probe then injected
+  only the first navigation failure and proved actual state-preserving relaunch, destination,
+  loaded editor, My Form ready and removal;2m33s pass. This is injected recovery evidence and
+  does not claim the original overlay reproduced spontaneously locally. Parent inspected the
+  clear final screenshot. `/tmp/story64-ci3-probe-capsule-green.log` and
+  `/tmp/story64-ci3-recovery-trace-proof.log`.
+- P10: the capsule trace reported a fully visible reorder control while centering kept scrolling
+  at the boundary. Only that search now accepts full visibility. Checkbox centering and all
+  later tap/save/reopen/cleanup checks remain. The final capsule journey passed3m33s.
+  `/tmp/story64-p10-capsule-report.xml`. The earlier mixed sequence failure remains in the ledger.
+- Remote verification of commit191b5941 passed the complete quality/coverage/accessibility gate,
+  full browser suite and168burn-in tests, contracts, previews, watchOS, k6 and secret scans. Six
+  Android shards passed. One corrupt SDK download cleared on a fresh runner; the remaining
+  My Form failure is addressed locally above. The repair commit still needs its own full CI run.
+  CodeRabbit's web/mobile review is waiting for the included hourly allowance around19:38UTC.
+- Remote verification of commit22b9bcdb completed with28passing checks. The full quality gate
+  passed, including98.2%changed-line coverage (961/979lines;80%threshold), both browser shards
+  and burn-in, contracts, previews and all six other Android shards. The prior My Form and
+  capsule repairs passed remotely. Android shard5 failed the comments journey's Community
+  entry before any comment action; the aggregate gate reflects that failure. P11 is being
+  validated locally before the remaining frontend review and a new full CI run.
+- P11: the CI screenshot and command trace show a gray backdrop over Home after a completed
+  Community tap. The hidden Expo Go sheet mechanism remains inferred. Community entry now
+  retries the tap and required15second destination assertion together; only retries relaunch
+  through the established state-preserving helper, with maxRetries2. Comment composition and
+  reply assertions remain unchanged. A temporary probe omitted only the first tap, observed the
+  required destination failure, performed actual clearState:false/stopApp:true relaunch, and
+  passed the second real tab tap plus destination/filter checks in3m34s. Parent and test
+  architect independently inspected its clear recovered screenshot. This proves entry recovery.
+  `/tmp/story64-p11-entry-trace-proof.log` and `/tmp/story64-p11-entry-probe-report.xml`.
+- Both local Pixel full-flow attempts reached Community, then failed during the unchanged
+  273unit input with a120second Maestro device-server timeout. The original CI backdrop did
+  not recur locally. These failures remain separate from the passing injected entry probe;
+  the Medium phone reached Community and Every climate, then exposed P12 before typing.
+  Complete final-head remote verification remains required.
+- P12: the Medium phone screenshot and hierarchy show the exact enabled Comments button fully
+  on screen at[563,893][814,1008]. Maestro's actual log measured Visibility Percent1.0 at
+  14:55:49.192, separately from the configured100%visibility requirement. Its centering search
+  continued for25seconds and rejected that visible control. Only the first Comments-action
+  search now uses centerElement:false. Exact target,15second search, real tap and every later
+  comment command remain unchanged. `/tmp/story64-p11-medium-comments.log` and
+  `/tmp/story64-p11-medium-report.xml` preserve the failed full attempt.
+- The final short Medium device proof passed1/1in1m1s: actual final Community helper, filter,
+  exact Comments search/tap, required open-sheet assertion, real close and Community return.
+  Parent inspected the readable sheet screenshot. This verifies the changed entry/search
+  prefix; it omits the unchanged typing remainder. Full final-head CI remains required.
+  `/tmp/story64-p11-visible-action-green.log` and
+  `/tmp/story64-p11-visible-action-report.xml`. Parent and test architect reviewed the final
+  two-file test change independently; no product or timeout changes were introduced.
+
+### CodeRabbit frontend repair, 2026-10-19
+
+- Actual frontend review5577131745 completed at20:10:55UTC, selecting all46eligible files and
+  retaining the four existing evidence-document exclusions. The reviewed tree exactly matched
+  delivery commit a397ae49. [Archived review](reviews/story-6-4-coderabbit-frontend-review.md).
+  Parent verified and triaged CR9 and CR10 separately; the same implementation agent owns the
+  source changes and the Codex test architect owns regressions and test-quality follow-up.
+- CR9 reproduced in a real browser before patching: Comments opened/focused and both thread
+  reads returned200, while an unwanted card-open request also returned200 with the feed arm.
+  The handler now retains dialog/focus setup and skips measurement for commentsFocus. The new
+  regression observes actual requests, verifies zero on comment opening/reopening and exactly
+  one successful measurement on regular look opening. Full comments plus reactions:15/15pass
+  in43.3s. `/tmp/story64-cr9-browser-{red,green}.log`.
+- CR10 reproduced with the actual runner CLI in an isolated cold package skeleton: importing
+  the missing testing dist failed before the fixture lifecycle. CI already builds that package
+  through its database-reset prehook. Local startup now unconditionally invokes that existing
+  shared preparation once before Prisma/testing imports, covering cold dependencies and stale
+  exports. The single runner child owns all device workers, so internal shards do not race the
+  build. Durable CLI regressions cover cold outputs, stale outputs and failure before imports;
+  all3pass. Full helper suite:7files,53tests pass. No real shared outputs were removed for the
+  cold reproduction. `/tmp/story64-cr10-cold-{red,green}.log`.
+- Source lint, web typecheck, Playwright typecheck/test lint, runner syntax and formatting pass.
+  Parent independently reviewed both production changes and both regression tests. A new
+  final-head CI run remains required after pushing this repair batch.

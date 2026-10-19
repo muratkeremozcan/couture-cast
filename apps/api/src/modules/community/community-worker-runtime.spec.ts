@@ -42,6 +42,8 @@ const harness = vi.hoisted(() => {
     queueClose: vi.fn().mockResolvedValue(undefined),
     screenerEnsureReady: vi.fn(),
     screenerClose: vi.fn(),
+    commentDispatch: vi.fn().mockResolvedValue(undefined),
+    commentStale: vi.fn().mockResolvedValue(undefined),
     dispatchPending: vi.fn().mockResolvedValue({ dispatched: 1, failed: 0 }),
     sweepStalePendingReview: vi.fn().mockResolvedValue({ stalled: 0 }),
     sweepExpiredUploads: vi
@@ -55,6 +57,13 @@ const harness = vi.hoisted(() => {
     }),
   }
 })
+
+vi.mock('./community-comments.outbox.js', () => ({
+  CommunityCommentsOutbox: class {
+    dispatchPending = harness.commentDispatch
+    sweepStale = harness.commentStale
+  },
+}))
 
 vi.mock('../../workers/base.worker.js', () => ({
   createWorker: (...args: unknown[]) => {
@@ -101,7 +110,10 @@ vi.mock('./community-maintenance.service.js', () => ({
   },
 }))
 
-import { createCommunityWorkerRuntime } from './community-worker-runtime'
+import {
+  createCommunityWorkerRuntime,
+  runCommunitySweepSteps,
+} from './community-worker-runtime'
 import {
   COMMUNITY_NSFW_SCREENER_ENV,
   COMMUNITY_NSFW_SCREENER_FIXTURE,
@@ -113,6 +125,47 @@ import {
  * like it exercises screening while running different wiring from production.
  * This asserts the one composition both call.
  */
+describe('runCommunitySweepSteps', () => {
+  it('runs every independent step before rejecting with safe failed-step names', async () => {
+    const names = [
+      'post_dispatch',
+      'reaction_dispatch',
+      'comment_dispatch',
+      'post_stale',
+      'comment_stale',
+    ] as const
+    const failed = ['post_dispatch', 'comment_dispatch', 'post_stale']
+    const order: string[] = []
+    const warn = vi.fn()
+    const result = await runCommunitySweepSteps(
+      names.map((name) => ({
+        name,
+        run: () => {
+          order.push(name)
+          return failed.includes(name)
+            ? Promise.reject(new Error('private member content and confidential SQL'))
+            : Promise.resolve()
+        },
+      })),
+      { warn }
+    ).catch((error: unknown) => error)
+
+    expect(result).toBeInstanceOf(Error)
+    expect(result).toMatchObject({
+      message:
+        'Community sweep steps failed: post_dispatch, comment_dispatch, post_stale',
+    })
+    expect(order).toEqual(names)
+    expect(warn.mock.calls).toEqual(
+      failed.map((step) => [
+        { event: 'community_sweep_step_failed', step, reason: 'sweep_failed' },
+        'Community sweep step deferred',
+      ])
+    )
+    expect(JSON.stringify(warn.mock.calls)).not.toMatch(/private|member|confidential|SQL/)
+  })
+})
+
 describe('createCommunityWorkerRuntime', () => {
   const claim = vi.fn().mockResolvedValue([])
   const settle = vi.fn().mockResolvedValue({ count: 1 })
@@ -135,6 +188,10 @@ describe('createCommunityWorkerRuntime', () => {
   })
 
   beforeEach(() => {
+    harness.commentDispatch.mockReset().mockResolvedValue(undefined)
+    harness.commentStale.mockReset().mockResolvedValue(undefined)
+    harness.dispatchPending.mockReset().mockResolvedValue({ dispatched: 1, failed: 0 })
+    harness.sweepStalePendingReview.mockReset().mockResolvedValue({ stalled: 0 })
     claim.mockReset().mockResolvedValue([])
     settle.mockClear()
     captureReactionEvent.mockClear()
@@ -228,6 +285,49 @@ describe('createCommunityWorkerRuntime', () => {
     // No selector was read, so there is no honest readiness payload to report.
     expect(runtime.readiness).toBeUndefined()
     expect(harness.screenerEnsureReady).not.toHaveBeenCalled()
+  })
+
+  it('keeps existing dispatch and stale work progressing when each comment sweep fails', async () => {
+    const order: string[] = []
+    harness.dispatchPending.mockImplementation(() => {
+      order.push('post')
+      return Promise.resolve({ dispatched: 1, failed: 0 })
+    })
+    harness.commentDispatch.mockImplementation(() => {
+      order.push('comment')
+      return Promise.reject(new Error('synthetic raw member and body must not be logged'))
+    })
+    harness.commentStale.mockRejectedValue(new Error('synthetic comment stale failure'))
+    const runtime = await createCommunityWorkerRuntime({
+      prisma,
+      telemetryService,
+      meter: meter(),
+    })
+    claim.mockImplementationOnce(() => {
+      order.push('reaction')
+      return Promise.resolve([])
+    })
+    try {
+      await expect(runtime.sweeps.dispatchPending()).rejects.toThrow(
+        'Community sweep steps failed: comment_dispatch'
+      )
+      expect(order).toEqual(['post', 'reaction', 'comment'])
+      await expect(runtime.sweeps.sweepStalePendingReview()).rejects.toThrow(
+        'Community sweep steps failed: comment_stale'
+      )
+      expect(harness.sweepStalePendingReview).toHaveBeenCalledOnce()
+      expect(harness.commentStale).toHaveBeenCalledOnce()
+      await expect(runtime.sweeps.dispatchPending()).rejects.toThrow(
+        'Community sweep steps failed: comment_dispatch'
+      )
+      await expect(runtime.sweeps.sweepStalePendingReview()).rejects.toThrow(
+        'Community sweep steps failed: comment_stale'
+      )
+      expect(harness.dispatchPending).toHaveBeenCalledTimes(2)
+      expect(harness.sweepStalePendingReview).toHaveBeenCalledTimes(2)
+    } finally {
+      await runtime.close()
+    }
   })
 
   it('exposes exactly the four sweeps both process groups drive', async () => {

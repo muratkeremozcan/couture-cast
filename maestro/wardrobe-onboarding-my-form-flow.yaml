@@ -39,17 +39,29 @@ tags:
       id: 'tab-wardrobe'
     timeout: 60000
 
-- runFlow:
-    file: subflows/open-wardrobe.yaml
-    label: 'Open the Wardrobe tab'
-
-- tapOn:
-    id: 'wardrobe-silhouette-link'
-
-- extendedWaitUntil:
-    visible:
-      id: 'wardrobe-silhouette-screen'
-    timeout: 15000
+# CI39302588027 left Expo Go's invisible developer-sheet backdrop over the
+# Wardrobe hub. The link remained discoverable while its tap was swallowed.
+# Reuse the tab helpers' bounded relaunch recovery only for this transition;
+# the destination and loaded-editor assertions still prove actual navigation.
+- evalScript: ${output.silhouetteNavigationAttempt = 0}
+- retry:
+    maxRetries: 2
+    commands:
+      - evalScript: ${output.silhouetteNavigationAttempt = output.silhouetteNavigationAttempt + 1}
+      - runFlow:
+          when:
+            true: ${output.silhouetteNavigationAttempt > 1}
+          file: subflows/relaunch-app.yaml
+          label: 'A silhouette tap was swallowed; relaunch before navigating again'
+      - runFlow:
+          file: subflows/open-wardrobe.yaml
+          label: 'Open the Wardrobe tab'
+      - tapOn:
+          id: 'wardrobe-silhouette-link'
+      - extendedWaitUntil:
+          visible:
+            id: 'wardrobe-silhouette-screen'
+          timeout: 15000
 
 # Wait rather than assert. `silhouette-editor` now names the ready state only
 # (its loading and error states carry their own ids), so this is a real

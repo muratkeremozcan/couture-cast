@@ -1,4 +1,6 @@
 import {
+  communityCommentEventNameSchema,
+  communityCommentEventPropertiesSchema,
   communityReactionEventNameSchema,
   trackCommunityReaction,
   communityReactionEventPropertiesSchema,
@@ -1028,6 +1030,52 @@ export class TelemetryService {
   }
 
   /** Durable outbox delivery propagates outages to the retry owner. */
+  async captureCommentEvent(
+    id: string,
+    actor: string,
+    eventType: string,
+    properties: unknown,
+    occurredAt: Date,
+    ownership?: { transaction: Prisma.TransactionClient; signal: AbortSignal }
+  ): Promise<void> {
+    ownership?.signal.throwIfAborted()
+    const event = communityCommentEventNameSchema.parse(eventType)
+    const parsed = communityCommentEventPropertiesSchema.parse(properties)
+    const payload = {
+      platform: parsed.platform,
+      is_self: parsed.isSelf,
+      is_reply: parsed.isReply,
+      $insert_id: id,
+      dedupe_key: id,
+      $ip: null,
+    }
+    await (ownership?.transaction ?? this.prisma).telemetryEvent.upsert({
+      where: { id },
+      update: {},
+      create: {
+        id,
+        created_at: occurredAt,
+        user_id: null,
+        event_type: event,
+        properties: payload,
+      },
+    })
+    if (!this.analyticsClient.captureAcknowledged)
+      throw new Error('Acknowledged analytics transport unavailable')
+    ownership?.signal.throwIfAborted()
+    const capture = {
+      distinctId: actor,
+      event,
+      timestamp: occurredAt.toISOString(),
+      properties: payload,
+    }
+    if (ownership)
+      await this.analyticsClient.captureAcknowledged(capture, {
+        signal: ownership.signal,
+      })
+    else await this.analyticsClient.captureAcknowledged(capture)
+  }
+
   async captureReactionEvent(
     id: string,
     userId: string,

@@ -33,7 +33,20 @@ import { runMobileE2EFlow } from './lib/mobile-e2e-flow-retry.mjs'
 const scriptDir = path.dirname(fileURLToPath(import.meta.url))
 const projectRoot = path.resolve(scriptDir, '..')
 const require = createRequire(import.meta.url)
+// Local CLI entrypoints reach these imports before API/Expo build hooks. The
+// shard launcher uses one runner for every device, so prepare shared outputs once.
+const sharedPreparation = spawnSync(
+  'npm',
+  ['run', 'prepare:shared-deps', '--workspace', 'packages/db'],
+  { cwd: projectRoot, stdio: 'inherit' }
+)
+if (sharedPreparation.error || sharedPreparation.status !== 0) {
+  throw new Error('Mobile E2E shared dependency preparation failed.', {
+    cause: sharedPreparation.error,
+  })
+}
 const { PrismaClient } = require('@prisma/client')
+const { cleanupCommunityCommentFixtures } = require('@couture/testing')
 const mobilePackageJson = JSON.parse(
   fs.readFileSync(path.join(projectRoot, 'apps/mobile/package.json'), 'utf8')
 )
@@ -1559,6 +1572,23 @@ const cleanupMobileE2EIdentity = async (apiBaseUrl, identity) => {
       })
       const postIds = posts.map((post) => post.id)
 
+      const comments = await tx.communityComment.findMany({
+        where: { user_id: identity.userId },
+        select: { id: true },
+      })
+      await cleanupCommunityCommentFixtures(
+        tx,
+        comments.map((row) => row.id)
+      )
+      // Replica-mode identity cleanup bypasses FK cascades; remove owned comment identities first.
+      await tx.communityCommentAnalyticsSubject.deleteMany({
+        where: { user_id: identity.userId },
+      })
+      await tx.communityCommentReceipt.deleteMany({ where: { user_id: identity.userId } })
+      await tx.communityCommentReport.updateMany({
+        where: { reporter_id: identity.userId },
+        data: { reporter_id: null },
+      })
       await tx.moderationEvent.deleteMany({
         where: {
           OR: [

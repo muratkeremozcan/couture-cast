@@ -1406,3 +1406,40 @@ file's own Code Review Findings section.
 - source_spec: `_bmad-output/implementation-artifacts/6-2b-community-screening-release-gate.md`
   summary: Correct the crash-recovery ceiling stated in `community-moderation.worker.ts` (423 s) so it counts every bounded processing stage (download 20 s, normalization/upload 30 s, screening 30 s) plus database and queue assumptions.
   evidence: Final Codex review of PR #151 (2026-10-17) traced the stage timeouts; the comment counts only one 30-second stage. Documentation only; deferred because the file is in the screening input set and editing it forces a full evidence re-measurement.
+
+- source_spec: `_bmad-output/implementation-artifacts/spec-6-4-threaded-comments.md`
+  summary: AccessibleModal background interaction is not disabled on lookbook pages lacking data-app-shell.
+  evidence: Pre-existing app-shell lookup has no matching element; the user authorized fixing observed accessibility defects during Story 6.4 delivery. Handle alongside modal focus verification.
+- source_spec: `_bmad-output/implementation-artifacts/spec-6-4-threaded-comments.md`
+  summary: Resolved the previously recorded AccessibleModal background interaction defect during Story 6.4.
+  evidence: Background body siblings now receive inert and aria-hidden while the portal stays interactive; cleanup restores previous values. Rendered regression and final real browser light/dark/phone accessibility checks pass.
+- source_spec: `_bmad-output/implementation-artifacts/spec-6-4-threaded-comments.md`
+  summary: The existing Expo Go downloader can unlink its redirected APK while that response is downloading.
+  evidence: PR154 Android shard6 job118222307555 failed with ENOENT in install-expo-go.mjs:78 before app tests. Its redirect handler starts fs.unlink and recursively opens the same destination before unlink completes. The standing CI-flake instruction authorizes repairing this setup defect during delivery.
+- source_spec: `_bmad-output/implementation-artifacts/spec-6-4-threaded-comments.md`
+  summary: Locally resolved the previously recorded Expo Go redirect cleanup race during PR154 hardening.
+  evidence: The real installer CLI reproduces ENOENT before repair. Final-response-only file creation and stream pipeline cleanup pass five deterministic regression cases; all50Playwright helper tests pass. Remote CI verification follows the repair push.
+- source_spec: `_bmad-output/implementation-artifacts/spec-6-4-threaded-comments.md`
+  summary: The existing My Form Maestro transition can be intercepted by an invisible Expo Go developer-sheet backdrop.
+  evidence: PR154 run39302588027 shard3 retained a discoverable Silhouette control under a gray scrim; its tap produced no navigation. The existing relaunch helper documents the same state. Repair follows the standing instruction to fix observed test flakes.
+- source_spec: `_bmad-output/implementation-artifacts/spec-6-4-threaded-comments.md`
+  summary: Locally resolved the recorded My Form navigation flake with bounded state-preserving recovery.
+  evidence: The transition reuses the existing relaunch helper on retries and retains destination/editor/ready/removal checks. Normal My Form passed1m51s; an injected first navigation failure exercised actual relaunch and passed2m33s. The original CI overlay did not recur spontaneously in the clean local baseline. Final remote CI follows the repair push.
+- source_spec: `_bmad-output/implementation-artifacts/spec-6-4-threaded-comments.md`
+  summary: The existing capsule Maestro reorder search can keep centering a fully visible control at a scroll boundary.
+  evidence: Local Android trace2026-10-19_135711 step077 reports Visibility Percent1.0 while centerElement:true keeps scrolling until timeout. The My Form patch had not executed. Repair follows the standing instruction to fix observed test flakes.
+- source_spec: `_bmad-output/implementation-artifacts/spec-6-4-threaded-comments.md`
+  summary: Locally resolved the recorded capsule reorder-search flake by accepting full visibility.
+  evidence: Only the reorder search uses centerElement:false. Checkbox centering, tap/save/reopen and cleanup checks remain. The final real capsule journey passed3m33s. Final remote CI follows the repair push.
+- source_spec: `_bmad-output/implementation-artifacts/spec-6-4-threaded-comments.md`
+  summary: The comments Maestro journey can remain on Home after a completed Community tab tap under a gray Expo Go backdrop.
+  evidence: PR154 run39310429421 shard5 failed its required community-screen assertion before comment actions. The precise hidden-sheet mechanism is inferred from the screenshot and matching prior incidents. Repair follows the standing instruction to fix observed test flakes.
+- source_spec: `_bmad-output/implementation-artifacts/spec-6-4-threaded-comments.md`
+  summary: Locally verified bounded Community-entry recovery while retaining every downstream comments command.
+  evidence: Each attempt requires the real tab tap and15second destination assertion; retries reuse state-preserving relaunch with maxRetries2. A temporary first-tap omission exercised failed destination, actual relaunch and successful second tap/destination/filter checks in3m34s. Two Pixel full-flow attempts reached Community, then hit separate120second device-server timeouts during unchanged273unit input. Full-flow verification remains pending.
+- source_spec: `_bmad-output/implementation-artifacts/spec-6-4-threaded-comments.md`
+  summary: The comments Maestro search can reject the exact fully visible Comments button while trying to center it.
+  evidence: The Medium phone full attempt reached Community and Every climate; its screenshot and enabled target bounds show the button fully visible, and Maestro measured Visibility Percent1.0 at14:55:49.192 before the centered search failed. Only this first Comments-action search now accepts full visibility with centerElement:false; exact target, timeout, tap and all later assertions remain.
+- source_spec: `_bmad-output/implementation-artifacts/spec-6-4-threaded-comments.md`
+  summary: Locally verified the final Community-entry and Comments-action prefix on the Medium phone.
+  evidence: A short actual-prefix probe passed1/1in1m1s with the final helper, filter selection, exact Comments search/tap, required sheet-open assertion, real close and Community return. Its readable sheet screenshot was independently inspected. The probe omits unchanged typing; the full new-head remote comments journey remains required.

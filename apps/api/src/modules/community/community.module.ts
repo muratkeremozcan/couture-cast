@@ -1,3 +1,6 @@
+import { CommunityCommentsController } from './community-comments.controller.js'
+import { CommunityCommentsRepository } from './community-comments.repository.js'
+import { CommunityCommentsService } from './community-comments.service.js'
 import { CommunityReactionOutboxDispatcher } from './community-reaction.outbox.js'
 import { Module, type NestModule, type MiddlewareConsumer } from '@nestjs/common'
 import { CommunityCacheHeadersMiddleware } from './community-cache-headers.middleware.js'
@@ -51,8 +54,10 @@ import { CommunityModerationActionsService } from './community-moderation.action
     TelemetryModule,
     GuardianModule,
   ],
-  controllers: [CommunityController],
+  controllers: [CommunityController, CommunityCommentsController],
   providers: [
+    CommunityCommentsRepository,
+    CommunityCommentsService,
     CommunityReactionOutboxDispatcher,
     CommunityRepository,
     CommunityService,
@@ -76,6 +81,8 @@ import { CommunityModerationActionsService } from './community-moderation.action
 })
 export class CommunityModule implements NestModule {
   configure(consumer: MiddlewareConsumer): void {
-    consumer.apply(CommunityCacheHeadersMiddleware).forRoutes(CommunityController)
+    consumer
+      .apply(CommunityCacheHeadersMiddleware)
+      .forRoutes(CommunityController, CommunityCommentsController)
   }
 }

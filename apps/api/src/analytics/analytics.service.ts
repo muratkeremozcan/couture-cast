@@ -11,7 +11,10 @@ export type AnalyticsCaptureEvent = {
 
 export interface AnalyticsClient {
   capture(event: AnalyticsCaptureEvent): void
-  captureAcknowledged?(event: AnalyticsCaptureEvent): Promise<void>
+  captureAcknowledged?(
+    event: AnalyticsCaptureEvent,
+    options?: { signal?: AbortSignal }
+  ): Promise<void>
 }
 
 export const ANALYTICS_CLIENT = Symbol('ANALYTICS_CLIENT')

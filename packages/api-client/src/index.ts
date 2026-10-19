@@ -33,7 +33,7 @@ export {
   type ListOutfitCapsulesQuery,
 } from './contracts/http/wardrobe'
 export * from './generated'
-export { createApiClient } from './client'
+export { createApiClient, communityCommentsClient } from './client'
 export type { ApiClientAccessToken, ApiClientOptions } from './client'
 export * from './types/analytics-events'
 export * from './types/deep-link-targets'
@@ -41,3 +41,5 @@ export * from './types/socket-events'
 export * from './realtime/polling-service'
 export { CommunityReactionState } from './community-reaction-state'
 export type { ReactionControls, ReactionControlState } from './community-reaction-state'
+
+export * from './community-comments-state'

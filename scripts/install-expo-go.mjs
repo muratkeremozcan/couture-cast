@@ -5,6 +5,7 @@ import fs from 'node:fs'
 import https from 'node:https'
 import path from 'node:path'
 import { spawn } from 'node:child_process'
+import { pipeline } from 'node:stream/promises'
 
 const EXPO_GO_SDK_54_URL =
   'https://github.com/expo/expo-go-releases/releases/download/Expo-Go-54.0.8/Expo-Go-54.0.8.apk'
@@ -45,49 +46,39 @@ const getAdb = () => {
   return 'adb'
 }
 
-const download = (url, dest, redirectsRemaining = 5) =>
-  new Promise((resolve, reject) => {
-    const file = fs.createWriteStream(dest)
+const download = async (url, dest, redirectsRemaining = 5) => {
+  const response = await new Promise((resolve, reject) => {
     https
       .get(url, (res) => {
-        if (
-          res.statusCode &&
-          res.statusCode >= 300 &&
-          res.statusCode < 400 &&
-          res.headers.location
-        ) {
-          file.close(() => {
-            fs.unlink(dest, () => undefined)
-            if (redirectsRemaining <= 0) {
-              reject(new Error('Download failed: too many redirects'))
-              return
-            }
-            const redirectedUrl = new URL(res.headers.location, url).toString()
-            download(redirectedUrl, dest, redirectsRemaining - 1).then(resolve, reject)
-          })
-          return
-        }
-
-        if (res.statusCode && res.statusCode >= 400) {
-          reject(new Error(`Download failed HTTP ${res.statusCode}`))
-          return
-        }
-        res.pipe(file)
-        file.on('finish', () => {
-          file.close(() => {
-            const size = fs.statSync(dest).size
-            if (size <= 0) {
-              reject(new Error('Download failed: APK file is empty'))
-              return
-            }
-            resolve()
-          })
-        })
+        res.once('error', reject)
+        resolve(res)
       })
-      .on('error', (err) => {
-        fs.unlink(dest, () => reject(err))
-      })
+      .once('error', reject)
   })
+  if (
+    response.statusCode >= 300 &&
+    response.statusCode < 400 &&
+    response.headers.location
+  ) {
+    response.resume()
+    if (redirectsRemaining <= 0) throw new Error('Download failed: too many redirects')
+    const redirectedUrl = new URL(response.headers.location, url).toString()
+    return download(redirectedUrl, dest, redirectsRemaining - 1)
+  }
+  if (response.statusCode !== 200) {
+    response.resume()
+    throw new Error(`Download failed HTTP ${response.statusCode}`)
+  }
+
+  // Only the final response owns a file. Redirect cleanup cannot unlink a later stream.
+  try {
+    await pipeline(response, fs.createWriteStream(dest))
+    if (fs.statSync(dest).size <= 0) throw new Error('Download failed: APK file is empty')
+  } catch (error) {
+    await fs.promises.rm(dest, { force: true }).catch(() => undefined)
+    throw error
+  }
+}
 
 const run = (cmd, args) =>
   new Promise((resolve, reject) => {

@@ -1,3 +1,6 @@
+import type { FeatureFlagsService } from '../feature-flags/feature-flags.service.js'
+import { CommunityCommentsOutbox } from './community-comments.outbox.js'
+import { CommunityCommentsProcessor } from './community-comments.processor.js'
 import { CommunityReactionOutboxDispatcher } from './community-reaction.outbox.js'
 import type { Worker } from 'bullmq'
 import type { PrismaClient } from '@prisma/client'
@@ -144,6 +147,35 @@ export interface CommunityNsfwScreenerSelection {
 }
 
 const logger = createBaseLogger().child({ feature: COMMUNITY_MODERATION_LOG_FEATURE })
+
+/** Each independent sweep retains progress when a sibling step fails. */
+export async function runCommunitySweepSteps(
+  steps: readonly {
+    name:
+      | 'post_dispatch'
+      | 'reaction_dispatch'
+      | 'comment_dispatch'
+      | 'post_stale'
+      | 'comment_stale'
+    run: () => Promise<unknown>
+  }[],
+  log: Pick<typeof logger, 'warn'> = logger
+): Promise<void> {
+  const failed: string[] = []
+  for (const step of steps) {
+    try {
+      await step.run()
+    } catch {
+      failed.push(step.name)
+      log.warn(
+        { event: 'community_sweep_step_failed', step: step.name, reason: 'sweep_failed' },
+        'Community sweep step deferred'
+      )
+    }
+  }
+  if (failed.length > 0)
+    throw new Error(`Community sweep steps failed: ${failed.join(', ')}`)
+}
 
 /**
  * Reads the selector, refusing an absent or unrecognised one.
@@ -348,6 +380,7 @@ async function finalizeSelection(
  */
 export async function createCommunityWorkerRuntime(deps: {
   prisma: PrismaClient
+  featureFlags?: Pick<FeatureFlagsService, 'getFeatureFlag'>
   telemetryService: TelemetryService
   /** Overrides the environment selection; specs inject a pinned engine here. */
   engine?: CommunityModerationEngine
@@ -381,8 +414,15 @@ export async function createCommunityWorkerRuntime(deps: {
     )
   }
 
+  const comments = new CommunityCommentsOutbox(
+    deps.prisma,
+    queue,
+    deps.telemetryService,
+    new CommunityCommentsProcessor(deps.prisma, engine, deps.featureFlags)
+  )
   const worker = createCommunityModerationWorker({
     prisma: deps.prisma,
+    featureFlags: deps.featureFlags,
     storage,
     telemetryService: deps.telemetryService,
     engine,
@@ -405,14 +445,24 @@ export async function createCommunityWorkerRuntime(deps: {
     worker,
     heartbeat,
     sweeps: {
-      dispatchPending: async () => {
-        await dispatcher.dispatchPending()
-        await new CommunityReactionOutboxDispatcher(
-          deps.prisma,
-          deps.telemetryService
-        ).dispatchPending()
-      },
-      sweepStalePendingReview: () => maintenance.sweepStalePendingReview(),
+      dispatchPending: () =>
+        runCommunitySweepSteps([
+          { name: 'post_dispatch', run: () => dispatcher.dispatchPending() },
+          {
+            name: 'reaction_dispatch',
+            run: () =>
+              new CommunityReactionOutboxDispatcher(
+                deps.prisma,
+                deps.telemetryService
+              ).dispatchPending(),
+          },
+          { name: 'comment_dispatch', run: () => comments.dispatchPending() },
+        ]),
+      sweepStalePendingReview: () =>
+        runCommunitySweepSteps([
+          { name: 'post_stale', run: () => maintenance.sweepStalePendingReview() },
+          { name: 'comment_stale', run: () => comments.sweepStale() },
+        ]),
       sweepExpiredUploads: () => maintenance.sweepExpiredUploads(),
       sweepErasureRequests: () => maintenance.sweepErasureRequests(),
     },

@@ -2366,3 +2366,18 @@ export function trackCommunityReaction(
     }),
   }
 }
+
+// Story 6.4 owner: strict content-free comment lifecycle telemetry.
+export const communityCommentEventNameSchema = z.enum([
+  'community_comment_submitted',
+  'community_comment_published',
+  'community_comment_deleted',
+  'community_comment_reported',
+])
+export const communityCommentEventPropertiesSchema = z
+  .object({
+    platform: z.enum(['web', 'mobile']),
+    isSelf: z.boolean(),
+    isReply: z.boolean(),
+  })
+  .strict()

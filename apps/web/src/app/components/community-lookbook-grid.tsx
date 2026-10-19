@@ -25,6 +25,34 @@
 //   every banner in the new language.
 'use client'
 
+import { CommunityComments } from './community-comments'
+import {
+  CommunityCommentsState,
+  CommunityReactionState,
+  type ReactionControls,
+} from '@couture/api-client'
+import {
+  communityCommentsSessionFromWeb,
+  communityCommentsRootsFromWeb,
+  communityCommentsRepliesFromWeb,
+  communityCommentsSubmissionsFromWeb,
+  communityCommentsCreateFromWeb,
+  communityCommentsDeleteFromWeb,
+  communityCommentsReportFromWeb,
+  allocateCommunityLookFromWeb,
+  communityFailureReason,
+  setCommunityReactionFromWeb,
+  communityRetryAfterSeconds,
+  generateIdempotencyKey,
+  getCommunityFeedFromWeb,
+  getCommunityPostFromWeb,
+  hasWebSession,
+  openCommunityPostFromWeb,
+  publishCommunityLookFromWeb,
+  reportCommunityPostFromWeb,
+  withdrawCommunityPostFromWeb,
+  type CommunityFailureReason,
+} from '../../lib/community'
 import { CommunityReactions } from './community-reactions'
 
 import React, {
@@ -35,7 +63,6 @@ import React, {
   useState,
   useSyncExternalStore,
 } from 'react'
-import { CommunityReactionState, type ReactionControls } from '@couture/api-client'
 import Image from 'next/image'
 import posthog from 'posthog-js'
 import { useTranslation } from 'react-i18next'
@@ -58,21 +85,6 @@ import {
   type EmbeddedCommunityChallenge,
   type SupportedLocale,
 } from '@couture/api-client/contracts/http'
-import {
-  allocateCommunityLookFromWeb,
-  communityFailureReason,
-  setCommunityReactionFromWeb,
-  communityRetryAfterSeconds,
-  generateIdempotencyKey,
-  getCommunityFeedFromWeb,
-  getCommunityPostFromWeb,
-  hasWebSession,
-  openCommunityPostFromWeb,
-  publishCommunityLookFromWeb,
-  reportCommunityPostFromWeb,
-  withdrawCommunityPostFromWeb,
-  type CommunityFailureReason,
-} from '../../lib/community'
 import { getI18n } from '../../i18n'
 import { AccessibleModal } from './accessible-modal'
 import { CHIP_NAVIGATION_HEIGHT_PX, type ChipCategory } from './chip-navigation'
@@ -713,6 +725,7 @@ function LookbookCardContent({
 }
 
 interface LookbookCardProps {
+  onComments: (item: CommunityFeedItem) => void
   reactionControls: ReactionControls
   item: CommunityFeedItem
   isHighlighted: boolean
@@ -729,6 +742,7 @@ interface LookbookCardProps {
 }
 
 function LookbookCard({
+  onComments,
   reactionControls,
   item,
   isHighlighted,
@@ -766,6 +780,14 @@ function LookbookCard({
         onImageRetry={onImageRetry}
         onOpen={onOpen}
       />
+      <button
+        type="button"
+        className="min-h-[44px] px-5 text-left text-sm font-medium focus-visible:outline focus-visible:outline-2 focus-visible:outline-[color:var(--theme-secondary)]"
+        data-testid={`comments-button-${item.id}`}
+        onClick={() => onComments(item)}
+      >
+        {t('community.comments.title')}
+      </button>
       <LookbookCardContent
         reactionControls={reactionControls}
         item={item}
@@ -798,6 +820,8 @@ function detailRevalidationTargets(
 }
 
 interface LookbookDetailDialogProps {
+  focusComments: boolean
+  comments: CommunityCommentsState
   reactionFeedback: { key: string; id: number } | null
   reactionControls: ReactionControls
   item: CommunityFeedItem
@@ -815,6 +839,8 @@ interface LookbookDetailDialogProps {
  * or its hat to the frame.
  */
 function LookbookDetailDialog({
+  focusComments,
+  comments,
   reactionFeedback,
   item,
   t,
@@ -828,6 +854,7 @@ function LookbookDetailDialog({
       isOpen
       onClose={onClose}
       title={t('community.card.label', { author: authorName })}
+      surface="theme"
       titleId="community-detail-title"
       closeLabel={t('community.card.detailClose')}
     >
@@ -877,6 +904,12 @@ function LookbookDetailDialog({
             {item.caption}
           </p>
         )}
+        <CommunityComments
+          postId={item.id}
+          state={comments}
+          focusOnOpen={focusComments}
+          onClose={onClose}
+        />
       </div>
     </AccessibleModal>
   )
@@ -1720,6 +1753,7 @@ export function CommunityLookbookGrid({
    * referenced card routinely sits far past the twelve rows of page one.
    */
   const [deepLinkedItem, setDeepLinkedItem] = useState<CommunityFeedItem | null>(null)
+  const [focusComments, setFocusComments] = useState(false)
   const [openedItem, setOpenedItem] = useState<CommunityFeedItem | null>(null)
   const openedItemRef = useRef(openedItem)
   openedItemRef.current = openedItem
@@ -1760,6 +1794,41 @@ export function CommunityLookbookGrid({
     key: string
     id: number
   } | null>(null)
+  const [comments] = useState(
+    () =>
+      new CommunityCommentsState(
+        {
+          roots: communityCommentsRootsFromWeb,
+          replies: communityCommentsRepliesFromWeb,
+          submissions: communityCommentsSubmissionsFromWeb,
+          create: communityCommentsCreateFromWeb,
+          delete: communityCommentsDeleteFromWeb,
+          report: communityCommentsReportFromWeb,
+        },
+        generateIdempotencyKey,
+        communityFailureReason,
+        (postId) => setOpenedItem((current) => (current?.id === postId ? null : current))
+      )
+  )
+  useEffect(() => {
+    const syncSession = () => {
+      comments.setSession(communityCommentsSessionFromWeb())
+      setHasSession(hasWebSession())
+    }
+    syncSession()
+    const timer = setInterval(syncSession, 1000)
+    window.addEventListener('storage', syncSession)
+    const erase = () => {
+      comments.reset()
+      setOpenedItem(null)
+    }
+    window.addEventListener('couture:account-erased', erase)
+    return () => {
+      clearInterval(timer)
+      window.removeEventListener('storage', syncSession)
+      window.removeEventListener('couture:account-erased', erase)
+    }
+  }, [comments])
   const [reactionState] = useState(
     () =>
       new CommunityReactionState({
@@ -1887,12 +1956,14 @@ export function CommunityLookbookGrid({
             setDeepLinkedItem(loadedIds.has(target) ? null : current)
           setOpenedItem((opened) => (opened?.id === target ? current : opened))
         } catch (error: unknown) {
-          if (isCurrent() && communityFailureReason(error) === 'not_found')
+          if (isCurrent() && communityFailureReason(error) === 'not_found') {
             reactionState.evict(target)
+            comments.evict(target)
+          }
         }
       }
     },
-    [reactionState]
+    [comments, reactionState]
   )
 
   const loadFeed = useCallback(
@@ -2048,8 +2119,10 @@ export function CommunityLookbookGrid({
           // copy, so nothing is reported from here.
           if (!cancelled && detailGeneration === detailGenerationRef.current) {
             setDeepLinkedItem(null)
-            if (communityFailureReason(error) === 'not_found')
+            if (communityFailureReason(error) === 'not_found') {
               reactionState.evict(highlightedCardId)
+              comments.evict(highlightedCardId)
+            }
           }
         })
     } else {
@@ -2059,7 +2132,7 @@ export function CommunityLookbookGrid({
       cancelled = true
       controller.abort()
     }
-  }, [highlightedCardId, reactionState])
+  }, [comments, highlightedCardId, reactionState])
 
   /**
    * The rows on screen: the loaded pages, with a deep-link target that is not
@@ -2121,11 +2194,12 @@ export function CommunityLookbookGrid({
    * seeing a photograph. The event's `isSelf` is decided server-side from the
    * stored author id, so nothing here compares ids.
    */
-  const handleOpenCard = (item: CommunityFeedItem) => {
+  const handleOpenCard = (item: CommunityFeedItem, commentsFocus = false) => {
+    setFocusComments(commentsFocus)
     setAnnouncement(null)
     setReactionFeedback(null)
     setOpenedItem(reactionState.current(item))
-    if (experimentVariant === null) {
+    if (commentsFocus || experimentVariant === null) {
       return
     }
     void openCommunityPostFromWeb(item.id, experimentVariant).catch(() => undefined)
@@ -2374,6 +2448,7 @@ export function CommunityLookbookGrid({
             onImageError={handleImageError}
             onImageRetry={handleImageRetry}
             onOpen={handleOpenCard}
+            onComments={(item) => handleOpenCard(item, true)}
             onReport={(postId) => {
               setReportError(null)
               setReportingPostId(postId)
@@ -2409,6 +2484,8 @@ export function CommunityLookbookGrid({
 
       {openedItem !== null && (
         <LookbookDetailDialog
+          comments={comments}
+          focusComments={focusComments}
           reactionControls={reactionState.controls(openedItem.id)}
           reactionFeedback={reactionFeedback}
           item={openedItem}
