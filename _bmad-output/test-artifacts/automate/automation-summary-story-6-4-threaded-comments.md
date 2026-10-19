@@ -478,3 +478,49 @@ failures and Medium centering failure remain failed local attempts; the short pr
 entry recovery and visible-action behavior only. **A complete comments journey on the new remote
 head remains required.** RV test quality remains **100/100 (A), Approve**, with zero remaining
 findings; remote CI and PR review are separate pending gates owned by root.
+
+## CR9 and CR10: frontend measurement and cold runner bootstrap
+
+The actual frontend CodeRabbit review `5577131745` identified two valid issues. The implementation
+agent owned source fixes; Codex TEA owned durable tests. CR9 production stayed unchanged until the
+real browser reproduced the unwanted request. CR10's isolated actual-runner reproduction preceded
+its source fix. An initial browser test-construction mismatch used the older feed schema; TEA
+corrected it to the actual shared reaction-feed schema before the intended red run.
+
+CR9's added browser journey opens Comments against the real API and waits for both thread reads.
+It observes every `/opened` POST, so server event deduplication cannot hide an extra producer.
+Before repair, the opened/focused thread also sent a successful measurement request with
+`experimentVariant: auto`, failing the zero-request assertion. After repair, Comments opening and
+reopening produce no measurement request. The positive control opens the regular look and checks
+exactly one real 200/tracked response with the experiment arm returned by the actual feed. This
+guards the measurement-producing HTTP boundary; it makes no separate analytics-sink persistence
+claim. The complete comments and reactions suites passed **15/15 in 43.3 seconds**.
+
+CR10's original isolated CLI run failed with `MODULE_NOT_FOUND` for the testing package's cold
+`dist/index.js` before startup preparation. The source now calls the existing shared preparation
+chain before Prisma/testing imports and fails closed if that command fails. The new
+`playwright/support/helpers/run-maestro-bootstrap.spec.ts` runs copies of the actual runner and
+its pure imports inside temporary workspace skeletons. Synthetic npm writes only isolated
+dependency outputs; synthetic pkill prevents host process changes. The cases prove cold outputs
+are prepared, stale warm outputs are replaced, preparation runs once before both imports, and a
+failed preparation prevents imports/platform work. Successful cases stop at the real explicit
+invalid-platform boundary. These three CLI cases passed; they exercise neither devices nor a real
+workspace build, API or database.
+
+| Scope                                                       | Result                                                                       | Evidence                                      |
+| ----------------------------------------------------------- | ---------------------------------------------------------------------------- | --------------------------------------------- |
+| CR9 real-browser prepatch reproduction                      | Intended zero-request assertion failed with one successful card-open request | `/tmp/story64-cr9-browser-red.log`            |
+| CR9 complete comments and reaction suites                   | 15/15 passed, including the regular-look positive control                    | `/tmp/story64-cr9-browser-green.log`          |
+| CR10 isolated actual-runner reproduction                    | Cold package import failed before preparation                                | `/tmp/story64-cr10-cold-red.log`              |
+| CR10 implementation-agent CLI probes                        | Cold, stale and failed-preparation boundaries passed                         | `/tmp/story64-cr10-cold-green.log`            |
+| CR10 durable CLI regressions                                | 3/3 passed                                                                   | `/tmp/story64-cr10-bootstrap-tests-green.log` |
+| Complete Playwright helper suite during browser preparation | 7 files, 53 tests passed                                                     | `/tmp/story64-cr9-browser-green.log`          |
+| Edited test ESLint and Playwright types                     | Both exit 0                                                                  | `/tmp/story64-cr9-cr10-test-{lint,types}.log` |
+
+The implementation agent independently reviewed both test deltas and found no additional gap.
+Its source lint, web types, Node syntax and formatting checks passed as recorded in
+`/tmp/story64-cr9-cr10-implementation-handoff.md`. TEA's browser run completed API/worker/web
+teardown and returned the execution window. No further native flow or historical mutation batch
+was rerun for these fixes. RV remains **100/100 (A), Approve**, with zero test-quality findings.
+Complete remote CI on the final head, including the pending full comments device journey, remains
+required before the user's completion definition is met.

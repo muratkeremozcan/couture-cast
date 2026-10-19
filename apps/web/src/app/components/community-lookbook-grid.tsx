@@ -2199,7 +2199,7 @@ export function CommunityLookbookGrid({
     setAnnouncement(null)
     setReactionFeedback(null)
     setOpenedItem(reactionState.current(item))
-    if (experimentVariant === null) {
+    if (commentsFocus || experimentVariant === null) {
       return
     }
     void openCommunityPostFromWeb(item.id, experimentVariant).catch(() => undefined)

@@ -10,6 +10,7 @@ import {
   communityCommentSubmissionResponseSchema,
   communityCommentSubmissionsResponseSchema,
   communityCommentsResponseSchema,
+  communityReactionFeedResponseSchema,
   guardianConsentRevokeResponseSchema,
   reportCommunityCommentResponseSchema,
   type CommunityComment,
@@ -154,12 +155,21 @@ async function openThread(page: Page, interceptNetworkCall: InterceptNetworkCall
   await expect(grid).toHaveAttribute('aria-busy', 'false')
   const allFeed = interceptNetworkCall({ method: 'GET', url: COMMUNITY_FEED_URL })
   await page.getByTestId('community-filter-all').click()
-  expect((await allFeed).status).toBe(200)
+  const acceptedFeed = await allFeed
+  expect(acceptedFeed.status).toBe(200)
+  const { experimentVariant } = communityReactionFeedResponseSchema.parse(
+    acceptedFeed.responseJson
+  ).data
   await expect(grid).toHaveAttribute('aria-busy', 'false')
 
   const opener = page.getByTestId(`comments-button-${POST_ID}`)
   const initial = await reopenThread(opener, interceptNetworkCall)
-  return { opener, thread: page.getByTestId('community-comments'), initial }
+  return {
+    opener,
+    thread: page.getByTestId('community-comments'),
+    initial,
+    experimentVariant,
+  }
 }
 
 async function reopenThread(
@@ -232,6 +242,52 @@ test.describe('Story 6.4 screened threaded comments', () => {
         body: { events: [], nextSince: new Date(0).toISOString() },
       },
     })
+  })
+
+  test('[P1] opens comments without recording a card open and records regular look opens', async ({
+    page,
+    communitySession,
+    interceptNetworkCall,
+  }) => {
+    expect(communitySession.userId).toBeTruthy()
+    const openedPath = `/api/v1/community/posts/${POST_ID}/opened`
+    const measurements: unknown[] = []
+    page.on('request', (request) => {
+      if (request.method() === 'POST' && new URL(request.url()).pathname === openedPath) {
+        measurements.push(request.postDataJSON())
+      }
+    })
+
+    await log.step('Comments opens its thread without producing a card-open request')
+    const { opener, thread, experimentVariant } = await openThread(
+      page,
+      interceptNetworkCall
+    )
+    await expect(thread.getByRole('heading', { name: 'Comments' })).toBeFocused()
+    await expect(thread.getByLabel('Add a comment')).toBeVisible()
+    // Both real thread reads have completed after the click handler. Capture all
+    // requests so server-side event deduplication cannot hide an extra producer.
+    expect(measurements).toEqual([])
+
+    await thread.getByRole('button', { name: 'Close this look', exact: true }).click()
+    await expect(thread).toHaveCount(0)
+    await expect(opener).toBeFocused()
+
+    await log.step('A regular look open still records the arm served by the real feed')
+    const openedCall = interceptNetworkCall({ method: 'POST', url: `**${openedPath}` })
+    await page.getByTestId(`lookbook-open-${POST_ID}`).click()
+    const opened = await openedCall
+    expect(opened.status).toBe(200)
+    expect(opened.requestJson).toEqual({ experimentVariant })
+    expect(opened.responseJson).toEqual({ tracked: true })
+    await expect(page.getByTestId('community-detail')).toBeVisible()
+    expect(measurements).toEqual([{ experimentVariant }])
+
+    await page.getByRole('dialog').getByLabel('Close this look', { exact: true }).click()
+    await expect(page.getByRole('dialog')).not.toBeVisible()
+    await reopenThread(opener, interceptNetworkCall)
+    await expect(thread.getByRole('heading', { name: 'Comments' })).toBeFocused()
+    expect(measurements).toEqual([{ experimentVariant }])
   })
 
   test('[P0] keeps a draft across close and reopen, then publishes it through the worker', async ({

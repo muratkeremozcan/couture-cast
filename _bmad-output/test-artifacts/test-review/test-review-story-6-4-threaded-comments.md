@@ -101,6 +101,15 @@ entry and visible-action probes establish their bounded scopes. A complete comme
 the new remote head is still required. Test-quality approval remains **100/100 (A), Approve**;
 it does not establish a passing release gate.
 
+The actual frontend CodeRabbit review's CR9 regression was reproduced in the real browser before
+the source fix: Comments sent an unwanted card-open request. The added journey observes every
+real measurement request, checks its absence after Comments opens and reopens, and retains a
+positive regular-look open with the exact feed arm and tracked response. All 15 comments/reaction
+browser cases passed. CR10's isolated actual-runner CLI reproduction failed on missing cold
+workspace output. Three durable CLI cases now verify cold and stale output preparation, exact
+preparation-before-import ordering and failure before imports. The shared helper suite passed
+53 tests. Test lint/types passed. These checks introduce no additional test-quality findings.
+
 playwright-utils is installed and `tea_use_playwright_utils` is true. The retained Claude baseline
 found adoption in 0 of 8 files outside its original review set. This continuation checks the added
 files against that recorded baseline. The reviewed Playwright specs
@@ -201,6 +210,7 @@ No additional recommendations.
 - playwright/tests/community-comments.spec.ts
 - playwright/tests/community-reactions.spec.ts
 - playwright/support/helpers/install-expo-go.spec.ts
+- playwright/support/helpers/run-maestro-bootstrap.spec.ts
 - maestro/community-comments.yaml
 - maestro/subflows/open-community-tab.yaml
 - maestro/wardrobe-onboarding-my-form-flow.yaml
