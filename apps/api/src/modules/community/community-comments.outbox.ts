@@ -20,7 +20,10 @@ export class CommunityCommentsOutbox {
       where: {
         dispatched_at: null,
         comment: { status: 'pending_screening' },
-        OR: [{ generation: 0 }, { updated_at: { lte: new Date(Date.now() - 30_000) } }],
+        OR: [
+          { generation: 0, attempts: 0 },
+          { updated_at: { lte: new Date(Date.now() - 30_000) } },
+        ],
       },
       orderBy: { created_at: 'asc' },
       take: 100,

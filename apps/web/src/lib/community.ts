@@ -46,6 +46,8 @@ import {
   COMMUNITY_MEDIA_UNAVAILABLE_MESSAGE,
   COMMUNITY_REPORT_REASON_CHANGED_MESSAGE,
   COMMUNITY_SELF_REPORT_MESSAGE,
+  COMMUNITY_COMMENT_SELF_REPORT_MESSAGE,
+  COMMUNITY_COMMENT_REPORT_REASON_CHANGED_MESSAGE,
   type CommunityExperimentVariant,
   type CommunityReactionFeed as CommunityFeed,
   type CommunityReactionFeedItem as CommunityFeedItem,
@@ -190,12 +192,23 @@ function reasonForResponse(status: number, message: string): CommunityFailureRea
     // where the first draft put it -- left `self_report` and its catalog string
     // unreachable, so reporting your own post read "We could not send your
     // report." instead of saying why it was refused.
-    if (message.includes(COMMUNITY_SELF_REPORT_MESSAGE)) return 'self_report'
+    if (
+      [COMMUNITY_SELF_REPORT_MESSAGE, COMMUNITY_COMMENT_SELF_REPORT_MESSAGE].some(
+        (copy) => message.includes(copy)
+      )
+    )
+      return 'self_report'
     return 'unknown'
   }
   if (status === 404) return 'not_found'
   if (status === 409) {
-    if (message.includes(COMMUNITY_REPORT_REASON_CHANGED_MESSAGE)) return 'reason_changed'
+    if (
+      [
+        COMMUNITY_REPORT_REASON_CHANGED_MESSAGE,
+        COMMUNITY_COMMENT_REPORT_REASON_CHANGED_MESSAGE,
+      ].some((copy) => message.includes(copy))
+    )
+      return 'reason_changed'
     return 'unknown'
   }
   if (status === 429) return 'rate_limited'

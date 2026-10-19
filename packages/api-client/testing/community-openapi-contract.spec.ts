@@ -9,6 +9,27 @@ describe('community HTTP contracts', () => {
   describe('published OpenAPI surface', () => {
     const document = generateHttpOpenApiDocument()
 
+    it.each([
+      ['get', '/api/v1/community/posts/{postId}/comments'],
+      ['get', '/api/v1/community/posts/{postId}/comments/{commentId}/replies'],
+      ['get', '/api/v1/community/posts/{postId}/comment-submissions'],
+      ['post', '/api/v1/community/posts/{postId}/comments'],
+      ['delete', '/api/v1/community/posts/{postId}/comments/{commentId}'],
+      ['post', '/api/v1/community/posts/{postId}/comments/{commentId}/report'],
+    ] as const)(
+      'documents the reachable internal error on comment %s %s',
+      (method, path) => {
+        expect(document.paths?.[path]?.[method]?.responses?.['500']).toEqual({
+          description: 'Internal server error occurred.',
+          content: {
+            'application/json': {
+              schema: { $ref: '#/components/schemas/InternalServerErrorHttpError' },
+            },
+          },
+        })
+      }
+    )
+
     it('6.1-CON-037 registers the single-post read path used by deep links and polling', () => {
       // Matrix row "Client race": a deep link outside the first page resolves
       // the visible target directly, and an owned post is polled until terminal.

@@ -44,6 +44,14 @@ export const COMMUNITY_REPORT_REASON_CHANGED_MESSAGE =
 
 export const COMMUNITY_SELF_REPORT_MESSAGE = 'You cannot report your own post.'
 
+export const COMMUNITY_COMMENT_REPORT_REASON_CHANGED_MESSAGE =
+  'You already reported this comment for a different reason.'
+
+export const COMMUNITY_COMMENT_SELF_REPORT_MESSAGE = 'You cannot report your own comment.'
+
+export const COMMUNITY_COMMENT_SUBMISSION_RATE_LIMITED_MESSAGE =
+  'Comment submission limit reached.'
+
 export const COMMUNITY_ALT_TEXT_UNCONFIRMED_MESSAGE =
   'Alt text must be reviewed and confirmed before publishing.'
 
@@ -1337,6 +1345,12 @@ function registerCommunityCommentContracts(
               },
             }
           : {}),
+        500: {
+          description: 'Internal server error occurred.',
+          content: {
+            'application/json': { schema: common.internalServerErrorHttpErrorSchema },
+          },
+        },
         503: {
           description: 'Community unavailable.',
           content: {

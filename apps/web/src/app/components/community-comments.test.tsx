@@ -96,6 +96,30 @@ beforeEach(() => {
 })
 
 describe('Story 6.4 rendered comments through real web wrappers', () => {
+  it.each([
+    [409, 'You already reported this comment for a different reason.', 'reason_changed'],
+    [403, 'You cannot report your own comment.', 'self_report'],
+  ] as const)(
+    'classifies comment report HTTP %s "%s" as %s through the real transport',
+    async (status, message, reason) => {
+      useMswHandlers(
+        http.post(`${base}/comments/root/report`, () =>
+          HttpResponse.json(
+            {
+              statusCode: status,
+              error: status === 409 ? 'Conflict' : 'Forbidden',
+              message,
+            },
+            { status }
+          )
+        )
+      )
+      await expect(
+        communityCommentsReportFromWeb('community-post-1', 'root', 'spam')
+      ).rejects.toMatchObject({ reason, httpStatus: status, message })
+    }
+  )
+
   it('pages through root, reply and private submission pages', async () => {
     const secondRoot = createCommunityComment({
       id: 'root-next',

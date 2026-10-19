@@ -19996,6 +19996,16 @@
               }
             }
           },
+          "500": {
+            "description": "Internal server error occurred.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/InternalServerErrorHttpError"
+                }
+              }
+            }
+          },
           "503": {
             "description": "Community unavailable.",
             "content": {
@@ -20131,6 +20141,16 @@
               }
             }
           },
+          "500": {
+            "description": "Internal server error occurred.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/InternalServerErrorHttpError"
+                }
+              }
+            }
+          },
           "503": {
             "description": "Community unavailable.",
             "content": {
@@ -20258,6 +20278,16 @@
               }
             }
           },
+          "500": {
+            "description": "Internal server error occurred.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/InternalServerErrorHttpError"
+                }
+              }
+            }
+          },
           "503": {
             "description": "Community unavailable.",
             "content": {
@@ -20377,6 +20407,16 @@
               }
             }
           },
+          "500": {
+            "description": "Internal server error occurred.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/InternalServerErrorHttpError"
+                }
+              }
+            }
+          },
           "503": {
             "description": "Community unavailable.",
             "content": {
@@ -20479,6 +20519,16 @@
               "application/json": {
                 "schema": {
                   "$ref": "#/components/schemas/NotFoundHttpError"
+                }
+              }
+            }
+          },
+          "500": {
+            "description": "Internal server error occurred.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/InternalServerErrorHttpError"
                 }
               }
             }
@@ -20624,6 +20674,16 @@
               "application/json": {
                 "schema": {
                   "$ref": "#/components/schemas/TooManyRequestsHttpError"
+                }
+              }
+            }
+          },
+          "500": {
+            "description": "Internal server error occurred.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/InternalServerErrorHttpError"
                 }
               }
             }

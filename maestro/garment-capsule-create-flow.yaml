@@ -250,7 +250,8 @@ tags:
     element:
       id: 'move-down-button-.*'
     direction: DOWN
-    centerElement: true
+    # Fully visible controls can sit below center at the scroll boundary.
+    centerElement: false
     timeout: 15000
     label: 'Bring the garment-order controls on screen'
 - waitForAnimationToEnd
