@@ -91,7 +91,6 @@ async function initializeI18n(): Promise<SupportedLocale> {
       resources,
       lng: locale,
       fallbackLng: defaultSupportedLocale,
-      compatibilityJSON: 'v3',
       interpolation: {
         escapeValue: false,
       },
