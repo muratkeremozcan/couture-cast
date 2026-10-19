@@ -406,3 +406,11 @@ The final HTTP compatibility repair retains the required shared 500 error field.
 Unexpected runtime failures are normalized by the API exception filter to that established
 three-field envelope, with the original exception retained in server logs. Optic diff
 against main passes; custom HTTP error and telemetry behavior retain regression coverage.
+
+The independent web agent reviewed 0f288971 with no required application changes and
+1,086 fresh checks. Its report and optional scratch-probe evidence are retained under
+test-review. A later CI watchdog retry exposed retained member reaction state in the test
+harness. The per-flow reset now clears the synthetic member's own reaction/receipt/outbox
+state atomically with onboarding state, rejects missing IDs, and has real database
+ownership/idempotence coverage. The fresh iOS community flow passes in 218 seconds.
+Final CI is required on this harness correction before merge.

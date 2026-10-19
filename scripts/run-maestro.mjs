@@ -27,6 +27,7 @@ import os from 'node:os'
 import { fileURLToPath, URL } from 'node:url'
 import path from 'node:path'
 import { MAESTRO_BIN, MAESTRO_PINNED_VERSION } from './maestro-version.mjs'
+import { resetMobileE2EFlowState } from './lib/mobile-e2e-flow-state.mjs'
 
 const scriptDir = path.dirname(fileURLToPath(import.meta.url))
 const projectRoot = path.resolve(scriptDir, '..')
@@ -116,6 +117,8 @@ const MAESTRO_ARTIFACT_DIR = process.env.MAESTRO_ARTIFACT_DIR || 'maestro/artifa
  * which is worse than the slow pass it replaces for a flow that was never
  * really broken. `runMaestroCommandWithWatchdogRetry` below is the other half:
  * one retry, specifically for a `timedOut` failure, before it counts.
+ * Later relaunches can also stall after writes. Authenticated serial flows
+ * reset their member-owned fixture state before that retry.
  */
 const CI_FLOW_TIMEOUT_MS = Number(process.env.MOBILE_E2E_CI_FLOW_TIMEOUT_MS || 360_000)
 
@@ -1406,9 +1409,7 @@ const clearMobileE2EDeviceSettings = async () => {
 const resetMobileE2EPerFlowState = async (identity) => {
   const prisma = new PrismaClient({ datasourceUrl: MOBILE_E2E_DATABASE_URL })
   try {
-    await prisma.wardrobeOnboardingState.deleteMany({
-      where: { user_id: identity.userId },
-    })
+    await resetMobileE2EFlowState(prisma, identity.userId)
   } finally {
     await prisma.$disconnect()
   }
@@ -3137,23 +3138,13 @@ const runShardedFlows = async (shardedFlows, target, maestroEnv, flowFailures) =
 }
 
 /**
- * Run one Maestro command, retrying exactly once if `CI_FLOW_TIMEOUT_MS` is
- * what killed it.
+ * Run one Maestro command with one retry after a watchdog timeout.
  *
- * Bounded to a single retry: this is not a general flake-retry mechanism. It
- * exists for one specific, now three-times-observed failure mode -- the
- * device's manifest fetch or Metro connection stalling completely before the
- * flow has done anything, the same "Waiting for flows to complete" followed
- * by total silence, recorded on three different flows across three different
- * runs on 2026-08-20, never mid-assertion, always before the flow got the
- * chance to start one. The watchdog alone turns that from a silent 20+ minute
- * pass into a fast, named failure, which is strictly better but still turns a
- * transient runner stall into a red gate. One retry keeps the fast failure
- * for a flow that is genuinely stuck, while giving the transient case -- which
- * has cleared on rerun every time it has been observed -- the same chance a
- * human re-running the job would give it. Because the stall has only ever been
- * seen before the flow starts, retrying is safe: there is nothing for the
- * killed attempt to have mutated.
+ * The watchdog bounds stalls during startup or a later relaunch. The Android
+ * community flow on 2026-10-19 saved Love before stalling during relaunch, so
+ * a retry must restore its member's fixture state. Authenticated serial flows
+ * supply beforeRetry for that reset, including reactions, receipts and outbox.
+ * The retry retains the original flow assertions and timeout.
  *
  * @param {string[]} args
  * @param {SpawnProcessOptions} options

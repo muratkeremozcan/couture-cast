@@ -29,6 +29,7 @@ import { CommunityReactionOutboxDispatcher } from '../src/modules/community/comm
 import { GuardianService } from '../src/modules/guardian/guardian.service.js'
 import { TelemetryService } from '../src/modules/telemetry/telemetry.service.js'
 import { isolatedCommunityDatabase } from './helpers/isolated-community-database.js'
+import { resetMobileE2EFlowState } from '../../../scripts/lib/mobile-e2e-flow-state.mjs'
 
 vi.mock('../src/workers/base.worker.js', () => ({
   defaultWorkerOptions: () => ({}),
@@ -124,6 +125,73 @@ afterAll(async () => {
 })
 
 describe('Story 6.3 durable reaction semantics', () => {
+  it('resets a retried mobile flow and preserves state for another member', async () => {
+    const member = await fixture()
+    const other = await fixture()
+    // Cross-owned posts prove reset scopes by the reacting member's identity.
+    await mutate(member.userId, other.postId, input('love'))
+    await mutate(other.userId, member.postId, input('love'))
+    await prisma.wardrobeOnboardingState.createMany({
+      data: [{ user_id: member.userId }, { user_id: other.userId }],
+    })
+    const readMemberState = (userId: string) =>
+      Promise.all([
+        prisma.communityReaction.findMany({ where: { user_id: userId } }),
+        prisma.communityReactionReceipt.findMany({ where: { user_id: userId } }),
+        prisma.communityReactionOutbox.findMany({ where: { user_id: userId } }),
+        prisma.wardrobeOnboardingState.findMany({ where: { user_id: userId } }),
+      ])
+    const sentinel = await readMemberState(other.userId)
+    expect(sentinel.map((rows) => rows.length)).toEqual([1, 1, 1, 1])
+    const memberBefore = await readMemberState(member.userId)
+    for (const invalidId of [undefined, '', '   ']) {
+      await expect(
+        Reflect.apply(resetMobileE2EFlowState, undefined, [prisma, invalidId])
+      ).rejects.toThrow('requires a member ID')
+      expect(await readMemberState(member.userId)).toEqual(memberBefore)
+      expect(await readMemberState(other.userId)).toEqual(sentinel)
+    }
+    const before = await prisma.lookbookPost.findUniqueOrThrow({
+      where: { id: other.postId },
+    })
+
+    await resetMobileE2EFlowState(prisma, member.userId)
+
+    expect(await readMemberState(member.userId)).toEqual([[], [], [], []])
+    expect(await readMemberState(other.userId)).toEqual(sentinel)
+    const after = await prisma.lookbookPost.findUniqueOrThrow({
+      where: { id: other.postId },
+    })
+    expect(after.reaction_generation).toBeGreaterThan(before.reaction_generation)
+    expect(
+      (await repository.reactionSummaries([other.postId], member.userId)).get(
+        other.postId
+      )
+    ).toMatchObject({
+      counts: { applause: 0, love: 0, inspiration: 0 },
+      total: 0,
+      revision: 0,
+      viewerReaction: null,
+    })
+
+    await resetMobileE2EFlowState(prisma, member.userId)
+
+    expect(await readMemberState(member.userId)).toEqual([[], [], [], []])
+    expect(await readMemberState(other.userId)).toEqual(sentinel)
+    expect(
+      await prisma.lookbookPost.findUniqueOrThrow({ where: { id: other.postId } })
+    ).toEqual(after)
+    expect(await mutate(member.userId, other.postId, input('applause'))).toMatchObject({
+      summary: {
+        counts: { applause: 1, love: 0, inspiration: 0 },
+        total: 1,
+        viewerReaction: 'applause',
+        revision: 1,
+      },
+    })
+    expect(await readMemberState(other.userId)).toEqual(sentinel)
+  })
+
   it('preserves reactions, receipts, and queued events through parent identity updates', async () => {
     const { userId, postId } = await fixture()
     const intent = input('applause')

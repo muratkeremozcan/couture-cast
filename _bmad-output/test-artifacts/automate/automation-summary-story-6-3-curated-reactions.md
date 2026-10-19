@@ -237,3 +237,35 @@ in /tmp/couture63-500-resume.log. Pact consumers remain stable across three runs
 provider verification passes in /tmp/couture63-500-pact.log. Optic compatibility passes
 in /tmp/couture63-500-optic.log. Focused filter/privacy verification passes all 39 cases
 in /tmp/couture63-500-focused.log. The independent runtime source review found no issues.
+
+## Web agent review and CI isolation follow-up
+
+The independent web agent reviewed exact head 0f288971 and reported no validated
+application defects or required corrections. It freshly passed 1,086 checks, including
+nine scratch probes. The formatted report is story-6-3-web-agent.md; its original Downloads
+file has SHA-256 2f0b02406e76fbd93cf295681e918c9d618144f64da31bc9963efc70519f1d6a.
+The optional probe patch is retained as evidence in story-6-3-web-agent-probes.patch.
+It is not applied to the source suite. The report's execution limits and reviewed SHA
+remain explicit. The subsequent delta changes the test harness and its regression coverage.
+
+Android CI exposed a fixture-isolation bug after a watchdog retry. The first community
+attempt saved Love, then stalled during relaunch. Its retry retained that member's Love
+selection. Replacing it with Applaud correctly produced Applaud 1 and Love 0, while the
+flow expected its initial Love 1 to remain. Per-flow reset now atomically clears only the
+synthetic reacting member's onboarding, reaction, receipt, and outbox state. Blank or
+missing member IDs are rejected before any deletion. The Prisma client's selected E2E
+database and finally-disconnect lifetime remain intact.
+
+The real database regression failed against the old reset and passes after repair. It
+checks crossed post ownership, exact preservation of another member's rows, generation
+invalidation, idempotence, invalid-ID safety, and a fresh revision-1 Applaud with Love 0.
+All 21 reaction integration tests, API type checks and affected-file lint pass. A separate
+Codex source review found no blocking issues. The fresh iOS community flow passes in
+3m 38s and its screenshot was inspected. Evidence: /tmp/couture63-flow-reset-{red,green,
+types,lint,ios}.log. The watchdog's existing timeout and retry budget are retained, with
+its documentation corrected to cover relaunch stalls after saved writes.
+
+Android shard 6 also encountered a Maestro deviceInfo transport failure before its hero
+flow executed any command. A fresh-device rerun passed the unchanged shard. The current
+remote head's other quality/browser checks passed. Final CI must pass on the new harness
+commit before the already-authorized merge. Production rollout flags remain disabled.
