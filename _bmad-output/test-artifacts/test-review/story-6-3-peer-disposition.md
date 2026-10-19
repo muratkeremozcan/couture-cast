@@ -4,9 +4,9 @@ Updated: 2026-10-19. Independent review followed by targeted test expansion.
 
 The original peer report is `story-6-3-codex-peer.md`. Its full-file rubric score and
 Request Changes verdict remain intact. The review demonstrated no new production defect.
-Root accepts the concrete test gaps and repairs below. The peer is implementing them through
-`bmad-tea-automate`, expand Create, with focused sequential execution. Verification evidence
-will be appended after that handoff.
+All concrete gaps and organization findings are implemented. The Codex peer used
+`bmad-tea-automate`, expand Create; root completed sequential verification and the final
+organization and retry-coverage repairs.
 
 ## Accepted actions
 
@@ -26,23 +26,28 @@ will be appended after that handoff.
 | Recommendation 22                   | Separate E2E concerns               | Focused layout/accessibility checks retain existing regression evidence                                         |
 | Recommendation 23                   | Observe feed before baselines       | Register interception before navigation/filter requests and await the real response                             |
 
-## Existing file organization follow-up
+## Completed file organization repairs
 
-Recommendations 12 through 18 concern full-file length. Each file already exceeded 1,000 lines
-at the story baseline. These are recorded as a separate organization follow-up. A focused split
-should preserve all scenarios and shared fixture ownership, with its own complete validation.
-No test result, coverage threshold, CI gate or product behavior is waived by this disposition.
-New expansion coverage should use focused files where practical.
+The user's final scope requires every review item to close in Story 6.3. Recommendations
+12 through 18 are implemented here. The original report remains historical evidence;
+its earlier file sizes describe the reviewed source before these repairs.
 
-| Review item | File                                                         | Baseline lines | Reviewed lines |
-| ----------- | ------------------------------------------------------------ | -------------: | -------------: |
-| 12          | apps/api/src/modules/community/community.repository.spec.ts  |           1504 |           1509 |
-| 13          | apps/api/src/modules/community/community.service.spec.ts     |           2403 |           2529 |
-| 14          | apps/api/src/modules/guardian/guardian.service.spec.ts       |           2522 |           2525 |
-| 15          | apps/mobile/src/screens/community-screen.test.tsx            |           1552 |           1991 |
-| 16          | apps/web/src/app/components/community-lookbook-grid.test.tsx |           2555 |           3135 |
-| 17          | packages/api-client/testing/community-contract.spec.ts       |           1074 |           1074 |
-| 18          | pact/http/consumer/interactions/community.ts                 |           1663 |           1760 |
+| Review item | Original suite                 | Completed split                                                                              |              Preserved cases |
+| ----------- | ------------------------------ | -------------------------------------------------------------------------------------------- | ---------------------------: |
+| 12          | Community repository           | Five focused specs and shared repository fixtures                                            |                           67 |
+| 13          | Community service              | Seven focused specs and shared service fixtures                                              |                          131 |
+| 14          | Guardian service               | Five focused specs and shared guardian fixtures                                              |                           90 |
+| 15          | Mobile community screen        | Registration entrypoint, five case modules and shared harness                                |                           71 |
+| 16          | Web community grid             | Seven focused specs and shared grid fixtures                                                 |                          104 |
+| 17          | API-client community contracts | Three focused specs and shared contract builders                                             |                           57 |
+| 18          | Pact community interactions    | Public entrypoint and focused fixture/feed/publication/moderation/challenge/reaction modules | 33 interactions per consumer |
+
+Every resulting spec and support module is below 1,000 lines. Support modules use the
+existing test-scaffolding locations and coverage exclusions. Test discovery, mock ownership,
+clock cleanup and scoped hooks remain explicit. Root's token-level comparison verifies
+unchanged test bodies across the API, web and contract splits. Mobile's ten route-parameter
+assignments use a shared setter with the same assignment semantics. All 21 existing reaction
+integration scenarios also survive their focused split; each file owns a disposable database.
 
 ## Execution state
 
@@ -52,11 +57,11 @@ New expansion coverage should use focused files where practical.
 - Expansion and local final verification: passed; evidence below.
 - Root owns commits, push/PR, CodeRabbit follow-up, CI repair and conditional merge.
 
-## Final local disposition
+## Earlier behavioral verification
 
 All accepted behavioral, isolation, clock, interaction and privacy repairs are implemented.
 The original 0/100 full-file rubric and Request Changes verdict are preserved as review
-evidence. The seven inherited file-size findings stay documented above for a focused split.
+evidence. The seven inherited file-size findings are closed by the focused splits above.
 
 Root inspected the complete peer diff and demonstrated four regression-sensitive failures
 by removing detail reconciliation, the eviction read fence, module middleware and lease
@@ -113,8 +118,7 @@ All six were accepted and repaired. Independent Codex reviewers verified the fix
 Fresh focused API verification: 39 passed. Full validation: 6,281 passed with ten existing
 intentional skips; types, lint, formatting, unchanged coverage thresholds, and production
 builds pass. Logs: /tmp/couture63-coderabbit-api.log and
-/tmp/couture63-coderabbit-validate.log. The original TEA report and inherited file-size
-follow-up remain intact. Production rollout flags remain disabled.
+/tmp/couture63-coderabbit-validate.log. The original TEA report remains historical evidence; all seven file-size findings are now closed. Production rollout flags remain disabled.
 
 Pact consumers remain deterministic over three runs (116 mobile, 125 web), and provider
 verification passes. Nine real browser publication/reaction journeys pass without retries,
@@ -147,8 +151,8 @@ The independent web agent reviewed exact head 0f288971 and reported no validated
 application defects or required corrections. It freshly passed 1,086 checks, including
 nine scratch probes. The formatted report is story-6-3-web-agent.md; its original Downloads
 file has SHA-256 2f0b02406e76fbd93cf295681e918c9d618144f64da31bc9963efc70519f1d6a.
-The optional probe patch is retained as evidence in story-6-3-web-agent-probes.patch.
-It is not applied to the source suite. The report's execution limits and reviewed SHA
+The original probe patch is retained as evidence in story-6-3-web-agent-probes.patch.
+All nine probes are now permanent cases in community-reaction-concurrency.integration.spec.ts. The report's execution limits and reviewed SHA
 remain explicit. The subsequent delta changes the test harness and its regression coverage.
 
 Android CI exposed a fixture-isolation bug after a watchdog retry. The first community
@@ -172,3 +176,49 @@ Android shard 6 also encountered a Maestro deviceInfo transport failure before i
 flow executed any command. A fresh-device rerun passed the unchanged shard. The current
 remote head's other quality/browser checks passed. Final CI must pass on the new harness
 commit before the already-authorized merge. Production rollout flags remain disabled.
+
+## Completed retry coverage repairs
+
+CodeRabbit's two coverage suggestions are implemented within this story. The runner calls
+an import-safe orchestration module that owns the reset before the first attempt and before
+its one watchdog retry. Tests cover a saved reaction surviving a timeout, the exact
+reset/run/retry/reset/run ordering, missing reset wiring, initial reset failure, retry reset
+failure, ordinary failure and exhaustion of the single retry. A reset failure prevents the
+next device attempt.
+
+The PostgreSQL fault test installs an AFTER DELETE trigger ordered after the real generation
+trigger. Its error includes the incremented generation, proving that the generation update
+executed. The transaction restores onboarding, outbox, receipt, reaction and post generation
+exactly. The fault trigger and function are removed in finally within the disposable database.
+
+Both regression proofs rejected seeded implementation defects: removing the second reset
+leaves Love revision 1 visible to the retry; replacing the transaction with sequential deletes
+leaves partially removed rows. Source bytes were restored after each proof. Logs:
+/tmp/couture63-retry-orchestration-red.log and /tmp/couture63-reset-rollback-red.log.
+
+Independent split review also identified a cluster-wide pg_stat_activity witness. It now
+requires datname = current_database(), so parallel suites cannot satisfy the revocation gate
+with an unrelated database's advisory wait. The new mobile scaffolding lives under the
+existing src/test-utils coverage exclusion. No review item is assigned to a later story. The final local quality gate is
+story-6-3-final-quality-gate.md; current-head CI is recorded in PR #153.
+
+## Final review closure verification
+
+All 23 recommendations, the advisory coverage actions, all six CodeRabbit findings, and
+both subsequent retry-coverage suggestions are closed within this story. The largest
+resulting test/support file is 599 lines. The nine web-agent probes are permanent tests.
+Independent final source reviews report no remaining concern.
+
+Full runtime verification exposed mock ordering after test extraction. All ten native mocks
+now register in the spec entrypoint and share a pure state module. Each web spec registers
+its own PostHog mock before component imports. Original assertions are retained. All 877
+native tests and all 777 web tests pass with unchanged coverage limits after these repairs.
+
+Final local verification totals 6,303 passing tests with ten existing intentional skips.
+Types, lint, formatting, unchanged coverage limits and production builds pass. Pact consumers
+are deterministic over three runs (116 mobile, 125 web), and the provider passes. All ten
+community RLS cases and nine browser journeys pass. The fresh iOS flow passes in 220 seconds;
+both browser and native screenshots were inspected. Full evidence and execution boundaries
+are recorded in story-6-3-final-quality-gate.md. The approved frozen intent remains exact.
+Production rollout flags remain disabled. Current-head CodeRabbit inspection and green CI
+remain the merge conditions in PR #153; root is completing those gates in this session.

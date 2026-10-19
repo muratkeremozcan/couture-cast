@@ -28,6 +28,7 @@ import { fileURLToPath, URL } from 'node:url'
 import path from 'node:path'
 import { MAESTRO_BIN, MAESTRO_PINNED_VERSION } from './maestro-version.mjs'
 import { resetMobileE2EFlowState } from './lib/mobile-e2e-flow-state.mjs'
+import { runMobileE2EFlow } from './lib/mobile-e2e-flow-retry.mjs'
 
 const scriptDir = path.dirname(fileURLToPath(import.meta.url))
 const projectRoot = path.resolve(scriptDir, '..')
@@ -3138,31 +3139,20 @@ const runShardedFlows = async (shardedFlows, target, maestroEnv, flowFailures) =
 }
 
 /**
- * Run one Maestro command with one retry after a watchdog timeout.
- *
- * The watchdog bounds stalls during startup or a later relaunch. The Android
- * community flow on 2026-10-19 saved Love before stalling during relaunch, so
- * a retry must restore its member's fixture state. Authenticated serial flows
- * supply beforeRetry for that reset, including reactions, receipts and outbox.
- * The retry retains the original flow assertions and timeout.
+ * Run one Maestro command, resetting its fixture before the initial attempt and
+ * the single watchdog retry. User-scoped flows keep their existing seeded state.
  *
  * @param {string[]} args
  * @param {SpawnProcessOptions} options
- * @param {string} label used in the retry log line
- * @param {() => Promise<void>} [beforeRetry] re-run any per-flow setup the
- *   killed attempt would otherwise have skipped on its retry
- * @returns {Promise<void>}
+ * @param {string} label
+ * @param {() => Promise<void>} reset per-flow fixture reset
  */
-const runMaestroCommandWithWatchdogRetry = async (args, options, label, beforeRetry) => {
-  try {
-    await runMaestroCommand(args, options)
-  } catch (error) {
-    if (!error.timedOut) throw error
-    log(`RETRY ${label} (${error.message})`)
-    if (beforeRetry) await beforeRetry()
-    await runMaestroCommand(args, options)
-  }
-}
+const runMaestroCommandWithWatchdogRetry = async (args, options, label, reset) =>
+  runMobileE2EFlow({
+    run: () => runMaestroCommand(args, options),
+    reset,
+    onRetry: (error) => log(`RETRY ${label} (${error.message})`),
+  })
 
 /**
  * Run the flows that cannot be sharded, one at a time on the first device.
@@ -3206,7 +3196,8 @@ const runUserScopedFlows = async (serialFlows, target, maestroEnv, flowFailures)
           logFile: WRITE_ARTIFACTS ? getFlowLogPath(flowPath) : undefined,
           timeoutMs: CI_FLOW_TIMEOUT_MS,
         },
-        flowPath
+        flowPath,
+        () => Promise.resolve()
       )
       log(`PASS ${flowPath}`)
     } catch (error) {
@@ -3380,10 +3371,6 @@ const runFlowsSerially = async (target, maestroEnv, mobileIdentity, flowFailures
   for (const flowPath of flowsToRun) {
     const { maestroArgs, maestroLogFile } = buildSingleFlowMaestroArgs(flowPath, target)
 
-    if (mobileIdentity) {
-      await resetMobileE2EPerFlowState(mobileIdentity)
-    }
-
     log(`Running Maestro flow (${maestroArgs.join(' ')})`)
     let maestroExitError
     try {
@@ -3395,7 +3382,9 @@ const runFlowsSerially = async (target, maestroEnv, mobileIdentity, flowFailures
           timeoutMs: CI_FLOW_TIMEOUT_MS,
         },
         flowPath,
-        mobileIdentity ? () => resetMobileE2EPerFlowState(mobileIdentity) : undefined
+        mobileIdentity
+          ? () => resetMobileE2EPerFlowState(mobileIdentity)
+          : () => Promise.resolve()
       )
     } catch (error) {
       maestroExitError = error

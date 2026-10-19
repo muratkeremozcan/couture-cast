@@ -269,3 +269,19 @@ Android shard 6 also encountered a Maestro deviceInfo transport failure before i
 flow executed any command. A fresh-device rerun passed the unchanged shard. The current
 remote head's other quality/browser checks passed. Final CI must pass on the new harness
 commit before the already-authorized merge. Production rollout flags remain disabled.
+
+## Final review closure
+
+All review work is completed within Story 6.3, including seven inherited oversized-suite
+findings, both watchdog/reset coverage suggestions and all nine independent web-agent probes.
+The final local gate is recorded in
+../test-review/story-6-3-final-quality-gate.md. There are 6,303 passing workspace tests with
+ten existing intentional skips and unchanged coverage thresholds. Types, lint, formatting,
+production builds, deterministic Pact consumers/provider, ten RLS cases, nine browser
+journeys and the fresh 220-second iOS flow pass. Both screenshots were inspected.
+
+The initial full run exposed native/web mock-registration issues introduced by extraction.
+Mocks now register at spec entrypoints and their shared state is import-safe. Complete
+mobile/web coverage passes after repair; all backend/package coverage tiers passed unchanged.
+No review item is assigned to a later story. Root is finishing current-head CodeRabbit and CI
+before the authorized merge, with production rollout flags disabled.

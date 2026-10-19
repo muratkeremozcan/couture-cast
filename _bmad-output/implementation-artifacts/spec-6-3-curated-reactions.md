@@ -414,3 +414,17 @@ harness. The per-flow reset now clears the synthetic member's own reaction/recei
 state atomically with onboarding state, rejects missing IDs, and has real database
 ownership/idempotence coverage. The fresh iOS community flow passes in 218 seconds.
 Final CI is required on this harness correction before merge.
+
+## Final review closure: 2026-10-19
+
+All remaining review work is completed in this story. Seven oversized suites are split into
+focused files with their scenarios preserved. The two watchdog/reset coverage suggestions
+and all nine web-agent probes are permanent tests. The largest resulting test/support file
+is 599 lines. No review item is assigned to a later story.
+
+Final local verification: 6,303 passing tests with ten existing intentional skips; unchanged
+coverage limits, types, lint, formatting, production builds, deterministic Pact consumers and
+provider, ten community RLS cases, nine browser journeys, and a fresh 220-second iOS flow.
+Screenshots were inspected. The final local decision is recorded in
+`../test-artifacts/test-review/story-6-3-final-quality-gate.md`. Current-head CodeRabbit review
+and green CI remain the merge conditions in PR #153. Production rollout flags stay disabled.
