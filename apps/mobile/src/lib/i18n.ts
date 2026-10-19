@@ -1,4 +1,5 @@
 // Step 22 step 1 owner: define language resources and system defaults in apps/mobile/src/lib/i18n.ts
+import './intl-polyfills'
 import { createInstance } from 'i18next'
 import { initReactI18next } from 'react-i18next'
 import * as Localization from 'expo-localization'

@@ -71,3 +71,27 @@ thresholds, types, lint, formatting and builds pass. Both Pact consumers are det
 over three runs and the provider passes. All 10 community RLS tests and eight real browser
 journeys pass. See the automate summary for commands and logs. Root retains the authorized
 CodeRabbit/CI review and conditional merge gates. Production rollout flags remain disabled.
+
+## Hermes runtime follow-up
+
+The fresh iOS E2E run reproduced a missing Intl.PluralRules error after modern plural
+resolution was enabled. The first Android CI run showed the same error and blocked
+settings journeys. Root added the FormatJS getCanonicalLocales, Locale and PluralRules
+polyfills in dependency order, with locale data for all ten supported locales, including
+the distinct Portuguese regional rule. The bootstrap test removes the native APIs before
+loading the real polyfills and verifies locale behavior. Modern FormatJS static blocks
+also required the standard Babel class-static-block transform under Expo SDK 54.
+
+All 877 mobile tests, mobile lint/types, widget/watchOS plugin tests and unchanged mobile
+coverage thresholds pass. The complete production iOS Hermes export passes. The fresh
+iOS community flow passes in 218 seconds with exact singular/plural text, add/replace,
+relaunch persistence and removal. Its screenshot was inspected. A separate read-only
+Codex subagent reviewed all seven native repair files and returned no findings.
+Logs: /tmp/couture63-polyfill-verify-mobile.log, /tmp/couture63-polyfill-coverage.log,
+/tmp/couture63-ios-export.log and /tmp/couture63-final-native-verified.log.
+
+The local runner used MOBILE_E2E_EXPO_NO_OPEN=1 because Simulator.app lookup failed
+while simctl and the booted iPhone remained available. Maestro opened the target device
+through the existing harness. No launcher policy, timeout or assertion was waived.
+CodeRabbit's status page reports a partial review outage beginning 2026-10-19 08:58 UTC;
+review has been requested and remains a prerequisite for merge.
