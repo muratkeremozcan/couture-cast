@@ -1066,10 +1066,30 @@ export function registerCommunityContracts(
         description: 'Authoritative current state, including accepted retries.',
         content: { 'application/json': { schema: reactionResponse } },
       },
-      400: { description: 'Invalid input.' },
-      401: { description: 'Authentication required.' },
-      403: { description: 'Age or guardian consent prevents participation.' },
-      404: { description: 'Post is hidden or deleted.' },
+      400: {
+        description: 'Invalid input.',
+        content: {
+          'application/json': { schema: commonSchemas.badRequestHttpErrorSchema },
+        },
+      },
+      401: {
+        description: 'Authentication required.',
+        content: {
+          'application/json': { schema: commonSchemas.unauthorizedHttpErrorSchema },
+        },
+      },
+      403: {
+        description: 'Age or guardian consent prevents participation.',
+        content: {
+          'application/json': { schema: commonSchemas.forbiddenHttpErrorSchema },
+        },
+      },
+      404: {
+        description: 'Post is hidden or deleted.',
+        content: {
+          'application/json': { schema: commonSchemas.notFoundHttpErrorSchema },
+        },
+      },
       409: {
         description:
           'Stale revision or changed receipt payload. Authoritative current state is returned.',
@@ -1077,8 +1097,32 @@ export function registerCommunityContracts(
           'application/json': { schema: communityReactionConflictResponseSchema },
         },
       },
-      429: { description: '60 new mutations per member per minute.' },
-      503: { description: 'Community rollout disabled.' },
+      429: {
+        description: '60 new mutations per member per minute.',
+        headers: {
+          'Retry-After': {
+            description: 'Seconds until the member may react again.',
+            schema: { type: 'integer', minimum: 1 },
+          },
+        },
+        content: {
+          'application/json': { schema: commonSchemas.tooManyRequestsHttpErrorSchema },
+        },
+      },
+      500: {
+        description: 'Internal server error occurred.',
+        content: {
+          'application/json': {
+            schema: commonSchemas.internalServerErrorHttpErrorSchema,
+          },
+        },
+      },
+      503: {
+        description: 'Community rollout disabled.',
+        content: {
+          'application/json': { schema: commonSchemas.serviceUnavailableHttpErrorSchema },
+        },
+      },
     },
   })
   registry.register('ClimateBand', climateBandSchema)

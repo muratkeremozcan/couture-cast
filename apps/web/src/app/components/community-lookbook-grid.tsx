@@ -1869,7 +1869,8 @@ export function CommunityLookbookGrid({
       targets: string[],
       readTicket: number,
       signal: AbortSignal,
-      generation: number
+      generation: number,
+      loadedIds: ReadonlySet<string>
     ) => {
       if (targets.length === 0) return
       const detailGeneration = ++detailGenerationRef.current
@@ -1882,7 +1883,8 @@ export function CommunityLookbookGrid({
           const post = await getCommunityPostFromWeb(target, signal)
           if (!isCurrent()) return
           const current = reactionState.read(post, readTicket)
-          if (target === highlightedIdRef.current) setDeepLinkedItem(current)
+          if (target === highlightedIdRef.current)
+            setDeepLinkedItem(loadedIds.has(target) ? null : current)
           setOpenedItem((opened) => (opened?.id === target ? current : opened))
         } catch (error: unknown) {
           if (isCurrent() && communityFailureReason(error) === 'not_found')
@@ -1934,10 +1936,13 @@ export function CommunityLookbookGrid({
           const current = reactionState.read(post, readTicket)
           return current ? [current] : []
         })
-        setDeepLinkedItem((post) => (post ? reactionState.current(post) : null))
         setOpenedItem((post) => (post ? reactionState.current(post) : null))
         const merged =
           append && !restarted ? mergeFeedPages(itemsRef.current, page) : page
+        const loadedIds = new Set(merged.map((post) => post.id))
+        setDeepLinkedItem((post) =>
+          post && !loadedIds.has(post.id) ? reactionState.current(post) : null
+        )
         setItems((previous) =>
           (append && !restarted ? mergeFeedPages(previous, page) : page).map((post) =>
             reactionState.current(post)
@@ -1964,7 +1969,8 @@ export function CommunityLookbookGrid({
           ),
           readTicket,
           controller.signal,
-          generation
+          generation,
+          loadedIds
         )
         hasLoadedFeedRef.current = true
       } catch (error: unknown) {
@@ -2057,11 +2063,14 @@ export function CommunityLookbookGrid({
 
   /**
    * The rows on screen: the loaded pages, with a deep-link target that is not
-   * among them carried at the head. `mergeFeedPages` is what keeps the row from
-   * appearing twice once paging reaches the page it really belongs to.
+   * among them carried at the head. Once paging reaches that target, its
+   * accepted feed position determines the order even if an older detail settles.
    */
   const displayedItems = useMemo(
-    () => (deepLinkedItem ? mergeFeedPages([deepLinkedItem], items) : items),
+    () =>
+      deepLinkedItem && !items.some((post) => post.id === deepLinkedItem.id)
+        ? mergeFeedPages([deepLinkedItem], items)
+        : items,
     [deepLinkedItem, items]
   )
 

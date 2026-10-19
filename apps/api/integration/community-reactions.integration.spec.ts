@@ -124,6 +124,55 @@ afterAll(async () => {
 })
 
 describe('Story 6.3 durable reaction semantics', () => {
+  it('preserves reactions, receipts, and queued events through parent identity updates', async () => {
+    const { userId, postId } = await fixture()
+    const intent = input('applause')
+    await mutate(userId, postId, intent)
+    const event = await prisma.communityReactionOutbox.findFirstOrThrow({
+      where: { post_id: postId },
+    })
+    const before = await prisma.lookbookPost.findUniqueOrThrow({ where: { id: postId } })
+    const nextUserId = randomUUID()
+    const nextPostId = `${namespace}-${randomUUID()}`
+    await prisma.user.update({ where: { id: userId }, data: { id: nextUserId } })
+    await prisma.lookbookPost.update({ where: { id: postId }, data: { id: nextPostId } })
+    const state = await prisma.communityReaction.findUniqueOrThrow({
+      where: { user_id_post_id: { user_id: nextUserId, post_id: nextPostId } },
+    })
+    expect(state).toMatchObject({ selection: 'applause', revision: 1 })
+    expect(
+      await prisma.communityReactionReceipt.findUniqueOrThrow({
+        where: {
+          user_id_mutation_id: { user_id: nextUserId, mutation_id: intent.mutationId },
+        },
+      })
+    ).toMatchObject({ post_id: nextPostId, selection: 'applause', base_revision: 0 })
+    expect(
+      await prisma.communityReactionOutbox.findUniqueOrThrow({ where: { id: event.id } })
+    ).toMatchObject({ user_id: nextUserId, post_id: nextPostId, payload: event.payload })
+    const after = await prisma.lookbookPost.findUniqueOrThrow({
+      where: { id: nextPostId },
+    })
+    expect(after.reaction_generation).toBeGreaterThan(before.reaction_generation)
+    expect(await mutate(nextUserId, nextPostId, intent)).toMatchObject({
+      summary: { total: 1, viewerReaction: 'applause', revision: 1 },
+    })
+    expect(
+      await prisma.communityReactionOutbox.count({ where: { post_id: nextPostId } })
+    ).toBe(1)
+    const constraints = await prisma.$queryRaw<
+      { conname: string; confupdtype: string; confdeltype: string }[]
+    >`
+      SELECT conname, confupdtype::text, confdeltype::text FROM pg_constraint
+      WHERE conrelid IN ('"CommunityReaction"'::regclass, '"CommunityReactionReceipt"'::regclass, '"CommunityReactionOutbox"'::regclass) AND contype = 'f'
+      ORDER BY conname
+    `
+    expect(constraints).toHaveLength(6)
+    expect(
+      constraints.every((row) => row.confupdtype === 'c' && row.confdeltype === 'c')
+    ).toBe(true)
+  })
+
   it('adds, replaces, retracts, and fences delayed first attempts and retained retries', async () => {
     const { userId, postId } = await fixture()
     const first = input('applause')

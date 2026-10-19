@@ -1,6 +1,10 @@
 import { createApiClient } from '../src/client'
 import { describe, expect, it } from 'vitest'
 import {
+  generateHttpOpenApiDocument,
+  internalServerErrorHttpErrorSchema,
+} from '../src/contracts/http'
+import {
   communityFeedItemSchema,
   communityReactionFeedItemSchema,
   communityReactionSummarySchema,
@@ -31,6 +35,68 @@ const post = {
   author: { displayName: 'Style Explorer 1234', isSelf: false },
 }
 describe('Story 6.3 reaction contracts', () => {
+  it('documents reachable reaction errors and the rate-limit retry header', () => {
+    const operation =
+      generateHttpOpenApiDocument().paths?.['/api/v1/community/posts/{postId}/reaction']
+        ?.put
+    expect(Object.keys(operation?.responses ?? {}).sort()).toEqual([
+      '200',
+      '400',
+      '401',
+      '403',
+      '404',
+      '409',
+      '429',
+      '500',
+      '503',
+    ])
+    for (const [status, schema] of [
+      ['400', 'BadRequestHttpError'],
+      ['401', 'UnauthorizedHttpError'],
+      ['403', 'ForbiddenHttpError'],
+      ['404', 'NotFoundHttpError'],
+      ['429', 'TooManyRequestsHttpError'],
+      ['500', 'InternalServerErrorHttpError'],
+      ['503', 'ServiceUnavailableHttpError'],
+    ] as const) {
+      expect(operation?.responses?.[status]).toMatchObject({
+        content: {
+          'application/json': { schema: { $ref: `#/components/schemas/${schema}` } },
+        },
+      })
+    }
+    expect(operation?.responses?.['429']).toMatchObject({
+      headers: {
+        'Retry-After': { schema: { type: 'integer', minimum: 1 } },
+      },
+    })
+  })
+
+  it('accepts both Nest 500 envelopes while keeping unexpected fields closed', () => {
+    const unexpectedFailure = { statusCode: 500, message: 'Internal server error' }
+    expect(internalServerErrorHttpErrorSchema.parse(unexpectedFailure)).toEqual(
+      unexpectedFailure
+    )
+    expect(
+      internalServerErrorHttpErrorSchema.parse({
+        ...unexpectedFailure,
+        error: 'Internal Server Error',
+      })
+    ).toHaveProperty('error', 'Internal Server Error')
+    expect(
+      internalServerErrorHttpErrorSchema.safeParse({
+        ...unexpectedFailure,
+        error: 'Database error',
+      }).success
+    ).toBe(false)
+    expect(
+      internalServerErrorHttpErrorSchema.safeParse({
+        ...unexpectedFailure,
+        details: 'private database details',
+      }).success
+    ).toBe(false)
+  })
+
   it('preserves strict installed clients and accepts only the negotiated fields', () => {
     expect(communityFeedItemSchema.parse(post)).toEqual(post)
     expect(

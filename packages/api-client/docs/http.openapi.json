@@ -232,8 +232,7 @@
         },
         "required": [
           "statusCode",
-          "message",
-          "error"
+          "message"
         ],
         "additionalProperties": false
       },
@@ -19581,16 +19580,44 @@
             }
           },
           "400": {
-            "description": "Invalid input."
+            "description": "Invalid input.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/BadRequestHttpError"
+                }
+              }
+            }
           },
           "401": {
-            "description": "Authentication required."
+            "description": "Authentication required.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/UnauthorizedHttpError"
+                }
+              }
+            }
           },
           "403": {
-            "description": "Age or guardian consent prevents participation."
+            "description": "Age or guardian consent prevents participation.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ForbiddenHttpError"
+                }
+              }
+            }
           },
           "404": {
-            "description": "Post is hidden or deleted."
+            "description": "Post is hidden or deleted.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/NotFoundHttpError"
+                }
+              }
+            }
           },
           "409": {
             "description": "Stale revision or changed receipt payload. Authoritative current state is returned.",
@@ -19689,10 +19716,43 @@
             }
           },
           "429": {
-            "description": "60 new mutations per member per minute."
+            "description": "60 new mutations per member per minute.",
+            "headers": {
+              "Retry-After": {
+                "description": "Seconds until the member may react again.",
+                "schema": {
+                  "type": "integer",
+                  "minimum": 1
+                }
+              }
+            },
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/TooManyRequestsHttpError"
+                }
+              }
+            }
+          },
+          "500": {
+            "description": "Internal server error occurred.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/InternalServerErrorHttpError"
+                }
+              }
+            }
           },
           "503": {
-            "description": "Community rollout disabled."
+            "description": "Community rollout disabled.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ServiceUnavailableHttpError"
+                }
+              }
+            }
           }
         }
       }

@@ -73,7 +73,8 @@ export const internalServerErrorHttpErrorSchema = z
   .object({
     statusCode: z.literal(500),
     message: nonEmptyStringSchema,
-    error: z.literal('Internal Server Error'),
+    // Nest omits `error` when its exception filter handles an unexpected failure.
+    error: z.literal('Internal Server Error').optional(),
   })
   .strict()
 

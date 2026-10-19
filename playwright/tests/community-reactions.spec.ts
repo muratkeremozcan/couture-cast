@@ -49,6 +49,52 @@ test.describe('Story 6.3 curated reactions', () => {
     })
   })
 
+  test('[P1] preserves feed order when a highlighted card enters the loaded page', async ({
+    page,
+    communitySession,
+    interceptNetworkCall,
+  }) => {
+    expect(communitySession.userId).toBeTruthy()
+    const firstFeed = interceptNetworkCall({ method: 'GET', url: COMMUNITY_FEED_URL })
+    await page.goto('/')
+    expect((await firstFeed).status).toBe(200)
+    await expect(page.getByTestId('community-card-grid')).toHaveAttribute(
+      'aria-busy',
+      'false'
+    )
+    const allFeed = interceptNetworkCall({ method: 'GET', url: COMMUNITY_FEED_URL })
+    await page.getByTestId('community-filter-all').click()
+    const body = (await allFeed).responseJson as { data: { items: { id: string }[] } }
+    const target = body.data.items[1]!.id
+    await page.goto(`/?source=notification&type=community&cardId=${target}`)
+    await expect(page.getByTestId(`lookbook-card-${target}`)).toHaveAttribute(
+      'data-highlighted',
+      'true'
+    )
+    await expect(page.getByTestId('community-card-grid')).toHaveAttribute(
+      'aria-busy',
+      'false'
+    )
+    const refreshed = interceptNetworkCall({ method: 'GET', url: COMMUNITY_FEED_URL })
+    await page.getByTestId('community-filter-all').click()
+    const accepted = (await refreshed).responseJson as {
+      data: { items: { id: string }[] }
+    }
+    await expect(page.getByTestId('community-card-grid')).toHaveAttribute(
+      'aria-busy',
+      'false'
+    )
+    await expect(
+      page.getByTestId('community-card-grid').getByRole('article')
+    ).toHaveCount(accepted.data.items.length)
+    expect(
+      await page
+        .getByTestId('community-card-grid')
+        .getByRole('article')
+        .evaluateAll((cards) => cards.map((card) => card.getAttribute('data-testid')))
+    ).toEqual(accepted.data.items.map((post) => `lookbook-card-${post.id}`))
+  })
+
   test('[P1] adds with the keyboard, replaces, persists after reload, and retracts', async ({
     page,
     communitySession,

@@ -95,3 +95,28 @@ while simctl and the booted iPhone remained available. Maestro opened the target
 through the existing harness. No launcher policy, timeout or assertion was waived.
 CodeRabbit's status page reports a partial review outage beginning 2026-10-19 08:58 UTC;
 review has been requested and remains a prerequisite for merge.
+
+## CodeRabbit follow-up
+
+CodeRabbit completed review 5570286660 on commit b292db4a and reported six minor findings.
+All six were accepted and repaired. Independent Codex reviewers verified the fixes.
+
+| Comment    | Repair                                                                                                                               | Regression evidence                                                                                                                                                                                           |
+| ---------- | ------------------------------------------------------------------------------------------------------------------------------------ | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| 4312806100 | Preserve the accepted feed position of highlighted cards; clear stale pins and guard late detail responses.                          | Real browser reproduction failed with the highlighted card promoted ahead of the first feed item. Three gated screen cases cover loaded cards, refresh admission, and pagination admission.                   |
+| 4312806164 | Match the existing formal Portuguese voice in both platform catalogs.                                                                | Full locale validation and mobile tests pass.                                                                                                                                                                 |
+| 4312806191 | Match the existing informal Turkish voice in both platform catalogs.                                                                 | Full locale validation and mobile tests pass.                                                                                                                                                                 |
+| 4312806229 | Document all reaction error bodies and Retry-After; regenerate OpenAPI and SDK. Accept Nest's actual two-field generic 500 envelope. | Real HTTP tests parse all documented errors, including an unexpected failure; OpenAPI assertions cover body references and the retry header.                                                                  |
+| 4312806240 | Add a generated forward migration setting update cascades on all six foreign keys. Applied SQL remains byte-for-byte unchanged.      | Test first failed on the original user FK. After migration, both parent identities update with state, receipts, and event IDs preserved; receipt replay adds no event; all six live constraints match Prisma. |
+| 4312806253 | Prepare utils and API-client before standalone testing build, watch, lint, and typecheck commands.                                   | Cold build first failed with TS2307 after cleaning API-client dist; the same standalone command passes after repair. Dependency order is acyclic.                                                             |
+
+Fresh focused API verification: 39 passed. Full validation: 6,281 passed with ten existing
+intentional skips; types, lint, formatting, unchanged coverage thresholds, and production
+builds pass. Logs: /tmp/couture63-coderabbit-api.log and
+/tmp/couture63-coderabbit-validate.log. The original TEA report and inherited file-size
+follow-up remain intact. Production rollout flags remain disabled.
+
+Pact consumers remain deterministic over three runs (116 mobile, 125 web), and provider
+verification passes. Nine real browser publication/reaction journeys pass without retries,
+including the ordering regression. Logs: /tmp/couture63-coderabbit-pact.log and
+/tmp/couture63-coderabbit-playwright.log. The fresh browser screenshot was inspected.

@@ -1,25 +1,40 @@
 import 'reflect-metadata'
 import {
   ConflictException,
+  ForbiddenException,
   Module,
   NotFoundException,
+  ServiceUnavailableException,
   type INestApplication,
   type Type,
 } from '@nestjs/common'
 import { MODULE_METADATA } from '@nestjs/common/constants'
+import { HttpAdapterHost } from '@nestjs/core'
 import { Test } from '@nestjs/testing'
 import request from 'supertest'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import {
   COMMUNITY_POST_NOT_FOUND_MESSAGE,
+  COMMUNITY_AGE_GATE_DENIED_MESSAGE,
+  COMMUNITY_FEED_DISABLED_MESSAGE,
   COMMUNITY_REACTION_CONFLICT_MESSAGE,
   COMMUNITY_REACTION_RATE_LIMITED_MESSAGE,
   communityFeedResponseSchema,
   communityReactionFeedResponseSchema,
   communityReactionPostResponseSchema,
   communityPostResponseSchema,
+  badRequestHttpErrorSchema,
+  communityReactionConflictResponseSchema,
+  forbiddenHttpErrorSchema,
+  internalServerErrorHttpErrorSchema,
+  notFoundHttpErrorSchema,
+  serviceUnavailableHttpErrorSchema,
+  tooManyRequestsHttpErrorSchema,
+  unauthorizedHttpErrorSchema,
   type CommunityReactionSummary,
 } from '@couture/api-client/contracts/http'
+import { ApiExceptionFilter } from '../../filters/api-exception.filter.js'
+import type { TelemetryService } from '../telemetry/telemetry.service.js'
 import { AccessTokenIdentityService } from '../auth/access-token-identity.service.js'
 import { AuthStateModule } from '../auth/auth-state.module.js'
 import { GuardianConsentStateService } from '../auth/guardian-consent-state.service.js'
@@ -140,6 +155,11 @@ describe('CommunityModule HTTP privacy wiring', () => {
     }
     const module = await builder.compile()
     app = module.createNestApplication()
+    app.useGlobalFilters(
+      new ApiExceptionFilter(app.get(HttpAdapterHost), {
+        captureEvent: vi.fn().mockResolvedValue(undefined),
+      } as unknown as TelemetryService)
+    )
     await app.init()
   })
 
@@ -245,7 +265,10 @@ describe('CommunityModule HTTP privacy wiring', () => {
       .set('x-couture-platform', 'web')
       .send(intent)
       .expect(401)
-    for (const response of [feed, detail, reaction]) expectPrivate(response.headers)
+    for (const response of [feed, detail, reaction]) {
+      expectPrivate(response.headers)
+      unauthorizedHttpErrorSchema.parse(response.body)
+    }
     expect(service.getFeed).not.toHaveBeenCalled()
     expect(service.getPost).not.toHaveBeenCalled()
     expect(service.setReaction).not.toHaveBeenCalled()
@@ -294,7 +317,77 @@ describe('CommunityModule HTTP privacy wiring', () => {
       .send(intent)
       .expect(409)
     expectPrivate(response.headers)
-    expect(response.body).toEqual(envelope)
+    expect(communityReactionConflictResponseSchema.parse(response.body)).toEqual(envelope)
+  })
+
+  it.each([
+    { name: 'invalid body', platform: 'web', body: { ...intent, selection: 'laugh' } },
+    { name: 'missing platform', platform: undefined, body: intent },
+  ])(
+    '[P1] documents a malformed reaction $name as a private 400',
+    async ({ platform, body }) => {
+      const pending = request(server())
+        .put(reactionPath)
+        .set('Authorization', 'Bearer viewer-a')
+      if (platform) pending.set('x-couture-platform', platform)
+      const response = await pending.send(body).expect(400)
+      expectPrivate(response.headers)
+      expect(badRequestHttpErrorSchema.parse(response.body)).toEqual({
+        statusCode: 400,
+        message: 'Invalid reaction request.',
+        error: 'Bad Request',
+      })
+      expect(service.setReaction).not.toHaveBeenCalled()
+    }
+  )
+
+  it.each([
+    {
+      status: 403,
+      exception: new ForbiddenException(COMMUNITY_AGE_GATE_DENIED_MESSAGE),
+      schema: forbiddenHttpErrorSchema,
+      message: COMMUNITY_AGE_GATE_DENIED_MESSAGE,
+    },
+    {
+      status: 404,
+      exception: new NotFoundException(COMMUNITY_POST_NOT_FOUND_MESSAGE),
+      schema: notFoundHttpErrorSchema,
+      message: COMMUNITY_POST_NOT_FOUND_MESSAGE,
+    },
+    {
+      status: 503,
+      exception: new ServiceUnavailableException(COMMUNITY_FEED_DISABLED_MESSAGE),
+      schema: serviceUnavailableHttpErrorSchema,
+      message: COMMUNITY_FEED_DISABLED_MESSAGE,
+    },
+  ])(
+    '[P1] matches the reaction $status body to its shared contract',
+    async ({ status, exception, schema, message }) => {
+      service.setReaction.mockRejectedValueOnce(exception)
+      const response = await request(server())
+        .put(reactionPath)
+        .set('Authorization', 'Bearer viewer-a')
+        .set('x-couture-platform', 'web')
+        .send(intent)
+        .expect(status)
+      expectPrivate(response.headers)
+      expect(schema.parse(response.body)).toMatchObject({ statusCode: status, message })
+    }
+  )
+
+  it('[P1] matches an unexpected reaction failure to the shared 500 contract', async () => {
+    service.setReaction.mockRejectedValueOnce(new Error('Synthetic database failure'))
+    const response = await request(server())
+      .put(reactionPath)
+      .set('Authorization', 'Bearer viewer-a')
+      .set('x-couture-platform', 'web')
+      .send(intent)
+      .expect(500)
+    expectPrivate(response.headers)
+    expect(internalServerErrorHttpErrorSchema.parse(response.body)).toEqual({
+      statusCode: 500,
+      message: 'Internal server error',
+    })
   })
 
   it('[P0] keeps the 429 envelope private and carries the exact Retry-After header', async () => {
@@ -309,7 +402,7 @@ describe('CommunityModule HTTP privacy wiring', () => {
       .expect(429)
     expectPrivate(response.headers)
     expect(response.headers['retry-after']).toBe('37')
-    expect(response.body).toEqual({
+    expect(tooManyRequestsHttpErrorSchema.parse(response.body)).toEqual({
       statusCode: 429,
       error: 'Too Many Requests',
       message: COMMUNITY_REACTION_RATE_LIMITED_MESSAGE,

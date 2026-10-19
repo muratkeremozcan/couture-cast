@@ -594,10 +594,10 @@
       "total": "{{count}} reações",
       "pending": "A guardar reação…",
       "updated": "Reação guardada.",
-      "conflict": "A tua reação mudou noutro dispositivo. Escolhe novamente.",
-      "failed": "Não foi possível guardar a tua reação. Tenta novamente para confirmar.",
+      "conflict": "A sua reação mudou noutro dispositivo. Escolha novamente.",
+      "failed": "Não foi possível guardar a sua reação. Tente novamente para confirmar.",
       "retry": "Tentar reação novamente",
-      "rateLimited": "Demasiadas reações. Tenta novamente dentro de um minuto.",
+      "rateLimited": "Demasiadas reações. Tente novamente dentro de um minuto.",
       "total_one": "{{count}} reação",
       "total_other": "{{count}} reações",
       "ineligible": "É preciso ter pelo menos 13 anos para reagir. Os menores de 16 precisam de consentimento ativo de um responsável."

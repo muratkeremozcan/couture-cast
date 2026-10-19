@@ -387,3 +387,17 @@ while simctl and the booted iPhone remained available. Maestro opened the target
 through the existing harness. No launcher policy, timeout or assertion was waived.
 CodeRabbit's status page reports a partial review outage beginning 2026-10-19 08:58 UTC;
 review has been requested and remains a prerequisite for merge.
+
+## CodeRabbit follow-up verification
+
+Review 5570286660 completed on b292db4a. All six findings were accepted and repaired:
+feed ordering for highlighted cards, Portuguese and Turkish voice alignment on both
+platforms, complete HTTP error contracts and regenerated SDK, a generated forward migration
+for six FK update cascades, and standalone testing-package dependency preparation.
+The original applied migrations and frozen approval remain unchanged.
+
+Real browser and cold-build reproductions failed before repair. The database identity-update
+probe failed on the original FK before the forward migration. Final local validation passes
+6,281 tests with ten existing skips, unchanged coverage thresholds, types, lint, formatting,
+and production builds. Pact determinism/provider verification and all nine browser journeys
+pass. Detailed disposition is in the linked test artifacts.

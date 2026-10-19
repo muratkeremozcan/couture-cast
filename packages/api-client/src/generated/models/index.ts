@@ -5348,7 +5348,7 @@ export interface InternalServerErrorHttpError {
    * @type {InternalServerErrorHttpErrorErrorEnum}
    * @memberof InternalServerErrorHttpError
    */
-  error: InternalServerErrorHttpErrorErrorEnum
+  error?: InternalServerErrorHttpErrorErrorEnum
 }
 
 /**

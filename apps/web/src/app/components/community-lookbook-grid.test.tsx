@@ -2383,6 +2383,78 @@ describe('CommunityLookbookGrid (Story 6.1)', () => {
       )
     })
 
+    it.each([
+      { offPage: false, append: false },
+      { offPage: true, append: false },
+      { offPage: true, append: true },
+    ])(
+      'keeps a highlighted card in accepted feed order (off-page: $offPage, append: $append)',
+      async ({ offPage, append }) => {
+        signIn()
+        let refreshed = false
+        let detailReads = 0
+        let releaseDetail!: () => void
+        const detailGate = new Promise<void>((resolve) => {
+          releaseDetail = resolve
+        })
+        useMswHandlers(
+          http.get(FEED_PATH, () =>
+            feedBody({
+              mode: refreshed && !append ? 'all' : 'auto',
+              nextCursor: append && !refreshed ? cursorFor() : null,
+              items:
+                !refreshed && offPage
+                  ? [item()]
+                  : refreshed && append
+                    ? [item({ id: 'post-2' })]
+                    : [item(), item({ id: 'post-2' })],
+            })
+          ),
+          http.get(POST_PATH, async () => {
+            detailReads += 1
+            if (refreshed) await detailGate
+            return postBody({ id: 'post-2' })
+          })
+        )
+        const user = userEvent.setup()
+        renderGrid({ highlightedCardId: 'post-2' })
+        await screen.findByTestId('lookbook-card-post-2')
+        await waitFor(() =>
+          expect(screen.getByTestId('community-card-grid')).toHaveAttribute(
+            'aria-busy',
+            'false'
+          )
+        )
+        const initialReads = detailReads
+        refreshed = true
+        try {
+          await user.click(
+            screen.getByTestId(append ? 'load-more-button' : 'community-filter-all')
+          )
+          await waitFor(() => expect(detailReads).toBeGreaterThan(initialReads))
+          expect(
+            within(screen.getByTestId('community-card-grid'))
+              .getAllByRole('article')
+              .map((card) => card.getAttribute('data-testid'))
+          ).toEqual(['lookbook-card-post-1', 'lookbook-card-post-2'])
+          releaseDetail()
+          await waitFor(() =>
+            expect(screen.getByTestId('community-card-grid')).toHaveAttribute(
+              'aria-busy',
+              'false'
+            )
+          )
+          expect(
+            within(screen.getByTestId('community-card-grid'))
+              .getAllByRole('article')
+              .map((card) => card.getAttribute('data-testid'))
+          ).toEqual(['lookbook-card-post-1', 'lookbook-card-post-2'])
+        } finally {
+          releaseDetail()
+        }
+      }
+    )
+
     it('6.1-WEB-070 resolves a deep-link target the loaded page does not hold', async () => {
       signIn()
       useMswHandlers(
@@ -3032,6 +3104,7 @@ describe('Story 6.3 screen request ownership', () => {
   })
   it('6.3-WEB-021 reconciles an older detail response with the feed-confirmed reaction', async () => {
     const gate = deferred()
+    const read = vi.spyOn(CommunityReactionState.prototype, 'read')
     let started = false
     useMswHandlers(
       http.get(FEED_PATH, () => HttpResponse.json({ data: feed({ items: [post()] }) })),
@@ -3054,13 +3127,22 @@ describe('Story 6.3 screen request ownership', () => {
       await user.click(within(controls).getByRole('button', { name: 'Applaud, 0' }))
       await within(controls).findByRole('button', { name: 'Applaud, 1' })
       gate.release()
-      await screen.findByText('Older detail completed.')
-      // The caption proves the old detail was rendered before counts are checked.
+      await waitFor(() =>
+        expect(read).toHaveBeenCalledWith(
+          expect.objectContaining({ caption: 'Older detail completed.' }),
+          expect.any(Number)
+        )
+      )
+      await act(async () => {
+        await Promise.resolve()
+      })
+      // The consumed detail must preserve the feed-confirmed reaction.
       expect(palette(screen.getByTestId('community-reactions-post-1'))).toEqual(
         confirmedPalette
       )
     } finally {
       gate.release()
+      read.mockRestore()
     }
   })
   it('6.3-WEB-022 preserves highlighted reaction focus and announces inside the modal', async () => {
