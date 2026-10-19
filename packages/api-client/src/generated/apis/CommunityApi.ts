@@ -15,14 +15,16 @@ import * as runtime from '../runtime'
 import type {
   AllocateCommunityPostInput,
   AllocateCommunityPostResponse,
+  ApiV1CommunityFeedGet200Response,
+  ApiV1CommunityPostsPostIdGet200Response,
   CommunityChallengeResponse,
-  CommunityFeedResponse,
-  CommunityPostResponse,
+  CommunityReactionResponse,
   CreateCommunityChallengeInput,
   OpenCommunityPostInput,
   PublishCommunityPostInput,
   PublishCommunityPostResponse,
   ReportCommunityPostInput,
+  SetCommunityReactionInput,
   TrackedResponse,
   UpdateCommunityChallengeInput,
 } from '../models/index'
@@ -38,6 +40,7 @@ export interface ApiV1CommunityChallengesPostRequest {
 
 export interface ApiV1CommunityFeedGetRequest {
   xCouturePlatform: ApiV1CommunityFeedGetXCouturePlatformEnum
+  xCoutureReactions?: ApiV1CommunityFeedGetXCoutureReactionsEnum
   mode?: ApiV1CommunityFeedGetModeEnum
   cursor?: string
   limit?: number
@@ -52,12 +55,19 @@ export interface ApiV1CommunityPostsAllocatePostRequest {
 export interface ApiV1CommunityPostsPostIdGetRequest {
   postId: string
   xCouturePlatform: ApiV1CommunityPostsPostIdGetXCouturePlatformEnum
+  xCoutureReactions?: ApiV1CommunityPostsPostIdGetXCoutureReactionsEnum
 }
 
 export interface ApiV1CommunityPostsPostIdOpenedPostRequest {
   postId: string
   xCouturePlatform: ApiV1CommunityPostsPostIdOpenedPostXCouturePlatformEnum
   openCommunityPostInput: OpenCommunityPostInput
+}
+
+export interface ApiV1CommunityPostsPostIdReactionPutRequest {
+  postId: string
+  xCouturePlatform: ApiV1CommunityPostsPostIdReactionPutXCouturePlatformEnum
+  setCommunityReactionInput: SetCommunityReactionInput
 }
 
 export interface ApiV1CommunityPostsPostIdReportPostRequest {
@@ -259,6 +269,12 @@ export class CommunityApi extends runtime.BaseAPI {
 
     const headerParameters: runtime.HTTPHeaders = {}
 
+    if (requestParameters['xCoutureReactions'] != null) {
+      headerParameters['x-couture-reactions'] = String(
+        requestParameters['xCoutureReactions']
+      )
+    }
+
     if (requestParameters['xCouturePlatform'] != null) {
       headerParameters['x-couture-platform'] = String(
         requestParameters['xCouturePlatform']
@@ -291,7 +307,7 @@ export class CommunityApi extends runtime.BaseAPI {
   async apiV1CommunityFeedGetRaw(
     requestParameters: ApiV1CommunityFeedGetRequest,
     initOverrides?: RequestInit | runtime.InitOverrideFunction
-  ): Promise<runtime.ApiResponse<CommunityFeedResponse>> {
+  ): Promise<runtime.ApiResponse<ApiV1CommunityFeedGet200Response>> {
     const requestOptions = await this.apiV1CommunityFeedGetRequestOpts(requestParameters)
     const response = await this.request(requestOptions, initOverrides)
 
@@ -305,7 +321,7 @@ export class CommunityApi extends runtime.BaseAPI {
   async apiV1CommunityFeedGet(
     requestParameters: ApiV1CommunityFeedGetRequest,
     initOverrides?: RequestInit | runtime.InitOverrideFunction
-  ): Promise<CommunityFeedResponse> {
+  ): Promise<ApiV1CommunityFeedGet200Response> {
     const response = await this.apiV1CommunityFeedGetRaw(requestParameters, initOverrides)
     return await response.value()
   }
@@ -427,6 +443,12 @@ export class CommunityApi extends runtime.BaseAPI {
 
     const headerParameters: runtime.HTTPHeaders = {}
 
+    if (requestParameters['xCoutureReactions'] != null) {
+      headerParameters['x-couture-reactions'] = String(
+        requestParameters['xCoutureReactions']
+      )
+    }
+
     if (requestParameters['xCouturePlatform'] != null) {
       headerParameters['x-couture-platform'] = String(
         requestParameters['xCouturePlatform']
@@ -463,7 +485,7 @@ export class CommunityApi extends runtime.BaseAPI {
   async apiV1CommunityPostsPostIdGetRaw(
     requestParameters: ApiV1CommunityPostsPostIdGetRequest,
     initOverrides?: RequestInit | runtime.InitOverrideFunction
-  ): Promise<runtime.ApiResponse<CommunityPostResponse>> {
+  ): Promise<runtime.ApiResponse<ApiV1CommunityPostsPostIdGet200Response>> {
     const requestOptions =
       await this.apiV1CommunityPostsPostIdGetRequestOpts(requestParameters)
     const response = await this.request(requestOptions, initOverrides)
@@ -478,7 +500,7 @@ export class CommunityApi extends runtime.BaseAPI {
   async apiV1CommunityPostsPostIdGet(
     requestParameters: ApiV1CommunityPostsPostIdGetRequest,
     initOverrides?: RequestInit | runtime.InitOverrideFunction
-  ): Promise<CommunityPostResponse> {
+  ): Promise<ApiV1CommunityPostsPostIdGet200Response> {
     const response = await this.apiV1CommunityPostsPostIdGetRaw(
       requestParameters,
       initOverrides
@@ -573,6 +595,97 @@ export class CommunityApi extends runtime.BaseAPI {
     initOverrides?: RequestInit | runtime.InitOverrideFunction
   ): Promise<TrackedResponse> {
     const response = await this.apiV1CommunityPostsPostIdOpenedPostRaw(
+      requestParameters,
+      initOverrides
+    )
+    return await response.value()
+  }
+
+  /**
+   * Creates request options for apiV1CommunityPostsPostIdReactionPut without sending the request
+   */
+  async apiV1CommunityPostsPostIdReactionPutRequestOpts(
+    requestParameters: ApiV1CommunityPostsPostIdReactionPutRequest
+  ): Promise<runtime.RequestOpts> {
+    if (requestParameters['postId'] == null) {
+      throw new runtime.RequiredError(
+        'postId',
+        'Required parameter "postId" was null or undefined when calling apiV1CommunityPostsPostIdReactionPut().'
+      )
+    }
+
+    if (requestParameters['xCouturePlatform'] == null) {
+      throw new runtime.RequiredError(
+        'xCouturePlatform',
+        'Required parameter "xCouturePlatform" was null or undefined when calling apiV1CommunityPostsPostIdReactionPut().'
+      )
+    }
+
+    if (requestParameters['setCommunityReactionInput'] == null) {
+      throw new runtime.RequiredError(
+        'setCommunityReactionInput',
+        'Required parameter "setCommunityReactionInput" was null or undefined when calling apiV1CommunityPostsPostIdReactionPut().'
+      )
+    }
+
+    const queryParameters: any = {}
+
+    const headerParameters: runtime.HTTPHeaders = {}
+
+    headerParameters['Content-Type'] = 'application/json'
+
+    if (requestParameters['xCouturePlatform'] != null) {
+      headerParameters['x-couture-platform'] = String(
+        requestParameters['xCouturePlatform']
+      )
+    }
+
+    if (this.configuration && this.configuration.accessToken) {
+      const token = this.configuration.accessToken
+      const tokenString = await token('bearerAuth', [])
+
+      if (tokenString) {
+        headerParameters['Authorization'] = `Bearer ${tokenString}`
+      }
+    }
+
+    let urlPath = `/api/v1/community/posts/{postId}/reaction`
+    urlPath = urlPath.replace(
+      `{${'postId'}}`,
+      encodeURIComponent(String(requestParameters['postId']))
+    )
+
+    return {
+      path: urlPath,
+      method: 'PUT',
+      headers: headerParameters,
+      query: queryParameters,
+      body: requestParameters['setCommunityReactionInput'],
+    }
+  }
+
+  /**
+   * Set or retract the current member reaction
+   */
+  async apiV1CommunityPostsPostIdReactionPutRaw(
+    requestParameters: ApiV1CommunityPostsPostIdReactionPutRequest,
+    initOverrides?: RequestInit | runtime.InitOverrideFunction
+  ): Promise<runtime.ApiResponse<CommunityReactionResponse>> {
+    const requestOptions =
+      await this.apiV1CommunityPostsPostIdReactionPutRequestOpts(requestParameters)
+    const response = await this.request(requestOptions, initOverrides)
+
+    return new runtime.JSONApiResponse(response)
+  }
+
+  /**
+   * Set or retract the current member reaction
+   */
+  async apiV1CommunityPostsPostIdReactionPut(
+    requestParameters: ApiV1CommunityPostsPostIdReactionPutRequest,
+    initOverrides?: RequestInit | runtime.InitOverrideFunction
+  ): Promise<CommunityReactionResponse> {
+    const response = await this.apiV1CommunityPostsPostIdReactionPutRaw(
       requestParameters,
       initOverrides
     )
@@ -861,6 +974,14 @@ export type ApiV1CommunityFeedGetXCouturePlatformEnum =
 /**
  * @export
  */
+export const ApiV1CommunityFeedGetXCoutureReactionsEnum = {
+  _1: '1',
+} as const
+export type ApiV1CommunityFeedGetXCoutureReactionsEnum =
+  (typeof ApiV1CommunityFeedGetXCoutureReactionsEnum)[keyof typeof ApiV1CommunityFeedGetXCoutureReactionsEnum]
+/**
+ * @export
+ */
 export const ApiV1CommunityFeedGetModeEnum = {
   auto: 'auto',
   all: 'all',
@@ -894,12 +1015,29 @@ export type ApiV1CommunityPostsPostIdGetXCouturePlatformEnum =
 /**
  * @export
  */
+export const ApiV1CommunityPostsPostIdGetXCoutureReactionsEnum = {
+  _1: '1',
+} as const
+export type ApiV1CommunityPostsPostIdGetXCoutureReactionsEnum =
+  (typeof ApiV1CommunityPostsPostIdGetXCoutureReactionsEnum)[keyof typeof ApiV1CommunityPostsPostIdGetXCoutureReactionsEnum]
+/**
+ * @export
+ */
 export const ApiV1CommunityPostsPostIdOpenedPostXCouturePlatformEnum = {
   web: 'web',
   mobile: 'mobile',
 } as const
 export type ApiV1CommunityPostsPostIdOpenedPostXCouturePlatformEnum =
   (typeof ApiV1CommunityPostsPostIdOpenedPostXCouturePlatformEnum)[keyof typeof ApiV1CommunityPostsPostIdOpenedPostXCouturePlatformEnum]
+/**
+ * @export
+ */
+export const ApiV1CommunityPostsPostIdReactionPutXCouturePlatformEnum = {
+  web: 'web',
+  mobile: 'mobile',
+} as const
+export type ApiV1CommunityPostsPostIdReactionPutXCouturePlatformEnum =
+  (typeof ApiV1CommunityPostsPostIdReactionPutXCouturePlatformEnum)[keyof typeof ApiV1CommunityPostsPostIdReactionPutXCouturePlatformEnum]
 /**
  * @export
  */

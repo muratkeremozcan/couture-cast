@@ -1,9 +1,7 @@
-import { Injectable, Inject } from '@nestjs/common'
-import { createHmac } from 'node:crypto'
-import { PrismaClient, Prisma } from '@prisma/client'
-import { z } from 'zod'
-import { ANALYTICS_CLIENT, type AnalyticsClient } from '../../analytics/analytics.service'
 import {
+  communityReactionEventNameSchema,
+  trackCommunityReaction,
+  communityReactionEventPropertiesSchema,
   trackProfileCompleted,
   trackFirstOutfitGenerated,
   trackForecastViewed,
@@ -73,6 +71,11 @@ import {
   type CommunityPostWithdrawnEvent,
   type CommunityChallengeParticipatedEvent,
 } from '@couture/api-client'
+import { Injectable, Inject } from '@nestjs/common'
+import { createHmac } from 'node:crypto'
+import { PrismaClient, Prisma } from '@prisma/client'
+import { z } from 'zod'
+import { ANALYTICS_CLIENT, type AnalyticsClient } from '../../analytics/analytics.service'
 import { allowsTestOnlySecrets } from '../../config/runtime-environment'
 import { createBaseLogger } from '../../logger/pino.config'
 
@@ -1022,6 +1025,43 @@ export class TelemetryService {
     @Inject(ANALYTICS_CLIENT) private readonly analyticsClient: AnalyticsClient
   ) {
     this.analyticsIdSecret = requireAnalyticsIdSecret()
+  }
+
+  /** Durable outbox delivery propagates outages to the retry owner. */
+  async captureReactionEvent(
+    id: string,
+    userId: string,
+    eventType: string,
+    properties: unknown,
+    occurredAt: Date = new Date()
+  ): Promise<void> {
+    const event = communityReactionEventNameSchema.parse(eventType)
+    const parsed = communityReactionEventPropertiesSchema.parse(properties)
+    const subject = buildAnalyticsSubjectId(userId, this.analyticsIdSecret)
+    const payload = trackCommunityReaction(
+      event,
+      { ...parsed, analyticsSubjectId: subject },
+      id
+    ).properties
+    await this.prisma.telemetryEvent.upsert({
+      where: { id },
+      create: {
+        id,
+        created_at: occurredAt,
+        user_id: null,
+        event_type: event,
+        properties: payload,
+      },
+      update: {},
+    })
+    if (!this.analyticsClient.captureAcknowledged)
+      throw new Error('Acknowledged analytics transport unavailable')
+    await this.analyticsClient.captureAcknowledged({
+      distinctId: subject,
+      event,
+      timestamp: occurredAt.toISOString(),
+      properties: payload,
+    })
   }
 
   async captureEvent<T extends keyof TelemetryPropertiesMap>(

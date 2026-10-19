@@ -537,6 +537,7 @@ export class GuardianService {
     const normalizedIpAddress = ipAddress?.trim() || null
 
     const result = await this.prisma.$transaction(async (tx) => {
+      await tx.$executeRaw`SELECT pg_advisory_xact_lock(hashtext('community_member:' || ${payload.teenId}))`
       const invitation = await tx.guardianInvitation.findUnique({
         where: { id: payload.sub },
         include: {
@@ -733,6 +734,7 @@ export class GuardianService {
       try {
         result = await this.prisma.$transaction(
           async (tx) => {
+            await tx.$executeRaw`SELECT pg_advisory_xact_lock(hashtext('community_member:' || ${teenId}))`
             const consent = await tx.guardianConsent.findFirst({
               where: {
                 guardian_id: guardianId,
@@ -810,6 +812,12 @@ export class GuardianService {
             // minor's public content must not depend on whether a profile row
             // happens to exist.
             if (sessionInvalidated) {
+              // Serialize reaction withdrawal and publication changes with member mutations.
+              await tx.$queryRaw`SELECT id FROM "LookbookPost" WHERE id IN (SELECT post_id FROM "CommunityReaction" WHERE user_id = ${teenId}) OR user_id = ${teenId} ORDER BY id FOR UPDATE`
+              await tx.communityReaction.updateMany({
+                where: { user_id: teenId, selection: { not: null } },
+                data: { selection: null, revision: { increment: 1 } },
+              })
               await tx.lookbookPost.updateMany({
                 where: {
                   user_id: teenId,
@@ -882,7 +890,10 @@ export class GuardianService {
             }
           },
           {
-            isolationLevel: Prisma.TransactionIsolationLevel.Serializable,
+            // The member lock serializes consent grants, revocations and reactions.
+            // ReadCommitted takes its snapshot after a waiting lock is acquired, so
+            // revocation sees every vote the preceding member transaction committed.
+            isolationLevel: Prisma.TransactionIsolationLevel.ReadCommitted,
           }
         )
         break
@@ -1235,9 +1246,10 @@ export class GuardianService {
   async assertWardrobeUploadAllowed(
     userId: string,
     // eslint-disable-next-line @typescript-eslint/no-unused-vars
-    role?: string
+    role?: string,
+    tx: Prisma.TransactionClient = this.prisma
   ): Promise<void> {
-    const user = await this.prisma.user.findUnique({
+    const user = await tx.user.findUnique({
       where: { id: userId },
       include: {
         profile: true,

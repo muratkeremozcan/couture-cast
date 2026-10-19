@@ -521,15 +521,9 @@ describe('WardrobeCapsulesScreen', () => {
     await waitFor(() => {
       expect(screen.getByText('2 garments · Needs repair')).toBeInTheDocument()
     })
-    /**
-     * Only the presence of the repair line is asserted, not its wording:
-     * `wardrobe.capsules.unavailableCount` is a `_one`/`_other` plural key and
-     * `src/lib/i18n.ts` pins `compatibilityJSON: 'v3'`, whose resolver looks for
-     * `key`/`key_plural` instead. The lookup misses and the raw key renders. See
-     * the bug note in this lane's report; the wording assertion belongs here
-     * once the compat flag is dropped.
-     */
-    expect(screen.getByTestId('capsule-unavailable-count-cap-9')).toBeInTheDocument()
+    expect(screen.getByTestId('capsule-unavailable-count-cap-9')).toHaveTextContent(
+      '2 unavailable garments'
+    )
     // Without this notice a user filtering a large wardrobe would believe the
     // first page is the whole set.
     expect(screen.getByTestId('capsule-truncation-notice')).toHaveTextContent(

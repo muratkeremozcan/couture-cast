@@ -109,6 +109,9 @@ export const analyticsEventNameSchema = z.enum([
   'community_post_published',
   'community_post_reported',
   'community_post_withdrawn',
+  'community_reaction_added',
+  'community_reaction_replaced',
+  'community_reaction_removed',
   'community_challenge_participated',
 ])
 
@@ -840,7 +843,43 @@ export type CommunityChallengeParticipatedEvent = z.infer<
   typeof communityChallengeParticipatedEventSchema
 >
 
+// Story 6.3 owner: closed, privacy-safe reaction events delivered by the server outbox.
+export const communityReactionEventNameSchema = z.enum([
+  'community_reaction_added',
+  'community_reaction_replaced',
+  'community_reaction_removed',
+])
+export const communityReactionEventPropertiesSchema = z
+  .object({
+    platform: z.enum(['web', 'mobile']),
+    isSelf: z.boolean(),
+    selection: z.enum(['applause', 'love', 'inspiration']).nullable(),
+    previousSelection: z.enum(['applause', 'love', 'inspiration']).nullable(),
+  })
+  .strict()
+export type CommunityReactionEventProperties = z.infer<
+  typeof communityReactionEventPropertiesSchema
+>
+
+export const communityReactionSinkPropertiesSchema = z
+  .object({
+    platform: z.enum(['web', 'mobile']),
+    is_self: z.boolean(),
+    selection: z.enum(['applause', 'love', 'inspiration']).nullable(),
+    previous_selection: z.enum(['applause', 'love', 'inspiration']).nullable(),
+    $insert_id: z.string().uuid(),
+    dedupe_key: z.string().uuid(),
+    $ip: z.null(),
+  })
+  .strict()
+export const communityReactionEventSchema = communityReactionEventPropertiesSchema
+  .extend({ analyticsSubjectId: z.string().min(1) })
+  .strict()
+
 export const analyticsEventSchemas = {
+  community_reaction_added: communityReactionEventSchema,
+  community_reaction_replaced: communityReactionEventSchema,
+  community_reaction_removed: communityReactionEventSchema,
   ritual_created: ritualCreatedEventSchema,
   wardrobe_upload_started: wardrobeUploadStartedEventSchema,
   alert_received: alertReceivedEventSchema,
@@ -2301,6 +2340,29 @@ export function trackCommunityChallengeParticipated(
       dedupe_key: parsed.dedupeKey,
       climate_band: parsed.climateBand,
       challenge_id: parsed.challengeId,
+    }),
+  }
+}
+
+/** Story 6.3 owner: one strict mapping for all durable reaction sink events. */
+export function trackCommunityReaction(
+  eventName: z.infer<typeof communityReactionEventNameSchema>,
+  event: z.infer<typeof communityReactionEventSchema>,
+  insertionId: string
+) {
+  const name = communityReactionEventNameSchema.parse(eventName)
+  const parsed = communityReactionEventSchema.parse(event)
+  return {
+    distinctId: parsed.analyticsSubjectId,
+    event: name,
+    properties: communityReactionSinkPropertiesSchema.parse({
+      platform: parsed.platform,
+      is_self: parsed.isSelf,
+      selection: parsed.selection,
+      previous_selection: parsed.previousSelection,
+      $insert_id: insertionId,
+      dedupe_key: insertionId,
+      $ip: null,
     }),
   }
 }

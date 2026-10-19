@@ -21,6 +21,19 @@
 # outlived them and swallowed every Settings tap.
 appId: ${MAESTRO_APP_ID}
 ---
+# On iOS 26, Expo Go's native menu is absent from the XCUI hierarchy while
+# the underlying tab bar remains discoverable. A screenshot of the failed
+# community flow showed the sheet still covering the app. Its backdrop sits
+# above the sheet; this position is the inert Home header after dismissal.
+- runFlow:
+    when:
+      platform: iOS
+    commands:
+      - tapOn:
+          point: '50%,10%'
+          label: 'Dismiss the iOS Expo Go menu backdrop after app mount'
+      - waitForAnimationToEnd
+
 - runFlow:
     when:
       visible:

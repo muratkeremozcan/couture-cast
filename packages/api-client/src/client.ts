@@ -8,7 +8,7 @@ export type ApiClientAccessToken = Exclude<
 export type ApiClientOptions = Pick<
   ConfigurationParameters,
   'accessToken' | 'credentials' | 'fetchApi' | 'headers'
->
+> & { communityReactions?: boolean }
 
 function isPromiseLike(value: unknown): value is Promise<string> {
   return (
@@ -54,7 +54,10 @@ export function createApiClient(
     accessToken: options.accessToken,
     credentials: options.credentials,
     fetchApi: options.fetchApi,
-    headers: options.headers,
+    headers: {
+      ...options.headers,
+      ...(options.communityReactions ? { 'x-couture-reactions': '1' } : {}),
+    },
   })
 
   return new DefaultApi(config)

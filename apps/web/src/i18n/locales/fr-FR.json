@@ -585,6 +585,22 @@
       "disabled": "Le fil de la communauté est temporairement indisponible.",
       "mediaUnavailable": "Ce look est temporairement indisponible. Réessayez dans quelques instants.",
       "generic": "Une erreur s’est produite. Réessayez."
+    },
+    "reactions": {
+      "label": "Réactions",
+      "applause": "Applaudir",
+      "love": "J’adore",
+      "inspiration": "Inspirant",
+      "total": "{{count}} réactions",
+      "pending": "Enregistrement de la réaction…",
+      "updated": "Réaction enregistrée.",
+      "conflict": "Votre réaction a changé sur un autre appareil. Choisissez à nouveau.",
+      "failed": "Impossible d’enregistrer votre réaction. Réessayez pour confirmer.",
+      "retry": "Réessayer la réaction",
+      "rateLimited": "Trop de réactions. Réessayez dans une minute.",
+      "total_one": "{{count}} réaction",
+      "total_other": "{{count}} réactions",
+      "ineligible": "Les réactions sont réservées aux 13 ans et plus. Avant 16 ans, un consentement parental actif est nécessaire."
     }
   }
 }

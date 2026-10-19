@@ -108,6 +108,20 @@ describe('initI18n on a first launch', () => {
     expect(i18n.t('wardrobe.capsules.save')).not.toBe('wardrobe.capsules.save')
   })
 
+  it.each([
+    { locale: 'en-US', one: '1 reaction', many: '2 reactions' },
+    { locale: 'fr-FR', one: '1 réaction', many: '2 réactions' },
+    { locale: 'tr-TR', one: '1 tepki', many: '2 tepki' },
+  ])('uses the shipped plural forms for $locale', async ({ locale, one, many }) => {
+    try {
+      await i18n.changeLanguage(locale)
+      expect(i18n.t('community.reactions.total', { count: 1 })).toBe(one)
+      expect(i18n.t('community.reactions.total', { count: 2 })).toBe(many)
+    } finally {
+      await i18n.changeLanguage('tr-TR')
+    }
+  })
+
   /**
    * Every screen calls this on mount. A second i18next init would tear down the
    * live language, so later calls must resolve from the already-loaded instance.

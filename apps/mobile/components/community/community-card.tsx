@@ -1,7 +1,9 @@
+import type { ReactionControls } from '@couture/api-client'
+import { CommunityReactions } from './community-reactions'
 import React, { useCallback, useEffect, useRef, useState } from 'react'
 import { Image, Pressable, StyleSheet, Text, TouchableOpacity, View } from 'react-native'
 import { useTranslation } from 'react-i18next'
-import type { CommunityFeedItem } from '@couture/api-client/contracts/http'
+import type { CommunityReactionFeedItem as CommunityFeedItem } from '@couture/api-client/contracts/http'
 import { useHeroPalette } from '@/components/hero/hero-theme'
 
 /**
@@ -178,6 +180,7 @@ function CommunityCardActions({
 }
 
 export interface CommunityCardProps {
+  reactionControls?: ReactionControls
   item: CommunityFeedItem
   /** Settles the report control into its disabled "Reported" state. */
   isReported?: boolean
@@ -195,6 +198,7 @@ export interface CommunityCardProps {
 }
 
 export function CommunityCard({
+  reactionControls,
   item,
   isReported = false,
   isSponsored = false,
@@ -375,6 +379,7 @@ export function CommunityCard({
         </Text>
       ) : null}
 
+      {reactionControls && <CommunityReactions item={item} controls={reactionControls} />}
       <View style={styles.actionsRow}>
         <CommunityCardActions
           item={item}

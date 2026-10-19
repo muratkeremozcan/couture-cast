@@ -114,8 +114,16 @@ import {
  * This asserts the one composition both call.
  */
 describe('createCommunityWorkerRuntime', () => {
-  const prisma = {} as PrismaClient
-  const telemetryService = {} as TelemetryService
+  const claim = vi.fn().mockResolvedValue([])
+  const settle = vi.fn().mockResolvedValue({ count: 1 })
+  const prisma = {
+    $queryRaw: claim,
+    $executeRaw: vi.fn().mockResolvedValue(0),
+    communityReactionOutbox: { updateMany: settle, deleteMany: vi.fn() },
+    communityReactionReceipt: { deleteMany: vi.fn() },
+  } as unknown as PrismaClient
+  const captureReactionEvent = vi.fn().mockResolvedValue(undefined)
+  const telemetryService = { captureReactionEvent } as unknown as TelemetryService
   const originalScreener = process.env[COMMUNITY_NSFW_SCREENER_ENV]
 
   const recordScreenerReadiness = vi.fn()
@@ -127,6 +135,9 @@ describe('createCommunityWorkerRuntime', () => {
   })
 
   beforeEach(() => {
+    claim.mockReset().mockResolvedValue([])
+    settle.mockClear()
+    captureReactionEvent.mockClear()
     harness.order.length = 0
     recordScreenerReadiness.mockReset()
     harness.screenerEnsureReady.mockReset().mockImplementation(async () => {
@@ -226,7 +237,26 @@ describe('createCommunityWorkerRuntime', () => {
       meter: meter(),
     })
 
+    claim.mockResolvedValueOnce([
+      {
+        id: '63100000-0000-4000-8000-000000000001',
+        user_id: 'synthetic-member',
+        event_type: 'community_reaction_added',
+        payload: {},
+        attempts: 1,
+        created_at: new Date(),
+      },
+    ])
     await runtime.sweeps.dispatchPending()
+    expect(captureReactionEvent).toHaveBeenCalledOnce()
+    expect(settle).toHaveBeenCalledWith(
+      expect.objectContaining({
+        data: expect.objectContaining({
+          delivered_at: expect.any(Date) as unknown,
+          lease_id: null,
+        }) as unknown,
+      })
+    )
     await runtime.sweeps.sweepStalePendingReview()
     await runtime.sweeps.sweepExpiredUploads()
     await runtime.sweeps.sweepErasureRequests()
@@ -272,6 +302,9 @@ describe('createCommunityWorkerRuntime', () => {
       telemetryService,
       meter: meter(),
     })
+    claim.mockReset().mockResolvedValue([])
+    settle.mockClear()
+    captureReactionEvent.mockClear()
     harness.order.length = 0
 
     await runtime.close()
@@ -298,6 +331,9 @@ describe('createCommunityWorkerRuntime', () => {
       telemetryService,
       meter: meter(),
     })
+    claim.mockReset().mockResolvedValue([])
+    settle.mockClear()
+    captureReactionEvent.mockClear()
     harness.order.length = 0
 
     await expect(runtime.close()).rejects.toBe(closeFailure)

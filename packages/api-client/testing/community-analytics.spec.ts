@@ -3,6 +3,7 @@
 import { describe, expect, it } from 'vitest'
 import {
   analyticsEventNameSchema,
+  trackCommunityReaction,
   analyticsEventSchemas,
   communityCardOpenedPropertiesSchema,
   communityFeedViewedPropertiesSchema,
@@ -183,7 +184,47 @@ const communityEventCases: CommunityEventCase[] = [
   },
 ]
 
+const reactionEventCases: CommunityEventCase[] = (
+  [
+    'community_reaction_added',
+    'community_reaction_replaced',
+    'community_reaction_removed',
+  ] as const
+).map((name) => {
+  const selection = name === 'community_reaction_removed' ? null : 'love'
+  const previousSelection = name === 'community_reaction_added' ? null : 'applause'
+  const insertionId = '63100000-0000-4000-8000-000000000001'
+  return {
+    name,
+    build: () =>
+      trackCommunityReaction(
+        name,
+        {
+          analyticsSubjectId: SUBJECT,
+          platform: 'web',
+          isSelf: true,
+          selection,
+          previousSelection,
+        },
+        insertionId
+      ),
+    properties: {
+      platform: 'web',
+      is_self: true,
+      selection,
+      previous_selection: previousSelection,
+      $insert_id: insertionId,
+      dedupe_key: insertionId,
+      $ip: null,
+    },
+  }
+})
+communityEventCases.push(...reactionEventCases)
+
 const COMMUNITY_EVENT_NAMES: CommunityEventName[] = [
+  'community_reaction_added',
+  'community_reaction_replaced',
+  'community_reaction_removed',
   'community_feed_viewed',
   'community_card_opened',
   'community_post_allocated',
@@ -402,7 +443,7 @@ describe('6.1 community analytics event wrappers', () => {
   })
 
   describe('registry closure', () => {
-    it('6.1-CON-058 covers all eight community events in this suite', () => {
+    it('6.1-CON-058 covers all eleven community events in this suite', () => {
       expect(communityEventCases.map((testCase) => testCase.name).sort()).toEqual(
         [...COMMUNITY_EVENT_NAMES].sort()
       )

@@ -1,6 +1,7 @@
 // Learning path Step 32: Wardrobe onboarding and silhouette setup.
 // See _bmad-output/project-knowledge/learning-path-step-by-step.md#step-32-wardrobe-onboarding-and-silhouette-setup
 import React from 'react'
+import { userEvent as browserUser } from '@vitest/browser/context'
 import type * as ReactNativeModule from 'react-native'
 import { fireEvent, render, screen, waitFor } from '@testing-library/react'
 import { afterEach, beforeAll, beforeEach, describe, expect, it, vi } from 'vitest'
@@ -216,34 +217,53 @@ describe('WardrobeHubScreen', () => {
   })
 
   it('4.4-MOB-HUB-03B polls a still-processing commit until it needs tags, then opens tagging (regression, 4.4-R05)', async () => {
-    // The extraction split "who owns polling a still-processing garment"
-    // across the capture modal (reports the commit result) and this screen
-    // (owns pollCommittedGarment): exactly the seam a regression could
-    // silently break with no test noticing, since every other capture test
-    // here only exercises the immediate 'awaiting_tags' commit result.
-    server.use(...captureUploadHandlers('garment-2', 'processing'))
-
-    renderScreen()
-    await captureOneGarment()
-    fireEvent.click(screen.getByTestId('garment-capture-done'))
-
-    // Still processing: no tagging modal yet, and the grid reflects it.
-    await waitFor(() => {
-      expect(screen.getByTestId('garment-status-processing')).toBeInTheDocument()
+    // Exercise the handoff from the capture modal's processing commit to the
+    // screen's poll. Hold the settling response until the processing UI is checked.
+    let garmentListReads = 0
+    let releaseAwaitingTags!: () => void
+    const awaitingTagsResponse = new Promise<void>((resolve) => {
+      releaseAwaitingTags = resolve
     })
-    expect(screen.queryByTestId('garment-tagging-modal')).not.toBeInTheDocument()
-
     server.use(
-      http.get('*/api/v1/wardrobe/garments', () =>
-        HttpResponse.json({
+      ...captureUploadHandlers('garment-2', 'processing'),
+      http.get('*/api/v1/wardrobe/garments', async () => {
+        garmentListReads += 1
+        if (garmentListReads === 1) return HttpResponse.json({ data: [] })
+        if (garmentListReads === 2) {
+          return HttpResponse.json({
+            data: [garmentFixture({ id: 'garment-2', status: 'processing' })],
+          })
+        }
+        await awaitingTagsResponse
+        return HttpResponse.json({
           data: [garmentFixture({ id: 'garment-2', status: 'awaiting_tags' })],
         })
-      )
+      })
     )
 
-    await waitFor(() => {
-      expect(screen.getByTestId('garment-tagging-modal')).toBeInTheDocument()
-    })
+    try {
+      renderScreen()
+      await screen.findByText('No garments added yet')
+      await captureOneGarment()
+      await browserUser.click(screen.getByTestId('garment-capture-done'))
+
+      // The second poll has started, so the first processing response reached
+      // the screen. The held response prevents the short poll budget racing ahead.
+      await waitFor(() => expect(garmentListReads).toBe(3))
+      expect(screen.getByTestId('garment-status-processing')).toBeInTheDocument()
+      expect(screen.queryByTestId('garment-tagging-modal')).not.toBeInTheDocument()
+      expect(screen.queryByTestId('wardrobe-error-banner')).not.toBeInTheDocument()
+
+      releaseAwaitingTags()
+      await waitFor(() => {
+        expect(screen.getByTestId('garment-status-awaiting_tags')).toBeInTheDocument()
+        expect(screen.getByTestId('garment-tagging-modal')).toBeInTheDocument()
+      })
+      expect(garmentListReads).toBe(3)
+      expect(screen.queryByTestId('wardrobe-error-banner')).not.toBeInTheDocument()
+    } finally {
+      releaseAwaitingTags()
+    }
   })
 
   it('4.4-MOB-HUB-04 shows the onboarding entry-point card while onboarding is not completed', async () => {

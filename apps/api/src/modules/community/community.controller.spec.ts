@@ -103,7 +103,15 @@ describe('CommunityController', () => {
     const createChallenge = vi.fn().mockResolvedValue(challengeProjection)
     const updateChallenge = vi.fn().mockResolvedValue(challengeProjection)
 
+    const setReaction = vi.fn().mockResolvedValue({
+      counts: { applause: 1, love: 0, inspiration: 0 },
+      total: 1,
+      viewerReaction: 'applause',
+      revision: 1,
+      generation: 1,
+    })
     const communityService = {
+      setReaction,
       getFeed,
       allocatePost,
       publishPost,
@@ -117,6 +125,7 @@ describe('CommunityController', () => {
     const controller = new CommunityController(communityService)
     return {
       controller,
+      setReaction,
       getFeed,
       allocatePost,
       publishPost,
@@ -593,6 +602,49 @@ describe('CommunityController', () => {
       const response = await controller.updateChallenge('chal-1', payload)
       expect(updateChallenge).toHaveBeenCalledWith('chal-1', payload)
       expect(response.data.id).toBe('chal-1')
+    })
+  })
+  describe('Story 6.3 reaction HTTP boundary', () => {
+    const input = {
+      selection: 'applause' as const,
+      mutationId: '63100000-0000-4000-8000-000000000001',
+      baseRevision: 0,
+    }
+    it('validates desired state and returns the authoritative response', async () => {
+      const { controller, setReaction } = createController()
+      const { response } = createResponse()
+      expect(
+        await controller.setReaction(authContext, 'post-1', 'web', input, response)
+      ).toMatchObject({ data: { viewerReaction: 'applause', revision: 1 } })
+      expect(setReaction).toHaveBeenCalledWith({
+        userId: authContext.userId,
+        postId: 'post-1',
+        platform: 'web',
+        input,
+      })
+      await expect(
+        controller.setReaction(authContext, 'post-1', undefined, input, response)
+      ).rejects.toBeInstanceOf(BadRequestException)
+      await expect(
+        controller.setReaction(
+          authContext,
+          'post-1',
+          'web',
+          { ...input, selection: 'laugh' },
+          response
+        )
+      ).rejects.toBeInstanceOf(BadRequestException)
+    })
+    it('preserves retry-after on mutation quota refusals', async () => {
+      const { controller, setReaction } = createController()
+      const { response, setHeader } = createResponse()
+      setReaction.mockRejectedValue(
+        new CommunityRateLimitException('Too many reactions.', 30)
+      )
+      await expect(
+        controller.setReaction(authContext, 'post-1', 'web', input, response)
+      ).rejects.toBeInstanceOf(CommunityRateLimitException)
+      expect(setHeader).toHaveBeenCalledWith('Retry-After', '30')
     })
   })
 })

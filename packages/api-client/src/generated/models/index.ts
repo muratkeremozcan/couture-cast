@@ -847,6 +847,836 @@ export type ApiHealthResponseServiceEnum =
 /**
  *
  * @export
+ * @interface ApiV1CommunityFeedGet200Response
+ */
+export interface ApiV1CommunityFeedGet200Response {
+  /**
+   *
+   * @type {ApiV1CommunityFeedGet200ResponseAnyOfData}
+   * @memberof ApiV1CommunityFeedGet200Response
+   */
+  data: ApiV1CommunityFeedGet200ResponseAnyOfData
+}
+/**
+ *
+ * @export
+ * @interface ApiV1CommunityFeedGet200ResponseAnyOf
+ */
+export interface ApiV1CommunityFeedGet200ResponseAnyOf {
+  /**
+   *
+   * @type {ApiV1CommunityFeedGet200ResponseAnyOfData}
+   * @memberof ApiV1CommunityFeedGet200ResponseAnyOf
+   */
+  data: ApiV1CommunityFeedGet200ResponseAnyOfData
+}
+/**
+ *
+ * @export
+ * @interface ApiV1CommunityFeedGet200ResponseAnyOfData
+ */
+export interface ApiV1CommunityFeedGet200ResponseAnyOfData {
+  /**
+   *
+   * @type {Array<ApiV1CommunityFeedGet200ResponseAnyOfDataItemsInner>}
+   * @memberof ApiV1CommunityFeedGet200ResponseAnyOfData
+   */
+  items: Array<ApiV1CommunityFeedGet200ResponseAnyOfDataItemsInner>
+  /**
+   *
+   * @type {Array<ApiV1CommunityFeedGet200ResponseAnyOfDataAuthorStatesInner>}
+   * @memberof ApiV1CommunityFeedGet200ResponseAnyOfData
+   */
+  authorStates: Array<ApiV1CommunityFeedGet200ResponseAnyOfDataAuthorStatesInner>
+  /**
+   *
+   * @type {string}
+   * @memberof ApiV1CommunityFeedGet200ResponseAnyOfData
+   */
+  nextCursor: string | null
+  /**
+   *
+   * @type {ApiV1CommunityFeedGet200ResponseAnyOfDataModeEnum}
+   * @memberof ApiV1CommunityFeedGet200ResponseAnyOfData
+   */
+  mode: ApiV1CommunityFeedGet200ResponseAnyOfDataModeEnum
+  /**
+   * The climate band resolved for the viewer, or null if unresolvable.
+   * @type {ApiV1CommunityFeedGet200ResponseAnyOfDataViewerBandEnum}
+   * @memberof ApiV1CommunityFeedGet200ResponseAnyOfData
+   */
+  viewerBand: ApiV1CommunityFeedGet200ResponseAnyOfDataViewerBandEnum | null
+  /**
+   *
+   * @type {boolean}
+   * @memberof ApiV1CommunityFeedGet200ResponseAnyOfData
+   */
+  bandResolved: boolean
+  /**
+   * Why the viewer band could not be resolved, or null when it resolved. Clients render a localized banner from this.
+   * @type {ApiV1CommunityFeedGet200ResponseAnyOfDataBandUnresolvedReasonEnum}
+   * @memberof ApiV1CommunityFeedGet200ResponseAnyOfData
+   */
+  bandUnresolvedReason: ApiV1CommunityFeedGet200ResponseAnyOfDataBandUnresolvedReasonEnum | null
+  /**
+   *
+   * @type {ApiV1CommunityFeedGet200ResponseAnyOfDataExperimentVariantEnum}
+   * @memberof ApiV1CommunityFeedGet200ResponseAnyOfData
+   */
+  experimentVariant: ApiV1CommunityFeedGet200ResponseAnyOfDataExperimentVariantEnum
+  /**
+   *
+   * @type {ApiV1CommunityFeedGet200ResponseAnyOfDataActiveChallenge}
+   * @memberof ApiV1CommunityFeedGet200ResponseAnyOfData
+   */
+  activeChallenge: ApiV1CommunityFeedGet200ResponseAnyOfDataActiveChallenge | null
+}
+
+/**
+ * @export
+ */
+export const ApiV1CommunityFeedGet200ResponseAnyOfDataModeEnum = {
+  auto: 'auto',
+  all: 'all',
+  cold_wet: 'cold_wet',
+  cold_dry: 'cold_dry',
+  temperate_wet: 'temperate_wet',
+  temperate_dry: 'temperate_dry',
+  warm_wet: 'warm_wet',
+  warm_dry: 'warm_dry',
+} as const
+export type ApiV1CommunityFeedGet200ResponseAnyOfDataModeEnum =
+  (typeof ApiV1CommunityFeedGet200ResponseAnyOfDataModeEnum)[keyof typeof ApiV1CommunityFeedGet200ResponseAnyOfDataModeEnum]
+
+/**
+ * @export
+ */
+export const ApiV1CommunityFeedGet200ResponseAnyOfDataViewerBandEnum = {
+  cold_wet: 'cold_wet',
+  cold_dry: 'cold_dry',
+  temperate_wet: 'temperate_wet',
+  temperate_dry: 'temperate_dry',
+  warm_wet: 'warm_wet',
+  warm_dry: 'warm_dry',
+} as const
+export type ApiV1CommunityFeedGet200ResponseAnyOfDataViewerBandEnum =
+  (typeof ApiV1CommunityFeedGet200ResponseAnyOfDataViewerBandEnum)[keyof typeof ApiV1CommunityFeedGet200ResponseAnyOfDataViewerBandEnum]
+
+/**
+ * @export
+ */
+export const ApiV1CommunityFeedGet200ResponseAnyOfDataBandUnresolvedReasonEnum = {
+  no_location: 'no_location',
+  weather_unavailable: 'weather_unavailable',
+  weather_stale: 'weather_stale',
+  weather_malformed: 'weather_malformed',
+  insufficient_usable_days: 'insufficient_usable_days',
+} as const
+export type ApiV1CommunityFeedGet200ResponseAnyOfDataBandUnresolvedReasonEnum =
+  (typeof ApiV1CommunityFeedGet200ResponseAnyOfDataBandUnresolvedReasonEnum)[keyof typeof ApiV1CommunityFeedGet200ResponseAnyOfDataBandUnresolvedReasonEnum]
+
+/**
+ * @export
+ */
+export const ApiV1CommunityFeedGet200ResponseAnyOfDataExperimentVariantEnum = {
+  auto: 'auto',
+  all: 'all',
+} as const
+export type ApiV1CommunityFeedGet200ResponseAnyOfDataExperimentVariantEnum =
+  (typeof ApiV1CommunityFeedGet200ResponseAnyOfDataExperimentVariantEnum)[keyof typeof ApiV1CommunityFeedGet200ResponseAnyOfDataExperimentVariantEnum]
+
+/**
+ *
+ * @export
+ * @interface ApiV1CommunityFeedGet200ResponseAnyOfDataActiveChallenge
+ */
+export interface ApiV1CommunityFeedGet200ResponseAnyOfDataActiveChallenge {
+  /**
+   *
+   * @type {string}
+   * @memberof ApiV1CommunityFeedGet200ResponseAnyOfDataActiveChallenge
+   */
+  id: string
+  /**
+   *
+   * @type {string}
+   * @memberof ApiV1CommunityFeedGet200ResponseAnyOfDataActiveChallenge
+   */
+  slug: string
+  /**
+   * The climate band this challenge is restricted to, or null if unrestricted.
+   * @type {ApiV1CommunityFeedGet200ResponseAnyOfDataActiveChallengeClimateBandEnum}
+   * @memberof ApiV1CommunityFeedGet200ResponseAnyOfDataActiveChallenge
+   */
+  climateBand: ApiV1CommunityFeedGet200ResponseAnyOfDataActiveChallengeClimateBandEnum | null
+  /**
+   *
+   * @type {string}
+   * @memberof ApiV1CommunityFeedGet200ResponseAnyOfDataActiveChallenge
+   */
+  title: string
+  /**
+   *
+   * @type {string}
+   * @memberof ApiV1CommunityFeedGet200ResponseAnyOfDataActiveChallenge
+   */
+  body: string
+  /**
+   *
+   * @type {string}
+   * @memberof ApiV1CommunityFeedGet200ResponseAnyOfDataActiveChallenge
+   */
+  startsAt: string
+  /**
+   *
+   * @type {string}
+   * @memberof ApiV1CommunityFeedGet200ResponseAnyOfDataActiveChallenge
+   */
+  endsAt: string
+  /**
+   *
+   * @type {string}
+   * @memberof ApiV1CommunityFeedGet200ResponseAnyOfDataActiveChallenge
+   */
+  timeZone: string
+}
+
+/**
+ * @export
+ */
+export const ApiV1CommunityFeedGet200ResponseAnyOfDataActiveChallengeClimateBandEnum = {
+  cold_wet: 'cold_wet',
+  cold_dry: 'cold_dry',
+  temperate_wet: 'temperate_wet',
+  temperate_dry: 'temperate_dry',
+  warm_wet: 'warm_wet',
+  warm_dry: 'warm_dry',
+} as const
+export type ApiV1CommunityFeedGet200ResponseAnyOfDataActiveChallengeClimateBandEnum =
+  (typeof ApiV1CommunityFeedGet200ResponseAnyOfDataActiveChallengeClimateBandEnum)[keyof typeof ApiV1CommunityFeedGet200ResponseAnyOfDataActiveChallengeClimateBandEnum]
+
+/**
+ *
+ * @export
+ * @interface ApiV1CommunityFeedGet200ResponseAnyOfDataAuthorStatesInner
+ */
+export interface ApiV1CommunityFeedGet200ResponseAnyOfDataAuthorStatesInner {
+  /**
+   *
+   * @type {string}
+   * @memberof ApiV1CommunityFeedGet200ResponseAnyOfDataAuthorStatesInner
+   */
+  id: string
+  /**
+   *
+   * @type {string}
+   * @memberof ApiV1CommunityFeedGet200ResponseAnyOfDataAuthorStatesInner
+   */
+  caption: string | null
+  /**
+   *
+   * @type {string}
+   * @memberof ApiV1CommunityFeedGet200ResponseAnyOfDataAuthorStatesInner
+   */
+  altText: string | null
+  /**
+   * The climate band stamped when the post was classified, or null if unclassified.
+   * @type {ApiV1CommunityFeedGet200ResponseAnyOfDataAuthorStatesInnerClimateBandEnum}
+   * @memberof ApiV1CommunityFeedGet200ResponseAnyOfDataAuthorStatesInner
+   */
+  climateBand: ApiV1CommunityFeedGet200ResponseAnyOfDataAuthorStatesInnerClimateBandEnum | null
+  /**
+   *
+   * @type {ApiV1CommunityFeedGet200ResponseAnyOfDataItemsInnerImageAccess}
+   * @memberof ApiV1CommunityFeedGet200ResponseAnyOfDataAuthorStatesInner
+   */
+  imageAccess: ApiV1CommunityFeedGet200ResponseAnyOfDataItemsInnerImageAccess | null
+  /**
+   *
+   * @type {string}
+   * @memberof ApiV1CommunityFeedGet200ResponseAnyOfDataAuthorStatesInner
+   */
+  createdAt: string
+  /**
+   *
+   * @type {string}
+   * @memberof ApiV1CommunityFeedGet200ResponseAnyOfDataAuthorStatesInner
+   */
+  publishedAt: string | null
+  /**
+   *
+   * @type {ApiV1CommunityFeedGet200ResponseAnyOfDataAuthorStatesInnerStatusEnum}
+   * @memberof ApiV1CommunityFeedGet200ResponseAnyOfDataAuthorStatesInner
+   */
+  status: ApiV1CommunityFeedGet200ResponseAnyOfDataAuthorStatesInnerStatusEnum
+  /**
+   *
+   * @type {string}
+   * @memberof ApiV1CommunityFeedGet200ResponseAnyOfDataAuthorStatesInner
+   */
+  challengeId: string | null
+  /**
+   *
+   * @type {string}
+   * @memberof ApiV1CommunityFeedGet200ResponseAnyOfDataAuthorStatesInner
+   */
+  moderationReason: string | null
+}
+
+/**
+ * @export
+ */
+export const ApiV1CommunityFeedGet200ResponseAnyOfDataAuthorStatesInnerClimateBandEnum = {
+  cold_wet: 'cold_wet',
+  cold_dry: 'cold_dry',
+  temperate_wet: 'temperate_wet',
+  temperate_dry: 'temperate_dry',
+  warm_wet: 'warm_wet',
+  warm_dry: 'warm_dry',
+} as const
+export type ApiV1CommunityFeedGet200ResponseAnyOfDataAuthorStatesInnerClimateBandEnum =
+  (typeof ApiV1CommunityFeedGet200ResponseAnyOfDataAuthorStatesInnerClimateBandEnum)[keyof typeof ApiV1CommunityFeedGet200ResponseAnyOfDataAuthorStatesInnerClimateBandEnum]
+
+/**
+ * @export
+ */
+export const ApiV1CommunityFeedGet200ResponseAnyOfDataAuthorStatesInnerStatusEnum = {
+  draft: 'draft',
+  uploading: 'uploading',
+  pending_review: 'pending_review',
+  published: 'published',
+  flagged: 'flagged',
+  review_failed: 'review_failed',
+  withdrawn: 'withdrawn',
+  consent_suspended: 'consent_suspended',
+} as const
+export type ApiV1CommunityFeedGet200ResponseAnyOfDataAuthorStatesInnerStatusEnum =
+  (typeof ApiV1CommunityFeedGet200ResponseAnyOfDataAuthorStatesInnerStatusEnum)[keyof typeof ApiV1CommunityFeedGet200ResponseAnyOfDataAuthorStatesInnerStatusEnum]
+
+/**
+ *
+ * @export
+ * @interface ApiV1CommunityFeedGet200ResponseAnyOfDataItemsInner
+ */
+export interface ApiV1CommunityFeedGet200ResponseAnyOfDataItemsInner {
+  /**
+   *
+   * @type {string}
+   * @memberof ApiV1CommunityFeedGet200ResponseAnyOfDataItemsInner
+   */
+  id: string
+  /**
+   *
+   * @type {string}
+   * @memberof ApiV1CommunityFeedGet200ResponseAnyOfDataItemsInner
+   */
+  caption: string | null
+  /**
+   *
+   * @type {string}
+   * @memberof ApiV1CommunityFeedGet200ResponseAnyOfDataItemsInner
+   */
+  altText: string | null
+  /**
+   * The climate band stamped when the post was published, or null if unclassified.
+   * @type {ApiV1CommunityFeedGet200ResponseAnyOfDataItemsInnerClimateBandEnum}
+   * @memberof ApiV1CommunityFeedGet200ResponseAnyOfDataItemsInner
+   */
+  climateBand: ApiV1CommunityFeedGet200ResponseAnyOfDataItemsInnerClimateBandEnum | null
+  /**
+   *
+   * @type {ApiV1CommunityFeedGet200ResponseAnyOfDataItemsInnerImageAccess}
+   * @memberof ApiV1CommunityFeedGet200ResponseAnyOfDataItemsInner
+   */
+  imageAccess: ApiV1CommunityFeedGet200ResponseAnyOfDataItemsInnerImageAccess
+  /**
+   *
+   * @type {string}
+   * @memberof ApiV1CommunityFeedGet200ResponseAnyOfDataItemsInner
+   */
+  publishedAt: string | null
+  /**
+   *
+   * @type {string}
+   * @memberof ApiV1CommunityFeedGet200ResponseAnyOfDataItemsInner
+   */
+  createdAt: string
+  /**
+   *
+   * @type {ApiV1CommunityFeedGet200ResponseAnyOfDataItemsInnerStatusEnum}
+   * @memberof ApiV1CommunityFeedGet200ResponseAnyOfDataItemsInner
+   */
+  status: ApiV1CommunityFeedGet200ResponseAnyOfDataItemsInnerStatusEnum
+  /**
+   *
+   * @type {string}
+   * @memberof ApiV1CommunityFeedGet200ResponseAnyOfDataItemsInner
+   */
+  challengeId: string | null
+  /**
+   *
+   * @type {ApiV1CommunityFeedGet200ResponseAnyOfDataItemsInnerAuthor}
+   * @memberof ApiV1CommunityFeedGet200ResponseAnyOfDataItemsInner
+   */
+  author: ApiV1CommunityFeedGet200ResponseAnyOfDataItemsInnerAuthor
+  /**
+   *
+   * @type {ApiV1CommunityFeedGet200ResponseAnyOfDataItemsInnerReactions}
+   * @memberof ApiV1CommunityFeedGet200ResponseAnyOfDataItemsInner
+   */
+  reactions?: ApiV1CommunityFeedGet200ResponseAnyOfDataItemsInnerReactions
+}
+
+/**
+ * @export
+ */
+export const ApiV1CommunityFeedGet200ResponseAnyOfDataItemsInnerClimateBandEnum = {
+  cold_wet: 'cold_wet',
+  cold_dry: 'cold_dry',
+  temperate_wet: 'temperate_wet',
+  temperate_dry: 'temperate_dry',
+  warm_wet: 'warm_wet',
+  warm_dry: 'warm_dry',
+} as const
+export type ApiV1CommunityFeedGet200ResponseAnyOfDataItemsInnerClimateBandEnum =
+  (typeof ApiV1CommunityFeedGet200ResponseAnyOfDataItemsInnerClimateBandEnum)[keyof typeof ApiV1CommunityFeedGet200ResponseAnyOfDataItemsInnerClimateBandEnum]
+
+/**
+ * @export
+ */
+export const ApiV1CommunityFeedGet200ResponseAnyOfDataItemsInnerStatusEnum = {
+  draft: 'draft',
+  uploading: 'uploading',
+  pending_review: 'pending_review',
+  published: 'published',
+  flagged: 'flagged',
+  review_failed: 'review_failed',
+  withdrawn: 'withdrawn',
+  consent_suspended: 'consent_suspended',
+} as const
+export type ApiV1CommunityFeedGet200ResponseAnyOfDataItemsInnerStatusEnum =
+  (typeof ApiV1CommunityFeedGet200ResponseAnyOfDataItemsInnerStatusEnum)[keyof typeof ApiV1CommunityFeedGet200ResponseAnyOfDataItemsInnerStatusEnum]
+
+/**
+ *
+ * @export
+ * @interface ApiV1CommunityFeedGet200ResponseAnyOfDataItemsInnerAuthor
+ */
+export interface ApiV1CommunityFeedGet200ResponseAnyOfDataItemsInnerAuthor {
+  /**
+   *
+   * @type {string}
+   * @memberof ApiV1CommunityFeedGet200ResponseAnyOfDataItemsInnerAuthor
+   */
+  displayName: string
+  /**
+   *
+   * @type {boolean}
+   * @memberof ApiV1CommunityFeedGet200ResponseAnyOfDataItemsInnerAuthor
+   */
+  isSelf: boolean
+}
+/**
+ *
+ * @export
+ * @interface ApiV1CommunityFeedGet200ResponseAnyOfDataItemsInnerImageAccess
+ */
+export interface ApiV1CommunityFeedGet200ResponseAnyOfDataItemsInnerImageAccess {
+  /**
+   *
+   * @type {string}
+   * @memberof ApiV1CommunityFeedGet200ResponseAnyOfDataItemsInnerImageAccess
+   */
+  url: string
+  /**
+   *
+   * @type {string}
+   * @memberof ApiV1CommunityFeedGet200ResponseAnyOfDataItemsInnerImageAccess
+   */
+  expiresAt: string
+}
+/**
+ * An authoritative single-snapshot reaction summary. total must equal the sum of applause, love and inspiration counts. revision persists after removal; generation advances on reactions, visibility and erasure changes.
+ * @export
+ * @interface ApiV1CommunityFeedGet200ResponseAnyOfDataItemsInnerReactions
+ */
+export interface ApiV1CommunityFeedGet200ResponseAnyOfDataItemsInnerReactions {
+  /**
+   *
+   * @type {ApiV1CommunityFeedGet200ResponseAnyOfDataItemsInnerReactionsCounts}
+   * @memberof ApiV1CommunityFeedGet200ResponseAnyOfDataItemsInnerReactions
+   */
+  counts: ApiV1CommunityFeedGet200ResponseAnyOfDataItemsInnerReactionsCounts
+  /**
+   *
+   * @type {number}
+   * @memberof ApiV1CommunityFeedGet200ResponseAnyOfDataItemsInnerReactions
+   */
+  total: number
+  /**
+   *
+   * @type {ApiV1CommunityFeedGet200ResponseAnyOfDataItemsInnerReactionsViewerReactionEnum}
+   * @memberof ApiV1CommunityFeedGet200ResponseAnyOfDataItemsInnerReactions
+   */
+  viewerReaction: ApiV1CommunityFeedGet200ResponseAnyOfDataItemsInnerReactionsViewerReactionEnum | null
+  /**
+   *
+   * @type {number}
+   * @memberof ApiV1CommunityFeedGet200ResponseAnyOfDataItemsInnerReactions
+   */
+  revision: number
+  /**
+   *
+   * @type {number}
+   * @memberof ApiV1CommunityFeedGet200ResponseAnyOfDataItemsInnerReactions
+   */
+  generation: number
+}
+
+/**
+ * @export
+ */
+export const ApiV1CommunityFeedGet200ResponseAnyOfDataItemsInnerReactionsViewerReactionEnum =
+  {
+    applause: 'applause',
+    love: 'love',
+    inspiration: 'inspiration',
+  } as const
+export type ApiV1CommunityFeedGet200ResponseAnyOfDataItemsInnerReactionsViewerReactionEnum =
+  (typeof ApiV1CommunityFeedGet200ResponseAnyOfDataItemsInnerReactionsViewerReactionEnum)[keyof typeof ApiV1CommunityFeedGet200ResponseAnyOfDataItemsInnerReactionsViewerReactionEnum]
+
+/**
+ *
+ * @export
+ * @interface ApiV1CommunityFeedGet200ResponseAnyOfDataItemsInnerReactionsCounts
+ */
+export interface ApiV1CommunityFeedGet200ResponseAnyOfDataItemsInnerReactionsCounts {
+  /**
+   *
+   * @type {number}
+   * @memberof ApiV1CommunityFeedGet200ResponseAnyOfDataItemsInnerReactionsCounts
+   */
+  applause: number
+  /**
+   *
+   * @type {number}
+   * @memberof ApiV1CommunityFeedGet200ResponseAnyOfDataItemsInnerReactionsCounts
+   */
+  love: number
+  /**
+   *
+   * @type {number}
+   * @memberof ApiV1CommunityFeedGet200ResponseAnyOfDataItemsInnerReactionsCounts
+   */
+  inspiration: number
+}
+/**
+ *
+ * @export
+ * @interface ApiV1CommunityPostsPostIdGet200Response
+ */
+export interface ApiV1CommunityPostsPostIdGet200Response {
+  /**
+   *
+   * @type {ApiV1CommunityPostsPostIdGet200ResponseAnyOfData}
+   * @memberof ApiV1CommunityPostsPostIdGet200Response
+   */
+  data: ApiV1CommunityPostsPostIdGet200ResponseAnyOfData
+}
+/**
+ *
+ * @export
+ * @interface ApiV1CommunityPostsPostIdGet200ResponseAnyOf
+ */
+export interface ApiV1CommunityPostsPostIdGet200ResponseAnyOf {
+  /**
+   *
+   * @type {ApiV1CommunityPostsPostIdGet200ResponseAnyOfData}
+   * @memberof ApiV1CommunityPostsPostIdGet200ResponseAnyOf
+   */
+  data: ApiV1CommunityPostsPostIdGet200ResponseAnyOfData
+}
+/**
+ *
+ * @export
+ * @interface ApiV1CommunityPostsPostIdGet200ResponseAnyOfData
+ */
+export interface ApiV1CommunityPostsPostIdGet200ResponseAnyOfData {
+  /**
+   *
+   * @type {string}
+   * @memberof ApiV1CommunityPostsPostIdGet200ResponseAnyOfData
+   */
+  id: string
+  /**
+   *
+   * @type {string}
+   * @memberof ApiV1CommunityPostsPostIdGet200ResponseAnyOfData
+   */
+  caption: string | null
+  /**
+   *
+   * @type {string}
+   * @memberof ApiV1CommunityPostsPostIdGet200ResponseAnyOfData
+   */
+  altText: string | null
+  /**
+   * The climate band stamped when the post was published, or null if unclassified.
+   * @type {ApiV1CommunityPostsPostIdGet200ResponseAnyOfDataClimateBandEnum}
+   * @memberof ApiV1CommunityPostsPostIdGet200ResponseAnyOfData
+   */
+  climateBand: ApiV1CommunityPostsPostIdGet200ResponseAnyOfDataClimateBandEnum | null
+  /**
+   *
+   * @type {ApiV1CommunityFeedGet200ResponseAnyOfDataItemsInnerImageAccess}
+   * @memberof ApiV1CommunityPostsPostIdGet200ResponseAnyOfData
+   */
+  imageAccess: ApiV1CommunityFeedGet200ResponseAnyOfDataItemsInnerImageAccess
+  /**
+   *
+   * @type {string}
+   * @memberof ApiV1CommunityPostsPostIdGet200ResponseAnyOfData
+   */
+  publishedAt: string | null
+  /**
+   *
+   * @type {string}
+   * @memberof ApiV1CommunityPostsPostIdGet200ResponseAnyOfData
+   */
+  createdAt: string
+  /**
+   *
+   * @type {ApiV1CommunityPostsPostIdGet200ResponseAnyOfDataStatusEnum}
+   * @memberof ApiV1CommunityPostsPostIdGet200ResponseAnyOfData
+   */
+  status: ApiV1CommunityPostsPostIdGet200ResponseAnyOfDataStatusEnum
+  /**
+   *
+   * @type {string}
+   * @memberof ApiV1CommunityPostsPostIdGet200ResponseAnyOfData
+   */
+  challengeId: string | null
+  /**
+   *
+   * @type {ApiV1CommunityFeedGet200ResponseAnyOfDataItemsInnerAuthor}
+   * @memberof ApiV1CommunityPostsPostIdGet200ResponseAnyOfData
+   */
+  author: ApiV1CommunityFeedGet200ResponseAnyOfDataItemsInnerAuthor
+  /**
+   *
+   * @type {ApiV1CommunityPostsPostIdGet200ResponseAnyOfDataReactions}
+   * @memberof ApiV1CommunityPostsPostIdGet200ResponseAnyOfData
+   */
+  reactions?: ApiV1CommunityPostsPostIdGet200ResponseAnyOfDataReactions
+}
+
+/**
+ * @export
+ */
+export const ApiV1CommunityPostsPostIdGet200ResponseAnyOfDataClimateBandEnum = {
+  cold_wet: 'cold_wet',
+  cold_dry: 'cold_dry',
+  temperate_wet: 'temperate_wet',
+  temperate_dry: 'temperate_dry',
+  warm_wet: 'warm_wet',
+  warm_dry: 'warm_dry',
+} as const
+export type ApiV1CommunityPostsPostIdGet200ResponseAnyOfDataClimateBandEnum =
+  (typeof ApiV1CommunityPostsPostIdGet200ResponseAnyOfDataClimateBandEnum)[keyof typeof ApiV1CommunityPostsPostIdGet200ResponseAnyOfDataClimateBandEnum]
+
+/**
+ * @export
+ */
+export const ApiV1CommunityPostsPostIdGet200ResponseAnyOfDataStatusEnum = {
+  draft: 'draft',
+  uploading: 'uploading',
+  pending_review: 'pending_review',
+  published: 'published',
+  flagged: 'flagged',
+  review_failed: 'review_failed',
+  withdrawn: 'withdrawn',
+  consent_suspended: 'consent_suspended',
+} as const
+export type ApiV1CommunityPostsPostIdGet200ResponseAnyOfDataStatusEnum =
+  (typeof ApiV1CommunityPostsPostIdGet200ResponseAnyOfDataStatusEnum)[keyof typeof ApiV1CommunityPostsPostIdGet200ResponseAnyOfDataStatusEnum]
+
+/**
+ * An authoritative single-snapshot reaction summary. total must equal the sum of applause, love and inspiration counts. revision persists after removal; generation advances on reactions, visibility and erasure changes.
+ * @export
+ * @interface ApiV1CommunityPostsPostIdGet200ResponseAnyOfDataReactions
+ */
+export interface ApiV1CommunityPostsPostIdGet200ResponseAnyOfDataReactions {
+  /**
+   *
+   * @type {ApiV1CommunityFeedGet200ResponseAnyOfDataItemsInnerReactionsCounts}
+   * @memberof ApiV1CommunityPostsPostIdGet200ResponseAnyOfDataReactions
+   */
+  counts: ApiV1CommunityFeedGet200ResponseAnyOfDataItemsInnerReactionsCounts
+  /**
+   *
+   * @type {number}
+   * @memberof ApiV1CommunityPostsPostIdGet200ResponseAnyOfDataReactions
+   */
+  total: number
+  /**
+   *
+   * @type {ApiV1CommunityPostsPostIdGet200ResponseAnyOfDataReactionsViewerReactionEnum}
+   * @memberof ApiV1CommunityPostsPostIdGet200ResponseAnyOfDataReactions
+   */
+  viewerReaction: ApiV1CommunityPostsPostIdGet200ResponseAnyOfDataReactionsViewerReactionEnum | null
+  /**
+   *
+   * @type {number}
+   * @memberof ApiV1CommunityPostsPostIdGet200ResponseAnyOfDataReactions
+   */
+  revision: number
+  /**
+   *
+   * @type {number}
+   * @memberof ApiV1CommunityPostsPostIdGet200ResponseAnyOfDataReactions
+   */
+  generation: number
+}
+
+/**
+ * @export
+ */
+export const ApiV1CommunityPostsPostIdGet200ResponseAnyOfDataReactionsViewerReactionEnum =
+  {
+    applause: 'applause',
+    love: 'love',
+    inspiration: 'inspiration',
+  } as const
+export type ApiV1CommunityPostsPostIdGet200ResponseAnyOfDataReactionsViewerReactionEnum =
+  (typeof ApiV1CommunityPostsPostIdGet200ResponseAnyOfDataReactionsViewerReactionEnum)[keyof typeof ApiV1CommunityPostsPostIdGet200ResponseAnyOfDataReactionsViewerReactionEnum]
+
+/**
+ *
+ * @export
+ * @interface ApiV1CommunityPostsPostIdReactionPut409Response
+ */
+export interface ApiV1CommunityPostsPostIdReactionPut409Response {
+  /**
+   *
+   * @type {ApiV1CommunityPostsPostIdReactionPut409ResponseStatusCodeEnum}
+   * @memberof ApiV1CommunityPostsPostIdReactionPut409Response
+   */
+  statusCode: ApiV1CommunityPostsPostIdReactionPut409ResponseStatusCodeEnum
+  /**
+   *
+   * @type {string}
+   * @memberof ApiV1CommunityPostsPostIdReactionPut409Response
+   */
+  message: string
+  /**
+   *
+   * @type {ApiV1CommunityPostsPostIdReactionPut409ResponseErrorEnum}
+   * @memberof ApiV1CommunityPostsPostIdReactionPut409Response
+   */
+  error: ApiV1CommunityPostsPostIdReactionPut409ResponseErrorEnum
+  /**
+   *
+   * @type {ApiV1CommunityPostsPostIdReactionPut409ResponseData}
+   * @memberof ApiV1CommunityPostsPostIdReactionPut409Response
+   */
+  data: ApiV1CommunityPostsPostIdReactionPut409ResponseData
+}
+
+/**
+ * @export
+ */
+export const ApiV1CommunityPostsPostIdReactionPut409ResponseStatusCodeEnum = {
+  NUMBER_409: 409,
+} as const
+export type ApiV1CommunityPostsPostIdReactionPut409ResponseStatusCodeEnum =
+  (typeof ApiV1CommunityPostsPostIdReactionPut409ResponseStatusCodeEnum)[keyof typeof ApiV1CommunityPostsPostIdReactionPut409ResponseStatusCodeEnum]
+
+/**
+ * @export
+ */
+export const ApiV1CommunityPostsPostIdReactionPut409ResponseErrorEnum = {
+  Conflict: 'Conflict',
+} as const
+export type ApiV1CommunityPostsPostIdReactionPut409ResponseErrorEnum =
+  (typeof ApiV1CommunityPostsPostIdReactionPut409ResponseErrorEnum)[keyof typeof ApiV1CommunityPostsPostIdReactionPut409ResponseErrorEnum]
+
+/**
+ * An authoritative single-snapshot reaction summary. total must equal the sum of applause, love and inspiration counts. revision persists after removal; generation advances on reactions, visibility and erasure changes.
+ * @export
+ * @interface ApiV1CommunityPostsPostIdReactionPut409ResponseData
+ */
+export interface ApiV1CommunityPostsPostIdReactionPut409ResponseData {
+  /**
+   *
+   * @type {ApiV1CommunityPostsPostIdReactionPut409ResponseDataCounts}
+   * @memberof ApiV1CommunityPostsPostIdReactionPut409ResponseData
+   */
+  counts: ApiV1CommunityPostsPostIdReactionPut409ResponseDataCounts
+  /**
+   *
+   * @type {number}
+   * @memberof ApiV1CommunityPostsPostIdReactionPut409ResponseData
+   */
+  total: number
+  /**
+   *
+   * @type {ApiV1CommunityPostsPostIdReactionPut409ResponseDataViewerReactionEnum}
+   * @memberof ApiV1CommunityPostsPostIdReactionPut409ResponseData
+   */
+  viewerReaction: ApiV1CommunityPostsPostIdReactionPut409ResponseDataViewerReactionEnum | null
+  /**
+   *
+   * @type {number}
+   * @memberof ApiV1CommunityPostsPostIdReactionPut409ResponseData
+   */
+  revision: number
+  /**
+   *
+   * @type {number}
+   * @memberof ApiV1CommunityPostsPostIdReactionPut409ResponseData
+   */
+  generation: number
+}
+
+/**
+ * @export
+ */
+export const ApiV1CommunityPostsPostIdReactionPut409ResponseDataViewerReactionEnum = {
+  applause: 'applause',
+  love: 'love',
+  inspiration: 'inspiration',
+} as const
+export type ApiV1CommunityPostsPostIdReactionPut409ResponseDataViewerReactionEnum =
+  (typeof ApiV1CommunityPostsPostIdReactionPut409ResponseDataViewerReactionEnum)[keyof typeof ApiV1CommunityPostsPostIdReactionPut409ResponseDataViewerReactionEnum]
+
+/**
+ *
+ * @export
+ * @interface ApiV1CommunityPostsPostIdReactionPut409ResponseDataCounts
+ */
+export interface ApiV1CommunityPostsPostIdReactionPut409ResponseDataCounts {
+  /**
+   *
+   * @type {number}
+   * @memberof ApiV1CommunityPostsPostIdReactionPut409ResponseDataCounts
+   */
+  applause: number
+  /**
+   *
+   * @type {number}
+   * @memberof ApiV1CommunityPostsPostIdReactionPut409ResponseDataCounts
+   */
+  love: number
+  /**
+   *
+   * @type {number}
+   * @memberof ApiV1CommunityPostsPostIdReactionPut409ResponseDataCounts
+   */
+  inspiration: number
+}
+/**
+ *
+ * @export
  * @interface ApiV1HealthQueuesGet200Response
  */
 export interface ApiV1HealthQueuesGet200Response {
@@ -1623,10 +2453,10 @@ export interface CommunityAuthorPostState {
   climateBand: CommunityAuthorPostStateClimateBandEnum | null
   /**
    *
-   * @type {CreateGarmentItemResponseDataImageAccess}
+   * @type {ApiV1CommunityFeedGet200ResponseAnyOfDataItemsInnerImageAccess}
    * @memberof CommunityAuthorPostState
    */
-  imageAccess: CreateGarmentItemResponseDataImageAccess | null
+  imageAccess: ApiV1CommunityFeedGet200ResponseAnyOfDataItemsInnerImageAccess | null
   /**
    *
    * @type {string}
@@ -1924,10 +2754,10 @@ export interface CommunityFeed {
   items: Array<CommunityFeedItemsInner>
   /**
    *
-   * @type {Array<CommunityFeedAuthorStatesInner>}
+   * @type {Array<ApiV1CommunityFeedGet200ResponseAnyOfDataAuthorStatesInner>}
    * @memberof CommunityFeed
    */
-  authorStates: Array<CommunityFeedAuthorStatesInner>
+  authorStates: Array<ApiV1CommunityFeedGet200ResponseAnyOfDataAuthorStatesInner>
   /**
    *
    * @type {string}
@@ -1966,10 +2796,10 @@ export interface CommunityFeed {
   experimentVariant: CommunityFeedExperimentVariantEnum
   /**
    *
-   * @type {CommunityFeedActiveChallenge}
+   * @type {ApiV1CommunityFeedGet200ResponseAnyOfDataActiveChallenge}
    * @memberof CommunityFeed
    */
-  activeChallenge: CommunityFeedActiveChallenge | null
+  activeChallenge: ApiV1CommunityFeedGet200ResponseAnyOfDataActiveChallenge | null
 }
 
 /**
@@ -2028,76 +2858,6 @@ export type CommunityFeedExperimentVariantEnum =
 /**
  *
  * @export
- * @interface CommunityFeedActiveChallenge
- */
-export interface CommunityFeedActiveChallenge {
-  /**
-   *
-   * @type {string}
-   * @memberof CommunityFeedActiveChallenge
-   */
-  id: string
-  /**
-   *
-   * @type {string}
-   * @memberof CommunityFeedActiveChallenge
-   */
-  slug: string
-  /**
-   * The climate band this challenge is restricted to, or null if unrestricted.
-   * @type {CommunityFeedActiveChallengeClimateBandEnum}
-   * @memberof CommunityFeedActiveChallenge
-   */
-  climateBand: CommunityFeedActiveChallengeClimateBandEnum | null
-  /**
-   *
-   * @type {string}
-   * @memberof CommunityFeedActiveChallenge
-   */
-  title: string
-  /**
-   *
-   * @type {string}
-   * @memberof CommunityFeedActiveChallenge
-   */
-  body: string
-  /**
-   *
-   * @type {string}
-   * @memberof CommunityFeedActiveChallenge
-   */
-  startsAt: string
-  /**
-   *
-   * @type {string}
-   * @memberof CommunityFeedActiveChallenge
-   */
-  endsAt: string
-  /**
-   *
-   * @type {string}
-   * @memberof CommunityFeedActiveChallenge
-   */
-  timeZone: string
-}
-
-/**
- * @export
- */
-export const CommunityFeedActiveChallengeClimateBandEnum = {
-  cold_wet: 'cold_wet',
-  cold_dry: 'cold_dry',
-  temperate_wet: 'temperate_wet',
-  temperate_dry: 'temperate_dry',
-  warm_wet: 'warm_wet',
-  warm_dry: 'warm_dry',
-} as const
-export type CommunityFeedActiveChallengeClimateBandEnum =
-  (typeof CommunityFeedActiveChallengeClimateBandEnum)[keyof typeof CommunityFeedActiveChallengeClimateBandEnum]
-
-/**
- *
- * @export
  * @interface CommunityFeedAuthor
  */
 export interface CommunityFeedAuthor {
@@ -2114,104 +2874,6 @@ export interface CommunityFeedAuthor {
    */
   isSelf: boolean
 }
-/**
- *
- * @export
- * @interface CommunityFeedAuthorStatesInner
- */
-export interface CommunityFeedAuthorStatesInner {
-  /**
-   *
-   * @type {string}
-   * @memberof CommunityFeedAuthorStatesInner
-   */
-  id: string
-  /**
-   *
-   * @type {string}
-   * @memberof CommunityFeedAuthorStatesInner
-   */
-  caption: string | null
-  /**
-   *
-   * @type {string}
-   * @memberof CommunityFeedAuthorStatesInner
-   */
-  altText: string | null
-  /**
-   * The climate band stamped when the post was classified, or null if unclassified.
-   * @type {CommunityFeedAuthorStatesInnerClimateBandEnum}
-   * @memberof CommunityFeedAuthorStatesInner
-   */
-  climateBand: CommunityFeedAuthorStatesInnerClimateBandEnum | null
-  /**
-   *
-   * @type {CreateGarmentItemResponseDataImageAccess}
-   * @memberof CommunityFeedAuthorStatesInner
-   */
-  imageAccess: CreateGarmentItemResponseDataImageAccess | null
-  /**
-   *
-   * @type {string}
-   * @memberof CommunityFeedAuthorStatesInner
-   */
-  createdAt: string
-  /**
-   *
-   * @type {string}
-   * @memberof CommunityFeedAuthorStatesInner
-   */
-  publishedAt: string | null
-  /**
-   *
-   * @type {CommunityFeedAuthorStatesInnerStatusEnum}
-   * @memberof CommunityFeedAuthorStatesInner
-   */
-  status: CommunityFeedAuthorStatesInnerStatusEnum
-  /**
-   *
-   * @type {string}
-   * @memberof CommunityFeedAuthorStatesInner
-   */
-  challengeId: string | null
-  /**
-   *
-   * @type {string}
-   * @memberof CommunityFeedAuthorStatesInner
-   */
-  moderationReason: string | null
-}
-
-/**
- * @export
- */
-export const CommunityFeedAuthorStatesInnerClimateBandEnum = {
-  cold_wet: 'cold_wet',
-  cold_dry: 'cold_dry',
-  temperate_wet: 'temperate_wet',
-  temperate_dry: 'temperate_dry',
-  warm_wet: 'warm_wet',
-  warm_dry: 'warm_dry',
-} as const
-export type CommunityFeedAuthorStatesInnerClimateBandEnum =
-  (typeof CommunityFeedAuthorStatesInnerClimateBandEnum)[keyof typeof CommunityFeedAuthorStatesInnerClimateBandEnum]
-
-/**
- * @export
- */
-export const CommunityFeedAuthorStatesInnerStatusEnum = {
-  draft: 'draft',
-  uploading: 'uploading',
-  pending_review: 'pending_review',
-  published: 'published',
-  flagged: 'flagged',
-  review_failed: 'review_failed',
-  withdrawn: 'withdrawn',
-  consent_suspended: 'consent_suspended',
-} as const
-export type CommunityFeedAuthorStatesInnerStatusEnum =
-  (typeof CommunityFeedAuthorStatesInnerStatusEnum)[keyof typeof CommunityFeedAuthorStatesInnerStatusEnum]
-
 /**
  *
  * @export
@@ -2244,10 +2906,10 @@ export interface CommunityFeedItem {
   climateBand: CommunityFeedItemClimateBandEnum | null
   /**
    *
-   * @type {CreateGarmentItemResponseDataImageAccess}
+   * @type {ApiV1CommunityFeedGet200ResponseAnyOfDataItemsInnerImageAccess}
    * @memberof CommunityFeedItem
    */
-  imageAccess: CreateGarmentItemResponseDataImageAccess
+  imageAccess: ApiV1CommunityFeedGet200ResponseAnyOfDataItemsInnerImageAccess
   /**
    *
    * @type {string}
@@ -2274,10 +2936,10 @@ export interface CommunityFeedItem {
   challengeId: string | null
   /**
    *
-   * @type {CommunityFeedItemAuthor}
+   * @type {ApiV1CommunityFeedGet200ResponseAnyOfDataItemsInnerAuthor}
    * @memberof CommunityFeedItem
    */
-  author: CommunityFeedItemAuthor
+  author: ApiV1CommunityFeedGet200ResponseAnyOfDataItemsInnerAuthor
 }
 
 /**
@@ -2313,25 +2975,6 @@ export type CommunityFeedItemStatusEnum =
 /**
  *
  * @export
- * @interface CommunityFeedItemAuthor
- */
-export interface CommunityFeedItemAuthor {
-  /**
-   *
-   * @type {string}
-   * @memberof CommunityFeedItemAuthor
-   */
-  displayName: string
-  /**
-   *
-   * @type {boolean}
-   * @memberof CommunityFeedItemAuthor
-   */
-  isSelf: boolean
-}
-/**
- *
- * @export
  * @interface CommunityFeedItemsInner
  */
 export interface CommunityFeedItemsInner {
@@ -2361,10 +3004,10 @@ export interface CommunityFeedItemsInner {
   climateBand: CommunityFeedItemsInnerClimateBandEnum | null
   /**
    *
-   * @type {CreateGarmentItemResponseDataImageAccess}
+   * @type {ApiV1CommunityFeedGet200ResponseAnyOfDataItemsInnerImageAccess}
    * @memberof CommunityFeedItemsInner
    */
-  imageAccess: CreateGarmentItemResponseDataImageAccess
+  imageAccess: ApiV1CommunityFeedGet200ResponseAnyOfDataItemsInnerImageAccess
   /**
    *
    * @type {string}
@@ -2391,10 +3034,10 @@ export interface CommunityFeedItemsInner {
   challengeId: string | null
   /**
    *
-   * @type {CommunityFeedItemAuthor}
+   * @type {ApiV1CommunityFeedGet200ResponseAnyOfDataItemsInnerAuthor}
    * @memberof CommunityFeedItemsInner
    */
-  author: CommunityFeedItemAuthor
+  author: ApiV1CommunityFeedGet200ResponseAnyOfDataItemsInnerAuthor
 }
 
 /**
@@ -2470,10 +3113,10 @@ export interface CommunityFeedResponseData {
   items: Array<CommunityFeedItemsInner>
   /**
    *
-   * @type {Array<CommunityFeedAuthorStatesInner>}
+   * @type {Array<ApiV1CommunityFeedGet200ResponseAnyOfDataAuthorStatesInner>}
    * @memberof CommunityFeedResponseData
    */
-  authorStates: Array<CommunityFeedAuthorStatesInner>
+  authorStates: Array<ApiV1CommunityFeedGet200ResponseAnyOfDataAuthorStatesInner>
   /**
    *
    * @type {string}
@@ -2512,10 +3155,10 @@ export interface CommunityFeedResponseData {
   experimentVariant: CommunityFeedResponseDataExperimentVariantEnum
   /**
    *
-   * @type {CommunityFeedActiveChallenge}
+   * @type {ApiV1CommunityFeedGet200ResponseAnyOfDataActiveChallenge}
    * @memberof CommunityFeedResponseData
    */
-  activeChallenge: CommunityFeedActiveChallenge | null
+  activeChallenge: ApiV1CommunityFeedGet200ResponseAnyOfDataActiveChallenge | null
 }
 
 /**
@@ -2620,6 +3263,313 @@ export const CommunityPostStatus = {
 } as const
 export type CommunityPostStatus =
   (typeof CommunityPostStatus)[keyof typeof CommunityPostStatus]
+
+/**
+ *
+ * @export
+ * @interface CommunityReactionFeedItem
+ */
+export interface CommunityReactionFeedItem {
+  /**
+   *
+   * @type {string}
+   * @memberof CommunityReactionFeedItem
+   */
+  id: string
+  /**
+   *
+   * @type {string}
+   * @memberof CommunityReactionFeedItem
+   */
+  caption: string | null
+  /**
+   *
+   * @type {string}
+   * @memberof CommunityReactionFeedItem
+   */
+  altText: string | null
+  /**
+   * The climate band stamped when the post was published, or null if unclassified.
+   * @type {CommunityReactionFeedItemClimateBandEnum}
+   * @memberof CommunityReactionFeedItem
+   */
+  climateBand: CommunityReactionFeedItemClimateBandEnum | null
+  /**
+   *
+   * @type {ApiV1CommunityFeedGet200ResponseAnyOfDataItemsInnerImageAccess}
+   * @memberof CommunityReactionFeedItem
+   */
+  imageAccess: ApiV1CommunityFeedGet200ResponseAnyOfDataItemsInnerImageAccess
+  /**
+   *
+   * @type {string}
+   * @memberof CommunityReactionFeedItem
+   */
+  publishedAt: string | null
+  /**
+   *
+   * @type {string}
+   * @memberof CommunityReactionFeedItem
+   */
+  createdAt: string
+  /**
+   *
+   * @type {CommunityReactionFeedItemStatusEnum}
+   * @memberof CommunityReactionFeedItem
+   */
+  status: CommunityReactionFeedItemStatusEnum
+  /**
+   *
+   * @type {string}
+   * @memberof CommunityReactionFeedItem
+   */
+  challengeId: string | null
+  /**
+   *
+   * @type {ApiV1CommunityFeedGet200ResponseAnyOfDataItemsInnerAuthor}
+   * @memberof CommunityReactionFeedItem
+   */
+  author: ApiV1CommunityFeedGet200ResponseAnyOfDataItemsInnerAuthor
+  /**
+   *
+   * @type {ApiV1CommunityPostsPostIdGet200ResponseAnyOfDataReactions}
+   * @memberof CommunityReactionFeedItem
+   */
+  reactions?: ApiV1CommunityPostsPostIdGet200ResponseAnyOfDataReactions
+}
+
+/**
+ * @export
+ */
+export const CommunityReactionFeedItemClimateBandEnum = {
+  cold_wet: 'cold_wet',
+  cold_dry: 'cold_dry',
+  temperate_wet: 'temperate_wet',
+  temperate_dry: 'temperate_dry',
+  warm_wet: 'warm_wet',
+  warm_dry: 'warm_dry',
+} as const
+export type CommunityReactionFeedItemClimateBandEnum =
+  (typeof CommunityReactionFeedItemClimateBandEnum)[keyof typeof CommunityReactionFeedItemClimateBandEnum]
+
+/**
+ * @export
+ */
+export const CommunityReactionFeedItemStatusEnum = {
+  draft: 'draft',
+  uploading: 'uploading',
+  pending_review: 'pending_review',
+  published: 'published',
+  flagged: 'flagged',
+  review_failed: 'review_failed',
+  withdrawn: 'withdrawn',
+  consent_suspended: 'consent_suspended',
+} as const
+export type CommunityReactionFeedItemStatusEnum =
+  (typeof CommunityReactionFeedItemStatusEnum)[keyof typeof CommunityReactionFeedItemStatusEnum]
+
+/**
+ *
+ * @export
+ * @interface CommunityReactionFeedResponse
+ */
+export interface CommunityReactionFeedResponse {
+  /**
+   *
+   * @type {CommunityReactionFeedResponseData}
+   * @memberof CommunityReactionFeedResponse
+   */
+  data: CommunityReactionFeedResponseData
+}
+/**
+ *
+ * @export
+ * @interface CommunityReactionFeedResponseData
+ */
+export interface CommunityReactionFeedResponseData {
+  /**
+   *
+   * @type {Array<ApiV1CommunityPostsPostIdGet200ResponseAnyOfData>}
+   * @memberof CommunityReactionFeedResponseData
+   */
+  items: Array<ApiV1CommunityPostsPostIdGet200ResponseAnyOfData>
+  /**
+   *
+   * @type {Array<ApiV1CommunityFeedGet200ResponseAnyOfDataAuthorStatesInner>}
+   * @memberof CommunityReactionFeedResponseData
+   */
+  authorStates: Array<ApiV1CommunityFeedGet200ResponseAnyOfDataAuthorStatesInner>
+  /**
+   *
+   * @type {string}
+   * @memberof CommunityReactionFeedResponseData
+   */
+  nextCursor: string | null
+  /**
+   *
+   * @type {CommunityReactionFeedResponseDataModeEnum}
+   * @memberof CommunityReactionFeedResponseData
+   */
+  mode: CommunityReactionFeedResponseDataModeEnum
+  /**
+   * The climate band resolved for the viewer, or null if unresolvable.
+   * @type {CommunityReactionFeedResponseDataViewerBandEnum}
+   * @memberof CommunityReactionFeedResponseData
+   */
+  viewerBand: CommunityReactionFeedResponseDataViewerBandEnum | null
+  /**
+   *
+   * @type {boolean}
+   * @memberof CommunityReactionFeedResponseData
+   */
+  bandResolved: boolean
+  /**
+   * Why the viewer band could not be resolved, or null when it resolved. Clients render a localized banner from this.
+   * @type {CommunityReactionFeedResponseDataBandUnresolvedReasonEnum}
+   * @memberof CommunityReactionFeedResponseData
+   */
+  bandUnresolvedReason: CommunityReactionFeedResponseDataBandUnresolvedReasonEnum | null
+  /**
+   *
+   * @type {CommunityReactionFeedResponseDataExperimentVariantEnum}
+   * @memberof CommunityReactionFeedResponseData
+   */
+  experimentVariant: CommunityReactionFeedResponseDataExperimentVariantEnum
+  /**
+   *
+   * @type {ApiV1CommunityFeedGet200ResponseAnyOfDataActiveChallenge}
+   * @memberof CommunityReactionFeedResponseData
+   */
+  activeChallenge: ApiV1CommunityFeedGet200ResponseAnyOfDataActiveChallenge | null
+}
+
+/**
+ * @export
+ */
+export const CommunityReactionFeedResponseDataModeEnum = {
+  auto: 'auto',
+  all: 'all',
+  cold_wet: 'cold_wet',
+  cold_dry: 'cold_dry',
+  temperate_wet: 'temperate_wet',
+  temperate_dry: 'temperate_dry',
+  warm_wet: 'warm_wet',
+  warm_dry: 'warm_dry',
+} as const
+export type CommunityReactionFeedResponseDataModeEnum =
+  (typeof CommunityReactionFeedResponseDataModeEnum)[keyof typeof CommunityReactionFeedResponseDataModeEnum]
+
+/**
+ * @export
+ */
+export const CommunityReactionFeedResponseDataViewerBandEnum = {
+  cold_wet: 'cold_wet',
+  cold_dry: 'cold_dry',
+  temperate_wet: 'temperate_wet',
+  temperate_dry: 'temperate_dry',
+  warm_wet: 'warm_wet',
+  warm_dry: 'warm_dry',
+} as const
+export type CommunityReactionFeedResponseDataViewerBandEnum =
+  (typeof CommunityReactionFeedResponseDataViewerBandEnum)[keyof typeof CommunityReactionFeedResponseDataViewerBandEnum]
+
+/**
+ * @export
+ */
+export const CommunityReactionFeedResponseDataBandUnresolvedReasonEnum = {
+  no_location: 'no_location',
+  weather_unavailable: 'weather_unavailable',
+  weather_stale: 'weather_stale',
+  weather_malformed: 'weather_malformed',
+  insufficient_usable_days: 'insufficient_usable_days',
+} as const
+export type CommunityReactionFeedResponseDataBandUnresolvedReasonEnum =
+  (typeof CommunityReactionFeedResponseDataBandUnresolvedReasonEnum)[keyof typeof CommunityReactionFeedResponseDataBandUnresolvedReasonEnum]
+
+/**
+ * @export
+ */
+export const CommunityReactionFeedResponseDataExperimentVariantEnum = {
+  auto: 'auto',
+  all: 'all',
+} as const
+export type CommunityReactionFeedResponseDataExperimentVariantEnum =
+  (typeof CommunityReactionFeedResponseDataExperimentVariantEnum)[keyof typeof CommunityReactionFeedResponseDataExperimentVariantEnum]
+
+/**
+ *
+ * @export
+ * @interface CommunityReactionPostResponse
+ */
+export interface CommunityReactionPostResponse {
+  /**
+   *
+   * @type {ApiV1CommunityPostsPostIdGet200ResponseAnyOfData}
+   * @memberof CommunityReactionPostResponse
+   */
+  data: ApiV1CommunityPostsPostIdGet200ResponseAnyOfData
+}
+/**
+ *
+ * @export
+ * @interface CommunityReactionResponse
+ */
+export interface CommunityReactionResponse {
+  /**
+   *
+   * @type {ApiV1CommunityPostsPostIdGet200ResponseAnyOfDataReactions}
+   * @memberof CommunityReactionResponse
+   */
+  data: ApiV1CommunityPostsPostIdGet200ResponseAnyOfDataReactions
+}
+/**
+ * An authoritative single-snapshot reaction summary. total must equal the sum of applause, love and inspiration counts. revision persists after removal; generation advances on reactions, visibility and erasure changes.
+ * @export
+ * @interface CommunityReactionSummary
+ */
+export interface CommunityReactionSummary {
+  /**
+   *
+   * @type {ApiV1CommunityFeedGet200ResponseAnyOfDataItemsInnerReactionsCounts}
+   * @memberof CommunityReactionSummary
+   */
+  counts: ApiV1CommunityFeedGet200ResponseAnyOfDataItemsInnerReactionsCounts
+  /**
+   *
+   * @type {number}
+   * @memberof CommunityReactionSummary
+   */
+  total: number
+  /**
+   *
+   * @type {CommunityReactionSummaryViewerReactionEnum}
+   * @memberof CommunityReactionSummary
+   */
+  viewerReaction: CommunityReactionSummaryViewerReactionEnum | null
+  /**
+   *
+   * @type {number}
+   * @memberof CommunityReactionSummary
+   */
+  revision: number
+  /**
+   *
+   * @type {number}
+   * @memberof CommunityReactionSummary
+   */
+  generation: number
+}
+
+/**
+ * @export
+ */
+export const CommunityReactionSummaryViewerReactionEnum = {
+  applause: 'applause',
+  love: 'love',
+  inspiration: 'inspiration',
+} as const
+export type CommunityReactionSummaryViewerReactionEnum =
+  (typeof CommunityReactionSummaryViewerReactionEnum)[keyof typeof CommunityReactionSummaryViewerReactionEnum]
 
 /**
  *
@@ -2862,10 +3812,10 @@ export interface CreateGarmentItemResponseData {
   committedAt: string | null
   /**
    *
-   * @type {CreateGarmentItemResponseDataImageAccess}
+   * @type {ApiV1CommunityFeedGet200ResponseAnyOfDataItemsInnerImageAccess}
    * @memberof CreateGarmentItemResponseData
    */
-  imageAccess: CreateGarmentItemResponseDataImageAccess | null
+  imageAccess: ApiV1CommunityFeedGet200ResponseAnyOfDataItemsInnerImageAccess | null
 }
 
 /**
@@ -2948,25 +3898,6 @@ export const CreateGarmentItemResponseDataRetentionStatusEnum = {
 export type CreateGarmentItemResponseDataRetentionStatusEnum =
   (typeof CreateGarmentItemResponseDataRetentionStatusEnum)[keyof typeof CreateGarmentItemResponseDataRetentionStatusEnum]
 
-/**
- *
- * @export
- * @interface CreateGarmentItemResponseDataImageAccess
- */
-export interface CreateGarmentItemResponseDataImageAccess {
-  /**
-   *
-   * @type {string}
-   * @memberof CreateGarmentItemResponseDataImageAccess
-   */
-  url: string
-  /**
-   *
-   * @type {string}
-   * @memberof CreateGarmentItemResponseDataImageAccess
-   */
-  expiresAt: string
-}
 /**
  *
  * @export
@@ -5436,10 +6367,10 @@ export interface OutfitCapsuleResponseDataGarmentsInner {
   comfortRange: OutfitCapsuleResponseDataGarmentsInnerComfortRangeEnum | null
   /**
    *
-   * @type {CreateGarmentItemResponseDataImageAccess}
+   * @type {ApiV1CommunityFeedGet200ResponseAnyOfDataItemsInnerImageAccess}
    * @memberof OutfitCapsuleResponseDataGarmentsInner
    */
-  imageAccess: CreateGarmentItemResponseDataImageAccess | null
+  imageAccess: ApiV1CommunityFeedGet200ResponseAnyOfDataItemsInnerImageAccess | null
   /**
    *
    * @type {OutfitCapsuleResponseDataGarmentsInnerAvailabilityStatusEnum}
@@ -6337,10 +7268,10 @@ export interface PlannerDayResultOneOfOutfitsInnerDisplayGarmentsInner {
   category: PlannerDayResultOneOfOutfitsInnerDisplayGarmentsInnerCategoryEnum | null
   /**
    *
-   * @type {CreateGarmentItemResponseDataImageAccess}
+   * @type {ApiV1CommunityFeedGet200ResponseAnyOfDataItemsInnerImageAccess}
    * @memberof PlannerDayResultOneOfOutfitsInnerDisplayGarmentsInner
    */
-  imageAccess: CreateGarmentItemResponseDataImageAccess | null
+  imageAccess: ApiV1CommunityFeedGet200ResponseAnyOfDataItemsInnerImageAccess | null
 }
 
 /**
@@ -7512,6 +8443,43 @@ export type ServiceUnavailableHttpErrorErrorEnum =
 /**
  *
  * @export
+ * @interface SetCommunityReactionInput
+ */
+export interface SetCommunityReactionInput {
+  /**
+   *
+   * @type {SetCommunityReactionInputSelectionEnum}
+   * @memberof SetCommunityReactionInput
+   */
+  selection: SetCommunityReactionInputSelectionEnum | null
+  /**
+   *
+   * @type {string}
+   * @memberof SetCommunityReactionInput
+   */
+  mutationId: string
+  /**
+   *
+   * @type {number}
+   * @memberof SetCommunityReactionInput
+   */
+  baseRevision: number
+}
+
+/**
+ * @export
+ */
+export const SetCommunityReactionInputSelectionEnum = {
+  applause: 'applause',
+  love: 'love',
+  inspiration: 'inspiration',
+} as const
+export type SetCommunityReactionInputSelectionEnum =
+  (typeof SetCommunityReactionInputSelectionEnum)[keyof typeof SetCommunityReactionInputSelectionEnum]
+
+/**
+ *
+ * @export
  * @interface SetPaletteConsentInput
  */
 export interface SetPaletteConsentInput {
@@ -8263,10 +9231,10 @@ export interface SilhouetteProfileResponseDataMyFormOneOf3 {
   committedAt: string
   /**
    *
-   * @type {CreateGarmentItemResponseDataImageAccess}
+   * @type {ApiV1CommunityFeedGet200ResponseAnyOfDataItemsInnerImageAccess}
    * @memberof SilhouetteProfileResponseDataMyFormOneOf3
    */
-  imageAccess: CreateGarmentItemResponseDataImageAccess
+  imageAccess: ApiV1CommunityFeedGet200ResponseAnyOfDataItemsInnerImageAccess
 }
 
 /**

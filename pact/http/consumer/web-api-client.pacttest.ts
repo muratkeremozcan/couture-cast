@@ -1,3 +1,12 @@
+import {
+  communityReactionConflictInteractions,
+  verifyCommunityReactionConflictInteraction,
+  verifyCommunityReactionRateLimitInteraction,
+  verifyCommunityReactionFeedInteraction,
+  communityReactionInteractions,
+  verifyCommunityReactionPostInteraction,
+  verifyCommunityReactionInteraction,
+} from './interactions/community'
 // Learning path Step 19: Scenario outfit generator.
 // See _bmad-output/project-knowledge/learning-path-step-by-step.md#step-19-scenario-outfit-generator
 // Learning path Step 20: Comfort calibration settings.
@@ -419,6 +428,60 @@ describe('CoutureCastWeb -> CoutureCastApi HTTP contract', () => {
 
   // Story 5.4: both surfaces read the profile on mount and write consent, an
   // analysis and a save/dismiss from the same screen.
+  it('[P0] preserves the current summary when a reaction revision is stale', async () => {
+    await verifyCommunityReactionConflictInteraction(
+      pact,
+      createWebClientForMockServer,
+      'web',
+      communityReactionConflictInteractions[0]
+    )
+  })
+
+  it('[P0] preserves the current summary when a reaction receipt payload changes', async () => {
+    await verifyCommunityReactionConflictInteraction(
+      pact,
+      createWebClientForMockServer,
+      'web',
+      communityReactionConflictInteractions[1]
+    )
+  })
+
+  it('[P1] exposes the reaction rolling-window Retry-After through ResponseError', async () => {
+    await verifyCommunityReactionRateLimitInteraction(
+      pact,
+      createWebClientForMockServer,
+      'web'
+    )
+  })
+
+  it('[P0] reads a negotiated feed with a populated viewer reaction summary', async () => {
+    await verifyCommunityReactionFeedInteraction(
+      pact,
+      createWebClientForMockServer,
+      'web'
+    )
+  })
+
+  it('negotiates reaction fields without changing legacy detail', async () => {
+    await verifyCommunityReactionPostInteraction(
+      pact,
+      createWebClientForMockServer,
+      'web'
+    )
+  })
+
+  it.each(communityReactionInteractions)(
+    'sets a desired reaction $selection',
+    async (interaction) => {
+      await verifyCommunityReactionInteraction(
+        pact,
+        createWebClientForMockServer,
+        'web',
+        interaction
+      )
+    }
+  )
+
   it('reads the palette advisor profile of an entitled user', async () => {
     await verifyEntitledPaletteReadInteraction(pact, createWebClientForMockServer)
   })

@@ -23,8 +23,12 @@
 
 import {
   allocateCommunityPostResponseSchema,
-  communityFeedResponseSchema,
-  communityPostResponseSchema,
+  communityReactionFeedResponseSchema,
+  communityReactionPostResponseSchema,
+  communityReactionResponseSchema,
+  communityReactionConflictResponseSchema,
+  type SetCommunityReactionInput,
+  type CommunityReactionSummary,
   openCommunityPostResponseSchema,
   publishCommunityPostResponseSchema,
   reportCommunityPostResponseSchema,
@@ -37,8 +41,8 @@ import {
   COMMUNITY_REPORT_REASON_CHANGED_MESSAGE,
   COMMUNITY_SELF_REPORT_MESSAGE,
   type CommunityExperimentVariant,
-  type CommunityFeed,
-  type CommunityFeedItem,
+  type CommunityReactionFeed as CommunityFeed,
+  type CommunityReactionFeedItem as CommunityFeedItem,
   type CommunityFeedMode,
   type CommunityReportReason,
   type SupportedLocale,
@@ -260,10 +264,10 @@ export async function getCommunityFeedFromWeb({
   const accessToken = readAccessToken()
   try {
     const response = await createWebApiClient({ accessToken }).apiV1CommunityFeedGet(
-      { xCouturePlatform: 'web', mode, cursor, limit },
+      { xCouturePlatform: 'web', xCoutureReactions: '1', mode, cursor, limit },
       { signal }
     )
-    return communityFeedResponseSchema.parse(response).data
+    return communityReactionFeedResponseSchema.parse(response).data
   } catch (error: unknown) {
     // Developer-facing. The grid renders `community.error.load`.
     throw await communityError(error, 'Unable to load the community feed.')
@@ -284,8 +288,11 @@ export async function getCommunityPostFromWeb(
   try {
     const response = await createWebApiClient({
       accessToken,
-    }).apiV1CommunityPostsPostIdGet({ postId, xCouturePlatform: 'web' }, { signal })
-    return communityPostResponseSchema.parse(response).data
+    }).apiV1CommunityPostsPostIdGet(
+      { postId, xCouturePlatform: 'web', xCoutureReactions: '1' },
+      { signal }
+    )
+    return communityReactionPostResponseSchema.parse(response).data
   } catch (error: unknown) {
     throw await communityError(error, 'Unable to load this community post.')
   }
@@ -559,5 +566,37 @@ export async function publishCommunityLookFromWeb({
     return publishCommunityPostResponseSchema.parse(response).data
   } catch (error: unknown) {
     throw await communityError(error, 'Unable to publish this look.')
+  }
+}
+
+/** The input is retained by the UI until a response or conflict confirms its fate. */
+export async function setCommunityReactionFromWeb(
+  postId: string,
+  input: SetCommunityReactionInput
+): Promise<{ summary: CommunityReactionSummary; conflict: boolean }> {
+  const accessToken = readAccessToken()
+  try {
+    const response = await createWebApiClient({
+      accessToken,
+    }).apiV1CommunityPostsPostIdReactionPut(
+      { postId, xCouturePlatform: 'web', setCommunityReactionInput: input },
+      { signal: AbortSignal.timeout(15000) }
+    )
+    return {
+      summary: communityReactionResponseSchema.parse(response).data,
+      conflict: false,
+    }
+  } catch (error: unknown) {
+    if (error instanceof ResponseError && error.response.status === 403)
+      throw new CommunityRequestError('age_gate', 'Reaction eligibility required.')
+    if (error instanceof ResponseError && error.response.status === 409) {
+      const conflict = communityReactionConflictResponseSchema.safeParse(
+        await error.response.clone().json()
+      )
+      if (conflict.success) return { summary: conflict.data.data, conflict: true }
+      const post = await getCommunityPostFromWeb(postId, AbortSignal.timeout(15000))
+      if (post.reactions) return { summary: post.reactions, conflict: true }
+    }
+    throw await communityError(error, 'Unable to update this reaction.')
   }
 }

@@ -1,3 +1,5 @@
+import 'reflect-metadata'
+import { API_TRANSACTIONAL_CONSENT_KEY } from './security.decorators'
 import {
   ForbiddenException,
   UnauthorizedException,
@@ -19,10 +21,11 @@ function createExecutionContext(headers: Record<string, string>) {
 
   return {
     context: {
+      getHandler: () => createExecutionContext,
       switchToHttp: () => ({
         getRequest: () => request,
       }),
-    } as ExecutionContext,
+    } as unknown as ExecutionContext,
     request,
   }
 }
@@ -110,5 +113,34 @@ describe('RequestAuthGuard', () => {
     })
 
     await expect(guard.canActivate(context)).rejects.toThrow('Invalid access token')
+  })
+})
+
+describe('Story 6.3 consent-loss retractions', () => {
+  it('delegates marked reaction eligibility to the locked handler after verifying authentication', async () => {
+    const { guard, canTeenAccess } = createGuard(
+      { userId: 'teen-1', role: 'teen' },
+      false
+    )
+    const handler = () => undefined
+    const request: {
+      headers: Record<string, string>
+      body: { selection: string | null }
+    } = {
+      headers: { authorization: 'Bearer teen-token' },
+      body: { selection: null },
+    }
+    const context = {
+      switchToHttp: () => ({ getRequest: () => request }),
+      getHandler: () => handler,
+    } as unknown as ExecutionContext
+    Reflect.defineMetadata(API_TRANSACTIONAL_CONSENT_KEY, true, handler)
+    await expect(guard.canActivate(context)).resolves.toBe(true)
+    expect(canTeenAccess).not.toHaveBeenCalled()
+    request.body.selection = 'love'
+    await expect(guard.canActivate(context)).resolves.toBe(true)
+    request.body.selection = null
+    Reflect.deleteMetadata(API_TRANSACTIONAL_CONSENT_KEY, handler)
+    await expect(guard.canActivate(context)).rejects.toBeInstanceOf(ForbiddenException)
   })
 })

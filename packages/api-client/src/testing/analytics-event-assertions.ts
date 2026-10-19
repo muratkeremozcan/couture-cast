@@ -1,5 +1,6 @@
 import {
   alertReceivedPropertiesSchema,
+  communityReactionSinkPropertiesSchema,
   analyticsEventNameSchema,
   guardianConsentGrantedPropertiesSchema,
   moderationActionPropertiesSchema,
@@ -60,6 +61,9 @@ type EventExpectationOptions = {
 }
 
 export const analyticsPropertySchemas = {
+  community_reaction_added: communityReactionSinkPropertiesSchema,
+  community_reaction_replaced: communityReactionSinkPropertiesSchema,
+  community_reaction_removed: communityReactionSinkPropertiesSchema,
   ritual_created: ritualCreatedPropertiesSchema,
   wardrobe_upload_started: wardrobeUploadStartedPropertiesSchema,
   alert_received: alertReceivedPropertiesSchema,

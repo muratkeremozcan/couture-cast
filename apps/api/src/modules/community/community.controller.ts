@@ -4,6 +4,8 @@ import {
   Controller,
   Get,
   Headers,
+  Header,
+  Put,
   HttpCode,
   Inject,
   Param,
@@ -20,6 +22,11 @@ import {
   communityChallengeResponseSchema,
   communityFeedQuerySchema,
   communityFeedResponseSchema,
+  communityReactionFeedResponseSchema,
+  communityReactionPostResponseSchema,
+  communityReactionResponseSchema,
+  setCommunityReactionInputSchema,
+  type CommunityReactionResponse,
   communityHeadersSchema,
   communityPostResponseSchema,
   createCommunityChallengeInputSchema,
@@ -40,7 +47,11 @@ import {
   type ReportCommunityPostResponse,
   type WithdrawCommunityPostResponse,
 } from '@couture/api-client/contracts/http'
-import { AuthContext, Roles } from '../auth/security.decorators.js'
+import {
+  AuthContext,
+  Roles,
+  ConsentCheckedInTransaction,
+} from '../auth/security.decorators.js'
 import { RequestAuthGuard, RolesGuard } from '../auth/security.guards.js'
 import type { RequestAuthContext } from '../auth/security.types.js'
 import { CommunityRateLimitException } from './community-rate-limit.exception.js'
@@ -78,11 +89,14 @@ export class CommunityController {
   ) {}
 
   @Get('feed')
+  @Header('Cache-Control', 'private, no-store')
+  @Header('Vary', 'x-couture-reactions, x-couture-platform, Authorization')
   async getFeed(
     @AuthContext() auth: RequestAuthContext,
     @Headers('x-couture-platform') platformHeader: string | undefined,
     @Headers('accept-language') acceptLanguage: string | undefined,
-    @Query() rawQuery: Record<string, unknown>
+    @Query() rawQuery: Record<string, unknown>,
+    @Headers('x-couture-reactions') reactionsHeader?: string
   ): Promise<CommunityFeedResponse> {
     const headersResult = communityHeadersSchema.safeParse({
       'x-couture-platform': platformHeader,
@@ -109,9 +123,14 @@ export class CommunityController {
       cursor,
       limit,
       acceptLanguage,
+      ...(reactionsHeader === '1' ? { reactions: true } : {}),
     })
 
-    return communityFeedResponseSchema.parse({ data })
+    return (
+      reactionsHeader === '1'
+        ? communityReactionFeedResponseSchema
+        : communityFeedResponseSchema
+    ).parse({ data })
   }
 
   /**
@@ -120,10 +139,13 @@ export class CommunityController {
    * here rather than walking the feed.
    */
   @Get('posts/:postId')
+  @Header('Cache-Control', 'private, no-store')
+  @Header('Vary', 'x-couture-reactions, x-couture-platform, Authorization')
   async getPost(
     @AuthContext() auth: RequestAuthContext,
     @Param('postId') postId: string,
-    @Headers('x-couture-platform') platformHeader: string | undefined
+    @Headers('x-couture-platform') platformHeader: string | undefined,
+    @Headers('x-couture-reactions') reactionsHeader?: string
   ): Promise<CommunityPostResponse> {
     const headersResult = communityHeadersSchema.safeParse({
       'x-couture-platform': platformHeader,
@@ -137,9 +159,42 @@ export class CommunityController {
     const data = await this.communityService.getPost({
       userId: auth.userId,
       postId,
+      ...(reactionsHeader === '1' ? { reactions: true } : {}),
     })
 
-    return communityPostResponseSchema.parse({ data })
+    return (
+      reactionsHeader === '1'
+        ? communityReactionPostResponseSchema
+        : communityPostResponseSchema
+    ).parse({ data })
+  }
+
+  @Put('posts/:postId/reaction')
+  @ConsentCheckedInTransaction()
+  @Header('Cache-Control', 'private, no-store')
+  async setReaction(
+    @AuthContext() auth: RequestAuthContext,
+    @Param('postId') postId: string,
+    @Headers('x-couture-platform') platformHeader: string | undefined,
+    @Body() rawBody: unknown,
+    @Res({ passthrough: true }) response: Response
+  ): Promise<CommunityReactionResponse> {
+    const headers = communityHeadersSchema.safeParse({
+      'x-couture-platform': platformHeader,
+    })
+    const input = setCommunityReactionInputSchema.safeParse(rawBody)
+    if (!headers.success || !input.success)
+      throw new BadRequestException('Invalid reaction request.')
+    return withRetryAfterHeader(response, async () =>
+      communityReactionResponseSchema.parse({
+        data: await this.communityService.setReaction({
+          userId: auth.userId,
+          postId,
+          input: input.data,
+          platform: headers.data['x-couture-platform'],
+        }),
+      })
+    )
   }
 
   @Post('posts/allocate')

@@ -7,6 +7,14 @@ import { ApiExceptionFilter } from './api-exception.filter.js'
 import { HttpException, HttpStatus, type ArgumentsHost } from '@nestjs/common'
 import type { HttpAdapterHost } from '@nestjs/core'
 import type { TelemetryService } from '../modules/telemetry/telemetry.service.js'
+import type * as PinoConfig from '../logger/pino.config'
+
+const { logErrorMock } = vi.hoisted(() => ({ logErrorMock: vi.fn() }))
+
+vi.mock('../logger/pino.config', async (importOriginal) => ({
+  ...(await importOriginal<typeof PinoConfig>()),
+  createBaseLogger: () => ({ child: () => ({ error: logErrorMock }) }),
+}))
 
 describe('ApiExceptionFilter', () => {
   let filter: ApiExceptionFilter
@@ -14,12 +22,18 @@ describe('ApiExceptionFilter', () => {
   let mockTelemetryService: TelemetryService
   let captureEventMock: ReturnType<typeof vi.fn>
   let replyMock: ReturnType<typeof vi.fn>
+  let endMock: ReturnType<typeof vi.fn>
+  let isHeadersSentMock: ReturnType<typeof vi.fn>
 
   beforeEach(() => {
+    logErrorMock.mockClear()
     replyMock = vi.fn()
+    endMock = vi.fn()
+    isHeadersSentMock = vi.fn().mockReturnValue(false)
     const mockHttpAdapter = {
       reply: replyMock,
-      isHeadersSent: vi.fn().mockReturnValue(false),
+      end: endMock,
+      isHeadersSent: isHeadersSentMock,
     }
     mockAdapterHost = {
       httpAdapter: mockHttpAdapter,
@@ -47,7 +61,7 @@ describe('ApiExceptionFilter', () => {
     const mockHost: ArgumentsHost = {
       switchToHttp: vi.fn().mockReturnValue({ getRequest, getResponse }),
       getType: vi.fn().mockReturnValue('http'),
-      getArgByIndex: vi.fn().mockReturnValue(fakeRequest),
+      getArgByIndex: vi.fn((index: number) => [fakeRequest, fakeResponse][index]),
       getArgs: vi.fn().mockReturnValue([fakeRequest, fakeResponse]),
     } as unknown as ArgumentsHost
 
@@ -55,7 +69,12 @@ describe('ApiExceptionFilter', () => {
 
     filter.catch(exception, mockHost)
 
-    expect(replyMock).toHaveBeenCalled()
+    expect(replyMock).toHaveBeenCalledExactlyOnceWith(
+      fakeResponse,
+      { statusCode: 400, message: 'Invalid payload' },
+      400
+    )
+    expect(logErrorMock).not.toHaveBeenCalled()
     expect(captureEventMock).toHaveBeenCalledWith(
       'user-1',
       'api_error_occurred',
@@ -69,7 +88,7 @@ describe('ApiExceptionFilter', () => {
     )
   })
 
-  it('captures a 500 status code and raw message for non-HttpExceptions', () => {
+  it('returns the shared 500 envelope, logs the original failure, and captures telemetry', () => {
     const fakeRequest = {
       url: '/api/v1/outfits',
       method: 'POST',
@@ -83,16 +102,30 @@ describe('ApiExceptionFilter', () => {
     const mockHost: ArgumentsHost = {
       switchToHttp: vi.fn().mockReturnValue({ getRequest, getResponse }),
       getType: vi.fn().mockReturnValue('http'),
-      getArgByIndex: vi.fn().mockReturnValue(fakeRequest),
+      getArgByIndex: vi.fn((index: number) => [fakeRequest, fakeResponse][index]),
       getArgs: vi.fn().mockReturnValue([fakeRequest, fakeResponse]),
     } as unknown as ArgumentsHost
 
-    // A plain Error (not an HttpException) should be treated as 500.
-    const exception = new Error('Unexpected database failure')
+    const exception = new Error('Unexpected database failure: private connection details')
 
     filter.catch(exception, mockHost)
 
-    expect(replyMock).toHaveBeenCalled()
+    expect(replyMock).toHaveBeenCalledExactlyOnceWith(
+      fakeResponse,
+      {
+        statusCode: 500,
+        message: 'Internal server error',
+        error: 'Internal Server Error',
+      },
+      500
+    )
+    expect(JSON.stringify(replyMock.mock.calls[0]?.[1])).not.toContain(
+      'private connection details'
+    )
+    expect(logErrorMock).toHaveBeenCalledExactlyOnceWith(
+      { err: exception },
+      expect.any(String)
+    )
     expect(captureEventMock).toHaveBeenCalledWith(
       'user-2',
       'api_error_occurred',
@@ -109,35 +142,83 @@ describe('ApiExceptionFilter', () => {
   it('skips telemetry capture when the request object is unavailable', () => {
     // Some exception contexts (e.g. WebSocket, RPC) may not produce an HTTP
     // request object; the filter must not throw in those cases.
-    const getRequest = vi.fn().mockReturnValue(undefined)
-    const getResponse = vi.fn().mockReturnValue({})
-
-    const mockHost: ArgumentsHost = {
-      switchToHttp: vi.fn().mockReturnValue({ getRequest, getResponse }),
-      getType: vi.fn().mockReturnValue('http'),
-      getArgByIndex: vi.fn().mockReturnValue(undefined),
-      getArgs: vi.fn().mockReturnValue([undefined, {}]),
-    } as unknown as ArgumentsHost
-
     const exception = new HttpException('Not found', HttpStatus.NOT_FOUND)
 
     // Must not throw.
-    expect(() => filter.catch(exception, mockHost)).not.toThrow()
+    expect(() => filter.catch(exception, buildHost(undefined))).not.toThrow()
     expect(captureEventMock).not.toHaveBeenCalled()
   })
 
-  const buildHost = (request: unknown): ArgumentsHost => {
-    const response = { headersSent: false }
+  const buildHost = (
+    request: unknown,
+    response: unknown = { headersSent: false }
+  ): ArgumentsHost => {
     return {
       switchToHttp: vi.fn().mockReturnValue({
         getRequest: vi.fn().mockReturnValue(request),
         getResponse: vi.fn().mockReturnValue(response),
       }),
       getType: vi.fn().mockReturnValue('http'),
-      getArgByIndex: vi.fn().mockReturnValue(request),
+      getArgByIndex: vi.fn((index: number) => [request, response][index]),
       getArgs: vi.fn().mockReturnValue([request, response]),
     } as unknown as ArgumentsHost
   }
+
+  it('preserves a custom HttpException envelope', () => {
+    const response = { headersSent: false }
+    const envelope = {
+      statusCode: 409,
+      error: 'Conflict',
+      message: 'Reaction revision changed.',
+      data: { revision: 3 },
+    }
+
+    filter.catch(
+      new HttpException(envelope, HttpStatus.CONFLICT),
+      buildHost({ path: '/api/v1/community/posts/post-1/reaction' }, response)
+    )
+
+    expect(replyMock).toHaveBeenCalledExactlyOnceWith(response, envelope, 409)
+    expect(logErrorMock).not.toHaveBeenCalled()
+  })
+
+  it('preserves the status and message of an http-errors exception', () => {
+    const response = { headersSent: false }
+    const exception = { statusCode: 400, message: 'Malformed JSON' }
+
+    filter.catch(exception, buildHost({ path: '/api/v1/outfits' }, response))
+
+    expect(replyMock).toHaveBeenCalledExactlyOnceWith(
+      response,
+      { statusCode: 400, message: 'Malformed JSON' },
+      400
+    )
+    expect(logErrorMock).not.toHaveBeenCalled()
+  })
+
+  it('ends an already-started response while logging and capturing an unexpected failure', () => {
+    isHeadersSentMock.mockReturnValue(true)
+    const response = { headersSent: true }
+    const exception = new Error('Stream failed')
+
+    filter.catch(
+      exception,
+      buildHost({ path: '/api/v1/outfits', method: 'POST' }, response)
+    )
+
+    expect(isHeadersSentMock).toHaveBeenCalledWith(response)
+    expect(replyMock).not.toHaveBeenCalled()
+    expect(endMock).toHaveBeenCalledExactlyOnceWith(response)
+    expect(logErrorMock).toHaveBeenCalledExactlyOnceWith(
+      { err: exception },
+      expect.any(String)
+    )
+    expect(captureEventMock).toHaveBeenCalledWith(
+      null,
+      'api_error_occurred',
+      expect.objectContaining({ statusCode: 500, errorCode: 'INTERNAL_ERROR' })
+    )
+  })
 
   it.each([
     [HttpStatus.UNAUTHORIZED, 'UNAUTHORIZED'],
@@ -188,15 +269,33 @@ describe('ApiExceptionFilter', () => {
     // the process on an error path that is already degraded.
     const catchSpy = vi.fn()
     captureEventMock.mockReturnValue({ catch: catchSpy })
+    const response = { headersSent: false }
+    const exception = new Error('Database unavailable')
 
     filter.catch(
-      new HttpException('boom', HttpStatus.BAD_REQUEST),
-      buildHost({ path: '/api/v1/alerts', method: 'GET' })
+      exception,
+      buildHost({ path: '/api/v1/alerts', method: 'GET' }, response)
     )
 
+    expect(replyMock).toHaveBeenCalledExactlyOnceWith(
+      response,
+      {
+        statusCode: 500,
+        message: 'Internal server error',
+        error: 'Internal Server Error',
+      },
+      500
+    )
+    expect(logErrorMock).toHaveBeenCalledWith({ err: exception }, expect.any(String))
     expect(catchSpy).toHaveBeenCalledWith(expect.any(Function))
     const onRejected = catchSpy.mock.calls[0]?.[0] as (err: unknown) => void
-    expect(() => onRejected(new Error('posthog unreachable'))).not.toThrow()
+    const telemetryFailure = new Error('posthog unreachable')
+    expect(() => onRejected(telemetryFailure)).not.toThrow()
+    expect(logErrorMock).toHaveBeenCalledWith(
+      { err: telemetryFailure },
+      'Failed to dispatch api_error_occurred telemetry event'
+    )
+    expect(replyMock).toHaveBeenCalledTimes(1)
   })
 
   it.each([
@@ -214,6 +313,34 @@ describe('ApiExceptionFilter', () => {
   })
 
   describe('affiliate webhook exclusion', () => {
+    it('normalizes and logs an unexpected webhook failure while excluding telemetry', () => {
+      const exception = new Error('Webhook processing failed')
+      const response = { headersSent: false }
+
+      filter.catch(
+        exception,
+        buildHost(
+          { path: '/API/v1/Commerce/Affiliate/Webhook/', method: 'POST' },
+          response
+        )
+      )
+
+      expect(replyMock).toHaveBeenCalledExactlyOnceWith(
+        response,
+        {
+          statusCode: 500,
+          message: 'Internal server error',
+          error: 'Internal Server Error',
+        },
+        500
+      )
+      expect(logErrorMock).toHaveBeenCalledExactlyOnceWith(
+        { err: exception },
+        expect.any(String)
+      )
+      expect(captureEventMock).not.toHaveBeenCalled()
+    })
+
     it.each([
       { name: 'the exact route', path: '/api/v1/commerce/affiliate/webhook' },
       { name: 'a trailing slash', path: '/api/v1/commerce/affiliate/webhook/' },
@@ -265,16 +392,32 @@ describe('ApiExceptionFilter', () => {
 
   it('still returns the HTTP response when telemetry extraction throws', () => {
     // Telemetry is best-effort; the client must still receive its error response.
+    const telemetryFailure = new Error('telemetry client not initialised')
     captureEventMock.mockImplementation(() => {
-      throw new Error('telemetry client not initialised')
+      throw telemetryFailure
     })
+    const response = { headersSent: false }
+    const exception = new Error('Database unavailable')
 
     expect(() =>
       filter.catch(
-        new HttpException('boom', HttpStatus.BAD_REQUEST),
-        buildHost({ path: '/api/v1/alerts', method: 'GET' })
+        exception,
+        buildHost({ path: '/api/v1/alerts', method: 'GET' }, response)
       )
     ).not.toThrow()
-    expect(replyMock).toHaveBeenCalled()
+    expect(replyMock).toHaveBeenCalledExactlyOnceWith(
+      response,
+      {
+        statusCode: 500,
+        message: 'Internal server error',
+        error: 'Internal Server Error',
+      },
+      500
+    )
+    expect(logErrorMock).toHaveBeenCalledWith({ err: exception }, expect.any(String))
+    expect(logErrorMock).toHaveBeenCalledWith(
+      { err: telemetryFailure },
+      'Error in global API exception filter telemetry extraction'
+    )
   })
 })

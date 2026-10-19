@@ -7,6 +7,10 @@ import {
 import type { ApiRole, AuthenticatedRequest, RequestAuthContext } from './security.types'
 
 export const API_ROLES_KEY = 'api_roles'
+export const API_TRANSACTIONAL_CONSENT_KEY = 'api_transactional_consent'
+/** The marked handler checks authoritative consent under its transaction lock. */
+export const ConsentCheckedInTransaction = () =>
+  SetMetadata(API_TRANSACTIONAL_CONSENT_KEY, true)
 
 export const Roles = (...roles: ApiRole[]) => SetMetadata(API_ROLES_KEY, roles)
 

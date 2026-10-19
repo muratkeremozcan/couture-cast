@@ -565,6 +565,34 @@ export const stateHandlers: StateHandlers = {
    * exactly what idempotency means; the double compares the incoming bytes
    * rather than being told the answer by two different states.
    */
+  'A community reaction revision and receipt exist for user': (parameters?: unknown) => {
+    const { userId, postId } = (parameters ?? {}) as CommunityStateParams
+    configureProviderCommunityState({ userId, postId, scenario: 'reaction-current' })
+    return Promise.resolve({
+      description: 'Configured reaction revision 3 and an applause receipt',
+    })
+  },
+
+  'The member has exhausted the community reaction rolling window': (
+    parameters?: unknown
+  ) => {
+    const { userId, postId } = (parameters ?? {}) as CommunityStateParams
+    configureProviderCommunityState({ userId, postId, scenario: 'reaction-rate-limited' })
+    return Promise.resolve({
+      description: 'Configured a reaction retry after 37 seconds',
+    })
+  },
+
+  'A community feed with populated viewer reactions exists for user': (
+    parameters?: unknown
+  ) => {
+    const { userId } = (parameters ?? {}) as CommunityStateParams
+    configureProviderCommunityState({ userId, scenario: 'reaction-feed' })
+    return Promise.resolve({
+      description: 'Configured a negotiated feed with six reactions',
+    })
+  },
+
   'A resolved climate band feed page exists for user': (parameters?: unknown) => {
     const { userId } = (parameters ?? {}) as CommunityStateParams
     configureProviderCommunityState({ userId, scenario: 'feed-resolved' })

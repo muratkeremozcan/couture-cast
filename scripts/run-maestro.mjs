@@ -27,6 +27,8 @@ import os from 'node:os'
 import { fileURLToPath, URL } from 'node:url'
 import path from 'node:path'
 import { MAESTRO_BIN, MAESTRO_PINNED_VERSION } from './maestro-version.mjs'
+import { resetMobileE2EFlowState } from './lib/mobile-e2e-flow-state.mjs'
+import { runMobileE2EFlow } from './lib/mobile-e2e-flow-retry.mjs'
 
 const scriptDir = path.dirname(fileURLToPath(import.meta.url))
 const projectRoot = path.resolve(scriptDir, '..')
@@ -116,6 +118,8 @@ const MAESTRO_ARTIFACT_DIR = process.env.MAESTRO_ARTIFACT_DIR || 'maestro/artifa
  * which is worse than the slow pass it replaces for a flow that was never
  * really broken. `runMaestroCommandWithWatchdogRetry` below is the other half:
  * one retry, specifically for a `timedOut` failure, before it counts.
+ * Later relaunches can also stall after writes. Authenticated serial flows
+ * reset their member-owned fixture state before that retry.
  */
 const CI_FLOW_TIMEOUT_MS = Number(process.env.MOBILE_E2E_CI_FLOW_TIMEOUT_MS || 360_000)
 
@@ -1406,9 +1410,7 @@ const clearMobileE2EDeviceSettings = async () => {
 const resetMobileE2EPerFlowState = async (identity) => {
   const prisma = new PrismaClient({ datasourceUrl: MOBILE_E2E_DATABASE_URL })
   try {
-    await prisma.wardrobeOnboardingState.deleteMany({
-      where: { user_id: identity.userId },
-    })
+    await resetMobileE2EFlowState(prisma, identity.userId)
   } finally {
     await prisma.$disconnect()
   }
@@ -3137,41 +3139,20 @@ const runShardedFlows = async (shardedFlows, target, maestroEnv, flowFailures) =
 }
 
 /**
- * Run one Maestro command, retrying exactly once if `CI_FLOW_TIMEOUT_MS` is
- * what killed it.
- *
- * Bounded to a single retry: this is not a general flake-retry mechanism. It
- * exists for one specific, now three-times-observed failure mode -- the
- * device's manifest fetch or Metro connection stalling completely before the
- * flow has done anything, the same "Waiting for flows to complete" followed
- * by total silence, recorded on three different flows across three different
- * runs on 2026-08-20, never mid-assertion, always before the flow got the
- * chance to start one. The watchdog alone turns that from a silent 20+ minute
- * pass into a fast, named failure, which is strictly better but still turns a
- * transient runner stall into a red gate. One retry keeps the fast failure
- * for a flow that is genuinely stuck, while giving the transient case -- which
- * has cleared on rerun every time it has been observed -- the same chance a
- * human re-running the job would give it. Because the stall has only ever been
- * seen before the flow starts, retrying is safe: there is nothing for the
- * killed attempt to have mutated.
+ * Run one Maestro command, resetting its fixture before the initial attempt and
+ * the single watchdog retry. User-scoped flows keep their existing seeded state.
  *
  * @param {string[]} args
  * @param {SpawnProcessOptions} options
- * @param {string} label used in the retry log line
- * @param {() => Promise<void>} [beforeRetry] re-run any per-flow setup the
- *   killed attempt would otherwise have skipped on its retry
- * @returns {Promise<void>}
+ * @param {string} label
+ * @param {() => Promise<void>} reset per-flow fixture reset
  */
-const runMaestroCommandWithWatchdogRetry = async (args, options, label, beforeRetry) => {
-  try {
-    await runMaestroCommand(args, options)
-  } catch (error) {
-    if (!error.timedOut) throw error
-    log(`RETRY ${label} (${error.message})`)
-    if (beforeRetry) await beforeRetry()
-    await runMaestroCommand(args, options)
-  }
-}
+const runMaestroCommandWithWatchdogRetry = async (args, options, label, reset) =>
+  runMobileE2EFlow({
+    run: () => runMaestroCommand(args, options),
+    reset,
+    onRetry: (error) => log(`RETRY ${label} (${error.message})`),
+  })
 
 /**
  * Run the flows that cannot be sharded, one at a time on the first device.
@@ -3215,7 +3196,8 @@ const runUserScopedFlows = async (serialFlows, target, maestroEnv, flowFailures)
           logFile: WRITE_ARTIFACTS ? getFlowLogPath(flowPath) : undefined,
           timeoutMs: CI_FLOW_TIMEOUT_MS,
         },
-        flowPath
+        flowPath,
+        () => Promise.resolve()
       )
       log(`PASS ${flowPath}`)
     } catch (error) {
@@ -3389,10 +3371,6 @@ const runFlowsSerially = async (target, maestroEnv, mobileIdentity, flowFailures
   for (const flowPath of flowsToRun) {
     const { maestroArgs, maestroLogFile } = buildSingleFlowMaestroArgs(flowPath, target)
 
-    if (mobileIdentity) {
-      await resetMobileE2EPerFlowState(mobileIdentity)
-    }
-
     log(`Running Maestro flow (${maestroArgs.join(' ')})`)
     let maestroExitError
     try {
@@ -3404,7 +3382,9 @@ const runFlowsSerially = async (target, maestroEnv, mobileIdentity, flowFailures
           timeoutMs: CI_FLOW_TIMEOUT_MS,
         },
         flowPath,
-        mobileIdentity ? () => resetMobileE2EPerFlowState(mobileIdentity) : undefined
+        mobileIdentity
+          ? () => resetMobileE2EPerFlowState(mobileIdentity)
+          : () => Promise.resolve()
       )
     } catch (error) {
       maestroExitError = error

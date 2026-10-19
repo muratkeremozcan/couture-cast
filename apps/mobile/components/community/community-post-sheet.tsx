@@ -494,15 +494,16 @@ export function CommunityPostSheet({
 
   return (
     <Modal
+      testID="community-post-sheet"
       visible={visible}
       transparent
       animationType="slide"
       onRequestClose={handleClose}
-      testID="community-post-sheet"
     >
       <View style={styles.overlay}>
         <View
           ref={sheetRef}
+          testID="community-post-sheet-content"
           accessibilityViewIsModal
           accessibilityLabel={t('community.compose.title')}
           style={[

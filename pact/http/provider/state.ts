@@ -461,6 +461,9 @@ export function resetProviderPlannerState() {
  * ordinary readable/writable world.
  */
 export type ProviderCommunityScenario =
+  | 'reaction-current'
+  | 'reaction-rate-limited'
+  | 'reaction-feed'
   | 'feed-resolved'
   | 'feed-band-unresolved'
   | 'feed-removed-content'

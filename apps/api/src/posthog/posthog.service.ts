@@ -63,6 +63,60 @@ export class PostHogService
     }
   }
 
+  /**
+   * Story 6.3: outbox acknowledgement uses the ingestion HTTP response.
+   * posthog-node captureImmediate also catches delivery failures in this installed
+   * version. This transport leaves retry ownership with the durable outbox.
+   * Wire format: https://posthog.com/docs/api and https://posthog.com/docs/data/anonymous-vs-identified-events
+   */
+  async captureAcknowledged({
+    distinctId,
+    event,
+    timestamp,
+    properties,
+  }: PostHogCaptureEvent): Promise<void> {
+    const apiKey = process.env.POSTHOG_API_KEY
+    if (!apiKey) throw new Error('Analytics ingestion is unconfigured')
+    const host = process.env.POSTHOG_HOST ?? 'https://us.i.posthog.com'
+    const response = await fetch(`${host.replace(/\/+$/, '')}/i/v0/e/`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        api_key: apiKey,
+        event,
+        timestamp,
+        distinct_id: distinctId,
+        uuid: properties?.$insert_id,
+        properties: {
+          ...properties,
+          $geoip_disable: true,
+          $process_person_profile: false,
+        },
+      }),
+      signal: AbortSignal.timeout(3000),
+    })
+    if (!response.ok) throw new Error(`Analytics ingestion refused: ${response.status}`)
+    const acknowledgement: unknown = await response.json()
+    if (
+      typeof acknowledgement === 'object' &&
+      acknowledgement !== null &&
+      'quota_limited' in acknowledgement &&
+      Array.isArray(acknowledgement.quota_limited) &&
+      acknowledgement.quota_limited.length > 0
+    )
+      throw new Error('Analytics ingestion quota limited')
+    if (
+      acknowledgement !== 1 &&
+      !(
+        typeof acknowledgement === 'object' &&
+        acknowledgement !== null &&
+        'status' in acknowledgement &&
+        acknowledgement.status === 1
+      )
+    )
+      throw new Error('Analytics ingestion acknowledgement invalid')
+  }
+
   async getFeatureFlagValue(
     flagKey: FeatureFlagKey,
     subjectId: FeatureFlagEvaluationSubject

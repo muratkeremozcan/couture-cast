@@ -25,7 +25,17 @@
 //   every banner in the new language.
 'use client'
 
-import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react'
+import { CommunityReactions } from './community-reactions'
+
+import React, {
+  useCallback,
+  useEffect,
+  useMemo,
+  useRef,
+  useState,
+  useSyncExternalStore,
+} from 'react'
+import { CommunityReactionState, type ReactionControls } from '@couture/api-client'
 import Image from 'next/image'
 import posthog from 'posthog-js'
 import { useTranslation } from 'react-i18next'
@@ -40,8 +50,9 @@ import {
   type CommunityAuthorPostState,
   type CommunityBandUnresolvedReason,
   type CommunityExperimentVariant,
-  type CommunityFeed,
-  type CommunityFeedItem,
+  type CommunityReactionSummary,
+  type CommunityReactionFeed as CommunityFeed,
+  type CommunityReactionFeedItem as CommunityFeedItem,
   type CommunityFeedMode,
   type CommunityReportReason,
   type EmbeddedCommunityChallenge,
@@ -50,6 +61,7 @@ import {
 import {
   allocateCommunityLookFromWeb,
   communityFailureReason,
+  setCommunityReactionFromWeb,
   communityRetryAfterSeconds,
   generateIdempotencyKey,
   getCommunityFeedFromWeb,
@@ -140,6 +152,7 @@ type Translate = (key: string, options?: Record<string, unknown>) => string
  * `filter` interpolation at render time because its label needs `t` itself.
  */
 interface Message {
+  announcementId?: number
   key: string
   params?: Record<string, unknown>
 }
@@ -376,7 +389,7 @@ export function LookbookFilterNav({
           // Selection is carried by weight and border thickness as well as
           // colour, so it survives a monochrome or high-contrast rendering.
           const activeStyles = isActive
-            ? 'border-[color:var(--theme-secondary)] font-bold text-[color:var(--theme-primary)] underline underline-offset-4'
+            ? 'border-[color:var(--theme-secondary)] font-bold text-[color:var(--theme-card-text)] underline underline-offset-4'
             : 'border-transparent font-medium text-neutral-600 min-[768px]:border-[color:var(--theme-card-border)] min-[768px]:bg-[var(--theme-card-bg)]'
 
           return (
@@ -388,7 +401,7 @@ export function LookbookFilterNav({
                 handleTabClick(mode)
               }}
               aria-pressed={isActive}
-              className={`min-h-[44px] whitespace-nowrap border-b-2 px-3 py-2 text-xs uppercase tracking-wider motion-safe:transition-colors motion-safe:duration-200 motion-reduce:transition-none focus-visible:outline focus-visible:outline-2 focus-visible:outline-[color:var(--theme-secondary)] ${tabletStyles} ${activeStyles}`}
+              className={`min-h-[44px] shrink-0 whitespace-nowrap border-b-2 px-3 py-2 text-xs uppercase tracking-wider motion-safe:transition-colors motion-safe:duration-200 motion-reduce:transition-none focus-visible:outline focus-visible:outline-2 focus-visible:outline-[color:var(--theme-secondary)] ${tabletStyles} ${activeStyles}`}
             >
               {modeLabel(mode, viewerBand, t, isActive)}
             </button>
@@ -444,7 +457,7 @@ function WeeklyChallengeBanner({
         <div className="flex items-center gap-2">
           <span
             data-testid="challenge-climate-band"
-            className="lookbook-metrics rounded bg-[var(--theme-secondary)] px-2 py-0.5 text-[10px] font-semibold uppercase text-[color:var(--theme-primary)]"
+            className="lookbook-metrics rounded bg-[#C9A14A] px-2 py-0.5 text-[10px] font-semibold uppercase text-[#111111]"
           >
             {challenge.climateBand
               ? bandLabel(challenge.climateBand, t)
@@ -476,7 +489,7 @@ function WeeklyChallengeBanner({
           onClick={() => {
             onParticipate(challenge)
           }}
-          className="min-h-[44px] rounded-full bg-[var(--theme-secondary)] px-5 py-2 text-xs font-semibold text-[color:var(--theme-primary)] shadow-sm focus-visible:outline focus-visible:outline-2 focus-visible:outline-[color:var(--theme-secondary)] motion-safe:transition-colors"
+          className="min-h-[44px] rounded-full bg-[#C9A14A] px-5 py-2 text-xs font-semibold text-[#111111] shadow-sm focus-visible:outline focus-visible:outline-2 focus-visible:outline-[color:var(--theme-secondary)] motion-safe:transition-colors"
         >
           {t('community.challenge.participate')}
         </button>
@@ -585,7 +598,7 @@ function LookbookCardImageSurface({
          */}
         <span
           data-testid={`climate-badge-${item.id}`}
-          className="lookbook-metrics rounded-md bg-[var(--theme-secondary)] px-2.5 py-1 text-[10px] font-semibold uppercase text-[color:var(--theme-primary)]"
+          className="lookbook-metrics rounded-md bg-[#C9A14A] px-2.5 py-1 text-[10px] font-semibold uppercase text-[#111111]"
         >
           {bandLabel(item.climateBand, t)}
         </span>
@@ -612,6 +625,7 @@ function LookbookCardImageSurface({
 }
 
 interface LookbookCardContentProps {
+  reactionControls: ReactionControls
   item: CommunityFeedItem
   isReported: boolean
   canAct: boolean
@@ -627,6 +641,7 @@ interface LookbookCardContentProps {
  * offered a self-report the server answers with 403.
  */
 function LookbookCardContent({
+  reactionControls,
   item,
   isReported,
   canAct,
@@ -659,6 +674,7 @@ function LookbookCardContent({
         )}
       </div>
 
+      {canAct && <CommunityReactions item={item} controls={reactionControls} />}
       {canAct && (
         <div className="flex items-center gap-3 border-t border-[color:var(--theme-card-border)] pt-3 text-xs">
           {item.author.isSelf ? (
@@ -697,6 +713,7 @@ function LookbookCardContent({
 }
 
 interface LookbookCardProps {
+  reactionControls: ReactionControls
   item: CommunityFeedItem
   isHighlighted: boolean
   isFailedImage: boolean
@@ -712,6 +729,7 @@ interface LookbookCardProps {
 }
 
 function LookbookCard({
+  reactionControls,
   item,
   isHighlighted,
   isFailedImage,
@@ -727,6 +745,7 @@ function LookbookCard({
 }: LookbookCardProps) {
   return (
     <article
+      data-focus-surface="light"
       id={`lookbook-card-${item.id}`}
       data-testid={`lookbook-card-${item.id}`}
       tabIndex={-1}
@@ -748,6 +767,7 @@ function LookbookCard({
         onOpen={onOpen}
       />
       <LookbookCardContent
+        reactionControls={reactionControls}
         item={item}
         isReported={isReported}
         canAct={canAct}
@@ -763,7 +783,23 @@ function LookbookCard({
 // LookbookDetailDialog
 // ---------------------------------------------------------------------------
 
+function detailRevalidationTargets(
+  highlightedId: string | undefined,
+  openedItem: CommunityFeedItem | null,
+  hasLoadedFeed: boolean
+): string[] {
+  return [
+    ...new Set(
+      [hasLoadedFeed ? highlightedId : undefined, openedItem?.id].filter(
+        (target): target is string => Boolean(target)
+      )
+    ),
+  ]
+}
+
 interface LookbookDetailDialogProps {
+  reactionFeedback: { key: string; id: number } | null
+  reactionControls: ReactionControls
   item: CommunityFeedItem
   t: Translate
   onClose: () => void
@@ -778,7 +814,13 @@ interface LookbookDetailDialogProps {
  * affordance, and a look the reader deliberately opened must not lose its hem
  * or its hat to the frame.
  */
-function LookbookDetailDialog({ item, t, onClose }: LookbookDetailDialogProps) {
+function LookbookDetailDialog({
+  reactionFeedback,
+  item,
+  t,
+  onClose,
+  reactionControls,
+}: LookbookDetailDialogProps) {
   const authorName = authorNameOf(item, t)
 
   return (
@@ -790,6 +832,17 @@ function LookbookDetailDialog({ item, t, onClose }: LookbookDetailDialogProps) {
       closeLabel={t('community.card.detailClose')}
     >
       <div data-testid="community-detail" className="flex flex-col gap-4">
+        <CommunityReactions item={item} controls={reactionControls} />
+        <div
+          role="status"
+          aria-live="polite"
+          className="sr-only"
+          data-testid="community-detail-feedback"
+        >
+          <span key={reactionFeedback?.id}>
+            {reactionFeedback ? t(reactionFeedback.key) : null}
+          </span>
+        </div>
         <div className="relative h-80 w-full overflow-hidden rounded-[8px] bg-[var(--theme-card-bg)]">
           <Image
             src={item.imageAccess.url}
@@ -804,7 +857,7 @@ function LookbookDetailDialog({ item, t, onClose }: LookbookDetailDialogProps) {
         <div className="flex flex-wrap items-center gap-2">
           <span
             data-testid={`community-detail-band-${item.id}`}
-            className="lookbook-metrics rounded-md bg-[var(--theme-secondary)] px-2.5 py-1 text-[10px] font-semibold uppercase text-[color:var(--theme-primary)]"
+            className="lookbook-metrics rounded-md bg-[#C9A14A] px-2.5 py-1 text-[10px] font-semibold uppercase text-[#111111]"
           >
             {bandLabel(item.climateBand, t)}
           </span>
@@ -1186,7 +1239,7 @@ function PostCreationModal({
                 onSelectPhoto(file)
               }
             }}
-            className="w-full text-xs text-neutral-600 file:mr-3 file:min-h-[44px] file:rounded-full file:border-0 file:bg-[var(--theme-secondary)] file:px-4 file:py-2 file:text-xs file:font-semibold file:text-[color:var(--theme-primary)] focus-visible:outline focus-visible:outline-2 focus-visible:outline-[color:var(--theme-secondary)]"
+            className="w-full text-xs text-neutral-600 file:mr-3 file:min-h-[44px] file:rounded-full file:border-0 file:bg-[#C9A14A] file:px-4 file:py-2 file:text-xs file:font-semibold file:text-[#111111] focus-visible:outline focus-visible:outline-2 focus-visible:outline-[color:var(--theme-secondary)]"
           />
           <p className="text-[10px] text-neutral-500">
             {t('community.compose.photoHint')}
@@ -1316,7 +1369,7 @@ function PostCreationModal({
             type="submit"
             data-testid="post-publish-submit"
             disabled={isPublishBlocked}
-            className="min-h-[44px] rounded-full bg-[var(--theme-secondary)] px-5 py-2 text-xs font-semibold text-[color:var(--theme-primary)] focus-visible:outline focus-visible:outline-2 focus-visible:outline-[color:var(--theme-secondary)] disabled:cursor-not-allowed disabled:opacity-40"
+            className="min-h-[44px] rounded-full bg-[#C9A14A] px-5 py-2 text-xs font-semibold text-[#111111] focus-visible:outline focus-visible:outline-2 focus-visible:outline-[color:var(--theme-secondary)] disabled:cursor-not-allowed disabled:opacity-40"
           >
             {isPublishing
               ? t('community.compose.publishing')
@@ -1354,7 +1407,7 @@ function CommunityHeader({ canShare, onShare, t }: CommunityHeaderProps) {
           type="button"
           data-testid="create-post-button"
           onClick={onShare}
-          className="min-h-[44px] rounded-full bg-[var(--theme-secondary)] px-4 py-1.5 text-xs font-semibold text-[color:var(--theme-primary)] focus-visible:outline focus-visible:outline-2 focus-visible:outline-[color:var(--theme-secondary)] motion-safe:transition-colors"
+          className="min-h-[44px] rounded-full bg-[#C9A14A] px-4 py-1.5 text-xs font-semibold text-[#111111] focus-visible:outline focus-visible:outline-2 focus-visible:outline-[color:var(--theme-secondary)] motion-safe:transition-colors"
         >
           {t('community.newPost')}
         </button>
@@ -1493,7 +1546,7 @@ function CommunityFeedStates({
               type="button"
               data-testid="community-feed-empty-share-button"
               onClick={onShare}
-              className="mt-4 min-h-[44px] rounded-full bg-[var(--theme-secondary)] px-5 py-2 text-xs font-semibold text-[color:var(--theme-primary)] focus-visible:outline focus-visible:outline-2 focus-visible:outline-[color:var(--theme-secondary)]"
+              className="mt-4 min-h-[44px] rounded-full bg-[#C9A14A] px-5 py-2 text-xs font-semibold text-[#111111] focus-visible:outline focus-visible:outline-2 focus-visible:outline-[color:var(--theme-secondary)]"
             >
               {t('community.share')}
             </button>
@@ -1668,12 +1721,65 @@ export function CommunityLookbookGrid({
    */
   const [deepLinkedItem, setDeepLinkedItem] = useState<CommunityFeedItem | null>(null)
   const [openedItem, setOpenedItem] = useState<CommunityFeedItem | null>(null)
+  const openedItemRef = useRef(openedItem)
+  openedItemRef.current = openedItem
+  const reactionAnnouncementId = useRef(0)
+  const handleReactionChange = useCallback(
+    (postId: string, summary: CommunityReactionSummary | null | undefined) => {
+      const update = (post: CommunityFeedItem | null): CommunityFeedItem | null => {
+        if (!post || post.id !== postId) return post
+        if (summary === null) return null
+        if (summary === undefined) return { ...post, reactions: undefined }
+        if (post.status !== 'published') return post
+        if (
+          post.reactions &&
+          (post.reactions.revision > summary.revision ||
+            post.reactions.generation > summary.generation)
+        )
+          return post
+        return { ...post, reactions: summary }
+      }
+      setItems((previous) =>
+        previous.flatMap((post) => {
+          const next = update(post)
+          return next ? [next] : []
+        })
+      )
+      setDeepLinkedItem(update)
+      setOpenedItem(update)
+    },
+    []
+  )
   const [activeChallenge, setActiveChallenge] =
     useState<EmbeddedCommunityChallenge | null>(null)
   const [isLoading, setIsLoading] = useState(false)
   const [isLoadingMore, setIsLoadingMore] = useState(false)
   const [feedError, setFeedError] = useState<Message | null>(null)
   const [announcement, setAnnouncement] = useState<Message | null>(null)
+  const [reactionFeedback, setReactionFeedback] = useState<{
+    key: string
+    id: number
+  } | null>(null)
+  const [reactionState] = useState(
+    () =>
+      new CommunityReactionState({
+        mutate: setCommunityReactionFromWeb,
+        newId: generateIdempotencyKey,
+        failureReason: communityFailureReason,
+        onChange: handleReactionChange,
+        onAnnounce: (key) => {
+          const id = ++reactionAnnouncementId.current
+          if (openedItemRef.current) setReactionFeedback({ key, id })
+          else setAnnouncement({ key, announcementId: id })
+        },
+      })
+  )
+  useSyncExternalStore(
+    reactionState.subscribe,
+    reactionState.getVersion,
+    reactionState.getVersion
+  )
+
   const [notice, setNotice] = useState<Notice | null>(null)
   const [failedImages, setFailedImages] = useState<Record<string, FailedImage>>({})
   const [hasSession, setHasSession] = useState(false)
@@ -1701,6 +1807,10 @@ export function CommunityLookbookGrid({
   // an append actually added, and reading it from state would put `items` in that
   // callback's dependency list and re-create it after every page.
   const itemsRef = useRef(items)
+  const highlightedIdRef = useRef(highlightedCardId)
+  highlightedIdRef.current = highlightedCardId
+  const detailGenerationRef = useRef(0)
+  const hasLoadedFeedRef = useRef(false)
 
   useEffect(() => {
     modeRef.current = currentMode
@@ -1754,78 +1864,135 @@ export function CommunityLookbookGrid({
    * Holds no `t`: everything it stores is a key plus params, so a language
    * change repaints without re-requesting.
    */
-  const loadFeed = useCallback(async (mode: CommunityFeedMode, cursor?: string) => {
-    const append = cursor !== undefined
-    feedControllerRef.current?.abort()
-    const controller = new AbortController()
-    feedControllerRef.current = controller
-    const generation = feedGenerationRef.current + 1
-    feedGenerationRef.current = generation
-
-    if (append) {
-      setIsLoadingMore(true)
-    } else {
-      setIsLoading(true)
-      setFeedError(null)
-      setNextCursor(null)
-      setAnnouncement({ key: 'community.feed.loading' })
-    }
-
-    try {
-      const { feed, restarted } = await readFeedPage(mode, cursor, controller.signal)
-      if (generation !== feedGenerationRef.current) {
-        return
+  const revalidateHighlighted = useCallback(
+    async (
+      targets: string[],
+      readTicket: number,
+      signal: AbortSignal,
+      generation: number,
+      loadedIds: ReadonlySet<string>
+    ) => {
+      if (targets.length === 0) return
+      const detailGeneration = ++detailGenerationRef.current
+      const isCurrent = () =>
+        !signal.aborted &&
+        generation === feedGenerationRef.current &&
+        detailGeneration === detailGenerationRef.current
+      for (const target of targets) {
+        try {
+          const post = await getCommunityPostFromWeb(target, signal)
+          if (!isCurrent()) return
+          const current = reactionState.read(post, readTicket)
+          if (target === highlightedIdRef.current)
+            setDeepLinkedItem(loadedIds.has(target) ? null : current)
+          setOpenedItem((opened) => (opened?.id === target ? current : opened))
+        } catch (error: unknown) {
+          if (isCurrent() && communityFailureReason(error) === 'not_found')
+            reactionState.evict(target)
+        }
       }
-      setServedMode(feed.mode)
-      setViewerBand(feed.viewerBand)
-      setBandResolved(feed.bandResolved)
-      setBandUnresolvedReason(feed.bandUnresolvedReason)
-      setExperimentVariant(feed.experimentVariant)
-      setAuthorStates(feed.authorStates)
-      setActiveChallenge(feed.activeChallenge)
-      setNextCursor(feed.nextCursor)
-      setFeedError(null)
-      // A refetch that hands back a freshly signed URL clears the failure: not
-      // clearing it is what left a recovered card reading "Image unavailable"
-      // for the rest of the session.
-      setFailedImages((previous) => pruneFailedImages(previous, feed.items))
-      if (append && !restarted) {
-        // Counted from what the merge actually appends, not from the page size:
-        // `mergeFeedPages` drops rows the previous page already carried, so
-        // announcing `feed.items.length` told a screen-reader reader that more
-        // looks had arrived than were added. Read off the ref rather than from
-        // inside the updater, because a state setter is not a place for a side
-        // effect.
-        const merged = mergeFeedPages(itemsRef.current, feed.items)
-        setItems(merged)
-        setAnnouncement({
-          key: 'community.feed.announceLoadedMore',
-          params: { count: merged.length - itemsRef.current.length },
-        })
+    },
+    [reactionState]
+  )
+
+  const loadFeed = useCallback(
+    async (mode: CommunityFeedMode, cursor?: string) => {
+      const readTicket = reactionState.beginRead()
+      const append = cursor !== undefined
+      feedControllerRef.current?.abort()
+      const controller = new AbortController()
+      feedControllerRef.current = controller
+      const generation = feedGenerationRef.current + 1
+      feedGenerationRef.current = generation
+
+      if (append) {
+        setIsLoadingMore(true)
       } else {
-        setItems(feed.items)
-        setAnnouncement({
-          // The mode SERVED, not the mode asked for. A viewer in the `all` arm
-          // who requests `auto` is otherwise told "Showing Your climate: Cold and
-          // dry looks" over a feed carrying every region.
-          key: 'community.feed.announceLoaded',
-          params: { filterMode: feed.mode, count: feed.items.length },
+        setIsLoading(true)
+        setFeedError(null)
+        setNextCursor(null)
+        setAnnouncement({ key: 'community.feed.loading' })
+      }
+
+      try {
+        const { feed, restarted } = await readFeedPage(mode, cursor, controller.signal)
+        if (generation !== feedGenerationRef.current) {
+          return
+        }
+        setServedMode(feed.mode)
+        setViewerBand(feed.viewerBand)
+        setBandResolved(feed.bandResolved)
+        setBandUnresolvedReason(feed.bandUnresolvedReason)
+        setExperimentVariant(feed.experimentVariant)
+        setAuthorStates(feed.authorStates)
+        setActiveChallenge(feed.activeChallenge)
+        setNextCursor(feed.nextCursor)
+        setFeedError(null)
+        // A refetch that hands back a freshly signed URL clears the failure: not
+        // clearing it is what left a recovered card reading "Image unavailable"
+        // for the rest of the session.
+        setFailedImages((previous) => pruneFailedImages(previous, feed.items))
+        const page = feed.items.flatMap((post) => {
+          const current = reactionState.read(post, readTicket)
+          return current ? [current] : []
         })
+        setOpenedItem((post) => (post ? reactionState.current(post) : null))
+        const merged =
+          append && !restarted ? mergeFeedPages(itemsRef.current, page) : page
+        const loadedIds = new Set(merged.map((post) => post.id))
+        setDeepLinkedItem((post) =>
+          post && !loadedIds.has(post.id) ? reactionState.current(post) : null
+        )
+        setItems((previous) =>
+          (append && !restarted ? mergeFeedPages(previous, page) : page).map((post) =>
+            reactionState.current(post)
+          )
+        )
+        setAnnouncement({
+          key:
+            append && !restarted
+              ? 'community.feed.announceLoadedMore'
+              : 'community.feed.announceLoaded',
+          params: {
+            filterMode: feed.mode,
+            count:
+              append && !restarted
+                ? merged.length - itemsRef.current.length
+                : page.length,
+          },
+        })
+        await revalidateHighlighted(
+          detailRevalidationTargets(
+            highlightedIdRef.current,
+            openedItemRef.current,
+            hasLoadedFeedRef.current
+          ),
+          readTicket,
+          controller.signal,
+          generation,
+          loadedIds
+        )
+        hasLoadedFeedRef.current = true
+      } catch (error: unknown) {
+        if (controller.signal.aborted || generation !== feedGenerationRef.current) {
+          return
+        }
+        const message = messageForError(
+          error,
+          'community.error.load',
+          languageRef.current
+        )
+        setFeedError(message)
+        setAnnouncement(message)
+      } finally {
+        if (!controller.signal.aborted && generation === feedGenerationRef.current) {
+          setIsLoading(false)
+          setIsLoadingMore(false)
+        }
       }
-    } catch (error: unknown) {
-      if (controller.signal.aborted || generation !== feedGenerationRef.current) {
-        return
-      }
-      const message = messageForError(error, 'community.error.load', languageRef.current)
-      setFeedError(message)
-      setAnnouncement(message)
-    } finally {
-      if (!controller.signal.aborted && generation === feedGenerationRef.current) {
-        setIsLoading(false)
-        setIsLoadingMore(false)
-      }
-    }
-  }, [])
+    },
+    [reactionState, revalidateHighlighted]
+  )
 
   useEffect(() => {
     // Cleared alongside the request, so the chips answer with the mode just
@@ -1863,19 +2030,26 @@ export function CommunityLookbookGrid({
     // to settle last. The flag makes a torn-down run's callbacks inert
     // regardless of that ordering.
     let cancelled = false
-    if (highlightedCardId && !items.some((item) => item.id === highlightedCardId)) {
+    const detailGeneration = ++detailGenerationRef.current
+    const readTicket = reactionState.beginRead()
+    if (
+      highlightedCardId &&
+      !itemsRef.current.some((item) => item.id === highlightedCardId)
+    ) {
       void getCommunityPostFromWeb(highlightedCardId, controller.signal)
         .then((post) => {
-          if (!cancelled) {
-            setDeepLinkedItem(post)
+          if (!cancelled && detailGeneration === detailGenerationRef.current) {
+            setDeepLinkedItem(reactionState.read(post, readTicket))
           }
         })
-        .catch(() => {
+        .catch((error: unknown) => {
           // A target withdrawn between the link being followed and this read is
           // an expected outcome, and `processWebDeepLink` owns the invalid-link
           // copy, so nothing is reported from here.
-          if (!cancelled) {
+          if (!cancelled && detailGeneration === detailGenerationRef.current) {
             setDeepLinkedItem(null)
+            if (communityFailureReason(error) === 'not_found')
+              reactionState.evict(highlightedCardId)
           }
         })
     } else {
@@ -1885,22 +2059,31 @@ export function CommunityLookbookGrid({
       cancelled = true
       controller.abort()
     }
-  }, [highlightedCardId, items])
+  }, [highlightedCardId, reactionState])
 
   /**
    * The rows on screen: the loaded pages, with a deep-link target that is not
-   * among them carried at the head. `mergeFeedPages` is what keeps the row from
-   * appearing twice once paging reaches the page it really belongs to.
+   * among them carried at the head. Once paging reaches that target, its
+   * accepted feed position determines the order even if an older detail settles.
    */
   const displayedItems = useMemo(
-    () => (deepLinkedItem ? mergeFeedPages([deepLinkedItem], items) : items),
+    () =>
+      deepLinkedItem && !items.some((post) => post.id === deepLinkedItem.id)
+        ? mergeFeedPages([deepLinkedItem], items)
+        : items,
     [deepLinkedItem, items]
   )
 
+  const focusedTargetRef = useRef<string | null>(null)
   useEffect(() => {
-    if (!highlightedCardId) return
+    if (!highlightedCardId) {
+      focusedTargetRef.current = null
+      return
+    }
+    if (focusedTargetRef.current === highlightedCardId) return
     const cardElement = document.getElementById(`lookbook-card-${highlightedCardId}`)
     if (cardElement) {
+      focusedTargetRef.current = highlightedCardId
       cardElement.scrollIntoView?.({ behavior: 'smooth', block: 'center' })
       cardElement.focus()
       setAnnouncement({ key: 'community.feed.announceFocused' })
@@ -1939,7 +2122,9 @@ export function CommunityLookbookGrid({
    * stored author id, so nothing here compares ids.
    */
   const handleOpenCard = (item: CommunityFeedItem) => {
-    setOpenedItem(item)
+    setAnnouncement(null)
+    setReactionFeedback(null)
+    setOpenedItem(reactionState.current(item))
     if (experimentVariant === null) {
       return
     }
@@ -2177,6 +2362,7 @@ export function CommunityLookbookGrid({
       >
         {displayedItems.map((item) => (
           <LookbookCard
+            reactionControls={reactionState.controls(item.id)}
             key={item.id}
             item={item}
             isHighlighted={item.id === highlightedCardId}
@@ -2216,11 +2402,15 @@ export function CommunityLookbookGrid({
         data-testid="community-live-region"
         className="sr-only"
       >
-        {renderMessage(announcement, t, viewerBand)}
+        <span key={announcement?.announcementId}>
+          {openedItem ? null : renderMessage(announcement, t, viewerBand)}
+        </span>
       </div>
 
       {openedItem !== null && (
         <LookbookDetailDialog
+          reactionControls={reactionState.controls(openedItem.id)}
+          reactionFeedback={reactionFeedback}
           item={openedItem}
           t={t}
           onClose={() => {

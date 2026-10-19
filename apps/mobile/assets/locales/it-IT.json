@@ -757,6 +757,22 @@
       "disabled": "Il feed della community non è disponibile al momento.",
       "mediaUnavailable": "Questo look non è disponibile al momento. Riprova tra poco.",
       "generic": "Qualcosa è andato storto. Riprova."
+    },
+    "reactions": {
+      "label": "Reazioni",
+      "applause": "Applaudi",
+      "love": "Adoro",
+      "inspiration": "Mi ispira",
+      "total": "{{count}} reazioni",
+      "pending": "Salvataggio della reazione…",
+      "updated": "Reazione salvata.",
+      "conflict": "La tua reazione è cambiata su un altro dispositivo. Scegli di nuovo.",
+      "failed": "Non è stato possibile salvare la reazione. Riprova per confermare.",
+      "retry": "Riprova reazione",
+      "rateLimited": "Troppe reazioni. Riprova tra un minuto.",
+      "total_one": "{{count}} reazione",
+      "total_other": "{{count}} reazioni",
+      "ineligible": "Per reagire devi avere almeno 13 anni. Sotto i 16 anni serve il consenso attivo di un tutore."
     }
   }
 }

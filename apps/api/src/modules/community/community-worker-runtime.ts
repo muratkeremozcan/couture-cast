@@ -1,3 +1,4 @@
+import { CommunityReactionOutboxDispatcher } from './community-reaction.outbox.js'
 import type { Worker } from 'bullmq'
 import type { PrismaClient } from '@prisma/client'
 import type { TelemetryService } from '../telemetry/telemetry.service.js'
@@ -404,7 +405,13 @@ export async function createCommunityWorkerRuntime(deps: {
     worker,
     heartbeat,
     sweeps: {
-      dispatchPending: () => dispatcher.dispatchPending(),
+      dispatchPending: async () => {
+        await dispatcher.dispatchPending()
+        await new CommunityReactionOutboxDispatcher(
+          deps.prisma,
+          deps.telemetryService
+        ).dispatchPending()
+      },
       sweepStalePendingReview: () => maintenance.sweepStalePendingReview(),
       sweepExpiredUploads: () => maintenance.sweepExpiredUploads(),
       sweepErasureRequests: () => maintenance.sweepErasureRequests(),

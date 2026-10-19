@@ -30,15 +30,20 @@
   "scripts": {
     "build": "rm -rf dist tsconfig.build.tsbuildinfo && npm exec --yes --package=typescript@5.9.3 -- tsc -p tsconfig.build.json",
     "build:watch": "tsc -p tsconfig.build.json --watch --preserveWatchOutput",
-    "prelint": "npm run build --workspace @couture/utils",
+    "prelint": "npm run prepare:shared-deps",
     "lint": "eslint --max-warnings=0 --ext .ts src templates test",
-    "typecheck": "npm run build --workspace @couture/utils && tsc --noEmit -p tsconfig.typecheck.json",
+    "typecheck": "tsc --noEmit -p tsconfig.typecheck.json",
     "test": "vitest run --config vitest.config.ts",
-    "test:coverage": "vitest run --config vitest.config.ts --coverage"
+    "test:coverage": "vitest run --config vitest.config.ts --coverage",
+    "prepare:shared-deps": "npm run build --workspace @couture/utils && npm run build --workspace @couture/api-client",
+    "prebuild": "npm run prepare:shared-deps",
+    "prebuild:watch": "npm run prepare:shared-deps",
+    "pretypecheck": "npm run prepare:shared-deps"
   },
   "dependencies": {
+    "@couture/api-client": "file:../api-client",
+    "@couture/utils": "file:../utils",
     "@faker-js/faker": "10.1.0",
-    "@prisma/client": "6.19.0",
-    "@couture/utils": "file:../utils"
+    "@prisma/client": "6.19.0"
   }
 }

@@ -65,3 +65,68 @@ describe('PostHogService', () => {
     ).resolves.toBe(undefined)
   })
 })
+
+describe('Story 6.3 acknowledged analytics ingestion', () => {
+  afterEach(() => {
+    vi.unstubAllGlobals()
+    vi.unstubAllEnvs()
+  })
+  it('retains retry ownership when ingestion is unconfigured, rejects, or quota-limits a 200 response', async () => {
+    const { PostHogService } = await import('#posthog/posthog.service')
+    vi.stubEnv('POSTHOG_API_KEY', '')
+    const adapter = new PostHogService()
+    const event = {
+      distinctId: 'hmac-synthetic-subject',
+      event: 'community_reaction_added',
+      properties: { $insert_id: '63100000-0000-4000-8000-000000000001' },
+    }
+    await expect(adapter.captureAcknowledged(event)).rejects.toThrow('unconfigured')
+    vi.stubEnv('POSTHOG_API_KEY', 'phc_synthetic')
+    vi.stubEnv('POSTHOG_HOST', 'http://localhost:43210/')
+    const fetch = vi
+      .fn()
+      .mockResolvedValueOnce(new Response('{}', { status: 503 }))
+      .mockResolvedValueOnce(
+        new Response(JSON.stringify({ status: 1, quota_limited: ['events'] }))
+      )
+      .mockResolvedValueOnce(new Response(JSON.stringify({ status: 0 })))
+    vi.stubGlobal('fetch', fetch)
+    await expect(adapter.captureAcknowledged(event)).rejects.toThrow('503')
+    await expect(adapter.captureAcknowledged(event)).rejects.toThrow('quota limited')
+    await expect(adapter.captureAcknowledged(event)).rejects.toThrow(
+      'acknowledgement invalid'
+    )
+  })
+
+  it('acknowledges accepted events with original time, stable UUID and disabled person/IP enrichment', async () => {
+    const { PostHogService } = await import('#posthog/posthog.service')
+    vi.stubEnv('POSTHOG_API_KEY', 'phc_synthetic')
+    vi.stubEnv('POSTHOG_HOST', '')
+    delete process.env.POSTHOG_HOST
+    const fetch = vi
+      .fn()
+      .mockResolvedValueOnce(new Response('1'))
+      .mockResolvedValueOnce(new Response(JSON.stringify({ status: 1 })))
+    vi.stubGlobal('fetch', fetch)
+    const adapter = new PostHogService()
+    const timestamp = '2026-10-01T12:00:00.000Z'
+    const event = {
+      distinctId: 'hmac-synthetic-subject',
+      event: 'community_reaction_added',
+      timestamp,
+      properties: { $insert_id: '63100000-0000-4000-8000-000000000001', $ip: null },
+    }
+    await expect(adapter.captureAcknowledged(event)).resolves.toBeUndefined()
+    await expect(adapter.captureAcknowledged(event)).resolves.toBeUndefined()
+    expect(fetch).toHaveBeenCalledWith(
+      'https://us.i.posthog.com/i/v0/e/',
+      expect.objectContaining({ method: 'POST' })
+    )
+    const request = fetch.mock.calls[0]?.[1] as RequestInit
+    expect(JSON.parse(request.body as string)).toMatchObject({
+      uuid: event.properties.$insert_id,
+      timestamp,
+      properties: { $ip: null, $geoip_disable: true, $process_person_profile: false },
+    })
+  })
+})

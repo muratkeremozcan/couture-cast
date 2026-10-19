@@ -1,4 +1,10 @@
-import { Catch, ArgumentsHost, HttpException, HttpStatus } from '@nestjs/common'
+import {
+  Catch,
+  ArgumentsHost,
+  HttpException,
+  HttpStatus,
+  InternalServerErrorException,
+} from '@nestjs/common'
 import { BaseExceptionFilter, HttpAdapterHost } from '@nestjs/core'
 import { TelemetryService } from '../modules/telemetry/telemetry.service'
 import { createBaseLogger } from '../logger/pino.config'
@@ -71,7 +77,18 @@ export class ApiExceptionFilter extends BaseExceptionFilter {
   }
 
   override catch(exception: unknown, host: ArgumentsHost): void {
-    super.catch(exception, host)
+    const unexpected =
+      !(exception instanceof HttpException) && !this.isHttpError(exception)
+    const responseException = unexpected
+      ? new InternalServerErrorException('Internal server error', {
+          cause: exception,
+          description: 'Internal Server Error',
+        })
+      : exception
+    super.catch(responseException, host)
+    if (unexpected) {
+      this.logger.error({ err: exception }, 'Unhandled API exception')
+    }
 
     try {
       const ctx = host.switchToHttp()
