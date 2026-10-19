@@ -231,49 +231,53 @@ enum CommunityReportReason {
 }
 
 model User {
-  id                            String                       @id @default(cuid())
-  email                         String                       @unique
-  created_at                    DateTime                     @default(now())
-  updated_at                    DateTime                     @updatedAt
-  profile                       UserProfile?
-  comfort_profile               ComfortPreferences?
-  garments                      GarmentItem[]
-  palette_insights              PaletteInsights[]
-  outfits                       OutfitRecommendation[]
-  lookbook_posts                LookbookPost[]
-  engagement                    EngagementEvent[]
-  audit_logs                    AuditLog[]
-  guardian_roles                GuardianConsent[]            @relation("GuardianRole")
-  teen_roles                    GuardianConsent[]            @relation("TeenRole")
-  sent_guardian_invitations     GuardianInvitation[]         @relation("TeenGuardianInvitations")
-  accepted_guardian_invitations GuardianInvitation[]         @relation("AcceptedGuardianInvitations")
-  moderation_flags              ModerationEvent[]            @relation("FlaggedByRelation")
-  moderation_reviews            ModerationEvent[]            @relation("ReviewedByRelation")
-  push_tokens                   PushToken[]
-  saved_locations               SavedLocation[]
-  alert_rules                   AlertRule[]
-  notification_preference       NotificationPreference?
-  event_envelopes               EventEnvelope[]
-  telemetry_events              TelemetryEvent[]
-  capsules                      OutfitCapsule[]
-  capsule_garments              OutfitCapsuleGarment[]
-  capsule_telemetry_claims      CapsuleTelemetryClaim[]
-  wardrobe_onboarding_state     WardrobeOnboardingState?
-  silhouette_profile            SilhouetteProfile?
-  commerce_preference           CommercePreference?
-  affiliate_clicks              AffiliateClick[]
-  premium_entitlement           PremiumEntitlement?
-  billing_events                BillingEvent[]
-  billing_customer              BillingCustomer?
-  premium_theme_preference      PremiumThemePreference?
-  palette_profile               PaletteProfile?
-  advisor_recommendation_states AdvisorRecommendationState[]
-  planner_day_plans             PlannerDayPlan[]
-  community_reactions           CommunityReaction[]
-  community_reaction_receipts   CommunityReactionReceipt[]
-  community_reaction_outbox     CommunityReactionOutbox[]
-  community_alias               CommunityAlias?
-  community_reports_filed       CommunityPostReport[]        @relation("CommunityReporter")
+  id                                  String                            @id @default(cuid())
+  email                               String                            @unique
+  created_at                          DateTime                          @default(now())
+  updated_at                          DateTime                          @updatedAt
+  profile                             UserProfile?
+  comfort_profile                     ComfortPreferences?
+  garments                            GarmentItem[]
+  palette_insights                    PaletteInsights[]
+  outfits                             OutfitRecommendation[]
+  lookbook_posts                      LookbookPost[]
+  engagement                          EngagementEvent[]
+  audit_logs                          AuditLog[]
+  guardian_roles                      GuardianConsent[]                 @relation("GuardianRole")
+  teen_roles                          GuardianConsent[]                 @relation("TeenRole")
+  sent_guardian_invitations           GuardianInvitation[]              @relation("TeenGuardianInvitations")
+  accepted_guardian_invitations       GuardianInvitation[]              @relation("AcceptedGuardianInvitations")
+  moderation_flags                    ModerationEvent[]                 @relation("FlaggedByRelation")
+  moderation_reviews                  ModerationEvent[]                 @relation("ReviewedByRelation")
+  push_tokens                         PushToken[]
+  saved_locations                     SavedLocation[]
+  alert_rules                         AlertRule[]
+  notification_preference             NotificationPreference?
+  event_envelopes                     EventEnvelope[]
+  telemetry_events                    TelemetryEvent[]
+  capsules                            OutfitCapsule[]
+  capsule_garments                    OutfitCapsuleGarment[]
+  capsule_telemetry_claims            CapsuleTelemetryClaim[]
+  wardrobe_onboarding_state           WardrobeOnboardingState?
+  silhouette_profile                  SilhouetteProfile?
+  commerce_preference                 CommercePreference?
+  affiliate_clicks                    AffiliateClick[]
+  premium_entitlement                 PremiumEntitlement?
+  billing_events                      BillingEvent[]
+  billing_customer                    BillingCustomer?
+  premium_theme_preference            PremiumThemePreference?
+  palette_profile                     PaletteProfile?
+  advisor_recommendation_states       AdvisorRecommendationState[]
+  planner_day_plans                   PlannerDayPlan[]
+  community_comment_analytics_subject CommunityCommentAnalyticsSubject?
+  community_comments                  CommunityComment[]
+  community_comment_receipts          CommunityCommentReceipt[]
+  community_comment_reports           CommunityCommentReport[]
+  community_reactions                 CommunityReaction[]
+  community_reaction_receipts         CommunityReactionReceipt[]
+  community_reaction_outbox           CommunityReactionOutbox[]
+  community_alias                     CommunityAlias?
+  community_reports_filed             CommunityPostReport[]             @relation("CommunityReporter")
 }
 
 /// RLS: user-scoped profile data keyed by user_id
@@ -559,20 +563,20 @@ model OutfitRecommendation {
 /// can satisfy both. The API serves the allowlisted projection on service_role.
 /// See the header of the Story 6.1 migration for the full reasoning.
 model LookbookPost {
-  id                        String                     @id @default(cuid())
-  user                      User                       @relation(fields: [user_id], references: [id], onDelete: Cascade)
-  user_id                   String
-  status                    CommunityPostStatus        @default(draft)
-  caption                   String?
-  alt_text                  String?
+  id                           String                     @id @default(cuid())
+  user                         User                       @relation(fields: [user_id], references: [id], onDelete: Cascade)
+  user_id                      String
+  status                       CommunityPostStatus        @default(draft)
+  caption                      String?
+  alt_text                     String?
   /// Opaque `community/<postId>/<random>.<ext>`. Never contains a user id: the
   /// path travels inside every signed URL, so a user id here deanonymizes the
   /// author to anyone the URL is shared with.
-  image_object_path         String?
-  image_content_type        String?
-  image_checksum            String?
-  image_byte_size           Int?
-  upload_expires_at         DateTime?
+  image_object_path            String?
+  image_content_type           String?
+  image_checksum               String?
+  image_byte_size              Int?
+  upload_expires_at            DateTime?
   /// When the author confirmed the alt text stored in `alt_text`. The Zod
   /// contract refuses an unconfirmed publish at the HTTP boundary, but a
   /// boundary check leaves no record; without this column nothing downstream
@@ -583,39 +587,41 @@ model LookbookPost {
   /// The migration adds `LookbookPost_alt_text_confirmed_when_published`, a
   /// CHECK Prisma cannot express, making the boundary a database invariant
   /// rather than only a contract one.
-  alt_text_confirmed_at     DateTime?
+  alt_text_confirmed_at        DateTime?
   /// When the submission was accepted, which is not `created_at`: the row is
   /// created at allocate time and a replayed allocate reuses it, so counting
   /// `created_at` would charge a retry against the rolling 24-hour cap.
-  submitted_at              DateTime?
-  published_at              DateTime?
-  moderation_reason         String?
-  moderation_engine_version String?
-  idempotency_key           String?
-  location_key              String?
-  locale                    String?
-  climate_band              ClimateBand?
-  palette_insight           PaletteInsights?           @relation("LookbookPalette", fields: [palette_insight_id], references: [id])
-  palette_insight_id        String?
-  challenge                 CommunityChallenge?        @relation(fields: [challenge_id], references: [id], onDelete: SetNull)
-  challenge_id              String?
-  moderation_outbox         CommunityModerationOutbox?
+  submitted_at                 DateTime?
+  published_at                 DateTime?
+  moderation_reason            String?
+  moderation_engine_version    String?
+  idempotency_key              String?
+  location_key                 String?
+  locale                       String?
+  climate_band                 ClimateBand?
+  palette_insight              PaletteInsights?           @relation("LookbookPalette", fields: [palette_insight_id], references: [id])
+  palette_insight_id           String?
+  challenge                    CommunityChallenge?        @relation(fields: [challenge_id], references: [id], onDelete: SetNull)
+  challenge_id                 String?
+  moderation_outbox            CommunityModerationOutbox?
   /// Erasure clock. The story requires deletion to complete within 72 hours,
   /// and it completes in three observable steps: the request, the row
   /// anonymization, and the durable removal of the storage object. A sweep
   /// cannot re-drive what it cannot see, so each step has its own timestamp.
-  erasure_requested_at      DateTime?
-  anonymized_at             DateTime?
-  objects_purged_at         DateTime?
-  created_at                DateTime                   @default(now())
-  updated_at                DateTime                   @updatedAt
-  engagement_events         EngagementEvent[]
-  moderation_events         ModerationEvent[]
-  reports                   CommunityPostReport[]
-  reaction_generation       Int                        @default(0)
-  reactions                 CommunityReaction[]
-  reaction_receipts         CommunityReactionReceipt[]
-  reaction_outbox           CommunityReactionOutbox[]
+  erasure_requested_at         DateTime?
+  anonymized_at                DateTime?
+  objects_purged_at            DateTime?
+  created_at                   DateTime                   @default(now())
+  updated_at                   DateTime                   @updatedAt
+  engagement_events            EngagementEvent[]
+  moderation_events            ModerationEvent[]
+  reports                      CommunityPostReport[]
+  comment_publication_sequence Int                        @default(0)
+  comments                     CommunityComment[]
+  reaction_generation          Int                        @default(0)
+  reactions                    CommunityReaction[]
+  reaction_receipts            CommunityReactionReceipt[]
+  reaction_outbox              CommunityReactionOutbox[]
 
   @@unique([user_id, idempotency_key])
   @@index([user_id])
@@ -1507,4 +1513,125 @@ model CommunityReactionOutbox {
 
   @@index([delivered_at, next_attempt_at])
   @@index([post_id])
+}
+
+// Story 6.4 owner: screened threads, immutable retry receipts and durable intake.
+enum CommunityCommentStatus {
+  pending_screening
+  published
+  held_for_review
+  blocked
+  screening_failed
+  author_deleted
+  consent_suspended
+  erased
+}
+
+model CommunityComment {
+  id                   String                           @id @default(cuid())
+  post_id              String
+  post                 LookbookPost                     @relation(fields: [post_id], references: [id], onDelete: Cascade)
+  user_id              String?
+  user                 User?                            @relation(fields: [user_id], references: [id], onDelete: SetNull)
+  parent_id            String?
+  parent               CommunityComment?                @relation("CommentReplies", fields: [parent_id], references: [id], onDelete: NoAction)
+  replies              CommunityComment[]               @relation("CommentReplies")
+  body                 String?
+  locale               String
+  status               CommunityCommentStatus           @default(pending_screening)
+  publication_sequence Int?
+  published_at         DateTime?
+  created_at           DateTime                         @default(now())
+  updated_at           DateTime                         @updatedAt
+  platform             String
+  screening_reason     String?
+  screening_version    String?
+  receipt              CommunityCommentReceipt?
+  screening_outbox     CommunityCommentScreeningOutbox?
+  reports              CommunityCommentReport[]
+
+  @@unique([post_id, publication_sequence])
+  @@index([post_id, parent_id, publication_sequence])
+  @@index([user_id, created_at])
+  @@index([status, created_at])
+}
+
+model CommunityCommentReceipt {
+  id           String           @id @default(cuid())
+  user_id      String
+  user         User             @relation(fields: [user_id], references: [id], onDelete: Cascade)
+  mutation_id  String           @db.Uuid
+  payload_hash String
+  comment_id   String           @unique
+  comment      CommunityComment @relation(fields: [comment_id], references: [id], onDelete: Cascade)
+  created_at   DateTime         @default(now())
+
+  @@unique([user_id, mutation_id])
+}
+
+model CommunityCommentScreeningOutbox {
+  id            String           @id @default(cuid())
+  comment_id    String           @unique
+  comment       CommunityComment @relation(fields: [comment_id], references: [id], onDelete: Cascade)
+  generation    Int              @default(0)
+  dispatched_at DateTime?
+  attempts      Int              @default(0)
+  created_at    DateTime         @default(now())
+  updated_at    DateTime         @updatedAt
+
+  @@index([dispatched_at, created_at])
+}
+
+model CommunityCommentReport {
+  id               String                  @id @default(cuid())
+  comment_id       String?
+  comment          CommunityComment?       @relation(fields: [comment_id], references: [id], onDelete: SetNull)
+  reporter_id      String?
+  reporter         User?                   @relation(fields: [reporter_id], references: [id], onDelete: SetNull)
+  reason           CommunityReportReason
+  content_snapshot Json?
+  accepted_at      DateTime                @default(now())
+  routed_at        DateTime                @default(now())
+  sla_due_at       DateTime
+  resolved_at      DateTime?
+  audit            CommunityCommentAudit[]
+
+  @@unique([comment_id, reporter_id])
+  @@index([reporter_id, accepted_at])
+  @@index([resolved_at, sla_due_at])
+}
+
+model CommunityCommentAudit {
+  id          String                  @id @default(cuid())
+  report_id   String?
+  report      CommunityCommentReport? @relation(fields: [report_id], references: [id], onDelete: SetNull)
+  action      String
+  reason      String
+  occurred_at DateTime                @default(now())
+
+  @@index([report_id])
+}
+
+model CommunityCommentAnalyticsOutbox {
+  id               String                           @id @db.Uuid
+  // HMAC identities only. No User foreign key or raw user identifiers.
+  actor            String
+  subject          CommunityCommentAnalyticsSubject @relation(fields: [actor], references: [actor], onDelete: Cascade)
+  event_type       String
+  payload          Json
+  created_at       DateTime                         @default(now())
+  delivered_at     DateTime?
+  attempts         Int                              @default(0)
+  next_attempt_at  DateTime                         @default(now())
+  lease_id         String?                          @db.Uuid
+  lease_expires_at DateTime?
+
+  @@index([delivered_at, next_attempt_at])
+}
+
+model CommunityCommentAnalyticsSubject {
+  user_id String                            @id
+  user    User                              @relation(fields: [user_id], references: [id], onDelete: Cascade)
+  actor   String                            @unique
+  events  CommunityCommentAnalyticsOutbox[]
 }

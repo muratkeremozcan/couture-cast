@@ -1,3 +1,4 @@
+import { listenHttpApp, httpTestUrl } from './helpers/loopback-http-app.js'
 import 'reflect-metadata'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { type TestingModule, Test } from '@nestjs/testing'
@@ -248,7 +249,7 @@ describe('Guardian emancipation sweep (integration)', () => {
       throw new Error('App is not initialized')
     }
 
-    return app.getHttpServer() as Parameters<typeof request>[0]
+    return httpTestUrl(app)
   }
 
   beforeEach(async () => {
@@ -288,7 +289,7 @@ describe('Guardian emancipation sweep (integration)', () => {
       .compile()
 
     app = moduleFixture.createNestApplication()
-    await app.init()
+    await listenHttpApp(app)
 
     guardianService = new GuardianService(
       { capture: vi.fn() } as never,

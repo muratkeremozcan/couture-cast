@@ -1,3 +1,4 @@
+import { listenHttpApp, httpTestUrl } from './helpers/loopback-http-app.js'
 // Learning path Step 9: Observability bootstrap with OpenTelemetry.
 // See _bmad-output/project-knowledge/learning-path-step-by-step.md#step-9-observability-bootstrap-with-opentelemetry
 // Learning path Step 10: Grafana Cloud setup, telemetry inventory, and dashboard planning.
@@ -196,7 +197,7 @@ describe('observability integration', () => {
       throw new Error('App is not initialized')
     }
 
-    return app.getHttpServer() as Parameters<typeof request>[0]
+    return httpTestUrl(app)
   }
 
   beforeEach(async () => {
@@ -297,7 +298,7 @@ describe('observability integration', () => {
     app = moduleFixture.createNestApplication()
     app.use(bindRequestContext)
     app.use(createRequestLoggerMiddleware({ env, logger }))
-    await app.init()
+    await listenHttpApp(app)
 
     const logCursor = logExpectations.createCursor()
     const response = await request(getHttpServer())

@@ -1,3 +1,5 @@
+import { sharedCommunityReportRetryAfter } from './community-report-limit.js'
+import { eraseCommunityComments } from './community-comments.privacy.js'
 import { randomUUID } from 'node:crypto'
 import { Inject, Injectable, ConflictException, NotFoundException } from '@nestjs/common'
 import {
@@ -478,7 +480,8 @@ export class CommunityRepository {
   async requestErasureForUser(userId: string, requestedAt: Date): Promise<number> {
     return this.prisma.$transaction(async (tx) => {
       await tx.$executeRaw`SELECT pg_advisory_xact_lock(hashtext('community_member:' || ${userId}))`
-      await tx.$queryRaw`SELECT id FROM "LookbookPost" WHERE id IN (SELECT post_id FROM "CommunityReaction" WHERE user_id = ${userId}) OR user_id = ${userId} ORDER BY id FOR UPDATE`
+      await tx.$queryRaw`SELECT id FROM "LookbookPost" WHERE id IN (SELECT post_id FROM "CommunityReaction" WHERE user_id = ${userId}) OR id IN (SELECT post_id FROM "CommunityComment" WHERE user_id = ${userId}) OR user_id = ${userId} ORDER BY id FOR UPDATE`
+      await eraseCommunityComments(tx, userId)
       await tx.communityReaction.deleteMany({ where: { user_id: userId } })
       await tx.communityReactionReceipt.deleteMany({ where: { user_id: userId } })
       await tx.communityReactionOutbox.deleteMany({ where: { user_id: userId } })
@@ -689,21 +692,13 @@ export class CommunityRepository {
             : { kind: 'reason_changed' as const, existingReason: existing.reason }
         }
 
-        const windowStart = new Date(
-          Date.now() - SUBMISSION_WINDOW_HOURS * 60 * 60 * 1000
+        const retryAfterSeconds = await sharedCommunityReportRetryAfter(
+          tx,
+          reporterId,
+          abuseLimit
         )
-        const recent = await tx.communityPostReport.findMany({
-          where: { reporter_id: reporterId, created_at: { gt: windowStart } },
-          orderBy: { created_at: 'asc' },
-          select: { created_at: true },
-        })
-
-        if (recent.length >= abuseLimit) {
-          return {
-            kind: 'rate_limited' as const,
-            retryAfterSeconds: retryAfterSecondsFrom(recent[0]?.created_at ?? null),
-          }
-        }
+        if (retryAfterSeconds !== null)
+          return { kind: 'rate_limited' as const, retryAfterSeconds }
 
         // Captured under the same `FOR UPDATE` lock that decided the post was
         // visible, so the snapshot is the content the reporter actually saw

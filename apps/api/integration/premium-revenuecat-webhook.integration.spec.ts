@@ -1,3 +1,4 @@
+import { listenHttpApp, httpTestUrl } from './helpers/loopback-http-app.js'
 import 'reflect-metadata'
 import { randomUUID } from 'node:crypto'
 import { PrismaClient } from '@prisma/client'
@@ -107,7 +108,7 @@ describe('5.2 RevenueCat webhook rail against real PostgreSQL and real HTTP', ()
     if (!app) {
       throw new Error('App is not initialized')
     }
-    return app.getHttpServer() as Parameters<typeof request>[0]
+    return httpTestUrl(app)
   }
 
   function postEvent(
@@ -242,7 +243,10 @@ describe('5.2 RevenueCat webhook rail against real PostgreSQL and real HTTP', ()
         telemetry as unknown as TelemetryService
       )
     )
-    await app.init()
+    // Keep one listening server for the suite. Supertest's implicit bind/close per
+    // request repeatedly opens ephemeral ports. A stable listener isolates this
+    // suite while other HTTP integration fixtures run in parallel.
+    await listenHttpApp(app)
   })
 
   beforeEach(async () => {
@@ -298,9 +302,14 @@ describe('5.2 RevenueCat webhook rail against real PostgreSQL and real HTTP', ()
         .send(JSON.stringify({ event: {} }))
 
       expect(response.status).toBe(401)
-      expect((response.body as { message?: string }).message).toBe(
-        BILLING_WEBHOOK_UNAUTHORIZED_MESSAGE
-      )
+      expect(
+        (response.body as { message?: string }).message,
+        JSON.stringify({
+          status: response.status,
+          headers: response.headers,
+          text: response.text,
+        })
+      ).toBe(BILLING_WEBHOOK_UNAUTHORIZED_MESSAGE)
     })
 
     it('does not emit api_error_occurred for webhook rejections (excluded route)', async (context) => {
@@ -495,10 +504,7 @@ describe('5.2 RevenueCat webhook rail against real PostgreSQL and real HTTP', ()
 
           const event = purchaseEvent({ type })
           const response = await postEvent(event)
-          // The body rides along so a status mismatch names its responder. One
-          // full-suite run answered `CANCELLATION from expired` with a 404 that
-          // no handler on this route can produce, and the status alone left
-          // nothing to tell Nest's router apart from anything else that answered.
+          // Include the response body to identify a failing HTTP responder.
           expect(response.status, `${type} from ${prior}: ${response.text}`).toBe(200)
           expect(response.body).toEqual({ data: { received: true } })
 

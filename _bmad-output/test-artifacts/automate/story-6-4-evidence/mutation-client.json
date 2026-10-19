@@ -1,0 +1,456 @@
+{
+  "sha": {
+    "src/community-comments-state.ts": "8daf88b7f169",
+    "src/contracts/http/community.ts": "64f7828d6040"
+  },
+  "baseline_total": 107,
+  "baseline_failed": [],
+  "rows": [
+    {
+      "id": "M1 no pending-work check",
+      "where": "src/community-comments-state.ts:206",
+      "original": "        !this.current(postId).submissions.some(\n          (item) => item.status === 'pending_screening'\n        )",
+      "mutated": "        false",
+      "killers": [
+        "community-comments-state.spec.ts > watchSubmissions polls only pending screening work arms the first poll 3s after screening work appears, not from an earlier update"
+      ],
+      "verdict": "killed"
+    },
+    {
+      "id": "M2 no 30s backoff cap",
+      "where": "src/community-comments-state.ts:233",
+      "original": "Math.min(30_000, 3000 * 2 ** failures)",
+      "mutated": "3000 * 2 ** failures",
+      "killers": [
+        "community-comments-state.spec.ts > watchSubmissions polls only pending screening work backs off failed polls on a 3s, 6s, 12s, 24s, 30s schedule capped at 30s"
+      ],
+      "verdict": "killed"
+    },
+    {
+      "id": "M3 failures not reset on success",
+      "where": "src/community-comments-state.ts:229",
+      "original": "? Math.min(failures + 1, 4) : 0",
+      "mutated": "? Math.min(failures + 1, 4) : failures",
+      "killers": [
+        "community-comments-state.spec.ts > watchSubmissions polls only pending screening work announces a failing poll once, then clears the error and restarts at 3s after recovery"
+      ],
+      "verdict": "killed"
+    },
+    {
+      "id": "M5a schedule stopped guard removed",
+      "where": "src/community-comments-state.ts:201",
+      "original": "      if (\n        stopped ||\n        !valid() ||\n        busy ||",
+      "mutated": "      if (\n        !valid() ||\n        busy ||",
+      "killers": [],
+      "verdict": "survived"
+    },
+    {
+      "id": "M5b post-poll fence removed",
+      "where": "src/community-comments-state.ts:227",
+      "original": "            if (stopped || !owns() || scheduledCycle !== cycle) return\n",
+      "mutated": "",
+      "killers": [
+        "community-comments-state.spec.ts > watchSubmissions polls only pending screening work polls the next account while an old poll is still in flight and ignores its completion"
+      ],
+      "verdict": "killed"
+    },
+    {
+      "id": "M6 stop does not clear timer",
+      "where": "src/community-comments-state.ts:239",
+      "original": "      stopped = true\n      if (timer) clearTimeout(timer)\n",
+      "mutated": "      stopped = true\n",
+      "killers": [],
+      "verdict": "survived"
+    },
+    {
+      "id": "M23a schedule ticket guard removed",
+      "where": "src/community-comments-state.ts:203",
+      "original": "        !valid() ||\n        busy ||",
+      "mutated": "        busy ||",
+      "killers": [],
+      "verdict": "survived"
+    },
+    {
+      "id": "M23b timer recheck removed",
+      "where": "src/community-comments-state.ts:216",
+      "original": "          if (\n            stopped ||\n            !owns() ||\n            scheduledCycle !== cycle ||\n            !this.current(postId).submissions.some(\n              (item) => item.status === 'pending_screening'\n            )\n          )\n            return\n",
+      "mutated": "",
+      "killers": [
+        "community-comments-state.spec.ts > watchSubmissions polls only pending screening work skips an armed poll once screening work settled through another refresh"
+      ],
+      "verdict": "killed"
+    },
+    {
+      "id": "M23c timer ticket recheck removed",
+      "where": "src/community-comments-state.ts:217",
+      "original": "            stopped ||\n            !owns() ||\n",
+      "mutated": "            stopped ||\n",
+      "killers": [],
+      "verdict": "survived"
+    },
+    {
+      "id": "M23d timer pending recheck removed",
+      "where": "src/community-comments-state.ts:219",
+      "original": "            scheduledCycle !== cycle ||\n            !this.current(postId).submissions.some(\n              (item) => item.status === 'pending_screening'\n            )\n",
+      "mutated": "            scheduledCycle !== cycle\n",
+      "killers": [
+        "community-comments-state.spec.ts > watchSubmissions polls only pending screening work skips an armed poll once screening work settled through another refresh"
+      ],
+      "verdict": "killed"
+    },
+    {
+      "id": "M23e timer stopped recheck removed",
+      "where": "src/community-comments-state.ts:216",
+      "original": "          if (\n            stopped ||\n            !owns() ||",
+      "mutated": "          if (\n            !owns() ||",
+      "killers": [],
+      "verdict": "survived"
+    },
+    {
+      "id": "M24a per-cycle ticket renewal removed",
+      "where": "src/community-comments-state.ts:198",
+      "original": "        valid = this.ticket(postId)\n",
+      "mutated": "",
+      "killers": [
+        "community-comments-state.spec.ts > watchSubmissions polls only pending screening work cancels the old account timer so later updates cannot arm a duplicate poll",
+        "community-comments-state.spec.ts > watchSubmissions polls only pending screening work polls the next account while an old poll is still in flight and ignores its completion",
+        "community-comments-state.spec.ts > watchSubmissions polls only pending screening work restarts the next account at the 3s base interval after earlier failures",
+        "community-comments-state.spec.ts > watchSubmissions polls only pending screening work resumes polling on the same watch for screening work created by the next account"
+      ],
+      "verdict": "killed"
+    },
+    {
+      "id": "M24b cycle bump removed",
+      "where": "src/community-comments-state.ts:199",
+      "original": "        cycle++\n",
+      "mutated": "",
+      "killers": [],
+      "verdict": "survived"
+    },
+    {
+      "id": "M24c whole renewal block removed",
+      "where": "src/community-comments-state.ts:193",
+      "original": "      if (!valid()) {\n        if (timer) clearTimeout(timer)\n        timer = undefined\n        busy = false\n        failures = 0\n        valid = this.ticket(postId)\n        cycle++\n      }\n",
+      "mutated": "",
+      "killers": [
+        "community-comments-state.spec.ts > watchSubmissions polls only pending screening work cancels the old account timer so later updates cannot arm a duplicate poll",
+        "community-comments-state.spec.ts > watchSubmissions polls only pending screening work polls the next account while an old poll is still in flight and ignores its completion",
+        "community-comments-state.spec.ts > watchSubmissions polls only pending screening work restarts the next account at the 3s base interval after earlier failures",
+        "community-comments-state.spec.ts > watchSubmissions polls only pending screening work resumes polling on the same watch for screening work created by the next account"
+      ],
+      "verdict": "killed"
+    },
+    {
+      "id": "M25a invalid old timer not cancelled",
+      "where": "src/community-comments-state.ts:194",
+      "original": "        if (timer) clearTimeout(timer)\n        timer = undefined\n",
+      "mutated": "        timer = undefined\n",
+      "killers": [
+        "community-comments-state.spec.ts > watchSubmissions polls only pending screening work cancels the old account timer so later updates cannot arm a duplicate poll"
+      ],
+      "verdict": "killed"
+    },
+    {
+      "id": "M25b invalid old timer handle kept",
+      "where": "src/community-comments-state.ts:194",
+      "original": "        if (timer) clearTimeout(timer)\n        timer = undefined\n",
+      "mutated": "        if (timer) clearTimeout(timer)\n",
+      "killers": [
+        "community-comments-state.spec.ts > watchSubmissions polls only pending screening work cancels the old account timer so later updates cannot arm a duplicate poll",
+        "community-comments-state.spec.ts > watchSubmissions polls only pending screening work restarts the next account at the 3s base interval after earlier failures",
+        "community-comments-state.spec.ts > watchSubmissions polls only pending screening work resumes polling on the same watch for screening work created by the next account"
+      ],
+      "verdict": "killed"
+    },
+    {
+      "id": "M25c renewal keeps busy flag",
+      "where": "src/community-comments-state.ts:196",
+      "original": "        busy = false\n        failures = 0\n",
+      "mutated": "        failures = 0\n",
+      "killers": [
+        "community-comments-state.spec.ts > watchSubmissions polls only pending screening work polls the next account while an old poll is still in flight and ignores its completion"
+      ],
+      "verdict": "killed"
+    },
+    {
+      "id": "M25d renewal keeps backoff",
+      "where": "src/community-comments-state.ts:197",
+      "original": "        failures = 0\n        valid = this.ticket(postId)\n",
+      "mutated": "        valid = this.ticket(postId)\n",
+      "killers": [
+        "community-comments-state.spec.ts > watchSubmissions polls only pending screening work restarts the next account at the 3s base interval after earlier failures"
+      ],
+      "verdict": "killed"
+    },
+    {
+      "id": "M26a timer cycle recheck removed",
+      "where": "src/community-comments-state.ts:219",
+      "original": "            scheduledCycle !== cycle ||\n            !this.current",
+      "mutated": "            !this.current",
+      "killers": [],
+      "verdict": "survived"
+    },
+    {
+      "id": "M26b post-poll ticket fence removed",
+      "where": "src/community-comments-state.ts:227",
+      "original": "if (stopped || !owns() || scheduledCycle !== cycle) return",
+      "mutated": "if (stopped || scheduledCycle !== cycle) return",
+      "killers": [],
+      "verdict": "survived"
+    },
+    {
+      "id": "M26c post-poll cycle fence removed",
+      "where": "src/community-comments-state.ts:227",
+      "original": "if (stopped || !owns() || scheduledCycle !== cycle) return",
+      "mutated": "if (stopped || !owns()) return",
+      "killers": [],
+      "verdict": "survived"
+    },
+    {
+      "id": "M26d post-poll stopped fence removed",
+      "where": "src/community-comments-state.ts:227",
+      "original": "if (stopped || !owns() || scheduledCycle !== cycle) return",
+      "mutated": "if (!owns() || scheduledCycle !== cycle) return",
+      "killers": [],
+      "verdict": "survived"
+    },
+    {
+      "id": "M26e timer uses live ticket",
+      "where": "src/community-comments-state.ts:218",
+      "original": "            !owns() ||\n",
+      "mutated": "            !valid() ||\n",
+      "killers": [],
+      "verdict": "survived"
+    },
+    {
+      "id": "M4 announce every failure",
+      "where": "src/community-comments-state.ts:172",
+      "original": "if (state.error !== key) this.announce(state, key)",
+      "mutated": "this.announce(state, key)",
+      "killers": [
+        "community-comments-state.spec.ts > pending-only private polling and once-only announcements backs off repeated failures, clears recovery, announces a transition once and stops after screening",
+        "community-comments-state.spec.ts > watchSubmissions polls only pending screening work announces a failing poll once, then clears the error and restarts at 3s after recovery"
+      ],
+      "verdict": "killed"
+    },
+    {
+      "id": "M7 consumeAnnouncement replays",
+      "where": "src/community-comments-state.ts:178",
+      "original": "(this.consumedAnnouncements.get(postId) ?? 0) >= announcement.id",
+      "mutated": "false",
+      "killers": [
+        "community-comments-state.spec.ts > consumeAnnouncement returns each announcement once, never replays it on reopen, and returns each new action",
+        "community-comments-state.spec.ts > pending-only private polling and once-only announcements backs off repeated failures, clears recovery, announces a transition once and stops after screening"
+      ],
+      "verdict": "killed"
+    },
+    {
+      "id": "M8 create invalidates public reads",
+      "where": "src/community-comments-state.ts:463",
+      "original": "this.statusesPending.delete(postId)\n      this.reconcileSubmissions(",
+      "mutated": "this.invalidateReads(postId)\n      this.reconcileSubmissions(",
+      "killers": [
+        "community-comments-state.spec.ts > Story 6.4 peer-review concurrency regressions keeps an initial public read alive when create succeeds before it",
+        "community-comments-state.spec.ts > public reads during a confirmed create keeps both an in-flight public refresh and the confirmed receipt"
+      ],
+      "verdict": "killed"
+    },
+    {
+      "id": "M9 429 not definite",
+      "where": "src/community-comments-state.ts:428",
+      "original": "[400, 403, 409, 429]",
+      "mutated": "[400, 403, 409]",
+      "killers": [
+        "community-comments-state-outcomes.spec.ts > create intent classification (B1) releases the intent after a definite HTTP 429 rejection and keeps the draft"
+      ],
+      "verdict": "killed"
+    },
+    {
+      "id": "M10 500/503 definite",
+      "where": "src/community-comments-state.ts:428",
+      "original": "[400, 403, 409, 429]",
+      "mutated": "[400, 403, 409, 429, 500, 503]",
+      "killers": [
+        "community-comments-state-outcomes.spec.ts > create intent classification (B1) retains the exact intent after HTTP 500 and retries the identical request",
+        "community-comments-state-outcomes.spec.ts > create intent classification (B1) retains the exact intent after HTTP 503 and retries the identical request"
+      ],
+      "verdict": "killed"
+    },
+    {
+      "id": "M11 load catch unfenced",
+      "where": "src/community-comments-state.ts:345",
+      "original": "if (isCurrent()) this.failed(postId, state, error)",
+      "mutated": "this.failed(postId, state, error)",
+      "killers": [
+        "community-comments-state-outcomes.spec.ts > stale-response fences with non-evicting failures ignores a reply expansion failure fenced by a root refresh",
+        "community-comments-state-outcomes.spec.ts > stale-response fences with non-evicting failures ignores a superseded public read that fails after a newer read succeeded",
+        "community-comments-state.spec.ts > screen-owned comments state ignores older success and errors after newer requests and visibility loss"
+      ],
+      "verdict": "killed"
+    },
+    {
+      "id": "M12 delete catch unfenced",
+      "where": "src/community-comments-state.ts:503",
+      "original": "    } catch (error) {\n      if (valid()) {\n        this.failed(postId, state, error)\n        this.emit()\n      }\n    }\n  }\n\n  async report(",
+      "mutated": "    } catch (error) {\n        this.failed(postId, state, error)\n        this.emit()\n    }\n  }\n\n  async report(",
+      "killers": [
+        "community-comments-state-outcomes.spec.ts > stale-response fences with non-evicting failures ignores not_found from mutations and polls started before an account switch",
+        "community-comments-state-outcomes.spec.ts > stale-response fences with non-evicting failures ignores signed_out from mutations and polls started before an account switch",
+        "community-comments-state-outcomes.spec.ts > stale-response fences with non-evicting failures ignores unknown from mutations and polls started before an account switch"
+      ],
+      "verdict": "killed"
+    },
+    {
+      "id": "M13 erased not suppressed",
+      "where": "src/community-comments-state.ts:405",
+      "original": "['author_deleted', 'consent_suspended', 'erased']",
+      "mutated": "['author_deleted', 'consent_suspended']",
+      "killers": [
+        "community-comments-state-outcomes.spec.ts > private status suppression of cached public comments removes a cached reply body and alias after a private erased status",
+        "community-comments-state-outcomes.spec.ts > private status suppression of cached public comments removes a cached root body and alias after a private erased status"
+      ],
+      "verdict": "killed"
+    },
+    {
+      "id": "M14 suppression does not fence reads",
+      "where": "src/community-comments-state.ts:406",
+      "original": "        this.invalidateReads(postId, false)\n",
+      "mutated": "",
+      "killers": [
+        "community-comments-state-outcomes.spec.ts > private status suppression of cached public comments removes a cached reply body and alias after a private author_deleted status",
+        "community-comments-state-outcomes.spec.ts > private status suppression of cached public comments removes a cached reply body and alias after a private consent_suspended status",
+        "community-comments-state-outcomes.spec.ts > private status suppression of cached public comments removes a cached reply body and alias after a private erased status",
+        "community-comments-state-outcomes.spec.ts > private status suppression of cached public comments removes a cached root body and alias after a private author_deleted status",
+        "community-comments-state-outcomes.spec.ts > private status suppression of cached public comments removes a cached root body and alias after a private consent_suspended status",
+        "community-comments-state-outcomes.spec.ts > private status suppression of cached public comments removes a cached root body and alias after a private erased status",
+        "community-comments-state.spec.ts > Story 6.4 peer-review concurrency regressions applies private suppression and fences an older public read"
+      ],
+      "verdict": "killed"
+    },
+    {
+      "id": "M15 merge across changed snapshots",
+      "where": "src/community-comments-state.ts:70",
+      "original": "previous.snapshot !== page.snapshot",
+      "mutated": "false",
+      "killers": [
+        "community-comments-state-outcomes.spec.ts > pagination across snapshots replaces replies when an append returns a changed snapshot",
+        "community-comments-state-outcomes.spec.ts > pagination across snapshots replaces roots when an append returns a changed snapshot"
+      ],
+      "verdict": "killed"
+    },
+    {
+      "id": "M16 age_gate maps to generic key",
+      "where": "src/community-comments-state.ts:170",
+      "original": "? 'community.error.ageGate'",
+      "mutated": "? 'community.comments.failed'",
+      "killers": [
+        "community-comments-state-outcomes.spec.ts > create intent classification (B1) releases the intent after a definite age_gate rejection and keeps the draft",
+        "community-comments-state-outcomes.spec.ts > screen-owned comments state handles public read failure age_gate with error community.error.ageGate"
+      ],
+      "verdict": "killed"
+    },
+    {
+      "id": "M17 request ownership ignored",
+      "where": "src/community-comments-state.ts:312",
+      "original": "return () => valid() && this.requests.get(key) === request",
+      "mutated": "return () => valid()",
+      "killers": [
+        "community-comments-state-outcomes.spec.ts > pagination across snapshots discards an in-flight append when a refresh replaces the snapshot",
+        "community-comments-state-outcomes.spec.ts > private status suppression of cached public comments removes a cached reply body and alias after a private author_deleted status",
+        "community-comments-state-outcomes.spec.ts > private status suppression of cached public comments removes a cached reply body and alias after a private consent_suspended status",
+        "community-comments-state-outcomes.spec.ts > private status suppression of cached public comments removes a cached reply body and alias after a private erased status",
+        "community-comments-state-outcomes.spec.ts > private status suppression of cached public comments removes a cached root body and alias after a private author_deleted status",
+        "community-comments-state-outcomes.spec.ts > private status suppression of cached public comments removes a cached root body and alias after a private consent_suspended status",
+        "community-comments-state-outcomes.spec.ts > private status suppression of cached public comments removes a cached root body and alias after a private erased status",
+        "community-comments-state-outcomes.spec.ts > stale-response fences with non-evicting failures ignores a reply expansion failure fenced by a root refresh",
+        "community-comments-state-outcomes.spec.ts > stale-response fences with non-evicting failures ignores a superseded public read that fails after a newer read succeeded",
+        "community-comments-state.spec.ts > Story 6.4 peer-review concurrency regressions applies private suppression and fences an older public read",
+        "community-comments-state.spec.ts > Story 6.4 peer-review concurrency regressions rejects a private poll captured before a confirmed create",
+        "community-comments-state.spec.ts > screen-owned comments state applies tombstones to roots/replies/owner statuses and fences delayed reads",
+        "community-comments-state.spec.ts > screen-owned comments state fences first reply expansions on refresh while preserving private and other-post reads",
+        "community-comments-state.spec.ts > screen-owned comments state ignores older success and errors after newer requests and visibility loss",
+        "community-comments-state.spec.ts > screen-owned comments state loads and merges reply pages, and clears/fences cached replies on refresh"
+      ],
+      "verdict": "killed"
+    },
+    {
+      "id": "M18a page schema not strict",
+      "where": "src/contracts/http/community.ts:1147",
+      "original": "    hasNewer: z.boolean(),\n  })\n  .strict()",
+      "mutated": "    hasNewer: z.boolean(),\n  })\n  .passthrough()",
+      "killers": [
+        "community-comments-client.spec.ts > Story 6.4 community comments client refuses an unexpected userId on roots a page returned by a thread server"
+      ],
+      "verdict": "killed"
+    },
+    {
+      "id": "M18b comment schema not strict",
+      "where": "src/contracts/http/community.ts:1098",
+      "original": "    replyCount: z.number().int().nonnegative(),\n  })\n  .strict()",
+      "mutated": "    replyCount: z.number().int().nonnegative(),\n  })\n  .passthrough()",
+      "killers": [
+        "community-comments-client.spec.ts > Story 6.4 community comments client refuses an unexpected userId on roots a comment returned by a thread server"
+      ],
+      "verdict": "killed"
+    },
+    {
+      "id": "M18c submission schema not strict",
+      "where": "src/contracts/http/community.ts:1110",
+      "original": "    publicationSequence: z.number().int().positive().nullable(),\n  })\n  .strict()",
+      "mutated": "    publicationSequence: z.number().int().positive().nullable(),\n  })\n  .passthrough()",
+      "killers": [
+        "community-comments-client.spec.ts > Story 6.4 community comments client refuses an unexpected userId on submissions a private submission returned by a thread server"
+      ],
+      "verdict": "killed"
+    },
+    {
+      "id": "M19 report catch unfenced",
+      "where": "src/community-comments-state.ts:526",
+      "original": "    } catch (error) {\n      if (valid()) {\n        this.failed(postId, state, error)\n        this.emit()\n      }\n    }\n    return false",
+      "mutated": "    } catch (error) {\n        this.failed(postId, state, error)\n        this.emit()\n    }\n    return false",
+      "killers": [
+        "community-comments-state-outcomes.spec.ts > stale-response fences with non-evicting failures ignores not_found from mutations and polls started before an account switch",
+        "community-comments-state-outcomes.spec.ts > stale-response fences with non-evicting failures ignores signed_out from mutations and polls started before an account switch",
+        "community-comments-state-outcomes.spec.ts > stale-response fences with non-evicting failures ignores unknown from mutations and polls started before an account switch"
+      ],
+      "verdict": "killed"
+    },
+    {
+      "id": "M20 private poll catch unfenced",
+      "where": "src/community-comments-state.ts:388",
+      "original": "      if (isCurrent()) {\n        this.failed(postId, state, error)\n        this.emit()\n      }",
+      "mutated": "      this.failed(postId, state, error)\n      this.emit()",
+      "killers": [
+        "community-comments-state-outcomes.spec.ts > stale-response fences with non-evicting failures ignores not_found from mutations and polls started before an account switch",
+        "community-comments-state-outcomes.spec.ts > stale-response fences with non-evicting failures ignores signed_out from mutations and polls started before an account switch",
+        "community-comments-state-outcomes.spec.ts > stale-response fences with non-evicting failures ignores unknown from mutations and polls started before an account switch"
+      ],
+      "verdict": "killed"
+    },
+    {
+      "id": "M21 definite reason list emptied",
+      "where": "src/community-comments-state.ts:429",
+      "original": "['age_gate', 'disabled', 'rate_limited', 'reason_changed', 'self_report']",
+      "mutated": "[]",
+      "killers": [
+        "community-comments-state-outcomes.spec.ts > create intent classification (B1) releases the intent after a definite age_gate rejection and keeps the draft",
+        "community-comments-state-outcomes.spec.ts > create intent classification (B1) releases the intent after a definite disabled rejection and keeps the draft",
+        "community-comments-state-outcomes.spec.ts > create intent classification (B1) releases the intent after a definite rate_limited rejection and keeps the draft",
+        "community-comments-state-outcomes.spec.ts > create intent classification (B1) releases the intent after a definite reason_changed rejection and keeps the draft",
+        "community-comments-state-outcomes.spec.ts > create intent classification (B1) releases the intent after a definite self_report rejection and keeps the draft"
+      ],
+      "verdict": "killed"
+    },
+    {
+      "id": "M22 recovered poll keeps error",
+      "where": "src/community-comments-state.ts:415",
+      "original": "    this.reconcileSubmissions(state, collected, append)\n    state.error = null\n",
+      "mutated": "    this.reconcileSubmissions(state, collected, append)\n",
+      "killers": [
+        "community-comments-state.spec.ts > pending-only private polling and once-only announcements backs off repeated failures, clears recovery, announces a transition once and stops after screening",
+        "community-comments-state.spec.ts > watchSubmissions polls only pending screening work announces a failing poll once, then clears the error and restarts at 3s after recovery"
+      ],
+      "verdict": "killed"
+    }
+  ]
+}

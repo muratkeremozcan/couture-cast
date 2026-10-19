@@ -69,12 +69,10 @@ export class PostHogService
    * version. This transport leaves retry ownership with the durable outbox.
    * Wire format: https://posthog.com/docs/api and https://posthog.com/docs/data/anonymous-vs-identified-events
    */
-  async captureAcknowledged({
-    distinctId,
-    event,
-    timestamp,
-    properties,
-  }: PostHogCaptureEvent): Promise<void> {
+  async captureAcknowledged(
+    { distinctId, event, timestamp, properties }: PostHogCaptureEvent,
+    options?: { signal?: AbortSignal }
+  ): Promise<void> {
     const apiKey = process.env.POSTHOG_API_KEY
     if (!apiKey) throw new Error('Analytics ingestion is unconfigured')
     const host = process.env.POSTHOG_HOST ?? 'https://us.i.posthog.com'
@@ -93,7 +91,9 @@ export class PostHogService
           $process_person_profile: false,
         },
       }),
-      signal: AbortSignal.timeout(3000),
+      signal: options?.signal
+        ? AbortSignal.any([options.signal, AbortSignal.timeout(3000)])
+        : AbortSignal.timeout(3000),
     })
     if (!response.ok) throw new Error(`Analytics ingestion refused: ${response.status}`)
     const acknowledgement: unknown = await response.json()
