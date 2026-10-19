@@ -1431,3 +1431,15 @@ file's own Code Review Findings section.
 - source_spec: `_bmad-output/implementation-artifacts/spec-6-4-threaded-comments.md`
   summary: Locally resolved the recorded capsule reorder-search flake by accepting full visibility.
   evidence: Only the reorder search uses centerElement:false. Checkbox centering, tap/save/reopen and cleanup checks remain. The final real capsule journey passed3m33s. Final remote CI follows the repair push.
+- source_spec: `_bmad-output/implementation-artifacts/spec-6-4-threaded-comments.md`
+  summary: The comments Maestro journey can remain on Home after a completed Community tab tap under a gray Expo Go backdrop.
+  evidence: PR154 run39310429421 shard5 failed its required community-screen assertion before comment actions. The precise hidden-sheet mechanism is inferred from the screenshot and matching prior incidents. Repair follows the standing instruction to fix observed test flakes.
+- source_spec: `_bmad-output/implementation-artifacts/spec-6-4-threaded-comments.md`
+  summary: Locally verified bounded Community-entry recovery while retaining every downstream comments command.
+  evidence: Each attempt requires the real tab tap and15second destination assertion; retries reuse state-preserving relaunch with maxRetries2. A temporary first-tap omission exercised failed destination, actual relaunch and successful second tap/destination/filter checks in3m34s. Two Pixel full-flow attempts reached Community, then hit separate120second device-server timeouts during unchanged273unit input. Full-flow verification remains pending.
+- source_spec: `_bmad-output/implementation-artifacts/spec-6-4-threaded-comments.md`
+  summary: The comments Maestro search can reject the exact fully visible Comments button while trying to center it.
+  evidence: The Medium phone full attempt reached Community and Every climate; its screenshot and enabled target bounds show the button fully visible, and Maestro measured Visibility Percent1.0 at14:55:49.192 before the centered search failed. Only this first Comments-action search now accepts full visibility with centerElement:false; exact target, timeout, tap and all later assertions remain.
+- source_spec: `_bmad-output/implementation-artifacts/spec-6-4-threaded-comments.md`
+  summary: Locally verified the final Community-entry and Comments-action prefix on the Medium phone.
+  evidence: A short actual-prefix probe passed1/1in1m1s with the final helper, filter selection, exact Comments search/tap, required sheet-open assertion, real close and Community return. Its readable sheet screenshot was independently inspected. The probe omits unchanged typing; the full new-head remote comments journey remains required.

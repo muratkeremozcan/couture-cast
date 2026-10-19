@@ -204,6 +204,8 @@ Paths below are relative to `apps/api/src/modules/community/` unless prefixed ot
 | P8      | medium  | patch  | Real CI burn-in proves the existing reaction journey selects two same-purpose Close this look controls after adding the comments surface. Preserve their consistent accessible labels; scope the existing test to the dialog header close control, assert dismissal, and rerun reaction E2E.                                                                                                                                      |
 | P9      | medium  | defer  | Real Android CI My Form navigation is intercepted by an invisible Expo Go developer-sheet backdrop. Existing relaunch recovery documents this exact state. Apply bounded transition recovery under the standing instruction to fix observed flakes; preserve destination and editor assertions.                                                                                                                                   |
 | P10     | medium  | defer  | A local Android predecessor capsule flow fails while Maestro keeps centering an already fully visible reorder control at the scroll boundary (step077, Visibility Percent1.0, no fatal/JS error). Remove the centering requirement only from that search, preserve visibility/tap/reorder/save assertions, and verify the capsule journey under the standing instruction to fix observed flakes.                                  |
+| P11     | medium  | patch  | Final-head Android run39310429421 shard5 fails the new comments journey before comment actions: tapping the community tab does not reach community-screen. Inspect actual failure artifacts and repair the entry transition with established bounded state-preserving recovery if the Expo Go overlay is confirmed; retain all comment assertions and verify the real device journey.                                             |
+| P12     | medium  | patch  | The local Medium phone reaches Community and selects Every climate, then its centered scroll search rejects the fully visible exact Look5 Comments button. Screenshot, enabled target bounds and Maestro's measured Visibility Percent1.0 confirm the same centering false failure seen in P10. Accept full visibility only for this search; retain the exact target, real tap and all subsequent assertions.                     |
 | CR1     | medium  | patch  | CodeRabbit4317569746: generation0 dispatch bypass ignores prior failed attempts, so a Redis outage retries every second. Restrict immediate first dispatch to attempts0 and retain30second backoff thereafter.                                                                                                                                                                                                                    |
 | CR2     | low     | patch  | CodeRabbit4317569800: changed comment report reason uses the post-specific message. Add a comment-specific contract constant and keep API/Pact consumer/provider expectations aligned. Both web/mobile error classifiers must also recognize the corrected comment message while preserving post mappings.                                                                                                                        |
 | CR3     | medium  | patch  | CodeRabbit4317569808: final-attempt markFailed rejection masks the original screening failure. Preserve the original cause while recording the secondary settlement failure safely.                                                                                                                                                                                                                                               |
@@ -453,3 +455,37 @@ and `/tmp/story64-t4-{lint,web-types,native-types}.log`. Broader TEA reruns foll
   Android shards passed. One corrupt SDK download cleared on a fresh runner; the remaining
   My Form failure is addressed locally above. The repair commit still needs its own full CI run.
   CodeRabbit's web/mobile review is waiting for the included hourly allowance around19:38UTC.
+- Remote verification of commit22b9bcdb completed with28passing checks. The full quality gate
+  passed, including98.2%changed-line coverage (961/979lines;80%threshold), both browser shards
+  and burn-in, contracts, previews and all six other Android shards. The prior My Form and
+  capsule repairs passed remotely. Android shard5 failed the comments journey's Community
+  entry before any comment action; the aggregate gate reflects that failure. P11 is being
+  validated locally before the remaining frontend review and a new full CI run.
+- P11: the CI screenshot and command trace show a gray backdrop over Home after a completed
+  Community tap. The hidden Expo Go sheet mechanism remains inferred. Community entry now
+  retries the tap and required15second destination assertion together; only retries relaunch
+  through the established state-preserving helper, with maxRetries2. Comment composition and
+  reply assertions remain unchanged. A temporary probe omitted only the first tap, observed the
+  required destination failure, performed actual clearState:false/stopApp:true relaunch, and
+  passed the second real tab tap plus destination/filter checks in3m34s. Parent and test
+  architect independently inspected its clear recovered screenshot. This proves entry recovery.
+  `/tmp/story64-p11-entry-trace-proof.log` and `/tmp/story64-p11-entry-probe-report.xml`.
+- Both local Pixel full-flow attempts reached Community, then failed during the unchanged
+  273unit input with a120second Maestro device-server timeout. The original CI backdrop did
+  not recur locally. These failures remain separate from the passing injected entry probe;
+  the Medium phone reached Community and Every climate, then exposed P12 before typing.
+  Complete final-head remote verification remains required.
+- P12: the Medium phone screenshot and hierarchy show the exact enabled Comments button fully
+  on screen at[563,893][814,1008]. Maestro's actual log measured Visibility Percent1.0 at
+  14:55:49.192, separately from the configured100%visibility requirement. Its centering search
+  continued for25seconds and rejected that visible control. Only the first Comments-action
+  search now uses centerElement:false. Exact target,15second search, real tap and every later
+  comment command remain unchanged. `/tmp/story64-p11-medium-comments.log` and
+  `/tmp/story64-p11-medium-report.xml` preserve the failed full attempt.
+- The final short Medium device proof passed1/1in1m1s: actual final Community helper, filter,
+  exact Comments search/tap, required open-sheet assertion, real close and Community return.
+  Parent inspected the readable sheet screenshot. This verifies the changed entry/search
+  prefix; it omits the unchanged typing remainder. Full final-head CI remains required.
+  `/tmp/story64-p11-visible-action-green.log` and
+  `/tmp/story64-p11-visible-action-report.xml`. Parent and test architect reviewed the final
+  two-file test change independently; no product or timeout changes were introduced.
