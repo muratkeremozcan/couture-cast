@@ -33,6 +33,18 @@ import { runMobileE2EFlow } from './lib/mobile-e2e-flow-retry.mjs'
 const scriptDir = path.dirname(fileURLToPath(import.meta.url))
 const projectRoot = path.resolve(scriptDir, '..')
 const require = createRequire(import.meta.url)
+// Local CLI entrypoints reach these imports before API/Expo build hooks. The
+// shard launcher uses one runner for every device, so prepare shared outputs once.
+const sharedPreparation = spawnSync(
+  'npm',
+  ['run', 'prepare:shared-deps', '--workspace', 'packages/db'],
+  { cwd: projectRoot, stdio: 'inherit' }
+)
+if (sharedPreparation.error || sharedPreparation.status !== 0) {
+  throw new Error('Mobile E2E shared dependency preparation failed.', {
+    cause: sharedPreparation.error,
+  })
+}
 const { PrismaClient } = require('@prisma/client')
 const { cleanupCommunityCommentFixtures } = require('@couture/testing')
 const mobilePackageJson = JSON.parse(

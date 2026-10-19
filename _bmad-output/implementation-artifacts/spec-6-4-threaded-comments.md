@@ -214,6 +214,8 @@ Paths below are relative to `apps/api/src/modules/community/` unless prefixed ot
 | CR6     | high    | patch  | CodeRabbit4317569845: no-cursor append takes request ownership before returning and can invalidate an in-flight refresh. Return before registering a request. Add root/reply deferred-response regressions at the shared client boundary. Current UI guards also need verification.                                                                                                                                               |
 | CR7     | low     | patch  | CodeRabbit4317569858: six comment routes omit reachable500 responses from the shared contract. Add standard internal-error response metadata, regenerate owned artifacts, and validate contract parity.                                                                                                                                                                                                                           |
 | CR8     | low     | patch  | CodeRabbit review5576185696 nitpick: comment provider double pins duplicated refusal literals. Use shared constants, including distinct comment self-report/submission-limit constants, across runtime and Pact without changing accepted message text.                                                                                                                                                                           |
+| CR9     | low     | patch  | CodeRabbit4318342687: web Comments opens the dialog through handleOpenCard and also records community_card_opened, while native Comments records no card-open event. Reproduce through the browser, suppress the recording for commentsFocus, and retain ordinary card-open measurement.                                                                                                                                          |
+| CR10    | medium  | patch  | CodeRabbit4318342700: the runner imports @couture/testing before local entrypoint preparation can build its untracked dist. Verify the cold local path and add robust shared preparation where required. Its CI premise is already covered by workflow db:reset -> predb:reset -> prepare:shared-deps, which builds testing before Maestro.                                                                                       |
 
 Review provenance: the existing user-owned Claude Code session `couture-cast-cd` used `claude-opus-5-5`; its verified peer-origin reply arrived 2026-10-19T16:33:48.068Z. Full report: [archived Opus review](reviews/story-6-4-opus-implementation-review.md). Findings above are classified individually before grouping.
 
@@ -489,3 +491,28 @@ and `/tmp/story64-t4-{lint,web-types,native-types}.log`. Broader TEA reruns foll
   `/tmp/story64-p11-visible-action-green.log` and
   `/tmp/story64-p11-visible-action-report.xml`. Parent and test architect reviewed the final
   two-file test change independently; no product or timeout changes were introduced.
+
+### CodeRabbit frontend repair, 2026-10-19
+
+- Actual frontend review5577131745 completed at20:10:55UTC, selecting all46eligible files and
+  retaining the four existing evidence-document exclusions. The reviewed tree exactly matched
+  delivery commit a397ae49. [Archived review](reviews/story-6-4-coderabbit-frontend-review.md).
+  Parent verified and triaged CR9 and CR10 separately; the same implementation agent owns the
+  source changes and the Codex test architect owns regressions and test-quality follow-up.
+- CR9 reproduced in a real browser before patching: Comments opened/focused and both thread
+  reads returned200, while an unwanted card-open request also returned200 with the feed arm.
+  The handler now retains dialog/focus setup and skips measurement for commentsFocus. The new
+  regression observes actual requests, verifies zero on comment opening/reopening and exactly
+  one successful measurement on regular look opening. Full comments plus reactions:15/15pass
+  in43.3s. `/tmp/story64-cr9-browser-{red,green}.log`.
+- CR10 reproduced with the actual runner CLI in an isolated cold package skeleton: importing
+  the missing testing dist failed before the fixture lifecycle. CI already builds that package
+  through its database-reset prehook. Local startup now unconditionally invokes that existing
+  shared preparation once before Prisma/testing imports, covering cold dependencies and stale
+  exports. The single runner child owns all device workers, so internal shards do not race the
+  build. Durable CLI regressions cover cold outputs, stale outputs and failure before imports;
+  all3pass. Full helper suite:7files,53tests pass. No real shared outputs were removed for the
+  cold reproduction. `/tmp/story64-cr10-cold-{red,green}.log`.
+- Source lint, web typecheck, Playwright typecheck/test lint, runner syntax and formatting pass.
+  Parent independently reviewed both production changes and both regression tests. A new
+  final-head CI run remains required after pushing this repair batch.
