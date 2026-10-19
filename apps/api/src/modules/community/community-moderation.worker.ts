@@ -1,3 +1,5 @@
+import type { FeatureFlagsService } from '../feature-flags/feature-flags.service.js'
+import { CommunityCommentsProcessor } from './community-comments.processor.js'
 // Story 6.1 Task 4: BullMQ worker for community content moderation (ADR-013).
 import { type Worker, type WorkerOptions, type Job } from 'bullmq'
 import { type PrismaClient } from '@prisma/client'
@@ -12,6 +14,8 @@ import {
 import { NsfwScreeningError } from './tensorflow-nsfw-image-screener.js'
 import {
   COMMUNITY_MODERATION_QUEUE,
+  COMMUNITY_COMMENT_JOB,
+  communityCommentJobSchema,
   communityModerationJobSchema,
 } from './community-moderation.queue.js'
 import {
@@ -199,6 +203,7 @@ export function terminalReason(error: unknown): string {
 
 export interface CommunityModerationWorkerDependencies {
   prisma: PrismaClient
+  featureFlags?: Pick<FeatureFlagsService, 'getFeatureFlag'>
   storage: CommunityStorage
   engine?: CommunityModerationEngine
   telemetryService: TelemetryService
@@ -223,11 +228,23 @@ export function createCommunityModerationWorker(
     deps.meter
   )
 
+  const comments = new CommunityCommentsProcessor(deps.prisma, engine, deps.featureFlags)
   const workerOpts = communityModerationWorkerOptions(options)
 
   return createWorker(
     queueName,
     async (job: Job) => {
+      if (job.name === COMMUNITY_COMMENT_JOB) {
+        const data = communityCommentJobSchema.parse(job.data)
+        try {
+          await comments.process(data.commentId, data.generation)
+        } catch (error) {
+          if (job.attemptsMade + 1 >= (job.opts.attempts ?? 3))
+            await comments.markFailed(data.commentId, false, data.generation)
+          throw error
+        }
+        return
+      }
       const data = communityModerationJobSchema.parse(job.data)
       const maxAttempts = job.opts.attempts ?? 3
       // `attemptsMade` counts the attempts BEFORE this one, so the attempt the

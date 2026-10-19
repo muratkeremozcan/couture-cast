@@ -1,4 +1,8 @@
-import type { CommunityReactionSummary } from '@couture/api-client/contracts/http'
+import type {
+  CommunityReactionSummary,
+  CommunityComment as CommentContract,
+  CommunityCommentSubmission,
+} from '@couture/api-client/contracts/http'
 import type {
   ClimateBand,
   CommunityAlias,
@@ -482,6 +486,40 @@ export function createCommunityReactionSummary(
     viewerReaction: null,
     revision: 0,
     generation: 0,
+    ...overrides,
+  }
+}
+
+// Story 6.4 owner: deterministic thread fixtures share the publication ordering contract.
+export function createCommunityComment(
+  overrides: Partial<CommentContract> = {}
+): CommentContract {
+  return {
+    id: 'comment-root-1',
+    postId: 'community-post-1',
+    parentId: null,
+    body: 'A lovely layered look.',
+    author: 'Style Explorer A1B2C3D4',
+    isOwn: false,
+    unavailable: false,
+    publicationSequence: 1,
+    publishedAt: '2026-10-19T12:00:00.000Z',
+    replyCount: 0,
+    ...overrides,
+  }
+}
+
+export function createCommunityCommentSubmission(
+  overrides: Partial<CommunityCommentSubmission> = {}
+): CommunityCommentSubmission {
+  return {
+    id: 'comment-pending-1',
+    postId: 'community-post-1',
+    parentId: null,
+    body: 'A lovely layered look.',
+    status: 'pending_screening',
+    createdAt: '2026-10-19T12:00:00.000Z',
+    publicationSequence: null,
     ...overrides,
   }
 }

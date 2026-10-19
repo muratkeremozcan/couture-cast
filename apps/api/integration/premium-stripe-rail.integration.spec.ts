@@ -1,3 +1,4 @@
+import { listenHttpApp, httpTestUrl } from './helpers/loopback-http-app.js'
 import 'reflect-metadata'
 import { randomUUID } from 'node:crypto'
 import { PrismaClient } from '@prisma/client'
@@ -138,7 +139,7 @@ describe('5.2 Stripe rail against real PostgreSQL and real HTTP', () => {
     if (!app) {
       throw new Error('App is not initialized')
     }
-    return app.getHttpServer() as Parameters<typeof request>[0]
+    return httpTestUrl(app)
   }
 
   function checkoutEventFixture(
@@ -228,7 +229,7 @@ describe('5.2 Stripe rail against real PostgreSQL and real HTTP', () => {
         telemetry as unknown as TelemetryService
       )
     )
-    await app.init()
+    await listenHttpApp(app)
 
     const stripeClient = app.get(StripeBillingClient)
     if (!(stripeClient instanceof FakeStripeBillingClient)) {

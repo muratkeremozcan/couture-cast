@@ -1,3 +1,4 @@
+import { listenHttpApp, httpTestUrl } from './helpers/loopback-http-app.js'
 import 'reflect-metadata'
 import { type INestApplication } from '@nestjs/common'
 import { Test, type TestingModule } from '@nestjs/testing'
@@ -239,7 +240,7 @@ describe('Location preferences API integration', () => {
       throw new Error('App is not initialized')
     }
 
-    return app.getHttpServer() as Parameters<typeof request>[0]
+    return httpTestUrl(app)
   }
 
   beforeEach(async () => {
@@ -273,7 +274,7 @@ describe('Location preferences API integration', () => {
       .compile()
 
     app = moduleFixture.createNestApplication()
-    await app.init()
+    await listenHttpApp(app)
   })
 
   afterEach(async () => {
@@ -368,7 +369,7 @@ describeRealDatabase('Location preferences API Prisma integration', () => {
       throw new Error('App is not initialized')
     }
 
-    return app.getHttpServer() as Parameters<typeof request>[0]
+    return httpTestUrl(app)
   }
 
   beforeEach(async () => {
@@ -419,7 +420,7 @@ describeRealDatabase('Location preferences API Prisma integration', () => {
       .compile()
 
     app = moduleFixture.createNestApplication()
-    await app.init()
+    await listenHttpApp(app)
   })
 
   afterEach(async () => {

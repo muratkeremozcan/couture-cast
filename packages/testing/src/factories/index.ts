@@ -113,6 +113,8 @@ export {
   persistCommunityChallenge,
   persistCommunityModerationOutbox,
   persistCommunityPostReport,
+  createCommunityComment,
+  createCommunityCommentSubmission,
   persistLookbookPost,
 } from './community.factory.js'
 export {

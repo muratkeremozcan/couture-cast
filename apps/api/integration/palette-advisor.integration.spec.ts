@@ -1,3 +1,4 @@
+import { listenHttpApp, httpTestUrl } from './helpers/loopback-http-app.js'
 // Learning path Step 36: Colour palette, beauty and accessory advisor.
 // See _bmad-output/project-knowledge/learning-path-step-by-step.md#step-36-colour-palette-beauty-and-accessory-advisor
 import 'reflect-metadata'
@@ -200,7 +201,7 @@ describe('5.4 palette advisor against real PostgreSQL and real HTTP', () => {
     if (!app) {
       throw new Error('App is not initialized')
     }
-    return app.getHttpServer() as Parameters<typeof request>[0]
+    return httpTestUrl(app)
   }
 
   const getProfile = (id: string) =>
@@ -380,7 +381,7 @@ describe('5.4 palette advisor against real PostgreSQL and real HTTP', () => {
       .compile()
 
     app = moduleFixture.createNestApplication()
-    await app.init()
+    await listenHttpApp(app)
   })
 
   beforeEach(async () => {

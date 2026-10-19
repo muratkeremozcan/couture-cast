@@ -1,3 +1,4 @@
+import { listenHttpApp, httpTestUrl } from './helpers/loopback-http-app.js'
 import 'reflect-metadata'
 import { randomUUID } from 'node:crypto'
 import { PrismaClient } from '@prisma/client'
@@ -128,7 +129,7 @@ describe('5.2 premium entitlement core against real PostgreSQL and real HTTP', (
     if (!app) {
       throw new Error('App is not initialized')
     }
-    const req = request(app.getHttpServer() as Parameters<typeof request>[0]).get(path)
+    const req = request(httpTestUrl(app)).get(path)
     return userId ? req.set({ authorization: tokenFor(userId) }) : req
   }
 
@@ -136,7 +137,7 @@ describe('5.2 premium entitlement core against real PostgreSQL and real HTTP', (
     if (!app) {
       throw new Error('App is not initialized')
     }
-    return request(app.getHttpServer() as Parameters<typeof request>[0])
+    return request(httpTestUrl(app))
       .post('/api/v1/commerce/subscription/refresh')
       .set({ authorization: tokenFor(userId) })
   }
@@ -215,7 +216,7 @@ describe('5.2 premium entitlement core against real PostgreSQL and real HTTP', (
       .compile()
 
     app = moduleFixture.createNestApplication()
-    await app.init()
+    await listenHttpApp(app)
 
     const client = app.get(RevenueCatClient)
     if (!(client instanceof FakeRevenueCatClient)) {

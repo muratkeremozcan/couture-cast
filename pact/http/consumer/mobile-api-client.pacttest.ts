@@ -1,4 +1,10 @@
 import {
+  commentOperations,
+  commentFailureCases,
+  verifyCommunityCommentFailure,
+  verifyCommunityCommentPage,
+  verifyCommunityComment,
+  verifyCommunityCommentMissing,
   communityReactionConflictInteractions,
   verifyCommunityReactionConflictInteraction,
   verifyCommunityReactionRateLimitInteraction,
@@ -415,6 +421,40 @@ describe('CoutureCastMobile -> CoutureCastApi HTTP contract', () => {
 
   // Story 5.4: both surfaces read the profile on mount and write consent, an
   // analysis and a save/dismiss from the same screen.
+  it.each(commentOperations)(
+    'preserves screened comment %s contracts',
+    async (operation) => {
+      await verifyCommunityComment(
+        pact,
+        createMobileClientForMockServer,
+        'mobile',
+        operation
+      )
+    }
+  )
+  it.each(commentFailureCases)('preserves comment refusal $name', async (failure) => {
+    await verifyCommunityCommentFailure(
+      pact,
+      createMobileClientForMockServer,
+      'mobile',
+      failure
+    )
+  })
+  it.each(['roots', 'replies', 'submissions'] as const)(
+    'preserves paginated comment %s contracts',
+    async (operation) => {
+      await verifyCommunityCommentPage(
+        pact,
+        createMobileClientForMockServer,
+        'mobile',
+        operation
+      )
+    }
+  )
+  it('refuses an unavailable comment thread', async () => {
+    await verifyCommunityCommentMissing(pact, createMobileClientForMockServer, 'mobile')
+  })
+
   it('[P0] preserves the current summary when a reaction revision is stale', async () => {
     await verifyCommunityReactionConflictInteraction(
       pact,

@@ -1,3 +1,4 @@
+import { listenHttpApp, httpTestUrl } from './helpers/loopback-http-app.js'
 // Learning path Step 33: Affiliate "Shop this look" CTA.
 // See _bmad-output/project-knowledge/learning-path-step-by-step.md#step-33-affiliate-shop-this-look-cta
 import 'reflect-metadata'
@@ -184,7 +185,7 @@ describe('5.1 affiliate clicks against real PostgreSQL and real HTTP', () => {
     if (!app) {
       throw new Error('App is not initialized')
     }
-    return request(app.getHttpServer() as Parameters<typeof request>[0])
+    return request(httpTestUrl(app))
       .post('/api/v1/commerce/affiliate/clicks')
       .set({ authorization: 'Bearer commerce-token' })
       .send(body)
@@ -254,7 +255,7 @@ describe('5.1 affiliate clicks against real PostgreSQL and real HTTP', () => {
       .compile()
 
     app = moduleFixture.createNestApplication()
-    await app.init()
+    await listenHttpApp(app)
   })
 
   beforeEach(() => {
@@ -619,7 +620,7 @@ describe('5.1 affiliate clicks against real PostgreSQL and real HTTP', () => {
     it('answers 401 with no bearer token', async (context) => {
       if (!requireSchema(context) || !app) return
 
-      const response = await request(app.getHttpServer() as Parameters<typeof request>[0])
+      const response = await request(httpTestUrl(app))
         .post('/api/v1/commerce/affiliate/clicks')
         .send(validBody())
 

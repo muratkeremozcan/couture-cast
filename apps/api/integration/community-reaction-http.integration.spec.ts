@@ -1,3 +1,4 @@
+import { listenHttpApp, httpTestUrl } from './helpers/loopback-http-app.js'
 import { communityReactionResponseSchema } from '@couture/api-client/contracts/http'
 import { Test } from '@nestjs/testing'
 import 'reflect-metadata'
@@ -50,14 +51,11 @@ describe('Story 6.3 guarded reaction HTTP routes', () => {
     }).compile()
     const app = module.createNestApplication()
     app.useLogger(false)
-    await app.init()
+    await listenHttpApp(app)
     try {
       const url = `/api/v1/community/posts/${owner.postId}/reaction`
-      await request(app.getHttpServer() as Parameters<typeof request>[0])
-        .put(url)
-        .send(input(null, 2))
-        .expect(401)
-      const removal = await request(app.getHttpServer() as Parameters<typeof request>[0])
+      await request(httpTestUrl(app)).put(url).send(input(null, 2)).expect(401)
+      const removal = await request(httpTestUrl(app))
         .put(url)
         .set('Authorization', 'Bearer synthetic-token')
         .set('x-couture-platform', 'web')
@@ -71,7 +69,7 @@ describe('Story 6.3 guarded reaction HTTP routes', () => {
         revision: 3,
       })
       for (const selection of ['applause', 'love'] as const) {
-        await request(app.getHttpServer() as Parameters<typeof request>[0])
+        await request(httpTestUrl(app))
           .put(url)
           .set('Authorization', 'Bearer synthetic-token')
           .set('x-couture-platform', 'web')
@@ -123,13 +121,13 @@ describe('Story 6.3 guarded reaction HTTP routes', () => {
     }).compile()
     const app = module.createNestApplication()
     app.useLogger(false)
-    await app.init()
+    await listenHttpApp(app)
     try {
       for (const [postId, revision] of [
         [member.postId, 0],
         [owner.postId, 1],
       ] as const) {
-        await request(app.getHttpServer() as Parameters<typeof request>[0])
+        await request(httpTestUrl(app))
           .put(`/api/v1/community/posts/${postId}/reaction`)
           .set('Authorization', 'Bearer synthetic-token')
           .set('x-couture-platform', 'web')

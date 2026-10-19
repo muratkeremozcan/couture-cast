@@ -1,3 +1,4 @@
+import { listenHttpApp, httpTestUrl } from './helpers/loopback-http-app.js'
 // Learning path Step 17: Weather alert rules and notification pipeline.
 // See _bmad-output/project-knowledge/learning-path-step-by-step.md#step-17-weather-alert-rules-and-notification-pipeline
 import 'reflect-metadata'
@@ -239,7 +240,7 @@ describe('Alerts API integration', () => {
       throw new Error('App is not initialized')
     }
 
-    return app.getHttpServer() as Parameters<typeof request>[0]
+    return httpTestUrl(app)
   }
 
   beforeEach(async () => {
@@ -279,7 +280,7 @@ describe('Alerts API integration', () => {
 
     app = moduleFixture.createNestApplication()
     app.useLogger(false)
-    await app.init()
+    await listenHttpApp(app)
   })
 
   afterEach(async () => {

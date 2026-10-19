@@ -468,6 +468,8 @@ export type ProviderCommunityScenario =
   | 'feed-band-unresolved'
   | 'feed-removed-content'
   | 'feed-cursor-invalid'
+  | 'comment-refusal'
+  | 'comment-page'
   | 'post-visible'
   | 'post-not-found'
   | 'allocate-new'
@@ -487,6 +489,7 @@ export type ProviderCommunityState = {
   userId: string | null
   postId: string | null
   scenario: ProviderCommunityScenario
+  refusal?: string
 }
 
 let providerCommunityState: ProviderCommunityState | null = null
@@ -495,11 +498,13 @@ export function configureProviderCommunityState(state: {
   userId?: string
   postId?: string
   scenario: ProviderCommunityScenario
+  refusal?: string
 }) {
   providerCommunityState = {
     userId: state.userId ?? null,
     postId: state.postId ?? null,
     scenario: state.scenario,
+    refusal: state.refusal,
   }
 }
 

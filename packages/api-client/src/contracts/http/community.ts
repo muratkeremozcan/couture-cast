@@ -1024,10 +1024,334 @@ export type CommunityChallengeResponse = z.infer<typeof communityChallengeRespon
 
 // --- OpenAPI Registration ---------------------------------------------------
 
+// Story 6.4 owner: independent screened thread contracts preserve feed projections.
+export const communityCommentStatusSchema = z.enum([
+  'pending_screening',
+  'published',
+  'held_for_review',
+  'blocked',
+  'screening_failed',
+  'author_deleted',
+  'consent_suspended',
+  'erased',
+])
+export type CommunityCommentStatus = z.infer<typeof communityCommentStatusSchema>
+
+export const communityCommentBodySchema = z
+  .string()
+  .refine(
+    (value) => !/[\p{Cc}\p{Zl}\p{Zp}]/u.test(value),
+    'Comments must be a single line.'
+  )
+  .refine((value) => !/[\uD800-\uDFFF]/u.test(value), 'Comment contains invalid Unicode.')
+  .openapi({
+    description:
+      'Control characters, line separators and unpaired UTF-16 surrogates are rejected.',
+  })
+  .transform((value) => value.normalize('NFC').trim())
+  .openapi({
+    description:
+      'Single-line valid Unicode. Control characters and line separators are rejected before NFC normalization and trimming.',
+  })
+  .pipe(
+    z
+      .string()
+      .min(1)
+      .max(280)
+      .refine(
+        (value) => !/[\p{Cc}\p{Zl}\p{Zp}]/u.test(value),
+        'Comments must be a single line.'
+      )
+      .refine(
+        (value) => /[^\s\p{Cf}\p{Default_Ignorable_Code_Point}\u2800]/u.test(value),
+        'Comment must contain visible text.'
+      )
+      .openapi({
+        description:
+          'NFC text trimmed to 1-280 UTF-16 units. Whitespace and Unicode format characters alone are refused; control characters and line separators are refused.',
+      })
+  )
+
+export const createCommunityCommentInputSchema = z
+  .object({
+    mutationId: z.string().uuid(),
+    body: communityCommentBodySchema,
+    locale: supportedLocaleSchema,
+    parentId: nonEmptyStringSchema.max(128).nullable().default(null),
+  })
+  .strict()
+export type CreateCommunityCommentInput = z.infer<
+  typeof createCommunityCommentInputSchema
+>
+
+export const communityCommentSchema = z
+  .object({
+    id: nonEmptyStringSchema,
+    postId: nonEmptyStringSchema,
+    parentId: nonEmptyStringSchema.nullable(),
+    body: z.string().max(280).nullable(),
+    author: nonEmptyStringSchema.nullable(),
+    isOwn: z.boolean(),
+    unavailable: z.boolean(),
+    publicationSequence: z.number().int().positive(),
+    publishedAt: isoTimestampSchema,
+    replyCount: z.number().int().nonnegative(),
+  })
+  .strict()
+export type CommunityComment = z.infer<typeof communityCommentSchema>
+export const communityCommentSubmissionSchema = z
+  .object({
+    id: nonEmptyStringSchema,
+    postId: nonEmptyStringSchema,
+    parentId: nonEmptyStringSchema.nullable(),
+    status: communityCommentStatusSchema,
+    body: z.string().max(280).nullable(),
+    createdAt: isoTimestampSchema,
+    publicationSequence: z.number().int().positive().nullable(),
+  })
+  .strict()
+export type CommunityCommentSubmission = z.infer<typeof communityCommentSubmissionSchema>
+export const COMMUNITY_COMMENT_PAGE_SIZE = 20
+export const communityCommentsQuerySchema = z
+  .object({
+    cursor: z.string().min(1).max(2048).optional(),
+    limit: z.coerce.number().int().min(1).max(50).default(COMMUNITY_COMMENT_PAGE_SIZE),
+  })
+  .strict()
+export type CommunityCommentsQuery = z.infer<typeof communityCommentsQuerySchema>
+export const communityCommentsCursorSchema = z
+  .object({
+    kind: z.enum(['roots', 'replies']),
+    postId: nonEmptyStringSchema,
+    parentId: nonEmptyStringSchema.nullable(),
+    snapshot: z.number().int().nonnegative(),
+    after: z.number().int().nonnegative(),
+  })
+  .strict()
+  .refine(
+    (value) =>
+      value.after <= value.snapshot &&
+      (value.kind === 'roots') === (value.parentId === null),
+    'Invalid comment cursor.'
+  )
+  .openapi({
+    description:
+      'Snapshot-scoped cursor. after cannot exceed snapshot. Root cursors require a null parentId; reply cursors require a parentId. The route post and parent must match the cursor scope.',
+  })
+export type CommunityCommentsCursor = z.infer<typeof communityCommentsCursorSchema>
+export const communityCommentsPageSchema = z
+  .object({
+    items: z.array(communityCommentSchema).max(50),
+    nextCursor: z.string().nullable(),
+    snapshot: z.number().int().nonnegative(),
+    hasNewer: z.boolean(),
+  })
+  .strict()
+export type CommunityCommentsPage = z.infer<typeof communityCommentsPageSchema>
+export const communityCommentsResponseSchema = z
+  .object({ data: communityCommentsPageSchema })
+  .strict()
+export const communityCommentSubmissionResponseSchema = z
+  .object({ data: communityCommentSubmissionSchema })
+  .strict()
+export const communityCommentSubmissionsResponseSchema = z
+  .object({
+    data: z
+      .object({
+        items: z.array(communityCommentSubmissionSchema).max(50),
+        nextCursor: z.string().nullable(),
+      })
+      .strict(),
+  })
+  .strict()
+export const reportCommunityCommentInputSchema = z
+  .object({ reason: communityReportReasonSchema })
+  .strict()
+export const reportCommunityCommentResponseSchema = z
+  .object({
+    data: z
+      .object({
+        reported: z.literal(true),
+        acceptedAt: isoTimestampSchema,
+        routedAt: isoTimestampSchema,
+        reviewDueAt: isoTimestampSchema,
+      })
+      .strict(),
+  })
+  .strict()
+export type ReportCommunityCommentResponse = z.infer<
+  typeof reportCommunityCommentResponseSchema
+>
+
+function registerCommunityCommentContracts(
+  registry: OpenAPIRegistry,
+  common: RegisteredCommonHttpSchemas
+) {
+  const page = registry.register(
+    'CommunityCommentsResponse',
+    communityCommentsResponseSchema
+  )
+  const submission = registry.register(
+    'CommunityCommentSubmissionResponse',
+    communityCommentSubmissionResponseSchema
+  )
+  const own = registry.register(
+    'CommunityCommentSubmissionsResponse',
+    communityCommentSubmissionsResponseSchema
+  )
+  const report = registry.register(
+    'ReportCommunityCommentResponse',
+    reportCommunityCommentResponseSchema
+  )
+  const input = registry.register(
+    'CreateCommunityCommentInput',
+    createCommunityCommentInputSchema
+  )
+  const reportInput = registry.register(
+    'ReportCommunityCommentInput',
+    reportCommunityCommentInputSchema
+  )
+  const routes = [
+    {
+      method: 'get',
+      suffix: '/comments',
+      operationId: 'getCommunityComments',
+      response: page,
+      query: true,
+    },
+    {
+      method: 'get',
+      suffix: '/comments/{commentId}/replies',
+      operationId: 'getCommunityCommentReplies',
+      response: page,
+      query: true,
+    },
+    {
+      method: 'get',
+      suffix: '/comment-submissions',
+      operationId: 'getCommunityCommentSubmissions',
+      response: own,
+      query: true,
+    },
+    {
+      method: 'post',
+      suffix: '/comments',
+      operationId: 'createCommunityComment',
+      response: submission,
+      body: input,
+    },
+    {
+      method: 'delete',
+      suffix: '/comments/{commentId}',
+      operationId: 'deleteCommunityComment',
+      response: submission,
+    },
+    {
+      method: 'post',
+      suffix: '/comments/{commentId}/report',
+      operationId: 'reportCommunityComment',
+      response: report,
+      body: reportInput,
+    },
+  ] as const
+  for (const route of routes)
+    registry.registerPath({
+      method: route.method,
+      path: `/api/v1/community/posts/{postId}${route.suffix}`,
+      operationId: route.operationId,
+      summary: route.operationId,
+      tags: ['community'],
+      security: [{ bearerAuth: [] }],
+      parameters: [
+        { name: 'postId', in: 'path', required: true, schema: { type: 'string' } },
+        ...(route.suffix.includes('{commentId}')
+          ? [
+              {
+                name: 'commentId',
+                in: 'path' as const,
+                required: true,
+                schema: { type: 'string' as const },
+              },
+            ]
+          : []),
+        {
+          name: 'x-couture-platform',
+          in: 'header',
+          required: true,
+          schema: { type: 'string', enum: ['web', 'mobile'] },
+        },
+      ],
+      request: {
+        ...('query' in route ? { query: communityCommentsQuerySchema } : {}),
+        ...('body' in route
+          ? {
+              body: {
+                required: true,
+                content: { 'application/json': { schema: route.body } },
+              },
+            }
+          : {}),
+      },
+      responses: {
+        200: {
+          description: 'Authoritative thread state.',
+          content: { 'application/json': { schema: route.response } },
+        },
+        400: {
+          description: 'Invalid request or scoped cursor.',
+          content: { 'application/json': { schema: common.badRequestHttpErrorSchema } },
+        },
+        401: {
+          description: 'Authentication required.',
+          content: { 'application/json': { schema: common.unauthorizedHttpErrorSchema } },
+        },
+        403: {
+          description: 'Participation or ownership denied.',
+          content: { 'application/json': { schema: common.forbiddenHttpErrorSchema } },
+        },
+        404: {
+          description: 'Thread unavailable.',
+          content: { 'application/json': { schema: common.notFoundHttpErrorSchema } },
+        },
+        ...(route.method === 'post'
+          ? {
+              409: {
+                description:
+                  'Accepted mutation or report reason differs from this retry.',
+                content: {
+                  'application/json': { schema: common.conflictHttpErrorSchema },
+                },
+              },
+              429: {
+                description: 'Rolling submission or combined report limit reached.',
+                headers: {
+                  'Retry-After': {
+                    description:
+                      'Seconds until the member may submit this operation again.',
+                    schema: { type: 'integer', minimum: 1 },
+                  },
+                },
+                content: {
+                  'application/json': { schema: common.tooManyRequestsHttpErrorSchema },
+                },
+              },
+            }
+          : {}),
+        503: {
+          description: 'Community unavailable.',
+          content: {
+            'application/json': { schema: common.serviceUnavailableHttpErrorSchema },
+          },
+        },
+      },
+    })
+}
+
 export function registerCommunityContracts(
   registry: OpenAPIRegistry,
   commonSchemas: RegisteredCommonHttpSchemas
 ) {
+  registerCommunityCommentContracts(registry, commonSchemas)
   const reactionInput = registry.register(
     'SetCommunityReactionInput',
     setCommunityReactionInputSchema

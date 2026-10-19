@@ -18,11 +18,17 @@ import type {
   ApiV1CommunityFeedGet200Response,
   ApiV1CommunityPostsPostIdGet200Response,
   CommunityChallengeResponse,
+  CommunityCommentSubmissionResponse,
+  CommunityCommentSubmissionsResponse,
+  CommunityCommentsResponse,
   CommunityReactionResponse,
   CreateCommunityChallengeInput,
+  CreateCommunityCommentInput,
   OpenCommunityPostInput,
   PublishCommunityPostInput,
   PublishCommunityPostResponse,
+  ReportCommunityCommentInput,
+  ReportCommunityCommentResponse,
   ReportCommunityPostInput,
   SetCommunityReactionInput,
   TrackedResponse,
@@ -85,6 +91,47 @@ export interface ApiV1CommunityPostsPublishPostRequest {
   idempotencyKey: string
   xCouturePlatform: ApiV1CommunityPostsPublishPostXCouturePlatformEnum
   publishCommunityPostInput: PublishCommunityPostInput
+}
+
+export interface CreateCommunityCommentRequest {
+  postId: string
+  xCouturePlatform: CreateCommunityCommentXCouturePlatformEnum
+  createCommunityCommentInput: CreateCommunityCommentInput
+}
+
+export interface DeleteCommunityCommentRequest {
+  postId: string
+  commentId: string
+  xCouturePlatform: DeleteCommunityCommentXCouturePlatformEnum
+}
+
+export interface GetCommunityCommentRepliesRequest {
+  postId: string
+  commentId: string
+  xCouturePlatform: GetCommunityCommentRepliesXCouturePlatformEnum
+  cursor?: string
+  limit?: number
+}
+
+export interface GetCommunityCommentSubmissionsRequest {
+  postId: string
+  xCouturePlatform: GetCommunityCommentSubmissionsXCouturePlatformEnum
+  cursor?: string
+  limit?: number
+}
+
+export interface GetCommunityCommentsRequest {
+  postId: string
+  xCouturePlatform: GetCommunityCommentsXCouturePlatformEnum
+  cursor?: string
+  limit?: number
+}
+
+export interface ReportCommunityCommentRequest {
+  postId: string
+  commentId: string
+  xCouturePlatform: ReportCommunityCommentXCouturePlatformEnum
+  reportCommunityCommentInput: ReportCommunityCommentInput
 }
 
 /**
@@ -960,6 +1007,562 @@ export class CommunityApi extends runtime.BaseAPI {
     )
     return await response.value()
   }
+
+  /**
+   * Creates request options for createCommunityComment without sending the request
+   */
+  async createCommunityCommentRequestOpts(
+    requestParameters: CreateCommunityCommentRequest
+  ): Promise<runtime.RequestOpts> {
+    if (requestParameters['postId'] == null) {
+      throw new runtime.RequiredError(
+        'postId',
+        'Required parameter "postId" was null or undefined when calling createCommunityComment().'
+      )
+    }
+
+    if (requestParameters['xCouturePlatform'] == null) {
+      throw new runtime.RequiredError(
+        'xCouturePlatform',
+        'Required parameter "xCouturePlatform" was null or undefined when calling createCommunityComment().'
+      )
+    }
+
+    if (requestParameters['createCommunityCommentInput'] == null) {
+      throw new runtime.RequiredError(
+        'createCommunityCommentInput',
+        'Required parameter "createCommunityCommentInput" was null or undefined when calling createCommunityComment().'
+      )
+    }
+
+    const queryParameters: any = {}
+
+    const headerParameters: runtime.HTTPHeaders = {}
+
+    headerParameters['Content-Type'] = 'application/json'
+
+    if (requestParameters['xCouturePlatform'] != null) {
+      headerParameters['x-couture-platform'] = String(
+        requestParameters['xCouturePlatform']
+      )
+    }
+
+    if (this.configuration && this.configuration.accessToken) {
+      const token = this.configuration.accessToken
+      const tokenString = await token('bearerAuth', [])
+
+      if (tokenString) {
+        headerParameters['Authorization'] = `Bearer ${tokenString}`
+      }
+    }
+
+    let urlPath = `/api/v1/community/posts/{postId}/comments`
+    urlPath = urlPath.replace(
+      `{${'postId'}}`,
+      encodeURIComponent(String(requestParameters['postId']))
+    )
+
+    return {
+      path: urlPath,
+      method: 'POST',
+      headers: headerParameters,
+      query: queryParameters,
+      body: requestParameters['createCommunityCommentInput'],
+    }
+  }
+
+  /**
+   * createCommunityComment
+   */
+  async createCommunityCommentRaw(
+    requestParameters: CreateCommunityCommentRequest,
+    initOverrides?: RequestInit | runtime.InitOverrideFunction
+  ): Promise<runtime.ApiResponse<CommunityCommentSubmissionResponse>> {
+    const requestOptions = await this.createCommunityCommentRequestOpts(requestParameters)
+    const response = await this.request(requestOptions, initOverrides)
+
+    return new runtime.JSONApiResponse(response)
+  }
+
+  /**
+   * createCommunityComment
+   */
+  async createCommunityComment(
+    requestParameters: CreateCommunityCommentRequest,
+    initOverrides?: RequestInit | runtime.InitOverrideFunction
+  ): Promise<CommunityCommentSubmissionResponse> {
+    const response = await this.createCommunityCommentRaw(
+      requestParameters,
+      initOverrides
+    )
+    return await response.value()
+  }
+
+  /**
+   * Creates request options for deleteCommunityComment without sending the request
+   */
+  async deleteCommunityCommentRequestOpts(
+    requestParameters: DeleteCommunityCommentRequest
+  ): Promise<runtime.RequestOpts> {
+    if (requestParameters['postId'] == null) {
+      throw new runtime.RequiredError(
+        'postId',
+        'Required parameter "postId" was null or undefined when calling deleteCommunityComment().'
+      )
+    }
+
+    if (requestParameters['commentId'] == null) {
+      throw new runtime.RequiredError(
+        'commentId',
+        'Required parameter "commentId" was null or undefined when calling deleteCommunityComment().'
+      )
+    }
+
+    if (requestParameters['xCouturePlatform'] == null) {
+      throw new runtime.RequiredError(
+        'xCouturePlatform',
+        'Required parameter "xCouturePlatform" was null or undefined when calling deleteCommunityComment().'
+      )
+    }
+
+    const queryParameters: any = {}
+
+    const headerParameters: runtime.HTTPHeaders = {}
+
+    if (requestParameters['xCouturePlatform'] != null) {
+      headerParameters['x-couture-platform'] = String(
+        requestParameters['xCouturePlatform']
+      )
+    }
+
+    if (this.configuration && this.configuration.accessToken) {
+      const token = this.configuration.accessToken
+      const tokenString = await token('bearerAuth', [])
+
+      if (tokenString) {
+        headerParameters['Authorization'] = `Bearer ${tokenString}`
+      }
+    }
+
+    let urlPath = `/api/v1/community/posts/{postId}/comments/{commentId}`
+    urlPath = urlPath.replace(
+      `{${'postId'}}`,
+      encodeURIComponent(String(requestParameters['postId']))
+    )
+    urlPath = urlPath.replace(
+      `{${'commentId'}}`,
+      encodeURIComponent(String(requestParameters['commentId']))
+    )
+
+    return {
+      path: urlPath,
+      method: 'DELETE',
+      headers: headerParameters,
+      query: queryParameters,
+    }
+  }
+
+  /**
+   * deleteCommunityComment
+   */
+  async deleteCommunityCommentRaw(
+    requestParameters: DeleteCommunityCommentRequest,
+    initOverrides?: RequestInit | runtime.InitOverrideFunction
+  ): Promise<runtime.ApiResponse<CommunityCommentSubmissionResponse>> {
+    const requestOptions = await this.deleteCommunityCommentRequestOpts(requestParameters)
+    const response = await this.request(requestOptions, initOverrides)
+
+    return new runtime.JSONApiResponse(response)
+  }
+
+  /**
+   * deleteCommunityComment
+   */
+  async deleteCommunityComment(
+    requestParameters: DeleteCommunityCommentRequest,
+    initOverrides?: RequestInit | runtime.InitOverrideFunction
+  ): Promise<CommunityCommentSubmissionResponse> {
+    const response = await this.deleteCommunityCommentRaw(
+      requestParameters,
+      initOverrides
+    )
+    return await response.value()
+  }
+
+  /**
+   * Creates request options for getCommunityCommentReplies without sending the request
+   */
+  async getCommunityCommentRepliesRequestOpts(
+    requestParameters: GetCommunityCommentRepliesRequest
+  ): Promise<runtime.RequestOpts> {
+    if (requestParameters['postId'] == null) {
+      throw new runtime.RequiredError(
+        'postId',
+        'Required parameter "postId" was null or undefined when calling getCommunityCommentReplies().'
+      )
+    }
+
+    if (requestParameters['commentId'] == null) {
+      throw new runtime.RequiredError(
+        'commentId',
+        'Required parameter "commentId" was null or undefined when calling getCommunityCommentReplies().'
+      )
+    }
+
+    if (requestParameters['xCouturePlatform'] == null) {
+      throw new runtime.RequiredError(
+        'xCouturePlatform',
+        'Required parameter "xCouturePlatform" was null or undefined when calling getCommunityCommentReplies().'
+      )
+    }
+
+    const queryParameters: any = {}
+
+    if (requestParameters['cursor'] != null) {
+      queryParameters['cursor'] = requestParameters['cursor']
+    }
+
+    if (requestParameters['limit'] != null) {
+      queryParameters['limit'] = requestParameters['limit']
+    }
+
+    const headerParameters: runtime.HTTPHeaders = {}
+
+    if (requestParameters['xCouturePlatform'] != null) {
+      headerParameters['x-couture-platform'] = String(
+        requestParameters['xCouturePlatform']
+      )
+    }
+
+    if (this.configuration && this.configuration.accessToken) {
+      const token = this.configuration.accessToken
+      const tokenString = await token('bearerAuth', [])
+
+      if (tokenString) {
+        headerParameters['Authorization'] = `Bearer ${tokenString}`
+      }
+    }
+
+    let urlPath = `/api/v1/community/posts/{postId}/comments/{commentId}/replies`
+    urlPath = urlPath.replace(
+      `{${'postId'}}`,
+      encodeURIComponent(String(requestParameters['postId']))
+    )
+    urlPath = urlPath.replace(
+      `{${'commentId'}}`,
+      encodeURIComponent(String(requestParameters['commentId']))
+    )
+
+    return {
+      path: urlPath,
+      method: 'GET',
+      headers: headerParameters,
+      query: queryParameters,
+    }
+  }
+
+  /**
+   * getCommunityCommentReplies
+   */
+  async getCommunityCommentRepliesRaw(
+    requestParameters: GetCommunityCommentRepliesRequest,
+    initOverrides?: RequestInit | runtime.InitOverrideFunction
+  ): Promise<runtime.ApiResponse<CommunityCommentsResponse>> {
+    const requestOptions =
+      await this.getCommunityCommentRepliesRequestOpts(requestParameters)
+    const response = await this.request(requestOptions, initOverrides)
+
+    return new runtime.JSONApiResponse(response)
+  }
+
+  /**
+   * getCommunityCommentReplies
+   */
+  async getCommunityCommentReplies(
+    requestParameters: GetCommunityCommentRepliesRequest,
+    initOverrides?: RequestInit | runtime.InitOverrideFunction
+  ): Promise<CommunityCommentsResponse> {
+    const response = await this.getCommunityCommentRepliesRaw(
+      requestParameters,
+      initOverrides
+    )
+    return await response.value()
+  }
+
+  /**
+   * Creates request options for getCommunityCommentSubmissions without sending the request
+   */
+  async getCommunityCommentSubmissionsRequestOpts(
+    requestParameters: GetCommunityCommentSubmissionsRequest
+  ): Promise<runtime.RequestOpts> {
+    if (requestParameters['postId'] == null) {
+      throw new runtime.RequiredError(
+        'postId',
+        'Required parameter "postId" was null or undefined when calling getCommunityCommentSubmissions().'
+      )
+    }
+
+    if (requestParameters['xCouturePlatform'] == null) {
+      throw new runtime.RequiredError(
+        'xCouturePlatform',
+        'Required parameter "xCouturePlatform" was null or undefined when calling getCommunityCommentSubmissions().'
+      )
+    }
+
+    const queryParameters: any = {}
+
+    if (requestParameters['cursor'] != null) {
+      queryParameters['cursor'] = requestParameters['cursor']
+    }
+
+    if (requestParameters['limit'] != null) {
+      queryParameters['limit'] = requestParameters['limit']
+    }
+
+    const headerParameters: runtime.HTTPHeaders = {}
+
+    if (requestParameters['xCouturePlatform'] != null) {
+      headerParameters['x-couture-platform'] = String(
+        requestParameters['xCouturePlatform']
+      )
+    }
+
+    if (this.configuration && this.configuration.accessToken) {
+      const token = this.configuration.accessToken
+      const tokenString = await token('bearerAuth', [])
+
+      if (tokenString) {
+        headerParameters['Authorization'] = `Bearer ${tokenString}`
+      }
+    }
+
+    let urlPath = `/api/v1/community/posts/{postId}/comment-submissions`
+    urlPath = urlPath.replace(
+      `{${'postId'}}`,
+      encodeURIComponent(String(requestParameters['postId']))
+    )
+
+    return {
+      path: urlPath,
+      method: 'GET',
+      headers: headerParameters,
+      query: queryParameters,
+    }
+  }
+
+  /**
+   * getCommunityCommentSubmissions
+   */
+  async getCommunityCommentSubmissionsRaw(
+    requestParameters: GetCommunityCommentSubmissionsRequest,
+    initOverrides?: RequestInit | runtime.InitOverrideFunction
+  ): Promise<runtime.ApiResponse<CommunityCommentSubmissionsResponse>> {
+    const requestOptions =
+      await this.getCommunityCommentSubmissionsRequestOpts(requestParameters)
+    const response = await this.request(requestOptions, initOverrides)
+
+    return new runtime.JSONApiResponse(response)
+  }
+
+  /**
+   * getCommunityCommentSubmissions
+   */
+  async getCommunityCommentSubmissions(
+    requestParameters: GetCommunityCommentSubmissionsRequest,
+    initOverrides?: RequestInit | runtime.InitOverrideFunction
+  ): Promise<CommunityCommentSubmissionsResponse> {
+    const response = await this.getCommunityCommentSubmissionsRaw(
+      requestParameters,
+      initOverrides
+    )
+    return await response.value()
+  }
+
+  /**
+   * Creates request options for getCommunityComments without sending the request
+   */
+  async getCommunityCommentsRequestOpts(
+    requestParameters: GetCommunityCommentsRequest
+  ): Promise<runtime.RequestOpts> {
+    if (requestParameters['postId'] == null) {
+      throw new runtime.RequiredError(
+        'postId',
+        'Required parameter "postId" was null or undefined when calling getCommunityComments().'
+      )
+    }
+
+    if (requestParameters['xCouturePlatform'] == null) {
+      throw new runtime.RequiredError(
+        'xCouturePlatform',
+        'Required parameter "xCouturePlatform" was null or undefined when calling getCommunityComments().'
+      )
+    }
+
+    const queryParameters: any = {}
+
+    if (requestParameters['cursor'] != null) {
+      queryParameters['cursor'] = requestParameters['cursor']
+    }
+
+    if (requestParameters['limit'] != null) {
+      queryParameters['limit'] = requestParameters['limit']
+    }
+
+    const headerParameters: runtime.HTTPHeaders = {}
+
+    if (requestParameters['xCouturePlatform'] != null) {
+      headerParameters['x-couture-platform'] = String(
+        requestParameters['xCouturePlatform']
+      )
+    }
+
+    if (this.configuration && this.configuration.accessToken) {
+      const token = this.configuration.accessToken
+      const tokenString = await token('bearerAuth', [])
+
+      if (tokenString) {
+        headerParameters['Authorization'] = `Bearer ${tokenString}`
+      }
+    }
+
+    let urlPath = `/api/v1/community/posts/{postId}/comments`
+    urlPath = urlPath.replace(
+      `{${'postId'}}`,
+      encodeURIComponent(String(requestParameters['postId']))
+    )
+
+    return {
+      path: urlPath,
+      method: 'GET',
+      headers: headerParameters,
+      query: queryParameters,
+    }
+  }
+
+  /**
+   * getCommunityComments
+   */
+  async getCommunityCommentsRaw(
+    requestParameters: GetCommunityCommentsRequest,
+    initOverrides?: RequestInit | runtime.InitOverrideFunction
+  ): Promise<runtime.ApiResponse<CommunityCommentsResponse>> {
+    const requestOptions = await this.getCommunityCommentsRequestOpts(requestParameters)
+    const response = await this.request(requestOptions, initOverrides)
+
+    return new runtime.JSONApiResponse(response)
+  }
+
+  /**
+   * getCommunityComments
+   */
+  async getCommunityComments(
+    requestParameters: GetCommunityCommentsRequest,
+    initOverrides?: RequestInit | runtime.InitOverrideFunction
+  ): Promise<CommunityCommentsResponse> {
+    const response = await this.getCommunityCommentsRaw(requestParameters, initOverrides)
+    return await response.value()
+  }
+
+  /**
+   * Creates request options for reportCommunityComment without sending the request
+   */
+  async reportCommunityCommentRequestOpts(
+    requestParameters: ReportCommunityCommentRequest
+  ): Promise<runtime.RequestOpts> {
+    if (requestParameters['postId'] == null) {
+      throw new runtime.RequiredError(
+        'postId',
+        'Required parameter "postId" was null or undefined when calling reportCommunityComment().'
+      )
+    }
+
+    if (requestParameters['commentId'] == null) {
+      throw new runtime.RequiredError(
+        'commentId',
+        'Required parameter "commentId" was null or undefined when calling reportCommunityComment().'
+      )
+    }
+
+    if (requestParameters['xCouturePlatform'] == null) {
+      throw new runtime.RequiredError(
+        'xCouturePlatform',
+        'Required parameter "xCouturePlatform" was null or undefined when calling reportCommunityComment().'
+      )
+    }
+
+    if (requestParameters['reportCommunityCommentInput'] == null) {
+      throw new runtime.RequiredError(
+        'reportCommunityCommentInput',
+        'Required parameter "reportCommunityCommentInput" was null or undefined when calling reportCommunityComment().'
+      )
+    }
+
+    const queryParameters: any = {}
+
+    const headerParameters: runtime.HTTPHeaders = {}
+
+    headerParameters['Content-Type'] = 'application/json'
+
+    if (requestParameters['xCouturePlatform'] != null) {
+      headerParameters['x-couture-platform'] = String(
+        requestParameters['xCouturePlatform']
+      )
+    }
+
+    if (this.configuration && this.configuration.accessToken) {
+      const token = this.configuration.accessToken
+      const tokenString = await token('bearerAuth', [])
+
+      if (tokenString) {
+        headerParameters['Authorization'] = `Bearer ${tokenString}`
+      }
+    }
+
+    let urlPath = `/api/v1/community/posts/{postId}/comments/{commentId}/report`
+    urlPath = urlPath.replace(
+      `{${'postId'}}`,
+      encodeURIComponent(String(requestParameters['postId']))
+    )
+    urlPath = urlPath.replace(
+      `{${'commentId'}}`,
+      encodeURIComponent(String(requestParameters['commentId']))
+    )
+
+    return {
+      path: urlPath,
+      method: 'POST',
+      headers: headerParameters,
+      query: queryParameters,
+      body: requestParameters['reportCommunityCommentInput'],
+    }
+  }
+
+  /**
+   * reportCommunityComment
+   */
+  async reportCommunityCommentRaw(
+    requestParameters: ReportCommunityCommentRequest,
+    initOverrides?: RequestInit | runtime.InitOverrideFunction
+  ): Promise<runtime.ApiResponse<ReportCommunityCommentResponse>> {
+    const requestOptions = await this.reportCommunityCommentRequestOpts(requestParameters)
+    const response = await this.request(requestOptions, initOverrides)
+
+    return new runtime.JSONApiResponse(response)
+  }
+
+  /**
+   * reportCommunityComment
+   */
+  async reportCommunityComment(
+    requestParameters: ReportCommunityCommentRequest,
+    initOverrides?: RequestInit | runtime.InitOverrideFunction
+  ): Promise<ReportCommunityCommentResponse> {
+    const response = await this.reportCommunityCommentRaw(
+      requestParameters,
+      initOverrides
+    )
+    return await response.value()
+  }
 }
 
 /**
@@ -1065,3 +1668,57 @@ export const ApiV1CommunityPostsPublishPostXCouturePlatformEnum = {
 } as const
 export type ApiV1CommunityPostsPublishPostXCouturePlatformEnum =
   (typeof ApiV1CommunityPostsPublishPostXCouturePlatformEnum)[keyof typeof ApiV1CommunityPostsPublishPostXCouturePlatformEnum]
+/**
+ * @export
+ */
+export const CreateCommunityCommentXCouturePlatformEnum = {
+  web: 'web',
+  mobile: 'mobile',
+} as const
+export type CreateCommunityCommentXCouturePlatformEnum =
+  (typeof CreateCommunityCommentXCouturePlatformEnum)[keyof typeof CreateCommunityCommentXCouturePlatformEnum]
+/**
+ * @export
+ */
+export const DeleteCommunityCommentXCouturePlatformEnum = {
+  web: 'web',
+  mobile: 'mobile',
+} as const
+export type DeleteCommunityCommentXCouturePlatformEnum =
+  (typeof DeleteCommunityCommentXCouturePlatformEnum)[keyof typeof DeleteCommunityCommentXCouturePlatformEnum]
+/**
+ * @export
+ */
+export const GetCommunityCommentRepliesXCouturePlatformEnum = {
+  web: 'web',
+  mobile: 'mobile',
+} as const
+export type GetCommunityCommentRepliesXCouturePlatformEnum =
+  (typeof GetCommunityCommentRepliesXCouturePlatformEnum)[keyof typeof GetCommunityCommentRepliesXCouturePlatformEnum]
+/**
+ * @export
+ */
+export const GetCommunityCommentSubmissionsXCouturePlatformEnum = {
+  web: 'web',
+  mobile: 'mobile',
+} as const
+export type GetCommunityCommentSubmissionsXCouturePlatformEnum =
+  (typeof GetCommunityCommentSubmissionsXCouturePlatformEnum)[keyof typeof GetCommunityCommentSubmissionsXCouturePlatformEnum]
+/**
+ * @export
+ */
+export const GetCommunityCommentsXCouturePlatformEnum = {
+  web: 'web',
+  mobile: 'mobile',
+} as const
+export type GetCommunityCommentsXCouturePlatformEnum =
+  (typeof GetCommunityCommentsXCouturePlatformEnum)[keyof typeof GetCommunityCommentsXCouturePlatformEnum]
+/**
+ * @export
+ */
+export const ReportCommunityCommentXCouturePlatformEnum = {
+  web: 'web',
+  mobile: 'mobile',
+} as const
+export type ReportCommunityCommentXCouturePlatformEnum =
+  (typeof ReportCommunityCommentXCouturePlatformEnum)[keyof typeof ReportCommunityCommentXCouturePlatformEnum]

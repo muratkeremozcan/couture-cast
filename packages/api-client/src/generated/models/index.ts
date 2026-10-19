@@ -2732,6 +2732,229 @@ export type CommunityChallengeResponseDataClimateBandEnum =
 /**
  *
  * @export
+ * @interface CommunityCommentSubmissionResponse
+ */
+export interface CommunityCommentSubmissionResponse {
+  /**
+   *
+   * @type {CommunityCommentSubmissionResponseData}
+   * @memberof CommunityCommentSubmissionResponse
+   */
+  data: CommunityCommentSubmissionResponseData
+}
+/**
+ *
+ * @export
+ * @interface CommunityCommentSubmissionResponseData
+ */
+export interface CommunityCommentSubmissionResponseData {
+  /**
+   *
+   * @type {string}
+   * @memberof CommunityCommentSubmissionResponseData
+   */
+  id: string
+  /**
+   *
+   * @type {string}
+   * @memberof CommunityCommentSubmissionResponseData
+   */
+  postId: string
+  /**
+   *
+   * @type {string}
+   * @memberof CommunityCommentSubmissionResponseData
+   */
+  parentId: string | null
+  /**
+   *
+   * @type {CommunityCommentSubmissionResponseDataStatusEnum}
+   * @memberof CommunityCommentSubmissionResponseData
+   */
+  status: CommunityCommentSubmissionResponseDataStatusEnum
+  /**
+   *
+   * @type {string}
+   * @memberof CommunityCommentSubmissionResponseData
+   */
+  body: string | null
+  /**
+   *
+   * @type {string}
+   * @memberof CommunityCommentSubmissionResponseData
+   */
+  createdAt: string
+  /**
+   *
+   * @type {number}
+   * @memberof CommunityCommentSubmissionResponseData
+   */
+  publicationSequence: number | null
+}
+
+/**
+ * @export
+ */
+export const CommunityCommentSubmissionResponseDataStatusEnum = {
+  pending_screening: 'pending_screening',
+  published: 'published',
+  held_for_review: 'held_for_review',
+  blocked: 'blocked',
+  screening_failed: 'screening_failed',
+  author_deleted: 'author_deleted',
+  consent_suspended: 'consent_suspended',
+  erased: 'erased',
+} as const
+export type CommunityCommentSubmissionResponseDataStatusEnum =
+  (typeof CommunityCommentSubmissionResponseDataStatusEnum)[keyof typeof CommunityCommentSubmissionResponseDataStatusEnum]
+
+/**
+ *
+ * @export
+ * @interface CommunityCommentSubmissionsResponse
+ */
+export interface CommunityCommentSubmissionsResponse {
+  /**
+   *
+   * @type {CommunityCommentSubmissionsResponseData}
+   * @memberof CommunityCommentSubmissionsResponse
+   */
+  data: CommunityCommentSubmissionsResponseData
+}
+/**
+ *
+ * @export
+ * @interface CommunityCommentSubmissionsResponseData
+ */
+export interface CommunityCommentSubmissionsResponseData {
+  /**
+   *
+   * @type {Array<CommunityCommentSubmissionResponseData>}
+   * @memberof CommunityCommentSubmissionsResponseData
+   */
+  items: Array<CommunityCommentSubmissionResponseData>
+  /**
+   *
+   * @type {string}
+   * @memberof CommunityCommentSubmissionsResponseData
+   */
+  nextCursor: string | null
+}
+/**
+ *
+ * @export
+ * @interface CommunityCommentsResponse
+ */
+export interface CommunityCommentsResponse {
+  /**
+   *
+   * @type {CommunityCommentsResponseData}
+   * @memberof CommunityCommentsResponse
+   */
+  data: CommunityCommentsResponseData
+}
+/**
+ *
+ * @export
+ * @interface CommunityCommentsResponseData
+ */
+export interface CommunityCommentsResponseData {
+  /**
+   *
+   * @type {Array<CommunityCommentsResponseDataItemsInner>}
+   * @memberof CommunityCommentsResponseData
+   */
+  items: Array<CommunityCommentsResponseDataItemsInner>
+  /**
+   *
+   * @type {string}
+   * @memberof CommunityCommentsResponseData
+   */
+  nextCursor: string | null
+  /**
+   *
+   * @type {number}
+   * @memberof CommunityCommentsResponseData
+   */
+  snapshot: number
+  /**
+   *
+   * @type {boolean}
+   * @memberof CommunityCommentsResponseData
+   */
+  hasNewer: boolean
+}
+/**
+ *
+ * @export
+ * @interface CommunityCommentsResponseDataItemsInner
+ */
+export interface CommunityCommentsResponseDataItemsInner {
+  /**
+   *
+   * @type {string}
+   * @memberof CommunityCommentsResponseDataItemsInner
+   */
+  id: string
+  /**
+   *
+   * @type {string}
+   * @memberof CommunityCommentsResponseDataItemsInner
+   */
+  postId: string
+  /**
+   *
+   * @type {string}
+   * @memberof CommunityCommentsResponseDataItemsInner
+   */
+  parentId: string | null
+  /**
+   *
+   * @type {string}
+   * @memberof CommunityCommentsResponseDataItemsInner
+   */
+  body: string | null
+  /**
+   *
+   * @type {string}
+   * @memberof CommunityCommentsResponseDataItemsInner
+   */
+  author: string | null
+  /**
+   *
+   * @type {boolean}
+   * @memberof CommunityCommentsResponseDataItemsInner
+   */
+  isOwn: boolean
+  /**
+   *
+   * @type {boolean}
+   * @memberof CommunityCommentsResponseDataItemsInner
+   */
+  unavailable: boolean
+  /**
+   *
+   * @type {number}
+   * @memberof CommunityCommentsResponseDataItemsInner
+   */
+  publicationSequence: number
+  /**
+   *
+   * @type {string}
+   * @memberof CommunityCommentsResponseDataItemsInner
+   */
+  publishedAt: string
+  /**
+   *
+   * @type {number}
+   * @memberof CommunityCommentsResponseDataItemsInner
+   */
+  replyCount: number
+}
+
+/**
+ *
+ * @export
  */
 export const CommunityExperimentVariant = {
   auto: 'auto',
@@ -3693,6 +3916,56 @@ export const CreateCommunityChallengeInputClimateBandEnum = {
 } as const
 export type CreateCommunityChallengeInputClimateBandEnum =
   (typeof CreateCommunityChallengeInputClimateBandEnum)[keyof typeof CreateCommunityChallengeInputClimateBandEnum]
+
+/**
+ *
+ * @export
+ * @interface CreateCommunityCommentInput
+ */
+export interface CreateCommunityCommentInput {
+  /**
+   *
+   * @type {string}
+   * @memberof CreateCommunityCommentInput
+   */
+  mutationId: string
+  /**
+   *
+   * @type {string}
+   * @memberof CreateCommunityCommentInput
+   */
+  body: string
+  /**
+   *
+   * @type {CreateCommunityCommentInputLocaleEnum}
+   * @memberof CreateCommunityCommentInput
+   */
+  locale: CreateCommunityCommentInputLocaleEnum
+  /**
+   *
+   * @type {string}
+   * @memberof CreateCommunityCommentInput
+   */
+  parentId?: string | null
+}
+
+/**
+ * @export
+ */
+export const CreateCommunityCommentInputLocaleEnum = {
+  en_US: 'en-US',
+  en_CA: 'en-CA',
+  es_419: 'es-419',
+  fr_CA: 'fr-CA',
+  fr_FR: 'fr-FR',
+  tr_TR: 'tr-TR',
+  de_DE: 'de-DE',
+  it_IT: 'it-IT',
+  pt_BR: 'pt-BR',
+  pt_PT: 'pt-PT',
+} as const
+export type CreateCommunityCommentInputLocaleEnum =
+  (typeof CreateCommunityCommentInputLocaleEnum)[keyof typeof CreateCommunityCommentInputLocaleEnum]
 
 /**
  *
@@ -7885,6 +8158,88 @@ export interface QueueMetrics {
    */
   paused?: number
 }
+/**
+ *
+ * @export
+ * @interface ReportCommunityCommentInput
+ */
+export interface ReportCommunityCommentInput {
+  /**
+   *
+   * @type {ReportCommunityCommentInputReasonEnum}
+   * @memberof ReportCommunityCommentInput
+   */
+  reason: ReportCommunityCommentInputReasonEnum
+}
+
+/**
+ * @export
+ */
+export const ReportCommunityCommentInputReasonEnum = {
+  spam: 'spam',
+  harassment: 'harassment',
+  inappropriate_content: 'inappropriate_content',
+  hate_speech: 'hate_speech',
+  violence: 'violence',
+  other: 'other',
+} as const
+export type ReportCommunityCommentInputReasonEnum =
+  (typeof ReportCommunityCommentInputReasonEnum)[keyof typeof ReportCommunityCommentInputReasonEnum]
+
+/**
+ *
+ * @export
+ * @interface ReportCommunityCommentResponse
+ */
+export interface ReportCommunityCommentResponse {
+  /**
+   *
+   * @type {ReportCommunityCommentResponseData}
+   * @memberof ReportCommunityCommentResponse
+   */
+  data: ReportCommunityCommentResponseData
+}
+/**
+ *
+ * @export
+ * @interface ReportCommunityCommentResponseData
+ */
+export interface ReportCommunityCommentResponseData {
+  /**
+   *
+   * @type {ReportCommunityCommentResponseDataReportedEnum}
+   * @memberof ReportCommunityCommentResponseData
+   */
+  reported: ReportCommunityCommentResponseDataReportedEnum
+  /**
+   *
+   * @type {string}
+   * @memberof ReportCommunityCommentResponseData
+   */
+  acceptedAt: string
+  /**
+   *
+   * @type {string}
+   * @memberof ReportCommunityCommentResponseData
+   */
+  routedAt: string
+  /**
+   *
+   * @type {string}
+   * @memberof ReportCommunityCommentResponseData
+   */
+  reviewDueAt: string
+}
+
+/**
+ * @export
+ */
+export const ReportCommunityCommentResponseDataReportedEnum = {
+  true: true,
+} as const
+export type ReportCommunityCommentResponseDataReportedEnum =
+  (typeof ReportCommunityCommentResponseDataReportedEnum)[keyof typeof ReportCommunityCommentResponseDataReportedEnum]
+
 /**
  *
  * @export

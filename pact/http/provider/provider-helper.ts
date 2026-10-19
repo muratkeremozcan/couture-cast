@@ -1,3 +1,6 @@
+import { CommunityCommentsController } from '../../../apps/api/src/modules/community/community-comments.controller'
+import { CommunityCommentsService } from '../../../apps/api/src/modules/community/community-comments.service'
+import { createCommunityCommentsDouble } from './doubles/community-comments'
 // Step 22 step 6 owner: mock localized database state response in Pact provider tests in pact/http/provider/provider-helper.ts
 
 import { type INestApplication } from '@nestjs/common'
@@ -241,8 +244,10 @@ export async function startLocalPactProvider({
       PaletteAdvisorController,
       PlannerController,
       CommunityController,
+      CommunityCommentsController,
     ],
     providers: [
+      { provide: CommunityCommentsService, useValue: createCommunityCommentsDouble() },
       EventsService,
       {
         provide: EventsRepository,

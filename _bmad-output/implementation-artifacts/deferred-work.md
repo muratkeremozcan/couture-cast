@@ -1406,3 +1406,10 @@ file's own Code Review Findings section.
 - source_spec: `_bmad-output/implementation-artifacts/6-2b-community-screening-release-gate.md`
   summary: Correct the crash-recovery ceiling stated in `community-moderation.worker.ts` (423 s) so it counts every bounded processing stage (download 20 s, normalization/upload 30 s, screening 30 s) plus database and queue assumptions.
   evidence: Final Codex review of PR #151 (2026-10-17) traced the stage timeouts; the comment counts only one 30-second stage. Documentation only; deferred because the file is in the screening input set and editing it forces a full evidence re-measurement.
+
+- source_spec: `_bmad-output/implementation-artifacts/spec-6-4-threaded-comments.md`
+  summary: AccessibleModal background interaction is not disabled on lookbook pages lacking data-app-shell.
+  evidence: Pre-existing app-shell lookup has no matching element; the user authorized fixing observed accessibility defects during Story 6.4 delivery. Handle alongside modal focus verification.
+- source_spec: `_bmad-output/implementation-artifacts/spec-6-4-threaded-comments.md`
+  summary: Resolved the previously recorded AccessibleModal background interaction defect during Story 6.4.
+  evidence: Background body siblings now receive inert and aria-hidden while the portal stays interactive; cleanup restores previous values. Rendered regression and final real browser light/dark/phone accessibility checks pass.

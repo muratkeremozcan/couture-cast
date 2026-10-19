@@ -1,3 +1,4 @@
+import { listenHttpApp, httpTestUrl } from './helpers/loopback-http-app.js'
 // Learning path Step 13: Serve one canonical OpenAPI contract from the API boundary.
 // See _bmad-output/project-knowledge/learning-path-step-by-step.md#step-13-serve-one-canonical-openapi-contract-from-the-api-boundary
 // Learning path Step 15: Validate, generate, and consume the canonical contract.
@@ -64,7 +65,7 @@ describe('HTTP contract parity (integration)', () => {
       throw new Error('App is not initialized')
     }
 
-    return app.getHttpServer() as Parameters<typeof request>[0]
+    return httpTestUrl(app)
   }
 
   beforeEach(async () => {
@@ -132,7 +133,7 @@ describe('HTTP contract parity (integration)', () => {
       .compile()
 
     app = moduleFixture.createNestApplication()
-    await app.init()
+    await listenHttpApp(app)
   })
 
   afterEach(async () => {

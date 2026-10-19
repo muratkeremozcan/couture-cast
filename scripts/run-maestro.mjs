@@ -34,6 +34,7 @@ const scriptDir = path.dirname(fileURLToPath(import.meta.url))
 const projectRoot = path.resolve(scriptDir, '..')
 const require = createRequire(import.meta.url)
 const { PrismaClient } = require('@prisma/client')
+const { cleanupCommunityCommentFixtures } = require('@couture/testing')
 const mobilePackageJson = JSON.parse(
   fs.readFileSync(path.join(projectRoot, 'apps/mobile/package.json'), 'utf8')
 )
@@ -1559,6 +1560,23 @@ const cleanupMobileE2EIdentity = async (apiBaseUrl, identity) => {
       })
       const postIds = posts.map((post) => post.id)
 
+      const comments = await tx.communityComment.findMany({
+        where: { user_id: identity.userId },
+        select: { id: true },
+      })
+      await cleanupCommunityCommentFixtures(
+        tx,
+        comments.map((row) => row.id)
+      )
+      // Replica-mode identity cleanup bypasses FK cascades; remove owned comment identities first.
+      await tx.communityCommentAnalyticsSubject.deleteMany({
+        where: { user_id: identity.userId },
+      })
+      await tx.communityCommentReceipt.deleteMany({ where: { user_id: identity.userId } })
+      await tx.communityCommentReport.updateMany({
+        where: { reporter_id: identity.userId },
+        data: { reporter_id: null },
+      })
       await tx.moderationEvent.deleteMany({
         where: {
           OR: [

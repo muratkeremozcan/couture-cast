@@ -1,4 +1,22 @@
-import { CommunityReactionState } from '@couture/api-client'
+import { CommunityCommentsState, CommunityReactionState } from '@couture/api-client'
+import { CommunityCommentsSheet } from '@/components/community/community-comments-sheet'
+import {
+  communityCommentsSessionFromMobile,
+  communityCommentsRootsFromMobile,
+  communityCommentsRepliesFromMobile,
+  communityCommentsSubmissionsFromMobile,
+  communityCommentsCreateFromMobile,
+  communityCommentsDeleteFromMobile,
+  communityCommentsReportFromMobile,
+  communityFailureReason,
+  generateIdempotencyKey,
+  setCommunityReactionFromMobile,
+  getCommunityFeedFromMobile,
+  getCommunityPostFromMobile,
+  recordCommunityCardOpenedFromMobile,
+  reportCommunityPostFromMobile,
+  withdrawCommunityPostFromMobile,
+} from '@/src/lib/community'
 import {
   useCallback,
   useEffect,
@@ -36,16 +54,6 @@ import {
 import { InfoBanner } from '@/components/info-banner'
 import { useMobileAnalytics } from '@/src/analytics/mobile-analytics'
 import { safeFindNodeHandle } from '@/src/lib/accessibility-focus'
-import {
-  communityFailureReason,
-  generateIdempotencyKey,
-  setCommunityReactionFromMobile,
-  getCommunityFeedFromMobile,
-  getCommunityPostFromMobile,
-  recordCommunityCardOpenedFromMobile,
-  reportCommunityPostFromMobile,
-  withdrawCommunityPostFromMobile,
-} from '@/src/lib/community'
 import { useHeroPalette } from '@/components/hero/hero-theme'
 import { CommunityFilterChips } from '@/components/community/community-filter-chips'
 import { CommunityChallengeBanner } from '@/components/community/community-challenge-banner'
@@ -156,6 +164,56 @@ export function CommunityScreen() {
   )
   const translationRef = useRef(t)
   translationRef.current = t
+  const [commentsPostId, setCommentsPostId] = useState<string | null>(null)
+  const commentsInvokerRef = useRef<View | null>(null)
+  const highlightedCommentsButtonRef = useRef<View | null>(null)
+  const commentsButtonRefs = useRef(new Map<string, View | null>())
+  const [comments] = useState(
+    () =>
+      new CommunityCommentsState(
+        {
+          roots: communityCommentsRootsFromMobile,
+          replies: communityCommentsRepliesFromMobile,
+          submissions: communityCommentsSubmissionsFromMobile,
+          create: communityCommentsCreateFromMobile,
+          delete: communityCommentsDeleteFromMobile,
+          report: communityCommentsReportFromMobile,
+        },
+        generateIdempotencyKey,
+        communityFailureReason,
+        (postId) => setCommentsPostId((current) => (current === postId ? null : current))
+      )
+  )
+  useEffect(() => {
+    let active = true
+    let syncing = false
+    let previousIdentity: string | null | undefined
+    const sync = async () => {
+      if (syncing) return
+      syncing = true
+      try {
+        const identity = await communityCommentsSessionFromMobile()
+        if (!active) return
+        comments.setSession(identity)
+        if (previousIdentity !== undefined && previousIdentity !== identity)
+          setCommentsPostId(null)
+        previousIdentity = identity
+      } catch {
+        // A storage read failure leaves the last confirmed session and draft intact.
+      } finally {
+        syncing = false
+      }
+    }
+    void sync()
+    const timer = setInterval(() => {
+      void sync()
+    }, 1000)
+    return () => {
+      active = false
+      clearInterval(timer)
+      comments.reset()
+    }
+  }, [comments])
   const [reactionState] = useState(
     () =>
       new CommunityReactionState({
@@ -272,8 +330,10 @@ export function CommunityScreen() {
           return
         }
         setDeepLinkPost(null)
-        if (communityFailureReason(error) === 'not_found' && parsed.payload?.cardId)
+        if (communityFailureReason(error) === 'not_found' && parsed.payload?.cardId) {
           reactionState.evict(parsed.payload.cardId)
+          comments.evict(parsed.payload.cardId)
+        }
         fail(
           communityFailureReason(error) === 'not_found'
             ? 'Community card target was not found'
@@ -353,6 +413,7 @@ export function CommunityScreen() {
       } catch (error: unknown) {
         if (isCurrent() && communityFailureReason(error) === 'not_found') {
           reactionState.evict(target)
+          comments.evict(target)
           setIsInvalidDeepLink(true)
         }
       }
@@ -858,6 +919,13 @@ export function CommunityScreen() {
           style={styles.highlightSection}
         >
           <CommunityCard
+            onComments={(post) => {
+              commentsInvokerRef.current = highlightedCommentsButtonRef.current
+              setCommentsPostId(post.id)
+            }}
+            commentsButtonRef={(node) => {
+              highlightedCommentsButtonRef.current = node
+            }}
             reactionControls={reactionState.controls(deepLinkPost.id)}
             item={deepLinkPost}
             isHighlighted
@@ -945,6 +1013,13 @@ export function CommunityScreen() {
         keyExtractor={(item) => item.id}
         renderItem={({ item }) => (
           <CommunityCard
+            onComments={(post) => {
+              commentsInvokerRef.current = commentsButtonRefs.current.get(post.id) ?? null
+              setCommentsPostId(post.id)
+            }}
+            commentsButtonRef={(node) => {
+              commentsButtonRefs.current.set(item.id, node)
+            }}
             reactionControls={reactionState.controls(item.id)}
             item={item}
             isReported={reportedPostIds.has(item.id)}
@@ -981,6 +1056,28 @@ export function CommunityScreen() {
         onSubmit={handleSubmitReport}
       />
 
+      <CommunityCommentsSheet
+        postId={commentsPostId}
+        state={comments}
+        locale={locale}
+        onClose={() => {
+          const highlighted =
+            deepLinkPost?.id === commentsPostId
+              ? highlightedCommentsButtonRef.current
+              : null
+          const feed = commentsPostId
+            ? (commentsButtonRefs.current.get(commentsPostId) ?? null)
+            : null
+          const original = commentsInvokerRef.current
+          const target =
+            original && (original === highlighted || original === feed)
+              ? original
+              : (highlighted ?? feed)
+          const node = safeFindNodeHandle(target)
+          setCommentsPostId(null)
+          if (node) AccessibilityInfo.setAccessibilityFocus(node)
+        }}
+      />
       <CommunityPostSheet
         visible={isPostSheetVisible}
         challenge={activeChallenge}

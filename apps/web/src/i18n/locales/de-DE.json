@@ -601,6 +601,48 @@
       "total_one": "{{count}} Reaktion",
       "total_other": "{{count}} Reaktionen",
       "ineligible": "Reaktionen sind ab 13 Jahren möglich. Unter 16 ist eine gültige Zustimmung eines Erziehungsberechtigten erforderlich."
+    },
+    "comments": {
+      "title": "Kommentare",
+      "reply": "Antworten",
+      "delete": "Löschen",
+      "replies": "Antworten ({{count}})",
+      "sendReport": "Meldung senden",
+      "cancel": "Abbrechen",
+      "refresh": "Aktualisieren",
+      "newer": "Neue Kommentare sind verfügbar. Zum Anzeigen aktualisieren.",
+      "loading": "Kommentare werden geladen…",
+      "empty": "Schreibe den ersten Kommentar.",
+      "moreReplies": "Weitere Antworten",
+      "more": "Weitere Kommentare",
+      "private": "Deine Beiträge. Nur du kannst sie sehen.",
+      "recovery": "Lösche diesen Beitrag und schreibe einen neuen Kommentar.",
+      "morePrivate": "Weitere Beiträge",
+      "replying": "Antwort auf einen Kommentar",
+      "compose": "Kommentar hinzufügen",
+      "count": "{{count}} / 280 Zeichen",
+      "unresolved": "Eine frühere Anfrage wartet auf Bestätigung. Wiederhole sie vor dem Senden des bearbeiteten Entwurfs.",
+      "sending": "Wird gesendet…",
+      "retry": "Erneut senden",
+      "send": "Kommentar senden",
+      "rateLimited": "Du hast das Kommentarlimit erreicht. Versuche es später erneut.",
+      "failed": "Kommentare konnten nicht aktualisiert werden. Versuche es erneut.",
+      "invalid": "Gib 1 bis 280 sichtbare Zeichen in einer Zeile ein.",
+      "submitted": "Kommentar zur Prüfung eingereicht.",
+      "deleted": "Kommentar gelöscht.",
+      "reported": "Meldung erhalten.",
+      "status": {
+        "pending_screening": "Wird geprüft. Nur du kannst es sehen.",
+        "published": "Veröffentlicht. Aktualisiere den Verlauf.",
+        "held_for_review": "Wartet auf Prüfung. Nur du kannst es sehen.",
+        "blocked": "Bei der Prüfung zurückgehalten. Nur du kannst es sehen.",
+        "screening_failed": "Prüfung fehlgeschlagen. Nur du kannst es sehen.",
+        "author_deleted": "Gelöscht.",
+        "consent_suspended": "Nicht verfügbar.",
+        "erased": "Nicht verfügbar."
+      },
+      "unavailable": "Nicht verfügbar.",
+      "close": "Kommentare schließen"
     }
   }
 }

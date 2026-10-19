@@ -91,11 +91,12 @@ describe('Story 6.3 reactions through the web client', () => {
     await user.click(screen.getByTestId('lookbook-open-post-1'))
     const detail = await screen.findByTestId('community-detail')
     await user.click(within(detail).getByRole('button', { name: 'Love, 1' }))
+    // The open look modal hides the grid card from assistive tech
+    // (accessible-modal.tsx L51-71), so the synced card control is a hidden node.
     await waitFor(() =>
-      expect(within(controls).getByRole('button', { name: 'Love, 0' })).toHaveAttribute(
-        'aria-pressed',
-        'false'
-      )
+      expect(
+        within(controls).getByRole('button', { name: 'Love, 0', hidden: true })
+      ).toHaveAttribute('aria-pressed', 'false')
     )
     expect(requests.map((request) => request.selection)).toEqual([
       'applause',

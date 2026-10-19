@@ -42,6 +42,8 @@ const harness = vi.hoisted(() => {
     queueClose: vi.fn().mockResolvedValue(undefined),
     screenerEnsureReady: vi.fn(),
     screenerClose: vi.fn(),
+    commentDispatch: vi.fn().mockResolvedValue(undefined),
+    commentStale: vi.fn().mockResolvedValue(undefined),
     dispatchPending: vi.fn().mockResolvedValue({ dispatched: 1, failed: 0 }),
     sweepStalePendingReview: vi.fn().mockResolvedValue({ stalled: 0 }),
     sweepExpiredUploads: vi
@@ -55,6 +57,13 @@ const harness = vi.hoisted(() => {
     }),
   }
 })
+
+vi.mock('./community-comments.outbox.js', () => ({
+  CommunityCommentsOutbox: class {
+    dispatchPending = harness.commentDispatch
+    sweepStale = harness.commentStale
+  },
+}))
 
 vi.mock('../../workers/base.worker.js', () => ({
   createWorker: (...args: unknown[]) => {
@@ -135,6 +144,10 @@ describe('createCommunityWorkerRuntime', () => {
   })
 
   beforeEach(() => {
+    harness.commentDispatch.mockReset().mockResolvedValue(undefined)
+    harness.commentStale.mockReset().mockResolvedValue(undefined)
+    harness.dispatchPending.mockReset().mockResolvedValue({ dispatched: 1, failed: 0 })
+    harness.sweepStalePendingReview.mockReset().mockResolvedValue({ stalled: 0 })
     claim.mockReset().mockResolvedValue([])
     settle.mockClear()
     captureReactionEvent.mockClear()
@@ -228,6 +241,38 @@ describe('createCommunityWorkerRuntime', () => {
     // No selector was read, so there is no honest readiness payload to report.
     expect(runtime.readiness).toBeUndefined()
     expect(harness.screenerEnsureReady).not.toHaveBeenCalled()
+  })
+
+  it('keeps existing dispatch and stale work progressing when each comment sweep fails', async () => {
+    const order: string[] = []
+    harness.dispatchPending.mockImplementation(() => {
+      order.push('post')
+      return Promise.resolve({ dispatched: 1, failed: 0 })
+    })
+    harness.commentDispatch.mockImplementation(() => {
+      order.push('comment')
+      return Promise.reject(new Error('synthetic raw member and body must not be logged'))
+    })
+    harness.commentStale.mockRejectedValue(new Error('synthetic comment stale failure'))
+    const runtime = await createCommunityWorkerRuntime({
+      prisma,
+      telemetryService,
+      meter: meter(),
+    })
+    claim.mockImplementationOnce(() => {
+      order.push('reaction')
+      return Promise.resolve([])
+    })
+    await expect(runtime.sweeps.dispatchPending()).resolves.toBeUndefined()
+    expect(order).toEqual(['post', 'reaction', 'comment'])
+    await expect(runtime.sweeps.sweepStalePendingReview()).resolves.toBeUndefined()
+    expect(harness.sweepStalePendingReview).toHaveBeenCalledOnce()
+    expect(harness.commentStale).toHaveBeenCalledOnce()
+    await runtime.sweeps.dispatchPending()
+    await runtime.sweeps.sweepStalePendingReview()
+    expect(harness.dispatchPending).toHaveBeenCalledTimes(2)
+    expect(harness.sweepStalePendingReview).toHaveBeenCalledTimes(2)
+    await runtime.close()
   })
 
   it('exposes exactly the four sweeps both process groups drive', async () => {

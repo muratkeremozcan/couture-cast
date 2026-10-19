@@ -625,6 +625,23 @@ export const stateHandlers: StateHandlers = {
     })
   },
 
+  'A comment operation has a documented refusal': (parameters?: unknown) => {
+    const { userId, postId, refusal } = (parameters ?? {}) as CommunityStateParams & {
+      refusal: string
+    }
+    configureProviderCommunityState({
+      userId,
+      postId,
+      refusal,
+      scenario: 'comment-refusal',
+    })
+    return Promise.resolve({ description: 'Configured documented comment refusal' })
+  },
+  'A comment page follows a scoped cursor': (parameters?: unknown) => {
+    const { userId, postId } = (parameters ?? {}) as CommunityStateParams
+    configureProviderCommunityState({ userId, postId, scenario: 'comment-page' })
+    return Promise.resolve({ description: 'Configured a second scoped comment page' })
+  },
   'A published community post is visible to the caller': (parameters?: unknown) => {
     const { userId, postId } = (parameters ?? {}) as CommunityStateParams
     configureProviderCommunityState({ userId, postId, scenario: 'post-visible' })

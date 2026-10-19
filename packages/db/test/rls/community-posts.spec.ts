@@ -35,6 +35,33 @@ const PERMISSION_DENIED = '42501'
 describe.concurrent('community table RLS policies', () => {
   useRlsDatabase()
 
+  scenarioTest(
+    '6.4-DB-RLS refuses direct access to every comment store',
+    async ({ scenario }) => {
+      for (const table of [
+        'CommunityComment',
+        'CommunityCommentReceipt',
+        'CommunityCommentScreeningOutbox',
+        'CommunityCommentReport',
+        'CommunityCommentAudit',
+        'CommunityCommentAnalyticsOutbox',
+        'CommunityCommentAnalyticsSubject',
+      ]) {
+        for (const role of ['anon', 'authenticated'] as const) {
+          await withRole(
+            role,
+            buildClaims(scenario.teenEmail, 'teen'),
+            async (client) => {
+              await expect(
+                client.query(`SELECT * FROM public."${table}"`)
+              ).rejects.toMatchObject({ code: PERMISSION_DENIED })
+            }
+          )
+        }
+      }
+    }
+  )
+
   /*
    * TITLED FOR WHAT IT PROVES. This was "in every status" and inserted one post
    * per status, which read as a status matrix and was not one: `42501` is

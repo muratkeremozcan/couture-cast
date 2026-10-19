@@ -3,7 +3,7 @@
   "main": "expo-router/entry",
   "version": "1.0.0",
   "scripts": {
-    "prepare:shared-deps": "npm run build --workspace @couture/utils && npm run build --workspace @couture/api-client",
+    "prepare:shared-deps": "npm run build --workspace @couture/testing",
     "preandroid": "npm run prepare:shared-deps",
     "preios": "npm run prepare:shared-deps",
     "pretypecheck": "npm run prepare:shared-deps",
