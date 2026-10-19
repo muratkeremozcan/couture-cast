@@ -200,6 +200,8 @@ Paths below are relative to `apps/api/src/modules/community/` unless prefixed ot
 | RV18    | low     | patch  | Web live-region text assertions mix raw textContent and semantic text matchers. Standardize exact text matching.                                                                                                                                                                                                                                                                                                                  |
 | RV19    | low     | patch  | Native absence and disabled-state assertions mix DOM attribute access and semantic matchers. Use the existing semantic matcher style consistently.                                                                                                                                                                                                                                                                                |
 | P6      | medium  | patch  | Final real Android run with the software keyboard and273unit root clips the primary Send button beneath Gboard. Parent inspected /tmp/story64-postreview-android-current.png. Correct the existing native keyboard-avoidance layout using measured window geometry and verify root/reply keyboard controls on devices; iOS currently passes.                                                                                      |
+| P7      | medium  | defer  | CI Android shard6 fails before app flows: the baseline Expo Go installer asynchronously unlinks a redirect destination and immediately opens the same path for the next response. The unlink can remove that new file; stat then throws ENOENT. This pre-existing setup flake is being repaired under the standing instruction to fix observed CI failures, with a controlled cold-installer regression.                          |
+| P8      | medium  | patch  | Real CI burn-in proves the existing reaction journey selects two same-purpose Close this look controls after adding the comments surface. Preserve their consistent accessible labels; scope the existing test to the dialog header close control, assert dismissal, and rerun reaction E2E.                                                                                                                                      |
 
 Review provenance: the existing user-owned Claude Code session `couture-cast-cd` used `claude-opus-5-5`; its verified peer-origin reply arrived 2026-10-19T16:33:48.068Z. Full report: [archived Opus review](reviews/story-6-4-opus-implementation-review.md). Findings above are classified individually before grouping.
 
@@ -382,3 +384,24 @@ and `/tmp/story64-t4-{lint,web-types,native-types}.log`. Broader TEA reruns foll
   both work peers remain open with context. Production community flags remain disabled.
 - PR154 is open at the user's explicit request. CodeRabbit and green final-head CI remain
   parent-owned delivery requirements; this local workflow completion does not certify them.
+
+### CI hardening after the first PR run, 2026-10-19
+
+- P7: Real Android shard6 failed before app tests when asynchronous redirect cleanup deleted the
+  next Expo Go APK stream. The same installer CLI reproduced the exact ENOENT through controlled
+  HTTP redirects, streams, isolated cache and a synthetic ADB process. The downloader now opens
+  a file only for the final HTTP200 and uses Node's stream pipeline for completion and error
+  ownership; failed partial files are removed. Five regression cases pass, including cache reuse,
+  selected device, HTTP refusal, interrupted transfer, write error and bounded redirects.
+  Logs `/tmp/story64-installer-red.log`, `/tmp/story64-installer-green.log`.
+- The new installer regression uses the existing Playwright helper runner, so CI executes it during
+  preparation. Parent ran the complete helper command: six files, 50 tests passed.
+  `/tmp/story64-p7-parent-helper-unit.log`. Source/helper lint, syntax and Playwright types pass.
+- P8: Real browser burn-in and a local red run reproduced the existing reaction test's ambiguous
+  Close query. Both same-purpose UI controls retain consistent accessible labels. The test now
+  selects the dialog header's explicitly labelled control and asserts dismissal at all three
+  close points. The complete reaction browser suite passed six tests in42.3seconds; types and
+  lint pass. `/tmp/story64-ci-reactions-selector-{red,green}.log`.
+- Own source/diff audit and the Codex test architect's bounded follow-up found no further issue.
+  These local repairs still require a new green remote CI run. CodeRabbit's review service is
+  reporting a partial outage, and its requested PR review has not returned.

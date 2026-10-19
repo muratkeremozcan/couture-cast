@@ -11,7 +11,7 @@ stepsCompleted:
   - step-04-generate-report
   - codex-maintenance-rescore
 lastStep: 'codex-maintenance-rescore'
-lastSaved: '2026-10-19T18:05:37Z'
+lastSaved: '2026-10-19T18:24:10Z'
 ---
 
 # Test quality review: Story 6.4 threaded comments
@@ -66,6 +66,13 @@ inspected both keyboard screenshots: the full Send label and bottom edge clear G
 the long reply context. The fresh mobile suite passed 897 tests across 81 files. The final iOS flow
 also passed. These device outcomes and manual visual checks are recorded separately in the
 automation summary; the test-quality score remains unchanged.
+
+CI follow-ups P7 and P8 were also reviewed. The Expo Go installer regression uses the actual CLI,
+isolated files, controlled HTTP streams and a synthetic ADB executable; its five cases passed.
+Transport delays inject stream failures, and assertions await process completion. The reaction
+journey's ambiguous close query was reproduced against the real local stack, then all three close
+queries were scoped to the labelled modal header with explicit dismissal assertions. All six real
+reaction browser cases passed. The repairs preserve existing UI controls and reaction assertions.
 
 playwright-utils is installed and `tea_use_playwright_utils` is true; 0 of 8 sampled files outside
 the review set use it. Adoption has not spread past the reviewed set. The reviewed Playwright spec
@@ -161,6 +168,8 @@ No additional recommendations.
 - pact/http/consumer/interactions/community/comments.ts
 - pact/http/provider/doubles/community-comments.ts
 - playwright/tests/community-comments.spec.ts
+- playwright/tests/community-reactions.spec.ts
+- playwright/support/helpers/install-expo-go.spec.ts
 - maestro/community-comments.yaml
 
 ## Review Context

@@ -20,7 +20,7 @@ stepsCompleted:
     'step-04-validate-and-summarize',
   ]
 lastStep: 'step-04-validate-and-summarize'
-lastSaved: '2026-10-19T18:05:37Z'
+lastSaved: '2026-10-19T18:24:10Z'
 inputDocuments:
   - _bmad-output/implementation-artifacts/spec-6-4-threaded-comments.md
   - _bmad-output/implementation-artifacts/6-4-threaded-comments-design.md
@@ -312,6 +312,39 @@ No browser or mocked component assertion was added for native IME geometry. Thos
 not model Gboard occlusion. Existing component interaction checks, real device flows and fresh
 manual pixel inspection provide the relevant evidence. TEA reviewed the small follow-up and found
 no additional concrete issue; the source fix belongs to the implementation agent.
+
+### P7 and P8: CI setup race and reaction selector regression
+
+P7 was the observed Expo Go installer setup race in Android CI. The implementation agent supplied
+a controlled CLI red reproduction with the same ENOENT stack and a five-case passing regression
+after fixing final-response file ownership. TEA inspected the small pipeline change and the new
+`playwright/support/helpers/install-expo-go.spec.ts`. The tests exercise the real CLI, HTTP
+response streams, isolated cache files and selected-device command arguments through a synthetic
+ADB executable. They assert exact cache bytes, cache reuse without a second request, failure exit
+codes, cleaned partial files, refusal to invoke ADB on failure, and bounded relative redirects.
+The local named redirect limit preserves the accepted five-redirect contract.
+
+The five cases passed in `/tmp/story64-installer-green.log`; the implementation agent also supplied
+green scoped lint, Playwright types and Node syntax checks in
+`/tmp/story64-installer-{lint,types,syntax}.log`. TEA found no additional behavioral test gap and did
+not repeat the passing runs. This is a Vitest CLI test; its local HTTP transport exercises Node
+streams directly. Playwright browser request fixtures do not apply to that runner.
+
+P8 was reproduced locally before editing: the existing Story 6.3 reaction browser journey failed
+with the same strict selector error as CI because two valid controls share `Close this look`.
+All three close queries now use the explicitly labelled dialog header control. Each close asserts
+that the dialog is dismissed. The reaction counts, persistence, retry, accessibility and keyboard
+assertions remain intact, and both UI close controls retain their accessible names.
+
+| Scope                                           | Result                                                    | Evidence                                       |
+| ----------------------------------------------- | --------------------------------------------------------- | ---------------------------------------------- |
+| Focused existing reaction journey before repair | Exact CI strict-selector failure reproduced               | `/tmp/story64-ci-reactions-selector-red.log`   |
+| Full real reaction browser suite after repair   | 6/6 passed, including the previously blocked serial cases | `/tmp/story64-ci-reactions-selector-green.log` |
+| Playwright types and reaction-spec lint         | Passed with zero warnings                                 | `/tmp/story64-ci-reactions-{types,lint}.log`   |
+| Edited-file formatting                          | Passed                                                    | `/tmp/story64-ci-maintenance-format.log`       |
+
+The browser/API/DB/Redis window completed teardown and was returned before further work. These
+local repairs have fresh regression evidence; the final CI rerun and PR review remain root-owned.
 
 ### Current quality result
 

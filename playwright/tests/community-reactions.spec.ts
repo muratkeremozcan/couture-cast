@@ -1,4 +1,4 @@
-import type { Locator } from '@playwright/test'
+import type { Locator, Page } from '@playwright/test'
 import { contrastRatio } from '@couture/utils'
 import { log } from '@seontechnologies/playwright-utils/log'
 import { checkA11y } from '../support/helpers/accessibility'
@@ -10,6 +10,8 @@ import {
 
 const labels = ['Applaud', 'Love', 'Inspired'] as const
 const emojis = ['👏', '❤️', '✨'] as const
+const modalHeaderClose = (page: Page) =>
+  page.getByRole('dialog').getByLabel('Close this look', { exact: true })
 async function visibleCounts(controls: Locator) {
   const counts = await Promise.all(
     labels.map(async (label) => {
@@ -138,7 +140,8 @@ test.describe('Story 6.3 curated reactions', () => {
     await detailControls.getByRole('button', { name: /^Love,/ }).click()
     await expectCounts(detailControls, replaced, initial.total + 1)
     await expectCounts(controls, replaced, initial.total + 1)
-    await page.getByRole('button', { name: 'Close this look' }).click()
+    await modalHeaderClose(page).click()
+    await expect(page.getByRole('dialog')).not.toBeVisible()
     await expect(love).toHaveAttribute('aria-pressed', 'true')
     await expect(applause).toHaveAttribute('aria-pressed', 'false')
     const reloadedFeed = interceptNetworkCall({ method: 'GET', url: COMMUNITY_FEED_URL })
@@ -165,7 +168,8 @@ test.describe('Story 6.3 curated reactions', () => {
     await detailControls.getByRole('button', { name: /^Love,/ }).click()
     await expectCounts(detailControls, initial.counts, initial.total)
     await expectCounts(controls, initial.counts, initial.total)
-    await page.getByRole('button', { name: 'Close this look' }).click()
+    await modalHeaderClose(page).click()
+    await expect(page.getByRole('dialog')).not.toBeVisible()
     await expect(love).toHaveAttribute('aria-pressed', 'false')
     await page.screenshot({
       path: 'playwright/artifacts/community-reactions.png',
@@ -290,7 +294,8 @@ test.describe('Story 6.3 curated reactions', () => {
       'Reaction saved.'
     )
     await checkA11y(page)
-    await page.getByRole('button', { name: 'Close this look' }).click()
+    await modalHeaderClose(page).click()
+    await expect(page.getByRole('dialog')).not.toBeVisible()
     await controls.getByRole('button', { name: /^Love,/ }).click()
     await expect(controls.getByRole('button', { name: /^Love,/ })).toHaveAttribute(
       'aria-pressed',

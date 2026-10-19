@@ -1413,3 +1413,9 @@ file's own Code Review Findings section.
 - source_spec: `_bmad-output/implementation-artifacts/spec-6-4-threaded-comments.md`
   summary: Resolved the previously recorded AccessibleModal background interaction defect during Story 6.4.
   evidence: Background body siblings now receive inert and aria-hidden while the portal stays interactive; cleanup restores previous values. Rendered regression and final real browser light/dark/phone accessibility checks pass.
+- source_spec: `_bmad-output/implementation-artifacts/spec-6-4-threaded-comments.md`
+  summary: The existing Expo Go downloader can unlink its redirected APK while that response is downloading.
+  evidence: PR154 Android shard6 job118222307555 failed with ENOENT in install-expo-go.mjs:78 before app tests. Its redirect handler starts fs.unlink and recursively opens the same destination before unlink completes. The standing CI-flake instruction authorizes repairing this setup defect during delivery.
+- source_spec: `_bmad-output/implementation-artifacts/spec-6-4-threaded-comments.md`
+  summary: Locally resolved the previously recorded Expo Go redirect cleanup race during PR154 hardening.
+  evidence: The real installer CLI reproduces ENOENT before repair. Final-response-only file creation and stream pipeline cleanup pass five deterministic regression cases; all50Playwright helper tests pass. Remote CI verification follows the repair push.
