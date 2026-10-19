@@ -101,14 +101,14 @@ review has been requested and remains a prerequisite for merge.
 CodeRabbit completed review 5570286660 on commit b292db4a and reported six minor findings.
 All six were accepted and repaired. Independent Codex reviewers verified the fixes.
 
-| Comment    | Repair                                                                                                                               | Regression evidence                                                                                                                                                                                           |
-| ---------- | ------------------------------------------------------------------------------------------------------------------------------------ | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| 4312806100 | Preserve the accepted feed position of highlighted cards; clear stale pins and guard late detail responses.                          | Real browser reproduction failed with the highlighted card promoted ahead of the first feed item. Three gated screen cases cover loaded cards, refresh admission, and pagination admission.                   |
-| 4312806164 | Match the existing formal Portuguese voice in both platform catalogs.                                                                | Full locale validation and mobile tests pass.                                                                                                                                                                 |
-| 4312806191 | Match the existing informal Turkish voice in both platform catalogs.                                                                 | Full locale validation and mobile tests pass.                                                                                                                                                                 |
-| 4312806229 | Document all reaction error bodies and Retry-After; regenerate OpenAPI and SDK. Accept Nest's actual two-field generic 500 envelope. | Real HTTP tests parse all documented errors, including an unexpected failure; OpenAPI assertions cover body references and the retry header.                                                                  |
-| 4312806240 | Add a generated forward migration setting update cascades on all six foreign keys. Applied SQL remains byte-for-byte unchanged.      | Test first failed on the original user FK. After migration, both parent identities update with state, receipts, and event IDs preserved; receipt replay adds no event; all six live constraints match Prisma. |
-| 4312806253 | Prepare utils and API-client before standalone testing build, watch, lint, and typecheck commands.                                   | Cold build first failed with TS2307 after cleaning API-client dist; the same standalone command passes after repair. Dependency order is acyclic.                                                             |
+| Comment    | Repair                                                                                                                                                                            | Regression evidence                                                                                                                                                                                           |
+| ---------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| 4312806100 | Preserve the accepted feed position of highlighted cards; clear stale pins and guard late detail responses.                                                                       | Real browser reproduction failed with the highlighted card promoted ahead of the first feed item. Three gated screen cases cover loaded cards, refresh admission, and pagination admission.                   |
+| 4312806164 | Match the existing formal Portuguese voice in both platform catalogs.                                                                                                             | Full locale validation and mobile tests pass.                                                                                                                                                                 |
+| 4312806191 | Match the existing informal Turkish voice in both platform catalogs.                                                                                                              | Full locale validation and mobile tests pass.                                                                                                                                                                 |
+| 4312806229 | Document all reaction error bodies and Retry-After; regenerate OpenAPI and SDK. Keep the established required three-field 500 contract and normalize unexpected runtime failures. | Real HTTP tests parse all documented errors, including an unexpected failure; OpenAPI assertions cover body references and the retry header.                                                                  |
+| 4312806240 | Add a generated forward migration setting update cascades on all six foreign keys. Applied SQL remains byte-for-byte unchanged.                                                   | Test first failed on the original user FK. After migration, both parent identities update with state, receipts, and event IDs preserved; receipt replay adds no event; all six live constraints match Prisma. |
+| 4312806253 | Prepare utils and API-client before standalone testing build, watch, lint, and typecheck commands.                                                                                | Cold build first failed with TS2307 after cleaning API-client dist; the same standalone command passes after repair. Dependency order is acyclic.                                                             |
 
 Fresh focused API verification: 39 passed. Full validation: 6,281 passed with ten existing
 intentional skips; types, lint, formatting, unchanged coverage thresholds, and production
@@ -120,3 +120,23 @@ Pact consumers remain deterministic over three runs (116 mobile, 125 web), and p
 verification passes. Nine real browser publication/reaction journeys pass without retries,
 including the ordering regression. Logs: /tmp/couture63-coderabbit-pact.log and
 /tmp/couture63-coderabbit-playwright.log. The fresh browser screenshot was inspected.
+
+## HTTP compatibility follow-up
+
+CI Optic rejected making the established shared 500 error field optional. The field is
+required again, preserving the existing generated SDK contract. The global exception
+filter now normalizes unexpected failures to the three-field public envelope, logs the
+original exception, and retains telemetry behavior. Existing HttpExceptions and http-errors
+objects keep their prior response handling. The actual HTTP regression failed against the
+old runtime response before repair. Regenerated OpenAPI and SDK pass Optic diff against main.
+Focused tests cover exact responses, private-detail protection, original logging, sent
+headers, custom errors, webhook exclusions, and telemetry failures.
+
+Final compatibility verification: 6,285 tests pass with ten existing intentional skips;
+unchanged coverage thresholds and production builds pass. Type checks and workspace lint
+completed in /tmp/couture63-500-validate.log. A new test's type-import style error was
+corrected, then API types/lint and remaining root lint/format/coverage/build checks passed
+in /tmp/couture63-500-resume.log. Pact consumers remain stable across three runs, and
+provider verification passes in /tmp/couture63-500-pact.log. Optic compatibility passes
+in /tmp/couture63-500-optic.log. Focused filter/privacy verification passes all 39 cases
+in /tmp/couture63-500-focused.log. The independent runtime source review found no issues.

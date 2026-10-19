@@ -401,3 +401,8 @@ probe failed on the original FK before the forward migration. Final local valida
 6,281 tests with ten existing skips, unchanged coverage thresholds, types, lint, formatting,
 and production builds. Pact determinism/provider verification and all nine browser journeys
 pass. Detailed disposition is in the linked test artifacts.
+
+The final HTTP compatibility repair retains the required shared 500 error field.
+Unexpected runtime failures are normalized by the API exception filter to that established
+three-field envelope, with the original exception retained in server logs. Optic diff
+against main passes; custom HTTP error and telemetry behavior retain regression coverage.

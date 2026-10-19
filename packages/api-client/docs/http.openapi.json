@@ -232,7 +232,8 @@
         },
         "required": [
           "statusCode",
-          "message"
+          "message",
+          "error"
         ],
         "additionalProperties": false
       },

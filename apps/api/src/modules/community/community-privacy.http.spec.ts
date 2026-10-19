@@ -387,6 +387,7 @@ describe('CommunityModule HTTP privacy wiring', () => {
     expect(internalServerErrorHttpErrorSchema.parse(response.body)).toEqual({
       statusCode: 500,
       message: 'Internal server error',
+      error: 'Internal Server Error',
     })
   })
 

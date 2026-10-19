@@ -72,17 +72,21 @@ describe('Story 6.3 reaction contracts', () => {
     })
   })
 
-  it('accepts both Nest 500 envelopes while keeping unexpected fields closed', () => {
-    const unexpectedFailure = { statusCode: 500, message: 'Internal server error' }
+  it('requires the established 500 envelope and keeps unexpected fields closed', () => {
+    const unexpectedFailure = {
+      statusCode: 500,
+      message: 'Internal server error',
+      error: 'Internal Server Error',
+    }
     expect(internalServerErrorHttpErrorSchema.parse(unexpectedFailure)).toEqual(
       unexpectedFailure
     )
     expect(
-      internalServerErrorHttpErrorSchema.parse({
-        ...unexpectedFailure,
-        error: 'Internal Server Error',
-      })
-    ).toHaveProperty('error', 'Internal Server Error')
+      internalServerErrorHttpErrorSchema.safeParse({
+        statusCode: 500,
+        message: 'Internal server error',
+      }).success
+    ).toBe(false)
     expect(
       internalServerErrorHttpErrorSchema.safeParse({
         ...unexpectedFailure,
