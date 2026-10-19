@@ -292,6 +292,128 @@ describe.concurrent('community table RLS policies', () => {
   )
 
   scenarioTest(
+    '6.3-DB-001 refuses anonymous and authenticated reaction writes without a post-existence oracle',
+    async ({ scenario: seeded }) => {
+      const adminClient = await adminPool.connect()
+      const postId = randomUUID()
+      const missingPostId = `missing-${randomUUID()}`
+      const receiptId = randomUUID()
+      const eventId = randomUUID()
+      const tables = [
+        'CommunityReaction',
+        'CommunityReactionReceipt',
+        'CommunityReactionOutbox',
+      ] as const
+
+      try {
+        // Every attempted mutation has legitimate user, enum and foreign-key data.
+        // The hidden draft also exercises the same boundary as a caller's missing post.
+        await insertLookbookPost(adminClient, {
+          id: postId,
+          userId: seeded.teenId,
+          status: 'draft',
+          publishedAt: null,
+        })
+        await adminClient.query(
+          `INSERT INTO public."CommunityReaction" ("user_id", "post_id", "selection", "revision")
+           VALUES ($1, $2, 'applause', 1)`,
+          [seeded.otherTeenId, postId]
+        )
+        await adminClient.query(
+          `INSERT INTO public."CommunityReactionReceipt"
+             ("user_id", "mutation_id", "post_id", "selection", "base_revision")
+           VALUES ($1, $2, $3, 'applause', 0)`,
+          [seeded.otherTeenId, receiptId, postId]
+        )
+        await adminClient.query(
+          `INSERT INTO public."CommunityReactionOutbox"
+             ("id", "user_id", "post_id", "event_type", "payload")
+           VALUES ($1, $2, $3, 'community_reaction_added', '{}'::jsonb)`,
+          [eventId, seeded.otherTeenId, postId]
+        )
+        const snapshot = async () =>
+          Promise.all(
+            tables.map(async (table) => {
+              const result = await adminClient.query(
+                `SELECT * FROM public."${table}" WHERE "post_id" = $1`,
+                [postId]
+              )
+              return result.rows as Record<string, unknown>[]
+            })
+          )
+        const before = await snapshot()
+        expect(before.map((rows) => rows.length)).toEqual([1, 1, 1])
+
+        for (const role of ['anon', 'authenticated'] as const) {
+          const claims = role === 'anon' ? null : buildClaims(seeded.teenEmail, 'teen')
+          for (const table of tables) {
+            const insert =
+              table === 'CommunityReaction'
+                ? `INSERT INTO public."${table}" ("user_id", "post_id", "selection", "revision")
+                 VALUES ($1, $2, 'love', 0)`
+                : table === 'CommunityReactionReceipt'
+                  ? `INSERT INTO public."${table}"
+                     ("user_id", "post_id", "mutation_id", "selection", "base_revision")
+                   VALUES ($1, $2, $3, 'love', 0)`
+                  : `INSERT INTO public."${table}"
+                     ("user_id", "post_id", "id", "event_type", "payload")
+                   VALUES ($1, $2, $3, 'community_reaction_added', '{}'::jsonb)`
+            const outcomes: string[] = []
+            for (const candidatePostId of [postId, missingPostId]) {
+              await withRole(role, claims, async (client) => {
+                try {
+                  await client.query(
+                    insert,
+                    table === 'CommunityReaction'
+                      ? [seeded.teenId, candidatePostId]
+                      : [seeded.teenId, candidatePostId, randomUUID()]
+                  )
+                  outcomes.push('inserted')
+                } catch (error) {
+                  outcomes.push((error as { code?: string }).code ?? 'unknown')
+                }
+              })
+            }
+            expect(outcomes, `${role} ${table} INSERT real/missing post`).toEqual([
+              PERMISSION_DENIED,
+              PERMISSION_DENIED,
+            ])
+            for (const statement of [
+              `UPDATE public."${table}" SET "post_id" = $1 WHERE "post_id" = $1`,
+              `DELETE FROM public."${table}" WHERE "post_id" = $1`,
+            ]) {
+              await withRole(role, claims, async (client) =>
+                expect(client.query(statement, [postId])).rejects.toMatchObject({
+                  code: PERMISSION_DENIED,
+                })
+              )
+            }
+            expect(
+              await snapshot(),
+              `${role} ${table} preserves privileged rows`
+            ).toEqual(before)
+          }
+        }
+      } finally {
+        // Explicit child cleanup also covers a test failure before fixture setup completes.
+        try {
+          for (const table of tables) {
+            await adminClient.query(
+              `DELETE FROM public."${table}" WHERE "post_id" = $1`,
+              [postId]
+            )
+          }
+          await adminClient.query('DELETE FROM public."LookbookPost" WHERE "id" = $1', [
+            postId,
+          ])
+        } finally {
+          adminClient.release()
+        }
+      }
+    }
+  )
+
+  scenarioTest(
     '6.1-DB-009 refuses every client role the engagement table, closing the post-existence oracle',
     async ({ scenario: seeded }) => {
       // EngagementEvent was left in the guardian migration's self-only list when

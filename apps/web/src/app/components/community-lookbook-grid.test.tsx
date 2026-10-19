@@ -8,9 +8,10 @@
 // A mocked lib would let the grid render `community.error.rateLimited` for a 409
 // and still pass. So each state below is one MSW response away from the real one.
 import axe from 'axe-core'
+import { CommunityReactionState } from '@couture/api-client'
 import { Blob as NodeBlob } from 'node:buffer'
 import { delay, http, HttpResponse } from 'msw'
-import { fireEvent, render, screen, waitFor, within } from '@testing-library/react'
+import { act, fireEvent, render, screen, waitFor, within } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import type { ComponentProps } from 'react'
@@ -75,6 +76,12 @@ const MERLOT = '#7A1F2D'
 const GOLD = '#C9A14A'
 
 const SUGGESTED_ALT_TEXT = 'A layered outfit photographed against a plain wall.'
+
+// Keep image lifetimes stable while transport and React continue on real timers.
+const IMAGE_REFERENCE_NOW = Date.parse('2026-10-19T12:00:00.000Z')
+beforeEach(() => {
+  vi.spyOn(Date, 'now').mockReturnValue(IMAGE_REFERENCE_NOW)
+})
 
 function isoIn(seconds: number): string {
   return new Date(Date.now() + seconds * 1000).toISOString()
@@ -928,6 +935,10 @@ describe('CommunityLookbookGrid (Story 6.1)', () => {
 
     it('6.1-WEB-057 does not double-request the next page on a second click', async () => {
       signIn()
+      let releasePage!: () => void
+      const pageResponse = new Promise<void>((resolve) => {
+        releasePage = resolve
+      })
       let calls = 0
       useMswHandlers(
         http.get(FEED_PATH, async ({ request }) => {
@@ -936,51 +947,63 @@ describe('CommunityLookbookGrid (Story 6.1)', () => {
           if (cursor === null) {
             return feedBody({ items: [item()], nextCursor: cursorFor() })
           }
-          await delay(30)
+          await pageResponse
           return feedBody({ items: [item({ id: 'post-2' })] })
         })
       )
-      const user = userEvent.setup()
-      renderGrid()
+      try {
+        const user = userEvent.setup()
+        renderGrid()
 
-      await screen.findByTestId('lookbook-card-post-1')
-      const control = screen.getByTestId('load-more-button')
-      await user.click(control)
-      // A second read on the same cursor would fetch the same page twice. The
-      // control is disabled while the first is in flight, so the click lands on
-      // nothing; `handleLoadMore`'s own `!isLoadingMore` guard is the second lock.
-      fireEvent.click(control)
+        await screen.findByTestId('lookbook-card-post-1')
+        const control = screen.getByTestId('load-more-button')
+        await user.click(control)
+        expect(control).toBeDisabled()
+        await user.click(control)
+        releasePage()
 
-      await screen.findByTestId('lookbook-card-post-2')
-      expect(calls).toBe(2)
+        await screen.findByTestId('lookbook-card-post-2')
+        expect(calls).toBe(2)
+      } finally {
+        releasePage()
+      }
     })
 
     it('6.1-WEB-017 disables the load-more control while the next page is in flight', async () => {
       signIn()
+      let releasePage!: () => void
+      const pageResponse = new Promise<void>((resolve) => {
+        releasePage = resolve
+      })
       useMswHandlers(
         http.get(FEED_PATH, async ({ request }) => {
           const cursor = new URL(request.url).searchParams.get('cursor')
           if (cursor === null) {
             return feedBody({ items: [item()], nextCursor: cursorFor() })
           }
-          await delay(30)
+          await pageResponse
           return feedBody({ items: [item({ id: 'post-2' })] })
         })
       )
-      const user = userEvent.setup()
-      renderGrid()
+      try {
+        const user = userEvent.setup()
+        renderGrid()
 
-      await screen.findByTestId('lookbook-card-post-1')
-      await user.click(screen.getByTestId('load-more-button'))
+        await screen.findByTestId('lookbook-card-post-1')
+        await user.click(screen.getByTestId('load-more-button'))
 
-      const control = screen.getByTestId('load-more-button')
-      expect(control).toBeDisabled()
-      expect(control).toHaveTextContent('Loading')
+        const control = screen.getByTestId('load-more-button')
+        expect(control).toBeDisabled()
+        expect(control).toHaveTextContent('Loading')
+        releasePage()
 
-      await screen.findByTestId('lookbook-card-post-2')
-      expect(screen.getByTestId('community-live-region')).toHaveTextContent(
-        'Loaded 1 more looks.'
-      )
+        await screen.findByTestId('lookbook-card-post-2')
+        expect(screen.getByTestId('community-live-region')).toHaveTextContent(
+          'Loaded 1 more looks.'
+        )
+      } finally {
+        releasePage()
+      }
     })
   })
 
@@ -2830,6 +2853,25 @@ describe('Story 6.3 screen request ownership', () => {
     viewerReaction: 'applause',
   }
   const post = () => ({ ...item(), reactions: zero })
+  function palette(controls: HTMLElement) {
+    return {
+      buttons: within(controls)
+        .getAllByRole('button')
+        .map((button) => ({
+          label: button.getAttribute('aria-label'),
+          pressed: button.getAttribute('aria-pressed'),
+        })),
+      total: within(controls).getByText(/^[0-9]+ reactions?$/).textContent,
+    }
+  }
+  const confirmedPalette = {
+    buttons: [
+      { label: 'Applaud, 1', pressed: 'true' },
+      { label: 'Love, 0', pressed: 'false' },
+      { label: 'Inspired, 0', pressed: 'false' },
+    ],
+    total: '1 reaction',
+  }
   beforeEach(() => {
     window.sessionStorage.clear()
     signIn()
@@ -2843,33 +2885,31 @@ describe('Story 6.3 screen request ownership', () => {
   }
   it('6.3-WEB closing detail during PUT retains accepted parent update', async () => {
     const gate = deferred()
-    let returned = false
     let sent = false
     useMswHandlers(
       http.get(FEED_PATH, () => HttpResponse.json({ data: feed({ items: [post()] }) })),
       http.put('/api/v1/community/posts/:postId/reaction', async () => {
         sent = true
         await gate.promise
-        returned = true
         return HttpResponse.json({ data: one })
       })
     )
-    const user = userEvent.setup()
-    renderGrid()
-    await user.click(await screen.findByTestId('lookbook-open-post-1'))
-    const detail = await screen.findByTestId('community-detail')
-    await user.click(within(detail).getByRole('button', { name: 'Applaud, 0' }))
-    await waitFor(() => expect(sent).toBe(true))
-    await user.click(screen.getByRole('button', { name: 'Close this look' }))
-    expect(screen.queryByTestId('community-detail')).toBeNull()
-    gate.release()
-    await waitFor(() => expect(returned).toBe(true))
-    await delay(80)
-    const controls = screen.getByTestId('community-reactions-post-1')
-    expect(within(controls).getByRole('button', { name: 'Applaud, 1' })).toHaveAttribute(
-      'aria-pressed',
-      'true'
-    )
+    try {
+      const user = userEvent.setup()
+      renderGrid()
+      await user.click(await screen.findByTestId('lookbook-open-post-1'))
+      const detail = await screen.findByTestId('community-detail')
+      await user.click(within(detail).getByRole('button', { name: 'Applaud, 0' }))
+      await waitFor(() => expect(sent).toBe(true))
+      await user.click(screen.getByRole('button', { name: 'Close this look' }))
+      expect(screen.queryByTestId('community-detail')).toBeNull()
+      gate.release()
+      const controls = screen.getByTestId('community-reactions-post-1')
+      await within(controls).findByRole('button', { name: 'Applaud, 1' })
+      expect(palette(controls)).toEqual(confirmedPalette)
+    } finally {
+      gate.release()
+    }
   })
   it('6.3-WEB card and detail serialize intents for the same post', async () => {
     const gate = deferred()
@@ -2882,83 +2922,114 @@ describe('Story 6.3 screen request ownership', () => {
         return HttpResponse.json({ data: one })
       })
     )
-    const user = userEvent.setup()
-    renderGrid()
-    await user.click(await screen.findByRole('button', { name: 'Applaud, 0' }))
-    await waitFor(() => expect(requests).toHaveLength(1))
-    await user.click(screen.getByTestId('lookbook-open-post-1'))
-    const detail = await screen.findByTestId('community-detail')
-    await user.click(within(detail).getByRole('button', { name: 'Love, 0' }))
-    await delay(80)
-    gate.release()
-    expect(requests).toHaveLength(1)
+    try {
+      const user = userEvent.setup()
+      renderGrid()
+      await user.click(await screen.findByRole('button', { name: 'Applaud, 0' }))
+      await waitFor(() => expect(requests).toHaveLength(1))
+      await user.click(screen.getByTestId('lookbook-open-post-1'))
+      const detail = await screen.findByTestId('community-detail')
+      const love = within(detail).getByRole('button', { name: 'Love, 0' })
+      expect(love).toHaveAttribute('aria-disabled', 'true')
+      await user.click(love)
+      gate.release()
+      await within(detail).findByRole('button', { name: 'Applaud, 1' })
+      expect(palette(within(detail).getByTestId('community-reactions-post-1'))).toEqual(
+        confirmedPalette
+      )
+      expect(requests).toHaveLength(1)
+    } finally {
+      gate.release()
+    }
   })
   it('6.3-WEB a feed started before mutation 404 cannot resurrect the post', async () => {
     const gate = deferred()
     let reads = 0
-    let returned = false
     useMswHandlers(
       http.get(FEED_PATH, async () => {
-        reads++
-        if (reads > 1) {
-          await gate.promise
-          returned = true
-        }
+        const read = ++reads
+        if (read > 1) await gate.promise
         return HttpResponse.json({
-          data: feed({ items: [post()], mode: reads > 1 ? 'all' : 'auto' }),
+          data: feed({
+            items:
+              read > 1
+                ? [
+                    post(),
+                    {
+                      ...post(),
+                      id: 'stale-feed-sentinel',
+                      caption: 'Older feed completed.',
+                    },
+                  ]
+                : [post()],
+            mode: read > 1 ? 'all' : 'auto',
+          }),
         })
       }),
       http.put('/api/v1/community/posts/:postId/reaction', () =>
         errorBody(404, COMMUNITY_POST_NOT_FOUND_MESSAGE, 'Not Found')
       )
     )
-    const user = userEvent.setup()
-    renderGrid()
-    const controls = await screen.findByTestId('community-reactions-post-1')
-    await user.click(screen.getByTestId('community-filter-all'))
-    await waitFor(() => expect(reads).toBe(2))
-    await user.click(within(controls).getByRole('button', { name: 'Applaud, 0' }))
-    await waitFor(() => expect(screen.queryByTestId('lookbook-card-post-1')).toBeNull())
-    gate.release()
-    await waitFor(() => expect(returned).toBe(true))
-    await delay(80)
-    expect(screen.queryByTestId('lookbook-card-post-1')).toBeNull()
+    try {
+      const user = userEvent.setup()
+      renderGrid()
+      const controls = await screen.findByTestId('community-reactions-post-1')
+      await user.click(screen.getByTestId('community-filter-all'))
+      await waitFor(() => expect(reads).toBe(2))
+      await user.click(within(controls).getByRole('button', { name: 'Applaud, 0' }))
+      await waitFor(() => expect(screen.queryByTestId('lookbook-card-post-1')).toBeNull())
+      gate.release()
+      await screen.findByText('Older feed completed.')
+      expect(screen.queryByTestId('lookbook-card-post-1')).toBeNull()
+    } finally {
+      gate.release()
+    }
   })
   it('6.3-WEB retained feed item protects confirmed summary against older feed', async () => {
     const gate = deferred()
     let reads = 0
-    let returned = false
     useMswHandlers(
       http.get(FEED_PATH, async () => {
-        reads++
-        if (reads > 1) {
-          await gate.promise
-          returned = true
-        }
+        const read = ++reads
+        if (read > 1) await gate.promise
         return HttpResponse.json({
-          data: feed({ items: [post()], mode: reads > 1 ? 'all' : 'auto' }),
+          data: feed({
+            items:
+              read > 1
+                ? [
+                    post(),
+                    {
+                      ...post(),
+                      id: 'stale-feed-sentinel',
+                      caption: 'Older feed completed.',
+                    },
+                  ]
+                : [post()],
+            mode: read > 1 ? 'all' : 'auto',
+          }),
         })
       }),
       http.put('/api/v1/community/posts/:postId/reaction', () =>
         HttpResponse.json({ data: one })
       )
     )
-    const user = userEvent.setup()
-    renderGrid()
-    const controls = await screen.findByTestId('community-reactions-post-1')
-    await user.click(screen.getByTestId('community-filter-all'))
-    await waitFor(() => expect(reads).toBe(2))
-    await user.click(within(controls).getByRole('button', { name: 'Applaud, 0' }))
-    await within(controls).findByRole('button', { name: 'Applaud, 1' })
-    gate.release()
-    await waitFor(() => expect(returned).toBe(true))
-    await delay(80)
-    expect(within(controls).getByRole('button', { name: 'Applaud, 1' })).toHaveAttribute(
-      'aria-pressed',
-      'true'
-    )
+    try {
+      const user = userEvent.setup()
+      renderGrid()
+      const controls = await screen.findByTestId('community-reactions-post-1')
+      await user.click(screen.getByTestId('community-filter-all'))
+      await waitFor(() => expect(reads).toBe(2))
+      await user.click(within(controls).getByRole('button', { name: 'Applaud, 0' }))
+      await within(controls).findByRole('button', { name: 'Applaud, 1' })
+      gate.release()
+      await screen.findByText('Older feed completed.')
+      expect(palette(screen.getByTestId('community-reactions-post-1'))).toEqual(
+        confirmedPalette
+      )
+    } finally {
+      gate.release()
+    }
   })
-
   it('6.3-WEB-021 reconciles an older detail response with the feed-confirmed reaction', async () => {
     const gate = deferred()
     let started = false
@@ -2967,28 +3038,31 @@ describe('Story 6.3 screen request ownership', () => {
       http.get(POST_PATH, async () => {
         started = true
         await gate.promise
-        return HttpResponse.json({ data: post() })
+        return HttpResponse.json({
+          data: { ...post(), caption: 'Older detail completed.' },
+        })
       }),
       http.put('/api/v1/community/posts/:postId/reaction', () =>
         HttpResponse.json({ data: one })
       )
     )
-    const user = userEvent.setup()
-    renderGrid({ highlightedCardId: 'post-1' })
-    const controls = await screen.findByTestId('community-reactions-post-1')
-    await waitFor(() => expect(started).toBe(true))
-    await user.click(within(controls).getByRole('button', { name: 'Applaud, 0' }))
-    await within(controls).findByRole('button', { name: 'Applaud, 1' })
-    gate.release()
-    await waitFor(() =>
-      expect(screen.getAllByRole('button', { name: 'Applaud, 1' })).toHaveLength(1)
-    )
-    expect(within(controls).getByRole('button', { name: 'Applaud, 1' })).toHaveAttribute(
-      'aria-pressed',
-      'true'
-    )
+    try {
+      const user = userEvent.setup()
+      renderGrid({ highlightedCardId: 'post-1' })
+      const controls = await screen.findByTestId('community-reactions-post-1')
+      await waitFor(() => expect(started).toBe(true))
+      await user.click(within(controls).getByRole('button', { name: 'Applaud, 0' }))
+      await within(controls).findByRole('button', { name: 'Applaud, 1' })
+      gate.release()
+      await screen.findByText('Older detail completed.')
+      // The caption proves the old detail was rendered before counts are checked.
+      expect(palette(screen.getByTestId('community-reactions-post-1'))).toEqual(
+        confirmedPalette
+      )
+    } finally {
+      gate.release()
+    }
   })
-
   it('6.3-WEB-022 preserves highlighted reaction focus and announces inside the modal', async () => {
     useMswHandlers(
       http.get(FEED_PATH, () => HttpResponse.json({ data: feed({ items: [post()] }) })),
@@ -3051,44 +3125,64 @@ describe('Story 6.3 screen request ownership', () => {
         return errorBody(404, COMMUNITY_POST_NOT_FOUND_MESSAGE, 'Not Found')
       })
     )
-    const user = userEvent.setup()
-    renderGrid()
-    await user.click(await screen.findByTestId('lookbook-open-post-1'))
-    expect(detailStarted).toBe(false)
-    hidden = true
-    fireEvent.error(within(screen.getByTestId('lookbook-card-post-1')).getByRole('img'))
-    await waitFor(() => expect(detailStarted).toBe(true))
-    expect(screen.getByTestId('community-detail')).toBeVisible()
-    gate.release()
-    await waitFor(() => expect(screen.queryByTestId('community-detail')).toBeNull())
-    expect(screen.queryByTestId('lookbook-card-post-1')).toBeNull()
+    try {
+      const user = userEvent.setup()
+      renderGrid()
+      await user.click(await screen.findByTestId('lookbook-open-post-1'))
+      expect(detailStarted).toBe(false)
+      hidden = true
+      fireEvent.error(within(screen.getByTestId('lookbook-card-post-1')).getByRole('img'))
+      await waitFor(() => expect(detailStarted).toBe(true))
+      expect(screen.getByTestId('community-detail')).toBeVisible()
+      gate.release()
+      await waitFor(() => expect(screen.queryByTestId('community-detail')).toBeNull())
+      expect(screen.queryByTestId('lookbook-card-post-1')).toBeNull()
+    } finally {
+      gate.release()
+    }
   })
   it('6.3-WEB-024 rejects an older detail after mutation 404', async () => {
     const gate = deferred()
+    const read = vi.spyOn(CommunityReactionState.prototype, 'read')
     let started = false
-    let returned = false
     useMswHandlers(
       http.get(FEED_PATH, () => HttpResponse.json({ data: feed({ items: [post()] }) })),
       http.get(POST_PATH, async () => {
         started = true
         await gate.promise
-        returned = true
-        return HttpResponse.json({ data: post() })
+        return HttpResponse.json({
+          data: { ...post(), caption: 'Fenced detail completed.' },
+        })
       }),
       http.put('/api/v1/community/posts/:postId/reaction', () =>
         errorBody(404, COMMUNITY_POST_NOT_FOUND_MESSAGE, 'Not Found')
       )
     )
-    const user = userEvent.setup()
-    renderGrid({ highlightedCardId: 'post-1' })
-    const controls = await screen.findByTestId('community-reactions-post-1')
-    await waitFor(() => expect(started).toBe(true))
-    await user.click(within(controls).getByRole('button', { name: 'Applaud, 0' }))
-    await waitFor(() => expect(screen.queryByTestId('lookbook-card-post-1')).toBeNull())
-    gate.release()
-    await waitFor(() => expect(returned).toBe(true))
-    await delay(80)
-    expect(screen.queryByTestId('lookbook-card-post-1')).toBeNull()
+    try {
+      const user = userEvent.setup()
+      renderGrid({ highlightedCardId: 'post-1' })
+      const controls = await screen.findByTestId('community-reactions-post-1')
+      await waitFor(() => expect(started).toBe(true))
+      await user.click(within(controls).getByRole('button', { name: 'Applaud, 0' }))
+      await waitFor(() => expect(screen.queryByTestId('lookbook-card-post-1')).toBeNull())
+      gate.release()
+      // A fenced response has no renderable output. Observe the real coordinator
+      // receiving this caption, then flush React before checking continued absence.
+      await waitFor(() =>
+        expect(read).toHaveBeenCalledWith(
+          expect.objectContaining({ caption: 'Fenced detail completed.' }),
+          expect.any(Number)
+        )
+      )
+      await act(async () => {
+        await Promise.resolve()
+      })
+      expect(screen.queryByTestId('lookbook-card-post-1')).toBeNull()
+      expect(screen.queryByText('Fenced detail completed.')).toBeNull()
+    } finally {
+      gate.release()
+      read.mockRestore()
+    }
   })
   it.each(['withdrawn', 'published'] as const)(
     '6.3-WEB-025 clears cached aggregates when refresh returns an owner post with status %s and omitted reactions',

@@ -3,6 +3,8 @@
 import type { CommunityService } from '../../../../apps/api/src/modules/community/community.service'
 import { CommunityRateLimitException } from '../../../../apps/api/src/modules/community/community-rate-limit.exception'
 import {
+  COMMUNITY_REACTION_CONFLICT_MESSAGE,
+  COMMUNITY_REACTION_RATE_LIMITED_MESSAGE,
   COMMUNITY_CHALLENGE_OVERLAP_MESSAGE,
   COMMUNITY_CONSENT_SUSPENDED_MESSAGE,
   COMMUNITY_IDEMPOTENCY_MISMATCH_MESSAGE,
@@ -293,9 +295,36 @@ function expectedBandFor(mode: CommunityFeedMode): ClimateBand | null {
 export function createCommunityDoubles() {
   const scenarioOf = () => getProviderCommunityState()?.scenario ?? 'feed-resolved'
 
+  const currentReactionSummary = () => ({
+    counts: { applause: 2, love: 1, inspiration: 3 },
+    total: 6,
+    viewerReaction: 'applause' as const,
+    revision: 3,
+    generation: 7,
+  })
+
   const mockCommunityService = {
-    setReaction: ({ input }: { input: SetCommunityReactionInput }) =>
-      Promise.resolve({
+    setReaction: ({ input }: { input: SetCommunityReactionInput }) => {
+      if (scenarioOf() === 'reaction-current') {
+        // Mirror repository precedence: a changed receipt payload conflicts even
+        // when its base revision matches the current revision.
+        const hasReceipt = input.mutationId === '63100000-0000-4000-8000-000000000001'
+        const changedReceipt =
+          hasReceipt && (input.selection !== 'applause' || input.baseRevision !== 2)
+        if (changedReceipt || (!hasReceipt && input.baseRevision !== 3)) {
+          throw new ConflictException({
+            statusCode: 409,
+            error: 'Conflict',
+            message: COMMUNITY_REACTION_CONFLICT_MESSAGE,
+            data: currentReactionSummary(),
+          })
+        }
+        return Promise.resolve(currentReactionSummary())
+      }
+      if (scenarioOf() === 'reaction-rate-limited') {
+        throw new CommunityRateLimitException(COMMUNITY_REACTION_RATE_LIMITED_MESSAGE, 37)
+      }
+      return Promise.resolve({
         counts: {
           applause: input.selection === 'applause' ? 1 : 0,
           love: input.selection === 'love' ? 1 : 0,
@@ -305,7 +334,8 @@ export function createCommunityDoubles() {
         viewerReaction: input.selection,
         revision: input.baseRevision + 1,
         generation: input.baseRevision + 1,
-      }),
+      })
+    },
     /*
      * THE CURSOR DECISION IS MADE BY THE REAL CODEC, not by the scenario.
      *
@@ -328,6 +358,7 @@ export function createCommunityDoubles() {
     getFeed: (params: {
       mode?: CommunityFeedMode
       cursor?: string
+      reactions?: boolean
     }): Promise<CommunityFeed> => {
       const mode = params.mode ?? 'auto'
       if (params.cursor) {
@@ -342,6 +373,19 @@ export function createCommunityDoubles() {
       }
 
       switch (scenarioOf()) {
+        case 'reaction-feed':
+          return Promise.resolve({
+            ...buildResolvedFeed(),
+            items: [
+              {
+                ...buildPublishedItem(),
+                ...(params.reactions ? { reactions: currentReactionSummary() } : {}),
+              },
+            ],
+            authorStates: [],
+            nextCursor: null,
+            activeChallenge: null,
+          })
         case 'feed-band-unresolved':
           return Promise.resolve(buildBandUnresolvedFeed())
         case 'feed-removed-content':

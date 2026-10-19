@@ -6,6 +6,11 @@ import path from 'node:path'
 import { PrismaClient } from '@prisma/client'
 import { createClient } from '@supabase/supabase-js'
 import type { APIRequestContext } from '@playwright/test'
+import type {
+  ApiRequestParams,
+  ApiRequestResponse,
+} from '@seontechnologies/playwright-utils/api-request'
+import { RecurseTimeoutError } from '@seontechnologies/playwright-utils/recurse'
 import { expect, test } from '../fixtures/merged-fixtures'
 import {
   authHeaders,
@@ -313,8 +318,19 @@ export type CommunityAuthorState = {
  * that says whether a fixture or a real model produced the verdict, and no
  * public endpoint exposes it.
  */
+type TerminalStateUtilities = {
+  apiRequest: <T>(
+    options: Omit<ApiRequestParams, 'request'>
+  ) => Promise<ApiRequestResponse<T>>
+  recurse: <T>(
+    command: () => Promise<T>,
+    predicate: (value: T) => boolean,
+    options?: Record<string, unknown>
+  ) => Promise<T>
+}
+
 export async function waitForTerminalAuthorState(
-  request: APIRequestContext,
+  { apiRequest, recurse }: TerminalStateUtilities,
   options: {
     apiBaseUrl: string
     userId: string
@@ -327,50 +343,49 @@ export async function waitForTerminalAuthorState(
   const deadline = Date.now() + (options.timeoutMs ?? 90_000)
   let lastStatus = 'unknown'
 
-  while (Date.now() < deadline) {
-    const response = await request.get(`${apiBaseUrl}/api/v1/community/posts/${postId}`, {
-      headers,
-    })
-    if (response.status() === 200) {
-      const body = (await response.json()) as { data: { status: string } }
-      lastStatus = body.data.status
-      if ((COMMUNITY_TERMINAL_STATUSES as readonly string[]).includes(lastStatus)) {
-        return {
-          status: lastStatus,
-          moderationReason:
-            lastStatus === 'published'
-              ? null
-              : await readAuthorStateReason(request, apiBaseUrl, userId, postId),
-          engineVersion: await readModerationEngineVersion(postId),
-        }
-      }
+  try {
+    await recurse(
+      async () => {
+        const { status, body } = await apiRequest<{ data: { status: string } }>({
+          method: 'GET',
+          path: `/api/v1/community/posts/${postId}`,
+          baseUrl: apiBaseUrl,
+          headers,
+          timeout: Math.max(1, deadline - Date.now()),
+          retryConfig: { maxRetries: 0 },
+        })
+        if (status === 200) lastStatus = body.data.status
+        return lastStatus
+      },
+      (status) => (COMMUNITY_TERMINAL_STATUSES as readonly string[]).includes(status),
+      { timeout: Math.max(1, deadline - Date.now()), interval: 500 }
+    )
+  } catch (error) {
+    if (!(error instanceof RecurseTimeoutError) && Date.now() < deadline) throw error
+    throw new Error(
+      `Post ${postId} never reached a terminal status; last observed "${lastStatus}". ` +
+        'A post stuck at pending_review usually means no community worker is consuming ' +
+        'the moderation queue, which the E2E launcher starts and waits on.',
+      { cause: error }
+    )
+  }
+
+  let moderationReason: string | null = null
+  if (lastStatus !== 'published') {
+    const { status, body } = await apiRequest<{
+      data: { authorStates: { id: string; moderationReason: string | null }[] }
+    }>({ method: 'GET', path: COMMUNITY_FEED_PATH, baseUrl: apiBaseUrl, headers })
+    if (status === 200) {
+      moderationReason =
+        body.data.authorStates.find((state) => state.id === postId)?.moderationReason ??
+        null
     }
-    await new Promise((resolve) => setTimeout(resolve, 500))
   }
-
-  throw new Error(
-    `Post ${postId} never reached a terminal status; last observed "${lastStatus}". ` +
-      'A post stuck at pending_review usually means no community worker is consuming ' +
-      'the moderation queue, which the E2E launcher starts and waits on.'
-  )
-}
-
-async function readAuthorStateReason(
-  request: APIRequestContext,
-  apiBaseUrl: string,
-  userId: string,
-  postId: string
-): Promise<string | null> {
-  const response = await request.get(`${apiBaseUrl}${COMMUNITY_FEED_PATH}`, {
-    headers: { ...authHeaders(userId, 'guardian'), 'x-couture-platform': 'web' },
-  })
-  if (response.status() !== 200) return null
-  const body = (await response.json()) as {
-    data: { authorStates: { id: string; moderationReason: string | null }[] }
+  return {
+    status: lastStatus,
+    moderationReason,
+    engineVersion: await readModerationEngineVersion(postId),
   }
-  return (
-    body.data.authorStates.find((state) => state.id === postId)?.moderationReason ?? null
-  )
 }
 
 async function readModerationEngineVersion(postId: string): Promise<string | null> {

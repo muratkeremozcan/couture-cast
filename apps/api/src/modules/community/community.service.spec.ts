@@ -8,7 +8,7 @@ import {
   NotFoundException,
   ServiceUnavailableException,
 } from '@nestjs/common'
-import { afterEach, describe, expect, it, vi } from 'vitest'
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import {
   communityCardOpenedEventSchema,
   communityFeedViewedEventSchema,
@@ -69,6 +69,8 @@ const TELEMETRY_VALIDATORS: Record<string, { parse: (value: unknown) => unknown 
     .omit({ analyticsSubjectId: true })
     .strict(),
 }
+
+const SERVICE_REFERENCE_TIME = new Date('2026-09-05T12:00:00.000Z')
 
 describe('CommunityService', () => {
   const viewerUserId = 'user-viewer-1'
@@ -370,7 +372,7 @@ describe('CommunityService', () => {
     const createUploadSession = vi.fn().mockResolvedValue({
       uploadUrl: 'https://storage.local/upload/url',
       uploadToken: 'upload-token-123',
-      expiresAt: new Date(Date.now() + 900000).toISOString(),
+      expiresAt: new Date(SERVICE_REFERENCE_TIME.getTime() + 900_000).toISOString(),
     })
     const storage = {
       signReadUrl: vi.fn(),
@@ -796,6 +798,7 @@ describe('CommunityService', () => {
   })
 
   describe('signed image URLs', () => {
+    beforeEach(() => vi.setSystemTime(SERVICE_REFERENCE_TIME))
     it('signs each section in one call with a matching expiresAt', async () => {
       const { service, signReadUrls } = createService()
       const result = await service.getFeed({ userId: viewerUserId, platform: 'web' })
@@ -809,8 +812,7 @@ describe('CommunityService', () => {
       )
 
       const expiryDate = new Date(result.items[0]!.imageAccess.expiresAt)
-      expect(expiryDate.getTime()).toBeGreaterThan(Date.now() + 890 * 1000)
-      expect(expiryDate.getTime()).toBeLessThanOrEqual(Date.now() + 910 * 1000)
+      expect(expiryDate.toISOString()).toBe('2026-09-05T12:15:00.000Z')
     })
   })
 
@@ -1279,6 +1281,7 @@ describe('CommunityService', () => {
   })
 
   describe('publishPost', () => {
+    beforeEach(() => vi.setSystemTime(SERVICE_REFERENCE_TIME))
     const draftPost = {
       ...ownPendingPost,
       id: 'post-draft-1',
@@ -1286,7 +1289,7 @@ describe('CommunityService', () => {
       alt_text: null,
       caption: null,
       image_object_path: 'community/post-draft-1/session-abc.jpg',
-      upload_expires_at: new Date(Date.now() + 600_000),
+      upload_expires_at: new Date(SERVICE_REFERENCE_TIME.getTime() + 600_000),
     }
 
     const validPublishInput = {
@@ -1328,14 +1331,25 @@ describe('CommunityService', () => {
       ).rejects.toThrow(ConflictException)
     })
 
-    it('throws ConflictException when the upload window has already closed', async () => {
+    it('throws ConflictException one millisecond after the upload expiry boundary', async () => {
       const { service, findPostById } = createService()
       findPostById.mockResolvedValueOnce({
         ...draftPost,
-        upload_expires_at: new Date(Date.now() - 1000),
+        upload_expires_at: new Date(SERVICE_REFERENCE_TIME.getTime() - 1),
       })
 
       await expect(publish(service)).rejects.toThrow(ConflictException)
+    })
+
+    it('accepts the upload at its exact expiry boundary', async () => {
+      const { service, findPostById, publishWithinQuota } = createService()
+      findPostById.mockResolvedValueOnce({
+        ...draftPost,
+        upload_expires_at: SERVICE_REFERENCE_TIME,
+      })
+
+      await expect(publish(service)).resolves.toMatchObject({ id: 'post-draft-1' })
+      expect(publishWithinQuota).toHaveBeenCalledTimes(1)
     })
 
     it('rejects whitespace-only alt text', async () => {
@@ -2112,6 +2126,7 @@ describe('CommunityService', () => {
     })
   })
   describe('storage outages are told apart from missing content', () => {
+    beforeEach(() => vi.setSystemTime(SERVICE_REFERENCE_TIME))
     const draftPost = {
       ...ownPendingPost,
       id: 'post-draft-1',
@@ -2119,7 +2134,7 @@ describe('CommunityService', () => {
       alt_text: null,
       caption: null,
       image_object_path: 'community/post-draft-1/session-abc.jpg' as string | null,
-      upload_expires_at: new Date(Date.now() + 600_000),
+      upload_expires_at: new Date(SERVICE_REFERENCE_TIME.getTime() + 600_000),
     }
 
     const publishInput = {

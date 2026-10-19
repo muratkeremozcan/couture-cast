@@ -548,6 +548,7 @@ const createService = (prisma = new InMemoryGuardianPrisma()) => {
   }
 }
 
+const INVITATION_REFERENCE_TIME = new Date('2026-04-22T03:00:00.000Z')
 const INVITE_SECRET = 'test-guardian-secret'
 const DEVELOPMENT_INVITATION_SECRET = 'guardian-invite-development-secret'
 
@@ -612,7 +613,8 @@ const seedInvitation = (
     teen_id: options.teenId,
     guardian_email: options.guardianEmail,
     consent_level: options.consentLevel ?? 'read_only',
-    expires_at: options.expiresAt ?? new Date(Date.now() + 60_000),
+    expires_at:
+      options.expiresAt ?? new Date(INVITATION_REFERENCE_TIME.getTime() + 60_000),
     accepted_at: options.acceptedAt ?? null,
     accepted_guardian_id: null,
     created_at: new Date(),
@@ -644,8 +646,8 @@ const buildInvitationTokenPayload = (overrides: Record<string, unknown> = {}) =>
   guardianEmail: 'guardian.seeded@example.com',
   consentLevel: 'read_only',
   type: 'guardian_invitation',
-  iat: Math.floor(Date.now() / 1000),
-  exp: Math.floor((Date.now() + 60_000) / 1000),
+  iat: Math.floor(INVITATION_REFERENCE_TIME.getTime() / 1000),
+  exp: Math.floor((INVITATION_REFERENCE_TIME.getTime() + 60_000) / 1000),
   ...overrides,
 })
 
@@ -701,6 +703,7 @@ describe('GuardianService', () => {
   })
 
   it('creates guardian invitations for teens awaiting consent and queues an email event', async () => {
+    vi.setSystemTime(INVITATION_REFERENCE_TIME)
     const teen = createTeenProfileFixture({
       id: 'teen-pending',
       email: 'teen.pending@example.com',
@@ -746,6 +749,7 @@ describe('GuardianService', () => {
   })
 
   it('rejects guardian invitations for teens that are not awaiting guardian consent', async () => {
+    vi.setSystemTime(INVITATION_REFERENCE_TIME)
     const teen = createTeenProfileFixture({
       id: 'teen-active',
       email: 'teen.active@example.com',
@@ -772,6 +776,7 @@ describe('GuardianService', () => {
   })
 
   it('accepts invitations, links or creates the guardian account, and records consent', async () => {
+    vi.setSystemTime(INVITATION_REFERENCE_TIME)
     const teen = createTeenProfileFixture({
       id: 'teen-consent',
       email: 'teen.consent@example.com',
@@ -846,6 +851,7 @@ describe('GuardianService', () => {
   })
 
   it('rejects invitations that were already accepted', async () => {
+    vi.setSystemTime(INVITATION_REFERENCE_TIME)
     const teen = createTeenProfileFixture({
       id: 'teen-replay',
       email: 'teen.replay@example.com',
@@ -1498,6 +1504,7 @@ describe('GuardianService', () => {
   })
 
   describe('guardian invitation email template', () => {
+    beforeEach(() => vi.setSystemTime(INVITATION_REFERENCE_TIME))
     it('escapes HTML metacharacters so account emails cannot inject markup', () => {
       // The invitation email is sent to an address the teen supplies, so every
       // interpolated value is attacker-influenced and must be escaped.
@@ -1522,6 +1529,7 @@ describe('GuardianService', () => {
   })
 
   describe('invitation link base URL resolution', () => {
+    beforeEach(() => vi.setSystemTime(INVITATION_REFERENCE_TIME))
     const inviteAndReadLink = async () => {
       const { prisma, service } = createService()
       seedUser(prisma, { id: 'teen-base-url', email: 'teen.baseurl@example.com' })
@@ -1568,6 +1576,7 @@ describe('GuardianService', () => {
   })
 
   describe('invitation signing secret resolution', () => {
+    beforeEach(() => vi.setSystemTime(INVITATION_REFERENCE_TIME))
     const issueTokenAndReadSignature = async () => {
       const { prisma, service } = createService()
       seedUser(prisma, { id: 'teen-secret', email: 'teen.secret@example.com' })
@@ -1632,6 +1641,7 @@ describe('GuardianService', () => {
   })
 
   describe('inviteGuardian refusals', () => {
+    beforeEach(() => vi.setSystemTime(INVITATION_REFERENCE_TIME))
     it('rejects invitations for an unknown teen account', async () => {
       const { prisma, service } = createService()
 
@@ -1681,6 +1691,7 @@ describe('GuardianService', () => {
   })
 
   describe('acceptInvitation token verification', () => {
+    beforeEach(() => vi.setSystemTime(INVITATION_REFERENCE_TIME))
     const acceptWith = (token: string) => {
       const { service } = createService()
       return service.acceptInvitation(token)
@@ -1721,10 +1732,10 @@ describe('GuardianService', () => {
       await expect(acceptWith(token)).rejects.toThrow(/invalid/)
     })
 
-    it('rejects a token whose expiry has already passed', async () => {
+    it('rejects a token at its exact expiry boundary', async () => {
       const token = signInvitationToken(
         buildInvitationTokenPayload({
-          exp: Math.floor((Date.now() - 60_000) / 1000),
+          exp: Math.floor(INVITATION_REFERENCE_TIME.getTime() / 1000),
         })
       )
 
@@ -1733,6 +1744,7 @@ describe('GuardianService', () => {
   })
 
   describe('acceptInvitation refusals', () => {
+    beforeEach(() => vi.setSystemTime(INVITATION_REFERENCE_TIME))
     it('rejects a token that references an invitation which no longer exists', async () => {
       const { service } = createService()
       const token = signInvitationToken(
@@ -1744,13 +1756,13 @@ describe('GuardianService', () => {
       )
     })
 
-    it('rejects an invitation whose stored expiry has lapsed even if the token has not', async () => {
+    it('rejects an invitation at its stored expiry boundary while the token remains valid', async () => {
       const { prisma, service } = createService()
       seedUser(prisma, { id: 'teen-seeded', email: 'teen.seeded@example.com' })
       seedInvitation(prisma, {
         teenId: 'teen-seeded',
         guardianEmail: 'guardian.seeded@example.com',
-        expiresAt: new Date(Date.now() - 1_000),
+        expiresAt: INVITATION_REFERENCE_TIME,
       })
 
       await expect(
@@ -1841,6 +1853,22 @@ describe('GuardianService', () => {
   })
 
   describe('acceptInvitation edge paths', () => {
+    beforeEach(() => vi.setSystemTime(INVITATION_REFERENCE_TIME))
+    it('accepts one millisecond before the stored invitation expires', async () => {
+      const { prisma, service } = createService()
+      seedUser(prisma, { id: 'teen-seeded', email: 'teen.seeded@example.com' })
+      seedInvitation(prisma, {
+        teenId: 'teen-seeded',
+        guardianEmail: 'guardian.seeded@example.com',
+        expiresAt: new Date(INVITATION_REFERENCE_TIME.getTime() + 1),
+      })
+
+      await expect(
+        service.acceptInvitation(signInvitationToken(buildInvitationTokenPayload()))
+      ).resolves.toMatchObject({ teenId: 'teen-seeded' })
+      expect(prisma.consents.size).toBe(1)
+    })
+
     it('records consent for a teen that has no profile row yet', async () => {
       const { prisma, service } = createService()
       seedUser(prisma, {

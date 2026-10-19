@@ -13,12 +13,22 @@ import {
 } from '@couture/api-client/contracts/http'
 import { PostHogService } from '../src/posthog/posthog.service.js'
 import { PrismaClient } from '@prisma/client'
-import { afterAll, beforeAll, describe, expect, it, vi } from 'vitest'
+import {
+  afterAll,
+  afterEach,
+  beforeAll,
+  beforeEach,
+  describe,
+  expect,
+  it,
+  vi,
+} from 'vitest'
 import { buildLookbookPostCreateInput, createLookbookPost } from '@couture/testing'
 import { CommunityRepository } from '../src/modules/community/community.repository.js'
 import { CommunityReactionOutboxDispatcher } from '../src/modules/community/community-reaction.outbox.js'
 import { GuardianService } from '../src/modules/guardian/guardian.service.js'
 import { TelemetryService } from '../src/modules/telemetry/telemetry.service.js'
+import { isolatedCommunityDatabase } from './helpers/isolated-community-database.js'
 
 vi.mock('../src/workers/base.worker.js', () => ({
   defaultWorkerOptions: () => ({}),
@@ -37,12 +47,11 @@ vi.mock('../src/modules/community/community-moderation.outbox.js', () => ({
   },
 }))
 
+const database = isolatedCommunityDatabase()
 const prisma = new PrismaClient({
   datasources: {
     db: {
-      url:
-        process.env.INTEGRATION_TEST_DATABASE_URL ??
-        'postgresql://postgres:postgres@127.0.0.1:54322/postgres',
+      url: database.url,
     },
   },
 })
@@ -58,8 +67,8 @@ const input = (
   selection: SetCommunityReactionInput['selection'],
   baseRevision = 0
 ): SetCommunityReactionInput => ({ selection, baseRevision, mutationId: randomUUID() })
-async function fixture(birthdate = '1990-01-01T00:00:00Z') {
-  const user = await prisma.user.create({
+async function fixture(birthdate = '1990-01-01T00:00:00Z', client = prisma) {
+  const user = await client.user.create({
     data: {
       email: `${namespace}-${randomUUID()}@synthetic.test`,
       profile: {
@@ -70,7 +79,7 @@ async function fixture(birthdate = '1990-01-01T00:00:00Z') {
       },
     },
   })
-  const post = await prisma.lookbookPost.create({
+  const post = await client.lookbookPost.create({
     data: buildLookbookPostCreateInput(
       createLookbookPost({
         id: `${namespace}-${randomUUID()}`,
@@ -96,26 +105,22 @@ function mutate(userId: string, postId: string, intent: SetCommunityReactionInpu
   })
 }
 beforeAll(async () => {
+  await database.migrate()
   await prisma.$queryRaw`SELECT 1 FROM "CommunityReaction" LIMIT 1`
+}, 30_000)
+beforeEach(async () => {
+  // This connection belongs to this file's disposable database. Each delivery
+  // scenario starts with its own backlog, independent of preceding reactions.
+  await prisma.communityReactionOutbox.deleteMany()
 })
+afterEach(() => vi.restoreAllMocks())
 afterAll(async () => {
-  const users = { email: { startsWith: namespace } }
-  await prisma.guardianConsent.deleteMany({ where: { teen: users } })
-  await prisma.lookbookPost.deleteMany({ where: { user: users } })
-  await prisma.userProfile.deleteMany({ where: { user: users } })
-  const pinned = await prisma.auditLog.findMany({
-    where: { user: users },
-    select: { user_id: true },
-  })
-  await prisma.user.deleteMany({
-    where: {
-      ...users,
-      id: {
-        notIn: pinned.map((row) => row.user_id).filter((id): id is string => id !== null),
-      },
-    },
-  })
-  await prisma.$disconnect()
+  try {
+    await prisma.$disconnect()
+  } finally {
+    // Database disposal also removes immutable guardian audit records on failure.
+    await database.drop()
+  }
 })
 
 describe('Story 6.3 durable reaction semantics', () => {
@@ -689,8 +694,11 @@ describe('Story 6.3 durable reaction semantics', () => {
 
   it('caps indexed retention batches and continues cleanup while delivery exhausts each sweep', async () => {
     const { userId, postId } = await fixture()
-    const expired = new Date(Date.now() - 31 * 24 * 60 * 60 * 1000)
-    const cutoff = new Date(Date.now() - 30 * 24 * 60 * 60 * 1000)
+    const [clock] = await prisma.$queryRaw<{ now: Date }[]>`SELECT now()`
+    let sweepNow = clock!.now.getTime()
+    vi.spyOn(Date, 'now').mockImplementation(() => sweepNow)
+    const expired = new Date(sweepNow - 31 * 24 * 60 * 60 * 1000)
+    const cutoff = new Date(sweepNow - 30 * 24 * 60 * 60 * 1000)
     await prisma.communityReactionReceipt.createMany({
       data: Array.from({ length: 205 }, () => ({
         user_id: userId,
@@ -712,10 +720,6 @@ describe('Story 6.3 durable reaction semantics', () => {
         delivered_at: expired,
       })),
     })
-    await prisma.communityReactionOutbox.updateMany({
-      where: { delivered_at: null },
-      data: { next_attempt_at: new Date(Date.now() + 60_000) },
-    })
     const dueIds = Array.from({ length: 4 }, () => randomUUID())
     await prisma.communityReactionOutbox.createMany({
       data: dueIds.map((id) => ({
@@ -728,8 +732,9 @@ describe('Story 6.3 durable reaction semantics', () => {
         next_attempt_at: new Date(0),
       })),
     })
-    const captureReactionEvent = vi.fn(async () => {
-      await new Promise((resolve) => setTimeout(resolve, 1050))
+    const captureReactionEvent = vi.fn(() => {
+      sweepNow += 1050
+      return Promise.resolve()
     })
     const dispatcher = new CommunityReactionOutboxDispatcher(prisma, {
       captureReactionEvent,
@@ -783,11 +788,6 @@ describe('Story 6.3 durable reaction semantics', () => {
     const row = await prisma.communityReactionOutbox.findFirstOrThrow({
       where: { post_id: postId },
     })
-    // Move unrelated test work out of this sweep without changing its delivery state.
-    await prisma.communityReactionOutbox.updateMany({
-      where: { id: { not: row.id }, delivered_at: null },
-      data: { next_attempt_at: new Date(Date.now() + 60_000) },
-    })
     await mutate(userId, postId, input('applause', 1))
     const second = await prisma.communityReactionOutbox.findFirstOrThrow({
       where: { post_id: postId, id: { not: row.id } },
@@ -800,10 +800,7 @@ describe('Story 6.3 durable reaction semantics', () => {
       where: { id: second.id },
       data: { next_attempt_at: new Date(1) },
     })
-    const url = new URL(
-      process.env.INTEGRATION_TEST_DATABASE_URL ??
-        'postgresql://postgres:postgres@127.0.0.1:54322/postgres'
-    )
+    const url = new URL(database.url)
     url.searchParams.set('connection_limit', '1')
     url.searchParams.set('pool_timeout', '1')
     const single = new PrismaClient({ datasources: { db: { url: url.toString() } } })
@@ -824,12 +821,15 @@ describe('Story 6.3 durable reaction semantics', () => {
       single,
       new TelemetryService(single, { capture: vi.fn(), captureAcknowledged: capture })
     )
+    const [clock] = await single.$queryRaw<{ now: Date }[]>`SELECT now()`
+    let sweepNow = clock!.now.getTime()
+    vi.spyOn(Date, 'now').mockImplementation(() => sweepNow)
     const dispatch = dispatcher.dispatchPending()
     try {
       await started
       // The telemetry upsert and this read must both acquire the sole connection.
       expect(await single.telemetryEvent.count({ where: { id: row.id } })).toBe(1)
-      await new Promise((resolve) => setTimeout(resolve, 1100))
+      sweepNow += 1100
       release()
       await dispatch
       expect(capture).toHaveBeenCalledTimes(1)
@@ -845,7 +845,8 @@ describe('Story 6.3 durable reaction semantics', () => {
         where: { id: row.id },
         data: {
           lease_id: randomUUID(),
-          lease_expires_at: new Date(Date.now() - 1),
+          // SQL clock and eligibility share the actual database timestamp.
+          lease_expires_at: new Date(clock!.now.getTime() - 1),
           next_attempt_at: new Date(0),
         },
       })

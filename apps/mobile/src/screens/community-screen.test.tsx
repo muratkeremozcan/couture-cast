@@ -4,13 +4,13 @@ vi.mock('expo-haptics', () => ({ selectionAsync: vi.fn().mockResolvedValue(undef
 // Story 6.1 Task 8 owner: the mobile community feed screen and its HTTP client.
 //
 // The network boundary stays REAL and is driven through MSW; `@/src/lib/community` is
-// deliberately not mocked. Three of the states here are reachable only through a
+// kept live through passthrough spies. Three of the states here are reachable only through a
 // rejected request (401, 409 already-reported, 429 with Retry-After), and the first
 // draft of this screen rendered `error.message` straight from the SDK, so a 429, a 409
 // and a 500 all read as "Response returned an error code". A mocked client proves none
 // of that.
 //
-// Only native modules are mocked. `src/lib/community.ts` imports `expo-image-picker`,
+// Native modules use test doubles; community client spies call the real HTTP path. `src/lib/community.ts` imports `expo-image-picker`,
 // `expo-image-manipulator`, `expo-file-system` and `expo-crypto` LAZILY because they
 // pull in `expo-modules-core`, which cannot be evaluated in a browser bundle.
 //
@@ -23,10 +23,21 @@ vi.mock('expo-haptics', () => ({ selectionAsync: vi.fn().mockResolvedValue(undef
  * every sibling screen suite awaits them so the call sites read the same way.
  */
 /* eslint-disable @typescript-eslint/await-thenable */
-import React from 'react'
+import React, { createElement } from 'react'
+import { CommunityReactionState } from '@couture/api-client'
+import * as communityClient from '@/src/lib/community'
+// Passthrough spies observe completed real HTTP promises for discarded responses.
+vi.mock('@/src/lib/community', { spy: true })
 import { Buffer } from 'buffer'
 import type * as ReactNativeModule from 'react-native'
-import { configure, fireEvent, screen, waitFor } from '@testing-library/react'
+import {
+  act,
+  configure,
+  fireEvent,
+  screen,
+  waitFor,
+  within,
+} from '@testing-library/react'
 import { delay, http, HttpResponse } from 'msw'
 import { cleanup, render } from 'vitest-browser-react'
 import {
@@ -119,10 +130,23 @@ vi.mock('expo-crypto', () => ({
  * restore only runs off web, and react-native-web's own `findNodeHandle` throws
  * unconditionally. Same shape as `wardrobe/capsule-builder-modal.test.tsx`.
  */
+// Match the established CommunityCard harness: retain the real RNW Image and
+// record its native onError prop, which a DOM error event cannot reach.
+const imageEvents = vi.hoisted(() => ({
+  errors: new Map<string, () => void>(),
+  createElement: null as unknown as typeof React.createElement,
+}))
 vi.mock('react-native', async (importOriginal) => {
   const actual = await importOriginal<typeof ReactNativeModule>()
+  function RecordingImage(props: Record<string, unknown>) {
+    if (typeof props.testID === 'string' && typeof props.onError === 'function') {
+      imageEvents.errors.set(props.testID, props.onError as () => void)
+    }
+    return imageEvents.createElement(actual.Image as never, props)
+  }
   return {
     ...actual,
+    Image: RecordingImage,
     AccessibilityInfo: {
       ...actual.AccessibilityInfo,
       announceForAccessibility: vi.fn(),
@@ -132,6 +156,8 @@ vi.mock('react-native', async (importOriginal) => {
     Platform: { ...actual.Platform, OS: 'web' },
   }
 })
+
+imageEvents.createElement = createElement
 
 import { AccessibilityInfo, Platform, findNodeHandle } from 'react-native'
 import { CommunityScreen } from '@/src/features/community/community-screen'
@@ -158,6 +184,11 @@ const PIXEL =
   'data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mP8z8BQDwAEhQGAhKmMIQAAAABJRU5ErkJggg=='
 
 const SDK_ERROR_MESSAGE = 'Response returned an error code'
+
+const IMAGE_REFERENCE_NOW = Date.parse('2026-10-19T12:00:00.000Z')
+beforeEach(() => {
+  vi.spyOn(Date, 'now').mockReturnValue(IMAGE_REFERENCE_NOW)
+})
 
 function imageAccess(expiresInMs = 3_600_000) {
   return { url: PIXEL, expiresAt: new Date(Date.now() + expiresInMs).toISOString() }
@@ -327,6 +358,7 @@ describe('Mobile community screen (Story 6.1)', () => {
 
   beforeEach(() => {
     mockParams = {}
+    imageEvents.errors.clear()
     feedUrls = []
     restoreAccessTokenResolver = setMobileAccessTokenResolver(() => 'session-token')
     imagePicker.requestMediaLibraryPermissionsAsync.mockResolvedValue({ granted: true })
@@ -441,7 +473,7 @@ describe('Mobile community screen (Story 6.1)', () => {
     )
 
     // The notice is advisory, so the tab has to stay usable once it is dismissed.
-    fireEvent.click(screen.getByLabelText('Dismiss banner'))
+    await browserUser.click(screen.getByLabelText('Dismiss banner'))
     await waitFor(() => expect(screen.queryByTestId('deep-link-info-banner')).toBeNull())
     expect(screen.getByTestId('community-screen')).toBeTruthy()
   })
@@ -1322,34 +1354,56 @@ describe('Mobile community screen (Story 6.1)', () => {
 
   // --- Image expiry ---------------------------------------------------------
 
-  it('6.1-MOB-022 bounds the signed-URL refetch and then says the image is unavailable', async () => {
-    // Every response carries an already-expired URL, which is what turned the
-    // first draft's expiry effect into an unbounded refetch loop.
+  it('6.1-MOB-022 bounds the signed-URL refetch at the expiry boundary and then says the image is unavailable', async () => {
+    const expiresAt = IMAGE_REFERENCE_NOW + 60_000
+    let expireImage: (() => void) | undefined
+    const schedule = globalThis.setTimeout.bind(globalThis)
+    const timer = vi
+      .spyOn(globalThis, 'setTimeout')
+      .mockImplementation((callback, ms, ...args: unknown[]) => {
+        if (ms === 60_000 && typeof callback === 'function') {
+          // Capture only the image deadline. Transport, React and retry backoff
+          // retain their real timers, so no service-worker I/O is frozen.
+          expireImage = () => callback(...args)
+        }
+        return schedule(callback, ms, ...args)
+      })
     serveFeed(() =>
       HttpResponse.json({
-        data: feed({ items: [item({ imageAccess: imageAccess(-1000) })] }),
+        data: feed({
+          items: [
+            item({
+              imageAccess: { url: PIXEL, expiresAt: new Date(expiresAt).toISOString() },
+            }),
+          ],
+        }),
       })
     )
-
-    await render(<CommunityScreen />)
-
-    await screen.findByTestId('community-post-card-post-a')
-    const afterFirstPage = feedUrls.length
-
-    await screen.findByTestId('community-card-image-unavailable-post-a', undefined, {
-      timeout: 10_000,
-    })
-    expect(screen.getByTestId('community-card-image-retry-post-a')).toBeTruthy()
-    expect(
-      screen.getByTestId('community-card-image-unavailable-post-a').textContent
-    ).toContain(enUS.community.card.imageUnavailable)
-
-    // Exactly the capped two refreshes, and then it stops: the first draft's
-    // effect re-armed on every refetch and refreshed forever.
-    expect(feedUrls.length - afterFirstPage).toBe(2)
-    const settled = feedUrls.length
-    await delay(500)
-    expect(feedUrls).toHaveLength(settled)
+    try {
+      await render(<CommunityScreen />)
+      await screen.findByTestId('community-post-card-post-a')
+      await waitFor(() => expect(expireImage).toBeTypeOf('function'))
+      expect(feedUrls).toHaveLength(1)
+      expect(screen.queryByTestId('community-card-image-unavailable-post-a')).toBeNull()
+      // Move exactly to the captured expiry deadline and fire its real callback.
+      await act(async () => {
+        vi.mocked(Date.now).mockReturnValue(expiresAt)
+        expireImage!()
+        await Promise.resolve()
+      })
+      await screen.findByTestId('community-card-image-unavailable-post-a', undefined, {
+        timeout: 10_000,
+      })
+      expect(screen.getByTestId('community-card-image-retry-post-a')).toBeTruthy()
+      expect(
+        screen.getByTestId('community-card-image-unavailable-post-a').textContent
+      ).toContain(enUS.community.card.imageUnavailable)
+      expect(feedUrls).toHaveLength(3)
+      expect(Date.now()).toBe(expiresAt)
+    } finally {
+      timer.mockRestore()
+      vi.mocked(Date.now).mockReturnValue(IMAGE_REFERENCE_NOW)
+    }
   }, 20_000)
   it('6.3-MOB-001 adds, replaces and retracts with independently focusable labeled controls', async () => {
     let summary: CommunityReactionSummary = {
@@ -1405,6 +1459,26 @@ describe('Mobile community screen (Story 6.1)', () => {
     })
     return { promise, release }
   }
+  function racePalette() {
+    const controls = screen.getByTestId('community-reactions-post-a')
+    return {
+      buttons: within(controls)
+        .getAllByRole('button')
+        .map((button) => ({
+          label: button.getAttribute('aria-label'),
+          pressed: button.getAttribute('aria-pressed'),
+        })),
+      total: screen.getByTestId('community-reaction-total-post-a').textContent,
+    }
+  }
+  const confirmedPalette = {
+    buttons: [
+      { label: 'Applaud, 1', pressed: 'true' },
+      { label: 'Love, 0', pressed: 'false' },
+      { label: 'Inspired, 0', pressed: 'false' },
+    ],
+    total: '1 reaction',
+  }
   const raceZero: CommunityReactionSummary = {
     counts: { applause: 0, love: 0, inspiration: 0 },
     total: 0,
@@ -1423,7 +1497,6 @@ describe('Mobile community screen (Story 6.1)', () => {
     mockParams = { source: 'notification', type: 'community', cardId: 'post-a' }
     const gate = raceDeferred()
     let detailSent = false
-    let returned = false
     serveFeed(() =>
       HttpResponse.json({ data: feed({ items: [{ ...item(), reactions: raceZero }] }) })
     )
@@ -1431,31 +1504,36 @@ describe('Mobile community screen (Story 6.1)', () => {
       http.get('*/api/v1/community/posts/:postId', async () => {
         detailSent = true
         await gate.promise
-        returned = true
-        return HttpResponse.json({ data: { ...item(), reactions: raceZero } })
+        return HttpResponse.json({
+          data: {
+            ...item(),
+            caption: 'Older native detail completed.',
+            reactions: raceZero,
+          },
+        })
       }),
       http.put('*/api/v1/community/posts/:postId/reaction', () =>
         HttpResponse.json({ data: raceOne })
       )
     )
-    await render(<CommunityScreen />)
-    const button = await screen.findByRole('button', { name: 'Applaud, 0' })
-    await waitFor(() => expect(detailSent).toBe(true))
-    await browserUser.click(button)
-    await screen.findByRole('button', { name: 'Applaud, 1' })
-    gate.release()
-    await waitFor(() => expect(returned).toBe(true))
-    await screen.findByTestId('highlighted-community-card-post-a')
-    await delay(80)
-    expect(
-      screen.getByRole('button', { name: 'Applaud, 1' }).getAttribute('aria-pressed')
-    ).toBe('true')
+    try {
+      await render(<CommunityScreen />)
+      const button = await screen.findByRole('button', { name: 'Applaud, 0' })
+      await waitFor(() => expect(detailSent).toBe(true))
+      await browserUser.click(button)
+      await screen.findByRole('button', { name: 'Applaud, 1' })
+      gate.release()
+      await screen.findByText('Older native detail completed.')
+      expect(racePalette()).toEqual(confirmedPalette)
+    } finally {
+      gate.release()
+    }
   })
   it('6.3-MOB delayed detail cannot resurrect a mutation 404', async () => {
     mockParams = { source: 'notification', type: 'community', cardId: 'post-a' }
     const gate = raceDeferred()
+    const read = vi.spyOn(CommunityReactionState.prototype, 'read')
     let detailSent = false
-    let returned = false
     serveFeed(() =>
       HttpResponse.json({ data: feed({ items: [{ ...item(), reactions: raceZero }] }) })
     )
@@ -1463,24 +1541,45 @@ describe('Mobile community screen (Story 6.1)', () => {
       http.get('*/api/v1/community/posts/:postId', async () => {
         detailSent = true
         await gate.promise
-        returned = true
-        return HttpResponse.json({ data: { ...item(), reactions: raceZero } })
+        return HttpResponse.json({
+          data: {
+            ...item(),
+            caption: 'Fenced native detail completed.',
+            reactions: raceZero,
+          },
+        })
       }),
       http.put('*/api/v1/community/posts/:postId/reaction', () =>
         errorEnvelope(404, 'Community post not found.')
       )
     )
-    await render(<CommunityScreen />)
-    const button = await screen.findByRole('button', { name: 'Applaud, 0' })
-    await waitFor(() => expect(detailSent).toBe(true))
-    await browserUser.click(button)
-    await waitFor(() =>
+    try {
+      await render(<CommunityScreen />)
+      const button = await screen.findByRole('button', { name: 'Applaud, 0' })
+      await waitFor(() => expect(detailSent).toBe(true))
+      await browserUser.click(button)
+      await waitFor(() =>
+        expect(screen.queryByTestId('community-post-card-post-a')).toBeNull()
+      )
+      gate.release()
+      // A fenced detail intentionally creates no UI. Observe its arrival at
+      // the real coordinator and flush React before the negative assertion.
+      await waitFor(() =>
+        expect(read).toHaveBeenCalledWith(
+          expect.objectContaining({ caption: 'Fenced native detail completed.' }),
+          expect.any(Number)
+        )
+      )
+      await act(async () => {
+        await Promise.resolve()
+      })
       expect(screen.queryByTestId('community-post-card-post-a')).toBeNull()
-    )
-    gate.release()
-    await waitFor(() => expect(returned).toBe(true))
-    await delay(80)
-    expect(screen.queryByTestId('community-post-card-post-a')).toBeNull()
+      expect(screen.queryByTestId('highlighted-community-card-post-a')).toBeNull()
+      expect(screen.queryByText('Fenced native detail completed.')).toBeNull()
+    } finally {
+      gate.release()
+      read.mockRestore()
+    }
   })
   it('6.3-MOB refreshed feed summary updates highlighted deep-link copy', async () => {
     mockParams = { source: 'notification', type: 'community', cardId: 'post-a' }
@@ -1501,22 +1600,25 @@ describe('Mobile community screen (Story 6.1)', () => {
     await screen.findByTestId('highlighted-community-card-post-a')
     await browserUser.click(screen.getByTestId('community-filter-chip-all'))
     await waitFor(() => expect(feedUrls).toHaveLength(2))
-    await delay(100)
-    expect(
-      screen.getByRole('button', { name: 'Applaud, 1' }).getAttribute('aria-pressed')
-    ).toBe('true')
+    await screen.findByRole('button', { name: 'Applaud, 1' })
+    expect(racePalette()).toEqual(confirmedPalette)
   })
   it('6.3-MOB filter unmount retains accepted in-flight mutation result', async () => {
     const gate = raceDeferred()
     const feedGate = raceDeferred()
     let sent = false
-    let returned = false
     serveFeed(async (_url, index) => {
       if (index) await feedGate.promise
       return HttpResponse.json({
         data: feed({
           mode: index ? 'all' : 'auto',
-          items: [{ ...item(), reactions: raceZero }],
+          items: [
+            {
+              ...item(),
+              caption: index ? 'Remounted native feed completed.' : item().caption,
+              reactions: raceZero,
+            },
+          ],
         }),
       })
     })
@@ -1524,27 +1626,33 @@ describe('Mobile community screen (Story 6.1)', () => {
       http.put('*/api/v1/community/posts/:postId/reaction', async () => {
         sent = true
         await gate.promise
-        returned = true
         return HttpResponse.json({ data: raceOne })
       })
     )
-    await render(<CommunityScreen />)
-    await browserUser.click(await screen.findByRole('button', { name: 'Applaud, 0' }))
-    await waitFor(() => expect(sent).toBe(true))
-    await browserUser.click(screen.getByTestId('community-filter-chip-all'))
-    await waitFor(() =>
-      expect(screen.queryByTestId('community-post-card-post-a')).toBeNull()
-    )
-    gate.release()
-    await waitFor(() => expect(returned).toBe(true))
-    await delay(80)
-    feedGate.release()
-    await screen.findByTestId('community-post-card-post-a')
-    expect(
-      screen.getByRole('button', { name: 'Applaud, 1' }).getAttribute('aria-pressed')
-    ).toBe('true')
+    try {
+      await render(<CommunityScreen />)
+      await browserUser.click(await screen.findByRole('button', { name: 'Applaud, 0' }))
+      await waitFor(() => expect(sent).toBe(true))
+      const mutation = vi.mocked(communityClient.setCommunityReactionFromMobile).mock
+        .results[0]!.value
+      await browserUser.click(screen.getByTestId('community-filter-chip-all'))
+      await waitFor(() =>
+        expect(screen.queryByTestId('community-post-card-post-a')).toBeNull()
+      )
+      // There are no mounted reaction controls during this filter load. Await
+      // the real client promise and flush its coordinator continuation first.
+      await act(async () => {
+        gate.release()
+        await mutation
+      })
+      feedGate.release()
+      await screen.findByText('Remounted native feed completed.')
+      expect(racePalette()).toEqual(confirmedPalette)
+    } finally {
+      gate.release()
+      feedGate.release()
+    }
   })
-
   it('6.3-MOB-021 retries a failed native PUT with the exact original payload', async () => {
     serveFeed(() =>
       HttpResponse.json({ data: feed({ items: [{ ...item(), reactions: raceZero }] }) })
@@ -1576,7 +1684,13 @@ describe('Mobile community screen (Story 6.1)', () => {
       return HttpResponse.json({
         data: feed({
           mode: index ? 'all' : 'auto',
-          items: [{ ...item(), reactions: raceZero }],
+          items: [
+            {
+              ...item(),
+              caption: index ? 'Older native feed completed.' : item().caption,
+              reactions: raceZero,
+            },
+          ],
         }),
       })
     })
@@ -1585,19 +1699,19 @@ describe('Mobile community screen (Story 6.1)', () => {
         HttpResponse.json({ data: raceOne })
       )
     )
-    await render(<CommunityScreen />)
-    await browserUser.click(await screen.findByRole('button', { name: 'Applaud, 0' }))
-    await screen.findByRole('button', { name: 'Applaud, 1' })
-    await browserUser.click(screen.getByTestId('community-filter-chip-all'))
-    await waitFor(() => expect(feedUrls).toHaveLength(2))
-    gate.release()
-    expect(
-      (await screen.findByRole('button', { name: 'Applaud, 1' })).getAttribute(
-        'aria-pressed'
-      )
-    ).toBe('true')
+    try {
+      await render(<CommunityScreen />)
+      await browserUser.click(await screen.findByRole('button', { name: 'Applaud, 0' }))
+      await screen.findByRole('button', { name: 'Applaud, 1' })
+      await browserUser.click(screen.getByTestId('community-filter-chip-all'))
+      await waitFor(() => expect(feedUrls).toHaveLength(2))
+      gate.release()
+      await screen.findByText('Older native feed completed.')
+      expect(racePalette()).toEqual(confirmedPalette)
+    } finally {
+      gate.release()
+    }
   })
-
   it('6.3-MOB-023 wraps controls on narrow cards with large text and counts', async () => {
     serveFeed(() =>
       HttpResponse.json({
@@ -1647,13 +1761,16 @@ describe('Mobile community screen (Story 6.1)', () => {
         return hidden
           ? errorEnvelope(404, 'Community post not found.')
           : HttpResponse.json({
-              data: { ...item({ imageAccess: imageAccess(250) }), reactions: raceZero },
+              data: { ...item(), reactions: raceZero },
             })
       })
     )
     await render(<CommunityScreen />)
     await screen.findByTestId('highlighted-community-card-post-a')
     hidden = true
+    act(() => {
+      imageEvents.errors.get('community-card-image-post-a')!()
+    })
     await waitFor(() => expect(detailReads).toBeGreaterThan(1))
     await waitFor(() =>
       expect(screen.queryByTestId('highlighted-community-card-post-a')).toBeNull()
@@ -1664,7 +1781,6 @@ describe('Mobile community screen (Story 6.1)', () => {
     mockParams = { source: 'notification', type: 'community', cardId: 'post-a' }
     const gate = raceDeferred()
     let reads = 0
-    let returned = false
     serveFeed((url, index) =>
       HttpResponse.json({
         data: feed({
@@ -1684,36 +1800,51 @@ describe('Mobile community screen (Story 6.1)', () => {
         reads += 1
         if (reads > 1) {
           await gate.promise
-          returned = true
         }
         return HttpResponse.json({
-          data: { ...item({ imageAccess: imageAccess(300) }), reactions: raceZero },
+          data: { ...item(), reactions: raceZero },
         })
       })
     )
-    await render(<CommunityScreen />)
-    await screen.findByTestId('highlighted-community-card-post-a')
-    await waitFor(() => expect(reads).toBe(2))
-    await browserUser.click(screen.getByTestId('community-filter-chip-all'))
-    await waitFor(() =>
+    try {
+      await render(<CommunityScreen />)
+      await screen.findByTestId('highlighted-community-card-post-a')
+      act(() => {
+        imageEvents.errors.get('community-card-image-post-a')!()
+      })
+      await waitFor(() => expect(reads).toBe(2))
+      const staleDetail = vi.mocked(communityClient.getCommunityPostFromMobile).mock
+        .results[1]!.value
+      // Attach before changing the filter, whose abort may reject this promise.
+      const staleSettled = Promise.allSettled([staleDetail])
+      await browserUser.click(screen.getByTestId('community-filter-chip-all'))
+      await waitFor(() =>
+        expect(
+          screen.getByTestId('community-filter-chip-all').getAttribute('aria-pressed')
+        ).toBe('true')
+      )
+      // The superseded request may already be aborted, so it has no visible
+      // completion. Await the real client's settlement and flush React.
+      await act(async () => {
+        gate.release()
+        await staleSettled
+      })
       expect(
         screen.getByTestId('community-filter-chip-all').getAttribute('aria-pressed')
       ).toBe('true')
-    )
-    gate.release()
-    await waitFor(() => expect(returned).toBe(true))
-    await delay(80)
-    expect(
-      screen.getByTestId('community-filter-chip-all').getAttribute('aria-pressed')
-    ).toBe('true')
-    await waitFor(() =>
+      await waitFor(() =>
+        expect(
+          feedUrls.some(
+            (url) => url.searchParams.get('cursor') === 'current-filter-cursor'
+          )
+        ).toBe(true)
+      )
       expect(
-        feedUrls.some((url) => url.searchParams.get('cursor') === 'current-filter-cursor')
-      ).toBe(true)
-    )
-    expect(
-      feedUrls.some((url) => url.searchParams.get('cursor') === 'stale-refresh-cursor')
-    ).toBe(false)
+        feedUrls.some((url) => url.searchParams.get('cursor') === 'stale-refresh-cursor')
+      ).toBe(false)
+    } finally {
+      gate.release()
+    }
   })
   it('6.3-MOB-025 an older feed cannot resurrect a post after a mutation 404', async () => {
     const gate = raceDeferred()
@@ -1721,7 +1852,19 @@ describe('Mobile community screen (Story 6.1)', () => {
     serveFeed(async (_url, index) => {
       if (index) await gate.promise
       return HttpResponse.json({
-        data: feed({ mode: index ? 'all' : 'auto', items: [first] }),
+        data: feed({
+          mode: index ? 'all' : 'auto',
+          items: index
+            ? [
+                first,
+                {
+                  ...first,
+                  id: 'native-feed-sentinel',
+                  caption: 'Fenced native feed completed.',
+                },
+              ]
+            : [first],
+        }),
       })
     })
     server.use(
@@ -1729,24 +1872,28 @@ describe('Mobile community screen (Story 6.1)', () => {
         errorEnvelope(404, 'Community post not found.')
       )
     )
-    await render(<CommunityScreen />)
-    // Keep an independently mounted highlighted copy while the list remounts for filtering.
-    mockParams = { source: 'notification', type: 'community', cardId: 'post-a' }
-    server.use(
-      http.get('*/api/v1/community/posts/:postId', () =>
-        HttpResponse.json({ data: first })
+    try {
+      await render(<CommunityScreen />)
+      // Keep an independently mounted highlighted copy while the list remounts for filtering.
+      mockParams = { source: 'notification', type: 'community', cardId: 'post-a' }
+      server.use(
+        http.get('*/api/v1/community/posts/:postId', () =>
+          HttpResponse.json({ data: first })
+        )
       )
-    )
-    await browserUser.click(await screen.findByTestId('community-filter-chip-all'))
-    await screen.findByTestId('highlighted-community-card-post-a')
-    await waitFor(() => expect(feedUrls).toHaveLength(2))
-    await browserUser.click(screen.getByRole('button', { name: 'Applaud, 0' }))
-    await waitFor(() =>
+      await browserUser.click(await screen.findByTestId('community-filter-chip-all'))
+      await screen.findByTestId('highlighted-community-card-post-a')
+      await waitFor(() => expect(feedUrls).toHaveLength(2))
+      await browserUser.click(screen.getByRole('button', { name: 'Applaud, 0' }))
+      await waitFor(() =>
+        expect(screen.queryByTestId('community-post-card-post-a')).toBeNull()
+      )
+      gate.release()
+      await screen.findByText('Fenced native feed completed.')
       expect(screen.queryByTestId('community-post-card-post-a')).toBeNull()
-    )
-    gate.release()
-    await delay(80)
-    expect(screen.queryByTestId('community-post-card-post-a')).toBeNull()
+    } finally {
+      gate.release()
+    }
   })
   it('6.3-MOB-026 shares pending ownership when detail replaces the feed card', async () => {
     mockParams = { source: 'notification', type: 'community', cardId: 'post-a' }
@@ -1767,24 +1914,29 @@ describe('Mobile community screen (Story 6.1)', () => {
         return HttpResponse.json({ data: raceOne })
       })
     )
-    await render(<CommunityScreen />)
-    await browserUser.click(await screen.findByRole('button', { name: 'Applaud, 0' }))
-    await waitFor(() => expect(requests).toHaveLength(1))
-    detail.release()
-    await screen.findByTestId('highlighted-community-card-post-a')
-    expect(
-      screen.getByRole('button', { name: 'Love, 0' }).getAttribute('aria-disabled')
-    ).toBe('true')
-    await browserUser.click(screen.getByRole('button', { name: 'Love, 0' }), {
-      force: true,
-    })
-    expect(requests).toHaveLength(1)
-    mutation.release()
-    expect(
-      (await screen.findByRole('button', { name: 'Applaud, 1' })).getAttribute(
-        'aria-pressed'
-      )
-    ).toBe('true')
+    try {
+      await render(<CommunityScreen />)
+      await browserUser.click(await screen.findByRole('button', { name: 'Applaud, 0' }))
+      await waitFor(() => expect(requests).toHaveLength(1))
+      detail.release()
+      await screen.findByTestId('highlighted-community-card-post-a')
+      expect(
+        screen.getByRole('button', { name: 'Love, 0' }).getAttribute('aria-disabled')
+      ).toBe('true')
+      await browserUser.click(screen.getByRole('button', { name: 'Love, 0' }), {
+        force: true,
+      })
+      expect(requests).toHaveLength(1)
+      mutation.release()
+      expect(
+        (await screen.findByRole('button', { name: 'Applaud, 1' })).getAttribute(
+          'aria-pressed'
+        )
+      ).toBe('true')
+    } finally {
+      detail.release()
+      mutation.release()
+    }
   })
 })
 

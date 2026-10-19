@@ -1,5 +1,5 @@
 // Learning path Step 38: Community feed by climate band.
-import { describe, expect, it, vi } from 'vitest'
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { Prisma, type PrismaClient } from '@prisma/client'
 import {
   CommunityChallengeWindowError,
@@ -395,6 +395,8 @@ describe('CommunityRepository', () => {
   })
 
   describe('publishWithinQuota', () => {
+    beforeEach(() => vi.setSystemTime(new Date('2026-09-05T12:00:00.000Z')))
+    afterEach(() => vi.useRealTimers())
     const publishData = {
       altText: 'A tailored trench over a cream knit',
       caption: 'Autumn commute',
@@ -453,7 +455,10 @@ describe('CommunityRepository', () => {
       })
 
       expect(lookbookPostFindMany).toHaveBeenCalledWith({
-        where: { user_id: viewerUserId, submitted_at: { gt: expect.any(Date) as Date } },
+        where: {
+          user_id: viewerUserId,
+          submitted_at: { gt: new Date('2026-09-04T12:00:00.000Z') },
+        },
         orderBy: { submitted_at: 'asc' },
         select: { submitted_at: true },
       })
@@ -478,8 +483,7 @@ describe('CommunityRepository', () => {
       expect(result.kind).toBe('rate_limited')
       if (result.kind === 'rate_limited') {
         // One hour left before the oldest submission leaves the 24-hour window.
-        expect(result.retryAfterSeconds).toBeGreaterThan(3_500)
-        expect(result.retryAfterSeconds).toBeLessThanOrEqual(3_600)
+        expect(result.retryAfterSeconds).toBe(3_600)
       }
       expect(lookbookPostUpdateMany).not.toHaveBeenCalled()
     })
@@ -640,6 +644,8 @@ describe('CommunityRepository', () => {
   })
 
   describe('recordReport', () => {
+    beforeEach(() => vi.setSystemTime(new Date('2026-09-05T12:00:00.000Z')))
+    afterEach(() => vi.useRealTimers())
     const lockedPublishedPost = [
       {
         user_id: 'author-other',
@@ -751,7 +757,7 @@ describe('CommunityRepository', () => {
 
       expect(result.kind).toBe('rate_limited')
       if (result.kind === 'rate_limited') {
-        expect(result.retryAfterSeconds).toBeGreaterThan(0)
+        expect(result.retryAfterSeconds).toBe(43_200)
       }
     })
 

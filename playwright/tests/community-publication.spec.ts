@@ -79,7 +79,7 @@ communityTest.describe('6.2 community publication journey', () => {
 
   communityTest(
     '6.2-E2E-01 publishes an uploaded look through the real screening pipeline',
-    async ({ page, request, interceptNetworkCall, communitySession }) => {
+    async ({ page, apiRequest, recurse, interceptNetworkCall, communitySession }) => {
       expect(communitySession.userId).toBeTruthy()
       const fixture = loadCommunityFixture(SAFE_FIXTURE)
 
@@ -133,11 +133,14 @@ communityTest.describe('6.2 community publication journey', () => {
        * dispatcher and reload for no reason.
        */
       await log.step('Wait for the moderation worker to reach a terminal state')
-      const terminal = await waitForTerminalAuthorState(request, {
-        apiBaseUrl: communitySession.apiBaseUrl,
-        userId: communitySession.userId,
-        postId,
-      })
+      const terminal = await waitForTerminalAuthorState(
+        { apiRequest, recurse },
+        {
+          apiBaseUrl: communitySession.apiBaseUrl,
+          userId: communitySession.userId,
+          postId,
+        }
+      )
 
       expect(
         terminal.status,
@@ -172,7 +175,7 @@ communityTest.describe('6.2 community publication journey', () => {
 
   communityTest(
     '6.2-E2E-03 shows the author a localized recovery state for a refused look',
-    async ({ page, request, communitySession }) => {
+    async ({ page, request, apiRequest, recurse, communitySession }) => {
       expect(communitySession.userId).toBeTruthy()
 
       // The same text refusal as 6.2-E2E-02, published over HTTP so this test
@@ -185,11 +188,14 @@ communityTest.describe('6.2 community publication journey', () => {
         caption: 'merde what a night',
         locale: 'en-US',
       })
-      const terminal = await waitForTerminalAuthorState(request, {
-        apiBaseUrl: communitySession.apiBaseUrl,
-        userId: communitySession.userId,
-        postId,
-      })
+      const terminal = await waitForTerminalAuthorState(
+        { apiRequest, recurse },
+        {
+          apiBaseUrl: communitySession.apiBaseUrl,
+          userId: communitySession.userId,
+          postId,
+        }
+      )
       expect(terminal.status).toBe('flagged')
       expect(terminal.moderationReason).toBe(TEXT_POLICY_MATCH_REASON)
 
@@ -220,7 +226,7 @@ communityTest.describe('6.2 community publication journey', () => {
 communityApiTest.describe('6.2 community non-publication journey', () => {
   communityApiTest(
     '6.2-E2E-02 refuses a disallowed caption and keeps it out of another member feed',
-    async ({ request, communityApi }, testInfo) => {
+    async ({ request, apiRequest, recurse, communityApi }, testInfo) => {
       const fixture = loadCommunityFixture(SAFE_FIXTURE)
 
       /*
@@ -240,11 +246,14 @@ communityApiTest.describe('6.2 community non-publication journey', () => {
         locale: 'en-US',
       })
 
-      const terminal = await waitForTerminalAuthorState(request, {
-        apiBaseUrl: communityApi.apiBaseUrl,
-        userId: communityApi.userId,
-        postId,
-      })
+      const terminal = await waitForTerminalAuthorState(
+        { apiRequest, recurse },
+        {
+          apiBaseUrl: communityApi.apiBaseUrl,
+          userId: communityApi.userId,
+          postId,
+        }
+      )
 
       expect(
         terminal.status,

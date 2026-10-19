@@ -1,6 +1,7 @@
 // Learning path Step 32: Wardrobe onboarding and silhouette setup.
 // See _bmad-output/project-knowledge/learning-path-step-by-step.md#step-32-wardrobe-onboarding-and-silhouette-setup
 import React from 'react'
+import { userEvent as browserUser } from '@vitest/browser/context'
 import type * as ReactNativeModule from 'react-native'
 import { fireEvent, render, screen, waitFor } from '@testing-library/react'
 import { afterEach, beforeAll, beforeEach, describe, expect, it, vi } from 'vitest'
@@ -244,7 +245,7 @@ describe('WardrobeHubScreen', () => {
       renderScreen()
       await screen.findByText('No garments added yet')
       await captureOneGarment()
-      fireEvent.click(screen.getByTestId('garment-capture-done'))
+      await browserUser.click(screen.getByTestId('garment-capture-done'))
 
       // The second poll has started, so the first processing response reached
       // the screen. The held response prevents the short poll budget racing ahead.

@@ -342,3 +342,24 @@ Desired-state writes, retained revisions, and receipts prevent resurrection thro
 - `npm run test:pw-local -- playwright/tests/community-reactions.spec.ts`: browser journey passes.
 - `MOBILE_E2E_PLATFORM=ios node scripts/run-maestro.mjs maestro/community-feed.yaml --artifacts`: native journey passes.
 - `npm run verify:changed` and `npm run validate`: affected/full quality gates pass.
+
+## Post-build Codex TEA verification
+
+On 2026-10-19, an independent Codex peer using bmad-tea reviewed 29 test/support files
+and expanded the accepted gaps. Its original report, root disposition and final evidence
+are in `_bmad-output/test-artifacts/test-review/story-6-3-codex-peer.md`,
+`story-6-3-peer-disposition.md`, and
+`_bmad-output/test-artifacts/automate/automation-summary-story-6-3-curated-reactions.md`.
+
+Added isolated real-database lease races, actual module HTTP privacy coverage, direct-role
+write refusals, SDK error/feed contracts and deterministic late-response screen assertions.
+Four seeded regression proofs fail as expected and restore source byte-for-byte. The screen
+tests exposed singular reaction text under the old i18next plural mode; the locale setup
+and regression assertions now use the shipped plural forms. A documented Pact integer
+matcher fallback handles the installed utility's Zod 3 incompatibility.
+
+Final local verification: 6,268 passing tests and 10 existing skips, all unchanged coverage
+thresholds, types/lint/format/builds; deterministic 116 mobile/125 web Pact interactions and
+provider verification; 10 RLS cases; eight browser publication/reaction journeys. Seven
+pre-existing oversized test files have a documented organization follow-up. PR review and
+CI must pass before the authorized merge. Production flags remain disabled.

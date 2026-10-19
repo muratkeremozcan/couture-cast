@@ -1,7 +1,12 @@
 import type { Locator } from '@playwright/test'
 import { contrastRatio } from '@couture/utils'
+import { log } from '@seontechnologies/playwright-utils/log'
 import { checkA11y } from '../support/helpers/accessibility'
-import { communityTest as test, expect } from '../support/helpers/community-session'
+import {
+  COMMUNITY_FEED_URL,
+  communityTest as test,
+  expect,
+} from '../support/helpers/community-session'
 
 const labels = ['Applaud', 'Love', 'Inspired'] as const
 const emojis = ['👏', '❤️', '✨'] as const
@@ -34,19 +39,37 @@ async function expectCounts(controls: Locator, counts: number[], total: number) 
 test.describe('Story 6.3 curated reactions', () => {
   // Count snapshots share one seeded post across these journeys.
   test.describe.configure({ mode: 'serial' })
-  test.beforeEach(async ({ page }) => {
-    await page.route('**/api/v1/events/poll**', async (route) =>
-      route.fulfill({ json: { events: [], nextSince: new Date(0).toISOString() } })
-    )
+  test.beforeEach(({ interceptNetworkCall }) => {
+    void interceptNetworkCall({
+      url: '**/api/v1/events/poll**',
+      fulfillResponse: {
+        status: 200,
+        body: { events: [], nextSince: new Date(0).toISOString() },
+      },
+    })
   })
 
-  test('adds with the keyboard, replaces, persists after reload, and retracts', async ({
+  test('[P1] adds with the keyboard, replaces, persists after reload, and retracts', async ({
     page,
     communitySession,
+    interceptNetworkCall,
   }) => {
     expect(communitySession.userId).toBeTruthy()
+    await log.step('Load the community feed through the real API')
+    const initialFeed = interceptNetworkCall({ method: 'GET', url: COMMUNITY_FEED_URL })
     await page.goto('/')
+    expect((await initialFeed).status).toBe(200)
+    await expect(page.getByTestId('community-card-grid')).toHaveAttribute(
+      'aria-busy',
+      'false'
+    )
+    const allFeed = interceptNetworkCall({ method: 'GET', url: COMMUNITY_FEED_URL })
     await page.getByTestId('community-filter-all').click()
+    expect((await allFeed).status).toBe(200)
+    await expect(page.getByTestId('community-card-grid')).toHaveAttribute(
+      'aria-busy',
+      'false'
+    )
     const controls = page
       .getByTestId('lookbook-card-lookbook-5')
       .getByTestId('community-reactions-lookbook-5')
@@ -56,6 +79,7 @@ test.describe('Story 6.3 curated reactions', () => {
     const initial = await visibleCounts(controls)
     const added = initial.counts.map((count, index) => count + (index === 0 ? 1 : 0))
     const replaced = initial.counts.map((count, index) => count + (index === 1 ? 1 : 0))
+    await log.step('React with the keyboard and confirm the saved state')
     await applause.focus()
     await page.keyboard.press('Space')
     await expect(applause).toHaveAttribute('aria-pressed', 'true')
@@ -71,8 +95,23 @@ test.describe('Story 6.3 curated reactions', () => {
     await page.getByRole('button', { name: 'Close this look' }).click()
     await expect(love).toHaveAttribute('aria-pressed', 'true')
     await expect(applause).toHaveAttribute('aria-pressed', 'false')
+    const reloadedFeed = interceptNetworkCall({ method: 'GET', url: COMMUNITY_FEED_URL })
     await page.reload()
+    expect((await reloadedFeed).status).toBe(200)
+    await expect(page.getByTestId('community-card-grid')).toHaveAttribute(
+      'aria-busy',
+      'false'
+    )
+    const reloadedAllFeed = interceptNetworkCall({
+      method: 'GET',
+      url: COMMUNITY_FEED_URL,
+    })
     await page.getByTestId('community-filter-all').click()
+    expect((await reloadedAllFeed).status).toBe(200)
+    await expect(page.getByTestId('community-card-grid')).toHaveAttribute(
+      'aria-busy',
+      'false'
+    )
     await expect(love).toHaveAttribute('aria-pressed', 'true')
     await expectCounts(controls, replaced, initial.total + 1)
     await page.getByTestId('lookbook-open-lookbook-5').click()
@@ -82,64 +121,86 @@ test.describe('Story 6.3 curated reactions', () => {
     await expectCounts(controls, initial.counts, initial.total)
     await page.getByRole('button', { name: 'Close this look' }).click()
     await expect(love).toHaveAttribute('aria-pressed', 'false')
-    await checkA11y(page)
-    // The ritual should fit its content while the independently scrolling feed grows.
-    const ritual = await page
-      .getByRole('region', { name: 'Hero Ritual Canvas' })
-      .boundingBox()
-    const community = await page
-      .getByRole('region', { name: 'Community section' })
-      .boundingBox()
-    expect(ritual?.height).toBeLessThan((community?.height ?? 0) - 100)
     await page.screenshot({
       path: 'playwright/artifacts/community-reactions.png',
       fullPage: true,
     })
   })
 
-  test('keeps counts after network failure and retries the same intent', async ({
+  test('[P1] keeps counts after network failure and retries the same intent', async ({
     page,
     communitySession,
+    interceptNetworkCall,
   }) => {
     expect(communitySession.userId).toBeTruthy()
+    await log.step('Load the community feed through the real API')
+    const initialFeed = interceptNetworkCall({ method: 'GET', url: COMMUNITY_FEED_URL })
     await page.goto('/')
+    expect((await initialFeed).status).toBe(200)
+    await expect(page.getByTestId('community-card-grid')).toHaveAttribute(
+      'aria-busy',
+      'false'
+    )
+    const allFeed = interceptNetworkCall({ method: 'GET', url: COMMUNITY_FEED_URL })
     await page.getByTestId('community-filter-all').click()
+    expect((await allFeed).status).toBe(200)
+    await expect(page.getByTestId('community-card-grid')).toHaveAttribute(
+      'aria-busy',
+      'false'
+    )
     const controls = page.getByTestId('community-reactions-lookbook-5')
     const applause = controls.getByRole('button', { name: /^Applaud,/ })
     await expect(applause).toHaveAttribute('aria-pressed', 'false')
-    let firstBody: unknown
-    await page.route(
-      '**/api/v1/community/posts/lookbook-5/reaction',
-      async (route) => {
-        firstBody = route.request().postDataJSON() as unknown
-        await route.abort('connectionfailed')
-        await page.unroute('**/api/v1/community/posts/lookbook-5/reaction')
+    let failFirst = true
+    // The utility's handler supports aborts; following attempts use the real backend.
+    const failedMutation = interceptNetworkCall({
+      method: 'PUT',
+      url: '**/api/v1/community/posts/lookbook-5/reaction',
+      handler: async (route) => {
+        if (failFirst) {
+          failFirst = false
+          await route.abort('connectionfailed')
+        } else {
+          await route.continue()
+        }
       },
-      { times: 1 }
-    )
+    })
     await applause.click()
+    const { requestJson: firstBody } = await failedMutation
     await expect(controls.getByRole('button', { name: 'Retry reaction' })).toBeVisible()
     await expect(applause).toHaveAttribute('aria-pressed', 'false')
-    const retry = page.waitForRequest(
-      (request) =>
-        request.method() === 'PUT' && request.url().endsWith('/lookbook-5/reaction')
-    )
+    await log.step('Retry the original reaction intent through the real API')
+    const retry = interceptNetworkCall({
+      method: 'PUT',
+      url: '**/api/v1/community/posts/lookbook-5/reaction',
+    })
     await controls.getByRole('button', { name: 'Retry reaction' }).click()
-    expect((await retry).postDataJSON()).toEqual(firstBody)
+    const retriedMutation = await retry
+    expect(retriedMutation.status).toBe(200)
+    expect(retriedMutation.requestJson).toEqual(firstBody)
     await expect(applause).toHaveAttribute('aria-pressed', 'true')
     await applause.click()
     await expect(applause).toHaveAttribute('aria-pressed', 'false')
   })
-  test('preserves highlighted focus, announces in detail, and contrasts in every theme', async ({
+  test('[P1] preserves highlighted focus, announces in detail, and contrasts in every theme', async ({
     page,
     communitySession,
+    interceptNetworkCall,
   }) => {
     expect(communitySession.userId).toBeTruthy()
+    await log.step('Load the community feed through the real API')
+    const initialFeed = interceptNetworkCall({ method: 'GET', url: COMMUNITY_FEED_URL })
     await page.goto('/?source=notification&type=community&cardId=lookbook-5')
+    expect((await initialFeed).status).toBe(200)
+    await expect(page.getByTestId('community-card-grid')).toHaveAttribute(
+      'aria-busy',
+      'false'
+    )
     const card = page.getByTestId('lookbook-card-lookbook-5')
     await expect(card).toBeFocused()
     const controls = card.getByTestId('community-reactions-lookbook-5')
     const applause = controls.getByRole('button', { name: /^Applaud,/ })
+    await log.step('React with the keyboard and confirm the saved state')
     await applause.focus()
     await page.keyboard.press('Space')
     await expect(applause).toHaveAttribute('aria-pressed', 'true')
@@ -189,5 +250,56 @@ test.describe('Story 6.3 curated reactions', () => {
       'aria-pressed',
       'false'
     )
+  })
+
+  test('[P2] keeps the ritual compact while the community feed scrolls independently', async ({
+    page,
+    communitySession,
+    interceptNetworkCall,
+  }) => {
+    expect(communitySession.userId).toBeTruthy()
+    await log.step('Load the community feed through the real API')
+    const initialFeed = interceptNetworkCall({ method: 'GET', url: COMMUNITY_FEED_URL })
+    await page.goto('/')
+    expect((await initialFeed).status).toBe(200)
+    await expect(page.getByTestId('community-card-grid')).toHaveAttribute(
+      'aria-busy',
+      'false'
+    )
+    const allFeed = interceptNetworkCall({ method: 'GET', url: COMMUNITY_FEED_URL })
+    await page.getByTestId('community-filter-all').click()
+    expect((await allFeed).status).toBe(200)
+    await expect(page.getByTestId('community-card-grid')).toHaveAttribute(
+      'aria-busy',
+      'false'
+    )
+    await expect(page.getByTestId('lookbook-card-lookbook-5')).toBeVisible()
+    const ritual = await page
+      .getByRole('region', { name: 'Hero Ritual Canvas' })
+      .boundingBox()
+    const community = await page
+      .getByRole('region', { name: 'Community section' })
+      .boundingBox()
+    expect(ritual).not.toBeNull()
+    expect(community).not.toBeNull()
+    expect(ritual!.height).toBeLessThan(community!.height - 100)
+  })
+
+  test('[P2] passes the default community feed accessibility audit', async ({
+    page,
+    communitySession,
+    interceptNetworkCall,
+  }) => {
+    expect(communitySession.userId).toBeTruthy()
+    await log.step('Load the community feed through the real API')
+    const initialFeed = interceptNetworkCall({ method: 'GET', url: COMMUNITY_FEED_URL })
+    await page.goto('/')
+    expect((await initialFeed).status).toBe(200)
+    await expect(page.getByTestId('community-card-grid')).toHaveAttribute(
+      'aria-busy',
+      'false'
+    )
+    await expect(page.getByTestId('community-filter-all')).toBeVisible()
+    await checkA11y(page)
   })
 })
