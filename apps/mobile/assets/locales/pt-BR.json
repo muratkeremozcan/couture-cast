@@ -773,6 +773,48 @@
       "total_one": "{{count}} reação",
       "total_other": "{{count}} reações",
       "ineligible": "É preciso ter pelo menos 13 anos para reagir. Menores de 16 precisam de consentimento ativo de um responsável."
+    },
+    "comments": {
+      "title": "Comentários",
+      "reply": "Responder",
+      "delete": "Excluir",
+      "replies": "Respostas ({{count}})",
+      "sendReport": "Enviar denúncia",
+      "cancel": "Cancelar",
+      "refresh": "Atualizar",
+      "newer": "Há novos comentários. Atualize para ver.",
+      "loading": "Carregando comentários…",
+      "empty": "Escreva o primeiro comentário.",
+      "moreReplies": "Mais respostas",
+      "more": "Mais comentários",
+      "private": "Seus envios. Só você pode vê-los.",
+      "recovery": "Exclua este envio e escreva um novo comentário.",
+      "morePrivate": "Mais envios",
+      "replying": "Respondendo a um comentário",
+      "compose": "Adicionar comentário",
+      "count": "{{count}} / 280 caracteres",
+      "unresolved": "Uma solicitação anterior precisa de confirmação. Tente novamente antes de enviar o rascunho editado.",
+      "sending": "Enviando…",
+      "retry": "Tentar envio novamente",
+      "send": "Enviar comentário",
+      "rateLimited": "Você atingiu o limite de comentários. Tente mais tarde.",
+      "failed": "Não foi possível atualizar os comentários. Tente novamente.",
+      "invalid": "Digite de 1 a 280 caracteres visíveis em uma linha.",
+      "submitted": "Comentário enviado para verificação.",
+      "deleted": "Comentário excluído.",
+      "reported": "Denúncia recebida.",
+      "status": {
+        "pending_screening": "Em verificação. Só você pode ver.",
+        "published": "Publicado. Atualize a conversa para ver.",
+        "held_for_review": "Aguardando revisão. Só você pode ver.",
+        "blocked": "Retido pela verificação. Só você pode ver.",
+        "screening_failed": "A verificação falhou. Só você pode ver.",
+        "author_deleted": "Excluído.",
+        "consent_suspended": "Indisponível.",
+        "erased": "Indisponível."
+      },
+      "unavailable": "Indisponível.",
+      "close": "Fechar comentários"
     }
   }
 }

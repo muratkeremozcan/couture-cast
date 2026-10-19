@@ -1,3 +1,4 @@
+import * as communityClient from '../../lib/community'
 import { CommunityReactionState } from '@couture/api-client'
 import { http, HttpResponse } from 'msw'
 import { act, fireEvent, screen, waitFor, within } from '@testing-library/react'
@@ -65,6 +66,26 @@ describe('Story 6.3 screen request ownership', () => {
     window.sessionStorage.clear()
     signIn()
   })
+  /**
+   * The modal header close. The in-thread comments close shares its name on
+   * purpose (both close the look), so scope to the dialog's own control:
+   * the one outside the detail body.
+   */
+  function detailHeaderClose() {
+    const body = screen.getByTestId('community-detail')
+    const closes = within(screen.getByRole('dialog'))
+      .getAllByRole('button', { name: 'Close this look' })
+      .filter((button) => !body.contains(button))
+    expect(closes).toHaveLength(1)
+    return closes[0]!
+  }
+  /**
+   * The open look modal hides every body sibling, the grid included, from
+   * assistive tech (accessible-modal.tsx L51-71), so the card image behind it
+   * is reachable only as a hidden node.
+   */
+  const cardImage = () =>
+    within(screen.getByTestId('lookbook-card-post-1')).getByRole('img', { hidden: true })
   function deferred() {
     let release!: () => void
     const promise = new Promise<void>((resolve) => {
@@ -72,6 +93,50 @@ describe('Story 6.3 screen request ownership', () => {
     })
     return { promise, release }
   }
+  it('preserves a discussion draft when the pending deep-link lookup fails on the network', async () => {
+    const previousScroll = Object.getOwnPropertyDescriptor(
+      HTMLElement.prototype,
+      'scrollIntoView'
+    )
+    Object.defineProperty(HTMLElement.prototype, 'scrollIntoView', {
+      configurable: true,
+      value: vi.fn(),
+    })
+    const gate = deferred(),
+      lookup = vi.spyOn(communityClient, 'getCommunityPostFromWeb')
+    useMswHandlers(
+      http.get(FEED_PATH, () => HttpResponse.json({ data: feed({ items: [post()] }) })),
+      http.get(POST_PATH, async () => {
+        await gate.promise
+        return HttpResponse.error()
+      })
+    )
+    try {
+      const user = userEvent.setup()
+      renderGrid({ highlightedCardId: 'post-1' })
+      await user.click(await screen.findByTestId('comments-button-post-1'))
+      await user.type(
+        await screen.findByLabelText('Add a comment'),
+        'Preserved discussion draft'
+      )
+      const pending = lookup.mock.results[0]!
+      if (pending.type !== 'return') throw new Error('Deep-link lookup did not start')
+      await act(async () => {
+        gate.release()
+        await pending.value.catch(() => undefined)
+      })
+      expect(screen.getByLabelText('Add a comment')).toHaveValue(
+        'Preserved discussion draft'
+      )
+    } finally {
+      gate.release()
+      lookup.mockRestore()
+      if (previousScroll)
+        Object.defineProperty(HTMLElement.prototype, 'scrollIntoView', previousScroll)
+      else Reflect.deleteProperty(HTMLElement.prototype, 'scrollIntoView')
+    }
+  })
+
   it('6.3-WEB closing detail during PUT retains accepted parent update', async () => {
     const gate = deferred()
     let sent = false
@@ -90,7 +155,7 @@ describe('Story 6.3 screen request ownership', () => {
       const detail = await screen.findByTestId('community-detail')
       await user.click(within(detail).getByRole('button', { name: 'Applaud, 0' }))
       await waitFor(() => expect(sent).toBe(true))
-      await user.click(screen.getByRole('button', { name: 'Close this look' }))
+      await user.click(detailHeaderClose())
       expect(screen.queryByTestId('community-detail')).toBeNull()
       gate.release()
       const controls = screen.getByTestId('community-reactions-post-1')
@@ -330,7 +395,7 @@ describe('Story 6.3 screen request ownership', () => {
       await user.click(await screen.findByTestId('lookbook-open-post-1'))
       expect(detailStarted).toBe(false)
       hidden = true
-      fireEvent.error(within(screen.getByTestId('lookbook-card-post-1')).getByRole('img'))
+      fireEvent.error(cardImage())
       await waitFor(() => expect(detailStarted).toBe(true))
       expect(screen.getByTestId('community-detail')).toBeVisible()
       gate.release()
@@ -408,7 +473,7 @@ describe('Story 6.3 screen request ownership', () => {
       const dialog = screen.getByTestId('community-detail')
       expect(within(dialog).getByTestId('community-reactions-post-1')).toBeVisible()
       hidden = true
-      fireEvent.error(within(screen.getByTestId('lookbook-card-post-1')).getByRole('img'))
+      fireEvent.error(cardImage())
       await waitFor(() =>
         expect(
           screen

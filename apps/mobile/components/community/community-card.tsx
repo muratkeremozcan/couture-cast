@@ -180,6 +180,8 @@ function CommunityCardActions({
 }
 
 export interface CommunityCardProps {
+  onComments?: (item: CommunityFeedItem) => void
+  commentsButtonRef?: React.Ref<View>
   reactionControls?: ReactionControls
   item: CommunityFeedItem
   /** Settles the report control into its disabled "Reported" state. */
@@ -198,6 +200,8 @@ export interface CommunityCardProps {
 }
 
 export function CommunityCard({
+  onComments,
+  commentsButtonRef,
   reactionControls,
   item,
   isReported = false,
@@ -381,6 +385,20 @@ export function CommunityCard({
 
       {reactionControls && <CommunityReactions item={item} controls={reactionControls} />}
       <View style={styles.actionsRow}>
+        {onComments && (
+          <TouchableOpacity
+            ref={commentsButtonRef}
+            accessibilityRole="button"
+            accessibilityLabel={t('community.comments.title')}
+            testID={`community-card-comments-${item.id}`}
+            style={[styles.secondaryButton, { borderColor: palette.mutedText }]}
+            onPress={() => onComments(item)}
+          >
+            <Text style={[styles.secondaryButtonText, { color: palette.text }]}>
+              {t('community.comments.title')}
+            </Text>
+          </TouchableOpacity>
+        )}
         <CommunityCardActions
           item={item}
           isReported={isReported}

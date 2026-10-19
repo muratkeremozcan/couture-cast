@@ -601,6 +601,48 @@
       "total_one": "{{count}} tepki",
       "total_other": "{{count}} tepki",
       "ineligible": "Tepki vermek için en az 13 yaşında olmalısın. 16 yaşından küçükler için geçerli veli onayı gerekir."
+    },
+    "comments": {
+      "title": "Yorumlar",
+      "reply": "Yanıtla",
+      "delete": "Sil",
+      "replies": "Yanıtlar ({{count}})",
+      "sendReport": "Bildirimi gönder",
+      "cancel": "İptal",
+      "refresh": "Yenile",
+      "newer": "Yeni yorumlar var. Görmek için yenileyin.",
+      "loading": "Yorumlar yükleniyor…",
+      "empty": "İlk yorumu siz yazın.",
+      "moreReplies": "Daha fazla yanıt",
+      "more": "Daha fazla yorum",
+      "private": "Gönderimleriniz. Bunları yalnızca siz görebilirsiniz.",
+      "recovery": "Bu gönderimi silip yeni bir yorum yazın.",
+      "morePrivate": "Daha fazla gönderim",
+      "replying": "Bir yoruma yanıt veriliyor",
+      "compose": "Yorum ekle",
+      "count": "{{count}} / 280 karakter",
+      "unresolved": "Önceki bir istek onay bekliyor. Düzenlenen taslağı göndermeden önce yeniden deneyin.",
+      "sending": "Gönderiliyor…",
+      "retry": "Gönderimi yeniden dene",
+      "send": "Yorumu gönder",
+      "rateLimited": "Yorum sınırına ulaştınız. Daha sonra tekrar deneyin.",
+      "failed": "Yorumlar güncellenemedi. Tekrar deneyin.",
+      "invalid": "Tek satırda 1–280 görünür karakter girin.",
+      "submitted": "Yorum tarama için gönderildi.",
+      "deleted": "Yorum silindi.",
+      "reported": "Bildirim alındı.",
+      "status": {
+        "pending_screening": "Taranıyor. Yalnızca siz görebilirsiniz.",
+        "published": "Yayımlandı. Görmek için konuyu yenileyin.",
+        "held_for_review": "İnceleme bekliyor. Yalnızca siz görebilirsiniz.",
+        "blocked": "Tarama sonucu bekletiliyor. Yalnızca siz görebilirsiniz.",
+        "screening_failed": "Tarama tamamlanamadı. Yalnızca siz görebilirsiniz.",
+        "author_deleted": "Silindi.",
+        "consent_suspended": "Kullanılamıyor.",
+        "erased": "Kullanılamıyor."
+      },
+      "unavailable": "Kullanılamıyor.",
+      "close": "Yorumları kapat"
     }
   }
 }

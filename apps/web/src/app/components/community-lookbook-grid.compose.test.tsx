@@ -267,10 +267,10 @@ describe('CommunityLookbookGrid (Story 6.1)', () => {
         http.post(ALLOCATE_PATH, () => allocateBody())
       )
       const user = userEvent.setup()
-      const { container } = renderGrid()
+      renderGrid()
 
       await user.click(await screen.findByTestId('create-post-button'))
-      const form = container.querySelector('form')
+      const form = screen.getByRole('dialog').querySelector('form')
       expect(form).not.toBeNull()
 
       fireEvent.submit(form as HTMLFormElement)

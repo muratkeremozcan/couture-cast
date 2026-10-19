@@ -11,7 +11,7 @@ import {
   setMockParams,
 } from './harness'
 import { userEvent as browserUser } from '@vitest/browser/context'
-import { screen, waitFor } from '@testing-library/react'
+import { screen, waitFor, within, fireEvent } from '@testing-library/react'
 import { delay, http, HttpResponse } from 'msw'
 import { cleanup, render } from 'vitest-browser-react'
 import { expect, it, vi } from 'vitest'
@@ -26,8 +26,244 @@ import { CommunityScreen } from '@/src/features/community/community-screen'
 import enUS from '@/assets/locales/en-US.json'
 import { press } from '@/src/test-utils/press'
 import { server } from '@/src/test-utils/msw/server'
+import { setMobileAccessTokenResolver } from '@/src/lib/mobile-auth'
+
+/** Gives every host node its own native handle, so focus targets stay distinguishable. */
+function distinctNodeHandles() {
+  const handles = new Map<unknown, number>()
+  const handleOf = (node: unknown) => {
+    if (!handles.has(node)) handles.set(node, 500 + handles.size)
+    return handles.get(node) ?? null
+  }
+  vi.mocked(findNodeHandle).mockImplementation(handleOf)
+  return handleOf
+}
 
 export function registerCommunityFeedCases() {
+  it('keeps a discussion open when an unrelated deep-link lookup returns404', async () => {
+    let release!: () => void
+    const gate = new Promise<void>((resolve) => {
+      release = resolve
+    })
+    setMockParams({ source: 'notification', type: 'community', cardId: 'post-b' })
+    server.use(
+      http.get('*/api/v1/community/posts/post-b', async () => {
+        await gate
+        return errorEnvelope(404, 'Community post not found.')
+      })
+    )
+    try {
+      await render(<CommunityScreen />)
+      press(await screen.findByTestId('community-card-comments-post-a'))
+      await screen.findByRole('button', { name: 'Close comments' })
+      release()
+      await screen.findByTestId('deep-link-info-banner')
+      expect(screen.getByRole('button', { name: 'Close comments' })).toBeVisible()
+    } finally {
+      release()
+    }
+  })
+
+  it('closes a discussion when the deep-link lookup for its own post returns 404', async () => {
+    let release!: () => void
+    const gate = new Promise<void>((resolve) => {
+      release = resolve
+    })
+    setMockParams({ source: 'notification', type: 'community', cardId: 'post-b' })
+    serveFeed(() => feedJson({ items: [item(), item({ id: 'post-b' })] }))
+    server.use(
+      http.get('*/api/v1/community/posts/post-b', async () => {
+        await gate
+        return errorEnvelope(404, 'Community post not found.')
+      })
+    )
+    try {
+      await render(<CommunityScreen />)
+      press(await screen.findByTestId('community-card-comments-post-b'))
+      await screen.findByRole('button', { name: 'Close comments' })
+      release()
+      await screen.findByTestId('deep-link-info-banner')
+      await waitFor(() =>
+        expect(screen.queryByRole('button', { name: 'Close comments' })).toBeNull()
+      )
+    } finally {
+      release()
+    }
+  })
+
+  it('restores close focus to the actual highlighted Comments control', async () => {
+    Object.defineProperty(Platform, 'OS', { value: 'ios', configurable: true })
+    const handleOf = distinctNodeHandles()
+    setMockParams({ source: 'notification', type: 'community', cardId: 'post-a' })
+    server.use(
+      http.get('*/api/v1/community/posts/post-a', () =>
+        HttpResponse.json({ data: item() })
+      )
+    )
+    await render(<CommunityScreen />)
+    const highlight = await screen.findByTestId('highlighted-community-card-post-a')
+    const invoker = within(highlight).getByTestId('community-card-comments-post-a')
+    // The deep-link focus lands on the card itself first, under its own handle.
+    await waitFor(() =>
+      expect(AccessibilityInfo.setAccessibilityFocus).toHaveBeenCalled()
+    )
+    press(invoker)
+    press(await screen.findByRole('button', { name: 'Close comments' }))
+    await waitFor(() => expect(findNodeHandle).toHaveBeenLastCalledWith(invoker))
+    const invokerHandle = handleOf(invoker)
+    expect(AccessibilityInfo.setAccessibilityFocus).toHaveBeenLastCalledWith(
+      invokerHandle
+    )
+    expect(vi.mocked(AccessibilityInfo.setAccessibilityFocus).mock.calls[0]).not.toEqual([
+      invokerHandle,
+    ])
+  })
+
+  it('restores close focus to the feed Comments control while a highlighted card is drawn', async () => {
+    Object.defineProperty(Platform, 'OS', { value: 'ios', configurable: true })
+    const handleOf = distinctNodeHandles()
+    setMockParams({ source: 'notification', type: 'community', cardId: 'post-a' })
+    serveFeed(() => feedJson({ items: [item(), item({ id: 'post-b' })] }))
+    server.use(
+      http.get('*/api/v1/community/posts/post-a', () =>
+        HttpResponse.json({ data: item() })
+      )
+    )
+    await render(<CommunityScreen />)
+    const highlight = await screen.findByTestId('highlighted-community-card-post-a')
+    const highlightInvoker = within(highlight).getByTestId(
+      'community-card-comments-post-a'
+    )
+    const feedInvoker = await screen.findByTestId('community-card-comments-post-b')
+    expect(highlight.contains(feedInvoker)).toBe(false)
+    // Settle the deep-link focus first, so the close restore is the last focus call.
+    await waitFor(() =>
+      expect(AccessibilityInfo.setAccessibilityFocus).toHaveBeenCalled()
+    )
+    press(feedInvoker)
+    press(await screen.findByRole('button', { name: 'Close comments' }))
+    await waitFor(() => expect(findNodeHandle).toHaveBeenLastCalledWith(feedInvoker))
+    expect(AccessibilityInfo.setAccessibilityFocus).toHaveBeenLastCalledWith(
+      handleOf(feedInvoker)
+    )
+    expect(findNodeHandle).not.toHaveBeenCalledWith(highlightInvoker)
+  })
+
+  it('restores close focus to the live highlighted copy when the feed invoker unmounted', async () => {
+    Object.defineProperty(Platform, 'OS', { value: 'ios', configurable: true })
+    const handleOf = distinctNodeHandles()
+    let release!: () => void
+    const gate = new Promise<void>((resolve) => {
+      release = resolve
+    })
+    // A reaction summary keeps the feed read from fencing the held detail read
+    // (a summary-less item fences older reads of the same post).
+    const reactions = {
+      counts: { applause: 0, love: 0, inspiration: 0 },
+      total: 0,
+      revision: 0,
+      generation: 0,
+      viewerReaction: null,
+    }
+    setMockParams({ source: 'notification', type: 'community', cardId: 'post-a' })
+    serveFeed(() => feedJson({ items: [{ ...item(), reactions }] }))
+    server.use(
+      http.get('*/api/v1/community/posts/post-a', async () => {
+        await gate
+        return HttpResponse.json({ data: { ...item(), reactions } })
+      })
+    )
+    try {
+      await render(<CommunityScreen />)
+      const feedInvoker = await screen.findByTestId('community-card-comments-post-a')
+      press(feedInvoker)
+      await screen.findByRole('button', { name: 'Close comments' })
+      release()
+      const highlight = await screen.findByTestId('highlighted-community-card-post-a')
+      const liveInvoker = within(highlight).getByTestId('community-card-comments-post-a')
+      // The feed copy of A is filtered out once the highlighted copy is drawn.
+      expect(feedInvoker.isConnected).toBe(false)
+      expect(screen.getAllByTestId('community-card-comments-post-a')).toEqual([
+        liveInvoker,
+      ])
+      // Settle the deep-link focus first, so the close restore is the last focus call.
+      await waitFor(() =>
+        expect(AccessibilityInfo.setAccessibilityFocus).toHaveBeenCalled()
+      )
+      press(screen.getByRole('button', { name: 'Close comments' }))
+      // onClose resolves and applies the focus target synchronously with the close.
+      await waitFor(() =>
+        expect(screen.queryByRole('button', { name: 'Close comments' })).toBeNull()
+      )
+      const liveHandle = handleOf(liveInvoker)
+      expect(liveHandle).not.toBe(handleOf(feedInvoker))
+      expect(vi.mocked(AccessibilityInfo.setAccessibilityFocus).mock.lastCall).toEqual([
+        liveHandle,
+      ])
+    } finally {
+      release()
+    }
+  })
+
+  it('retains the last confirmed session through token read faults and resets on resolved sign-out', async () => {
+    let unavailable = false,
+      identity: string | undefined = 'session-token',
+      reads = 0
+    const unhandled: unknown[] = []
+    const recordUnhandled = (event: PromiseRejectionEvent) => {
+      unhandled.push(event.reason)
+    }
+    window.addEventListener('unhandledrejection', recordUnhandled)
+    const restore = setMobileAccessTokenResolver(() => {
+      reads++
+      return unavailable
+        ? Promise.reject(new Error('synthetic session unavailable'))
+        : identity
+    })
+    // The session sync runs once a second; each wait spans at least one tick.
+    const nextRead = async () => {
+      const before = reads
+      await waitFor(() => expect(reads).toBeGreaterThan(before), { timeout: 2500 })
+    }
+    try {
+      await render(<CommunityScreen />)
+      press(await screen.findByTestId('community-card-comments-post-a'))
+      await screen.findByRole('button', { name: 'Close comments' })
+      fireEvent.change(screen.getByLabelText('Add a comment'), {
+        target: { value: 'Saved through storage failure' },
+      })
+      unavailable = true
+      await nextRead()
+      // A second failed tick proves the first rejection was settled, not left unhandled.
+      await nextRead()
+      expect(unhandled).toEqual([])
+      expect(screen.getByRole('button', { name: 'Close comments' })).toBeVisible()
+      expect(screen.getByLabelText('Add a comment')).toHaveValue(
+        'Saved through storage failure'
+      )
+      unavailable = false
+      await nextRead()
+      expect(screen.getByLabelText('Add a comment')).toHaveValue(
+        'Saved through storage failure'
+      )
+      identity = undefined
+      await waitFor(
+        () => expect(screen.queryByRole('button', { name: 'Close comments' })).toBeNull(),
+        { timeout: 2500 }
+      )
+      // Signing in again finds no draft left over from the signed-out session.
+      identity = 'next-session-token'
+      await nextRead()
+      await nextRead()
+      press(screen.getByTestId('community-card-comments-post-a'))
+      await screen.findByRole('button', { name: 'Close comments' })
+      expect(screen.getByLabelText('Add a comment')).toHaveValue('')
+    } finally {
+      restore()
+      window.removeEventListener('unhandledrejection', recordUnhandled)
+    }
+  })
+
   it('6.1-MOB-001 shows loading skeletons first, then the feed', async () => {
     serveFeed(async () => {
       await delay(120)

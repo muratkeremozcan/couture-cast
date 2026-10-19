@@ -1,4 +1,5 @@
 import React from 'react'
+import { renderToString } from 'react-dom/server'
 import { fireEvent, render, screen } from '@testing-library/react'
 import { describe, expect, it, vi } from 'vitest'
 import { AccessibleModal } from './accessible-modal'
@@ -33,6 +34,173 @@ function renderModal(
 }
 
 describe('AccessibleModal', () => {
+  it('keeps the dialog outside a transformed page ancestor and the inert app shell', () => {
+    render(
+      <div data-app-shell style={{ transform: 'translateX(0)' }}>
+        <AccessibleModal
+          isOpen
+          onClose={vi.fn()}
+          titleId="viewport-title"
+          title="Comments"
+        >
+          <button type="button">Send comment</button>
+        </AccessibleModal>
+      </div>
+    )
+    const dialog = screen.getByRole('dialog', { hidden: true })
+    expect(dialog.parentElement).toBe(document.body)
+    expect(dialog.closest('[data-app-shell]')).toBeNull()
+    expect(screen.getByRole('button', { name: 'Send comment' })).toBeVisible()
+  })
+
+  it('can render an initially open dialog during SSR without a document', () => {
+    vi.stubGlobal('document', undefined)
+    try {
+      expect(
+        renderToString(
+          <AccessibleModal
+            isOpen
+            onClose={vi.fn()}
+            titleId="server-title"
+            title="Comments"
+          >
+            <button type="button">Send comment</button>
+          </AccessibleModal>
+        )
+      ).toBe('')
+    } finally {
+      vi.unstubAllGlobals()
+    }
+  })
+
+  it('pairs a theme surface with the existing light-surface keyboard focus token', () => {
+    renderModal({ surface: 'theme' })
+    expect(screen.getByRole('dialog').firstElementChild).toHaveAttribute(
+      'data-focus-surface',
+      'light'
+    )
+  })
+
+  it('hides actual page content without an app-shell marker and restores prior state', () => {
+    const view = render(
+      <main aria-hidden="false">
+        <button type="button">Background action</button>
+        <div style={{ transform: 'translateX(0)' }}>
+          <AccessibleModal
+            isOpen
+            title="Comments"
+            titleId="background-test"
+            onClose={vi.fn()}
+          >
+            <button type="button">Inside discussion</button>
+          </AccessibleModal>
+        </div>
+      </main>
+    )
+    const background = screen.getByText('Background action')
+    expect(background.closest('[aria-hidden="true"]')).not.toBeNull()
+    expect(screen.getByRole('dialog').closest('[aria-hidden="true"]')).toBeNull()
+    view.unmount()
+    expect(view.container).not.toHaveAttribute('aria-hidden')
+    expect(view.container.inert).toBe(false)
+  })
+
+  /**
+   * Every body-level sibling is background, not only the app shell: a toast or
+   * banner portal outside the shell must not stay reachable behind the dialog.
+   */
+  it('inerts every body sibling except its own portal and restores each prior state on close', () => {
+    const banner = document.body.appendChild(document.createElement('aside'))
+    const shown = Object.assign(
+      document.body.appendChild(document.createElement('nav')),
+      {
+        inert: true,
+      }
+    )
+    shown.setAttribute('aria-hidden', 'false')
+    const script = document.body.appendChild(document.createElement('script'))
+    try {
+      const { unmount } = renderModal()
+      const dialog = screen.getByRole('dialog')
+
+      expect(banner).toHaveAttribute('aria-hidden', 'true')
+      expect(banner.inert).toBe(true)
+      expect(shown).toHaveAttribute('aria-hidden', 'true')
+      expect(shown.inert).toBe(true)
+      expect(script).not.toHaveAttribute('aria-hidden')
+      expect(dialog.parentElement).toBe(document.body)
+      expect(dialog).not.toHaveAttribute('aria-hidden')
+      expect(dialog.inert).not.toBe(true)
+
+      unmount()
+
+      expect(banner).not.toHaveAttribute('aria-hidden')
+      expect(banner.inert).toBe(false)
+      expect(shown).toHaveAttribute('aria-hidden', 'false')
+      expect(shown.inert).toBe(true)
+    } finally {
+      banner.remove()
+      shown.remove()
+      script.remove()
+    }
+  })
+
+  /**
+   * A second modal opened over the first hides the first one's portal only
+   * while it is open; closing it hands the first dialog back intact.
+   */
+  it('leaves an outer modal reachable and focused after a stacked modal closes', () => {
+    function Stacked({ inner }: { inner: boolean }) {
+      return (
+        <>
+          <button type="button">Page action</button>
+          <AccessibleModal
+            isOpen
+            onClose={vi.fn()}
+            titleId="outer-title"
+            title="Outer"
+            closeLabel="Close outer"
+          >
+            <button type="button">Outer action</button>
+          </AccessibleModal>
+          <AccessibleModal
+            isOpen={inner}
+            onClose={vi.fn()}
+            titleId="inner-title"
+            title="Inner"
+            closeLabel="Close inner"
+          >
+            <button type="button">Inner action</button>
+          </AccessibleModal>
+        </>
+      )
+    }
+    const view = render(<Stacked inner={false} />)
+    const outer = screen.getByRole('dialog', { name: 'Outer' })
+    expect(document.activeElement).toBe(screen.getByLabelText('Close outer'))
+
+    view.rerender(<Stacked inner />)
+    const inner = screen.getByRole('dialog', { name: 'Inner' })
+    expect(outer).toHaveAttribute('aria-hidden', 'true')
+    expect(outer.inert).toBe(true)
+    expect(inner).not.toHaveAttribute('aria-hidden')
+    expect(document.activeElement).toBe(screen.getByLabelText('Close inner'))
+
+    view.rerender(<Stacked inner={false} />)
+    expect(screen.queryByRole('dialog', { name: 'Inner' })).not.toBeInTheDocument()
+    expect(outer).not.toHaveAttribute('aria-hidden')
+    expect(outer.inert).toBe(false)
+    expect(document.activeElement).toBe(screen.getByLabelText('Close outer'))
+    // The page behind the outer modal stays hidden while the outer modal is open.
+    expect(view.container).toHaveAttribute('aria-hidden', 'true')
+    expect(view.container.inert).toBe(true)
+    expect(screen.queryByRole('button', { name: 'Page action' })).not.toBeInTheDocument()
+
+    view.unmount()
+    expect(view.container).not.toHaveAttribute('aria-hidden')
+    expect(view.container.inert).toBe(false)
+  })
+
   it('renders nothing while closed', () => {
     renderModal({ isOpen: false })
 

@@ -1,3 +1,10 @@
+'use client'
+
+import {
+  communityCommentsClient,
+  commentSessionIdentity,
+  ResponseError,
+} from '@couture/api-client'
 // Story 6.1 Task 5 owner: the web app's community feed client.
 //
 // Mirrors `palette-advisor.ts` and `premium.ts` deliberately, and three things
@@ -19,7 +26,6 @@
 //   `try { ... } catch { /* Simulated in tests */ }` and published anyway, so a
 //   storage failure produced a post whose object was never written. Upload
 //   failure now throws `upload_failed` and nothing is published.
-'use client'
 
 import {
   allocateCommunityPostResponseSchema,
@@ -45,9 +51,9 @@ import {
   type CommunityReactionFeedItem as CommunityFeedItem,
   type CommunityFeedMode,
   type CommunityReportReason,
+  type CreateCommunityCommentInput,
   type SupportedLocale,
 } from '@couture/api-client/contracts/http'
-import { ResponseError } from '@couture/api-client'
 import { createWebApiClient } from './api-client'
 import {
   generateIdempotencyKey,
@@ -105,7 +111,8 @@ export class CommunityRequestError extends Error {
   constructor(
     reason: CommunityFailureReason,
     message: string,
-    retryAfterSeconds?: number
+    retryAfterSeconds?: number,
+    readonly httpStatus?: number
   ) {
     super(message)
     this.name = 'CommunityRequestError'
@@ -218,7 +225,8 @@ async function communityError(
     return new CommunityRequestError(
       reasonForResponse(error.response.status, message),
       message,
-      readRetryAfterSeconds(error.response)
+      readRetryAfterSeconds(error.response),
+      error.response.status
     )
   }
   // Anything else is a transport failure, an abort, or a contract-parse
@@ -599,4 +607,57 @@ export async function setCommunityReactionFromWeb(
     }
     throw await communityError(error, 'Unable to update this reaction.')
   }
+}
+
+async function commentRequest<T>(
+  request: (client: ReturnType<typeof communityCommentsClient>) => Promise<T>
+): Promise<T> {
+  const accessToken = readAccessToken()
+  try {
+    return await request(
+      communityCommentsClient(createWebApiClient({ accessToken }), 'web', {
+        signal: AbortSignal.timeout(15000),
+      })
+    )
+  } catch (error) {
+    throw await communityError(error, 'Unable to update comments.')
+  }
+}
+
+export function communityCommentsRootsFromWeb(postId: string, cursor?: string) {
+  return commentRequest((client) => client.roots(postId, cursor))
+}
+export function communityCommentsRepliesFromWeb(
+  postId: string,
+  parentId: string,
+  cursor?: string
+) {
+  return commentRequest((client) => client.replies(postId, parentId, cursor))
+}
+export function communityCommentsSubmissionsFromWeb(postId: string, cursor?: string) {
+  return commentRequest((client) => client.submissions(postId, cursor))
+}
+export function communityCommentsCreateFromWeb(
+  postId: string,
+  input: CreateCommunityCommentInput
+) {
+  return commentRequest((client) => client.create(postId, input))
+}
+export function communityCommentsDeleteFromWeb(postId: string, commentId: string) {
+  return commentRequest((client) => client.delete(postId, commentId))
+}
+export function communityCommentsReportFromWeb(
+  postId: string,
+  commentId: string,
+  reason: CommunityReportReason
+) {
+  return commentRequest((client) => client.report(postId, commentId, reason))
+}
+
+export function communityCommentsSessionFromWeb() {
+  return commentSessionIdentity(
+    typeof window === 'undefined'
+      ? null
+      : window.sessionStorage.getItem(WEB_ACCESS_TOKEN_STORAGE_KEY)
+  )
 }

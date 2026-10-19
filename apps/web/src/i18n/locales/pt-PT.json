@@ -601,6 +601,48 @@
       "total_one": "{{count}} reação",
       "total_other": "{{count}} reações",
       "ineligible": "É preciso ter pelo menos 13 anos para reagir. Os menores de 16 precisam de consentimento ativo de um responsável."
+    },
+    "comments": {
+      "title": "Comentários",
+      "reply": "Responder",
+      "delete": "Eliminar",
+      "replies": "Respostas ({{count}})",
+      "sendReport": "Enviar denúncia",
+      "cancel": "Cancelar",
+      "refresh": "Atualizar",
+      "newer": "Há novos comentários. Atualize para os ver.",
+      "loading": "A carregar comentários…",
+      "empty": "Escreva o primeiro comentário.",
+      "moreReplies": "Mais respostas",
+      "more": "Mais comentários",
+      "private": "Os seus envios. Só os pode ver.",
+      "recovery": "Elimine este envio e escreva um novo comentário.",
+      "morePrivate": "Mais envios",
+      "replying": "A responder a um comentário",
+      "compose": "Adicionar comentário",
+      "count": "{{count}} / 280 caracteres",
+      "unresolved": "Um pedido anterior precisa de confirmação. Tente novamente antes de enviar o rascunho editado.",
+      "sending": "A enviar…",
+      "retry": "Tentar envio novamente",
+      "send": "Enviar comentário",
+      "rateLimited": "Atingiu o limite de comentários. Tente mais tarde.",
+      "failed": "Não foi possível atualizar os comentários. Tente novamente.",
+      "invalid": "Introduza de 1 a 280 carateres visíveis numa linha.",
+      "submitted": "Comentário enviado para verificação.",
+      "deleted": "Comentário eliminado.",
+      "reported": "Denúncia recebida.",
+      "status": {
+        "pending_screening": "Em verificação. Só o pode ver.",
+        "published": "Publicado. Atualize a conversa para o ver.",
+        "held_for_review": "A aguardar revisão. Só o pode ver.",
+        "blocked": "Retido pela verificação. Só o pode ver.",
+        "screening_failed": "A verificação falhou. Só o pode ver.",
+        "author_deleted": "Eliminado.",
+        "consent_suspended": "Indisponível.",
+        "erased": "Indisponível."
+      },
+      "unavailable": "Indisponível.",
+      "close": "Fechar comentários"
     }
   }
 }
