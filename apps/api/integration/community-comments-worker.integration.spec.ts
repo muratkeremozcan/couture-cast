@@ -340,9 +340,11 @@ describe('comment worker Redis retry and generation ownership', () => {
     await box.sweepStale()
     expect(
       await prisma.communityComment.count({ where: { status: 'pending_screening' } })
-    ).toBe(100)
+    ).toBe(STALE_SWEEP_PAGE)
     expect(
-      await prisma.communityComment.findUniqueOrThrow({ where: { id: rows[100]!.id } })
+      await prisma.communityComment.findUniqueOrThrow({
+        where: { id: rows[STALE_SWEEP_PAGE]!.id },
+      })
     ).toMatchObject({ status: 'screening_failed' })
     expect(
       await prisma.communityCommentReport.count({

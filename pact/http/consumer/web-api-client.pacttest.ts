@@ -432,8 +432,7 @@ describe('CoutureCastWeb -> CoutureCastApi HTTP contract', () => {
     }
   )
 
-  // Story 5.4: both surfaces read the profile on mount and write consent, an
-  // analysis and a save/dismiss from the same screen.
+  // Story 6.4: both surfaces preserve screened thread, refusal and paging contracts.
   it.each(commentOperations)(
     'preserves screened comment %s contracts',
     async (operation) => {

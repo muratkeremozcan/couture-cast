@@ -20,7 +20,7 @@ stepsCompleted:
     'step-04-validate-and-summarize',
   ]
 lastStep: 'step-04-validate-and-summarize'
-lastSaved: '2026-10-19T22:40:00Z'
+lastSaved: '2026-10-19T18:05:37Z'
 inputDocuments:
   - _bmad-output/implementation-artifacts/spec-6-4-threaded-comments.md
   - _bmad-output/implementation-artifacts/6-4-threaded-comments-design.md
@@ -214,4 +214,115 @@ No assertion operator, business value, threshold or coverage was reduced.
 
 ### Remaining findings
 
-See the final RV report (`_bmad-output/test-artifacts/test-review/test-review-story-6-4-threaded-comments.md`): 2 High (live-clock stale boundaries in the worker and recovery analytics cases, accepted by root for clock-domain reasons), 7 Medium and 10 Low maintainability items.
+At the end of the Claude review, 2 High, 7 Medium and 10 Low maintenance findings remained.
+The continuation below repairs and verifies all 19. The historical report is preserved at
+`../test-review/story-6-4-evidence/claude-quality-review-before-maintenance.md`.
+
+## Codex continuation: final maintenance and verification
+
+The user requested a Codex peer to conserve the Claude allowance. The separate Claude Opus 5.5
+TEA session completed the original review, test expansion and most final repairs, then returned
+ownership in verified message `d4c47cfa-a9f5-4e7f-b719-888b1b692f64` from `story64-tea` at
+`2026-10-19T17:46:28.651Z`. Codex finished the test-only cleanup, scoped execution and sequential
+rescore. Production source remained read-only throughout the TEA work.
+
+Execution status: **passed** for all continuation-owned checks. Final root-owned iOS and Android
+flows and manual pixel checks also passed. Root owns CI and PR review resolution.
+
+### Maintenance repairs
+
+The numbers below match the 19 findings in the historical Claude report.
+
+| Finding                         | Repair                                                                                                                 | Evidence                                                        |
+| ------------------------------- | ---------------------------------------------------------------------------------------------------------------------- | --------------------------------------------------------------- |
+| 1: worker stale clock           | `STALE_BACKLOG_AT` fixes backlog at 2000-01-01 while Redis scheduling keeps live timers                                | Real worker suite: 5 passed                                     |
+| 2: recovery stale clock         | Age from fixed `NOW`, pin Date only for the sweep, restore in `finally`, assert failure before live analytics delivery | Recovery suite: 3 passed                                        |
+| 3: worker payload duplication   | Reuse `persistCommentFixture` and `commentInput` from the shared integration helper                                    | Worker: 5 passed                                                |
+| 4: delivery payload duplication | Reuse the same member/post/request builders                                                                            | Delivery: 3 passed                                              |
+| 5: web payload duplication      | Reuse `reportReceipt` and `submissionsPage`                                                                            | Web comments: 20 passed                                         |
+| 6: client payload duplication   | Reuse `item` and `own` from package-local fixtures, preserving the dependency direction                                | Client: 107 passed                                              |
+| 7: state payload duplication    | Reuse `ownPage` and `SubmissionsPage`                                                                                  | Client: 107 passed                                              |
+| 8: web mixed journey            | Separate paging, reply cancellation and report cancellation/submission cases                                           | Web comments: 20 passed                                         |
+| 9: native mixed journey         | Separate the same concerns with all original checks retained                                                           | Native sheet: 14 passed                                         |
+| 10: HTTP page boundary          | Name `PAGE_LIMIT` and derive the invalid request from it                                                               | HTTP: 15 passed                                                 |
+| 11: HTTP retry expiry           | Name the one-hour Retry-After calculation                                                                              | HTTP: 15 passed                                                 |
+| 12: integration text boundary   | Name UTF-16 cap and derive accepted/over-cap emoji strings                                                             | Threads: 28 passed                                              |
+| 13: worker stale-age literal    | Replace moving 16-minute setup with the documented fixed backlog date                                                  | Worker: 5 passed                                                |
+| 14: worker sweep boundary       | Use `STALE_SWEEP_PAGE` for setup size, pending count and final row index                                               | Worker: 5 passed                                                |
+| 15: schema text boundary        | Name UTF-16 cap and derive emoji test strings locally                                                                  | Client: 107 passed                                              |
+| 16: focus contrast boundary     | Name `MIN_FOCUS_CONTRAST` and cite WCAG 2.2 SC 1.4.11                                                                  | Root browser: 8 passed; the final edit names the same threshold |
+| 17: HTTP assertion dialect      | Use Vitest assertions for HTTP status throughout the file                                                              | HTTP: 15 passed                                                 |
+| 18: web live-region dialect     | Use exact `toHaveTextContent` checks                                                                                   | Web comments: 20 passed                                         |
+| 19: native matcher dialect      | Use DOM absence and attribute matchers consistently                                                                    | Native sheet: 14 passed                                         |
+
+The worker cases exercise an already-stale backlog; the precise stale cutoff stays in the recovery
+suite. The final setup removes the moving boundary without introducing a production clock seam.
+Analytics retry uses its live application/database clock after the controlled sweep finishes.
+
+Additional advisories repaired: exact nonempty root identities accompany the `.every` assertion;
+quota fixtures share a pinned service clock and explicit factory date; Pact comment blocks identify
+Story 6.4 and every operation's provider endpoint. No assertion, threshold or expected value was
+weakened. The Pact edits after the full gate change comments only.
+
+### Fresh continuation execution
+
+| Scope                                                  | Result                                           | Log                                              |
+| ------------------------------------------------------ | ------------------------------------------------ | ------------------------------------------------ |
+| Client state, outcomes and transport                   | 3 files, 107 passed                              | `/tmp/story64-codex-tea-client-final.log`        |
+| Web comments                                           | 1 file, 20 passed                                | `/tmp/story64-codex-tea-web-final.log`           |
+| Native comments sheet                                  | 1 file, 14 passed                                | `/tmp/story64-codex-tea-mobile-final.log`        |
+| Full mobile coverage after the P6 fix                  | 81 files, 897 passed; existing thresholds passed | `/tmp/story64-postreview-mobile-p6-coverage.log` |
+| Recovery first, with real PostgreSQL                   | 3 passed                                         | `/tmp/story64-codex-tea-recovery-final.log`      |
+| Other comment integration files, real PostgreSQL/Redis | 82 passed, 1 documented opt-in measurement skip  | `/tmp/story64-codex-tea-api-final.log`           |
+| API types                                              | Passed                                           | `/tmp/story64-codex-tea-api-types.log`           |
+| Scoped lint                                            | Passed with zero warnings                        | `/tmp/story64-codex-tea-lint.log`                |
+| Edited-file formatting                                 | Passed                                           | `/tmp/story64-codex-tea-format.log`              |
+
+The 10 integration files total **85 passed, 1 documented opt-in measurement skip**. Each uses its
+own database; worker queues have unique names. The root-owned DB/Redis window was returned before
+Android preparation. No additional harness ran during native execution.
+
+Root-executed evidence inspected by the continuation: full Pact consumer determinism and provider
+gate passed (`/tmp/story64-postreview-pact.log`); browser journeys passed **8/8**
+(`/tmp/story64-postreview-browser.log`). Root reports the final iOS flow passed 1/1 in 2m44s with
+the 273-unit reply-root context and software keyboard visible. The final Android flow after P6
+passed 1/1 in 2m28s, exited 0 and completed teardown
+(`/tmp/story64-postreview-maestro-android-p6.log`,
+`/tmp/story64-postreview-maestro-android-report.xml`). Device runs were executed by the
+implementation session and assessed visually by root.
+
+### P6 keyboard evidence: automated and visual checks
+
+The first Android automated flow passed while Gboard partly covered Send. Root's manual pixel
+inspection found the defect, then the implementation agent corrected the Android modal's keyboard
+offset using the native status-bar height. iOS retains its existing offset. The targeted sheet suite
+passed 14/14, types and lint passed, and the fresh full mobile coverage run passed 897 tests across
+81 files with unchanged thresholds.
+
+The final automated Android flow proves the root and reply can be composed, submitted, published
+and read with a real keyboard. Its `assertVisible` and successful taps establish discoverability
+and interaction. Full pixel visibility is assessed separately: root personally inspected the fresh
+root-keyboard, reply-keyboard and discussion images under
+`maestro/artifacts/2026-10-19_130157/Screened community comments/takeScreenshot/maestro/artifacts/`.
+Root confirmed the entire Send label and bottom edge clear Gboard in both keyboard images, and the
+header, Close, long context, Cancel, composer and counter remain readable. Discussion indentation
+and controls also render correctly. The earlier iOS images are under the `2026-10-19_125148` run.
+
+No browser or mocked component assertion was added for native IME geometry. Those environments do
+not model Gboard occlusion. Existing component interaction checks, real device flows and fresh
+manual pixel inspection provide the relevant evidence. TEA reviewed the small follow-up and found
+no additional concrete issue; the source fix belongs to the implementation agent.
+
+### Current quality result
+
+[The current RV report](../test-review/test-review-story-6-4-threaded-comments.md) scores **100/100
+(A), Approve**, with 0 Critical, 0 High, 0 Medium and 0 Low findings. This is a sequential repair
+rescore against Claude's four-dimension review. It preserves the original review provenance and
+deduction ledger. Test quality approval and local execution evidence are separate from the final
+CI and PR review gates owned by root.
+
+### Library integrations
+
+Both configured utility packages remain in use. No new library deviations were introduced. Pact
+broker MCP tools were unreachable in the original review; contract scrutiny used provider source
+and generated OpenAPI. Codex preserved that limitation and made no broker verification claim.

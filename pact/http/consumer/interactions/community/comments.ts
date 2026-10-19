@@ -255,6 +255,9 @@ export async function verifyCommunityCommentFailure(
   platform: CommunityPlatform,
   failure: (typeof commentFailureCases)[number]
 ) {
+  // Provider endpoint: apps/api/src/modules/community/community-comments.controller.ts -> GET /api/v1/community/posts/:postId/comments
+  // Provider endpoint: apps/api/src/modules/community/community-comments.controller.ts -> POST /api/v1/community/posts/:postId/comments
+  // Provider endpoint: apps/api/src/modules/community/community-comments.controller.ts -> POST /api/v1/community/posts/:postId/comments/:commentId/report
   const operation = failure.operation
   const input = { ...commentIntent, ...('body' in failure ? { body: failure.body } : {}) }
   await pact
@@ -327,6 +330,9 @@ export async function verifyCommunityCommentPage(
   platform: CommunityPlatform,
   operation: 'roots' | 'replies' | 'submissions'
 ) {
+  // Provider endpoint: apps/api/src/modules/community/community-comments.controller.ts -> GET /api/v1/community/posts/:postId/comments
+  // Provider endpoint: apps/api/src/modules/community/community-comments.controller.ts -> GET /api/v1/community/posts/:postId/comments/:commentId/replies
+  // Provider endpoint: apps/api/src/modules/community/community-comments.controller.ts -> GET /api/v1/community/posts/:postId/comment-submissions
   const response =
     operation === 'submissions'
       ? {

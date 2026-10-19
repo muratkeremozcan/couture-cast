@@ -8,6 +8,7 @@ import {
   Modal,
   ScrollView,
   StyleSheet,
+  StatusBar,
   Text,
   TextInput,
   TouchableOpacity,
@@ -23,6 +24,11 @@ import {
 } from '@couture/api-client/contracts/http'
 import { useHeroPalette } from '@/components/hero/hero-theme'
 import { safeFindNodeHandle } from '@/src/lib/accessibility-focus'
+
+// Android's non-translucent modal starts below the native status-bar inset.
+function modalKeyboardOffset(): number {
+  return Platform.OS === 'android' ? (StatusBar.currentHeight ?? 0) : 0
+}
 
 export function CommunityCommentsSheet({
   postId,
@@ -217,6 +223,7 @@ export function CommunityCommentsSheet({
       <KeyboardAvoidingView
         style={styles.backdrop}
         behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
+        keyboardVerticalOffset={modalKeyboardOffset()}
       >
         <View
           style={[styles.sheet, { backgroundColor: palette.surface }]}

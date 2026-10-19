@@ -2,7 +2,7 @@
 title: 'Story 6.4: Threaded comments'
 type: 'feature'
 created: '2026-10-19'
-status: 'in-review'
+status: 'done'
 baseline_commit: '989d101785d2fdec203e63d05213862442475e4c'
 route: 'dispatch'
 story_key: '6-4-threaded-comments'
@@ -78,7 +78,7 @@ Paths below are relative to `apps/api/src/modules/community/` unless prefixed ot
 - [x] New `packages/api-client/src/community-comments-state.ts`, `apps/web/src/lib/community.ts`, `apps/mobile/src/lib/community.ts`: shared request/draft/retry ownership, page merge and late-response visibility fences.
 - [x] `apps/web/src/app/components/community-lookbook-grid.tsx`, new adjacent `community-comments.tsx`; mobile screen/card and new `apps/mobile/components/community/community-comments-sheet.tsx`: Comments action, root/reply compose, private status, report/delete/tombstones, load-more, focus/announcements, 44px targets and theme contrast.
 - [x] Web/mobile locale catalogs and `packages/testing/src/factories/community.factory.ts`: all ten translations, deterministic thread fixtures and cleanup.
-- [x] Colocated API/client/component tests, `apps/api/integration/community-comments.integration.spec.ts`, `packages/db/test/rls/community-posts.spec.ts`, Pact interactions/provider doubles, new `playwright/tests/community-comments.spec.ts` and `maestro/community-comments.yaml`: matrix, real worker, concurrency, consent races, privacy, report timing, accessibility and recovery.
+- [x] Colocated API/client/component tests, `apps/api/integration/community-comments-*.integration.spec.ts`, `packages/db/test/rls/community-posts.spec.ts`, Pact interactions/provider doubles, new `playwright/tests/community-comments.spec.ts` and `maestro/community-comments.yaml`: matrix, real worker, concurrency, consent races, privacy, report timing, accessibility and recovery.
 
 **Acceptance Criteria:**
 
@@ -199,6 +199,7 @@ Paths below are relative to `apps/api/src/modules/community/` unless prefixed ot
 | RV17    | low     | patch  | HTTP status assertions mix supertest and Vitest styles. Use consistent Vitest response status assertions while keeping exact error bodies.                                                                                                                                                                                                                                                                                        |
 | RV18    | low     | patch  | Web live-region text assertions mix raw textContent and semantic text matchers. Standardize exact text matching.                                                                                                                                                                                                                                                                                                                  |
 | RV19    | low     | patch  | Native absence and disabled-state assertions mix DOM attribute access and semantic matchers. Use the existing semantic matcher style consistently.                                                                                                                                                                                                                                                                                |
+| P6      | medium  | patch  | Final real Android run with the software keyboard and273unit root clips the primary Send button beneath Gboard. Parent inspected /tmp/story64-postreview-android-current.png. Correct the existing native keyboard-avoidance layout using measured window geometry and verify root/reply keyboard controls on devices; iOS currently passes.                                                                                      |
 
 Review provenance: the existing user-owned Claude Code session `couture-cast-cd` used `claude-opus-5-5`; its verified peer-origin reply arrived 2026-10-19T16:33:48.068Z. Full report: [archived Opus review](reviews/story-6-4-opus-implementation-review.md). Findings above are classified individually before grouping.
 
@@ -353,3 +354,31 @@ and `/tmp/story64-t4-{lint,web-types,native-types}.log`. Broader TEA reruns foll
 - The separate TEA review identified additional test-maintenance corrections after its first
   final rescore. RV1-RV19 record each finding independently; the peer is applying test-only
   fixture/clock/assertion corrections and focused-case splits before its updated verdict.
+
+### Final local acceptance, 2026-10-19
+
+- Own audit, three independent BMad review layers and the actual Claude Code Opus 5.5
+  implementation review are complete. Every finding is individually triaged above.
+  The raw Opus report is archived under `reviews/` with its repair follow-up.
+- A separate actual Claude Opus 5.5 `bmad-tea` peer reviewed and expanded tests. At the user's
+  request, a Codex TEA continuation conserved Claude allowance and completed the remaining
+  test-maintenance repairs. Current RV is 100/100, Approve, with zero remaining findings.
+  Historical review and verified peer handoff are retained with current provenance.
+- Final scoped test-architect checks passed client107, web20, native14 and real backend85,
+  with one documented opt-in measurement skip. API types, lint and formatting pass.
+  Full mobile coverage after the final Android keyboard repair passed897tests across81files;
+  original coverage thresholds remain unchanged.
+- Final iOS Maestro passed1/1 in2m44s with273unitroot and long reply context.
+  `/tmp/story64-postreview-maestro-ios-final.log` and its JUnit report.
+- Final Android Maestro passed1/1 in2m28s after a real screenshot reproduced Gboard clipping
+  the primary Send action. The existing keyboard-avoidance offset now uses native Android
+  status-bar height; iOS retains its previous geometry. Scoped sheet tests, types and lint pass.
+  `/tmp/story64-postreview-maestro-android-p6.log` and its JUnit report.
+- Parent visually inspected fresh iOS125148 and Android130157 root/reply keyboard and
+  discussion screenshots. Full primary action, heading, close, reply context/cancel, input
+  and counter are readable above the keyboards. Automated visibility/submission alone did
+  not establish full pixel visibility; the pre-fix Android flow passed while clipped.
+- All real harnesses ran sequentially and are stopped. The temporary Claude relay is stopped;
+  both work peers remain open with context. Production community flags remain disabled.
+- PR154 is open at the user's explicit request. CodeRabbit and green final-head CI remain
+  parent-owned delivery requirements; this local workflow completion does not certify them.
