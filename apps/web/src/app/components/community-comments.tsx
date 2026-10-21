@@ -19,15 +19,26 @@ export function CommunityComments({
   postId,
   state,
   focusOnOpen = false,
+  target,
   onClose,
 }: {
   postId: string
   state: CommunityCommentsState
+  target?: {
+    commentId: string
+    parentId: string | null
+    pageCursor: string | null
+    parentPageCursor: string | null
+  }
   focusOnOpen?: boolean
   onClose?: () => void
 }) {
   const { t, i18n } = useTranslation(undefined, { i18n: getI18n() })
-  useSyncExternalStore(state.subscribe, state.getVersion, state.getVersion)
+  const threadVersion = useSyncExternalStore(
+    state.subscribe,
+    state.getVersion,
+    state.getVersion
+  )
   const thread = state.current(postId)
   const [reporting, setReporting] = useState<string | null>(null)
   const reportGeneration = useRef(0)
@@ -48,10 +59,41 @@ export function CommunityComments({
     }
   }, [focusOnOpen, postId])
   useEffect(() => {
-    void state.load(postId)
+    if (target) void state.loadTarget(postId, target)
+    else void state.load(postId)
     void state.statuses(postId)
     return state.watchSubmissions(postId)
-  }, [postId, state])
+  }, [postId, state, target])
+  const focusedTarget = useRef<string | null>(null)
+  const focusedEntry = useRef<string | null>(null)
+  useEffect(() => {
+    if (!target || focusedTarget.current === target.commentId) return
+    const element = document.getElementById(`community-comment-${target.commentId}`)
+    if (element) {
+      focusedTarget.current = target.commentId
+      focusedEntry.current = target.commentId
+      element.focus()
+      element.scrollIntoView({ block: 'nearest' })
+    }
+  }, [target, thread.roots, thread.replies, threadVersion])
+  useEffect(() => {
+    const id = focusedEntry.current
+    if (!id) return
+    const items = [
+      ...(thread.roots?.items ?? []),
+      ...[...thread.replies.values()].flatMap((page) => page.items),
+    ]
+    if (items.some((item) => item.id === id && !item.unavailable)) return
+    const active = document.activeElement
+    const entry = document.getElementById(`community-comment-${id}`)
+    focusedEntry.current = null
+    if (active && active !== document.body && !entry?.contains(active)) return
+    headingRef.current?.focus()
+    setAnnouncement((previous) => ({
+      key: 'community.comments.unavailable',
+      id: (previous?.id ?? 0) + 1,
+    }))
+  }, [thread.roots, thread.replies, threadVersion])
   useEffect(() => {
     const next = state.consumeAnnouncement(postId)
     if (!next) return
@@ -85,6 +127,18 @@ export function CommunityComments({
     <article
       key={item.id}
       data-testid={`comment-${item.id}`}
+      id={`community-comment-${item.id}`}
+      tabIndex={-1}
+      onFocusCapture={() => {
+        focusedEntry.current = item.id
+      }}
+      onBlurCapture={(event) => {
+        if (
+          event.relatedTarget &&
+          !event.currentTarget.contains(event.relatedTarget as Node)
+        )
+          focusedEntry.current = null
+      }}
       className="space-y-2 rounded-lg border border-[color:var(--theme-card-border)] p-3"
     >
       {item.author && <p className="text-sm font-semibold">{item.author}</p>}

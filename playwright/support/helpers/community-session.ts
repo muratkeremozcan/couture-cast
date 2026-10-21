@@ -21,6 +21,7 @@ import {
   resolveApiBaseUrl,
 } from './api-test'
 import { WEB_ACCESS_TOKEN_STORAGE_KEY } from './commerce-session'
+import { localE2EAccessToken } from './local-e2e-token'
 
 export const COMMUNITY_FEED_PATH = '/api/v1/community/feed'
 export const COMMUNITY_ALLOCATE_PATH = '/api/v1/community/posts/allocate'
@@ -140,7 +141,7 @@ export type CommunitySession = {
  * code ran.
  */
 export function communityAccessToken(userId: string): string {
-  return `test-token:guardian:${userId}`
+  return localE2EAccessToken(userId)
 }
 
 export async function signUpCommunityUser(

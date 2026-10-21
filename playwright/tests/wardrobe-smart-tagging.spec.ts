@@ -12,6 +12,7 @@ import { resolveEnvironmentConfig } from '../config/environments'
 import { checkA11y, waitForAccessibilityReady } from '../support/helpers/accessibility'
 import { buildUniqueId, isNonLocalEnvironment } from '../support/helpers/api-test'
 import { cleanupWardrobeUserTestData } from '../support/helpers/user-test-data'
+import { localE2EAccessToken } from '../support/helpers/local-e2e-token'
 
 const environment = resolveEnvironmentConfig('local')
 const garmentFixturePath = path.resolve(
@@ -68,7 +69,7 @@ wardrobeTest.describe('Wardrobe Smart Tagging Flow', () => {
           expect(signup.status).toBe(201)
           const signupBody = signupResponseSchema.parse(signup.body)
           cleanupState.userId = signupBody.userId
-          const token = `test-token:guardian:${signupBody.userId}`
+          const token = localE2EAccessToken(signupBody.userId)
           cleanupState.accessToken = token
 
           const location = await apiRequest({

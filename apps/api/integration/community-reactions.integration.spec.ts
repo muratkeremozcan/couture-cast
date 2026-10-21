@@ -7,6 +7,189 @@ import { reactionTestContext } from './helpers/community-reaction-context.js'
 const { prisma, repository, namespace, input, fixture, mutate } = reactionTestContext()
 
 describe('Story 6.3 durable reaction semantics', () => {
+  it('cascades a member identity through every engagement FK and scalar slot without touching another member', async () => {
+    const owner = await fixture()
+    const unrelated = await fixture()
+    const seed = async (userId: string, postId: string) => {
+      const now = new Date()
+      const expires = new Date(now.getTime() + 60000)
+      const preference = await prisma.communityNotificationPreference.create({
+        data: { user_id: userId },
+      })
+      const cache = await prisma.communityFlagEvaluation.create({
+        data: {
+          member_id: userId,
+          flag_key: 'community_read_enabled',
+          subject_generation: 0,
+          remote_value: true,
+          remote_evaluated_at: now,
+          expires_at: expires,
+        },
+      })
+      const token = await prisma.pushToken.create({
+        data: {
+          user_id: userId,
+          token: `ExpoPushToken[identity_${randomUUID()}]`,
+          installation_id: randomUUID(),
+        },
+      })
+      const group = await prisma.communityNotificationGroup.create({
+        data: {
+          recipient_id: userId,
+          post_id: postId,
+          eligible_at: now,
+          next_attempt_at: now,
+          expires_at: expires,
+        },
+      })
+      const intent = await prisma.communityNotificationIntent.create({
+        data: {
+          source_kind: 'reaction',
+          post_id: postId,
+          actor_id: userId,
+          recipient_id: userId,
+          preference_generation: 0,
+          deliverable: true,
+          expires_at: expires,
+          group_id: group.id,
+        },
+      })
+      const link = await prisma.communityArtifactSubject.create({
+        data: {
+          artifact_kind: 'intent',
+          artifact_id: intent.id,
+          member_id: userId,
+          role: 'actor',
+          generation: 0,
+        },
+      })
+      const delivery = await prisma.communityTokenDelivery.create({
+        data: {
+          group_id: group.id,
+          registration_id: token.id,
+          binding_generation: token.binding_generation,
+          owner_id: userId,
+          status: 'pending',
+          next_attempt_at: now,
+        },
+      })
+      const head = await prisma.communityStreamHead.findFirstOrThrow({
+        where: { owner_id: userId },
+      })
+      return { preference, cache, token, group, intent, link, delivery, head }
+    }
+    const a = await seed(owner.userId, owner.postId)
+    const b = await seed(unrelated.userId, unrelated.postId)
+    const constraints = await prisma.$queryRaw<
+      { conname: string; confupdtype: string; confdeltype: string }[]
+    >`SELECT conname,confupdtype::text,confdeltype::text FROM pg_constraint
+      WHERE conname IN ('community_subject_user_fk','community_preference_user_fk',
+        'community_flag_subject_fk','community_artifact_subject_fk','community_stream_owner_fk','PushToken_user_id_fkey') ORDER BY conname`
+    expect(constraints).toEqual([
+      { conname: 'PushToken_user_id_fkey', confupdtype: 'c', confdeltype: 'r' },
+      { conname: 'community_artifact_subject_fk', confupdtype: 'c', confdeltype: 'c' },
+      { conname: 'community_flag_subject_fk', confupdtype: 'c', confdeltype: 'c' },
+      { conname: 'community_preference_user_fk', confupdtype: 'c', confdeltype: 'c' },
+      { conname: 'community_stream_owner_fk', confupdtype: 'c', confdeltype: 'c' },
+      { conname: 'community_subject_user_fk', confupdtype: 'c', confdeltype: 'c' },
+    ])
+    const replacement = randomUUID()
+    await prisma.user.update({ where: { id: owner.userId }, data: { id: replacement } })
+    expect(
+      await prisma.communitySubject.findUnique({ where: { member_id: owner.userId } })
+    ).toBeNull()
+    expect(
+      await prisma.communitySubject.findUnique({ where: { member_id: replacement } })
+    ).toMatchObject({ generation: 0 })
+    expect(
+      await prisma.communityNotificationPreference.findUnique({
+        where: { user_id: replacement },
+      })
+    ).toEqual({ ...a.preference, user_id: replacement })
+    expect(
+      await prisma.communityFlagEvaluation.findUnique({
+        where: {
+          member_id_flag_key: {
+            member_id: replacement,
+            flag_key: 'community_read_enabled',
+          },
+        },
+      })
+    ).toEqual({ ...a.cache, member_id: replacement })
+    expect(
+      await prisma.communityArtifactSubject.findUnique({
+        where: {
+          artifact_kind_artifact_id_member_id_role: {
+            artifact_kind: 'intent',
+            artifact_id: a.intent.id,
+            member_id: replacement,
+            role: 'actor',
+          },
+        },
+      })
+    ).toEqual({ ...a.link, member_id: replacement })
+    expect(
+      await prisma.communityStreamHead.findUnique({ where: { id: a.head.id } })
+    ).toEqual({ ...a.head, owner_id: replacement })
+    expect(
+      await prisma.pushToken.findUnique({ where: { id: a.token.id } })
+    ).toMatchObject({
+      user_id: replacement,
+      token: a.token.token,
+      binding_generation: a.token.binding_generation,
+    })
+    expect(
+      await prisma.communityNotificationIntent.findUnique({ where: { id: a.intent.id } })
+    ).toEqual({ ...a.intent, actor_id: replacement, recipient_id: replacement })
+    expect(
+      await prisma.communityNotificationGroup.findUnique({ where: { id: a.group.id } })
+    ).toEqual({ ...a.group, recipient_id: replacement })
+    expect(
+      await prisma.communityTokenDelivery.findUnique({ where: { id: a.delivery.id } })
+    ).toEqual({ ...a.delivery, owner_id: replacement })
+    expect(
+      await prisma.communityNotificationPreference.findUnique({
+        where: { user_id: unrelated.userId },
+      })
+    ).toEqual(b.preference)
+    expect(
+      await prisma.communityFlagEvaluation.findUnique({
+        where: {
+          member_id_flag_key: {
+            member_id: unrelated.userId,
+            flag_key: 'community_read_enabled',
+          },
+        },
+      })
+    ).toEqual(b.cache)
+    expect(
+      await prisma.communityArtifactSubject.findUnique({
+        where: {
+          artifact_kind_artifact_id_member_id_role: {
+            artifact_kind: 'intent',
+            artifact_id: b.intent.id,
+            member_id: unrelated.userId,
+            role: 'actor',
+          },
+        },
+      })
+    ).toEqual(b.link)
+    expect(
+      await prisma.communityStreamHead.findUnique({ where: { id: b.head.id } })
+    ).toEqual(b.head)
+    expect(await prisma.pushToken.findUnique({ where: { id: b.token.id } })).toEqual(
+      b.token
+    )
+    expect(
+      await prisma.communityNotificationIntent.findUnique({ where: { id: b.intent.id } })
+    ).toEqual(b.intent)
+    expect(
+      await prisma.communityNotificationGroup.findUnique({ where: { id: b.group.id } })
+    ).toEqual(b.group)
+    expect(
+      await prisma.communityTokenDelivery.findUnique({ where: { id: b.delivery.id } })
+    ).toEqual(b.delivery)
+  })
   it('preserves reactions, receipts, and queued events through parent identity updates', async () => {
     const { userId, postId } = await fixture()
     const intent = input('applause')

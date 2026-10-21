@@ -12,18 +12,33 @@ describe('CommunityMaintenanceService', () => {
   const now = new Date('2026-09-05T12:00:00.000Z')
 
   const createService = () => {
-    const findMany = vi.fn()
+    const findMany = vi.fn<() => Promise<Record<string, unknown>[]>>()
     const update = vi.fn().mockResolvedValue({})
-    const updateMany = vi.fn()
+    const updateMany = vi.fn().mockResolvedValue({ count: 1 })
     const deleteMany = vi.fn()
     const jobFailureCreate = vi.fn().mockResolvedValue({ id: 'jf-1' })
-    const prisma = {
-      lookbookPost: { findMany, update, updateMany, deleteMany },
+    const firstRows = async (): Promise<Record<string, unknown>[]> => {
+      const result = findMany.mock.results[0]
+      return result?.type === 'return' ? await result.value : []
+    }
+    findMany.mockImplementation(firstRows)
+    const findFirst = vi.fn(async () => (await firstRows())[0])
+    const transaction = {
+      $executeRaw: vi.fn().mockResolvedValue(1),
+      $queryRaw: vi.fn().mockResolvedValue([]),
+      lookbookPost: { findMany, findFirst, update, updateMany, deleteMany },
       jobFailure: { create: jobFailureCreate },
+    }
+    const prisma = {
+      ...transaction,
+      $transaction: vi.fn((work: (tx: typeof transaction) => Promise<unknown>) =>
+        work(transaction)
+      ),
     } as unknown as PrismaClient
 
     const storage = new InMemoryCommunityStorage()
     return {
+      prisma,
       service: new CommunityMaintenanceService(prisma, storage),
       storage,
       findMany,
@@ -150,12 +165,12 @@ describe('CommunityMaintenanceService', () => {
 
       const result = await service.sweepErasureRequests(now)
 
-      expect(updateMany).toHaveBeenCalledWith({
+      expect(update).toHaveBeenCalledWith({
         where: { id: 'post-erase' },
-        data: { status: 'withdrawn' },
+        data: expect.objectContaining({ status: 'withdrawn' }) as unknown,
       })
-      expect(updateMany.mock.invocationCallOrder[0]!).toBeLessThan(
-        update.mock.invocationCallOrder[0]!
+      expect(update.mock.invocationCallOrder[0]!).toBeLessThan(
+        updateMany.mock.invocationCallOrder[0]!
       )
       expect(storage.removed).toEqual(['community/post-erase/s.jpg'])
       expect(result).toEqual({ hidden: 1, anonymized: 1, objectsPurged: 1, overdue: 0 })
@@ -171,6 +186,7 @@ describe('CommunityMaintenanceService', () => {
       expect(update).toHaveBeenCalledWith({
         where: { id: 'post-erase' },
         data: {
+          status: 'withdrawn',
           caption: null,
           alt_text: null,
           locale: null,
@@ -181,8 +197,13 @@ describe('CommunityMaintenanceService', () => {
       })
       // Separate timestamps so a sweep interrupted halfway re-drives only the
       // step that did not finish.
-      expect(update).toHaveBeenCalledWith({
-        where: { id: 'post-erase' },
+      expect(updateMany).toHaveBeenCalledWith({
+        where: {
+          id: 'post-erase',
+          image_object_path: 'community/post-erase/s.jpg',
+          erasure_requested_at: { not: null },
+          objects_purged_at: null,
+        },
         data: { image_object_path: null, objects_purged_at: now },
       })
     })
@@ -195,7 +216,7 @@ describe('CommunityMaintenanceService', () => {
           anonymized_at: new Date('2026-09-05T11:30:00.000Z'),
         }),
       ])
-      updateMany.mockResolvedValueOnce({ count: 0 })
+      updateMany.mockResolvedValueOnce({ count: 1 })
 
       const result = await service.sweepErasureRequests(now)
 
@@ -205,7 +226,7 @@ describe('CommunityMaintenanceService', () => {
     })
 
     it('leaves objects_purged_at unset when the delete fails, and flags an overdue request', async () => {
-      const { findMany, update, updateMany } = createService()
+      const { prisma, findMany, update, updateMany } = createService()
       findMany.mockResolvedValueOnce([
         erasureRow({
           status: 'withdrawn',
@@ -219,32 +240,35 @@ describe('CommunityMaintenanceService', () => {
 
       const failingStorage = new InMemoryCommunityStorage()
       vi.spyOn(failingStorage, 'remove').mockRejectedValueOnce(new Error('denied'))
-      const service = new CommunityMaintenanceService(
-        {
-          lookbookPost: { findMany, update, updateMany },
-        } as unknown as PrismaClient,
-        failingStorage
-      )
+      const service = new CommunityMaintenanceService(prisma, failingStorage)
 
       const result = await service.sweepErasureRequests(now)
 
       // Stamping the purge here would record a deletion that never happened.
       expect(result).toEqual({ hidden: 0, anonymized: 0, objectsPurged: 0, overdue: 1 })
-      expect(update).not.toHaveBeenCalled()
+      expect(update).toHaveBeenCalledWith({
+        where: { id: 'post-erase' },
+        data: { status: 'withdrawn' },
+      })
     })
 
     it('purges a row whose object was already removed', async () => {
-      const { service, findMany, update, updateMany } = createService()
+      const { service, findMany, updateMany } = createService()
       findMany.mockResolvedValueOnce([
         erasureRow({ status: 'withdrawn', image_object_path: null }),
       ])
-      updateMany.mockResolvedValueOnce({ count: 0 })
+      updateMany.mockResolvedValueOnce({ count: 1 })
 
       const result = await service.sweepErasureRequests(now)
 
       expect(result.objectsPurged).toBe(1)
-      expect(update).toHaveBeenCalledWith({
-        where: { id: 'post-erase' },
+      expect(updateMany).toHaveBeenCalledWith({
+        where: {
+          id: 'post-erase',
+          image_object_path: null,
+          erasure_requested_at: { not: null },
+          objects_purged_at: null,
+        },
         data: { image_object_path: null, objects_purged_at: now },
       })
     })
@@ -276,23 +300,23 @@ describe('CommunityMaintenanceService', () => {
       // Guarded on `status: draft` so a post that was published between the
       // query and the delete is not removed.
       expect(deleteMany).toHaveBeenCalledWith({
-        where: { id: { in: ['post-abandoned'] }, status: 'draft' },
+        where: {
+          id: { in: ['post-abandoned'] },
+          status: 'draft',
+          upload_expires_at: { lt: now },
+          erasure_requested_at: { not: null },
+        },
       })
     })
 
     it('keeps the rows when the object delete fails, so the next sweep retries', async () => {
-      const { findMany, deleteMany } = createService()
+      const { prisma, findMany, deleteMany } = createService()
       findMany.mockResolvedValueOnce([
         { id: 'post-abandoned', image_object_path: 'community/post-abandoned/s.jpg' },
       ])
       const failingStorage = new InMemoryCommunityStorage()
       vi.spyOn(failingStorage, 'remove').mockRejectedValueOnce(new Error('denied'))
-      const failingService = new CommunityMaintenanceService(
-        {
-          lookbookPost: { findMany, deleteMany },
-        } as unknown as PrismaClient,
-        failingStorage
-      )
+      const failingService = new CommunityMaintenanceService(prisma, failingStorage)
 
       const result = await failingService.sweepExpiredUploads(now)
 

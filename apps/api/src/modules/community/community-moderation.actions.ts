@@ -1,4 +1,14 @@
-import { Inject, Injectable, Logger, NotFoundException } from '@nestjs/common'
+import { FeatureFlagsService } from '../feature-flags/feature-flags.service.js'
+import { assertCommunityDatabaseAccess } from './community-access.service.js'
+import { guardCommunityPost } from './community-privacy.js'
+import {
+  Inject,
+  Injectable,
+  Logger,
+  NotFoundException,
+  ForbiddenException,
+  ServiceUnavailableException,
+} from '@nestjs/common'
 import { PrismaClient, type LookbookPost } from '@prisma/client'
 import { buildCommunityContentSnapshot } from './community-audit-snapshot.js'
 
@@ -38,7 +48,9 @@ export class CommunityModerationActionsService {
 
   constructor(
     @Inject(PrismaClient)
-    private readonly prisma: PrismaClient
+    private readonly prisma: PrismaClient,
+    @Inject(FeatureFlagsService)
+    private readonly flags: Pick<FeatureFlagsService, 'getFeatureFlag'>
   ) {}
 
   /**
@@ -67,13 +79,30 @@ export class CommunityModerationActionsService {
     reason: string
   }): Promise<{ released: boolean }> {
     const { postId, operatorId, reason } = params
+    const source = await this.prisma.lookbookPost.findUnique({ where: { id: postId } })
+    if (!source) throw new NotFoundException('COMMUNITY_POST_NOT_FOUND')
+    if (!(await this.flags.getFeatureFlag('community_write_enabled', source.user_id)))
+      throw new ServiceUnavailableException('Community publication is unavailable.')
     const releasedAt = new Date()
 
     return this.prisma.$transaction(async (tx) => {
+      await tx.$executeRaw`SELECT pg_advisory_xact_lock(hashtext('community_member:' || ${source.user_id}))`
       const post = await this.lockPost(tx, postId)
 
-      if (post.status !== 'flagged') {
+      if (
+        post.status !== 'flagged' ||
+        post.user_id !== source.user_id ||
+        post.erasure_requested_at ||
+        post.anonymized_at
+      ) {
         return { released: false }
+      }
+
+      try {
+        await assertCommunityDatabaseAccess(tx, post.user_id)
+      } catch (error) {
+        if (error instanceof ForbiddenException) return { released: false }
+        throw error
       }
 
       await tx.lookbookPost.update({
@@ -134,12 +163,16 @@ export class CommunityModerationActionsService {
     reason: string
   }): Promise<{ takenDown: boolean }> {
     const { postId, operatorId, reason } = params
+    const source = await this.prisma.lookbookPost.findUnique({ where: { id: postId } })
+    if (!source) throw new NotFoundException('COMMUNITY_POST_NOT_FOUND')
     const takenDownAt = new Date()
 
     return this.prisma.$transaction(async (tx) => {
+      await guardCommunityPost(tx, postId)
+      await tx.$executeRaw`SELECT pg_advisory_xact_lock(hashtext('community_member:' || ${source.user_id}))`
       const post = await this.lockPost(tx, postId)
 
-      if (post.status !== 'published') {
+      if (post.status !== 'published' || post.user_id !== source.user_id) {
         return { takenDown: false }
       }
 

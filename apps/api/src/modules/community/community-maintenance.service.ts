@@ -1,5 +1,6 @@
 import { Inject, Injectable } from '@nestjs/common'
-import { PrismaClient } from '@prisma/client'
+import { Prisma, PrismaClient } from '@prisma/client'
+import { communityPrivacyTransaction, guardCommunityPost } from './community-privacy.js'
 import { createBaseLogger } from '../../logger/pino.config.js'
 import {
   SupabaseCommunityStorageAdapter,
@@ -181,32 +182,14 @@ export class CommunityMaintenanceService {
     const deadlineMs = ERASURE_DEADLINE_HOURS * 60 * 60 * 1000
 
     for (const post of pending) {
-      if (post.status !== 'withdrawn') {
-        const hidden = await this.prisma.lookbookPost.updateMany({
-          where: { id: post.id },
-          data: { status: 'withdrawn' },
-        })
-        result.hidden += hidden.count
-      }
+      const metadata = await this.eraseMetadata(post.id, now)
+      if (!metadata) continue
+      result.hidden += metadata.hidden
+      result.anonymized += metadata.anonymized
 
-      if (!post.anonymized_at) {
-        await this.prisma.lookbookPost.update({
-          where: { id: post.id },
-          data: {
-            caption: null,
-            alt_text: null,
-            locale: null,
-            location_key: null,
-            image_checksum: null,
-            anonymized_at: now,
-          },
-        })
-        result.anonymized += 1
-      }
-
-      if (post.image_object_path) {
+      if (metadata.image_object_path) {
         try {
-          await this.storage.remove([post.image_object_path])
+          await this.storage.remove([metadata.image_object_path])
         } catch (error: unknown) {
           // Leave `objects_purged_at` unset so the next sweep retries. Stamping
           // it here would record a deletion that never happened.
@@ -228,11 +211,19 @@ export class CommunityMaintenanceService {
         }
       }
 
-      await this.prisma.lookbookPost.update({
-        where: { id: post.id },
-        data: { image_object_path: null, objects_purged_at: now },
+      const purged = await communityPrivacyTransaction(this.prisma, async (tx) => {
+        await guardCommunityPost(tx, post.id)
+        return tx.lookbookPost.updateMany({
+          where: {
+            id: post.id,
+            image_object_path: metadata.image_object_path,
+            erasure_requested_at: { not: null },
+            objects_purged_at: null,
+          },
+          data: { image_object_path: null, objects_purged_at: now },
+        })
       })
-      result.objectsPurged += 1
+      result.objectsPurged += purged.count
     }
 
     if (result.overdue > 0) {
@@ -247,6 +238,36 @@ export class CommunityMaintenanceService {
     }
 
     return result
+  }
+
+  private eraseMetadata(id: string, now: Date) {
+    return communityPrivacyTransaction(this.prisma, async (tx) => {
+      await guardCommunityPost(tx, id)
+      await tx.$queryRaw`SELECT id FROM "LookbookPost" WHERE id = ${id} FOR UPDATE`
+      const post = await tx.lookbookPost.findFirst({
+        where: { id, erasure_requested_at: { not: null }, objects_purged_at: null },
+      })
+      if (!post) return null
+      const hidden = post.status === 'withdrawn' ? 0 : 1
+      const anonymized = post.anonymized_at ? 0 : 1
+      await tx.lookbookPost.update({
+        where: { id },
+        data: {
+          status: 'withdrawn',
+          ...(anonymized
+            ? {
+                caption: null,
+                alt_text: null,
+                locale: null,
+                location_key: null,
+                image_checksum: null,
+                anonymized_at: now,
+              }
+            : {}),
+        },
+      })
+      return { hidden, anonymized, image_object_path: post.image_object_path }
+    })
   }
 
   /**
@@ -275,7 +296,32 @@ export class CommunityMaintenanceService {
       return { objectsDeleted: 0, draftsDeleted: 0 }
     }
 
-    const objectPaths = abandoned
+    const candidateIds = abandoned.map((post) => post.id)
+    const claimed = await communityPrivacyTransaction(this.prisma, async (tx) => {
+      await tx.$executeRaw(
+        Prisma.sql`SELECT community_privacy_guards(ARRAY[]::text[],ARRAY[${Prisma.join(candidateIds)}]::text[],true)`
+      )
+      await tx.$queryRaw(
+        Prisma.sql`SELECT id FROM "LookbookPost" WHERE id IN (${Prisma.join(candidateIds)}) ORDER BY id FOR UPDATE`
+      )
+      const rows = await tx.lookbookPost.findMany({
+        where: {
+          id: { in: candidateIds },
+          status: 'draft',
+          upload_expires_at: { lt: now },
+        },
+        select: { id: true, image_object_path: true },
+      })
+      // Reserve cleanup durably before storage I/O. Publication checks this fence under its post lock.
+      await tx.lookbookPost.updateMany({
+        where: { id: { in: rows.map((row) => row.id) }, erasure_requested_at: null },
+        data: { erasure_requested_at: now },
+      })
+      return rows
+    })
+    if (!claimed.length) return { objectsDeleted: 0, draftsDeleted: 0 }
+
+    const objectPaths = claimed
       .map((post) => post.image_object_path)
       .filter((path): path is string => Boolean(path))
 
@@ -299,11 +345,22 @@ export class CommunityMaintenanceService {
       }
     }
 
-    const deleted = await this.prisma.lookbookPost.deleteMany({
-      where: {
-        id: { in: abandoned.map((post) => post.id) },
-        status: 'draft',
-      },
+    const ids = claimed.map((post) => post.id)
+    const deleted = await communityPrivacyTransaction(this.prisma, async (tx) => {
+      await tx.$executeRaw(
+        Prisma.sql`SELECT community_privacy_guards(ARRAY[]::text[],ARRAY[${Prisma.join(ids)}]::text[],true)`
+      )
+      await tx.$queryRaw(
+        Prisma.sql`SELECT id FROM "LookbookPost" WHERE id IN (${Prisma.join(ids)}) ORDER BY id FOR UPDATE`
+      )
+      return tx.lookbookPost.deleteMany({
+        where: {
+          id: { in: ids },
+          status: 'draft',
+          upload_expires_at: { lt: now },
+          erasure_requested_at: { not: null },
+        },
+      })
     })
 
     this.logger.info(

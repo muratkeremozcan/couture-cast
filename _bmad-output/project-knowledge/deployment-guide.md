@@ -845,3 +845,29 @@ as a repository procedure.
 10. **Observability does not cover the deployed serverless bootstrap or critical dependencies.**
     Current custom queue/cache/realtime/database dashboards are placeholders rather than live
     operational signals.
+
+### Story 6.5 engagement dispatch controls
+
+Production community rollout remains frozen. `COMMUNITY_DISPATCH_ENABLED` defaults off.
+When an isolated approved lane enables it, `COMMUNITY_ENGAGEMENT_OWNER` must select
+`general` or `community`. The selected composition alone allocates the dedicated guard pool
+with36 connections and32 send slots. The general-only deployment selects `general`; the
+standalone community composition selects `community`. Other compositions report `standby`.
+These configured limits require the story's actual capacity and timing evidence before use.
+
+`COMMUNITY_GUARD_DATABASE_URL` must identify the same primary host/database as `DATABASE_URL`.
+Dispatch additionally verifies PG17+, the privacy capability and effective server guard timeouts.
+No credential value or database URL belongs in readiness logs.
+
+The runtime returns `dispatch.status`: `disabled`, `standby`, `ready` or `degraded`.
+`community_dispatch_readiness` logs that status, role and a sanitized reason. Degraded reasons
+are `owner_unconfigured`, `guard_unconfigured`, `guard_mismatch` and `capability_unavailable`.
+A dispatch preflight failure closes its owned guard pool and starts no dispatch/provider loop.
+Moderation, append, stream/detail retention and operational telemetry continue independently in
+both compositions. The runtime's close hook retains ownership of all its timers and connections.
+
+Operators investigate degraded dispatch while keeping community rollout off, verify the selected
+owner and existing primary's measured capabilities, then restart the assigned process after the
+configuration is corrected. This startup preflight does not automatically enable dispatch later.
+No guard/pool/privacy limit may be weakened to clear readiness. Preserve original overdue work
+and eligibility clocks for the required recovery proof; a readiness log establishes no acceptance.

@@ -685,3 +685,42 @@ describe('Story 6.4 native comments sheet through real wrappers', () => {
     )
   })
 })
+
+it('R07 moves a removed notification target to the stable thread landmark once', async () => {
+  let visible = true
+  server.use(
+    http.get(`${base}/comments`, () => HttpResponse.json(page(visible ? [root] : [])))
+  )
+  const state = makeState()
+  render(
+    <CommunityCommentsSheet
+      postId={POST_ID}
+      state={state}
+      locale="en-US"
+      onClose={vi.fn()}
+      target={{
+        commentId: root.id,
+        parentId: null,
+        pageCursor: null,
+        parentPageCursor: null,
+      }}
+    />
+  )
+  await waitFor(() =>
+    expect(setAccessibilityFocus).toHaveBeenCalledWith(
+      nodeHandle(screen.getByTestId('comment-root'))
+    )
+  )
+  const before = vi.mocked(announceForAccessibility).mock.calls.length
+  visible = false
+  await state.refresh(POST_ID)
+  await waitFor(() => expect(screen.queryByTestId('comment-root')).toBeNull())
+  expect(setAccessibilityFocus).toHaveBeenLastCalledWith(nodeHandle(sheetTitle()))
+  expect(vi.mocked(announceForAccessibility).mock.calls.slice(before)).toEqual([
+    ['Unavailable.'],
+  ])
+  await state.refresh(POST_ID)
+  expect(vi.mocked(announceForAccessibility).mock.calls.slice(before)).toEqual([
+    ['Unavailable.'],
+  ])
+})

@@ -13,10 +13,46 @@ for (const file of rootEnvFiles) {
   loadEnv({ path: path.join(rootDir, file), override: false, quiet: true })
 }
 
+const isolatedNative = process.env.STORY65_NATIVE_TEST_BUILD === '1'
+if (isolatedNative) {
+  for (const value of [
+    process.env.EXPO_PUBLIC_API_BASE_URL,
+    process.env.EXPO_PUBLIC_SUPABASE_URL,
+  ]) {
+    if (
+      !value ||
+      !['localhost', '127.0.0.1', '10.0.2.2'].includes(new URL(value).hostname)
+    )
+      throw new Error(
+        'Story 6.5 native fixtures require explicit local API and Auth origins.'
+      )
+  }
+}
 export default ({ config }: ConfigContext) => ({
   ...config,
+  ...(isolatedNative
+    ? { name: 'CoutureCast Story65', scheme: 'couturecast-story65' }
+    : {}),
+  ios: {
+    ...config.ios,
+    ...(isolatedNative ? { bundleIdentifier: 'com.couturecast.story65' } : {}),
+  },
+  android: {
+    ...config.android,
+    ...(isolatedNative ? { package: 'com.couturecast.story65' } : {}),
+    ...(process.env.FIREBASE_GOOGLE_SERVICES_FILE
+      ? { googleServicesFile: process.env.FIREBASE_GOOGLE_SERVICES_FILE }
+      : {}),
+  },
   extra: {
     ...config.extra,
+    story65NativeFixtures: isolatedNative,
+    supabaseUrl:
+      process.env.EXPO_PUBLIC_SUPABASE_URL ?? process.env.NEXT_PUBLIC_SUPABASE_URL ?? '',
+    supabaseAnonKey:
+      process.env.EXPO_PUBLIC_SUPABASE_ANON_KEY ??
+      process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY ??
+      '',
     posthogApiKey: process.env.POSTHOG_API_KEY ?? '',
     posthogHost: process.env.POSTHOG_HOST ?? 'https://us.i.posthog.com',
     mobileAnalyticsDiagnostics:

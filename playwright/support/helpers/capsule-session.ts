@@ -3,6 +3,7 @@ import type { ApiRequestFixtureParams } from '@seontechnologies/playwright-utils
 import { interceptNetworkCall } from '@seontechnologies/playwright-utils/intercept-network-call'
 import { expect, test } from '../fixtures/merged-fixtures'
 import { isNonLocalEnvironment } from './api-test'
+import { localE2EAccessToken } from './local-e2e-token'
 
 /**
  * Capsule journeys need an owner who already has eligible garments, because the
@@ -104,7 +105,7 @@ export const capsuleTest = test.extend<{ capsuleSession: CapsuleSession }>({
      * route runs. The identity is still the seeded owner, so every request is
      * an owner acting on their own capsules.
      */
-    const accessToken = `test-token:guardian:${ownerUserId}`
+    const accessToken = localE2EAccessToken(ownerUserId)
 
     await context.addInitScript(
       ([storageKey, token]) => {

@@ -19,44 +19,66 @@ export type DeepLinkNotificationType = z.infer<typeof deepLinkNotificationTypeSc
 
 const nonEmptyIdentifierSchema = z.string().trim().min(1)
 
-export const deepLinkSchema = z
-  .object({
-    source: deepLinkSourceSchema,
-    slot: deepLinkSlotSchema.optional(),
-    size: deepLinkWidgetSizeSchema.optional(),
-    type: deepLinkNotificationTypeSchema.optional(),
-    alertId: nonEmptyIdentifierSchema.optional(),
-    cardId: nonEmptyIdentifierSchema.optional(),
-    expiresAt: z.string().datetime({ offset: true }).optional(),
-  })
-  .superRefine((payload, context) => {
-    let missingField: 'slot' | 'type' | 'cardId' | 'alertId' | undefined
-    if ((payload.source === 'widget' || payload.source === 'watch') && !payload.slot) {
-      missingField = 'slot'
-    } else if (payload.source === 'notification' && !payload.type) {
-      missingField = 'type'
-    } else if (
-      payload.source === 'notification' &&
-      payload.type === 'community' &&
-      !payload.cardId
-    ) {
-      missingField = 'cardId'
-    } else if (
-      payload.source === 'notification' &&
-      payload.type === 'severe_weather' &&
-      !payload.alertId
-    ) {
-      missingField = 'alertId'
-    }
+const deepLinkFields = z.object({
+  source: deepLinkSourceSchema,
+  slot: deepLinkSlotSchema.optional(),
+  size: deepLinkWidgetSizeSchema.optional(),
+  type: deepLinkNotificationTypeSchema.optional(),
+  alertId: nonEmptyIdentifierSchema.optional(),
+  cardId: nonEmptyIdentifierSchema.optional(),
+  commentId: nonEmptyIdentifierSchema.optional(),
+  parentId: nonEmptyIdentifierSchema.optional(),
+  expiresAt: z.string().datetime({ offset: true }).optional(),
+})
 
-    if (missingField) {
-      context.addIssue({
-        code: z.ZodIssueCode.custom,
-        path: [missingField],
-        message: `${payload.source} deep links require ${missingField}`,
-      })
-    }
-  })
+type DeepLinkFields = z.infer<typeof deepLinkFields>
+function validateCommentTarget(payload: DeepLinkFields, context: z.RefinementCtx) {
+  if (
+    (payload.commentId || payload.parentId) &&
+    (payload.source !== 'notification' ||
+      payload.type !== 'community' ||
+      !payload.cardId ||
+      (payload.parentId && !payload.commentId))
+  ) {
+    context.addIssue({
+      code: z.ZodIssueCode.custom,
+      path: ['commentId'],
+      message: 'Comment targets require a community card.',
+    })
+  }
+}
+function validateRequiredTarget(payload: DeepLinkFields, context: z.RefinementCtx) {
+  let missingField: 'slot' | 'type' | 'cardId' | 'alertId' | undefined
+  if ((payload.source === 'widget' || payload.source === 'watch') && !payload.slot) {
+    missingField = 'slot'
+  } else if (payload.source === 'notification' && !payload.type) {
+    missingField = 'type'
+  } else if (
+    payload.source === 'notification' &&
+    payload.type === 'community' &&
+    !payload.cardId
+  ) {
+    missingField = 'cardId'
+  } else if (
+    payload.source === 'notification' &&
+    payload.type === 'severe_weather' &&
+    !payload.alertId
+  ) {
+    missingField = 'alertId'
+  }
+
+  if (missingField) {
+    context.addIssue({
+      code: z.ZodIssueCode.custom,
+      path: [missingField],
+      message: `${payload.source} deep links require ${missingField}`,
+    })
+  }
+}
+export const deepLinkSchema = deepLinkFields.superRefine((payload, context) => {
+  validateCommentTarget(payload, context)
+  validateRequiredTarget(payload, context)
+})
 
 export type DeepLinkPayload = z.infer<typeof deepLinkSchema>
 
@@ -73,6 +95,8 @@ const deepLinkIntentKeys = [
   'type',
   'alertId',
   'cardId',
+  'commentId',
+  'parentId',
   'expiresAt',
 ] as const
 

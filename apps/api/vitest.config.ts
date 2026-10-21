@@ -36,6 +36,10 @@ const integrationDatabaseUrl =
 export default defineConfig({
   resolve: {
     alias: {
+      '@couture/api-client/contracts/http': resolve(
+        __dirname,
+        '../../packages/api-client/src/contracts/http/index.ts'
+      ),
       '@couture/utils': resolve(__dirname, '../../packages/utils/src/index.ts'),
       '@couture/config': resolve(__dirname, '../../packages/config/src/index.ts'),
       '@couture/api-client': resolve(__dirname, '../../packages/api-client/src/index.ts'),

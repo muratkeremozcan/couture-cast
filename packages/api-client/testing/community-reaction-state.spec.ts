@@ -56,6 +56,16 @@ const settled = async () => {
 }
 
 describe('screen-owned community reaction state', () => {
+  it('preserves a concurrent legacy detail while omission still fences an older aggregate', () => {
+    const { state } = setup()
+    const detail = state.beginRead()
+    const legacy = { ...item, reactions: undefined }
+    state.read(legacy, state.beginRead())
+    expect(state.read(legacy, detail)).toBe(legacy)
+    expect(state.read(item, detail)).toEqual({ ...item, reactions: undefined })
+    state.evict(item.id)
+    expect(state.read(legacy, detail)).toBeNull()
+  })
   it('shares confirmed snapshots across readers while preserving hidden/legacy omissions', () => {
     const { state, onChange } = setup()
     expect(state.current(item)).toBe(item)
@@ -75,12 +85,12 @@ describe('screen-owned community reaction state', () => {
     expect(onChange).toHaveBeenLastCalledWith('post', undefined)
     const stalePublic = state.beginRead()
     expect(state.read(hidden, state.beginRead())).toBe(hidden)
-    expect(state.read(item, stalePublic)).toBeNull()
+    expect(state.read(item, stalePublic)).toEqual({ ...item, reactions: undefined })
     const stale = state.beginRead()
     const owner = { ...hidden, status: 'withdrawn' as const }
     expect(state.read(owner, state.beginRead())).toBe(owner)
     expect(onChange).toHaveBeenLastCalledWith('post', undefined)
-    expect(state.read(item, stale)).toBeNull()
+    expect(state.read(item, stale)).toEqual({ ...item, reactions: undefined })
   })
 
   it('fences every older read after 404 and permits subsequent public reads', () => {

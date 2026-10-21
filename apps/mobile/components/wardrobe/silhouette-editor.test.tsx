@@ -66,13 +66,13 @@ vi.mock('expo-crypto', () => ({
   randomUUID: vi.fn(() => `idem-key-${(idempotencyKeyCounter += 1)}`),
 }))
 
-/** Base64url-shaped JWT payload so `resolveOwnerUserId` can decode a userId. */
+/** Synthetic auth principal; the profile HTTP response supplies the application owner. */
 function fakeAccessToken(userId: string): string {
   const payload = btoa(JSON.stringify({ sub: userId })).replace(/=+$/, '')
   return `header.${payload}.signature`
 }
 
-const ACCESS_TOKEN = fakeAccessToken('user-1')
+const ACCESS_TOKEN = fakeAccessToken('auth-principal-user-1')
 
 const defaultProfile = {
   mode: 'default_mannequin' as const,
@@ -164,6 +164,23 @@ describe('SilhouetteEditor', () => {
   })
 
   beforeEach(() => {
+    server.use(
+      http.get('*/api/v1/user/profile', ({ request }) => {
+        if (request.headers.get('authorization') !== `Bearer ${ACCESS_TOKEN}`)
+          return HttpResponse.json({ message: 'Unauthorized' }, { status: 401 })
+        return HttpResponse.json({
+          user: {
+            id: 'user-1',
+            email: 'owner@synthetic.test',
+            displayName: null,
+            birthdate: '1990-01-01T00:00:00.000Z',
+            role: 'guardian',
+          },
+          linkedGuardians: [],
+          linkedTeens: [],
+        })
+      })
+    )
     idempotencyKeyCounter = 0
     process.env.EXPO_PUBLIC_API_BASE_URL = window.location.origin
     imagePicker.requestCameraPermissionsAsync.mockResolvedValue({ granted: true })

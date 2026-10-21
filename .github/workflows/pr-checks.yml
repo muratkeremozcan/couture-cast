@@ -38,7 +38,7 @@ jobs:
     # make two concurrent runs corrupt each other.
     services:
       postgres:
-        image: postgres:16-alpine
+        image: postgres:17-alpine
         env:
           POSTGRES_USER: postgres
           POSTGRES_PASSWORD: postgres
@@ -141,7 +141,7 @@ jobs:
           -- TO `authenticated` ONLY, never `anon`: the suites require `anon` to
           -- hold zero grants everywhere, so including it fails 6 tests.
           --
-          -- Verified against postgres:16-alpine: the real migration gives
+          -- Verified against postgres:17-alpine: the real migration gives
           -- 97/97 including 5.1-DB-020, and the REVOKE-deleted mutant now fails
           -- 2 tests instead of passing silently.
           ALTER DEFAULT PRIVILEGES IN SCHEMA public

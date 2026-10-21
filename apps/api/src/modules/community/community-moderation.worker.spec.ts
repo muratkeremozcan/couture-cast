@@ -33,6 +33,8 @@ import type { CommunityModerationJob } from './community-moderation.queue'
 import type { CommunityModerationMeter } from './community-moderation.telemetry'
 import type { Job, WorkerOptions } from 'bullmq'
 
+const communityRolloutFixture = { getFeatureFlag: vi.fn().mockResolvedValue(true) }
+
 const workerHarness = vi.hoisted(() => ({
   registeredProcessor: null as
     | ((job: Job<CommunityModerationJob>) => Promise<void>)
@@ -81,7 +83,17 @@ describe('CommunityModerationProcessor & Worker', () => {
       callback(mockPrisma as unknown as PrismaClient)
     )
 
+  const eligibleProfile = {
+    birthdate: new Date('1990-01-01'),
+    preferences: { compliance: { accountStatus: 'active' } },
+  }
   const mockPrisma = {
+    $executeRaw: vi.fn().mockResolvedValue(1),
+    $queryRaw: vi.fn().mockResolvedValue([{ id: 'post-fixture' }]),
+    userProfile: { findUnique: vi.fn().mockResolvedValue(eligibleProfile) },
+    user: {
+      findUnique: vi.fn().mockResolvedValue({ profile: eligibleProfile, teen_roles: [] }),
+    },
     lookbookPost: {
       findUnique: mockFindUnique,
       update: mockPostUpdate,
@@ -143,6 +155,7 @@ describe('CommunityModerationProcessor & Worker', () => {
 
   const pendingPost = (overrides: Record<string, unknown> = {}) => ({
     status: 'pending_review',
+    user_id: 'user-default',
     caption: 'A classic autumn trench',
     alt_text: 'Full length photo',
     locale: 'en-US',
@@ -156,6 +169,7 @@ describe('CommunityModerationProcessor & Worker', () => {
 
   beforeEach(() => {
     vi.clearAllMocks()
+    mockFindUnique.mockReset().mockResolvedValue(pendingPost({ id: 'post-default' }))
     mockPostUpdate.mockResolvedValue({})
     mockPostUpdateMany.mockResolvedValue({ count: 1 })
     mockOutboxUpdateMany.mockResolvedValue({ count: 1 })
@@ -168,12 +182,14 @@ describe('CommunityModerationProcessor & Worker', () => {
       mockPrisma,
       mockStorage,
       mockTelemetryService,
-      engine
+      engine,
+      undefined,
+      communityRolloutFixture
     )
 
   describe('Operations canary', () => {
     it('publishes the canary post but keeps it out of analytics', async () => {
-      mockFindUnique.mockResolvedValueOnce(
+      mockFindUnique.mockResolvedValue(
         pendingPost({
           id: 'post-canary',
           user_id: 'canary-user-abc123',
@@ -200,7 +216,7 @@ describe('CommunityModerationProcessor & Worker', () => {
 
   describe('Clean path -> published', () => {
     it('transitions pending_review post to published, stamps published_at, and emits telemetry', async () => {
-      mockFindUnique.mockResolvedValueOnce(
+      mockFindUnique.mockResolvedValue(
         pendingPost({
           id: 'post-100',
           user_id: 'user-1',
@@ -223,7 +239,13 @@ describe('CommunityModerationProcessor & Worker', () => {
 
       expect(mockDownload).toHaveBeenCalledWith('community/post-100/session-1.jpg')
       expect(mockPostUpdateMany).toHaveBeenCalledWith({
-        where: { id: 'post-100', status: 'pending_review' },
+        where: {
+          id: 'post-100',
+          user_id: 'user-1',
+          status: 'pending_review',
+          erasure_requested_at: null,
+          anonymized_at: null,
+        },
         data: expect.objectContaining({
           status: 'published',
           published_at: expect.any(Date),
@@ -277,7 +299,7 @@ describe('CommunityModerationProcessor & Worker', () => {
       // after the post already published records nothing. Without the guard a
       // redelivered job would add a second "screened and passed" row for one
       // screening.
-      mockFindUnique.mockResolvedValueOnce(
+      mockFindUnique.mockResolvedValue(
         pendingPost({
           id: 'post-raced',
           user_id: 'user-1',
@@ -307,7 +329,7 @@ describe('CommunityModerationProcessor & Worker', () => {
       // The beta gate counts UNIQUE published participants, so the key is the
       // challenge and the author rather than the post; a second post from the
       // same author into the same challenge is the same participant.
-      mockFindUnique.mockResolvedValueOnce(
+      mockFindUnique.mockResolvedValue(
         pendingPost({
           id: 'post-challenge',
           user_id: 'user-9',
@@ -349,7 +371,7 @@ describe('CommunityModerationProcessor & Worker', () => {
     })
 
     it('emits no participation event for a post with no challenge', async () => {
-      mockFindUnique.mockResolvedValueOnce(
+      mockFindUnique.mockResolvedValue(
         pendingPost({
           id: 'post-solo',
           user_id: 'user-9',
@@ -377,7 +399,7 @@ describe('CommunityModerationProcessor & Worker', () => {
 
   describe('Upload verification before screening', () => {
     it('terminates at review_failed when the stored checksum does not match the bytes', async () => {
-      mockFindUnique.mockResolvedValueOnce(
+      mockFindUnique.mockResolvedValue(
         pendingPost({
           id: 'post-tamper',
           user_id: 'user-t',
@@ -396,7 +418,13 @@ describe('CommunityModerationProcessor & Worker', () => {
       await processor.process({ postId: 'post-tamper', uploadSessionId: 'session-t' })
 
       expect(mockPostUpdateMany).toHaveBeenCalledWith({
-        where: { id: 'post-tamper', status: 'pending_review' },
+        where: {
+          id: 'post-tamper',
+          user_id: expect.any(String) as string,
+          status: 'pending_review',
+          erasure_requested_at: null,
+          anonymized_at: null,
+        },
         data: {
           status: 'review_failed',
           moderation_reason: 'IMAGE_CHECKSUM_MISMATCH',
@@ -405,7 +433,7 @@ describe('CommunityModerationProcessor & Worker', () => {
     })
 
     it('terminates at review_failed when the sniffed MIME contradicts the declaration', async () => {
-      mockFindUnique.mockResolvedValueOnce(
+      mockFindUnique.mockResolvedValue(
         pendingPost({
           id: 'post-mime',
           user_id: 'user-m',
@@ -426,7 +454,13 @@ describe('CommunityModerationProcessor & Worker', () => {
       await processor.process({ postId: 'post-mime', uploadSessionId: 'session-m' })
 
       expect(mockPostUpdateMany).toHaveBeenCalledWith({
-        where: { id: 'post-mime', status: 'pending_review' },
+        where: {
+          id: 'post-mime',
+          user_id: expect.any(String) as string,
+          status: 'pending_review',
+          erasure_requested_at: null,
+          anonymized_at: null,
+        },
         data: {
           status: 'review_failed',
           moderation_reason: 'UNSUPPORTED_IMAGE_TYPE',
@@ -435,7 +469,7 @@ describe('CommunityModerationProcessor & Worker', () => {
     })
 
     it('re-encodes the object and persists the new checksum when re-encoding changes the bytes', async () => {
-      mockFindUnique.mockResolvedValueOnce(
+      mockFindUnique.mockResolvedValue(
         pendingPost({
           id: 'post-reencode',
           user_id: 'user-r',
@@ -462,8 +496,15 @@ describe('CommunityModerationProcessor & Worker', () => {
         expect.any(Buffer),
         'image/jpeg'
       )
-      expect(mockPostUpdate).toHaveBeenCalledWith({
-        where: { id: 'post-reencode' },
+      expect(mockPostUpdateMany).toHaveBeenCalledWith({
+        where: {
+          id: 'post-reencode',
+          user_id: 'user-r',
+          status: 'pending_review',
+          image_object_path: 'community/post-reencode/session-r.jpg',
+          erasure_requested_at: null,
+          anonymized_at: null,
+        },
         data: expect.objectContaining({
           image_checksum: expect.any(String),
           image_byte_size: expect.any(Number),
@@ -475,7 +516,7 @@ describe('CommunityModerationProcessor & Worker', () => {
 
   describe('Flagged path -> ModerationEvent, outbox stamp & SLA alert', () => {
     it('transitions post to flagged, sets moderation_reason, and persists ModerationEvent', async () => {
-      mockFindUnique.mockResolvedValueOnce(
+      mockFindUnique.mockResolvedValue(
         pendingPost({
           id: 'post-200',
           user_id: 'user-2',
@@ -495,7 +536,13 @@ describe('CommunityModerationProcessor & Worker', () => {
       await processor.process({ postId: 'post-200', uploadSessionId: 'session-2' })
 
       expect(mockPostUpdateMany).toHaveBeenCalledWith({
-        where: { id: 'post-200', status: 'pending_review' },
+        where: {
+          id: 'post-200',
+          user_id: expect.any(String) as string,
+          status: 'pending_review',
+          erasure_requested_at: null,
+          anonymized_at: null,
+        },
         data: expect.objectContaining({
           status: 'flagged',
           moderation_reason: 'profanity',
@@ -518,7 +565,7 @@ describe('CommunityModerationProcessor & Worker', () => {
     it('stamps the outbox on the flagged branch so the dispatcher stops re-enqueuing it', async () => {
       // Without this stamp the dispatcher, whose only claim predicate is
       // `dispatched_at IS NULL`, re-enqueues every flagged post forever.
-      mockFindUnique.mockResolvedValueOnce(
+      mockFindUnique.mockResolvedValue(
         pendingPost({
           id: 'post-flagged-outbox',
           user_id: 'user-2',
@@ -545,7 +592,7 @@ describe('CommunityModerationProcessor & Worker', () => {
     })
 
     it('aggregates multiple flagged reasons (profanity and nsfw)', async () => {
-      mockFindUnique.mockResolvedValueOnce(
+      mockFindUnique.mockResolvedValue(
         pendingPost({
           id: 'post-300',
           user_id: 'user-3',
@@ -565,7 +612,13 @@ describe('CommunityModerationProcessor & Worker', () => {
       await processor.process({ postId: 'post-300', uploadSessionId: 'session-3' })
 
       expect(mockPostUpdateMany).toHaveBeenCalledWith({
-        where: { id: 'post-300', status: 'pending_review' },
+        where: {
+          id: 'post-300',
+          user_id: expect.any(String) as string,
+          status: 'pending_review',
+          erasure_requested_at: null,
+          anonymized_at: null,
+        },
         data: expect.objectContaining({
           status: 'flagged',
           moderation_reason: expect.stringContaining('profanity'),
@@ -580,7 +633,7 @@ describe('CommunityModerationProcessor & Worker', () => {
     })
 
     it('flags rather than publishes when the image screener reports itself unavailable', async () => {
-      mockFindUnique.mockResolvedValueOnce(
+      mockFindUnique.mockResolvedValue(
         pendingPost({
           id: 'post-unscreened',
           user_id: 'user-u',
@@ -598,7 +651,13 @@ describe('CommunityModerationProcessor & Worker', () => {
       await processor.process({ postId: 'post-unscreened', uploadSessionId: 'session-u' })
 
       expect(mockPostUpdateMany).toHaveBeenCalledWith({
-        where: { id: 'post-unscreened', status: 'pending_review' },
+        where: {
+          id: 'post-unscreened',
+          user_id: expect.any(String) as string,
+          status: 'pending_review',
+          erasure_requested_at: null,
+          anonymized_at: null,
+        },
         data: expect.objectContaining({
           status: 'flagged',
           moderation_reason: 'screening_unavailable',
@@ -609,7 +668,7 @@ describe('CommunityModerationProcessor & Worker', () => {
 
   describe('Non-pending or missing posts', () => {
     it('skips processing when post is not found', async () => {
-      mockFindUnique.mockResolvedValueOnce(null)
+      mockFindUnique.mockResolvedValue(null)
       const processor = createProcessor(new FixtureCommunityModerationEngine())
 
       await processor.process({ postId: 'missing-post', uploadSessionId: 's1' })
@@ -619,7 +678,7 @@ describe('CommunityModerationProcessor & Worker', () => {
     })
 
     it('skips processing when post status is not pending_review', async () => {
-      mockFindUnique.mockResolvedValueOnce({
+      mockFindUnique.mockResolvedValue({
         id: 'post-400',
         user_id: 'user-4',
         status: 'published',
@@ -637,7 +696,7 @@ describe('CommunityModerationProcessor & Worker', () => {
 
   describe('Error handling & retry exhaustion -> review_failed', () => {
     it('propagates storage download errors so BullMQ can retry', async () => {
-      mockFindUnique.mockResolvedValueOnce(
+      mockFindUnique.mockResolvedValue(
         pendingPost({
           id: 'post-err',
           user_id: 'user-err',
@@ -664,7 +723,13 @@ describe('CommunityModerationProcessor & Worker', () => {
       )
 
       expect(mockPostUpdateMany).toHaveBeenCalledWith({
-        where: { id: 'post-fail', status: 'pending_review' },
+        where: {
+          id: 'post-fail',
+          user_id: expect.any(String) as string,
+          status: 'pending_review',
+          erasure_requested_at: null,
+          anonymized_at: null,
+        },
         data: {
           status: 'review_failed',
           moderation_reason: 'Exhausted 3 retry attempts due to network timeout',
@@ -680,6 +745,7 @@ describe('CommunityModerationProcessor & Worker', () => {
   describe('createCommunityModerationWorker', () => {
     it('creates a worker that executes processor and calls markFailed on attempt exhaustion', async () => {
       const worker = createCommunityModerationWorker({
+        featureFlags: communityRolloutFixture,
         prisma: mockPrisma,
         storage: mockStorage,
         telemetryService: mockTelemetryService,
@@ -688,7 +754,7 @@ describe('CommunityModerationProcessor & Worker', () => {
       expect(worker).toBeDefined()
       expect(workerHarness.registeredProcessor).toBeTypeOf('function')
 
-      mockFindUnique.mockResolvedValueOnce(
+      mockFindUnique.mockResolvedValue(
         pendingPost({
           id: 'post-exhausted',
           user_id: 'user-ex',
@@ -708,7 +774,13 @@ describe('CommunityModerationProcessor & Worker', () => {
       ).rejects.toThrow('Permanent failure')
 
       expect(mockPostUpdateMany).toHaveBeenCalledWith({
-        where: { id: 'post-exhausted', status: 'pending_review' },
+        where: {
+          id: 'post-exhausted',
+          user_id: expect.any(String) as string,
+          status: 'pending_review',
+          erasure_requested_at: null,
+          anonymized_at: null,
+        },
         data: {
           status: 'review_failed',
           moderation_reason: SCREENING_UNAVAILABLE_REASON,
@@ -717,7 +789,7 @@ describe('CommunityModerationProcessor & Worker', () => {
     })
 
     it('rethrows without markFailed when retry attempts remain', async () => {
-      mockFindUnique.mockResolvedValueOnce(
+      mockFindUnique.mockResolvedValue(
         pendingPost({
           id: 'post-retry',
           user_id: 'user-retry',
@@ -751,6 +823,7 @@ describe('CommunityModerationProcessor & Worker', () => {
 
     const buildWorker = () =>
       createCommunityModerationWorker({
+        featureFlags: communityRolloutFixture,
         prisma: mockPrisma,
         storage: mockStorage,
         telemetryService: mockTelemetryService,
@@ -835,7 +908,7 @@ describe('CommunityModerationProcessor & Worker', () => {
       // `attemptsMade` is the count BEFORE this attempt, so evidence built from
       // it directly would report the last of three attempts as attempt 2.
       buildWorker()
-      mockFindUnique.mockResolvedValueOnce(
+      mockFindUnique.mockResolvedValue(
         pendingPost({
           id: 'post-attempt',
           user_id: 'user-attempt',
@@ -864,7 +937,7 @@ describe('CommunityModerationProcessor & Worker', () => {
       // different things. This attempt fails and BullMQ will retry it, so there
       // is a failure to count and no terminal transition to report.
       buildWorker()
-      mockFindUnique.mockResolvedValueOnce(
+      mockFindUnique.mockResolvedValue(
         pendingPost({
           id: 'post-transient',
           user_id: 'user-transient',
@@ -890,7 +963,7 @@ describe('CommunityModerationProcessor & Worker', () => {
 
     it('records the final attempt alongside the review_failed transition', async () => {
       buildWorker()
-      mockFindUnique.mockResolvedValueOnce(
+      mockFindUnique.mockResolvedValue(
         pendingPost({
           id: 'post-last',
           user_id: 'user-last',
@@ -911,7 +984,13 @@ describe('CommunityModerationProcessor & Worker', () => {
 
       expect(recordAttemptFailure).toHaveBeenCalledWith('error', 3)
       expect(mockPostUpdateMany).toHaveBeenCalledWith({
-        where: { id: 'post-last', status: 'pending_review' },
+        where: {
+          id: 'post-last',
+          user_id: expect.any(String) as string,
+          status: 'pending_review',
+          erasure_requested_at: null,
+          anonymized_at: null,
+        },
         data: {
           status: 'review_failed',
           moderation_reason: SCREENING_UNAVAILABLE_REASON,
@@ -927,6 +1006,7 @@ describe('CommunityModerationProcessor & Worker', () => {
         throw new Error('metrics exporter unreachable')
       }
       createCommunityModerationWorker({
+        featureFlags: communityRolloutFixture,
         prisma: mockPrisma,
         storage: mockStorage,
         telemetryService: mockTelemetryService,
@@ -941,7 +1021,7 @@ describe('CommunityModerationProcessor & Worker', () => {
           recordModelHealth: exploding,
         },
       })
-      mockFindUnique.mockResolvedValueOnce(
+      mockFindUnique.mockResolvedValue(
         pendingPost({
           id: 'post-metrics-fault',
           user_id: 'user-metrics',
@@ -970,6 +1050,7 @@ describe('CommunityModerationProcessor & Worker', () => {
       // The fail-closed rule at the seam, exercised through the whole processor:
       // `passed: true` with a `block` disposition must flag, not publish.
       createCommunityModerationWorker({
+        featureFlags: communityRolloutFixture,
         prisma: mockPrisma,
         storage: mockStorage,
         telemetryService: mockTelemetryService,
@@ -978,7 +1059,7 @@ describe('CommunityModerationProcessor & Worker', () => {
         }),
         meter,
       })
-      mockFindUnique.mockResolvedValueOnce(
+      mockFindUnique.mockResolvedValue(
         pendingPost({
           id: 'post-contradiction',
           user_id: 'user-contradiction',
@@ -1011,12 +1092,13 @@ describe('CommunityModerationProcessor & Worker', () => {
   describe('terminal reason on retry exhaustion', () => {
     it('persists the stable timeout code rather than an error message', async () => {
       createCommunityModerationWorker({
+        featureFlags: communityRolloutFixture,
         prisma: mockPrisma,
         storage: mockStorage,
         telemetryService: mockTelemetryService,
         engine: new FixtureCommunityModerationEngine({}),
       })
-      mockFindUnique.mockResolvedValueOnce(
+      mockFindUnique.mockResolvedValue(
         pendingPost({
           id: 'post-wedged',
           user_id: 'user-wedged',
@@ -1040,7 +1122,13 @@ describe('CommunityModerationProcessor & Worker', () => {
       // A stable code an operator can query, not free text that changes when a
       // library rewords its message.
       expect(mockPostUpdateMany).toHaveBeenCalledWith({
-        where: { id: 'post-wedged', status: 'pending_review' },
+        where: {
+          id: 'post-wedged',
+          user_id: expect.any(String) as string,
+          status: 'pending_review',
+          erasure_requested_at: null,
+          anonymized_at: null,
+        },
         data: { status: 'review_failed', moderation_reason: 'inference_timeout' },
       })
     })
@@ -1060,9 +1148,12 @@ describe('CommunityModerationProcessor & Worker', () => {
       const processor = new CommunityModerationProcessor(
         mockPrisma,
         mockStorage,
-        mockTelemetryService
+        mockTelemetryService,
+        undefined,
+        undefined,
+        communityRolloutFixture
       )
-      mockFindUnique.mockResolvedValueOnce(
+      mockFindUnique.mockResolvedValue(
         pendingPost({
           id: 'post-default-engine',
           user_id: 'user-d',
@@ -1076,7 +1167,13 @@ describe('CommunityModerationProcessor & Worker', () => {
       })
 
       expect(mockPostUpdateMany).toHaveBeenCalledWith({
-        where: { id: 'post-default-engine', status: 'pending_review' },
+        where: {
+          id: 'post-default-engine',
+          user_id: expect.any(String) as string,
+          status: 'pending_review',
+          erasure_requested_at: null,
+          anonymized_at: null,
+        },
         data: expect.objectContaining({
           status: 'flagged',
           moderation_reason: 'screening_unavailable',
@@ -1085,7 +1182,7 @@ describe('CommunityModerationProcessor & Worker', () => {
     })
 
     it('throws when a pending post has no object path to screen', async () => {
-      mockFindUnique.mockResolvedValueOnce(
+      mockFindUnique.mockResolvedValue(
         pendingPost({ id: 'post-no-path', user_id: 'user-n', image_object_path: null })
       )
 
@@ -1097,7 +1194,7 @@ describe('CommunityModerationProcessor & Worker', () => {
     })
 
     it('terminates at review_failed when the stored declaration is incomplete', async () => {
-      mockFindUnique.mockResolvedValueOnce(
+      mockFindUnique.mockResolvedValue(
         pendingPost({
           id: 'post-no-decl',
           user_id: 'user-d',
@@ -1111,7 +1208,13 @@ describe('CommunityModerationProcessor & Worker', () => {
       await processor.process({ postId: 'post-no-decl', uploadSessionId: 'session-d' })
 
       expect(mockPostUpdateMany).toHaveBeenCalledWith({
-        where: { id: 'post-no-decl', status: 'pending_review' },
+        where: {
+          id: 'post-no-decl',
+          user_id: expect.any(String) as string,
+          status: 'pending_review',
+          erasure_requested_at: null,
+          anonymized_at: null,
+        },
         data: {
           status: 'review_failed',
           moderation_reason: 'IMAGE_DECLARATION_MISSING',
@@ -1122,7 +1225,7 @@ describe('CommunityModerationProcessor & Worker', () => {
     it('emits nothing when another worker already moved the post on', async () => {
       // The guarded update matching zero rows means a concurrent worker won;
       // emitting here would double-count a publication.
-      mockFindUnique.mockResolvedValueOnce(
+      mockFindUnique.mockResolvedValue(
         pendingPost({
           id: 'post-raced',
           user_id: 'user-r',
@@ -1145,7 +1248,7 @@ describe('CommunityModerationProcessor & Worker', () => {
     })
 
     it('writes no moderation event when the flag update loses its race', async () => {
-      mockFindUnique.mockResolvedValueOnce(
+      mockFindUnique.mockResolvedValue(
         pendingPost({
           id: 'post-raced-flag',
           user_id: 'user-r',
@@ -1177,7 +1280,7 @@ describe('CommunityModerationProcessor & Worker', () => {
     })
 
     it('flags with a generic reason when the engine returns no reasons', async () => {
-      mockFindUnique.mockResolvedValueOnce(
+      mockFindUnique.mockResolvedValue(
         pendingPost({
           id: 'post-silent',
           user_id: 'user-s',
@@ -1195,13 +1298,19 @@ describe('CommunityModerationProcessor & Worker', () => {
       await processor.process({ postId: 'post-silent', uploadSessionId: 'session-s' })
 
       expect(mockPostUpdateMany).toHaveBeenCalledWith({
-        where: { id: 'post-silent', status: 'pending_review' },
+        where: {
+          id: 'post-silent',
+          user_id: expect.any(String) as string,
+          status: 'pending_review',
+          erasure_requested_at: null,
+          anonymized_at: null,
+        },
         data: expect.objectContaining({ moderation_reason: 'flagged_by_screening' }),
       })
     })
 
     it('keeps the request alive when the published telemetry emit throws', async () => {
-      mockFindUnique.mockResolvedValueOnce(
+      mockFindUnique.mockResolvedValue(
         pendingPost({
           id: 'post-telemetry',
           user_id: 'user-t',
@@ -1251,7 +1360,7 @@ describe('CommunityModerationProcessor & Worker', () => {
     it('marks failed when a job with no configured attempt count fails', async () => {
       // `job.opts.attempts` is optional in BullMQ's type; the default of three
       // is what the queue config actually sets.
-      mockFindUnique.mockResolvedValueOnce(
+      mockFindUnique.mockResolvedValue(
         pendingPost({
           id: 'post-no-attempts',
           user_id: 'user-a',
@@ -1261,6 +1370,7 @@ describe('CommunityModerationProcessor & Worker', () => {
       mockDownload.mockRejectedValueOnce(new Error('Permanent failure'))
 
       createCommunityModerationWorker({
+        featureFlags: communityRolloutFixture,
         prisma: mockPrisma,
         storage: mockStorage,
         telemetryService: mockTelemetryService,
@@ -1277,7 +1387,13 @@ describe('CommunityModerationProcessor & Worker', () => {
       ).rejects.toThrow('Permanent failure')
 
       expect(mockPostUpdateMany).toHaveBeenCalledWith({
-        where: { id: 'post-no-attempts', status: 'pending_review' },
+        where: {
+          id: 'post-no-attempts',
+          user_id: expect.any(String) as string,
+          status: 'pending_review',
+          erasure_requested_at: null,
+          anonymized_at: null,
+        },
         data: {
           status: 'review_failed',
           moderation_reason: SCREENING_UNAVAILABLE_REASON,
@@ -1286,7 +1402,7 @@ describe('CommunityModerationProcessor & Worker', () => {
     })
 
     it('reports a non-Error rejection with its own fallback message', async () => {
-      mockFindUnique.mockResolvedValueOnce(
+      mockFindUnique.mockResolvedValue(
         pendingPost({
           id: 'post-string-throw',
           user_id: 'user-a',
@@ -1296,6 +1412,7 @@ describe('CommunityModerationProcessor & Worker', () => {
       mockDownload.mockRejectedValueOnce('not an error object')
 
       createCommunityModerationWorker({
+        featureFlags: communityRolloutFixture,
         prisma: mockPrisma,
         storage: mockStorage,
         telemetryService: mockTelemetryService,
@@ -1312,7 +1429,13 @@ describe('CommunityModerationProcessor & Worker', () => {
       ).rejects.toBe('not an error object')
 
       expect(mockPostUpdateMany).toHaveBeenCalledWith({
-        where: { id: 'post-string-throw', status: 'pending_review' },
+        where: {
+          id: 'post-string-throw',
+          user_id: expect.any(String) as string,
+          status: 'pending_review',
+          erasure_requested_at: null,
+          anonymized_at: null,
+        },
         data: {
           status: 'review_failed',
           moderation_reason: SCREENING_UNAVAILABLE_REASON,

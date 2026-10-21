@@ -433,6 +433,13 @@ export default function SettingsScreen() {
             ) : null}
           </View>
 
+          <Pressable
+            accessibilityRole="link"
+            onPress={() => router.push('/notification-settings')}
+            style={styles.actionButton}
+          >
+            <Text style={styles.actionText}>{t('community.notifications.title')}</Text>
+          </Pressable>
           <PremiumSettingsSection />
 
           <PremiumThemeSection />

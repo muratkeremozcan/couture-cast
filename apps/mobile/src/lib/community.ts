@@ -1,5 +1,6 @@
 import {
   communityCommentsClient,
+  communitySyncClient,
   commentSessionIdentity,
   ResponseError,
 } from '@couture/api-client'
@@ -252,15 +253,19 @@ export async function getCommunityFeedFromMobile({
 
 export async function getCommunityPostFromMobile(
   postId: string,
-  signal?: AbortSignal
+  signal?: AbortSignal,
+  timeoutMs?: number
 ): Promise<CommunityFeedItem> {
   const accessToken = await readAccessToken()
   try {
-    const response = await withRequestTimeout(signal, (requestSignal) =>
-      communityClient(accessToken).apiV1CommunityPostsPostIdGet(
-        { postId, xCouturePlatform: 'mobile', xCoutureReactions: '1' },
-        { signal: requestSignal }
-      )
+    const response = await withRequestTimeout(
+      signal,
+      (requestSignal) =>
+        communityClient(accessToken).apiV1CommunityPostsPostIdGet(
+          { postId, xCouturePlatform: 'mobile', xCoutureReactions: '1' },
+          { signal: requestSignal }
+        ),
+      timeoutMs
     )
     return communityReactionPostResponseSchema.parse(response).data
   } catch (error: unknown) {
@@ -631,34 +636,46 @@ export async function setCommunityReactionFromMobile(
 }
 
 async function commentRequest<T>(
-  request: (client: ReturnType<typeof communityCommentsClient>) => Promise<T>
+  request: (client: ReturnType<typeof communityCommentsClient>) => Promise<T>,
+  signal?: AbortSignal
 ): Promise<T> {
   const accessToken = await readAccessToken()
   try {
-    return await withRequestTimeout(undefined, (signal) =>
-      request(
-        communityCommentsClient(createMobileApiClient({ accessToken }), 'mobile', {
-          signal,
-        })
-      )
+    return await withRequestTimeout(
+      signal ? AbortSignal.any([signal, AbortSignal.timeout(2000)]) : undefined,
+      (signal) =>
+        request(
+          communityCommentsClient(createMobileApiClient({ accessToken }), 'mobile', {
+            signal,
+          })
+        )
     )
   } catch (error) {
     throw await communityError(error, 'Unable to update comments.')
   }
 }
 
-export function communityCommentsRootsFromMobile(postId: string, cursor?: string) {
-  return commentRequest((client) => client.roots(postId, cursor))
+export function communityCommentsRootsFromMobile(
+  postId: string,
+  cursor?: string,
+  signal?: AbortSignal
+) {
+  return commentRequest((client) => client.roots(postId, cursor), signal)
 }
 export function communityCommentsRepliesFromMobile(
   postId: string,
   parentId: string,
-  cursor?: string
+  cursor?: string,
+  signal?: AbortSignal
 ) {
-  return commentRequest((client) => client.replies(postId, parentId, cursor))
+  return commentRequest((client) => client.replies(postId, parentId, cursor), signal)
 }
-export function communityCommentsSubmissionsFromMobile(postId: string, cursor?: string) {
-  return commentRequest((client) => client.submissions(postId, cursor))
+export function communityCommentsSubmissionsFromMobile(
+  postId: string,
+  cursor?: string,
+  signal?: AbortSignal
+) {
+  return commentRequest((client) => client.submissions(postId, cursor), signal)
 }
 export function communityCommentsCreateFromMobile(
   postId: string,
@@ -678,5 +695,15 @@ export function communityCommentsReportFromMobile(
 }
 
 export async function communityCommentsSessionFromMobile() {
-  return commentSessionIdentity(await resolveMobileAccessToken())
+  const { mobileApplicationUserId } = await import('./mobile-auth.js')
+  return (
+    mobileApplicationUserId() ?? commentSessionIdentity(await resolveMobileAccessToken())
+  )
 }
+
+export const communitySyncFromMobile = (token?: string | (() => Promise<string>)) =>
+  communitySyncClient(
+    createMobileApiClient({
+      accessToken: token ?? (async () => (await resolveMobileAccessToken()) ?? ''),
+    })
+  )

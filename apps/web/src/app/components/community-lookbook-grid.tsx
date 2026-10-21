@@ -27,12 +27,17 @@
 
 import { CommunityComments } from './community-comments'
 import {
+  ResponseError,
   CommunityCommentsState,
+  CommunitySyncState,
+  CommunityRequestSuperseded,
   CommunityReactionState,
   type ReactionControls,
 } from '@couture/api-client'
 import {
   communityCommentsSessionFromWeb,
+  communitySyncFromWeb,
+  communityRealtimeTokenFromWeb,
   communityCommentsRootsFromWeb,
   communityCommentsRepliesFromWeb,
   communityCommentsSubmissionsFromWeb,
@@ -40,6 +45,7 @@ import {
   communityCommentsDeleteFromWeb,
   communityCommentsReportFromWeb,
   allocateCommunityLookFromWeb,
+  CommunityRequestError,
   communityFailureReason,
   setCommunityReactionFromWeb,
   communityRetryAfterSeconds,
@@ -53,6 +59,7 @@ import {
   withdrawCommunityPostFromWeb,
   type CommunityFailureReason,
 } from '../../lib/community'
+import { resolveWebApiBaseUrl } from '../../lib/api-client'
 import { CommunityReactions } from './community-reactions'
 
 import React, {
@@ -64,9 +71,10 @@ import React, {
   useSyncExternalStore,
 } from 'react'
 import Image from 'next/image'
+import Link from 'next/link'
 import posthog from 'posthog-js'
 import { useTranslation } from 'react-i18next'
-import { CLIMATE_BANDS } from '@couture/utils'
+import { parseDeepLink, CLIMATE_BANDS } from '@couture/utils'
 import {
   communityModerationReasonCategories,
   communityPostCaptionSchema,
@@ -137,6 +145,21 @@ const MERLOT = '#7A1F2D'
  * Typing this as a total `Record` means a new member of
  * `CommunityFailureReason` fails to typecheck here until it has copy.
  */
+function notificationFailureIsRetryable(error: unknown) {
+  if (
+    error instanceof CommunityRequestError &&
+    ['signed_out', 'age_gate', 'not_found', 'disabled'].includes(error.reason)
+  )
+    return false
+  const status =
+    error instanceof CommunityRequestError
+      ? error.httpStatus
+      : error instanceof ResponseError
+        ? error.response.status
+        : undefined
+  return status === undefined || status === 408 || status === 429 || status >= 500
+}
+
 const FAILURE_KEYS: Record<CommunityFailureReason, string> = {
   signed_out: 'community.error.signedOut',
   age_gate: 'community.error.ageGate',
@@ -820,6 +843,13 @@ function detailRevalidationTargets(
 }
 
 interface LookbookDetailDialogProps {
+  suspended?: boolean
+  commentTarget?: {
+    commentId: string
+    parentId: string | null
+    pageCursor: string | null
+    parentPageCursor: string | null
+  }
   focusComments: boolean
   comments: CommunityCommentsState
   reactionFeedback: { key: string; id: number } | null
@@ -839,6 +869,7 @@ interface LookbookDetailDialogProps {
  * or its hat to the frame.
  */
 function LookbookDetailDialog({
+  suspended = false,
   focusComments,
   comments,
   reactionFeedback,
@@ -846,11 +877,13 @@ function LookbookDetailDialog({
   t,
   onClose,
   reactionControls,
+  commentTarget,
 }: LookbookDetailDialogProps) {
   const authorName = authorNameOf(item, t)
 
   return (
     <AccessibleModal
+      suspended={suspended}
       isOpen
       onClose={onClose}
       title={t('community.card.label', { author: authorName })}
@@ -907,7 +940,8 @@ function LookbookDetailDialog({
         <CommunityComments
           postId={item.id}
           state={comments}
-          focusOnOpen={focusComments}
+          focusOnOpen={focusComments && !commentTarget}
+          target={commentTarget}
           onClose={onClose}
         />
       </div>
@@ -1027,6 +1061,7 @@ function AuthorStatesSection({ states, t }: AuthorStatesSectionProps) {
 // ---------------------------------------------------------------------------
 
 interface CommunityReportModalProps {
+  suspended?: boolean
   onClose: () => void
   onSubmit: (reason: CommunityReportReason, details?: string) => void
   isSubmitting: boolean
@@ -1035,6 +1070,7 @@ interface CommunityReportModalProps {
 }
 
 function CommunityReportModal({
+  suspended = false,
   onClose,
   onSubmit,
   isSubmitting,
@@ -1046,6 +1082,7 @@ function CommunityReportModal({
 
   return (
     <AccessibleModal
+      suspended={suspended}
       isOpen
       onClose={onClose}
       title={t('community.report.title')}
@@ -1151,6 +1188,7 @@ function CommunityReportModal({
 // ---------------------------------------------------------------------------
 
 interface PostCreationModalProps {
+  suspended?: boolean
   onClose: () => void
   onSelectPhoto: (file: File) => void
   onPublish: (params: {
@@ -1176,6 +1214,7 @@ interface PostCreationModalProps {
  * publishing sends the confirmed text. The client never invents a suggestion.
  */
 function PostCreationModal({
+  suspended = false,
   onClose,
   onSelectPhoto,
   onPublish,
@@ -1233,6 +1272,7 @@ function PostCreationModal({
 
   return (
     <AccessibleModal
+      suspended={suspended}
       isOpen
       onClose={onClose}
       title={t('community.compose.title')}
@@ -1710,6 +1750,29 @@ export interface CommunityLookbookGridProps {
   onServedModeChange?: (mode: CommunityFeedMode) => void
 }
 
+function communityPresentation(
+  available: boolean,
+  hasSession: boolean,
+  items: CommunityFeedItem[],
+  authorStates: CommunityAuthorPostState[],
+  nextCursor: string | null,
+  newLooks: CommunityFeedItem[],
+  openedItem: CommunityFeedItem | null
+) {
+  return {
+    items: available ? items : [],
+    authorStates: available ? authorStates : [],
+    nextCursor: available ? nextCursor : null,
+    showNewLooks: available && newLooks.length > 0,
+    detail: openedItem,
+    canAct: available && hasSession,
+    settingsHref: hasSession ? '/notification-settings' : '/signin',
+    settingsLabel: hasSession
+      ? 'community.notifications.title'
+      : 'community.notifications.signin',
+  }
+}
+
 export function CommunityLookbookGrid({
   activeTab = 'auto',
   onTabChange,
@@ -1733,6 +1796,12 @@ export function CommunityLookbookGrid({
    * and is served `all`.
    */
   const [servedMode, setServedMode] = useState<CommunityFeedMode | null>(null)
+  const [communityAvailable, setCommunityAvailable] = useState(true)
+  const [newLooks, setNewLooks] = useState<CommunityFeedItem[]>([])
+  const newLooksRef = useRef(newLooks)
+  newLooksRef.current = newLooks
+  const [isInsertingLooks, setIsInsertingLooks] = useState(false)
+
   const [items, setItems] = useState<CommunityFeedItem[]>([])
   const [authorStates, setAuthorStates] = useState<CommunityAuthorPostState[]>([])
   const [viewerBand, setViewerBand] = useState<ClimateBand | null>(null)
@@ -1753,6 +1822,15 @@ export function CommunityLookbookGrid({
    * referenced card routinely sits far past the twelve rows of page one.
    */
   const [deepLinkedItem, setDeepLinkedItem] = useState<CommunityFeedItem | null>(null)
+  const [commentTarget, setCommentTarget] = useState<
+    | {
+        commentId: string
+        parentId: string | null
+        pageCursor: string | null
+        parentPageCursor: string | null
+      }
+    | undefined
+  >()
   const [focusComments, setFocusComments] = useState(false)
   const [openedItem, setOpenedItem] = useState<CommunityFeedItem | null>(null)
   const openedItemRef = useRef(openedItem)
@@ -1798,6 +1876,7 @@ export function CommunityLookbookGrid({
     () =>
       new CommunityCommentsState(
         {
+          locate: (input, signal) => communitySyncFromWeb().resolve(input, signal),
           roots: communityCommentsRootsFromWeb,
           replies: communityCommentsRepliesFromWeb,
           submissions: communityCommentsSubmissionsFromWeb,
@@ -1810,25 +1889,6 @@ export function CommunityLookbookGrid({
         (postId) => setOpenedItem((current) => (current?.id === postId ? null : current))
       )
   )
-  useEffect(() => {
-    const syncSession = () => {
-      comments.setSession(communityCommentsSessionFromWeb())
-      setHasSession(hasWebSession())
-    }
-    syncSession()
-    const timer = setInterval(syncSession, 1000)
-    window.addEventListener('storage', syncSession)
-    const erase = () => {
-      comments.reset()
-      setOpenedItem(null)
-    }
-    window.addEventListener('couture:account-erased', erase)
-    return () => {
-      clearInterval(timer)
-      window.removeEventListener('storage', syncSession)
-      window.removeEventListener('couture:account-erased', erase)
-    }
-  }, [comments])
   const [reactionState] = useState(
     () =>
       new CommunityReactionState({
@@ -1852,6 +1912,8 @@ export function CommunityLookbookGrid({
   const [notice, setNotice] = useState<Notice | null>(null)
   const [failedImages, setFailedImages] = useState<Record<string, FailedImage>>({})
   const [hasSession, setHasSession] = useState(false)
+  const [sessionScope, setSessionScope] = useState<string | null>(null)
+  const sessionScopeRef = useRef<string | null | undefined>(undefined)
 
   const [reportingPostId, setReportingPostId] = useState<string | null>(null)
   const [reportError, setReportError] = useState<Message | null>(null)
@@ -1875,10 +1937,14 @@ export function CommunityLookbookGrid({
   // Mirrors the three refs above. `loadFeed` needs the current page to count what
   // an append actually added, and reading it from state would put `items` in that
   // callback's dependency list and re-create it after every page.
+  const realtimeDeepLink = useRef(deepLinkedItem)
+  realtimeDeepLink.current = deepLinkedItem
   const itemsRef = useRef(items)
   const highlightedIdRef = useRef(highlightedCardId)
   highlightedIdRef.current = highlightedCardId
   const detailGenerationRef = useRef(0)
+  const notificationIntentRef = useRef(0)
+  const realtimeSyncRef = useRef<CommunitySyncState | null>(null)
   const hasLoadedFeedRef = useRef(false)
 
   useEffect(() => {
@@ -2066,6 +2132,62 @@ export function CommunityLookbookGrid({
   )
 
   useEffect(() => {
+    const clearScope = () => {
+      feedGenerationRef.current++
+      detailGenerationRef.current++
+      feedControllerRef.current?.abort()
+      actionControllerRef.current?.abort()
+      reactionState.reset()
+      setItems([])
+      itemsRef.current = []
+      setAuthorStates([])
+      setOpenedItem(null)
+      setDeepLinkedItem(null)
+      setNewLooks([])
+      setNextCursor(null)
+      setCommentTarget(undefined)
+      setReportingPostId(null)
+      setReportedPostIds(new Set())
+      setIsCreateModalOpen(false)
+      setIsSubmittingReport(false)
+      setIsPreparingPhoto(false)
+      setIsPublishing(false)
+      setAllocated(null)
+      setPhotoPreview((value) => {
+        if (value) URL.revokeObjectURL(value)
+        return null
+      })
+    }
+    const syncSession = () => {
+      const identity = communityCommentsSessionFromWeb()
+      const previous = sessionScopeRef.current
+      sessionScopeRef.current = identity
+      comments.setSession(identity)
+      setHasSession(hasWebSession())
+      setSessionScope(identity)
+      if (previous !== undefined && previous !== identity) {
+        clearScope()
+        if (identity) void loadFeed(modeRef.current)
+      }
+    }
+    const erase = () => {
+      comments.reset()
+      clearScope()
+    }
+    syncSession()
+    const timer = setInterval(syncSession, 1000)
+    window.addEventListener('storage', syncSession)
+    window.addEventListener('couture:session', syncSession)
+    window.addEventListener('couture:account-erased', erase)
+    return () => {
+      clearInterval(timer)
+      window.removeEventListener('storage', syncSession)
+      window.removeEventListener('couture:session', syncSession)
+      window.removeEventListener('couture:account-erased', erase)
+    }
+  }, [comments, reactionState, loadFeed])
+
+  useEffect(() => {
     // Cleared alongside the request, so the chips answer with the mode just
     // clicked while the server is deciding what to serve for it, and correct
     // themselves when it answers. Holding the previous served mode instead would
@@ -2073,6 +2195,181 @@ export function CommunityLookbookGrid({
     setServedMode(null)
     void loadFeed(currentMode)
   }, [currentMode, loadFeed])
+
+  const insertNewLooks = async () => {
+    if (isInsertingLooks) return
+    const generation = detailGenerationRef.current
+    const ticket = reactionState.beginRead()
+    const buffered = newLooksRef.current
+    setIsInsertingLooks(true)
+    try {
+      const fresh: CommunityFeedItem[] = []
+      for (let offset = 0; offset < buffered.length; offset += 50) {
+        const result = await communitySyncFromWeb().resolve(
+          {
+            targets: buffered
+              .slice(offset, offset + 50)
+              .map((post) => ({ key: post.id, postId: post.id })),
+          },
+          AbortSignal.timeout(2000)
+        )
+        if (generation !== detailGenerationRef.current) return
+        for (const target of result.targets)
+          if (target.status === 'available') {
+            const post = reactionState.read(target.post, ticket)
+            if (post) fresh.push(post)
+          }
+      }
+      setItems((previous) => [
+        ...new Map([...fresh, ...previous].map((post) => [post.id, post])).values(),
+      ])
+      newLooksRef.current = []
+      setNewLooks([])
+    } catch {
+      if (generation === detailGenerationRef.current) realtimeSyncRef.current?.recover()
+    } finally {
+      setIsInsertingLooks(false)
+    }
+  }
+
+  useEffect(() => {
+    if (!sessionScope) return
+    let active = true
+    const refreshFeed = async (signal?: AbortSignal) => {
+      const generation = feedGenerationRef.current
+      const page = await getCommunityFeedFromWeb({
+        mode: currentMode,
+        limit: FEED_PAGE_SIZE,
+        signal,
+      })
+      if (!active) return
+      if (signal?.aborted) throw new CommunityRequestSuperseded()
+      if (generation !== feedGenerationRef.current) throw new CommunityRequestSuperseded()
+      setAuthorStates(page.authorStates)
+      setNextCursor(page.nextCursor)
+      setServedMode(page.mode)
+      setViewerBand(page.viewerBand)
+      setActiveChallenge(page.activeChallenge)
+      setIsLoadingMore(false)
+      setIsLoading(false)
+
+      const existing = new Set(itemsRef.current.map((item) => item.id))
+      const incoming = page.items.filter((item) => !existing.has(item.id))
+      if (!itemsRef.current.length) setItems(page.items)
+      else if (incoming.length) {
+        const buffered = mergeFeedPages(incoming, newLooksRef.current)
+        newLooksRef.current = buffered
+        setNewLooks(buffered)
+        setAnnouncement({
+          key: 'community.realtime.newLooks',
+          params: { count: incoming.length },
+        })
+      }
+    }
+    const sync = new CommunitySyncState(communitySyncFromWeb(), currentMode, {
+      rendered: () => [
+        ...itemsRef.current.map((item) => item.id),
+        ...(openedItemRef.current ? [openedItemRef.current.id] : []),
+        ...newLooksRef.current.map((item) => item.id),
+        ...(realtimeDeepLink.current ? [realtimeDeepLink.current.id] : []),
+      ],
+      rebuild: refreshFeed,
+      reconcile: async (signal) => {
+        const open = openedItemRef.current
+        if (open) await comments.refresh(open.id, signal)
+      },
+      apply: (target) => {
+        if (!active) return
+        if (target.status === 'unavailable') {
+          feedGenerationRef.current++
+          detailGenerationRef.current++
+          if (openedItemRef.current?.id === target.key) openedItemRef.current = null
+          if (realtimeDeepLink.current?.id === target.key) realtimeDeepLink.current = null
+          feedControllerRef.current?.abort()
+          setIsLoading(false)
+          setIsLoadingMore(false)
+          newLooksRef.current = newLooksRef.current.filter(
+            (item) => item.id !== target.key
+          )
+          setNewLooks(newLooksRef.current)
+          reactionState.evict(target.key)
+          comments.evict(target.key)
+          setItems((previous) => previous.filter((item) => item.id !== target.key))
+          setOpenedItem((item) => (item?.id === target.key ? null : item))
+          setDeepLinkedItem((item) => (item?.id === target.key ? null : item))
+          return
+        }
+        const updated = reactionState.read(target.post, reactionState.beginRead())
+        if (!updated) return
+        newLooksRef.current = newLooksRef.current.map((item) =>
+          item.id === target.post.id ? updated : item
+        )
+        setNewLooks(newLooksRef.current)
+        const update = (item: CommunityFeedItem | null) =>
+          item?.id === target.post.id ? updated : item
+        setItems((previous) => previous.map((item) => update(item)!))
+        setOpenedItem(update)
+        setDeepLinkedItem(update)
+      },
+      changed: async (events, signal) => {
+        feedGenerationRef.current++
+        detailGenerationRef.current++
+        feedControllerRef.current?.abort()
+        setIsLoading(false)
+        setIsLoadingMore(false)
+        if (events.some((event) => event.kind === 'post.published'))
+          await refreshFeed(signal)
+      },
+      availability: (state, realtime) => {
+        if (!active) return
+        comments.setRealtimeHealthy(state === 'connected' && Boolean(realtime))
+        setCommunityAvailable(state === 'connected')
+        if (state === 'connected')
+          setNotice((previous) =>
+            previous?.message.key === 'community.realtime.unavailable' ? null : previous
+          )
+        else if (state !== 'denied')
+          setNotice({ message: { key: 'community.realtime.unavailable' }, tone: 'info' })
+        if (state !== 'connected' && state !== 'recovering') {
+          feedGenerationRef.current++
+          detailGenerationRef.current++
+          setIsLoading(false)
+          setIsLoadingMore(false)
+          feedControllerRef.current?.abort()
+        }
+        if (state === 'denied') {
+          actionControllerRef.current?.abort()
+          setIsSubmittingReport(false)
+          setIsPreparingPhoto(false)
+          setIsPublishing(false)
+          comments.reset()
+          reactionState.reset()
+          setItems([])
+          setOpenedItem(null)
+          setNewLooks([])
+        }
+      },
+    })
+    realtimeSyncRef.current = sync
+    sync.start(
+      process.env.NEXT_PUBLIC_REALTIME_URL ??
+        (resolveWebApiBaseUrl() || window.location.origin),
+      communityRealtimeTokenFromWeb
+    )
+    const foreground = () => {
+      if (document.visibilityState === 'visible') sync.foreground()
+    }
+    document.addEventListener('visibilitychange', foreground)
+    window.addEventListener('online', foreground)
+    return () => {
+      active = false
+      sync.stop()
+      if (realtimeSyncRef.current === sync) realtimeSyncRef.current = null
+      comments.setRealtimeHealthy(false)
+      document.removeEventListener('visibilitychange', foreground)
+      window.removeEventListener('online', foreground)
+    }
+  }, [comments, currentMode, sessionScope, reactionState])
 
   useEffect(
     () => () => {
@@ -2132,7 +2429,142 @@ export function CommunityLookbookGrid({
       cancelled = true
       controller.abort()
     }
-  }, [comments, highlightedCardId, reactionState])
+  }, [comments, highlightedCardId, reactionState, sessionScope])
+
+  useEffect(() => {
+    if (!highlightedCardId || !sessionScope) return
+    const parsed = parseDeepLink(
+      Object.fromEntries(new URLSearchParams(window.location.search))
+    )
+    if (
+      !parsed.valid ||
+      !parsed.payload?.commentId ||
+      parsed.payload.cardId !== highlightedCardId
+    )
+      return
+    let active = true
+    const payload = parsed.payload
+    const intent = notificationIntentRef.current
+    let generation = detailGenerationRef.current
+    const readTicket = reactionState.beginRead()
+    const controller = new AbortController()
+    const deadline = performance.now() + 10_000
+    let retryTimer: ReturnType<typeof setTimeout> | undefined
+    const operationTimer = setTimeout(() => controller.abort(), 10_000)
+    const resolveOwned = async () => {
+      do {
+        generation = detailGenerationRef.current
+        try {
+          const result = await communitySyncFromWeb().resolve(
+            {
+              targets: [
+                {
+                  key: 'notification',
+                  postId: highlightedCardId,
+                  commentId: payload.commentId,
+                  ...(payload.parentId ? { parentId: payload.parentId } : {}),
+                },
+              ],
+            },
+            AbortSignal.any([
+              controller.signal,
+              AbortSignal.timeout(
+                Math.min(2000, Math.max(1, Math.ceil(deadline - performance.now())))
+              ),
+            ])
+          )
+          if (
+            !active ||
+            intent !== notificationIntentRef.current ||
+            generation === detailGenerationRef.current
+          )
+            return result
+        } catch (error) {
+          if (
+            !notificationFailureIsRetryable(error) ||
+            controller.signal.aborted ||
+            !active ||
+            intent !== notificationIntentRef.current
+          )
+            throw error
+          await new Promise<void>((resolve) => {
+            retryTimer = setTimeout(
+              resolve,
+              Math.min(250, Math.max(0, deadline - performance.now()))
+            )
+          })
+        }
+        // Keep the original per-target read ticket across retries. A withdrawn
+        // target stays fenced even when an unrelated invalidation re-owns this read.
+      } while (active && !controller.signal.aborted && performance.now() < deadline)
+      throw new CommunityRequestSuperseded()
+    }
+    let abortOperation: () => void = () => undefined
+    const aborted = new Promise<never>((_resolve, reject) => {
+      abortOperation = () =>
+        reject(new DOMException('Target verification is unavailable.', 'AbortError'))
+      controller.signal.addEventListener('abort', abortOperation, { once: true })
+    })
+    void Promise.race([resolveOwned(), aborted])
+      .then((result) => {
+        if (!active || generation !== detailGenerationRef.current) return
+        const target = result.targets[0]
+        if (!target || target.status === 'unavailable') {
+          if (target?.status === 'unavailable') {
+            if (openedItemRef.current?.id === highlightedCardId)
+              openedItemRef.current = null
+            if (realtimeDeepLink.current?.id === highlightedCardId)
+              realtimeDeepLink.current = null
+            newLooksRef.current = newLooksRef.current.filter(
+              (item) => item.id !== highlightedCardId
+            )
+            setNewLooks(newLooksRef.current)
+            reactionState.evict(highlightedCardId)
+            comments.evict(highlightedCardId)
+          }
+          if (intent === notificationIntentRef.current)
+            setNotice({ message: { key: 'community.deepLink.invalid' }, tone: 'info' })
+          return
+        }
+        if (intent !== notificationIntentRef.current) return
+        const focus = target.comment ?? target.parent
+        const post = reactionState.read(target.post, readTicket)
+        if (!post) return
+        setOpenedItem(post)
+        if (focus)
+          setCommentTarget({
+            commentId: focus.id,
+            parentId: target.comment?.parentId ?? null,
+            pageCursor: target.comment ? target.pageCursor : target.parentPageCursor,
+            parentPageCursor: target.parentPageCursor,
+          })
+        setFocusComments(true)
+      })
+      .catch((error: unknown) => {
+        if (
+          active &&
+          intent === notificationIntentRef.current &&
+          generation === detailGenerationRef.current
+        )
+          setNotice({
+            message: {
+              key: notificationFailureIsRetryable(error)
+                ? 'community.realtime.unavailable'
+                : 'community.deepLink.invalid',
+            },
+            tone: 'info',
+          })
+      })
+      .finally(() => {
+        clearTimeout(operationTimer)
+        clearTimeout(retryTimer)
+        controller.signal.removeEventListener('abort', abortOperation)
+      })
+    return () => {
+      active = false
+      controller.abort()
+    }
+  }, [sessionScope, highlightedCardId, reactionState, comments])
 
   /**
    * The rows on screen: the loaded pages, with a deep-link target that is not
@@ -2195,6 +2627,7 @@ export function CommunityLookbookGrid({
    * stored author id, so nothing here compares ids.
    */
   const handleOpenCard = (item: CommunityFeedItem, commentsFocus = false) => {
+    notificationIntentRef.current++
     setFocusComments(commentsFocus)
     setAnnouncement(null)
     setReactionFeedback(null)
@@ -2234,6 +2667,7 @@ export function CommunityLookbookGrid({
   )
 
   const beginAction = (): AbortController => {
+    actionControllerRef.current?.abort()
     const controller = new AbortController()
     actionControllerRef.current = controller
     return controller
@@ -2251,25 +2685,31 @@ export function CommunityLookbookGrid({
     reason: CommunityReportReason,
     details?: string
   ): Promise<void> => {
-    if (!reportingPostId) return
+    if (!reportingPostId || !communityAvailable) return
+    const action = beginAction()
     const postId = reportingPostId
     setIsSubmittingReport(true)
     setReportError(null)
     try {
-      await reportCommunityPostFromWeb(postId, reason, details, beginAction().signal)
+      await reportCommunityPostFromWeb(postId, reason, details, action.signal)
+      if (action.signal.aborted) return
       settleReported(postId, { key: 'community.report.success' }, 'success')
     } catch (error: unknown) {
+      if (action.signal.aborted) return
       setReportError(
         messageForError(error, 'community.error.report', languageRef.current)
       )
     } finally {
-      setIsSubmittingReport(false)
+      if (!action.signal.aborted) setIsSubmittingReport(false)
     }
   }
 
   const handleWithdrawPost = async (postId: string): Promise<void> => {
+    if (!communityAvailable) return
+    const action = beginAction()
     try {
-      await withdrawCommunityPostFromWeb(postId, beginAction().signal)
+      await withdrawCommunityPostFromWeb(postId, action.signal)
+      if (action.signal.aborted) return
       // No optimistic removal: `items` is published rows only, and a withdrawn
       // post moves to `authorStates` on the next read. Filtering it out locally
       // is what made it reappear on the following refresh.
@@ -2278,6 +2718,7 @@ export function CommunityLookbookGrid({
       setAnnouncement(message)
       await loadFeed(modeRef.current)
     } catch (error: unknown) {
+      if (action.signal.aborted) return
       const message = messageForError(
         error,
         'community.error.withdraw',
@@ -2300,12 +2741,14 @@ export function CommunityLookbookGrid({
   }
 
   const openCreateModal = () => {
+    if (!communityAvailable) return
     setComposeError(null)
     setNotice(null)
     setIsCreateModalOpen(true)
   }
 
   const handleSelectPhoto = async (file: File): Promise<void> => {
+    if (!communityAvailable) return
     const preview = URL.createObjectURL(file)
     setPhotoPreview((current) => {
       if (current) URL.revokeObjectURL(current)
@@ -2315,20 +2758,23 @@ export function CommunityLookbookGrid({
     setComposeError(null)
     setIsPreparingPhoto(true)
     const idempotencyKey = generateIdempotencyKey()
+    const action = beginAction()
     try {
       const session = await allocateCommunityLookFromWeb({
         imagePreview: preview,
         locale,
         idempotencyKey,
-        signal: beginAction().signal,
+        signal: action.signal,
       })
+      if (action.signal.aborted) return
       setAllocated({ ...session, idempotencyKey })
     } catch (error: unknown) {
+      if (action.signal.aborted) return
       setComposeError(
         messageForError(error, 'community.error.upload', languageRef.current)
       )
     } finally {
-      setIsPreparingPhoto(false)
+      if (!action.signal.aborted) setIsPreparingPhoto(false)
     }
   }
 
@@ -2337,10 +2783,12 @@ export function CommunityLookbookGrid({
     caption?: string
     challengeId?: string | null
   }): Promise<void> => {
+    if (!communityAvailable) return
     if (!allocated) {
       setComposeError({ key: 'community.validation.photoRequired' })
       return
     }
+    const action = beginAction()
     setIsPublishing(true)
     setComposeError(null)
     try {
@@ -2352,8 +2800,9 @@ export function CommunityLookbookGrid({
         challengeId: params.challengeId,
         locale,
         idempotencyKey: allocated.idempotencyKey,
-        signal: beginAction().signal,
+        signal: action.signal,
       })
+      if (action.signal.aborted) return
       closeCreateModal()
       const message: Message = { key: 'community.compose.success' }
       setNotice({ message, tone: 'success' })
@@ -2362,11 +2811,12 @@ export function CommunityLookbookGrid({
       // than in the published grid. Re-read instead of inserting it locally.
       await loadFeed(modeRef.current)
     } catch (error: unknown) {
+      if (action.signal.aborted) return
       setComposeError(
         messageForError(error, 'community.error.publish', languageRef.current)
       )
     } finally {
-      setIsPublishing(false)
+      if (!action.signal.aborted) setIsPublishing(false)
     }
   }
 
@@ -2388,6 +2838,16 @@ export function CommunityLookbookGrid({
   const bandNoticeReason =
     displayedMode === 'auto' && !bandResolved ? bandUnresolvedReason : null
 
+  const presentation = communityPresentation(
+    communityAvailable,
+    hasSession,
+    displayedItems,
+    authorStates,
+    nextCursor,
+    newLooks,
+    openedItem
+  )
+
   return (
     <aside aria-label={t('community.sectionLabel')} className="flex flex-col gap-6">
       {showFilterNav && (
@@ -2399,7 +2859,13 @@ export function CommunityLookbookGrid({
         />
       )}
 
-      <CommunityHeader canShare={hasSession} onShare={openCreateModal} t={t} />
+      <Link
+        href={presentation.settingsHref}
+        className="min-h-12 self-start py-3 underline"
+      >
+        {t(presentation.settingsLabel)}
+      </Link>
+      <CommunityHeader canShare={presentation.canAct} onShare={openCreateModal} t={t} />
 
       <CommunityNotices
         bandUnresolvedReason={bandNoticeReason}
@@ -2422,7 +2888,7 @@ export function CommunityLookbookGrid({
         errorText={renderMessage(feedError, t, viewerBand)}
         itemCount={displayedItems.length}
         gridColumns={gridColumns}
-        canShare={hasSession}
+        canShare={presentation.canAct}
         onRetry={handleRetry}
         onShare={openCreateModal}
         t={t}
@@ -2434,7 +2900,7 @@ export function CommunityLookbookGrid({
         aria-busy={isLoading || isLoadingMore}
         className={`grid gap-6 ${gridColumns}`}
       >
-        {displayedItems.map((item) => (
+        {presentation.items.map((item) => (
           <LookbookCard
             reactionControls={reactionState.controls(item.id)}
             key={item.id}
@@ -2443,7 +2909,7 @@ export function CommunityLookbookGrid({
             isFailedImage={failedImages[item.id]?.url === item.imageAccess.url}
             isReported={reportedPostIds.has(item.id)}
             isSponsored={sponsored.has(item.id)}
-            canAct={hasSession}
+            canAct={presentation.canAct}
             t={t}
             onImageError={handleImageError}
             onImageRetry={handleImageRetry}
@@ -2460,10 +2926,22 @@ export function CommunityLookbookGrid({
         ))}
       </div>
 
-      <AuthorStatesSection states={authorStates} t={t} />
+      {presentation.showNewLooks && (
+        <button
+          type="button"
+          className="rounded-full border px-4 py-3 focus-visible:outline focus-visible:outline-2 focus-visible:outline-[#C9A14A]"
+          disabled={isInsertingLooks}
+          onClick={() => {
+            void insertNewLooks()
+          }}
+        >
+          {t('community.realtime.showNewLooks', { count: newLooks.length })}
+        </button>
+      )}
+      <AuthorStatesSection states={presentation.authorStates} t={t} />
 
       <LoadMoreControl
-        nextCursor={nextCursor}
+        nextCursor={presentation.nextCursor}
         isLoading={isLoading}
         isLoadingMore={isLoadingMore}
         onLoadMore={handleLoadMore}
@@ -2482,15 +2960,22 @@ export function CommunityLookbookGrid({
         </span>
       </div>
 
-      {openedItem !== null && (
+      {presentation.detail && (
         <LookbookDetailDialog
+          suspended={!communityAvailable}
           comments={comments}
           focusComments={focusComments}
-          reactionControls={reactionState.controls(openedItem.id)}
+          commentTarget={
+            presentation.detail.id === highlightedCardId ? commentTarget : undefined
+          }
+          reactionControls={reactionState.controls(presentation.detail.id)}
           reactionFeedback={reactionFeedback}
-          item={openedItem}
+          item={presentation.detail}
           t={t}
           onClose={() => {
+            notificationIntentRef.current++
+            comments.retireFocus(presentation.detail!.id)
+            setCommentTarget(undefined)
             setOpenedItem(null)
           }}
         />
@@ -2498,6 +2983,7 @@ export function CommunityLookbookGrid({
 
       {reportingPostId !== null && (
         <CommunityReportModal
+          suspended={!communityAvailable}
           onClose={closeReportModal}
           onSubmit={(reason, details) => {
             void handleReportSubmit(reason, details)
@@ -2510,6 +2996,7 @@ export function CommunityLookbookGrid({
 
       {isCreateModalOpen && (
         <PostCreationModal
+          suspended={!communityAvailable}
           onClose={closeCreateModal}
           onSelectPhoto={(file) => {
             void handleSelectPhoto(file)

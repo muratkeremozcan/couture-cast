@@ -88,8 +88,11 @@ export default function WardrobeCapsulesScreen() {
       }
       setAccessToken(token)
       try {
-        setOwnerUserId(resolveOwnerUserId(token))
+        const owner = await resolveOwnerUserId(token)
+        if (cancelled) return
+        setOwnerUserId(owner)
       } catch (error: unknown) {
+        if (cancelled) return
         setErrorMessage(
           error instanceof Error ? error.message : 'Sign in to manage capsules.'
         )

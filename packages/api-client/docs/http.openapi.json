@@ -14746,6 +14746,951 @@
         },
         "additionalProperties": false,
         "description": "Updates a community challenge. At least one field must be present. Moving the window requires startsAt, endsAt and timeZone together, and the result must start on a Monday in that zone and span exactly seven days."
+      },
+      "getCommunityEventsResponse": {
+        "type": "object",
+        "properties": {
+          "data": {
+            "type": "object",
+            "properties": {
+              "events": {
+                "type": "array",
+                "items": {
+                  "oneOf": [
+                    {
+                      "type": "object",
+                      "properties": {
+                        "version": {
+                          "type": "number",
+                          "enum": [
+                            1
+                          ]
+                        },
+                        "kind": {
+                          "type": "string",
+                          "enum": [
+                            "resync"
+                          ]
+                        },
+                        "resyncRequired": {
+                          "type": "boolean",
+                          "enum": [
+                            true
+                          ]
+                        }
+                      },
+                      "required": [
+                        "version",
+                        "kind",
+                        "resyncRequired"
+                      ],
+                      "additionalProperties": false
+                    },
+                    {
+                      "type": "object",
+                      "properties": {
+                        "version": {
+                          "type": "number",
+                          "enum": [
+                            1
+                          ]
+                        },
+                        "kind": {
+                          "type": "string",
+                          "enum": [
+                            "post.published",
+                            "reactions.changed",
+                            "comment.published"
+                          ]
+                        },
+                        "postId": {
+                          "type": "string",
+                          "minLength": 1,
+                          "maxLength": 200
+                        },
+                        "commentId": {
+                          "type": "string",
+                          "minLength": 1,
+                          "maxLength": 200
+                        },
+                        "parentId": {
+                          "type": "string",
+                          "minLength": 1,
+                          "maxLength": 200
+                        },
+                        "communityRevision": {
+                          "type": "string",
+                          "pattern": "^\\d+$"
+                        }
+                      },
+                      "required": [
+                        "version",
+                        "kind",
+                        "postId",
+                        "communityRevision"
+                      ],
+                      "additionalProperties": false
+                    },
+                    {
+                      "type": "object",
+                      "properties": {
+                        "version": {
+                          "type": "number",
+                          "enum": [
+                            1
+                          ]
+                        },
+                        "kind": {
+                          "type": "string",
+                          "enum": [
+                            "comment.status"
+                          ]
+                        },
+                        "postId": {
+                          "type": "string",
+                          "minLength": 1,
+                          "maxLength": 200
+                        },
+                        "commentId": {
+                          "type": "string",
+                          "minLength": 1,
+                          "maxLength": 200
+                        },
+                        "privateRevision": {
+                          "type": "string",
+                          "pattern": "^\\d+$"
+                        }
+                      },
+                      "required": [
+                        "version",
+                        "kind",
+                        "postId",
+                        "commentId",
+                        "privateRevision"
+                      ],
+                      "additionalProperties": false
+                    }
+                  ]
+                },
+                "maxItems": 200
+              },
+              "nextCursor": {
+                "type": "string",
+                "minLength": 1
+              },
+              "hasMore": {
+                "type": "boolean"
+              },
+              "resyncRequired": {
+                "type": "boolean"
+              }
+            },
+            "required": [
+              "events",
+              "nextCursor",
+              "hasMore",
+              "resyncRequired"
+            ],
+            "additionalProperties": false
+          }
+        },
+        "required": [
+          "data"
+        ],
+        "additionalProperties": false
+      },
+      "getCommunityNotificationPreferencesResponse": {
+        "type": "object",
+        "properties": {
+          "data": {
+            "type": "object",
+            "properties": {
+              "enabled": {
+                "type": "boolean"
+              },
+              "timezoneConfigured": {
+                "type": "boolean",
+                "default": true
+              },
+              "quietHoursEnabled": {
+                "type": "boolean"
+              },
+              "pushEnabled": {
+                "type": "boolean"
+              },
+              "quietHoursStart": {
+                "type": "string",
+                "pattern": "^(?:[01]\\d|2[0-3]):[0-5]\\d$"
+              },
+              "quietHoursEnd": {
+                "type": "string",
+                "pattern": "^(?:[01]\\d|2[0-3]):[0-5]\\d$"
+              },
+              "timezone": {
+                "type": "string",
+                "minLength": 1,
+                "maxLength": 120,
+                "description": "Invariant enforced at runtime and NOT expressible in this schema: the value must be a valid IANA timezone name as resolved by the host Intl database (for example America/New_York). Any other bounded string is rejected."
+              },
+              "revision": {
+                "type": "string",
+                "minLength": 1,
+                "maxLength": 200
+              }
+            },
+            "required": [
+              "enabled",
+              "quietHoursEnabled",
+              "pushEnabled",
+              "quietHoursStart",
+              "quietHoursEnd",
+              "timezone",
+              "revision"
+            ],
+            "additionalProperties": false
+          }
+        },
+        "required": [
+          "data"
+        ],
+        "additionalProperties": false
+      },
+      "patchCommunityNotificationPreferencesInput": {
+        "type": "object",
+        "properties": {
+          "baseRevision": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 200
+          },
+          "enabled": {
+            "type": "boolean"
+          },
+          "quietHoursEnabled": {
+            "type": "boolean"
+          },
+          "quietHoursStart": {
+            "type": "string",
+            "pattern": "^(?:[01]\\d|2[0-3]):[0-5]\\d$"
+          },
+          "quietHoursEnd": {
+            "type": "string",
+            "pattern": "^(?:[01]\\d|2[0-3]):[0-5]\\d$"
+          },
+          "timezone": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 120,
+            "description": "Invariant enforced at runtime and NOT expressible in this schema: the value must be a valid IANA timezone name as resolved by the host Intl database (for example America/New_York). Any other bounded string is rejected."
+          }
+        },
+        "required": [
+          "baseRevision"
+        ],
+        "additionalProperties": false
+      },
+      "patchCommunityNotificationPreferencesResponse": {
+        "type": "object",
+        "properties": {
+          "data": {
+            "type": "object",
+            "properties": {
+              "enabled": {
+                "type": "boolean"
+              },
+              "timezoneConfigured": {
+                "type": "boolean",
+                "default": true
+              },
+              "quietHoursEnabled": {
+                "type": "boolean"
+              },
+              "pushEnabled": {
+                "type": "boolean"
+              },
+              "quietHoursStart": {
+                "type": "string",
+                "pattern": "^(?:[01]\\d|2[0-3]):[0-5]\\d$"
+              },
+              "quietHoursEnd": {
+                "type": "string",
+                "pattern": "^(?:[01]\\d|2[0-3]):[0-5]\\d$"
+              },
+              "timezone": {
+                "type": "string",
+                "minLength": 1,
+                "maxLength": 120,
+                "description": "Invariant enforced at runtime and NOT expressible in this schema: the value must be a valid IANA timezone name as resolved by the host Intl database (for example America/New_York). Any other bounded string is rejected."
+              },
+              "revision": {
+                "type": "string",
+                "minLength": 1,
+                "maxLength": 200
+              }
+            },
+            "required": [
+              "enabled",
+              "quietHoursEnabled",
+              "pushEnabled",
+              "quietHoursStart",
+              "quietHoursEnd",
+              "timezone",
+              "revision"
+            ],
+            "additionalProperties": false
+          }
+        },
+        "required": [
+          "data"
+        ],
+        "additionalProperties": false
+      },
+      "resolveCommunityTargetsInput": {
+        "type": "object",
+        "properties": {
+          "targets": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "key": {
+                  "type": "string",
+                  "minLength": 1,
+                  "maxLength": 200
+                },
+                "postId": {
+                  "type": "string",
+                  "minLength": 1,
+                  "maxLength": 200
+                },
+                "commentId": {
+                  "type": "string",
+                  "minLength": 1,
+                  "maxLength": 200
+                },
+                "parentId": {
+                  "type": "string",
+                  "minLength": 1,
+                  "maxLength": 200
+                }
+              },
+              "required": [
+                "key",
+                "postId"
+              ],
+              "additionalProperties": false
+            },
+            "minItems": 1,
+            "maxItems": 50
+          }
+        },
+        "required": [
+          "targets"
+        ],
+        "additionalProperties": false
+      },
+      "resolveCommunityTargetsResponse": {
+        "type": "object",
+        "properties": {
+          "data": {
+            "type": "object",
+            "properties": {
+              "targets": {
+                "type": "array",
+                "items": {
+                  "oneOf": [
+                    {
+                      "type": "object",
+                      "properties": {
+                        "key": {
+                          "type": "string",
+                          "minLength": 1,
+                          "maxLength": 200
+                        },
+                        "status": {
+                          "type": "string",
+                          "enum": [
+                            "unavailable"
+                          ]
+                        }
+                      },
+                      "required": [
+                        "key",
+                        "status"
+                      ],
+                      "additionalProperties": false
+                    },
+                    {
+                      "type": "object",
+                      "properties": {
+                        "key": {
+                          "type": "string",
+                          "minLength": 1,
+                          "maxLength": 200
+                        },
+                        "status": {
+                          "type": "string",
+                          "enum": [
+                            "available"
+                          ]
+                        },
+                        "communityRevision": {
+                          "type": "string",
+                          "pattern": "^\\d+$"
+                        },
+                        "post": {
+                          "type": "object",
+                          "properties": {
+                            "id": {
+                              "type": "string",
+                              "minLength": 1
+                            },
+                            "caption": {
+                              "type": [
+                                "string",
+                                "null"
+                              ]
+                            },
+                            "altText": {
+                              "type": [
+                                "string",
+                                "null"
+                              ]
+                            },
+                            "climateBand": {
+                              "type": [
+                                "string",
+                                "null"
+                              ],
+                              "description": "The climate band stamped when the post was published, or null if unclassified.",
+                              "enum": [
+                                "cold_wet",
+                                "cold_dry",
+                                "temperate_wet",
+                                "temperate_dry",
+                                "warm_wet",
+                                "warm_dry",
+                                null
+                              ]
+                            },
+                            "imageAccess": {
+                              "type": "object",
+                              "properties": {
+                                "url": {
+                                  "type": "string",
+                                  "format": "uri"
+                                },
+                                "expiresAt": {
+                                  "type": "string",
+                                  "format": "date-time"
+                                }
+                              },
+                              "required": [
+                                "url",
+                                "expiresAt"
+                              ],
+                              "additionalProperties": false
+                            },
+                            "publishedAt": {
+                              "type": [
+                                "string",
+                                "null"
+                              ],
+                              "format": "date-time"
+                            },
+                            "createdAt": {
+                              "type": "string",
+                              "format": "date-time"
+                            },
+                            "status": {
+                              "type": "string",
+                              "enum": [
+                                "draft",
+                                "uploading",
+                                "pending_review",
+                                "published",
+                                "flagged",
+                                "review_failed",
+                                "withdrawn",
+                                "consent_suspended"
+                              ]
+                            },
+                            "challengeId": {
+                              "type": [
+                                "string",
+                                "null"
+                              ]
+                            },
+                            "author": {
+                              "type": "object",
+                              "properties": {
+                                "displayName": {
+                                  "type": "string",
+                                  "minLength": 1
+                                },
+                                "isSelf": {
+                                  "type": "boolean"
+                                }
+                              },
+                              "required": [
+                                "displayName",
+                                "isSelf"
+                              ],
+                              "additionalProperties": false
+                            },
+                            "reactions": {
+                              "type": "object",
+                              "properties": {
+                                "counts": {
+                                  "type": "object",
+                                  "properties": {
+                                    "applause": {
+                                      "type": "integer",
+                                      "minimum": 0
+                                    },
+                                    "love": {
+                                      "type": "integer",
+                                      "minimum": 0
+                                    },
+                                    "inspiration": {
+                                      "type": "integer",
+                                      "minimum": 0
+                                    }
+                                  },
+                                  "required": [
+                                    "applause",
+                                    "love",
+                                    "inspiration"
+                                  ],
+                                  "additionalProperties": false
+                                },
+                                "total": {
+                                  "type": "integer",
+                                  "minimum": 0
+                                },
+                                "viewerReaction": {
+                                  "type": [
+                                    "string",
+                                    "null"
+                                  ],
+                                  "enum": [
+                                    "applause",
+                                    "love",
+                                    "inspiration",
+                                    null
+                                  ]
+                                },
+                                "revision": {
+                                  "type": "integer",
+                                  "minimum": 0
+                                },
+                                "generation": {
+                                  "type": "integer",
+                                  "minimum": 0
+                                }
+                              },
+                              "required": [
+                                "counts",
+                                "total",
+                                "viewerReaction",
+                                "revision",
+                                "generation"
+                              ],
+                              "additionalProperties": false,
+                              "description": "An authoritative single-snapshot reaction summary. total must equal the sum of applause, love and inspiration counts. revision persists after removal; generation advances on reactions, visibility and erasure changes."
+                            }
+                          },
+                          "required": [
+                            "id",
+                            "caption",
+                            "altText",
+                            "climateBand",
+                            "imageAccess",
+                            "publishedAt",
+                            "createdAt",
+                            "status",
+                            "challengeId",
+                            "author",
+                            "reactions"
+                          ],
+                          "additionalProperties": false
+                        },
+                        "comment": {
+                          "type": [
+                            "object",
+                            "null"
+                          ],
+                          "properties": {
+                            "id": {
+                              "type": "string",
+                              "minLength": 1
+                            },
+                            "postId": {
+                              "type": "string",
+                              "minLength": 1
+                            },
+                            "parentId": {
+                              "type": [
+                                "string",
+                                "null"
+                              ],
+                              "minLength": 1
+                            },
+                            "body": {
+                              "type": [
+                                "string",
+                                "null"
+                              ],
+                              "maxLength": 280
+                            },
+                            "author": {
+                              "type": [
+                                "string",
+                                "null"
+                              ],
+                              "minLength": 1
+                            },
+                            "isOwn": {
+                              "type": "boolean"
+                            },
+                            "unavailable": {
+                              "type": "boolean"
+                            },
+                            "publicationSequence": {
+                              "type": "integer",
+                              "exclusiveMinimum": 0
+                            },
+                            "publishedAt": {
+                              "type": "string",
+                              "format": "date-time"
+                            },
+                            "replyCount": {
+                              "type": "integer",
+                              "minimum": 0
+                            }
+                          },
+                          "required": [
+                            "id",
+                            "postId",
+                            "parentId",
+                            "body",
+                            "author",
+                            "isOwn",
+                            "unavailable",
+                            "publicationSequence",
+                            "publishedAt",
+                            "replyCount"
+                          ],
+                          "additionalProperties": false
+                        },
+                        "parent": {
+                          "type": [
+                            "object",
+                            "null"
+                          ],
+                          "properties": {
+                            "id": {
+                              "type": "string",
+                              "minLength": 1
+                            },
+                            "postId": {
+                              "type": "string",
+                              "minLength": 1
+                            },
+                            "parentId": {
+                              "type": [
+                                "string",
+                                "null"
+                              ],
+                              "minLength": 1
+                            },
+                            "body": {
+                              "type": [
+                                "string",
+                                "null"
+                              ],
+                              "maxLength": 280
+                            },
+                            "author": {
+                              "type": [
+                                "string",
+                                "null"
+                              ],
+                              "minLength": 1
+                            },
+                            "isOwn": {
+                              "type": "boolean"
+                            },
+                            "unavailable": {
+                              "type": "boolean"
+                            },
+                            "publicationSequence": {
+                              "type": "integer",
+                              "exclusiveMinimum": 0
+                            },
+                            "publishedAt": {
+                              "type": "string",
+                              "format": "date-time"
+                            },
+                            "replyCount": {
+                              "type": "integer",
+                              "minimum": 0
+                            }
+                          },
+                          "required": [
+                            "id",
+                            "postId",
+                            "parentId",
+                            "body",
+                            "author",
+                            "isOwn",
+                            "unavailable",
+                            "publicationSequence",
+                            "publishedAt",
+                            "replyCount"
+                          ],
+                          "additionalProperties": false
+                        },
+                        "pageCursor": {
+                          "type": [
+                            "string",
+                            "null"
+                          ]
+                        },
+                        "parentPageCursor": {
+                          "type": [
+                            "string",
+                            "null"
+                          ]
+                        },
+                        "threadPosition": {
+                          "type": [
+                            "integer",
+                            "null"
+                          ],
+                          "minimum": 0
+                        }
+                      },
+                      "required": [
+                        "key",
+                        "status",
+                        "communityRevision",
+                        "post",
+                        "comment",
+                        "parent",
+                        "pageCursor",
+                        "parentPageCursor",
+                        "threadPosition"
+                      ],
+                      "additionalProperties": false
+                    }
+                  ]
+                },
+                "maxItems": 50
+              }
+            },
+            "required": [
+              "targets"
+            ],
+            "additionalProperties": false
+          }
+        },
+        "required": [
+          "data"
+        ],
+        "additionalProperties": false
+      },
+      "registerPushTokenInput": {
+        "type": "object",
+        "properties": {
+          "token": {
+            "type": "string",
+            "maxLength": 255,
+            "pattern": "^(?:ExponentPushToken|ExpoPushToken)\\[[A-Za-z0-9_-]+\\]$"
+          },
+          "installationId": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "platform": {
+            "type": "string",
+            "enum": [
+              "ios",
+              "android"
+            ]
+          },
+          "permission": {
+            "type": "string",
+            "enum": [
+              "granted",
+              "denied",
+              "undetermined"
+            ]
+          },
+          "expectedBinding": {
+            "type": "object",
+            "properties": {
+              "registrationId": {
+                "type": "string",
+                "minLength": 1,
+                "maxLength": 200
+              },
+              "bindingGeneration": {
+                "type": "integer",
+                "exclusiveMinimum": 0
+              }
+            },
+            "required": [
+              "registrationId",
+              "bindingGeneration"
+            ],
+            "additionalProperties": false
+          },
+          "transfer": {
+            "type": "boolean"
+          }
+        },
+        "required": [
+          "token",
+          "installationId",
+          "platform",
+          "permission"
+        ],
+        "additionalProperties": false
+      },
+      "registerPushTokenResponse": {
+        "type": "object",
+        "properties": {
+          "data": {
+            "type": "object",
+            "properties": {
+              "registrationId": {
+                "type": "string",
+                "minLength": 1,
+                "maxLength": 200
+              },
+              "bindingGeneration": {
+                "type": "integer",
+                "exclusiveMinimum": 0
+              },
+              "platform": {
+                "type": [
+                  "string",
+                  "null"
+                ]
+              },
+              "permission": {
+                "type": "string",
+                "enum": [
+                  "granted",
+                  "denied",
+                  "undetermined",
+                  "unknown"
+                ]
+              },
+              "lastUsedAt": {
+                "type": "string",
+                "format": "date-time"
+              }
+            },
+            "required": [
+              "registrationId",
+              "bindingGeneration",
+              "platform",
+              "permission",
+              "lastUsedAt"
+            ],
+            "additionalProperties": false
+          }
+        },
+        "required": [
+          "data"
+        ],
+        "additionalProperties": false
+      },
+      "getPushRegistrationsResponse": {
+        "type": "object",
+        "properties": {
+          "data": {
+            "type": "object",
+            "properties": {
+              "registrations": {
+                "type": "array",
+                "items": {
+                  "type": "object",
+                  "properties": {
+                    "registrationId": {
+                      "type": "string",
+                      "minLength": 1,
+                      "maxLength": 200
+                    },
+                    "bindingGeneration": {
+                      "type": "integer",
+                      "exclusiveMinimum": 0
+                    },
+                    "platform": {
+                      "type": [
+                        "string",
+                        "null"
+                      ]
+                    },
+                    "permission": {
+                      "type": "string",
+                      "enum": [
+                        "granted",
+                        "denied",
+                        "undetermined",
+                        "unknown"
+                      ]
+                    },
+                    "lastUsedAt": {
+                      "type": "string",
+                      "format": "date-time"
+                    }
+                  },
+                  "required": [
+                    "registrationId",
+                    "bindingGeneration",
+                    "platform",
+                    "permission",
+                    "lastUsedAt"
+                  ],
+                  "additionalProperties": false
+                },
+                "maxItems": 5
+              }
+            },
+            "required": [
+              "registrations"
+            ],
+            "additionalProperties": false
+          }
+        },
+        "required": [
+          "data"
+        ],
+        "additionalProperties": false
+      },
+      "removePushRegistrationResponse": {
+        "type": "object",
+        "properties": {
+          "data": {
+            "type": "object",
+            "properties": {
+              "removed": {
+                "type": "boolean"
+              }
+            },
+            "required": [
+              "removed"
+            ],
+            "additionalProperties": false
+          }
+        },
+        "required": [
+          "data"
+        ],
+        "additionalProperties": false
       }
     },
     "parameters": {}
@@ -15792,6 +16737,11 @@
     },
     "/api/v1/user/profile": {
       "get": {
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
         "tags": [
           "user"
         ],
@@ -22646,6 +23596,1373 @@
               "application/json": {
                 "schema": {
                   "$ref": "#/components/schemas/InternalServerErrorHttpError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/community/events": {
+      "get": {
+        "operationId": "getCommunityEvents",
+        "summary": "getCommunityEvents",
+        "tags": [
+          "communitySync"
+        ],
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
+        "parameters": [
+          {
+            "schema": {
+              "type": "string",
+              "maxLength": 4096
+            },
+            "required": false,
+            "name": "cursor",
+            "in": "query"
+          },
+          {
+            "schema": {
+              "type": "string",
+              "enum": [
+                "auto",
+                "all",
+                "cold_wet",
+                "cold_dry",
+                "temperate_wet",
+                "temperate_dry",
+                "warm_wet",
+                "warm_dry"
+              ],
+              "default": "all"
+            },
+            "required": false,
+            "name": "mode",
+            "in": "query"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Success",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/getCommunityEventsResponse"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Invalid request or cursor",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "statusCode": {
+                      "type": "number",
+                      "enum": [
+                        400
+                      ]
+                    },
+                    "code": {
+                      "type": "string",
+                      "enum": [
+                        "invalid_request",
+                        "invalid_cursor"
+                      ]
+                    },
+                    "message": {
+                      "type": "string"
+                    }
+                  },
+                  "required": [
+                    "code",
+                    "message"
+                  ]
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Unauthorized"
+          },
+          "403": {
+            "description": "Denied"
+          },
+          "409": {
+            "description": "Revision conflict, binding conflict or resync_required",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "statusCode": {
+                      "type": "number",
+                      "enum": [
+                        409
+                      ]
+                    },
+                    "code": {
+                      "type": "string",
+                      "enum": [
+                        "resync_required",
+                        "revision_conflict",
+                        "binding_changed",
+                        "registration_limit"
+                      ]
+                    },
+                    "message": {
+                      "type": "string"
+                    },
+                    "current": {
+                      "type": "object",
+                      "properties": {
+                        "enabled": {
+                          "type": "boolean"
+                        },
+                        "timezoneConfigured": {
+                          "type": "boolean",
+                          "default": true
+                        },
+                        "quietHoursEnabled": {
+                          "type": "boolean"
+                        },
+                        "pushEnabled": {
+                          "type": "boolean"
+                        },
+                        "quietHoursStart": {
+                          "type": "string",
+                          "pattern": "^(?:[01]\\d|2[0-3]):[0-5]\\d$"
+                        },
+                        "quietHoursEnd": {
+                          "type": "string",
+                          "pattern": "^(?:[01]\\d|2[0-3]):[0-5]\\d$"
+                        },
+                        "timezone": {
+                          "type": "string",
+                          "minLength": 1,
+                          "maxLength": 120,
+                          "description": "Invariant enforced at runtime and NOT expressible in this schema: the value must be a valid IANA timezone name as resolved by the host Intl database (for example America/New_York). Any other bounded string is rejected."
+                        },
+                        "revision": {
+                          "type": "string",
+                          "minLength": 1,
+                          "maxLength": 200
+                        }
+                      },
+                      "required": [
+                        "enabled",
+                        "quietHoursEnabled",
+                        "pushEnabled",
+                        "quietHoursStart",
+                        "quietHoursEnd",
+                        "timezone",
+                        "revision"
+                      ],
+                      "additionalProperties": false
+                    }
+                  },
+                  "required": [
+                    "code"
+                  ]
+                }
+              }
+            }
+          },
+          "503": {
+            "description": "unavailable; bounded retry seconds preserve the remote cadence",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "statusCode": {
+                      "type": "number",
+                      "enum": [
+                        503
+                      ]
+                    },
+                    "code": {
+                      "type": "string",
+                      "enum": [
+                        "unavailable"
+                      ]
+                    },
+                    "retryAfterSeconds": {
+                      "type": "integer",
+                      "minimum": 1,
+                      "maximum": 45
+                    },
+                    "message": {
+                      "type": "string"
+                    },
+                    "error": {
+                      "type": "string"
+                    }
+                  },
+                  "required": [
+                    "statusCode",
+                    "code",
+                    "retryAfterSeconds",
+                    "message"
+                  ]
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/community/notification-preferences": {
+      "get": {
+        "operationId": "getCommunityNotificationPreferences",
+        "summary": "getCommunityNotificationPreferences",
+        "tags": [
+          "communitySync"
+        ],
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Success",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/getCommunityNotificationPreferencesResponse"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Invalid request or cursor",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "statusCode": {
+                      "type": "number",
+                      "enum": [
+                        400
+                      ]
+                    },
+                    "code": {
+                      "type": "string",
+                      "enum": [
+                        "invalid_request",
+                        "invalid_cursor"
+                      ]
+                    },
+                    "message": {
+                      "type": "string"
+                    }
+                  },
+                  "required": [
+                    "code",
+                    "message"
+                  ]
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Unauthorized"
+          },
+          "403": {
+            "description": "Denied"
+          },
+          "409": {
+            "description": "Revision conflict, binding conflict or resync_required",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "statusCode": {
+                      "type": "number",
+                      "enum": [
+                        409
+                      ]
+                    },
+                    "code": {
+                      "type": "string",
+                      "enum": [
+                        "resync_required",
+                        "revision_conflict",
+                        "binding_changed",
+                        "registration_limit"
+                      ]
+                    },
+                    "message": {
+                      "type": "string"
+                    },
+                    "current": {
+                      "type": "object",
+                      "properties": {
+                        "enabled": {
+                          "type": "boolean"
+                        },
+                        "timezoneConfigured": {
+                          "type": "boolean",
+                          "default": true
+                        },
+                        "quietHoursEnabled": {
+                          "type": "boolean"
+                        },
+                        "pushEnabled": {
+                          "type": "boolean"
+                        },
+                        "quietHoursStart": {
+                          "type": "string",
+                          "pattern": "^(?:[01]\\d|2[0-3]):[0-5]\\d$"
+                        },
+                        "quietHoursEnd": {
+                          "type": "string",
+                          "pattern": "^(?:[01]\\d|2[0-3]):[0-5]\\d$"
+                        },
+                        "timezone": {
+                          "type": "string",
+                          "minLength": 1,
+                          "maxLength": 120,
+                          "description": "Invariant enforced at runtime and NOT expressible in this schema: the value must be a valid IANA timezone name as resolved by the host Intl database (for example America/New_York). Any other bounded string is rejected."
+                        },
+                        "revision": {
+                          "type": "string",
+                          "minLength": 1,
+                          "maxLength": 200
+                        }
+                      },
+                      "required": [
+                        "enabled",
+                        "quietHoursEnabled",
+                        "pushEnabled",
+                        "quietHoursStart",
+                        "quietHoursEnd",
+                        "timezone",
+                        "revision"
+                      ],
+                      "additionalProperties": false
+                    }
+                  },
+                  "required": [
+                    "code"
+                  ]
+                }
+              }
+            }
+          },
+          "503": {
+            "description": "unavailable; bounded retry seconds preserve the remote cadence",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "statusCode": {
+                      "type": "number",
+                      "enum": [
+                        503
+                      ]
+                    },
+                    "code": {
+                      "type": "string",
+                      "enum": [
+                        "unavailable"
+                      ]
+                    },
+                    "retryAfterSeconds": {
+                      "type": "integer",
+                      "minimum": 1,
+                      "maximum": 45
+                    },
+                    "message": {
+                      "type": "string"
+                    },
+                    "error": {
+                      "type": "string"
+                    }
+                  },
+                  "required": [
+                    "statusCode",
+                    "code",
+                    "retryAfterSeconds",
+                    "message"
+                  ]
+                }
+              }
+            }
+          }
+        }
+      },
+      "patch": {
+        "operationId": "patchCommunityNotificationPreferences",
+        "summary": "patchCommunityNotificationPreferences",
+        "tags": [
+          "communitySync"
+        ],
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/patchCommunityNotificationPreferencesInput"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Success",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/patchCommunityNotificationPreferencesResponse"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Invalid request or cursor",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "statusCode": {
+                      "type": "number",
+                      "enum": [
+                        400
+                      ]
+                    },
+                    "code": {
+                      "type": "string",
+                      "enum": [
+                        "invalid_request",
+                        "invalid_cursor"
+                      ]
+                    },
+                    "message": {
+                      "type": "string"
+                    }
+                  },
+                  "required": [
+                    "code",
+                    "message"
+                  ]
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Unauthorized"
+          },
+          "403": {
+            "description": "Denied"
+          },
+          "409": {
+            "description": "Revision conflict, binding conflict or resync_required",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "statusCode": {
+                      "type": "number",
+                      "enum": [
+                        409
+                      ]
+                    },
+                    "code": {
+                      "type": "string",
+                      "enum": [
+                        "resync_required",
+                        "revision_conflict",
+                        "binding_changed",
+                        "registration_limit"
+                      ]
+                    },
+                    "message": {
+                      "type": "string"
+                    },
+                    "current": {
+                      "type": "object",
+                      "properties": {
+                        "enabled": {
+                          "type": "boolean"
+                        },
+                        "timezoneConfigured": {
+                          "type": "boolean",
+                          "default": true
+                        },
+                        "quietHoursEnabled": {
+                          "type": "boolean"
+                        },
+                        "pushEnabled": {
+                          "type": "boolean"
+                        },
+                        "quietHoursStart": {
+                          "type": "string",
+                          "pattern": "^(?:[01]\\d|2[0-3]):[0-5]\\d$"
+                        },
+                        "quietHoursEnd": {
+                          "type": "string",
+                          "pattern": "^(?:[01]\\d|2[0-3]):[0-5]\\d$"
+                        },
+                        "timezone": {
+                          "type": "string",
+                          "minLength": 1,
+                          "maxLength": 120,
+                          "description": "Invariant enforced at runtime and NOT expressible in this schema: the value must be a valid IANA timezone name as resolved by the host Intl database (for example America/New_York). Any other bounded string is rejected."
+                        },
+                        "revision": {
+                          "type": "string",
+                          "minLength": 1,
+                          "maxLength": 200
+                        }
+                      },
+                      "required": [
+                        "enabled",
+                        "quietHoursEnabled",
+                        "pushEnabled",
+                        "quietHoursStart",
+                        "quietHoursEnd",
+                        "timezone",
+                        "revision"
+                      ],
+                      "additionalProperties": false
+                    }
+                  },
+                  "required": [
+                    "code"
+                  ]
+                }
+              }
+            }
+          },
+          "503": {
+            "description": "unavailable; bounded retry seconds preserve the remote cadence",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "statusCode": {
+                      "type": "number",
+                      "enum": [
+                        503
+                      ]
+                    },
+                    "code": {
+                      "type": "string",
+                      "enum": [
+                        "unavailable"
+                      ]
+                    },
+                    "retryAfterSeconds": {
+                      "type": "integer",
+                      "minimum": 1,
+                      "maximum": 45
+                    },
+                    "message": {
+                      "type": "string"
+                    },
+                    "error": {
+                      "type": "string"
+                    }
+                  },
+                  "required": [
+                    "statusCode",
+                    "code",
+                    "retryAfterSeconds",
+                    "message"
+                  ]
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/community/targets/resolve": {
+      "post": {
+        "operationId": "resolveCommunityTargets",
+        "summary": "resolveCommunityTargets",
+        "tags": [
+          "communitySync"
+        ],
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/resolveCommunityTargetsInput"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Success",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/resolveCommunityTargetsResponse"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Invalid request or cursor",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "statusCode": {
+                      "type": "number",
+                      "enum": [
+                        400
+                      ]
+                    },
+                    "code": {
+                      "type": "string",
+                      "enum": [
+                        "invalid_request",
+                        "invalid_cursor"
+                      ]
+                    },
+                    "message": {
+                      "type": "string"
+                    }
+                  },
+                  "required": [
+                    "code",
+                    "message"
+                  ]
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Unauthorized"
+          },
+          "403": {
+            "description": "Denied"
+          },
+          "409": {
+            "description": "Revision conflict, binding conflict or resync_required",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "statusCode": {
+                      "type": "number",
+                      "enum": [
+                        409
+                      ]
+                    },
+                    "code": {
+                      "type": "string",
+                      "enum": [
+                        "resync_required",
+                        "revision_conflict",
+                        "binding_changed",
+                        "registration_limit"
+                      ]
+                    },
+                    "message": {
+                      "type": "string"
+                    },
+                    "current": {
+                      "type": "object",
+                      "properties": {
+                        "enabled": {
+                          "type": "boolean"
+                        },
+                        "timezoneConfigured": {
+                          "type": "boolean",
+                          "default": true
+                        },
+                        "quietHoursEnabled": {
+                          "type": "boolean"
+                        },
+                        "pushEnabled": {
+                          "type": "boolean"
+                        },
+                        "quietHoursStart": {
+                          "type": "string",
+                          "pattern": "^(?:[01]\\d|2[0-3]):[0-5]\\d$"
+                        },
+                        "quietHoursEnd": {
+                          "type": "string",
+                          "pattern": "^(?:[01]\\d|2[0-3]):[0-5]\\d$"
+                        },
+                        "timezone": {
+                          "type": "string",
+                          "minLength": 1,
+                          "maxLength": 120,
+                          "description": "Invariant enforced at runtime and NOT expressible in this schema: the value must be a valid IANA timezone name as resolved by the host Intl database (for example America/New_York). Any other bounded string is rejected."
+                        },
+                        "revision": {
+                          "type": "string",
+                          "minLength": 1,
+                          "maxLength": 200
+                        }
+                      },
+                      "required": [
+                        "enabled",
+                        "quietHoursEnabled",
+                        "pushEnabled",
+                        "quietHoursStart",
+                        "quietHoursEnd",
+                        "timezone",
+                        "revision"
+                      ],
+                      "additionalProperties": false
+                    }
+                  },
+                  "required": [
+                    "code"
+                  ]
+                }
+              }
+            }
+          },
+          "503": {
+            "description": "unavailable; bounded retry seconds preserve the remote cadence",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "statusCode": {
+                      "type": "number",
+                      "enum": [
+                        503
+                      ]
+                    },
+                    "code": {
+                      "type": "string",
+                      "enum": [
+                        "unavailable"
+                      ]
+                    },
+                    "retryAfterSeconds": {
+                      "type": "integer",
+                      "minimum": 1,
+                      "maximum": 45
+                    },
+                    "message": {
+                      "type": "string"
+                    },
+                    "error": {
+                      "type": "string"
+                    }
+                  },
+                  "required": [
+                    "statusCode",
+                    "code",
+                    "retryAfterSeconds",
+                    "message"
+                  ]
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/notifications/push-tokens": {
+      "post": {
+        "operationId": "registerPushToken",
+        "summary": "registerPushToken",
+        "tags": [
+          "communitySync"
+        ],
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/registerPushTokenInput"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Success",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/registerPushTokenResponse"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Invalid request or cursor",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "statusCode": {
+                      "type": "number",
+                      "enum": [
+                        400
+                      ]
+                    },
+                    "code": {
+                      "type": "string",
+                      "enum": [
+                        "invalid_request",
+                        "invalid_cursor"
+                      ]
+                    },
+                    "message": {
+                      "type": "string"
+                    }
+                  },
+                  "required": [
+                    "code",
+                    "message"
+                  ]
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Unauthorized"
+          },
+          "403": {
+            "description": "Denied"
+          },
+          "409": {
+            "description": "Revision conflict, binding conflict or resync_required",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "statusCode": {
+                      "type": "number",
+                      "enum": [
+                        409
+                      ]
+                    },
+                    "code": {
+                      "type": "string",
+                      "enum": [
+                        "resync_required",
+                        "revision_conflict",
+                        "binding_changed",
+                        "registration_limit"
+                      ]
+                    },
+                    "message": {
+                      "type": "string"
+                    },
+                    "current": {
+                      "type": "object",
+                      "properties": {
+                        "enabled": {
+                          "type": "boolean"
+                        },
+                        "timezoneConfigured": {
+                          "type": "boolean",
+                          "default": true
+                        },
+                        "quietHoursEnabled": {
+                          "type": "boolean"
+                        },
+                        "pushEnabled": {
+                          "type": "boolean"
+                        },
+                        "quietHoursStart": {
+                          "type": "string",
+                          "pattern": "^(?:[01]\\d|2[0-3]):[0-5]\\d$"
+                        },
+                        "quietHoursEnd": {
+                          "type": "string",
+                          "pattern": "^(?:[01]\\d|2[0-3]):[0-5]\\d$"
+                        },
+                        "timezone": {
+                          "type": "string",
+                          "minLength": 1,
+                          "maxLength": 120,
+                          "description": "Invariant enforced at runtime and NOT expressible in this schema: the value must be a valid IANA timezone name as resolved by the host Intl database (for example America/New_York). Any other bounded string is rejected."
+                        },
+                        "revision": {
+                          "type": "string",
+                          "minLength": 1,
+                          "maxLength": 200
+                        }
+                      },
+                      "required": [
+                        "enabled",
+                        "quietHoursEnabled",
+                        "pushEnabled",
+                        "quietHoursStart",
+                        "quietHoursEnd",
+                        "timezone",
+                        "revision"
+                      ],
+                      "additionalProperties": false
+                    }
+                  },
+                  "required": [
+                    "code"
+                  ]
+                }
+              }
+            }
+          },
+          "503": {
+            "description": "unavailable; bounded retry seconds preserve the remote cadence",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "statusCode": {
+                      "type": "number",
+                      "enum": [
+                        503
+                      ]
+                    },
+                    "code": {
+                      "type": "string",
+                      "enum": [
+                        "unavailable"
+                      ]
+                    },
+                    "retryAfterSeconds": {
+                      "type": "integer",
+                      "minimum": 1,
+                      "maximum": 45
+                    },
+                    "message": {
+                      "type": "string"
+                    },
+                    "error": {
+                      "type": "string"
+                    }
+                  },
+                  "required": [
+                    "statusCode",
+                    "code",
+                    "retryAfterSeconds",
+                    "message"
+                  ]
+                }
+              }
+            }
+          }
+        }
+      },
+      "get": {
+        "operationId": "getPushRegistrations",
+        "summary": "getPushRegistrations",
+        "tags": [
+          "communitySync"
+        ],
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Success",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/getPushRegistrationsResponse"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Invalid request or cursor",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "statusCode": {
+                      "type": "number",
+                      "enum": [
+                        400
+                      ]
+                    },
+                    "code": {
+                      "type": "string",
+                      "enum": [
+                        "invalid_request",
+                        "invalid_cursor"
+                      ]
+                    },
+                    "message": {
+                      "type": "string"
+                    }
+                  },
+                  "required": [
+                    "code",
+                    "message"
+                  ]
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Unauthorized"
+          },
+          "403": {
+            "description": "Denied"
+          },
+          "409": {
+            "description": "Revision conflict, binding conflict or resync_required",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "statusCode": {
+                      "type": "number",
+                      "enum": [
+                        409
+                      ]
+                    },
+                    "code": {
+                      "type": "string",
+                      "enum": [
+                        "resync_required",
+                        "revision_conflict",
+                        "binding_changed",
+                        "registration_limit"
+                      ]
+                    },
+                    "message": {
+                      "type": "string"
+                    },
+                    "current": {
+                      "type": "object",
+                      "properties": {
+                        "enabled": {
+                          "type": "boolean"
+                        },
+                        "timezoneConfigured": {
+                          "type": "boolean",
+                          "default": true
+                        },
+                        "quietHoursEnabled": {
+                          "type": "boolean"
+                        },
+                        "pushEnabled": {
+                          "type": "boolean"
+                        },
+                        "quietHoursStart": {
+                          "type": "string",
+                          "pattern": "^(?:[01]\\d|2[0-3]):[0-5]\\d$"
+                        },
+                        "quietHoursEnd": {
+                          "type": "string",
+                          "pattern": "^(?:[01]\\d|2[0-3]):[0-5]\\d$"
+                        },
+                        "timezone": {
+                          "type": "string",
+                          "minLength": 1,
+                          "maxLength": 120,
+                          "description": "Invariant enforced at runtime and NOT expressible in this schema: the value must be a valid IANA timezone name as resolved by the host Intl database (for example America/New_York). Any other bounded string is rejected."
+                        },
+                        "revision": {
+                          "type": "string",
+                          "minLength": 1,
+                          "maxLength": 200
+                        }
+                      },
+                      "required": [
+                        "enabled",
+                        "quietHoursEnabled",
+                        "pushEnabled",
+                        "quietHoursStart",
+                        "quietHoursEnd",
+                        "timezone",
+                        "revision"
+                      ],
+                      "additionalProperties": false
+                    }
+                  },
+                  "required": [
+                    "code"
+                  ]
+                }
+              }
+            }
+          },
+          "503": {
+            "description": "unavailable; bounded retry seconds preserve the remote cadence",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "statusCode": {
+                      "type": "number",
+                      "enum": [
+                        503
+                      ]
+                    },
+                    "code": {
+                      "type": "string",
+                      "enum": [
+                        "unavailable"
+                      ]
+                    },
+                    "retryAfterSeconds": {
+                      "type": "integer",
+                      "minimum": 1,
+                      "maximum": 45
+                    },
+                    "message": {
+                      "type": "string"
+                    },
+                    "error": {
+                      "type": "string"
+                    }
+                  },
+                  "required": [
+                    "statusCode",
+                    "code",
+                    "retryAfterSeconds",
+                    "message"
+                  ]
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/notifications/push-tokens/{registrationId}": {
+      "delete": {
+        "operationId": "removePushRegistration",
+        "summary": "removePushRegistration",
+        "tags": [
+          "communitySync"
+        ],
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
+        "parameters": [
+          {
+            "in": "path",
+            "name": "registrationId",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "schema": {
+              "type": "integer",
+              "exclusiveMinimum": 0
+            },
+            "required": true,
+            "name": "bindingGeneration",
+            "in": "query"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Success",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/removePushRegistrationResponse"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Invalid request or cursor",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "statusCode": {
+                      "type": "number",
+                      "enum": [
+                        400
+                      ]
+                    },
+                    "code": {
+                      "type": "string",
+                      "enum": [
+                        "invalid_request",
+                        "invalid_cursor"
+                      ]
+                    },
+                    "message": {
+                      "type": "string"
+                    }
+                  },
+                  "required": [
+                    "code",
+                    "message"
+                  ]
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Unauthorized"
+          },
+          "403": {
+            "description": "Denied"
+          },
+          "409": {
+            "description": "Revision conflict, binding conflict or resync_required",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "statusCode": {
+                      "type": "number",
+                      "enum": [
+                        409
+                      ]
+                    },
+                    "code": {
+                      "type": "string",
+                      "enum": [
+                        "resync_required",
+                        "revision_conflict",
+                        "binding_changed",
+                        "registration_limit"
+                      ]
+                    },
+                    "message": {
+                      "type": "string"
+                    },
+                    "current": {
+                      "type": "object",
+                      "properties": {
+                        "enabled": {
+                          "type": "boolean"
+                        },
+                        "timezoneConfigured": {
+                          "type": "boolean",
+                          "default": true
+                        },
+                        "quietHoursEnabled": {
+                          "type": "boolean"
+                        },
+                        "pushEnabled": {
+                          "type": "boolean"
+                        },
+                        "quietHoursStart": {
+                          "type": "string",
+                          "pattern": "^(?:[01]\\d|2[0-3]):[0-5]\\d$"
+                        },
+                        "quietHoursEnd": {
+                          "type": "string",
+                          "pattern": "^(?:[01]\\d|2[0-3]):[0-5]\\d$"
+                        },
+                        "timezone": {
+                          "type": "string",
+                          "minLength": 1,
+                          "maxLength": 120,
+                          "description": "Invariant enforced at runtime and NOT expressible in this schema: the value must be a valid IANA timezone name as resolved by the host Intl database (for example America/New_York). Any other bounded string is rejected."
+                        },
+                        "revision": {
+                          "type": "string",
+                          "minLength": 1,
+                          "maxLength": 200
+                        }
+                      },
+                      "required": [
+                        "enabled",
+                        "quietHoursEnabled",
+                        "pushEnabled",
+                        "quietHoursStart",
+                        "quietHoursEnd",
+                        "timezone",
+                        "revision"
+                      ],
+                      "additionalProperties": false
+                    }
+                  },
+                  "required": [
+                    "code"
+                  ]
+                }
+              }
+            }
+          },
+          "503": {
+            "description": "unavailable; bounded retry seconds preserve the remote cadence",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "statusCode": {
+                      "type": "number",
+                      "enum": [
+                        503
+                      ]
+                    },
+                    "code": {
+                      "type": "string",
+                      "enum": [
+                        "unavailable"
+                      ]
+                    },
+                    "retryAfterSeconds": {
+                      "type": "integer",
+                      "minimum": 1,
+                      "maximum": 45
+                    },
+                    "message": {
+                      "type": "string"
+                    },
+                    "error": {
+                      "type": "string"
+                    }
+                  },
+                  "required": [
+                    "statusCode",
+                    "code",
+                    "retryAfterSeconds",
+                    "message"
+                  ]
                 }
               }
             }

@@ -1,13 +1,27 @@
-import { CommunityCommentsState, CommunityReactionState } from '@couture/api-client'
+import { resolveMobileApiBaseUrl } from '@/src/lib/api-client'
+import {
+  resolveMobileAccessToken,
+  mobileApplicationUserId,
+  subscribeMobileApplicationUser,
+} from '@/src/lib/mobile-auth'
+import {
+  ResponseError,
+  CommunityCommentsState,
+  CommunityReactionState,
+  CommunitySyncState,
+  CommunityRequestSuperseded,
+} from '@couture/api-client'
 import { CommunityCommentsSheet } from '@/components/community/community-comments-sheet'
 import {
   communityCommentsSessionFromMobile,
+  communitySyncFromMobile,
   communityCommentsRootsFromMobile,
   communityCommentsRepliesFromMobile,
   communityCommentsSubmissionsFromMobile,
   communityCommentsCreateFromMobile,
   communityCommentsDeleteFromMobile,
   communityCommentsReportFromMobile,
+  CommunityRequestError,
   communityFailureReason,
   generateIdempotencyKey,
   setCommunityReactionFromMobile,
@@ -28,6 +42,7 @@ import {
 import { useTranslation } from 'react-i18next'
 import {
   AccessibilityInfo,
+  AppState,
   ActivityIndicator,
   FlatList,
   Platform,
@@ -86,6 +101,21 @@ const EXPLAINED_AUTHOR_STATES = new Set([
   'consent_suspended',
 ])
 
+function notificationFailureIsRetryable(error: unknown) {
+  if (
+    error instanceof CommunityRequestError &&
+    ['signed_out', 'age_gate', 'not_found', 'disabled'].includes(error.reason)
+  )
+    return false
+  const status =
+    error instanceof CommunityRequestError
+      ? error.httpStatus
+      : error instanceof ResponseError
+        ? error.response.status
+        : undefined
+  return status === undefined || status === 408 || status === 429 || status >= 500
+}
+
 type FeedState = 'loading' | 'ready' | 'error'
 
 function isInitialFeedRequest(cursor: string | undefined, refresh: boolean): boolean {
@@ -116,15 +146,26 @@ export function CommunityScreen() {
   const palette = useHeroPalette()
   const locale = useResolvedCommunityLocale(i18n.language)
   const analytics = useMobileAnalytics()
-  const { source, type, cardId, expiresAt } = useLocalSearchParams()
+  const { source, type, cardId, commentId, parentId, expiresAt } = useLocalSearchParams()
   const targetRef = useRef<View>(null)
   const newPostButtonRef = useRef<View>(null)
   const cardRefs = useRef(new Map<string, View | null>())
   const [deepLinkPost, setDeepLinkPost] = useState<CommunityFeedItem | null>(null)
+  const [commentTarget, setCommentTarget] = useState<
+    | {
+        commentId: string
+        parentId: string | null
+        pageCursor: string | null
+        parentPageCursor: string | null
+      }
+    | undefined
+  >()
   const [isInvalidDeepLink, setIsInvalidDeepLink] = useState(false)
 
   // Feed state
   const [mode, setMode] = useState<CommunityFeedMode>('auto')
+  const modeRef = useRef(mode)
+  modeRef.current = mode
   /**
    * The mode the SERVER served, which is not always the one that was requested:
    * the beta experiment resolves a request for `auto` to whichever arm the viewer
@@ -136,7 +177,22 @@ export function CommunityScreen() {
   const [servedMode, setServedMode] = useState<CommunityFeedMode>('auto')
   const [experimentVariant, setExperimentVariant] =
     useState<CommunityExperimentVariant | null>(null)
+  const [communityAvailable, setCommunityAvailable] = useState(true)
+  const [sessionScope, setSessionScope] = useState<string | null>(null)
+  const sessionScopeRef = useRef<string | null | undefined>(undefined)
+  const actionGenerationRef = useRef(0)
+  const actionControllerRef = useRef<AbortController | null>(null)
+  const [newLooks, setNewLooks] = useState<CommunityFeedItem[]>([])
+  const newLooksRef = useRef(newLooks)
+  newLooksRef.current = newLooks
+  const [isInsertingLooks, setIsInsertingLooks] = useState(false)
+
   const [items, setItems] = useState<CommunityFeedItem[]>([])
+  const realtimeDeepLink = useRef(deepLinkPost)
+  realtimeDeepLink.current = deepLinkPost
+  const realtimeItems = useRef(items)
+  realtimeItems.current = items
+  const realtimeOpenPost = useRef<string | null>(null)
   const handleReactionChange = useCallback(
     (postId: string, summary: CommunityReactionSummary | null | undefined) => {
       const update = (post: CommunityFeedItem | null): CommunityFeedItem | null => {
@@ -165,6 +221,7 @@ export function CommunityScreen() {
   const translationRef = useRef(t)
   translationRef.current = t
   const [commentsPostId, setCommentsPostId] = useState<string | null>(null)
+  realtimeOpenPost.current = commentsPostId
   const commentsInvokerRef = useRef<View | null>(null)
   const highlightedCommentsButtonRef = useRef<View | null>(null)
   const commentsButtonRefs = useRef(new Map<string, View | null>())
@@ -172,6 +229,7 @@ export function CommunityScreen() {
     () =>
       new CommunityCommentsState(
         {
+          locate: (input, signal) => communitySyncFromMobile().resolve(input, signal),
           roots: communityCommentsRootsFromMobile,
           replies: communityCommentsRepliesFromMobile,
           submissions: communityCommentsSubmissionsFromMobile,
@@ -184,36 +242,6 @@ export function CommunityScreen() {
         (postId) => setCommentsPostId((current) => (current === postId ? null : current))
       )
   )
-  useEffect(() => {
-    let active = true
-    let syncing = false
-    let previousIdentity: string | null | undefined
-    const sync = async () => {
-      if (syncing) return
-      syncing = true
-      try {
-        const identity = await communityCommentsSessionFromMobile()
-        if (!active) return
-        comments.setSession(identity)
-        if (previousIdentity !== undefined && previousIdentity !== identity)
-          setCommentsPostId(null)
-        previousIdentity = identity
-      } catch {
-        // A storage read failure leaves the last confirmed session and draft intact.
-      } finally {
-        syncing = false
-      }
-    }
-    void sync()
-    const timer = setInterval(() => {
-      void sync()
-    }, 1000)
-    return () => {
-      active = false
-      clearInterval(timer)
-      comments.reset()
-    }
-  }, [comments])
   const [reactionState] = useState(
     () =>
       new CommunityReactionState({
@@ -237,6 +265,8 @@ export function CommunityScreen() {
   )
   const highlightedTargetRef = useRef<string | null>(null)
   const detailGenerationRef = useRef(0)
+  const notificationIntentRef = useRef(0)
+  const realtimeSyncRef = useRef<CommunitySyncState | null>(null)
   const [authorStates, setAuthorStates] = useState<CommunityAuthorPostState[]>([])
   const [nextCursor, setNextCursor] = useState<string | null>(null)
   const [viewerBand, setViewerBand] = useState<ClimateBand | null>(null)
@@ -273,12 +303,13 @@ export function CommunityScreen() {
 
   useEffect(() => {
     highlightedTargetRef.current = null
-    const rawParams = { source, type, cardId, expiresAt }
-    const fail = (reason: string) => {
+    if (!sessionScope) return
+    const rawParams = { source, type, cardId, commentId, parentId, expiresAt }
+    const fail = (_reason: string) => {
       setIsInvalidDeepLink(true)
       analytics.capture('deep_link_invalid', {
-        rawUrl: JSON.stringify(rawParams),
-        reason,
+        rawUrl: 'community-notification',
+        reason: 'target_unavailable',
         surface: 'mobile',
       })
     }
@@ -297,11 +328,15 @@ export function CommunityScreen() {
       return
     }
 
-    highlightedTargetRef.current = parsed.payload.cardId
-    const detailGeneration = ++detailGenerationRef.current
+    const payload = parsed.payload
+    const targetPostId = parsed.payload.cardId
+    highlightedTargetRef.current = targetPostId
+    const intent = notificationIntentRef.current
+    let detailGeneration = ++detailGenerationRef.current
     const readTicket = reactionState.beginRead()
     let active = true
     const controller = new AbortController()
+    const operationTimer = setTimeout(() => controller.abort(), 10_000)
     /*
      * Resolved against the community API rather than assembled from the
      * notification's own payload. The synthetic card carried no image, no alt
@@ -311,28 +346,121 @@ export function CommunityScreen() {
      * also the only thing that knows whether THIS viewer may see the post: it
      * answers 404 for everything they may not.
      */
-    void getCommunityPostFromMobile(parsed.payload.cardId, controller.signal)
-      .then((post) => {
-        if (!active || detailGeneration !== detailGenerationRef.current) {
+    const requestTarget = () =>
+      payload.commentId
+        ? communitySyncFromMobile()
+            .resolve(
+              {
+                targets: [
+                  {
+                    key: 'notification',
+                    postId: targetPostId,
+                    ...(payload.commentId ? { commentId: payload.commentId } : {}),
+                    ...(payload.parentId ? { parentId: payload.parentId } : {}),
+                  },
+                ],
+              },
+              AbortSignal.any([controller.signal, AbortSignal.timeout(2000)])
+            )
+            .then((result) => result.targets[0])
+        : getCommunityPostFromMobile(targetPostId, controller.signal, 2000).then(
+            (post) => ({
+              status: 'available' as const,
+              post,
+              comment: null,
+              parent: null,
+              pageCursor: null,
+              parentPageCursor: null,
+            })
+          )
+    const deadline = performance.now() + 10_000
+    let retryTimer: ReturnType<typeof setTimeout> | undefined
+    const targetRequest = async () => {
+      do {
+        detailGeneration = detailGenerationRef.current
+        try {
+          const target = await requestTarget()
+          if (
+            !active ||
+            intent !== notificationIntentRef.current ||
+            detailGeneration === detailGenerationRef.current
+          )
+            return target
+        } catch (error) {
+          if (
+            !notificationFailureIsRetryable(error) ||
+            controller.signal.aborted ||
+            !active ||
+            intent !== notificationIntentRef.current
+          )
+            throw error
+          await new Promise<void>((resolve) => {
+            retryTimer = setTimeout(
+              resolve,
+              Math.min(250, Math.max(0, deadline - performance.now()))
+            )
+          })
+        }
+      } while (active && !controller.signal.aborted && performance.now() < deadline)
+      throw new CommunityRequestSuperseded()
+    }
+    let abortOperation: () => void = () => undefined
+    const aborted = new Promise<never>((_resolve, reject) => {
+      abortOperation = () =>
+        reject(new DOMException('Target verification is unavailable.', 'AbortError'))
+      controller.signal.addEventListener('abort', abortOperation, { once: true })
+    })
+    void Promise.race([targetRequest(), aborted])
+      .then((target) => {
+        if (!active || detailGeneration !== detailGenerationRef.current) return
+        if (!target || target.status === 'unavailable') {
+          if (target?.status === 'unavailable') {
+            if (realtimeOpenPost.current === targetPostId) realtimeOpenPost.current = null
+            if (realtimeDeepLink.current?.id === targetPostId)
+              realtimeDeepLink.current = null
+            newLooksRef.current = newLooksRef.current.filter(
+              (item) => item.id !== targetPostId
+            )
+            setNewLooks(newLooksRef.current)
+            reactionState.evict(targetPostId)
+            comments.evict(targetPostId)
+          }
+          setDeepLinkPost(null)
+          if (intent === notificationIntentRef.current) setIsInvalidDeepLink(true)
           return
         }
-        setDeepLinkPost(reactionState.read(post, readTicket))
+        const post = reactionState.read(target.post, readTicket)
+        setDeepLinkPost(post)
+        if (!post) return
         setIsInvalidDeepLink(false)
-        analytics.capture('deep_link_handled', {
-          source: 'notification',
-          type: 'community',
-          cardId: post.id,
-          surface: 'mobile',
-        })
+        setNoticeKey((previous) =>
+          previous === 'community.realtime.unavailable' ? null : previous
+        )
+        const focus = target.comment ?? target.parent
+        if (focus && intent === notificationIntentRef.current) {
+          setCommentTarget({
+            commentId: focus.id,
+            parentId: target.comment?.parentId ?? null,
+            pageCursor: target.comment ? target.pageCursor : target.parentPageCursor,
+            parentPageCursor: target.parentPageCursor,
+          })
+          setCommentsPostId(target.post.id)
+        }
       })
       .catch((error: unknown) => {
         if (!active || detailGeneration !== detailGenerationRef.current) {
           return
         }
         setDeepLinkPost(null)
-        if (communityFailureReason(error) === 'not_found' && parsed.payload?.cardId) {
-          reactionState.evict(parsed.payload.cardId)
-          comments.evict(parsed.payload.cardId)
+        if (communityFailureReason(error) === 'not_found' && payload?.cardId) {
+          reactionState.evict(targetPostId)
+          comments.evict(targetPostId)
+        }
+        if (intent !== notificationIntentRef.current) return
+        if (notificationFailureIsRetryable(error)) {
+          setIsInvalidDeepLink(false)
+          setNoticeKey('community.realtime.unavailable')
+          return
         }
         fail(
           communityFailureReason(error) === 'not_found'
@@ -340,12 +468,28 @@ export function CommunityScreen() {
             : 'Community card target could not be loaded'
         )
       })
-
+      .finally(() => {
+        clearTimeout(operationTimer)
+        clearTimeout(retryTimer)
+        controller.signal.removeEventListener('abort', abortOperation)
+      })
     return () => {
       active = false
+      clearTimeout(operationTimer)
       controller.abort()
     }
-  }, [source, type, cardId, expiresAt, analytics, reactionState])
+  }, [
+    source,
+    type,
+    sessionScope,
+    cardId,
+    commentId,
+    parentId,
+    expiresAt,
+    analytics,
+    reactionState,
+    comments,
+  ])
 
   const focusNode = useCallback((node: View | null) => {
     if (Platform.OS === 'web' || !node) {
@@ -370,14 +514,14 @@ export function CommunityScreen() {
    */
   const focusedTargetRef = useRef<string | null>(null)
   useEffect(() => {
-    if (!deepLinkPost) {
+    if (!deepLinkPost || commentTarget) {
       return
     }
     if (focusedTargetRef.current === deepLinkPost.id) return
     focusedTargetRef.current = deepLinkPost.id
     AccessibilityInfo.announceForAccessibility(t('community.feed.announceFocused'))
     focusNode(targetRef.current)
-  }, [focusNode, deepLinkPost, t])
+  }, [focusNode, deepLinkPost, commentTarget, t])
 
   /**
    * One in-flight feed request at a time, guarded twice: the `AbortController`
@@ -539,9 +683,237 @@ export function CommunityScreen() {
   )
 
   useEffect(() => {
+    let active = true
+    let syncing = false
+    const assignIdentity = (identity: string | null) => {
+      const previous = sessionScopeRef.current
+      sessionScopeRef.current = identity
+      comments.setSession(identity)
+      setSessionScope(identity)
+      if (previous === undefined || previous === identity) return
+      requestGenerationRef.current++
+      detailGenerationRef.current++
+      actionGenerationRef.current++
+      controllerRef.current?.abort()
+      actionControllerRef.current?.abort()
+      reactionState.reset()
+      setItems([])
+      realtimeItems.current = []
+      setNewLooks([])
+      setAuthorStates([])
+      setNextCursor(null)
+      setDeepLinkPost(null)
+      setCommentsPostId(null)
+      setCommentTarget(undefined)
+      setReportingPost(null)
+      setReportedPostIds(new Set())
+      setIsSubmittingReport(false)
+      setIsPostSheetVisible(false)
+      if (identity) void loadFeed(modeRef.current)
+    }
+    const sync = async () => {
+      if (syncing) return
+      syncing = true
+      try {
+        const identity = await communityCommentsSessionFromMobile()
+        if (active) assignIdentity(identity)
+      } catch {
+        /* Transient token/storage failure retains permitted same-owner drafts. */
+      } finally {
+        syncing = false
+      }
+    }
+    void sync()
+    const unsubscribeIdentity = subscribeMobileApplicationUser(() => {
+      assignIdentity(mobileApplicationUserId())
+      void sync()
+    })
+    const timer = setInterval(() => {
+      void sync()
+    }, 1000)
+    return () => {
+      active = false
+      unsubscribeIdentity()
+      clearInterval(timer)
+      comments.reset()
+    }
+  }, [comments, reactionState, loadFeed])
+
+  useEffect(() => {
     void loadFeed(mode)
     return () => controllerRef.current?.abort()
   }, [loadFeed, mode])
+
+  const insertNewLooks = async () => {
+    if (isInsertingLooks) return
+    const generation = detailGenerationRef.current
+    const ticket = reactionState.beginRead()
+    const buffered = newLooksRef.current
+    setIsInsertingLooks(true)
+    try {
+      const fresh: CommunityFeedItem[] = []
+      for (let offset = 0; offset < buffered.length; offset += 50) {
+        const result = await communitySyncFromMobile().resolve(
+          {
+            targets: buffered
+              .slice(offset, offset + 50)
+              .map((post) => ({ key: post.id, postId: post.id })),
+          },
+          AbortSignal.timeout(2000)
+        )
+        if (generation !== detailGenerationRef.current) return
+        for (const target of result.targets)
+          if (target.status === 'available') {
+            const post = reactionState.read(target.post, ticket)
+            if (post) fresh.push(post)
+          }
+      }
+      setItems((previous) => [
+        ...new Map([...fresh, ...previous].map((post) => [post.id, post])).values(),
+      ])
+      newLooksRef.current = []
+      setNewLooks([])
+    } catch {
+      if (generation === detailGenerationRef.current) realtimeSyncRef.current?.recover()
+    } finally {
+      setIsInsertingLooks(false)
+    }
+  }
+
+  useEffect(() => {
+    if (!sessionScope) return
+    let active = true
+    const refreshFeed = async (signal?: AbortSignal) => {
+      const generation = requestGenerationRef.current
+      const page = await getCommunityFeedFromMobile({
+        mode,
+        limit: FEED_PAGE_SIZE,
+        signal,
+      })
+      if (!active) return
+      if (signal?.aborted) throw new CommunityRequestSuperseded()
+      if (generation !== requestGenerationRef.current)
+        throw new CommunityRequestSuperseded()
+      setAuthorStates(page.authorStates)
+      setNextCursor(page.nextCursor)
+      setServedMode(page.mode)
+      setViewerBand(page.viewerBand)
+      setActiveChallenge(page.activeChallenge)
+      setIsLoadingMore(false)
+      setIsRefreshing(false)
+      setFeedState('ready')
+
+      const ids = new Set(realtimeItems.current.map((item) => item.id))
+      const incoming = page.items.filter((item) => !ids.has(item.id))
+      if (!realtimeItems.current.length) setItems(page.items)
+      else if (incoming.length) {
+        const buffered = [
+          ...new Map(
+            [...incoming, ...newLooksRef.current].map((item) => [item.id, item])
+          ).values(),
+        ]
+        newLooksRef.current = buffered
+        setNewLooks(buffered)
+        AccessibilityInfo.announceForAccessibility(
+          translationRef.current('community.realtime.newLooks', {
+            count: incoming.length,
+          })
+        )
+      }
+    }
+    const sync = new CommunitySyncState(communitySyncFromMobile(), mode, {
+      rendered: () => [
+        ...realtimeItems.current.map((item) => item.id),
+        ...(realtimeOpenPost.current ? [realtimeOpenPost.current] : []),
+        ...newLooksRef.current.map((item) => item.id),
+        ...(realtimeDeepLink.current ? [realtimeDeepLink.current.id] : []),
+      ],
+      rebuild: refreshFeed,
+      reconcile: async (signal) => {
+        const post = realtimeOpenPost.current
+        if (post) await comments.refresh(post, signal)
+      },
+      apply: (target) => {
+        if (!active) return
+        if (target.status === 'unavailable') {
+          requestGenerationRef.current++
+          detailGenerationRef.current++
+          if (realtimeOpenPost.current === target.key) realtimeOpenPost.current = null
+          if (realtimeDeepLink.current?.id === target.key) realtimeDeepLink.current = null
+          controllerRef.current?.abort()
+          setIsLoadingMore(false)
+          setIsRefreshing(false)
+          newLooksRef.current = newLooksRef.current.filter(
+            (item) => item.id !== target.key
+          )
+          setNewLooks(newLooksRef.current)
+          reactionState.evict(target.key)
+          comments.evict(target.key)
+          setItems((previous) => previous.filter((item) => item.id !== target.key))
+          setDeepLinkPost((item) => (item?.id === target.key ? null : item))
+          setCommentsPostId((current) => (current === target.key ? null : current))
+        } else {
+          const updated = reactionState.read(target.post, reactionState.beginRead())
+          if (!updated) return
+          newLooksRef.current = newLooksRef.current.map((item) =>
+            item.id === target.post.id ? updated : item
+          )
+          setNewLooks(newLooksRef.current)
+          setItems((previous) =>
+            previous.map((item) => (item.id === target.post.id ? updated : item))
+          )
+          setDeepLinkPost((item) => (item?.id === target.post.id ? updated : item))
+        }
+      },
+      changed: async (events, signal) => {
+        requestGenerationRef.current++
+        detailGenerationRef.current++
+        controllerRef.current?.abort()
+        setIsLoadingMore(false)
+        setIsRefreshing(false)
+        if (events.some((event) => event.kind === 'post.published'))
+          await refreshFeed(signal)
+      },
+      availability: (state, realtime) => {
+        if (!active) return
+        comments.setRealtimeHealthy(state === 'connected' && Boolean(realtime))
+        setCommunityAvailable(state === 'connected')
+        if (state !== 'connected' && state !== 'recovering') {
+          requestGenerationRef.current++
+          detailGenerationRef.current++
+          setIsLoadingMore(false)
+          setIsRefreshing(false)
+          controllerRef.current?.abort()
+        }
+        if (state === 'connected') {
+          setFeedState('ready')
+          setFeedError(null)
+        }
+        if (state === 'denied') {
+          actionControllerRef.current?.abort()
+          setIsSubmittingReport(false)
+          actionGenerationRef.current++
+          comments.reset()
+          reactionState.reset()
+          setItems([])
+          setNewLooks([])
+          setCommentsPostId(null)
+        }
+      },
+    })
+    realtimeSyncRef.current = sync
+    sync.start(resolveMobileApiBaseUrl(), resolveMobileAccessToken)
+    const lifecycle = AppState.addEventListener('change', (state) => {
+      if (state === 'active') sync.foreground()
+    })
+    return () => {
+      active = false
+      sync.stop()
+      if (realtimeSyncRef.current === sync) realtimeSyncRef.current = null
+      comments.setRealtimeHealthy(false)
+      lifecycle.remove()
+    }
+  }, [comments, mode, reactionState, sessionScope])
 
   const modeLabel = useMemo(
     () =>
@@ -624,28 +996,46 @@ export function CommunityScreen() {
 
   const handleSubmitReport = useCallback(
     async (postId: string, reason: CommunityReportReason, details?: string) => {
+      if (!communityAvailable) return
+      const generation = actionGenerationRef.current
+      const controller = new AbortController()
+      actionControllerRef.current?.abort()
+      actionControllerRef.current = controller
       setIsSubmittingReport(true)
       setReportError(null)
       try {
-        await reportCommunityPostFromMobile(postId, reason, details)
+        await reportCommunityPostFromMobile(postId, reason, details, controller.signal)
+        if (controller.signal.aborted || generation !== actionGenerationRef.current)
+          return
         markReported(postId)
         setNoticeKey('community.report.success')
         closeReportModal()
       } catch (error: unknown) {
+        if (controller.signal.aborted || generation !== actionGenerationRef.current)
+          return
         setReportError(error)
       } finally {
-        setIsSubmittingReport(false)
+        if (!controller.signal.aborted) setIsSubmittingReport(false)
       }
     },
-    [closeReportModal, markReported]
+    [closeReportModal, markReported, communityAvailable]
   )
 
   const handleWithdrawPost = useCallback(
     async (post: CommunityFeedItem) => {
+      if (!communityAvailable) return
+      const generation = actionGenerationRef.current
+      const controller = new AbortController()
+      actionControllerRef.current?.abort()
+      actionControllerRef.current = controller
       setActionError(null)
       try {
-        await withdrawCommunityPostFromMobile(post.id)
+        await withdrawCommunityPostFromMobile(post.id, controller.signal)
+        if (controller.signal.aborted || generation !== actionGenerationRef.current)
+          return
       } catch (error: unknown) {
+        if (controller.signal.aborted || generation !== actionGenerationRef.current)
+          return
         // No optimistic removal, and no silent swallow: a failed withdraw leaves
         // the look in the feed and says so.
         setActionError({ error, fallbackKey: 'community.error.withdraw' })
@@ -655,7 +1045,7 @@ export function CommunityScreen() {
       // The server moves the row into `authorStates`; the client just re-reads.
       await loadFeed(mode, { refresh: true })
     },
-    [loadFeed, mode]
+    [loadFeed, mode, communityAvailable]
   )
 
   const handleImageExpiry = useCallback(() => {
@@ -736,6 +1126,18 @@ export function CommunityScreen() {
   }, [])
 
   const renderEmptyComponent = () => {
+    if (!communityAvailable)
+      return (
+        <View style={styles.stateContainer} testID="community-feed-unavailable">
+          <Text
+            accessibilityLiveRegion="polite"
+            style={[styles.stateBody, { color: palette.mutedText }]}
+          >
+            {t('community.realtime.unavailable')}
+          </Text>
+        </View>
+      )
+
     if (feedState === 'loading') {
       return (
         <View
@@ -818,7 +1220,7 @@ export function CommunityScreen() {
   }
 
   const renderAuthorStates = () => {
-    if (authorStates.length === 0) {
+    if (!communityAvailable || authorStates.length === 0) {
       return null
     }
     return (
@@ -913,13 +1315,14 @@ export function CommunityScreen() {
           </Text>
         </View>
       ) : null}
-      {deepLinkPost ? (
+      {deepLinkPost && communityAvailable ? (
         <View
           testID={`highlighted-community-card-${deepLinkPost.id}`}
           style={styles.highlightSection}
         >
           <CommunityCard
             onComments={(post) => {
+              notificationIntentRef.current++
               commentsInvokerRef.current = highlightedCommentsButtonRef.current
               setCommentsPostId(post.id)
             }}
@@ -1008,12 +1411,27 @@ export function CommunityScreen() {
         viewerBand={viewerBand}
       />
 
+      {newLooks.length > 0 && communityAvailable && (
+        <TouchableOpacity
+          accessibilityRole="button"
+          style={[styles.primaryButton, { backgroundColor: ACCENT_GOLD }]}
+          disabled={isInsertingLooks}
+          onPress={() => {
+            void insertNewLooks()
+          }}
+        >
+          <Text style={{ color: ON_ACCENT }}>
+            {t('community.realtime.showNewLooks', { count: newLooks.length })}
+          </Text>
+        </TouchableOpacity>
+      )}
       <FlatList
-        data={feedState === 'loading' ? [] : listItems}
+        data={feedState === 'loading' || !communityAvailable ? [] : listItems}
         keyExtractor={(item) => item.id}
         renderItem={({ item }) => (
           <CommunityCard
             onComments={(post) => {
+              notificationIntentRef.current++
               commentsInvokerRef.current = commentsButtonRefs.current.get(post.id) ?? null
               setCommentsPostId(post.id)
             }}
@@ -1048,6 +1466,7 @@ export function CommunityScreen() {
       />
 
       <CommunityReportModal
+        suspended={!communityAvailable}
         visible={reportingPost !== null}
         post={reportingPost}
         errorMessage={reportErrorMessage}
@@ -1057,10 +1476,14 @@ export function CommunityScreen() {
       />
 
       <CommunityCommentsSheet
-        postId={commentsPostId}
+        postId={communityAvailable ? commentsPostId : null}
+        target={commentsPostId === deepLinkPost?.id ? commentTarget : undefined}
         state={comments}
         locale={locale}
         onClose={() => {
+          notificationIntentRef.current++
+          if (commentsPostId) comments.retireFocus(commentsPostId)
+          setCommentTarget(undefined)
           const highlighted =
             deepLinkPost?.id === commentsPostId
               ? highlightedCommentsButtonRef.current
@@ -1079,6 +1502,8 @@ export function CommunityScreen() {
         }}
       />
       <CommunityPostSheet
+        key={sessionScope ?? 'anonymous'}
+        suspended={!communityAvailable}
         visible={isPostSheetVisible}
         challenge={activeChallenge}
         defaultChallengeOptIn={challengeOptIn}

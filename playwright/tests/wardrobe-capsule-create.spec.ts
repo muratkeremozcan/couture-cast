@@ -162,6 +162,9 @@ test.describe('Wardrobe capsule creation', () => {
     // a parallel worker created against the shared seeded owner.
     const capsuleId = created?.data.id as string
     await page.getByTestId(`edit-capsule-button-${capsuleId}`).click()
+    await expect(page.getByRole('dialog')).toBeVisible()
+    await expect(page.getByTestId('capsule-name-input')).toHaveValue(capsuleName)
+    await expect(page.locator('[data-testid^="ordered-garment-item-"]')).toHaveCount(2)
 
     const orderedAfter = await page
       .locator('[data-testid^="ordered-garment-item-"]')

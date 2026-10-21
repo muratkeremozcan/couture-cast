@@ -2,6 +2,8 @@
 // private suppression and snapshot pagination for the screen-owned comments state.
 import { describe, expect, it, vi } from 'vitest'
 import { CommunityCommentsState } from '../src/community-comments-state'
+import { CommunityRequestSuperseded } from '../src/community-sync-state'
+import type { CommunitySyncClient } from '../src/community-sync-client'
 import type {
   CommunityCommentsPage,
   CommunityCommentSubmission,
@@ -322,5 +324,253 @@ describe('pagination across snapshots', () => {
       ['post', 'next'],
       ['post', undefined],
     ])
+  })
+})
+
+describe('R07 authoritative thread recovery', () => {
+  function focusedReplyTarget() {
+    return {
+      key: 'post',
+      status: 'available' as const,
+      communityRevision: '2',
+      post: {
+        id: 'post',
+        status: 'published' as const,
+        caption: null,
+        altText: 'Neutral fixture',
+        climateBand: 'cold_dry' as const,
+        challengeId: null,
+        createdAt: '2026-01-01T00:00:00Z',
+        publishedAt: '2026-01-01T00:00:00Z',
+        author: { displayName: 'Fixture', isSelf: false },
+        imageAccess: {
+          url: 'https://fixture.invalid/image',
+          expiresAt: '2026-12-01T00:00:00Z',
+        },
+        reactions: {
+          counts: { applause: 0, love: 0, inspiration: 0 },
+          total: 0,
+          viewerReaction: null,
+          revision: 0,
+          generation: 0,
+        },
+      },
+      comment: { ...item('reply-22', 45), parentId: 'root-23' },
+      parent: { ...item('root-23', 23), replyCount: 22 },
+      pageCursor: 'reply-target-page',
+      parentPageCursor: 'parent-target-page',
+      threadPosition: 45,
+    }
+  }
+  it('keeps the focused off-page reply when refresh starts before its target page commits', async () => {
+    const { state, transport } = setup()
+    const targetRoots = deferred<CommunityCommentsPage>()
+    const located = deferred<Awaited<ReturnType<CommunitySyncClient['resolve']>>>()
+    const locateStarted = deferred<void>()
+    const target = focusedReplyTarget()
+    const locate = vi
+      .fn<CommunitySyncClient['resolve']>()
+      .mockImplementationOnce(() => {
+        locateStarted.resolve()
+        return located.promise
+      })
+      .mockResolvedValue({ targets: [target] })
+    transport.locate = locate
+    transport.roots
+      .mockReturnValueOnce(targetRoots.promise)
+      .mockResolvedValue(page([target.parent]))
+    transport.replies.mockResolvedValue(page([target.comment]))
+    const loading = state.loadTarget('post', {
+      commentId: target.comment.id,
+      parentId: target.parent.id,
+      pageCursor: target.pageCursor,
+      parentPageCursor: target.parentPageCursor,
+    })
+    state.draft('post', { body: 'Retained draft' })
+    const refreshing = state.refresh('post')
+    await locateStarted.promise
+    expect(state.current('post').replies.size).toBe(0)
+    targetRoots.resolve(page([target.parent]))
+    await loading
+    expect(state.current('post').replies.get('root-23')?.items).toEqual([target.comment])
+    located.resolve({ targets: [target] })
+    await refreshing
+    expect(state.current('post').replies.get('root-23')?.items).toEqual([target.comment])
+    expect(transport.replies).toHaveBeenLastCalledWith(
+      'post',
+      'root-23',
+      'reply-target-page'
+    )
+    await state.refresh('post')
+    expect(state.current('post').replies.get('root-23')?.items).toEqual([target.comment])
+    expect(state.current('post').draft.body).toBe('Retained draft')
+    expect(locate).toHaveBeenCalledTimes(2)
+  })
+  it.each([
+    'explicit navigation',
+    'close',
+    'new target',
+    'eviction',
+    'account switch',
+  ] as const)('fences the captured focus refresh after %s', async (action) => {
+    const { state, transport } = setup()
+    const target = focusedReplyTarget()
+    transport.roots.mockResolvedValue(page([target.parent]))
+    transport.replies.mockResolvedValue(page([target.comment]))
+    await state.loadTarget('post', {
+      commentId: target.comment.id,
+      parentId: target.parent.id,
+      pageCursor: target.pageCursor,
+      parentPageCursor: target.parentPageCursor,
+    })
+    const located = deferred<Awaited<ReturnType<CommunitySyncClient['resolve']>>>()
+    transport.locate = vi
+      .fn<CommunitySyncClient['resolve']>()
+      .mockReturnValue(located.promise)
+    const refreshing = state.refresh('post')
+    const rejected = expect(refreshing).rejects.toBeInstanceOf(CommunityRequestSuperseded)
+    if (action === 'explicit navigation') await state.load('post')
+    else if (action === 'close') state.retireFocus('post')
+    else if (action === 'eviction') state.evict('post')
+    else if (action === 'account switch') state.setSession('second')
+    else
+      await state.loadTarget('post', {
+        commentId: 'other-root',
+        parentId: null,
+        pageCursor: 'other-target-page',
+        parentPageCursor: null,
+      })
+    state.draft('post', { body: 'Current owner draft' })
+    const rootsCalls = transport.roots.mock.calls.length
+    located.resolve({ targets: [{ key: 'post', status: 'unavailable' }] })
+    await rejected
+    expect(state.current('post').draft.body).toBe('Current owner draft')
+    expect(transport.roots).toHaveBeenCalledTimes(rootsCalls)
+    if (action === 'eviction' || action === 'account switch')
+      expect(state.current('post').replies.size).toBe(0)
+  })
+  it('resolves the current off-page snapshot before refreshing and fences a late account result', async () => {
+    const { state, transport } = setup()
+    state.setSession('first')
+    transport.roots.mockResolvedValue(page([item('older-target', 25)]))
+    const located: Awaited<ReturnType<CommunitySyncClient['resolve']>> = {
+      targets: [
+        {
+          key: 'post',
+          status: 'available',
+          communityRevision: '2',
+          post: {
+            id: 'post',
+            status: 'published',
+            caption: null,
+            altText: 'Neutral fixture',
+            climateBand: 'cold_dry',
+            challengeId: null,
+            createdAt: '2026-01-01T00:00:00Z',
+            publishedAt: '2026-01-01T00:00:00Z',
+            author: { displayName: 'Fixture', isSelf: false },
+            imageAccess: {
+              url: 'https://fixture.invalid/image',
+              expiresAt: '2026-12-01T00:00:00Z',
+            },
+            reactions: {
+              counts: { applause: 0, love: 0, inspiration: 0 },
+              total: 0,
+              viewerReaction: null,
+              revision: 0,
+              generation: 0,
+            },
+          },
+          comment: item('older-target', 25),
+          parent: null,
+          pageCursor: 'new-snapshot-page',
+          parentPageCursor: null,
+          threadPosition: 25,
+        },
+      ],
+    }
+    const locate = vi.fn<CommunitySyncClient['resolve']>().mockResolvedValue(located)
+    transport.locate = locate
+    await state.loadTarget('post', {
+      commentId: 'older-target',
+      parentId: null,
+      pageCursor: 'old-snapshot-page',
+      parentPageCursor: null,
+    })
+    state.draft('post', { body: 'Retained off-page draft' })
+    await state.refresh('post')
+    expect(locate).toHaveBeenCalledWith(
+      { targets: [{ key: 'post', postId: 'post', commentId: 'older-target' }] },
+      undefined
+    )
+    expect(transport.roots).toHaveBeenLastCalledWith('post', 'new-snapshot-page')
+    expect(state.current('post').draft.body).toBe('Retained off-page draft')
+    // Explicit navigation retires the deep-link page; passive refresh keeps its intent.
+    await state.load('post')
+    await state.refresh('post')
+    expect(locate).toHaveBeenCalledTimes(1)
+    expect(transport.roots).toHaveBeenLastCalledWith('post', undefined)
+    await state.loadTarget('post', {
+      commentId: 'older-target',
+      parentId: null,
+      pageCursor: 'new-snapshot-page',
+      parentPageCursor: null,
+    })
+    const held = deferred<Awaited<ReturnType<CommunitySyncClient['resolve']>>>()
+    locate.mockReturnValueOnce(held.promise)
+    const refreshing = state.refresh('post')
+    state.setSession('second')
+    state.draft('post', { body: 'Second account draft' })
+    held.resolve({ targets: [{ key: 'post', status: 'unavailable' }] })
+    await expect(refreshing).rejects.toBeInstanceOf(CommunityRequestSuperseded)
+    expect(state.current('post').draft.body).toBe('Second account draft')
+    expect(transport.roots).toHaveBeenCalledTimes(5)
+  })
+
+  it('propagates a required refresh failure and retains the draft for retry', async () => {
+    const { state, transport } = setup()
+    await state.load('post')
+    state.draft('post', { body: 'Retained draft' })
+    transport.roots.mockRejectedValueOnce(new Error('offline'))
+    await expect(state.refresh('post')).rejects.toThrow('offline')
+    expect(state.current('post').draft.body).toBe('Retained draft')
+  })
+  it('preserves the off-page target cursor during refresh and announces only added comments', async () => {
+    const { state, transport } = setup()
+    transport.roots.mockResolvedValue(page([item('older-target', 25)]))
+    await state.loadTarget('post', {
+      parentId: null,
+      pageCursor: 'off-page',
+      parentPageCursor: null,
+    })
+    await state.refresh('post')
+    expect(transport.roots).toHaveBeenLastCalledWith('post', 'off-page')
+    expect(state.consumeAnnouncement('post')).toBeNull()
+    transport.roots.mockResolvedValue(page([item('older-target', 25), item('new', 26)]))
+    await state.refresh('post')
+    expect(state.consumeAnnouncement('post')?.key).toBe('community.realtime.newComments')
+  })
+  it('target loading preserves a concurrent private status read and handles page failure', async () => {
+    const { state, transport } = setup()
+    const held = deferred<SubmissionsPage>()
+    transport.submissions.mockReturnValueOnce(held.promise)
+    const statuses = state.statuses('post')
+    await state.loadTarget('post', {
+      parentId: null,
+      pageCursor: 'target',
+      parentPageCursor: null,
+    })
+    held.resolve(ownPage())
+    await statuses
+    expect(state.current('post').submissions).toEqual([own()])
+    transport.roots.mockRejectedValueOnce('unknown')
+    await expect(
+      state.loadTarget('post', {
+        parentId: null,
+        pageCursor: 'target',
+        parentPageCursor: null,
+      })
+    ).resolves.toBeUndefined()
+    expect(state.current('post').error).toBe('community.comments.failed')
   })
 })

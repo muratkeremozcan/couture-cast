@@ -11,7 +11,7 @@ import {
   setMockParams,
 } from './harness'
 import { userEvent as browserUser } from '@vitest/browser/context'
-import { screen, waitFor, within, fireEvent } from '@testing-library/react'
+import { screen, waitFor, within, fireEvent, act } from '@testing-library/react'
 import { delay, http, HttpResponse } from 'msw'
 import { cleanup, render } from 'vitest-browser-react'
 import { expect, it, vi } from 'vitest'
@@ -26,6 +26,7 @@ import { CommunityScreen } from '@/src/features/community/community-screen'
 import enUS from '@/assets/locales/en-US.json'
 import { press } from '@/src/test-utils/press'
 import { server } from '@/src/test-utils/msw/server'
+import { getCommunityPostFromMobile } from '@/src/lib/community'
 import { setMobileAccessTokenResolver } from '@/src/lib/mobile-auth'
 
 /** Gives every host node its own native handle, so focus targets stay distinguishable. */
@@ -40,56 +41,108 @@ function distinctNodeHandles() {
 }
 
 export function registerCommunityFeedCases() {
-  it('keeps a discussion open when an unrelated deep-link lookup returns404', async () => {
+  it('R12 keeps a visible late detail card while stripping revoked reaction capability', async () => {
     let release!: () => void
-    const gate = new Promise<void>((resolve) => {
+    const held = new Promise<void>((resolve) => {
       release = resolve
     })
-    setMockParams({ source: 'notification', type: 'community', cardId: 'post-b' })
+    setMockParams({ source: 'notification', type: 'community', cardId: 'post-a' })
     server.use(
-      http.get('*/api/v1/community/posts/post-b', async () => {
-        await gate
-        return errorEnvelope(404, 'Community post not found.')
+      http.get('*/api/v1/community/posts/post-a', async () => {
+        await held
+        return HttpResponse.json({
+          data: item({
+            reactions: {
+              counts: { applause: 1, love: 0, inspiration: 0 },
+              total: 1,
+              viewerReaction: null,
+              revision: 1,
+              generation: 0,
+            },
+          }),
+        })
       })
     )
     try {
       await render(<CommunityScreen />)
-      press(await screen.findByTestId('community-card-comments-post-a'))
-      await screen.findByRole('button', { name: 'Close comments' })
+      await screen.findByTestId('community-post-card-post-a')
       release()
-      await screen.findByTestId('deep-link-info-banner')
-      expect(screen.getByRole('button', { name: 'Close comments' })).toBeVisible()
+      const target = await screen.findByTestId('highlighted-community-card-post-a')
+      expect(within(target).getByTestId('community-post-card-post-a')).toBeVisible()
+      expect(within(target).queryByTestId('community-reactions-post-a')).toBeNull()
     } finally {
       release()
     }
   })
 
-  it('closes a discussion when the deep-link lookup for its own post returns 404', async () => {
-    let release!: () => void
-    const gate = new Promise<void>((resolve) => {
-      release = resolve
-    })
-    setMockParams({ source: 'notification', type: 'community', cardId: 'post-b' })
-    serveFeed(() => feedJson({ items: [item(), item({ id: 'post-b' })] }))
-    server.use(
-      http.get('*/api/v1/community/posts/post-b', async () => {
-        await gate
-        return errorEnvelope(404, 'Community post not found.')
+  it.each(['post-a', 'post-b'] as const)(
+    'settles a retired notification404 with authoritative eviction and discussion ownership for %s',
+    async (openedPost) => {
+      let release!: () => void
+      const gate = new Promise<void>((resolve) => {
+        release = resolve
       })
-    )
-    try {
-      await render(<CommunityScreen />)
-      press(await screen.findByTestId('community-card-comments-post-b'))
-      await screen.findByRole('button', { name: 'Close comments' })
-      release()
-      await screen.findByTestId('deep-link-info-banner')
-      await waitFor(() =>
-        expect(screen.queryByRole('button', { name: 'Close comments' })).toBeNull()
+      let requests = 0
+      setMockParams({ source: 'notification', type: 'community', cardId: 'post-b' })
+      serveFeed(() => feedJson({ items: [item(), item({ id: 'post-b' })] }))
+      server.use(
+        http.get('*/api/v1/community/posts/post-b', async () => {
+          requests++
+          await gate
+          return errorEnvelope(404, 'Community post not found.')
+        })
       )
-    } finally {
-      release()
+      try {
+        await render(<CommunityScreen />)
+        await screen.findByTestId('community-post-card-post-b')
+        await waitFor(() => expect(requests).toBeGreaterThan(0))
+        press(await screen.findByTestId(`community-card-comments-${openedPost}`))
+        await screen.findByRole('button', { name: 'Close comments' })
+        fireEvent.change(screen.getByLabelText('Add a comment'), {
+          target: { value: 'Owned discussion draft' },
+        })
+        expect(screen.getByLabelText('Add a comment')).toHaveValue(
+          'Owned discussion draft'
+        )
+        // Settle the actual wrapper, then wait for authoritative eviction. An
+        // absent banner alone cannot prove that the held result was consumed.
+        const reads = vi
+          .mocked(getCommunityPostFromMobile)
+          .mock.results.map((result): unknown => result.value)
+        expect(reads.length).toBeGreaterThan(0)
+        await act(async () => {
+          release()
+          await Promise.allSettled(reads)
+        })
+        await waitFor(() =>
+          expect(screen.queryByTestId('community-post-card-post-b')).toBeNull()
+        )
+        expect(screen.getByTestId('community-post-card-post-a')).toBeVisible()
+        if (openedPost === 'post-a') {
+          expect(screen.getByRole('button', { name: 'Close comments' })).toBeVisible()
+          expect(screen.getByLabelText('Add a comment')).toHaveValue(
+            'Owned discussion draft'
+          )
+        } else {
+          await waitFor(() =>
+            expect(screen.queryByRole('button', { name: 'Close comments' })).toBeNull()
+          )
+        }
+        expect(screen.queryByTestId('highlighted-community-card-post-b')).toBeNull()
+        expect(screen.queryByTestId('deep-link-info-banner')).toBeNull()
+        expect(
+          mockCapture.mock.calls.filter(([name]) => name === 'deep_link_invalid')
+        ).toEqual([])
+      } finally {
+        release()
+        await Promise.allSettled(
+          vi
+            .mocked(getCommunityPostFromMobile)
+            .mock.results.map((result): unknown => result.value)
+        )
+      }
     }
-  })
+  )
 
   it('restores close focus to the actual highlighted Comments control', async () => {
     Object.defineProperty(Platform, 'OS', { value: 'ios', configurable: true })

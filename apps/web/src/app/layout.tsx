@@ -1,3 +1,4 @@
+import { SessionBridge } from './components/session-bridge'
 // Step 2 step 2 owner: searchable owner anchor
 import type { Metadata } from 'next'
 import localFont from 'next/font/local'
@@ -29,6 +30,7 @@ export default function RootLayout({
   return (
     <html lang="en">
       <body className={`${geistSans.variable} ${geistMono.variable} antialiased`}>
+        <SessionBridge />
         <SkipToContent />
         {children}
       </body>

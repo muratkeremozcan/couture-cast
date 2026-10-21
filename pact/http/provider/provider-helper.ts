@@ -1,3 +1,12 @@
+import { CommunitySyncController } from '../../../apps/api/src/modules/community/community-sync.controller.js'
+import { CommunityPreferencesService } from '../../../apps/api/src/modules/community/community-preferences.service.js'
+import { CommunitySyncService } from '../../../apps/api/src/modules/community/community-sync.service.js'
+import { CommunityTargetsService } from '../../../apps/api/src/modules/community/community-targets.service.js'
+import { PushRegistrationController } from '../../../apps/api/src/modules/notifications/push-registration.controller.js'
+import { PushRegistrationService } from '../../../apps/api/src/modules/notifications/push-registration.service.js'
+import { AlertsController } from '../../../apps/api/src/modules/alerts/alerts.controller'
+import { AlertsService } from '../../../apps/api/src/modules/alerts/alerts.service'
+import { createCommunityEngagementDoubles } from './doubles/community-engagement'
 import { CommunityCommentsController } from '../../../apps/api/src/modules/community/community-comments.controller'
 import { CommunityCommentsService } from '../../../apps/api/src/modules/community/community-comments.service'
 import { createCommunityCommentsDouble } from './doubles/community-comments'
@@ -78,6 +87,7 @@ import { createPaletteAdvisorDoubles } from './doubles/palette-advisor'
 import { createPlannerDoubles } from './doubles/planner'
 import { createCommunityDoubles } from './doubles/community'
 import {
+  resetProviderEngagementState,
   resetProviderCapsuleState,
   resetProviderCommerceState,
   resetProviderOnboardingState,
@@ -132,6 +142,7 @@ export function resetProviderState() {
   resetProviderPaletteAdvisorState()
   resetProviderPlannerState()
   resetProviderCommunityState()
+  resetProviderEngagementState()
 }
 
 export function parsePactEvent(event: PactEvent | string) {
@@ -224,8 +235,12 @@ export async function startLocalPactProvider({
   const { mockPaletteAdvisorService } = createPaletteAdvisorDoubles()
   const { mockPlannerService } = createPlannerDoubles()
   const { mockCommunityService } = createCommunityDoubles()
+  const engagement = createCommunityEngagementDoubles()
   const moduleFixture = await Test.createTestingModule({
     controllers: [
+      CommunitySyncController,
+      PushRegistrationController,
+      AlertsController,
       ApiHealthController,
       HealthController,
       EventsController,
@@ -247,6 +262,11 @@ export async function startLocalPactProvider({
       CommunityCommentsController,
     ],
     providers: [
+      { provide: CommunityPreferencesService, useValue: engagement.preferences },
+      { provide: CommunitySyncService, useValue: engagement.sync },
+      { provide: CommunityTargetsService, useValue: engagement.targets },
+      { provide: PushRegistrationService, useValue: engagement.registrations },
+      { provide: AlertsService, useValue: engagement.alerts },
       { provide: CommunityCommentsService, useValue: createCommunityCommentsDouble() },
       EventsService,
       {

@@ -7,6 +7,7 @@ module.exports = {
       './apps/mobile/tsconfig.json',
       './apps/web/tsconfig.json',
       './apps/api/tsconfig.json',
+      './packages/api-client/tsconfig.json',
       './playwright/tsconfig.json',
       './pact/tsconfig.json',
     ],

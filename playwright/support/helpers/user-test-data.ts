@@ -57,7 +57,8 @@ export async function cleanupUserTestData(userId: string | undefined): Promise<v
     ['postgres:', 'postgresql:'].includes(databaseUrl.protocol) &&
     localHosts.has(databaseUrl.hostname) &&
     databaseUrl.port === '54322' &&
-    databaseUrl.pathname === '/postgres' &&
+    (databaseUrl.pathname === '/postgres' ||
+      /^\/tea_community_[a-f0-9]{32}$/.test(databaseUrl.pathname)) &&
     databaseUrl.username === 'postgres'
   if (!isSupportedLocalDatabase) {
     throw new Error(

@@ -1,3 +1,4 @@
+import { CommunityFlagEvaluationService } from './community-flag-evaluation.service.js'
 import { Module } from '@nestjs/common'
 import { AnalyticsModule } from '../../analytics/analytics.module'
 import { PrismaModule } from '../../prisma/prisma.module'
@@ -8,7 +9,12 @@ import { FeatureFlagsService } from './feature-flags.service'
 
 @Module({
   imports: [PrismaModule, AnalyticsModule],
-  providers: [FeatureFlagsRepository, FeatureFlagsService, FeatureFlagsWarmup],
-  exports: [FeatureFlagsService],
+  providers: [
+    FeatureFlagsRepository,
+    FeatureFlagsService,
+    FeatureFlagsWarmup,
+    CommunityFlagEvaluationService,
+  ],
+  exports: [FeatureFlagsService, CommunityFlagEvaluationService],
 })
 export class FeatureFlagsModule {}

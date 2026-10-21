@@ -228,7 +228,8 @@ export function createCommunityModerationWorker(
     deps.storage,
     deps.telemetryService,
     engine,
-    deps.meter
+    deps.meter,
+    deps.featureFlags
   )
 
   const comments = new CommunityCommentsProcessor(deps.prisma, engine, deps.featureFlags)

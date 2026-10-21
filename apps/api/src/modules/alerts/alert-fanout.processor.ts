@@ -239,7 +239,12 @@ export class AlertFanoutProcessor {
       }
       failureStage = 'push_provider'
       const dispatch = await this.pushNotificationService.sendBatchNotifications(
-        buildPushMessages(eventId, payload, tokens)
+        buildPushMessages(
+          eventId,
+          payload,
+          tokens.map((binding) => binding.token)
+        ),
+        tokens
       )
       const successfulTicketCount = dispatch.tickets.filter(
         (ticket) => ticket.status === 'ok'

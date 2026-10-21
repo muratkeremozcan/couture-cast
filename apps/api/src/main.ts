@@ -1,3 +1,10 @@
+import { Server } from 'node:http'
+import { attachCommunityRealtime } from './realtime/community-realtime.server.js'
+import { AccessTokenIdentityService } from './modules/auth/access-token-identity.service.js'
+import { CommunityAccessService } from './modules/community/community-access.service.js'
+import { CommunityStreamRepository } from './modules/community/community-stream.repository.js'
+import { PrismaClient } from '@prisma/client'
+import { resolveHttpCorsOrigins } from './bootstrap/configure-app.js'
 // Step 2 step 4 owner: searchable owner anchor
 // Step 9 bootstrap order owner: searchable owner anchor
 import 'reflect-metadata'
@@ -8,6 +15,10 @@ import {
   resolveOtelDiagnosticLogLevel,
   resolveOtlpExporterConfig,
 } from './instrumentation'
+
+function isHttpServer(value: unknown): value is Server {
+  return value instanceof Server
+}
 
 async function bootstrap() {
   // 4) initialize SDK before app bootstrap
@@ -85,6 +96,17 @@ async function bootstrap() {
     })
   )
   const port = Number(process.env.PORT ?? 3000)
+  const httpServer: unknown = app.getHttpServer()
+  if (!isHttpServer(httpServer)) throw new Error('HTTP server unavailable.')
+  attachCommunityRealtime(httpServer, () =>
+    Promise.resolve({
+      prisma: app.get(PrismaClient),
+      identity: app.get(AccessTokenIdentityService),
+      access: app.get(CommunityAccessService),
+      streams: app.get(CommunityStreamRepository),
+      origins: resolveHttpCorsOrigins(),
+    })
+  )
   await app.listen(port)
 
   try {

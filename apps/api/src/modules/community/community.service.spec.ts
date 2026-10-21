@@ -32,7 +32,7 @@ describe('CommunityService feed', () => {
 
       await expect(
         service.getFeed({ userId: viewerUserId, platform: 'web' })
-      ).rejects.toThrow(ServiceUnavailableException)
+      ).rejects.toMatchObject({ status: 403, response: { code: 'denied' } })
 
       expect(getFeatureFlag).toHaveBeenCalledWith('community_read_enabled', viewerUserId)
       expect(findViewerLocations).not.toHaveBeenCalled()

@@ -815,6 +815,34 @@
       },
       "unavailable": "Indisponible.",
       "close": "Fermer les commentaires"
+    },
+    "realtime": {
+      "newLooks": "{{count}} nouveaux looks sont disponibles.",
+      "showNewLooks": "Afficher {{count}} nouveaux looks",
+      "newComments": "De nouveaux commentaires sont disponibles.",
+      "unavailable": "La communauté est temporairement indisponible. Votre brouillon est enregistré."
+    },
+    "notifications": {
+      "title": "Notifications de la communauté",
+      "enabled": "Notifications des interactions",
+      "quiet": "Heures silencieuses pour toutes les notifications, y compris la météo",
+      "start": "Début des heures silencieuses",
+      "end": "Fin des heures silencieuses",
+      "timezone": "Fuseau horaire du compte",
+      "save": "Enregistrer les réglages",
+      "saved": "Réglages enregistrés.",
+      "failed": "Impossible d’enregistrer les réglages. Réessayez.",
+      "conflict": "Les réglages ont changé sur un autre appareil. Vérifiez les valeurs et réessayez.",
+      "permission": "Autorisez les notifications dans les réglages de votre appareil, puis réessayez.",
+      "signin": "Se connecter",
+      "email": "Adresse courriel",
+      "code": "Code reçu par courriel",
+      "sendCode": "Envoyer le code de connexion",
+      "verify": "Vérifier le code",
+      "codeSent": "Consultez votre courriel pour le code de connexion.",
+      "signout": "Se déconnecter",
+      "deviceSettings": "Ouvrir les réglages de l’appareil",
+      "back": "Retour à la communauté"
     }
   }
 }

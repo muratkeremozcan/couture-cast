@@ -4,7 +4,8 @@ import type { FeatureFlagEvaluationSubject, FeatureFlagKey } from '@couture/conf
 export interface RemoteFeatureFlagProvider {
   getFeatureFlagValue(
     flagKey: FeatureFlagKey,
-    subjectId: FeatureFlagEvaluationSubject
+    subjectId: FeatureFlagEvaluationSubject,
+    options?: { signal: AbortSignal }
   ): Promise<unknown>
 }
 

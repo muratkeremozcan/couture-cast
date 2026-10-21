@@ -12,7 +12,7 @@ import {
 import Constants, { AppOwnership } from 'expo-constants'
 import { useFonts } from 'expo-font'
 import type { Notification } from 'expo-notifications'
-import { Stack, usePathname } from 'expo-router'
+import { Stack, usePathname, useRouter, useRootNavigationState } from 'expo-router'
 import * as SplashScreen from 'expo-splash-screen'
 import { useEffect, useRef, useState } from 'react'
 import 'react-native-reanimated'
@@ -91,6 +91,54 @@ function RootLayoutNav() {
   /* eslint-disable @typescript-eslint/no-unsafe-assignment */
   const colorScheme = useColorScheme()
   const theme = colorScheme === 'dark' ? DarkTheme : DefaultTheme
+
+  const router = useRouter()
+  const navigation = useRootNavigationState()
+  const readyListeners = useRef(new Set<() => void>())
+  const readyRef = useRef(false)
+  readyRef.current = Boolean(navigation?.key)
+  useEffect(() => {
+    readyListeners.current.forEach((listener) => listener())
+  }, [navigation?.key])
+  useEffect(() => {
+    let stopped = false
+    const cleanups: (() => void)[] = []
+    void import('../src/lib/native-session.js')
+      .then(async ({ startNativeSession }) => {
+        const cleanup = await startNativeSession()
+        if (stopped) cleanup()
+        else cleanups.push(cleanup)
+      })
+      .catch(() => undefined)
+    void import('../src/lib/native-notifications.js')
+      .then(async ({ startNativeNotifications }) => {
+        const cleanup = await startNativeNotifications({
+          ready: () => readyRef.current,
+          subscribeReady: (listener) => {
+            readyListeners.current.add(listener)
+            return () => {
+              readyListeners.current.delete(listener)
+            }
+          },
+          open: (params) => router.push({ pathname: '/(tabs)/community', params }),
+        })
+        if (stopped) cleanup()
+        else cleanups.push(cleanup)
+      })
+      .catch(() => undefined)
+    if (__DEV__)
+      void import('../src/lib/native-notification-fixture.js')
+        .then(async ({ startNativeNotificationFixture }) => {
+          const cleanup = await startNativeNotificationFixture()
+          if (stopped) cleanup()
+          else cleanups.push(cleanup)
+        })
+        .catch(() => undefined)
+    return () => {
+      stopped = true
+      cleanups.forEach((cleanup) => cleanup())
+    }
+  }, [router])
 
   const pathname = usePathname()
   const previousPathname = useRef<string | undefined>(undefined)

@@ -815,6 +815,34 @@
       },
       "unavailable": "Unavailable.",
       "close": "Close comments"
+    },
+    "realtime": {
+      "newLooks": "{{count}} new looks are ready.",
+      "showNewLooks": "Show {{count}} new looks",
+      "newComments": "New comments are available.",
+      "unavailable": "Community is temporarily unavailable. Your draft is saved."
+    },
+    "notifications": {
+      "title": "Community notifications",
+      "enabled": "Engagement notifications",
+      "quiet": "Quiet hours for all push notifications, including weather",
+      "start": "Quiet hours start",
+      "end": "Quiet hours end",
+      "timezone": "Account time zone",
+      "save": "Save settings",
+      "saved": "Settings saved.",
+      "failed": "Settings could not be saved. Try again.",
+      "conflict": "Settings changed elsewhere. Review the current values and try again.",
+      "permission": "Allow notifications in your device settings, then try again.",
+      "signin": "Sign in",
+      "email": "Email",
+      "code": "Email code",
+      "sendCode": "Send sign-in code",
+      "verify": "Verify code",
+      "codeSent": "Check your email for the sign-in code.",
+      "signout": "Sign out",
+      "deviceSettings": "Open device settings",
+      "back": "Back to community"
     }
   }
 }

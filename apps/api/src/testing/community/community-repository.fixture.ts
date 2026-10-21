@@ -32,6 +32,21 @@ export const createRepo = () => {
   const transaction = vi.fn()
 
   const client = {
+    communitySubject: { findUnique: vi.fn().mockResolvedValue({ generation: 0 }) },
+    userProfile: {
+      findUnique: vi.fn().mockResolvedValue({
+        birthdate: new Date('1990-01-01'),
+        preferences: { compliance: { accountStatus: 'active' } },
+      }),
+    },
+    user: {
+      findUnique: vi.fn().mockResolvedValue({
+        id: viewerUserId,
+        profile: { birthdate: new Date('1990-01-01') },
+        teen_roles: [],
+      }),
+    },
+    guardianConsent: { findFirst: vi.fn().mockResolvedValue(null) },
     communityReaction: { deleteMany: vi.fn().mockResolvedValue({ count: 0 }) },
     communityReactionReceipt: { deleteMany: vi.fn().mockResolvedValue({ count: 0 }) },
     communityReactionOutbox: { deleteMany: vi.fn().mockResolvedValue({ count: 0 }) },

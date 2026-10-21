@@ -643,6 +643,34 @@
       },
       "unavailable": "Indisponível.",
       "close": "Fechar comentários"
+    },
+    "realtime": {
+      "newLooks": "Há {{count}} novos visuais disponíveis.",
+      "showNewLooks": "Mostrar {{count}} novos visuais",
+      "newComments": "Há novos comentários disponíveis.",
+      "unavailable": "A comunidade está temporariamente indisponível. O rascunho foi guardado."
+    },
+    "notifications": {
+      "title": "Notificações da comunidade",
+      "enabled": "Notificações de interações",
+      "quiet": "Horário de silêncio para todas as notificações push, incluindo o tempo",
+      "start": "Início do horário de silêncio",
+      "end": "Fim do horário de silêncio",
+      "timezone": "Fuso horário da conta",
+      "save": "Guardar definições",
+      "saved": "Definições guardadas.",
+      "failed": "Não foi possível guardar as definições. Tente novamente.",
+      "conflict": "As definições foram alteradas noutro local. Reveja os valores atuais e tente novamente.",
+      "permission": "Permita notificações nas definições do dispositivo e tente novamente.",
+      "signin": "Iniciar sessão",
+      "email": "Endereço de e-mail",
+      "code": "Código recebido por e-mail",
+      "sendCode": "Enviar código de acesso",
+      "verify": "Verificar código",
+      "codeSent": "Consulte o seu e-mail para obter o código de acesso.",
+      "signout": "Terminar sessão",
+      "deviceSettings": "Abrir definições do dispositivo",
+      "back": "Voltar à comunidade"
     }
   }
 }

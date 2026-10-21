@@ -34,22 +34,36 @@ export function CommunityCommentsSheet({
   postId,
   state,
   locale,
+  target,
   onClose,
 }: {
   postId: string | null
   state: CommunityCommentsState
+  target?: {
+    commentId: string
+    parentId: string | null
+    pageCursor: string | null
+    parentPageCursor: string | null
+  }
   locale: SupportedLocale
   onClose: () => void
 }) {
   const { t } = useTranslation()
   const palette = useHeroPalette()
-  useSyncExternalStore(state.subscribe, state.getVersion, state.getVersion)
+  const threadVersion = useSyncExternalStore(
+    state.subscribe,
+    state.getVersion,
+    state.getVersion
+  )
   const [reporting, setReporting] = useState<string | null>(null)
   const reportGeneration = useRef(0)
   const [reason, setReason] = useState<CommunityReportReason>('spam')
   const titleRef = useRef<Text>(null)
   const statusRef = useRef<Text>(null)
   const composerRef = useRef<TextInput>(null)
+  const entries = useRef(new Map<string, View | null>())
+  const focused = useRef<string | null>(null)
+  const removedFocus = useRef<string | null>(null)
   const thread = state.current(postId ?? '__closed__')
   const focus = (ref: React.RefObject<Text | View | null>) => {
     const node = safeFindNodeHandle(ref.current)
@@ -58,10 +72,11 @@ export function CommunityCommentsSheet({
   useEffect(() => {
     if (!postId) return
     setReporting(null)
-    void state.load(postId)
+    if (target) void state.loadTarget(postId, target)
+    else void state.load(postId)
     void state.statuses(postId)
     return state.watchSubmissions(postId)
-  }, [postId, state])
+  }, [postId, state, target])
   useEffect(() => {
     if (!postId) return
     const announcement = state.consumeAnnouncement(postId)
@@ -69,6 +84,34 @@ export function CommunityCommentsSheet({
     AccessibilityInfo.announceForAccessibility(t(announcement.key))
     if (announcement.key === 'community.comments.submitted') focus(statusRef)
   }, [postId, state, t, thread.announcement?.id])
+
+  useEffect(() => {
+    if (!target) return
+    const items = [
+      ...(thread.roots?.items ?? []),
+      ...[...thread.replies.values()].flatMap((page) => page.items),
+    ]
+    const visible = items.some(
+      (item) => item.id === target.commentId && !item.unavailable
+    )
+    if (focused.current === target.commentId) {
+      if (!visible && removedFocus.current !== target.commentId) {
+        removedFocus.current = target.commentId
+        if (!composerRef.current?.isFocused()) {
+          focus(titleRef)
+          AccessibilityInfo.announceForAccessibility(t('community.comments.unavailable'))
+        }
+      }
+      return
+    }
+    if (!visible) return
+    const entry = entries.current.get(target.commentId)
+    const node = entry ? safeFindNodeHandle(entry) : null
+    if (node) {
+      focused.current = target.commentId
+      AccessibilityInfo.setAccessibilityFocus(node)
+    }
+  }, [target, thread.roots, thread.replies, threadVersion, t])
 
   if (!postId) return null
   const button = (
@@ -118,8 +161,12 @@ export function CommunityCommentsSheet({
     <View
       key={item.id}
       testID={`comment-${item.id}`}
+      ref={(node) => {
+        entries.current.set(item.id, node)
+      }}
+      accessibilityLabel={[item.author, item.body].filter(Boolean).join('. ')}
       style={[styles.entry, { borderColor: palette.divider }]}
-      accessible={false}
+      accessible={Boolean(target && target.commentId === item.id)}
     >
       {item.author && (
         <Text style={[styles.author, { color: palette.text }]}>{item.author}</Text>
@@ -218,7 +265,9 @@ export function CommunityCommentsSheet({
       transparent
       animationType="slide"
       onRequestClose={onClose}
-      onShow={() => focus(titleRef)}
+      onShow={() => {
+        if (!target) focus(titleRef)
+      }}
     >
       <KeyboardAvoidingView
         style={styles.backdrop}

@@ -13,7 +13,7 @@ type MockExpo = {
 }
 
 class InMemoryPushTokenRepository
-  implements Pick<PushTokenRepository, 'saveToken' | 'deleteTokens'>
+  implements Pick<PushTokenRepository, 'saveToken' | 'deleteBindings'>
 {
   tokens = new Map<string, { userId: string; platform?: string }>()
   deletedTokens: string[] = []
@@ -24,6 +24,9 @@ class InMemoryPushTokenRepository
     return Promise.resolve({
       id: token,
       token,
+      installation_id: null,
+      binding_generation: 1,
+      permission: 'unknown',
       user_id: userId,
       platform: platform ?? null,
       last_used_at: now,
@@ -32,7 +35,8 @@ class InMemoryPushTokenRepository
     })
   }
 
-  deleteTokens(tokens: string[]) {
+  deleteBindings(bindings: { token: string }[]) {
+    const tokens = bindings.map((binding) => binding.token)
     this.deletedTokens.push(...tokens)
     let count = 0
     tokens.forEach((token) => {
@@ -151,10 +155,20 @@ describe('PushNotificationService', () => {
     )
     const { repo, service } = createService({ expo: { sendPushNotificationsAsync } })
 
-    const result = await service.sendBatchNotifications([
-      { to: 'ExponentPushToken[invalid]', body: 'Hello', sound: 'default' },
-      { to: 'ExponentPushToken[rate]', body: 'Hello', sound: 'default' },
-    ])
+    const result = await service.sendBatchNotifications(
+      [
+        { to: 'ExponentPushToken[invalid]', body: 'Hello', sound: 'default' },
+        { to: 'ExponentPushToken[rate]', body: 'Hello', sound: 'default' },
+      ],
+      [
+        {
+          registrationId: 'captured-invalid',
+          ownerId: 'user-1',
+          bindingGeneration: 1,
+          token: 'ExponentPushToken[invalid]',
+        },
+      ]
+    )
 
     expect(result.invalidTokens).toContain('ExponentPushToken[invalid]')
     expect(result.rateLimitedTokens).toContain('ExponentPushToken[rate]')

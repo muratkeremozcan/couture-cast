@@ -60,7 +60,14 @@ function createHarness(options?: {
           }
     ),
     findPreferenceByUserId: vi.fn().mockResolvedValue(options?.preference ?? null),
-    findPushTokensByUserId: vi.fn().mockResolvedValue(options?.tokens ?? []),
+    findPushTokensByUserId: vi.fn().mockResolvedValue(
+      (options?.tokens ?? []).map((token, index) => ({
+        token,
+        registrationId: `registration-${index}`,
+        ownerId: 'user-1',
+        bindingGeneration: 1,
+      }))
+    ),
     recordOutcome: vi.fn().mockResolvedValue(undefined),
     hasRealtimeBeenPublished: vi
       .fn()
@@ -81,7 +88,7 @@ function createHarness(options?: {
   )
   const deleteTokens = vi.fn((tokens: string[]) => Promise.resolve(tokens.length))
   const pushService = new PushNotificationService(
-    { deleteTokens } as never,
+    { deleteBindings: deleteTokens } as never,
     { sendPushNotificationsAsync } as never
   )
   const logger = { error: vi.fn(), info: vi.fn() }
@@ -238,7 +245,14 @@ describe('AlertFanoutProcessor', () => {
       prunedInvalidTokenCount: 1,
       invalidTokenPruneFailed: false,
     })
-    expect(harness.deleteTokens).toHaveBeenCalledWith(['ExponentPushToken[token-0]'])
+    expect(harness.deleteTokens).toHaveBeenCalledWith([
+      {
+        token: 'ExponentPushToken[token-0]',
+        registrationId: 'registration-0',
+        ownerId: 'user-1',
+        bindingGeneration: 1,
+      },
+    ])
     expect(JSON.stringify(audit)).not.toContain('ExponentPushToken')
   })
 

@@ -15,8 +15,11 @@ declare global {
 }
 
 beforeAll(async () => {
+  // The browser shim forwards worker options. Request traces contain Authorization;
+  // quiet leaves handler errors and assertions observable without logging bearers.
+  const options = { onUnhandledRequest: 'bypass' as const, quiet: true }
   // eslint-disable-next-line @typescript-eslint/await-thenable
-  await server.listen({ onUnhandledRequest: 'bypass' })
+  await server.listen(options)
 })
 
 beforeEach(() => {

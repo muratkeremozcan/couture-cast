@@ -242,6 +242,7 @@ function ComposePhotoSection({ asset, isBusy, onPick }: ComposePhotoSectionProps
 }
 
 export interface CommunityPostSheetProps {
+  suspended?: boolean
   visible: boolean
   /** Active weekly challenge, when the feed carries one. */
   challenge?: EmbeddedCommunityChallenge | null
@@ -253,6 +254,7 @@ export interface CommunityPostSheetProps {
 
 export function CommunityPostSheet({
   visible,
+  suspended = false,
   challenge = null,
   defaultChallengeOptIn = false,
   onClose,
@@ -352,7 +354,7 @@ export function CommunityPostSheet({
 
     try {
       const picked = await pickCommunityPhoto()
-      if (!picked) {
+      if (!picked || controller.signal.aborted) {
         return
       }
       setAsset(picked)
@@ -371,7 +373,9 @@ export function CommunityPostSheet({
         locale,
         idempotencyKey,
         signal: controller.signal,
-        onStateChange: setPublishState,
+        onStateChange: (state) => {
+          if (!controller.signal.aborted) setPublishState(state)
+        },
       })
       if (controller.signal.aborted) {
         return
@@ -495,7 +499,7 @@ export function CommunityPostSheet({
   return (
     <Modal
       testID="community-post-sheet"
-      visible={visible}
+      visible={visible && !suspended}
       transparent
       animationType="slide"
       onRequestClose={handleClose}

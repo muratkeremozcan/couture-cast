@@ -23,6 +23,7 @@ import { registerSubscriptionContracts } from './subscription'
 import { registerPremiumThemeContracts } from './premium-theme'
 import { registerPaletteAdvisorContracts } from './palette-advisor'
 import { registerPlannerContracts } from './planner'
+import { registerCommunitySyncContracts } from './community-sync'
 import { registerCommunityContracts } from './community'
 
 export const HTTP_OPENAPI_OUTPUT_FILENAME = 'http.openapi.json'
@@ -117,6 +118,7 @@ export function createHttpOpenApiRegistry() {
   registerPaletteAdvisorContracts(registry, commonSchemas)
   registerPlannerContracts(registry, commonSchemas)
   registerCommunityContracts(registry, commonSchemas)
+  registerCommunitySyncContracts(registry, commonSchemas)
 
   return registry
 }

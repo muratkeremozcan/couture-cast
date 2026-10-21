@@ -1,0 +1,377 @@
+import Constants from 'expo-constants'
+// Story 6.5 owner: Expo installation binding and actual OS response lifecycle.
+import { communitySyncClient, CommunityNotificationResponses } from '@couture/api-client'
+import {
+  pushRegistrationSchema,
+  communityNotificationDataSchema,
+  type RegisterPushTokenInput,
+} from '@couture/api-client/contracts/http'
+import { z } from 'zod'
+import type * as ExpoNotifications from 'expo-notifications'
+import type { NotificationResponse, DevicePushToken } from 'expo-notifications'
+import { createMobileApiClient } from './api-client'
+import { resolveMobileAccessToken } from './mobile-auth'
+import {
+  beforeNativeLogout,
+  nativeSessionIdentity,
+  subscribeNativeSession,
+} from './native-session'
+
+const installationKey = 'couturecast.push-installation'
+const registrationKey = 'couturecast.push-registration'
+const pendingKey = 'couturecast.push-cleanup'
+function notificationProjectId(): string | undefined {
+  const extra: unknown = Constants.expoConfig?.extra
+  const eas: unknown =
+    extra && typeof extra === 'object' && 'eas' in extra ? extra.eas : undefined
+  const configured =
+    eas &&
+    typeof eas === 'object' &&
+    'projectId' in eas &&
+    typeof eas.projectId === 'string'
+      ? eas.projectId
+      : undefined
+  return Constants.easConfig?.projectId ?? configured
+}
+const storedBindingSchema = pushRegistrationSchema.extend({ owner: z.string().min(1) })
+const pendingBindingSchema = storedBindingSchema.pick({
+  owner: true,
+  registrationId: true,
+  bindingGeneration: true,
+})
+type StoredBinding = z.infer<typeof storedBindingSchema>
+function readJson(raw: string | null): unknown {
+  try {
+    return raw ? JSON.parse(raw) : undefined
+  } catch {
+    return undefined
+  }
+}
+async function readBinding(includePending = false): Promise<StoredBinding | undefined> {
+  const secure = await import('expo-secure-store')
+  const raw =
+    (await secure.getItemAsync(registrationKey)) ??
+    (includePending ? await secure.getItemAsync(pendingKey) : null)
+  const result = storedBindingSchema.safeParse(readJson(raw))
+  return result.success ? result.data : undefined
+}
+const tokenApi = (token: string, timeout = 5000) =>
+  communitySyncClient(createMobileApiClient({ accessToken: token }), () => ({
+    signal: AbortSignal.timeout(timeout),
+  }))
+async function clearPending(owner: string, client: ReturnType<typeof tokenApi>) {
+  const secure = await import('expo-secure-store')
+  const pending = pendingBindingSchema.safeParse(
+    readJson(await secure.getItemAsync(pendingKey))
+  )
+  if (!pending.success || pending.data.owner !== owner) return
+  await client.remove(pending.data.registrationId, pending.data.bindingGeneration)
+  await secure.deleteItemAsync(pendingKey)
+}
+async function requirePermission(
+  notifications: typeof ExpoNotifications,
+  previous: StoredBinding | undefined,
+  owner: string,
+  client: ReturnType<typeof tokenApi>,
+  request: boolean
+) {
+  let permission = await notifications.getPermissionsAsync()
+  if (request && !permission.granted)
+    permission = await notifications.requestPermissionsAsync()
+  if (permission.granted) return
+  if (previous?.owner === owner) {
+    await client.remove(previous.registrationId, previous.bindingGeneration)
+    if (nativeSessionIdentity() === owner) {
+      const secure = await import('expo-secure-store')
+      await secure.deleteItemAsync(registrationKey)
+    }
+  }
+  throw new Error('notification_permission_denied')
+}
+type RegistrationFlight = {
+  owner: string
+  promise: Promise<void>
+  dirty: boolean
+  permission: boolean
+  deviceToken?: DevicePushToken
+}
+let registrationFlight: RegistrationFlight | undefined
+async function registration(
+  owner: string,
+  requestPermission: boolean,
+  devicePushToken?: DevicePushToken
+): Promise<void> {
+  const token = await resolveMobileAccessToken()
+  if (!token || nativeSessionIdentity() !== owner) throw new Error('Sign in first.')
+  const client = tokenApi(token)
+  const [{ Platform }, notifications, secure, crypto] = await Promise.all([
+    import('react-native'),
+    import('expo-notifications'),
+    import('expo-secure-store'),
+    import('expo-crypto'),
+  ])
+  if (Platform.OS !== 'ios' && Platform.OS !== 'android')
+    throw new Error('Native notification device required.')
+  await clearPending(owner, client)
+  const previous = await readBinding(true)
+  if (Platform.OS === 'android')
+    await notifications.setNotificationChannelAsync('community', {
+      name: 'CoutureCast',
+      importance: notifications.AndroidImportance.DEFAULT,
+    })
+  await requirePermission(notifications, previous, owner, client, requestPermission)
+  const projectId = notificationProjectId()
+  if (!projectId) throw new Error('Notification project unavailable.')
+  const expoToken = await notifications.getExpoPushTokenAsync({
+    projectId,
+    ...(devicePushToken ? { devicePushToken } : {}),
+  })
+  let installationId = await secure.getItemAsync(installationKey)
+  if (!installationId) {
+    installationId = crypto.randomUUID()
+    await secure.setItemAsync(installationKey, installationId)
+  }
+  if (nativeSessionIdentity() !== owner) return
+  const input = {
+    token: expoToken.data,
+    installationId,
+    platform: Platform.OS,
+    permission: 'granted',
+    ...(previous
+      ? {
+          expectedBinding: {
+            registrationId: previous.registrationId,
+            bindingGeneration: previous.bindingGeneration,
+          },
+          transfer: previous.owner !== owner,
+        }
+      : {}),
+  } as const
+  const bound = await registerBinding(client, owner, previous, input)
+  if (!bound) return
+  const stored = { ...bound, owner }
+  if (nativeSessionIdentity() !== owner) {
+    await secure.setItemAsync(pendingKey, JSON.stringify(stored))
+    await client.remove(bound.registrationId, bound.bindingGeneration)
+    await secure.deleteItemAsync(pendingKey)
+    return
+  }
+  await secure.setItemAsync(registrationKey, JSON.stringify(stored))
+  // A successful explicit transfer also completes an old owner's pending cleanup.
+  await secure.deleteItemAsync(pendingKey)
+}
+async function bindingConflict(error: unknown) {
+  const response =
+    error && typeof error === 'object' && 'response' in error ? error.response : undefined
+  if (!(response instanceof Response) || response.status !== 409) return false
+  const body: unknown = await response.clone().json()
+  return Boolean(
+    body && typeof body === 'object' && 'code' in body && body.code === 'binding_changed'
+  )
+}
+async function registerBinding(
+  client: ReturnType<typeof tokenApi>,
+  owner: string,
+  previous: StoredBinding | undefined,
+  input: RegisterPushTokenInput
+) {
+  let bound
+  try {
+    bound = await client.register(input)
+  } catch (error) {
+    if (previous?.owner !== owner || !(await bindingConflict(error))) throw error
+    const { registrations } = await client.registrations()
+    if (nativeSessionIdentity() !== owner) return
+    const current = registrations.find(
+      (row) => row.registrationId === previous.registrationId
+    )
+    // Listing proves only this owner's bindings. A concurrent transfer remains rejected by the server.
+    const fresh = {
+      token: input.token,
+      installationId: input.installationId,
+      platform: input.platform,
+      permission: input.permission,
+    }
+    bound = await client.register({
+      ...fresh,
+      ...(current
+        ? {
+            expectedBinding: {
+              registrationId: current.registrationId,
+              bindingGeneration: current.bindingGeneration,
+            },
+          }
+        : {}),
+    })
+  }
+  return bound
+}
+
+export async function reconcileNativeRegistration(
+  requestPermission = false,
+  deviceToken?: DevicePushToken
+): Promise<void> {
+  const owner = nativeSessionIdentity()
+  if (!owner) throw new Error('Sign in first.')
+  if (registrationFlight) {
+    const existing = registrationFlight
+    if (existing.owner === owner) {
+      if (requestPermission && !existing.permission) {
+        existing.permission = true
+        existing.dirty = true
+      }
+      if (deviceToken) {
+        existing.deviceToken = deviceToken
+        existing.dirty = true
+      }
+      return existing.promise
+    }
+    await existing.promise.catch(() => undefined)
+    return reconcileNativeRegistration(requestPermission, deviceToken)
+  }
+  const flight: RegistrationFlight = {
+    owner,
+    promise: Promise.resolve(),
+    dirty: true,
+    permission: requestPermission,
+    ...(deviceToken ? { deviceToken } : {}),
+  }
+  registrationFlight = flight
+  flight.promise = (async () => {
+    do {
+      flight.dirty = false
+      try {
+        await registration(owner, flight.permission, flight.deviceToken)
+      } catch (error) {
+        if (!flight.dirty) throw error
+      }
+    } while (flight.dirty && nativeSessionIdentity() === owner)
+  })().finally(() => {
+    if (registrationFlight === flight) registrationFlight = undefined
+  })
+  return flight.promise
+}
+export async function enableNativeCommunityNotifications() {
+  const owner = nativeSessionIdentity()
+  if (!owner) throw new Error('Sign in first.')
+  await reconcileNativeRegistration(true)
+  const token = await resolveMobileAccessToken()
+  const binding = await readBinding()
+  if (
+    !token ||
+    nativeSessionIdentity() !== owner ||
+    binding?.owner !== owner ||
+    binding.permission !== 'granted'
+  )
+    throw new Error('Notification account changed.')
+  const client = tokenApi(token)
+  const settings = await client.preferences()
+  if (nativeSessionIdentity() !== owner) throw new Error('Notification account changed.')
+  const result = await client.patchPreferences({
+    baseRevision: settings.revision,
+    enabled: true,
+  })
+  if (nativeSessionIdentity() !== owner) throw new Error('Notification account changed.')
+  return result
+}
+async function unbind(accessToken?: string) {
+  await registrationFlight?.promise.catch(() => undefined)
+  const secure = await import('expo-secure-store')
+  const value = await readBinding()
+  if (!value) return
+  await secure.setItemAsync(pendingKey, JSON.stringify(value))
+  try {
+    if (!accessToken) return
+    await tokenApi(accessToken, 2000).remove(
+      value.registrationId,
+      value.bindingGeneration
+    )
+    await secure.deleteItemAsync(pendingKey)
+  } finally {
+    await secure.deleteItemAsync(registrationKey)
+  }
+}
+export async function startNativeNotifications(options: {
+  ready: () => boolean
+  subscribeReady?: (listener: () => void) => () => void
+  open: (params: {
+    source: 'notification'
+    type: 'community'
+    cardId: string
+    commentId?: string
+    parentId?: string
+    expiresAt?: string
+  }) => void
+}): Promise<() => void> {
+  const [notifications, { AppState }] = await Promise.all([
+    import('expo-notifications'),
+    import('react-native'),
+  ])
+  notifications.setNotificationHandler({
+    handleNotification: (notification) => {
+      const community = communityNotificationDataSchema.safeParse(
+        notification.request.content.data
+      ).success
+      return Promise.resolve({
+        shouldShowBanner: community,
+        shouldShowList: community,
+        shouldPlaySound: false,
+        shouldSetBadge: false,
+      })
+    },
+  })
+  let stopped = false
+  const responses = new CommunityNotificationResponses({
+    ready: () => !stopped && options.ready() && Boolean(nativeSessionIdentity()),
+    open: options.open,
+    consumed: () => {
+      void notifications.clearLastNotificationResponseAsync().catch(() => undefined)
+    },
+  })
+  const drain = () => responses.drain()
+  const receive = (response: NotificationResponse) => {
+    responses.receive(
+      response.notification.request.content.data,
+      response.actionIdentifier
+    )
+  }
+  const responseListener = notifications.addNotificationResponseReceivedListener(receive)
+  const tokenListener = notifications.addPushTokenListener((token) => {
+    if (stopped) return
+    void reconcileNativeRegistration(false, token).catch(() => undefined)
+  })
+  const auth = subscribeNativeSession(() => {
+    if (stopped) return
+    drain()
+    if (nativeSessionIdentity()) void reconcileNativeRegistration().catch(() => undefined)
+  })
+  const logout = beforeNativeLogout(unbind)
+  const readiness = options.subscribeReady?.(drain)
+  const lifecycle = AppState.addEventListener('change', (state) => {
+    if (!stopped && state === 'active') {
+      drain()
+      void reconcileNativeRegistration().catch(() => undefined)
+    }
+  })
+  const cleanup = () => {
+    stopped = true
+    responses.stop()
+    notifications.setNotificationHandler(null)
+    responseListener.remove()
+    tokenListener.remove()
+    auth()
+    logout()
+    lifecycle.remove()
+    readiness?.()
+  }
+  if (nativeSessionIdentity()) void reconcileNativeRegistration().catch(() => undefined)
+  try {
+    const startup = await notifications.getLastNotificationResponseAsync()
+    if (startup) receive(startup)
+    drain()
+    return cleanup
+  } catch (error) {
+    cleanup()
+    throw error
+  }
+}

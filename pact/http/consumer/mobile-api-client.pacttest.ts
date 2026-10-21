@@ -1,4 +1,6 @@
 import {
+  communityEngagementInteractions,
+  verifyCommunityEngagement,
   commentOperations,
   commentFailureCases,
   verifyCommunityCommentFailure,
@@ -167,6 +169,17 @@ function createMobileAdminClientForMockServer(mockServer: V3MockServer) {
 }
 
 describe('CoutureCastMobile -> CoutureCastApi HTTP contract', () => {
+  for (const interaction of communityEngagementInteractions) {
+    it(interaction.id, async () => {
+      await verifyCommunityEngagement(
+        pact,
+        createMobileClientForMockServer,
+        'mobile',
+        interaction
+      )
+    })
+  }
+
   it('reads API health metadata', async () => {
     await verifyApiHealthInteraction(pact, createMobileClientForMockServer)
   })

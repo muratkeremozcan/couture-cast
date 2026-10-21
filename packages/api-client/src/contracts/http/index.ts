@@ -19,3 +19,5 @@ export * from './subscription'
 export * from './user'
 export * from './wardrobe'
 export * from './weather'
+
+export * from './community-sync'

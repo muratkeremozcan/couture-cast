@@ -643,6 +643,34 @@
       },
       "unavailable": "Kullanılamıyor.",
       "close": "Yorumları kapat"
+    },
+    "realtime": {
+      "newLooks": "{{count}} yeni görünüm hazır.",
+      "showNewLooks": "{{count}} yeni görünümü göster",
+      "newComments": "Yeni yorumlar var.",
+      "unavailable": "Topluluk geçici olarak kullanılamıyor. Taslağınız kaydedildi."
+    },
+    "notifications": {
+      "title": "Topluluk bildirimleri",
+      "enabled": "Etkileşim bildirimleri",
+      "quiet": "Hava durumu dahil tüm anlık bildirimler için sessiz saatler",
+      "start": "Sessiz saatlerin başlangıcı",
+      "end": "Sessiz saatlerin bitişi",
+      "timezone": "Hesabın saat dilimi",
+      "save": "Ayarları kaydet",
+      "saved": "Ayarlar kaydedildi.",
+      "failed": "Ayarlar kaydedilemedi. Yeniden deneyin.",
+      "conflict": "Ayarlar başka bir yerde değiştirildi. Güncel değerleri kontrol edip yeniden deneyin.",
+      "permission": "Cihaz ayarlarından bildirimlere izin verip yeniden deneyin.",
+      "signin": "Oturum aç",
+      "email": "E-posta adresi",
+      "code": "E-posta kodu",
+      "sendCode": "Giriş kodu gönder",
+      "verify": "Kodu doğrula",
+      "codeSent": "Giriş kodu için e-postanızı kontrol edin.",
+      "signout": "Oturumu kapat",
+      "deviceSettings": "Cihaz ayarlarını aç",
+      "back": "Topluluğa dön"
     }
   }
 }

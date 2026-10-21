@@ -66,15 +66,21 @@ export class PrismaAlertsRepository implements AlertsRepository {
       quiet_hours_start: command.quietHoursStart,
       quiet_hours_end: command.quietHoursEnd,
       timezone: command.timezone,
+      timezone_configured: true,
     }
 
-    return this.prisma.notificationPreference.upsert({
-      where: { user_id: userId },
-      create: {
-        user_id: userId,
-        ...data,
-      },
-      update: data,
+    return this.prisma.$transaction(async (tx) => {
+      await tx.$executeRaw`SELECT community_privacy_guards(ARRAY[${userId}]::text[],ARRAY[]::text[],true)`
+      await tx.$executeRaw`SELECT pg_advisory_xact_lock(hashtext('community_member:' || ${userId}))`
+      const result = await tx.notificationPreference.upsert({
+        where: { user_id: userId },
+        create: {
+          user_id: userId,
+          ...data,
+        },
+        update: data,
+      })
+      return result
     })
   }
 

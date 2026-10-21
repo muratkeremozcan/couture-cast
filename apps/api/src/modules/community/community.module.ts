@@ -1,3 +1,9 @@
+import { CommunityPreferencesService } from './community-preferences.service.js'
+import { CommunityAccessService } from './community-access.service.js'
+import { CommunityStreamRepository } from './community-stream.repository.js'
+import { CommunitySyncService } from './community-sync.service.js'
+import { CommunityTargetsService } from './community-targets.service.js'
+import { CommunitySyncController } from './community-sync.controller.js'
 import { CommunityCommentsController } from './community-comments.controller.js'
 import { CommunityCommentsRepository } from './community-comments.repository.js'
 import { CommunityCommentsService } from './community-comments.service.js'
@@ -54,8 +60,17 @@ import { CommunityModerationActionsService } from './community-moderation.action
     TelemetryModule,
     GuardianModule,
   ],
-  controllers: [CommunityController, CommunityCommentsController],
+  controllers: [
+    CommunityController,
+    CommunityCommentsController,
+    CommunitySyncController,
+  ],
   providers: [
+    CommunityPreferencesService,
+    CommunityAccessService,
+    CommunityStreamRepository,
+    CommunitySyncService,
+    CommunityTargetsService,
     CommunityCommentsRepository,
     CommunityCommentsService,
     CommunityReactionOutboxDispatcher,
@@ -70,6 +85,8 @@ import { CommunityModerationActionsService } from './community-moderation.action
     RolesGuard,
   ],
   exports: [
+    CommunityAccessService,
+    CommunityStreamRepository,
     CommunityService,
     CommunityRepository,
     CommunityMaintenanceService,
@@ -83,6 +100,10 @@ export class CommunityModule implements NestModule {
   configure(consumer: MiddlewareConsumer): void {
     consumer
       .apply(CommunityCacheHeadersMiddleware)
-      .forRoutes(CommunityController, CommunityCommentsController)
+      .forRoutes(
+        CommunityController,
+        CommunityCommentsController,
+        CommunitySyncController
+      )
   }
 }

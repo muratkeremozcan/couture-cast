@@ -11,6 +11,9 @@ const mockPushTokens: PushToken[] = [
   {
     id: 'token-1',
     user_id: 'user-a',
+    installation_id: null,
+    binding_generation: 1,
+    permission: 'unknown',
     token: 'ExponentPushToken[token-1]',
     platform: 'ios',
     last_used_at: new Date('2024-01-01T00:00:00Z'),
@@ -20,6 +23,9 @@ const mockPushTokens: PushToken[] = [
   {
     id: 'token-2',
     user_id: 'user-b',
+    installation_id: null,
+    binding_generation: 1,
+    permission: 'unknown',
     token: 'ExponentPushToken[token-2]',
     platform: 'android',
     last_used_at: new Date('2024-01-02T00:00:00Z'),
@@ -32,8 +38,21 @@ const createRepository = () => {
   const findMany = vi.fn().mockResolvedValue(mockPushTokens)
   const upsert = vi.fn().mockResolvedValue(mockPushTokens[0])
   const deleteMany = vi.fn().mockResolvedValue({ count: 2 })
+  const transaction = {
+    $executeRaw: vi.fn().mockResolvedValue(1),
+    $queryRaw: vi.fn().mockResolvedValue([]),
+    communityTokenDelivery: { updateMany: vi.fn().mockResolvedValue({ count: 0 }) },
+    pushToken: {
+      findMany,
+      upsert,
+      deleteMany,
+      findUnique: vi.fn().mockResolvedValue(null),
+    },
+  }
   const prisma = {
-    pushToken: { findMany, upsert, deleteMany },
+    ...transaction,
+    $transaction: (work: (tx: typeof transaction) => Promise<unknown>) =>
+      work(transaction),
   } as unknown as PrismaClient
   return { repo: new PushTokenRepository(prisma), findMany, upsert, deleteMany }
 }
@@ -90,29 +109,35 @@ describe('PushTokenRepository', () => {
     expect(result).toEqual(mockPushTokens)
   })
 
-  it('deduplicates and deletes provider-invalid tokens', async () => {
+  it('conditionally prunes only captured owner and generation bindings', async () => {
     const { repo, deleteMany } = createRepository()
-
-    await expect(
-      repo.deleteTokens([
-        ' ExponentPushToken[token-1] ',
-        'ExponentPushToken[token-1]',
-        'ExponentPushToken[token-2]',
-      ])
-    ).resolves.toBe(2)
+    const binding = {
+      token: 'ExponentPushToken[token-1]',
+      registrationId: 'token-1',
+      ownerId: 'user-a',
+      bindingGeneration: 3,
+    }
+    await expect(repo.deleteBindings([binding])).resolves.toBe(2)
     expect(deleteMany).toHaveBeenCalledWith({
       where: {
-        token: {
-          in: ['ExponentPushToken[token-1]', 'ExponentPushToken[token-2]'],
-        },
+        OR: [
+          {
+            id: 'token-1',
+            user_id: 'user-a',
+            binding_generation: 3,
+            token: 'ExponentPushToken[token-1]',
+          },
+        ],
       },
     })
+    deleteMany.mockClear()
+    await expect(repo.deleteBindings([])).resolves.toBe(0)
+    expect(deleteMany).not.toHaveBeenCalled()
   })
-
   it('does not issue a delete for an empty token set', async () => {
     const { repo, deleteMany } = createRepository()
 
-    await expect(repo.deleteTokens([' ', ''])).resolves.toBe(0)
+    await expect(repo.deleteBindings([])).resolves.toBe(0)
     expect(deleteMany).not.toHaveBeenCalled()
   })
 })

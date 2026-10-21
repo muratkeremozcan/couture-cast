@@ -20,10 +20,12 @@ export type RequestContext = {
   feature?: string
   requestId: string
   userId?: string
+  communityAuthorizationDeadline?: number
 }
 
 type RequestLike = Pick<Request, 'headers' | 'originalUrl' | 'url'> & {
   auth?: { userId?: string }
+  method?: string
   id?: string | number | object
 }
 
@@ -75,8 +77,15 @@ export function createRequestContext(request: RequestLike): RequestContext {
       ? String(request.id)
       : resolveRequestId(request.headers[REQUEST_ID_HEADER])
 
+  const path = (request.originalUrl ?? request.url).split('?')[0] ?? ''
+  const communityRead =
+    path.startsWith('/api/v1/community/') &&
+    (request.method === 'GET' || path.endsWith('/targets/resolve'))
   return {
     requestId,
+    ...(communityRead
+      ? { communityAuthorizationDeadline: performance.now() + 1950 }
+      : {}),
     userId: extractUserId(request),
     feature: inferFeatureFromPath(request.originalUrl ?? request.url),
   }
@@ -113,6 +122,7 @@ export function bindRequestContext(
   const authRequest = request as AuthenticatedRequest
   const context = createRequestContext({
     headers: request.headers,
+    method: request.method,
     originalUrl: request.originalUrl,
     url: request.url,
     auth: authRequest.auth,

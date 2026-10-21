@@ -1,3 +1,4 @@
+import { z } from 'zod'
 import { Injectable, OnApplicationShutdown } from '@nestjs/common'
 import type { FeatureFlagEvaluationSubject, FeatureFlagKey } from '@couture/config'
 import { PostHog } from 'posthog-node'
@@ -7,6 +8,33 @@ import type {
 } from '../analytics/analytics.service'
 import { createBaseLogger } from '../logger/pino.config'
 import type { RemoteFeatureFlagProvider } from '../modules/feature-flags/remote-feature-flag-provider'
+
+const remoteFlagResponseSchema = z.object({
+  flags: z.record(
+    z.object({
+      key: z.string(),
+      enabled: z.boolean(),
+      variant: z.string().nullable().optional(),
+      failed: z.boolean().optional(),
+    })
+  ),
+  quotaLimited: z.array(z.unknown()).optional(),
+  quota_limited: z.array(z.unknown()).optional(),
+  errorsWhileComputingFlags: z.boolean().optional(),
+})
+function remoteFlagValue(body: unknown, flag: string): unknown {
+  const result = remoteFlagResponseSchema.safeParse(body)
+  if (!result.success) return undefined
+  if (
+    result.data.quotaLimited?.length ||
+    result.data.quota_limited?.length ||
+    result.data.errorsWhileComputingFlags
+  )
+    return undefined
+  const evaluated = result.data.flags[flag]
+  if (!evaluated || evaluated.key !== flag || evaluated.failed) return undefined
+  return evaluated.variant ?? evaluated.enabled
+}
 
 export type PostHogCaptureEvent = AnalyticsCaptureEvent
 
@@ -119,9 +147,11 @@ export class PostHogService
 
   async getFeatureFlagValue(
     flagKey: FeatureFlagKey,
-    subjectId: FeatureFlagEvaluationSubject
+    subjectId: FeatureFlagEvaluationSubject,
+    options?: { signal: AbortSignal }
   ): Promise<unknown> {
     if (!this.client) return undefined
+    if (options) return this.getRemoteFeatureFlag(flagKey, subjectId, options.signal)
 
     try {
       // Flow ref S0.7/T8/2: return the raw SDK value. The shared config
@@ -139,6 +169,31 @@ export class PostHogService
       this.logger.warn({ err: error, flagKey }, 'posthog_feature_flag_failed')
       return undefined
     }
+  }
+
+  private async getRemoteFeatureFlag(
+    flagKey: FeatureFlagKey,
+    subjectId: FeatureFlagEvaluationSubject,
+    signal: AbortSignal
+  ): Promise<unknown> {
+    // Community owns retries and a shared database claim. One invocation is one HTTP call.
+    const host = process.env.POSTHOG_HOST ?? 'https://us.i.posthog.com'
+    const response = await fetch(`${host.replace(/\/+$/, '')}/flags?v=2`, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        'User-Agent': 'posthog-node/couturecast-community',
+      },
+      body: JSON.stringify({
+        api_key: process.env.POSTHOG_API_KEY,
+        distinct_id: subjectId,
+        flag_keys_to_evaluate: [flagKey],
+      }),
+      signal: signal,
+    })
+    if (!response.ok) return undefined
+    const body: unknown = await response.json()
+    return remoteFlagValue(body, flagKey)
   }
 
   onApplicationShutdown(): void {

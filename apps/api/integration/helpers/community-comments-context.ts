@@ -102,7 +102,17 @@ export function commentsTestContext() {
   const prisma = new PrismaClient({ datasourceUrl: database.url })
   const repository = new CommunityCommentsRepository(prisma)
   const engine = new DefaultCommunityModerationEngine()
-  const flags = { getFeatureFlag: vi.fn().mockResolvedValue(true) }
+  const getFeatureFlag = vi
+    .fn<(key: string, member: string) => Promise<boolean>>()
+    .mockResolvedValue(true)
+  const flags = {
+    getFeatureFlag,
+    communityReadEvaluation: async (member: string) => ({
+      value: await getFeatureFlag('community_read_enabled', member),
+      expiresAt: new Date(Date.now() + 60000),
+      validUntil: performance.now() + 60000,
+    }),
+  }
   const processor = new CommunityCommentsProcessor(prisma, engine, flags)
   const namespace = `comments-${randomUUID()}`
   const guardian = new GuardianService(

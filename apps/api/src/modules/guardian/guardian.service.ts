@@ -1,3 +1,7 @@
+import {
+  guardCommunitySubject,
+  forgetCommunitySubject,
+} from '../community/community-privacy.js'
 import { assertWardrobeParticipationAllowed } from './guardian-participation.js'
 import { createHmac, timingSafeEqual } from 'node:crypto'
 import {
@@ -734,6 +738,7 @@ export class GuardianService {
       try {
         result = await this.prisma.$transaction(
           async (tx) => {
+            await guardCommunitySubject(tx, teenId)
             await tx.$executeRaw`SELECT pg_advisory_xact_lock(hashtext('community_member:' || ${teenId}))`
             const consent = await tx.guardianConsent.findFirst({
               where: {
@@ -834,6 +839,7 @@ export class GuardianService {
                   status: 'consent_suspended',
                 },
               })
+              await forgetCommunitySubject(tx, teenId, false)
             }
 
             if (sessionInvalidated && consent.teen.profile) {
@@ -1031,6 +1037,7 @@ export class GuardianService {
         try {
           result = await this.prisma.$transaction(
             async (tx) => {
+              await guardCommunitySubject(tx, candidate.id)
               const teen = await tx.user.findUnique({
                 where: { id: candidate.id },
                 include: {

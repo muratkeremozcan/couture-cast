@@ -75,3 +75,31 @@ it('signals delivery failure safely and leaves its durable lease recoverable', a
     /secret|confidential|never logged/
   )
 })
+
+it('R14 continues the stale sweep after one dependency failure', async () => {
+  const failed = vi
+    .fn()
+    .mockRejectedValueOnce(new Error('fixture unavailable'))
+    .mockResolvedValue(undefined)
+  const prisma = {
+    communityComment: {
+      findMany: vi.fn().mockResolvedValue([{ id: 'first' }, { id: 'second' }]),
+    },
+    communityCommentAnalyticsOutbox: {
+      findMany: vi.fn().mockResolvedValue([]),
+      deleteMany: vi.fn().mockResolvedValue({ count: 0 }),
+    },
+    communityCommentScreeningOutbox: {
+      findMany: vi.fn().mockResolvedValue([]),
+      deleteMany: vi.fn().mockResolvedValue({ count: 0 }),
+    },
+  }
+  const box = new CommunityCommentsOutbox(
+    prisma as never,
+    {} as never,
+    {} as never,
+    { markFailed: failed } as never
+  )
+  await expect(box.sweepStale()).resolves.toBeUndefined()
+  expect(failed).toHaveBeenNthCalledWith(2, 'second', true)
+})

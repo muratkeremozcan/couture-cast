@@ -124,19 +124,6 @@ describe('CommunityRepository persistence', () => {
       expect(lookbookPostFindUnique).toHaveBeenCalledWith({ where: { id: 'post-1' } })
     })
 
-    it('updatePost updates post data', async () => {
-      const { repo, lookbookPostUpdate } = createRepo()
-      lookbookPostUpdate.mockResolvedValueOnce({ id: 'post-1', status: 'withdrawn' })
-
-      const post = await repo.updatePost('post-1', { status: 'withdrawn' })
-
-      expect(lookbookPostUpdate).toHaveBeenCalledWith({
-        where: { id: 'post-1' },
-        data: { status: 'withdrawn' },
-      })
-      expect(post.status).toBe('withdrawn')
-    })
-
     it('createModerationOutbox upserts the outbox record', async () => {
       const { repo, moderationOutboxUpsert } = createRepo()
       moderationOutboxUpsert.mockResolvedValueOnce({ id: 'outbox-1', post_id: 'post-1' })

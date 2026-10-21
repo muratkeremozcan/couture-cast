@@ -316,19 +316,39 @@ describe('pollGarmentUntilSettled', () => {
 })
 
 describe('resolveOwnerUserId', () => {
-  it('4.4-MOB-LIB-14 reads the owner from the bearer token sub claim', () => {
-    expect(resolveOwnerUserId(fakeAccessToken({ sub: 'user-42' }))).toBe('user-42')
+  it('4.4-MOB-LIB-14 reads the canonical profile owner independently of the token sub', async () => {
+    const token = fakeAccessToken({ sub: 'different-auth-principal' })
+    server.use(
+      http.get('*/api/v1/user/profile', ({ request }) => {
+        expect(request.headers.get('Authorization')).toBe(`Bearer ${token}`)
+        return HttpResponse.json({
+          user: {
+            id: 'user-42',
+            email: 'owner@synthetic.test',
+            displayName: null,
+            birthdate: '1990-01-01T00:00:00.000Z',
+            role: 'guardian',
+          },
+          linkedGuardians: [],
+          linkedTeens: [],
+        })
+      })
+    )
+    await expect(resolveOwnerUserId(token)).resolves.toBe('user-42')
   })
 
-  it.each([
-    ['a token with no payload segment', 'not-a-jwt'],
-    ['a payload that is not JSON', 'header.bm90LWpzb24.signature'],
-    ['a payload with no sub claim', fakeAccessToken({ role: 'guardian' })],
-    ['a payload with an empty sub claim', fakeAccessToken({ sub: '' })],
-  ])('4.4-MOB-LIB-15 rejects %s with a re-authenticate message', (_label, token) => {
-    expect(() => resolveOwnerUserId(token)).toThrow(
-      'Your session token is malformed. Sign in again.'
+  it('4.4-MOB-LIB-15 propagates authenticated canonical-profile401 for caller sign-in recovery', async () => {
+    const requests: (string | null)[] = []
+    server.use(
+      http.get('*/api/v1/user/profile', ({ request }) => {
+        requests.push(request.headers.get('authorization'))
+        return HttpResponse.json({ message: 'Unauthorized' }, { status: 401 })
+      })
     )
+    await expect(resolveOwnerUserId('opaque-provider-bearer')).rejects.toMatchObject({
+      response: { status: 401 },
+    })
+    expect(requests).toEqual(['Bearer opaque-provider-bearer'])
   })
 
   it('4.4-MOB-LIB-16 builds the documented capsule ETag format', () => {

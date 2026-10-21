@@ -1,6 +1,7 @@
 // Story 5.1 Task 9: browser and API sessions for the affiliate commerce journeys.
 import type { APIRequestContext } from '@playwright/test'
 import { expect, test } from '../fixtures/merged-fixtures'
+import { localE2EAccessToken } from './local-e2e-token'
 import {
   authHeaders,
   buildUniqueId,
@@ -66,7 +67,7 @@ export async function signUpCommerceUser(
  * account acting on its own preference row.
  */
 export function commerceAccessToken(userId: string): string {
-  return `test-token:guardian:${userId}`
+  return localE2EAccessToken(userId)
 }
 
 /**

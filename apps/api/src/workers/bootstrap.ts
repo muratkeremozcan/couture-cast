@@ -1,3 +1,7 @@
+import type { PrismaClient } from '@prisma/client'
+import type { AlertRealtimePublisher } from '../modules/alerts/alert-fanout.types.js'
+import { startCommunityEngagementRuntime } from '../modules/community/community-engagement.runtime.js'
+import { CommunityFlagEvaluationService } from '../modules/feature-flags/community-flag-evaluation.service.js'
 import '../load-env'
 import type { Queue, Worker } from 'bullmq'
 import { Expo } from 'expo-server-sdk'
@@ -82,6 +86,23 @@ const closeables: ShutdownQueue[] = []
 const redisClients: Redis[] = []
 let posthogService: PostHogService | undefined
 
+// One standalone weather composition shared by startup and isolated provider-boundary proof.
+export function createStandaloneWeatherFanout(
+  prisma: PrismaClient,
+  realtime: AlertRealtimePublisher,
+  telemetry: TelemetryService,
+  expo: ConstructorParameters<typeof PushNotificationService>[1] = new Expo({
+    accessToken: process.env.EXPO_PUSH_ACCESS_TOKEN,
+  })
+) {
+  return new AlertFanoutProcessor(
+    new PrismaAlertFanoutRepository(prisma),
+    realtime,
+    new PushNotificationService(new PushTokenRepository(prisma), expo),
+    telemetry
+  )
+}
+
 export async function startWorkers() {
   try {
     // Flow ref S0.4/T5: create queue clients for the known queues before any
@@ -127,13 +148,18 @@ export async function startWorkers() {
     redisClients.push(alertRelayRedis)
     posthogService = new PostHogService()
     const telemetryService = new TelemetryService(prisma, posthogService)
-    const alertFanoutProcessor = new AlertFanoutProcessor(
-      new PrismaAlertFanoutRepository(prisma),
+    try {
+      const engagement = await startCommunityEngagementRuntime(prisma, posthogService)
+      closeables.push({ close: engagement.close, disconnect: engagement.close })
+    } catch {
+      logger.error(
+        { reason: 'community_capability_unavailable' },
+        'Community engagement startup failed; weather startup continues'
+      )
+    }
+    const alertFanoutProcessor = createStandaloneWeatherFanout(
+      prisma,
       new RedisAlertRealtimePublisher(alertRelayRedis),
-      new PushNotificationService(
-        new PushTokenRepository(prisma),
-        new Expo({ accessToken: process.env.EXPO_TOKEN })
-      ),
       telemetryService
     )
     const weatherRepository = new WeatherRepository(prisma)
@@ -267,7 +293,8 @@ export async function startWorkers() {
       telemetryService,
       featureFlags: new FeatureFlagsService(
         new FeatureFlagsRepository(prisma),
-        posthogService
+        posthogService,
+        new CommunityFlagEvaluationService(prisma, posthogService)
       ),
     })
     closeables.push({
@@ -279,7 +306,8 @@ export async function startWorkers() {
       admin: new AdminService(),
       featureFlags: new FeatureFlagsService(
         new FeatureFlagsRepository(prisma),
-        posthogService
+        posthogService,
+        new CommunityFlagEvaluationService(prisma, posthogService)
       ),
       guardian: new GuardianService(
         posthogService,

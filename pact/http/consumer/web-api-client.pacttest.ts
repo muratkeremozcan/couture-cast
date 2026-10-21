@@ -1,4 +1,6 @@
 import {
+  communityEngagementInteractions,
+  verifyCommunityEngagement,
   commentOperations,
   commentFailureCases,
   verifyCommunityCommentFailure,
@@ -164,6 +166,17 @@ const createWebAdminClientForMockServer = (mockServer: { url: string }) =>
   })
 
 describe('CoutureCastWeb -> CoutureCastApi HTTP contract', () => {
+  for (const interaction of communityEngagementInteractions) {
+    it(interaction.id, async () => {
+      await verifyCommunityEngagement(
+        pact,
+        createWebClientForMockServer,
+        'web',
+        interaction
+      )
+    })
+  }
+
   it('reads API health metadata', async () => {
     await verifyApiHealthInteraction(pact, createWebClientForMockServer)
   })

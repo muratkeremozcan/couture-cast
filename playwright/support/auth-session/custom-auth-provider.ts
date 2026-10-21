@@ -10,6 +10,7 @@ import {
 } from '@seontechnologies/playwright-utils/auth-session'
 import { resolveEnvironmentConfig } from '../../config/environments'
 import type { ApiRole } from '../helpers/api-test'
+import { localE2EAccessToken } from '../helpers/local-e2e-token'
 
 const DEFAULT_AUTH_SESSION_COOKIE_NAME = 'couturecast-e2e-auth'
 
@@ -55,7 +56,7 @@ function resolveSyntheticAuthToken(options: Partial<AuthOptions> = {}): string {
   const userIdentifier = options.userIdentifier?.trim() || 'guardian'
   const role = resolveRole(userIdentifier)
 
-  return `test-token-${role}`
+  return localE2EAccessToken(`${role}-1`, role)
 }
 
 function isStorageState(value: unknown): value is PlaywrightStorageState {
@@ -134,7 +135,7 @@ function extractToken(tokenData: Record<string, unknown>) {
 function isJwtExpired(rawToken: string) {
   const payload = rawToken.split('.')[1]
   if (!payload) {
-    return false
+    return true
   }
 
   try {
@@ -142,11 +143,11 @@ function isJwtExpired(rawToken: string) {
       exp?: unknown
     }
 
-    return typeof decoded.exp === 'number'
+    return typeof decoded.exp === 'number' && Number.isFinite(decoded.exp)
       ? decoded.exp <= Math.floor(Date.now() / 1000) + 60
-      : false
+      : true
   } catch {
-    return false
+    return true
   }
 }
 

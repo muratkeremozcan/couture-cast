@@ -50,7 +50,18 @@ export class CommunityReactionState {
   private readonly summaries = new Map<string, CommunityReactionSummary | undefined>()
   private readonly intents = new Map<string, Intent>()
   private readonly evictions = new Map<string, number>()
+  private readonly capabilityFences = new Map<string, number>()
   private clock = 0
+  private scopeFence = 0
+
+  reset(): void {
+    this.scopeFence = this.beginRead()
+    this.summaries.clear()
+    this.intents.clear()
+    this.evictions.clear()
+    this.capabilityFences.clear()
+    this.emit()
+  }
   private version = 0
   private readonly listeners = new Set<() => void>()
 
@@ -79,7 +90,14 @@ export class CommunityReactionState {
   }
 
   private isFenced(postId: string, ticket: number): boolean {
-    return ticket <= (this.evictions.get(postId) ?? -1)
+    return (
+      ticket <=
+      Math.max(
+        this.scopeFence,
+        this.evictions.get(postId) ?? -1,
+        this.capabilityFences.get(postId) ?? -1
+      )
+    )
   }
 
   evict(postId: string): void {
@@ -93,10 +111,14 @@ export class CommunityReactionState {
     item: CommunityReactionFeedItem,
     ticket: number
   ): CommunityReactionFeedItem | null {
-    if (this.isFenced(item.id, ticket)) return null
+    if (ticket <= Math.max(this.scopeFence, this.evictions.get(item.id) ?? -1))
+      return null
+    // Concurrent legacy reads remain visible while a capability omission fences reactions.
+    if (this.isFenced(item.id, ticket))
+      return item.reactions ? { ...item, reactions: undefined } : item
     if (!item.reactions) {
       // An omitted capability field cannot inherit an older public aggregate.
-      this.fenceReads(item.id)
+      this.capabilityFences.set(item.id, this.beginRead())
       this.summaries.set(item.id, undefined)
       this.options.onChange(item.id, undefined)
       return item

@@ -1,7 +1,9 @@
+import { calculateAge } from '@couture/utils'
 import { Inject, Injectable, UnauthorizedException } from '@nestjs/common'
 import { PrismaClient } from '@prisma/client'
 import { z } from 'zod'
 import type { Request } from 'express'
+import { CommunityUnavailableException } from '../community/community-availability.js'
 import { API_ROLES, type ApiRole } from './security.types.js'
 
 /**
@@ -19,13 +21,21 @@ const mobileE2EClaimsSchema = z.object({
   e2e: z.literal(MOBILE_E2E_TOKEN_MARKER),
 })
 
-const supabaseIdentitySchema = z.object({
-  app_metadata: z.record(z.unknown()).optional(),
-  confirmed_at: z.unknown().optional(),
-  email: z.unknown().optional(),
-  email_confirmed_at: z.unknown().optional(),
-  email_verified: z.unknown().optional(),
-})
+const supabaseIdentitySchema = z
+  .object({
+    id: z.unknown().optional(),
+    app_metadata: z.record(z.unknown()).optional(),
+    confirmed_at: z.unknown().optional(),
+    email: z.unknown().optional(),
+    email_confirmed_at: z.unknown().optional(),
+    email_verified: z.unknown().optional(),
+  })
+  .refine(
+    (identity) =>
+      identity.id !== undefined ||
+      identity.email !== undefined ||
+      identity.app_metadata !== undefined
+  )
 
 export type AccessTokenIdentity = {
   userId: string
@@ -96,15 +106,10 @@ export class AccessTokenIdentityService {
   }
 
   /**
-   * The mobile Maestro harness needs a token the *app under test* can read, not
-   * only one the API accepts. `resolveOwnerUserId` in
-   * `apps/mobile/src/lib/wardrobe.ts` derives the signed-in user id by decoding
-   * the bearer token's `sub` claim, because in production the token is always a
-   * Supabase JWT. The harness previously injected `test-token:guardian:<id>`,
-   * which has no `.` separator at all, so every owner-scoped screen (capsule
-   * library, silhouette editor, wardrobe onboarding) caught the decode failure
-   * and rendered "Your session token is malformed. Sign in again." instead of
-   * its content. The token therefore has to be JWT-*shaped*.
+   * The mobile Maestro harness uses a JWT-shaped token with an explicit fixture marker.
+   * Earlier native clients decoded its sub claim for ownership. Current clients resolve the
+   * canonical app user through authenticated GET /user/profile, and this fixture identity
+   * reaches that same endpoint. The shape remains for existing isolated native runners.
    *
    * Nothing here verifies a signature or treats the value as a real JWT. It is
    * matched only inside the same `TEST_ENV` gate as every other bypass, only
@@ -190,12 +195,12 @@ export class AccessTokenIdentityService {
     supabaseUrl: string,
     anonKey: string
   ): Promise<unknown> {
-    const endpoint = new URL(
-      '/auth/v1/user',
-      `${supabaseUrl.replace(/\/$/, '')}/`
-    ).toString()
     let response: Response
     try {
+      const endpoint = new URL(
+        '/auth/v1/user',
+        `${supabaseUrl.replace(/\/$/, '')}/`
+      ).toString()
       response = await fetch(endpoint, {
         method: 'GET',
         headers: {
@@ -206,17 +211,18 @@ export class AccessTokenIdentityService {
         signal: AbortSignal.timeout(5_000),
       })
     } catch {
-      throw invalidAccessToken()
+      throw new CommunityUnavailableException()
     }
 
     if (!response.ok) {
-      throw invalidAccessToken()
+      if (response.status === 401 || response.status === 403) throw invalidAccessToken()
+      throw new CommunityUnavailableException()
     }
 
     try {
       return await response.json()
     } catch {
-      throw invalidAccessToken()
+      throw new CommunityUnavailableException()
     }
   }
 
@@ -229,7 +235,7 @@ export class AccessTokenIdentityService {
       throw invalidAccessToken()
     }
 
-    const user = await this.prisma.user.findFirst({
+    const users = await this.prisma.user.findMany({
       where: {
         email: {
           equals: parsedEmail.data.toLowerCase(),
@@ -237,13 +243,14 @@ export class AccessTokenIdentityService {
         },
       },
       select: { id: true },
+      take: 2,
     })
 
-    if (!user) {
+    if (users.length !== 1 || !users[0]) {
       throw invalidAccessToken()
     }
 
-    return user.id
+    return users[0].id
   }
 
   async resolveIdentity(
@@ -263,12 +270,11 @@ export class AccessTokenIdentityService {
       }
     }
 
-    const supabaseUrl = process.env.SUPABASE_URL
-    const anonKey = process.env.SUPABASE_ANON_KEY
+    const supabaseUrl = process.env.SUPABASE_URL?.trim()
+    const anonKey = process.env.SUPABASE_ANON_KEY?.trim()
 
-    if (!token || !supabaseUrl || !anonKey) {
-      throw invalidAccessToken()
-    }
+    if (!token) throw invalidAccessToken()
+    if (!supabaseUrl || !anonKey) throw new CommunityUnavailableException()
 
     const body = await this.fetchSupabaseIdentity(
       token,
@@ -276,26 +282,42 @@ export class AccessTokenIdentityService {
       anonKey.trim()
     )
     const identity = supabaseIdentitySchema.safeParse(body)
-    if (!identity.success) {
-      throw invalidAccessToken()
-    }
+    if (!identity.success) throw new CommunityUnavailableException()
 
-    const appMetadata = identity.data.app_metadata ?? {}
+    try {
+      return await this.resolveVerifiedIdentity(identity.data)
+    } catch (error) {
+      if (error instanceof UnauthorizedException) throw error
+      throw new CommunityUnavailableException()
+    }
+  }
+
+  private async resolveVerifiedIdentity(
+    identity: z.infer<typeof supabaseIdentitySchema>
+  ): Promise<AccessTokenIdentity> {
+    const appMetadata = identity.app_metadata ?? {}
     const roleValue =
       normalizeString(appMetadata.app_role) ?? normalizeString(appMetadata.role)
     const role = parseApiRole(roleValue)
-    if (!role) {
-      throw invalidAccessToken()
-    }
+    if (roleValue && !role) throw invalidAccessToken()
 
     const trustedAppUserId = normalizeString(appMetadata.app_user_id)
-    if (trustedAppUserId) {
+    if (trustedAppUserId && role) {
       return { userId: trustedAppUserId, role }
     }
 
-    const verified = hasVerifiedEmailEvidence(identity.data)
-    const userId = await this.resolveUserIdFromDb(identity.data.email, verified)
-    return { userId, role }
+    const verified = hasVerifiedEmailEvidence(identity)
+    const userId =
+      trustedAppUserId ?? (await this.resolveUserIdFromDb(identity.email, verified))
+    if (role) return { userId, role }
+    // Plain email OTP identities obtain their non-privileged role from the existing
+    // server-validated profile. Client user_metadata never establishes app identity.
+    const profile = await this.prisma.userProfile.findUnique({
+      where: { user_id: userId },
+    })
+    if (!profile?.birthdate || calculateAge(profile.birthdate) < 13)
+      throw invalidAccessToken()
+    return { userId, role: calculateAge(profile.birthdate) >= 18 ? 'guardian' : 'teen' }
   }
 
   async resolveUserId(rawToken: string): Promise<string> {

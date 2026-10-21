@@ -1,3 +1,5 @@
+import { startCommunityEngagementRuntime } from '../modules/community/community-engagement.runtime.js'
+import { CommunityFlagEvaluationService } from '../modules/feature-flags/community-flag-evaluation.service.js'
 import '../load-env'
 import { FeatureFlagsService } from '../modules/feature-flags/feature-flags.service.js'
 import { FeatureFlagsRepository } from '../modules/feature-flags/feature-flags.repository.js'
@@ -101,6 +103,12 @@ export async function startCommunityWorkers() {
     const prisma = getPrismaClient()
     posthogService = new PostHogService()
     const telemetryService = new TelemetryService(prisma, posthogService)
+    const engagement = await startCommunityEngagementRuntime(
+      prisma,
+      posthogService,
+      'community'
+    )
+    closeRuntime = engagement.close
 
     // Readiness first, consumption second. `createCommunityWorkerRuntime`
     // resolves only once the selected screener has loaded and verified whatever
@@ -110,11 +118,14 @@ export async function startCommunityWorkers() {
       telemetryService,
       featureFlags: new FeatureFlagsService(
         new FeatureFlagsRepository(prisma),
-        posthogService
+        posthogService,
+        new CommunityFlagEvaluationService(prisma, posthogService)
       ),
     })
     workers.push(community.worker)
-    closeRuntime = community.close
+    closeRuntime = async () => {
+      await Promise.all([community.close(), engagement.close()])
+    }
 
     schedule('dispatch', DISPATCH_INTERVAL_MS, community.sweeps.dispatchPending)
     schedule('stale-review', SWEEP_INTERVAL_MS, community.sweeps.sweepStalePendingReview)
