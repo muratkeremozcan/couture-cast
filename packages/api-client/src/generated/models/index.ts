@@ -9086,7 +9086,7 @@ export type ReportCommunityPostInputReasonEnum =
   (typeof ReportCommunityPostInputReasonEnum)[keyof typeof ReportCommunityPostInputReasonEnum]
 
 /**
- *
+ * Resolve one to fifty targets with unique correlation keys. Every parentId requires commentId.
  * @export
  * @interface ResolveCommunityTargetsInput
  */
