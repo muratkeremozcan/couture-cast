@@ -89,7 +89,7 @@
     "test:a11y:lighthouse": "npm run prepare:playwright && start-server-and-test 'npm run start:web' http://127.0.0.1:3005 'lhci autorun --config=lighthouserc.cjs'",
     "prepare:k6": "npm run build --workspace @couture/k6-utils",
     "test:k6": "npm run test:k6:local",
-    "test:k6:local": "npm run prepare:k6 && start-server-and-test 'cross-env TEST_ENV=local DATABASE_URL=postgresql://postgres:postgres@127.0.0.1:54322/postgres ALLOW_DEV_GUARDIAN_SECRET=true GUARDIAN_INVITE_WEB_BASE_URL=http://127.0.0.1:3005 npm run start:api:e2e' http://127.0.0.1:4000/api/health 'k6/scripts/run-k6-env.sh local'",
+    "test:k6:local": "npm run prepare:k6 && start-server-and-test 'cross-env TEST_ENV=local COMMUNITY_FLAG_FIXTURE_MODE=true DATABASE_URL=postgresql://postgres:postgres@127.0.0.1:54322/postgres ALLOW_DEV_GUARDIAN_SECRET=true GUARDIAN_INVITE_WEB_BASE_URL=http://127.0.0.1:3005 npm run start:api:e2e' http://127.0.0.1:4000/api/health 'k6/scripts/run-k6-env.sh local'",
     "test:k6:preview": "npm run prepare:k6 && k6/scripts/run-k6-env.sh preview",
     "test:k6:prod": "npm run prepare:k6 && k6/scripts/run-k6-env.sh production",
     "maestro:install": "node ./scripts/maestro-install.mjs",
