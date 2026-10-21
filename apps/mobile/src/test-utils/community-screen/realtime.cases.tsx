@@ -309,7 +309,7 @@ export function registerCommunityRealtimeCases() {
     await waitFor(() =>
       expect(screen.queryByText('Previously visible thread comment.')).toBeNull()
     )
-    expect(screen.getByTestId<HTMLInputElement>('comment-body').value).toBe(
+    expect((await screen.findByTestId<HTMLInputElement>('comment-body')).value).toBe(
       'Keep my unsent thread draft'
     )
   })

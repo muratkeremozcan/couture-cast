@@ -34,11 +34,11 @@ function notificationProjectId(): string | undefined {
   return Constants.easConfig?.projectId ?? configured
 }
 const storedBindingSchema = pushRegistrationSchema.extend({ owner: z.string().min(1) })
-const pendingBindingSchema = storedBindingSchema.pick({
-  owner: true,
-  registrationId: true,
-  bindingGeneration: true,
-})
+// Cleanup needs only the ownership fence. Stored bindings also retain platform
+// metadata for transfer recovery, including records persisted by older clients.
+const pendingBindingSchema = storedBindingSchema
+  .pick({ owner: true, registrationId: true, bindingGeneration: true })
+  .strip()
 type StoredBinding = z.infer<typeof storedBindingSchema>
 function readJson(raw: string | null): unknown {
   try {

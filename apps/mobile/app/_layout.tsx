@@ -28,6 +28,9 @@ import { registerBackgroundFetchAsync } from '@/src/lib/background-fetch'
 import { AccessibilityAnnouncerProvider } from '@/src/hooks/use-accessibility-announcer'
 import { AppThemeProvider } from '@/src/theme/theme-context'
 
+const isExpoGoAndroid =
+  Platform.OS === 'android' && Constants.appOwnership === AppOwnership.Expo
+
 export {
   // Catch any errors thrown by the Layout component.
   ErrorBoundary,
@@ -110,23 +113,24 @@ function RootLayoutNav() {
         else cleanups.push(cleanup)
       })
       .catch(() => undefined)
-    void import('../src/lib/native-notifications.js')
-      .then(async ({ startNativeNotifications }) => {
-        const cleanup = await startNativeNotifications({
-          ready: () => readyRef.current,
-          subscribeReady: (listener) => {
-            readyListeners.current.add(listener)
-            return () => {
-              readyListeners.current.delete(listener)
-            }
-          },
-          open: (params) => router.push({ pathname: '/(tabs)/community', params }),
+    if (!isExpoGoAndroid)
+      void import('../src/lib/native-notifications.js')
+        .then(async ({ startNativeNotifications }) => {
+          const cleanup = await startNativeNotifications({
+            ready: () => readyRef.current,
+            subscribeReady: (listener) => {
+              readyListeners.current.add(listener)
+              return () => {
+                readyListeners.current.delete(listener)
+              }
+            },
+            open: (params) => router.push({ pathname: '/(tabs)/community', params }),
+          })
+          if (stopped) cleanup()
+          else cleanups.push(cleanup)
         })
-        if (stopped) cleanup()
-        else cleanups.push(cleanup)
-      })
-      .catch(() => undefined)
-    if (__DEV__)
+        .catch(() => undefined)
+    if (__DEV__ && !isExpoGoAndroid)
       void import('../src/lib/native-notification-fixture.js')
         .then(async ({ startNativeNotificationFixture }) => {
           const cleanup = await startNativeNotificationFixture()
@@ -155,8 +159,6 @@ function RootLayoutNav() {
   }, [pathname])
 
   useEffect(() => {
-    const isExpoGoAndroid =
-      Platform.OS === 'android' && Constants.appOwnership === AppOwnership.Expo
     if (Platform.OS === 'web' || isExpoGoAndroid) {
       return
     }

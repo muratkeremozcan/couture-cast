@@ -84,7 +84,15 @@ async function createPendingPost(storage: InMemoryCommunityStorage) {
     .jpeg()
     .toBuffer()
   const user = await prisma.user.create({
-    data: { email: `${namespace}-${randomUUID().slice(0, 8)}@synthetic.test` },
+    data: {
+      email: `${namespace}-${randomUUID().slice(0, 8)}@synthetic.test`,
+      profile: {
+        create: {
+          birthdate: new Date('1990-01-01'),
+          preferences: { compliance: { accountStatus: 'active' } },
+        },
+      },
+    },
   })
   const postId = `crash-${randomUUID()}`
   const uploadSessionId = randomUUID()
@@ -131,6 +139,9 @@ afterAll(async () => {
     await prisma.communityModerationOutbox.deleteMany({ where: { post: owned } })
     await prisma.lookbookPost.deleteMany({ where: owned })
     await prisma.communityAlias.deleteMany({ where: owned })
+    await prisma.userProfile.deleteMany({
+      where: { user: { email: { startsWith: namespace } } },
+    })
     await prisma.user.deleteMany({ where: { email: { startsWith: namespace } } })
     await prisma.jobFailure.deleteMany({ where: { queue_name: queueName } })
   }
@@ -193,6 +204,7 @@ describe('6.2b community moderation crash recovery', () => {
         prisma,
         storage,
         telemetryService: telemetry,
+        featureFlags: { getFeatureFlag: () => Promise.resolve(true) } as never,
         engine: new FixtureCommunityModerationEngine({
           textOutcome: { passed: true, reasons: [] },
           imageOutcome: { passed: true, reasons: [], disposition: 'pass' },

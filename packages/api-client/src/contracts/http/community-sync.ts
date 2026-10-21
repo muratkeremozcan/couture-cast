@@ -27,6 +27,9 @@ export const communityNotificationDataSchema = z
   .refine((value) => !value.parentId || Boolean(value.commentId), {
     message: 'Parent requires a comment.',
   })
+  .openapi({
+    description: 'Versioned community notification. A parentId requires commentId.',
+  })
 export type CommunityNotificationData = z.infer<typeof communityNotificationDataSchema>
 export const communityDoorbellSchema = z
   .object({ version: z.literal(1), type: z.literal('community:changed') })
@@ -126,6 +129,10 @@ export const resolveCommunityTargetsInputSchema = z
         path: ['targets'],
         message: 'Parent requires a comment.',
       })
+  })
+  .openapi({
+    description:
+      'Resolve one to fifty targets with unique correlation keys. Every parentId requires commentId.',
   })
 export const resolvedCommunityTargetSchema = z.discriminatedUnion('status', [
   z.object({ key: id, status: z.literal('unavailable') }).strict(),

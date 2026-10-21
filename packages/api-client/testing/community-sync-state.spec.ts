@@ -1,6 +1,7 @@
 import { afterEach, describe, expect, it, vi } from 'vitest'
 import {
   CommunitySyncState,
+  CommunityRequestSuperseded,
   type CommunitySyncCallbacks,
 } from '../src/community-sync-state'
 import type { CommunitySyncClient } from '../src/community-sync-client'
@@ -46,6 +47,241 @@ afterEach(() => {
 })
 
 describe('Story 6.5 reconciliation ownership', () => {
+  it('paginates target batches and ignores late results after stop', async () => {
+    const { client, callbacks, state } = setup()
+    callbacks.rendered = () => Array.from({ length: 51 }, (_, i) => `post-${i}`)
+    const held = deferred<Awaited<ReturnType<CommunitySyncClient['resolve']>>>()
+    client.resolve.mockResolvedValueOnce({ targets: [] }).mockImplementationOnce(() => {
+      state.stop()
+      return held.promise
+    })
+    const flight = state.catchUp()
+    await vi.waitFor(() => expect(client.resolve).toHaveBeenCalledTimes(2))
+    expect(client.resolve.mock.calls.map(([input]) => input.targets.length)).toEqual([
+      50, 1,
+    ])
+    held.resolve({ targets: [{ key: 'post-50', status: 'unavailable' }] })
+    await flight
+    expect(callbacks.apply).not.toHaveBeenCalled()
+  })
+  it('consumes duplicate events once and drains a nonbootstrap page with hasMore', async () => {
+    const { client, callbacks, state } = setup()
+    await state.catchUp()
+    const event = {
+      version: 1,
+      kind: 'post.published',
+      postId: 'post',
+      communityRevision: '1',
+    } as const
+    client.events
+      .mockResolvedValueOnce(page('one', { events: [event, event], hasMore: true }))
+      .mockResolvedValue(page('two'))
+    await state.catchUp()
+    expect(client.events).toHaveBeenLastCalledWith('all', 'one', expect.any(AbortSignal))
+    expect(callbacks.changed).toHaveBeenCalledExactlyOnceWith(
+      [event, event],
+      expect.any(AbortSignal)
+    )
+    state.stop()
+  })
+  it('refuses an older projection even when newer invalidation still needs consuming', async () => {
+    const { client, callbacks, state } = setup()
+    const current = {
+      key: 'post',
+      status: 'available',
+      communityRevision: '9',
+      post: {
+        id: 'post',
+        status: 'published',
+        caption: null,
+        altText: 'Fixture',
+        climateBand: 'cold_dry',
+        challengeId: null,
+        createdAt: '2026-10-20T00:00:00Z',
+        publishedAt: '2026-10-20T00:00:00Z',
+        author: { displayName: 'Fixture', isSelf: false },
+        imageAccess: {
+          url: 'https://fixture.invalid/image',
+          expiresAt: '2026-10-22T00:00:00Z',
+        },
+        reactions: {
+          counts: { applause: 0, love: 0, inspiration: 0 },
+          total: 0,
+          viewerReaction: null,
+          revision: 0,
+          generation: 1,
+        },
+      },
+      comment: null,
+      parent: null,
+      pageCursor: null,
+      parentPageCursor: null,
+      threadPosition: null,
+    } satisfies Awaited<ReturnType<CommunitySyncClient['resolve']>>['targets'][number]
+    client.resolve.mockResolvedValue({ targets: [current] })
+    await state.catchUp()
+    client.resolve.mockResolvedValue({
+      targets: [{ ...current, communityRevision: '8' }],
+    })
+    client.events.mockResolvedValue(
+      page('new-event', {
+        events: [
+          {
+            version: 1,
+            kind: 'reactions.changed',
+            postId: 'post',
+            communityRevision: '10',
+          },
+        ],
+      })
+    )
+    await state.catchUp()
+    expect(callbacks.apply).toHaveBeenCalledExactlyOnceWith(current)
+    expect(callbacks.changed).toHaveBeenCalledTimes(1)
+    state.stop()
+  })
+  it.each([
+    undefined,
+    null,
+    'offline',
+    { response: null },
+    { response: {} },
+    { response: { status: 401 } },
+  ])(
+    'classifies dependency failure without publishing an unverified view: %j',
+    async (error) => {
+      const { client, callbacks, state } = setup()
+      client.events.mockRejectedValue(error)
+      await state.catchUp()
+      expect(callbacks.apply).not.toHaveBeenCalled()
+      expect(callbacks.availability).toHaveBeenLastCalledWith(
+        ...(typeof error === 'object' &&
+        error?.response &&
+        'status' in error.response &&
+        error.response.status === 401
+          ? ['denied']
+          : ['unavailable', false])
+      )
+      state.stop()
+    }
+  )
+  it('retires transport callbacks and foreground/recovery after denial', async () => {
+    const { client, callbacks, state } = setup()
+    state.start('https://fixtures.invalid', () => Promise.resolve('fixture'))
+    await state.catchUp()
+    const transport = vi.mocked(connectCommunityTransport).mock.calls[0]![0]
+    transport.state('denied')
+    const calls = client.events.mock.calls.length
+    const availability = vi.mocked(callbacks.availability).mock.calls.length
+    transport.state('connected')
+    transport.changed()
+    state.foreground()
+    state.recover()
+    await state.catchUp()
+    expect(client.events).toHaveBeenCalledTimes(calls)
+    expect(callbacks.availability).toHaveBeenCalledTimes(availability)
+  })
+  it('uses a fresh validation on foreground and bounded recovery even with a quiet socket', async () => {
+    vi.useFakeTimers()
+    const { client, callbacks, state } = setup()
+    await state.catchUp()
+    const initial = client.resolve.mock.calls.length
+    state.foreground()
+    await state.catchUp()
+    expect(client.resolve.mock.calls.length).toBeGreaterThan(initial)
+    state.recover()
+    expect(callbacks.availability).toHaveBeenLastCalledWith('unavailable', false)
+    await vi.advanceTimersByTimeAsync(8000)
+    expect(callbacks.availability).toHaveBeenLastCalledWith('connected', false)
+    state.stop()
+  })
+  it.each(['event', 'rebuild', 'changed', 'reconcile'] as const)(
+    'does not publish completion after session retirement during %s',
+    async (phase) => {
+      const { client, callbacks, state } = setup()
+      if (phase === 'event')
+        client.events.mockImplementation(() => {
+          state.stop()
+          return Promise.resolve(page('retired'))
+        })
+      if (phase === 'rebuild')
+        callbacks.rebuild = () => {
+          state.stop()
+          return Promise.resolve()
+        }
+      if (phase === 'changed') {
+        client.events.mockResolvedValue(
+          page('retired', {
+            events: [
+              {
+                version: 1,
+                kind: 'comment.status',
+                postId: 'post',
+                commentId: 'reply',
+                privateRevision: '1',
+              },
+            ],
+          })
+        )
+        callbacks.changed = () => {
+          state.stop()
+          return Promise.resolve()
+        }
+      }
+      if (phase === 'reconcile')
+        callbacks.reconcile = () => {
+          state.stop()
+          return Promise.resolve()
+        }
+      await state.catchUp()
+      expect(callbacks.availability).not.toHaveBeenCalledWith(
+        'connected',
+        expect.anything()
+      )
+    }
+  )
+  it('retries superseded reconciliation and does not consume duplicate public revisions', async () => {
+    const { client, callbacks, state } = setup()
+    callbacks.reconcile = vi
+      .fn()
+      .mockRejectedValueOnce(new CommunityRequestSuperseded())
+      .mockResolvedValue(undefined)
+    const change = {
+      version: 1,
+      kind: 'reactions.changed',
+      postId: 'post',
+      communityRevision: '4',
+    } as const
+    const privateChange = {
+      version: 1,
+      kind: 'comment.status',
+      postId: 'post',
+      commentId: 'reply',
+      privateRevision: '1',
+    } as const
+    client.events.mockResolvedValue(page('head', { events: [change, privateChange] }))
+    await state.catchUp()
+    await state.catchUp()
+    const calls = vi.mocked(callbacks.changed).mock.calls
+    expect(calls[0]?.[0]).toEqual([change, privateChange])
+    expect(calls.at(-1)?.[0]).toEqual([privateChange])
+    state.stop()
+  })
+  it('aborts a held HTTP request at two seconds and retires its late result', async () => {
+    vi.useFakeTimers()
+    const { client, callbacks, state } = setup()
+    const held = deferred<Page>()
+    client.events.mockReturnValue(held.promise)
+    const flight = state.catchUp()
+    await vi.advanceTimersByTimeAsync(2000)
+    await flight
+    expect(client.events.mock.calls[0]?.[2]?.aborted).toBe(true)
+    expect(callbacks.availability).toHaveBeenLastCalledWith('unavailable', false)
+    held.resolve(page('late'))
+    await vi.advanceTimersByTimeAsync(0)
+    expect(callbacks.rebuild).not.toHaveBeenCalled()
+    state.stop()
+  })
   it('bounds repeated cursorless409 recovery and hides unverifiable content until a fresh snapshot succeeds', async () => {
     vi.useFakeTimers()
     vi.spyOn(Math, 'random').mockReturnValue(0)

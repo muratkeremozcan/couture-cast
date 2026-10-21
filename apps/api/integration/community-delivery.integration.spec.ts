@@ -122,6 +122,238 @@ async function fixture(tokens = 1) {
 }
 
 describe('Story 6.5 actual guarded provider boundary', () => {
+  it.each([
+    ['missing owner', 'pending'],
+    ['missing post scope', 'pending'],
+    ['settled delivery', 'accepted'],
+    ['no subject links', 'suppressed'],
+    ['stale subject generation', 'pending'],
+    ['future claim', 'pending'],
+    ['three initiated attempts', 'failed'],
+    ['legacy opt-out', 'suppressed'],
+    ['community opt-out', 'suppressed'],
+    ['expired group', 'expired'],
+    ['invalid token permission', 'suppressed'],
+    ['withdrawn post', 'suppressed'],
+    ['expired contributor', 'suppressed'],
+    ['changed preference generation', 'suppressed'],
+    ['removed reaction', 'suppressed'],
+    ['ineligible actor', 'suppressed'],
+    ['quiet hours', 'deferred'],
+    ['outside-quiet spacing', 'deferred'],
+    ['expired remote grant', 'deferred'],
+  ] as const)(
+    'final handoff makes no provider call for %s',
+    async (condition, expected) => {
+      const { author, actor, post, deliveries } = await fixture()
+      const delivery = deliveries[0]!
+      const verified = await flags.evaluate(author.id)
+      // Mutations are authoritative controlled fixtures; the actual guarded send resumes with capability1.
+      await prisma.$executeRaw`UPDATE "CommunityRuntimeCapability" SET privacy_version=0 WHERE id=1`
+      const group = { id: delivery.group_id }
+      const mutations: Record<typeof condition, () => Promise<unknown>> = {
+        'missing owner': () =>
+          prisma.communityTokenDelivery.update({
+            where: { id: delivery.id },
+            data: { owner_id: null },
+          }),
+        'missing post scope': () =>
+          prisma.communityNotificationGroup.update({
+            where: group,
+            data: { post_id: null },
+          }),
+        'settled delivery': () =>
+          prisma.communityTokenDelivery.update({
+            where: { id: delivery.id },
+            data: { status: 'accepted' },
+          }),
+        'no subject links': () =>
+          prisma.communityArtifactSubject.deleteMany({
+            where: { artifact_kind: 'group', artifact_id: delivery.group_id },
+          }),
+        'stale subject generation': () =>
+          prisma.communitySubject.update({
+            where: { member_id: actor.id },
+            data: { generation: { increment: 1 } },
+          }),
+        'future claim': () =>
+          prisma.communityTokenDelivery.update({
+            where: { id: delivery.id },
+            data: { next_attempt_at: new Date(Date.now() + 60000) },
+          }),
+        'three initiated attempts': () =>
+          prisma.communityDeliveryAttempt.createMany({
+            data: [1, 2, 3].map((ordinal) => ({
+              delivery_id: delivery.id,
+              ordinal,
+              status: 'failed',
+              lease_owner: randomUUID(),
+              lease_until: new Date(),
+              guard_until: new Date(),
+            })),
+          }),
+        'legacy opt-out': () =>
+          prisma.notificationPreference.update({
+            where: { user_id: author.id },
+            data: { push_enabled: false },
+          }),
+        'community opt-out': () =>
+          prisma.communityNotificationPreference.update({
+            where: { user_id: author.id },
+            data: { enabled: false },
+          }),
+        'expired group': () =>
+          prisma.communityNotificationGroup.update({
+            where: group,
+            data: { expires_at: new Date(0) },
+          }),
+        'invalid token permission': () =>
+          prisma.pushToken.update({
+            where: { id: delivery.registration_id },
+            data: { permission: 'denied' },
+          }),
+        'withdrawn post': () =>
+          prisma.lookbookPost.update({
+            where: { id: post.id },
+            data: { status: 'withdrawn' },
+          }),
+        'expired contributor': () =>
+          prisma.communityNotificationIntent.updateMany({
+            where: { group_id: delivery.group_id },
+            data: { expires_at: new Date(0) },
+          }),
+        'changed preference generation': () =>
+          prisma.communityNotificationPreference.update({
+            where: { user_id: author.id },
+            data: { generation: { increment: 1 } },
+          }),
+        'removed reaction': () =>
+          prisma.communityReaction.deleteMany({
+            where: { user_id: actor.id, post_id: post.id },
+          }),
+        'ineligible actor': () =>
+          prisma.userProfile.update({
+            where: { user_id: actor.id },
+            data: { preferences: { compliance: { accountStatus: 'suspended' } } },
+          }),
+        'quiet hours': () =>
+          prisma.notificationPreference.update({
+            where: { user_id: author.id },
+            data: {
+              quiet_hours_enabled: true,
+              quiet_hours_start: '00:00',
+              quiet_hours_end: '23:59',
+              timezone: 'UTC',
+            },
+          }),
+        'outside-quiet spacing': () =>
+          prisma.communityNotificationGroup.update({
+            where: group,
+            data: { next_attempt_at: new Date(Date.now() + 60000) },
+          }),
+        'expired remote grant': () =>
+          prisma.communityFlagEvaluation.updateMany({
+            where: { member_id: author.id },
+            data: { expires_at: new Date(0) },
+          }),
+      }
+      await mutations[condition]()
+      await prisma.$executeRaw`UPDATE "CommunityRuntimeCapability" SET privacy_version=1 WHERE id=1`
+      await new CommunitySendGuard(
+        prisma,
+        { evaluate: () => Promise.resolve(verified) },
+        new CommunityPushProvider(fetch, endpoint)
+      ).dispatch(delivery.id)
+      expect(requests).toHaveLength(0)
+      expect(
+        await prisma.communityTokenDelivery.findUnique({ where: { id: delivery.id } })
+      ).toMatchObject({ status: expected })
+      expect(
+        await prisma.communityDeliveryReceipt.count({
+          where: { attempt: { delivery_id: delivery.id } },
+        })
+      ).toBe(0)
+    }
+  )
+  it.each([
+    'missing receipt',
+    'malformed response',
+    'HTTP failure',
+    'transport failure',
+    'provider failure',
+    'unspecified provider failure',
+    'expired lookup',
+    'missing ticket',
+    'late poll',
+  ] as const)('accepted delivery never resends after %s', async (condition) => {
+    const { deliveries } = await fixture()
+    const delivery = deliveries[0]!
+    await sender().dispatch(delivery.id)
+    const attempt = await prisma.communityDeliveryAttempt.findFirstOrThrow({
+      where: { delivery_id: delivery.id },
+    })
+    await prisma.communityDeliveryReceipt.update({
+      where: { attempt_id: attempt.id },
+      data: {
+        next_attempt_at: new Date(0),
+        ...(condition === 'expired lookup' ? { expires_at: new Date(0) } : {}),
+        ...(condition === 'late poll' ? { lookup_count: 4 } : {}),
+      },
+    })
+    if (condition === 'missing ticket')
+      await prisma.communityDeliveryAttempt.update({
+        where: { id: attempt.id },
+        data: { ticket_id: null },
+      })
+    const body =
+      condition === 'malformed response'
+        ? { unexpected: true }
+        : condition === 'provider failure'
+          ? {
+              data: {
+                [attempt.ticket_id!]: {
+                  status: 'error',
+                  details: { error: 'MessageRateExceeded' },
+                },
+              },
+            }
+          : condition === 'unspecified provider failure'
+            ? { data: { [attempt.ticket_id!]: { status: 'error' } } }
+            : { data: {} }
+    const transport = vi.fn<typeof fetch>().mockResolvedValue(
+      new Response(JSON.stringify(body), {
+        status: condition === 'HTTP failure' ? 503 : 200,
+      })
+    )
+    if (condition === 'transport failure')
+      transport.mockRejectedValue(new Error('Controlled receipt outage'))
+    await new CommunityReceiptsWorker(
+      prisma,
+      new PushTokenRepository(prisma),
+      transport
+    ).sweep()
+    const receipt = await prisma.communityDeliveryReceipt.findUniqueOrThrow({
+      where: { attempt_id: attempt.id },
+    })
+    const status = ['expired lookup', 'missing ticket'].includes(condition)
+      ? 'receipt_unknown'
+      : ['provider failure', 'unspecified provider failure'].includes(condition)
+        ? 'receipt_failed'
+        : 'pending'
+    expect(receipt.status).toBe(status)
+    if (status === 'pending') {
+      expect(receipt.lookup_count).toBe(condition === 'late poll' ? 5 : 1)
+      expect(receipt.next_attempt_at.getTime()).toBeGreaterThan(Date.now())
+      expect(receipt.next_attempt_at.getTime()).toBeLessThanOrEqual(
+        receipt.expires_at.getTime()
+      )
+    }
+    await sender().dispatch(delivery.id)
+    expect(requests).toHaveLength(1)
+    expect(
+      await prisma.communityDeliveryAttempt.count({ where: { delivery_id: delivery.id } })
+    ).toBe(1)
+  })
   it('R04 later contributors extend group expiry and policy edits retain outside-quiet spacing', async () => {
     const { author, post } = await fixture()
     const previous = await prisma.communityNotificationGroup.findFirstOrThrow({

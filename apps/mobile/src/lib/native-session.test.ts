@@ -18,6 +18,17 @@ const sdk = vi.hoisted(() => ({
   startRefresh: vi.fn().mockResolvedValue(undefined),
   stopRefresh: vi.fn().mockResolvedValue(undefined),
   installFailure: false,
+  signIn: vi
+    .fn<() => Promise<{ error: Error | null }>>()
+    .mockResolvedValue({ error: null }),
+  signOut: vi.fn().mockResolvedValue(undefined),
+  storage: undefined as
+    | undefined
+    | {
+        getItem: (key: string) => Promise<string | null>
+        setItem: (key: string, value: string) => Promise<void>
+        removeItem: (key: string) => Promise<void>
+      },
 }))
 vi.mock('react-native', () => ({
   AppState: {
@@ -50,23 +61,35 @@ vi.mock('expo-secure-store', () => ({
 }))
 vi.mock('@supabase/supabase-js', () => ({
   processLock: vi.fn(),
-  createClient: () => ({
-    auth: {
-      getSession: () =>
-        Promise.resolve({ data: { session: sdk.current }, error: sdk.error }),
-      verifyOtp: () =>
-        Promise.resolve({ data: { session: sdk.current }, error: sdk.error }),
-      signOut: () => Promise.resolve(),
-      startAutoRefresh: sdk.startRefresh,
-      stopAutoRefresh: sdk.stopRefresh,
-      onAuthStateChange: (callback: typeof sdk.callback) => {
-        sdk.callback = callback
-        return { data: { subscription: { unsubscribe: sdk.unsubscribe } } }
+  createClient: (
+    _url: string,
+    _key: string,
+    options: { auth: { storage: typeof sdk.storage } }
+  ) => {
+    sdk.storage = options.auth.storage
+    return {
+      auth: {
+        getSession: () =>
+          Promise.resolve({ data: { session: sdk.current }, error: sdk.error }),
+        verifyOtp: () =>
+          Promise.resolve({ data: { session: sdk.current }, error: sdk.error }),
+        signOut: sdk.signOut,
+        signInWithOtp: sdk.signIn,
+        startAutoRefresh: sdk.startRefresh,
+        stopAutoRefresh: sdk.stopRefresh,
+        onAuthStateChange: (callback: typeof sdk.callback) => {
+          sdk.callback = callback
+          return { data: { subscription: { unsubscribe: sdk.unsubscribe } } }
+        },
       },
-    },
-  }),
+    }
+  },
 }))
 import {
+  beforeNativeLogout,
+  subscribeNativeSession,
+  nativeSupabase,
+  requestNativeOtp,
   nativeSessionIdentity,
   resolveNativeSessionToken,
   signOutNativeSession,
@@ -421,4 +444,111 @@ describe('native verified session ownership', () => {
     server.use(http.get('*/api/v1/user/profile', () => HttpResponse.json(profile(owner))))
     expect(await resolveNativeSessionToken()).toBe('fresh-token')
   }, 10000)
+})
+
+describe('native session recovery and secure lifecycle', () => {
+  it('passes secure storage operations through the SDK adapter', async () => {
+    await nativeSupabase()
+    const secure = await import('expo-secure-store')
+    await sdk.storage!.setItem('session-fixture', 'synthetic-value')
+    expect(secure.setItemAsync).toHaveBeenCalledWith(
+      'session-fixture',
+      'synthetic-value',
+      { keychainAccessible: 1 }
+    )
+    expect(await sdk.storage!.getItem('session-fixture')).toBeNull()
+    expect(secure.getItemAsync).toHaveBeenCalledWith('session-fixture')
+    await sdk.storage!.removeItem('session-fixture')
+    expect(sdk.deleted).toContain('session-fixture')
+  })
+  it('requests email OTP, reports provider refusal, and rejects an absent verification session', async () => {
+    await requestNativeOtp('session@synthetic.test')
+    expect(sdk.signIn).toHaveBeenCalledWith({
+      email: 'session@synthetic.test',
+      options: { shouldCreateUser: true },
+    })
+    sdk.signIn.mockResolvedValueOnce({ error: new Error('offline') })
+    await expect(requestNativeOtp('session@synthetic.test')).rejects.toThrow(
+      'Sign-in could not be started.'
+    )
+    sdk.current = null
+    await expect(verifyNativeOtp('session@synthetic.test', 'bad')).rejects.toThrow(
+      'Sign-in code could not be verified.'
+    )
+    expect(nativeSessionIdentity()).toBeNull()
+  })
+  it('clears visible identity before bounded logout hooks and clears storage even when SDK logout fails', async () => {
+    await verifyNativeOtp('session@synthetic.test', 'fixture')
+    const observed = vi.fn()
+    const unsubscribe = subscribeNativeSession(observed)
+    const hook = vi.fn((token?: string) => {
+      expect(token).toBe('local-session-a')
+      expect(nativeSessionIdentity()).toBeNull()
+      return Promise.reject(new Error('unbind offline'))
+    })
+    const removeHook = beforeNativeLogout(hook)
+    sdk.signOut.mockRejectedValueOnce(new Error('logout offline'))
+    try {
+      await expect(signOutNativeSession()).rejects.toThrow('logout offline')
+      expect(hook).toHaveBeenCalledTimes(1)
+      expect(observed).toHaveBeenCalledTimes(1)
+      expect(sdk.deleted).toEqual(
+        expect.arrayContaining([
+          'couturecast.auth-session',
+          'couturecast.auth-session-code-verifier',
+        ])
+      )
+    } finally {
+      unsubscribe()
+      removeHook()
+    }
+    await signOutNativeSession()
+    expect(hook).toHaveBeenCalledTimes(1)
+    expect(observed).toHaveBeenCalledTimes(1)
+  })
+  it('ignores queued auth after cleanup and makes teardown idempotent', async () => {
+    await verifyNativeOtp('session@synthetic.test', 'fixture')
+    cleanup = await startNativeSession()
+    const callback = sdk.callback!
+    cleanup()
+    cleanup()
+    cleanup = undefined
+    callback('SIGNED_IN', { access_token: 'late', user: { id: 'late-principal' } })
+    await new Promise((resolve) => setTimeout(resolve, 10))
+    expect(nativeSessionIdentity()).toBe('canonical-member-a')
+    expect(sdk.unsubscribe).toHaveBeenCalledTimes(1)
+    expect(sdk.removeLifecycle).toHaveBeenCalledTimes(1)
+  })
+})
+
+it('contains background SDK failures, retains verified scope, and recovers bearer supply on foreground', async () => {
+  await verifyNativeOtp('session@synthetic.test', 'fixture')
+  sdk.startRefresh.mockRejectedValue(new Error('refresh offline'))
+  sdk.stopRefresh.mockRejectedValue(new Error('stop offline'))
+  try {
+    cleanup = await startNativeSession()
+    sdk.error = new Error('SDK offline')
+    sdk.lifecycle!('background')
+    sdk.lifecycle!('active')
+    await expect(resolveMobileAccessToken()).rejects.toThrow(
+      'Session verification is unavailable.'
+    )
+    expect(nativeSessionIdentity()).toBe('canonical-member-a')
+    expect(sdk.startRefresh).toHaveBeenCalledTimes(2)
+    expect(sdk.stopRefresh).toHaveBeenCalledTimes(1)
+    sdk.error = null
+    sdk.startRefresh.mockResolvedValue(undefined)
+    sdk.lifecycle!('active')
+    expect(await resolveMobileAccessToken()).toBe('local-session-a')
+    cleanup()
+    cleanup = undefined
+    await new Promise((resolve) => setTimeout(resolve, 0))
+    expect(sdk.stopRefresh).toHaveBeenCalledTimes(2)
+    expect(sdk.unsubscribe).toHaveBeenCalledTimes(1)
+    expect(sdk.removeLifecycle).toHaveBeenCalledTimes(1)
+  } finally {
+    sdk.error = null
+    sdk.startRefresh.mockResolvedValue(undefined)
+    sdk.stopRefresh.mockResolvedValue(undefined)
+  }
 })

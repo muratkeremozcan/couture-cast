@@ -98,6 +98,19 @@ describe('WardrobeSilhouetteScreen', () => {
       fakeAccessToken('user-1')
     )
     server.use(
+      http.get('*/api/v1/user/profile', () =>
+        HttpResponse.json({
+          user: {
+            id: 'user-1',
+            email: 'owner@synthetic.test',
+            displayName: null,
+            birthdate: '1990-01-01T00:00:00.000Z',
+            role: 'guardian',
+          },
+          linkedGuardians: [],
+          linkedTeens: [],
+        })
+      ),
       http.get('*/api/v1/wardrobe/silhouette', () =>
         HttpResponse.json({ data: defaultProfile })
       )

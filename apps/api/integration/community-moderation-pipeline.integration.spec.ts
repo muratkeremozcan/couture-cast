@@ -203,6 +203,7 @@ afterAll(async () => {
     })
     await prisma.lookbookPost.deleteMany({ where: owned })
     await prisma.communityAlias.deleteMany({ where: owned })
+    await prisma.userProfile.deleteMany({ where: owned })
     await prisma.user.deleteMany({ where: { email: { startsWith: namespace } } })
     await prisma.jobFailure.deleteMany({
       where: { queue_name: { startsWith: namespace } },

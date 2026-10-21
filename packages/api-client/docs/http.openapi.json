@@ -15087,7 +15087,8 @@
         "required": [
           "targets"
         ],
-        "additionalProperties": false
+        "additionalProperties": false,
+        "description": "Resolve one to fifty targets with unique correlation keys. Every parentId requires commentId."
       },
       "resolveCommunityTargetsResponse": {
         "type": "object",

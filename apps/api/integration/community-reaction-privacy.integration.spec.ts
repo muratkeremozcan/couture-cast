@@ -88,7 +88,7 @@ describe('Story 6.3 reaction consent, visibility and erasure', () => {
     await vi.waitFor(async () => {
       const waiting = await prisma.$queryRaw<
         { count: bigint }[]
-      >`SELECT COUNT(*) AS count FROM pg_stat_activity WHERE datname = current_database() AND wait_event = 'advisory' AND query LIKE '%community_member:%'`
+      >`SELECT COUNT(*) AS count FROM pg_stat_activity WHERE datname = current_database() AND wait_event = 'advisory' AND cardinality(pg_blocking_pids(pid)) > 0`
       expect(Number(waiting[0]?.count)).toBeGreaterThan(0)
     })
     release()

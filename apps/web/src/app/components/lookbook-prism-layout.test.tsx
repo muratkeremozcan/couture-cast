@@ -1,3 +1,4 @@
+import { CommunitySyncState } from '@couture/api-client'
 // Learning path Step 25: Lookbook Prism responsive layout and community grid.
 // See _bmad-output/project-knowledge/learning-path-step-by-step.md#step-25-lookbook-prism-responsive-layout-and-community-grid
 // Learning path Step 26: Chip navigation and sticky bottom nav.
@@ -120,6 +121,8 @@ function communityFeedHandler() {
 
 describe('LookbookPrismLayout (Integration 3.5-INT-001 - 3.5-INT-005)', () => {
   beforeEach(() => {
+    // Story6.5 transport is covered independently; these legacy presentation cases own static HTTP.
+    vi.spyOn(CommunitySyncState.prototype, 'start').mockImplementation(() => undefined)
     vi.clearAllMocks()
     window.sessionStorage.clear()
   })

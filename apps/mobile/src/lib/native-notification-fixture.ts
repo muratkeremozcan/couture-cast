@@ -2,13 +2,13 @@
 import { communityNotificationDataSchema } from '@couture/api-client/contracts/http'
 
 export async function startNativeNotificationFixture(): Promise<() => void> {
-  const [application, linking, notifications] = await Promise.all([
-    import('expo-application'),
+  const application = await import('expo-application')
+  if (!__DEV__ || application.applicationId !== 'com.couturecast.story65')
+    return () => undefined
+  const [linking, notifications] = await Promise.all([
     import('expo-linking'),
     import('expo-notifications'),
   ])
-  if (!__DEV__ || application.applicationId !== 'com.couturecast.story65')
-    return () => undefined
   const schedule = async (url: string) => {
     const parsed = new URL(url)
     if (

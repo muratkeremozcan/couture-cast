@@ -2,6 +2,7 @@ import { describe, expect, it } from 'vitest'
 import {
   nextAllowedCommunityInstant,
   classifyCommunityTicket,
+  communityPushCopy,
 } from './community-push-policy.js'
 const expires = (now: string) => new Date(Date.parse(now) + 86_400_000)
 const policy = {
@@ -81,5 +82,28 @@ describe('Story 6.5 notification policy', () => {
       { status: 'error', details: { error: 'Unknown' } },
     ])
       expect(classifyCommunityTicket(value).status).toBe('unknown')
+  })
+})
+
+describe('localized anonymous notification copy', () => {
+  it.each(['es-MX', 'fr-FR', 'en-US', undefined])(
+    'keeps singular and grouped copy distinct for %s',
+    (locale) => {
+      const one = communityPushCopy(locale, false)
+      const many = communityPushCopy(locale, true)
+      expect(one.title).toBe('CoutureCast')
+      expect(many.title).toBe('CoutureCast')
+      expect(one.body).not.toBe(many.body)
+      expect(one.body + many.body).not.toMatch(/owner|post-id|member-id/)
+    }
+  )
+  it('expires a contribution whose entire remaining life is inside quiet hours', () => {
+    expect(
+      nextAllowedCommunityInstant(
+        policy,
+        new Date('2026-10-20T04:00:00Z'),
+        new Date('2026-10-20T04:01:00Z')
+      )
+    ).toEqual({ status: 'expired' })
   })
 })

@@ -554,7 +554,9 @@ BEGIN
 END $$;
 CREATE TRIGGER community_consent_privacy_entry BEFORE UPDATE OR DELETE ON "GuardianConsent"
   FOR EACH ROW EXECUTE FUNCTION community_privacy_assert_consent();
-CREATE FUNCTION community_privacy_assert_token() RETURNS trigger LANGUAGE plpgsql AS $$
+-- Invoker RLS still governs the write; the trigger only checks private guard metadata.
+CREATE FUNCTION community_privacy_assert_token() RETURNS trigger LANGUAGE plpgsql
+SECURITY DEFINER SET search_path = pg_catalog, public, pg_temp AS $$
 BEGIN
   IF TG_OP = 'DELETE' OR (OLD.user_id,OLD.token,OLD.permission,OLD.binding_generation,OLD.installation_id)
     IS DISTINCT FROM (NEW.user_id,NEW.token,NEW.permission,NEW.binding_generation,NEW.installation_id) THEN
@@ -566,7 +568,9 @@ BEGIN
 END $$;
 CREATE TRIGGER community_token_privacy_entry BEFORE UPDATE OR DELETE ON "PushToken"
   FOR EACH ROW EXECUTE FUNCTION community_privacy_assert_token();
-CREATE FUNCTION community_privacy_assert_policy() RETURNS trigger LANGUAGE plpgsql AS $$
+-- Invoker RLS still governs the write; the trigger only checks private guard metadata.
+CREATE FUNCTION community_privacy_assert_policy() RETURNS trigger LANGUAGE plpgsql
+SECURITY DEFINER SET search_path = pg_catalog, public, pg_temp AS $$
 BEGIN
   IF TG_OP = 'DELETE' THEN PERFORM community_require_guard(65001,OLD.user_id); RETURN OLD; END IF;
   PERFORM community_require_guard(65001,NEW.user_id);

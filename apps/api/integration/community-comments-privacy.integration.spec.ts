@@ -89,10 +89,14 @@ describe('Story 6.4 comment consent gates', () => {
     ).toBeNull()
   })
 
-  it('answers reads with 503 while the read flag is off', async () => {
+  it('answers reads with typed denial while the read flag is off', async () => {
     const adult = await fixture()
     flags.getFeatureFlag.mockResolvedValueOnce(false)
-    await expect(roots(adult.userId, adult.postId)).rejects.toMatchObject({ status: 503 })
+    // Story6.5 design D3: affirmative remote false is denial; dependency failure is503.
+    await expect(roots(adult.userId, adult.postId)).rejects.toMatchObject({
+      status: 403,
+      response: { code: 'denied' },
+    })
   })
 
   it('fences a genuinely delayed screening result against consent revocation and a posting freeze', async () => {

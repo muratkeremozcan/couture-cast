@@ -12,6 +12,32 @@ const payload = {
   expiresAt: '2026-10-20T00:00:00Z',
 }
 describe('Story 6.5 OS response routing coordinator', () => {
+  it('bounds consumed dedupe history while keeping recent notification actions unique', () => {
+    const open = vi.fn()
+    const state = new CommunityNotificationResponses({
+      ready: () => true,
+      open,
+      consumed: vi.fn(),
+    })
+    const first = { ...payload, notificationId: '65000000-0000-4000-8000-000000000000' }
+    for (let i = 0; i < 257; i++)
+      state.receive(
+        {
+          ...payload,
+          notificationId: `65000000-0000-4000-8000-${String(i).padStart(12, '0')}`,
+        },
+        'default'
+      )
+    expect(open).toHaveBeenCalledTimes(257)
+    state.receive(
+      { ...payload, notificationId: '65000000-0000-4000-8000-000000000256' },
+      'default'
+    )
+    expect(open).toHaveBeenCalledTimes(257)
+    state.receive(first, 'default')
+    expect(open).toHaveBeenCalledTimes(258)
+    state.stop()
+  })
   it('6.5-UNIT-007: buffers cold responses behind auth/router and deduplicates warm/startup replay', () => {
     let ready = false
     const open = vi.fn()

@@ -1,7 +1,12 @@
 // Story 6.5 native boundaries are controlled; registration/preferences use actual HTTP wrappers.
 import { http, HttpResponse } from 'msw'
 import { beforeEach, describe, expect, it, vi } from 'vitest'
-import type { DevicePushToken, ExpoPushTokenOptions } from 'expo-notifications'
+import type {
+  NotificationResponse,
+  Notification,
+  DevicePushToken,
+  ExpoPushTokenOptions,
+} from 'expo-notifications'
 import { server } from '../test-utils/msw/server'
 const device = vi.hoisted(() => ({
   owner: 'member-a' as string | null,
@@ -16,13 +21,35 @@ const device = vi.hoisted(() => ({
   permissionHook: undefined as (() => Promise<{ granted: boolean }>) | undefined,
   requestGranted: false,
   requests: 0,
+  platform: 'ios',
+  handler: undefined as
+    | undefined
+    | { handleNotification: (notification: Notification) => Promise<unknown> },
+  response: undefined as undefined | ((value: NotificationResponse) => void),
+  startup: null as NotificationResponse | null,
+  startupError: false,
+  lifecycle: undefined as undefined | ((state: string) => void),
+  auth: undefined as undefined | (() => void),
+  logout: undefined as undefined | ((token?: string) => Promise<void>),
+  removals: vi.fn(),
+  clearResponse: vi.fn().mockResolvedValue(undefined),
+  channel: vi.fn().mockResolvedValue(undefined),
 }))
 vi.mock('expo-constants', () => ({
   default: { easConfig: { projectId: 'isolated-test-project' } },
 }))
 vi.mock('react-native', () => ({
-  Platform: { OS: 'ios' },
-  AppState: { addEventListener: () => ({ remove: vi.fn() }) },
+  Platform: {
+    get OS() {
+      return device.platform
+    },
+  },
+  AppState: {
+    addEventListener: (_: string, callback: (state: string) => void) => {
+      device.lifecycle = callback
+      return { remove: device.removals }
+    },
+  },
 }))
 vi.mock('expo-secure-store', () => ({
   getItemAsync: (key: string) => Promise.resolve(device.storage.get(key) ?? null),
@@ -39,14 +66,24 @@ vi.mock('expo-crypto', () => ({
   randomUUID: () => '63100000-0000-4000-8000-000000000001',
 }))
 vi.mock('expo-notifications', () => ({
-  setNotificationHandler: vi.fn(),
-  addNotificationResponseReceivedListener: () => ({ remove: vi.fn() }),
+  setNotificationHandler: (value: typeof device.handler) => {
+    device.handler = value
+  },
+  addNotificationResponseReceivedListener: (callback: typeof device.response) => {
+    device.response = callback
+    return { remove: device.removals }
+  },
+  setNotificationChannelAsync: device.channel,
+  AndroidImportance: { DEFAULT: 3 },
   addPushTokenListener: (callback: (token: DevicePushToken) => void) => {
     device.rotation = callback
-    return { remove: vi.fn() }
+    return { remove: device.removals }
   },
-  getLastNotificationResponseAsync: () => Promise.resolve(null),
-  clearLastNotificationResponseAsync: () => Promise.resolve(),
+  getLastNotificationResponseAsync: () =>
+    device.startupError
+      ? Promise.reject(new Error('startup unavailable'))
+      : Promise.resolve(device.startup),
+  clearLastNotificationResponseAsync: device.clearResponse,
   getPermissionsAsync: () =>
     device.permissionHook?.() ?? Promise.resolve({ granted: device.granted }),
   requestPermissionsAsync: () => {
@@ -63,8 +100,14 @@ vi.mock('expo-notifications', () => ({
 }))
 vi.mock('./native-session', () => ({
   nativeSessionIdentity: () => device.owner,
-  subscribeNativeSession: () => vi.fn(),
-  beforeNativeLogout: () => vi.fn(),
+  subscribeNativeSession: (callback: () => void) => {
+    device.auth = callback
+    return device.removals
+  },
+  beforeNativeLogout: (callback: typeof device.logout) => {
+    device.logout = callback
+    return device.removals
+  },
 }))
 vi.mock('./mobile-auth', () => ({
   resolveMobileAccessToken: () => Promise.resolve(`fixture-${device.owner}`),
@@ -77,6 +120,10 @@ import {
 let patches = 0
 let registrations = 0
 beforeEach(() => {
+  device.platform = 'ios'
+  device.startup = null
+  device.startupError = false
+  device.handler = undefined
   device.owner = 'member-a'
   device.granted = true
   device.transferDuringToken = false
@@ -256,4 +303,239 @@ describe('native permission and binding enablement', () => {
       JSON.parse(device.storage.get('couturecast.push-registration')!)
     ).toMatchObject({ owner: 'member-a', bindingGeneration: 1 })
   })
+})
+
+const binding = (owner = 'member-a') => ({
+  owner,
+  registrationId: 'owned-registration',
+  bindingGeneration: 4,
+  platform: 'ios',
+  permission: 'granted',
+  lastUsedAt: new Date().toISOString(),
+})
+const notificationData = () => ({
+  version: 1,
+  notificationId: '63100000-0000-4000-8000-000000000004',
+  source: 'notification',
+  type: 'community',
+  cardId: 'post-fixture',
+  expiresAt: new Date(Date.now() + 60000).toISOString(),
+})
+const responseFor = (data: unknown) =>
+  ({
+    actionIdentifier: 'default',
+    notification: { request: { content: { data } } },
+  }) as NotificationResponse
+
+describe('native OS response, cleanup and revocation boundaries', () => {
+  it('buffers cold response until authenticated readiness, deduplicates and detaches every listener', async () => {
+    device.owner = null
+    device.startup = responseFor(notificationData())
+    let ready = false
+    let drain!: () => void
+    const removeReady = vi.fn(),
+      open = vi.fn()
+    const close = await startNativeNotifications({
+      ready: () => ready,
+      open,
+      subscribeReady: (fn) => {
+        drain = fn
+        return removeReady
+      },
+    })
+    expect(open).not.toHaveBeenCalled()
+    expect(
+      await device.handler!.handleNotification(device.startup.notification)
+    ).toMatchObject({ shouldShowBanner: true, shouldPlaySound: false })
+    expect(
+      await device.handler!.handleNotification(
+        responseFor({ arbitrary: true }).notification
+      )
+    ).toMatchObject({ shouldShowBanner: false })
+    device.owner = 'member-a'
+    ready = true
+    drain()
+    expect(open).toHaveBeenCalledWith(device.startup.notification.request.content.data)
+    device.response!(device.startup)
+    expect(open).toHaveBeenCalledTimes(1)
+    expect(device.clearResponse).toHaveBeenCalledTimes(1)
+    close()
+    expect(device.handler).toBeNull()
+    expect(device.removals).toHaveBeenCalledTimes(5)
+    expect(removeReady).toHaveBeenCalledTimes(1)
+    device.rotation!({ type: 'ios', data: 'late' })
+    device.auth!()
+    device.lifecycle!('active')
+    drain()
+    device.response!(
+      responseFor({
+        ...notificationData(),
+        notificationId: '63100000-0000-4000-8000-000000000005',
+      })
+    )
+    expect(open).toHaveBeenCalledTimes(1)
+    expect(registrations).toBe(0)
+  })
+  it('cleans up partial response startup failure', async () => {
+    device.owner = null
+    device.startupError = true
+    await expect(
+      startNativeNotifications({ ready: () => true, open: vi.fn() })
+    ).rejects.toThrow('startup unavailable')
+    expect(device.removals).toHaveBeenCalledTimes(5)
+    expect(device.handler).toBeNull()
+  })
+  it('reconciles on foreground and owner notification, while background does no registration', async () => {
+    device.owner = null
+    const close = await startNativeNotifications({ ready: () => true, open: vi.fn() })
+    try {
+      device.lifecycle!('background')
+      expect(registrations).toBe(0)
+      device.owner = 'member-a'
+      device.auth!()
+      await reconcileNativeRegistration()
+      expect(registrations).toBe(1)
+      device.lifecycle!('active')
+      await reconcileNativeRegistration()
+      expect(registrations).toBe(2)
+    } finally {
+      close()
+    }
+  })
+  it('revokes only the recorded binding generation when OS permission disappears', async () => {
+    device.storage.set('couturecast.push-registration', JSON.stringify(binding()))
+    device.granted = false
+    const removed: unknown[] = []
+    server.use(
+      http.delete('*/api/v1/notifications/push-tokens/:id', ({ request, params }) => {
+        removed.push({
+          id: params.id,
+          body: {
+            bindingGeneration: Number(
+              new URL(request.url).searchParams.get('bindingGeneration')
+            ),
+          },
+        })
+        return HttpResponse.json({ data: { removed: true } })
+      })
+    )
+    await expect(reconcileNativeRegistration()).rejects.toThrow(
+      'notification_permission_denied'
+    )
+    expect(removed).toEqual([
+      { id: 'owned-registration', body: { bindingGeneration: 4 } },
+    ])
+    expect(device.storage.has('couturecast.push-registration')).toBe(false)
+    expect(registrations).toBe(0)
+  })
+  it('keeps failed logout cleanup durable and retries it before a new binding', async () => {
+    device.owner = null
+    const close = await startNativeNotifications({ ready: () => true, open: vi.fn() })
+    device.storage.set('couturecast.push-registration', JSON.stringify(binding()))
+    let attempts = 0
+    server.use(
+      http.delete('*/api/v1/notifications/push-tokens/:id', () => {
+        attempts++
+        return attempts === 1
+          ? HttpResponse.json({}, { status: 503 })
+          : HttpResponse.json({ data: { removed: true } })
+      })
+    )
+    try {
+      await expect(device.logout!('captured-fixture-token')).rejects.toThrow()
+      expect(device.storage.has('couturecast.push-registration')).toBe(false)
+      expect(JSON.parse(device.storage.get('couturecast.push-cleanup')!)).toMatchObject({
+        owner: 'member-a',
+        bindingGeneration: 4,
+      })
+      device.owner = 'member-a'
+      await reconcileNativeRegistration()
+      expect(attempts).toBe(2)
+      expect(registrations).toBe(1)
+      expect(device.storage.has('couturecast.push-cleanup')).toBe(false)
+    } finally {
+      close()
+    }
+  })
+  it('retains cleanup without a logout bearer and permits explicit transfer by the new owner', async () => {
+    device.owner = null
+    const close = await startNativeNotifications({ ready: () => true, open: vi.fn() })
+    device.storage.set('couturecast.push-registration', JSON.stringify(binding()))
+    const bodies: unknown[] = []
+    server.use(
+      http.post('*/api/v1/notifications/push-tokens', async ({ request }) => {
+        bodies.push(await request.json())
+        const { owner, ...publicBinding } = binding('member-b')
+        expect(owner).toBe(device.owner)
+        return HttpResponse.json({ data: publicBinding })
+      })
+    )
+    try {
+      await device.logout!()
+      expect(device.storage.has('couturecast.push-cleanup')).toBe(true)
+      device.owner = 'member-b'
+      await reconcileNativeRegistration()
+      expect(bodies).toEqual([
+        expect.objectContaining({
+          transfer: true,
+          expectedBinding: { registrationId: 'owned-registration', bindingGeneration: 4 },
+        }),
+      ])
+      expect(
+        JSON.parse(device.storage.get('couturecast.push-registration')!)
+      ).toMatchObject({ owner: 'member-b' })
+      expect(device.storage.has('couturecast.push-cleanup')).toBe(false)
+    } finally {
+      close()
+    }
+  })
+  it('creates Android channel and rejects nonnative registration before HTTP', async () => {
+    device.platform = 'web'
+    await expect(reconcileNativeRegistration()).rejects.toThrow(
+      'Native notification device required.'
+    )
+    expect(registrations).toBe(0)
+    device.platform = 'android'
+    await reconcileNativeRegistration()
+    expect(device.channel).toHaveBeenCalledWith('community', {
+      name: 'CoutureCast',
+      importance: 3,
+    })
+    expect(registrations).toBe(1)
+  })
+})
+
+it('keeps response navigation available during OS registration failures and recovers on permission restoration', async () => {
+  device.granted = false
+  device.startup = responseFor(notificationData())
+  device.clearResponse.mockRejectedValueOnce(new Error('OS response storage unavailable'))
+  const open = vi.fn()
+  const close = await startNativeNotifications({ ready: () => true, open })
+  try {
+    await expect(reconcileNativeRegistration()).rejects.toThrow(
+      'notification_permission_denied'
+    )
+    expect(open).toHaveBeenCalledTimes(1)
+    expect(device.clearResponse).toHaveBeenCalledTimes(1)
+    device.rotation!({ type: 'ios', data: 'denied-token' })
+    await expect(reconcileNativeRegistration()).rejects.toThrow(
+      'notification_permission_denied'
+    )
+    device.auth!()
+    await expect(reconcileNativeRegistration()).rejects.toThrow(
+      'notification_permission_denied'
+    )
+    device.lifecycle!('active')
+    await expect(reconcileNativeRegistration()).rejects.toThrow(
+      'notification_permission_denied'
+    )
+    expect(registrations).toBe(0)
+    device.granted = true
+    await reconcileNativeRegistration()
+    expect(registrations).toBe(1)
+    device.response!(device.startup)
+    expect(open).toHaveBeenCalledTimes(1)
+  } finally {
+    close()
+  }
 })

@@ -410,6 +410,14 @@ export function CommunityScreen() {
         reject(new DOMException('Target verification is unavailable.', 'AbortError'))
       controller.signal.addEventListener('abort', abortOperation, { once: true })
     })
+    const reportHandled = () => {
+      if (intent === notificationIntentRef.current)
+        analytics.capture('deep_link_handled', {
+          source: 'notification',
+          type: 'community',
+          surface: 'mobile',
+        })
+    }
     void Promise.race([targetRequest(), aborted])
       .then((target) => {
         if (!active || detailGeneration !== detailGenerationRef.current) return
@@ -433,6 +441,7 @@ export function CommunityScreen() {
         setDeepLinkPost(post)
         if (!post) return
         setIsInvalidDeepLink(false)
+        reportHandled()
         setNoticeKey((previous) =>
           previous === 'community.realtime.unavailable' ? null : previous
         )

@@ -1,3 +1,5 @@
+import type { CommunityFeedItem } from '@couture/api-client/contracts/http'
+import { CommunitySyncState } from '@couture/api-client'
 // Learning path Step 27: Widget and notification deep-link handling.
 // See _bmad-output/project-knowledge/learning-path-step-by-step.md#step-27-widget-and-notification-deep-link-handling
 // Story 3.7 Task 5 step 1 owner: unit-test web deep-link hydration, severe weather focus, and invalid banner
@@ -57,6 +59,51 @@ describe('Web Deep-Link Handling (Story 3.7)', () => {
   const originalLocation = window.location
 
   beforeEach(() => {
+    // Story6.5 transport is covered independently; these legacy presentation cases own static HTTP.
+    vi.spyOn(CommunitySyncState.prototype, 'start').mockImplementation(() => undefined)
+    useMswHandlers(
+      http.post('*/api/v1/community/targets/resolve', async ({ request }) => {
+        const input = (await request.json()) as {
+          targets: { key: string; postId: string }[]
+        }
+        const targets = []
+        for (const target of input.targets) {
+          const response = await fetch(
+            new URL(
+              `/api/v1/community/posts/${encodeURIComponent(target.postId)}`,
+              request.url
+            )
+          )
+          if (response.status === 404) {
+            targets.push({ key: target.key, status: 'unavailable' })
+            continue
+          }
+          if (!response.ok) return new HttpResponse(null, { status: response.status })
+          const body = (await response.json()) as { data: CommunityFeedItem }
+          targets.push({
+            key: target.key,
+            status: 'available',
+            communityRevision: '0',
+            post: {
+              ...body.data,
+              reactions: {
+                counts: { applause: 0, love: 0, inspiration: 0 },
+                total: 0,
+                viewerReaction: null,
+                revision: 0,
+                generation: 0,
+              },
+            },
+            comment: null,
+            parent: null,
+            pageCursor: null,
+            parentPageCursor: null,
+            threadPosition: null,
+          })
+        }
+        return HttpResponse.json({ data: { targets } })
+      })
+    )
     captureMock.mockClear()
     vi.clearAllMocks()
   })
