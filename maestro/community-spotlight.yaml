@@ -4,7 +4,7 @@
 # Chicago, Illinois, United States. The spotlight resolves that member's area
 # from it, so this flow reads the shared, read-only cohort the database seed
 # publishes (`packages/db/prisma/seeds/community-spotlight.ts`, posts
-# `seed-spotlight-1` through `seed-spotlight-6`) and therefore requires that
+# `seed-spotlight-1` through `seed-spotlight-7`) and therefore requires that
 # cohort to sit in the same area as the harness location. The seed publishes
 # relative to its own run time, so CI's `db:reset` keeps every post inside the
 # seven-day window. The flow never reacts, so it can share the cohort with every
@@ -72,26 +72,40 @@ tags:
 - assertNotVisible:
     id: 'community-spotlight-disabled'
 
-# View more appears only when the snapshot holds more than one page, which
-# depends on how many cohorts share this area on the run's database.
-- runFlow:
-    when:
-      visible:
-        id: 'community-spotlight-view-more'
-    commands:
-      - tapOn:
-          id: 'community-spotlight-view-more'
-          label: 'Append the next spotlight page'
-      - extendedWaitUntil:
-          notVisible:
-            id: 'community-spotlight-loading-more'
-          timeout: 15000
-          label: 'The next page landed'
-      - assertNotVisible:
-          id: 'community-spotlight-more-error'
-      - assertVisible:
-          id: 'community-spotlight-item-seed-spotlight-1'
-          label: 'Appending kept the first page in place'
+# View more. The seeded cohort holds seven posts and a page holds six, so the
+# second page always exists and appends exactly `seed-spotlight-7`.
+- scrollUntilVisible:
+    element:
+      id: 'community-spotlight-view-more'
+    direction: DOWN
+    timeout: 15000
+- tapOn:
+    id: 'community-spotlight-view-more'
+    label: 'Append the next spotlight page'
+- extendedWaitUntil:
+    notVisible:
+      id: 'community-spotlight-loading-more'
+    timeout: 15000
+    label: 'The next page landed'
+- assertNotVisible:
+    id: 'community-spotlight-more-error'
+- scrollUntilVisible:
+    element:
+      id: 'community-spotlight-rank-seed-spotlight-7'
+    direction: DOWN
+    timeout: 15000
+    label: 'The seventh ranked look was appended'
+- assertVisible:
+    id: 'community-spotlight-rank-seed-spotlight-7'
+    text: 'Rank 7'
+- assertNotVisible:
+    id: 'community-spotlight-view-more'
+- scrollUntilVisible:
+    element:
+      id: 'community-spotlight-item-seed-spotlight-1'
+    direction: UP
+    timeout: 15000
+    label: 'Appending kept the first page in place'
 
 # --- Opening a card into its detail and back --------------------------------
 

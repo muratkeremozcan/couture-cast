@@ -123,6 +123,7 @@ export {
   persistSpotlightCohort,
   planSpotlightCohort,
   SEEDED_SPOTLIGHT_AREA,
+  SEEDED_SPOTLIGHT_COHORT_SIZE,
   SPOTLIGHT_FIXTURE_COHORT_AUTHORS,
   uniqueSpotlightArea,
 } from './community-spotlight.factory.js'

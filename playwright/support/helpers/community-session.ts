@@ -6,7 +6,7 @@ import path from 'node:path'
 import { PrismaClient, Prisma } from '@prisma/client'
 import { cleanupCommunityCommentFixtures } from '@couture/testing'
 import { createClient } from '@supabase/supabase-js'
-import type { APIRequestContext } from '@playwright/test'
+import type { APIRequestContext, Page } from '@playwright/test'
 import type {
   ApiRequestParams,
   ApiRequestResponse,
@@ -28,6 +28,27 @@ export const COMMUNITY_ALLOCATE_PATH = '/api/v1/community/posts/allocate'
 export const COMMUNITY_PUBLISH_PATH = '/api/v1/community/posts/publish'
 
 export const COMMUNITY_FEED_URL = `**${COMMUNITY_FEED_PATH}*`
+
+/**
+ * The first COMPLETED feed read, optionally for one mode. The grid supersedes
+ * and aborts an in-flight feed read when a newer one starts, so binding to the
+ * first matching request can observe one that never answers. An aborted request
+ * has no response, so waiting on responses skips it. Register before the action.
+ */
+export async function completedCommunityFeed(
+  page: Page,
+  mode?: string
+): Promise<{ status: number; responseJson: unknown }> {
+  const response = await page.waitForResponse((candidate) => {
+    const url = new URL(candidate.url())
+    return (
+      candidate.request().method() === 'GET' &&
+      url.pathname === COMMUNITY_FEED_PATH &&
+      (mode === undefined || url.searchParams.get('mode') === mode)
+    )
+  })
+  return { status: response.status(), responseJson: (await response.json()) as unknown }
+}
 
 /** Bucket the community upload session writes to, per the storage adapter. */
 const COMMUNITY_IMAGES_BUCKET = 'community-images'

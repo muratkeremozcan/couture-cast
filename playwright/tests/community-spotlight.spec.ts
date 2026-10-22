@@ -5,8 +5,8 @@ import { communityTest as test, expect } from '../support/helpers/community-sess
 import {
   SEEDED_SPOTLIGHT_POST_IDS,
   assertSeededSpotlight,
-  createSpotlightCohort,
   placeViewerInArea,
+  seededSpotlightCaption,
 } from '../support/helpers/community-spotlight'
 import { SEEDED_SPOTLIGHT_AREA } from '@couture/testing'
 
@@ -66,13 +66,14 @@ test.describe('Story 6.6 City Spotlight', () => {
           .locator(':scope > *')
           .first()
       ).toHaveAttribute('data-testid', 'community-spotlight')
-      expect(await rankedIds(page)).toEqual(SEEDED_SPOTLIGHT_POST_IDS)
-      for (const [index, postId] of SEEDED_SPOTLIGHT_POST_IDS.entries()) {
+      const firstPage = SEEDED_SPOTLIGHT_POST_IDS.slice(0, 6)
+      expect(await rankedIds(page)).toEqual(firstPage)
+      for (const [index, postId] of firstPage.entries()) {
         await expect(
           page.getByTestId(`community-spotlight-item-${postId}`)
         ).toHaveAttribute('data-rank', String(index + 1))
       }
-      await expect(page.getByTestId('community-spotlight-view-more')).toHaveCount(0)
+      await expect(page.getByTestId('community-spotlight-view-more')).toBeVisible()
       await checkA11y(page)
     } finally {
       // Leave the page first: an open detail keeps reading the post's comments,
@@ -85,15 +86,18 @@ test.describe('Story 6.6 City Spotlight', () => {
   test('[P1] View more appends the next ranked looks, focuses the first one and announces once', async ({
     page,
     communitySession,
-  }, testInfo) => {
-    const cohort = await createSpotlightCohort(testInfo, { extra: 2 })
-    const removeLocation = await placeViewerInArea(communitySession.userId, cohort.area)
+  }) => {
+    await assertSeededSpotlight()
+    const removeLocation = await placeViewerInArea(
+      communitySession.userId,
+      SEEDED_SPOTLIGHT_AREA
+    )
     try {
       await loadedSpotlight(page)
       await expect(page.getByTestId('community-spotlight-heading')).toHaveText(
-        `Spotlight in ${cohort.area.city}`
+        `Spotlight in ${SEEDED_SPOTLIGHT_AREA.city}`
       )
-      expect(await rankedIds(page)).toEqual(cohort.expectedOrder.slice(0, 6))
+      expect(await rankedIds(page)).toEqual(SEEDED_SPOTLIGHT_POST_IDS.slice(0, 6))
 
       // Every text the one live region takes, so a repeated announcement shows.
       await page.getByTestId('community-live-region').evaluate((region) => {
@@ -107,18 +111,18 @@ test.describe('Story 6.6 City Spotlight', () => {
       })
       await page.getByTestId('community-spotlight-view-more').click()
 
-      const firstNew = cohort.expectedOrder[6]!
+      const firstNew = SEEDED_SPOTLIGHT_POST_IDS[6]!
       await expect(page.getByTestId(`spotlight-lookbook-card-${firstNew}`)).toBeFocused()
-      expect(await rankedIds(page)).toEqual(cohort.expectedOrder)
+      expect(await rankedIds(page)).toEqual(SEEDED_SPOTLIGHT_POST_IDS)
       await expect(page.getByTestId('community-live-region')).toHaveText(
-        'Loaded 2 more spotlight looks.'
+        'Loaded 1 more spotlight look.'
       )
       expect(
         await page.evaluate(() =>
           (
             (window as unknown as { __spotlightAnnouncements: string[] })
               .__spotlightAnnouncements ?? []
-          ).filter((text) => text === 'Loaded 2 more spotlight looks.')
+          ).filter((text) => text === 'Loaded 1 more spotlight look.')
         )
       ).toHaveLength(1)
       await expect(page.getByTestId('community-spotlight-view-more')).toHaveCount(0)
@@ -128,16 +132,18 @@ test.describe('Story 6.6 City Spotlight', () => {
       // and deleting the fixture under a live request turns it into a 404.
       await page.goto('about:blank')
       await removeLocation()
-      await cohort.cleanup()
     }
   })
 
   test('[P1] opening a spotlight look opens the detail and records only the spotlight open', async ({
     page,
     communitySession,
-  }, testInfo) => {
-    const cohort = await createSpotlightCohort(testInfo)
-    const removeLocation = await placeViewerInArea(communitySession.userId, cohort.area)
+  }) => {
+    await assertSeededSpotlight()
+    const removeLocation = await placeViewerInArea(
+      communitySession.userId,
+      SEEDED_SPOTLIGHT_AREA
+    )
     try {
       const opens: unknown[] = []
       page.on('request', (request) => {
@@ -148,7 +154,7 @@ test.describe('Story 6.6 City Spotlight', () => {
           opens.push(request.postDataJSON())
       })
       await loadedSpotlight(page)
-      const target = cohort.expectedOrder[1]!
+      const target = SEEDED_SPOTLIGHT_POST_IDS[1]!
       const recorded = page.waitForResponse(
         (response) =>
           response.request().method() === 'POST' &&
@@ -159,7 +165,7 @@ test.describe('Story 6.6 City Spotlight', () => {
       const dialog = page.getByRole('dialog')
       await expect(dialog).toBeVisible()
       await expect(dialog.getByTestId('community-detail-caption')).toHaveText(
-        cohort.captions.get(target)!
+        seededSpotlightCaption(target)
       )
       expect(
         await dialog.evaluate((element) => element.contains(document.activeElement))
@@ -171,7 +177,6 @@ test.describe('Story 6.6 City Spotlight', () => {
       // and deleting the fixture under a live request turns it into a 404.
       await page.goto('about:blank')
       await removeLocation()
-      await cohort.cleanup()
     }
   })
 

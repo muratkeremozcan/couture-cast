@@ -10,6 +10,14 @@ type SpotlightPrismaClient = PrismaClient | Prisma.TransactionClient
 export const SPOTLIGHT_FIXTURE_COHORT_AUTHORS = 5
 
 /**
+ * Posts in the shared seeded cohort: one past a six-post spotlight page, so
+ * View more has something to append. Every spotlight post publishes inside the
+ * last seven days and so leads the public feed; seven of them plus the feed
+ * seed's five `lookbook-N` rows still fit the feed's first twelve-post page.
+ */
+export const SEEDED_SPOTLIGHT_COHORT_SIZE = 7
+
+/**
  * One area as a member saved it. The API normalizes each component (trimmed,
  * NFKC, lowercased) before comparing, so fixture names stay ASCII and the
  * normalized form is a plain lowercase.

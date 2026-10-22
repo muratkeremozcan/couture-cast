@@ -19,7 +19,7 @@ import {
 import { checkA11y, contrastRatio } from '../support/helpers/accessibility'
 import { authHeaders } from '../support/helpers/api-test'
 import {
-  COMMUNITY_FEED_URL,
+  completedCommunityFeed,
   communityApiTest,
   communityTest,
   expect,
@@ -149,11 +149,11 @@ async function settledSubmission(
 /** Network-first: every read the journey waits on is registered before it fires. */
 async function openThread(page: Page, interceptNetworkCall: InterceptNetworkCallFn) {
   const grid = page.getByTestId('community-card-grid')
-  const initialFeed = interceptNetworkCall({ method: 'GET', url: COMMUNITY_FEED_URL })
+  const initialFeed = completedCommunityFeed(page)
   await page.goto('/')
   expect((await initialFeed).status).toBe(200)
   await expect(grid).toHaveAttribute('aria-busy', 'false')
-  const allFeed = interceptNetworkCall({ method: 'GET', url: COMMUNITY_FEED_URL })
+  const allFeed = completedCommunityFeed(page, 'all')
   await page.getByTestId('community-filter-all').click()
   const acceptedFeed = await allFeed
   expect(acceptedFeed.status).toBe(200)

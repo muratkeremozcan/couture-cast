@@ -10,7 +10,7 @@ import { unwrapCjsNamespace } from './interop.js'
 
 const {
   SEEDED_SPOTLIGHT_AREA,
-  SPOTLIGHT_FIXTURE_COHORT_AUTHORS,
+  SEEDED_SPOTLIGHT_COHORT_SIZE,
   buildSpotlightSavedLocationCreateInput,
   persistSpotlightCohort,
   planSpotlightCohort,
@@ -18,7 +18,7 @@ const {
 
 /** Stable synthetic author ids, so a re-run seed upserts the same rows. */
 export const SEEDED_SPOTLIGHT_AUTHOR_IDS = Array.from(
-  { length: SPOTLIGHT_FIXTURE_COHORT_AUTHORS + 1 },
+  { length: SEEDED_SPOTLIGHT_COHORT_SIZE },
   (_, index) => `spotlight-author-${index + 1}`
 )
 
