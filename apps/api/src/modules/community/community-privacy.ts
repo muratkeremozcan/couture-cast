@@ -34,6 +34,10 @@ export async function forgetCommunitySubject(
   erase: boolean
 ) {
   await tx.$executeRaw`SELECT community_forget_subject(${member},${erase})`
+  // Story 6.6: account erasure also drops the member's spotlight read window,
+  // in the same transaction as the rest of the subject.
+  if (erase)
+    await tx.communitySpotlightReadWindow.deleteMany({ where: { user_id: member } })
 }
 export async function communityPrivacyTransaction<T>(
   prisma: PrismaClient,

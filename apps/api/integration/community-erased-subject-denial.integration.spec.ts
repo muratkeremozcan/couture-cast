@@ -144,6 +144,9 @@ async function untouched(owner: string) {
     await prisma.communityFlagEvaluation.count({ where: { member_id: owner } })
   ).toBe(0)
   expect(await prisma.communityStreamHead.count({ where: { owner_id: owner } })).toBe(0)
+  expect(
+    await prisma.communitySpotlightReadWindow.count({ where: { user_id: owner } })
+  ).toBe(0)
 }
 
 beforeAll(async () => {
@@ -205,6 +208,17 @@ describe('6.5 F2 erased subject is a terminal typed denial on every shared autho
       await untouched(owner.id)
     }
   )
+
+  it('erasure deletes the spotlight read window a first-page read left behind', async () => {
+    const owner = await member()
+    expect((await routes(owner.id).spotlight()).status).toBe(200)
+    expect(
+      await prisma.communitySpotlightReadWindow.count({ where: { user_id: owner.id } })
+    ).toBe(1)
+    await repository.requestErasureForUser(owner.id, new Date())
+    expect((await routes(owner.id).spotlight()).status).toBe(403)
+    await untouched(owner.id)
+  })
 
   it('the realtime handshake of an erased member is refused with the denied control', async () => {
     const socketFor = await realtime()
