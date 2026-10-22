@@ -156,11 +156,22 @@ afterEach(async () => {
   vi.useRealTimers()
   vi.unstubAllEnvs()
 })
+/** A spotlight Redis that answers nothing useful, so no test opens a socket. */
+function idleSpotlightRedis() {
+  return {
+    get: vi.fn(() => Promise.resolve(null)),
+    set: vi.fn(() => Promise.resolve('OK' as const)),
+    eval: vi.fn(() => Promise.resolve(1)),
+    disconnect: vi.fn(),
+  }
+}
 async function start(
   primary: ReturnType<typeof databaseBoundary>,
   role: 'general' | 'community'
 ) {
-  const runtime = await runtimeUnderTest()(primary.prisma, remote, role)
+  const runtime = await runtimeUnderTest()(primary.prisma, remote, role, {
+    spotlightRedis: idleSpotlightRedis(),
+  })
   opened.push(runtime)
   return runtime
 }
@@ -270,12 +281,7 @@ describe('T03 actual engagement runtime composition', () => {
       findUnique: vi.fn(() => Promise.resolve(null)),
       upsert: vi.fn(() => Promise.resolve({})),
     }
-    const spotlightRedis = {
-      get: vi.fn(() => Promise.resolve(null)),
-      set: vi.fn(() => Promise.resolve('OK' as const)),
-      eval: vi.fn(() => Promise.resolve(1)),
-      disconnect: vi.fn(),
-    }
+    const spotlightRedis = idleSpotlightRedis()
     const runtime = await runtimeUnderTest()(primary.prisma, remote, 'general', {
       spotlightRedis,
     })
@@ -284,6 +290,48 @@ describe('T03 actual engagement runtime composition', () => {
     expect(order.slice(0, 2)).toEqual(['append', 'invalidate'])
     expect(spotlightRedis.eval).toHaveBeenCalled()
     await runtime.close()
+    opened.splice(opened.indexOf(runtime), 1)
+    expect(spotlightRedis.disconnect).toHaveBeenCalledTimes(1)
+  })
+
+  it('6.6-UNIT-041 a stalled spotlight Redis never stalls the append loop or shutdown', async () => {
+    vi.stubEnv('COMMUNITY_DISPATCH_ENABLED', 'false')
+    const primary = databaseBoundary()
+    const db = primary.db as typeof primary.db & Record<string, unknown>
+    let appends = 0
+    vi.mocked(db.communityDomainOutbox.findMany).mockImplementation(() => {
+      appends += 1
+      return Promise.resolve([])
+    })
+    db.communityStreamHead = {
+      findUnique: vi.fn(() =>
+        Promise.resolve({ epoch: 'epoch-1', sequence: 3n, retention_floor: 0n })
+      ),
+    }
+    db.communitySpotlightCursor = {
+      findUnique: vi.fn(() => Promise.resolve(null)),
+      upsert: vi.fn(() => Promise.resolve({})),
+    }
+    // A server that accepted the connection and never answers again.
+    const spotlightRedis = {
+      ...idleSpotlightRedis(),
+      eval: vi.fn(() => new Promise<never>(() => undefined)),
+    }
+    const runtime = await runtimeUnderTest()(primary.prisma, remote, 'general', {
+      spotlightRedis,
+    })
+    opened.push(runtime)
+    await vi.advanceTimersByTimeAsync(501)
+    expect(appends).toBe(1)
+    expect(spotlightRedis.eval).toHaveBeenCalledTimes(1)
+    // One budget plus one interval later the loop appended again, and the
+    // stalled pass was never doubled while it hung.
+    await vi.advanceTimersByTimeAsync(2000 + 501)
+    expect(appends).toBe(2)
+    expect(spotlightRedis.eval).toHaveBeenCalledTimes(1)
+    const closing = runtime.close()
+    await vi.advanceTimersByTimeAsync(2000)
+    await closing
     opened.splice(opened.indexOf(runtime), 1)
     expect(spotlightRedis.disconnect).toHaveBeenCalledTimes(1)
   })

@@ -9,20 +9,29 @@ import type { SpotlightAreaLevel } from './community-spotlight-area.js'
 export const COMMUNITY_SPOTLIGHT_REDIS = Symbol('COMMUNITY_SPOTLIGHT_REDIS')
 export const COMMUNITY_SPOTLIGHT_KEY_PREFIX = 'community-spotlight'
 
+/** Every spotlight Redis command fails after this long instead of waiting. */
+export const SPOTLIGHT_REDIS_COMMAND_TIMEOUT_MS = 500
+
 /**
  * The read model's client reuses the ritual cache's options: a short connect
  * timeout, one retry and no offline queue, so an unavailable Redis fails fast
- * and readers rank directly from the database.
+ * and readers rank directly from the database. The command timeout covers the
+ * other failure: a server that accepted the connection and stopped answering.
  */
-export function createCommunitySpotlightRedis(options: { eager?: boolean } = {}): Redis {
-  const config = getRedisConfig()
+export function createCommunitySpotlightRedis(
+  options: { eager?: boolean; url?: string } = {}
+): Redis {
+  const config = options.url
+    ? { ...getRedisConfig(), url: options.url }
+    : getRedisConfig()
   const client = new Redis(config.url, {
     ...redisOptionsFromConfig(config),
     maxRetriesPerRequest: 1,
     enableOfflineQueue: false,
     connectTimeout: 1000,
-    // The worker runtime connects on first use; the request path connects at
-    // startup so its first read does not fall back to the database.
+    commandTimeout: SPOTLIGHT_REDIS_COMMAND_TIMEOUT_MS,
+    // Callers that serve traffic connect at startup so their first command
+    // does not fall back; a lazy client connects on first use.
     lazyConnect: true,
   })
   // Failures surface on each command; the connection's own error events would
@@ -42,8 +51,7 @@ export interface SpotlightRedis {
     key: string,
     value: string,
     expiryToken: 'EX',
-    seconds: number,
-    modeToken: 'NX'
+    seconds: number
   ): Promise<'OK' | null>
   eval(
     script: string,
@@ -188,8 +196,11 @@ export class CommunitySpotlightCache {
   }
 
   /**
-   * Stores the immutable snapshot under its digest, then publishes the area
-   * pointer through the compare-and-set. Returns whether the pointer landed.
+   * Stores the snapshot under its digest, then publishes the area pointer
+   * through the compare-and-set. Returns whether the pointer landed. The ID
+   * digests the ordered post IDs, so a rebuild with the same ID holds the same
+   * posts; it overwrites the body so the newer reaction generations replace
+   * the ones that forced the rebuild.
    */
   async publish(
     snapshot: SpotlightSnapshot,
@@ -199,8 +210,7 @@ export class CommunitySpotlightCache {
       this.snapshotKey(snapshot.id),
       JSON.stringify(spotlightSnapshotSchema.parse(snapshot)),
       'EX',
-      SPOTLIGHT_SNAPSHOT_TTL_SECONDS,
-      'NX'
+      SPOTLIGHT_SNAPSHOT_TTL_SECONDS
     )
     const landed = await this.redis.eval(
       COMPARE_AND_SET_POINTER,

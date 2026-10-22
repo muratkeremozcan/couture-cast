@@ -57,19 +57,21 @@ export async function startCommunityEngagementRuntime(
     schedule()
   }
   const streams = new CommunityStreamRepository(prisma)
-  const spotlightRedis = options.spotlightRedis ?? createCommunitySpotlightRedis()
+  const spotlightRedis =
+    options.spotlightRedis ?? createCommunitySpotlightRedis({ eager: true })
   const spotlight = new CommunitySpotlightInvalidator(
     prisma,
     new CommunitySpotlightCache(spotlightRedis)
   )
   // Story 6.6: the spotlight invalidator runs in the same tick, after append.
-  // It never throws, so Redis can never block the append loop, and an append
-  // failure still lets it drain events that are already appended.
+  // It never throws and its pass is bounded, so a down or stalled Redis can
+  // never block the append loop or shutdown, and an append failure still lets
+  // it drain events that are already appended.
   const appendThenInvalidate = async () => {
     try {
       return await streams.append()
     } finally {
-      await spotlight.process()
+      await spotlight.processWithin()
     }
   }
   loop('append', 500, appendThenInvalidate)

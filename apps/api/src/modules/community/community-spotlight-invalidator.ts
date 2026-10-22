@@ -1,18 +1,22 @@
 // Story 6.6 owner: at-least-once spotlight invalidation from the public stream.
 import type { PrismaClient } from '@prisma/client'
 import { createBaseLogger } from '../../logger/pino.config.js'
-import { areaHashesOf, areaComponentsOf } from './community-spotlight-area.js'
+import { areaHashesOf, storedAreaComponents } from './community-spotlight-area.js'
 import type { CommunitySpotlightCache } from './community-spotlight-cache.js'
 
 export const SPOTLIGHT_INVALIDATOR_CURSOR_ID = 'public'
 const PUBLIC_STREAM_ID = 'public'
 const BATCH_SIZE = 200
+/** The longest one invalidation pass may hold the append loop or shutdown. */
+export const SPOTLIGHT_INVALIDATOR_BUDGET_MS = 2000
 
 export type SpotlightInvalidationOutcome =
   | { status: 'idle' }
   | { status: 'advanced'; processed: number; position: bigint }
   | { status: 'resumed_at_head'; position: bigint }
-  | { status: 'deferred'; reason: 'redis_unavailable' | 'database_unavailable' }
+  | { status: 'deferred'; reason: DeferReason }
+
+type DeferReason = 'redis_unavailable' | 'database_unavailable' | 'timeout' | 'in_flight'
 
 type StreamEventRow = { sequence: bigint; kind: string; post_id: string | null }
 type Plan = { epoch: boolean; areas: Set<string> }
@@ -25,11 +29,38 @@ type Plan = { epoch: boolean; areas: Set<string> }
  */
 export class CommunitySpotlightInvalidator {
   private readonly logger = createBaseLogger().child({ feature: 'community-spotlight' })
+  private inFlight: Promise<SpotlightInvalidationOutcome> | null = null
 
   constructor(
     private readonly prisma: PrismaClient,
     private readonly cache: CommunitySpotlightCache
   ) {}
+
+  /**
+   * One pass raced against `budgetMs`, so a stalled Redis or database never
+   * holds the append loop or shutdown longer. A pass that outlives its budget
+   * keeps running, and calls made meanwhile return at once without starting
+   * another, so two passes never overlap.
+   */
+  async processWithin(
+    budgetMs: number = SPOTLIGHT_INVALIDATOR_BUDGET_MS
+  ): Promise<SpotlightInvalidationOutcome> {
+    if (this.inFlight) return this.defer('in_flight')
+    const pass = this.process().finally(() => {
+      this.inFlight = null
+    })
+    this.inFlight = pass
+    let timer: ReturnType<typeof setTimeout> | undefined
+    const budget = new Promise<SpotlightInvalidationOutcome>((resolve) => {
+      timer = setTimeout(() => resolve(this.defer('timeout')), budgetMs)
+      timer.unref?.()
+    })
+    try {
+      return await Promise.race([pass, budget])
+    } finally {
+      clearTimeout(timer)
+    }
+  }
 
   /** Never throws: a failure is logged and leaves the cursor where it was. */
   async process(): Promise<SpotlightInvalidationOutcome> {
@@ -98,8 +129,10 @@ export class CommunitySpotlightInvalidator {
 
   /**
    * An event whose post still has area components invalidates its city,
-   * region and country. `resync`, a null post, a missing post or a post with
-   * no components cannot be mapped to an area and invalidates everything.
+   * region and country. `resync`, a null post, a missing post, or an
+   * anonymized or erasure-requested post cannot be mapped to the area it left
+   * and invalidates everything. A live post that was never stamped belongs to
+   * no area and no snapshot, so its event changes nothing.
    */
   private async plan(events: readonly StreamEventRow[]): Promise<Plan> {
     const plan: Plan = { epoch: false, areas: new Set() }
@@ -113,23 +146,25 @@ export class CommunitySpotlightInvalidator {
     const posts = ids.length
       ? await this.prisma.lookbookPost.findMany({
           where: { id: { in: ids } },
-          select: { id: true, area_country: true, area_region: true, area_city: true },
+          select: {
+            id: true,
+            area_country: true,
+            area_region: true,
+            area_city: true,
+            anonymized_at: true,
+            erasure_requested_at: true,
+          },
         })
       : []
     const byId = new Map(posts.map((post) => [post.id, post]))
     for (const event of events) {
       const post =
         event.kind === 'resync' || !event.post_id ? undefined : byId.get(event.post_id)
-      const hashes = post
-        ? areaHashesOf(
-            areaComponentsOf({
-              country: post.area_country,
-              region: post.area_region,
-              city: post.area_city,
-            })
-          )
-        : []
-      if (hashes.length === 0) plan.epoch = true
+      if (!post || post.anonymized_at || post.erasure_requested_at) {
+        plan.epoch = true
+        continue
+      }
+      const hashes = areaHashesOf(storedAreaComponents(post))
       for (const hash of hashes) plan.areas.add(hash)
     }
     return plan
@@ -174,9 +209,7 @@ export class CommunitySpotlightInvalidator {
     return { status: 'resumed_at_head', position: head.sequence }
   }
 
-  private defer(
-    reason: 'redis_unavailable' | 'database_unavailable'
-  ): SpotlightInvalidationOutcome {
+  private defer(reason: DeferReason): SpotlightInvalidationOutcome {
     this.logger.warn(
       { event: 'community_spotlight_invalidation_deferred', reason },
       'Spotlight invalidation deferred; the cursor did not advance'

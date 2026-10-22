@@ -3,7 +3,7 @@
 // integration/community-spotlight-invalidation.integration.spec.ts.
 import type { PrismaClient } from '@prisma/client'
 import { describe, expect, it, vi } from 'vitest'
-import { areaComponentsOf, areaHashesOf } from './community-spotlight-area'
+import { areaHashesOf, storedAreaComponents } from './community-spotlight-area'
 import type { CommunitySpotlightCache } from './community-spotlight-cache'
 import { CommunitySpotlightInvalidator } from './community-spotlight-invalidator'
 
@@ -72,7 +72,7 @@ describe('6.6 spotlight invalidator', () => {
   })
 
   it('6.6-UNIT-032 maps area events to their versions and unmappable events to the epoch', async () => {
-    const area = { area_country: 'pt', area_region: 'lisboa', area_city: 'lisbon' }
+    const area = { area_country: 'PT', area_region: 'lisboa', area_city: 'lisbon' }
     const { invalidator, cache } = boundary({
       cursor: { epoch: 'epoch-1', position: 4n },
       events: [
@@ -87,9 +87,58 @@ describe('6.6 spotlight invalidator', () => {
       position: 6n,
     })
     expect(cache.bumpEpoch).toHaveBeenCalledTimes(1)
-    expect(cache.bumpAreas).toHaveBeenCalledWith(
-      areaHashesOf(areaComponentsOf({ country: 'pt', region: 'lisboa', city: 'lisbon' }))
-    )
+    expect(cache.bumpAreas).toHaveBeenCalledWith(areaHashesOf(storedAreaComponents(area)))
+  })
+
+  it('6.6-UNIT-035 leaves epoch and versions alone for a live never-stamped post', async () => {
+    const { invalidator, cache, prisma } = boundary({
+      cursor: { epoch: 'epoch-1', position: 4n },
+      events: [{ sequence: 5n, kind: 'reactions.changed', post_id: 'post-unstamped' }],
+      posts: [
+        {
+          id: 'post-unstamped',
+          area_country: null,
+          area_region: null,
+          area_city: null,
+          anonymized_at: null,
+          erasure_requested_at: null,
+        },
+      ],
+    })
+    await expect(invalidator.process()).resolves.toEqual({
+      status: 'advanced',
+      processed: 1,
+      position: 5n,
+    })
+    expect(cache.bumpEpoch).not.toHaveBeenCalled()
+    expect(cache.bumpAreas).toHaveBeenCalledWith([])
+    const [advance] = prisma.communitySpotlightCursor.updateMany.mock
+      .calls[0] as unknown as [{ data: { position: bigint } }]
+    expect(advance.data.position).toBe(5n)
+  })
+
+  it('6.6-UNIT-036 bumps the epoch for an anonymized or erasure-requested post', async () => {
+    for (const cleared of [
+      { anonymized_at: new Date(), erasure_requested_at: null },
+      { anonymized_at: null, erasure_requested_at: new Date() },
+    ]) {
+      const { invalidator, cache } = boundary({
+        cursor: { epoch: 'epoch-1', position: 4n },
+        events: [{ sequence: 5n, kind: 'post.updated', post_id: 'post-erased' }],
+        posts: [
+          {
+            id: 'post-erased',
+            area_country: 'PT',
+            area_region: 'lisboa',
+            area_city: 'lisbon',
+            ...cleared,
+          },
+        ],
+      })
+      await expect(invalidator.process()).resolves.toMatchObject({ status: 'advanced' })
+      expect(cache.bumpEpoch).toHaveBeenCalledTimes(1)
+      expect(cache.bumpAreas).toHaveBeenCalledWith([])
+    }
   })
 
   it('6.6-UNIT-033 defers on database failures before and after Redis, never throwing', async () => {
@@ -114,5 +163,35 @@ describe('6.6 spotlight invalidator', () => {
       reason: 'redis_unavailable',
     })
     expect(prisma.communitySpotlightCursor.upsert).not.toHaveBeenCalled()
+  })
+
+  it('6.6-UNIT-037 bounds a stalled pass and never starts a second one beside it', async () => {
+    vi.useFakeTimers()
+    try {
+      const { invalidator, cache } = boundary({})
+      cache.bumpEpoch.mockImplementation(() => new Promise<never>(() => undefined))
+      const first = invalidator.processWithin(2000)
+      await vi.advanceTimersByTimeAsync(1999)
+      await expect(invalidator.processWithin(2000)).resolves.toEqual({
+        status: 'deferred',
+        reason: 'in_flight',
+      })
+      await vi.advanceTimersByTimeAsync(1)
+      await expect(first).resolves.toEqual({ status: 'deferred', reason: 'timeout' })
+      expect(cache.bumpEpoch).toHaveBeenCalledTimes(1)
+    } finally {
+      vi.useRealTimers()
+    }
+  })
+
+  it('6.6-UNIT-038 a pass inside its budget returns its own outcome and frees the slot', async () => {
+    const { invalidator, cache } = boundary({})
+    await expect(invalidator.processWithin()).resolves.toMatchObject({
+      status: 'resumed_at_head',
+    })
+    await expect(invalidator.processWithin()).resolves.toMatchObject({
+      status: 'resumed_at_head',
+    })
+    expect(cache.bumpEpoch).toHaveBeenCalledTimes(2)
   })
 })
