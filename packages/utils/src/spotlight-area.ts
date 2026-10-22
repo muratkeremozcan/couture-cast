@@ -105,7 +105,7 @@ const TRANSLITERATIONS: Readonly<Record<string, string>> = {
 /**
  * Trimmed, NFKD with combining marks removed, Turkish dotted and dotless I
  * folded, then lowercased, with letters NFKD keeps whole (`ß`, `ł`, `ø` and
- * the like) transliterated. NFC afterwards recomposes scripts NFKD split
+ * the like) transliterated and every whitespace run collapsed to one space. NFC afterwards recomposes scripts NFKD split
  * without marks, such as Hangul. Blank collapses to null.
  */
 export function foldAreaComponent(value: string | null | undefined): string | null {
@@ -118,6 +118,7 @@ export function foldAreaComponent(value: string | null | undefined): string | nu
     .replace(/ı/g, 'i')
     .toLowerCase()
     .replace(/[ßłđðøæœþ]/g, (letter) => TRANSLITERATIONS[letter] ?? letter)
+    .replace(/\s+/g, ' ')
     .trim()
   return folded.length > 0 ? folded : null
 }
