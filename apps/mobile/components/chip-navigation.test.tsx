@@ -25,13 +25,15 @@ vi.mock('@/src/hooks/use-accessibility-announcer', () => ({
   useAccessibilityAnnouncer: () => ({ announce: analyticsMocks.announce }),
 }))
 
+const labelOverrides = vi.hoisted((): Record<string, string> => ({}))
+
 vi.mock('react-i18next', () => ({
   useTranslation: () => ({
     t: (key: string, values?: { defaultValue?: string; chip?: string }) => {
       if (key === 'accessibility.chip_filter_label') {
         return `Show ${values?.chip ?? ''} recommendations`
       }
-      return values?.defaultValue ?? key
+      return labelOverrides[key] ?? values?.defaultValue ?? key
     },
   }),
 }))
@@ -72,4 +74,52 @@ describe('MobileChipNavigation Component (Story 3.6 - 3.6-UNIT-009)', () => {
       surface: 'mobile',
     })
   })
+})
+
+describe('MobileChipNavigation long localized labels', () => {
+  // The longest chip labels across the 10 locales: fr-FR, fr-CA and it-IT.
+  const longestLabels = [
+    ['Personnel', 'Communauté', 'Sponsorisé'],
+    ['Personnel', 'Communauté', 'Commandité'],
+    ['Personale', 'Community', 'Sponsorizzato'],
+  ]
+
+  it.each(longestLabels)(
+    'keeps %s, %s and %s on one untruncated line',
+    (personal, community, sponsored) => {
+      Object.assign(labelOverrides, {
+        'accessibility.chip_personal': personal,
+        'accessibility.chip_community': community,
+        'accessibility.chip_sponsored': sponsored,
+      })
+      try {
+        render(<MobileChipHarness />)
+        for (const label of [personal, community, sponsored]) {
+          const text = screen.getByText(label)
+          const range = document.createRange()
+          range.selectNodeContents(text)
+          const lineTops = new Set(
+            Array.from(range.getClientRects(), (rect: DOMRect) => Math.round(rect.top))
+          )
+          // One rendered line, fully inside the chip's padded content box. Android
+          // breaks an overlong word mid-word; a browser lets it spill into the padding
+          // instead. Both fail here.
+          expect(lineTops.size, `${label} line count`).toBe(1)
+          const chip = text.closest('[data-testid^="chip-"]')
+          if (!chip) throw new Error(`No chip wraps ${label}`)
+          const chipRect = chip.getBoundingClientRect()
+          const chipStyle = getComputedStyle(chip)
+          const textRect = range.getBoundingClientRect()
+          expect(textRect.left, `${label} left edge`).toBeGreaterThanOrEqual(
+            chipRect.left + parseFloat(chipStyle.paddingLeft)
+          )
+          expect(textRect.right, `${label} right edge`).toBeLessThanOrEqual(
+            chipRect.right - parseFloat(chipStyle.paddingRight)
+          )
+        }
+      } finally {
+        for (const key of Object.keys(labelOverrides)) delete labelOverrides[key]
+      }
+    }
+  )
 })

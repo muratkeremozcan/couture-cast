@@ -43,7 +43,7 @@ import {
   type RitualResponse,
   type AlertPreferences,
 } from '@couture/api-client/contracts/http'
-import type { WeatherAlertDeepLinkTarget } from '@couture/api-client'
+import { ResponseError, type WeatherAlertDeepLinkTarget } from '@couture/api-client'
 import {
   trackMobileAffiliateCtaShown,
   trackMobileRitualCreated,
@@ -84,6 +84,23 @@ const SCENARIO_CHIPS: Record<ScenarioType, ChipCategory> = {
 }
 
 const ritualRequestTimeoutMs = 15_000
+// The API's 400 message for a user with no saved location (RitualService).
+const noLocationMessage = 'No location preferences found for user'
+
+// `no-location` is a setup gap, so retrying cannot succeed; any other failure can.
+type HeroLoadError = 'no-location' | 'generic'
+
+async function classifyRitualError(error: unknown): Promise<HeroLoadError> {
+  if (!(error instanceof ResponseError) || error.response.status !== 400) {
+    return 'generic'
+  }
+  try {
+    const body = (await error.response.json()) as { message?: unknown }
+    return body.message === noLocationMessage ? 'no-location' : 'generic'
+  } catch {
+    return 'generic'
+  }
+}
 const modalFocusRestorationDelayMs = 400
 
 function focusAccessibilityTarget(
@@ -211,7 +228,7 @@ export default function TabOneScreen() {
 
   const [ritual, setRitual] = useState<RitualResponse | null>(null)
   const [isLoading, setIsLoading] = useState(true)
-  const [error, setError] = useState<string | null>(null)
+  const [error, setError] = useState<HeroLoadError | null>(null)
   const [activeScenario, setActiveScenario] = useState<ScenarioType>('morning')
   const [activeChipCategory, setActiveChipCategory] = useState<ChipCategory>('Personal')
   const [pendingWidgetSlot, setPendingWidgetSlot] = useState<WidgetSlot | null>(null)
@@ -306,7 +323,8 @@ export default function TabOneScreen() {
           })
         )
       }
-    } catch {
+    } catch (loadError) {
+      const errorKind = await classifyRitualError(loadError)
       if (loadId !== latestLoadId.current) {
         return
       }
@@ -318,11 +336,7 @@ export default function TabOneScreen() {
         setIsStale(true)
         setIsCacheServed(true)
       } else {
-        setError(
-          t('hero.load_error', {
-            defaultValue: 'Unable to load daily recommendations',
-          })
-        )
+        setError(errorKind)
       }
     } finally {
       if (loadId === latestLoadId.current) {
@@ -642,7 +656,12 @@ export default function TabOneScreen() {
   )
 
   return (
-    <SafeAreaView style={[styles.safeContainer, { backgroundColor: palette.background }]}>
+    // Side insets only: the native header and the tab bar already cover top and bottom,
+    // and a second top inset left an empty band above the chips.
+    <SafeAreaView
+      style={[styles.safeContainer, { backgroundColor: palette.background }]}
+      edges={['left', 'right']}
+    >
       <ScrollView
         ref={scrollViewRef}
         style={[styles.container, { backgroundColor: palette.background }]}
@@ -697,7 +716,19 @@ export default function TabOneScreen() {
           </View>
         )}
 
-        {error && !ritual ? (
+        {error === 'no-location' && !ritual ? (
+          <View
+            style={[
+              styles.errorState,
+              { backgroundColor: palette.surface, borderColor: palette.divider },
+            ]}
+            testID="hero-no-location-state"
+          >
+            <Text style={[styles.errorText, { color: palette.text }]}>
+              {t('hero.no_location')}
+            </Text>
+          </View>
+        ) : error && !ritual ? (
           <View
             style={[
               styles.errorState,
@@ -708,7 +739,11 @@ export default function TabOneScreen() {
             <View style={[styles.errorMark, { borderColor: palette.divider }]}>
               <Text style={[styles.errorMarkText, { color: palette.text }]}>!</Text>
             </View>
-            <Text style={[styles.errorText, { color: palette.text }]}>{error}</Text>
+            <Text style={[styles.errorText, { color: palette.text }]}>
+              {t('hero.load_error', {
+                defaultValue: 'Unable to load daily recommendations',
+              })}
+            </Text>
             <Pressable
               style={[styles.retryButton, { backgroundColor: palette.text }]}
               onPress={handleRetry}

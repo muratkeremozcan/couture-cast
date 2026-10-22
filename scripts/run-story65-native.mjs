@@ -341,7 +341,9 @@ function ensureAndroidReverses() {
   // An adb transport reset (the emulator briefly goes offline under host load) drops
   // reverses, so wait for the device and re-assert the owned ones before each use.
   run(adbPath, ['-s', device, 'wait-for-device'])
-  for (const port of [4077, 8088, 53051]) adb('reverse', `tcp:${port}`, `tcp:${port}`)
+  // 54321 is local Supabase: signed community image URLs point at localhost:54321.
+  for (const port of [4077, 8088, 53051, 54321])
+    adb('reverse', `tcp:${port}`, `tcp:${port}`)
 }
 
 function openApp() {

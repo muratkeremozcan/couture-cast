@@ -46,6 +46,10 @@ import {
   setThemeFromMobile,
   PREMIUM_THEME_KEYS,
 } from '@/src/lib/premium-theme'
+import {
+  resolveMobileAccessToken,
+  subscribeMobileApplicationUser,
+} from '@/src/lib/mobile-auth'
 import { getSavedSettings, saveSettings } from '@/src/lib/settings-storage'
 import { updatePreferredLocaleFromMobile } from '@/src/lib/user'
 import { useAccessibilityAnnouncer } from '@/src/hooks/use-accessibility-announcer'
@@ -93,6 +97,34 @@ const availableLocales = [
   { code: 'pt-PT', label: 'Português (Portugal)' },
 ] satisfies readonly { code: SupportedLocale; label: string }[]
 
+/**
+ * Whether a member is signed in. The shopping preference and the subscription belong to
+ * a member, so a signed-out device has nothing to load and nothing has failed. Re-checked
+ * whenever the application user changes (sign-in, sign-out, account switch).
+ */
+function useMemberSignedIn(): boolean | null {
+  const [signedIn, setSignedIn] = useState<boolean | null>(null)
+  useEffect(() => {
+    let active = true
+    const check = () => {
+      void resolveMobileAccessToken()
+        .then((token) => {
+          if (active) setSignedIn(Boolean(token))
+        })
+        .catch(() => {
+          if (active) setSignedIn(false)
+        })
+    }
+    check()
+    const unsubscribe = subscribeMobileApplicationUser(check)
+    return () => {
+      active = false
+      unsubscribe()
+    }
+  }, [])
+  return signedIn
+}
+
 export default function SettingsScreen() {
   const analytics = useMobileAnalytics()
   const { announce } = useAccessibilityAnnouncer()
@@ -110,8 +142,13 @@ export default function SettingsScreen() {
   // failed read can never be mistaken for an opt-out the user did not make.
   const [affiliateCtasEnabled, setAffiliateCtasEnabled] = useState<boolean | null>(null)
   const [commerceStatus, setCommerceStatus] = useState<string | null>(null)
-  const [commerceError, setCommerceError] = useState<string | null>(null)
+  // An i18n key, translated at render: the load effect then depends on the session
+  // alone, and a language change cannot re-read the preference over an in-flight toggle.
+  const [commerceError, setCommerceError] = useState<
+    'commerce.settings.loadError' | 'commerce.settings.error' | null
+  >(null)
   const commerceChangeInFlight = useRef(false)
+  const signedIn = useMemberSignedIn()
 
   useEffect(() => {
     if (localeError) {
@@ -120,6 +157,12 @@ export default function SettingsScreen() {
   }, [announce, localeError])
 
   useEffect(() => {
+    if (signedIn !== true) {
+      // Signed out (or not known yet): nothing to show, and nothing has failed.
+      setAffiliateCtasEnabled(null)
+      setCommerceError(null)
+      return
+    }
     const controller = new AbortController()
 
     void getCommercePreferenceFromMobile(controller.signal)
@@ -138,13 +181,13 @@ export default function SettingsScreen() {
             // `loadError`, not `error`: this is the initial read, and `error`
             // reads "Unable to update shopping preferences.", which names an
             // action the user did not take and cannot retry from here.
-            t('commerce.settings.loadError')
+            'commerce.settings.loadError'
           )
         }
       })
 
     return () => controller.abort()
-  }, [t])
+  }, [signedIn])
 
   const handleAffiliateCtasToggle = async () => {
     if (commerceChangeInFlight.current || affiliateCtasEnabled === null) {
@@ -166,7 +209,7 @@ export default function SettingsScreen() {
       setCommerceStatus(t('commerce.settings.saved'))
     } catch {
       setAffiliateCtasEnabled(previous)
-      setCommerceError(t('commerce.settings.error'))
+      setCommerceError('commerce.settings.error')
     } finally {
       commerceChangeInFlight.current = false
     }
@@ -320,7 +363,10 @@ export default function SettingsScreen() {
   }, [t])
 
   return (
-    <SafeAreaView style={styles.safeArea}>
+    // The tab screen already sits under a native header and above a tab bar that pads its
+    // own bottom inset, so only the side insets apply here. Top and bottom insets again
+    // left fixed bands of the navigation background that clipped the content.
+    <SafeAreaView style={styles.safeArea} edges={['left', 'right']}>
       <ScrollView
         style={styles.scrollView}
         contentContainerStyle={styles.scrollContent}
@@ -384,53 +430,61 @@ export default function SettingsScreen() {
             <Text style={styles.disclosureText} testID="commerce-settings-disclosure">
               {t('commerce.settings.disclosure')}
             </Text>
-            <Pressable
-              style={[
-                styles.commerceToggle,
-                affiliateCtasEnabled ? styles.commerceToggleOn : null,
-              ]}
-              disabled={affiliateCtasEnabled === null}
-              onPress={() => {
-                void handleAffiliateCtasToggle()
-              }}
-              testID="commerce-opt-out-toggle"
-              accessibilityRole="switch"
-              accessibilityState={{
-                checked: affiliateCtasEnabled ?? false,
-                disabled: affiliateCtasEnabled === null,
-              }}
-              // react-native-web does not project `accessibilityState` onto the
-              // DOM, so the aria pair rides alongside it exactly as
-              // `components/chip-navigation.tsx` does.
-              aria-checked={affiliateCtasEnabled ?? false}
-              aria-disabled={affiliateCtasEnabled === null}
-              accessibilityLabel={t('commerce.settings.optOutLabel')}
-              accessibilityHint={t('commerce.settings.optOutHelp')}
-            >
-              <Text style={styles.commerceToggleLabel}>
-                {t('commerce.settings.optOutLabel')}
+            {signedIn === false ? (
+              <Text style={styles.helpText} testID="commerce-settings-signed-out">
+                {t('commerce.settings.signedOutHint')}
               </Text>
-            </Pressable>
-            <Text style={styles.helpText}>{t('commerce.settings.optOutHelp')}</Text>
-            {commerceStatus ? (
-              <Text
-                style={styles.statusText}
-                testID="commerce-settings-status"
-                accessibilityLiveRegion="polite"
-              >
-                {commerceStatus}
-              </Text>
-            ) : null}
-            {commerceError ? (
-              <Text
-                style={styles.errorText}
-                testID="commerce-settings-error"
-                accessibilityRole="alert"
-                accessibilityLiveRegion="assertive"
-              >
-                {commerceError}
-              </Text>
-            ) : null}
+            ) : (
+              <>
+                <Pressable
+                  style={[
+                    styles.commerceToggle,
+                    affiliateCtasEnabled ? styles.commerceToggleOn : null,
+                  ]}
+                  disabled={affiliateCtasEnabled === null}
+                  onPress={() => {
+                    void handleAffiliateCtasToggle()
+                  }}
+                  testID="commerce-opt-out-toggle"
+                  accessibilityRole="switch"
+                  accessibilityState={{
+                    checked: affiliateCtasEnabled ?? false,
+                    disabled: affiliateCtasEnabled === null,
+                  }}
+                  // react-native-web does not project `accessibilityState` onto the
+                  // DOM, so the aria pair rides alongside it exactly as
+                  // `components/chip-navigation.tsx` does.
+                  aria-checked={affiliateCtasEnabled ?? false}
+                  aria-disabled={affiliateCtasEnabled === null}
+                  accessibilityLabel={t('commerce.settings.optOutLabel')}
+                  accessibilityHint={t('commerce.settings.optOutHelp')}
+                >
+                  <Text style={styles.commerceToggleLabel}>
+                    {t('commerce.settings.optOutLabel')}
+                  </Text>
+                </Pressable>
+                <Text style={styles.helpText}>{t('commerce.settings.optOutHelp')}</Text>
+                {commerceStatus ? (
+                  <Text
+                    style={styles.statusText}
+                    testID="commerce-settings-status"
+                    accessibilityLiveRegion="polite"
+                  >
+                    {commerceStatus}
+                  </Text>
+                ) : null}
+                {commerceError ? (
+                  <Text
+                    style={styles.errorText}
+                    testID="commerce-settings-error"
+                    accessibilityRole="alert"
+                    accessibilityLiveRegion="assertive"
+                  >
+                    {t(commerceError)}
+                  </Text>
+                ) : null}
+              </>
+            )}
           </View>
 
           <Pressable
@@ -440,7 +494,7 @@ export default function SettingsScreen() {
           >
             <Text style={styles.actionText}>{t('community.notifications.title')}</Text>
           </Pressable>
-          <PremiumSettingsSection />
+          <PremiumSettingsSection signedIn={signedIn} />
 
           <PremiumThemeSection />
 
@@ -496,7 +550,7 @@ function isPremiumFlowBusy(premiumFlow: PremiumFlowState): boolean {
  * subscription — while `purchasesEnabled` (the only kill-switch exposure)
  * decides whether any subscribe control exists at all.
  */
-function PremiumSettingsSection() {
+function PremiumSettingsSection({ signedIn }: { signedIn: boolean | null }) {
   const analytics = useMobileAnalytics()
   const { t, i18n } = useTranslation()
   const [subscription, setSubscription] = useState<Subscription | null>(null)
@@ -511,6 +565,11 @@ function PremiumSettingsSection() {
   const premiumPollAbortRef = useRef<AbortController | null>(null)
 
   useEffect(() => {
+    if (signedIn !== true) {
+      setSubscription(null)
+      setSubscriptionLoadFailed(false)
+      return
+    }
     const controller = new AbortController()
 
     void getSubscriptionFromMobile(controller.signal)
@@ -538,7 +597,7 @@ function PremiumSettingsSection() {
       controller.abort()
       premiumPollAbortRef.current?.abort()
     }
-  }, [])
+  }, [signedIn])
 
   /**
    * Success-outcome follow-up only: refresh beats webhook latency, then the
@@ -679,7 +738,12 @@ function PremiumSettingsSection() {
       <Text style={styles.disclosureText} testID="premium-settings-disclosure">
         {t('commerce.premium.disclosure')}
       </Text>
-      {renderState.kind === 'load-error' ? (
+      {signedIn === false ? (
+        <Text style={styles.premiumStatusLine} testID="premium-signed-out">
+          {t('commerce.premium.signedOutHint')}
+        </Text>
+      ) : null}
+      {signedIn === true && renderState.kind === 'load-error' ? (
         <Text
           style={styles.errorText}
           testID="premium-load-error"

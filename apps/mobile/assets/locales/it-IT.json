@@ -37,7 +37,18 @@
     "loading": "Caricamento raccomandazioni...",
     "garment_swap_title": "Scegli alternativa per {{category}}",
     "feels_like": "Percepito",
-    "precipitation": "Precipitazione"
+    "precipitation": "Precipitazione",
+    "alert": {
+      "events": {
+        "flood": "Allerta alluvione",
+        "winter-storm": "Allerta tempesta invernale",
+        "wind": "Allerta vento",
+        "heat": "Allerta caldo",
+        "ice": "Allerta ghiaccio"
+      },
+      "body_generic": "È in vigore un'allerta meteo per la tua zona."
+    },
+    "no_location": "Aggiungi la tua posizione per ricevere gli outfit del giorno"
   },
   "widget": {
     "now": "ORA",
@@ -53,16 +64,16 @@
     "locale_change_error": "Impossibile cambiare la lingua. Riprova.",
     "region_units": "Regione e Unità",
     "languages": {
-      "en-US": "Inglese (USA)",
-      "en-CA": "Inglese (Canada)",
-      "es-419": "Spagnolo (LatAm)",
-      "fr-CA": "Francese (Canada)",
-      "fr-FR": "Francese (Europa)",
-      "tr-TR": "Turco",
-      "de-DE": "Tedesco",
+      "en-US": "English (US)",
+      "en-CA": "English (Canada)",
+      "es-419": "Español (LatAm)",
+      "fr-CA": "Français (Canada)",
+      "fr-FR": "Français (Europe)",
+      "tr-TR": "Türkçe",
+      "de-DE": "Deutsch",
       "it-IT": "Italiano",
-      "pt-BR": "Portoghese (Brasile)",
-      "pt-PT": "Portoghese (Portogallo)"
+      "pt-BR": "Português (Brasil)",
+      "pt-PT": "Português (Portugal)"
     },
     "api_health": "Verifica dello stato dell'API...",
     "api_health_status": "Stato dell'API: {{status}}",
@@ -322,7 +333,8 @@
       "optOutHelp": "Disattiva questa opzione per nascondere tutti i suggerimenti di partner e affiliazione.",
       "saved": "Preferenze di acquisto aggiornate",
       "error": "Impossibile aggiornare le preferenze di acquisto.",
-      "loadError": "Impossibile caricare le preferenze di acquisto."
+      "loadError": "Impossibile caricare le preferenze di acquisto.",
+      "signedOutHint": "Accedi per modificare questa impostazione"
     },
     "premium": {
       "sectionTitle": "Premium",
@@ -582,7 +594,8 @@
       "plannerLocked": {
         "title": "Il pianificatore di 7 giorni è una funzione Premium",
         "cta": "Ottieni Premium"
-      }
+      },
+      "signedOutHint": "Accedi per abbonarti o gestire Premium"
     }
   },
   "community": {

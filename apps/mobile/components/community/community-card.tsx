@@ -27,7 +27,9 @@ const ON_DESTRUCTIVE = '#FFFFFF'
  * effect: an unbounded loop. The effect now keys on `item.id` and
  * `imageAccess.expiresAt` alone, the attempts are capped, and the card settles
  * into a visible "image unavailable" state with a manual retry once the budget is
- * spent. A URL that comes back valid resets the budget.
+ * spent. Only an image that actually loads resets the budget: an unexpired URL
+ * can still fail (unreachable host, broken object), and treating it as valid made
+ * the budget reset on every refresh, so the card never reached its fallback.
  */
 const MAX_IMAGE_REFRESH_ATTEMPTS = 2
 const IMAGE_REFRESH_BACKOFF_MS = [0, 4000]
@@ -38,6 +40,7 @@ interface CommunityCardMediaProps {
   label: string
   isUnavailable: boolean
   onError: () => void
+  onLoad: () => void
   onRetry: () => void
   onOpen: () => void
 }
@@ -48,6 +51,7 @@ function CommunityCardMedia({
   label,
   isUnavailable,
   onError,
+  onLoad,
   onRetry,
   onOpen,
 }: CommunityCardMediaProps) {
@@ -106,6 +110,7 @@ function CommunityCardMedia({
             accessibilityLabel={label}
             onAccessibilityTap={onOpen}
             onError={onError}
+            onLoad={onLoad}
           />
         </Pressable>
       )}
@@ -241,6 +246,11 @@ export function CommunityCard({
     void latestRef.current.onImageExpiry?.(latestRef.current.item)
   }, [])
 
+  const handleImageLoad = useCallback(() => {
+    // The image rendered, so the bounded retry budget starts over.
+    attemptsRef.current = 0
+  }, [])
+
   const handleRetryImage = useCallback(() => {
     attemptsRef.current = 0
     setImageState('ok')
@@ -260,9 +270,8 @@ export function CommunityCard({
 
     const msUntilExpiry = expiresAtMs - Date.now()
     if (msUntilExpiry > 0) {
-      // A usable URL arrived, so the bounded retry budget starts over.
-      attemptsRef.current = 0
-      setImageState('ok')
+      // An unexpired URL is not proof the image loads (the host can be unreachable or
+      // the object broken), so only a completed load restores the budget (onLoad).
       const timer = setTimeout(requestImageRefresh, msUntilExpiry)
       return () => clearTimeout(timer)
     }
@@ -370,6 +379,7 @@ export function CommunityCard({
         label={imageLabel}
         isUnavailable={imageState === 'unavailable'}
         onError={requestImageRefresh}
+        onLoad={handleImageLoad}
         onRetry={handleRetryImage}
         onOpen={handleOpen}
       />

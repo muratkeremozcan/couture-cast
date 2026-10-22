@@ -37,7 +37,18 @@
     "loading": "Chargement des recommandations...",
     "garment_swap_title": "Choisir une alternative pour {{category}}",
     "feels_like": "Ressenti",
-    "precipitation": "Précipitations"
+    "precipitation": "Précipitations",
+    "alert": {
+      "events": {
+        "flood": "Avertissement d'inondation",
+        "winter-storm": "Avertissement de tempête hivernale",
+        "wind": "Avertissement de vents violents",
+        "heat": "Avertissement de chaleur",
+        "ice": "Avertissement de verglas"
+      },
+      "body_generic": "Un avertissement météo est en vigueur dans votre secteur."
+    },
+    "no_location": "Ajoutez votre emplacement pour recevoir vos tenues du jour"
   },
   "widget": {
     "now": "MAINTENANT",
@@ -53,16 +64,16 @@
     "locale_change_error": "Impossible de changer la langue. Veuillez réessayer.",
     "region_units": "Région et Unités",
     "languages": {
-      "en-US": "Anglais (É.-U.)",
-      "en-CA": "Anglais (Canada)",
-      "es-419": "Espagnol (LatAm)",
+      "en-US": "English (US)",
+      "en-CA": "English (Canada)",
+      "es-419": "Español (LatAm)",
       "fr-CA": "Français (Canada)",
       "fr-FR": "Français (Europe)",
-      "tr-TR": "Turc",
-      "de-DE": "Allemand",
-      "it-IT": "Italien",
-      "pt-BR": "Portugais (Brésil)",
-      "pt-PT": "Portugais (Portugal)"
+      "tr-TR": "Türkçe",
+      "de-DE": "Deutsch",
+      "it-IT": "Italiano",
+      "pt-BR": "Português (Brasil)",
+      "pt-PT": "Português (Portugal)"
     },
     "api_health": "Vérification de l'état de l'API...",
     "api_health_status": "État de l'API: {{status}}",
@@ -322,7 +333,8 @@
       "optOutHelp": "Désactivez cette option pour masquer toutes les suggestions de partenaires et d’affiliation.",
       "saved": "Préférences de magasinage mises à jour",
       "error": "Impossible de mettre à jour les préférences de magasinage.",
-      "loadError": "Impossible de charger les préférences de magasinage."
+      "loadError": "Impossible de charger les préférences de magasinage.",
+      "signedOutHint": "Connectez-vous pour modifier ce réglage"
     },
     "premium": {
       "sectionTitle": "Premium",
@@ -582,7 +594,8 @@
       "plannerLocked": {
         "title": "Le planificateur sur 7 jours est une fonctionnalité Premium",
         "cta": "Obtenir Premium"
-      }
+      },
+      "signedOutHint": "Connectez-vous pour vous abonner ou gérer Premium"
     }
   },
   "community": {

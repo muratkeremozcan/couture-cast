@@ -37,7 +37,18 @@
     "loading": "Loading recommendations...",
     "garment_swap_title": "Choose alternate {{category}}",
     "feels_like": "Feels like",
-    "precipitation": "Precipitation"
+    "precipitation": "Precipitation",
+    "alert": {
+      "events": {
+        "flood": "Flood warning",
+        "winter-storm": "Winter storm warning",
+        "wind": "Wind warning",
+        "heat": "Heat warning",
+        "ice": "Ice warning"
+      },
+      "body_generic": "A weather warning is in effect for your area."
+    },
+    "no_location": "Add your location to get daily outfits"
   },
   "widget": {
     "now": "NOW",
@@ -59,10 +70,10 @@
       "fr-CA": "Français (Canada)",
       "fr-FR": "Français (Europe)",
       "tr-TR": "Türkçe",
-      "de-DE": "German",
-      "it-IT": "Italian",
-      "pt-BR": "Portuguese (Brazil)",
-      "pt-PT": "Portuguese (Portugal)"
+      "de-DE": "Deutsch",
+      "it-IT": "Italiano",
+      "pt-BR": "Português (Brasil)",
+      "pt-PT": "Português (Portugal)"
     },
     "api_health": "Checking API health...",
     "api_health_status": "API health: {{status}}",
@@ -322,7 +333,8 @@
       "optOutHelp": "Turn this off to hide all partner and affiliate suggestions.",
       "saved": "Shopping preferences updated",
       "error": "Unable to update shopping preferences.",
-      "loadError": "Unable to load shopping preferences."
+      "loadError": "Unable to load shopping preferences.",
+      "signedOutHint": "Sign in to change this"
     },
     "premium": {
       "sectionTitle": "Premium",
@@ -582,7 +594,8 @@
       "plannerLocked": {
         "title": "The 7-Day Planner is a Premium feature",
         "cta": "Get Premium"
-      }
+      },
+      "signedOutHint": "Sign in to subscribe or manage Premium"
     }
   },
   "community": {

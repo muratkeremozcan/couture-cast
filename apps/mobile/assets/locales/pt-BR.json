@@ -37,7 +37,18 @@
     "loading": "Carregando recomendações...",
     "garment_swap_title": "Escolher alternativa para {{category}}",
     "feels_like": "Sensação térmica",
-    "precipitation": "Precipitação"
+    "precipitation": "Precipitação",
+    "alert": {
+      "events": {
+        "flood": "Alerta de enchente",
+        "winter-storm": "Alerta de tempestade de inverno",
+        "wind": "Alerta de ventania",
+        "heat": "Alerta de calor",
+        "ice": "Alerta de gelo"
+      },
+      "body_generic": "Há um alerta meteorológico em vigor para sua região."
+    },
+    "no_location": "Adicione sua localização para receber looks diários"
   },
   "widget": {
     "now": "AGORA",
@@ -53,13 +64,13 @@
     "locale_change_error": "Não foi possível alterar o idioma. Tente novamente.",
     "region_units": "Região e Unidades",
     "languages": {
-      "en-US": "Inglês (EUA)",
-      "en-CA": "Inglês (Canadá)",
-      "es-419": "Espanhol (LatAm)",
-      "fr-CA": "Francês (Canadá)",
-      "fr-FR": "Francês (Europa)",
-      "tr-TR": "Turco",
-      "de-DE": "Alemão",
+      "en-US": "English (US)",
+      "en-CA": "English (Canada)",
+      "es-419": "Español (LatAm)",
+      "fr-CA": "Français (Canada)",
+      "fr-FR": "Français (Europe)",
+      "tr-TR": "Türkçe",
+      "de-DE": "Deutsch",
       "it-IT": "Italiano",
       "pt-BR": "Português (Brasil)",
       "pt-PT": "Português (Portugal)"
@@ -322,7 +333,8 @@
       "optOutHelp": "Desative para ocultar todas as sugestões de parceiros e afiliados.",
       "saved": "Preferências de compra atualizadas",
       "error": "Não foi possível atualizar as preferências de compra.",
-      "loadError": "Não foi possível carregar as preferências de compra."
+      "loadError": "Não foi possível carregar as preferências de compra.",
+      "signedOutHint": "Entre na sua conta para alterar isto"
     },
     "premium": {
       "sectionTitle": "Premium",
@@ -582,7 +594,8 @@
       "plannerLocked": {
         "title": "O planejador de 7 dias é um recurso Premium",
         "cta": "Obter Premium"
-      }
+      },
+      "signedOutHint": "Faça login para assinar ou gerenciar o Premium"
     }
   },
   "community": {

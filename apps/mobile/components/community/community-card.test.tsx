@@ -412,6 +412,70 @@ describe('CommunityCard (Story 6.1)', () => {
     ).toBeInTheDocument()
   })
 
+  it('6.5-MOB-POLISH-01 spends the budget when every refreshed, unexpired URL also fails', () => {
+    // An unreachable image host (or a broken object): each refresh returns a fresh,
+    // unexpired signed URL that fails again. An unexpired URL is not proof the image
+    // loads, so the budget must not reset and the card must reach its fallback.
+    const onImageExpiry = vi.fn()
+    const fresh = (n: number) =>
+      item({
+        imageAccess: {
+          url: `${PIXEL}#${n}`,
+          expiresAt: new Date(Date.now() + 3_600_000 + n).toISOString(),
+        },
+      })
+    const card = (n: number) => (
+      <CommunityCard
+        item={fresh(n)}
+        onReport={vi.fn()}
+        onWithdraw={vi.fn()}
+        onImageExpiry={onImageExpiry}
+      />
+    )
+    const { rerender } = render(card(0))
+    for (const n of [1, 2, 3]) {
+      const onError = imageSpy.props.get('community-card-image-post-a')?.onError as
+        | (() => void)
+        | undefined
+      if (!onError) break
+      act(() => onError())
+      rerender(card(n))
+    }
+
+    expect(onImageExpiry).toHaveBeenCalledTimes(2)
+    expect(
+      screen.getByTestId('community-card-image-unavailable-post-a')
+    ).toBeInTheDocument()
+  })
+
+  it('6.5-MOB-POLISH-02 restores the full budget once an image actually loads', () => {
+    const onImageExpiry = vi.fn()
+    render(
+      <CommunityCard
+        item={item()}
+        onReport={vi.fn()}
+        onWithdraw={vi.fn()}
+        onImageExpiry={onImageExpiry}
+      />
+    )
+    const props = () =>
+      imageSpy.props.get('community-card-image-post-a') as {
+        onError: () => void
+        onLoad?: () => void
+      }
+
+    act(() => props().onError())
+    act(() => props().onLoad?.())
+    act(() => {
+      props().onError()
+      props().onError()
+    })
+
+    // One failure, a successful load, then a full budget of two more refreshes.
+    expect(onImageExpiry).toHaveBeenCalledTimes(3)
+    expect(screen.queryByTestId('community-card-image-unavailable-post-a')).toBeNull()
+  })
+
   it('6.1-MOB-039 treats an unparsable expiry as an unavailable image straight away', () => {
     const onImageExpiry = vi.fn()
     render(

@@ -83,6 +83,16 @@ vi.mock('@/src/lib/api-health', () => ({
 // `@/src/lib/commerce` is deliberately NOT mocked here: `premium-theme.ts` imports
 // `withRequestTimeout` from it, and replacing that with a `vi.fn()` would silently stop
 // every request this suite is meant to make.
+// Premium belongs to a signed-in member; the screen only reads it with an access token.
+// Plain functions, not vi.fn: restoreMocks would strip a mock implementation per test.
+vi.mock('@/src/lib/mobile-auth', () => ({
+  resolveMobileAccessToken: () => Promise.resolve('member-token'),
+  subscribeMobileApplicationUser: () => () => undefined,
+  mobileApplicationUserId: () => null,
+  setMobileApplicationUserId: () => undefined,
+  setMobileAccessTokenResolver: () => undefined,
+}))
+
 vi.mock('@/src/lib/premium', () => ({
   getSubscriptionFromMobile: getSubscriptionMock,
   ensurePurchasesConfigured: ensurePurchasesConfiguredMock,

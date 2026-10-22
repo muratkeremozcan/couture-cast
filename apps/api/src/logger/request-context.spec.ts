@@ -84,4 +84,73 @@ describe('request-context', () => {
       userId: 'guardian-123',
     })
   })
+
+  it('uses the first value of a repeated request id header', () => {
+    expect(resolveRequestId([' req-first ', 'req-second'])).toBe('req-first')
+  })
+
+  it('generates a request id when the inbound header is blank', () => {
+    expect(resolveRequestId('   ')).toMatch(/^[0-9a-f-]{36}$/i)
+  })
+
+  it('infers a feature from unversioned and empty paths', () => {
+    expect(inferFeatureFromPath(undefined)).toBe('api')
+    expect(inferFeatureFromPath('/health?probe=1')).toBe('health')
+    expect(inferFeatureFromPath('/api/v2/events')).toBe('api')
+    expect(inferFeatureFromPath('/')).toBe('api')
+  })
+
+  it('falls back to the user id header when the request is not authenticated', () => {
+    expect(
+      extractUserId({
+        headers: { 'x-user-id': ' header-user ' },
+        originalUrl: '/api/v1/events',
+        url: '/api/v1/events',
+      })
+    ).toBe('header-user')
+  })
+
+  it('stringifies a numeric request id and reads the header when no id is set', () => {
+    expect(
+      createRequestContext({
+        headers: {},
+        id: 42,
+        originalUrl: '/health',
+        url: '/health',
+      })
+    ).toMatchObject({ requestId: '42', feature: 'health' })
+    expect(
+      createRequestContext({
+        headers: { 'x-request-id': 'inbound-7' },
+        originalUrl: '/health',
+        url: '/health',
+      }).requestId
+    ).toBe('inbound-7')
+  })
+
+  it('gives community reads, and only them, an authorization deadline', () => {
+    const context = (method: string, path: string) =>
+      createRequestContext({ headers: {}, method, originalUrl: path, url: path })
+    const before = performance.now()
+    const read = context('GET', '/api/v1/community/feed?cursor=1')
+    expect(read.communityAuthorizationDeadline).toBeGreaterThanOrEqual(before + 1950)
+    expect(read.communityAuthorizationDeadline).toBeLessThanOrEqual(
+      performance.now() + 1950
+    )
+    expect(
+      context('POST', '/api/v1/community/targets/resolve').communityAuthorizationDeadline
+    ).toBeDefined()
+    expect(
+      context('POST', '/api/v1/community/posts/p1/reactions')
+        .communityAuthorizationDeadline
+    ).toBeUndefined()
+    expect(
+      context('GET', '/api/v1/ritual').communityAuthorizationDeadline
+    ).toBeUndefined()
+  })
+
+  it('ignores context updates outside a request', () => {
+    expect(() => updateRequestContext({ userId: 'nobody' })).not.toThrow()
+    expect(getRequestContext()).toBeUndefined()
+  })
 })

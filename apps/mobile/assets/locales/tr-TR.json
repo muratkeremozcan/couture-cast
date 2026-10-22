@@ -37,7 +37,18 @@
     "loading": "Öneriler yükleniyor...",
     "garment_swap_title": "{{category}} için alternatif seçin",
     "feels_like": "Hissedilen sıcaklık",
-    "precipitation": "Yağış oranı"
+    "precipitation": "Yağış oranı",
+    "alert": {
+      "events": {
+        "flood": "Sel uyarısı",
+        "winter-storm": "Kış fırtınası uyarısı",
+        "wind": "Rüzgâr uyarısı",
+        "heat": "Sıcak hava uyarısı",
+        "ice": "Buzlanma uyarısı"
+      },
+      "body_generic": "Bölgeniz için bir hava durumu uyarısı yürürlükte."
+    },
+    "no_location": "Günlük kombinler almak için konumunuzu ekleyin"
   },
   "widget": {
     "now": "ŞİMDİ",
@@ -53,16 +64,16 @@
     "locale_change_error": "Dil değiştirilemedi. Lütfen tekrar deneyin.",
     "region_units": "Bölge ve Birimler",
     "languages": {
-      "en-US": "İngilizce (ABD)",
-      "en-CA": "İngilizce (Kanada)",
-      "es-419": "İspanyolca (LatAm)",
-      "fr-CA": "Fransızca (Kanada)",
-      "fr-FR": "Fransızca (Avrupa)",
+      "en-US": "English (US)",
+      "en-CA": "English (Canada)",
+      "es-419": "Español (LatAm)",
+      "fr-CA": "Français (Canada)",
+      "fr-FR": "Français (Europe)",
       "tr-TR": "Türkçe",
-      "de-DE": "Almanca",
-      "it-IT": "İtalyanca",
-      "pt-BR": "Portekizce (Brezilya)",
-      "pt-PT": "Portekizce (Portekiz)"
+      "de-DE": "Deutsch",
+      "it-IT": "Italiano",
+      "pt-BR": "Português (Brasil)",
+      "pt-PT": "Português (Portugal)"
     },
     "api_health": "API durumu kontrol ediliyor...",
     "api_health_status": "API durumu: {{status}}",
@@ -322,7 +333,8 @@
       "optOutHelp": "Tüm iş ortağı ve bağlı kuruluş önerilerini gizlemek için bunu kapatın.",
       "saved": "Alışveriş tercihleri güncellendi",
       "error": "Alışveriş tercihleri güncellenemedi.",
-      "loadError": "Alışveriş tercihleri yüklenemedi."
+      "loadError": "Alışveriş tercihleri yüklenemedi.",
+      "signedOutHint": "Bunu değiştirmek için oturum açın"
     },
     "premium": {
       "sectionTitle": "Premium",
@@ -582,7 +594,8 @@
       "plannerLocked": {
         "title": "7 günlük planlayıcı bir Premium özelliğidir",
         "cta": "Premium al"
-      }
+      },
+      "signedOutHint": "Premium'a abone olmak veya yönetmek için giriş yapın"
     }
   },
   "community": {

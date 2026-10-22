@@ -39,6 +39,7 @@ const {
   getSubscriptionMock,
   ensurePurchasesConfiguredMock,
   premiumPassthroughMocks,
+  resolveMobileAccessTokenMock,
 } = vi.hoisted(() => ({
   analyticsCaptureMock: vi.fn(),
   analyticsDistinctIdMock: vi.fn(() => 'test-user-id'),
@@ -57,6 +58,17 @@ const {
     resolvePremiumSectionState: vi.fn(),
     isEntitledSubscription: vi.fn(),
   },
+  resolveMobileAccessTokenMock: vi.fn(),
+}))
+
+// The member's session is a boundary too: shopping preferences and the subscription
+// belong to a signed-in member, so the screen only reads them with an access token.
+vi.mock('@/src/lib/mobile-auth', () => ({
+  resolveMobileAccessToken: resolveMobileAccessTokenMock,
+  subscribeMobileApplicationUser: () => () => undefined,
+  mobileApplicationUserId: () => null,
+  setMobileApplicationUserId: vi.fn(),
+  setMobileAccessTokenResolver: vi.fn(),
 }))
 
 vi.mock('@/src/analytics/mobile-analytics', () => ({
@@ -126,6 +138,8 @@ describe('SettingsScreen', () => {
     loadMobileApiHealthMock.mockResolvedValue({ status: 'ok' })
     updatePreferredLocaleMock.mockReset()
     updatePreferredLocaleMock.mockResolvedValue({ success: true })
+    resolveMobileAccessTokenMock.mockReset()
+    resolveMobileAccessTokenMock.mockResolvedValue('member-token')
     getCommercePreferenceMock.mockReset()
     getCommercePreferenceMock.mockResolvedValue({ affiliateCtasEnabled: true })
     updateCommercePreferenceMock.mockReset()
@@ -363,7 +377,12 @@ describe('SettingsScreen', () => {
     const toggle = await screen.findByTestId('commerce-opt-out-toggle')
     await waitFor(() => {
       expect(toggle).toHaveAttribute('aria-checked', 'true')
+      // Usable, not just rendered: an unknown stored value also reads aria-checked false.
+      expect(toggle).not.toHaveAttribute('aria-disabled', 'true')
     })
+    // react-native-web hands the enabled state to its press responder in a passive
+    // effect after render; flush it so the click is not judged against the old config.
+    await act(() => Promise.resolve())
 
     fireEvent.click(toggle)
 
@@ -385,7 +404,12 @@ describe('SettingsScreen', () => {
     const toggle = await screen.findByTestId('commerce-opt-out-toggle')
     await waitFor(() => {
       expect(toggle).toHaveAttribute('aria-checked', 'false')
+      // Usable, not just rendered: an unknown stored value also reads aria-checked false.
+      expect(toggle).not.toHaveAttribute('aria-disabled', 'true')
     })
+    // react-native-web hands the enabled state to its press responder in a passive
+    // effect after render; flush it so the click is not judged against the old config.
+    await act(() => Promise.resolve())
 
     fireEvent.click(toggle)
 
@@ -405,7 +429,12 @@ describe('SettingsScreen', () => {
     const toggle = await screen.findByTestId('commerce-opt-out-toggle')
     await waitFor(() => {
       expect(toggle).toHaveAttribute('aria-checked', 'true')
+      // Usable, not just rendered: an unknown stored value also reads aria-checked false.
+      expect(toggle).not.toHaveAttribute('aria-disabled', 'true')
     })
+    // react-native-web hands the enabled state to its press responder in a passive
+    // effect after render; flush it so the click is not judged against the old config.
+    await act(() => Promise.resolve())
 
     fireEvent.click(toggle)
 
@@ -438,6 +467,23 @@ describe('SettingsScreen', () => {
 
     fireEvent.click(toggle)
     expect(updateCommercePreferenceMock).not.toHaveBeenCalled()
+  })
+
+  it('6.5-MOB-POLISH-03 shows a signed-out device no load errors for member data it cannot have', async () => {
+    resolveMobileAccessTokenMock.mockResolvedValue(undefined)
+    // What the API answers without a bearer, so a read here would surface as an error.
+    getCommercePreferenceMock.mockRejectedValue(new Error('401'))
+    getSubscriptionMock.mockRejectedValue(new Error('401'))
+
+    await render(<SettingsScreen />)
+
+    expect(await screen.findByTestId('commerce-settings-signed-out')).toBeInTheDocument()
+    expect(await screen.findByTestId('premium-signed-out')).toBeInTheDocument()
+    expect(screen.queryByTestId('commerce-settings-error')).toBeNull()
+    expect(screen.queryByTestId('premium-load-error')).toBeNull()
+    expect(screen.queryByTestId('commerce-opt-out-toggle')).toBeNull()
+    expect(getCommercePreferenceMock).not.toHaveBeenCalled()
+    expect(getSubscriptionMock).not.toHaveBeenCalled()
   })
 
   it('5.1-MOB-SET-06 gives the toggle a touch target of at least 44 by 44 pixels', async () => {

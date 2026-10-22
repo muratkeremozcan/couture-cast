@@ -47,11 +47,11 @@ export function MobileChipNavigation({
 
   return (
     <View style={styles.container} testID="mobile-chip-navigation">
+      {/* Chips size to their localized label, so there is no fixed snap interval. */}
       <ScrollView
         horizontal
         showsHorizontalScrollIndicator={false}
         decelerationRate="fast"
-        snapToInterval={128}
         contentContainerStyle={styles.scrollContent}
       >
         {CHIP_CATEGORIES.map((category) => {
@@ -78,6 +78,7 @@ export function MobileChipNavigation({
               ]}
             >
               <Text
+                numberOfLines={1}
                 style={[
                   styles.chipText,
                   isActive ? styles.chipTextActive : styles.chipTextInactive,
@@ -105,8 +106,13 @@ const styles = StyleSheet.create({
     gap: 8,
   },
   chip: {
-    width: 120,
-    paddingHorizontal: 16,
+    // A minimum, not a fixed width: COMMUNAUTÉ, SPONSORISÉ and SPONSORIZZATO need more
+    // label space than a fixed chip had and must never break mid-word. The minimum and
+    // padding keep all three chips of the longest locale (it-IT) on a 360-point-wide
+    // phone without scrolling.
+    minWidth: 96,
+    flexShrink: 0,
+    paddingHorizontal: 12,
     paddingVertical: 10,
     borderRadius: 9999,
     borderWidth: 1,

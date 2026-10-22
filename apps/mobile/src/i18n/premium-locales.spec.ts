@@ -102,14 +102,15 @@ function placeholders(value: string): string[] {
 const reference = flatten(premiumTree(enUS as Catalog))
 
 describe('5.2 mobile premium locale parity', () => {
-  it('5.2-I18N-MOB-01 ships the 22 Decision 12a mobile keys in the reference catalog', () => {
-    // 21 shared keys plus the mobile-only `unavailableInBuild`. `signedOutHint`
-    // stays web-only. `plannerLocked.*` now ships on mobile too (Story 5.5),
+  it('5.2-I18N-MOB-01 ships the 23 Decision 12a mobile keys in the reference catalog', () => {
+    // 21 shared keys, the mobile-only `unavailableInBuild`, and `signedOutHint`: the
+    // settings tab is reachable signed out, so it says what signing in unlocks
+    // instead of a load failure. `plannerLocked.*` now ships on mobile too (Story 5.5),
     // but it is excluded here the same way `theme`/`palette`/`planner` are,
     // and audited in its own `planner-locales.spec.ts`.
-    expect(reference.size).toBe(22)
+    expect(reference.size).toBe(23)
     expect(reference.has('unavailableInBuild')).toBe(true)
-    expect(reference.has('signedOutHint')).toBe(false)
+    expect(reference.has('signedOutHint')).toBe(true)
   })
 
   it('5.2-I18N-MOB-02 uses an identical key tree in every locale', () => {

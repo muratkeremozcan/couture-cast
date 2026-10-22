@@ -37,7 +37,18 @@
     "loading": "A carregar recomendações...",
     "garment_swap_title": "Escolher alternativa para {{category}}",
     "feels_like": "Sensação térmica",
-    "precipitation": "Precipitação"
+    "precipitation": "Precipitação",
+    "alert": {
+      "events": {
+        "flood": "Aviso de cheias",
+        "winter-storm": "Aviso de tempestade de inverno",
+        "wind": "Aviso de vento forte",
+        "heat": "Aviso de calor",
+        "ice": "Aviso de gelo"
+      },
+      "body_generic": "Está em vigor um aviso meteorológico para a sua zona."
+    },
+    "no_location": "Adicione a sua localização para receber sugestões de roupa diárias"
   },
   "widget": {
     "now": "AGORA",
@@ -53,13 +64,13 @@
     "locale_change_error": "Não foi possível alterar o idioma. Tente novamente.",
     "region_units": "Região e Unidades",
     "languages": {
-      "en-US": "Inglês (EUA)",
-      "en-CA": "Inglês (Canadá)",
-      "es-419": "Espanhol (LatAm)",
-      "fr-CA": "Francês (Canadá)",
-      "fr-FR": "Francês (Europa)",
-      "tr-TR": "Turco",
-      "de-DE": "Alemão",
+      "en-US": "English (US)",
+      "en-CA": "English (Canada)",
+      "es-419": "Español (LatAm)",
+      "fr-CA": "Français (Canada)",
+      "fr-FR": "Français (Europe)",
+      "tr-TR": "Türkçe",
+      "de-DE": "Deutsch",
       "it-IT": "Italiano",
       "pt-BR": "Português (Brasil)",
       "pt-PT": "Português (Portugal)"
@@ -322,7 +333,8 @@
       "optOutHelp": "Desative esta opção para ocultar todas as sugestões de parceiros e afiliados.",
       "saved": "Preferências de compra atualizadas",
       "error": "Não foi possível atualizar as preferências de compra.",
-      "loadError": "Não foi possível carregar as preferências de compra."
+      "loadError": "Não foi possível carregar as preferências de compra.",
+      "signedOutHint": "Inicie sessão para alterar esta definição"
     },
     "premium": {
       "sectionTitle": "Premium",
@@ -582,7 +594,8 @@
       "plannerLocked": {
         "title": "O planeador de 7 dias é uma funcionalidade Premium",
         "cta": "Obter Premium"
-      }
+      },
+      "signedOutHint": "Inicie sessão para subscrever ou gerir o Premium"
     }
   },
   "community": {
