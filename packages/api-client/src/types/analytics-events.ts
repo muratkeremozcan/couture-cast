@@ -13,6 +13,7 @@ import {
   communityFeedModeSchema,
   communityPlatformSchema,
   communityReportReasonSchema,
+  communityServedSpotlightLevelSchema,
   communitySpotlightLevelSchema,
   COMMUNITY_SPOTLIGHT_MAX_LIMIT,
   COMMUNITY_SPOTLIGHT_MAX_RANK,
@@ -849,7 +850,8 @@ export const communitySpotlightOpenedEventSchema = z
     analyticsSubjectId: nonEmptyString,
     platform: communityPlatformSchema,
     dedupeKey: communityDedupeKeySchema,
-    level: communitySpotlightLevelSchema,
+    // Only a served level carries cards to open; `none` serves none.
+    level: communityServedSpotlightLevelSchema,
     rank: z.number().int().min(1).max(COMMUNITY_SPOTLIGHT_MAX_RANK),
   })
   .strict()
@@ -2076,7 +2078,7 @@ export const communitySpotlightOpenedPropertiesSchema = z
   .object({
     platform: communityPlatformSchema,
     dedupe_key: nonEmptyString,
-    level: communitySpotlightLevelSchema,
+    level: communityServedSpotlightLevelSchema,
     rank: z.number().int().min(1).max(COMMUNITY_SPOTLIGHT_MAX_RANK),
   })
   .strict()

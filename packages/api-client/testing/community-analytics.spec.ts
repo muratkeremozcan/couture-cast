@@ -7,6 +7,7 @@ import {
   analyticsEventSchemas,
   communityCardOpenedPropertiesSchema,
   communityFeedViewedPropertiesSchema,
+  communitySpotlightOpenedPropertiesSchema,
   trackCommunityCardOpened,
   trackCommunityChallengeParticipated,
   trackCommunityFeedViewed,
@@ -316,7 +317,25 @@ const namesOf = (source: Record<string, unknown>): string[] =>
     .sort()
 
 describe('6.6 spotlight event bounds', () => {
-  it('6.6-CON-002 refuses fractional ranks and ranks or item counts outside the caps', () => {
+  it('6.6-CON-002 refuses fractional ranks, ranks or item counts outside the caps, and an open at level none', () => {
+    // An open only happens on a served card, so `none` is never its level.
+    expect(() =>
+      trackCommunitySpotlightOpened({
+        analyticsSubjectId: SUBJECT,
+        platform: 'web',
+        dedupeKey: 'k',
+        level: 'none' as never,
+        rank: 1,
+      })
+    ).toThrow()
+    expect(
+      communitySpotlightOpenedPropertiesSchema.safeParse({
+        platform: 'web',
+        dedupe_key: 'k',
+        level: 'none',
+        rank: 1,
+      }).success
+    ).toBe(false)
     for (const rank of [0, 61])
       expect(() =>
         trackCommunitySpotlightOpened({
