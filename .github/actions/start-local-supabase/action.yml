@@ -1,15 +1,27 @@
 name: Start local Supabase
-description: Start local Supabase services with retry/backoff for transient registry pull failures.
+description: >-
+  Start local Supabase services, retrying transient registry pull failures with
+  exponential backoff and jitter, and alternating the image registry per attempt.
 
 inputs:
   max-attempts:
-    description: Maximum number of startup attempts
+    description: >-
+      Maximum number of startup attempts. Attempts alternate between the
+      registries in image-registry and fallback-registries, so the default gives
+      each registry three tries.
     required: false
-    default: '4'
+    default: '6'
   base-delay-seconds:
-    description: Base delay in seconds used for linear backoff between attempts
+    description: >-
+      First retry delay in seconds. Each later retry doubles it, capped at
+      max-delay-seconds, and adds up to base-delay-seconds of random jitter so
+      parallel shards do not hit the registry in lockstep.
     required: false
     default: '20'
+  max-delay-seconds:
+    description: Upper bound in seconds for one backoff delay, before jitter.
+    required: false
+    default: '120'
   exclude:
     description: >-
       Comma-separated containers not to start. Services no test uses are skipped
@@ -22,36 +34,61 @@ inputs:
     default: 'realtime,studio,postgres-meta,logflare,vector,edge-runtime,supavisor,mailpit,imgproxy'
   image-registry:
     description: >-
-      Registry the Supabase CLI pulls its images from. The CLI default,
-      public.ecr.aws, caps anonymous data per runner IP and fails shards with
-      "toomanyrequests: Data limit exceeded"; Supabase mirrors the same tags to
-      ghcr.io, which the job token authenticates against.
+      Registry the first attempt pulls the Supabase images from, passed to the
+      CLI as SUPABASE_INTERNAL_IMAGE_REGISTRY. Supabase mirrors the same tags to
+      ghcr.io, which the job token authenticates against, and to public.ecr.aws,
+      the CLI default, which caps anonymous data per runner IP.
     required: false
     default: 'ghcr.io'
+  fallback-registries:
+    description: >-
+      Comma-separated registries the later attempts rotate through after
+      image-registry. Either registry can answer "toomanyrequests" on a busy
+      runner pool; alternating means one throttled registry cannot fail a shard.
+    required: false
+    default: 'public.ecr.aws'
 
 runs:
   using: composite
   steps:
-    - name: Log in to the image registry
-      if: inputs.image-registry == 'ghcr.io'
-      shell: bash
-      env:
-        REGISTRY_TOKEN: ${{ github.token }}
-      # Anonymous pulls still work if the login fails, so it does not stop the job.
-      run: echo "$REGISTRY_TOKEN" | docker login ghcr.io -u "$GITHUB_ACTOR" --password-stdin || true
-
     - name: Start local Supabase with retry
       shell: bash
       env:
-        SUPABASE_INTERNAL_IMAGE_REGISTRY: ${{ inputs.image-registry }}
+        MAX_ATTEMPTS: ${{ inputs.max-attempts }}
+        BASE_DELAY: ${{ inputs.base-delay-seconds }}
+        MAX_DELAY: ${{ inputs.max-delay-seconds }}
         EXCLUDE: ${{ inputs.exclude }}
+        PRIMARY_REGISTRY: ${{ inputs.image-registry }}
+        FALLBACK_REGISTRIES: ${{ inputs.fallback-registries }}
+        REGISTRY_TOKEN: ${{ github.token }}
       run: |
         set -u -o pipefail
 
-        max_attempts='${{ inputs.max-attempts }}'
-        base_delay='${{ inputs.base-delay-seconds }}'
+        for setting in MAX_ATTEMPTS BASE_DELAY MAX_DELAY; do
+          if ! [[ "${!setting}" =~ ^[0-9]+$ ]]; then
+            echo "::error::${setting} must be a non-negative integer, got '${!setting}'."
+            exit 2
+          fi
+        done
+        if [ "$MAX_ATTEMPTS" -lt 1 ]; then
+          echo "::error::max-attempts must be at least 1."
+          exit 2
+        fi
+
         exclude="$EXCLUDE"
-        attempt=1
+        registries=()
+        for registry in "$PRIMARY_REGISTRY" ${FALLBACK_REGISTRIES//,/ }; do
+          [ -n "$registry" ] && registries+=("$registry")
+        done
+        if [ "${#registries[@]}" -eq 0 ]; then
+          echo "::error::No image registry configured."
+          exit 2
+        fi
+        ghcr_logged_in=false
+        # The token stays a shell variable, out of the environment every npx and
+        # docker child inherits.
+        registry_token="$REGISTRY_TOKEN"
+        unset REGISTRY_TOKEN
 
         diagnose_db_port() {
           echo "::group::Supabase database port diagnostics"
@@ -77,37 +114,71 @@ runs:
           ' >> "$GITHUB_ENV"
         }
 
-        while [ "$attempt" -le "$max_attempts" ]; do
-          echo "::group::Start local Supabase (attempt ${attempt}/${max_attempts})"
+        # Only ghcr.io takes the job token; the other mirrors are pulled anonymously.
+        # Anonymous pulls still work if the login fails, so it does not stop the job.
+        login_for() {
+          if [ "$1" = 'ghcr.io' ] && [ "$ghcr_logged_in" = false ]; then
+            if printf '%s' "$registry_token" | docker login ghcr.io -u "${GITHUB_ACTOR:-github-actions}" --password-stdin; then
+              ghcr_logged_in=true
+            else
+              echo "::warning::ghcr.io login failed; pulling anonymously."
+            fi
+          fi
+        }
+
+        # Exponential backoff capped at MAX_DELAY, plus up to BASE_DELAY of jitter.
+        backoff_seconds() {
+          local delay=$(( BASE_DELAY * (1 << ($1 - 1)) ))
+          if [ "$delay" -gt "$MAX_DELAY" ] || [ "$1" -gt 16 ]; then delay=$MAX_DELAY; fi
+          echo $(( delay + RANDOM % (BASE_DELAY + 1) ))
+        }
+
+        attempt=1
+        while [ "$attempt" -le "$MAX_ATTEMPTS" ]; do
+          registry="${registries[$(( (attempt - 1) % ${#registries[@]} ))]}"
+          export SUPABASE_INTERNAL_IMAGE_REGISTRY="$registry"
+          login_for "$registry"
+          echo "::group::Start local Supabase (attempt ${attempt}/${MAX_ATTEMPTS}, registry ${registry})"
 
           if npx supabase start ${exclude:+--exclude "$exclude"}; then
-            echo "Supabase services started successfully."
+            echo "Supabase services started successfully from ${registry}."
             npx supabase status || true
-            export_supabase_environment
+            # Without -e a failed export would fall through to success and leave
+            # later steps without SUPABASE_URL or the keys.
+            if ! export_supabase_environment; then
+              echo "::endgroup::"
+              echo "::error::Supabase started but its URL and keys could not be exported."
+              exit 1
+            fi
             echo "::endgroup::"
             exit 0
           else
             exit_code=$?
           fi
 
-          echo "Supabase startup failed with exit code ${exit_code}."
+          echo "Supabase startup failed with exit code ${exit_code} (registry ${registry})."
           npx supabase status || true
           echo "::endgroup::"
           diagnose_db_port
 
-          if [ "$attempt" -eq "$max_attempts" ]; then
-            echo "::error::Failed to start local Supabase after ${max_attempts} attempts."
+          if [ "$attempt" -eq "$MAX_ATTEMPTS" ]; then
+            echo "::error::Failed to start local Supabase after ${MAX_ATTEMPTS} attempts across: ${registries[*]}."
             exit "$exit_code"
           fi
 
-          sleep_seconds=$(( base_delay * attempt ))
+          # The next attempt may pull from a different registry, whose image names
+          # differ, so clear whatever this attempt left half started.
+          npx supabase stop --no-backup || true
+
+          sleep_seconds=$(backoff_seconds "$attempt")
           echo "Retrying Supabase startup in ${sleep_seconds}s..."
           sleep "$sleep_seconds"
           attempt=$(( attempt + 1 ))
         done
 
     - name: Log out of the image registry
-      # Later steps run PR code; drop the stored credential once the images are pulled.
-      if: always() && inputs.image-registry == 'ghcr.io'
+      # Later steps run PR code; drop any stored ghcr.io credential once the
+      # images are pulled. Logging out without a login is a harmless no-op.
+      if: always()
       shell: bash
       run: docker logout ghcr.io || true
