@@ -1965,13 +1965,12 @@ export function CommunityLookbookGrid({
   // through this surface's single live region.
   const spotlight = useCommunitySpotlight({
     scope: sessionScope,
-    reconcile: (page) => {
-      const ticket = reactionState.beginRead()
-      return page.flatMap((post) => {
+    beginRead: () => reactionState.beginRead(),
+    reconcile: (page, ticket) =>
+      page.flatMap((post) => {
         const current = reactionState.read(post, ticket)
         return current ? [{ ...current, rank: post.rank }] : []
-      })
-    },
+      }),
     announce: (message) => {
       setAnnouncement({ ...message, announcementId: ++reactionAnnouncementId.current })
     },

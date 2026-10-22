@@ -70,8 +70,16 @@ type PostUpdate = (post: CommunityFeedItem | null) => CommunityFeedItem | null
 export interface UseCommunitySpotlightOptions {
   /** The session identity. Null keeps the module idle; a change reloads page one. */
   scope: string | null
-  /** Runs every arriving page through the grid's reaction state. */
-  reconcile: (items: readonly CommunitySpotlightItem[]) => CommunitySpotlightItem[]
+  /**
+   * Takes a reaction read ticket. The hook takes it before each request, so an
+   * eviction that lands while the request is in flight outranks its response.
+   */
+  beginRead: () => number
+  /** Runs an arrived page through the grid's reaction state under its ticket. */
+  reconcile: (
+    items: readonly CommunitySpotlightItem[],
+    ticket: number
+  ) => CommunitySpotlightItem[]
   announce: (message: SpotlightAnnouncement) => void
 }
 
@@ -100,12 +108,15 @@ function isDisabledRefusal(error: unknown): boolean {
 
 export function useCommunitySpotlight({
   scope,
+  beginRead,
   reconcile,
   announce,
 }: UseCommunitySpotlightOptions) {
   const [state, setState] = useState<CommunitySpotlightState>(IDLE)
   const stateRef = useRef(state)
   stateRef.current = state
+  const beginReadRef = useRef(beginRead)
+  beginReadRef.current = beginRead
   const reconcileRef = useRef(reconcile)
   reconcileRef.current = reconcile
   const announceRef = useRef(announce)
@@ -140,9 +151,10 @@ export function useCommunitySpotlight({
         focusTargetId: null,
       }))
       try {
+        const ticket = beginReadRef.current()
         const page = await getCommunitySpotlightFromWeb({ signal: request.signal })
         if (!request.current()) return
-        const items = reconcileRef.current(page.items)
+        const items = reconcileRef.current(page.items, ticket)
         setState({
           status: 'ready',
           level: page.level,
@@ -169,12 +181,16 @@ export function useCommunitySpotlight({
     const request = begin()
     setState((previous) => ({ ...previous, loadingMore: true, moreFailed: false }))
     try {
+      const ticket = beginReadRef.current()
       const page = await getCommunitySpotlightFromWeb({
         cursor: nextCursor,
         signal: request.signal,
       })
       if (!request.current()) return
-      const added = newEntries(stateRef.current.items, reconcileRef.current(page.items))
+      const added = newEntries(
+        stateRef.current.items,
+        reconcileRef.current(page.items, ticket)
+      )
       setState((current) => ({
         ...current,
         status: 'ready',
@@ -245,6 +261,7 @@ export function useCommunitySpotlight({
       const controller = new AbortController()
       itemControllersRef.current.add(controller)
       try {
+        const ticket = beginReadRef.current()
         const post = await getCommunityPostFromWeb(postId, controller.signal)
         if (controller.signal.aborted) return
         // The single-post read returns an author their own post in any status.
@@ -252,7 +269,7 @@ export function useCommunitySpotlight({
         // the copy. `apply` keeps the rank the copy was served at.
         const fresh =
           post.status === 'published'
-            ? (reconcileRef.current([{ ...post, rank: shown.rank }])[0] ?? null)
+            ? (reconcileRef.current([{ ...post, rank: shown.rank }], ticket)[0] ?? null)
             : null
         apply((item) => (item?.id === postId ? fresh : item))
       } catch (error: unknown) {

@@ -7,6 +7,7 @@ import type {
   CommunityReactionSpotlight,
   CommunityReactionSpotlightItem as CommunitySpotlightItem,
 } from '@couture/api-client/contracts/http'
+import { CommunityReactionState } from '@couture/api-client'
 import { useCommunitySpotlight } from './community-spotlight'
 
 const lib = vi.hoisted(() => ({
@@ -45,7 +46,7 @@ function setup(reconcile = (items: readonly CommunitySpotlightItem[]) => [...ite
   const announce = vi.fn()
   const hook = renderHook(
     ({ scope }: { scope: string | null }) =>
-      useCommunitySpotlight({ scope, reconcile, announce }),
+      useCommunitySpotlight({ scope, beginRead: () => 0, reconcile, announce }),
     { initialProps: { scope: 'member-1' as string | null } }
   )
   return { ...hook, announce }
@@ -202,5 +203,73 @@ describe('6.6 spotlight single-post refresh', () => {
     read.resolve({ id: 'a', status: 'withdrawn' })
     await refreshing
     expect(result.current.state).toBe(before)
+  })
+})
+
+describe('6.6 spotlight reads against realtime evictions', () => {
+  function grid() {
+    const reactionState = new CommunityReactionState({
+      onChange: () => undefined,
+    } as never)
+    const announce = vi.fn()
+    const hook = renderHook(() =>
+      useCommunitySpotlight({
+        scope: 'member-1',
+        // The grid's own wiring: the ticket comes from the hook, before the request.
+        beginRead: () => reactionState.beginRead(),
+        reconcile: (items, ticket) =>
+          items.flatMap((post) => {
+            const current = reactionState.read(post, ticket)
+            return current ? [{ ...current, rank: post.rank }] : []
+          }),
+        announce,
+      })
+    )
+    return { ...hook, reactionState }
+  }
+
+  it('6.6-WEB-069 a first page that was in flight during an eviction never restores the post', async () => {
+    const first = deferred<CommunityReactionSpotlight>()
+    lib.getCommunitySpotlightFromWeb.mockReturnValueOnce(first.promise)
+    const { result, reactionState } = grid()
+    reactionState.evict('removed')
+    await act(async () => {
+      first.resolve(page([item('removed', 1), item('kept', 2)]))
+      await first.promise
+    })
+    await waitFor(() => expect(result.current.state.status).toBe('ready'))
+    expect(result.current.state.items.map((entry) => entry.id)).toEqual(['kept'])
+  })
+
+  it('6.6-WEB-070 a View more page and a single-post refresh in flight during an eviction stay out', async () => {
+    lib.getCommunitySpotlightFromWeb.mockResolvedValueOnce(page([item('a', 1)], 'next'))
+    const { result, reactionState } = grid()
+    await waitFor(() => expect(result.current.state.status).toBe('ready'))
+
+    const more = deferred<CommunityReactionSpotlight>()
+    lib.getCommunitySpotlightFromWeb.mockReturnValueOnce(more.promise)
+    let loading!: Promise<void>
+    act(() => {
+      loading = result.current.loadMore()
+    })
+    reactionState.evict('removed')
+    await act(async () => {
+      more.resolve(page([item('removed', 2)]))
+      await loading
+    })
+    expect(result.current.state.items.map((entry) => entry.id)).toEqual(['a'])
+
+    const read = deferred<unknown>()
+    lib.getCommunityPostFromWeb.mockReturnValueOnce(read.promise)
+    let refreshing!: Promise<void>
+    act(() => {
+      refreshing = result.current.refreshItem('a')
+    })
+    reactionState.evict('a')
+    await act(async () => {
+      read.resolve({ id: 'a', status: 'published' })
+      await refreshing
+    })
+    expect(result.current.state.items).toEqual([])
   })
 })
