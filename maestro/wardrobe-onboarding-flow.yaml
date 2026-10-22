@@ -54,18 +54,35 @@ tags:
     file: subflows/open-wardrobe.yaml
     label: 'Open the Wardrobe tab'
 
-- extendedWaitUntil:
-    visible:
-      id: 'wardrobe-onboarding-card'
-    timeout: 15000
-
-- tapOn:
-    id: 'wardrobe-onboarding-card'
-
-- extendedWaitUntil:
-    visible:
-      id: 'wardrobe-onboarding-screen'
-    timeout: 15000
+# Expo Go can leave its developer sheet parked off screen with the dimmed
+# backdrop still up. Maestro cannot see that sheet, so the text-guarded absorb
+# in open-app.yaml skips it, and the backdrop swallows the card tap while the
+# deep link above still lands. CI run 39827475510 (shard 4) failed exactly so.
+# The tap is therefore paired with its destination and retried, relaunching
+# the app first on a retry, as subflows/open-wardrobe-tab.yaml does for the tab.
+- evalScript: ${output.onboardingCardAttempt = 0}
+- retry:
+    maxRetries: 2
+    commands:
+      - evalScript: ${output.onboardingCardAttempt = output.onboardingCardAttempt + 1}
+      - runFlow:
+          when:
+            true: ${output.onboardingCardAttempt > 1}
+          commands:
+            - runFlow:
+                file: subflows/relaunch-app.yaml
+                label: 'The card tap was swallowed; relaunch the app before trying again'
+            - runFlow: subflows/open-wardrobe.yaml
+      - extendedWaitUntil:
+          visible:
+            id: 'wardrobe-onboarding-card'
+          timeout: 15000
+      - tapOn:
+          id: 'wardrobe-onboarding-card'
+      - extendedWaitUntil:
+          visible:
+            id: 'wardrobe-onboarding-screen'
+          timeout: 15000
 
 - assertVisible:
     id: 'onboarding-permission-step'
