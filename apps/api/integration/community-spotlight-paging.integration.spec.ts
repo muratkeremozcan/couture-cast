@@ -1,6 +1,8 @@
 // Story 6.6 I/O matrix: pinned snapshots, signed cursors and live rechecks across
 // pages, against a real PG17 database and an owned Redis key space.
 import { describe, expect, it } from 'vitest'
+import { COMMUNITY_SPOTLIGHT_PAGE_ONE_READS_PER_MINUTE } from '@couture/api-client/contracts/http'
+import { CommunityRateLimitException } from '../src/modules/community/community-rate-limit.exception.js'
 import { areaComponentsOf } from '../src/modules/community/community-spotlight-area.js'
 import {
   SPOTLIGHT_TEST_AS_OF,
@@ -188,5 +190,40 @@ describe('6.6 spotlight paging', () => {
       level: 'city',
       label: area.city.toUpperCase(),
     })
+  })
+})
+
+describe('6.6 page-one read limit', () => {
+  it('6.6-INT-070 allows 30 page-one reads a minute, never counts later pages, and resets each minute', async () => {
+    const area = ctx.area('read-limit')
+    await ctx.cohort(area, 5)
+    const viewer = await ctx.member(area)
+    expect(COMMUNITY_SPOTLIGHT_PAGE_ONE_READS_PER_MINUTE).toBe(30)
+    let cursor: string | null = null
+    for (let read = 0; read < 30; read += 1) {
+      const page = await ctx.read(viewer, { limit: 2 })
+      cursor = page.nextCursor
+    }
+    // A later page pages through a snapshot already served; it is not counted.
+    await expect(ctx.read(viewer, { limit: 2, cursor: cursor! })).resolves.toMatchObject({
+      level: 'city',
+    })
+    const refused = await ctx.read(viewer, { limit: 2 }).catch((error: unknown) => error)
+    expect(refused).toBeInstanceOf(CommunityRateLimitException)
+    // SPOTLIGHT_TEST_NOW is 30 seconds into its minute.
+    expect((refused as CommunityRateLimitException).retryAfterSeconds).toBe(30)
+    expect((refused as CommunityRateLimitException).getStatus()).toBe(429)
+
+    // Another member keeps a separate window.
+    const neighbour = await ctx.member(area)
+    await expect(ctx.read(neighbour)).resolves.toMatchObject({ level: 'city' })
+
+    ctx.clock.current = new Date(SPOTLIGHT_TEST_NOW.getTime() + 30_000)
+    await expect(ctx.read(viewer, { limit: 2 })).resolves.toMatchObject({ level: 'city' })
+    await expect(
+      ctx.prisma.communitySpotlightReadWindow.findUniqueOrThrow({
+        where: { user_id: viewer },
+      })
+    ).resolves.toMatchObject({ reads: 1 })
   })
 })

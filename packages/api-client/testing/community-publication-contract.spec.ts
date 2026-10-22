@@ -83,31 +83,46 @@ describe('community HTTP contracts', () => {
       ).toBe(false)
     })
 
-    it('6.6-CON-001 accepts the spotlight branch only with a rank from 1 to 60 and no variant', () => {
+    it('6.6-CON-001 accepts the spotlight branch only with a rank from 1 to 60, a served level and no variant', () => {
       expect(
-        openCommunityPostInputSchema.parse({ surface: 'spotlight', rank: 1 })
+        openCommunityPostInputSchema.parse({
+          surface: 'spotlight',
+          rank: 1,
+          level: 'city',
+        })
       ).toEqual({
         surface: 'spotlight',
         rank: 1,
+        level: 'city',
       })
-      expect(
-        openCommunityPostInputSchema.safeParse({ surface: 'spotlight', rank: 60 }).success
-      ).toBe(true)
+      for (const level of ['city', 'region', 'country'])
+        expect(
+          openCommunityPostInputSchema.safeParse({
+            surface: 'spotlight',
+            rank: 60,
+            level,
+          }).success
+        ).toBe(true)
       for (const rank of [0, 61, 1.5, '1'])
         expect(
-          openCommunityPostInputSchema.safeParse({ surface: 'spotlight', rank }).success
+          openCommunityPostInputSchema.safeParse({
+            surface: 'spotlight',
+            rank,
+            level: 'city',
+          }).success
         ).toBe(false)
+      for (const body of [
+        { surface: 'spotlight', rank: 3 },
+        { surface: 'spotlight', rank: 3, level: 'none' },
+        { surface: 'spotlight', rank: 3, level: 'planet' },
+        { surface: 'spotlight', rank: 3, level: 'city', experimentVariant: 'auto' },
+        { experimentVariant: 'auto', level: 'city' },
+        { surface: 'feed', rank: 3, level: 'city' },
+      ])
+        expect(openCommunityPostInputSchema.safeParse(body).success).toBe(false)
       expect(
-        openCommunityPostInputSchema.safeParse({
-          surface: 'spotlight',
-          rank: 3,
-          experimentVariant: 'auto',
-        }).success
-      ).toBe(false)
-      expect(
-        openCommunityPostInputSchema.safeParse({ surface: 'feed', rank: 3 }).success
-      ).toBe(false)
-      expect(isSpotlightOpenInput({ surface: 'spotlight', rank: 2 })).toBe(true)
+        isSpotlightOpenInput({ surface: 'spotlight', rank: 2, level: 'region' })
+      ).toBe(true)
       expect(isSpotlightOpenInput({ experimentVariant: 'auto' })).toBe(false)
     })
   })

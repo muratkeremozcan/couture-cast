@@ -66,8 +66,7 @@ describe('6.6 spotlight level selection', () => {
   })
 
   it('6.6-INT-003 same city name in two regions never merges: the country holds all six', async () => {
-    const base = ctx.area('same-name')
-    const country = `Country ${base.region}`
+    const { country } = ctx.area('same-name')
     const left = { country, region: 'West', city: 'Springfield' }
     const right = { country, region: 'East', city: 'Springfield' }
     await ctx.cohort(left, 3)
@@ -93,8 +92,7 @@ describe('6.6 spotlight level selection', () => {
   })
 
   it('6.6-INT-005 under five authors at the country is none with no items', async () => {
-    const area = ctx.area('thin')
-    const thinCountry = { ...area, country: `Thin ${area.region}` }
+    const thinCountry = ctx.area('thin')
     await ctx.cohort(thinCountry, 4)
     const viewer = await ctx.member(thinCountry)
     await expect(ctx.read(viewer)).resolves.toEqual({
@@ -105,7 +103,7 @@ describe('6.6 spotlight level selection', () => {
     })
   })
 
-  it('6.6-INT-006 no usable location: no saved location, or one without a country, is none', async () => {
+  it('6.6-INT-006 no usable location: none, a null or blank country, or one that resolves to no ISO code', async () => {
     const area = ctx.area('no-location')
     await ctx.cohort(area)
     const none = await ctx.member(null)
@@ -119,7 +117,12 @@ describe('6.6 spotlight level selection', () => {
       region: area.region,
       city: area.city,
     })
-    for (const viewer of [none, countryless, blank])
+    const unresolved = await ctx.member({
+      country: 'Atlantis',
+      region: area.region,
+      city: area.city,
+    })
+    for (const viewer of [none, countryless, blank, unresolved])
       await expect(ctx.read(viewer)).resolves.toMatchObject({ level: 'none', items: [] })
   })
 
@@ -263,15 +266,43 @@ describe('6.6 spotlight eligibility and ranking', () => {
     expect(first.rows.map((row) => row.id)).toEqual(cohort.expectedOrder)
   })
 
-  it('6.6-INT-013 the windowed partial index exists with its visibility predicate', async () => {
-    const [index] = await ctx.prisma.$queryRaw<{ indexdef: string }[]>`
-      SELECT indexdef FROM pg_indexes
-      WHERE tablename = 'LookbookPost' AND indexname = 'LookbookPost_spotlight_area_window_idx'
+  it('6.6-INT-013 the windowed partial indexes exist with their visibility predicate', async () => {
+    const indexes = await ctx.prisma.$queryRaw<{ indexname: string; indexdef: string }[]>`
+      SELECT indexname, indexdef FROM pg_indexes
+      WHERE indexname IN (
+        'LookbookPost_spotlight_area_window_idx',
+        'LookbookPost_spotlight_region_window_idx',
+        'LookbookPost_spotlight_country_window_idx',
+        'CommunityReaction_spotlight_post_idx'
+      )
     `
-    expect(index?.indexdef).toContain(
-      '(area_country, area_region, area_city, published_at DESC)'
+    const definition = (name: string) =>
+      indexes.find((index) => index.indexname === name)?.indexdef ?? ''
+    for (const [name, columns, component] of [
+      [
+        'LookbookPost_spotlight_area_window_idx',
+        '(area_country, area_region, area_city, published_at DESC)',
+        'area_country IS NOT NULL',
+      ],
+      [
+        'LookbookPost_spotlight_region_window_idx',
+        '(area_country, area_region, published_at DESC) INCLUDE (area_city, user_id, reaction_generation)',
+        'area_region IS NOT NULL',
+      ],
+      [
+        'LookbookPost_spotlight_country_window_idx',
+        '(area_country, published_at DESC) INCLUDE (area_region, area_city, user_id, reaction_generation)',
+        'area_country IS NOT NULL',
+      ],
+    ] as const) {
+      expect(definition(name), name).toContain(columns)
+      expect(definition(name), name).toContain("status = 'published'")
+      expect(definition(name), name).toContain('erasure_requested_at IS NULL')
+      expect(definition(name), name).toContain('anonymized_at IS NULL')
+      expect(definition(name), name).toContain(component)
+    }
+    expect(definition('CommunityReaction_spotlight_post_idx')).toContain(
+      '(post_id) INCLUDE (user_id) WHERE (selection IS NOT NULL)'
     )
-    expect(index?.indexdef).toContain("status = 'published'")
-    expect(index?.indexdef).toContain('area_country IS NOT NULL')
   })
 })

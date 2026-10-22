@@ -152,6 +152,7 @@ export class CommunityController {
     @AuthContext() auth: RequestAuthContext,
     @Headers('x-couture-platform') platformHeader: string | undefined,
     @Query() rawQuery: Record<string, unknown>,
+    @Res({ passthrough: true }) response: Response,
     @Headers('x-couture-reactions') reactionsHeader?: string
   ): Promise<CommunitySpotlightResponse> {
     const headersResult = communityHeadersSchema.safeParse({
@@ -169,13 +170,15 @@ export class CommunityController {
       )
     }
     const reactions = reactionsHeader === '1'
-    const data = await this.spotlightService.getSpotlight({
-      userId: auth.userId,
-      platform: headersResult.data['x-couture-platform'],
-      cursor: queryResult.data.cursor,
-      limit: queryResult.data.limit,
-      ...(reactions ? { reactions: true } : {}),
-    })
+    const data = await withRetryAfterHeader(response, () =>
+      this.spotlightService.getSpotlight({
+        userId: auth.userId,
+        platform: headersResult.data['x-couture-platform'],
+        cursor: queryResult.data.cursor,
+        limit: queryResult.data.limit,
+        ...(reactions ? { reactions: true } : {}),
+      })
+    )
     return (
       reactions
         ? communityReactionSpotlightResponseSchema
@@ -377,6 +380,7 @@ export class CommunityController {
           postId,
           platform: headersResult.data['x-couture-platform'],
           rank: input.rank,
+          level: input.level,
         })
       : await this.communityService.recordCardOpened({
           userId: auth.userId,

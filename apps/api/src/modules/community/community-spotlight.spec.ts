@@ -6,7 +6,7 @@ import {
   areaHash,
   areaHashesOf,
   availableAreaLevels,
-  normalizeAreaComponent,
+  storedAreaComponents,
   viewerAreaLabel,
 } from './community-spotlight-area'
 import {
@@ -14,6 +14,11 @@ import {
   randomCounterSeed,
   type SpotlightRedis,
 } from './community-spotlight-cache'
+import {
+  communityPostToken,
+  communitySubjectToken,
+  spotlightOpenDedupeKey,
+} from './community-analytics'
 import {
   decodeSpotlightCursor,
   encodeSpotlightCursor,
@@ -106,16 +111,46 @@ describe('6.6 spotlight score', () => {
 })
 
 describe('6.6 hierarchical areas', () => {
-  it('6.6-UNIT-008 trims, applies NFKC and lowercases each component', () => {
-    expect(normalizeAreaComponent('  Ｌｉｓｂｏｎ ')).toBe('lisbon')
-    expect(normalizeAreaComponent('LISBOA')).toBe('lisboa')
-    expect(normalizeAreaComponent('   ')).toBeNull()
-    expect(normalizeAreaComponent(null)).toBeNull()
+  it('6.6-UNIT-008 resolves spelling variants of one place to one area', () => {
+    const variants = [
+      { country: 'USA', region: 'Illinois', city: 'Chicago' },
+      { country: 'United States', region: ' ILLINOIS ', city: 'chicago' },
+      { country: 'Estados Unidos', region: 'Illinois', city: 'Chicago' },
+    ]
+    for (const variant of variants) {
+      expect(areaComponentsOf(variant)).toEqual({
+        country: 'US',
+        region: 'illinois',
+        city: 'chicago',
+      })
+    }
+    expect(
+      areaComponentsOf({ country: 'Deutschland', region: 'Bayern', city: 'München' })
+    ).toEqual({ country: 'DE', region: 'bayern', city: 'munchen' })
+    const accented = areaComponentsOf({
+      country: 'Brasil',
+      region: 'SP',
+      city: 'São Paulo',
+    })
+    const plain = areaComponentsOf({ country: 'Brazil', region: 'sp', city: 'Sao Paulo' })
+    expect(areaHashesOf(accented)).toEqual(areaHashesOf(plain))
+    const dotted = areaComponentsOf({
+      country: 'Türkiye',
+      region: 'İstanbul',
+      city: 'İstanbul',
+    })
+    const dotless = areaComponentsOf({
+      country: 'Turkey',
+      region: 'Istanbul',
+      city: 'ıstanbul',
+    })
+    expect(dotted).toEqual({ country: 'TR', region: 'istanbul', city: 'istanbul' })
+    expect(areaHashesOf(dotted)).toEqual(areaHashesOf(dotless))
   })
 
-  it('6.6-UNIT-009 keeps only the prefix whose parents exist', () => {
+  it('6.6-UNIT-009 keeps only the prefix whose parents exist or resolve', () => {
     expect(areaComponentsOf({ country: 'PT', region: null, city: 'Lisbon' })).toEqual({
-      country: 'pt',
+      country: 'PT',
       region: null,
       city: null,
     })
@@ -127,10 +162,23 @@ describe('6.6 hierarchical areas', () => {
       }
     )
     expect(
+      areaComponentsOf({ country: 'Atlantis', region: 'Lisboa', city: 'Lisbon' })
+    ).toEqual({ country: null, region: null, city: null })
+    expect(
       availableAreaLevels(
         areaComponentsOf({ country: 'PT', region: 'Lisboa', city: null })
       )
     ).toEqual(['region', 'country'])
+    expect(
+      storedAreaComponents({
+        area_country: null,
+        area_region: 'lisboa',
+        area_city: 'lisbon',
+      })
+    ).toEqual({ country: null, region: null, city: null })
+    expect(
+      storedAreaComponents({ area_country: 'PT', area_region: null, area_city: 'lisbon' })
+    ).toEqual({ country: 'PT', region: null, city: null })
   })
 
   it('6.6-UNIT-010 never merges same-named cities or regions under different parents', () => {
@@ -158,6 +206,31 @@ describe('6.6 hierarchical areas', () => {
     expect(viewerAreaLabel(source, 'region')).toBe('Lisboa')
     expect(viewerAreaLabel(source, 'country')).toBe('Portugal')
     expect(viewerAreaLabel(source, 'none')).toBeNull()
+  })
+})
+
+describe('6.6 spotlight open dedupe key', () => {
+  it('6.6-UNIT-012 keys on HMAC tokens for viewer and post, never a raw id', () => {
+    const key = spotlightOpenDedupeKey('viewer-raw-id', 'post-raw-id')
+    expect(key).toBe(
+      [
+        'community_spotlight_opened',
+        communitySubjectToken('viewer-raw-id'),
+        communityPostToken('post-raw-id'),
+        'spotlight',
+      ].join(':')
+    )
+    expect(key).toMatch(
+      /^community_spotlight_opened:[0-9a-f]{16}:[0-9a-f]{16}:spotlight$/
+    )
+    expect(key).not.toContain('viewer-raw-id')
+    expect(key).not.toContain('post-raw-id')
+    expect(communityPostToken('post-raw-id')).not.toBe(
+      communitySubjectToken('post-raw-id')
+    )
+    expect(spotlightOpenDedupeKey('viewer-raw-id', 'post-raw-id')).toBe(key)
+    expect(spotlightOpenDedupeKey('viewer-raw-id', 'other-post')).not.toBe(key)
+    expect(spotlightOpenDedupeKey('other-viewer', 'post-raw-id')).not.toBe(key)
   })
 })
 
@@ -255,5 +328,37 @@ describe('6.6 spotlight counters', () => {
     await expect(
       cache.current('city', HASH, { epoch: '7', version: '9007199254740993' })
     ).resolves.toMatchObject({ id: snapshotId })
+  })
+
+  it('6.6-UNIT-017 a same-ID rebuild overwrites the stored generations', async () => {
+    const stored = new Map<string, string>()
+    const redis: SpotlightRedis = {
+      get: (key) => Promise.resolve(stored.get(key) ?? null),
+      // Honors NX like Redis, so a create-only write would keep the old body.
+      set: (key: string, value: string, ...modes: unknown[]) => {
+        if (modes.includes('NX') && stored.has(key)) return Promise.resolve(null)
+        stored.set(key, value)
+        return Promise.resolve('OK')
+      },
+      eval: () => Promise.resolve(1),
+    }
+    const cache = new CommunitySpotlightCache(redis, 'unit')
+    const counters = { epoch: '7', version: '11' }
+    const snapshot = {
+      version: 1 as const,
+      id: 'e'.repeat(64),
+      asOf: AS_OF.toISOString(),
+      level: 'city' as const,
+      areaHash: HASH,
+      entries: [{ id: 'post-1', generation: 3 }],
+    }
+    await expect(cache.publish(snapshot, counters)).resolves.toBe(true)
+    await cache.publish(
+      { ...snapshot, entries: [{ id: 'post-1', generation: 4 }] },
+      counters
+    )
+    await expect(cache.snapshot(snapshot.id)).resolves.toMatchObject({
+      entries: [{ id: 'post-1', generation: 4 }],
+    })
   })
 })

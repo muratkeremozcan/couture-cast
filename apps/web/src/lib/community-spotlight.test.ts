@@ -124,7 +124,7 @@ describe('City Spotlight web wrappers (Story 6.6)', () => {
     expect(communityFailureReason(stale)).toBe('cursor_invalid')
   })
 
-  it('6.6-WEB-013 records a spotlight open with its rank and no experiment arm', async () => {
+  it('6.6-WEB-013 records a spotlight open with its rank, served level and no experiment arm', async () => {
     const bodies: unknown[] = []
     useMswHandlers(
       http.post('/api/v1/community/posts/:postId/opened', async ({ request }) => {
@@ -132,7 +132,7 @@ describe('City Spotlight web wrappers (Story 6.6)', () => {
         return HttpResponse.json({ tracked: true })
       })
     )
-    await openCommunitySpotlightPostFromWeb('post-9', 9)
-    expect(bodies).toEqual([{ surface: 'spotlight', rank: 9 }])
+    await openCommunitySpotlightPostFromWeb('post-9', 9, 'region')
+    expect(bodies).toEqual([{ surface: 'spotlight', rank: 9, level: 'region' }])
   })
 })

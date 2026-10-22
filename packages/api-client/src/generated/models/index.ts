@@ -7785,7 +7785,7 @@ export type OnboardingPreconditionRequiredErrorErrorEnum =
   (typeof OnboardingPreconditionRequiredErrorErrorEnum)[keyof typeof OnboardingPreconditionRequiredErrorErrorEnum]
 
 /**
- * Either a feed open with experimentVariant, or a spotlight open with surface spotlight and a rank from 1 to 60. The two forms never mix.
+ * Either a feed open with experimentVariant, or a spotlight open with surface spotlight, a rank from 1 to 60 and the served level. The two forms never mix.
  * @export
  * @interface OpenCommunityPostInput
  */
@@ -7808,6 +7808,12 @@ export interface OpenCommunityPostInput {
    * @memberof OpenCommunityPostInput
    */
   rank?: number
+  /**
+   *
+   * @type {OpenCommunityPostInputLevelEnum}
+   * @memberof OpenCommunityPostInput
+   */
+  level?: OpenCommunityPostInputLevelEnum
 }
 
 /**
@@ -7828,6 +7834,17 @@ export const OpenCommunityPostInputSurfaceEnum = {
 } as const
 export type OpenCommunityPostInputSurfaceEnum =
   (typeof OpenCommunityPostInputSurfaceEnum)[keyof typeof OpenCommunityPostInputSurfaceEnum]
+
+/**
+ * @export
+ */
+export const OpenCommunityPostInputLevelEnum = {
+  city: 'city',
+  region: 'region',
+  country: 'country',
+} as const
+export type OpenCommunityPostInputLevelEnum =
+  (typeof OpenCommunityPostInputLevelEnum)[keyof typeof OpenCommunityPostInputLevelEnum]
 
 /**
  *

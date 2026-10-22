@@ -520,8 +520,11 @@ export function createCommunityDoubles() {
             items: [{ ...buildPublishedItem(), rank: 1 }].slice(0, params.limit),
             nextCursor: SPOTLIGHT_NEXT_CURSOR,
           }),
-    recordOpened: (params: { rank: number }): Promise<{ tracked: true }> =>
-      Number.isInteger(params.rank)
+    recordOpened: (params: {
+      rank: number
+      level: string
+    }): Promise<{ tracked: true }> =>
+      Number.isInteger(params.rank) && params.level !== 'none'
         ? Promise.resolve({ tracked: true })
         : Promise.reject(new Error('A feed open reached the spotlight path')),
   } as unknown as CommunitySpotlightService

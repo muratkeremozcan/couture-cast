@@ -2,7 +2,7 @@
   "openapi": "3.1.0",
   "info": {
     "title": "CoutureCast HTTP API",
-    "version": "1.6.0",
+    "version": "1.7.0",
     "description": "Canonical HTTP contracts shared across API, web, mobile, and tests."
   },
   "servers": [
@@ -15397,10 +15397,18 @@
             "type": "integer",
             "minimum": 1,
             "maximum": 60
+          },
+          "level": {
+            "type": "string",
+            "enum": [
+              "city",
+              "region",
+              "country"
+            ]
           }
         },
         "additionalProperties": false,
-        "description": "Either a feed open with experimentVariant, or a spotlight open with surface spotlight and a rank from 1 to 60. The two forms never mix."
+        "description": "Either a feed open with experimentVariant, or a spotlight open with surface spotlight, a rank from 1 to 60 and the served level. The two forms never mix."
       },
       "UpdateCommunityChallengeInput": {
         "type": "object",
@@ -23339,6 +23347,25 @@
                     "message"
                   ],
                   "additionalProperties": false
+                }
+              }
+            }
+          },
+          "429": {
+            "description": "30 first-page reads per member per minute; later pages are not counted.",
+            "headers": {
+              "Retry-After": {
+                "description": "Seconds until the member may read the first page again.",
+                "schema": {
+                  "type": "integer",
+                  "minimum": 1
+                }
+              }
+            },
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/TooManyRequestsHttpError"
                 }
               }
             }

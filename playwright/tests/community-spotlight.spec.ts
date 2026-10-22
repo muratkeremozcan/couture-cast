@@ -171,7 +171,7 @@ test.describe('Story 6.6 City Spotlight', () => {
         await dialog.evaluate((element) => element.contains(document.activeElement))
       ).toBe(true)
       expect((await recorded).status()).toBe(200)
-      expect(opens).toEqual([{ surface: 'spotlight', rank: 2 }])
+      expect(opens).toEqual([{ surface: 'spotlight', rank: 2, level: 'city' }])
     } finally {
       // Leave the page first: an open detail keeps reading the post's comments,
       // and deleting the fixture under a live request turns it into a 404.

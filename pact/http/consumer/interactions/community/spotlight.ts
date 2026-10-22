@@ -130,13 +130,13 @@ export async function verifyOpenCommunitySpotlightPostInteraction(
         params: { userId: pactEventAuth.userId },
       })
     )
-    .uponReceiving('a spotlight card open with its rank')
+    .uponReceiving('a spotlight card open with its rank and served level')
     .withRequest(
       'POST',
       `/api/v1/community/posts/${PUBLISHED_POST_ID}/opened`,
       setJsonContent({
         headers: communityHeaders(platform),
-        body: { surface: 'spotlight', rank: SPOTLIGHT_RANK },
+        body: { surface: 'spotlight', rank: SPOTLIGHT_RANK, level: 'city' },
       })
     )
     .willRespondWith(200, setJsonContent({ body: { tracked: like(true) } }))
@@ -145,7 +145,11 @@ export async function verifyOpenCommunitySpotlightPostInteraction(
         {
           postId: PUBLISHED_POST_ID,
           xCouturePlatform: platform,
-          openCommunityPostInput: { surface: 'spotlight', rank: SPOTLIGHT_RANK },
+          openCommunityPostInput: {
+            surface: 'spotlight',
+            rank: SPOTLIGHT_RANK,
+            level: 'city',
+          },
         }
       )
       expect(response).toEqual({ tracked: true })

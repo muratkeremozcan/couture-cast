@@ -507,6 +507,10 @@ export const COMMUNITY_REACTION_CONFLICT_MESSAGE =
   'Reaction changed. Refresh and try again.'
 export const COMMUNITY_REACTION_RATE_LIMITED_MESSAGE =
   'Too many reactions. Please try again in a minute.'
+/** Story 6.6: the privacy model's page-one spotlight read limit. */
+export const COMMUNITY_SPOTLIGHT_PAGE_ONE_READS_PER_MINUTE = 30
+export const COMMUNITY_SPOTLIGHT_RATE_LIMITED_MESSAGE =
+  'Too many spotlight reads. Please try again in a minute.'
 
 // --- Feed Read Schemas ------------------------------------------------------
 
@@ -772,15 +776,23 @@ export type OpenCommunityFeedPostInput = z.infer<typeof openCommunityFeedPostInp
 /** Story 6.6: the snapshot rank range, matching the 60-post spotlight cap. */
 export const COMMUNITY_SPOTLIGHT_MAX_RANK = 60
 
+/** Story 6.6: the levels a served spotlight can carry; `none` serves no cards. */
+export const communityServedSpotlightLevelSchema = z.enum(['city', 'region', 'country'])
+export type CommunityServedSpotlightLevel = z.infer<
+  typeof communityServedSpotlightLevelSchema
+>
+
 /**
  * Story 6.6: an open from the City Spotlight module. It carries the card's rank
- * and never an experiment arm, because the spotlight is outside the feed
- * experiment; this branch records only `community_spotlight_opened`.
+ * and the level the module was served at, and never an experiment arm, because
+ * the spotlight is outside the feed experiment; this branch records only
+ * `community_spotlight_opened`.
  */
 export const openCommunitySpotlightPostInputSchema = z
   .object({
     surface: z.literal('spotlight'),
     rank: z.number().int().min(1).max(COMMUNITY_SPOTLIGHT_MAX_RANK),
+    level: communityServedSpotlightLevelSchema,
   })
   .strict()
 export type OpenCommunitySpotlightPostInput = z.infer<
@@ -805,10 +817,12 @@ export const openCommunityPostInputSchema = z
     experimentVariant: communityExperimentVariantSchema.optional(),
     surface: z.literal('spotlight').optional(),
     rank: z.number().int().min(1).max(COMMUNITY_SPOTLIGHT_MAX_RANK).optional(),
+    level: communityServedSpotlightLevelSchema.optional(),
   })
   .strict()
   .superRefine((body, context) => {
-    const spotlight = body.surface !== undefined || body.rank !== undefined
+    const spotlight =
+      body.surface !== undefined || body.rank !== undefined || body.level !== undefined
     const valid = spotlight
       ? openCommunitySpotlightPostInputSchema.safeParse(body).success
       : openCommunityFeedPostInputSchema.safeParse(body).success
@@ -816,19 +830,19 @@ export const openCommunityPostInputSchema = z
       context.addIssue({
         code: z.ZodIssueCode.custom,
         message: spotlight
-          ? 'A spotlight open needs surface spotlight and a rank, and no experiment variant.'
+          ? 'A spotlight open needs surface spotlight, a rank and the served level, and no experiment variant.'
           : 'A feed open needs the served experiment variant.',
       })
   })
   .transform(
     (body): OpenCommunityPostInput =>
       body.surface !== undefined
-        ? { surface: body.surface, rank: body.rank! }
+        ? { surface: body.surface, rank: body.rank!, level: body.level! }
         : { experimentVariant: body.experimentVariant! }
   )
   .openapi({
     description:
-      'Either a feed open with experimentVariant, or a spotlight open with surface spotlight and a rank from 1 to 60. The two forms never mix.',
+      'Either a feed open with experimentVariant, or a spotlight open with surface spotlight, a rank from 1 to 60 and the served level. The two forms never mix.',
   })
 
 export function isSpotlightOpenInput(
@@ -1869,6 +1883,18 @@ export function registerCommunityContracts(
         description: 'The community read rollout or age eligibility refuses this viewer.',
         content: {
           'application/json': { schema: communitySpotlightDeniedResponseSchema },
+        },
+      },
+      429: {
+        description: `${COMMUNITY_SPOTLIGHT_PAGE_ONE_READS_PER_MINUTE} first-page reads per member per minute; later pages are not counted.`,
+        headers: {
+          'Retry-After': {
+            description: 'Seconds until the member may read the first page again.',
+            schema: { type: 'integer', minimum: 1 },
+          },
+        },
+        content: {
+          'application/json': { schema: commonSchemas.tooManyRequestsHttpErrorSchema },
         },
       },
       500: {

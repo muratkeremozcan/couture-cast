@@ -4,7 +4,7 @@ import 'reflect-metadata'
 import { Test } from '@nestjs/testing'
 import type { INestApplication } from '@nestjs/common'
 import request from 'supertest'
-import { afterAll, beforeAll, describe, expect, it } from 'vitest'
+import { afterAll, beforeAll, describe, expect, it, vi } from 'vitest'
 import {
   communityReactionSpotlightResponseSchema,
   communitySpotlightResponseSchema,
@@ -14,6 +14,7 @@ import { GuardianConsentStateService } from '../src/modules/auth/guardian-consen
 import { CommunityController } from '../src/modules/community/community.controller.js'
 import { CommunityService } from '../src/modules/community/community.service.js'
 import { CommunitySpotlightService } from '../src/modules/community/community-spotlight.service.js'
+import { communitySubjectToken } from '../src/modules/community/community-analytics.js'
 import { listenHttpApp } from './helpers/loopback-http-app.js'
 import { spotlightTestContext } from './helpers/community-spotlight-context.js'
 
@@ -166,43 +167,81 @@ describe('6.6 spotlight analytics', () => {
     expect(rows.every((row) => row.user_id === null)).toBe(true)
   })
 
-  it('6.6-HTTP-011 a spotlight open records only community_spotlight_opened', async () => {
+  it('6.6-HTTP-011 a spotlight open records only community_spotlight_opened, with no raw identifier anywhere', async () => {
     const { viewer, cohort, area } = await seeded('opened')
+    const other = await ctx.member(area)
+    const [postId, secondPostId] = [cohort.expectedOrder[2]!, cohort.expectedOrder[3]!]
+    const open = (member: string, post: string, rank: number) =>
+      request(url)
+        .post(`/api/v1/community/posts/${post}/opened`)
+        .set(as(member))
+        .send({ surface: 'spotlight', rank, level: 'city' })
     ctx.analytics.splice(0)
-    const postId = cohort.expectedOrder[2]!
-    const response = await request(url)
-      .post(`/api/v1/community/posts/${postId}/opened`)
-      .set(as(viewer))
-      .send({ surface: 'spotlight', rank: 3 })
+    const response = await open(viewer, postId, 3)
     expect(response.status).toBe(200)
     expect(response.body).toEqual({ tracked: true })
     expect(ctx.analytics.map((event) => event.event)).toEqual([
       'community_spotlight_opened',
     ])
+    const key = ctx.analytics[0]!.properties!.dedupe_key
     expect(ctx.analytics[0]!.properties).toEqual({
       platform: 'web',
-      dedupe_key: expect.stringMatching(
-        /^community_spotlight_opened:.+:[0-9a-f]{16}:spotlight$/
-      ) as string,
+      dedupe_key: expect.any(String) as string,
       level: 'city',
       rank: 3,
       $ip: null,
     })
+    // Event name, then opaque hex components, then the surface. The member
+    // component is the shared HMAC subject token and the post component is an
+    // HMAC of the post id, so neither raw identifier can appear.
+    expect(key).toMatch(/^community_spotlight_opened:([0-9a-f]{16,64}:){2}spotlight$/)
+    const components = String(key).split(':').slice(1, -1)
+    const subject = communitySubjectToken(viewer)
+    expect(components).toContain(subject)
+    const postComponent = components.find((component) => component !== subject)!
+    expect(postComponent).toBeDefined()
+
+    // Deterministic per (post, viewer, surface): a repeat collapses, while a
+    // different post or a different viewer yields a different key whose post
+    // component tracks the post alone.
+    await open(viewer, postId, 3).expect(200)
+    await open(viewer, secondPostId, 4).expect(200)
+    await open(other, postId, 3).expect(200)
+    const keys = ctx.analytics.map((event) => String(event.properties!.dedupe_key))
+    expect(keys[1]).toBe(key)
+    expect(keys[2]).not.toBe(key)
+    expect(keys[2]!.split(':')).not.toContain(postComponent)
+    expect(keys[3]).not.toBe(key)
+    expect(keys[3]!.split(':')).toContain(postComponent)
+    expect(keys[3]!.split(':')).toContain(communitySubjectToken(other))
+
+    // Nothing is stripped before this check: the dedupe key travels to the
+    // analytics sink with every other property.
     const serialized = JSON.stringify(ctx.analytics).toLowerCase()
-    for (const forbidden of [viewer, postId, area.city, area.region, area.country])
-      expect(serialized.replace(/"dedupe_key":"[^"]*"/, '')).not.toContain(
-        forbidden.toLowerCase()
-      )
+    for (const forbidden of [
+      viewer,
+      other,
+      postId,
+      secondPostId,
+      area.city,
+      area.region,
+      area.country,
+    ])
+      expect(serialized).not.toContain(forbidden.toLowerCase())
   })
 
-  it('6.6-HTTP-012 refuses a bad rank, a mixed body and a hidden post', async () => {
+  it('6.6-HTTP-012 refuses a bad rank, a bad or missing level, a mixed body and a hidden post', async () => {
     const { viewer, cohort } = await seeded('opened-bad', 5)
     const postId = cohort.expectedOrder[0]!
     for (const body of [
-      { surface: 'spotlight', rank: 0 },
-      { surface: 'spotlight', rank: 61 },
-      { surface: 'spotlight' },
-      { surface: 'spotlight', rank: 2, experimentVariant: 'auto' },
+      { surface: 'spotlight', rank: 0, level: 'city' },
+      { surface: 'spotlight', rank: 61, level: 'city' },
+      { surface: 'spotlight', level: 'city' },
+      { surface: 'spotlight', rank: 1 },
+      { surface: 'spotlight', rank: 1, level: 'none' },
+      { surface: 'spotlight', rank: 1, level: 'planet' },
+      { surface: 'spotlight', rank: 2, level: 'city', experimentVariant: 'auto' },
+      { experimentVariant: 'auto', level: 'city' },
       {},
     ])
       await request(url)
@@ -213,8 +252,29 @@ describe('6.6 spotlight analytics', () => {
     await request(url)
       .post('/api/v1/community/posts/missing-post/opened')
       .set(as(viewer))
-      .send({ surface: 'spotlight', rank: 1 })
+      .send({ surface: 'spotlight', rank: 1, level: 'city' })
       .expect(404)
+  })
+
+  it('6.6-HTTP-014 records the served level from the body and runs no cohort query on open', async () => {
+    const { viewer, cohort } = await seeded('opened-level')
+    ctx.analytics.splice(0)
+    const cohorts = vi.spyOn(ctx.spotlightRepository, 'cohorts')
+    const cohortAt = vi.spyOn(ctx.spotlightRepository, 'cohortAt')
+    try {
+      // The viewer resolves to `city` today; the served level wins regardless.
+      await request(url)
+        .post(`/api/v1/community/posts/${cohort.expectedOrder[0]!}/opened`)
+        .set(as(viewer))
+        .send({ surface: 'spotlight', rank: 1, level: 'region' })
+        .expect(200)
+      expect(cohorts).not.toHaveBeenCalled()
+      expect(cohortAt).not.toHaveBeenCalled()
+      expect(ctx.analytics.map((event) => event.properties!.level)).toEqual(['region'])
+    } finally {
+      cohorts.mockRestore()
+      cohortAt.mockRestore()
+    }
   })
 
   it('6.6-HTTP-013 an installed client open keeps exactly the old community_card_opened', async () => {

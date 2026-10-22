@@ -89,10 +89,29 @@ export class CommunitySpotlightRepository {
 
   /**
    * The first saved location in `findViewerLocations` order whose country is
-   * usable, with its normalized hierarchical components. Null means `none`.
+   * usable, with its canonical hierarchical components. Null means `none`.
    */
   findAreaLocation(userId: string): Promise<SpotlightLocation | null> {
     return findSpotlightLocation(this.prisma, userId)
+  }
+
+  /**
+   * Counts one page-one read in the member's fixed one-minute window and
+   * returns the window's count, in one atomic statement: concurrent reads
+   * serialize on the member's row, so none is lost.
+   */
+  async recordPageOneRead(
+    userId: string,
+    now: Date
+  ): Promise<{ reads: number; windowStart: Date }> {
+    const [row] = await this.prisma.$queryRaw<{ reads: number; window_start: Date }[]>`
+      INSERT INTO "CommunitySpotlightReadWindow" AS w (user_id, window_start, reads)
+      VALUES (${userId}, date_trunc('minute', ${now.toISOString()}::timestamptz), 1)
+      ON CONFLICT (user_id) DO UPDATE SET
+        reads = CASE WHEN w.window_start = EXCLUDED.window_start THEN w.reads + 1 ELSE 1 END,
+        window_start = EXCLUDED.window_start
+      RETURNING reads, window_start`
+    return { reads: row!.reads, windowStart: row!.window_start }
   }
 
   /** Distinct eligible authors at every level of this area, from one statement. */

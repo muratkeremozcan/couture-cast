@@ -3,8 +3,10 @@
 import { BadRequestException } from '@nestjs/common'
 import { describe, expect, it, vi } from 'vitest'
 import type { CommunitySpotlight } from '@couture/api-client/contracts/http'
+import type { Response } from 'express'
 import type { RequestAuthContext } from '../auth/security.types'
 import { CommunityController } from './community.controller'
+import { CommunityRateLimitException } from './community-rate-limit.exception'
 import type { CommunityService } from './community.service'
 import type { CommunitySpotlightService } from './community-spotlight.service'
 
@@ -15,6 +17,12 @@ const page: CommunitySpotlight = {
   items: [],
   nextCursor: null,
 }
+
+function response() {
+  const setHeader = vi.fn()
+  return { setHeader, res: { setHeader } as unknown as Response }
+}
+const { res } = response()
 
 function controller() {
   const getSpotlight = vi.fn().mockResolvedValue(page)
@@ -34,7 +42,7 @@ function controller() {
 describe('6.6 spotlight controller', () => {
   it('6.6-UNIT-060 reads with the default limit and negotiates reactions like the feed', async () => {
     const { subject, getSpotlight } = controller()
-    await expect(subject.getSpotlight(auth, 'mobile', {})).resolves.toEqual({
+    await expect(subject.getSpotlight(auth, 'mobile', {}, res)).resolves.toEqual({
       data: page,
     })
     expect(getSpotlight).toHaveBeenLastCalledWith({
@@ -43,7 +51,7 @@ describe('6.6 spotlight controller', () => {
       cursor: undefined,
       limit: 6,
     })
-    await subject.getSpotlight(auth, 'web', { limit: '12', cursor: 'next' }, '1')
+    await subject.getSpotlight(auth, 'web', { limit: '12', cursor: 'next' }, res, '1')
     expect(getSpotlight).toHaveBeenLastCalledWith({
       userId: 'viewer-1',
       platform: 'web',
@@ -55,25 +63,54 @@ describe('6.6 spotlight controller', () => {
 
   it('6.6-UNIT-061 refuses a missing platform and limits outside 1 to 12', async () => {
     const { subject, getSpotlight } = controller()
-    await expect(subject.getSpotlight(auth, undefined, {})).rejects.toThrow(
+    await expect(subject.getSpotlight(auth, undefined, {}, res)).rejects.toThrow(
       BadRequestException
     )
     for (const limit of ['0', '13'])
-      await expect(subject.getSpotlight(auth, 'web', { limit })).rejects.toThrow(
+      await expect(subject.getSpotlight(auth, 'web', { limit }, res)).rejects.toThrow(
         BadRequestException
       )
     expect(getSpotlight).not.toHaveBeenCalled()
   })
 
+  it('6.6-UNIT-065 a page-one read over the limit answers 429 with Retry-After', async () => {
+    const { subject, getSpotlight } = controller()
+    const { setHeader, res: limited } = response()
+    getSpotlight.mockRejectedValueOnce(new CommunityRateLimitException('Too many', 37))
+    await expect(subject.getSpotlight(auth, 'web', {}, limited)).rejects.toBeInstanceOf(
+      CommunityRateLimitException
+    )
+    expect(setHeader).toHaveBeenCalledWith('Retry-After', '37')
+  })
+
   it('6.6-UNIT-062 routes a spotlight open to the spotlight service only', async () => {
     const { subject, recordOpened, recordCardOpened } = controller()
-    await subject.openPost(auth, 'post-1', 'web', { surface: 'spotlight', rank: 4 })
+    await subject.openPost(auth, 'post-1', 'web', {
+      surface: 'spotlight',
+      rank: 4,
+      level: 'region',
+    })
     expect(recordOpened).toHaveBeenCalledWith({
       userId: 'viewer-1',
       postId: 'post-1',
       platform: 'web',
       rank: 4,
+      level: 'region',
     })
+    expect(recordCardOpened).not.toHaveBeenCalled()
+  })
+
+  it('6.6-UNIT-064 refuses a spotlight open without a served level', async () => {
+    const { subject, recordOpened, recordCardOpened } = controller()
+    for (const body of [
+      { surface: 'spotlight', rank: 4 },
+      { surface: 'spotlight', rank: 4, level: 'none' },
+      { experimentVariant: 'auto', level: 'city' },
+    ])
+      await expect(subject.openPost(auth, 'post-1', 'web', body)).rejects.toThrow(
+        BadRequestException
+      )
+    expect(recordOpened).not.toHaveBeenCalled()
     expect(recordCardOpened).not.toHaveBeenCalled()
   })
 

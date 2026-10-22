@@ -31,6 +31,7 @@ import {
   communityReactionFeedResponseSchema,
   communityReactionSpotlightResponseSchema,
   type CommunityReactionSpotlight,
+  type CommunityServedSpotlightLevel,
   communityReactionPostResponseSchema,
   communityReactionResponseSchema,
   communityReactionConflictResponseSchema,
@@ -357,13 +358,14 @@ export async function recordCommunityCardOpenedFromMobile(
 }
 
 /**
- * Story 6.6: a spotlight card open. It carries the card's snapshot rank and no
- * experiment arm, and the server records only `community_spotlight_opened`
+ * Story 6.6: a spotlight card open. It carries the card's snapshot rank and
+ * the served level, and no experiment arm, and the server records only `community_spotlight_opened`
  * for it, never the feed's card open.
  */
 export async function recordCommunitySpotlightOpenedFromMobile(
   postId: string,
   rank: number,
+  level: CommunityServedSpotlightLevel,
   signal?: AbortSignal
 ): Promise<void> {
   const accessToken = await readAccessToken()
@@ -373,7 +375,7 @@ export async function recordCommunitySpotlightOpenedFromMobile(
         {
           postId,
           xCouturePlatform: 'mobile',
-          openCommunityPostInput: { surface: 'spotlight', rank },
+          openCommunityPostInput: { surface: 'spotlight', rank, level },
         },
         { signal: requestSignal }
       )

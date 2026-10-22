@@ -2,6 +2,8 @@
 import { HttpException, Inject, Injectable, Logger } from '@nestjs/common'
 import type { LookbookPost } from '@prisma/client'
 import {
+  COMMUNITY_SPOTLIGHT_PAGE_ONE_READS_PER_MINUTE,
+  COMMUNITY_SPOTLIGHT_RATE_LIMITED_MESSAGE,
   type CommunityPlatform,
   type CommunityReactionSpotlight as CommunitySpotlight,
   type CommunityReactionSpotlightItem as CommunitySpotlightItem,
@@ -9,7 +11,7 @@ import {
   type OpenCommunityPostResponse,
 } from '@couture/api-client/contracts/http'
 import { TelemetryService } from '../telemetry/telemetry.service.js'
-import { communitySubjectToken, postDedupeKey } from './community-analytics.js'
+import { communitySubjectToken, spotlightOpenDedupeKey } from './community-analytics.js'
 import {
   areaHash,
   availableAreaLevels,
@@ -39,6 +41,7 @@ import {
   CommunitySpotlightRepository,
   type SpotlightCohorts,
 } from './community-spotlight.repository.js'
+import { CommunityRateLimitException } from './community-rate-limit.exception.js'
 import { CommunityService } from './community.service.js'
 
 export interface CommunitySpotlightClock {
@@ -149,6 +152,7 @@ export class CommunitySpotlightService {
   }
 
   private async read(params: GetSpotlightParams): Promise<CommunitySpotlight> {
+    if (!params.cursor) await this.limitPageOneReads(params.userId)
     const asOf = spotlightAsOf(this.clock.now())
     // The level is resolved by a live cohort count BEFORE any pointer lookup,
     // so a level that fell below the cohort is never served from a pointer.
@@ -175,6 +179,21 @@ export class CommunitySpotlightService {
       label: viewerAreaLabel(viewer.location, snapshot.level),
       ...page,
     }
+  }
+
+  /**
+   * The privacy model's read limit: page one is where a member could probe
+   * the ranking repeatedly, so it is counted before any cohort query runs.
+   * Later pages page through a snapshot already served and are not counted.
+   */
+  private async limitPageOneReads(userId: string): Promise<void> {
+    const now = this.clock.now()
+    const { reads, windowStart } = await this.repository.recordPageOneRead(userId, now)
+    if (reads <= COMMUNITY_SPOTLIGHT_PAGE_ONE_READS_PER_MINUTE) return
+    throw new CommunityRateLimitException(
+      COMMUNITY_SPOTLIGHT_RATE_LIMITED_MESSAGE,
+      Math.max(1, Math.ceil((windowStart.getTime() + 60_000 - now.getTime()) / 1000))
+    )
   }
 
   private async resolveViewer(userId: string, asOf: Date): Promise<ViewerResolution> {
@@ -372,24 +391,22 @@ export class CommunitySpotlightService {
    * The spotlight branch of the opened endpoint. It records only
    * `community_spotlight_opened`, never `community_card_opened`.
    */
+  /**
+   * The served level and rank come from the validated body: the open records
+   * what the member saw, and runs no cohort query of its own.
+   */
   async recordOpened(params: {
     userId: string
     postId: string
     platform: CommunityPlatform
     rank: number
+    level: SpotlightAreaLevel
   }): Promise<OpenCommunityPostResponse> {
     await this.community.assertPublicPostReadable(params.userId, params.postId)
-    const viewer = await this.resolveViewer(
-      params.userId,
-      spotlightAsOf(this.clock.now())
-    )
     await this.capture(params.userId, 'community_spotlight_opened', {
       platform: params.platform,
-      dedupeKey: postDedupeKey(
-        `${params.postId}:${communitySubjectToken(params.userId)}:spotlight`,
-        'community_spotlight_opened'
-      ),
-      level: viewer.level,
+      dedupeKey: spotlightOpenDedupeKey(params.userId, params.postId),
+      level: params.level,
       rank: params.rank,
     })
     return { tracked: true }
