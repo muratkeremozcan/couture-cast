@@ -75,3 +75,7 @@ CLAUDE.md
 .codex/
 .antigravity/
 .gemini/
+
+# Raw per-story run evidence (logs, build outputs, worker copies). Summaries live in
+# _bmad-output/implementation-artifacts.
+_bmad-output/test-artifacts/story-*/

@@ -44,6 +44,11 @@ on:
         description: "Vercel team slug used for Preview URL resolution"
         required: false
         default: muratkeremozcans-projects
+      realtime_probe:
+        type: boolean
+        description: "Story 6.5 O1 hosted realtime probe run (preview only)"
+        required: false
+        default: false
     secrets:
       VERCEL_AUTOMATION_BYPASS_SECRET:
         required: false
@@ -55,7 +60,8 @@ on:
 jobs:
   e2e:
     runs-on: ubuntu-latest
-    timeout-minutes: 20
+    # The O1 probe holds one socket through the server's 295 s recycle (about 8 minutes).
+    timeout-minutes: ${{ inputs.realtime_probe && 30 || 20 }}
     env:
       LOCAL_DATABASE_URL: postgresql://postgres:postgres@127.0.0.1:54322/postgres
     permissions:
@@ -140,6 +146,13 @@ jobs:
           # bypass cookie it mints would be recorded in them.
           VERCEL_AUTOMATION_BYPASS_SECRET: ${{ inputs.test_env == 'preview' && secrets.VERCEL_AUTOMATION_BYPASS_SECRET || '' }}
           VERCEL_TOKEN: ${{ secrets.VERCEL_TOKEN }}
+          # O1 probe run only (opt-in for community-engagement-preview.spec.ts). The ids are
+          # non-secret repository variables: stable probe identities the owner targets with
+          # the community_read_enabled flag. PREVIEW_WEB_FIXTURE_AUTH enables the browser half.
+          O1_REALTIME_PROBE: ${{ inputs.test_env == 'preview' && inputs.realtime_probe && '1' || '' }}
+          PROBE_READER_USER_ID: ${{ inputs.test_env == 'preview' && inputs.realtime_probe && vars.PREVIEW_PROBE_READER_USER_ID || '' }}
+          PROBE_WRITER_USER_ID: ${{ inputs.test_env == 'preview' && inputs.realtime_probe && vars.PREVIEW_PROBE_WRITER_USER_ID || '' }}
+          PREVIEW_WEB_FIXTURE_AUTH: ${{ inputs.test_env == 'preview' && inputs.realtime_probe && vars.PREVIEW_WEB_FIXTURE_AUTH || '' }}
           VERCEL_WEB_PROJECT_SLUG: ${{ inputs.vercel_web_project_slug }}
           VERCEL_API_PROJECT_SLUG: ${{ inputs.vercel_api_project_slug }}
           VERCEL_TEAM_SLUG: ${{ inputs.vercel_team_slug }}
