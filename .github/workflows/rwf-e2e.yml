@@ -61,7 +61,11 @@ jobs:
   e2e:
     runs-on: ubuntu-latest
     # The O1 probe holds one socket through the server's 295 s recycle (about 8 minutes).
-    timeout-minutes: ${{ inputs.realtime_probe && 30 || 20 }}
+    # A local run starts Supabase: its 600 s start budget plus about 5 min of
+    # image cache restore and save on top of the full unsharded Playwright suite, which runs
+    # about twice one pr-pw-e2e-local shard's 9.1 min peak. Preview runs start
+    # nothing locally and keep their budgets.
+    timeout-minutes: ${{ inputs.test_env == 'local' && 40 || inputs.realtime_probe && 30 || 20 }}
     env:
       LOCAL_DATABASE_URL: postgresql://postgres:postgres@127.0.0.1:54322/postgres
     permissions:

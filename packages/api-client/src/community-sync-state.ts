@@ -12,6 +12,12 @@ import {
   type CommunityTransportState,
 } from './realtime/community-transport'
 export class CommunityRequestSuperseded extends Error {}
+/**
+ * Fallback polls start 5 to 5.5 s apart, start to start, while no socket serves the feed.
+ * A poll plus its 2 s request deadline then completes inside the 8 s verification bound.
+ */
+const FALLBACK_MIN_MS = 5000
+const FALLBACK_JITTER_MS = 500
 type Target = z.infer<typeof resolvedCommunityTargetSchema>
 type EventPage = Awaited<ReturnType<CommunitySyncClient['events']>>
 function responseStatus(error: unknown): unknown {
@@ -20,6 +26,16 @@ function responseStatus(error: unknown): unknown {
   return response && typeof response === 'object' && 'status' in response
     ? response.status
     : undefined
+}
+/** Whether the server answered: a generated response error, or an app error keeping its status. */
+function answered(error: unknown): boolean {
+  if (typeof responseStatus(error) === 'number') return true
+  return (
+    !!error &&
+    typeof error === 'object' &&
+    'httpStatus' in error &&
+    typeof error.httpStatus === 'number'
+  )
 }
 export type CommunitySyncCallbacks = {
   rendered: () => string[]
@@ -172,7 +188,10 @@ export class CommunitySyncState {
       this.stop()
     } else {
       this.connected = false
-      this.callbacks.availability('unavailable', false)
+      // Only a server answer says community is unavailable. A deadline abort, a network
+      // error or an unknown shape is transient: verified content stays until the D3 bound
+      // lapses, and the fallback retries meanwhile.
+      this.callbacks.availability(answered(error) ? 'unavailable' : 'recovering', false)
       this.scheduleFallback()
     }
   }
@@ -294,7 +313,7 @@ export class CommunitySyncState {
         this.scheduleFallback()
         void this.catchUp()
       },
-      7500 + Math.random() * 500
+      FALLBACK_MIN_MS + Math.random() * FALLBACK_JITTER_MS
     )
   }
 }

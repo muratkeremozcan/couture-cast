@@ -32,6 +32,21 @@ import {
 /** Postgres `insufficient_privilege`: the table is not granted to this role. */
 const PERMISSION_DENIED = '42501'
 
+/**
+ * A 42501 that names `table`. The code alone cannot tell this table's grant
+ * refusal from one raised by another relation the statement touches. Local
+ * Supabase grants `anon` no USAGE on `public`, so `anon` may be refused at the
+ * schema first; the catalog check in policy-matrix.spec.ts proves the table
+ * grant itself for both client roles.
+ */
+const refusedAtGrantOf =
+  (table: string, role: 'anon' | 'authenticated') =>
+  (error: unknown): boolean =>
+    error instanceof Error &&
+    (error as Error & { code?: string }).code === PERMISSION_DENIED &&
+    (error.message === `permission denied for table ${table}` ||
+      (role === 'anon' && error.message === 'permission denied for schema public'))
+
 describe.concurrent('community table RLS policies', () => {
   useRlsDatabase()
 
@@ -58,6 +73,51 @@ describe.concurrent('community table RLS policies', () => {
             }
           )
         }
+      }
+    }
+  )
+
+  scenarioTest(
+    '6.6-DB-RLS refuses every client role the spotlight invalidator cursor',
+    async ({ scenario }) => {
+      for (const role of ['anon', 'authenticated'] as const) {
+        await withRole(role, buildClaims(scenario.teenEmail, 'teen'), async (client) => {
+          await expect(
+            client.query('SELECT * FROM public."CommunitySpotlightCursor"')
+          ).rejects.toSatisfy(refusedAtGrantOf('CommunitySpotlightCursor', role))
+        })
+        await withRole(role, buildClaims(scenario.teenEmail, 'teen'), async (client) => {
+          await expect(
+            client.query(
+              `INSERT INTO public."CommunitySpotlightCursor" ("id", "epoch", "position")
+               VALUES ('public', gen_random_uuid(), 0)`
+            )
+          ).rejects.toSatisfy(refusedAtGrantOf('CommunitySpotlightCursor', role))
+        })
+      }
+    }
+  )
+
+  scenarioTest(
+    '6.6-DB-RLS-002 refuses every client role the spotlight read windows',
+    async ({ scenario }) => {
+      for (const role of ['anon', 'authenticated'] as const) {
+        await withRole(role, buildClaims(scenario.teenEmail, 'teen'), async (client) => {
+          await expect(
+            client.query('SELECT * FROM public."CommunitySpotlightReadWindow"')
+          ).rejects.toSatisfy(refusedAtGrantOf('CommunitySpotlightReadWindow', role))
+        })
+        // Literal VALUES and a bound id. An INSERT ... SELECT FROM "User" is refused
+        // at "User" for `authenticated`, which left this table's grant unproven.
+        await withRole(role, buildClaims(scenario.teenEmail, 'teen'), async (client) => {
+          await expect(
+            client.query(
+              `INSERT INTO public."CommunitySpotlightReadWindow" ("user_id", "window_start", "reads")
+               VALUES ($1, now(), 1)`,
+              [scenario.teenId]
+            )
+          ).rejects.toSatisfy(refusedAtGrantOf('CommunitySpotlightReadWindow', role))
+        })
       }
     }
   )

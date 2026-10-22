@@ -13,6 +13,10 @@ import {
   communityFeedModeSchema,
   communityPlatformSchema,
   communityReportReasonSchema,
+  communityServedSpotlightLevelSchema,
+  communitySpotlightLevelSchema,
+  COMMUNITY_SPOTLIGHT_MAX_LIMIT,
+  COMMUNITY_SPOTLIGHT_MAX_RANK,
 } from '../contracts/http/community'
 
 /** Story 0.7 owner file: analytics contracts + tracking wrappers.
@@ -113,6 +117,11 @@ export const analyticsEventNameSchema = z.enum([
   'community_reaction_replaced',
   'community_reaction_removed',
   'community_challenge_participated',
+  // Story 6.6. Server-side only, pseudonymous. Closed properties only: platform,
+  // dedupe key, level and an item count or rank. No area names, captions, media,
+  // coordinates or raw identifiers.
+  'community_spotlight_viewed',
+  'community_spotlight_opened',
 ])
 
 export type AnalyticsEventName = z.infer<typeof analyticsEventNameSchema>
@@ -819,6 +828,38 @@ export type CommunityPostWithdrawnEvent = z.infer<
   typeof communityPostWithdrawnEventSchema
 >
 
+// Story 6.6. A page-one spotlight read, deduplicated in ten-second buckets like
+// the feed view. `level` is the served level; `none` means no cohort was met.
+export const communitySpotlightViewedEventSchema = z
+  .object({
+    analyticsSubjectId: nonEmptyString,
+    platform: communityPlatformSchema,
+    dedupeKey: communityDedupeKeySchema,
+    level: communitySpotlightLevelSchema,
+    itemCount: z.number().int().min(0).max(COMMUNITY_SPOTLIGHT_MAX_LIMIT),
+  })
+  .strict()
+
+export type CommunitySpotlightViewedEvent = z.infer<
+  typeof communitySpotlightViewedEventSchema
+>
+
+// Story 6.6. A spotlight card open, deduplicated per post, viewer and surface.
+export const communitySpotlightOpenedEventSchema = z
+  .object({
+    analyticsSubjectId: nonEmptyString,
+    platform: communityPlatformSchema,
+    dedupeKey: communityDedupeKeySchema,
+    // Only a served level carries cards to open; `none` serves none.
+    level: communityServedSpotlightLevelSchema,
+    rank: z.number().int().min(1).max(COMMUNITY_SPOTLIGHT_MAX_RANK),
+  })
+  .strict()
+
+export type CommunitySpotlightOpenedEvent = z.infer<
+  typeof communitySpotlightOpenedEventSchema
+>
+
 /**
  * One per unique published participant, so the challenge count stays honest.
  *
@@ -925,6 +966,8 @@ export const analyticsEventSchemas = {
   community_post_reported: communityPostReportedEventSchema,
   community_post_withdrawn: communityPostWithdrawnEventSchema,
   community_challenge_participated: communityChallengeParticipatedEventSchema,
+  community_spotlight_viewed: communitySpotlightViewedEventSchema,
+  community_spotlight_opened: communitySpotlightOpenedEventSchema,
 }
 
 export const ritualCreatedPropertiesSchema = z.object({
@@ -2018,6 +2061,32 @@ export type CommunityPostWithdrawnProperties = z.infer<
   typeof communityPostWithdrawnPropertiesSchema
 >
 
+export const communitySpotlightViewedPropertiesSchema = z
+  .object({
+    platform: communityPlatformSchema,
+    dedupe_key: nonEmptyString,
+    level: communitySpotlightLevelSchema,
+    item_count: z.number().int().min(0).max(COMMUNITY_SPOTLIGHT_MAX_LIMIT),
+  })
+  .strict()
+
+export type CommunitySpotlightViewedProperties = z.infer<
+  typeof communitySpotlightViewedPropertiesSchema
+>
+
+export const communitySpotlightOpenedPropertiesSchema = z
+  .object({
+    platform: communityPlatformSchema,
+    dedupe_key: nonEmptyString,
+    level: communityServedSpotlightLevelSchema,
+    rank: z.number().int().min(1).max(COMMUNITY_SPOTLIGHT_MAX_RANK),
+  })
+  .strict()
+
+export type CommunitySpotlightOpenedProperties = z.infer<
+  typeof communitySpotlightOpenedPropertiesSchema
+>
+
 export const communityChallengeParticipatedPropertiesSchema = z
   .object({
     platform: communityPlatformSchema,
@@ -2320,6 +2389,46 @@ export function trackCommunityPostWithdrawn(
       platform: parsed.platform,
       dedupe_key: parsed.dedupeKey,
       climate_band: parsed.climateBand,
+    }),
+  }
+}
+
+export function trackCommunitySpotlightViewed(
+  event: CommunitySpotlightViewedEvent
+): AnalyticsCapturePayload<
+  'community_spotlight_viewed',
+  CommunitySpotlightViewedProperties
+> {
+  const parsed = communitySpotlightViewedEventSchema.parse(event)
+
+  return {
+    distinctId: parsed.analyticsSubjectId,
+    event: 'community_spotlight_viewed',
+    properties: communitySpotlightViewedPropertiesSchema.parse({
+      platform: parsed.platform,
+      dedupe_key: parsed.dedupeKey,
+      level: parsed.level,
+      item_count: parsed.itemCount,
+    }),
+  }
+}
+
+export function trackCommunitySpotlightOpened(
+  event: CommunitySpotlightOpenedEvent
+): AnalyticsCapturePayload<
+  'community_spotlight_opened',
+  CommunitySpotlightOpenedProperties
+> {
+  const parsed = communitySpotlightOpenedEventSchema.parse(event)
+
+  return {
+    distinctId: parsed.analyticsSubjectId,
+    event: 'community_spotlight_opened',
+    properties: communitySpotlightOpenedPropertiesSchema.parse({
+      platform: parsed.platform,
+      dedupe_key: parsed.dedupeKey,
+      level: parsed.level,
+      rank: parsed.rank,
     }),
   }
 }

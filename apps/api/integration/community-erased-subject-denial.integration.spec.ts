@@ -18,6 +18,11 @@ import { CommunityTargetsService } from '../src/modules/community/community-targ
 import { CommunityPreferencesService } from '../src/modules/community/community-preferences.service.js'
 import { CommunityController } from '../src/modules/community/community.controller.js'
 import { CommunityService } from '../src/modules/community/community.service.js'
+import {
+  CommunitySpotlightService,
+  systemSpotlightClock,
+} from '../src/modules/community/community-spotlight.service.js'
+import { CommunitySpotlightRepository } from '../src/modules/community/community-spotlight.repository.js'
 import { CommunityRepository } from '../src/modules/community/community.repository.js'
 import { CommunityStreamRepository } from '../src/modules/community/community-stream.repository.js'
 import { CommunityAccessService } from '../src/modules/community/community-access.service.js'
@@ -58,6 +63,16 @@ const community = new CommunityService(
   new InMemoryCommunityStorage(),
   outside as never
 )
+// Story 6.6: the spotlight shares the feed's read gate, so it must refuse the same way.
+const spotlightRepository = new CommunitySpotlightRepository(prisma)
+const spotlight = new CommunitySpotlightService(
+  spotlightRepository,
+  community,
+  outside as never,
+  outside as never,
+  systemSpotlightClock,
+  'unreachable'
+)
 const runtimes: ReturnType<typeof createCommunityRealtimeServer>[] = []
 const sockets: Socket[] = []
 let app: INestApplication
@@ -91,6 +106,7 @@ const routes = (owner: string) => ({
       body: JSON.stringify({ targets: [{ key: 'post', postId: 'lookbook-probe' }] }),
     }),
   feed: () => http('/api/v1/community/feed?mode=all&limit=12', owner),
+  spotlight: () => http('/api/v1/community/spotlight', owner),
 })
 function realtimeToken(owner: string) {
   return `e30.${Buffer.from(
@@ -129,6 +145,9 @@ async function untouched(owner: string) {
     await prisma.communityFlagEvaluation.count({ where: { member_id: owner } })
   ).toBe(0)
   expect(await prisma.communityStreamHead.count({ where: { owner_id: owner } })).toBe(0)
+  expect(
+    await prisma.communitySpotlightReadWindow.count({ where: { user_id: owner } })
+  ).toBe(0)
 }
 
 beforeAll(async () => {
@@ -151,6 +170,7 @@ beforeAll(async () => {
         useValue: new CommunityPreferencesService(prisma, access),
       },
       { provide: CommunityService, useValue: community },
+      { provide: CommunitySpotlightService, useValue: spotlight },
       { provide: AccessTokenIdentityService, useValue: identity },
       {
         provide: GuardianConsentStateService,
@@ -176,7 +196,7 @@ afterAll(async () => {
 })
 
 describe('6.5 F2 erased subject is a terminal typed denial on every shared authorization path', () => {
-  it.each(['preferences', 'targets', 'feed'] as const)(
+  it.each(['preferences', 'targets', 'feed', 'spotlight'] as const)(
     '%s answers 403 denied after same-session erasure and recreates nothing',
     async (route) => {
       const owner = await member()
@@ -189,6 +209,53 @@ describe('6.5 F2 erased subject is a terminal typed denial on every shared autho
       await untouched(owner.id)
     }
   )
+
+  it('erasure deletes the spotlight read window a first-page read left behind', async () => {
+    const owner = await member()
+    expect((await routes(owner.id).spotlight()).status).toBe(200)
+    expect(
+      await prisma.communitySpotlightReadWindow.count({ where: { user_id: owner.id } })
+    ).toBe(1)
+    await repository.requestErasureForUser(owner.id, new Date())
+    expect((await routes(owner.id).spotlight()).status).toBe(403)
+    await untouched(owner.id)
+  })
+
+  it('a spotlight read authorized before erasure never writes the erased member back', async () => {
+    const owner = await member()
+    expect((await routes(owner.id).preferences()).status).toBe(200)
+    // Hold the read after the read gate let it through, right before its
+    // limiter write, and commit the erasure in that gap.
+    // The real write, through an unspied repository on the same database.
+    const writer = new CommunitySpotlightRepository(prisma)
+    let release!: () => void
+    const held = new Promise<void>((resolve) => {
+      release = resolve
+    })
+    let reached!: () => void
+    const atWrite = new Promise<void>((resolve) => {
+      reached = resolve
+    })
+    const spy = vi
+      .spyOn(spotlightRepository, 'recordRead')
+      .mockImplementationOnce(async (userId: string, now: Date) => {
+        reached()
+        await held
+        return writer.recordRead(userId, now)
+      })
+    try {
+      const response = routes(owner.id).spotlight()
+      await atWrite
+      await repository.requestErasureForUser(owner.id, new Date())
+      release()
+      const refused = await response
+      expect(refused.status).toBe(403)
+      expect(await refused.json()).toEqual(DENIED)
+      await untouched(owner.id)
+    } finally {
+      spy.mockRestore()
+    }
+  })
 
   it('the realtime handshake of an erased member is refused with the denied control', async () => {
     const socketFor = await realtime()

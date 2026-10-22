@@ -145,6 +145,9 @@ export type ContractApiClient = Pick<
   | 'apiV1CommunityPostsPublishPost'
   | 'apiV1CommunityPostsPostIdReportPost'
   | 'apiV1CommunityChallengesPost'
+  // Story 6.6 City Spotlight and both branches of the opened endpoint.
+  | 'getCommunitySpotlight'
+  | 'apiV1CommunityPostsPostIdOpenedPost'
 >
 
 export type CreateClient = (mockServer: V3MockServer) => ContractApiClient

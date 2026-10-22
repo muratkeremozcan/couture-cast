@@ -98,6 +98,9 @@ export const workerOnlyTables = [
   'CommunityAlias',
   'CommunityPostReport',
   'ModerationEvent',
+  // Story 6.6: the spotlight invalidator cursor and the per-member read window.
+  'CommunitySpotlightCursor',
+  'CommunitySpotlightReadWindow',
 ] as const
 
 export const selfOnlyTables = [

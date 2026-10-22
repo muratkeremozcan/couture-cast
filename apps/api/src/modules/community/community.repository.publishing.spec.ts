@@ -15,6 +15,7 @@ describe('CommunityRepository publishing and erasure', () => {
       climateBand: 'temperate_dry' as const,
       locale: 'en-US',
       challengeId: null,
+      area: { country: null, region: null, city: null },
     }
 
     it('takes the per-user advisory lock before counting, inside one transaction', async () => {
@@ -140,6 +141,9 @@ describe('CommunityRepository publishing and erasure', () => {
           climate_band: 'temperate_dry',
           locale: 'en-US',
           challenge_id: null,
+          area_country: null,
+          area_region: null,
+          area_city: null,
           submitted_at: expect.any(Date) as Date,
           alt_text_confirmed_at: expect.any(Date) as Date,
         },
@@ -238,11 +242,14 @@ describe('CommunityRepository publishing and erasure', () => {
     })
 
     it('marks every post of a member that is not already counting down, and reports the count', async () => {
-      const { repo, lookbookPostUpdateMany } = createRepo()
+      const { repo, lookbookPostUpdateMany, spotlightReadWindowDeleteMany } = createRepo()
       lookbookPostUpdateMany.mockResolvedValueOnce({ count: 4 })
       const requestedAt = new Date('2026-09-06T10:00:00.000Z')
 
       await expect(repo.requestErasureForUser('user-1', requestedAt)).resolves.toBe(4)
+      expect(spotlightReadWindowDeleteMany).toHaveBeenCalledWith({
+        where: { user_id: 'user-1' },
+      })
 
       expect(lookbookPostUpdateMany).toHaveBeenCalledWith({
         where: { user_id: 'user-1', erasure_requested_at: null },

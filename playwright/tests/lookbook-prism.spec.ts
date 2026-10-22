@@ -96,6 +96,18 @@ communityTest.describe('Lookbook Prism Responsive Layout (3.5-E2E-001)', () => {
           return communityBox.x > heroBox.x
         })
         .toBe(true)
+      // The two columns share the row evenly and the community column stays on
+      // screen. A bare `1fr` track let the hero's chip row claim the whole row.
+      const evenColumns = async (viewportWidth: number) => {
+        const heroBox = await heroSection.boundingBox()
+        const communityBox = await communitySection.boundingBox()
+        if (!heroBox || !communityBox) return false
+        return (
+          Math.abs(heroBox.width - communityBox.width) <= 2 &&
+          communityBox.x + communityBox.width <= viewportWidth
+        )
+      }
+      await expect.poll(() => evenColumns(1280)).toBe(true)
       // Story 5.5 Decision 7: closed by default. Below 1440px the planner is
       // reachable as a focus-trapped overlay drawer.
       const plannerRail = page.getByRole('complementary', { name: /planner rail/i })
@@ -118,6 +130,7 @@ communityTest.describe('Lookbook Prism Responsive Layout (3.5-E2E-001)', () => {
           return box?.width ?? 0
         })
         .toBeGreaterThanOrEqual(1300)
+      await expect.poll(() => evenColumns(1440)).toBe(true)
 
       await log.step('Toggle comparison mode and verify comparison view container')
       const comparisonToggle = page.getByRole('button', { name: /comparison mode/i })

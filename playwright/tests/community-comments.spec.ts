@@ -1,5 +1,5 @@
 import { randomInt, randomUUID } from 'node:crypto'
-import { mergeTests, type Page } from '@playwright/test'
+import { mergeTests, type Locator, type Page } from '@playwright/test'
 import type {
   ApiRequestParams,
   ApiRequestResponse,
@@ -19,7 +19,7 @@ import {
 import { checkA11y, contrastRatio } from '../support/helpers/accessibility'
 import { authHeaders } from '../support/helpers/api-test'
 import {
-  COMMUNITY_FEED_URL,
+  completedCommunityFeed,
   communityApiTest,
   communityTest,
   expect,
@@ -146,14 +146,39 @@ async function settledSubmission(
   return items.find((item) => item.id === id)!
 }
 
+/**
+ * The thread's failure alert is transient by design: any refresh that succeeds
+ * clears it, and realtime can deliver one within the same second as the
+ * failure. Records every alert text the thread shows, for `expect.poll`.
+ */
+async function recordThreadAlerts(thread: Locator): Promise<() => Promise<string[]>> {
+  const key = `__threadAlerts${Math.random().toString(36).slice(2)}`
+  await thread.evaluate((element, name) => {
+    const seen: string[] = []
+    Object.assign(window, { [name]: seen })
+    new MutationObserver(() =>
+      element
+        .querySelectorAll('[role="alert"]')
+        .forEach((alert) => seen.push(alert.textContent ?? ''))
+    ).observe(element, { childList: true, subtree: true, characterData: true })
+  }, key)
+  return () =>
+    thread
+      .page()
+      .evaluate(
+        (name) => (window as unknown as Record<string, string[]>)[name] ?? [],
+        key
+      )
+}
+
 /** Network-first: every read the journey waits on is registered before it fires. */
 async function openThread(page: Page, interceptNetworkCall: InterceptNetworkCallFn) {
   const grid = page.getByTestId('community-card-grid')
-  const initialFeed = interceptNetworkCall({ method: 'GET', url: COMMUNITY_FEED_URL })
+  const initialFeed = completedCommunityFeed(page)
   await page.goto('/')
   expect((await initialFeed).status).toBe(200)
   await expect(grid).toHaveAttribute('aria-busy', 'false')
-  const allFeed = interceptNetworkCall({ method: 'GET', url: COMMUNITY_FEED_URL })
+  const allFeed = completedCommunityFeed(page, 'all')
   await page.getByTestId('community-filter-all').click()
   const acceptedFeed = await allFeed
   expect(acceptedFeed.status).toBe(200)
@@ -635,6 +660,7 @@ test.describe('Story 6.4 screened threaded comments', () => {
       },
     })
     await composer.fill(draft)
+    const alerts = await recordThreadAlerts(thread)
     await thread.getByRole('button', { name: 'Send comment', exact: true }).click()
     const { requestJson: firstRequest } = await lostCreate
     expect(firstRequest).toEqual({
@@ -643,9 +669,7 @@ test.describe('Story 6.4 screened threaded comments', () => {
       locale: 'en-US',
       parentId: null,
     })
-    await expect(thread.getByRole('alert')).toHaveText(
-      'Comments could not be updated. Try again.'
-    )
+    await expect.poll(alerts).toContain('Comments could not be updated. Try again.')
     await expect(
       thread.getByText(
         'An earlier request needs confirmation. Retry it before sending your edited draft.'
@@ -734,11 +758,10 @@ test.describe('Story 6.4 screened threaded comments', () => {
         }
       },
     })
+    const alerts = await recordThreadAlerts(thread)
     await entry.getByRole('button', { name: 'Send report', exact: true }).click()
     expect((await failedReport).requestJson).toEqual({ reason: 'harassment' })
-    await expect(thread.getByRole('alert')).toHaveText(
-      'Comments could not be updated. Try again.'
-    )
+    await expect.poll(alerts).toContain('Comments could not be updated. Try again.')
     await expect(reason).toHaveValue('harassment')
 
     await log.step('Retry: the report is accepted and routed within five minutes')

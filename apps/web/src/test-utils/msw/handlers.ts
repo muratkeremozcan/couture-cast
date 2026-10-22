@@ -6,6 +6,7 @@ import {
   communityCommentsResponseSchema,
   communityCommentSubmissionsResponseSchema,
   communityPostResponseSchema,
+  communitySpotlightResponseSchema,
   publishCommunityPostResponseSchema,
   reportCommunityPostResponseSchema,
   withdrawCommunityPostResponseSchema,
@@ -81,6 +82,16 @@ export const handlers = [
         experimentVariant: 'auto',
         activeChallenge: null,
       },
+    })
+  ),
+  /**
+   * Story 6.6. The grid reads the City Spotlight on mount beside the feed. The
+   * default is level `none`, the honest answer for a viewer with no cohort, so a
+   * suite that wants ranked looks installs its own fixture.
+   */
+  http.get('/api/v1/community/spotlight', () =>
+    communityJson(communitySpotlightResponseSchema, {
+      data: { level: 'none', label: null, items: [], nextCursor: null },
     })
   ),
   /**

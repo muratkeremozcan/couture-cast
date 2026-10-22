@@ -14,9 +14,12 @@ const choices = [
 export function CommunityReactions({
   item,
   controls,
+  scope = '',
 }: {
   item: CommunityReactionFeedItem
   controls: ReactionControls
+  /** Test id prefix, so the City Spotlight's copy of a post stays addressable. */
+  scope?: string
 }) {
   const { t } = useTranslation(undefined, { i18n: getI18n() })
   const { pending, errorKey, canRetry, onSubmit } = controls
@@ -28,7 +31,7 @@ export function CommunityReactions({
       aria-busy={pending}
       data-focus-surface="light"
       className="space-y-2 rounded-lg bg-[var(--theme-card-bg)] p-2"
-      data-testid={`community-reactions-${item.id}`}
+      data-testid={`${scope}community-reactions-${item.id}`}
     >
       <div
         role="group"

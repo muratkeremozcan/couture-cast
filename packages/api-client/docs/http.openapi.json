@@ -2,7 +2,7 @@
   "openapi": "3.1.0",
   "info": {
     "title": "CoutureCast HTTP API",
-    "version": "1.6.0",
+    "version": "1.7.0",
     "description": "Canonical HTTP contracts shared across API, web, mobile, and tests."
   },
   "servers": [
@@ -14666,6 +14666,717 @@
         ],
         "additionalProperties": false
       },
+      "CommunitySpotlightLevel": {
+        "type": "string",
+        "enum": [
+          "city",
+          "region",
+          "country",
+          "none"
+        ]
+      },
+      "CommunitySpotlightItem": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string",
+            "minLength": 1
+          },
+          "caption": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "altText": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "climateBand": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "description": "The climate band stamped when the post was published, or null if unclassified.",
+            "enum": [
+              "cold_wet",
+              "cold_dry",
+              "temperate_wet",
+              "temperate_dry",
+              "warm_wet",
+              "warm_dry",
+              null
+            ]
+          },
+          "imageAccess": {
+            "type": "object",
+            "properties": {
+              "url": {
+                "type": "string",
+                "format": "uri"
+              },
+              "expiresAt": {
+                "type": "string",
+                "format": "date-time"
+              }
+            },
+            "required": [
+              "url",
+              "expiresAt"
+            ],
+            "additionalProperties": false
+          },
+          "publishedAt": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "format": "date-time"
+          },
+          "createdAt": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "status": {
+            "type": "string",
+            "enum": [
+              "draft",
+              "uploading",
+              "pending_review",
+              "published",
+              "flagged",
+              "review_failed",
+              "withdrawn",
+              "consent_suspended"
+            ]
+          },
+          "challengeId": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "author": {
+            "type": "object",
+            "properties": {
+              "displayName": {
+                "type": "string",
+                "minLength": 1
+              },
+              "isSelf": {
+                "type": "boolean"
+              }
+            },
+            "required": [
+              "displayName",
+              "isSelf"
+            ],
+            "additionalProperties": false
+          },
+          "rank": {
+            "type": "integer",
+            "minimum": 1,
+            "maximum": 60,
+            "description": "One-based position of the post in the ranked snapshot."
+          }
+        },
+        "required": [
+          "id",
+          "caption",
+          "altText",
+          "climateBand",
+          "imageAccess",
+          "publishedAt",
+          "createdAt",
+          "status",
+          "challengeId",
+          "author",
+          "rank"
+        ],
+        "additionalProperties": false
+      },
+      "CommunityReactionSpotlightItem": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string",
+            "minLength": 1
+          },
+          "caption": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "altText": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "climateBand": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "description": "The climate band stamped when the post was published, or null if unclassified.",
+            "enum": [
+              "cold_wet",
+              "cold_dry",
+              "temperate_wet",
+              "temperate_dry",
+              "warm_wet",
+              "warm_dry",
+              null
+            ]
+          },
+          "imageAccess": {
+            "type": "object",
+            "properties": {
+              "url": {
+                "type": "string",
+                "format": "uri"
+              },
+              "expiresAt": {
+                "type": "string",
+                "format": "date-time"
+              }
+            },
+            "required": [
+              "url",
+              "expiresAt"
+            ],
+            "additionalProperties": false
+          },
+          "publishedAt": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "format": "date-time"
+          },
+          "createdAt": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "status": {
+            "type": "string",
+            "enum": [
+              "draft",
+              "uploading",
+              "pending_review",
+              "published",
+              "flagged",
+              "review_failed",
+              "withdrawn",
+              "consent_suspended"
+            ]
+          },
+          "challengeId": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "author": {
+            "type": "object",
+            "properties": {
+              "displayName": {
+                "type": "string",
+                "minLength": 1
+              },
+              "isSelf": {
+                "type": "boolean"
+              }
+            },
+            "required": [
+              "displayName",
+              "isSelf"
+            ],
+            "additionalProperties": false
+          },
+          "reactions": {
+            "type": "object",
+            "properties": {
+              "counts": {
+                "type": "object",
+                "properties": {
+                  "applause": {
+                    "type": "integer",
+                    "minimum": 0
+                  },
+                  "love": {
+                    "type": "integer",
+                    "minimum": 0
+                  },
+                  "inspiration": {
+                    "type": "integer",
+                    "minimum": 0
+                  }
+                },
+                "required": [
+                  "applause",
+                  "love",
+                  "inspiration"
+                ],
+                "additionalProperties": false
+              },
+              "total": {
+                "type": "integer",
+                "minimum": 0
+              },
+              "viewerReaction": {
+                "type": [
+                  "string",
+                  "null"
+                ],
+                "enum": [
+                  "applause",
+                  "love",
+                  "inspiration",
+                  null
+                ]
+              },
+              "revision": {
+                "type": "integer",
+                "minimum": 0
+              },
+              "generation": {
+                "type": "integer",
+                "minimum": 0
+              }
+            },
+            "required": [
+              "counts",
+              "total",
+              "viewerReaction",
+              "revision",
+              "generation"
+            ],
+            "additionalProperties": false,
+            "description": "An authoritative single-snapshot reaction summary. total must equal the sum of applause, love and inspiration counts. revision persists after removal; generation advances on reactions, visibility and erasure changes."
+          },
+          "rank": {
+            "type": "integer",
+            "minimum": 1,
+            "maximum": 60,
+            "description": "One-based position of the post in the ranked snapshot."
+          }
+        },
+        "required": [
+          "id",
+          "caption",
+          "altText",
+          "climateBand",
+          "imageAccess",
+          "publishedAt",
+          "createdAt",
+          "status",
+          "challengeId",
+          "author",
+          "rank"
+        ],
+        "additionalProperties": false
+      },
+      "CommunitySpotlightResponse": {
+        "type": "object",
+        "properties": {
+          "data": {
+            "type": "object",
+            "properties": {
+              "level": {
+                "type": "string",
+                "enum": [
+                  "city",
+                  "region",
+                  "country",
+                  "none"
+                ]
+              },
+              "label": {
+                "type": [
+                  "string",
+                  "null"
+                ],
+                "description": "The viewer's own place name at the ranked level, or null for none. Never derived from authors."
+              },
+              "items": {
+                "type": "array",
+                "items": {
+                  "type": "object",
+                  "properties": {
+                    "id": {
+                      "type": "string",
+                      "minLength": 1
+                    },
+                    "caption": {
+                      "type": [
+                        "string",
+                        "null"
+                      ]
+                    },
+                    "altText": {
+                      "type": [
+                        "string",
+                        "null"
+                      ]
+                    },
+                    "climateBand": {
+                      "type": [
+                        "string",
+                        "null"
+                      ],
+                      "description": "The climate band stamped when the post was published, or null if unclassified.",
+                      "enum": [
+                        "cold_wet",
+                        "cold_dry",
+                        "temperate_wet",
+                        "temperate_dry",
+                        "warm_wet",
+                        "warm_dry",
+                        null
+                      ]
+                    },
+                    "imageAccess": {
+                      "type": "object",
+                      "properties": {
+                        "url": {
+                          "type": "string",
+                          "format": "uri"
+                        },
+                        "expiresAt": {
+                          "type": "string",
+                          "format": "date-time"
+                        }
+                      },
+                      "required": [
+                        "url",
+                        "expiresAt"
+                      ],
+                      "additionalProperties": false
+                    },
+                    "publishedAt": {
+                      "type": [
+                        "string",
+                        "null"
+                      ],
+                      "format": "date-time"
+                    },
+                    "createdAt": {
+                      "type": "string",
+                      "format": "date-time"
+                    },
+                    "status": {
+                      "type": "string",
+                      "enum": [
+                        "draft",
+                        "uploading",
+                        "pending_review",
+                        "published",
+                        "flagged",
+                        "review_failed",
+                        "withdrawn",
+                        "consent_suspended"
+                      ]
+                    },
+                    "challengeId": {
+                      "type": [
+                        "string",
+                        "null"
+                      ]
+                    },
+                    "author": {
+                      "type": "object",
+                      "properties": {
+                        "displayName": {
+                          "type": "string",
+                          "minLength": 1
+                        },
+                        "isSelf": {
+                          "type": "boolean"
+                        }
+                      },
+                      "required": [
+                        "displayName",
+                        "isSelf"
+                      ],
+                      "additionalProperties": false
+                    },
+                    "rank": {
+                      "type": "integer",
+                      "minimum": 1,
+                      "maximum": 60,
+                      "description": "One-based position of the post in the ranked snapshot."
+                    }
+                  },
+                  "required": [
+                    "id",
+                    "caption",
+                    "altText",
+                    "climateBand",
+                    "imageAccess",
+                    "publishedAt",
+                    "createdAt",
+                    "status",
+                    "challengeId",
+                    "author",
+                    "rank"
+                  ],
+                  "additionalProperties": false
+                }
+              },
+              "nextCursor": {
+                "type": [
+                  "string",
+                  "null"
+                ]
+              }
+            },
+            "required": [
+              "level",
+              "label",
+              "items",
+              "nextCursor"
+            ],
+            "additionalProperties": false
+          }
+        },
+        "required": [
+          "data"
+        ],
+        "additionalProperties": false
+      },
+      "CommunityReactionSpotlightResponse": {
+        "type": "object",
+        "properties": {
+          "data": {
+            "type": "object",
+            "properties": {
+              "level": {
+                "type": "string",
+                "enum": [
+                  "city",
+                  "region",
+                  "country",
+                  "none"
+                ]
+              },
+              "label": {
+                "type": [
+                  "string",
+                  "null"
+                ],
+                "description": "The viewer's own place name at the ranked level, or null for none. Never derived from authors."
+              },
+              "items": {
+                "type": "array",
+                "items": {
+                  "type": "object",
+                  "properties": {
+                    "id": {
+                      "type": "string",
+                      "minLength": 1
+                    },
+                    "caption": {
+                      "type": [
+                        "string",
+                        "null"
+                      ]
+                    },
+                    "altText": {
+                      "type": [
+                        "string",
+                        "null"
+                      ]
+                    },
+                    "climateBand": {
+                      "type": [
+                        "string",
+                        "null"
+                      ],
+                      "description": "The climate band stamped when the post was published, or null if unclassified.",
+                      "enum": [
+                        "cold_wet",
+                        "cold_dry",
+                        "temperate_wet",
+                        "temperate_dry",
+                        "warm_wet",
+                        "warm_dry",
+                        null
+                      ]
+                    },
+                    "imageAccess": {
+                      "type": "object",
+                      "properties": {
+                        "url": {
+                          "type": "string",
+                          "format": "uri"
+                        },
+                        "expiresAt": {
+                          "type": "string",
+                          "format": "date-time"
+                        }
+                      },
+                      "required": [
+                        "url",
+                        "expiresAt"
+                      ],
+                      "additionalProperties": false
+                    },
+                    "publishedAt": {
+                      "type": [
+                        "string",
+                        "null"
+                      ],
+                      "format": "date-time"
+                    },
+                    "createdAt": {
+                      "type": "string",
+                      "format": "date-time"
+                    },
+                    "status": {
+                      "type": "string",
+                      "enum": [
+                        "draft",
+                        "uploading",
+                        "pending_review",
+                        "published",
+                        "flagged",
+                        "review_failed",
+                        "withdrawn",
+                        "consent_suspended"
+                      ]
+                    },
+                    "challengeId": {
+                      "type": [
+                        "string",
+                        "null"
+                      ]
+                    },
+                    "author": {
+                      "type": "object",
+                      "properties": {
+                        "displayName": {
+                          "type": "string",
+                          "minLength": 1
+                        },
+                        "isSelf": {
+                          "type": "boolean"
+                        }
+                      },
+                      "required": [
+                        "displayName",
+                        "isSelf"
+                      ],
+                      "additionalProperties": false
+                    },
+                    "reactions": {
+                      "type": "object",
+                      "properties": {
+                        "counts": {
+                          "type": "object",
+                          "properties": {
+                            "applause": {
+                              "type": "integer",
+                              "minimum": 0
+                            },
+                            "love": {
+                              "type": "integer",
+                              "minimum": 0
+                            },
+                            "inspiration": {
+                              "type": "integer",
+                              "minimum": 0
+                            }
+                          },
+                          "required": [
+                            "applause",
+                            "love",
+                            "inspiration"
+                          ],
+                          "additionalProperties": false
+                        },
+                        "total": {
+                          "type": "integer",
+                          "minimum": 0
+                        },
+                        "viewerReaction": {
+                          "type": [
+                            "string",
+                            "null"
+                          ],
+                          "enum": [
+                            "applause",
+                            "love",
+                            "inspiration",
+                            null
+                          ]
+                        },
+                        "revision": {
+                          "type": "integer",
+                          "minimum": 0
+                        },
+                        "generation": {
+                          "type": "integer",
+                          "minimum": 0
+                        }
+                      },
+                      "required": [
+                        "counts",
+                        "total",
+                        "viewerReaction",
+                        "revision",
+                        "generation"
+                      ],
+                      "additionalProperties": false,
+                      "description": "An authoritative single-snapshot reaction summary. total must equal the sum of applause, love and inspiration counts. revision persists after removal; generation advances on reactions, visibility and erasure changes."
+                    },
+                    "rank": {
+                      "type": "integer",
+                      "minimum": 1,
+                      "maximum": 60,
+                      "description": "One-based position of the post in the ranked snapshot."
+                    }
+                  },
+                  "required": [
+                    "id",
+                    "caption",
+                    "altText",
+                    "climateBand",
+                    "imageAccess",
+                    "publishedAt",
+                    "createdAt",
+                    "status",
+                    "challengeId",
+                    "author",
+                    "rank"
+                  ],
+                  "additionalProperties": false
+                }
+              },
+              "nextCursor": {
+                "type": [
+                  "string",
+                  "null"
+                ]
+              }
+            },
+            "required": [
+              "level",
+              "label",
+              "items",
+              "nextCursor"
+            ],
+            "additionalProperties": false
+          }
+        },
+        "required": [
+          "data"
+        ],
+        "additionalProperties": false
+      },
       "OpenCommunityPostInput": {
         "type": "object",
         "properties": {
@@ -14675,12 +15386,29 @@
               "auto",
               "all"
             ]
+          },
+          "surface": {
+            "type": "string",
+            "enum": [
+              "spotlight"
+            ]
+          },
+          "rank": {
+            "type": "integer",
+            "minimum": 1,
+            "maximum": 60
+          },
+          "level": {
+            "type": "string",
+            "enum": [
+              "city",
+              "region",
+              "country"
+            ]
           }
         },
-        "required": [
-          "experimentVariant"
-        ],
-        "additionalProperties": false
+        "additionalProperties": false,
+        "description": "Either a feed open with experimentVariant, or a spotlight open with surface spotlight, a rank from 1 to 60 and the served level. The two forms never mix."
       },
       "UpdateCommunityChallengeInput": {
         "type": "object",
@@ -22460,6 +23188,243 @@
         }
       }
     },
+    "/api/v1/community/spotlight": {
+      "get": {
+        "tags": [
+          "community"
+        ],
+        "operationId": "getCommunitySpotlight",
+        "summary": "Read the City Spotlight for the viewer area",
+        "description": "Returns recent published looks from the viewer’s coarse area ranked by non-author reactions and recency. The narrowest of city, region and country with at least five distinct eligible authors is used; otherwise level is none with no items. Read authorization and rollout rules match the feed.",
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "x-couture-reactions",
+            "in": "header",
+            "required": false,
+            "schema": {
+              "type": "string",
+              "enum": [
+                "1"
+              ]
+            },
+            "description": "Opt in to live reaction summaries on each item, exactly like the feed."
+          },
+          {
+            "name": "x-couture-platform",
+            "in": "header",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "enum": [
+                "web",
+                "mobile"
+              ]
+            },
+            "description": "Platform making the request."
+          },
+          {
+            "name": "cursor",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "string"
+            },
+            "description": "Opaque signed cursor from a previous page. It is bound to the member, level, area and ranked snapshot; a cursor that no longer matches returns 400 invalid_cursor and paging restarts from the first page."
+          },
+          {
+            "name": "limit",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "integer",
+              "minimum": 1,
+              "maximum": 12,
+              "default": 6
+            },
+            "description": "Number of ranked positions to read (1-12, default 6)."
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "City Spotlight page.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "anyOf": [
+                    {
+                      "$ref": "#/components/schemas/CommunitySpotlightResponse"
+                    },
+                    {
+                      "$ref": "#/components/schemas/CommunityReactionSpotlightResponse"
+                    }
+                  ]
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Invalid query, or a cursor that is malformed, foreign or stale.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "anyOf": [
+                    {
+                      "$ref": "#/components/schemas/BadRequestHttpError"
+                    },
+                    {
+                      "type": "object",
+                      "properties": {
+                        "statusCode": {
+                          "type": "number",
+                          "enum": [
+                            400
+                          ]
+                        },
+                        "code": {
+                          "type": "string",
+                          "enum": [
+                            "invalid_cursor"
+                          ]
+                        },
+                        "message": {
+                          "type": "string",
+                          "minLength": 1
+                        }
+                      },
+                      "required": [
+                        "statusCode",
+                        "code",
+                        "message"
+                      ],
+                      "additionalProperties": false
+                    }
+                  ]
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Missing or invalid authentication headers.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/UnauthorizedHttpError"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "The community read rollout or age eligibility refuses this viewer.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "statusCode": {
+                      "type": "number",
+                      "enum": [
+                        403
+                      ]
+                    },
+                    "code": {
+                      "type": "string"
+                    },
+                    "message": {
+                      "type": "string",
+                      "minLength": 1
+                    },
+                    "error": {
+                      "type": "string"
+                    }
+                  },
+                  "required": [
+                    "statusCode",
+                    "message"
+                  ],
+                  "additionalProperties": false
+                }
+              }
+            }
+          },
+          "429": {
+            "description": "30 spotlight reads per member per minute, first and later pages alike.",
+            "headers": {
+              "Retry-After": {
+                "description": "Seconds until the member may read the spotlight again.",
+                "schema": {
+                  "type": "integer",
+                  "minimum": 1
+                }
+              }
+            },
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/TooManyRequestsHttpError"
+                }
+              }
+            }
+          },
+          "500": {
+            "description": "Internal server error occurred.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/InternalServerErrorHttpError"
+                }
+              }
+            }
+          },
+          "503": {
+            "description": "Access could not be verified within the authorization budget.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "statusCode": {
+                      "type": "number",
+                      "enum": [
+                        503
+                      ]
+                    },
+                    "code": {
+                      "type": "string",
+                      "enum": [
+                        "unavailable"
+                      ]
+                    },
+                    "retryAfterSeconds": {
+                      "type": "integer",
+                      "minimum": 1
+                    },
+                    "message": {
+                      "type": "string",
+                      "minLength": 1
+                    },
+                    "error": {
+                      "type": "string"
+                    }
+                  },
+                  "required": [
+                    "statusCode",
+                    "code",
+                    "retryAfterSeconds",
+                    "message"
+                  ],
+                  "additionalProperties": false
+                }
+              }
+            }
+          }
+        }
+      }
+    },
     "/api/v1/community/posts/allocate": {
       "post": {
         "tags": [
@@ -23187,7 +24152,7 @@
           "community"
         ],
         "summary": "Record that a viewer opened a community post",
-        "description": "Records one card-open. The server decides whether the opener is the author, because a client-asserted is-self flag would let the beta gate be moved by the population it measures. Repeats within the deduplication window collapse to one event.",
+        "description": "Records one card-open. The server decides whether the opener is the author, because a client-asserted is-self flag would let the beta gate be moved by the population it measures. Repeats within the deduplication window collapse to one event. A body with surface spotlight and a rank records only a spotlight open; a body without surface keeps the feed card-open behavior.",
         "security": [
           {
             "bearerAuth": []
@@ -23239,7 +24204,7 @@
             }
           },
           "400": {
-            "description": "Missing or invalid x-couture-platform header, or an invalid request body.",
+            "description": "Missing or invalid x-couture-platform header, or an invalid request body, including a spotlight rank outside 1 to 60.",
             "content": {
               "application/json": {
                 "schema": {

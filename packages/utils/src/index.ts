@@ -83,3 +83,12 @@ export type { Lab, SkinDepth, SkinUndertone } from './skin-tone'
 
 export { CLIMATE_BANDS, ORDERED_CLIMATE_BANDS, classifyClimateBand } from './climate-band'
 export type { ClimateBand, ClimateBandDay } from './climate-band'
+
+export {
+  canonicalCountryCode,
+  canonicalSpotlightArea,
+  foldAreaComponent,
+  SPOTLIGHT_COUNTRY_LOCALES,
+  spotlightCountryCodes,
+} from './spotlight-area'
+export type { CanonicalSpotlightArea, SpotlightAreaSource } from './spotlight-area'

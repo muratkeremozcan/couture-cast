@@ -13,6 +13,7 @@ export const createRepo = () => {
   const lookbookPostCreate = vi.fn()
   const lookbookPostUpdate = vi.fn()
   const lookbookPostUpdateMany = vi.fn()
+  const spotlightReadWindowDeleteMany = vi.fn().mockResolvedValue({ count: 0 })
   const communityChallengeFindFirst = vi.fn()
   const communityChallengeFindUnique = vi.fn()
   const communityChallengeCreate = vi.fn()
@@ -50,6 +51,7 @@ export const createRepo = () => {
     communityReaction: { deleteMany: vi.fn().mockResolvedValue({ count: 0 }) },
     communityReactionReceipt: { deleteMany: vi.fn().mockResolvedValue({ count: 0 }) },
     communityReactionOutbox: { deleteMany: vi.fn().mockResolvedValue({ count: 0 }) },
+    communitySpotlightReadWindow: { deleteMany: spotlightReadWindowDeleteMany },
     savedLocation: { findMany: savedLocationFindMany },
     lookbookPost: {
       findMany: lookbookPostFindMany,
@@ -124,6 +126,7 @@ export const createRepo = () => {
     lookbookPostCreate,
     lookbookPostUpdate,
     lookbookPostUpdateMany,
+    spotlightReadWindowDeleteMany,
     communityChallengeFindFirst,
     communityChallengeFindUnique,
     communityChallengeCreate,

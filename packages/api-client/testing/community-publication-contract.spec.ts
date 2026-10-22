@@ -5,6 +5,7 @@ import {
   createCommunityChallengeInputSchema,
   ianaTimeZoneSchema,
   openCommunityPostInputSchema,
+  isSpotlightOpenInput,
   publishCommunityPostInputSchema,
   updateCommunityChallengeInputSchema,
 } from '../src/contracts/http'
@@ -62,13 +63,12 @@ describe('community HTTP contracts', () => {
       // attribute the open to an assignment that changed after the feed read.
       // Whether the opener is the author stays server-decided, so a client
       // cannot send that judgement in beside it.
-      expect(
-        openCommunityPostInputSchema.parse({ experimentVariant: 'auto' })
-          .experimentVariant
-      ).toBe('auto')
-      expect(
-        openCommunityPostInputSchema.parse({ experimentVariant: 'all' }).experimentVariant
-      ).toBe('all')
+      expect(openCommunityPostInputSchema.parse({ experimentVariant: 'auto' })).toEqual({
+        experimentVariant: 'auto',
+      })
+      expect(openCommunityPostInputSchema.parse({ experimentVariant: 'all' })).toEqual({
+        experimentVariant: 'all',
+      })
 
       expect(openCommunityPostInputSchema.safeParse({}).success).toBe(false)
       expect(
@@ -81,6 +81,49 @@ describe('community HTTP contracts', () => {
           isSelf: false,
         }).success
       ).toBe(false)
+    })
+
+    it('6.6-CON-001 accepts the spotlight branch only with a rank from 1 to 60, a served level and no variant', () => {
+      expect(
+        openCommunityPostInputSchema.parse({
+          surface: 'spotlight',
+          rank: 1,
+          level: 'city',
+        })
+      ).toEqual({
+        surface: 'spotlight',
+        rank: 1,
+        level: 'city',
+      })
+      for (const level of ['city', 'region', 'country'])
+        expect(
+          openCommunityPostInputSchema.safeParse({
+            surface: 'spotlight',
+            rank: 60,
+            level,
+          }).success
+        ).toBe(true)
+      for (const rank of [0, 61, 1.5, '1'])
+        expect(
+          openCommunityPostInputSchema.safeParse({
+            surface: 'spotlight',
+            rank,
+            level: 'city',
+          }).success
+        ).toBe(false)
+      for (const body of [
+        { surface: 'spotlight', rank: 3 },
+        { surface: 'spotlight', rank: 3, level: 'none' },
+        { surface: 'spotlight', rank: 3, level: 'planet' },
+        { surface: 'spotlight', rank: 3, level: 'city', experimentVariant: 'auto' },
+        { experimentVariant: 'auto', level: 'city' },
+        { surface: 'feed', rank: 3, level: 'city' },
+      ])
+        expect(openCommunityPostInputSchema.safeParse(body).success).toBe(false)
+      expect(
+        isSpotlightOpenInput({ surface: 'spotlight', rank: 2, level: 'region' })
+      ).toBe(true)
+      expect(isSpotlightOpenInput({ experimentVariant: 'auto' })).toBe(false)
     })
   })
 

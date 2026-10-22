@@ -279,6 +279,7 @@ model User {
   community_delivery_subject          CommunitySubject?
   community_notification_preference   CommunityNotificationPreference?
   community_alias                     CommunityAlias?
+  community_spotlight_read_window     CommunitySpotlightReadWindow?
   community_reports_filed             CommunityPostReport[]             @relation("CommunityReporter")
 }
 
@@ -603,6 +604,14 @@ model LookbookPost {
   location_key                 String?
   locale                       String?
   climate_band                 ClimateBand?
+  /// Story 6.6 coarse area components, normalized (trimmed, NFKC, lowercased)
+  /// and stamped at submission from the author's chosen saved location. Only a
+  /// hierarchical prefix is stored (CHECK `LookbookPost_area_hierarchical`), and
+  /// anonymization clears them with `location_key` (CHECK
+  /// `LookbookPost_area_cleared_when_anonymized`).
+  area_country                 String?
+  area_region                  String?
+  area_city                    String?
   palette_insight              PaletteInsights?           @relation("LookbookPalette", fields: [palette_insight_id], references: [id])
   palette_insight_id           String?
   challenge                    CommunityChallenge?        @relation(fields: [challenge_id], references: [id], onDelete: SetNull)
@@ -640,6 +649,26 @@ model LookbookPost {
   @@index([upload_expires_at])
   @@index([user_id, submitted_at(sort: Desc)])
   @@index([erasure_requested_at, objects_purged_at])
+  /// Three indexes on this table are deliberately NOT declared here, all
+  /// partial on the public visibility predicate (status = 'published' AND
+  /// published_at IS NOT NULL AND erasure_requested_at IS NULL AND
+  /// anonymized_at IS NULL) plus one area component IS NOT NULL:
+  ///
+  ///   LookbookPost_spotlight_area_window_idx
+  ///     ON (area_country, area_region, area_city, published_at DESC)
+  ///   LookbookPost_spotlight_region_window_idx
+  ///     ON (area_country, area_region, published_at DESC)
+  ///     INCLUDE (area_city, user_id, reaction_generation)
+  ///   LookbookPost_spotlight_country_window_idx
+  ///     ON (area_country, published_at DESC)
+  ///     INCLUDE (area_region, area_city, user_id, reaction_generation)
+  ///
+  /// created by 20261022120000_community_city_spotlight and
+  /// 20261022140000_community_spotlight_window_indexes for windowed spotlight
+  /// reads at city, region and country level. They are PARTIAL and the Prisma
+  /// DSL cannot say `WHERE`; see the AffiliateOffer comment for why an
+  /// undeclared partial index is the honest description. The spotlight
+  /// integration suite guards the objects themselves.
 }
 
 /// Story 6.1: the persisted pseudonym a community post is attributed to.
@@ -1484,6 +1513,10 @@ model CommunityReaction {
 
   @@id([user_id, post_id])
   @@index([post_id, selection])
+  /// Also undeclared because it is PARTIAL: CommunityReaction_spotlight_post_idx
+  /// ON (post_id) INCLUDE (user_id) WHERE selection IS NOT NULL, from
+  /// 20261022140000_community_spotlight_window_indexes, for index-only
+  /// non-author reaction counts. The spotlight integration suite guards it.
 }
 
 /// Payload-bound accepted requests. Retention is 30 days.
@@ -1696,6 +1729,25 @@ model CommunityDomainOutbox {
   @@index([appended_at, created_at, id])
 }
 
+/// Story 6.6: the spotlight invalidator's durable cursor over the public
+/// stream. API-only: RLS is enabled with zero policies and no client grants.
+model CommunitySpotlightCursor {
+  id         String   @id
+  epoch      String   @db.Uuid
+  position   BigInt
+  updated_at DateTime @default(now())
+}
+
+/// Story 6.6: one fixed one-minute window of spotlight reads per
+/// member, for the privacy model's read limit. API-only: RLS is enabled with
+/// zero policies and no client grants.
+model CommunitySpotlightReadWindow {
+  user_id      String   @id
+  user         User     @relation(fields: [user_id], references: [id], onDelete: Cascade)
+  window_start DateTime @db.Timestamptz(6)
+  reads        Int
+}
+
 model CommunityStreamEvent {
   id               String              @id @default(uuid()) @db.Uuid
   source_outbox_id String              @unique @db.Uuid
@@ -1827,7 +1879,7 @@ model CommunityRuntimeCapability {
 
 /// Anonymous operational outcomes. Random IDs dedupe delivery without subject correlation.
 model CommunityEngagementTelemetry {
-  id                  String    @id @default(uuid()) @db.Uuid
+  id                  String    @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
   event_type          String
   outcome             String
   reason              String?
@@ -1850,7 +1902,7 @@ model CommunityEngagementTelemetry {
 
 /// Server-only policy-derived deadline history. Identified solely through its guarded group.
 model CommunityEligibilityChange {
-  id String @id @default(uuid()) @db.Uuid
+  id String @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
   group_id String @db.Uuid
   group CommunityNotificationGroup @relation(fields: [group_id], references: [id], onDelete: Cascade)
   recorded_at DateTime @default(now())

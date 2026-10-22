@@ -3,7 +3,7 @@ import { contrastRatio } from '@couture/utils'
 import { log } from '@seontechnologies/playwright-utils/log'
 import { checkA11y } from '../support/helpers/accessibility'
 import {
-  COMMUNITY_FEED_URL,
+  completedCommunityFeed,
   communityTest as test,
   expect,
 } from '../support/helpers/community-session'
@@ -54,17 +54,16 @@ test.describe('Story 6.3 curated reactions', () => {
   test('[P1] preserves feed order when a highlighted card enters the loaded page', async ({
     page,
     communitySession,
-    interceptNetworkCall,
   }) => {
     expect(communitySession.userId).toBeTruthy()
-    const firstFeed = interceptNetworkCall({ method: 'GET', url: COMMUNITY_FEED_URL })
+    const firstFeed = completedCommunityFeed(page)
     await page.goto('/')
     expect((await firstFeed).status).toBe(200)
     await expect(page.getByTestId('community-card-grid')).toHaveAttribute(
       'aria-busy',
       'false'
     )
-    const allFeed = interceptNetworkCall({ method: 'GET', url: COMMUNITY_FEED_URL })
+    const allFeed = completedCommunityFeed(page, 'all')
     await page.getByTestId('community-filter-all').click()
     const body = (await allFeed).responseJson as { data: { items: { id: string }[] } }
     const target = body.data.items[1]!.id
@@ -77,7 +76,7 @@ test.describe('Story 6.3 curated reactions', () => {
       'aria-busy',
       'false'
     )
-    const refreshed = interceptNetworkCall({ method: 'GET', url: COMMUNITY_FEED_URL })
+    const refreshed = completedCommunityFeed(page, 'all')
     await page.getByTestId('community-filter-all').click()
     const accepted = (await refreshed).responseJson as {
       data: { items: { id: string }[] }
@@ -100,18 +99,17 @@ test.describe('Story 6.3 curated reactions', () => {
   test('[P1] adds with the keyboard, replaces, persists after reload, and retracts', async ({
     page,
     communitySession,
-    interceptNetworkCall,
   }) => {
     expect(communitySession.userId).toBeTruthy()
     await log.step('Load the community feed through the real API')
-    const initialFeed = interceptNetworkCall({ method: 'GET', url: COMMUNITY_FEED_URL })
+    const initialFeed = completedCommunityFeed(page)
     await page.goto('/')
     expect((await initialFeed).status).toBe(200)
     await expect(page.getByTestId('community-card-grid')).toHaveAttribute(
       'aria-busy',
       'false'
     )
-    const allFeed = interceptNetworkCall({ method: 'GET', url: COMMUNITY_FEED_URL })
+    const allFeed = completedCommunityFeed(page, 'all')
     await page.getByTestId('community-filter-all').click()
     expect((await allFeed).status).toBe(200)
     await expect(page.getByTestId('community-card-grid')).toHaveAttribute(
@@ -144,17 +142,14 @@ test.describe('Story 6.3 curated reactions', () => {
     await expect(page.getByRole('dialog')).not.toBeVisible()
     await expect(love).toHaveAttribute('aria-pressed', 'true')
     await expect(applause).toHaveAttribute('aria-pressed', 'false')
-    const reloadedFeed = interceptNetworkCall({ method: 'GET', url: COMMUNITY_FEED_URL })
+    const reloadedFeed = completedCommunityFeed(page)
     await page.reload()
     expect((await reloadedFeed).status).toBe(200)
     await expect(page.getByTestId('community-card-grid')).toHaveAttribute(
       'aria-busy',
       'false'
     )
-    const reloadedAllFeed = interceptNetworkCall({
-      method: 'GET',
-      url: COMMUNITY_FEED_URL,
-    })
+    const reloadedAllFeed = completedCommunityFeed(page, 'all')
     await page.getByTestId('community-filter-all').click()
     expect((await reloadedAllFeed).status).toBe(200)
     await expect(page.getByTestId('community-card-grid')).toHaveAttribute(
@@ -184,14 +179,14 @@ test.describe('Story 6.3 curated reactions', () => {
   }) => {
     expect(communitySession.userId).toBeTruthy()
     await log.step('Load the community feed through the real API')
-    const initialFeed = interceptNetworkCall({ method: 'GET', url: COMMUNITY_FEED_URL })
+    const initialFeed = completedCommunityFeed(page)
     await page.goto('/')
     expect((await initialFeed).status).toBe(200)
     await expect(page.getByTestId('community-card-grid')).toHaveAttribute(
       'aria-busy',
       'false'
     )
-    const allFeed = interceptNetworkCall({ method: 'GET', url: COMMUNITY_FEED_URL })
+    const allFeed = completedCommunityFeed(page, 'all')
     await page.getByTestId('community-filter-all').click()
     expect((await allFeed).status).toBe(200)
     await expect(page.getByTestId('community-card-grid')).toHaveAttribute(
@@ -235,11 +230,10 @@ test.describe('Story 6.3 curated reactions', () => {
   test('[P1] preserves highlighted focus, announces in detail, and contrasts in every theme', async ({
     page,
     communitySession,
-    interceptNetworkCall,
   }) => {
     expect(communitySession.userId).toBeTruthy()
     await log.step('Load the community feed through the real API')
-    const initialFeed = interceptNetworkCall({ method: 'GET', url: COMMUNITY_FEED_URL })
+    const initialFeed = completedCommunityFeed(page)
     await page.goto('/?source=notification&type=community&cardId=lookbook-5')
     expect((await initialFeed).status).toBe(200)
     await expect(page.getByTestId('community-card-grid')).toHaveAttribute(
@@ -306,18 +300,17 @@ test.describe('Story 6.3 curated reactions', () => {
   test('[P2] keeps the ritual compact while the community feed scrolls independently', async ({
     page,
     communitySession,
-    interceptNetworkCall,
   }) => {
     expect(communitySession.userId).toBeTruthy()
     await log.step('Load the community feed through the real API')
-    const initialFeed = interceptNetworkCall({ method: 'GET', url: COMMUNITY_FEED_URL })
+    const initialFeed = completedCommunityFeed(page)
     await page.goto('/')
     expect((await initialFeed).status).toBe(200)
     await expect(page.getByTestId('community-card-grid')).toHaveAttribute(
       'aria-busy',
       'false'
     )
-    const allFeed = interceptNetworkCall({ method: 'GET', url: COMMUNITY_FEED_URL })
+    const allFeed = completedCommunityFeed(page, 'all')
     await page.getByTestId('community-filter-all').click()
     expect((await allFeed).status).toBe(200)
     await expect(page.getByTestId('community-card-grid')).toHaveAttribute(
@@ -339,11 +332,10 @@ test.describe('Story 6.3 curated reactions', () => {
   test('[P2] passes the default community feed accessibility audit', async ({
     page,
     communitySession,
-    interceptNetworkCall,
   }) => {
     expect(communitySession.userId).toBeTruthy()
     await log.step('Load the community feed through the real API')
-    const initialFeed = interceptNetworkCall({ method: 'GET', url: COMMUNITY_FEED_URL })
+    const initialFeed = completedCommunityFeed(page)
     await page.goto('/')
     expect((await initialFeed).status).toBe(200)
     await expect(page.getByTestId('community-card-grid')).toHaveAttribute(

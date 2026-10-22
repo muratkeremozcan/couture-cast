@@ -22,13 +22,42 @@ tags:
 - runFlow: subflows/open-community-tab.yaml
 - tapOn:
     id: 'community-filter-chip-all'
+# The chip refetches the feed, and while it loads the list renders empty, which
+# resets any scroll; scrolling starts only once the page is in.
+- extendedWaitUntil:
+    notVisible:
+      id: 'community-feed-skeleton'
+    timeout: 20000
+# Story 6.6: the City Spotlight heads the list and the seeded spotlight posts
+# lead the feed, so `lookbook-5` sits about eight screen-tall cards down. The
+# card is reached first with long, steady swipes, as in community-feed.yaml.
+- extendedWaitUntil:
+    visible:
+      id: 'community-spotlight-heading'
+    timeout: 20000
+# Long straight swipes, each moving most of a screen, reach the card in about
+# half the steps of a scroll command, and each step checks for it first.
+- repeat:
+    while:
+      notVisible:
+        id: 'community-post-card-lookbook-5'
+    times: 30
+    commands:
+      - swipe:
+          start: '50%, 85%'
+          end: '50%, 20%'
+          duration: 500
+- extendedWaitUntil:
+    visible:
+      id: 'community-post-card-lookbook-5'
+    timeout: 10000
 - scrollUntilVisible:
     element:
       id: 'community-card-comments-lookbook-5'
     direction: DOWN
     # A fully visible action can remain below center at the scroll boundary.
     centerElement: false
-    timeout: 15000
+    timeout: 20000
 - tapOn:
     id: 'community-card-comments-lookbook-5'
 - assertVisible: 'Close comments'

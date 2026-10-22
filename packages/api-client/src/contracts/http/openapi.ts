@@ -157,7 +157,17 @@ export function generateHttpOpenApiDocument() {
       // (feed read, single-post read, upload allocate, publish, report, card
       // open, withdraw, challenge create, challenge update) under a new tag,
       // and no changes to existing operations.
-      version: '1.6.0',
+      // Stories 6.3 to 6.6 bump the minor once more; none of them shipped its
+      // own bump, so this entry records all four. 6.3 adds the reaction PUT and
+      // reaction projections negotiated by the `x-couture-reactions` request
+      // header. 6.4 adds six comment operations (list, replies, create, delete,
+      // report, submission status). 6.5 adds the community events stream, the
+      // targets resolve read, notification preferences read and update, and
+      // push token register, list and delete. 6.6 adds the City Spotlight read
+      // and an optional spotlight branch (`surface`, `rank`, `level`) on the
+      // card-open body, which keeps a body without `surface` valid unchanged.
+      // No existing operation narrows.
+      version: '1.7.0',
       description: 'Canonical HTTP contracts shared across API, web, mobile, and tests.',
     },
     servers: [

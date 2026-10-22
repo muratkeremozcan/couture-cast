@@ -1,0 +1,273 @@
+// Story 6.6: area components reach a post only at submission, hold only a
+// hierarchical prefix, and leave the post exactly when its location key does.
+import { randomUUID } from 'node:crypto'
+import { describe, expect, it, vi } from 'vitest'
+import { buildLookbookPostCreateInput, createLookbookPost } from '@couture/testing'
+import { CommunityMaintenanceService } from '../src/modules/community/community-maintenance.service.js'
+import { areaComponentsOf } from '../src/modules/community/community-spotlight-area.js'
+import { InMemoryCommunityStorage } from '../src/modules/community/community-storage.fake.js'
+import { GuardianService } from '../src/modules/guardian/guardian.service.js'
+import {
+  hoursBeforeAsOf,
+  spotlightTestContext,
+} from './helpers/community-spotlight-context.js'
+
+const ctx = spotlightTestContext('area')
+
+const AREA_SELECT = {
+  area_country: true,
+  area_region: true,
+  area_city: true,
+  location_key: true,
+} as const
+
+async function draft(author: string) {
+  const fixture = createLookbookPost({
+    userId: author,
+    status: 'draft',
+    publishedAt: null,
+    submittedAt: null,
+    altTextConfirmedAt: null,
+    locationKey: null,
+  })
+  await ctx.prisma.lookbookPost.create({ data: buildLookbookPostCreateInput(fixture) })
+  return fixture.id
+}
+
+async function submit(author: string, postId: string) {
+  const location = await ctx.repository.findAreaLocation(author)
+  return ctx.repository.publishWithinQuota({
+    userId: author,
+    postId,
+    cap: 10,
+    data: {
+      altText: 'Layered look',
+      caption: null,
+      climateBand: null,
+      locale: 'en-US',
+      challengeId: null,
+      area: location?.area ?? { country: null, region: null, city: null },
+    },
+  })
+}
+
+describe('6.6 area stamping', () => {
+  it("6.6-INT-050 stamps only the canonical components of the author's chosen location", async () => {
+    const author = await ctx.member({
+      country: '  PORTUGAL ',
+      region: 'Lisboa',
+      city: 'Ｌｉｓｂôｎ',
+    })
+    const postId = await draft(author)
+    await expect(submit(author, postId)).resolves.toMatchObject({ kind: 'published' })
+    const row = await ctx.prisma.lookbookPost.findUniqueOrThrow({
+      where: { id: postId },
+      select: { ...AREA_SELECT, caption: true, locale: true },
+    })
+    expect(row).toMatchObject({
+      area_country: 'PT',
+      area_region: 'lisboa',
+      area_city: 'lisbon',
+      location_key: null,
+    })
+  })
+
+  it('6.6-INT-051 stores only the prefix whose parents exist, and nothing without a country', async () => {
+    const partial = await ctx.member({
+      country: 'Portugal',
+      region: null,
+      city: 'Lisbon',
+    })
+    const partialPost = await draft(partial)
+    await submit(partial, partialPost)
+    await expect(
+      ctx.prisma.lookbookPost.findUniqueOrThrow({
+        where: { id: partialPost },
+        select: AREA_SELECT,
+      })
+    ).resolves.toMatchObject({
+      area_country: 'PT',
+      area_region: null,
+      area_city: null,
+    })
+
+    for (const country of [null, 'Atlantis']) {
+      const nowhere = await ctx.member({ country, region: 'Lisboa', city: 'Lisbon' })
+      const nowherePost = await draft(nowhere)
+      await submit(nowhere, nowherePost)
+      await expect(
+        ctx.prisma.lookbookPost.findUniqueOrThrow({
+          where: { id: nowherePost },
+          select: AREA_SELECT,
+        })
+      ).resolves.toMatchObject({ area_country: null, area_region: null, area_city: null })
+    }
+  })
+
+  it.each([
+    {
+      variant: 'country names and abbreviations',
+      authors: [
+        { country: 'USA', region: 'Illinois', city: 'Chicago' },
+        { country: 'United States', region: ' ILLINOIS ', city: 'chicago' },
+        { country: 'U.S.A.', region: 'Illinois', city: 'Chicago' },
+        { country: 'Estados Unidos', region: 'illinois', city: 'CHICAGO' },
+        { country: 'États-Unis', region: 'Illinois', city: 'Chicago' },
+      ],
+      viewer: { country: 'US', region: 'Illinois', city: 'Chicago' },
+    },
+    {
+      variant: 'accented and plain spellings',
+      authors: [
+        { country: 'Brasil', region: 'São Paulo', city: 'São Paulo' },
+        { country: 'Brazil', region: 'Sao Paulo', city: 'Sao Paulo' },
+        { country: 'BR', region: 'SÃO PAULO', city: 'sao paulo' },
+        { country: 'Brésil', region: 'Sao Paulo', city: 'São Paulo' },
+        { country: 'Brasilien', region: 'São Paulo', city: 'SAO PAULO' },
+      ],
+      viewer: { country: 'Brazil', region: 'Sao Paulo', city: 'São Paulo' },
+    },
+  ])('6.6-INT-056 $variant of one place stamp and rank as one city', async (matrix) => {
+    const authors: string[] = []
+    const posts: string[] = []
+    for (const location of matrix.authors) {
+      const author = await ctx.member(location)
+      const postId = await draft(author)
+      await expect(submit(author, postId)).resolves.toMatchObject({ kind: 'published' })
+      authors.push(author)
+      posts.push(postId)
+    }
+    const stamped = await ctx.prisma.lookbookPost.findMany({
+      where: { id: { in: posts } },
+      select: AREA_SELECT,
+    })
+    expect(new Set(stamped.map((row) => JSON.stringify(row))).size).toBe(1)
+    // Moderation approval publishes the submitted posts.
+    await ctx.prisma.lookbookPost.updateMany({
+      where: { id: { in: posts } },
+      data: { status: 'published', published_at: hoursBeforeAsOf(1) },
+    })
+    for (const [index, postId] of posts.entries())
+      await ctx.react(authors[(index + 1) % authors.length]!, postId, 'love')
+    const viewer = await ctx.member(matrix.viewer)
+    const page = await ctx.read(viewer, { limit: 12 })
+    expect(page.level).toBe('city')
+    expect(page.label).toBe(matrix.viewer.city)
+    expect(page.items.map((item) => item.id).sort()).toEqual([...posts].sort())
+  })
+
+  it('6.6-INT-052 the database refuses a city without a region and an anonymized row with an area', async () => {
+    const author = await ctx.member()
+    const id = await draft(author)
+    await expect(
+      ctx.prisma
+        .$executeRaw`UPDATE "LookbookPost" SET area_country = 'x', area_city = 'y' WHERE id = ${id}`
+    ).rejects.toThrow(/LookbookPost_area_hierarchical/)
+    await expect(
+      ctx.prisma
+        .$executeRaw`UPDATE "LookbookPost" SET area_country = 'x', anonymized_at = now() WHERE id = ${id}`
+    ).rejects.toThrow(/LookbookPost_area_cleared_when_anonymized/)
+  })
+})
+
+describe('6.6 area clearing', () => {
+  /**
+   * A published post stamped the way submission stamps it, with the exact
+   * stored components it must keep: the country's ISO code, region and city
+   * folded to lowercase.
+   */
+  async function publishedInArea(author: string) {
+    const area = ctx.area(randomUUID())
+    const stamped = areaComponentsOf(area)
+    const fixture = createLookbookPost({
+      userId: author,
+      publishedAt: hoursBeforeAsOf(1),
+      locationKey: 'legacy-key',
+      areaCountry: stamped.country,
+      areaRegion: stamped.region,
+      areaCity: stamped.city,
+    })
+    await ctx.prisma.lookbookPost.create({ data: buildLookbookPostCreateInput(fixture) })
+    const expected = {
+      area_country: stamped.country,
+      area_region: stamped.region,
+      area_city: stamped.city,
+    }
+    // Fixture guard: the folding really happened, so a kept value is the stamp.
+    expect(expected.area_country).toMatch(/^[A-Z]{2}$/)
+    expect(expected.area_region).toBe(area.region.toLowerCase())
+    expect(expected.area_city).toBe(area.city.toLowerCase())
+    return { postId: fixture.id, expected }
+  }
+
+  it('6.6-INT-053 erasure clears the components in the same update that clears location_key', async () => {
+    const author = await ctx.member()
+    const { postId } = await publishedInArea(author)
+    await ctx.repository.withdrawPostAndRequestErasure(postId, new Date())
+    const maintenance = new CommunityMaintenanceService(
+      ctx.prisma,
+      new InMemoryCommunityStorage()
+    )
+    await maintenance.sweepErasureRequests(new Date())
+    await expect(
+      ctx.prisma.lookbookPost.findUniqueOrThrow({
+        where: { id: postId },
+        select: { ...AREA_SELECT, anonymized_at: true },
+      })
+    ).resolves.toMatchObject({
+      area_country: null,
+      area_region: null,
+      area_city: null,
+      location_key: null,
+      anonymized_at: expect.any(Date) as Date,
+    })
+  })
+
+  it('6.6-INT-054 author withdrawal keeps the components; visibility alone hides the post', async () => {
+    const author = await ctx.member()
+    const { postId, expected } = await publishedInArea(author)
+    await ctx.repository.withdrawPostAndRequestErasure(postId, new Date())
+    await expect(
+      ctx.prisma.lookbookPost.findUniqueOrThrow({
+        where: { id: postId },
+        select: { ...AREA_SELECT, status: true },
+      })
+    ).resolves.toEqual({ ...expected, location_key: 'legacy-key', status: 'withdrawn' })
+  })
+
+  it('6.6-INT-055 guardian consent suspension keeps the components on the suspended post', async () => {
+    const guardianId = await ctx.member()
+    const teen = await ctx.prisma.user.create({
+      data: {
+        email: `cc66-teen-${randomUUID()}@synthetic.test`,
+        profile: {
+          create: {
+            birthdate: new Date('2012-01-01T00:00:00Z'),
+            preferences: { compliance: { accountStatus: 'active' } },
+          },
+        },
+      },
+    })
+    await ctx.prisma.guardianConsent.create({
+      data: { guardian_id: guardianId, teen_id: teen.id, status: 'granted' },
+    })
+    const { postId, expected } = await publishedInArea(teen.id)
+    const guardian = new GuardianService(
+      { capture: vi.fn() },
+      ctx.prisma,
+      { markTeenAccessRevoked: vi.fn(), markTeenAccessGranted: vi.fn() } as never,
+      { invalidateUserSessions: vi.fn().mockResolvedValue(undefined) } as never
+    )
+    await guardian.revokeConsent(guardianId, teen.id)
+    await expect(
+      ctx.prisma.lookbookPost.findUniqueOrThrow({
+        where: { id: postId },
+        select: { ...AREA_SELECT, status: true },
+      })
+    ).resolves.toEqual({
+      ...expected,
+      location_key: 'legacy-key',
+      status: 'consent_suspended',
+    })
+  })
+})

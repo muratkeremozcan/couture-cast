@@ -18,6 +18,7 @@ import {
   communityRetryAfterSeconds,
   getCommunityFeedFromMobile,
   getCommunityPostFromMobile,
+  getCommunitySpotlightFromMobile,
   pickCommunityPhoto,
   reportCommunityPostFromMobile,
 } from '@/src/lib/community'
@@ -92,6 +93,8 @@ export function registerCommunityClientCases() {
     [409, 'Some other conflict.', 'unknown'],
     [429, 'Slow down.', 'rate_limited'],
     [503, COMMUNITY_FEED_DISABLED_MESSAGE, 'disabled'],
+    // The shared read gate refuses a member outside the read rollout with a 403.
+    [403, COMMUNITY_FEED_DISABLED_MESSAGE, 'disabled'],
     // A published row whose object cannot be signed. The service answers this on
     // the single-post read and on publish, and it shares its status with the
     // rollout kill switch, so the two are told apart by message alone.
@@ -216,5 +219,70 @@ export function registerCommunityClientCases() {
       width: 900,
       height: 1200,
     })
+  })
+
+  it('6.6-MOB-008 refuses a spotlight page that drifts from the strict contract', async () => {
+    let drift = true
+    server.use(
+      http.get('*/api/v1/community/spotlight', () =>
+        HttpResponse.json({
+          data: {
+            level: 'city',
+            label: 'Lisbon',
+            items: [],
+            nextCursor: null,
+            ...(drift ? { cohort: 5 } : {}),
+          },
+        })
+      )
+    )
+    // A parse refusal is a client-side failure: no server status, no disabled state.
+    const failure: unknown = await getCommunitySpotlightFromMobile().catch(
+      (error: unknown) => error
+    )
+    expect(failure).toBeInstanceOf(CommunityRequestError)
+    expect(failure).toMatchObject({ reason: 'unknown', httpStatus: undefined })
+    // Control: the same page without the extra key parses, so the key alone refused it.
+    drift = false
+    await expect(getCommunitySpotlightFromMobile()).resolves.toMatchObject({
+      level: 'city',
+      label: 'Lisbon',
+      items: [],
+    })
+  })
+
+  it('6.6-MOB-009 retries the spotlight and the feed once after a gate unavailable 503', async () => {
+    const calls = { spotlight: 0, feed: 0 }
+    const refusal = () =>
+      HttpResponse.json(
+        {
+          statusCode: 503,
+          code: 'unavailable',
+          retryAfterSeconds: 0,
+          message: 'Access could not be verified.',
+        },
+        { status: 503 }
+      )
+    server.use(
+      http.get('*/api/v1/community/spotlight', () =>
+        calls.spotlight++ === 0
+          ? refusal()
+          : HttpResponse.json({
+              data: { level: 'none', label: null, items: [], nextCursor: null },
+            })
+      ),
+      http.get(FEED_ROUTE, () => {
+        calls.feed += 1
+        return refusal()
+      })
+    )
+    await expect(getCommunitySpotlightFromMobile()).resolves.toMatchObject({
+      level: 'none',
+    })
+    expect(calls.spotlight).toBe(2)
+    await expect(getCommunityFeedFromMobile({ mode: 'all' })).rejects.toBeInstanceOf(
+      CommunityRequestError
+    )
+    expect(calls.feed).toBe(2)
   })
 }

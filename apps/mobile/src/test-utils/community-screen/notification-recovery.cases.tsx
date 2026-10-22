@@ -497,10 +497,13 @@ export function registerCommunityNotificationRecoveryCases() {
     try {
       await render(<CommunityScreen />)
       await waitFor(() => expect(f.state.notificationCalls).toBe(1))
+      // The notification is held, so waiting for the feed card here cannot race
+      // past the fence; the spotlight read on mount may land first.
       press(
-        within(screen.getByTestId('community-post-card-post-a')).getByRole('button', {
-          name: 'Applaud, 0',
-        })
+        within(await screen.findByTestId('community-post-card-post-a')).getByRole(
+          'button',
+          { name: 'Applaud, 0' }
+        )
       )
       await waitFor(() =>
         expect(screen.queryByTestId('community-post-card-post-a')).toBeNull()

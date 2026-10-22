@@ -38,6 +38,30 @@ export function postDedupeKey(postId: string, eventName: string): string {
 }
 
 /**
+ * Story 6.6: a non-reversible token for one post, so a dedupe key can tell
+ * posts apart without carrying the raw id to the analytics sink.
+ */
+export function communityPostToken(postId: string): string {
+  return createHmac('sha256', requireAnalyticsIdSecret())
+    .update(`community-post:${postId}`)
+    .digest('hex')
+    .slice(0, 16)
+}
+
+/**
+ * Story 6.6: one spotlight open per post, viewer and surface. Both identity
+ * components are HMAC tokens, so neither raw id leaves the server.
+ */
+export function spotlightOpenDedupeKey(userId: string, postId: string): string {
+  return buildCommunityDedupeKey(
+    'community_spotlight_opened',
+    communitySubjectToken(userId),
+    communityPostToken(postId),
+    'spotlight'
+  )
+}
+
+/**
  * How coarse the feed-view dedupe bucket is, in milliseconds.
  *
  * A feed view has no post id to key on. A client retrying a dropped response

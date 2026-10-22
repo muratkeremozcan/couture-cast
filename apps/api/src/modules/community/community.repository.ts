@@ -14,6 +14,11 @@ import {
 import { recordCommunityEngagement } from './community-engagement-intent.js'
 import { sharedCommunityReportRetryAfter } from './community-report-limit.js'
 import { eraseCommunityComments } from './community-comments.privacy.js'
+import {
+  findSpotlightLocation,
+  type SpotlightAreaComponents,
+  type SpotlightLocation,
+} from './community-spotlight-area.js'
 import { randomUUID } from 'node:crypto'
 import {
   Inject,
@@ -66,6 +71,8 @@ export interface PublishPostData {
   climateBand: ClimateBand | null
   locale: string
   challengeId: string | null
+  /** Story 6.6: normalized hierarchical area prefix stamped at submission. */
+  area: SpotlightAreaComponents
 }
 
 /**
@@ -330,6 +337,11 @@ export class CommunityRepository {
    * classifies rather than giving up on the first location that happens to have
    * no usable weather.
    */
+  /** Story 6.6: the author's chosen location for area stamping. */
+  findAreaLocation(userId: string): Promise<SpotlightLocation | null> {
+    return findSpotlightLocation(this.prisma, userId)
+  }
+
   async findViewerLocations(userId: string): Promise<SavedLocation[]> {
     return this.prisma.savedLocation.findMany({
       where: { user_id: userId },
@@ -615,6 +627,9 @@ export class CommunityRepository {
           climate_band: data.climateBand,
           locale: data.locale,
           challenge_id: data.challengeId,
+          area_country: data.area.country,
+          area_region: data.area.region,
+          area_city: data.area.city,
           submitted_at: submittedAt,
           // Stamped in the SAME statement that writes `alt_text`, on the
           // draft -> pending_review transition. The two have to move together:

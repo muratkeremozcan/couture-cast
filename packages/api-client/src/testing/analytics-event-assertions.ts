@@ -45,6 +45,8 @@ import {
   communityPostReportedPropertiesSchema,
   communityPostSubmittedPropertiesSchema,
   communityPostWithdrawnPropertiesSchema,
+  communitySpotlightOpenedPropertiesSchema,
+  communitySpotlightViewedPropertiesSchema,
   type AnalyticsEventName,
 } from '../types/analytics-events'
 import type { ExpectLike } from './expect-like'
@@ -110,6 +112,8 @@ export const analyticsPropertySchemas = {
   community_post_reported: communityPostReportedPropertiesSchema,
   community_post_withdrawn: communityPostWithdrawnPropertiesSchema,
   community_challenge_participated: communityChallengeParticipatedPropertiesSchema,
+  community_spotlight_viewed: communitySpotlightViewedPropertiesSchema,
+  community_spotlight_opened: communitySpotlightOpenedPropertiesSchema,
 }
 
 const formatCapturedEvents = (events: readonly MemoryTrackedAnalyticsEvent[]) =>

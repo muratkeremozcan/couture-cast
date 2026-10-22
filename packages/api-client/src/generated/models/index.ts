@@ -3746,6 +3746,283 @@ export interface CommunityReactionResponse {
   data: ApiV1CommunityPostsPostIdGet200ResponseAnyOfDataReactions
 }
 /**
+ *
+ * @export
+ * @interface CommunityReactionSpotlightItem
+ */
+export interface CommunityReactionSpotlightItem {
+  /**
+   *
+   * @type {string}
+   * @memberof CommunityReactionSpotlightItem
+   */
+  id: string
+  /**
+   *
+   * @type {string}
+   * @memberof CommunityReactionSpotlightItem
+   */
+  caption: string | null
+  /**
+   *
+   * @type {string}
+   * @memberof CommunityReactionSpotlightItem
+   */
+  altText: string | null
+  /**
+   * The climate band stamped when the post was published, or null if unclassified.
+   * @type {CommunityReactionSpotlightItemClimateBandEnum}
+   * @memberof CommunityReactionSpotlightItem
+   */
+  climateBand: CommunityReactionSpotlightItemClimateBandEnum | null
+  /**
+   *
+   * @type {ApiV1CommunityFeedGet200ResponseAnyOfDataItemsInnerImageAccess}
+   * @memberof CommunityReactionSpotlightItem
+   */
+  imageAccess: ApiV1CommunityFeedGet200ResponseAnyOfDataItemsInnerImageAccess
+  /**
+   *
+   * @type {string}
+   * @memberof CommunityReactionSpotlightItem
+   */
+  publishedAt: string | null
+  /**
+   *
+   * @type {string}
+   * @memberof CommunityReactionSpotlightItem
+   */
+  createdAt: string
+  /**
+   *
+   * @type {CommunityReactionSpotlightItemStatusEnum}
+   * @memberof CommunityReactionSpotlightItem
+   */
+  status: CommunityReactionSpotlightItemStatusEnum
+  /**
+   *
+   * @type {string}
+   * @memberof CommunityReactionSpotlightItem
+   */
+  challengeId: string | null
+  /**
+   *
+   * @type {ApiV1CommunityFeedGet200ResponseAnyOfDataItemsInnerAuthor}
+   * @memberof CommunityReactionSpotlightItem
+   */
+  author: ApiV1CommunityFeedGet200ResponseAnyOfDataItemsInnerAuthor
+  /**
+   *
+   * @type {ApiV1CommunityPostsPostIdGet200ResponseAnyOfDataReactions}
+   * @memberof CommunityReactionSpotlightItem
+   */
+  reactions?: ApiV1CommunityPostsPostIdGet200ResponseAnyOfDataReactions
+  /**
+   * One-based position of the post in the ranked snapshot.
+   * @type {number}
+   * @memberof CommunityReactionSpotlightItem
+   */
+  rank: number
+}
+
+/**
+ * @export
+ */
+export const CommunityReactionSpotlightItemClimateBandEnum = {
+  cold_wet: 'cold_wet',
+  cold_dry: 'cold_dry',
+  temperate_wet: 'temperate_wet',
+  temperate_dry: 'temperate_dry',
+  warm_wet: 'warm_wet',
+  warm_dry: 'warm_dry',
+} as const
+export type CommunityReactionSpotlightItemClimateBandEnum =
+  (typeof CommunityReactionSpotlightItemClimateBandEnum)[keyof typeof CommunityReactionSpotlightItemClimateBandEnum]
+
+/**
+ * @export
+ */
+export const CommunityReactionSpotlightItemStatusEnum = {
+  draft: 'draft',
+  uploading: 'uploading',
+  pending_review: 'pending_review',
+  published: 'published',
+  flagged: 'flagged',
+  review_failed: 'review_failed',
+  withdrawn: 'withdrawn',
+  consent_suspended: 'consent_suspended',
+} as const
+export type CommunityReactionSpotlightItemStatusEnum =
+  (typeof CommunityReactionSpotlightItemStatusEnum)[keyof typeof CommunityReactionSpotlightItemStatusEnum]
+
+/**
+ *
+ * @export
+ * @interface CommunityReactionSpotlightResponse
+ */
+export interface CommunityReactionSpotlightResponse {
+  /**
+   *
+   * @type {CommunityReactionSpotlightResponseData}
+   * @memberof CommunityReactionSpotlightResponse
+   */
+  data: CommunityReactionSpotlightResponseData
+}
+/**
+ *
+ * @export
+ * @interface CommunityReactionSpotlightResponseData
+ */
+export interface CommunityReactionSpotlightResponseData {
+  /**
+   *
+   * @type {CommunityReactionSpotlightResponseDataLevelEnum}
+   * @memberof CommunityReactionSpotlightResponseData
+   */
+  level: CommunityReactionSpotlightResponseDataLevelEnum
+  /**
+   * The viewer's own place name at the ranked level, or null for none. Never derived from authors.
+   * @type {string}
+   * @memberof CommunityReactionSpotlightResponseData
+   */
+  label: string | null
+  /**
+   *
+   * @type {Array<CommunityReactionSpotlightResponseDataItemsInner>}
+   * @memberof CommunityReactionSpotlightResponseData
+   */
+  items: Array<CommunityReactionSpotlightResponseDataItemsInner>
+  /**
+   *
+   * @type {string}
+   * @memberof CommunityReactionSpotlightResponseData
+   */
+  nextCursor: string | null
+}
+
+/**
+ * @export
+ */
+export const CommunityReactionSpotlightResponseDataLevelEnum = {
+  city: 'city',
+  region: 'region',
+  country: 'country',
+  none: 'none',
+} as const
+export type CommunityReactionSpotlightResponseDataLevelEnum =
+  (typeof CommunityReactionSpotlightResponseDataLevelEnum)[keyof typeof CommunityReactionSpotlightResponseDataLevelEnum]
+
+/**
+ *
+ * @export
+ * @interface CommunityReactionSpotlightResponseDataItemsInner
+ */
+export interface CommunityReactionSpotlightResponseDataItemsInner {
+  /**
+   *
+   * @type {string}
+   * @memberof CommunityReactionSpotlightResponseDataItemsInner
+   */
+  id: string
+  /**
+   *
+   * @type {string}
+   * @memberof CommunityReactionSpotlightResponseDataItemsInner
+   */
+  caption: string | null
+  /**
+   *
+   * @type {string}
+   * @memberof CommunityReactionSpotlightResponseDataItemsInner
+   */
+  altText: string | null
+  /**
+   * The climate band stamped when the post was published, or null if unclassified.
+   * @type {CommunityReactionSpotlightResponseDataItemsInnerClimateBandEnum}
+   * @memberof CommunityReactionSpotlightResponseDataItemsInner
+   */
+  climateBand: CommunityReactionSpotlightResponseDataItemsInnerClimateBandEnum | null
+  /**
+   *
+   * @type {ApiV1CommunityFeedGet200ResponseAnyOfDataItemsInnerImageAccess}
+   * @memberof CommunityReactionSpotlightResponseDataItemsInner
+   */
+  imageAccess: ApiV1CommunityFeedGet200ResponseAnyOfDataItemsInnerImageAccess
+  /**
+   *
+   * @type {string}
+   * @memberof CommunityReactionSpotlightResponseDataItemsInner
+   */
+  publishedAt: string | null
+  /**
+   *
+   * @type {string}
+   * @memberof CommunityReactionSpotlightResponseDataItemsInner
+   */
+  createdAt: string
+  /**
+   *
+   * @type {CommunityReactionSpotlightResponseDataItemsInnerStatusEnum}
+   * @memberof CommunityReactionSpotlightResponseDataItemsInner
+   */
+  status: CommunityReactionSpotlightResponseDataItemsInnerStatusEnum
+  /**
+   *
+   * @type {string}
+   * @memberof CommunityReactionSpotlightResponseDataItemsInner
+   */
+  challengeId: string | null
+  /**
+   *
+   * @type {ApiV1CommunityFeedGet200ResponseAnyOfDataItemsInnerAuthor}
+   * @memberof CommunityReactionSpotlightResponseDataItemsInner
+   */
+  author: ApiV1CommunityFeedGet200ResponseAnyOfDataItemsInnerAuthor
+  /**
+   *
+   * @type {ApiV1CommunityPostsPostIdGet200ResponseAnyOfDataReactions}
+   * @memberof CommunityReactionSpotlightResponseDataItemsInner
+   */
+  reactions?: ApiV1CommunityPostsPostIdGet200ResponseAnyOfDataReactions
+  /**
+   * One-based position of the post in the ranked snapshot.
+   * @type {number}
+   * @memberof CommunityReactionSpotlightResponseDataItemsInner
+   */
+  rank: number
+}
+
+/**
+ * @export
+ */
+export const CommunityReactionSpotlightResponseDataItemsInnerClimateBandEnum = {
+  cold_wet: 'cold_wet',
+  cold_dry: 'cold_dry',
+  temperate_wet: 'temperate_wet',
+  temperate_dry: 'temperate_dry',
+  warm_wet: 'warm_wet',
+  warm_dry: 'warm_dry',
+} as const
+export type CommunityReactionSpotlightResponseDataItemsInnerClimateBandEnum =
+  (typeof CommunityReactionSpotlightResponseDataItemsInnerClimateBandEnum)[keyof typeof CommunityReactionSpotlightResponseDataItemsInnerClimateBandEnum]
+
+/**
+ * @export
+ */
+export const CommunityReactionSpotlightResponseDataItemsInnerStatusEnum = {
+  draft: 'draft',
+  uploading: 'uploading',
+  pending_review: 'pending_review',
+  published: 'published',
+  flagged: 'flagged',
+  review_failed: 'review_failed',
+  withdrawn: 'withdrawn',
+  consent_suspended: 'consent_suspended',
+} as const
+export type CommunityReactionSpotlightResponseDataItemsInnerStatusEnum =
+  (typeof CommunityReactionSpotlightResponseDataItemsInnerStatusEnum)[keyof typeof CommunityReactionSpotlightResponseDataItemsInnerStatusEnum]
+
+/**
  * An authoritative single-snapshot reaction summary. total must equal the sum of applause, love and inspiration counts. revision persists after removal; generation advances on reactions, visibility and erasure changes.
  * @export
  * @interface CommunityReactionSummary
@@ -3808,6 +4085,284 @@ export const CommunityReportReason = {
 } as const
 export type CommunityReportReason =
   (typeof CommunityReportReason)[keyof typeof CommunityReportReason]
+
+/**
+ *
+ * @export
+ * @interface CommunitySpotlightItem
+ */
+export interface CommunitySpotlightItem {
+  /**
+   *
+   * @type {string}
+   * @memberof CommunitySpotlightItem
+   */
+  id: string
+  /**
+   *
+   * @type {string}
+   * @memberof CommunitySpotlightItem
+   */
+  caption: string | null
+  /**
+   *
+   * @type {string}
+   * @memberof CommunitySpotlightItem
+   */
+  altText: string | null
+  /**
+   * The climate band stamped when the post was published, or null if unclassified.
+   * @type {CommunitySpotlightItemClimateBandEnum}
+   * @memberof CommunitySpotlightItem
+   */
+  climateBand: CommunitySpotlightItemClimateBandEnum | null
+  /**
+   *
+   * @type {ApiV1CommunityFeedGet200ResponseAnyOfDataItemsInnerImageAccess}
+   * @memberof CommunitySpotlightItem
+   */
+  imageAccess: ApiV1CommunityFeedGet200ResponseAnyOfDataItemsInnerImageAccess
+  /**
+   *
+   * @type {string}
+   * @memberof CommunitySpotlightItem
+   */
+  publishedAt: string | null
+  /**
+   *
+   * @type {string}
+   * @memberof CommunitySpotlightItem
+   */
+  createdAt: string
+  /**
+   *
+   * @type {CommunitySpotlightItemStatusEnum}
+   * @memberof CommunitySpotlightItem
+   */
+  status: CommunitySpotlightItemStatusEnum
+  /**
+   *
+   * @type {string}
+   * @memberof CommunitySpotlightItem
+   */
+  challengeId: string | null
+  /**
+   *
+   * @type {ApiV1CommunityFeedGet200ResponseAnyOfDataItemsInnerAuthor}
+   * @memberof CommunitySpotlightItem
+   */
+  author: ApiV1CommunityFeedGet200ResponseAnyOfDataItemsInnerAuthor
+  /**
+   * One-based position of the post in the ranked snapshot.
+   * @type {number}
+   * @memberof CommunitySpotlightItem
+   */
+  rank: number
+}
+
+/**
+ * @export
+ */
+export const CommunitySpotlightItemClimateBandEnum = {
+  cold_wet: 'cold_wet',
+  cold_dry: 'cold_dry',
+  temperate_wet: 'temperate_wet',
+  temperate_dry: 'temperate_dry',
+  warm_wet: 'warm_wet',
+  warm_dry: 'warm_dry',
+} as const
+export type CommunitySpotlightItemClimateBandEnum =
+  (typeof CommunitySpotlightItemClimateBandEnum)[keyof typeof CommunitySpotlightItemClimateBandEnum]
+
+/**
+ * @export
+ */
+export const CommunitySpotlightItemStatusEnum = {
+  draft: 'draft',
+  uploading: 'uploading',
+  pending_review: 'pending_review',
+  published: 'published',
+  flagged: 'flagged',
+  review_failed: 'review_failed',
+  withdrawn: 'withdrawn',
+  consent_suspended: 'consent_suspended',
+} as const
+export type CommunitySpotlightItemStatusEnum =
+  (typeof CommunitySpotlightItemStatusEnum)[keyof typeof CommunitySpotlightItemStatusEnum]
+
+/**
+ *
+ * @export
+ */
+export const CommunitySpotlightLevel = {
+  city: 'city',
+  region: 'region',
+  country: 'country',
+  none: 'none',
+} as const
+export type CommunitySpotlightLevel =
+  (typeof CommunitySpotlightLevel)[keyof typeof CommunitySpotlightLevel]
+
+/**
+ *
+ * @export
+ * @interface CommunitySpotlightResponse
+ */
+export interface CommunitySpotlightResponse {
+  /**
+   *
+   * @type {CommunitySpotlightResponseData}
+   * @memberof CommunitySpotlightResponse
+   */
+  data: CommunitySpotlightResponseData
+}
+/**
+ *
+ * @export
+ * @interface CommunitySpotlightResponseData
+ */
+export interface CommunitySpotlightResponseData {
+  /**
+   *
+   * @type {CommunitySpotlightResponseDataLevelEnum}
+   * @memberof CommunitySpotlightResponseData
+   */
+  level: CommunitySpotlightResponseDataLevelEnum
+  /**
+   * The viewer's own place name at the ranked level, or null for none. Never derived from authors.
+   * @type {string}
+   * @memberof CommunitySpotlightResponseData
+   */
+  label: string | null
+  /**
+   *
+   * @type {Array<CommunitySpotlightResponseDataItemsInner>}
+   * @memberof CommunitySpotlightResponseData
+   */
+  items: Array<CommunitySpotlightResponseDataItemsInner>
+  /**
+   *
+   * @type {string}
+   * @memberof CommunitySpotlightResponseData
+   */
+  nextCursor: string | null
+}
+
+/**
+ * @export
+ */
+export const CommunitySpotlightResponseDataLevelEnum = {
+  city: 'city',
+  region: 'region',
+  country: 'country',
+  none: 'none',
+} as const
+export type CommunitySpotlightResponseDataLevelEnum =
+  (typeof CommunitySpotlightResponseDataLevelEnum)[keyof typeof CommunitySpotlightResponseDataLevelEnum]
+
+/**
+ *
+ * @export
+ * @interface CommunitySpotlightResponseDataItemsInner
+ */
+export interface CommunitySpotlightResponseDataItemsInner {
+  /**
+   *
+   * @type {string}
+   * @memberof CommunitySpotlightResponseDataItemsInner
+   */
+  id: string
+  /**
+   *
+   * @type {string}
+   * @memberof CommunitySpotlightResponseDataItemsInner
+   */
+  caption: string | null
+  /**
+   *
+   * @type {string}
+   * @memberof CommunitySpotlightResponseDataItemsInner
+   */
+  altText: string | null
+  /**
+   * The climate band stamped when the post was published, or null if unclassified.
+   * @type {CommunitySpotlightResponseDataItemsInnerClimateBandEnum}
+   * @memberof CommunitySpotlightResponseDataItemsInner
+   */
+  climateBand: CommunitySpotlightResponseDataItemsInnerClimateBandEnum | null
+  /**
+   *
+   * @type {ApiV1CommunityFeedGet200ResponseAnyOfDataItemsInnerImageAccess}
+   * @memberof CommunitySpotlightResponseDataItemsInner
+   */
+  imageAccess: ApiV1CommunityFeedGet200ResponseAnyOfDataItemsInnerImageAccess
+  /**
+   *
+   * @type {string}
+   * @memberof CommunitySpotlightResponseDataItemsInner
+   */
+  publishedAt: string | null
+  /**
+   *
+   * @type {string}
+   * @memberof CommunitySpotlightResponseDataItemsInner
+   */
+  createdAt: string
+  /**
+   *
+   * @type {CommunitySpotlightResponseDataItemsInnerStatusEnum}
+   * @memberof CommunitySpotlightResponseDataItemsInner
+   */
+  status: CommunitySpotlightResponseDataItemsInnerStatusEnum
+  /**
+   *
+   * @type {string}
+   * @memberof CommunitySpotlightResponseDataItemsInner
+   */
+  challengeId: string | null
+  /**
+   *
+   * @type {ApiV1CommunityFeedGet200ResponseAnyOfDataItemsInnerAuthor}
+   * @memberof CommunitySpotlightResponseDataItemsInner
+   */
+  author: ApiV1CommunityFeedGet200ResponseAnyOfDataItemsInnerAuthor
+  /**
+   * One-based position of the post in the ranked snapshot.
+   * @type {number}
+   * @memberof CommunitySpotlightResponseDataItemsInner
+   */
+  rank: number
+}
+
+/**
+ * @export
+ */
+export const CommunitySpotlightResponseDataItemsInnerClimateBandEnum = {
+  cold_wet: 'cold_wet',
+  cold_dry: 'cold_dry',
+  temperate_wet: 'temperate_wet',
+  temperate_dry: 'temperate_dry',
+  warm_wet: 'warm_wet',
+  warm_dry: 'warm_dry',
+} as const
+export type CommunitySpotlightResponseDataItemsInnerClimateBandEnum =
+  (typeof CommunitySpotlightResponseDataItemsInnerClimateBandEnum)[keyof typeof CommunitySpotlightResponseDataItemsInnerClimateBandEnum]
+
+/**
+ * @export
+ */
+export const CommunitySpotlightResponseDataItemsInnerStatusEnum = {
+  draft: 'draft',
+  uploading: 'uploading',
+  pending_review: 'pending_review',
+  published: 'published',
+  flagged: 'flagged',
+  review_failed: 'review_failed',
+  withdrawn: 'withdrawn',
+  consent_suspended: 'consent_suspended',
+} as const
+export type CommunitySpotlightResponseDataItemsInnerStatusEnum =
+  (typeof CommunitySpotlightResponseDataItemsInnerStatusEnum)[keyof typeof CommunitySpotlightResponseDataItemsInnerStatusEnum]
 
 /**
  *
@@ -5901,6 +6456,219 @@ export interface GetCommunityNotificationPreferencesResponse {
 /**
  *
  * @export
+ * @interface GetCommunitySpotlight200Response
+ */
+export interface GetCommunitySpotlight200Response {
+  /**
+   *
+   * @type {CommunityReactionSpotlightResponseData}
+   * @memberof GetCommunitySpotlight200Response
+   */
+  data: CommunityReactionSpotlightResponseData
+}
+/**
+ *
+ * @export
+ * @interface GetCommunitySpotlight400Response
+ */
+export interface GetCommunitySpotlight400Response {
+  /**
+   *
+   * @type {GetCommunitySpotlight400ResponseStatusCodeEnum}
+   * @memberof GetCommunitySpotlight400Response
+   */
+  statusCode: GetCommunitySpotlight400ResponseStatusCodeEnum
+  /**
+   *
+   * @type {string}
+   * @memberof GetCommunitySpotlight400Response
+   */
+  message: string
+  /**
+   *
+   * @type {GetCommunitySpotlight400ResponseErrorEnum}
+   * @memberof GetCommunitySpotlight400Response
+   */
+  error: GetCommunitySpotlight400ResponseErrorEnum
+  /**
+   *
+   * @type {GetCommunitySpotlight400ResponseCodeEnum}
+   * @memberof GetCommunitySpotlight400Response
+   */
+  code: GetCommunitySpotlight400ResponseCodeEnum
+}
+
+/**
+ * @export
+ */
+export const GetCommunitySpotlight400ResponseStatusCodeEnum = {
+  NUMBER_400: 400,
+} as const
+export type GetCommunitySpotlight400ResponseStatusCodeEnum =
+  (typeof GetCommunitySpotlight400ResponseStatusCodeEnum)[keyof typeof GetCommunitySpotlight400ResponseStatusCodeEnum]
+
+/**
+ * @export
+ */
+export const GetCommunitySpotlight400ResponseErrorEnum = {
+  Bad_Request: 'Bad Request',
+} as const
+export type GetCommunitySpotlight400ResponseErrorEnum =
+  (typeof GetCommunitySpotlight400ResponseErrorEnum)[keyof typeof GetCommunitySpotlight400ResponseErrorEnum]
+
+/**
+ * @export
+ */
+export const GetCommunitySpotlight400ResponseCodeEnum = {
+  invalid_cursor: 'invalid_cursor',
+} as const
+export type GetCommunitySpotlight400ResponseCodeEnum =
+  (typeof GetCommunitySpotlight400ResponseCodeEnum)[keyof typeof GetCommunitySpotlight400ResponseCodeEnum]
+
+/**
+ *
+ * @export
+ * @interface GetCommunitySpotlight400ResponseAnyOf
+ */
+export interface GetCommunitySpotlight400ResponseAnyOf {
+  /**
+   *
+   * @type {GetCommunitySpotlight400ResponseAnyOfStatusCodeEnum}
+   * @memberof GetCommunitySpotlight400ResponseAnyOf
+   */
+  statusCode: GetCommunitySpotlight400ResponseAnyOfStatusCodeEnum
+  /**
+   *
+   * @type {GetCommunitySpotlight400ResponseAnyOfCodeEnum}
+   * @memberof GetCommunitySpotlight400ResponseAnyOf
+   */
+  code: GetCommunitySpotlight400ResponseAnyOfCodeEnum
+  /**
+   *
+   * @type {string}
+   * @memberof GetCommunitySpotlight400ResponseAnyOf
+   */
+  message: string
+}
+
+/**
+ * @export
+ */
+export const GetCommunitySpotlight400ResponseAnyOfStatusCodeEnum = {
+  NUMBER_400: 400,
+} as const
+export type GetCommunitySpotlight400ResponseAnyOfStatusCodeEnum =
+  (typeof GetCommunitySpotlight400ResponseAnyOfStatusCodeEnum)[keyof typeof GetCommunitySpotlight400ResponseAnyOfStatusCodeEnum]
+
+/**
+ * @export
+ */
+export const GetCommunitySpotlight400ResponseAnyOfCodeEnum = {
+  invalid_cursor: 'invalid_cursor',
+} as const
+export type GetCommunitySpotlight400ResponseAnyOfCodeEnum =
+  (typeof GetCommunitySpotlight400ResponseAnyOfCodeEnum)[keyof typeof GetCommunitySpotlight400ResponseAnyOfCodeEnum]
+
+/**
+ *
+ * @export
+ * @interface GetCommunitySpotlight403Response
+ */
+export interface GetCommunitySpotlight403Response {
+  /**
+   *
+   * @type {GetCommunitySpotlight403ResponseStatusCodeEnum}
+   * @memberof GetCommunitySpotlight403Response
+   */
+  statusCode: GetCommunitySpotlight403ResponseStatusCodeEnum
+  /**
+   *
+   * @type {string}
+   * @memberof GetCommunitySpotlight403Response
+   */
+  code?: string
+  /**
+   *
+   * @type {string}
+   * @memberof GetCommunitySpotlight403Response
+   */
+  message: string
+  /**
+   *
+   * @type {string}
+   * @memberof GetCommunitySpotlight403Response
+   */
+  error?: string
+}
+
+/**
+ * @export
+ */
+export const GetCommunitySpotlight403ResponseStatusCodeEnum = {
+  NUMBER_403: 403,
+} as const
+export type GetCommunitySpotlight403ResponseStatusCodeEnum =
+  (typeof GetCommunitySpotlight403ResponseStatusCodeEnum)[keyof typeof GetCommunitySpotlight403ResponseStatusCodeEnum]
+
+/**
+ *
+ * @export
+ * @interface GetCommunitySpotlight503Response
+ */
+export interface GetCommunitySpotlight503Response {
+  /**
+   *
+   * @type {GetCommunitySpotlight503ResponseStatusCodeEnum}
+   * @memberof GetCommunitySpotlight503Response
+   */
+  statusCode: GetCommunitySpotlight503ResponseStatusCodeEnum
+  /**
+   *
+   * @type {GetCommunitySpotlight503ResponseCodeEnum}
+   * @memberof GetCommunitySpotlight503Response
+   */
+  code: GetCommunitySpotlight503ResponseCodeEnum
+  /**
+   *
+   * @type {number}
+   * @memberof GetCommunitySpotlight503Response
+   */
+  retryAfterSeconds: number
+  /**
+   *
+   * @type {string}
+   * @memberof GetCommunitySpotlight503Response
+   */
+  message: string
+  /**
+   *
+   * @type {string}
+   * @memberof GetCommunitySpotlight503Response
+   */
+  error?: string
+}
+
+/**
+ * @export
+ */
+export const GetCommunitySpotlight503ResponseStatusCodeEnum = {
+  NUMBER_503: 503,
+} as const
+export type GetCommunitySpotlight503ResponseStatusCodeEnum =
+  (typeof GetCommunitySpotlight503ResponseStatusCodeEnum)[keyof typeof GetCommunitySpotlight503ResponseStatusCodeEnum]
+
+/**
+ * @export
+ */
+export const GetCommunitySpotlight503ResponseCodeEnum = {
+  unavailable: 'unavailable',
+} as const
+export type GetCommunitySpotlight503ResponseCodeEnum =
+  (typeof GetCommunitySpotlight503ResponseCodeEnum)[keyof typeof GetCommunitySpotlight503ResponseCodeEnum]
+
+/**
+ *
+ * @export
  * @interface GetPushRegistrationsResponse
  */
 export interface GetPushRegistrationsResponse {
@@ -7017,7 +7785,7 @@ export type OnboardingPreconditionRequiredErrorErrorEnum =
   (typeof OnboardingPreconditionRequiredErrorErrorEnum)[keyof typeof OnboardingPreconditionRequiredErrorErrorEnum]
 
 /**
- *
+ * Either a feed open with experimentVariant, or a spotlight open with surface spotlight, a rank from 1 to 60 and the served level. The two forms never mix.
  * @export
  * @interface OpenCommunityPostInput
  */
@@ -7027,7 +7795,25 @@ export interface OpenCommunityPostInput {
    * @type {OpenCommunityPostInputExperimentVariantEnum}
    * @memberof OpenCommunityPostInput
    */
-  experimentVariant: OpenCommunityPostInputExperimentVariantEnum
+  experimentVariant?: OpenCommunityPostInputExperimentVariantEnum
+  /**
+   *
+   * @type {OpenCommunityPostInputSurfaceEnum}
+   * @memberof OpenCommunityPostInput
+   */
+  surface?: OpenCommunityPostInputSurfaceEnum
+  /**
+   *
+   * @type {number}
+   * @memberof OpenCommunityPostInput
+   */
+  rank?: number
+  /**
+   *
+   * @type {OpenCommunityPostInputLevelEnum}
+   * @memberof OpenCommunityPostInput
+   */
+  level?: OpenCommunityPostInputLevelEnum
 }
 
 /**
@@ -7039,6 +7825,26 @@ export const OpenCommunityPostInputExperimentVariantEnum = {
 } as const
 export type OpenCommunityPostInputExperimentVariantEnum =
   (typeof OpenCommunityPostInputExperimentVariantEnum)[keyof typeof OpenCommunityPostInputExperimentVariantEnum]
+
+/**
+ * @export
+ */
+export const OpenCommunityPostInputSurfaceEnum = {
+  spotlight: 'spotlight',
+} as const
+export type OpenCommunityPostInputSurfaceEnum =
+  (typeof OpenCommunityPostInputSurfaceEnum)[keyof typeof OpenCommunityPostInputSurfaceEnum]
+
+/**
+ * @export
+ */
+export const OpenCommunityPostInputLevelEnum = {
+  city: 'city',
+  region: 'region',
+  country: 'country',
+} as const
+export type OpenCommunityPostInputLevelEnum =
+  (typeof OpenCommunityPostInputLevelEnum)[keyof typeof OpenCommunityPostInputLevelEnum]
 
 /**
  *

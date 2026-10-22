@@ -7,6 +7,7 @@ import {
   analyticsEventSchemas,
   communityCardOpenedPropertiesSchema,
   communityFeedViewedPropertiesSchema,
+  communitySpotlightOpenedPropertiesSchema,
   trackCommunityCardOpened,
   trackCommunityChallengeParticipated,
   trackCommunityFeedViewed,
@@ -15,9 +16,15 @@ import {
   trackCommunityPostReported,
   trackCommunityPostSubmitted,
   trackCommunityPostWithdrawn,
+  trackCommunitySpotlightOpened,
+  trackCommunitySpotlightViewed,
   type AnalyticsEventName,
 } from '../src/types/analytics-events'
 import { analyticsPropertySchemas } from '../src/testing/analytics-event-assertions'
+import {
+  COMMUNITY_SPOTLIGHT_MAX_LIMIT,
+  COMMUNITY_SPOTLIGHT_MAX_RANK,
+} from '../src/contracts/http'
 
 const SUBJECT = 'hmac-subject-1'
 
@@ -221,6 +228,45 @@ const reactionEventCases: CommunityEventCase[] = (
 })
 communityEventCases.push(...reactionEventCases)
 
+// Story 6.6: the two spotlight events carry only platform, dedupe key, level and
+// an item count or rank.
+communityEventCases.push(
+  {
+    name: 'community_spotlight_viewed',
+    build: () =>
+      trackCommunitySpotlightViewed({
+        analyticsSubjectId: SUBJECT,
+        platform: 'web',
+        dedupeKey: 'community_spotlight_viewed:token:177000',
+        level: 'city',
+        itemCount: 6,
+      }),
+    properties: {
+      platform: 'web',
+      dedupe_key: 'community_spotlight_viewed:token:177000',
+      level: 'city',
+      item_count: 6,
+    },
+  },
+  {
+    name: 'community_spotlight_opened',
+    build: () =>
+      trackCommunitySpotlightOpened({
+        analyticsSubjectId: SUBJECT,
+        platform: 'mobile',
+        dedupeKey: 'community_spotlight_opened:post-token:spotlight',
+        level: 'region',
+        rank: 7,
+      }),
+    properties: {
+      platform: 'mobile',
+      dedupe_key: 'community_spotlight_opened:post-token:spotlight',
+      level: 'region',
+      rank: 7,
+    },
+  }
+)
+
 const COMMUNITY_EVENT_NAMES: CommunityEventName[] = [
   'community_reaction_added',
   'community_reaction_replaced',
@@ -233,6 +279,8 @@ const COMMUNITY_EVENT_NAMES: CommunityEventName[] = [
   'community_post_reported',
   'community_post_withdrawn',
   'community_challenge_participated',
+  'community_spotlight_viewed',
+  'community_spotlight_opened',
 ]
 
 /**
@@ -249,6 +297,9 @@ const SENSITIVE_FIELDS: Record<string, Record<string, unknown>> = {
   object_path: { object_path: 'community/user-123/post-1.jpg' },
   post_id: { post_id: 'post-1' },
   moderation_reason: { moderation_reason: 'failed_image_screen' },
+  area_label: { label: 'Lisbon' },
+  area_names: { city: 'lisbon', region: 'lisboa', country: 'pt' },
+  area_hash: { area_hash: 'a'.repeat(64) },
 }
 
 const withoutKey = (
@@ -264,6 +315,83 @@ const namesOf = (source: Record<string, unknown>): string[] =>
   Object.keys(source)
     .filter((key) => key.startsWith('community_'))
     .sort()
+
+describe('6.6 spotlight event bounds', () => {
+  it('6.6-CON-002 refuses fractional ranks, ranks or item counts outside the caps, and an open at level none', () => {
+    // An open only happens on a served card, so `none` is never its level.
+    expect(() =>
+      trackCommunitySpotlightOpened({
+        analyticsSubjectId: SUBJECT,
+        platform: 'web',
+        dedupeKey: 'k',
+        level: 'none' as never,
+        rank: 1,
+      })
+    ).toThrow()
+    expect(
+      communitySpotlightOpenedPropertiesSchema.safeParse({
+        platform: 'web',
+        dedupe_key: 'k',
+        level: 'none',
+        rank: 1,
+      }).success
+    ).toBe(false)
+    for (const rank of [0, 61])
+      expect(() =>
+        trackCommunitySpotlightOpened({
+          analyticsSubjectId: SUBJECT,
+          platform: 'web',
+          dedupeKey: 'k',
+          level: 'city',
+          rank,
+        })
+      ).toThrow()
+    expect(() =>
+      trackCommunitySpotlightViewed({
+        analyticsSubjectId: SUBJECT,
+        platform: 'web',
+        dedupeKey: 'k',
+        level: 'none',
+        itemCount: 13,
+      })
+    ).toThrow()
+    expect(() =>
+      trackCommunitySpotlightOpened({
+        analyticsSubjectId: SUBJECT,
+        platform: 'web',
+        dedupeKey: 'k',
+        level: 'city',
+        rank: 1.5,
+      })
+    ).toThrow()
+  })
+
+  it('6.6-CON-003 accepts the first and last rank and an empty or full page', () => {
+    for (const rank of [1, COMMUNITY_SPOTLIGHT_MAX_RANK])
+      expect(
+        trackCommunitySpotlightOpened({
+          analyticsSubjectId: SUBJECT,
+          platform: 'web',
+          dedupeKey: 'k',
+          level: 'country',
+          rank,
+        }).properties
+      ).toEqual({ platform: 'web', dedupe_key: 'k', level: 'country', rank })
+    for (const [level, itemCount] of [
+      ['none', 0],
+      ['city', COMMUNITY_SPOTLIGHT_MAX_LIMIT],
+    ] as const)
+      expect(
+        trackCommunitySpotlightViewed({
+          analyticsSubjectId: SUBJECT,
+          platform: 'mobile',
+          dedupeKey: 'k',
+          level,
+          itemCount,
+        }).properties
+      ).toEqual({ platform: 'mobile', dedupe_key: 'k', level, item_count: itemCount })
+  })
+})
 
 describe('6.1 community analytics event wrappers', () => {
   describe.each(communityEventCases)('$name', ({ name, build, properties }) => {

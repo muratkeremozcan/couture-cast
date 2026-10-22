@@ -131,8 +131,8 @@ describe('LookbookPrismLayout (Integration 3.5-INT-001 - 3.5-INT-005)', () => {
     render(<LookbookPrismLayout />)
 
     const grid = screen.getByTestId('lookbook-prism-grid')
-    expect(grid).toHaveClass('min-[1280px]:grid-cols-2')
-    expect(grid).toHaveClass('min-[1440px]:grid-cols-[1fr_1fr_320px]')
+    expect(grid).toHaveClass('min-[1280px]:grid-cols-[minmax(0,1fr)_minmax(0,1fr)]')
+    expect(grid).toHaveClass('min-[1440px]:grid-cols-[minmax(0,1fr)_minmax(0,1fr)_320px]')
     expect(
       screen.getByRole('region', { name: /hero ritual canvas/i })
     ).toBeInTheDocument()

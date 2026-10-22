@@ -103,6 +103,10 @@ export interface LookbookPostFixture {
   locationKey?: string | null
   locale?: string | null
   climateBand?: ClimateBand | null
+  /** Story 6.6: normalized hierarchical area components stamped at submission. */
+  areaCountry?: string | null
+  areaRegion?: string | null
+  areaCity?: string | null
   paletteInsightId?: string | null
   challengeId?: string | null
   erasureRequestedAt?: Date | null
@@ -142,6 +146,9 @@ function buildDefaultLookbookPostFixture(now: Date): LookbookPostFixture {
     locationKey: 'us-il-chicago',
     locale: 'en-US',
     climateBand: 'temperate_dry',
+    areaCountry: null,
+    areaRegion: null,
+    areaCity: null,
     paletteInsightId: null,
     challengeId: null,
     erasureRequestedAt: null,
@@ -193,6 +200,9 @@ export function buildLookbookPostCreateInput(
     location_key: fixture.locationKey,
     locale: fixture.locale,
     climate_band: fixture.climateBand,
+    area_country: fixture.areaCountry,
+    area_region: fixture.areaRegion,
+    area_city: fixture.areaCity,
     palette_insight_id: fixture.paletteInsightId,
     challenge_id: fixture.challengeId,
     erasure_requested_at: fixture.erasureRequestedAt,

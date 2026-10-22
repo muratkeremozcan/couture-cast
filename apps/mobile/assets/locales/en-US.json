@@ -862,6 +862,26 @@
       "back": "Back to community",
       "bindingConflict": "This device's notification registration changed. Try again.",
       "pushUnavailable": "Push notifications are not available on this device."
+    },
+    "spotlight": {
+      "eyebrow": "City Spotlight",
+      "heading": "Spotlight in {{area}}",
+      "headingFallback": "City Spotlight",
+      "intro": "Standout looks near you from the past week.",
+      "rank": "Rank {{rank}}",
+      "position": "Position {{position}} of {{count}}",
+      "loading": "Loading the City Spotlight",
+      "emptyTitle": "No spotlight near you yet",
+      "emptyBody": "When enough members near you share looks, the most loved ones from this week appear here.",
+      "disabled": "The City Spotlight is temporarily unavailable.",
+      "error": "We could not load the City Spotlight.",
+      "retry": "Try again",
+      "viewMore": "View more",
+      "loadingMore": "Loading more looks",
+      "announceLoadedMore": "Loaded {{count}} more spotlight looks.",
+      "announceLoadedMore_one": "Loaded {{count}} more spotlight look.",
+      "announceLoadedMore_other": "Loaded {{count}} more spotlight looks.",
+      "announceRefreshed": "The City Spotlight was refreshed with the latest ranking."
     }
   }
 }

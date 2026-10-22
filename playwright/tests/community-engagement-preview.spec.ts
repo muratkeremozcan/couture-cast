@@ -152,7 +152,9 @@ test.describe('Story 6.5 hosted realtime on the protected preview', () => {
       (await feed.json()) as {
         data: { items: { id: string; reactions: { revision: number } }[] }
       }
-    ).data.items[0]!
+    ).data.items.find((item) => item.id.startsWith('lookbook-'))!
+    // A feed-seed post, never the shared read-only City Spotlight cohort, whose
+    // seeded posts are newer and lead the all-climates feed.
     const reactions = page.getByTestId(`community-reactions-${post.id}`)
     const label = await reactions
       .getByRole('button', { name: /^Applaud,/ })

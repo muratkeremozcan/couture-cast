@@ -274,6 +274,9 @@ export function registerCommunityPublishingCases() {
     try {
       await render(<CommunityScreen />)
       await screen.findByTestId('community-post-card-post-a')
+      // A completed load restores the retry budget, so the first load has to land
+      // before the deadline fires or it would grant one extra refetch.
+      await screen.findByTestId('community-card-image-loaded-post-a')
       await waitFor(() => expect(expireImage).toBeTypeOf('function'))
       expect(feedUrls).toHaveLength(1)
       expect(screen.queryByTestId('community-card-image-unavailable-post-a')).toBeNull()

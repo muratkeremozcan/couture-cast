@@ -7,6 +7,7 @@ import {
   communitySyncClient,
   commentSessionIdentity,
   ResponseError,
+  retryOnceWhenCommunityUnavailable,
 } from '@couture/api-client'
 // Story 6.1 Task 5 owner: the web app's community feed client.
 //
@@ -36,6 +37,10 @@ import {
   communityReactionPostResponseSchema,
   communityReactionResponseSchema,
   communityReactionConflictResponseSchema,
+  communityReactionSpotlightResponseSchema,
+  COMMUNITY_SPOTLIGHT_DEFAULT_LIMIT,
+  type CommunityReactionSpotlight,
+  type CommunityServedSpotlightLevel,
   type SetCommunityReactionInput,
   type CommunityReactionSummary,
   openCommunityPostResponseSchema,
@@ -190,6 +195,10 @@ function reasonForResponse(status: number, message: string): CommunityFailureRea
   }
   if (status === 403) {
     if (message.includes(COMMUNITY_AGE_GATE_DENIED_MESSAGE)) return 'age_gate'
+    // The read gate refuses a viewer outside the read rollout with a 403 whose
+    // message is the same disabled copy the 503 carries, so both read as the
+    // localized disabled state rather than a generic failure.
+    if (message.includes(COMMUNITY_FEED_DISABLED_MESSAGE)) return 'disabled'
     // `community.service.ts` throws the self-report refusal as a
     // `ForbiddenException`, not a conflict. Classifying it under 409 -- which is
     // where the first draft put it -- left `self_report` and its catalog string
@@ -287,9 +296,14 @@ export async function getCommunityFeedFromWeb({
 }: CommunityFeedRequest): Promise<CommunityFeed> {
   const accessToken = readAccessToken()
   try {
-    const response = await createWebApiClient({ accessToken }).apiV1CommunityFeedGet(
-      { xCouturePlatform: 'web', xCoutureReactions: '1', mode, cursor, limit },
-      { signal }
+    // The read gate's `unavailable` 503 is retryable by contract.
+    const response = await retryOnceWhenCommunityUnavailable(
+      () =>
+        createWebApiClient({ accessToken }).apiV1CommunityFeedGet(
+          { xCouturePlatform: 'web', xCoutureReactions: '1', mode, cursor, limit },
+          { signal }
+        ),
+      signal
     )
     return communityReactionFeedResponseSchema.parse(response).data
   } catch (error: unknown) {
@@ -372,6 +386,68 @@ export async function openCommunityPostFromWeb(
     openCommunityPostResponseSchema.parse(response)
   } catch (error: unknown) {
     throw await communityError(error, 'Unable to record this card open.')
+  }
+}
+
+export interface CommunitySpotlightRequest {
+  /** Signed cursor from the previous spotlight page; omitted for page one. */
+  cursor?: string
+  limit?: number
+  signal?: AbortSignal
+}
+
+/**
+ * Story 6.6: one page of the City Spotlight. Reaction summaries are negotiated
+ * exactly like the feed, so spotlight cards share the grid's reaction state.
+ */
+export async function getCommunitySpotlightFromWeb({
+  cursor,
+  limit = COMMUNITY_SPOTLIGHT_DEFAULT_LIMIT,
+  signal,
+}: CommunitySpotlightRequest = {}): Promise<CommunityReactionSpotlight> {
+  const accessToken = readAccessToken()
+  try {
+    const response = await retryOnceWhenCommunityUnavailable(
+      () =>
+        createWebApiClient({ accessToken }).getCommunitySpotlight(
+          { xCouturePlatform: 'web', xCoutureReactions: '1', cursor, limit },
+          { signal }
+        ),
+      signal
+    )
+    return communityReactionSpotlightResponseSchema.parse(response).data
+  } catch (error: unknown) {
+    // Developer-facing. The spotlight renders `community.spotlight.error`.
+    throw await communityError(error, 'Unable to load the City Spotlight.')
+  }
+}
+
+/**
+ * Story 6.6: records a spotlight open. The body names the surface, the card's
+ * rank and the level the module was served at, and never an experiment arm, so
+ * the server records only the spotlight event and never a feed card-open.
+ */
+export async function openCommunitySpotlightPostFromWeb(
+  postId: string,
+  rank: number,
+  level: CommunityServedSpotlightLevel,
+  signal?: AbortSignal
+): Promise<void> {
+  const accessToken = readAccessToken()
+  try {
+    const response = await createWebApiClient({
+      accessToken,
+    }).apiV1CommunityPostsPostIdOpenedPost(
+      {
+        postId,
+        xCouturePlatform: 'web',
+        openCommunityPostInput: { surface: 'spotlight', rank, level },
+      },
+      { signal }
+    )
+    openCommunityPostResponseSchema.parse(response)
+  } catch (error: unknown) {
+    throw await communityError(error, 'Unable to record this spotlight open.')
   }
 }
 

@@ -2,6 +2,7 @@ import {
   encodeCommunityFeedCursor,
   type CommunityPlatform,
 } from '@couture/api-client/contracts/http'
+import { MatchersV3 } from '@pact-foundation/pact'
 import { isoTimestamp, like, pactEventHeaders, string } from '../shared'
 
 // Learning path Step 38: Community feed by climate band.
@@ -266,7 +267,35 @@ const publishRequestBody = {
   challengeId: CHALLENGE_ID,
 }
 
+/**
+ * The populated summary the provider double returns for a negotiated read
+ * (Story 6.3), shared by the feed and the Story 6.6 spotlight interactions.
+ */
+const currentReactionSummary = {
+  counts: { applause: 2, love: 1, inspiration: 3 },
+  total: 6,
+  viewerReaction: 'applause' as const,
+  revision: 3,
+  generation: 7,
+}
+// pactjs-utils 1.1.0 reads Zod 3 .int() checks as decimals. Provider verification
+// rejects valid integer JSON with those matchers. Use Pact's integer matcher;
+// the real consumer still validates the entire response with the refined schema.
+const reactionSummaryMatchers = () => ({
+  counts: {
+    applause: MatchersV3.integer(currentReactionSummary.counts.applause),
+    love: MatchersV3.integer(currentReactionSummary.counts.love),
+    inspiration: MatchersV3.integer(currentReactionSummary.counts.inspiration),
+  },
+  total: MatchersV3.integer(currentReactionSummary.total),
+  viewerReaction: string(currentReactionSummary.viewerReaction),
+  revision: MatchersV3.integer(currentReactionSummary.revision),
+  generation: MatchersV3.integer(currentReactionSummary.generation),
+})
+
 export {
+  currentReactionSummary,
+  reactionSummaryMatchers,
   FEED_PATH,
   PUBLISHED_POST_ID,
   AUTHOR_PENDING_POST_ID,

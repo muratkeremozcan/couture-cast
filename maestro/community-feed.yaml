@@ -15,7 +15,7 @@
 # `LookbookPost` rows with stable ids `lookbook-1` through `lookbook-5`,
 # captions `Look N — weather-ready layers`, and `climate_band` alternating
 # `temperate_dry` / `cold_dry`. They are published a minute apart in id order, so
-# `lookbook-5` is the NEWEST and leads the `published_at DESC` feed; this flow
+# `lookbook-5` is the NEWEST of these and leads them in `published_at DESC`; this flow
 # anchors on it for that reason. CI runs `npm run db:reset` before the shards
 # (.github/workflows/pr-mobile-e2e.yml), so those rows are present and every
 # device sees them. Asserting `community-feed-empty` here would FAIL. This flow
@@ -188,6 +188,12 @@ tags:
     retryTapIfNoChange: true
     label: 'Pin the feed to every climate so the result does not depend on this
       device user having a saved location'
+# The chip refetches the feed, and while it loads the list renders empty, which
+# resets any scroll; scrolling starts only once the page is in.
+- extendedWaitUntil:
+    notVisible:
+      id: 'community-feed-skeleton'
+    timeout: 20000
 
 - assertVisible:
     id: 'community-filter-chip-all'
@@ -207,20 +213,47 @@ tags:
 # this flow that read as a broken feed, and it is exactly the mistake the
 # ordering contract exists to catch.
 #
-# Asserting the newest post is the first visible card is a stronger check than
-# "some card rendered": a feed that lost its ordering, or that fell back to
-# creation time (which moderation stamps long before publication), puts a
-# different post here and fails.
+# Story 6.6: the City Spotlight module now heads the list, and the seeded
+# spotlight cohort publishes relative to the seed run, so its posts are newer
+# than every `lookbook-N` row and lead the all-climates feed. The flow scrolls to
+# the newest feed-seed post instead of expecting it in the first viewport. The
+# spotlight carousel and seven newer feed cards, each nearly a screen tall, sit
+# above it. A fast scroll command opened the card under it on Android, so the
+# card is reached with long, steady swipes instead. A card is
+# taller than the space between the header and the tab bar on a phone, so the
+# checks below walk it top to bottom, scrolling each part into view before
+# asserting it: a part asserted earlier may already have scrolled away.
+- extendedWaitUntil:
+    visible:
+      id: 'community-spotlight-heading'
+    timeout: 20000
+    label: 'The spotlight header rendered above the feed, over the real API'
+# Long straight swipes, each moving most of a screen, reach the card in about
+# half the steps of a scroll command, and each step checks for it first.
+- repeat:
+    while:
+      notVisible:
+        id: 'community-post-card-lookbook-5'
+    times: 30
+    commands:
+      - swipe:
+          start: '50%, 85%'
+          end: '50%, 20%'
+          duration: 500
 - extendedWaitUntil:
     visible:
       id: 'community-post-card-lookbook-5'
-    timeout: 20000
-    label: 'The newest seeded post is the first card, over the real API'
+    timeout: 10000
+    label: 'The newest feed-seed post renders in the feed'
 
+- scrollUntilVisible:
+    element:
+      id: 'community-card-author-lookbook-5'
+    direction: DOWN
+    timeout: 20000
 - assertVisible:
-    id: 'community-card-caption-lookbook-5'
-    text: 'Look 5 — weather-ready layers'
-    label: 'The caption is the seeded row, so this is live data and not a fixture'
+    id: 'community-card-author-lookbook-5'
+    label: 'The author line renders a pseudonym rather than being absent'
 
 # TWO ASSERTIONS, NOT ONE WITH BOTH `id` AND `text`.
 #
@@ -228,8 +261,8 @@ tags:
 # the pill does not have one: `community-card-climate-pill-<id>` is the `testID`
 # on the wrapping `View` (community-card.tsx), while the band label lives on a
 # child `<Text>`. The combined form therefore fails against a perfectly correct
-# card. The caption above is not affected because its `testID` sits on the `Text`
-# element itself.
+# card. The caption below is not affected because its `testID` sits on the
+# `Text` element itself.
 - assertVisible:
     id: 'community-card-climate-pill-lookbook-5'
     label: 'The climate band pill renders on the card'
@@ -238,13 +271,16 @@ tags:
     text: 'Temperate and dry'
     label: 'The seeded band renders through the locale catalog, not as a raw enum'
 
-- assertVisible:
-    id: 'community-card-author-lookbook-5'
-    label: 'The author line renders a pseudonym rather than being absent'
-
 # The signed image URL is minted per request and the card renders it. A post
 # whose object could not be signed is dropped from the feed entirely, so this
-# also proves the seeded object exists in the bucket.
+# also proves the seeded object exists in the bucket. Half the image on screen
+# puts its top edge, where the loaded marker sits, on screen too.
+- scrollUntilVisible:
+    element:
+      id: 'community-card-image-lookbook-5'
+    direction: DOWN
+    visibilityPercentage: 50
+    timeout: 20000
 - assertVisible:
     id: 'community-card-image-lookbook-5'
     label: 'The card rendered its signed image rather than the unavailable state'
@@ -262,6 +298,21 @@ tags:
 - assertNotVisible:
     id: 'community-card-image-unavailable-lookbook-5'
 
+- scrollUntilVisible:
+    element:
+      id: 'community-card-caption-lookbook-5'
+    direction: DOWN
+    timeout: 20000
+- assertVisible:
+    id: 'community-card-caption-lookbook-5'
+    text: 'Look 5 — weather-ready layers'
+    label: 'The caption is the seeded row, so this is live data and not a fixture'
+
+- scrollUntilVisible:
+    element:
+      id: 'community-card-report-lookbook-5'
+    direction: DOWN
+    timeout: 20000
 - assertVisible:
     id: 'community-card-report-lookbook-5'
     text: 'Report'
@@ -280,6 +331,29 @@ tags:
     id: 'community-feed-error'
 - assertNotVisible:
     id: 'community-action-error'
+
+# ORDERING. The feed-seed rows publish a minute apart, so `lookbook-5` must sit
+# above `lookbook-4` in the `published_at DESC` feed. A feed that lost
+# its ordering, or fell back to creation time (which moderation stamps long
+# before publication), puts `lookbook-4` first and fails here. Each card is
+# almost a screen tall, so the next card is scrolled in and asserted below the
+# one still on screen above it.
+- scrollUntilVisible:
+    element:
+      id: 'community-post-card-lookbook-4'
+    direction: DOWN
+    visibilityPercentage: 50
+    timeout: 20000
+- assertVisible:
+    id: 'community-post-card-lookbook-4'
+    below:
+      id: 'community-post-card-lookbook-5'
+    label: 'The newest feed-seed post sits above the next one'
+- scrollUntilVisible:
+    element:
+      id: 'community-card-caption-lookbook-5'
+    direction: UP
+    timeout: 20000
 
 # Story 6.3: desired-state add, replace, reload, and remove against the real API.
 - scrollUntilVisible:
@@ -345,10 +419,39 @@ tags:
     id: 'tab-community'
 - tapOn:
     id: 'community-filter-chip-all'
+# The chip refetches the feed, and while it loads the list renders empty, which
+# resets any scroll; scrolling starts only once the page is in.
+- extendedWaitUntil:
+    notVisible:
+      id: 'community-feed-skeleton'
+    timeout: 20000
+- extendedWaitUntil:
+    visible:
+      id: 'community-spotlight-heading'
+    timeout: 20000
+# The spotlight and the newer seeded feed cards sit above `lookbook-5` again
+# after the relaunch, so the card is reached the same way as the first time.
+# Long straight swipes, each moving most of a screen, reach the card in about
+# half the steps of a scroll command, and each step checks for it first.
+- repeat:
+    while:
+      notVisible:
+        id: 'community-post-card-lookbook-5'
+    times: 30
+    commands:
+      - swipe:
+          start: '50%, 85%'
+          end: '50%, 20%'
+          duration: 500
+- extendedWaitUntil:
+    visible:
+      id: 'community-post-card-lookbook-5'
+    timeout: 10000
 - scrollUntilVisible:
     element:
       id: 'community-reaction-total-lookbook-5'
     direction: DOWN
+    timeout: 20000
 - assertVisible:
     id: 'community-reaction-love-lookbook-5'
     selected: true

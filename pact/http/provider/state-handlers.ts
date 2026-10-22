@@ -613,6 +613,40 @@ export const stateHandlers: StateHandlers = {
     })
   },
 
+  'A city spotlight page exists for the viewer area': (parameters?: unknown) => {
+    const { userId } = (parameters ?? {}) as CommunityStateParams
+    configureProviderCommunityState({ userId, scenario: 'spotlight-city' })
+    return Promise.resolve({
+      description: 'Configured a ranked city spotlight page for the viewer area',
+    })
+  },
+
+  'A second city spotlight page follows the first-page cursor': (
+    parameters?: unknown
+  ) => {
+    const { userId } = (parameters ?? {}) as CommunityStateParams
+    configureProviderCommunityState({ userId, scenario: 'spotlight-page-two' })
+    return Promise.resolve({
+      description: 'Configured a ranked city spotlight with a second page',
+    })
+  },
+
+  'The community read rollout is off for the viewer': (parameters?: unknown) => {
+    const { userId } = (parameters ?? {}) as CommunityStateParams
+    configureProviderCommunityState({ userId, scenario: 'spotlight-disabled' })
+    return Promise.resolve({
+      description: 'Configured a viewer the community read rollout refuses',
+    })
+  },
+
+  'No spotlight cohort exists for the viewer area': (parameters?: unknown) => {
+    const { userId } = (parameters ?? {}) as CommunityStateParams
+    configureProviderCommunityState({ userId, scenario: 'spotlight-none' })
+    return Promise.resolve({
+      description: 'Configured a viewer area where no level meets the privacy cohort',
+    })
+  },
+
   'The viewer climate band cannot be resolved': (parameters?: unknown) => {
     const { userId } = (parameters ?? {}) as CommunityStateParams
     configureProviderCommunityState({ userId, scenario: 'feed-band-unresolved' })

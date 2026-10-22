@@ -714,6 +714,7 @@ describe('6.1 community moderation pipeline', () => {
           climateBand: 'cold_wet',
           locale: 'en-US',
           challengeId: null,
+          area: { country: null, region: null, city: null },
         },
       })
       expect(published.kind).toBe('published')

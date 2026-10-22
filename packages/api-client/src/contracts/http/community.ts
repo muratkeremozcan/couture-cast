@@ -507,6 +507,13 @@ export const COMMUNITY_REACTION_CONFLICT_MESSAGE =
   'Reaction changed. Refresh and try again.'
 export const COMMUNITY_REACTION_RATE_LIMITED_MESSAGE =
   'Too many reactions. Please try again in a minute.'
+/**
+ * Story 6.6: the privacy model's spotlight read limit. Every page counts, so
+ * replaying a cursor is no unmetered way to probe the cohort.
+ */
+export const COMMUNITY_SPOTLIGHT_READS_PER_MINUTE = 30
+export const COMMUNITY_SPOTLIGHT_RATE_LIMITED_MESSAGE =
+  'Too many spotlight reads. Please try again in a minute.'
 
 // --- Feed Read Schemas ------------------------------------------------------
 
@@ -757,7 +764,7 @@ export type ReportCommunityPostResponse = z.infer<
  * without, and it needs a route because only the server can be trusted to say
  * whether the opener is the author.
  */
-export const openCommunityPostInputSchema = z
+export const openCommunityFeedPostInputSchema = z
   .object({
     /**
      * The arm the client was serving when the card was opened. Sent rather than
@@ -767,10 +774,189 @@ export const openCommunityPostInputSchema = z
     experimentVariant: communityExperimentVariantSchema,
   })
   .strict()
-export type OpenCommunityPostInput = z.infer<typeof openCommunityPostInputSchema>
+export type OpenCommunityFeedPostInput = z.infer<typeof openCommunityFeedPostInputSchema>
+
+/** Story 6.6: the snapshot rank range, matching the 60-post spotlight cap. */
+export const COMMUNITY_SPOTLIGHT_MAX_RANK = 60
+
+/** Story 6.6: the levels a served spotlight can carry; `none` serves no cards. */
+export const communityServedSpotlightLevelSchema = z.enum(['city', 'region', 'country'])
+export type CommunityServedSpotlightLevel = z.infer<
+  typeof communityServedSpotlightLevelSchema
+>
+
+/**
+ * Story 6.6: an open from the City Spotlight module. It carries the card's rank
+ * and the level the module was served at, and never an experiment arm, because
+ * the spotlight is outside the feed experiment; this branch records only
+ * `community_spotlight_opened`.
+ */
+export const openCommunitySpotlightPostInputSchema = z
+  .object({
+    surface: z.literal('spotlight'),
+    rank: z.number().int().min(1).max(COMMUNITY_SPOTLIGHT_MAX_RANK),
+    level: communityServedSpotlightLevelSchema,
+  })
+  .strict()
+export type OpenCommunitySpotlightPostInput = z.infer<
+  typeof openCommunitySpotlightPostInputSchema
+>
+
+export type OpenCommunityPostInput =
+  | OpenCommunityFeedPostInput
+  | OpenCommunitySpotlightPostInput
+
+/**
+ * Discriminated by the presence of `surface`. A body without it is exactly the
+ * installed clients' feed open and keeps today's `community_card_opened`
+ * behavior byte for byte.
+ *
+ * One strict object with optional members, refined to exactly one branch,
+ * rather than a schema union: the published request body only widens, so an
+ * installed client's body stays valid under the same object schema.
+ */
+const OPEN_COMMUNITY_POST_INPUT_DESCRIPTION =
+  'Either a feed open with experimentVariant, or a spotlight open with surface spotlight, a rank from 1 to 60 and the served level. The two forms never mix.'
+
+export const openCommunityPostInputSchema = z
+  .object({
+    experimentVariant: communityExperimentVariantSchema.optional(),
+    surface: z.literal('spotlight').optional(),
+    rank: z.number().int().min(1).max(COMMUNITY_SPOTLIGHT_MAX_RANK).optional(),
+    level: communityServedSpotlightLevelSchema.optional(),
+  })
+  .strict()
+  .superRefine((body, context) => {
+    const spotlight =
+      body.surface !== undefined || body.rank !== undefined || body.level !== undefined
+    const valid = spotlight
+      ? openCommunitySpotlightPostInputSchema.safeParse(body).success
+      : openCommunityFeedPostInputSchema.safeParse(body).success
+    if (!valid)
+      context.addIssue({
+        code: z.ZodIssueCode.custom,
+        message: spotlight
+          ? 'A spotlight open needs surface spotlight, a rank and the served level, and no experiment variant.'
+          : 'A feed open needs the served experiment variant.',
+      })
+  })
+  .openapi({ description: OPEN_COMMUNITY_POST_INPUT_DESCRIPTION })
+  .transform(
+    (body): OpenCommunityPostInput =>
+      body.surface !== undefined
+        ? { surface: body.surface, rank: body.rank!, level: body.level! }
+        : { experimentVariant: body.experimentVariant! }
+  )
+  .openapi({ description: OPEN_COMMUNITY_POST_INPUT_DESCRIPTION })
+
+export function isSpotlightOpenInput(
+  input: OpenCommunityPostInput
+): input is OpenCommunitySpotlightPostInput {
+  return 'surface' in input
+}
 
 export const openCommunityPostResponseSchema = trackedResponseSchema
 export type OpenCommunityPostResponse = z.infer<typeof openCommunityPostResponseSchema>
+
+// --- City Spotlight (Story 6.6) ----------------------------------------------
+
+/**
+ * The area level a spotlight was ranked at. `none` means no level met the
+ * privacy cohort and the response carries no items.
+ */
+export const communitySpotlightLevelSchema = z.enum(['city', 'region', 'country', 'none'])
+export type CommunitySpotlightLevel = z.infer<typeof communitySpotlightLevelSchema>
+
+export const COMMUNITY_SPOTLIGHT_DEFAULT_LIMIT = 6
+export const COMMUNITY_SPOTLIGHT_MAX_LIMIT = 12
+
+const communitySpotlightRankSchema = z
+  .number()
+  .int()
+  .min(1)
+  .max(COMMUNITY_SPOTLIGHT_MAX_RANK)
+  .openapi({ description: 'One-based position of the post in the ranked snapshot.' })
+
+export const communitySpotlightItemSchema = communityFeedItemSchema
+  .extend({ rank: communitySpotlightRankSchema })
+  .strict()
+export type CommunitySpotlightItem = z.infer<typeof communitySpotlightItemSchema>
+
+export const communitySpotlightSchema = z
+  .object({
+    level: communitySpotlightLevelSchema,
+    label: z.string().nullable().openapi({
+      description:
+        "The viewer's own place name at the ranked level, or null for none. Never derived from authors.",
+    }),
+    items: z.array(communitySpotlightItemSchema),
+    nextCursor: z.string().nullable(),
+  })
+  .strict()
+export type CommunitySpotlight = z.infer<typeof communitySpotlightSchema>
+
+export const communitySpotlightResponseSchema = z
+  .object({ data: communitySpotlightSchema })
+  .strict()
+export type CommunitySpotlightResponse = z.infer<typeof communitySpotlightResponseSchema>
+
+export const communityReactionSpotlightItemSchema = communityReactionFeedItemSchema
+  .extend({ rank: communitySpotlightRankSchema })
+  .strict()
+export type CommunityReactionSpotlightItem = z.infer<
+  typeof communityReactionSpotlightItemSchema
+>
+
+export const communityReactionSpotlightSchema = communitySpotlightSchema
+  .extend({ items: z.array(communityReactionSpotlightItemSchema) })
+  .strict()
+export type CommunityReactionSpotlight = z.infer<typeof communityReactionSpotlightSchema>
+
+export const communityReactionSpotlightResponseSchema = z
+  .object({ data: communityReactionSpotlightSchema })
+  .strict()
+export type CommunityReactionSpotlightResponse = z.infer<
+  typeof communityReactionSpotlightResponseSchema
+>
+
+export const communitySpotlightQuerySchema = z
+  .object({
+    cursor: z.string().min(1).optional(),
+    limit: z.coerce
+      .number()
+      .int()
+      .min(1)
+      .max(COMMUNITY_SPOTLIGHT_MAX_LIMIT)
+      .default(COMMUNITY_SPOTLIGHT_DEFAULT_LIMIT),
+  })
+  .strict()
+export type CommunitySpotlightQuery = z.infer<typeof communitySpotlightQuerySchema>
+
+/** The refusal the spotlight shares with every other read-authorized community route. */
+export const communitySpotlightInvalidCursorResponseSchema = z
+  .object({
+    statusCode: z.literal(400),
+    code: z.literal('invalid_cursor'),
+    message: nonEmptyStringSchema,
+  })
+  .strict()
+export const communitySpotlightDeniedResponseSchema = z
+  .object({
+    statusCode: z.literal(403),
+    code: z.string().optional(),
+    message: nonEmptyStringSchema,
+    error: z.string().optional(),
+  })
+  .strict()
+export const communitySpotlightUnavailableResponseSchema = z
+  .object({
+    statusCode: z.literal(503),
+    code: z.literal('unavailable'),
+    retryAfterSeconds: z.number().int().min(1),
+    message: nonEmptyStringSchema,
+    error: z.string().optional(),
+  })
+  .strict()
 
 export const withdrawCommunityPostResponseSchema = trackedResponseSchema
 export type WithdrawCommunityPostResponse = z.infer<
@@ -1608,6 +1794,130 @@ export function registerCommunityContracts(
     },
   })
 
+  registry.register('CommunitySpotlightLevel', communitySpotlightLevelSchema)
+  registry.register('CommunitySpotlightItem', communitySpotlightItemSchema)
+  registry.register(
+    'CommunityReactionSpotlightItem',
+    communityReactionSpotlightItemSchema
+  )
+  const registeredSpotlightResponse = registry.register(
+    'CommunitySpotlightResponse',
+    communitySpotlightResponseSchema
+  )
+  const registeredReactionSpotlightResponse = registry.register(
+    'CommunityReactionSpotlightResponse',
+    communityReactionSpotlightResponseSchema
+  )
+  registry.registerPath({
+    method: 'get',
+    path: '/api/v1/community/spotlight',
+    tags: ['community'],
+    operationId: 'getCommunitySpotlight',
+    summary: 'Read the City Spotlight for the viewer area',
+    description:
+      'Returns recent published looks from the viewer\u2019s coarse area ranked by non-author reactions and recency. The narrowest of city, region and country with at least five distinct eligible authors is used; otherwise level is none with no items. Read authorization and rollout rules match the feed.',
+    security: [{ bearerAuth: [] }],
+    parameters: [
+      {
+        name: 'x-couture-reactions',
+        in: 'header',
+        required: false,
+        schema: { type: 'string', enum: ['1'] },
+        description:
+          'Opt in to live reaction summaries on each item, exactly like the feed.',
+      },
+      {
+        name: 'x-couture-platform',
+        in: 'header',
+        required: true,
+        schema: { type: 'string', enum: ['web', 'mobile'] },
+        description: 'Platform making the request.',
+      },
+      {
+        name: 'cursor',
+        in: 'query',
+        required: false,
+        schema: { type: 'string' },
+        description:
+          'Opaque signed cursor from a previous page. It is bound to the member, level, area and ranked snapshot; a cursor that no longer matches returns 400 invalid_cursor and paging restarts from the first page.',
+      },
+      {
+        name: 'limit',
+        in: 'query',
+        required: false,
+        schema: {
+          type: 'integer',
+          minimum: 1,
+          maximum: COMMUNITY_SPOTLIGHT_MAX_LIMIT,
+          default: COMMUNITY_SPOTLIGHT_DEFAULT_LIMIT,
+        },
+        description: 'Number of ranked positions to read (1-12, default 6).',
+      },
+    ],
+    responses: {
+      200: {
+        description: 'City Spotlight page.',
+        content: {
+          'application/json': {
+            schema: z.union([
+              registeredSpotlightResponse,
+              registeredReactionSpotlightResponse,
+            ]),
+          },
+        },
+      },
+      400: {
+        description: 'Invalid query, or a cursor that is malformed, foreign or stale.',
+        content: {
+          'application/json': {
+            schema: z.union([
+              commonSchemas.badRequestHttpErrorSchema,
+              communitySpotlightInvalidCursorResponseSchema,
+            ]),
+          },
+        },
+      },
+      401: {
+        description: 'Missing or invalid authentication headers.',
+        content: {
+          'application/json': { schema: commonSchemas.unauthorizedHttpErrorSchema },
+        },
+      },
+      403: {
+        description: 'The community read rollout or age eligibility refuses this viewer.',
+        content: {
+          'application/json': { schema: communitySpotlightDeniedResponseSchema },
+        },
+      },
+      429: {
+        description: `${COMMUNITY_SPOTLIGHT_READS_PER_MINUTE} spotlight reads per member per minute, first and later pages alike.`,
+        headers: {
+          'Retry-After': {
+            description: 'Seconds until the member may read the spotlight again.',
+            schema: { type: 'integer', minimum: 1 },
+          },
+        },
+        content: {
+          'application/json': { schema: commonSchemas.tooManyRequestsHttpErrorSchema },
+        },
+      },
+      500: {
+        description: 'Internal server error occurred.',
+        content: {
+          'application/json': {
+            schema: commonSchemas.internalServerErrorHttpErrorSchema,
+          },
+        },
+      },
+      503: {
+        description: 'Access could not be verified within the authorization budget.',
+        content: {
+          'application/json': { schema: communitySpotlightUnavailableResponseSchema },
+        },
+      },
+    },
+  })
+
   registry.registerPath({
     method: 'post',
     path: '/api/v1/community/posts/allocate',
@@ -1977,7 +2287,7 @@ export function registerCommunityContracts(
     tags: ['community'],
     summary: 'Record that a viewer opened a community post',
     description:
-      'Records one card-open. The server decides whether the opener is the author, because a client-asserted is-self flag would let the beta gate be moved by the population it measures. Repeats within the deduplication window collapse to one event.',
+      'Records one card-open. The server decides whether the opener is the author, because a client-asserted is-self flag would let the beta gate be moved by the population it measures. Repeats within the deduplication window collapse to one event. A body with surface spotlight and a rank records only a spotlight open; a body without surface keeps the feed card-open behavior.',
     security: [{ bearerAuth: [] }],
     parameters: [
       {
@@ -2017,7 +2327,7 @@ export function registerCommunityContracts(
       },
       400: {
         description:
-          'Missing or invalid x-couture-platform header, or an invalid request body.',
+          'Missing or invalid x-couture-platform header, or an invalid request body, including a spotlight rank outside 1 to 60.',
         content: {
           'application/json': { schema: commonSchemas.badRequestHttpErrorSchema },
         },

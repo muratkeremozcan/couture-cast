@@ -118,6 +118,22 @@ export {
   persistLookbookPost,
 } from './community.factory.js'
 export {
+  buildSpotlightSavedLocationCreateInput,
+  normalizeSpotlightAreaNames,
+  persistSpotlightCohort,
+  planSpotlightCohort,
+  SEEDED_SPOTLIGHT_AREA,
+  SEEDED_SPOTLIGHT_COHORT_SIZE,
+  SPOTLIGHT_FIXTURE_COHORT_AUTHORS,
+  uniqueSpotlightArea,
+} from './community-spotlight.factory.js'
+export type {
+  SpotlightAreaComponentsFixture,
+  SpotlightAreaNames,
+  SpotlightCohortFixture,
+  SpotlightReactionFixture,
+} from './community-spotlight.factory.js'
+export {
   DEFAULT_FACTORY_REGISTRY_KEYS,
   createFactoryRegistry,
   factoryRegistry,

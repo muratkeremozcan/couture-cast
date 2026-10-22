@@ -464,6 +464,26 @@
       "yourPostsTitle": "Sürmekte olan kombinlerin",
       "yourPostsBody": "İnceleme bitene kadar bunları yalnızca sen görürsün."
     },
+    "spotlight": {
+      "eyebrow": "Şehir Vitrini",
+      "heading": "{{area}} vitrini",
+      "headingFallback": "Şehir Vitrini",
+      "intro": "Geçen haftadan yakınındaki öne çıkan kombinler.",
+      "rank": "{{rank}}. sıra",
+      "position": "{{count}} konumdan {{position}}. konum",
+      "loading": "Şehir vitrini yükleniyor",
+      "emptyTitle": "Yakınında henüz vitrin yok",
+      "emptyBody": "Yakınındaki yeterli sayıda üye kombin paylaştığında, bu haftanın en sevilenleri burada görünür.",
+      "disabled": "Şehir vitrini geçici olarak kullanılamıyor.",
+      "error": "Şehir vitrini yüklenemedi.",
+      "retry": "Tekrar dene",
+      "viewMore": "Daha fazla göster",
+      "loadingMore": "Daha fazla kombin yükleniyor",
+      "announceLoadedMore": "{{count}} vitrin kombini daha yüklendi.",
+      "announceLoadedMore_one": "{{count}} vitrin kombini daha yüklendi.",
+      "announceLoadedMore_other": "{{count}} vitrin kombini daha yüklendi.",
+      "announceRefreshed": "Şehir vitrini en güncel sıralamayla yenilendi."
+    },
     "card": {
       "label": "{{author}} tarafından paylaşılan kombin",
       "authorSelf": "Sen",

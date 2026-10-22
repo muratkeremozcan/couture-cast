@@ -437,13 +437,16 @@ export function LookbookPrismLayout() {
         className={`grid gap-8 ${
           isMobilePreview
             ? 'grid-cols-1'
-            : 'grid-cols-1 min-[1280px]:grid-cols-2 min-[1440px]:grid-cols-[1fr_1fr_320px]'
+            : // `minmax(0,1fr)`, because a bare `1fr` track floors at its content's
+              // min-content: the hero's non-wrapping filter chips then claimed the
+              // whole row and crushed the community column off the right edge.
+              'grid-cols-1 min-[1280px]:grid-cols-[minmax(0,1fr)_minmax(0,1fr)] min-[1440px]:grid-cols-[minmax(0,1fr)_minmax(0,1fr)_320px]'
         }`}
       >
         {/* Left Column / Slot 1: Hero Ritual Canvas */}
         <section
           aria-label="Hero Ritual Canvas"
-          className={`flex self-start flex-col gap-6 rounded-[8px] border border-[#E6E6ED] bg-[#F5F5F7] p-6 shadow-sm ${
+          className={`flex min-w-0 self-start flex-col gap-6 rounded-[8px] border border-[#E6E6ED] bg-[#F5F5F7] p-6 shadow-sm ${
             isMobilePreview ? '' : 'sm:p-8'
           }`}
         >
@@ -566,7 +569,7 @@ export function LookbookPrismLayout() {
         </section>
 
         {/* Right Column / Slot 2: Community Lookbook Grid */}
-        <section aria-label="Community Section" className="w-full">
+        <section aria-label="Community Section" className="w-full min-w-0">
           <CommunityLookbookGrid
             activeTab={activeTab}
             isMobilePreview={isMobilePreview}

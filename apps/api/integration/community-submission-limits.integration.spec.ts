@@ -149,6 +149,7 @@ const PUBLISH_DATA = {
   climateBand: 'temperate_dry' as const,
   locale: 'en-US',
   challengeId: null,
+  area: { country: null, region: null, city: null },
 }
 
 beforeAll(async () => {

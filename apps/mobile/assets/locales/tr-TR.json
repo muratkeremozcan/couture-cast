@@ -862,6 +862,26 @@
       "back": "Topluluğa dön",
       "bindingConflict": "Bu cihazın bildirim kaydı değişti. Tekrar deneyin.",
       "pushUnavailable": "Bu cihazda anlık bildirimler kullanılamıyor."
+    },
+    "spotlight": {
+      "eyebrow": "Şehir Vitrini",
+      "heading": "{{area}} vitrini",
+      "headingFallback": "Şehir Vitrini",
+      "intro": "Geçen haftadan yakınındaki öne çıkan kombinler.",
+      "rank": "{{rank}}. sıra",
+      "position": "{{count}} konumdan {{position}}. konum",
+      "loading": "Şehir vitrini yükleniyor",
+      "emptyTitle": "Yakınında henüz vitrin yok",
+      "emptyBody": "Yakınındaki yeterli sayıda üye kombin paylaştığında, bu haftanın en sevilenleri burada görünür.",
+      "disabled": "Şehir vitrini geçici olarak kullanılamıyor.",
+      "error": "Şehir vitrini yüklenemedi.",
+      "retry": "Tekrar dene",
+      "viewMore": "Daha fazla göster",
+      "loadingMore": "Daha fazla kombin yükleniyor",
+      "announceLoadedMore": "{{count}} vitrin kombini daha yüklendi.",
+      "announceLoadedMore_one": "{{count}} vitrin kombini daha yüklendi.",
+      "announceLoadedMore_other": "{{count}} vitrin kombini daha yüklendi.",
+      "announceRefreshed": "Şehir vitrini en güncel sıralamayla yenilendi."
     }
   }
 }

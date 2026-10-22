@@ -53,7 +53,9 @@ vi.mock('expo-crypto', () => ({
 }))
 // Retain the real RNW Image and record native onError, which DOM errors cannot reach.
 vi.mock('react-native', async (importOriginal) => {
-  const { imageEvents } = await import('../test-utils/community-screen/mock-state.js')
+  const { imageEvents, refreshEvents } = await import(
+    '../test-utils/community-screen/mock-state.js'
+  )
   const actual = await importOriginal<typeof ReactNativeModule>()
   function RecordingImage(props: Record<string, unknown>) {
     if (typeof props.testID === 'string' && typeof props.onError === 'function') {
@@ -61,9 +63,14 @@ vi.mock('react-native', async (importOriginal) => {
     }
     return imageEvents.createElement(actual.Image as never, props)
   }
+  function RecordingRefreshControl(props: Record<string, unknown>) {
+    refreshEvents.onRefresh = props.onRefresh as () => void
+    return imageEvents.createElement(actual.RefreshControl as never, props)
+  }
   return {
     ...actual,
     Image: RecordingImage,
+    RefreshControl: RecordingRefreshControl,
     AccessibilityInfo: {
       ...actual.AccessibilityInfo,
       announceForAccessibility: vi.fn(),
@@ -88,8 +95,12 @@ import { registerCommunityModerationCases } from '../test-utils/community-screen
 import { registerCommunityPublishingCases } from '../test-utils/community-screen/publishing.cases'
 import { registerCommunityReactionsCases } from '../test-utils/community-screen/reactions.cases'
 import { registerCommunityRealtimeCases } from '../test-utils/community-screen/realtime.cases'
+import { registerCommunityAvailabilityRestoreCases } from '../test-utils/community-screen/availability-restore.cases'
 import { registerCommunityNotificationRecoveryCases } from '../test-utils/community-screen/notification-recovery.cases'
 import { registerCommunityClientCases } from '../test-utils/community-screen/client.cases'
+import { registerCommunitySpotlightCases } from '../test-utils/community-screen/spotlight.cases'
+import { registerCommunitySpotlightReviewCases } from '../test-utils/community-screen/spotlight-review.cases'
+import { refreshEvents } from '../test-utils/community-screen/mock-state'
 import { configure } from '@testing-library/react'
 import { delay } from 'msw'
 import { afterAll, afterEach, beforeAll, beforeEach, describe, vi } from 'vitest'
@@ -122,6 +133,7 @@ describe('Mobile community screen (Story 6.1)', () => {
     vi.spyOn(CommunitySyncState.prototype, 'start').mockImplementation(() => undefined)
     setMockParams({})
     imageEvents.errors.clear()
+    refreshEvents.onRefresh = undefined
     resetFeedUrls()
     restoreAccessTokenResolver = setMobileAccessTokenResolver(() => 'session-token')
     imagePicker.requestMediaLibraryPermissionsAsync.mockResolvedValue({ granted: true })
@@ -154,7 +166,10 @@ describe('Mobile community screen (Story 6.1)', () => {
   registerCommunityPublishingCases()
   registerCommunityReactionsCases()
   registerCommunityRealtimeCases()
+  registerCommunityAvailabilityRestoreCases()
   registerCommunityNotificationRecoveryCases()
+  registerCommunitySpotlightCases()
+  registerCommunitySpotlightReviewCases()
 })
 
 /**
