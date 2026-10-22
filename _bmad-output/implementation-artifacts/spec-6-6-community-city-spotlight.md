@@ -92,7 +92,8 @@ surfaces with privacy-safe impression and open analytics.
   back to direct database ranking capped at 60. The invalidator is bounded so Redis never stalls
   `append()`.
 - Privacy model: coarse canonical area, 5-author cohort, the viewer's own label, and at most 30
-  page-one spotlight reads per member per minute through the community rate-limit contract.
+  spotlight reads (page one and cursor pages) per member per minute through the community
+  rate-limit contract.
 - Web: module heads the community section on `/`; mobile: header of the Community tab list. Show a
   heading with the area label, ranked cards reusing existing card and detail components, loading,
   empty, disabled and error states, and a View more button that appends the next page, moves focus to
@@ -289,6 +290,9 @@ rank: 1..60, level }` without `experimentVariant`, where `level` is the served l
   Redis-down recompute; discriminated opened branch that never emits `community_card_opened`;
   level enum and window inclusivity; AC2 restated against the invalidator boundary. KEEP: owner
   delegated cohort 5, 7-day window, score formula, submission stamping, no backfill.
+- 2026-10-22, iteration 4 (code review round 2, coordinator under owner delegation): the read
+  limit counts every spotlight read, cursor pages included (R29); region and city also transliterate
+  letters NFKD cannot split, such as ß, ł, đ, ø, æ (R32).
 - 2026-10-22, iteration 3 (code review round 1, coordinator under owner delegation): canonical
   ISO country and folded region and city; epoch only for unmappable, erased or anonymized posts; open
   body carries served level; same-ID rebuild refreshes generations; Redis `commandTimeout` and
