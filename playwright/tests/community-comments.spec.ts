@@ -635,6 +635,22 @@ test.describe('Story 6.4 screened threaded comments', () => {
       },
     })
     await composer.fill(draft)
+    // The failure alert is transient by design: a refresh that succeeds clears
+    // it, and the accepted comment can publish through realtime within the same
+    // second. Record every alert the thread shows instead of racing that refresh.
+    await thread.evaluate((element) => {
+      const seen: string[] = []
+      Object.assign(window, { __commentAlerts: seen })
+      const record = () =>
+        element
+          .querySelectorAll('[role="alert"]')
+          .forEach((alert) => seen.push(alert.textContent ?? ''))
+      new MutationObserver(record).observe(element, {
+        childList: true,
+        subtree: true,
+        characterData: true,
+      })
+    })
     await thread.getByRole('button', { name: 'Send comment', exact: true }).click()
     const { requestJson: firstRequest } = await lostCreate
     expect(firstRequest).toEqual({
@@ -643,9 +659,13 @@ test.describe('Story 6.4 screened threaded comments', () => {
       locale: 'en-US',
       parentId: null,
     })
-    await expect(thread.getByRole('alert')).toHaveText(
-      'Comments could not be updated. Try again.'
-    )
+    await expect
+      .poll(() =>
+        page.evaluate(
+          () => (window as unknown as { __commentAlerts: string[] }).__commentAlerts
+        )
+      )
+      .toContain('Comments could not be updated. Try again.')
     await expect(
       thread.getByText(
         'An earlier request needs confirmation. Retry it before sending your edited draft.'
