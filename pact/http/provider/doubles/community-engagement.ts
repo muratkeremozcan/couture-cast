@@ -69,10 +69,22 @@ const reply = {
 }
 export function createCommunityEngagementDoubles() {
   const scenario = () => getProviderEngagementState()
-  // Exercise the production access-denial branch. Database access is unreachable
-  // after the controlled affirmative false flag; unavailable uses its real exception.
+  // Exercise the production access-denial branch. The member's community subject is
+  // present (erasure is a separate terminal check that runs first), so the controlled
+  // affirmative false flag yields the real 403. Eligibility reads after the flag are
+  // unreachable; unavailable uses its real exception.
+  const subjectPresent = {
+    $executeRawUnsafe: () => Promise.resolve(0),
+    communitySubject: {
+      findUnique: ({ where }: { where: { member_id: string } }) =>
+        Promise.resolve({ member_id: where.member_id }),
+    },
+  }
   const access = new CommunityAccessService(
-    {} as PrismaClient,
+    {
+      $transaction: (work: (tx: typeof subjectPresent) => Promise<unknown>) =>
+        work(subjectPresent),
+    } as unknown as PrismaClient,
     {
       communityReadEvaluation: () =>
         Promise.resolve({
