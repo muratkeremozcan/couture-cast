@@ -2,6 +2,11 @@
 import { createHash } from 'node:crypto'
 import type { Prisma, PrismaClient } from '@prisma/client'
 import type { CommunityReactionSelection } from '@couture/api-client/contracts/http'
+import {
+  canonicalCountryCode,
+  canonicalSpotlightArea,
+  spotlightCountryCodes,
+} from '@couture/utils'
 import { createLookbookPost, type LookbookPostFixture } from './community.factory.js'
 
 type SpotlightPrismaClient = PrismaClient | Prisma.TransactionClient
@@ -18,9 +23,9 @@ export const SPOTLIGHT_FIXTURE_COHORT_AUTHORS = 5
 export const SEEDED_SPOTLIGHT_COHORT_SIZE = 7
 
 /**
- * One area as a member saved it. The API normalizes each component (trimmed,
- * NFKC, lowercased) before comparing, so fixture names stay ASCII and the
- * normalized form is a plain lowercase.
+ * One area as a member saved it. The API stores the canonical form: the
+ * country as its ISO 3166-1 alpha-2 code, region and city folded (trimmed,
+ * NFKD without combining marks, Turkish I folded, lowercased).
  */
 export interface SpotlightAreaNames {
   country: string
@@ -34,25 +39,57 @@ export interface SpotlightAreaComponentsFixture {
   city: string
 }
 
+/** The canonical components the API stamps for these names. */
 export function normalizeSpotlightAreaNames(
   names: SpotlightAreaNames
 ): SpotlightAreaComponentsFixture {
-  const normalize = (value: string) => value.trim().normalize('NFKC').trim().toLowerCase()
-  return {
-    country: normalize(names.country),
-    region: normalize(names.region),
-    city: normalize(names.city),
+  const area = canonicalSpotlightArea(names)
+  if (!area.country || !area.region || !area.city) {
+    throw new Error(
+      `Spotlight fixture area does not resolve to a full city tuple: ${JSON.stringify(names)}`
+    )
   }
+  return { country: area.country, region: area.region, city: area.city }
+}
+
+/**
+ * Countries fixtures name explicitly. Unique areas never hand them out, so a
+ * test's country-level cohort can never absorb another test's posts.
+ */
+const EXPLICIT_FIXTURE_COUNTRIES = new Set(['US', 'PT', 'BR', 'DE', 'TR', 'GB', 'GE'])
+let uniqueAreaCount = 0
+let fixtureCountries: readonly string[] | null = null
+
+/**
+ * English names of the countries unique areas hand out, each one resolving
+ * back to its own code. Names keep privacy assertions meaningful: a two-letter
+ * code would match inside unrelated serialized text.
+ */
+function uniqueFixtureCountries(): readonly string[] {
+  if (fixtureCountries) return fixtureCountries
+  const english = new Intl.DisplayNames(['en-US'], { type: 'region', fallback: 'none' })
+  fixtureCountries = spotlightCountryCodes()
+    .filter((code) => !EXPLICIT_FIXTURE_COUNTRIES.has(code))
+    .map((code) => ({ code, name: english.of(code) }))
+    .filter(({ code, name }) => name && canonicalCountryCode(name) === code)
+    .map(({ name }) => name!)
+  return fixtureCountries
 }
 
 /**
  * A unique area tuple for one test. Tests that mutate reactions own their own
  * area with its own cohort, so no two tests can move each other's ranking.
+ * Countries are real, so each call in one process takes the next unused one.
+ * Spotlight suites own one database per process, so no two areas in a
+ * database ever share a country.
  */
 export function uniqueSpotlightArea(namespace: string): SpotlightAreaNames {
   const token = createHash('sha256').update(namespace).digest('hex').slice(0, 10)
+  const country = uniqueFixtureCountries()[uniqueAreaCount]
+  if (!country) throw new Error('Every fixture country is already taken in this process')
+  uniqueAreaCount += 1
   return {
-    country: `Land ${token}`,
+    country,
     region: `Region ${token}`,
     city: `City ${token}`,
   }

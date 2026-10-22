@@ -1,6 +1,7 @@
 // Story 6.6 owner: hierarchical coarse areas for the City Spotlight.
 import { createHash } from 'node:crypto'
 import type { PrismaClient } from '@prisma/client'
+import { canonicalSpotlightArea } from '@couture/utils'
 import type { CommunitySpotlightLevel } from '@couture/api-client/contracts/http'
 
 export type SpotlightAreaLevel = Exclude<CommunitySpotlightLevel, 'none'>
@@ -29,24 +30,30 @@ export interface SpotlightLocationSource {
   city: string | null
 }
 
-/** Trimmed, NFKC, lowercased; blank collapses to null. */
-export function normalizeAreaComponent(value: string | null | undefined): string | null {
-  if (value == null) return null
-  const normalized = value.trim().normalize('NFKC').trim().toLowerCase()
-  return normalized.length > 0 ? normalized : null
-}
-
 /**
- * Keeps only the prefix whose parents are all present, so a city under a
- * missing region is dropped rather than stored where it could merge with a
- * same-named city elsewhere.
+ * The canonical components of a saved location: the country as its ISO
+ * 3166-1 alpha-2 code, region and city folded to one spelling. Only the prefix
+ * whose parents all resolve is kept, so a city under a missing region can
+ * never merge with a same-named city elsewhere.
  */
 export function areaComponentsOf(
   source: SpotlightLocationSource
 ): SpotlightAreaComponents {
-  const country = normalizeAreaComponent(source.country)
-  const region = country ? normalizeAreaComponent(source.region) : null
-  const city = region ? normalizeAreaComponent(source.city) : null
+  return canonicalSpotlightArea(source)
+}
+
+/**
+ * Components already stored on a post. They were canonical when stamped, so
+ * only the hierarchy is enforced again.
+ */
+export function storedAreaComponents(post: {
+  area_country: string | null
+  area_region: string | null
+  area_city: string | null
+}): SpotlightAreaComponents {
+  const country = post.area_country
+  const region = country ? post.area_region : null
+  const city = region ? post.area_city : null
   return { country, region, city }
 }
 

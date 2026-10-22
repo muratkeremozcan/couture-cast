@@ -51,11 +51,11 @@ async function submit(author: string, postId: string) {
 }
 
 describe('6.6 area stamping', () => {
-  it("6.6-INT-050 stamps only the normalized components of the author's chosen location", async () => {
+  it("6.6-INT-050 stamps only the canonical components of the author's chosen location", async () => {
     const author = await ctx.member({
       country: '  PORTUGAL ',
       region: 'Lisboa',
-      city: 'Ｌｉｓｂｏｎ',
+      city: 'Ｌｉｓｂôｎ',
     })
     const postId = await draft(author)
     await expect(submit(author, postId)).resolves.toMatchObject({ kind: 'published' })
@@ -64,7 +64,7 @@ describe('6.6 area stamping', () => {
       select: { ...AREA_SELECT, caption: true, locale: true },
     })
     expect(row).toMatchObject({
-      area_country: 'portugal',
+      area_country: 'PT',
       area_region: 'lisboa',
       area_city: 'lisbon',
       location_key: null,
@@ -85,20 +85,74 @@ describe('6.6 area stamping', () => {
         select: AREA_SELECT,
       })
     ).resolves.toMatchObject({
-      area_country: 'portugal',
+      area_country: 'PT',
       area_region: null,
       area_city: null,
     })
 
-    const nowhere = await ctx.member({ country: null, region: 'Lisboa', city: 'Lisbon' })
-    const nowherePost = await draft(nowhere)
-    await submit(nowhere, nowherePost)
-    await expect(
-      ctx.prisma.lookbookPost.findUniqueOrThrow({
-        where: { id: nowherePost },
-        select: AREA_SELECT,
-      })
-    ).resolves.toMatchObject({ area_country: null, area_region: null, area_city: null })
+    for (const country of [null, 'Atlantis']) {
+      const nowhere = await ctx.member({ country, region: 'Lisboa', city: 'Lisbon' })
+      const nowherePost = await draft(nowhere)
+      await submit(nowhere, nowherePost)
+      await expect(
+        ctx.prisma.lookbookPost.findUniqueOrThrow({
+          where: { id: nowherePost },
+          select: AREA_SELECT,
+        })
+      ).resolves.toMatchObject({ area_country: null, area_region: null, area_city: null })
+    }
+  })
+
+  it.each([
+    {
+      variant: 'country names and abbreviations',
+      authors: [
+        { country: 'USA', region: 'Illinois', city: 'Chicago' },
+        { country: 'United States', region: ' ILLINOIS ', city: 'chicago' },
+        { country: 'U.S.A.', region: 'Illinois', city: 'Chicago' },
+        { country: 'Estados Unidos', region: 'illinois', city: 'CHICAGO' },
+        { country: 'États-Unis', region: 'Illinois', city: 'Chicago' },
+      ],
+      viewer: { country: 'US', region: 'Illinois', city: 'Chicago' },
+    },
+    {
+      variant: 'accented and plain spellings',
+      authors: [
+        { country: 'Brasil', region: 'São Paulo', city: 'São Paulo' },
+        { country: 'Brazil', region: 'Sao Paulo', city: 'Sao Paulo' },
+        { country: 'BR', region: 'SÃO PAULO', city: 'sao paulo' },
+        { country: 'Brésil', region: 'Sao Paulo', city: 'São Paulo' },
+        { country: 'Brasilien', region: 'São Paulo', city: 'SAO PAULO' },
+      ],
+      viewer: { country: 'Brazil', region: 'Sao Paulo', city: 'São Paulo' },
+    },
+  ])('6.6-INT-056 $variant of one place stamp and rank as one city', async (matrix) => {
+    const authors: string[] = []
+    const posts: string[] = []
+    for (const location of matrix.authors) {
+      const author = await ctx.member(location)
+      const postId = await draft(author)
+      await expect(submit(author, postId)).resolves.toMatchObject({ kind: 'published' })
+      authors.push(author)
+      posts.push(postId)
+    }
+    const stamped = await ctx.prisma.lookbookPost.findMany({
+      where: { id: { in: posts } },
+      select: AREA_SELECT,
+    })
+    expect(new Set(stamped.map((row) => JSON.stringify(row))).size).toBe(1)
+    // Moderation approval publishes the submitted posts.
+    await ctx.prisma.lookbookPost.updateMany({
+      where: { id: { in: posts } },
+      data: { status: 'published', published_at: hoursBeforeAsOf(1) },
+    })
+    for (const [index, postId] of posts.entries())
+      await ctx.react(authors[(index + 1) % authors.length]!, postId, 'love')
+    const viewer = await ctx.member(matrix.viewer)
+    const page = await ctx.read(viewer, { limit: 12 })
+    expect(page.level).toBe('city')
+    expect(page.label).toBe(matrix.viewer.city)
+    expect(page.items.map((item) => item.id).sort()).toEqual([...posts].sort())
   })
 
   it('6.6-INT-052 the database refuses a city without a region and an anonymized row with an area', async () => {
@@ -122,7 +176,7 @@ describe('6.6 area clearing', () => {
       userId: author,
       publishedAt: hoursBeforeAsOf(1),
       locationKey: 'legacy-key',
-      areaCountry: area.country.toLowerCase(),
+      areaCountry: area.country,
       areaRegion: area.region.toLowerCase(),
       areaCity: area.city.toLowerCase(),
     })
