@@ -12,6 +12,8 @@ import {
 } from '@couture/testing'
 import { isolatedCommunityDatabase } from './helpers/isolated-community-database.js'
 import { createCommunityRealtimeServer } from '../src/realtime/community-realtime.server.js'
+import { communityRealtimeInstance } from '../src/realtime/community-realtime-instance.js'
+import { communityRealtimeConnectedSchema } from '@couture/api-client/contracts/http'
 import { AccessTokenIdentityService } from '../src/modules/auth/access-token-identity.service.js'
 import { CommunityAccessService } from '../src/modules/community/community-access.service.js'
 import { CommunityStreamRepository } from '../src/modules/community/community-stream.repository.js'
@@ -235,8 +237,11 @@ describe('Story 6.5 real local websocket-only transport with isolated fixture au
         fixtureToken(member.id)
       )
       await connect(socket)
+      // Handshake plus two revalidations. D1 allows each revalidation up to 8 s after the
+      // previous start (jittered per socket), so two can take up to 16 s; the bound under
+      // test is the interval assertion below, unchanged.
       await vi.waitFor(() => expect(starts.length).toBeGreaterThanOrEqual(3), {
-        timeout: 12000,
+        timeout: 17000,
         interval: 100,
       })
       const intervals = starts.slice(1).map((start, index) => start - starts[index]!)
@@ -251,7 +256,7 @@ describe('Story 6.5 real local websocket-only transport with isolated fixture au
     } finally {
       proof.mockRestore()
     }
-  }, 14000)
+  }, 20000)
 
   it('6.5-INT-007: separate instances assist committed work without a screening worker', async () => {
     const member = await fixture()
@@ -394,6 +399,25 @@ describe('Story 6.5 real local websocket-only transport with isolated fixture au
     sockets.push(cookieOnly)
     await refusedWithoutControl(cookieOnly)
     await refusedWithoutControl(client(base, fixtureToken(member.id, Date.now() - 1000)))
+  })
+
+  it('6.5-INT-010: every connection is acknowledged with this process instance value and nothing else', async () => {
+    const member = await fixture()
+    const a = client(await instance(), fixtureToken(member.id))
+    const b = client(await instance(), fixtureToken(member.id))
+    const acknowledgements = [
+      next(a, 'community:connected'),
+      next(b, 'community:connected'),
+    ]
+    await Promise.all([connect(a), connect(b)])
+    const [first, second] = await Promise.all(acknowledgements)
+    // Two servers in one process share one instance value; a strict schema admits no
+    // host, region, member or request data alongside it.
+    expect(communityRealtimeConnectedSchema.parse(first)).toEqual({
+      version: 1,
+      instance: communityRealtimeInstance,
+    })
+    expect(second).toEqual(first)
   })
 
   it('6.5-INT-009: private-only activity does not ring another member and denial closes with generic control', async () => {

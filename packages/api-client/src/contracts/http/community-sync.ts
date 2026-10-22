@@ -37,6 +37,15 @@ export const communityDoorbellSchema = z
 export const communityAvailabilitySchema = z
   .object({ version: z.literal(1), status: z.enum(['unavailable', 'denied']) })
   .strict()
+/**
+ * `community:connected`, sent once per accepted connection. `instance` is an opaque
+ * diagnostic value: random per realtime process (16 base64url characters), carrying no
+ * host, region, member or request data. It lets an operator's probe prove two distinct
+ * instances; clients must not depend on it.
+ */
+export const communityRealtimeConnectedSchema = z
+  .object({ version: z.literal(1), instance: z.string().regex(/^[A-Za-z0-9_-]{16}$/) })
+  .strict()
 export const communityStreamEventSchema = z.discriminatedUnion('kind', [
   z
     .object({

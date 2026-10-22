@@ -789,6 +789,58 @@ describe('Story 6.5 actual HTTP controllers and generated client wrappers', () =
     ).toEqual({ removed: true })
   })
 
+  it('6.5-CONTRACT-004: a pruned previous-owner binding lets the next owner register fresh; a live one never moves without transfer', async () => {
+    const previousOwner = await fixture()
+    const nextOwner = await fixture()
+    const intruder = await fixture()
+    const device = {
+      installationId: randomUUID(),
+      token: `ExpoPushToken[fixture_${randomUUID().replaceAll('-', '')}]`,
+      platform: 'ios',
+      permission: 'granted',
+    } as const
+    const stale = await clients(previousOwner.id).register(device)
+    // Receipt cleanup or retention prunes the previous owner's row.
+    await prisma.pushToken.delete({ where: { id: stale.registrationId } })
+    const conflictCode = async (work: Promise<unknown>) => {
+      const error: unknown = await work.then(
+        () => undefined,
+        (reason: unknown) => reason
+      )
+      const response =
+        error && typeof error === 'object' && 'response' in error
+          ? (error.response as Response)
+          : undefined
+      return response
+        ? {
+            status: response.status,
+            code: ((await response.json()) as { code?: string }).code,
+          }
+        : undefined
+    }
+    expect(
+      await conflictCode(
+        clients(nextOwner.id).register({
+          ...device,
+          expectedBinding: {
+            registrationId: stale.registrationId,
+            bindingGeneration: stale.bindingGeneration,
+          },
+          transfer: true,
+        })
+      )
+    ).toEqual({ status: 409, code: 'binding_changed' })
+    const fresh = await clients(nextOwner.id).register(device)
+    expect((await clients(nextOwner.id).registrations()).registrations).toEqual([fresh])
+    // A token live for another owner is never taken by a registration without a transfer.
+    expect(await conflictCode(clients(intruder.id).register(device))).toEqual({
+      status: 409,
+      code: 'binding_changed',
+    })
+    expect((await clients(nextOwner.id).registrations()).registrations).toEqual([fresh])
+    expect((await clients(intruder.id).registrations()).registrations).toEqual([])
+  })
+
   it('6.5-CONTRACT-003: bootstrap/replay cursors are authenticated-scope bound', async () => {
     const owner = await fixture()
     const other = await fixture()

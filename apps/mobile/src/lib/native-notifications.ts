@@ -145,7 +145,9 @@ async function registration(
         }
       : {}),
   } as const
-  const bound = await registerBinding(client, owner, previous, input)
+  const bound = await registerBinding(client, owner, previous, input, () =>
+    secure.deleteItemAsync(registrationKey)
+  )
   if (!bound) return
   const stored = { ...bound, owner }
   if (nativeSessionIdentity() !== owner) {
@@ -171,25 +173,34 @@ async function registerBinding(
   client: ReturnType<typeof tokenApi>,
   owner: string,
   previous: StoredBinding | undefined,
-  input: RegisterPushTokenInput
+  input: RegisterPushTokenInput,
+  forgetStale: () => Promise<void>
 ) {
   let bound
   try {
     bound = await client.register(input)
   } catch (error) {
-    if (previous?.owner !== owner || !(await bindingConflict(error))) throw error
-    const { registrations } = await client.registrations()
-    if (nativeSessionIdentity() !== owner) return
-    const current = registrations.find(
-      (row) => row.registrationId === previous.registrationId
-    )
-    // Listing proves only this owner's bindings. A concurrent transfer remains rejected by the server.
+    if (!previous || !(await bindingConflict(error))) throw error
     const fresh = {
       token: input.token,
       installationId: input.installationId,
       platform: input.platform,
       permission: input.permission,
     }
+    if (previous.owner !== owner) {
+      // The previous owner's binding no longer exists as remembered (receipt cleanup or
+      // retention pruned it), so the transfer cannot match. Forget it and register fresh.
+      // The server still refuses a token that is live for another owner without a valid
+      // transfer, so this never takes over someone else's binding.
+      await forgetStale()
+      return client.register(fresh)
+    }
+    const { registrations } = await client.registrations()
+    if (nativeSessionIdentity() !== owner) return
+    const current = registrations.find(
+      (row) => row.registrationId === previous.registrationId
+    )
+    // Listing proves only this owner's bindings. A concurrent transfer remains rejected by the server.
     bound = await client.register({
       ...fresh,
       ...(current

@@ -11,6 +11,7 @@ import {
 } from '../modules/community/community-availability.js'
 import type { CommunityStreamRepository } from '../modules/community/community-stream.repository.js'
 import { createBaseLogger } from '../logger/pino.config.js'
+import { communityRealtimeInstance } from './community-realtime-instance.js'
 
 export type CommunityRealtimeDependencies = {
   prisma: PrismaClient
@@ -377,6 +378,10 @@ export function attachCommunityRealtime(
       return
     }
     connections.set(socket, state)
+    socket.emit('community:connected', {
+      version: 1,
+      instance: communityRealtimeInstance,
+    })
     const expiration = setTimeout(
       () => socket.disconnect(true),
       Math.max(
