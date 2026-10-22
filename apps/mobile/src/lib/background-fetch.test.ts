@@ -37,7 +37,7 @@ vi.mock('expo-background-fetch', () => ({
 }))
 
 import { registerBackgroundFetchAsync } from './background-fetch'
-import { setMobileApplicationUserId } from './mobile-auth'
+import { setMobileAccessTokenResolver, setMobileApplicationUserId } from './mobile-auth'
 import { clearRitualMemoryCache, ritualCacheOwner, saveRitualCache } from './ritual-cache'
 
 const TASK_NAME = 'RITUAL_BACKGROUND_FETCH_TASK'
@@ -50,6 +50,10 @@ function runRitualTask() {
     throw new Error(`${TASK_NAME} was never registered with TaskManager`)
   }
   return task()
+}
+
+function signedOutKeys() {
+  return Object.keys(localStorage).filter((key) => key.startsWith('ritual:signed-out:'))
 }
 
 function storedRitualEntry() {
@@ -91,16 +95,19 @@ describe('widget background cache freshness', () => {
 
 describe('ritual background fetch task', () => {
   const originalBaseUrl = process.env.EXPO_PUBLIC_API_BASE_URL
+  let restoreAccessTokenResolver: (() => void) | undefined
 
   beforeEach(() => {
     process.env.EXPO_PUBLIC_API_BASE_URL = window.location.origin
     localStorage.clear()
     clearRitualMemoryCache()
     setMobileApplicationUserId(MEMBER_ID)
+    restoreAccessTokenResolver = setMobileAccessTokenResolver(() => 'member-token')
   })
 
   afterEach(() => {
     process.env.EXPO_PUBLIC_API_BASE_URL = originalBaseUrl
+    restoreAccessTokenResolver?.()
     setMobileApplicationUserId(null)
     localStorage.clear()
     clearRitualMemoryCache()
@@ -169,20 +176,41 @@ describe('ritual background fetch task', () => {
   })
 
   /**
-   * A wake before any member session is restored still refreshes, but into the
-   * signed-out bucket: it must never land in, or read from, a member's cache.
+   * R9-1: a cold background wake has no verified member until the token resolver restores
+   * the session. The member is known only after that, so the ritual fetched with their
+   * bearer must land under their key and never in the shared signed-out bucket, which a
+   * signed-out Home or another member's first load would read.
    */
-  it('caches under the signed-out owner when no member session is restored', async () => {
+  it('stores a ritual fetched after a delayed verification under the member, never signed-out', async () => {
     setMobileApplicationUserId(null)
+    setMobileAccessTokenResolver(() => {
+      setMobileApplicationUserId(MEMBER_ID)
+      return 'member-token'
+    })
 
     await expect(runRitualTask()).resolves.toBe(native.result.NewData)
 
-    expect(
-      localStorage.getItem(
-        `ritual:signed-out:en-US:${mockRitualResponse.data.weather.locationKey}`
-      )
-    ).not.toBeNull()
-    expect(storedRitualEntry()).toBeNull()
+    expect(storedRitualEntry()).not.toBeNull()
+    expect(signedOutKeys()).toEqual([])
+  })
+
+  it('fetches and stores nothing when no member session verifies', async () => {
+    const ritualRequests = vi.fn()
+    server.use(
+      http.get('*/api/v1/ritual', () => {
+        ritualRequests()
+        return HttpResponse.json(mockRitualResponse)
+      })
+    )
+    setMobileApplicationUserId(null)
+    setMobileAccessTokenResolver(() => undefined)
+
+    await expect(runRitualTask()).resolves.toBe(native.result.NoData)
+
+    expect(ritualRequests).not.toHaveBeenCalled()
+    expect(Object.keys(localStorage).filter((key) => key.startsWith('ritual:'))).toEqual(
+      []
+    )
   })
 
   /**

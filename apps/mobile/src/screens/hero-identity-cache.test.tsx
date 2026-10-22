@@ -104,6 +104,31 @@ describe('TabOneScreen identity change on a shared device', () => {
     expect(ritualRequestsBy.slice(requestsBeforeSwitch)).not.toContain('member-a')
   })
 
+  it('6.5-MOB-HERO-ID-03 never stores a member ritual under the signed-out owner on a cold start', async () => {
+    // R9-1 on Home: the first load starts before the stored session restores, so the
+    // render-time owner is signed-out, and the token resolver restores member A mid-load.
+    // A's ritual must land under A's key only; the signed-out bucket is what a signed-out
+    // Home or another member's first load reads.
+    setMobileAccessTokenResolver(() => {
+      setMobileApplicationUserId('member-a')
+      return 'token-a'
+    })
+
+    await render(<TabOneScreen />)
+    await waitFor(() => {
+      expect(screen.getByTestId('current-temperature').textContent).toBe('70°F')
+    })
+    await waitFor(() => {
+      expect(
+        Object.keys(localStorage).some((key) => key.startsWith('ritual:member:member-a:'))
+      ).toBe(true)
+    })
+
+    expect(
+      Object.keys(localStorage).filter((key) => key.startsWith('ritual:signed-out:'))
+    ).toEqual([])
+  })
+
   it('6.5-MOB-HERO-ID-02 still serves a member their own ritual from the cache', async () => {
     setMobileApplicationUserId('member-a')
     const first = await render(<TabOneScreen />)
