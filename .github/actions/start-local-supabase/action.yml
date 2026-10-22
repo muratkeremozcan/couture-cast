@@ -1,14 +1,15 @@
 name: Start local Supabase
 description: >-
-  Start local Supabase services, retrying transient registry pull failures with
-  exponential backoff and jitter, and alternating the image registry per attempt.
+  Start local Supabase services from a cached image set when one exists, else
+  pull with retries that alternate the image registry per attempt, back off
+  exponentially with jitter, and never run past a total time budget.
 
 inputs:
   max-attempts:
     description: >-
       Maximum number of startup attempts. Attempts alternate between the
-      registries in image-registry and fallback-registries, so the default gives
-      each registry three tries.
+      registries in image-registry and fallback-registries. The time budget can
+      end the loop earlier.
     required: false
     default: '6'
   base-delay-seconds:
@@ -22,6 +23,21 @@ inputs:
     description: Upper bound in seconds for one backoff delay, before jitter.
     required: false
     default: '120'
+  time-budget-seconds:
+    description: >-
+      Total seconds the start attempts and the waits between them may take. A
+      running attempt is cut off when the budget ends, a wait is shortened to
+      leave room for one more attempt, and no attempt starts with less than
+      min-attempt-seconds left. Callers size timeout-minutes to this budget plus
+      their own work. Image cache restore and save run outside it.
+    required: false
+    default: '600'
+  min-attempt-seconds:
+    description: >-
+      Fewest budget seconds an attempt needs to be worth starting. A cold pull
+      and start measured 100 to 160 seconds on hosted runners.
+    required: false
+    default: '90'
   exclude:
     description: >-
       Comma-separated containers not to start. Services no test uses are skipped
@@ -47,24 +63,89 @@ inputs:
       runner pool; alternating means one throttled registry cannot fail a shard.
     required: false
     default: 'public.ecr.aws'
+  image-cache:
+    description: >-
+      Restore the Supabase images from the Actions cache before starting. The
+      key covers the Supabase CLI version, supabase/config.toml and the exclude
+      list, so a hit holds every image this start needs and pulls nothing.
+    required: false
+    default: 'true'
+  save-image-cache:
+    description: >-
+      Save the pulled images to the Actions cache on a miss. Exactly one job
+      across all workflows sets this, so shards never race the same key;
+      every other caller only restores.
+    required: false
+    default: 'false'
 
 runs:
   using: composite
   steps:
+    - name: Compute the Supabase image cache key
+      id: cache-key
+      if: inputs.image-cache == 'true'
+      shell: bash
+      env:
+        EXCLUDE: ${{ inputs.exclude }}
+        CONFIG_HASH: ${{ hashFiles('supabase/config.toml') }}
+      run: |
+        set -u -o pipefail
+        cli_version="$(node -p "require('supabase/package.json').version")"
+        exclude_hash="$(printf '%s' "$EXCLUDE" | sha256sum | cut -c1-16)"
+        {
+          echo "key=supabase-images-v1-${RUNNER_OS}-cli${cli_version}-config${CONFIG_HASH:0:16}-exclude${exclude_hash}"
+          echo "dir=${RUNNER_TEMP}/supabase-image-cache"
+        } >> "$GITHUB_OUTPUT"
+
+    - name: Restore the Supabase image cache
+      id: cache-restore
+      if: inputs.image-cache == 'true'
+      uses: actions/cache/restore@v4
+      with:
+        path: ${{ steps.cache-key.outputs.dir }}
+        key: ${{ steps.cache-key.outputs.key }}
+
+    - name: Load the cached Supabase images
+      id: cache-load
+      if: inputs.image-cache == 'true' && steps.cache-restore.outputs.cache-hit == 'true'
+      shell: bash
+      env:
+        CACHE_DIR: ${{ steps.cache-key.outputs.dir }}
+      run: |
+        set -u -o pipefail
+        # A cache that does not load is treated as a miss: the start pulls.
+        if [ -s "$CACHE_DIR/images.tar.zst" ] && [ -s "$CACHE_DIR/registry" ] &&
+          zstd -dc "$CACHE_DIR/images.tar.zst" | docker load; then
+          echo "registry=$(cat "$CACHE_DIR/registry")" >> "$GITHUB_OUTPUT"
+          echo "loaded=true" >> "$GITHUB_OUTPUT"
+        else
+          echo "::warning::The Supabase image cache did not load; pulling instead."
+          echo "loaded=false" >> "$GITHUB_OUTPUT"
+        fi
+
     - name: Start local Supabase with retry
+      id: start
       shell: bash
       env:
         MAX_ATTEMPTS: ${{ inputs.max-attempts }}
         BASE_DELAY: ${{ inputs.base-delay-seconds }}
         MAX_DELAY: ${{ inputs.max-delay-seconds }}
+        TIME_BUDGET: ${{ inputs.time-budget-seconds }}
+        MIN_ATTEMPT: ${{ inputs.min-attempt-seconds }}
         EXCLUDE: ${{ inputs.exclude }}
         PRIMARY_REGISTRY: ${{ inputs.image-registry }}
         FALLBACK_REGISTRIES: ${{ inputs.fallback-registries }}
+        CACHE_LOADED: ${{ steps.cache-load.outputs.loaded == 'true' }}
+        CACHED_REGISTRY: ${{ steps.cache-load.outputs.registry }}
+        SAVE_IMAGE_CACHE: ${{ inputs.image-cache == 'true' && inputs.save-image-cache == 'true' && steps.cache-restore.outputs.cache-hit != 'true' }}
+        CACHE_DIR: ${{ steps.cache-key.outputs.dir }}
         REGISTRY_TOKEN: ${{ github.token }}
       run: |
         set -u -o pipefail
+        # One collation for every sorted image list, so `comm` compares them reliably.
+        export LC_ALL=C
 
-        for setting in MAX_ATTEMPTS BASE_DELAY MAX_DELAY; do
+        for setting in MAX_ATTEMPTS BASE_DELAY MAX_DELAY TIME_BUDGET MIN_ATTEMPT; do
           if ! [[ "${!setting}" =~ ^[0-9]+$ ]]; then
             echo "::error::${setting} must be a non-negative integer, got '${!setting}'."
             exit 2
@@ -77,8 +158,15 @@ runs:
 
         exclude="$EXCLUDE"
         registries=()
+        # A loaded cache holds images tagged for the registry they were pulled
+        # from, so that registry goes first and the first attempt pulls nothing.
+        if [ "$CACHE_LOADED" = true ] && [ -n "$CACHED_REGISTRY" ]; then
+          registries+=("$CACHED_REGISTRY")
+        fi
         for registry in "$PRIMARY_REGISTRY" ${FALLBACK_REGISTRIES//,/ }; do
-          [ -n "$registry" ] && registries+=("$registry")
+          if [ -n "$registry" ] && [[ " ${registries[*]-} " != *" ${registry} "* ]]; then
+            registries+=("$registry")
+          fi
         done
         if [ "${#registries[@]}" -eq 0 ]; then
           echo "::error::No image registry configured."
@@ -89,6 +177,15 @@ runs:
         # docker child inherits.
         registry_token="$REGISTRY_TOKEN"
         unset REGISTRY_TOKEN
+        started_at=$(date +%s)
+        cached_images=""
+        if [ "$CACHE_LOADED" = true ]; then
+          cached_images="$(docker images --format '{{.Repository}}:{{.Tag}}' | sort -u)"
+        fi
+
+        remaining_seconds() {
+          echo $(( TIME_BUDGET - ($(date +%s) - started_at) ))
+        }
 
         diagnose_db_port() {
           echo "::group::Supabase database port diagnostics"
@@ -133,14 +230,62 @@ runs:
           echo $(( delay + RANDOM % (BASE_DELAY + 1) ))
         }
 
+        # The one writer saves exactly the images this start used, tagged for the
+        # registry they came from, so a later hit loads them under the same names.
+        write_image_cache() {
+          local registry=$1 images
+          images="$(docker images --format '{{.Repository}}:{{.Tag}}' | grep "^${registry}/supabase/" | sort -u)"
+          if [ -z "$images" ]; then
+            echo "::warning::No ${registry}/supabase images to cache."
+            return 0
+          fi
+          mkdir -p "$CACHE_DIR"
+          # shellcheck disable=SC2086 # one image reference per word
+          if docker save $images | zstd -T0 -3 -q -o "$CACHE_DIR/images.tar.zst"; then
+            printf '%s' "$registry" > "$CACHE_DIR/registry"
+            echo "cache_written=true" >> "$GITHUB_OUTPUT"
+            echo "Cached $(wc -l <<< "$images") Supabase images from ${registry}."
+          else
+            echo "::warning::Saving the Supabase images failed; the cache is skipped."
+            : > "$CACHE_DIR/images.tar.zst"
+          fi
+        }
+
+        # A hit must pull nothing; any image beyond the cached set means the key
+        # missed an input and the cache is stale.
+        check_cache_hit_pulled_nothing() {
+          local now pulled
+          now="$(docker images --format '{{.Repository}}:{{.Tag}}' | sort -u)"
+          pulled="$(comm -13 <(printf '%s\n' "$cached_images") <(printf '%s\n' "$now") | grep '/supabase/' || true)"
+          if [ -n "$pulled" ]; then
+            echo "::warning::Supabase image cache hit, but these were pulled: $(tr '\n' ' ' <<< "$pulled")"
+          else
+            echo "Supabase image cache hit: nothing was pulled."
+          fi
+        }
+
+        run_start() {
+          if command -v timeout > /dev/null; then
+            timeout --kill-after=15 "$1" npx supabase start ${exclude:+--exclude "$exclude"}
+          else
+            npx supabase start ${exclude:+--exclude "$exclude"}
+          fi
+        }
+
         attempt=1
+        exit_code=1
         while [ "$attempt" -le "$MAX_ATTEMPTS" ]; do
+          remaining=$(remaining_seconds)
+          if [ "$remaining" -lt "$MIN_ATTEMPT" ]; then
+            echo "::error::Supabase start time budget (${TIME_BUDGET}s) exhausted after $(( attempt - 1 )) attempts; ${remaining}s left is under min-attempt-seconds (${MIN_ATTEMPT}s)."
+            exit "$exit_code"
+          fi
           registry="${registries[$(( (attempt - 1) % ${#registries[@]} ))]}"
           export SUPABASE_INTERNAL_IMAGE_REGISTRY="$registry"
           login_for "$registry"
-          echo "::group::Start local Supabase (attempt ${attempt}/${MAX_ATTEMPTS}, registry ${registry})"
+          echo "::group::Start local Supabase (attempt ${attempt}/${MAX_ATTEMPTS}, registry ${registry}, ${remaining}s of budget left)"
 
-          if npx supabase start ${exclude:+--exclude "$exclude"}; then
+          if run_start "$remaining"; then
             echo "Supabase services started successfully from ${registry}."
             npx supabase status || true
             # Without -e a failed export would fall through to success and leave
@@ -151,12 +296,18 @@ runs:
               exit 1
             fi
             echo "::endgroup::"
+            if [ "$CACHE_LOADED" = true ]; then check_cache_hit_pulled_nothing; fi
+            if [ "$SAVE_IMAGE_CACHE" = true ]; then write_image_cache "$registry"; fi
             exit 0
           else
             exit_code=$?
           fi
 
-          echo "Supabase startup failed with exit code ${exit_code} (registry ${registry})."
+          if [ "$exit_code" -eq 124 ] || [ "$exit_code" -eq 137 ]; then
+            echo "Supabase startup was cut off by the time budget (exit ${exit_code}, registry ${registry})."
+          else
+            echo "Supabase startup failed with exit code ${exit_code} (registry ${registry})."
+          fi
           npx supabase status || true
           echo "::endgroup::"
           diagnose_db_port
@@ -170,11 +321,25 @@ runs:
           # differ, so clear whatever this attempt left half started.
           npx supabase stop --no-backup || true
 
+          # Wait, but always leave room for one more attempt inside the budget.
           sleep_seconds=$(backoff_seconds "$attempt")
+          room=$(( $(remaining_seconds) - MIN_ATTEMPT ))
+          if [ "$room" -lt "$sleep_seconds" ]; then sleep_seconds=$(( room > 0 ? room : 0 )); fi
           echo "Retrying Supabase startup in ${sleep_seconds}s..."
           sleep "$sleep_seconds"
           attempt=$(( attempt + 1 ))
         done
+
+    - name: Save the Supabase image cache
+      # Only the designated writer, only on a miss, and only after a start that
+      # produced the archive; a failed or empty archive is never published.
+      if: >-
+        inputs.image-cache == 'true' && inputs.save-image-cache == 'true' &&
+        steps.cache-restore.outputs.cache-hit != 'true' && steps.start.outputs.cache_written == 'true'
+      uses: actions/cache/save@v4
+      with:
+        path: ${{ steps.cache-key.outputs.dir }}
+        key: ${{ steps.cache-key.outputs.key }}
 
     - name: Log out of the image registry
       # Later steps run PR code; drop any stored ghcr.io credential once the
