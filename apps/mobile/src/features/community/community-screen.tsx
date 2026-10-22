@@ -801,6 +801,12 @@ export function CommunityScreen() {
         if (active) assignIdentity(identity)
       } catch {
         /* Transient token/storage failure retains permitted same-owner drafts. */
+        // A failed first resolution leaves no member to read the spotlight for, so
+        // it idles as signed out until a later sync resolves one. The ref stays
+        // undefined, so that later sync counts as the first resolution and keeps
+        // the feed and drafts.
+        if (active && sessionScopeRef.current === undefined)
+          setSessionScope((current) => current ?? null)
       } finally {
         syncing = false
       }

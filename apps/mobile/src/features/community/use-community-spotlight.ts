@@ -41,7 +41,12 @@ export interface CommunitySpotlightView {
     postId: string,
     summary: CommunityReactionSummary | null | undefined
   ) => void
-  /** Replaces a spotlight copy with a newer read of the post, keeping its rank. */
+  /**
+   * Replaces a spotlight copy with a newer read of the post, keeping its rank. A
+   * read that is no longer `published` removes the copy: the single-post read
+   * returns an author their own withdrawn or flagged post, and the spotlight
+   * ranks public posts only.
+   */
   applyPost: (post: CommunityReactionFeedItem) => void
   /** Removes a post the viewer can no longer see, such as a withdrawn or hidden one. */
   evict: (postId: string) => void
@@ -279,13 +284,14 @@ export function useCommunitySpotlight({
   )
 
   const applyPost = useCallback((post: CommunityReactionFeedItem) => {
-    setItems((previous) =>
-      previous.some((item) => item.id === post.id)
-        ? previous.map((item) =>
-            item.id === post.id ? { ...post, rank: item.rank } : item
-          )
-        : previous
-    )
+    setItems((previous) => {
+      if (!previous.some((item) => item.id === post.id)) return previous
+      if (post.status !== 'published')
+        return previous.filter((item) => item.id !== post.id)
+      return previous.map((item) =>
+        item.id === post.id ? { ...post, rank: item.rank } : item
+      )
+    })
   }, [])
 
   const evict = useCallback((postId: string) => {
