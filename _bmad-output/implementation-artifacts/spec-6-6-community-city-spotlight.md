@@ -2,7 +2,7 @@
 title: 'Story 6.6: Community City Spotlight'
 type: 'feature'
 created: '2026-10-22'
-status: 'in-progress'
+status: 'in-review'
 baseline_commit: 'a9215495c792e4153713f952c5052c4a5e5c815e'
 route: 'dispatch'
 story_key: '6-6-community-city-spotlight'
@@ -30,8 +30,11 @@ surfaces with privacy-safe impression and open analytics.
 **Always:**
 
 - Area identity is hierarchical: city = `(country, region, city)`, region = `(country, region)`,
-  country = `(country)`. Components are trimmed, NFKC, lowercased. A level exists only when it and
-  every parent component are non-null. Same-named cities or regions under different parents never merge.
+  country = `(country)`. Country is canonical ISO 3166-1 alpha-2, resolved from the saved text by a
+  reverse `Intl.DisplayNames` lookup over the ten supported locales plus a short alias table; text that
+  does not resolve counts as null. Region and city are trimmed, NFKD with combining marks removed,
+  Turkish dotted and dotless I folded, then lowercased. A level exists only when it and every parent
+  component are non-null. Same-named cities or regions under different parents never merge.
 - Location choice for author and viewer: the first `SavedLocation` in `findViewerLocations` order
   (`is_primary desc, created_at asc`) whose `country` is non-null. None means level `none`.
 - At submission, stamp the post's three components from the author's chosen location. Coordinates,
@@ -56,12 +59,14 @@ surfaces with privacy-safe impression and open analytics.
   live per request. Responses stay `private, no-store`.
 - Snapshot: ordered post IDs plus `as_of`, level and area hash. Snapshot ID = SHA-256 of
   `(as_of, level, area hash, ordered IDs)`. Stored immutable in Redis under its ID for 600 seconds.
-  An area pointer key (embedding the global spotlight epoch, level and area hash) names the current
+  A rebuild that yields the same ID refreshes the stored generations; the ordered IDs are identical
+  by construction. An area pointer key (embedding the global spotlight epoch, level and area hash) names the current
   snapshot and the area version it was built at.
 - Invalidation: a spotlight invalidator consumes appended public `CommunityStreamEvent` rows by its
   own durable cursor, after their commit, at least once. An event whose post still has area
   components increments the version of its city, region and country areas. `resync`, a null
-  `post_id`, a missing post or missing components increments the global epoch. The cursor advances
+  `post_id`, a missing post, or a post with `anonymized_at` or `erasure_requested_at` set increments
+  the global epoch. An event on a live post that was never stamped changes nothing. The cursor advances
   only after Redis succeeds; Redis failure never blocks the append loop. It runs in the same runtime
   tick after `append()`.
 - Rebuild race: a builder reads the area version before its database read and publishes its pointer
@@ -83,7 +88,11 @@ surfaces with privacy-safe impression and open analytics.
   reset never re-matches an old pointer. When the invalidator cursor falls below the stream retention
   floor, it increments the global epoch and resumes from the current head.
 - Redis client reuses the ritual options (`connectTimeout: 1000`, `maxRetriesPerRequest: 1`,
-  `enableOfflineQueue: false`); unavailability falls back to direct database ranking capped at 60.
+  `enableOfflineQueue: false`) plus `commandTimeout: 500`; unavailability or a stalled server falls
+  back to direct database ranking capped at 60. The invalidator is bounded so Redis never stalls
+  `append()`.
+- Privacy model: coarse canonical area, 5-author cohort, the viewer's own label, and at most 30
+  page-one spotlight reads per member per minute through the community rate-limit contract.
 - Web: module heads the community section on `/`; mobile: header of the Community tab list. Show a
   heading with the area label, ranked cards reusing existing card and detail components, loading,
   empty, disabled and error states, and a View more button that appends the next page, moves focus to
@@ -91,7 +100,8 @@ surfaces with privacy-safe impression and open analytics.
   header accessibility role.
 - Analytics: server records `community_spotlight_viewed` on page-one reads (10-second dedupe bucket
   like feed view). The opened endpoint gains a discriminated body branch `{ surface: 'spotlight',
-rank: 1..60 }` without `experimentVariant`; that branch emits only `community_spotlight_opened`
+rank: 1..60, level }` without `experimentVariant`, where `level` is the served level other than
+  `none`; the server validates and records these and runs no cohort query on open; that branch emits only `community_spotlight_opened`
   with its own post-viewer-surface dedupe. Requests without `surface` keep today's
   `community_card_opened` behavior byte-identical. Properties: HMAC subject, dedupe key, platform,
   level, item count or rank. No area names, captions, media, coordinates or raw IDs.
@@ -111,29 +121,31 @@ rank: 1..60 }` without `experimentVariant`; that branch emits only `community_sp
 
 ## I/O & Edge-Case Matrix
 
-| Scenario                                 | Input / State                               | Expected Output / Behavior                                                                                  | Error Handling               |
-| ---------------------------------------- | ------------------------------------------- | ----------------------------------------------------------------------------------------------------------- | ---------------------------- |
-| City cohort met                          | 5+ authors in viewer city tuple             | `city` ranking, viewer's label                                                                              | N/A                          |
-| City thin, region met                    | 3 city authors, 7 region                    | `region` ranking                                                                                            | N/A                          |
-| Same city name, two regions              | 3 + 3 authors, one country, nothing else    | Cities and regions each fail; `country` ranking holds all 6                                                 | N/A                          |
-| Viewer city null, region set             | Partial location                            | Starts at `region`                                                                                          | N/A                          |
-| No cohort anywhere                       | Under 5 at country                          | `none`, no items, empty state                                                                               | N/A                          |
-| No usable location                       | No location with country                    | `none`                                                                                                      | N/A                          |
-| Window edges                             | Published exactly at `as_of - 7d` / `as_of` | Excluded / included                                                                                         | N/A                          |
-| Equal scores                             | Same score and counts                       | `published_at` desc then `id` desc                                                                          | N/A                          |
-| Only self reactions                      | Author reacted to own post                  | Ineligible                                                                                                  | N/A                          |
-| Reaction on snapshot post                | Generation advanced                         | Next page one rebuilds immediately                                                                          | N/A                          |
-| Reaction outside snapshot                | Post gains first reaction                   | Reflected on first page one after invalidator processes its event                                           | Retry on Redis failure       |
-| Rebuild races invalidation               | Build started before commit                 | Stale pointer never published                                                                               | CAS refusal                  |
-| Takedown or withdrawal                   | Status leaves published                     | Absent from every later response                                                                            | Live visibility check        |
-| Fifth author erased, post outside top 60 | City falls to 4                             | Next page one picks `region` by its live cohort count, with or without the invalidator; old cursors invalid | `invalid_cursor`             |
-| Invalidator behind retention floor       | Cursor older than 48h stream floor          | Global epoch bump, resume at head                                                                           | N/A                          |
-| `resync` event                           | No post                                     | Global epoch bump                                                                                           | N/A                          |
-| Redis down, page one and two             | Connection refused                          | Database ranking; page two recompute matches ID                                                             | `invalid_cursor` on mismatch |
-| Foreign or stale cursor                  | Other member, or viewer moved area          | Refused                                                                                                     | `invalid_cursor`             |
-| Spotlight open                           | `surface: 'spotlight'`, rank                | Only `community_spotlight_opened`                                                                           | 400 on bad rank              |
-| Installed client open                    | No `surface`                                | Exactly the old `community_card_opened`                                                                     | N/A                          |
-| Flag off or ineligible viewer            | Read rollout disabled                       | Same refusal as feed                                                                                        | Localized disabled state     |
+| Scenario                                 | Input / State                                          | Expected Output / Behavior                                                                                  | Error Handling               |
+| ---------------------------------------- | ------------------------------------------------------ | ----------------------------------------------------------------------------------------------------------- | ---------------------------- |
+| City cohort met                          | 5+ authors in viewer city tuple                        | `city` ranking, viewer's label                                                                              | N/A                          |
+| City thin, region met                    | 3 city authors, 7 region                               | `region` ranking                                                                                            | N/A                          |
+| Same city name, two regions              | 3 + 3 authors, one country, nothing else               | Cities and regions each fail; `country` ranking holds all 6                                                 | N/A                          |
+| Viewer city null, region set             | Partial location                                       | Starts at `region`                                                                                          | N/A                          |
+| Spelling variants                        | `USA` and `United States`; `Sao Paulo` and `São Paulo` | One area each                                                                                               | N/A                          |
+| Reaction on never-stamped post           | Live post with null components                         | No version or epoch change                                                                                  | N/A                          |
+| No cohort anywhere                       | Under 5 at country                                     | `none`, no items, empty state                                                                               | N/A                          |
+| No usable location                       | No location with country                               | `none`                                                                                                      | N/A                          |
+| Window edges                             | Published exactly at `as_of - 7d` / `as_of`            | Excluded / included                                                                                         | N/A                          |
+| Equal scores                             | Same score and counts                                  | `published_at` desc then `id` desc                                                                          | N/A                          |
+| Only self reactions                      | Author reacted to own post                             | Ineligible                                                                                                  | N/A                          |
+| Reaction on snapshot post                | Generation advanced                                    | Next page one rebuilds immediately                                                                          | N/A                          |
+| Reaction outside snapshot                | Post gains first reaction                              | Reflected on first page one after invalidator processes its event                                           | Retry on Redis failure       |
+| Rebuild races invalidation               | Build started before commit                            | Stale pointer never published                                                                               | CAS refusal                  |
+| Takedown or withdrawal                   | Status leaves published                                | Absent from every later response                                                                            | Live visibility check        |
+| Fifth author erased, post outside top 60 | City falls to 4                                        | Next page one picks `region` by its live cohort count, with or without the invalidator; old cursors invalid | `invalid_cursor`             |
+| Invalidator behind retention floor       | Cursor older than 48h stream floor                     | Global epoch bump, resume at head                                                                           | N/A                          |
+| `resync` event                           | No post                                                | Global epoch bump                                                                                           | N/A                          |
+| Redis down, page one and two             | Connection refused                                     | Database ranking; page two recompute matches ID                                                             | `invalid_cursor` on mismatch |
+| Foreign or stale cursor                  | Other member, or viewer moved area                     | Refused                                                                                                     | `invalid_cursor`             |
+| Spotlight open                           | `surface: 'spotlight'`, rank                           | Only `community_spotlight_opened`                                                                           | 400 on bad rank              |
+| Installed client open                    | No `surface`                                           | Exactly the old `community_card_opened`                                                                     | N/A                          |
+| Flag off or ineligible viewer            | Read rollout disabled                                  | Same refusal as feed                                                                                        | Localized disabled state     |
 
 </frozen-after-approval>
 
@@ -230,6 +242,11 @@ rank: 1..60 }` without `experimentVariant`; that branch emits only `community_sp
   Redis-down recompute; discriminated opened branch that never emits `community_card_opened`;
   level enum and window inclusivity; AC2 restated against the invalidator boundary. KEEP: owner
   delegated cohort 5, 7-day window, score formula, submission stamping, no backfill.
+- 2026-10-22, iteration 3 (code review round 1, coordinator under owner delegation): canonical
+  ISO country and folded region and city; epoch only for unmappable, erased or anonymized posts; open
+  body carries served level; same-ID rebuild refreshes generations; Redis `commandTimeout` and
+  bounded invalidator; per-member page-one read limit. Triage:
+  `_bmad-output/test-artifacts/story-6-6/reviews/code-triage-1.md`.
 - 2026-10-22, iteration 2: live cohort count on page one before pointer lookup; cursor carries
   `as_of`; determinate same-name row; erasure row independent of event form; counter lifetimes,
   `SET NX` random seeds and retention-floor epoch bump.

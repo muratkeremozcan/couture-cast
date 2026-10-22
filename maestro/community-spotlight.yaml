@@ -13,8 +13,11 @@
 # ORDER. `seed-spotlight-1` is the freshest post with the most non-author
 # reactions, so it ranks first deterministically.
 #
-# SELECTORS. A spotlight post can also appear in the feed below, so every card
-# selector is scoped with `childOf` to its spotlight item.
+# SELECTORS. A spotlight post can also appear in the feed below. iOS does not
+# expose the spotlight item container as a parent in its accessibility tree, so
+# `childOf` never matches there. The module heads the list, so the spotlight
+# copy is the first match (`index: 0`); inside the detail sheet, the reused
+# card is located geometrically below the detail's rank.
 appId: ${MAESTRO_APP_ID}
 name: 'Community City Spotlight'
 tags:
@@ -59,11 +62,14 @@ tags:
     text: 'Rank 1'
     label: 'The freshest, most loved seeded post ranks first'
 
-- assertVisible:
-    id: 'community-card-image-seed-spotlight-1'
-    childOf:
-      id: 'community-spotlight-item-seed-spotlight-1'
-    label: 'The reused card rendered its signed image'
+# The image element exists before its bytes arrive; the loaded marker appears
+# only after onLoad fires, so this proves the signed image actually loaded.
+- extendedWaitUntil:
+    visible:
+      id: 'community-card-image-loaded-seed-spotlight-1'
+      index: 0
+    timeout: 20000
+    label: 'The reused card loaded its signed image'
 
 - assertNotVisible:
     id: 'community-spotlight-empty'
@@ -73,12 +79,15 @@ tags:
     id: 'community-spotlight-disabled'
 
 # View more. The seeded cohort holds seven posts and a page holds six, so the
-# second page always exists and appends exactly `seed-spotlight-7`.
+# second page always exists and appends exactly `seed-spotlight-7`. Each card is
+# about one screen tall on a phone, so the scrolls get a generous budget, and
+# each target is centred so a tap never lands on the tab bar above its edge.
 - scrollUntilVisible:
     element:
       id: 'community-spotlight-view-more'
     direction: DOWN
-    timeout: 15000
+    centerElement: true
+    timeout: 60000
 - tapOn:
     id: 'community-spotlight-view-more'
     label: 'Append the next spotlight page'
@@ -93,7 +102,8 @@ tags:
     element:
       id: 'community-spotlight-rank-seed-spotlight-7'
     direction: DOWN
-    timeout: 15000
+    centerElement: true
+    timeout: 60000
     label: 'The seventh ranked look was appended'
 - assertVisible:
     id: 'community-spotlight-rank-seed-spotlight-7'
@@ -104,15 +114,15 @@ tags:
     element:
       id: 'community-spotlight-item-seed-spotlight-1'
     direction: UP
-    timeout: 15000
+    centerElement: true
+    timeout: 60000
     label: 'Appending kept the first page in place'
 
 # --- Opening a card into its detail and back --------------------------------
 
 - tapOn:
     id: 'community-card-open-seed-spotlight-1'
-    childOf:
-      id: 'community-spotlight-item-seed-spotlight-1'
+    index: 0
     label: 'Open the first spotlight card'
 
 - extendedWaitUntil:
@@ -129,8 +139,8 @@ tags:
 
 - assertVisible:
     id: 'community-post-card-seed-spotlight-1'
-    childOf:
-      id: 'community-spotlight-detail'
+    below:
+      id: 'community-spotlight-detail-rank'
     label: 'The detail shows the reused card for the same post'
 
 - tapOn:
