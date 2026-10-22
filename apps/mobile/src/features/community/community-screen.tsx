@@ -15,6 +15,7 @@ import {
   CommunityVerification,
 } from '@couture/api-client'
 import { CommunityCommentsSheet } from '@/components/community/community-comments-sheet'
+import { useCommunityScrollRestore } from './use-community-scroll-restore'
 import {
   communityCommentsSessionFromMobile,
   communitySyncFromMobile,
@@ -1289,6 +1290,12 @@ export function CommunityScreen() {
     () => (deepLinkPost ? items.filter((item) => item.id !== deepLinkPost.id) : items),
     [deepLinkPost, items]
   )
+  const feedRows = feedState === 'loading' || !communityAvailable ? [] : listItems
+  const feedScroll = useCommunityScrollRestore({
+    available: communityAvailable,
+    data: feedRows,
+    scope: feedScopeRef,
+  })
 
   const feedErrorMessage = useMemo(() => {
     const { key, options } = communityErrorTranslation(
@@ -1678,7 +1685,13 @@ export function CommunityScreen() {
         </TouchableOpacity>
       )}
       <FlatList
-        data={feedState === 'loading' || !communityAvailable ? [] : listItems}
+        ref={feedScroll.listRef}
+        testID="community-feed-list"
+        data={feedRows}
+        onScroll={feedScroll.onScroll}
+        onScrollBeginDrag={feedScroll.onScrollBeginDrag}
+        onContentSizeChange={feedScroll.onContentSizeChange}
+        scrollEventThrottle={16}
         keyExtractor={(item) => item.id}
         renderItem={({ item }) => (
           <CommunityCard

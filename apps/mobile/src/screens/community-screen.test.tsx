@@ -88,6 +88,7 @@ import { registerCommunityModerationCases } from '../test-utils/community-screen
 import { registerCommunityPublishingCases } from '../test-utils/community-screen/publishing.cases'
 import { registerCommunityReactionsCases } from '../test-utils/community-screen/reactions.cases'
 import { registerCommunityRealtimeCases } from '../test-utils/community-screen/realtime.cases'
+import { registerCommunityAvailabilityRestoreCases } from '../test-utils/community-screen/availability-restore.cases'
 import { registerCommunityNotificationRecoveryCases } from '../test-utils/community-screen/notification-recovery.cases'
 import { registerCommunityClientCases } from '../test-utils/community-screen/client.cases'
 import { registerCommunitySpotlightCases } from '../test-utils/community-screen/spotlight.cases'
@@ -156,6 +157,7 @@ describe('Mobile community screen (Story 6.1)', () => {
   registerCommunityPublishingCases()
   registerCommunityReactionsCases()
   registerCommunityRealtimeCases()
+  registerCommunityAvailabilityRestoreCases()
   registerCommunityNotificationRecoveryCases()
   registerCommunitySpotlightCases()
   registerCommunitySpotlightReviewCases()
