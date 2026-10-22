@@ -94,6 +94,11 @@ const DESTRUCTIVE_MERLOT = '#7A1F2D'
 const ON_DESTRUCTIVE = '#FFFFFF'
 
 const FEED_PAGE_SIZE = 12
+/**
+ * Least time left in which a notification target attempt may start: one bearer read, one
+ * request and its answer. Below it the attempt would leave after the 10 s operation bound.
+ */
+const MINIMUM_TARGET_ATTEMPT_MS = 250
 
 /** The four terminal states the `community.removed.*` tree explains. */
 const EXPLAINED_AUTHOR_STATES = new Set([
@@ -365,10 +370,17 @@ export function CommunityScreen() {
      * also the only thing that knows whether THIS viewer may see the post: it
      * answers 404 for everything they may not.
      */
-    const requestTarget = () =>
-      payload.commentId
-        ? withRequestDeadline(2000, [controller.signal], (signal) =>
-            communitySyncFromMobile().resolve(
+    const deadline = performance.now() + 10_000
+    // The bearer is read first, so the admission check sees the time it took: an attempt
+    // that can no longer dispatch and answer inside the 10 s bound is never started.
+    const requestTarget = async () => {
+      const token = (await resolveMobileAccessToken()) ?? ''
+      const remaining = deadline - performance.now()
+      if (remaining < MINIMUM_TARGET_ATTEMPT_MS) throw new CommunityRequestSuperseded()
+      const timeout = Math.min(2000, Math.floor(remaining))
+      return payload.commentId
+        ? withRequestDeadline(timeout, [controller.signal], (signal) =>
+            communitySyncFromMobile(token).resolve(
               {
                 targets: [
                   {
@@ -382,17 +394,20 @@ export function CommunityScreen() {
               signal
             )
           ).then((result) => result.targets[0])
-        : getCommunityPostFromMobile(targetPostId, controller.signal, 2000).then(
-            (post) => ({
-              status: 'available' as const,
-              post,
-              comment: null,
-              parent: null,
-              pageCursor: null,
-              parentPageCursor: null,
-            })
-          )
-    const deadline = performance.now() + 10_000
+        : getCommunityPostFromMobile(
+            targetPostId,
+            controller.signal,
+            timeout,
+            token
+          ).then((post) => ({
+            status: 'available' as const,
+            post,
+            comment: null,
+            parent: null,
+            pageCursor: null,
+            parentPageCursor: null,
+          }))
+    }
     let retryTimer: ReturnType<typeof setTimeout> | undefined
     const targetRequest = async () => {
       do {
@@ -420,7 +435,11 @@ export function CommunityScreen() {
             )
           })
         }
-      } while (active && !controller.signal.aborted && performance.now() < deadline)
+      } while (
+        active &&
+        !controller.signal.aborted &&
+        deadline - performance.now() >= MINIMUM_TARGET_ATTEMPT_MS
+      )
       throw new CommunityRequestSuperseded()
     }
     let abortOperation: () => void = () => undefined

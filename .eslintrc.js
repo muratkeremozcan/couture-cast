@@ -33,6 +33,12 @@ module.exports = {
   },
   overrides: [
     {
+      // Expo Router mandates this filename and a named `redirectSystemPath` export, so
+      // the default-export exemption the other `+` route files rely on does not apply.
+      files: ['apps/mobile/app/+native-intent.tsx'],
+      rules: { 'filenames/match-regex': 'off' },
+    },
+    {
       // Repository tooling scripts are plain Node modules outside every tsconfig project,
       // so they lint without type information.
       files: ['**/*.mjs'],

@@ -75,7 +75,8 @@
     "dismiss_banner": "Dismiss banner",
     "invalid_link": "This link is invalid, expired, or no longer available.",
     "about_couturecast": "About CoutureCast",
-    "about_description": "CoutureCast combines weather intelligence with wardrobe recommendations."
+    "about_description": "CoutureCast combines weather intelligence with wardrobe recommendations.",
+    "back": "Back"
   },
   "accessibility": {
     "skip_to_content": "Skip to main content",

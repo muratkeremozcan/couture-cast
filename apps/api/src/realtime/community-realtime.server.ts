@@ -33,10 +33,11 @@ type Connection = {
   revalidateAfter: number
 }
 /**
- * Per-socket revalidation interval. Ticks run every second, so a 4 to 7 s interval keeps
- * every revalidation start within D1's eight seconds while spreading a reconnect herd.
+ * Per-socket revalidation interval, 4 to 6 s. Ticks run about every second and a loaded
+ * tick can start late, so the upper end leaves two seconds of headroom under D1's eight
+ * seconds while still spreading a reconnect herd across a two-second window.
  */
-const revalidationInterval = () => 4000 + Math.random() * 3000
+const revalidationInterval = () => 4000 + Math.random() * 2000
 /**
  * Concurrent member authorizations per instance, across handshakes and ticks. Each one is a
  * pool transaction with a 100 ms acquisition wait; unbounded, a herd of sockets waited past

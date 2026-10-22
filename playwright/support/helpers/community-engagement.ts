@@ -203,6 +203,42 @@ export const interceptFor =
   (options) =>
     interceptNetworkCall({ page, ...options })
 export const thread = (page: Page) => page.getByTestId('community-comments')
+
+/**
+ * Records, from inside the page, every moment the given card or the open thread stops
+ * being visible, or the outage notice appears. A single snapshot can miss a brief
+ * hide; a MutationObserver cannot. Returns a stop function with what it saw.
+ */
+export async function watchContentStaysVisible(page: Page, postId: string) {
+  await page.evaluate((cardId) => {
+    const lapses: string[] = []
+    const check = () => {
+      const card = document.querySelector(`[data-testid="lookbook-card-${cardId}"]`)
+      const sheet = document.querySelector('[data-testid="community-comments"]')
+      if (!card?.checkVisibility())
+        lapses.push(`card hidden @${Math.round(performance.now())}`)
+      if (!sheet?.checkVisibility())
+        lapses.push(`thread hidden @${Math.round(performance.now())}`)
+      if (document.body.textContent?.includes('Community is temporarily unavailable'))
+        lapses.push(`outage notice @${Math.round(performance.now())}`)
+    }
+    const observer = new MutationObserver(check)
+    observer.observe(document.body, { subtree: true, childList: true, attributes: true })
+    check()
+    Object.defineProperty(window, '__contentWatch', {
+      configurable: true,
+      value: { lapses, stop: () => observer.disconnect() },
+    })
+  }, postId)
+  return () =>
+    page.evaluate(() => {
+      const watch = (
+        window as unknown as { __contentWatch: { lapses: string[]; stop: () => void } }
+      ).__contentWatch
+      watch.stop()
+      return [...new Set(watch.lapses.map((lapse) => lapse.split(' @')[0]))]
+    })
+}
 export async function openComments(page: Page, postId: string) {
   await page.getByTestId(`comments-button-${postId}`).click()
   await expect(

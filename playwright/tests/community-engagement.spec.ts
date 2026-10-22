@@ -17,6 +17,7 @@ import {
   thread,
   interceptFor,
   observeCommunitySocket,
+  watchContentStaysVisible,
   observeCommunityFallbackTimers,
   communityTestDatabase,
   disablePeriodicCommunityPolling,
@@ -191,9 +192,11 @@ test.describe('Story 6.5 real engagement transport', () => {
       )
       await openComments(page, POST)
       await thread(page).getByLabel('Add a comment').fill('Draft across an outage')
+      // D3/D9: a reconnecting socket is not an outage. The card, the open thread and
+      // the draft stay visible while HTTP fallback serves events.
+      const stopWatching = await watchContentStaysVisible(page, POST)
       const outage = Date.now()
       await transport.disconnect()
-      await expect(page.getByTestId(`lookbook-card-${POST}`)).toHaveCount(0)
       const comment = await submitComment(
         { apiRequest, recurse },
         communityApi,
@@ -215,6 +218,8 @@ test.describe('Story 6.5 real engagement transport', () => {
       await expect(thread(page).getByLabel('Add a comment')).toHaveValue(
         'Draft across an outage'
       )
+      await expect(page.getByTestId(`lookbook-card-${POST}`)).toBeVisible()
+      expect(await stopWatching()).toEqual([])
       const handshakes = transport.handshakes
       // A different owner keeps a valid cursor throughout this worker's private reset.
       const independent = await apiRequest<unknown>({

@@ -1,4 +1,10 @@
-import { type ComponentRef, useEffect, useRef, useState } from 'react'
+import {
+  type ComponentRef,
+  useEffect,
+  useRef,
+  useState,
+  useSyncExternalStore,
+} from 'react'
 import { useTranslation } from 'react-i18next'
 import {
   AccessibilityInfo,
@@ -13,7 +19,11 @@ import { SafeAreaView } from 'react-native-safe-area-context'
 import { Text, View } from '@/components/themed'
 import { useMobileAnalytics } from '@/src/analytics/mobile-analytics'
 import { createMobileApiClient } from '@/src/lib/api-client'
-import { resolveMobileAccessToken } from '@/src/lib/mobile-auth'
+import {
+  mobileApplicationUserId,
+  resolveMobileAccessToken,
+  subscribeMobileApplicationUser,
+} from '@/src/lib/mobile-auth'
 import {
   readLatestRitualCache,
   saveRitualCache,
@@ -173,6 +183,13 @@ export default function TabOneScreen() {
   const params = useLocalSearchParams()
   const { source, size, slot, type, alertId, cardId, expiresAt } = params
   const analyticsUserId = analytics.getDistinctId() || 'mobile-anonymous-user'
+  // After a cold start the first load can run before the stored session is restored and
+  // fail without a bearer. The restored identity re-runs it.
+  const applicationUserId = useSyncExternalStore(
+    subscribeMobileApplicationUser,
+    mobileApplicationUserId,
+    mobileApplicationUserId
+  )
   const activeLocale =
     resolveSupportedLocale(i18n.resolvedLanguage ?? i18n.language) ??
     defaultSupportedLocale
@@ -321,7 +338,7 @@ export default function TabOneScreen() {
       analytics.capture('tab_one_viewed')
     }
     void loadData()
-  }, [activeLocale, analyticsUserId])
+  }, [activeLocale, analyticsUserId, applicationUserId])
 
   useEffect(() => {
     const rawParams = { source, size, slot, type, alertId, cardId, expiresAt }

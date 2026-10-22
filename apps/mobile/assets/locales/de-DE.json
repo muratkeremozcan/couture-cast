@@ -75,7 +75,8 @@
     "dismiss_banner": "Banner schließen",
     "invalid_link": "Dieser Link ist ungültig, abgelaufen oder nicht mehr verfügbar.",
     "about_couturecast": "Über CoutureCast",
-    "about_description": "CoutureCast verbindet Wetterdaten mit Garderobenempfehlungen."
+    "about_description": "CoutureCast verbindet Wetterdaten mit Garderobenempfehlungen.",
+    "back": "Zurück"
   },
   "accessibility": {
     "skip_to_content": "Zum Hauptinhalt springen",

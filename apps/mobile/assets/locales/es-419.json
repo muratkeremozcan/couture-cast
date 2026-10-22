@@ -75,7 +75,8 @@
     "dismiss_banner": "Cerrar aviso",
     "invalid_link": "Este enlace no es válido, venció o ya no está disponible.",
     "about_couturecast": "Acerca de CoutureCast",
-    "about_description": "CoutureCast combina información meteorológica con recomendaciones de vestuario."
+    "about_description": "CoutureCast combina información meteorológica con recomendaciones de vestuario.",
+    "back": "Atrás"
   },
   "accessibility": {
     "skip_to_content": "Saltar al contenido principal",

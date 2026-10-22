@@ -254,9 +254,11 @@ export async function getCommunityFeedFromMobile({
 export async function getCommunityPostFromMobile(
   postId: string,
   signal?: AbortSignal,
-  timeoutMs?: number
+  timeoutMs?: number,
+  /** A bearer the caller already acquired, e.g. to check a deadline before dispatch. */
+  bearer?: string
 ): Promise<CommunityFeedItem> {
-  const accessToken = await readAccessToken()
+  const accessToken = bearer || (await readAccessToken())
   try {
     const response = await withRequestTimeout(
       signal,

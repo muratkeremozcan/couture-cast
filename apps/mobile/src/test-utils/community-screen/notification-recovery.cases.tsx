@@ -75,12 +75,13 @@ function deferred() {
   })
   return { promise, release }
 }
-function notification(kind: 'card' | 'reply' = 'reply') {
+function notification(kind: 'card' | 'reply' | 'root' = 'reply') {
   setMockParams({
     source: 'notification',
     type: 'community',
     cardId: 'post-a',
     ...(kind === 'reply' ? { commentId: reply.id, parentId: rootComment.id } : {}),
+    ...(kind === 'root' ? { commentId: rootComment.id } : {}),
   })
 }
 function available(
@@ -92,8 +93,12 @@ function available(
     status: 'available',
     communityRevision: String(revision),
     post: post(target.postId),
-    comment: target.commentId ? reply : null,
-    parent: target.commentId ? rootComment : null,
+    comment: !target.commentId
+      ? null
+      : target.commentId === rootComment.id
+        ? rootComment
+        : reply,
+    parent: target.commentId === reply.id ? rootComment : null,
     pageCursor: null,
     parentPageCursor: null,
     threadPosition: target.commentId ? 1 : null,
@@ -443,6 +448,42 @@ export function registerCommunityNotificationRecoveryCases() {
       }
     }
   )
+
+  it('T05 A11 a root-comment tap opens and focuses that comment across a foreground resync', async () => {
+    const held = deferred(),
+      handle = recordFocus()
+    const f = journey({
+      notification: async (call) => {
+        if (call === 1) await held.promise
+      },
+    })
+    notification('root')
+    try {
+      await render(<CommunityScreen />)
+      await waitFor(() => expect(f.state.notificationCalls).toBe(1))
+      // iOS delivers a background tap while the app returns to the foreground, so the
+      // coordinator's foreground resync runs while the target is still resolving.
+      await act(async () => {
+        f.sync().foreground()
+        await f.sync().catchUp()
+      })
+      await act(async () => {
+        held.release()
+        await Promise.allSettled(f.pending)
+      })
+      const target = await screen.findByTestId('comment-target-root')
+      await waitFor(() =>
+        expect(AccessibilityInfo.setAccessibilityFocus).toHaveBeenCalledWith(
+          handle(target)
+        )
+      )
+      expect(screen.getByText(rootComment.body)).toBeVisible()
+      expect(screen.getByRole('button', { name: 'Close comments' })).toBeVisible()
+    } finally {
+      held.release()
+      await Promise.allSettled(f.pending)
+    }
+  })
 
   it('T05 B05 a mutation-fenced held reply target cannot open a sheet or request ordinary roots', async () => {
     const held = deferred(),

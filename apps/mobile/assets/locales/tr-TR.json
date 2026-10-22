@@ -75,7 +75,8 @@
     "dismiss_banner": "Bildirimi kapat",
     "invalid_link": "Bu bağlantı geçersiz, süresi dolmuş veya artık kullanılamıyor.",
     "about_couturecast": "CoutureCast hakkında",
-    "about_description": "CoutureCast hava durumu verilerini gardırop önerileriyle birleştirir."
+    "about_description": "CoutureCast hava durumu verilerini gardırop önerileriyle birleştirir.",
+    "back": "Geri"
   },
   "accessibility": {
     "skip_to_content": "Ana içeriğe atla",

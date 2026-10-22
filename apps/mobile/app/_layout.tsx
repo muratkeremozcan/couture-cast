@@ -219,7 +219,9 @@ function RootLayoutNav() {
         */}
         <AppThemeProvider>
           <ThemeProvider value={theme}>
-            <Stack>
+            {/* iOS labels the back button with the previous route's title; the tab
+                group has none, so it read "(tabs)". */}
+            <Stack screenOptions={{ headerBackTitle: t('common.back') }}>
               <Stack.Screen name="(tabs)" options={{ headerShown: false }} />
               <Stack.Screen name="modal" options={{ presentation: 'modal' }} />
               <Stack.Screen

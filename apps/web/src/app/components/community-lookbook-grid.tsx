@@ -132,6 +132,11 @@ const REMOVED_STATUSES = new Set([
 const MAX_AUTOMATIC_IMAGE_REFETCHES = 2
 
 const FEED_PAGE_SIZE = 12
+/**
+ * Least time left in which a notification target attempt may start: one bearer read, one
+ * request and its answer. Below it the attempt would leave after the 10 s operation bound.
+ */
+const MINIMUM_TARGET_ATTEMPT_MS = 250
 
 /**
  * Deep merlot. A semantic state colour for errors, destructive actions and
@@ -2460,6 +2465,10 @@ export function CommunityLookbookGrid({
     const resolveOwned = async () => {
       do {
         generation = detailGenerationRef.current
+        // An attempt is admitted only if it can still dispatch and answer inside the
+        // operation's 10 s bound; a boundary attempt would leave after the deadline.
+        const remaining = deadline - performance.now()
+        if (remaining < MINIMUM_TARGET_ATTEMPT_MS) break
         try {
           const result = await communitySyncFromWeb().resolve(
             {
@@ -2474,9 +2483,7 @@ export function CommunityLookbookGrid({
             },
             AbortSignal.any([
               controller.signal,
-              AbortSignal.timeout(
-                Math.min(2000, Math.max(1, Math.ceil(deadline - performance.now())))
-              ),
+              AbortSignal.timeout(Math.min(2000, Math.floor(remaining))),
             ])
           )
           if (
@@ -2502,7 +2509,7 @@ export function CommunityLookbookGrid({
         }
         // Keep the original per-target read ticket across retries. A withdrawn
         // target stays fenced even when an unrelated invalidation re-owns this read.
-      } while (active && !controller.signal.aborted && performance.now() < deadline)
+      } while (active && !controller.signal.aborted)
       throw new CommunityRequestSuperseded()
     }
     let abortOperation: () => void = () => undefined
