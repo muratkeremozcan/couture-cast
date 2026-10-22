@@ -52,9 +52,16 @@ tags:
 - assertVisible: ${output.commentRoot}
 - tapOn:
     id: 'comment-submit'
+# With live insertion the comment can be screened and published before the private
+# "Your submissions" section ever renders, so that section cannot be awaited. The draft is
+# cleared only after the server accepts the submission, and the send control returns to
+# idle: both are stable once reached.
 - extendedWaitUntil:
-    visible: 'Your submissions. Only you can see these.'
+    visible: '^0 / 280 characters$'
     timeout: 15000
+- assertVisible:
+    id: 'comment-submit'
+    text: 'Send comment'
 - takeScreenshot:
     path: maestro/artifacts/community-comments-submitted
 # With realtime connected, the published root is inserted live (about 2 s) and the
@@ -91,6 +98,13 @@ tags:
     path: maestro/artifacts/community-comments-reply-keyboard
 - tapOn:
     id: 'comment-submit'
+# Same acceptance proof for the reply: cleared draft and an idle send control.
+- extendedWaitUntil:
+    visible: '^0 / 280 characters$'
+    timeout: 15000
+- assertVisible:
+    id: 'comment-submit'
+    text: 'Send comment'
 # The published reply is inserted live too; wait for the parent's replies action.
 - scrollUntilVisible:
     element:
@@ -99,13 +113,6 @@ tags:
     direction: DOWN
     centerElement: true
     timeout: 20000
-- scrollUntilVisible:
-    element:
-      id: 'comment-replies-.*'
-      text: ${output.repliesAction}
-    direction: DOWN
-    centerElement: true
-    timeout: 15000
 - tapOn:
     id: 'comment-replies-.*'
     text: ${output.repliesAction}
