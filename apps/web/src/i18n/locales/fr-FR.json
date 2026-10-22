@@ -470,6 +470,7 @@
       "headingFallback": "À la une de la ville",
       "intro": "Les looks remarquables près de chez vous cette semaine.",
       "rank": "Rang {{rank}}",
+      "position": "Position {{position}} sur {{count}}",
       "loading": "Chargement de la une de la ville",
       "emptyTitle": "Rien à la une près de chez vous pour le moment",
       "emptyBody": "Dès que suffisamment de membres près de chez vous partageront des looks, les plus appréciés de la semaine apparaîtront ici.",

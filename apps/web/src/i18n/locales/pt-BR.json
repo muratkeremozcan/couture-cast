@@ -470,6 +470,7 @@
       "headingFallback": "Destaques da cidade",
       "intro": "Looks que se destacaram perto de você na última semana.",
       "rank": "Posição {{rank}}",
+      "position": "Posição {{position}} de {{count}}",
       "loading": "Carregando os destaques da cidade",
       "emptyTitle": "Ainda não há destaques perto de você",
       "emptyBody": "Quando pessoas suficientes perto de você compartilharem looks, os mais queridos da semana aparecerão aqui.",

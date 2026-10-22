@@ -470,6 +470,7 @@
       "headingFallback": "Destaques da cidade",
       "intro": "Visuais que se destacaram perto de si na última semana.",
       "rank": "Posição {{rank}}",
+      "position": "Posição {{position}} de {{count}}",
       "loading": "A carregar os destaques da cidade",
       "emptyTitle": "Ainda não há destaques perto de si",
       "emptyBody": "Quando membros suficientes perto de si partilharem visuais, os mais apreciados da semana aparecerão aqui.",

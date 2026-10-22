@@ -470,6 +470,7 @@
       "headingFallback": "In evidenza in città",
       "intro": "I look più apprezzati vicino a te nell'ultima settimana.",
       "rank": "Posizione {{rank}}",
+      "position": "Posizione {{position}} di {{count}}",
       "loading": "Caricamento dei look in evidenza",
       "emptyTitle": "Ancora nessun look in evidenza vicino a te",
       "emptyBody": "Quando abbastanza persone vicino a te condivideranno dei look, qui compariranno i più amati della settimana.",

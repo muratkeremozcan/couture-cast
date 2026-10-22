@@ -3,11 +3,12 @@ import React, { useCallback, useEffect, useRef } from 'react'
 import {
   AccessibilityInfo,
   ActivityIndicator,
-  Platform,
+  ScrollView,
   StyleSheet,
   Text,
   TouchableOpacity,
   View,
+  useWindowDimensions,
 } from 'react-native'
 import { useTranslation } from 'react-i18next'
 import type {
@@ -24,6 +25,38 @@ import type {
 /** Same derived gold the community screen and challenge banner use. */
 const ACCENT_GOLD = '#C9A14A'
 const ON_ACCENT = '#111111'
+
+/** The heading's native id, so the carousel's list can name itself after it. */
+const HEADING_ID = 'community-spotlight-heading'
+
+/** Share of the window one carousel item takes, so the next card peeks. */
+export const SPOTLIGHT_ITEM_SHARE = 0.85
+/** Keeps a tablet card near phone size, so the feed still starts one card down. */
+export const SPOTLIGHT_ITEM_MAX_WIDTH = 420
+/** `CommunityCard` keeps this margin on each side, the same inset as the feed. */
+const CARD_INSET = 16
+
+export interface SpotlightCarouselMetrics {
+  /** Width of one item: the card plus its own insets. */
+  itemWidth: number
+  /** Distance from one card to the next, which is also the snap interval. */
+  step: number
+}
+
+/**
+ * Story 6.6 R42: the spotlight is one horizontal carousel, so the ranked cards
+ * add a single card height above the feed. The reused card keeps its 16px
+ * insets, so each item overlaps its neighbours by half an inset on each side:
+ * cards sit 16px apart, as feed cards do vertically, and every card snaps to the
+ * feed's 16px left edge.
+ */
+export function spotlightCarouselMetrics(windowWidth: number): SpotlightCarouselMetrics {
+  const itemWidth = Math.min(
+    Math.round(windowWidth * SPOTLIGHT_ITEM_SHARE),
+    SPOTLIGHT_ITEM_MAX_WIDTH
+  )
+  return { itemWidth, step: itemWidth - CARD_INSET }
+}
 
 export interface CommunitySpotlightModuleProps {
   status: SpotlightStatus
@@ -57,10 +90,17 @@ export function CommunitySpotlightModule({
 }: CommunitySpotlightModuleProps) {
   const { t } = useTranslation()
   const palette = useHeroPalette()
+  const { width: windowWidth } = useWindowDimensions()
+  const { itemWidth, step } = spotlightCarouselMetrics(windowWidth)
   const rankRefs = useRef(new Map<string, View | null>())
+  const carouselRef = useRef<ScrollView>(null)
   const handledFocusRef = useRef(0)
   const translationRef = useRef(t)
   translationRef.current = t
+  const itemsRef = useRef(items)
+  itemsRef.current = items
+  const stepRef = useRef(step)
+  stepRef.current = step
 
   const setRankRef = useCallback(
     (postId: string, node: View | null) => {
@@ -72,6 +112,8 @@ export function CommunitySpotlightModule({
 
   // View more and a stale-cursor restart each move focus to the first new card
   // and announce the change once, through the same announcement path the feed uses.
+  // The carousel first brings that card to its start, so a card appended past
+  // the right edge never takes focus out of sight.
   useEffect(() => {
     if (!focusRequest || handledFocusRef.current === focusRequest.serial) return
     handledFocusRef.current = focusRequest.serial
@@ -83,8 +125,11 @@ export function CommunitySpotlightModule({
         : translationRef.current('community.spotlight.announceRefreshed')
     )
     const { firstId } = focusRequest
-    if (firstId === null || Platform.OS === 'web') return
+    if (firstId === null) return
     requestAnimationFrame(() => {
+      const index = itemsRef.current.findIndex((item) => item.id === firstId)
+      if (index >= 0)
+        carouselRef.current?.scrollTo({ x: index * stepRef.current, animated: true })
       const handle = safeFindNodeHandle(rankRefs.current.get(firstId) ?? null)
       if (handle) AccessibilityInfo.setAccessibilityFocus(handle)
     })
@@ -106,6 +151,7 @@ export function CommunitySpotlightModule({
     >
       <Text
         testID="community-spotlight-heading"
+        nativeID={HEADING_ID}
         accessibilityRole="header"
         style={[styles.heading, { color: palette.text }]}
       >
@@ -171,39 +217,86 @@ export function CommunitySpotlightModule({
       )
     }
     return (
-      <View testID="community-spotlight-list" style={styles.list}>
+      <>
         <Text style={[styles.body, { color: palette.mutedText }]}>
           {t('community.spotlight.intro')}
         </Text>
-        {items.map((item) => (
-          <View
-            key={item.id}
-            testID={`community-spotlight-item-${item.id}`}
-            style={styles.item}
-          >
+        {/*
+          Horizontal inside the feed's vertical list: a horizontal pan moves the
+          carousel and a vertical pan moves the feed. Every loaded card stays
+          mounted, which keeps the whole carousel on the accessibility tree for
+          VoiceOver and TalkBack.
+        */}
+        <ScrollView
+          ref={carouselRef}
+          testID="community-spotlight-row"
+          horizontal
+          showsHorizontalScrollIndicator={false}
+          snapToInterval={step}
+          snapToAlignment="start"
+          decelerationRate="fast"
+          disableIntervalMomentum
+          contentContainerStyle={styles.carouselContent}
+        >
+          {items.length > 0 ? (
+            // The list holds the ranked looks alone; View more trails it, so
+            // the count read with each card covers the looks.
             <View
-              ref={(node) => setRankRef(item.id, node)}
-              testID={`community-spotlight-rank-${item.id}`}
-              accessible
-              accessibilityLabel={t('community.spotlight.rank', { rank: item.rank })}
-              style={[styles.rankBadge, { backgroundColor: ACCENT_GOLD }]}
+              testID="community-spotlight-list"
+              role="list"
+              aria-labelledby={HEADING_ID}
+              style={styles.list}
             >
-              <Text style={[styles.rankText, { color: ON_ACCENT }]}>#{item.rank}</Text>
+              {items.map((item, index) => (
+                <View
+                  key={item.id}
+                  testID={`community-spotlight-item-${item.id}`}
+                  role="listitem"
+                  style={[styles.item, { width: itemWidth }]}
+                >
+                  <View
+                    ref={(node) => setRankRef(item.id, node)}
+                    testID={`community-spotlight-rank-${item.id}`}
+                    accessible
+                    accessibilityLabel={rankLabel(item.rank, index + 1, items.length)}
+                    style={[styles.rankBadge, { backgroundColor: ACCENT_GOLD }]}
+                  >
+                    <Text style={[styles.rankText, { color: ON_ACCENT }]}>
+                      #{item.rank}
+                    </Text>
+                  </View>
+                  {renderCard(item)}
+                </View>
+              ))}
             </View>
-            {renderCard(item)}
-          </View>
-        ))}
-        {renderFooter()}
-      </View>
+          ) : null}
+          {renderFooter()}
+        </ScrollView>
+      </>
     )
   }
 
+  /**
+   * The rank can skip a number the server filtered, so the position and count
+   * among the loaded looks follow it.
+   */
+  function rankLabel(rank: number, position: number, count: number) {
+    return `${t('community.spotlight.rank', { rank })}, ${t(
+      'community.spotlight.position',
+      { position, count }
+    )}`
+  }
+
+  /**
+   * The carousel's trailing item: View more while a next page exists, or the
+   * loading and retry states that stand in for it.
+   */
   function renderFooter() {
     if (isLoadingMore) {
       return (
-        <View testID="community-spotlight-loading-more" style={styles.stateRow}>
+        <View testID="community-spotlight-loading-more" style={styles.trailing}>
           <ActivityIndicator size="small" color={palette.text} />
-          <Text style={[styles.body, { color: palette.mutedText }]}>
+          <Text style={[styles.trailingText, { color: palette.mutedText }]}>
             {t('community.spotlight.loadingMore')}
           </Text>
         </View>
@@ -214,9 +307,9 @@ export function CommunitySpotlightModule({
         <View
           testID="community-spotlight-more-error"
           accessibilityRole="alert"
-          style={styles.stateColumn}
+          style={styles.trailing}
         >
-          <Text style={[styles.body, { color: palette.text }]}>
+          <Text style={[styles.trailingText, { color: palette.text }]}>
             {t('community.spotlight.error')}
           </Text>
           <TouchableOpacity
@@ -235,17 +328,19 @@ export function CommunitySpotlightModule({
     }
     if (!hasMore) return null
     return (
-      <TouchableOpacity
-        testID="community-spotlight-view-more"
-        style={[styles.outlineButton, { borderColor: palette.mutedText }]}
-        onPress={onViewMore}
-        accessibilityRole="button"
-        accessibilityLabel={t('community.spotlight.viewMore')}
-      >
-        <Text style={[styles.outlineButtonText, { color: palette.text }]}>
-          {t('community.spotlight.viewMore')}
-        </Text>
-      </TouchableOpacity>
+      <View style={styles.trailing}>
+        <TouchableOpacity
+          testID="community-spotlight-view-more"
+          style={[styles.outlineButton, { borderColor: palette.mutedText }]}
+          onPress={onViewMore}
+          accessibilityRole="button"
+          accessibilityLabel={t('community.spotlight.viewMore')}
+        >
+          <Text style={[styles.outlineButtonText, { color: palette.text }]}>
+            {t('community.spotlight.viewMore')}
+          </Text>
+        </TouchableOpacity>
+      </View>
     )
   }
 }
@@ -285,11 +380,29 @@ const styles = StyleSheet.create({
   stateColumn: {
     gap: 8,
   },
+  carouselContent: {
+    // Half an inset at each end: the overlapping items below bring the first
+    // and last cards back to the full 16px inset.
+    paddingHorizontal: CARD_INSET / 2,
+  },
   list: {
-    gap: 12,
+    flexDirection: 'row',
   },
   item: {
     gap: 6,
+    marginHorizontal: -CARD_INSET / 2,
+  },
+  trailing: {
+    justifyContent: 'center',
+    alignItems: 'center',
+    maxWidth: 240,
+    paddingHorizontal: CARD_INSET / 2,
+    gap: 8,
+  },
+  trailingText: {
+    fontSize: 13,
+    lineHeight: 18,
+    textAlign: 'center',
   },
   rankBadge: {
     alignSelf: 'flex-start',

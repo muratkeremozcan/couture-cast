@@ -869,6 +869,7 @@
       "headingFallback": "Şehir Vitrini",
       "intro": "Geçen haftadan yakınındaki öne çıkan kombinler.",
       "rank": "{{rank}}. sıra",
+      "position": "{{count}} konumdan {{position}}. konum",
       "loading": "Şehir vitrini yükleniyor",
       "emptyTitle": "Yakınında henüz vitrin yok",
       "emptyBody": "Yakınındaki yeterli sayıda üye kombin paylaştığında, bu haftanın en sevilenleri burada görünür.",

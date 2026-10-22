@@ -869,6 +869,7 @@
       "headingFallback": "City Spotlight",
       "intro": "Standout looks near you from the past week.",
       "rank": "Rank {{rank}}",
+      "position": "Position {{position}} of {{count}}",
       "loading": "Loading the City Spotlight",
       "emptyTitle": "No spotlight near you yet",
       "emptyBody": "When enough members near you share looks, the most loved ones from this week appear here.",

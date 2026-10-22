@@ -470,6 +470,7 @@
       "headingFallback": "Stadt-Highlights",
       "intro": "Herausragende Looks aus der Nähe aus der vergangenen Woche.",
       "rank": "Platz {{rank}}",
+      "position": "Position {{position}} von {{count}}",
       "loading": "Stadt-Highlights werden geladen",
       "emptyTitle": "In der Nähe gibt es noch keine Highlights",
       "emptyBody": "Sobald genug Mitglieder in der Nähe Looks teilen, erscheinen hier die beliebtesten dieser Woche.",

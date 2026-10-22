@@ -470,6 +470,7 @@
       "headingFallback": "Destacados de la ciudad",
       "intro": "Looks sobresalientes cerca de ti de la última semana.",
       "rank": "Puesto {{rank}}",
+      "position": "Posición {{position}} de {{count}}",
       "loading": "Cargando los destacados de la ciudad",
       "emptyTitle": "Todavía no hay destacados cerca de ti",
       "emptyBody": "Cuando suficientes personas cerca de ti compartan looks, aquí aparecerán los más queridos de esta semana.",

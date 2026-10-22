@@ -470,6 +470,7 @@
       "headingFallback": "Vedettes de la ville",
       "intro": "Les looks remarquables près de chez vous cette semaine.",
       "rank": "Rang {{rank}}",
+      "position": "Position {{position}} sur {{count}}",
       "loading": "Chargement des vedettes de la ville",
       "emptyTitle": "Aucune vedette près de chez vous pour l'instant",
       "emptyBody": "Quand assez de membres près de chez vous partageront des looks, les plus aimés de la semaine apparaîtront ici.",

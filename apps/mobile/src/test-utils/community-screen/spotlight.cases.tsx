@@ -126,7 +126,13 @@ export function registerCommunitySpotlightCases() {
     expect(screen.getByTestId('community-spotlight-rank-spot-1').textContent).toBe('#1')
     expect(
       screen.getByTestId('community-spotlight-rank-spot-2').getAttribute('aria-label')
-    ).toBe('Rank 2')
+    ).toBe('Rank 2, Position 2 of 2')
+    // One horizontal carousel: the second card sits beside the first.
+    const second = screen.getByTestId('community-spotlight-item-spot-2')
+    expect(second.getBoundingClientRect().top).toBe(first.getBoundingClientRect().top)
+    expect(second.getBoundingClientRect().left).toBeGreaterThan(
+      first.getBoundingClientRect().left
+    )
     expect(screen.queryByTestId('community-spotlight-view-more')).toBeNull()
     // Reaction summaries are negotiated exactly like the feed.
     expect(requests[0]?.headers.get('x-couture-reactions')).toBe('1')
@@ -182,7 +188,12 @@ export function registerCommunitySpotlightCases() {
         : page({ nextCursor: 'cursor-2' })
     )
     await render(<CommunityScreen />)
-    press(await screen.findByTestId('community-spotlight-view-more'))
+    const viewMore = await screen.findByTestId('community-spotlight-view-more')
+    const row = screen.getByTestId('community-spotlight-row')
+    // View more trails the cards inside the carousel.
+    expect(row.contains(viewMore)).toBe(true)
+    const scroll = vi.spyOn(row, 'scroll')
+    press(viewMore)
     const newRank = await screen.findByTestId('community-spotlight-rank-spot-3')
     expect(screen.getByTestId('community-spotlight-item-spot-1')).toBeVisible()
     expect(urls.map((url) => url.searchParams.get('cursor'))).toEqual([null, 'cursor-2'])
@@ -190,6 +201,17 @@ export function registerCommunitySpotlightCases() {
     expect(AccessibilityInfo.setAccessibilityFocus).toHaveBeenLastCalledWith(
       handles.get(newRank)
     )
+    // The carousel brought the first new card to its start before focus moved.
+    const firstNew = screen.getByTestId('community-spotlight-item-spot-3')
+    const firstCard = screen.getByTestId('community-spotlight-item-spot-1')
+    const offset = Math.round(
+      firstNew.getBoundingClientRect().left - firstCard.getBoundingClientRect().left
+    )
+    expect(scroll).toHaveBeenCalledWith(expect.objectContaining({ left: offset, top: 0 }))
+    expect(scroll.mock.invocationCallOrder.at(-1)).toBeLessThan(
+      vi.mocked(AccessibilityInfo.setAccessibilityFocus).mock.invocationCallOrder.at(-1)!
+    )
+    expect(newRank.getAttribute('aria-label')).toBe('Rank 3, Position 3 of 4')
     const announcements = vi
       .mocked(AccessibilityInfo.announceForAccessibility)
       .mock.calls.filter(([text]) => text === 'Loaded 2 more spotlight looks.')
