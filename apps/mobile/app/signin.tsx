@@ -3,6 +3,15 @@ import { View, Text, TextInput, Pressable, StyleSheet } from 'react-native'
 import { useTranslation } from 'react-i18next'
 import { router } from 'expo-router'
 import { requestNativeOtp, verifyNativeOtp } from '@/src/lib/native-session'
+import {
+  NativeSignInError,
+  type NativeSignInFailure,
+} from '@/src/lib/native-signin-error'
+const FAILURE_KEYS: Record<NativeSignInFailure, string> = {
+  denied: 'community.notifications.signinDenied',
+  code_invalid: 'community.notifications.signinCodeInvalid',
+  unavailable: 'community.notifications.signinUnavailable',
+}
 export default function SignInScreen() {
   const { t } = useTranslation()
   const [email, setEmail] = useState('')
@@ -21,17 +30,17 @@ export default function SignInScreen() {
         setSent(true)
         setMessage('community.notifications.codeSent')
       }
-    } catch {
-      setMessage('community.notifications.failed')
+    } catch (error) {
+      // Anything unclassified is treated as temporary, so the person retries.
+      setMessage(
+        FAILURE_KEYS[error instanceof NativeSignInError ? error.reason : 'unavailable']
+      )
     } finally {
       setBusy(false)
     }
   }
   return (
     <View style={styles.container}>
-      <Text accessibilityRole="header" style={styles.title}>
-        {t('community.notifications.signin')}
-      </Text>
       <Text>{t('community.notifications.email')}</Text>
       <TextInput
         accessibilityLabel={t('community.notifications.email')}

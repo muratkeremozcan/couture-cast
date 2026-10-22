@@ -159,9 +159,6 @@ export default function NotificationSettingsScreen() {
   }
   return (
     <ScrollView contentContainerStyle={styles.container}>
-      <Text accessibilityRole="header" style={styles.title}>
-        {t('community.notifications.title')}
-      </Text>
       {draft && (
         <>
           <View style={styles.row}>

@@ -27,6 +27,7 @@ import { initI18n } from '@/src/lib/i18n'
 import { registerBackgroundFetchAsync } from '@/src/lib/background-fetch'
 import { AccessibilityAnnouncerProvider } from '@/src/hooks/use-accessibility-announcer'
 import { AppThemeProvider } from '@/src/theme/theme-context'
+import { useTranslation } from 'react-i18next'
 
 const isExpoGoAndroid =
   Platform.OS === 'android' && Constants.appOwnership === AppOwnership.Expo
@@ -94,6 +95,7 @@ function RootLayoutNav() {
   /* eslint-disable @typescript-eslint/no-unsafe-assignment */
   const colorScheme = useColorScheme()
   const theme = colorScheme === 'dark' ? DarkTheme : DefaultTheme
+  const { t } = useTranslation()
 
   const router = useRouter()
   const navigation = useRootNavigationState()
@@ -223,6 +225,15 @@ function RootLayoutNav() {
               <Stack.Screen
                 name="wardrobe-capsules"
                 options={{ title: 'Outfit capsules' }}
+              />
+              {/* The native header carries each title; the screens render no second one. */}
+              <Stack.Screen
+                name="signin"
+                options={{ title: t('community.notifications.signin') }}
+              />
+              <Stack.Screen
+                name="notification-settings"
+                options={{ title: t('community.notifications.title') }}
               />
             </Stack>
           </ThemeProvider>

@@ -11,6 +11,8 @@ import { AppState } from 'react-native'
 import { userProfileResponseSchema } from '@couture/api-client/contracts/http'
 import { createMobileApiClient } from './api-client'
 import { setMobileAccessTokenResolver, setMobileApplicationUserId } from './mobile-auth'
+import { secureSessionStorage } from './secure-session-storage'
+import { codeRejected, NativeSignInError } from './native-signin-error'
 
 let clientPromise: Promise<SupabaseClient> | undefined
 let session: Session | null = null
@@ -66,14 +68,8 @@ export function nativeSupabase(): Promise<SupabaseClient> {
         autoRefreshToken: true,
         detectSessionInUrl: false,
         lock: processLock,
-        storage: {
-          getItem: (name) => secure.getItemAsync(name),
-          setItem: (name, value) =>
-            secure.setItemAsync(name, value, {
-              keychainAccessible: secure.AFTER_FIRST_UNLOCK_THIS_DEVICE_ONLY,
-            }),
-          removeItem: (name) => secure.deleteItemAsync(name),
-        },
+        // Sessions routinely exceed SecureStore's 2048-byte value limit; see the module.
+        storage: secureSessionStorage(secure),
       },
     })
   })()
@@ -252,16 +248,28 @@ export async function requestNativeOtp(email: string) {
     email,
     options: { shouldCreateUser: true },
   })
-  if (error) throw new Error('Sign-in could not be started.')
+  if (error) throw new NativeSignInError('unavailable', 'Sign-in could not be started.')
 }
 export async function verifyNativeOtp(email: string, token: string) {
   const client = await nativeSupabase()
   if (member) await signOutNativeSession()
   const { data, error } = await client.auth.verifyOtp({ email, token, type: 'email' })
-  if (error || !data.session) throw new Error('Sign-in code could not be verified.')
+  if (error || !data.session)
+    throw new NativeSignInError(
+      codeRejected(error) ? 'code_invalid' : 'unavailable',
+      'Sign-in code could not be verified.'
+    )
   localSignedOut = false
-  await acceptSession(data.session)
-  if (!member) throw new Error('This account is unavailable.')
+  try {
+    await acceptSession(data.session)
+  } catch (failure) {
+    // A 401/403/404 account check is the server saying this identity has no account.
+    throw new NativeSignInError(
+      sessionDenied(failure) ? 'denied' : 'unavailable',
+      'Session verification is unavailable.'
+    )
+  }
+  if (!member) throw new NativeSignInError('denied', 'This account is unavailable.')
 }
 export async function signOutNativeSession() {
   const client = await nativeSupabase()
@@ -279,8 +287,8 @@ export async function signOutNativeSession() {
     await Promise.allSettled([...logoutHooks].map((hook) => hook(token)))
     await client.auth.signOut({ scope: 'local' })
   } finally {
-    const secure = await import('expo-secure-store')
-    await secure.deleteItemAsync(authStorageKey)
-    await secure.deleteItemAsync(`${authStorageKey}-code-verifier`)
+    const storage = secureSessionStorage(await import('expo-secure-store'))
+    await storage.removeItem(authStorageKey)
+    await storage.removeItem(`${authStorageKey}-code-verifier`)
   }
 }

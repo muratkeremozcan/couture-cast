@@ -1417,10 +1417,8 @@ export function CommunityScreen() {
       style={[styles.container, { backgroundColor: palette.background }]}
       testID="community-screen"
     >
+      {/* The tab header already names the screen, as on every other tab. */}
       <View style={styles.header}>
-        <Text style={[styles.title, { color: palette.text }]}>
-          {t('community.title')}
-        </Text>
         <TouchableOpacity
           ref={newPostButtonRef}
           testID="community-new-post-button"
@@ -1550,7 +1548,7 @@ const styles = StyleSheet.create({
   },
   header: {
     flexDirection: 'row',
-    justifyContent: 'space-between',
+    justifyContent: 'flex-end',
     alignItems: 'center',
     paddingHorizontal: 16,
     paddingTop: 16,
