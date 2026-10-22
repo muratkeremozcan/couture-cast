@@ -193,6 +193,9 @@ export function CommunityScreen() {
   const [newLooks, setNewLooks] = useState<CommunityFeedItem[]>([])
   const newLooksRef = useRef(newLooks)
   newLooksRef.current = newLooks
+  // Advances whenever the feed's scope (filter or session) changes. Buffered looks and an
+  // insertion under way belong to the scope they started in.
+  const feedScopeRef = useRef(0)
   const [isInsertingLooks, setIsInsertingLooks] = useState(false)
 
   const [items, setItems] = useState<CommunityFeedItem[]>([])
@@ -738,6 +741,7 @@ export function CommunityScreen() {
       comments.setSession(identity)
       setSessionScope(identity)
       if (previous === undefined || previous === identity) return
+      feedScopeRef.current++
       requestGenerationRef.current++
       detailGenerationRef.current++
       actionGenerationRef.current++
@@ -746,6 +750,7 @@ export function CommunityScreen() {
       reactionState.reset()
       setItems([])
       realtimeItems.current = []
+      newLooksRef.current = []
       setNewLooks([])
       setAuthorStates([])
       setNextCursor(null)
@@ -791,8 +796,19 @@ export function CommunityScreen() {
     return () => controllerRef.current?.abort()
   }, [loadFeed, mode])
 
+  useEffect(() => {
+    // Looks buffered under the previous filter are not part of this feed. Target
+    // resolution stays filter-agnostic, so the buffer itself has to be dropped.
+    feedScopeRef.current++
+    newLooksRef.current = []
+    setNewLooks([])
+  }, [mode])
+
   const insertNewLooks = async () => {
     if (isInsertingLooks) return
+    const scope = feedScopeRef.current
+    const current = (generation: number) =>
+      generation === detailGenerationRef.current && scope === feedScopeRef.current
     const generation = detailGenerationRef.current
     const ticket = reactionState.beginRead()
     const buffered = newLooksRef.current
@@ -810,7 +826,7 @@ export function CommunityScreen() {
             signal
           )
         )
-        if (generation !== detailGenerationRef.current) return
+        if (!current(generation)) return
         for (const target of result.targets)
           if (target.status === 'available') {
             const post = reactionState.read(target.post, ticket)
@@ -823,7 +839,7 @@ export function CommunityScreen() {
       newLooksRef.current = []
       setNewLooks([])
     } catch {
-      if (generation === detailGenerationRef.current) realtimeSyncRef.current?.recover()
+      if (current(generation)) realtimeSyncRef.current?.recover()
     } finally {
       setIsInsertingLooks(false)
     }

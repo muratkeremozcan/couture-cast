@@ -30,6 +30,8 @@ let localSignedOut = false
 const authStorageKey = 'couturecast.auth-session'
 const listeners = new Set<() => void>()
 const logoutHooks = new Set<(token?: string) => Promise<void>>()
+// Logout cleanup hooks get at most this long before sign-out returns.
+const LOGOUT_HOOK_DEADLINE_MS = 3500
 const emit = () => listeners.forEach((fn) => fn())
 export const nativeSessionIdentity = () => member
 export const subscribeNativeSession = (listener: () => void) => {
@@ -283,12 +285,23 @@ export async function signOutNativeSession() {
   session = null
   setMobileApplicationUserId(null)
   emit()
+  // Hooks start with the captured credential, but durable sign-out never waits on them:
+  // a hook stalled on a provider (for example the OS push token) cannot leave the
+  // previous session stored for a fresh process to restore.
+  const hooks = Promise.allSettled([...logoutHooks].map((hook) => hook(token)))
   try {
-    await Promise.allSettled([...logoutHooks].map((hook) => hook(token)))
     await client.auth.signOut({ scope: 'local' })
   } finally {
     const storage = secureSessionStorage(await import('expo-secure-store'))
     await storage.removeItem(authStorageKey)
     await storage.removeItem(`${authStorageKey}-code-verifier`)
+    let timer: ReturnType<typeof setTimeout> | undefined
+    await Promise.race([
+      hooks,
+      new Promise<void>((resolve) => {
+        timer = setTimeout(resolve, LOGOUT_HOOK_DEADLINE_MS)
+      }),
+    ])
+    clearTimeout(timer)
   }
 }

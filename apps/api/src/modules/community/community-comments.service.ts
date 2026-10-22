@@ -34,6 +34,8 @@ export class CommunityCommentsService {
     const budget = new CommunityAuthorizationBudget()
     return communityDependency(() =>
       budget.run(async () => {
+        // An erased subject is a terminal denial before any flag-cache read (D3).
+        await this.repository.assertSubjectAvailable(member, budget)
         let grant = await this.flags.communityReadEvaluation(member, budget)
         if (!grant.value)
           throw new ForbiddenException({

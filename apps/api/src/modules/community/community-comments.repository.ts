@@ -1,4 +1,7 @@
-import { assertCommunityReadEligibility } from './community-access.service.js'
+import {
+  assertCommunityReadEligibility,
+  assertCommunitySubjectPresent,
+} from './community-access.service.js'
 import type { CommunityAuthorizationBudget } from './community-availability.js'
 import {
   guardCommunityPost,
@@ -112,6 +115,9 @@ export class CommunityCommentsRepository {
   constructor(@Inject(PrismaClient) private readonly prisma: PrismaClient) {}
   assertReadEligibility(member: string, budget: CommunityAuthorizationBudget) {
     return assertCommunityReadEligibility(this.prisma, member, budget)
+  }
+  assertSubjectAvailable(member: string, budget: CommunityAuthorizationBudget) {
+    return assertCommunitySubjectPresent(this.prisma, member, budget)
   }
 
   async withThread<T>(

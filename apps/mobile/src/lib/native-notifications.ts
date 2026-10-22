@@ -87,7 +87,8 @@ async function requirePermission(
   previous: StoredBinding | undefined,
   owner: string,
   client: ReturnType<typeof tokenApi>,
-  request: boolean
+  request: boolean,
+  current: () => boolean
 ) {
   let permission = await notifications.getPermissionsAsync()
   if (request && !permission.granted)
@@ -95,7 +96,7 @@ async function requirePermission(
   if (permission.granted) return
   if (previous?.owner === owner) {
     await client.remove(previous.registrationId, previous.bindingGeneration)
-    if (nativeSessionIdentity() === owner) {
+    if (current()) {
       const secure = await import('expo-secure-store')
       await secure.deleteItemAsync(registrationKey)
     }
@@ -104,19 +105,27 @@ async function requirePermission(
 }
 type RegistrationFlight = {
   owner: string
+  epoch: number
   promise: Promise<void>
   dirty: boolean
   permission: boolean
   deviceToken?: DevicePushToken
 }
 let registrationFlight: RegistrationFlight | undefined
+// Logout advances the epoch. A registration started under an earlier epoch belongs to a
+// signed-out session: whatever it obtains later is never registered or stored for it.
+let registrationEpoch = 0
+// Logout gives an in-flight registration this long to finish its own fenced cleanup.
+const LOGOUT_REGISTRATION_WAIT_MS = 1000
 async function registration(
   owner: string,
+  epoch: number,
   requestPermission: boolean,
   devicePushToken?: DevicePushToken
 ): Promise<void> {
+  const current = () => epoch === registrationEpoch && nativeSessionIdentity() === owner
   const token = await resolveMobileAccessToken()
-  if (!token || nativeSessionIdentity() !== owner) throw new Error('Sign in first.')
+  if (!token || !current()) throw new Error('Sign in first.')
   const client = tokenApi(token)
   const [notifications, secure, crypto] = await Promise.all([
     import('expo-notifications'),
@@ -135,7 +144,14 @@ async function registration(
       name: 'CoutureCast',
       importance: notifications.AndroidImportance.DEFAULT,
     })
-  await requirePermission(notifications, previous, owner, client, requestPermission)
+  await requirePermission(
+    notifications,
+    previous,
+    owner,
+    client,
+    requestPermission,
+    current
+  )
   const projectId = notificationProjectId()
   if (!projectId)
     throw new NativeNotificationFailure(
@@ -168,7 +184,7 @@ async function registration(
     installationId = crypto.randomUUID()
     await secure.setItemAsync(installationKey, installationId)
   }
-  if (nativeSessionIdentity() !== owner) return
+  if (!current()) return
   const input = {
     token: expoToken.data,
     installationId,
@@ -184,7 +200,7 @@ async function registration(
         }
       : {}),
   } as const
-  const bound = await registerBinding(client, owner, previous, input, () =>
+  const bound = await registerBinding(client, owner, previous, input, current, () =>
     secure.deleteItemAsync(registrationKey)
   ).catch(async (error: unknown) => {
     throw (await bindingConflict(error))
@@ -197,7 +213,7 @@ async function registration(
   })
   if (!bound) return
   const stored = { ...bound, owner }
-  if (nativeSessionIdentity() !== owner) {
+  if (!current()) {
     await secure.setItemAsync(pendingKey, JSON.stringify(stored))
     await client.remove(bound.registrationId, bound.bindingGeneration)
     await forgetPending()
@@ -224,6 +240,7 @@ async function registerBinding(
   owner: string,
   previous: StoredBinding | undefined,
   input: RegisterPushTokenInput,
+  current: () => boolean,
   forgetStale: () => Promise<void>
 ) {
   let bound
@@ -246,18 +263,18 @@ async function registerBinding(
       return client.register(fresh)
     }
     const { registrations } = await client.registrations()
-    if (nativeSessionIdentity() !== owner) return
-    const current = registrations.find(
+    if (!current()) return
+    const listed = registrations.find(
       (row) => row.registrationId === previous.registrationId
     )
     // Listing proves only this owner's bindings. A concurrent transfer remains rejected by the server.
     bound = await client.register({
       ...fresh,
-      ...(current
+      ...(listed
         ? {
             expectedBinding: {
-              registrationId: current.registrationId,
-              bindingGeneration: current.bindingGeneration,
+              registrationId: listed.registrationId,
+              bindingGeneration: listed.bindingGeneration,
             },
           }
         : {}),
@@ -272,7 +289,8 @@ export async function reconcileNativeRegistration(
 ): Promise<void> {
   const owner = nativeSessionIdentity()
   if (!owner) throw new Error('Sign in first.')
-  if (registrationFlight) {
+  // A flight from before a logout is fenced and never writes, so nothing waits on it.
+  if (registrationFlight?.epoch === registrationEpoch) {
     const existing = registrationFlight
     if (existing.owner === owner) {
       if (requestPermission && !existing.permission) {
@@ -290,6 +308,7 @@ export async function reconcileNativeRegistration(
   }
   const flight: RegistrationFlight = {
     owner,
+    epoch: registrationEpoch,
     promise: Promise.resolve(),
     dirty: true,
     permission: requestPermission,
@@ -300,11 +319,15 @@ export async function reconcileNativeRegistration(
     do {
       flight.dirty = false
       try {
-        await registration(owner, flight.permission, flight.deviceToken)
+        await registration(owner, flight.epoch, flight.permission, flight.deviceToken)
       } catch (error) {
         if (!flight.dirty) throw error
       }
-    } while (flight.dirty && nativeSessionIdentity() === owner)
+    } while (
+      flight.dirty &&
+      flight.epoch === registrationEpoch &&
+      nativeSessionIdentity() === owner
+    )
   })().finally(() => {
     if (registrationFlight === flight) registrationFlight = undefined
   })
@@ -345,7 +368,19 @@ export async function enableNativeCommunityNotifications() {
  * removes the binding.
  */
 async function unbind(accessToken?: string) {
-  await registrationFlight?.promise.catch(() => undefined)
+  registrationEpoch++
+  const flight = registrationFlight?.promise.catch(() => undefined)
+  // Bounded: a registration stalled on the OS push token cannot hold logout open.
+  if (flight) {
+    let timer: ReturnType<typeof setTimeout> | undefined
+    await Promise.race([
+      flight,
+      new Promise<void>((resolve) => {
+        timer = setTimeout(resolve, LOGOUT_REGISTRATION_WAIT_MS)
+      }),
+    ])
+    clearTimeout(timer)
+  }
   const secure = await import('expo-secure-store')
   try {
     const value = await readBinding()

@@ -10,6 +10,7 @@ import { COMMUNITY_AGE_GATE_DENIED_MESSAGE } from '@couture/api-client/contracts
 import { calculateAge } from '@couture/utils'
 import { FeatureFlagsService } from '../feature-flags/feature-flags.service.js'
 import { assertWardrobeParticipationAllowed } from '../guardian/guardian-participation.js'
+import { assertCommunitySubjectAvailable } from './community-privacy.js'
 
 @Injectable()
 export class CommunityAccessService {
@@ -29,6 +30,11 @@ export class CommunityAccessService {
     budget = new CommunityAuthorizationBudget(),
     tx: Prisma.TransactionClient = this.prisma
   ): Promise<CommunityGrant> {
+    await (tx === this.prisma
+      ? assertCommunitySubjectPresent(this.prisma, member, budget)
+      : communityDependency(() =>
+          budget.run(() => assertCommunitySubjectAvailable(tx, member))
+        ))
     const grant = await this.flags.communityReadEvaluation(member, budget)
     if (!grant.value)
       throw new ForbiddenException({
@@ -61,6 +67,31 @@ export class CommunityAccessService {
   ): Promise<void> {
     await assertCommunityDatabaseAccess(tx, member)
   }
+}
+
+/**
+ * Erasure is a primary-backed terminal denial, established before any flag-cache read. The
+ * cache only holds rows for an existing subject, so evaluating the flag first reports a
+ * permanent erasure as a retryable outage. A real database failure still maps to unavailable.
+ */
+export async function assertCommunitySubjectPresent(
+  prisma: PrismaClient,
+  member: string,
+  budget: CommunityAuthorizationBudget
+): Promise<void> {
+  await communityDependency(() =>
+    budget.run(() =>
+      prisma.$transaction(
+        async (tx) => {
+          await tx.$executeRawUnsafe(
+            `SET LOCAL statement_timeout = '${Math.min(500, budget.remaining())}ms'`
+          )
+          await assertCommunitySubjectAvailable(tx, member)
+        },
+        { timeout: budget.remaining(), maxWait: Math.min(100, budget.remaining()) }
+      )
+    )
+  )
 }
 
 export async function assertCommunityDatabaseReadAccess(

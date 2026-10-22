@@ -310,6 +310,7 @@ export const createService = (
   const reactionSummaries = vi.fn().mockResolvedValue(new Map())
   const repository = {
     assertReadEligibility: vi.fn().mockResolvedValue(undefined),
+    assertSubjectAvailable: vi.fn().mockResolvedValue(undefined),
     setReaction,
     reactionSummaries,
     findViewerLocations,

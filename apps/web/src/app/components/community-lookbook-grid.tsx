@@ -1806,6 +1806,9 @@ export function CommunityLookbookGrid({
   const [newLooks, setNewLooks] = useState<CommunityFeedItem[]>([])
   const newLooksRef = useRef(newLooks)
   newLooksRef.current = newLooks
+  // Advances whenever the feed's scope (filter or session) changes. Buffered looks and an
+  // insertion under way belong to the scope they started in.
+  const feedScopeRef = useRef(0)
   const [isInsertingLooks, setIsInsertingLooks] = useState(false)
 
   const [items, setItems] = useState<CommunityFeedItem[]>([])
@@ -2139,6 +2142,7 @@ export function CommunityLookbookGrid({
 
   useEffect(() => {
     const clearScope = () => {
+      feedScopeRef.current++
       feedGenerationRef.current++
       detailGenerationRef.current++
       feedControllerRef.current?.abort()
@@ -2199,11 +2203,19 @@ export function CommunityLookbookGrid({
     // themselves when it answers. Holding the previous served mode instead would
     // leave the click looking like it did nothing.
     setServedMode(null)
+    // Looks buffered under the previous filter are not part of this feed. Target
+    // resolution stays filter-agnostic, so the buffer itself has to be dropped.
+    feedScopeRef.current++
+    newLooksRef.current = []
+    setNewLooks([])
     void loadFeed(currentMode)
   }, [currentMode, loadFeed])
 
   const insertNewLooks = async () => {
     if (isInsertingLooks) return
+    const scope = feedScopeRef.current
+    const current = (generation: number) =>
+      generation === detailGenerationRef.current && scope === feedScopeRef.current
     const generation = detailGenerationRef.current
     const ticket = reactionState.beginRead()
     const buffered = newLooksRef.current
@@ -2219,7 +2231,7 @@ export function CommunityLookbookGrid({
           },
           AbortSignal.timeout(2000)
         )
-        if (generation !== detailGenerationRef.current) return
+        if (!current(generation)) return
         for (const target of result.targets)
           if (target.status === 'available') {
             const post = reactionState.read(target.post, ticket)
@@ -2232,7 +2244,7 @@ export function CommunityLookbookGrid({
       newLooksRef.current = []
       setNewLooks([])
     } catch {
-      if (generation === detailGenerationRef.current) realtimeSyncRef.current?.recover()
+      if (current(generation)) realtimeSyncRef.current?.recover()
     } finally {
       setIsInsertingLooks(false)
     }

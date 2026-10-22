@@ -96,6 +96,92 @@ function holdEvents() {
   return release
 }
 
+const scopeSummary = {
+  counts: { applause: 0, love: 0, inspiration: 0 },
+  total: 0,
+  viewerReaction: null,
+  revision: 0,
+  generation: 0,
+}
+/** A cold_dry feed that gains one published look, and a warm_wet feed beside it. */
+function twoFilterFeeds() {
+  const syncs: CommunitySyncState[] = []
+  vi.spyOn(CommunitySyncState.prototype, 'start').mockImplementation(function (
+    this: CommunitySyncState
+  ) {
+    syncs.push(this)
+  })
+  const state = { published: false, resolveHeld: undefined as Promise<void> | undefined }
+  const look = (id: string) => item({ id, reactions: scopeSummary })
+  serveFeed((url) =>
+    feedJson({
+      items:
+        url.searchParams.get('mode') === 'warm_wet'
+          ? [look('post-warm')]
+          : [look('post-cold'), ...(state.published ? [look('post-cold-new')] : [])],
+    })
+  )
+  server.use(
+    http.get('*/api/v1/community/events', () =>
+      HttpResponse.json({
+        data: {
+          events: state.published
+            ? [
+                {
+                  version: 1,
+                  kind: 'post.published',
+                  postId: 'post-cold-new',
+                  communityRevision: '1',
+                },
+              ]
+            : [],
+          nextCursor: 'scope',
+          hasMore: false,
+          resyncRequired: false,
+        },
+      })
+    ),
+    // Resolution answers for any public post, whatever filter is selected.
+    http.post('*/api/v1/community/targets/resolve', async ({ request }) => {
+      const { targets } = (await request.json()) as {
+        targets: { key: string; postId: string }[]
+      }
+      if (targets.some((target) => target.postId === 'post-cold-new'))
+        await state.resolveHeld
+      return HttpResponse.json({
+        data: {
+          targets: targets.map((target) => ({
+            key: target.key,
+            status: 'available',
+            communityRevision: '1',
+            post: look(target.postId),
+            comment: null,
+            parent: null,
+            pageCursor: null,
+            parentPageCursor: null,
+            threadPosition: null,
+          })),
+        },
+      })
+    })
+  )
+  return { syncs, state }
+}
+/** Opens cold_dry, then lets a catch-up buffer the newly published look. */
+async function bufferColdLook(feeds: ReturnType<typeof twoFilterFeeds>) {
+  await render(<CommunityScreen />)
+  press(await screen.findByTestId('community-filter-chip-cold_dry'))
+  await screen.findByTestId('community-post-card-post-cold')
+  await act(async () => {
+    await feeds.syncs.at(-1)!.catchUp()
+  })
+  feeds.state.published = true
+  await act(async () => {
+    await feeds.syncs.at(-1)!.catchUp()
+  })
+  await screen.findByRole('button', { name: 'Show 1 new looks' })
+}
+
 export function registerCommunityRealtimeCases() {
   it('A09 a recovering signal after the verification bound hides content until a catch-up verifies it', async () => {
     const recover = recoveryCoordinator()
@@ -565,6 +651,31 @@ export function registerCommunityRealtimeCases() {
     )
     expect(published).toBe(1)
   })
+  it('drops new looks buffered under the previous filter when the filter changes', async () => {
+    const feeds = twoFilterFeeds()
+    await bufferColdLook(feeds)
+    press(screen.getByTestId('community-filter-chip-warm_wet'))
+    await screen.findByTestId('community-post-card-post-warm')
+    expect(screen.queryByRole('button', { name: 'Show 1 new looks' })).toBeNull()
+    expect(screen.queryByTestId('community-post-card-post-cold-new')).toBeNull()
+  })
+  it('never inserts looks from an insertion started before the filter changed', async () => {
+    const feeds = twoFilterFeeds()
+    await bufferColdLook(feeds)
+    let release!: () => void
+    feeds.state.resolveHeld = new Promise<void>((resolve) => {
+      release = resolve
+    })
+    press(screen.getByRole('button', { name: 'Show 1 new looks' }))
+    press(screen.getByTestId('community-filter-chip-warm_wet'))
+    await screen.findByTestId('community-post-card-post-warm')
+    release()
+    await act(async () => {
+      await new Promise((resolve) => setTimeout(resolve, 100))
+    })
+    expect(screen.getByTestId('community-post-card-post-warm')).toBeTruthy()
+    expect(screen.queryByTestId('community-post-card-post-cold-new')).toBeNull()
+  })
   it('R08 withdraws a buffered new look before the member can insert it', async () => {
     let catchUp!: () => Promise<void>
     vi.spyOn(CommunitySyncState.prototype, 'start').mockImplementation(function (
@@ -652,7 +763,7 @@ export function registerCommunityRealtimeCases() {
     await waitFor(() =>
       expect(screen.queryByRole('button', { name: 'Show 1 new looks' })).toBeNull()
     )
-    expect(screen.queryByTestId('community-card-post-b')).toBeNull()
+    expect(screen.queryByTestId('community-post-card-post-b')).toBeNull()
   })
   it('6.5-MOB-local: passive invalidation replaces a previously rendered reaction aggregate', async () => {
     let catchUp: (() => Promise<void>) | undefined

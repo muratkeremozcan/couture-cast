@@ -2,6 +2,7 @@ import type { CommunityAuthorizationBudget } from './community-availability.js'
 import {
   assertCommunityDatabaseAccess,
   assertCommunityReadEligibility,
+  assertCommunitySubjectPresent,
 } from './community-access.service.js'
 import {
   assertCommunitySubjectAvailable,
@@ -184,6 +185,9 @@ export class CommunityRepository {
   constructor(@Inject(PrismaClient) private readonly prisma: PrismaClient) {}
   assertReadEligibility(member: string, budget: CommunityAuthorizationBudget) {
     return assertCommunityReadEligibility(this.prisma, member, budget)
+  }
+  assertSubjectAvailable(member: string, budget: CommunityAuthorizationBudget) {
+    return assertCommunitySubjectPresent(this.prisma, member, budget)
   }
 
   /** One statement supplies every aggregate and viewer revision from one MVCC snapshot. */
