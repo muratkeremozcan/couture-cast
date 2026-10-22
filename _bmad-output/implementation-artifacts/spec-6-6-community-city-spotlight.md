@@ -190,20 +190,20 @@ rank: 1..60, level }` without `experimentVariant`, where `level` is the served l
 
 **Execution:**
 
-- [ ] `packages/db/prisma/schema.prisma` and new migration -- area columns, index, anonymization
+- [x] `packages/db/prisma/schema.prisma` and new migration -- area columns, index, anonymization
       clearing, API-only invalidator cursor row with RLS -- area source, privacy, durable invalidation.
-- [ ] `apps/api/src/modules/community/` submission and maintenance paths -- stamp and clear area keys.
-- [ ] New `community-spotlight.repository.ts`, `community-spotlight.service.ts`, `community-spotlight-cache.ts`,
+- [x] `apps/api/src/modules/community/` submission and maintenance paths -- stamp and clear area keys.
+- [x] New `community-spotlight.repository.ts`, `community-spotlight.service.ts`, `community-spotlight-cache.ts`,
       `community-spotlight-invalidator.ts` -- clock seam, eligibility, level selection, scoring, snapshots,
       CAS pointers, versions and epoch, cursor, Redis fallback; wire the invalidator into
       `community-engagement.runtime.ts` after `append()`.
-- [ ] `packages/api-client/src/contracts/http/community.ts` and `openapi.ts` -- `GET /api/v1/community/spotlight`
+- [x] `packages/api-client/src/contracts/http/community.ts` and `openapi.ts` -- `GET /api/v1/community/spotlight`
       and optional opened `surface`/`rank`; regenerate OpenAPI/SDK; Optic diff clean.
-- [ ] `community.controller.ts`, `community.module.ts` -- route, headers, authorization wiring.
-- [ ] Telemetry service and analytics event registry -- two strict spotlight events and privacy tests.
-- [ ] Web and mobile wrappers, spotlight module components, View more, focus and announcements.
-- [ ] All 20 locale catalogs -- `community.spotlight.*` keys.
-- [ ] Seeds and factories -- deterministic spotlight cohort fixtures for local, Playwright and Maestro.
+- [x] `community.controller.ts`, `community.module.ts` -- route, headers, authorization wiring.
+- [x] Telemetry service and analytics event registry -- two strict spotlight events and privacy tests.
+- [x] Web and mobile wrappers, spotlight module components, View more, focus and announcements.
+- [x] All 20 locale catalogs -- `community.spotlight.*` keys.
+- [x] Seeds and factories -- deterministic spotlight cohort fixtures for local, Playwright and Maestro.
 - [ ] Unit tests (pure scorer, constants, cursor) and real-database plus owned-Redis integration tests
       covering every I/O matrix row; Pact interactions for spotlight and both opened branches;
       Playwright spotlight spec with axe on `pr-pw-e2e-local`; Maestro flow registered in
@@ -232,6 +232,53 @@ rank: 1..60, level }` without `experimentVariant`, where `level` is the served l
   delegated by the owner to the coordinator.
 - Build note from TEA: random 63-bit counter seeds exceed JS safe integers and Lua doubles, so
   versions and epochs are compared as strings everywhere, pinned by a unit test.
+- 2026-10-22, implementation. Changes outside the story's own surface, each with the defect it
+  fixed:
+  - Web feed reads retry once on the read gate's retryable 503 (`retryOnceWhenCommunityUnavailable`,
+    shared with mobile): under browser-test contention the gate's authorization budget answered a
+    transient 503 that left the feed in its error state.
+  - Web and mobile clients classify the read gate's rollout 403 (it carries the disabled message)
+    as `disabled`; before, it fell through to a generic failure, so a member outside the rollout saw
+    the error state on the feed and the spotlight instead of the localized disabled state.
+  - Prisma schema: two telemetry id defaults now say `dbgenerated("gen_random_uuid()")`, matching
+    their migrations; `prisma migrate diff` reported drift on a clean database.
+  - Lookbook Prism layout: grid tracks use `minmax(0, 1fr)` and the columns `min-w-0`; plain `1fr`
+    let the image column's intrinsic width crush the community column to about 160 px at 1440 px.
+  - Playwright community journeys wait for completed feed reads and record transient comment alerts;
+    they raced superseded reads and alerts that cleared before the assertion ran.
+  - Mobile feed footer and empty state render as elements; passed as functions they were rebuilt on
+    every render and dropped screen-reader focus from Load more. 6.1-MOB-022 waits for the first
+    image load before expiring the image; the late load reset the retry budget.
+- 2026-10-22, privacy model (R24, R29). The spotlight exposes a coarse canonical area (ISO
+  country, folded region and city), never coordinates or a location key; ranks only levels with at
+  least 5 distinct eligible authors and never returns the cohort size; labels with the viewer's own
+  saved place name; and allows at most 30 spotlight reads per member per minute, counted in
+  `CommunitySpotlightReadWindow` (one row per member, fixed minute window, atomic upsert, deleted
+  with the community subject on erasure, cascading with the user) and refused with the community
+  429 and `Retry-After`. Code review round 2 (R29) made cursor pages count too, because each later
+  page rechecks the cohort live and a replayed cursor would otherwise probe it without limit; the
+  frozen Privacy model bullet still says page-one and needs the coordinator's amendment.
+- 2026-10-22, erasure (R26): `forgetCommunitySubject(erase=true)` deletes the read window row in
+  the transaction that forgets the community subject.
+- 2026-10-22, canonical areas (R22). `canonicalCountryCode` lives in `@couture/utils` because the
+  API and the spotlight fixtures must agree; it builds its table lazily from `Intl.DisplayNames`
+  long and short names in the ten locales, the 249 ISO codes plus `XK`, and an alias table. Region
+  codes ICU treats as aliases (`UK` to `GB`) and non-country regions (`EU`, `UN`, `ZZ`,
+  exceptional reservations) never resolve. Fixture areas take real countries, one per call per
+  process, by English name.
+- 2026-10-22, query plans (R21), PG17 with 50,000 posts over 60 days (half in one country) and
+  529,466 reactions; plans and load script in
+  `_bmad-output/test-artifacts/story-6-6/runs/r21-explain/`. Before: both country-level queries
+  hash-joined a parallel sequential scan of every reaction, with posts from the generic
+  `(status, published_at, id)` index; cohort 34.9 ms, rank 51.6 ms. Migration
+  `20261022140000_community_spotlight_window_indexes` adds partial window indexes led by the country
+  and by the region, and a covering partial reaction index. After: nested loops driven by
+  `LookbookPost_spotlight_country_window_idx` with index-only reaction probes (zero heap fetches);
+  cohort 18.2 ms, country rank 34.6 ms, region rank 2.9 ms, city rank 0.4 ms.
+- 2026-10-22, opened dedupe (R2): `community_spotlight_opened:<subject token>:<post token>:spotlight`,
+  both tokens 16-hex HMACs under the analytics id secret.
+- 2026-10-22, image expiry on spotlight cards re-reads that one post on both platforms and replaces
+  only its copy; a page-one refresh would drop later pages and close a detail opened from one.
 
 ## Spec Change Log
 
