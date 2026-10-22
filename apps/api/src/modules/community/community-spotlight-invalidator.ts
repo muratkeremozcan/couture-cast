@@ -9,6 +9,8 @@ const PUBLIC_STREAM_ID = 'public'
 const BATCH_SIZE = 200
 /** The longest one invalidation pass may hold the append loop or shutdown. */
 export const SPOTLIGHT_INVALIDATOR_BUDGET_MS = 2000
+/** A pass still unsettled after this many budgets is abandoned as hung. */
+export const SPOTLIGHT_INVALIDATOR_ABANDON_BUDGETS = 4
 
 export type SpotlightInvalidationOutcome =
   | { status: 'idle' }
@@ -29,7 +31,11 @@ type Plan = { epoch: boolean; areas: Set<string> }
  */
 export class CommunitySpotlightInvalidator {
   private readonly logger = createBaseLogger().child({ feature: 'community-spotlight' })
-  private inFlight: Promise<SpotlightInvalidationOutcome> | null = null
+  private inFlight: {
+    pass: Promise<SpotlightInvalidationOutcome>
+    startedAt: number
+    warned: boolean
+  } | null = null
 
   constructor(
     private readonly prisma: PrismaClient,
@@ -40,16 +46,36 @@ export class CommunitySpotlightInvalidator {
    * One pass raced against `budgetMs`, so a stalled Redis or database never
    * holds the append loop or shutdown longer. A pass that outlives its budget
    * keeps running, and calls made meanwhile return at once without starting
-   * another, so two passes never overlap.
+   * another, warning once per pass. A pass still unsettled after
+   * `SPOTLIGHT_INVALIDATOR_ABANDON_BUDGETS` budgets is abandoned as hung, so
+   * one lost promise can never stop invalidation for good; the cursor's
+   * compare-and-set keeps a late finish from moving it twice.
    */
   async processWithin(
     budgetMs: number = SPOTLIGHT_INVALIDATOR_BUDGET_MS
   ): Promise<SpotlightInvalidationOutcome> {
-    if (this.inFlight) return this.defer('in_flight')
-    const pass = this.process().finally(() => {
-      this.inFlight = null
-    })
-    this.inFlight = pass
+    const now = Date.now()
+    if (this.inFlight) {
+      const age = now - this.inFlight.startedAt
+      if (age < budgetMs * SPOTLIGHT_INVALIDATOR_ABANDON_BUDGETS) {
+        if (this.inFlight.warned) return { status: 'deferred', reason: 'in_flight' }
+        this.inFlight.warned = true
+        return this.defer('in_flight')
+      }
+      this.logger.warn(
+        { event: 'community_spotlight_invalidation_abandoned', ageMs: age },
+        'Spotlight invalidation pass abandoned as hung; starting a new one'
+      )
+    }
+    const flight = {
+      pass: this.process().finally(() => {
+        if (this.inFlight === flight) this.inFlight = null
+      }),
+      startedAt: now,
+      warned: false,
+    }
+    this.inFlight = flight
+    const { pass } = flight
     let timer: ReturnType<typeof setTimeout> | undefined
     const budget = new Promise<SpotlightInvalidationOutcome>((resolve) => {
       timer = setTimeout(() => resolve(this.defer('timeout')), budgetMs)

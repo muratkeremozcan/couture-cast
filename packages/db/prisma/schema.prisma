@@ -1738,7 +1738,7 @@ model CommunitySpotlightCursor {
   updated_at DateTime @default(now())
 }
 
-/// Story 6.6: one fixed one-minute window of page-one spotlight reads per
+/// Story 6.6: one fixed one-minute window of spotlight reads per
 /// member, for the privacy model's read limit. API-only: RLS is enabled with
 /// zero policies and no client grants.
 model CommunitySpotlightReadWindow {

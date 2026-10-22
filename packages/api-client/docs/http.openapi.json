@@ -23352,10 +23352,10 @@
             }
           },
           "429": {
-            "description": "30 first-page reads per member per minute; later pages are not counted.",
+            "description": "30 spotlight reads per member per minute, first and later pages alike.",
             "headers": {
               "Retry-After": {
-                "description": "Seconds until the member may read the first page again.",
+                "description": "Seconds until the member may read the spotlight again.",
                 "schema": {
                   "type": "integer",
                   "minimum": 1

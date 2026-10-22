@@ -507,8 +507,11 @@ export const COMMUNITY_REACTION_CONFLICT_MESSAGE =
   'Reaction changed. Refresh and try again.'
 export const COMMUNITY_REACTION_RATE_LIMITED_MESSAGE =
   'Too many reactions. Please try again in a minute.'
-/** Story 6.6: the privacy model's page-one spotlight read limit. */
-export const COMMUNITY_SPOTLIGHT_PAGE_ONE_READS_PER_MINUTE = 30
+/**
+ * Story 6.6: the privacy model's spotlight read limit. Every page counts, so
+ * replaying a cursor is no unmetered way to probe the cohort.
+ */
+export const COMMUNITY_SPOTLIGHT_READS_PER_MINUTE = 30
 export const COMMUNITY_SPOTLIGHT_RATE_LIMITED_MESSAGE =
   'Too many spotlight reads. Please try again in a minute.'
 
@@ -1886,10 +1889,10 @@ export function registerCommunityContracts(
         },
       },
       429: {
-        description: `${COMMUNITY_SPOTLIGHT_PAGE_ONE_READS_PER_MINUTE} first-page reads per member per minute; later pages are not counted.`,
+        description: `${COMMUNITY_SPOTLIGHT_READS_PER_MINUTE} spotlight reads per member per minute, first and later pages alike.`,
         headers: {
           'Retry-After': {
-            description: 'Seconds until the member may read the first page again.',
+            description: 'Seconds until the member may read the spotlight again.',
             schema: { type: 'integer', minimum: 1 },
           },
         },

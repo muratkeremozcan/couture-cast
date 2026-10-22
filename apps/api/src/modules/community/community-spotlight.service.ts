@@ -2,7 +2,7 @@
 import { HttpException, Inject, Injectable, Logger } from '@nestjs/common'
 import type { LookbookPost } from '@prisma/client'
 import {
-  COMMUNITY_SPOTLIGHT_PAGE_ONE_READS_PER_MINUTE,
+  COMMUNITY_SPOTLIGHT_READS_PER_MINUTE,
   COMMUNITY_SPOTLIGHT_RATE_LIMITED_MESSAGE,
   type CommunityPlatform,
   type CommunityReactionSpotlight as CommunitySpotlight,
@@ -152,7 +152,7 @@ export class CommunitySpotlightService {
   }
 
   private async read(params: GetSpotlightParams): Promise<CommunitySpotlight> {
-    if (!params.cursor) await this.limitPageOneReads(params.userId)
+    await this.limitReads(params.userId)
     const asOf = spotlightAsOf(this.clock.now())
     // The level is resolved by a live cohort count BEFORE any pointer lookup,
     // so a level that fell below the cohort is never served from a pointer.
@@ -182,14 +182,14 @@ export class CommunitySpotlightService {
   }
 
   /**
-   * The privacy model's read limit: page one is where a member could probe
-   * the ranking repeatedly, so it is counted before any cohort query runs.
-   * Later pages page through a snapshot already served and are not counted.
+   * The privacy model's read limit. Every page counts: a later page rechecks
+   * the cohort live, so replaying one cursor would otherwise probe it without
+   * limit. The read is counted before any cohort query runs.
    */
-  private async limitPageOneReads(userId: string): Promise<void> {
+  private async limitReads(userId: string): Promise<void> {
     const now = this.clock.now()
-    const { reads, windowStart } = await this.repository.recordPageOneRead(userId, now)
-    if (reads <= COMMUNITY_SPOTLIGHT_PAGE_ONE_READS_PER_MINUTE) return
+    const { reads, windowStart } = await this.repository.recordRead(userId, now)
+    if (reads <= COMMUNITY_SPOTLIGHT_READS_PER_MINUTE) return
     throw new CommunityRateLimitException(
       COMMUNITY_SPOTLIGHT_RATE_LIMITED_MESSAGE,
       Math.max(1, Math.ceil((windowStart.getTime() + 60_000 - now.getTime()) / 1000))

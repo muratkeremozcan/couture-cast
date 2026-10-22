@@ -96,11 +96,11 @@ export class CommunitySpotlightRepository {
   }
 
   /**
-   * Counts one page-one read in the member's fixed one-minute window and
+   * Counts one spotlight read in the member's fixed one-minute window and
    * returns the window's count, in one atomic statement: concurrent reads
    * serialize on the member's row, so none is lost.
    */
-  async recordPageOneRead(
+  async recordRead(
     userId: string,
     now: Date
   ): Promise<{ reads: number; windowStart: Date }> {

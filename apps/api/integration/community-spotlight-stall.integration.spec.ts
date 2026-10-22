@@ -9,7 +9,7 @@ import {
   type Socket,
 } from 'node:net'
 import type Redis from 'ioredis'
-import { afterAll, describe, expect, it } from 'vitest'
+import { afterAll, describe, expect, it, vi } from 'vitest'
 import { getRedisConfig } from '../src/config/redis.js'
 import {
   CommunitySpotlightCache,
@@ -17,7 +17,11 @@ import {
   createCommunitySpotlightRedis,
   type SpotlightRedis,
 } from '../src/modules/community/community-spotlight-cache.js'
-import { CommunitySpotlightInvalidator } from '../src/modules/community/community-spotlight-invalidator.js'
+import {
+  CommunitySpotlightInvalidator,
+  SPOTLIGHT_INVALIDATOR_BUDGET_MS,
+} from '../src/modules/community/community-spotlight-invalidator.js'
+import { startCommunityEngagementRuntime } from '../src/modules/community/community-engagement.runtime.js'
 import { spotlightTestContext } from './helpers/community-spotlight-context.js'
 
 const ctx = spotlightTestContext('stall')
@@ -175,5 +179,41 @@ describe('6.6 stalled spotlight Redis', () => {
       where: { id: 'public' },
     })
     expect(after.position > before.position).toBe(true)
+  })
+
+  it('6.6-INT-062 the real engagement runtime keeps appending and shuts down while Redis stalls', async () => {
+    vi.stubEnv('COMMUNITY_DISPATCH_ENABLED', 'false')
+    const area = ctx.area('stalled-runtime')
+    const cohort = await ctx.cohort(area, 5)
+    while ((await ctx.streams.append()) > 0) {
+      // Start from an empty outbox so every append below is the runtime's.
+    }
+    const { proxy, client } = await stallableClient()
+    const remote = { getFeatureFlagValue: () => Promise.resolve<unknown>(true) }
+    const runtime = await startCommunityEngagementRuntime(ctx.prisma, remote, 'general', {
+      spotlightRedis: client,
+    })
+    try {
+      proxy.stall()
+      const appendedFor = (postId: string) =>
+        ctx.prisma.communityStreamEvent.count({
+          where: { stream_id: 'public', post_id: postId },
+        })
+      // Two reactions further apart than one invalidation budget: the second is
+      // appended only if the loop came back after a pass that met the stall.
+      for (const post of cohort.posts.slice(0, 2)) {
+        const before = await appendedFor(post.id)
+        await ctx.react(await ctx.member(), post.id, 'love')
+        await vi.waitFor(
+          async () => expect(await appendedFor(post.id)).toBeGreaterThan(before),
+          { timeout: SPOTLIGHT_INVALIDATOR_BUDGET_MS * 3, interval: 100 }
+        )
+      }
+    } finally {
+      const closing = timed(() => runtime.close())
+      const { ms } = await closing
+      expect(ms).toBeLessThan(SPOTLIGHT_INVALIDATOR_BUDGET_MS + 1000)
+      vi.unstubAllEnvs()
+    }
   })
 })

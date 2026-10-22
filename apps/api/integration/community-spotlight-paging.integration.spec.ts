@@ -1,7 +1,7 @@
 // Story 6.6 I/O matrix: pinned snapshots, signed cursors and live rechecks across
 // pages, against a real PG17 database and an owned Redis key space.
 import { describe, expect, it } from 'vitest'
-import { COMMUNITY_SPOTLIGHT_PAGE_ONE_READS_PER_MINUTE } from '@couture/api-client/contracts/http'
+import { COMMUNITY_SPOTLIGHT_READS_PER_MINUTE } from '@couture/api-client/contracts/http'
 import { CommunityRateLimitException } from '../src/modules/community/community-rate-limit.exception.js'
 import { areaComponentsOf } from '../src/modules/community/community-spotlight-area.js'
 import {
@@ -193,26 +193,27 @@ describe('6.6 spotlight paging', () => {
   })
 })
 
-describe('6.6 page-one read limit', () => {
-  it('6.6-INT-070 allows 30 page-one reads a minute, never counts later pages, and resets each minute', async () => {
+describe('6.6 spotlight read limit', () => {
+  it('6.6-INT-070 allows 30 spotlight reads a minute, cursor pages included, and resets each minute', async () => {
     const area = ctx.area('read-limit')
     await ctx.cohort(area, 5)
     const viewer = await ctx.member(area)
-    expect(COMMUNITY_SPOTLIGHT_PAGE_ONE_READS_PER_MINUTE).toBe(30)
-    let cursor: string | null = null
-    for (let read = 0; read < 30; read += 1) {
-      const page = await ctx.read(viewer, { limit: 2 })
-      cursor = page.nextCursor
+    expect(COMMUNITY_SPOTLIGHT_READS_PER_MINUTE).toBe(30)
+    const first = await ctx.read(viewer, { limit: 2 })
+    // Replaying one cursor is counted like any other read.
+    for (let read = 1; read < 30; read += 1)
+      await expect(
+        ctx.read(viewer, { limit: 2, cursor: first.nextCursor! })
+      ).resolves.toMatchObject({ level: 'city' })
+    for (const cursor of [first.nextCursor!, undefined]) {
+      const refused = await ctx
+        .read(viewer, { limit: 2, ...(cursor ? { cursor } : {}) })
+        .catch((error: unknown) => error)
+      expect(refused).toBeInstanceOf(CommunityRateLimitException)
+      // SPOTLIGHT_TEST_NOW is 30 seconds into its minute.
+      expect((refused as CommunityRateLimitException).retryAfterSeconds).toBe(30)
+      expect((refused as CommunityRateLimitException).getStatus()).toBe(429)
     }
-    // A later page pages through a snapshot already served; it is not counted.
-    await expect(ctx.read(viewer, { limit: 2, cursor: cursor! })).resolves.toMatchObject({
-      level: 'city',
-    })
-    const refused = await ctx.read(viewer, { limit: 2 }).catch((error: unknown) => error)
-    expect(refused).toBeInstanceOf(CommunityRateLimitException)
-    // SPOTLIGHT_TEST_NOW is 30 seconds into its minute.
-    expect((refused as CommunityRateLimitException).retryAfterSeconds).toBe(30)
-    expect((refused as CommunityRateLimitException).getStatus()).toBe(429)
 
     // Another member keeps a separate window.
     const neighbour = await ctx.member(area)

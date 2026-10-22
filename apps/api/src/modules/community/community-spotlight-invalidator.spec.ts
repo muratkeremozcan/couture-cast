@@ -184,6 +184,51 @@ describe('6.6 spotlight invalidator', () => {
     }
   })
 
+  it('6.6-UNIT-039 abandons a never-settling pass after four budgets and warns once per pass', async () => {
+    vi.useFakeTimers()
+    try {
+      const { invalidator, cache } = boundary({})
+      cache.bumpEpoch.mockImplementation(() => new Promise<never>(() => undefined))
+      const { logger } = invalidator as unknown as {
+        logger: {
+          warn: (fields: { event?: string; reason?: string }, message: string) => void
+        }
+      }
+      const warn = vi.spyOn(logger, 'warn')
+      const inFlightWarnings = () =>
+        warn.mock.calls.filter(([fields]) => fields.reason === 'in_flight').length
+
+      void invalidator.processWithin(2000)
+      for (let tick = 1; tick < 8; tick += 1) {
+        await vi.advanceTimersByTimeAsync(500)
+        await expect(invalidator.processWithin(2000)).resolves.toEqual({
+          status: 'deferred',
+          reason: 'in_flight',
+        })
+      }
+      expect(cache.bumpEpoch).toHaveBeenCalledTimes(1)
+      expect(inFlightWarnings()).toBe(1)
+
+      // Eight seconds in, the first pass is four budgets old and is abandoned.
+      await vi.advanceTimersByTimeAsync(4500)
+      void invalidator.processWithin(2000)
+      await vi.advanceTimersByTimeAsync(0)
+      expect(cache.bumpEpoch).toHaveBeenCalledTimes(2)
+      expect(
+        warn.mock.calls.some(
+          ([fields]) => fields.event === 'community_spotlight_invalidation_abandoned'
+        )
+      ).toBe(true)
+      await expect(invalidator.processWithin(2000)).resolves.toEqual({
+        status: 'deferred',
+        reason: 'in_flight',
+      })
+      expect(inFlightWarnings()).toBe(2)
+    } finally {
+      vi.useRealTimers()
+    }
+  })
+
   it('6.6-UNIT-038 a pass inside its budget returns its own outcome and frees the slot', async () => {
     const { invalidator, cache } = boundary({})
     await expect(invalidator.processWithin()).resolves.toMatchObject({
