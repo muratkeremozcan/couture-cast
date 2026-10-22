@@ -1,4 +1,5 @@
 /* eslint-disable @typescript-eslint/await-thenable */
+import { CommunitySyncState } from '@couture/api-client'
 import type * as ReactNativeModule from 'react-native'
 // Keep mock registration in the test entrypoint so it precedes every case import.
 vi.mock('expo-haptics', () => ({ selectionAsync: vi.fn().mockResolvedValue(undefined) }))
@@ -86,6 +87,8 @@ import { registerCommunityFeedCases } from '../test-utils/community-screen/feed.
 import { registerCommunityModerationCases } from '../test-utils/community-screen/moderation.cases'
 import { registerCommunityPublishingCases } from '../test-utils/community-screen/publishing.cases'
 import { registerCommunityReactionsCases } from '../test-utils/community-screen/reactions.cases'
+import { registerCommunityRealtimeCases } from '../test-utils/community-screen/realtime.cases'
+import { registerCommunityNotificationRecoveryCases } from '../test-utils/community-screen/notification-recovery.cases'
 import { registerCommunityClientCases } from '../test-utils/community-screen/client.cases'
 import { configure } from '@testing-library/react'
 import { delay } from 'msw'
@@ -114,6 +117,9 @@ describe('Mobile community screen (Story 6.1)', () => {
   })
 
   beforeEach(() => {
+    // Legacy REST journeys retain their measured request sequence. Story 6.5 cases below
+    // restore the real coordinator and exercise its HTTP bootstrap/reconciliation separately.
+    vi.spyOn(CommunitySyncState.prototype, 'start').mockImplementation(() => undefined)
     setMockParams({})
     imageEvents.errors.clear()
     resetFeedUrls()
@@ -147,6 +153,8 @@ describe('Mobile community screen (Story 6.1)', () => {
   registerCommunityModerationCases()
   registerCommunityPublishingCases()
   registerCommunityReactionsCases()
+  registerCommunityRealtimeCases()
+  registerCommunityNotificationRecoveryCases()
 })
 
 /**

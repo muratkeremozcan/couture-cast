@@ -1,7 +1,7 @@
 import { Inject, Injectable, Optional } from '@nestjs/common'
 import { Expo, type ExpoPushMessage, type ExpoPushTicket } from 'expo-server-sdk'
 
-import { PushTokenRepository } from './push-token.repository'
+import { PushTokenRepository, type CapturedPushBinding } from './push-token.repository'
 
 /**
  * Story 0.5 owner file: push delivery leg in the hybrid realtime architecture.
@@ -94,7 +94,8 @@ export class PushNotificationService {
   }
 
   async sendBatchNotifications(
-    messages: ExpoPushMessage[]
+    messages: ExpoPushMessage[],
+    bindings: CapturedPushBinding[] = []
   ): Promise<NotificationDispatchResult> {
     // Flow ref S0.5/T3: keep batches within Expo API limits to reduce provider-side failures.
     const batches: ExpoPushMessage[][] = []
@@ -186,8 +187,9 @@ export class PushNotificationService {
     let invalidTokenPruneFailed = false
     if (uniqueInvalidTokens.length > 0) {
       try {
-        prunedInvalidTokenCount =
-          await this.pushTokenRepository.deleteTokens(uniqueInvalidTokens)
+        prunedInvalidTokenCount = await this.pushTokenRepository.deleteBindings(
+          bindings.filter((binding) => uniqueInvalidTokens.includes(binding.token))
+        )
       } catch {
         invalidTokenPruneFailed = true
       }

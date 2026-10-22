@@ -1,3 +1,4 @@
+import { withRequestDeadline } from '@couture/api-client'
 // Story 5.1 Task 6 owner: mobile commerce boundary (affiliate CTA + opt-out).
 //
 // Everything the affiliate CTA needs from the network lives here so the hero
@@ -51,23 +52,7 @@ export async function withRequestTimeout<T>(
   request: (requestSignal: AbortSignal) => Promise<T>,
   timeoutMs = COMMERCE_REQUEST_TIMEOUT_MS
 ): Promise<T> {
-  const controller = new AbortController()
-  const abortFromCaller = () => controller.abort(signal?.reason)
-
-  if (signal?.aborted) {
-    abortFromCaller()
-  } else {
-    signal?.addEventListener('abort', abortFromCaller, { once: true })
-  }
-
-  const timeout = setTimeout(() => controller.abort(), timeoutMs)
-
-  try {
-    return await request(controller.signal)
-  } finally {
-    clearTimeout(timeout)
-    signal?.removeEventListener('abort', abortFromCaller)
-  }
+  return withRequestDeadline(timeoutMs, [signal], request)
 }
 
 /**

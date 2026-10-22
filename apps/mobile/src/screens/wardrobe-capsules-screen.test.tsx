@@ -53,7 +53,7 @@ function fakeAccessToken(userId: string): string {
   return `header.${payload}.signature`
 }
 
-const ACCESS_TOKEN = fakeAccessToken('user-1')
+const ACCESS_TOKEN = fakeAccessToken('auth-principal-user-1')
 
 function garment(id: string, category: string): GarmentItemContract {
   return {
@@ -142,6 +142,23 @@ describe('WardrobeCapsulesScreen', () => {
   })
 
   beforeEach(() => {
+    server.use(
+      http.get('*/api/v1/user/profile', ({ request }) => {
+        if (request.headers.get('authorization') !== `Bearer ${ACCESS_TOKEN}`)
+          return HttpResponse.json({ message: 'Unauthorized' }, { status: 401 })
+        return HttpResponse.json({
+          user: {
+            id: 'user-1',
+            email: 'owner@synthetic.test',
+            displayName: null,
+            birthdate: '1990-01-01T00:00:00.000Z',
+            role: 'guardian',
+          },
+          linkedGuardians: [],
+          linkedTeens: [],
+        })
+      })
+    )
     process.env.EXPO_PUBLIC_API_BASE_URL = window.location.origin
     listRequests = []
     restoreAccessTokenResolver = setMobileAccessTokenResolver(() => ACCESS_TOKEN)
@@ -162,8 +179,7 @@ describe('WardrobeCapsulesScreen', () => {
     expect(screen.getByText('Work capsule')).toBeInTheDocument()
     expect(screen.getByText('Weekday rotation')).toBeInTheDocument()
     expect(screen.getByText('2 garments · Ready')).toBeInTheDocument()
-    // The owner segment comes from the bearer token's `sub` claim, so a
-    // regression there would silently read another user's wardrobe.
+    // The canonical profile owns the segment. Its id differs from the bearer principal.
     expect(listRequests.at(-1)?.pathname).toBe('/api/v1/wardrobe/user-1/capsules')
     expect(screen.queryByTestId('capsule-loading-state')).not.toBeInTheDocument()
   })
@@ -191,7 +207,7 @@ describe('WardrobeCapsulesScreen', () => {
 
     await waitFor(() => {
       expect(screen.getByTestId('capsule-error-banner')).toHaveTextContent(
-        'Your session token is malformed. Sign in again.'
+        'Your session could not be verified. Sign in again.'
       )
     })
     expect(screen.queryByTestId('capsule-loading-state')).not.toBeInTheDocument()

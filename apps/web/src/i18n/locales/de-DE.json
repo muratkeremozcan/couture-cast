@@ -643,6 +643,39 @@
       },
       "unavailable": "Nicht verfügbar.",
       "close": "Kommentare schließen"
+    },
+    "realtime": {
+      "newLooks": "{{count}} neue Looks sind bereit.",
+      "showNewLooks": "{{count}} neue Looks anzeigen",
+      "newComments": "Neue Kommentare sind verfügbar.",
+      "unavailable": "Die Community ist vorübergehend nicht verfügbar. Ihr Entwurf wurde gespeichert."
+    },
+    "notifications": {
+      "title": "Community-Benachrichtigungen",
+      "enabled": "Benachrichtigungen zu Interaktionen",
+      "quiet": "Ruhezeiten für alle Push-Benachrichtigungen, auch zum Wetter",
+      "start": "Beginn der Ruhezeit",
+      "end": "Ende der Ruhezeit",
+      "timezone": "Zeitzone des Kontos",
+      "save": "Einstellungen speichern",
+      "saved": "Einstellungen gespeichert.",
+      "failed": "Die Einstellungen konnten nicht gespeichert werden. Erneut versuchen.",
+      "conflict": "Die Einstellungen wurden an anderer Stelle geändert. Aktuelle Werte prüfen und erneut versuchen.",
+      "permission": "Benachrichtigungen in den Geräteeinstellungen erlauben und erneut versuchen.",
+      "signin": "Anmelden",
+      "email": "E-Mail-Adresse",
+      "code": "Code aus der E-Mail",
+      "sendCode": "Anmeldecode senden",
+      "verify": "Code bestätigen",
+      "codeSent": "Den Anmeldecode finden Sie in Ihrer E-Mail.",
+      "signinDenied": "Mit dieser E-Mail-Adresse kann sich kein CoutureCast-Konto anmelden. Adresse prüfen und erneut versuchen.",
+      "signinUnavailable": "Die Anmeldung ist vorübergehend nicht verfügbar. Gleich erneut versuchen.",
+      "signinCodeInvalid": "Der Code ist falsch oder abgelaufen. E-Mails prüfen oder einen neuen Code anfordern.",
+      "signout": "Abmelden",
+      "deviceSettings": "Geräteeinstellungen öffnen",
+      "back": "Zurück zur Community",
+      "bindingConflict": "Die Benachrichtigungsregistrierung dieses Geräts hat sich geändert. Versuche es erneut.",
+      "pushUnavailable": "Push-Benachrichtigungen sind auf diesem Gerät nicht verfügbar."
     }
   }
 }

@@ -96,6 +96,65 @@ beforeEach(() => {
 })
 
 describe('Story 6.4 rendered comments through real web wrappers', () => {
+  it('R07 moves a removed focused target to the thread landmark once', async () => {
+    HTMLElement.prototype.scrollIntoView = vi.fn()
+    let visible = true
+    useMswHandlers(
+      http.get(`${base}/comments`, () => HttpResponse.json(page(visible ? [root] : [])))
+    )
+    const state = makeState()
+    render(
+      <CommunityComments
+        postId="community-post-1"
+        state={state}
+        target={{
+          commentId: root.id,
+          parentId: null,
+          pageCursor: null,
+          parentPageCursor: null,
+        }}
+      />
+    )
+    await waitFor(() => expect(screen.getByTestId('comment-root')).toHaveFocus())
+    visible = false
+    await act(async () => {
+      await state.refresh('community-post-1')
+    })
+    expect(screen.queryByTestId('comment-root')).toBeNull()
+    expect(screen.getByRole('heading', { name: 'Comments' })).toHaveFocus()
+    expect(screen.getByRole('status')).toHaveTextContent('Unavailable.')
+  })
+
+  it('R07 keeps composer focus when its previously focused target is removed', async () => {
+    HTMLElement.prototype.scrollIntoView = vi.fn()
+    let visible = true
+    useMswHandlers(
+      http.get(`${base}/comments`, () => HttpResponse.json(page(visible ? [root] : [])))
+    )
+    const state = makeState()
+    render(
+      <CommunityComments
+        postId="community-post-1"
+        state={state}
+        target={{
+          commentId: root.id,
+          parentId: null,
+          pageCursor: null,
+          parentPageCursor: null,
+        }}
+      />
+    )
+    await waitFor(() => expect(screen.getByTestId('comment-root')).toHaveFocus())
+    const composer = screen.getByRole('textbox', { name: 'Add a comment' })
+    composer.focus()
+    fireEvent.change(composer, { target: { value: 'Keep writing' } })
+    visible = false
+    await act(async () => {
+      await state.refresh('community-post-1')
+    })
+    expect(composer).toHaveFocus()
+    expect(composer).toHaveValue('Keep writing')
+  })
   it.each([
     [409, 'You already reported this comment for a different reason.', 'reason_changed'],
     [403, 'You cannot report your own comment.', 'self_report'],

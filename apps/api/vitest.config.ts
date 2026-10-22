@@ -36,6 +36,10 @@ const integrationDatabaseUrl =
 export default defineConfig({
   resolve: {
     alias: {
+      '@couture/api-client/contracts/http': resolve(
+        __dirname,
+        '../../packages/api-client/src/contracts/http/index.ts'
+      ),
       '@couture/utils': resolve(__dirname, '../../packages/utils/src/index.ts'),
       '@couture/config': resolve(__dirname, '../../packages/config/src/index.ts'),
       '@couture/api-client': resolve(__dirname, '../../packages/api-client/src/index.ts'),
@@ -67,6 +71,12 @@ export default defineConfig({
       ...(process.env.RUN_COMMUNITY_SAFE_CORPUS_EVALUATION === 'true'
         ? []
         : ['**/community-safe-corpus.evaluation.spec.ts']),
+      // Story 6.5 acceptance harness #3: real wall-clock cache, herd, retention and
+      // load timelines that each run for minutes, so they run only through their
+      // own recorded command.
+      ...(process.env.RUN_STORY65_ACCEPTANCE === 'true'
+        ? []
+        : ['**/*.acceptance.spec.ts']),
     ],
     setupFiles: [resolve(__dirname, 'src/test-setup.ts')],
     // Both names are pinned so the lookup chain the integration suites share cannot

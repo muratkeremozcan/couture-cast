@@ -4,14 +4,18 @@ const plist = require('@expo/plist').default
 const fs = require('fs')
 const path = require('path')
 
-const watchAppGroup = 'group.com.couturecast.app.watch'
-const iosAppGroup = 'group.com.couturecast.app'
+const nativeBundleId =
+  process.env.STORY65_NATIVE_TEST_BUILD === '1'
+    ? 'com.couturecast.story65'
+    : 'com.couturecast.app'
+const watchAppGroup = `group.${nativeBundleId}.watch`
+const iosAppGroup = `group.${nativeBundleId}`
 
 const watchAppName = 'WatchApp'
-const watchAppBundleId = 'com.couturecast.app.watchapp'
+const watchAppBundleId = `${nativeBundleId}.watchapp`
 
 const watchWidgetName = 'WatchWidget'
-const watchWidgetBundleId = 'com.couturecast.app.watchapp.watchwidget'
+const watchWidgetBundleId = `${nativeBundleId}.watchapp.watchwidget`
 
 function ensureDirectory(directory) {
   fs.mkdirSync(directory, { recursive: true })
@@ -19,7 +23,15 @@ function ensureDirectory(directory) {
 
 function copyFile(source, destination) {
   ensureDirectory(path.dirname(destination))
-  fs.copyFileSync(source, destination)
+  if (
+    nativeBundleId !== 'com.couturecast.app' &&
+    /\.(swift|kt|xml|plist)$/.test(source)
+  ) {
+    fs.writeFileSync(
+      destination,
+      fs.readFileSync(source, 'utf8').replaceAll('com.couturecast.app', nativeBundleId)
+    )
+  } else fs.copyFileSync(source, destination)
 }
 
 function resolveSpaceGroteskFont(projectRoot) {
@@ -225,11 +237,11 @@ function writeWatchExtensionFiles(projectRoot, iosDirectory) {
       CFBundleVersion: '$(CURRENT_PROJECT_VERSION)',
       CFBundleURLTypes: [
         {
-          CFBundleURLName: 'com.couturecast.app.watchapp',
+          CFBundleURLName: `${nativeBundleId}.watchapp`,
           CFBundleURLSchemes: ['couturecast-watch'],
         },
       ],
-      WKCompanionAppBundleIdentifier: 'com.couturecast.app',
+      WKCompanionAppBundleIdentifier: nativeBundleId,
       WKApplication: true,
       UIAppFonts: ['SpaceGrotesk-WatchApp.ttf'],
     })

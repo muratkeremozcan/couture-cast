@@ -21,6 +21,7 @@ export async function getUserProfileFromMobile(
 ): Promise<UserProfileResponse> {
   const response = await fetchImpl(`${resolveMobileApiBaseUrl()}/api/v1/user/profile`, {
     method: 'GET',
+    headers: { Authorization: `Bearer ${(await resolveMobileAccessToken()) ?? ''}` },
   })
 
   if (!response.ok) {

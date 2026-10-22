@@ -1,6 +1,6 @@
 // Step 6 push token owner: searchable owner anchor
 import { Injectable } from '@nestjs/common'
-import { PrismaClient, type PushToken } from '@prisma/client'
+import { PrismaClient, Prisma, type PushToken } from '@prisma/client'
 
 /**
  * Story 0.5 support file: push token persistence for offline/background delivery.
@@ -15,6 +15,13 @@ import { PrismaClient, type PushToken } from '@prisma/client'
  * - S0.5/T3: push dispatch depends on durable tokens that survive reconnects.
  * - S0.5/T4: token persistence is the stable storage layer behind the push path.
  */
+export type CapturedPushBinding = {
+  registrationId: string
+  ownerId: string
+  bindingGeneration: number
+  token: string
+  inactiveBefore?: Date
+}
 @Injectable()
 export class PushTokenRepository {
   constructor(private readonly prisma: PrismaClient) {}
@@ -29,21 +36,52 @@ export class PushTokenRepository {
 
     const normalizedPlatform = this.normalizePlatform(platform)
     const now = new Date()
-    const record = await this.prisma.pushToken.upsert({
+    const previous = await this.prisma.pushToken.findUnique({
       where: { token: normalizedToken },
-      update: {
-        user_id: normalizedUserId,
-        platform: normalizedPlatform,
-        last_used_at: now,
-      },
-      create: {
-        user_id: normalizedUserId,
-        token: normalizedToken,
-        platform: normalizedPlatform,
-        last_used_at: now,
-      },
     })
-    return record
+    const owners = [
+      ...new Set([normalizedUserId, ...(previous ? [previous.user_id] : [])]),
+    ]
+    return this.prisma.$transaction(async (tx) => {
+      await tx.$executeRaw(
+        Prisma.sql`SELECT community_privacy_guards(ARRAY[${Prisma.join(owners)}]::text[],ARRAY[]::text[],true)`
+      )
+      const locked = await tx.$queryRaw<
+        PushToken[]
+      >`SELECT * FROM "PushToken" WHERE token = ${normalizedToken} FOR UPDATE`
+      const current = locked[0]
+      if (
+        current?.id !== previous?.id ||
+        current?.binding_generation !== previous?.binding_generation
+      )
+        throw new Error('Push binding changed; retry registration.')
+      const transferred = current && current.user_id !== normalizedUserId
+      if (transferred)
+        await tx.communityTokenDelivery.updateMany({
+          where: {
+            registration_id: current.id,
+            owner_id: current.user_id,
+            binding_generation: current.binding_generation,
+            status: { in: ['pending', 'deferred', 'retryable_rejection'] },
+          },
+          data: { status: 'suppressed' },
+        })
+      return tx.pushToken.upsert({
+        where: { token: normalizedToken },
+        update: {
+          user_id: normalizedUserId,
+          platform: normalizedPlatform,
+          last_used_at: now,
+          ...(transferred ? { binding_generation: { increment: 1 } } : {}),
+        },
+        create: {
+          user_id: normalizedUserId,
+          token: normalizedToken,
+          platform: normalizedPlatform,
+          last_used_at: now,
+        },
+      })
+    })
   }
 
   async findByUserIds(userIds: string[]): Promise<PushToken[]> {
@@ -55,16 +93,28 @@ export class PushTokenRepository {
     return records
   }
 
-  async deleteTokens(tokens: string[]): Promise<number> {
-    const normalizedTokens = [
-      ...new Set(tokens.map((token) => token.trim()).filter(Boolean)),
-    ]
-    if (normalizedTokens.length === 0) return 0
-
-    const result = await this.prisma.pushToken.deleteMany({
-      where: { token: { in: normalizedTokens } },
+  async deleteBindings(bindings: CapturedPushBinding[]): Promise<number> {
+    if (!bindings.length) return 0
+    const owners = [...new Set(bindings.map((b) => b.ownerId))]
+    return this.prisma.$transaction(async (tx) => {
+      await tx.$executeRaw(
+        Prisma.sql`SELECT community_privacy_guards(ARRAY[${Prisma.join(owners)}]::text[],ARRAY[]::text[],true)`
+      )
+      const result = await tx.pushToken.deleteMany({
+        where: {
+          OR: bindings.map((binding) => ({
+            id: binding.registrationId,
+            user_id: binding.ownerId,
+            binding_generation: binding.bindingGeneration,
+            token: binding.token,
+            ...(binding.inactiveBefore
+              ? { last_used_at: { lte: binding.inactiveBefore } }
+              : {}),
+          })),
+        },
+      })
+      return result.count
     })
-    return result.count
   }
 
   private normalizePlatform(platform?: string): string | null {

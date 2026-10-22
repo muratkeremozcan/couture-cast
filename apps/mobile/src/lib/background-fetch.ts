@@ -2,11 +2,10 @@
 import * as BackgroundFetch from 'expo-background-fetch'
 import * as TaskManager from 'expo-task-manager'
 import { getSavedSettings } from './settings-storage'
-import { readLatestRitualCache, saveRitualCache } from './ritual-cache'
+import { readLatestRitualCache, ritualCacheOwner, saveRitualCache } from './ritual-cache'
 import { createMobileApiClient } from './api-client'
-import { resolveMobileAccessToken } from './mobile-auth'
+import { mobileApplicationUserId, resolveMobileAccessToken } from './mobile-auth'
 import { loadWidgetAlertPreferences } from './widget-alert-preferences'
-import { mobileAnalyticsClient } from '../analytics/mobile-analytics'
 import { isWidgetCacheFresh } from './widget-cache-freshness'
 import {
   defaultSupportedLocale,
@@ -19,7 +18,17 @@ TaskManager.defineTask(RITUAL_BACKGROUND_FETCH_TASK, async () => {
   try {
     const settings = await getSavedSettings()
     const locale = settings.locale ?? defaultSupportedLocale
-    const userId = mobileAnalyticsClient.getDistinctId() || 'mobile-anonymous-user'
+
+    // The member is known only once the token resolver has verified (and on a cold wake,
+    // restored) the session. Deriving the cache owner before that keyed member A's ritual
+    // as signed-out, which a signed-out Home or another member's first load then read.
+    // Without a verified member there is nothing to fetch: the ritual needs a bearer.
+    const token = await resolveMobileAccessToken()
+    const member = mobileApplicationUserId()
+    if (!token || !member) {
+      return BackgroundFetch.BackgroundFetchResult.NoData
+    }
+    const userId = ritualCacheOwner(member)
 
     const cached = await readLatestRitualCache(userId, locale)
 
@@ -27,7 +36,6 @@ TaskManager.defineTask(RITUAL_BACKGROUND_FETCH_TASK, async () => {
       return BackgroundFetch.BackgroundFetchResult.NoData
     }
 
-    const token = await resolveMobileAccessToken()
     const client = createMobileApiClient({
       accessToken: () => Promise.resolve(token || ''),
     })

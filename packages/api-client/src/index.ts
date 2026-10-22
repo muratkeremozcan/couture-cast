@@ -43,3 +43,12 @@ export { CommunityReactionState } from './community-reaction-state'
 export type { ReactionControls, ReactionControlState } from './community-reaction-state'
 
 export * from './community-comments-state'
+
+export * from './community-sync-client'
+export * from './community-sync-state'
+export * from './community-verification'
+export * from './community-notification-responses'
+export * from './realtime/community-transport'
+
+export * from './community-notification-settings'
+export * from './request-deadline'

@@ -40,7 +40,17 @@
       "expo-router",
       "expo-localization",
       "./plugins/with-widgets",
-      "./plugins/with-watchos"
+      "./plugins/with-watchos",
+      "./plugins/with-supported-ios-target",
+      [
+        "expo-notifications",
+        {
+          "icon": "./assets/images/notification-icon.png",
+          "color": "#C9A14A",
+          "defaultChannel": "community"
+        }
+      ],
+      "expo-secure-store"
     ],
     "experiments": {
       "typedRoutes": true

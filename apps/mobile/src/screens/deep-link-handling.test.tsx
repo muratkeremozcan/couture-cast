@@ -1,3 +1,4 @@
+import { CommunitySyncState } from '@couture/api-client'
 // Learning path Step 27: Widget and notification deep-link handling.
 // See _bmad-output/project-knowledge/learning-path-step-by-step.md#step-27-widget-and-notification-deep-link-handling
 /* eslint-disable @typescript-eslint/await-thenable */
@@ -93,6 +94,7 @@ describe('Mobile Deep Link Handling (Story 3.7)', () => {
   })
 
   beforeEach(() => {
+    vi.spyOn(CommunitySyncState.prototype, 'start').mockImplementation(() => undefined)
     mockCapture.mockClear()
     mockSetParams.mockClear()
     mockPush.mockClear()
@@ -100,6 +102,47 @@ describe('Mobile Deep Link Handling (Story 3.7)', () => {
     restoreAccessTokenResolver = setMobileAccessTokenResolver(() => 'session-token')
     mockParams = {}
     server.use(
+      http.post('*/api/v1/community/targets/resolve', async ({ request }) => {
+        const input = (await request.json()) as {
+          targets: { key: string; postId: string }[]
+        }
+        const targets = []
+        for (const target of input.targets) {
+          const response = await fetch(
+            new URL(
+              `/api/v1/community/posts/${encodeURIComponent(target.postId)}`,
+              request.url
+            )
+          )
+          if (response.status === 404) {
+            targets.push({ key: target.key, status: 'unavailable' })
+            continue
+          }
+          if (!response.ok) return new HttpResponse(null, { status: response.status })
+          const body = (await response.json()) as { data: CommunityFeedItem }
+          targets.push({
+            key: target.key,
+            status: 'available',
+            communityRevision: '0',
+            post: {
+              ...body.data,
+              reactions: {
+                counts: { applause: 0, love: 0, inspiration: 0 },
+                total: 0,
+                viewerReaction: null,
+                revision: 0,
+                generation: 0,
+              },
+            },
+            comment: null,
+            parent: null,
+            pageCursor: null,
+            parentPageCursor: null,
+            threadPosition: null,
+          })
+        }
+        return HttpResponse.json({ data: { targets } })
+      }),
       http.get('*/api/v1/events/poll', () =>
         HttpResponse.json({
           events: [
@@ -204,7 +247,7 @@ describe('Mobile Deep Link Handling (Story 3.7)', () => {
     expect(mockCapture).toHaveBeenCalledWith('deep_link_handled', {
       source: 'notification',
       type: 'community',
-      cardId: 'look-42',
+      // Story6.5 D8: preserve successful-link analytics without raw target identifiers.
       surface: 'mobile',
     })
     expect(
@@ -254,30 +297,50 @@ describe('Mobile Deep Link Handling (Story 3.7)', () => {
     await waitFor(() => {
       expect(mockCapture).toHaveBeenCalledWith(
         'deep_link_invalid',
-        expect.objectContaining({ reason: 'Community card target was not found' })
+        expect.objectContaining({ reason: 'target_unavailable' })
       )
     })
     expect(screen.queryByTestId('highlighted-community-card-look-99')).toBeNull()
   })
 
-  it('3.7-UNIT-011: CommunityScreen reports a community card that could not be loaded', async () => {
-    mockParams = { source: 'notification', type: 'community', cardId: 'look-42' }
-    server.use(
-      http.get(
-        '*/api/v1/community/posts/:postId',
-        () => new HttpResponse(null, { status: 500 })
+  it.each(['recovers', 'exhausts'] as const)(
+    '3.7-UNIT-011: CommunityScreen keeps retryable target intent when dependency %s',
+    async (outcome) => {
+      // D3/D9: a transient failure retains the same notification intent and bounded retries.
+      mockParams = { source: 'notification', type: 'community', cardId: 'look-42' }
+      let unavailable = true
+      let failures = 0
+      server.use(
+        http.get('*/api/v1/community/posts/:postId', () => {
+          if (unavailable) {
+            failures++
+            return new HttpResponse(null, { status: 500 })
+          }
+          return HttpResponse.json({ data: communityPost() })
+        })
       )
-    )
-
-    await render(<CommunityScreen />)
-
-    await waitFor(() => {
-      expect(mockCapture).toHaveBeenCalledWith(
-        'deep_link_invalid',
-        expect.objectContaining({ reason: 'Community card target could not be loaded' })
-      )
-    })
-  })
+      await render(<CommunityScreen />)
+      if (outcome === 'recovers') {
+        await waitFor(() => expect(failures).toBeGreaterThan(0))
+        unavailable = false
+        await screen.findByTestId('highlighted-community-card-look-42')
+        expect(mockCapture).toHaveBeenCalledWith('deep_link_handled', {
+          source: 'notification',
+          type: 'community',
+          surface: 'mobile',
+        })
+      } else {
+        await screen.findByText(
+          enUS.community.realtime.unavailable,
+          {},
+          { timeout: 12000 }
+        )
+        expect(screen.queryByTestId('highlighted-community-card-look-42')).toBeNull()
+      }
+      expect(mockCapture).not.toHaveBeenCalledWith('deep_link_invalid', expect.anything())
+    },
+    15000
+  )
 
   it('3.7-UNIT-012: CommunityScreen falls back to catalogue copy for a card with no climate band', async () => {
     mockParams = { source: 'notification', type: 'community', cardId: 'look-77' }

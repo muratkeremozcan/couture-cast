@@ -1,0 +1,21 @@
+# Story 6.5 owner: real sign-in UI, step 1. Requests a code for ${MAESTRO_EMAIL} through the
+# product's requestNativeOtp. The runner then reads the owned-harness code and runs step 2.
+# The label text and the EditText share one accessible name; index 1 is the input.
+appId: ${MAESTRO_APP_ID}
+---
+- runFlow: open-signin.yaml
+- tapOn: ${MAESTRO_SIGNIN}
+- extendedWaitUntil:
+    visible: ${MAESTRO_SEND}
+    timeout: 15000
+- tapOn:
+    text: ${MAESTRO_EMAIL_LABEL}
+    index: 1
+- inputText: ${MAESTRO_EMAIL}
+# iOS reports a failure when the simulator shows no software keyboard.
+- hideKeyboard:
+    optional: true
+- tapOn: ${MAESTRO_SEND}
+- extendedWaitUntil:
+    visible: ${MAESTRO_CODE_SENT}
+    timeout: 20000

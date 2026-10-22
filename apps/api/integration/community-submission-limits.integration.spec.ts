@@ -73,7 +73,15 @@ const namespace = `community-limits-${randomUUID().slice(0, 8)}`
 
 async function createUser(label: string): Promise<string> {
   const user = await prisma.user.create({
-    data: { email: `${namespace}-${label}-${randomUUID().slice(0, 8)}@synthetic.test` },
+    data: {
+      email: `${namespace}-${label}-${randomUUID().slice(0, 8)}@synthetic.test`,
+      profile: {
+        create: {
+          birthdate: new Date('1990-01-01'),
+          preferences: { compliance: { accountStatus: 'active' } },
+        },
+      },
+    },
   })
   return user.id
 }
@@ -164,6 +172,9 @@ afterAll(async () => {
     })
     await prisma.lookbookPost.deleteMany({ where: owned })
     await prisma.communityAlias.deleteMany({ where: owned })
+    await prisma.userProfile.deleteMany({
+      where: { user: { email: { startsWith: namespace } } },
+    })
     await prisma.user.deleteMany({ where: { email: { startsWith: namespace } } })
   }
   await prisma.$disconnect()

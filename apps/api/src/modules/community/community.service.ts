@@ -1,4 +1,8 @@
 import {
+  CommunityAuthorizationBudget,
+  communityDependency,
+} from './community-availability.js'
+import {
   type SetCommunityReactionInput,
   type CommunityReactionSummary,
   COMMUNITY_REACTION_RATE_LIMITED_MESSAGE,
@@ -201,9 +205,10 @@ export class CommunityService {
   }
 
   async getFeed(params: GetFeedParams): Promise<CommunityFeed> {
+    return this.readAuthorized(params.userId, () => this.getFeedSnapshot(params))
+  }
+  private async getFeedSnapshot(params: GetFeedParams): Promise<CommunityFeed> {
     const { userId, platform, mode = 'auto', cursor, limit = 12, acceptLanguage } = params
-
-    await this.assertReadEnabled(userId)
 
     // The assignment is resolved BEFORE the query and decides what is actually
     // served. Computing it afterwards, as this did, made both arms identical:
@@ -300,14 +305,39 @@ export class CommunityService {
    * cannot see is a 404 rather than a 403, so the endpoint does not confirm that
    * a hidden post exists.
    */
+  async syncScope(userId: string, mode: CommunityFeedMode) {
+    const effectiveMode = this.resolveEffectiveMode(
+      mode,
+      resolveCommunityExperimentVariant(userId)
+    )
+    const band = await this.resolveViewerBand(userId)
+    return {
+      mode: effectiveMode,
+      band: this.resolveFilterBand(effectiveMode, band.viewerBand) ?? null,
+    }
+  }
+
+  async projectSnapshot(
+    posts: LookbookPost[],
+    userId: string,
+    summaries: Map<string, CommunityReactionSummary>
+  ) {
+    return this.buildFeedItems(posts, userId, true, summaries)
+  }
+
   async getPost(params: {
     userId: string
     postId: string
     reactions?: boolean
   }): Promise<CommunityFeedItem> {
+    return this.readAuthorized(params.userId, () => this.getPostSnapshot(params))
+  }
+  private async getPostSnapshot(params: {
+    userId: string
+    postId: string
+    reactions?: boolean
+  }): Promise<CommunityFeedItem> {
     const { userId, postId } = params
-
-    await this.assertReadEnabled(userId)
 
     const post = await this.repository.findPostById(postId)
     const isVisible = post && (isPubliclyVisiblePost(post) || post.user_id === userId)
@@ -363,6 +393,35 @@ export class CommunityService {
     }
   }
 
+  private async readAuthorized<T>(member: string, work: () => Promise<T>): Promise<T> {
+    const budget = new CommunityAuthorizationBudget()
+    return communityDependency(() =>
+      budget.run(async () => {
+        // An erased subject is a terminal denial before any flag-cache read (D3).
+        await this.repository.assertSubjectAvailable(member, budget)
+        let grant = await this.featureFlagsService.communityReadEvaluation(member, budget)
+        if (!grant.value)
+          throw new ForbiddenException({
+            statusCode: 403,
+            code: 'denied',
+            message: COMMUNITY_FEED_DISABLED_MESSAGE,
+          })
+        await this.repository.assertReadEligibility(member, budget)
+        const result = await work()
+        await this.repository.assertReadEligibility(member, budget)
+        if (performance.now() >= grant.validUntil)
+          grant = await this.featureFlagsService.communityReadEvaluation(member, budget)
+        budget.check(grant)
+        if (!grant.value)
+          throw new ForbiddenException({
+            statusCode: 403,
+            code: 'denied',
+            message: COMMUNITY_FEED_DISABLED_MESSAGE,
+          })
+        return result
+      })
+    )
+  }
   private async assertReadEnabled(userId: string): Promise<void> {
     await this.assertFlagEnabled('community_read_enabled', userId)
   }
@@ -519,10 +578,26 @@ export class CommunityService {
    * post still appears in `authorStates`, where `imageAccess` is nullable and the
    * client renders the localized removed-content notice.
    */
+  private feedSummaries(
+    posts: LookbookPost[],
+    viewer: string,
+    include: boolean,
+    snapshot?: Map<string, CommunityReactionSummary>
+  ): Promise<Map<string, CommunityReactionSummary>> {
+    if (snapshot) return Promise.resolve(snapshot)
+    return include
+      ? this.repository.reactionSummaries(
+          posts.map((post) => post.id),
+          viewer
+        )
+      : Promise.resolve(new Map<string, CommunityReactionSummary>())
+  }
+
   private async buildFeedItems(
     posts: LookbookPost[],
     viewerUserId: string,
-    includeReactions = false
+    includeReactions = false,
+    snapshotSummaries?: Map<string, CommunityReactionSummary>
   ): Promise<CommunityFeedItem[]> {
     if (posts.length === 0) {
       return []
@@ -537,12 +612,12 @@ export class CommunityService {
       ),
     ])
 
-    const summaries = includeReactions
-      ? await this.repository.reactionSummaries(
-          posts.map((post) => post.id),
-          viewerUserId
-        )
-      : new Map<string, CommunityReactionSummary>()
+    const summaries = await this.feedSummaries(
+      posts,
+      viewerUserId,
+      includeReactions,
+      snapshotSummaries
+    )
     const items: CommunityFeedItem[] = []
     for (const post of posts) {
       const signedUrl = post.image_object_path

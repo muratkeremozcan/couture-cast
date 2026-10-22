@@ -12,7 +12,6 @@ import { checkA11y } from '../support/helpers/accessibility'
 import {
   communityTest as test,
   expect,
-  COMMUNITY_FEED_URL,
   SEEDED_BAND,
   SEEDED_COMMUNITY_POSTS,
 } from '../support/helpers/community-session'
@@ -119,7 +118,11 @@ test.describe('6.1 community feed by climate band', () => {
     await page.goto(COMMUNITY_ROUTE)
     await expect(page.getByTestId('community-card-grid')).toBeAttached()
 
-    const bandRequest = interceptNetworkCall({ method: 'GET', url: COMMUNITY_FEED_URL })
+    // A socket connect can reconcile the current mode while the filter is clicked.
+    const bandRequest = interceptNetworkCall({
+      method: 'GET',
+      url: `**/api/v1/community/feed?*mode=${SEEDED_BAND}*`,
+    })
     await page.getByTestId(`community-filter-${SEEDED_BAND}`).click()
     const banded = await bandRequest
 

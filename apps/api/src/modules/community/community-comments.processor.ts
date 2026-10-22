@@ -1,13 +1,14 @@
+import { recordCommunityEngagement } from './community-engagement-intent.js'
 import type { FeatureFlagsService } from '../feature-flags/feature-flags.service.js'
 import {
   withModerationTimeout,
   MODERATION_SCREENING_TIMEOUT_MS,
 } from './community-moderation.processor.js'
 // Story 6.4 owner: worker-only text screening with guarded publication.
-import { ForbiddenException } from '@nestjs/common'
+import { ForbiddenException, ServiceUnavailableException } from '@nestjs/common'
 import { Prisma, type PrismaClient } from '@prisma/client'
 import type { CommunityModerationEngine } from './community-moderation.engine.js'
-import { assertWardrobeParticipationAllowed } from '../guardian/guardian-participation.js'
+import { assertCommunityDatabaseAccess } from './community-access.service.js'
 import { PUBLICLY_VISIBLE_POST_WHERE } from './community.repository.js'
 import { commentAnalytics } from './community-comments.repository.js'
 
@@ -68,7 +69,7 @@ export class CommunityCommentsProcessor {
         })
         let eligible = !!post
         try {
-          await assertWardrobeParticipationAllowed(tx, input.user_id!)
+          await assertCommunityDatabaseAccess(tx, input.user_id!)
         } catch (error) {
           if (!(error instanceof ForbiddenException)) throw error
           eligible = false
@@ -126,6 +127,11 @@ export class CommunityCommentsProcessor {
           input.user_id === post?.user_id,
           input.parent_id !== null
         )
+        await recordCommunityEngagement(tx, {
+          actor: input.user_id!,
+          post: input.post_id,
+          comment: commentId,
+        })
       },
       { isolationLevel: Prisma.TransactionIsolationLevel.ReadCommitted }
     )
@@ -163,11 +169,16 @@ export class CommunityCommentsProcessor {
   private async rolloutAllows(userId: string): Promise<boolean> {
     // Missing authority stays fail-closed; the injected service owns remote/fallback policy.
     if (!this.flags) return false
-    const [read, write] = await Promise.all([
-      this.flags.getFeatureFlag('community_read_enabled', userId),
-      this.flags.getFeatureFlag('community_write_enabled', userId),
-    ])
-    return Boolean(read && write)
+    try {
+      const [read, write] = await Promise.all([
+        this.flags.getFeatureFlag('community_read_enabled', userId),
+        this.flags.getFeatureFlag('community_write_enabled', userId),
+      ])
+      return Boolean(read && write)
+    } catch (error) {
+      if (error instanceof ServiceUnavailableException) return false
+      throw error
+    }
   }
 
   private async defer(commentId: string, generation?: number): Promise<void> {

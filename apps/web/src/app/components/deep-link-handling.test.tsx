@@ -1,3 +1,5 @@
+import type { CommunityFeedItem } from '@couture/api-client/contracts/http'
+import { CommunitySyncState } from '@couture/api-client'
 // Learning path Step 27: Widget and notification deep-link handling.
 // See _bmad-output/project-knowledge/learning-path-step-by-step.md#step-27-widget-and-notification-deep-link-handling
 // Story 3.7 Task 5 step 1 owner: unit-test web deep-link hydration, severe weather focus, and invalid banner
@@ -57,11 +59,57 @@ describe('Web Deep-Link Handling (Story 3.7)', () => {
   const originalLocation = window.location
 
   beforeEach(() => {
+    // Story6.5 transport is covered independently; these legacy presentation cases own static HTTP.
+    vi.spyOn(CommunitySyncState.prototype, 'start').mockImplementation(() => undefined)
+    useMswHandlers(
+      http.post('*/api/v1/community/targets/resolve', async ({ request }) => {
+        const input = (await request.json()) as {
+          targets: { key: string; postId: string }[]
+        }
+        const targets = []
+        for (const target of input.targets) {
+          const response = await fetch(
+            new URL(
+              `/api/v1/community/posts/${encodeURIComponent(target.postId)}`,
+              request.url
+            )
+          )
+          if (response.status === 404) {
+            targets.push({ key: target.key, status: 'unavailable' })
+            continue
+          }
+          if (!response.ok) return new HttpResponse(null, { status: response.status })
+          const body = (await response.json()) as { data: CommunityFeedItem }
+          targets.push({
+            key: target.key,
+            status: 'available',
+            communityRevision: '0',
+            post: {
+              ...body.data,
+              reactions: {
+                counts: { applause: 0, love: 0, inspiration: 0 },
+                total: 0,
+                viewerReaction: null,
+                revision: 0,
+                generation: 0,
+              },
+            },
+            comment: null,
+            parent: null,
+            pageCursor: null,
+            parentPageCursor: null,
+            threadPosition: null,
+          })
+        }
+        return HttpResponse.json({ data: { targets } })
+      })
+    )
     captureMock.mockClear()
     vi.clearAllMocks()
   })
 
   afterEach(() => {
+    window.sessionStorage.clear()
     Object.defineProperty(window, 'location', {
       writable: true,
       value: originalLocation,
@@ -98,13 +146,17 @@ describe('Web Deep-Link Handling (Story 3.7)', () => {
   })
 
   it('3.7-UNIT-002: Focuses the canonical severe weather alert target', async () => {
+    // The events feed is per account, so the alert is read with the reader's bearer.
+    signIn()
+    const authorizations: (string | null)[] = []
     useMswHandlers(
-      http.get('/api/v1/events/poll', () =>
-        HttpResponse.json({
+      http.get('/api/v1/events/poll', ({ request }) => {
+        authorizations.push(request.headers.get('authorization'))
+        return HttpResponse.json({
           events: [createWeatherAlertPolledEvent('alert-999', 'user-1')],
           nextSince: '2026-07-30T12:00:00.000Z',
         })
-      )
+      })
     )
     setLocationSearch('?source=notification&type=severe_weather&alertId=alert-999')
     render(<LookbookPrismLayout />)
@@ -122,6 +174,7 @@ describe('Web Deep-Link Handling (Story 3.7)', () => {
         surface: 'web',
       })
     })
+    expect(authorizations).toEqual(['Bearer test-access-token'])
   })
 
   it('3.7-UNIT-003: Selects, scrolls to, and focuses the community card', async () => {
@@ -196,6 +249,7 @@ describe('Web Deep-Link Handling degraded targets (Story 3.7)', () => {
   })
 
   afterEach(() => {
+    window.sessionStorage.clear()
     Object.defineProperty(window, 'location', {
       writable: true,
       value: originalLocation,
@@ -245,7 +299,28 @@ describe('Web Deep-Link Handling degraded targets (Story 3.7)', () => {
     )
   })
 
+  it('reports a weather alert link opened while signed out without reading the feed', async () => {
+    let polls = 0
+    useMswHandlers(
+      http.get('/api/v1/events/poll', () => {
+        polls += 1
+        return HttpResponse.json({ events: [], nextSince: null })
+      })
+    )
+    setLocationSearch('?source=notification&type=severe_weather&alertId=alert-999')
+    render(<LookbookPrismLayout />)
+
+    await waitFor(() =>
+      expect(captureMock).toHaveBeenCalledWith(
+        'deep_link_invalid',
+        expect.objectContaining({ reason: 'Weather alert target could not be loaded' })
+      )
+    )
+    expect(polls).toBe(0)
+  })
+
   it('reports an unloadable weather alert target rather than focusing nothing', async () => {
+    signIn()
     useMswHandlers(http.get('/api/v1/events/poll', () => HttpResponse.error()))
     setLocationSearch('?source=notification&type=severe_weather&alertId=alert-999')
     render(<LookbookPrismLayout />)
@@ -260,6 +335,7 @@ describe('Web Deep-Link Handling degraded targets (Story 3.7)', () => {
   })
 
   it('reports a weather alert that is no longer in the polled feed', async () => {
+    signIn()
     useMswHandlers(
       http.get('/api/v1/events/poll', () =>
         HttpResponse.json({

@@ -66,6 +66,9 @@ const env = {
   ...process.env,
   NODE_ENV: 'test',
   TEST_ENV: 'local',
+  COMMUNITY_FLAG_FIXTURE_MODE: 'true',
+  NEXT_PUBLIC_E2E_AUTH: 'true',
+  NEXT_PUBLIC_REALTIME_URL: process.env.API_BASE_URL ?? 'http://127.0.0.1:4000',
   GARMENT_TAGGING_ENGINE: 'fixture',
   // What the default `fixture` evidence mode buys:
   // Story 6.1: without this the ADR-013 NSFW model is absent, every post fails
@@ -466,6 +469,9 @@ async function main() {
         ...env,
         API_BASE_URL: apiBaseUrl,
         POSTHOG_API_KEY: process.env.POSTHOG_API_KEY || '',
+        COMMUNITY_FLAG_FIXTURE_MODE: 'true',
+        NEXT_PUBLIC_E2E_AUTH: 'true',
+        NEXT_PUBLIC_REALTIME_URL: process.env.API_BASE_URL ?? 'http://127.0.0.1:4000',
       },
       path.join(repoRoot, 'apps/web')
     )

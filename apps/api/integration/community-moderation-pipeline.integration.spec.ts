@@ -46,6 +46,8 @@ import { getRedisConfig, redisOptionsFromConfig } from '../src/config/redis.js'
 import { disconnectPrismaClient } from '../src/workers/prisma.js'
 import { FIXTURE_ENGINE_VERSION_SUFFIX } from '../src/modules/community/community-screening-policy.js'
 
+const communityRolloutFixture = { getFeatureFlag: vi.fn().mockResolvedValue(true) }
+
 const databaseUrl =
   process.env.INTEGRATION_TEST_DATABASE_URL ??
   process.env.DATABASE_URL ??
@@ -119,7 +121,15 @@ const namespace = `community-pipeline-${randomUUID().slice(0, 8)}`
 
 async function createUser(label: string): Promise<string> {
   const user = await prisma.user.create({
-    data: { email: `${namespace}-${label}-${randomUUID().slice(0, 8)}@synthetic.test` },
+    data: {
+      email: `${namespace}-${label}-${randomUUID().slice(0, 8)}@synthetic.test`,
+      profile: {
+        create: {
+          birthdate: new Date('1990-01-01'),
+          preferences: { compliance: { accountStatus: 'active' } },
+        },
+      },
+    },
   })
   return user.id
 }
@@ -193,6 +203,7 @@ afterAll(async () => {
     })
     await prisma.lookbookPost.deleteMany({ where: owned })
     await prisma.communityAlias.deleteMany({ where: owned })
+    await prisma.userProfile.deleteMany({ where: owned })
     await prisma.user.deleteMany({ where: { email: { startsWith: namespace } } })
     await prisma.jobFailure.deleteMany({
       where: { queue_name: { startsWith: namespace } },
@@ -292,7 +303,9 @@ describe('6.1 community moderation pipeline', () => {
         prisma,
         storage,
         telemetry,
-        new DefaultCommunityModerationEngine()
+        new DefaultCommunityModerationEngine(),
+        undefined,
+        communityRolloutFixture
       )
       const { postId } = await createPendingPost(storage)
 
@@ -318,7 +331,9 @@ describe('6.1 community moderation pipeline', () => {
         new FixtureCommunityModerationEngine({
           textOutcome: { passed: false, reasons: ['profanity'] },
           imageOutcome: { passed: true, reasons: [] },
-        })
+        }),
+        undefined,
+        communityRolloutFixture
       )
       const { postId, userId } = await createPendingPost(storage)
 
@@ -360,7 +375,9 @@ describe('6.1 community moderation pipeline', () => {
         new FixtureCommunityModerationEngine({
           textOutcome: { passed: true, reasons: [] },
           imageOutcome: { passed: true, reasons: [] },
-        })
+        }),
+        undefined,
+        communityRolloutFixture
       )
       const { postId } = await createPendingPost(storage)
 
@@ -386,7 +403,9 @@ describe('6.1 community moderation pipeline', () => {
         prisma,
         storage,
         telemetry,
-        new DefaultCommunityModerationEngine()
+        new DefaultCommunityModerationEngine(),
+        undefined,
+        communityRolloutFixture
       )
       const { postId, objectPath } = await createPendingPost(storage)
       storage.objects.delete(objectPath)
@@ -431,7 +450,9 @@ describe('6.1 community moderation pipeline', () => {
         new FixtureCommunityModerationEngine({
           textOutcome: { passed: true, reasons: [] },
           imageOutcome: { passed: true, reasons: [] },
-        })
+        }),
+        undefined,
+        communityRolloutFixture
       )
       const { postId } = await createPendingPost(storage)
       await processor.process({ postId, uploadSessionId: postId })
@@ -465,7 +486,9 @@ describe('6.1 community moderation pipeline', () => {
         new FixtureCommunityModerationEngine({
           textOutcome: { passed: true, reasons: [] },
           imageOutcome: { passed: true, reasons: [] },
-        })
+        }),
+        undefined,
+        communityRolloutFixture
       )
       const { postId } = await createPendingPost(storage)
 
@@ -508,7 +531,9 @@ describe('6.1 community moderation pipeline', () => {
         new FixtureCommunityModerationEngine({
           textOutcome: { passed: true, reasons: [] },
           imageOutcome: { passed: true, reasons: [] },
-        })
+        }),
+        undefined,
+        communityRolloutFixture
       )
 
       // A band this suite owns outright, so the page contents are exactly the
@@ -725,7 +750,8 @@ describe('6.1 community moderation pipeline', () => {
      * failure here is an API defect and must not be retried, serialised, or
      * given a longer timeout.
      */
-    const actions = () => new CommunityModerationActionsService(prisma)
+    const actions = () =>
+      new CommunityModerationActionsService(prisma, communityRolloutFixture)
 
     async function createPostInStatus(
       status: 'flagged' | 'published',
@@ -927,7 +953,9 @@ describe('6.2 screening dispositions and attempt evidence', () => {
           reasons: ['low_confidence'],
           disposition: 'review',
         },
-      })
+      }),
+      undefined,
+      communityRolloutFixture
     )
     await processor.process({ postId, uploadSessionId: 'session' })
 
@@ -958,7 +986,9 @@ describe('6.2 screening dispositions and attempt evidence', () => {
       new FixtureCommunityModerationEngine({
         textOutcome: { passed: true, reasons: [] },
         imageOutcome: { passed: false, reasons: ['unsafe_class'], disposition: 'block' },
-      })
+      }),
+      undefined,
+      communityRolloutFixture
     )
     await processor.process({ postId, uploadSessionId: 'session' })
 
@@ -982,7 +1012,9 @@ describe('6.2 screening dispositions and attempt evidence', () => {
         // `passed: true` beside a blocking disposition. Reading either half
         // alone publishes on whichever one is wrong.
         imageOutcome: { passed: true, reasons: [], disposition: 'block' },
-      })
+      }),
+      undefined,
+      communityRolloutFixture
     )
     await processor.process({ postId, uploadSessionId: 'session' })
 
@@ -1006,7 +1038,9 @@ describe('6.2 screening dispositions and attempt evidence', () => {
       prisma,
       storage,
       telemetry,
-      new FixtureCommunityModerationEngine(pinned)
+      new FixtureCommunityModerationEngine(pinned),
+      undefined,
+      communityRolloutFixture
     ).process({ postId: withoutPolicy.postId, uploadSessionId: 'session' })
 
     const base = new FixtureCommunityModerationEngine(pinned)
@@ -1022,7 +1056,9 @@ describe('6.2 screening dispositions and attempt evidence', () => {
       prisma,
       storage,
       telemetry,
-      policyBacked
+      policyBacked,
+      undefined,
+      communityRolloutFixture
     ).process({ postId: withPolicy.postId, uploadSessionId: 'session' })
 
     const bare = await prisma.lookbookPost.findUniqueOrThrow({
@@ -1052,7 +1088,14 @@ describe('6.2 screening dispositions and attempt evidence', () => {
     wedged.moderatePost = () =>
       Promise.reject(new Error('community content screening timed out after 30000ms'))
 
-    const processor = new CommunityModerationProcessor(prisma, storage, telemetry, wedged)
+    const processor = new CommunityModerationProcessor(
+      prisma,
+      storage,
+      telemetry,
+      wedged,
+      undefined,
+      communityRolloutFixture
+    )
     await expect(
       processor.process(
         { postId, uploadSessionId: 'session' },
@@ -1079,7 +1122,9 @@ describe('6.2 screening dispositions and attempt evidence', () => {
       prisma,
       storage,
       telemetry,
-      new FixtureCommunityModerationEngine({})
+      new FixtureCommunityModerationEngine({}),
+      undefined,
+      communityRolloutFixture
     )
     await processor.markFailed(postId, 'inference_timeout', {
       attempt: 3,
@@ -1134,7 +1179,9 @@ describe('6.2 screening dispositions and attempt evidence', () => {
         new FixtureCommunityModerationEngine({
           textOutcome: { passed: true, reasons: [] },
           imageOutcome: { passed: true, reasons: [], disposition: 'pass' },
-        })
+        }),
+        undefined,
+        communityRolloutFixture
       )
 
       let attempts = 0

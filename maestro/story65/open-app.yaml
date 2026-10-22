@@ -1,0 +1,60 @@
+# Story 6.5 owner: the runner opens the dev client on the owned Metro URL. This confirms the
+# iOS open prompt, absorbs the dev-client onboarding sheet (it covers the tab bar on first
+# load), returns from pushed stack screens and waits for the tab bar. Only ids and
+# dev-client/OS text are matched, so it works in every app locale.
+appId: ${MAESTRO_APP_ID}
+---
+- retry:
+    maxRetries: 3
+    commands:
+      - extendedWaitUntil:
+          visible: 'Open in .*|This is the developer menu.*|Connected to:'
+          timeout: 10000
+          optional: true
+      - runFlow:
+          when:
+            visible: 'Open in .*'
+          commands:
+            - tapOn: 'Open'
+            - extendedWaitUntil:
+                visible: 'This is the developer menu.*|Connected to:'
+                timeout: 60000
+                optional: true
+      - runFlow:
+          when:
+            visible: 'This is the developer menu.*'
+          commands:
+            - tapOn: 'Continue'
+      # Continue leaves the full dev menu open over the app; close it.
+      - runFlow:
+          when:
+            visible: 'Connected to:'
+          commands:
+            - tapOn: 'Close'
+      # Return from pushed stack screens (sign-in, notification settings) to the tabs.
+      - repeat:
+          times: 3
+          commands:
+            - runFlow:
+                when:
+                  visible: 'Navigate up'
+                commands:
+                  - tapOn: 'Navigate up'
+            - runFlow:
+                when:
+                  visible:
+                    id: 'BackButton'
+                commands:
+                  - tapOn:
+                      id: 'BackButton'
+            - runFlow:
+                when:
+                  visible:
+                    id: 'comments-close'
+                commands:
+                  - tapOn:
+                      id: 'comments-close'
+      - extendedWaitUntil:
+          visible:
+            id: 'tab-home'
+          timeout: 30000

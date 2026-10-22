@@ -1,7 +1,10 @@
 // Story 6.4 owner: shared builders for the comments state specs. Each setup() call returns a
 // fresh state, transport and id generator, so no state is shared across tests or files.
 import { vi } from 'vitest'
-import { CommunityCommentsState } from '../src/community-comments-state'
+import {
+  CommunityCommentsState,
+  type CommunityCommentsTransport,
+} from '../src/community-comments-state'
 import type {
   CommunityComment,
   CommunityCommentsPage,
@@ -47,6 +50,7 @@ export const ownPage = (
 })
 export function setup() {
   const transport = {
+    locate: undefined as CommunityCommentsTransport['locate'],
     roots: vi.fn().mockResolvedValue(page()),
     replies: vi.fn().mockResolvedValue(page()),
     submissions: vi.fn().mockResolvedValue({ items: [], nextCursor: null }),

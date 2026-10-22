@@ -49,8 +49,11 @@ vi.mock('@/src/lib/ritual-cache', async (importOriginal) => {
 import TabOneScreen from '@/app/(tabs)/index'
 import { server } from '@/src/test-utils/msw/server'
 import { mockRitualResponse, mockShopThisLook } from '@/src/test-utils/msw/handlers'
-import { setMobileAccessTokenResolver } from '@/src/lib/mobile-auth'
-import { clearRitualMemoryCache } from '@/src/lib/ritual-cache'
+import {
+  setMobileAccessTokenResolver,
+  setMobileApplicationUserId,
+} from '@/src/lib/mobile-auth'
+import { clearRitualMemoryCache, ritualCacheOwner } from '@/src/lib/ritual-cache'
 import i18n, { initI18n } from '@/src/lib/i18n'
 
 /** Seeds the device cache exactly as a previous launch would have left it. */
@@ -58,7 +61,7 @@ async function seedRitualCache(entry: {
   data: typeof mockRitualResponse
   timestamp: number
 }) {
-  await realCache.module?.saveRitualCache('test-user-id', 'en-US', entry)
+  await realCache.module?.saveRitualCache(ritualCacheOwner('test-member'), 'en-US', entry)
 }
 
 /** The ritual payload with a live offer on the morning card, as the API sends it. */
@@ -97,6 +100,9 @@ describe('TabOneScreen affiliate CTA', () => {
         realCache.module?.saveRitualCache(...args)
     )
     restoreAccessTokenResolver = setMobileAccessTokenResolver(() => 'session-token')
+    // Set after the auto-cleanup unmounted the previous screen; changing identity while a
+    // screen is mounted reloads it and leaks a request into this test.
+    setMobileApplicationUserId('test-member')
     clearRitualMemoryCache()
     localStorage.clear()
     await i18n.changeLanguage('en-US')

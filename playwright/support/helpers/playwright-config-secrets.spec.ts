@@ -18,6 +18,7 @@ const DUMMY_SECRETS = {
   VERCEL_TOKEN: 'dummy-vercel-token-for-config-test',
   DATABASE_URL_PROD: 'postgresql://dummy:dummy-password@prod.invalid:5432/db',
   GH_TOKEN: 'dummy-gh-token-for-config-test',
+  SUPABASE_SERVICE_ROLE_KEY: 'dummy-service-role-key-for-config-test',
   UNRELATED_CI_VARIABLE: 'dummy-unrelated-ci-variable',
 }
 
@@ -61,6 +62,7 @@ describe('Playwright configs keep the environment out of reports', () => {
     const config = await loadConfig('../../config/local.config')
 
     expect(Object.keys(webServerEnv(config)).sort()).toEqual(LOCAL_WEB_SERVER_ENV_KEYS)
+    expect(config.use?.extraHTTPHeaders).toBeUndefined()
     expectNoDummySecret({ webServer: config.webServer, metadata: config.metadata })
   })
 
@@ -70,6 +72,7 @@ describe('Playwright configs keep the environment out of reports', () => {
     expect(Object.keys(webServerEnv(config)).sort()).toEqual(
       [...LOCAL_WEB_SERVER_ENV_KEYS, 'COMMUNITY_SCREENING_EVIDENCE_MODE'].sort()
     )
+    expect(config.use?.extraHTTPHeaders).toBeUndefined()
     expectNoDummySecret({ webServer: config.webServer, metadata: config.metadata })
   })
 
@@ -79,6 +82,8 @@ describe('Playwright configs keep the environment out of reports', () => {
       const config = await loadConfig(`../../config/${name}.config`)
 
       expect(config.webServer).toBeUndefined()
+      // Browser contexts carry no service-role header; only the request fixture does.
+      expect(config.use?.extraHTTPHeaders).toBeUndefined()
       // The bypass cookie minted from the secret is a credential too, and
       // traces record cookies, so preview records none while it holds one.
       if (name === 'preview') expect(config.use?.trace).toBe('off')

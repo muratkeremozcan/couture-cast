@@ -37,7 +37,18 @@
     "loading": "Chargement des recommandations...",
     "garment_swap_title": "Choisir une alternative pour {{category}}",
     "feels_like": "Ressenti",
-    "precipitation": "Précipitations"
+    "precipitation": "Précipitations",
+    "alert": {
+      "events": {
+        "flood": "Alerte inondation",
+        "winter-storm": "Alerte tempête hivernale",
+        "wind": "Alerte vent violent",
+        "heat": "Alerte canicule",
+        "ice": "Alerte verglas"
+      },
+      "body_generic": "Une alerte météo est en vigueur dans votre zone."
+    },
+    "no_location": "Ajoutez votre position pour recevoir vos tenues du jour"
   },
   "widget": {
     "now": "MAINTENANT",
@@ -53,16 +64,16 @@
     "locale_change_error": "Impossible de changer la langue. Veuillez réessayer.",
     "region_units": "Région et Unités",
     "languages": {
-      "en-US": "Anglais (É.-U.)",
-      "en-CA": "Anglais (Canada)",
-      "es-419": "Espagnol (LatAm)",
+      "en-US": "English (US)",
+      "en-CA": "English (Canada)",
+      "es-419": "Español (LatAm)",
       "fr-CA": "Français (Canada)",
       "fr-FR": "Français (Europe)",
-      "tr-TR": "Turc",
-      "de-DE": "Allemand",
-      "it-IT": "Italien",
-      "pt-BR": "Portugais (Brésil)",
-      "pt-PT": "Portugais (Portugal)"
+      "tr-TR": "Türkçe",
+      "de-DE": "Deutsch",
+      "it-IT": "Italiano",
+      "pt-BR": "Português (Brasil)",
+      "pt-PT": "Português (Portugal)"
     },
     "api_health": "Vérification de l'état de l'API...",
     "api_health_status": "État de l'API: {{status}}",
@@ -75,7 +86,8 @@
     "dismiss_banner": "Fermer la bannière",
     "invalid_link": "Ce lien est invalide, expiré ou n’est plus disponible.",
     "about_couturecast": "À propos de CoutureCast",
-    "about_description": "CoutureCast associe les données météo aux recommandations vestimentaires."
+    "about_description": "CoutureCast associe les données météo aux recommandations vestimentaires.",
+    "back": "Retour"
   },
   "accessibility": {
     "skip_to_content": "Passer au contenu principal",
@@ -321,7 +333,8 @@
       "optOutHelp": "Désactivez cette option pour masquer toutes les suggestions de partenaires et d’affiliation.",
       "saved": "Préférences d’achat mises à jour",
       "error": "Impossible de mettre à jour les préférences d’achat.",
-      "loadError": "Impossible de charger les préférences d’achat."
+      "loadError": "Impossible de charger les préférences d’achat.",
+      "signedOutHint": "Connectez-vous pour modifier ce réglage"
     },
     "premium": {
       "sectionTitle": "Premium",
@@ -581,7 +594,8 @@
       "plannerLocked": {
         "title": "Le planificateur sur 7 jours est une fonctionnalité Premium",
         "cta": "Obtenir Premium"
-      }
+      },
+      "signedOutHint": "Connectez-vous pour vous abonner ou gérer Premium"
     }
   },
   "community": {
@@ -815,6 +829,39 @@
       },
       "unavailable": "Indisponible.",
       "close": "Fermer les commentaires"
+    },
+    "realtime": {
+      "newLooks": "{{count}} nouveaux looks sont disponibles.",
+      "showNewLooks": "Afficher {{count}} nouveaux looks",
+      "newComments": "De nouveaux commentaires sont disponibles.",
+      "unavailable": "La communauté est temporairement indisponible. Votre brouillon est enregistré."
+    },
+    "notifications": {
+      "title": "Notifications de la communauté",
+      "enabled": "Notifications des interactions",
+      "quiet": "Heures silencieuses pour toutes les notifications, y compris la météo",
+      "start": "Début des heures silencieuses",
+      "end": "Fin des heures silencieuses",
+      "timezone": "Fuseau horaire du compte",
+      "save": "Enregistrer les réglages",
+      "saved": "Réglages enregistrés.",
+      "failed": "Impossible d’enregistrer les réglages. Réessayez.",
+      "conflict": "Les réglages ont changé sur un autre appareil. Vérifiez les valeurs et réessayez.",
+      "permission": "Autorisez les notifications dans les réglages de votre appareil, puis réessayez.",
+      "signin": "Se connecter",
+      "email": "Adresse courriel",
+      "code": "Code reçu par courriel",
+      "sendCode": "Envoyer le code de connexion",
+      "verify": "Vérifier le code",
+      "codeSent": "Consultez votre courriel pour le code de connexion.",
+      "signinDenied": "Aucun compte CoutureCast ne peut se connecter avec cette adresse e-mail. Vérifiez l’adresse et réessayez.",
+      "signinUnavailable": "La connexion est temporairement indisponible. Réessayez dans un instant.",
+      "signinCodeInvalid": "Ce code est incorrect ou a expiré. Vérifiez vos e-mails ou demandez un nouveau code.",
+      "signout": "Se déconnecter",
+      "deviceSettings": "Ouvrir les réglages de l’appareil",
+      "back": "Retour à la communauté",
+      "bindingConflict": "L’enregistrement des notifications de cet appareil a changé. Réessayez.",
+      "pushUnavailable": "Les notifications push ne sont pas disponibles sur cet appareil."
     }
   }
 }

@@ -32,6 +32,7 @@ const DESTRUCTIVE_MERLOT = '#7A1F2D'
 const ON_DESTRUCTIVE = '#FFFFFF'
 
 export interface CommunityReportModalProps {
+  suspended?: boolean
   visible: boolean
   post: CommunityFeedItem | null
   /** Already translated by the screen, which owns the failure-reason mapping. */
@@ -47,6 +48,7 @@ export interface CommunityReportModalProps {
 
 export function CommunityReportModal({
   visible,
+  suspended = false,
   post,
   errorMessage = null,
   isSubmitting = false,
@@ -91,7 +93,7 @@ export function CommunityReportModal({
 
   return (
     <Modal
-      visible={visible}
+      visible={visible && !suspended}
       transparent
       animationType="fade"
       onRequestClose={onClose}

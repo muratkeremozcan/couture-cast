@@ -1,7 +1,16 @@
+import { FeatureFlagsService } from '../feature-flags/feature-flags.service.js'
+import { assertCommunityDatabaseAccess } from './community-access.service.js'
 // Story 6.1 Task 4: BullMQ processor for automated community content moderation.
 // Implements ADR-013 transactional content screening, publishing, flagging,
 // SLA alert recording, and retry exhaustion handling.
-import { Inject, Injectable, Logger, Optional } from '@nestjs/common'
+import {
+  Inject,
+  Injectable,
+  Logger,
+  Optional,
+  ForbiddenException,
+  ServiceUnavailableException,
+} from '@nestjs/common'
 import { communityImageValidationCodeSchema } from '@couture/api-client/contracts/http'
 import { PrismaClient, type ClimateBand, type LookbookPost } from '@prisma/client'
 import {
@@ -125,7 +134,10 @@ export class CommunityModerationProcessor {
     @Optional()
     engine?: CommunityModerationEngine,
     @Optional()
-    meter?: CommunityModerationMeter
+    meter?: CommunityModerationMeter,
+    @Optional()
+    @Inject(FeatureFlagsService)
+    private readonly flags?: Pick<FeatureFlagsService, 'getFeatureFlag'>
   ) {
     this.moderationEngine = engine ?? new DefaultCommunityModerationEngine()
     // Wrapped even when one is injected. A metrics fault after a post has
@@ -197,7 +209,7 @@ export class CommunityModerationProcessor {
     let imageBuffer: Buffer
     try {
       const normalized = await withModerationTimeout(
-        this.normalizeUpload(post.id, post.image_object_path, rawBytes, {
+        this.normalizeUpload(post.id, post.user_id, post.image_object_path, rawBytes, {
           byteSize: post.image_byte_size,
           mimeType: post.image_content_type,
           sha256: post.image_checksum,
@@ -305,6 +317,7 @@ export class CommunityModerationProcessor {
    */
   private async normalizeUpload(
     postId: string,
+    userId: string,
     objectPath: string,
     rawBytes: Buffer,
     declared: {
@@ -327,14 +340,30 @@ export class CommunityModerationProcessor {
 
     if (normalized.sha256 !== declared.sha256) {
       await this.storage.upload(objectPath, normalized.bytes, normalized.mimeType)
-      await this.prisma.lookbookPost.update({
-        where: { id: postId },
-        data: {
-          image_checksum: normalized.sha256,
-          image_byte_size: normalized.byteSize,
-          image_content_type: normalized.mimeType,
-        },
+      const updated = await this.prisma.$transaction(async (tx) => {
+        await tx.$executeRaw`SELECT pg_advisory_xact_lock(hashtext('community_member:' || ${userId}))`
+        await tx.$queryRaw`SELECT id FROM "LookbookPost" WHERE id = ${postId} FOR UPDATE`
+        return tx.lookbookPost.updateMany({
+          where: {
+            id: postId,
+            user_id: userId,
+            status: 'pending_review',
+            image_object_path: objectPath,
+            erasure_requested_at: null,
+            anonymized_at: null,
+          },
+          data: {
+            image_checksum: normalized.sha256,
+            image_byte_size: normalized.byteSize,
+            image_content_type: normalized.mimeType,
+          },
+        })
       })
+      if (!updated.count) {
+        // A completed late upload cannot restore erased metadata or retain its object.
+        await this.storage.remove([objectPath])
+        throw new Error('Community normalization ownership expired.')
+      }
     }
 
     return normalized.bytes
@@ -351,10 +380,33 @@ export class CommunityModerationProcessor {
   }): Promise<void> {
     const { postId, userId, climateBand, challengeId, engineVersion, platform, post } =
       params
+    const canary = isCommunityCanaryUser(userId)
+    if (!canary && !(await this.flags?.getFeatureFlag('community_write_enabled', userId)))
+      throw new ServiceUnavailableException('Community publication is unavailable.')
     const publishedAt = new Date()
     const updated = await this.prisma.$transaction(async (tx) => {
+      await tx.$executeRaw`SELECT pg_advisory_xact_lock(hashtext('community_member:' || ${userId}))`
+      await tx.$queryRaw`SELECT id FROM "LookbookPost" WHERE id = ${postId} FOR UPDATE`
+      if (!canary) {
+        try {
+          await assertCommunityDatabaseAccess(tx, userId)
+        } catch (error) {
+          if (!(error instanceof ForbiddenException)) throw error
+          await tx.lookbookPost.updateMany({
+            where: { id: postId, status: 'pending_review' },
+            data: { status: 'consent_suspended' },
+          })
+          return false
+        }
+      }
       const updateResult = await tx.lookbookPost.updateMany({
-        where: { id: postId, status: 'pending_review' },
+        where: {
+          id: postId,
+          user_id: userId,
+          status: 'pending_review',
+          erasure_requested_at: null,
+          anonymized_at: null,
+        },
         data: {
           status: 'published',
           published_at: publishedAt,
@@ -448,8 +500,16 @@ export class CommunityModerationProcessor {
     const flaggedAt = new Date()
 
     await this.prisma.$transaction(async (tx) => {
+      await tx.$executeRaw`SELECT pg_advisory_xact_lock(hashtext('community_member:' || ${userId}))`
+      await tx.$queryRaw`SELECT id FROM "LookbookPost" WHERE id = ${postId} FOR UPDATE`
       const updateResult = await tx.lookbookPost.updateMany({
-        where: { id: postId, status: 'pending_review' },
+        where: {
+          id: postId,
+          user_id: userId,
+          status: 'pending_review',
+          erasure_requested_at: null,
+          anonymized_at: null,
+        },
         data: {
           status: 'flagged',
           moderation_reason: reason,
@@ -519,9 +579,19 @@ export class CommunityModerationProcessor {
     context?: CommunityModerationAttemptContext
   ): Promise<void> {
     const failedAt = new Date()
+    const source = await this.prisma.lookbookPost.findUnique({ where: { id: postId } })
+    if (!source) return
     await this.prisma.$transaction(async (tx) => {
+      await tx.$executeRaw`SELECT pg_advisory_xact_lock(hashtext('community_member:' || ${source.user_id}))`
+      await tx.$queryRaw`SELECT id FROM "LookbookPost" WHERE id = ${postId} FOR UPDATE`
       const updateResult = await tx.lookbookPost.updateMany({
-        where: { id: postId, status: 'pending_review' },
+        where: {
+          id: postId,
+          user_id: source.user_id,
+          status: 'pending_review',
+          erasure_requested_at: null,
+          anonymized_at: null,
+        },
         data: {
           status: 'review_failed',
           moderation_reason: reason,

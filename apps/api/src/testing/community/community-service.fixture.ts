@@ -201,7 +201,14 @@ export const createService = (
   } = options
 
   const getFeatureFlag = vi.fn().mockResolvedValue(flagEnabled)
-  const featureFlagsService = { getFeatureFlag } as unknown as FeatureFlagsService
+  const featureFlagsService = {
+    getFeatureFlag,
+    communityReadEvaluation: async (member: string) => ({
+      value: await getFeatureFlag('community_read_enabled', member),
+      expiresAt: new Date(Date.now() + 60000),
+      validUntil: performance.now() + 60000,
+    }),
+  } as unknown as FeatureFlagsService
 
   const findViewerLocations = vi.fn().mockResolvedValue(locations)
   const findPublishedFeedPosts = vi.fn().mockResolvedValue({ posts, nextCursor })
@@ -302,6 +309,8 @@ export const createService = (
     })
   const reactionSummaries = vi.fn().mockResolvedValue(new Map())
   const repository = {
+    assertReadEligibility: vi.fn().mockResolvedValue(undefined),
+    assertSubjectAvailable: vi.fn().mockResolvedValue(undefined),
     setReaction,
     reactionSummaries,
     findViewerLocations,

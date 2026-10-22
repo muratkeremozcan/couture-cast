@@ -1,3 +1,12 @@
+import {
+  assertCommunityReadEligibility,
+  assertCommunitySubjectPresent,
+} from './community-access.service.js'
+import type { CommunityAuthorizationBudget } from './community-availability.js'
+import {
+  guardCommunityPost,
+  assertCommunitySubjectAvailable,
+} from './community-privacy.js'
 import { sharedCommunityReportRetryAfter } from './community-report-limit.js'
 // Story 6.4 owner: member/post serialized threads and synchronous moderation intake.
 import { createHash, randomUUID } from 'node:crypto'
@@ -104,6 +113,12 @@ export async function commentAnalytics(
 @Injectable()
 export class CommunityCommentsRepository {
   constructor(@Inject(PrismaClient) private readonly prisma: PrismaClient) {}
+  assertReadEligibility(member: string, budget: CommunityAuthorizationBudget) {
+    return assertCommunityReadEligibility(this.prisma, member, budget)
+  }
+  assertSubjectAvailable(member: string, budget: CommunityAuthorizationBudget) {
+    return assertCommunitySubjectPresent(this.prisma, member, budget)
+  }
 
   async withThread<T>(
     userId: string,
@@ -113,10 +128,12 @@ export class CommunityCommentsRepository {
       tx: Tx,
       post: { user_id: string; comment_publication_sequence: number }
     ) => Promise<T>,
-    readOnly = false
+    readOnly = false,
+    privacyMutation = false
   ): Promise<T> {
     return this.prisma.$transaction(
       async (tx) => {
+        if (privacyMutation) await guardCommunityPost(tx, postId)
         if (readOnly) {
           await tx.$executeRaw`SELECT pg_advisory_xact_lock_shared(hashtext('community_member:' || ${userId}))`
           await tx.$queryRaw`SELECT id FROM "LookbookPost" WHERE id = ${postId} FOR SHARE`
@@ -129,6 +146,7 @@ export class CommunityCommentsRepository {
         })
         if (!post || !isPubliclyVisiblePost(post))
           throw new NotFoundException(COMMUNITY_POST_NOT_FOUND_MESSAGE)
+        await assertCommunitySubjectAvailable(tx, userId)
         await eligible(tx, false)
         return work(tx, post)
       },
@@ -427,7 +445,9 @@ export class CommunityCommentsRepository {
           row.parent_id !== null
         )
         return commentSubmission(deleted)
-      }
+      },
+      false,
+      true
     )
   }
 

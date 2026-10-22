@@ -84,11 +84,11 @@ function placeholders(value: string): string[] {
 const reference = flatten(commerceTree(enUS as Catalog))
 
 describe('5.1 mobile commerce locale parity', () => {
-  it('5.1-I18N-MOB-01 ships 13 commerce keys in the reference catalog', () => {
-    // Twelve at story 5.1, plus `settings.loadError`. Web carries fourteen: it
-    // also has `settings.signedOutHint`, which mobile has no use for because
-    // its settings screen is unreachable without a session.
-    expect(reference.size).toBe(13)
+  it('5.1-I18N-MOB-01 ships 14 commerce keys in the reference catalog', () => {
+    // Twelve at story 5.1, plus `settings.loadError` and `settings.signedOutHint`,
+    // matching web's fourteen. The settings tab is reachable signed out, so it says
+    // what signing in unlocks instead of reporting a load failure.
+    expect(reference.size).toBe(14)
   })
 
   it('5.1-I18N-MOB-02 uses an identical key tree in every locale', () => {

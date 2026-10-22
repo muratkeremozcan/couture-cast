@@ -1,0 +1,17 @@
+# Story 6.5 owner: real sign-in UI, step 2. MAESTRO_OTP arrives only as process environment
+# (never argv or artifacts); the runner keeps this flow's debug output private.
+appId: ${MAESTRO_APP_ID}
+---
+- tapOn:
+    text: ${MAESTRO_CODE_LABEL}
+    index: 1
+- inputText: ${MAESTRO_OTP}
+# iOS reports a failure when the simulator shows no software keyboard.
+- hideKeyboard:
+    optional: true
+- tapOn: ${MAESTRO_VERIFY}
+# verifyNativeOtp resolves the canonical app account, then the screen returns to settings,
+# which renders the owner's preference controls.
+- extendedWaitUntil:
+    visible: ${MAESTRO_ENABLED}
+    timeout: 30000

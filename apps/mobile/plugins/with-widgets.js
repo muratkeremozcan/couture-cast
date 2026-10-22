@@ -11,9 +11,13 @@ const plist = require('@expo/plist').default
 const fs = require('fs')
 const path = require('path')
 
-const appGroup = 'group.com.couturecast.app'
+const nativeBundleId =
+  process.env.STORY65_NATIVE_TEST_BUILD === '1'
+    ? 'com.couturecast.story65'
+    : 'com.couturecast.app'
+const appGroup = `group.${nativeBundleId}`
 const extensionName = 'OutfitWidget'
-const extensionBundleIdentifier = 'com.couturecast.app.OutfitWidget'
+const extensionBundleIdentifier = `${nativeBundleId}.OutfitWidget`
 const androidWidgetClasses = [
   'OutfitWidgetProvider',
   'OutfitWidgetProviderSmall',
@@ -29,7 +33,15 @@ function ensureDirectory(directory) {
 
 function copyFile(source, destination) {
   ensureDirectory(path.dirname(destination))
-  fs.copyFileSync(source, destination)
+  if (
+    nativeBundleId !== 'com.couturecast.app' &&
+    /\.(swift|kt|xml|plist)$/.test(source)
+  ) {
+    fs.writeFileSync(
+      destination,
+      fs.readFileSync(source, 'utf8').replaceAll('com.couturecast.app', nativeBundleId)
+    )
+  } else fs.copyFileSync(source, destination)
 }
 
 function resolveSpaceGroteskFont(projectRoot) {

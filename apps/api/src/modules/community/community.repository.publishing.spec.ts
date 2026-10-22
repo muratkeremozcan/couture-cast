@@ -126,7 +126,13 @@ describe('CommunityRepository publishing and erasure', () => {
 
       expect(result.kind).toBe('published')
       expect(lookbookPostUpdateMany).toHaveBeenCalledWith({
-        where: { id: 'post-10', user_id: viewerUserId, status: 'draft' },
+        where: {
+          id: 'post-10',
+          user_id: viewerUserId,
+          status: 'draft',
+          erasure_requested_at: null,
+          anonymized_at: null,
+        },
         data: {
           status: 'pending_review',
           alt_text: publishData.altText,
@@ -208,7 +214,9 @@ describe('CommunityRepository publishing and erasure', () => {
 
       await repo.withdrawPostAndRequestErasure('post-1', requestedAt)
 
-      const statement = JSON.stringify(executeRaw.mock.calls[0])
+      const statement = JSON.stringify(
+        executeRaw.mock.calls.find((call) => JSON.stringify(call).includes('UPDATE'))
+      )
       expect(statement).toContain('UPDATE')
       expect(statement).toContain('withdrawn')
       expect(statement).toContain('erasure_requested_at')
@@ -222,7 +230,11 @@ describe('CommunityRepository publishing and erasure', () => {
 
       await repo.withdrawPostAndRequestErasure('post-1', new Date())
 
-      expect(JSON.stringify(executeRaw.mock.calls[0])).toContain('COALESCE')
+      expect(
+        JSON.stringify(
+          executeRaw.mock.calls.find((call) => JSON.stringify(call).includes('UPDATE'))
+        )
+      ).toContain('COALESCE')
     })
 
     it('marks every post of a member that is not already counting down, and reports the count', async () => {

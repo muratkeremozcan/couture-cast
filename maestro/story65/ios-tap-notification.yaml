@@ -1,0 +1,47 @@
+# Story 6.5 owner: present and tap an iOS notification. The runner prepares the simctl push;
+# this flow triggers it so the banner appears while the flow is watching.
+# - background: the Home button sends the app to the background first.
+# - background and cold: the banner shows over SpringBoard and is tapped by its text.
+# - warm: the banner shows over the foreground app (on Settings, where the runner left it),
+#   where Maestro's iOS hierarchy does not include it. The flow screenshots the presented
+#   banner and taps its on-screen position, and proves the tap by the app leaving Settings.
+#   Under heavy host load a banner can arrive late, so a missed tap re-fires the push.
+appId: ${MAESTRO_APP_ID}
+---
+- runFlow:
+    when:
+      true: ${MAESTRO_LIFECYCLE == 'background'}
+    commands:
+      - pressKey: Home
+      - waitForAnimationToEnd
+- runFlow:
+    when:
+      true: ${MAESTRO_LIFECYCLE != 'warm'}
+    commands:
+      - runScript:
+          file: push-trigger.js
+      - extendedWaitUntil:
+          visible: ${MAESTRO_NOTIFICATION_BODY}
+          timeout: 15000
+      - takeScreenshot:
+          path: presented-${MAESTRO_CASE}
+      - tapOn: ${MAESTRO_NOTIFICATION_BODY}
+- runFlow:
+    when:
+      true: ${MAESTRO_LIFECYCLE == 'warm'}
+    commands:
+      - retry:
+          maxRetries: 3
+          commands:
+            - runScript:
+                file: push-trigger.js
+            - waitForAnimationToEnd:
+                timeout: 1500
+            - takeScreenshot:
+                path: presented-${MAESTRO_CASE}
+            - tapOn:
+                point: 50%, 10%
+            - extendedWaitUntil:
+                notVisible:
+                  id: 'settings-screen'
+                timeout: 8000

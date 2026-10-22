@@ -4,9 +4,17 @@
     "api/index.ts": {
       "maxDuration": 25,
       "memory": 1024
+    },
+    "api/realtime.ts": {
+      "maxDuration": 300,
+      "memory": 1024
     }
   },
   "rewrites": [
+    {
+      "source": "/api/realtime",
+      "destination": "/api/realtime"
+    },
     {
       "source": "/(.*)",
       "destination": "/api/index"

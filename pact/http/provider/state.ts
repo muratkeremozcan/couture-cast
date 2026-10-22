@@ -515,3 +515,21 @@ export function getProviderCommunityState(): ProviderCommunityState | null {
 export function resetProviderCommunityState() {
   providerCommunityState = null
 }
+
+export type ProviderEngagementScenario =
+  | 'ready'
+  | 'legacy-updated'
+  | 'other-owner'
+  | 'unavailable'
+  | 'denied'
+  | 'child-removed'
+let providerEngagementState: ProviderEngagementScenario = 'ready'
+export function configureProviderEngagementState(scenario: ProviderEngagementScenario) {
+  providerEngagementState = scenario
+}
+export function getProviderEngagementState() {
+  return providerEngagementState
+}
+export function resetProviderEngagementState() {
+  providerEngagementState = 'ready'
+}

@@ -3,6 +3,7 @@ import { describe, expect, it, vi } from 'vitest'
 import { ZodError } from 'zod'
 import { CommunityCommentsState } from '../src/community-comments-state'
 import { communityCommentsClient, createApiClient } from '../src/client'
+import { abortError } from '../src/request-deadline'
 import { item, own } from './community-comments-state-fixtures'
 
 const createdAt = '2026-10-19T12:00:00.000Z'
@@ -159,7 +160,7 @@ describe('Story 6.4 community comments client', () => {
     const pending = state.submit('post', 'en-US')
     try {
       await vi.waitFor(() => expect(bodies).toHaveLength(1))
-      cancellation.abort(new DOMException('Request deadline reached', 'TimeoutError'))
+      cancellation.abort(abortError('Request deadline reached', 'TimeoutError'))
       await vi.waitFor(() => expect(state.current('post').pending).toBe(false))
       await pending
       expect(state.current('post').draft.body).toBe('Hello')

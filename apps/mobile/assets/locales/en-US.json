@@ -37,7 +37,18 @@
     "loading": "Loading recommendations...",
     "garment_swap_title": "Choose alternate {{category}}",
     "feels_like": "Feels like",
-    "precipitation": "Precipitation"
+    "precipitation": "Precipitation",
+    "alert": {
+      "events": {
+        "flood": "Flood warning",
+        "winter-storm": "Winter storm warning",
+        "wind": "Wind warning",
+        "heat": "Heat warning",
+        "ice": "Ice warning"
+      },
+      "body_generic": "A weather warning is in effect for your area."
+    },
+    "no_location": "Add your location to get daily outfits"
   },
   "widget": {
     "now": "NOW",
@@ -59,10 +70,10 @@
       "fr-CA": "Français (Canada)",
       "fr-FR": "Français (Europe)",
       "tr-TR": "Türkçe",
-      "de-DE": "German",
-      "it-IT": "Italian",
-      "pt-BR": "Portuguese (Brazil)",
-      "pt-PT": "Portuguese (Portugal)"
+      "de-DE": "Deutsch",
+      "it-IT": "Italiano",
+      "pt-BR": "Português (Brasil)",
+      "pt-PT": "Português (Portugal)"
     },
     "api_health": "Checking API health...",
     "api_health_status": "API health: {{status}}",
@@ -75,7 +86,8 @@
     "dismiss_banner": "Dismiss banner",
     "invalid_link": "This link is invalid, expired, or no longer available.",
     "about_couturecast": "About CoutureCast",
-    "about_description": "CoutureCast combines weather intelligence with wardrobe recommendations."
+    "about_description": "CoutureCast combines weather intelligence with wardrobe recommendations.",
+    "back": "Back"
   },
   "accessibility": {
     "skip_to_content": "Skip to main content",
@@ -321,7 +333,8 @@
       "optOutHelp": "Turn this off to hide all partner and affiliate suggestions.",
       "saved": "Shopping preferences updated",
       "error": "Unable to update shopping preferences.",
-      "loadError": "Unable to load shopping preferences."
+      "loadError": "Unable to load shopping preferences.",
+      "signedOutHint": "Sign in to change this"
     },
     "premium": {
       "sectionTitle": "Premium",
@@ -581,7 +594,8 @@
       "plannerLocked": {
         "title": "The 7-Day Planner is a Premium feature",
         "cta": "Get Premium"
-      }
+      },
+      "signedOutHint": "Sign in to subscribe or manage Premium"
     }
   },
   "community": {
@@ -815,6 +829,39 @@
       },
       "unavailable": "Unavailable.",
       "close": "Close comments"
+    },
+    "realtime": {
+      "newLooks": "{{count}} new looks are ready.",
+      "showNewLooks": "Show {{count}} new looks",
+      "newComments": "New comments are available.",
+      "unavailable": "Community is temporarily unavailable. Your draft is saved."
+    },
+    "notifications": {
+      "title": "Community notifications",
+      "enabled": "Engagement notifications",
+      "quiet": "Quiet hours for all push notifications, including weather",
+      "start": "Quiet hours start",
+      "end": "Quiet hours end",
+      "timezone": "Account time zone",
+      "save": "Save settings",
+      "saved": "Settings saved.",
+      "failed": "Settings could not be saved. Try again.",
+      "conflict": "Settings changed elsewhere. Review the current values and try again.",
+      "permission": "Allow notifications in your device settings, then try again.",
+      "signin": "Sign in",
+      "email": "Email",
+      "code": "Email code",
+      "sendCode": "Send sign-in code",
+      "verify": "Verify code",
+      "codeSent": "Check your email for the sign-in code.",
+      "signinDenied": "No CoutureCast account can sign in with this email. Check the address and try again.",
+      "signinUnavailable": "Sign-in is temporarily unavailable. Try again in a moment.",
+      "signinCodeInvalid": "That code is incorrect or expired. Check your email or request a new code.",
+      "signout": "Sign out",
+      "deviceSettings": "Open device settings",
+      "back": "Back to community",
+      "bindingConflict": "This device's notification registration changed. Try again.",
+      "pushUnavailable": "Push notifications are not available on this device."
     }
   }
 }

@@ -19,6 +19,15 @@ on:
         description: "Custom API base URL (optional override)"
         type: string
         required: false
+      scope:
+        # A choice, never free text: each value selects a fixed command below.
+        type: choice
+        description: "Preview scope"
+        required: false
+        default: full
+        options:
+          - full
+          - o1-realtime-probe
 
 permissions:
   contents: read
@@ -48,7 +57,8 @@ jobs:
     uses: ./.github/workflows/rwf-e2e.yml
     with:
       test_env: ${{ inputs.test_env }}
-      test_command: "npm run test:pw-preview"
+      test_command: ${{ inputs.scope == 'o1-realtime-probe' && 'npm run test:pw-preview -- playwright/tests/community-engagement-preview.spec.ts' || 'npm run test:pw-preview' }}
+      realtime_probe: ${{ inputs.scope == 'o1-realtime-probe' }}
       gh_ref: ${{ github.sha }}
       deployment_ref: ${{ github.ref_name }}
       custom_base_url: ${{ inputs.custom_base_url || needs.preview-ready.outputs.web_url }}

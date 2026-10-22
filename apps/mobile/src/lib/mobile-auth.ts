@@ -89,3 +89,18 @@ export function setMobileAccessTokenResolver(resolver: MobileAccessTokenResolver
 export async function resolveMobileAccessToken() {
   return await accessTokenResolver()
 }
+
+let applicationUserId: string | null = null
+const identityListeners = new Set<() => void>()
+export const mobileApplicationUserId = () => applicationUserId
+export function setMobileApplicationUserId(value: string | null) {
+  if (applicationUserId === value) return
+  applicationUserId = value
+  identityListeners.forEach((listener) => listener())
+}
+export function subscribeMobileApplicationUser(listener: () => void) {
+  identityListeners.add(listener)
+  return () => {
+    identityListeners.delete(listener)
+  }
+}

@@ -17,6 +17,16 @@ export type RitualCacheEntry = {
   alertPreferences?: AlertPreferences
 }
 
+/**
+ * The cache owner is the signed-in application user. The ritual holds that member's saved
+ * location, outfits and alerts, so a device-level id (the analytics distinct id, shared by
+ * every member on the device) served member A's ritual to member B after a sign-in switch.
+ * Entries written under the old device-level keys are never read again.
+ */
+export function ritualCacheOwner(applicationUserId: string | null) {
+  return applicationUserId ? `member:${applicationUserId}` : 'signed-out'
+}
+
 const memoryCache: Record<string, RitualCacheEntry> = {}
 const latestLocationByUserLocale: Record<string, string> = {}
 

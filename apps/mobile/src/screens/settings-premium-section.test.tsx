@@ -96,6 +96,16 @@ vi.mock('@/src/lib/commerce', () => ({
 // factories. The two pure exports (resolver + entitlement predicate) get their
 // REAL implementations wired in beforeAll via vi.importActual, so the section
 // still renders from the actual render-state logic.
+// Premium belongs to a signed-in member; the screen only reads it with an access token.
+// Plain functions, not vi.fn: restoreMocks would strip a mock implementation per test.
+vi.mock('@/src/lib/mobile-auth', () => ({
+  resolveMobileAccessToken: () => Promise.resolve('member-token'),
+  subscribeMobileApplicationUser: () => () => undefined,
+  mobileApplicationUserId: () => null,
+  setMobileApplicationUserId: () => undefined,
+  setMobileAccessTokenResolver: () => undefined,
+}))
+
 vi.mock('@/src/lib/premium', () => ({
   getSubscriptionFromMobile: getSubscriptionMock,
   ensurePurchasesConfigured: ensurePurchasesConfiguredMock,

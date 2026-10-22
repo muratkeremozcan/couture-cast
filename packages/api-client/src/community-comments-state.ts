@@ -8,19 +8,31 @@ import {
   type CommunityReportReason,
   type CreateCommunityCommentInput,
 } from './contracts/http/community'
+import type { CommunitySyncClient } from './community-sync-client'
+import { CommunityRequestSuperseded } from './community-sync-state'
 import type { SupportedLocale } from './contracts/http/localization'
 
 export interface CommunityCommentsTransport {
-  roots(postId: string, cursor?: string): Promise<CommunityCommentsPage>
+  locate?: CommunitySyncClient['resolve']
+  roots(
+    postId: string,
+    cursor?: string,
+    signal?: AbortSignal
+  ): Promise<CommunityCommentsPage>
   replies(
     postId: string,
     parentId: string,
-    cursor?: string
+    cursor?: string,
+    signal?: AbortSignal
   ): Promise<CommunityCommentsPage>
   submissions(
     postId: string,
-    cursor?: string
-  ): Promise<{ items: CommunityCommentSubmission[]; nextCursor: string | null }>
+    cursor?: string,
+    signal?: AbortSignal
+  ): Promise<{
+    items: CommunityCommentSubmission[]
+    nextCursor: string | null
+  }>
   create(
     postId: string,
     input: CreateCommunityCommentInput
@@ -79,9 +91,22 @@ function mergePage(
 }
 
 export class CommunityCommentsState {
+  private realtimeHealthy = false
+
+  setRealtimeHealthy(healthy: boolean) {
+    this.realtimeHealthy = healthy
+    this.emit()
+  }
+
   private readonly threads = new Map<string, CommentThreadState>()
   private readonly fences = new Map<string, number>()
   private readonly requests = new Map<string, number>()
+  private readonly startCursors = new Map<string, string | undefined>()
+  private readonly focusTargets = new Map<
+    string,
+    { commentId: string; parentId: string | null }
+  >()
+  private readonly publicPages = new Map<string, number>()
   private readonly statusPages = new Map<string, number>()
   private readonly statusesPending = new Map<string, Promise<void>>()
   private readonly listeners = new Set<() => void>()
@@ -126,6 +151,9 @@ export class CommunityCommentsState {
     this.fences.clear()
     this.requests.clear()
     this.statusPages.clear()
+    this.startCursors.clear()
+    this.focusTargets.clear()
+    this.publicPages.clear()
     this.statusesPending.clear()
     this.consumedAnnouncements.clear()
     this.emit()
@@ -135,8 +163,23 @@ export class CommunityCommentsState {
     this.threads.delete(postId)
     this.onUnavailable?.(postId)
     this.statusPages.delete(postId)
+    this.focusTargets.delete(postId)
+    for (const key of this.startCursors.keys())
+      if (key.startsWith(`${postId}/`)) {
+        this.startCursors.delete(key)
+        this.publicPages.delete(key)
+      }
     this.statusesPending.delete(postId)
     this.emit()
+  }
+  retireFocus(postId: string): void {
+    this.focusTargets.delete(postId)
+    for (const key of this.startCursors.keys()) {
+      if (key.startsWith(`${postId}/`)) {
+        this.startCursors.delete(key)
+        this.publicPages.delete(key)
+      }
+    }
   }
   private ticket(postId: string) {
     const generation = this.generation,
@@ -190,6 +233,11 @@ export class CommunityCommentsState {
       busy = false,
       failures = 0
     const schedule = () => {
+      if (this.realtimeHealthy) {
+        if (timer) clearTimeout(timer)
+        timer = undefined
+        return
+      }
       if (!valid()) {
         if (timer) clearTimeout(timer)
         timer = undefined
@@ -215,6 +263,7 @@ export class CommunityCommentsState {
           timer = undefined
           if (
             stopped ||
+            this.realtimeHealthy ||
             !owns() ||
             scheduledCycle !== cycle ||
             !this.current(postId).submissions.some(
@@ -284,9 +333,16 @@ export class CommunityCommentsState {
     postId: string,
     parentId: string | null,
     page: CommunityCommentsPage | null | undefined,
-    append: boolean
+    append: boolean,
+    signal?: AbortSignal
   ) {
-    const cursor = append ? (page?.nextCursor ?? undefined) : undefined
+    const cursor = append
+      ? (page?.nextCursor ?? undefined)
+      : this.startCursors.get(`${postId}/${parentId ?? ''}`)
+    if (signal)
+      return parentId
+        ? this.transport.replies(postId, parentId, cursor, signal)
+        : this.transport.roots(postId, cursor, signal)
     return parentId
       ? this.transport.replies(postId, parentId, cursor)
       : this.transport.roots(postId, cursor)
@@ -316,16 +372,32 @@ export class CommunityCommentsState {
     return this.statusPages.get(postId) ?? 1
   }
 
+  private recordPageCount(
+    key: string,
+    current: CommunityCommentsPage | null | undefined,
+    page: CommunityCommentsPage,
+    append: boolean
+  ) {
+    this.publicPages.set(
+      key,
+      append && current?.snapshot === page.snapshot
+        ? (this.publicPages.get(key) ?? 1) + 1
+        : 1
+    )
+  }
+
   async load(
     postId: string,
     parentId: string | null = null,
     append = false
   ): Promise<void> {
+    if (!parentId && !append) this.retireFocus(postId)
     const state = this.current(postId)
     const key = `${postId}/${parentId ?? ''}`
     const current = parentId ? state.replies.get(parentId) : state.roots
     if (append && !current?.nextCursor) return
     const isCurrent = this.ownRequest(postId, key)
+    if (!append) this.startCursors.delete(key)
     if (!parentId && !append) {
       this.clearReplies(postId, state)
     }
@@ -335,6 +407,7 @@ export class CommunityCommentsState {
     try {
       const page = await this.readPage(postId, parentId, current, append)
       if (!isCurrent()) return
+      this.recordPageCount(key, current, page, append)
       const merged = mergePage(current, page, append)
       if (parentId) state.replies.set(parentId, merged)
       else state.roots = merged
@@ -351,18 +424,176 @@ export class CommunityCommentsState {
     }
   }
 
-  statuses(postId: string, append = false): Promise<void> {
+  async refresh(postId: string, signal?: AbortSignal): Promise<void> {
+    const state = this.current(postId)
+    this.invalidateReads(postId)
+    const owner = this.ownRequest(postId, `${postId}/refresh`)
+    const focus = this.focusTargets.get(postId)
+    const owns = () =>
+      owner() && !signal?.aborted && this.focusTargets.get(postId) === focus
+    const previousIds = this.publicIds(state)
+    const rootsBound =
+      this.publicPages.get(`${postId}/`) ??
+      Math.max(1, Math.ceil((state.roots?.items.length ?? 0) / 20))
+    const replyBounds = new Map(
+      [...state.replies].map(
+        ([parent, page]) =>
+          [
+            parent,
+            this.publicPages.get(`${postId}/${parent}`) ??
+              Math.max(1, Math.ceil(page.items.length / 20)),
+          ] as const
+      )
+    )
+    // A target's reply page may still be loading when this refresh captures its bounds.
+    if (focus?.parentId && !replyBounds.has(focus.parentId))
+      replyBounds.set(focus.parentId, 1)
+    try {
+      await this.refreshLocation(postId, owns, signal)
+      if (!owns()) throw new CommunityRequestSuperseded()
+      const roots = await this.refreshPages(postId, null, rootsBound, signal)
+      const replies = await Promise.all(
+        [...replyBounds].map(
+          async ([parent, bound]) =>
+            [parent, await this.refreshPages(postId, parent, bound, signal)] as const
+        )
+      )
+      if (!owns()) throw new CommunityRequestSuperseded()
+      state.roots = roots
+      state.replies = new Map(replies)
+      state.error = null
+      if ([...this.publicIds(state)].some((id) => !previousIds.has(id)))
+        this.announce(state, 'community.realtime.newComments')
+      this.emit()
+      await this.statuses(postId, false, true, signal)
+    } catch (error) {
+      if (owns()) {
+        this.failed(postId, state, error)
+        this.emit()
+      }
+      throw error
+    }
+  }
+
+  private async refreshLocation(
+    postId: string,
+    owns: () => boolean,
+    signal?: AbortSignal
+  ) {
+    const focus = this.focusTargets.get(postId)
+    if (!focus || !this.transport.locate) return
+    const result = await this.transport.locate(
+      {
+        targets: [
+          {
+            key: postId,
+            postId,
+            commentId: focus.commentId,
+            ...(focus.parentId ? { parentId: focus.parentId } : {}),
+          },
+        ],
+      },
+      signal
+    )
+    if (!owns()) throw new CommunityRequestSuperseded()
+    const target = result.targets[0]
+    if (!target || target.status === 'unavailable') {
+      this.evict(postId)
+      throw new CommunityRequestSuperseded()
+    }
+    this.startCursors.set(
+      `${postId}/`,
+      (focus.parentId ? target.parentPageCursor : target.pageCursor) ?? undefined
+    )
+    if (focus.parentId)
+      this.startCursors.set(`${postId}/${focus.parentId}`, target.pageCursor ?? undefined)
+  }
+
+  private async refreshPages(
+    postId: string,
+    parent: string | null,
+    bound: number,
+    signal?: AbortSignal
+  ): Promise<CommunityCommentsPage> {
+    let page = await this.readPage(postId, parent, undefined, false, signal)
+    for (let index = 1; index < bound && page.nextCursor; index++) {
+      const next = await this.readPage(postId, parent, page, true, signal)
+      page = mergePage(page, next, true)
+    }
+    return page
+  }
+
+  async loadTarget(
+    postId: string,
+    location: {
+      commentId?: string
+      parentId: string | null
+      pageCursor: string | null
+      parentPageCursor: string | null
+    }
+  ): Promise<void> {
+    if (location.commentId)
+      this.focusTargets.set(postId, {
+        commentId: location.commentId,
+        parentId: location.parentId,
+      })
+    if (location.parentId) {
+      await this.loadLocation(postId, null, location.parentPageCursor)
+      await this.loadLocation(postId, location.parentId, location.pageCursor)
+    } else await this.loadLocation(postId, null, location.pageCursor)
+  }
+
+  async loadLocation(
+    postId: string,
+    parent: string | null,
+    cursor: string | null
+  ): Promise<void> {
+    const state = this.current(postId)
+    const key = `${postId}/${parent ?? ''}`
+    const owns = this.ownRequest(postId, key)
+    try {
+      const page = parent
+        ? await this.transport.replies(postId, parent, cursor ?? undefined)
+        : await this.transport.roots(postId, cursor ?? undefined)
+      if (!owns()) return
+      this.startCursors.set(key, cursor ?? undefined)
+      this.publicPages.set(key, 1)
+      if (parent) state.replies.set(parent, page)
+      else state.roots = page
+    } catch (error) {
+      if (owns()) this.failed(postId, state, error)
+    } finally {
+      if (owns()) this.emit()
+    }
+  }
+
+  statuses(
+    postId: string,
+    append = false,
+    required = false,
+    signal?: AbortSignal
+  ): Promise<void> {
     const pending = this.statusesPending.get(postId)
-    if (pending) return append ? pending.then(() => this.statuses(postId, true)) : pending
-    const operation = this.readStatuses(postId, append)
+    if (pending) {
+      const joined = append
+        ? pending.then(() => this.statuses(postId, true, required, signal))
+        : pending
+      return required ? joined : joined.catch(() => undefined)
+    }
+    const operation = this.readStatuses(postId, append, signal)
     this.statusesPending.set(postId, operation)
-    return operation.finally(() => {
+    const finished = operation.finally(() => {
       if (this.statusesPending.get(postId) === operation)
         this.statusesPending.delete(postId)
     })
+    return required ? finished : finished.catch(() => undefined)
   }
 
-  private async readStatuses(postId: string, append: boolean): Promise<void> {
+  private async readStatuses(
+    postId: string,
+    append: boolean,
+    signal?: AbortSignal
+  ): Promise<void> {
     const state = this.current(postId)
     if (append && !state.submissionsCursor) return
     const isCurrent = this.ownRequest(postId, `${postId}/private`)
@@ -377,7 +608,10 @@ export class CommunityCommentsState {
     let pages = 0
     try {
       do {
-        const page = await this.transport.submissions(postId, cursor)
+        const page = await (signal
+          ? this.transport.submissions(postId, cursor, signal)
+          : this.transport.submissions(postId, cursor))
+        if (signal?.aborted) throw new CommunityRequestSuperseded()
         if (!isCurrent()) return
         collected.push(...page.items)
         cursor = page.nextCursor ?? undefined
@@ -388,6 +622,7 @@ export class CommunityCommentsState {
       if (isCurrent()) {
         this.failed(postId, state, error)
         this.emit()
+        throw error
       }
     }
   }
@@ -401,6 +636,9 @@ export class CommunityCommentsState {
     pages: number
   ): void {
     const previous = new Map(state.submissions.map((item) => [item.id, item.status]))
+    // A comment a live insert already shows publicly needs no "refresh to view" prompt;
+    // that wording is only for the polling fallback, where it is not yet in the thread.
+    const publicIds = this.publicIds(state)
     for (const item of collected) {
       if (['author_deleted', 'consent_suspended', 'erased'].includes(item.status)) {
         this.invalidateReads(postId, false)
@@ -408,7 +646,8 @@ export class CommunityCommentsState {
       }
       if (
         previous.get(item.id) === 'pending_screening' &&
-        item.status !== 'pending_screening'
+        item.status !== 'pending_screening' &&
+        !(item.status === 'published' && publicIds.has(item.id))
       )
         this.announce(state, `community.comments.status.${item.status}`)
     }

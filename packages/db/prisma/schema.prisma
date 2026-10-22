@@ -276,6 +276,8 @@ model User {
   community_reactions                 CommunityReaction[]
   community_reaction_receipts         CommunityReactionReceipt[]
   community_reaction_outbox           CommunityReactionOutbox[]
+  community_delivery_subject          CommunitySubject?
+  community_notification_preference   CommunityNotificationPreference?
   community_alias                     CommunityAlias?
   community_reports_filed             CommunityPostReport[]             @relation("CommunityReporter")
 }
@@ -434,9 +436,11 @@ model NotificationPreference {
   user_id             String   @unique
   quiet_hours_enabled Boolean  @default(false)
   push_enabled        Boolean  @default(true)
+  policy_revision     Int      @default(0)
   quiet_hours_start   String   @default("22:00")
   quiet_hours_end     String   @default("07:00")
   timezone            String   @default("UTC")
+  timezone_configured Boolean  @default(true)
   created_at          DateTime @default(now())
   updated_at          DateTime @updatedAt
 }
@@ -618,6 +622,7 @@ model LookbookPost {
   reports                      CommunityPostReport[]
   comment_publication_sequence Int                        @default(0)
   comments                     CommunityComment[]
+  community_revision           BigInt                     @default(0)
   reaction_generation          Int                        @default(0)
   reactions                    CommunityReaction[]
   reaction_receipts            CommunityReactionReceipt[]
@@ -744,14 +749,17 @@ model EngagementEvent {
 }
 
 model PushToken {
-  id           String   @id @default(cuid())
-  user         User     @relation(fields: [user_id], references: [id])
-  user_id      String
-  token        String   @unique
-  platform     String?
-  last_used_at DateTime @default(now())
-  created_at   DateTime @default(now())
-  updated_at   DateTime @updatedAt
+  id                 String   @id @default(cuid())
+  user               User     @relation(fields: [user_id], references: [id])
+  user_id            String
+  installation_id    String?  @unique
+  binding_generation Int      @default(1)
+  permission         String   @default("unknown")
+  token              String   @unique
+  platform           String?
+  last_used_at       DateTime @default(now())
+  created_at         DateTime @default(now())
+  updated_at         DateTime @updatedAt
 
   @@index([user_id])
 }
@@ -1634,4 +1642,221 @@ model CommunityCommentAnalyticsSubject {
   user    User                              @relation(fields: [user_id], references: [id], onDelete: Cascade)
   actor   String                            @unique
   events  CommunityCommentAnalyticsOutbox[]
+}
+
+/// Story 6.5: API-only privacy generations. Created with the account, never by late work.
+model CommunitySubject {
+  user             User                       @relation(fields: [member_id], references: [id], onDelete: Cascade, onUpdate: Cascade, map: "community_subject_user_fk")
+  artifacts        CommunityArtifactSubject[]
+  flag_evaluations CommunityFlagEvaluation[]
+  stream_head      CommunityStreamHead?
+  member_id        String                     @id
+  generation       Int                        @default(0)
+  private_revision BigInt                     @default(0)
+  created_at       DateTime                   @default(now())
+}
+
+/// All identifying artifacts enumerate each linked subject and its captured generation.
+model CommunityArtifactSubject {
+  subject       CommunitySubject @relation(fields: [member_id], references: [member_id], onDelete: Cascade, onUpdate: Cascade, map: "community_artifact_subject_fk")
+  artifact_kind String
+  artifact_id   String
+  member_id     String
+  role          String
+  generation    Int
+
+  @@id([artifact_kind, artifact_id, member_id, role])
+  @@index([member_id, artifact_kind])
+}
+
+model CommunityStreamHead {
+  owner           CommunitySubject?      @relation(fields: [owner_id], references: [member_id], onDelete: Cascade, onUpdate: Cascade, map: "community_stream_owner_fk")
+  id              String                 @id
+  owner_id        String?                @unique
+  epoch           String                 @default(uuid()) @db.Uuid
+  sequence        BigInt                 @default(0)
+  retention_floor BigInt                 @default(0)
+  last_assist_at  DateTime?
+  events          CommunityStreamEvent[]
+
+  @@index([owner_id])
+}
+
+model CommunityDomainOutbox {
+  id          String    @id @default(uuid()) @db.Uuid
+  stream_id   String
+  kind        String
+  post_id     String?
+  comment_id  String?
+  parent_id   String?
+  revision    BigInt
+  created_at  DateTime  @default(now())
+  appended_at DateTime?
+
+  @@index([appended_at, created_at, id])
+}
+
+model CommunityStreamEvent {
+  id               String              @id @default(uuid()) @db.Uuid
+  source_outbox_id String              @unique @db.Uuid
+  stream_id        String
+  stream           CommunityStreamHead @relation(fields: [stream_id], references: [id], onDelete: Cascade)
+  sequence         BigInt
+  kind             String
+  revision         BigInt
+  post_id          String?
+  comment_id       String?
+  parent_id        String?
+  appended_at      DateTime            @default(now())
+
+  @@unique([stream_id, sequence])
+  @@index([appended_at])
+}
+
+model CommunityNotificationPreference {
+  user       User     @relation(fields: [user_id], references: [id], onDelete: Cascade, onUpdate: Cascade, map: "community_preference_user_fk")
+  user_id    String   @id
+  enabled    Boolean  @default(false)
+  revision   Int      @default(0)
+  generation Int      @default(0)
+  updated_at DateTime @updatedAt
+}
+
+model CommunityFlagEvaluation {
+  subject             CommunitySubject @relation(fields: [member_id], references: [member_id], onDelete: Cascade, onUpdate: Cascade, map: "community_flag_subject_fk")
+  member_id           String
+  flag_key            String
+  remote_value        Boolean?
+  remote_evaluated_at DateTime?
+  expires_at          DateTime?
+  next_claim_at       DateTime         @default(now())
+  refresh_owner       String?          @db.Uuid
+  refresh_until       DateTime?
+  subject_generation  Int
+  last_used_at        DateTime         @default(now())
+
+  @@id([member_id, flag_key])
+  @@index([last_used_at])
+}
+
+model CommunityNotificationIntent {
+  id                        String                      @id @default(uuid()) @db.Uuid
+  source_kind               String
+  post_id                   String
+  comment_id                String?
+  actor_id                  String?
+  recipient_id              String?
+  preference_generation     Int
+  deliverable               Boolean
+  qualification_recorded_at DateTime                    @default(now())
+  expires_at                DateTime
+  group_id                  String?                     @db.Uuid
+  group                     CommunityNotificationGroup? @relation(fields: [group_id], references: [id], onDelete: SetNull)
+
+  @@unique([source_kind, post_id, actor_id, recipient_id, comment_id])
+  @@index([group_id])
+  @@index([recipient_id, deliverable, qualification_recorded_at])
+}
+
+model CommunityNotificationGroup {
+  id              String                        @id @default(uuid()) @db.Uuid
+  recipient_id    String?
+  post_id         String?
+  status          String                        @default("pending")
+  eligible_at     DateTime
+  policy_revision Int @default(0)
+  next_attempt_at DateTime
+  expires_at      DateTime
+  snapshot_at     DateTime?
+  created_at      DateTime                      @default(now())
+  intents         CommunityNotificationIntent[]
+  deliveries      CommunityTokenDelivery[]
+  eligibility_changes CommunityEligibilityChange[]
+
+  @@index([status, next_attempt_at, eligible_at])
+}
+
+model CommunityTokenDelivery {
+  id                 String                     @id @default(uuid()) @db.Uuid
+  group_id           String                     @db.Uuid
+  group              CommunityNotificationGroup @relation(fields: [group_id], references: [id], onDelete: Cascade)
+  registration_id    String
+  binding_generation Int
+  owner_id           String?
+  status             String                     @default("pending")
+  next_attempt_at    DateTime
+  attempts           CommunityDeliveryAttempt[]
+
+  @@unique([group_id, registration_id, binding_generation])
+  @@index([status, next_attempt_at])
+}
+
+model CommunityDeliveryAttempt {
+  id           String                    @id @default(uuid()) @db.Uuid
+  delivery_id  String                    @db.Uuid
+  delivery     CommunityTokenDelivery    @relation(fields: [delivery_id], references: [id], onDelete: Cascade)
+  ordinal      Int
+  status       String
+  lease_owner  String                    @db.Uuid
+  lease_until  DateTime
+  guard_until  DateTime
+  started_at   DateTime                  @default(now())
+  completed_at DateTime?
+  ticket_id    String?
+  reason       String?
+  receipt      CommunityDeliveryReceipt?
+
+  @@unique([delivery_id, ordinal])
+  @@index([status, lease_until])
+}
+
+model CommunityDeliveryReceipt {
+  attempt_id      String                   @id @db.Uuid
+  attempt         CommunityDeliveryAttempt @relation(fields: [attempt_id], references: [id], onDelete: Cascade)
+  status          String                   @default("pending")
+  next_attempt_at DateTime
+  expires_at      DateTime
+  lookup_count    Int                      @default(0)
+}
+
+/// Version fence remains zero until every privacy writer has been verified.
+model CommunityRuntimeCapability {
+  id              Int @id
+  privacy_version Int @default(0)
+}
+
+/// Anonymous operational outcomes. Random IDs dedupe delivery without subject correlation.
+model CommunityEngagementTelemetry {
+  id                  String    @id @default(uuid()) @db.Uuid
+  event_type          String
+  outcome             String
+  reason              String?
+  elapsed_ms          Int       @default(0)
+  eligible_latency_ms Int       @default(0)
+  attempt_ordinal     Int       @default(0)
+  backlog_count       Int       @default(0)
+  oldest_age_ms       Int       @default(0)
+  build_identity      String
+  created_at          DateTime  @default(now())
+  delivered_at        DateTime?
+  next_attempt_at     DateTime  @default(now())
+  attempts            Int       @default(0)
+  lease_owner         String?   @db.Uuid
+  lease_until         DateTime?
+
+  @@index([delivered_at, next_attempt_at])
+  @@index([created_at])
+}
+
+/// Server-only policy-derived deadline history. Identified solely through its guarded group.
+model CommunityEligibilityChange {
+  id String @id @default(uuid()) @db.Uuid
+  group_id String @db.Uuid
+  group CommunityNotificationGroup @relation(fields: [group_id], references: [id], onDelete: Cascade)
+  recorded_at DateTime @default(now())
+  policy_revision Int
+  previous_eligible_at DateTime
+  eligible_at DateTime
+  reason String
+  @@index([group_id, recorded_at])
 }

@@ -23,6 +23,15 @@ export async function waitForAccessibilityReady(page: Page): Promise<void> {
   await page.locator('main#main-content').waitFor({ state: 'visible' })
   await page.evaluate(async () => {
     await document.fonts?.ready
+    // An entry animation (e.g. the planner rail's 280 ms opacity fade) blends text
+    // into its background, so axe would measure colors no user sees once it ends.
+    // Infinite animations (loading pulses) never finish and are left running.
+    await Promise.all(
+      document
+        .getAnimations()
+        .filter((animation) => animation.effect?.getComputedTiming().endTime !== Infinity)
+        .map((animation) => animation.finished.catch(() => undefined))
+    )
     await new Promise<void>((resolve) => {
       requestAnimationFrame(() => requestAnimationFrame(() => resolve()))
     })

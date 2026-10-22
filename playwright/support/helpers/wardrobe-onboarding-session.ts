@@ -2,7 +2,7 @@
 // onboarding/silhouette Playwright journeys. Extracted out of the three specs
 // that each independently defined an identical `CleanupState`, `cleanupState`
 // fixture, and `signUpAndAuthenticate` -- centralizing the
-// `test-token:guardian:<userId>` token format and the
+// explicit local E2E token claims and the
 // `couturecast.access-token` session-storage key here means an auth-scheme
 // change only needs one edit instead of three.
 import type { Page, TestInfo } from '@playwright/test'
@@ -11,6 +11,8 @@ import { expect, test as base } from '../fixtures/merged-fixtures'
 import { resolveEnvironmentConfig } from '../../config/environments'
 import { buildUniqueId, type ApiRequestFixture } from './api-test'
 import { cleanupWardrobeUserTestData } from './user-test-data'
+import { seedWebSession } from './commerce-session'
+import { localE2EAccessToken } from './local-e2e-token'
 
 const environment = resolveEnvironmentConfig('local')
 
@@ -62,13 +64,10 @@ export async function signUpAndAuthenticate(
   expect(signup.status).toBe(201)
   const signupBody = signupResponseSchema.parse(signup.body)
   cleanupState.userId = signupBody.userId
-  const accessToken = `test-token:guardian:${signupBody.userId}`
+  const accessToken = localE2EAccessToken(signupBody.userId)
   cleanupState.accessToken = accessToken
 
-  await page.addInitScript((token) => {
-    window.sessionStorage.setItem('couturecast.access-token', token)
-  }, accessToken)
-  await page.setExtraHTTPHeaders({ Authorization: `Bearer ${accessToken}` })
+  await seedWebSession(page, accessToken)
 
   return accessToken
 }

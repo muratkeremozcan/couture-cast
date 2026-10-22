@@ -1,0 +1,6 @@
+# Story 6.5 owner: sign out once the member's preferences have loaded, then prove the
+# reopened screen has no member controls.
+appId: ${MAESTRO_APP_ID}
+---
+- runFlow: notification-settings-loaded.yaml
+- runFlow: session-signout.yaml

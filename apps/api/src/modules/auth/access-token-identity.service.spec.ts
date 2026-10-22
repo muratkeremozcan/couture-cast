@@ -1,3 +1,4 @@
+import { CommunityUnavailableException } from '../community/community-availability.js'
 import { UnauthorizedException } from '@nestjs/common'
 import type { PrismaClient } from '@prisma/client'
 import type { Request } from 'express'
@@ -30,11 +31,16 @@ function mockSupabaseUser(body: unknown, status = 200) {
 }
 
 function createService(user: { id: string } | null = null) {
-  const findFirst = vi.fn().mockResolvedValue(user)
-  const prisma = { user: { findFirst } }
+  const findFirst = vi.fn().mockResolvedValue(user ? [user] : [])
+  const profileLookup = vi.fn().mockResolvedValue(null)
+  const prisma = {
+    user: { findMany: findFirst },
+    userProfile: { findUnique: profileLookup },
+  }
 
   return {
     findFirst,
+    profileLookup,
     service: new AccessTokenIdentityService(prisma as unknown as PrismaClient),
   }
 }
@@ -140,7 +146,36 @@ describe('AccessTokenIdentityService', () => {
         },
       },
       select: { id: true },
+      take: 2,
     })
+  })
+
+  it('R13 rejects ambiguous case-variant email mappings', async () => {
+    mockSupabaseUser({
+      email: 'MEMBER@example.com',
+      email_confirmed_at: '2026-01-01T00:00:00Z',
+    })
+    const { service, findFirst } = createService()
+    findFirst.mockResolvedValue([{ id: 'account-a' }, { id: 'account-b' }])
+    await expect(service.resolveIdentity('verified-token')).rejects.toBeInstanceOf(
+      UnauthorizedException
+    )
+  })
+
+  it('R13 preserves a trusted app binding independently of missing role metadata', async () => {
+    mockSupabaseUser({
+      app_metadata: { app_user_id: 'bound-account' },
+      email: 'other@example.com',
+      email_confirmed_at: '2026-01-01T00:00:00Z',
+    })
+    const { service, profileLookup, findFirst } = createService({ id: 'email-account' })
+    profileLookup.mockResolvedValue({ birthdate: new Date('1990-01-01') })
+    await expect(service.resolveIdentity('verified-token')).resolves.toEqual({
+      userId: 'bound-account',
+      role: 'guardian',
+    })
+    expect(findFirst).not.toHaveBeenCalled()
+    expect(profileLookup).toHaveBeenCalledWith({ where: { user_id: 'bound-account' } })
   })
 
   it('rejects email fallback without server confirmation evidence', async () => {
@@ -420,7 +455,7 @@ describe('AccessTokenIdentityService', () => {
       const { service } = createService()
 
       await expect(service.resolveIdentity(token)).rejects.toBeInstanceOf(
-        UnauthorizedException
+        token.trim() ? CommunityUnavailableException : UnauthorizedException
       )
       expect(fetchMock).not.toHaveBeenCalled()
     })
@@ -430,7 +465,7 @@ describe('AccessTokenIdentityService', () => {
       const { findFirst, service } = createService({ id: 'app-user-1' })
 
       await expect(service.resolveIdentity('valid-token')).rejects.toBeInstanceOf(
-        UnauthorizedException
+        CommunityUnavailableException
       )
       expect(findFirst).not.toHaveBeenCalled()
     })
@@ -445,7 +480,7 @@ describe('AccessTokenIdentityService', () => {
       const { service } = createService({ id: 'app-user-1' })
 
       await expect(service.resolveIdentity('valid-token')).rejects.toBeInstanceOf(
-        UnauthorizedException
+        CommunityUnavailableException
       )
     })
 
@@ -454,7 +489,7 @@ describe('AccessTokenIdentityService', () => {
       const { service } = createService({ id: 'app-user-1' })
 
       await expect(service.resolveIdentity('valid-token')).rejects.toBeInstanceOf(
-        UnauthorizedException
+        CommunityUnavailableException
       )
     })
 
@@ -473,8 +508,33 @@ describe('AccessTokenIdentityService', () => {
     })
   })
 
+  it.each([
+    ['1990-01-01', 'guardian'],
+    ['2011-01-01', 'teen'],
+  ])(
+    'maps verified OTP email to the canonical app identity with profile birthdate %s',
+    async (birthdate, role) => {
+      mockSupabaseUser({
+        id: 'different-supabase-principal',
+        email: 'existing@synthetic.test',
+        email_confirmed_at: '2026-01-01T00:00:00Z',
+        user_metadata: { app_role: 'admin', app_user_id: 'spoofed-identity' },
+      })
+      const { service, profileLookup } = createService({
+        id: 'canonical-application-user',
+      })
+      profileLookup.mockResolvedValue({ birthdate: new Date(birthdate) })
+      await expect(service.resolveIdentity('verified-otp-access-token')).resolves.toEqual(
+        { userId: 'canonical-application-user', role }
+      )
+      expect(profileLookup).toHaveBeenCalledWith({
+        where: { user_id: 'canonical-application-user' },
+      })
+    }
+  )
+
   describe('role resolution from Supabase app metadata', () => {
-    it('rejects an identity with no app_metadata at all', async () => {
+    it('rejects a verified email identity whose application profile has no eligible age', async () => {
       mockSupabaseUser({
         email: 'user@example.com',
         confirmed_at: '2026-07-13T12:00:00Z',
@@ -484,7 +544,9 @@ describe('AccessTokenIdentityService', () => {
       await expect(service.resolveIdentity('no-metadata')).rejects.toBeInstanceOf(
         UnauthorizedException
       )
-      expect(findFirst).not.toHaveBeenCalled()
+      expect(findFirst).toHaveBeenCalledWith(
+        expect.objectContaining({ select: { id: true } })
+      )
     })
 
     it('falls back to the legacy role claim when app_role is blank', async () => {

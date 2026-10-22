@@ -223,6 +223,12 @@ class InMemoryGuardianIntegrationPrisma {
     ),
   }
 
+  $executeRaw = vi.fn((sql: TemplateStringsArray) => {
+    if (!sql.join('').includes('community_prepare_subject_privacy'))
+      throw new Error('Unexpected privacy SQL')
+    return Promise.resolve(0)
+  })
+
   $transaction = vi.fn(
     async <T>(
       callback: (tx: InMemoryGuardianIntegrationPrisma) => Promise<T>,

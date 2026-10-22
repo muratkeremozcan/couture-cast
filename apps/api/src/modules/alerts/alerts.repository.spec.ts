@@ -6,7 +6,14 @@ import { beforeEach, describe, expect, it, vi } from 'vitest'
 import { PrismaAlertsRepository } from './alerts.repository'
 
 describe('PrismaAlertsRepository', () => {
+  const notificationPreference = {
+    findUnique: vi.fn().mockResolvedValue(null),
+    upsert: vi.fn().mockResolvedValue({}),
+  }
   const transaction = {
+    $executeRaw: vi.fn().mockResolvedValue(1),
+    communityNotificationGroup: { updateMany: vi.fn().mockResolvedValue({ count: 0 }) },
+    notificationPreference,
     alertRule: {
       findMany: vi.fn().mockResolvedValue([]),
       upsert: vi.fn().mockResolvedValue({}),
@@ -16,10 +23,7 @@ describe('PrismaAlertsRepository', () => {
     alertRule: {
       findMany: vi.fn().mockResolvedValue([]),
     },
-    notificationPreference: {
-      findUnique: vi.fn().mockResolvedValue(null),
-      upsert: vi.fn().mockResolvedValue({}),
-    },
+    notificationPreference,
     $transaction: vi.fn((run: (client: typeof transaction) => Promise<unknown>) =>
       run(transaction)
     ),
@@ -91,6 +95,7 @@ describe('PrismaAlertsRepository', () => {
         quiet_hours_start: '22:00',
         quiet_hours_end: '07:00',
         timezone: 'America/Chicago',
+        timezone_configured: true,
       },
       update: {
         quiet_hours_enabled: true,
@@ -98,6 +103,7 @@ describe('PrismaAlertsRepository', () => {
         quiet_hours_start: '22:00',
         quiet_hours_end: '07:00',
         timezone: 'America/Chicago',
+        timezone_configured: true,
       },
     })
   })

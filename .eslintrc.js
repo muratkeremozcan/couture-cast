@@ -7,6 +7,7 @@ module.exports = {
       './apps/mobile/tsconfig.json',
       './apps/web/tsconfig.json',
       './apps/api/tsconfig.json',
+      './packages/api-client/tsconfig.json',
       './playwright/tsconfig.json',
       './pact/tsconfig.json',
     ],
@@ -31,6 +32,12 @@ module.exports = {
     },
   },
   overrides: [
+    {
+      // Expo Router mandates this filename and a named `redirectSystemPath` export, so
+      // the default-export exemption the other `+` route files rely on does not apply.
+      files: ['apps/mobile/app/+native-intent.tsx'],
+      rules: { 'filenames/match-regex': 'off' },
+    },
     {
       // Repository tooling scripts are plain Node modules outside every tsconfig project,
       // so they lint without type information.
@@ -189,6 +196,21 @@ module.exports = {
               "NewExpression[callee.object.name='Intl'][callee.property.name=/^(ListFormat|Segmenter)$/]",
             message:
               'Hermes ships no Intl.ListFormat or Intl.Segmenter. Use formatLocalizedList from @couture/utils, or feature-detect before constructing.',
+          },
+          {
+            // Hermes has no DOMException global; constructing one throws a ReferenceError
+            // and once blanked the community feed in CI Maestro.
+            selector: "NewExpression[callee.name='DOMException']",
+            message:
+              'Hermes has no DOMException. Use abortError() from @couture/api-client and check error.name.',
+          },
+          {
+            // Metro turns import('react-native') into a wildcard interop that evaluates
+            // every lazy getter, including deprecated PushNotificationIOS, whose null
+            // native module throws on iOS and silently stopped session restore and push.
+            selector: "ImportExpression[source.value='react-native']",
+            message:
+              "Import from 'react-native' statically by name; a dynamic import evaluates every deprecated module getter on iOS.",
           },
         ],
       },

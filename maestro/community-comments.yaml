@@ -52,21 +52,28 @@ tags:
 - assertVisible: ${output.commentRoot}
 - tapOn:
     id: 'comment-submit'
+# With live insertion the comment can be screened and published before the private
+# "Your submissions" section ever renders, so that section cannot be awaited. The draft is
+# cleared only after the server accepts the submission, and the send control returns to
+# idle: both are stable once reached.
 - extendedWaitUntil:
-    visible: 'Your submissions. Only you can see these.'
+    visible: '^0 / 280 characters$'
     timeout: 15000
+- assertVisible:
+    id: 'comment-submit'
+    text: 'Send comment'
 - takeScreenshot:
     path: maestro/artifacts/community-comments-submitted
-- extendedWaitUntil:
-    visible: 'Published. Refresh the thread to view it.'
-    timeout: 20000
+# With realtime connected, the published root is inserted live (about 2 s) and the
+# "Published. Refresh the thread to view it." notice never appears. Wait for its public
+# reply action instead, scrolling in case the live insert lands below the fold.
 - scrollUntilVisible:
     element:
-      text: 'Refresh'
-    direction: UP
+      id: 'comment-reply-.*'
+      text: ${output.replyAction}
+    direction: DOWN
     centerElement: true
-    timeout: 15000
-- tapOn: 'Refresh'
+    timeout: 20000
 - scrollUntilVisible:
     element:
       text: ${output.commentRoot}
@@ -91,23 +98,21 @@ tags:
     path: maestro/artifacts/community-comments-reply-keyboard
 - tapOn:
     id: 'comment-submit'
+# Same acceptance proof for the reply: cleared draft and an idle send control.
 - extendedWaitUntil:
-    visible: 'Published. Refresh the thread to view it.'
-    timeout: 20000
-- scrollUntilVisible:
-    element:
-      text: 'Refresh'
-    direction: UP
-    centerElement: true
+    visible: '^0 / 280 characters$'
     timeout: 15000
-- tapOn: 'Refresh'
+- assertVisible:
+    id: 'comment-submit'
+    text: 'Send comment'
+# The published reply is inserted live too; wait for the parent's replies action.
 - scrollUntilVisible:
     element:
       id: 'comment-replies-.*'
       text: ${output.repliesAction}
     direction: DOWN
     centerElement: true
-    timeout: 15000
+    timeout: 20000
 - tapOn:
     id: 'comment-replies-.*'
     text: ${output.repliesAction}

@@ -1,6 +1,7 @@
 // Story 5.1 Task 9: browser and API sessions for the affiliate commerce journeys.
-import type { APIRequestContext } from '@playwright/test'
+import type { APIRequestContext, BrowserContext, Page } from '@playwright/test'
 import { expect, test } from '../fixtures/merged-fixtures'
+import { localE2EAccessToken } from './local-e2e-token'
 import {
   authHeaders,
   buildUniqueId,
@@ -10,6 +11,22 @@ import {
 } from './api-test'
 
 export const WEB_ACCESS_TOKEN_STORAGE_KEY = 'couturecast.access-token'
+
+/**
+ * Signs a browser in the way the app itself is signed in: the bearer lives in
+ * sessionStorage and the web client attaches it to each request. No context-level
+ * Authorization header is set, so a client path that forgets its bearer fails
+ * here exactly as it would for a real user.
+ */
+export async function seedWebSession(target: BrowserContext | Page, accessToken: string) {
+  await target.addInitScript(
+    ({ key, token }) => {
+      // Init scripts also run in a fresh page's opaque about:blank, where storage throws.
+      if (window.location.origin !== 'null') window.sessionStorage.setItem(key, token)
+    },
+    { key: WEB_ACCESS_TOKEN_STORAGE_KEY, token: accessToken }
+  )
+}
 
 export const COMMERCE_PREFERENCES_PATH = '/api/v1/commerce/preferences'
 export const AFFILIATE_CLICKS_PATH = '/api/v1/commerce/affiliate/clicks'
@@ -66,7 +83,7 @@ export async function signUpCommerceUser(
  * account acting on its own preference row.
  */
 export function commerceAccessToken(userId: string): string {
-  return `test-token:guardian:${userId}`
+  return localE2EAccessToken(userId)
 }
 
 /**
@@ -103,10 +120,8 @@ export async function createLocationForUser(
 /**
  * A signed-in browser session on a brand-new account.
  *
- * The init script goes on the context rather than the page so a reload, or a
- * second page, is still authenticated. `setExtraHTTPHeaders` covers the
- * Next.js rewrite path, where the browser talks to the web origin and the
- * server proxies through to the API.
+ * The session is seeded on the context rather than the page so a reload, or a
+ * second page, is still authenticated.
  */
 export const commerceTest = test.extend<{ commerceSession: CommerceSession }>({
   commerceSession: async ({ context, request }, use, testInfo) => {
@@ -124,13 +139,7 @@ export const commerceTest = test.extend<{ commerceSession: CommerceSession }>({
     )
     const accessToken = commerceAccessToken(userId)
 
-    await context.addInitScript(
-      ([storageKey, token]) => {
-        window.sessionStorage.setItem(storageKey as string, token as string)
-      },
-      [WEB_ACCESS_TOKEN_STORAGE_KEY, accessToken]
-    )
-    await context.setExtraHTTPHeaders({ Authorization: `Bearer ${accessToken}` })
+    await seedWebSession(context, accessToken)
 
     await use({ userId, accessToken, apiBaseUrl })
 

@@ -1,5 +1,13 @@
+import {
+  CommunityAuthorizationBudget,
+  type CommunityGrant,
+} from '../community/community-availability.js'
 // Step 8 feature-flag coordination owner: searchable owner anchor
-import { Injectable } from '@nestjs/common'
+import {
+  CommunityFlagEvaluationService,
+  CommunityUnavailableException,
+} from './community-flag-evaluation.service.js'
+import { Injectable, Optional, Inject } from '@nestjs/common'
 import {
   FEATURE_FLAG_KEYS,
   FEATURE_FLAG_SYNC_DISTINCT_ID,
@@ -41,13 +49,47 @@ export class FeatureFlagsService {
   constructor(
     private readonly repository: FeatureFlagsRepository,
     @InjectRemoteFeatureFlagProvider()
-    private readonly remoteProvider: RemoteFeatureFlagProvider
+    private readonly remoteProvider: RemoteFeatureFlagProvider,
+    @Optional()
+    @Inject(CommunityFlagEvaluationService)
+    private readonly communityCache?: CommunityFlagEvaluationService
   ) {}
+
+  async communityReadEvaluation(
+    userId: string,
+    budget = new CommunityAuthorizationBudget()
+  ): Promise<CommunityGrant> {
+    const database = process.env.DATABASE_URL
+    const fixture =
+      process.env.TEST_ENV === 'local' &&
+      process.env.COMMUNITY_FLAG_FIXTURE_MODE === 'true' &&
+      database &&
+      ['localhost', '127.0.0.1'].includes(new URL(database).hostname)
+    if (fixture) {
+      const value = coerceFeatureFlagValue(
+        'community_read_enabled',
+        await budget.run(() => this.repository.findValue('community_read_enabled'))
+      )
+      if (value === undefined) throw new CommunityUnavailableException()
+      return {
+        value,
+        expiresAt: new Date(Date.now() + 60000),
+        validUntil: performance.now() + 60000,
+      }
+    }
+    if (!this.communityCache) throw new CommunityUnavailableException()
+    return this.communityCache.evaluate(userId, budget)
+  }
 
   async getFeatureFlag<K extends FeatureFlagKey>(
     flagKey: K,
     userId: string
   ): Promise<FeatureFlagValue<K>> {
+    if (flagKey === 'community_read_enabled') {
+      const grant = await this.communityReadEvaluation(userId)
+      new CommunityAuthorizationBudget().check(grant)
+      return coerceFeatureFlagValue(flagKey, grant.value)!
+    }
     // Flow ref S0.7/T8/1-3: one call path for all request-time reads: validate
     // key, ask PostHog, then fall back safely if needed.
     return resolveFeatureFlag(flagKey, userId, {

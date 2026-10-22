@@ -174,7 +174,14 @@ describe('weather alert delivery latency integration', () => {
       findPushTokensByUserId(requestedUserId) {
         expect(requestedUserId).toBe(userId)
         clock.advance(SECOND_MS)
-        return Promise.resolve(['ExponentPushToken[latency-test-token]'])
+        return Promise.resolve([
+          {
+            token: 'ExponentPushToken[latency-test-token]',
+            registrationId: 'latency-registration',
+            ownerId: userId,
+            bindingGeneration: 1,
+          },
+        ])
       },
       recordOutcome(input) {
         clock.advance(SECOND_MS)

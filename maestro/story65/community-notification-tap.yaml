@@ -1,0 +1,65 @@
+# Story 6.5 owner: tap a presented community notification in the OS UI and assert the exact
+# in-app destination. Only scripts/run-story65-native.mjs runs this flow: it lives under
+# maestro/story65/ so the standard top-level shard discovery never selects it. The runner
+# presents the notification first (warm, background or cold) and sets MAESTRO_PLATFORM,
+# MAESTRO_EXPECT and MAESTRO_TARGET_ID.
+appId: ${MAESTRO_APP_ID}
+name: 'Story 6.5 community notification OS tap'
+tags:
+  - story65
+  - native-os
+---
+- runFlow:
+    when:
+      true: ${MAESTRO_PLATFORM == 'android'}
+    file: android-tap-shade-notification.yaml
+- runFlow:
+    when:
+      true: ${MAESTRO_PLATFORM == 'ios'}
+    file: ios-tap-notification.yaml
+# A cold tap reloads the dev client; absorb its onboarding sheet without leaving the route.
+- runFlow:
+    when:
+      visible: 'This is the developer menu.*'
+    commands:
+      - tapOn: 'Continue'
+- runFlow:
+    when:
+      visible: 'Connected to:'
+    commands:
+      - tapOn: 'Close'
+# A comment target opens the modal comments sheet, which hides the screen beneath it from
+# the accessibility tree; card and fallback targets stay on the community screen.
+- runFlow:
+    when:
+      true: ${MAESTRO_EXPECT == 'comment'}
+    commands:
+      - extendedWaitUntil:
+          visible:
+            id: ${MAESTRO_TARGET_ID}
+          timeout: 45000
+      - assertVisible: ${MAESTRO_COMMENTS_TITLE}
+- runFlow:
+    when:
+      true: ${MAESTRO_EXPECT == 'card'}
+    commands:
+      - extendedWaitUntil:
+          visible:
+            id: ${MAESTRO_TARGET_ID}
+          timeout: 45000
+      - assertVisible:
+          id: 'community-screen'
+      - assertVisible: ${MAESTRO_COMMUNITY_TITLE}
+- runFlow:
+    when:
+      true: ${MAESTRO_EXPECT == 'fallback'}
+    commands:
+      - extendedWaitUntil:
+          visible:
+            id: 'deep-link-info-banner'
+          timeout: 45000
+      - assertVisible: ${MAESTRO_INVALID}
+      - assertVisible:
+          id: 'community-screen'
+- takeScreenshot:
+    path: destination-${MAESTRO_CASE}

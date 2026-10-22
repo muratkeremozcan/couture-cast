@@ -32,6 +32,11 @@ export type EnvironmentConfig = {
   credentials: {
     defaultUser: Credentials
   }
+  /**
+   * Service-role headers for APIRequestContext only (the merged `request` fixture).
+   * Never put them in `use.extraHTTPHeaders`: Chromium lets a context header override
+   * the app's own Authorization, and Playwright copies those headers into every trace.
+   */
   apiHeaders: Record<string, string>
 }
 

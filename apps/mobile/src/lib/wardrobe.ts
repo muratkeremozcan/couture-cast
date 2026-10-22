@@ -1,4 +1,4 @@
-import { ResponseError } from '@couture/api-client'
+import { ResponseError, withRequestDeadline } from '@couture/api-client'
 import {
   type GarmentItemContract,
   type SuggestGarmentTagsData,
@@ -16,6 +16,7 @@ import {
   type CreateSilhouetteUploadUrlInput,
   type CreateSilhouetteUploadUrlResponse,
   type CommitSilhouettePhotoInput,
+  userProfileResponseSchema,
   garmentListResponseSchema,
   suggestGarmentTagsResponseSchema,
   updateGarmentTagsResponseSchema,
@@ -189,30 +190,23 @@ export async function updateGarmentTagsFromMobile(
 }
 
 /**
- * Resolves the signed-in user from the bearer token's `sub` claim. Capsule routes
+ * Resolves the signed-in application user from the authenticated profile. Capsule routes
  * take an explicit owner segment so guardians and admins can act for another
  * user; the signed-in user is simply the default owner.
  */
-export function resolveOwnerUserId(accessToken: string): string {
-  const payloadSegment = accessToken.split('.')[1]
-  if (!payloadSegment) {
-    throw new Error('Your session token is malformed. Sign in again.')
-  }
-
+export async function resolveOwnerUserId(accessToken: string): Promise<string> {
   try {
-    const normalized = payloadSegment.replace(/-/g, '+').replace(/_/g, '/')
-    const padded = normalized.padEnd(Math.ceil(normalized.length / 4) * 4, '=')
-    const claims = JSON.parse(
-      typeof atob === 'function'
-        ? atob(padded)
-        : Buffer.from(padded, 'base64').toString('utf8')
-    ) as { sub?: unknown }
-    if (typeof claims.sub !== 'string' || claims.sub.length === 0) {
-      throw new Error('missing sub claim')
-    }
-    return claims.sub
-  } catch {
-    throw new Error('Your session token is malformed. Sign in again.')
+    const response = await withRequestDeadline(5000, [], (signal) =>
+      createMobileApiClient({ accessToken }).apiV1UserProfileGet({ signal })
+    )
+    return userProfileResponseSchema.parse(response).user.id
+  } catch (error) {
+    if (error instanceof ResponseError && [401, 403].includes(error.response.status))
+      throw new ResponseError(
+        error.response,
+        'Your session could not be verified. Sign in again.'
+      )
+    throw error
   }
 }
 

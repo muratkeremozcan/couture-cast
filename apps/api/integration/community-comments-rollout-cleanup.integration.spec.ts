@@ -1,3 +1,4 @@
+import { CommunityFlagEvaluationService } from '../src/modules/feature-flags/community-flag-evaluation.service.js'
 import { Queue } from 'bullmq'
 import { describe, expect, it, vi } from 'vitest'
 import { cleanupCommunityCommentFixtures } from '../../../packages/testing/src/community-comments-cleanup.js'
@@ -21,7 +22,8 @@ describe('Story 6.4 comment rollout authority, cleanup and real worker', () => {
     const remoteProvider = { getFeatureFlagValue: vi.fn().mockResolvedValue(true) }
     const authority = new FeatureFlagsService(
       new FeatureFlagsRepository(prisma),
-      remoteProvider as never
+      remoteProvider as never,
+      new CommunityFlagEvaluationService(prisma, remoteProvider)
     )
     const remote = new CommunityCommentsProcessor(prisma, engine, authority)
     try {

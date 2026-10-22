@@ -1,0 +1,20 @@
+# Story 6.5 owner: Settings tab > Community notifications, through the product UI. Retried
+# from the tab bar, because a dev-client bundle reload right after a cold open can reset
+# navigation to Home while this flow is on its way.
+appId: ${MAESTRO_APP_ID}
+---
+- retry:
+    maxRetries: 3
+    commands:
+      - runFlow: open-settings-tab.yaml
+      # Centered, because iOS Settings has a fixed band above the tab bar that clips the
+      # bottom.
+      - scrollUntilVisible:
+          element: ${MAESTRO_TITLE}
+          direction: DOWN
+          centerElement: true
+          timeout: 20000
+      - tapOn: ${MAESTRO_TITLE}
+      - extendedWaitUntil:
+          visible: ${MAESTRO_SIGNOUT}
+          timeout: 15000

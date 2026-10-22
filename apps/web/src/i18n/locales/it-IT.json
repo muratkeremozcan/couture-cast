@@ -643,6 +643,39 @@
       },
       "unavailable": "Non disponibile.",
       "close": "Chiudi commenti"
+    },
+    "realtime": {
+      "newLooks": "Sono pronti {{count}} nuovi look.",
+      "showNewLooks": "Mostra {{count}} nuovi look",
+      "newComments": "Sono disponibili nuovi commenti.",
+      "unavailable": "La community è temporaneamente non disponibile. La bozza è salvata."
+    },
+    "notifications": {
+      "title": "Notifiche della community",
+      "enabled": "Notifiche sulle interazioni",
+      "quiet": "Orari silenziosi per tutte le notifiche push, incluso il meteo",
+      "start": "Inizio dell'orario silenzioso",
+      "end": "Fine dell'orario silenzioso",
+      "timezone": "Fuso orario del profilo",
+      "save": "Salva impostazioni",
+      "saved": "Impostazioni salvate.",
+      "failed": "Impossibile salvare le impostazioni. Riprova.",
+      "conflict": "Le impostazioni sono state modificate altrove. Controlla i valori attuali e riprova.",
+      "permission": "Consenti le notifiche nelle impostazioni del dispositivo, poi riprova.",
+      "signin": "Accedi",
+      "email": "Indirizzo email",
+      "code": "Codice ricevuto per email",
+      "sendCode": "Invia codice d'accesso",
+      "verify": "Verifica codice",
+      "codeSent": "Controlla la tua email per il codice d'accesso.",
+      "signinDenied": "Nessun account CoutureCast può accedere con questa email. Controlla l’indirizzo e riprova.",
+      "signinUnavailable": "L’accesso non è al momento disponibile. Riprova tra poco.",
+      "signinCodeInvalid": "Il codice non è corretto o è scaduto. Controlla l’email o richiedi un nuovo codice.",
+      "signout": "Esci",
+      "deviceSettings": "Apri impostazioni del dispositivo",
+      "back": "Torna alla community",
+      "bindingConflict": "La registrazione delle notifiche di questo dispositivo è cambiata. Riprova.",
+      "pushUnavailable": "Le notifiche push non sono disponibili su questo dispositivo."
     }
   }
 }

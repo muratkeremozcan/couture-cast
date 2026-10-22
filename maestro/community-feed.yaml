@@ -249,6 +249,16 @@ tags:
     id: 'community-card-image-lookbook-5'
     label: 'The card rendered its signed image rather than the unavailable state'
 
+# The image element exists before its bytes arrive, so the assertion above cannot
+# tell a loaded image from a blank placeholder: it passed for months while the
+# emulator had no route to local Supabase storage. The loaded marker appears only
+# after the image's onLoad fires.
+- extendedWaitUntil:
+    visible:
+      id: 'community-card-image-loaded-lookbook-5'
+    timeout: 20000
+    label: 'The signed image actually loaded on the device'
+
 - assertNotVisible:
     id: 'community-card-image-unavailable-lookbook-5'
 

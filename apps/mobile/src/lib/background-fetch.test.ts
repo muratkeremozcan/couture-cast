@@ -23,7 +23,6 @@ const native = vi.hoisted(() => {
     }),
     isTaskRegisteredAsync: vi.fn(),
     registerTaskAsync: vi.fn(),
-    getDistinctId: vi.fn(),
   }
 })
 
@@ -37,15 +36,13 @@ vi.mock('expo-background-fetch', () => ({
   registerTaskAsync: native.registerTaskAsync,
 }))
 
-vi.mock('../analytics/mobile-analytics', () => ({
-  mobileAnalyticsClient: { getDistinctId: native.getDistinctId },
-}))
-
 import { registerBackgroundFetchAsync } from './background-fetch'
-import { clearRitualMemoryCache, saveRitualCache } from './ritual-cache'
+import { setMobileAccessTokenResolver, setMobileApplicationUserId } from './mobile-auth'
+import { clearRitualMemoryCache, ritualCacheOwner, saveRitualCache } from './ritual-cache'
 
 const TASK_NAME = 'RITUAL_BACKGROUND_FETCH_TASK'
-const USER_ID = 'bg-user'
+const MEMBER_ID = 'bg-user'
+const USER_ID = ritualCacheOwner(MEMBER_ID)
 
 function runRitualTask() {
   const task = native.tasks.get(TASK_NAME)
@@ -53,6 +50,10 @@ function runRitualTask() {
     throw new Error(`${TASK_NAME} was never registered with TaskManager`)
   }
   return task()
+}
+
+function signedOutKeys() {
+  return Object.keys(localStorage).filter((key) => key.startsWith('ritual:signed-out:'))
 }
 
 function storedRitualEntry() {
@@ -94,16 +95,20 @@ describe('widget background cache freshness', () => {
 
 describe('ritual background fetch task', () => {
   const originalBaseUrl = process.env.EXPO_PUBLIC_API_BASE_URL
+  let restoreAccessTokenResolver: (() => void) | undefined
 
   beforeEach(() => {
     process.env.EXPO_PUBLIC_API_BASE_URL = window.location.origin
     localStorage.clear()
     clearRitualMemoryCache()
-    native.getDistinctId.mockReturnValue(USER_ID)
+    setMobileApplicationUserId(MEMBER_ID)
+    restoreAccessTokenResolver = setMobileAccessTokenResolver(() => 'member-token')
   })
 
   afterEach(() => {
     process.env.EXPO_PUBLIC_API_BASE_URL = originalBaseUrl
+    restoreAccessTokenResolver?.()
+    setMobileApplicationUserId(null)
     localStorage.clear()
     clearRitualMemoryCache()
   })
@@ -171,19 +176,41 @@ describe('ritual background fetch task', () => {
   })
 
   /**
-   * A degraded analytics client leaves the task without a distinct id. The core
-   * ritual still has to refresh, under the documented anonymous identity.
+   * R9-1: a cold background wake has no verified member until the token resolver restores
+   * the session. The member is known only after that, so the ritual fetched with their
+   * bearer must land under their key and never in the shared signed-out bucket, which a
+   * signed-out Home or another member's first load would read.
    */
-  it('falls back to the anonymous user when analytics has no distinct id', async () => {
-    native.getDistinctId.mockReturnValue(undefined)
+  it('stores a ritual fetched after a delayed verification under the member, never signed-out', async () => {
+    setMobileApplicationUserId(null)
+    setMobileAccessTokenResolver(() => {
+      setMobileApplicationUserId(MEMBER_ID)
+      return 'member-token'
+    })
 
     await expect(runRitualTask()).resolves.toBe(native.result.NewData)
 
-    expect(
-      localStorage.getItem(
-        `ritual:mobile-anonymous-user:en-US:${mockRitualResponse.data.weather.locationKey}`
-      )
-    ).not.toBeNull()
+    expect(storedRitualEntry()).not.toBeNull()
+    expect(signedOutKeys()).toEqual([])
+  })
+
+  it('fetches and stores nothing when no member session verifies', async () => {
+    const ritualRequests = vi.fn()
+    server.use(
+      http.get('*/api/v1/ritual', () => {
+        ritualRequests()
+        return HttpResponse.json(mockRitualResponse)
+      })
+    )
+    setMobileApplicationUserId(null)
+    setMobileAccessTokenResolver(() => undefined)
+
+    await expect(runRitualTask()).resolves.toBe(native.result.NoData)
+
+    expect(ritualRequests).not.toHaveBeenCalled()
+    expect(Object.keys(localStorage).filter((key) => key.startsWith('ritual:'))).toEqual(
+      []
+    )
   })
 
   /**

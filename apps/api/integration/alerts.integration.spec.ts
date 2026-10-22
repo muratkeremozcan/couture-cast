@@ -66,6 +66,11 @@ type PreferenceUpsertArguments = {
 }
 
 type AlertRuleTransactionClient = {
+  $executeRaw: (...args: unknown[]) => Promise<number>
+  notificationPreference: {
+    upsert(arguments_: PreferenceUpsertArguments): Promise<NotificationPreferenceRecord>
+  }
+
   alertRule: {
     findMany(arguments_: { where: { user_id: string } }): Promise<AlertRuleRecord[]>
     upsert(arguments_: RuleUpsertArguments): Promise<AlertRuleRecord>
@@ -103,6 +108,8 @@ class TransactionalAlertsPrisma {
           }
         : {
             id: `preference-${this.nextPreferenceId++}`,
+            policy_revision: 0,
+            timezone_configured: true,
             ...arguments_.create,
             created_at: now,
             updated_at: now,
@@ -123,6 +130,8 @@ class TransactionalAlertsPrisma {
       this.failAtRuleUpsert = null
 
       const transaction: AlertRuleTransactionClient = {
+        $executeRaw: vi.fn().mockResolvedValue(1),
+        notificationPreference: this.notificationPreference,
         alertRule: {
           findMany: ({ where }) =>
             Promise.resolve(this.findRules(workingRules, where.user_id)),

@@ -1,5 +1,5 @@
 import React from 'react'
-import { StyleSheet, Pressable, Platform } from 'react-native'
+import { StyleSheet, Pressable, Platform, ScrollView } from 'react-native'
 import { Text, View } from '@/components/themed'
 import { useHeroPalette } from './hero-theme'
 import { useTranslation } from 'react-i18next'
@@ -25,51 +25,66 @@ export function ScenarioToggles({
   const palette = useHeroPalette()
 
   return (
-    <View
-      style={[styles.container, { borderBottomColor: palette.divider }]}
-      testID="scenario-toggles"
-      accessibilityRole="tablist"
-    >
-      {scenarios.map((tab) => {
-        const isActive = activeScenario === tab.key
-        return (
-          <Pressable
-            key={tab.key}
-            onPress={() => onScenarioChange(tab.key)}
-            style={[styles.tabButton, isActive && styles.activeTabButton]}
-            testID={`scenario-toggle-${tab.key}`}
-            accessibilityRole="tab"
-            accessibilityState={{ selected: isActive }}
-          >
-            <Text
+    <View style={styles.container} testID="scenario-toggles" accessibilityRole="tablist">
+      {/* Tabs size to their localized label on one line (it-IT and pt-PT outgrow a third
+          of a 360-point phone) and scroll sideways only when the labels cannot all fit. */}
+      <ScrollView
+        horizontal
+        showsHorizontalScrollIndicator={false}
+        contentContainerStyle={styles.scrollContent}
+      >
+        {scenarios.map((tab) => {
+          const isActive = activeScenario === tab.key
+          return (
+            <Pressable
+              key={tab.key}
+              onPress={() => onScenarioChange(tab.key)}
               style={[
-                styles.tabLabel,
-                { color: palette.mutedText },
-                isActive && styles.activeTabLabel,
-                isActive && { color: palette.text },
+                styles.tabButton,
+                { borderBottomColor: palette.divider },
+                isActive && styles.activeTabButton,
               ]}
+              testID={`scenario-toggle-${tab.key}`}
+              accessibilityRole="tab"
+              accessibilityState={{ selected: isActive }}
             >
-              {t(tab.labelKey, { defaultValue: tab.defaultLabel })}
-            </Text>
-            {isActive && <View style={styles.activeUnderline} />}
-          </Pressable>
-        )
-      })}
+              <Text
+                numberOfLines={1}
+                style={[
+                  styles.tabLabel,
+                  { color: palette.mutedText },
+                  isActive && styles.activeTabLabel,
+                  isActive && { color: palette.text },
+                ]}
+              >
+                {t(tab.labelKey, { defaultValue: tab.defaultLabel })}
+              </Text>
+              {isActive && <View style={styles.activeUnderline} />}
+            </Pressable>
+          )
+        })}
+      </ScrollView>
     </View>
   )
 }
 
 const styles = StyleSheet.create({
   container: {
-    flexDirection: 'row',
-    borderBottomWidth: 1,
-    borderBottomColor: '#E6E6ED',
     backgroundColor: 'transparent',
     marginHorizontal: 16,
     marginVertical: 12,
   },
+  scrollContent: {
+    flexGrow: 1,
+  },
+  // Each tab carries its own share of the divider so the line scrolls with the tabs and
+  // the active underline can overlap it without being clipped by the scroll view.
   tabButton: {
-    flex: 1,
+    flexGrow: 1,
+    flexShrink: 0,
+    borderBottomWidth: 1,
+    borderBottomColor: '#E6E6ED',
+    paddingHorizontal: 12,
     paddingVertical: 12,
     alignItems: 'center',
     justifyContent: 'center',

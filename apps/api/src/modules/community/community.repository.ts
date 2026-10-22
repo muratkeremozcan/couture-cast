@@ -1,7 +1,27 @@
+import type { CommunityAuthorizationBudget } from './community-availability.js'
+import {
+  assertCommunityDatabaseAccess,
+  assertCommunityReadEligibility,
+  assertCommunitySubjectPresent,
+} from './community-access.service.js'
+import {
+  assertCommunitySubjectAvailable,
+  guardCommunitySubject,
+  guardCommunityPost,
+  forgetCommunitySubject,
+  communityPrivacyTransaction,
+} from './community-privacy.js'
+import { recordCommunityEngagement } from './community-engagement-intent.js'
 import { sharedCommunityReportRetryAfter } from './community-report-limit.js'
 import { eraseCommunityComments } from './community-comments.privacy.js'
 import { randomUUID } from 'node:crypto'
-import { Inject, Injectable, ConflictException, NotFoundException } from '@nestjs/common'
+import {
+  Inject,
+  Injectable,
+  ConflictException,
+  NotFoundException,
+  ForbiddenException,
+} from '@nestjs/common'
 import {
   Prisma,
   PrismaClient,
@@ -152,9 +172,23 @@ function reactionEventType(previous: string | null, selection: string | null): s
   return previous === null ? 'community_reaction_added' : 'community_reaction_replaced'
 }
 
+function qualifiesForEngagement(
+  changed: boolean,
+  previous: string | null,
+  selection: string | null
+) {
+  return changed && previous === null && selection !== null
+}
+
 @Injectable()
 export class CommunityRepository {
   constructor(@Inject(PrismaClient) private readonly prisma: PrismaClient) {}
+  assertReadEligibility(member: string, budget: CommunityAuthorizationBudget) {
+    return assertCommunityReadEligibility(this.prisma, member, budget)
+  }
+  assertSubjectAvailable(member: string, budget: CommunityAuthorizationBudget) {
+    return assertCommunitySubjectPresent(this.prisma, member, budget)
+  }
 
   /** One statement supplies every aggregate and viewer revision from one MVCC snapshot. */
   async reactionSummaries(
@@ -197,6 +231,7 @@ export class CommunityRepository {
     const { userId, postId, input, platform } = params
     return this.prisma.$transaction(async (tx) => {
       await tx.$executeRaw`SELECT pg_advisory_xact_lock(hashtext('community_member:' || ${userId}))`
+      await assertCommunitySubjectAvailable(tx, userId)
       await tx.$queryRaw`SELECT id FROM "LookbookPost" WHERE id = ${postId} FOR UPDATE`
       await params.assertEligible(tx, false)
       const post = await tx.lookbookPost.findUnique({ where: { id: postId } })
@@ -282,6 +317,9 @@ export class CommunityRepository {
       })
       const summary = (await this.reactionSummaries([postId], userId, tx)).get(postId)
       if (!summary) throw new NotFoundException(COMMUNITY_POST_NOT_FOUND_MESSAGE)
+      if (qualifiesForEngagement(changed, current.viewerReaction, input.selection)) {
+        await recordCommunityEngagement(tx, { actor: userId, post: postId })
+      }
       return { summary }
     })
   }
@@ -428,7 +466,15 @@ export class CommunityRepository {
   async createPostDraft(
     data: Prisma.LookbookPostUncheckedCreateInput
   ): Promise<LookbookPost> {
-    return this.prisma.lookbookPost.create({ data })
+    return this.prisma.$transaction(async (tx) => {
+      await tx.$executeRaw`SELECT pg_advisory_xact_lock(hashtext('community_member:' || ${data.user_id}))`
+      await assertCommunityDatabaseAccess(tx, data.user_id)
+      const subject = await tx.communitySubject.findUnique({
+        where: { member_id: data.user_id },
+      })
+      if (!subject) throw new ForbiddenException('Community account unavailable')
+      return tx.lookbookPost.create({ data })
+    })
   }
 
   async findPostById(postId: string): Promise<LookbookPost | null> {
@@ -458,13 +504,16 @@ export class CommunityRepository {
    * the Prisma client, and this statement does not go through it.
    */
   async withdrawPostAndRequestErasure(postId: string, requestedAt: Date): Promise<void> {
-    await this.prisma.$executeRaw`
+    await communityPrivacyTransaction(this.prisma, async (tx) => {
+      await guardCommunityPost(tx, postId)
+      await tx.$executeRaw`
       UPDATE "LookbookPost"
       SET status = 'withdrawn'::"CommunityPostStatus",
           erasure_requested_at = COALESCE(erasure_requested_at, ${requestedAt}),
           updated_at = ${requestedAt}
       WHERE id = ${postId}
     `
+    })
   }
 
   /**
@@ -478,7 +527,8 @@ export class CommunityRepository {
    * bytes the request was about.
    */
   async requestErasureForUser(userId: string, requestedAt: Date): Promise<number> {
-    return this.prisma.$transaction(async (tx) => {
+    return communityPrivacyTransaction(this.prisma, async (tx) => {
+      await guardCommunitySubject(tx, userId)
       await tx.$executeRaw`SELECT pg_advisory_xact_lock(hashtext('community_member:' || ${userId}))`
       await tx.$queryRaw`SELECT id FROM "LookbookPost" WHERE id IN (SELECT post_id FROM "CommunityReaction" WHERE user_id = ${userId}) OR id IN (SELECT post_id FROM "CommunityComment" WHERE user_id = ${userId}) OR user_id = ${userId} ORDER BY id FOR UPDATE`
       await eraseCommunityComments(tx, userId)
@@ -489,17 +539,8 @@ export class CommunityRepository {
         where: { user_id: userId, erasure_requested_at: null },
         data: { erasure_requested_at: requestedAt },
       })
+      await forgetCommunitySubject(tx, userId, true)
       return count
-    })
-  }
-
-  async updatePost(
-    postId: string,
-    data: Prisma.LookbookPostUncheckedUpdateInput
-  ): Promise<LookbookPost> {
-    return this.prisma.lookbookPost.update({
-      where: { id: postId },
-      data,
     })
   }
 
@@ -514,7 +555,7 @@ export class CommunityRepository {
    * never applied at publish at all, so a client could allocate twenty drafts
    * under the cap and then publish all twenty.
    *
-   * The advisory lock is the first statement in the transaction, keyed on the
+   * The engagement-member lock precedes the submission lock, keyed on the
    * submitting user, so same-user submissions serialise without serialising the
    * table. The window is `submitted_at > now() - 24 hours`, which is the spec's
    * exclusive lower bound, and `submitted_at` is stamped on ACCEPTANCE rather
@@ -534,7 +575,11 @@ export class CommunityRepository {
       // both read nine and both accept. The lock is per user and released at
       // commit, so it serialises one author's submissions without serialising
       // the table.
+      await tx.$executeRaw`SELECT pg_advisory_xact_lock(hashtext('community_member:' || ${userId}))`
       await tx.$executeRaw`SELECT pg_advisory_xact_lock(hashtext('community_submission:' || ${userId}))`
+
+      await tx.$queryRaw`SELECT id FROM "LookbookPost" WHERE id = ${postId} ORDER BY id FOR UPDATE`
+      await assertCommunityDatabaseAccess(tx, userId)
 
       // `submitted_at`, not `created_at`. The row is created at allocate time
       // and a replayed allocate reuses it through the idempotency key, so
@@ -556,7 +601,13 @@ export class CommunityRepository {
 
       const submittedAt = new Date()
       const updated = await tx.lookbookPost.updateMany({
-        where: { id: postId, user_id: userId, status: 'draft' },
+        where: {
+          id: postId,
+          user_id: userId,
+          status: 'draft',
+          erasure_requested_at: null,
+          anonymized_at: null,
+        },
         data: {
           status: 'pending_review',
           alt_text: data.altText,

@@ -1,0 +1,19 @@
+# Story 6.5 owner: open the Android notification shade and tap the presented community
+# notification. The shade opens with an OS edge swipe from the status bar, because Maestro
+# has no shade command; a second swipe covers a first one the foreground app absorbed.
+# The tap targets the generic notification body text.
+appId: ${MAESTRO_APP_ID}
+---
+- retry:
+    maxRetries: 3
+    commands:
+      - swipe:
+          start: 50%, 1%
+          end: 50%, 75%
+          duration: 800
+      - extendedWaitUntil:
+          visible: ${MAESTRO_NOTIFICATION_BODY}
+          timeout: 5000
+- takeScreenshot:
+    path: presented-${MAESTRO_CASE}
+- tapOn: ${MAESTRO_NOTIFICATION_BODY}

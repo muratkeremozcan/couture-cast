@@ -1,3 +1,4 @@
+import { CommunitySyncState } from '@couture/api-client'
 // Shared community grid fixtures, transport responses, image preparation, and test lifecycle.
 import { Blob as NodeBlob } from 'node:buffer'
 import { http, HttpResponse } from 'msw'
@@ -339,6 +340,9 @@ export const REMOVED_COPY = {
 
 export function setupCommunityGridClock() {
   beforeEach(() => {
+    // These feature tests own the pre-realtime transport boundary. Story6.5's
+    // state and browser suites exercise the real subscription separately.
+    vi.spyOn(CommunitySyncState.prototype, 'start').mockImplementation(() => undefined)
     vi.spyOn(Date, 'now').mockReturnValue(IMAGE_REFERENCE_NOW)
   })
 }

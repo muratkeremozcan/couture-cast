@@ -5,6 +5,7 @@ import { createPortal } from 'react-dom'
 
 export interface AccessibleModalProps {
   isOpen: boolean
+  suspended?: boolean
   onClose: () => void
   titleId: string
   title: string
@@ -21,6 +22,7 @@ export interface AccessibleModalProps {
 
 export function AccessibleModal({
   isOpen,
+  suspended = false,
   onClose,
   titleId,
   title,
@@ -36,10 +38,11 @@ export function AccessibleModal({
 }: AccessibleModalProps) {
   const dialogRef = useRef<HTMLDivElement | null>(null)
   const closeButtonRef = useRef<HTMLButtonElement | null>(null)
+  const resumeFocusRef = useRef<HTMLElement | null>(null)
   const previousActiveElementRef = useRef<HTMLElement | null>(null)
 
   useLayoutEffect(() => {
-    if (!isOpen) {
+    if (!isOpen || suspended) {
       return
     }
     previousActiveElementRef.current =
@@ -48,7 +51,8 @@ export function AccessibleModal({
     // Lock body scroll
     const originalStyle = document.body.style.overflow
     document.body.style.overflow = 'hidden'
-    const overlay = dialogRef.current?.parentElement
+    const dialog = dialogRef.current
+    const overlay = dialog?.parentElement
     const background = new Set<HTMLElement>([
       ...Array.from(document.body.children).filter(
         (element): element is HTMLElement =>
@@ -71,10 +75,14 @@ export function AccessibleModal({
     }
 
     // Establish modal focus before paint so a user action cannot race delayed focus setup.
-    ;(initialFocusRef?.current ?? closeButtonRef.current)?.focus()
+    const resume = resumeFocusRef.current?.isConnected ? resumeFocusRef.current : null
+    ;(resume ?? initialFocusRef?.current ?? closeButtonRef.current)?.focus()
     const currentInvoker = invokingElementRef?.current
 
     return () => {
+      const focused = document.activeElement
+      if (focused instanceof HTMLElement && dialog?.contains(focused))
+        resumeFocusRef.current = focused
       document.body.style.overflow = originalStyle
       for (const { element, inert, hidden } of priorBackground) {
         element.inert = inert
@@ -91,7 +99,7 @@ export function AccessibleModal({
             : null
       targetToFocus?.focus()
     }
-  }, [initialFocusRef, isOpen, invokingElementRef])
+  }, [initialFocusRef, isOpen, suspended, invokingElementRef])
 
   if (!isOpen || typeof document === 'undefined') {
     return null
@@ -139,7 +147,10 @@ export function AccessibleModal({
   return createPortal(
     <div
       role="dialog"
-      aria-modal="true"
+      aria-modal={!suspended}
+      aria-hidden={suspended || undefined}
+      inert={suspended}
+      style={suspended ? { display: 'none' } : undefined}
       aria-labelledby={titleId}
       aria-describedby={descriptionId}
       onKeyDown={handleKeyDown}

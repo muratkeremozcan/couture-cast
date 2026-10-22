@@ -72,7 +72,16 @@ export class CommunityCommentsOutbox {
       orderBy: { created_at: 'asc' },
       select: { id: true },
     })
-    for (const row of rows) await this.processor.markFailed(row.id, true)
+    for (const row of rows) {
+      try {
+        await this.processor.markFailed(row.id, true)
+      } catch {
+        this.logger.warn(
+          { event: 'community_comment_stale_deferred', reason: 'dependency_unavailable' },
+          'Stale comment screening deferred'
+        )
+      }
+    }
     const cutoff = new Date(Date.now() - 30 * 86_400_000)
     const [expired, finished] = await Promise.all([
       this.prisma.communityCommentAnalyticsOutbox.findMany({

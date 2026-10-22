@@ -79,6 +79,7 @@ export function registerUserContracts(
   registry.registerPath({
     method: 'get',
     path: '/api/v1/user/profile',
+    security: [{ bearerAuth: [] }],
     tags: ['user'],
     summary: 'Get the authenticated user profile',
     description:

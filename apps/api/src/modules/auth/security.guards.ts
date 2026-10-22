@@ -1,4 +1,8 @@
 import {
+  CommunityAuthorizationBudget,
+  CommunityUnavailableException,
+} from '../community/community-availability.js'
+import {
   CanActivate,
   ExecutionContext,
   ForbiddenException,
@@ -58,10 +62,21 @@ export class RequestAuthGuard implements CanActivate {
       throw new UnauthorizedException('Missing or invalid bearer token')
     }
 
+    const path = (request.originalUrl ?? request.url ?? '').split('?')[0] ?? ''
+    const budget =
+      path.startsWith('/api/v1/community/') &&
+      (request.method === 'GET' || path.endsWith('/targets/resolve'))
+        ? new CommunityAuthorizationBudget()
+        : undefined
     let identity: { userId: string; role: ApiRole }
     try {
-      identity = await this.accessTokenIdentityService.resolveIdentity(token, request)
-    } catch {
+      identity = budget
+        ? await budget.run(() =>
+            this.accessTokenIdentityService.resolveIdentity(token, request)
+          )
+        : await this.accessTokenIdentityService.resolveIdentity(token, request)
+    } catch (error) {
+      if (error instanceof CommunityUnavailableException) throw error
       throw new UnauthorizedException('Invalid access token')
     }
 
@@ -77,11 +92,14 @@ export class RequestAuthGuard implements CanActivate {
     if (
       role === 'teen' &&
       !consentCheckedInTransaction &&
-      !(await this.guardianConsentStateService.canTeenAccess(userId))
+      !(await (budget
+        ? budget.run(() => this.guardianConsentStateService.canTeenAccess(userId))
+        : this.guardianConsentStateService.canTeenAccess(userId)))
     ) {
       throw new ForbiddenException('Guardian consent required before continuing')
     }
 
+    budget?.check()
     return true
   }
 }

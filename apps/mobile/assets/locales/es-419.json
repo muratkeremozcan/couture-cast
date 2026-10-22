@@ -37,7 +37,18 @@
     "loading": "Cargando recomendaciones...",
     "garment_swap_title": "Elegir alternativa para {{category}}",
     "feels_like": "Sensación térmica",
-    "precipitation": "Precipitación"
+    "precipitation": "Precipitación",
+    "alert": {
+      "events": {
+        "flood": "Alerta por inundación",
+        "winter-storm": "Alerta por tormenta invernal",
+        "wind": "Alerta por viento",
+        "heat": "Alerta por calor",
+        "ice": "Alerta por hielo"
+      },
+      "body_generic": "Hay una alerta meteorológica vigente para tu zona."
+    },
+    "no_location": "Agrega tu ubicación para recibir tus atuendos del día"
   },
   "widget": {
     "now": "AHORA",
@@ -53,13 +64,13 @@
     "locale_change_error": "No se pudo cambiar el idioma. Inténtalo de nuevo.",
     "region_units": "Región y Unidades",
     "languages": {
-      "en-US": "Inglés (EE. UU.)",
-      "en-CA": "Inglés (Canadá)",
+      "en-US": "English (US)",
+      "en-CA": "English (Canada)",
       "es-419": "Español (LatAm)",
-      "fr-CA": "Francés (Canadá)",
-      "fr-FR": "Francés (Europa)",
-      "tr-TR": "Turco",
-      "de-DE": "Alemán",
+      "fr-CA": "Français (Canada)",
+      "fr-FR": "Français (Europe)",
+      "tr-TR": "Türkçe",
+      "de-DE": "Deutsch",
       "it-IT": "Italiano",
       "pt-BR": "Português (Brasil)",
       "pt-PT": "Português (Portugal)"
@@ -75,7 +86,8 @@
     "dismiss_banner": "Cerrar aviso",
     "invalid_link": "Este enlace no es válido, venció o ya no está disponible.",
     "about_couturecast": "Acerca de CoutureCast",
-    "about_description": "CoutureCast combina información meteorológica con recomendaciones de vestuario."
+    "about_description": "CoutureCast combina información meteorológica con recomendaciones de vestuario.",
+    "back": "Atrás"
   },
   "accessibility": {
     "skip_to_content": "Saltar al contenido principal",
@@ -321,7 +333,8 @@
       "optOutHelp": "Desactiva esto para ocultar todas las sugerencias de socios y afiliados.",
       "saved": "Preferencias de compra actualizadas",
       "error": "No se pudieron actualizar las preferencias de compra.",
-      "loadError": "No se pudieron cargar las preferencias de compra."
+      "loadError": "No se pudieron cargar las preferencias de compra.",
+      "signedOutHint": "Inicia sesión para cambiar esto"
     },
     "premium": {
       "sectionTitle": "Premium",
@@ -581,7 +594,8 @@
       "plannerLocked": {
         "title": "El planificador de 7 días es una función Premium",
         "cta": "Obtener Premium"
-      }
+      },
+      "signedOutHint": "Inicia sesión para suscribirte o administrar Premium"
     }
   },
   "community": {
@@ -815,6 +829,39 @@
       },
       "unavailable": "No disponible.",
       "close": "Cerrar comentarios"
+    },
+    "realtime": {
+      "newLooks": "Hay {{count}} looks nuevos.",
+      "showNewLooks": "Mostrar {{count}} looks nuevos",
+      "newComments": "Hay comentarios nuevos.",
+      "unavailable": "La comunidad no está disponible temporalmente. Tu borrador está guardado."
+    },
+    "notifications": {
+      "title": "Notificaciones de la comunidad",
+      "enabled": "Notificaciones de interacciones",
+      "quiet": "Horario de silencio para todas las notificaciones, incluido el clima",
+      "start": "Inicio del horario de silencio",
+      "end": "Fin del horario de silencio",
+      "timezone": "Zona horaria de la cuenta",
+      "save": "Guardar ajustes",
+      "saved": "Ajustes guardados.",
+      "failed": "No se pudieron guardar los ajustes. Inténtalo de nuevo.",
+      "conflict": "Los ajustes cambiaron en otro dispositivo. Revisa los valores y vuelve a intentarlo.",
+      "permission": "Permite las notificaciones en los ajustes del dispositivo y vuelve a intentarlo.",
+      "signin": "Iniciar sesión",
+      "email": "Correo electrónico",
+      "code": "Código del correo",
+      "sendCode": "Enviar código de acceso",
+      "verify": "Verificar código",
+      "codeSent": "Busca el código de acceso en tu correo.",
+      "signinDenied": "Ninguna cuenta de CoutureCast puede iniciar sesión con este correo. Revisa la dirección e inténtalo de nuevo.",
+      "signinUnavailable": "El inicio de sesión no está disponible por el momento. Inténtalo de nuevo en un momento.",
+      "signinCodeInvalid": "El código es incorrecto o venció. Revisa tu correo o solicita un código nuevo.",
+      "signout": "Cerrar sesión",
+      "deviceSettings": "Abrir ajustes del dispositivo",
+      "back": "Volver a la comunidad",
+      "bindingConflict": "El registro de notificaciones de este dispositivo cambió. Inténtalo de nuevo.",
+      "pushUnavailable": "Las notificaciones push no están disponibles en este dispositivo."
     }
   }
 }

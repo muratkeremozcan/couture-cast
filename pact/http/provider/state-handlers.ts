@@ -1,3 +1,7 @@
+import {
+  configureProviderEngagementState,
+  type ProviderEngagementScenario,
+} from './state'
 import type { VerifierOptions } from '@pact-foundation/pact'
 import type {
   EntitlementStore,
@@ -565,6 +569,14 @@ export const stateHandlers: StateHandlers = {
    * exactly what idempotency means; the double compares the incoming bytes
    * rather than being told the answer by two different states.
    */
+  'Community engagement protocol state': (parameters?: unknown) => {
+    const { scenario } = parameters as { scenario: ProviderEngagementScenario }
+    configureProviderEngagementState(scenario)
+    return Promise.resolve({
+      description: 'Configured community engagement dependency outcome',
+    })
+  },
+
   'A community reaction revision and receipt exist for user': (parameters?: unknown) => {
     const { userId, postId } = (parameters ?? {}) as CommunityStateParams
     configureProviderCommunityState({ userId, postId, scenario: 'reaction-current' })

@@ -1,0 +1,56 @@
+# Story 6.5 owner: turn engagement notifications on through the product settings screen and
+# answer the real OS permission dialog with ${MAESTRO_DIALOG_CHOICE}. The runner resets the
+# OS permission to "ask" beforehand, so the dialog is required: a run where the OS does not
+# ask fails here. The runner then asserts the exact outcome message, the OS permission and
+# the server binding.
+appId: ${MAESTRO_APP_ID}
+---
+- runFlow: open-app.yaml
+- runFlow: open-notification-settings.yaml
+- extendedWaitUntil:
+    visible: ${MAESTRO_ENABLED}
+    timeout: 30000
+# The label and the Switch share one accessible name, and Maestro does not select by tree
+# order. Android picks the control to the right of its label; on iOS the Switch is the
+# first match. Only the Switch can be checked, so "not visible as checked" means it is off,
+# and the checked assertion proves the Switch itself changed.
+# A session refresh right after load can rebuild the draft, so retry until the Switch holds.
+- retry:
+    maxRetries: 3
+    commands:
+      - runFlow:
+          when:
+            notVisible:
+              text: ${MAESTRO_ENABLED}
+              checked: true
+          commands:
+            - runFlow:
+                when:
+                  platform: Android
+                commands:
+                  - tapOn:
+                      rightOf: ${MAESTRO_ENABLED}
+            - runFlow:
+                when:
+                  platform: iOS
+                commands:
+                  - tapOn:
+                      text: ${MAESTRO_ENABLED}
+                      index: 0
+      - waitForAnimationToEnd
+      - assertVisible:
+          text: ${MAESTRO_ENABLED}
+          checked: true
+- tapOn: ${MAESTRO_SAVE}
+- extendedWaitUntil:
+    visible: ${MAESTRO_DIALOG_CHOICE}
+    timeout: 15000
+- takeScreenshot:
+    path: os-dialog-${MAESTRO_CASE}
+- tapOn: ${MAESTRO_DIALOG_CHOICE}
+# Any settled outcome; which one is the runner's assertion.
+- extendedWaitUntil:
+    visible: ${MAESTRO_OUTCOME}
+    timeout: 30000
+- takeScreenshot:
+    path: result-${MAESTRO_CASE}

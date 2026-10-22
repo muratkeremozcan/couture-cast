@@ -26,12 +26,16 @@ async function openDeepLink(
   expect((await pollCall).status).toBe(200)
 }
 
+/** Signed-out links never poll: `/events/poll` requires an account. */
+async function openSignedOutLink(page: Page, path: string) {
+  await page.goto(path)
+}
+
 test.describe('Widget / Notification Deep-Link Handling (Story 3.7)', () => {
   test('3.7-E2E-001: Widget tap deep link URL hydrates hero canvas and active chip', async ({
     page,
-    interceptNetworkCall,
   }) => {
-    await openDeepLink(page, interceptNetworkCall, '/?source=widget&slot=am')
+    await openSignedOutLink(page, '/?source=widget&slot=am')
 
     const heroTitle = page.getByTestId('hero-recommendation-title')
     await expect(heroTitle).toBeVisible()
@@ -44,7 +48,11 @@ test.describe('Widget / Notification Deep-Link Handling (Story 3.7)', () => {
   test('3.7-E2E-002: Severe weather notification deep link focuses severe weather alert banner', async ({
     page,
     interceptNetworkCall,
+    communitySession,
   }) => {
+    // Severe-weather notifications reach signed-in accounts; their target loads from
+    // the account's events feed. Destructured so the session exists before navigation.
+    expect(communitySession.userId).toBeTruthy()
     await openDeepLink(
       page,
       interceptNetworkCall,
@@ -84,13 +92,8 @@ test.describe('Widget / Notification Deep-Link Handling (Story 3.7)', () => {
 
   test('3.7-E2E-004: Invalid deep link falls back to hero ritual and displays InfoBanner', async ({
     page,
-    interceptNetworkCall,
   }) => {
-    await openDeepLink(
-      page,
-      interceptNetworkCall,
-      '/?source=invalid_source&slot=bad_slot'
-    )
+    await openSignedOutLink(page, '/?source=invalid_source&slot=bad_slot')
 
     const infoBanner = page.getByTestId('deep-link-info-banner')
     await expect(infoBanner).toBeVisible()

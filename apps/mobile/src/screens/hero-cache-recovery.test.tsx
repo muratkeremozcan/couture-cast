@@ -33,8 +33,15 @@ vi.mock('@/src/analytics/mobile-analytics', () => ({
 import TabOneScreen from '@/app/(tabs)/index'
 import { server } from '@/src/test-utils/msw/server'
 import { mockRitualResponse } from '@/src/test-utils/msw/handlers'
-import { setMobileAccessTokenResolver } from '@/src/lib/mobile-auth'
-import { clearRitualMemoryCache, saveRitualCache } from '@/src/lib/ritual-cache'
+import {
+  setMobileAccessTokenResolver,
+  setMobileApplicationUserId,
+} from '@/src/lib/mobile-auth'
+import {
+  clearRitualMemoryCache,
+  ritualCacheOwner,
+  saveRitualCache,
+} from '@/src/lib/ritual-cache'
 import { AccessibilityAnnouncerProvider } from '@/src/hooks/use-accessibility-announcer'
 import i18n, { initI18n } from '@/src/lib/i18n'
 
@@ -75,6 +82,9 @@ describe('TabOneScreen cache, recovery, and deep-link routing', () => {
     ritualRequestCount = 0
     mockGetDistinctId.mockReturnValue('test-user-id')
     restoreAccessTokenResolver = setMobileAccessTokenResolver(() => 'session-token')
+    // Set after the auto-cleanup unmounted the previous screen; changing identity while a
+    // screen is mounted reloads it and leaks a request into this test.
+    setMobileApplicationUserId('test-member')
     server.use(countingRitualHandler())
     await i18n.changeLanguage('en-US')
   })
@@ -88,7 +98,7 @@ describe('TabOneScreen cache, recovery, and deep-link routing', () => {
   })
 
   it('3.3-MOB-HERO-10 serves a cache younger than 15 minutes without touching the network', async () => {
-    await saveRitualCache('test-user-id', 'en-US', {
+    await saveRitualCache(ritualCacheOwner('test-member'), 'en-US', {
       data: mockRitualResponse,
       timestamp: Date.now(),
     })
@@ -105,9 +115,10 @@ describe('TabOneScreen cache, recovery, and deep-link routing', () => {
     expect(screen.queryByTestId('stale-cache-banner')).toBeNull()
   })
 
-  it('3.3-MOB-HERO-11 scopes the cache to an anonymous identity when analytics has no distinct id', async () => {
+  it('3.3-MOB-HERO-11 scopes the cache to the signed-out owner when no member is signed in', async () => {
+    setMobileApplicationUserId(null)
     mockGetDistinctId.mockReturnValue('')
-    await saveRitualCache('mobile-anonymous-user', 'en-US', {
+    await saveRitualCache(ritualCacheOwner(null), 'en-US', {
       data: mockRitualResponse,
       timestamp: Date.now(),
     })
@@ -117,13 +128,13 @@ describe('TabOneScreen cache, recovery, and deep-link routing', () => {
     await waitFor(() => {
       expect(screen.getByText('Classic Trench Coat')).toBeTruthy()
     })
-    // A signed-out user still gets the offline ritual; without the fallback id
-    // the cache key would be `ritual::en-US:...` and never match on re-open.
+    // A signed-out user still gets the offline ritual under a non-empty owner, even
+    // with no analytics id; an empty owner would key `ritual::en-US:...`.
     expect(ritualRequestCount).toBe(0)
   })
 
   it('3.3-MOB-HERO-12 refetches after the cache passes 15 minutes', async () => {
-    await saveRitualCache('test-user-id', 'en-US', {
+    await saveRitualCache(ritualCacheOwner('test-member'), 'en-US', {
       data: mockRitualResponse,
       timestamp: Date.now() - 16 * 60 * 1000,
     })

@@ -28,12 +28,14 @@
     "@asteasolutions/zod-to-openapi": "^7.3.4",
     "@couture/api-client": "file:../../packages/api-client",
     "@couture/utils": "file:../../packages/utils",
+    "@supabase/supabase-js": "^2.118.0",
     "i18next": "^23.11.0",
     "next": "15.5.25",
     "posthog-js": "^1.356.1",
     "react": "19.1.0",
     "react-dom": "19.1.0",
     "react-i18next": "^14.1.1",
+    "socket.io-client": "4.8.3",
     "zod": "3.25.76"
   },
   "devDependencies": {

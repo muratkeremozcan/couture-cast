@@ -12,21 +12,8 @@ test.describe('Web smoke', () => {
   test('hero renders with healthy services and passes accessibility scan', async ({
     apiRequest,
     page,
-    interceptNetworkCall,
     validateSchema,
   }, testInfo) => {
-    const pollCallPromise = interceptNetworkCall({
-      method: 'GET',
-      url: '**/api/v1/events/poll*',
-      fulfillResponse: {
-        status: 200,
-        body: {
-          events: [],
-          nextSince: null,
-        },
-      },
-    })
-
     const metadata = (testInfo.project.metadata ?? {}) as Record<string, string>
     const healthEndpoint =
       metadata.healthEndpoint ??
@@ -45,9 +32,8 @@ test.describe('Web smoke', () => {
       shape: { status: 'ok' },
     })
 
+    // Signed out: the events poll requires an account, so none is sent.
     await page.goto('/')
-    const pollCall = await pollCallPromise
-    expect(pollCall.status).toBe(200)
 
     await expect(page.getByTestId('hero-headline')).toContainText(
       'Plan confident outfits'

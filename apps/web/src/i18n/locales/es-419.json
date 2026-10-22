@@ -643,6 +643,39 @@
       },
       "unavailable": "No disponible.",
       "close": "Cerrar comentarios"
+    },
+    "realtime": {
+      "newLooks": "Hay {{count}} looks nuevos.",
+      "showNewLooks": "Mostrar {{count}} looks nuevos",
+      "newComments": "Hay comentarios nuevos.",
+      "unavailable": "La comunidad no está disponible temporalmente. Tu borrador está guardado."
+    },
+    "notifications": {
+      "title": "Notificaciones de la comunidad",
+      "enabled": "Notificaciones de interacciones",
+      "quiet": "Horario de silencio para todas las notificaciones, incluido el clima",
+      "start": "Inicio del horario de silencio",
+      "end": "Fin del horario de silencio",
+      "timezone": "Zona horaria de la cuenta",
+      "save": "Guardar ajustes",
+      "saved": "Ajustes guardados.",
+      "failed": "No se pudieron guardar los ajustes. Inténtalo de nuevo.",
+      "conflict": "Los ajustes cambiaron en otro dispositivo. Revisa los valores y vuelve a intentarlo.",
+      "permission": "Permite las notificaciones en los ajustes del dispositivo y vuelve a intentarlo.",
+      "signin": "Iniciar sesión",
+      "email": "Correo electrónico",
+      "code": "Código del correo",
+      "sendCode": "Enviar código de acceso",
+      "verify": "Verificar código",
+      "codeSent": "Busca el código de acceso en tu correo.",
+      "signinDenied": "Ninguna cuenta de CoutureCast puede iniciar sesión con este correo. Revisa la dirección e inténtalo de nuevo.",
+      "signinUnavailable": "El inicio de sesión no está disponible por el momento. Inténtalo de nuevo en un momento.",
+      "signinCodeInvalid": "El código es incorrecto o venció. Revisa tu correo o solicita un código nuevo.",
+      "signout": "Cerrar sesión",
+      "deviceSettings": "Abrir ajustes del dispositivo",
+      "back": "Volver a la comunidad",
+      "bindingConflict": "El registro de notificaciones de este dispositivo cambió. Inténtalo de nuevo.",
+      "pushUnavailable": "Las notificaciones push no están disponibles en este dispositivo."
     }
   }
 }

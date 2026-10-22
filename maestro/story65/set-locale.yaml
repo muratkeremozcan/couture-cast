@@ -1,0 +1,15 @@
+# Story 6.5 owner: select ${MAESTRO_LOCALE} through the real Settings language buttons. The
+# choice syncs to the signed-in profile, so the runner selects a locale before every tap
+# case (en-US included) instead of relying on what an earlier case left behind.
+appId: ${MAESTRO_APP_ID}
+---
+- runFlow: open-settings-tab.yaml
+- scrollUntilVisible:
+    element:
+      id: 'locale-btn-${MAESTRO_LOCALE}'
+    direction: UP
+    centerElement: true
+    timeout: 15000
+- tapOn:
+    id: 'locale-btn-${MAESTRO_LOCALE}'
+- waitForAnimationToEnd

@@ -98,3 +98,8 @@ export type SocketEvent =
   | { channel: 'lookbook:new'; event: LookbookNewEvent }
   | { channel: 'ritual:update'; event: RitualUpdateEvent }
   | { channel: 'alert:weather'; event: AlertWeatherEvent }
+
+export {
+  communityDoorbellSchema,
+  communityAvailabilitySchema,
+} from '../contracts/http/community-sync'

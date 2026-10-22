@@ -80,7 +80,7 @@ export function WardrobeOnboardingScreen() {
       const token = await resolveMobileAccessToken()
       if (!token) throw new Error('AUTHENTICATION_REQUIRED')
       setAccessToken(token)
-      userIdRef.current = resolveOwnerUserId(token)
+      userIdRef.current = await resolveOwnerUserId(token)
 
       const state = await getWardrobeOnboardingStateFromMobile(token)
       revisionRef.current = state.revision

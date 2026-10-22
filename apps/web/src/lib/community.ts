@@ -1,7 +1,10 @@
 'use client'
 
+import { webSessionIdentity } from './web-session'
+
 import {
   communityCommentsClient,
+  communitySyncClient,
   commentSessionIdentity,
   ResponseError,
 } from '@couture/api-client'
@@ -623,13 +626,16 @@ export async function setCommunityReactionFromWeb(
 }
 
 async function commentRequest<T>(
-  request: (client: ReturnType<typeof communityCommentsClient>) => Promise<T>
+  request: (client: ReturnType<typeof communityCommentsClient>) => Promise<T>,
+  signal?: AbortSignal
 ): Promise<T> {
   const accessToken = readAccessToken()
   try {
     return await request(
       communityCommentsClient(createWebApiClient({ accessToken }), 'web', {
-        signal: AbortSignal.timeout(15000),
+        signal: signal
+          ? AbortSignal.any([signal, AbortSignal.timeout(2000)])
+          : AbortSignal.timeout(15000),
       })
     )
   } catch (error) {
@@ -637,18 +643,27 @@ async function commentRequest<T>(
   }
 }
 
-export function communityCommentsRootsFromWeb(postId: string, cursor?: string) {
-  return commentRequest((client) => client.roots(postId, cursor))
+export function communityCommentsRootsFromWeb(
+  postId: string,
+  cursor?: string,
+  signal?: AbortSignal
+) {
+  return commentRequest((client) => client.roots(postId, cursor), signal)
 }
 export function communityCommentsRepliesFromWeb(
   postId: string,
   parentId: string,
-  cursor?: string
+  cursor?: string,
+  signal?: AbortSignal
 ) {
-  return commentRequest((client) => client.replies(postId, parentId, cursor))
+  return commentRequest((client) => client.replies(postId, parentId, cursor), signal)
 }
-export function communityCommentsSubmissionsFromWeb(postId: string, cursor?: string) {
-  return commentRequest((client) => client.submissions(postId, cursor))
+export function communityCommentsSubmissionsFromWeb(
+  postId: string,
+  cursor?: string,
+  signal?: AbortSignal
+) {
+  return commentRequest((client) => client.submissions(postId, cursor), signal)
 }
 export function communityCommentsCreateFromWeb(
   postId: string,
@@ -668,9 +683,26 @@ export function communityCommentsReportFromWeb(
 }
 
 export function communityCommentsSessionFromWeb() {
-  return commentSessionIdentity(
-    typeof window === 'undefined'
-      ? null
-      : window.sessionStorage.getItem(WEB_ACCESS_TOKEN_STORAGE_KEY)
+  return (
+    webSessionIdentity() ??
+    commentSessionIdentity(
+      typeof window === 'undefined'
+        ? null
+        : window.sessionStorage.getItem(WEB_ACCESS_TOKEN_STORAGE_KEY)
+    )
   )
+}
+
+export const communitySyncFromWeb = (token?: string | (() => Promise<string>)) =>
+  communitySyncClient(
+    createWebApiClient({ accessToken: token ?? (() => readAccessToken()) })
+  )
+export async function communityRealtimeTokenFromWeb() {
+  const { resolveWebSessionToken } = await import('./web-session')
+  if (
+    process.env.NEXT_PUBLIC_E2E_AUTH === 'true' &&
+    readAccessToken().startsWith('test-token')
+  )
+    return readAccessToken()
+  return resolveWebSessionToken()
 }

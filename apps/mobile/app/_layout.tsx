@@ -12,7 +12,7 @@ import {
 import Constants, { AppOwnership } from 'expo-constants'
 import { useFonts } from 'expo-font'
 import type { Notification } from 'expo-notifications'
-import { Stack, usePathname } from 'expo-router'
+import { Stack, usePathname, useRouter, useRootNavigationState } from 'expo-router'
 import * as SplashScreen from 'expo-splash-screen'
 import { useEffect, useRef, useState } from 'react'
 import 'react-native-reanimated'
@@ -27,6 +27,10 @@ import { initI18n } from '@/src/lib/i18n'
 import { registerBackgroundFetchAsync } from '@/src/lib/background-fetch'
 import { AccessibilityAnnouncerProvider } from '@/src/hooks/use-accessibility-announcer'
 import { AppThemeProvider } from '@/src/theme/theme-context'
+import { useTranslation } from 'react-i18next'
+
+const isExpoGoAndroid =
+  Platform.OS === 'android' && Constants.appOwnership === AppOwnership.Expo
 
 export {
   // Catch any errors thrown by the Layout component.
@@ -91,6 +95,56 @@ function RootLayoutNav() {
   /* eslint-disable @typescript-eslint/no-unsafe-assignment */
   const colorScheme = useColorScheme()
   const theme = colorScheme === 'dark' ? DarkTheme : DefaultTheme
+  const { t } = useTranslation()
+
+  const router = useRouter()
+  const navigation = useRootNavigationState()
+  const readyListeners = useRef(new Set<() => void>())
+  const readyRef = useRef(false)
+  readyRef.current = Boolean(navigation?.key)
+  useEffect(() => {
+    readyListeners.current.forEach((listener) => listener())
+  }, [navigation?.key])
+  useEffect(() => {
+    let stopped = false
+    const cleanups: (() => void)[] = []
+    void import('../src/lib/native-session.js')
+      .then(async ({ startNativeSession }) => {
+        const cleanup = await startNativeSession()
+        if (stopped) cleanup()
+        else cleanups.push(cleanup)
+      })
+      .catch(() => undefined)
+    if (!isExpoGoAndroid)
+      void import('../src/lib/native-notifications.js')
+        .then(async ({ startNativeNotifications }) => {
+          const cleanup = await startNativeNotifications({
+            ready: () => readyRef.current,
+            subscribeReady: (listener) => {
+              readyListeners.current.add(listener)
+              return () => {
+                readyListeners.current.delete(listener)
+              }
+            },
+            open: (params) => router.push({ pathname: '/(tabs)/community', params }),
+          })
+          if (stopped) cleanup()
+          else cleanups.push(cleanup)
+        })
+        .catch(() => undefined)
+    if (__DEV__ && !isExpoGoAndroid)
+      void import('../src/lib/native-notification-fixture.js')
+        .then(async ({ startNativeNotificationFixture }) => {
+          const cleanup = await startNativeNotificationFixture()
+          if (stopped) cleanup()
+          else cleanups.push(cleanup)
+        })
+        .catch(() => undefined)
+    return () => {
+      stopped = true
+      cleanups.forEach((cleanup) => cleanup())
+    }
+  }, [router])
 
   const pathname = usePathname()
   const previousPathname = useRef<string | undefined>(undefined)
@@ -107,8 +161,6 @@ function RootLayoutNav() {
   }, [pathname])
 
   useEffect(() => {
-    const isExpoGoAndroid =
-      Platform.OS === 'android' && Constants.appOwnership === AppOwnership.Expo
     if (Platform.OS === 'web' || isExpoGoAndroid) {
       return
     }
@@ -167,12 +219,23 @@ function RootLayoutNav() {
         */}
         <AppThemeProvider>
           <ThemeProvider value={theme}>
-            <Stack>
+            {/* iOS labels the back button with the previous route's title; the tab
+                group has none, so it read "(tabs)". */}
+            <Stack screenOptions={{ headerBackTitle: t('common.back') }}>
               <Stack.Screen name="(tabs)" options={{ headerShown: false }} />
               <Stack.Screen name="modal" options={{ presentation: 'modal' }} />
               <Stack.Screen
                 name="wardrobe-capsules"
-                options={{ title: 'Outfit capsules' }}
+                options={{ title: t('wardrobe.capsules.title') }}
+              />
+              {/* The native header carries each title; the screens render no second one. */}
+              <Stack.Screen
+                name="signin"
+                options={{ title: t('community.notifications.signin') }}
+              />
+              <Stack.Screen
+                name="notification-settings"
+                options={{ title: t('community.notifications.title') }}
               />
             </Stack>
           </ThemeProvider>

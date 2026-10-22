@@ -1,0 +1,4 @@
+# Story 6.5 owner: Settings tab > Community notifications > Sign in, through the product UI.
+appId: ${MAESTRO_APP_ID}
+---
+- runFlow: open-notification-settings.yaml

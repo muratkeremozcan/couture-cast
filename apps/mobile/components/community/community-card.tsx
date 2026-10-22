@@ -27,17 +27,28 @@ const ON_DESTRUCTIVE = '#FFFFFF'
  * effect: an unbounded loop. The effect now keys on `item.id` and
  * `imageAccess.expiresAt` alone, the attempts are capped, and the card settles
  * into a visible "image unavailable" state with a manual retry once the budget is
- * spent. A URL that comes back valid resets the budget.
+ * spent. Only an image that actually loads resets the budget: an unexpired URL
+ * can still fail (unreachable host, broken object), and treating it as valid made
+ * the budget reset on every refresh, so the card never reached its fallback.
+ * A load that settles neither way within IMAGE_LOAD_TIMEOUT_MS counts as a failure:
+ * an unanswering host fires no onError on some Android stacks, which otherwise left
+ * a blank placeholder forever. A new URL on an unavailable card (a feed refetch from
+ * anywhere) is probed with `Image.prefetch` and shown only once reachable, without
+ * restoring the budget, so a recovered host needs no manual retry and an unreachable
+ * one never flickers back to a placeholder.
  */
 const MAX_IMAGE_REFRESH_ATTEMPTS = 2
 const IMAGE_REFRESH_BACKOFF_MS = [0, 4000]
+export const IMAGE_LOAD_TIMEOUT_MS = 15_000
 
 interface CommunityCardMediaProps {
   postId: string
   imageUri: string
   label: string
   isUnavailable: boolean
+  isLoaded: boolean
   onError: () => void
+  onLoad: () => void
   onRetry: () => void
   onOpen: () => void
 }
@@ -47,7 +58,9 @@ function CommunityCardMedia({
   imageUri,
   label,
   isUnavailable,
+  isLoaded,
   onError,
+  onLoad,
   onRetry,
   onOpen,
 }: CommunityCardMediaProps) {
@@ -106,7 +119,18 @@ function CommunityCardMedia({
             accessibilityLabel={label}
             onAccessibilityTap={onOpen}
             onError={onError}
+            onLoad={onLoad}
           />
+          {isLoaded ? (
+            // UI automation marker: the image element exists before it loads, so only
+            // this proves a load completed. It has no label and takes no touches.
+            <View
+              testID={`community-card-image-loaded-${postId}`}
+              collapsable={false}
+              pointerEvents="none"
+              style={styles.loadedMarker}
+            />
+          ) : null}
         </Pressable>
       )}
     </View>
@@ -218,10 +242,14 @@ export function CommunityCard({
 
   const itemId = item.id
   const expiresAt = item.imageAccess.expiresAt
+  const imageUrl = item.imageAccess.url
 
   const [imageState, setImageState] = useState<'ok' | 'unavailable'>('ok')
   const [refreshTick, setRefreshTick] = useState(0)
   const attemptsRef = useRef(0)
+  // Whether the rendered image has fired onLoad or onError since its load timer armed.
+  const loadSettledRef = useRef(false)
+  const [imageLoaded, setImageLoaded] = useState(false)
 
   // Kept out of the expiry effect's dependency array on purpose: reading the
   // latest item and callback through a ref is what stops a refetch from
@@ -241,6 +269,19 @@ export function CommunityCard({
     void latestRef.current.onImageExpiry?.(latestRef.current.item)
   }, [])
 
+  const handleImageLoad = useCallback(() => {
+    // The image rendered, so the bounded retry budget starts over.
+    loadSettledRef.current = true
+    attemptsRef.current = 0
+    setImageLoaded(true)
+  }, [])
+
+  const handleImageError = useCallback(() => {
+    loadSettledRef.current = true
+    setImageLoaded(false)
+    requestImageRefresh()
+  }, [requestImageRefresh])
+
   const handleRetryImage = useCallback(() => {
     attemptsRef.current = 0
     setImageState('ok')
@@ -251,6 +292,35 @@ export function CommunityCard({
     latestRef.current.onOpen?.(latestRef.current.item)
   }, [])
 
+  const shownUrlRef = useRef(imageUrl)
+  useEffect(() => {
+    if (shownUrlRef.current === imageUrl) return
+    shownUrlRef.current = imageUrl
+    setImageLoaded(false)
+    if (imageState !== 'unavailable') return
+    let active = true
+    Image.prefetch(imageUrl).then(
+      (reachable) => {
+        if (active && reachable) setImageState('ok')
+      },
+      () => undefined
+    )
+    return () => {
+      active = false
+    }
+  }, [imageUrl, imageState])
+
+  useEffect(() => {
+    if (imageState !== 'ok') return
+    loadSettledRef.current = false
+    const timer = setTimeout(() => {
+      if (loadSettledRef.current) return
+      loadSettledRef.current = true
+      requestImageRefresh()
+    }, IMAGE_LOAD_TIMEOUT_MS)
+    return () => clearTimeout(timer)
+  }, [imageUrl, imageState, refreshTick, requestImageRefresh])
+
   useEffect(() => {
     const expiresAtMs = Date.parse(expiresAt)
     if (Number.isNaN(expiresAtMs)) {
@@ -260,9 +330,8 @@ export function CommunityCard({
 
     const msUntilExpiry = expiresAtMs - Date.now()
     if (msUntilExpiry > 0) {
-      // A usable URL arrived, so the bounded retry budget starts over.
-      attemptsRef.current = 0
-      setImageState('ok')
+      // An unexpired URL is not proof the image loads (the host can be unreachable or
+      // the object broken), so only a completed load restores the budget (onLoad).
       const timer = setTimeout(requestImageRefresh, msUntilExpiry)
       return () => clearTimeout(timer)
     }
@@ -369,7 +438,9 @@ export function CommunityCard({
         imageUri={item.imageAccess.url}
         label={imageLabel}
         isUnavailable={imageState === 'unavailable'}
-        onError={requestImageRefresh}
+        isLoaded={imageLoaded}
+        onError={handleImageError}
+        onLoad={handleImageLoad}
         onRetry={handleRetryImage}
         onOpen={handleOpen}
       />
@@ -485,6 +556,13 @@ const styles = StyleSheet.create({
   image: {
     width: '100%',
     height: '100%',
+  },
+  loadedMarker: {
+    position: 'absolute',
+    top: 0,
+    left: 0,
+    width: 1,
+    height: 1,
   },
   imageFallback: {
     flex: 1,

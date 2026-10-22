@@ -130,6 +130,13 @@ const storage = new InMemoryCommunityStorage()
 /** Flags, telemetry, weather and guardian are doubles; the feed query is real. */
 const featureFlagsService = {
   getFeatureFlag: vi.fn().mockResolvedValue(true),
+  communityReadEvaluation: vi.fn(() =>
+    Promise.resolve({
+      value: true,
+      expiresAt: new Date(Date.now() + 60000),
+      validUntil: performance.now() + 60000,
+    })
+  ),
 } as unknown as FeatureFlagsService
 
 const telemetryService = {
@@ -228,7 +235,16 @@ beforeAll(async () => {
     [allArmUserId, 'all'],
   ] as const) {
     await prisma.user.create({
-      data: { id: userId, email: `${namespace}-${arm}@synthetic.test` },
+      data: {
+        id: userId,
+        email: `${namespace}-${arm}@synthetic.test`,
+        profile: {
+          create: {
+            birthdate: new Date('1990-01-01'),
+            preferences: { compliance: { accountStatus: 'active' } },
+          },
+        },
+      },
     })
     // A viewer with no saved location resolves no band at all, and an
     // unresolved band collapses both arms onto `all`, which would make this
@@ -262,6 +278,9 @@ afterAll(async () => {
     await prisma.lookbookPost.deleteMany({ where: owned })
     await prisma.savedLocation.deleteMany({ where: owned })
     await prisma.communityAlias.deleteMany({ where: owned })
+    await prisma.userProfile.deleteMany({
+      where: { user: { email: { startsWith: namespace } } },
+    })
     await prisma.user.deleteMany({ where: { email: { startsWith: namespace } } })
   }
   await prisma.$disconnect()

@@ -5345,6 +5345,588 @@ export interface GetAlertPreferencesResponseDataPreferences {
 /**
  *
  * @export
+ * @interface GetCommunityEvents400Response
+ */
+export interface GetCommunityEvents400Response {
+  /**
+   *
+   * @type {GetCommunityEvents400ResponseStatusCodeEnum}
+   * @memberof GetCommunityEvents400Response
+   */
+  statusCode?: GetCommunityEvents400ResponseStatusCodeEnum
+  /**
+   *
+   * @type {GetCommunityEvents400ResponseCodeEnum}
+   * @memberof GetCommunityEvents400Response
+   */
+  code: GetCommunityEvents400ResponseCodeEnum
+  /**
+   *
+   * @type {string}
+   * @memberof GetCommunityEvents400Response
+   */
+  message: string
+}
+
+/**
+ * @export
+ */
+export const GetCommunityEvents400ResponseStatusCodeEnum = {
+  NUMBER_400: 400,
+} as const
+export type GetCommunityEvents400ResponseStatusCodeEnum =
+  (typeof GetCommunityEvents400ResponseStatusCodeEnum)[keyof typeof GetCommunityEvents400ResponseStatusCodeEnum]
+
+/**
+ * @export
+ */
+export const GetCommunityEvents400ResponseCodeEnum = {
+  invalid_request: 'invalid_request',
+  invalid_cursor: 'invalid_cursor',
+} as const
+export type GetCommunityEvents400ResponseCodeEnum =
+  (typeof GetCommunityEvents400ResponseCodeEnum)[keyof typeof GetCommunityEvents400ResponseCodeEnum]
+
+/**
+ *
+ * @export
+ * @interface GetCommunityEvents409Response
+ */
+export interface GetCommunityEvents409Response {
+  /**
+   *
+   * @type {GetCommunityEvents409ResponseStatusCodeEnum}
+   * @memberof GetCommunityEvents409Response
+   */
+  statusCode?: GetCommunityEvents409ResponseStatusCodeEnum
+  /**
+   *
+   * @type {GetCommunityEvents409ResponseCodeEnum}
+   * @memberof GetCommunityEvents409Response
+   */
+  code: GetCommunityEvents409ResponseCodeEnum
+  /**
+   *
+   * @type {string}
+   * @memberof GetCommunityEvents409Response
+   */
+  message?: string
+  /**
+   *
+   * @type {GetCommunityEvents409ResponseCurrent}
+   * @memberof GetCommunityEvents409Response
+   */
+  current?: GetCommunityEvents409ResponseCurrent
+}
+
+/**
+ * @export
+ */
+export const GetCommunityEvents409ResponseStatusCodeEnum = {
+  NUMBER_409: 409,
+} as const
+export type GetCommunityEvents409ResponseStatusCodeEnum =
+  (typeof GetCommunityEvents409ResponseStatusCodeEnum)[keyof typeof GetCommunityEvents409ResponseStatusCodeEnum]
+
+/**
+ * @export
+ */
+export const GetCommunityEvents409ResponseCodeEnum = {
+  resync_required: 'resync_required',
+  revision_conflict: 'revision_conflict',
+  binding_changed: 'binding_changed',
+  registration_limit: 'registration_limit',
+} as const
+export type GetCommunityEvents409ResponseCodeEnum =
+  (typeof GetCommunityEvents409ResponseCodeEnum)[keyof typeof GetCommunityEvents409ResponseCodeEnum]
+
+/**
+ *
+ * @export
+ * @interface GetCommunityEvents409ResponseCurrent
+ */
+export interface GetCommunityEvents409ResponseCurrent {
+  /**
+   *
+   * @type {boolean}
+   * @memberof GetCommunityEvents409ResponseCurrent
+   */
+  enabled: boolean
+  /**
+   *
+   * @type {boolean}
+   * @memberof GetCommunityEvents409ResponseCurrent
+   */
+  timezoneConfigured?: boolean
+  /**
+   *
+   * @type {boolean}
+   * @memberof GetCommunityEvents409ResponseCurrent
+   */
+  quietHoursEnabled: boolean
+  /**
+   *
+   * @type {boolean}
+   * @memberof GetCommunityEvents409ResponseCurrent
+   */
+  pushEnabled: boolean
+  /**
+   *
+   * @type {string}
+   * @memberof GetCommunityEvents409ResponseCurrent
+   */
+  quietHoursStart: string
+  /**
+   *
+   * @type {string}
+   * @memberof GetCommunityEvents409ResponseCurrent
+   */
+  quietHoursEnd: string
+  /**
+   * Invariant enforced at runtime and NOT expressible in this schema: the value must be a valid IANA timezone name as resolved by the host Intl database (for example America/New_York). Any other bounded string is rejected.
+   * @type {string}
+   * @memberof GetCommunityEvents409ResponseCurrent
+   */
+  timezone: string
+  /**
+   *
+   * @type {string}
+   * @memberof GetCommunityEvents409ResponseCurrent
+   */
+  revision: string
+}
+/**
+ *
+ * @export
+ * @interface GetCommunityEvents503Response
+ */
+export interface GetCommunityEvents503Response {
+  /**
+   *
+   * @type {GetCommunityEvents503ResponseStatusCodeEnum}
+   * @memberof GetCommunityEvents503Response
+   */
+  statusCode: GetCommunityEvents503ResponseStatusCodeEnum
+  /**
+   *
+   * @type {GetCommunityEvents503ResponseCodeEnum}
+   * @memberof GetCommunityEvents503Response
+   */
+  code: GetCommunityEvents503ResponseCodeEnum
+  /**
+   *
+   * @type {number}
+   * @memberof GetCommunityEvents503Response
+   */
+  retryAfterSeconds: number
+  /**
+   *
+   * @type {string}
+   * @memberof GetCommunityEvents503Response
+   */
+  message: string
+  /**
+   *
+   * @type {string}
+   * @memberof GetCommunityEvents503Response
+   */
+  error?: string
+}
+
+/**
+ * @export
+ */
+export const GetCommunityEvents503ResponseStatusCodeEnum = {
+  NUMBER_503: 503,
+} as const
+export type GetCommunityEvents503ResponseStatusCodeEnum =
+  (typeof GetCommunityEvents503ResponseStatusCodeEnum)[keyof typeof GetCommunityEvents503ResponseStatusCodeEnum]
+
+/**
+ * @export
+ */
+export const GetCommunityEvents503ResponseCodeEnum = {
+  unavailable: 'unavailable',
+} as const
+export type GetCommunityEvents503ResponseCodeEnum =
+  (typeof GetCommunityEvents503ResponseCodeEnum)[keyof typeof GetCommunityEvents503ResponseCodeEnum]
+
+/**
+ *
+ * @export
+ * @interface GetCommunityEventsResponse
+ */
+export interface GetCommunityEventsResponse {
+  /**
+   *
+   * @type {GetCommunityEventsResponseData}
+   * @memberof GetCommunityEventsResponse
+   */
+  data: GetCommunityEventsResponseData
+}
+/**
+ *
+ * @export
+ * @interface GetCommunityEventsResponseData
+ */
+export interface GetCommunityEventsResponseData {
+  /**
+   *
+   * @type {Array<GetCommunityEventsResponseDataEventsInner>}
+   * @memberof GetCommunityEventsResponseData
+   */
+  events: Array<GetCommunityEventsResponseDataEventsInner>
+  /**
+   *
+   * @type {string}
+   * @memberof GetCommunityEventsResponseData
+   */
+  nextCursor: string
+  /**
+   *
+   * @type {boolean}
+   * @memberof GetCommunityEventsResponseData
+   */
+  hasMore: boolean
+  /**
+   *
+   * @type {boolean}
+   * @memberof GetCommunityEventsResponseData
+   */
+  resyncRequired: boolean
+}
+/**
+ * @type GetCommunityEventsResponseDataEventsInner
+ *
+ * @export
+ */
+export type GetCommunityEventsResponseDataEventsInner =
+  | GetCommunityEventsResponseDataEventsInnerOneOf
+  | GetCommunityEventsResponseDataEventsInnerOneOf1
+  | GetCommunityEventsResponseDataEventsInnerOneOf2
+/**
+ *
+ * @export
+ * @interface GetCommunityEventsResponseDataEventsInnerOneOf
+ */
+export interface GetCommunityEventsResponseDataEventsInnerOneOf {
+  /**
+   *
+   * @type {GetCommunityEventsResponseDataEventsInnerOneOfVersionEnum}
+   * @memberof GetCommunityEventsResponseDataEventsInnerOneOf
+   */
+  version: GetCommunityEventsResponseDataEventsInnerOneOfVersionEnum
+  /**
+   *
+   * @type {GetCommunityEventsResponseDataEventsInnerOneOfKindEnum}
+   * @memberof GetCommunityEventsResponseDataEventsInnerOneOf
+   */
+  kind: GetCommunityEventsResponseDataEventsInnerOneOfKindEnum
+  /**
+   *
+   * @type {GetCommunityEventsResponseDataEventsInnerOneOfResyncRequiredEnum}
+   * @memberof GetCommunityEventsResponseDataEventsInnerOneOf
+   */
+  resyncRequired: GetCommunityEventsResponseDataEventsInnerOneOfResyncRequiredEnum
+}
+
+/**
+ * @export
+ */
+export const GetCommunityEventsResponseDataEventsInnerOneOfVersionEnum = {
+  NUMBER_1: 1,
+} as const
+export type GetCommunityEventsResponseDataEventsInnerOneOfVersionEnum =
+  (typeof GetCommunityEventsResponseDataEventsInnerOneOfVersionEnum)[keyof typeof GetCommunityEventsResponseDataEventsInnerOneOfVersionEnum]
+
+/**
+ * @export
+ */
+export const GetCommunityEventsResponseDataEventsInnerOneOfKindEnum = {
+  resync: 'resync',
+} as const
+export type GetCommunityEventsResponseDataEventsInnerOneOfKindEnum =
+  (typeof GetCommunityEventsResponseDataEventsInnerOneOfKindEnum)[keyof typeof GetCommunityEventsResponseDataEventsInnerOneOfKindEnum]
+
+/**
+ * @export
+ */
+export const GetCommunityEventsResponseDataEventsInnerOneOfResyncRequiredEnum = {
+  true: true,
+} as const
+export type GetCommunityEventsResponseDataEventsInnerOneOfResyncRequiredEnum =
+  (typeof GetCommunityEventsResponseDataEventsInnerOneOfResyncRequiredEnum)[keyof typeof GetCommunityEventsResponseDataEventsInnerOneOfResyncRequiredEnum]
+
+/**
+ *
+ * @export
+ * @interface GetCommunityEventsResponseDataEventsInnerOneOf1
+ */
+export interface GetCommunityEventsResponseDataEventsInnerOneOf1 {
+  /**
+   *
+   * @type {GetCommunityEventsResponseDataEventsInnerOneOf1VersionEnum}
+   * @memberof GetCommunityEventsResponseDataEventsInnerOneOf1
+   */
+  version: GetCommunityEventsResponseDataEventsInnerOneOf1VersionEnum
+  /**
+   *
+   * @type {GetCommunityEventsResponseDataEventsInnerOneOf1KindEnum}
+   * @memberof GetCommunityEventsResponseDataEventsInnerOneOf1
+   */
+  kind: GetCommunityEventsResponseDataEventsInnerOneOf1KindEnum
+  /**
+   *
+   * @type {string}
+   * @memberof GetCommunityEventsResponseDataEventsInnerOneOf1
+   */
+  postId: string
+  /**
+   *
+   * @type {string}
+   * @memberof GetCommunityEventsResponseDataEventsInnerOneOf1
+   */
+  commentId?: string
+  /**
+   *
+   * @type {string}
+   * @memberof GetCommunityEventsResponseDataEventsInnerOneOf1
+   */
+  parentId?: string
+  /**
+   *
+   * @type {string}
+   * @memberof GetCommunityEventsResponseDataEventsInnerOneOf1
+   */
+  communityRevision: string
+}
+
+/**
+ * @export
+ */
+export const GetCommunityEventsResponseDataEventsInnerOneOf1VersionEnum = {
+  NUMBER_1: 1,
+} as const
+export type GetCommunityEventsResponseDataEventsInnerOneOf1VersionEnum =
+  (typeof GetCommunityEventsResponseDataEventsInnerOneOf1VersionEnum)[keyof typeof GetCommunityEventsResponseDataEventsInnerOneOf1VersionEnum]
+
+/**
+ * @export
+ */
+export const GetCommunityEventsResponseDataEventsInnerOneOf1KindEnum = {
+  post_published: 'post.published',
+  reactions_changed: 'reactions.changed',
+  comment_published: 'comment.published',
+} as const
+export type GetCommunityEventsResponseDataEventsInnerOneOf1KindEnum =
+  (typeof GetCommunityEventsResponseDataEventsInnerOneOf1KindEnum)[keyof typeof GetCommunityEventsResponseDataEventsInnerOneOf1KindEnum]
+
+/**
+ *
+ * @export
+ * @interface GetCommunityEventsResponseDataEventsInnerOneOf2
+ */
+export interface GetCommunityEventsResponseDataEventsInnerOneOf2 {
+  /**
+   *
+   * @type {GetCommunityEventsResponseDataEventsInnerOneOf2VersionEnum}
+   * @memberof GetCommunityEventsResponseDataEventsInnerOneOf2
+   */
+  version: GetCommunityEventsResponseDataEventsInnerOneOf2VersionEnum
+  /**
+   *
+   * @type {GetCommunityEventsResponseDataEventsInnerOneOf2KindEnum}
+   * @memberof GetCommunityEventsResponseDataEventsInnerOneOf2
+   */
+  kind: GetCommunityEventsResponseDataEventsInnerOneOf2KindEnum
+  /**
+   *
+   * @type {string}
+   * @memberof GetCommunityEventsResponseDataEventsInnerOneOf2
+   */
+  postId: string
+  /**
+   *
+   * @type {string}
+   * @memberof GetCommunityEventsResponseDataEventsInnerOneOf2
+   */
+  commentId: string
+  /**
+   *
+   * @type {string}
+   * @memberof GetCommunityEventsResponseDataEventsInnerOneOf2
+   */
+  privateRevision: string
+}
+
+/**
+ * @export
+ */
+export const GetCommunityEventsResponseDataEventsInnerOneOf2VersionEnum = {
+  NUMBER_1: 1,
+} as const
+export type GetCommunityEventsResponseDataEventsInnerOneOf2VersionEnum =
+  (typeof GetCommunityEventsResponseDataEventsInnerOneOf2VersionEnum)[keyof typeof GetCommunityEventsResponseDataEventsInnerOneOf2VersionEnum]
+
+/**
+ * @export
+ */
+export const GetCommunityEventsResponseDataEventsInnerOneOf2KindEnum = {
+  comment_status: 'comment.status',
+} as const
+export type GetCommunityEventsResponseDataEventsInnerOneOf2KindEnum =
+  (typeof GetCommunityEventsResponseDataEventsInnerOneOf2KindEnum)[keyof typeof GetCommunityEventsResponseDataEventsInnerOneOf2KindEnum]
+
+/**
+ *
+ * @export
+ * @interface GetCommunityNotificationPreferences409Response
+ */
+export interface GetCommunityNotificationPreferences409Response {
+  /**
+   *
+   * @type {GetCommunityNotificationPreferences409ResponseStatusCodeEnum}
+   * @memberof GetCommunityNotificationPreferences409Response
+   */
+  statusCode?: GetCommunityNotificationPreferences409ResponseStatusCodeEnum
+  /**
+   *
+   * @type {GetCommunityNotificationPreferences409ResponseCodeEnum}
+   * @memberof GetCommunityNotificationPreferences409Response
+   */
+  code: GetCommunityNotificationPreferences409ResponseCodeEnum
+  /**
+   *
+   * @type {string}
+   * @memberof GetCommunityNotificationPreferences409Response
+   */
+  message?: string
+  /**
+   *
+   * @type {GetCommunityNotificationPreferences409ResponseCurrent}
+   * @memberof GetCommunityNotificationPreferences409Response
+   */
+  current?: GetCommunityNotificationPreferences409ResponseCurrent
+}
+
+/**
+ * @export
+ */
+export const GetCommunityNotificationPreferences409ResponseStatusCodeEnum = {
+  NUMBER_409: 409,
+} as const
+export type GetCommunityNotificationPreferences409ResponseStatusCodeEnum =
+  (typeof GetCommunityNotificationPreferences409ResponseStatusCodeEnum)[keyof typeof GetCommunityNotificationPreferences409ResponseStatusCodeEnum]
+
+/**
+ * @export
+ */
+export const GetCommunityNotificationPreferences409ResponseCodeEnum = {
+  resync_required: 'resync_required',
+  revision_conflict: 'revision_conflict',
+  binding_changed: 'binding_changed',
+  registration_limit: 'registration_limit',
+} as const
+export type GetCommunityNotificationPreferences409ResponseCodeEnum =
+  (typeof GetCommunityNotificationPreferences409ResponseCodeEnum)[keyof typeof GetCommunityNotificationPreferences409ResponseCodeEnum]
+
+/**
+ *
+ * @export
+ * @interface GetCommunityNotificationPreferences409ResponseCurrent
+ */
+export interface GetCommunityNotificationPreferences409ResponseCurrent {
+  /**
+   *
+   * @type {boolean}
+   * @memberof GetCommunityNotificationPreferences409ResponseCurrent
+   */
+  enabled: boolean
+  /**
+   *
+   * @type {boolean}
+   * @memberof GetCommunityNotificationPreferences409ResponseCurrent
+   */
+  timezoneConfigured?: boolean
+  /**
+   *
+   * @type {boolean}
+   * @memberof GetCommunityNotificationPreferences409ResponseCurrent
+   */
+  quietHoursEnabled: boolean
+  /**
+   *
+   * @type {boolean}
+   * @memberof GetCommunityNotificationPreferences409ResponseCurrent
+   */
+  pushEnabled: boolean
+  /**
+   *
+   * @type {string}
+   * @memberof GetCommunityNotificationPreferences409ResponseCurrent
+   */
+  quietHoursStart: string
+  /**
+   *
+   * @type {string}
+   * @memberof GetCommunityNotificationPreferences409ResponseCurrent
+   */
+  quietHoursEnd: string
+  /**
+   * Invariant enforced at runtime and NOT expressible in this schema: the value must be a valid IANA timezone name as resolved by the host Intl database (for example America/New_York). Any other bounded string is rejected.
+   * @type {string}
+   * @memberof GetCommunityNotificationPreferences409ResponseCurrent
+   */
+  timezone: string
+  /**
+   *
+   * @type {string}
+   * @memberof GetCommunityNotificationPreferences409ResponseCurrent
+   */
+  revision: string
+}
+/**
+ *
+ * @export
+ * @interface GetCommunityNotificationPreferencesResponse
+ */
+export interface GetCommunityNotificationPreferencesResponse {
+  /**
+   *
+   * @type {GetCommunityNotificationPreferences409ResponseCurrent}
+   * @memberof GetCommunityNotificationPreferencesResponse
+   */
+  data: GetCommunityNotificationPreferences409ResponseCurrent
+}
+/**
+ *
+ * @export
+ * @interface GetPushRegistrationsResponse
+ */
+export interface GetPushRegistrationsResponse {
+  /**
+   *
+   * @type {GetPushRegistrationsResponseData}
+   * @memberof GetPushRegistrationsResponse
+   */
+  data: GetPushRegistrationsResponseData
+}
+/**
+ *
+ * @export
+ * @interface GetPushRegistrationsResponseData
+ */
+export interface GetPushRegistrationsResponseData {
+  /**
+   *
+   * @type {Array<RegisterPushTokenResponseData>}
+   * @memberof GetPushRegistrationsResponseData
+   */
+  registrations: Array<RegisterPushTokenResponseData>
+}
+/**
+ *
+ * @export
  * @interface GuardianConsentInput
  */
 export interface GuardianConsentInput {
@@ -7325,6 +7907,62 @@ export const PaletteSource = {
 export type PaletteSource = (typeof PaletteSource)[keyof typeof PaletteSource]
 
 /**
+ *
+ * @export
+ * @interface PatchCommunityNotificationPreferencesInput
+ */
+export interface PatchCommunityNotificationPreferencesInput {
+  /**
+   *
+   * @type {string}
+   * @memberof PatchCommunityNotificationPreferencesInput
+   */
+  baseRevision: string
+  /**
+   *
+   * @type {boolean}
+   * @memberof PatchCommunityNotificationPreferencesInput
+   */
+  enabled?: boolean
+  /**
+   *
+   * @type {boolean}
+   * @memberof PatchCommunityNotificationPreferencesInput
+   */
+  quietHoursEnabled?: boolean
+  /**
+   *
+   * @type {string}
+   * @memberof PatchCommunityNotificationPreferencesInput
+   */
+  quietHoursStart?: string
+  /**
+   *
+   * @type {string}
+   * @memberof PatchCommunityNotificationPreferencesInput
+   */
+  quietHoursEnd?: string
+  /**
+   * Invariant enforced at runtime and NOT expressible in this schema: the value must be a valid IANA timezone name as resolved by the host Intl database (for example America/New_York). Any other bounded string is rejected.
+   * @type {string}
+   * @memberof PatchCommunityNotificationPreferencesInput
+   */
+  timezone?: string
+}
+/**
+ *
+ * @export
+ * @interface PatchCommunityNotificationPreferencesResponse
+ */
+export interface PatchCommunityNotificationPreferencesResponse {
+  /**
+   *
+   * @type {GetCommunityNotificationPreferences409ResponseCurrent}
+   * @memberof PatchCommunityNotificationPreferencesResponse
+   */
+  data: GetCommunityNotificationPreferences409ResponseCurrent
+}
+/**
  * @type PlannerDayResult
  *
  * @export
@@ -8161,6 +8799,179 @@ export interface QueueMetrics {
 /**
  *
  * @export
+ * @interface RegisterPushTokenInput
+ */
+export interface RegisterPushTokenInput {
+  /**
+   *
+   * @type {string}
+   * @memberof RegisterPushTokenInput
+   */
+  token: string
+  /**
+   *
+   * @type {string}
+   * @memberof RegisterPushTokenInput
+   */
+  installationId: string
+  /**
+   *
+   * @type {RegisterPushTokenInputPlatformEnum}
+   * @memberof RegisterPushTokenInput
+   */
+  platform: RegisterPushTokenInputPlatformEnum
+  /**
+   *
+   * @type {RegisterPushTokenInputPermissionEnum}
+   * @memberof RegisterPushTokenInput
+   */
+  permission: RegisterPushTokenInputPermissionEnum
+  /**
+   *
+   * @type {RegisterPushTokenInputExpectedBinding}
+   * @memberof RegisterPushTokenInput
+   */
+  expectedBinding?: RegisterPushTokenInputExpectedBinding
+  /**
+   *
+   * @type {boolean}
+   * @memberof RegisterPushTokenInput
+   */
+  transfer?: boolean
+}
+
+/**
+ * @export
+ */
+export const RegisterPushTokenInputPlatformEnum = {
+  ios: 'ios',
+  android: 'android',
+} as const
+export type RegisterPushTokenInputPlatformEnum =
+  (typeof RegisterPushTokenInputPlatformEnum)[keyof typeof RegisterPushTokenInputPlatformEnum]
+
+/**
+ * @export
+ */
+export const RegisterPushTokenInputPermissionEnum = {
+  granted: 'granted',
+  denied: 'denied',
+  undetermined: 'undetermined',
+} as const
+export type RegisterPushTokenInputPermissionEnum =
+  (typeof RegisterPushTokenInputPermissionEnum)[keyof typeof RegisterPushTokenInputPermissionEnum]
+
+/**
+ *
+ * @export
+ * @interface RegisterPushTokenInputExpectedBinding
+ */
+export interface RegisterPushTokenInputExpectedBinding {
+  /**
+   *
+   * @type {string}
+   * @memberof RegisterPushTokenInputExpectedBinding
+   */
+  registrationId: string
+  /**
+   *
+   * @type {number}
+   * @memberof RegisterPushTokenInputExpectedBinding
+   */
+  bindingGeneration: number
+}
+/**
+ *
+ * @export
+ * @interface RegisterPushTokenResponse
+ */
+export interface RegisterPushTokenResponse {
+  /**
+   *
+   * @type {RegisterPushTokenResponseData}
+   * @memberof RegisterPushTokenResponse
+   */
+  data: RegisterPushTokenResponseData
+}
+/**
+ *
+ * @export
+ * @interface RegisterPushTokenResponseData
+ */
+export interface RegisterPushTokenResponseData {
+  /**
+   *
+   * @type {string}
+   * @memberof RegisterPushTokenResponseData
+   */
+  registrationId: string
+  /**
+   *
+   * @type {number}
+   * @memberof RegisterPushTokenResponseData
+   */
+  bindingGeneration: number
+  /**
+   *
+   * @type {string}
+   * @memberof RegisterPushTokenResponseData
+   */
+  platform: string | null
+  /**
+   *
+   * @type {RegisterPushTokenResponseDataPermissionEnum}
+   * @memberof RegisterPushTokenResponseData
+   */
+  permission: RegisterPushTokenResponseDataPermissionEnum
+  /**
+   *
+   * @type {string}
+   * @memberof RegisterPushTokenResponseData
+   */
+  lastUsedAt: string
+}
+
+/**
+ * @export
+ */
+export const RegisterPushTokenResponseDataPermissionEnum = {
+  granted: 'granted',
+  denied: 'denied',
+  undetermined: 'undetermined',
+  unknown: 'unknown',
+} as const
+export type RegisterPushTokenResponseDataPermissionEnum =
+  (typeof RegisterPushTokenResponseDataPermissionEnum)[keyof typeof RegisterPushTokenResponseDataPermissionEnum]
+
+/**
+ *
+ * @export
+ * @interface RemovePushRegistrationResponse
+ */
+export interface RemovePushRegistrationResponse {
+  /**
+   *
+   * @type {RemovePushRegistrationResponseData}
+   * @memberof RemovePushRegistrationResponse
+   */
+  data: RemovePushRegistrationResponseData
+}
+/**
+ *
+ * @export
+ * @interface RemovePushRegistrationResponseData
+ */
+export interface RemovePushRegistrationResponseData {
+  /**
+   *
+   * @type {boolean}
+   * @memberof RemovePushRegistrationResponseData
+   */
+  removed: boolean
+}
+/**
+ *
+ * @export
  * @interface ReportCommunityCommentInput
  */
 export interface ReportCommunityCommentInput {
@@ -8273,6 +9084,288 @@ export const ReportCommunityPostInputReasonEnum = {
 } as const
 export type ReportCommunityPostInputReasonEnum =
   (typeof ReportCommunityPostInputReasonEnum)[keyof typeof ReportCommunityPostInputReasonEnum]
+
+/**
+ * Resolve one to fifty targets with unique correlation keys. Every parentId requires commentId.
+ * @export
+ * @interface ResolveCommunityTargetsInput
+ */
+export interface ResolveCommunityTargetsInput {
+  /**
+   *
+   * @type {Array<ResolveCommunityTargetsInputTargetsInner>}
+   * @memberof ResolveCommunityTargetsInput
+   */
+  targets: Array<ResolveCommunityTargetsInputTargetsInner>
+}
+/**
+ *
+ * @export
+ * @interface ResolveCommunityTargetsInputTargetsInner
+ */
+export interface ResolveCommunityTargetsInputTargetsInner {
+  /**
+   *
+   * @type {string}
+   * @memberof ResolveCommunityTargetsInputTargetsInner
+   */
+  key: string
+  /**
+   *
+   * @type {string}
+   * @memberof ResolveCommunityTargetsInputTargetsInner
+   */
+  postId: string
+  /**
+   *
+   * @type {string}
+   * @memberof ResolveCommunityTargetsInputTargetsInner
+   */
+  commentId?: string
+  /**
+   *
+   * @type {string}
+   * @memberof ResolveCommunityTargetsInputTargetsInner
+   */
+  parentId?: string
+}
+/**
+ *
+ * @export
+ * @interface ResolveCommunityTargetsResponse
+ */
+export interface ResolveCommunityTargetsResponse {
+  /**
+   *
+   * @type {ResolveCommunityTargetsResponseData}
+   * @memberof ResolveCommunityTargetsResponse
+   */
+  data: ResolveCommunityTargetsResponseData
+}
+/**
+ *
+ * @export
+ * @interface ResolveCommunityTargetsResponseData
+ */
+export interface ResolveCommunityTargetsResponseData {
+  /**
+   *
+   * @type {Array<ResolveCommunityTargetsResponseDataTargetsInner>}
+   * @memberof ResolveCommunityTargetsResponseData
+   */
+  targets: Array<ResolveCommunityTargetsResponseDataTargetsInner>
+}
+/**
+ * @type ResolveCommunityTargetsResponseDataTargetsInner
+ *
+ * @export
+ */
+export type ResolveCommunityTargetsResponseDataTargetsInner =
+  | ResolveCommunityTargetsResponseDataTargetsInnerOneOf
+  | ResolveCommunityTargetsResponseDataTargetsInnerOneOf1
+/**
+ *
+ * @export
+ * @interface ResolveCommunityTargetsResponseDataTargetsInnerOneOf
+ */
+export interface ResolveCommunityTargetsResponseDataTargetsInnerOneOf {
+  /**
+   *
+   * @type {string}
+   * @memberof ResolveCommunityTargetsResponseDataTargetsInnerOneOf
+   */
+  key: string
+  /**
+   *
+   * @type {ResolveCommunityTargetsResponseDataTargetsInnerOneOfStatusEnum}
+   * @memberof ResolveCommunityTargetsResponseDataTargetsInnerOneOf
+   */
+  status: ResolveCommunityTargetsResponseDataTargetsInnerOneOfStatusEnum
+}
+
+/**
+ * @export
+ */
+export const ResolveCommunityTargetsResponseDataTargetsInnerOneOfStatusEnum = {
+  unavailable: 'unavailable',
+} as const
+export type ResolveCommunityTargetsResponseDataTargetsInnerOneOfStatusEnum =
+  (typeof ResolveCommunityTargetsResponseDataTargetsInnerOneOfStatusEnum)[keyof typeof ResolveCommunityTargetsResponseDataTargetsInnerOneOfStatusEnum]
+
+/**
+ *
+ * @export
+ * @interface ResolveCommunityTargetsResponseDataTargetsInnerOneOf1
+ */
+export interface ResolveCommunityTargetsResponseDataTargetsInnerOneOf1 {
+  /**
+   *
+   * @type {string}
+   * @memberof ResolveCommunityTargetsResponseDataTargetsInnerOneOf1
+   */
+  key: string
+  /**
+   *
+   * @type {ResolveCommunityTargetsResponseDataTargetsInnerOneOf1StatusEnum}
+   * @memberof ResolveCommunityTargetsResponseDataTargetsInnerOneOf1
+   */
+  status: ResolveCommunityTargetsResponseDataTargetsInnerOneOf1StatusEnum
+  /**
+   *
+   * @type {string}
+   * @memberof ResolveCommunityTargetsResponseDataTargetsInnerOneOf1
+   */
+  communityRevision: string
+  /**
+   *
+   * @type {ResolveCommunityTargetsResponseDataTargetsInnerOneOf1Post}
+   * @memberof ResolveCommunityTargetsResponseDataTargetsInnerOneOf1
+   */
+  post: ResolveCommunityTargetsResponseDataTargetsInnerOneOf1Post
+  /**
+   *
+   * @type {CommunityCommentsResponseDataItemsInner}
+   * @memberof ResolveCommunityTargetsResponseDataTargetsInnerOneOf1
+   */
+  comment: CommunityCommentsResponseDataItemsInner | null
+  /**
+   *
+   * @type {CommunityCommentsResponseDataItemsInner}
+   * @memberof ResolveCommunityTargetsResponseDataTargetsInnerOneOf1
+   */
+  parent: CommunityCommentsResponseDataItemsInner | null
+  /**
+   *
+   * @type {string}
+   * @memberof ResolveCommunityTargetsResponseDataTargetsInnerOneOf1
+   */
+  pageCursor: string | null
+  /**
+   *
+   * @type {string}
+   * @memberof ResolveCommunityTargetsResponseDataTargetsInnerOneOf1
+   */
+  parentPageCursor: string | null
+  /**
+   *
+   * @type {number}
+   * @memberof ResolveCommunityTargetsResponseDataTargetsInnerOneOf1
+   */
+  threadPosition: number | null
+}
+
+/**
+ * @export
+ */
+export const ResolveCommunityTargetsResponseDataTargetsInnerOneOf1StatusEnum = {
+  available: 'available',
+} as const
+export type ResolveCommunityTargetsResponseDataTargetsInnerOneOf1StatusEnum =
+  (typeof ResolveCommunityTargetsResponseDataTargetsInnerOneOf1StatusEnum)[keyof typeof ResolveCommunityTargetsResponseDataTargetsInnerOneOf1StatusEnum]
+
+/**
+ *
+ * @export
+ * @interface ResolveCommunityTargetsResponseDataTargetsInnerOneOf1Post
+ */
+export interface ResolveCommunityTargetsResponseDataTargetsInnerOneOf1Post {
+  /**
+   *
+   * @type {string}
+   * @memberof ResolveCommunityTargetsResponseDataTargetsInnerOneOf1Post
+   */
+  id: string
+  /**
+   *
+   * @type {string}
+   * @memberof ResolveCommunityTargetsResponseDataTargetsInnerOneOf1Post
+   */
+  caption: string | null
+  /**
+   *
+   * @type {string}
+   * @memberof ResolveCommunityTargetsResponseDataTargetsInnerOneOf1Post
+   */
+  altText: string | null
+  /**
+   * The climate band stamped when the post was published, or null if unclassified.
+   * @type {ResolveCommunityTargetsResponseDataTargetsInnerOneOf1PostClimateBandEnum}
+   * @memberof ResolveCommunityTargetsResponseDataTargetsInnerOneOf1Post
+   */
+  climateBand: ResolveCommunityTargetsResponseDataTargetsInnerOneOf1PostClimateBandEnum | null
+  /**
+   *
+   * @type {ApiV1CommunityFeedGet200ResponseAnyOfDataItemsInnerImageAccess}
+   * @memberof ResolveCommunityTargetsResponseDataTargetsInnerOneOf1Post
+   */
+  imageAccess: ApiV1CommunityFeedGet200ResponseAnyOfDataItemsInnerImageAccess
+  /**
+   *
+   * @type {string}
+   * @memberof ResolveCommunityTargetsResponseDataTargetsInnerOneOf1Post
+   */
+  publishedAt: string | null
+  /**
+   *
+   * @type {string}
+   * @memberof ResolveCommunityTargetsResponseDataTargetsInnerOneOf1Post
+   */
+  createdAt: string
+  /**
+   *
+   * @type {ResolveCommunityTargetsResponseDataTargetsInnerOneOf1PostStatusEnum}
+   * @memberof ResolveCommunityTargetsResponseDataTargetsInnerOneOf1Post
+   */
+  status: ResolveCommunityTargetsResponseDataTargetsInnerOneOf1PostStatusEnum
+  /**
+   *
+   * @type {string}
+   * @memberof ResolveCommunityTargetsResponseDataTargetsInnerOneOf1Post
+   */
+  challengeId: string | null
+  /**
+   *
+   * @type {ApiV1CommunityFeedGet200ResponseAnyOfDataItemsInnerAuthor}
+   * @memberof ResolveCommunityTargetsResponseDataTargetsInnerOneOf1Post
+   */
+  author: ApiV1CommunityFeedGet200ResponseAnyOfDataItemsInnerAuthor
+  /**
+   *
+   * @type {ApiV1CommunityPostsPostIdGet200ResponseAnyOfDataReactions}
+   * @memberof ResolveCommunityTargetsResponseDataTargetsInnerOneOf1Post
+   */
+  reactions: ApiV1CommunityPostsPostIdGet200ResponseAnyOfDataReactions
+}
+
+/**
+ * @export
+ */
+export const ResolveCommunityTargetsResponseDataTargetsInnerOneOf1PostClimateBandEnum = {
+  cold_wet: 'cold_wet',
+  cold_dry: 'cold_dry',
+  temperate_wet: 'temperate_wet',
+  temperate_dry: 'temperate_dry',
+  warm_wet: 'warm_wet',
+  warm_dry: 'warm_dry',
+} as const
+export type ResolveCommunityTargetsResponseDataTargetsInnerOneOf1PostClimateBandEnum =
+  (typeof ResolveCommunityTargetsResponseDataTargetsInnerOneOf1PostClimateBandEnum)[keyof typeof ResolveCommunityTargetsResponseDataTargetsInnerOneOf1PostClimateBandEnum]
+
+/**
+ * @export
+ */
+export const ResolveCommunityTargetsResponseDataTargetsInnerOneOf1PostStatusEnum = {
+  draft: 'draft',
+  uploading: 'uploading',
+  pending_review: 'pending_review',
+  published: 'published',
+  flagged: 'flagged',
+  review_failed: 'review_failed',
+  withdrawn: 'withdrawn',
+  consent_suspended: 'consent_suspended',
+} as const
+export type ResolveCommunityTargetsResponseDataTargetsInnerOneOf1PostStatusEnum =
+  (typeof ResolveCommunityTargetsResponseDataTargetsInnerOneOf1PostStatusEnum)[keyof typeof ResolveCommunityTargetsResponseDataTargetsInnerOneOf1PostStatusEnum]
 
 /**
  *

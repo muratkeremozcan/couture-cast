@@ -223,7 +223,7 @@ export function SilhouetteEditor({
     setIsLoading(true)
     setLoadError(null)
     try {
-      userIdRef.current = resolveOwnerUserId(accessToken)
+      userIdRef.current = await resolveOwnerUserId(accessToken)
       const next = await getSilhouetteProfileFromMobile(accessToken)
       applyProfile(next)
       // A fresh mount (e.g. reopening this screen after the app was closed

@@ -94,18 +94,38 @@ describe('PrismaAlertFanoutRepository', () => {
   it('loads only token values for the requested owner', async () => {
     const { repository, pushTokenFindMany } = createRepository()
     pushTokenFindMany.mockResolvedValue([
-      { token: 'ExponentPushToken[first]' },
-      { token: 'ExponentPushToken[second]' },
+      {
+        token: 'ExponentPushToken[first]',
+        id: 'first',
+        user_id: 'user-1',
+        binding_generation: 1,
+      },
+      {
+        token: 'ExponentPushToken[second]',
+        id: 'second',
+        user_id: 'user-1',
+        binding_generation: 3,
+      },
     ])
 
     await expect(repository.findPushTokensByUserId('user-1')).resolves.toEqual([
-      'ExponentPushToken[first]',
-      'ExponentPushToken[second]',
+      {
+        token: 'ExponentPushToken[first]',
+        registrationId: 'first',
+        ownerId: 'user-1',
+        bindingGeneration: 1,
+      },
+      {
+        token: 'ExponentPushToken[second]',
+        registrationId: 'second',
+        ownerId: 'user-1',
+        bindingGeneration: 3,
+      },
     ])
     expect(pushTokenFindMany).toHaveBeenCalledWith({
       where: { user_id: 'user-1' },
       orderBy: { id: 'asc' },
-      select: { token: true },
+      select: { token: true, id: true, user_id: true, binding_generation: true },
     })
   })
 

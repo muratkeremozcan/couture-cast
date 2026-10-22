@@ -1,3 +1,4 @@
+import type { CapturedPushBinding } from '../notifications/push-token.repository.js'
 import type { AlertWeatherEvent } from '@couture/api-client/types/socket-events'
 
 import type {
@@ -54,7 +55,7 @@ export abstract class AlertFanoutRepository {
   abstract findPreferenceByUserId(
     userId: string
   ): Promise<NotificationPreferenceSnapshot | null>
-  abstract findPushTokensByUserId(userId: string): Promise<string[]>
+  abstract findPushTokensByUserId(userId: string): Promise<CapturedPushBinding[]>
   abstract recordOutcome(input: AlertFanoutAuditInput): Promise<void>
   abstract hasRealtimeBeenPublished(eventId: string): Promise<boolean>
 }

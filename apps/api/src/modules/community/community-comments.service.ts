@@ -1,3 +1,7 @@
+import {
+  CommunityAuthorizationBudget,
+  communityDependency,
+} from './community-availability.js'
 // Story 6.4 owner: rollout and transactional eligibility for comment operations.
 import {
   ForbiddenException,
@@ -26,6 +30,35 @@ export class CommunityCommentsService {
     @Inject(GuardianService) private readonly guardian: GuardianService
   ) {}
 
+  private async readAuthorized<T>(member: string, work: () => Promise<T>): Promise<T> {
+    const budget = new CommunityAuthorizationBudget()
+    return communityDependency(() =>
+      budget.run(async () => {
+        // An erased subject is a terminal denial before any flag-cache read (D3).
+        await this.repository.assertSubjectAvailable(member, budget)
+        let grant = await this.flags.communityReadEvaluation(member, budget)
+        if (!grant.value)
+          throw new ForbiddenException({
+            statusCode: 403,
+            code: 'denied',
+            message: COMMUNITY_FEED_DISABLED_MESSAGE,
+          })
+        await this.repository.assertReadEligibility(member, budget)
+        const result = await work()
+        await this.repository.assertReadEligibility(member, budget)
+        if (performance.now() >= grant.validUntil)
+          grant = await this.flags.communityReadEvaluation(member, budget)
+        budget.check(grant)
+        if (!grant.value)
+          throw new ForbiddenException({
+            statusCode: 403,
+            code: 'denied',
+            message: COMMUNITY_FEED_DISABLED_MESSAGE,
+          })
+        return result
+      })
+    )
+  }
   private async eligibility(userId: string, create = false) {
     const read = await this.flags.getFeatureFlag('community_read_enabled', userId)
     if (!read) throw new ServiceUnavailableException(COMMUNITY_FEED_DISABLED_MESSAGE)
@@ -61,6 +94,15 @@ export class CommunityCommentsService {
     cursor?: string
     limit: number
   }) {
+    return this.readAuthorized(params.userId, () => this.listSnapshot(params))
+  }
+  private async listSnapshot(params: {
+    userId: string
+    postId: string
+    parentId: string | null
+    cursor?: string
+    limit: number
+  }) {
     return this.repository.list({
       ...params,
       eligible: await this.eligibility(params.userId),
@@ -68,6 +110,14 @@ export class CommunityCommentsService {
   }
 
   async submissions(params: {
+    userId: string
+    postId: string
+    cursor?: string
+    limit: number
+  }) {
+    return this.readAuthorized(params.userId, () => this.submissionsSnapshot(params))
+  }
+  private async submissionsSnapshot(params: {
     userId: string
     postId: string
     cursor?: string

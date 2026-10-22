@@ -1,3 +1,4 @@
+import type { CapturedPushBinding } from '../notifications/push-token.repository.js'
 import { Inject, Injectable } from '@nestjs/common'
 import { Prisma, PrismaClient } from '@prisma/client'
 
@@ -60,13 +61,18 @@ export class PrismaAlertFanoutRepository extends AlertFanoutRepository {
     }
   }
 
-  async findPushTokensByUserId(userId: string): Promise<string[]> {
+  async findPushTokensByUserId(userId: string): Promise<CapturedPushBinding[]> {
     const records = await this.prisma.pushToken.findMany({
       where: { user_id: userId },
       orderBy: { id: 'asc' },
-      select: { token: true },
+      select: { token: true, id: true, user_id: true, binding_generation: true },
     })
-    return records.map((record) => record.token)
+    return records.map((record) => ({
+      token: record.token,
+      registrationId: record.id,
+      ownerId: record.user_id,
+      bindingGeneration: record.binding_generation,
+    }))
   }
 
   async recordOutcome(input: AlertFanoutAuditInput): Promise<void> {

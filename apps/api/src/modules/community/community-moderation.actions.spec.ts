@@ -12,12 +12,22 @@ describe('CommunityModerationActionsService', () => {
   const reportUpdateMany = vi.fn().mockResolvedValue({ count: 1 })
   const reportFindUniqueOrThrow = vi.fn()
 
+  const eligibleProfile = {
+    birthdate: new Date('1990-01-01'),
+    preferences: { compliance: { accountStatus: 'active' } },
+  }
   const prisma = {
+    $executeRaw: vi.fn().mockResolvedValue(1),
+    userProfile: { findUnique: vi.fn().mockResolvedValue(eligibleProfile) },
+    user: {
+      findUnique: vi.fn().mockResolvedValue({ profile: eligibleProfile, teen_roles: [] }),
+    },
     $queryRaw: queryRaw,
     $transaction: vi.fn((callback: (tx: PrismaClient) => Promise<unknown>) =>
       callback(prisma as unknown as PrismaClient)
     ),
     lookbookPost: {
+      findUnique: vi.fn().mockResolvedValue({ id: 'post-1', user_id: 'owner-1' }),
       findUniqueOrThrow: postFindUniqueOrThrow,
       update: postUpdate,
     },
@@ -30,6 +40,7 @@ describe('CommunityModerationActionsService', () => {
 
   const post = (overrides: Record<string, unknown> = {}) => ({
     id: 'post-1',
+    user_id: 'owner-1',
     status: 'flagged',
     caption: 'Autumn commute look',
     alt_text: 'A denim jacket over a striped shirt',
@@ -42,7 +53,9 @@ describe('CommunityModerationActionsService', () => {
   })
 
   const createService = () =>
-    new CommunityModerationActionsService(prisma as unknown as PrismaClient)
+    new CommunityModerationActionsService(prisma as unknown as PrismaClient, {
+      getFeatureFlag: vi.fn().mockResolvedValue(true),
+    })
 
   beforeEach(() => {
     vi.clearAllMocks()

@@ -51,9 +51,22 @@ const authSession = base.extend<AuthFixtures>({
 // every other endpoint.
 const networkErrorMonitor = base.extend(createNetworkErrorMonitorFixture())
 
+// Service-role headers belong to API seeding only. Browser contexts carry none, so
+// every page proves the app sends its own bearer (see environments.ts apiHeaders).
+const serviceRequest = base.extend({
+  request: async ({ playwright }, use) => {
+    const request = await playwright.request.newContext({
+      extraHTTPHeaders: environment.apiHeaders,
+    })
+    await use(request)
+    await request.dispose()
+  },
+})
+
 // Compose base Playwright test with playwright-utils fixtures and local fixtures.
 export const test = mergeTests(
   base,
+  serviceRequest,
   authSession,
   interceptNetworkCall,
   apiRequest,

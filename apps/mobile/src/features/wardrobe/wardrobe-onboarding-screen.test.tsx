@@ -94,7 +94,7 @@ function fakeAccessToken(userId: string): string {
   return `header.${payload}.signature`
 }
 
-const ACCESS_TOKEN = fakeAccessToken('user-1')
+const ACCESS_TOKEN = fakeAccessToken('auth-principal-user-1')
 
 const notStartedState = {
   status: 'not_started' as const,
@@ -172,6 +172,23 @@ describe('WardrobeOnboardingScreen', () => {
   })
 
   beforeEach(() => {
+    server.use(
+      http.get('*/api/v1/user/profile', ({ request }) => {
+        if (request.headers.get('authorization') !== `Bearer ${ACCESS_TOKEN}`)
+          return HttpResponse.json({ message: 'Unauthorized' }, { status: 401 })
+        return HttpResponse.json({
+          user: {
+            id: 'user-1',
+            email: 'owner@synthetic.test',
+            displayName: null,
+            birthdate: '1990-01-01T00:00:00.000Z',
+            role: 'guardian',
+          },
+          linkedGuardians: [],
+          linkedTeens: [],
+        })
+      })
+    )
     process.env.EXPO_PUBLIC_API_BASE_URL = window.location.origin
     restoreAccessTokenResolver = setMobileAccessTokenResolver(() => ACCESS_TOKEN)
     imagePicker.requestCameraPermissionsAsync.mockResolvedValue({ granted: true })
@@ -219,13 +236,13 @@ describe('WardrobeOnboardingScreen', () => {
   })
 
   it('4.4-MOB-ONB-03 grants permission and advances to the capture step', async () => {
+    const writes: { etag: string | null; body: unknown }[] = []
     server.use(
       http.get('*/api/v1/wardrobe/onboarding', () =>
         HttpResponse.json({ data: notStartedState })
       ),
       http.patch('*/api/v1/wardrobe/onboarding', async ({ request }) => {
-        expect(request.headers.get('if-match')).toBe('"onboarding:user-1:0"')
-        expect(await request.json()).toEqual({ targetStep: 'capture' })
+        writes.push({ etag: request.headers.get('if-match'), body: await request.json() })
         return HttpResponse.json({
           data: { ...inProgressState, currentStep: 'capture', revision: 1 },
         })
@@ -241,20 +258,25 @@ describe('WardrobeOnboardingScreen', () => {
       expect(screen.getByTestId('onboarding-capture-step')).toBeInTheDocument()
     })
     expect(screen.getByTestId('onboarding-use-starter')).toBeInTheDocument()
+    expect(writes).toEqual([
+      { etag: '"onboarding:user-1:0"', body: { targetStep: 'capture' } },
+    ])
   })
 
   it('4.4-MOB-ONB-04 shows a denial banner but still advances to the capture step', async () => {
+    const writes: { etag: string | null; body: unknown }[] = []
     imagePicker.requestCameraPermissionsAsync.mockResolvedValue({ granted: false })
     imagePicker.requestMediaLibraryPermissionsAsync.mockResolvedValue({ granted: false })
     server.use(
       http.get('*/api/v1/wardrobe/onboarding', () =>
         HttpResponse.json({ data: notStartedState })
       ),
-      http.patch('*/api/v1/wardrobe/onboarding', () =>
-        HttpResponse.json({
+      http.patch('*/api/v1/wardrobe/onboarding', async ({ request }) => {
+        writes.push({ etag: request.headers.get('if-match'), body: await request.json() })
+        return HttpResponse.json({
           data: { ...inProgressState, currentStep: 'capture', revision: 1 },
         })
-      ),
+      }),
       http.get('*/api/v1/wardrobe/garments', () => HttpResponse.json({ data: [] }))
     )
     renderScreen()
@@ -267,9 +289,14 @@ describe('WardrobeOnboardingScreen', () => {
         'You can still import files or use the starter wardrobe.'
       )
     })
+    await screen.findByTestId('onboarding-capture-step')
+    expect(writes).toEqual([
+      { etag: '"onboarding:user-1:0"', body: { targetStep: 'capture' } },
+    ])
   })
 
   it('4.4-MOB-ONB-05 skips straight to the silhouette step via the starter wardrobe', async () => {
+    const writes: { etag: string | null; body: unknown }[] = []
     server.use(
       http.get('*/api/v1/wardrobe/onboarding', () =>
         HttpResponse.json({
@@ -281,10 +308,7 @@ describe('WardrobeOnboardingScreen', () => {
         HttpResponse.json({ data: defaultSilhouetteProfile })
       ),
       http.patch('*/api/v1/wardrobe/onboarding', async ({ request }) => {
-        expect(await request.json()).toEqual({
-          targetStep: 'silhouette',
-          usedStarterWardrobe: true,
-        })
+        writes.push({ etag: request.headers.get('if-match'), body: await request.json() })
         return HttpResponse.json({
           data: { ...inProgressState, currentStep: 'silhouette', revision: 2 },
         })
@@ -298,6 +322,12 @@ describe('WardrobeOnboardingScreen', () => {
     await waitFor(() => {
       expect(screen.getByTestId('onboarding-silhouette-step')).toBeInTheDocument()
     })
+    expect(writes).toEqual([
+      {
+        etag: '"onboarding:user-1:1"',
+        body: { targetStep: 'silhouette', usedStarterWardrobe: true },
+      },
+    ])
   })
 
   it('4.4-MOB-ONB-06 shows a checklist row and blocks Continue while a garment needs tags', async () => {
@@ -325,6 +355,7 @@ describe('WardrobeOnboardingScreen', () => {
   })
 
   it('4.4-MOB-ONB-07 enables Continue once every garment is tagged and advances to silhouette', async () => {
+    const writes: { etag: string | null; body: unknown }[] = []
     server.use(
       http.get('*/api/v1/wardrobe/onboarding', () =>
         HttpResponse.json({
@@ -338,7 +369,7 @@ describe('WardrobeOnboardingScreen', () => {
         HttpResponse.json({ data: defaultSilhouetteProfile })
       ),
       http.patch('*/api/v1/wardrobe/onboarding', async ({ request }) => {
-        expect(await request.json()).toEqual({ targetStep: 'silhouette' })
+        writes.push({ etag: request.headers.get('if-match'), body: await request.json() })
         return HttpResponse.json({
           data: { ...inProgressState, currentStep: 'silhouette', revision: 2 },
         })
@@ -357,6 +388,9 @@ describe('WardrobeOnboardingScreen', () => {
     await waitFor(() => {
       expect(screen.getByTestId('onboarding-silhouette-step')).toBeInTheDocument()
     })
+    expect(writes).toEqual([
+      { etag: '"onboarding:user-1:1"', body: { targetStep: 'silhouette' } },
+    ])
   })
 
   it('4.4-MOB-ONB-08 resumes mid-flow after a reload with both the announcement and the checklist state', async () => {
@@ -463,6 +497,7 @@ describe('WardrobeOnboardingScreen', () => {
   })
 
   it('4.4-MOB-ONB-11 reaches the completion step and returns to the wardrobe hub', async () => {
+    const writes: { etag: string | null; body: unknown }[] = []
     // The completion step has to be advanced into rather than loaded: an
     // initial GET already at `complete` is necessarily `status: 'completed'`,
     // which the screen redirects straight to the hub (see 4.4-MOB-ONB-02).
@@ -477,7 +512,7 @@ describe('WardrobeOnboardingScreen', () => {
         HttpResponse.json({ data: defaultSilhouetteProfile })
       ),
       http.patch('*/api/v1/wardrobe/onboarding', async ({ request }) => {
-        expect(await request.json()).toEqual({ targetStep: 'complete' })
+        writes.push({ etag: request.headers.get('if-match'), body: await request.json() })
         return HttpResponse.json({ data: completedState })
       })
     )
@@ -492,9 +527,13 @@ describe('WardrobeOnboardingScreen', () => {
 
     fireEvent.click(screen.getByTestId('onboarding-done'))
     expect(routerMock.replace).toHaveBeenCalledWith('/wardrobe')
+    expect(writes).toEqual([
+      { etag: '"onboarding:user-1:2"', body: { targetStep: 'complete' } },
+    ])
   })
 
   it('4.4-MOB-ONB-12 recovers from a stale revision by refreshing before retrying, instead of repeating the same 412 forever', async () => {
+    const writes: { etag: string | null; body: unknown }[] = []
     server.use(
       http.get('*/api/v1/wardrobe/onboarding', () =>
         HttpResponse.json({ data: notStartedState })
@@ -506,8 +545,8 @@ describe('WardrobeOnboardingScreen', () => {
     // The first PATCH races another device that already advanced the
     // revision: reject with a stale precondition.
     server.use(
-      http.patch('*/api/v1/wardrobe/onboarding', ({ request }) => {
-        expect(request.headers.get('if-match')).toBe('"onboarding:user-1:0"')
+      http.patch('*/api/v1/wardrobe/onboarding', async ({ request }) => {
+        writes.push({ etag: request.headers.get('if-match'), body: await request.json() })
         return HttpResponse.json(
           {
             statusCode: 412,
@@ -531,8 +570,7 @@ describe('WardrobeOnboardingScreen', () => {
         HttpResponse.json({ data: { ...inProgressState, revision: 5 } })
       ),
       http.patch('*/api/v1/wardrobe/onboarding', async ({ request }) => {
-        expect(request.headers.get('if-match')).toBe('"onboarding:user-1:5"')
-        expect(await request.json()).toEqual({ targetStep: 'capture' })
+        writes.push({ etag: request.headers.get('if-match'), body: await request.json() })
         return HttpResponse.json({
           data: { ...inProgressState, currentStep: 'capture', revision: 6 },
         })
@@ -544,6 +582,10 @@ describe('WardrobeOnboardingScreen', () => {
     await waitFor(() => {
       expect(screen.getByTestId('onboarding-capture-step')).toBeInTheDocument()
     })
+    expect(writes).toEqual([
+      { etag: '"onboarding:user-1:0"', body: { targetStep: 'capture' } },
+      { etag: '"onboarding:user-1:5"', body: { targetStep: 'capture' } },
+    ])
   })
 
   it('4.4-MOB-ONB-13 tags a garment from the checklist and unblocks Continue', async () => {

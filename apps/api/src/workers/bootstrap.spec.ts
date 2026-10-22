@@ -16,6 +16,8 @@ import type * as BootstrapModule from './bootstrap.js'
 import type * as WeatherConfigModule from '../modules/weather/providers/weather.config'
 
 const harness = vi.hoisted(() => ({
+  exit: vi.fn(),
+  engagement: vi.fn().mockResolvedValue({ close: vi.fn() }),
   communityClose: vi.fn().mockResolvedValue(undefined),
   createCommunityWorkerRuntime: vi.fn(),
   shutdownWorkerResources: vi.fn().mockResolvedValue(undefined),
@@ -27,6 +29,10 @@ const harness = vi.hoisted(() => ({
     'maintenance',
     'community-moderation',
   ],
+}))
+
+vi.mock('../modules/community/community-engagement.runtime.js', () => ({
+  startCommunityEngagementRuntime: harness.engagement,
 }))
 
 vi.mock('../config/queues', () => ({
@@ -113,6 +119,7 @@ async function loadBootstrap(): Promise<typeof BootstrapModule> {
 
 describe('general worker bootstrap', () => {
   beforeEach(() => {
+    harness.engagement.mockReset().mockResolvedValue({ close: vi.fn() })
     harness.communityClose.mockClear().mockResolvedValue(undefined)
     harness.shutdownWorkerResources.mockClear().mockResolvedValue(undefined)
     harness.createCommunityWorkerRuntime.mockReset().mockResolvedValue({
@@ -132,11 +139,25 @@ describe('general worker bootstrap', () => {
     })
     // `performShutdown` ends in `process.exit`, which would take the vitest
     // worker with it.
-    vi.spyOn(process, 'exit').mockImplementation((() => undefined) as never)
+    harness.exit.mockClear()
+    vi.spyOn(process, 'exit').mockImplementation(((code?: number) => {
+      harness.exit(code)
+    }) as never)
   })
 
   const shutdownResources = (): WorkerShutdownResources =>
     harness.shutdownWorkerResources.mock.calls[0]?.[0] as WorkerShutdownResources
+
+  it('R05 community capability failure leaves weather/general worker startup running', async () => {
+    harness.engagement.mockRejectedValueOnce(
+      new Error('Community dispatch capability unavailable')
+    )
+    const bootstrap = await loadBootstrap()
+    await bootstrap.startWorkers()
+    expect(harness.createCommunityWorkerRuntime).toHaveBeenCalledTimes(1)
+    expect(harness.exit).not.toHaveBeenCalled()
+    await bootstrap.performShutdown()
+  })
 
   it('waits for community readiness before it has a consumer to shut down', async () => {
     const bootstrap = await loadBootstrap()
@@ -178,8 +199,8 @@ describe('general worker bootstrap', () => {
     await bootstrap.startWorkers()
     await bootstrap.performShutdown()
 
-    // Six queues plus the community closeable. A regression that dropped the
+    // Six queues plus the engagement and screening closeables. A regression that dropped the
     // closeable again would leave exactly six.
-    expect(shutdownResources().queues).toHaveLength(harness.queueNames.length + 1)
+    expect(shutdownResources().queues).toHaveLength(harness.queueNames.length + 2)
   })
 })

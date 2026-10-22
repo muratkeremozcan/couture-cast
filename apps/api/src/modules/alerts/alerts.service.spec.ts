@@ -28,6 +28,8 @@ function notificationPreference(
 ): NotificationPreferenceRecord {
   return {
     id: overrides.id ?? 'preference-1',
+    policy_revision: overrides.policy_revision ?? 0,
+    timezone_configured: overrides.timezone_configured ?? true,
     user_id: overrides.user_id ?? 'user-1',
     quiet_hours_enabled: overrides.quiet_hours_enabled ?? true,
     push_enabled: overrides.push_enabled ?? true,

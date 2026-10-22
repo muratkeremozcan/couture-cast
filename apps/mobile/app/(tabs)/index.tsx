@@ -1,4 +1,10 @@
-import { type ComponentRef, useEffect, useRef, useState } from 'react'
+import {
+  type ComponentRef,
+  useEffect,
+  useRef,
+  useState,
+  useSyncExternalStore,
+} from 'react'
 import { useTranslation } from 'react-i18next'
 import {
   AccessibilityInfo,
@@ -13,9 +19,14 @@ import { SafeAreaView } from 'react-native-safe-area-context'
 import { Text, View } from '@/components/themed'
 import { useMobileAnalytics } from '@/src/analytics/mobile-analytics'
 import { createMobileApiClient } from '@/src/lib/api-client'
-import { resolveMobileAccessToken } from '@/src/lib/mobile-auth'
+import {
+  mobileApplicationUserId,
+  resolveMobileAccessToken,
+  subscribeMobileApplicationUser,
+} from '@/src/lib/mobile-auth'
 import {
   readLatestRitualCache,
+  ritualCacheOwner,
   saveRitualCache,
   withoutShopThisLook,
 } from '@/src/lib/ritual-cache'
@@ -33,7 +44,7 @@ import {
   type RitualResponse,
   type AlertPreferences,
 } from '@couture/api-client/contracts/http'
-import type { WeatherAlertDeepLinkTarget } from '@couture/api-client'
+import { ResponseError, type WeatherAlertDeepLinkTarget } from '@couture/api-client'
 import {
   trackMobileAffiliateCtaShown,
   trackMobileRitualCreated,
@@ -74,6 +85,23 @@ const SCENARIO_CHIPS: Record<ScenarioType, ChipCategory> = {
 }
 
 const ritualRequestTimeoutMs = 15_000
+// The API's 400 message for a user with no saved location (RitualService).
+const noLocationMessage = 'No location preferences found for user'
+
+// `no-location` is a setup gap, so retrying cannot succeed; any other failure can.
+type HeroLoadError = 'no-location' | 'generic'
+
+async function classifyRitualError(error: unknown): Promise<HeroLoadError> {
+  if (!(error instanceof ResponseError) || error.response.status !== 400) {
+    return 'generic'
+  }
+  try {
+    const body = (await error.response.json()) as { message?: unknown }
+    return body.message === noLocationMessage ? 'no-location' : 'generic'
+  } catch {
+    return 'generic'
+  }
+}
 const modalFocusRestorationDelayMs = 400
 
 function focusAccessibilityTarget(
@@ -173,6 +201,14 @@ export default function TabOneScreen() {
   const params = useLocalSearchParams()
   const { source, size, slot, type, alertId, cardId, expiresAt } = params
   const analyticsUserId = analytics.getDistinctId() || 'mobile-anonymous-user'
+  // After a cold start the first load can run before the stored session is restored and
+  // fail without a bearer. The restored identity re-runs it.
+  const applicationUserId = useSyncExternalStore(
+    subscribeMobileApplicationUser,
+    mobileApplicationUserId,
+    mobileApplicationUserId
+  )
+  const cacheOwner = ritualCacheOwner(applicationUserId)
   const activeLocale =
     resolveSupportedLocale(i18n.resolvedLanguage ?? i18n.language) ??
     defaultSupportedLocale
@@ -194,7 +230,7 @@ export default function TabOneScreen() {
 
   const [ritual, setRitual] = useState<RitualResponse | null>(null)
   const [isLoading, setIsLoading] = useState(true)
-  const [error, setError] = useState<string | null>(null)
+  const [error, setError] = useState<HeroLoadError | null>(null)
   const [activeScenario, setActiveScenario] = useState<ScenarioType>('morning')
   const [activeChipCategory, setActiveChipCategory] = useState<ChipCategory>('Personal')
   const [pendingWidgetSlot, setPendingWidgetSlot] = useState<WidgetSlot | null>(null)
@@ -244,7 +280,7 @@ export default function TabOneScreen() {
     setError(null)
     setIsStale(false)
 
-    const cached = await readLatestRitualCache(analyticsUserId, activeLocale)
+    const cached = await readLatestRitualCache(cacheOwner, activeLocale)
     const now = Date.now()
 
     if (!forceRefresh && cached && now - cached.timestamp < 15 * 60 * 1000) {
@@ -266,7 +302,7 @@ export default function TabOneScreen() {
       setRitual(data)
       setAlertPreferences(fetchedPreferences)
       setIsCacheServed(false)
-      void saveRitualCache(analyticsUserId, activeLocale, {
+      void saveRitualCache(cacheOwner, activeLocale, {
         // Decision 6: the commerce block never enters the device cache, or the
         // CTA outlives an opt-out by fifteen minutes online and indefinitely
         // offline.
@@ -289,7 +325,8 @@ export default function TabOneScreen() {
           })
         )
       }
-    } catch {
+    } catch (loadError) {
+      const errorKind = await classifyRitualError(loadError)
       if (loadId !== latestLoadId.current) {
         return
       }
@@ -301,11 +338,7 @@ export default function TabOneScreen() {
         setIsStale(true)
         setIsCacheServed(true)
       } else {
-        setError(
-          t('hero.load_error', {
-            defaultValue: 'Unable to load daily recommendations',
-          })
-        )
+        setError(errorKind)
       }
     } finally {
       if (loadId === latestLoadId.current) {
@@ -321,7 +354,7 @@ export default function TabOneScreen() {
       analytics.capture('tab_one_viewed')
     }
     void loadData()
-  }, [activeLocale, analyticsUserId])
+  }, [activeLocale, analyticsUserId, applicationUserId])
 
   useEffect(() => {
     const rawParams = { source, size, slot, type, alertId, cardId, expiresAt }
@@ -562,7 +595,7 @@ export default function TabOneScreen() {
 
     setRitual(updatedRitual)
 
-    void saveRitualCache(analyticsUserId, activeLocale, {
+    void saveRitualCache(cacheOwner, activeLocale, {
       // A swap rewrites a network payload, so this write can carry a commerce
       // block too. Decision 6 applies to every cache write, not just the fetch.
       data: withoutShopThisLook(updatedRitual),
@@ -625,7 +658,12 @@ export default function TabOneScreen() {
   )
 
   return (
-    <SafeAreaView style={[styles.safeContainer, { backgroundColor: palette.background }]}>
+    // Side insets only: the native header and the tab bar already cover top and bottom,
+    // and a second top inset left an empty band above the chips.
+    <SafeAreaView
+      style={[styles.safeContainer, { backgroundColor: palette.background }]}
+      edges={['left', 'right']}
+    >
       <ScrollView
         ref={scrollViewRef}
         style={[styles.container, { backgroundColor: palette.background }]}
@@ -680,7 +718,19 @@ export default function TabOneScreen() {
           </View>
         )}
 
-        {error && !ritual ? (
+        {error === 'no-location' && !ritual ? (
+          <View
+            style={[
+              styles.errorState,
+              { backgroundColor: palette.surface, borderColor: palette.divider },
+            ]}
+            testID="hero-no-location-state"
+          >
+            <Text style={[styles.errorText, { color: palette.text }]}>
+              {t('hero.no_location')}
+            </Text>
+          </View>
+        ) : error && !ritual ? (
           <View
             style={[
               styles.errorState,
@@ -691,7 +741,11 @@ export default function TabOneScreen() {
             <View style={[styles.errorMark, { borderColor: palette.divider }]}>
               <Text style={[styles.errorMarkText, { color: palette.text }]}>!</Text>
             </View>
-            <Text style={[styles.errorText, { color: palette.text }]}>{error}</Text>
+            <Text style={[styles.errorText, { color: palette.text }]}>
+              {t('hero.load_error', {
+                defaultValue: 'Unable to load daily recommendations',
+              })}
+            </Text>
             <Pressable
               style={[styles.retryButton, { backgroundColor: palette.text }]}
               onPress={handleRetry}
