@@ -29,7 +29,10 @@ export interface CommunityCommentsTransport {
     postId: string,
     cursor?: string,
     signal?: AbortSignal
-  ): Promise<{ items: CommunityCommentSubmission[]; nextCursor: string | null }>
+  ): Promise<{
+    items: CommunityCommentSubmission[]
+    nextCursor: string | null
+  }>
   create(
     postId: string,
     input: CreateCommunityCommentInput
@@ -633,6 +636,9 @@ export class CommunityCommentsState {
     pages: number
   ): void {
     const previous = new Map(state.submissions.map((item) => [item.id, item.status]))
+    // A comment a live insert already shows publicly needs no "refresh to view" prompt;
+    // that wording is only for the polling fallback, where it is not yet in the thread.
+    const publicIds = this.publicIds(state)
     for (const item of collected) {
       if (['author_deleted', 'consent_suspended', 'erased'].includes(item.status)) {
         this.invalidateReads(postId, false)
@@ -640,7 +646,8 @@ export class CommunityCommentsState {
       }
       if (
         previous.get(item.id) === 'pending_screening' &&
-        item.status !== 'pending_screening'
+        item.status !== 'pending_screening' &&
+        !(item.status === 'published' && publicIds.has(item.id))
       )
         this.announce(state, `community.comments.status.${item.status}`)
     }

@@ -910,3 +910,36 @@ describe('public reads during a confirmed create', () => {
     ])
   })
 })
+
+describe('published announcement when the comment is already in the thread', () => {
+  it('does not ask to refresh for a comment the same pass already shows publicly', async () => {
+    const { state, transport } = setup()
+    transport.submissions.mockResolvedValueOnce(ownPage())
+    await state.statuses('post')
+    state.consumeAnnouncement('post')
+    // A live insert made the own comment public before its status read settled.
+    state.current('post').roots = page([item('own', 1)])
+    transport.submissions.mockResolvedValueOnce(
+      ownPage([{ ...own(), status: 'published', publicationSequence: 1 }])
+    )
+    await state.statuses('post')
+    expect(state.consumeAnnouncement('post')?.key ?? null).not.toBe(
+      'community.comments.status.published'
+    )
+    expect(state.current('post').submissions).toEqual([])
+  })
+
+  it('keeps the refresh wording when polling settles a comment that is not yet visible', async () => {
+    const { state, transport } = setup()
+    transport.submissions.mockResolvedValueOnce(ownPage())
+    await state.statuses('post')
+    state.consumeAnnouncement('post')
+    transport.submissions.mockResolvedValueOnce(
+      ownPage([{ ...own(), status: 'published', publicationSequence: 1 }])
+    )
+    await state.statuses('post')
+    expect(state.consumeAnnouncement('post')?.key).toBe(
+      'community.comments.status.published'
+    )
+  })
+})
