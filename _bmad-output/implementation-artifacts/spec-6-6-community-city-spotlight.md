@@ -280,6 +280,25 @@ rank: 1..60, level }` without `experimentVariant`, where `level` is the served l
   both tokens 16-hex HMACs under the analytics id secret.
 - 2026-10-22, image expiry on spotlight cards re-reads that one post on both platforms and replaces
   only its copy; a page-one refresh would drop later pages and close a detail opened from one.
+- 2026-10-22, layout (R42, owner decision through the coordinator). Six stacked full cards put
+  the first feed card about 11,000 px down on mobile and below the first viewport on web. Both
+  platforms now show one horizontal row of the reused card with View more as its trailing item;
+  the R11 focus and announcement rules hold, and focus scrolls the first appended look into view.
+  Mobile uses a snapping horizontal ScrollView (item `min(85% of the window, 420)`, so about 58 pt
+  of the next card peeks at 390 pt) rather than a virtualized list, so every loaded look stays on
+  the accessibility tree; each rank badge reads `Rank N, Position P of C` through the new
+  `community.spotlight.position` key. Web uses an ordered list with `aria-posinset` and
+  `aria-setsize`, cards `85cqw` wide on narrow screens and a column wide from 768 px, with scroll
+  snap and no sideways page scroll; Playwright asserts one row and a module one card tall at
+  390 px and 1280 px. Below 1280 px the hero sits above the community section, so at 390 px the
+  first feed card stays below the first viewport for reasons outside the spotlight; the module now
+  adds one card height there.
+- 2026-10-22, Maestro (R18, R19): feed cards are taller than the space between the sticky chips
+  and the tab bar, so flows reach a card by half of it, then walk its parts top to bottom. Two
+  harness defects surfaced when the new flow reshuffled shards and were fixed: Settings scrolls to
+  a locale-stable `settings-language-title` because Android counts a clipped chip sliver as
+  visible, and the wardrobe onboarding card tap retries after a relaunch when Expo Go's invisible
+  developer-sheet backdrop swallows it.
 
 ## Spec Change Log
 
