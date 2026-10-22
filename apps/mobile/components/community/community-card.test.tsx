@@ -25,6 +25,11 @@ vi.mock('expo-localization', () => ({
  */
 const imageSpy = vi.hoisted(() => ({
   props: new Map<string, Record<string, unknown>>(),
+  // `Image.prefetch` is the network probe a recovering card uses; owned here so a test
+  // decides whether the new URL is reachable.
+  prefetch: vi.fn<(uri: string) => Promise<boolean>>(),
+  // A host that never answers: the real image gets no load callbacks at all.
+  silent: false,
   // Filled in from this file's own React below. Importing `react` inside the mock
   // factory instantiates a second copy of it and every hook in the tree then reads
   // a null dispatcher.
@@ -38,7 +43,10 @@ vi.mock('react-native', async (importOriginal) => {
     if (typeof props.testID === 'string') {
       imageSpy.props.set(props.testID, props)
     }
-    return imageSpy.createElement(RealImage as never, props)
+    const rendered = imageSpy.silent
+      ? { ...props, onLoad: undefined, onError: undefined }
+      : props
+    return imageSpy.createElement(RealImage as never, rendered)
   }
   function RecordingView(props: Record<string, unknown>) {
     if (typeof props.testID === 'string') {
@@ -53,6 +61,7 @@ vi.mock('react-native', async (importOriginal) => {
     }
     return imageSpy.createElement(RealPressable as never, props)
   }
+  RecordingImage.prefetch = (uri: string) => imageSpy.prefetch(uri)
   return {
     ...actual,
     Image: RecordingImage,
@@ -81,7 +90,7 @@ imageSpy.createElement = createElement
 import enUS from '@/assets/locales/en-US.json'
 import i18n, { initI18n } from '@/src/lib/i18n'
 import { press } from '@/src/test-utils/press'
-import { CommunityCard } from './community-card'
+import { CommunityCard, IMAGE_LOAD_TIMEOUT_MS } from './community-card'
 
 /** A real 1x1 PNG: `ImageLoader` resolves it without touching the network. */
 const PIXEL =
@@ -134,6 +143,9 @@ describe('CommunityCard (Story 6.1)', () => {
 
   beforeEach(() => {
     imageSpy.props.clear()
+    imageSpy.prefetch.mockReset()
+    imageSpy.prefetch.mockResolvedValue(false)
+    imageSpy.silent = false
     viewSpy.props.clear()
     pressableSpy.props.clear()
   })
@@ -442,6 +454,134 @@ describe('CommunityCard (Story 6.1)', () => {
       rerender(card(n))
     }
 
+    expect(onImageExpiry).toHaveBeenCalledTimes(2)
+    expect(
+      screen.getByTestId('community-card-image-unavailable-post-a')
+    ).toBeInTheDocument()
+  })
+
+  it('6.5-MOB-POLISH-10 recovers an unavailable card once a new URL is reachable, keeping the spent budget', async () => {
+    // Once the budget is spent the card shows its fallback. A later feed refetch (from
+    // anywhere) delivers a new URL: the card probes it in the background and shows it
+    // only once it is reachable, so an unreachable host never flickers back to a blank
+    // placeholder. Only a completed load restores the budget, so a URL that then fails
+    // returns straight to the fallback without another refresh.
+    const onImageExpiry = vi.fn()
+    const card = (n: number) => (
+      <CommunityCard
+        item={item({
+          imageAccess: {
+            url: `${PIXEL}#${n}`,
+            expiresAt: new Date(Date.now() + 3_600_000).toISOString(),
+          },
+        })}
+        onReport={vi.fn()}
+        onWithdraw={vi.fn()}
+        onImageExpiry={onImageExpiry}
+      />
+    )
+    const onError = () =>
+      (imageSpy.props.get('community-card-image-post-a') as { onError: () => void })
+        .onError
+    const unavailable = () =>
+      screen.queryByTestId('community-card-image-unavailable-post-a')
+    const { rerender } = render(card(0))
+    act(() => onError()())
+    act(() => onError()())
+    act(() => onError()())
+    expect(unavailable()).toBeInTheDocument()
+    expect(onImageExpiry).toHaveBeenCalledTimes(2)
+
+    // Still unreachable: the probe fails and the fallback stays, with no refresh.
+    rerender(card(1))
+    await act(() => Promise.resolve())
+    expect(imageSpy.prefetch).toHaveBeenCalledWith(`${PIXEL}#1`)
+    expect(unavailable()).toBeInTheDocument()
+
+    imageSpy.prefetch.mockResolvedValue(true)
+    rerender(card(2))
+    expect(unavailable()).toBeInTheDocument()
+    await act(() => Promise.resolve())
+    expect(unavailable()).toBeNull()
+    expect(screen.getByTestId('community-card-image-post-a')).toBeInTheDocument()
+
+    act(() => onError()())
+    expect(unavailable()).toBeInTheDocument()
+    expect(onImageExpiry).toHaveBeenCalledTimes(2)
+  })
+
+  it('6.5-MOB-POLISH-12 recovers from a transient first failure', () => {
+    // CI and slow emulators: the first fetch of a fresh signed URL fails once, the
+    // refresh delivers a new URL and that one loads. The card must show the image, and
+    // the completed load restores the full budget for any later failure.
+    const onImageExpiry = vi.fn()
+    const card = (n: number) => (
+      <CommunityCard
+        item={item({
+          imageAccess: {
+            url: `${PIXEL}#${n}`,
+            expiresAt: new Date(Date.now() + 3_600_000).toISOString(),
+          },
+        })}
+        onReport={vi.fn()}
+        onWithdraw={vi.fn()}
+        onImageExpiry={onImageExpiry}
+      />
+    )
+    const image = () =>
+      imageSpy.props.get('community-card-image-post-a') as {
+        onError: () => void
+        onLoad: () => void
+      }
+    const { rerender } = render(card(0))
+    act(() => image().onError())
+    expect(onImageExpiry).toHaveBeenCalledTimes(1)
+    rerender(card(1))
+    act(() => image().onLoad())
+
+    expect(screen.queryByTestId('community-card-image-unavailable-post-a')).toBeNull()
+    expect(screen.getByTestId('community-card-image-post-a')).toBeInTheDocument()
+    act(() => image().onError())
+    act(() => image().onError())
+    expect(onImageExpiry).toHaveBeenCalledTimes(3)
+    expect(screen.queryByTestId('community-card-image-unavailable-post-a')).toBeNull()
+  })
+
+  it('6.5-MOB-POLISH-13 treats a load that never settles as a failure', () => {
+    // A storage host that never answers fires neither onLoad nor onError on some
+    // Android stacks, which left a blank placeholder forever. The load timeout spends
+    // the same bounded budget, so the card still reaches its fallback.
+    vi.useFakeTimers()
+    imageSpy.silent = true
+    const onImageExpiry = vi.fn()
+    render(
+      <CommunityCard
+        item={item({
+          imageAccess: {
+            url: PIXEL,
+            expiresAt: new Date(Date.now() + 3_600_000).toISOString(),
+          },
+        })}
+        onReport={vi.fn()}
+        onWithdraw={vi.fn()}
+        onImageExpiry={onImageExpiry}
+      />
+    )
+
+    act(() => {
+      vi.advanceTimersByTime(IMAGE_LOAD_TIMEOUT_MS - 1)
+    })
+    expect(onImageExpiry).not.toHaveBeenCalled()
+    act(() => {
+      vi.advanceTimersByTime(1)
+    })
+    expect(onImageExpiry).toHaveBeenCalledTimes(1)
+    // Each refresh re-arms the load timer in an effect, so time advances one load at a time.
+    for (let load = 0; load < 3; load++) {
+      act(() => {
+        vi.advanceTimersByTime(IMAGE_LOAD_TIMEOUT_MS)
+      })
+    }
     expect(onImageExpiry).toHaveBeenCalledTimes(2)
     expect(
       screen.getByTestId('community-card-image-unavailable-post-a')

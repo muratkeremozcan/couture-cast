@@ -11,10 +11,10 @@
 // environment, sent only as a request header, and never written to output.
 //
 // CLI: PROBE_API_BASE_URL=... [PROBE_WEB_ORIGIN=...] [VERCEL_AUTOMATION_BYPASS_SECRET=...]
-//      [PROBE_READER_USER_ID=... PROBE_WRITER_USER_ID=...] [PROBE_HOLD_MS=320000] [PROBE_SOCKETS=6] [PROBE_SAMPLES=5] [PROBE_OUT=evidence.json]
+//      [PROBE_READER_USER_ID=... PROBE_WRITER_USER_ID=...] [PROBE_ALLOW_LOCAL_TARGET=1 loopback only] [PROBE_HOLD_MS=320000] [PROBE_SOCKETS=6] [PROBE_SAMPLES=5] [PROBE_OUT=evidence.json]
 //      node scripts/probe-community-preview.mjs
 import { createHash, randomUUID } from 'node:crypto'
-import { writeFile } from 'node:fs/promises'
+import { readFile, writeFile } from 'node:fs/promises'
 import { pathToFileURL } from 'node:url'
 import { io } from 'socket.io-client'
 import WebSocket from 'ws'
@@ -22,6 +22,16 @@ import WebSocket from 'ws'
 const DOORBELL = JSON.stringify({ version: 1, type: 'community:changed' })
 const RECYCLE_MS = 295_000
 const FOREIGN_ORIGIN = 'https://origin-probe.invalid'
+const LOOPBACK_HOSTS = new Set(['127.0.0.1', 'localhost', '[::1]'])
+const LATENCY_BOUND_MS = 10_000
+// Longer than the bound, so a late doorbell fails the latency claim instead of passing it.
+const DOORBELL_WAIT_MS = 20_000
+const PUBLISH_WAIT_MS = 90_000
+const FIXTURE_DIR = new URL(
+  '../apps/api/test/fixtures/community-moderation/v1/',
+  import.meta.url
+)
+const FIXTURE_FILE = 'safe-satin-plum-512x512.jpg'
 
 const sleep = (ms) => new Promise((resolve) => setTimeout(resolve, ms))
 const expiresAt = (bearer) =>
@@ -56,7 +66,7 @@ function birthdate(yearsAgo) {
 function client({ apiBaseUrl, bypass }) {
   const base = apiBaseUrl.replace(/\/$/, '')
   const protection = bypass ? { 'x-vercel-protection-bypass': bypass } : {}
-  async function http(method, path, { bearer, body } = {}) {
+  async function http(method, path, { bearer, body, headers = {} } = {}) {
     for (let attempt = 0; ; attempt++) {
       const response = await fetch(`${base}${path}`, {
         method,
@@ -66,6 +76,7 @@ function client({ apiBaseUrl, bypass }) {
           'x-couture-reactions': '1',
           ...(bearer ? { authorization: `Bearer ${bearer}` } : {}),
           ...(body ? { 'content-type': 'application/json' } : {}),
+          ...headers,
         },
         body: body ? JSON.stringify(body) : undefined,
       })
@@ -223,25 +234,98 @@ function recordIdentities(record, reader, writer) {
   )
 }
 
-function recordAccess(record, feed, post) {
-  if (feed.status !== 200) {
-    const reason =
-      feed.status === 403
-        ? 'community_read_enabled is off or access is denied for the probe identities'
-        : `community feed answered ${feed.status}`
-    record('communityAccess', 'not-executed', notExecuted(reason))
-    return 'refused'
+function recordAccess(record, feed) {
+  if (feed.status === 200) {
+    record('communityAccess', 'pass', {})
+    return 'granted'
   }
-  record('communityAccess', 'pass', {})
-  record(
-    'readablePost',
-    post ? 'pass' : 'not-executed',
-    post ? { post: post.id } : notExecuted('the preview feed has no visible post')
-  )
-  return 'granted'
+  const reason =
+    feed.status === 403
+      ? 'community_read_enabled is off or access is denied for the probe identities'
+      : `community feed answered ${feed.status}`
+  record('communityAccess', 'not-executed', notExecuted(reason))
+  return 'refused'
 }
 
-/** Alternates the writer's applause on the post and returns the event revision it produced. */
+/**
+ * Writes go only to a preview. A loopback API reporting `test` or `development` is allowed
+ * only when explicitly opted in for local validation; production never is.
+ */
+export function targetRefusal(apiBaseUrl, environment, allowLocalTarget = false) {
+  if (environment === 'preview') return null
+  const loopback = LOOPBACK_HOSTS.has(new URL(apiBaseUrl).hostname)
+  if (allowLocalTarget && loopback && ['test', 'development'].includes(environment))
+    return null
+  return `health reports environment ${JSON.stringify(environment)}; the probe writes only to a preview`
+}
+
+async function fixtureImage() {
+  const manifest = JSON.parse(
+    await readFile(new URL('manifest.json', FIXTURE_DIR), 'utf8')
+  )
+  const entry = manifest.files.find((file) => file.path === FIXTURE_FILE)
+  const bytes = await readFile(new URL(FIXTURE_FILE, FIXTURE_DIR))
+  if (createHash('sha256').update(bytes).digest('hex') !== entry.sha256)
+    throw new Error(`${FIXTURE_FILE} does not match its manifest hash`)
+  return { ...entry, bytes }
+}
+
+/** Allocates, uploads and publishes one look owned by a probe identity, then awaits its review. */
+async function publishProbePost(api, bearer) {
+  const image = await fixtureImage()
+  const key = randomUUID()
+  const allocated = await api.http('POST', '/api/v1/community/posts/allocate', {
+    bearer,
+    headers: { 'idempotency-key': key },
+    body: {
+      locale: 'en-US',
+      contentType: image.contentType,
+      byteSize: image.byteSize,
+      sha256: image.sha256,
+      widthPx: image.widthPx,
+      heightPx: image.heightPx,
+    },
+  })
+  if (allocated.status !== 200) return { reason: `allocate answered ${allocated.status}` }
+  const session = allocated.json.data
+  // The signed storage URL is not the protected deployment: no bypass, no bearer.
+  const upload = await fetch(session.uploadUrl, {
+    method: 'PUT',
+    headers: { 'x-upload-token': session.uploadToken, 'content-type': image.contentType },
+    body: image.bytes,
+  })
+  if (!upload.ok) return { reason: `upload answered ${upload.status}` }
+  const published = await api.http('POST', '/api/v1/community/posts/publish', {
+    bearer,
+    headers: { 'idempotency-key': key },
+    body: {
+      postId: session.postId,
+      uploadSessionId: session.uploadSessionId,
+      altText: 'A plum satin fabric swatch.',
+      altTextConfirmed: true,
+      caption: null,
+      locale: 'en-US',
+    },
+  })
+  if (published.status !== 200) return { reason: `publish answered ${published.status}` }
+  const started = performance.now()
+  while (performance.now() - started < PUBLISH_WAIT_MS) {
+    const post = await api.http('GET', `/api/v1/community/posts/${session.postId}`, {
+      bearer,
+    })
+    const status = post.json?.data?.status
+    if (status === 'published') return { post: post.json.data }
+    if (['flagged', 'review_failed', 'withdrawn'].includes(status))
+      return { postId: session.postId, reason: `the probe look ended ${status}` }
+    await sleep(2000)
+  }
+  return {
+    postId: session.postId,
+    reason: `the probe look was not published within ${PUBLISH_WAIT_MS / 1000} s (no screening worker on this deployment?)`,
+  }
+}
+
+/** Alternates the writer's applause on the probe-owned post; returns the event revision. */
 function reactionCommitter(api, writerBearer, post) {
   let revision = post.reactions?.revision ?? 0
   let selection = null
@@ -259,20 +343,38 @@ function reactionCommitter(api, writerBearer, post) {
   }
 }
 
+async function probePost(api, record, access, readerBearer) {
+  if (access !== 'granted') return null
+  const owned = await publishProbePost(api, readerBearer)
+  record(
+    'probePost',
+    owned.post ? 'pass' : 'not-executed',
+    owned.post ? { post: owned.post.id } : notExecuted(owned.reason)
+  )
+  return owned
+}
+
 /**
- * What this run can reach: the deployment, two identities, their community access and one
- * post to react to. Missing prerequisites narrow what runs; they never fail the run.
+ * What this run can reach: a preview deployment, two identities, their community access and
+ * one look the probe owns. A non-preview target aborts here, before any write. Missing
+ * prerequisites narrow what runs; they never fail the run.
  */
 async function preflight(api, record, evidence, options) {
   const health = await api.http('GET', '/api/health')
+  const environment = health.json?.environment ?? null
   evidence.deployment = {
     status: health.status,
     gitSha: health.json?.gitSha ?? null,
-    environment: health.json?.environment ?? null,
+    environment,
     vercelId: health.headers.get('x-vercel-id'),
   }
   if (health.status !== 200) {
     record('reachability', 'fail', { reason: `health answered ${health.status}` })
+    return null
+  }
+  const refusal = targetRefusal(api.base, environment, options.allowLocalTarget)
+  if (refusal) {
+    record('environment', 'fail', { reason: refusal })
     return null
   }
   const reader = await probeIdentity(api, 'reader', options.readerUserId)
@@ -280,17 +382,18 @@ async function preflight(api, record, evidence, options) {
   evidence.identities = { reader: digest(reader.id), writer: digest(writer.id) }
   recordIdentities(record, reader, writer)
   const writerBearer = fixtureBearer(writer.id, 3600)
+  const readerBearer = () => fixtureBearer(reader.id, 600)
   const feed = await api.http('GET', '/api/v1/community/feed?mode=all&limit=12', {
     bearer: writerBearer,
   })
-  const post = feed.status === 200 ? (feed.json?.data?.items?.[0] ?? null) : null
-  const access = recordAccess(record, feed, post)
+  const access = recordAccess(record, feed)
+  const owned = await probePost(api, record, access, readerBearer())
   return {
     access,
-    post,
-    readerBearer: () => fixtureBearer(reader.id, 600),
-    commit:
-      access === 'granted' && post ? reactionCommitter(api, writerBearer, post) : null,
+    post: owned?.post ?? null,
+    ownedPostId: owned?.post?.id ?? owned?.postId ?? null,
+    readerBearer,
+    commit: owned?.post ? reactionCommitter(api, writerBearer, owned.post) : null,
   }
 }
 
@@ -422,7 +525,7 @@ async function sampleDoorbells(subscribers, session, samples) {
             connection.events
               .slice(marks[index])
               .find((event) => event.event === 'community:changed'),
-          10_000
+          DOORBELL_WAIT_MS
         )
       )
     )
@@ -480,7 +583,7 @@ async function probeDoorbells(api, record, session, { sockets, samples }) {
   )
   record('instances', ...instanceClaim(nonces, subscribers.length))
   if (!session.commit) {
-    const reason = notExecuted('no readable post to commit a reaction on')
+    const reason = notExecuted('no published probe-owned look to react on')
     record('doorbells', 'not-executed', reason)
     record('crossFunctionLatency', 'not-executed', reason)
     for (const connection of subscribers) connection.socket.close()
@@ -498,7 +601,7 @@ async function probeDoorbells(api, record, session, { sockets, samples }) {
   const sorted = [...delivered].sort((a, b) => a - b)
   record(
     'crossFunctionLatency',
-    sorted.length && sorted.at(-1) <= 10_000 ? 'pass' : 'fail',
+    sorted.length && sorted.at(-1) <= LATENCY_BOUND_MS ? 'pass' : 'fail',
     {
       maxMs: sorted.at(-1) ?? null,
       p50Ms: sorted.length ? sorted[Math.floor(sorted.length / 2)] : null,
@@ -624,7 +727,7 @@ async function probeRecycle(api, record, session, holdMs) {
     record(
       'recycleCatchUp',
       'not-executed',
-      notExecuted('no readable post to commit a reaction on')
+      notExecuted('no published probe-owned look to react on')
     )
     return
   }
@@ -634,6 +737,21 @@ async function probeRecycle(api, record, session, holdMs) {
     !once.duplicates.length && !once.skipped.length && once.ordered ? 'pass' : 'fail',
     { commitRevisions: [...ours], observedRevisions: seen, ...once }
   )
+}
+
+/** The probe-owned look leaves the shared preview feed when the run ends. */
+async function withdrawProbePost(api, record, session) {
+  if (!session.ownedPostId) return
+  const withdrawn = await api.http(
+    'POST',
+    `/api/v1/community/posts/${session.ownedPostId}/withdraw`,
+    {
+      bearer: session.readerBearer(),
+    }
+  )
+  record('probePostWithdrawn', withdrawn.status === 200 ? 'pass' : 'fail', {
+    httpStatus: withdrawn.status,
+  })
 }
 
 export async function runPreviewProbe(options) {
@@ -652,6 +770,7 @@ export async function runPreviewProbe(options) {
       samples: options.samples ?? 5,
     })
     await probeRecycle(api, record, session, options.holdMs ?? 320_000)
+    await withdrawProbePost(api, record, session)
   }
   evidence.finishedAt = new Date().toISOString()
   return evidence
@@ -669,6 +788,7 @@ if (import.meta.url === pathToFileURL(process.argv[1] ?? '').href) {
     bypass: process.env.VERCEL_AUTOMATION_BYPASS_SECRET?.trim() || undefined,
     readerUserId: process.env.PROBE_READER_USER_ID?.trim() || undefined,
     writerUserId: process.env.PROBE_WRITER_USER_ID?.trim() || undefined,
+    allowLocalTarget: process.env.PROBE_ALLOW_LOCAL_TARGET === '1',
     holdMs: Number(process.env.PROBE_HOLD_MS ?? 320_000),
     sockets: Number(process.env.PROBE_SOCKETS ?? 6),
     samples: Number(process.env.PROBE_SAMPLES ?? 5),

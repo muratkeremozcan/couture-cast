@@ -14,9 +14,12 @@ export class NativeSignInError extends Error {
     this.name = 'NativeSignInError'
   }
 }
-/** Auth answers a wrong or expired code with a 4xx; anything else is not the code's fault. */
+/**
+ * Auth answers a wrong or expired code with a 4xx. A 429 rate limit and anything else are
+ * not the code's fault, so they read as a temporary failure.
+ */
 export function codeRejected(error: unknown) {
   if (!error || typeof error !== 'object' || !('status' in error)) return false
   const status: unknown = error.status
-  return typeof status === 'number' && status >= 400 && status < 500
+  return typeof status === 'number' && status >= 400 && status < 500 && status !== 429
 }

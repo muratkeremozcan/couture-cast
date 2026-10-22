@@ -30,9 +30,16 @@ const ON_DESTRUCTIVE = '#FFFFFF'
  * spent. Only an image that actually loads resets the budget: an unexpired URL
  * can still fail (unreachable host, broken object), and treating it as valid made
  * the budget reset on every refresh, so the card never reached its fallback.
+ * A load that settles neither way within IMAGE_LOAD_TIMEOUT_MS counts as a failure:
+ * an unanswering host fires no onError on some Android stacks, which otherwise left
+ * a blank placeholder forever. A new URL on an unavailable card (a feed refetch from
+ * anywhere) is probed with `Image.prefetch` and shown only once reachable, without
+ * restoring the budget, so a recovered host needs no manual retry and an unreachable
+ * one never flickers back to a placeholder.
  */
 const MAX_IMAGE_REFRESH_ATTEMPTS = 2
 const IMAGE_REFRESH_BACKOFF_MS = [0, 4000]
+export const IMAGE_LOAD_TIMEOUT_MS = 15_000
 
 interface CommunityCardMediaProps {
   postId: string
@@ -223,10 +230,13 @@ export function CommunityCard({
 
   const itemId = item.id
   const expiresAt = item.imageAccess.expiresAt
+  const imageUrl = item.imageAccess.url
 
   const [imageState, setImageState] = useState<'ok' | 'unavailable'>('ok')
   const [refreshTick, setRefreshTick] = useState(0)
   const attemptsRef = useRef(0)
+  // Whether the rendered image has fired onLoad or onError since its load timer armed.
+  const loadSettledRef = useRef(false)
 
   // Kept out of the expiry effect's dependency array on purpose: reading the
   // latest item and callback through a ref is what stops a refetch from
@@ -248,8 +258,14 @@ export function CommunityCard({
 
   const handleImageLoad = useCallback(() => {
     // The image rendered, so the bounded retry budget starts over.
+    loadSettledRef.current = true
     attemptsRef.current = 0
   }, [])
+
+  const handleImageError = useCallback(() => {
+    loadSettledRef.current = true
+    requestImageRefresh()
+  }, [requestImageRefresh])
 
   const handleRetryImage = useCallback(() => {
     attemptsRef.current = 0
@@ -260,6 +276,34 @@ export function CommunityCard({
   const handleOpen = useCallback(() => {
     latestRef.current.onOpen?.(latestRef.current.item)
   }, [])
+
+  const shownUrlRef = useRef(imageUrl)
+  useEffect(() => {
+    if (shownUrlRef.current === imageUrl) return
+    shownUrlRef.current = imageUrl
+    if (imageState !== 'unavailable') return
+    let active = true
+    Image.prefetch(imageUrl).then(
+      (reachable) => {
+        if (active && reachable) setImageState('ok')
+      },
+      () => undefined
+    )
+    return () => {
+      active = false
+    }
+  }, [imageUrl, imageState])
+
+  useEffect(() => {
+    if (imageState !== 'ok') return
+    loadSettledRef.current = false
+    const timer = setTimeout(() => {
+      if (loadSettledRef.current) return
+      loadSettledRef.current = true
+      requestImageRefresh()
+    }, IMAGE_LOAD_TIMEOUT_MS)
+    return () => clearTimeout(timer)
+  }, [imageUrl, imageState, refreshTick, requestImageRefresh])
 
   useEffect(() => {
     const expiresAtMs = Date.parse(expiresAt)
@@ -378,7 +422,7 @@ export function CommunityCard({
         imageUri={item.imageAccess.url}
         label={imageLabel}
         isUnavailable={imageState === 'unavailable'}
-        onError={requestImageRefresh}
+        onError={handleImageError}
         onLoad={handleImageLoad}
         onRetry={handleRetryImage}
         onOpen={handleOpen}

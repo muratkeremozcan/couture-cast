@@ -1,7 +1,8 @@
-// Story 6.5 (D7/D8 privacy): a logout that cannot reach the API keeps retrying the binding
-// removal with the signed-out member's own credential, so the device stops receiving that
-// member's notifications as soon as it is back online. Native boundaries are controlled;
-// removal and registration use the actual HTTP wrappers.
+// Story 6.5 (D5 privacy): a logout that cannot reach the API keeps only the opaque pending
+// registration. No credential outlives the logout, and network restoration alone never
+// authenticates a deletion; cleanup waits for the owner to sign in again, an explicit
+// transfer on the next sign-in, or inactive-binding expiry. Native boundaries are
+// controlled; removal and registration use the actual HTTP wrappers.
 import { http, HttpResponse } from 'msw'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import type { ExpoPushTokenOptions } from 'expo-notifications'
@@ -107,10 +108,6 @@ function removalEndpoint() {
 }
 const offline = () => HttpResponse.error() as Response
 const removed = (value: boolean) => HttpResponse.json({ data: { removed: value } })
-const credential = (): unknown => {
-  const raw = device.storage.get(credentialKey)
-  return raw ? JSON.parse(raw) : undefined
-}
 const settle = () => new Promise((resolve) => setTimeout(resolve, 50))
 let close: (() => void) | undefined
 
@@ -141,60 +138,66 @@ async function offlineLogout() {
 }
 
 describe('offline logout binding cleanup', () => {
-  it('retries the removal with the signed-out member credential on the next app start', async () => {
+  it('keeps only the opaque pending registration and no credential', async () => {
     await offlineLogout()
     expect(device.storage.has(registrationKey)).toBe(false)
-    expect(device.storage.has(pendingKey)).toBe(true)
-    expect(credential()).toEqual({ owner: 'member-a', accessToken: 'captured-token-a' })
+    expect(JSON.parse(device.storage.get(pendingKey)!)).toMatchObject({
+      owner: 'member-a',
+      registrationId: stored.registrationId,
+      bindingGeneration: stored.bindingGeneration,
+    })
+    expect(
+      [...device.storage.values()].some((value) => value.includes('captured-token-a'))
+    ).toBe(false)
+  })
+
+  it('sends no deletion on restart or foreground without reauthentication', async () => {
+    await offlineLogout()
+    const before = removals.length
     answer = () => removed(true)
     close = await startNativeNotifications({ ready: () => true, open: vi.fn() })
-    await vi.waitFor(() => expect(device.storage.has(pendingKey)).toBe(false))
+    device.lifecycle!('active')
+    await settle()
+    expect(removals).toHaveLength(before)
+    expect(device.storage.has(pendingKey)).toBe(true)
+  })
+
+  it('purges a credential an earlier build retained, without sending it', async () => {
+    device.owner = null
+    device.storage.set(pendingKey, JSON.stringify(stored))
+    device.storage.set(
+      credentialKey,
+      JSON.stringify({ owner: 'member-a', accessToken: 'captured-token-a' })
+    )
+    close = await startNativeNotifications({ ready: () => true, open: vi.fn() })
+    await vi.waitFor(() => expect(device.storage.has(credentialKey)).toBe(false))
+    device.lifecycle!('active')
+    await settle()
+    expect(removals).toHaveLength(0)
+    expect(device.storage.has(pendingKey)).toBe(true)
+  })
+
+  it('removes the pending registration once its owner signs in again', async () => {
+    await offlineLogout()
+    answer = () => removed(true)
+    server.use(
+      http.post('*/api/v1/notifications/push-tokens', () =>
+        HttpResponse.json({
+          data: {
+            ...stored,
+            owner: undefined,
+            registrationId: '63100000-0000-4000-8000-0000000000bb',
+          },
+        })
+      )
+    )
+    device.owner = 'member-a'
+    await reconcileNativeRegistration()
     expect(removals.at(-1)).toEqual({
       id: stored.registrationId,
-      bearer: 'Bearer captured-token-a',
+      bearer: 'Bearer fixture-member-a',
     })
-    expect(device.storage.has(credentialKey)).toBe(false)
-  })
-
-  it('keeps retrying on foreground while offline and stops once the binding is gone', async () => {
-    await offlineLogout()
-    close = await startNativeNotifications({ ready: () => true, open: vi.fn() })
-    await settle()
-    expect(credential()).toEqual({ owner: 'member-a', accessToken: 'captured-token-a' })
-    const before = removals.length
-    // The server reports nothing left to remove: the binding is already gone.
-    answer = () => removed(false)
-    device.lifecycle!('active')
-    await vi.waitFor(() => expect(device.storage.has(pendingKey)).toBe(false))
-    expect(removals.length).toBe(before + 1)
-    expect(device.storage.has(credentialKey)).toBe(false)
-    device.lifecycle!('active')
-    await settle()
-    expect(removals.length).toBe(before + 1)
-  })
-
-  it('discards a rejected credential but keeps the binding for the next sign-in to take over', async () => {
-    await offlineLogout()
-    answer = () =>
-      HttpResponse.json({ statusCode: 401, message: 'Unauthorized' }, { status: 401 })
-    close = await startNativeNotifications({ ready: () => true, open: vi.fn() })
-    await vi.waitFor(() => expect(device.storage.has(credentialKey)).toBe(false))
-    expect(device.storage.has(pendingKey)).toBe(true)
-    const before = removals.length
-    device.lifecycle!('active')
-    await settle()
-    expect(removals.length).toBe(before)
-  })
-
-  it('never pairs one member credential with another member binding', async () => {
-    await offlineLogout()
-    device.storage.set(pendingKey, JSON.stringify({ ...stored, owner: 'member-b' }))
-    const before = removals.length
-    answer = () => removed(true)
-    close = await startNativeNotifications({ ready: () => true, open: vi.fn() })
-    await vi.waitFor(() => expect(device.storage.has(credentialKey)).toBe(false))
-    expect(removals.length).toBe(before)
-    expect(device.storage.has(pendingKey)).toBe(true)
+    expect(device.storage.has(pendingKey)).toBe(false)
   })
 })
 

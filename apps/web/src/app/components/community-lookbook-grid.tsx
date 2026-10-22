@@ -32,6 +32,7 @@ import {
   CommunitySyncState,
   CommunityRequestSuperseded,
   CommunityReactionState,
+  CommunityVerification,
   type ReactionControls,
 } from '@couture/api-client'
 import {
@@ -2271,6 +2272,17 @@ export function CommunityLookbookGrid({
         })
       }
     }
+    const outage: Notice = {
+      message: { key: 'community.realtime.unavailable' },
+      tone: 'info',
+    }
+    // D3: shown content outlives a reconnect only while access was verified recently.
+    // Once that lapses, the content hides and the outage is announced (D9).
+    const verification = new CommunityVerification(() => {
+      if (!active) return
+      setCommunityAvailable(false)
+      setNotice(outage)
+    })
     const sync = new CommunitySyncState(communitySyncFromWeb(), currentMode, {
       rendered: () => [
         ...itemsRef.current.map((item) => item.id),
@@ -2328,19 +2340,21 @@ export function CommunityLookbookGrid({
       availability: (state, realtime) => {
         if (!active) return
         comments.setRealtimeHealthy(state === 'connected' && Boolean(realtime))
-        // Only an unverifiable or denied member hides content (D3/D9). A reconnecting
-        // socket keeps the feed, drafts and focus while HTTP polling serves them, and
-        // it is not announced as an outage.
-        // 'recovering' changes nothing: shown content stays shown, and content hidden
-        // as unverified stays hidden until a catch-up reports 'connected'.
+        // Only unverified or denied access hides content (D3/D9). While recovering, the
+        // feed, drafts and focus stay for at most 8 s after the last successful
+        // authorization, so routine reconnects and HTTP polling do not flicker, and a
+        // reconnect is not announced as an outage. Content hidden as unverified stays
+        // hidden until a catch-up reports 'connected'.
+        const { visible, verify } = verification.update(state, realtime)
         if (state === 'connected') setCommunityAvailable(true)
-        else if (state !== 'recovering') setCommunityAvailable(false)
-        if (state === 'connected' || state === 'recovering')
+        else if (!visible) setCommunityAvailable(false)
+        if (verify) void realtimeSyncRef.current?.catchUp()
+        // The outage notice clears only once verified content is visible again.
+        if (state === 'connected')
           setNotice((previous) =>
             previous?.message.key === 'community.realtime.unavailable' ? null : previous
           )
-        else if (state === 'unavailable')
-          setNotice({ message: { key: 'community.realtime.unavailable' }, tone: 'info' })
+        else if (state === 'unavailable') setNotice(outage)
         if (state !== 'connected' && state !== 'recovering') {
           feedGenerationRef.current++
           detailGenerationRef.current++
@@ -2368,12 +2382,16 @@ export function CommunityLookbookGrid({
       communityRealtimeTokenFromWeb
     )
     const foreground = () => {
-      if (document.visibilityState === 'visible') sync.foreground()
+      if (document.visibilityState !== 'visible') return
+      // Revalidate before restoring anything shown while the page was hidden.
+      verification.foreground()
+      sync.foreground()
     }
     document.addEventListener('visibilitychange', foreground)
     window.addEventListener('online', foreground)
     return () => {
       active = false
+      verification.stop()
       sync.stop()
       if (realtimeSyncRef.current === sync) realtimeSyncRef.current = null
       comments.setRealtimeHealthy(false)

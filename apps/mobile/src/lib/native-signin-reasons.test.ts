@@ -73,6 +73,7 @@ describe('native sign-in failure reasons', () => {
 
   it.each([
     ['an expired or wrong code', 403, 'code_invalid'],
+    ['an Auth rate limit', 429, 'unavailable'],
     ['an Auth outage', 500, 'unavailable'],
     ['a network failure', undefined, 'unavailable'],
   ] as const)('classifies %s', async (_label, status, expected) => {

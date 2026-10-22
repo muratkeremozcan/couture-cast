@@ -12,6 +12,7 @@ import {
   CommunityReactionState,
   CommunitySyncState,
   CommunityRequestSuperseded,
+  CommunityVerification,
 } from '@couture/api-client'
 import { CommunityCommentsSheet } from '@/components/community/community-comments-sheet'
 import {
@@ -869,6 +870,10 @@ export function CommunityScreen() {
         )
       }
     }
+    // D3: shown content outlives a reconnect only while access was verified recently.
+    const verification = new CommunityVerification(() => {
+      if (active) setCommunityAvailable(false)
+    })
     const sync = new CommunitySyncState(communitySyncFromMobile(), mode, {
       rendered: () => [
         ...realtimeItems.current.map((item) => item.id),
@@ -925,12 +930,14 @@ export function CommunityScreen() {
       availability: (state, realtime) => {
         if (!active) return
         comments.setRealtimeHealthy(state === 'connected' && Boolean(realtime))
-        // Only an unverifiable or denied member hides content (D3/D9). A reconnecting
-        // socket keeps the feed, drafts and focus while HTTP polling serves them.
-        // 'recovering' changes nothing: shown content stays shown, and content hidden
-        // as unverified stays hidden until a catch-up reports 'connected'.
+        // Only unverified or denied access hides content (D3/D9). While recovering, the
+        // feed, drafts and focus stay for at most 8 s after the last successful
+        // authorization, so routine reconnects and HTTP polling do not flicker. Content
+        // hidden as unverified stays hidden until a catch-up reports 'connected'.
+        const { visible, verify } = verification.update(state, realtime)
         if (state === 'connected') setCommunityAvailable(true)
-        else if (state !== 'recovering') setCommunityAvailable(false)
+        else if (!visible) setCommunityAvailable(false)
+        if (verify) void realtimeSyncRef.current?.catchUp()
         if (state !== 'connected' && state !== 'recovering') {
           requestGenerationRef.current++
           detailGenerationRef.current++
@@ -957,10 +964,14 @@ export function CommunityScreen() {
     realtimeSyncRef.current = sync
     sync.start(resolveMobileApiBaseUrl(), resolveMobileAccessToken)
     const lifecycle = AppState.addEventListener('change', (state) => {
-      if (state === 'active') sync.foreground()
+      if (state !== 'active') return
+      // Revalidate before restoring anything shown before the app went to background.
+      verification.foreground()
+      sync.foreground()
     })
     return () => {
       active = false
+      verification.stop()
       sync.stop()
       if (realtimeSyncRef.current === sync) realtimeSyncRef.current = null
       comments.setRealtimeHealthy(false)

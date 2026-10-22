@@ -129,6 +129,40 @@ describe('native session storage', () => {
     expect(await store.storage!.getItem(KEY)).toBe(previous)
   })
 
+  it('leaves no keys after an interrupted write followed by sign-out', async () => {
+    await store.storage!.setItem(KEY, session(6000))
+    const write = (key: string, value: string) => {
+      store.values.set(key, value)
+      return Promise.resolve()
+    }
+    // The new generation's first chunk lands, then the write is interrupted.
+    store.setItemAsync
+      .mockImplementationOnce(write)
+      .mockImplementationOnce(write)
+      .mockImplementationOnce(() =>
+        Promise.reject(new Error('Keychain write interrupted'))
+      )
+    await expect(store.storage!.setItem(KEY, session(9000))).rejects.toThrow(
+      'interrupted'
+    )
+    await store.storage!.removeItem(KEY)
+    expect([...store.values.keys()]).toEqual([])
+  })
+
+  it('sweeps chunks a failed cleanup of the previous generation left behind', async () => {
+    await store.storage!.setItem(KEY, session(6000))
+    const previousChunks = [...store.values.keys()].filter((key) => key !== KEY)
+    store.deleteItemAsync.mockImplementationOnce(() =>
+      Promise.reject(new Error('Keychain delete interrupted'))
+    )
+    await store.storage!.setItem(KEY, session(6000)).catch(() => undefined)
+    const current = session(300)
+    await store.storage!.setItem(KEY, current)
+    expect(await store.storage!.getItem(KEY)).toBe(current)
+    expect([...store.values.keys()]).toEqual([KEY])
+    for (const key of previousChunks) expect(store.values.has(key)).toBe(false)
+  })
+
   it('keeps reading a session stored whole by an earlier build', async () => {
     const legacy = session(300)
     store.values.set(KEY, legacy)

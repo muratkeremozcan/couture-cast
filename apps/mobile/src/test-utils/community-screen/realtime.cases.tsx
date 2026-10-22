@@ -4,6 +4,7 @@ import { press } from '@/src/test-utils/press'
 import { CommunitySyncState } from '@couture/api-client'
 import type { CommunityReactionSummary } from '@couture/api-client/contracts/http'
 import { act, fireEvent, screen, waitFor } from '@testing-library/react'
+import { AppState } from 'react-native'
 import { http, HttpResponse } from 'msw'
 import { render } from 'vitest-browser-react'
 import { expect, it, vi } from 'vitest'
@@ -78,8 +79,74 @@ function recoveryCoordinator() {
   })
 }
 
+/** Holds the next catch-up's event page until released. */
+function holdEvents() {
+  let release!: () => void
+  const held = new Promise<void>((resolve) => {
+    release = resolve
+  })
+  server.use(
+    http.get('*/api/v1/community/events', async () => {
+      await held
+      return HttpResponse.json({
+        data: { events: [], nextCursor: 'held', hasMore: false, resyncRequired: false },
+      })
+    })
+  )
+  return release
+}
+
 export function registerCommunityRealtimeCases() {
-  it('A09 a reconnecting socket keeps the feed while HTTP catch-up serves it', async () => {
+  it('A09 a recovering signal after the verification bound hides content until a catch-up verifies it', async () => {
+    const recover = recoveryCoordinator()
+    await render(<CommunityScreen />)
+    await screen.findByTestId('community-post-card-post-a')
+    await act(recover)
+    const release = holdEvents()
+    const sync = recover.sync()
+    let pending!: Promise<void>
+    // The last successful authorization is now older than the 8 s bound (D3).
+    const clock = vi.spyOn(Date, 'now').mockReturnValue(Date.now() + 9000)
+    try {
+      await act(() => {
+        sync.foreground()
+        pending = sync.catchUp()
+      })
+      expect(screen.queryByTestId('community-post-card-post-a')).toBeNull()
+      expect(screen.getByTestId('community-feed-unavailable')).toBeTruthy()
+    } finally {
+      clock.mockRestore()
+      release()
+      await act(() => pending)
+    }
+    await screen.findByTestId('community-post-card-post-a')
+  })
+  it('A09 a foreground restore keeps content hidden until a catch-up verifies access', async () => {
+    const lifecycle: ((state: string) => void)[] = []
+    vi.spyOn(AppState, 'addEventListener').mockImplementation((_type, listener) => {
+      lifecycle.push(listener as (state: string) => void)
+      return { remove: () => undefined }
+    })
+    const recover = recoveryCoordinator()
+    await render(<CommunityScreen />)
+    await screen.findByTestId('community-post-card-post-a')
+    await act(recover)
+    const release = holdEvents()
+    let pending!: Promise<void>
+    try {
+      await act(() => {
+        lifecycle.forEach((listener) => listener('active'))
+        pending = recover.sync().catchUp()
+      })
+      // Verified only a moment ago, but a restore still waits for revalidation.
+      expect(screen.queryByTestId('community-post-card-post-a')).toBeNull()
+    } finally {
+      release()
+      await act(() => pending)
+    }
+    await screen.findByTestId('community-post-card-post-a')
+  })
+  it('A09 a recovering signal within the verification bound keeps the feed while HTTP catch-up serves it', async () => {
     const recover = recoveryCoordinator()
     await render(<CommunityScreen />)
     await screen.findByTestId('community-post-card-post-a')

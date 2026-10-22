@@ -502,6 +502,34 @@ const suppressAndroidErrorDialogs = async () => {
   }
 }
 
+/**
+ * The host ports an Android device needs a route to: Metro (the chosen port and the
+ * 8081 fallback), the local API, and local Supabase.
+ *
+ * Supabase is on the list because the API signs community and wardrobe image URLs
+ * against SUPABASE_URL, which on a local stack is `127.0.0.1:54321`. Without a route
+ * there every signed image fails on the device. community-feed.yaml used to pass
+ * anyway: the community card never reached its unavailable state and kept a blank
+ * placeholder that still carried the `community-card-image-*` id. Once the card was
+ * fixed to settle on "Image unavailable", the flow failed exactly as it should have.
+ * A SUPABASE_URL that points off this machine (a hosted project) needs no mapping.
+ *
+ * @param {number} metroPort
+ * @returns {number[]}
+ */
+const androidHostPorts = (metroPort) => {
+  let supabasePort = 54321
+  const supabaseUrl = process.env.SUPABASE_URL?.trim()
+  if (supabaseUrl) {
+    const url = new URL(supabaseUrl)
+    const loopback = ['127.0.0.1', 'localhost', '[::1]'].includes(url.hostname)
+    supabasePort = loopback
+      ? Number(url.port || (url.protocol === 'https:' ? 443 : 80))
+      : 0
+  }
+  return [...new Set([metroPort, 8081, 4000, supabasePort].filter(Boolean))]
+}
+
 const reverseAndroidPorts = async (ports) => {
   const adbBinary = resolveAdbBinary()
   for (const port of ports) {
@@ -3614,9 +3642,7 @@ const run = async () => {
     // Every emulator needs its own mapping: `adb reverse` is per device, so on a
     // sharded run mapping only the first one leaves the other three with no
     // route to Metro at all.
-    await forEachAndroidDevice(() =>
-      reverseAndroidPorts([...new Set([metroPort, 8081, 4000])])
-    )
+    await forEachAndroidDevice(() => reverseAndroidPorts(androidHostPorts(metroPort)))
 
     await resolveAndroidHostRoute(metroPort)
   }
@@ -3688,7 +3714,7 @@ const run = async () => {
   // candidate Metro ports are mapped because the pair list below falls back
   // from the chosen port to 8081.
   if (target.platform === 'android') {
-    await reverseAndroidPorts([...new Set([metroPort, 8081, 4000])])
+    await reverseAndroidPorts(androidHostPorts(metroPort))
   }
 
   const portPairs = buildPortPairs(target.platform, metroPort)

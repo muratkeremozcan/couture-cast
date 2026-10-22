@@ -108,6 +108,12 @@ test.describe('Story 6.5 hosted realtime on the protected preview', () => {
       'x-couture-reactions': '1',
       ...(bypass ? { 'x-vercel-protection-bypass': bypass } : {}),
     }
+    // Round 8 M2: no write (signup, reaction) unless the API under test is a preview.
+    const health = await fetch(`${apiBaseUrl}/api/health`, { headers })
+    expect(health.status).toBe(200)
+    expect(((await health.json()) as { environment?: string }).environment).toBe(
+      'preview'
+    )
     const bearer = async () => {
       const signup = await fetch(`${apiBaseUrl}/api/v1/auth/signup`, {
         method: 'POST',
