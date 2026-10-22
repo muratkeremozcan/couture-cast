@@ -53,7 +53,7 @@ describe('City Spotlight web wrappers (Story 6.6)', () => {
   })
 
   it('6.6-WEB-014 retries the feed and the spotlight once after a gate unavailable 503', async () => {
-    const calls: Record<string, number> = { spotlight: 0, feed: 0 }
+    const calls = { spotlight: 0, feed: 0 }
     const refusal = () =>
       HttpResponse.json(
         {
