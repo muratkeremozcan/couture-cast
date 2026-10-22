@@ -7,6 +7,8 @@
 **Project Level:** Level 3  
 **Target Scale:** 2–3 cross-functional squads with shared moderation support
 
+_Updated: 2026-10-22: added CC-6.14 complimentary full access for owner-selected testers._
+
 _Updated: 2026-09-06: re-sliced the remaining Epic 6 work from the shipped Story 6.1 baseline._
 
 ---
@@ -650,6 +652,23 @@ demonstrate trustworthy safety operations.
 3. Provide a moderator-authorized evidence export plus database, API, and end-to-end proof for the
    audit, privacy, and deletion signatures on the Community Beta gate.
    **Prerequisites:** CC-6.11, CC-1.4.
+
+**Story CC-6.14: Complimentary full access**
+As the product owner, I want to give chosen members the full feature set without payment so that
+family testers can use premium and community features in production.
+**Acceptance Criteria**
+
+1. Add a complimentary entitlement source that grants every premium capability without a billing
+   provider, customer record, or charge, and that payment webhooks, renewals, and expiry jobs never
+   downgrade, overwrite, or bill.
+2. Enable the community rollout flags and push dispatch for complimentary members only, leaving
+   every other member, cohort, and production default unchanged.
+3. Provide an owner-only, audited grant and revoke path that records actor, member, reason, and
+   time; revoking restores the member's prior paid or free state on the next request.
+4. Prove with tests that complimentary members reach premium and community features, that paid and
+   free members are unaffected, and that account erasure removes the grant and its audit subject
+   identity on the established schedule.
+   **Prerequisites:** CC-5.2, CC-6.5.
 
 ### Epic 6 refinement decision
 
