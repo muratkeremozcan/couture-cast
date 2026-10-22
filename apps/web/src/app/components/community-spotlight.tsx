@@ -235,7 +235,8 @@ export function useCommunitySpotlight({
   /**
    * Re-reads one post for a fresh signed image URL and updates only its
    * spotlight copy, keeping every loaded page, the rank and the reader's place.
-   * A post the reader can no longer see leaves the spotlight.
+   * A post the reader can no longer see, or one that is no longer published,
+   * leaves the spotlight.
    */
   const refreshItem = useCallback(
     async (postId: string) => {
@@ -246,8 +247,13 @@ export function useCommunitySpotlight({
       try {
         const post = await getCommunityPostFromWeb(postId, controller.signal)
         if (controller.signal.aborted) return
-        // `apply` keeps the rank the copy was served at.
-        const fresh = reconcileRef.current([{ ...post, rank: shown.rank }])[0] ?? null
+        // The single-post read returns an author their own post in any status.
+        // The spotlight ranks published posts only, so any other status evicts
+        // the copy. `apply` keeps the rank the copy was served at.
+        const fresh =
+          post.status === 'published'
+            ? (reconcileRef.current([{ ...post, rank: shown.rank }])[0] ?? null)
+            : null
         apply((item) => (item?.id === postId ? fresh : item))
       } catch (error: unknown) {
         if (controller.signal.aborted) return

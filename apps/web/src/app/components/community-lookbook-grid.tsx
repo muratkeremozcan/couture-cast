@@ -218,6 +218,17 @@ interface FailedImage {
   attempts: number
 }
 
+/**
+ * The card surfaces that render a post's image. Each copy recovers through its
+ * own refetch (the feed reloads its page, the spotlight re-reads one post), so
+ * a failure on one copy never marks the other unavailable.
+ */
+type ImageSurface = 'feed' | 'spotlight'
+
+type FailedImages = Record<ImageSurface, Record<string, FailedImage>>
+
+const NO_FAILED_IMAGES: FailedImages = { feed: {}, spotlight: {} }
+
 /** One compose attempt: the allocated session plus the key that replays it. */
 interface AllocatedLook {
   postId: string
@@ -1944,7 +1955,7 @@ export function CommunityLookbookGrid({
   )
 
   const [notice, setNotice] = useState<Notice | null>(null)
-  const [failedImages, setFailedImages] = useState<Record<string, FailedImage>>({})
+  const [failedImages, setFailedImages] = useState<FailedImages>(NO_FAILED_IMAGES)
   const [hasSession, setHasSession] = useState(false)
   const [sessionScope, setSessionScope] = useState<string | null>(null)
   const sessionScopeRef = useRef<string | null | undefined>(undefined)
@@ -2125,7 +2136,10 @@ export function CommunityLookbookGrid({
         // A refetch that hands back a freshly signed URL clears the failure: not
         // clearing it is what left a recovered card reading "Image unavailable"
         // for the rest of the session.
-        setFailedImages((previous) => pruneFailedImages(previous, feed.items))
+        setFailedImages((previous) => ({
+          ...previous,
+          feed: pruneFailedImages(previous.feed, feed.items),
+        }))
         const page = feed.items.flatMap((post) => {
           const current = reactionState.read(post, readTicket)
           return current ? [current] : []
@@ -2754,36 +2768,40 @@ export function CommunityLookbookGrid({
     void openCommunitySpotlightPostFromWeb(item.id, rank, level).catch(() => undefined)
   }
 
-  /** Records a failed image; true while its automatic refetches remain. */
-  const recordImageFailure = useCallback((item: CommunityFeedItem) => {
-    const url = item.imageAccess.url
-    const previous = failedImagesRef.current[item.id]
-    const attempts = previous?.url === url ? previous.attempts : 0
-    setFailedImages((current) => ({
-      ...current,
-      [item.id]: { url, attempts: attempts + 1 },
-    }))
-    return attempts < MAX_AUTOMATIC_IMAGE_REFETCHES
-  }, [])
+  /** Records a failed image on one surface; true while its automatic refetches remain. */
+  const recordImageFailure = useCallback(
+    (surface: ImageSurface, item: CommunityFeedItem) => {
+      const url = item.imageAccess.url
+      const previous = failedImagesRef.current[surface][item.id]
+      const attempts = previous?.url === url ? previous.attempts : 0
+      setFailedImages((current) => ({
+        ...current,
+        [surface]: { ...current[surface], [item.id]: { url, attempts: attempts + 1 } },
+      }))
+      return attempts < MAX_AUTOMATIC_IMAGE_REFETCHES
+    },
+    []
+  )
 
-  const clearImageFailure = useCallback((postId: string) => {
+  const clearImageFailure = useCallback((surface: ImageSurface, postId: string) => {
     setFailedImages((current) => {
-      const next = { ...current }
+      if (!(postId in current[surface])) return current
+      const next = { ...current[surface] }
       delete next[postId]
-      return next
+      return { ...current, [surface]: next }
     })
   }, [])
 
   const handleImageError = useCallback(
     (item: CommunityFeedItem) => {
-      if (recordImageFailure(item)) void loadFeed(modeRef.current)
+      if (recordImageFailure('feed', item)) void loadFeed(modeRef.current)
     },
     [recordImageFailure, loadFeed]
   )
 
   const handleImageRetry = useCallback(
     (item: CommunityFeedItem) => {
-      clearImageFailure(item.id)
+      clearImageFailure('feed', item.id)
       void loadFeed(modeRef.current)
     },
     [clearImageFailure, loadFeed]
@@ -2794,14 +2812,14 @@ export function CommunityLookbookGrid({
   const { refreshItem: refreshSpotlightItem } = spotlight
   const handleSpotlightImageError = useCallback(
     (item: CommunityFeedItem) => {
-      if (recordImageFailure(item)) void refreshSpotlightItem(item.id)
+      if (recordImageFailure('spotlight', item)) void refreshSpotlightItem(item.id)
     },
     [recordImageFailure, refreshSpotlightItem]
   )
 
   const handleSpotlightImageRetry = useCallback(
     (item: CommunityFeedItem) => {
-      clearImageFailure(item.id)
+      clearImageFailure('spotlight', item.id)
       void refreshSpotlightItem(item.id)
     },
     [clearImageFailure, refreshSpotlightItem]
@@ -3012,7 +3030,7 @@ export function CommunityLookbookGrid({
             reactionControls={reactionState.controls(item.id)}
             item={item}
             isHighlighted={false}
-            isFailedImage={failedImages[item.id]?.url === item.imageAccess.url}
+            isFailedImage={failedImages.spotlight[item.id]?.url === item.imageAccess.url}
             isReported={reportedPostIds.has(item.id)}
             isSponsored={sponsored.has(item.id)}
             canAct={presentation.canAct}
@@ -3090,7 +3108,7 @@ export function CommunityLookbookGrid({
             key={item.id}
             item={item}
             isHighlighted={item.id === highlightedCardId}
-            isFailedImage={failedImages[item.id]?.url === item.imageAccess.url}
+            isFailedImage={failedImages.feed[item.id]?.url === item.imageAccess.url}
             isReported={reportedPostIds.has(item.id)}
             isSponsored={sponsored.has(item.id)}
             canAct={presentation.canAct}
