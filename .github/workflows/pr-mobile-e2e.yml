@@ -149,9 +149,10 @@ jobs:
     # timeout-minutes = measured work + the Supabase start budget + cache.
     # Measured on recent green runs (2026-10-22), work excluding the Supabase
     # step peaked at 21.9 min across 56 shard runs; start-local-supabase may spend up to its
-    # time-budget-seconds (600 s = 10 min) on start attempts, and restoring or
-    # saving its image cache adds about 3 min.
-    # 22 + 10 + 3 = 35 min, so 45 keeps about 10 min of margin.
+    # time-budget-seconds (600 s = 10 min) on start attempts, restoring its
+    # image cache adds about 3 min, and a job that missed the cache saves it
+    # for the others (about 2 min more).
+    # 22 + 10 + 3 + 2 = 37 min, so 45 keeps about 8 min of margin.
     timeout-minutes: 45
     services:
       redis:

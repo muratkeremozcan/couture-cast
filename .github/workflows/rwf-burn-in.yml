@@ -31,8 +31,9 @@ jobs:
     # Measured on recent green runs (2026-10-22), work excluding the Supabase
     # step peaked at 12.6 min across 6 runs, and it grows with
     # the number of changed specs; start-local-supabase may spend up to its
-    # time-budget-seconds (600 s = 10 min) on start attempts, and restoring or
-    # saving its image cache adds about 3 min.
+    # time-budget-seconds (600 s = 10 min) on start attempts, restoring its
+    # image cache adds about 3 min, and a job that missed the cache saves it
+    # for the others (about 2 min more).
     timeout-minutes: 35
     services:
       redis:

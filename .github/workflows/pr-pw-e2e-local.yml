@@ -53,9 +53,9 @@ jobs:
     # timeout-minutes = measured work + the Supabase start budget + cache.
     # Measured on recent green runs (2026-10-22), work excluding the Supabase
     # step peaked at 9.1 min across 16 shard runs; start-local-supabase may spend up to its
-    # time-budget-seconds (600 s = 10 min) on start attempts, and restoring or
-    # saving its image cache adds about 3 min.
-    # Shard 1 also writes the image cache on a miss (about 2 min more).
+    # time-budget-seconds (600 s = 10 min) on start attempts, restoring its
+    # image cache adds about 3 min, and a job that missed the cache saves it
+    # for the others (about 2 min more).
     timeout-minutes: 25
     runs-on: ubuntu-latest
     services:
@@ -115,11 +115,6 @@ jobs:
 
       - name: Start local Supabase services
         uses: ./.github/actions/start-local-supabase
-        with:
-          # The one writer of the Supabase image cache. This workflow also runs
-          # on pushes to main, whose cache every branch can restore; every other
-          # caller only restores, so no two jobs race the same key.
-          save-image-cache: ${{ matrix.shardIndex == 1 }}
 
       - name: Reset local Playwright database
         run: npm run db:reset

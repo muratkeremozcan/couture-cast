@@ -59,10 +59,13 @@ inputs:
   fallback-registries:
     description: >-
       Comma-separated registries the later attempts rotate through after
-      image-registry. Either registry can answer "toomanyrequests" on a busy
-      runner pool; alternating means one throttled registry cannot fail a shard.
+      image-registry. Any one of them can answer "toomanyrequests" on a busy
+      runner pool; rotating means one throttled registry cannot fail a shard.
+      docker.io serves the upstream names the CLI pins (supabase/postgres,
+      postgrest/postgrest, library/kong, ...), verified for CLI 2.62.5 with
+      `docker manifest inspect`.
     required: false
-    default: 'public.ecr.aws'
+    default: 'public.ecr.aws,docker.io'
   image-cache:
     description: >-
       Restore the Supabase images from the Actions cache before starting. The
@@ -72,11 +75,12 @@ inputs:
     default: 'true'
   save-image-cache:
     description: >-
-      Save the pulled images to the Actions cache on a miss. Exactly one job
-      across all workflows sets this, so shards never race the same key;
-      every other caller only restores.
+      Save the pulled images to the Actions cache after a start that missed it,
+      so the first job anywhere that gets its images seeds the cache for every
+      other. Concurrent saves of one key are safe: the first upload wins and
+      the rest are skipped, and the save step never fails the job.
     required: false
-    default: 'false'
+    default: 'true'
 
 runs:
   using: composite
@@ -230,13 +234,21 @@ runs:
           echo $(( delay + RANDOM % (BASE_DELAY + 1) ))
         }
 
-        # The one writer saves exactly the images this start used, tagged for the
-        # registry they came from, so a later hit loads them under the same names.
+        # The images this project's containers run from, under the names they
+        # were pulled as. Mirrors use <registry>/supabase/<name>; docker.io keeps
+        # the upstream names, so the containers are the registry-neutral source.
+        project_images() {
+          docker ps --all --filter label=com.supabase.cli.project \
+            --format '{{.Image}}' | sort -u
+        }
+
+        # Saves exactly the images this start used, so a later hit loads them
+        # under the same names and the CLI finds every one already present.
         write_image_cache() {
           local registry=$1 images
-          images="$(docker images --format '{{.Repository}}:{{.Tag}}' | grep "^${registry}/supabase/" | sort -u)"
+          images="$(project_images)"
           if [ -z "$images" ]; then
-            echo "::warning::No ${registry}/supabase images to cache."
+            echo "::warning::No Supabase project images to cache."
             return 0
           fi
           mkdir -p "$CACHE_DIR"
@@ -251,12 +263,11 @@ runs:
           fi
         }
 
-        # A hit must pull nothing; any image beyond the cached set means the key
-        # missed an input and the cache is stale.
+        # A hit must pull nothing: every image a project container runs from has
+        # to come from the loaded set, or the key missed an input and is stale.
         check_cache_hit_pulled_nothing() {
-          local now pulled
-          now="$(docker images --format '{{.Repository}}:{{.Tag}}' | sort -u)"
-          pulled="$(comm -13 <(printf '%s\n' "$cached_images") <(printf '%s\n' "$now") | grep '/supabase/' || true)"
+          local pulled
+          pulled="$(comm -13 <(printf '%s\n' "$cached_images") <(project_images))"
           if [ -n "$pulled" ]; then
             echo "::warning::Supabase image cache hit, but these were pulled: $(tr '\n' ' ' <<< "$pulled")"
           else
@@ -331,8 +342,10 @@ runs:
         done
 
     - name: Save the Supabase image cache
-      # Only the designated writer, only on a miss, and only after a start that
-      # produced the archive; a failed or empty archive is never published.
+      # Any caller, only on a miss, and only after a start that produced the
+      # archive; a failed or empty archive is never published. A lost race for
+      # the key or a cache service error must not fail the job.
+      continue-on-error: true
       if: >-
         inputs.image-cache == 'true' && inputs.save-image-cache == 'true' &&
         steps.cache-restore.outputs.cache-hit != 'true' && steps.start.outputs.cache_written == 'true'
