@@ -299,6 +299,16 @@ rank: 1..60, level }` without `experimentVariant`, where `level` is the served l
   a locale-stable `settings-language-title` because Android counts a clipped chip sliver as
   visible, and the wardrobe onboarding card tap retries after a relaunch when Expo Go's invisible
   developer-sheet backdrop swallows it.
+- 2026-10-22, Story 6.5 defect found and fixed here (R43, coordinator decision). After a socket
+  drop the verification window keeps content for 2 s, and the shared sync state reported every
+  untyped request failure, including its own 2 s client abort of a request the server had answered
+  200, as `unavailable`. Both hid the feed and emptied the list, so members lost their scroll
+  position and could see "temporarily unavailable" with every call succeeding; Maestro surfaced it
+  on a slow Android emulator. Failures with no server status now report `recovering`, so the
+  unchanged 8 s privacy window decides; any server status stays `unavailable` and 401/403 stay
+  `denied`. The HTTP fallback starts every 5.0 to 5.5 s, so a poll plus its 2 s budget completes
+  inside the window. When content must hide and the same items return, web and mobile restore the
+  reader's scroll position; content still unmounts while unverified.
 
 ## Spec Change Log
 
