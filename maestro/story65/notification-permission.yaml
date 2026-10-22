@@ -4,21 +4,14 @@
 appId: ${MAESTRO_APP_ID}
 ---
 - runFlow: open-app.yaml
-- runFlow: open-settings-tab.yaml
-# Centered, because iOS Settings has a fixed band above the tab bar that clips the bottom.
-- scrollUntilVisible:
-    element: ${MAESTRO_TITLE}
-    direction: DOWN
-    centerElement: true
-    timeout: 20000
-- tapOn: ${MAESTRO_TITLE}
+- runFlow: open-notification-settings.yaml
 - extendedWaitUntil:
     visible: ${MAESTRO_ENABLED}
     timeout: 30000
-# The label and the Switch share one accessible name. Only the Switch can be checked, so
-# "not visible as checked" means the Switch is off. Tree order differs by platform: the
-# runner passes MAESTRO_SWITCH_INDEX (Android 1, iOS 0), and the checked assertion proves
-# the Switch itself changed.
+# The label and the Switch share one accessible name, and Maestro does not select by tree
+# order. Android picks the control to the right of its label; on iOS the Switch is the
+# first match. Only the Switch can be checked, so "not visible as checked" means it is off,
+# and the checked assertion proves the Switch itself changed.
 # A session refresh right after load can rebuild the draft, so retry until the Switch holds.
 - retry:
     maxRetries: 3
@@ -29,9 +22,19 @@ appId: ${MAESTRO_APP_ID}
               text: ${MAESTRO_ENABLED}
               checked: true
           commands:
-            - tapOn:
-                text: ${MAESTRO_ENABLED}
-                index: ${MAESTRO_SWITCH_INDEX}
+            - runFlow:
+                when:
+                  platform: Android
+                commands:
+                  - tapOn:
+                      rightOf: ${MAESTRO_ENABLED}
+            - runFlow:
+                when:
+                  platform: iOS
+                commands:
+                  - tapOn:
+                      text: ${MAESTRO_ENABLED}
+                      index: 0
       - waitForAnimationToEnd
       - assertVisible:
           text: ${MAESTRO_ENABLED}

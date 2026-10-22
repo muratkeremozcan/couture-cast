@@ -1,0 +1,11 @@
+# Story 6.5 owner: sign out through the product UI, then reopen the notification settings:
+# a signed-out screen has no member controls.
+appId: ${MAESTRO_APP_ID}
+---
+- runFlow: open-app.yaml
+- runFlow: open-notification-settings.yaml
+- tapOn: ${MAESTRO_SIGNOUT}
+- runFlow: open-notification-settings.yaml
+- assertNotVisible: ${MAESTRO_ENABLED}
+- takeScreenshot:
+    path: signed-out-${MAESTRO_CASE}

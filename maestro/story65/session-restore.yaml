@@ -1,0 +1,27 @@
+# Story 6.5 owner: after the runner ends the app process and reopens it, the secure session
+# must restore without a new sign-in. Home must load for the restored member (P2: no
+# hero error state), the iOS back button must carry the localized label (P3), and the
+# notification settings must render the member's controls.
+appId: ${MAESTRO_APP_ID}
+---
+- runFlow: open-app.yaml
+- extendedWaitUntil:
+    visible:
+      id: 'outfit-recommendation-card'
+    timeout: 30000
+    optional: true
+- assertNotVisible:
+    id: 'hero-error-state'
+- takeScreenshot:
+    path: home-restored-${MAESTRO_CASE}
+- runFlow: open-notification-settings.yaml
+- runFlow:
+    when:
+      true: ${MAESTRO_PLATFORM == 'ios'}
+    commands:
+      - assertVisible: ${MAESTRO_BACK}
+- extendedWaitUntil:
+    visible: ${MAESTRO_ENABLED}
+    timeout: 30000
+- takeScreenshot:
+    path: settings-restored-${MAESTRO_CASE}

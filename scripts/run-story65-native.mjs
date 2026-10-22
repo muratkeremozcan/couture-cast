@@ -318,6 +318,7 @@ async function prepare() {
     ),
     targets: state.targets,
   })
+  await locate()
 }
 
 // ---------------------------------------------------------------------------------------
@@ -346,15 +347,20 @@ function ensureAndroidReverses() {
 function openApp() {
   if (platform === 'android') {
     ensureAndroidReverses()
+    // Launch like the home-screen icon (ACTION_MAIN). The dev client then loads its most
+    // recent bundle, our Metro. Launching with the dev-client VIEW URL instead makes that
+    // URL the activity's intent, and expo-notifications' forwarder re-delivers it on a
+    // notification tap, so the dev launcher reloads the bundle mid-routing.
     adb(
       'shell',
       'am',
       'start',
       '-a',
-      'android.intent.action.VIEW',
-      '-d',
-      devClientUrl,
-      appId
+      'android.intent.action.MAIN',
+      '-c',
+      'android.intent.category.LAUNCHER',
+      '-n',
+      `${appId}/.MainActivity`
     )
   } else openIosApp()
 }
@@ -475,16 +481,22 @@ async function present(data) {
  * runs as a child process because Maestro runs synchronously in this process.
  */
 async function startIosPushTrigger(payload) {
+  // Answers every request (the warm iOS case may re-fire a missed banner); exits when the
+  // runner ends it after the flow, or on its own after ten minutes.
   const source = `
     const http = require('node:http'), { spawnSync } = require('node:child_process')
     const [device, appId, payload] = process.argv.slice(1)
+    let pushed = 0
     const server = http.createServer((req, res) => {
       const result = spawnSync('xcrun', ['simctl', 'push', device, appId, payload])
+      // simctl returns on delivery; give SpringBoard time to animate the banner in.
+      spawnSync('sleep', ['1.5'])
+      if (result.status === 0) pushed++
       res.writeHead(result.status === 0 ? 200 : 500).end()
-      server.close(() => process.exit(result.status === 0 ? 0 : 1))
     })
     server.listen(0, '127.0.0.1', () => console.log(server.address().port))
-    setTimeout(() => process.exit(2), 600000).unref()`
+    process.on('SIGTERM', () => process.exit(pushed > 0 ? 0 : 1))
+    setTimeout(() => process.exit(pushed > 0 ? 0 : 2), 600000).unref()`
   const child = spawn(process.execPath, ['-e', source, device, appId, payload], {
     stdio: ['ignore', 'pipe', 'inherit'],
   })
@@ -497,7 +509,12 @@ async function startIosPushTrigger(payload) {
       code === 0 ? resolve() : reject(new Error(`simctl push trigger exited ${code}`))
     )
   })
-  return { url: `http://127.0.0.1:${port}/push`, delivered }
+  // The runner calls finish() after the flow; the trigger reports whether any push landed.
+  const finish = () => {
+    child.kill('SIGTERM')
+    return delivered
+  }
+  return { url: `http://127.0.0.1:${port}/push`, finish }
 }
 
 // ---------------------------------------------------------------------------------------
@@ -531,7 +548,7 @@ function localeEnv(locale) {
     MAESTRO_COMMENTS_TITLE: json.community.comments.title,
     MAESTRO_INVALID: json.community.deepLink.invalid,
     MAESTRO_LOCALE: locale,
-    MAESTRO_SWITCH_INDEX: platform === 'android' ? '1' : '0',
+    MAESTRO_BACK: json.common.back,
   }
 }
 
@@ -602,11 +619,15 @@ async function freshApp() {
 }
 
 async function signin() {
-  const label = requireArg('account')
+  await signInAccount(requireArg('account'), args.locale ?? 'en-US', { fresh: true })
+}
+
+/** Real sign-in UI and real verifyNativeOtp; the OTP reaches Maestro only through env. */
+async function signInAccount(label, locale, { fresh }) {
   const account = state().accounts[label]
   if (!account) throw new Error(`Unknown account ${label}`)
-  const locale = args.locale ?? 'en-US'
-  await freshApp()
+  if (fresh) await freshApp()
+  else maestro('open-app.yaml', `open-${label}-${Date.now()}`, localeEnv(locale))
   const since = Date.now()
   maestro('signin-request.yaml', `signin-request-${label}`, {
     ...localeEnv(locale),
@@ -655,7 +676,7 @@ async function tap() {
   openApp()
   maestro('open-app.yaml', `ready-${label}`, localeEnv('en-US'))
   maestro('set-locale.yaml', `locale-${label}`, localeEnv(locale))
-  let pushed = Promise.resolve()
+  let finishPush = () => Promise.resolve()
   let iosEnv = {}
   if (platform === 'android') {
     if (spec.lifecycle === 'background') goHome()
@@ -666,7 +687,7 @@ async function tap() {
     // itself backgrounds the app and triggers the push.
     if (spec.lifecycle === 'cold') await terminateKeepingNotification()
     const trigger = await present(data)
-    pushed = trigger.delivered
+    finishPush = trigger.finish
     iosEnv = { MAESTRO_PUSH_URL: trigger.url, MAESTRO_LIFECYCLE: spec.lifecycle }
   }
   log('presented', {
@@ -684,15 +705,21 @@ async function tap() {
             MAESTRO_EXPECT: 'card',
             MAESTRO_TARGET_ID: `highlighted-community-card-${target.cardId}`,
           }
-  maestro('community-notification-tap.yaml', label, {
-    ...localeEnv(locale),
-    ...destination,
-    ...iosEnv,
-    MAESTRO_PLATFORM: platform,
-    MAESTRO_CASE: label,
-    MAESTRO_NOTIFICATION_BODY: notificationBody,
-  })
-  await pushed
+  try {
+    maestro('community-notification-tap.yaml', label, {
+      ...localeEnv(locale),
+      ...destination,
+      ...iosEnv,
+      MAESTRO_PLATFORM: platform,
+      MAESTRO_CASE: label,
+      MAESTRO_NOTIFICATION_BODY: notificationBody,
+    })
+  } catch (error) {
+    // End the push trigger even when the flow fails, then report the flow failure.
+    await finishPush().catch(() => undefined)
+    throw error
+  }
+  await finishPush()
   captureHierarchy(label)
   const result = {
     case: name,
@@ -736,6 +763,7 @@ async function permission() {
   const owner = state().accounts.recipient
   const locale = args.locale ?? 'en-US'
   const label = `permission-${name}-${locale}`
+  if (name !== 'revoked') await disableEngagementNotifications(owner)
   const n = strings[locale].community.notifications
   if (platform === 'ios') return iosPermission(name, owner, locale, label, n)
   ensureAndroidReverses()
@@ -831,10 +859,170 @@ async function iosPermission(name, owner, locale, label, n) {
   log('permission', result)
 }
 
+/** API request log lines (method, path, status) recorded after `since`, in order. */
+function apiCallsSince(since) {
+  return fs
+    .readFileSync(path.join(harness, 'api.log'), 'utf8')
+    .split('\n')
+    .filter((line) => line.includes('"message":"request_completed"'))
+    .map((line) => JSON.parse(line))
+    .filter((row) => row.timestamp > since)
+    .map((row) => ({
+      at: row.timestamp,
+      method: row.method,
+      path: row.path,
+      status: row.statusCode,
+    }))
+}
+
+/**
+ * Native session cases (N1):
+ * - restore: end the app process, reopen; the secure session restores, Home loads (P2) and
+ *   the member's settings render. On iOS the back label is localized (P3).
+ * - logout: sign out in the UI; the binding the member held is removed.
+ * - switch: sign the second account in over the first; the first member's binding goes.
+ * - logout-offline: sign out while the owned API is paused (SIGSTOP on this harness's own
+ *   API process), resume it, and record what the pending unbind does on the next start.
+ */
+async function session() {
+  const name = requireArg('case')
+  const locale = args.locale ?? 'en-US'
+  const label = `session-${name}-${locale}`
+  const { recipient, second } = state().accounts
+  if (platform === 'android') ensureAndroidReverses()
+  const since = new Date().toISOString()
+  const owners = async () => ({
+    recipient: await bindings(recipient.appUserId),
+    second: await bindings(second.appUserId),
+  })
+  const before = await owners()
+  const env = { ...localeEnv(locale), MAESTRO_PLATFORM: platform, MAESTRO_CASE: label }
+  // The locale syncs to the profile and persists on the device; select it explicitly.
+  if (!appRunning()) openApp()
+  maestro('open-app.yaml', `ready-${label}`, localeEnv('en-US'))
+  maestro('set-locale.yaml', `locale-${label}`, localeEnv(locale))
+  let detail = {}
+  if (name === 'restore') {
+    stopApp()
+    openApp()
+    maestro('session-restore.yaml', label, env)
+    const calls = apiCallsSince(since)
+    const profile = calls.findIndex(
+      (c) => c.path === '/api/v1/user/profile' && c.status < 400
+    )
+    const ritualAfter = calls.slice(profile + 1).find((c) => c.path === '/api/v1/ritual')
+    if (profile < 0) throw new Error('No successful profile request after restore')
+    // The flow already proved Home rendered without its error state (P2). Home may render
+    // from the ritual cache; any network reload after restore must succeed.
+    if (ritualAfter && ritualAfter.status >= 400)
+      throw new Error(`Home reload failed after restore: ${JSON.stringify(ritualAfter)}`)
+    detail = {
+      profile: calls[profile],
+      homeSource: ritualAfter ? 'network' : 'ritual cache',
+      ritualAfterRestore: ritualAfter ?? null,
+    }
+  } else if (name === 'logout') {
+    maestro('session-logout.yaml', label, env)
+  } else if (name === 'switch') {
+    await signInAccount('second', locale, { fresh: false })
+  } else if (name === 'logout-offline') {
+    const apiPid = readJson(path.join(harness, 'api-process.json')).pid
+    const command = run('ps', ['-p', String(apiPid), '-o', 'command=']).stdout
+    if (!command.includes('c-doc/workspace/apps/api/dist/src/main.js'))
+      throw new Error('The recorded API process is not this harness API')
+    process.kill(apiPid, 'SIGSTOP')
+    try {
+      maestro('session-logout.yaml', label, env)
+    } finally {
+      process.kill(apiPid, 'SIGCONT')
+    }
+    detail.pausedApi = apiPid
+    detail.bindingsAfterOfflineLogout = await owners()
+    stopApp()
+    openApp()
+    maestro('open-app.yaml', `${label}-reopen`, env)
+    await sleep(5_000)
+  } else throw new Error(`Unknown session case ${name}`)
+  captureHierarchy(label)
+  const result = {
+    case: name,
+    locale,
+    bindingsBefore: before,
+    bindingsAfter: await owners(),
+    ...detail,
+    apiCalls: apiCallsSince(since).filter((c) =>
+      /profile|ritual|push|notification-preferences|tokens/.test(c.path)
+    ),
+    at: new Date().toISOString(),
+  }
+  writeJson(path.join(evidence, `${label}.json`), result)
+  log('session', result)
+}
+
+/**
+ * Home needs a saved location: without one /ritual answers 400 "No location preferences
+ * found" and Home shows its error state. Give the signed-in accounts a location through
+ * the product API (as onboarding would) and confirm the ritual loads.
+ */
+async function locate() {
+  const { recipient, second } = state().accounts
+  const results = {}
+  for (const [label, account] of Object.entries({ recipient, second })) {
+    const bearer = await nodeBearer(account)
+    const saved = await apiJson('POST', '/api/v1/locations', {
+      bearer,
+      body: {
+        label: 'Chicago',
+        locationKey: 'chicago-il',
+        latitude: 41.878,
+        longitude: -87.63,
+        timezone: 'America/Chicago',
+        city: 'Chicago',
+        region: 'Illinois',
+        country: 'United States',
+      },
+    })
+    if (![201, 409].includes(saved.status))
+      throw new Error(`Saving a location failed for ${label}: ${saved.status}`)
+    const ritual = await apiJson('GET', '/api/v1/ritual?locale=en-US', { bearer })
+    if (ritual.status !== 200)
+      throw new Error(`Ritual for ${label} answered ${ritual.status}`)
+    results[label] = { location: saved.status, ritual: ritual.status }
+  }
+  log('located', results)
+}
+
+/**
+ * Permission cases start from engagement notifications off on the server. Turning them on in
+ * the UI is what makes the app ask the OS. A preference left on by an earlier case would
+ * save without any OS request.
+ */
+async function disableEngagementNotifications(account) {
+  const bearer = await nodeBearer(account)
+  const headers = { 'x-couture-platform': 'mobile' }
+  const current = await apiJson('GET', '/api/v1/community/notification-preferences', {
+    bearer,
+    headers,
+  })
+  if (current.status !== 200)
+    throw new Error(`Preferences read answered ${current.status}`)
+  if (!current.body.data.enabled) return
+  const patched = await apiJson('PATCH', '/api/v1/community/notification-preferences', {
+    bearer,
+    headers,
+    body: { baseRevision: current.body.data.revision, enabled: false },
+  })
+  if (patched.status !== 200)
+    throw new Error(`Preferences update answered ${patched.status}`)
+}
+
 const command = args._[0]
 checkMaestro()
 if (command === 'prepare') await prepare()
 else if (command === 'signin') await signin()
 else if (command === 'tap') await tap()
 else if (command === 'permission') await permission()
-else throw new Error('Command must be prepare, signin, tap or permission')
+else if (command === 'session') await session()
+else if (command === 'locate') await locate()
+else
+  throw new Error('Command must be prepare, locate, signin, tap, permission or session')

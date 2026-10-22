@@ -1,22 +1,25 @@
-# Story 6.5 owner: the runner opens the dev client on the owned Metro URL. The dev-client
-# onboarding sheet covers the tab bar on first load, so absorb it before waiting for Home.
+# Story 6.5 owner: the runner opens the dev client on the owned Metro URL. This confirms the
+# iOS open prompt, absorbs the dev-client onboarding sheet (it covers the tab bar on first
+# load), returns from pushed stack screens and waits for the tab bar. Only ids and
+# dev-client/OS text are matched, so it works in every app locale.
 appId: ${MAESTRO_APP_ID}
 ---
 - retry:
     maxRetries: 3
     commands:
       - extendedWaitUntil:
-          visible: 'Open in .*|This is the developer menu.*|Connected to:|Home|Navigate up|${MAESTRO_TITLE}'
-          timeout: 30000
-      # iOS confirms opening the dev-client URL from simctl openurl.
+          visible: 'Open in .*|This is the developer menu.*|Connected to:'
+          timeout: 10000
+          optional: true
       - runFlow:
           when:
             visible: 'Open in .*'
           commands:
             - tapOn: 'Open'
             - extendedWaitUntil:
-                visible: 'This is the developer menu.*|Connected to:|Home'
+                visible: 'This is the developer menu.*|Connected to:'
                 timeout: 60000
+                optional: true
       - runFlow:
           when:
             visible: 'This is the developer menu.*'
@@ -44,7 +47,14 @@ appId: ${MAESTRO_APP_ID}
                 commands:
                   - tapOn:
                       id: 'BackButton'
+            - runFlow:
+                when:
+                  visible:
+                    id: 'comments-close'
+                commands:
+                  - tapOn:
+                      id: 'comments-close'
       - extendedWaitUntil:
           visible:
             id: 'tab-home'
-          timeout: 20000
+          timeout: 30000
