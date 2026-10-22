@@ -815,6 +815,9 @@ export type OpenCommunityPostInput =
  * rather than a schema union: the published request body only widens, so an
  * installed client's body stays valid under the same object schema.
  */
+const OPEN_COMMUNITY_POST_INPUT_DESCRIPTION =
+  'Either a feed open with experimentVariant, or a spotlight open with surface spotlight, a rank from 1 to 60 and the served level. The two forms never mix.'
+
 export const openCommunityPostInputSchema = z
   .object({
     experimentVariant: communityExperimentVariantSchema.optional(),
@@ -837,16 +840,14 @@ export const openCommunityPostInputSchema = z
           : 'A feed open needs the served experiment variant.',
       })
   })
+  .openapi({ description: OPEN_COMMUNITY_POST_INPUT_DESCRIPTION })
   .transform(
     (body): OpenCommunityPostInput =>
       body.surface !== undefined
         ? { surface: body.surface, rank: body.rank!, level: body.level! }
         : { experimentVariant: body.experimentVariant! }
   )
-  .openapi({
-    description:
-      'Either a feed open with experimentVariant, or a spotlight open with surface spotlight, a rank from 1 to 60 and the served level. The two forms never mix.',
-  })
+  .openapi({ description: OPEN_COMMUNITY_POST_INPUT_DESCRIPTION })
 
 export function isSpotlightOpenInput(
   input: OpenCommunityPostInput
