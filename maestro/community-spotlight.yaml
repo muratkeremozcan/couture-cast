@@ -56,10 +56,11 @@ tags:
     text: 'Spotlight in Chicago'
     label: "The heading names the viewer's own place at the ranked level"
 
-# The badge is one accessible element whose label is the localized rank.
+# The badge is one accessible element whose label is the localized rank, then
+# its position among the loaded looks and their count.
 - assertVisible:
     id: 'community-spotlight-rank-seed-spotlight-1'
-    text: 'Rank 1'
+    text: 'Rank 1, Position 1 of 6'
     label: 'The freshest, most loved seeded post ranks first'
 
 # The image element exists before its bytes arrive; the loaded marker appears
@@ -79,15 +80,25 @@ tags:
     id: 'community-spotlight-disabled'
 
 # View more. The seeded cohort holds seven posts and a page holds six, so the
-# second page always exists and appends exactly `seed-spotlight-7`. Each card is
-# about one screen tall on a phone, so the scrolls get a generous budget, and
-# each target is centred so a tap never lands on the tab bar above its edge.
-- scrollUntilVisible:
-    element:
-      id: 'community-spotlight-view-more'
-    direction: DOWN
-    centerElement: true
-    timeout: 60000
+# second page always exists and appends exactly `seed-spotlight-7`. The looks
+# sit in one horizontal carousel whose trailing item is View more, and one
+# full-width swipe moves one card. The swipes run at 62% of the screen height,
+# which is inside the carousel on a phone. Maestro's swipe from the carousel
+# element moved it one card in eight tries on an Android emulator.
+- extendedWaitUntil:
+    visible:
+      id: 'community-spotlight-row'
+    timeout: 10000
+- repeat:
+    while:
+      notVisible:
+        id: 'community-spotlight-view-more'
+    times: 8
+    commands:
+      - swipe:
+          start: '90%, 62%'
+          end: '5%, 62%'
+          duration: 400
 - tapOn:
     id: 'community-spotlight-view-more'
     label: 'Append the next spotlight page'
@@ -98,24 +109,30 @@ tags:
     label: 'The next page landed'
 - assertNotVisible:
     id: 'community-spotlight-more-error'
-- scrollUntilVisible:
-    element:
+# The module scrolls the carousel to the first appended look itself.
+- extendedWaitUntil:
+    visible:
       id: 'community-spotlight-rank-seed-spotlight-7'
-    direction: DOWN
-    centerElement: true
-    timeout: 60000
-    label: 'The seventh ranked look was appended'
+    timeout: 15000
+    label: 'The seventh ranked look was appended and brought into view'
 - assertVisible:
     id: 'community-spotlight-rank-seed-spotlight-7'
-    text: 'Rank 7'
+    text: 'Rank 7, Position 7 of 7'
 - assertNotVisible:
     id: 'community-spotlight-view-more'
-- scrollUntilVisible:
-    element:
-      id: 'community-spotlight-item-seed-spotlight-1'
-    direction: UP
-    centerElement: true
-    timeout: 60000
+- repeat:
+    while:
+      notVisible:
+        id: 'community-spotlight-rank-seed-spotlight-1'
+    times: 9
+    commands:
+      - swipe:
+          start: '10%, 62%'
+          end: '95%, 62%'
+          duration: 400
+- assertVisible:
+    id: 'community-spotlight-rank-seed-spotlight-1'
+    text: 'Rank 1, Position 1 of 7'
     label: 'Appending kept the first page in place'
 
 # --- Opening a card into its detail and back --------------------------------
@@ -154,6 +171,16 @@ tags:
     label: 'The detail closed'
 
 - assertVisible:
+    id: 'community-spotlight-rank-seed-spotlight-1'
+    text: 'Rank 1, Position 1 of 7'
+    label: 'The module is back where the member left it'
+
+- scrollUntilVisible:
+    element:
+      id: 'community-spotlight-heading'
+    direction: UP
+    timeout: 30000
+- assertVisible:
     id: 'community-spotlight-heading'
     text: 'Spotlight in Chicago'
-    label: 'The module is back where the member left it'
+    label: 'The heading still names the viewer place after the round trip'
