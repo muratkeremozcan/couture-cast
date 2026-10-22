@@ -230,3 +230,51 @@ describe('verified web session failure boundaries', () => {
     expect(sessionStorage.getItem(key)).toBeNull()
   })
 })
+describe('sign-in failure reasons', () => {
+  const reason = (promise: Promise<unknown>) =>
+    promise.then(
+      () => 'resolved',
+      (error: unknown) =>
+        error && typeof error === 'object' && 'reason' in error ? error.reason : 'untyped'
+    )
+  it('reports a code that could not be sent as temporary', async () => {
+    const auth = await import('./web-session')
+    sdk.request.mockResolvedValue({ error: new Error('mail unavailable') })
+    expect(await reason(auth.requestWebOtp('member@example.test'))).toBe('unavailable')
+  })
+  it.each([
+    ['an expired or wrong code', 403, 'code_invalid'],
+    ['a rejected code', 400, 'code_invalid'],
+    ['an Auth outage', 500, 'unavailable'],
+    ['a network failure', undefined, 'unavailable'],
+  ] as const)('classifies %s', async (_label, status, expected) => {
+    const auth = await import('./web-session')
+    sdk.verify.mockResolvedValue({
+      data: { session: null },
+      error: Object.assign(new Error('Auth refused'), status ? { status } : {}),
+    })
+    expect(await reason(auth.verifyWebOtp('member@example.test', '123456'))).toBe(
+      expected
+    )
+    expect(sessionStorage.getItem(key)).toBeNull()
+  })
+  it.each([
+    [401, 'denied'],
+    [403, 'denied'],
+    [404, 'denied'],
+    [503, 'unavailable'],
+  ] as const)(
+    'classifies a verified code whose account check answers %i as %s',
+    async (status, expected) => {
+      useMswHandlers(
+        http.get('*/api/v1/user/profile', () => HttpResponse.json({}, { status }))
+      )
+      const auth = await import('./web-session')
+      expect(await reason(auth.verifyWebOtp('member@example.test', '123456'))).toBe(
+        expected
+      )
+      expect(auth.webSessionIdentity()).toBeNull()
+      expect(sessionStorage.getItem(key)).toBeNull()
+    }
+  )
+})

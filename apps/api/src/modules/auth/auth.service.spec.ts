@@ -1,5 +1,5 @@
 import { BadRequestException, ForbiddenException } from '@nestjs/common'
-import type { PrismaClient } from '@prisma/client'
+import { Prisma, type PrismaClient } from '@prisma/client'
 import { afterEach, describe, expect, it, vi } from 'vitest'
 import {
   createGuardianProfileFixture,
@@ -12,17 +12,17 @@ import type { TelemetryService } from '../telemetry/telemetry.service'
 
 const FIXED_TODAY = new Date('2026-04-16T12:00:00.000Z')
 
-const createService = (findUnique = vi.fn(), create = vi.fn()) => {
+const createService = (findFirst = vi.fn(), create = vi.fn()) => {
   const capture = vi.fn()
   const analyticsClient = {
     capture,
   } as unknown as AnalyticsClient
 
+  // Signup checks and creates inside one transaction that holds the address lock.
+  const lock = vi.fn()
+  const tx = { $executeRaw: lock, user: { findFirst, create } }
   const prisma = {
-    user: {
-      findUnique,
-      create,
-    },
+    $transaction: vi.fn((work: (client: typeof tx) => Promise<unknown>) => work(tx)),
   } as unknown as PrismaClient
 
   const captureEvent = vi.fn()
@@ -31,7 +31,8 @@ const createService = (findUnique = vi.fn(), create = vi.fn()) => {
   return {
     service: new AuthService(analyticsClient, prisma, telemetryService),
     capture,
-    findUnique,
+    findFirst,
+    lock,
     create,
     captureEvent,
   }
@@ -43,7 +44,7 @@ describe('AuthService', () => {
   })
 
   it('blocks signup when the birthdate is younger than thirteen', async () => {
-    const { service, findUnique, create } = createService()
+    const { service, findFirst, create } = createService()
 
     await expect(
       service.signUp(
@@ -55,12 +56,12 @@ describe('AuthService', () => {
       )
     ).rejects.toThrow(ForbiddenException)
 
-    expect(findUnique).not.toHaveBeenCalled()
+    expect(findFirst).not.toHaveBeenCalled()
     expect(create).not.toHaveBeenCalled()
   })
 
   it('creates active accounts for users aged sixteen and older', async () => {
-    const { service, findUnique, create, captureEvent } = createService(
+    const { service, findFirst, lock, create, captureEvent } = createService(
       vi.fn().mockResolvedValue(null),
       vi.fn().mockResolvedValue({ id: 'user-16' })
     )
@@ -80,10 +81,11 @@ describe('AuthService', () => {
       guardianConsentRequired: false,
     })
 
-    expect(findUnique).toHaveBeenCalledWith({
-      where: { email: 'adult-teen@example.com' },
+    expect(findFirst).toHaveBeenCalledWith({
+      where: { email: { equals: 'adult-teen@example.com', mode: 'insensitive' } },
       select: { id: true },
     })
+    expect(lock).toHaveBeenCalledTimes(1)
     expect(create).toHaveBeenCalledWith({
       data: {
         email: 'adult-teen@example.com',
@@ -181,7 +183,7 @@ describe('AuthService', () => {
   })
 
   it('rejects impossible birthdates with a bad request error', async () => {
-    const { service, findUnique, create } = createService()
+    const { service, findFirst, create } = createService()
 
     await expect(
       service.signUp(
@@ -193,8 +195,40 @@ describe('AuthService', () => {
       )
     ).rejects.toThrow(BadRequestException)
 
-    expect(findUnique).not.toHaveBeenCalled()
+    expect(findFirst).not.toHaveBeenCalled()
     expect(create).not.toHaveBeenCalled()
+  })
+
+  it('maps a Prisma unique violation to the duplicate email error and rethrows anything else', async () => {
+    const unique = new Prisma.PrismaClientKnownRequestError('Unique constraint failed', {
+      code: 'P2002',
+      clientVersion: 'test',
+    })
+    const { service } = createService(
+      vi.fn().mockResolvedValue(null),
+      vi.fn().mockRejectedValue(unique)
+    )
+    await expect(
+      service.signUp(
+        { email: 'race@example.com', birthdate: '2009-04-15' },
+        { today: FIXED_TODAY }
+      )
+    ).rejects.toThrow('Email already registered')
+
+    const foreignKey = new Prisma.PrismaClientKnownRequestError('Foreign key failed', {
+      code: 'P2003',
+      clientVersion: 'test',
+    })
+    const { service: other } = createService(
+      vi.fn().mockResolvedValue(null),
+      vi.fn().mockRejectedValue(foreignKey)
+    )
+    await expect(
+      other.signUp(
+        { email: 'other@example.com', birthdate: '2009-04-15' },
+        { today: FIXED_TODAY }
+      )
+    ).rejects.toBe(foreignKey)
   })
 
   it('maps unique constraint races during create to duplicate email errors', async () => {
@@ -240,5 +274,26 @@ describe('AuthService', () => {
       },
     })
     expect(result).toEqual({ tracked: true })
+  })
+
+  it('stamps guardian consent with the current time when the caller sends none', () => {
+    const guardian = createGuardianProfileFixture()
+    const teen = createTeenProfileFixture()
+    const { service, capture } = createService()
+    const before = Date.now()
+
+    service.grantGuardianConsent({
+      guardianId: guardian.id,
+      teenId: teen.id,
+      consentLevel: 'full',
+    })
+
+    const properties = (
+      capture.mock.calls[0]![0] as { properties: Record<string, string> }
+    ).properties
+    expect(properties.timestamp).toBe(properties.consent_timestamp)
+    const stamped = Date.parse(properties.timestamp!)
+    expect(stamped).toBeGreaterThanOrEqual(before)
+    expect(stamped).toBeLessThanOrEqual(Date.now())
   })
 })

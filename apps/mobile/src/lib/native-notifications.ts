@@ -1,4 +1,5 @@
 import Constants from 'expo-constants'
+import { AppState, Platform } from 'react-native'
 // Story 6.5 owner: Expo installation binding and actual OS response lifecycle.
 import { communitySyncClient, CommunityNotificationResponses } from '@couture/api-client'
 import {
@@ -102,8 +103,7 @@ async function registration(
   const token = await resolveMobileAccessToken()
   if (!token || nativeSessionIdentity() !== owner) throw new Error('Sign in first.')
   const client = tokenApi(token)
-  const [{ Platform }, notifications, secure, crypto] = await Promise.all([
-    import('react-native'),
+  const [notifications, secure, crypto] = await Promise.all([
     import('expo-notifications'),
     import('expo-secure-store'),
     import('expo-crypto'),
@@ -301,10 +301,7 @@ export async function startNativeNotifications(options: {
     expiresAt?: string
   }) => void
 }): Promise<() => void> {
-  const [notifications, { AppState }] = await Promise.all([
-    import('expo-notifications'),
-    import('react-native'),
-  ])
+  const notifications = await import('expo-notifications')
   notifications.setNotificationHandler({
     handleNotification: (notification) => {
       const community = communityNotificationDataSchema.safeParse(

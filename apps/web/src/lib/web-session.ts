@@ -19,6 +19,27 @@ let verification: VerificationFlight | undefined
 let localSignedOut = false
 const authStorageKey = 'couturecast.auth-session'
 export const webSessionIdentity = () => member
+/**
+ * Why sign-in failed, in terms a person can act on: `denied` means this address has no
+ * CoutureCast account that can sign in (retrying will not help); `code_invalid` means the
+ * code was wrong or expired; `unavailable` means a transient failure worth retrying.
+ */
+export type WebSignInFailure = 'denied' | 'code_invalid' | 'unavailable'
+export class WebSignInError extends Error {
+  constructor(
+    readonly reason: WebSignInFailure,
+    message: string
+  ) {
+    super(message)
+    this.name = 'WebSignInError'
+  }
+}
+/** Auth answers a wrong or expired code with a 4xx; anything else is not the code's fault. */
+function codeRejected(error: unknown) {
+  if (!error || typeof error !== 'object' || !('status' in error)) return false
+  const status: unknown = error.status
+  return typeof status === 'number' && status >= 400 && status < 500
+}
 export function webSupabase() {
   const url = process.env.NEXT_PUBLIC_SUPABASE_URL
   const key = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY
@@ -170,7 +191,7 @@ export async function requestWebOtp(email: string) {
     email,
     options: { shouldCreateUser: true },
   })
-  if (error) throw new Error('Sign-in could not be started.')
+  if (error) throw new WebSignInError('unavailable', 'Sign-in could not be started.')
 }
 export async function verifyWebOtp(email: string, token: string) {
   const { data, error } = await webSupabase().auth.verifyOtp({
@@ -178,10 +199,22 @@ export async function verifyWebOtp(email: string, token: string) {
     token,
     type: 'email',
   })
-  if (error || !data.session) throw new Error('Sign-in code could not be verified.')
+  if (error || !data.session)
+    throw new WebSignInError(
+      codeRejected(error) ? 'code_invalid' : 'unavailable',
+      'Sign-in code could not be verified.'
+    )
   localSignedOut = false
-  await accept(data.session)
-  if (!member) throw new Error('This account is unavailable.')
+  try {
+    await accept(data.session)
+  } catch (failure) {
+    // A 401/403/404 account check is the server saying this identity has no account.
+    throw new WebSignInError(
+      sessionDenied(failure) ? 'denied' : 'unavailable',
+      'Session verification is unavailable.'
+    )
+  }
+  if (!member) throw new WebSignInError('denied', 'This account is unavailable.')
 }
 export async function signOutWebSession() {
   localSignedOut = true

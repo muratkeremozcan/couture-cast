@@ -7,6 +7,7 @@ import {
   type SupabaseClient,
 } from '@supabase/supabase-js'
 import Constants from 'expo-constants'
+import { AppState } from 'react-native'
 import { userProfileResponseSchema } from '@couture/api-client/contracts/http'
 import { createMobileApiClient } from './api-client'
 import { setMobileAccessTokenResolver, setMobileApplicationUserId } from './mobile-auth'
@@ -222,7 +223,6 @@ export async function startNativeSession(): Promise<() => void> {
       }, 0)
     })
     unsubscribe = () => data.subscription.unsubscribe()
-    const { AppState } = await import('react-native')
     const lifecycle = AppState.addEventListener('change', (state) => {
       if (state === 'active') {
         void client.auth.startAutoRefresh().catch(() => undefined)

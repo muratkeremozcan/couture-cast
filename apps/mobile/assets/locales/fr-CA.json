@@ -840,6 +840,9 @@
       "sendCode": "Envoyer le code de connexion",
       "verify": "Vérifier le code",
       "codeSent": "Consultez votre courriel pour le code de connexion.",
+      "signinDenied": "Aucun compte CoutureCast ne peut se connecter avec cette adresse courriel. Vérifiez l’adresse et réessayez.",
+      "signinUnavailable": "La connexion est temporairement indisponible. Réessayez dans un instant.",
+      "signinCodeInvalid": "Ce code est incorrect ou a expiré. Vérifiez vos courriels ou demandez un nouveau code.",
       "signout": "Se déconnecter",
       "deviceSettings": "Ouvrir les réglages de l’appareil",
       "back": "Retour à la communauté"

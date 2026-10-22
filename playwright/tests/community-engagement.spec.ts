@@ -59,13 +59,12 @@ test.describe('Story 6.5 real engagement transport', () => {
     apiRequest,
     recurse,
     request,
-    interceptNetworkCall,
   }, testInfo) => {
     expect(communitySession.userId).not.toBe(communityApi.userId)
     const fallbackArms = await observeCommunityFallbackTimers(page)
     const transport = await observeCommunitySocket(page)
-    await openAll(page, interceptNetworkCall)
-    await openAll(authorPage, interceptFor(authorPage))
+    await openAll(page)
+    await openAll(authorPage)
     await recurse(
       () => Promise.resolve(transport.handshakes),
       (count) => count > 0,
@@ -178,21 +177,13 @@ test.describe('Story 6.5 real engagement transport', () => {
     '[P0] E2E-002 real socket outage falls back within eight seconds, reconnects and resyncs an expired epoch',
     { annotation: [{ type: 'expectedCommunityResync' }] },
     async (
-      {
-        page,
-        authorPage,
-        communitySession,
-        communityApi,
-        apiRequest,
-        recurse,
-        interceptNetworkCall,
-      },
+      { page, authorPage, communitySession, communityApi, apiRequest, recurse },
       testInfo
     ) => {
       expect(communitySession.userId).not.toBe(communityApi.userId)
       const transport = await observeCommunitySocket(page)
-      await openAll(page, interceptNetworkCall)
-      await openAll(authorPage, interceptFor(authorPage))
+      await openAll(page)
+      await openAll(authorPage)
       await recurse(
         () => Promise.resolve(transport.handshakes),
         (value) => value > 0,
@@ -305,15 +296,14 @@ test.describe('Story 6.5 real engagement transport', () => {
     communityApi,
     apiRequest,
     recurse,
-    interceptNetworkCall,
   }) => {
     expect(communitySession.userId).not.toBe(communityApi.userId)
     await disablePeriodicCommunityPolling(page)
     await disablePeriodicCommunityPolling(authorPage)
     const readerSocket = await observeCommunitySocket(page)
     const authorSocket = await observeCommunitySocket(authorPage)
-    await openAll(page, interceptNetworkCall)
-    await openAll(authorPage, interceptFor(authorPage))
+    await openAll(page)
+    await openAll(authorPage)
     await openComments(page, POST)
     await openComments(authorPage, POST)
     await recurse(
@@ -616,16 +606,7 @@ test.describe('Story 6.5 real engagement transport', () => {
     '[P0] E2E-003 takedown and account erasure invalidate live cards and matching discussions while unrelated drafts survive',
     { annotation: [{ type: 'expectedAuthorErasureDenial' }] },
     async (
-      {
-        page,
-        authorPage,
-        communitySession,
-        communityApi,
-        apiRequest,
-        recurse,
-        request,
-        interceptNetworkCall,
-      },
+      { page, authorPage, communitySession, communityApi, apiRequest, recurse, request },
       testInfo
     ) => {
       expect(communitySession.userId).not.toBe(communityApi.userId)
@@ -653,8 +634,8 @@ test.describe('Story 6.5 real engagement transport', () => {
       await disablePeriodicCommunityPolling(authorPage)
       const reader = await observeCommunitySocket(page),
         author = await observeCommunitySocket(authorPage)
-      await openAll(page, interceptNetworkCall)
-      await openAll(authorPage, interceptFor(authorPage))
+      await openAll(page)
+      await openAll(authorPage)
       await recurse(
         () => Promise.resolve(reader.handshakes > 0 && author.handshakes > 0),
         Boolean,

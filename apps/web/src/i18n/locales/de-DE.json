@@ -668,6 +668,9 @@
       "sendCode": "Anmeldecode senden",
       "verify": "Code bestätigen",
       "codeSent": "Den Anmeldecode finden Sie in Ihrer E-Mail.",
+      "signinDenied": "Mit dieser E-Mail-Adresse kann sich kein CoutureCast-Konto anmelden. Adresse prüfen und erneut versuchen.",
+      "signinUnavailable": "Die Anmeldung ist vorübergehend nicht verfügbar. Gleich erneut versuchen.",
+      "signinCodeInvalid": "Der Code ist falsch oder abgelaufen. E-Mails prüfen oder einen neuen Code anfordern.",
       "signout": "Abmelden",
       "deviceSettings": "Geräteeinstellungen öffnen",
       "back": "Zurück zur Community"

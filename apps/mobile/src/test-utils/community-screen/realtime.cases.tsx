@@ -81,6 +81,7 @@ export function registerCommunityRealtimeCases() {
   it('A05 doorbell invalidation releases held pagination ownership and allows another load', async () => {
     const recover = recoveryCoordinator()
     let pages = 0
+    let firstPages = 0
     let release!: () => void
     const held = new Promise<void>((resolve) => {
       release = resolve
@@ -90,12 +91,25 @@ export function registerCommunityRealtimeCases() {
         if (++pages === 1) await held
         return feedJson({ items: [item({ id: 'page-two' })], nextCursor: null })
       }
-      return feedJson({ items: [item()], nextCursor: cursor('temperate_dry') })
+      // The coordinator's first catch-up rebuilds the feed, which legitimately releases
+      // any page request already in flight. The initial page therefore offers no cursor:
+      // pagination can only start once that bootstrap rebuild has landed, so the one held
+      // request below is the one the doorbell must release.
+      return feedJson({
+        items: [item()],
+        nextCursor: ++firstPages >= 2 ? cursor('temperate_dry') : null,
+      })
     })
     await render(<CommunityScreen />)
     await screen.findByTestId('community-post-card-post-a')
     await act(recover)
-    if (pages === 0) press(await screen.findByTestId('community-feed-load-more'))
+    expect(firstPages).toBe(2)
+    // FlatList may reach the end on its own; otherwise the member asks for the next page.
+    // A press racing that call is ignored by the screen's pagination ownership.
+    await waitFor(() =>
+      expect(pages > 0 || screen.queryByTestId('community-feed-load-more')).toBeTruthy()
+    )
+    if (pages === 0) press(screen.getByTestId('community-feed-load-more'))
     await waitFor(() => expect(pages).toBe(1))
     try {
       server.use(

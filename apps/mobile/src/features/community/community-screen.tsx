@@ -270,7 +270,15 @@ export function CommunityScreen() {
   const notificationIntentRef = useRef(0)
   const realtimeSyncRef = useRef<CommunitySyncState | null>(null)
   const [authorStates, setAuthorStates] = useState<CommunityAuthorPostState[]>([])
-  const [nextCursor, setNextCursor] = useState<string | null>(null)
+  const [nextCursor, setNextCursorState] = useState<string | null>(null)
+  // The load-more control and onEndReached can both act on a render whose cursor a page
+  // that just landed has already consumed. The ref holds the latest cursor, so a stale
+  // handler cannot re-request a page that is already in the feed.
+  const nextCursorRef = useRef<string | null>(null)
+  const setNextCursor = useCallback((value: string | null) => {
+    nextCursorRef.current = value
+    setNextCursorState(value)
+  }, [])
   const [viewerBand, setViewerBand] = useState<ClimateBand | null>(null)
   const [bandResolved, setBandResolved] = useState(true)
   const [bandUnresolvedReason, setBandUnresolvedReason] =
@@ -280,7 +288,16 @@ export function CommunityScreen() {
   const [feedState, setFeedState] = useState<FeedState>('loading')
   const [feedError, setFeedError] = useState<unknown>(null)
   const [isRefreshing, setIsRefreshing] = useState(false)
-  const [isLoadingMore, setIsLoadingMore] = useState(false)
+  const [isLoadingMore, setIsLoadingMoreState] = useState(false)
+  // FlatList can call onEndReached in the same frame as a tap on the load-more control,
+  // and both read one render's state, so a state-only guard let two next-page requests
+  // start (the second aborted the first). The ref is the synchronous owner: one request
+  // until it settles or a reset releases it.
+  const loadingMoreRef = useRef(false)
+  const setIsLoadingMore = useCallback((value: boolean) => {
+    loadingMoreRef.current = value
+    setIsLoadingMoreState(value)
+  }, [])
 
   // Action state
   const [reportingPost, setReportingPost] = useState<CommunityFeedItem | null>(null)
@@ -966,10 +983,11 @@ export function CommunityScreen() {
   }, [loadFeed, mode])
 
   const handleLoadMore = useCallback(() => {
-    if (nextCursor && !isLoadingMore && feedState === 'ready' && !isRefreshing) {
-      void loadFeed(mode, { cursor: nextCursor })
+    const cursor = nextCursorRef.current
+    if (cursor && !loadingMoreRef.current && feedState === 'ready' && !isRefreshing) {
+      void loadFeed(mode, { cursor })
     }
-  }, [feedState, isLoadingMore, isRefreshing, loadFeed, mode, nextCursor])
+  }, [feedState, isRefreshing, loadFeed, mode])
 
   const handleOpenCard = useCallback(
     (post: CommunityFeedItem) => {

@@ -668,6 +668,9 @@
       "sendCode": "Invia codice d'accesso",
       "verify": "Verifica codice",
       "codeSent": "Controlla la tua email per il codice d'accesso.",
+      "signinDenied": "Nessun account CoutureCast può accedere con questa email. Controlla l’indirizzo e riprova.",
+      "signinUnavailable": "L’accesso non è al momento disponibile. Riprova tra poco.",
+      "signinCodeInvalid": "Il codice non è corretto o è scaduto. Controlla l’email o richiedi un nuovo codice.",
       "signout": "Esci",
       "deviceSettings": "Apri impostazioni del dispositivo",
       "back": "Torna alla community"

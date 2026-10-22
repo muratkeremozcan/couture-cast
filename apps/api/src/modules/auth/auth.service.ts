@@ -71,38 +71,45 @@ export class AuthService {
       throw new ForbiddenException(gate.message)
     }
 
-    const existingUser = await this.prisma.user.findUnique({
-      where: { email: parsed.data.email },
-      select: { id: true },
-    })
-
-    if (existingUser) {
-      throw new BadRequestException('Email already registered')
-    }
-
     const accountStatus = gate.requiresGuardian ? 'pending_guardian_consent' : 'active'
 
+    // One account per address whatever its case: verified-email identity mapping treats
+    // case variants as ambiguous and denies every one of them. The column's unique index
+    // is case-sensitive, so the check runs under a transaction lock on the lowercased
+    // address; concurrent case-variant signups serialize and only the first is created.
+    // The address is stored as typed.
+    const normalized = parsed.data.email.toLowerCase()
     let user: { id: string }
     try {
-      user = await this.prisma.user.create({
-        data: {
-          email: parsed.data.email,
-          profile: {
-            create: {
-              birthdate,
-              preferences: {
-                compliance: {
-                  accountStatus,
-                  guardianConsentRequired: gate.requiresGuardian,
+      user = await this.prisma.$transaction(async (tx) => {
+        await tx.$executeRaw`SELECT pg_advisory_xact_lock(hashtext('user_email:' || ${normalized}))`
+        const existingUser = await tx.user.findFirst({
+          where: { email: { equals: normalized, mode: 'insensitive' } },
+          select: { id: true },
+        })
+        if (existingUser) {
+          throw new BadRequestException('Email already registered')
+        }
+        return tx.user.create({
+          data: {
+            email: parsed.data.email,
+            profile: {
+              create: {
+                birthdate,
+                preferences: {
+                  compliance: {
+                    accountStatus,
+                    guardianConsentRequired: gate.requiresGuardian,
+                  },
                 },
               },
             },
+            comfort_profile: {
+              create: {},
+            },
           },
-          comfort_profile: {
-            create: {},
-          },
-        },
-        select: { id: true },
+          select: { id: true },
+        })
       })
     } catch (error) {
       if (isUniqueConstraintError(error)) {

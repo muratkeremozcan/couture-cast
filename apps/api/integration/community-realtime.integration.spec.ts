@@ -282,28 +282,118 @@ describe('Story 6.5 real local websocket-only transport with isolated fixture au
     ).toBe(0)
   }, 12_000)
 
+  /**
+   * A rejection decided before any identity is verified is a transport refusal: it carries
+   * no `community:availability` control, so clients keep polling HTTP, which authorizes
+   * independently. Only an outcome about a verified identity is an affirmative `denied`.
+   */
+  async function refusedWithoutControl(socket: Socket) {
+    const error: unknown = await connect(socket).then(
+      () => {
+        throw new Error('Expected the handshake to be refused')
+      },
+      (reason: unknown) => reason
+    )
+    expect(error).toBeInstanceOf(Error)
+    expect((error as Error).message).toBe('Community connection unavailable.')
+    expect((error as { data?: unknown }).data).toBeUndefined()
+    expect(socket.connected).toBe(false)
+  }
+
   it.each([
-    ['native bearer without Origin', undefined, true],
-    ['allowed browser Origin', 'https://story65.synthetic.test', true],
-    ['denied browser Origin', 'https://denied.synthetic.test', false],
-  ])('6.5-INT-008: %s', async (_label, origin, allowed) => {
+    ['native bearer without Origin', () => undefined],
+    ['allowed browser Origin', () => 'https://story65.synthetic.test'],
+    // React Native's WebSocket always sends a default Origin built from the socket URL.
+    ['native default Origin of the socket host', (base: string) => base],
+  ] as const)(
+    '6.5-INT-008: %s with a verified bearer connects',
+    async (_label, origin) => {
+      const member = await fixture()
+      const base = await instance()
+      const socket = client(base, fixtureToken(member.id), origin(base))
+      await connect(socket)
+      expect(socket.connected).toBe(true)
+    }
+  )
+
+  it('6.5-INT-008: a foreign browser Origin is refused without a denial control', async () => {
     const member = await fixture()
-    const socket = client(await instance(), fixtureToken(member.id), origin)
-    if (allowed) await connect(socket)
-    else
-      await expect(connect(socket)).rejects.toThrow('Community connection unavailable.')
-    expect(socket.connected).toBe(allowed)
+    const socket = client(
+      await instance(),
+      fixtureToken(member.id),
+      'https://denied.synthetic.test'
+    )
+    await refusedWithoutControl(socket)
+  })
+
+  it('6.5-INT-008: a verified bearer larger than 1 KB connects', async () => {
+    // Supabase access tokens carry user and app metadata; 1.5 KB and more is ordinary.
+    const member = await fixture()
+    const token = `e30.${Buffer.from(
+      JSON.stringify({
+        sub: member.id,
+        role: 'guardian',
+        exp: Math.floor((Date.now() + 60_000) / 1000),
+        e2e: 'couturecast-mobile-e2e',
+        user_metadata: { profile: 'm'.repeat(1400) },
+      })
+    ).toString('base64url')}.couturecast-mobile-e2e`
+    expect(token.length).toBeGreaterThan(1500)
+    expect(token.length).toBeLessThanOrEqual(8192)
+    const socket = client(await instance(), token)
+    await connect(socket)
+    expect(socket.connected).toBe(true)
+  })
+
+  it('6.5-INT-008: malformed Origins and malformed bearers are refused without a denial control', async () => {
+    const member = await fixture()
+    const base = await instance()
+    // Sandboxed frames and file:// pages send the literal Origin "null".
+    await refusedWithoutControl(client(base, fixtureToken(member.id), 'null'))
+    const raw = (auth: Record<string, unknown>) => {
+      const socket = io(`${base}/community`, {
+        path: '/api/realtime',
+        addTrailingSlash: false,
+        transports: ['websocket'],
+        auth,
+        reconnection: false,
+        forceNew: true,
+        autoConnect: false,
+      })
+      sockets.push(socket)
+      return socket
+    }
+    await refusedWithoutControl(raw({ token: 42 }))
+    // A bearer whose expiry cannot be read is treated as already expired.
+    await refusedWithoutControl(raw({ token: 'e30.bm90LWpzb24.signature' }))
+    await refusedWithoutControl(
+      raw({
+        token: `e30.${Buffer.from(JSON.stringify({ sub: member.id })).toString('base64url')}.sig`,
+      })
+    )
+    await refusedWithoutControl(raw({ token: 'x'.repeat(8193) }))
   })
 
   it('6.5-INT-008: cookie-only and expired bearer handshakes fail closed', async () => {
     const member = await fixture()
     const base = await instance()
-    await expect(connect(client(base))).rejects.toThrow(
-      'Community connection unavailable.'
-    )
-    await expect(
-      connect(client(base, fixtureToken(member.id, Date.now() - 1000)))
-    ).rejects.toThrow('Community connection unavailable.')
+    await refusedWithoutControl(client(base))
+    // The socket host's own Origin never stands in for a bearer.
+    const cookieOnly = io(`${base}/community`, {
+      path: '/api/realtime',
+      addTrailingSlash: false,
+      transports: ['websocket'],
+      reconnection: false,
+      forceNew: true,
+      autoConnect: false,
+      extraHeaders: {
+        Origin: base,
+        Cookie: `sb-access-token=${fixtureToken(member.id)}`,
+      },
+    })
+    sockets.push(cookieOnly)
+    await refusedWithoutControl(cookieOnly)
+    await refusedWithoutControl(client(base, fixtureToken(member.id, Date.now() - 1000)))
   })
 
   it('6.5-INT-009: private-only activity does not ring another member and denial closes with generic control', async () => {

@@ -840,6 +840,9 @@
       "sendCode": "Giriş kodu gönder",
       "verify": "Kodu doğrula",
       "codeSent": "Giriş kodu için e-postanızı kontrol edin.",
+      "signinDenied": "Bu e-posta ile hiçbir CoutureCast hesabı oturum açamaz. Adresi kontrol edip yeniden deneyin.",
+      "signinUnavailable": "Oturum açma geçici olarak kullanılamıyor. Biraz sonra yeniden deneyin.",
+      "signinCodeInvalid": "Kod yanlış veya süresi dolmuş. E-postanızı kontrol edin ya da yeni bir kod isteyin.",
       "signout": "Oturumu kapat",
       "deviceSettings": "Cihaz ayarlarını aç",
       "back": "Topluluğa dön"

@@ -1,0 +1,52 @@
+# Story 6.5 owner: turn engagement notifications on through the product settings screen and
+# answer the real OS permission dialog with ${MAESTRO_DIALOG_CHOICE}. The runner sets the OS
+# permission state beforehand and checks the server binding afterwards.
+appId: ${MAESTRO_APP_ID}
+---
+- runFlow: open-app.yaml
+- tapOn:
+    id: 'tab-settings'
+- extendedWaitUntil:
+    visible:
+      id: 'settings-screen'
+    timeout: 15000
+- scrollUntilVisible:
+    element: ${MAESTRO_TITLE}
+    direction: DOWN
+    timeout: 20000
+- tapOn: ${MAESTRO_TITLE}
+- extendedWaitUntil:
+    visible: ${MAESTRO_ENABLED}
+    timeout: 30000
+# The label and the Switch share one accessible name. Only the Switch can be checked, so
+# "not visible as checked" means the Switch is off; index 1 is the Switch in tree order.
+# A session refresh right after load can rebuild the draft, so retry until the Switch holds.
+- retry:
+    maxRetries: 3
+    commands:
+      - runFlow:
+          when:
+            notVisible:
+              text: ${MAESTRO_ENABLED}
+              checked: true
+          commands:
+            - tapOn:
+                text: ${MAESTRO_ENABLED}
+                index: 1
+      - waitForAnimationToEnd
+      - assertVisible:
+          text: ${MAESTRO_ENABLED}
+          checked: true
+- tapOn: ${MAESTRO_SAVE}
+- runFlow:
+    when:
+      visible: ${MAESTRO_DIALOG_CHOICE}
+    commands:
+      - takeScreenshot:
+          path: os-dialog-${MAESTRO_CASE}
+      - tapOn: ${MAESTRO_DIALOG_CHOICE}
+- extendedWaitUntil:
+    visible: ${MAESTRO_EXPECT_TEXT}
+    timeout: 30000
+- takeScreenshot:
+    path: result-${MAESTRO_CASE}

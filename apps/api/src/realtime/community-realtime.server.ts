@@ -29,6 +29,25 @@ type Connection = {
   lastBell: number
   connectedAt: number
 }
+/**
+ * A handshake refused before any identity is verified: a foreign Origin, no bearer, or a
+ * bearer already past its own expiry. It is a transport refusal, not an affirmative denial,
+ * so it carries no `community:availability` control. Clients treat it as an ordinary
+ * disconnect and keep polling HTTP, which authorizes independently.
+ */
+class HandshakeRefused extends Error {}
+/**
+ * React Native's WebSocket always sends a default Origin built from the socket URL. An Origin
+ * naming this server's own host is therefore the native client's absent Origin: it is allowed
+ * only with a bearer in handshake auth, which is then verified like any other.
+ */
+function sameHostOrigin(origin: string, host: string | undefined) {
+  try {
+    return Boolean(host) && new URL(origin).host === host
+  } catch {
+    return false
+  }
+}
 const control = (socket: Socket, status: 'denied' | 'unavailable') => {
   socket.emit('community:availability', { version: 1, status })
   socket.disconnect(true)
@@ -61,7 +80,11 @@ export function attachCommunityRealtime(
     transports: ['websocket'],
     serveClient: false,
     destroyUpgrade: false,
-    maxHttpBufferSize: 1024,
+    // The handshake CONNECT packet carries the bearer, and the handshake below accepts one
+    // of up to 8192 characters. A smaller engine limit silently drops ordinary Supabase
+    // tokens (user and app metadata push them past 1 KB) before identity is checked.
+    // Clients send no other messages on this namespace.
+    maxHttpBufferSize: 16 * 1024,
     pingInterval: 10_000,
     pingTimeout: 5000,
   })
@@ -226,13 +249,18 @@ export function attachCommunityRealtime(
       const deps = await budget.run(dependencies)
       lastDependencies = deps
       const origin = socket.handshake.headers.origin
-      if (origin && !deps.origins.includes(origin))
-        throw new ForbiddenException('origin_denied')
+      if (
+        origin &&
+        !deps.origins.includes(origin) &&
+        !sameHostOrigin(origin, socket.handshake.headers.host)
+      )
+        throw new HandshakeRefused()
+      // Cookies are never read: a bearer in handshake auth is the only credential.
       const token: unknown = socket.handshake.auth.token
       if (typeof token !== 'string' || !token || token.length > 8192)
-        throw new UnauthorizedException()
+        throw new HandshakeRefused()
       const expiresAt = expiry(token)
-      if (expiresAt <= Date.now()) throw new UnauthorizedException()
+      if (expiresAt <= Date.now()) throw new HandshakeRefused()
       const identity = await budget.run(() => deps.identity.resolveIdentity(token))
       const checkedAt = performance.now()
       const grant = await authorize(deps, identity.userId, budget)
@@ -242,7 +270,8 @@ export function attachCommunityRealtime(
         })
       )
       budget.check(grant)
-      if (expiresAt <= Date.now()) throw new UnauthorizedException()
+      // The bearer lapsed during the handshake: a fresh token on reconnect resolves it.
+      if (expiresAt <= Date.now()) throw new HandshakeRefused()
       const key = (id: string) => {
         const h = heads.find((head) => head.id === id || head.owner_id === id)
         return h ? `${h.epoch}:${h.sequence}` : ''
@@ -259,6 +288,10 @@ export function attachCommunityRealtime(
     })()
       .then(() => next())
       .catch((error: unknown) => {
+        if (error instanceof HandshakeRefused) {
+          next(new Error('Community connection unavailable.'))
+          return
+        }
         const failure = Object.assign(new Error('Community connection unavailable.'), {
           data: {
             version: 1,

@@ -20,7 +20,7 @@ import {
   communityApiTest,
   signUpCommunityUser,
   type CommunitySession,
-  COMMUNITY_FEED_URL,
+  COMMUNITY_FEED_PATH,
   expect,
 } from './community-session'
 import { log } from '@seontechnologies/playwright-utils/log'
@@ -86,6 +86,14 @@ async function monitorPage(
   }
 }
 
+/**
+ * Init script, serialized into the page on its own. It also runs in a fresh page's opaque about:blank, where
+ * sessionStorage throws a SecurityError, so it seeds only real app origins.
+ */
+function seedSessionToken({ key, token }: { key: string; token: string }) {
+  if (window.location.origin !== 'null') window.sessionStorage.setItem(key, token)
+}
+
 export const test = communityApiTest.extend<{
   authorPage: Page
   communitySession: CommunitySession
@@ -103,22 +111,19 @@ export const test = communityApiTest.extend<{
     )
     communityApi.trackUser(userId)
     const accessToken = engagementToken(userId)
-    // The local base config may carry service-role headers. App requests must
-    // publish their own verified bearer through the production wrapper.
-    await context.setExtraHTTPHeaders({})
-    await context.addInitScript(
-      ([key, token]) => sessionStorage.setItem(key!, token!),
-      [WEB_ACCESS_TOKEN_STORAGE_KEY, accessToken]
-    )
+    await context.addInitScript(seedSessionToken, {
+      key: WEB_ACCESS_TOKEN_STORAGE_KEY,
+      token: accessToken,
+    })
     await use({ userId, accessToken, apiBaseUrl: communityApi.apiBaseUrl })
   },
   authorPage: async ({ browser, communityApi, baseURL }, use, testInfo) => {
     const context = await browser.newContext({ baseURL })
     const token = engagementToken(communityApi.userId)
-    await context.addInitScript(
-      ([key, value]) => sessionStorage.setItem(key!, value!),
-      [WEB_ACCESS_TOKEN_STORAGE_KEY, token]
-    )
+    await context.addInitScript(seedSessionToken, {
+      key: WEB_ACCESS_TOKEN_STORAGE_KEY,
+      token,
+    })
     const page = await context.newPage()
     try {
       await monitorPage(
@@ -152,7 +157,7 @@ export const accountFor = (session: {
   },
 })
 
-export async function openAll(page: Page, intercept: InterceptNetworkCallFn) {
+export async function openAll(page: Page) {
   page.on('requestfailed', (request) => {
     void log.info(
       `Request failed: ${new URL(request.url()).pathname} ${request.failure()?.errorText}`
@@ -172,11 +177,21 @@ export async function openAll(page: Page, intercept: InterceptNetworkCallFn) {
     'aria-busy',
     'false'
   )
-  const all = intercept({ method: 'GET', url: COMMUNITY_FEED_URL })
+  // playwright-utils deviation: interceptNetworkCall binds to the first matching
+  // request. The app may supersede (abort) that feed read, so wait for the
+  // completed `all` response the grid actually renders.
+  const all = page.waitForResponse((response) => {
+    const url = new URL(response.url())
+    return (
+      response.request().method() === 'GET' &&
+      url.pathname === COMMUNITY_FEED_PATH &&
+      url.searchParams.get('mode') === 'all'
+    )
+  })
   await page.getByTestId('community-filter-all').click()
   const result = await all
-  expect(result.status).toBe(200)
-  const data = communityReactionFeedResponseSchema.parse(result.responseJson).data
+  expect(result.status()).toBe(200)
+  const data = communityReactionFeedResponseSchema.parse(await result.json()).data
   await expect(page.getByTestId('community-card-grid')).toHaveAttribute(
     'aria-busy',
     'false'

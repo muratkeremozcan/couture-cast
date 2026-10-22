@@ -191,6 +191,21 @@ module.exports = {
             message:
               'Hermes ships no Intl.ListFormat or Intl.Segmenter. Use formatLocalizedList from @couture/utils, or feature-detect before constructing.',
           },
+          {
+            // Hermes has no DOMException global; constructing one throws a ReferenceError
+            // and once blanked the community feed in CI Maestro.
+            selector: "NewExpression[callee.name='DOMException']",
+            message:
+              'Hermes has no DOMException. Use abortError() from @couture/api-client and check error.name.',
+          },
+          {
+            // Metro turns import('react-native') into a wildcard interop that evaluates
+            // every lazy getter, including deprecated PushNotificationIOS, whose null
+            // native module throws on iOS and silently stopped session restore and push.
+            selector: "ImportExpression[source.value='react-native']",
+            message:
+              "Import from 'react-native' statically by name; a dynamic import evaluates every deprecated module getter on iOS.",
+          },
         ],
       },
     },

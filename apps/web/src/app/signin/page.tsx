@@ -2,7 +2,17 @@
 import { useState } from 'react'
 import { useTranslation } from 'react-i18next'
 import { getI18n } from '../../i18n'
-import { requestWebOtp, verifyWebOtp } from '../../lib/web-session'
+import {
+  requestWebOtp,
+  verifyWebOtp,
+  WebSignInError,
+  type WebSignInFailure,
+} from '../../lib/web-session'
+const FAILURE_KEYS: Record<WebSignInFailure, string> = {
+  denied: 'community.notifications.signinDenied',
+  code_invalid: 'community.notifications.signinCodeInvalid',
+  unavailable: 'community.notifications.signinUnavailable',
+}
 export default function SignInPage() {
   const { t } = useTranslation('translation', { i18n: getI18n() })
   const [email, setEmail] = useState('')
@@ -28,7 +38,14 @@ export default function SignInPage() {
                 setMessage('community.notifications.codeSent')
               }
             })
-            .catch(() => setMessage('community.notifications.failed'))
+            .catch((error: unknown) =>
+              // Anything unclassified is treated as temporary, so the person retries.
+              setMessage(
+                FAILURE_KEYS[
+                  error instanceof WebSignInError ? error.reason : 'unavailable'
+                ]
+              )
+            )
             .finally(() => setBusy(false))
         }}
       >

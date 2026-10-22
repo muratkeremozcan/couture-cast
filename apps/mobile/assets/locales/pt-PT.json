@@ -840,6 +840,9 @@
       "sendCode": "Enviar código de acesso",
       "verify": "Verificar código",
       "codeSent": "Consulte o seu e-mail para obter o código de acesso.",
+      "signinDenied": "Nenhuma conta CoutureCast pode iniciar sessão com este e-mail. Verifique o endereço e tente novamente.",
+      "signinUnavailable": "O início de sessão está temporariamente indisponível. Tente novamente dentro de momentos.",
+      "signinCodeInvalid": "O código está incorreto ou expirou. Verifique o seu e-mail ou peça um novo código.",
       "signout": "Terminar sessão",
       "deviceSettings": "Abrir definições do dispositivo",
       "back": "Voltar à comunidade"

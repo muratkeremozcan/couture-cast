@@ -67,6 +67,8 @@ test.describe('Home analytics resilience', () => {
         // bearer on the poll has to come from the web client itself.
         await context.addInitScript(
           ([storageKey, token]) => {
+            // The script also runs in the opaque about:blank, where storage throws.
+            if (window.location.origin === 'null') return
             window.sessionStorage.setItem(storageKey as string, token as string)
           },
           [WEB_ACCESS_TOKEN_STORAGE_KEY, accessToken]

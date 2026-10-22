@@ -3,7 +3,10 @@
 import type { Locator, Page } from '@playwright/test'
 import type { InterceptNetworkCallFn } from '@seontechnologies/playwright-utils/intercept-network-call'
 import { createWeatherAlertPolledEvent } from '@couture/api-client/testing/deep-link-events'
-import { expect, test } from '../support/fixtures/merged-fixtures'
+import { expect } from '../support/fixtures/merged-fixtures'
+// communityTest only adds a lazy `communitySession`; the severe-alert cases
+// destructure it because the events feed behind that alert requires an account.
+import { communityTest as test } from '../support/helpers/community-session'
 import { checkA11y, waitForAccessibilityReady } from '../support/helpers/accessibility'
 
 // This scan discovers nothing: it iterates this literal array, so a destination
@@ -283,7 +286,9 @@ test.describe('Story 3.8 interaction states', () => {
   test('severe alert and community deep-link targets receive programmatic focus', async ({
     page,
     interceptNetworkCall,
+    communitySession,
   }) => {
+    expect(communitySession.userId).toBeTruthy()
     installSevereAlert(interceptNetworkCall)
     await openStablePage(
       page,
@@ -392,7 +397,10 @@ test.describe('Story 3.8 interaction states', () => {
   test('rendered light, dark, gold, and alert focus outlines meet 3:1', async ({
     page,
     interceptNetworkCall,
+    communitySession,
   }) => {
+    // The alert surface below needs a signed-in account (see installSevereAlert).
+    expect(communitySession.userId).toBeTruthy()
     await openStablePage(page, '/', interceptNetworkCall)
 
     const dark = await focusColors(page.getByTestId('nav-ritual'))

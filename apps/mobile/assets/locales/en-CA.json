@@ -840,6 +840,9 @@
       "sendCode": "Send sign-in code",
       "verify": "Verify code",
       "codeSent": "Check your email for the sign-in code.",
+      "signinDenied": "No CoutureCast account can sign in with this email. Check the address and try again.",
+      "signinUnavailable": "Sign-in is temporarily unavailable. Try again in a moment.",
+      "signinCodeInvalid": "That code is incorrect or expired. Check your email or request a new code.",
       "signout": "Sign out",
       "deviceSettings": "Open device settings",
       "back": "Back to community"

@@ -38,7 +38,6 @@ export default defineConfig(
   merge({}, baseConfig, {
     use: {
       baseURL: environment.webBaseUrl,
-      extraHTTPHeaders: environment.apiHeaders,
     },
     metadata: {
       environment: environment.name,

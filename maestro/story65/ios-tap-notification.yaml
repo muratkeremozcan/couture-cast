@@ -1,0 +1,19 @@
+# Story 6.5 owner: tap the presented iOS notification. A banner shows for a foreground app
+# (the app's handler requests banners) and on the Home Screen; if it has already retracted,
+# Notification Center is opened with an OS edge swipe from the top and the item is tapped.
+appId: ${MAESTRO_APP_ID}
+---
+- runFlow:
+    when:
+      notVisible: ${MAESTRO_NOTIFICATION_BODY}
+    commands:
+      - swipe:
+          start: 30%, 0%
+          end: 30%, 70%
+          duration: 500
+- extendedWaitUntil:
+    visible: ${MAESTRO_NOTIFICATION_BODY}
+    timeout: 15000
+- takeScreenshot:
+    path: presented-${MAESTRO_CASE}
+- tapOn: ${MAESTRO_NOTIFICATION_BODY}

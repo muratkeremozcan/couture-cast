@@ -12,7 +12,6 @@ export default defineConfig(
     globalSetup: path.resolve(__dirname, '..', 'global-setup-vercel-bypass.ts'),
     use: {
       baseURL: environment.webBaseUrl,
-      extraHTTPHeaders: environment.apiHeaders,
       // Vercel bypass cookies minted by global setup; see that file for why
       // the secret itself must not be sent from tests.
       storageState: VERCEL_BYPASS_STATE_PATH,
