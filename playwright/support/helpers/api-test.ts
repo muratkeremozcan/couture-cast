@@ -1,6 +1,6 @@
 // Centralizes Playwright API-test environment, identity, and payload helpers so specs
 // do not duplicate environment guards or generated user data.
-import { randomBytes } from 'node:crypto'
+import { createHash, randomBytes } from 'node:crypto'
 import type { TestInfo } from '@playwright/test'
 
 export type ApiRole = 'guardian' | 'teen' | 'moderator' | 'admin'
@@ -100,6 +100,17 @@ function slugify(value: string): string {
     .slice(0, 36)
 }
 
+/**
+ * The title slug, cut for readability, with a short hash of the per-test id.
+ * A cut slug alone let two titles that differ only near the end (a viewport
+ * width, say) collide. The part stays at the 36 characters the slug alone
+ * used, because several endpoints validate the length of ids built here.
+ */
+function testSlug(testInfo: TestInfo): string {
+  const hash = createHash('sha256').update(testInfo.testId).digest('hex').slice(0, 8)
+  return `${slugify(testInfo.title).slice(0, 27).replace(/-+$/, '')}-${hash}`
+}
+
 export function buildUniqueId(prefix: string, testInfo: TestInfo): string {
   return [
     prefix,
@@ -108,11 +119,7 @@ export function buildUniqueId(prefix: string, testInfo: TestInfo): string {
     `p${testInfo.parallelIndex}`,
     `r${testInfo.repeatEachIndex}`,
     `retry${testInfo.retry}`,
-    // The slug is cut at 36 characters for readability, so two titles that
-    // differ only near the end (a viewport width, say) would collide; the
-    // per-test id keeps every test apart.
-    testInfo.testId,
-    slugify(testInfo.title),
+    testSlug(testInfo),
   ].join('-')
 }
 
