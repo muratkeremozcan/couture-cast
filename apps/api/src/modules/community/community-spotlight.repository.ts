@@ -3,6 +3,7 @@ import { Inject, Injectable } from '@nestjs/common'
 import { Prisma, PrismaClient, type LookbookPost } from '@prisma/client'
 import { COMMUNITY_CANARY_USER_ID_PREFIX } from './community-analytics.js'
 import { PUBLICLY_VISIBLE_POST_WHERE } from './community.repository.js'
+import { assertCommunitySubjectAvailable } from './community-privacy.js'
 import {
   findSpotlightLocation,
   type SpotlightAreaComponents,
@@ -99,19 +100,31 @@ export class CommunitySpotlightRepository {
    * Counts one spotlight read in the member's fixed one-minute window and
    * returns the window's count, in one atomic statement: concurrent reads
    * serialize on the member's row, so none is lost.
+   *
+   * The write holds the member's privacy lock in shared mode and rechecks the
+   * community subject under it. Erasure takes the same lock exclusively, so a
+   * read authorized before an erasure committed can never write the erased
+   * member's id back afterwards; it is refused like any read after erasure.
    */
   async recordRead(
     userId: string,
     now: Date
   ): Promise<{ reads: number; windowStart: Date }> {
-    const [row] = await this.prisma.$queryRaw<{ reads: number; window_start: Date }[]>`
-      INSERT INTO "CommunitySpotlightReadWindow" AS w (user_id, window_start, reads)
-      VALUES (${userId}, date_trunc('minute', ${now.toISOString()}::timestamptz), 1)
-      ON CONFLICT (user_id) DO UPDATE SET
-        reads = CASE WHEN w.window_start = EXCLUDED.window_start THEN w.reads + 1 ELSE 1 END,
-        window_start = EXCLUDED.window_start
-      RETURNING reads, window_start`
-    return { reads: row!.reads, windowStart: row!.window_start }
+    return this.prisma.$transaction(
+      async (tx) => {
+        await tx.$executeRaw`SELECT pg_advisory_xact_lock_shared(hashtext('community_member:' || ${userId}))`
+        await assertCommunitySubjectAvailable(tx, userId)
+        const [row] = await tx.$queryRaw<{ reads: number; window_start: Date }[]>`
+          INSERT INTO "CommunitySpotlightReadWindow" AS w (user_id, window_start, reads)
+          VALUES (${userId}, date_trunc('minute', ${now.toISOString()}::timestamptz), 1)
+          ON CONFLICT (user_id) DO UPDATE SET
+            reads = CASE WHEN w.window_start = EXCLUDED.window_start THEN w.reads + 1 ELSE 1 END,
+            window_start = EXCLUDED.window_start
+          RETURNING reads, window_start`
+        return { reads: row!.reads, windowStart: row!.window_start }
+      },
+      { isolationLevel: Prisma.TransactionIsolationLevel.ReadCommitted }
+    )
   }
 
   /** Distinct eligible authors at every level of this area, from one statement. */

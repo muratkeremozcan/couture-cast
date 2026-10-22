@@ -64,8 +64,9 @@ const community = new CommunityService(
   outside as never
 )
 // Story 6.6: the spotlight shares the feed's read gate, so it must refuse the same way.
+const spotlightRepository = new CommunitySpotlightRepository(prisma)
 const spotlight = new CommunitySpotlightService(
-  new CommunitySpotlightRepository(prisma),
+  spotlightRepository,
   community,
   outside as never,
   outside as never,
@@ -218,6 +219,42 @@ describe('6.5 F2 erased subject is a terminal typed denial on every shared autho
     await repository.requestErasureForUser(owner.id, new Date())
     expect((await routes(owner.id).spotlight()).status).toBe(403)
     await untouched(owner.id)
+  })
+
+  it('a spotlight read authorized before erasure never writes the erased member back', async () => {
+    const owner = await member()
+    expect((await routes(owner.id).preferences()).status).toBe(200)
+    // Hold the read after the read gate let it through, right before its
+    // limiter write, and commit the erasure in that gap.
+    // The real write, through an unspied repository on the same database.
+    const writer = new CommunitySpotlightRepository(prisma)
+    let release!: () => void
+    const held = new Promise<void>((resolve) => {
+      release = resolve
+    })
+    let reached!: () => void
+    const atWrite = new Promise<void>((resolve) => {
+      reached = resolve
+    })
+    const spy = vi
+      .spyOn(spotlightRepository, 'recordRead')
+      .mockImplementationOnce(async (userId: string, now: Date) => {
+        reached()
+        await held
+        return writer.recordRead(userId, now)
+      })
+    try {
+      const response = routes(owner.id).spotlight()
+      await atWrite
+      await repository.requestErasureForUser(owner.id, new Date())
+      release()
+      const refused = await response
+      expect(refused.status).toBe(403)
+      expect(await refused.json()).toEqual(DENIED)
+      await untouched(owner.id)
+    } finally {
+      spy.mockRestore()
+    }
   })
 
   it('the realtime handshake of an erased member is refused with the denied control', async () => {
