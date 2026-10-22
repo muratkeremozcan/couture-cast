@@ -46,7 +46,7 @@ function renderModule(overrides: Partial<CommunitySpotlightModuleProps> = {}) {
     hasMore: true,
     isLoadingMore: false,
     loadMoreFailed: false,
-    lastAppend: null,
+    focusRequest: null,
     onRetry: vi.fn(),
     onViewMore: vi.fn(),
     renderCard: (item) => <p data-testid={`stub-card-${item.id}`}>{item.altText}</p>,

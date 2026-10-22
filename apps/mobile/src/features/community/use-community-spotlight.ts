@@ -1,6 +1,7 @@
 // Story 6.6 owner: the mobile City Spotlight's paging and reaction state.
 import type { CommunityReactionState } from '@couture/api-client'
 import type {
+  CommunityReactionFeedItem,
   CommunityReactionSpotlightItem,
   CommunityReactionSummary,
   CommunitySpotlightLevel,
@@ -8,17 +9,21 @@ import type {
 import { useCallback, useEffect, useRef, useState } from 'react'
 import {
   communityFailureReason,
+  getCommunityPostFromMobile,
   getCommunitySpotlightFromMobile,
 } from '@/src/lib/community'
 
-export type SpotlightStatus = 'loading' | 'ready' | 'disabled' | 'error'
+/** `idle` while no member is signed in: the module hides and reads nothing. */
+export type SpotlightStatus = 'idle' | 'loading' | 'ready' | 'disabled' | 'error'
 
-/** The first card a View more appended, so focus can move there exactly once. */
-export interface SpotlightAppend {
-  firstId: string
-  count: number
-  serial: number
-}
+/**
+ * A one-shot request to move focus and announce once. View more names the first
+ * card it appended and how many it added; a stale-cursor restart names the first
+ * card of the fresh page one, or none when that page came back empty.
+ */
+export type SpotlightFocusRequest =
+  | { kind: 'appended'; firstId: string; count: number; serial: number }
+  | { kind: 'refreshed'; firstId: string | null; serial: number }
 
 export interface CommunitySpotlightView {
   status: SpotlightStatus
@@ -28,7 +33,7 @@ export interface CommunitySpotlightView {
   hasMore: boolean
   isLoadingMore: boolean
   loadMoreFailed: boolean
-  lastAppend: SpotlightAppend | null
+  focusRequest: SpotlightFocusRequest | null
   reload: () => void
   loadMore: () => void
   /** Mirrors the screen's reaction reconciliation for spotlight copies. */
@@ -36,6 +41,15 @@ export interface CommunitySpotlightView {
     postId: string,
     summary: CommunityReactionSummary | null | undefined
   ) => void
+  /** Replaces a spotlight copy with a newer read of the post, keeping its rank. */
+  applyPost: (post: CommunityReactionFeedItem) => void
+  /** Removes a post the viewer can no longer see, such as a withdrawn or hidden one. */
+  evict: (postId: string) => void
+  /**
+   * Re-reads one post for a fresh signed image URL and updates only its
+   * spotlight copy, so every loaded page and the reader's place survive.
+   */
+  refreshItem: (postId: string) => void
 }
 
 /** Same read refusals as the feed render the localized disabled state. */
@@ -44,11 +58,29 @@ function isDisabledRefusal(error: unknown): boolean {
   return reason === 'disabled' || reason === 'age_gate'
 }
 
+/**
+ * The posts of a page that are not shown yet. A later page can repeat a post an
+ * earlier page carried, so counts, focus and the appended list all come from
+ * this result alone.
+ */
+function newEntries(
+  shown: readonly CommunityReactionSpotlightItem[],
+  page: readonly CommunityReactionSpotlightItem[]
+): CommunityReactionSpotlightItem[] {
+  const seen = new Set(shown.map((item) => item.id))
+  return page.filter((item) => {
+    if (seen.has(item.id)) return false
+    seen.add(item.id)
+    return true
+  })
+}
+
 export function useCommunitySpotlight({
   sessionScope,
   reactionState,
 }: {
-  sessionScope: string | null
+  /** Undefined until the screen first resolves the member; null when signed out. */
+  sessionScope: string | null | undefined
   reactionState: CommunityReactionState
 }): CommunitySpotlightView {
   const [status, setStatus] = useState<SpotlightStatus>('loading')
@@ -58,14 +90,20 @@ export function useCommunitySpotlight({
   const [nextCursor, setNextCursorState] = useState<string | null>(null)
   const [isLoadingMore, setIsLoadingMore] = useState(false)
   const [loadMoreFailed, setLoadMoreFailed] = useState(false)
-  const [lastAppend, setLastAppend] = useState<SpotlightAppend | null>(null)
+  const [focusRequest, setFocusRequest] = useState<SpotlightFocusRequest | null>(null)
+  // A page settles after later renders, so it compares against the cards shown now.
+  const itemsRef = useRef(items)
+  itemsRef.current = items
   // The rendered View more can act on a render whose cursor an arriving page has
   // already consumed, so the latest cursor is read through a ref.
   const nextCursorRef = useRef<string | null>(null)
   const generationRef = useRef(0)
   const controllerRef = useRef<AbortController | null>(null)
   const loadingMoreRef = useRef(false)
-  const appendSerialRef = useRef(0)
+  const focusSerialRef = useRef(0)
+  // Single-post image refreshes run beside paging, so a View more never cancels
+  // one. A session change or unmount aborts them all.
+  const itemRefreshesRef = useRef(new Map<string, AbortController>())
 
   const setNextCursor = useCallback((value: string | null) => {
     nextCursorRef.current = value
@@ -93,29 +131,50 @@ export function useCommunitySpotlight({
     }
   }, [])
 
-  const load = useCallback(async () => {
-    const ticket = reactionState.beginRead()
-    const { controller, isCurrent } = begin()
-    loadingMoreRef.current = false
-    setIsLoadingMore(false)
-    setLoadMoreFailed(false)
-    setStatus('loading')
-    try {
-      const page = await getCommunitySpotlightFromMobile({ signal: controller.signal })
-      if (!isCurrent()) return
-      setLevel(page.level)
-      setLabel(page.label)
-      setItems(readItems(page.items, ticket))
-      setNextCursor(page.nextCursor)
-      setLastAppend(null)
-      setStatus('ready')
-    } catch (error: unknown) {
-      if (!isCurrent()) return
-      setItems([])
-      setNextCursor(null)
-      setStatus(isDisabledRefusal(error) ? 'disabled' : 'error')
-    }
-  }, [begin, reactionState, readItems, setNextCursor])
+  const load = useCallback(
+    async (restarted = false) => {
+      const ticket = reactionState.beginRead()
+      const { controller, isCurrent } = begin()
+      loadingMoreRef.current = false
+      setIsLoadingMore(false)
+      setLoadMoreFailed(false)
+      setStatus('loading')
+      try {
+        const page = await getCommunitySpotlightFromMobile({ signal: controller.signal })
+        if (!isCurrent()) return
+        const shown = newEntries([], readItems(page.items, ticket))
+        setLevel(page.level)
+        setLabel(page.label)
+        setItems(shown)
+        setNextCursor(page.nextCursor)
+        if (restarted) {
+          focusSerialRef.current += 1
+          setFocusRequest({
+            kind: 'refreshed',
+            firstId: shown[0]?.id ?? null,
+            serial: focusSerialRef.current,
+          })
+        } else {
+          setFocusRequest(null)
+        }
+        setStatus('ready')
+      } catch (error: unknown) {
+        if (!isCurrent()) return
+        setItems([])
+        setNextCursor(null)
+        setFocusRequest(null)
+        setStatus(isDisabledRefusal(error) ? 'disabled' : 'error')
+      }
+    },
+    [begin, reactionState, readItems, setNextCursor]
+  )
+
+  // Pull to refresh and Retry read page one only for a signed-in member.
+  const sessionScopeRef = useRef(sessionScope)
+  sessionScopeRef.current = sessionScope
+  const reload = useCallback(() => {
+    if (sessionScopeRef.current) void load()
+  }, [load])
 
   const loadMore = useCallback(() => {
     const cursor = nextCursorRef.current
@@ -128,28 +187,30 @@ export function useCommunitySpotlight({
     void getCommunitySpotlightFromMobile({ cursor, signal: controller.signal })
       .then((page) => {
         if (!isCurrent()) return
-        const fresh = readItems(page.items, ticket)
-        setItems((previous) => {
-          const seen = new Set(previous.map((item) => item.id))
-          return [...previous, ...fresh.filter((item) => !seen.has(item.id))]
-        })
+        const added = newEntries(itemsRef.current, readItems(page.items, ticket))
+        setItems((previous) => [...previous, ...newEntries(previous, added)])
+        // View more stays for the cursor this page returned.
         setNextCursor(page.nextCursor)
-        const first = fresh[0]
+        // A page whose posts were all filtered or already shown changes nothing
+        // the reader can hear, so it moves no focus and stays silent.
+        const first = added[0]
         if (first) {
-          appendSerialRef.current += 1
-          setLastAppend({
+          focusSerialRef.current += 1
+          setFocusRequest({
+            kind: 'appended',
             firstId: first.id,
-            count: fresh.length,
-            serial: appendSerialRef.current,
+            count: added.length,
+            serial: focusSerialRef.current,
           })
         }
       })
       .catch((error: unknown) => {
         if (!isCurrent()) return
         // A stale cursor is ordinary: the snapshot it names expired or the
-        // viewer's area moved. The contract's remedy is to restart from page one.
+        // viewer's area moved. The contract's remedy is to restart from page one,
+        // which then takes focus and announces the refresh.
         if (communityFailureReason(error) === 'cursor_invalid') {
-          void load()
+          void load(true)
           return
         }
         setLoadMoreFailed(true)
@@ -161,16 +222,41 @@ export function useCommunitySpotlight({
       })
   }, [begin, load, reactionState, readItems, setNextCursor])
 
-  // Page one loads on mount, like the feed, and again only when a known member
-  // changes, so the first session resolution does not repeat the same read.
-  const scopeRef = useRef<string | null | undefined>(undefined)
+  const abortItemRefreshes = useCallback(() => {
+    for (const controller of itemRefreshesRef.current.values()) controller.abort()
+    itemRefreshesRef.current.clear()
+  }, [])
+
+  // Page one loads once the screen resolves a member, and again on every member
+  // change, including a sign-in after the screen mounted. Each change first drops
+  // the previous member's cards; without a member the module idles and reads
+  // nothing, like web.
   useEffect(() => {
-    const previous = scopeRef.current
-    scopeRef.current = sessionScope
-    if (previous === undefined || (previous !== null && previous !== sessionScope))
+    if (sessionScope === undefined) return
+    abortItemRefreshes()
+    setLevel('none')
+    setLabel(null)
+    setItems([])
+    setNextCursor(null)
+    setFocusRequest(null)
+    if (sessionScope !== null) {
       void load()
-  }, [load, sessionScope])
-  useEffect(() => () => controllerRef.current?.abort(), [])
+      return
+    }
+    controllerRef.current?.abort()
+    generationRef.current += 1
+    loadingMoreRef.current = false
+    setIsLoadingMore(false)
+    setLoadMoreFailed(false)
+    setStatus('idle')
+  }, [abortItemRefreshes, load, sessionScope, setNextCursor])
+  useEffect(
+    () => () => {
+      controllerRef.current?.abort()
+      abortItemRefreshes()
+    },
+    [abortItemRefreshes]
+  )
 
   const applyReactionChange = useCallback(
     (postId: string, summary: CommunityReactionSummary | null | undefined) => {
@@ -192,6 +278,50 @@ export function useCommunitySpotlight({
     []
   )
 
+  const applyPost = useCallback((post: CommunityReactionFeedItem) => {
+    setItems((previous) =>
+      previous.some((item) => item.id === post.id)
+        ? previous.map((item) =>
+            item.id === post.id ? { ...post, rank: item.rank } : item
+          )
+        : previous
+    )
+  }, [])
+
+  const evict = useCallback((postId: string) => {
+    setItems((previous) =>
+      previous.some((item) => item.id === postId)
+        ? previous.filter((item) => item.id !== postId)
+        : previous
+    )
+  }, [])
+
+  const refreshItem = useCallback(
+    (postId: string) => {
+      const refreshes = itemRefreshesRef.current
+      if (refreshes.has(postId) || !itemsRef.current.some((item) => item.id === postId))
+        return
+      const controller = new AbortController()
+      refreshes.set(postId, controller)
+      const ticket = reactionState.beginRead()
+      void getCommunityPostFromMobile(postId, controller.signal)
+        .then((post) => {
+          if (controller.signal.aborted) return
+          // A null read means the post left the community while this was in flight.
+          const fresh = reactionState.read(post, ticket)
+          if (fresh) applyPost(fresh)
+        })
+        .catch((error: unknown) => {
+          if (controller.signal.aborted) return
+          if (communityFailureReason(error) === 'not_found') evict(postId)
+        })
+        .finally(() => {
+          if (refreshes.get(postId) === controller) refreshes.delete(postId)
+        })
+    },
+    [applyPost, evict, reactionState]
+  )
+
   return {
     status,
     level,
@@ -200,11 +330,12 @@ export function useCommunitySpotlight({
     hasMore: nextCursor !== null,
     isLoadingMore,
     loadMoreFailed,
-    lastAppend,
-    reload: () => {
-      void load()
-    },
+    focusRequest,
+    reload,
     loadMore,
     applyReactionChange,
+    applyPost,
+    evict,
+    refreshItem,
   }
 }

@@ -17,7 +17,7 @@ import type {
 import { useHeroPalette } from '@/components/hero/hero-theme'
 import { safeFindNodeHandle } from '@/src/lib/accessibility-focus'
 import type {
-  SpotlightAppend,
+  SpotlightFocusRequest,
   SpotlightStatus,
 } from '@/src/features/community/use-community-spotlight'
 
@@ -33,7 +33,7 @@ export interface CommunitySpotlightModuleProps {
   hasMore: boolean
   isLoadingMore: boolean
   loadMoreFailed: boolean
-  lastAppend: SpotlightAppend | null
+  focusRequest: SpotlightFocusRequest | null
   onRetry: () => void
   onViewMore: () => void
   renderCard: (item: CommunityReactionSpotlightItem) => React.ReactNode
@@ -49,7 +49,7 @@ export function CommunitySpotlightModule({
   hasMore,
   isLoadingMore,
   loadMoreFailed,
-  lastAppend,
+  focusRequest,
   onRetry,
   onViewMore,
   renderCard,
@@ -58,7 +58,7 @@ export function CommunitySpotlightModule({
   const { t } = useTranslation()
   const palette = useHeroPalette()
   const rankRefs = useRef(new Map<string, View | null>())
-  const handledAppendRef = useRef(0)
+  const handledFocusRef = useRef(0)
   const translationRef = useRef(t)
   translationRef.current = t
 
@@ -70,26 +70,32 @@ export function CommunitySpotlightModule({
     [registerRank]
   )
 
-  // View more moves focus to the first appended card and announces the change
-  // once per append, through the same announcement path the feed uses.
+  // View more and a stale-cursor restart each move focus to the first new card
+  // and announce the change once, through the same announcement path the feed uses.
   useEffect(() => {
-    if (!lastAppend || handledAppendRef.current === lastAppend.serial) return
-    handledAppendRef.current = lastAppend.serial
+    if (!focusRequest || handledFocusRef.current === focusRequest.serial) return
+    handledFocusRef.current = focusRequest.serial
     AccessibilityInfo.announceForAccessibility(
-      translationRef.current('community.spotlight.announceLoadedMore', {
-        count: lastAppend.count,
-      })
+      focusRequest.kind === 'appended'
+        ? translationRef.current('community.spotlight.announceLoadedMore', {
+            count: focusRequest.count,
+          })
+        : translationRef.current('community.spotlight.announceRefreshed')
     )
-    if (Platform.OS === 'web') return
+    const { firstId } = focusRequest
+    if (firstId === null || Platform.OS === 'web') return
     requestAnimationFrame(() => {
-      const handle = safeFindNodeHandle(rankRefs.current.get(lastAppend.firstId) ?? null)
+      const handle = safeFindNodeHandle(rankRefs.current.get(firstId) ?? null)
       if (handle) AccessibilityInfo.setAccessibilityFocus(handle)
     })
-  }, [lastAppend])
+  }, [focusRequest])
 
   const heading = label
     ? t('community.spotlight.heading', { area: label })
     : t('community.spotlight.headingFallback')
+
+  // No member, nothing to rank: the module hides like it does on web.
+  if (status === 'idle') return null
 
   return (
     <View
@@ -150,7 +156,9 @@ export function CommunitySpotlightModule({
         </View>
       )
     }
-    if (level === 'none' || items.length === 0) {
+    // Ranks a View more can still reach keep the list, even when every card
+    // shown so far has left it.
+    if (level === 'none' || (items.length === 0 && !hasMore)) {
       return (
         <View testID="community-spotlight-empty" style={styles.stateColumn}>
           <Text style={[styles.emptyTitle, { color: palette.text }]}>

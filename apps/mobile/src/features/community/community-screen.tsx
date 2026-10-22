@@ -194,7 +194,9 @@ export function CommunityScreen() {
   const [experimentVariant, setExperimentVariant] =
     useState<CommunityExperimentVariant | null>(null)
   const [communityAvailable, setCommunityAvailable] = useState(true)
-  const [sessionScope, setSessionScope] = useState<string | null>(null)
+  // Undefined until the first identity resolution, so the spotlight can tell a
+  // later sign-in apart from the first one.
+  const [sessionScope, setSessionScope] = useState<string | null | undefined>(undefined)
   const sessionScopeRef = useRef<string | null | undefined>(undefined)
   const actionGenerationRef = useRef(0)
   const actionControllerRef = useRef<AbortController | null>(null)
@@ -289,6 +291,9 @@ export function CommunityScreen() {
   )
   const spotlight = useCommunitySpotlight({ sessionScope, reactionState })
   spotlightReactionRef.current = spotlight.applyReactionChange
+  // Read by the realtime callbacks, which outlive any one render.
+  const spotlightRef = useRef(spotlight)
+  spotlightRef.current = spotlight
   const [spotlightDetail, setSpotlightDetail] =
     useState<CommunityReactionSpotlightItem | null>(null)
   const spotlightRankRefs = useRef(new Map<string, View | null>())
@@ -921,6 +926,9 @@ export function CommunityScreen() {
         ...(realtimeOpenPost.current ? [realtimeOpenPost.current] : []),
         ...newLooksRef.current.map((item) => item.id),
         ...(realtimeDeepLink.current ? [realtimeDeepLink.current.id] : []),
+        // Spotlight posts can sit outside every feed page, and a hidden or
+        // erased one must still leave the module.
+        ...spotlightRef.current.items.map((item) => item.id),
       ],
       rebuild: refreshFeed,
       reconcile: async (signal) => {
@@ -946,6 +954,8 @@ export function CommunityScreen() {
           setItems((previous) => previous.filter((item) => item.id !== target.key))
           setDeepLinkPost((item) => (item?.id === target.key ? null : item))
           setCommentsPostId((current) => (current === target.key ? null : current))
+          // Leaving the spotlight also closes its detail when it shows this post.
+          spotlightRef.current.evict(target.key)
         } else {
           const updated = reactionState.read(target.post, reactionState.beginRead())
           if (!updated) return
@@ -957,6 +967,7 @@ export function CommunityScreen() {
             previous.map((item) => (item.id === target.post.id ? updated : item))
           )
           setDeepLinkPost((item) => (item?.id === target.post.id ? updated : item))
+          spotlightRef.current.applyPost(updated)
         }
       },
       changed: async (events, signal) => {
@@ -1088,16 +1099,29 @@ export function CommunityScreen() {
    * Story 6.6: a spotlight open records only the spotlight event with the
    * card's rank, then opens the detail. The feed's card open never fires here.
    */
-  const handleOpenSpotlight = useCallback((post: CommunityReactionSpotlightItem) => {
-    void recordCommunitySpotlightOpenedFromMobile(post.id, post.rank).catch(
-      () => undefined
-    )
-    setSpotlightDetail(post)
-  }, [])
+  const spotlightLevel = spotlight.level
+  const handleOpenSpotlight = useCallback(
+    (post: CommunityReactionSpotlightItem) => {
+      // The open carries the level the cards were served at; a `none` level
+      // serves no cards, so there is nothing to record.
+      if (spotlightLevel !== 'none')
+        void recordCommunitySpotlightOpenedFromMobile(
+          post.id,
+          post.rank,
+          spotlightLevel
+        ).catch(() => undefined)
+      setSpotlightDetail(post)
+    },
+    [spotlightLevel]
+  )
 
-  // A look that left the spotlight (hidden, erased or the member changed) cannot
-  // stay open in its detail.
+  // A look that left the spotlight (hidden, erased, withdrawn or the member
+  // changed) cannot stay open in its detail. While it stays, the detail shows the
+  // live copy, so a refreshed image or realtime update reaches it too.
   const spotlightItems = spotlight.items
+  const spotlightDetailItem = spotlightDetail
+    ? (spotlightItems.find((post) => post.id === spotlightDetail.id) ?? null)
+    : null
   useEffect(() => {
     if (spotlightDetail && !spotlightItems.some((post) => post.id === spotlightDetail.id))
       setSpotlightDetail(null)
@@ -1199,6 +1223,9 @@ export function CommunityScreen() {
         return
       }
       setNoticeKey('community.removed.withdrawn')
+      // The spotlight ranks public posts only and never serves a withdrawn one
+      // again, so its copy and any detail showing it leave now.
+      spotlightRef.current.evict(post.id)
       // The server moves the row into `authorStates`; the client just re-reads.
       await loadFeed(mode, { refresh: true })
     },
@@ -1470,7 +1497,9 @@ export function CommunityScreen() {
           })
         }
         onWithdraw={handleWithdrawPost}
-        onImageExpiry={handleImageExpiry}
+        // Only this post is re-read, so every loaded page and the reader's place
+        // survive a fresh signed image URL.
+        onImageExpiry={(target) => spotlight.refreshItem(target.id)}
         onOpen={inDetail ? undefined : () => handleOpenSpotlight(post)}
       />
     )
@@ -1553,7 +1582,7 @@ export function CommunityScreen() {
           hasMore={spotlight.hasMore}
           isLoadingMore={spotlight.isLoadingMore}
           loadMoreFailed={spotlight.loadMoreFailed}
-          lastAppend={spotlight.lastAppend}
+          focusRequest={spotlight.focusRequest}
           onRetry={spotlight.reload}
           onViewMore={spotlight.loadMore}
           renderCard={(post) => renderSpotlightCard(post, false)}
@@ -1677,8 +1706,10 @@ export function CommunityScreen() {
         onEndReached={handleLoadMore}
         onEndReachedThreshold={0.5}
         ListHeaderComponent={renderHeaderComponent()}
-        ListEmptyComponent={renderEmptyComponent}
-        ListFooterComponent={renderFooterComponent}
+        // Elements keep the empty state and the load-more control mounted across
+        // renders; a fresh function per render would remount them and drop focus.
+        ListEmptyComponent={renderEmptyComponent()}
+        ListFooterComponent={renderFooterComponent()}
         contentContainerStyle={styles.listContent}
       />
 
@@ -1727,7 +1758,7 @@ export function CommunityScreen() {
         }}
       />
       <CommunitySpotlightDetail
-        item={communityAvailable ? spotlightDetail : null}
+        item={communityAvailable ? spotlightDetailItem : null}
         onClose={() => closeSpotlightDetail()}
         onDismissed={runPendingSpotlightAction}
         renderCard={(post) => renderSpotlightCard(post, true)}
