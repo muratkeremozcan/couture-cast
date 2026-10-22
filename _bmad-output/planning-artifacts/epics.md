@@ -7,6 +7,8 @@
 **Project Level:** Level 3  
 **Target Scale:** 2–3 cross-functional squads with shared moderation support
 
+_Updated: 2026-10-22: added CC-1.2b client location capture, found during CC-6.6 review._
+
 _Updated: 2026-10-22: added CC-6.14 complimentary full access for owner-selected testers._
 
 _Updated: 2026-09-06: re-sliced the remaining Epic 6 work from the shipped Story 6.1 baseline._
@@ -226,6 +228,20 @@ As a commuter, I want to save and switch between several cities so that I can pl
 2. Switching updates primary forecast context within two taps and persists preference.
 3. Widgets/watch refresh to reflect selected location within 5 minutes.  
    **Prerequisites:** CC-1.1.
+
+**Story CC-1.2b: Client location capture**
+As a member, I want to add and choose my city on web and mobile so that my daily ritual, climate band
+and City Spotlight use where I actually am.
+**Acceptance Criteria**
+
+1. Web and mobile let a member search for and save a location through the existing locations API,
+   storing provider-resolved coordinates, timezone, and canonical city, region, and country; a member
+   with no saved location is guided to add one instead of seeing a ritual error.
+2. The member can mark one saved location primary and switch between saved locations within two
+   taps on both platforms, with localized, accessible controls in every supported locale.
+3. Prove with Pact, API, Playwright, and Maestro tests that a location saved through the product UI
+   drives the ritual, the community climate band, and City Spotlight area stamping.
+   **Prerequisites:** CC-1.2, CC-6.6.
 
 **Story CC-1.3: Alert rules & notification pipeline**  
 As a user, I want timely alerts for major weather shifts so that I can adjust my wardrobe plan quickly.  
@@ -668,7 +684,7 @@ family testers can use premium and community features in production.
 4. Prove with tests that complimentary members reach premium and community features, that paid and
    free members are unaffected, and that account erasure removes the grant and its audit subject
    identity on the established schedule.
-   **Prerequisites:** CC-5.2, CC-6.5.
+   **Prerequisites:** CC-5.2, CC-6.5, CC-1.2b.
 
 ### Epic 6 refinement decision
 

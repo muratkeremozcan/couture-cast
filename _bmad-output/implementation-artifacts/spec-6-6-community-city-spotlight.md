@@ -2,7 +2,7 @@
 title: 'Story 6.6: Community City Spotlight'
 type: 'feature'
 created: '2026-10-22'
-status: 'in-review'
+status: 'done'
 baseline_commit: 'a9215495c792e4153713f952c5052c4a5e5c815e'
 route: 'dispatch'
 story_key: '6-6-community-city-spotlight'
@@ -205,7 +205,7 @@ rank: 1..60, level }` without `experimentVariant`, where `level` is the served l
 - [x] Web and mobile wrappers, spotlight module components, View more, focus and announcements.
 - [x] All 20 locale catalogs -- `community.spotlight.*` keys.
 - [x] Seeds and factories -- deterministic spotlight cohort fixtures for local, Playwright and Maestro.
-- [ ] Unit tests (pure scorer, constants, cursor) and real-database plus owned-Redis integration tests
+- [x] Unit tests (pure scorer, constants, cursor) and real-database plus owned-Redis integration tests
       covering every I/O matrix row; Pact interactions for spotlight and both opened branches;
       Playwright spotlight spec with axe on `pr-pw-e2e-local`; Maestro flow registered in
       `run-maestro.mjs` and `maestro-flow-durations.json`.
@@ -309,6 +309,13 @@ rank: 1..60, level }` without `experimentVariant`, where `level` is the served l
   `denied`. The HTTP fallback starts every 5.0 to 5.5 s, so a poll plus its 2 s budget completes
   inside the window. When content must hide and the same items return, web and mobile restore the
   reader's scroll position; content still unmounts while unverified.
+- 2026-10-22, close-out. Merge-ready head `890ab140` (PR #158): the three code reviewers returned
+  READY on `ab2e904d` (R43, R44) in
+  [Opus](../test-artifacts/story-6-6/reviews/cc66-opus-r43-review.md),
+  [Astra](../test-artifacts/story-6-6/reviews/cc66-astra-r43-review.md) and
+  [TEA](../test-artifacts/story-6-6/reviews/cc66-tea-r43-review.md); `890ab140` adds only TEA's
+  burn-in dependency analysis fix (R45). The carousel flows pass on the local iOS simulator
+  (`runs/ios-community-r42-1`: spotlight, feed, comments) and CI carries the Android shards.
 
 ## Spec Change Log
 

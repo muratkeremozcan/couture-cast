@@ -56,9 +56,10 @@ development_status:
   0-14-expand-test-infra-auth-contract-performance: done
 
   # Epic 1: Weather Intelligence & Platform Foundation (Phase 1)
-  epic-1: done
+  epic-1: in-progress
   1-1-weather-api-ingestion-service: done
   1-2-multi-location-preferences: done
+  1-2b-client-location-capture: backlog
   1-3-alert-rules-notification-pipeline: done
   1-4-telemetry-audit-baseline: done
 
@@ -102,7 +103,7 @@ development_status:
   6-3-curated-reactions: done
   6-4-threaded-comments: done
   6-5-realtime-engagement-notifications: done
-  6-6-community-city-spotlight: in-progress
+  6-6-community-city-spotlight: done
   6-7-home-spotlight-teaser: backlog
   6-8-safe-branded-share-card-export: backlog
   6-9-native-platform-sharing: backlog
