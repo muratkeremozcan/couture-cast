@@ -239,4 +239,39 @@ export function registerCommunityClientCases() {
       CommunityRequestError
     )
   })
+
+  it('6.6-MOB-009 retries the spotlight and the feed once after a gate unavailable 503', async () => {
+    const calls = { spotlight: 0, feed: 0 }
+    const refusal = () =>
+      HttpResponse.json(
+        {
+          statusCode: 503,
+          code: 'unavailable',
+          retryAfterSeconds: 0,
+          message: 'Access could not be verified.',
+        },
+        { status: 503 }
+      )
+    server.use(
+      http.get('*/api/v1/community/spotlight', () =>
+        calls.spotlight++ === 0
+          ? refusal()
+          : HttpResponse.json({
+              data: { level: 'none', label: null, items: [], nextCursor: null },
+            })
+      ),
+      http.get(FEED_ROUTE, () => {
+        calls.feed += 1
+        return refusal()
+      })
+    )
+    await expect(getCommunitySpotlightFromMobile()).resolves.toMatchObject({
+      level: 'none',
+    })
+    expect(calls.spotlight).toBe(2)
+    await expect(getCommunityFeedFromMobile({ mode: 'all' })).rejects.toBeInstanceOf(
+      CommunityRequestError
+    )
+    expect(calls.feed).toBe(2)
+  })
 }

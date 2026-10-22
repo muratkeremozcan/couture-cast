@@ -3,6 +3,7 @@ import {
   communitySyncClient,
   commentSessionIdentity,
   ResponseError,
+  retryOnceWhenCommunityUnavailable,
 } from '@couture/api-client'
 // Story 6.1 Task 5 owner: the mobile app's community feed client.
 //
@@ -245,11 +246,16 @@ export async function getCommunityFeedFromMobile({
 }: CommunityFeedRequest): Promise<CommunityFeed> {
   const accessToken = await readAccessToken()
   try {
-    const response = await withRequestTimeout(signal, (requestSignal) =>
-      communityClient(accessToken).apiV1CommunityFeedGet(
-        { xCouturePlatform: 'mobile', xCoutureReactions: '1', mode, cursor, limit },
-        { signal: requestSignal }
-      )
+    // The read gate's `unavailable` 503 is retryable by contract.
+    const response = await retryOnceWhenCommunityUnavailable(
+      () =>
+        withRequestTimeout(signal, (requestSignal) =>
+          communityClient(accessToken).apiV1CommunityFeedGet(
+            { xCouturePlatform: 'mobile', xCoutureReactions: '1', mode, cursor, limit },
+            { signal: requestSignal }
+          )
+        ),
+      signal
     )
     return communityReactionFeedResponseSchema.parse(response).data
   } catch (error: unknown) {
@@ -275,11 +281,15 @@ export async function getCommunitySpotlightFromMobile({
 }: CommunitySpotlightRequest = {}): Promise<CommunityReactionSpotlight> {
   const accessToken = await readAccessToken()
   try {
-    const response = await withRequestTimeout(signal, (requestSignal) =>
-      communityClient(accessToken).getCommunitySpotlight(
-        { xCouturePlatform: 'mobile', xCoutureReactions: '1', cursor, limit },
-        { signal: requestSignal }
-      )
+    const response = await retryOnceWhenCommunityUnavailable(
+      () =>
+        withRequestTimeout(signal, (requestSignal) =>
+          communityClient(accessToken).getCommunitySpotlight(
+            { xCouturePlatform: 'mobile', xCoutureReactions: '1', cursor, limit },
+            { signal: requestSignal }
+          )
+        ),
+      signal
     )
     return communityReactionSpotlightResponseSchema.parse(response).data
   } catch (error: unknown) {

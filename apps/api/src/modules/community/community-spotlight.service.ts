@@ -1,5 +1,5 @@
 // Story 6.6 owner: City Spotlight reads, snapshots and analytics.
-import { Inject, Injectable, Logger } from '@nestjs/common'
+import { HttpException, Inject, Injectable, Logger } from '@nestjs/common'
 import type { LookbookPost } from '@prisma/client'
 import {
   type CommunityPlatform,
@@ -91,6 +91,11 @@ function isResolved(viewer: ViewerResolution): viewer is ResolvedViewer {
   return viewer.location !== null && viewer.level !== 'none'
 }
 
+function errorCode(error: unknown): string | null {
+  if (typeof error !== 'object' || error === null || !('code' in error)) return null
+  return typeof error.code === 'string' ? error.code : null
+}
+
 export function spotlightViewDedupeKey(userId: string, now: number): string {
   return [
     'community_spotlight_viewed',
@@ -123,7 +128,24 @@ export class CommunitySpotlightService {
 
   /** Read authorization, rollout, consent, age, erasure and canary rules match the feed. */
   getSpotlight(params: GetSpotlightParams): Promise<CommunitySpotlight> {
-    return this.community.readAuthorized(params.userId, () => this.read(params))
+    return this.community.readAuthorized(params.userId, async () => {
+      try {
+        return await this.read(params)
+      } catch (error: unknown) {
+        // The shared gate turns any fault into a retryable 503, which hides it.
+        // Record its class and code, never its message or any identifier.
+        if (!(error instanceof HttpException))
+          this.logger.error(
+            {
+              event: 'community_spotlight_read_failed',
+              reason: error instanceof Error ? error.name : 'unknown',
+              code: errorCode(error),
+            },
+            'City Spotlight read failed'
+          )
+        throw error
+      }
+    })
   }
 
   private async read(params: GetSpotlightParams): Promise<CommunitySpotlight> {

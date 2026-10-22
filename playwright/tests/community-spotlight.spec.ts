@@ -75,6 +75,9 @@ test.describe('Story 6.6 City Spotlight', () => {
       await expect(page.getByTestId('community-spotlight-view-more')).toHaveCount(0)
       await checkA11y(page)
     } finally {
+      // Leave the page first: an open detail keeps reading the post's comments,
+      // and deleting the fixture under a live request turns it into a 404.
+      await page.goto('about:blank')
       await removeLocation()
     }
   })
@@ -121,6 +124,9 @@ test.describe('Story 6.6 City Spotlight', () => {
       await expect(page.getByTestId('community-spotlight-view-more')).toHaveCount(0)
       await checkA11y(page)
     } finally {
+      // Leave the page first: an open detail keeps reading the post's comments,
+      // and deleting the fixture under a live request turns it into a 404.
+      await page.goto('about:blank')
       await removeLocation()
       await cohort.cleanup()
     }
@@ -161,6 +167,9 @@ test.describe('Story 6.6 City Spotlight', () => {
       expect((await recorded).status()).toBe(200)
       expect(opens).toEqual([{ surface: 'spotlight', rank: 2 }])
     } finally {
+      // Leave the page first: an open detail keeps reading the post's comments,
+      // and deleting the fixture under a live request turns it into a 404.
+      await page.goto('about:blank')
       await removeLocation()
       await cohort.cleanup()
     }

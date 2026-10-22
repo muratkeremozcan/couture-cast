@@ -7,6 +7,7 @@ import {
   communitySyncClient,
   commentSessionIdentity,
   ResponseError,
+  retryOnceWhenCommunityUnavailable,
 } from '@couture/api-client'
 // Story 6.1 Task 5 owner: the web app's community feed client.
 //
@@ -294,9 +295,14 @@ export async function getCommunityFeedFromWeb({
 }: CommunityFeedRequest): Promise<CommunityFeed> {
   const accessToken = readAccessToken()
   try {
-    const response = await createWebApiClient({ accessToken }).apiV1CommunityFeedGet(
-      { xCouturePlatform: 'web', xCoutureReactions: '1', mode, cursor, limit },
-      { signal }
+    // The read gate's `unavailable` 503 is retryable by contract.
+    const response = await retryOnceWhenCommunityUnavailable(
+      () =>
+        createWebApiClient({ accessToken }).apiV1CommunityFeedGet(
+          { xCouturePlatform: 'web', xCoutureReactions: '1', mode, cursor, limit },
+          { signal }
+        ),
+      signal
     )
     return communityReactionFeedResponseSchema.parse(response).data
   } catch (error: unknown) {
@@ -400,9 +406,13 @@ export async function getCommunitySpotlightFromWeb({
 }: CommunitySpotlightRequest = {}): Promise<CommunityReactionSpotlight> {
   const accessToken = readAccessToken()
   try {
-    const response = await createWebApiClient({ accessToken }).getCommunitySpotlight(
-      { xCouturePlatform: 'web', xCoutureReactions: '1', cursor, limit },
-      { signal }
+    const response = await retryOnceWhenCommunityUnavailable(
+      () =>
+        createWebApiClient({ accessToken }).getCommunitySpotlight(
+          { xCouturePlatform: 'web', xCoutureReactions: '1', cursor, limit },
+          { signal }
+        ),
+      signal
     )
     return communityReactionSpotlightResponseSchema.parse(response).data
   } catch (error: unknown) {

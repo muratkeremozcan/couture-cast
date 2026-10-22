@@ -8,6 +8,7 @@ import {
 import { useMswHandlers } from '../test-utils/msw/runtime'
 import {
   communityFailureReason,
+  getCommunityFeedFromWeb,
   getCommunitySpotlightFromWeb,
   openCommunitySpotlightPostFromWeb,
 } from './community'
@@ -49,6 +50,34 @@ describe('City Spotlight web wrappers (Story 6.6)', () => {
       { reactions: '1', platform: 'web', query: '?cursor=next&limit=12' },
       { reactions: '1', platform: 'web', query: '?limit=6' },
     ])
+  })
+
+  it('6.6-WEB-014 retries the feed and the spotlight once after a gate unavailable 503', async () => {
+    const calls: Record<string, number> = { spotlight: 0, feed: 0 }
+    const refusal = () =>
+      HttpResponse.json(
+        {
+          statusCode: 503,
+          code: 'unavailable',
+          retryAfterSeconds: 0,
+          message: 'Access could not be verified.',
+        },
+        { status: 503 }
+      )
+    useMswHandlers(
+      http.get(SPOTLIGHT_PATH, () =>
+        calls.spotlight++ === 0 ? refusal() : HttpResponse.json({ data: page })
+      ),
+      http.get('/api/v1/community/feed', () => {
+        calls.feed += 1
+        return refusal()
+      })
+    )
+    await expect(getCommunitySpotlightFromWeb()).resolves.toEqual(page)
+    expect(calls.spotlight).toBe(2)
+    // A second refusal is surfaced, once, as the classified failure.
+    await expect(getCommunityFeedFromWeb({ mode: 'all' })).rejects.toBeInstanceOf(Error)
+    expect(calls.feed).toBe(2)
   })
 
   it('6.6-WEB-011 refuses a response the strict contract does not accept', async () => {
