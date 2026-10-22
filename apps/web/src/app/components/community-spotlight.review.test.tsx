@@ -1,19 +1,17 @@
 // Story 6.6 code review round 2: spotlight single-post refresh and per-surface
 // image failures, through the real web transport and MSW.
-import { http, HttpResponse } from 'msw'
-import { fireEvent, screen, waitFor, within } from '@testing-library/react'
+import { http } from 'msw'
+import { screen, waitFor, within } from '@testing-library/react'
+import userEvent from '@testing-library/user-event'
 import { describe, expect, it, vi } from 'vitest'
-import {
-  communityReactionSpotlightResponseSchema,
-  type CommunityReactionSpotlight,
-  type CommunityReactionSpotlightItem,
-} from '@couture/api-client/contracts/http'
 import { useMswHandlers } from '../../test-utils/msw/runtime'
 import {
   FEED_PATH,
+  IMAGE_URL,
   POST_PATH,
   REFRESHED_IMAGE_URL,
   feedHandler,
+  isoIn,
   item,
   postBody,
   renderGrid,
@@ -21,44 +19,18 @@ import {
   setupCommunityGridSurface,
   signIn,
 } from '../../test-utils/community-lookbook-grid'
+import {
+  SPOTLIGHT_PATH,
+  failImage,
+  ranked,
+  spotlightBody,
+} from '../../test-utils/community-spotlight'
 
 vi.mock('posthog-js', () => ({
   default: { capture: vi.fn() },
 }))
 
-const SPOTLIGHT_PATH = '/api/v1/community/spotlight'
-
 setupCommunityGridClock()
-
-function ranked(rank: number, overrides: Partial<CommunityReactionSpotlightItem> = {}) {
-  return {
-    ...item({
-      id: `spot-${rank}`,
-      caption: `Spotlight look ${rank}`,
-      author: { displayName: `Explorer ${rank}`, isSelf: false },
-    }),
-    rank,
-    ...overrides,
-  } satisfies CommunityReactionSpotlightItem
-}
-
-function spotlightBody(overrides: Partial<CommunityReactionSpotlight> = {}) {
-  return HttpResponse.json(
-    communityReactionSpotlightResponseSchema.parse({
-      data: {
-        level: 'city',
-        label: 'Lisbon',
-        items: [],
-        nextCursor: null,
-        ...overrides,
-      },
-    }) as unknown as Record<string, unknown>
-  )
-}
-
-function failImage(testId: string) {
-  fireEvent.error(screen.getByTestId(testId).querySelector('img') as HTMLImageElement)
-}
 
 describe('CommunitySpotlightSection review round 2 (Story 6.6)', () => {
   setupCommunityGridSurface()
@@ -164,5 +136,67 @@ describe('CommunitySpotlightSection review round 2 (Story 6.6)', () => {
       screen.getByTestId('spotlight-lookbook-image-spot-1').querySelector('img')
     ).not.toBeNull()
     expect(screen.getByTestId('spotlight-lookbook-open-spot-1')).toBeInTheDocument()
+  })
+
+  it('6.6-WEB-080 a spotlight image failure re-reads the post and renders its fresh signed URL in place', async () => {
+    signIn()
+    const cursors: (string | null)[] = []
+    const reads: string[] = []
+    useMswHandlers(
+      feedHandler({ items: [item({ id: 'spot-1' })] }),
+      http.get(SPOTLIGHT_PATH, ({ request }) => {
+        const cursor = new URL(request.url).searchParams.get('cursor')
+        cursors.push(cursor)
+        return cursor === null
+          ? spotlightBody({ items: [ranked(1), ranked(2)], nextCursor: 'c2' })
+          : spotlightBody({ items: [ranked(3)], nextCursor: null })
+      }),
+      // The signed URL expired; the single-post read signs a fresh one.
+      http.get(POST_PATH, ({ params }) => {
+        reads.push(String(params.postId))
+        return postBody({
+          id: String(params.postId),
+          caption: 'Spotlight look 1',
+          author: { displayName: 'Explorer 1', isSelf: false },
+          imageAccess: { url: REFRESHED_IMAGE_URL, expiresAt: isoIn(3600) },
+        })
+      })
+    )
+    const user = userEvent.setup()
+    renderGrid()
+
+    await screen.findByTestId('spotlight-lookbook-card-spot-2')
+    await screen.findByTestId('lookbook-card-spot-1')
+    await user.click(screen.getByTestId('community-spotlight-view-more'))
+    await screen.findByTestId('spotlight-lookbook-card-spot-3')
+    failImage('spotlight-lookbook-image-spot-1')
+
+    await waitFor(() =>
+      expect(
+        screen
+          .getByTestId('spotlight-lookbook-image-spot-1')
+          .querySelector('img')
+          ?.getAttribute('src')
+      ).toBe(REFRESHED_IMAGE_URL)
+    )
+    expect(
+      screen.queryByTestId('spotlight-image-unavailable-spot-1')
+    ).not.toBeInTheDocument()
+    expect(screen.getByTestId('spotlight-lookbook-open-spot-1')).toBeInTheDocument()
+    expect(reads).toEqual(['spot-1'])
+    // Refreshed in place: no page-one reload, every loaded rank kept.
+    expect(cursors).toEqual([null, 'c2'])
+    expect(
+      within(screen.getByTestId('community-spotlight-list'))
+        .getAllByRole('listitem')
+        .map((entry) => entry.getAttribute('data-rank'))
+    ).toEqual(['1', '2', '3'])
+    // The feed copy keeps the URL it was served with.
+    expect(
+      screen
+        .getByTestId('lookbook-image-spot-1')
+        .querySelector('img')
+        ?.getAttribute('src')
+    ).toBe(IMAGE_URL)
   })
 })

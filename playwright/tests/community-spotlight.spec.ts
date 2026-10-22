@@ -1,5 +1,6 @@
 // Story 6.6: the City Spotlight module that heads the community section on `/`.
 import type { Page } from '@playwright/test'
+import { COMMUNITY_SPOTLIGHT_DEFAULT_LIMIT } from '@couture/api-client/contracts/http'
 import { checkA11y } from '../support/helpers/accessibility'
 import { communityTest as test, expect } from '../support/helpers/community-session'
 import {
@@ -66,7 +67,10 @@ test.describe('Story 6.6 City Spotlight', () => {
           .locator(':scope > *')
           .first()
       ).toHaveAttribute('data-testid', 'community-spotlight')
-      const firstPage = SEEDED_SPOTLIGHT_POST_IDS.slice(0, 6)
+      const firstPage = SEEDED_SPOTLIGHT_POST_IDS.slice(
+        0,
+        COMMUNITY_SPOTLIGHT_DEFAULT_LIMIT
+      )
       expect(await rankedIds(page)).toEqual(firstPage)
       for (const [index, postId] of firstPage.entries()) {
         await expect(
@@ -83,7 +87,7 @@ test.describe('Story 6.6 City Spotlight', () => {
     }
   })
 
-  test('[P1] View more appends the next ranked looks, focuses the first one and announces once', async ({
+  test('[P1] View more from the keyboard appends the next ranked looks, focuses the first one and announces once', async ({
     page,
     communitySession,
   }) => {
@@ -97,7 +101,9 @@ test.describe('Story 6.6 City Spotlight', () => {
       await expect(page.getByTestId('community-spotlight-heading')).toHaveText(
         `Spotlight in ${SEEDED_SPOTLIGHT_AREA.city}`
       )
-      expect(await rankedIds(page)).toEqual(SEEDED_SPOTLIGHT_POST_IDS.slice(0, 6))
+      expect(await rankedIds(page)).toEqual(
+        SEEDED_SPOTLIGHT_POST_IDS.slice(0, COMMUNITY_SPOTLIGHT_DEFAULT_LIMIT)
+      )
 
       // Every text the one live region takes, so a repeated announcement shows.
       await page.getByTestId('community-live-region').evaluate((region) => {
@@ -109,11 +115,19 @@ test.describe('Story 6.6 City Spotlight', () => {
           characterData: true,
         })
       })
-      await page.getByTestId('community-spotlight-view-more').click()
+      // AC4 names keyboard users: View more is reached and activated from the keyboard.
+      const viewMore = page.getByTestId('community-spotlight-view-more')
+      await viewMore.focus()
+      await expect(viewMore).toBeFocused()
+      await page.keyboard.press('Enter')
 
-      const firstNew = SEEDED_SPOTLIGHT_POST_IDS[6]!
+      const firstNew = SEEDED_SPOTLIGHT_POST_IDS[COMMUNITY_SPOTLIGHT_DEFAULT_LIMIT]!
       await expect(page.getByTestId(`spotlight-lookbook-card-${firstNew}`)).toBeFocused()
       expect(await rankedIds(page)).toEqual(SEEDED_SPOTLIGHT_POST_IDS)
+      // Page two continues the ranking: its first look is rank 7, not a fresh rank 1.
+      await expect(
+        page.getByTestId(`community-spotlight-item-${firstNew}`)
+      ).toHaveAttribute('data-rank', String(COMMUNITY_SPOTLIGHT_DEFAULT_LIMIT + 1))
       await expect(page.getByTestId('community-live-region')).toHaveText(
         'Loaded 1 more spotlight look.'
       )
@@ -138,6 +152,7 @@ test.describe('Story 6.6 City Spotlight', () => {
   test('[P1] opening a spotlight look opens the detail and records only the spotlight open', async ({
     page,
     communitySession,
+    interceptNetworkCall,
   }) => {
     await assertSeededSpotlight()
     const removeLocation = await placeViewerInArea(
@@ -146,6 +161,8 @@ test.describe('Story 6.6 City Spotlight', () => {
     )
     try {
       const opens: unknown[] = []
+      // playwright-utils deviation: interceptNetworkCall resolves on its first match;
+      // this listener counts every open, so a second one shows.
       page.on('request', (request) => {
         if (
           request.method() === 'POST' &&
@@ -155,11 +172,10 @@ test.describe('Story 6.6 City Spotlight', () => {
       })
       await loadedSpotlight(page)
       const target = SEEDED_SPOTLIGHT_POST_IDS[1]!
-      const recorded = page.waitForResponse(
-        (response) =>
-          response.request().method() === 'POST' &&
-          response.url().endsWith(`/community/posts/${target}/opened`)
-      )
+      const recorded = interceptNetworkCall({
+        method: 'POST',
+        url: `**/community/posts/${target}/opened`,
+      })
       await page.getByTestId(`spotlight-lookbook-open-${target}`).click()
 
       const dialog = page.getByRole('dialog')
@@ -170,7 +186,7 @@ test.describe('Story 6.6 City Spotlight', () => {
       expect(
         await dialog.evaluate((element) => element.contains(document.activeElement))
       ).toBe(true)
-      expect((await recorded).status()).toBe(200)
+      expect((await recorded).status).toBe(200)
       expect(opens).toEqual([{ surface: 'spotlight', rank: 2, level: 'city' }])
     } finally {
       // Leave the page first: an open detail keeps reading the post's comments,
@@ -218,7 +234,7 @@ test.describe('Story 6.6 City Spotlight', () => {
             moduleHeight: module.height,
           }
         })
-        expect(layout.tops).toHaveLength(6)
+        expect(layout.tops).toHaveLength(COMMUNITY_SPOTLIGHT_DEFAULT_LIMIT)
         expect(new Set(layout.tops).size).toBe(1)
         expect(layout.rowScrolls).toBe(true)
         expect(layout.pageScrollsSideways).toBe(false)
@@ -247,5 +263,6 @@ test.describe('Story 6.6 City Spotlight', () => {
       'No spotlight near you yet'
     )
     await expect(page.getByTestId('community-spotlight-list')).toHaveCount(0)
+    await checkA11y(page)
   })
 })

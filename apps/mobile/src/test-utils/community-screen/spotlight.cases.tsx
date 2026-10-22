@@ -1,12 +1,14 @@
 /* eslint-disable @typescript-eslint/await-thenable */
 // Story 6.6 owner: the mobile City Spotlight module through the real HTTP boundary.
 import { item, errorEnvelope, feedJson, imageEvents, serveFeed } from './harness'
+import { refreshEvents } from './mock-state'
 import { CommunitySyncState } from '@couture/api-client'
 import { act, screen, waitFor, within } from '@testing-library/react'
 import { http, HttpResponse } from 'msw'
 import { render } from 'vitest-browser-react'
 import { expect, it, vi } from 'vitest'
 import {
+  COMMUNITY_AGE_GATE_DENIED_MESSAGE,
   COMMUNITY_CURSOR_INVALID_MESSAGE,
   COMMUNITY_FEED_DISABLED_MESSAGE,
   communityReactionSpotlightResponseSchema,
@@ -290,6 +292,10 @@ export function registerCommunitySpotlightCases() {
           : errorEnvelope(401, 'Unauthorized')
       )
       await render(<CommunityScreen />)
+      // Signed out on a mounted screen: the module idles and reads nothing.
+      await screen.findByTestId('community-feed-error')
+      await waitFor(() => expect(screen.queryByTestId('community-spotlight')).toBeNull())
+      expect(requests).toHaveLength(0)
       token = 'session-token'
       expect(
         await screen.findByTestId('community-spotlight-item-member-1', undefined, {
@@ -297,7 +303,10 @@ export function registerCommunitySpotlightCases() {
         })
       ).toBeVisible()
       expect(screen.queryByTestId('community-spotlight-error')).toBeNull()
-      expect(requests.at(-1)?.headers.get('authorization')).toBe('Bearer session-token')
+      // The sign-in made the first and only spotlight read, and it carried the session.
+      expect(requests.map((request) => request.headers.get('authorization'))).toEqual([
+        'Bearer session-token',
+      ])
     } finally {
       restore()
     }
@@ -455,33 +464,160 @@ export function registerCommunitySpotlightCases() {
     expect(screen.getByTestId('community-spotlight-item-spot-1')).toBeVisible()
   })
 
-  it('6.6-MOB-034 an expired spotlight image refreshes the spotlight, not only the feed (R9)', async () => {
+  it('6.6-MOB-034 an expired spotlight image re-reads only that post and keeps every loaded page (R9)', async () => {
+    const REFRESHED = 'https://storage.test/refreshed-spot-1.png'
     serveFeed(() => feedJson({ items: [] }))
-    let spotlightReads = 0
-    let postReads = 0
-    serveSpotlight(() => {
-      spotlightReads += 1
-      return page({ items: [rankedLook('spot-1', 1)] })
-    })
+    const postReads: string[] = []
+    const { urls } = serveSpotlight((url) =>
+      url.searchParams.get('cursor') === 'cursor-2'
+        ? page({ items: [rankedLook('spot-3', 3)], nextCursor: null })
+        : page({
+            items: [rankedLook('spot-1', 1), rankedLook('spot-2', 2)],
+            nextCursor: 'cursor-2',
+          })
+    )
     server.use(
       http.get('*/api/v1/community/posts/:postId', ({ params }) => {
-        postReads += 1
+        postReads.push(params.postId as string)
         return HttpResponse.json({
-          data: { ...item({ id: params.postId as string }), reactions: ZERO },
+          data: {
+            ...item({ id: params.postId as string }),
+            imageAccess: { url: REFRESHED, expiresAt: '2030-01-01T00:00:00.000Z' },
+            reactions: ZERO,
+          },
         })
       })
     )
     await render(<CommunityScreen />)
-    await screen.findByTestId('community-spotlight-item-spot-1')
-    const before = spotlightReads + postReads
+    press(await screen.findByTestId('community-spotlight-view-more'))
+    await screen.findByTestId('community-spotlight-item-spot-3')
     await waitFor(() =>
       expect(imageEvents.errors.get('community-card-image-spot-1')).toBeTypeOf('function')
     )
     act(() => {
       imageEvents.errors.get('community-card-image-spot-1')!()
     })
-    await waitFor(() => expect(spotlightReads + postReads).toBeGreaterThan(before))
-    expect(screen.getByTestId('community-spotlight-item-spot-1')).toBeVisible()
+    await waitFor(() =>
+      expect(
+        screen
+          .getByTestId('community-spotlight-item-spot-1')
+          .querySelector(`img[src="${REFRESHED}"]`)
+      ).not.toBeNull()
+    )
+    expect(postReads).toEqual(['spot-1'])
+    // No page-one reload stood in for the single-post read: page two and the rank stay.
+    expect(urls.map((url) => url.searchParams.get('cursor'))).toEqual([null, 'cursor-2'])
+    expect(screen.getByTestId('community-spotlight-item-spot-3')).toBeVisible()
+    expect(screen.getByTestId('community-spotlight-rank-spot-1').textContent).toBe('#1')
+  })
+
+  it('6.6-MOB-076 a reaction 404 on a spotlight card evicts that copy in place', async () => {
+    serveFeed(() => feedJson({ items: [] }))
+    const { urls } = serveSpotlight(() =>
+      page({ items: [rankedLook('spot-1', 1), rankedLook('spot-2', 2)] })
+    )
+    const reacted: string[] = []
+    server.use(
+      http.put('*/api/v1/community/posts/:postId/reaction', ({ params }) => {
+        reacted.push(params.postId as string)
+        return errorEnvelope(404, 'Community post not found.')
+      })
+    )
+    await render(<CommunityScreen />)
+    const card = await screen.findByTestId('community-spotlight-item-spot-1')
+    press(within(card).getByRole('button', { name: 'Applaud, 0' }))
+
+    await waitFor(() =>
+      expect(screen.queryByTestId('community-spotlight-item-spot-1')).toBeNull()
+    )
+    expect(reacted).toEqual(['spot-1'])
+    expect(screen.getByTestId('community-spotlight-item-spot-2')).toBeVisible()
+    expect(urls).toHaveLength(1)
+  })
+
+  it('6.6-MOB-079 pull to refresh re-reads spotlight page one with the feed', async () => {
+    let reads = 0
+    serveSpotlight(() => {
+      reads += 1
+      return page({ items: [rankedLook(reads === 1 ? 'before-1' : 'after-1', 1)] })
+    })
+    await render(<CommunityScreen />)
+    await screen.findByTestId('community-spotlight-item-before-1')
+    await waitFor(() => expect(refreshEvents.onRefresh).toBeTypeOf('function'))
+    act(() => refreshEvents.onRefresh!())
+
+    expect(await screen.findByTestId('community-spotlight-item-after-1')).toBeVisible()
+    expect(screen.queryByTestId('community-spotlight-item-before-1')).toBeNull()
+    expect(reads).toBe(2)
+  })
+
+  it('6.6-MOB-080 pull to refresh while signed out reads no spotlight', async () => {
+    const restore = setMobileAccessTokenResolver(() => undefined)
+    try {
+      const { requests } = serveSpotlight(() => page())
+      let feedReads = 0
+      serveFeed(() => {
+        feedReads += 1
+        return feedJson({ items: [] })
+      })
+      await render(<CommunityScreen />)
+      await screen.findByTestId('community-feed-error')
+      await waitFor(() => expect(refreshEvents.onRefresh).toBeTypeOf('function'))
+      act(() => refreshEvents.onRefresh!())
+      // Barrier: the refresh settles back to the signed-out feed state.
+      await screen.findByTestId('community-feed-error')
+      await act(async () => {
+        await Promise.resolve()
+      })
+      expect(requests).toHaveLength(0)
+      expect(feedReads).toBe(0)
+      expect(screen.queryByTestId('community-spotlight')).toBeNull()
+    } finally {
+      restore()
+    }
+  })
+
+  it('6.6-MOB-081 reporting from the spotlight detail waits for its dismissal and returns focus to the rank', async () => {
+    const handles = iosFocusHandles()
+    serveFeed(() => feedJson({ items: [] }))
+    serveSpotlight(() => page())
+    server.use(
+      http.post('*/api/v1/community/posts/:postId/opened', () =>
+        HttpResponse.json({ tracked: true })
+      )
+    )
+    await render(<CommunityScreen />)
+    const card = await screen.findByTestId('community-spotlight-item-spot-2')
+    press(within(card).getByTestId('community-card-open-spot-2'))
+    const detail = await screen.findByTestId('community-spotlight-detail')
+    press(within(detail).getByTestId('community-card-report-spot-2'))
+
+    // iOS presents one modal at a time: the report opens once the detail has left.
+    await screen.findByTestId('community-report-modal')
+    expect(screen.queryByTestId('community-spotlight-detail-title')).toBeNull()
+
+    press(screen.getByTestId('cancel-report-button'))
+    const rank = screen.getByTestId('community-spotlight-rank-spot-2')
+    await waitFor(() => {
+      expect(handles.get(rank)).toBeTypeOf('number')
+      expect(AccessibilityInfo.setAccessibilityFocus).toHaveBeenLastCalledWith(
+        handles.get(rank)
+      )
+    })
+  })
+
+  it('6.6-MOB-078 an age-gate refusal shows the disabled state, never the error', async () => {
+    serveSpotlight(() =>
+      HttpResponse.json(
+        { statusCode: 403, code: 'denied', message: COMMUNITY_AGE_GATE_DENIED_MESSAGE },
+        { status: 403 }
+      )
+    )
+    await render(<CommunityScreen />)
+    const disabled = await screen.findByTestId('community-spotlight-disabled')
+    expect(disabled.textContent).toBe('The City Spotlight is temporarily unavailable.')
+    expect(screen.queryByTestId('community-spotlight-error')).toBeNull()
+    expect(screen.queryByTestId('community-spotlight-retry')).toBeNull()
   })
 
   it('6.6-MOB-035 a cursor-invalid restart focuses the first card and announces the refresh once (R11)', async () => {

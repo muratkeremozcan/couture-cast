@@ -117,11 +117,24 @@ describe('CommunitySpotlightDetail focus and announcement (Story 6.6 R20)', () =
 
     // A reaction or realtime refresh hands the sheet a new object for the same look.
     await view.rerender(<Harness item={{ ...look(2), caption: 'Updated caption' }} />)
-    await screen.findByTestId('community-spotlight-detail-title')
-    // Give a stray second onShow the same time the first one needed.
-    await new Promise((resolve) => setTimeout(resolve, 600))
+    expect(
+      (await screen.findByTestId('community-spotlight-detail-title')).textContent
+    ).toBe('City Spotlight')
     expect(focusedAnnouncements()).toHaveLength(1)
-    expect(AccessibilityInfo.setAccessibilityFocus).toHaveBeenCalledTimes(1)
+
+    // Sentinel: a real reopen must add exactly one announcement and one focus. A
+    // stray onShow from the update above would land first and make either count 3.
+    await view.rerender(<Harness item={null} />)
+    await waitFor(() =>
+      expect(screen.queryByTestId('community-spotlight-detail-title')).toBeNull()
+    )
+    await view.rerender(<Harness item={look(3)} />)
+    await waitFor(() => expect(focusedAnnouncements()).toHaveLength(2))
+    await waitFor(() =>
+      expect(AccessibilityInfo.setAccessibilityFocus).toHaveBeenCalledTimes(2)
+    )
+    expect(focusedAnnouncements()).toHaveLength(2)
+    expect(AccessibilityInfo.setAccessibilityFocus).toHaveBeenCalledTimes(2)
   })
 
   it('6.6-MOB-042 every reopen announces and focuses once more, never twice', async () => {

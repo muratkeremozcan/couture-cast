@@ -75,15 +75,29 @@ describe('6.6 spotlight score', () => {
     expect(isWithinSpotlightWindow(AS_OF, new Date(AS_OF.getTime() + 1))).toBe(false)
   })
 
-  it('6.6-UNIT-005 orders equal scores and counts by published_at desc, then id desc', () => {
+  it('6.6-UNIT-005 orders equal scores by non-author reactions desc, then equal counts by id desc', () => {
+    // 1 / (2 + 2)^1.5 and 8 / (14 + 2)^1.5 are both exactly 0.125. The newer
+    // post would win a published_at tiebreak, so only the reactions term puts
+    // the older post first. Equal scores with equal counts imply equal ages,
+    // so the published_at term never decides between distinct timestamps.
+    const fewer = { id: 'post-z-fewer', reactions: 1, publishedAt: hoursBefore(2) }
+    const more = { id: 'post-a-more', reactions: 8, publishedAt: hoursBefore(14) }
+    expect(spotlightScore(fewer.reactions, 2)).toBe(0.125)
+    expect(spotlightScore(more.reactions, 14)).toBe(0.125)
     const same = hoursBefore(5)
     const ranked = rankSpotlightEntries(AS_OF, [
+      fewer,
       { id: 'post-a', reactions: 2, publishedAt: same },
       { id: 'post-c', reactions: 2, publishedAt: same },
-      { id: 'post-b', reactions: 2, publishedAt: hoursBefore(4) },
+      more,
       { id: 'post-self-only', reactions: 0, publishedAt: hoursBefore(1) },
     ])
-    expect(ranked.map((entry) => entry.id)).toEqual(['post-b', 'post-c', 'post-a'])
+    expect(ranked.map((entry) => entry.id)).toEqual([
+      'post-a-more',
+      'post-z-fewer',
+      'post-c',
+      'post-a',
+    ])
   })
 
   it('6.6-UNIT-006 ranks identically on every run and caps at 60', () => {

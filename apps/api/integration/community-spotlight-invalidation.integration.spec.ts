@@ -152,12 +152,25 @@ describe('6.6 spotlight read model', () => {
     const epoch = await ctx.redis.get(ctx.cache.epochKey())
     const counters = await ctx.cache.counters(hash)
     expect(await ctx.cache.current('city', hash, counters)).not.toBeNull()
+    const { sequence: headBefore } =
+      await ctx.prisma.communityStreamHead.findUniqueOrThrow({
+        where: { id: 'public' },
+      })
     // Deleting a published post leaves only an anonymous resync marker.
     await ctx.prisma.communityReaction.deleteMany({
       where: { post_id: cohort.posts.at(-1)!.id },
     })
     await ctx.prisma.lookbookPost.delete({ where: { id: cohort.posts.at(-1)!.id } })
     await ctx.drain()
+    // A missing post also bumps the epoch, so the bump alone cannot show the
+    // append converted these rows: every new public event is an anonymous resync.
+    const appended = await ctx.prisma.communityStreamEvent.findMany({
+      where: { stream_id: 'public', sequence: { gt: headBefore } },
+      orderBy: { sequence: 'asc' },
+      select: { kind: true, post_id: true },
+    })
+    expect(appended.length).toBeGreaterThan(0)
+    for (const event of appended) expect(event).toEqual({ kind: 'resync', post_id: null })
     const after = await ctx.redis.get(ctx.cache.epochKey())
     expect(after).not.toBe(epoch)
     expect(
@@ -256,5 +269,57 @@ describe('6.6 spotlight read model', () => {
       expect(value).not.toBeNull()
       expect(value).not.toBe(before[index])
     })
+  })
+  it('6.6-INT-031 a reaction on a live never-stamped post moves no version and no epoch', async () => {
+    const { area, hash } = await primedArea('never-stamped')
+    const components = areaComponentsOf(area)
+    const hashes = (['city', 'region', 'country'] as const).map((level) =>
+      areaHash(components, level)
+    )
+    // Seed every level's counter, so a bump from a missing key also shows.
+    for (const levelHash of hashes) await ctx.cache.counters(levelHash)
+    const keys = [
+      ctx.cache.epochKey(),
+      ...hashes.map((levelHash) => ctx.cache.areaVersionKey(levelHash)),
+    ]
+    const before = await Promise.all(keys.map((key) => ctx.redis.get(key)))
+    expect(before.every((value) => value !== null)).toBe(true)
+
+    // Published before area stamping existed: live, visible, and in no area.
+    const fixture = createLookbookPost(
+      {
+        userId: await ctx.member(),
+        areaCountry: null,
+        areaRegion: null,
+        areaCity: null,
+        publishedAt: hoursBeforeAsOf(0.5),
+      },
+      { now: hoursBeforeAsOf(0.5) }
+    )
+    await ctx.prisma.lookbookPost.create({ data: buildLookbookPostCreateInput(fixture) })
+    await ctx.react(await ctx.member(), fixture.id, 'love')
+    const { sequence: headBefore } =
+      await ctx.prisma.communityStreamHead.findUniqueOrThrow({
+        where: { id: 'public' },
+      })
+
+    await expect(ctx.drain()).resolves.toMatchObject({ status: 'advanced' })
+    // The reaction reached the stream as an event naming the post, so the
+    // invalidator really planned it and found no area to bump.
+    const { sequence: headAfter } =
+      await ctx.prisma.communityStreamHead.findUniqueOrThrow({
+        where: { id: 'public' },
+      })
+    expect(headAfter).toBeGreaterThan(headBefore)
+    await expect(
+      ctx.prisma.communityStreamEvent.findMany({
+        where: { stream_id: 'public', sequence: { gt: headBefore } },
+        select: { post_id: true },
+      })
+    ).resolves.toContainEqual({ post_id: fixture.id })
+    expect(await Promise.all(keys.map((key) => ctx.redis.get(key)))).toEqual(before)
+    await expect(
+      ctx.cache.current('city', hash, await ctx.cache.counters(hash))
+    ).resolves.not.toBeNull()
   })
 })

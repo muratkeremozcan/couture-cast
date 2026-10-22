@@ -3,7 +3,7 @@
 import { CommunitySyncState } from '@couture/api-client'
 import { act, screen } from '@testing-library/react'
 import { http, HttpResponse } from 'msw'
-import { afterEach, beforeEach, expect, it, vi } from 'vitest'
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { useMswHandlers } from '../../test-utils/msw/runtime'
 import {
   FEED_PATH,
@@ -170,63 +170,64 @@ async function hideAsUnverified(handlers: ReturnType<typeof useVerifiedFeedHandl
   }
 }
 
-it('6.5-R43-WEB-001 a catch-up aborted at its 2 s client deadline keeps the verified feed', async () => {
-  const handlers = await openVerifiedFeed(useVerifiedFeedHandlers())
-  const card = screen.getByTestId('lookbook-card-post-1')
-  // The server answers, but the response lands after the client's 2 s deadline.
-  const release = handlers.hold()
-  vi.useFakeTimers({ toFake: ['setTimeout', 'clearTimeout'] })
-  try {
-    let pending!: Promise<void>
-    await act(async () => {
-      pending = handlers.sync().catchUp()
-      await vi.advanceTimersByTimeAsync(2000)
-      await pending
-    })
-    expect(screen.getByTestId('lookbook-card-post-1')).toBe(card)
-    expect(screen.queryByText(OUTAGE)).toBeNull()
-  } finally {
-    vi.useRealTimers()
-    release()
-  }
-})
+describe('community scroll restore after a required hide (Story 6.5 R43)', () => {
+  it('6.5-R43-WEB-001 a catch-up aborted at its 2 s client deadline keeps the verified feed', async () => {
+    const handlers = await openVerifiedFeed(useVerifiedFeedHandlers())
+    const card = screen.getByTestId('lookbook-card-post-1')
+    // The server answers, but the response lands after the client's 2 s deadline.
+    const release = handlers.hold()
+    vi.useFakeTimers({ toFake: ['setTimeout', 'clearTimeout'] })
+    try {
+      let pending!: Promise<void>
+      await act(async () => {
+        pending = handlers.sync().catchUp()
+        await vi.advanceTimersByTimeAsync(2000)
+        await pending
+      })
+      expect(screen.getByTestId('lookbook-card-post-1')).toBe(card)
+      expect(screen.queryByText(OUTAGE)).toBeNull()
+    } finally {
+      vi.useRealTimers()
+      release()
+    }
+  })
 
-it('6.5-R43-WEB-002 returns the reader to the same card when the same items come back after a required hide', async () => {
-  const handlers = await openVerifiedFeed(useVerifiedFeedHandlers())
-  const { page, scrollBy } = layoutWindow()
-  // The reader is on the second card, 300 px of it above the top of the window.
-  page.scrollY = 1300
-  // Focus sits on a control outside the feed, which the restore must not move.
-  const settings = document.querySelector<HTMLAnchorElement>(
-    'a[href="/notification-settings"]'
-  )!
-  settings.focus()
-  expect(document.activeElement).toBe(settings)
+  it('6.5-R43-WEB-002 returns the reader to the same card when the same items come back after a required hide', async () => {
+    const handlers = await openVerifiedFeed(useVerifiedFeedHandlers())
+    const { page, scrollBy } = layoutWindow()
+    // The reader is on the second card, 300 px of it above the top of the window.
+    page.scrollY = 1300
+    // Focus sits on a control outside the feed, which the restore must not move.
+    const settings = screen.getByRole('link', { name: 'Community notifications' })
+    expect(settings).toHaveAttribute('href', '/notification-settings')
+    settings.focus()
+    expect(document.activeElement).toBe(settings)
 
-  const restore = await hideAsUnverified(handlers)
-  // Content still unmounts while unverified, and the shorter page clamps the scroll.
-  expect(screen.queryByTestId('lookbook-card-post-2')).toBeNull()
-  page.scrollY = 0
-  await restore()
+    const restore = await hideAsUnverified(handlers)
+    // Content still unmounts while unverified, and the shorter page clamps the scroll.
+    expect(screen.queryByTestId('lookbook-card-post-2')).toBeNull()
+    page.scrollY = 0
+    await restore()
 
-  expect(await screen.findByTestId('lookbook-card-post-2')).toBeVisible()
-  expect(scrollBy).toHaveBeenCalledExactlyOnceWith({ top: 1300, behavior: 'instant' })
-  expect(page.scrollY).toBe(1300)
-  expect(document.activeElement).toBe(settings)
-})
+    expect(await screen.findByTestId('lookbook-card-post-2')).toBeVisible()
+    expect(scrollBy).toHaveBeenCalledExactlyOnceWith({ top: 1300, behavior: 'instant' })
+    expect(page.scrollY).toBe(1300)
+    expect(document.activeElement).toBe(settings)
+  })
 
-it('6.5-R43-WEB-003 leaves the scroll alone when the returning items no longer include what was shown', async () => {
-  const handlers = await openVerifiedFeed(useVerifiedFeedHandlers())
-  const { page, scrollBy } = layoutWindow()
-  page.scrollY = 1300
+  it('6.5-R43-WEB-003 leaves the scroll alone when the returning items no longer include what was shown', async () => {
+    const handlers = await openVerifiedFeed(useVerifiedFeedHandlers())
+    const { page, scrollBy } = layoutWindow()
+    page.scrollY = 1300
 
-  const restore = await hideAsUnverified(handlers)
-  expect(screen.queryByTestId('lookbook-card-post-2')).toBeNull()
-  page.scrollY = 0
-  handlers.remove('post-3')
-  await restore()
+    const restore = await hideAsUnverified(handlers)
+    expect(screen.queryByTestId('lookbook-card-post-2')).toBeNull()
+    page.scrollY = 0
+    handlers.remove('post-3')
+    await restore()
 
-  expect(await screen.findByTestId('lookbook-card-post-2')).toBeVisible()
-  expect(screen.queryByTestId('lookbook-card-post-3')).toBeNull()
-  expect(scrollBy).not.toHaveBeenCalled()
+    expect(await screen.findByTestId('lookbook-card-post-2')).toBeVisible()
+    expect(screen.queryByTestId('lookbook-card-post-3')).toBeNull()
+    expect(scrollBy).not.toHaveBeenCalled()
+  })
 })

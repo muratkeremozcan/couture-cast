@@ -23,3 +23,5 @@ export const imageEvents = {
   errors: new Map<string, () => void>(),
   createElement: null as unknown as typeof createElement,
 }
+/** The list's pull-to-refresh handler, which react-native-web renders no gesture for. */
+export const refreshEvents = { onRefresh: undefined as (() => void) | undefined }

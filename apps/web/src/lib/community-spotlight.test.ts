@@ -76,7 +76,16 @@ describe('City Spotlight web wrappers (Story 6.6)', () => {
     await expect(getCommunitySpotlightFromWeb()).resolves.toEqual(page)
     expect(calls.spotlight).toBe(2)
     // A second refusal is surfaced, once, as the classified failure.
-    await expect(getCommunityFeedFromWeb({ mode: 'all' })).rejects.toBeInstanceOf(Error)
+    const failure: unknown = await getCommunityFeedFromWeb({ mode: 'all' }).catch(
+      (error: unknown) => error
+    )
+    expect(failure).toMatchObject({
+      name: 'CommunityRequestError',
+      httpStatus: 503,
+      message: 'Access could not be verified.',
+    })
+    // A gate outage that carries no disabled copy stays a generic, retryable failure.
+    expect(communityFailureReason(failure)).toBe('unknown')
     expect(calls.feed).toBe(2)
   })
 

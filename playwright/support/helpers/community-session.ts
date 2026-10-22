@@ -39,6 +39,8 @@ export async function completedCommunityFeed(
   page: Page,
   mode?: string
 ): Promise<{ status: number; responseJson: unknown }> {
+  // playwright-utils deviation: interceptNetworkCall observes the first matching
+  // request, which can be an aborted feed read that never answers.
   const response = await page.waitForResponse((candidate) => {
     const url = new URL(candidate.url())
     return (

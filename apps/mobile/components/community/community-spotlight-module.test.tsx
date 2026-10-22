@@ -250,6 +250,19 @@ describe('CommunitySpotlightModule (Story 6.6)', () => {
     expect(screen.queryByTestId('community-spotlight-view-more')).toBeNull()
   })
 
+  it('6.6-MOB-075 a ranked level whose last card left shows the empty state only once no page remains', () => {
+    const { props, rerender } = renderModule({ level: 'city', items: [], hasMore: false })
+    expect(screen.getByTestId('community-spotlight-empty').textContent).toContain(
+      'No spotlight near you yet'
+    )
+    expect(screen.queryByTestId('community-spotlight-row')).toBeNull()
+
+    // A next page can still reach ranked looks, so View more stays in place of the empty state.
+    rerender(<CommunitySpotlightModule {...props} hasMore />)
+    expect(screen.queryByTestId('community-spotlight-empty')).toBeNull()
+    expect(screen.getByTestId('community-spotlight-view-more')).toBeVisible()
+  })
+
   it('6.6-MOB-022 keeps loaded cards and offers a retry when the next page fails', () => {
     const { props } = renderModule({ loadMoreFailed: true })
     expect(screen.getByTestId('stub-card-spot-2')).toBeTruthy()

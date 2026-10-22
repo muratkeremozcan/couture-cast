@@ -92,6 +92,37 @@ describe('spotlight area canonicalization', () => {
     }
   })
 
+  it('keeps countries whose names contain one another apart', () => {
+    const pairs: [string, string, string, string][] = [
+      ['Niger', 'NE', 'Nigeria', 'NG'],
+      ['Sudan', 'SD', 'South Sudan', 'SS'],
+      ['Guinea', 'GN', 'Equatorial Guinea', 'GQ'],
+      ['Dominica', 'DM', 'Dominican Republic', 'DO'],
+      ['Austria', 'AT', 'Australia', 'AU'],
+    ]
+    for (const [left, leftCode, right, rightCode] of pairs) {
+      expect(canonicalCountryCode(left), left).toBe(leftCode)
+      expect(canonicalCountryCode(right), right).toBe(rightCode)
+    }
+  })
+
+  it('round-trips every country name in every product locale and display style', () => {
+    for (const locale of SPOTLIGHT_COUNTRY_LOCALES) {
+      for (const style of ['long', 'short'] as const) {
+        const names = new Intl.DisplayNames([locale], {
+          type: 'region',
+          style,
+          fallback: 'none',
+        })
+        for (const code of spotlightCountryCodes()) {
+          const name = names.of(code)
+          expect(name, `${locale} ${style} ${code}`).toBeTruthy()
+          expect(canonicalCountryCode(name), `${locale} ${style} ${name}`).toBe(code)
+        }
+      }
+    }
+  })
+
   it('lists exactly the ISO 3166-1 alpha-2 codes plus Kosovo', () => {
     const codes = spotlightCountryCodes()
     expect(codes).toHaveLength(250)
@@ -120,6 +151,9 @@ describe('spotlight area canonicalization', () => {
     expect(foldAreaComponent('Ærøskøbing')).toBe('aeroskobing')
     expect(foldAreaComponent('Œuvre')).toBe('oeuvre')
     expect(foldAreaComponent('Þórshöfn')).toBe('thorshofn')
+    // A name that extends another stays its own area.
+    expect(foldAreaComponent('Paris')).toBe('paris')
+    expect(foldAreaComponent('Parish')).toBe('parish')
     expect(foldAreaComponent(' \u0301 ')).toBeNull()
     expect(foldAreaComponent('   ')).toBeNull()
     expect(foldAreaComponent(null)).toBeNull()

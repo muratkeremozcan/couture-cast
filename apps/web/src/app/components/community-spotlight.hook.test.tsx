@@ -167,8 +167,54 @@ describe('6.6 spotlight single-post refresh', () => {
     expect(result.current.state.items.map((entry) => entry.id)).toEqual(['a'])
   })
 
-  it('6.6-WEB-067 a reset aborts an in-flight refresh, which then changes nothing', async () => {
-    const { result } = await ready()
+  /**
+   * Starts a refresh of 'a' on a held read, resets, and reloads the same page,
+   * so a late answer that slipped past the abort would visibly change `a`.
+   */
+  async function refreshAcrossReset() {
+    const hook = await ready()
+    const read = deferred<unknown>()
+    let signal: AbortSignal | undefined
+    lib.getCommunityPostFromWeb.mockImplementationOnce(
+      (_id: string, abort: AbortSignal) => {
+        signal = abort
+        return read.promise
+      }
+    )
+    let refreshing!: Promise<void>
+    act(() => {
+      refreshing = hook.result.current.refreshItem('a')
+    })
+    act(() => hook.result.current.reset())
+    expect(signal?.aborted).toBe(true)
+    lib.getCommunitySpotlightFromWeb.mockResolvedValueOnce(
+      page([item('a', 1), item('b', 2)])
+    )
+    await act(() => hook.result.current.retry())
+    expect(hook.result.current.state.status).toBe('ready')
+    return { ...hook, read, refreshing: () => refreshing }
+  }
+
+  it('6.6-WEB-067 a reset aborts an in-flight refresh, whose late not found never evicts the reloaded post', async () => {
+    const { result, read, refreshing } = await refreshAcrossReset()
+    await act(async () => {
+      read.reject({ reason: 'not_found' })
+      await refreshing()
+    })
+    expect(result.current.state.items.map((entry) => entry.id)).toEqual(['a', 'b'])
+  })
+
+  it('6.6-WEB-068 a refresh answered after a reset is ignored, even for a post no longer published', async () => {
+    const { result, read, refreshing } = await refreshAcrossReset()
+    await act(async () => {
+      read.resolve({ id: 'a', status: 'withdrawn' })
+      await refreshing()
+    })
+    expect(result.current.state.items.map((entry) => entry.id)).toEqual(['a', 'b'])
+  })
+
+  it('6.6-WEB-084 unmounting aborts an in-flight refresh', async () => {
+    const { result, unmount } = await ready()
     const read = deferred<unknown>()
     let signal: AbortSignal | undefined
     lib.getCommunityPostFromWeb.mockImplementationOnce(
@@ -181,28 +227,11 @@ describe('6.6 spotlight single-post refresh', () => {
     act(() => {
       refreshing = result.current.refreshItem('a')
     })
-    act(() => result.current.reset())
-    expect(signal?.aborted).toBe(true)
-    await act(async () => {
-      read.reject({ reason: 'not_found' })
-      await refreshing
-    })
-    expect(result.current.state).toMatchObject({ status: 'idle', items: [] })
-  })
-
-  it('6.6-WEB-068 a refresh answered after its abort is ignored', async () => {
-    const { result, unmount } = await ready()
-    const read = deferred<unknown>()
-    lib.getCommunityPostFromWeb.mockReturnValueOnce(read.promise)
-    let refreshing!: Promise<void>
-    act(() => {
-      refreshing = result.current.refreshItem('a')
-    })
-    const before = result.current.state
+    expect(signal?.aborted).toBe(false)
     unmount()
-    read.resolve({ id: 'a', status: 'withdrawn' })
+    expect(signal?.aborted).toBe(true)
+    read.resolve({ id: 'a', status: 'published' })
     await refreshing
-    expect(result.current.state).toBe(before)
   })
 })
 

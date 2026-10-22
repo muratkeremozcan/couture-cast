@@ -170,7 +170,7 @@ describe('6.6 spotlight eligibility and ranking', () => {
     expect(ids).not.toContain(atEdge)
   })
 
-  it('6.6-INT-009 equal scores and counts order by published_at desc, then id desc', async () => {
+  it('6.6-INT-009 equal scores and counts order by id desc, below a newer post that wins on score', async () => {
     const area = ctx.area('ties')
     const cohort = await ctx.cohort(area)
     const [first, second, third, reactor] = cohort.authorIds as [
@@ -264,6 +264,47 @@ describe('6.6 spotlight eligibility and ranking', () => {
     const reference = rankSpotlightEntries(SPOTLIGHT_TEST_AS_OF, first.rows)
     expect(first.rows.map((row) => row.id)).toEqual(reference.map((row) => row.id))
     expect(first.rows.map((row) => row.id)).toEqual(cohort.expectedOrder)
+  })
+
+  it('6.6-INT-014 equal scores order by non-author reactions desc in SQL and in the pure reference', async () => {
+    const area = ctx.area('reaction-tiebreak')
+    const cohort = await ctx.cohort(area)
+    // 1 / (2 + 2)^1.5 and 8 / (14 + 2)^1.5 are both exactly 0.125. Both the
+    // published_at and the id tiebreak favor the newer post, so only the
+    // reactions term ranks the older one first.
+    const newer = await post(await ctx.member(), area, hoursBeforeAsOf(2), {
+      id: `tie-z-${cohort.area.city}`,
+    })
+    const older = await post(await ctx.member(), area, hoursBeforeAsOf(14), {
+      id: `tie-a-${cohort.area.city}`,
+    })
+    await ctx.react(cohort.authorIds[0]!, newer, 'love')
+    for (let index = 0; index < 8; index += 1)
+      await ctx.react(await ctx.member(), older, 'applause')
+
+    const ranking = await ctx.spotlightRepository.rank(
+      areaComponentsOf(area),
+      'city',
+      SPOTLIGHT_TEST_AS_OF
+    )
+    const row = (id: string) => ranking.rows.find((entry) => entry.id === id)!
+    // Fixture guard: the pair is an exact tie on score, in SQL and in the formula.
+    expect(row(newer)).toMatchObject({ reactions: 1, score: 0.125 })
+    expect(row(older)).toMatchObject({ reactions: 8, score: 0.125 })
+    expect(
+      spotlightScore(1, spotlightAgeHours(SPOTLIGHT_TEST_AS_OF, row(newer).publishedAt))
+    ).toBe(
+      spotlightScore(8, spotlightAgeHours(SPOTLIGHT_TEST_AS_OF, row(older).publishedAt))
+    )
+    const ids = ranking.rows.map((entry) => entry.id)
+    expect(ids.filter((id) => id === newer || id === older)).toEqual([older, newer])
+    expect(ids).toEqual(
+      rankSpotlightEntries(SPOTLIGHT_TEST_AS_OF, ranking.rows).map((entry) => entry.id)
+    )
+
+    const viewer = await ctx.member(area)
+    const served = (await ctx.read(viewer, { limit: 12 })).items.map((item) => item.id)
+    expect(served.filter((id) => id === newer || id === older)).toEqual([older, newer])
   })
 
   it('6.6-INT-013 the windowed partial indexes exist with their visibility predicate', async () => {

@@ -36,6 +36,14 @@ import { isolatedCommunityDatabase } from './isolated-community-database.js'
 export const SPOTLIGHT_TEST_NOW = new Date('2026-10-22T12:00:30.000Z')
 export const SPOTLIGHT_TEST_AS_OF = new Date('2026-10-22T12:00:00.000Z')
 
+/**
+ * A read grant that never lapses during a run. `validUntil` is compared with
+ * `performance.now()` and `expiresAt` is a wall-clock instant. Both are fixed
+ * far in the future, so no live clock decides whether a grant lapsed.
+ */
+export const SPOTLIGHT_TEST_GRANT_EXPIRES_AT = new Date('2099-01-01T00:00:00.000Z')
+export const SPOTLIGHT_TEST_GRANT_VALID_UNTIL = Number.MAX_SAFE_INTEGER
+
 export function hoursBeforeAsOf(hours: number): Date {
   return new Date(SPOTLIGHT_TEST_AS_OF.getTime() - hours * 3_600_000)
 }
@@ -75,8 +83,8 @@ export function spotlightTestContext(label: string) {
     communityReadEvaluation: vi.fn(() =>
       Promise.resolve({
         value: true,
-        expiresAt: new Date(Date.now() + 60_000),
-        validUntil: performance.now() + 60_000,
+        expiresAt: SPOTLIGHT_TEST_GRANT_EXPIRES_AT,
+        validUntil: SPOTLIGHT_TEST_GRANT_VALID_UNTIL,
       })
     ),
   }

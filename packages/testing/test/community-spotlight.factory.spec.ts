@@ -60,11 +60,15 @@ describe('spotlight fixture areas', () => {
     )
   })
 
-  it('throws once every fixture country in the process is taken', () => {
+  it('throws once every fixture country in the process is taken', async () => {
+    // A fresh module instance owns its own counter, so exhausting it here leaves
+    // the statically imported one untouched whatever order the tests run in.
+    vi.resetModules()
+    const fresh = await import('../src/factories/community-spotlight.factory.js')
     let taken = 0
     expect(() => {
       for (;;) {
-        uniqueSpotlightArea(`exhaust-${taken}`)
+        fresh.uniqueSpotlightArea(`exhaust-${taken}`)
         taken += 1
       }
     }).toThrow(/Every fixture country is already taken/)

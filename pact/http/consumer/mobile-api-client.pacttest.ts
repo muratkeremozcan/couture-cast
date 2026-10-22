@@ -120,6 +120,10 @@ import {
   // Story 6.6 City Spotlight and both opened branches.
   verifyCommunitySpotlightInteraction,
   verifyCommunitySpotlightNoneInteraction,
+  verifyCommunityReactionSpotlightInteraction,
+  verifyCommunitySpotlightPageTwoInteraction,
+  verifyCommunitySpotlightInvalidCursorInteraction,
+  verifyCommunitySpotlightDisabledInteraction,
   verifyOpenCommunitySpotlightPostInteraction,
   verifyOpenCommunityFeedPostInteraction,
   verifyCommunityPostInteraction,
@@ -623,6 +627,38 @@ describe('CoutureCastMobile -> CoutureCastApi HTTP contract', () => {
 
   it('reads a spotlight with no eligible cohort', async () => {
     await verifyCommunitySpotlightNoneInteraction(
+      pact,
+      createMobileClientForMockServer,
+      'mobile'
+    )
+  })
+
+  it('reads the negotiated city spotlight with live reactions', async () => {
+    await verifyCommunityReactionSpotlightInteraction(
+      pact,
+      createMobileClientForMockServer,
+      'mobile'
+    )
+  })
+
+  it('reads spotlight page two with the page-one cursor', async () => {
+    await verifyCommunitySpotlightPageTwoInteraction(
+      pact,
+      createMobileClientForMockServer,
+      'mobile'
+    )
+  })
+
+  it('restarts the spotlight on an invalid_cursor refusal', async () => {
+    await verifyCommunitySpotlightInvalidCursorInteraction(
+      pact,
+      createMobileClientForMockServer,
+      'mobile'
+    )
+  })
+
+  it('reads the spotlight refusal while the read rollout is off', async () => {
+    await verifyCommunitySpotlightDisabledInteraction(
       pact,
       createMobileClientForMockServer,
       'mobile'

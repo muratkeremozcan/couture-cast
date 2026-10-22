@@ -20,6 +20,10 @@ import {
   type AnalyticsEventName,
 } from '../src/types/analytics-events'
 import { analyticsPropertySchemas } from '../src/testing/analytics-event-assertions'
+import {
+  COMMUNITY_SPOTLIGHT_MAX_LIMIT,
+  COMMUNITY_SPOTLIGHT_MAX_RANK,
+} from '../src/contracts/http'
 
 const SUBJECT = 'hmac-subject-1'
 
@@ -312,7 +316,7 @@ const namesOf = (source: Record<string, unknown>): string[] =>
     .sort()
 
 describe('6.6 spotlight event bounds', () => {
-  it('6.6-CON-002 refuses ranks and item counts outside the spotlight caps', () => {
+  it('6.6-CON-002 refuses fractional ranks and ranks or item counts outside the caps', () => {
     for (const rank of [0, 61])
       expect(() =>
         trackCommunitySpotlightOpened({
@@ -332,6 +336,41 @@ describe('6.6 spotlight event bounds', () => {
         itemCount: 13,
       })
     ).toThrow()
+    expect(() =>
+      trackCommunitySpotlightOpened({
+        analyticsSubjectId: SUBJECT,
+        platform: 'web',
+        dedupeKey: 'k',
+        level: 'city',
+        rank: 1.5,
+      })
+    ).toThrow()
+  })
+
+  it('6.6-CON-003 accepts the first and last rank and an empty or full page', () => {
+    for (const rank of [1, COMMUNITY_SPOTLIGHT_MAX_RANK])
+      expect(
+        trackCommunitySpotlightOpened({
+          analyticsSubjectId: SUBJECT,
+          platform: 'web',
+          dedupeKey: 'k',
+          level: 'country',
+          rank,
+        }).properties
+      ).toEqual({ platform: 'web', dedupe_key: 'k', level: 'country', rank })
+    for (const [level, itemCount] of [
+      ['none', 0],
+      ['city', COMMUNITY_SPOTLIGHT_MAX_LIMIT],
+    ] as const)
+      expect(
+        trackCommunitySpotlightViewed({
+          analyticsSubjectId: SUBJECT,
+          platform: 'mobile',
+          dedupeKey: 'k',
+          level,
+          itemCount,
+        }).properties
+      ).toEqual({ platform: 'mobile', dedupe_key: 'k', level, item_count: itemCount })
   })
 })
 

@@ -16,11 +16,19 @@ import { CommunityService } from '../src/modules/community/community.service.js'
 import { CommunitySpotlightService } from '../src/modules/community/community-spotlight.service.js'
 import { communitySubjectToken } from '../src/modules/community/community-analytics.js'
 import { listenHttpApp } from './helpers/loopback-http-app.js'
-import { spotlightTestContext } from './helpers/community-spotlight-context.js'
+import {
+  SPOTLIGHT_TEST_GRANT_VALID_UNTIL,
+  spotlightTestContext,
+} from './helpers/community-spotlight-context.js'
 
 const ctx = spotlightTestContext('http')
 let app: INestApplication
 let url: string
+
+/** A `teen:` token resolves to a teen identity; every other token is an adult. */
+const TEEN_TOKEN_PREFIX = 'teen:'
+/** Teens whose guardian consent check refuses access. */
+const teensWithoutAccess = new Set<string>()
 
 const as = (userId: string) => ({
   authorization: `Bearer ${userId}`,
@@ -35,13 +43,20 @@ beforeAll(async () => {
       { provide: CommunitySpotlightService, useValue: ctx.service },
       {
         provide: GuardianConsentStateService,
-        useValue: { canTeenAccess: () => Promise.resolve(true) },
+        useValue: {
+          canTeenAccess: (userId: string) =>
+            Promise.resolve(!teensWithoutAccess.has(userId)),
+        },
       },
       {
         provide: AccessTokenIdentityService,
         useValue: {
           resolveIdentity: (token: string) =>
-            Promise.resolve({ userId: token, role: 'adult' }),
+            Promise.resolve(
+              token.startsWith(TEEN_TOKEN_PREFIX)
+                ? { userId: token.slice(TEEN_TOKEN_PREFIX.length), role: 'teen' }
+                : { userId: token, role: 'adult' }
+            ),
         },
       },
     ],
@@ -109,8 +124,8 @@ describe('6.6 spotlight HTTP route', () => {
     ctx.analytics.splice(0)
     const denied = {
       value: false,
-      expiresAt: new Date(),
-      validUntil: performance.now() + 60_000,
+      expiresAt: new Date(0),
+      validUntil: SPOTLIGHT_TEST_GRANT_VALID_UNTIL,
     }
     ctx.flags.communityReadEvaluation.mockResolvedValueOnce(denied)
     const feed = await request(url).get('/api/v1/community/feed').set(as(viewer))
@@ -122,6 +137,26 @@ describe('6.6 spotlight HTTP route', () => {
     expect(spotlight.status).toBe(feed.status)
     expect(spotlight.body).toEqual(feed.body)
     expect(ctx.analytics).toEqual([])
+  })
+
+  it('6.6-HTTP-005 a teen without guardian consent is refused exactly like the feed', async () => {
+    const { area } = await seeded('teen', 5)
+    const teen = await ctx.member(area)
+    teensWithoutAccess.add(teen)
+    ctx.analytics.splice(0)
+    try {
+      const token = `${TEEN_TOKEN_PREFIX}${teen}`
+      const feed = await request(url).get('/api/v1/community/feed').set(as(token))
+      const spotlight = await request(url)
+        .get('/api/v1/community/spotlight')
+        .set(as(token))
+      expect(feed.status).toBe(403)
+      expect(spotlight.status).toBe(feed.status)
+      expect(spotlight.body).toEqual(feed.body)
+      expect(ctx.analytics).toEqual([])
+    } finally {
+      teensWithoutAccess.delete(teen)
+    }
   })
 })
 
@@ -233,9 +268,17 @@ describe('6.6 spotlight analytics', () => {
   it('6.6-HTTP-012 refuses a bad rank, a bad or missing level, a mixed body and a hidden post', async () => {
     const { viewer, cohort } = await seeded('opened-bad', 5)
     const postId = cohort.expectedOrder[0]!
+    const hiddenId = cohort.expectedOrder[1]!
+    const open = (post: string, body: object) =>
+      request(url)
+        .post(`/api/v1/community/posts/${post}/opened`)
+        .set(as(viewer))
+        .send(body)
+    ctx.analytics.splice(0)
     for (const body of [
       { surface: 'spotlight', rank: 0, level: 'city' },
       { surface: 'spotlight', rank: 61, level: 'city' },
+      { surface: 'spotlight', rank: 2.5, level: 'city' },
       { surface: 'spotlight', level: 'city' },
       { surface: 'spotlight', rank: 1 },
       { surface: 'spotlight', rank: 1, level: 'none' },
@@ -244,16 +287,24 @@ describe('6.6 spotlight analytics', () => {
       { experimentVariant: 'auto', level: 'city' },
       {},
     ])
-      await request(url)
-        .post(`/api/v1/community/posts/${postId}/opened`)
-        .set(as(viewer))
-        .send(body)
-        .expect(400)
-    await request(url)
-      .post('/api/v1/community/posts/missing-post/opened')
-      .set(as(viewer))
-      .send({ surface: 'spotlight', rank: 1, level: 'city' })
-      .expect(404)
+      await open(postId, body).expect(400)
+    expect(ctx.analytics).toEqual([])
+
+    // A withdrawn post answers like a missing one, and neither records an open.
+    await ctx.prisma.lookbookPost.update({
+      where: { id: hiddenId },
+      data: { status: 'withdrawn' },
+    })
+    await open(hiddenId, { surface: 'spotlight', rank: 2, level: 'city' }).expect(404)
+    await open('missing-post', { surface: 'spotlight', rank: 1, level: 'city' }).expect(
+      404
+    )
+    expect(ctx.analytics).toEqual([])
+
+    // Both rank boundaries are accepted: 60 is the snapshot cap.
+    for (const rank of [1, 60])
+      await open(postId, { surface: 'spotlight', rank, level: 'city' }).expect(200)
+    expect(ctx.analytics.map((event) => event.properties!.rank)).toEqual([1, 60])
   })
 
   it('6.6-HTTP-014 records the served level from the body and runs no cohort query on open', async () => {

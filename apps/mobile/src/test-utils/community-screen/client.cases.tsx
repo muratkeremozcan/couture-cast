@@ -222,6 +222,7 @@ export function registerCommunityClientCases() {
   })
 
   it('6.6-MOB-008 refuses a spotlight page that drifts from the strict contract', async () => {
+    let drift = true
     server.use(
       http.get('*/api/v1/community/spotlight', () =>
         HttpResponse.json({
@@ -230,14 +231,24 @@ export function registerCommunityClientCases() {
             label: 'Lisbon',
             items: [],
             nextCursor: null,
-            cohort: 5,
+            ...(drift ? { cohort: 5 } : {}),
           },
         })
       )
     )
-    await expect(getCommunitySpotlightFromMobile()).rejects.toBeInstanceOf(
-      CommunityRequestError
+    // A parse refusal is a client-side failure: no server status, no disabled state.
+    const failure: unknown = await getCommunitySpotlightFromMobile().catch(
+      (error: unknown) => error
     )
+    expect(failure).toBeInstanceOf(CommunityRequestError)
+    expect(failure).toMatchObject({ reason: 'unknown', httpStatus: undefined })
+    // Control: the same page without the extra key parses, so the key alone refused it.
+    drift = false
+    await expect(getCommunitySpotlightFromMobile()).resolves.toMatchObject({
+      level: 'city',
+      label: 'Lisbon',
+      items: [],
+    })
   })
 
   it('6.6-MOB-009 retries the spotlight and the feed once after a gate unavailable 503', async () => {

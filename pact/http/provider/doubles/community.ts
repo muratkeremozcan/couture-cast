@@ -3,17 +3,20 @@
 import type { CommunityService } from '../../../../apps/api/src/modules/community/community.service'
 import type { CommunitySpotlightService } from '../../../../apps/api/src/modules/community/community-spotlight.service'
 import { CommunityRateLimitException } from '../../../../apps/api/src/modules/community/community-rate-limit.exception'
+import { decodeSpotlightCursor } from '../../../../apps/api/src/modules/community/community-spotlight-cursor'
 import {
   COMMUNITY_REACTION_CONFLICT_MESSAGE,
   COMMUNITY_REACTION_RATE_LIMITED_MESSAGE,
   COMMUNITY_CHALLENGE_OVERLAP_MESSAGE,
   COMMUNITY_CONSENT_SUSPENDED_MESSAGE,
+  COMMUNITY_FEED_DISABLED_MESSAGE,
   COMMUNITY_IDEMPOTENCY_MISMATCH_MESSAGE,
   COMMUNITY_POST_NOT_FOUND_MESSAGE,
   COMMUNITY_POST_RATE_LIMITED_MESSAGE,
   COMMUNITY_REPORT_REASON_CHANGED_MESSAGE,
   COMMUNITY_SELF_REPORT_MESSAGE,
   COMMUNITY_UPLOAD_SESSION_MISMATCH_MESSAGE,
+  communityServedSpotlightLevelSchema,
   encodeCommunityFeedCursor,
   safeDecodeCommunityFeedCursor,
   type ClimateBand,
@@ -24,6 +27,7 @@ import {
   type CommunityFeed,
   type CommunityFeedItem,
   type CommunitySpotlight,
+  type CommunityReactionSpotlight,
 } from '@couture/api-client/contracts/http'
 import {
   BadRequestException,
@@ -81,6 +85,7 @@ const VIEWER_BAND = 'temperate_dry' as const
 /** Story 6.6, mirrored from `interactions/community/spotlight.ts`. */
 const SPOTLIGHT_LABEL = 'Lisbon'
 const SPOTLIGHT_NEXT_CURSOR = 'spotlight-cursor-6600-page-two'
+const SPOTLIGHT_PAGE_TWO_RANK = 7
 const LOCALE = 'en-US'
 
 /**
@@ -510,23 +515,75 @@ export function createCommunityDoubles() {
   } as unknown as CommunityService
 
   /** Story 6.6: the City Spotlight service, one page per provider scenario. */
+  const spotlightItem = (rank: number, reactions: boolean) => ({
+    ...buildPublishedItem(),
+    rank,
+    ...(reactions ? { reactions: currentReactionSummary() } : {}),
+  })
   const mockCommunitySpotlightService = {
-    getSpotlight: (params: { limit: number }): Promise<CommunitySpotlight> =>
-      scenarioOf() === 'spotlight-none'
-        ? Promise.resolve({ level: 'none', label: null, items: [], nextCursor: null })
-        : Promise.resolve({
+    getSpotlight: (params: {
+      userId: string
+      cursor?: string
+      limit: number
+      reactions?: boolean
+    }): Promise<CommunitySpotlight | CommunityReactionSpotlight> => {
+      const scenario = scenarioOf()
+      // The shared read gate's refusal, byte for byte: CommunityService.readAuthorized.
+      if (scenario === 'spotlight-disabled')
+        return Promise.reject(
+          new ForbiddenException({
+            statusCode: 403,
+            code: 'denied',
+            message: COMMUNITY_FEED_DISABLED_MESSAGE,
+          })
+        )
+      const reactions = params.reactions === true
+      if (params.cursor) {
+        if (scenario === 'spotlight-page-two' && params.cursor === SPOTLIGHT_NEXT_CURSOR)
+          return Promise.resolve({
             level: 'city',
             label: SPOTLIGHT_LABEL,
-            items: [{ ...buildPublishedItem(), rank: 1 }].slice(0, params.limit),
-            nextCursor: SPOTLIGHT_NEXT_CURSOR,
-          }),
+            items: [spotlightItem(SPOTLIGHT_PAGE_TWO_RANK, reactions)],
+            nextCursor: null,
+          })
+        // Any other cursor is the real codec's decision, so its refusal is the
+        // API's own invalid_cursor envelope.
+        try {
+          decodeSpotlightCursor(params.cursor, params.userId)
+        } catch (error: unknown) {
+          return Promise.reject(error instanceof Error ? error : new Error(String(error)))
+        }
+        return Promise.reject(new Error('An unexpected spotlight cursor was accepted'))
+      }
+      if (scenario === 'spotlight-none')
+        return Promise.resolve({
+          level: 'none',
+          label: null,
+          items: [],
+          nextCursor: null,
+        })
+      return Promise.resolve({
+        level: 'city',
+        label: SPOTLIGHT_LABEL,
+        items: [spotlightItem(1, reactions)].slice(0, params.limit),
+        nextCursor: SPOTLIGHT_NEXT_CURSOR,
+      })
+    },
+    /**
+     * The spotlight branch of the opened endpoint. It refuses a body that lost
+     * its served level, its rank or the post id, so a controller that drops one
+     * fails verification.
+     */
     recordOpened: (params: {
+      postId: string
       rank: number
-      level: string
+      level: unknown
     }): Promise<{ tracked: true }> =>
-      Number.isInteger(params.rank) && params.level !== 'none'
+      params.postId === PUBLISHED_POST_ID &&
+      Number.isInteger(params.rank) &&
+      communityServedSpotlightLevelSchema.safeParse(params.level).success
         ? Promise.resolve({ tracked: true })
-        : Promise.reject(new Error('A feed open reached the spotlight path')),
+        : Promise.reject(new Error('A spotlight open reached the double incomplete')),
   } as unknown as CommunitySpotlightService
 
   return { mockCommunityService, mockCommunitySpotlightService }

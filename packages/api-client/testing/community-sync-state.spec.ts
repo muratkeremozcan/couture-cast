@@ -46,6 +46,8 @@ function setup() {
 afterEach(() => {
   vi.useRealTimers()
   vi.clearAllMocks()
+  // The Math.random spies would otherwise pin jitter for every later test.
+  vi.restoreAllMocks()
 })
 /** Feeds availability through the clients' D3 verification, as both screens do. */
 function verified(callbacks: CommunitySyncCallbacks, state: CommunitySyncState) {

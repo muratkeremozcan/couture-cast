@@ -3,7 +3,7 @@
 import { item, feedJson, imageEvents, serveFeed } from './harness'
 import { CommunitySyncState } from '@couture/api-client'
 import { act, screen, waitFor } from '@testing-library/react'
-import { delay, http, HttpResponse } from 'msw'
+import { http, HttpResponse } from 'msw'
 import { render } from 'vitest-browser-react'
 import { expect, it, vi } from 'vitest'
 import {
@@ -202,7 +202,11 @@ export function registerCommunitySpotlightReviewCases() {
       () => expect(resolveIdentity.mock.calls.length).toBeGreaterThanOrEqual(2),
       { timeout: 4000 }
     )
-    await delay(100)
+    // One more failed sync cycle runs to completion before the negative checks.
+    const seen = resolveIdentity.mock.calls.length
+    await waitFor(() => expect(resolveIdentity.mock.calls.length).toBeGreaterThan(seen), {
+      timeout: 4000,
+    })
     expect(screen.queryByTestId('community-spotlight')).toBeNull()
     expect(reads.count).toBe(0)
 

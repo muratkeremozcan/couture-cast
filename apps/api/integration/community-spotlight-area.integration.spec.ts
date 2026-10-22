@@ -4,6 +4,7 @@ import { randomUUID } from 'node:crypto'
 import { describe, expect, it, vi } from 'vitest'
 import { buildLookbookPostCreateInput, createLookbookPost } from '@couture/testing'
 import { CommunityMaintenanceService } from '../src/modules/community/community-maintenance.service.js'
+import { areaComponentsOf } from '../src/modules/community/community-spotlight-area.js'
 import { InMemoryCommunityStorage } from '../src/modules/community/community-storage.fake.js'
 import { GuardianService } from '../src/modules/guardian/guardian.service.js'
 import {
@@ -170,23 +171,38 @@ describe('6.6 area stamping', () => {
 })
 
 describe('6.6 area clearing', () => {
+  /**
+   * A published post stamped the way submission stamps it, with the exact
+   * stored components it must keep: the country's ISO code, region and city
+   * folded to lowercase.
+   */
   async function publishedInArea(author: string) {
     const area = ctx.area(randomUUID())
+    const stamped = areaComponentsOf(area)
     const fixture = createLookbookPost({
       userId: author,
       publishedAt: hoursBeforeAsOf(1),
       locationKey: 'legacy-key',
-      areaCountry: area.country,
-      areaRegion: area.region.toLowerCase(),
-      areaCity: area.city.toLowerCase(),
+      areaCountry: stamped.country,
+      areaRegion: stamped.region,
+      areaCity: stamped.city,
     })
     await ctx.prisma.lookbookPost.create({ data: buildLookbookPostCreateInput(fixture) })
-    return fixture.id
+    const expected = {
+      area_country: stamped.country,
+      area_region: stamped.region,
+      area_city: stamped.city,
+    }
+    // Fixture guard: the folding really happened, so a kept value is the stamp.
+    expect(expected.area_country).toMatch(/^[A-Z]{2}$/)
+    expect(expected.area_region).toBe(area.region.toLowerCase())
+    expect(expected.area_city).toBe(area.city.toLowerCase())
+    return { postId: fixture.id, expected }
   }
 
   it('6.6-INT-053 erasure clears the components in the same update that clears location_key', async () => {
     const author = await ctx.member()
-    const postId = await publishedInArea(author)
+    const { postId } = await publishedInArea(author)
     await ctx.repository.withdrawPostAndRequestErasure(postId, new Date())
     const maintenance = new CommunityMaintenanceService(
       ctx.prisma,
@@ -209,17 +225,14 @@ describe('6.6 area clearing', () => {
 
   it('6.6-INT-054 author withdrawal keeps the components; visibility alone hides the post', async () => {
     const author = await ctx.member()
-    const postId = await publishedInArea(author)
+    const { postId, expected } = await publishedInArea(author)
     await ctx.repository.withdrawPostAndRequestErasure(postId, new Date())
     await expect(
       ctx.prisma.lookbookPost.findUniqueOrThrow({
         where: { id: postId },
-        select: AREA_SELECT,
+        select: { ...AREA_SELECT, status: true },
       })
-    ).resolves.toMatchObject({
-      area_country: expect.any(String) as string,
-      area_city: expect.any(String) as string,
-    })
+    ).resolves.toEqual({ ...expected, location_key: 'legacy-key', status: 'withdrawn' })
   })
 
   it('6.6-INT-055 guardian consent suspension keeps the components on the suspended post', async () => {
@@ -238,7 +251,7 @@ describe('6.6 area clearing', () => {
     await ctx.prisma.guardianConsent.create({
       data: { guardian_id: guardianId, teen_id: teen.id, status: 'granted' },
     })
-    const postId = await publishedInArea(teen.id)
+    const { postId, expected } = await publishedInArea(teen.id)
     const guardian = new GuardianService(
       { capture: vi.fn() },
       ctx.prisma,
@@ -251,9 +264,10 @@ describe('6.6 area clearing', () => {
         where: { id: postId },
         select: { ...AREA_SELECT, status: true },
       })
-    ).resolves.toMatchObject({
+    ).resolves.toEqual({
+      ...expected,
+      location_key: 'legacy-key',
       status: 'consent_suspended',
-      area_country: expect.any(String) as string,
     })
   })
 })

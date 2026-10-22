@@ -41,7 +41,11 @@ describe('6.6 community unavailable retry', () => {
       .mockRejectedValueOnce(second)
     const result = retryOnceWhenCommunityUnavailable(work)
     const settled = expect(result).rejects.toBe(second)
-    await vi.advanceTimersByTimeAsync(COMMUNITY_UNAVAILABLE_MAX_RETRY_SECONDS * 1000)
+    // The advised 45 seconds are capped: no retry one millisecond short of the
+    // cap, the retry exactly at it.
+    await vi.advanceTimersByTimeAsync(COMMUNITY_UNAVAILABLE_MAX_RETRY_SECONDS * 1000 - 1)
+    expect(work).toHaveBeenCalledTimes(1)
+    await vi.advanceTimersByTimeAsync(1)
     await settled
     expect(work).toHaveBeenCalledTimes(2)
     await expect(second.response.json()).resolves.toMatchObject({ code: 'unavailable' })
@@ -59,13 +63,33 @@ describe('6.6 community unavailable retry', () => {
     }
   })
 
-  it('6.6-CON-013 stops waiting when the caller aborts', async () => {
+  it('6.6-CON-013 stops waiting when the caller aborts during the pause', async () => {
+    const controller = new AbortController()
+    const work = vi.fn().mockRejectedValueOnce(unavailable(2))
+    let outcome: unknown = 'pending'
+    void retryOnceWhenCommunityUnavailable(work, controller.signal).then(
+      (value: unknown) => (outcome = { resolved: value }),
+      (error: unknown) => (outcome = error)
+    )
+    await vi.advanceTimersByTimeAsync(1000)
+    expect(work).toHaveBeenCalledTimes(1)
+    controller.abort()
+    // Settled without moving the clock: the abort ends the pause itself.
+    await vi.advanceTimersByTimeAsync(0)
+    expect(outcome).toMatchObject({ name: 'AbortError' })
+    // Past the advised two seconds, the retry still never runs.
+    await vi.advanceTimersByTimeAsync(2000)
+    expect(work).toHaveBeenCalledTimes(1)
+  })
+
+  it('6.6-CON-014 never starts the pause when the caller aborted first', async () => {
     const controller = new AbortController()
     const work = vi.fn().mockRejectedValueOnce(unavailable(2))
     const result = retryOnceWhenCommunityUnavailable(work, controller.signal)
     const settled = expect(result).rejects.toMatchObject({ name: 'AbortError' })
     controller.abort()
     await settled
+    await vi.advanceTimersByTimeAsync(2000)
     expect(work).toHaveBeenCalledTimes(1)
   })
 })

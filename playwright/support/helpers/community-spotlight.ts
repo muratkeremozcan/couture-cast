@@ -30,6 +30,13 @@ export function seededSpotlightCaption(postId: string): string {
 const SPOTLIGHT_WINDOW_MS = 7 * 24 * 60 * 60 * 1000
 
 /**
+ * Restated from the seed: the reactions from other members on each seeded post,
+ * in rank order. A test that leaves a reaction on the shared cohort reorders the
+ * spotlight for every other test, so the guard names that cause first.
+ */
+export const SEEDED_SPOTLIGHT_REACTION_COUNTS = [6, 5, 4, 3, 2, 1, 1]
+
+/**
  * The seeded posts publish relative to the time the seed ran, and the spotlight
  * ranks the last seven days only, so a local database seeded more than a week
  * ago legitimately shows no seeded spotlight.
@@ -39,7 +46,7 @@ export async function assertSeededSpotlight(): Promise<void> {
   try {
     const posts = await db.lookbookPost.findMany({
       where: { id: { in: SEEDED_SPOTLIGHT_POST_IDS } },
-      select: { id: true, published_at: true, caption: true },
+      select: { id: true, user_id: true, published_at: true, caption: true },
     })
     expect(
       posts.map((post) => post.id).sort(),
@@ -47,6 +54,21 @@ export async function assertSeededSpotlight(): Promise<void> {
     ).toEqual([...SEEDED_SPOTLIGHT_POST_IDS].sort())
     for (const post of posts) expect(post.caption).toBe(seededSpotlightCaption(post.id))
     const oldest = Math.min(...posts.map((post) => post.published_at?.getTime() ?? 0))
+    const reactions = await db.communityReaction.findMany({
+      where: { post_id: { in: SEEDED_SPOTLIGHT_POST_IDS }, selection: { not: null } },
+      select: { post_id: true, user_id: true },
+    })
+    const authors = new Map(posts.map((post) => [post.id, post.user_id]))
+    expect(
+      SEEDED_SPOTLIGHT_POST_IDS.map(
+        (postId) =>
+          reactions.filter(
+            (reaction) =>
+              reaction.post_id === postId && reaction.user_id !== authors.get(postId)
+          ).length
+      ),
+      'A test changed a reaction on the shared seeded City Spotlight cohort. Run `npm run db:seed` and keep tests off `seed-spotlight-*` reactions.'
+    ).toEqual(SEEDED_SPOTLIGHT_REACTION_COUNTS)
     expect(
       Date.now() - oldest,
       'The seeded City Spotlight cohort has aged out of the seven-day window. Run `npm run db:seed`.'
