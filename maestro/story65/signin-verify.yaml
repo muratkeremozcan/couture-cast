@@ -6,7 +6,9 @@ appId: ${MAESTRO_APP_ID}
     text: ${MAESTRO_CODE_LABEL}
     index: 1
 - inputText: ${MAESTRO_OTP}
-- hideKeyboard
+# iOS reports a failure when the simulator shows no software keyboard.
+- hideKeyboard:
+    optional: true
 - tapOn: ${MAESTRO_VERIFY}
 # verifyNativeOtp resolves the canonical app account, then the screen returns to settings,
 # which renders the owner's preference controls.

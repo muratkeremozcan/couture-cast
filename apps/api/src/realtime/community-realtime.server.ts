@@ -10,6 +10,7 @@ import {
   type CommunityGrant,
 } from '../modules/community/community-availability.js'
 import type { CommunityStreamRepository } from '../modules/community/community-stream.repository.js'
+import { createBaseLogger } from '../logger/pino.config.js'
 
 export type CommunityRealtimeDependencies = {
   prisma: PrismaClient
@@ -28,6 +29,49 @@ type Connection = {
   privateHead: string
   lastBell: number
   connectedAt: number
+  /** Jittered per socket so one instance's sockets never revalidate in lockstep. */
+  revalidateAfter: number
+}
+/**
+ * Per-socket revalidation interval. Ticks run every second, so a 4 to 7 s interval keeps
+ * every revalidation start within D1's eight seconds while spreading a reconnect herd.
+ */
+const revalidationInterval = () => 4000 + Math.random() * 3000
+/**
+ * Concurrent member authorizations per instance, across handshakes and ticks. Each one is a
+ * pool transaction with a 100 ms acquisition wait; unbounded, a herd of sockets waited past
+ * the 2 s budget and healthy members were told the service was unavailable. Time spent
+ * queued here still counts against each request's own budget.
+ */
+const AUTHORIZATION_CONCURRENCY = 3
+function concurrencyLimit(limit: number) {
+  let active = 0
+  const waiting: (() => void)[] = []
+  return async <T>(work: () => Promise<T>): Promise<T> => {
+    while (active >= limit) await new Promise<void>((resolve) => waiting.push(resolve))
+    active++
+    try {
+      return await work()
+    } finally {
+      active--
+      waiting.shift()?.()
+    }
+  }
+}
+/** Why a check failed, for logs: an error class or code, never an identifier. */
+function failureReason(error: unknown): string {
+  if (error instanceof ForbiddenException) return 'denied'
+  const cause: unknown =
+    error && typeof error === 'object' && 'cause' in error ? error.cause : undefined
+  for (const candidate of [error, cause])
+    if (
+      candidate &&
+      typeof candidate === 'object' &&
+      'code' in candidate &&
+      typeof candidate.code === 'string'
+    )
+      return candidate.code
+  return error instanceof Error ? error.name : 'unknown'
 }
 /**
  * A handshake refused before any identity is verified: a foreign Origin, no bearer, or a
@@ -89,6 +133,8 @@ export function attachCommunityRealtime(
     pingTimeout: 5000,
   })
   const namespace = io.of('/community')
+  const logger = createBaseLogger().child({ feature: 'community-realtime' })
+  const limited = concurrencyLimit(AUTHORIZATION_CONCURRENCY)
   const connections = new Map<Socket, Connection>()
   const authorized = new WeakMap<Socket, Connection>()
   let timer: ReturnType<typeof setTimeout> | undefined
@@ -138,16 +184,18 @@ export function attachCommunityRealtime(
     deps: CommunityRealtimeDependencies,
     member: string,
     budget: CommunityAuthorizationBudget
-  ): Promise<CommunityGrant> => {
-    if (deps.access.authorize) return deps.access.authorize(member, budget)
-    // Explicit injected test adapters retain the existing assert-only interface.
-    await budget.run(() => deps.access.assert(member))
-    return {
-      value: true,
-      expiresAt: new Date(Date.now() + budget.remaining()),
-      validUntil: budget.deadline,
-    }
-  }
+  ): Promise<CommunityGrant> =>
+    limited(async () => {
+      budget.check()
+      if (deps.access.authorize) return deps.access.authorize(member, budget)
+      // Explicit injected test adapters retain the existing assert-only interface.
+      await budget.run(() => deps.access.assert(member))
+      return {
+        value: true,
+        expiresAt: new Date(Date.now() + budget.remaining()),
+        validUntil: budget.deadline,
+      }
+    })
   const tick = async () => {
     if (running || closing) return
     running = true
@@ -164,6 +212,12 @@ export function attachCommunityRealtime(
           .finally(() => {
             assistance = undefined
           })
+      }
+      const failures = new Map<string, number>()
+      const fail = (socket: Socket, error: unknown) => {
+        const reason = failureReason(error)
+        failures.set(reason, (failures.get(reason) ?? 0) + 1)
+        control(socket, error instanceof ForbiddenException ? 'denied' : 'unavailable')
       }
       const checks = new Map<string, Promise<CommunityGrant>>()
       const check = (member: string) => {
@@ -184,15 +238,13 @@ export function attachCommunityRealtime(
             socket.disconnect(true)
             return
           }
-          if (started - state.checkedAt < 4000) return
+          if (started - state.checkedAt < state.revalidateAfter) return
           state.checkedAt = started
+          state.revalidateAfter = revalidationInterval()
           try {
             budget.check(await check(state.member))
           } catch (error) {
-            control(
-              socket,
-              error instanceof ForbiddenException ? 'denied' : 'unavailable'
-            )
+            fail(socket, error)
           }
         })
       )
@@ -214,6 +266,7 @@ export function attachCommunityRealtime(
             return
           try {
             state.checkedAt = started
+            state.revalidateAfter = revalidationInterval()
             const grant = await check(state.member)
             budget.check(grant)
             if (
@@ -228,14 +281,20 @@ export function attachCommunityRealtime(
             state.publicHead = currentPublic
             state.privateHead = currentPrivate
           } catch (error) {
-            control(
-              socket,
-              error instanceof ForbiddenException ? 'denied' : 'unavailable'
-            )
+            fail(socket, error)
           }
         })
       )
-    } catch {
+      if (failures.size)
+        logger.warn(
+          { reasons: Object.fromEntries(failures) },
+          'community_realtime_revalidation_failed'
+        )
+    } catch (error) {
+      logger.error(
+        { reason: failureReason(error), sockets: connections.size },
+        'community_realtime_tick_failed'
+      )
       for (const socket of connections.keys()) control(socket, 'unavailable')
     } finally {
       running = false
@@ -284,6 +343,7 @@ export function attachCommunityRealtime(
         privateHead: key(identity.userId),
         lastBell: 0,
         connectedAt: Date.now(),
+        revalidateAfter: revalidationInterval(),
       } satisfies Connection)
     })()
       .then(() => next())

@@ -20,7 +20,7 @@ import {
   isNonLocalEnvironment,
   resolveApiBaseUrl,
 } from './api-test'
-import { WEB_ACCESS_TOKEN_STORAGE_KEY } from './commerce-session'
+import { seedWebSession } from './commerce-session'
 import { localE2EAccessToken } from './local-e2e-token'
 
 export const COMMUNITY_FEED_PATH = '/api/v1/community/feed'
@@ -434,8 +434,7 @@ async function readModerationEngineVersion(postId: string): Promise<string | nul
  * requests are exposed at all.
  *
  * Context-level, like `commerceTest`: a reload or a second page stays
- * authenticated, and `setExtraHTTPHeaders` covers the Next.js rewrite path where
- * the server proxies through to the API.
+ * authenticated.
  *
  * The account is disposable and the rows it leaves are not: a report row points at
  * a SEEDED post and outlives the account that made it, so the teardown below
@@ -457,13 +456,7 @@ export const communityTest = test.extend<{ communitySession: CommunitySession }>
     )
     const accessToken = communityAccessToken(userId)
 
-    await context.addInitScript(
-      ([storageKey, token]) => {
-        window.sessionStorage.setItem(storageKey as string, token as string)
-      },
-      [WEB_ACCESS_TOKEN_STORAGE_KEY, accessToken]
-    )
-    await context.setExtraHTTPHeaders({ Authorization: `Bearer ${accessToken}` })
+    await seedWebSession(context, accessToken)
 
     await use({ userId, accessToken, apiBaseUrl })
 

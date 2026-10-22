@@ -2323,12 +2323,18 @@ export function CommunityLookbookGrid({
       availability: (state, realtime) => {
         if (!active) return
         comments.setRealtimeHealthy(state === 'connected' && Boolean(realtime))
-        setCommunityAvailable(state === 'connected')
-        if (state === 'connected')
+        // Only an unverifiable or denied member hides content (D3/D9). A reconnecting
+        // socket keeps the feed, drafts and focus while HTTP polling serves them, and
+        // it is not announced as an outage.
+        // 'recovering' changes nothing: shown content stays shown, and content hidden
+        // as unverified stays hidden until a catch-up reports 'connected'.
+        if (state === 'connected') setCommunityAvailable(true)
+        else if (state !== 'recovering') setCommunityAvailable(false)
+        if (state === 'connected' || state === 'recovering')
           setNotice((previous) =>
             previous?.message.key === 'community.realtime.unavailable' ? null : previous
           )
-        else if (state !== 'denied')
+        else if (state === 'unavailable')
           setNotice({ message: { key: 'community.realtime.unavailable' }, tone: 'info' })
         if (state !== 'connected' && state !== 'recovering') {
           feedGenerationRef.current++

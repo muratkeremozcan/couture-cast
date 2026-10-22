@@ -224,7 +224,7 @@ function RootLayoutNav() {
               <Stack.Screen name="modal" options={{ presentation: 'modal' }} />
               <Stack.Screen
                 name="wardrobe-capsules"
-                options={{ title: 'Outfit capsules' }}
+                options={{ title: t('wardrobe.capsules.title') }}
               />
               {/* The native header carries each title; the screens render no second one. */}
               <Stack.Screen

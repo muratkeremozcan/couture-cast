@@ -1,0 +1,14 @@
+# Story 6.5 owner: open the Settings tab. Like maestro/subflows/open-settings.yaml, a tab tap
+# landing during a transition is retried until the settings screen renders.
+appId: ${MAESTRO_APP_ID}
+---
+- retry:
+    maxRetries: 3
+    commands:
+      - tapOn:
+          id: 'tab-settings'
+          retryTapIfNoChange: true
+      - extendedWaitUntil:
+          visible:
+            id: 'settings-screen'
+          timeout: 15000

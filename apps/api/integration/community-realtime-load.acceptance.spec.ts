@@ -51,6 +51,9 @@ const spawn = (file: string, variables: NodeJS.ProcessEnv = {}) => {
   return child
 }
 const sockets: Socket[] = []
+const handshakeErrors: string[] = []
+const socketEvents: string[] = []
+const availabilityAt: { at: number; port: number; payload: unknown }[] = []
 const states: CommunitySyncState[] = []
 let balancer: { server: Server; port: number; target: number; peers: Set<NetSocket> }
 let collector: Awaited<ReturnType<typeof usageCollector>>
@@ -145,6 +148,14 @@ function socketFor(port: number, member: string, bells: Bell[], reconnect: boole
     forceNew: true,
     extraHeaders: { Origin: ORIGIN },
   })
+  socket.on('community:availability', (payload: unknown) => {
+    socketEvents.push(`availability:${JSON.stringify(payload)}`)
+    availabilityAt.push({ at: Date.now(), port, payload })
+  })
+  socket.on('disconnect', (reason: string) => socketEvents.push(`disconnect:${reason}`))
+  socket.on('connect_error', (error: Error & { data?: unknown }) =>
+    handshakeErrors.push(`${error.message}|${JSON.stringify(error.data ?? null)}`)
+  )
   socket.on('community:changed', (payload: unknown) =>
     bells.push({ at: Date.now(), payload })
   )
@@ -155,6 +166,9 @@ function socketFor(port: number, member: string, bells: Bell[], reconnect: boole
 const redisUrl = process.env.STORY65_OWNED_REDIS_URL
 let instanceA: Awaited<ReturnType<typeof api>>
 let instanceB: Awaited<ReturnType<typeof api>>
+// A spare instance takes B's sockets on failover, so no instance exceeds the D10
+// envelope of 100 sockets. Doubling one instance to 200 is a separate overload probe.
+let instanceC: Awaited<ReturnType<typeof api>>
 
 beforeAll(async () => {
   if (!redisUrl)
@@ -163,6 +177,13 @@ beforeAll(async () => {
   const [server] = await prisma.$queryRaw<{ version: number }[]>`
     SELECT current_setting('server_version_num')::integer AS version`
   expect(server?.version).toBeGreaterThanOrEqual(170000)
+  // The API children run the local fixture flag lane, which reads the seeded flag table;
+  // this owned database carries the same seed value local and test environments use.
+  await prisma.featureFlag.upsert({
+    where: { key: 'community_read_enabled' },
+    create: { key: 'community_read_enabled', value: true },
+    update: { value: true },
+  })
   const remote = spawn('community-flag-remote.mjs')
   const flags = readySchema.parse(await remote.event('ready'))
   const recorder = spawn('community-provider-recorder.mjs')
@@ -178,12 +199,14 @@ beforeAll(async () => {
   expect(await runtime.call('start', 'general')).toEqual({ status: 'disabled' })
   instanceA = await api(await freePort(), redisUrl)
   instanceB = await api(await freePort(), redisUrl)
+  instanceC = await api(await freePort(), redisUrl)
   balancer = await startBalancer(instanceB.port)
   collector = await usageCollector(spawn, database.url)
   await collector.track({
     runtime: runtimeReady.pid,
     apiA: instanceA.pid,
     apiB: instanceB.pid,
+    apiC: instanceC.pid,
   })
   evidence.postgres = server?.version
   await collector.start()
@@ -215,7 +238,11 @@ it('rings every socket within 10 s at 20/s plus a burst of 100, at most once a s
       })
     })
   )
-  const actors = await Promise.all(Array.from({ length: 40 }, () => active()))
+  // Every commit is a first reaction by one actor on one post, so each is a genuine
+  // committed invalidation rather than a revision conflict: 70 actors x 20 posts.
+  const actors = await Promise.all(
+    Array.from({ length: Math.ceil((BURST + RATE * SECONDS) / 20) }, () => active())
+  )
   const members = await Promise.all(
     Array.from({ length: 2 * SOCKETS_PER_INSTANCE + FALLBACK_CLIENTS }, () => active())
   )
@@ -240,7 +267,16 @@ it('rings every socket within 10 s at 20/s plus a burst of 100, at most once a s
     () => Promise.resolve(sockets.filter((socket) => socket.connected).length),
     (count) => count === 2 * SOCKETS_PER_INSTANCE,
     30_000
-  )
+  ).catch((error: unknown) => {
+    const reasons = handshakeErrors.reduce<Record<string, number>>((all, reason) => {
+      all[reason] = (all[reason] ?? 0) + 1
+      return all
+    }, {})
+    throw new Error(
+      `${sockets.filter((socket) => socket.connected).length} of ${sockets.length} sockets connected; handshake errors ${JSON.stringify(reasons)}`,
+      { cause: error }
+    )
+  })
 
   // HTTP fallback clients: compiled SDK sync state, realtime unreachable, events via the
   // balancer. Every change callback is a fallback poll that found the commit.
@@ -278,7 +314,7 @@ it('rings every socket within 10 s at 20/s plus a burst of 100, at most once a s
   const commits: { at: number; sequence?: bigint }[] = []
   const commit = async (index: number) => {
     await repository.setReaction({
-      userId: actors[index % actors.length]!.id,
+      userId: actors[Math.floor(index / posts.length)]!.id,
       postId: posts[index % posts.length]!.id,
       platform: 'web',
       input: {
@@ -301,8 +337,8 @@ it('rings every socket within 10 s at 20/s plus a burst of 100, at most once a s
       Array.from({ length: RATE }, (_, index) => commit(BURST + second * RATE + index))
     )
     if (second === SECONDS / 2) {
-      // Instance B dies; the balancer fails over to A for every new connection.
-      balancer.target = instanceA.port
+      // Instance B dies; the balancer fails over to the spare C for every new connection.
+      balancer.target = instanceC.port
       instanceB.child.signal('SIGKILL')
       killedAt = Date.now()
     }
@@ -368,6 +404,15 @@ it('rings every socket within 10 s at 20/s plus a burst of 100, at most once a s
     fallbackMaxMs: sort(fallback),
     bellCounts: { min: Math.min(...bellCounts), max: Math.max(...bellCounts) },
     minimumBellIntervalMs: minimumInterval,
+    availabilityAt,
+    socketEvents: socketEvents.reduce<Record<string, number>>((all, event) => {
+      all[event] = (all[event] ?? 0) + 1
+      return all
+    }, {}),
+    handshakeErrors: handshakeErrors.reduce<Record<string, number>>((all, event) => {
+      all[event] = (all[event] ?? 0) + 1
+      return all
+    }, {}),
   }
 
   expect(commits).toHaveLength(BURST + RATE * SECONDS)

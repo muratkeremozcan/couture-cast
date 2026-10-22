@@ -1,6 +1,8 @@
 # Story 6.5 owner: tap a presented community notification in the OS UI and assert the exact
-# in-app destination. scripts/run-story65-native.mjs presents the notification first (warm,
-# background or cold) and sets MAESTRO_PLATFORM, MAESTRO_EXPECT and MAESTRO_TARGET_ID.
+# in-app destination. Only scripts/run-story65-native.mjs runs this flow: it lives under
+# maestro/story65/ so the standard top-level shard discovery never selects it. The runner
+# presents the notification first (warm, background or cold) and sets MAESTRO_PLATFORM,
+# MAESTRO_EXPECT and MAESTRO_TARGET_ID.
 appId: ${MAESTRO_APP_ID}
 name: 'Story 6.5 community notification OS tap'
 tags:
@@ -10,11 +12,11 @@ tags:
 - runFlow:
     when:
       true: ${MAESTRO_PLATFORM == 'android'}
-    file: story65/android-tap-shade-notification.yaml
+    file: android-tap-shade-notification.yaml
 - runFlow:
     when:
       true: ${MAESTRO_PLATFORM == 'ios'}
-    file: story65/ios-tap-notification.yaml
+    file: ios-tap-notification.yaml
 # A cold tap reloads the dev client; absorb its onboarding sheet without leaving the route.
 - runFlow:
     when:
@@ -26,11 +28,8 @@ tags:
       visible: 'Connected to:'
     commands:
       - tapOn: 'Close'
-- extendedWaitUntil:
-    visible:
-      id: 'community-screen'
-    timeout: 45000
-- assertVisible: ${MAESTRO_COMMUNITY_TITLE}
+# A comment target opens the modal comments sheet, which hides the screen beneath it from
+# the accessibility tree; card and fallback targets stay on the community screen.
 - runFlow:
     when:
       true: ${MAESTRO_EXPECT == 'comment'}
@@ -48,6 +47,9 @@ tags:
           visible:
             id: ${MAESTRO_TARGET_ID}
           timeout: 45000
+      - assertVisible:
+          id: 'community-screen'
+      - assertVisible: ${MAESTRO_COMMUNITY_TITLE}
 - runFlow:
     when:
       true: ${MAESTRO_EXPECT == 'fallback'}
@@ -57,5 +59,7 @@ tags:
             id: 'deep-link-info-banner'
           timeout: 45000
       - assertVisible: ${MAESTRO_INVALID}
+      - assertVisible:
+          id: 'community-screen'
 - takeScreenshot:
     path: destination-${MAESTRO_CASE}

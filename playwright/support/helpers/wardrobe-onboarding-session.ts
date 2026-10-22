@@ -11,6 +11,7 @@ import { expect, test as base } from '../fixtures/merged-fixtures'
 import { resolveEnvironmentConfig } from '../../config/environments'
 import { buildUniqueId, type ApiRequestFixture } from './api-test'
 import { cleanupWardrobeUserTestData } from './user-test-data'
+import { seedWebSession } from './commerce-session'
 import { localE2EAccessToken } from './local-e2e-token'
 
 const environment = resolveEnvironmentConfig('local')
@@ -66,10 +67,7 @@ export async function signUpAndAuthenticate(
   const accessToken = localE2EAccessToken(signupBody.userId)
   cleanupState.accessToken = accessToken
 
-  await page.addInitScript((token) => {
-    window.sessionStorage.setItem('couturecast.access-token', token)
-  }, accessToken)
-  await page.setExtraHTTPHeaders({ Authorization: `Bearer ${accessToken}` })
+  await seedWebSession(page, accessToken)
 
   return accessToken
 }

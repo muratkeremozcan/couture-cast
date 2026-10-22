@@ -29,6 +29,7 @@ import path from 'node:path'
 import { MAESTRO_BIN, MAESTRO_PINNED_VERSION } from './maestro-version.mjs'
 import { resetMobileE2EFlowState } from './lib/mobile-e2e-flow-state.mjs'
 import { runMobileE2EFlow } from './lib/mobile-e2e-flow-retry.mjs'
+import { buildMobileE2EAccessToken } from './lib/mobile-e2e-token.mjs'
 
 const scriptDir = path.dirname(fileURLToPath(import.meta.url))
 const projectRoot = path.resolve(scriptDir, '..')
@@ -1427,42 +1428,6 @@ const resetMobileE2EPerFlowState = async (identity) => {
   } finally {
     await prisma.$disconnect()
   }
-}
-
-/**
- * Marker claim shared with `matchMobileE2EBypass` in
- * `apps/api/src/modules/auth/access-token-identity.service.ts`. Kept in sync by
- * hand: the API must not import a helper that manufactures bearer tokens.
- */
-const MOBILE_E2E_TOKEN_MARKER = 'couturecast-mobile-e2e'
-
-/**
- * Mint the bearer token the app under test runs as.
- *
- * This has to be JWT-*shaped*, not merely something the API accepts. The mobile
- * client derives the signed-in user id by decoding the token's `sub` claim
- * (`resolveOwnerUserId` in `apps/mobile/src/lib/wardrobe.ts`), because in
- * production the token is always a Supabase JWT. The harness used to inject
- * `test-token:guardian:<userId>`, which contains no `.` at all, so `split('.')`
- * yielded no payload segment and the decode threw. Every screen that needs the
- * signed-in user id -- the capsule library, the silhouette editor and the
- * wardrobe onboarding screen -- caught that and rendered "Your session token is
- * malformed. Sign in again." in place of its content. Because those screens
- * reuse one testID across their loading, error and ready states, the error
- * surfaced to Maestro as an element simply "not found" on a screen it had
- * already asserted it was on, which is why it read as six separate selector
- * bugs across six flows.
- *
- * The token is unsigned and is never verified as a JWT. The API matches it
- * through its existing `TEST_ENV`-gated bypass list, keyed on the `e2e` marker
- * claim.
- */
-const buildMobileE2EAccessToken = (userId, role = 'guardian') => {
-  const encodeSegment = (value) =>
-    Buffer.from(JSON.stringify(value), 'utf8').toString('base64url')
-  const header = encodeSegment({ alg: 'none', typ: 'JWT' })
-  const payload = encodeSegment({ sub: userId, role, e2e: MOBILE_E2E_TOKEN_MARKER })
-  return `${header}.${payload}.${MOBILE_E2E_TOKEN_MARKER}`
 }
 
 const setupMobileE2EIdentity = async (apiBaseUrl) => {

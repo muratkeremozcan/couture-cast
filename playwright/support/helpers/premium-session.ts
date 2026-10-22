@@ -17,8 +17,8 @@ import {
   resolveApiBaseUrl,
 } from './api-test'
 import {
-  WEB_ACCESS_TOKEN_STORAGE_KEY,
   commerceAccessToken,
+  seedWebSession,
   signUpCommerceUser,
 } from './commerce-session'
 
@@ -75,15 +75,8 @@ export const premiumSeededTest = test.extend<{
     const accessToken = commerceAccessToken(userId)
 
     // Context-level, not page-level, exactly like `commerceTest`: a reload or a
-    // second page stays authenticated, and `setExtraHTTPHeaders` covers the
-    // Next.js rewrite path where the server proxies to the API.
-    await context.addInitScript(
-      ([storageKey, token]) => {
-        window.sessionStorage.setItem(storageKey as string, token as string)
-      },
-      [WEB_ACCESS_TOKEN_STORAGE_KEY, accessToken]
-    )
-    await context.setExtraHTTPHeaders({ Authorization: `Bearer ${accessToken}` })
+    // second page stays authenticated.
+    await seedWebSession(context, accessToken)
 
     await use({ userId, accessToken, apiBaseUrl })
   },
@@ -115,13 +108,7 @@ export const premiumFreshTest = test.extend<{ premiumFreshSession: PremiumSessio
     )
     const accessToken = commerceAccessToken(userId)
 
-    await context.addInitScript(
-      ([storageKey, token]) => {
-        window.sessionStorage.setItem(storageKey as string, token as string)
-      },
-      [WEB_ACCESS_TOKEN_STORAGE_KEY, accessToken]
-    )
-    await context.setExtraHTTPHeaders({ Authorization: `Bearer ${accessToken}` })
+    await seedWebSession(context, accessToken)
 
     await use({ userId, accessToken, apiBaseUrl })
   },

@@ -69,6 +69,7 @@ function recoveryCoordinator() {
     await sync.catchUp()
   }
   return Object.assign(recover, {
+    sync: () => syncs[0]!,
     unavailable: async () => {
       failed = true
       await recover()
@@ -78,6 +79,41 @@ function recoveryCoordinator() {
 }
 
 export function registerCommunityRealtimeCases() {
+  it('A09 a reconnecting socket keeps the feed while HTTP catch-up serves it', async () => {
+    const recover = recoveryCoordinator()
+    await render(<CommunityScreen />)
+    await screen.findByTestId('community-post-card-post-a')
+    await act(recover)
+    let releaseEvents!: () => void
+    const eventsHeld = new Promise<void>((resolve) => {
+      releaseEvents = resolve
+    })
+    server.use(
+      http.get('*/api/v1/community/events', async () => {
+        await eventsHeld
+        return HttpResponse.json({
+          data: { events: [], nextCursor: 'held', hasMore: false, resyncRequired: false },
+        })
+      })
+    )
+    // foreground() reports 'recovering' and starts a catch-up that is still in flight.
+    const sync = recover.sync()
+    let pending!: Promise<void>
+    await act(() => {
+      sync.foreground()
+      pending = sync.catchUp()
+    })
+    try {
+      // Recovering is not unavailable: the cards, the composer entry and the
+      // new-post control stay usable while polling serves the feed.
+      expect(screen.getByTestId('community-post-card-post-a')).toBeTruthy()
+      expect(screen.getByTestId('community-new-post-button')).toBeTruthy()
+    } finally {
+      releaseEvents()
+      await act(() => pending)
+    }
+    expect(screen.getByTestId('community-post-card-post-a')).toBeTruthy()
+  })
   it('A05 doorbell invalidation releases held pagination ownership and allows another load', async () => {
     const recover = recoveryCoordinator()
     let pages = 0

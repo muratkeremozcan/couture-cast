@@ -3,6 +3,7 @@ import type { ApiRequestFixtureParams } from '@seontechnologies/playwright-utils
 import { interceptNetworkCall } from '@seontechnologies/playwright-utils/intercept-network-call'
 import { expect, test } from '../fixtures/merged-fixtures'
 import { isNonLocalEnvironment } from './api-test'
+import { seedWebSession } from './commerce-session'
 import { localE2EAccessToken } from './local-e2e-token'
 
 /**
@@ -16,8 +17,6 @@ import { localE2EAccessToken } from './local-e2e-token'
  * one the API accepts; no particular token encoding is required.
  */
 export const SEEDED_WARDROBE_OWNER = 'teen-1'
-
-export const WEB_ACCESS_TOKEN_STORAGE_KEY = 'couturecast.access-token'
 
 export type CapsuleSession = {
   ownerUserId: string
@@ -107,13 +106,7 @@ export const capsuleTest = test.extend<{ capsuleSession: CapsuleSession }>({
      */
     const accessToken = localE2EAccessToken(ownerUserId)
 
-    await context.addInitScript(
-      ([storageKey, token]) => {
-        window.sessionStorage.setItem(storageKey as string, token as string)
-      },
-      [WEB_ACCESS_TOKEN_STORAGE_KEY, accessToken]
-    )
-    await context.setExtraHTTPHeaders({ Authorization: `Bearer ${accessToken}` })
+    await seedWebSession(context, accessToken)
 
     await use({ ownerUserId, accessToken })
   },

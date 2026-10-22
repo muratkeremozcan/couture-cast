@@ -100,7 +100,7 @@ function GarmentThumb({
         </div>
       )}
       {garment.category && (
-        <span className="text-[10px] text-[color:var(--theme-card-text)]">
+        <span className="text-[10px] text-neutral-500">
           {t(`commerce.premium.planner.garmentCategory.${garment.category}`)}
         </span>
       )}

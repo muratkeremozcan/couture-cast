@@ -1,19 +1,36 @@
-# Story 6.5 owner: tap the presented iOS notification. A banner shows for a foreground app
-# (the app's handler requests banners) and on the Home Screen; if it has already retracted,
-# Notification Center is opened with an OS edge swipe from the top and the item is tapped.
+# Story 6.5 owner: present and tap an iOS notification. The runner prepares the simctl push;
+# this flow triggers it so the banner appears while the flow is watching.
+# - background: the Home button sends the app to the background first.
+# - background and cold: the banner shows over SpringBoard and is tapped by its text.
+# - warm: the banner shows over the foreground app, where Maestro's iOS hierarchy does not
+#   include it. The flow screenshots the presented banner and taps its on-screen position.
 appId: ${MAESTRO_APP_ID}
 ---
 - runFlow:
     when:
-      notVisible: ${MAESTRO_NOTIFICATION_BODY}
+      true: ${MAESTRO_LIFECYCLE == 'background'}
     commands:
-      - swipe:
-          start: 30%, 0%
-          end: 30%, 70%
-          duration: 500
-- extendedWaitUntil:
-    visible: ${MAESTRO_NOTIFICATION_BODY}
-    timeout: 15000
-- takeScreenshot:
-    path: presented-${MAESTRO_CASE}
-- tapOn: ${MAESTRO_NOTIFICATION_BODY}
+      - pressKey: Home
+      - waitForAnimationToEnd
+- runScript:
+    file: push-trigger.js
+- runFlow:
+    when:
+      true: ${MAESTRO_LIFECYCLE != 'warm'}
+    commands:
+      - extendedWaitUntil:
+          visible: ${MAESTRO_NOTIFICATION_BODY}
+          timeout: 15000
+      - takeScreenshot:
+          path: presented-${MAESTRO_CASE}
+      - tapOn: ${MAESTRO_NOTIFICATION_BODY}
+- runFlow:
+    when:
+      true: ${MAESTRO_LIFECYCLE == 'warm'}
+    commands:
+      - waitForAnimationToEnd:
+          timeout: 1500
+      - takeScreenshot:
+          path: presented-${MAESTRO_CASE}
+      - tapOn:
+          point: 50%, 10%

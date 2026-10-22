@@ -906,7 +906,12 @@ export function CommunityScreen() {
       availability: (state, realtime) => {
         if (!active) return
         comments.setRealtimeHealthy(state === 'connected' && Boolean(realtime))
-        setCommunityAvailable(state === 'connected')
+        // Only an unverifiable or denied member hides content (D3/D9). A reconnecting
+        // socket keeps the feed, drafts and focus while HTTP polling serves them.
+        // 'recovering' changes nothing: shown content stays shown, and content hidden
+        // as unverified stays hidden until a catch-up reports 'connected'.
+        if (state === 'connected') setCommunityAvailable(true)
+        else if (state !== 'recovering') setCommunityAvailable(false)
         if (state !== 'connected' && state !== 'recovering') {
           requestGenerationRef.current++
           detailGenerationRef.current++

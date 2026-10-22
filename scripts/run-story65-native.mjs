@@ -22,7 +22,7 @@
  *   `simctl push`. Both only schedule. The proof is the Maestro tap on the presented OS
  *   notification, followed by the destination assertion.
  */
-import { spawnSync } from 'node:child_process'
+import { spawn, spawnSync } from 'node:child_process'
 import { createHash, randomUUID } from 'node:crypto'
 import fs from 'node:fs'
 import os from 'node:os'
@@ -337,7 +337,9 @@ const simctl = (...rest) => run('xcrun', ['simctl', ...rest])
 
 /** The emulator reaches the owned API, Metro and Auth proxy over loopback reverses. */
 function ensureAndroidReverses() {
-  // An adb transport reset drops reverses, so re-assert the owned ones before each use.
+  // An adb transport reset (the emulator briefly goes offline under host load) drops
+  // reverses, so wait for the device and re-assert the owned ones before each use.
+  run(adbPath, ['-s', device, 'wait-for-device'])
   for (const port of [4077, 8088, 53051]) adb('reverse', `tcp:${port}`, `tcp:${port}`)
 }
 
@@ -354,7 +356,23 @@ function openApp() {
       devClientUrl,
       appId
     )
-  } else simctl('openurl', device, devClientUrl)
+  } else openIosApp()
+}
+
+/**
+ * simctl openurl intermittently fails (LSApplicationWorkspace error 115) right after the
+ * app was terminated; launching the app first and retrying the URL makes it deterministic.
+ */
+function openIosApp() {
+  run('xcrun', ['simctl', 'launch', device, appId], { allowFail: true })
+  for (let attempt = 1; ; attempt++) {
+    const result = run('xcrun', ['simctl', 'openurl', device, devClientUrl], {
+      allowFail: true,
+    })
+    if (result.status === 0) return
+    if (attempt === 3) throw new Error(`simctl openurl failed: ${result.stderr}`)
+    spawnSync('sleep', ['2'])
+  }
 }
 
 function stopApp() {
@@ -391,7 +409,14 @@ async function terminateKeepingNotification() {
 }
 
 function androidNotificationCount() {
-  const out = adb('shell', 'dumpsys', 'notification', '--noredact').stdout
+  // dumpsys can fail transiently while the emulator is loaded; callers poll, so count 0.
+  const out = run(
+    adbPath,
+    ['-s', device, 'shell', 'dumpsys', 'notification', '--noredact'],
+    {
+      allowFail: true,
+    }
+  ).stdout
   return out
     .split('\n')
     .filter(
@@ -441,7 +466,38 @@ async function present(data) {
     aps: { alert: { title: 'CoutureCast', body: notificationBody }, sound: 'default' },
     body: data,
   })
-  simctl('push', device, appId, payload)
+  return startIosPushTrigger(payload)
+}
+
+/**
+ * A one-shot local trigger that delivers the prepared simctl push when the Maestro flow asks
+ * for it (maestro/story65/push-trigger.js), so the banner appears while the flow watches. It
+ * runs as a child process because Maestro runs synchronously in this process.
+ */
+async function startIosPushTrigger(payload) {
+  const source = `
+    const http = require('node:http'), { spawnSync } = require('node:child_process')
+    const [device, appId, payload] = process.argv.slice(1)
+    const server = http.createServer((req, res) => {
+      const result = spawnSync('xcrun', ['simctl', 'push', device, appId, payload])
+      res.writeHead(result.status === 0 ? 200 : 500).end()
+      server.close(() => process.exit(result.status === 0 ? 0 : 1))
+    })
+    server.listen(0, '127.0.0.1', () => console.log(server.address().port))
+    setTimeout(() => process.exit(2), 600000).unref()`
+  const child = spawn(process.execPath, ['-e', source, device, appId, payload], {
+    stdio: ['ignore', 'pipe', 'inherit'],
+  })
+  const port = await new Promise((resolve, reject) => {
+    child.stdout.once('data', (chunk) => resolve(Number(String(chunk).trim())))
+    child.once('exit', (code) => reject(new Error(`push trigger exited ${code}`)))
+  })
+  const delivered = new Promise((resolve, reject) => {
+    child.once('exit', (code) =>
+      code === 0 ? resolve() : reject(new Error(`simctl push trigger exited ${code}`))
+    )
+  })
+  return { url: `http://127.0.0.1:${port}/push`, delivered }
 }
 
 // ---------------------------------------------------------------------------------------
@@ -475,6 +531,7 @@ function localeEnv(locale) {
     MAESTRO_COMMENTS_TITLE: json.community.comments.title,
     MAESTRO_INVALID: json.community.deepLink.invalid,
     MAESTRO_LOCALE: locale,
+    MAESTRO_SWITCH_INDEX: platform === 'android' ? '1' : '0',
   }
 }
 
@@ -586,12 +643,32 @@ async function tap() {
   const label = `${name}-${locale}`
   const target = state().targets[spec.target]
   const data = notificationData(target, { expired: spec.expired })
-  if (platform === 'android') ensureAndroidReverses()
-  if (!appRunning()) openApp()
-  maestro('open-app.yaml', `ready-${label}`, localeEnv(locale))
-  if (spec.lifecycle === 'background') goHome()
-  await present(data)
-  if (spec.lifecycle === 'cold') await terminateKeepingNotification()
+  if (platform === 'android') {
+    ensureAndroidReverses()
+    // Tap cases need presentable notifications; the permission states have their own cases.
+    if (!androidPermissionGranted())
+      adb('shell', 'pm', 'grant', appId, 'android.permission.POST_NOTIFICATIONS')
+  }
+  // Every case starts from a stopped app: force-stop also clears earlier notifications, so
+  // the shade holds exactly this case's notification and never a group summary.
+  stopApp()
+  openApp()
+  maestro('open-app.yaml', `ready-${label}`, localeEnv('en-US'))
+  maestro('set-locale.yaml', `locale-${label}`, localeEnv(locale))
+  let pushed = Promise.resolve()
+  let iosEnv = {}
+  if (platform === 'android') {
+    if (spec.lifecycle === 'background') goHome()
+    await present(data)
+    if (spec.lifecycle === 'cold') await terminateKeepingNotification()
+  } else {
+    // iOS delivers remote pushes to a terminated app, so end it before the push. The flow
+    // itself backgrounds the app and triggers the push.
+    if (spec.lifecycle === 'cold') await terminateKeepingNotification()
+    const trigger = await present(data)
+    pushed = trigger.delivered
+    iosEnv = { MAESTRO_PUSH_URL: trigger.url, MAESTRO_LIFECYCLE: spec.lifecycle }
+  }
   log('presented', {
     case: name,
     lifecycle: spec.lifecycle,
@@ -607,13 +684,15 @@ async function tap() {
             MAESTRO_EXPECT: 'card',
             MAESTRO_TARGET_ID: `highlighted-community-card-${target.cardId}`,
           }
-  maestro('../community-notification-tap.yaml', label, {
+  maestro('community-notification-tap.yaml', label, {
     ...localeEnv(locale),
     ...destination,
+    ...iosEnv,
     MAESTRO_PLATFORM: platform,
     MAESTRO_CASE: label,
     MAESTRO_NOTIFICATION_BODY: notificationBody,
   })
+  await pushed
   captureHierarchy(label)
   const result = {
     case: name,
@@ -654,12 +733,11 @@ function androidPermissionGranted() {
  */
 async function permission() {
   const name = requireArg('case')
-  if (platform !== 'android')
-    throw new Error('iOS permission states use simctl privacy; not wired yet')
   const owner = state().accounts.recipient
   const locale = args.locale ?? 'en-US'
   const label = `permission-${name}-${locale}`
   const n = strings[locale].community.notifications
+  if (platform === 'ios') return iosPermission(name, owner, locale, label, n)
   ensureAndroidReverses()
   const before = await bindings(owner.appUserId)
   if (name === 'denied') {
@@ -717,6 +795,34 @@ async function permission() {
     case: name,
     locale,
     osPermissionGranted: androidPermissionGranted(),
+    bindingsBefore: before,
+    bindingsAfter: after,
+    at: new Date().toISOString(),
+  }
+  writeJson(path.join(evidence, `${label}.json`), result)
+  log('permission', result)
+}
+
+/**
+ * iOS asks once per install, so the granted case runs on a fresh install. The system alert is
+ * answered in the OS UI. Revocation is not scriptable on the simulator.
+ */
+async function iosPermission(name, owner, locale, label, n) {
+  if (!['granted', 'denied'].includes(name))
+    throw new Error(`iOS permission case ${name} is not scriptable`)
+  const before = await bindings(owner.appUserId)
+  maestro('notification-permission.yaml', label, {
+    ...localeEnv(locale),
+    MAESTRO_DIALOG_CHOICE: name === 'granted' ? '^Allow$' : 'Don.t Allow',
+    MAESTRO_EXPECT_TEXT:
+      name === 'granted' ? `${n.saved}|${n.failed}|${n.permission}` : n.permission,
+    MAESTRO_CASE: label,
+  })
+  captureHierarchy(label)
+  const after = await bindings(owner.appUserId)
+  const result = {
+    case: name,
+    locale,
     bindingsBefore: before,
     bindingsAfter: after,
     at: new Date().toISOString(),

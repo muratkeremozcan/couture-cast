@@ -12,7 +12,9 @@ appId: ${MAESTRO_APP_ID}
     text: ${MAESTRO_EMAIL_LABEL}
     index: 1
 - inputText: ${MAESTRO_EMAIL}
-- hideKeyboard
+# iOS reports a failure when the simulator shows no software keyboard.
+- hideKeyboard:
+    optional: true
 - tapOn: ${MAESTRO_SEND}
 - extendedWaitUntil:
     visible: ${MAESTRO_CODE_SENT}
