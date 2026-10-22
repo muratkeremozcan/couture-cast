@@ -28,6 +28,8 @@ import {
 import {
   allocateCommunityPostResponseSchema,
   communityReactionFeedResponseSchema,
+  communityReactionSpotlightResponseSchema,
+  type CommunityReactionSpotlight,
   communityReactionPostResponseSchema,
   communityReactionResponseSchema,
   communityReactionConflictResponseSchema,
@@ -147,6 +149,10 @@ function reasonForResponse(status: number, message: string): CommunityFailureRea
   if (status === 401) return 'signed_out'
   if (status === 403) {
     if (message.includes(COMMUNITY_AGE_GATE_DENIED_MESSAGE)) return 'age_gate'
+    // The read gate the feed and the City Spotlight share refuses a member
+    // outside the read rollout with a 403 carrying the rollout message, so the
+    // screen can render its localized disabled state instead of a generic error.
+    if (message.includes(COMMUNITY_FEED_DISABLED_MESSAGE)) return 'disabled'
     // `community.service.ts` throws the self-report refusal as a
     // `ForbiddenException`, not a conflict. Classifying it under 409 -- which is
     // where the first draft put it -- left `self_report` and its catalog string
@@ -251,6 +257,36 @@ export async function getCommunityFeedFromMobile({
   }
 }
 
+export interface CommunitySpotlightRequest {
+  /** The signed cursor from the previous spotlight page; omitted for page one. */
+  cursor?: string
+  limit?: number
+  signal?: AbortSignal
+}
+
+/**
+ * Story 6.6: one page of the City Spotlight. Reaction summaries are negotiated
+ * exactly like the feed, so a card renders the same live counts in both places.
+ */
+export async function getCommunitySpotlightFromMobile({
+  cursor,
+  limit,
+  signal,
+}: CommunitySpotlightRequest = {}): Promise<CommunityReactionSpotlight> {
+  const accessToken = await readAccessToken()
+  try {
+    const response = await withRequestTimeout(signal, (requestSignal) =>
+      communityClient(accessToken).getCommunitySpotlight(
+        { xCouturePlatform: 'mobile', xCoutureReactions: '1', cursor, limit },
+        { signal: requestSignal }
+      )
+    )
+    return communityReactionSpotlightResponseSchema.parse(response).data
+  } catch (error: unknown) {
+    throw await communityError(error, 'Unable to load the City Spotlight.')
+  }
+}
+
 export async function getCommunityPostFromMobile(
   postId: string,
   signal?: AbortSignal,
@@ -307,6 +343,34 @@ export async function recordCommunityCardOpenedFromMobile(
     openCommunityPostResponseSchema.parse(response)
   } catch (error: unknown) {
     throw await communityError(error, 'Unable to record this card open.')
+  }
+}
+
+/**
+ * Story 6.6: a spotlight card open. It carries the card's snapshot rank and no
+ * experiment arm, and the server records only `community_spotlight_opened`
+ * for it, never the feed's card open.
+ */
+export async function recordCommunitySpotlightOpenedFromMobile(
+  postId: string,
+  rank: number,
+  signal?: AbortSignal
+): Promise<void> {
+  const accessToken = await readAccessToken()
+  try {
+    const response = await withRequestTimeout(signal, (requestSignal) =>
+      communityClient(accessToken).apiV1CommunityPostsPostIdOpenedPost(
+        {
+          postId,
+          xCouturePlatform: 'mobile',
+          openCommunityPostInput: { surface: 'spotlight', rank },
+        },
+        { signal: requestSignal }
+      )
+    )
+    openCommunityPostResponseSchema.parse(response)
+  } catch (error: unknown) {
+    throw await communityError(error, 'Unable to record this spotlight open.')
   }
 }
 

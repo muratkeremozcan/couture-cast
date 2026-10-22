@@ -342,6 +342,7 @@ describe('CommunityRepository constraints', () => {
           climateBand: null,
           locale: 'en-US',
           challengeId: null,
+          area: { country: null, region: null, city: null },
         },
       })
 

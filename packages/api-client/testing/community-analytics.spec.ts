@@ -15,6 +15,8 @@ import {
   trackCommunityPostReported,
   trackCommunityPostSubmitted,
   trackCommunityPostWithdrawn,
+  trackCommunitySpotlightOpened,
+  trackCommunitySpotlightViewed,
   type AnalyticsEventName,
 } from '../src/types/analytics-events'
 import { analyticsPropertySchemas } from '../src/testing/analytics-event-assertions'
@@ -221,6 +223,45 @@ const reactionEventCases: CommunityEventCase[] = (
 })
 communityEventCases.push(...reactionEventCases)
 
+// Story 6.6: the two spotlight events carry only platform, dedupe key, level and
+// an item count or rank.
+communityEventCases.push(
+  {
+    name: 'community_spotlight_viewed',
+    build: () =>
+      trackCommunitySpotlightViewed({
+        analyticsSubjectId: SUBJECT,
+        platform: 'web',
+        dedupeKey: 'community_spotlight_viewed:token:177000',
+        level: 'city',
+        itemCount: 6,
+      }),
+    properties: {
+      platform: 'web',
+      dedupe_key: 'community_spotlight_viewed:token:177000',
+      level: 'city',
+      item_count: 6,
+    },
+  },
+  {
+    name: 'community_spotlight_opened',
+    build: () =>
+      trackCommunitySpotlightOpened({
+        analyticsSubjectId: SUBJECT,
+        platform: 'mobile',
+        dedupeKey: 'community_spotlight_opened:post-token:spotlight',
+        level: 'region',
+        rank: 7,
+      }),
+    properties: {
+      platform: 'mobile',
+      dedupe_key: 'community_spotlight_opened:post-token:spotlight',
+      level: 'region',
+      rank: 7,
+    },
+  }
+)
+
 const COMMUNITY_EVENT_NAMES: CommunityEventName[] = [
   'community_reaction_added',
   'community_reaction_replaced',
@@ -233,6 +274,8 @@ const COMMUNITY_EVENT_NAMES: CommunityEventName[] = [
   'community_post_reported',
   'community_post_withdrawn',
   'community_challenge_participated',
+  'community_spotlight_viewed',
+  'community_spotlight_opened',
 ]
 
 /**
@@ -249,6 +292,9 @@ const SENSITIVE_FIELDS: Record<string, Record<string, unknown>> = {
   object_path: { object_path: 'community/user-123/post-1.jpg' },
   post_id: { post_id: 'post-1' },
   moderation_reason: { moderation_reason: 'failed_image_screen' },
+  area_label: { label: 'Lisbon' },
+  area_names: { city: 'lisbon', region: 'lisboa', country: 'pt' },
+  area_hash: { area_hash: 'a'.repeat(64) },
 }
 
 const withoutKey = (
@@ -264,6 +310,30 @@ const namesOf = (source: Record<string, unknown>): string[] =>
   Object.keys(source)
     .filter((key) => key.startsWith('community_'))
     .sort()
+
+describe('6.6 spotlight event bounds', () => {
+  it('6.6-CON-002 refuses ranks and item counts outside the spotlight caps', () => {
+    for (const rank of [0, 61])
+      expect(() =>
+        trackCommunitySpotlightOpened({
+          analyticsSubjectId: SUBJECT,
+          platform: 'web',
+          dedupeKey: 'k',
+          level: 'city',
+          rank,
+        })
+      ).toThrow()
+    expect(() =>
+      trackCommunitySpotlightViewed({
+        analyticsSubjectId: SUBJECT,
+        platform: 'web',
+        dedupeKey: 'k',
+        level: 'none',
+        itemCount: 13,
+      })
+    ).toThrow()
+  })
+})
 
 describe('6.1 community analytics event wrappers', () => {
   describe.each(communityEventCases)('$name', ({ name, build, properties }) => {

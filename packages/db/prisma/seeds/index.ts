@@ -11,6 +11,7 @@ import {
 import { seedFeatureFlags } from './feature-flags.js'
 import { unwrapCjsNamespace } from './interop.js'
 import { seedRituals } from './rituals.js'
+import { seedCommunitySpotlight } from './community-spotlight.js'
 import { seedUsers } from './users.js'
 import { seedWardrobeItems } from './wardrobe.js'
 import { seedWeather } from './weather.js'
@@ -25,6 +26,8 @@ async function main() {
   const garments = await seedWardrobeItems(prisma, users.teens)
   const weather = await seedWeather(prisma)
   await seedRituals(prisma, users.teens, garments, weather)
+  // Story 6.6: relative to this run's own clock, unlike the feed seed above.
+  await seedCommunitySpotlight(prisma)
   await seedFeatureFlags(prisma)
   // Story 5.1 decision 14. Self-guarded: a no-op outside non-production, so it
   // is safe to call unconditionally here.

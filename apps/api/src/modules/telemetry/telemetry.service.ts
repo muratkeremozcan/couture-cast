@@ -25,6 +25,8 @@ import {
   trackPremiumPlannerDayReshuffled,
   trackCommunityFeedViewed,
   trackCommunityCardOpened,
+  trackCommunitySpotlightOpened,
+  trackCommunitySpotlightViewed,
   trackCommunityPostAllocated,
   trackCommunityPostSubmitted,
   trackCommunityPostPublished,
@@ -45,6 +47,8 @@ import {
   premiumPlannerDayReshuffledEventSchema,
   communityFeedViewedEventSchema,
   communityCardOpenedEventSchema,
+  communitySpotlightOpenedEventSchema,
+  communitySpotlightViewedEventSchema,
   communityPostAllocatedEventSchema,
   communityPostSubmittedEventSchema,
   communityPostPublishedEventSchema,
@@ -66,6 +70,8 @@ import {
   type PremiumPlannerDayReshuffledEvent,
   type CommunityFeedViewedEvent,
   type CommunityCardOpenedEvent,
+  type CommunitySpotlightOpenedEvent,
+  type CommunitySpotlightViewedEvent,
   type CommunityPostAllocatedEvent,
   type CommunityPostSubmittedEvent,
   type CommunityPostPublishedEvent,
@@ -243,6 +249,9 @@ export interface TelemetryPropertiesMap {
     CommunityChallengeParticipatedEvent,
     'analyticsSubjectId'
   >
+  /** Story 6.6. Closed properties only: platform, dedupe key, level, count or rank. */
+  community_spotlight_viewed: Omit<CommunitySpotlightViewedEvent, 'analyticsSubjectId'>
+  community_spotlight_opened: Omit<CommunitySpotlightOpenedEvent, 'analyticsSubjectId'>
 }
 
 /**
@@ -300,6 +309,14 @@ const communityFeedViewedInputSchema = communityFeedViewedEventSchema
   .strict()
 
 const communityCardOpenedInputSchema = communityCardOpenedEventSchema
+  .omit({ analyticsSubjectId: true })
+  .strict()
+
+const communitySpotlightViewedInputSchema = communitySpotlightViewedEventSchema
+  .omit({ analyticsSubjectId: true })
+  .strict()
+
+const communitySpotlightOpenedInputSchema = communitySpotlightOpenedEventSchema
   .omit({ analyticsSubjectId: true })
   .strict()
 
@@ -372,6 +389,8 @@ const telemetryValidators: Record<keyof TelemetryPropertiesMap, z.ZodSchema> = {
   community_post_reported: communityPostReportedInputSchema,
   community_post_withdrawn: communityPostWithdrawnInputSchema,
   community_challenge_participated: communityChallengeParticipatedInputSchema,
+  community_spotlight_viewed: communitySpotlightViewedInputSchema,
+  community_spotlight_opened: communitySpotlightOpenedInputSchema,
 }
 
 export function requireAnalyticsIdSecret(): string {
@@ -832,6 +851,36 @@ function buildCommunityCardOpened(
   })
 }
 
+function buildCommunitySpotlightViewed(
+  userId: string | null,
+  props: Record<string, unknown>,
+  analyticsIdSecret: string
+): PostHogPayload {
+  const rawUserId = getString(userId)
+  if (!rawUserId) {
+    throw new Error('Community telemetry requires an authenticated user')
+  }
+  return trackCommunitySpotlightViewed({
+    ...communitySpotlightViewedInputSchema.parse(props),
+    analyticsSubjectId: buildAnalyticsSubjectId(rawUserId, analyticsIdSecret),
+  })
+}
+
+function buildCommunitySpotlightOpened(
+  userId: string | null,
+  props: Record<string, unknown>,
+  analyticsIdSecret: string
+): PostHogPayload {
+  const rawUserId = getString(userId)
+  if (!rawUserId) {
+    throw new Error('Community telemetry requires an authenticated user')
+  }
+  return trackCommunitySpotlightOpened({
+    ...communitySpotlightOpenedInputSchema.parse(props),
+    analyticsSubjectId: buildAnalyticsSubjectId(rawUserId, analyticsIdSecret),
+  })
+}
+
 function buildCommunityPostAllocated(
   userId: string | null,
   props: Record<string, unknown>,
@@ -967,6 +1016,8 @@ const PSEUDONYMOUS_EVENT_TYPES: ReadonlySet<AnalyticsEventName> = new Set([
   'community_post_reported',
   'community_post_withdrawn',
   'community_challenge_participated',
+  'community_spotlight_viewed',
+  'community_spotlight_opened',
 ])
 
 const pseudonymousEventBuilders: Partial<
@@ -1000,6 +1051,8 @@ const pseudonymousEventBuilders: Partial<
   community_post_reported: buildCommunityPostReported,
   community_post_withdrawn: buildCommunityPostWithdrawn,
   community_challenge_participated: buildCommunityChallengeParticipated,
+  community_spotlight_viewed: buildCommunitySpotlightViewed,
+  community_spotlight_opened: buildCommunitySpotlightOpened,
 }
 
 const eventBuilders: Partial<

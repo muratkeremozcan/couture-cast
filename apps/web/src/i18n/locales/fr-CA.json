@@ -464,6 +464,25 @@
       "yourPostsTitle": "Vos looks en cours",
       "yourPostsBody": "Vous êtes la seule personne à les voir tant que la vérification n’est pas terminée."
     },
+    "spotlight": {
+      "eyebrow": "Vedettes de la ville",
+      "heading": "Vedettes à {{area}}",
+      "headingFallback": "Vedettes de la ville",
+      "intro": "Les looks remarquables près de chez vous cette semaine.",
+      "rank": "Rang {{rank}}",
+      "loading": "Chargement des vedettes de la ville",
+      "emptyTitle": "Aucune vedette près de chez vous pour l'instant",
+      "emptyBody": "Quand assez de membres près de chez vous partageront des looks, les plus aimés de la semaine apparaîtront ici.",
+      "disabled": "Les vedettes de la ville sont temporairement indisponibles.",
+      "error": "Impossible de charger les vedettes de la ville.",
+      "retry": "Réessayer",
+      "viewMore": "Voir plus",
+      "loadingMore": "Chargement d'autres looks",
+      "announceLoadedMore": "{{count}} looks vedettes de plus chargés.",
+      "announceLoadedMore_one": "{{count}} look vedette de plus chargé.",
+      "announceLoadedMore_other": "{{count}} looks vedettes de plus chargés.",
+      "announceRefreshed": "Les vedettes de la ville ont été actualisées selon le classement le plus récent."
+    },
     "card": {
       "label": "Look de {{author}}",
       "authorSelf": "Vous",

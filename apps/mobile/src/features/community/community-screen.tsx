@@ -31,6 +31,7 @@ import {
   getCommunityFeedFromMobile,
   getCommunityPostFromMobile,
   recordCommunityCardOpenedFromMobile,
+  recordCommunitySpotlightOpenedFromMobile,
   reportCommunityPostFromMobile,
   withdrawCommunityPostFromMobile,
 } from '@/src/lib/community'
@@ -66,6 +67,7 @@ import {
   type CommunityExperimentVariant,
   type CommunityReactionFeedItem as CommunityFeedItem,
   type CommunityFeedMode,
+  type CommunityReactionSpotlightItem,
   type CommunityReportReason,
   type EmbeddedCommunityChallenge,
 } from '@couture/api-client/contracts/http'
@@ -77,6 +79,12 @@ import { CommunityFilterChips } from '@/components/community/community-filter-ch
 import { CommunityChallengeBanner } from '@/components/community/community-challenge-banner'
 import { CommunityCard } from '@/components/community/community-card'
 import { CommunityReportModal } from '@/components/community/community-report-modal'
+import { CommunitySpotlightModule } from '@/components/community/community-spotlight-module'
+import { CommunitySpotlightDetail } from '@/components/community/community-spotlight-detail'
+import {
+  useCommunitySpotlight,
+  type CommunitySpotlightView,
+} from '@/src/features/community/use-community-spotlight'
 import {
   CommunityPostSheet,
   communityErrorTranslation,
@@ -204,8 +212,13 @@ export function CommunityScreen() {
   const realtimeItems = useRef(items)
   realtimeItems.current = items
   const realtimeOpenPost = useRef<string | null>(null)
+  // Story 6.6: spotlight copies reconcile through the same reaction owner.
+  const spotlightReactionRef = useRef<
+    CommunitySpotlightView['applyReactionChange'] | null
+  >(null)
   const handleReactionChange = useCallback(
     (postId: string, summary: CommunityReactionSummary | null | undefined) => {
+      spotlightReactionRef.current?.(postId, summary)
       const update = (post: CommunityFeedItem | null): CommunityFeedItem | null => {
         if (!post || post.id !== postId) return post
         if (summary === null) return null
@@ -274,6 +287,16 @@ export function CommunityScreen() {
     reactionState.getVersion,
     reactionState.getVersion
   )
+  const spotlight = useCommunitySpotlight({ sessionScope, reactionState })
+  spotlightReactionRef.current = spotlight.applyReactionChange
+  const [spotlightDetail, setSpotlightDetail] =
+    useState<CommunityReactionSpotlightItem | null>(null)
+  const spotlightRankRefs = useRef(new Map<string, View | null>())
+  const spotlightCommentsButtonRefs = useRef(new Map<string, View | null>())
+  /** Where focus returns when a report opened from the spotlight closes. */
+  const spotlightReturnRef = useRef<View | null>(null)
+  /** A report or comments action chosen inside the detail, run once it has closed. */
+  const pendingSpotlightActionRef = useRef<(() => void) | null>(null)
   const highlightedTargetRef = useRef<string | null>(null)
   const detailGenerationRef = useRef(0)
   const notificationIntentRef = useRef(0)
@@ -758,6 +781,8 @@ export function CommunityScreen() {
       setCommentsPostId(null)
       setCommentTarget(undefined)
       setReportingPost(null)
+      setSpotlightDetail(null)
+      pendingSpotlightActionRef.current = null
       setReportedPostIds(new Set())
       setIsSubmittingReport(false)
       setIsPostSheetVisible(false)
@@ -1025,9 +1050,11 @@ export function CommunityScreen() {
     setServedMode(next)
   }, [])
 
+  const reloadSpotlight = spotlight.reload
   const handleRefresh = useCallback(() => {
     void loadFeed(mode, { refresh: true })
-  }, [loadFeed, mode])
+    reloadSpotlight()
+  }, [loadFeed, mode, reloadSpotlight])
 
   const handleRetry = useCallback(() => {
     void loadFeed(mode)
@@ -1057,6 +1084,51 @@ export function CommunityScreen() {
     [experimentVariant]
   )
 
+  /**
+   * Story 6.6: a spotlight open records only the spotlight event with the
+   * card's rank, then opens the detail. The feed's card open never fires here.
+   */
+  const handleOpenSpotlight = useCallback((post: CommunityReactionSpotlightItem) => {
+    void recordCommunitySpotlightOpenedFromMobile(post.id, post.rank).catch(
+      () => undefined
+    )
+    setSpotlightDetail(post)
+  }, [])
+
+  // A look that left the spotlight (hidden, erased or the member changed) cannot
+  // stay open in its detail.
+  const spotlightItems = spotlight.items
+  useEffect(() => {
+    if (spotlightDetail && !spotlightItems.some((post) => post.id === spotlightDetail.id))
+      setSpotlightDetail(null)
+  }, [spotlightDetail, spotlightItems])
+
+  const registerSpotlightRank = useCallback((postId: string, node: View | null) => {
+    spotlightRankRefs.current.set(postId, node)
+  }, [])
+
+  const runPendingSpotlightAction = useCallback(() => {
+    const action = pendingSpotlightActionRef.current
+    pendingSpotlightActionRef.current = null
+    action?.()
+  }, [])
+
+  const closeSpotlightDetail = useCallback(
+    (action?: () => void) => {
+      const closing = spotlightDetail
+      setSpotlightDetail(null)
+      if (action) {
+        pendingSpotlightActionRef.current = action
+        // iOS cannot present a second modal while this one is still leaving, so
+        // the action waits for its dismissal there; other platforms run it now.
+        if (Platform.OS !== 'ios') runPendingSpotlightAction()
+        return
+      }
+      if (closing) focusNode(spotlightRankRefs.current.get(closing.id) ?? null)
+    },
+    [focusNode, runPendingSpotlightAction, spotlightDetail]
+  )
+
   const markReported = useCallback((postId: string) => {
     setReportedPostIds((previous) => new Set(previous).add(postId))
   }, [])
@@ -1070,7 +1142,11 @@ export function CommunityScreen() {
     const invokerId = reportingPost?.id
     setReportingPost(null)
     setReportError(null)
-    if (invokerId) {
+    const spotlightReturn = spotlightReturnRef.current
+    spotlightReturnRef.current = null
+    if (spotlightReturn) {
+      focusNode(spotlightReturn)
+    } else if (invokerId) {
       focusNode(cardRefs.current.get(invokerId) ?? null)
     }
   }, [focusNode, reportingPost])
@@ -1354,6 +1430,52 @@ export function CommunityScreen() {
     )
   }
 
+  /**
+   * The spotlight reuses the feed card with every control. Inside the detail,
+   * comments and report first close the sheet and return focus to the card's
+   * rank in the module when they finish.
+   */
+  const renderSpotlightCard = (
+    post: CommunityReactionSpotlightItem,
+    inDetail: boolean
+  ) => {
+    const viaDetail = (action: () => void) =>
+      inDetail ? closeSpotlightDetail(action) : action()
+    return (
+      <CommunityCard
+        onComments={(target) =>
+          viaDetail(() => {
+            notificationIntentRef.current++
+            commentsInvokerRef.current =
+              spotlightCommentsButtonRefs.current.get(target.id) ??
+              spotlightRankRefs.current.get(target.id) ??
+              null
+            setCommentsPostId(target.id)
+          })
+        }
+        commentsButtonRef={
+          inDetail
+            ? undefined
+            : (node) => {
+                spotlightCommentsButtonRefs.current.set(post.id, node)
+              }
+        }
+        reactionControls={reactionState.controls(post.id)}
+        item={reactionState.current(post)}
+        isReported={reportedPostIds.has(post.id)}
+        onReport={(target) =>
+          viaDetail(() => {
+            spotlightReturnRef.current = spotlightRankRefs.current.get(target.id) ?? null
+            handleReportPost(target)
+          })
+        }
+        onWithdraw={handleWithdrawPost}
+        onImageExpiry={handleImageExpiry}
+        onOpen={inDetail ? undefined : () => handleOpenSpotlight(post)}
+      />
+    )
+  }
+
   const renderHeaderComponent = () => (
     <View>
       {bannerMessage ? (
@@ -1421,6 +1543,22 @@ export function CommunityScreen() {
             onOpen={handleOpenCard}
           />
         </View>
+      ) : null}
+      {communityAvailable ? (
+        <CommunitySpotlightModule
+          status={spotlight.status}
+          level={spotlight.level}
+          label={spotlight.label}
+          items={spotlight.items}
+          hasMore={spotlight.hasMore}
+          isLoadingMore={spotlight.isLoadingMore}
+          loadMoreFailed={spotlight.loadMoreFailed}
+          lastAppend={spotlight.lastAppend}
+          onRetry={spotlight.reload}
+          onViewMore={spotlight.loadMore}
+          renderCard={(post) => renderSpotlightCard(post, false)}
+          registerRank={registerSpotlightRank}
+        />
       ) : null}
       {activeChallenge && (
         <CommunityChallengeBanner
@@ -1570,15 +1708,29 @@ export function CommunityScreen() {
           const feed = commentsPostId
             ? (commentsButtonRefs.current.get(commentsPostId) ?? null)
             : null
+          const spotlightInvoker = commentsPostId
+            ? (spotlightCommentsButtonRefs.current.get(commentsPostId) ??
+              spotlightRankRefs.current.get(commentsPostId) ??
+              null)
+            : null
           const original = commentsInvokerRef.current
           const target =
-            original && (original === highlighted || original === feed)
+            original &&
+            (original === highlighted ||
+              original === feed ||
+              original === spotlightInvoker)
               ? original
               : (highlighted ?? feed)
           const node = safeFindNodeHandle(target)
           setCommentsPostId(null)
           if (node) AccessibilityInfo.setAccessibilityFocus(node)
         }}
+      />
+      <CommunitySpotlightDetail
+        item={communityAvailable ? spotlightDetail : null}
+        onClose={() => closeSpotlightDetail()}
+        onDismissed={runPendingSpotlightAction}
+        renderCard={(post) => renderSpotlightCard(post, true)}
       />
       <CommunityPostSheet
         key={sessionScope ?? 'anonymous'}

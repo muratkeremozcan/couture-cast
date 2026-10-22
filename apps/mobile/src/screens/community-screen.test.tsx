@@ -90,6 +90,7 @@ import { registerCommunityReactionsCases } from '../test-utils/community-screen/
 import { registerCommunityRealtimeCases } from '../test-utils/community-screen/realtime.cases'
 import { registerCommunityNotificationRecoveryCases } from '../test-utils/community-screen/notification-recovery.cases'
 import { registerCommunityClientCases } from '../test-utils/community-screen/client.cases'
+import { registerCommunitySpotlightCases } from '../test-utils/community-screen/spotlight.cases'
 import { configure } from '@testing-library/react'
 import { delay } from 'msw'
 import { afterAll, afterEach, beforeAll, beforeEach, describe, vi } from 'vitest'
@@ -155,6 +156,7 @@ describe('Mobile community screen (Story 6.1)', () => {
   registerCommunityReactionsCases()
   registerCommunityRealtimeCases()
   registerCommunityNotificationRecoveryCases()
+  registerCommunitySpotlightCases()
 })
 
 /**

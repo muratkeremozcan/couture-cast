@@ -15,6 +15,7 @@ describe('CommunityRepository publishing and erasure', () => {
       climateBand: 'temperate_dry' as const,
       locale: 'en-US',
       challengeId: null,
+      area: { country: null, region: null, city: null },
     }
 
     it('takes the per-user advisory lock before counting, inside one transaction', async () => {
@@ -140,6 +141,9 @@ describe('CommunityRepository publishing and erasure', () => {
           climate_band: 'temperate_dry',
           locale: 'en-US',
           challenge_id: null,
+          area_country: null,
+          area_region: null,
+          area_city: null,
           submitted_at: expect.any(Date) as Date,
           alt_text_confirmed_at: expect.any(Date) as Date,
         },

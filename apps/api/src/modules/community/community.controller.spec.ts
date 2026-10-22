@@ -13,6 +13,7 @@ import type { RequestAuthContext } from '../auth/security.types'
 import { CommunityRateLimitException } from './community-rate-limit.exception'
 import { CommunityController } from './community.controller'
 import type { CommunityService } from './community.service'
+import type { CommunitySpotlightService } from './community-spotlight.service'
 
 /**
  * The write endpoints take the response object so a rolling-window refusal can
@@ -122,7 +123,13 @@ describe('CommunityController', () => {
       updateChallenge,
     } as unknown as CommunityService
 
-    const controller = new CommunityController(communityService)
+    // A spotlight double that fails loudly: none of these feed tests may reach it.
+    const spotlightService = {
+      getSpotlight: vi.fn().mockRejectedValue(new Error('unexpected spotlight read')),
+      recordOpened: vi.fn().mockRejectedValue(new Error('unexpected spotlight open')),
+    } as unknown as CommunitySpotlightService
+
+    const controller = new CommunityController(communityService, spotlightService)
     return {
       controller,
       setReaction,

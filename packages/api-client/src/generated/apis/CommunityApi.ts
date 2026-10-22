@@ -24,6 +24,7 @@ import type {
   CommunityReactionResponse,
   CreateCommunityChallengeInput,
   CreateCommunityCommentInput,
+  GetCommunitySpotlight200Response,
   OpenCommunityPostInput,
   PublishCommunityPostInput,
   PublishCommunityPostResponse,
@@ -123,6 +124,13 @@ export interface GetCommunityCommentSubmissionsRequest {
 export interface GetCommunityCommentsRequest {
   postId: string
   xCouturePlatform: GetCommunityCommentsXCouturePlatformEnum
+  cursor?: string
+  limit?: number
+}
+
+export interface GetCommunitySpotlightRequest {
+  xCouturePlatform: GetCommunitySpotlightXCouturePlatformEnum
+  xCoutureReactions?: GetCommunitySpotlightXCoutureReactionsEnum
   cursor?: string
   limit?: number
 }
@@ -619,7 +627,7 @@ export class CommunityApi extends runtime.BaseAPI {
   }
 
   /**
-   * Records one card-open. The server decides whether the opener is the author, because a client-asserted is-self flag would let the beta gate be moved by the population it measures. Repeats within the deduplication window collapse to one event.
+   * Records one card-open. The server decides whether the opener is the author, because a client-asserted is-self flag would let the beta gate be moved by the population it measures. Repeats within the deduplication window collapse to one event. A body with surface spotlight and a rank records only a spotlight open; a body without surface keeps the feed card-open behavior.
    * Record that a viewer opened a community post
    */
   async apiV1CommunityPostsPostIdOpenedPostRaw(
@@ -634,7 +642,7 @@ export class CommunityApi extends runtime.BaseAPI {
   }
 
   /**
-   * Records one card-open. The server decides whether the opener is the author, because a client-asserted is-self flag would let the beta gate be moved by the population it measures. Repeats within the deduplication window collapse to one event.
+   * Records one card-open. The server decides whether the opener is the author, because a client-asserted is-self flag would let the beta gate be moved by the population it measures. Repeats within the deduplication window collapse to one event. A body with surface spotlight and a rank records only a spotlight open; a body without surface keeps the feed card-open behavior.
    * Record that a viewer opened a community post
    */
   async apiV1CommunityPostsPostIdOpenedPost(
@@ -1464,6 +1472,88 @@ export class CommunityApi extends runtime.BaseAPI {
   }
 
   /**
+   * Creates request options for getCommunitySpotlight without sending the request
+   */
+  async getCommunitySpotlightRequestOpts(
+    requestParameters: GetCommunitySpotlightRequest
+  ): Promise<runtime.RequestOpts> {
+    if (requestParameters['xCouturePlatform'] == null) {
+      throw new runtime.RequiredError(
+        'xCouturePlatform',
+        'Required parameter "xCouturePlatform" was null or undefined when calling getCommunitySpotlight().'
+      )
+    }
+
+    const queryParameters: any = {}
+
+    if (requestParameters['cursor'] != null) {
+      queryParameters['cursor'] = requestParameters['cursor']
+    }
+
+    if (requestParameters['limit'] != null) {
+      queryParameters['limit'] = requestParameters['limit']
+    }
+
+    const headerParameters: runtime.HTTPHeaders = {}
+
+    if (requestParameters['xCoutureReactions'] != null) {
+      headerParameters['x-couture-reactions'] = String(
+        requestParameters['xCoutureReactions']
+      )
+    }
+
+    if (requestParameters['xCouturePlatform'] != null) {
+      headerParameters['x-couture-platform'] = String(
+        requestParameters['xCouturePlatform']
+      )
+    }
+
+    if (this.configuration && this.configuration.accessToken) {
+      const token = this.configuration.accessToken
+      const tokenString = await token('bearerAuth', [])
+
+      if (tokenString) {
+        headerParameters['Authorization'] = `Bearer ${tokenString}`
+      }
+    }
+
+    let urlPath = `/api/v1/community/spotlight`
+
+    return {
+      path: urlPath,
+      method: 'GET',
+      headers: headerParameters,
+      query: queryParameters,
+    }
+  }
+
+  /**
+   * Returns recent published looks from the viewer’s coarse area ranked by non-author reactions and recency. The narrowest of city, region and country with at least five distinct eligible authors is used; otherwise level is none with no items. Read authorization and rollout rules match the feed.
+   * Read the City Spotlight for the viewer area
+   */
+  async getCommunitySpotlightRaw(
+    requestParameters: GetCommunitySpotlightRequest,
+    initOverrides?: RequestInit | runtime.InitOverrideFunction
+  ): Promise<runtime.ApiResponse<GetCommunitySpotlight200Response>> {
+    const requestOptions = await this.getCommunitySpotlightRequestOpts(requestParameters)
+    const response = await this.request(requestOptions, initOverrides)
+
+    return new runtime.JSONApiResponse(response)
+  }
+
+  /**
+   * Returns recent published looks from the viewer’s coarse area ranked by non-author reactions and recency. The narrowest of city, region and country with at least five distinct eligible authors is used; otherwise level is none with no items. Read authorization and rollout rules match the feed.
+   * Read the City Spotlight for the viewer area
+   */
+  async getCommunitySpotlight(
+    requestParameters: GetCommunitySpotlightRequest,
+    initOverrides?: RequestInit | runtime.InitOverrideFunction
+  ): Promise<GetCommunitySpotlight200Response> {
+    const response = await this.getCommunitySpotlightRaw(requestParameters, initOverrides)
+    return await response.value()
+  }
+
+  /**
    * Creates request options for reportCommunityComment without sending the request
    */
   async reportCommunityCommentRequestOpts(
@@ -1713,6 +1803,23 @@ export const GetCommunityCommentsXCouturePlatformEnum = {
 } as const
 export type GetCommunityCommentsXCouturePlatformEnum =
   (typeof GetCommunityCommentsXCouturePlatformEnum)[keyof typeof GetCommunityCommentsXCouturePlatformEnum]
+/**
+ * @export
+ */
+export const GetCommunitySpotlightXCouturePlatformEnum = {
+  web: 'web',
+  mobile: 'mobile',
+} as const
+export type GetCommunitySpotlightXCouturePlatformEnum =
+  (typeof GetCommunitySpotlightXCouturePlatformEnum)[keyof typeof GetCommunitySpotlightXCouturePlatformEnum]
+/**
+ * @export
+ */
+export const GetCommunitySpotlightXCoutureReactionsEnum = {
+  _1: '1',
+} as const
+export type GetCommunitySpotlightXCoutureReactionsEnum =
+  (typeof GetCommunitySpotlightXCoutureReactionsEnum)[keyof typeof GetCommunitySpotlightXCoutureReactionsEnum]
 /**
  * @export
  */

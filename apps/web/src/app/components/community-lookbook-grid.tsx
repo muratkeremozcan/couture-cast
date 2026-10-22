@@ -55,6 +55,7 @@ import {
   getCommunityPostFromWeb,
   hasWebSession,
   openCommunityPostFromWeb,
+  openCommunitySpotlightPostFromWeb,
   publishCommunityLookFromWeb,
   reportCommunityPostFromWeb,
   withdrawCommunityPostFromWeb,
@@ -62,6 +63,11 @@ import {
 } from '../../lib/community'
 import { resolveWebApiBaseUrl } from '../../lib/api-client'
 import { CommunityReactions } from './community-reactions'
+import {
+  CommunitySpotlightSection,
+  SPOTLIGHT_CARD_SCOPE,
+  useCommunitySpotlight,
+} from './community-spotlight'
 
 import React, {
   useCallback,
@@ -89,6 +95,7 @@ import {
   type CommunityReactionSummary,
   type CommunityReactionFeed as CommunityFeed,
   type CommunityReactionFeedItem as CommunityFeedItem,
+  type CommunityReactionSpotlightItem as CommunitySpotlightItem,
   type CommunityFeedMode,
   type CommunityReportReason,
   type EmbeddedCommunityChallenge,
@@ -544,6 +551,8 @@ function WeeklyChallengeBanner({
 // ---------------------------------------------------------------------------
 
 interface LookbookCardImageSurfaceProps {
+  /** Prefix for every id and test id, so a spotlight copy never collides with the feed copy. */
+  scope: string
   item: CommunityFeedItem
   isFailedImage: boolean
   isSponsored: boolean
@@ -554,6 +563,7 @@ interface LookbookCardImageSurfaceProps {
 }
 
 function LookbookCardImageSurface({
+  scope,
   item,
   isFailedImage,
   isSponsored,
@@ -567,12 +577,12 @@ function LookbookCardImageSurface({
 
   return (
     <div
-      data-testid={`lookbook-image-${item.id}`}
+      data-testid={`${scope}lookbook-image-${item.id}`}
       className="relative flex h-64 w-full items-center justify-center overflow-hidden bg-[var(--theme-card-bg)]"
     >
       {isFailedImage ? (
         <div
-          data-testid={`image-unavailable-${item.id}`}
+          data-testid={`${scope}image-unavailable-${item.id}`}
           className="absolute inset-0 flex flex-col items-center justify-center gap-2 bg-[var(--theme-card-bg)] p-4 text-center"
         >
           <span className="text-xs font-medium text-neutral-600">
@@ -580,7 +590,7 @@ function LookbookCardImageSurface({
           </span>
           <button
             type="button"
-            data-testid={`image-retry-button-${item.id}`}
+            data-testid={`${scope}image-retry-button-${item.id}`}
             onClick={() => {
               onImageRetry(item)
             }}
@@ -614,7 +624,7 @@ function LookbookCardImageSurface({
       {!isFailedImage && (
         <button
           type="button"
-          data-testid={`lookbook-open-${item.id}`}
+          data-testid={`${scope}lookbook-open-${item.id}`}
           aria-label={t('community.card.openLabel', { author: authorName })}
           onClick={() => {
             onOpen(item)
@@ -638,14 +648,14 @@ function LookbookCardImageSurface({
          * would place them, so the second badge had nothing real to show.
          */}
         <span
-          data-testid={`climate-badge-${item.id}`}
+          data-testid={`${scope}climate-badge-${item.id}`}
           className="lookbook-metrics rounded-md bg-[#C9A14A] px-2.5 py-1 text-[10px] font-semibold uppercase text-[#111111]"
         >
           {bandLabel(item.climateBand, t)}
         </span>
         {item.status !== 'published' && (
           <span
-            data-testid={`status-badge-${item.id}`}
+            data-testid={`${scope}status-badge-${item.id}`}
             className="lookbook-metrics rounded-md border border-[color:var(--theme-card-border)] bg-white/95 px-2 py-0.5 text-[9px] font-medium uppercase text-[color:var(--theme-card-text)]"
           >
             {t(`community.status.${item.status}`)}
@@ -653,7 +663,7 @@ function LookbookCardImageSurface({
         )}
         {isSponsored && (
           <span
-            data-testid={`sponsored-badge-${item.id}`}
+            data-testid={`${scope}sponsored-badge-${item.id}`}
             className="lookbook-metrics rounded-md border border-[color:var(--theme-secondary)] bg-white/95 px-2 py-0.5 text-[9px] font-semibold uppercase text-[color:var(--theme-card-text)]"
           >
             <span aria-hidden="true">{t('community.card.sponsored')}</span>
@@ -666,6 +676,7 @@ function LookbookCardImageSurface({
 }
 
 interface LookbookCardContentProps {
+  scope: string
   reactionControls: ReactionControls
   item: CommunityFeedItem
   isReported: boolean
@@ -682,6 +693,7 @@ interface LookbookCardContentProps {
  * offered a self-report the server answers with 403.
  */
 function LookbookCardContent({
+  scope,
   reactionControls,
   item,
   isReported,
@@ -695,11 +707,11 @@ function LookbookCardContent({
   return (
     <div className="flex flex-1 flex-col justify-between gap-3 p-5">
       <div className="space-y-2">
-        <h3 id={`lookbook-card-title-${item.id}`} className="sr-only">
+        <h3 id={`${scope}lookbook-card-title-${item.id}`} className="sr-only">
           {t('community.card.label', { author: authorName })}
         </h3>
         <span
-          data-testid={`author-name-${item.id}`}
+          data-testid={`${scope}author-name-${item.id}`}
           className="lookbook-metrics block text-xs font-semibold text-[color:var(--theme-card-text)]"
         >
           {authorName}
@@ -707,7 +719,7 @@ function LookbookCardContent({
 
         {item.caption && (
           <p
-            data-testid={`caption-${item.id}`}
+            data-testid={`${scope}caption-${item.id}`}
             className="text-xs leading-relaxed text-neutral-600 line-clamp-3"
           >
             {item.caption}
@@ -715,13 +727,15 @@ function LookbookCardContent({
         )}
       </div>
 
-      {canAct && <CommunityReactions item={item} controls={reactionControls} />}
+      {canAct && (
+        <CommunityReactions item={item} controls={reactionControls} scope={scope} />
+      )}
       {canAct && (
         <div className="flex items-center gap-3 border-t border-[color:var(--theme-card-border)] pt-3 text-xs">
           {item.author.isSelf ? (
             <button
               type="button"
-              data-testid={`withdraw-button-${item.id}`}
+              data-testid={`${scope}withdraw-button-${item.id}`}
               onClick={() => {
                 onWithdraw(item.id)
               }}
@@ -733,7 +747,7 @@ function LookbookCardContent({
           ) : (
             <button
               type="button"
-              data-testid={`report-button-${item.id}`}
+              data-testid={`${scope}report-button-${item.id}`}
               disabled={isReported}
               onClick={() => {
                 onReport(item.id)
@@ -754,6 +768,8 @@ function LookbookCardContent({
 }
 
 interface LookbookCardProps {
+  /** Empty for the feed; `spotlight-` for the City Spotlight's copy of a post. */
+  scope?: string
   onComments: (item: CommunityFeedItem) => void
   reactionControls: ReactionControls
   item: CommunityFeedItem
@@ -771,6 +787,7 @@ interface LookbookCardProps {
 }
 
 function LookbookCard({
+  scope = '',
   onComments,
   reactionControls,
   item,
@@ -789,10 +806,10 @@ function LookbookCard({
   return (
     <article
       data-focus-surface="light"
-      id={`lookbook-card-${item.id}`}
-      data-testid={`lookbook-card-${item.id}`}
+      id={`${scope}lookbook-card-${item.id}`}
+      data-testid={`${scope}lookbook-card-${item.id}`}
       tabIndex={-1}
-      aria-labelledby={`lookbook-card-title-${item.id}`}
+      aria-labelledby={`${scope}lookbook-card-title-${item.id}`}
       data-highlighted={isHighlighted ? 'true' : 'false'}
       className={`flex flex-col overflow-hidden rounded-[8px] border bg-[var(--theme-card-bg)] text-[color:var(--theme-card-text)] shadow-sm motion-safe:transition-[border-color,box-shadow] motion-safe:duration-300 motion-reduce:transition-none focus-visible:outline focus-visible:outline-2 focus-visible:outline-[color:var(--theme-secondary)] ${
         isHighlighted
@@ -801,6 +818,7 @@ function LookbookCard({
       }`}
     >
       <LookbookCardImageSurface
+        scope={scope}
         item={item}
         isFailedImage={isFailedImage}
         isSponsored={isSponsored}
@@ -812,12 +830,13 @@ function LookbookCard({
       <button
         type="button"
         className="min-h-[44px] px-5 text-left text-sm font-medium focus-visible:outline focus-visible:outline-2 focus-visible:outline-[color:var(--theme-secondary)]"
-        data-testid={`comments-button-${item.id}`}
+        data-testid={`${scope}comments-button-${item.id}`}
         onClick={() => onComments(item)}
       >
         {t('community.comments.title')}
       </button>
       <LookbookCardContent
+        scope={scope}
         reactionControls={reactionControls}
         item={item}
         isReported={isReported}
@@ -1845,6 +1864,11 @@ export function CommunityLookbookGrid({
   const openedItemRef = useRef(openedItem)
   openedItemRef.current = openedItem
   const reactionAnnouncementId = useRef(0)
+  // Set once the spotlight hook exists below; reaction updates reach its copies too.
+  const spotlightApplyRef = useRef<
+    | ((update: (post: CommunityFeedItem | null) => CommunityFeedItem | null) => void)
+    | null
+  >(null)
   const handleReactionChange = useCallback(
     (postId: string, summary: CommunityReactionSummary | null | undefined) => {
       const update = (post: CommunityFeedItem | null): CommunityFeedItem | null => {
@@ -1868,6 +1892,7 @@ export function CommunityLookbookGrid({
       )
       setDeepLinkedItem(update)
       setOpenedItem(update)
+      spotlightApplyRef.current?.(update)
     },
     []
   )
@@ -1923,6 +1948,25 @@ export function CommunityLookbookGrid({
   const [hasSession, setHasSession] = useState(false)
   const [sessionScope, setSessionScope] = useState<string | null>(null)
   const sessionScopeRef = useRef<string | null | undefined>(undefined)
+
+  // Story 6.6: the City Spotlight heads this section. Its pages run through the
+  // same reaction state as the feed, and its one View more announcement goes
+  // through this surface's single live region.
+  const spotlight = useCommunitySpotlight({
+    scope: sessionScope,
+    reconcile: (page) => {
+      const ticket = reactionState.beginRead()
+      return page.flatMap((post) => {
+        const current = reactionState.read(post, ticket)
+        return current ? [{ ...current, rank: post.rank }] : []
+      })
+    },
+    announce: (message) => {
+      setAnnouncement({ ...message, announcementId: ++reactionAnnouncementId.current })
+    },
+  })
+  spotlightApplyRef.current = spotlight.apply
+  const { reset: resetSpotlight, apply: applySpotlight } = spotlight
 
   const [reportingPostId, setReportingPostId] = useState<string | null>(null)
   const [reportError, setReportError] = useState<Message | null>(null)
@@ -2148,6 +2192,7 @@ export function CommunityLookbookGrid({
       feedControllerRef.current?.abort()
       actionControllerRef.current?.abort()
       reactionState.reset()
+      resetSpotlight()
       setItems([])
       itemsRef.current = []
       setAuthorStates([])
@@ -2195,7 +2240,7 @@ export function CommunityLookbookGrid({
       window.removeEventListener('couture:session', syncSession)
       window.removeEventListener('couture:account-erased', erase)
     }
-  }, [comments, reactionState, loadFeed])
+  }, [comments, reactionState, loadFeed, resetSpotlight])
 
   useEffect(() => {
     // Cleared alongside the request, so the chips answer with the mode just
@@ -2326,6 +2371,7 @@ export function CommunityLookbookGrid({
           setItems((previous) => previous.filter((item) => item.id !== target.key))
           setOpenedItem((item) => (item?.id === target.key ? null : item))
           setDeepLinkedItem((item) => (item?.id === target.key ? null : item))
+          applySpotlight((item) => (item?.id === target.key ? null : item))
           return
         }
         const updated = reactionState.read(target.post, reactionState.beginRead())
@@ -2339,6 +2385,7 @@ export function CommunityLookbookGrid({
         setItems((previous) => previous.map((item) => update(item)!))
         setOpenedItem(update)
         setDeepLinkedItem(update)
+        applySpotlight(update)
       },
       changed: async (events, signal) => {
         feedGenerationRef.current++
@@ -2381,6 +2428,7 @@ export function CommunityLookbookGrid({
           setIsPublishing(false)
           comments.reset()
           reactionState.reset()
+          resetSpotlight()
           setItems([])
           setOpenedItem(null)
           setNewLooks([])
@@ -2410,7 +2458,7 @@ export function CommunityLookbookGrid({
       document.removeEventListener('visibilitychange', foreground)
       window.removeEventListener('online', foreground)
     }
-  }, [comments, currentMode, sessionScope, reactionState])
+  }, [comments, currentMode, sessionScope, reactionState, applySpotlight, resetSpotlight])
 
   useEffect(
     () => () => {
@@ -2669,16 +2717,31 @@ export function CommunityLookbookGrid({
    * seeing a photograph. The event's `isSelf` is decided server-side from the
    * stored author id, so nothing here compares ids.
    */
-  const handleOpenCard = (item: CommunityFeedItem, commentsFocus = false) => {
+  const showDetail = (item: CommunityFeedItem, commentsFocus: boolean) => {
     notificationIntentRef.current++
     setFocusComments(commentsFocus)
     setAnnouncement(null)
     setReactionFeedback(null)
     setOpenedItem(reactionState.current(item))
+  }
+
+  const handleOpenCard = (item: CommunityFeedItem, commentsFocus = false) => {
+    showDetail(item, commentsFocus)
     if (commentsFocus || experimentVariant === null) {
       return
     }
     void openCommunityPostFromWeb(item.id, experimentVariant).catch(() => undefined)
+  }
+
+  /**
+   * Story 6.6: a spotlight open records only the spotlight event, with the
+   * card's snapshot rank. It never sends the feed card-open, so the feed
+   * experiment's lift is measured on feed opens alone.
+   */
+  const handleOpenSpotlightCard = (item: CommunitySpotlightItem) => {
+    const { rank, ...post } = item
+    showDetail(post, false)
+    void openCommunitySpotlightPostFromWeb(item.id, rank).catch(() => undefined)
   }
 
   const handleImageError = useCallback(
@@ -2759,6 +2822,9 @@ export function CommunityLookbookGrid({
       const message: Message = { key: 'community.removed.withdrawn' }
       setNotice({ message, tone: 'success' })
       setAnnouncement(message)
+      // The spotlight ranks public posts only and never serves a withdrawn one
+      // again, so its copy leaves now rather than on the next page-one read.
+      applySpotlight((item) => (item?.id === postId ? null : item))
       await loadFeed(modeRef.current)
     } catch (error: unknown) {
       if (action.signal.aborted) return
@@ -2893,6 +2959,49 @@ export function CommunityLookbookGrid({
 
   return (
     <aside aria-label={t('community.sectionLabel')} className="flex flex-col gap-6">
+      <CommunitySpotlightSection
+        state={spotlight.state}
+        available={communityAvailable}
+        gridColumns={gridColumns}
+        t={t}
+        onLoadMore={() => {
+          void spotlight.loadMore()
+        }}
+        onRetry={() => {
+          void spotlight.retry()
+        }}
+        onFocused={spotlight.clearFocusTarget}
+        renderCard={(item) => (
+          <LookbookCard
+            scope={SPOTLIGHT_CARD_SCOPE}
+            reactionControls={reactionState.controls(item.id)}
+            item={item}
+            isHighlighted={false}
+            isFailedImage={failedImages[item.id]?.url === item.imageAccess.url}
+            isReported={reportedPostIds.has(item.id)}
+            isSponsored={sponsored.has(item.id)}
+            canAct={presentation.canAct}
+            t={t}
+            onImageError={handleImageError}
+            onImageRetry={(post) => {
+              handleImageRetry(post)
+              void spotlight.retry()
+            }}
+            onOpen={() => {
+              handleOpenSpotlightCard(item)
+            }}
+            onComments={(post) => handleOpenCard(post, true)}
+            onReport={(postId) => {
+              setReportError(null)
+              setReportingPostId(postId)
+            }}
+            onWithdraw={(postId) => {
+              void handleWithdrawPost(postId)
+            }}
+          />
+        )}
+      />
+
       {showFilterNav && (
         <LookbookFilterNav
           activeTab={displayedMode}

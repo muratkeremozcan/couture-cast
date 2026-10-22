@@ -603,6 +603,14 @@ model LookbookPost {
   location_key                 String?
   locale                       String?
   climate_band                 ClimateBand?
+  /// Story 6.6 coarse area components, normalized (trimmed, NFKC, lowercased)
+  /// and stamped at submission from the author's chosen saved location. Only a
+  /// hierarchical prefix is stored (CHECK `LookbookPost_area_hierarchical`), and
+  /// anonymization clears them with `location_key` (CHECK
+  /// `LookbookPost_area_cleared_when_anonymized`).
+  area_country                 String?
+  area_region                  String?
+  area_city                    String?
   palette_insight              PaletteInsights?           @relation("LookbookPalette", fields: [palette_insight_id], references: [id])
   palette_insight_id           String?
   challenge                    CommunityChallenge?        @relation(fields: [challenge_id], references: [id], onDelete: SetNull)
@@ -640,6 +648,18 @@ model LookbookPost {
   @@index([upload_expires_at])
   @@index([user_id, submitted_at(sort: Desc)])
   @@index([erasure_requested_at, objects_purged_at])
+  /// One index on this table is deliberately NOT declared here:
+  ///
+  ///   LookbookPost_spotlight_area_window_idx
+  ///     ON (area_country, area_region, area_city, published_at DESC)
+  ///     WHERE status = 'published' AND published_at IS NOT NULL
+  ///       AND erasure_requested_at IS NULL AND anonymized_at IS NULL
+  ///       AND area_country IS NOT NULL
+  ///
+  /// created by 20261022120000_community_city_spotlight for windowed spotlight
+  /// reads. It is PARTIAL and the Prisma DSL cannot say `WHERE`; see the
+  /// AffiliateOffer comment for why an undeclared partial index is the honest
+  /// description. The spotlight integration suite guards the object itself.
 }
 
 /// Story 6.1: the persisted pseudonym a community post is attributed to.
@@ -1696,6 +1716,15 @@ model CommunityDomainOutbox {
   @@index([appended_at, created_at, id])
 }
 
+/// Story 6.6: the spotlight invalidator's durable cursor over the public
+/// stream. API-only: RLS is enabled with zero policies and no client grants.
+model CommunitySpotlightCursor {
+  id         String   @id
+  epoch      String   @db.Uuid
+  position   BigInt
+  updated_at DateTime @default(now())
+}
+
 model CommunityStreamEvent {
   id               String              @id @default(uuid()) @db.Uuid
   source_outbox_id String              @unique @db.Uuid
@@ -1827,7 +1856,7 @@ model CommunityRuntimeCapability {
 
 /// Anonymous operational outcomes. Random IDs dedupe delivery without subject correlation.
 model CommunityEngagementTelemetry {
-  id                  String    @id @default(uuid()) @db.Uuid
+  id                  String    @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
   event_type          String
   outcome             String
   reason              String?
@@ -1850,7 +1879,7 @@ model CommunityEngagementTelemetry {
 
 /// Server-only policy-derived deadline history. Identified solely through its guarded group.
 model CommunityEligibilityChange {
-  id String @id @default(uuid()) @db.Uuid
+  id String @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
   group_id String @db.Uuid
   group CommunityNotificationGroup @relation(fields: [group_id], references: [id], onDelete: Cascade)
   recorded_at DateTime @default(now())

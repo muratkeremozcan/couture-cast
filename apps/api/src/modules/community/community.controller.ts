@@ -34,6 +34,11 @@ import {
   publishCommunityPostResponseSchema,
   openCommunityPostInputSchema,
   openCommunityPostResponseSchema,
+  isSpotlightOpenInput,
+  communitySpotlightQuerySchema,
+  communitySpotlightResponseSchema,
+  communityReactionSpotlightResponseSchema,
+  type CommunitySpotlightResponse,
   reportCommunityPostInputSchema,
   reportCommunityPostResponseSchema,
   updateCommunityChallengeInputSchema,
@@ -56,6 +61,7 @@ import { RequestAuthGuard, RolesGuard } from '../auth/security.guards.js'
 import type { RequestAuthContext } from '../auth/security.types.js'
 import { CommunityRateLimitException } from './community-rate-limit.exception.js'
 import { CommunityService } from './community.service.js'
+import { CommunitySpotlightService } from './community-spotlight.service.js'
 
 /**
  * Runs `work` and, if it is refused by a rolling-window limiter, stamps
@@ -85,7 +91,9 @@ async function withRetryAfterHeader<T>(
 export class CommunityController {
   constructor(
     @Inject(CommunityService)
-    private readonly communityService: CommunityService
+    private readonly communityService: CommunityService,
+    @Inject(CommunitySpotlightService)
+    private readonly spotlightService: CommunitySpotlightService
   ) {}
 
   @Get('feed')
@@ -130,6 +138,48 @@ export class CommunityController {
       reactionsHeader === '1'
         ? communityReactionFeedResponseSchema
         : communityFeedResponseSchema
+    ).parse({ data })
+  }
+
+  /**
+   * Story 6.6: the City Spotlight. Reaction summaries negotiate exactly like
+   * the feed and are always computed live; responses are never cached.
+   */
+  @Get('spotlight')
+  @Header('Cache-Control', 'private, no-store')
+  @Header('Vary', 'x-couture-reactions, x-couture-platform, Authorization')
+  async getSpotlight(
+    @AuthContext() auth: RequestAuthContext,
+    @Headers('x-couture-platform') platformHeader: string | undefined,
+    @Query() rawQuery: Record<string, unknown>,
+    @Headers('x-couture-reactions') reactionsHeader?: string
+  ): Promise<CommunitySpotlightResponse> {
+    const headersResult = communityHeadersSchema.safeParse({
+      'x-couture-platform': platformHeader,
+    })
+    if (!headersResult.success) {
+      throw new BadRequestException(
+        headersResult.error.issues.map((i) => i.message).join('; ')
+      )
+    }
+    const queryResult = communitySpotlightQuerySchema.safeParse(rawQuery)
+    if (!queryResult.success) {
+      throw new BadRequestException(
+        queryResult.error.issues.map((i) => i.message).join('; ')
+      )
+    }
+    const reactions = reactionsHeader === '1'
+    const data = await this.spotlightService.getSpotlight({
+      userId: auth.userId,
+      platform: headersResult.data['x-couture-platform'],
+      cursor: queryResult.data.cursor,
+      limit: queryResult.data.limit,
+      ...(reactions ? { reactions: true } : {}),
+    })
+    return (
+      reactions
+        ? communityReactionSpotlightResponseSchema
+        : communitySpotlightResponseSchema
     ).parse({ data })
   }
 
@@ -320,12 +370,20 @@ export class CommunityController {
       )
     }
 
-    const result = await this.communityService.recordCardOpened({
-      userId: auth.userId,
-      postId,
-      platform: headersResult.data['x-couture-platform'],
-      input: bodyResult.data,
-    })
+    const input = bodyResult.data
+    const result = isSpotlightOpenInput(input)
+      ? await this.spotlightService.recordOpened({
+          userId: auth.userId,
+          postId,
+          platform: headersResult.data['x-couture-platform'],
+          rank: input.rank,
+        })
+      : await this.communityService.recordCardOpened({
+          userId: auth.userId,
+          postId,
+          platform: headersResult.data['x-couture-platform'],
+          input,
+        })
 
     return openCommunityPostResponseSchema.parse(result)
   }

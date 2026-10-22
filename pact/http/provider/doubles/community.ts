@@ -1,6 +1,7 @@
 // Learning path Step 38: Community feed by climate band.
 // See _bmad-output/project-knowledge/learning-path-step-by-step.md#step-38-community-feed-by-climate-band
 import type { CommunityService } from '../../../../apps/api/src/modules/community/community.service'
+import type { CommunitySpotlightService } from '../../../../apps/api/src/modules/community/community-spotlight.service'
 import { CommunityRateLimitException } from '../../../../apps/api/src/modules/community/community-rate-limit.exception'
 import {
   COMMUNITY_REACTION_CONFLICT_MESSAGE,
@@ -22,6 +23,7 @@ import {
   type AllocateCommunityPostSession,
   type CommunityFeed,
   type CommunityFeedItem,
+  type CommunitySpotlight,
 } from '@couture/api-client/contracts/http'
 import {
   BadRequestException,
@@ -75,6 +77,10 @@ const IMAGE_URL =
 const UPLOAD_URL = 'https://storage.couturecast.test/community/uploads/6100/session-0001'
 
 const VIEWER_BAND = 'temperate_dry' as const
+
+/** Story 6.6, mirrored from `interactions/community/spotlight.ts`. */
+const SPOTLIGHT_LABEL = 'Lisbon'
+const SPOTLIGHT_NEXT_CURSOR = 'spotlight-cursor-6600-page-two'
 const LOCALE = 'en-US'
 
 /**
@@ -475,6 +481,17 @@ export function createCommunityDoubles() {
 
     withdrawPost: (): Promise<{ tracked: true }> => Promise.resolve({ tracked: true }),
 
+    /**
+     * Story 6.6: the feed branch of the opened endpoint. It refuses anything but
+     * a feed body, so a controller that routed a spotlight open here fails.
+     */
+    recordCardOpened: (params: {
+      input: { experimentVariant?: string }
+    }): Promise<{ tracked: true }> =>
+      params.input.experimentVariant
+        ? Promise.resolve({ tracked: true })
+        : Promise.reject(new Error('A spotlight open reached the feed card-open path')),
+
     createChallenge: () => {
       if (scenarioOf() === 'challenge-overlap') {
         // The overlap check has to consider global (null-band) rows too. That
@@ -492,5 +509,22 @@ export function createCommunityDoubles() {
     },
   } as unknown as CommunityService
 
-  return { mockCommunityService }
+  /** Story 6.6: the City Spotlight service, one page per provider scenario. */
+  const mockCommunitySpotlightService = {
+    getSpotlight: (params: { limit: number }): Promise<CommunitySpotlight> =>
+      scenarioOf() === 'spotlight-none'
+        ? Promise.resolve({ level: 'none', label: null, items: [], nextCursor: null })
+        : Promise.resolve({
+            level: 'city',
+            label: SPOTLIGHT_LABEL,
+            items: [{ ...buildPublishedItem(), rank: 1 }].slice(0, params.limit),
+            nextCursor: SPOTLIGHT_NEXT_CURSOR,
+          }),
+    recordOpened: (params: { rank: number }): Promise<{ tracked: true }> =>
+      Number.isInteger(params.rank)
+        ? Promise.resolve({ tracked: true })
+        : Promise.reject(new Error('A feed open reached the spotlight path')),
+  } as unknown as CommunitySpotlightService
+
+  return { mockCommunityService, mockCommunitySpotlightService }
 }

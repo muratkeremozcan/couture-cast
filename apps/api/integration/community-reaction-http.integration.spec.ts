@@ -8,6 +8,7 @@ import { AccessTokenIdentityService } from '../src/modules/auth/access-token-ide
 import { GuardianConsentStateService } from '../src/modules/auth/guardian-consent-state.service.js'
 import { CommunityController } from '../src/modules/community/community.controller.js'
 import { CommunityService } from '../src/modules/community/community.service.js'
+import { CommunitySpotlightService } from '../src/modules/community/community-spotlight.service.js'
 
 import { reactionTestContext } from './helpers/community-reaction-context.js'
 
@@ -35,6 +36,7 @@ describe('Story 6.3 guarded reaction HTTP routes', () => {
       controllers: [CommunityController],
       providers: [
         { provide: CommunityService, useValue: service },
+        { provide: CommunitySpotlightService, useValue: {} },
         {
           provide: GuardianConsentStateService,
           useValue: { canTeenAccess: vi.fn().mockResolvedValue(false) },
@@ -105,6 +107,7 @@ describe('Story 6.3 guarded reaction HTTP routes', () => {
       controllers: [CommunityController],
       providers: [
         { provide: CommunityService, useValue: service },
+        { provide: CommunitySpotlightService, useValue: {} },
         {
           provide: GuardianConsentStateService,
           useValue: { canTeenAccess: vi.fn().mockResolvedValue(true) },

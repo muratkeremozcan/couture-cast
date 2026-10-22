@@ -37,12 +37,13 @@ import {
   type CommunityFeed,
   type CommunityFeedCursorPayload,
   type CommunityFeedItem,
+  type CommunityReactionFeedItem,
   type CommunityExperimentVariant,
   type CommunityFeedMode,
   type CommunityPlatform,
   type CreateCommunityChallengeInput,
   type EmbeddedCommunityChallenge,
-  type OpenCommunityPostInput,
+  type OpenCommunityFeedPostInput,
   type OpenCommunityPostResponse,
   type PublishCommunityPostInput,
   type ReportCommunityPostInput,
@@ -325,6 +326,15 @@ export class CommunityService {
     return this.buildFeedItems(posts, userId, true, summaries)
   }
 
+  /** The feed's own public projection, with live reaction summaries when negotiated. */
+  projectFeedItems(
+    posts: LookbookPost[],
+    userId: string,
+    reactions: boolean
+  ): Promise<CommunityReactionFeedItem[]> {
+    return this.buildFeedItems(posts, userId, reactions)
+  }
+
   async getPost(params: {
     userId: string
     postId: string
@@ -393,7 +403,12 @@ export class CommunityService {
     }
   }
 
-  private async readAuthorized<T>(member: string, work: () => Promise<T>): Promise<T> {
+  /**
+   * The one read gate every public community read goes through: erased subject,
+   * read rollout, age and consent eligibility, before and after the work. The
+   * City Spotlight reuses it so its refusals match the feed exactly.
+   */
+  async readAuthorized<T>(member: string, work: () => Promise<T>): Promise<T> {
     const budget = new CommunityAuthorizationBudget()
     return communityDependency(() =>
       budget.run(async () => {
@@ -897,14 +912,9 @@ export class CommunityService {
     userId: string
     postId: string
     platform: CommunityPlatform
-    input: OpenCommunityPostInput
+    input: OpenCommunityFeedPostInput
   }): Promise<OpenCommunityPostResponse> {
-    await this.assertReadEnabled(params.userId)
-
-    const post = await this.repository.findPostById(params.postId)
-    if (!post || !isPubliclyVisiblePost(post)) {
-      throw new NotFoundException(COMMUNITY_POST_NOT_FOUND_MESSAGE)
-    }
+    const post = await this.assertPublicPostReadable(params.userId, params.postId)
 
     await this.capture(params.userId, 'community_card_opened', {
       platform: params.platform,
@@ -930,6 +940,20 @@ export class CommunityService {
     })
 
     return { tracked: true }
+  }
+
+  /**
+   * The gates an open passes before anything is recorded: the read rollout
+   * first (503), then public visibility (404, never 403, so a hidden post is
+   * not confirmed to exist).
+   */
+  async assertPublicPostReadable(userId: string, postId: string): Promise<LookbookPost> {
+    await this.assertReadEnabled(userId)
+    const post = await this.repository.findPostById(postId)
+    if (!post || !isPubliclyVisiblePost(post)) {
+      throw new NotFoundException(COMMUNITY_POST_NOT_FOUND_MESSAGE)
+    }
+    return post
   }
 
   async allocatePost(params: {
@@ -1107,6 +1131,9 @@ export class CommunityService {
 
     const challengeId = await this.resolveSubmissionChallenge(input.challengeId)
     const { viewerBand } = await this.resolveViewerBand(userId)
+    // Story 6.6: only the normalized coarse components of the author's chosen
+    // location reach the post; coordinates, keys, labels and zones never do.
+    const location = await this.repository.findAreaLocation(userId)
 
     // The cap is enforced HERE, atomically, rather than at allocate. Allocation
     // produces drafts, which are free by design; a submission is what counts.
@@ -1120,6 +1147,7 @@ export class CommunityService {
         climateBand: viewerBand ?? null,
         locale: input.locale,
         challengeId,
+        area: location?.area ?? { country: null, region: null, city: null },
       },
     })
 

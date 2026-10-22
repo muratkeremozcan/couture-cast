@@ -862,6 +862,25 @@
       "back": "Zurück zur Community",
       "bindingConflict": "Die Benachrichtigungsregistrierung dieses Geräts hat sich geändert. Versuche es erneut.",
       "pushUnavailable": "Push-Benachrichtigungen sind auf diesem Gerät nicht verfügbar."
+    },
+    "spotlight": {
+      "eyebrow": "Stadt-Highlights",
+      "heading": "Highlights in {{area}}",
+      "headingFallback": "Stadt-Highlights",
+      "intro": "Herausragende Looks aus der Nähe aus der vergangenen Woche.",
+      "rank": "Platz {{rank}}",
+      "loading": "Stadt-Highlights werden geladen",
+      "emptyTitle": "In der Nähe gibt es noch keine Highlights",
+      "emptyBody": "Sobald genug Mitglieder in der Nähe Looks teilen, erscheinen hier die beliebtesten dieser Woche.",
+      "disabled": "Die Stadt-Highlights sind vorübergehend nicht verfügbar.",
+      "error": "Die Stadt-Highlights konnten nicht geladen werden.",
+      "retry": "Erneut versuchen",
+      "viewMore": "Mehr anzeigen",
+      "loadingMore": "Weitere Looks werden geladen",
+      "announceLoadedMore": "{{count}} weitere Highlight-Looks geladen.",
+      "announceLoadedMore_one": "{{count}} weiterer Highlight-Look geladen.",
+      "announceLoadedMore_other": "{{count}} weitere Highlight-Looks geladen.",
+      "announceRefreshed": "Die Stadt-Highlights wurden mit der neuesten Rangfolge aktualisiert."
     }
   }
 }

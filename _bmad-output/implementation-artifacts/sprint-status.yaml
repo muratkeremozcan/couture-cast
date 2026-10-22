@@ -30,7 +30,7 @@
 # - Dev moves story to 'review', SM/Code-Review validates, then Dev moves to 'done'
 
 generated: 2026-07-07
-last_updated: 2026-10-20
+last_updated: 2026-10-22
 project: couture-cast
 project_key: couture-cast
 tracking_system: file-system
@@ -102,7 +102,7 @@ development_status:
   6-3-curated-reactions: done
   6-4-threaded-comments: done
   6-5-realtime-engagement-notifications: done
-  6-6-community-city-spotlight: backlog
+  6-6-community-city-spotlight: in-progress
   6-7-home-spotlight-teaser: backlog
   6-8-safe-branded-share-card-export: backlog
   6-9-native-platform-sharing: backlog

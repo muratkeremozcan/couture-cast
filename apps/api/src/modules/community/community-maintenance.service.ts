@@ -260,6 +260,9 @@ export class CommunityMaintenanceService {
                 alt_text: null,
                 locale: null,
                 location_key: null,
+                area_country: null,
+                area_region: null,
+                area_city: null,
                 image_checksum: null,
                 anonymized_at: now,
               }

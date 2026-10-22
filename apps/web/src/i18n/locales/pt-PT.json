@@ -464,6 +464,25 @@
       "yourPostsTitle": "Os seus visuais em curso",
       "yourPostsBody": "Mais ninguém vê estes visuais até a verificação terminar."
     },
+    "spotlight": {
+      "eyebrow": "Destaques da cidade",
+      "heading": "Destaques em {{area}}",
+      "headingFallback": "Destaques da cidade",
+      "intro": "Visuais que se destacaram perto de si na última semana.",
+      "rank": "Posição {{rank}}",
+      "loading": "A carregar os destaques da cidade",
+      "emptyTitle": "Ainda não há destaques perto de si",
+      "emptyBody": "Quando membros suficientes perto de si partilharem visuais, os mais apreciados da semana aparecerão aqui.",
+      "disabled": "Os destaques da cidade estão temporariamente indisponíveis.",
+      "error": "Não foi possível carregar os destaques da cidade.",
+      "retry": "Tentar novamente",
+      "viewMore": "Ver mais",
+      "loadingMore": "A carregar mais visuais",
+      "announceLoadedMore": "Mais {{count}} visuais em destaque carregados.",
+      "announceLoadedMore_one": "Mais {{count}} visual em destaque carregado.",
+      "announceLoadedMore_other": "Mais {{count}} visuais em destaque carregados.",
+      "announceRefreshed": "Os destaques da cidade foram atualizados com a classificação mais recente."
+    },
     "card": {
       "label": "Visual de {{author}}",
       "authorSelf": "Você",

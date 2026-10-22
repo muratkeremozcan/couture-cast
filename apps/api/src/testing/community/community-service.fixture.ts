@@ -21,6 +21,10 @@ import type { WeatherQueryService } from '../../modules/weather/weather-query.se
 import { type CommunityRepository } from '../../modules/community/community.repository'
 import type { CommunityStorage } from '../../modules/community/community-storage.adapter'
 import { CommunityService } from '../../modules/community/community.service'
+import {
+  areaComponentsOf,
+  type SpotlightLocationSource,
+} from '../../modules/community/community-spotlight-area'
 
 /**
  * The telemetry double validates through the SAME schemas `TelemetryService`
@@ -211,6 +215,28 @@ export const createService = (
   } as unknown as FeatureFlagsService
 
   const findViewerLocations = vi.fn().mockResolvedValue(locations)
+  // Story 6.6: the same first-usable-country rule production applies.
+  const findAreaLocation = vi.fn().mockImplementation(() => {
+    const location = (locations as Partial<SpotlightLocationSource>[])
+      .map(
+        (candidate): SpotlightLocationSource => ({
+          country: candidate.country ?? null,
+          region: candidate.region ?? null,
+          city: candidate.city ?? null,
+        })
+      )
+      .find((candidate) => areaComponentsOf(candidate).country !== null)
+    return Promise.resolve(
+      location
+        ? {
+            country: location.country,
+            region: location.region,
+            city: location.city,
+            area: areaComponentsOf(location),
+          }
+        : null
+    )
+  })
   const findPublishedFeedPosts = vi.fn().mockResolvedValue({ posts, nextCursor })
   const findAuthorPostStates = vi.fn().mockResolvedValue(authorPosts)
   const findActiveChallenge = vi.fn().mockResolvedValue(challenge)
@@ -314,6 +340,7 @@ export const createService = (
     setReaction,
     reactionSummaries,
     findViewerLocations,
+    findAreaLocation,
     findPublishedFeedPosts,
     findAuthorPostStates,
     findActiveChallenge,
@@ -388,6 +415,7 @@ export const createService = (
     reactionSummaries,
     getFeatureFlag,
     findViewerLocations,
+    findAreaLocation,
     getLatestWeather,
     findPublishedFeedPosts,
     findAuthorPostStates,

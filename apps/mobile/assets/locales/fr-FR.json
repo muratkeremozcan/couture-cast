@@ -862,6 +862,25 @@
       "back": "Retour à la communauté",
       "bindingConflict": "L’enregistrement des notifications de cet appareil a changé. Réessayez.",
       "pushUnavailable": "Les notifications push ne sont pas disponibles sur cet appareil."
+    },
+    "spotlight": {
+      "eyebrow": "À la une de la ville",
+      "heading": "À la une à {{area}}",
+      "headingFallback": "À la une de la ville",
+      "intro": "Les looks remarquables près de chez vous cette semaine.",
+      "rank": "Rang {{rank}}",
+      "loading": "Chargement de la une de la ville",
+      "emptyTitle": "Rien à la une près de chez vous pour le moment",
+      "emptyBody": "Dès que suffisamment de membres près de chez vous partageront des looks, les plus appréciés de la semaine apparaîtront ici.",
+      "disabled": "La une de la ville est temporairement indisponible.",
+      "error": "Impossible de charger la une de la ville.",
+      "retry": "Réessayer",
+      "viewMore": "Voir plus",
+      "loadingMore": "Chargement d'autres looks",
+      "announceLoadedMore": "{{count}} looks à la une supplémentaires chargés.",
+      "announceLoadedMore_one": "{{count}} look à la une supplémentaire chargé.",
+      "announceLoadedMore_other": "{{count}} looks à la une supplémentaires chargés.",
+      "announceRefreshed": "La une de la ville a été actualisée avec le classement le plus récent."
     }
   }
 }

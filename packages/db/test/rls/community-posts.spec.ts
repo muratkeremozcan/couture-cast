@@ -62,6 +62,27 @@ describe.concurrent('community table RLS policies', () => {
     }
   )
 
+  scenarioTest(
+    '6.6-DB-RLS refuses every client role the spotlight invalidator cursor',
+    async ({ scenario }) => {
+      for (const role of ['anon', 'authenticated'] as const) {
+        await withRole(role, buildClaims(scenario.teenEmail, 'teen'), async (client) => {
+          await expect(
+            client.query('SELECT * FROM public."CommunitySpotlightCursor"')
+          ).rejects.toMatchObject({ code: PERMISSION_DENIED })
+        })
+        await withRole(role, buildClaims(scenario.teenEmail, 'teen'), async (client) => {
+          await expect(
+            client.query(
+              `INSERT INTO public."CommunitySpotlightCursor" ("id", "epoch", "position")
+               VALUES ('public', gen_random_uuid(), 0)`
+            )
+          ).rejects.toMatchObject({ code: PERMISSION_DENIED })
+        })
+      }
+    }
+  )
+
   /*
    * TITLED FOR WHAT IT PROVES. This was "in every status" and inserted one post
    * per status, which read as a status matrix and was not one: `42501` is

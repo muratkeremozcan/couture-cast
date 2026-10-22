@@ -262,10 +262,37 @@ describe('CommunityService publishing and challenges', () => {
           climateBand: 'temperate_dry',
           locale: 'en-US',
           challengeId: null,
+          area: { country: null, region: null, city: null },
         },
       })
       expect(feedItem.id).toBe('post-draft-1')
       expect(feedItem.author.isSelf).toBe(true)
+    })
+
+    it("6.6-UNIT-050 stamps only the normalized coarse area of the author's chosen location", async () => {
+      const { service, findPostById, publishWithinQuota, findAreaLocation } =
+        createService()
+      findPostById.mockResolvedValueOnce(draftPost)
+      findAreaLocation.mockResolvedValueOnce({
+        country: ' Portugal ',
+        region: 'Lisboa',
+        city: 'Lisbon',
+        area: { country: 'portugal', region: 'lisboa', city: 'lisbon' },
+      })
+
+      await publish(service)
+
+      const [call] = publishWithinQuota.mock.calls.at(-1) as [
+        { data: Record<string, unknown> },
+      ]
+      expect(call.data.area).toEqual({
+        country: 'portugal',
+        region: 'lisboa',
+        city: 'lisbon',
+      })
+      expect(JSON.stringify(call.data)).not.toMatch(
+        /latitude|longitude|location_key|timezone/
+      )
     })
 
     it('associates an open challenge with the submission', async () => {

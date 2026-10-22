@@ -117,6 +117,11 @@ import {
   verifyCommunityFeedRemovedContentInteraction,
   verifyCommunityFeedRejectionInteraction,
   communityFeedRejections,
+  // Story 6.6 City Spotlight and both opened branches.
+  verifyCommunitySpotlightInteraction,
+  verifyCommunitySpotlightNoneInteraction,
+  verifyOpenCommunitySpotlightPostInteraction,
+  verifyOpenCommunityFeedPostInteraction,
   verifyCommunityPostInteraction,
   verifyCommunityPostNotFoundInteraction,
   verifyAllocateCommunityPostInteraction,
@@ -607,6 +612,38 @@ describe('CoutureCastMobile -> CoutureCastApi HTTP contract', () => {
       await verifyCommunityFeedRejectionInteraction(pact, rejection, 'mobile')
     }
   )
+
+  it('reads the city spotlight for the viewer area', async () => {
+    await verifyCommunitySpotlightInteraction(
+      pact,
+      createMobileClientForMockServer,
+      'mobile'
+    )
+  })
+
+  it('reads a spotlight with no eligible cohort', async () => {
+    await verifyCommunitySpotlightNoneInteraction(
+      pact,
+      createMobileClientForMockServer,
+      'mobile'
+    )
+  })
+
+  it('records a spotlight card open with its rank', async () => {
+    await verifyOpenCommunitySpotlightPostInteraction(
+      pact,
+      createMobileClientForMockServer,
+      'mobile'
+    )
+  })
+
+  it('records a feed card open with the served experiment arm', async () => {
+    await verifyOpenCommunityFeedPostInteraction(
+      pact,
+      createMobileClientForMockServer,
+      'mobile'
+    )
+  })
 
   it('resolves one visible community post directly', async () => {
     await verifyCommunityPostInteraction(pact, createMobileClientForMockServer, 'mobile')

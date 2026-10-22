@@ -33,6 +33,7 @@ import { PlannerController } from '../../../apps/api/src/modules/personalization
 import { PlannerService } from '../../../apps/api/src/modules/personalization/planner.service'
 import { CommunityController } from '../../../apps/api/src/modules/community/community.controller'
 import { CommunityService } from '../../../apps/api/src/modules/community/community.service'
+import { CommunitySpotlightService } from '../../../apps/api/src/modules/community/community-spotlight.service'
 import { ComfortController } from '../../../apps/api/src/modules/personalization/comfort.controller'
 import { ComfortService } from '../../../apps/api/src/modules/personalization/comfort.service'
 import { UserController } from '../../../apps/api/src/modules/user/user.controller'
@@ -234,7 +235,7 @@ export async function startLocalPactProvider({
   const { mockPremiumEntitlementService } = createPremiumEntitlementDouble()
   const { mockPaletteAdvisorService } = createPaletteAdvisorDoubles()
   const { mockPlannerService } = createPlannerDoubles()
-  const { mockCommunityService } = createCommunityDoubles()
+  const { mockCommunityService, mockCommunitySpotlightService } = createCommunityDoubles()
   const engagement = createCommunityEngagementDoubles()
   const moduleFixture = await Test.createTestingModule({
     controllers: [
@@ -360,6 +361,10 @@ export async function startLocalPactProvider({
       {
         provide: CommunityService,
         useValue: mockCommunityService,
+      },
+      {
+        provide: CommunitySpotlightService,
+        useValue: mockCommunitySpotlightService,
       },
       {
         provide: PremiumEntitlementService,

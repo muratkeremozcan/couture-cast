@@ -25,6 +25,18 @@ import { SupabaseCommunityStorageAdapter } from './community-storage.adapter.js'
 import { CommunityModerationQueue } from './community-moderation.queue.js'
 import { CommunityModerationOutboxDispatcher } from './community-moderation.outbox.js'
 import { CommunityModerationActionsService } from './community-moderation.actions.js'
+import {
+  COMMUNITY_SPOTLIGHT_KEY_PREFIX,
+  COMMUNITY_SPOTLIGHT_REDIS,
+  createCommunitySpotlightRedis,
+} from './community-spotlight-cache.js'
+import {
+  COMMUNITY_SPOTLIGHT_CLOCK,
+  COMMUNITY_SPOTLIGHT_KEY_PREFIX_TOKEN,
+  CommunitySpotlightService,
+  systemSpotlightClock,
+} from './community-spotlight.service.js'
+import { CommunitySpotlightRepository } from './community-spotlight.repository.js'
 
 /**
  * `CommunityModerationProcessor` IS DELIBERATELY ABSENT from this module.
@@ -76,6 +88,17 @@ import { CommunityModerationActionsService } from './community-moderation.action
     CommunityReactionOutboxDispatcher,
     CommunityRepository,
     CommunityService,
+    CommunitySpotlightRepository,
+    CommunitySpotlightService,
+    {
+      provide: COMMUNITY_SPOTLIGHT_REDIS,
+      useFactory: () => createCommunitySpotlightRedis({ eager: true }),
+    },
+    { provide: COMMUNITY_SPOTLIGHT_CLOCK, useValue: systemSpotlightClock },
+    {
+      provide: COMMUNITY_SPOTLIGHT_KEY_PREFIX_TOKEN,
+      useValue: COMMUNITY_SPOTLIGHT_KEY_PREFIX,
+    },
     CommunityMaintenanceService,
     SupabaseCommunityStorageAdapter,
     CommunityModerationQueue,

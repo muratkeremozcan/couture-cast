@@ -11,11 +11,23 @@ import { CommunityStreamRepository } from './community-stream.repository.js'
 import { CommunitySendGuard } from './community-send-guard.js'
 import { CommunityNotificationsWorker } from './community-notifications.worker.js'
 import { CommunityReceiptsWorker } from './community-receipts.worker.js'
+import {
+  CommunitySpotlightCache,
+  createCommunitySpotlightRedis,
+  type SpotlightRedis,
+} from './community-spotlight-cache.js'
+import { CommunitySpotlightInvalidator } from './community-spotlight-invalidator.js'
+
+export interface CommunityEngagementRuntimeOptions {
+  /** Story 6.6: the spotlight read model's Redis. Defaults to the ritual options. */
+  spotlightRedis?: SpotlightRedis & { disconnect?: () => void }
+}
 
 export async function startCommunityEngagementRuntime(
   prisma: PrismaClient,
   remote: RemoteFeatureFlagProvider & Partial<AnalyticsClient>,
-  role: 'general' | 'community' = 'general'
+  role: 'general' | 'community' = 'general',
+  options: CommunityEngagementRuntimeOptions = {}
 ) {
   const logger = createBaseLogger().child({ feature: 'community-engagement' })
   const timers = new Set<ReturnType<typeof setTimeout>>()
@@ -45,7 +57,22 @@ export async function startCommunityEngagementRuntime(
     schedule()
   }
   const streams = new CommunityStreamRepository(prisma)
-  loop('append', 500, () => streams.append())
+  const spotlightRedis = options.spotlightRedis ?? createCommunitySpotlightRedis()
+  const spotlight = new CommunitySpotlightInvalidator(
+    prisma,
+    new CommunitySpotlightCache(spotlightRedis)
+  )
+  // Story 6.6: the spotlight invalidator runs in the same tick, after append.
+  // It never throws, so Redis can never block the append loop, and an append
+  // failure still lets it drain events that are already appended.
+  const appendThenInvalidate = async () => {
+    try {
+      return await streams.append()
+    } finally {
+      await spotlight.process()
+    }
+  }
+  loop('append', 500, appendThenInvalidate)
   loop('stream-retention', 10_000, () => streams.retain())
   const retention = new CommunityRetentionWorker(prisma, new PushTokenRepository(prisma))
   loop('detail-retention', 10_000, () => retention.sweep())
@@ -64,6 +91,7 @@ export async function startCommunityEngagementRuntime(
       timers.forEach(clearTimeout)
       timers.clear()
       await Promise.allSettled(running)
+      spotlightRedis.disconnect?.()
       await guardPool?.$disconnect()
     },
   }

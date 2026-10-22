@@ -1,0 +1,135 @@
+# Story 6.6: the City Spotlight module heading the Community tab.
+#
+# DATA. `run-maestro.mjs` signs up a fresh member whose only saved location is
+# Chicago, Illinois, United States. The spotlight resolves that member's area
+# from it, so this flow reads the shared, read-only cohort the database seed
+# publishes (`packages/db/prisma/seeds/community-spotlight.ts`, posts
+# `seed-spotlight-1` through `seed-spotlight-6`) and therefore requires that
+# cohort to sit in the same area as the harness location. The seed publishes
+# relative to its own run time, so CI's `db:reset` keeps every post inside the
+# seven-day window. The flow never reacts, so it can share the cohort with every
+# other device and stays out of `USER_SCOPED_FLOWS`.
+#
+# ORDER. `seed-spotlight-1` is the freshest post with the most non-author
+# reactions, so it ranks first deterministically.
+#
+# SELECTORS. A spotlight post can also appear in the feed below, so every card
+# selector is scoped with `childOf` to its spotlight item.
+appId: ${MAESTRO_APP_ID}
+name: 'Community City Spotlight'
+tags:
+  - e2e
+  - community
+  - maestro
+---
+- launchApp:
+    appId: ${MAESTRO_APP_ID}
+    clearState: true
+    stopApp: false
+
+- runFlow: subflows/open-app.yaml
+
+- tapOn:
+    id: 'tab-community'
+    retryTapIfNoChange: true
+    label: 'Open the community tab from the bottom navigation'
+
+- extendedWaitUntil:
+    visible:
+      id: 'community-screen'
+    timeout: 15000
+    label: 'Community screen is the one on top'
+
+# The loaded marker: the ranked list replaces the loading state only after a
+# real page arrived from the API.
+- extendedWaitUntil:
+    visible:
+      id: 'community-spotlight-item-seed-spotlight-1'
+    timeout: 20000
+    label: 'The first ranked spotlight card loaded over the real API'
+
+- assertVisible:
+    id: 'community-spotlight-heading'
+    text: 'Spotlight in Chicago'
+    label: "The heading names the viewer's own place at the ranked level"
+
+# The badge is one accessible element whose label is the localized rank.
+- assertVisible:
+    id: 'community-spotlight-rank-seed-spotlight-1'
+    text: 'Rank 1'
+    label: 'The freshest, most loved seeded post ranks first'
+
+- assertVisible:
+    id: 'community-card-image-seed-spotlight-1'
+    childOf:
+      id: 'community-spotlight-item-seed-spotlight-1'
+    label: 'The reused card rendered its signed image'
+
+- assertNotVisible:
+    id: 'community-spotlight-empty'
+- assertNotVisible:
+    id: 'community-spotlight-error'
+- assertNotVisible:
+    id: 'community-spotlight-disabled'
+
+# View more appears only when the snapshot holds more than one page, which
+# depends on how many cohorts share this area on the run's database.
+- runFlow:
+    when:
+      visible:
+        id: 'community-spotlight-view-more'
+    commands:
+      - tapOn:
+          id: 'community-spotlight-view-more'
+          label: 'Append the next spotlight page'
+      - extendedWaitUntil:
+          notVisible:
+            id: 'community-spotlight-loading-more'
+          timeout: 15000
+          label: 'The next page landed'
+      - assertNotVisible:
+          id: 'community-spotlight-more-error'
+      - assertVisible:
+          id: 'community-spotlight-item-seed-spotlight-1'
+          label: 'Appending kept the first page in place'
+
+# --- Opening a card into its detail and back --------------------------------
+
+- tapOn:
+    id: 'community-card-open-seed-spotlight-1'
+    childOf:
+      id: 'community-spotlight-item-seed-spotlight-1'
+    label: 'Open the first spotlight card'
+
+- extendedWaitUntil:
+    visible:
+      id: 'community-spotlight-detail-title'
+      text: 'City Spotlight'
+    timeout: 10000
+    label: 'The detail opened on top of the module'
+
+- assertVisible:
+    id: 'community-spotlight-detail-rank'
+    text: 'Rank 1'
+    label: 'The detail names the rank it was opened from'
+
+- assertVisible:
+    id: 'community-post-card-seed-spotlight-1'
+    childOf:
+      id: 'community-spotlight-detail'
+    label: 'The detail shows the reused card for the same post'
+
+- tapOn:
+    id: 'community-spotlight-detail-close'
+    label: 'Return from the detail'
+
+- extendedWaitUntil:
+    notVisible:
+      id: 'community-spotlight-detail-title'
+    timeout: 10000
+    label: 'The detail closed'
+
+- assertVisible:
+    id: 'community-spotlight-heading'
+    text: 'Spotlight in Chicago'
+    label: 'The module is back where the member left it'

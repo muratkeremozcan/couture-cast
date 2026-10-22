@@ -15,7 +15,7 @@
 # `LookbookPost` rows with stable ids `lookbook-1` through `lookbook-5`,
 # captions `Look N — weather-ready layers`, and `climate_band` alternating
 # `temperate_dry` / `cold_dry`. They are published a minute apart in id order, so
-# `lookbook-5` is the NEWEST and leads the `published_at DESC` feed; this flow
+# `lookbook-5` is the NEWEST of these and leads them in `published_at DESC`; this flow
 # anchors on it for that reason. CI runs `npm run db:reset` before the shards
 # (.github/workflows/pr-mobile-e2e.yml), so those rows are present and every
 # device sees them. Asserting `community-feed-empty` here would FAIL. This flow
@@ -207,15 +207,21 @@ tags:
 # this flow that read as a broken feed, and it is exactly the mistake the
 # ordering contract exists to catch.
 #
-# Asserting the newest post is the first visible card is a stronger check than
-# "some card rendered": a feed that lost its ordering, or that fell back to
-# creation time (which moderation stamps long before publication), puts a
-# different post here and fails.
+# Story 6.6: the City Spotlight module now heads the list, and the seeded
+# spotlight cohort publishes relative to the seed run, so its posts are newer
+# than every `lookbook-N` row and lead the all-climates feed. The flow scrolls to
+# the newest feed-seed post instead of expecting it in the first viewport.
 - extendedWaitUntil:
     visible:
-      id: 'community-post-card-lookbook-5'
+      id: 'community-spotlight-heading'
     timeout: 20000
-    label: 'The newest seeded post is the first card, over the real API'
+    label: 'The spotlight header rendered above the feed, over the real API'
+- scrollUntilVisible:
+    element:
+      id: 'community-post-card-lookbook-5'
+    direction: DOWN
+    timeout: 20000
+    label: 'The newest feed-seed post renders in the feed'
 
 - assertVisible:
     id: 'community-card-caption-lookbook-5'

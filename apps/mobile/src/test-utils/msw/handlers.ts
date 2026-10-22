@@ -6,6 +6,7 @@ import {
   communityCommentsResponseSchema,
   communityCommentSubmissionsResponseSchema,
   communityPostResponseSchema,
+  communityReactionSpotlightResponseSchema,
   publishCommunityPostResponseSchema,
   reportCommunityPostResponseSchema,
   withdrawCommunityPostResponseSchema,
@@ -364,6 +365,13 @@ const localizedOutfits: Record<string, typeof mockRitualResponse.data.outfits> =
 }
 
 export const handlers = [
+  // Story 6.6: by default the viewer has no spotlight cohort, so every screen
+  // suite renders the compact empty module unless a test serves its own page.
+  http.get('*/api/v1/community/spotlight', () =>
+    communityJson(communityReactionSpotlightResponseSchema, {
+      data: { level: 'none', label: null, items: [], nextCursor: null },
+    })
+  ),
   http.get('*/api/v1/community/posts/:postId/comments', () =>
     communityJson(communityCommentsResponseSchema, {
       data: { items: [], nextCursor: null, snapshot: 0, hasNewer: false },

@@ -484,6 +484,8 @@ export type ProviderCommunityScenario =
   | 'report-rate-limited'
   | 'challenge-created'
   | 'challenge-overlap'
+  | 'spotlight-city'
+  | 'spotlight-none'
 
 export type ProviderCommunityState = {
   userId: string | null

@@ -18,6 +18,7 @@ import {
   communityRetryAfterSeconds,
   getCommunityFeedFromMobile,
   getCommunityPostFromMobile,
+  getCommunitySpotlightFromMobile,
   pickCommunityPhoto,
   reportCommunityPostFromMobile,
 } from '@/src/lib/community'
@@ -92,6 +93,8 @@ export function registerCommunityClientCases() {
     [409, 'Some other conflict.', 'unknown'],
     [429, 'Slow down.', 'rate_limited'],
     [503, COMMUNITY_FEED_DISABLED_MESSAGE, 'disabled'],
+    // The shared read gate refuses a member outside the read rollout with a 403.
+    [403, COMMUNITY_FEED_DISABLED_MESSAGE, 'disabled'],
     // A published row whose object cannot be signed. The service answers this on
     // the single-post read and on publish, and it shares its status with the
     // rollout kill switch, so the two are told apart by message alone.
@@ -216,5 +219,24 @@ export function registerCommunityClientCases() {
       width: 900,
       height: 1200,
     })
+  })
+
+  it('6.6-MOB-008 refuses a spotlight page that drifts from the strict contract', async () => {
+    server.use(
+      http.get('*/api/v1/community/spotlight', () =>
+        HttpResponse.json({
+          data: {
+            level: 'city',
+            label: 'Lisbon',
+            items: [],
+            nextCursor: null,
+            cohort: 5,
+          },
+        })
+      )
+    )
+    await expect(getCommunitySpotlightFromMobile()).rejects.toBeInstanceOf(
+      CommunityRequestError
+    )
   })
 }

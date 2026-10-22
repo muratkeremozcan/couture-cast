@@ -862,6 +862,25 @@
       "back": "Retour à la communauté",
       "bindingConflict": "L’enregistrement des notifications de cet appareil a changé. Réessayez.",
       "pushUnavailable": "Les notifications push ne sont pas disponibles sur cet appareil."
+    },
+    "spotlight": {
+      "eyebrow": "Vedettes de la ville",
+      "heading": "Vedettes à {{area}}",
+      "headingFallback": "Vedettes de la ville",
+      "intro": "Les looks remarquables près de chez vous cette semaine.",
+      "rank": "Rang {{rank}}",
+      "loading": "Chargement des vedettes de la ville",
+      "emptyTitle": "Aucune vedette près de chez vous pour l'instant",
+      "emptyBody": "Quand assez de membres près de chez vous partageront des looks, les plus aimés de la semaine apparaîtront ici.",
+      "disabled": "Les vedettes de la ville sont temporairement indisponibles.",
+      "error": "Impossible de charger les vedettes de la ville.",
+      "retry": "Réessayer",
+      "viewMore": "Voir plus",
+      "loadingMore": "Chargement d'autres looks",
+      "announceLoadedMore": "{{count}} looks vedettes de plus chargés.",
+      "announceLoadedMore_one": "{{count}} look vedette de plus chargé.",
+      "announceLoadedMore_other": "{{count}} looks vedettes de plus chargés.",
+      "announceRefreshed": "Les vedettes de la ville ont été actualisées selon le classement le plus récent."
     }
   }
 }

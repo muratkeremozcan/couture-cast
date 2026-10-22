@@ -20,6 +20,7 @@ import { GuardianConsentStateService } from '../../src/modules/auth/guardian-con
 import { CommunityCommentsController } from '../../src/modules/community/community-comments.controller.js'
 import { CommunityCacheHeadersMiddleware } from '../../src/modules/community/community-cache-headers.middleware.js'
 import { CommunityController } from '../../src/modules/community/community.controller.js'
+import { CommunitySpotlightService } from '../../src/modules/community/community-spotlight.service.js'
 import { CommunityService } from '../../src/modules/community/community.service.js'
 import { CommunityRepository } from '../../src/modules/community/community.repository.js'
 import { CommunityCommentsRepository } from '../../src/modules/community/community-comments.repository.js'
@@ -180,6 +181,7 @@ export function commentsTestContext() {
       providers: [
         { provide: CommunityCommentsService, useValue: service },
         { provide: CommunityService, useValue: posts },
+        { provide: CommunitySpotlightService, useValue: {} },
         {
           provide: GuardianConsentStateService,
           useValue: {

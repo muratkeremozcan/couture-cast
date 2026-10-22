@@ -16,6 +16,8 @@ import * as notifications from './community-notifications.worker.js'
 import * as receipts from './community-receipts.worker.js'
 import * as retention from './community-retention.worker.js'
 import * as telemetry from './community-operational-telemetry.js'
+import * as spotlightCache from './community-spotlight-cache.js'
+import * as spotlightInvalidator from './community-spotlight-invalidator.js'
 import { startCommunityEngagementRuntime } from './community-engagement.runtime.js'
 
 const poolConstructor = vi.hoisted(() => vi.fn())
@@ -85,9 +87,9 @@ function runtimeUnderTest(): typeof startCommunityEngagementRuntime {
     return startCommunityEngagementRuntime
   const path = resolve(__dirname, 'community-engagement.runtime.ts')
   const source = readFileSync(path, 'utf8')
-  const statement = "loop('append', 500, () => streams.append())"
+  const statement = "loop('append', 500, appendThenInvalidate)"
   expect(source.split(statement)).toHaveLength(2)
-  const code = transpileModule(source.replace(statement, 'void streams'), {
+  const code = transpileModule(source.replace(statement, 'void appendThenInvalidate'), {
     compilerOptions: { module: ModuleKind.CommonJS, target: ScriptTarget.ES2022 },
   }).outputText
   const dependencies: Record<string, unknown> = {
@@ -101,6 +103,8 @@ function runtimeUnderTest(): typeof startCommunityEngagementRuntime {
     './community-receipts.worker.js': receipts,
     './community-retention.worker.js': retention,
     './community-operational-telemetry.js': telemetry,
+    './community-spotlight-cache.js': spotlightCache,
+    './community-spotlight-invalidator.js': spotlightInvalidator,
   }
   const exports = {} as {
     startCommunityEngagementRuntime: typeof startCommunityEngagementRuntime
@@ -246,6 +250,43 @@ describe('T03 actual engagement runtime composition', () => {
       expect(dispatchQueries(primary)).toHaveLength(0)
     }
   )
+
+  it('6.6-UNIT-040 runs the spotlight invalidator in the same tick, after append', async () => {
+    vi.stubEnv('COMMUNITY_DISPATCH_ENABLED', 'false')
+    const primary = databaseBoundary()
+    const order: string[] = []
+    const db = primary.db as typeof primary.db & Record<string, unknown>
+    vi.mocked(db.communityDomainOutbox.findMany).mockImplementation(() => {
+      order.push('append')
+      return Promise.resolve([])
+    })
+    db.communityStreamHead = {
+      findUnique: vi.fn(() => {
+        order.push('invalidate')
+        return Promise.resolve({ epoch: 'epoch-1', sequence: 3n, retention_floor: 0n })
+      }),
+    }
+    db.communitySpotlightCursor = {
+      findUnique: vi.fn(() => Promise.resolve(null)),
+      upsert: vi.fn(() => Promise.resolve({})),
+    }
+    const spotlightRedis = {
+      get: vi.fn(() => Promise.resolve(null)),
+      set: vi.fn(() => Promise.resolve('OK' as const)),
+      eval: vi.fn(() => Promise.resolve(1)),
+      disconnect: vi.fn(),
+    }
+    const runtime = await runtimeUnderTest()(primary.prisma, remote, 'general', {
+      spotlightRedis,
+    })
+    opened.push(runtime)
+    await vi.advanceTimersByTimeAsync(501)
+    expect(order.slice(0, 2)).toEqual(['append', 'invalidate'])
+    expect(spotlightRedis.eval).toHaveBeenCalled()
+    await runtime.close()
+    opened.splice(opened.indexOf(runtime), 1)
+    expect(spotlightRedis.disconnect).toHaveBeenCalledTimes(1)
+  })
 
   const failures = [
     ['owner_unconfigured', 'owner'],

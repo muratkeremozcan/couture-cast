@@ -464,6 +464,25 @@
       "yourPostsTitle": "I tuoi look in corso",
       "yourPostsBody": "Solo tu li vedi finché il controllo non è concluso."
     },
+    "spotlight": {
+      "eyebrow": "In evidenza in città",
+      "heading": "In evidenza a {{area}}",
+      "headingFallback": "In evidenza in città",
+      "intro": "I look più apprezzati vicino a te nell'ultima settimana.",
+      "rank": "Posizione {{rank}}",
+      "loading": "Caricamento dei look in evidenza",
+      "emptyTitle": "Ancora nessun look in evidenza vicino a te",
+      "emptyBody": "Quando abbastanza persone vicino a te condivideranno dei look, qui compariranno i più amati della settimana.",
+      "disabled": "I look in evidenza in città non sono temporaneamente disponibili.",
+      "error": "Non è stato possibile caricare i look in evidenza in città.",
+      "retry": "Riprova",
+      "viewMore": "Mostra altri",
+      "loadingMore": "Caricamento di altri look",
+      "announceLoadedMore": "Caricati altri {{count}} look in evidenza.",
+      "announceLoadedMore_one": "Caricato {{count}} altro look in evidenza.",
+      "announceLoadedMore_other": "Caricati altri {{count}} look in evidenza.",
+      "announceRefreshed": "I look in evidenza in città sono stati aggiornati con la classifica più recente."
+    },
     "card": {
       "label": "Look di {{author}}",
       "authorSelf": "Tu",

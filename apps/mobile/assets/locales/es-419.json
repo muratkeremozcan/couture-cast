@@ -862,6 +862,25 @@
       "back": "Volver a la comunidad",
       "bindingConflict": "El registro de notificaciones de este dispositivo cambió. Inténtalo de nuevo.",
       "pushUnavailable": "Las notificaciones push no están disponibles en este dispositivo."
+    },
+    "spotlight": {
+      "eyebrow": "Destacados de la ciudad",
+      "heading": "Destacados en {{area}}",
+      "headingFallback": "Destacados de la ciudad",
+      "intro": "Looks sobresalientes cerca de ti de la última semana.",
+      "rank": "Puesto {{rank}}",
+      "loading": "Cargando los destacados de la ciudad",
+      "emptyTitle": "Todavía no hay destacados cerca de ti",
+      "emptyBody": "Cuando suficientes personas cerca de ti compartan looks, aquí aparecerán los más queridos de esta semana.",
+      "disabled": "Los destacados de la ciudad no están disponibles por el momento.",
+      "error": "No pudimos cargar los destacados de la ciudad.",
+      "retry": "Reintentar",
+      "viewMore": "Ver más",
+      "loadingMore": "Cargando más looks",
+      "announceLoadedMore": "Se cargaron {{count}} looks destacados más.",
+      "announceLoadedMore_one": "Se cargó {{count}} look destacado más.",
+      "announceLoadedMore_other": "Se cargaron {{count}} looks destacados más.",
+      "announceRefreshed": "Los destacados de la ciudad se actualizaron con la clasificación más reciente."
     }
   }
 }

@@ -5,6 +5,7 @@ import {
   createCommunityChallengeInputSchema,
   ianaTimeZoneSchema,
   openCommunityPostInputSchema,
+  isSpotlightOpenInput,
   publishCommunityPostInputSchema,
   updateCommunityChallengeInputSchema,
 } from '../src/contracts/http'
@@ -62,13 +63,12 @@ describe('community HTTP contracts', () => {
       // attribute the open to an assignment that changed after the feed read.
       // Whether the opener is the author stays server-decided, so a client
       // cannot send that judgement in beside it.
-      expect(
-        openCommunityPostInputSchema.parse({ experimentVariant: 'auto' })
-          .experimentVariant
-      ).toBe('auto')
-      expect(
-        openCommunityPostInputSchema.parse({ experimentVariant: 'all' }).experimentVariant
-      ).toBe('all')
+      expect(openCommunityPostInputSchema.parse({ experimentVariant: 'auto' })).toEqual({
+        experimentVariant: 'auto',
+      })
+      expect(openCommunityPostInputSchema.parse({ experimentVariant: 'all' })).toEqual({
+        experimentVariant: 'all',
+      })
 
       expect(openCommunityPostInputSchema.safeParse({}).success).toBe(false)
       expect(
@@ -81,6 +81,34 @@ describe('community HTTP contracts', () => {
           isSelf: false,
         }).success
       ).toBe(false)
+    })
+
+    it('6.6-CON-001 accepts the spotlight branch only with a rank from 1 to 60 and no variant', () => {
+      expect(
+        openCommunityPostInputSchema.parse({ surface: 'spotlight', rank: 1 })
+      ).toEqual({
+        surface: 'spotlight',
+        rank: 1,
+      })
+      expect(
+        openCommunityPostInputSchema.safeParse({ surface: 'spotlight', rank: 60 }).success
+      ).toBe(true)
+      for (const rank of [0, 61, 1.5, '1'])
+        expect(
+          openCommunityPostInputSchema.safeParse({ surface: 'spotlight', rank }).success
+        ).toBe(false)
+      expect(
+        openCommunityPostInputSchema.safeParse({
+          surface: 'spotlight',
+          rank: 3,
+          experimentVariant: 'auto',
+        }).success
+      ).toBe(false)
+      expect(
+        openCommunityPostInputSchema.safeParse({ surface: 'feed', rank: 3 }).success
+      ).toBe(false)
+      expect(isSpotlightOpenInput({ surface: 'spotlight', rank: 2 })).toBe(true)
+      expect(isSpotlightOpenInput({ experimentVariant: 'auto' })).toBe(false)
     })
   })
 

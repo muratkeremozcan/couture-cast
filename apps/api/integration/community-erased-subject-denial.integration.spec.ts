@@ -18,6 +18,11 @@ import { CommunityTargetsService } from '../src/modules/community/community-targ
 import { CommunityPreferencesService } from '../src/modules/community/community-preferences.service.js'
 import { CommunityController } from '../src/modules/community/community.controller.js'
 import { CommunityService } from '../src/modules/community/community.service.js'
+import {
+  CommunitySpotlightService,
+  systemSpotlightClock,
+} from '../src/modules/community/community-spotlight.service.js'
+import { CommunitySpotlightRepository } from '../src/modules/community/community-spotlight.repository.js'
 import { CommunityRepository } from '../src/modules/community/community.repository.js'
 import { CommunityStreamRepository } from '../src/modules/community/community-stream.repository.js'
 import { CommunityAccessService } from '../src/modules/community/community-access.service.js'
@@ -58,6 +63,15 @@ const community = new CommunityService(
   new InMemoryCommunityStorage(),
   outside as never
 )
+// Story 6.6: the spotlight shares the feed's read gate, so it must refuse the same way.
+const spotlight = new CommunitySpotlightService(
+  new CommunitySpotlightRepository(prisma),
+  community,
+  outside as never,
+  outside as never,
+  systemSpotlightClock,
+  'unreachable'
+)
 const runtimes: ReturnType<typeof createCommunityRealtimeServer>[] = []
 const sockets: Socket[] = []
 let app: INestApplication
@@ -91,6 +105,7 @@ const routes = (owner: string) => ({
       body: JSON.stringify({ targets: [{ key: 'post', postId: 'lookbook-probe' }] }),
     }),
   feed: () => http('/api/v1/community/feed?mode=all&limit=12', owner),
+  spotlight: () => http('/api/v1/community/spotlight', owner),
 })
 function realtimeToken(owner: string) {
   return `e30.${Buffer.from(
@@ -151,6 +166,7 @@ beforeAll(async () => {
         useValue: new CommunityPreferencesService(prisma, access),
       },
       { provide: CommunityService, useValue: community },
+      { provide: CommunitySpotlightService, useValue: spotlight },
       { provide: AccessTokenIdentityService, useValue: identity },
       {
         provide: GuardianConsentStateService,
@@ -176,7 +192,7 @@ afterAll(async () => {
 })
 
 describe('6.5 F2 erased subject is a terminal typed denial on every shared authorization path', () => {
-  it.each(['preferences', 'targets', 'feed'] as const)(
+  it.each(['preferences', 'targets', 'feed', 'spotlight'] as const)(
     '%s answers 403 denied after same-session erasure and recreates nothing',
     async (route) => {
       const owner = await member()
