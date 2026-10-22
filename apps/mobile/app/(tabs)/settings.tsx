@@ -392,7 +392,7 @@ export default function SettingsScreen() {
       >
         <View style={styles.container} testID="settings-screen">
           <View style={styles.settingsSection}>
-            <Text style={styles.sectionTitle}>
+            <Text style={styles.sectionTitle} testID="settings-language-title">
               {t('settings.language', { defaultValue: 'Language' })}
             </Text>
             <View style={styles.localeGrid}>

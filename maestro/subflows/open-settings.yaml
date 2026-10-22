@@ -88,5 +88,16 @@ appId: ${MAESTRO_APP_ID}
     direction: UP
     timeout: 10000
     label: 'Settings list is scrolled to the top'
+# Android reports only the on-screen part of a node's bounds, so a sliver of the
+# en-US chip under the header already counts as fully visible and the scroll
+# above can stop with the heading still hidden. CI run 39827475510 (shard 6)
+# failed so after palette-advisor.yaml left Settings scrolled far down. The
+# heading's own testID, which is the same in every locale, settles it.
+- scrollUntilVisible:
+    element:
+      id: 'settings-language-title'
+    direction: UP
+    timeout: 10000
+    label: 'The Language heading is on screen'
 
 - waitForAnimationToEnd
