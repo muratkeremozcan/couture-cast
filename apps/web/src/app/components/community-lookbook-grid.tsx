@@ -63,6 +63,7 @@ import {
 } from '../../lib/community'
 import { resolveWebApiBaseUrl } from '../../lib/api-client'
 import { CommunityReactions } from './community-reactions'
+import { useCommunityScrollRestore } from './community-scroll-restore'
 import {
   CommunitySpotlightSection,
   SPOTLIGHT_CARD_SCOPE,
@@ -72,6 +73,7 @@ import {
 import React, {
   useCallback,
   useEffect,
+  useLayoutEffect,
   useMemo,
   useRef,
   useState,
@@ -1840,6 +1842,13 @@ export function CommunityLookbookGrid({
   // insertion under way belong to the scope they started in.
   const feedScopeRef = useRef(0)
   const [isInsertingLooks, setIsInsertingLooks] = useState(false)
+  const gridRef = useRef<HTMLDivElement>(null)
+  // The cards the grid rendered last, so a D3 hide can capture where the reader was.
+  const renderedItemsRef = useRef<CommunityFeedItem[]>([])
+  const { capture: captureScroll, restore: restoreScroll } = useCommunityScrollRestore({
+    grid: gridRef,
+    scope: feedScopeRef,
+  })
 
   const [items, setItems] = useState<CommunityFeedItem[]>([])
   const [authorStates, setAuthorStates] = useState<CommunityAuthorPostState[]>([])
@@ -2352,9 +2361,13 @@ export function CommunityLookbookGrid({
     }
     // D3: shown content outlives a reconnect only while access was verified recently.
     // Once that lapses, the content hides and the outage is announced (D9).
+    const hideContent = () => {
+      captureScroll(renderedItemsRef.current)
+      setCommunityAvailable(false)
+    }
     const verification = new CommunityVerification(() => {
       if (!active) return
-      setCommunityAvailable(false)
+      hideContent()
       setNotice(outage)
     })
     const sync = new CommunitySyncState(communitySyncFromWeb(), currentMode, {
@@ -2426,7 +2439,7 @@ export function CommunityLookbookGrid({
         // hidden until a catch-up reports 'connected'.
         const { visible, verify } = verification.update(state, realtime)
         if (state === 'connected') setCommunityAvailable(true)
-        else if (!visible) setCommunityAvailable(false)
+        else if (!visible) hideContent()
         if (verify) void realtimeSyncRef.current?.catchUp()
         // The outage notice clears only once verified content is visible again.
         if (state === 'connected')
@@ -2478,7 +2491,15 @@ export function CommunityLookbookGrid({
       document.removeEventListener('visibilitychange', foreground)
       window.removeEventListener('online', foreground)
     }
-  }, [comments, currentMode, sessionScope, reactionState, applySpotlight, resetSpotlight])
+  }, [
+    comments,
+    currentMode,
+    sessionScope,
+    reactionState,
+    applySpotlight,
+    resetSpotlight,
+    captureScroll,
+  ])
 
   useEffect(
     () => () => {
@@ -3008,6 +3029,11 @@ export function CommunityLookbookGrid({
     newLooks,
     openedItem
   )
+  useLayoutEffect(() => {
+    if (!communityAvailable) return
+    renderedItemsRef.current = presentation.items
+    restoreScroll(presentation.items)
+  }, [communityAvailable, presentation.items, restoreScroll])
 
   return (
     <aside aria-label={t('community.sectionLabel')} className="flex flex-col gap-6">
@@ -3096,6 +3122,7 @@ export function CommunityLookbookGrid({
       />
 
       <div
+        ref={gridRef}
         data-testid="community-card-grid"
         data-chip-category={chipCategory}
         aria-busy={isLoading || isLoadingMore}
