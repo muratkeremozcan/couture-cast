@@ -1967,6 +1967,10 @@ export function CommunityLookbookGrid({
   })
   spotlightApplyRef.current = spotlight.apply
   const { reset: resetSpotlight, apply: applySpotlight } = spotlight
+  // Realtime reads the rendered spotlight posts from a ref, so the sync state
+  // built once per session always sees the current page.
+  const spotlightItemsRef = useRef(spotlight.state.items)
+  spotlightItemsRef.current = spotlight.state.items
 
   const [reportingPostId, setReportingPostId] = useState<string | null>(null)
   const [reportError, setReportError] = useState<Message | null>(null)
@@ -2346,6 +2350,9 @@ export function CommunityLookbookGrid({
         ...(openedItemRef.current ? [openedItemRef.current.id] : []),
         ...newLooksRef.current.map((item) => item.id),
         ...(realtimeDeepLink.current ? [realtimeDeepLink.current.id] : []),
+        // Spotlight posts can sit outside every feed page, and a hidden or
+        // erased one must still leave the module.
+        ...spotlightItemsRef.current.map((item) => item.id),
       ],
       rebuild: refreshFeed,
       reconcile: async (signal) => {
@@ -2735,41 +2742,69 @@ export function CommunityLookbookGrid({
 
   /**
    * Story 6.6: a spotlight open records only the spotlight event, with the
-   * card's snapshot rank. It never sends the feed card-open, so the feed
-   * experiment's lift is measured on feed opens alone.
+   * card's snapshot rank and the level the module was served at. It never
+   * sends the feed card-open, so the feed experiment's lift is measured on
+   * feed opens alone.
    */
   const handleOpenSpotlightCard = (item: CommunitySpotlightItem) => {
     const { rank, ...post } = item
     showDetail(post, false)
-    void openCommunitySpotlightPostFromWeb(item.id, rank).catch(() => undefined)
+    const { level } = spotlight.state
+    if (level === 'none') return
+    void openCommunitySpotlightPostFromWeb(item.id, rank, level).catch(() => undefined)
   }
+
+  /** Records a failed image; true while its automatic refetches remain. */
+  const recordImageFailure = useCallback((item: CommunityFeedItem) => {
+    const url = item.imageAccess.url
+    const previous = failedImagesRef.current[item.id]
+    const attempts = previous?.url === url ? previous.attempts : 0
+    setFailedImages((current) => ({
+      ...current,
+      [item.id]: { url, attempts: attempts + 1 },
+    }))
+    return attempts < MAX_AUTOMATIC_IMAGE_REFETCHES
+  }, [])
+
+  const clearImageFailure = useCallback((postId: string) => {
+    setFailedImages((current) => {
+      const next = { ...current }
+      delete next[postId]
+      return next
+    })
+  }, [])
 
   const handleImageError = useCallback(
     (item: CommunityFeedItem) => {
-      const url = item.imageAccess.url
-      const previous = failedImagesRef.current[item.id]
-      const attempts = previous?.url === url ? previous.attempts : 0
-      setFailedImages((current) => ({
-        ...current,
-        [item.id]: { url, attempts: attempts + 1 },
-      }))
-      if (attempts < MAX_AUTOMATIC_IMAGE_REFETCHES) {
-        void loadFeed(modeRef.current)
-      }
+      if (recordImageFailure(item)) void loadFeed(modeRef.current)
     },
-    [loadFeed]
+    [recordImageFailure, loadFeed]
   )
 
   const handleImageRetry = useCallback(
     (item: CommunityFeedItem) => {
-      setFailedImages((current) => {
-        const next = { ...current }
-        delete next[item.id]
-        return next
-      })
+      clearImageFailure(item.id)
       void loadFeed(modeRef.current)
     },
-    [loadFeed]
+    [clearImageFailure, loadFeed]
+  )
+
+  // A spotlight image refetches only its own post, so a failed image never
+  // reloads the feed or drops the spotlight's loaded pages.
+  const { refreshItem: refreshSpotlightItem } = spotlight
+  const handleSpotlightImageError = useCallback(
+    (item: CommunityFeedItem) => {
+      if (recordImageFailure(item)) void refreshSpotlightItem(item.id)
+    },
+    [recordImageFailure, refreshSpotlightItem]
+  )
+
+  const handleSpotlightImageRetry = useCallback(
+    (item: CommunityFeedItem) => {
+      clearImageFailure(item.id)
+      void refreshSpotlightItem(item.id)
+    },
+    [clearImageFailure, refreshSpotlightItem]
   )
 
   const beginAction = (): AbortController => {
@@ -2982,11 +3017,8 @@ export function CommunityLookbookGrid({
             isSponsored={sponsored.has(item.id)}
             canAct={presentation.canAct}
             t={t}
-            onImageError={handleImageError}
-            onImageRetry={(post) => {
-              handleImageRetry(post)
-              void spotlight.retry()
-            }}
+            onImageError={handleSpotlightImageError}
+            onImageRetry={handleSpotlightImageRetry}
             onOpen={() => {
               handleOpenSpotlightCard(item)
             }}

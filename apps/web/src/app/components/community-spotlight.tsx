@@ -19,7 +19,11 @@ import type {
   CommunityReactionSpotlightItem as CommunitySpotlightItem,
   CommunitySpotlightLevel,
 } from '@couture/api-client/contracts/http'
-import { communityFailureReason, getCommunitySpotlightFromWeb } from '../../lib/community'
+import {
+  communityFailureReason,
+  getCommunityPostFromWeb,
+  getCommunitySpotlightFromWeb,
+} from '../../lib/community'
 
 const MERLOT = '#7A1F2D'
 
@@ -71,13 +75,27 @@ export interface UseCommunitySpotlightOptions {
   announce: (message: SpotlightAnnouncement) => void
 }
 
-/** Appends a page without repeating a post an earlier page already carried. */
-function appendPage(
-  previous: readonly CommunitySpotlightItem[],
+/**
+ * The posts of a page that are not shown yet. A later page can repeat a post an
+ * earlier page carried, so counts, focus and the appended list all come from
+ * this result alone.
+ */
+function newEntries(
+  shown: readonly CommunitySpotlightItem[],
   page: readonly CommunitySpotlightItem[]
 ): CommunitySpotlightItem[] {
-  const seen = new Set(previous.map((item) => item.id))
-  return [...previous, ...page.filter((item) => !seen.has(item.id))]
+  const seen = new Set(shown.map((item) => item.id))
+  return page.filter((item) => {
+    if (seen.has(item.id)) return false
+    seen.add(item.id)
+    return true
+  })
+}
+
+/** Same read refusals as the feed render the localized disabled state, like mobile. */
+function isDisabledRefusal(error: unknown): boolean {
+  const reason = communityFailureReason(error)
+  return reason === 'disabled' || reason === 'age_gate'
 }
 
 export function useCommunitySpotlight({
@@ -96,6 +114,9 @@ export function useCommunitySpotlight({
   // is dropped rather than painted over newer state.
   const generationRef = useRef(0)
   const controllerRef = useRef<AbortController | null>(null)
+  // Single-post image refreshes run beside paging, so a View more never cancels
+  // one. A reset or unmount aborts them all.
+  const itemControllersRef = useRef(new Set<AbortController>())
 
   const begin = useCallback(() => {
     controllerRef.current?.abort()
@@ -136,10 +157,7 @@ export function useCommunitySpotlight({
           announceRef.current({ key: 'community.spotlight.announceRefreshed' })
       } catch (error: unknown) {
         if (!request.current()) return
-        setState({
-          ...IDLE,
-          status: communityFailureReason(error) === 'disabled' ? 'disabled' : 'error',
-        })
+        setState({ ...IDLE, status: isDisabledRefusal(error) ? 'disabled' : 'error' })
       }
     },
     [begin]
@@ -156,24 +174,25 @@ export function useCommunitySpotlight({
         signal: request.signal,
       })
       if (!request.current()) return
-      const fresh = reconcileRef.current(page.items)
-      const previous = stateRef.current.items
-      const items = appendPage(previous, fresh)
-      const added = items.slice(previous.length)
+      const added = newEntries(stateRef.current.items, reconcileRef.current(page.items))
       setState((current) => ({
         ...current,
         status: 'ready',
         level: page.level,
         label: page.label,
-        items,
+        items: [...current.items, ...newEntries(current.items, added)],
         nextCursor: page.nextCursor,
         loadingMore: false,
         focusTargetId: added[0]?.id ?? null,
       }))
-      announceRef.current({
-        key: 'community.spotlight.announceLoadedMore',
-        params: { count: added.length },
-      })
+      // A page whose posts were all filtered or already shown changes nothing
+      // the reader can hear, so it stays silent and View more stays for the
+      // cursor it returned.
+      if (added.length > 0)
+        announceRef.current({
+          key: 'community.spotlight.announceLoadedMore',
+          params: { count: added.length },
+        })
     } catch (error: unknown) {
       if (!request.current()) return
       // The cursor is bound to the ranked snapshot and the viewer's area. When
@@ -187,11 +206,17 @@ export function useCommunitySpotlight({
     }
   }, [begin, loadFirstPage])
 
+  const abortItemRefreshes = useCallback(() => {
+    for (const controller of itemControllersRef.current) controller.abort()
+    itemControllersRef.current.clear()
+  }, [])
+
   const reset = useCallback(() => {
     controllerRef.current?.abort()
+    abortItemRefreshes()
     generationRef.current++
     setState(IDLE)
-  }, [])
+  }, [abortItemRefreshes])
 
   /** Applies a reaction, realtime or eviction update from the grid to every spotlight copy. */
   const apply = useCallback((update: PostUpdate) => {
@@ -206,6 +231,34 @@ export function useCommunitySpotlight({
       return changed ? { ...previous, items } : previous
     })
   }, [])
+
+  /**
+   * Re-reads one post for a fresh signed image URL and updates only its
+   * spotlight copy, keeping every loaded page, the rank and the reader's place.
+   * A post the reader can no longer see leaves the spotlight.
+   */
+  const refreshItem = useCallback(
+    async (postId: string) => {
+      const shown = stateRef.current.items.find((item) => item.id === postId)
+      if (!shown) return
+      const controller = new AbortController()
+      itemControllersRef.current.add(controller)
+      try {
+        const post = await getCommunityPostFromWeb(postId, controller.signal)
+        if (controller.signal.aborted) return
+        // `apply` keeps the rank the copy was served at.
+        const fresh = reconcileRef.current([{ ...post, rank: shown.rank }])[0] ?? null
+        apply((item) => (item?.id === postId ? fresh : item))
+      } catch (error: unknown) {
+        if (controller.signal.aborted) return
+        if (communityFailureReason(error) === 'not_found')
+          apply((item) => (item?.id === postId ? null : item))
+      } finally {
+        itemControllersRef.current.delete(controller)
+      }
+    },
+    [apply]
+  )
 
   const clearFocusTarget = useCallback(() => {
     setState((previous) =>
@@ -224,8 +277,9 @@ export function useCommunitySpotlight({
   useEffect(
     () => () => {
       controllerRef.current?.abort()
+      abortItemRefreshes()
     },
-    []
+    [abortItemRefreshes]
   )
 
   return {
@@ -234,13 +288,14 @@ export function useCommunitySpotlight({
     retry: loadFirstPage,
     reset,
     apply,
+    refreshItem,
     clearFocusTarget,
   }
 }
 
 export interface CommunitySpotlightSectionProps {
   state: CommunitySpotlightState
-  /** False while community access is unverified; the ranked cards hide with the feed. */
+  /** False while community access is unverified; the module hides with the feed, like mobile. */
   available: boolean
   gridColumns: string
   t: Translate
@@ -319,6 +374,43 @@ function SpotlightStates({
   )
 }
 
+/** A failed page's notice and View more, which stays while any cursor remains. */
+function SpotlightPaging({
+  state,
+  t,
+  onLoadMore,
+}: Pick<CommunitySpotlightSectionProps, 'state' | 't' | 'onLoadMore'>) {
+  return (
+    <>
+      {state.moreFailed && (
+        <p
+          data-testid="community-spotlight-more-error"
+          style={{ color: MERLOT }}
+          className="text-center text-xs"
+        >
+          {t('community.spotlight.error')}
+        </p>
+      )}
+
+      {state.nextCursor !== null && (
+        <div className="flex justify-center">
+          <button
+            type="button"
+            data-testid="community-spotlight-view-more"
+            disabled={state.loadingMore}
+            onClick={onLoadMore}
+            className="min-h-[44px] rounded-full border border-[color:var(--theme-secondary)] px-6 py-2 text-xs font-semibold uppercase tracking-wider text-[color:var(--theme-card-text)] focus-visible:outline focus-visible:outline-2 focus-visible:outline-[color:var(--focus-essential)] disabled:opacity-50"
+          >
+            {state.loadingMore
+              ? t('community.spotlight.loadingMore')
+              : t('community.spotlight.viewMore')}
+          </button>
+        </div>
+      )}
+    </>
+  )
+}
+
 export function CommunitySpotlightSection({
   state,
   available,
@@ -335,18 +427,21 @@ export function CommunitySpotlightSection({
     onFocused()
   }, [state.focusTargetId, onFocused])
 
-  if (state.status === 'idle') return null
+  if (state.status === 'idle' || !available) return null
 
-  const items = available ? state.items : []
-  const hasArea = state.status === 'ready' && state.level !== 'none' && state.label
-  const showList = state.status === 'ready' && items.length > 0
+  const ready = state.status === 'ready'
+  const hasArea = ready && state.level !== 'none' && state.label
+  const showList = ready && state.items.length > 0
+  // A page can arrive with every post filtered while ranks remain behind its
+  // cursor. The empty state is for a spotlight with nothing left to show.
+  const showEmpty = ready && state.items.length === 0 && state.nextCursor === null
 
   return (
     <section
       aria-labelledby="community-spotlight-heading"
       aria-busy={state.status === 'loading' || state.loadingMore}
       data-testid="community-spotlight"
-      data-level={state.status === 'ready' ? state.level : undefined}
+      data-level={ready ? state.level : undefined}
       className="flex flex-col gap-4 border-b border-[color:var(--theme-card-border)] pb-6"
     >
       <div className="flex flex-col gap-1">
@@ -367,13 +462,13 @@ export function CommunitySpotlightSection({
         </p>
       </div>
 
-      {showList ? (
+      {showList && (
         <ol
           data-testid="community-spotlight-list"
           aria-labelledby="community-spotlight-heading"
           className={`grid gap-6 ${gridColumns}`}
         >
-          {items.map((item) => (
+          {state.items.map((item) => (
             <li
               key={item.id}
               data-testid={`community-spotlight-item-${item.id}`}
@@ -393,7 +488,9 @@ export function CommunitySpotlightSection({
             </li>
           ))}
         </ol>
-      ) : (
+      )}
+
+      {(!ready || showEmpty) && (
         <SpotlightStates
           state={state}
           gridColumns={gridColumns}
@@ -402,31 +499,7 @@ export function CommunitySpotlightSection({
         />
       )}
 
-      {showList && state.moreFailed && (
-        <p
-          data-testid="community-spotlight-more-error"
-          style={{ color: MERLOT }}
-          className="text-center text-xs"
-        >
-          {t('community.spotlight.error')}
-        </p>
-      )}
-
-      {showList && state.nextCursor !== null && (
-        <div className="flex justify-center">
-          <button
-            type="button"
-            data-testid="community-spotlight-view-more"
-            disabled={state.loadingMore}
-            onClick={onLoadMore}
-            className="min-h-[44px] rounded-full border border-[color:var(--theme-secondary)] px-6 py-2 text-xs font-semibold uppercase tracking-wider text-[color:var(--theme-card-text)] focus-visible:outline focus-visible:outline-2 focus-visible:outline-[color:var(--focus-essential)] disabled:opacity-50"
-          >
-            {state.loadingMore
-              ? t('community.spotlight.loadingMore')
-              : t('community.spotlight.viewMore')}
-          </button>
-        </div>
-      )}
+      {ready && <SpotlightPaging state={state} t={t} onLoadMore={onLoadMore} />}
     </section>
   )
 }
