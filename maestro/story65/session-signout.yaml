@@ -1,0 +1,14 @@
+# Story 6.5 owner: from loaded notification settings, sign out through the product UI and
+# reopen the screen: a signed-out screen has no member controls. A still-signed-in member
+# gets the same window to load before absence is asserted.
+appId: ${MAESTRO_APP_ID}
+---
+- tapOn: ${MAESTRO_SIGNOUT}
+- runFlow: open-notification-settings.yaml
+- extendedWaitUntil:
+    visible: ${MAESTRO_ENABLED}
+    timeout: 15000
+    optional: true
+- assertNotVisible: ${MAESTRO_ENABLED}
+- takeScreenshot:
+    path: signed-out-${MAESTRO_CASE}

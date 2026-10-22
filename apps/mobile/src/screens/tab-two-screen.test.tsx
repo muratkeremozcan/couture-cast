@@ -500,6 +500,27 @@ describe('SettingsScreen', () => {
     expect(getSubscriptionMock).not.toHaveBeenCalled()
   })
 
+  it('6.5-MOB-POLISH-11 never tells a member they are signed out when the session read fails transiently', async () => {
+    // A keychain read can fail once (device locked, storage busy). That is not proof of no
+    // session: the screen must not show the signed-out hints, and it loads the member's
+    // data once the read succeeds.
+    resolveMobileAccessTokenMock.mockRejectedValueOnce(new Error('keychain busy'))
+
+    await render(<SettingsScreen />)
+
+    await waitFor(
+      () => {
+        expect(getCommercePreferenceMock).toHaveBeenCalled()
+        expect(getSubscriptionMock).toHaveBeenCalled()
+      },
+      { timeout: 5_000 }
+    )
+    expect(await screen.findByTestId('commerce-opt-out-toggle')).toBeInTheDocument()
+    expect(screen.queryByTestId('commerce-settings-signed-out')).toBeNull()
+    expect(screen.queryByTestId('premium-signed-out')).toBeNull()
+    expect(resolveMobileAccessTokenMock.mock.calls.length).toBeGreaterThanOrEqual(2)
+  })
+
   it('5.1-MOB-SET-06 gives the toggle a touch target of at least 44 by 44 pixels', async () => {
     await render(<SettingsScreen />)
 

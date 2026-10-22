@@ -1,6 +1,8 @@
 # Story 6.5 owner: turn engagement notifications on through the product settings screen and
-# answer the real OS permission dialog with ${MAESTRO_DIALOG_CHOICE}. The runner sets the OS
-# permission state beforehand and checks the server binding afterwards.
+# answer the real OS permission dialog with ${MAESTRO_DIALOG_CHOICE}. The runner resets the
+# OS permission to "ask" beforehand, so the dialog is required: a run where the OS does not
+# ask fails here. The runner then asserts the exact outcome message, the OS permission and
+# the server binding.
 appId: ${MAESTRO_APP_ID}
 ---
 - runFlow: open-app.yaml
@@ -40,15 +42,15 @@ appId: ${MAESTRO_APP_ID}
           text: ${MAESTRO_ENABLED}
           checked: true
 - tapOn: ${MAESTRO_SAVE}
-- runFlow:
-    when:
-      visible: ${MAESTRO_DIALOG_CHOICE}
-    commands:
-      - takeScreenshot:
-          path: os-dialog-${MAESTRO_CASE}
-      - tapOn: ${MAESTRO_DIALOG_CHOICE}
 - extendedWaitUntil:
-    visible: ${MAESTRO_EXPECT_TEXT}
+    visible: ${MAESTRO_DIALOG_CHOICE}
+    timeout: 15000
+- takeScreenshot:
+    path: os-dialog-${MAESTRO_CASE}
+- tapOn: ${MAESTRO_DIALOG_CHOICE}
+# Any settled outcome; which one is the runner's assertion.
+- extendedWaitUntil:
+    visible: ${MAESTRO_OUTCOME}
     timeout: 30000
 - takeScreenshot:
     path: result-${MAESTRO_CASE}

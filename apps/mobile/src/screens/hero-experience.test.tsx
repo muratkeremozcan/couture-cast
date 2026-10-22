@@ -10,8 +10,15 @@ import { describe, expect, it, beforeAll, beforeEach, afterEach, vi } from 'vite
 import { server } from '@/src/test-utils/msw/server'
 import { http, HttpResponse } from 'msw'
 import TabOneScreen from '@/app/(tabs)/index'
-import { setMobileAccessTokenResolver } from '@/src/lib/mobile-auth'
-import { clearRitualMemoryCache, saveRitualCache } from '@/src/lib/ritual-cache'
+import {
+  setMobileAccessTokenResolver,
+  setMobileApplicationUserId,
+} from '@/src/lib/mobile-auth'
+import {
+  clearRitualMemoryCache,
+  ritualCacheOwner,
+  saveRitualCache,
+} from '@/src/lib/ritual-cache'
 import { mockRitualResponse } from '@/src/test-utils/msw/handlers'
 import i18n, { initI18n } from '@/src/lib/i18n'
 
@@ -46,6 +53,9 @@ describe('Mobile Hero Experience (TabOneScreen)', () => {
 
   beforeEach(async () => {
     setMobileAccessTokenResolver(() => 'session-token')
+    // Set after the auto-cleanup unmounted the previous screen; changing identity while a
+    // screen is mounted reloads it and leaks a request into this test.
+    setMobileApplicationUserId('test-member')
     await i18n.changeLanguage('en-US')
   })
 
@@ -201,7 +211,7 @@ describe('Mobile Hero Experience (TabOneScreen)', () => {
 
   it('verifies offline fallback banner and stale state display when API request fails', async () => {
     // Older than the 15-minute freshness window.
-    await saveRitualCache('test-user-id', 'en-US', {
+    await saveRitualCache(ritualCacheOwner('test-member'), 'en-US', {
       data: mockRitualResponse,
       timestamp: Date.now() - 20 * 60 * 1000, // 20 minutes ago (stale!)
     })

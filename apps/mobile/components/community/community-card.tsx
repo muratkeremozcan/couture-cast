@@ -46,6 +46,7 @@ interface CommunityCardMediaProps {
   imageUri: string
   label: string
   isUnavailable: boolean
+  isLoaded: boolean
   onError: () => void
   onLoad: () => void
   onRetry: () => void
@@ -57,6 +58,7 @@ function CommunityCardMedia({
   imageUri,
   label,
   isUnavailable,
+  isLoaded,
   onError,
   onLoad,
   onRetry,
@@ -119,6 +121,16 @@ function CommunityCardMedia({
             onError={onError}
             onLoad={onLoad}
           />
+          {isLoaded ? (
+            // UI automation marker: the image element exists before it loads, so only
+            // this proves a load completed. It has no label and takes no touches.
+            <View
+              testID={`community-card-image-loaded-${postId}`}
+              collapsable={false}
+              pointerEvents="none"
+              style={styles.loadedMarker}
+            />
+          ) : null}
         </Pressable>
       )}
     </View>
@@ -237,6 +249,7 @@ export function CommunityCard({
   const attemptsRef = useRef(0)
   // Whether the rendered image has fired onLoad or onError since its load timer armed.
   const loadSettledRef = useRef(false)
+  const [imageLoaded, setImageLoaded] = useState(false)
 
   // Kept out of the expiry effect's dependency array on purpose: reading the
   // latest item and callback through a ref is what stops a refetch from
@@ -260,10 +273,12 @@ export function CommunityCard({
     // The image rendered, so the bounded retry budget starts over.
     loadSettledRef.current = true
     attemptsRef.current = 0
+    setImageLoaded(true)
   }, [])
 
   const handleImageError = useCallback(() => {
     loadSettledRef.current = true
+    setImageLoaded(false)
     requestImageRefresh()
   }, [requestImageRefresh])
 
@@ -281,6 +296,7 @@ export function CommunityCard({
   useEffect(() => {
     if (shownUrlRef.current === imageUrl) return
     shownUrlRef.current = imageUrl
+    setImageLoaded(false)
     if (imageState !== 'unavailable') return
     let active = true
     Image.prefetch(imageUrl).then(
@@ -422,6 +438,7 @@ export function CommunityCard({
         imageUri={item.imageAccess.url}
         label={imageLabel}
         isUnavailable={imageState === 'unavailable'}
+        isLoaded={imageLoaded}
         onError={handleImageError}
         onLoad={handleImageLoad}
         onRetry={handleRetryImage}
@@ -539,6 +556,13 @@ const styles = StyleSheet.create({
   image: {
     width: '100%',
     height: '100%',
+  },
+  loadedMarker: {
+    position: 'absolute',
+    top: 0,
+    left: 0,
+    width: 1,
+    height: 1,
   },
   imageFallback: {
     flex: 1,

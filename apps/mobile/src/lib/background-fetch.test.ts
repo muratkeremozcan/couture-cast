@@ -23,7 +23,6 @@ const native = vi.hoisted(() => {
     }),
     isTaskRegisteredAsync: vi.fn(),
     registerTaskAsync: vi.fn(),
-    getDistinctId: vi.fn(),
   }
 })
 
@@ -37,15 +36,13 @@ vi.mock('expo-background-fetch', () => ({
   registerTaskAsync: native.registerTaskAsync,
 }))
 
-vi.mock('../analytics/mobile-analytics', () => ({
-  mobileAnalyticsClient: { getDistinctId: native.getDistinctId },
-}))
-
 import { registerBackgroundFetchAsync } from './background-fetch'
-import { clearRitualMemoryCache, saveRitualCache } from './ritual-cache'
+import { setMobileApplicationUserId } from './mobile-auth'
+import { clearRitualMemoryCache, ritualCacheOwner, saveRitualCache } from './ritual-cache'
 
 const TASK_NAME = 'RITUAL_BACKGROUND_FETCH_TASK'
-const USER_ID = 'bg-user'
+const MEMBER_ID = 'bg-user'
+const USER_ID = ritualCacheOwner(MEMBER_ID)
 
 function runRitualTask() {
   const task = native.tasks.get(TASK_NAME)
@@ -99,11 +96,12 @@ describe('ritual background fetch task', () => {
     process.env.EXPO_PUBLIC_API_BASE_URL = window.location.origin
     localStorage.clear()
     clearRitualMemoryCache()
-    native.getDistinctId.mockReturnValue(USER_ID)
+    setMobileApplicationUserId(MEMBER_ID)
   })
 
   afterEach(() => {
     process.env.EXPO_PUBLIC_API_BASE_URL = originalBaseUrl
+    setMobileApplicationUserId(null)
     localStorage.clear()
     clearRitualMemoryCache()
   })
@@ -171,19 +169,20 @@ describe('ritual background fetch task', () => {
   })
 
   /**
-   * A degraded analytics client leaves the task without a distinct id. The core
-   * ritual still has to refresh, under the documented anonymous identity.
+   * A wake before any member session is restored still refreshes, but into the
+   * signed-out bucket: it must never land in, or read from, a member's cache.
    */
-  it('falls back to the anonymous user when analytics has no distinct id', async () => {
-    native.getDistinctId.mockReturnValue(undefined)
+  it('caches under the signed-out owner when no member session is restored', async () => {
+    setMobileApplicationUserId(null)
 
     await expect(runRitualTask()).resolves.toBe(native.result.NewData)
 
     expect(
       localStorage.getItem(
-        `ritual:mobile-anonymous-user:en-US:${mockRitualResponse.data.weather.locationKey}`
+        `ritual:signed-out:en-US:${mockRitualResponse.data.weather.locationKey}`
       )
     ).not.toBeNull()
+    expect(storedRitualEntry()).toBeNull()
   })
 
   /**

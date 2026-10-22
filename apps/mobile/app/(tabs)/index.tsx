@@ -26,6 +26,7 @@ import {
 } from '@/src/lib/mobile-auth'
 import {
   readLatestRitualCache,
+  ritualCacheOwner,
   saveRitualCache,
   withoutShopThisLook,
 } from '@/src/lib/ritual-cache'
@@ -207,6 +208,7 @@ export default function TabOneScreen() {
     mobileApplicationUserId,
     mobileApplicationUserId
   )
+  const cacheOwner = ritualCacheOwner(applicationUserId)
   const activeLocale =
     resolveSupportedLocale(i18n.resolvedLanguage ?? i18n.language) ??
     defaultSupportedLocale
@@ -278,7 +280,7 @@ export default function TabOneScreen() {
     setError(null)
     setIsStale(false)
 
-    const cached = await readLatestRitualCache(analyticsUserId, activeLocale)
+    const cached = await readLatestRitualCache(cacheOwner, activeLocale)
     const now = Date.now()
 
     if (!forceRefresh && cached && now - cached.timestamp < 15 * 60 * 1000) {
@@ -300,7 +302,7 @@ export default function TabOneScreen() {
       setRitual(data)
       setAlertPreferences(fetchedPreferences)
       setIsCacheServed(false)
-      void saveRitualCache(analyticsUserId, activeLocale, {
+      void saveRitualCache(cacheOwner, activeLocale, {
         // Decision 6: the commerce block never enters the device cache, or the
         // CTA outlives an opt-out by fifteen minutes online and indefinitely
         // offline.
@@ -593,7 +595,7 @@ export default function TabOneScreen() {
 
     setRitual(updatedRitual)
 
-    void saveRitualCache(analyticsUserId, activeLocale, {
+    void saveRitualCache(cacheOwner, activeLocale, {
       // A swap rewrites a network payload, so this write can carry a commerce
       // block too. Decision 6 applies to every cache write, not just the fetch.
       data: withoutShopThisLook(updatedRitual),

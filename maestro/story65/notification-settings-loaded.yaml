@@ -1,0 +1,10 @@
+# Story 6.5 owner: open the notification settings as the signed-in member and wait for the
+# member's preferences to load. "Sign out" renders before they load, so the loaded Switch
+# is the precondition for every logout case.
+appId: ${MAESTRO_APP_ID}
+---
+- runFlow: open-app.yaml
+- runFlow: open-notification-settings.yaml
+- extendedWaitUntil:
+    visible: ${MAESTRO_ENABLED}
+    timeout: 30000

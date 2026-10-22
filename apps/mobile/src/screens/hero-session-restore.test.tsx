@@ -28,6 +28,8 @@ vi.mock('@/src/lib/ritual-cache', async (importOriginal) => {
   const actual = await importOriginal<typeof RitualCacheModule>()
   return {
     withoutShopThisLook: actual.withoutShopThisLook,
+    // Pure key derivation, not storage: kept real so the screen keys exactly as shipped.
+    ritualCacheOwner: actual.ritualCacheOwner,
     readLatestRitualCache: vi.fn().mockResolvedValue(null),
     saveRitualCache: vi.fn().mockResolvedValue(undefined),
     clearRitualMemoryCache: () => undefined,

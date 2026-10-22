@@ -65,6 +65,8 @@ vi.mock('@/src/lib/ritual-cache', async (importOriginal) => {
     // real one is kept: mocking it would hide the very stripping the screen is
     // supposed to perform before it writes.
     withoutShopThisLook: actual.withoutShopThisLook,
+    // Pure key derivation, not storage: kept real so the screen keys exactly as shipped.
+    ritualCacheOwner: actual.ritualCacheOwner,
     readLatestRitualCache: readLatestRitualCacheMock,
     saveRitualCache: saveRitualCacheMock,
     clearRitualMemoryCache: () => undefined,

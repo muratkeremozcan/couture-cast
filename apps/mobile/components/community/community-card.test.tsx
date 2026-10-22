@@ -588,6 +588,38 @@ describe('CommunityCard (Story 6.1)', () => {
     ).toBeInTheDocument()
   })
 
+  it('6.5-MOB-POLISH-14 marks the image loaded only after it actually loads', () => {
+    // The image element exists from the first render, loaded or not, so asserting it
+    // cannot fail. The loaded marker appears only after onLoad and goes on a failure.
+    imageSpy.silent = true
+    render(
+      <CommunityCard
+        item={item({
+          imageAccess: {
+            url: PIXEL,
+            expiresAt: new Date(Date.now() + 3_600_000).toISOString(),
+          },
+        })}
+        onReport={vi.fn()}
+        onWithdraw={vi.fn()}
+        onImageExpiry={vi.fn()}
+      />
+    )
+    const image = () =>
+      imageSpy.props.get('community-card-image-post-a') as {
+        onError: () => void
+        onLoad: () => void
+      }
+    const loaded = () => screen.queryByTestId('community-card-image-loaded-post-a')
+
+    expect(screen.getByTestId('community-card-image-post-a')).toBeInTheDocument()
+    expect(loaded()).toBeNull()
+    act(() => image().onLoad())
+    expect(loaded()).toBeInTheDocument()
+    act(() => image().onError())
+    expect(loaded()).toBeNull()
+  })
+
   it('6.5-MOB-POLISH-02 restores the full budget once an image actually loads', () => {
     const onImageExpiry = vi.fn()
     render(

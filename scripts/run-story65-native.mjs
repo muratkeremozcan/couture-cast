@@ -110,6 +110,62 @@ async function waitFor(description, probe, { timeout = 30_000, interval = 500 } 
   }
 }
 
+/**
+ * `--invert outcome` expects the opposite of every claim a case asserts, and `--invert
+ * dialog` skips the reset that makes the OS ask for notification permission. Either run
+ * must exit red: it is the proof that the case's assertions can fail at all.
+ */
+const invert = args.invert ?? null
+if (invert && !['outcome', 'dialog'].includes(invert))
+  throw new Error('--invert must be outcome or dialog')
+const caseSuffix = invert ? `-inverted-${invert}` : ''
+
+/**
+ * Asserts one claim a case makes, or its opposite on an `--invert outcome` run. Every
+ * claim is logged and returned so the evidence JSON lists what the case proved.
+ */
+function claim(claims, name, holds, detail = {}) {
+  const inverted = invert === 'outcome'
+  claims.push({ name, holds, ...detail })
+  log('claim', { name, holds, inverted, ...detail })
+  if (holds === inverted)
+    throw new Error(
+      `${inverted ? 'Inverted claim still held' : 'Claim failed'}: ${name} ${JSON.stringify(detail)}`
+    )
+}
+
+/**
+ * A claim this build cannot exercise is recorded as not provable rather than passed: the
+ * Android build has no FCM configuration, so it never obtains a push token and never
+ * holds a server binding to create, move or remove.
+ */
+function notProvable(claims, name, reason) {
+  claims.push({ name, provable: false, reason })
+  log('claim', { name, provable: false, reason })
+}
+
+const pushProvider =
+  platform === 'ios' || Boolean(publicEnv.FIREBASE_GOOGLE_SERVICES_FILE)
+const noProviderReason =
+  'this Android build has no FCM configuration (N3 prerequisite), so it never holds a push binding'
+
+const escapeRegex = (text) => text.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')
+
+/** Every text and accessibility label on screen now, from a captured hierarchy. */
+function visibleTexts(label) {
+  captureHierarchy(label)
+  const raw = fs.readFileSync(path.join(evidence, `hierarchy-${label}.json`), 'utf8')
+  const texts = []
+  const walk = (node) => {
+    const attributes = node.attributes ?? {}
+    for (const key of ['text', 'accessibilityText', 'hintText'])
+      if (attributes[key]) texts.push(attributes[key])
+    for (const child of node.children ?? []) walk(child)
+  }
+  walk(JSON.parse(raw.slice(raw.indexOf('{'))))
+  return texts
+}
+
 // ---------------------------------------------------------------------------------------
 // Accounts and local Auth
 
@@ -642,11 +698,21 @@ async function signInAccount(label, locale, { fresh }) {
     { ...localeEnv(locale), MAESTRO_OTP: code },
     { secrets: [code], privateOutput: true }
   )
+  writeJson(memberPath, { account: label, at: new Date().toISOString() })
   log('signed-in', {
     account: label,
     authUserId: account.authUserId,
     appUserId: account.appUserId,
   })
+}
+
+/** Which account this device is signed in as: recorded by the runner's own sign-ins. */
+const memberPath = path.join(evidence, 'signed-in-member.json')
+function signedInMember() {
+  if (args.member) return args.member
+  if (!fs.existsSync(memberPath))
+    throw new Error('No sign-in recorded on this device; pass --member recipient|second')
+  return readJson(memberPath).account
 }
 
 const tapCases = {
@@ -753,112 +819,169 @@ function androidPermissionGranted() {
   return line?.includes('granted=true') ?? false
 }
 
+/** Server bindings this platform's device holds for one member. */
+const devicePlatformBindings = (rows) => rows.filter((row) => row.platform === platform)
+
+function resetAndroidPermission() {
+  // Back to "ask": clear the user decision so the OS dialog is shown again.
+  adb('shell', 'pm', 'revoke', appId, 'android.permission.POST_NOTIFICATIONS')
+  adb(
+    'shell',
+    'pm',
+    'clear-permission-flags',
+    appId,
+    'android.permission.POST_NOTIFICATIONS',
+    'user-set',
+    'user-fixed'
+  )
+}
+
 /**
- * OS permission states, answered in the real OS dialog where one appears:
- * - denied: permission reset to ask, the dialog is answered "Don't allow"
- * - granted: the dialog is answered "Allow"; registration then needs a provider token
- * - revoked: the OS revokes a granted permission (Android kills the process), the app is
- *   reopened and its foreground reconcile runs
+ * OS permission states, answered in the real OS dialog, which every denied and granted run
+ * requires (the flow fails when no dialog appears):
+ * - denied: permission reset to ask, the dialog is answered "Don't allow". The screen asks
+ *   for device settings, the OS stays denied and no binding is created.
+ * - granted: the dialog is answered "Allow". With a push provider the screen saves and the
+ *   member gains exactly one binding; the Android build has no FCM, so it reports push as
+ *   unavailable and creates none.
+ * - revoked (Android): the OS revokes a granted permission and ends the app; after reopening,
+ *   the OS is denied and no granted binding remains.
+ * iOS asks once per install, so its denied and granted runs start from a fresh install.
  */
 async function permission() {
   const name = requireArg('case')
   const owner = state().accounts.recipient
   const locale = args.locale ?? 'en-US'
-  const label = `permission-${name}-${locale}`
-  if (name !== 'revoked') await disableEngagementNotifications(owner)
-  const n = strings[locale].community.notifications
-  if (platform === 'ios') return iosPermission(name, owner, locale, label, n)
-  ensureAndroidReverses()
-  const before = await bindings(owner.appUserId)
-  if (name === 'denied') {
-    // Back to "ask": clear the user decision so the OS dialog is shown again.
-    adb('shell', 'pm', 'revoke', appId, 'android.permission.POST_NOTIFICATIONS')
-    adb(
-      'shell',
-      'pm',
-      'clear-permission-flags',
-      appId,
-      'android.permission.POST_NOTIFICATIONS',
-      'user-set',
-      'user-fixed'
-    )
-    openApp()
-    maestro('notification-permission.yaml', label, {
-      ...localeEnv(locale),
-      MAESTRO_DIALOG_CHOICE: 'Don.t allow',
-      MAESTRO_EXPECT_TEXT: n.permission,
-      MAESTRO_CASE: label,
-    })
-  } else if (name === 'granted') {
-    adb('shell', 'pm', 'revoke', appId, 'android.permission.POST_NOTIFICATIONS')
-    adb(
-      'shell',
-      'pm',
-      'clear-permission-flags',
-      appId,
-      'android.permission.POST_NOTIFICATIONS',
-      'user-set',
-      'user-fixed'
-    )
-    openApp()
-    maestro('notification-permission.yaml', label, {
-      ...localeEnv(locale),
-      MAESTRO_DIALOG_CHOICE: 'Allow',
-      // Settle on any outcome message; the binding check below is the assertion.
-      MAESTRO_EXPECT_TEXT: `${n.saved}|${n.failed}|${n.permission}`,
-      MAESTRO_CASE: label,
-    })
-  } else if (name === 'revoked') {
-    if (!androidPermissionGranted())
-      throw new Error('Revocation needs a granted permission first')
-    adb('shell', 'pm', 'revoke', appId, 'android.permission.POST_NOTIFICATIONS')
-    await waitFor('the OS to end the app after revocation', () => !appRunning(), {
-      timeout: 15_000,
-    })
-    openApp()
-    maestro('open-app.yaml', label, localeEnv(locale))
-    await sleep(5_000)
-  } else throw new Error(`Unknown permission case ${name}`)
-  captureHierarchy(label)
-  const after = await bindings(owner.appUserId)
-  const result = {
+  const label = `permission-${name}-${locale}${caseSuffix}`
+  const answered = name === 'denied' || name === 'granted'
+  if (!answered && name !== 'revoked') throw new Error(`Unknown permission case ${name}`)
+  if (platform === 'ios' && !answered)
+    throw new Error(`iOS permission case ${name} is not scriptable`)
+  if (platform === 'android') ensureAndroidReverses()
+  if (answered) await disableEngagementNotifications(owner)
+  const ctx = {
+    name,
+    owner,
+    locale,
+    label,
+    n: strings[locale].community.notifications,
+    before: devicePlatformBindings(await bindings(owner.appUserId)),
+    claims: [],
+  }
+  const after = answered ? await permissionAnswered(ctx) : await permissionRevoked(ctx)
+  writeCaseEvidence('permission', label, {
     case: name,
     locale,
-    osPermissionGranted: androidPermissionGranted(),
-    bindingsBefore: before,
+    claims: ctx.claims,
+    bindingsBefore: ctx.before,
     bindingsAfter: after,
-    at: new Date().toISOString(),
-  }
-  writeJson(path.join(evidence, `${label}.json`), result)
-  log('permission', result)
+  })
 }
 
-/**
- * iOS asks once per install, so the granted case runs on a fresh install. The system alert is
- * answered in the OS UI. Revocation is not scriptable on the simulator.
- */
-async function iosPermission(name, owner, locale, label, n) {
-  if (!['granted', 'denied'].includes(name))
-    throw new Error(`iOS permission case ${name} is not scriptable`)
-  const before = await bindings(owner.appUserId)
+/** Exactly one outcome message is on screen, and it is the expected one. */
+function claimOnlyMessage(claims, texts, outcomes, expected) {
+  const shown = outcomes.filter((text) => texts.includes(text))
+  claim(
+    claims,
+    `the screen reports "${expected}" and nothing else`,
+    shown.length === 1 && shown[0] === expected,
+    { shown }
+  )
+}
+
+async function permissionAnswered({ name, owner, locale, label, n, before, claims }) {
+  if (platform === 'android') {
+    // `--invert dialog` keeps the current decision, so the OS has nothing to ask.
+    if (invert !== 'dialog') resetAndroidPermission()
+    openApp()
+  }
+  const choice = {
+    android: { denied: 'Don.t allow', granted: 'Allow' },
+    ios: { denied: 'Don.t Allow', granted: '^Allow$' },
+  }[platform][name]
+  const outcomes = [n.saved, n.failed, n.permission, n.pushUnavailable, n.bindingConflict]
   maestro('notification-permission.yaml', label, {
     ...localeEnv(locale),
-    MAESTRO_DIALOG_CHOICE: name === 'granted' ? '^Allow$' : 'Don.t Allow',
-    MAESTRO_EXPECT_TEXT:
-      name === 'granted' ? `${n.saved}|${n.failed}|${n.permission}` : n.permission,
+    MAESTRO_DIALOG_CHOICE: choice,
+    MAESTRO_OUTCOME: outcomes.map(escapeRegex).join('|'),
     MAESTRO_CASE: label,
   })
+  const texts = visibleTexts(label)
+  const after = devicePlatformBindings(await bindings(owner.appUserId))
+  const granted = name === 'granted'
+  claimOnlyMessage(
+    claims,
+    texts,
+    outcomes,
+    !granted ? n.permission : pushProvider ? n.saved : n.pushUnavailable
+  )
+  if (platform === 'android')
+    claim(claims, `the OS permission is ${name}`, androidPermissionGranted() === granted)
+  const delta = granted && pushProvider ? 1 : 0
+  claim(
+    claims,
+    delta ? 'the member gains exactly one binding' : 'no binding is created',
+    after.length === before.length + delta,
+    { before: before.length, after: after.length }
+  )
+  return after
+}
+
+async function permissionRevoked({ owner, locale, label, before, claims }) {
+  if (!androidPermissionGranted())
+    throw new Error('Revocation needs a granted permission first')
+  adb('shell', 'pm', 'revoke', appId, 'android.permission.POST_NOTIFICATIONS')
+  const ended = await waitFor(
+    'the OS to end the app after revocation',
+    () => !appRunning(),
+    { timeout: 15_000 }
+  ).catch(() => false)
+  claim(claims, 'the OS ends the app on revocation', Boolean(ended))
+  openApp()
+  maestro('open-app.yaml', label, localeEnv(locale))
+  await sleep(5_000)
   captureHierarchy(label)
-  const after = await bindings(owner.appUserId)
-  const result = {
-    case: name,
-    locale,
-    bindingsBefore: before,
-    bindingsAfter: after,
-    at: new Date().toISOString(),
-  }
-  writeJson(path.join(evidence, `${label}.json`), result)
-  log('permission', result)
+  const after = devicePlatformBindings(await bindings(owner.appUserId))
+  claim(
+    claims,
+    'the OS permission is revoked after reopening',
+    !androidPermissionGranted()
+  )
+  if (before.some((row) => row.permission === 'granted'))
+    claim(
+      claims,
+      'no granted binding remains after the foreground reconcile',
+      after.every((row) => row.permission !== 'granted'),
+      { before, after }
+    )
+  else
+    notProvable(
+      claims,
+      'the foreground reconcile retires a granted binding',
+      noProviderReason
+    )
+  return after
+}
+
+function writeCaseEvidence(kind, label, result) {
+  const full = { ...result, invert, at: new Date().toISOString() }
+  writeJson(path.join(evidence, `${label}.json`), full)
+  log(kind, full)
+}
+
+/** App user ids the API authenticated after `since`, from its request log. */
+function authenticatedUsersSince(since) {
+  return [
+    ...new Set(
+      fs
+        .readFileSync(path.join(harness, 'api.log'), 'utf8')
+        .split('\n')
+        .filter((line) => line.includes('"message":"request_completed"'))
+        .map((line) => JSON.parse(line))
+        .filter((row) => row.timestamp > since && row.userId)
+        .map((row) => row.userId)
+    ),
+  ]
 }
 
 /** API request log lines (method, path, status) recorded after `since`, in order. */
@@ -888,77 +1011,187 @@ function apiCallsSince(since) {
  */
 async function session() {
   const name = requireArg('case')
+  const run = sessionCases[name]
+  if (!run) throw new Error(`Unknown session case ${name}`)
   const locale = args.locale ?? 'en-US'
-  const label = `session-${name}-${locale}`
+  const label = `session-${name}-${locale}${caseSuffix}`
   const { recipient, second } = state().accounts
   if (platform === 'android') ensureAndroidReverses()
   const since = new Date().toISOString()
   const owners = async () => ({
-    recipient: await bindings(recipient.appUserId),
-    second: await bindings(second.appUserId),
+    recipient: devicePlatformBindings(await bindings(recipient.appUserId)),
+    second: devicePlatformBindings(await bindings(second.appUserId)),
   })
-  const before = await owners()
-  const env = { ...localeEnv(locale), MAESTRO_PLATFORM: platform, MAESTRO_CASE: label }
+  const ctx = {
+    locale,
+    label,
+    since,
+    owners,
+    n: strings[locale].community.notifications,
+    before: await owners(),
+    member: name === 'restore' ? null : signedInMember(),
+    env: { ...localeEnv(locale), MAESTRO_PLATFORM: platform, MAESTRO_CASE: label },
+    claims: [],
+  }
   // The locale syncs to the profile and persists on the device; select it explicitly.
   if (!appRunning()) openApp()
   maestro('open-app.yaml', `ready-${label}`, localeEnv('en-US'))
   maestro('set-locale.yaml', `locale-${label}`, localeEnv(locale))
-  let detail = {}
-  if (name === 'restore') {
-    stopApp()
-    openApp()
-    maestro('session-restore.yaml', label, env)
-    const calls = apiCallsSince(since)
-    const profile = calls.findIndex(
-      (c) => c.path === '/api/v1/user/profile' && c.status < 400
-    )
-    const ritualAfter = calls.slice(profile + 1).find((c) => c.path === '/api/v1/ritual')
-    if (profile < 0) throw new Error('No successful profile request after restore')
-    // The flow already proved Home rendered without its error state (P2). Home may render
-    // from the ritual cache; any network reload after restore must succeed.
-    if (ritualAfter && ritualAfter.status >= 400)
-      throw new Error(`Home reload failed after restore: ${JSON.stringify(ritualAfter)}`)
-    detail = {
-      profile: calls[profile],
-      homeSource: ritualAfter ? 'network' : 'ritual cache',
-      ritualAfterRestore: ritualAfter ?? null,
-    }
-  } else if (name === 'logout') {
-    maestro('session-logout.yaml', label, env)
-  } else if (name === 'switch') {
-    await signInAccount('second', locale, { fresh: false })
-  } else if (name === 'logout-offline') {
-    const apiPid = readJson(path.join(harness, 'api-process.json')).pid
-    const command = run('ps', ['-p', String(apiPid), '-o', 'command=']).stdout
-    if (!command.includes('c-doc/workspace/apps/api/dist/src/main.js'))
-      throw new Error('The recorded API process is not this harness API')
-    process.kill(apiPid, 'SIGSTOP')
-    try {
-      maestro('session-logout.yaml', label, env)
-    } finally {
-      process.kill(apiPid, 'SIGCONT')
-    }
-    detail.pausedApi = apiPid
-    detail.bindingsAfterOfflineLogout = await owners()
-    stopApp()
-    openApp()
-    maestro('open-app.yaml', `${label}-reopen`, env)
-    await sleep(5_000)
-  } else throw new Error(`Unknown session case ${name}`)
-  captureHierarchy(label)
-  const result = {
+  const detail = (await run(ctx)) ?? {}
+  writeCaseEvidence('session', label, {
     case: name,
     locale,
-    bindingsBefore: before,
+    member: ctx.member,
+    claims: ctx.claims,
+    bindingsBefore: ctx.before,
     bindingsAfter: await owners(),
     ...detail,
     apiCalls: apiCallsSince(since).filter((c) =>
       /profile|ritual|push|notification-preferences|tokens/.test(c.path)
     ),
-    at: new Date().toISOString(),
-  }
-  writeJson(path.join(evidence, `${label}.json`), result)
-  log('session', result)
+  })
+}
+
+/** A member's binding claim, or why this build cannot exercise it. */
+function claimMemberBinding(ctx, name, holds, detail) {
+  if (ctx.before[ctx.member].length > 0) claim(ctx.claims, name, holds, detail)
+  else
+    notProvable(
+      ctx.claims,
+      name,
+      pushProvider ? `${ctx.member} held no binding beforehand` : noProviderReason
+    )
+}
+
+const sessionCases = {
+  /**
+   * End the app process and reopen it: the secure session restores, the profile loads
+   * and Home renders (P2); on iOS the back label is localized (P3).
+   */
+  async restore({ label, env, claims }) {
+    // Anchored at the restart: the profile read must come from the restored session, and
+    // Home's first load can run (and answer 401) before the stored session is restored;
+    // the restored identity re-runs it (from the member's cache or the network).
+    const restartedAt = new Date().toISOString()
+    stopApp()
+    openApp()
+    maestro('session-restore.yaml', label, env)
+    captureHierarchy(label)
+    const calls = apiCallsSince(restartedAt)
+    const profile = calls.findIndex(
+      (c) => c.path === '/api/v1/user/profile' && c.status < 400
+    )
+    const ritualAfter = calls.slice(profile + 1).find((c) => c.path === '/api/v1/ritual')
+    claim(claims, 'the restored session reads the profile successfully', profile >= 0)
+    // The flow already proved Home rendered without its error state (P2). Home may render
+    // from the ritual cache; any network reload after restore must succeed.
+    claim(
+      claims,
+      'any Home reload after restore succeeds',
+      !ritualAfter || ritualAfter.status < 400,
+      { ritualAfter: ritualAfter ?? null }
+    )
+    return {
+      profile: calls[profile] ?? null,
+      homeSource: ritualAfter ? 'network' : 'ritual cache',
+    }
+  },
+
+  /** Sign out in the UI once preferences loaded: the member's binding leaves the server. */
+  async logout(ctx) {
+    maestro('session-logout.yaml', ctx.label, ctx.env)
+    fs.rmSync(memberPath, { force: true })
+    claim(
+      ctx.claims,
+      'the reopened screen holds no member preferences',
+      !visibleTexts(ctx.label).includes(ctx.n.enabled)
+    )
+    const after = await ctx.owners()
+    claimMemberBinding(
+      ctx,
+      `logout removes ${ctx.member}'s binding server-side`,
+      after[ctx.member].length === 0,
+      { before: ctx.before[ctx.member].length, after: after[ctx.member].length }
+    )
+  },
+
+  /** Sign the other account in over the current one: the binding changes owner. */
+  async switch(ctx) {
+    const next = ctx.member === 'recipient' ? 'second' : 'recipient'
+    await signInAccount(next, ctx.locale, { fresh: false })
+    // Every member request after the sign-in completes is the new member's.
+    const signedInAt = new Date().toISOString()
+    maestro('notification-settings-loaded.yaml', `${ctx.label}-as-${next}`, ctx.env)
+    captureHierarchy(ctx.label)
+    const actingAs = authenticatedUsersSince(signedInAt)
+    claim(
+      ctx.claims,
+      `the device acts only as ${next} after the switch`,
+      actingAs.length > 0 &&
+        actingAs.every((id) => id === state().accounts[next].appUserId),
+      { actingAs }
+    )
+    const after = await ctx.owners()
+    claimMemberBinding(
+      ctx,
+      `${ctx.member}'s binding leaves the device on switch`,
+      after[ctx.member].length === 0,
+      { before: ctx.before[ctx.member].length, after: after[ctx.member].length }
+    )
+    if (pushProvider)
+      claim(
+        ctx.claims,
+        `${next} holds the device binding after the switch`,
+        after[next].length === 1,
+        { after: after[next].length }
+      )
+    else
+      notProvable(ctx.claims, 'the new member gains the device binding', noProviderReason)
+  },
+
+  /**
+   * Sign out while this harness's own API is paused (SIGSTOP), resume it and reopen. D5:
+   * the unreachable unbind leaves the server binding for owner reauthentication, transfer
+   * on the next sign-in or inactive expiry, and a signed-out reopen must not drop it.
+   */
+  async 'logout-offline'(ctx) {
+    const apiPid = readJson(path.join(harness, 'api-process.json')).pid
+    const command = run('ps', ['-p', String(apiPid), '-o', 'command=']).stdout
+    if (!command.includes('c-doc/workspace/apps/api/dist/src/main.js'))
+      throw new Error('The recorded API process is not this harness API')
+    // Preferences load while the API is up; only the sign-out runs against a paused API.
+    maestro('notification-settings-loaded.yaml', `${ctx.label}-loaded`, ctx.env)
+    process.kill(apiPid, 'SIGSTOP')
+    try {
+      maestro('session-signout.yaml', ctx.label, ctx.env)
+    } finally {
+      process.kill(apiPid, 'SIGCONT')
+    }
+    fs.rmSync(memberPath, { force: true })
+    claim(
+      ctx.claims,
+      'the device signs out while the API is unreachable',
+      !visibleTexts(ctx.label).includes(ctx.n.enabled)
+    )
+    const afterOffline = await ctx.owners()
+    stopApp()
+    openApp()
+    maestro('open-app.yaml', `${ctx.label}-reopen`, ctx.env)
+    await sleep(5_000)
+    const afterReopen = await ctx.owners()
+    const held = ctx.before[ctx.member].length
+    claimMemberBinding(
+      ctx,
+      `${ctx.member}'s binding is kept for D5 cleanup after an offline logout`,
+      afterOffline[ctx.member].length === held && afterReopen[ctx.member].length === held,
+      {
+        before: held,
+        afterOffline: afterOffline[ctx.member].length,
+        afterReopen: afterReopen[ctx.member].length,
+      }
+    )
+    return { pausedApi: apiPid, bindingsAfterOfflineLogout: afterOffline }
+  },
 }
 
 /**

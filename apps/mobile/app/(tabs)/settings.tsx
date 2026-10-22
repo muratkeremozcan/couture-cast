@@ -102,23 +102,37 @@ const availableLocales = [
  * a member, so a signed-out device has nothing to load and nothing has failed. Re-checked
  * whenever the application user changes (sign-in, sign-out, account switch).
  */
+// Retry delays for a session read that throws (keychain locked or busy).
+const SESSION_READ_RETRY_MS = [1_000, 2_000, 4_000]
+
+/**
+ * `false` only when the session read affirmatively finds no token. A read that throws
+ * is not proof of no session, so the state stays unknown (`null`, no signed-out hint and
+ * no member reads) and the read is retried a bounded number of times.
+ */
 function useMemberSignedIn(): boolean | null {
   const [signedIn, setSignedIn] = useState<boolean | null>(null)
   useEffect(() => {
     let active = true
-    const check = () => {
+    let retryTimer: ReturnType<typeof setTimeout> | undefined
+    const check = (attempt = 0) => {
+      clearTimeout(retryTimer)
       void resolveMobileAccessToken()
         .then((token) => {
           if (active) setSignedIn(Boolean(token))
         })
         .catch(() => {
-          if (active) setSignedIn(false)
+          const delay = SESSION_READ_RETRY_MS[attempt]
+          if (active && delay !== undefined) {
+            retryTimer = setTimeout(() => check(attempt + 1), delay)
+          }
         })
     }
     check()
-    const unsubscribe = subscribeMobileApplicationUser(check)
+    const unsubscribe = subscribeMobileApplicationUser(() => check())
     return () => {
       active = false
+      clearTimeout(retryTimer)
       unsubscribe()
     }
   }, [])
