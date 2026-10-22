@@ -2,7 +2,7 @@
 title: 'Story 6.5: Realtime engagement and notifications'
 type: 'feature'
 created: '2026-10-20'
-status: 'in-review'
+status: 'done'
 baseline_commit: 'aa8cd0e1f12ea778a9ca40b76c0868637f1b55a1'
 route: 'dispatch'
 story_key: '6-5-realtime-engagement-notifications'
