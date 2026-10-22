@@ -4,6 +4,7 @@ import { describe, expect, it, vi } from 'vitest'
 import { CommunityCommentsState } from '../src/community-comments-state'
 import { CommunityRequestSuperseded } from '../src/community-sync-state'
 import type { CommunitySyncClient } from '../src/community-sync-client'
+import { abortError } from '../src/request-deadline'
 import type {
   CommunityCommentsPage,
   CommunityCommentSubmission,
@@ -117,8 +118,8 @@ describe('create intent classification (B1)', () => {
   it.each<[string, unknown]>([
     ['HTTP 500', { httpStatus: 500 }],
     ['HTTP 503', { httpStatus: 503 }],
-    ['a deadline timeout', new DOMException('Request deadline reached', 'TimeoutError')],
-    ['an aborted request', new DOMException('The operation was aborted.', 'AbortError')],
+    ['a deadline timeout', abortError('Request deadline reached', 'TimeoutError')],
+    ['an aborted request', abortError('The operation was aborted.')],
     ['a network failure', new TypeError('Failed to fetch')],
   ])(
     'retains the exact intent after %s and retries the identical request',

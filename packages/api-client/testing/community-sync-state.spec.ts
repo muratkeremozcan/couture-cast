@@ -5,6 +5,7 @@ import {
   type CommunitySyncCallbacks,
 } from '../src/community-sync-state'
 import type { CommunitySyncClient } from '../src/community-sync-client'
+import { abortError } from '../src/request-deadline'
 import { connectCommunityTransport } from '../src/realtime/community-transport'
 
 vi.mock('../src/realtime/community-transport', () => ({
@@ -469,7 +470,7 @@ describe('Story 6.5 reconciliation ownership', () => {
             'abort',
             () => {
               clearTimeout(timer)
-              reject(new DOMException('Aborted', 'AbortError'))
+              reject(abortError('Aborted'))
             },
             { once: true }
           )

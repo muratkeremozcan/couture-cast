@@ -6,6 +6,7 @@ import type {
   resolvedCommunityTargetSchema,
 } from './contracts/http'
 import type { CommunitySyncClient } from './community-sync-client'
+import { abortError } from './request-deadline'
 import {
   connectCommunityTransport,
   type CommunityTransportState,
@@ -272,7 +273,7 @@ export class CommunitySyncState {
     const aborted = new Promise<never>((_, reject) => {
       controller.signal.addEventListener(
         'abort',
-        () => reject(new DOMException('Community request aborted', 'AbortError')),
+        () => reject(abortError('Community request aborted')),
         { once: true }
       )
       timer = setTimeout(() => controller.abort(), timeout)

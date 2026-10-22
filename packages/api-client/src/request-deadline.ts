@@ -1,3 +1,17 @@
+/**
+ * An abort or deadline error that exists on every runtime. Hermes has no DOMException
+ * global, so code that can run on React Native builds a plain Error and callers branch on
+ * `error.name`, never on `instanceof DOMException`.
+ */
+export function abortError(
+  message: string,
+  name: 'AbortError' | 'TimeoutError' = 'AbortError'
+): Error {
+  const error = new Error(message)
+  error.name = name
+  return error
+}
+
 /** Portable to React Native's AbortController polyfill. Each call owns its cleanup. */
 export async function withRequestDeadline<T>(
   timeoutMs: number,

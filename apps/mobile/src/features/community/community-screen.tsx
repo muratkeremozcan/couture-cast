@@ -5,6 +5,7 @@ import {
   subscribeMobileApplicationUser,
 } from '@/src/lib/mobile-auth'
 import {
+  abortError,
   ResponseError,
   withRequestDeadline,
   CommunityCommentsState,
@@ -407,8 +408,7 @@ export function CommunityScreen() {
     }
     let abortOperation: () => void = () => undefined
     const aborted = new Promise<never>((_resolve, reject) => {
-      abortOperation = () =>
-        reject(new DOMException('Target verification is unavailable.', 'AbortError'))
+      abortOperation = () => reject(abortError('Target verification is unavailable.'))
       controller.signal.addEventListener('abort', abortOperation, { once: true })
     })
     const reportHandled = () => {
