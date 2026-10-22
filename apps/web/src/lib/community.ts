@@ -424,8 +424,8 @@ export async function getCommunitySpotlightFromWeb({
 
 /**
  * Story 6.6: records a spotlight open. The body names the surface, the card's
- * rank and the level the module was served at, and never an experiment arm, so the server records only the
- * spotlight event and never a feed card-open.
+ * rank and the level the module was served at, and never an experiment arm, so
+ * the server records only the spotlight event and never a feed card-open.
  */
 export async function openCommunitySpotlightPostFromWeb(
   postId: string,

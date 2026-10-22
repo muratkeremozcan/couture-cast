@@ -135,4 +135,21 @@ describe('City Spotlight web wrappers (Story 6.6)', () => {
     await openCommunitySpotlightPostFromWeb('post-9', 9, 'region')
     expect(bodies).toEqual([{ surface: 'spotlight', rank: 9, level: 'region' }])
   })
+
+  it('6.6-WEB-015 a refused spotlight open surfaces the classified failure', async () => {
+    useMswHandlers(
+      http.post('/api/v1/community/posts/:postId/opened', () =>
+        HttpResponse.json(
+          { statusCode: 404, error: 'Not Found', message: 'Post not found.' },
+          { status: 404 }
+        )
+      )
+    )
+    const failure: unknown = await openCommunitySpotlightPostFromWeb(
+      'post-gone',
+      1,
+      'city'
+    ).catch((error: unknown) => error)
+    expect(communityFailureReason(failure)).toBe('not_found')
+  })
 })
