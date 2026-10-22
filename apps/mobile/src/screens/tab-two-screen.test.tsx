@@ -165,7 +165,19 @@ describe('SettingsScreen', () => {
     setMobileAnalyticsDiagnosticsEnabled(false)
   })
 
+  it('6.5-MOB-POLISH-07 keeps API health and wiring notes out of the user build', async () => {
+    // Diagnostics stay off unless EXPO_PUBLIC_MOBILE_ANALYTICS_DIAGNOSTICS=1, so users
+    // never see developer status lines and the screen never polls the health route.
+    await render(<SettingsScreen />)
+
+    await screen.findByTestId('locale-btn-tr-TR')
+    expect(screen.queryByText(/API health/)).toBeNull()
+    expect(screen.queryByText(/alert_received/)).toBeNull()
+    expect(loadMobileApiHealthMock).not.toHaveBeenCalled()
+  })
+
   it('renders API health loaded from the generated client', async () => {
+    setMobileAnalyticsDiagnosticsEnabled(true)
     loadMobileApiHealthMock.mockResolvedValue({
       status: 'ok',
     })
@@ -177,6 +189,7 @@ describe('SettingsScreen', () => {
 
   it('falls back to unavailable when the API health request never resolves', async () => {
     vi.useFakeTimers()
+    setMobileAnalyticsDiagnosticsEnabled(true)
     loadMobileApiHealthMock.mockImplementation(() => new Promise(() => undefined))
 
     await render(<SettingsScreen />)
@@ -293,6 +306,7 @@ describe('SettingsScreen', () => {
   })
 
   it('falls back to unavailable when the API health request is rejected', async () => {
+    setMobileAnalyticsDiagnosticsEnabled(true)
     loadMobileApiHealthMock.mockRejectedValue(new Error('health endpoint down'))
 
     await render(<SettingsScreen />)

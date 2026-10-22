@@ -673,7 +673,9 @@
       "signinCodeInvalid": "Kod yanlış veya süresi dolmuş. E-postanızı kontrol edin ya da yeni bir kod isteyin.",
       "signout": "Oturumu kapat",
       "deviceSettings": "Cihaz ayarlarını aç",
-      "back": "Topluluğa dön"
+      "back": "Topluluğa dön",
+      "bindingConflict": "Bu cihazın bildirim kaydı değişti. Tekrar deneyin.",
+      "pushUnavailable": "Bu cihazda anlık bildirimler kullanılamıyor."
     }
   }
 }

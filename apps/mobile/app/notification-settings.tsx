@@ -21,6 +21,7 @@ import { router } from 'expo-router'
 import type { CommunityNotificationSettings } from '@couture/api-client/contracts/http'
 import { communitySyncFromMobile } from '@/src/lib/community'
 import { enableNativeCommunityNotifications } from '@/src/lib/native-notifications'
+import { nativeNotificationFailureKey } from '@/src/lib/native-notification-errors'
 import { resolveMobileAccessToken } from '@/src/lib/mobile-auth'
 import { getCalendars } from 'expo-localization'
 import {
@@ -100,7 +101,9 @@ export default function NotificationSettingsScreen() {
     settings: CommunityNotificationSettings,
     current: () => boolean
   ) => {
-    if (isCommunityPreferenceConflict(error)) {
+    const nativeFailure = nativeNotificationFailureKey(error)
+    if (nativeFailure) setMessage(nativeFailure)
+    else if (isCommunityPreferenceConflict(error)) {
       setMessage('community.notifications.conflict')
       try {
         const value = await client.preferences()

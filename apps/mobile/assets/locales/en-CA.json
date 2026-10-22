@@ -859,7 +859,9 @@
       "signinCodeInvalid": "That code is incorrect or expired. Check your email or request a new code.",
       "signout": "Sign out",
       "deviceSettings": "Open device settings",
-      "back": "Back to community"
+      "back": "Back to community",
+      "bindingConflict": "This device's notification registration changed. Try again.",
+      "pushUnavailable": "Push notifications are not available on this device."
     }
   }
 }

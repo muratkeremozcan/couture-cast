@@ -40,6 +40,7 @@ vi.mock('expo-localization', () => ({
 }))
 vi.mock('expo-router', () => ({ router: { push: vi.fn(), back: vi.fn() } }))
 import NotificationSettingsScreen from '../../app/notification-settings'
+import { NativeNotificationFailure } from '../lib/native-notification-errors'
 const settings = () => ({
   enabled: true,
   pushEnabled: true,
@@ -159,6 +160,34 @@ describe('notification settings failure, retry and cleanup journeys', () => {
     expect(enable).toHaveBeenCalledTimes(2)
     expect(screen.getByLabelText(label('enabled'))).toBeChecked()
   })
+  it.each([
+    ['bindingConflict', 'Notification binding changed.'],
+    ['pushUnavailable', 'Push notifications are not available on this device.'],
+  ] as const)(
+    'explains a %s registration failure with its own copy',
+    async (reason, detail) => {
+      session.owner = 'member-a'
+      server.use(
+        http.get('*/api/v1/community/notification-preferences', () =>
+          HttpResponse.json({
+            data: { ...settings(), enabled: false, timezoneConfigured: true },
+          })
+        )
+      )
+      enable.mockRejectedValueOnce(new NativeNotificationFailure(reason, detail))
+      await render(<NotificationSettingsScreen />)
+      await screen.findByDisplayValue('UTC')
+      await interact(() => {
+        fireEvent.click(screen.getByLabelText(label('enabled')))
+      })
+      await interact(() => {
+        fireEvent.click(screen.getByRole('button', { name: label('save') }))
+      })
+      await screen.findByText(label(reason))
+      expect(screen.queryByText(label('conflict'))).toBeNull()
+      expect(screen.queryByRole('button', { name: label('deviceSettings') })).toBeNull()
+    }
+  )
   it('retains a draft after server failure and succeeds on explicit retry', async () => {
     session.owner = 'member-a'
     let writes = 0

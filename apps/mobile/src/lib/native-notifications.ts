@@ -17,10 +17,13 @@ import {
   nativeSessionIdentity,
   subscribeNativeSession,
 } from './native-session'
+import { NativeNotificationFailure } from './native-notification-errors'
+import { secureSessionStorage } from './secure-session-storage'
 
 const installationKey = 'couturecast.push-installation'
 const registrationKey = 'couturecast.push-registration'
 const pendingKey = 'couturecast.push-cleanup'
+const credentialKey = 'couturecast.push-cleanup-credential'
 function notificationProjectId(): string | undefined {
   const extra: unknown = Constants.expoConfig?.extra
   const eas: unknown =
@@ -41,6 +44,12 @@ const pendingBindingSchema = storedBindingSchema
   .pick({ owner: true, registrationId: true, bindingGeneration: true })
   .strip()
 type StoredBinding = z.infer<typeof storedBindingSchema>
+type PendingBinding = z.infer<typeof pendingBindingSchema>
+// The signed-out member's own access token, kept only to finish that member's removal.
+const cleanupCredentialSchema = z.object({
+  owner: z.string().min(1),
+  accessToken: z.string().min(1),
+})
 function readJson(raw: string | null): unknown {
   try {
     return raw ? JSON.parse(raw) : undefined
@@ -58,6 +67,20 @@ async function readBinding(includePending = false): Promise<StoredBinding | unde
 }
 const tokenApi = (token: string, timeout = 5000) =>
   communitySyncClient(createMobileApiClient({ accessToken: token }), undefined, timeout)
+async function cleanupCredentials() {
+  // Access tokens can outgrow one SecureStore value, so they use the chunked store.
+  return secureSessionStorage(await import('expo-secure-store'))
+}
+async function forgetPending() {
+  const secure = await import('expo-secure-store')
+  await secure.deleteItemAsync(pendingKey)
+  await (await cleanupCredentials()).removeItem(credentialKey)
+}
+function responseStatus(error: unknown) {
+  const response =
+    error && typeof error === 'object' && 'response' in error ? error.response : undefined
+  return response instanceof Response ? response.status : undefined
+}
 async function clearPending(owner: string, client: ReturnType<typeof tokenApi>) {
   const secure = await import('expo-secure-store')
   const pending = pendingBindingSchema.safeParse(
@@ -65,7 +88,63 @@ async function clearPending(owner: string, client: ReturnType<typeof tokenApi>) 
   )
   if (!pending.success || pending.data.owner !== owner) return
   await client.remove(pending.data.registrationId, pending.data.bindingGeneration)
-  await secure.deleteItemAsync(pendingKey)
+  await forgetPending()
+}
+/** Removes a signed-out member's binding with that member's captured credential. */
+async function removeWithCredential(binding: PendingBinding, accessToken: string) {
+  try {
+    await tokenApi(accessToken, 2000).remove(
+      binding.registrationId,
+      binding.bindingGeneration
+    )
+  } catch (error) {
+    const status = responseStatus(error)
+    // The server confirms nothing is left to remove.
+    if (status === 404) return forgetPending()
+    // The credential is no longer valid. The binding record stays so the next sign-in on
+    // this device can still take it over by explicit transfer.
+    if (status === 401 || status === 403)
+      await (await cleanupCredentials()).removeItem(credentialKey)
+    throw error
+  }
+  // `removed: false` also confirms the binding is gone (pruned or already transferred).
+  await forgetPending()
+}
+let cleanupFlight: Promise<void> | undefined
+/**
+ * Retries a logout's binding removal that could not reach the API, on app start and on
+ * every return to the foreground.
+ *
+ * Residual window: the device can still receive the signed-out member's notifications
+ * until the first start or foreground with connectivity while the captured access token
+ * is valid (logout signs out locally, so the token keeps its normal lifetime). If the
+ * token expires first, the binding stays live until the next sign-in on this device
+ * transfers it, or until the 30-day inactive-binding retention removes it.
+ */
+function retryPendingCleanup() {
+  cleanupFlight ??= (async () => {
+    await registrationFlight?.promise.catch(() => undefined)
+    const secure = await import('expo-secure-store')
+    const credentials = await cleanupCredentials()
+    const credential = cleanupCredentialSchema.safeParse(
+      readJson(await credentials.getItem(credentialKey))
+    )
+    if (!credential.success) return
+    const pending = pendingBindingSchema.safeParse(
+      readJson(await secure.getItemAsync(pendingKey))
+    )
+    // Never send one member's credential for another member's binding.
+    if (!pending.success || pending.data.owner !== credential.data.owner) {
+      await credentials.removeItem(credentialKey)
+      return
+    }
+    await removeWithCredential(pending.data, credential.data.accessToken)
+  })()
+    .catch(() => undefined)
+    .finally(() => {
+      cleanupFlight = undefined
+    })
+  return cleanupFlight
 }
 async function requirePermission(
   notifications: typeof ExpoNotifications,
@@ -109,7 +188,10 @@ async function registration(
     import('expo-crypto'),
   ])
   if (Platform.OS !== 'ios' && Platform.OS !== 'android')
-    throw new Error('Native notification device required.')
+    throw new NativeNotificationFailure(
+      'pushUnavailable',
+      'Native notification device required.'
+    )
   await clearPending(owner, client)
   const previous = await readBinding(true)
   if (Platform.OS === 'android')
@@ -119,11 +201,32 @@ async function registration(
     })
   await requirePermission(notifications, previous, owner, client, requestPermission)
   const projectId = notificationProjectId()
-  if (!projectId) throw new Error('Notification project unavailable.')
-  const expoToken = await notifications.getExpoPushTokenAsync({
-    projectId,
-    ...(devicePushToken ? { devicePushToken } : {}),
-  })
+  if (!projectId)
+    throw new NativeNotificationFailure(
+      'pushUnavailable',
+      'Notification project unavailable.'
+    )
+  const expoToken = await notifications
+    .getExpoPushTokenAsync({
+      projectId,
+      ...(devicePushToken ? { devicePushToken } : {}),
+    })
+    .catch((error: unknown) => {
+      // A network or token-service failure is worth retrying. Anything else means this
+      // device cannot produce a push token (for example Android without FCM).
+      const code =
+        error && typeof error === 'object' && 'code' in error ? error.code : undefined
+      if (
+        code === 'ERR_NOTIFICATIONS_NETWORK_ERROR' ||
+        code === 'ERR_NOTIFICATIONS_SERVER_ERROR'
+      )
+        throw error
+      throw new NativeNotificationFailure(
+        'pushUnavailable',
+        'Push notifications are not available on this device.',
+        error
+      )
+    })
   let installationId = await secure.getItemAsync(installationKey)
   if (!installationId) {
     installationId = crypto.randomUUID()
@@ -147,24 +250,35 @@ async function registration(
   } as const
   const bound = await registerBinding(client, owner, previous, input, () =>
     secure.deleteItemAsync(registrationKey)
-  )
+  ).catch(async (error: unknown) => {
+    throw (await bindingConflict(error))
+      ? new NativeNotificationFailure(
+          'bindingConflict',
+          'Notification binding changed.',
+          error
+        )
+      : error
+  })
   if (!bound) return
   const stored = { ...bound, owner }
   if (nativeSessionIdentity() !== owner) {
     await secure.setItemAsync(pendingKey, JSON.stringify(stored))
     await client.remove(bound.registrationId, bound.bindingGeneration)
-    await secure.deleteItemAsync(pendingKey)
+    await forgetPending()
     return
   }
   await secure.setItemAsync(registrationKey, JSON.stringify(stored))
   // A successful explicit transfer also completes an old owner's pending cleanup.
-  await secure.deleteItemAsync(pendingKey)
+  await forgetPending()
 }
 async function bindingConflict(error: unknown) {
   const response =
     error && typeof error === 'object' && 'response' in error ? error.response : undefined
   if (!(response instanceof Response) || response.status !== 409) return false
-  const body: unknown = await response.clone().json()
+  const body: unknown = await response
+    .clone()
+    .json()
+    .catch(() => undefined)
   return Boolean(
     body && typeof body === 'object' && 'code' in body && body.code === 'binding_changed'
   )
@@ -286,17 +400,23 @@ export async function enableNativeCommunityNotifications() {
 async function unbind(accessToken?: string) {
   await registrationFlight?.promise.catch(() => undefined)
   const secure = await import('expo-secure-store')
-  const value = await readBinding()
-  if (!value) return
-  await secure.setItemAsync(pendingKey, JSON.stringify(value))
   try {
-    if (!accessToken) return
-    await tokenApi(accessToken, 2000).remove(
-      value.registrationId,
-      value.bindingGeneration
+    const value = await readBinding()
+    if (!value) return
+    // Best effort: a keychain failure must not stop the removal attempt below.
+    const durable = await secure.setItemAsync(pendingKey, JSON.stringify(value)).then(
+      () => true,
+      () => false
     )
-    await secure.deleteItemAsync(pendingKey)
+    if (!accessToken) return
+    if (durable)
+      await (await cleanupCredentials())
+        .setItem(credentialKey, JSON.stringify({ owner: value.owner, accessToken }))
+        .catch(() => undefined)
+    await removeWithCredential(value, accessToken)
   } finally {
+    // Defense in depth: the signed-out member's record never outlives the logout, even
+    // when it is unreadable or the cleanup record could not be written.
     await secure.deleteItemAsync(registrationKey)
   }
 }
@@ -356,6 +476,7 @@ export async function startNativeNotifications(options: {
   const lifecycle = AppState.addEventListener('change', (state) => {
     if (!stopped && state === 'active') {
       drain()
+      void retryPendingCleanup()
       void reconcileNativeRegistration().catch(() => undefined)
     }
   })
@@ -370,6 +491,7 @@ export async function startNativeNotifications(options: {
     lifecycle.remove()
     readiness?.()
   }
+  void retryPendingCleanup()
   if (nativeSessionIdentity()) void reconcileNativeRegistration().catch(() => undefined)
   try {
     const startup = await notifications.getLastNotificationResponseAsync()

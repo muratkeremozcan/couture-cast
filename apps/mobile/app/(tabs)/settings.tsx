@@ -319,6 +319,10 @@ export default function SettingsScreen() {
   }
 
   useEffect(() => {
+    // API health is a developer status line, so it only loads with diagnostics on.
+    if (!isMobileAnalyticsDiagnosticsEnabled) {
+      return
+    }
     let isActive = true
     const unavailableTimer = setTimeout(() => {
       if (!isActive) {
@@ -502,28 +506,30 @@ export default function SettingsScreen() {
 
           <PlannerLinkRow />
 
-          <Text style={styles.infoText}>{apiHealthMessage}</Text>
-          <Text style={styles.infoText}>
-            {t('settings.diagnostic_info', {
-              defaultValue:
-                'alert_received tracking is wired to real push notification receipt listeners.',
-            })}
-          </Text>
           {isMobileAnalyticsDiagnosticsEnabled ? (
-            <Pressable
-              style={styles.actionButton}
-              onPress={recordDiagnosticAlert}
-              accessibilityRole="button"
-              accessibilityLabel={t('settings.diagnostic_alert_btn', {
-                defaultValue: 'Record weather alert analytics',
-              })}
-            >
-              <Text style={styles.actionText}>
-                {t('settings.diagnostic_alert_btn', {
-                  defaultValue: 'Record weather alert analytics',
+            <>
+              <Text style={styles.infoText}>{apiHealthMessage}</Text>
+              <Text style={styles.infoText}>
+                {t('settings.diagnostic_info', {
+                  defaultValue:
+                    'alert_received tracking is wired to real push notification receipt listeners.',
                 })}
               </Text>
-            </Pressable>
+              <Pressable
+                style={styles.actionButton}
+                onPress={recordDiagnosticAlert}
+                accessibilityRole="button"
+                accessibilityLabel={t('settings.diagnostic_alert_btn', {
+                  defaultValue: 'Record weather alert analytics',
+                })}
+              >
+                <Text style={styles.actionText}>
+                  {t('settings.diagnostic_alert_btn', {
+                    defaultValue: 'Record weather alert analytics',
+                  })}
+                </Text>
+              </Pressable>
+            </>
           ) : null}
           <MobileAnalyticsDiagnosticsPanel />
         </View>

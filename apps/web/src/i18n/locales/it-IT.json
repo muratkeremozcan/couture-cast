@@ -673,7 +673,9 @@
       "signinCodeInvalid": "Il codice non è corretto o è scaduto. Controlla l’email o richiedi un nuovo codice.",
       "signout": "Esci",
       "deviceSettings": "Apri impostazioni del dispositivo",
-      "back": "Torna alla community"
+      "back": "Torna alla community",
+      "bindingConflict": "La registrazione delle notifiche di questo dispositivo è cambiata. Riprova.",
+      "pushUnavailable": "Le notifiche push non sono disponibili su questo dispositivo."
     }
   }
 }

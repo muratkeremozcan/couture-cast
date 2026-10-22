@@ -859,7 +859,9 @@
       "signinCodeInvalid": "Der Code ist falsch oder abgelaufen. E-Mails prüfen oder einen neuen Code anfordern.",
       "signout": "Abmelden",
       "deviceSettings": "Geräteeinstellungen öffnen",
-      "back": "Zurück zur Community"
+      "back": "Zurück zur Community",
+      "bindingConflict": "Die Benachrichtigungsregistrierung dieses Geräts hat sich geändert. Versuche es erneut.",
+      "pushUnavailable": "Push-Benachrichtigungen sind auf diesem Gerät nicht verfügbar."
     }
   }
 }

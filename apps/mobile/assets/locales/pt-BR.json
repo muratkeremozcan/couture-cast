@@ -859,7 +859,9 @@
       "signinCodeInvalid": "O código está incorreto ou expirou. Verifique seu e-mail ou solicite um novo código.",
       "signout": "Sair",
       "deviceSettings": "Abrir configurações do dispositivo",
-      "back": "Voltar à comunidade"
+      "back": "Voltar à comunidade",
+      "bindingConflict": "O registro de notificações deste dispositivo mudou. Tente novamente.",
+      "pushUnavailable": "As notificações push não estão disponíveis neste dispositivo."
     }
   }
 }
