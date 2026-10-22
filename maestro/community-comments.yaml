@@ -57,16 +57,16 @@ tags:
     timeout: 15000
 - takeScreenshot:
     path: maestro/artifacts/community-comments-submitted
-- extendedWaitUntil:
-    visible: 'Published. Refresh the thread to view it.'
-    timeout: 20000
+# With realtime connected, the published root is inserted live (about 2 s) and the
+# "Published. Refresh the thread to view it." notice never appears. Wait for its public
+# reply action instead, scrolling in case the live insert lands below the fold.
 - scrollUntilVisible:
     element:
-      text: 'Refresh'
-    direction: UP
+      id: 'comment-reply-.*'
+      text: ${output.replyAction}
+    direction: DOWN
     centerElement: true
-    timeout: 15000
-- tapOn: 'Refresh'
+    timeout: 20000
 - scrollUntilVisible:
     element:
       text: ${output.commentRoot}
@@ -91,16 +91,14 @@ tags:
     path: maestro/artifacts/community-comments-reply-keyboard
 - tapOn:
     id: 'comment-submit'
-- extendedWaitUntil:
-    visible: 'Published. Refresh the thread to view it.'
-    timeout: 20000
+# The published reply is inserted live too; wait for the parent's replies action.
 - scrollUntilVisible:
     element:
-      text: 'Refresh'
-    direction: UP
+      id: 'comment-replies-.*'
+      text: ${output.repliesAction}
+    direction: DOWN
     centerElement: true
-    timeout: 15000
-- tapOn: 'Refresh'
+    timeout: 20000
 - scrollUntilVisible:
     element:
       id: 'comment-replies-.*'
