@@ -303,20 +303,44 @@ describe('Mobile Deep Link Handling (Story 3.7)', () => {
     expect(screen.queryByTestId('highlighted-community-card-look-99')).toBeNull()
   })
 
-  it('3.7-UNIT-011: CommunityScreen preserves retryable unavailable after a target dependency failure', async () => {
-    // Story6.5 D3/D9: dependency errors retain intent and show unavailable, without invalid-target analytics.
-    mockParams = { source: 'notification', type: 'community', cardId: 'look-42' }
-    server.use(
-      http.get(
-        '*/api/v1/community/posts/:postId',
-        () => new HttpResponse(null, { status: 500 })
+  it.each(['recovers', 'exhausts'] as const)(
+    '3.7-UNIT-011: CommunityScreen keeps retryable target intent when dependency %s',
+    async (outcome) => {
+      // D3/D9: a transient failure retains the same notification intent and bounded retries.
+      mockParams = { source: 'notification', type: 'community', cardId: 'look-42' }
+      let unavailable = true
+      let failures = 0
+      server.use(
+        http.get('*/api/v1/community/posts/:postId', () => {
+          if (unavailable) {
+            failures++
+            return new HttpResponse(null, { status: 500 })
+          }
+          return HttpResponse.json({ data: communityPost() })
+        })
       )
-    )
-    await render(<CommunityScreen />)
-    await screen.findByText(enUS.community.realtime.unavailable, {}, { timeout: 12000 })
-    expect(mockCapture).not.toHaveBeenCalledWith('deep_link_invalid', expect.anything())
-    expect(screen.queryByTestId('highlighted-community-card-look-42')).toBeNull()
-  }, 15000)
+      await render(<CommunityScreen />)
+      if (outcome === 'recovers') {
+        await waitFor(() => expect(failures).toBeGreaterThan(0))
+        unavailable = false
+        await screen.findByTestId('highlighted-community-card-look-42')
+        expect(mockCapture).toHaveBeenCalledWith('deep_link_handled', {
+          source: 'notification',
+          type: 'community',
+          surface: 'mobile',
+        })
+      } else {
+        await screen.findByText(
+          enUS.community.realtime.unavailable,
+          {},
+          { timeout: 12000 }
+        )
+        expect(screen.queryByTestId('highlighted-community-card-look-42')).toBeNull()
+      }
+      expect(mockCapture).not.toHaveBeenCalledWith('deep_link_invalid', expect.anything())
+    },
+    15000
+  )
 
   it('3.7-UNIT-012: CommunityScreen falls back to catalogue copy for a card with no climate band', async () => {
     mockParams = { source: 'notification', type: 'community', cardId: 'look-77' }

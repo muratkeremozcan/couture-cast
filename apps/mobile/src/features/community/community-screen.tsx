@@ -6,6 +6,7 @@ import {
 } from '@/src/lib/mobile-auth'
 import {
   ResponseError,
+  withRequestDeadline,
   CommunityCommentsState,
   CommunityReactionState,
   CommunitySyncState,
@@ -348,8 +349,8 @@ export function CommunityScreen() {
      */
     const requestTarget = () =>
       payload.commentId
-        ? communitySyncFromMobile()
-            .resolve(
+        ? withRequestDeadline(2000, [controller.signal], (signal) =>
+            communitySyncFromMobile().resolve(
               {
                 targets: [
                   {
@@ -360,9 +361,9 @@ export function CommunityScreen() {
                   },
                 ],
               },
-              AbortSignal.any([controller.signal, AbortSignal.timeout(2000)])
+              signal
             )
-            .then((result) => result.targets[0])
+          ).then((result) => result.targets[0])
         : getCommunityPostFromMobile(targetPostId, controller.signal, 2000).then(
             (post) => ({
               status: 'available' as const,
@@ -762,13 +763,15 @@ export function CommunityScreen() {
     try {
       const fresh: CommunityFeedItem[] = []
       for (let offset = 0; offset < buffered.length; offset += 50) {
-        const result = await communitySyncFromMobile().resolve(
-          {
-            targets: buffered
-              .slice(offset, offset + 50)
-              .map((post) => ({ key: post.id, postId: post.id })),
-          },
-          AbortSignal.timeout(2000)
+        const result = await withRequestDeadline(2000, [], (signal) =>
+          communitySyncFromMobile().resolve(
+            {
+              targets: buffered
+                .slice(offset, offset + 50)
+                .map((post) => ({ key: post.id, postId: post.id })),
+            },
+            signal
+          )
         )
         if (generation !== detailGenerationRef.current) return
         for (const target of result.targets)

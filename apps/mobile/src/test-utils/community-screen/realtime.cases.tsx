@@ -222,6 +222,11 @@ export function registerCommunityRealtimeCases() {
     })
     let visible = true
     let resync = false
+    let releaseRebuild!: () => void
+    const heldRebuild = new Promise<void>((resolve) => {
+      releaseRebuild = resolve
+    })
+    let rebuilding = false
     const summary = {
       counts: { applause: 0, love: 0, inspiration: 0 },
       total: 0,
@@ -229,7 +234,13 @@ export function registerCommunityRealtimeCases() {
       revision: 0,
       generation: 0,
     }
-    serveFeed(() => feedJson({ items: [item({ reactions: summary })] }))
+    serveFeed(async () => {
+      if (!visible) {
+        rebuilding = true
+        await heldRebuild
+      }
+      return feedJson({ items: [item({ reactions: summary })] })
+    })
     server.use(
       http.get('*/api/v1/community/events', () => {
         const removed = resync
@@ -298,11 +309,24 @@ export function registerCommunityRealtimeCases() {
     })
     press(await screen.findByTestId('community-card-comments-post-a'))
     await screen.findByText('Previously visible thread comment.')
-    fireEvent.change(screen.getByTestId('comment-body'), {
+    const composer = screen.getByTestId<HTMLInputElement>('comment-body')
+    composer.focus()
+    fireEvent.change(composer, {
       target: { value: 'Keep my unsent thread draft' },
     })
     visible = false
     resync = true
+    try {
+      await act(async () => {
+        await syncs[0]!.catchUp()
+      })
+      await waitFor(() => expect(rebuilding).toBe(true))
+      expect(screen.getByTestId('comment-body')).toBe(composer)
+      expect(document.activeElement).toBe(composer)
+      expect(screen.getByTestId('community-card-comments-post-a')).toBeTruthy()
+    } finally {
+      releaseRebuild()
+    }
     await act(async () => {
       await syncs[0]!.catchUp()
     })
@@ -312,6 +336,8 @@ export function registerCommunityRealtimeCases() {
     expect((await screen.findByTestId<HTMLInputElement>('comment-body')).value).toBe(
       'Keep my unsent thread draft'
     )
+    expect(screen.getByTestId('comment-body')).toBe(composer)
+    expect(document.activeElement).toBe(composer)
   })
 
   it('R09 foreground recovery preserves an in-flight same-owner publish', async () => {

@@ -10,6 +10,10 @@ import { afterAll, afterEach, beforeAll, beforeEach } from 'vitest'
 
 import { server } from './src/test-utils/msw/server'
 
+// React Native0.81 supplies abort-controller3, which has neither static method.
+Reflect.deleteProperty(AbortSignal, 'any')
+Reflect.deleteProperty(AbortSignal, 'timeout')
+
 declare global {
   const __VITEST_WATCH__: boolean
 }
@@ -23,6 +27,8 @@ beforeAll(async () => {
 })
 
 beforeEach(() => {
+  Reflect.deleteProperty(AbortSignal, 'any')
+  Reflect.deleteProperty(AbortSignal, 'timeout')
   // Clear the DOM before each test to prevent pollution/leaks when running tests sequentially
   cleanupDom()
   cleanupBrowser()

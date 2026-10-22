@@ -642,13 +642,14 @@ async function commentRequest<T>(
   const accessToken = await readAccessToken()
   try {
     return await withRequestTimeout(
-      signal ? AbortSignal.any([signal, AbortSignal.timeout(2000)]) : undefined,
+      signal,
       (signal) =>
         request(
           communityCommentsClient(createMobileApiClient({ accessToken }), 'mobile', {
             signal,
           })
-        )
+        ),
+      signal ? 2000 : undefined
     )
   } catch (error) {
     throw await communityError(error, 'Unable to update comments.')

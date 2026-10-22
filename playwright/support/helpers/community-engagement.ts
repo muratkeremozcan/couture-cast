@@ -1,3 +1,4 @@
+import { localPlaywrightDatabaseUrl } from './user-test-data'
 import { randomUUID } from 'node:crypto'
 import { PrismaClient } from '@prisma/client'
 import { type Page, type WebSocketRoute, type TestInfo } from '@playwright/test'
@@ -51,9 +52,8 @@ async function monitorPage(
   info: TestInfo,
   author = false
 ) {
-  const expectsResync = info.annotations.some(
-    (item) => item.type === 'expectedCommunityResync'
-  )
+  const expectsResync =
+    !author && info.annotations.some((item) => item.type === 'expectedCommunityResync')
   const expectsErasure =
     author && info.annotations.some((item) => item.type === 'expectedAuthorErasureDenial')
   const excluded = /\/api\/v1\/community\/events(?:\?|$)/
@@ -103,17 +103,18 @@ export const test = communityApiTest.extend<{
     )
     communityApi.trackUser(userId)
     const accessToken = engagementToken(userId)
+    // The local base config may carry service-role headers. App requests must
+    // publish their own verified bearer through the production wrapper.
+    await context.setExtraHTTPHeaders({})
     await context.addInitScript(
       ([key, token]) => sessionStorage.setItem(key!, token!),
       [WEB_ACCESS_TOKEN_STORAGE_KEY, accessToken]
     )
-    await context.setExtraHTTPHeaders({ Authorization: `Bearer ${accessToken}` })
     await use({ userId, accessToken, apiBaseUrl: communityApi.apiBaseUrl })
   },
   authorPage: async ({ browser, communityApi, baseURL }, use, testInfo) => {
     const context = await browser.newContext({ baseURL })
     const token = engagementToken(communityApi.userId)
-    await context.setExtraHTTPHeaders({ Authorization: `Bearer ${token}` })
     await context.addInitScript(
       ([key, value]) => sessionStorage.setItem(key!, value!),
       [WEB_ACCESS_TOKEN_STORAGE_KEY, token]
@@ -268,6 +269,7 @@ export async function observeCommunitySocket(page: Page) {
   let blocked = false,
     handshakes = 0,
     doorbells = 0
+  const bells: number[] = []
   const sockets = new Set<WebSocketRoute>()
   // playwright-utils deviation: HTTP interceptNetworkCall cannot observe or fault WebSocket frames.
   await page.routeWebSocket('**/api/realtime**', async (socket) => {
@@ -287,6 +289,7 @@ export async function observeCommunitySocket(page: Page) {
           { version: 1, type: 'community:changed' },
         ])
         doorbells++
+        bells.push(Date.now())
       }
       socket.send(message)
     })
@@ -314,6 +317,8 @@ export async function observeCommunitySocket(page: Page) {
     get doorbells() {
       return doorbells
     },
+    /** Arrival time of each doorbell, recorded before it is forwarded to the page. */
+    bells,
     reads,
     async disconnect() {
       blocked = true
@@ -328,7 +333,7 @@ export async function observeCommunitySocket(page: Page) {
 
 /** Controlled operator entry point. Production has no HTTP moderation operator route. */
 export async function takeDownCommunityLook(postId: string, operatorId: string) {
-  const db = new PrismaClient({ datasources: { db: { url: process.env.DATABASE_URL } } })
+  const db = communityTestDatabase()
   // The normal local Playwright route builds API dist before executing browser tests.
   const { CommunityModerationActionsService } =
     require('../../../apps/api/dist/src/modules/community/community-moderation.actions.js') as {
@@ -366,7 +371,7 @@ export async function takeDownCommunityLook(postId: string, operatorId: string) 
 
 /** Production account-erasure repository entry point, scoped to the fixture's own account. */
 export async function requestCommunityAccountErasure(userId: string) {
-  const db = new PrismaClient({ datasources: { db: { url: process.env.DATABASE_URL } } })
+  const db = communityTestDatabase()
   const { CommunityRepository } =
     require('../../../apps/api/dist/src/modules/community/community.repository.js') as {
       CommunityRepository: new (db: PrismaClient) => {
@@ -386,4 +391,27 @@ export async function requestCommunityAccountErasure(userId: string) {
   } finally {
     await db.$disconnect()
   }
+}
+
+export function communityTestDatabase() {
+  return new PrismaClient({ datasourceUrl: localPlaywrightDatabaseUrl().toString() })
+}
+
+/** Observe fallback timer arming without changing any timer or callback. */
+export async function observeCommunityFallbackTimers(page: Page) {
+  await page.addInitScript(() => {
+    const original = window.setTimeout.bind(window)
+    const evidence = { armed: 0 }
+    Object.defineProperty(window, '__communityFallbackTimers', { value: evidence })
+    window.setTimeout = ((handler: TimerHandler, delay?: number, ...args: unknown[]) => {
+      if (delay !== undefined && delay >= 7500 && delay < 8000) evidence.armed++
+      return original(handler, delay, ...args)
+    }) as typeof window.setTimeout
+  })
+  return () =>
+    page.evaluate(
+      () =>
+        (window as unknown as { __communityFallbackTimers: { armed: number } })
+          .__communityFallbackTimers.armed
+    )
 }

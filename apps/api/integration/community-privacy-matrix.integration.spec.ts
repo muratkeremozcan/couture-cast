@@ -222,6 +222,16 @@ async function verifyEffect(name: string, f: Fixture) {
   }
 }
 describe('6.5-INT-019..024 actual cross-feature privacy entry points and subject roles', () => {
+  it('parent harness guard sends only to its owned provider recorder', async () => {
+    const f = await h.fixture()
+    await h.worker.dispatch()
+    expect(await h.ledger()).toHaveLength(1)
+    expect(
+      await h.prisma.communityTokenDelivery.findUniqueOrThrow({
+        where: { id: f.delivery.id },
+      })
+    ).toMatchObject({ status: 'accepted' })
+  }, 10_000)
   it.each(['actor', 'recipient', 'author', 'parentAuthor'] as const)(
     'erasure of linked %s wins after the durable claim and before final authorization',
     async (role) => {
@@ -235,9 +245,19 @@ describe('6.5-INT-019..024 actual cross-feature privacy entry points and subject
         new Date()
       )
       await child.call('continue')
-      await dispatch
+      expect(await dispatch).toEqual({ status: 'fulfilled' })
       await child.call('dispatch', f.delivery.id)
       expect(await h.ledger()).toHaveLength(0)
+      expect(
+        await h.prisma.communityTokenDelivery.findUniqueOrThrow({
+          where: { id: f.delivery.id },
+        })
+      ).toMatchObject({ status: 'unknown' })
+      const attempts = await h.prisma.communityDeliveryAttempt.findMany({
+        where: { delivery_id: f.delivery.id },
+      })
+      expect(attempts).toHaveLength(1)
+      expect(attempts[0]).toMatchObject({ status: 'unknown', reason: 'subject_removed' })
       expect(
         await h.prisma.communityArtifactSubject.count({
           where: { member_id: f[role].id },
@@ -246,6 +266,31 @@ describe('6.5-INT-019..024 actual cross-feature privacy entry points and subject
     },
     10_000
   )
+
+  it('same claim barrier without erasure fulfills and sends exactly once', async () => {
+    const f = await h.fixture('reply')
+    const { child } = await h.sender()
+    await child.call('barrier', 'claim')
+    const dispatch = settle(child.call('dispatch', f.delivery.id))
+    await child.event('claimed')
+    await child.call('continue')
+    expect(await dispatch).toEqual({ status: 'fulfilled' })
+    await child.call('dispatch', f.delivery.id)
+    expect(await h.ledger()).toHaveLength(1)
+    expect(
+      await h.prisma.communityTokenDelivery.findUniqueOrThrow({
+        where: { id: f.delivery.id },
+      })
+    ).toMatchObject({ status: 'accepted' })
+    const attempts = await h.prisma.communityDeliveryAttempt.findMany({
+      where: { delivery_id: f.delivery.id },
+    })
+    expect(attempts).toHaveLength(1)
+    expect(attempts[0]).toMatchObject({
+      status: 'accepted',
+      completed_at: expect.any(Date) as Date,
+    })
+  }, 10_000)
 
   it.each(mutations)(
     '$name serializes behind an actual provider guard and does not recreate old work',

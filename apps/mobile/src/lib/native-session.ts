@@ -1,3 +1,4 @@
+import { withRequestDeadline } from '@couture/api-client'
 // Story 6.5 owner: secure Supabase restore/refresh and API-resolved application identity.
 import {
   createClient,
@@ -135,9 +136,11 @@ async function verifySession(next: Session | null) {
   }
   try {
     requireBearerLifetime(next)
-    const result = await createMobileApiClient({
-      accessToken: next.access_token,
-    }).apiV1UserProfileGet({ signal: AbortSignal.timeout(5000) })
+    const result = await withRequestDeadline(5000, [], (signal) =>
+      createMobileApiClient({
+        accessToken: next.access_token,
+      }).apiV1UserProfileGet({ signal })
+    )
     const profile = userProfileResponseSchema.parse(result)
     if (request !== generation || localSignedOut) {
       if (localSignedOut) return

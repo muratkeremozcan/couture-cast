@@ -1,4 +1,4 @@
-import { ResponseError } from '@couture/api-client'
+import { ResponseError, withRequestDeadline } from '@couture/api-client'
 import {
   type GarmentItemContract,
   type SuggestGarmentTagsData,
@@ -196,9 +196,9 @@ export async function updateGarmentTagsFromMobile(
  */
 export async function resolveOwnerUserId(accessToken: string): Promise<string> {
   try {
-    const response = await createMobileApiClient({ accessToken }).apiV1UserProfileGet({
-      signal: AbortSignal.timeout(5000),
-    })
+    const response = await withRequestDeadline(5000, [], (signal) =>
+      createMobileApiClient({ accessToken }).apiV1UserProfileGet({ signal })
+    )
     return userProfileResponseSchema.parse(response).user.id
   } catch (error) {
     if (error instanceof ResponseError && [401, 403].includes(error.response.status))

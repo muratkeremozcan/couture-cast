@@ -1,9 +1,9 @@
 import { randomInt, randomUUID } from 'node:crypto'
 import { writeFile } from 'node:fs/promises'
-import { PrismaClient } from '@prisma/client'
 import {
   communityCommentSubmissionResponseSchema,
   communityConflictResponseSchema,
+  communityEventsResponseSchema,
   resolveCommunityTargetsResponseSchema,
 } from '@couture/api-client/contracts/http'
 import {
@@ -17,6 +17,8 @@ import {
   thread,
   interceptFor,
   observeCommunitySocket,
+  observeCommunityFallbackTimers,
+  communityTestDatabase,
   disablePeriodicCommunityPolling,
   submitComment,
   settleComment,
@@ -43,14 +45,13 @@ const evidenceJson = (value: unknown) =>
     2
   )
 const digits = () => String(randomInt(1_000_000_000, 10_000_000_000))
-const prisma = () =>
-  new PrismaClient({ datasources: { db: { url: process.env.DATABASE_URL } } })
+const prisma = communityTestDatabase
 
 test.describe('Story 6.5 real engagement transport', () => {
   test.describe.configure({ mode: 'serial' })
   test.setTimeout(120_000)
 
-  test('[P0] E2E-001 healthy socket delivers two-browser reactions, comments and buffered new looks with periodic polling disabled', async ({
+  test('[P0] E2E-001 healthy socket delivers two-browser reactions, comments and buffered new looks without healthy fallback polling', async ({
     page,
     authorPage,
     communitySession,
@@ -61,7 +62,7 @@ test.describe('Story 6.5 real engagement transport', () => {
     interceptNetworkCall,
   }, testInfo) => {
     expect(communitySession.userId).not.toBe(communityApi.userId)
-    await disablePeriodicCommunityPolling(page)
+    const fallbackArms = await observeCommunityFallbackTimers(page)
     const transport = await observeCommunitySocket(page)
     await openAll(page, interceptNetworkCall)
     await openAll(authorPage, interceptFor(authorPage))
@@ -117,16 +118,26 @@ test.describe('Story 6.5 real engagement transport', () => {
     await expect(thread(page).getByLabel('Add a comment')).toBeFocused()
     expect(transport.doorbells).toBeGreaterThan(before)
     // Wall-clock observation covers one full fallback interval. No manually driven refresh is used.
+    // Parallel workers may ring legitimate doorbells, so every read must follow one within 2 s;
+    // fallback reads cannot start before 7.5 s and arming itself stays pinned.
+    const initialArms = await fallbackArms()
     const quietStart = Date.now(),
       reads = transport.reads.length
     await recurse(
-      () =>
-        Promise.resolve({
-          elapsed: Date.now() - quietStart,
-          reads: transport.reads.length,
-        }),
+      async () => ({
+        elapsed: Date.now() - quietStart,
+        unexplained: transport.reads
+          .slice(reads)
+          .filter(
+            (read) =>
+              !transport.bells.some((bell) => bell <= read.at && read.at - bell <= 2_000)
+          )
+          .map((read) => `${read.path}@${read.at - quietStart}ms`),
+        armed: await fallbackArms(),
+      }),
       (value) => {
-        expect(value.reads).toBe(reads)
+        expect(value.unexplained).toEqual([])
+        expect(value.armed).toBe(initialArms)
         return value.elapsed >= 8_100
       },
       { timeout: 9_500, interval: 100 }
@@ -214,21 +225,51 @@ test.describe('Story 6.5 real engagement transport', () => {
         'Draft across an outage'
       )
       const handshakes = transport.handshakes
+      // A different owner keeps a valid cursor throughout this worker's private reset.
+      const independent = await apiRequest<unknown>({
+        method: 'GET',
+        path: '/api/v1/community/events?mode=all',
+        baseUrl: communityApi.apiBaseUrl,
+        headers: communityApi.headers,
+        retryConfig: { maxRetries: 0 },
+      })
+      expect(independent.status).toBe(200)
+      const independentCursor = communityEventsResponseSchema.parse(independent.body).data
+        .nextCursor
       const db = prisma()
       try {
-        await db.communityStreamHead.updateMany({
-          where: { owner_id: null },
+        const rotated = await db.communityStreamHead.updateMany({
+          where: { owner_id: communitySession.userId },
           data: { epoch: randomUUID() },
         })
+        expect(rotated.count).toBe(1)
       } finally {
         await db.$disconnect()
       }
-      const resync = interceptNetworkCall({ method: 'GET', url: '**/community/events*' })
+      const unaffected = await apiRequest<unknown>({
+        method: 'GET',
+        path: `/api/v1/community/events?mode=all&cursor=${encodeURIComponent(independentCursor)}`,
+        baseUrl: communityApi.apiBaseUrl,
+        headers: communityApi.headers,
+        retryConfig: { maxRetries: 0 },
+      })
+      expect(unaffected.status).toBe(200)
+      expect(
+        communityEventsResponseSchema.parse(unaffected.body).data.resyncRequired
+      ).toBe(false)
+      // playwright-utils deviation: interceptNetworkCall always awaits response.json().
+      // The app reads only the status of this 409, and Chromium never finishes an
+      // unread fetch body, so observe status and URL here; the replay checks the body.
+      const resync = page.waitForResponse(
+        (candidate) =>
+          candidate.request().method() === 'GET' &&
+          new URL(candidate.url()).pathname === '/api/v1/community/events'
+      )
       transport.reconnect()
       await page.evaluate(() => window.dispatchEvent(new Event('online')))
       const response = await resync
-      expect(response.status).toBe(409)
-      const staleCursor = new URL(response.request!.url())
+      expect(response.status()).toBe(409)
+      const staleCursor = new URL(response.url())
       const conflict = await apiRequest<unknown>({
         method: 'GET',
         path: staleCursor.pathname + staleCursor.search,
@@ -541,9 +582,6 @@ test.describe('Story 6.5 real engagement transport', () => {
       { timeout: 10_000 }
     )
     try {
-      await page.context().setExtraHTTPHeaders({
-        Authorization: `Bearer ${nextToken}`,
-      })
       await page.evaluate(
         ([key, token]) => {
           sessionStorage.setItem(key!, token!)

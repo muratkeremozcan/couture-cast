@@ -1,9 +1,8 @@
-import {
-  BadRequestException,
-  ConflictException,
-  ForbiddenException,
-  ServiceUnavailableException,
-} from '@nestjs/common'
+import { CommunityAccessService } from '../../../../apps/api/src/modules/community/community-access.service.js'
+import { CommunityUnavailableException } from '../../../../apps/api/src/modules/community/community-availability.js'
+import type { FeatureFlagsService } from '../../../../apps/api/src/modules/feature-flags/feature-flags.service.js'
+import type { PrismaClient } from '@prisma/client'
+import { BadRequestException, ConflictException } from '@nestjs/common'
 import type { CommunityPreferencesService } from '../../../../apps/api/src/modules/community/community-preferences.service.js'
 import type { CommunitySyncService } from '../../../../apps/api/src/modules/community/community-sync.service.js'
 import type { CommunityTargetsService } from '../../../../apps/api/src/modules/community/community-targets.service.js'
@@ -70,15 +69,22 @@ const reply = {
 }
 export function createCommunityEngagementDoubles() {
   const scenario = () => getProviderEngagementState()
-  const authorize = () => {
-    if (scenario() === 'denied') throw new ForbiddenException('Community access denied.')
-    if (scenario() === 'unavailable')
-      throw new ServiceUnavailableException({
-        statusCode: 503,
-        code: 'unavailable',
-        retryAfterSeconds: 2,
-        message: 'Community is temporarily unavailable.',
-      })
+  // Exercise the production access-denial branch. Database access is unreachable
+  // after the controlled affirmative false flag; unavailable uses its real exception.
+  const access = new CommunityAccessService(
+    {} as PrismaClient,
+    {
+      communityReadEvaluation: () =>
+        Promise.resolve({
+          value: false,
+          expiresAt: new Date(Date.now() + 1000),
+          validUntil: performance.now() + 1000,
+        }),
+    } as unknown as FeatureFlagsService
+  )
+  const authorize = async () => {
+    if (scenario() === 'denied') await access.assert('pact-member')
+    if (scenario() === 'unavailable') throw new CommunityUnavailableException()
   }
   const snapshot = () => ({
     ...legacy,
@@ -87,12 +93,12 @@ export function createCommunityEngagementDoubles() {
     revision: scenario() === 'legacy-updated' ? 'policy-2' : 'policy-1',
   })
   const preferences: Pick<CommunityPreferencesService, 'get' | 'patch'> = {
-    get: () => {
-      authorize()
+    get: async () => {
+      await authorize()
       return Promise.resolve(snapshot())
     },
-    patch: (_user, input) => {
-      authorize()
+    patch: async (_user, input) => {
+      await authorize()
       const current = snapshot()
       if (input.baseRevision !== current.revision)
         throw new ConflictException({
@@ -122,8 +128,8 @@ export function createCommunityEngagementDoubles() {
     },
   }
   const sync: Pick<CommunitySyncService, 'events'> = {
-    events: (_owner, _mode, cursor) => {
-      authorize()
+    events: async (_owner, _mode, cursor) => {
+      await authorize()
       if (cursor === 'foreign-cursor')
         throw new BadRequestException({
           statusCode: 400,
@@ -188,8 +194,8 @@ export function createCommunityEngagementDoubles() {
     },
   }
   const targets: Pick<CommunityTargetsService, 'resolve'> = {
-    resolve: (_owner, input) => {
-      authorize()
+    resolve: async (_owner, input) => {
+      await authorize()
       return Promise.resolve({
         targets: input.targets.map((target) => {
           if (target.postId !== post.id)

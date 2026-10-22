@@ -56,9 +56,7 @@ async function readBinding(includePending = false): Promise<StoredBinding | unde
   return result.success ? result.data : undefined
 }
 const tokenApi = (token: string, timeout = 5000) =>
-  communitySyncClient(createMobileApiClient({ accessToken: token }), () => ({
-    signal: AbortSignal.timeout(timeout),
-  }))
+  communitySyncClient(createMobileApiClient({ accessToken: token }), undefined, timeout)
 async function clearPending(owner: string, client: ReturnType<typeof tokenApi>) {
   const secure = await import('expo-secure-store')
   const pending = pendingBindingSchema.safeParse(

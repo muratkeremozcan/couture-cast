@@ -50,22 +50,10 @@ test.describe('Home analytics capture', () => {
         browserWindow.__enableAnalyticsTestHook = true
       })
 
-      const pollCallPromise = interceptNetworkCall({
-        method: 'GET',
-        url: '**/api/v1/events/poll*',
-        fulfillResponse: {
-          status: 200,
-          body: {
-            events: [],
-            nextSince: null,
-          },
-        },
-      })
-
-      await log.step('Load the home page with analytics and poll endpoints stubbed.')
+      await log.step('Load the home page with the analytics endpoints stubbed.')
+      // A signed-out visitor has no events feed to poll; the signed-in poll is
+      // covered by home-analytics-resilience.spec.ts.
       await page.goto('/')
-      const pollCall = await pollCallPromise
-      expect(pollCall.status).toBe(200)
       await expect(page.getByTestId('hero-headline')).toBeVisible()
 
       await log.step('Wait for analytics bindings to hydrate before clicking the CTA.')

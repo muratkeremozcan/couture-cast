@@ -613,6 +613,7 @@ describe('Story 6.5 actual HTTP controllers and generated client wrappers', () =
       .mockRejectedValueOnce(new Error('optional appender unavailable'))
     try {
       expect((await clients(owner.id).events('all')).events).toEqual([])
+      expect(assist).toHaveBeenCalledTimes(1)
     } finally {
       assist.mockRestore()
     }

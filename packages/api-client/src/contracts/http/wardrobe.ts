@@ -1,3 +1,4 @@
+import { withRequestDeadline } from '../../request-deadline'
 import type { OpenAPIRegistry } from '@asteasolutions/zod-to-openapi'
 // Story 4.1 Task 4 step 1 owner: define Zod request and response envelope schemas and uploadGarmentBytes helper
 // Story 4.2 Task 4 step 1 owner: define suggestGarmentTags and updateGarmentTags HTTP contracts and Zod schemas in packages/api-client/src/contracts/http/wardrobe.ts
@@ -2518,17 +2519,9 @@ export async function uploadGarmentBytes({
     'Content-Type': mimeType,
   }
 
-  const requestSignal =
-    timeoutMs === undefined
-      ? signal
-      : AbortSignal.any(
-          signal
-            ? [signal, AbortSignal.timeout(timeoutMs)]
-            : [AbortSignal.timeout(timeoutMs)]
-        )
   const totalBytes = 'byteLength' in body ? body.byteLength : body.size
 
-  try {
+  const perform = async (requestSignal?: AbortSignal) => {
     const response = await fetchFn(uploadUrl, {
       method: 'PUT',
       headers,
@@ -2548,6 +2541,10 @@ export async function uploadGarmentBytes({
       }
       throw new Error(errorMessage)
     }
+  }
+  try {
+    if (timeoutMs === undefined) await perform(signal)
+    else await withRequestDeadline(timeoutMs, [signal], perform)
   } finally {
     // Fetch exposes completion only. Use XMLHttpRequest.upload for incremental web progress.
     onProgress?.(totalBytes, totalBytes)

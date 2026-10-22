@@ -47,6 +47,32 @@ afterEach(() => {
 })
 
 describe('Story 6.5 reconciliation ownership', () => {
+  it('silently rebuilds a healthy removal marker with a valid cursor while composition stays owned', async () => {
+    const { client, callbacks, state } = setup()
+    state.start('https://fixtures.invalid', () => Promise.resolve('fixture'))
+    vi.mocked(connectCommunityTransport).mock.calls[0]![0].state('connected')
+    await state.catchUp()
+    const rebuilt = deferred<void>()
+    callbacks.rebuild = vi.fn(() => rebuilt.promise)
+    vi.mocked(callbacks.availability).mockClear()
+    client.events.mockResolvedValueOnce(
+      page('removed', {
+        resyncRequired: true,
+        events: [{ version: 1, kind: 'resync', resyncRequired: true }],
+      })
+    )
+    try {
+      await state.catchUp()
+      await vi.waitFor(() => expect(callbacks.rebuild).toHaveBeenCalledTimes(1))
+      expect(callbacks.availability).not.toHaveBeenCalled()
+      rebuilt.resolve(undefined)
+      await state.catchUp()
+      expect(callbacks.availability).toHaveBeenLastCalledWith('connected', true)
+    } finally {
+      rebuilt.resolve(undefined)
+      state.stop()
+    }
+  })
   it('paginates target batches and ignores late results after stop', async () => {
     const { client, callbacks, state } = setup()
     callbacks.rendered = () => Array.from({ length: 51 }, (_, i) => `post-${i}`)

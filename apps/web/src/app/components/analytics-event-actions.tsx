@@ -2,14 +2,18 @@
 'use client'
 
 import {
+  commentSessionIdentity,
   trackAlertReceived,
   trackRitualCreated,
   trackWardrobeUploadStarted,
 } from '@couture/api-client'
-import { useEffect, useRef, type ChangeEvent, type MouseEvent } from 'react'
+import { useEffect, type ChangeEvent, type MouseEvent } from 'react'
 import { browserAnalytics } from '../../analytics/browser-analytics'
-import { createWebApiClient } from '../../lib/api-client'
-import { pollWebEvents } from '../../lib/events-client'
+import {
+  createWebEventsClient,
+  pollWebEvents,
+  readWebEventsAccessToken,
+} from '../../lib/events-client'
 
 declare global {
   interface Window {
@@ -62,31 +66,51 @@ function getWebAnalyticsIdentity() {
   }
 }
 
+/**
+ * The account the stored bearer belongs to, or null when nobody is signed in.
+ *
+ * A token refresh keeps the account, so the poll cursor survives it; an account
+ * switch or a sign-out changes it, and the cursor the previous account earned
+ * goes with it.
+ */
+function readSignedInAccount(): string | null {
+  return commentSessionIdentity(readWebEventsAccessToken())
+}
+
 export function AnalyticsEventActions() {
-  const nextSinceRef = useRef<string | null>(null)
-  const apiClientRef = useRef<ReturnType<typeof createWebApiClient> | null>(null)
-
-  useEffect(() => {
-    // Story 0.9 Task 7 step 4 owner:
-    // hold the generated client at the component edge so polling reuses one app-local runtime wrapper.
-    apiClientRef.current = createWebApiClient()
-  }, [])
-
   useEffect(() => {
     if (window.__enableAnalyticsTestHook) {
       window.__analyticsBindingsReady = true
     }
 
+    // Story 0.9 Task 7 step 4 owner:
+    // hold the generated client at the component edge so polling reuses one app-local runtime wrapper.
+    // The client reads the bearer per request, so it outlives token refreshes and account switches.
+    const apiClient = createWebEventsClient()
+    let account = readSignedInAccount()
+    let nextSince: string | undefined
+    let inFlight: AbortController | undefined
+
     const trackAlertEvents = async () => {
-      const apiClient = apiClientRef.current
-      if (!apiClient) {
+      const pollAccount = account
+      // The feed is per account: with nobody signed in there is nothing to read.
+      if (!pollAccount) {
         return
       }
 
+      inFlight?.abort()
+      const controller = new AbortController()
+      inFlight = controller
+
       try {
-        const body = await pollWebEvents(nextSinceRef.current ?? undefined, apiClient)
+        const body = await pollWebEvents(nextSince, apiClient, controller.signal)
+        // An answer for an account that has since signed out or switched is not
+        // the current reader's to report, and neither is its cursor.
+        if (controller.signal.aborted || account !== pollAccount) {
+          return
+        }
         if (typeof body.nextSince === 'string') {
-          nextSinceRef.current = body.nextSince
+          nextSince = body.nextSince
         }
 
         for (const event of body.events ?? []) {
@@ -111,15 +135,44 @@ export function AnalyticsEventActions() {
       } catch {
         // Ignore transient polling failures and retry on the next interval.
         return
+      } finally {
+        if (inFlight === controller) {
+          inFlight = undefined
+        }
+      }
+    }
+
+    /** Re-reads the session; returns whether the signed-in account changed. */
+    const syncAccount = () => {
+      const current = readSignedInAccount()
+      if (current === account) {
+        return false
+      }
+      account = current
+      nextSince = undefined
+      inFlight?.abort()
+      inFlight = undefined
+      return true
+    }
+
+    const handleSessionChange = () => {
+      if (syncAccount()) {
+        void trackAlertEvents()
       }
     }
 
     void trackAlertEvents()
     const interval = window.setInterval(() => {
+      syncAccount()
       void trackAlertEvents()
     }, 30_000)
+    window.addEventListener('couture:session', handleSessionChange)
+    window.addEventListener('storage', handleSessionChange)
     return () => {
       window.clearInterval(interval)
+      window.removeEventListener('couture:session', handleSessionChange)
+      window.removeEventListener('storage', handleSessionChange)
+      inFlight?.abort()
 
       if (window.__enableAnalyticsTestHook) {
         window.__analyticsBindingsReady = false

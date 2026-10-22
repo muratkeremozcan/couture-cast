@@ -123,16 +123,18 @@ export class CommunitySyncState {
   private current(generation: number) {
     return !this.stopped && generation === this.generation
   }
-  private resync(retryImmediately: boolean) {
+  private resync(retryImmediately: boolean, unavailable = true) {
     this.generation++
     this.request++
     this.cursor = undefined
     this.revisions.clear()
     this.projections.clear()
     this.nextTargetValidation = 0
-    this.connected = false
     this.dirty = retryImmediately
-    this.callbacks.availability('unavailable', false)
+    if (unavailable) {
+      this.connected = false
+      this.callbacks.availability('unavailable', false)
+    }
     if (!retryImmediately) this.scheduleFallback()
   }
   private async run(generation: number) {
@@ -144,7 +146,9 @@ export class CommunitySyncState {
         )
         if (!this.current(generation)) return
         if (page.resyncRequired) {
-          this.resync(Boolean(this.cursor))
+          // A routine removal marker can rebuild from verified heads without
+          // suspending mounted composition. Unverifiable bootstrap still hides.
+          this.resync(Boolean(this.cursor), !this.cursor)
           return
         }
         await this.applyPage(page, generation)

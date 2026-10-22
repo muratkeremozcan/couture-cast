@@ -2,6 +2,8 @@ import { render, screen } from '@testing-library/react'
 import { describe, expect, it, vi } from 'vitest'
 
 vi.mock('@couture/api-client', () => ({
+  // Signed out: the style case renders without reading the events feed.
+  commentSessionIdentity: vi.fn(() => null),
   trackAlertReceived: vi.fn(() => ({ event: 'alert_received', properties: {} })),
   trackRitualCreated: vi.fn(() => ({ event: 'ritual_created', properties: {} })),
   trackWardrobeUploadStarted: vi.fn(() => ({

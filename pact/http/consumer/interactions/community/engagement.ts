@@ -155,7 +155,8 @@ const typedUnavailable = {
   statusCode: 503,
   code: 'unavailable',
   retryAfterSeconds: 2,
-  message: 'Community is temporarily unavailable.',
+  message: 'Access could not be verified.',
+  error: 'Service Unavailable',
 }
 const conflicts = (code: string) => ({ code, message: 'Installation binding changed.' })
 export const communityEngagementInteractions: Case[] = [
@@ -380,8 +381,8 @@ export const communityEngagementInteractions: Case[] = [
     status: 403,
     response: {
       statusCode: 403,
-      message: 'Community access denied.',
-      error: 'Forbidden',
+      message: 'Community access is disabled.',
+      code: 'denied',
     },
     call: (s) => s.events('all'),
   },

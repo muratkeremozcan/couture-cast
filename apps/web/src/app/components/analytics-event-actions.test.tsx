@@ -7,6 +7,7 @@ import {
   createAnalyticsEventExpectations,
   type MemoryTrackedAnalyticsEvent,
 } from '@couture/api-client/testing/analytics-event-assertions'
+import { WEB_ACCESS_TOKEN_STORAGE_KEY } from '../../lib/wardrobe'
 import { useMswHandlers } from '../../test-utils/msw/runtime'
 
 const { trackedEvents, captureMock, distinctIdMock, initMock } = vi.hoisted(() => {
@@ -32,6 +33,26 @@ vi.mock('posthog-js', () => ({
 
 import { AnalyticsEventActions } from './analytics-event-actions'
 
+/** Polling is per account, so every case that expects a poll starts signed in. */
+function signIn(token = 'test-access-token') {
+  window.sessionStorage.setItem(WEB_ACCESS_TOKEN_STORAGE_KEY, token)
+}
+
+/** A bearer shaped like a Supabase JWT, so its `sub` names the account it belongs to. */
+function accountToken(sub: string, issue: string) {
+  const claims = btoa(JSON.stringify({ sub, issue }))
+    .replace(/\+/g, '-')
+    .replace(/\//g, '_')
+    .replace(/=+$/, '')
+  return `header.${claims}.signature`
+}
+
+function changeSession(token: string | null) {
+  if (token) signIn(token)
+  else window.sessionStorage.removeItem(WEB_ACCESS_TOKEN_STORAGE_KEY)
+  window.dispatchEvent(new Event('couture:session'))
+}
+
 describe('AnalyticsEventActions', () => {
   const eventExpectations = createAnalyticsEventExpectations(trackedEvents, expect)
   const originalPostHogApiKey = process.env.POSTHOG_API_KEY
@@ -43,9 +64,11 @@ describe('AnalyticsEventActions', () => {
     distinctIdMock.mockReset()
     distinctIdMock.mockReturnValue('web-test-user')
     process.env.POSTHOG_API_KEY = 'phc_test'
+    signIn()
   })
 
   afterEach(() => {
+    window.sessionStorage.clear()
     process.env.POSTHOG_API_KEY = originalPostHogApiKey
     vi.restoreAllMocks()
   })
@@ -178,9 +201,11 @@ describe('AnalyticsEventActions degraded inputs', () => {
     distinctIdMock.mockReset()
     distinctIdMock.mockReturnValue('web-test-user')
     process.env.POSTHOG_API_KEY = 'phc_test'
+    signIn()
   })
 
   afterEach(() => {
+    window.sessionStorage.clear()
     process.env.POSTHOG_API_KEY = originalPostHogApiKey
     delete window.__enableAnalyticsTestHook
     delete window.__analyticsBindingsReady
@@ -396,5 +421,162 @@ describe('AnalyticsEventActions degraded inputs', () => {
     } finally {
       vi.useRealTimers()
     }
+  })
+})
+
+describe('AnalyticsEventActions session-scoped polling', () => {
+  type PollRequest = { authorization: string | null; since: string | null }
+
+  beforeEach(() => {
+    trackedEvents.splice(0, trackedEvents.length)
+    captureMock.mockClear()
+    distinctIdMock.mockReset()
+    distinctIdMock.mockReturnValue('web-test-user')
+    window.sessionStorage.clear()
+    vi.useFakeTimers({ shouldAdvanceTime: true })
+  })
+
+  afterEach(() => {
+    vi.useRealTimers()
+    window.sessionStorage.clear()
+    vi.restoreAllMocks()
+  })
+
+  function useRecordedPolls(
+    respond: (
+      request: PollRequest,
+      index: number
+    ) => Record<string, unknown> | Promise<Record<string, unknown>> = () => ({
+      events: [],
+      nextSince: null,
+    })
+  ) {
+    const requests: PollRequest[] = []
+    useMswHandlers(
+      http.get('/api/v1/events/poll', async ({ request }) => {
+        const recorded = {
+          authorization: request.headers.get('authorization'),
+          since: new URL(request.url).searchParams.get('since'),
+        }
+        requests.push(recorded)
+        return HttpResponse.json(await respond(recorded, requests.length - 1))
+      })
+    )
+    return requests
+  }
+
+  it('sends the signed-in bearer token with every poll', async () => {
+    signIn('token-a')
+    const requests = useRecordedPolls()
+
+    render(<AnalyticsEventActions />)
+    await vi.waitFor(() => expect(requests).toHaveLength(1))
+    await vi.advanceTimersByTimeAsync(30_000)
+    await vi.waitFor(() => expect(requests).toHaveLength(2))
+
+    expect(requests.map((request) => request.authorization)).toEqual([
+      'Bearer token-a',
+      'Bearer token-a',
+    ])
+  })
+
+  it('does not poll while signed out, and starts when a session appears', async () => {
+    const requests = useRecordedPolls()
+
+    render(<AnalyticsEventActions />)
+    await vi.advanceTimersByTimeAsync(60_000)
+    changeSession('token-a')
+
+    // The first recorded request is the one the session started: nothing went
+    // out during the signed-out minute before it.
+    await vi.waitFor(() => expect(requests).toHaveLength(1))
+    expect(requests[0]).toEqual({ authorization: 'Bearer token-a', since: null })
+  })
+
+  it('stops polling on sign-out', async () => {
+    signIn('token-a')
+    const requests = useRecordedPolls()
+
+    render(<AnalyticsEventActions />)
+    await vi.waitFor(() => expect(requests).toHaveLength(1))
+    changeSession(null)
+    await vi.advanceTimersByTimeAsync(90_000)
+    changeSession('token-b')
+
+    await vi.waitFor(() => expect(requests).toHaveLength(2))
+    expect(requests.map((request) => request.authorization)).toEqual([
+      'Bearer token-a',
+      'Bearer token-b',
+    ])
+  })
+
+  it('keeps the cursor across a token refresh for the same account', async () => {
+    const first = accountToken('member-1', 'first')
+    const refreshed = accountToken('member-1', 'refreshed')
+    signIn(first)
+    const requests = useRecordedPolls((_request, index) => ({
+      events: [],
+      nextSince: `cursor-${index + 1}`,
+    }))
+
+    render(<AnalyticsEventActions />)
+    await vi.waitFor(() => expect(requests).toHaveLength(1))
+    changeSession(refreshed)
+    await vi.advanceTimersByTimeAsync(30_000)
+
+    await vi.waitFor(() => expect(requests).toHaveLength(2))
+    expect(requests).toEqual([
+      { authorization: `Bearer ${first}`, since: null },
+      { authorization: `Bearer ${refreshed}`, since: 'cursor-1' },
+    ])
+  })
+
+  it('restarts the cursor and drops the in-flight poll of the previous account on account switch', async () => {
+    const accountA = accountToken('member-a', 'a')
+    const accountB = accountToken('member-b', 'b')
+    let releaseHeldPoll: () => void = () => undefined
+    const heldPoll = new Promise<void>((resolve) => {
+      releaseHeldPoll = resolve
+    })
+    signIn(accountA)
+    const requests = useRecordedPolls(async (request, index) => {
+      if (request.authorization === `Bearer ${accountA}` && index === 1) {
+        await heldPoll
+        return {
+          events: [
+            {
+              id: 'evt-a',
+              channel: 'weather_alert',
+              userId: 'member-a',
+              payload: { alertType: 'storm', severity: 'warning' },
+            },
+          ],
+          nextSince: 'cursor-a-late',
+        }
+      }
+      return { events: [], nextSince: index === 0 ? 'cursor-a' : 'cursor-b' }
+    })
+
+    render(<AnalyticsEventActions />)
+    await vi.waitFor(() => expect(requests).toHaveLength(1))
+    await vi.advanceTimersByTimeAsync(30_000)
+    await vi.waitFor(() => expect(requests).toHaveLength(2))
+
+    changeSession(accountB)
+    await vi.waitFor(() => expect(requests).toHaveLength(3))
+    releaseHeldPoll()
+    await vi.advanceTimersByTimeAsync(30_000)
+    await vi.waitFor(() => expect(requests).toHaveLength(4))
+
+    expect(requests).toEqual([
+      { authorization: `Bearer ${accountA}`, since: null },
+      { authorization: `Bearer ${accountA}`, since: 'cursor-a' },
+      { authorization: `Bearer ${accountB}`, since: null },
+      { authorization: `Bearer ${accountB}`, since: 'cursor-b' },
+    ])
+    // Account A's alert arrived after the switch, so it is not B's to report.
+    expect(trackedEvents.filter((tracked) => tracked.event === 'alert_received')).toEqual(
+      []
+    )
   })
 })

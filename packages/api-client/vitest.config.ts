@@ -3,6 +3,7 @@ import { defineConfig } from 'vitest/config'
 export default defineConfig({
   test: {
     environment: 'node',
+    setupFiles: ['./testing/setup.ts'],
     include: ['testing/**/*.{spec,test}.ts'],
     coverage: {
       reporter: ['text', 'json-summary', 'lcov'],

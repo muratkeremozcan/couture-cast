@@ -2,6 +2,7 @@
 import { createServer } from 'node:http'
 let mode = 'accepted'
 const ledger = []
+const receipts = []
 const held = new Set()
 const entries = new WeakMap()
 const answer = (response) => {
@@ -30,6 +31,22 @@ const server = createServer((request, response) => {
   request.on('end', () => {
     try {
       const message = JSON.parse(bytes)
+      if (request.url === '/receipts') {
+        // Receipt lookups for tickets this recorder issued; every one settled ok.
+        if (!Array.isArray(message.ids)) throw new Error('Invalid receipt request')
+        receipts.push({
+          at: performance.now(),
+          wall: Date.now(),
+          ids: message.ids.length,
+        })
+        response.setHeader('content-type', 'application/json')
+        response.end(
+          JSON.stringify({
+            data: Object.fromEntries(message.ids.map((id) => [id, { status: 'ok' }])),
+          })
+        )
+        return
+      }
       if (
         typeof message.to !== 'string' ||
         !message.data ||
@@ -82,6 +99,13 @@ process.on('message', ({ id, op, args }) => {
   }
   process.send?.({
     id,
-    value: op === 'ledger' ? ledger : op === 'state' ? { held: held.size } : null,
+    value:
+      op === 'ledger'
+        ? ledger
+        : op === 'receipts'
+          ? receipts
+          : op === 'state'
+            ? { held: held.size }
+            : null,
   })
 })

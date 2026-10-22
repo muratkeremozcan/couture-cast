@@ -142,7 +142,14 @@ describe('generated sync HTTP client boundary', () => {
     const page = { events: [], nextCursor: 'head', hasMore: false, resyncRequired: false }
     const { client, fetchApi } = setup({ data: page }, { signal: controller.signal })
     const request = new AbortController()
-    expect(await client.events('all', 'old', request.signal)).toEqual(page)
+    let settle!: (response: Response) => void
+    fetchApi.mockReturnValueOnce(
+      new Promise<Response>((resolve) => {
+        settle = resolve
+      })
+    )
+    const flight = client.events('all', 'old', request.signal)
+    await vi.waitFor(() => expect(fetchApi).toHaveBeenCalledTimes(1))
     const [url, init] = fetchApi.mock.calls[0]!
     expect(new URL(url as string).pathname).toBe('/api/v1/community/events')
     expect(Object.fromEntries(new URL(url as string).searchParams)).toEqual({
@@ -152,15 +159,29 @@ describe('generated sync HTTP client boundary', () => {
     expect(init?.headers).toMatchObject({ Authorization: 'Bearer fixture-session' })
     controller.abort()
     expect(init?.signal?.aborted).toBe(true)
+    settle(Response.json({ data: page }))
+    expect(await flight).toEqual(page)
   })
   it('refreshes caller options per attempt and propagates explicit request cancellation', async () => {
     let header = 'first'
     const options = vi.fn(() => ({ headers: { 'x-request-owner': header } }))
     const { client, fetchApi } = setup({ data: { targets: [] } }, options)
     const controller = new AbortController()
-    await client.resolve({ targets: [{ key: 'p', postId: 'p' }] }, controller.signal)
+    let settle!: (response: Response) => void
+    fetchApi.mockReturnValueOnce(
+      new Promise<Response>((resolve) => {
+        settle = resolve
+      })
+    )
+    const flight = client.resolve(
+      { targets: [{ key: 'p', postId: 'p' }] },
+      controller.signal
+    )
+    await vi.waitFor(() => expect(fetchApi).toHaveBeenCalledTimes(1))
     controller.abort()
     expect(fetchApi.mock.calls[0]?.[1]?.signal?.aborted).toBe(true)
+    settle(Response.json({ data: { targets: [] } }))
+    await flight
     header = 'second'
     await client.resolve({ targets: [{ key: 'p', postId: 'p' }] })
     expect(options).toHaveBeenCalledTimes(2)

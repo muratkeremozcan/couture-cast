@@ -16,6 +16,7 @@ import { isolatedCommunityDatabase } from './isolated-community-database.js'
 import { CommunityRepository } from '../../src/modules/community/community.repository.js'
 import { CommunityNotificationsWorker } from '../../src/modules/community/community-notifications.worker.js'
 import { CommunitySendGuard } from '../../src/modules/community/community-send-guard.js'
+import { CommunityPushProvider } from '../../src/modules/community/community-push-provider.js'
 import { CommunityFlagEvaluationService } from '../../src/modules/feature-flags/community-flag-evaluation.service.js'
 import { PushRegistrationService } from '../../src/modules/notifications/push-registration.service.js'
 import { recordCommunityEngagement } from '../../src/modules/community/community-engagement-intent.js'
@@ -174,7 +175,11 @@ export async function engagementHarness() {
   const flags = new CommunityFlagEvaluationService(prisma, {
     getFeatureFlagValue: () => Promise.resolve(true),
   })
-  const guard = new CommunitySendGuard(prisma, flags)
+  const guard = new CommunitySendGuard(
+    prisma,
+    flags,
+    new CommunityPushProvider(fetch, endpoint)
+  )
   const worker = new CommunityNotificationsWorker(prisma, guard)
   return {
     prisma,

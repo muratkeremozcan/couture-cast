@@ -48,23 +48,7 @@ export async function cleanupUserTestData(userId: string | undefined): Promise<v
   if (!userId) {
     return
   }
-  if (!process.env.DATABASE_URL) {
-    throw new Error('DATABASE_URL is required to clean local Playwright user data')
-  }
-  const databaseUrl = new URL(process.env.DATABASE_URL)
-  const localHosts = new Set(['localhost', '127.0.0.1', '[::1]'])
-  const isSupportedLocalDatabase =
-    ['postgres:', 'postgresql:'].includes(databaseUrl.protocol) &&
-    localHosts.has(databaseUrl.hostname) &&
-    databaseUrl.port === '54322' &&
-    (databaseUrl.pathname === '/postgres' ||
-      /^\/tea_community_[a-f0-9]{32}$/.test(databaseUrl.pathname)) &&
-    databaseUrl.username === 'postgres'
-  if (!isSupportedLocalDatabase) {
-    throw new Error(
-      `Refusing destructive Playwright cleanup outside the supported local Supabase database: ${databaseUrl.hostname}:${databaseUrl.port}${databaseUrl.pathname}`
-    )
-  }
+  const databaseUrl = localPlaywrightDatabaseUrl()
 
   const prisma = new PrismaClient({ datasourceUrl: databaseUrl.toString() })
 
@@ -148,4 +132,27 @@ export async function cleanupUserTestData(userId: string | undefined): Promise<v
   } finally {
     await prisma.$disconnect()
   }
+}
+
+/** Shared guard for local Playwright database mutations. */
+export function localPlaywrightDatabaseUrl(): URL {
+  if (!process.env.DATABASE_URL) {
+    throw new Error('DATABASE_URL is required to clean local Playwright user data')
+  }
+  const databaseUrl = new URL(process.env.DATABASE_URL)
+  const localHosts = new Set(['localhost', '127.0.0.1', '[::1]'])
+  const isSupportedLocalDatabase =
+    ['postgres:', 'postgresql:'].includes(databaseUrl.protocol) &&
+    localHosts.has(databaseUrl.hostname) &&
+    databaseUrl.port === '54322' &&
+    (databaseUrl.pathname === '/postgres' ||
+      /^\/tea_community_[a-f0-9]{32}$/.test(databaseUrl.pathname)) &&
+    databaseUrl.username === 'postgres'
+  if (!isSupportedLocalDatabase) {
+    throw new Error(
+      `Refusing destructive Playwright cleanup outside the supported local Supabase database: ${databaseUrl.hostname}:${databaseUrl.port}${databaseUrl.pathname}`
+    )
+  }
+
+  return databaseUrl
 }
