@@ -39,6 +39,39 @@ describe('spotlight area canonicalization', () => {
     expect(canonicalCountryCode('Kosovo')).toBe('XK')
   })
 
+  it('drops a leading article, reads & as and, saint as st, and knows formal names', () => {
+    const cases: [string, string][] = [
+      ['The Netherlands', 'NL'],
+      ['the Bahamas', 'BS'],
+      ['The Gambia', 'GM'],
+      ['Les Pays-Bas', 'NL'],
+      ['Die Niederlande', 'NL'],
+      ['Gli Stati Uniti', 'US'],
+      ['Os Estados Unidos', 'US'],
+      ['El Salvador', 'SV'],
+      ['Antigua and Barbuda', 'AG'],
+      ['Antigua & Barbuda', 'AG'],
+      ['Bosnia & Herzegovina', 'BA'],
+      ['Korea', 'KR'],
+      ['Republic of Korea', 'KR'],
+      ['DPRK', 'KP'],
+      ['Congo', 'CG'],
+      ['Republic of the Congo', 'CG'],
+      ['DRC', 'CD'],
+      ['DR Congo', 'CD'],
+      ['Democratic Republic of the Congo', 'CD'],
+      ['Republic of Ireland', 'IE'],
+      ['St Kitts and Nevis', 'KN'],
+      ['Saint Kitts and Nevis', 'KN'],
+      ['St. Kitts & Nevis', 'KN'],
+      ['Saint Lucia', 'LC'],
+    ]
+    for (const [text, code] of cases) expect(canonicalCountryCode(text), text).toBe(code)
+    // A lone code is never read as an article.
+    expect(canonicalCountryCode('IL')).toBe('IL')
+    expect(canonicalCountryCode('LA')).toBe('LA')
+  })
+
   it('leaves unknown, blank and non-country text unresolved', () => {
     for (const text of [
       null,
@@ -80,6 +113,13 @@ describe('spotlight area canonicalization', () => {
     expect(foldAreaComponent('ıstanbul')).toBe('istanbul')
     expect(foldAreaComponent('Ｚüｒｉｃｈ')).toBe('zurich')
     expect(foldAreaComponent('서울')).toBe('서울')
+    expect(foldAreaComponent('Straße')).toBe('strasse')
+    expect(foldAreaComponent('Łódź')).toBe('lodz')
+    expect(foldAreaComponent('Đà Nẵng')).toBe('da nang')
+    expect(foldAreaComponent('Tromsø')).toBe('tromso')
+    expect(foldAreaComponent('Ærøskøbing')).toBe('aeroskobing')
+    expect(foldAreaComponent('Œuvre')).toBe('oeuvre')
+    expect(foldAreaComponent('Þórshöfn')).toBe('thorshofn')
     expect(foldAreaComponent(' \u0301 ')).toBeNull()
     expect(foldAreaComponent('   ')).toBeNull()
     expect(foldAreaComponent(null)).toBeNull()

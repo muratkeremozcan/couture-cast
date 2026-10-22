@@ -44,7 +44,8 @@ const NON_COUNTRY_REGIONS = new Set([
 
 /**
  * Common spellings no locale's display name covers: abbreviations, former
- * names and constituent countries. Keys are already in `countryKey` form.
+ * names, formal names and constituent countries. Keys pass through
+ * `countryKey` like every other name.
  */
 const COUNTRY_ALIASES: Readonly<Record<string, string>> = {
   usa: 'US',
@@ -68,11 +69,43 @@ const COUNTRY_ALIASES: Readonly<Record<string, string>> = {
   'cape verde': 'CV',
   'east timor': 'TL',
   'vatican city': 'VA',
+  korea: 'KR',
+  'republic of korea': 'KR',
+  dprk: 'KP',
+  congo: 'CG',
+  'republic of the congo': 'CG',
+  'congo brazzaville': 'CG',
+  drc: 'CD',
+  'dr congo': 'CD',
+  'democratic republic of the congo': 'CD',
+  'congo kinshasa': 'CD',
+  'republic of ireland': 'IE',
+  'saint kitts and nevis': 'KN',
+}
+
+/**
+ * Leading articles in the product languages. One is dropped only when more
+ * words follow, so `The Gambia` and `Gambia` meet while a lone `IL` stays a code.
+ */
+const LEADING_ARTICLE =
+  /^(?:the|la|le|les|l|el|los|las|die|der|das|o|os|a|as|il|lo|gli|i) (?=\S)/
+
+/** Letters NFKD leaves whole, spelled the way their plain-Latin forms are typed. */
+const TRANSLITERATIONS: Readonly<Record<string, string>> = {
+  ß: 'ss',
+  ł: 'l',
+  đ: 'd',
+  ð: 'd',
+  ø: 'o',
+  æ: 'ae',
+  œ: 'oe',
+  þ: 'th',
 }
 
 /**
  * Trimmed, NFKD with combining marks removed, Turkish dotted and dotless I
- * folded, then lowercased. NFC afterwards recomposes scripts NFKD split
+ * folded, then lowercased, with letters NFKD keeps whole (`ß`, `ł`, `ø` and
+ * the like) transliterated. NFC afterwards recomposes scripts NFKD split
  * without marks, such as Hangul. Blank collapses to null.
  */
 export function foldAreaComponent(value: string | null | undefined): string | null {
@@ -84,18 +117,25 @@ export function foldAreaComponent(value: string | null | undefined): string | nu
     .normalize('NFC')
     .replace(/ı/g, 'i')
     .toLowerCase()
+    .replace(/[ßłđðøæœþ]/g, (letter) => TRANSLITERATIONS[letter] ?? letter)
     .trim()
   return folded.length > 0 ? folded : null
 }
 
-/** The lookup form of a country name: folded, dots dropped, separators collapsed. */
+/**
+ * The lookup form of a country name: folded, dots dropped, `&` read as `and`,
+ * `saint` as `st`, separators collapsed and one leading article dropped.
+ */
 function countryKey(value: string): string | null {
   const folded = foldAreaComponent(value)
   if (!folded) return null
   const key = folded
     .replace(/\./g, '')
+    .replace(/&/g, ' and ')
     .replace(/[\s\-‐‑–—_,'’()]+/g, ' ')
     .trim()
+    .replace(/\bsaint\b/g, 'st')
+    .replace(LEADING_ARTICLE, '')
   return key.length > 0 ? key : null
 }
 
@@ -138,8 +178,9 @@ function countries() {
       for (const code of codes) claim(names.of(code), code)
     }
   }
-  for (const [key, code] of Object.entries(COUNTRY_ALIASES)) {
-    if (!byKey.has(key)) byKey.set(key, code)
+  for (const [alias, code] of Object.entries(COUNTRY_ALIASES)) {
+    const key = countryKey(alias)
+    if (key && !byKey.has(key)) byKey.set(key, code)
   }
   countryTable = { codes, byKey }
   return countryTable
