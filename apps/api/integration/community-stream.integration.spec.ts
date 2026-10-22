@@ -9,7 +9,9 @@ import { CommunityStreamRepository } from '../src/modules/community/community-st
 
 const database = isolatedCommunityDatabase()
 const prisma = new PrismaClient({ datasources: { db: { url: database.url } } })
-const stream = new CommunityStreamRepository(prisma)
+// One appender per test: its adaptive batch limit is per-instance state, and a test that
+// drove it into budget pressure must not shrink the next test's batches.
+let stream: CommunityStreamRepository
 const clients: Client[] = []
 async function connection() {
   const client = new Client({ connectionString: database.url })
@@ -37,6 +39,7 @@ beforeAll(async () => {
   expect(version!.version).toBeGreaterThanOrEqual(170000)
 }, 30_000)
 beforeEach(async () => {
+  stream = new CommunityStreamRepository(prisma)
   await prisma.communityStreamEvent.deleteMany()
   await prisma.communityDomainOutbox.deleteMany()
 })
