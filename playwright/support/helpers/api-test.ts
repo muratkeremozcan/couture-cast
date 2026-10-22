@@ -108,6 +108,10 @@ export function buildUniqueId(prefix: string, testInfo: TestInfo): string {
     `p${testInfo.parallelIndex}`,
     `r${testInfo.repeatEachIndex}`,
     `retry${testInfo.retry}`,
+    // The slug is cut at 36 characters for readability, so two titles that
+    // differ only near the end (a viewport width, say) would collide; the
+    // per-test id keeps every test apart.
+    testInfo.testId,
     slugify(testInfo.title),
   ].join('-')
 }
