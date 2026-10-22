@@ -180,6 +180,58 @@ test.describe('Story 6.6 City Spotlight', () => {
     }
   })
 
+  for (const viewport of [
+    { width: 390, height: 844 },
+    { width: 1280, height: 800 },
+  ]) {
+    test(`[P1] lays the ranked looks out in one horizontal row at ${viewport.width}px`, async ({
+      page,
+      communitySession,
+    }) => {
+      // R42: six stacked cards pushed the first feed card several screens down.
+      // One row keeps the feed within a card's height of the module.
+      await assertSeededSpotlight()
+      const removeLocation = await placeViewerInArea(
+        communitySession.userId,
+        SEEDED_SPOTLIGHT_AREA
+      )
+      try {
+        await page.setViewportSize(viewport)
+        await loadedSpotlight(page)
+        const row = page.getByTestId('community-spotlight-row')
+        await expect(row).toBeVisible()
+        const layout = await row.evaluate((element) => {
+          const items = Array.from(
+            element.querySelectorAll<HTMLElement>(
+              '[data-testid^="community-spotlight-item-"]'
+            ),
+            (item) => item.getBoundingClientRect()
+          )
+          const module = document
+            .querySelector('[data-testid="community-spotlight"]')!
+            .getBoundingClientRect()
+          return {
+            rowScrolls: element.scrollWidth > element.clientWidth,
+            pageScrollsSideways: document.documentElement.scrollWidth > window.innerWidth,
+            tops: items.map((item) => Math.round(item.top)),
+            cardHeight: Math.max(...items.map((item) => item.height)),
+            moduleHeight: module.height,
+          }
+        })
+        expect(layout.tops).toHaveLength(6)
+        expect(new Set(layout.tops).size).toBe(1)
+        expect(layout.rowScrolls).toBe(true)
+        expect(layout.pageScrollsSideways).toBe(false)
+        // Heading, row and View more: the module is one card tall plus chrome.
+        expect(layout.moduleHeight).toBeLessThan(layout.cardHeight + 200)
+        await checkA11y(page)
+      } finally {
+        await page.goto('about:blank')
+        await removeLocation()
+      }
+    })
+  }
+
   test('[P2] shows the localized empty state for a viewer with no saved location', async ({
     page,
     communitySession,

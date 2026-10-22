@@ -320,7 +320,8 @@ export interface CommunitySpotlightSectionProps {
   state: CommunitySpotlightState
   /** False while community access is unverified; the module hides with the feed, like mobile. */
   available: boolean
-  gridColumns: string
+  /** The phone frame preview keeps the narrow card width at every viewport width. */
+  isMobilePreview: boolean
   t: Translate
   onLoadMore: () => void
   onRetry: () => void
@@ -328,25 +329,64 @@ export interface CommunitySpotlightSectionProps {
   renderCard: (item: CommunitySpotlightItem) => React.ReactNode
 }
 
+/**
+ * Story 6.6 R42: the spotlight is one horizontal row, so the ranked cards add a
+ * single card height above the feed. On a narrow column a card takes 85% of the
+ * row and the next one peeks. From 768px it takes a fixed 240px, the width of
+ * one feed column at 1440px, which shows two cards and part of a third in the
+ * 600px community column at 1280px. The 1440px layout narrows that column to
+ * about 500px beside the planner rail, so cards drop to 220px there and the
+ * third still peeks. `cqw` resolves against the row (its `container-type`),
+ * which keeps the width independent of the list element between the row and
+ * its cards.
+ */
+function cardWidth(isMobilePreview: boolean): string {
+  return isMobilePreview
+    ? 'w-[85cqw]'
+    : 'w-[85cqw] min-[768px]:w-[240px] min-[1440px]:w-[220px]'
+}
+
+/**
+ * The row scrolls on its own axis, so the page never scrolls sideways. The
+ * padding keeps a focused card's outline inside the clipped scroll box, and the
+ * matching scroll padding keeps a snapped card clear of the edge.
+ */
+const ROW_CLASSES =
+  'flex gap-4 p-1 [container-type:inline-size] snap-x snap-mandatory scroll-px-1 overflow-x-auto overscroll-x-contain'
+
+/**
+ * Moves focus to a card View more appended and scrolls it to the start of the
+ * row: a card appended past the right edge would otherwise take focus out of
+ * sight. jsdom implements no `scrollIntoView`.
+ */
+function focusSpotlightCard(postId: string) {
+  const card = document.getElementById(spotlightCardElementId(postId))
+  if (!card) return
+  card.focus({ preventScroll: true })
+  if (typeof card.scrollIntoView === 'function')
+    card.scrollIntoView({ inline: 'start', block: 'nearest' })
+}
+
 function SpotlightStates({
   state,
-  gridColumns,
+  isMobilePreview,
   t,
   onRetry,
-}: Pick<CommunitySpotlightSectionProps, 'state' | 'gridColumns' | 't' | 'onRetry'>) {
+}: Pick<CommunitySpotlightSectionProps, 'state' | 'isMobilePreview' | 't' | 'onRetry'>) {
   if (state.status === 'loading') {
     // Decorative. The section carries `aria-busy`, and the grid's single live
-    // region stays free for the feed's own loading announcement.
+    // region stays free for the feed's own loading announcement. The skeleton
+    // takes the row's shape, so the feed below does not jump when cards land.
     return (
       <div
         data-testid="community-spotlight-loading"
         aria-hidden="true"
-        className={`grid gap-6 ${gridColumns}`}
+        className="flex gap-4 overflow-hidden p-1 [container-type:inline-size]"
       >
         {[1, 2].map((n) => (
           <div
             key={n}
-            className="h-72 animate-pulse rounded-[8px] border border-[color:var(--theme-card-border)] bg-[var(--theme-card-bg)]"
+            className={`h-72 shrink-0 animate-pulse rounded-[8px] border border-[color:var(--theme-card-border)] bg-[var(--theme-card-bg)] ${cardWidth(isMobilePreview)}`}
           />
         ))}
       </div>
@@ -397,14 +437,86 @@ function SpotlightStates({
   )
 }
 
-/** A failed page's notice and View more, which stays while any cursor remains. */
-function SpotlightPaging({
+/**
+ * View more, the trailing item of the row while any cursor remains. It sits
+ * after the list element, so the list's item count and each card's position
+ * cover the ranked looks alone.
+ */
+function SpotlightViewMore({
   state,
   t,
   onLoadMore,
 }: Pick<CommunitySpotlightSectionProps, 'state' | 't' | 'onLoadMore'>) {
+  if (state.nextCursor === null) return null
+  return (
+    <div className="flex shrink-0 snap-start items-center px-2">
+      <button
+        type="button"
+        data-testid="community-spotlight-view-more"
+        disabled={state.loadingMore}
+        onClick={onLoadMore}
+        className="min-h-[44px] whitespace-nowrap rounded-full border border-[color:var(--theme-secondary)] px-6 py-2 text-xs font-semibold uppercase tracking-wider text-[color:var(--theme-card-text)] focus-visible:outline focus-visible:outline-2 focus-visible:outline-[color:var(--focus-essential)] disabled:opacity-50"
+      >
+        {state.loadingMore
+          ? t('community.spotlight.loadingMore')
+          : t('community.spotlight.viewMore')}
+      </button>
+    </div>
+  )
+}
+
+/**
+ * The ranked looks and View more as one horizontal row, then the notice for a
+ * page that failed to load.
+ */
+function SpotlightRow({
+  state,
+  isMobilePreview,
+  t,
+  onLoadMore,
+  renderCard,
+}: Pick<
+  CommunitySpotlightSectionProps,
+  'state' | 'isMobilePreview' | 't' | 'onLoadMore' | 'renderCard'
+>) {
+  const width = cardWidth(isMobilePreview)
   return (
     <>
+      <div data-testid="community-spotlight-row" className={ROW_CLASSES}>
+        {state.items.length > 0 && (
+          <ol
+            data-testid="community-spotlight-list"
+            aria-labelledby="community-spotlight-heading"
+            className="flex shrink-0 gap-4"
+          >
+            {state.items.map((item, index) => (
+              <li
+                key={item.id}
+                data-testid={`community-spotlight-item-${item.id}`}
+                data-rank={item.rank}
+                // Position and count among the loaded looks. The rank can skip a
+                // number the server filtered, so it stays in its own text.
+                aria-posinset={index + 1}
+                aria-setsize={state.items.length}
+                className={`relative shrink-0 snap-start ${width}`}
+              >
+                <span className="sr-only">
+                  {t('community.spotlight.rank', { rank: item.rank })}
+                </span>
+                <span
+                  aria-hidden="true"
+                  className="lookbook-metrics pointer-events-none absolute right-3 top-3 z-10 rounded-md bg-[#111111] px-2.5 py-1 text-[10px] font-semibold text-white shadow-sm"
+                >
+                  #{item.rank}
+                </span>
+                {renderCard(item)}
+              </li>
+            ))}
+          </ol>
+        )}
+        <SpotlightViewMore state={state} t={t} onLoadMore={onLoadMore} />
+      </div>
+
       {state.moreFailed && (
         <p
           data-testid="community-spotlight-more-error"
@@ -414,22 +526,6 @@ function SpotlightPaging({
           {t('community.spotlight.error')}
         </p>
       )}
-
-      {state.nextCursor !== null && (
-        <div className="flex justify-center">
-          <button
-            type="button"
-            data-testid="community-spotlight-view-more"
-            disabled={state.loadingMore}
-            onClick={onLoadMore}
-            className="min-h-[44px] rounded-full border border-[color:var(--theme-secondary)] px-6 py-2 text-xs font-semibold uppercase tracking-wider text-[color:var(--theme-card-text)] focus-visible:outline focus-visible:outline-2 focus-visible:outline-[color:var(--focus-essential)] disabled:opacity-50"
-          >
-            {state.loadingMore
-              ? t('community.spotlight.loadingMore')
-              : t('community.spotlight.viewMore')}
-          </button>
-        </div>
-      )}
     </>
   )
 }
@@ -437,7 +533,7 @@ function SpotlightPaging({
 export function CommunitySpotlightSection({
   state,
   available,
-  gridColumns,
+  isMobilePreview,
   t,
   onLoadMore,
   onRetry,
@@ -446,7 +542,7 @@ export function CommunitySpotlightSection({
 }: CommunitySpotlightSectionProps) {
   useEffect(() => {
     if (!state.focusTargetId) return
-    document.getElementById(spotlightCardElementId(state.focusTargetId))?.focus()
+    focusSpotlightCard(state.focusTargetId)
     onFocused()
   }, [state.focusTargetId, onFocused])
 
@@ -454,7 +550,6 @@ export function CommunitySpotlightSection({
 
   const ready = state.status === 'ready'
   const hasArea = ready && state.level !== 'none' && state.label
-  const showList = ready && state.items.length > 0
   // A page can arrive with every post filtered while ranks remain behind its
   // cursor. The empty state is for a spotlight with nothing left to show.
   const showEmpty = ready && state.items.length === 0 && state.nextCursor === null
@@ -465,7 +560,7 @@ export function CommunitySpotlightSection({
       aria-busy={state.status === 'loading' || state.loadingMore}
       data-testid="community-spotlight"
       data-level={ready ? state.level : undefined}
-      className="flex flex-col gap-4 border-b border-[color:var(--theme-card-border)] pb-6"
+      className="flex min-w-0 flex-col gap-4 border-b border-[color:var(--theme-card-border)] pb-6"
     >
       <div className="flex flex-col gap-1">
         <span className="lookbook-metrics text-xs uppercase tracking-widest text-[color:var(--theme-card-text)]">
@@ -485,44 +580,22 @@ export function CommunitySpotlightSection({
         </p>
       </div>
 
-      {showList && (
-        <ol
-          data-testid="community-spotlight-list"
-          aria-labelledby="community-spotlight-heading"
-          className={`grid gap-6 ${gridColumns}`}
-        >
-          {state.items.map((item) => (
-            <li
-              key={item.id}
-              data-testid={`community-spotlight-item-${item.id}`}
-              data-rank={item.rank}
-              className="relative"
-            >
-              <span className="sr-only">
-                {t('community.spotlight.rank', { rank: item.rank })}
-              </span>
-              <span
-                aria-hidden="true"
-                className="lookbook-metrics pointer-events-none absolute right-3 top-3 z-10 rounded-md bg-[#111111] px-2.5 py-1 text-[10px] font-semibold text-white shadow-sm"
-              >
-                #{item.rank}
-              </span>
-              {renderCard(item)}
-            </li>
-          ))}
-        </ol>
-      )}
-
-      {(!ready || showEmpty) && (
+      {ready && !showEmpty ? (
+        <SpotlightRow
+          state={state}
+          isMobilePreview={isMobilePreview}
+          t={t}
+          onLoadMore={onLoadMore}
+          renderCard={renderCard}
+        />
+      ) : (
         <SpotlightStates
           state={state}
-          gridColumns={gridColumns}
+          isMobilePreview={isMobilePreview}
           t={t}
           onRetry={onRetry}
         />
       )}
-
-      {ready && <SpotlightPaging state={state} t={t} onLoadMore={onLoadMore} />}
     </section>
   )
 }

@@ -3014,7 +3014,7 @@ export function CommunityLookbookGrid({
       <CommunitySpotlightSection
         state={spotlight.state}
         available={communityAvailable}
-        gridColumns={gridColumns}
+        isMobilePreview={isMobilePreview}
         t={t}
         onLoadMore={() => {
           void spotlight.loadMore()

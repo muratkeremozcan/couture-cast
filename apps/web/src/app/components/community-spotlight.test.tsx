@@ -941,4 +941,146 @@ describe('CommunitySpotlightSection (Story 6.6)', () => {
     )
     expect(screen.getByTestId('spotlight-lookbook-card-spot-2')).toBeInTheDocument()
   })
+
+  // --- Story 6.6 R42: one horizontal row above the feed -----------------------
+
+  it("6.6-WEB-071 the row is an ordered list named by the heading with each look's position and the loaded count (R42)", async () => {
+    signIn()
+    useMswHandlers(
+      feedHandler({ items: [] }),
+      http.get(SPOTLIGHT_PATH, ({ request }) =>
+        new URL(request.url).searchParams.get('cursor') === null
+          ? spotlightBody({
+              items: [ranked(1), ranked(2), ranked(4)],
+              nextCursor: 'cursor-2',
+            })
+          : spotlightBody({ items: [ranked(5)], nextCursor: null })
+      )
+    )
+    const user = userEvent.setup()
+    renderGrid()
+
+    const list = await screen.findByRole('list', { name: 'Spotlight in Lisbon' })
+    expect(list.tagName).toBe('OL')
+    expect(list).toBe(screen.getByTestId('community-spotlight-list'))
+    const positions = () =>
+      within(screen.getByTestId('community-spotlight-list'))
+        .getAllByRole('listitem')
+        .map((entry) => [
+          entry.getAttribute('aria-posinset'),
+          entry.getAttribute('aria-setsize'),
+          entry.querySelector('.sr-only')?.textContent,
+        ])
+    // The position counts loaded looks; the rank keeps the number the server
+    // ranked, which skips a look it filtered.
+    expect(positions()).toEqual([
+      ['1', '3', 'Rank 1'],
+      ['2', '3', 'Rank 2'],
+      ['3', '3', 'Rank 4'],
+    ])
+
+    await user.click(screen.getByTestId('community-spotlight-view-more'))
+    await screen.findByTestId('spotlight-lookbook-card-spot-5')
+    expect(positions()).toEqual([
+      ['1', '4', 'Rank 1'],
+      ['2', '4', 'Rank 2'],
+      ['3', '4', 'Rank 4'],
+      ['4', '4', 'Rank 5'],
+    ])
+  })
+
+  it('6.6-WEB-072 View more is the trailing item of the row, after the last look and outside the list count (R42)', async () => {
+    signIn()
+    useMswHandlers(
+      feedHandler({ items: [] }),
+      http.get(SPOTLIGHT_PATH, () =>
+        spotlightBody({ items: [ranked(1), ranked(2)], nextCursor: 'cursor-2' })
+      )
+    )
+    renderGrid()
+
+    await screen.findByTestId('spotlight-lookbook-card-spot-2')
+    const row = screen.getByTestId('community-spotlight-row')
+    const list = within(row).getByTestId('community-spotlight-list')
+    const viewMore = within(row).getByTestId('community-spotlight-view-more')
+    const entries = within(list).getAllByRole('listitem')
+    // Cards first, then View more as the row's last item.
+    expect(Array.from(row.children).at(0)).toBe(list)
+    expect(row.lastElementChild?.contains(viewMore)).toBe(true)
+    expect(entries.at(-1)?.getAttribute('data-rank')).toBe('2')
+    expect(
+      entries.at(-1)!.compareDocumentPosition(viewMore) & Node.DOCUMENT_POSITION_FOLLOWING
+    ).toBeTruthy()
+    expect(list.contains(viewMore)).toBe(false)
+    // The row scrolls through the buttons it holds and takes no tab stop itself.
+    expect(row).not.toHaveAttribute('tabindex')
+  })
+
+  it('6.6-WEB-073 View more scrolls the look it focuses to the start of the row (R42)', async () => {
+    signIn()
+    const previous = Object.getOwnPropertyDescriptor(
+      HTMLElement.prototype,
+      'scrollIntoView'
+    )
+    const scrollIntoView = vi.fn()
+    Object.defineProperty(HTMLElement.prototype, 'scrollIntoView', {
+      configurable: true,
+      value: scrollIntoView,
+    })
+    try {
+      useMswHandlers(
+        feedHandler({ items: [] }),
+        http.get(SPOTLIGHT_PATH, ({ request }) =>
+          new URL(request.url).searchParams.get('cursor') === null
+            ? spotlightBody({ items: [ranked(1), ranked(2)], nextCursor: 'cursor-2' })
+            : spotlightBody({ items: [ranked(3)], nextCursor: null })
+        )
+      )
+      const user = userEvent.setup()
+      renderGrid()
+
+      await screen.findByTestId('spotlight-lookbook-card-spot-2')
+      // Rendering page one moves nothing: only an appended look takes focus.
+      expect(scrollIntoView).not.toHaveBeenCalled()
+      await user.click(screen.getByTestId('community-spotlight-view-more'))
+
+      const third = await screen.findByTestId('spotlight-lookbook-card-spot-3')
+      await waitFor(() => expect(document.activeElement).toBe(third))
+      expect(scrollIntoView).toHaveBeenCalledTimes(1)
+      expect(scrollIntoView).toHaveBeenCalledWith({ inline: 'start', block: 'nearest' })
+      expect(scrollIntoView.mock.contexts[0]).toBe(third)
+    } finally {
+      if (previous)
+        Object.defineProperty(HTMLElement.prototype, 'scrollIntoView', previous)
+      else Reflect.deleteProperty(HTMLElement.prototype, 'scrollIntoView')
+    }
+  })
+
+  it('6.6-WEB-074 the loading skeleton takes the row shape and stays out of the accessibility tree (R42)', async () => {
+    signIn()
+    let release!: () => void
+    const held = new Promise<void>((resolve) => {
+      release = resolve
+    })
+    useMswHandlers(
+      feedHandler({ items: [] }),
+      http.get(SPOTLIGHT_PATH, async () => {
+        await held
+        return spotlightBody({ items: [ranked(1)], nextCursor: null })
+      })
+    )
+    renderGrid()
+
+    const skeleton = await screen.findByTestId('community-spotlight-loading')
+    expect(skeleton).toHaveAttribute('aria-hidden', 'true')
+    expect(skeleton.children).toHaveLength(2)
+    expect(screen.getByTestId('community-spotlight')).toHaveAttribute('aria-busy', 'true')
+    expect(screen.queryByTestId('community-spotlight-row')).not.toBeInTheDocument()
+
+    release()
+    expect(
+      await screen.findByTestId('spotlight-lookbook-card-spot-1')
+    ).toBeInTheDocument()
+    expect(screen.queryByTestId('community-spotlight-loading')).not.toBeInTheDocument()
+  })
 })
