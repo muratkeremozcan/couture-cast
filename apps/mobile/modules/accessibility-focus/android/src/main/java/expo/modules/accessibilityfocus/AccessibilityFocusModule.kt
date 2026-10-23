@@ -3,7 +3,6 @@ package expo.modules.accessibilityfocus
 import android.os.Handler
 import android.os.Looper
 import android.view.View
-import android.view.accessibility.AccessibilityNodeInfo
 import expo.modules.kotlin.Promise
 import expo.modules.kotlin.modules.Module
 import expo.modules.kotlin.modules.ModuleDefinition
@@ -35,11 +34,7 @@ class AccessibilityFocusModule : Module() {
 
     AsyncFunction("focus") { tag: Int, promise: Promise ->
       mainHandler.post {
-        val view = decorView()?.findViewById<View>(tag)
-        promise.resolve(
-          view?.performAccessibilityAction(AccessibilityNodeInfo.ACTION_ACCESSIBILITY_FOCUS, null)
-            ?: false
-        )
+        promise.resolve(observer.moveFocus(decorView(), tag))
       }
     }
 

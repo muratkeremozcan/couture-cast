@@ -163,6 +163,24 @@ class AccessibilityFocusObserver(
       else super.getAccessibilityNodeProvider(host)
   }
 
+  /**
+   * Asks the accessibility service to move its cursor to the view with React tag
+   * `tag` under `decor`. False when the view is not there yet or the service
+   * cannot take it (no screen reader, or touch exploration off).
+   *
+   * A view that already holds the cursor refuses the action and sends no event,
+   * so it counts as moved and the observed window reports the focus it holds.
+   * Runs on the main looper.
+   */
+  fun moveFocus(decor: View?, tag: Int): Boolean {
+    val view = decor?.findViewById<View>(tag) ?: return false
+    if (view.isAccessibilityFocused) {
+      attachedDecor?.takeIf { it === decor }?.let { report(it) }
+      return true
+    }
+    return view.performAccessibilityAction(AccessibilityNodeInfo.ACTION_ACCESSIBILITY_FOCUS, null)
+  }
+
   companion object {
     internal fun focusedView(view: View): View? {
       if (view.isAccessibilityFocused) return view
