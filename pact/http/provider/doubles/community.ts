@@ -7,6 +7,7 @@ import { decodeSpotlightCursor } from '../../../../apps/api/src/modules/communit
 import {
   COMMUNITY_REACTION_CONFLICT_MESSAGE,
   COMMUNITY_REACTION_RATE_LIMITED_MESSAGE,
+  COMMUNITY_SPOTLIGHT_RATE_LIMITED_MESSAGE,
   COMMUNITY_CHALLENGE_OVERLAP_MESSAGE,
   COMMUNITY_CONSENT_SUSPENDED_MESSAGE,
   COMMUNITY_FEED_DISABLED_MESSAGE,
@@ -545,6 +546,11 @@ export function createCommunityDoubles() {
             code: 'denied',
             message: COMMUNITY_FEED_DISABLED_MESSAGE,
           })
+        )
+      // The page-one read limit's refusal: CommunitySpotlightService.getSpotlight.
+      if (scenario === 'spotlight-rate-limited')
+        return Promise.reject(
+          new CommunityRateLimitException(COMMUNITY_SPOTLIGHT_RATE_LIMITED_MESSAGE, 37)
         )
       const reactions = params.reactions === true
       if (params.cursor) {

@@ -693,6 +693,15 @@ export const stateHandlers: StateHandlers = {
     })
   },
 
+  'The viewer has exhausted the spotlight read limit': (parameters?: unknown) => {
+    const { userId } = (parameters ?? {}) as CommunityStateParams
+    configureProviderCommunityState({ userId, scenario: 'spotlight-rate-limited' })
+    return Promise.resolve({
+      description:
+        'Configured a viewer whose page-one spotlight reads are over the limit',
+    })
+  },
+
   'No spotlight cohort exists for the viewer area': (parameters?: unknown) => {
     const { userId } = (parameters ?? {}) as CommunityStateParams
     configureProviderCommunityState({ userId, scenario: 'spotlight-none' })

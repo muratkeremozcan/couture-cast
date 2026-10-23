@@ -131,6 +131,7 @@ import {
   // Story 6.7 Home teaser read and open.
   verifyCommunitySpotlightHomeTeaserInteraction,
   verifyOpenCommunityHomeTeaserPostInteraction,
+  verifyCommunitySpotlightHomeTeaserRateLimitedInteraction,
   verifyOpenCommunityFeedPostInteraction,
   verifyCommunityPostInteraction,
   verifyCommunityPostNotFoundInteraction,
@@ -700,6 +701,14 @@ describe('CoutureCastWeb -> CoutureCastApi HTTP contract', () => {
 
   it('records a home teaser open with rank one', async () => {
     await verifyOpenCommunityHomeTeaserPostInteraction(
+      pact,
+      createWebClientForMockServer,
+      'web'
+    )
+  })
+
+  it('reports a home teaser read over the limit with its Retry-After', async () => {
+    await verifyCommunitySpotlightHomeTeaserRateLimitedInteraction(
       pact,
       createWebClientForMockServer,
       'web'

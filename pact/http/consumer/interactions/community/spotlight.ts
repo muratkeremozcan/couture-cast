@@ -11,6 +11,7 @@ import { ResponseError } from '@couture/api-client'
 import {
   COMMUNITY_CURSOR_INVALID_MESSAGE,
   COMMUNITY_FEED_DISABLED_MESSAGE,
+  COMMUNITY_SPOTLIGHT_RATE_LIMITED_MESSAGE,
   communityReactionSpotlightResponseSchema,
   communitySpotlightDeniedResponseSchema,
   communitySpotlightInvalidCursorResponseSchema,
@@ -538,5 +539,59 @@ export async function verifyCommunitySpotlightDisabledInteraction(
       expect(
         communitySpotlightDeniedResponseSchema.parse(await error.response.json())
       ).toEqual(envelope)
+    })
+}
+
+/**
+ * Story 6.7: a Home teaser read over the page-one limit. The teaser defers its
+ * next read by `Retry-After`, so the header is part of the contract.
+ */
+export async function verifyCommunitySpotlightHomeTeaserRateLimitedInteraction(
+  pact: PactV4,
+  createClient: CreateClient,
+  platform: CommunityPlatform
+) {
+  // Provider endpoint: apps/api/src/modules/community/community.controller.ts -> GET /api/v1/community/spotlight
+  const envelope = {
+    statusCode: 429,
+    error: 'Too Many Requests',
+    message: COMMUNITY_SPOTLIGHT_RATE_LIMITED_MESSAGE,
+  }
+  await pact
+    .addInteraction()
+    .given(
+      ...createProviderState({
+        name: 'The viewer has exhausted the spotlight read limit',
+        params: { userId: pactEventAuth.userId },
+      })
+    )
+    .uponReceiving(`a ${platform} home teaser read over the spotlight read limit`)
+    .withRequest(
+      'GET',
+      SPOTLIGHT_PATH,
+      setJsonContent({
+        headers: negotiatedHeaders(platform),
+        query: { limit: '1', surface: 'home_teaser' },
+      })
+    )
+    .willRespondWith(
+      429,
+      setJsonContent({ headers: { 'Retry-After': '37' }, body: envelope })
+    )
+    .executeTest(async (mockServer: V3MockServer) => {
+      const error: unknown = await createClient(mockServer)
+        .getCommunitySpotlight({
+          xCouturePlatform: platform,
+          xCoutureReactions: '1',
+          limit: 1,
+          surface: 'home_teaser',
+        })
+        .catch((failure: unknown) => failure)
+      expect(error).toBeInstanceOf(ResponseError)
+      if (!(error instanceof ResponseError))
+        throw new Error('Expected generated-client ResponseError')
+      expect(error.response.status).toBe(429)
+      expect(error.response.headers.get('Retry-After')).toBe('37')
+      expect(await error.response.json()).toEqual(envelope)
     })
 }
