@@ -21,7 +21,12 @@ import {
   trackGarmentUploadCompleted,
   trackGuardianConsentGranted,
   trackLocaleSwitched,
+  trackLocationSaved,
+  trackLocationSearchFailed,
   trackLocationSwitched,
+  locationSavedEventSchema,
+  locationSearchFailedEventSchema,
+  locationSwitchedEventSchema,
   trackModerationAction,
   trackProfileCompleted,
   trackRitualCreated,
@@ -255,22 +260,71 @@ describe('analytics tracking wrappers', () => {
     })
   })
 
-  // A first-ever location selection has no previous location; null must survive
-  // normalization rather than being dropped as an absent optional.
-  it('preserves a null from_location on the first location switch', () => {
-    expect(
-      trackLocationSwitched({
-        userId: 'user-1',
-        fromLocation: null,
-        toLocation: 'chicago-il',
-        timestamp: TIMESTAMP,
-      }).properties
-    ).toEqual({
-      user_id: 'user-1',
-      from_location: null,
-      to_location: 'chicago-il',
-      timestamp: TIMESTAMP,
+  // Story 1.2b: the switch event is pseudonymous and carries no place keys,
+  // so nothing in it says where a member lives.
+  it('keeps location_switched pseudonymous with no place properties', () => {
+    expect(trackLocationSwitched({ analyticsSubjectId: 'subject-1' })).toEqual({
+      distinctId: 'subject-1',
+      event: 'location_switched',
+      properties: {},
     })
+    expect(
+      locationSwitchedEventSchema.safeParse({
+        analyticsSubjectId: 'subject-1',
+        toLocation: 'chicago-il',
+      }).success
+    ).toBe(false)
+  })
+
+  it('normalizes location_saved to closed properties', () => {
+    expect(
+      trackLocationSaved({
+        analyticsSubjectId: 'subject-1',
+        platform: 'web',
+        outcome: 'saved',
+        resultCount: 1,
+      })
+    ).toEqual({
+      distinctId: 'subject-1',
+      event: 'location_saved',
+      properties: { platform: 'web', outcome: 'saved', result_count: 1 },
+    })
+  })
+
+  it('normalizes location_search_failed to closed properties', () => {
+    expect(
+      trackLocationSearchFailed({
+        analyticsSubjectId: 'subject-1',
+        platform: 'mobile',
+        outcome: 'provider_timeout',
+        resultCount: 0,
+      }).properties
+    ).toEqual({ platform: 'mobile', outcome: 'provider_timeout', result_count: 0 })
+  })
+
+  // A query, a place name or a location key smuggled into either event must be
+  // refused at the schema, never forwarded.
+  it.each([
+    ['query', { q: 'Chicago' }],
+    ['place name', { city: 'Chicago' }],
+    ['location key', { locationKey: 'chicago-il-us-41-871n-87-631w' }],
+    ['raw member id', { userId: 'user-1' }],
+  ])('refuses a %s on location analytics events', (_label, extra) => {
+    const base = {
+      analyticsSubjectId: 'subject-1',
+      platform: 'web' as const,
+      resultCount: 0,
+    }
+    expect(
+      locationSavedEventSchema.safeParse({ ...base, outcome: 'saved', ...extra }).success
+    ).toBe(false)
+    expect(
+      locationSearchFailedEventSchema.safeParse({
+        ...base,
+        outcome: 'no_results',
+        ...extra,
+      }).success
+    ).toBe(false)
   })
 
   it('normalizes locale_switched input', () => {

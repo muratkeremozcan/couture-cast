@@ -697,5 +697,53 @@
       "bindingConflict": "Die Benachrichtigungsregistrierung dieses Geräts hat sich geändert. Versuche es erneut.",
       "pushUnavailable": "Push-Benachrichtigungen sind auf diesem Gerät nicht verfügbar."
     }
+  },
+  "locations": {
+    "title": "Orte",
+    "intro": "Speichere bis zu drei Orte. Dein Hauptort bestimmt deine täglichen Outfits und dein Community-Klima.",
+    "count": "{{count}} von 3 gespeichert",
+    "empty": "Noch keine Orte gespeichert. Suche nach einer Stadt, um einen hinzuzufügen.",
+    "signedOutHint": "Melde dich an, um deine Orte zu verwalten.",
+    "loadError": "Deine Orte konnten nicht geladen werden.",
+    "primary": "Hauptort",
+    "makePrimary": "Als Hauptort festlegen",
+    "rename": "Umbenennen",
+    "renameField": "Neuer Name",
+    "renameSave": "Namen speichern",
+    "cancel": "Abbrechen",
+    "delete": "Löschen",
+    "deleteConfirm": "{{label}} löschen?",
+    "deleteConfirmAction": "Ja, löschen",
+    "searchLabel": "Nach einer Stadt suchen",
+    "searchHint": "Gib mindestens zwei Buchstaben ein.",
+    "searching": "Suche läuft...",
+    "resultCount": "Ergebnisse: {{count}}",
+    "noResults": "Keine Stadt passt zu dieser Suche.",
+    "selected": "Ausgewählt: {{place}}",
+    "labelField": "Benenne diesen Ort",
+    "save": "Ort speichern",
+    "saving": "Wird gespeichert...",
+    "saved": "{{label}} gespeichert.",
+    "primaryChanged": "{{label}} ist jetzt dein Hauptort.",
+    "renamed": "Umbenannt in {{label}}.",
+    "deleted": "{{label}} gelöscht.",
+    "limit": "Du hast drei Orte gespeichert. Lösche einen, um einen neuen hinzuzufügen.",
+    "retry": "Erneut versuchen",
+    "guided": {
+      "add": "Ort hinzufügen"
+    },
+    "errors": {
+      "provider_unavailable": "Die Städtesuche ist vorübergehend nicht verfügbar. Versuche es erneut.",
+      "save_unavailable": "Diese Stadt konnte gerade nicht gespeichert werden. Versuche es erneut.",
+      "service_unavailable": "Orte sind vorübergehend nicht verfügbar. Versuche es später erneut.",
+      "invalid_candidate": "Dieses Suchergebnis ist abgelaufen. Suche erneut.",
+      "duplicate": "Dieser Ort ist bereits gespeichert.",
+      "rate_limited": "Zu viele Suchen. Warte kurz und versuche es erneut.",
+      "invalid_query": "Gib zwischen 2 und 80 Zeichen ein.",
+      "unknown": "Etwas ist schiefgelaufen. Versuche es erneut."
+    }
+  },
+  "settings": {
+    "title": "Einstellungen"
   }
 }

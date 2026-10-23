@@ -697,5 +697,53 @@
       "bindingConflict": "L’enregistrement des notifications de cet appareil a changé. Réessayez.",
       "pushUnavailable": "Les notifications push ne sont pas disponibles sur cet appareil."
     }
+  },
+  "locations": {
+    "title": "Lieux",
+    "intro": "Enregistrez jusqu'à trois lieux. Votre lieu principal guide vos tenues du jour et le climat de votre communauté.",
+    "count": "{{count}} sur 3 enregistrés",
+    "empty": "Aucun lieu enregistré pour l'instant. Recherchez une ville pour en ajouter un.",
+    "signedOutHint": "Connectez-vous pour gérer vos lieux.",
+    "loadError": "Impossible de charger vos lieux.",
+    "primary": "Principal",
+    "makePrimary": "Définir comme principal",
+    "rename": "Renommer",
+    "renameField": "Nouveau nom",
+    "renameSave": "Enregistrer le nom",
+    "cancel": "Annuler",
+    "delete": "Supprimer",
+    "deleteConfirm": "Supprimer {{label}} ?",
+    "deleteConfirmAction": "Oui, supprimer",
+    "searchLabel": "Rechercher une ville",
+    "searchHint": "Saisissez au moins deux lettres.",
+    "searching": "Recherche en cours...",
+    "resultCount": "Résultats : {{count}}",
+    "noResults": "Aucune ville ne correspond à cette recherche.",
+    "selected": "Sélectionné : {{place}}",
+    "labelField": "Nommez ce lieu",
+    "save": "Enregistrer le lieu",
+    "saving": "Enregistrement...",
+    "saved": "{{label}} enregistré.",
+    "primaryChanged": "{{label}} est maintenant votre lieu principal.",
+    "renamed": "Renommé en {{label}}.",
+    "deleted": "{{label}} supprimé.",
+    "limit": "Vous avez enregistré trois lieux. Supprimez-en un pour en ajouter un autre.",
+    "retry": "Réessayer",
+    "guided": {
+      "add": "Ajouter un lieu"
+    },
+    "errors": {
+      "provider_unavailable": "La recherche de villes est momentanément indisponible. Réessayez.",
+      "save_unavailable": "Cette ville n’a pas pu être enregistrée pour le moment. Réessayez.",
+      "service_unavailable": "Les lieux sont momentanément indisponibles. Réessayez plus tard.",
+      "invalid_candidate": "Ce résultat a expiré. Relancez la recherche.",
+      "duplicate": "Ce lieu est déjà enregistré.",
+      "rate_limited": "Trop de recherches. Patientez un instant puis réessayez.",
+      "invalid_query": "Saisissez entre 2 et 80 caractères.",
+      "unknown": "Un problème est survenu. Réessayez."
+    }
+  },
+  "settings": {
+    "title": "Paramètres"
   }
 }

@@ -53,6 +53,17 @@ const explicitlyDisabled = Object.fromEntries(
   Object.entries(process.env).filter(([, value]) => value === '')
 )
 
+// Keys the local E2E launcher already settled (an explicit isolated
+// DATABASE_URL, the screener selector, the weather double origins) arrive
+// listed in E2E_CALLER_OWNED_ENV_KEYS. The .env.local override below must not
+// second-guess them in this process either.
+const callerOwned: Record<string, string> = {}
+for (const key of (process.env.E2E_CALLER_OWNED_ENV_KEYS ?? '').split(',')) {
+  const name = key.trim()
+  const value = name ? process.env[name] : undefined
+  if (value) callerOwned[name] = value
+}
+
 // Load root env files before AppModule/bootstrap reads process.env.
 for (const file of rootEnvFiles) {
   const fullPath = path.join(rootDir, file)
@@ -67,4 +78,4 @@ for (const file of rootEnvFiles) {
   })
 }
 
-Object.assign(process.env, explicitlyDisabled)
+Object.assign(process.env, explicitlyDisabled, callerOwned)

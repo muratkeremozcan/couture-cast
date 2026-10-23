@@ -8,7 +8,7 @@ import {
   serveFeed,
   setMockParams,
 } from './harness'
-import { userEvent as browserUser } from '@vitest/browser/context'
+import { userEvent as browserUser } from 'vitest/browser'
 import { CommunityReactionState } from '@couture/api-client'
 import * as communityClient from '@/src/lib/community'
 import { act, screen, waitFor, within } from '@testing-library/react'
@@ -553,6 +553,37 @@ export function registerCommunityReactionsCases() {
       ).toBe('true')
     } finally {
       detail.release()
+      mutation.release()
+    }
+  })
+
+  it('6.3-MOB-028 marks every reaction control busy while a reaction request runs', async () => {
+    const mutation = raceDeferred()
+    serveFeed(() =>
+      HttpResponse.json({ data: feed({ items: [{ ...item(), reactions: raceZero }] }) })
+    )
+    server.use(
+      http.put('*/api/v1/community/posts/:postId/reaction', async () => {
+        await mutation.promise
+        return HttpResponse.json({ data: raceOne })
+      })
+    )
+    const busyStates = () =>
+      within(screen.getByTestId('community-reactions-post-a'))
+        .getAllByRole('button')
+        .map((button) => button.getAttribute('aria-busy'))
+    try {
+      await render(<CommunityScreen />)
+      const applause = await screen.findByRole('button', { name: 'Applaud, 0' })
+      expect(busyStates()).toEqual(['false', 'false', 'false'])
+
+      await browserUser.click(applause)
+      await waitFor(() => expect(busyStates()).toEqual(['true', 'true', 'true']))
+
+      mutation.release()
+      await screen.findByRole('button', { name: 'Applaud, 1' })
+      expect(busyStates()).toEqual(['false', 'false', 'false'])
+    } finally {
       mutation.release()
     }
   })

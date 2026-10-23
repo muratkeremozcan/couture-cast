@@ -50,13 +50,24 @@ tags:
 # lesson `premium-subscription.yaml` and `palette-advisor.yaml` record:
 # `extendedWaitUntil: visible` requires the element inside the VIEWPORT, and
 # CI's `pixel_3a` profile is shorter than the local `medium_phone`.
+# No `centerElement`: this row sits at the end of the Settings list and can
+# never reach the middle of the screen. Maestro then spends five more settling
+# swipes before it accepts the row, and on a slow emulator those outlast the
+# timeout and the step reports a row it is showing as not found (Story 1.2b
+# R25 verification run). A fully visible row is what the tap below needs.
 - scrollUntilVisible:
     element:
       id: 'planner-link'
     direction: DOWN
-    centerElement: true
     timeout: 15000
     label: 'Planner entry row is reachable from settings'
+
+# Pin the list end. The row is at the bottom of Settings, where the scroll view
+# stops with the row clear of the tab bar. iOS judges visibility from unclipped
+# XCUI frames, so the step above can stop with the row half behind the tab bar
+# and the tap below would land on a tab (Story 1.2b R27). One more scroll to the
+# end settles the row in the same place on both platforms.
+- scroll
 
 - tapOn:
     id: 'planner-link'

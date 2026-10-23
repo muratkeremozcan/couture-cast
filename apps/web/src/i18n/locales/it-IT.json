@@ -697,5 +697,53 @@
       "bindingConflict": "La registrazione delle notifiche di questo dispositivo è cambiata. Riprova.",
       "pushUnavailable": "Le notifiche push non sono disponibili su questo dispositivo."
     }
+  },
+  "locations": {
+    "title": "Luoghi",
+    "intro": "Salva fino a tre luoghi. Il tuo luogo principale guida gli outfit del giorno e il clima della tua community.",
+    "count": "{{count}} su 3 salvati",
+    "empty": "Nessun luogo salvato. Cerca una città per aggiungerne uno.",
+    "signedOutHint": "Accedi per gestire i tuoi luoghi.",
+    "loadError": "Impossibile caricare i tuoi luoghi.",
+    "primary": "Principale",
+    "makePrimary": "Imposta come principale",
+    "rename": "Rinomina",
+    "renameField": "Nuovo nome",
+    "renameSave": "Salva nome",
+    "cancel": "Annulla",
+    "delete": "Elimina",
+    "deleteConfirm": "Eliminare {{label}}?",
+    "deleteConfirmAction": "Sì, elimina",
+    "searchLabel": "Cerca una città",
+    "searchHint": "Digita almeno due lettere.",
+    "searching": "Ricerca in corso...",
+    "resultCount": "Risultati: {{count}}",
+    "noResults": "Nessuna città corrisponde alla ricerca.",
+    "selected": "Selezionato: {{place}}",
+    "labelField": "Dai un nome a questo luogo",
+    "save": "Salva luogo",
+    "saving": "Salvataggio...",
+    "saved": "{{label}} salvato.",
+    "primaryChanged": "{{label}} è ora il tuo luogo principale.",
+    "renamed": "Rinominato in {{label}}.",
+    "deleted": "{{label}} eliminato.",
+    "limit": "Hai salvato tre luoghi. Eliminane uno per aggiungerne un altro.",
+    "retry": "Riprova",
+    "guided": {
+      "add": "Aggiungi un luogo"
+    },
+    "errors": {
+      "provider_unavailable": "La ricerca delle città non è disponibile al momento. Riprova.",
+      "save_unavailable": "Non è stato possibile salvare questa città al momento. Riprova.",
+      "service_unavailable": "I luoghi non sono disponibili al momento. Riprova più tardi.",
+      "invalid_candidate": "Questo risultato è scaduto. Cerca di nuovo.",
+      "duplicate": "Questo luogo è già salvato.",
+      "rate_limited": "Troppe ricerche. Attendi un momento e riprova.",
+      "invalid_query": "Digita da 2 a 80 caratteri.",
+      "unknown": "Qualcosa è andato storto. Riprova."
+    }
+  },
+  "settings": {
+    "title": "Impostazioni"
   }
 }

@@ -2,21 +2,27 @@ import fs from 'node:fs'
 import path from 'node:path'
 import { resolveGitMetadata } from '../../apps/web/git-metadata'
 import { config as loadEnv } from 'dotenv'
+import { loadEnvKeepingLocalStack } from '../../scripts/lib/caller-owned-env.mjs'
 
 // Load environment file based on TEST_ENV (falls back to .env).
 const envSuffix = (
   process.env.TEST_ENV ?? (process.env.NODE_ENV === 'production' ? 'prod' : 'local')
 ).toLowerCase()
 const envFiles = [`.env.${envSuffix}`, '.env']
-for (const file of envFiles) {
-  const envPath = path.resolve(process.cwd(), file)
-  if (fs.existsSync(envPath)) {
-    // Local Playwright runs should prefer .env.local over any inherited remote
-    // DATABASE_URL or service origin from the parent shell.
-    loadEnv({ path: envPath, override: envSuffix === 'local' && file === '.env.local' })
-    break
+// Local Playwright runs should prefer .env.local over any inherited remote
+// DATABASE_URL or service origin from the parent shell. An inherited loopback
+// stack (DATABASE_URL, REDIS_URL, Supabase) is the caller's isolated choice and
+// survives, in the runner and in every worker; the webServer launcher then
+// inherits it and keeps it for its own children.
+loadEnvKeepingLocalStack(() => {
+  for (const file of envFiles) {
+    const envPath = path.resolve(process.cwd(), file)
+    if (fs.existsSync(envPath)) {
+      loadEnv({ path: envPath, override: envSuffix === 'local' && file === '.env.local' })
+      break
+    }
   }
-}
+})
 
 export type EnvironmentName = 'local' | 'preview' | 'prod'
 

@@ -353,24 +353,6 @@ describe('TelemetryService', () => {
       })
     })
 
-    it('preserves a null previous location on the first location switch', async () => {
-      await service.captureEvent('user-1', 'location_switched', {
-        fromLocation: null,
-        toLocation: 'austin-tx',
-      })
-
-      expect(analyticsCapture).toHaveBeenCalledWith({
-        distinctId: 'user-1',
-        event: 'location_switched',
-        properties: {
-          user_id: 'user-1',
-          from_location: null,
-          to_location: 'austin-tx',
-          timestamp: '2026-07-16T12:00:00.000Z',
-        },
-      })
-    })
-
     it('honors an explicit isFirstOutfit override', async () => {
       await service.captureEvent('user-1', 'first_outfit_generated', {
         location_id: 'loc-9',

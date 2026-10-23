@@ -10,11 +10,17 @@
 # Why relaunch instead of closing it: there is nothing to close. The dimming
 # window is not in the accessibility hierarchy (only the app is), its sheet has
 # no content to tap, and blind backdrop taps did not clear it in run
-# 38934394685. Whether it is an Expo Go sheet stuck mid-animation or a dialog
-# whose content never attached cannot be told from the screenshot and hierarchy
-# alone, so the runner now saves `dumpsys window windows` for every failed
-# Android flow (`<flow>-windows.txt` in the artifacts); the next occurrence will
-# name the window.
+# 38934394685.
+#
+# Named since (Story 1.2b R24, CI job 120258320163): it is Expo Go's own
+# developer-menu onboarding. `<flow>-windows.txt` showed no dialog window, so
+# the dim is drawn inside the Expo Go activity, and Maestro's logcat placed a
+# full-size sheet node at y=2400, below the screen: its open animation never
+# ran. Expo Go 54 raises that onboarding two seconds after an experience loads
+# whenever onboarding is unfinished, and `clearState: true` resets that before
+# every flow, so a relaunch could only raise it again. Android launches now
+# carry the extra that turns the onboarding off (`open-link.yaml`), which
+# removes the trigger; this relaunch stays for any other swallowed tap.
 #
 # `clearState: false` keeps the signed-in session and everything the flow has
 # already set up; the caller only loses its in-memory screen, which it is about

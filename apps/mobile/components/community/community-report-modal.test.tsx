@@ -257,6 +257,8 @@ describe('CommunityReportModal (Story 6.1)', () => {
 
     const submit = screen.getByTestId('submit-report-button')
     expect(submit.getAttribute('aria-disabled')).toBe('true')
+    // react-native-web 0.21 renders `aria-busy`, never `accessibilityState.busy`.
+    expect(submit.getAttribute('aria-busy')).toBe('true')
     expect(submit.getAttribute('aria-label')).toBe(enUS.community.report.submitting)
     press(submit)
     expect(onSubmit).not.toHaveBeenCalled()

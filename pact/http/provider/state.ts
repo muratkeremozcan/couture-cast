@@ -5,6 +5,17 @@ import type {
   SilhouettePhotoFailureReason,
   SilhouettePhotoStatus,
 } from '@couture/api-client/contracts/http'
+import { encodeLocationCandidate } from '../../../apps/api/src/modules/location-preferences/location-candidate-token.js'
+import { buildSearchLocationKey } from '../../../apps/api/src/modules/location-preferences/location-key.js'
+import type {
+  LocationSearchWindowCount,
+  SavedLocationRecord,
+} from '../../../apps/api/src/modules/location-preferences/location-preferences.repository.js'
+import type { GeocodedPlace } from '../../../apps/api/src/modules/weather/providers/location-geocoding.js'
+import type {
+  NormalizedWeatherForecast,
+  WeatherIngestionTarget,
+} from '../../../apps/api/src/modules/weather/providers/weather.types.js'
 
 /**
  * Per-domain provider scenario state.
@@ -536,4 +547,259 @@ export function getProviderEngagementState() {
 }
 export function resetProviderEngagementState() {
   providerEngagementState = 'ready'
+}
+
+/* --------------------------------------------------------------------------- *
+ * Story 1.2b client location capture.
+ *
+ * Provider verification runs the real `LocationCaptureService` and
+ * `LocationPreferencesService`; `doubles/locations.ts` fakes only the seams
+ * they inject, and those fakes read the world below. Each scenario builds the
+ * world its provider state names: the saved locations, the search window, the
+ * clock, the provider outcomes and the candidate secret. A scenario that ends
+ * in a save also mints the candidate token the real service will verify; the
+ * state handler hands it to the verifier as a provider-state injected value.
+ * --------------------------------------------------------------------------- */
+export type ProviderLocationScenario =
+  | 'search-candidates'
+  | 'no-locations'
+  | 'expired-candidate'
+  | 'three-locations'
+  | 'two-locations'
+  | 'duplicate-location'
+  | 'search-limit-reached'
+  | 'provider-unavailable'
+  | 'capture-unconfigured'
+
+export type ProviderLocationWorld = {
+  userId: string
+  scenario: ProviderLocationScenario
+  /** What `LOCATION_CLOCK` answers. */
+  now: Date
+  /** Every member's saved locations, so ownership is decided by the services. */
+  records: SavedLocationRecord[]
+  searchWindows: Map<string, LocationSearchWindowCount>
+  geocoderDown: boolean
+  forecastDown: boolean
+  persistedForecasts: NormalizedWeatherForecast[]
+  refreshTargets: WeatherIngestionTarget[]
+}
+
+/** A member who is not the caller, owning `loc-foreign-9`. */
+export const PACT_OTHER_MEMBER_ID = 'pact-other-member'
+/** At least 32 characters, so `resolveLocationCandidateSecret` accepts it. */
+export const PACT_LOCATION_CANDIDATE_SECRET =
+  'pact-location-candidate-secret-fixed-0123456789'
+export const PACT_LOCATION_CLOCK_START = new Date('2026-10-22T12:00:30.000Z')
+const PACT_LOCATION_CREATED_AT = new Date('2026-10-22T12:00:00.000Z')
+/** One minute past the 15-minute candidate lifetime. */
+const EXPIRED_CANDIDATE_ADVANCE_MS = 16 * 60 * 1000
+/** The real service allows 30 searches a minute; the next one is the 31st. */
+const SEARCHES_ALREADY_IN_WINDOW = 30
+
+/** The one place the fake geocoder returns, and the candidate a save mints. */
+export const PACT_CHICAGO_PLACE: GeocodedPlace = {
+  city: 'Chicago',
+  region: 'Illinois',
+  country: 'US',
+  latitude: 41.878,
+  longitude: -87.63,
+  localizedName: null,
+}
+
+function savedRecord(
+  overrides: Partial<SavedLocationRecord> &
+    Pick<SavedLocationRecord, 'id' | 'label' | 'city' | 'country' | 'timezone'>
+): SavedLocationRecord {
+  return {
+    user_id: '',
+    location_key: '',
+    latitude: 0,
+    longitude: 0,
+    region: null,
+    is_primary: false,
+    sort_order: 0,
+    created_at: PACT_LOCATION_CREATED_AT,
+    updated_at: PACT_LOCATION_CREATED_AT,
+    ...overrides,
+  }
+}
+
+const chicagoRecord = (userId: string, sortOrder: number) =>
+  savedRecord({
+    id: 'loc-searched-1',
+    user_id: userId,
+    label: 'Home',
+    location_key: buildSearchLocationKey(PACT_CHICAGO_PLACE),
+    latitude: PACT_CHICAGO_PLACE.latitude,
+    longitude: PACT_CHICAGO_PLACE.longitude,
+    timezone: 'America/Chicago',
+    city: 'Chicago',
+    region: 'Illinois',
+    country: 'US',
+    is_primary: sortOrder === 0,
+    sort_order: sortOrder,
+  })
+
+const officeRecord = (userId: string, sortOrder: number) =>
+  savedRecord({
+    id: 'loc-office-2',
+    user_id: userId,
+    label: 'Office',
+    location_key: 'monaco-mc-43-738n-7-425e',
+    latitude: 43.738,
+    longitude: 7.425,
+    timezone: 'Europe/Monaco',
+    city: 'Monaco',
+    country: 'MC',
+    is_primary: sortOrder === 0,
+    sort_order: sortOrder,
+  })
+
+const lisbonRecord = (userId: string, id: string, sortOrder: number) =>
+  savedRecord({
+    id,
+    user_id: userId,
+    label: 'Studio',
+    location_key: 'lisbon-lisboa-pt-38-722n-9-139w',
+    latitude: 38.722,
+    longitude: -9.139,
+    timezone: 'Europe/Lisbon',
+    city: 'Lisbon',
+    region: 'Lisboa',
+    country: 'PT',
+    is_primary: sortOrder === 0,
+    sort_order: sortOrder,
+  })
+
+const osloRecord = (userId: string, sortOrder: number) =>
+  savedRecord({
+    id: 'loc-oslo-4',
+    user_id: userId,
+    label: 'Cabin',
+    location_key: 'oslo-no-59-913n-10-752e',
+    latitude: 59.913,
+    longitude: 10.752,
+    timezone: 'Europe/Oslo',
+    city: 'Oslo',
+    country: 'NO',
+    is_primary: sortOrder === 0,
+    sort_order: sortOrder,
+  })
+
+/** Another member's location: it exists, and the caller does not own it. */
+const foreignRecord = () => lisbonRecord(PACT_OTHER_MEMBER_ID, 'loc-foreign-9', 0)
+
+function seedRecords(scenario: ProviderLocationScenario, userId: string) {
+  switch (scenario) {
+    case 'two-locations':
+      return [chicagoRecord(userId, 0), officeRecord(userId, 1), foreignRecord()]
+    case 'three-locations':
+      return [
+        officeRecord(userId, 0),
+        lisbonRecord(userId, 'loc-lisbon-3', 1),
+        osloRecord(userId, 2),
+        foreignRecord(),
+      ]
+    case 'duplicate-location':
+      return [chicagoRecord(userId, 0), foreignRecord()]
+    default:
+      return [foreignRecord()]
+  }
+}
+
+const LOCATION_ENV_KEYS = ['LOCATION_CANDIDATE_SECRET', 'NODE_ENV', 'TEST_ENV'] as const
+let savedLocationEnv: Partial<Record<(typeof LOCATION_ENV_KEYS)[number], string>> | null =
+  null
+
+/** Sets the listed keys (`undefined` unsets one); keys left out stay as they are. */
+function setLocationEnv(
+  values: Partial<Record<(typeof LOCATION_ENV_KEYS)[number], string | undefined>>
+) {
+  savedLocationEnv ??= Object.fromEntries(
+    LOCATION_ENV_KEYS.flatMap((key) =>
+      process.env[key] === undefined ? [] : [[key, process.env[key]]]
+    )
+  )
+  for (const key of LOCATION_ENV_KEYS) {
+    if (!(key in values)) continue
+    const value = values[key]
+    if (value === undefined) delete process.env[key]
+    else process.env[key] = value
+  }
+}
+
+function restoreLocationEnv() {
+  if (!savedLocationEnv) return
+  const saved = savedLocationEnv
+  for (const key of LOCATION_ENV_KEYS) {
+    if (saved[key] === undefined) delete process.env[key]
+    else process.env[key] = saved[key]
+  }
+  savedLocationEnv = null
+}
+
+let providerLocationWorld: ProviderLocationWorld | null = null
+
+/**
+ * Builds the world one provider state names and returns the values the
+ * verifier injects into the request (`fromProviderState`).
+ */
+export function configureProviderLocationState(state: {
+  userId?: string
+  scenario: ProviderLocationScenario
+}): { candidateToken?: string } {
+  const { scenario } = state
+  const userId = state.userId ?? ''
+  const world: ProviderLocationWorld = {
+    userId,
+    scenario,
+    now: PACT_LOCATION_CLOCK_START,
+    records: seedRecords(scenario, userId),
+    searchWindows: new Map(),
+    geocoderDown: scenario === 'provider-unavailable',
+    forecastDown: scenario === 'provider-unavailable',
+    persistedForecasts: [],
+    refreshTargets: [],
+  }
+
+  if (scenario === 'search-limit-reached') {
+    world.searchWindows.set(userId, {
+      searches: SEARCHES_ALREADY_IN_WINDOW,
+      windowStart: new Date('2026-10-22T12:00:00.000Z'),
+    })
+  }
+
+  providerLocationWorld = world
+
+  if (scenario === 'capture-unconfigured') {
+    // Preview and production without LOCATION_CANDIDATE_SECRET: no test-only
+    // fallback applies, so both capture endpoints fail closed.
+    setLocationEnv({
+      LOCATION_CANDIDATE_SECRET: undefined,
+      NODE_ENV: 'production',
+      TEST_ENV: undefined,
+    })
+    return {}
+  }
+
+  setLocationEnv({ LOCATION_CANDIDATE_SECRET: PACT_LOCATION_CANDIDATE_SECRET })
+  const candidateToken = encodeLocationCandidate(
+    PACT_CHICAGO_PLACE,
+    PACT_LOCATION_CANDIDATE_SECRET,
+    world.now
+  )
+  if (scenario === 'expired-candidate') {
+    world.now = new Date(world.now.getTime() + EXPIRED_CANDIDATE_ADVANCE_MS)
+  }
+  return { candidateToken }
+}
+
+export function getProviderLocationWorld(): ProviderLocationWorld | null {
+  return providerLocationWorld
+}
+
+export function resetProviderLocationState() {
+  providerLocationWorld = null
+  restoreLocationEnv()
 }

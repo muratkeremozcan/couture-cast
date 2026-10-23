@@ -16,6 +16,7 @@ import path from 'node:path'
 import { spawn } from 'node:child_process'
 import { config as loadEnv } from 'dotenv'
 import { applyLocalE2eDatabaseUrl } from './local-e2e-database.mjs'
+import { loadEnvKeepingCallerOwned } from './lib/caller-owned-env.mjs'
 
 /**
  * Find the repository root by walking upward until we see the env files that
@@ -64,17 +65,21 @@ const shouldForceLocalEnv = (process.env.TEST_ENV ?? '').toLowerCase() === 'loca
 // Load env files in the same order the local API path expects: the most
 // specific repo-level file first, then the environment-specific file, then the
 // generic fallback. Local Playwright smoke runs should prefer .env.local over
-// inherited remote service URLs from the parent shell.
-for (const file of rootEnvFiles) {
-  const fullPath = path.join(repoRoot, file)
-  if (!existsSync(fullPath)) continue
+// inherited remote service URLs from the parent shell, except for the keys the
+// local E2E launcher settled itself (E2E_CALLER_OWNED_ENV_KEYS), such as an
+// isolated DATABASE_URL: those are what this run must migrate.
+loadEnvKeepingCallerOwned(() => {
+  for (const file of rootEnvFiles) {
+    const fullPath = path.join(repoRoot, file)
+    if (!existsSync(fullPath)) continue
 
-  loadEnv({
-    path: fullPath,
-    override: shouldForceLocalEnv && file === '.env.local',
-    quiet: true,
-  })
-}
+    loadEnv({
+      path: fullPath,
+      override: shouldForceLocalEnv && file === '.env.local',
+      quiet: true,
+    })
+  }
+})
 
 // A fresh clone and a new git worktree both have no repo-level env file, so a
 // local run would otherwise stop here on a missing DATABASE_URL whose value is

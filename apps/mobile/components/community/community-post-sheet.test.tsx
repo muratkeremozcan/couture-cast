@@ -516,11 +516,16 @@ describe('CommunityPostSheet (Story 6.1)', () => {
       })
     )
     const { onPublished } = renderSheet()
+    const publishBusy = () =>
+      screen.getByTestId('community-publish-button').getAttribute('aria-busy')
+    expect(publishBusy()).toBe('false')
 
     press(screen.getByTestId('community-pick-image-button'))
     expect((await screen.findByTestId('community-publish-status')).textContent).toContain(
       enUS.community.compose.uploading
     )
+    // react-native-web 0.21 renders `aria-busy`, never `accessibilityState.busy`.
+    expect(publishBusy()).toBe('true')
 
     await waitFor(() =>
       expect(
@@ -538,6 +543,7 @@ describe('CommunityPostSheet (Story 6.1)', () => {
     expect((await screen.findByTestId('community-publish-status')).textContent).toContain(
       enUS.community.compose.publishing
     )
+    expect(publishBusy()).toBe('true')
     await waitFor(() => expect(onPublished).toHaveBeenCalledTimes(1))
     expect(onPublished).toHaveBeenCalledWith(
       expect.objectContaining({ id: 'post-new-42' })

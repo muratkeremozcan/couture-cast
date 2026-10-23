@@ -1535,8 +1535,13 @@ const NOTICE_CLASSES: Record<NoticeTone, string> = {
   error: '',
 }
 
+/** Story 1.2b: the guided add-location path, which returns here after the save. */
+export const COMMUNITY_ADD_LOCATION_HREF =
+  '/settings?addLocation=1&returnTo=%2F#locations'
+
 interface CommunityNoticesProps {
   bandUnresolvedReason: CommunityBandUnresolvedReason | null
+  canAddLocation: boolean
   notice: Notice | null
   noticeText: string | null
   t: Translate
@@ -1551,6 +1556,7 @@ interface CommunityNoticesProps {
  */
 function CommunityNotices({
   bandUnresolvedReason,
+  canAddLocation,
   notice,
   noticeText,
   t,
@@ -1558,12 +1564,21 @@ function CommunityNotices({
   return (
     <>
       {bandUnresolvedReason && (
-        <p
+        <div
           data-testid="community-band-unresolved"
-          className="rounded-[8px] border border-[color:var(--theme-card-border)] bg-[var(--theme-card-bg)] p-3 text-xs text-[color:var(--theme-card-text)]"
+          className="flex flex-col gap-2 rounded-[8px] border border-[color:var(--theme-card-border)] bg-[var(--theme-card-bg)] p-3 text-xs text-[color:var(--theme-card-text)]"
         >
-          {t(`community.band.unresolved.${bandUnresolvedReason}`)}
-        </p>
+          <p>{t(`community.band.unresolved.${bandUnresolvedReason}`)}</p>
+          {bandUnresolvedReason === 'no_location' && canAddLocation && (
+            <Link
+              href={COMMUNITY_ADD_LOCATION_HREF}
+              className="inline-flex min-h-[44px] items-center self-start font-semibold underline"
+              data-testid="community-add-location"
+            >
+              {t('locations.guided.add')}
+            </Link>
+          )}
+        </div>
       )}
       {notice && (
         <p
@@ -2222,6 +2237,11 @@ export function CommunityLookbookGrid({
       setItems([])
       itemsRef.current = []
       setAuthorStates([])
+      // The band and why it did not resolve describe the member who left; the
+      // notice and its add-location action go with them.
+      setViewerBand(null)
+      setBandResolved(true)
+      setBandUnresolvedReason(null)
       setOpenedItem(null)
       setDeepLinkedItem(null)
       setNewLooks([])
@@ -3096,6 +3116,7 @@ export function CommunityLookbookGrid({
 
       <CommunityNotices
         bandUnresolvedReason={bandNoticeReason}
+        canAddLocation={hasSession}
         notice={notice}
         noticeText={renderMessage(notice?.message ?? null, t, viewerBand)}
         t={t}

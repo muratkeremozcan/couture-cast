@@ -145,6 +145,19 @@ import {
   verifyCreateCommunityChallengeInteraction,
   verifyCreateCommunityChallengeRejectionInteraction,
   communityChallengeRejections,
+  verifyLocationSearchInteraction,
+  verifyLocationSearchErrorInteraction,
+  locationSearchErrorInteractions,
+  verifyLocationSearchRateLimitedInteraction,
+  verifyLocationSaveFromSearchInteraction,
+  verifyLocationSaveErrorInteraction,
+  locationSaveErrorInteractions,
+  verifyLocationListInteraction,
+  verifyLocationSetPrimaryInteraction,
+  verifyLocationSetPrimaryForeignInteraction,
+  verifyLocationDeleteInteraction,
+  verifyLocationDeleteForeignInteraction,
+  verifyLocationRenameInteraction,
 } from './api-contract-interactions'
 
 const pact = new PactV4({
@@ -753,4 +766,59 @@ describe('CoutureCastWeb -> CoutureCastApi HTTP contract', () => {
       await verifyCreateCommunityChallengeRejectionInteraction(pact, rejection)
     }
   )
+
+  // Story 1.2b: client location capture.
+  it('searches cities for a location', async () => {
+    await verifyLocationSearchInteraction(pact, createWebClientForMockServer, 'web')
+  })
+
+  it.each(locationSearchErrorInteractions)(
+    'preserves the typed city search error envelope $description',
+    async (interaction) => {
+      await verifyLocationSearchErrorInteraction(pact, interaction, 'web')
+    }
+  )
+
+  it('carries Retry-After when city search is rate limited', async () => {
+    await verifyLocationSearchRateLimitedInteraction(pact, 'web')
+  })
+
+  it('saves a searched city as a location', async () => {
+    await verifyLocationSaveFromSearchInteraction(
+      pact,
+      createWebClientForMockServer,
+      'web'
+    )
+  })
+
+  it.each(locationSaveErrorInteractions)(
+    'preserves the save-from-search error envelope that $description',
+    async (interaction) => {
+      await verifyLocationSaveErrorInteraction(pact, interaction, 'web')
+    }
+  )
+
+  it('lists saved locations', async () => {
+    await verifyLocationListInteraction(pact, createWebClientForMockServer)
+  })
+
+  it('renames a saved location', async () => {
+    await verifyLocationRenameInteraction(pact, createWebClientForMockServer)
+  })
+
+  it('switches the primary saved location', async () => {
+    await verifyLocationSetPrimaryInteraction(pact, createWebClientForMockServer)
+  })
+
+  it('refuses to make a foreign location primary', async () => {
+    await verifyLocationSetPrimaryForeignInteraction(pact)
+  })
+
+  it('deletes a saved location', async () => {
+    await verifyLocationDeleteInteraction(pact, createWebClientForMockServer)
+  })
+
+  it('refuses to delete a foreign location', async () => {
+    await verifyLocationDeleteForeignInteraction(pact)
+  })
 })

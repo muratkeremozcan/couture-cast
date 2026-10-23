@@ -4,6 +4,7 @@ import {
   ritualResponseSchema,
   type AlertPreferences,
   type RitualResponse,
+  supportedLocales,
   type SupportedLocale,
 } from '@couture/api-client/contracts/http'
 import { shareWidgetData } from './widget-share'
@@ -29,6 +30,33 @@ export function ritualCacheOwner(applicationUserId: string | null) {
 
 const memoryCache: Record<string, RitualCacheEntry> = {}
 const latestLocationByUserLocale: Record<string, string> = {}
+
+/**
+ * Story 1.2b: every cache mutation for one member runs after the previous one
+ * settles. Native writes are asynchronous, so without this order a save that
+ * started before {@link forgetLatestRitual} could land its latest-location
+ * pointer after the invalidation and restore the previous primary's ritual on
+ * the next mount, and an older save could overwrite a newer primary's pointer.
+ * A failed mutation still releases the next one.
+ */
+const mutationTailByUser: Record<string, Promise<void>> = {}
+
+/**
+ * Bumped when {@link forgetLatestRitual} is called, before it is queued. A save
+ * called earlier that has not run yet sees a newer generation and drops its
+ * pointer, so a queued save for the previous primary cannot republish it.
+ */
+const pointerGenerationByUser: Record<string, number> = {}
+
+function serializeForUser<T>(userId: string, mutation: () => Promise<T>): Promise<T> {
+  const previous = mutationTailByUser[userId] ?? Promise.resolve()
+  const run = previous.then(mutation)
+  mutationTailByUser[userId] = run.then(
+    () => undefined,
+    () => undefined
+  )
+  return run
+}
 
 function ritualCacheKey(userId: string, locale: SupportedLocale, locationKey: string) {
   return `${cachePrefix}:${userId}:${locale}:${locationKey}`
@@ -81,6 +109,22 @@ async function writeStoredValue(key: string, value: string) {
     `${fileSystem.documentDirectory}${storageFileName(key)}`,
     value
   )
+}
+
+async function deleteStoredValue(key: string) {
+  if (Platform.OS === 'web') {
+    globalThis.localStorage?.removeItem(key)
+    return
+  }
+
+  const fileSystem = await loadNativeFileSystem()
+  if (!fileSystem.documentDirectory) {
+    return
+  }
+
+  await fileSystem.deleteAsync(`${fileSystem.documentDirectory}${storageFileName(key)}`, {
+    idempotent: true,
+  })
 }
 
 async function publishWidgetData(
@@ -197,20 +241,56 @@ export async function saveRitualCache(
   const locationKey = entry.data.data.weather.locationKey
   const key = ritualCacheKey(userId, locale, locationKey)
   const localeKey = userLocaleKey(userId, locale)
-  memoryCache[key] = entry
-  latestLocationByUserLocale[localeKey] = locationKey
 
-  try {
-    await Promise.all([
+  const generation = pointerGenerationByUser[userId] ?? 0
+
+  await serializeForUser(userId, async () => {
+    const current = generation === (pointerGenerationByUser[userId] ?? 0)
+    memoryCache[key] = entry
+    if (current) latestLocationByUserLocale[localeKey] = locationKey
+    // allSettled, never all: the serialization is held until EVERY write this
+    // mutation started has landed. With `Promise.all`, a rejected entry write
+    // released the next mutation while the pointer write was still in flight,
+    // so an invalidation could finish first and the pointer land after it.
+    const results = await Promise.allSettled([
       writeStoredValue(key, JSON.stringify(entry)),
-      writeStoredValue(latestLocationCacheKey(userId, locale), locationKey),
+      ...(current
+        ? [writeStoredValue(latestLocationCacheKey(userId, locale), locationKey)]
+        : []),
     ])
-  } catch (error) {
-    console.warn('[RitualCache] Durable cache write failed', error)
-    throw error
-  }
+    const failure = results.find(
+      (result): result is PromiseRejectedResult => result.status === 'rejected'
+    )
+    if (failure) {
+      console.warn('[RitualCache] Durable cache write failed', failure.reason)
+      throw failure.reason
+    }
+  })
   // Story 3.3 Task 1 step 2 owner: update widgets only after the durable cache writes finish.
   await publishWidgetData(entry, locale)
+}
+
+/**
+ * Story 1.2b: the member's primary location changed (saved, switched or deleted),
+ * so no cached ritual names the right place any more. Dropping the latest-location
+ * pointer in every locale means neither the fifteen-minute fast path nor the
+ * offline fallback can serve the previous primary's ritual; entries for a
+ * location are only reachable through that pointer.
+ */
+export async function forgetLatestRitual(userId: string): Promise<void> {
+  pointerGenerationByUser[userId] = (pointerGenerationByUser[userId] ?? 0) + 1
+  await serializeForUser(userId, async () => {
+    await Promise.all(
+      supportedLocales.map(async (locale) => {
+        delete latestLocationByUserLocale[userLocaleKey(userId, locale)]
+        try {
+          await deleteStoredValue(latestLocationCacheKey(userId, locale))
+        } catch (error) {
+          console.warn('[RitualCache] Latest ritual pointer delete failed', error)
+        }
+      })
+    )
+  })
 }
 
 export function clearRitualMemoryCache() {

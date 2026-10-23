@@ -1,6 +1,9 @@
 appId: ${MAESTRO_APP_ID}
 ---
-- openLink: ${WARDROBE_URL}
+- runFlow:
+    file: open-link.yaml
+    env:
+      LINK: ${WARDROBE_URL}
 
 - extendedWaitUntil:
     visible:

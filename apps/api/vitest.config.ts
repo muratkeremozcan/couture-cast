@@ -1,3 +1,4 @@
+import { availableParallelism } from 'node:os'
 import { resolve } from 'node:path'
 import { defineConfig } from 'vitest/config'
 
@@ -28,10 +29,30 @@ import { defineConfig } from 'vitest/config'
  * variable that is already set. A machine with no database still skips, exactly as
  * before, because the probe against the local Supabase default simply fails.
  */
-const integrationDatabaseUrl =
+const integrationDatabaseUrl = withPinnedPoolSize(
   process.env.INTEGRATION_TEST_DATABASE_URL ??
-  process.env.DATABASE_URL ??
-  'postgresql://postgres:postgres@127.0.0.1:54322/postgres'
+    process.env.DATABASE_URL ??
+    'postgresql://postgres:postgres@127.0.0.1:54322/postgres'
+)
+
+/**
+ * Prisma sizes each client's pool from the machine: `num_cpus * 2 + 1`. CI's 4 vCPU
+ * runner gets 9 connections per client across 3 workers. A 14-core laptop gets 29
+ * per client across 13 workers, and the full tier then exhausts a 100-connection
+ * local Supabase: `remaining connection slots are reserved for roles with the
+ * SUPERUSER attribute`, failing whichever DB-backed suites lose the race (measured
+ * 2026-10-22: 4 to 7 files red uncapped, all green capped). Pinning CI's pool size
+ * makes the tier's connection demand independent of the core count. The isolated
+ * database helpers derive their URLs from this one, so they inherit the limit; `pg`
+ * ignores the parameter. An explicit `connection_limit` in the caller's URL wins.
+ */
+function withPinnedPoolSize(url: string): string {
+  const parsed = new URL(url)
+  if (!parsed.searchParams.has('connection_limit')) {
+    parsed.searchParams.set('connection_limit', '9')
+  }
+  return parsed.toString()
+}
 
 export default defineConfig({
   resolve: {
@@ -46,6 +67,18 @@ export default defineConfig({
     },
   },
   test: {
+    // At most four test files at once, whatever the core count. The DB-backed
+    // integration suites assert real wall-clock budgets (a 1 s interactive
+    // transaction in community fan-out, the 1950 ms community authorization
+    // budget, provider barrier deadlines), and each file also runs child
+    // processes, servers and BullMQ workers against the ONE shared Postgres and
+    // Redis. Vitest's default of one worker per core put 13 files on a 14-core
+    // machine onto that database at once; the measured result on 2026-10-22 was
+    // 1 to 15 timing failures per full run (expired transactions, budget
+    // overruns, hook timeouts), each green alone. Capped at four: three
+    // consecutive full runs green, including one started at load average 23.
+    // CI's 4 vCPU runner keeps its three. VITEST_MAX_WORKERS still overrides.
+    maxWorkers: Math.max(1, Math.min(4, availableParallelism() - 1)),
     globals: true,
     environment: 'node',
     include: ['src/**/*.{spec,test}.ts', 'integration/**/*.spec.ts'],

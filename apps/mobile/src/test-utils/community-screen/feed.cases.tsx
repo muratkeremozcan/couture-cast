@@ -10,7 +10,8 @@ import {
   serveFeed,
   setMockParams,
 } from './harness'
-import { userEvent as browserUser } from '@vitest/browser/context'
+import { routing } from './mock-state'
+import { userEvent as browserUser } from 'vitest/browser'
 import { screen, waitFor, within, fireEvent, act } from '@testing-library/react'
 import { delay, http, HttpResponse } from 'msw'
 import { cleanup, render } from 'vitest-browser-react'
@@ -27,7 +28,12 @@ import enUS from '@/assets/locales/en-US.json'
 import { press } from '@/src/test-utils/press'
 import { server } from '@/src/test-utils/msw/server'
 import { getCommunityPostFromMobile } from '@/src/lib/community'
-import { setMobileAccessTokenResolver } from '@/src/lib/mobile-auth'
+import { saveLocationFromSearchFromMobile } from '@/src/lib/locations'
+import { savedLocation } from '@/src/test-utils/locations'
+import {
+  setMobileAccessTokenResolver,
+  setMobileApplicationUserId,
+} from '@/src/lib/mobile-auth'
 
 /** Gives every host node its own native handle, so focus targets stay distinguishable. */
 function distinctNodeHandles() {
@@ -384,9 +390,103 @@ export function registerCommunityFeedCases() {
       await render(<CommunityScreen />)
 
       const notice = await screen.findByTestId('community-band-unresolved')
-      expect(notice.textContent).toBe(enUS.community.band.unresolved[reason])
+      // The whole panel, exactly: the reason's copy, plus the Story 1.2b
+      // add-location action that only the no_location panel carries.
+      const action = reason === 'no_location' ? enUS.locations.guided.add : ''
+      expect(notice.textContent).toBe(
+        `${enUS.community.band.unresolved[reason]}${action}`
+      )
     }
   )
+
+  it.each(communityBandUnresolvedReasonSchema.options)(
+    '1.2b-MOB-COMMUNITY-01 offers the guided add-location action only for no_location: %s',
+    async (reason) => {
+      serveFeed(() =>
+        feedJson({ viewerBand: null, bandResolved: false, bandUnresolvedReason: reason })
+      )
+
+      await render(<CommunityScreen />)
+
+      const notice = await screen.findByTestId('community-band-unresolved')
+      const action = within(notice).queryByTestId('community-add-location')
+      if (reason !== 'no_location') {
+        expect(action).toBeNull()
+        return
+      }
+      expect(action?.textContent).toBe(enUS.locations.guided.add)
+      await browserUser.click(action!)
+      expect(routing.router.push).toHaveBeenCalledWith('/locations?guided=1')
+    }
+  )
+
+  it('1.2b-MOB-COMMUNITY-02 resolves the band on a mounted Community tab when a location is saved elsewhere', async () => {
+    let hasLocation = false
+    serveFeed(() =>
+      hasLocation
+        ? feedJson()
+        : feedJson({
+            viewerBand: null,
+            bandResolved: false,
+            bandUnresolvedReason: 'no_location',
+          })
+    )
+    server.use(
+      http.post('*/api/v1/locations/from-search', () => {
+        hasLocation = true
+        return HttpResponse.json({ data: savedLocation() }, { status: 201 })
+      })
+    )
+
+    await render(<CommunityScreen />)
+    await screen.findByTestId('community-add-location')
+
+    // The save happens on the Locations screen; this tab only hears
+    // `onLocationsChanged`, and nobody pulls to refresh.
+    await saveLocationFromSearchFromMobile('candidate.signature', 'Home')
+
+    await waitFor(() => {
+      expect(screen.queryByTestId('community-band-unresolved')).toBeNull()
+    })
+    expect(screen.getByTestId('community-filter-chip-auto').textContent).toContain(
+      enUS.community.filters.mode.autoWithBand.replace(
+        '{{band}}',
+        enUS.community.band.temperate_dry
+      )
+    )
+    expect(feedUrls).toHaveLength(2)
+  })
+
+  it('1.2b-MOB-COMMUNITY-03 drops the no-location notice and its action when the member signs out', async () => {
+    serveFeed(() =>
+      feedJson({
+        viewerBand: null,
+        bandResolved: false,
+        bandUnresolvedReason: 'no_location',
+      })
+    )
+    let token: string | undefined = 'session-token'
+    const restore = setMobileAccessTokenResolver(() => token)
+    setMobileApplicationUserId('member-a')
+    try {
+      await render(<CommunityScreen />)
+      const notice = await screen.findByTestId('community-band-unresolved')
+      expect(within(notice).getByTestId('community-add-location')).toBeVisible()
+
+      // What signOutNativeSession does to the session boundary: the token goes
+      // and the application user is cleared, which notifies identity listeners.
+      token = undefined
+      setMobileApplicationUserId(null)
+
+      await waitFor(() => {
+        expect(screen.queryByTestId('community-band-unresolved')).toBeNull()
+      })
+      expect(screen.queryByTestId('community-add-location')).toBeNull()
+    } finally {
+      setMobileApplicationUserId(null)
+      restore()
+    }
+  })
 
   it('6.1-MOB-082 shares its one live region with the invalid deep-link notice', async () => {
     setMockParams({ source: 'notification', type: 'community' })

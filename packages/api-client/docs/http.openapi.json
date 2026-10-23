@@ -1930,6 +1930,368 @@
           "data"
         ]
       },
+      "LocationHeaders": {
+        "type": "object",
+        "properties": {
+          "x-couture-platform": {
+            "type": "string",
+            "enum": [
+              "web",
+              "mobile"
+            ],
+            "description": "Which client is calling. Required on search and save from search; drives the platform property on location analytics."
+          }
+        },
+        "required": [
+          "x-couture-platform"
+        ]
+      },
+      "LocationSearchQueryParams": {
+        "type": "object",
+        "properties": {
+          "q": {
+            "type": "string",
+            "minLength": 2,
+            "maxLength": 80,
+            "description": "City name to search for. Never logged or sent to analytics."
+          },
+          "locale": {
+            "type": "string",
+            "enum": [
+              "en-US",
+              "en-CA",
+              "es-419",
+              "fr-CA",
+              "fr-FR",
+              "tr-TR",
+              "de-DE",
+              "it-IT",
+              "pt-BR",
+              "pt-PT"
+            ],
+            "description": "Display locale for candidate labels. Never changes stored values."
+          }
+        },
+        "required": [
+          "q"
+        ],
+        "additionalProperties": false
+      },
+      "LocationSearchCandidate": {
+        "type": "object",
+        "properties": {
+          "city": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 120,
+            "description": "The provider's default place name."
+          },
+          "region": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "minLength": 1,
+            "maxLength": 120
+          },
+          "country": {
+            "type": "string",
+            "pattern": "^[A-Z]{2}$",
+            "description": "ISO 3166-1 alpha-2 country code."
+          },
+          "latitude": {
+            "type": "number",
+            "minimum": -90,
+            "maximum": 90
+          },
+          "longitude": {
+            "type": "number",
+            "minimum": -180,
+            "maximum": 180
+          },
+          "displayLabel": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 400,
+            "description": "Localized label for display only. Not part of the signed candidate."
+          },
+          "candidateToken": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 2048,
+            "description": "Signed, identity-free candidate valid for 15 minutes. Pass it to POST /api/v1/locations/from-search."
+          }
+        },
+        "required": [
+          "city",
+          "region",
+          "country",
+          "latitude",
+          "longitude",
+          "displayLabel",
+          "candidateToken"
+        ]
+      },
+      "LocationSearchResponse": {
+        "type": "object",
+        "properties": {
+          "data": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "city": {
+                  "type": "string",
+                  "minLength": 1,
+                  "maxLength": 120,
+                  "description": "The provider's default place name."
+                },
+                "region": {
+                  "type": [
+                    "string",
+                    "null"
+                  ],
+                  "minLength": 1,
+                  "maxLength": 120
+                },
+                "country": {
+                  "type": "string",
+                  "pattern": "^[A-Z]{2}$",
+                  "description": "ISO 3166-1 alpha-2 country code."
+                },
+                "latitude": {
+                  "type": "number",
+                  "minimum": -90,
+                  "maximum": 90
+                },
+                "longitude": {
+                  "type": "number",
+                  "minimum": -180,
+                  "maximum": 180
+                },
+                "displayLabel": {
+                  "type": "string",
+                  "minLength": 1,
+                  "maxLength": 400,
+                  "description": "Localized label for display only. Not part of the signed candidate."
+                },
+                "candidateToken": {
+                  "type": "string",
+                  "minLength": 1,
+                  "maxLength": 2048,
+                  "description": "Signed, identity-free candidate valid for 15 minutes. Pass it to POST /api/v1/locations/from-search."
+                }
+              },
+              "required": [
+                "city",
+                "region",
+                "country",
+                "latitude",
+                "longitude",
+                "displayLabel",
+                "candidateToken"
+              ]
+            },
+            "maxItems": 5
+          }
+        },
+        "required": [
+          "data"
+        ]
+      },
+      "CreateSavedLocationFromSearchInput": {
+        "type": "object",
+        "properties": {
+          "candidateToken": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 2048
+          },
+          "label": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 80
+          }
+        },
+        "required": [
+          "candidateToken",
+          "label"
+        ],
+        "additionalProperties": false
+      },
+      "CreateSavedLocationFromSearchResponse": {
+        "type": "object",
+        "properties": {
+          "data": {
+            "type": "object",
+            "properties": {
+              "id": {
+                "type": "string",
+                "minLength": 1
+              },
+              "label": {
+                "type": "string",
+                "minLength": 1
+              },
+              "locationKey": {
+                "type": "string",
+                "minLength": 1,
+                "maxLength": 120,
+                "pattern": "^[a-z0-9]+(-[a-z0-9]+)*$"
+              },
+              "latitude": {
+                "type": "number",
+                "minimum": -90,
+                "maximum": 90
+              },
+              "longitude": {
+                "type": "number",
+                "minimum": -180,
+                "maximum": 180
+              },
+              "timezone": {
+                "type": "string",
+                "minLength": 1
+              },
+              "city": {
+                "type": [
+                  "string",
+                  "null"
+                ],
+                "minLength": 1,
+                "maxLength": 120
+              },
+              "region": {
+                "type": [
+                  "string",
+                  "null"
+                ],
+                "minLength": 1,
+                "maxLength": 120
+              },
+              "country": {
+                "type": [
+                  "string",
+                  "null"
+                ],
+                "minLength": 1,
+                "maxLength": 120
+              },
+              "isPrimary": {
+                "type": "boolean"
+              },
+              "sortOrder": {
+                "type": "integer",
+                "minimum": 0,
+                "maximum": 2147483647
+              },
+              "createdAt": {
+                "type": "string",
+                "format": "date-time"
+              },
+              "updatedAt": {
+                "type": "string",
+                "format": "date-time"
+              }
+            },
+            "required": [
+              "id",
+              "label",
+              "locationKey",
+              "latitude",
+              "longitude",
+              "timezone",
+              "city",
+              "region",
+              "country",
+              "isPrimary",
+              "sortOrder",
+              "createdAt",
+              "updatedAt"
+            ]
+          }
+        },
+        "required": [
+          "data"
+        ]
+      },
+      "LocationRequestErrorResponse": {
+        "type": "object",
+        "properties": {
+          "statusCode": {
+            "type": "number",
+            "enum": [
+              400
+            ]
+          },
+          "code": {
+            "type": "string",
+            "enum": [
+              "invalid_request",
+              "invalid_candidate",
+              "location_limit_reached",
+              "location_duplicate"
+            ]
+          },
+          "message": {
+            "type": "string",
+            "minLength": 1
+          },
+          "error": {
+            "type": "string",
+            "enum": [
+              "Bad Request"
+            ]
+          }
+        },
+        "required": [
+          "statusCode",
+          "code",
+          "message",
+          "error"
+        ]
+      },
+      "LocationUnavailableResponse": {
+        "type": "object",
+        "properties": {
+          "statusCode": {
+            "type": "number",
+            "enum": [
+              503
+            ]
+          },
+          "code": {
+            "type": "string",
+            "enum": [
+              "provider_unavailable",
+              "location_service_unavailable"
+            ]
+          },
+          "retryable": {
+            "type": "boolean",
+            "enum": [
+              true
+            ]
+          },
+          "message": {
+            "type": "string",
+            "minLength": 1
+          },
+          "error": {
+            "type": "string",
+            "enum": [
+              "Service Unavailable"
+            ]
+          }
+        },
+        "required": [
+          "statusCode",
+          "code",
+          "retryable",
+          "message",
+          "error"
+        ]
+      },
       "ModerationActionInput": {
         "type": "object",
         "properties": {
@@ -17066,6 +17428,233 @@
               "application/json": {
                 "schema": {
                   "$ref": "#/components/schemas/NotFoundHttpError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/locations/search": {
+      "get": {
+        "tags": [
+          "locations"
+        ],
+        "summary": "Search cities through the configured weather provider",
+        "description": "Returns at most five city candidates from the configured provider geocoding. Each candidate carries a signed, identity-free candidateToken valid for 15 minutes. The query text is never logged or sent to analytics.",
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
+        "parameters": [
+          {
+            "schema": {
+              "type": "string",
+              "minLength": 2,
+              "maxLength": 80,
+              "description": "City name to search for. Never logged or sent to analytics."
+            },
+            "required": true,
+            "description": "City name to search for. Never logged or sent to analytics.",
+            "name": "q",
+            "in": "query"
+          },
+          {
+            "schema": {
+              "type": "string",
+              "enum": [
+                "en-US",
+                "en-CA",
+                "es-419",
+                "fr-CA",
+                "fr-FR",
+                "tr-TR",
+                "de-DE",
+                "it-IT",
+                "pt-BR",
+                "pt-PT"
+              ],
+              "description": "Display locale for candidate labels. Never changes stored values."
+            },
+            "required": false,
+            "description": "Display locale for candidate labels. Never changes stored values.",
+            "name": "locale",
+            "in": "query"
+          },
+          {
+            "schema": {
+              "type": "string",
+              "enum": [
+                "web",
+                "mobile"
+              ],
+              "description": "Which client is calling. Required on search and save from search; drives the platform property on location analytics."
+            },
+            "required": true,
+            "description": "Which client is calling. Required on search and save from search; drives the platform property on location analytics.",
+            "name": "x-couture-platform",
+            "in": "header"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Search candidates returned successfully",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/LocationSearchResponse"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Query shorter than 2 or longer than 80 characters, or a missing platform header",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/LocationRequestErrorResponse"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Missing or invalid authentication headers",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/UnauthorizedHttpError"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Guardian consent is required for teen access",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ForbiddenHttpError"
+                }
+              }
+            }
+          },
+          "429": {
+            "description": "30 searches per member per minute.",
+            "headers": {
+              "Retry-After": {
+                "description": "Seconds until the member may search again.",
+                "schema": {
+                  "type": "integer",
+                  "minimum": 1
+                }
+              }
+            },
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/TooManyRequestsHttpError"
+                }
+              }
+            }
+          },
+          "503": {
+            "description": "The provider failed, timed out after 3 seconds or has no key, or the candidate secret is missing. Retryable.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/LocationUnavailableResponse"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/locations/from-search": {
+      "post": {
+        "tags": [
+          "locations"
+        ],
+        "summary": "Save a searched city as a location",
+        "description": "Verifies the candidate token, fetches one forecast for the candidate coordinates (3-second timeout) for its IANA timezone, and persists that forecast as the location snapshot before saving. Coordinates, timezone and country never come from the client. Storage follows the saved-location rules: at most three, the first becomes primary, a duplicate key is refused.",
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
+        "parameters": [
+          {
+            "schema": {
+              "type": "string",
+              "enum": [
+                "web",
+                "mobile"
+              ],
+              "description": "Which client is calling. Required on search and save from search; drives the platform property on location analytics."
+            },
+            "required": true,
+            "description": "Which client is calling. Required on search and save from search; drives the platform property on location analytics.",
+            "name": "x-couture-platform",
+            "in": "header"
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/CreateSavedLocationFromSearchInput"
+              }
+            }
+          }
+        },
+        "responses": {
+          "201": {
+            "description": "Saved location created with its weather snapshot",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/CreateSavedLocationFromSearchResponse"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Invalid body, tampered, foreign-environment or expired candidate, three saved locations already, or a duplicate location",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/LocationRequestErrorResponse"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Missing or invalid authentication headers",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/UnauthorizedHttpError"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Guardian consent is required for teen access",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ForbiddenHttpError"
+                }
+              }
+            }
+          },
+          "503": {
+            "description": "The forecast call failed, timed out or returned an invalid timezone, or the candidate secret is missing. Nothing was saved. Retryable.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/LocationUnavailableResponse"
                 }
               }
             }

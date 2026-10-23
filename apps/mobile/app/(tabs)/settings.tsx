@@ -505,6 +505,8 @@ export default function SettingsScreen() {
             )}
           </View>
 
+          <LocationsLinkRow />
+
           <Pressable
             accessibilityRole="link"
             onPress={() => router.push('/notification-settings')}
@@ -1380,6 +1382,26 @@ function PaletteAdvisorLinkRow() {
       onPress={() => router.push('/palette-advisor')}
     >
       <Text style={styles.actionText}>{t('commerce.premium.palette.sectionTitle')}</Text>
+    </Pressable>
+  )
+}
+
+/**
+ * Story 1.2b: the entry point to saved locations. From Settings, switching the
+ * primary location takes two taps: this row, then the location's Make primary.
+ */
+function LocationsLinkRow() {
+  const { t } = useTranslation()
+
+  return (
+    <Pressable
+      accessibilityRole="link"
+      accessibilityLabel={t('locations.title')}
+      style={styles.actionButton}
+      testID="locations-link"
+      onPress={() => router.push('/locations')}
+    >
+      <Text style={styles.actionText}>{t('locations.title')}</Text>
     </Pressable>
   )
 }

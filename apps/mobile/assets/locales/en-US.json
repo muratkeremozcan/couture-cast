@@ -883,5 +883,50 @@
       "announceLoadedMore_other": "Loaded {{count}} more spotlight looks.",
       "announceRefreshed": "The City Spotlight was refreshed with the latest ranking."
     }
+  },
+  "locations": {
+    "title": "Locations",
+    "intro": "Save up to three places. Your primary location drives your daily outfits and your community climate.",
+    "count": "{{count}} of 3 saved",
+    "empty": "No saved locations yet. Search for a city to add one.",
+    "signedOutHint": "Sign in to manage your locations.",
+    "loadError": "Unable to load your locations.",
+    "primary": "Primary",
+    "makePrimary": "Make primary",
+    "rename": "Rename",
+    "renameField": "New name",
+    "renameSave": "Save name",
+    "cancel": "Cancel",
+    "delete": "Delete",
+    "deleteConfirm": "Delete {{label}}?",
+    "deleteConfirmAction": "Yes, delete",
+    "searchLabel": "Search for a city",
+    "searchHint": "Type at least two letters.",
+    "searching": "Searching...",
+    "resultCount": "Results: {{count}}",
+    "noResults": "No cities match that search.",
+    "selected": "Selected: {{place}}",
+    "labelField": "Name this place",
+    "save": "Save location",
+    "saving": "Saving...",
+    "saved": "{{label}} saved.",
+    "primaryChanged": "{{label}} is now your primary location.",
+    "renamed": "Renamed to {{label}}.",
+    "deleted": "{{label}} deleted.",
+    "limit": "You have saved three locations. Delete one to add another.",
+    "retry": "Try again",
+    "guided": {
+      "add": "Add a location"
+    },
+    "errors": {
+      "provider_unavailable": "City search is temporarily unavailable. Try again.",
+      "save_unavailable": "This city could not be saved right now. Try again.",
+      "service_unavailable": "Locations are temporarily unavailable. Try again later.",
+      "invalid_candidate": "That search result expired. Search again.",
+      "duplicate": "That location is already saved.",
+      "rate_limited": "Too many searches. Wait a moment and try again.",
+      "invalid_query": "Type between 2 and 80 characters.",
+      "unknown": "Something went wrong. Try again."
+    }
   }
 }

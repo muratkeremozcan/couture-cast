@@ -43,6 +43,12 @@ const weatherLocationRetryOptions: JobsOptions = {
   backoff: { type: 'exponential', delay: 1000 },
 }
 
+/**
+ * One job per location per refresh bucket. The separator is `__` and the
+ * bucket is epoch milliseconds: BullMQ 5 rejects a custom job id containing a
+ * colon unless it has exactly three segments, and an ISO timestamp carries two
+ * colons of its own, so the earlier `name:key:iso` form failed every enqueue.
+ */
 export function createWeatherLocationJobId(
   locationKey: string,
   date: Date,
@@ -50,7 +56,7 @@ export function createWeatherLocationJobId(
 ): string {
   const bucketMs = refreshMinutes * 60 * 1000
   const bucketStart = Math.floor(date.getTime() / bucketMs) * bucketMs
-  return `${WEATHER_LOCATION_JOB_NAME}:${locationKey}:${new Date(bucketStart).toISOString()}`
+  return `${WEATHER_LOCATION_JOB_NAME}__${locationKey}__${bucketStart}`
 }
 
 function coalesceTargets(

@@ -1,6 +1,6 @@
 // Community grid journeys through the real web transport and MSW.
 import { delay, http, HttpResponse } from 'msw'
-import { screen, waitFor, within } from '@testing-library/react'
+import { act, screen, waitFor, within } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import { describe, expect, it, vi } from 'vitest'
 import { CLIMATE_BANDS } from '@couture/utils'
@@ -250,6 +250,66 @@ describe('CommunityLookbookGrid (Story 6.1)', () => {
         expect(screen.queryByTestId('community-band-unresolved')).not.toBeInTheDocument()
       }
     )
+
+    it.each([...communityBandUnresolvedReasonSchema.options])(
+      '1.2b-WEB-GRID-01 offers the guided add-location action only for no_location: %s',
+      async (reason) => {
+        signIn()
+        useMswHandlers(
+          feedHandler({
+            items: [item()],
+            viewerBand: null,
+            bandResolved: false,
+            bandUnresolvedReason: reason,
+            mode: 'auto',
+          })
+        )
+        renderGrid()
+
+        const notice = await screen.findByTestId('community-band-unresolved')
+        const action = within(notice).queryByTestId('community-add-location')
+        if (reason === 'no_location') {
+          expect(action?.textContent).toBe('Add a location')
+          expect(action).toHaveAttribute(
+            'href',
+            '/settings?addLocation=1&returnTo=%2F#locations'
+          )
+        } else {
+          expect(action).toBeNull()
+        }
+      }
+    )
+
+    // A reader with no session never loads a feed, so this is reachable only by
+    // signing out under a notice that is already showing. The notice described
+    // the member who left; it goes with its action, not after it.
+    it('1.2b-WEB-GRID-02 withdraws the band notice and its add-location action on sign-out', async () => {
+      signIn()
+      useMswHandlers(
+        feedHandler({
+          items: [item()],
+          viewerBand: null,
+          bandResolved: false,
+          bandUnresolvedReason: 'no_location',
+          mode: 'auto',
+        })
+      )
+      renderGrid()
+
+      const notice = await screen.findByTestId('community-band-unresolved')
+      expect(within(notice).getByTestId('community-add-location')).toBeInTheDocument()
+
+      window.sessionStorage.clear()
+      act(() => {
+        window.dispatchEvent(new Event('couture:session'))
+      })
+
+      await waitFor(() =>
+        expect(screen.queryByTestId('community-add-location')).not.toBeInTheDocument()
+      )
+      expect(screen.queryByTestId('community-band-unresolved')).not.toBeInTheDocument()
+      expect(document.body).not.toHaveTextContent(UNRESOLVED_COPY.no_location)
+    })
 
     it('6.1-WEB-009 hides the band notice when the band resolved', async () => {
       signIn()

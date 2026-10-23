@@ -93,8 +93,16 @@ describe('Story 6.5 committed stream append', () => {
         )
       ),
     })
+    // The first stream-event insert sleeps past the append's 450 ms statement
+    // timeout, so the first append overruns whatever batch it prepared. Sizing
+    // the overrun from 20 ms per row alone depended on the 150 ms preparation
+    // window filling about 23 rows; a loaded CI runner prepared fewer, every
+    // batch fit, and no append failed (Story 1.2b R30). A sequence counts the
+    // inserts because it survives the aborted transaction; every later insert
+    // keeps the 20 ms cost the adaptation is measured against.
+    await prisma.$executeRawUnsafe('CREATE SEQUENCE story65_slow_event_inserts')
     await prisma.$executeRawUnsafe(
-      'CREATE FUNCTION story65_slow_event_write() RETURNS trigger LANGUAGE plpgsql AS $$ BEGIN PERFORM pg_sleep(0.02); RETURN NEW; END $$'
+      "CREATE FUNCTION story65_slow_event_write() RETURNS trigger LANGUAGE plpgsql AS $$ BEGIN IF nextval('story65_slow_event_inserts') = 1 THEN PERFORM pg_sleep(0.6); ELSE PERFORM pg_sleep(0.02); END IF; RETURN NEW; END $$"
     )
     await prisma.$executeRawUnsafe(
       'CREATE TRIGGER story65_slow_event BEFORE INSERT ON "CommunityStreamEvent" FOR EACH ROW EXECUTE FUNCTION story65_slow_event_write()'
@@ -127,6 +135,7 @@ describe('Story 6.5 committed stream append', () => {
         'DROP TRIGGER story65_slow_event ON "CommunityStreamEvent"'
       )
       await prisma.$executeRawUnsafe('DROP FUNCTION story65_slow_event_write()')
+      await prisma.$executeRawUnsafe('DROP SEQUENCE story65_slow_event_inserts')
     }
     expect(failures).toBeGreaterThan(0)
     expect(

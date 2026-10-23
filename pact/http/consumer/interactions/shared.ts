@@ -13,7 +13,16 @@ import type { DefaultApi } from '@couture/api-client'
  * and nothing re-exports a symbol on another module's behalf.
  */
 
-export const { decimal, eachLike, equal, like, nullValue, regex, string } = MatchersV3
+export const {
+  decimal,
+  eachLike,
+  equal,
+  fromProviderState,
+  like,
+  nullValue,
+  regex,
+  string,
+} = MatchersV3
 
 export const pactEventAuth = {
   accessToken: 'pact-event-token',
@@ -148,6 +157,13 @@ export type ContractApiClient = Pick<
   // Story 6.6 City Spotlight and both branches of the opened endpoint.
   | 'getCommunitySpotlight'
   | 'apiV1CommunityPostsPostIdOpenedPost'
+  // Story 1.2b client location capture. The error rows go out through raw fetch.
+  | 'apiV1LocationsSearchGet'
+  | 'apiV1LocationsFromSearchPost'
+  | 'apiV1LocationsGet'
+  | 'apiV1LocationsLocationIdPrimaryPost'
+  | 'apiV1LocationsLocationIdPatch'
+  | 'apiV1LocationsLocationIdDelete'
 >
 
 export type CreateClient = (mockServer: V3MockServer) => ContractApiClient

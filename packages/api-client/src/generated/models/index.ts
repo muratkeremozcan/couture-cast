@@ -4963,6 +4963,38 @@ export interface CreatePaletteSelfieUploadUrlResponse {
 /**
  *
  * @export
+ * @interface CreateSavedLocationFromSearchInput
+ */
+export interface CreateSavedLocationFromSearchInput {
+  /**
+   *
+   * @type {string}
+   * @memberof CreateSavedLocationFromSearchInput
+   */
+  candidateToken: string
+  /**
+   *
+   * @type {string}
+   * @memberof CreateSavedLocationFromSearchInput
+   */
+  label: string
+}
+/**
+ *
+ * @export
+ * @interface CreateSavedLocationFromSearchResponse
+ */
+export interface CreateSavedLocationFromSearchResponse {
+  /**
+   *
+   * @type {ListSavedLocationsResponseDataInner}
+   * @memberof CreateSavedLocationFromSearchResponse
+   */
+  data: ListSavedLocationsResponseDataInner
+}
+/**
+ *
+ * @export
  * @interface CreateSavedLocationInput
  */
 export interface CreateSavedLocationInput {
@@ -7440,6 +7472,316 @@ export interface ListSavedLocationsResponseDataInner {
    */
   updatedAt: string
 }
+/**
+ *
+ * @export
+ * @interface LocationHeaders
+ */
+export interface LocationHeaders {
+  /**
+   * Which client is calling. Required on search and save from search; drives the platform property on location analytics.
+   * @type {LocationHeadersXCouturePlatformEnum}
+   * @memberof LocationHeaders
+   */
+  xCouturePlatform: LocationHeadersXCouturePlatformEnum
+}
+
+/**
+ * @export
+ */
+export const LocationHeadersXCouturePlatformEnum = {
+  web: 'web',
+  mobile: 'mobile',
+} as const
+export type LocationHeadersXCouturePlatformEnum =
+  (typeof LocationHeadersXCouturePlatformEnum)[keyof typeof LocationHeadersXCouturePlatformEnum]
+
+/**
+ *
+ * @export
+ * @interface LocationRequestErrorResponse
+ */
+export interface LocationRequestErrorResponse {
+  /**
+   *
+   * @type {LocationRequestErrorResponseStatusCodeEnum}
+   * @memberof LocationRequestErrorResponse
+   */
+  statusCode: LocationRequestErrorResponseStatusCodeEnum
+  /**
+   *
+   * @type {LocationRequestErrorResponseCodeEnum}
+   * @memberof LocationRequestErrorResponse
+   */
+  code: LocationRequestErrorResponseCodeEnum
+  /**
+   *
+   * @type {string}
+   * @memberof LocationRequestErrorResponse
+   */
+  message: string
+  /**
+   *
+   * @type {LocationRequestErrorResponseErrorEnum}
+   * @memberof LocationRequestErrorResponse
+   */
+  error: LocationRequestErrorResponseErrorEnum
+}
+
+/**
+ * @export
+ */
+export const LocationRequestErrorResponseStatusCodeEnum = {
+  NUMBER_400: 400,
+} as const
+export type LocationRequestErrorResponseStatusCodeEnum =
+  (typeof LocationRequestErrorResponseStatusCodeEnum)[keyof typeof LocationRequestErrorResponseStatusCodeEnum]
+
+/**
+ * @export
+ */
+export const LocationRequestErrorResponseCodeEnum = {
+  invalid_request: 'invalid_request',
+  invalid_candidate: 'invalid_candidate',
+  location_limit_reached: 'location_limit_reached',
+  location_duplicate: 'location_duplicate',
+} as const
+export type LocationRequestErrorResponseCodeEnum =
+  (typeof LocationRequestErrorResponseCodeEnum)[keyof typeof LocationRequestErrorResponseCodeEnum]
+
+/**
+ * @export
+ */
+export const LocationRequestErrorResponseErrorEnum = {
+  Bad_Request: 'Bad Request',
+} as const
+export type LocationRequestErrorResponseErrorEnum =
+  (typeof LocationRequestErrorResponseErrorEnum)[keyof typeof LocationRequestErrorResponseErrorEnum]
+
+/**
+ *
+ * @export
+ * @interface LocationSearchCandidate
+ */
+export interface LocationSearchCandidate {
+  /**
+   * The provider's default place name.
+   * @type {string}
+   * @memberof LocationSearchCandidate
+   */
+  city: string
+  /**
+   *
+   * @type {string}
+   * @memberof LocationSearchCandidate
+   */
+  region: string | null
+  /**
+   * ISO 3166-1 alpha-2 country code.
+   * @type {string}
+   * @memberof LocationSearchCandidate
+   */
+  country: string
+  /**
+   *
+   * @type {number}
+   * @memberof LocationSearchCandidate
+   */
+  latitude: number
+  /**
+   *
+   * @type {number}
+   * @memberof LocationSearchCandidate
+   */
+  longitude: number
+  /**
+   * Localized label for display only. Not part of the signed candidate.
+   * @type {string}
+   * @memberof LocationSearchCandidate
+   */
+  displayLabel: string
+  /**
+   * Signed, identity-free candidate valid for 15 minutes. Pass it to POST /api/v1/locations/from-search.
+   * @type {string}
+   * @memberof LocationSearchCandidate
+   */
+  candidateToken: string
+}
+/**
+ *
+ * @export
+ * @interface LocationSearchQueryParams
+ */
+export interface LocationSearchQueryParams {
+  /**
+   * City name to search for. Never logged or sent to analytics.
+   * @type {string}
+   * @memberof LocationSearchQueryParams
+   */
+  q: string
+  /**
+   * Display locale for candidate labels. Never changes stored values.
+   * @type {LocationSearchQueryParamsLocaleEnum}
+   * @memberof LocationSearchQueryParams
+   */
+  locale?: LocationSearchQueryParamsLocaleEnum
+}
+
+/**
+ * @export
+ */
+export const LocationSearchQueryParamsLocaleEnum = {
+  en_US: 'en-US',
+  en_CA: 'en-CA',
+  es_419: 'es-419',
+  fr_CA: 'fr-CA',
+  fr_FR: 'fr-FR',
+  tr_TR: 'tr-TR',
+  de_DE: 'de-DE',
+  it_IT: 'it-IT',
+  pt_BR: 'pt-BR',
+  pt_PT: 'pt-PT',
+} as const
+export type LocationSearchQueryParamsLocaleEnum =
+  (typeof LocationSearchQueryParamsLocaleEnum)[keyof typeof LocationSearchQueryParamsLocaleEnum]
+
+/**
+ *
+ * @export
+ * @interface LocationSearchResponse
+ */
+export interface LocationSearchResponse {
+  /**
+   *
+   * @type {Array<LocationSearchResponseDataInner>}
+   * @memberof LocationSearchResponse
+   */
+  data: Array<LocationSearchResponseDataInner>
+}
+/**
+ *
+ * @export
+ * @interface LocationSearchResponseDataInner
+ */
+export interface LocationSearchResponseDataInner {
+  /**
+   * The provider's default place name.
+   * @type {string}
+   * @memberof LocationSearchResponseDataInner
+   */
+  city: string
+  /**
+   *
+   * @type {string}
+   * @memberof LocationSearchResponseDataInner
+   */
+  region: string | null
+  /**
+   * ISO 3166-1 alpha-2 country code.
+   * @type {string}
+   * @memberof LocationSearchResponseDataInner
+   */
+  country: string
+  /**
+   *
+   * @type {number}
+   * @memberof LocationSearchResponseDataInner
+   */
+  latitude: number
+  /**
+   *
+   * @type {number}
+   * @memberof LocationSearchResponseDataInner
+   */
+  longitude: number
+  /**
+   * Localized label for display only. Not part of the signed candidate.
+   * @type {string}
+   * @memberof LocationSearchResponseDataInner
+   */
+  displayLabel: string
+  /**
+   * Signed, identity-free candidate valid for 15 minutes. Pass it to POST /api/v1/locations/from-search.
+   * @type {string}
+   * @memberof LocationSearchResponseDataInner
+   */
+  candidateToken: string
+}
+/**
+ *
+ * @export
+ * @interface LocationUnavailableResponse
+ */
+export interface LocationUnavailableResponse {
+  /**
+   *
+   * @type {LocationUnavailableResponseStatusCodeEnum}
+   * @memberof LocationUnavailableResponse
+   */
+  statusCode: LocationUnavailableResponseStatusCodeEnum
+  /**
+   *
+   * @type {LocationUnavailableResponseCodeEnum}
+   * @memberof LocationUnavailableResponse
+   */
+  code: LocationUnavailableResponseCodeEnum
+  /**
+   *
+   * @type {LocationUnavailableResponseRetryableEnum}
+   * @memberof LocationUnavailableResponse
+   */
+  retryable: LocationUnavailableResponseRetryableEnum
+  /**
+   *
+   * @type {string}
+   * @memberof LocationUnavailableResponse
+   */
+  message: string
+  /**
+   *
+   * @type {LocationUnavailableResponseErrorEnum}
+   * @memberof LocationUnavailableResponse
+   */
+  error: LocationUnavailableResponseErrorEnum
+}
+
+/**
+ * @export
+ */
+export const LocationUnavailableResponseStatusCodeEnum = {
+  NUMBER_503: 503,
+} as const
+export type LocationUnavailableResponseStatusCodeEnum =
+  (typeof LocationUnavailableResponseStatusCodeEnum)[keyof typeof LocationUnavailableResponseStatusCodeEnum]
+
+/**
+ * @export
+ */
+export const LocationUnavailableResponseCodeEnum = {
+  provider_unavailable: 'provider_unavailable',
+  location_service_unavailable: 'location_service_unavailable',
+} as const
+export type LocationUnavailableResponseCodeEnum =
+  (typeof LocationUnavailableResponseCodeEnum)[keyof typeof LocationUnavailableResponseCodeEnum]
+
+/**
+ * @export
+ */
+export const LocationUnavailableResponseRetryableEnum = {
+  true: true,
+} as const
+export type LocationUnavailableResponseRetryableEnum =
+  (typeof LocationUnavailableResponseRetryableEnum)[keyof typeof LocationUnavailableResponseRetryableEnum]
+
+/**
+ * @export
+ */
+export const LocationUnavailableResponseErrorEnum = {
+  Service_Unavailable: 'Service Unavailable',
+} as const
+export type LocationUnavailableResponseErrorEnum =
+  (typeof LocationUnavailableResponseErrorEnum)[keyof typeof LocationUnavailableResponseErrorEnum]
+
 /**
  *
  * @export

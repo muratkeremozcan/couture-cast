@@ -19,6 +19,7 @@ import enUS from '@/assets/locales/en-US.json'
 import i18n from '@/src/lib/i18n'
 import { press } from '@/src/test-utils/press'
 import { server } from '@/src/test-utils/msw/server'
+import { setMobileAccessTokenResolver } from '@/src/lib/mobile-auth'
 
 export function registerCommunityPublishingCases() {
   // --- Compose --------------------------------------------------------------
@@ -249,6 +250,7 @@ export function registerCommunityPublishingCases() {
   it('6.1-MOB-022 bounds the signed-URL refetch at the expiry boundary and then says the image is unavailable', async () => {
     const expiresAt = IMAGE_REFERENCE_NOW + 60_000
     let expireImage: (() => void) | undefined
+    let restoreTokenResolver: (() => void) | undefined
     const schedule = globalThis.setTimeout.bind(globalThis)
     const timer = vi
       .spyOn(globalThis, 'setTimeout')
@@ -280,6 +282,14 @@ export function registerCommunityPublishingCases() {
       await waitFor(() => expect(expireImage).toBeTypeOf('function'))
       expect(feedUrls).toHaveLength(1)
       expect(screen.queryByTestId('community-card-image-unavailable-post-a')).toBeNull()
+      // Every feed request awaits the access-token lookup before it is sent, so
+      // the card can show its fallback before its last refetch reaches the
+      // network. Slow that lookup on purpose: the request count below must be
+      // waited for, never read in the same tick as the fallback (CI run on
+      // cb3d07b8 read 2 of 3 under a loaded coverage run).
+      restoreTokenResolver = setMobileAccessTokenResolver(
+        () => new Promise((resolve) => schedule(() => resolve('session-token'), 500))
+      )
       // Move exactly to the captured expiry deadline and fire its real callback.
       await act(async () => {
         vi.mocked(Date.now).mockReturnValue(expiresAt)
@@ -293,9 +303,14 @@ export function registerCommunityPublishingCases() {
       expect(
         screen.getByTestId('community-card-image-unavailable-post-a').textContent
       ).toContain(enUS.community.card.imageUnavailable)
+      // The fallback shows as the second refetch starts; wait for that request
+      // to arrive, then make sure the spent budget allows no further one.
+      await waitFor(() => expect(feedUrls).toHaveLength(3))
+      await new Promise((resolve) => schedule(resolve, 1_000))
       expect(feedUrls).toHaveLength(3)
       expect(Date.now()).toBe(expiresAt)
     } finally {
+      restoreTokenResolver?.()
       timer.mockRestore()
       vi.mocked(Date.now).mockReturnValue(IMAGE_REFERENCE_NOW)
     }

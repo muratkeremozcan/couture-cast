@@ -27,8 +27,36 @@ import os from 'node:os'
 import { fileURLToPath, URL } from 'node:url'
 import path from 'node:path'
 import { MAESTRO_BIN, MAESTRO_PINNED_VERSION } from './maestro-version.mjs'
-import { resetMobileE2EFlowState } from './lib/mobile-e2e-flow-state.mjs'
+import {
+  clearMobileE2ELocations,
+  locationCaptureWeatherDoubleCause,
+  mobileE2EBaselineLocationRequestBody,
+  resetMobileE2EFlowState,
+  restoreMobileE2EBaselineLocation,
+} from './lib/mobile-e2e-flow-state.mjs'
+import {
+  coordinateKeySuffix,
+  fold,
+  SENTINEL_TEMPERATURE_C,
+  sentinelPlace,
+} from './lib/weather-provider-double-data.mjs'
+import { startExpoGoLinkEndpoint } from './lib/expo-go-link-endpoint.mjs'
+import {
+  describeMissingReport,
+  flowTitleOf,
+  lastStartedMaestroCommand,
+  newestFlowDebugLog,
+  removeReportEverywhere,
+} from './lib/maestro-flow-outcome.mjs'
 import { runMobileE2EFlow } from './lib/mobile-e2e-flow-retry.mjs'
+import {
+  adbDeviceStates,
+  captureSlowProbeState,
+  resolveProbeSerials,
+  runAdb,
+  saveDiagnostic,
+  waitForPackageManagerReady,
+} from './lib/package-manager-readiness.mjs'
 import { buildMobileE2EAccessToken } from './lib/mobile-e2e-token.mjs'
 
 const scriptDir = path.dirname(fileURLToPath(import.meta.url))
@@ -1449,51 +1477,314 @@ const clearMobileE2EDeviceSettings = async () => {
   }
 }
 
-const resetMobileE2EPerFlowState = async (identity) => {
+/**
+ * Story 1.2b: one sentinel place per run. `Sentinel <nonce>` geocodes, on the
+ * weather provider double the E2E API reaches, to coordinates no run has saved,
+ * so the location capture flow always saves a key with no prior snapshot.
+ */
+const LOCATION_SENTINEL_NONCE = randomUUID().replace(/-/g, '').slice(0, 10)
+const LOCATION_SENTINEL_QUERY = `Sentinel ${LOCATION_SENTINEL_NONCE}`
+const LOCATION_SENTINEL_PLACE = sentinelPlace(LOCATION_SENTINEL_NONCE)
+const LOCATION_SENTINEL_KEY_SUFFIX = coordinateKeySuffix(
+  LOCATION_SENTINEL_PLACE.lat,
+  LOCATION_SENTINEL_PLACE.lon
+)
+/** The saved row's place line starts with this: `Sentinelville, Sentinel County`. */
+const LOCATION_SENTINEL_PLACE_TEXT = `${LOCATION_SENTINEL_PLACE.name}, ${LOCATION_SENTINEL_PLACE.state}`
+/**
+ * The hero's current temperature for the sentinel forecast, in the Fahrenheit
+ * the en-US devices show, rounded as `formatTemperature` rounds it
+ * (apps/mobile/src/lib/formatters.ts). 31 C is 88 F.
+ */
+const LOCATION_SENTINEL_TEMP_F = String(Math.round((SENTINEL_TEMPERATURE_C * 9) / 5 + 32))
+
+const LOCATION_CAPTURE_FLOW = 'maestro/location-capture.yaml'
+
+/**
+ * The weather provider double the E2E API's providers point at. The API
+ * launcher (scripts/start-api-e2e-with-workers.mjs) keeps a caller's own pair of
+ * loopback origins, and otherwise starts the double on E2E_WEATHER_DOUBLE_PORT
+ * (4010 by default); this reads the same inputs.
+ */
+const WEATHER_DOUBLE_ORIGIN =
+  process.env.OPENWEATHER_API_ORIGIN && process.env.WEATHERAPI_API_ORIGIN
+    ? process.env.OPENWEATHER_API_ORIGIN.replace(/\/+$/, '')
+    : `http://127.0.0.1:${process.env.E2E_WEATHER_DOUBLE_PORT || '4010'}`
+
+/**
+ * State a flow needs beyond the shared per-flow reset. `before` runs ahead of
+ * every attempt; `after` runs once the flow finishes, pass or fail, so the
+ * flows after it start from the baseline the identity setup created.
+ */
+const FLOW_STATE_HOOKS = {
+  [LOCATION_CAPTURE_FLOW]: {
+    before: (prisma, userId) =>
+      clearMobileE2ELocations(prisma, userId, LOCATION_SENTINEL_KEY_SUFFIX),
+    after: (prisma, userId) => restoreMobileE2EBaselineLocation(prisma, userId),
+  },
+}
+
+const withMobileE2EPrisma = async (work) => {
   const prisma = new PrismaClient({ datasourceUrl: MOBILE_E2E_DATABASE_URL })
   try {
-    await resetMobileE2EFlowState(prisma, identity.userId)
+    await work(prisma)
   } finally {
     await prisma.$disconnect()
   }
 }
 
-const setupMobileE2EIdentity = async (apiBaseUrl) => {
-  const email = `mobile-e2e-${randomUUID()}@example.com`
-  const signup = await requestJson(`${apiBaseUrl}/api/v1/auth/signup`, {
-    method: 'POST',
-    headers: { 'content-type': 'application/json' },
-    body: JSON.stringify({
-      email,
-      birthdate: '2000-01-15',
-    }),
+const resetMobileE2EPerFlowState = async (identity, flowPath) =>
+  withMobileE2EPrisma(async (prisma) => {
+    await resetMobileE2EFlowState(prisma, identity.userId)
+    await FLOW_STATE_HOOKS[flowPath]?.before(prisma, identity.userId)
   })
-  const userId = signup?.userId
-  if (typeof userId !== 'string' || userId.length === 0) {
-    throw new Error('Mobile E2E signup did not return a userId')
+
+const restoreMobileE2EStateAfterFlow = async (identity, flowPath) => {
+  const hook = FLOW_STATE_HOOKS[flowPath]?.after
+  if (!identity || !hook) return
+  await withMobileE2EPrisma((prisma) => hook(prisma, identity.userId))
+}
+
+/**
+ * Runs the after hook and turns its error into the cause the flow is failed
+ * with. A throw here used to replace the flow's own outcome and escape the
+ * suite loop, so every later flow went unrun and the summary never printed.
+ * The later flows still run: each one gets its own per-flow reset, and the
+ * summary names this failure next to whatever they report.
+ *
+ * @returns {Promise<string | undefined>}
+ */
+const restoreMobileE2EStateOrCause = async (identity, flowPath) => {
+  try {
+    await restoreMobileE2EStateAfterFlow(identity, flowPath)
+    return undefined
+  } catch (error) {
+    return `state restore failed: ${error instanceof Error ? error.message : String(error)}`
   }
+}
+
+/**
+ * Story 1.2b: `location-capture.yaml` searches and saves through the API's
+ * weather providers, so it runs only against an API shown to reach the local
+ * double, and is judged on what the double saw. Flows the suite refuses before
+ * running are kept here with their cause.
+ *
+ * @type {Map<string, string>}
+ */
+const flowRefusals = new Map()
+
+/**
+ * @param {string} resource `stats` or `requests`
+ * @returns {Promise<any>}
+ */
+const readWeatherDouble = async (resource) => {
+  const response = await fetch(`${WEATHER_DOUBLE_ORIGIN}/__double/${resource}`, {
+    signal: AbortSignal.timeout(5_000),
+  })
+  if (!response.ok) {
+    throw new Error(`/__double/${resource} answered ${response.status}`)
+  }
+  return response.json()
+}
+
+const weatherDoubleUnreachable = (error) =>
+  `weather provider double unreachable at ${WEATHER_DOUBLE_ORIGIN} (${error instanceof Error ? error.message : String(error)}); refusing a run that could reach a live provider`
+
+/**
+ * Proves, before the flow runs, that the API the device talks to sends its
+ * searches to the double. The runner may be reusing an API on :4000 that a
+ * developer started with live provider keys, or (MOBILE_E2E_SKIP_API=1) one it
+ * did not start at all, and either would send the flow's search and save-time
+ * forecast to OpenWeather or WeatherAPI. One search for a per-run probe query
+ * goes through the API; the double must log it. That probe is the only request
+ * a misconfigured API can forward anywhere, and it carries no member data.
+ *
+ * @param {string} apiBaseUrl reachable from this machine
+ * @param {string | undefined} accessToken the member the probe searches as
+ * @returns {Promise<string | undefined>} the cause that refuses the flow
+ */
+const proveApiReachesWeatherDouble = async (apiBaseUrl, accessToken) => {
+  let before
+  try {
+    before = await readWeatherDouble('stats')
+  } catch (error) {
+    return weatherDoubleUnreachable(error)
+  }
+  if (!accessToken) {
+    return `no member access token to probe ${apiBaseUrl} with, so it cannot be shown to use the weather provider double at ${WEATHER_DOUBLE_ORIGIN}`
+  }
+  const probe = `Sentinel probe-${LOCATION_SENTINEL_NONCE}`
+  let status
+  try {
+    const response = await fetch(
+      `${apiBaseUrl}/api/v1/locations/search?${new URLSearchParams({ q: probe, locale: 'en-US' })}`,
+      {
+        headers: {
+          authorization: `Bearer ${accessToken}`,
+          // Search requires the caller's client kind; the app sends `mobile`.
+          'x-couture-platform': 'mobile',
+        },
+        signal: AbortSignal.timeout(15_000),
+      }
+    )
+    status = response.status
+  } catch (error) {
+    return `location search probe through ${apiBaseUrl} failed (${error instanceof Error ? error.message : String(error)})`
+  }
+  let requests
+  try {
+    requests = await readWeatherDouble('requests')
+  } catch (error) {
+    return weatherDoubleUnreachable(error)
+  }
+  const reached = requests.geocoding.some(
+    (entry) => entry.seq > before.geocoding && fold(entry.query) === fold(probe)
+  )
+  if (!reached) {
+    return `the API at ${apiBaseUrl} did not send the search probe "${probe}" to the weather provider double at ${WEATHER_DOUBLE_ORIGIN} (search answered ${status}); it is not using the double, so the flow is refused`
+  }
+  if (status !== 200) {
+    return `location search probe through ${apiBaseUrl} reached the double but answered ${status}`
+  }
+  return undefined
+}
+
+/**
+ * Refuses `location-capture.yaml` up front when the API cannot be shown to use
+ * the double. Every other flow is unaffected.
+ *
+ * @param {string} apiBaseUrl
+ * @param {string | undefined} accessToken
+ * @returns {Promise<void>}
+ */
+const guardWeatherDoubleFlows = async (apiBaseUrl, accessToken) => {
+  if (!flowsToRun.includes(LOCATION_CAPTURE_FLOW)) return
+  const cause = await proveApiReachesWeatherDouble(apiBaseUrl, accessToken)
+  if (cause) {
+    flowRefusals.set(LOCATION_CAPTURE_FLOW, cause)
+    log(`REFUSE ${LOCATION_CAPTURE_FLOW} (${cause})`)
+  } else {
+    log(
+      `The API at ${apiBaseUrl} reaches the weather provider double at ${WEATHER_DOUBLE_ORIGIN}`
+    )
+  }
+}
+
+/**
+ * Notes the double's counts before a flow that must run on it, and returns the
+ * check that judges what the double saw afterwards.
+ *
+ * @param {string} flowPath
+ * @returns {Promise<{ cause?: string, verify?: () => Promise<string | undefined> } | undefined>}
+ */
+const watchWeatherDouble = async (flowPath) => {
+  if (flowPath !== LOCATION_CAPTURE_FLOW) return undefined
+  let before
+  try {
+    before = await readWeatherDouble('stats')
+  } catch (error) {
+    return { cause: weatherDoubleUnreachable(error) }
+  }
+  return {
+    verify: async () => {
+      try {
+        return locationCaptureWeatherDoubleCause({
+          before,
+          requests: await readWeatherDouble('requests'),
+          query: LOCATION_SENTINEL_QUERY,
+          place: LOCATION_SENTINEL_PLACE,
+        })
+      } catch (error) {
+        return weatherDoubleUnreachable(error)
+      }
+    },
+  }
+}
+
+/**
+ * Fails a flow with a named cause on top of whatever Maestro reported: a pass
+ * becomes a failure, and an existing failure entry gains the cause, so the
+ * flow is still counted once.
+ *
+ * @param {string} flowPath
+ * @param {string} cause
+ * @param {string[]} flowFailures collected in place
+ * @returns {void}
+ */
+const failFlowWithCause = (flowPath, cause, flowFailures) => {
+  log(`FAIL ${flowPath} (${cause})`)
+  flowPasses.delete(flowPath)
+  const index = flowFailures.findLastIndex(
+    (entry) => entry === flowPath || entry.startsWith(`${flowPath} (`)
+  )
+  if (index === -1) {
+    flowFailures.push(`${flowPath} (${cause})`)
+  } else {
+    flowFailures[index] = `${flowFailures[index]} (${cause})`
+  }
+}
+
+/**
+ * The community beta arm, as `community-analytics.ts` assigns it:
+ * `sha256('community-experiment:' + userId)[0] % 2`, even is `auto`.
+ *
+ * @param {string} userId
+ * @returns {'auto' | 'all'}
+ */
+const communityExperimentArm = (userId) =>
+  createHash('sha256').update(`community-experiment:${userId}`).digest().readUInt8(0) %
+    2 ===
+  0
+    ? 'auto'
+    : 'all'
+
+/**
+ * Story 1.2b: the run's member is always on the `auto` arm. Only `auto` serves
+ * the viewer's band, so only there can `location-capture.yaml` read the band a
+ * saved location resolves, and only there is the no-location notice reachable.
+ * A random signup lands on `all` half the time, which made that proof a coin
+ * flip (run 39881035993 shard 1). Signing up again until the arm is `auto` is
+ * bounded: twelve independent fair draws all landing on `all` is 1 in 4096.
+ *
+ * @param {string} apiBaseUrl
+ * @returns {Promise<string>}
+ */
+const signUpAutoArmMobileE2EMember = async (apiBaseUrl) => {
+  for (let attempt = 0; attempt < 12; attempt += 1) {
+    const signup = await requestJson(`${apiBaseUrl}/api/v1/auth/signup`, {
+      method: 'POST',
+      headers: { 'content-type': 'application/json' },
+      body: JSON.stringify({
+        email: `mobile-e2e-${randomUUID()}@example.com`,
+        birthdate: '2000-01-15',
+      }),
+    })
+    const userId = signup?.userId
+    if (typeof userId !== 'string' || userId.length === 0) {
+      throw new Error('Mobile E2E signup did not return a userId')
+    }
+    if (communityExperimentArm(userId) === 'auto') return userId
+  }
+  throw new Error('No auto-arm mobile E2E member after 12 signups; the arm hash changed.')
+}
+
+const setupMobileE2EIdentity = async (apiBaseUrl) => {
+  const userId = await signUpAutoArmMobileE2EMember(apiBaseUrl)
 
   const accessToken = buildMobileE2EAccessToken(userId)
   const authorization = `Bearer ${accessToken}`
   const identity = { accessToken, userId }
 
   try {
+    // The same place `restoreMobileE2EBaselineLocation` puts back after a flow
+    // that changes it, so every flow reads one baseline whatever ran before it.
     await requestJson(`${apiBaseUrl}/api/v1/locations`, {
       method: 'POST',
       headers: {
         authorization,
         'content-type': 'application/json',
       },
-      body: JSON.stringify({
-        label: 'Chicago',
-        locationKey: 'chicago-il',
-        latitude: 41.878,
-        longitude: -87.63,
-        timezone: 'America/Chicago',
-        city: 'Chicago',
-        region: 'Illinois',
-        country: 'United States',
-      }),
+      body: JSON.stringify(mobileE2EBaselineLocationRequestBody()),
     })
 
     await requestJson(`${apiBaseUrl}/api/v1/ritual?locale=en-US`, {
@@ -3020,6 +3311,12 @@ const buildMaestroFlowEnvArgs = () => [
   '-e',
   `REPLACEMENT_GARMENT_ID=${process.env.REPLACEMENT_GARMENT_ID ?? ''}`,
   '-e',
+  `LOCATION_SENTINEL_QUERY=${LOCATION_SENTINEL_QUERY}`,
+  '-e',
+  `LOCATION_SENTINEL_PLACE=${LOCATION_SENTINEL_PLACE_TEXT}`,
+  '-e',
+  `LOCATION_SENTINEL_TEMP_F=${LOCATION_SENTINEL_TEMP_F}`,
+  '-e',
   `APP_URL=${process.env.APP_URL}`,
   '-e',
   `WARDROBE_URL=${process.env.WARDROBE_URL}`,
@@ -3027,6 +3324,9 @@ const buildMaestroFlowEnvArgs = () => [
   `WIDGET_MORNING_URL=${process.env.WIDGET_MORNING_URL}`,
   '-e',
   `WIDGET_EVENING_URL=${process.env.WIDGET_EVENING_URL}`,
+  // Empty on iOS: `subflows/open-link.yaml` then keeps a plain `openLink`.
+  '-e',
+  `MAESTRO_EXPO_GO_OPEN_URL=${process.env.MAESTRO_EXPO_GO_OPEN_URL ?? ''}`,
 ]
 
 /**
@@ -3139,6 +3439,8 @@ const runShardedFlows = async (shardedFlows, target, maestroEnv, flowFailures) =
   // report is the evidence; the exit code only adds a failure the
   // report could not describe.
   let maestroExitError
+  // Same rule as the serial path: never read an earlier run's report (R28).
+  removeMaestroReport(parallelArgs)
   try {
     await runMaestroCommand(parallelArgs, {
       env: maestroEnv,
@@ -3163,7 +3465,9 @@ const runShardedFlows = async (shardedFlows, target, maestroEnv, flowFailures) =
 
 /**
  * Run one Maestro command, resetting its fixture before the initial attempt and
- * the single watchdog retry. User-scoped flows keep their existing seeded state.
+ * the single watchdog retry. User-scoped flows keep their seeded garments,
+ * capsule and alert; the reset clears only onboarding state, reactions and
+ * whatever the flow's own `FLOW_STATE_HOOKS` entry clears.
  *
  * @param {string[]} args
  * @param {SpawnProcessOptions} options
@@ -3172,10 +3476,36 @@ const runShardedFlows = async (shardedFlows, target, maestroEnv, flowFailures) =
  */
 const runMaestroCommandWithWatchdogRetry = async (args, options, label, reset) =>
   runMobileE2EFlow({
-    run: () => runMaestroCommand(args, options),
+    run: () => {
+      // Each attempt starts with no report on disk. A report left by an earlier
+      // run (or an earlier attempt) would otherwise be read as this attempt's
+      // outcome when Maestro is killed before writing one: locally a timed-out
+      // flow was judged by a stale passing report (Story 1.2b R28).
+      removeMaestroReport(args)
+      return runMaestroCommand(args, options)
+    },
     reset,
     onRetry: (error) => log(`RETRY ${label} (${error.message})`),
   })
+
+/**
+ * Delete the JUnit report a Maestro invocation is about to write.
+ *
+ * @param {string[]} args Maestro arguments, with the report after `--output`
+ * @returns {void}
+ */
+const removeMaestroReport = (args) => {
+  const index = args.indexOf('--output')
+  const reportPath = index >= 0 ? args[index + 1] : undefined
+  if (!reportPath) return
+  // Every same-named report under the artifact tree, not just this path: a
+  // missing report is looked up by basename (`resolveReportPath`), so a nested
+  // stale one could otherwise judge a killed attempt (R29).
+  removeReportEverywhere(
+    path.resolve(projectRoot, MAESTRO_ARTIFACT_DIR),
+    path.resolve(projectRoot, reportPath)
+  )
+}
 
 /**
  * Run the flows that cannot be sharded, one at a time on the first device.
@@ -3186,8 +3516,24 @@ const runMaestroCommandWithWatchdogRetry = async (args, options, label, reset) =
  * @param {string[]} flowFailures collected in place
  * @returns {Promise<void>}
  */
-const runUserScopedFlows = async (serialFlows, target, maestroEnv, flowFailures) => {
+const runUserScopedFlows = async (
+  serialFlows,
+  target,
+  maestroEnv,
+  flowFailures,
+  identity
+) => {
   for (const flowPath of serialFlows) {
+    const refusal = flowRefusals.get(flowPath)
+    if (refusal) {
+      failFlowWithCause(flowPath, refusal, flowFailures)
+      continue
+    }
+    const doubleWatch = await watchWeatherDouble(flowPath)
+    if (doubleWatch?.cause) {
+      failFlowWithCause(flowPath, doubleWatch.cause, flowFailures)
+      continue
+    }
     const serialArgs = [
       '--platform',
       target.platform,
@@ -3220,12 +3566,20 @@ const runUserScopedFlows = async (serialFlows, target, maestroEnv, flowFailures)
           timeoutMs: CI_FLOW_TIMEOUT_MS,
         },
         flowPath,
-        () => Promise.resolve()
+        identity
+          ? () => resetMobileE2EPerFlowState(identity, flowPath)
+          : () => Promise.resolve()
       )
+      flowPasses.add(flowPath)
       log(`PASS ${flowPath}`)
     } catch (error) {
       flowFailures.push(flowPath)
       log(`FAIL ${flowPath} (${error.message})`)
+    }
+    const restoreCause = await restoreMobileE2EStateOrCause(identity, flowPath)
+    const doubleCause = await doubleWatch?.verify?.()
+    for (const cause of [doubleCause, restoreCause]) {
+      if (cause) failFlowWithCause(flowPath, cause, flowFailures)
     }
   }
 }
@@ -3256,6 +3610,12 @@ const buildSingleFlowMaestroArgs = (flowPath, target) => {
       // Without this, concurrent shards all drive whichever simulator
       // Maestro picks first.
       maestroArgs.push('--udid', iosSimulatorUdid)
+    }
+    if (target.platform === 'android' && androidSerial) {
+      // The same for a chosen emulator: with a second one attached, Maestro
+      // would otherwise drive whichever it lists first, not the one every adb
+      // step of this run acted on.
+      maestroArgs.push('--udid', androidSerial)
     }
     maestroArgs.push('test')
     maestroArgs.push(...buildMaestroFlowEnvArgs())
@@ -3297,63 +3657,114 @@ const buildSingleFlowMaestroArgs = (flowPath, target) => {
  * @param {string} flowPath
  * @param {Error | undefined} maestroExitError
  * @param {string[]} flowFailures collected in place
+ * @param {number} [startedAtMs] when the flow's first attempt began
  * @returns {void}
  */
-const recordSingleFlowOutcome = (flowPath, maestroExitError, flowFailures) => {
+const recordSingleFlowOutcome = (
+  flowPath,
+  maestroExitError,
+  flowFailures,
+  startedAtMs
+) => {
   const failuresBefore = flowFailures.length
-  recordFlowOutcome(flowPath, maestroExitError, flowFailures)
+  recordFlowOutcome(flowPath, maestroExitError, flowFailures, startedAtMs)
   if (flowFailures.length > failuresBefore) captureAndroidWindowStack(flowPath)
 }
 
 /**
- * Save the Android window stack next to a failed flow's artifacts.
+ * Save the Android window stack, device log tail and process list next to a
+ * failed flow's artifacts.
  *
  * Expo Go sometimes dims the whole screen for a developer sheet that never
  * draws (CI runs 38934394685 and 38959860317). The dimming window is not in the
  * accessibility hierarchy Maestro records, so the screenshot and hierarchy
  * cannot say what it is. `dumpsys window windows` lists every window with its
- * owner, type and flags, which can. It carries window and package names only.
+ * owner, type and flags, which can. The device log can carry app output, like
+ * the `device-logcat.txt` Maestro itself saves for a finished flow; CI's
+ * artifact secret scan runs over all of it before upload.
  *
  * @param {string} flowPath
  * @returns {void}
  */
 const captureAndroidWindowStack = (flowPath) => {
   if (!WRITE_ARTIFACTS || IOS_UDIDS.length > 0) return
-  const result = spawnSync(
-    resolveAdbBinary(),
-    ['shell', 'dumpsys', 'window', 'windows'],
-    {
+  // Story 1.2b R28: a flow killed at its watchdog leaves no Maestro debug
+  // output, so the device side of the stall is captured here too. In CI job
+  // 120347100806 `community-feed.yaml` sat in Maestro's `pm clear` for both
+  // attempts while the next flow's clear took 1.6 s, and nothing recorded what
+  // the device was doing. The log tail and the process list (a blocked
+  // `pm clear` is still running there after Maestro is killed) say.
+  const captures = [
+    ['windows', ['shell', 'dumpsys', 'window', 'windows'], 'window stack'],
+    ['logcat', ['logcat', '-d', '-t', '4000'], 'device log tail'],
+    ['processes', ['shell', 'ps', '-A', '-o', 'PID,PPID,S,TIME,ARGS'], 'process list'],
+  ]
+  for (const [suffix, args, label] of captures) {
+    const result = spawnSync(resolveAdbBinary(), args, {
       encoding: 'utf8',
       timeout: 15_000,
+      maxBuffer: 64 * 1024 * 1024,
       env: androidSerial
         ? { ...process.env, ANDROID_SERIAL: androidSerial }
         : process.env,
+    })
+    if (result.status !== 0 || !result.stdout) {
+      log(`Could not capture the Android ${label} for ${flowPath}`)
+      continue
     }
-  )
-  if (result.status !== 0 || !result.stdout) {
-    log(`Could not capture the Android window stack for ${flowPath}`)
-    return
+    const target = path.join(
+      MAESTRO_ARTIFACT_DIR,
+      `${getFlowName(flowPath)}-${suffix}.txt`
+    )
+    // A write error is logged, never thrown: it must not stop the remaining
+    // flows or replace the failure it documents (R29).
+    saveDiagnostic(target, result.stdout, log, `the Android ${label} for ${flowPath}`)
   }
-  const target = path.join(MAESTRO_ARTIFACT_DIR, `${getFlowName(flowPath)}-windows.txt`)
-  fs.mkdirSync(path.dirname(target), { recursive: true })
-  fs.writeFileSync(target, result.stdout)
-  log(`Saved the Android window stack for ${flowPath} to ${target}`)
+}
+
+/**
+ * The last command Maestro started for a flow, from its newest debug log.
+ *
+ * @param {string} flowPath
+ * @param {number} [startedAtMs] ignore logs older than the flow's first attempt
+ * @returns {string | undefined}
+ */
+const lastMaestroCommandFor = (flowPath, startedAtMs) => {
+  try {
+    const title = flowTitleOf(fs.readFileSync(flowPath, 'utf8'))
+    // Only this flow's own run: an older log would name another run's step (R29).
+    const logFile =
+      title && newestFlowDebugLog(MAESTRO_ARTIFACT_DIR, title, { sinceMs: startedAtMs })
+    return logFile
+      ? lastStartedMaestroCommand(fs.readFileSync(logFile, 'utf8'))
+      : undefined
+  } catch {
+    return undefined
+  }
 }
 
 /**
  * @param {string} flowPath
  * @param {Error | undefined} maestroExitError
  * @param {string[]} flowFailures collected in place
+ * @param {number} [startedAtMs] when the flow's first attempt began
  * @returns {void}
  */
-const recordFlowOutcome = (flowPath, maestroExitError, flowFailures) => {
+const recordFlowOutcome = (flowPath, maestroExitError, flowFailures, startedAtMs) => {
   if (WRITE_ARTIFACTS) {
     const resolvedReportPath =
       resolveReportPath(getFlowReportPath(flowPath)) ?? getFlowReportPath(flowPath)
     const report = readSuiteReport(resolvedReportPath)
     if (report.unreadable) {
-      flowFailures.push(`${flowPath} (JUnit report unreadable: ${report.unreadable})`)
-      log(`FAIL ${flowPath} (JUnit report could not be read)`)
+      // A watchdog kill leaves no report; the kill is the failure (R28).
+      const failure = describeMissingReport(
+        flowPath,
+        report.unreadable,
+        maestroExitError,
+        lastMaestroCommandFor(flowPath, startedAtMs)
+      )
+      flowFailures.push(failure)
+      log(`FAIL ${failure}`)
     } else if (report.failed.length > 0) {
       flowFailures.push(flowPath)
       log(`FAIL ${flowPath} (${report.failed.join(', ')})`)
@@ -3392,9 +3803,20 @@ const recordFlowOutcome = (flowPath, maestroExitError, flowFailures) => {
  */
 const runFlowsSerially = async (target, maestroEnv, mobileIdentity, flowFailures) => {
   for (const flowPath of flowsToRun) {
+    const refusal = flowRefusals.get(flowPath)
+    if (refusal) {
+      failFlowWithCause(flowPath, refusal, flowFailures)
+      continue
+    }
+    const doubleWatch = await watchWeatherDouble(flowPath)
+    if (doubleWatch?.cause) {
+      failFlowWithCause(flowPath, doubleWatch.cause, flowFailures)
+      continue
+    }
     const { maestroArgs, maestroLogFile } = buildSingleFlowMaestroArgs(flowPath, target)
 
     log(`Running Maestro flow (${maestroArgs.join(' ')})`)
+    const flowStartedAt = Date.now()
     let maestroExitError
     try {
       await runMaestroCommandWithWatchdogRetry(
@@ -3406,14 +3828,19 @@ const runFlowsSerially = async (target, maestroEnv, mobileIdentity, flowFailures
         },
         flowPath,
         mobileIdentity
-          ? () => resetMobileE2EPerFlowState(mobileIdentity)
+          ? () => resetMobileE2EPerFlowState(mobileIdentity, flowPath)
           : () => Promise.resolve()
       )
     } catch (error) {
       maestroExitError = error
     }
+    const restoreCause = await restoreMobileE2EStateOrCause(mobileIdentity, flowPath)
+    const doubleCause = await doubleWatch?.verify?.()
 
-    recordSingleFlowOutcome(flowPath, maestroExitError, flowFailures)
+    recordSingleFlowOutcome(flowPath, maestroExitError, flowFailures, flowStartedAt)
+    for (const cause of [doubleCause, restoreCause]) {
+      if (cause) failFlowWithCause(flowPath, cause, flowFailures)
+    }
   }
 }
 
@@ -3441,6 +3868,9 @@ const USER_SCOPED_FLOWS = [
   'maestro/deep-link-handling.yaml',
   'maestro/garment-capsule-create-flow.yaml',
   'maestro/garment-capsule-repair-flow.yaml',
+  // Story 1.2b: removes and restores the member's saved locations around
+  // itself, which only the per-flow hooks of a serial run can do safely.
+  'maestro/location-capture.yaml',
 ]
 
 /**
@@ -3465,7 +3895,14 @@ const runParallelSuite = async (target, maestroEnv, mobileIdentities, flowFailur
     await runShardedFlows(shardedFlows, target, maestroEnv, flowFailures)
   }
 
-  await runUserScopedFlows(serialFlows, target, maestroEnv, flowFailures)
+  // The first shard device runs these; its identity is the first one created.
+  await runUserScopedFlows(
+    serialFlows,
+    target,
+    maestroEnv,
+    flowFailures,
+    mobileIdentities[0]
+  )
 }
 
 /**
@@ -3699,9 +4136,17 @@ const run = async () => {
       })
       mobileIdentity = await createMobileIdentities(apiSetupBaseUrl, mobileIdentities)
       applyMobileFixtureEnv(mobileIdentity, mobileApiBaseUrl)
+      await guardWeatherDoubleFlows(apiSetupBaseUrl, mobileIdentity.accessToken)
     } else if (!process.env.EXPO_PUBLIC_API_BASE_URL) {
       throw new Error(
         'MOBILE_E2E_SKIP_API=1 requires EXPO_PUBLIC_API_BASE_URL and an externally managed test identity.'
+      )
+    } else {
+      // The external API is held to the same proof, through the address the
+      // device uses; the emulator's alias for this machine is loopback here.
+      await guardWeatherDoubleFlows(
+        process.env.EXPO_PUBLIC_API_BASE_URL.replace('//10.0.2.2', '//127.0.0.1'),
+        process.env.EXPO_PUBLIC_E2E_ACCESS_TOKEN
       )
     }
   } catch (error) {
@@ -3734,6 +4179,48 @@ const run = async () => {
     applyExpoUrlEnv(resolvedPair, target.appId)
 
     await awaitExpoGoAndWarmBundle(target, resolvedPair.health)
+
+    // Story 1.2b R24: Android flows open deep links through this endpoint, which
+    // launches Expo Go with its developer-menu onboarding off. See
+    // scripts/lib/expo-go-link-endpoint.mjs. `MOBILE_E2E_EXPO_GO_ONBOARDING=show`
+    // keeps Expo Go's default, for comparing the two.
+    // R29: probe exactly the devices this run drives, and stop with a named
+    // error if one of them is missing or not ready, never skip it silently.
+    const androidDevices =
+      target.platform === 'android'
+        ? resolveProbeSerials(ANDROID_SERIALS, await adbDeviceStates(resolveAdbBinary()))
+        : []
+    // Story 1.2b R28: start no flow until each device's package manager answers
+    // `pm clear` promptly. See scripts/lib/package-manager-readiness.mjs.
+    for (const serial of androidDevices) {
+      // eslint-disable-next-line no-await-in-loop -- one device at a time
+      await waitForPackageManagerReady({
+        runProbe: (signal) =>
+          runAdb(
+            resolveAdbBinary(),
+            ['-s', serial, 'shell', 'pm', 'clear', target.appId],
+            signal
+          ),
+        onUnreadyProbe: (attempt) =>
+          captureSlowProbeState({
+            adbBinary: resolveAdbBinary(),
+            serial,
+            artifactDir: path.resolve(projectRoot, MAESTRO_ARTIFACT_DIR),
+            attempt,
+            log,
+          }),
+        log: (message) => log(`[${serial}] ${message}`),
+      })
+    }
+    const expoGoLinks =
+      target.platform === 'android'
+        ? await startExpoGoLinkEndpoint({
+            adbBinary: resolveAdbBinary(),
+            devices: androidDevices,
+            disableOnboarding: process.env.MOBILE_E2E_EXPO_GO_ONBOARDING !== 'show',
+          })
+        : undefined
+    process.env.MAESTRO_EXPO_GO_OPEN_URL = expoGoLinks?.url ?? ''
 
     const { maestroEnv, xcrunShimDir } = createMaestroEnv(target.platform)
 
@@ -3786,6 +4273,7 @@ const run = async () => {
 
       await runFlowsSerially(target, maestroEnv, mobileIdentity, flowFailures)
     } finally {
+      await expoGoLinks?.close()
       if (xcrunShimDir) {
         fs.rmSync(xcrunShimDir, { recursive: true, force: true })
       }

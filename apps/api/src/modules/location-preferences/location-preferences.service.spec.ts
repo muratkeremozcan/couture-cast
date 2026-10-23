@@ -1,5 +1,5 @@
 import { BadRequestException, NotFoundException } from '@nestjs/common'
-import { beforeEach, describe, expect, it, vi } from 'vitest'
+import { beforeEach, describe, expect, it, vi, type Mock } from 'vitest'
 import type { UpdateSavedLocationInput } from '../../contracts/http'
 
 import { LocationPreferencesService } from './location-preferences.service'
@@ -12,6 +12,8 @@ import {
   type UpdateSavedLocationCommand,
 } from './location-preferences.repository'
 import type { TelemetryService } from '../telemetry/telemetry.service'
+import type { WeatherRefreshPublisher } from '../weather/weather-refresh.queue'
+import type { WeatherRepository } from '../weather/weather.repository'
 
 const userId = 'user-1'
 
@@ -76,6 +78,7 @@ function createRepositoryStub() {
     }),
     findByLocationKeyForUser: vi.fn().mockResolvedValue(null),
     findManyByUserId: vi.fn().mockResolvedValue(locations),
+    recordSearch: vi.fn(),
     setPrimary: vi.fn().mockImplementation((_ownerId: string, id: string) => {
       if (locations.some((location) => location.id === id)) {
         return Promise.resolve(savedLocation({ id }))
@@ -96,12 +99,28 @@ describe('LocationPreferencesService', () => {
   let repository: ReturnType<typeof createRepositoryStub>
   let service: LocationPreferencesService
   let captureEvent: ReturnType<typeof vi.fn>
+  let findLatestByLocationKey: ReturnType<typeof vi.fn>
+  let enqueueLocationRefresh: Mock<WeatherRefreshPublisher['enqueueLocationRefresh']>
+  const now = new Date('2026-10-22T12:00:00.000Z')
 
   beforeEach(() => {
     repository = createRepositoryStub()
     captureEvent = vi.fn()
+    findLatestByLocationKey = vi.fn().mockResolvedValue(null)
+    enqueueLocationRefresh = vi
+      .fn<WeatherRefreshPublisher['enqueueLocationRefresh']>()
+      .mockResolvedValue(undefined)
     const telemetryService = { captureEvent } as unknown as TelemetryService
-    service = new LocationPreferencesService(repository, telemetryService)
+    service = new LocationPreferencesService(
+      repository,
+      telemetryService,
+      { findLatestByLocationKey } as unknown as Pick<
+        WeatherRepository,
+        'findLatestByLocationKey'
+      >,
+      { enqueueLocationRefresh },
+      { now: () => now }
+    )
   })
 
   it('creates the first saved location as primary with canonical key and rounded coordinates', async () => {
@@ -320,10 +339,66 @@ describe('LocationPreferencesService', () => {
     await service.setPrimary(userId, 'location-2')
 
     expect(repository.setPrimary).toHaveBeenCalledWith(userId, 'location-2')
-    expect(captureEvent).toHaveBeenCalledWith(userId, 'location_switched', {
-      userId,
-      fromLocation: 'home',
-      toLocation: 'chicago-il',
+    expect(captureEvent).toHaveBeenCalledWith(userId, 'location_switched', {})
+  })
+
+  // Story 1.2b: the switch event is pseudonymous; no place key may reach it.
+  it('captures location_switched with no place keys', async () => {
+    await service.setPrimary(userId, 'location-2')
+
+    expect(JSON.stringify(captureEvent.mock.calls)).not.toMatch(/home|chicago|office/i)
+  })
+
+  it.each([
+    ['absent', null],
+    ['older than five minutes', { fetched_at: new Date(now.getTime() - 5 * 60_000 - 1) }],
+  ])(
+    'enqueues a refresh when the new primary snapshot is %s',
+    async (_label, snapshot) => {
+      findLatestByLocationKey.mockResolvedValue(snapshot)
+
+      await service.setPrimary(userId, 'location-2')
+
+      expect(findLatestByLocationKey).toHaveBeenCalledWith('chicago-il')
+      expect(enqueueLocationRefresh).toHaveBeenCalledWith(
+        {
+          locationKey: 'chicago-il',
+          locationName: 'Chicago',
+          latitude: 41.878,
+          longitude: -87.63,
+        },
+        now
+      )
+    }
+  )
+
+  it('skips the refresh when the new primary snapshot is five minutes old or newer', async () => {
+    findLatestByLocationKey.mockResolvedValue({
+      fetched_at: new Date(now.getTime() - 5 * 60_000),
+    })
+
+    await service.setPrimary(userId, 'location-2')
+
+    expect(enqueueLocationRefresh).not.toHaveBeenCalled()
+  })
+
+  it('never fails the switch when the refresh enqueue fails or stalls', async () => {
+    // The spec's number, written out so a change to the production deadline fails.
+    /** A switch waits at most one second on its refresh enqueue. */
+    const REFRESH_ENQUEUE_DEADLINE_MS = 1000
+    vi.useFakeTimers()
+    try {
+      enqueueLocationRefresh.mockReturnValueOnce(new Promise(() => undefined))
+      const stalled = service.setPrimary(userId, 'location-2')
+      await vi.advanceTimersByTimeAsync(REFRESH_ENQUEUE_DEADLINE_MS)
+      await expect(stalled).resolves.toMatchObject({ id: 'location-2' })
+    } finally {
+      vi.useRealTimers()
+    }
+
+    enqueueLocationRefresh.mockRejectedValueOnce(new Error('redis down'))
+    await expect(service.setPrimary(userId, 'location-2')).resolves.toMatchObject({
+      id: 'location-2',
     })
   })
 
@@ -331,6 +406,38 @@ describe('LocationPreferencesService', () => {
     await service.deleteLocation(userId, 'location-1')
 
     expect(repository.delete).toHaveBeenCalledWith(userId, 'location-1')
+  })
+
+  it('refreshes the primary promoted by deleting the current one', async () => {
+    repository.delete.mockResolvedValueOnce(
+      savedLocation({ id: 'location-1', location_key: 'home', is_primary: true })
+    )
+    repository.findManyByUserId.mockResolvedValueOnce([
+      savedLocation({
+        id: 'location-2',
+        location_key: 'office-key',
+        city: '',
+        label: 'Office',
+        is_primary: true,
+      }),
+    ])
+
+    await service.deleteLocation(userId, 'location-1')
+
+    expect(enqueueLocationRefresh).toHaveBeenCalledWith(
+      expect.objectContaining({ locationKey: 'office-key', locationName: 'Office' }),
+      now
+    )
+  })
+
+  it('does not refresh when a non-primary location is deleted', async () => {
+    repository.delete.mockResolvedValueOnce(
+      savedLocation({ id: 'location-2', is_primary: false })
+    )
+
+    await service.deleteLocation(userId, 'location-2')
+
+    expect(enqueueLocationRefresh).not.toHaveBeenCalled()
   })
 
   it('throws NotFoundException if location to delete is not found', async () => {

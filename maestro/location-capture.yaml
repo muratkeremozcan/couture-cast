@@ -1,0 +1,160 @@
+# Story 1.2b: client location capture through the guided entry.
+#
+# The runner removes this member's saved locations before the flow and restores
+# the baseline Chicago location after it (`FLOW_STATE_HOOKS` in
+# scripts/run-maestro.mjs), so the hero opens on its no-location state. The E2E
+# API reaches the local weather provider double (scripts/weather-provider-double.mjs),
+# never a live provider: before the suite the runner proves the API sends a probe
+# search there, and refuses this flow otherwise.
+#
+# `LOCATION_SENTINEL_QUERY` (`Sentinel <per-run nonce>`) geocodes to
+# `LOCATION_SENTINEL_PLACE`, at coordinates derived from the nonce that no run
+# has saved. Its forecast carries the sentinel 31 C the ritual's synthetic test
+# weather (68 F) never produces; the runner passes it as
+# `LOCATION_SENTINEL_TEMP_F`, so the hero showing exactly that proves the ritual
+# consumed the forecast persisted at save. The double cannot tell one set of
+# coordinates from another by temperature, so the runner also reads the double's
+# request log after the flow and fails it unless this run's search reached the
+# double and a forecast was fetched at the sentinel place's own coordinates.
+appId: ${MAESTRO_APP_ID}
+name: 'Location capture guided entry'
+tags:
+  - e2e
+  - locations
+  - maestro
+---
+- launchApp:
+    appId: ${MAESTRO_APP_ID}
+    clearState: true
+    stopApp: false
+
+- runFlow: subflows/open-app.yaml
+
+# --- The hero explains the missing location and offers the guided action -----
+- extendedWaitUntil:
+    visible:
+      id: 'hero-no-location-state'
+    timeout: 30000
+    label: 'Hero opens on the no-location state'
+- tapOn:
+    id: 'hero-add-location'
+    label: 'Open Locations from the hero'
+
+# --- Search, pick and save -------------------------------------------------------
+- extendedWaitUntil:
+    visible:
+      id: 'locations-search-input'
+    timeout: 15000
+    label: 'Locations opened with the search field'
+- tapOn:
+    id: 'locations-search-input'
+- inputText: ${LOCATION_SENTINEL_QUERY}
+- extendedWaitUntil:
+    visible:
+      id: 'location-search-option-0'
+    timeout: 15000
+    label: 'The sentinel city is offered'
+- assertVisible:
+    id: 'location-search-option-0'
+    text: '${LOCATION_SENTINEL_PLACE}.*'
+    label: 'The first option is the sentinel place, not some other match'
+# iOS only. The soft keyboard there covers the lower screen. On Android Maestro
+# dismisses the keyboard with the back key, which pops this stacked screen
+# whenever no soft keyboard is up (a hardware-keyboard AVD), and the Locations
+# scroll view keeps taps on its buttons while the keyboard is up
+# (`keyboardShouldPersistTaps="handled"`), so Android needs no dismissal.
+- runFlow:
+    when:
+      platform: iOS
+    commands:
+      - hideKeyboard
+- tapOn:
+    id: 'location-search-option-0'
+    label: 'Pick the sentinel city'
+- extendedWaitUntil:
+    visible:
+      id: 'location-label-input'
+    timeout: 10000
+- tapOn:
+    id: 'location-label-input'
+# Picking a candidate prefills the label with its city (`Sentinelville`, 13
+# characters); 40 clears it with room to spare.
+- eraseText: 40
+- inputText: 'Home'
+- runFlow:
+    when:
+      platform: iOS
+    commands:
+      - hideKeyboard
+- tapOn:
+    id: 'location-save-button'
+    label: 'Save the location'
+
+# --- The save returns to the hero, which shows a ritual on the saved forecast ---
+- extendedWaitUntil:
+    visible:
+      id: 'outfit-recommendation-card'
+    timeout: 30000
+    label: 'Hero shows a ritual without a manual reload'
+- assertNotVisible:
+    id: 'hero-no-location-state'
+- assertVisible:
+    id: 'current-temperature'
+    text: '${LOCATION_SENTINEL_TEMP_F}°F'
+    label: 'The ritual reports the sentinel forecast, not the synthetic 68 F'
+- takeScreenshot:
+    path: maestro/artifacts/location-capture-hero
+
+# --- Community resolves the climate band ------------------------------------------
+# The runner's member is on the `auto` arm (`signUpAutoArmMobileE2EMember` in
+# scripts/run-maestro.mjs), and the chip names the band only while `auto` is the
+# active filter. Earlier flows may have left another filter selected, so the
+# flow selects `auto` first.
+- tapOn:
+    id: 'tab-community'
+    retryTapIfNoChange: true
+- extendedWaitUntil:
+    visible:
+      id: 'community-screen'
+    timeout: 20000
+- extendedWaitUntil:
+    visible:
+      id: 'community-filter-chip-auto'
+    timeout: 20000
+- tapOn:
+    id: 'community-filter-chip-auto'
+    label: 'Select the Your climate filter'
+- extendedWaitUntil:
+    visible:
+      id: 'community-filter-chip-auto'
+      text: 'Your climate: .*'
+    timeout: 20000
+    label: 'The auto chip names the resolved band'
+- assertNotVisible:
+    id: 'community-band-unresolved'
+
+# --- Settings lists the saved location as primary ----------------------------------
+- runFlow: subflows/open-settings.yaml
+- scrollUntilVisible:
+    element:
+      id: 'locations-link'
+    direction: DOWN
+    centerElement: true
+    timeout: 15000
+- tapOn:
+    id: 'locations-link'
+- extendedWaitUntil:
+    visible:
+      id: 'location-primary-badge-0'
+    timeout: 15000
+    label: 'The saved location is primary'
+- assertVisible:
+    id: 'location-label-0'
+    text: 'Home'
+- assertVisible:
+    text: '${LOCATION_SENTINEL_PLACE}, .*'
+    below:
+      id: 'location-label-0'
+    label: 'The saved row names the sentinel place the flow picked'
+- takeScreenshot:
+    path: maestro/artifacts/location-capture-settings

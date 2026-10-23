@@ -205,13 +205,24 @@ test.describe('Story 5.1 web settings affiliate opt-out', () => {
     // control becomes interactive. A disabled checkbox is out of the tab order, so
     // tabbing before this lands on the nav.
     await expect(optOutToggle(page)).toBeEnabled()
+    // The Locations section renders its search only once its own list read
+    // answers, which can land after the preferences read. Tabbing before then
+    // skips straight from the skip link to the toggle.
+    await expect(page.getByTestId('locations-section')).toHaveAttribute(
+      'data-state',
+      'ready'
+    )
 
     await log.step('Tab from the top of the document to the control')
-    // The skip link is the first focusable element in the layout and the checkbox is
-    // the first one inside `main`, so two presses is the whole path. The exact count
-    // is the point: a control reachable only after ten tabs is unusable.
+    // The skip link is the first focusable element in the layout. Story 1.2b put
+    // the Locations section first inside `main`, and for this member, who has no
+    // saved location, its only control is the city search, so three presses is
+    // the whole path. The exact count is the point: a control reachable only
+    // after ten tabs is unusable.
     await page.keyboard.press('Tab')
     await expect(page.getByRole('link', { name: 'Skip to main content' })).toBeFocused()
+    await page.keyboard.press('Tab')
+    await expect(page.getByRole('combobox', { name: 'Search for a city' })).toBeFocused()
     await page.keyboard.press('Tab')
     await expect(optOutToggle(page)).toBeFocused()
 

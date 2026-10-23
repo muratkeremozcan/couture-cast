@@ -4,6 +4,7 @@ import { fileURLToPath } from 'node:url'
 import { spawn } from 'node:child_process'
 import { config as loadEnv } from 'dotenv'
 import { applyLocalE2eDatabaseUrl, isLocalTestRun } from './local-e2e-database.mjs'
+import { isLoopbackUrl, loadLauncherEnv } from './lib/caller-owned-env.mjs'
 import {
   e2eStackLauncherPath,
   e2eStackRecordPath,
@@ -125,32 +126,43 @@ const shouldForceLocalEnv = (env.TEST_ENV ?? '').toLowerCase() === 'local'
 // getting it wrong: a `.env.local` that defined it would relabel a real-model
 // evidence run as a fixture one, and every artifact the run produced would
 // carry the wrong claim. No env file in this repository defines it today.
-// This carve-out reaches the launcher only. `apps/api/src/load-env.ts` repeats
-// the same `.env.local` override inside every child spawned below, over the
-// env handed to it, so a file default introduced later would still beat the
-// value passed through `spawn`. Closing that needs the same carve-out there.
-const explicitlyDisabled = Object.fromEntries(
-  Object.entries(env).filter(([, value]) => value === '')
-)
-const callerOwned = Object.fromEntries(
-  ['DATABASE_URL', 'COMMUNITY_NSFW_SCREENER']
-    .map((key) => [key, env[key]])
-    .filter(([, value]) => value)
-)
+// `apps/api/src/load-env.ts` repeats the same `.env.local` override inside
+// every child spawned below, so the keys kept here travel to the children in
+// `E2E_CALLER_OWNED_ENV_KEYS` and load-env keeps them too. Before that, an
+// explicit isolated `DATABASE_URL` reached the launcher's seed step while the
+// API and workers it spawned wrote to whatever `.env.local` named.
+//
+// The inherited loopback stack joins too (`inheritedLocalStackEnv`): a loopback
+// `REDIS_URL`, `SUPABASE_URL` with its keys, so an isolated local stack is
+// honoured while a remote URL inherited from the shell still loses to
+// `.env.local`, which is what the override exists for. The Playwright runner
+// above this script applies the same rule, so its workers agree with it.
+loadLauncherEnv(env, () => {
+  for (const file of rootEnvFiles) {
+    const fullPath = path.join(repoRoot, file)
+    if (!existsSync(fullPath)) continue
 
-for (const file of rootEnvFiles) {
-  const fullPath = path.join(repoRoot, file)
-  if (!existsSync(fullPath)) continue
+    loadEnv({
+      path: fullPath,
+      override: shouldForceLocalEnv && file === '.env.local',
+      processEnv: env,
+      quiet: true,
+    })
+  }
+})
 
-  loadEnv({
-    path: fullPath,
-    override: shouldForceLocalEnv && file === '.env.local',
-    processEnv: env,
-    quiet: true,
-  })
+// Story 1.2b: this stack must never reach a live weather provider. An origin
+// from the shell, `.env.local` or `.env` that is not loopback is refused here,
+// before anything is built or started, because the API honours the override
+// outside production and would send real geocoding and forecast calls there.
+const WEATHER_ORIGIN_KEYS = ['OPENWEATHER_API_ORIGIN', 'WEATHERAPI_API_ORIGIN']
+for (const key of WEATHER_ORIGIN_KEYS) {
+  if (env[key] && !isLoopbackUrl(env[key])) {
+    refuse(
+      `${key}=${env[key]} is not a loopback origin. The E2E stack only talks to the local weather provider double; unset it, or point it at a double on 127.0.0.1.`
+    )
+  }
 }
-
-Object.assign(env, explicitlyDisabled, callerOwned)
 
 // `.env.local` overrides this script's own `NODE_ENV` and `TEST_ENV` above, so
 // which environment the stack will declare itself to be is settled only here.
@@ -335,6 +347,50 @@ async function isUrlHealthy(url) {
   }
 }
 
+/**
+ * Story 1.2b: city search and the save-time forecast reach a local deterministic
+ * double, never a live provider. The API honours the origin overrides only
+ * outside production, and both lanes run with TEST_ENV=local. A caller that set
+ * its own loopback origins keeps them (non-loopback origins were refused at
+ * startup). When this launcher starts the double it also replaces both keys
+ * with a dummy, so a call that still went astray could not authenticate with
+ * a real key from `.env.local`. The four values join the caller-owned keys, or
+ * `apps/api/src/load-env.ts` would put the `.env.local` keys back in every child.
+ */
+async function startWeatherProviderDouble() {
+  if (env.OPENWEATHER_API_ORIGIN && env.WEATHERAPI_API_ORIGIN) {
+    console.log(
+      `[start-api-e2e-with-workers] Weather providers already point at ${env.OPENWEATHER_API_ORIGIN} and ${env.WEATHERAPI_API_ORIGIN}.`
+    )
+    return
+  }
+  const port = env.E2E_WEATHER_DOUBLE_PORT || '4010'
+  const origin = `http://127.0.0.1:${port}`
+  const { ready } = startManagedProcess(
+    'node',
+    ['scripts/weather-provider-double.mjs', '--port', port],
+    env,
+    repoRoot,
+    '"event":"ready"'
+  )
+  await ready
+  env.OPENWEATHER_API_ORIGIN = origin
+  env.WEATHERAPI_API_ORIGIN = origin
+  env.OPENWEATHER_API_KEY = 'e2e-weather-double-key'
+  env.WEATHERAPI_API_KEY = 'e2e-weather-double-key'
+  env.E2E_CALLER_OWNED_ENV_KEYS = [
+    ...new Set([
+      ...env.E2E_CALLER_OWNED_ENV_KEYS.split(',').filter(Boolean),
+      ...WEATHER_ORIGIN_KEYS,
+      'OPENWEATHER_API_KEY',
+      'WEATHERAPI_API_KEY',
+    ]),
+  ].join(',')
+  console.log(
+    `[start-api-e2e-with-workers] Weather provider double listening at ${origin}`
+  )
+}
+
 async function main() {
   console.log('[start-api-e2e-with-workers] Preparing database and application builds...')
   const reuseExistingWeb =
@@ -376,6 +432,8 @@ async function main() {
   } else {
     await runPreparation('npm', ['run', 'build', '--workspace', 'api'])
   }
+
+  await startWeatherProviderDouble()
 
   console.log(
     `[start-api-e2e-with-workers] Starting API, Wardrobe Worker and Community Worker with fixture garment tagging and ${evidenceMode} community screening...`

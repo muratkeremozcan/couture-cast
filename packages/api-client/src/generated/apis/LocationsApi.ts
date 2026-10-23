@@ -13,14 +13,22 @@
 
 import * as runtime from '../runtime'
 import type {
+  CreateSavedLocationFromSearchInput,
+  CreateSavedLocationFromSearchResponse,
   CreateSavedLocationInput,
   CreateSavedLocationResponse,
   DeleteSavedLocationResponse,
   ListSavedLocationsResponse,
+  LocationSearchResponse,
   SetPrimarySavedLocationResponse,
   UpdateSavedLocationInput,
   UpdateSavedLocationResponse,
 } from '../models/index'
+
+export interface ApiV1LocationsFromSearchPostRequest {
+  xCouturePlatform: ApiV1LocationsFromSearchPostXCouturePlatformEnum
+  createSavedLocationFromSearchInput: CreateSavedLocationFromSearchInput
+}
 
 export interface ApiV1LocationsLocationIdDeleteRequest {
   locationId: string
@@ -39,10 +47,98 @@ export interface ApiV1LocationsPostRequest {
   createSavedLocationInput: CreateSavedLocationInput
 }
 
+export interface ApiV1LocationsSearchGetRequest {
+  q: string
+  xCouturePlatform: ApiV1LocationsSearchGetXCouturePlatformEnum
+  locale?: ApiV1LocationsSearchGetLocaleEnum
+}
+
 /**
  *
  */
 export class LocationsApi extends runtime.BaseAPI {
+  /**
+   * Creates request options for apiV1LocationsFromSearchPost without sending the request
+   */
+  async apiV1LocationsFromSearchPostRequestOpts(
+    requestParameters: ApiV1LocationsFromSearchPostRequest
+  ): Promise<runtime.RequestOpts> {
+    if (requestParameters['xCouturePlatform'] == null) {
+      throw new runtime.RequiredError(
+        'xCouturePlatform',
+        'Required parameter "xCouturePlatform" was null or undefined when calling apiV1LocationsFromSearchPost().'
+      )
+    }
+
+    if (requestParameters['createSavedLocationFromSearchInput'] == null) {
+      throw new runtime.RequiredError(
+        'createSavedLocationFromSearchInput',
+        'Required parameter "createSavedLocationFromSearchInput" was null or undefined when calling apiV1LocationsFromSearchPost().'
+      )
+    }
+
+    const queryParameters: any = {}
+
+    const headerParameters: runtime.HTTPHeaders = {}
+
+    headerParameters['Content-Type'] = 'application/json'
+
+    if (requestParameters['xCouturePlatform'] != null) {
+      headerParameters['x-couture-platform'] = String(
+        requestParameters['xCouturePlatform']
+      )
+    }
+
+    if (this.configuration && this.configuration.accessToken) {
+      const token = this.configuration.accessToken
+      const tokenString = await token('bearerAuth', [])
+
+      if (tokenString) {
+        headerParameters['Authorization'] = `Bearer ${tokenString}`
+      }
+    }
+
+    let urlPath = `/api/v1/locations/from-search`
+
+    return {
+      path: urlPath,
+      method: 'POST',
+      headers: headerParameters,
+      query: queryParameters,
+      body: requestParameters['createSavedLocationFromSearchInput'],
+    }
+  }
+
+  /**
+   * Verifies the candidate token, fetches one forecast for the candidate coordinates (3-second timeout) for its IANA timezone, and persists that forecast as the location snapshot before saving. Coordinates, timezone and country never come from the client. Storage follows the saved-location rules: at most three, the first becomes primary, a duplicate key is refused.
+   * Save a searched city as a location
+   */
+  async apiV1LocationsFromSearchPostRaw(
+    requestParameters: ApiV1LocationsFromSearchPostRequest,
+    initOverrides?: RequestInit | runtime.InitOverrideFunction
+  ): Promise<runtime.ApiResponse<CreateSavedLocationFromSearchResponse>> {
+    const requestOptions =
+      await this.apiV1LocationsFromSearchPostRequestOpts(requestParameters)
+    const response = await this.request(requestOptions, initOverrides)
+
+    return new runtime.JSONApiResponse(response)
+  }
+
+  /**
+   * Verifies the candidate token, fetches one forecast for the candidate coordinates (3-second timeout) for its IANA timezone, and persists that forecast as the location snapshot before saving. Coordinates, timezone and country never come from the client. Storage follows the saved-location rules: at most three, the first becomes primary, a duplicate key is refused.
+   * Save a searched city as a location
+   */
+  async apiV1LocationsFromSearchPost(
+    requestParameters: ApiV1LocationsFromSearchPostRequest,
+    initOverrides?: RequestInit | runtime.InitOverrideFunction
+  ): Promise<CreateSavedLocationFromSearchResponse> {
+    const response = await this.apiV1LocationsFromSearchPostRaw(
+      requestParameters,
+      initOverrides
+    )
+    return await response.value()
+  }
+
   /**
    * Creates request options for apiV1LocationsGet without sending the request
    */
@@ -368,4 +464,127 @@ export class LocationsApi extends runtime.BaseAPI {
     const response = await this.apiV1LocationsPostRaw(requestParameters, initOverrides)
     return await response.value()
   }
+
+  /**
+   * Creates request options for apiV1LocationsSearchGet without sending the request
+   */
+  async apiV1LocationsSearchGetRequestOpts(
+    requestParameters: ApiV1LocationsSearchGetRequest
+  ): Promise<runtime.RequestOpts> {
+    if (requestParameters['q'] == null) {
+      throw new runtime.RequiredError(
+        'q',
+        'Required parameter "q" was null or undefined when calling apiV1LocationsSearchGet().'
+      )
+    }
+
+    if (requestParameters['xCouturePlatform'] == null) {
+      throw new runtime.RequiredError(
+        'xCouturePlatform',
+        'Required parameter "xCouturePlatform" was null or undefined when calling apiV1LocationsSearchGet().'
+      )
+    }
+
+    const queryParameters: any = {}
+
+    if (requestParameters['q'] != null) {
+      queryParameters['q'] = requestParameters['q']
+    }
+
+    if (requestParameters['locale'] != null) {
+      queryParameters['locale'] = requestParameters['locale']
+    }
+
+    const headerParameters: runtime.HTTPHeaders = {}
+
+    if (requestParameters['xCouturePlatform'] != null) {
+      headerParameters['x-couture-platform'] = String(
+        requestParameters['xCouturePlatform']
+      )
+    }
+
+    if (this.configuration && this.configuration.accessToken) {
+      const token = this.configuration.accessToken
+      const tokenString = await token('bearerAuth', [])
+
+      if (tokenString) {
+        headerParameters['Authorization'] = `Bearer ${tokenString}`
+      }
+    }
+
+    let urlPath = `/api/v1/locations/search`
+
+    return {
+      path: urlPath,
+      method: 'GET',
+      headers: headerParameters,
+      query: queryParameters,
+    }
+  }
+
+  /**
+   * Returns at most five city candidates from the configured provider geocoding. Each candidate carries a signed, identity-free candidateToken valid for 15 minutes. The query text is never logged or sent to analytics.
+   * Search cities through the configured weather provider
+   */
+  async apiV1LocationsSearchGetRaw(
+    requestParameters: ApiV1LocationsSearchGetRequest,
+    initOverrides?: RequestInit | runtime.InitOverrideFunction
+  ): Promise<runtime.ApiResponse<LocationSearchResponse>> {
+    const requestOptions =
+      await this.apiV1LocationsSearchGetRequestOpts(requestParameters)
+    const response = await this.request(requestOptions, initOverrides)
+
+    return new runtime.JSONApiResponse(response)
+  }
+
+  /**
+   * Returns at most five city candidates from the configured provider geocoding. Each candidate carries a signed, identity-free candidateToken valid for 15 minutes. The query text is never logged or sent to analytics.
+   * Search cities through the configured weather provider
+   */
+  async apiV1LocationsSearchGet(
+    requestParameters: ApiV1LocationsSearchGetRequest,
+    initOverrides?: RequestInit | runtime.InitOverrideFunction
+  ): Promise<LocationSearchResponse> {
+    const response = await this.apiV1LocationsSearchGetRaw(
+      requestParameters,
+      initOverrides
+    )
+    return await response.value()
+  }
 }
+
+/**
+ * @export
+ */
+export const ApiV1LocationsFromSearchPostXCouturePlatformEnum = {
+  web: 'web',
+  mobile: 'mobile',
+} as const
+export type ApiV1LocationsFromSearchPostXCouturePlatformEnum =
+  (typeof ApiV1LocationsFromSearchPostXCouturePlatformEnum)[keyof typeof ApiV1LocationsFromSearchPostXCouturePlatformEnum]
+/**
+ * @export
+ */
+export const ApiV1LocationsSearchGetXCouturePlatformEnum = {
+  web: 'web',
+  mobile: 'mobile',
+} as const
+export type ApiV1LocationsSearchGetXCouturePlatformEnum =
+  (typeof ApiV1LocationsSearchGetXCouturePlatformEnum)[keyof typeof ApiV1LocationsSearchGetXCouturePlatformEnum]
+/**
+ * @export
+ */
+export const ApiV1LocationsSearchGetLocaleEnum = {
+  en_US: 'en-US',
+  en_CA: 'en-CA',
+  es_419: 'es-419',
+  fr_CA: 'fr-CA',
+  fr_FR: 'fr-FR',
+  tr_TR: 'tr-TR',
+  de_DE: 'de-DE',
+  it_IT: 'it-IT',
+  pt_BR: 'pt-BR',
+  pt_PT: 'pt-PT',
+} as const
+export type ApiV1LocationsSearchGetLocaleEnum =
+  (typeof ApiV1LocationsSearchGetLocaleEnum)[keyof typeof ApiV1LocationsSearchGetLocaleEnum]

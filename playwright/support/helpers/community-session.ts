@@ -553,7 +553,7 @@ async function deleteCommunityStorageObjects(objectPaths: string[]): Promise<voi
  * issues an unscoped `deleteMany` against `AlertCooldownReservation` that a
  * community spec has no business doing to a shared database.
  */
-async function deleteCommunityRowsForUser(userId: string): Promise<void> {
+export async function deleteCommunityRowsForUser(userId: string): Promise<void> {
   const prisma = new PrismaClient({
     datasources: { db: { url: cleanupDatabaseUrl } },
   })

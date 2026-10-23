@@ -3,6 +3,8 @@ import { ConfiguredWeatherIngestionTargetSchema } from './weather.schemas.js'
 
 const WeatherProviderModeSchema = z.enum(['openweather', 'weatherapi'])
 
+export type WeatherProviderMode = z.infer<typeof WeatherProviderModeSchema>
+
 // Story 5.5 Decision 3: WeatherAPI's `days` param accepts 1-14, gated by the
 // provisioned plan. Default `3` matches the depth already proven safe in
 // production; deployed environments raise it to `8` (the planner's own cap)
@@ -27,7 +29,7 @@ export interface WeatherConfig {
   openWeatherApiKey?: string
   weatherApiKey?: string
   refreshMinutes: number
-  providerMode: z.infer<typeof WeatherProviderModeSchema>
+  providerMode: WeatherProviderMode
   ingestionTargets: z.infer<typeof ConfiguredWeatherIngestionTargetSchema>[]
   weatherApiForecastDays: number
 }
@@ -88,4 +90,20 @@ export function loadWeatherConfig(env: NodeJS.ProcessEnv = process.env): Weather
     ingestionTargets: targetResult.data,
     weatherApiForecastDays: environmentResult.data.WEATHERAPI_FORECAST_DAYS,
   }
+}
+
+/**
+ * Story 1.2b: the configured provider for city search and the save-time
+ * forecast. Unset means OpenWeather; an unknown value is a configuration error.
+ */
+export function resolveWeatherProviderMode(
+  env: Readonly<NodeJS.ProcessEnv> = process.env
+): WeatherProviderMode {
+  const parsed = WeatherProviderModeSchema.default('openweather').safeParse(
+    env.WEATHER_PROVIDER_MODE
+  )
+  if (!parsed.success) {
+    throw new WeatherConfigError(['WEATHER_PROVIDER_MODE'])
+  }
+  return parsed.data
 }

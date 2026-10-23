@@ -8,6 +8,7 @@
 /* eslint-disable @typescript-eslint/await-thenable */
 import { act, fireEvent, screen, waitFor } from '@testing-library/react'
 import { render } from 'vitest-browser-react'
+import { userEvent } from 'vitest/browser'
 import { afterEach, beforeEach, beforeAll, describe, expect, it, vi } from 'vitest'
 import type * as PremiumModule from '../lib/premium'
 
@@ -116,6 +117,7 @@ import i18n, { initI18n } from '../lib/i18n'
 import { mockSubscriptionNone } from '../test-utils/msw/handlers'
 import { getSavedSettings } from '../lib/settings-storage'
 import { setMobileAnalyticsDiagnosticsEnabled } from '../analytics/mobile-analytics-diagnostics'
+import { router } from 'expo-router'
 import SettingsScreen, { API_HEALTH_TIMEOUT_MS } from '../../app/(tabs)/settings'
 
 const SUBPIXEL_ROUNDING_SLACK_PX = 2
@@ -174,6 +176,15 @@ describe('SettingsScreen', () => {
     expect(screen.queryByText(/API health/)).toBeNull()
     expect(screen.queryByText(/alert_received/)).toBeNull()
     expect(loadMobileApiHealthMock).not.toHaveBeenCalled()
+  })
+
+  it('1.2b-MOB-SETTINGS-01 opens Locations from its Settings row', async () => {
+    // Switching primary takes two taps from Settings: this row, then Make primary.
+    await render(<SettingsScreen />)
+
+    await userEvent.click(await screen.findByRole('link', { name: 'Locations' }))
+
+    expect(vi.mocked(router.push)).toHaveBeenCalledWith('/locations')
   })
 
   it('renders API health loaded from the generated client', async () => {

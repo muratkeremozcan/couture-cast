@@ -101,6 +101,8 @@ export const workerOnlyTables = [
   // Story 6.6: the spotlight invalidator cursor and the per-member read window.
   'CommunitySpotlightCursor',
   'CommunitySpotlightReadWindow',
+  // Story 1.2b: the per-member city search window.
+  'LocationSearchWindow',
 ] as const
 
 export const selfOnlyTables = [

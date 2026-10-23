@@ -1,6 +1,8 @@
 import {
   configureProviderEngagementState,
+  configureProviderLocationState,
   type ProviderEngagementScenario,
+  type ProviderLocationScenario,
 } from './state'
 import type { VerifierOptions } from '@pact-foundation/pact'
 import type {
@@ -88,7 +90,59 @@ type PremiumThemeStateParams = {
   theme?: PremiumThemeKey
 }
 
+/**
+ * Builds the location world the state names. What it returns is also the
+ * provider-state injected values: `candidateToken` replaces the consumer's
+ * `fromProviderState('${candidateToken}', ...)` example with a token the real
+ * service signed for this world.
+ */
+const locationState =
+  (scenario: ProviderLocationScenario, description: string) => (parameters?: unknown) => {
+    const { userId } = (parameters ?? {}) as { userId?: string }
+    const injected = configureProviderLocationState({ userId, scenario })
+    return Promise.resolve({ description, ...injected })
+  }
+
 export const stateHandlers: StateHandlers = {
+  /* ----------------------------------------------------------------------- *
+   * Story 1.2b client location capture.
+   * ----------------------------------------------------------------------- */
+  'A city search returns candidates for user': locationState(
+    'search-candidates',
+    'Configured a city search with one candidate'
+  ),
+  'The user has no saved locations': locationState(
+    'no-locations',
+    'Configured an empty saved-location collection'
+  ),
+  'The user holds an expired location candidate': locationState(
+    'expired-candidate',
+    'Minted a candidate, then moved the clock past its 15-minute lifetime'
+  ),
+  'The user has three saved locations': locationState(
+    'three-locations',
+    'Seeded three saved locations other than the candidate'
+  ),
+  'The user has two saved locations': locationState(
+    'two-locations',
+    "Seeded two saved locations and another member's location"
+  ),
+  'The user already saved this searched location': locationState(
+    'duplicate-location',
+    "Seeded a saved location with the candidate's location key"
+  ),
+  'The user has used the city search allowance for this minute': locationState(
+    'search-limit-reached',
+    'Seeded 30 searches in the current one-minute window'
+  ),
+  'The location provider is unavailable for user': locationState(
+    'provider-unavailable',
+    'Configured a geocoding and forecast outage'
+  ),
+  'Location capture is not configured': locationState(
+    'capture-unconfigured',
+    'Unset LOCATION_CANDIDATE_SECRET outside a test runtime'
+  ),
   /* ----------------------------------------------------------------------- *
    * Story 4.3 outfit capsules.
    * Deterministic states: the provider is configured to present a known

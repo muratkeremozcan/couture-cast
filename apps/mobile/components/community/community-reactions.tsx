@@ -41,6 +41,9 @@ export function CommunityReactions({
               disabled: pending || canRetry,
               busy: pending,
             }}
+            // react-native-web 0.21 drops `accessibilityState.busy`; the aria
+            // mirror is what reaches the DOM.
+            aria-busy={pending}
             disabled={pending || canRetry}
             onPress={() => {
               onSubmit(id)

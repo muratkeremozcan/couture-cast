@@ -883,5 +883,50 @@
       "announceLoadedMore_other": "Mais {{count}} visuais em destaque carregados.",
       "announceRefreshed": "Os destaques da cidade foram atualizados com a classificação mais recente."
     }
+  },
+  "locations": {
+    "title": "Locais",
+    "intro": "Guarde até três locais. O seu local principal define os seus coordenados diários e o clima da sua comunidade.",
+    "count": "{{count}} de 3 guardados",
+    "empty": "Ainda não tem locais guardados. Pesquise uma cidade para adicionar um.",
+    "signedOutHint": "Inicie sessão para gerir os seus locais.",
+    "loadError": "Não foi possível carregar os seus locais.",
+    "primary": "Principal",
+    "makePrimary": "Definir como principal",
+    "rename": "Mudar o nome",
+    "renameField": "Novo nome",
+    "renameSave": "Guardar nome",
+    "cancel": "Cancelar",
+    "delete": "Eliminar",
+    "deleteConfirm": "Eliminar {{label}}?",
+    "deleteConfirmAction": "Sim, eliminar",
+    "searchLabel": "Pesquisar uma cidade",
+    "searchHint": "Escreva pelo menos duas letras.",
+    "searching": "A pesquisar...",
+    "resultCount": "Resultados: {{count}}",
+    "noResults": "Nenhuma cidade corresponde a esta pesquisa.",
+    "selected": "Selecionado: {{place}}",
+    "labelField": "Dê um nome a este local",
+    "save": "Guardar local",
+    "saving": "A guardar...",
+    "saved": "{{label}} guardado.",
+    "primaryChanged": "{{label}} é agora o seu local principal.",
+    "renamed": "Nome alterado para {{label}}.",
+    "deleted": "{{label}} eliminado.",
+    "limit": "Guardou três locais. Elimine um para adicionar outro.",
+    "retry": "Tentar novamente",
+    "guided": {
+      "add": "Adicionar um local"
+    },
+    "errors": {
+      "provider_unavailable": "A pesquisa de cidades está temporariamente indisponível. Tente novamente.",
+      "save_unavailable": "Não foi possível guardar esta cidade agora. Tente novamente.",
+      "service_unavailable": "Os locais estão temporariamente indisponíveis. Tente mais tarde.",
+      "invalid_candidate": "Esse resultado expirou. Pesquise novamente.",
+      "duplicate": "Esse local já está guardado.",
+      "rate_limited": "Demasiadas pesquisas. Aguarde um momento e tente novamente.",
+      "invalid_query": "Escreva entre 2 e 80 caracteres.",
+      "unknown": "Algo correu mal. Tente novamente."
+    }
   }
 }

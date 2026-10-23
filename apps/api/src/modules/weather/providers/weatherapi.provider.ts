@@ -10,6 +10,7 @@ import {
   WeatherProviderError,
 } from './weather-provider.error.js'
 import type { IWeatherProvider } from './weather-provider.interface.js'
+import { resolveWeatherProviderOrigin } from './weather-provider-origin.js'
 import { WeatherApiForecastDaysSchema } from './weather.config.js'
 import {
   type WeatherApiForecastDaySchema,
@@ -29,7 +30,7 @@ import type {
 } from './weather.types.js'
 
 const PROVIDER = 'weatherapi' as const
-const DEFAULT_BASE_URL = 'https://api.weatherapi.com/v1/forecast.json'
+const FORECAST_PATH = '/v1/forecast.json'
 const LOCATION_TOLERANCE_DEGREES = 0.02
 
 function longitudeDistance(left: number, right: number): number {
@@ -54,7 +55,9 @@ export class WeatherApiProvider implements IWeatherProvider {
   constructor(options: WeatherApiProviderOptions = {}) {
     const env = options.env ?? process.env
     this.apiKey = options.apiKey ?? env.WEATHERAPI_API_KEY ?? ''
-    this.baseUrl = options.baseUrl ?? DEFAULT_BASE_URL
+    this.baseUrl =
+      options.baseUrl ??
+      `${resolveWeatherProviderOrigin('weatherapi', env)}${FORECAST_PATH}`
     this.forecastDays =
       options.forecastDays ??
       WeatherApiForecastDaysSchema.parse(env.WEATHERAPI_FORECAST_DAYS)

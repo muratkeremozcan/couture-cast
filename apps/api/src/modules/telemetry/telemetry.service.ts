@@ -9,6 +9,12 @@ import {
   trackForecastViewed,
   trackAlertSent,
   trackLocationSwitched,
+  trackLocationSaved,
+  trackLocationSearchFailed,
+  locationSavedEventSchema,
+  locationSearchFailedEventSchema,
+  type LocationSavedEvent,
+  type LocationSearchFailedEvent,
   trackApiErrorOccurred,
   trackGarmentUploadCompleted,
   trackGarmentTaggingCompleted,
@@ -110,12 +116,11 @@ export interface TelemetryPropertiesMap {
     severity: 'info' | 'warning' | 'critical'
     channel: 'realtime' | 'push'
   } & Record<string, unknown>
-  location_switched: {
-    fromLocation: string | null
-    from_location?: string | null
-    toLocation: string
-    to_location?: string
-  } & Record<string, unknown>
+  /**
+   * Story 1.2b. Pseudonymous with no properties: callers pass the raw user id as
+   * `captureEvent`'s first argument and the HMAC subject is derived here.
+   */
+  location_switched: Record<string, never>
   api_error_occurred: {
     route?: string
     endpoint?: string
@@ -252,6 +257,9 @@ export interface TelemetryPropertiesMap {
   /** Story 6.6. Closed properties only: platform, dedupe key, level, count or rank. */
   community_spotlight_viewed: Omit<CommunitySpotlightViewedEvent, 'analyticsSubjectId'>
   community_spotlight_opened: Omit<CommunitySpotlightOpenedEvent, 'analyticsSubjectId'>
+  /** Story 1.2b. Closed properties only: platform, outcome, result count. */
+  location_saved: Omit<LocationSavedEvent, 'analyticsSubjectId'>
+  location_search_failed: Omit<LocationSearchFailedEvent, 'analyticsSubjectId'>
 }
 
 /**
@@ -316,6 +324,14 @@ const communitySpotlightViewedInputSchema = communitySpotlightViewedEventSchema
   .omit({ analyticsSubjectId: true })
   .strict()
 
+const locationSavedInputSchema = locationSavedEventSchema
+  .omit({ analyticsSubjectId: true })
+  .strict()
+
+const locationSearchFailedInputSchema = locationSearchFailedEventSchema
+  .omit({ analyticsSubjectId: true })
+  .strict()
+
 const communitySpotlightOpenedInputSchema = communitySpotlightOpenedEventSchema
   .omit({ analyticsSubjectId: true })
   .strict()
@@ -355,7 +371,7 @@ const telemetryValidators: Record<keyof TelemetryPropertiesMap, z.ZodSchema> = {
     severity: z.enum(['info', 'warning', 'critical']),
     channel: z.enum(['realtime', 'push']),
   }),
-  location_switched: z.object({}),
+  location_switched: z.object({}).strict(),
   api_error_occurred: z.object({
     method: z.string(),
   }),
@@ -391,6 +407,8 @@ const telemetryValidators: Record<keyof TelemetryPropertiesMap, z.ZodSchema> = {
   community_challenge_participated: communityChallengeParticipatedInputSchema,
   community_spotlight_viewed: communitySpotlightViewedInputSchema,
   community_spotlight_opened: communitySpotlightOpenedInputSchema,
+  location_saved: locationSavedInputSchema,
+  location_search_failed: locationSearchFailedInputSchema,
 }
 
 export function requireAnalyticsIdSecret(): string {
@@ -507,16 +525,48 @@ function buildAlertSent(
   })
 }
 
+function requireLocationTelemetryUser(userId: string | null): string {
+  const rawUserId = getString(userId)
+  if (!rawUserId) {
+    throw new Error('Location telemetry requires an authenticated user')
+  }
+  return rawUserId
+}
+
 function buildLocationSwitched(
-  userId: string,
-  props: Record<string, unknown>,
-  timestamp: string
+  userId: string | null,
+  _props: Record<string, unknown>,
+  analyticsIdSecret: string
 ): PostHogPayload {
   return trackLocationSwitched({
-    userId,
-    fromLocation: getStringOrNull(props['fromLocation'] ?? props['from_location']),
-    toLocation: getString(props['toLocation'] ?? props['to_location']),
-    timestamp,
+    analyticsSubjectId: buildAnalyticsSubjectId(
+      requireLocationTelemetryUser(userId),
+      analyticsIdSecret
+    ),
+  })
+}
+
+function buildLocationSaved(
+  userId: string | null,
+  props: Record<string, unknown>,
+  analyticsIdSecret: string
+): PostHogPayload {
+  const rawUserId = requireLocationTelemetryUser(userId)
+  return trackLocationSaved({
+    ...locationSavedInputSchema.parse(props),
+    analyticsSubjectId: buildAnalyticsSubjectId(rawUserId, analyticsIdSecret),
+  })
+}
+
+function buildLocationSearchFailed(
+  userId: string | null,
+  props: Record<string, unknown>,
+  analyticsIdSecret: string
+): PostHogPayload {
+  const rawUserId = requireLocationTelemetryUser(userId)
+  return trackLocationSearchFailed({
+    ...locationSearchFailedInputSchema.parse(props),
+    analyticsSubjectId: buildAnalyticsSubjectId(rawUserId, analyticsIdSecret),
   })
 }
 
@@ -1018,6 +1068,9 @@ const PSEUDONYMOUS_EVENT_TYPES: ReadonlySet<AnalyticsEventName> = new Set([
   'community_challenge_participated',
   'community_spotlight_viewed',
   'community_spotlight_opened',
+  'location_switched',
+  'location_saved',
+  'location_search_failed',
 ])
 
 const pseudonymousEventBuilders: Partial<
@@ -1053,6 +1106,9 @@ const pseudonymousEventBuilders: Partial<
   community_challenge_participated: buildCommunityChallengeParticipated,
   community_spotlight_viewed: buildCommunitySpotlightViewed,
   community_spotlight_opened: buildCommunitySpotlightOpened,
+  location_switched: buildLocationSwitched,
+  location_saved: buildLocationSaved,
+  location_search_failed: buildLocationSearchFailed,
 }
 
 const eventBuilders: Partial<
@@ -1066,7 +1122,6 @@ const eventBuilders: Partial<
     buildFirstOutfitGenerated(getString(uid ?? ''), p, ts),
   forecast_viewed: (uid, p, ts) => buildForecastViewed(getString(uid ?? ''), p, ts),
   alert_sent: (uid, p, ts) => buildAlertSent(getString(uid ?? ''), p, ts),
-  location_switched: (uid, p, ts) => buildLocationSwitched(getString(uid ?? ''), p, ts),
   api_error_occurred: (uid, p, ts) => buildApiErrorOccurred(uid, p, ts),
 }
 

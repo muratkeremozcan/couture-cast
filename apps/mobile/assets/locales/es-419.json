@@ -883,5 +883,50 @@
       "announceLoadedMore_other": "Se cargaron {{count}} looks destacados más.",
       "announceRefreshed": "Los destacados de la ciudad se actualizaron con la clasificación más reciente."
     }
+  },
+  "locations": {
+    "title": "Ubicaciones",
+    "intro": "Guarda hasta tres lugares. Tu ubicación principal define tus atuendos diarios y el clima de tu comunidad.",
+    "count": "{{count}} de 3 guardadas",
+    "empty": "Aún no tienes ubicaciones guardadas. Busca una ciudad para agregar una.",
+    "signedOutHint": "Inicia sesión para administrar tus ubicaciones.",
+    "loadError": "No se pudieron cargar tus ubicaciones.",
+    "primary": "Principal",
+    "makePrimary": "Hacer principal",
+    "rename": "Cambiar nombre",
+    "renameField": "Nombre nuevo",
+    "renameSave": "Guardar nombre",
+    "cancel": "Cancelar",
+    "delete": "Eliminar",
+    "deleteConfirm": "¿Eliminar {{label}}?",
+    "deleteConfirmAction": "Sí, eliminar",
+    "searchLabel": "Busca una ciudad",
+    "searchHint": "Escribe al menos dos letras.",
+    "searching": "Buscando...",
+    "resultCount": "Resultados: {{count}}",
+    "noResults": "Ninguna ciudad coincide con esa búsqueda.",
+    "selected": "Seleccionada: {{place}}",
+    "labelField": "Ponle nombre a este lugar",
+    "save": "Guardar ubicación",
+    "saving": "Guardando...",
+    "saved": "{{label}} guardada.",
+    "primaryChanged": "{{label}} ahora es tu ubicación principal.",
+    "renamed": "Nuevo nombre: {{label}}.",
+    "deleted": "{{label}} eliminada.",
+    "limit": "Ya guardaste tres ubicaciones. Elimina una para agregar otra.",
+    "retry": "Intentar de nuevo",
+    "guided": {
+      "add": "Agregar una ubicación"
+    },
+    "errors": {
+      "provider_unavailable": "La búsqueda de ciudades no está disponible por ahora. Intenta de nuevo.",
+      "save_unavailable": "No pudimos guardar esta ciudad por ahora. Intenta de nuevo.",
+      "service_unavailable": "Las ubicaciones no están disponibles por ahora. Intenta más tarde.",
+      "invalid_candidate": "Ese resultado venció. Busca de nuevo.",
+      "duplicate": "Esa ubicación ya está guardada.",
+      "rate_limited": "Demasiadas búsquedas. Espera un momento e intenta de nuevo.",
+      "invalid_query": "Escribe entre 2 y 80 caracteres.",
+      "unknown": "Algo salió mal. Intenta de nuevo."
+    }
   }
 }

@@ -237,6 +237,7 @@ function RootLayoutNav() {
                 name="notification-settings"
                 options={{ title: t('community.notifications.title') }}
               />
+              <Stack.Screen name="locations" options={{ title: t('locations.title') }} />
             </Stack>
           </ThemeProvider>
         </AppThemeProvider>
