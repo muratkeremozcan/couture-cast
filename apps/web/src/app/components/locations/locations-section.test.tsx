@@ -200,12 +200,12 @@ describe('LocationsSection', () => {
   let saved: SavedLocation[]
   let user: UserEvent
 
-  beforeEach(() => {
+  beforeEach(async () => {
     saved = []
     searchParams = new URLSearchParams()
     push.mockClear()
     user = userEvent.setup()
-    void getI18n().changeLanguage('en-US')
+    await getI18n().changeLanguage('en-US')
   })
 
   afterEach(() => {
@@ -488,7 +488,7 @@ describe('LocationsSection', () => {
     ).toHaveTextContent('Studio')
 
     await user.click(screen.getByRole('button', { name: 'Delete, Home' }))
-    expect(screen.getByText('Delete Home?')).toBeInTheDocument()
+    expect(screen.getAllByTestId('location-item')[0]).toHaveTextContent('Delete Home?')
     await user.click(screen.getByRole('button', { name: 'Yes, delete' }))
     await waitFor(() => expect(status().textContent).toBe('Home deleted.'))
     const items = screen.getAllByTestId('location-item')

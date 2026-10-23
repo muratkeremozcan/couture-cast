@@ -390,11 +390,12 @@ export function registerCommunityFeedCases() {
       await render(<CommunityScreen />)
 
       const notice = await screen.findByTestId('community-band-unresolved')
-      // The exact element, not a substring: the no_location panel also carries
-      // the Story 1.2b add-location action.
-      expect(
-        within(notice).getByText(enUS.community.band.unresolved[reason]).textContent
-      ).toBe(enUS.community.band.unresolved[reason])
+      // The whole panel, exactly: the reason's copy, plus the Story 1.2b
+      // add-location action that only the no_location panel carries.
+      const action = reason === 'no_location' ? enUS.locations.guided.add : ''
+      expect(notice.textContent).toBe(
+        `${enUS.community.band.unresolved[reason]}${action}`
+      )
     }
   )
 

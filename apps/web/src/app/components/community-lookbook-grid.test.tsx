@@ -308,7 +308,7 @@ describe('CommunityLookbookGrid (Story 6.1)', () => {
         expect(screen.queryByTestId('community-add-location')).not.toBeInTheDocument()
       )
       expect(screen.queryByTestId('community-band-unresolved')).not.toBeInTheDocument()
-      expect(screen.queryByText(UNRESOLVED_COPY.no_location)).not.toBeInTheDocument()
+      expect(document.body).not.toHaveTextContent(UNRESOLVED_COPY.no_location)
     })
 
     it('6.1-WEB-009 hides the band notice when the band resolved', async () => {

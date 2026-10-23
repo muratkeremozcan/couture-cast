@@ -383,11 +383,14 @@ describe('LocationPreferencesService', () => {
   })
 
   it('never fails the switch when the refresh enqueue fails or stalls', async () => {
+    // The spec's number, written out so a change to the production deadline fails.
+    /** A switch waits at most one second on its refresh enqueue. */
+    const REFRESH_ENQUEUE_DEADLINE_MS = 1000
     vi.useFakeTimers()
     try {
       enqueueLocationRefresh.mockReturnValueOnce(new Promise(() => undefined))
       const stalled = service.setPrimary(userId, 'location-2')
-      await vi.advanceTimersByTimeAsync(1000)
+      await vi.advanceTimersByTimeAsync(REFRESH_ENQUEUE_DEADLINE_MS)
       await expect(stalled).resolves.toMatchObject({ id: 'location-2' })
     } finally {
       vi.useRealTimers()

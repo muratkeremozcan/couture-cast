@@ -85,6 +85,12 @@ export const exactUnavailableSchema = locationUnavailableResponseSchema.strict()
 export const PROVIDER_DEADLINE_MS = 3000
 /** Headroom over the deadline for a real HTTP round trip on a loaded runner. */
 export const DEADLINE_MARGIN_MS = 900
+/**
+ * Slack under the deadline for a call that timed out: timers and `Date.now()`
+ * are millisecond-coarse and a timer can fire a tick early. 100 ms still proves
+ * the call waited out the deadline instead of failing fast.
+ */
+export const DEADLINE_EARLY_SLACK_MS = 100
 /** A search candidate stays savable for 15 minutes. */
 export const CANDIDATE_LIFETIME_MS = 15 * 60_000
 /** `WEATHER_REFRESH_MINUTES` is unset here, so the refresh queue buckets by 5. */

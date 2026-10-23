@@ -46,19 +46,25 @@ function ritualFor(locationKey: string): RitualResponse {
   }
 }
 
+/** A member nothing queues: its mutations never wait behind member-1's held write. */
+const UNQUEUED_MEMBER = 'member-unqueued'
+
 /**
- * Gives `work` time to finish on its own. Unordered, every mocked native call
- * resolves within a few microtasks, so it settles well inside the grace period;
- * ordered behind a held write, it cannot settle until that write is released.
+ * Settles once `twin`, the same mutation for {@link UNQUEUED_MEMBER}, has
+ * settled. `twin` is started after `work` and takes the same native steps, so
+ * an unordered `work` has settled by then too; ordered behind a held write,
+ * `work` cannot even start until that write is released. No timer decides it.
  */
-async function settledOrQueued(work: Promise<unknown>): Promise<void> {
-  await Promise.race([
-    work.then(
+async function settledOrQueued(
+  work: Promise<unknown>,
+  twin: () => Promise<unknown>
+): Promise<void> {
+  const settled = (promise: Promise<unknown>) =>
+    promise.then(
       () => undefined,
       () => undefined
-    ),
-    new Promise<void>((resolve) => setTimeout(resolve, 100)),
-  ])
+    )
+  await Promise.race([settled(work), settled(twin())])
 }
 
 /**
@@ -113,7 +119,7 @@ describe('ritual cache mutation order on native storage', () => {
     // Unordered, the invalidation finishes while the old write is held, and the
     // write then lands after it. Ordered, the invalidation waits for the write.
     const invalidation = forgetLatestRitual('member-1')
-    await settledOrQueued(invalidation)
+    await settledOrQueued(invalidation, () => forgetLatestRitual(UNQUEUED_MEMBER))
     pointer.release()
     await pendingSave
     await invalidation
@@ -134,7 +140,12 @@ describe('ritual cache mutation order on native storage', () => {
       data: ritualFor('new-primary'),
       timestamp: 200,
     })
-    await settledOrQueued(newerSave)
+    await settledOrQueued(newerSave, () =>
+      saveRitualCache(UNQUEUED_MEMBER, 'en-US', {
+        data: ritualFor('new-primary'),
+        timestamp: 200,
+      })
+    )
     pointer.release()
     await Promise.all([olderSave, newerSave])
 
@@ -156,7 +167,12 @@ describe('ritual cache mutation order on native storage', () => {
       data: ritualFor('new-primary'),
       timestamp: 200,
     })
-    await settledOrQueued(newerSave)
+    await settledOrQueued(newerSave, () =>
+      saveRitualCache(UNQUEUED_MEMBER, 'en-US', {
+        data: ritualFor('new-primary'),
+        timestamp: 200,
+      })
+    )
     pointer.release()
     await expect(olderSave).rejects.toThrow('disk full')
     // The failure released the queue, and the newer primary still won.
@@ -183,7 +199,7 @@ describe('ritual cache mutation order on native storage', () => {
     })
     await pointer.started
     const invalidation = forgetLatestRitual('member-1')
-    await settledOrQueued(invalidation)
+    await settledOrQueued(invalidation, () => forgetLatestRitual(UNQUEUED_MEMBER))
     pointer.release()
     await expect(refresh).rejects.toThrow('disk full')
     await invalidation
@@ -191,6 +207,7 @@ describe('ritual cache mutation order on native storage', () => {
     clearRitualMemoryCache()
     await expect(readLatestRitualCache('member-1', 'en-US')).resolves.toBeNull()
   })
+
   it('1.2b-MOB-CACHE-05 a save queued before an invalidation never writes its pointer', async () => {
     const pointer = holdNextPointerWrite()
     const inFlight = saveRitualCache('member-1', 'en-US', {

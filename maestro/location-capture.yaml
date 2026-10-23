@@ -77,6 +77,8 @@ tags:
     timeout: 10000
 - tapOn:
     id: 'location-label-input'
+# Picking a candidate prefills the label with its city (`Sentinelville`, 13
+# characters); 40 clears it with room to spare.
 - eraseText: 40
 - inputText: 'Home'
 - runFlow:

@@ -351,15 +351,31 @@ describeRealDatabase('Location capture real-database integration: lifecycle', ()
       // unrelated saved, switched and failed-search events. The proof must fail.
       expect(() => assertJourney(unrelated)).toThrow()
 
+      // Each durable row, in capture order, with the only property keys it may
+      // carry: saves and failed searches keep three coarse fields, a switch none.
+      const coarseKeys = ['outcome', 'platform', 'result_count']
+      const expectedRows: [eventType: string, propertyKeys: string[]][] = [
+        // The bystander's saves, switch and empty search.
+        ['location_saved', coarseKeys],
+        ['location_saved', coarseKeys],
+        ['location_switched', []],
+        ['location_search_failed', coarseKeys],
+        // The member's journey, in the order `expected` lists it.
+        ['location_search_failed', coarseKeys],
+        ['location_search_failed', coarseKeys],
+        ['location_saved', coarseKeys],
+        ['location_saved', coarseKeys],
+        ['location_saved', coarseKeys],
+        ['location_switched', []],
+      ]
       const rows = harness.telemetryRows
       expect(rows).toHaveLength(harness.analytics.length)
-      for (const row of rows) {
+      expect(rows).toHaveLength(expectedRows.length)
+      for (const [index, [eventType, propertyKeys]] of expectedRows.entries()) {
+        const row = rows[index]!
         expect(row.user_id).toBeNull()
-        expect(Object.keys(row.properties as object).sort()).toEqual(
-          row.event_type === 'location_switched'
-            ? []
-            : ['outcome', 'platform', 'result_count']
-        )
+        expect(row.event_type).toBe(eventType)
+        expect(Object.keys(row.properties as object).sort()).toEqual(propertyKeys)
       }
 
       const logs = capturedLogLines

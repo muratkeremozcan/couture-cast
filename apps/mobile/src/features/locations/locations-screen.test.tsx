@@ -149,7 +149,7 @@ describe('LocationsScreen', () => {
     expect((await screen.findByTestId('location-label-0')).textContent).toBe('Home')
     expect(screen.getByTestId('location-primary-badge-0')).toBeTruthy()
     expect(screen.queryByTestId('location-primary-badge-1')).toBeNull()
-    expect(screen.getByText('Monaco')).toBeTruthy()
+    expect(screen.getByTestId('location-item-1')).toHaveTextContent('Monaco')
     expect(screen.getByTestId('locations-count').textContent).toBe('2 of 3 saved')
   })
 
@@ -512,7 +512,7 @@ describe('LocationsScreen', () => {
 
     renderScreen()
     await userEvent.click(await screen.findByTestId('location-delete-0'))
-    expect(screen.getByText('Delete Home?')).toBeTruthy()
+    expect(screen.getByTestId('location-item-0')).toHaveTextContent('Delete Home?')
     await userEvent.click(screen.getByTestId('location-delete-confirm'))
 
     await waitFor(() => expect(screen.queryByTestId('location-item-1')).toBeNull())

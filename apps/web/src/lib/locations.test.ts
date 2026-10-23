@@ -2,7 +2,10 @@
 // `LocationFailureReason`, so this pins the mapping from each HTTP answer.
 import { http, HttpResponse } from 'msw'
 import { afterEach, describe, expect, it } from 'vitest'
-import type { SavedLocation } from '@couture/api-client/contracts/http'
+import type {
+  LocationSearchCandidate,
+  SavedLocation,
+} from '@couture/api-client/contracts/http'
 import { useMswHandlers } from '../test-utils/msw/runtime'
 import { WEB_ACCESS_TOKEN_STORAGE_KEY } from './wardrobe'
 import {
@@ -31,6 +34,16 @@ const location: SavedLocation = {
   updatedAt: '2026-10-22T12:00:00.000Z',
 }
 
+const candidate: LocationSearchCandidate = {
+  city: 'Chicago',
+  region: 'Illinois',
+  country: 'US',
+  latitude: 41.878,
+  longitude: -87.63,
+  displayLabel: 'Chicago, Illinois, United States',
+  candidateToken: 'payload.signature',
+}
+
 afterEach(() => {
   window.sessionStorage.clear()
 })
@@ -45,111 +58,177 @@ async function reasonOf(work: Promise<unknown>): Promise<string> {
   return (caught as LocationRequestError).reason
 }
 
-describe('web location transport', () => {
-  it('1.2b-WEB-LIB-01 refuses every call while signed out, before any request', async () => {
-    await expect(reasonOf(listLocationsFromWeb())).resolves.toBe('signed_out')
-  })
+/** The 400 envelope the location routes answer with a typed `code`. */
+function requestErrorBody(code: string) {
+  return { statusCode: 400, code, message: 'x', error: 'Bad Request' }
+}
 
-  it('1.2b-WEB-LIB-02 sends the web platform and parses each success', async () => {
-    signIn()
-    const platforms: (string | null)[] = []
-    useMswHandlers(
-      http.get('*/api/v1/locations', () => HttpResponse.json({ data: [location] })),
-      http.get('*/api/v1/locations/search', ({ request }) => {
-        platforms.push(request.headers.get('x-couture-platform'))
-        return HttpResponse.json({
-          data: [
-            {
-              city: 'Chicago',
-              region: 'Illinois',
-              country: 'US',
-              latitude: 41.878,
-              longitude: -87.63,
-              displayLabel: 'Chicago, Illinois, United States',
-              candidateToken: 'payload.signature',
-            },
-          ],
-        })
-      }),
-      http.post('*/api/v1/locations/from-search', ({ request }) => {
-        platforms.push(request.headers.get('x-couture-platform'))
-        return HttpResponse.json({ data: location }, { status: 201 })
-      }),
-      http.post('*/api/v1/locations/loc-1/primary', () =>
-        HttpResponse.json({ data: location })
-      ),
-      http.patch('*/api/v1/locations/loc-1', () =>
-        HttpResponse.json({ data: { ...location, label: 'Office' } })
-      ),
-      http.delete('*/api/v1/locations/loc-1', () =>
-        HttpResponse.json({ data: { deleted: true } })
-      )
-    )
+/** The retryable 503 envelope the location routes answer with a typed `code`. */
+function unavailableBody(code: string) {
+  return {
+    statusCode: 503,
+    code,
+    retryable: true,
+    message: 'x',
+    error: 'Service Unavailable',
+  }
+}
 
-    await expect(listLocationsFromWeb()).resolves.toEqual([location])
-    await expect(searchLocationsFromWeb('Chicago', 'en-US')).resolves.toHaveLength(1)
-    await expect(
-      saveLocationFromSearchFromWeb('payload.signature', 'Home')
-    ).resolves.toEqual(location)
-    await expect(setPrimaryLocationFromWeb('loc-1')).resolves.toEqual(location)
-    await expect(renameLocationFromWeb('loc-1', 'Office')).resolves.toMatchObject({
-      label: 'Office',
+type SentRequest = {
+  method: string
+  path: string
+  body: unknown
+  platform: string | null
+  authorization: string | null
+}
+
+/** Answers every location route with `answer` and records what each request sent. */
+function useLocationRequestRecorder(
+  answer: () => Response = () => HttpResponse.json({})
+) {
+  const sent: SentRequest[] = []
+  useMswHandlers(
+    http.all('*/api/v1/locations*', async ({ request }) => {
+      const url = new URL(request.url)
+      const text = await request.text()
+      sent.push({
+        method: request.method,
+        path: `${url.pathname}${url.search}`,
+        body: text ? (JSON.parse(text) as unknown) : null,
+        platform: request.headers.get('x-couture-platform'),
+        authorization: request.headers.get('authorization'),
+      })
+      return answer()
     })
-    await expect(deleteLocationFromWeb('loc-1')).resolves.toBeUndefined()
-    expect(platforms).toEqual(['web', 'web'])
-  })
+  )
+  return sent
+}
+
+/** A promise the test settles itself, so no timer decides when a handler answers. */
+function deferred() {
+  let resolve!: () => void
+  const promise = new Promise<void>((settle) => (resolve = settle))
+  return { promise, resolve }
+}
+
+const everyCall = [
+  ['listLocationsFromWeb', () => listLocationsFromWeb()],
+  ['searchLocationsFromWeb', () => searchLocationsFromWeb('Chicago', 'en-US')],
+  [
+    'saveLocationFromSearchFromWeb',
+    () => saveLocationFromSearchFromWeb('payload.signature', 'Home'),
+  ],
+  ['setPrimaryLocationFromWeb', () => setPrimaryLocationFromWeb('loc-1')],
+  ['renameLocationFromWeb', () => renameLocationFromWeb('loc-1', 'Office')],
+  ['deleteLocationFromWeb', () => deleteLocationFromWeb('loc-1')],
+] as const
+
+describe('web location transport', () => {
+  it.each(everyCall)(
+    '1.2b-WEB-LIB-01 %s refuses while signed out, before any request',
+    async (_name, call) => {
+      const sent = useLocationRequestRecorder()
+
+      await expect(reasonOf(call())).resolves.toBe('signed_out')
+      expect(sent).toEqual([])
+    }
+  )
+
+  it.each([
+    {
+      name: 'listLocationsFromWeb',
+      call: () => listLocationsFromWeb(),
+      status: 200,
+      answer: { data: [location] },
+      result: [location],
+      request: { method: 'GET', path: '/api/v1/locations', body: null, platform: null },
+    },
+    {
+      name: 'searchLocationsFromWeb',
+      call: () => searchLocationsFromWeb('Chicago', 'en-US'),
+      status: 200,
+      answer: { data: [candidate] },
+      result: [candidate],
+      request: {
+        method: 'GET',
+        path: '/api/v1/locations/search?q=Chicago&locale=en-US',
+        body: null,
+        platform: 'web',
+      },
+    },
+    {
+      name: 'saveLocationFromSearchFromWeb',
+      call: () => saveLocationFromSearchFromWeb('payload.signature', 'Home'),
+      status: 201,
+      answer: { data: location },
+      result: location,
+      request: {
+        method: 'POST',
+        path: '/api/v1/locations/from-search',
+        body: { candidateToken: 'payload.signature', label: 'Home' },
+        platform: 'web',
+      },
+    },
+    {
+      name: 'setPrimaryLocationFromWeb',
+      call: () => setPrimaryLocationFromWeb('loc-1'),
+      status: 200,
+      answer: { data: location },
+      result: location,
+      request: {
+        method: 'POST',
+        path: '/api/v1/locations/loc-1/primary',
+        body: null,
+        platform: null,
+      },
+    },
+    {
+      name: 'renameLocationFromWeb',
+      call: () => renameLocationFromWeb('loc-1', 'Office'),
+      status: 200,
+      answer: { data: { ...location, label: 'Office' } },
+      result: { ...location, label: 'Office' },
+      request: {
+        method: 'PATCH',
+        path: '/api/v1/locations/loc-1',
+        body: { label: 'Office' },
+        platform: null,
+      },
+    },
+    {
+      name: 'deleteLocationFromWeb',
+      call: () => deleteLocationFromWeb('loc-1'),
+      status: 200,
+      answer: { data: { deleted: true } },
+      result: undefined,
+      request: {
+        method: 'DELETE',
+        path: '/api/v1/locations/loc-1',
+        body: null,
+        platform: null,
+      },
+    },
+  ])(
+    '1.2b-WEB-LIB-02 $name sends its request and parses the success',
+    async ({ call, status, answer, result, request }) => {
+      signIn()
+      const sent = useLocationRequestRecorder(() => HttpResponse.json(answer, { status }))
+
+      await expect(call()).resolves.toEqual(result)
+      expect(sent).toEqual([{ ...request, authorization: 'Bearer test-access-token' }])
+    }
+  )
 
   it.each([
     [401, { message: 'Unauthorized' }, 'signed_out'],
     [404, { message: 'Not Found' }, 'not_found'],
     [429, { message: 'Too Many Requests' }, 'rate_limited'],
-    [
-      400,
-      { statusCode: 400, code: 'invalid_request', message: 'q', error: 'Bad Request' },
-      'invalid_query',
-    ],
-    [
-      400,
-      { statusCode: 400, code: 'invalid_candidate', message: 'x', error: 'Bad Request' },
-      'invalid_candidate',
-    ],
-    [
-      400,
-      {
-        statusCode: 400,
-        code: 'location_limit_reached',
-        message: 'x',
-        error: 'Bad Request',
-      },
-      'limit_reached',
-    ],
-    [
-      400,
-      { statusCode: 400, code: 'location_duplicate', message: 'x', error: 'Bad Request' },
-      'duplicate',
-    ],
-    [
-      503,
-      {
-        statusCode: 503,
-        code: 'provider_unavailable',
-        retryable: true,
-        message: 'x',
-        error: 'Service Unavailable',
-      },
-      'provider_unavailable',
-    ],
-    [
-      503,
-      {
-        statusCode: 503,
-        code: 'location_service_unavailable',
-        retryable: true,
-        message: 'x',
-        error: 'Service Unavailable',
-      },
-      'service_unavailable',
-    ],
+    [400, requestErrorBody('invalid_request'), 'invalid_query'],
+    [400, requestErrorBody('invalid_candidate'), 'invalid_candidate'],
+    [400, requestErrorBody('location_limit_reached'), 'limit_reached'],
+    [400, requestErrorBody('location_duplicate'), 'duplicate'],
+    [503, unavailableBody('provider_unavailable'), 'provider_unavailable'],
+    [503, unavailableBody('location_service_unavailable'), 'service_unavailable'],
     // The legacy location routes answer the plain Nest 400.
     [400, { statusCode: 400, message: 'bad', error: 'Bad Request' }, 'invalid_query'],
     [500, { statusCode: 500, message: 'boom' }, 'unknown'],
@@ -184,17 +263,24 @@ describe('web location transport', () => {
 
   it('1.2b-WEB-LIB-05 lets an aborted search reject as an abort, never as a failure', async () => {
     signIn()
+    const reached = deferred()
+    const answer = deferred()
     useMswHandlers(
       http.get('*/api/v1/locations/search', async () => {
-        await new Promise((resolve) => setTimeout(resolve, 1000))
+        reached.resolve()
+        // Held until the test has seen the abort, so the abort always lands first.
+        await answer.promise
         return HttpResponse.json({ data: [] })
       })
     )
     const controller = new AbortController()
     const pending = searchLocationsFromWeb('Chicago', 'en-US', controller.signal)
+    // Abort the request in flight, once the server holds it.
+    await reached.promise
     controller.abort()
 
     const caught = await pending.catch((error: unknown) => error)
+    answer.resolve()
     expect(caught).not.toBeInstanceOf(LocationRequestError)
     expect((caught as Error).name).toBe('AbortError')
   })

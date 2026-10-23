@@ -3,7 +3,12 @@ import { classifyClimateBand, canonicalSpotlightArea } from '@couture/utils'
 import request from 'supertest'
 import { expect, it } from 'vitest'
 import { SENTINEL_TEMPERATURE_C } from '../../../scripts/weather-provider-double.mjs'
-import { coordinateKeySuffix } from '../../../scripts/lib/weather-provider-double-data.mjs'
+import {
+  coordinateKeySuffix,
+  DOUBLE_DAILY_DAYS,
+  DOUBLE_DAILY_MAX_C,
+  DOUBLE_DAILY_MIN_C,
+} from '../../../scripts/lib/weather-provider-double-data.mjs'
 import { encodeLocationCandidate } from '../src/modules/location-preferences/location-candidate-token'
 import { WeatherQueryService } from '../src/modules/weather/weather-query.service'
 import {
@@ -12,6 +17,7 @@ import {
 } from '../src/modules/weather/weather.repository'
 import {
   CANDIDATE_LIFETIME_MS,
+  DEADLINE_EARLY_SLACK_MS,
   DEADLINE_MARGIN_MS,
   describeRealDatabase,
   exactRequestErrorSchema,
@@ -21,6 +27,9 @@ import {
   sentinel,
   useLocationCaptureSuite,
 } from './helpers/location-capture-harness'
+
+/** The double answers 48 future hours, the provider's full window; each is a segment. */
+const DOUBLE_HOURLY_SEGMENTS = 48
 
 /**
  * Story 1.2b: search and save against a real migrated database, a real Redis
@@ -69,11 +78,14 @@ describeRealDatabase(
       expect(snapshots).toHaveLength(1)
       const [snapshot] = snapshots
       expect(snapshot?.temperature).toBe(SENTINEL_TEMPERATURE_C)
-      expect(snapshot?.segments).toHaveLength(48)
+      expect(snapshot?.segments).toHaveLength(DOUBLE_HOURLY_SEGMENTS)
       // The daily projection Community reads the climate band from.
       const daily = parseDailySummaries(snapshot!.daily_summaries)
-      expect(daily).toHaveLength(8)
-      expect(daily[0]).toMatchObject({ temperatureMin: 14, temperatureMax: 24 })
+      expect(daily).toHaveLength(DOUBLE_DAILY_DAYS)
+      expect(daily[0]).toMatchObject({
+        temperatureMin: DOUBLE_DAILY_MIN_C,
+        temperatureMax: DOUBLE_DAILY_MAX_C,
+      })
       expect(classifyClimateBand(daily)).not.toBeNull()
 
       const latest = await new WeatherQueryService(
@@ -116,7 +128,9 @@ describeRealDatabase(
         expect(elapsed).toBeLessThan(PROVIDER_DEADLINE_MS + DEADLINE_MARGIN_MS)
         if (q === 'Provider slow') {
           // The slow double answers after 4 s: a shorter deadline gives up early.
-          expect(elapsed).toBeGreaterThanOrEqual(PROVIDER_DEADLINE_MS - 100)
+          expect(elapsed).toBeGreaterThanOrEqual(
+            PROVIDER_DEADLINE_MS - DEADLINE_EARLY_SLACK_MS
+          )
         }
       }
       expect(harness.captured.map((entry) => entry.properties)).toEqual([
@@ -288,10 +302,11 @@ describeRealDatabase(
     it('1.2b-INT-08 saves nothing when the save forecast fails, returns an invalid timezone or exceeds 3 seconds', async () => {
       const harness = await harnessFor('openweather')
       const viewer = await member(harness)
+      const queries = ['Failtown', 'Badzone', 'Slowtown'] as const
       const candidates = [
-        ...(await search(harness, viewer.token, 'Failtown')),
-        ...(await search(harness, viewer.token, 'Badzone')),
-        ...(await search(harness, viewer.token, 'Slowtown')),
+        ...(await search(harness, viewer.token, queries[0])),
+        ...(await search(harness, viewer.token, queries[1])),
+        ...(await search(harness, viewer.token, queries[2])),
       ]
       // These keys are shared by every run, so count what this test adds.
       const byKey = {
@@ -307,14 +322,11 @@ describeRealDatabase(
           where: byKey,
         }),
       })
-      expect(candidates.map((candidate) => candidate.city)).toEqual([
-        'Failtown',
-        'Badzone',
-        'Slowtown',
-      ])
+      expect(candidates.map((candidate) => candidate.city)).toEqual(queries)
       const before = await persisted()
 
-      for (const candidate of candidates) {
+      for (const [index, query] of queries.entries()) {
+        const candidate = candidates[index]!
         const startedAt = Date.now()
         const response = await save(harness, viewer.token, candidate.candidateToken)
         const elapsed = Date.now() - startedAt
@@ -323,9 +335,11 @@ describeRealDatabase(
           code: 'provider_unavailable',
           retryable: true,
         })
-        if (candidate.city === 'Slowtown') {
+        if (query === 'Slowtown') {
           // The slow double answers after 4 s; the save gives up at 3.
-          expect(elapsed).toBeGreaterThanOrEqual(PROVIDER_DEADLINE_MS - 100)
+          expect(elapsed).toBeGreaterThanOrEqual(
+            PROVIDER_DEADLINE_MS - DEADLINE_EARLY_SLACK_MS
+          )
           expect(elapsed).toBeLessThan(PROVIDER_DEADLINE_MS + DEADLINE_MARGIN_MS)
         }
       }

@@ -39,53 +39,59 @@ const candidate = {
 }
 
 describe('location contract compatibility', () => {
+  const typed400 = {
+    statusCode: 400,
+    code: 'location_duplicate',
+    message: 'That location is already saved.',
+    error: 'Bad Request',
+  }
+  const typed503 = {
+    statusCode: 503,
+    code: 'provider_unavailable',
+    retryable: true,
+    message: 'down',
+    error: 'Service Unavailable',
+  }
+
+  // [name, schema, the body with fields a later server adds, the known body]
   it.each([
     [
       'search results',
       locationSearchResponseSchema,
       { data: [{ ...candidate, timezoneHint: 'America/Chicago' }], page: 1 },
+      { data: [candidate] },
     ],
     [
       'a saved location',
       createSavedLocationFromSearchResponseSchema,
       { data: { ...savedLocation, weatherReady: true } },
+      { data: savedLocation },
     ],
     [
       'the saved list',
       listSavedLocationsResponseSchema,
       { data: [{ ...savedLocation, weatherReady: true }] },
+      { data: [savedLocation] },
     ],
     [
       'a typed 400',
       locationRequestErrorResponseSchema,
-      {
-        statusCode: 400,
-        code: 'location_duplicate',
-        message: 'That location is already saved.',
-        error: 'Bad Request',
-        requestId: 'req-1',
-      },
+      { ...typed400, requestId: 'req-1' },
+      typed400,
     ],
     [
       'a typed 503',
       locationUnavailableResponseSchema,
-      {
-        statusCode: 503,
-        code: 'provider_unavailable',
-        retryable: true,
-        message: 'down',
-        error: 'Service Unavailable',
-        retryAfterSeconds: 5,
-      },
+      { ...typed503, retryAfterSeconds: 5 },
+      typed503,
     ],
   ])(
     '1.2b-UNIT-CONTRACT-01 parses %s that carry an added field and drops it',
-    (_name, schema, body) => {
+    (_name, schema, body, known) => {
       const parsed = schema.safeParse(body)
       expect(parsed.success).toBe(true)
-      expect(JSON.stringify(parsed.data)).not.toMatch(
-        /timezoneHint|weatherReady|requestId|retryAfterSeconds|"page"/
-      )
+      // Every known field survives with its value; only the added ones go.
+      expect(parsed.data).toStrictEqual(known)
     }
   )
 
