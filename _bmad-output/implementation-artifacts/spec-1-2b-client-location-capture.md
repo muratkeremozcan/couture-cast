@@ -2,7 +2,7 @@
 title: 'Story 1.2b: Client location capture'
 type: 'feature'
 created: '2026-10-22'
-status: 'in-progress'
+status: 'done'
 baseline_commit: '1d4ad0c2c549abd52541d2c6e12a6af24878e5f9'
 route: 'dispatch'
 story_key: '1-2b-client-location-capture'
@@ -254,6 +254,21 @@ SUPERUSER attribute`; 4 to 7 files red per run). `apps/api/vitest.config.ts` pin
     `CommunityUnavailableException` from the spent budget, hook timeouts, and assertions downstream
     of them), each file green alone. The config now caps workers at four (CI keeps three): three
     consecutive full runs green from load average 23, and two more green with four extra CPU burners.
+- 2026-10-23, code review rounds 5 and later (TEA phase 2 and Opus rescore), fixed in this PR:
+  - R16: INT-17 holds both saves at a barrier inside the forecast call, after both passed preflight
+    and before either commits, so it fails on the pre-R11 order every time.
+  - R17: Try again after a failed web search announces the retried result once, never "no cities".
+  - R18: on sign-out the community no-location notice leaves together with its add-location action.
+  - R19 and community follow-up: busy Locations and Community actions expose `aria-busy` on the
+    mobile web build, which react-native-web 0.21 does not map from `accessibilityState`.
+  - R20: `community-feed.yaml` stops swiping once the post's author row is in view, so its walk down
+    the card no longer depends on where the last swipe landed.
+  - R21: after Delete, keyboard focus lands on the confirmation, which renders in its own slot.
+  - R22 and R22b: the migrate script, the Playwright runner and its workers keep the launcher's
+    caller-owned env keys, so an isolated loopback stack is never redirected to the default local
+    database by `.env.local`.
+  - iOS `location-capture.yaml` passed at `40a4cf79` outside the sandbox, including its iOS-only
+    keyboard guards.
 
 ## Spec Change Log
 
