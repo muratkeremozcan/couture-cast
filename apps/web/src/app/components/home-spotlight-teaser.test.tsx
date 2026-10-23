@@ -1,7 +1,8 @@
 // Story 6.7: the web Home spotlight teaser in the Lookbook Prism layout. Reads
 // are deferred through MSW so each test decides when one settles.
 import { act, fireEvent, render, screen, waitFor, within } from '@testing-library/react'
-import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
+import userEvent from '@testing-library/user-event'
+import { afterEach, beforeEach, describe, expect, it, onTestFinished, vi } from 'vitest'
 import { http, HttpResponse } from 'msw'
 import {
   COMMUNITY_FEED_DISABLED_MESSAGE,
@@ -30,6 +31,8 @@ vi.mock('../../lib/community', { spy: true })
 vi.mock('next/navigation', () => ({ usePathname: () => '/' }))
 
 const SPOTLIGHT_PATH = '/api/v1/community/spotlight'
+/** The `Retry-After` hint, in seconds, the 429 case answers with. */
+const RETRY_AFTER_S = 90
 const TEASER_PREFIX = 'home-spotlight-teaser'
 
 function spotlightItem(
@@ -107,8 +110,8 @@ function useServedSpotlight(
             body: communityReactionSpotlightResponseSchema.parse({ data: value }),
           }
     )
-    // Lets the response reach the lifecycle and React commit it.
-    await act(() => new Promise((resolve) => setTimeout(resolve, 0)))
+    // Waits on the wrapper's own promise, then lets React commit the result.
+    await settledTeaserRead(index)
   }
   return { teaserReads, moduleReads, answer }
 }
@@ -175,6 +178,45 @@ function heroCanvas() {
   return screen.getByRole('region', { name: /hero ritual canvas/i })
 }
 
+/** True when the hero canvas ends with the outfit tiles: nothing is reserved after them. */
+function heroEndsWithOutfits(): boolean {
+  return (
+    heroCanvas().lastElementChild?.querySelector('[data-testid="outfit-scroll"]') !== null
+  )
+}
+
+/** The hero canvas markup with the teaser link taken out. */
+function heroWithoutTeaser(): string {
+  const clone = heroCanvas().cloneNode(true) as HTMLElement
+  clone.querySelector(`[data-testid="${TEASER_PREFIX}-link"]`)?.remove()
+  return clone.innerHTML
+}
+
+/**
+ * Records every message the community live region takes, one entry per
+ * announcement, so a repeated announcement shows even when its text matches.
+ */
+function recordAnnouncements(): string[] {
+  const region = screen.getByTestId('community-live-region')
+  const seen: string[] = []
+  const observer = new MutationObserver((records) => {
+    for (const record of records)
+      for (const node of record.addedNodes)
+        if (node.textContent) seen.push(node.textContent)
+  })
+  observer.observe(region, { childList: true, subtree: true })
+  onTestFinished(() => observer.disconnect())
+  return seen
+}
+
+/** Lets the frames a focus hand-off is scheduled on run. */
+async function nextFrames(count = 3) {
+  for (let frame = 0; frame < count; frame += 1)
+    await act(async () => {
+      await new Promise((resolve) => requestAnimationFrame(resolve))
+    })
+}
+
 describe('6.7 web Home spotlight teaser', () => {
   const scrollIntoView = Object.getOwnPropertyDescriptor(
     HTMLElement.prototype,
@@ -207,9 +249,16 @@ describe('6.7 web Home spotlight teaser', () => {
     signIn()
     const { teaserReads, answer } = useServedSpotlight()
     render(<LookbookPrismLayout />)
+    await waitFor(() => expect(teaserReads).toHaveLength(1))
+    await screen.findByTestId('community-spotlight-heading')
+    const heroBefore = heroCanvas().innerHTML
+    expect(heroEndsWithOutfits()).toBe(true)
     await answer(0, cityPage())
     const link = await screen.findByTestId('home-spotlight-teaser-link')
 
+    // The hero is unchanged apart from the teaser appended after it.
+    expect(heroCanvas().lastElementChild).toBe(link)
+    expect(heroWithoutTeaser()).toBe(heroBefore)
     expect(teaserReads[0]!.url.searchParams.get('limit')).toBe('1')
     expect(heroCanvas().contains(link)).toBe(true)
     // After the outfit tiles, so it follows the hero in focus order.
@@ -234,13 +283,15 @@ describe('6.7 web Home spotlight teaser', () => {
     expect(within(link).queryAllByRole('img')).toHaveLength(0)
     expect(link.querySelectorAll('a, button, [tabindex]')).toHaveLength(0)
     expect(heroCanvas().textContent).not.toContain('Private caption')
-    // No teaser id reuses a module or card id.
-    for (const node of teaserNodes())
-      expect(node.getAttribute('data-testid')).toMatch(/^home-spotlight-teaser-/)
-    expect(link.id).toBe('')
+    // No teaser id or test id reuses a module or card id, on the link or inside it.
+    for (const node of [link, ...link.querySelectorAll('[data-testid], [id]')]) {
+      const testId = node.getAttribute('data-testid')
+      if (testId !== null) expect(testId).toMatch(/^home-spotlight-teaser-/)
+      if (node.id) expect(node.id).toMatch(/^home-spotlight-teaser-/)
+    }
   })
 
-  it('6.7-WEB-002 the author rule names the viewer You, a blank name falls back, one reaction is singular', async () => {
+  it('6.7-WEB-002 the author rule names the viewer You', async () => {
     signIn()
     const { answer } = useServedSpotlight()
     render(<LookbookPrismLayout />)
@@ -294,7 +345,7 @@ describe('6.7 web Home spotlight teaser', () => {
     expect(teaserNodes()).toEqual([])
     expect(moduleReads.every((url) => !url.searchParams.has('surface'))).toBe(true)
 
-    fireEvent.click(screen.getByRole('button', { name: /mobile preview/i }))
+    await userEvent.setup().click(screen.getByRole('button', { name: /mobile preview/i }))
     await answer(0, cityPage())
     expect(await screen.findByTestId('home-spotlight-teaser-link')).toBeInTheDocument()
     // The preview scrolled the frame into view on the next animation frame.
@@ -305,7 +356,7 @@ describe('6.7 web Home spotlight teaser', () => {
     )
   })
 
-  it('6.7-WEB-019 unmounting before the preview frame runs leaves nothing to throw', () => {
+  it('6.7-WEB-019 unmounting before the preview frame runs leaves nothing to throw', async () => {
     const frames: FrameRequestCallback[] = []
     vi.spyOn(window, 'requestAnimationFrame').mockImplementation((callback) => {
       frames.push(callback)
@@ -313,10 +364,31 @@ describe('6.7 web Home spotlight teaser', () => {
     })
     const cancelled = vi.spyOn(window, 'cancelAnimationFrame')
     const view = render(<LookbookPrismLayout />)
-    fireEvent.click(screen.getByRole('button', { name: /mobile preview/i }))
+    await userEvent.setup().click(screen.getByRole('button', { name: /mobile preview/i }))
     expect(frames).toHaveLength(1)
     view.unmount()
     expect(cancelled).toHaveBeenCalledWith(1)
+  })
+
+  it.each([
+    [1279, 'stacks and reads'],
+    [1280, 'sits side by side and reads nothing'],
+  ] as const)('6.7-WEB-020 at %i px the layout %s', async (width, _outcome) => {
+    setViewport(width)
+    signIn()
+    const { teaserReads, moduleReads, answer } = useServedSpotlight()
+    render(<LookbookPrismLayout />)
+    await waitFor(() => expect(moduleReads.length).toBeGreaterThan(0))
+    if (width < 1280) {
+      await answer(0, cityPage())
+      expect(await screen.findByTestId('home-spotlight-teaser-link')).toBeInTheDocument()
+      expect(teaserReads).toHaveLength(1)
+    } else {
+      // The teaser would read in the mount effects, before any module request.
+      expect(teaserCalls()).toHaveLength(0)
+      expect(teaserReads).toHaveLength(0)
+      expect(teaserNodes()).toEqual([])
+    }
   })
 
   it.each([
@@ -367,10 +439,11 @@ describe('6.7 web Home spotlight teaser', () => {
       await waitFor(() => expect(teaserReads).toHaveLength(1))
       await screen.findByTestId('community-spotlight-heading')
       const expected = heroCanvas().innerHTML
+      expect(heroEndsWithOutfits()).toBe(true)
       await answer(0, refusal as Answer)
-      await settledTeaserRead(0)
       expect(teaserNodes()).toEqual([])
       expect(heroCanvas().innerHTML).toBe(expected)
+      expect(heroEndsWithOutfits()).toBe(true)
       // One transport attempt, and the lifecycle schedules nothing after a refusal.
       expect(teaserReads).toHaveLength(1)
       expect(teaserCalls()).toHaveLength(1)
@@ -426,15 +499,22 @@ describe('6.7 web Home spotlight teaser', () => {
     await answer(0, cityPage())
     fireEvent.error(await screen.findByTestId('home-spotlight-teaser-image'))
     expect(teaserNodes()).toEqual([])
+    expect(heroEndsWithOutfits()).toBe(true)
   })
 
-  it('6.7-WEB-009 activating focuses the entry with one announcement and posts the home_teaser open', async () => {
+  /** Signs in, records opens, and serves `look-1` second in the module. */
+  function useEntryHome() {
     signIn()
     const opens = useRecordedOpens()
     const { answer } = useServedSpotlight(() => ({
       status: 200,
       body: { data: cityPage([spotlightItem('look-0', 1), spotlightItem('look-1', 2)]) },
     }))
+    return { opens, answer }
+  }
+
+  /** Renders Home, shows the teaser for `look-1` and waits for its module card. */
+  async function showEntry(answer: ReturnType<typeof useEntryHome>['answer']) {
     render(<LookbookPrismLayout />)
     await answer(0, cityPage([spotlightItem('look-1')]))
     const link = await screen.findByTestId('home-spotlight-teaser-link')
@@ -443,24 +523,47 @@ describe('6.7 web Home spotlight teaser', () => {
       expect(element).not.toBeNull()
       return element!
     })
+    return { link, card }
+  }
 
-    fireEvent.click(link)
+  it('6.7-WEB-009 activating focuses the entry with exactly one announcement', async () => {
+    const { answer } = useEntryHome()
+    const { link, card } = await showEntry(answer)
+    const announcements = recordAnnouncements()
+
+    await userEvent.setup().click(link)
     await waitFor(() => expect(document.activeElement).toBe(card))
-    const liveRegion = screen.getByTestId('community-live-region')
     await waitFor(() =>
-      expect(liveRegion.textContent).toBe(enUS.community.feed.announceFocused)
+      expect(screen.getByTestId('community-live-region').textContent).toBe(
+        enUS.community.feed.announceFocused
+      )
     )
+    await nextFrames()
+    expect(announcements).toEqual([enUS.community.feed.announceFocused])
+    expect(screen.queryByTestId('community-spotlight-notice')).toBeNull()
+    expect(screen.queryByTestId('deep-link-info-banner')).toBeNull()
+  })
+
+  it('6.7-WEB-021 an activation posts one home_teaser open with rank and level only', async () => {
+    const { opens, answer } = useEntryHome()
+    const { link } = await showEntry(answer)
+    await userEvent.setup().click(link)
     await waitFor(() => expect(opens).toHaveLength(1))
     expect(opens[0]).toEqual({
       postId: 'look-1',
       body: { surface: 'home_teaser', rank: 1, level: 'city' },
     })
-    expect(screen.queryByTestId('community-spotlight-notice')).toBeNull()
-    expect(screen.queryByTestId('deep-link-info-banner')).toBeNull()
+  })
 
-    // A repeat activation is a fresh token: focus moves again.
+  it('6.7-WEB-022 a repeat activation is a fresh token: focus moves again', async () => {
+    const { opens, answer } = useEntryHome()
+    const { link, card } = await showEntry(answer)
+    const user = userEvent.setup()
+    await user.click(link)
+    await waitFor(() => expect(document.activeElement).toBe(card))
     act(() => link.focus())
-    fireEvent.click(link)
+    expect(document.activeElement).toBe(link)
+    await user.click(link)
     await waitFor(() => expect(document.activeElement).toBe(card))
     await waitFor(() => expect(opens).toHaveLength(2))
   })
@@ -492,10 +595,15 @@ describe('6.7 web Home spotlight teaser', () => {
       const { answer } = useServedSpotlight(module as () => Answer)
       render(<LookbookPrismLayout />)
       await answer(0, cityPage())
-      fireEvent.click(await screen.findByTestId('home-spotlight-teaser-link'))
+      const link = await screen.findByTestId('home-spotlight-teaser-link')
+      const announcements = recordAnnouncements()
+      await userEvent.setup().click(link)
       const notice = await screen.findByTestId('community-spotlight-notice')
       expect(notice.textContent).toBe(enUS.community.spotlight.targetUnavailable)
       await waitFor(() => expect(document.activeElement).toBe(notice))
+      // Focusing the notice is its single announcement: no live region repeats it.
+      await nextFrames()
+      expect(announcements).not.toContain(enUS.community.spotlight.targetUnavailable)
       expect(notice.getAttribute('tabindex')).toBe('-1')
       expect(notice.closest('[aria-live]')).toBeNull()
       expect(
@@ -527,7 +635,19 @@ describe('6.7 web Home spotlight teaser', () => {
     const start = Date.now()
     const now = vi.spyOn(Date, 'now').mockReturnValue(start)
     vi.useFakeTimers({ toFake: ['setTimeout', 'clearTimeout'] })
-    fireEvent.click(link)
+    const announcements = recordAnnouncements()
+    // Testing Library's async wrapper waits on a zero-delay timeout, which this
+    // clock fakes, so the click settles while the clock advances by nothing.
+    let clicked = false
+    void userEvent
+      .setup({ delay: null })
+      .click(link)
+      .then(() => (clicked = true))
+    for (let round = 0; round < 20 && !clicked; round += 1)
+      await act(async () => {
+        await vi.advanceTimersByTimeAsync(0)
+      })
+    expect(clicked).toBe(true)
     await act(async () => {
       await vi.advanceTimersByTimeAsync(SPOTLIGHT_FOCUS_WAIT_MS - 1)
     })
@@ -541,6 +661,7 @@ describe('6.7 web Home spotlight teaser', () => {
     const notice = await screen.findByTestId('community-spotlight-notice')
     expect(notice.textContent).toBe(enUS.community.spotlight.destinationUnavailable)
     await waitFor(() => expect(document.activeElement).toBe(notice))
+    expect(announcements).not.toContain(enUS.community.spotlight.destinationUnavailable)
 
     act(() => releaseModule!())
     await waitFor(() =>
@@ -563,6 +684,66 @@ describe('6.7 web Home spotlight teaser', () => {
     act(() => signIn('test-token-member-2'))
     await waitFor(() => expect(document.activeElement).toBe(heroCanvas()))
   })
+
+  it('6.7-WEB-023 a teaser that leaves while another control holds focus moves no focus', async () => {
+    signIn('test-token-member-1')
+    const { answer } = useServedSpotlight()
+    render(<LookbookPrismLayout />)
+    await answer(0, cityPage())
+    await screen.findByTestId('home-spotlight-teaser-link')
+    const elsewhere = screen.getByRole('button', { name: /mobile preview/i })
+    act(() => elsewhere.focus())
+    act(() => signIn('test-token-member-2'))
+    expect(teaserNodes()).toEqual([])
+    // The hand-off would run on the next frame; let several pass.
+    await nextFrames()
+    expect(document.activeElement).toBe(elsewhere)
+  })
+
+  it.each([
+    // Content hidden while the module still holds the entry.
+    ['became unavailable', ['unavailable']],
+    // Access came back, but the module it reset has not read again.
+    ['came back with no module', ['denied', 'connected']],
+  ] as const)(
+    '6.7-WEB-024 a Community that %s focuses the destination notice',
+    async (_name, states) => {
+      const syncs: CommunitySyncState[] = []
+      vi.spyOn(CommunitySyncState.prototype, 'start').mockImplementation(function (
+        this: CommunitySyncState
+      ) {
+        syncs.push(this)
+      })
+      signIn()
+      useRecordedOpens()
+      const { answer } = useServedSpotlight()
+      render(<LookbookPrismLayout />)
+      await answer(0, cityPage())
+      const link = await screen.findByTestId('home-spotlight-teaser-link')
+      await waitFor(() =>
+        expect(document.getElementById('spotlight-lookbook-card-look-1')).not.toBeNull()
+      )
+      await waitFor(() => expect(syncs.length).toBeGreaterThan(0))
+      const { callbacks } = syncs.at(-1) as unknown as {
+        callbacks: { availability: (state: string, realtime?: boolean) => void }
+      }
+      for (const state of states) act(() => callbacks.availability(state))
+      await waitFor(() =>
+        expect(document.getElementById('spotlight-lookbook-card-look-1')).toBeNull()
+      )
+      const announcements = recordAnnouncements()
+      await userEvent.setup().click(link)
+      const notice = await screen.findByTestId('community-spotlight-notice')
+      expect(notice.textContent).toBe(enUS.community.spotlight.destinationUnavailable)
+      await waitFor(() => expect(document.activeElement).toBe(notice))
+      expect(
+        screen.getByRole('region', { name: /community section/i }).contains(notice)
+      ).toBe(true)
+      expect(screen.queryByTestId('deep-link-info-banner')).toBeNull()
+      await nextFrames()
+      expect(announcements).not.toContain(enUS.community.spotlight.destinationUnavailable)
+    }
+  )
 
   it('6.7-WEB-013 the value survives leaving and re-entering stacked; a return inside 60 seconds reads nothing', async () => {
     let clock = Date.parse('2026-10-23T12:00:00.000Z')
@@ -599,12 +780,14 @@ describe('6.7 web Home spotlight teaser', () => {
     await answer(0, cityPage())
     await screen.findByTestId('home-spotlight-teaser-link')
 
+    const halfFloor = SPOTLIGHT_TEASER_READ_FLOOR_MS / 2
     act(() => setVisibility('hidden'))
-    clock += 30_000
+    clock += halfFloor
     act(() => setVisibility('visible'))
     expect(teaserCalls()).toHaveLength(1)
     act(() => setVisibility('hidden'))
-    clock += 30_001
+    // Together just past the floor.
+    clock += halfFloor + 1
     act(() => setVisibility('visible'))
     expect(teaserCalls()).toHaveLength(2)
     await waitFor(() => expect(teaserReads).toHaveLength(2))
@@ -689,18 +872,19 @@ describe('6.7 web Home spotlight teaser', () => {
     act(() => setVisibility('visible'))
     await answer(1, {
       status: 429,
-      headers: { 'Retry-After': '90' },
+      headers: { 'Retry-After': String(RETRY_AFTER_S) },
       body: { statusCode: 429, message: 'Too many spotlight reads.' },
     })
     await settledTeaserRead(1)
     expect(teaserNodes()).toEqual([])
 
+    // One second short of the hint, then the hint itself.
     act(() => setVisibility('hidden'))
-    clock += 89_000
+    clock += (RETRY_AFTER_S - 1) * 1000
     act(() => setVisibility('visible'))
     expect(teaserCalls()).toHaveLength(2)
     act(() => setVisibility('hidden'))
-    clock += 1_000
+    clock += 1000
     act(() => setVisibility('visible'))
     expect(teaserCalls()).toHaveLength(3)
   })
@@ -750,6 +934,48 @@ describe('6.7 web Home spotlight teaser', () => {
         await flush()
       expect(teaserReads).toHaveLength(2)
     }
+
+    it.each([
+      [
+        'the disabled 403',
+        {
+          status: 403,
+          body: {
+            statusCode: 403,
+            code: 'denied',
+            message: 'Community is not available for this account yet.',
+          },
+        },
+      ],
+      [
+        'the disabled 503',
+        {
+          status: 503,
+          body: { statusCode: 503, message: COMMUNITY_FEED_DISABLED_MESSAGE },
+        },
+      ],
+      [
+        'a 500',
+        { status: 500, body: { statusCode: 500, message: 'Internal server error' } },
+      ],
+    ] as const)(
+      '6.7-WEB-025 %s on the first read starts no retry loop',
+      async (_name, refusal) => {
+        useFakeClockTeaserReads()
+        render(<LookbookPrismLayout />)
+        for (let round = 0; round < 50 && teaserReads.length === 0; round += 1)
+          await flush()
+        teaserReads[0]!.resolve(refusal)
+        await flush()
+        expect(teaserNodes()).toEqual([])
+        await act(async () => {
+          await vi.advanceTimersByTimeAsync(SPOTLIGHT_TEASER_REREAD_MS * 2)
+        })
+        await flush()
+        expect(teaserReads).toHaveLength(1)
+        expect(teaserCalls()).toHaveLength(1)
+      }
+    )
 
     it('6.7-WEB-017 a contention 503 on the re-read removes the teaser at once and reads nothing after the hint', async () => {
       useFakeClockTeaserReads()
