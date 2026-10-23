@@ -3,9 +3,22 @@
 import { createHash } from 'node:crypto'
 import { PrismaClient } from '@prisma/client'
 import type { APIRequestContext } from '@playwright/test'
+import type {
+  ApiRequestParams,
+  ApiRequestResponse,
+} from '@seontechnologies/playwright-utils/api-request'
+import {
+  createSavedLocationFromSearchResponseSchema,
+  locationSearchResponseSchema,
+  type SavedLocation,
+} from '@couture/api-client/contracts/http'
 import {
   coordinateKeySuffix,
+  FLAKY_SAVE_PREFIX,
+  FLAKY_SEARCH_PREFIX,
+  flakySavePlace,
   sentinelPlace,
+  type WeatherProviderDoublePlace,
 } from '../../../scripts/lib/weather-provider-double-data.mjs'
 import { expect, test } from '../fixtures/merged-fixtures'
 import { buildUniqueId, isNonLocalEnvironment, resolveApiBaseUrl } from './api-test'
@@ -16,7 +29,7 @@ import {
   signUpCommunityUser,
 } from './community-session'
 
-export { expect, sentinelPlace }
+export { expect }
 
 /**
  * Same resolution chain as the other local-lane helpers, and never
@@ -51,13 +64,45 @@ async function signUpAutoArmMember(
   throw new Error('No auto-arm member after 12 signups; the arm hash changed.')
 }
 
+/**
+ * Twelve hex characters of the per-test id. The unique id itself grows with
+ * `PW_TEST_RUN_ID`, and a nonce cut by the input's 80-character limit would
+ * geocode a different place than the one the test asserts on.
+ */
+export function locationNonce(unique: string): string {
+  return createHash('sha256').update(unique).digest('hex').slice(0, 12)
+}
+
+export type ApiRequestFn = <T = unknown>(
+  options: Omit<ApiRequestParams, 'request'>
+) => Promise<ApiRequestResponse<T>>
+
 export type LocationSession = {
   userId: string
   accessToken: string
   apiBaseUrl: string
+  /** The weather double's place for this test's nonce; assert against it. */
+  sentinelPlace: WeatherProviderDoublePlace
   /** A query only this test types, geocoding to coordinates no run has saved. */
   sentinelQuery: string
   sentinelKeySuffix: string
+  /** Fails once with 500, then answers `sentinelPlace`. */
+  flakySearchQuery: string
+  /** Geocodes to `flakySavePlace`, whose first save-time forecast fails with 503. */
+  flakySaveQuery: string
+  flakySavePlace: WeatherProviderDoublePlace
+  /** Headers the web client sends, for API calls made as this member. */
+  headers: Record<string, string>
+  /**
+   * Saves a place the way the web does (search, then save the chosen
+   * candidate), so the row and its weather snapshot are real. Rows saved in
+   * order: the first one is primary.
+   */
+  seedLocation: (
+    query: string,
+    region: string | null,
+    label: string
+  ) => Promise<SavedLocation>
 }
 
 /**
@@ -65,7 +110,7 @@ export type LocationSession = {
  * signed-out page renders a calm shell that reads like a broken component.
  */
 export const locationTest = test.extend<{ locationSession: LocationSession }>({
-  locationSession: async ({ context, request }, use, testInfo) => {
+  locationSession: async ({ context, request, apiRequest }, use, testInfo) => {
     test.skip(
       isNonLocalEnvironment(testInfo),
       'Location capture writes locations and needs the local weather provider double.'
@@ -75,37 +120,74 @@ export const locationTest = test.extend<{ locationSession: LocationSession }>({
     const unique = buildUniqueId('loc', testInfo)
     const userId = await signUpAutoArmMember(request, apiBaseUrl, unique)
     const accessToken = communityAccessToken(userId)
-    const nonce = unique.toLowerCase().replace(/[^a-z0-9]/g, '')
+    const nonce = locationNonce(unique)
     const place = sentinelPlace(nonce)
+    const flakyPlace = flakySavePlace(nonce)
+    const nonceKeySuffixes = [
+      coordinateKeySuffix(place.lat, place.lon),
+      coordinateKeySuffix(flakyPlace.lat, flakyPlace.lon),
+    ]
+    const headers = {
+      Authorization: `Bearer ${accessToken}`,
+      'x-couture-platform': 'web',
+    }
+    const call = apiRequest as ApiRequestFn
     await seedWebSession(context, accessToken)
+
+    async function seedLocation(
+      query: string,
+      region: string | null,
+      label: string
+    ): Promise<SavedLocation> {
+      const search = await call({
+        method: 'GET',
+        path: '/api/v1/locations/search',
+        baseUrl: apiBaseUrl,
+        headers,
+        params: { q: query, locale: 'en-US' },
+      })
+      expect(search.status, `search ${query}`).toBe(200)
+      const candidate = locationSearchResponseSchema
+        .parse(search.body)
+        .data.find((option) => option.region === region)
+      if (!candidate) throw new Error(`No ${query} candidate in region ${region}.`)
+      const saved = await call({
+        method: 'POST',
+        path: '/api/v1/locations/from-search',
+        baseUrl: apiBaseUrl,
+        headers,
+        body: { candidateToken: candidate.candidateToken, label },
+      })
+      expect(saved.status, `save ${label}`).toBe(201)
+      return createSavedLocationFromSearchResponseSchema.parse(saved.body).data
+    }
 
     await use({
       userId,
       accessToken,
       apiBaseUrl,
+      sentinelPlace: place,
       sentinelQuery: `Sentinel ${nonce}`,
-      sentinelKeySuffix: coordinateKeySuffix(place.lat, place.lon),
+      sentinelKeySuffix: nonceKeySuffixes[0]!,
+      flakySearchQuery: `${FLAKY_SEARCH_PREFIX} ${nonce}`,
+      flakySaveQuery: `${FLAKY_SAVE_PREFIX} ${nonce}`,
+      flakySavePlace: flakyPlace,
+      headers,
+      seedLocation,
     })
 
     await deleteCommunityRowsForUser(userId)
     const prisma = locationPrisma()
     try {
-      const keys = (
-        await prisma.savedLocation.findMany({
-          where: { user_id: userId },
-          select: { location_key: true },
-        })
-      ).map((row) => row.location_key)
       await prisma.savedLocation.deleteMany({ where: { user_id: userId } })
-      const sentinelKeys = keys.filter((key) =>
-        key.endsWith(coordinateKeySuffix(place.lat, place.lon))
-      )
-      await prisma.forecastSegment.deleteMany({
-        where: { weather_snapshot: { location_key: { in: sentinelKeys } } },
-      })
-      await prisma.weatherSnapshot.deleteMany({
-        where: { location_key: { in: sentinelKeys } },
-      })
+      // By key suffix, not by saved row: a snapshot whose save then failed has
+      // no row to find it by. Catalog places (Springfield, Monaco) are shared
+      // across tests and left to the local teardown reset.
+      const nonceKeys = {
+        OR: nonceKeySuffixes.map((suffix) => ({ location_key: { endsWith: suffix } })),
+      }
+      await prisma.forecastSegment.deleteMany({ where: { weather_snapshot: nonceKeys } })
+      await prisma.weatherSnapshot.deleteMany({ where: nonceKeys })
     } finally {
       await prisma.$disconnect()
     }

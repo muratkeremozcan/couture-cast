@@ -9,6 +9,11 @@ export const SENTINEL_WEATHERAPI_CONDITION_CODE = 1153
 export const SENTINEL_CONDITION = 'drizzle'
 export const DOUBLE_SLOW_DELAY_MS = 4000
 
+/** One Call's daily projection: eight days, each with these bounds. */
+export const DOUBLE_DAILY_DAYS = 8
+export const DOUBLE_DAILY_MIN_C = 14
+export const DOUBLE_DAILY_MAX_C = 24
+
 const US = 'United States of America'
 
 /** OpenWeather names; `weatherApiCountry` is how WeatherAPI spells the country. */
@@ -169,6 +174,41 @@ export function sentinelPlace(nonce) {
     timezone: 'America/Denver',
     localNames: { en: 'Sentinelville', fr: 'Sentinelleville' },
   }
+}
+
+/**
+ * Fail-once scenarios, keyed per nonce so parallel tests never share one.
+ * `Flaky search <nonce>`: the first geocoding call fails with 500, every later
+ * call answers the nonce's sentinel place. `Flaky save <nonce>` geocodes to
+ * `flakySavePlace(nonce)`, whose first forecast call fails with 503.
+ */
+export const FLAKY_SEARCH_PREFIX = 'Flaky search'
+export const FLAKY_SAVE_PREFIX = 'Flaky save'
+
+/**
+ * Deterministic coordinates per nonce in a band no other place uses (latitude
+ * -20 to -50, longitude 80 to 120), so the forecast endpoint can tell a flaky
+ * save from its coordinates alone.
+ */
+export function flakySavePlace(nonce) {
+  const digest = createHash('sha256')
+    .update(`flaky:${fold(nonce)}`)
+    .digest()
+  const lat = -Math.round((20 + (digest.readUInt32BE(0) % 30000) / 1000) * 10000) / 10000
+  const lon = Math.round((80 + (digest.readUInt32BE(4) % 40000) / 1000) * 10000) / 10000
+  return {
+    name: 'Flakyville',
+    state: 'Sentinel County',
+    country: 'US',
+    weatherApiCountry: US,
+    lat,
+    lon,
+    timezone: 'America/Denver',
+  }
+}
+
+export function isFlakySaveCoordinate(latitude, longitude) {
+  return latitude <= -20 && latitude >= -50 && longitude >= 80 && longitude <= 120
 }
 
 /** The coordinate suffix a saved-location key ends with: `41-871n-87-631w`. */

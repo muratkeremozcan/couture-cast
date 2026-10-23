@@ -10,12 +10,21 @@
 //
 // `Sentinel <nonce>` geocodes to one place whose coordinates derive from the
 // nonce, so each run saves a location key that has never had a snapshot.
+// `Flaky search <nonce>` and `Flaky save <nonce>` fail once per nonce and then
+// recover, so a test can press retry and see it succeed.
 import { createServer } from 'node:http'
 import { pathToFileURL } from 'node:url'
 import {
+  DOUBLE_DAILY_DAYS,
+  DOUBLE_DAILY_MAX_C,
+  DOUBLE_DAILY_MIN_C,
   DOUBLE_PLACES,
   DOUBLE_SLOW_DELAY_MS,
+  FLAKY_SAVE_PREFIX,
+  FLAKY_SEARCH_PREFIX,
+  flakySavePlace,
   fold,
+  isFlakySaveCoordinate,
   sentinelPlace,
   SENTINEL_OPENWEATHER_CONDITION_ID,
   SENTINEL_TEMPERATURE_C,
@@ -24,10 +33,17 @@ import {
 
 export * from './lib/weather-provider-double-data.mjs'
 
+function nonceAfter(prefix, folded) {
+  return new RegExp(`^${fold(prefix)}\\s+([a-z0-9-]+)$`).exec(folded)?.[1] ?? null
+}
+
 function geocode(query) {
   const folded = fold(query)
-  const sentinel = /^sentinel\s+([a-z0-9-]+)$/.exec(folded)
-  if (sentinel) return [sentinelPlace(sentinel[1])]
+  const sentinel =
+    nonceAfter('sentinel', folded) ?? nonceAfter(FLAKY_SEARCH_PREFIX, folded)
+  if (sentinel) return [sentinelPlace(sentinel)]
+  const flakySave = nonceAfter(FLAKY_SAVE_PREFIX, folded)
+  if (flakySave) return [flakySavePlace(flakySave)]
   if (folded.length < 2) return []
   return DOUBLE_PLACES.filter((place) => fold(place.name).startsWith(folded)).slice(0, 5)
 }
@@ -76,9 +92,9 @@ function openWeatherForecast(lat, lon, timezone, nowSeconds) {
       wind_gust: 5,
       weather: [condition],
     })),
-    daily: Array.from({ length: 8 }, (_, index) => ({
+    daily: Array.from({ length: DOUBLE_DAILY_DAYS }, (_, index) => ({
       dt: hourStart + index * 86400,
-      temp: { min: 14, max: 24 },
+      temp: { min: DOUBLE_DAILY_MIN_C, max: DOUBLE_DAILY_MAX_C },
       feels_like: { day: 22, night: 13, eve: 19, morn: 15 },
       pop: 0.2,
       wind_speed: 3,
@@ -95,8 +111,8 @@ function weatherApiForecast(lat, lon, timezone, nowSeconds) {
     return {
       date: utcDate(dayStart),
       day: {
-        maxtemp_c: 24,
-        mintemp_c: 14,
+        maxtemp_c: DOUBLE_DAILY_MAX_C,
+        mintemp_c: DOUBLE_DAILY_MIN_C,
         maxwind_kph: 12,
         totalprecip_mm: 0.4,
         daily_chance_of_rain: 20,
@@ -168,10 +184,21 @@ function weatherApiSearchBody(places) {
   }))
 }
 
-async function handleGeocoding(url, response) {
+/** True the first time a fail-once key is seen, false on every later call. */
+function failsOnce(failedOnce, key) {
+  if (failedOnce.has(key)) return false
+  failedOnce.add(key)
+  return true
+}
+
+async function handleGeocoding(url, response, failedOnce) {
   const query = url.searchParams.get('q') ?? ''
   const folded = fold(query)
   if (folded === 'provider down') return send(response, 500, { message: 'down' })
+  const flakySearch = nonceAfter(FLAKY_SEARCH_PREFIX, folded)
+  if (flakySearch && failsOnce(failedOnce, `search:${flakySearch}`)) {
+    return send(response, 500, { message: 'down once' })
+  }
   if (folded === 'provider slow') await delay(DOUBLE_SLOW_DELAY_MS)
   const places = geocode(query)
   return send(
@@ -197,10 +224,16 @@ function forecastTimezone(place) {
   return place?.timezone ?? 'America/Denver'
 }
 
-async function handleForecast(url, response, nowSeconds) {
+async function handleForecast(url, response, nowSeconds, failedOnce) {
   const [lat, lon] = forecastCoordinates(url)
   if (!Number.isFinite(lat) || !Number.isFinite(lon)) {
     return send(response, 400, { message: 'bad coordinates' })
+  }
+  if (
+    isFlakySaveCoordinate(lat, lon) &&
+    failsOnce(failedOnce, `forecast:${lat.toFixed(4)},${lon.toFixed(4)}`)
+  ) {
+    return send(response, 503, { message: 'down once' })
   }
   const place = placeAt(lat, lon)
   if (place?.forecast === 'fail') return send(response, 503, { message: 'down' })
@@ -215,18 +248,21 @@ async function handleForecast(url, response, nowSeconds) {
   )
 }
 
-function handleControl(url, response, stats) {
+function handleControl(url, response, stats, failedOnce) {
   if (url.pathname === '/__double/reset') {
     stats.geocoding = 0
     stats.forecast = 0
+    failedOnce.clear()
   }
   if (url.pathname === '/__double/health') return send(response, 200, { ok: true })
   return send(response, 200, stats)
 }
 
-async function handle(request, response, { stats, now }) {
+async function handle(request, response, { stats, now, failedOnce }) {
   const url = new URL(request.url ?? '/', 'http://127.0.0.1')
-  if (url.pathname.startsWith('/__double/')) return handleControl(url, response, stats)
+  if (url.pathname.startsWith('/__double/')) {
+    return handleControl(url, response, stats, failedOnce)
+  }
 
   const isGeocoding = GEOCODING_PATHS.has(url.pathname)
   if (!isGeocoding && !FORECAST_PATHS.has(url.pathname)) {
@@ -237,10 +273,10 @@ async function handle(request, response, { stats, now }) {
   }
   if (isGeocoding) {
     stats.geocoding += 1
-    return handleGeocoding(url, response)
+    return handleGeocoding(url, response, failedOnce)
   }
   stats.forecast += 1
-  return handleForecast(url, response, Math.floor(now() / 1000))
+  return handleForecast(url, response, Math.floor(now() / 1000), failedOnce)
 }
 
 /**
@@ -252,10 +288,12 @@ export async function startWeatherProviderDouble({
   now = () => Date.now(),
 } = {}) {
   const stats = { geocoding: 0, forecast: 0 }
+  // Fail-once keys already served, so the second call for a nonce recovers.
+  const failedOnce = new Set()
   const sockets = new Set()
 
   const server = createServer((request, response) => {
-    handle(request, response, { stats, now }).catch((error) => {
+    handle(request, response, { stats, now, failedOnce }).catch((error) => {
       send(response, 500, { message: error instanceof Error ? error.message : 'error' })
     })
   })

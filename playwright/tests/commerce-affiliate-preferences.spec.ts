@@ -205,6 +205,13 @@ test.describe('Story 5.1 web settings affiliate opt-out', () => {
     // control becomes interactive. A disabled checkbox is out of the tab order, so
     // tabbing before this lands on the nav.
     await expect(optOutToggle(page)).toBeEnabled()
+    // The Locations section renders its search only once its own list read
+    // answers, which can land after the preferences read. Tabbing before then
+    // skips straight from the skip link to the toggle.
+    await expect(page.getByTestId('locations-section')).toHaveAttribute(
+      'data-state',
+      'ready'
+    )
 
     await log.step('Tab from the top of the document to the control')
     // The skip link is the first focusable element in the layout. Story 1.2b put

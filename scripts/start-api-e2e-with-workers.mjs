@@ -171,6 +171,19 @@ for (const file of rootEnvFiles) {
 Object.assign(env, explicitlyDisabled, callerOwned)
 env.E2E_CALLER_OWNED_ENV_KEYS = Object.keys(callerOwned).join(',')
 
+// Story 1.2b: this stack must never reach a live weather provider. An origin
+// from the shell, `.env.local` or `.env` that is not loopback is refused here,
+// before anything is built or started, because the API honours the override
+// outside production and would send real geocoding and forecast calls there.
+const WEATHER_ORIGIN_KEYS = ['OPENWEATHER_API_ORIGIN', 'WEATHERAPI_API_ORIGIN']
+for (const key of WEATHER_ORIGIN_KEYS) {
+  if (env[key] && !isLoopbackUrl(env[key])) {
+    refuse(
+      `${key}=${env[key]} is not a loopback origin. The E2E stack only talks to the local weather provider double; unset it, or point it at a double on 127.0.0.1.`
+    )
+  }
+}
+
 // `.env.local` overrides this script's own `NODE_ENV` and `TEST_ENV` above, so
 // which environment the stack will declare itself to be is settled only here.
 // `isLocalTestRun` is the predicate `allowsTestOnlySecrets()` and
@@ -358,8 +371,11 @@ async function isUrlHealthy(url) {
  * Story 1.2b: city search and the save-time forecast reach a local deterministic
  * double, never a live provider. The API honours the origin overrides only
  * outside production, and both lanes run with TEST_ENV=local. A caller that set
- * its own origins keeps them; the keys only need to be present, because the
- * double accepts any.
+ * its own loopback origins keeps them (non-loopback origins were refused at
+ * startup). When this launcher starts the double it also replaces both keys
+ * with a dummy, so a call that still went astray could not authenticate with
+ * a real key from `.env.local`. The four values join the caller-owned keys, or
+ * `apps/api/src/load-env.ts` would put the `.env.local` keys back in every child.
  */
 async function startWeatherProviderDouble() {
   if (env.OPENWEATHER_API_ORIGIN && env.WEATHERAPI_API_ORIGIN) {
@@ -380,8 +396,16 @@ async function startWeatherProviderDouble() {
   await ready
   env.OPENWEATHER_API_ORIGIN = origin
   env.WEATHERAPI_API_ORIGIN = origin
-  env.OPENWEATHER_API_KEY ||= 'e2e-weather-double-key'
-  env.WEATHERAPI_API_KEY ||= 'e2e-weather-double-key'
+  env.OPENWEATHER_API_KEY = 'e2e-weather-double-key'
+  env.WEATHERAPI_API_KEY = 'e2e-weather-double-key'
+  env.E2E_CALLER_OWNED_ENV_KEYS = [
+    ...new Set([
+      ...env.E2E_CALLER_OWNED_ENV_KEYS.split(',').filter(Boolean),
+      ...WEATHER_ORIGIN_KEYS,
+      'OPENWEATHER_API_KEY',
+      'WEATHERAPI_API_KEY',
+    ]),
+  ].join(',')
   console.log(
     `[start-api-e2e-with-workers] Weather provider double listening at ${origin}`
   )
