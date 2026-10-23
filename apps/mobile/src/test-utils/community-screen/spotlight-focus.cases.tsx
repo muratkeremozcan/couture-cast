@@ -408,6 +408,65 @@ export function registerCommunitySpotlightFocusCases() {
     }
   })
 
+  it('6.7-MOB-051 an intent that arrives while Community is still blurred focuses the entry once the screen takes focus', async () => {
+    const handles = iosFocusHandles()
+    vi.mocked(AccessibilityInfo.announceForAccessibility).mockClear()
+    serveSpotlight(() => page())
+    setMockParams({})
+    const view = await render(<CommunityScreen />)
+    const rank = await screen.findByTestId('community-spotlight-rank-spot-2')
+    // The router delivers the params before it reports the screen focused.
+    act(() => screenFocus.set(false))
+    setMockParams(teaserIntent('spot-2', 'token-051'))
+    await view.rerender(<CommunityScreen />)
+    await frames(5)
+    expect(announcementsOf(ANNOUNCE_FOCUSED)).toHaveLength(0)
+
+    act(() => screenFocus.set(true))
+    await waitFor(() =>
+      expect(AccessibilityInfo.setAccessibilityFocus).toHaveBeenLastCalledWith(
+        handles.get(rank)
+      )
+    )
+    expect(announcementsOf(ANNOUNCE_FOCUSED)).toHaveLength(1)
+  })
+
+  it('6.7-MOB-052 an intent for a missing entry that arrives while Community is blurred focuses the notice once it takes focus', async () => {
+    serveSpotlight(() => page({ items: [spotlightItem('spot-1', 1)] }))
+    setMockParams({})
+    const view = await render(<CommunityScreen />)
+    await screen.findByTestId('community-spotlight-rank-spot-1')
+    act(() => screenFocus.set(false))
+    setMockParams(teaserIntent('spot-9', 'token-052'))
+    await view.rerender(<CommunityScreen />)
+    await frames(5)
+    expect(screen.queryByTestId('deep-link-info-banner')).toBeNull()
+
+    act(() => screenFocus.set(true))
+    await expectFocusedNotice(TARGET_UNAVAILABLE)
+  })
+
+  it('6.7-MOB-053 a notice already focused takes no focus again on a later visit', async () => {
+    iosFocusHandles()
+    serveSpotlight(() => page({ items: [spotlightItem('spot-1', 1)] }))
+    setMockParams(teaserIntent('spot-9', 'token-053'))
+    await render(<CommunityScreen />)
+    await screen.findByTestId('deep-link-info-banner-message')
+    await waitFor(() =>
+      expect(AccessibilityInfo.setAccessibilityFocus).toHaveBeenCalled()
+    )
+    const afterNotice = vi.mocked(AccessibilityInfo.setAccessibilityFocus).mock.calls
+      .length
+
+    // Away and back: the notice still shows, and focus stays where the member is.
+    act(() => screenFocus.set(false))
+    act(() => screenFocus.set(true))
+    await frames(5)
+    expect(vi.mocked(AccessibilityInfo.setAccessibilityFocus).mock.calls).toHaveLength(
+      afterNotice
+    )
+  })
+
   it('6.7-MOB-041 an identity change while the destination is pending moves no focus and shows no notice', async () => {
     const held: (() => void)[] = []
     onTestFinished(() => {

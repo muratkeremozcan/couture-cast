@@ -330,14 +330,19 @@ export function CommunityScreen() {
    * Community (the Home tab, Android back) retires the intent and any targeted
    * focus not yet carried out, so nothing resolves, announces or moves focus on
    * a screen the member has left. Declared before the intent effects, so their
-   * first run already sees this visit as focused.
+   * first run already sees this visit as focused. The state re-runs them when
+   * focus arrives after an intent the router delivered first; the ref guards
+   * their timers and frames.
    */
   const screenFocusedRef = useRef(false)
+  const [screenFocused, setScreenFocused] = useState(false)
   useFocusEffect(
     useCallback(() => {
       screenFocusedRef.current = true
+      setScreenFocused(true)
       return () => {
         screenFocusedRef.current = false
+        setScreenFocused(false)
         setSpotlightIntent(null)
         const request = spotlightRef.current.focusRequest
         if (request?.kind === 'targeted')
@@ -1409,7 +1414,7 @@ export function CommunityScreen() {
   const focusSpotlightEntry = spotlight.focusEntry
   const feedListRef = feedScroll.listRef
   useEffect(() => {
-    if (!spotlightIntent || !screenFocusedRef.current) return
+    if (!spotlightIntent || !screenFocused) return
     const report = (key: SpotlightNoticeKey) => {
       if (!screenFocusedRef.current) return
       setSpotlightIntent(null)
@@ -1443,16 +1448,21 @@ export function CommunityScreen() {
     communityAvailable,
     feedListRef,
     focusSpotlightEntry,
+    screenFocused,
     spotlightIntent,
     spotlightItems,
     spotlightLevel,
     spotlightStatus,
   ])
 
+  const focusedNoticeSerialRef = useRef<number | null>(null)
   // Focusing the notice is its single announcement: the list returns to its
   // top, then focus moves to the message. No live region repeats it.
   useEffect(() => {
-    if (!spotlightNotice || !screenFocusedRef.current) return
+    if (!spotlightNotice || !screenFocused) return
+    // Focused once: a later visit leaves focus where the member puts it.
+    if (focusedNoticeSerialRef.current === spotlightNotice.serial) return
+    focusedNoticeSerialRef.current = spotlightNotice.serial
     feedListRef.current?.scrollToOffset({ offset: 0, animated: false })
     requestAnimationFrame(() => {
       if (!screenFocusedRef.current) return
@@ -1463,7 +1473,7 @@ export function CommunityScreen() {
       const handle = safeFindNodeHandle(noticeRef.current)
       if (handle) AccessibilityInfo.setAccessibilityFocus(handle)
     })
-  }, [feedListRef, spotlightNotice])
+  }, [feedListRef, screenFocused, spotlightNotice])
 
   const feedErrorMessage = useMemo(() => {
     const { key, options } = communityErrorTranslation(
