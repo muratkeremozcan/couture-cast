@@ -3,9 +3,12 @@
 //
 // Lists saved locations (label, place, primary marker), adds through city
 // search, and switches primary in one tap, renames and deletes in place. Every
-// target is at least 44 points. Outcomes are announced once through the shared
-// announcer; errors use the alert role. Opened from a guided entry, a save
-// returns to the originating screen, which reloads on `onLocationsChanged`.
+// target is at least 44 points. Outcomes and search, save and list-action
+// errors are announced once through the shared announcer; only the list load
+// error uses the alert role. Busy actions set `aria-busy` beside
+// `accessibilityState.busy`, which react-native-web 0.21 no longer renders.
+// Opened from a guided entry, a save returns to the originating screen, which
+// reloads on `onLocationsChanged`.
 import { useCallback, useEffect, useRef, useState } from 'react'
 import { useTranslation } from 'react-i18next'
 import { router } from 'expo-router'
@@ -339,6 +342,7 @@ export function LocationsScreen({ guided = false }: LocationsScreenProps) {
                   <Pressable
                     accessibilityRole="button"
                     accessibilityState={{ busy: busyId === location.id }}
+                    aria-busy={busyId === location.id}
                     onPress={() => {
                       const next = renameValue.trim()
                       if (!next) return
@@ -371,6 +375,7 @@ export function LocationsScreen({ guided = false }: LocationsScreenProps) {
                   <Pressable
                     accessibilityRole="button"
                     accessibilityState={{ busy: busyId === location.id }}
+                    aria-busy={busyId === location.id}
                     onPress={() => {
                       void runListAction(location.id, async () => {
                         await deleteLocationFromMobile(location.id)
@@ -400,6 +405,7 @@ export function LocationsScreen({ guided = false }: LocationsScreenProps) {
                       accessibilityRole="button"
                       accessibilityLabel={`${t('locations.makePrimary')}, ${location.label}`}
                       accessibilityState={{ busy: busyId === location.id }}
+                      aria-busy={busyId === location.id}
                       onPress={() => {
                         void runListAction(location.id, async () => {
                           await setPrimaryLocationFromMobile(location.id)
@@ -510,6 +516,7 @@ export function LocationsScreen({ guided = false }: LocationsScreenProps) {
                   <Pressable
                     accessibilityRole="button"
                     accessibilityState={{ busy: isSaving }}
+                    aria-busy={isSaving}
                     onPress={() => {
                       void save()
                     }}
