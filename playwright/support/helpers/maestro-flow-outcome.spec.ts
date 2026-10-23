@@ -12,6 +12,7 @@ import {
   flowTitleOf,
   lastStartedMaestroCommand,
   newestFlowDebugLog,
+  removeReportEverywhere,
 } from '../../../scripts/lib/maestro-flow-outcome.mjs'
 
 const HUNG_LOG = [
@@ -80,5 +81,48 @@ describe('Maestro flow outcome without a JUnit report', () => {
     expect(
       newestFlowDebugLog(path.join(directory, 'missing'), 'Community feed')
     ).toBeUndefined()
+  })
+  it('1.2b-R29-07 removes every same-named report, the nested stale ones included', () => {
+    directory = fs.mkdtempSync(path.join(os.tmpdir(), 'maestro-outcome-'))
+    const exact = path.join(directory, 'community-feed-report.xml')
+    const nested = path.join(
+      directory,
+      '2026-10-22_130422',
+      'old',
+      'community-feed-report.xml'
+    )
+    const other = path.join(directory, 'deep-link-handling-report.xml')
+    for (const file of [exact, nested, other]) {
+      fs.mkdirSync(path.dirname(file), { recursive: true })
+      fs.writeFileSync(file, '<testsuites/>')
+    }
+
+    expect(removeReportEverywhere(directory, exact).sort()).toEqual(
+      [exact, nested].sort()
+    )
+    expect(fs.existsSync(exact)).toBe(false)
+    expect(fs.existsSync(nested)).toBe(false)
+    expect(fs.existsSync(other)).toBe(true)
+  })
+
+  it('1.2b-R29-08 names a step only from a log written since the flow started', () => {
+    directory = fs.mkdtempSync(path.join(os.tmpdir(), 'maestro-outcome-'))
+    const file = path.join(
+      directory,
+      '2026-10-22_090000',
+      'Community feed',
+      'logs',
+      'maestro.log'
+    )
+    fs.mkdirSync(path.dirname(file), { recursive: true })
+    fs.writeFileSync(file, HUNG_LOG)
+    fs.utimesSync(file, 1_000, 1_000)
+
+    expect(
+      newestFlowDebugLog(directory, 'Community feed', { sinceMs: 2_000_000 })
+    ).toBeUndefined()
+    expect(newestFlowDebugLog(directory, 'Community feed', { sinceMs: 500_000 })).toBe(
+      file
+    )
   })
 })

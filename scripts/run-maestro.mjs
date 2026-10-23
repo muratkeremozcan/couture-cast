@@ -40,17 +40,21 @@ import {
   SENTINEL_TEMPERATURE_C,
   sentinelPlace,
 } from './lib/weather-provider-double-data.mjs'
-import { listAdbDevices, startExpoGoLinkEndpoint } from './lib/expo-go-link-endpoint.mjs'
+import { startExpoGoLinkEndpoint } from './lib/expo-go-link-endpoint.mjs'
 import {
   describeMissingReport,
   flowTitleOf,
   lastStartedMaestroCommand,
   newestFlowDebugLog,
+  removeReportEverywhere,
 } from './lib/maestro-flow-outcome.mjs'
 import { runMobileE2EFlow } from './lib/mobile-e2e-flow-retry.mjs'
 import {
+  adbDeviceStates,
   captureSlowProbeState,
+  resolveProbeSerials,
   runAdb,
+  saveDiagnostic,
   waitForPackageManagerReady,
 } from './lib/package-manager-readiness.mjs'
 import { buildMobileE2EAccessToken } from './lib/mobile-e2e-token.mjs'
@@ -3493,7 +3497,14 @@ const runMaestroCommandWithWatchdogRetry = async (args, options, label, reset) =
 const removeMaestroReport = (args) => {
   const index = args.indexOf('--output')
   const reportPath = index >= 0 ? args[index + 1] : undefined
-  if (reportPath) fs.rmSync(reportPath, { force: true })
+  if (!reportPath) return
+  // Every same-named report under the artifact tree, not just this path: a
+  // missing report is looked up by basename (`resolveReportPath`), so a nested
+  // stale one could otherwise judge a killed attempt (R29).
+  removeReportEverywhere(
+    path.resolve(projectRoot, MAESTRO_ARTIFACT_DIR),
+    path.resolve(projectRoot, reportPath)
+  )
 }
 
 /**
@@ -3646,11 +3657,17 @@ const buildSingleFlowMaestroArgs = (flowPath, target) => {
  * @param {string} flowPath
  * @param {Error | undefined} maestroExitError
  * @param {string[]} flowFailures collected in place
+ * @param {number} [startedAtMs] when the flow's first attempt began
  * @returns {void}
  */
-const recordSingleFlowOutcome = (flowPath, maestroExitError, flowFailures) => {
+const recordSingleFlowOutcome = (
+  flowPath,
+  maestroExitError,
+  flowFailures,
+  startedAtMs
+) => {
   const failuresBefore = flowFailures.length
-  recordFlowOutcome(flowPath, maestroExitError, flowFailures)
+  recordFlowOutcome(flowPath, maestroExitError, flowFailures, startedAtMs)
   if (flowFailures.length > failuresBefore) captureAndroidWindowStack(flowPath)
 }
 
@@ -3699,9 +3716,9 @@ const captureAndroidWindowStack = (flowPath) => {
       MAESTRO_ARTIFACT_DIR,
       `${getFlowName(flowPath)}-${suffix}.txt`
     )
-    fs.mkdirSync(path.dirname(target), { recursive: true })
-    fs.writeFileSync(target, result.stdout)
-    log(`Saved the Android ${label} for ${flowPath} to ${target}`)
+    // A write error is logged, never thrown: it must not stop the remaining
+    // flows or replace the failure it documents (R29).
+    saveDiagnostic(target, result.stdout, log, `the Android ${label} for ${flowPath}`)
   }
 }
 
@@ -3709,12 +3726,15 @@ const captureAndroidWindowStack = (flowPath) => {
  * The last command Maestro started for a flow, from its newest debug log.
  *
  * @param {string} flowPath
+ * @param {number} [startedAtMs] ignore logs older than the flow's first attempt
  * @returns {string | undefined}
  */
-const lastMaestroCommandFor = (flowPath) => {
+const lastMaestroCommandFor = (flowPath, startedAtMs) => {
   try {
     const title = flowTitleOf(fs.readFileSync(flowPath, 'utf8'))
-    const logFile = title && newestFlowDebugLog(MAESTRO_ARTIFACT_DIR, title)
+    // Only this flow's own run: an older log would name another run's step (R29).
+    const logFile =
+      title && newestFlowDebugLog(MAESTRO_ARTIFACT_DIR, title, { sinceMs: startedAtMs })
     return logFile
       ? lastStartedMaestroCommand(fs.readFileSync(logFile, 'utf8'))
       : undefined
@@ -3727,9 +3747,10 @@ const lastMaestroCommandFor = (flowPath) => {
  * @param {string} flowPath
  * @param {Error | undefined} maestroExitError
  * @param {string[]} flowFailures collected in place
+ * @param {number} [startedAtMs] when the flow's first attempt began
  * @returns {void}
  */
-const recordFlowOutcome = (flowPath, maestroExitError, flowFailures) => {
+const recordFlowOutcome = (flowPath, maestroExitError, flowFailures, startedAtMs) => {
   if (WRITE_ARTIFACTS) {
     const resolvedReportPath =
       resolveReportPath(getFlowReportPath(flowPath)) ?? getFlowReportPath(flowPath)
@@ -3740,7 +3761,7 @@ const recordFlowOutcome = (flowPath, maestroExitError, flowFailures) => {
         flowPath,
         report.unreadable,
         maestroExitError,
-        lastMaestroCommandFor(flowPath)
+        lastMaestroCommandFor(flowPath, startedAtMs)
       )
       flowFailures.push(failure)
       log(`FAIL ${failure}`)
@@ -3795,6 +3816,7 @@ const runFlowsSerially = async (target, maestroEnv, mobileIdentity, flowFailures
     const { maestroArgs, maestroLogFile } = buildSingleFlowMaestroArgs(flowPath, target)
 
     log(`Running Maestro flow (${maestroArgs.join(' ')})`)
+    const flowStartedAt = Date.now()
     let maestroExitError
     try {
       await runMaestroCommandWithWatchdogRetry(
@@ -3815,7 +3837,7 @@ const runFlowsSerially = async (target, maestroEnv, mobileIdentity, flowFailures
     const restoreCause = await restoreMobileE2EStateOrCause(mobileIdentity, flowPath)
     const doubleCause = await doubleWatch?.verify?.()
 
-    recordSingleFlowOutcome(flowPath, maestroExitError, flowFailures)
+    recordSingleFlowOutcome(flowPath, maestroExitError, flowFailures, flowStartedAt)
     for (const cause of [doubleCause, restoreCause]) {
       if (cause) failFlowWithCause(flowPath, cause, flowFailures)
     }
@@ -4162,8 +4184,12 @@ const run = async () => {
     // launches Expo Go with its developer-menu onboarding off. See
     // scripts/lib/expo-go-link-endpoint.mjs. `MOBILE_E2E_EXPO_GO_ONBOARDING=show`
     // keeps Expo Go's default, for comparing the two.
+    // R29: probe exactly the devices this run drives, and stop with a named
+    // error if one of them is missing or not ready, never skip it silently.
     const androidDevices =
-      target.platform === 'android' ? await listAdbDevices(resolveAdbBinary()) : []
+      target.platform === 'android'
+        ? resolveProbeSerials(ANDROID_SERIALS, await adbDeviceStates(resolveAdbBinary()))
+        : []
     // Story 1.2b R28: start no flow until each device's package manager answers
     // `pm clear` promptly. See scripts/lib/package-manager-readiness.mjs.
     for (const serial of androidDevices) {
@@ -4175,7 +4201,7 @@ const run = async () => {
             ['-s', serial, 'shell', 'pm', 'clear', target.appId],
             signal
           ),
-        onSlowProbe: (attempt) =>
+        onUnreadyProbe: (attempt) =>
           captureSlowProbeState({
             adbBinary: resolveAdbBinary(),
             serial,

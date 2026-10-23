@@ -32,12 +32,15 @@ export function lastStartedMaestroCommand(logText) {
 /**
  * The newest debug `maestro.log` Maestro wrote for a flow named `flowTitle`
  * (the flow's `name:`), under `<artifactDir>/<timestamp>/<flowTitle>/logs/`.
+ * Only logs written at or after `sinceMs` count, so a killed attempt that left
+ * no log of its own is never described by an earlier run's (R29).
  *
  * @param {string} artifactDir
  * @param {string} flowTitle
+ * @param {{ sinceMs?: number }} [options]
  * @returns {string | undefined}
  */
-export function newestFlowDebugLog(artifactDir, flowTitle) {
+export function newestFlowDebugLog(artifactDir, flowTitle, { sinceMs = 0 } = {}) {
   let runs
   try {
     runs = fs.readdirSync(artifactDir, { withFileTypes: true })
@@ -48,8 +51,49 @@ export function newestFlowDebugLog(artifactDir, flowTitle) {
     .filter((entry) => entry.isDirectory())
     .map((entry) => path.join(artifactDir, entry.name, flowTitle, 'logs', 'maestro.log'))
     .filter((file) => fs.existsSync(file))
-    .sort((left, right) => fs.statSync(right).mtimeMs - fs.statSync(left).mtimeMs)
-  return candidates[0]
+    .map((file) => ({ file, mtimeMs: fs.statSync(file).mtimeMs }))
+    .filter(({ mtimeMs }) => mtimeMs >= sinceMs)
+    .sort((left, right) => right.mtimeMs - left.mtimeMs)
+  return candidates[0]?.file
+}
+
+/**
+ * Deletes every file named like `reportPath` under `artifactRoot`, the exact
+ * path included. The runner reads a missing report through a same-basename
+ * search of the artifact tree (so a moved layout still resolves), and a stale
+ * report left anywhere in that tree would otherwise judge an attempt Maestro
+ * was killed before reporting (R29). Returns the paths removed.
+ *
+ * @param {string} artifactRoot
+ * @param {string} reportPath
+ * @returns {string[]}
+ */
+export function removeReportEverywhere(artifactRoot, reportPath) {
+  const removed = []
+  if (fs.existsSync(reportPath)) {
+    fs.rmSync(reportPath, { force: true })
+    removed.push(reportPath)
+  }
+  const wanted = path.basename(reportPath)
+  const stack = [artifactRoot]
+  while (stack.length > 0) {
+    const directory = stack.pop()
+    let entries
+    try {
+      entries = fs.readdirSync(directory, { withFileTypes: true })
+    } catch {
+      continue
+    }
+    for (const entry of entries) {
+      const full = path.join(directory, entry.name)
+      if (entry.isDirectory()) stack.push(full)
+      else if (entry.name === wanted) {
+        fs.rmSync(full, { force: true })
+        removed.push(full)
+      }
+    }
+  }
+  return removed
 }
 
 /**

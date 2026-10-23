@@ -1,8 +1,13 @@
 export declare function lastStartedMaestroCommand(logText: string): string | undefined
 export declare function newestFlowDebugLog(
   artifactDir: string,
-  flowTitle: string
+  flowTitle: string,
+  options?: { sinceMs?: number }
 ): string | undefined
+export declare function removeReportEverywhere(
+  artifactRoot: string,
+  reportPath: string
+): string[]
 export declare function describeMissingReport(
   flowPath: string,
   unreadable: string,
