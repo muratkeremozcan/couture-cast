@@ -6,16 +6,28 @@
  * the teardown that acts on the decision.
  */
 import type * as ChildProcess from 'node:child_process'
+import type * as E2eStackPid from '../../../scripts/e2e-stack-pid.mjs'
+import { spawn as realSpawn } from 'node:child_process'
 import fs from 'node:fs'
+import os from 'node:os'
 import path from 'node:path'
-import { afterEach, describe, expect, it, vi } from 'vitest'
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
+import { resolveEnvironmentConfig } from '../../config/environments'
 import globalTeardown from '../../global-teardown'
 import { databaseResetDecision } from './db-reset-policy'
 
 const execSync = vi.hoisted(() => vi.fn())
+const stopE2eStack = vi.hoisted(() => vi.fn(() => Promise.resolve('no-record')))
 vi.mock('node:child_process', async (importOriginal) => ({
   ...(await importOriginal<typeof ChildProcess>()),
   execSync,
+}))
+// The teardown stops "this run's" E2E stack before a reset. `prepare:playwright`
+// runs this suite inside the burn-in web server, whose own launcher is that
+// stack, so the real call signalled the server it was running in.
+vi.mock('../../../scripts/e2e-stack-pid.mjs', async (importOriginal) => ({
+  ...(await importOriginal<typeof E2eStackPid>()),
+  stopE2eStack,
 }))
 
 const LOCAL_DB = 'postgresql://postgres:postgres@127.0.0.1:54322/postgres'
@@ -105,17 +117,65 @@ describe('Playwright teardown database reset policy', () => {
 
 describe('Playwright global teardown', () => {
   const saved = { ...process.env }
+  let recordDirectory: string
+  let standIn: ChildProcess.ChildProcess | undefined
+
+  beforeEach(() => {
+    // The teardown finds "this run's" stack record under os.tmpdir(). A fresh
+    // TMPDIR keeps these cases away from any real stack's record, such as the
+    // burn-in web server's own launcher, which runs this suite.
+    recordDirectory = fs.mkdtempSync(path.join(os.tmpdir(), 'db-reset-policy-'))
+  })
   afterEach(() => {
-    process.env = { ...saved }
+    standIn?.kill('SIGKILL')
+    standIn = undefined
+    for (const key of Object.keys(process.env))
+      if (!(key in saved)) delete process.env[key]
+    Object.assign(process.env, saved)
+    fs.rmSync(recordDirectory, { recursive: true, force: true })
     execSync.mockReset()
+    stopE2eStack.mockClear()
     vi.restoreAllMocks()
   })
 
   async function runTeardown(env: Record<string, string>) {
-    process.env = { PATH: saved.PATH, HOME: saved.HOME, ...env }
+    // Mutated in place: a new object would detach process.env from the real
+    // environment, and os.tmpdir() reads TMPDIR from the real one.
+    for (const key of Object.keys(process.env))
+      if (!['PATH', 'HOME'].includes(key)) delete process.env[key]
+    Object.assign(process.env, { TMPDIR: recordDirectory }, env)
     const warn = vi.spyOn(console, 'warn').mockImplementation(() => undefined)
     await globalTeardown()
     return warn
+  }
+
+  /** A live process recorded as this checkout's E2E stack launcher. */
+  async function recordStandInLauncher(): Promise<ChildProcess.ChildProcess> {
+    const actual = await vi.importActual<typeof E2eStackPid>(
+      '../../../scripts/e2e-stack-pid.mjs'
+    )
+    const launcherPath = actual.e2eStackLauncherPath(repoRoot)
+    const child = realSpawn(
+      process.execPath,
+      ['-e', 'setInterval(() => {}, 1000)', launcherPath, '--with-web'],
+      { stdio: 'ignore' }
+    )
+    await new Promise((resolve) => setTimeout(resolve, 300))
+    const webPort = new URL(resolveEnvironmentConfig('local').webBaseUrl).port || '3005'
+    const recordPath = actual.e2eStackRecordPath(repoRoot, webPort, recordDirectory)
+    expect(
+      actual.writeE2eStackRecord(recordPath, { pid: child.pid!, launcherPath })
+    ).not.toBeNull()
+    return child
+  }
+
+  const alive = (child: ChildProcess.ChildProcess) => {
+    try {
+      process.kill(child.pid!, 0)
+      return child.exitCode === null && child.signalCode === null
+    } catch {
+      return false
+    }
   }
 
   it('leaves the database alone for a raw local run', async () => {
@@ -124,15 +184,21 @@ describe('Playwright global teardown', () => {
       DATABASE_URL: UNREACHABLE_LOCAL_DB,
     })
     expect(execSync).not.toHaveBeenCalledWith('npm run db:reset', expect.anything())
+    expect(stopE2eStack).not.toHaveBeenCalled()
     expect(warn).toHaveBeenCalledWith(expect.stringContaining('the reset is opt-in'))
   })
 
-  it('resets the database for a run that opted in', async () => {
+  it('resets the database for a run that opted in, and never signals a live launcher', async () => {
+    standIn = await recordStandInLauncher()
     await runTeardown({
       TEST_ENV: 'local',
       DATABASE_URL: UNREACHABLE_LOCAL_DB,
       PLAYWRIGHT_DB_RESET: 'true',
     })
     expect(execSync).toHaveBeenCalledWith('npm run db:reset', expect.anything())
+    expect(stopE2eStack).toHaveBeenCalledTimes(1)
+    // The burn-in web server runs this suite from inside its own launcher.
+    await new Promise((resolve) => setTimeout(resolve, 300))
+    expect(alive(standIn)).toBe(true)
   })
 })
