@@ -254,10 +254,24 @@ tags:
     timeout: 10000
     label: 'The newest feed-seed post renders in the feed'
 
+# UP, NOT DOWN, TO THE AUTHOR ROW.
+#
+# The author row is the card's topmost part, so once any part of the card is on
+# screen the row is either on screen too or ABOVE the list. It is never below.
+# This used to scroll DOWN to it, and CI job 120208110948 failed there (`No
+# visible element found: id: community-card-author-lookbook-5`): the feed list
+# spans [580,2190] on that 2400 px screen, the swipe drags 1560 px, and with the
+# fling after release the last swipe carried the card from wholly below the list
+# to its author row above the list top, under the sticky filter strip, so DOWN
+# ran to the end of the feed. Waiting on the row itself instead of the card does
+# not help: a swipe that can carry the row past the whole list can skip the row.
+# The card is a screen tall, so no swipe skips it. `scrollUntilVisible` checks
+# before it scrolls, so a row already on screen costs nothing here. Every check
+# after this one is for a part BELOW the row, so only downward walks follow.
 - scrollUntilVisible:
     element:
       id: 'community-card-author-lookbook-5'
-    direction: DOWN
+    direction: UP
     timeout: 20000
 - assertVisible:
     id: 'community-card-author-lookbook-5'

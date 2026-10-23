@@ -12,6 +12,11 @@
 // nonce, so each run saves a location key that has never had a snapshot.
 // `Flaky search <nonce>` and `Flaky save <nonce>` fail once per nonce and then
 // recover, so a test can press retry and see it succeed.
+//
+// `/__double/stats` counts provider calls per endpoint and `/__double/requests`
+// lists what each one asked for (the query, the coordinates), both read-only,
+// so a harness outside this process can prove which place a forecast was
+// fetched for.
 import { createServer } from 'node:http'
 import { pathToFileURL } from 'node:url'
 import {
@@ -158,6 +163,20 @@ const delay = (ms) => new Promise((resolve) => setTimeout(resolve, ms))
 
 const GEOCODING_PATHS = new Set(['/geo/1.0/direct', '/v1/search.json'])
 const FORECAST_PATHS = new Set(['/data/3.0/onecall', '/v1/forecast.json'])
+const OPENWEATHER_PATHS = new Set(['/geo/1.0/direct', '/data/3.0/onecall'])
+
+/** The newest entries the request log keeps per endpoint. */
+export const DOUBLE_REQUEST_LOG_LIMIT = 500
+
+/**
+ * Appends one entry, numbered by the endpoint's call count (`seq` 1 is the
+ * first call since start or reset), so a reader that noted the count before
+ * an action can take exactly the entries that action caused.
+ */
+function logRequest(log, entry) {
+  log.push(entry)
+  if (log.length > DOUBLE_REQUEST_LOG_LIMIT) log.shift()
+}
 
 function openWeatherGeocodingBody(places) {
   return places
@@ -248,20 +267,23 @@ async function handleForecast(url, response, nowSeconds, failedOnce) {
   )
 }
 
-function handleControl(url, response, stats, failedOnce) {
+function handleControl(url, response, { stats, requests, failedOnce }) {
   if (url.pathname === '/__double/reset') {
     stats.geocoding = 0
     stats.forecast = 0
+    requests.geocoding.length = 0
+    requests.forecast.length = 0
     failedOnce.clear()
   }
   if (url.pathname === '/__double/health') return send(response, 200, { ok: true })
+  if (url.pathname === '/__double/requests') return send(response, 200, requests)
   return send(response, 200, stats)
 }
 
-async function handle(request, response, { stats, now, failedOnce }) {
+async function handle(request, response, { stats, requests, now, failedOnce }) {
   const url = new URL(request.url ?? '/', 'http://127.0.0.1')
   if (url.pathname.startsWith('/__double/')) {
-    return handleControl(url, response, stats, failedOnce)
+    return handleControl(url, response, { stats, requests, failedOnce })
   }
 
   const isGeocoding = GEOCODING_PATHS.has(url.pathname)
@@ -271,29 +293,39 @@ async function handle(request, response, { stats, now, failedOnce }) {
   if (!url.searchParams.get('appid') && !url.searchParams.get('key')) {
     return send(response, 401, { message: 'missing key' })
   }
+  const provider = OPENWEATHER_PATHS.has(url.pathname) ? 'openweather' : 'weatherapi'
   if (isGeocoding) {
     stats.geocoding += 1
+    logRequest(requests.geocoding, {
+      seq: stats.geocoding,
+      provider,
+      query: url.searchParams.get('q') ?? '',
+    })
     return handleGeocoding(url, response, failedOnce)
   }
   stats.forecast += 1
+  const [latitude, longitude] = forecastCoordinates(url)
+  logRequest(requests.forecast, { seq: stats.forecast, provider, latitude, longitude })
   return handleForecast(url, response, Math.floor(now() / 1000), failedOnce)
 }
 
 /**
  * Starts the double on 127.0.0.1. `stats` counts provider calls per endpoint so
- * tests can prove a refused request never reached a provider.
+ * tests can prove a refused request never reached a provider; `requests` logs
+ * what each call asked for.
  */
 export async function startWeatherProviderDouble({
   port = 0,
   now = () => Date.now(),
 } = {}) {
   const stats = { geocoding: 0, forecast: 0 }
+  const requests = { geocoding: [], forecast: [] }
   // Fail-once keys already served, so the second call for a nonce recovers.
   const failedOnce = new Set()
   const sockets = new Set()
 
   const server = createServer((request, response) => {
-    handle(request, response, { stats, now, failedOnce }).catch((error) => {
+    handle(request, response, { stats, requests, now, failedOnce }).catch((error) => {
       send(response, 500, { message: error instanceof Error ? error.message : 'error' })
     })
   })
@@ -313,6 +345,7 @@ export async function startWeatherProviderDouble({
     origin,
     port: address.port,
     stats,
+    requests,
     close: () =>
       new Promise((resolve) => {
         for (const socket of sockets) socket.destroy()

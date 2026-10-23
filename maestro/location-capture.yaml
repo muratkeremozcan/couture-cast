@@ -4,10 +4,18 @@
 # the baseline Chicago location after it (`FLOW_STATE_HOOKS` in
 # scripts/run-maestro.mjs), so the hero opens on its no-location state. The E2E
 # API reaches the local weather provider double (scripts/weather-provider-double.mjs),
-# never a live provider. `LOCATION_SENTINEL_QUERY` geocodes to a place no run
-# has saved, and its forecast carries the sentinel 31 C (88 F) the ritual's
-# synthetic test weather never produces, so the hero showing 88 degrees proves
-# the ritual consumed the forecast persisted at save.
+# never a live provider: before the suite the runner proves the API sends a probe
+# search there, and refuses this flow otherwise.
+#
+# `LOCATION_SENTINEL_QUERY` (`Sentinel <per-run nonce>`) geocodes to
+# `LOCATION_SENTINEL_PLACE`, at coordinates derived from the nonce that no run
+# has saved. Its forecast carries the sentinel 31 C the ritual's synthetic test
+# weather (68 F) never produces; the runner passes it as
+# `LOCATION_SENTINEL_TEMP_F`, so the hero showing exactly that proves the ritual
+# consumed the forecast persisted at save. The double cannot tell one set of
+# coordinates from another by temperature, so the runner also reads the double's
+# request log after the flow and fails it unless this run's search reached the
+# double and a forecast was fetched at the sentinel place's own coordinates.
 appId: ${MAESTRO_APP_ID}
 name: 'Location capture guided entry'
 tags:
@@ -46,7 +54,20 @@ tags:
       id: 'location-search-option-0'
     timeout: 15000
     label: 'The sentinel city is offered'
-- hideKeyboard
+- assertVisible:
+    id: 'location-search-option-0'
+    text: '${LOCATION_SENTINEL_PLACE}.*'
+    label: 'The first option is the sentinel place, not some other match'
+# iOS only. The soft keyboard there covers the lower screen. On Android Maestro
+# dismisses the keyboard with the back key, which pops this stacked screen
+# whenever no soft keyboard is up (a hardware-keyboard AVD), and the Locations
+# scroll view keeps taps on its buttons while the keyboard is up
+# (`keyboardShouldPersistTaps="handled"`), so Android needs no dismissal.
+- runFlow:
+    when:
+      platform: iOS
+    commands:
+      - hideKeyboard
 - tapOn:
     id: 'location-search-option-0'
     label: 'Pick the sentinel city'
@@ -58,7 +79,11 @@ tags:
     id: 'location-label-input'
 - eraseText: 40
 - inputText: 'Home'
-- hideKeyboard
+- runFlow:
+    when:
+      platform: iOS
+    commands:
+      - hideKeyboard
 - tapOn:
     id: 'location-save-button'
     label: 'Save the location'
@@ -73,8 +98,8 @@ tags:
     id: 'hero-no-location-state'
 - assertVisible:
     id: 'current-temperature'
-    text: '.*88.*'
-    label: 'The ritual reports the sentinel forecast'
+    text: '${LOCATION_SENTINEL_TEMP_F}°F'
+    label: 'The ritual reports the sentinel forecast, not the synthetic 68 F'
 - takeScreenshot:
     path: maestro/artifacts/location-capture-hero
 
@@ -124,5 +149,10 @@ tags:
 - assertVisible:
     id: 'location-label-0'
     text: 'Home'
+- assertVisible:
+    text: '${LOCATION_SENTINEL_PLACE}, .*'
+    below:
+      id: 'location-label-0'
+    label: 'The saved row names the sentinel place the flow picked'
 - takeScreenshot:
     path: maestro/artifacts/location-capture-settings
