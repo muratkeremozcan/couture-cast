@@ -40,6 +40,7 @@ import {
   SENTINEL_TEMPERATURE_C,
   sentinelPlace,
 } from './lib/weather-provider-double-data.mjs'
+import { listAdbDevices, startExpoGoLinkEndpoint } from './lib/expo-go-link-endpoint.mjs'
 import { runMobileE2EFlow } from './lib/mobile-e2e-flow-retry.mjs'
 import { buildMobileE2EAccessToken } from './lib/mobile-e2e-token.mjs'
 
@@ -3308,6 +3309,9 @@ const buildMaestroFlowEnvArgs = () => [
   `WIDGET_MORNING_URL=${process.env.WIDGET_MORNING_URL}`,
   '-e',
   `WIDGET_EVENING_URL=${process.env.WIDGET_EVENING_URL}`,
+  // Empty on iOS: `subflows/open-link.yaml` then keeps a plain `openLink`.
+  '-e',
+  `MAESTRO_EXPO_GO_OPEN_URL=${process.env.MAESTRO_EXPO_GO_OPEN_URL ?? ''}`,
 ]
 
 /**
@@ -4081,6 +4085,20 @@ const run = async () => {
 
     await awaitExpoGoAndWarmBundle(target, resolvedPair.health)
 
+    // Story 1.2b R24: Android flows open deep links through this endpoint, which
+    // launches Expo Go with its developer-menu onboarding off. See
+    // scripts/lib/expo-go-link-endpoint.mjs. `MOBILE_E2E_EXPO_GO_ONBOARDING=show`
+    // keeps Expo Go's default, for comparing the two.
+    const expoGoLinks =
+      target.platform === 'android'
+        ? await startExpoGoLinkEndpoint({
+            adbBinary: resolveAdbBinary(),
+            devices: await listAdbDevices(resolveAdbBinary()),
+            disableOnboarding: process.env.MOBILE_E2E_EXPO_GO_ONBOARDING !== 'show',
+          })
+        : undefined
+    process.env.MAESTRO_EXPO_GO_OPEN_URL = expoGoLinks?.url ?? ''
+
     const { maestroEnv, xcrunShimDir } = createMaestroEnv(target.platform)
 
     // A suite runner reports on every flow. Rejecting on the first failure hid
@@ -4132,6 +4150,7 @@ const run = async () => {
 
       await runFlowsSerially(target, maestroEnv, mobileIdentity, flowFailures)
     } finally {
+      await expoGoLinks?.close()
       if (xcrunShimDir) {
         fs.rmSync(xcrunShimDir, { recursive: true, force: true })
       }

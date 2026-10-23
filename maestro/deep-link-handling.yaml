@@ -21,14 +21,20 @@ tags:
     id: 'hero-experience-scrollview'
 
 # Test Severe Weather Notification Deep Link
-- openLink: '${APP_URL}?source=notification&type=severe_weather&alertId=${WEATHER_ALERT_ID}'
+- runFlow:
+    file: subflows/open-link.yaml
+    env:
+      LINK: '${APP_URL}?source=notification&type=severe_weather&alertId=${WEATHER_ALERT_ID}'
 - assertVisible:
     id: 'severe-weather-alert-focused'
 - takeScreenshot:
     path: maestro/artifacts/deep-link-severe-weather
 
 # Test Invalid Deep Link Fallback & Info Banner
-- openLink: '${APP_URL}?source=invalid_src&slot=bad_slot'
+- runFlow:
+    file: subflows/open-link.yaml
+    env:
+      LINK: '${APP_URL}?source=invalid_src&slot=bad_slot'
 - assertVisible:
     id: 'deep-link-info-banner'
 - takeScreenshot:

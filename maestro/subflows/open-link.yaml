@@ -1,0 +1,35 @@
+# Open a deep link in Expo Go. Use this instead of a bare `openLink`.
+#
+# On Android Expo Go raises its developer-menu onboarding by itself after an
+# experience loads whenever onboarding is unfinished, and `clearState: true`
+# resets that before every flow. On CI the sheet sometimes never animated in
+# and its invisible backdrop swallowed every tap for the rest of the flow (CI
+# job 120258320163). A launch intent carrying `EXKernelDisableNuxDefaultsKey`
+# turns that onboarding off for the process, and Maestro's `openLink` cannot
+# add extras, so on Android the runner sends the intent over adb
+# (`scripts/lib/expo-go-link-endpoint.mjs`, via `open-expo-go-link.js`).
+#
+# iOS keeps `openLink`: its sheet handling lives in `absorb-expo-dev-sheet.yaml`.
+# So does any run that set no endpoint, such as the Story 6.5 native harness,
+# which drives a development build rather than Expo Go.
+#
+# Pass the link as `LINK`:
+#   - runFlow:
+#       file: subflows/open-link.yaml
+#       env:
+#         LINK: ${APP_URL}
+appId: ${MAESTRO_APP_ID}
+---
+- runFlow:
+    when:
+      true: ${maestro.platform === 'android' && typeof MAESTRO_EXPO_GO_OPEN_URL === 'string' && MAESTRO_EXPO_GO_OPEN_URL !== ''}
+    commands:
+      - runScript:
+          file: open-expo-go-link.js
+          env:
+            LINK: ${LINK}
+- runFlow:
+    when:
+      true: ${maestro.platform !== 'android' || typeof MAESTRO_EXPO_GO_OPEN_URL !== 'string' || MAESTRO_EXPO_GO_OPEN_URL === ''}
+    commands:
+      - openLink: ${LINK}

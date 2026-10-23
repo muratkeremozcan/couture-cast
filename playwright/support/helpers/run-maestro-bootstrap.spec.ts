@@ -8,6 +8,7 @@ import { afterEach, beforeEach, describe, expect, it } from 'vitest'
 const runnerFiles = [
   'scripts/run-maestro.mjs',
   'scripts/maestro-version.mjs',
+  'scripts/lib/expo-go-link-endpoint.mjs',
   'scripts/lib/mobile-e2e-flow-state.mjs',
   'scripts/lib/mobile-e2e-flow-retry.mjs',
   'scripts/lib/mobile-e2e-token.mjs',

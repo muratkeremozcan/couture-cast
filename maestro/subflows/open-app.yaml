@@ -26,7 +26,10 @@ appId: ${MAESTRO_APP_ID}
 - retry:
     maxRetries: 2
     commands:
-      - openLink: ${APP_URL}
+      - runFlow:
+          file: open-link.yaml
+          env:
+            LINK: ${APP_URL}
 
       # Dismiss an Android system "isn't responding" dialog before anything else.
       #
@@ -238,7 +241,10 @@ appId: ${MAESTRO_APP_ID}
       notVisible:
         id: 'tab-home'
     commands:
-      - openLink: ${APP_URL}
+      - runFlow:
+          file: open-link.yaml
+          env:
+            LINK: ${APP_URL}
       - extendedWaitUntil:
           visible:
             id: 'tab-home'
