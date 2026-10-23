@@ -19,7 +19,10 @@ import {
   recordCommunitySpotlightOpenedFromMobile,
 } from '@/src/lib/community'
 import { safeFindNodeHandle } from '@/src/lib/accessibility-focus'
-import { observeAccessibilityFocus } from '@/modules/accessibility-focus'
+import {
+  focusAccessibilityElement,
+  observeAccessibilityFocus,
+} from '@/modules/accessibility-focus'
 
 export interface HomeSpotlightTeaserView {
   value: SpotlightTeaserValue | null
@@ -154,46 +157,63 @@ interface FocusRequest {
 }
 
 /**
- * On the next frame, asks `destination` where focus should go and moves
- * accessibility focus there: the DOM node on web, the native node elsewhere.
- * Choosing in the frame means a teaser that left since the request was queued
- * is never the target. Resolves the request, or null when nothing was focused.
+ * How many frames a native view gets to accept accessibility focus. On a return
+ * to Home the screen's views are reattached a frame or more after navigation
+ * reports focus, and until then the platform refuses the move.
  */
-function focusOnNextFrame(
-  destination: () => FocusDestination | null
-): Promise<FocusRequest | null> {
-  return new Promise((resolve) => {
-    requestAnimationFrame(() => {
-      const chosen = destination()
-      if (!chosen) {
-        resolve(null)
-        return
-      }
-      if (Platform.OS === 'web') {
-        const element = document.querySelector<HTMLElement>(
-          `[data-testid="${FOCUS_TEST_IDS[chosen.target]}"]`
-        )
-        element?.focus()
-        resolve(
-          element
-            ? {
-                target: chosen.target,
-                handle: null,
-                landed: document.activeElement === element,
-              }
-            : null
-        )
-        return
-      }
-      const handle = safeFindNodeHandle(chosen.node)
-      if (!handle) {
-        resolve(null)
-        return
-      }
-      AccessibilityInfo.setAccessibilityFocus(handle)
-      resolve({ target: chosen.target, handle, landed: false })
-    })
+export const NATIVE_FOCUS_FRAMES = 60
+
+const nextFrame = () =>
+  new Promise<void>((resolve) => {
+    requestAnimationFrame(() => resolve())
   })
+
+/**
+ * From the next frame on, asks `destination` where focus should go and moves
+ * accessibility focus there: the DOM node on web, the native node elsewhere,
+ * through the accessibility-focus module when the build carries it. The target
+ * is chosen again in every frame, so a teaser that left since the request was
+ * queued is never the target; a native view that refuses focus is asked again
+ * on the next frame, up to `NATIVE_FOCUS_FRAMES`. `onChosen` runs once, at the
+ * first frame that has a destination. Resolves the request that went through,
+ * or null when nothing was focused.
+ */
+async function moveAccessibilityFocus(
+  destination: () => FocusDestination | null,
+  onChosen: () => void
+): Promise<FocusRequest | null> {
+  for (let frame = 0; frame < NATIVE_FOCUS_FRAMES; frame += 1) {
+    await nextFrame()
+    const chosen = destination()
+    if (!chosen) return null
+    if (frame === 0) onChosen()
+    if (Platform.OS === 'web') {
+      const element = document.querySelector<HTMLElement>(
+        `[data-testid="${FOCUS_TEST_IDS[chosen.target]}"]`
+      )
+      element?.focus()
+      return element
+        ? {
+            target: chosen.target,
+            handle: null,
+            landed: document.activeElement === element,
+          }
+        : null
+    }
+    const handle = safeFindNodeHandle(chosen.node)
+    if (!handle) return null
+    // The module moves the screen reader's cursor itself; React Native's call is
+    // the fallback where the build has none (Expo Go), and it cannot say whether
+    // the move was taken.
+    const moving = focusAccessibilityElement(handle)
+    if (!moving) {
+      AccessibilityInfo.setAccessibilityFocus(handle)
+      return { target: chosen.target, handle, landed: false }
+    }
+    if (await moving.catch(() => false))
+      return { target: chosen.target, handle, landed: false }
+  }
+  return null
 }
 
 const nextMove = (target: TeaserFocusTarget) => (previous: TeaserFocusMove | null) => ({
@@ -248,6 +268,8 @@ export function useHomeSpotlightTeaserLink({
   /** A native focus request the OS has not confirmed yet. */
   const unconfirmedRef = useRef<FocusRequest | null>(null)
   const mountedRef = useRef(true)
+  /** Each focus move takes this serial; a later move ends any earlier one still trying. */
+  const moveSerialRef = useRef(0)
   const [focusRequested, setFocusRequested] = useState<TeaserFocusMove | null>(null)
   const [focusLanded, setFocusLanded] = useState<TeaserFocusMove | null>(null)
 
@@ -273,15 +295,27 @@ export function useHomeSpotlightTeaserLink({
   )
 
   const moveFocus = useCallback(
-    (destination: () => FocusDestination | null) =>
-      focusOnNextFrame(() =>
-        mountedRef.current && isHomeFocusedRef.current ? destination() : null
+    (
+      destination: () => FocusDestination | null,
+      onChosen: () => void = () => undefined
+    ) => {
+      moveSerialRef.current += 1
+      const serial = moveSerialRef.current
+      return moveAccessibilityFocus(
+        () =>
+          serial === moveSerialRef.current &&
+          mountedRef.current &&
+          isHomeFocusedRef.current
+            ? destination()
+            : null,
+        onChosen
       ).then((request) => {
         if (!request || !mountedRef.current) return
         setFocusRequested(nextMove(request.target))
         if (request.landed) setFocusLanded(nextMove(request.target))
         else if (request.handle) unconfirmedRef.current = request
-      }),
+      })
+    },
     []
   )
 
@@ -291,15 +325,17 @@ export function useHomeSpotlightTeaserLink({
       setIsHomeFocused(true)
       const token = pendingReturnRef.current
       if (token) {
-        void moveFocus(() => {
-          // Consumed once a destination exists in the frame focus moves in; a
-          // Home blur before that frame leaves it for the next return.
-          if (pendingReturnRef.current !== token) return null
-          pendingReturnRef.current = null
-          return linkRef.current
-            ? { target: 'link', node: linkRef.current }
-            : { target: 'scroll-view', node: scrollViewRef.current }
-        })
+        void moveFocus(
+          () =>
+            linkRef.current
+              ? { target: 'link', node: linkRef.current }
+              : { target: 'scroll-view', node: scrollViewRef.current },
+          // Consumed once a destination exists in a frame focus moves in; a Home
+          // blur before that frame leaves it for the next return.
+          () => {
+            if (pendingReturnRef.current === token) pendingReturnRef.current = null
+          }
+        )
       }
       return () => {
         isHomeFocusedRef.current = false

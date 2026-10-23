@@ -20,6 +20,10 @@ const heroCardRenders = vi.hoisted(() => ({ count: 0 }))
 const osFocus = vi.hoisted(() => ({
   available: true,
   listeners: new Set<AccessibilityFocusListener>(),
+  /** Native tags the module was asked to move the screen reader's cursor to. */
+  moves: [] as number[],
+  /** How many more requests the platform refuses, as before a view is reattached. */
+  refusals: 0,
   report(tags: number[]) {
     for (const listener of [...this.listeners]) listener({ tags })
   },
@@ -35,6 +39,15 @@ vi.mock('expo-localization', () => ({
 }))
 vi.mock('@/src/lib/community', { spy: true })
 vi.mock('@/modules/accessibility-focus', () => ({
+  focusAccessibilityElement: (tag: number) => {
+    if (!osFocus.available) return null
+    osFocus.moves.push(tag)
+    if (osFocus.refusals > 0) {
+      osFocus.refusals -= 1
+      return Promise.resolve(false)
+    }
+    return Promise.resolve(true)
+  },
   observeAccessibilityFocus: (listener: AccessibilityFocusListener) => {
     if (!osFocus.available) return null
     osFocus.listeners.add(listener)
@@ -108,6 +121,7 @@ import {
 } from '@/src/lib/mobile-auth'
 import { communityCommentsSessionFromMobile } from '@/src/lib/community'
 import { SPOTLIGHT_TEASER_READ_FLOOR_MS } from '@couture/api-client'
+import { NATIVE_FOCUS_FRAMES } from '@/src/features/home/use-home-spotlight-teaser'
 import i18n, { initI18n } from '@/src/lib/i18n'
 
 let restoreToken: (() => void) | undefined
@@ -142,7 +156,20 @@ function iosFocusHandles() {
   }
 }
 
+/**
+ * Every native focus move, through the module or React Native's call; only one
+ * path may carry a move, so a move sent both ways counts twice.
+ */
 function focusCalls(): number[] {
+  return [
+    ...osFocus.moves,
+    ...vi
+      .mocked(AccessibilityInfo.setAccessibilityFocus)
+      .mock.calls.map(([handle]) => handle),
+  ]
+}
+
+function reactNativeFocusCalls(): number[] {
   return vi
     .mocked(AccessibilityInfo.setAccessibilityFocus)
     .mock.calls.map(([handle]) => handle)
@@ -191,6 +218,8 @@ beforeEach(async () => {
   screenFocus.reset()
   osFocus.available = true
   osFocus.listeners.clear()
+  osFocus.moves.length = 0
+  osFocus.refusals = 0
   heroCardRenders.count = 0
   token = 'session-token'
   restoreToken = setMobileAccessTokenResolver(() => token)
@@ -215,6 +244,9 @@ describe('6.7 mobile Home teaser native focus', () => {
     await waitFor(() => expect(focusCalls()).toHaveLength(1))
     expect(domOf(focusCalls()[0]!)).toBe(link)
     expect(focusCalls()).toEqual([handleOf(link)])
+    // The module moves the cursor; React Native's Android call is ignored by TalkBack.
+    expect(osFocus.moves).toEqual([handleOf(link)])
+    expect(reactNativeFocusCalls()).toEqual([])
     await screen.findByTestId('home-spotlight-teaser-focus-requested-link-1')
     // Only the OS report confirms the move.
     expect(screen.queryByTestId('home-spotlight-teaser-focused-link-1')).toBeNull()
@@ -295,7 +327,8 @@ describe('6.7 mobile Home teaser native focus', () => {
     const { link } = await shownTeaser()
     const { handleOf } = iosFocusHandles()
     await activateAndReturn(link)
-    await waitFor(() => expect(focusCalls()).toEqual([handleOf(link)]))
+    await waitFor(() => expect(reactNativeFocusCalls()).toEqual([handleOf(link)]))
+    expect(focusCalls()).toHaveLength(1)
     await screen.findByTestId('home-spotlight-teaser-focus-requested-link-1')
 
     signOut()
@@ -306,6 +339,36 @@ describe('6.7 mobile Home teaser native focus', () => {
       document.querySelector('[data-testid^="home-spotlight-teaser-focused-"]')
     ).toBeNull()
     for (const spy of consoleSpies) expect(spy).not.toHaveBeenCalled()
+  })
+
+  it('6.7-MOB-048 a link that refuses focus while Home reattaches is asked again each frame until it takes it', async () => {
+    const { link } = await shownTeaser()
+    const { handleOf } = iosFocusHandles()
+    osFocus.refusals = 3
+    await activateAndReturn(link)
+
+    await waitFor(() => expect(osFocus.moves).toHaveLength(4))
+    expect(new Set(osFocus.moves)).toEqual(new Set([handleOf(link)]))
+    await screen.findByTestId('home-spotlight-teaser-focus-requested-link-1')
+    await settleFrames()
+    expect(osFocus.moves).toHaveLength(4)
+    expect(reactNativeFocusCalls()).toEqual([])
+  })
+
+  it('6.7-MOB-049 a view that never takes focus is asked for a bounded number of frames, then left', async () => {
+    const { link } = await shownTeaser()
+    iosFocusHandles()
+    osFocus.refusals = Number.POSITIVE_INFINITY
+    await activateAndReturn(link)
+
+    await waitFor(() => expect(osFocus.moves).toHaveLength(NATIVE_FOCUS_FRAMES), {
+      timeout: 10_000,
+    })
+    await settleFrames()
+    expect(osFocus.moves).toHaveLength(NATIVE_FOCUS_FRAMES)
+    expect(
+      document.querySelector('[data-testid^="home-spotlight-teaser-focus-requested-"]')
+    ).toBeNull()
   })
 
   it('6.7-MOB-047 a re-read that fails between the return and its focus frame sends focus to the scroll view, once', async () => {

@@ -1,8 +1,9 @@
 import ExpoModulesCore
 import UIKit
 
-/// Reports VoiceOver focus changes as the native view tags from the focused
-/// element outwards. React Native views carry their React tag as `UIView.tag`.
+/// Moves VoiceOver focus to a view, and reports VoiceOver focus changes as the
+/// native view tags from the focused element outwards. React Native views carry
+/// their React tag as `UIView.tag`.
 public class AccessibilityFocusModule: Module {
   private var observer: NSObjectProtocol?
 
@@ -10,6 +11,15 @@ public class AccessibilityFocusModule: Module {
     Name("AccessibilityFocus")
 
     Events("onAccessibilityFocusChange")
+
+    AsyncFunction("focus") { (tag: Int) -> Bool in
+      guard let view = self.appContext?.findView(withTag: tag, ofType: UIView.self) else {
+        return false
+      }
+      UIAccessibility.post(notification: .layoutChanged, argument: view)
+      return true
+    }
+    .runOnQueue(.main)
 
     OnStartObserving {
       self.startObserving()

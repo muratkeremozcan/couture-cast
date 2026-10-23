@@ -1,5 +1,5 @@
-// Story 6.7 owner: web and test build of the accessibility-focus observer. The
-// DOM reports focus itself, so nothing here observes anything.
+// Story 6.7 owner: web and test build of the accessibility-focus module. The
+// DOM moves and reports focus itself, so nothing here does either.
 import type { AccessibilityFocusListener } from './types'
 
 export type { AccessibilityFocusChange, AccessibilityFocusListener } from './types'
@@ -11,5 +11,13 @@ export type { AccessibilityFocusChange, AccessibilityFocusListener } from './typ
 export function observeAccessibilityFocus(
   _listener: AccessibilityFocusListener
 ): (() => void) | null {
+  return null
+}
+
+/**
+ * Asks the screen reader to move its cursor to the view with this native tag.
+ * Resolves whether the view accepted it; null when this build has no module.
+ */
+export function focusAccessibilityElement(_tag: number): Promise<boolean> | null {
   return null
 }

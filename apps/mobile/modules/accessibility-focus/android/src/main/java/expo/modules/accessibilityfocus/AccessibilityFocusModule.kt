@@ -4,12 +4,18 @@ import android.os.Build
 import android.view.View
 import android.view.ViewGroup
 import android.view.accessibility.AccessibilityEvent
+import android.view.accessibility.AccessibilityNodeInfo
+import expo.modules.kotlin.Promise
 import expo.modules.kotlin.modules.Module
 import expo.modules.kotlin.modules.ModuleDefinition
 
 /**
- * Reports TalkBack focus changes as the native view tags from the focused view
- * outwards. Every accessibility event a view sends passes its ancestors'
+ * Moves TalkBack focus to a view, and reports TalkBack focus changes as the
+ * native view tags from the focused view outwards. React Native's own Android
+ * `setAccessibilityFocus` only sends `TYPE_VIEW_FOCUSED`, which TalkBack ignores
+ * for a view that cannot take input focus; `ACTION_ACCESSIBILITY_FOCUS` asks the
+ * accessibility service to move its cursor there.
+ * Every accessibility event a view sends passes its ancestors'
  * `onRequestSendAccessibilityEvent`, so one delegate on the window's decor view
  * sees each focus and focus-clear in the app. React Native views carry their
  * React tag as the view id.
@@ -22,6 +28,21 @@ class AccessibilityFocusModule : Module() {
     Name("AccessibilityFocus")
 
     Events("onAccessibilityFocusChange")
+
+    AsyncFunction("focus") { tag: Int, promise: Promise ->
+      val activity = appContext.currentActivity
+      if (activity == null) {
+        promise.resolve(false)
+        return@AsyncFunction
+      }
+      activity.runOnUiThread {
+        val view = activity.window?.decorView?.findViewById<View>(tag)
+        promise.resolve(
+          view?.performAccessibilityAction(AccessibilityNodeInfo.ACTION_ACCESSIBILITY_FOCUS, null)
+            ?: false
+        )
+      }
+    }
 
     OnStartObserving {
       runOnUiThread { attach() }
