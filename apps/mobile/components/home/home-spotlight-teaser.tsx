@@ -10,7 +10,10 @@ import React, {
 import { Image, Pressable, StyleSheet, Text, View, useColorScheme } from 'react-native'
 import { useTranslation } from 'react-i18next'
 import type { SpotlightTeaserValue } from '@couture/api-client'
-import { useHomeSpotlightTeaserLink } from '@/src/features/home/use-home-spotlight-teaser'
+import {
+  type TeaserFocusMove,
+  useHomeSpotlightTeaserLink,
+} from '@/src/features/home/use-home-spotlight-teaser'
 import { useHeroPalette } from '@/components/hero/hero-theme'
 import { IMAGE_LOAD_TIMEOUT_MS } from '@/components/community/community-card'
 
@@ -157,7 +160,7 @@ export const HomeSpotlightTeaserSlot = memo(function HomeSpotlightTeaserSlot({
   scrollViewRef: RefObject<unknown>
 }) {
   const teaser = useHomeSpotlightTeaserLink({ applicationUserId, scrollViewRef })
-  const { focusMove } = teaser
+  const { focusRequested, focusLanded } = teaser
   return (
     <>
       {teaser.value ? (
@@ -170,19 +173,35 @@ export const HomeSpotlightTeaserSlot = memo(function HomeSpotlightTeaserSlot({
           onBlur={teaser.onBlur}
         />
       ) : null}
-      {focusMove ? (
-        // UI automation marker: names the target and count of the last focus
-        // move this Home made. It has no label and takes no touches.
-        <View
-          testID={`home-spotlight-teaser-focused-${focusMove.target}-${focusMove.count}`}
-          collapsable={false}
-          pointerEvents="none"
-          style={styles.focusMarker}
-        />
+      {focusRequested ? (
+        <FocusMarker kind="focus-requested" move={focusRequested} />
       ) : null}
+      {focusLanded ? <FocusMarker kind="focused" move={focusLanded} /> : null}
     </>
   )
 })
+
+/**
+ * UI automation marker: names the target and count of the last focus move Home
+ * requested (`focus-requested`) or the platform confirmed (`focused`). It has no
+ * label and takes no touches.
+ */
+function FocusMarker({
+  kind,
+  move,
+}: {
+  kind: 'focus-requested' | 'focused'
+  move: TeaserFocusMove
+}) {
+  return (
+    <View
+      testID={`home-spotlight-teaser-${kind}-${move.target}-${move.count}`}
+      collapsable={false}
+      pointerEvents="none"
+      style={styles.focusMarker}
+    />
+  )
+}
 
 const styles = StyleSheet.create({
   // Out of flow, so a fallback move leaves Home with no reserved space. It sits

@@ -4,6 +4,7 @@ import {
   type RefObject,
   useCallback,
   useEffect,
+  useLayoutEffect,
   useRef,
   useState,
   useSyncExternalStore,
@@ -18,14 +19,7 @@ import {
   recordCommunitySpotlightOpenedFromMobile,
 } from '@/src/lib/community'
 import { safeFindNodeHandle } from '@/src/lib/accessibility-focus'
-
-/**
- * How long a return focus counts as the teaser holding focus. React Native has
- * no screen-reader focus event, so a hand-off to the scroll view is armed only
- * for this window after the return put focus on the link. Past it, the member may
- * have swiped elsewhere, and moving focus would pull them away from it.
- */
-export const TEASER_RETURN_FOCUS_HOLD_MS = 10_000
+import { observeAccessibilityFocus } from '@/modules/accessibility-focus'
 
 export interface HomeSpotlightTeaserView {
   value: SpotlightTeaserValue | null
@@ -134,7 +128,7 @@ function newFocusToken(): string {
 
 export type TeaserFocusTarget = 'link' | 'scroll-view'
 
-/** The last focus move this Home made, for UI automation; the count proves "once". */
+/** A focus move this Home made, for UI automation; the count proves "once". */
 export interface TeaserFocusMove {
   target: TeaserFocusTarget
   count: number
@@ -145,54 +139,94 @@ const FOCUS_TEST_IDS: Record<TeaserFocusTarget, string> = {
   'scroll-view': 'hero-experience-scrollview',
 }
 
+interface FocusDestination {
+  target: TeaserFocusTarget
+  node: unknown
+}
+
+/** A focus request that reached a real node: its target and native handle. */
+interface FocusRequest {
+  target: TeaserFocusTarget
+  /** Native handle; null on web, where the DOM reports focus itself. */
+  handle: number | null
+  /** Web only: focus actually landed on the element. */
+  landed: boolean
+}
+
 /**
- * Moves accessibility focus on the next frame: the DOM node on web, the native
- * node elsewhere. Resolves whether focus was actually requested.
+ * On the next frame, asks `destination` where focus should go and moves
+ * accessibility focus there: the DOM node on web, the native node elsewhere.
+ * Choosing in the frame means a teaser that left since the request was queued
+ * is never the target. Resolves the request, or null when nothing was focused.
  */
-function focusTarget(
-  target: unknown,
-  kind: TeaserFocusTarget,
-  stillWanted: () => boolean
-): Promise<boolean> {
+function focusOnNextFrame(
+  destination: () => FocusDestination | null
+): Promise<FocusRequest | null> {
   return new Promise((resolve) => {
     requestAnimationFrame(() => {
-      if (!stillWanted()) {
-        resolve(false)
+      const chosen = destination()
+      if (!chosen) {
+        resolve(null)
         return
       }
       if (Platform.OS === 'web') {
         const element = document.querySelector<HTMLElement>(
-          `[data-testid="${FOCUS_TEST_IDS[kind]}"]`
+          `[data-testid="${FOCUS_TEST_IDS[chosen.target]}"]`
         )
         element?.focus()
-        resolve(Boolean(element))
+        resolve(
+          element
+            ? {
+                target: chosen.target,
+                handle: null,
+                landed: document.activeElement === element,
+              }
+            : null
+        )
         return
       }
-      const handle = safeFindNodeHandle(target)
-      if (handle) AccessibilityInfo.setAccessibilityFocus(handle)
-      resolve(Boolean(handle))
+      const handle = safeFindNodeHandle(chosen.node)
+      if (!handle) {
+        resolve(null)
+        return
+      }
+      AccessibilityInfo.setAccessibilityFocus(handle)
+      resolve({ target: chosen.target, handle, landed: false })
     })
   })
 }
+
+const nextMove = (target: TeaserFocusTarget) => (previous: TeaserFocusMove | null) => ({
+  target,
+  count: (previous?.count ?? 0) + 1,
+})
 
 export interface HomeSpotlightTeaserLink extends HomeSpotlightTeaserView {
   linkRef: RefObject<View | null>
   open: () => void
   onFocus: () => void
   onBlur: () => void
-  focusMove: TeaserFocusMove | null
+  /** The last focus move Home requested from a real node. */
+  focusRequested: TeaserFocusMove | null
+  /**
+   * The last focus move the platform confirmed: the DOM on web, the OS
+   * accessibility-focus event on a native build that carries the observer.
+   */
+  focusLanded: TeaserFocusMove | null
 }
 
 /**
  * The Home teaser as one link: activation pushes Community with a fresh focus
  * intent and records the home_teaser open; the first return to Home after an
  * activation puts focus back on the link, or on the scroll view when the link
- * is gone; a teaser that leaves while it holds focus hands focus to the scroll
- * view.
+ * is gone by the frame focus moves in; a teaser that leaves while it holds focus
+ * hands focus to the scroll view.
  *
- * "Holds focus" is input focus reported by the link (keyboard, web) or the
- * bounded window after a return focus. Screen readers report neither, so the
- * window keeps a later removal from stealing focus the member moved elsewhere.
+ * "Holds focus" is what the platform reports: input focus from the link
+ * (keyboard, web), or OS accessibility focus on the link from the native
+ * observer. A build without the observer (Expo Go) cannot see a screen reader's
+ * focus, so it hands nothing off on removal and never steals focus the member
+ * moved elsewhere.
  */
 export function useHomeSpotlightTeaserLink({
   applicationUserId,
@@ -209,9 +243,13 @@ export function useHomeSpotlightTeaserLink({
   /** The activation whose return to Home still owes a focus move; consumed once. */
   const pendingReturnRef = useRef<string | null>(null)
   const inputFocusRef = useRef(false)
-  const returnHoldUntilRef = useRef(0)
+  /** The OS reports accessibility focus on the link. */
+  const osFocusOnLinkRef = useRef(false)
+  /** A native focus request the OS has not confirmed yet. */
+  const unconfirmedRef = useRef<FocusRequest | null>(null)
   const mountedRef = useRef(true)
-  const [focusMove, setFocusMove] = useState<TeaserFocusMove | null>(null)
+  const [focusRequested, setFocusRequested] = useState<TeaserFocusMove | null>(null)
+  const [focusLanded, setFocusLanded] = useState<TeaserFocusMove | null>(null)
 
   useEffect(() => {
     mountedRef.current = true
@@ -220,16 +258,29 @@ export function useHomeSpotlightTeaserLink({
     }
   }, [])
 
+  useEffect(
+    () =>
+      observeAccessibilityFocus(({ tags }) => {
+        const linkHandle = safeFindNodeHandle(linkRef.current)
+        osFocusOnLinkRef.current = linkHandle !== null && tags.includes(linkHandle)
+        const request = unconfirmedRef.current
+        if (request?.handle && tags.includes(request.handle)) {
+          unconfirmedRef.current = null
+          setFocusLanded(nextMove(request.target))
+        }
+      }) ?? undefined,
+    []
+  )
+
   const moveFocus = useCallback(
-    (target: unknown, kind: TeaserFocusTarget) =>
-      focusTarget(
-        target,
-        kind,
-        () => mountedRef.current && isHomeFocusedRef.current
-      ).then((moved) => {
-        if (!moved || !mountedRef.current) return moved
-        setFocusMove((previous) => ({ target: kind, count: (previous?.count ?? 0) + 1 }))
-        return moved
+    (destination: () => FocusDestination | null) =>
+      focusOnNextFrame(() =>
+        mountedRef.current && isHomeFocusedRef.current ? destination() : null
+      ).then((request) => {
+        if (!request || !mountedRef.current) return
+        setFocusRequested(nextMove(request.target))
+        if (request.landed) setFocusLanded(nextMove(request.target))
+        else if (request.handle) unconfirmedRef.current = request
       }),
     []
   )
@@ -238,32 +289,36 @@ export function useHomeSpotlightTeaserLink({
     useCallback(() => {
       isHomeFocusedRef.current = true
       setIsHomeFocused(true)
-      if (pendingReturnRef.current) {
-        pendingReturnRef.current = null
-        if (linkRef.current) {
-          void moveFocus(linkRef.current, 'link').then((moved) => {
-            if (moved)
-              returnHoldUntilRef.current = Date.now() + TEASER_RETURN_FOCUS_HOLD_MS
-          })
-        } else {
-          void moveFocus(scrollViewRef.current, 'scroll-view')
-        }
+      const token = pendingReturnRef.current
+      if (token) {
+        void moveFocus(() => {
+          // Consumed once a destination exists in the frame focus moves in; a
+          // Home blur before that frame leaves it for the next return.
+          if (pendingReturnRef.current !== token) return null
+          pendingReturnRef.current = null
+          return linkRef.current
+            ? { target: 'link', node: linkRef.current }
+            : { target: 'scroll-view', node: scrollViewRef.current }
+        })
       }
       return () => {
         isHomeFocusedRef.current = false
-        returnHoldUntilRef.current = 0
         inputFocusRef.current = false
+        osFocusOnLinkRef.current = false
         setIsHomeFocused(false)
       }
     }, [moveFocus, scrollViewRef])
   )
 
-  useEffect(() => {
+  // Runs in the commit that removes the link, before any later focus report
+  // could describe where the platform put focus after the removal.
+  useLayoutEffect(() => {
     if (teaser.value) return
-    const held = inputFocusRef.current || Date.now() < returnHoldUntilRef.current
+    const held = inputFocusRef.current || osFocusOnLinkRef.current
     inputFocusRef.current = false
-    returnHoldUntilRef.current = 0
-    if (held) void moveFocus(scrollViewRef.current, 'scroll-view')
+    osFocusOnLinkRef.current = false
+    if (held)
+      void moveFocus(() => ({ target: 'scroll-view', node: scrollViewRef.current }))
   }, [moveFocus, scrollViewRef, teaser.value])
 
   const value = teaser.value
@@ -272,7 +327,6 @@ export function useHomeSpotlightTeaserLink({
     const focusToken = newFocusToken()
     pendingReturnRef.current = focusToken
     inputFocusRef.current = false
-    returnHoldUntilRef.current = 0
     // Measurement only: a failed record never blocks the navigation.
     void recordCommunitySpotlightOpenedFromMobile(
       value.item.id,
@@ -300,5 +354,5 @@ export function useHomeSpotlightTeaserLink({
     inputFocusRef.current = false
   }, [])
 
-  return { ...teaser, linkRef, open, onFocus, onBlur, focusMove }
+  return { ...teaser, linkRef, open, onFocus, onBlur, focusRequested, focusLanded }
 }

@@ -180,7 +180,7 @@ export function serveTeaserImages() {
 export function teaserNodes(): Element[] {
   return Array.from(
     document.querySelectorAll<Element>(
-      `[data-testid^="${TEASER_PREFIX}"]:not([data-testid^="${TEASER_PREFIX}-focused-"])`
+      `[data-testid^="${TEASER_PREFIX}"]:not([data-testid^="${TEASER_PREFIX}-focused-"]):not([data-testid^="${TEASER_PREFIX}-focus-requested-"])`
     )
   )
 }

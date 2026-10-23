@@ -1,0 +1,9 @@
+{
+  "platforms": ["apple", "android"],
+  "apple": {
+    "modules": ["AccessibilityFocusModule"]
+  },
+  "android": {
+    "modules": ["expo.modules.accessibilityfocus.AccessibilityFocusModule"]
+  }
+}

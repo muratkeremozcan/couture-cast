@@ -94,14 +94,17 @@ tags:
     timeout: 15000
     label: 'The teaser is still on Home after the round trip'
 
-# The focus marker renders only after the native accessibility-focus request
-# resolved a handle for its target; its suffix counts the moves this Home made.
+# Expo Go carries no accessibility-focus observer and no screen reader runs
+# here, so this flow proves the request: `focus-requested` renders after the
+# native focus call reached a real node, and its suffix counts the requests.
+# The OS-confirmed `focused` marker is asserted on the development build with
+# TalkBack (`maestro/story67/teaser-talkback-focus.yaml`).
 - scrollUntilVisible:
     element:
-      id: 'home-spotlight-teaser-focused-link-1'
+      id: 'home-spotlight-teaser-focus-requested-link-1'
     direction: DOWN
     timeout: 15000
-    label: 'The Home tab return moved accessibility focus to the teaser link, once'
+    label: 'The Home tab return requested accessibility focus on the teaser link, once'
 
 # Android back is a second, separate way home, with its own activation.
 - runFlow:
@@ -127,7 +130,7 @@ tags:
           timeout: 15000
       - scrollUntilVisible:
           element:
-            id: 'home-spotlight-teaser-focused-link-2'
+            id: 'home-spotlight-teaser-focus-requested-link-2'
           direction: DOWN
           timeout: 15000
-          label: 'Android back moved accessibility focus to the teaser link, once more'
+          label: 'Android back requested accessibility focus on the teaser link, once more'
