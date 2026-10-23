@@ -28,10 +28,30 @@ import { defineConfig } from 'vitest/config'
  * variable that is already set. A machine with no database still skips, exactly as
  * before, because the probe against the local Supabase default simply fails.
  */
-const integrationDatabaseUrl =
+const integrationDatabaseUrl = withPinnedPoolSize(
   process.env.INTEGRATION_TEST_DATABASE_URL ??
-  process.env.DATABASE_URL ??
-  'postgresql://postgres:postgres@127.0.0.1:54322/postgres'
+    process.env.DATABASE_URL ??
+    'postgresql://postgres:postgres@127.0.0.1:54322/postgres'
+)
+
+/**
+ * Prisma sizes each client's pool from the machine: `num_cpus * 2 + 1`. CI's 4 vCPU
+ * runner gets 9 connections per client across 3 workers. A 14-core laptop gets 29
+ * per client across 13 workers, and the full tier then exhausts a 100-connection
+ * local Supabase: `remaining connection slots are reserved for roles with the
+ * SUPERUSER attribute`, failing whichever DB-backed suites lose the race (measured
+ * 2026-10-22: 4 to 7 files red uncapped, all green capped). Pinning CI's pool size
+ * makes the tier's connection demand independent of the core count. The isolated
+ * database helpers derive their URLs from this one, so they inherit the limit; `pg`
+ * ignores the parameter. An explicit `connection_limit` in the caller's URL wins.
+ */
+function withPinnedPoolSize(url: string): string {
+  const parsed = new URL(url)
+  if (!parsed.searchParams.has('connection_limit')) {
+    parsed.searchParams.set('connection_limit', '9')
+  }
+  return parsed.toString()
+}
 
 export default defineConfig({
   resolve: {
