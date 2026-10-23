@@ -2,7 +2,7 @@ import fs from 'node:fs'
 import path from 'node:path'
 import { resolveGitMetadata } from '../../apps/web/git-metadata'
 import { config as loadEnv } from 'dotenv'
-import { loadEnvKeepingCallerOwned } from '../../scripts/lib/caller-owned-env.mjs'
+import { loadEnvKeepingLocalStack } from '../../scripts/lib/caller-owned-env.mjs'
 
 // Load environment file based on TEST_ENV (falls back to .env).
 const envSuffix = (
@@ -10,9 +10,11 @@ const envSuffix = (
 ).toLowerCase()
 const envFiles = [`.env.${envSuffix}`, '.env']
 // Local Playwright runs should prefer .env.local over any inherited remote
-// DATABASE_URL or service origin from the parent shell, except for the keys
-// the local E2E launcher settled itself (E2E_CALLER_OWNED_ENV_KEYS).
-loadEnvKeepingCallerOwned(() => {
+// DATABASE_URL or service origin from the parent shell. An inherited loopback
+// stack (DATABASE_URL, REDIS_URL, Supabase) is the caller's isolated choice and
+// survives, in the runner and in every worker; the webServer launcher then
+// inherits it and keeps it for its own children.
+loadEnvKeepingLocalStack(() => {
   for (const file of envFiles) {
     const envPath = path.resolve(process.cwd(), file)
     if (fs.existsSync(envPath)) {

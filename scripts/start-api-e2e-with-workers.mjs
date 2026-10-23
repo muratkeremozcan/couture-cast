@@ -4,6 +4,7 @@ import { fileURLToPath } from 'node:url'
 import { spawn } from 'node:child_process'
 import { config as loadEnv } from 'dotenv'
 import { applyLocalE2eDatabaseUrl, isLocalTestRun } from './local-e2e-database.mjs'
+import { isLoopbackUrl, loadLauncherEnv } from './lib/caller-owned-env.mjs'
 import {
   e2eStackLauncherPath,
   e2eStackRecordPath,
@@ -131,45 +132,24 @@ const shouldForceLocalEnv = (env.TEST_ENV ?? '').toLowerCase() === 'local'
 // explicit isolated `DATABASE_URL` reached the launcher's seed step while the
 // API and workers it spawned wrote to whatever `.env.local` named.
 //
-// `REDIS_URL` joins only when it is a loopback URL, so an isolated local Redis
-// is honoured while a remote URL inherited from the shell still loses to
-// `.env.local`, which is what the override exists for.
-const explicitlyDisabled = Object.fromEntries(
-  Object.entries(env).filter(([, value]) => value === '')
-)
-function isLoopbackUrl(value) {
-  try {
-    return ['127.0.0.1', 'localhost', '::1', '[::1]'].includes(new URL(value).hostname)
-  } catch {
-    return false
+// The inherited loopback stack joins too (`inheritedLocalStackEnv`): a loopback
+// `REDIS_URL`, `SUPABASE_URL` with its keys, so an isolated local stack is
+// honoured while a remote URL inherited from the shell still loses to
+// `.env.local`, which is what the override exists for. The Playwright runner
+// above this script applies the same rule, so its workers agree with it.
+loadLauncherEnv(env, () => {
+  for (const file of rootEnvFiles) {
+    const fullPath = path.join(repoRoot, file)
+    if (!existsSync(fullPath)) continue
+
+    loadEnv({
+      path: fullPath,
+      override: shouldForceLocalEnv && file === '.env.local',
+      processEnv: env,
+      quiet: true,
+    })
   }
-}
-const callerOwned = Object.fromEntries(
-  [
-    'DATABASE_URL',
-    'COMMUNITY_NSFW_SCREENER',
-    'OPENWEATHER_API_ORIGIN',
-    'WEATHERAPI_API_ORIGIN',
-    'REDIS_URL',
-  ]
-    .map((key) => [key, env[key]])
-    .filter(([key, value]) => value && (key !== 'REDIS_URL' || isLoopbackUrl(value)))
-)
-
-for (const file of rootEnvFiles) {
-  const fullPath = path.join(repoRoot, file)
-  if (!existsSync(fullPath)) continue
-
-  loadEnv({
-    path: fullPath,
-    override: shouldForceLocalEnv && file === '.env.local',
-    processEnv: env,
-    quiet: true,
-  })
-}
-
-Object.assign(env, explicitlyDisabled, callerOwned)
-env.E2E_CALLER_OWNED_ENV_KEYS = Object.keys(callerOwned).join(',')
+})
 
 // Story 1.2b: this stack must never reach a live weather provider. An origin
 // from the shell, `.env.local` or `.env` that is not loopback is refused here,
