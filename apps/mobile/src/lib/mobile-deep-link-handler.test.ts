@@ -304,7 +304,7 @@ describe('processMobileDeepLink', () => {
       })
     })
 
-    it('6.7-MOB-030 keeps an in-app spotlight focus intent with its token', async () => {
+    it('6.7-MOB-037 keeps an in-app spotlight focus intent with its token', async () => {
       const { options, capture } = createMockOptions({
         source: 'app',
         type: 'community',
@@ -325,7 +325,7 @@ describe('processMobileDeepLink', () => {
       expect(capture).not.toHaveBeenCalledWith('deep_link_invalid', expect.anything())
     })
 
-    it('6.7-MOB-031 refuses a focus intent without its token', async () => {
+    it('6.7-MOB-038 refuses a focus intent without its token', async () => {
       const { options, capture } = createMockOptions({
         source: 'app',
         type: 'community',

@@ -3,11 +3,11 @@
 import { item, setMockParams } from './harness'
 import { CommunitySyncState, type CommunitySyncCallbacks } from '@couture/api-client'
 import { screenFocus } from '../focus-effect'
-import { routing } from './mock-state'
+import { mockCapture, routing } from './mock-state'
 import { act, screen, waitFor } from '@testing-library/react'
 import { http, HttpResponse } from 'msw'
 import { render } from 'vitest-browser-react'
-import { expect, it, vi } from 'vitest'
+import { expect, it, onTestFinished, vi } from 'vitest'
 import {
   COMMUNITY_FEED_DISABLED_MESSAGE,
   communityReactionSpotlightResponseSchema,
@@ -92,6 +92,18 @@ async function expectFocusedNotice(message: string) {
     'polite'
   )
   expect(document.body.textContent).not.toContain(INVALID_LINK)
+  // The notice outranks the invalid banner on screen, so check the invalid
+  // verdict itself was never reached.
+  expect(mockCapture.mock.calls.filter(([name]) => name === 'deep_link_invalid')).toEqual(
+    []
+  )
+}
+
+async function frames(count: number) {
+  for (let frame = 0; frame < count; frame += 1)
+    await act(async () => {
+      await new Promise((resolve) => requestAnimationFrame(resolve))
+    })
 }
 
 export function registerCommunitySpotlightFocusCases() {
@@ -318,46 +330,53 @@ export function registerCommunitySpotlightFocusCases() {
     )
   })
 
-  // The Home tab and Android back both reach Community as a navigation blur.
-  it.each(['the Home tab', 'Android back'])(
-    '6.7-MOB-027 leaving through %s retires a pending destination: a later response announces and focuses nothing',
-    async (way) => {
-      let release: (() => void) | undefined
-      serveSpotlight(
-        () =>
-          new Promise<Response>((resolve) => {
-            release = () => resolve(page())
-          })
-      )
-      const handles = iosFocusHandles()
-      vi.mocked(AccessibilityInfo.announceForAccessibility).mockClear()
-      vi.mocked(AccessibilityInfo.setAccessibilityFocus).mockClear()
-      setMockParams(teaserIntent('spot-1', `token-027-${way}`))
-      await render(<CommunityScreen />)
-      await waitFor(() => expect(release).toBeTypeOf('function'))
-      act(() => screenFocus.set(false))
+  // The Home tab and Android back both reach Community as the same navigation
+  // blur, so one case covers both.
+  it('6.7-MOB-027 leaving retires a pending destination: a later response announces and focuses nothing', async () => {
+    let release: (() => void) | undefined
+    serveSpotlight(
+      () =>
+        new Promise<Response>((resolve) => {
+          release = () => resolve(page())
+        })
+    )
+    const handles = iosFocusHandles()
+    vi.mocked(AccessibilityInfo.announceForAccessibility).mockClear()
+    vi.mocked(AccessibilityInfo.setAccessibilityFocus).mockClear()
+    setMockParams(teaserIntent('spot-1', 'token-027'))
+    await render(<CommunityScreen />)
+    await waitFor(() => expect(release).toBeTypeOf('function'))
+    act(() => screenFocus.set(false))
 
-      release!()
-      const rank = await screen.findByTestId('community-spotlight-rank-spot-1')
-      for (let frame = 0; frame < 3; frame += 1)
-        await act(async () => {
-          await new Promise((resolve) => requestAnimationFrame(resolve))
-        })
-      act(() => screenFocus.set(true))
-      for (let frame = 0; frame < 3; frame += 1)
-        await act(async () => {
-          await new Promise((resolve) => requestAnimationFrame(resolve))
-        })
-      expect(announcementsOf(ANNOUNCE_FOCUSED)).toHaveLength(0)
-      expect(AccessibilityInfo.setAccessibilityFocus).not.toHaveBeenCalledWith(
-        handles.get(rank)
-      )
-      expect(screen.queryByTestId('deep-link-info-banner')).toBeNull()
-    }
-  )
+    release!()
+    const rank = await screen.findByTestId('community-spotlight-rank-spot-1')
+    for (let frame = 0; frame < 3; frame += 1)
+      await act(async () => {
+        await new Promise((resolve) => requestAnimationFrame(resolve))
+      })
+    act(() => screenFocus.set(true))
+    for (let frame = 0; frame < 3; frame += 1)
+      await act(async () => {
+        await new Promise((resolve) => requestAnimationFrame(resolve))
+      })
+    expect(announcementsOf(ANNOUNCE_FOCUSED)).toHaveLength(0)
+    expect(AccessibilityInfo.setAccessibilityFocus).not.toHaveBeenCalledWith(
+      handles.get(rank)
+    )
+    expect(screen.queryByTestId('deep-link-info-banner')).toBeNull()
+  })
 
   it('6.7-MOB-028 leaving before the 10-second destination deadline shows and focuses no notice', async () => {
-    serveSpotlight(() => new Promise<Response>(() => undefined))
+    // Held for the whole case, then released so no connection outlives it.
+    let releaseRead!: () => void
+    const readHeld = new Promise<void>((resolve) => {
+      releaseRead = resolve
+    })
+    onTestFinished(() => releaseRead())
+    serveSpotlight(async () => {
+      await readHeld
+      return HttpResponse.error()
+    })
     iosFocusHandles()
     vi.mocked(AccessibilityInfo.setAccessibilityFocus).mockClear()
     const startedAt = Date.now()
@@ -386,6 +405,42 @@ export function registerCommunitySpotlightFocusCases() {
     } finally {
       vi.useRealTimers()
       dateNow.mockRestore()
+    }
+  })
+
+  it('6.7-MOB-041 an identity change while the destination is pending moves no focus and shows no notice', async () => {
+    const held: (() => void)[] = []
+    onTestFinished(() => {
+      for (const release of held) release()
+    })
+    serveSpotlight(
+      () =>
+        new Promise<Response>((resolve) => {
+          held.push(() => resolve(page()))
+        })
+    )
+    const handles = iosFocusHandles()
+    vi.mocked(AccessibilityInfo.announceForAccessibility).mockClear()
+    vi.mocked(AccessibilityInfo.setAccessibilityFocus).mockClear()
+    const previousMember = mobileApplicationUserId()
+    setMobileApplicationUserId('member-a')
+    try {
+      setMockParams(teaserIntent('spot-1', 'token-041'))
+      await render(<CommunityScreen />)
+      await waitFor(() => expect(held.length).toBeGreaterThan(0))
+      // Another member takes the session while the module is still loading.
+      act(() => setMobileApplicationUserId('member-b'))
+      await waitFor(() => expect(held.length).toBeGreaterThan(1))
+      for (const release of held) release()
+      const rank = await screen.findByTestId('community-spotlight-rank-spot-1')
+      await frames(5)
+      expect(announcementsOf(ANNOUNCE_FOCUSED)).toHaveLength(0)
+      expect(AccessibilityInfo.setAccessibilityFocus).not.toHaveBeenCalledWith(
+        handles.get(rank)
+      )
+      expect(screen.queryByTestId('deep-link-info-banner')).toBeNull()
+    } finally {
+      setMobileApplicationUserId(previousMember)
     }
   })
 }

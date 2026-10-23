@@ -199,6 +199,30 @@ export function expectOccupiesNoLayout(element: Element) {
   expect(withElement).toBe(withoutElement)
 }
 
+/**
+ * Home renders nothing after the hero conditional: the scroll content ends with
+ * the node that holds `heroTestId`, and only the content's own bottom padding
+ * follows it. A reference taken while a read is pending would carry a
+ * placeholder the teaser left there, so this checks the structure itself.
+ */
+export function expectNothingAfterHero(heroTestId: string) {
+  const hero = document.querySelector(`[data-testid="${heroTestId}"]`)
+  const content = document.querySelector(
+    '[data-testid="hero-experience-scrollview"]'
+  )?.firstElementChild
+  expect(hero).not.toBeNull()
+  expect(content).toBeTruthy()
+  let top: Element = hero!
+  while (top.parentElement && top.parentElement !== content) top = top.parentElement
+  expect(top.parentElement).toBe(content)
+  expect(content!.lastElementChild).toBe(top)
+  const padding = parseFloat(getComputedStyle(content!).paddingBottom)
+  const margin = parseFloat(getComputedStyle(top).marginBottom)
+  const below =
+    content!.getBoundingClientRect().bottom - top.getBoundingClientRect().bottom
+  expect(Math.round(below - margin - padding)).toBe(0)
+}
+
 export function follows(first: Element, second: Element): boolean {
   return Boolean(first.compareDocumentPosition(second) & Node.DOCUMENT_POSITION_FOLLOWING)
 }

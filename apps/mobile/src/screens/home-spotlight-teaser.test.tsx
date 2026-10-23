@@ -4,9 +4,19 @@
 // read or the member resolution it depends on has settled, and time-driven rows
 // use fake timers.
 import type * as RitualCacheModule from '@/src/lib/ritual-cache'
-import { act, configure, fireEvent, screen, waitFor } from '@testing-library/react'
+import { act, configure, screen, waitFor } from '@testing-library/react'
+import { userEvent } from 'vitest/browser'
 import { AppState, type AppStateStatus } from 'react-native'
-import { afterEach, beforeAll, beforeEach, describe, expect, it, vi } from 'vitest'
+import {
+  afterEach,
+  beforeAll,
+  beforeEach,
+  describe,
+  expect,
+  it,
+  onTestFinished,
+  vi,
+} from 'vitest'
 import { http, HttpResponse } from 'msw'
 import { COMMUNITY_FEED_DISABLED_MESSAGE } from '@couture/api-client/contracts/http'
 import {
@@ -14,6 +24,7 @@ import {
   SPOTLIGHT_TEASER_READ_FLOOR_MS,
   SPOTLIGHT_TEASER_REREAD_MS,
 } from '@couture/api-client'
+import { IMAGE_LOAD_TIMEOUT_MS } from '@/components/community/community-card'
 
 const routerPush = vi.hoisted(() => vi.fn())
 
@@ -56,6 +67,7 @@ import {
   advance,
   cityPage,
   deferSpotlightReads,
+  expectNothingAfterHero,
   expectOccupiesNoLayout,
   follows,
   recordOpens,
@@ -233,6 +245,9 @@ describe('6.7 mobile Home spotlight teaser', () => {
       await settledRead(0)
       expect(teaserNodes()).toEqual([])
       expect(screen.getByTestId('hero-experience-scrollview').innerHTML).toBe(expected)
+      // The pending state is no reference for "no space": check that nothing at
+      // all follows the hero.
+      expectNothingAfterHero('outfit-recommendation-card')
       // A refusal starts no retry, in the wrapper or in the lifecycle.
       expect(reads).toHaveLength(1)
       expect(teaserReadCalls()).toBe(1)
@@ -241,8 +256,19 @@ describe('6.7 mobile Home spotlight teaser', () => {
 
   it('6.7-MOB-005 follows the hero while it is loading, failed or without a location', async () => {
     const { answer } = deferSpotlightReads()
-    // Loading: the ritual never answers, the teaser still shows.
-    server.use(http.get('*/api/v1/ritual', () => new Promise<never>(() => undefined)))
+    // Loading: the ritual never answers, the teaser still shows. The held
+    // request is released when the test ends, so it holds no connection after.
+    let releaseRitual!: () => void
+    const ritualHeld = new Promise<void>((resolve) => {
+      releaseRitual = resolve
+    })
+    onTestFinished(() => releaseRitual())
+    server.use(
+      http.get('*/api/v1/ritual', async () => {
+        await ritualHeld
+        return HttpResponse.error()
+      })
+    )
     setMobileApplicationUserId('member-1')
     const loading = await renderHome()
     await answer(0, cityPage())
@@ -355,6 +381,8 @@ describe('6.7 mobile Home spotlight teaser', () => {
     await answer(0, cityPage())
     await screen.findByTestId('home-spotlight-teaser-link')
     await waitFor(() => expect(teaserNodes()).toEqual([]))
+    await screen.findByTestId('outfit-recommendation-card')
+    expectNothingAfterHero('outfit-recommendation-card')
   })
 
   it('6.7-MOB-009 each activation posts the home_teaser open and pushes a fresh focus token', async () => {
@@ -365,8 +393,8 @@ describe('6.7 mobile Home spotlight teaser', () => {
     await answer(0, cityPage())
     const link = await screen.findByTestId('home-spotlight-teaser-link')
 
-    fireEvent.click(link)
-    fireEvent.click(link)
+    await userEvent.click(link)
+    await userEvent.click(link)
     await waitFor(() => expect(opens).toHaveLength(2))
     expect(opens[0]).toEqual({
       postId: 'look-1',
@@ -399,7 +427,7 @@ describe('6.7 mobile Home spotlight teaser', () => {
     await answer(0, cityPage())
     const link = await screen.findByTestId('home-spotlight-teaser-link')
 
-    fireEvent.click(link)
+    await userEvent.click(link)
     act(() => screenFocus.set(false))
     ;(document.activeElement as HTMLElement | null)?.blur()
     act(() => screenFocus.set(true))
@@ -412,9 +440,11 @@ describe('6.7 mobile Home spotlight teaser', () => {
     ;(document.activeElement as HTMLElement | null)?.blur()
     act(() => screenFocus.set(false))
     act(() => screenFocus.set(true))
-    await act(async () => {
-      await new Promise((resolve) => requestAnimationFrame(resolve))
-    })
+    // Several frames: a focus move scheduled a frame or two out still shows.
+    for (let frame = 0; frame < 5; frame += 1)
+      await act(async () => {
+        await new Promise((resolve) => requestAnimationFrame(resolve))
+      })
     expect(document.activeElement).not.toBe(link)
     expect(screen.queryByTestId('home-spotlight-teaser-focused-link-2')).toBeNull()
   })
@@ -425,7 +455,7 @@ describe('6.7 mobile Home spotlight teaser', () => {
     setMobileApplicationUserId('member-1')
     await renderHome()
     await answer(0, cityPage())
-    fireEvent.click(await screen.findByTestId('home-spotlight-teaser-link'))
+    await userEvent.click(await screen.findByTestId('home-spotlight-teaser-link'))
     act(() => screenFocus.set(false))
     // Signing out while away removes the teaser.
     token = undefined
@@ -647,7 +677,7 @@ describe('6.7 mobile Home spotlight teaser timers', () => {
     }
   )
 
-  it('6.7-MOB-020 a re-read that never answers times out at the client and removes the teaser', async () => {
+  it('6.7-MOB-036 a re-read that never answers times out at the client and removes the teaser', async () => {
     const { reads } = deferSpotlightReads()
     fakeClock()
     setMobileApplicationUserId('member-1')
@@ -672,4 +702,85 @@ describe('6.7 mobile Home spotlight teaser timers', () => {
     await untilFrame(() => teaserNodes().length === 0)
     expect(teaserReadCalls()).toBe(2)
   })
+
+  it('6.7-MOB-039 an image that settles neither way within 15 seconds removes the teaser', async () => {
+    // The image host never answers: no onLoad, no onError. Released at the end so
+    // the held request outlives nothing.
+    let releaseImage!: () => void
+    const imageHeld = new Promise<void>((resolve) => {
+      releaseImage = resolve
+    })
+    onTestFinished(() => releaseImage())
+    server.use(
+      http.get('*/teaser/:file', async () => {
+        await imageHeld
+        return HttpResponse.error()
+      })
+    )
+    const { reads } = deferSpotlightReads()
+    fakeClock()
+    setMobileApplicationUserId('member-1')
+    await renderHome()
+    await untilFrame(() => reads.length === 1)
+    reads[0]!.resolve({ status: 200, body: { data: cityPage() } })
+    await untilFrame(
+      () => document.querySelector('[data-testid="home-spotlight-teaser-link"]') !== null
+    )
+    await advance(IMAGE_LOAD_TIMEOUT_MS - 1)
+    expect(teaserNodes().length).toBeGreaterThan(0)
+    expect(screen.queryByTestId('home-spotlight-teaser-image-loaded')).toBeNull()
+    await advance(1)
+    await untilFrame(() => teaserNodes().length === 0)
+    expect(teaserReadCalls()).toBe(1)
+  })
+
+  it.each([
+    [
+      'the disabled 403',
+      {
+        status: 403,
+        body: {
+          statusCode: 403,
+          code: 'denied',
+          message: COMMUNITY_FEED_DISABLED_MESSAGE,
+        },
+      },
+    ],
+    [
+      'the disabled 503',
+      {
+        status: 503,
+        body: { statusCode: 503, message: COMMUNITY_FEED_DISABLED_MESSAGE },
+      },
+    ],
+    [
+      'a 500',
+      { status: 500, body: { statusCode: 500, message: 'Internal server error' } },
+    ],
+  ] as const)(
+    '6.7-MOB-040 %s on the first read starts no retry loop while Home stays shown',
+    async (_name, refusal) => {
+      const { reads } = deferSpotlightReads()
+      fakeClock()
+      setMobileApplicationUserId('member-1')
+      await renderHome()
+      await untilFrame(() => reads.length === 1)
+      reads[0]!.resolve(refusal)
+      // Settled at the wrapper's own promise; waitFor would ride the faked clock.
+      let settled = false
+      void (
+        vi.mocked(getCommunitySpotlightFromMobile).mock.results[0]!
+          .value as Promise<unknown>
+      ).then(
+        () => (settled = true),
+        () => (settled = true)
+      )
+      await untilFrame(() => settled)
+      // Two re-read periods with Home in focus: no timed retry, no wrapper retry.
+      await advance(SPOTLIGHT_TEASER_REREAD_MS * 2)
+      expect(teaserReadCalls()).toBe(1)
+      expect(reads).toHaveLength(1)
+      expect(teaserNodes()).toEqual([])
+    }
+  )
 })
