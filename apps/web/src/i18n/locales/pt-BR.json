@@ -482,7 +482,9 @@
       "announceLoadedMore": "Mais {{count}} looks em destaque carregados.",
       "announceLoadedMore_one": "Mais {{count}} look em destaque carregado.",
       "announceLoadedMore_other": "Mais {{count}} looks em destaque carregados.",
-      "announceRefreshed": "Os destaques da cidade foram atualizados com a classificação mais recente."
+      "announceRefreshed": "Os destaques da cidade foram atualizados com a classificação mais recente.",
+      "targetUnavailable": "Esse look não está mais em Destaques da cidade.",
+      "destinationUnavailable": "Destaques da cidade não está disponível agora."
     },
     "card": {
       "label": "Look de {{author}}",
@@ -745,5 +747,17 @@
   },
   "settings": {
     "title": "Configurações"
+  },
+  "home": {
+    "spotlightTeaser": {
+      "heading": "Look em destaque em {{label}}",
+      "reactions": "{{count}} reações",
+      "reactions_one": "{{count}} reação",
+      "reactions_other": "{{count}} reações",
+      "linkLabel": "Look em destaque em {{label}} de {{author}}, {{count}} reações. Abre Destaques da cidade.",
+      "linkLabel_one": "Look em destaque em {{label}} de {{author}}, {{count}} reação. Abre Destaques da cidade.",
+      "linkLabel_other": "Look em destaque em {{label}} de {{author}}, {{count}} reações. Abre Destaques da cidade.",
+      "cta": "Ver em Destaques da cidade"
+    }
   }
 }

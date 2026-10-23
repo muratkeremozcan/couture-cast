@@ -1,23 +1,36 @@
 // Story 3.7 Task 4 step 2 owner: implement mobile reusable info banner for invalid deep link notifications
-import React, { useState } from 'react'
+import React, { forwardRef, useState } from 'react'
 import { Platform, Pressable, StyleSheet, Text, View } from 'react-native'
 import { useTranslation } from 'react-i18next'
 
 export interface InfoBannerProps {
   message: string
   onDismiss?: () => void
+  /**
+   * Story 6.7: false turns the polite live region off. Only a notice that takes
+   * focus uses it, because moving focus there is its single announcement.
+   */
+  liveRegion?: boolean
 }
 
-export function InfoBanner({ message, onDismiss }: InfoBannerProps) {
+/**
+ * One mounted instance carries every message: a new message shows again even
+ * after the previous one was dismissed, without remounting the region. The ref
+ * names the message element, so a caller can move accessibility focus to it.
+ */
+export const InfoBanner = forwardRef<View, InfoBannerProps>(function InfoBanner(
+  { message, onDismiss, liveRegion = true },
+  ref
+) {
   const { t } = useTranslation()
-  const [isVisible, setIsVisible] = useState(true)
+  const [dismissedMessage, setDismissedMessage] = useState<string | null>(null)
 
-  if (!isVisible) {
+  if (dismissedMessage === message) {
     return null
   }
 
   const handleDismiss = () => {
-    setIsVisible(false)
+    setDismissedMessage(message)
     if (onDismiss) {
       onDismiss()
     }
@@ -25,12 +38,20 @@ export function InfoBanner({ message, onDismiss }: InfoBannerProps) {
 
   return (
     <View
-      accessibilityLiveRegion="polite"
+      accessibilityLiveRegion={liveRegion ? 'polite' : 'none'}
       accessibilityLabel={message}
       testID="deep-link-info-banner"
       style={styles.container}
     >
-      <View style={styles.content}>
+      <View
+        ref={ref}
+        testID="deep-link-info-banner-message"
+        accessible
+        accessibilityLabel={message}
+        // Focusable from code on web without becoming a tab stop.
+        {...(Platform.OS === 'web' ? { tabIndex: -1 as const } : {})}
+        style={styles.content}
+      >
         <View style={styles.iconContainer}>
           <Text style={styles.iconText}>i</Text>
         </View>
@@ -47,7 +68,7 @@ export function InfoBanner({ message, onDismiss }: InfoBannerProps) {
       </Pressable>
     </View>
   )
-}
+})
 
 const styles = StyleSheet.create({
   container: {

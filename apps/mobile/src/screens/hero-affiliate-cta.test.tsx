@@ -5,15 +5,19 @@
 // what belongs here is the screen-owned behaviour: one impression per
 // recommendation, and a device cache that cannot resurrect a withdrawn CTA.
 /* eslint-disable @typescript-eslint/await-thenable */
+import type * as FocusEffectModule from '@/src/test-utils/focus-effect'
 import { fireEvent, screen, waitFor } from '@testing-library/react'
 import type * as RitualCacheModule from '@/src/lib/ritual-cache'
 import { render } from 'vitest-browser-react'
 import { afterEach, beforeAll, beforeEach, describe, expect, it, vi } from 'vitest'
 import { http, HttpResponse } from 'msw'
 
-vi.mock('expo-router', () => ({
+vi.mock('expo-router', async () => ({
   useLocalSearchParams: () => ({}),
   useRouter: () => ({ setParams: vi.fn(), push: vi.fn() }),
+  useFocusEffect: (
+    await vi.importActual<typeof FocusEffectModule>('@/src/test-utils/focus-effect')
+  ).useFocusEffect,
 }))
 
 vi.mock('expo-localization', () => ({

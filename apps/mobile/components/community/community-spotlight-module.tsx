@@ -122,7 +122,9 @@ export function CommunitySpotlightModule({
         ? translationRef.current('community.spotlight.announceLoadedMore', {
             count: focusRequest.count,
           })
-        : translationRef.current('community.spotlight.announceRefreshed')
+        : focusRequest.kind === 'targeted'
+          ? translationRef.current('community.feed.announceFocused')
+          : translationRef.current('community.spotlight.announceRefreshed')
     )
     const { firstId } = focusRequest
     if (firstId === null) return

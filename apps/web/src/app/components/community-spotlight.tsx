@@ -283,6 +283,16 @@ export function useCommunitySpotlight({
     [apply]
   )
 
+  /**
+   * Story 6.7: focuses one shown entry through the same one-shot focus target
+   * View more uses. Returns false when the entry is not shown.
+   */
+  const focusEntry = useCallback((postId: string) => {
+    if (!stateRef.current.items.some((item) => item.id === postId)) return false
+    setState((previous) => ({ ...previous, focusTargetId: postId }))
+    return true
+  }, [])
+
   const clearFocusTarget = useCallback(() => {
     setState((previous) =>
       previous.focusTargetId === null ? previous : { ...previous, focusTargetId: null }
@@ -313,6 +323,7 @@ export function useCommunitySpotlight({
     apply,
     refreshItem,
     clearFocusTarget,
+    focusEntry,
   }
 }
 

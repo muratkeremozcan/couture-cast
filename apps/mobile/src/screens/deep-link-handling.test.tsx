@@ -1,3 +1,4 @@
+import type * as FocusEffectModule from '@/src/test-utils/focus-effect'
 import { CommunitySyncState } from '@couture/api-client'
 // Learning path Step 27: Widget and notification deep-link handling.
 // See _bmad-output/project-knowledge/learning-path-step-by-step.md#step-27-widget-and-notification-deep-link-handling
@@ -58,9 +59,12 @@ const mockSetParams = vi.fn()
 const mockPush = vi.fn()
 const mockRouter = { setParams: mockSetParams, push: mockPush }
 
-vi.mock('expo-router', () => ({
+vi.mock('expo-router', async () => ({
   useLocalSearchParams: () => mockParams,
   useRouter: () => mockRouter,
+  useFocusEffect: (
+    await vi.importActual<typeof FocusEffectModule>('@/src/test-utils/focus-effect')
+  ).useFocusEffect,
 }))
 
 vi.mock('expo-localization', () => ({

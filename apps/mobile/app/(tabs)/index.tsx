@@ -70,6 +70,8 @@ import { MobileChipNavigation, type ChipCategory } from '@/components/chip-navig
 import { useAccessibilityAnnouncer } from '@/src/hooks/use-accessibility-announcer'
 import { useReducedMotion } from '@/src/hooks/use-reduced-motion'
 import { safeFindNodeHandle } from '@/src/lib/accessibility-focus'
+import { HomeSpotlightTeaserSlot } from '@/components/home/home-spotlight-teaser'
+import { useHomeSpotlightTeaserLink } from '@/src/features/home/use-home-spotlight-teaser'
 
 type ScenarioType = 'morning' | 'midday' | 'evening'
 type SwapFocusTarget = number | { focus?: () => void }
@@ -229,6 +231,13 @@ export default function TabOneScreen() {
   const firstSwapOptionRef = useRef<ComponentRef<typeof Pressable>>(null)
   const swapTriggerRef = useRef<SwapFocusTarget | null>(null)
   const garmentRefs = useRef(new Map<string, ComponentRef<typeof Pressable> | null>())
+
+  // Story 6.7: the teaser reads on its own and never waits on, hides or
+  // re-renders the hero.
+  const teaser = useHomeSpotlightTeaserLink({
+    memberId: applicationUserId,
+    scrollViewRef,
+  })
 
   const [ritual, setRitual] = useState<RitualResponse | null>(null)
   const [isLoading, setIsLoading] = useState(true)
@@ -697,6 +706,9 @@ export default function TabOneScreen() {
         contentContainerStyle={styles.contentContainer}
         stickyHeaderIndices={[0]}
         testID="hero-experience-scrollview"
+        // Focusable from code on web without becoming a tab stop, so focus can
+        // land here when the teaser leaves.
+        {...(Platform.OS === 'web' ? { tabIndex: -1 as const } : {})}
       >
         <MobileChipNavigation
           activeCategory={activeChipCategory}
@@ -830,6 +842,9 @@ export default function TabOneScreen() {
             />
           </>
         )}
+
+        {/* Story 6.7: after the whole hero conditional, so it follows in focus order. */}
+        <HomeSpotlightTeaserSlot teaser={teaser} />
       </ScrollView>
 
       {/* Garment Swap Modal */}

@@ -482,7 +482,9 @@
       "announceLoadedMore": "{{count}} weitere Highlight-Looks geladen.",
       "announceLoadedMore_one": "{{count}} weiterer Highlight-Look geladen.",
       "announceLoadedMore_other": "{{count}} weitere Highlight-Looks geladen.",
-      "announceRefreshed": "Die Stadt-Highlights wurden mit der neuesten Rangfolge aktualisiert."
+      "announceRefreshed": "Die Stadt-Highlights wurden mit der neuesten Rangfolge aktualisiert.",
+      "targetUnavailable": "Dieser Look ist nicht mehr in den Stadt-Highlights.",
+      "destinationUnavailable": "Die Stadt-Highlights sind gerade nicht verfügbar."
     },
     "card": {
       "label": "Look von {{author}}",
@@ -745,5 +747,17 @@
   },
   "settings": {
     "title": "Einstellungen"
+  },
+  "home": {
+    "spotlightTeaser": {
+      "heading": "Herausragender Look in {{label}}",
+      "reactions": "{{count}} Reaktionen",
+      "reactions_one": "{{count}} Reaktion",
+      "reactions_other": "{{count}} Reaktionen",
+      "linkLabel": "Herausragender Look in {{label}} von {{author}}, {{count}} Reaktionen. Öffnet die Stadt-Highlights.",
+      "linkLabel_one": "Herausragender Look in {{label}} von {{author}}, {{count}} Reaktion. Öffnet die Stadt-Highlights.",
+      "linkLabel_other": "Herausragender Look in {{label}} von {{author}}, {{count}} Reaktionen. Öffnet die Stadt-Highlights.",
+      "cta": "In den Stadt-Highlights ansehen"
+    }
   }
 }

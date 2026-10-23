@@ -111,6 +111,19 @@ const FEED_PAGE_SIZE = 12
  * request and its answer. Below it the attempt would leave after the 10 s operation bound.
  */
 const MINIMUM_TARGET_ATTEMPT_MS = 250
+/** Story 6.7: how long a teaser focus intent waits for a loading spotlight module. */
+export const SPOTLIGHT_FOCUS_WAIT_MS = 10_000
+
+/** Story 6.7: a Home teaser activation, copied out of the route params once per token. */
+interface SpotlightFocusIntent {
+  cardId: string
+  focusToken: string
+  receivedAt: number
+}
+
+type SpotlightNoticeKey =
+  | 'community.spotlight.targetUnavailable'
+  | 'community.spotlight.destinationUnavailable'
 
 /** The four terminal states the `community.removed.*` tree explains. */
 const EXPLAINED_AUTHOR_STATES = new Set([
@@ -165,7 +178,8 @@ export function CommunityScreen() {
   const palette = useHeroPalette()
   const locale = useResolvedCommunityLocale(i18n.language)
   const analytics = useMobileAnalytics()
-  const { source, type, cardId, commentId, parentId, expiresAt } = useLocalSearchParams()
+  const { source, type, cardId, commentId, parentId, expiresAt, focus, focusToken } =
+    useLocalSearchParams()
   const router = useRouter()
   const targetRef = useRef<View>(null)
   const newPostButtonRef = useRef<View>(null)
@@ -181,6 +195,18 @@ export function CommunityScreen() {
     | undefined
   >()
   const [isInvalidDeepLink, setIsInvalidDeepLink] = useState(false)
+  // Story 6.7: the teaser focus intent and the notice that reports an outcome
+  // other than the entry itself. The serial re-focuses a repeated notice.
+  const [spotlightIntent, setSpotlightIntent] = useState<SpotlightFocusIntent | null>(
+    null
+  )
+  const seenFocusTokensRef = useRef(new Set<string>())
+  const [spotlightNotice, setSpotlightNotice] = useState<{
+    key: SpotlightNoticeKey
+    serial: number
+  } | null>(null)
+  const spotlightNoticeSerialRef = useRef(0)
+  const noticeRef = useRef<View>(null)
 
   // Feed state
   const [mode, setMode] = useState<CommunityFeedMode>('auto')
@@ -364,6 +390,9 @@ export function CommunityScreen() {
   useEffect(() => {
     highlightedTargetRef.current = null
     if (!sessionScope) return
+    // Story 6.7: an in-app spotlight focus intent is resolved by its own effect
+    // and never reaches the notification path or its invalid-link banner.
+    if (source === 'app' && (focus !== undefined || focusToken !== undefined)) return
     const rawParams = { source, type, cardId, commentId, parentId, expiresAt }
     const fail = (_reason: string) => {
       setIsInvalidDeepLink(true)
@@ -568,10 +597,44 @@ export function CommunityScreen() {
     commentId,
     parentId,
     expiresAt,
+    focus,
+    focusToken,
     analytics,
     reactionState,
     comments,
   ])
+
+  /**
+   * Story 6.7: the first sight of a new token copies the intent into screen
+   * state, then the spotlight params clear. Clearing never cancels the copy,
+   * and a token already seen moves no focus.
+   */
+  useEffect(() => {
+    if (source !== 'app' || (focus === undefined && focusToken === undefined)) return
+    const parsed = parseDeepLink({ source, type, cardId, focus, focusToken })
+    const payload = parsed.valid ? parsed.payload : undefined
+    if (
+      payload?.focus === 'spotlight' &&
+      payload.cardId &&
+      payload.focusToken &&
+      !seenFocusTokensRef.current.has(payload.focusToken)
+    ) {
+      seenFocusTokensRef.current.add(payload.focusToken)
+      setSpotlightNotice(null)
+      setSpotlightIntent({
+        cardId: payload.cardId,
+        focusToken: payload.focusToken,
+        receivedAt: Date.now(),
+      })
+    }
+    router.setParams({
+      source: undefined,
+      type: undefined,
+      cardId: undefined,
+      focus: undefined,
+      focusToken: undefined,
+    })
+  }, [source, type, cardId, focus, focusToken, router])
 
   const focusNode = useCallback((node: View | null) => {
     if (Platform.OS === 'web' || !node) {
@@ -797,6 +860,9 @@ export function CommunityScreen() {
       setReportingPost(null)
       setSpotlightDetail(null)
       pendingSpotlightActionRef.current = null
+      // A teaser intent belongs to the member who tapped it.
+      setSpotlightIntent(null)
+      setSpotlightNotice(null)
       setReportedPostIds(new Set())
       setIsSubmittingReport(false)
       setIsPostSheetVisible(false)
@@ -1311,6 +1377,70 @@ export function CommunityScreen() {
     scope: feedScopeRef,
   })
 
+  /**
+   * Story 6.7: resolves a teaser focus intent against the spotlight module. A
+   * loading module is awaited for at most 10 seconds. The entry, when shown,
+   * takes focus with one announcement; every other outcome focuses one notice.
+   * Either way the intent is consumed, so a later recovery moves no focus.
+   */
+  const spotlightStatus = spotlight.status
+  const focusSpotlightEntry = spotlight.focusEntry
+  const feedListRef = feedScroll.listRef
+  useEffect(() => {
+    if (!spotlightIntent) return
+    const report = (key: SpotlightNoticeKey) => {
+      setSpotlightIntent(null)
+      spotlightNoticeSerialRef.current += 1
+      setSpotlightNotice({ key, serial: spotlightNoticeSerialRef.current })
+    }
+    if (!communityAvailable || spotlightStatus === 'idle') {
+      report('community.spotlight.destinationUnavailable')
+      return
+    }
+    if (spotlightStatus === 'loading') {
+      const timer = setTimeout(
+        () => report('community.spotlight.destinationUnavailable'),
+        Math.max(0, spotlightIntent.receivedAt + SPOTLIGHT_FOCUS_WAIT_MS - Date.now())
+      )
+      return () => clearTimeout(timer)
+    }
+    if (
+      spotlightStatus === 'ready' &&
+      spotlightLevel !== 'none' &&
+      spotlightItems.some((post) => post.id === spotlightIntent.cardId)
+    ) {
+      setSpotlightIntent(null)
+      // The module heads the list, so the list returns to its top first.
+      feedListRef.current?.scrollToOffset({ offset: 0, animated: false })
+      focusSpotlightEntry(spotlightIntent.cardId)
+      return
+    }
+    report('community.spotlight.targetUnavailable')
+  }, [
+    communityAvailable,
+    feedListRef,
+    focusSpotlightEntry,
+    spotlightIntent,
+    spotlightItems,
+    spotlightLevel,
+    spotlightStatus,
+  ])
+
+  // Focusing the notice is its single announcement: the list returns to its
+  // top, then focus moves to the message. No live region repeats it.
+  useEffect(() => {
+    if (!spotlightNotice) return
+    feedListRef.current?.scrollToOffset({ offset: 0, animated: false })
+    requestAnimationFrame(() => {
+      if (Platform.OS === 'web') {
+        ;(noticeRef.current as unknown as { focus?: () => void } | null)?.focus?.()
+        return
+      }
+      const handle = safeFindNodeHandle(noticeRef.current)
+      if (handle) AccessibilityInfo.setAccessibilityFocus(handle)
+    })
+  }, [feedListRef, spotlightNotice])
+
   const feedErrorMessage = useMemo(() => {
     const { key, options } = communityErrorTranslation(
       feedError,
@@ -1325,15 +1455,18 @@ export function CommunityScreen() {
    * deep-link notice and every success confirmation share one channel; failures
    * go to the assertive alert panel below instead of competing for it.
    */
-  const bannerMessage = isInvalidDeepLink
-    ? t('community.deepLink.invalid')
-    : noticeKey
-      ? t(noticeKey)
-      : null
+  const bannerMessage = spotlightNotice
+    ? t(spotlightNotice.key)
+    : isInvalidDeepLink
+      ? t('community.deepLink.invalid')
+      : noticeKey
+        ? t(noticeKey)
+        : null
 
   const dismissBanner = useCallback(() => {
     setIsInvalidDeepLink(false)
     setNoticeKey(null)
+    setSpotlightNotice(null)
   }, [])
 
   const renderEmptyComponent = () => {
@@ -1536,9 +1669,10 @@ export function CommunityScreen() {
     <View>
       {bannerMessage ? (
         <InfoBanner
-          key={bannerMessage}
+          ref={noticeRef}
           message={bannerMessage}
           onDismiss={dismissBanner}
+          liveRegion={!spotlightNotice}
         />
       ) : null}
       {actionErrorMessage ? (

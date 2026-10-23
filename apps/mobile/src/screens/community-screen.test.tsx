@@ -100,6 +100,7 @@ import { registerCommunityNotificationRecoveryCases } from '../test-utils/commun
 import { registerCommunityClientCases } from '../test-utils/community-screen/client.cases'
 import { registerCommunitySpotlightCases } from '../test-utils/community-screen/spotlight.cases'
 import { registerCommunitySpotlightReviewCases } from '../test-utils/community-screen/spotlight-review.cases'
+import { registerCommunitySpotlightFocusCases } from '../test-utils/community-screen/spotlight-focus.cases'
 import { refreshEvents } from '../test-utils/community-screen/mock-state'
 import { configure } from '@testing-library/react'
 import { delay } from 'msw'
@@ -170,6 +171,7 @@ describe('Mobile community screen (Story 6.1)', () => {
   registerCommunityNotificationRecoveryCases()
   registerCommunitySpotlightCases()
   registerCommunitySpotlightReviewCases()
+  registerCommunitySpotlightFocusCases()
 })
 
 /**

@@ -2,6 +2,7 @@
 // Story 6.5: after a native cold start, Home's first load can run before the stored
 // session is restored. It must load once the identity is ready rather than leave the
 // "unable to load" state up for good.
+import type * as FocusEffectModule from '@/src/test-utils/focus-effect'
 import React from 'react'
 import type * as RitualCacheModule from '@/src/lib/ritual-cache'
 import { act, configure, screen, waitFor } from '@testing-library/react'
@@ -9,9 +10,12 @@ import { render } from 'vitest-browser-react'
 import { afterEach, beforeAll, beforeEach, describe, expect, it, vi } from 'vitest'
 import { http, HttpResponse } from 'msw'
 
-vi.mock('expo-router', () => ({
+vi.mock('expo-router', async () => ({
   useLocalSearchParams: () => ({}),
   useRouter: () => ({ setParams: vi.fn(), push: vi.fn() }),
+  useFocusEffect: (
+    await vi.importActual<typeof FocusEffectModule>('@/src/test-utils/focus-effect')
+  ).useFocusEffect,
 }))
 vi.mock('expo-localization', () => ({
   getLocales: () => [{ languageTag: 'en-US', languageCode: 'en', regionCode: 'US' }],

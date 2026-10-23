@@ -1801,6 +1801,57 @@ export interface CommunityLookbookGridProps {
    * `auto` chip pressed over a feed carrying every region.
    */
   onServedModeChange?: (mode: CommunityFeedMode) => void
+  /**
+   * Story 6.7: a Home teaser activation. A new token asks this section to focus
+   * that spotlight entry, or to focus one notice saying why it cannot.
+   */
+  spotlightFocusIntent?: SpotlightFocusIntent | null
+}
+
+/** Story 6.7: one Home teaser activation, resolved once per token. */
+export interface SpotlightFocusIntent {
+  cardId: string
+  focusToken: string
+}
+
+/** How long a teaser focus intent waits for a loading spotlight module. */
+export const SPOTLIGHT_FOCUS_WAIT_MS = 10_000
+
+type SpotlightNoticeKey =
+  | 'community.spotlight.targetUnavailable'
+  | 'community.spotlight.destinationUnavailable'
+
+/**
+ * Story 6.7: the notice for a teaser outcome other than the entry itself. It
+ * sits outside every availability gate and is focused, never announced: the
+ * focus move is its single announcement.
+ */
+function SpotlightFocusNotice({
+  notice,
+  t,
+}: {
+  notice: { key: SpotlightNoticeKey; serial: number } | null
+  t: Translate
+}) {
+  const ref = useRef<HTMLParagraphElement>(null)
+  useEffect(() => {
+    if (!notice) return
+    const element = ref.current
+    if (!element) return
+    element.scrollIntoView?.({ block: 'nearest' })
+    element.focus({ preventScroll: true })
+  }, [notice])
+  if (!notice) return null
+  return (
+    <p
+      ref={ref}
+      tabIndex={-1}
+      data-testid="community-spotlight-notice"
+      className="rounded-[8px] border border-[color:var(--theme-card-border)] bg-[var(--theme-card-bg)] p-3 text-xs text-[color:var(--theme-card-text)] focus-visible:outline focus-visible:outline-2 focus-visible:outline-[#C9A14A]"
+    >
+      {t(notice.key)}
+    </p>
+  )
 }
 
 function communityPresentation(
@@ -1836,6 +1887,7 @@ export function CommunityLookbookGrid({
   sponsoredPostIds,
   onViewerBandChange,
   onServedModeChange,
+  spotlightFocusIntent,
 }: CommunityLookbookGridProps) {
   const { t, i18n } = useCommunityTranslation()
   const locale = useResolvedLocale(i18n.language)
@@ -2000,6 +2052,28 @@ export function CommunityLookbookGrid({
     },
   })
   spotlightApplyRef.current = spotlight.apply
+
+  // Story 6.7: a teaser intent is copied once per token, then resolved against
+  // the module: a loading module is awaited for at most 10 seconds; the entry
+  // takes focus with one announcement; any other outcome focuses one notice.
+  // Either way the intent is consumed, so a later recovery moves no focus.
+  const seenFocusTokensRef = useRef(new Set<string>())
+  const [pendingFocus, setPendingFocus] = useState<{
+    cardId: string
+    receivedAt: number
+  } | null>(null)
+  const [spotlightNotice, setSpotlightNotice] = useState<{
+    key: SpotlightNoticeKey
+    serial: number
+  } | null>(null)
+  const spotlightNoticeSerialRef = useRef(0)
+  useEffect(() => {
+    if (!spotlightFocusIntent) return
+    if (seenFocusTokensRef.current.has(spotlightFocusIntent.focusToken)) return
+    seenFocusTokensRef.current.add(spotlightFocusIntent.focusToken)
+    setSpotlightNotice(null)
+    setPendingFocus({ cardId: spotlightFocusIntent.cardId, receivedAt: Date.now() })
+  }, [spotlightFocusIntent])
   const { reset: resetSpotlight, apply: applySpotlight } = spotlight
   // Realtime reads the rendered spotlight posts from a ref, so the sync state
   // built once per session always sees the current page.
@@ -2234,6 +2308,9 @@ export function CommunityLookbookGrid({
       actionControllerRef.current?.abort()
       reactionState.reset()
       resetSpotlight()
+      // A teaser intent and its notice belong to the member who tapped it.
+      setPendingFocus(null)
+      setSpotlightNotice(null)
       setItems([])
       itemsRef.current = []
       setAuthorStates([])
@@ -3040,6 +3117,51 @@ export function CommunityLookbookGrid({
   const bandNoticeReason =
     displayedMode === 'auto' && !bandResolved ? bandUnresolvedReason : null
 
+  const spotlightStatus = spotlight.state.status
+  const spotlightLevel = spotlight.state.level
+  const spotlightItems = spotlight.state.items
+  const focusSpotlightEntry = spotlight.focusEntry
+  useEffect(() => {
+    if (!pendingFocus) return
+    const report = (key: SpotlightNoticeKey) => {
+      setPendingFocus(null)
+      spotlightNoticeSerialRef.current += 1
+      setSpotlightNotice({ key, serial: spotlightNoticeSerialRef.current })
+    }
+    if (!communityAvailable || spotlightStatus === 'idle') {
+      report('community.spotlight.destinationUnavailable')
+      return
+    }
+    if (spotlightStatus === 'loading') {
+      const timer = setTimeout(
+        () => report('community.spotlight.destinationUnavailable'),
+        Math.max(0, pendingFocus.receivedAt + SPOTLIGHT_FOCUS_WAIT_MS - Date.now())
+      )
+      return () => clearTimeout(timer)
+    }
+    if (
+      spotlightStatus === 'ready' &&
+      spotlightLevel !== 'none' &&
+      spotlightItems.some((post) => post.id === pendingFocus.cardId)
+    ) {
+      setPendingFocus(null)
+      focusSpotlightEntry(pendingFocus.cardId)
+      setAnnouncement({
+        key: 'community.feed.announceFocused',
+        announcementId: ++reactionAnnouncementId.current,
+      })
+      return
+    }
+    report('community.spotlight.targetUnavailable')
+  }, [
+    communityAvailable,
+    focusSpotlightEntry,
+    pendingFocus,
+    spotlightItems,
+    spotlightLevel,
+    spotlightStatus,
+  ])
+
   const presentation = communityPresentation(
     communityAvailable,
     hasSession,
@@ -3057,6 +3179,7 @@ export function CommunityLookbookGrid({
 
   return (
     <aside aria-label={t('community.sectionLabel')} className="flex flex-col gap-6">
+      <SpotlightFocusNotice notice={spotlightNotice} t={t} />
       <CommunitySpotlightSection
         state={spotlight.state}
         available={communityAvailable}

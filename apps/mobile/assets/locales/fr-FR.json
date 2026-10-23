@@ -881,7 +881,9 @@
       "announceLoadedMore": "{{count}} looks à la une supplémentaires chargés.",
       "announceLoadedMore_one": "{{count}} look à la une supplémentaire chargé.",
       "announceLoadedMore_other": "{{count}} looks à la une supplémentaires chargés.",
-      "announceRefreshed": "La une de la ville a été actualisée avec le classement le plus récent."
+      "announceRefreshed": "La une de la ville a été actualisée avec le classement le plus récent.",
+      "targetUnavailable": "Ce look n'est plus dans À la une de la ville.",
+      "destinationUnavailable": "À la une de la ville n'est pas disponible pour le moment."
     }
   },
   "locations": {
@@ -927,6 +929,18 @@
       "rate_limited": "Trop de recherches. Patientez un instant puis réessayez.",
       "invalid_query": "Saisissez entre 2 et 80 caractères.",
       "unknown": "Un problème est survenu. Réessayez."
+    }
+  },
+  "home": {
+    "spotlightTeaser": {
+      "heading": "Look à la une à {{label}}",
+      "reactions": "{{count}} réactions",
+      "reactions_one": "{{count}} réaction",
+      "reactions_other": "{{count}} réactions",
+      "linkLabel": "Look à la une à {{label}} par {{author}}, {{count}} réactions. Ouvre À la une de la ville.",
+      "linkLabel_one": "Look à la une à {{label}} par {{author}}, {{count}} réaction. Ouvre À la une de la ville.",
+      "linkLabel_other": "Look à la une à {{label}} par {{author}}, {{count}} réactions. Ouvre À la une de la ville.",
+      "cta": "Voir dans À la une de la ville"
     }
   }
 }

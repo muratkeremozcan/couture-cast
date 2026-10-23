@@ -2,6 +2,7 @@
 // Covers the hero screen's degraded and native-only paths: a durable cache
 // that refuses writes, a widget slot that maps to a named scenario, and the
 // iOS accessibility-focus routes the web renderer never takes.
+import type * as FocusEffectModule from '@/src/test-utils/focus-effect'
 import React from 'react'
 import type * as ReactNativeModule from 'react-native'
 import type * as RitualCacheModule from '@/src/lib/ritual-cache'
@@ -32,9 +33,12 @@ let mockParams: Record<string, string> = {}
 const mockSetParams = vi.fn()
 const mockPush = vi.fn()
 
-vi.mock('expo-router', () => ({
+vi.mock('expo-router', async () => ({
   useLocalSearchParams: () => mockParams,
   useRouter: () => ({ setParams: mockSetParams, push: mockPush }),
+  useFocusEffect: (
+    await vi.importActual<typeof FocusEffectModule>('@/src/test-utils/focus-effect')
+  ).useFocusEffect,
 }))
 
 vi.mock('expo-localization', () => ({
