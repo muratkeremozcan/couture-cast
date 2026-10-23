@@ -41,6 +41,13 @@ const latestLocationByUserLocale: Record<string, string> = {}
  */
 const mutationTailByUser: Record<string, Promise<void>> = {}
 
+/**
+ * Bumped when {@link forgetLatestRitual} is called, before it is queued. A save
+ * called earlier that has not run yet sees a newer generation and drops its
+ * pointer, so a queued save for the previous primary cannot republish it.
+ */
+const pointerGenerationByUser: Record<string, number> = {}
+
 function serializeForUser<T>(userId: string, mutation: () => Promise<T>): Promise<T> {
   const previous = mutationTailByUser[userId] ?? Promise.resolve()
   const run = previous.then(mutation)
@@ -235,17 +242,28 @@ export async function saveRitualCache(
   const key = ritualCacheKey(userId, locale, locationKey)
   const localeKey = userLocaleKey(userId, locale)
 
+  const generation = pointerGenerationByUser[userId] ?? 0
+
   await serializeForUser(userId, async () => {
+    const current = generation === (pointerGenerationByUser[userId] ?? 0)
     memoryCache[key] = entry
-    latestLocationByUserLocale[localeKey] = locationKey
-    try {
-      await Promise.all([
-        writeStoredValue(key, JSON.stringify(entry)),
-        writeStoredValue(latestLocationCacheKey(userId, locale), locationKey),
-      ])
-    } catch (error) {
-      console.warn('[RitualCache] Durable cache write failed', error)
-      throw error
+    if (current) latestLocationByUserLocale[localeKey] = locationKey
+    // allSettled, never all: the serialization is held until EVERY write this
+    // mutation started has landed. With `Promise.all`, a rejected entry write
+    // released the next mutation while the pointer write was still in flight,
+    // so an invalidation could finish first and the pointer land after it.
+    const results = await Promise.allSettled([
+      writeStoredValue(key, JSON.stringify(entry)),
+      ...(current
+        ? [writeStoredValue(latestLocationCacheKey(userId, locale), locationKey)]
+        : []),
+    ])
+    const failure = results.find(
+      (result): result is PromiseRejectedResult => result.status === 'rejected'
+    )
+    if (failure) {
+      console.warn('[RitualCache] Durable cache write failed', failure.reason)
+      throw failure.reason
     }
   })
   // Story 3.3 Task 1 step 2 owner: update widgets only after the durable cache writes finish.
@@ -260,6 +278,7 @@ export async function saveRitualCache(
  * location are only reachable through that pointer.
  */
 export async function forgetLatestRitual(userId: string): Promise<void> {
+  pointerGenerationByUser[userId] = (pointerGenerationByUser[userId] ?? 0) + 1
   await serializeForUser(userId, async () => {
     await Promise.all(
       supportedLocales.map(async (locale) => {
