@@ -362,20 +362,20 @@ describe('6.7 mobile Home teaser native focus', () => {
     expect(reactNativeFocusCalls()).toEqual([])
   })
 
-  it('6.7-MOB-049 a view that never takes focus is asked for a bounded number of frames, then left', async () => {
+  it('6.7-MOB-049 a view the module never finds ready is asked for a bounded number of frames, then through React Native once', async () => {
     const { link } = await shownTeaser()
-    iosFocusHandles()
+    const { handleOf } = iosFocusHandles()
     osFocus.refusals = Number.POSITIVE_INFINITY
     await activateAndReturn(link)
 
-    await waitFor(() => expect(osFocus.moves).toHaveLength(NATIVE_FOCUS_FRAMES), {
+    await waitFor(() => expect(reactNativeFocusCalls()).toEqual([handleOf(link)]), {
       timeout: 10_000,
     })
+    expect(osFocus.moves).toHaveLength(NATIVE_FOCUS_FRAMES)
+    await screen.findByTestId('home-spotlight-teaser-focus-requested-link-1')
     await settleFrames()
     expect(osFocus.moves).toHaveLength(NATIVE_FOCUS_FRAMES)
-    expect(
-      document.querySelector('[data-testid^="home-spotlight-teaser-focus-requested-"]')
-    ).toBeNull()
+    expect(reactNativeFocusCalls()).toHaveLength(1)
   })
 
   it('6.7-MOB-050 a TalkBack report that arrives before the native call resolves still confirms the move', async () => {

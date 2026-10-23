@@ -17,6 +17,8 @@
     "test": "npm run vitest:run && npm run test:widget-prebuild && npm run test:watchos-prebuild",
     "test:widget-prebuild": "node --test plugins/with-widgets.test.js",
     "test:watchos-prebuild": "node --test plugins/with-watchos.test.js",
+    "test:accessibility-focus:android": "expo prebuild --platform android --no-install && cd android && ./gradlew :accessibility-focus:testDebugUnitTest --console=plain",
+    "test:accessibility-focus:ios": "cd modules/accessibility-focus/ios && xcodebuild test -scheme AccessibilityFocusTarget -destination \"platform=iOS Simulator,name=${ACCESSIBILITY_FOCUS_SIMULATOR:-iPhone 16}\"",
     "pretest:coverage": "npm run prepare:shared-deps",
     "test:coverage": "vitest run --config vitest.config.ts --coverage",
     "start": "expo start",

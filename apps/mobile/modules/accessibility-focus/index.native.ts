@@ -12,6 +12,8 @@ import type { AccessibilityFocusChange, AccessibilityFocusListener } from './typ
 export type { AccessibilityFocusChange, AccessibilityFocusListener } from './types'
 
 interface AccessibilityFocusModule {
+  /** False on Android before API 29, where observing could discard another delegate. */
+  canObserveFocus?: boolean
   focus(tag: number): Promise<boolean>
   addListener(
     event: 'onAccessibilityFocusChange',
@@ -19,18 +21,21 @@ interface AccessibilityFocusModule {
   ): EventSubscription
 }
 
-const nativeModule =
+/** Looked up per call: a registry read, and it keeps the wrapper free of load order. */
+const nativeModule = () =>
   requireOptionalNativeModule<AccessibilityFocusModule>('AccessibilityFocus')
 
 /**
  * Subscribes to OS accessibility-focus changes. Returns the unsubscribe, or null
- * when this build cannot observe them.
+ * when this build cannot observe them: no module (Expo Go), or an Android
+ * version the module will not observe on.
  */
 export function observeAccessibilityFocus(
   listener: AccessibilityFocusListener
 ): (() => void) | null {
-  if (!nativeModule) return null
-  const subscription = nativeModule.addListener('onAccessibilityFocusChange', listener)
+  const module = nativeModule()
+  if (!module || module.canObserveFocus === false) return null
+  const subscription = module.addListener('onAccessibilityFocusChange', listener)
   return () => subscription.remove()
 }
 
@@ -39,5 +44,6 @@ export function observeAccessibilityFocus(
  * Resolves whether the view accepted it; null when this build has no module.
  */
 export function focusAccessibilityElement(tag: number): Promise<boolean> | null {
-  return nativeModule ? nativeModule.focus(tag) : null
+  const module = nativeModule()
+  return module ? module.focus(tag) : null
 }

@@ -12,10 +12,13 @@ public class AccessibilityFocusModule: Module {
 
     Events("onAccessibilityFocusChange")
 
+    Constants(["canObserveFocus": true])
+
     AsyncFunction("focus") { (tag: Int) -> Bool in
-      guard let view = self.appContext?.findView(withTag: tag, ofType: UIView.self) else {
-        return false
-      }
+      let view = self.appContext?.findView(withTag: tag, ofType: UIView.self)
+      // A view that is not in a window yet cannot take VoiceOver focus; refusing
+      // lets the caller ask again once React Native has reattached it.
+      guard AccessibilityFocusTarget.canTakeFocus(view), let view else { return false }
       UIAccessibility.post(notification: .layoutChanged, argument: view)
       return true
     }
@@ -42,7 +45,8 @@ public class AccessibilityFocusModule: Module {
       queue: .main
     ) { [weak self] notification in
       let element = notification.userInfo?[UIAccessibility.focusedElementUserInfoKey]
-      self?.sendEvent("onAccessibilityFocusChange", ["tags": Self.tags(of: element)])
+      self?.sendEvent(
+        "onAccessibilityFocusChange", ["tags": AccessibilityFocusTarget.tags(of: element)])
     }
   }
 
@@ -51,18 +55,5 @@ public class AccessibilityFocusModule: Module {
       NotificationCenter.default.removeObserver(observer)
     }
     observer = nil
-  }
-
-  private static func tags(of element: Any?) -> [Int] {
-    var view = element as? UIView
-    if view == nil, let accessibilityElement = element as? UIAccessibilityElement {
-      view = accessibilityElement.accessibilityContainer as? UIView
-    }
-    var tags: [Int] = []
-    while let current = view {
-      if current.tag > 0 { tags.append(current.tag) }
-      view = current.superview
-    }
-    return tags
   }
 }

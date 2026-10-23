@@ -1,0 +1,4 @@
+# Xcode writes its Swift package workspace state here when it opens ios/Package.swift.
+ios/.swiftpm/
+ios/.build/
+android/build/

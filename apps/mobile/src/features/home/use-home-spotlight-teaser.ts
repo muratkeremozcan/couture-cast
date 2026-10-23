@@ -176,7 +176,8 @@ const nextFrame = () =>
  * through the accessibility-focus module when the build carries it. The target
  * is chosen again in every frame, so a teaser that left since the request was
  * queued is never the target; a native view that refuses focus is asked again
- * on the next frame, up to `NATIVE_FOCUS_FRAMES`. `onChosen` runs once, at the
+ * on the next frame, up to `NATIVE_FOCUS_FRAMES`; a view the module refused for
+ * all of them gets React Native's own request as a last resort. `onChosen` runs once, at the
  * first frame that has a destination; `onDispatch` runs just before each native
  * request, because the OS can report the focus before the request resolves.
  * Resolves the request that went through, or null when nothing was focused.
@@ -218,7 +219,16 @@ async function moveAccessibilityFocus(
     }
     if (await moving.catch(() => false)) return request
   }
-  return null
+  // The module never found the view ready. React Native's request is all that is
+  // left, for the target still wanted now; the OS report says whether it landed.
+  await nextFrame()
+  const chosen = destination()
+  const handle = chosen ? safeFindNodeHandle(chosen.node) : null
+  if (!chosen || !handle) return null
+  const request = { target: chosen.target, handle, landed: false }
+  onDispatch(request)
+  AccessibilityInfo.setAccessibilityFocus(handle)
+  return request
 }
 
 const nextMove = (target: TeaserFocusTarget) => (previous: TeaserFocusMove | null) => ({
