@@ -396,4 +396,125 @@ describe('LocationsSection', () => {
     })
     expect(results.violations.map((violation) => violation.id)).toEqual([])
   })
+  it('1.2b-WEB-13 says search is down on a search 503 and searches again on retry', async () => {
+    signIn()
+    let attempts = 0
+    useMswHandlers(
+      listHandler(),
+      http.get('/api/v1/locations/search', () => {
+        attempts += 1
+        return attempts === 1
+          ? HttpResponse.json(
+              {
+                statusCode: 503,
+                code: 'provider_unavailable',
+                retryable: true,
+                message: 'down',
+                error: 'Service Unavailable',
+              },
+              { status: 503 }
+            )
+          : HttpResponse.json({ data: [CANDIDATE] })
+      })
+    )
+
+    renderSection()
+    await searchFor('Chicago')
+    expect((await screen.findByTestId('location-error')).textContent).toBe(
+      'City search is temporarily unavailable. Try again.'
+    )
+    fireEvent.click(screen.getByTestId('location-retry-button'))
+
+    await screen.findByTestId('location-search-option')
+    expect(attempts).toBe(2)
+    expect(screen.queryByTestId('location-error')).toBeNull()
+  })
+
+  it('1.2b-WEB-14 wraps the active option with the arrow keys and closes on Escape', async () => {
+    signIn()
+    useMswHandlers(
+      listHandler(),
+      http.get('/api/v1/locations/search', () =>
+        HttpResponse.json({
+          data: [
+            CANDIDATE,
+            { ...CANDIDATE, city: 'Chicago Heights', candidateToken: 'b.c' },
+          ],
+        })
+      )
+    )
+
+    renderSection()
+    const input = await searchFor('Chicago')
+    const options = await screen.findAllByTestId('location-search-option')
+    expect(input).toHaveAttribute('aria-activedescendant', options[0]!.id)
+
+    fireEvent.keyDown(input, { key: 'ArrowUp' })
+    expect(input).toHaveAttribute('aria-activedescendant', options[1]!.id)
+    fireEvent.keyDown(input, { key: 'ArrowDown' })
+    expect(input).toHaveAttribute('aria-activedescendant', options[0]!.id)
+
+    fireEvent.keyDown(input, { key: 'Escape' })
+    expect(screen.getByTestId('location-search-results')).not.toBeVisible()
+    expect(input).toHaveAttribute('aria-expanded', 'false')
+  })
+
+  it('1.2b-WEB-15 explains a failed list load', async () => {
+    signIn()
+    useMswHandlers(
+      http.get('/api/v1/locations', () =>
+        HttpResponse.json({ statusCode: 500, message: 'boom' }, { status: 500 })
+      )
+    )
+
+    renderSection()
+
+    expect(await screen.findByTestId('locations-load-error')).toBeInTheDocument()
+    expect(screen.queryByTestId('location-search-input')).toBeNull()
+  })
+
+  it('1.2b-WEB-16 reports a failed primary switch and keeps the list as it was', async () => {
+    signIn()
+    saved = [location(), office]
+    useMswHandlers(
+      listHandler(),
+      http.post('/api/v1/locations/loc-2/primary', () =>
+        HttpResponse.json({ statusCode: 404, message: 'gone' }, { status: 404 })
+      )
+    )
+
+    renderSection()
+    fireEvent.click(await screen.findByRole('button', { name: 'Make primary, Office' }))
+
+    expect((await screen.findByTestId('locations-error')).textContent).toBe(
+      'Something went wrong. Try again.'
+    )
+    expect(screen.getAllByTestId('location-item')[0]).toHaveAttribute(
+      'data-primary',
+      'true'
+    )
+  })
+
+  it('1.2b-WEB-17 cancels a rename with Escape or Cancel and a delete with Cancel', async () => {
+    signIn()
+    saved = [location(), office]
+    useMswHandlers(listHandler())
+
+    renderSection()
+    const rename = await screen.findByRole('button', { name: 'Rename, Office' })
+    fireEvent.click(rename)
+    fireEvent.keyDown(screen.getByTestId('location-rename-input'), { key: 'Escape' })
+    expect(screen.queryByTestId('location-rename-input')).toBeNull()
+    // Focus returns to the item, as after every list action.
+    await waitFor(() => expect(document.activeElement?.textContent).toBe('Office'))
+
+    fireEvent.click(screen.getByRole('button', { name: 'Rename, Office' }))
+    fireEvent.click(screen.getByRole('button', { name: 'Cancel' }))
+    expect(screen.queryByTestId('location-rename-input')).toBeNull()
+
+    fireEvent.click(screen.getByRole('button', { name: 'Delete, Home' }))
+    fireEvent.click(screen.getByRole('button', { name: 'Cancel' }))
+    expect(screen.queryByTestId('location-delete-confirm')).toBeNull()
+    expect(screen.getAllByTestId('location-item')).toHaveLength(2)
+  })
 })

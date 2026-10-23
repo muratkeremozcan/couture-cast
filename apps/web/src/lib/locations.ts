@@ -19,7 +19,7 @@ import {
   type SavedLocation,
   type SupportedLocale,
 } from '@couture/api-client/contracts/http'
-import { ResponseError } from '@couture/api-client'
+import { FetchError, ResponseError } from '@couture/api-client'
 import { createWebApiClient } from './api-client'
 import { WEB_ACCESS_TOKEN_STORAGE_KEY } from './wardrobe'
 
@@ -98,6 +98,10 @@ async function locationError(error: unknown): Promise<LocationRequestError> {
       `Location request failed with HTTP ${error.response.status}`
     )
   }
+  // The generated SDK wraps a fetch rejection in `FetchError`, so an abort
+  // arrives as its cause. A cancelled request is the caller's choice, never a
+  // failure to report.
+  if (error instanceof FetchError && error.cause.name === 'AbortError') throw error.cause
   if (error instanceof Error && error.name === 'AbortError') throw error
   return new LocationRequestError(
     'unknown',

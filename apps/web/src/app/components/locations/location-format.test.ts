@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { safeReturnPath } from './location-format'
+import { errorKey, formatPlace, safeReturnPath } from './location-format'
 
 const ORIGIN = 'https://couture.example'
 
@@ -31,5 +31,37 @@ describe('safeReturnPath', () => {
     ['relative path', 'settings'],
   ])('1.2b-WEB-15 sends a %s target home', (_name, value) => {
     expect(safeReturnPath(value, ORIGIN)).toBe('/')
+  })
+})
+
+describe('errorKey', () => {
+  it('1.2b-WEB-16b names save, search, limit and unknown failures apart', () => {
+    expect(errorKey('provider_unavailable')).toBe('locations.errors.provider_unavailable')
+    expect(errorKey('provider_unavailable', 'save')).toBe(
+      'locations.errors.save_unavailable'
+    )
+    expect(errorKey('duplicate', 'save')).toBe('locations.errors.duplicate')
+    expect(errorKey('limit_reached')).toBe('locations.limit')
+    expect(errorKey('not_found')).toBe('locations.errors.unknown')
+  })
+})
+
+describe('formatPlace', () => {
+  it('1.2b-WEB-16c localizes an ISO country and keeps a legacy free-text one', () => {
+    expect(formatPlace({ city: 'Lyon', region: null, country: 'FR' }, 'en-US')).toBe(
+      'Lyon, France'
+    )
+    expect(formatPlace({ city: 'Lyon', region: null, country: 'FR' }, 'de-DE')).toBe(
+      'Lyon, Frankreich'
+    )
+    expect(
+      formatPlace(
+        { city: 'Springfield', region: 'IL', country: 'United States' },
+        'en-US'
+      )
+    ).toBe('Springfield, IL, United States')
+    expect(formatPlace({ city: 'Somewhere', region: null, country: null }, 'en-US')).toBe(
+      'Somewhere'
+    )
   })
 })
