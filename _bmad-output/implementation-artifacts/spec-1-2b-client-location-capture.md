@@ -301,6 +301,8 @@ SUPERUSER attribute`; 4 to 7 files red per run). `apps/api/vitest.config.ts` pin
   list and can never reach the middle. Maestro then makes five more settling swipes before it
   accepts a visible row, and on a slow emulator those outlasted the 15 s timeout, so the step
   reported a row it was showing as not found. Both steps now wait for the row to be fully visible.
+  R27: iOS judges that visibility from unclipped XCUI frames, so each step is followed by a `scroll`
+  that pins the list end, where the row clears the tab bar on both platforms.
 
 ## Spec Change Log
 
