@@ -16,6 +16,11 @@ export declare function waitForPackageManagerReady(options: {
   sleep?: (ms: number) => Promise<void>
 }): Promise<{ attempts: number; durationsMs: number[] }>
 
+export declare function shouldCaptureUnreadyProbe(
+  attempt: number,
+  final: boolean
+): boolean
+
 export declare function resolveProbeSerials(
   intendedSerials: string[],
   adbStates: Map<string, string>

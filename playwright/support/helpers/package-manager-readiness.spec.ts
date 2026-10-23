@@ -12,6 +12,7 @@ import {
   captureSlowProbeState,
   resolveProbeSerials,
   saveDiagnostic,
+  shouldCaptureUnreadyProbe,
   waitForPackageManagerReady,
 } from '../../../scripts/lib/package-manager-readiness.mjs'
 
@@ -73,7 +74,8 @@ describe('package manager readiness probe', () => {
 
     expect(result.attempts).toBe(3)
     expect(result.durationsMs).toHaveLength(3)
-    expect(onUnreadyProbe.mock.calls).toEqual([[1], [2]])
+    // Only the first unready probe captures; the second is logged (R29b).
+    expect(onUnreadyProbe.mock.calls).toEqual([[1]])
     // Every blocked probe was told to stop.
     for (const [signal] of runProbe.mock.calls.slice(0, 2))
       expect(signal.aborted).toBe(true)
@@ -86,9 +88,7 @@ describe('package manager readiness probe', () => {
 
   it('1.2b-R28-07 fails with every probe outcome once the overall bound passes', async () => {
     let clock = 0
-    const onUnreadyProbe = vi.fn(() => {
-      clock += 40
-    })
+    const onUnreadyProbe = vi.fn()
 
     await expect(
       waitForPackageManagerReady({
@@ -97,13 +97,18 @@ describe('package manager readiness probe', () => {
         log: () => undefined,
         probeTimeoutMs: 10,
         overallTimeoutMs: 100,
+        retryDelayMs: 40,
         now: () => clock,
-        sleep: noWait,
+        sleep: (ms) => {
+          clock += ms
+          return Promise.resolve()
+        },
       })
     ).rejects.toThrow(
-      /never answered pm clear with Success in 100 ms \(probe 1 did not complete within 10 ms; probe 2 /
+      /never answered pm clear with Success in 100 ms \(probe 1 did not complete within 10 ms; probe 2 did not complete within 10 ms; probe 3 /
     )
-    expect(onUnreadyProbe).toHaveBeenCalledTimes(3)
+    // The first probe and the one that ends the wait capture (R29b).
+    expect(onUnreadyProbe.mock.calls).toEqual([[1], [4]])
   })
 
   it('1.2b-R28-08 saves logcat, processes and package and activity dumps for a slow probe', async () => {
@@ -158,7 +163,11 @@ describe('package manager readiness probe', () => {
       })
 
       expect(result.attempts).toBe(3)
-      expect(onUnreadyProbe.mock.calls).toEqual([[1], [2]])
+      // Probe 2 is logged, not captured (R29b).
+      expect(onUnreadyProbe.mock.calls).toEqual([[1]])
+      expect(String(log.mock.calls[1]?.[0])).toMatch(
+        /^Package manager not ready: pm clear probe 2 exited/
+      )
       expect(String(log.mock.calls[0]?.[0])).toMatch(
         /^Package manager not ready: pm clear probe 1 exited/
       )
@@ -271,5 +280,39 @@ describe('package manager readiness probe', () => {
     expect(
       saveDiagnostic(path.join(directory, 'ok', 'a.txt'), 'x', log, 'a capture')
     ).toBe(true)
+  })
+  it('1.2b-R29b-01 captures the first, every tenth and the final unready probe only', async () => {
+    let clock = 0
+    const onUnreadyProbe = vi.fn()
+    const log = vi.fn()
+
+    await expect(
+      waitForPackageManagerReady({
+        runProbe: answers(1, 'error: device offline'),
+        onUnreadyProbe,
+        log,
+        overallTimeoutMs: 50_000,
+        retryDelayMs: 2_000,
+        now: () => clock,
+        sleep: (ms) => {
+          clock += ms
+          return Promise.resolve()
+        },
+      })
+    ).rejects.toThrow(/never answered pm clear with Success in 50000 ms/)
+
+    // Probe k starts at 2 s x (k - 1), so probe 26 is the first at the bound.
+    expect(onUnreadyProbe.mock.calls).toEqual([[1], [10], [20], [26]])
+    // Every probe is still logged with its outcome.
+    expect(log).toHaveBeenCalledTimes(26)
+  })
+
+  it('1.2b-R29b-02 picks capture probes by attempt and the final flag', () => {
+    expect(
+      [1, 2, 9, 10, 11, 20, 21].filter((attempt) =>
+        shouldCaptureUnreadyProbe(attempt, false)
+      )
+    ).toEqual([1, 10, 20])
+    expect(shouldCaptureUnreadyProbe(7, true)).toBe(true)
   })
 })

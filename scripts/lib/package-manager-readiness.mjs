@@ -28,9 +28,10 @@ export const PROBE_RETRY_DELAY_MS = 2_000
  * Probes until one succeeds, logging each. Success means `pm clear` exited 0
  * and printed `Success` within `probeTimeoutMs` (Story 1.2b R29). Anything else
  * (a probe killed at its bound, a non-zero exit, `Can't find service: package`,
- * `device offline`, an adb that would not start) is reported to
- * `onUnreadyProbe` and retried after `retryDelayMs`, until `overallTimeoutMs`
- * has passed, which throws with every probe's outcome.
+ * `device offline`, an adb that would not start) is logged and retried after
+ * `retryDelayMs`, until `overallTimeoutMs` has passed, which throws with every
+ * probe's outcome. `onUnreadyProbe` runs for the probes
+ * `shouldCaptureUnreadyProbe` picks.
  *
  * @param {{
  *   runProbe: (signal: AbortSignal) => Promise<{ code: number | null, output: string }>,
@@ -72,8 +73,9 @@ export async function waitForPackageManagerReady({
       : `did not complete within ${probeTimeoutMs} ms`
     outcomes.push(`probe ${attempt} ${outcome}`)
     log(`Package manager not ready: pm clear probe ${attempt} ${outcome}`)
-    await onUnreadyProbe(attempt)
-    if (now() - startedAt >= overallTimeoutMs) {
+    const final = now() - startedAt >= overallTimeoutMs
+    if (shouldCaptureUnreadyProbe(attempt, final)) await onUnreadyProbe(attempt)
+    if (final) {
       throw new Error(
         `The package manager never answered pm clear with Success in ${overallTimeoutMs} ms ` +
           `(${outcomes.join('; ')})`
@@ -81,6 +83,20 @@ export async function waitForPackageManagerReady({
     }
     await sleep(retryDelayMs)
   }
+}
+
+/**
+ * Which unready probes capture the device state: the first, every tenth, and
+ * the last before the overall bound fails. Every probe is logged, but four
+ * dumps per probe at one probe every 2 s over 15 minutes would pile up hundreds
+ * of megabytes of artifacts (Story 1.2b R29b).
+ *
+ * @param {number} attempt 1-based; every attempt before a success was unready
+ * @param {boolean} final whether this probe ends the wait
+ * @returns {boolean}
+ */
+export function shouldCaptureUnreadyProbe(attempt, final) {
+  return final || attempt === 1 || attempt % 10 === 0
 }
 
 /**
