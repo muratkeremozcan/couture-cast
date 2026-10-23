@@ -347,6 +347,12 @@ and links to that entry inside the existing City Spotlight with focus and screen
     focus once (6.7-MOB-051 to 053). The web hero layout check now fails on an empty hero canvas.
     The Android second tap in `home-spotlight-teaser.yaml` keeps its swipe: the teaser is the last
     item on Home, so the scroll clamps at the end of the content and cannot carry it off screen.
+  - Found on the Android Expo Go lane: the 15 s image deadline kept counting while the app was in
+    the background, so a teaser read just before the app went to the background was removed on
+    return, and the 60 s read floor kept it away. The deadline now runs only while Home is
+    focused and in the foreground, and each return gives the image a whole deadline
+    (6.7-MOB-054). The Community Spotlight carousel flow waits for the carousel to settle between
+    swipes and allows sixteen of them, after eight unsettled swipes stopped on #5 under load.
 
 ## Spec Change Log
 
