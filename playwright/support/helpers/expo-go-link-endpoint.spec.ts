@@ -3,6 +3,9 @@
  * through, so every launch carries the extra that turns Expo Go's developer-menu
  * onboarding off. See scripts/lib/expo-go-link-endpoint.mjs.
  */
+import fs from 'node:fs'
+import os from 'node:os'
+import path from 'node:path'
 import { afterEach, describe, expect, it, vi } from 'vitest'
 import {
   DISABLE_ONBOARDING_EXTRA,
@@ -42,22 +45,26 @@ describe('Expo Go link endpoint', () => {
     const response = await post({ device: 'emulator-5556', url: LINK })
 
     expect(response.status).toBe(200)
-    expect(run).toHaveBeenCalledWith('/sdk/adb', [
-      '-s',
-      'emulator-5556',
-      'shell',
-      'am',
-      'start',
-      '-W',
-      '-a',
-      'android.intent.action.VIEW',
-      '-d',
-      `'${LINK}'`,
-      '--ez',
-      DISABLE_ONBOARDING_EXTRA,
-      'true',
-      'host.exp.exponent',
-    ])
+    expect(run).toHaveBeenCalledWith(
+      '/sdk/adb',
+      [
+        '-s',
+        'emulator-5556',
+        'shell',
+        'am',
+        'start',
+        '-W',
+        '-a',
+        'android.intent.action.VIEW',
+        '-d',
+        `'${LINK}'`,
+        '--ez',
+        DISABLE_ONBOARDING_EXTRA,
+        'true',
+        'host.exp.exponent',
+      ],
+      expect.any(AbortSignal)
+    )
   })
 
   it('1.2b-R24-02 leaves the extra off when the run keeps Expo Go defaults', () => {
@@ -115,5 +122,60 @@ describe('Expo Go link endpoint', () => {
     )
 
     await expect(listAdbDevices('/sdk/adb', run)).resolves.toEqual(['emulator-5554'])
+  })
+  it('1.2b-R24-07 answers 504 naming the device and command when adb hangs', async () => {
+    let received: AbortSignal | undefined
+    const hangs = vi.fn(
+      (_binary: string, _args: string[], signal?: AbortSignal) =>
+        new Promise<{ code: number | null; output: string }>(() => {
+          received = signal
+        })
+    )
+    const started = await startExpoGoLinkEndpoint({
+      adbBinary: '/sdk/adb',
+      devices: ['emulator-5554'],
+      timeoutMs: 50,
+      run: hangs,
+    })
+    close = started.close
+
+    const response = await fetch(started.url, {
+      method: 'POST',
+      body: JSON.stringify({ device: 'emulator-5554', url: LINK }),
+    })
+
+    expect(response.status).toBe(504)
+    const body = await response.text()
+    expect(body).toContain('emulator-5554')
+    expect(body).toContain('/sdk/adb -s emulator-5554 shell am start -W')
+    expect(received?.aborted).toBe(true)
+  })
+
+  it('1.2b-R24-08 kills a real adb process that outlives the timeout', async () => {
+    const directory = fs.mkdtempSync(path.join(os.tmpdir(), 'expo-go-link-'))
+    const pidFile = path.join(directory, 'pid')
+    const stuckAdb = path.join(directory, 'adb')
+    fs.writeFileSync(stuckAdb, `#!/bin/sh\necho $$ > '${pidFile}'\nexec sleep 30\n`, {
+      mode: 0o755,
+    })
+    try {
+      const started = await startExpoGoLinkEndpoint({
+        adbBinary: stuckAdb,
+        devices: ['emulator-5554'],
+        timeoutMs: 300,
+      })
+      close = started.close
+
+      const response = await fetch(started.url, {
+        method: 'POST',
+        body: JSON.stringify({ device: 'emulator-5554', url: LINK }),
+      })
+
+      expect(response.status).toBe(504)
+      const pid = Number(fs.readFileSync(pidFile, 'utf8'))
+      await vi.waitFor(() => expect(() => process.kill(pid, 0)).toThrow())
+    } finally {
+      fs.rmSync(directory, { recursive: true, force: true })
+    }
   })
 })

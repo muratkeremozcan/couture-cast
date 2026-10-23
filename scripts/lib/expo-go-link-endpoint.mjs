@@ -60,17 +60,25 @@ export function expoGoOpenLinkArgs(device, url, { disableOnboarding = true } = {
 /**
  * @param {string} binary
  * @param {string[]} args
+ * @param {AbortSignal} [signal] kills the child when aborted
  * @returns {Promise<{ code: number | null, output: string }>}
  */
-const runCommand = (binary, args) =>
+const runCommand = (binary, args, signal) =>
   new Promise((resolve) => {
-    const child = spawn(binary, args, { stdio: ['ignore', 'pipe', 'pipe'] })
+    const child = spawn(binary, args, { stdio: ['ignore', 'pipe', 'pipe'], signal })
     let output = ''
     child.stdout.on('data', (chunk) => (output += chunk))
     child.stderr.on('data', (chunk) => (output += chunk))
     child.on('error', (error) => resolve({ code: null, output: String(error) }))
     child.on('close', (code) => resolve({ code, output }))
   })
+
+/**
+ * How long one `am start -W` may take. A launch normally reports within a few
+ * seconds; without a bound a wedged adb or device held the flow until Maestro's
+ * own HTTP timeout, minutes later, with nothing naming the cause.
+ */
+export const OPEN_LINK_TIMEOUT_MS = 30_000
 
 /**
  * @param {import('node:http').IncomingMessage} request
@@ -88,12 +96,15 @@ const readBody = async (request) => {
  * Answers 200 once `am start -W` reports the activity launched, 400 for a body
  * that names an unknown device or a link that is not exp:// or exps://, and 502
  * when adb or the activity manager refuses (`am start` reports some failures on
- * stdout with exit code 0).
+ * stdout with exit code 0). A launch that has not reported within `timeoutMs`
+ * is killed and answered 504, naming the device and the adb command, so the
+ * flow fails at once on the real cause.
  *
  * @param {{
  *   adbBinary: string,
  *   devices: string[],
  *   disableOnboarding?: boolean,
+ *   timeoutMs?: number,
  *   run?: typeof runCommand,
  * }} options
  * @returns {Promise<{ url: string, close: () => Promise<void> }>}
@@ -102,6 +113,7 @@ export async function startExpoGoLinkEndpoint({
   adbBinary,
   devices,
   disableOnboarding = true,
+  timeoutMs = OPEN_LINK_TIMEOUT_MS,
   run = runCommand,
 }) {
   const server = http.createServer(async (request, response) => {
@@ -126,10 +138,28 @@ export async function startExpoGoLinkEndpoint({
       response.writeHead(400).end('Only exp:// and exps:// links open in Expo Go')
       return
     }
-    const result = await run(
-      adbBinary,
-      expoGoOpenLinkArgs(device, url, { disableOnboarding })
-    )
+    const args = expoGoOpenLinkArgs(device, url, { disableOnboarding })
+    const controller = new AbortController()
+    /** @type {ReturnType<typeof setTimeout> | undefined} */
+    let timer
+    const timedOut = new Promise((resolve) => {
+      timer = setTimeout(() => {
+        // Settle first: the abort makes the killed child resolve `run` too.
+        resolve(undefined)
+        controller.abort()
+      }, timeoutMs)
+    })
+    const result = await Promise.race([run(adbBinary, args, controller.signal), timedOut])
+    clearTimeout(timer)
+    if (!result) {
+      response
+        .writeHead(504)
+        .end(
+          `adb did not finish opening the link on ${device} within ${timeoutMs} ms: ` +
+            `${adbBinary} ${args.join(' ')}`
+        )
+      return
+    }
     if (result.code !== 0 || /^Error/m.test(result.output)) {
       response.writeHead(502).end(result.output)
       return
