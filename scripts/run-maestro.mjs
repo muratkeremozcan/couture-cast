@@ -1503,20 +1503,52 @@ const restoreMobileE2EStateAfterFlow = async (identity, flowPath) => {
   await withMobileE2EPrisma((prisma) => hook(prisma, identity.userId))
 }
 
-const setupMobileE2EIdentity = async (apiBaseUrl) => {
-  const email = `mobile-e2e-${randomUUID()}@example.com`
-  const signup = await requestJson(`${apiBaseUrl}/api/v1/auth/signup`, {
-    method: 'POST',
-    headers: { 'content-type': 'application/json' },
-    body: JSON.stringify({
-      email,
-      birthdate: '2000-01-15',
-    }),
-  })
-  const userId = signup?.userId
-  if (typeof userId !== 'string' || userId.length === 0) {
-    throw new Error('Mobile E2E signup did not return a userId')
+/**
+ * The community beta arm, as `community-analytics.ts` assigns it:
+ * `sha256('community-experiment:' + userId)[0] % 2`, even is `auto`.
+ *
+ * @param {string} userId
+ * @returns {'auto' | 'all'}
+ */
+const communityExperimentArm = (userId) =>
+  createHash('sha256').update(`community-experiment:${userId}`).digest().readUInt8(0) %
+    2 ===
+  0
+    ? 'auto'
+    : 'all'
+
+/**
+ * Story 1.2b: the run's member is always on the `auto` arm. Only `auto` serves
+ * the viewer's band, so only there can `location-capture.yaml` read the band a
+ * saved location resolves, and only there is the no-location notice reachable.
+ * A random signup lands on `all` half the time, which made that proof a coin
+ * flip (run 39881035993 shard 1). Signing up again until the arm is `auto` is
+ * bounded: twelve independent fair draws all landing on `all` is 1 in 4096.
+ *
+ * @param {string} apiBaseUrl
+ * @returns {Promise<string>}
+ */
+const signUpAutoArmMobileE2EMember = async (apiBaseUrl) => {
+  for (let attempt = 0; attempt < 12; attempt += 1) {
+    const signup = await requestJson(`${apiBaseUrl}/api/v1/auth/signup`, {
+      method: 'POST',
+      headers: { 'content-type': 'application/json' },
+      body: JSON.stringify({
+        email: `mobile-e2e-${randomUUID()}@example.com`,
+        birthdate: '2000-01-15',
+      }),
+    })
+    const userId = signup?.userId
+    if (typeof userId !== 'string' || userId.length === 0) {
+      throw new Error('Mobile E2E signup did not return a userId')
+    }
+    if (communityExperimentArm(userId) === 'auto') return userId
   }
+  throw new Error('No auto-arm mobile E2E member after 12 signups; the arm hash changed.')
+}
+
+const setupMobileE2EIdentity = async (apiBaseUrl) => {
+  const userId = await signUpAutoArmMobileE2EMember(apiBaseUrl)
 
   const accessToken = buildMobileE2EAccessToken(userId)
   const authorization = `Bearer ${accessToken}`

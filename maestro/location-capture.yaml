@@ -79,6 +79,10 @@ tags:
     path: maestro/artifacts/location-capture-hero
 
 # --- Community resolves the climate band ------------------------------------------
+# The runner's member is on the `auto` arm (`signUpAutoArmMobileE2EMember` in
+# scripts/run-maestro.mjs), and the chip names the band only while `auto` is the
+# active filter. Earlier flows may have left another filter selected, so the
+# flow selects `auto` first.
 - tapOn:
     id: 'tab-community'
     retryTapIfNoChange: true
@@ -90,9 +94,14 @@ tags:
     visible:
       id: 'community-filter-chip-auto'
     timeout: 20000
-- assertVisible:
+- tapOn:
     id: 'community-filter-chip-auto'
-    text: 'Your climate: .*'
+    label: 'Select the Your climate filter'
+- extendedWaitUntil:
+    visible:
+      id: 'community-filter-chip-auto'
+      text: 'Your climate: .*'
+    timeout: 20000
     label: 'The auto chip names the resolved band'
 - assertNotVisible:
     id: 'community-band-unresolved'

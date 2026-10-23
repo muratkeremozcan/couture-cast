@@ -156,9 +156,11 @@ tags:
 # the server resolves a requested `auto` to the viewer's experiment arm:
 # `resolveEffectiveMode` returns the variant, and `resolveCommunityExperimentVariant`
 # is `sha256('community-experiment:' + userId).readUInt8(0) % 2` -- a 50/50
-# split on the user id (`community-analytics.ts`). `run-maestro.mjs` signs up a
-# FRESH random user per run, so that split is re-rolled on every CI run and the
-# `auto` chip is selected in roughly half of them.
+# split on the user id (`community-analytics.ts`). `run-maestro.mjs` used to
+# sign up a FRESH random user per run, so that split was re-rolled on every CI
+# run and the `auto` chip was selected in roughly half of them. Since Story 1.2b
+# it signs up until the member is on `auto`, because `location-capture.yaml`
+# has to read the resolved band; the assertions below still hold in either arm.
 #
 # That is not a hypothesis. Run 34060302593 passed with user
 # `cmtqbf8ao00004xn6d0a20kfb`, which hashes to the `auto` arm; run 34062456272
@@ -183,9 +185,15 @@ tags:
     label: 'Precondition: the strip opens with a filter selected, whichever arm
       the experiment served this run'
 
+# ONE TAP, NO `retryTapIfNoChange`. In the `auto` arm with a resolved band the
+# active chip reads "Your climate: Cold and wet"; the tap moves the selection,
+# that chip shrinks to "Your climate", and the whole strip slides left. When
+# Maestro judged the first tap a no-op and retapped the same point, the second
+# tap landed on `cold_wet`, which had slid under it (local run 2026-10-22,
+# step 43 screenshot). The selected-state assertion below catches a tap that
+# truly did nothing.
 - tapOn:
     id: 'community-filter-chip-all'
-    retryTapIfNoChange: true
     label: 'Pin the feed to every climate so the result does not depend on this
       device user having a saved location'
 # The chip refetches the feed, and while it loads the list renders empty, which
