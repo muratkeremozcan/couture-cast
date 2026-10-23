@@ -9,9 +9,11 @@ const runnerFiles = [
   'scripts/run-maestro.mjs',
   'scripts/maestro-version.mjs',
   'scripts/lib/expo-go-link-endpoint.mjs',
+  'scripts/lib/maestro-flow-outcome.mjs',
   'scripts/lib/mobile-e2e-flow-state.mjs',
   'scripts/lib/mobile-e2e-flow-retry.mjs',
   'scripts/lib/mobile-e2e-token.mjs',
+  'scripts/lib/package-manager-readiness.mjs',
   'scripts/lib/weather-provider-double-data.mjs',
 ]
 const prepareArgs = ['run', 'prepare:shared-deps', '--workspace', 'packages/db']

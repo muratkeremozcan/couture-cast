@@ -41,7 +41,18 @@ import {
   sentinelPlace,
 } from './lib/weather-provider-double-data.mjs'
 import { listAdbDevices, startExpoGoLinkEndpoint } from './lib/expo-go-link-endpoint.mjs'
+import {
+  describeMissingReport,
+  flowTitleOf,
+  lastStartedMaestroCommand,
+  newestFlowDebugLog,
+} from './lib/maestro-flow-outcome.mjs'
 import { runMobileE2EFlow } from './lib/mobile-e2e-flow-retry.mjs'
+import {
+  captureSlowProbeState,
+  runAdb,
+  waitForPackageManagerReady,
+} from './lib/package-manager-readiness.mjs'
 import { buildMobileE2EAccessToken } from './lib/mobile-e2e-token.mjs'
 
 const scriptDir = path.dirname(fileURLToPath(import.meta.url))
@@ -3424,6 +3435,8 @@ const runShardedFlows = async (shardedFlows, target, maestroEnv, flowFailures) =
   // report is the evidence; the exit code only adds a failure the
   // report could not describe.
   let maestroExitError
+  // Same rule as the serial path: never read an earlier run's report (R28).
+  removeMaestroReport(parallelArgs)
   try {
     await runMaestroCommand(parallelArgs, {
       env: maestroEnv,
@@ -3459,10 +3472,29 @@ const runShardedFlows = async (shardedFlows, target, maestroEnv, flowFailures) =
  */
 const runMaestroCommandWithWatchdogRetry = async (args, options, label, reset) =>
   runMobileE2EFlow({
-    run: () => runMaestroCommand(args, options),
+    run: () => {
+      // Each attempt starts with no report on disk. A report left by an earlier
+      // run (or an earlier attempt) would otherwise be read as this attempt's
+      // outcome when Maestro is killed before writing one: locally a timed-out
+      // flow was judged by a stale passing report (Story 1.2b R28).
+      removeMaestroReport(args)
+      return runMaestroCommand(args, options)
+    },
     reset,
     onRetry: (error) => log(`RETRY ${label} (${error.message})`),
   })
+
+/**
+ * Delete the JUnit report a Maestro invocation is about to write.
+ *
+ * @param {string[]} args Maestro arguments, with the report after `--output`
+ * @returns {void}
+ */
+const removeMaestroReport = (args) => {
+  const index = args.indexOf('--output')
+  const reportPath = index >= 0 ? args[index + 1] : undefined
+  if (reportPath) fs.rmSync(reportPath, { force: true })
+}
 
 /**
  * Run the flows that cannot be sharded, one at a time on the first device.
@@ -3623,38 +3655,72 @@ const recordSingleFlowOutcome = (flowPath, maestroExitError, flowFailures) => {
 }
 
 /**
- * Save the Android window stack next to a failed flow's artifacts.
+ * Save the Android window stack, device log tail and process list next to a
+ * failed flow's artifacts.
  *
  * Expo Go sometimes dims the whole screen for a developer sheet that never
  * draws (CI runs 38934394685 and 38959860317). The dimming window is not in the
  * accessibility hierarchy Maestro records, so the screenshot and hierarchy
  * cannot say what it is. `dumpsys window windows` lists every window with its
- * owner, type and flags, which can. It carries window and package names only.
+ * owner, type and flags, which can. The device log can carry app output, like
+ * the `device-logcat.txt` Maestro itself saves for a finished flow; CI's
+ * artifact secret scan runs over all of it before upload.
  *
  * @param {string} flowPath
  * @returns {void}
  */
 const captureAndroidWindowStack = (flowPath) => {
   if (!WRITE_ARTIFACTS || IOS_UDIDS.length > 0) return
-  const result = spawnSync(
-    resolveAdbBinary(),
-    ['shell', 'dumpsys', 'window', 'windows'],
-    {
+  // Story 1.2b R28: a flow killed at its watchdog leaves no Maestro debug
+  // output, so the device side of the stall is captured here too. In CI job
+  // 120347100806 `community-feed.yaml` sat in Maestro's `pm clear` for both
+  // attempts while the next flow's clear took 1.6 s, and nothing recorded what
+  // the device was doing. The log tail and the process list (a blocked
+  // `pm clear` is still running there after Maestro is killed) say.
+  const captures = [
+    ['windows', ['shell', 'dumpsys', 'window', 'windows'], 'window stack'],
+    ['logcat', ['logcat', '-d', '-t', '4000'], 'device log tail'],
+    ['processes', ['shell', 'ps', '-A', '-o', 'PID,PPID,S,TIME,ARGS'], 'process list'],
+  ]
+  for (const [suffix, args, label] of captures) {
+    const result = spawnSync(resolveAdbBinary(), args, {
       encoding: 'utf8',
       timeout: 15_000,
+      maxBuffer: 64 * 1024 * 1024,
       env: androidSerial
         ? { ...process.env, ANDROID_SERIAL: androidSerial }
         : process.env,
+    })
+    if (result.status !== 0 || !result.stdout) {
+      log(`Could not capture the Android ${label} for ${flowPath}`)
+      continue
     }
-  )
-  if (result.status !== 0 || !result.stdout) {
-    log(`Could not capture the Android window stack for ${flowPath}`)
-    return
+    const target = path.join(
+      MAESTRO_ARTIFACT_DIR,
+      `${getFlowName(flowPath)}-${suffix}.txt`
+    )
+    fs.mkdirSync(path.dirname(target), { recursive: true })
+    fs.writeFileSync(target, result.stdout)
+    log(`Saved the Android ${label} for ${flowPath} to ${target}`)
   }
-  const target = path.join(MAESTRO_ARTIFACT_DIR, `${getFlowName(flowPath)}-windows.txt`)
-  fs.mkdirSync(path.dirname(target), { recursive: true })
-  fs.writeFileSync(target, result.stdout)
-  log(`Saved the Android window stack for ${flowPath} to ${target}`)
+}
+
+/**
+ * The last command Maestro started for a flow, from its newest debug log.
+ *
+ * @param {string} flowPath
+ * @returns {string | undefined}
+ */
+const lastMaestroCommandFor = (flowPath) => {
+  try {
+    const title = flowTitleOf(fs.readFileSync(flowPath, 'utf8'))
+    const logFile = title && newestFlowDebugLog(MAESTRO_ARTIFACT_DIR, title)
+    return logFile
+      ? lastStartedMaestroCommand(fs.readFileSync(logFile, 'utf8'))
+      : undefined
+  } catch {
+    return undefined
+  }
 }
 
 /**
@@ -3669,8 +3735,15 @@ const recordFlowOutcome = (flowPath, maestroExitError, flowFailures) => {
       resolveReportPath(getFlowReportPath(flowPath)) ?? getFlowReportPath(flowPath)
     const report = readSuiteReport(resolvedReportPath)
     if (report.unreadable) {
-      flowFailures.push(`${flowPath} (JUnit report unreadable: ${report.unreadable})`)
-      log(`FAIL ${flowPath} (JUnit report could not be read)`)
+      // A watchdog kill leaves no report; the kill is the failure (R28).
+      const failure = describeMissingReport(
+        flowPath,
+        report.unreadable,
+        maestroExitError,
+        lastMaestroCommandFor(flowPath)
+      )
+      flowFailures.push(failure)
+      log(`FAIL ${failure}`)
     } else if (report.failed.length > 0) {
       flowFailures.push(flowPath)
       log(`FAIL ${flowPath} (${report.failed.join(', ')})`)
@@ -4089,11 +4162,35 @@ const run = async () => {
     // launches Expo Go with its developer-menu onboarding off. See
     // scripts/lib/expo-go-link-endpoint.mjs. `MOBILE_E2E_EXPO_GO_ONBOARDING=show`
     // keeps Expo Go's default, for comparing the two.
+    const androidDevices =
+      target.platform === 'android' ? await listAdbDevices(resolveAdbBinary()) : []
+    // Story 1.2b R28: start no flow until each device's package manager answers
+    // `pm clear` promptly. See scripts/lib/package-manager-readiness.mjs.
+    for (const serial of androidDevices) {
+      // eslint-disable-next-line no-await-in-loop -- one device at a time
+      await waitForPackageManagerReady({
+        runProbe: (signal) =>
+          runAdb(
+            resolveAdbBinary(),
+            ['-s', serial, 'shell', 'pm', 'clear', target.appId],
+            signal
+          ),
+        onSlowProbe: (attempt) =>
+          captureSlowProbeState({
+            adbBinary: resolveAdbBinary(),
+            serial,
+            artifactDir: path.resolve(projectRoot, MAESTRO_ARTIFACT_DIR),
+            attempt,
+            log,
+          }),
+        log: (message) => log(`[${serial}] ${message}`),
+      })
+    }
     const expoGoLinks =
       target.platform === 'android'
         ? await startExpoGoLinkEndpoint({
             adbBinary: resolveAdbBinary(),
-            devices: await listAdbDevices(resolveAdbBinary()),
+            devices: androidDevices,
             disableOnboarding: process.env.MOBILE_E2E_EXPO_GO_ONBOARDING !== 'show',
           })
         : undefined
