@@ -17,7 +17,9 @@
 #    the app has mounted, on every launch that followed `clearState`. The app
 #    stays visible behind it, so assertions pass, and then the sheet eats the
 #    flow's next tap. The end of this subflow waits for the sheet and closes
-#    it; see the note there.
+#    it; see the note there. On Android `open-link.yaml` now launches with that
+#    onboarding off (Story 1.2b R24), so there the wait finds nothing unless
+#    something else, such as a shake, opens the menu.
 #
 # Callers keep their own `launchApp` because `clearState` differs per flow, then
 # `- runFlow: subflows/open-app.yaml` immediately after it.
@@ -224,13 +226,20 @@ appId: ${MAESTRO_APP_ID}
 # only the safe half, the deep-link re-entry.
 #
 # The wait is optional: a flow launched without `clearState` may find no sheet,
-# and then the wait costs its timeout once.
-- extendedWaitUntil:
-    visible:
-      text: 'This is the developer menu.*|Connected to expo-cli.*'
-    timeout: 15000
-    optional: true
-    label: 'An Expo Go developer sheet has risen'
+# and then the wait costs its timeout once. iOS only: Android launches with the
+# onboarding off (Story 1.2b R24), so there it could only time out, 15 s on
+# every launch. The guarded closers in `absorb-expo-dev-sheet.yaml` still run
+# on both platforms for a menu something else opened.
+- runFlow:
+    when:
+      platform: iOS
+    commands:
+      - extendedWaitUntil:
+          visible:
+            text: 'This is the developer menu.*|Connected to expo-cli.*'
+          timeout: 15000
+          optional: true
+          label: 'An Expo Go developer sheet has risen'
 - runFlow: absorb-expo-dev-sheet.yaml
 
 # If closing the sheet left the app off screen (the full menu's backdrop tap is

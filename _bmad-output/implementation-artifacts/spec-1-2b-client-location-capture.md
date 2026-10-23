@@ -269,6 +269,19 @@ SUPERUSER attribute`; 4 to 7 files red per run). `apps/api/vitest.config.ts` pin
     database by `.env.local`.
   - iOS `location-capture.yaml` passed at `40a4cf79` outside the sandbox, including its iOS-only
     keyboard guards.
+- 2026-10-23, R24 (Android Maestro flake, CI job 120258320163): Expo Go 54 raises its developer-menu
+  onboarding by itself two seconds after an experience loads whenever onboarding is unfinished
+  (`DevMenuManager.maybeShowWithOnboarding`), and Maestro's `clearState` resets that before every
+  flow. When the sheet's open animation never ran, its backdrop stayed over the app with the sheet
+  parked below the screen and swallowed every tap, and each relaunch raised it again. A launch
+  intent carrying `EXKernelDisableNuxDefaultsKey` turns the onboarding off for the process, so on
+  Android every deep link now goes through a runner endpoint that sends the VIEW intent over adb on
+  the device Maestro names (`scripts/lib/expo-go-link-endpoint.mjs`,
+  `maestro/subflows/open-link.yaml`); iOS keeps `openLink`. A CI experiment (run 39914110811, 40
+  cold launches per arm) showed the onboarding on every launch without the extra under both
+  animation settings and on none of 80 with it, so the animation-scale lead was ruled out and
+  animations stay disabled (13.1 s against 17.0 s per launch). The Android-only 15 s wait for a
+  sheet that can no longer rise was removed from `open-app.yaml`.
 
 ## Spec Change Log
 
