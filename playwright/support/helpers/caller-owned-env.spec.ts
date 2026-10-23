@@ -69,6 +69,7 @@ function migrateDatabaseUrl(env: Record<string, string>) {
 /** The local stack keys every leg below records, with .env.local's defaults. */
 const ENV_LOCAL_STACK = {
   DATABASE_URL: ENV_LOCAL_DATABASE_URL,
+  REDIS_URL: 'redis://127.0.0.1:6379',
   SUPABASE_URL: 'http://127.0.0.1:54321',
   SUPABASE_SERVICE_ROLE_KEY: 'default-service-role-key',
   NEXT_PUBLIC_SUPABASE_ANON_KEY: 'default-anon-key',
@@ -86,7 +87,7 @@ function runPlaywright(inherited: Stack): { runner: Stack; worker: Stack } {
     path.join(directory, '.env.local'),
     Object.entries(ENV_LOCAL_STACK)
       .map(([key, value]) => `${key}=${value}\n`)
-      .join('') + 'REDIS_URL=redis://127.0.0.1:6379\n'
+      .join('')
   )
   fs.symlinkSync(
     path.join(repoRoot, 'node_modules'),
@@ -176,6 +177,7 @@ describe('caller-owned environment keys survive the .env.local override', () => 
   it('1.2b-ENV-03 keeps an isolated loopback stack in the runner, its workers and the launcher', () => {
     const isolated: Stack = {
       DATABASE_URL: CALLER_DATABASE_URL,
+      REDIS_URL: 'redis://127.0.0.1:56391',
       SUPABASE_URL: 'http://127.0.0.1:55321',
       SUPABASE_SERVICE_ROLE_KEY: 'isolated-service-role-key',
       NEXT_PUBLIC_SUPABASE_ANON_KEY: 'isolated-anon-key',
@@ -196,6 +198,7 @@ describe('caller-owned environment keys survive the .env.local override', () => 
     const remote: Stack = {
       DATABASE_URL:
         'postgresql://postgres:secret@db.remote-ref.supabase.co:5432/postgres',
+      REDIS_URL: 'rediss://default:secret@remote-redis.example.com:6380',
       SUPABASE_URL: 'https://remote-ref.supabase.co',
       SUPABASE_SERVICE_ROLE_KEY: 'remote-service-role-key',
       NEXT_PUBLIC_SUPABASE_ANON_KEY: 'remote-anon-key',
