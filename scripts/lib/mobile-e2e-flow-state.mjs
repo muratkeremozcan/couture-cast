@@ -3,6 +3,10 @@ import { fold } from './weather-provider-double-data.mjs'
 /**
  * Reset state owned by the synthetic member before each flow and watchdog retry.
  * A timed-out flow can have saved a reaction before stalling during relaunch.
+ * It can also have turned affiliate suggestions off: commerce-affiliate.yaml
+ * opts out, then relaunches, and a relaunch that stalls into the watchdog
+ * (2026-10-23, CI job 120691261539) left its retry with no affiliate block to
+ * find. Without a preference row the member has the default, suggestions on.
  */
 export const resetMobileE2EFlowState = async (prisma, userId) => {
   if (typeof userId !== 'string' || userId.trim().length === 0) {
@@ -13,6 +17,7 @@ export const resetMobileE2EFlowState = async (prisma, userId) => {
     prisma.communityReactionOutbox.deleteMany({ where: { user_id: userId } }),
     prisma.communityReactionReceipt.deleteMany({ where: { user_id: userId } }),
     prisma.communityReaction.deleteMany({ where: { user_id: userId } }),
+    prisma.commercePreference.deleteMany({ where: { user_id: userId } }),
   ])
 }
 
