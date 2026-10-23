@@ -247,6 +247,9 @@ export function CommunityReportModal({
                 isSubmitDisabled ? t('community.report.reasonLabel') : undefined
               }
               accessibilityState={{ disabled: isSubmitDisabled, busy: isSubmitting }}
+              // react-native-web 0.21 drops `accessibilityState.busy`; the aria
+              // mirror is what reaches the DOM.
+              aria-busy={isSubmitting}
               style={[
                 styles.submitButton,
                 { backgroundColor: ACCENT_GOLD },

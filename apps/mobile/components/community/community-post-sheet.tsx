@@ -668,6 +668,9 @@ export function CommunityPostSheet({
               // Why the control is dead, spoken rather than implied by dimming.
               accessibilityHint={publishBlockerKey ? t(publishBlockerKey) : undefined}
               accessibilityState={{ disabled: isPublishDisabled, busy: isBusy }}
+              // react-native-web 0.21 drops `accessibilityState.busy`; the aria
+              // mirror is what reaches the DOM.
+              aria-busy={isBusy}
             >
               {isBusy ? (
                 <ActivityIndicator size="small" color={ON_ACCENT} />
