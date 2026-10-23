@@ -368,6 +368,29 @@ playwright/tests/community-comments.spec.ts --repeat-each=3`, went out without t
     left open reacted to the cleanup's realtime events, read the replies of a just-erased root,
     got a 400, and failed the Story 6.4 tombstone test through the network monitor.
 
+- 2026-10-23, round 4 (`reviews/code-triage-1.md`, R17 to R22).
+  - R17, R21: burn-in failed with "Process from config.webServer exited early". The burn-in web
+    server's launcher runs `prepare:playwright`, which ends with the Playwright helper suite, and
+    the new teardown spec called the real teardown for an opted-in run. That stops this checkout's
+    recorded E2E stack before `db:reset`, so it signalled the launcher it ran inside. The spec now
+    mocks the stack stopper and asserts whether it is called. It runs the teardown under a fresh
+    `TMPDIR`, set on the real environment because `os.tmpdir()` reads it there. In that directory
+    it records a stand-in launcher, which must survive; without the mock the stand-in is killed
+    and the case fails. Reproduced locally first: a stand-in recorded at the real path was
+    SIGTERMed by the old spec and survived the new one.
+  - R19, R20 (Android): `AccessibilityFocusObserver` forwards every `AccessibilityDelegate` method
+    to the delegate the decor view already had. A stop restores that delegate and leaves alone one
+    that someone installed later. Before API 29 the existing delegate cannot be read, so the
+    observer installs nothing there, and the module reports `canObserveFocus: false`. Attach and
+    detach run on the main looper behind an observing flag, so observing can start before an
+    Activity exists and attaches when one reaches the foreground; a destroyed window's decor view
+    is released. Robolectric: 9 tests, each red on a one-line break.
+  - R18 (iOS): `focus` refuses a view outside a window or under a hidden ancestor
+    (`AccessibilityFocusTarget.swift`, XCTest through `ios/Package.swift`), and the hook asks again
+    on later frames. After `NATIVE_FOCUS_FRAMES` refusals it sends React Native's own request for
+    the target still wanted (6.7-MOB-049). The JS wrapper reads the module on each call
+    (6.7-MOB-055 to 057).
+
 ## Spec Change Log
 
 - 2026-10-23, iteration 5 (rereview 3): read floor, last-attempt time and `Retry-After` are
