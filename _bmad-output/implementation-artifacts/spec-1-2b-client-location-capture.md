@@ -315,6 +315,13 @@ SUPERUSER attribute`; 4 to 7 files red per run). `apps/api/vitest.config.ts` pin
   and every attempt starts with its previous JUnit report removed: locally a timed-out flow had
   been judged by a stale passing report. Failed Android flows also save the device log tail and
   process list.
+- 2026-10-23, R29 (review of the R28 runner change): the readiness probe now counts only a `pm clear`
+  that exits 0 and prints `Success` (any other answer is retried after 2 s); it probes the run's own
+  intended devices and stops, naming the device, if one is missing or not ready; diagnostic writes
+  log and swallow filesystem errors so a capture never replaces an outcome or stops the run; before
+  each attempt every same-named report under the artifact tree is removed, so the basename fallback
+  cannot read a stale one; and the last command named for a killed flow comes only from a log
+  written since that flow started.
 
 ## Spec Change Log
 
