@@ -66,6 +66,97 @@ function migrateDatabaseUrl(env: Record<string, string>) {
   return fs.readFileSync(recorded, 'utf8')
 }
 
+/** The local stack keys every leg below records, with .env.local's defaults. */
+const ENV_LOCAL_STACK = {
+  DATABASE_URL: ENV_LOCAL_DATABASE_URL,
+  SUPABASE_URL: 'http://127.0.0.1:54321',
+  SUPABASE_SERVICE_ROLE_KEY: 'default-service-role-key',
+  NEXT_PUBLIC_SUPABASE_ANON_KEY: 'default-anon-key',
+}
+type Stack = typeof ENV_LOCAL_STACK
+
+/**
+ * Runs a real `playwright test` under TEST_ENV=local with no
+ * E2E_CALLER_OWNED_ENV_KEYS, against a .env.local holding the default stack.
+ * The config imports the real environment module, so it loads in the runner
+ * (recorded by globalSetup) and again in the worker (recorded by the probe).
+ */
+function runPlaywright(inherited: Stack): { runner: Stack; worker: Stack } {
+  fs.writeFileSync(
+    path.join(directory, '.env.local'),
+    Object.entries(ENV_LOCAL_STACK)
+      .map(([key, value]) => `${key}=${value}\n`)
+      .join('') + 'REDIS_URL=redis://127.0.0.1:6379\n'
+  )
+  fs.symlinkSync(
+    path.join(repoRoot, 'node_modules'),
+    path.join(directory, 'node_modules')
+  )
+  const record = (name: string) => path.join(directory, `${name}.json`)
+  const snapshot = `JSON.stringify(Object.fromEntries(${JSON.stringify(
+    Object.keys(ENV_LOCAL_STACK)
+  )}.map((key) => [key, process.env[key]])))`
+  fs.writeFileSync(
+    path.join(directory, 'playwright.config.ts'),
+    [
+      `import ${JSON.stringify(path.join(repoRoot, 'playwright/config/environments'))}`,
+      "import { defineConfig } from '@playwright/test'",
+      "export default defineConfig({ testDir: '.', testMatch: 'probe.spec.ts', globalSetup: './record-runner.ts', workers: 1, reporter: 'line' })",
+    ].join('\n')
+  )
+  fs.writeFileSync(
+    path.join(directory, 'record-runner.ts'),
+    `import fs from 'node:fs'\nexport default () => fs.writeFileSync(${JSON.stringify(record('runner'))}, ${snapshot})\n`
+  )
+  fs.writeFileSync(
+    path.join(directory, 'probe.spec.ts'),
+    `import fs from 'node:fs'\nimport { test } from '@playwright/test'\ntest('records the worker environment', () => fs.writeFileSync(${JSON.stringify(record('worker'))}, ${snapshot}))\n`
+  )
+  const result = spawnSync(
+    'npx',
+    ['playwright', 'test', '--config', 'playwright.config.ts'],
+    {
+      cwd: directory,
+      env: {
+        PATH: process.env.PATH ?? '',
+        HOME: process.env.HOME ?? '',
+        TEST_ENV: 'local',
+        ...inherited,
+      },
+      encoding: 'utf8',
+    }
+  )
+  expect(result.status, `${result.stdout}\n${result.stderr}`).toBe(0)
+  const read = (name: string) =>
+    JSON.parse(fs.readFileSync(record(name), 'utf8')) as Stack
+  return { runner: read('runner'), worker: read('worker') }
+}
+
+/**
+ * The webServer launcher starts from the runner's environment plus its
+ * overrides and resolves its own against the same .env.local.
+ */
+function resolveLauncher(runner: Stack) {
+  const launcher: NodeJS.ProcessEnv = {
+    ...runner,
+    TEST_ENV: 'local',
+    POSTHOG_API_KEY: '',
+  }
+  loadLauncherEnv(launcher, () => {
+    loadEnv({
+      path: path.join(directory, '.env.local'),
+      override: true,
+      // dotenv types its target as string values; this one is a plain env copy.
+      processEnv: launcher as Record<string, string>,
+      quiet: true,
+    })
+  })
+  const stack = Object.fromEntries(
+    Object.keys(ENV_LOCAL_STACK).map((key) => [key, launcher[key]])
+  ) as Stack
+  return { stack, owned: launcher.E2E_CALLER_OWNED_ENV_KEYS?.split(',') ?? [] }
+}
+
 describe('caller-owned environment keys survive the .env.local override', () => {
   it('1.2b-ENV-01 migrates the database the launcher chose', () => {
     expect(
@@ -83,97 +174,36 @@ describe('caller-owned environment keys survive the .env.local override', () => 
   })
 
   it('1.2b-ENV-03 keeps an isolated loopback stack in the runner, its workers and the launcher', () => {
-    // The real path, with no E2E_CALLER_OWNED_ENV_KEYS anywhere: a caller
-    // exports an isolated stack and runs Playwright under TEST_ENV=local while
-    // .env.local names the default one. A real `playwright test` loads the
-    // environment module in the runner (recorded by globalSetup) and again in
-    // its worker (recorded by the probe test); the webServer launcher then
-    // starts from the runner's environment and resolves its own.
-    const isolated = {
+    const isolated: Stack = {
       DATABASE_URL: CALLER_DATABASE_URL,
       SUPABASE_URL: 'http://127.0.0.1:55321',
       SUPABASE_SERVICE_ROLE_KEY: 'isolated-service-role-key',
+      NEXT_PUBLIC_SUPABASE_ANON_KEY: 'isolated-anon-key',
     }
-    fs.appendFileSync(
-      path.join(directory, '.env.local'),
-      'SUPABASE_SERVICE_ROLE_KEY=default-service-role-key\nREDIS_URL=redis://127.0.0.1:6379\n'
-    )
-    fs.symlinkSync(
-      path.join(repoRoot, 'node_modules'),
-      path.join(directory, 'node_modules')
-    )
-    const record = (name: string) => path.join(directory, `${name}.json`)
-    const snapshot =
-      'JSON.stringify({ DATABASE_URL: process.env.DATABASE_URL, SUPABASE_URL: process.env.SUPABASE_URL, SUPABASE_SERVICE_ROLE_KEY: process.env.SUPABASE_SERVICE_ROLE_KEY })'
-    fs.writeFileSync(
-      path.join(directory, 'playwright.config.ts'),
-      [
-        `import ${JSON.stringify(path.join(repoRoot, 'playwright/config/environments'))}`,
-        "import { defineConfig } from '@playwright/test'",
-        "export default defineConfig({ testDir: '.', testMatch: 'probe.spec.ts', globalSetup: './record-runner.ts', workers: 1, reporter: 'line' })",
-      ].join('\n')
-    )
-    fs.writeFileSync(
-      path.join(directory, 'record-runner.ts'),
-      `import fs from 'node:fs'\nexport default () => fs.writeFileSync(${JSON.stringify(record('runner'))}, ${snapshot})\n`
-    )
-    fs.writeFileSync(
-      path.join(directory, 'probe.spec.ts'),
-      `import fs from 'node:fs'\nimport { test } from '@playwright/test'\ntest('records the worker environment', () => fs.writeFileSync(${JSON.stringify(record('worker'))}, ${snapshot}))\n`
-    )
 
-    const result = spawnSync(
-      'npx',
-      ['playwright', 'test', '--config', 'playwright.config.ts'],
-      {
-        cwd: directory,
-        env: {
-          PATH: process.env.PATH ?? '',
-          HOME: process.env.HOME ?? '',
-          TEST_ENV: 'local',
-          ...isolated,
-        },
-        encoding: 'utf8',
-      }
-    )
-    expect(result.status, `${result.stdout}\n${result.stderr}`).toBe(0)
-    const runner = JSON.parse(fs.readFileSync(record('runner'), 'utf8')) as Record<
-      string,
-      string
-    >
-    const worker = JSON.parse(fs.readFileSync(record('worker'), 'utf8')) as Record<
-      string,
-      string
-    >
+    const { runner, worker } = runPlaywright(isolated)
     expect(runner).toEqual(isolated)
     expect(worker).toEqual(isolated)
+    const launcher = resolveLauncher(runner)
+    expect(launcher.stack).toEqual(isolated)
+    expect(launcher.owned).toEqual(expect.arrayContaining(Object.keys(isolated)))
+  })
 
-    // The launcher: the runner's environment plus the webServer overrides,
-    // resolved by the launcher's own loader against the same .env.local.
-    const launcher: NodeJS.ProcessEnv = {
-      ...runner,
-      TEST_ENV: 'local',
-      POSTHOG_API_KEY: '',
+  it('1.2b-ENV-04 lets .env.local replace a remote stack in the runner, its workers and the launcher', () => {
+    // The override exists for this: a shell that still holds a remote
+    // database or Supabase project must not leak into a local run, and the
+    // Supabase keys go with the URL they belong to.
+    const remote: Stack = {
+      DATABASE_URL:
+        'postgresql://postgres:secret@db.remote-ref.supabase.co:5432/postgres',
+      SUPABASE_URL: 'https://remote-ref.supabase.co',
+      SUPABASE_SERVICE_ROLE_KEY: 'remote-service-role-key',
+      NEXT_PUBLIC_SUPABASE_ANON_KEY: 'remote-anon-key',
     }
-    loadLauncherEnv(launcher, () => {
-      loadEnv({
-        path: path.join(directory, '.env.local'),
-        override: true,
-        // dotenv types its target as string values; this one is a plain env copy.
-        processEnv: launcher as Record<string, string>,
-        quiet: true,
-      })
-    })
-    expect({
-      DATABASE_URL: launcher.DATABASE_URL,
-      SUPABASE_URL: launcher.SUPABASE_URL,
-      SUPABASE_SERVICE_ROLE_KEY: launcher.SUPABASE_SERVICE_ROLE_KEY,
-    }).toEqual(isolated)
-    expect(launcher.E2E_CALLER_OWNED_ENV_KEYS?.split(',')).toEqual(
-      expect.arrayContaining(Object.keys(isolated))
-    )
-    // A remote value still loses: nothing inherited named REDIS_URL, so the
-    // file's default stands.
-    expect(launcher.REDIS_URL).toBe('redis://127.0.0.1:6379')
+
+    const { runner, worker } = runPlaywright(remote)
+    expect(runner).toEqual(ENV_LOCAL_STACK)
+    expect(worker).toEqual(ENV_LOCAL_STACK)
+    expect(resolveLauncher(runner).stack).toEqual(ENV_LOCAL_STACK)
   })
 })
