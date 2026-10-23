@@ -10,6 +10,7 @@ import {
   serveFeed,
   setMockParams,
 } from './harness'
+import { routing } from './mock-state'
 import { userEvent as browserUser } from '@vitest/browser/context'
 import { screen, waitFor, within, fireEvent, act } from '@testing-library/react'
 import { delay, http, HttpResponse } from 'msw'
@@ -384,7 +385,32 @@ export function registerCommunityFeedCases() {
       await render(<CommunityScreen />)
 
       const notice = await screen.findByTestId('community-band-unresolved')
-      expect(notice.textContent).toBe(enUS.community.band.unresolved[reason])
+      // The exact element, not a substring: the no_location panel also carries
+      // the Story 1.2b add-location action.
+      expect(
+        within(notice).getByText(enUS.community.band.unresolved[reason]).textContent
+      ).toBe(enUS.community.band.unresolved[reason])
+    }
+  )
+
+  it.each(communityBandUnresolvedReasonSchema.options)(
+    '1.2b-MOB-COMMUNITY-01 offers the guided add-location action only for no_location: %s',
+    async (reason) => {
+      serveFeed(() =>
+        feedJson({ viewerBand: null, bandResolved: false, bandUnresolvedReason: reason })
+      )
+
+      await render(<CommunityScreen />)
+
+      const notice = await screen.findByTestId('community-band-unresolved')
+      const action = within(notice).queryByTestId('community-add-location')
+      if (reason !== 'no_location') {
+        expect(action).toBeNull()
+        return
+      }
+      expect(action?.textContent).toBe(enUS.locations.guided.add)
+      press(action!)
+      expect(routing.router.push).toHaveBeenCalledWith('/locations?guided=1')
     }
   )
 

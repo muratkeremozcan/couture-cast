@@ -1,3 +1,4 @@
+import { onLocationsChanged } from '@/src/lib/locations'
 import { resolveMobileApiBaseUrl } from '@/src/lib/api-client'
 import {
   resolveMobileAccessToken,
@@ -51,13 +52,14 @@ import {
   ActivityIndicator,
   FlatList,
   Platform,
+  Pressable,
   RefreshControl,
   StyleSheet,
   Text,
   TouchableOpacity,
   View,
 } from 'react-native'
-import { useLocalSearchParams } from 'expo-router'
+import { useLocalSearchParams, useRouter } from 'expo-router'
 import { hasDeepLinkIntent, parseDeepLink } from '@couture/utils'
 import {
   communityModerationReasonCategories,
@@ -164,6 +166,7 @@ export function CommunityScreen() {
   const locale = useResolvedCommunityLocale(i18n.language)
   const analytics = useMobileAnalytics()
   const { source, type, cardId, commentId, parentId, expiresAt } = useLocalSearchParams()
+  const router = useRouter()
   const targetRef = useRef<View>(null)
   const newPostButtonRef = useRef<View>(null)
   const cardRefs = useRef(new Map<string, View | null>())
@@ -1078,6 +1081,12 @@ export function CommunityScreen() {
     void loadFeed(mode)
   }, [loadFeed, mode])
 
+  // Story 1.2b: a saved or switched location changes the viewer's band and
+  // spotlight area, so the feed and spotlight reload when any screen reports it.
+  const refreshRef = useRef(handleRefresh)
+  refreshRef.current = handleRefresh
+  useEffect(() => onLocationsChanged(() => refreshRef.current()), [])
+
   const handleLoadMore = useCallback(() => {
     const cursor = nextCursorRef.current
     if (cursor && !loadingMoreRef.current && feedState === 'ready' && !isRefreshing) {
@@ -1558,6 +1567,22 @@ export function CommunityScreen() {
           <Text style={[styles.stateBody, { color: palette.text }]}>
             {t(`community.band.unresolved.${bandUnresolvedReason}`)}
           </Text>
+          {bandUnresolvedReason === 'no_location' ? (
+            <Pressable
+              accessibilityRole="button"
+              onPress={() => router.push('/locations?guided=1')}
+              style={[
+                styles.outlineButton,
+                styles.bandAction,
+                { borderColor: palette.mutedText },
+              ]}
+              testID="community-add-location"
+            >
+              <Text style={[styles.outlineButtonText, { color: palette.text }]}>
+                {t('locations.guided.add')}
+              </Text>
+            </Pressable>
+          ) : null}
         </View>
       ) : null}
       {deepLinkPost && communityAvailable ? (
@@ -1843,6 +1868,10 @@ const styles = StyleSheet.create({
   },
   highlightSection: {
     marginTop: 12,
+  },
+  bandAction: {
+    alignSelf: 'flex-start',
+    marginTop: 10,
   },
   infoPanel: {
     marginHorizontal: 16,

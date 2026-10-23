@@ -189,6 +189,16 @@ describe('LocationCaptureService', () => {
       expect(captureEvent).not.toHaveBeenCalled()
     })
 
+    it('1.2b-UNIT-CAP-18 names a city state once in its display label', async () => {
+      geocoder.search.mockResolvedValueOnce([
+        { ...chicago, city: 'Monaco', region: null, country: 'MC', localizedName: null },
+      ])
+
+      const [monaco] = await service.search(userId, 'Monaco', 'en-US', 'web')
+
+      expect(monaco?.displayLabel).toBe('Monaco')
+    })
+
     it('1.2b-UNIT-CAP-02 collapses provider results that share a location key', async () => {
       geocoder.search.mockResolvedValueOnce([
         chicago,

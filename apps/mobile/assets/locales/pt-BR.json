@@ -883,5 +883,52 @@
       "announceLoadedMore_other": "Mais {{count}} looks em destaque carregados.",
       "announceRefreshed": "Os destaques da cidade foram atualizados com a classificação mais recente."
     }
+  },
+  "locations": {
+    "title": "Locais",
+    "intro": "Salve até três lugares. Seu local principal define seus looks do dia e o clima da sua comunidade.",
+    "count": "{{count}} de 3 salvos",
+    "empty": "Nenhum local salvo ainda. Busque uma cidade para adicionar.",
+    "signedOutHint": "Entre para gerenciar seus locais.",
+    "loadError": "Não foi possível carregar seus locais.",
+    "primary": "Principal",
+    "makePrimary": "Tornar principal",
+    "makePrimaryLabel": "Tornar {{label}} seu local principal",
+    "rename": "Renomear",
+    "renameLabel": "Renomear {{label}}",
+    "renameField": "Novo nome",
+    "renameSave": "Salvar nome",
+    "cancel": "Cancelar",
+    "delete": "Excluir",
+    "deleteLabel": "Excluir {{label}}",
+    "deleteConfirm": "Excluir {{label}}?",
+    "deleteConfirmAction": "Sim, excluir",
+    "searchLabel": "Buscar uma cidade",
+    "searchHint": "Digite pelo menos duas letras.",
+    "searching": "Buscando...",
+    "resultCount": "Resultados: {{count}}",
+    "noResults": "Nenhuma cidade corresponde a essa busca.",
+    "selected": "Selecionado: {{place}}",
+    "labelField": "Dê um nome a este lugar",
+    "save": "Salvar local",
+    "saving": "Salvando...",
+    "saved": "{{label}} salvo.",
+    "primaryChanged": "{{label}} agora é seu local principal.",
+    "renamed": "Renomeado para {{label}}.",
+    "deleted": "{{label}} excluído.",
+    "limit": "Você salvou três locais. Exclua um para adicionar outro.",
+    "retry": "Tentar novamente",
+    "guided": {
+      "add": "Adicionar um local"
+    },
+    "errors": {
+      "provider_unavailable": "A busca de cidades está indisponível no momento. Tente novamente.",
+      "service_unavailable": "Os locais estão indisponíveis no momento. Tente mais tarde.",
+      "invalid_candidate": "Esse resultado expirou. Busque novamente.",
+      "duplicate": "Esse local já está salvo.",
+      "rate_limited": "Muitas buscas. Aguarde um momento e tente novamente.",
+      "invalid_query": "Digite entre 2 e 80 caracteres.",
+      "unknown": "Algo deu errado. Tente novamente."
+    }
   }
 }

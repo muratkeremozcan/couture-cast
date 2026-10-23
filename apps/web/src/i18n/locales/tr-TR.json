@@ -697,5 +697,52 @@
       "bindingConflict": "Bu cihazın bildirim kaydı değişti. Tekrar deneyin.",
       "pushUnavailable": "Bu cihazda anlık bildirimler kullanılamıyor."
     }
+  },
+  "locations": {
+    "title": "Konumlar",
+    "intro": "En fazla üç yer kaydedin. Ana konumunuz günlük kombinlerinizi ve topluluk iklimini belirler.",
+    "count": "{{count}} / 3 kayıtlı",
+    "empty": "Henüz kayıtlı konum yok. Eklemek için bir şehir arayın.",
+    "signedOutHint": "Konumlarınızı yönetmek için giriş yapın.",
+    "loadError": "Konumlarınız yüklenemedi.",
+    "primary": "Ana konum",
+    "makePrimary": "Ana konum yap",
+    "makePrimaryLabel": "{{label}} konumunu ana konum yap",
+    "rename": "Yeniden adlandır",
+    "renameLabel": "{{label}} konumunu yeniden adlandır",
+    "renameField": "Yeni ad",
+    "renameSave": "Adı kaydet",
+    "cancel": "İptal",
+    "delete": "Sil",
+    "deleteLabel": "{{label}} konumunu sil",
+    "deleteConfirm": "{{label}} silinsin mi?",
+    "deleteConfirmAction": "Evet, sil",
+    "searchLabel": "Şehir arayın",
+    "searchHint": "En az iki harf yazın.",
+    "searching": "Aranıyor...",
+    "resultCount": "Sonuçlar: {{count}}",
+    "noResults": "Bu aramayla eşleşen şehir yok.",
+    "selected": "Seçilen: {{place}}",
+    "labelField": "Bu yere bir ad verin",
+    "save": "Konumu kaydet",
+    "saving": "Kaydediliyor...",
+    "saved": "{{label}} kaydedildi.",
+    "primaryChanged": "{{label}} artık ana konumunuz.",
+    "renamed": "Yeni ad: {{label}}.",
+    "deleted": "{{label}} silindi.",
+    "limit": "Üç konum kaydettiniz. Yeni bir tane eklemek için birini silin.",
+    "retry": "Tekrar dene",
+    "guided": {
+      "add": "Konum ekle"
+    },
+    "errors": {
+      "provider_unavailable": "Şehir araması şu anda kullanılamıyor. Tekrar deneyin.",
+      "service_unavailable": "Konumlar şu anda kullanılamıyor. Daha sonra tekrar deneyin.",
+      "invalid_candidate": "Bu arama sonucunun süresi doldu. Yeniden arayın.",
+      "duplicate": "Bu konum zaten kayıtlı.",
+      "rate_limited": "Çok fazla arama yapıldı. Biraz bekleyip tekrar deneyin.",
+      "invalid_query": "2 ile 80 karakter arasında yazın.",
+      "unknown": "Bir sorun oluştu. Tekrar deneyin."
+    }
   }
 }

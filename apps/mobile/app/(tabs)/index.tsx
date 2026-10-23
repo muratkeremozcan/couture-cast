@@ -19,6 +19,7 @@ import { SafeAreaView } from 'react-native-safe-area-context'
 import { Text, View } from '@/components/themed'
 import { useMobileAnalytics } from '@/src/analytics/mobile-analytics'
 import { createMobileApiClient } from '@/src/lib/api-client'
+import { onLocationsChanged } from '@/src/lib/locations'
 import {
   mobileApplicationUserId,
   resolveMobileAccessToken,
@@ -346,6 +347,18 @@ export default function TabOneScreen() {
       }
     }
   }
+
+  // Story 1.2b: a saved, switched or deleted location changes the ritual, so the
+  // hero refetches past its cache the moment any screen reports the change.
+  const loadDataRef = useRef(loadData)
+  loadDataRef.current = loadData
+  useEffect(
+    () =>
+      onLocationsChanged(() => {
+        void loadDataRef.current(true)
+      }),
+    []
+  )
 
   useEffect(() => {
     // Track when user views Tab One - top of the engagement funnel
@@ -729,6 +742,16 @@ export default function TabOneScreen() {
             <Text style={[styles.errorText, { color: palette.text }]}>
               {t('hero.no_location')}
             </Text>
+            <Pressable
+              style={[styles.retryButton, { backgroundColor: palette.text }]}
+              onPress={() => router.push('/locations?guided=1')}
+              accessibilityRole="button"
+              testID="hero-add-location"
+            >
+              <Text style={[styles.retryText, { color: palette.background }]}>
+                {t('locations.guided.add')}
+              </Text>
+            </Pressable>
           </View>
         ) : error && !ritual ? (
           <View

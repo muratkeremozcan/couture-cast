@@ -1,9 +1,11 @@
 // Story 5.1 Task 7 owner: the real Web settings page, replacing the placeholder.
 'use client'
 
+import { Suspense } from 'react'
 import { I18nextProvider } from 'react-i18next'
 import { getI18n } from '../../i18n'
 import { CommercePreferencesSection } from '../components/commerce-preferences-section'
+import { LocationsSection } from '../components/locations/locations-section'
 import { PremiumThemeSection } from '../components/premium-theme-section'
 import { StickyBottomNav } from '../components/sticky-bottom-nav'
 import { SubscriptionSection } from '../components/subscription-section'
@@ -33,6 +35,10 @@ export default function SettingsPage() {
         className="min-h-screen bg-neutral-950 px-6 py-16 pb-[calc(5.5rem+env(safe-area-inset-bottom,0px))] text-white outline-none"
       >
         <h1 className="text-4xl font-semibold">Settings</h1>
+        {/* `useSearchParams` reads the guided-entry query, which needs a boundary. */}
+        <Suspense fallback={null}>
+          <LocationsSection />
+        </Suspense>
         <CommercePreferencesSection />
         <SubscriptionSection />
         <PremiumThemeSection />

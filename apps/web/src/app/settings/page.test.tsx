@@ -17,6 +17,8 @@ import SettingsPage from './page'
 
 vi.mock('next/navigation', () => ({
   usePathname: () => '/settings',
+  useRouter: () => ({ push: vi.fn() }),
+  useSearchParams: () => new URLSearchParams(),
 }))
 vi.mock('posthog-js', () => ({
   default: { capture: vi.fn() },
@@ -63,6 +65,15 @@ function themeHandler() {
   )
 }
 
+/**
+ * Story 1.2b mounts `LocationsSection` first on this page, so every signed-in
+ * render also lists saved locations. Its own states live in
+ * `components/locations/locations-section.test.tsx`.
+ */
+function locationsHandler() {
+  return http.get('/api/v1/locations', () => HttpResponse.json({ data: [] }))
+}
+
 function signIn() {
   window.sessionStorage.setItem(WEB_ACCESS_TOKEN_STORAGE_KEY, 'test-access-token')
 }
@@ -87,6 +98,7 @@ function preferenceHandlers(options: {
   return [
     subscriptionHandler(),
     themeHandler(),
+    locationsHandler(),
     http.get(PREFERENCES_PATH, () => {
       if (options.getStatus) {
         return HttpResponse.json(
@@ -211,6 +223,7 @@ describe('Web settings page', () => {
     useMswHandlers(
       subscriptionHandler(),
       themeHandler(),
+      locationsHandler(),
       http.get(PREFERENCES_PATH, ({ request }) => {
         authorization(request.headers.get('authorization'))
         return HttpResponse.json({ data: { affiliateCtasEnabled: true } })
@@ -326,6 +339,7 @@ describe('Web settings page', () => {
     useMswHandlers(
       subscriptionHandler(),
       themeHandler(),
+      locationsHandler(),
       http.get(PREFERENCES_PATH, () =>
         HttpResponse.json({ data: { affiliateCtasEnabled: true } })
       ),
@@ -405,6 +419,7 @@ describe('Web settings page', () => {
     useMswHandlers(
       subscriptionHandler(),
       themeHandler(),
+      locationsHandler(),
       http.get(PREFERENCES_PATH, async ({ request }) => {
         request.signal.addEventListener('abort', () => aborted.resolve())
         await gate.promise

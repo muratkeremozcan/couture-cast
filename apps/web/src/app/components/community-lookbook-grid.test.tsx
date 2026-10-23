@@ -251,6 +251,35 @@ describe('CommunityLookbookGrid (Story 6.1)', () => {
       }
     )
 
+    it.each([...communityBandUnresolvedReasonSchema.options])(
+      '1.2b-WEB-GRID-01 offers the guided add-location action only for no_location: %s',
+      async (reason) => {
+        signIn()
+        useMswHandlers(
+          feedHandler({
+            items: [item()],
+            viewerBand: null,
+            bandResolved: false,
+            bandUnresolvedReason: reason,
+            mode: 'auto',
+          })
+        )
+        renderGrid()
+
+        const notice = await screen.findByTestId('community-band-unresolved')
+        const action = within(notice).queryByTestId('community-add-location')
+        if (reason === 'no_location') {
+          expect(action?.textContent).toBe('Add a location')
+          expect(action).toHaveAttribute(
+            'href',
+            '/settings?addLocation=1&returnTo=%2F#locations'
+          )
+        } else {
+          expect(action).toBeNull()
+        }
+      }
+    )
+
     it('6.1-WEB-009 hides the band notice when the band resolved', async () => {
       signIn()
       useMswHandlers(feedHandler({ items: [item()] }))

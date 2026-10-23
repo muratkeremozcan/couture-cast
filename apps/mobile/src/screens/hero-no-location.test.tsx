@@ -18,18 +18,22 @@ import itIT from '@/assets/locales/it-IT.json'
 import ptBR from '@/assets/locales/pt-BR.json'
 import ptPT from '@/assets/locales/pt-PT.json'
 import trTR from '@/assets/locales/tr-TR.json'
+import { saveLocationFromSearchFromMobile } from '@/src/lib/locations'
 import { setMobileAccessTokenResolver } from '@/src/lib/mobile-auth'
 import { clearRitualMemoryCache } from '@/src/lib/ritual-cache'
 import i18n, { initI18n } from '@/src/lib/i18n'
+import { mockRitualResponse } from '@/src/test-utils/msw/handlers'
 import { server } from '@/src/test-utils/msw/server'
 
 vi.mock('expo-localization', () => ({
   getLocales: () => [{ languageTag: 'en-US', languageCode: 'en', regionCode: 'US' }],
 }))
 
+const routerPush = vi.hoisted(() => vi.fn())
+
 vi.mock('expo-router', () => ({
   useLocalSearchParams: () => ({}),
-  useRouter: () => ({ setParams: vi.fn(), push: vi.fn() }),
+  useRouter: () => ({ setParams: vi.fn(), push: routerPush }),
 }))
 
 vi.mock('@/src/analytics/mobile-analytics', () => ({
@@ -88,6 +92,9 @@ describe('TabOneScreen without a saved location', () => {
       expect(screen.getByText(hint)).toBeTruthy()
       expect(screen.queryByTestId('hero-error-state')).toBeNull()
       expect(screen.queryByRole('button', { name: i18n.t('hero.retry') })).toBeNull()
+      expect(
+        screen.getByRole('button', { name: i18n.t('locations.guided.add') })
+      ).toBeTruthy()
       expect(screen.queryByText(i18n.t('hero.load_error'))).toBeNull()
     }
   )
@@ -113,5 +120,67 @@ describe('TabOneScreen without a saved location', () => {
         `${name} hero.no_location`
       ).toEqual(expect.any(String))
     }
+  })
+
+  it('1.2b-MOB-HERO-01 opens the guided add-location screen from the no-location state', async () => {
+    answerRitualWith(400, 'No location preferences found for user')
+
+    await render(<TabOneScreen />)
+
+    const action = await screen.findByTestId('hero-add-location')
+    expect(action.textContent).toBe('Add a location')
+    action.click()
+    expect(routerPush).toHaveBeenCalledWith('/locations?guided=1')
+  })
+
+  it('1.2b-MOB-HERO-02 shows a ritual as soon as a location is saved, with no manual reload', async () => {
+    let hasLocation = false
+    server.use(
+      http.get('*/api/v1/ritual', () =>
+        hasLocation
+          ? HttpResponse.json(mockRitualResponse)
+          : HttpResponse.json(
+              {
+                message: 'No location preferences found for user',
+                error: 'Bad Request',
+                statusCode: 400,
+              },
+              { status: 400 }
+            )
+      ),
+      http.post('*/api/v1/locations/from-search', () => {
+        hasLocation = true
+        return HttpResponse.json(
+          {
+            data: {
+              id: 'loc-1',
+              label: 'Home',
+              locationKey: 'chicago-illinois-us-41-878n-87-630w',
+              latitude: 41.878,
+              longitude: -87.63,
+              timezone: 'America/Chicago',
+              city: 'Chicago',
+              region: 'Illinois',
+              country: 'US',
+              isPrimary: true,
+              sortOrder: 0,
+              createdAt: '2026-10-22T12:00:00.000Z',
+              updatedAt: '2026-10-22T12:00:00.000Z',
+            },
+          },
+          { status: 201 }
+        )
+      })
+    )
+
+    await render(<TabOneScreen />)
+    await screen.findByTestId('hero-no-location-state')
+
+    await saveLocationFromSearchFromMobile('candidate.signature', 'Home')
+
+    await waitFor(() => {
+      expect(screen.getByTestId('outfit-recommendation-card')).toBeTruthy()
+    })
+    expect(screen.queryByTestId('hero-no-location-state')).toBeNull()
   })
 })

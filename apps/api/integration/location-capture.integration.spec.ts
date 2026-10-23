@@ -501,13 +501,13 @@ describeRealDatabase('Location capture real-database integration', () => {
     const [de] = await search(harness, german.token, 'Moscow', 'de-DE')
     const [en] = await search(harness, english.token, 'Moscow', 'en-US')
     expect(de?.displayLabel).toBe('Moskau, Moscow, Russland')
-    expect(en?.displayLabel).toBe('Moscow, Moscow, Russia')
+    expect(en?.displayLabel).toBe('Moscow, Russia')
     const first = await saveCandidate(harness, german.token, de!)
     const second = await saveCandidate(harness, english.token, en!)
     expect(first.locationKey).toBe(second.locationKey)
 
     const [istanbul] = await search(harness, english.token, 'İstanbul', 'tr-TR')
-    expect(istanbul?.displayLabel).toBe('İstanbul, İstanbul, Türkiye')
+    expect(istanbul?.displayLabel).toBe('İstanbul, Türkiye')
     const savedIstanbul = await saveCandidate(
       harness,
       english.token,

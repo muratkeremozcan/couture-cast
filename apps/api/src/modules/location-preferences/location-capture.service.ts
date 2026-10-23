@@ -99,13 +99,21 @@ function countryDisplayName(country: string, locale: string): string {
   }
 }
 
+/** City states such as Monaco name the city and country alike; say it once. */
 function displayLabel(place: GeocodedPlace, locale: string): string {
+  const seen = new Set<string>()
   return [
     place.localizedName ?? place.city,
     place.region,
     countryDisplayName(place.country, locale),
   ]
-    .filter((part): part is string => Boolean(part))
+    .filter((part): part is string => {
+      if (!part) return false
+      const key = part.trim().toLocaleLowerCase(locale)
+      if (seen.has(key)) return false
+      seen.add(key)
+      return true
+    })
     .join(', ')
 }
 
