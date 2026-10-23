@@ -9,28 +9,41 @@ import {
   locationSearchResponseSchema,
   locationUnavailableResponseSchema,
   setPrimarySavedLocationResponseSchema,
+  updateSavedLocationResponseSchema,
   type LocationPlatform,
+  type LocationRequestErrorCode,
+  type LocationUnavailableErrorCode,
 } from '@couture/api-client/contracts/http'
 import { expect } from 'vitest'
 import {
   eachLike,
+  equal,
+  fromProviderState,
   isoTimestamp,
   like,
   nullValue,
   pactEventAuth,
   pactEventHeaders,
+  regex,
   string,
   type CreateClient,
 } from './shared'
 
 /* ---------------------------------------------------------------------------
- * Story 1.2b client location capture: search, save from search, list, switch
- * primary and delete, the five operations the web Locations section and the
+ * Story 1.2b client location capture: search, save from search, list, rename,
+ * switch primary and delete, the operations the web Locations section and the
  * mobile Locations screen drive.
  *
- * Every identifier below is mirrored in `pact/http/provider/doubles/locations.ts`.
- * The candidate token is opaque to clients: they hand back exactly what search
- * returned, so the contract pins only its presence and string type.
+ * Provider verification runs the real location services against faked seams
+ * (`pact/http/provider/doubles/locations.ts`), and each provider state builds
+ * the world its name describes (`pact/http/provider/state.ts`). The candidate
+ * token is opaque to clients: they hand back exactly what search returned. Save
+ * rows therefore send it with `fromProviderState`, and the provider injects a
+ * token its real service signed for that state.
+ *
+ * The `code`, `retryable`, `statusCode` and `error` fields are what both
+ * clients switch on, so they are pinned with `equal`; `isPrimary` is pinned for
+ * the same reason.
  *
  * Error rows go out through raw fetch because the generated SDK throws on non-2xx
  * responses; what they pin is the typed `code` envelope the clients localize.
@@ -41,11 +54,24 @@ import {
 export const PACT_SEARCHED_LOCATION_ID = 'loc-searched-1'
 export const PACT_OFFICE_LOCATION_ID = 'loc-office-2'
 export const PACT_FOREIGN_LOCATION_ID = 'loc-foreign-9'
+/** The consumer-side example; verification sends the token the provider state minted. */
 export const PACT_CANDIDATE_TOKEN = 'pact-candidate-payload.pact-candidate-signature'
 const SEARCH_KEY = 'chicago-illinois-us-41-878n-87-630w'
 const CREATED_AT = '2026-10-22T12:00:00.000Z'
+const NOT_FOUND_MESSAGE = 'Saved location not found'
 
-const searchedLocationBody = (isPrimary: boolean) => ({
+/**
+ * Search candidates and locations saved from search carry an ISO 3166-1
+ * alpha-2 country. The list, rename and primary rows keep `string()`: the
+ * saved-location contract still admits a legacy free-text country, which both
+ * clients render as typed.
+ */
+const countryCode = (value: string) => regex(/^[A-Z]{2}$/, value)
+
+const injectedCandidateToken = () =>
+  fromProviderState('${candidateToken}', PACT_CANDIDATE_TOKEN)
+
+const searchedLocationBody = (isPrimary: boolean, country = string('US')) => ({
   id: string(PACT_SEARCHED_LOCATION_ID),
   label: string('Home'),
   locationKey: string(SEARCH_KEY),
@@ -54,16 +80,16 @@ const searchedLocationBody = (isPrimary: boolean) => ({
   timezone: string('America/Chicago'),
   city: string('Chicago'),
   region: string('Illinois'),
-  country: string('US'),
-  isPrimary: like(isPrimary),
+  country,
+  isPrimary: equal(isPrimary),
   sortOrder: like(0),
   createdAt: isoTimestamp(CREATED_AT),
   updatedAt: isoTimestamp(CREATED_AT),
 })
 
-const officeLocationBody = (isPrimary: boolean) => ({
-  id: string(PACT_OFFICE_LOCATION_ID),
-  label: string('Office'),
+const officeLocationBody = (isPrimary: boolean, label = string('Office')) => ({
+  id: equal(PACT_OFFICE_LOCATION_ID),
+  label,
   locationKey: string('monaco-mc-43-738n-7-425e'),
   latitude: like(43.738),
   longitude: like(7.425),
@@ -71,11 +97,32 @@ const officeLocationBody = (isPrimary: boolean) => ({
   city: string('Monaco'),
   region: nullValue(),
   country: string('MC'),
-  isPrimary: like(isPrimary),
+  isPrimary: equal(isPrimary),
   sortOrder: like(1),
   createdAt: isoTimestamp(CREATED_AT),
   updatedAt: isoTimestamp(CREATED_AT),
 })
+
+const requestErrorBody = (code: LocationRequestErrorCode, message: string) => ({
+  statusCode: equal(400),
+  code: equal(code),
+  message: string(message),
+  error: equal('Bad Request'),
+})
+
+const unavailableBody = (code: LocationUnavailableErrorCode, message: string) => ({
+  statusCode: equal(503),
+  code: equal(code),
+  retryable: equal(true),
+  message: string(message),
+  error: equal('Service Unavailable'),
+})
+
+const notFoundBody = {
+  statusCode: equal(404),
+  message: string(NOT_FOUND_MESSAGE),
+  error: equal('Not Found'),
+}
 
 const platformHeaders = (platform: LocationPlatform) => ({
   ...pactEventHeaders,
@@ -119,7 +166,7 @@ export async function verifyLocationSearchInteraction(
           data: eachLike({
             city: string('Chicago'),
             region: string('Illinois'),
-            country: string('US'),
+            country: countryCode('US'),
             latitude: like(41.878),
             longitude: like(-87.63),
             displayLabel: string('Chicago, Illinois, États-Unis'),
@@ -142,36 +189,108 @@ export async function verifyLocationSearchInteraction(
 }
 
 /**
- * Provider endpoint: /api/v1/locations/search -> GET (provider failure)
+ * Provider endpoint: /api/v1/locations/search -> GET (typed failures)
  *
- * The typed retryable 503 the clients turn into a localized retry message.
+ * The validation 400 comes from the controller before the rate limit or the
+ * provider runs; the 503s come from the capture service: a provider outage, and
+ * a deployment without LOCATION_CANDIDATE_SECRET that fails closed.
  */
-export async function verifyLocationSearchUnavailableInteraction(
+export const locationSearchErrorInteractions = [
+  {
+    description: 'while the provider is down',
+    state: 'The location provider is unavailable for user',
+    q: 'Chicago',
+    status: 503,
+    body: unavailableBody(
+      'provider_unavailable',
+      'The location provider is temporarily unavailable. Try again.'
+    ),
+    code: 'provider_unavailable',
+  },
+  {
+    description: 'while location capture is not configured',
+    state: 'Location capture is not configured',
+    q: 'Chicago',
+    status: 503,
+    body: unavailableBody(
+      'location_service_unavailable',
+      'Location search is temporarily unavailable.'
+    ),
+    code: 'location_service_unavailable',
+  },
+  {
+    description: 'with a one-character query',
+    state: 'A city search returns candidates for user',
+    q: 'C',
+    status: 400,
+    body: requestErrorBody('invalid_request', 'Search text must be 2 to 80 characters'),
+    code: 'invalid_request',
+  },
+] as const
+
+export async function verifyLocationSearchErrorInteraction(
+  pact: PactV4,
+  interaction: (typeof locationSearchErrorInteractions)[number],
+  platform: LocationPlatform
+) {
+  await pact
+    .addInteraction()
+    .given(...memberState(interaction.state))
+    .uponReceiving(`a ${platform} city search ${interaction.description}`)
+    .withRequest(
+      'GET',
+      '/api/v1/locations/search',
+      setJsonContent({ headers: platformHeaders(platform), query: { q: interaction.q } })
+    )
+    .willRespondWith(interaction.status, setJsonContent({ body: interaction.body }))
+    .executeTest(async (mockServer: V3MockServer) => {
+      const response = await fetch(
+        `${mockServer.url}/api/v1/locations/search?q=${interaction.q}`,
+        { headers: platformHeaders(platform) }
+      )
+
+      expect(response.status).toBe(interaction.status)
+      const body: unknown = await response.json()
+      const parsed =
+        interaction.status === 503
+          ? locationUnavailableResponseSchema.parse(body)
+          : locationRequestErrorResponseSchema.parse(body)
+      expect(parsed.code).toBe(interaction.code)
+    })
+}
+
+/**
+ * Provider endpoint: /api/v1/locations/search -> GET (31st search in a minute)
+ *
+ * The shared rate-limit contract: the body stays `{ statusCode, message, error }`
+ * and the retry time travels only in `Retry-After`, which the controller sets.
+ */
+export async function verifyLocationSearchRateLimitedInteraction(
   pact: PactV4,
   platform: LocationPlatform
 ) {
   await pact
     .addInteraction()
-    .given(...memberState('The location provider is unavailable for user'))
-    .uponReceiving(`a ${platform} city search while the provider is down`)
+    .given(...memberState('The user has used the city search allowance for this minute'))
+    .uponReceiving(`a ${platform} city search over the per-minute limit`)
     .withRequest(
       'GET',
       '/api/v1/locations/search',
       setJsonContent({ headers: platformHeaders(platform), query: { q: 'Chicago' } })
     )
     .willRespondWith(
-      503,
+      429,
       setJsonContent({
+        headers: { 'Retry-After': regex(/^[1-9][0-9]*$/, '30') },
         body: {
-          statusCode: like(503),
-          code: string('provider_unavailable'),
-          retryable: like(true),
-          message: string('The location provider is temporarily unavailable. Try again.'),
-          error: string('Service Unavailable'),
+          statusCode: equal(429),
+          message: string('Too many location searches. Try again shortly.'),
+          error: equal('Too Many Requests'),
         },
       })
     )
     .executeTest(async (mockServer: V3MockServer) => {
+      // The generated SDK throws on 429, so the request goes out directly.
       const response = await fetch(
         `${mockServer.url}/api/v1/locations/search?q=Chicago`,
         {
@@ -179,10 +298,9 @@ export async function verifyLocationSearchUnavailableInteraction(
         }
       )
 
-      expect(response.status).toBe(503)
-      expect(locationUnavailableResponseSchema.parse(await response.json()).code).toBe(
-        'provider_unavailable'
-      )
+      expect(response.status).toBe(429)
+      // A refusal with no recovery time is not actionable.
+      expect(Number(response.headers.get('retry-after'))).toBeGreaterThan(0)
     })
 }
 
@@ -209,10 +327,13 @@ export async function verifyLocationSaveFromSearchInteraction(
       '/api/v1/locations/from-search',
       setJsonContent({
         headers: platformHeaders(platform),
-        body: { candidateToken: PACT_CANDIDATE_TOKEN, label: 'Home' },
+        body: { candidateToken: injectedCandidateToken(), label: 'Home' },
       })
     )
-    .willRespondWith(201, setJsonContent({ body: { data: searchedLocationBody(true) } }))
+    .willRespondWith(
+      201,
+      setJsonContent({ body: { data: searchedLocationBody(true, countryCode('US')) } })
+    )
     .executeTest(async (mockServer: V3MockServer) => {
       const response = await createClient(mockServer).apiV1LocationsFromSearchPost({
         xCouturePlatform: platform,
@@ -228,33 +349,61 @@ export async function verifyLocationSaveFromSearchInteraction(
     })
 }
 
+const PROVIDER_DOWN = 'The location provider is temporarily unavailable. Try again.'
+
+/**
+ * `injectsCandidate: false` marks the one row that fails before the token is
+ * read: with no secret configured there is nothing to sign one with.
+ */
 export const locationSaveErrorInteractions = [
   {
-    description: 'refuses an expired or tampered candidate',
+    description: 'refuses an expired candidate',
     state: 'The user holds an expired location candidate',
     status: 400,
     code: 'invalid_candidate',
-    message: 'This search result expired. Search again.',
-    error: 'Bad Request',
-    retryable: false,
+    body: requestErrorBody(
+      'invalid_candidate',
+      'This search result expired. Search again.'
+    ),
+    injectsCandidate: true,
   },
   {
     description: 'explains the three-location limit',
     state: 'The user has three saved locations',
     status: 400,
     code: 'location_limit_reached',
-    message: 'Users can save at most three locations',
-    error: 'Bad Request',
-    retryable: false,
+    body: requestErrorBody(
+      'location_limit_reached',
+      'Users can save at most three locations'
+    ),
+    injectsCandidate: true,
+  },
+  {
+    description: 'refuses a city the user already saved',
+    state: 'The user already saved this searched location',
+    status: 400,
+    code: 'location_duplicate',
+    body: requestErrorBody('location_duplicate', 'Saved location already exists'),
+    injectsCandidate: true,
   },
   {
     description: 'saves nothing when the forecast call fails',
     state: 'The location provider is unavailable for user',
     status: 503,
     code: 'provider_unavailable',
-    message: 'The location provider is temporarily unavailable. Try again.',
-    error: 'Service Unavailable',
-    retryable: true,
+    body: unavailableBody('provider_unavailable', PROVIDER_DOWN),
+    injectsCandidate: true,
+  },
+  {
+    description: 'fails closed while location capture is not configured',
+    state: 'Location capture is not configured',
+    status: 503,
+    code: 'location_service_unavailable',
+    body: unavailableBody(
+      'location_service_unavailable',
+      'Location search is temporarily unavailable.'
+    ),
+    injectsCandidate: false,
   },
 ] as const
 
@@ -272,21 +421,15 @@ export async function verifyLocationSaveErrorInteraction(
       '/api/v1/locations/from-search',
       setJsonContent({
         headers: platformHeaders(platform),
-        body: { candidateToken: PACT_CANDIDATE_TOKEN, label: 'Home' },
-      })
-    )
-    .willRespondWith(
-      interaction.status,
-      setJsonContent({
         body: {
-          statusCode: like(interaction.status),
-          code: string(interaction.code),
-          ...(interaction.retryable ? { retryable: like(true) } : {}),
-          message: string(interaction.message),
-          error: string(interaction.error),
+          candidateToken: interaction.injectsCandidate
+            ? injectedCandidateToken()
+            : PACT_CANDIDATE_TOKEN,
+          label: 'Home',
         },
       })
     )
+    .willRespondWith(interaction.status, setJsonContent({ body: interaction.body }))
     .executeTest(async (mockServer: V3MockServer) => {
       const response = await fetch(`${mockServer.url}/api/v1/locations/from-search`, {
         method: 'POST',
@@ -339,6 +482,39 @@ export async function verifyLocationListInteraction(
 }
 
 /**
+ * Provider endpoint: /api/v1/locations/{locationId} -> PATCH updateLocation
+ *
+ * Both clients rename through this route with a label-only body.
+ * Status codes: 200.
+ */
+export async function verifyLocationRenameInteraction(
+  pact: PactV4,
+  createClient: CreateClient
+) {
+  await pact
+    .addInteraction()
+    .given(...memberState('The user has two saved locations'))
+    .uponReceiving('a request to rename a saved location')
+    .withRequest(
+      'PATCH',
+      `/api/v1/locations/${PACT_OFFICE_LOCATION_ID}`,
+      setJsonContent({ headers: pactEventHeaders, body: { label: 'Work' } })
+    )
+    .willRespondWith(
+      200,
+      setJsonContent({ body: { data: officeLocationBody(false, equal('Work')) } })
+    )
+    .executeTest(async (mockServer: V3MockServer) => {
+      const response = await createClient(mockServer).apiV1LocationsLocationIdPatch({
+        locationId: PACT_OFFICE_LOCATION_ID,
+        updateSavedLocationInput: { label: 'Work' },
+      })
+
+      expect(updateSavedLocationResponseSchema.parse(response).data.label).toBe('Work')
+    })
+}
+
+/**
  * Provider endpoint: /api/v1/locations/{locationId}/primary -> POST setPrimary
  *
  * Status codes: 200 (`@HttpCode(200)`); 404 for a location the caller does not own.
@@ -370,6 +546,7 @@ export async function verifyLocationSetPrimaryInteraction(
     })
 }
 
+/** `loc-foreign-9` exists in the provider world and belongs to another member. */
 export async function verifyLocationSetPrimaryForeignInteraction(pact: PactV4) {
   await pact
     .addInteraction()
@@ -380,16 +557,7 @@ export async function verifyLocationSetPrimaryForeignInteraction(pact: PactV4) {
       `/api/v1/locations/${PACT_FOREIGN_LOCATION_ID}/primary`,
       setJsonContent({ headers: pactEventHeaders })
     )
-    .willRespondWith(
-      404,
-      setJsonContent({
-        body: {
-          statusCode: like(404),
-          message: string('Saved location not found'),
-          error: string('Not Found'),
-        },
-      })
-    )
+    .willRespondWith(404, setJsonContent({ body: notFoundBody }))
     .executeTest(async (mockServer: V3MockServer) => {
       const response = await fetch(
         `${mockServer.url}/api/v1/locations/${PACT_FOREIGN_LOCATION_ID}/primary`,
@@ -419,12 +587,33 @@ export async function verifyLocationDeleteInteraction(
       `/api/v1/locations/${PACT_SEARCHED_LOCATION_ID}`,
       setJsonContent({ headers: pactEventHeaders })
     )
-    .willRespondWith(200, setJsonContent({ body: { data: { deleted: like(true) } } }))
+    .willRespondWith(200, setJsonContent({ body: { data: { deleted: equal(true) } } }))
     .executeTest(async (mockServer: V3MockServer) => {
       const response = await createClient(mockServer).apiV1LocationsLocationIdDelete({
         locationId: PACT_SEARCHED_LOCATION_ID,
       })
 
       expect(deleteSavedLocationResponseSchema.parse(response).data.deleted).toBe(true)
+    })
+}
+
+export async function verifyLocationDeleteForeignInteraction(pact: PactV4) {
+  await pact
+    .addInteraction()
+    .given(...memberState('The user has two saved locations'))
+    .uponReceiving('a request to delete a foreign location')
+    .withRequest(
+      'DELETE',
+      `/api/v1/locations/${PACT_FOREIGN_LOCATION_ID}`,
+      setJsonContent({ headers: pactEventHeaders })
+    )
+    .willRespondWith(404, setJsonContent({ body: notFoundBody }))
+    .executeTest(async (mockServer: V3MockServer) => {
+      const response = await fetch(
+        `${mockServer.url}/api/v1/locations/${PACT_FOREIGN_LOCATION_ID}`,
+        { method: 'DELETE', headers: pactEventHeaders }
+      )
+
+      expect(response.status).toBe(404)
     })
 }

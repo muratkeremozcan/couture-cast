@@ -143,7 +143,9 @@ import {
   verifyCreateCommunityChallengeRejectionInteraction,
   communityChallengeRejections,
   verifyLocationSearchInteraction,
-  verifyLocationSearchUnavailableInteraction,
+  verifyLocationSearchErrorInteraction,
+  locationSearchErrorInteractions,
+  verifyLocationSearchRateLimitedInteraction,
   verifyLocationSaveFromSearchInteraction,
   verifyLocationSaveErrorInteraction,
   locationSaveErrorInteractions,
@@ -151,6 +153,8 @@ import {
   verifyLocationSetPrimaryInteraction,
   verifyLocationSetPrimaryForeignInteraction,
   verifyLocationDeleteInteraction,
+  verifyLocationDeleteForeignInteraction,
+  verifyLocationRenameInteraction,
 } from './api-contract-interactions'
 
 const pact = new PactV4({
@@ -775,8 +779,15 @@ describe('CoutureCastMobile -> CoutureCastApi HTTP contract', () => {
     await verifyLocationSearchInteraction(pact, createMobileClientForMockServer, 'mobile')
   })
 
-  it('preserves the typed retryable envelope when the location provider is down', async () => {
-    await verifyLocationSearchUnavailableInteraction(pact, 'mobile')
+  it.each(locationSearchErrorInteractions)(
+    'preserves the typed city search error envelope $description',
+    async (interaction) => {
+      await verifyLocationSearchErrorInteraction(pact, interaction, 'mobile')
+    }
+  )
+
+  it('carries Retry-After when city search is rate limited', async () => {
+    await verifyLocationSearchRateLimitedInteraction(pact, 'mobile')
   })
 
   it('saves a searched city as a location', async () => {
@@ -798,6 +809,10 @@ describe('CoutureCastMobile -> CoutureCastApi HTTP contract', () => {
     await verifyLocationListInteraction(pact, createMobileClientForMockServer)
   })
 
+  it('renames a saved location', async () => {
+    await verifyLocationRenameInteraction(pact, createMobileClientForMockServer)
+  })
+
   it('switches the primary saved location', async () => {
     await verifyLocationSetPrimaryInteraction(pact, createMobileClientForMockServer)
   })
@@ -808,5 +823,9 @@ describe('CoutureCastMobile -> CoutureCastApi HTTP contract', () => {
 
   it('deletes a saved location', async () => {
     await verifyLocationDeleteInteraction(pact, createMobileClientForMockServer)
+  })
+
+  it('refuses to delete a foreign location', async () => {
+    await verifyLocationDeleteForeignInteraction(pact)
   })
 })

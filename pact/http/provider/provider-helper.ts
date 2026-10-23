@@ -90,7 +90,16 @@ import { createCommunityDoubles } from './doubles/community'
 import { createLocationDoubles } from './doubles/locations'
 import { LocationPreferencesController } from '../../../apps/api/src/modules/location-preferences/location-preferences.controller'
 import { LocationPreferencesService } from '../../../apps/api/src/modules/location-preferences/location-preferences.service'
-import { LocationCaptureService } from '../../../apps/api/src/modules/location-preferences/location-capture.service'
+import {
+  LOCATION_FORECAST_PROVIDER,
+  LOCATION_GEOCODER,
+  LocationCaptureService,
+} from '../../../apps/api/src/modules/location-preferences/location-capture.service'
+import { LOCATION_CLOCK } from '../../../apps/api/src/modules/location-preferences/location-clock.js'
+import { PrismaLocationPreferencesRepository } from '../../../apps/api/src/modules/location-preferences/location-preferences.repository.js'
+import { TelemetryService } from '../../../apps/api/src/modules/telemetry/telemetry.service.js'
+import { WeatherRefreshQueue } from '../../../apps/api/src/modules/weather/weather-refresh.queue.js'
+import { WeatherRepository } from '../../../apps/api/src/modules/weather/weather.repository.js'
 import {
   resetProviderEngagementState,
   resetProviderCapsuleState,
@@ -243,8 +252,7 @@ export async function startLocalPactProvider({
   const { mockPlannerService } = createPlannerDoubles()
   const { mockCommunityService, mockCommunitySpotlightService } = createCommunityDoubles()
   const engagement = createCommunityEngagementDoubles()
-  const { mockLocationPreferencesService, mockLocationCaptureService } =
-    createLocationDoubles()
+  const locationSeams = createLocationDoubles()
   const moduleFixture = await Test.createTestingModule({
     controllers: [
       CommunitySyncController,
@@ -278,8 +286,20 @@ export async function startLocalPactProvider({
       { provide: PushRegistrationService, useValue: engagement.registrations },
       { provide: AlertsService, useValue: engagement.alerts },
       { provide: CommunityCommentsService, useValue: createCommunityCommentsDouble() },
-      { provide: LocationPreferencesService, useValue: mockLocationPreferencesService },
-      { provide: LocationCaptureService, useValue: mockLocationCaptureService },
+      // Story 1.2b: the real location services run; only their injected seams
+      // are faked, so the contract's statuses and codes come from service logic.
+      LocationPreferencesService,
+      LocationCaptureService,
+      {
+        provide: PrismaLocationPreferencesRepository,
+        useValue: locationSeams.repository,
+      },
+      { provide: WeatherRepository, useValue: locationSeams.weatherRepository },
+      { provide: LOCATION_GEOCODER, useValue: locationSeams.geocoder },
+      { provide: LOCATION_FORECAST_PROVIDER, useValue: locationSeams.forecastProvider },
+      { provide: TelemetryService, useValue: locationSeams.telemetry },
+      { provide: LOCATION_CLOCK, useValue: locationSeams.clock },
+      { provide: WeatherRefreshQueue, useValue: locationSeams.weatherRefresh },
       EventsService,
       {
         provide: EventsRepository,

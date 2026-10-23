@@ -146,7 +146,9 @@ import {
   verifyCreateCommunityChallengeRejectionInteraction,
   communityChallengeRejections,
   verifyLocationSearchInteraction,
-  verifyLocationSearchUnavailableInteraction,
+  verifyLocationSearchErrorInteraction,
+  locationSearchErrorInteractions,
+  verifyLocationSearchRateLimitedInteraction,
   verifyLocationSaveFromSearchInteraction,
   verifyLocationSaveErrorInteraction,
   locationSaveErrorInteractions,
@@ -154,6 +156,8 @@ import {
   verifyLocationSetPrimaryInteraction,
   verifyLocationSetPrimaryForeignInteraction,
   verifyLocationDeleteInteraction,
+  verifyLocationDeleteForeignInteraction,
+  verifyLocationRenameInteraction,
 } from './api-contract-interactions'
 
 const pact = new PactV4({
@@ -768,8 +772,15 @@ describe('CoutureCastWeb -> CoutureCastApi HTTP contract', () => {
     await verifyLocationSearchInteraction(pact, createWebClientForMockServer, 'web')
   })
 
-  it('preserves the typed retryable envelope when the location provider is down', async () => {
-    await verifyLocationSearchUnavailableInteraction(pact, 'web')
+  it.each(locationSearchErrorInteractions)(
+    'preserves the typed city search error envelope $description',
+    async (interaction) => {
+      await verifyLocationSearchErrorInteraction(pact, interaction, 'web')
+    }
+  )
+
+  it('carries Retry-After when city search is rate limited', async () => {
+    await verifyLocationSearchRateLimitedInteraction(pact, 'web')
   })
 
   it('saves a searched city as a location', async () => {
@@ -791,6 +802,10 @@ describe('CoutureCastWeb -> CoutureCastApi HTTP contract', () => {
     await verifyLocationListInteraction(pact, createWebClientForMockServer)
   })
 
+  it('renames a saved location', async () => {
+    await verifyLocationRenameInteraction(pact, createWebClientForMockServer)
+  })
+
   it('switches the primary saved location', async () => {
     await verifyLocationSetPrimaryInteraction(pact, createWebClientForMockServer)
   })
@@ -801,5 +816,9 @@ describe('CoutureCastWeb -> CoutureCastApi HTTP contract', () => {
 
   it('deletes a saved location', async () => {
     await verifyLocationDeleteInteraction(pact, createWebClientForMockServer)
+  })
+
+  it('refuses to delete a foreign location', async () => {
+    await verifyLocationDeleteForeignInteraction(pact)
   })
 })
