@@ -1,3 +1,4 @@
+import { availableParallelism } from 'node:os'
 import { resolve } from 'node:path'
 import { defineConfig } from 'vitest/config'
 
@@ -66,6 +67,18 @@ export default defineConfig({
     },
   },
   test: {
+    // At most four test files at once, whatever the core count. The DB-backed
+    // integration suites assert real wall-clock budgets (a 1 s interactive
+    // transaction in community fan-out, the 1950 ms community authorization
+    // budget, provider barrier deadlines), and each file also runs child
+    // processes, servers and BullMQ workers against the ONE shared Postgres and
+    // Redis. Vitest's default of one worker per core put 13 files on a 14-core
+    // machine onto that database at once; the measured result on 2026-10-22 was
+    // 1 to 15 timing failures per full run (expired transactions, budget
+    // overruns, hook timeouts), each green alone. Capped at four: three
+    // consecutive full runs green, including one started at load average 23.
+    // CI's 4 vCPU runner keeps its three. VITEST_MAX_WORKERS still overrides.
+    maxWorkers: Math.max(1, Math.min(4, availableParallelism() - 1)),
     globals: true,
     environment: 'node',
     include: ['src/**/*.{spec,test}.ts', 'integration/**/*.spec.ts'],
