@@ -31,6 +31,26 @@ export function ritualCacheOwner(applicationUserId: string | null) {
 const memoryCache: Record<string, RitualCacheEntry> = {}
 const latestLocationByUserLocale: Record<string, string> = {}
 
+/**
+ * Story 1.2b: every cache mutation for one member runs after the previous one
+ * settles. Native writes are asynchronous, so without this order a save that
+ * started before {@link forgetLatestRitual} could land its latest-location
+ * pointer after the invalidation and restore the previous primary's ritual on
+ * the next mount, and an older save could overwrite a newer primary's pointer.
+ * A failed mutation still releases the next one.
+ */
+const mutationTailByUser: Record<string, Promise<void>> = {}
+
+function serializeForUser<T>(userId: string, mutation: () => Promise<T>): Promise<T> {
+  const previous = mutationTailByUser[userId] ?? Promise.resolve()
+  const run = previous.then(mutation)
+  mutationTailByUser[userId] = run.then(
+    () => undefined,
+    () => undefined
+  )
+  return run
+}
+
 function ritualCacheKey(userId: string, locale: SupportedLocale, locationKey: string) {
   return `${cachePrefix}:${userId}:${locale}:${locationKey}`
 }
@@ -214,18 +234,20 @@ export async function saveRitualCache(
   const locationKey = entry.data.data.weather.locationKey
   const key = ritualCacheKey(userId, locale, locationKey)
   const localeKey = userLocaleKey(userId, locale)
-  memoryCache[key] = entry
-  latestLocationByUserLocale[localeKey] = locationKey
 
-  try {
-    await Promise.all([
-      writeStoredValue(key, JSON.stringify(entry)),
-      writeStoredValue(latestLocationCacheKey(userId, locale), locationKey),
-    ])
-  } catch (error) {
-    console.warn('[RitualCache] Durable cache write failed', error)
-    throw error
-  }
+  await serializeForUser(userId, async () => {
+    memoryCache[key] = entry
+    latestLocationByUserLocale[localeKey] = locationKey
+    try {
+      await Promise.all([
+        writeStoredValue(key, JSON.stringify(entry)),
+        writeStoredValue(latestLocationCacheKey(userId, locale), locationKey),
+      ])
+    } catch (error) {
+      console.warn('[RitualCache] Durable cache write failed', error)
+      throw error
+    }
+  })
   // Story 3.3 Task 1 step 2 owner: update widgets only after the durable cache writes finish.
   await publishWidgetData(entry, locale)
 }
@@ -238,16 +260,18 @@ export async function saveRitualCache(
  * location are only reachable through that pointer.
  */
 export async function forgetLatestRitual(userId: string): Promise<void> {
-  await Promise.all(
-    supportedLocales.map(async (locale) => {
-      delete latestLocationByUserLocale[userLocaleKey(userId, locale)]
-      try {
-        await deleteStoredValue(latestLocationCacheKey(userId, locale))
-      } catch (error) {
-        console.warn('[RitualCache] Latest ritual pointer delete failed', error)
-      }
-    })
-  )
+  await serializeForUser(userId, async () => {
+    await Promise.all(
+      supportedLocales.map(async (locale) => {
+        delete latestLocationByUserLocale[userLocaleKey(userId, locale)]
+        try {
+          await deleteStoredValue(latestLocationCacheKey(userId, locale))
+        } catch (error) {
+          console.warn('[RitualCache] Latest ritual pointer delete failed', error)
+        }
+      })
+    )
+  })
 }
 
 export function clearRitualMemoryCache() {
