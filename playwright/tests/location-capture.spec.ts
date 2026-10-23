@@ -356,10 +356,12 @@ test.describe('1.2b client location capture @local-lane', () => {
     await remove.press('Space')
     const confirm = section.getByRole('button', { name: 'Yes, delete' })
     await expect(confirm).toBeVisible()
+    // The key that opened the confirmation lands the user on it, so the next
+    // Enter deletes; it must not leave focus on Cancel.
+    await expect(confirm).toBeFocused()
     await checkA11y(page)
 
-    await confirm.focus()
-    await confirm.press('Enter')
+    await page.keyboard.press('Enter')
     await expect(section.getByRole('status')).toHaveText('Capital deleted.')
     await expect(section.getByTestId('location-item-label')).toHaveText([
       'Ozarks',
