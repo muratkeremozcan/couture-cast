@@ -36,8 +36,10 @@ NestJS API E2E coverage.
    `commerce_affiliate_enabled` flag row. Every seed is an upsert and none
    delete. Pass `SKIP_E2E_SEED=true` to skip it on a fast re-run.
 
-   Teardown runs `db:reset`, which drops and rebuilds the database. Set
-   `PLAYWRIGHT_SKIP_DB_RESET=true` if something else is using it.
+   Teardown runs `db:reset`, which drops and rebuilds the database. Only this
+   script opts in (`PLAYWRIGHT_DB_RESET=true`); a raw `npx playwright test`
+   never resets anything. Set `PLAYWRIGHT_SKIP_DB_RESET=true` if something
+   else is using the database.
 
 5. Use the other helpers, `npm run test:pw-preview` or
    `npm run test:pw-prod`, when remote deployments are ready, or run

@@ -6,23 +6,7 @@ import {
   stopE2eStack,
 } from '../scripts/e2e-stack-pid.mjs'
 import { resolveEnvironmentConfig } from './config/environments'
-
-function isLocalDatabaseUrl(value: string): boolean {
-  try {
-    const url = new URL(value)
-    const hostname = url.hostname.toLowerCase().replace(/^\[|\]$/g, '')
-    return [
-      '127.0.0.1',
-      'localhost',
-      '0.0.0.0',
-      '::1',
-      '::ffff:127.0.0.1',
-      '::ffff:7f00:1',
-    ].includes(hostname)
-  } catch {
-    return false
-  }
-}
+import { databaseResetDecision } from './support/helpers/db-reset-policy'
 
 /**
  * Playwright stops its web server only after this teardown returns, so the E2E
@@ -59,19 +43,9 @@ export default async function globalTeardown() {
     .filter(Boolean)
     .join(path.delimiter)
 
-  const testEnv = (env.TEST_ENV ?? 'local').toLowerCase()
-  const shouldResetDatabase =
-    testEnv === 'local' &&
-    env.DATABASE_URL !== undefined &&
-    isLocalDatabaseUrl(env.DATABASE_URL) &&
-    env.PLAYWRIGHT_SKIP_DB_RESET !== 'true'
-
-  if (env.CI || !shouldResetDatabase) {
-    console.warn(
-      'Skipping db:reset in global teardown (CI, non-local TEST_ENV, remote/missing DATABASE_URL, or PLAYWRIGHT_SKIP_DB_RESET=true)'
-    )
-    return
-  }
+  const decision = databaseResetDecision(env)
+  console.warn(decision.reason)
+  if (!decision.reset) return
 
   await stopThisRunsE2eStack()
 
