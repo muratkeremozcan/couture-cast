@@ -50,11 +50,15 @@ tags:
 # lesson `premium-subscription.yaml` and `palette-advisor.yaml` record:
 # `extendedWaitUntil: visible` requires the element inside the VIEWPORT, and
 # CI's `pixel_3a` profile is shorter than the local `medium_phone`.
+# No `centerElement`: this row sits at the end of the Settings list and can
+# never reach the middle of the screen. Maestro then spends five more settling
+# swipes before it accepts the row, and on a slow emulator those outlast the
+# timeout and the step reports a row it is showing as not found (Story 1.2b
+# R25 verification run). A fully visible row is what the tap below needs.
 - scrollUntilVisible:
     element:
       id: 'planner-link'
     direction: DOWN
-    centerElement: true
     timeout: 15000
     label: 'Planner entry row is reachable from settings'
 
