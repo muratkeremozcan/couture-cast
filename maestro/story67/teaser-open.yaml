@@ -1,0 +1,26 @@
+# Story 6.7 owner: from the tabs, find the Home teaser and activate it. The teaser is the
+# last item on Home, so one extra swipe settles it clear of the tab bar before the tap.
+appId: ${MAESTRO_APP_ID}
+---
+- tapOn:
+    id: 'tab-home'
+    retryTapIfNoChange: true
+- scrollUntilVisible:
+    element:
+      id: 'home-spotlight-teaser-link'
+    direction: DOWN
+    timeout: 30000
+    label: 'The teaser follows the hero on Home'
+- swipe:
+    start: '50%, 70%'
+    end: '50%, 35%'
+    duration: 400
+- waitForAnimationToEnd
+- tapOn:
+    id: 'home-spotlight-teaser-link'
+    label: 'Activate the teaser'
+- extendedWaitUntil:
+    visible:
+      id: 'community-spotlight-rank-.*'
+    timeout: 20000
+    label: 'Community shows the City Spotlight entry'

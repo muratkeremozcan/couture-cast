@@ -212,10 +212,9 @@ async function moveAccessibilityFocus(
     const moving = focusAccessibilityElement(handle)
     if (!moving) {
       AccessibilityInfo.setAccessibilityFocus(handle)
-      return { target: chosen.target, handle, landed: false }
+      return request
     }
-    if (await moving.catch(() => false))
-      return { target: chosen.target, handle, landed: false }
+    if (await moving.catch(() => false)) return request
   }
   return null
 }

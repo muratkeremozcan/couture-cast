@@ -1,0 +1,17 @@
+# Story 6.7 owner: real sign-in UI, step 2 of 3. Sends the code request through the product's
+# requestNativeOtp and opens the code field for the runner to type into.
+appId: ${MAESTRO_APP_ID}
+---
+- extendedWaitUntil:
+    visible: ${MAESTRO_EMAIL}
+    timeout: 10000
+    label: 'The whole address is in the field'
+- hideKeyboard:
+    optional: true
+- tapOn: ${MAESTRO_SEND}
+- extendedWaitUntil:
+    visible: ${MAESTRO_CODE_SENT}
+    timeout: 20000
+- tapOn:
+    text: ${MAESTRO_CODE_LABEL}
+    index: 1

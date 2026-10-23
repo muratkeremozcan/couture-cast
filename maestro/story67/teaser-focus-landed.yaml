@@ -1,0 +1,13 @@
+# Story 6.7 owner: reads the OS-confirmed focus marker after a return to Home. It renders
+# only when the accessibility-focus module reported TalkBack focus on the requested target,
+# and its count proves the move happened once.
+appId: ${MAESTRO_APP_ID}
+---
+- scrollUntilVisible:
+    element:
+      id: 'home-spotlight-teaser-focused-${MAESTRO_TARGET}-1'
+    direction: DOWN
+    timeout: 15000
+    label: 'TalkBack focus landed on the ${MAESTRO_TARGET}, once'
+- assertNotVisible:
+    id: 'home-spotlight-teaser-focused-.*-2'
