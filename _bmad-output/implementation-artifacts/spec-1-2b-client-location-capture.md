@@ -324,6 +324,12 @@ SUPERUSER attribute`; 4 to 7 files red per run). `apps/api/vitest.config.ts` pin
   written since that flow started. R29b: an unready probe captures the device state only on the
   first, every tenth and the final probe, so a 15-minute wait cannot pile up hundreds of megabytes;
   every probe is still logged.
+- 2026-10-23, R30 (CI, quality-gate on f44a385a): Story 6.5's `community-stream` R01 relied on 20 ms per
+  inserted row to make the first append overrun its 450 ms statement timeout, but the append
+  prepares candidates only for 150 ms, so on a loaded runner the batch stayed small enough to fit
+  and no append failed (reproduced 8 of 12 runs under ten CPU burners). The test now makes only the
+  first stream-event insert slow, counted by a sequence that survives the aborted transaction, so
+  the first append always overruns; it passed 12 of 12 under the same load.
 
 ## Spec Change Log
 
