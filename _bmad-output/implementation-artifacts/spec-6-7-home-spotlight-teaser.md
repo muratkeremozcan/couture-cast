@@ -273,10 +273,8 @@ and links to that entry inside the existing City Spotlight with focus and screen
     hides the previous member's value in the same render and the lifecycle clears and aborts
     before the next identity resolves (6.7-MOB-018). Web already resolves synchronously; 6.7-WEB-007
     now asserts the clear in the same commit.
-  - R2: on native the teaser counts as holding focus only for 10 seconds
-    (`TEASER_RETURN_FOCUS_HOLD_MS`) after a return focus, or while the link reports input focus.
-    Home blur and activation end the window, so a later removal never pulls a screen reader away
-    from what the member swiped to (6.7-MOB-033, 6.7-MOB-034).
+  - R2: on native the teaser counted as holding focus for 10 seconds after a return focus, or
+    while the link reported input focus. Round 2 (R13) replaced the window with OS-reported focus.
   - R3: `HomeSpotlightTeaserSlot` owns the lifecycle, focus state and return focus as a memoized
     child, so teaser updates never re-render the hero (6.7-MOB-035 counts hero card renders).
   - R4: the spotlight hook retires a handled focus request (`acknowledgeFocusRequest`), so a module
@@ -284,10 +282,9 @@ and links to that entry inside the existing City Spotlight with focus and screen
   - R5: Community retires a pending teaser intent and any unexecuted targeted focus on navigation
     blur, and guards its deadline timer and animation-frame callbacks (6.7-MOB-027, 6.7-MOB-028).
   - R6: native return focus is covered with native handles and exact call counts (6.7-MOB-030 to
-    6.7-MOB-032). Home renders a 1-point automation marker,
-    `home-spotlight-teaser-focused-<target>-<count>`, after a focus request reached a real node, and
-    the Maestro flows assert it for the Home tab return, Android back and, in
-    `home-spotlight-teaser-fallback.yaml`, the return after the value expired.
+    6.7-MOB-032). The Maestro flow asserts an automation marker for the Home tab return and Android
+    back. The test phase removed the expiry fallback flow, and round 2 (R12) moved the device
+    focus check to OS-confirmed TalkBack focus.
   - R7: `surface=home_teaser` reads make one transport attempt on both clients; the Community
     module keeps its single contention retry (6.7-MOB-015, 6.7-WEB-017).
   - R8: absence assertions wait on the wrapper's own settled promise or on synchronous read starts,
@@ -297,8 +294,54 @@ and links to that entry inside the existing City Spotlight with focus and screen
     hold a browser connection into the next test.
   - R10: the layout cancels its preview scroll frame on unmount, and the web teaser suite stubs
     `scrollIntoView`, which jsdom lacks, restoring it afterwards (6.7-WEB-004, 6.7-WEB-019).
-  - CodeRabbit: `Retry-After` deferrals ignore non-finite values and are capped at five minutes
-    (`SPOTLIGHT_TEASER_MAX_DEFERRAL_MS`), since the spotlight read limit counts per minute.
+  - CodeRabbit: `Retry-After` deferrals ignore non-finite values. A five-minute cap added here
+    was reversed in round 2 (R15).
+
+- 2026-10-23, code review round 2 (`reviews/code-triage-1.md`, R12 to R15, with
+  `reviews/cc67-astra-code-review-2.md` D1 to D4) and the test review's open items
+  (`reviews/cc67-tea-test-review.md`). Decision (coordinator, option A): React Native 0.81
+  reports no screen-reader focus, so a local Expo module reports and moves it.
+  - Evidence for the decision: Android `AccessibilityInfoModule.setAccessibilityFocus` is a no-op
+    and the JS call sends `TYPE_VIEW_FOCUSED`; iOS posts `UIAccessibilityLayoutChangedNotification`;
+    `ReactAccessibilityDelegate` forwards only declared custom actions; no React Native view
+    implements `accessibilityElementDidBecomeFocused`.
+  - `apps/mobile/modules/accessibility-focus`: `observeAccessibilityFocus` reports OS focus
+    changes as native view tags from the focused element outwards (iOS
+    `UIAccessibility.elementFocusedNotification`; Android an accessibility delegate on the window's
+    decor view that sees `TYPE_VIEW_ACCESSIBILITY_FOCUSED` and `_CLEARED`).
+    `focusAccessibilityElement` moves the cursor (Android `ACTION_ACCESSIBILITY_FOCUS`, iOS a
+    layout-changed notification for the view). Expo Go and web carry no module; there both
+    return null and the hook falls back to React Native's call and to what the DOM reports.
+  - R13: the teaser hands focus to the scroll view on removal only while the link holds input
+    focus or the OS reports accessibility focus on it. There is no timer. Without the module it
+    hands nothing off and logs nothing (6.7-MOB-032 to 034, 046).
+  - R14: the return target is chosen in the frame focus moves in, and again in each retry frame;
+    the return is consumed once a destination exists (6.7-MOB-047).
+  - R12: Home renders `home-spotlight-teaser-focus-requested-<target>-<count>` once a request
+    reached a real node, and `home-spotlight-teaser-focused-<target>-<count>` only after the
+    platform confirmed it (the DOM on web, the OS report on a native build). The Expo Go flow
+    asserts the request marker. `scripts/run-story67-talkback.mjs` with `maestro/story67/` asserts
+    the confirmed marker on an Android development build with TalkBack enabled through adb: Android
+    back to the link, and the return after a sign-out identity change to the scroll view. With
+    the platform focus call suppressed, the request marker still renders and both cases fail.
+    CI has no development-build lane, so this flow is local evidence. The Expo Go lanes keep
+    running in CI. iOS is covered at unit level only: the Simulator has no VoiceOver.
+  - Defects the device run found and fixed: TalkBack ignores React Native's Android
+    `TYPE_VIEW_FOCUSED` for the link, so the module moves the cursor itself. Home's views are
+    reattached a frame after navigation reports focus, so a refused move is retried for up to
+    `NATIVE_FOCUS_FRAMES` (6.7-MOB-048, 049). TalkBack reports focus from inside the native call,
+    before its promise resolves, so a request waits for its report from the moment it is sent
+    (6.7-MOB-050).
+  - Harness facts: any UiAutomation client (Maestro, `uiautomator dump`) suspends TalkBack and the
+    app's touch exploration while connected, so no flow runs while TalkBack is on and the runner
+    waits a fixed 4 s for a transition before reading the recorded marker. Maestro's `inputText`
+    stalls its device server on the Gboard emulator image, so the runner types with
+    `adb shell input text` in short chunks.
+  - R15: a finite positive `Retry-After` defers the next read to its exact deadline; non-finite
+    and non-positive values fall back to the read floor (6.7-UNIT-036, 043).
+  - Test review items: the native "moves nothing" checks wait five frames; 6.7-MOB-035 takes its
+    baseline once hero renders hold steady and drives an identity change; the native suite clicks
+    through `userEvent`.
 
 ## Spec Change Log
 
