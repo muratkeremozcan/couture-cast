@@ -100,6 +100,41 @@ export class WeatherRepository {
     }
   }
 
+  /**
+   * Story 1.2b: the save-from-search snapshot, written inside the caller's
+   * transaction so it commits or rolls back with the saved location. A
+   * concurrent writer of the same provider snapshot is absorbed by
+   * `skipDuplicates` (ON CONFLICT DO NOTHING) instead of aborting the caller's
+   * transaction, and segments are attached only by the writer that inserted it.
+   */
+  async persistForecastWithin(
+    transaction: Prisma.TransactionClient,
+    forecast: NormalizedWeatherForecast
+  ): Promise<void> {
+    const snapshot = this.toSnapshotData(forecast)
+    const inserted = await transaction.weatherSnapshot.createMany({
+      data: [snapshot],
+      skipDuplicates: true,
+    })
+    if (inserted.count === 0 || forecast.hourly.length === 0) return
+    const { id } = await transaction.weatherSnapshot.findUniqueOrThrow({
+      where: {
+        location_key_provider_provider_updated_at: {
+          location_key: snapshot.location_key,
+          provider: snapshot.provider,
+          provider_updated_at: snapshot.provider_updated_at,
+        },
+      },
+      select: { id: true },
+    })
+    await transaction.forecastSegment.createMany({
+      data: this.toSegmentData(forecast).map((segment) => ({
+        ...segment,
+        weather_snapshot_id: id,
+      })),
+    })
+  }
+
   async findLatestByLocationKey(
     locationKey: string
   ): Promise<WeatherSnapshotWithSegments | null> {
@@ -162,6 +197,13 @@ export class WeatherRepository {
     forecast: NormalizedWeatherForecast
   ): Prisma.WeatherSnapshotCreateInput {
     return {
+      ...this.toSnapshotData(forecast),
+      segments: { create: this.toSegmentData(forecast) },
+    }
+  }
+
+  private toSnapshotData(forecast: NormalizedWeatherForecast) {
+    return {
       location: forecast.locationName ?? forecast.locationKey,
       location_key: normalizeLocationKey(forecast.locationKey),
       latitude: forecast.latitude,
@@ -181,20 +223,21 @@ export class WeatherRepository {
         forecast.daily && forecast.daily.length > 0
           ? (forecast.daily as unknown as Prisma.InputJsonArray)
           : Prisma.JsonNull,
-      segments: {
-        create: forecast.hourly.map((hour, index) => ({
-          forecast_at: hour.forecastAt,
-          hour_offset: index,
-          temperature: hour.temperature,
-          feels_like: hour.feelsLike,
-          precipitation_probability: hour.precipitationProbability,
-          precipitation_amount: hour.precipitationAmount,
-          wind_speed: hour.windSpeed,
-          wind_gust: hour.windGust,
-          condition: hour.condition,
-          provider_weather_code: hour.providerWeatherCode,
-        })),
-      },
-    }
+    } satisfies Prisma.WeatherSnapshotCreateManyInput
+  }
+
+  private toSegmentData(forecast: NormalizedWeatherForecast) {
+    return forecast.hourly.map((hour, index) => ({
+      forecast_at: hour.forecastAt,
+      hour_offset: index,
+      temperature: hour.temperature,
+      feels_like: hour.feelsLike,
+      precipitation_probability: hour.precipitationProbability,
+      precipitation_amount: hour.precipitationAmount,
+      wind_speed: hour.windSpeed,
+      wind_gust: hour.windGust,
+      condition: hour.condition,
+      provider_weather_code: hour.providerWeatherCode,
+    }))
   }
 }

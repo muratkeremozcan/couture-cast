@@ -11,12 +11,13 @@ import {
   createSavedLocationFromSearchResponseSchema,
   listSavedLocationsResponseSchema,
   locationRequestErrorResponseSchema,
-  locationSearchResponseSchema,
+  locationSearchCandidateSchema,
   locationUnavailableResponseSchema,
   tooManyRequestsHttpErrorSchema,
   type LocationSearchCandidate,
 } from '@couture/api-client/contracts/http'
 import { canonicalSpotlightArea } from '@couture/utils'
+import { z } from 'zod'
 import {
   SENTINEL_TEMPERATURE_C,
   startWeatherProviderDouble,
@@ -76,6 +77,16 @@ import {
  * LOCATION_PREFERENCES_REAL_DB_INTEGRATION=true, and then a failed schema probe
  * fails this suite; it never skips.
  */
+
+// The published response schemas strip unknown keys so installed clients
+// survive an additive server change. The server's own output is pinned exactly
+// here: a candidate that grew an identity field would fail these.
+const exactSearchResponseSchema = z
+  .object({ data: z.array(locationSearchCandidateSchema.strict()) })
+  .strict()
+const exactRequestErrorSchema = locationRequestErrorResponseSchema.strict()
+const exactUnavailableSchema = locationUnavailableResponseSchema.strict()
+
 const runRealDatabase = process.env.LOCATION_PREFERENCES_REAL_DB_INTEGRATION === 'true'
 const describeRealDatabase = runRealDatabase ? describe : describe.skip
 
@@ -314,7 +325,7 @@ describeRealDatabase('Location capture real-database integration', () => {
       .query({ q, locale })
       .set(headers(token))
     expect(response.status).toBe(200)
-    return locationSearchResponseSchema.parse(response.body).data
+    return exactSearchResponseSchema.parse(response.body).data
   }
 
   function save(harness: Harness, token: string, candidateToken: string, label = 'Home') {
@@ -394,9 +405,7 @@ describeRealDatabase('Location capture real-database integration', () => {
       .set(headers(viewer.token))
 
     expect(response.status).toBe(400)
-    expect(locationRequestErrorResponseSchema.parse(response.body).code).toBe(
-      'invalid_request'
-    )
+    expect(exactRequestErrorSchema.parse(response.body).code).toBe('invalid_request')
     expect(double.stats.geocoding).toBe(before)
   })
 
@@ -411,7 +420,7 @@ describeRealDatabase('Location capture real-database integration', () => {
         .query({ q })
         .set(headers(viewer.token))
       expect(response.status).toBe(503)
-      expect(locationUnavailableResponseSchema.parse(response.body)).toMatchObject({
+      expect(exactUnavailableSchema.parse(response.body)).toMatchObject({
         code: 'provider_unavailable',
         retryable: true,
       })
@@ -453,9 +462,7 @@ describeRealDatabase('Location capture real-database integration', () => {
       'Again'
     )
     expect(duplicate.status).toBe(400)
-    expect(locationRequestErrorResponseSchema.parse(duplicate.body).code).toBe(
-      'location_duplicate'
-    )
+    expect(exactRequestErrorSchema.parse(duplicate.body).code).toBe('location_duplicate')
 
     const [monaco] = await search(harness, viewer.token, 'Monaco')
     const saved = await saveCandidate(harness, viewer.token, monaco!, 'Coast')
@@ -470,9 +477,7 @@ describeRealDatabase('Location capture real-database integration', () => {
     const [chicago] = await search(harness, viewer.token, 'Chicago')
     const fourth = await save(harness, viewer.token, chicago!.candidateToken, 'Fourth')
     expect(fourth.status).toBe(400)
-    expect(locationRequestErrorResponseSchema.parse(fourth.body).code).toBe(
-      'location_limit_reached'
-    )
+    expect(exactRequestErrorSchema.parse(fourth.body).code).toBe('location_limit_reached')
     expect(double.stats.forecast).toBe(forecastsBefore)
     expect(
       await harness.prisma.savedLocation.count({ where: { user_id: viewer.id } })
@@ -525,9 +530,7 @@ describeRealDatabase('Location capture real-database integration', () => {
     for (const token of tokens) {
       const response = await save(harness, viewer.token, token)
       expect(response.status).toBe(400)
-      expect(locationRequestErrorResponseSchema.parse(response.body).code).toBe(
-        'invalid_candidate'
-      )
+      expect(exactRequestErrorSchema.parse(response.body).code).toBe('invalid_candidate')
     }
     expect(
       await harness.prisma.savedLocation.count({ where: { user_id: viewer.id } })
@@ -558,7 +561,7 @@ describeRealDatabase('Location capture real-database integration', () => {
       const [candidate] = await search(harness, viewer.token, q)
       const response = await save(harness, viewer.token, candidate!.candidateToken)
       expect(response.status).toBe(503)
-      expect(locationUnavailableResponseSchema.parse(response.body)).toMatchObject({
+      expect(exactUnavailableSchema.parse(response.body)).toMatchObject({
         code: 'provider_unavailable',
         retryable: true,
       })
@@ -786,7 +789,7 @@ describeRealDatabase('Location capture real-database integration', () => {
 
     for (const response of [searched, saved]) {
       expect(response.status).toBe(503)
-      expect(locationUnavailableResponseSchema.parse(response.body).code).toBe(
+      expect(exactUnavailableSchema.parse(response.body).code).toBe(
         'location_service_unavailable'
       )
     }
@@ -1029,5 +1032,50 @@ describeRealDatabase('Location capture real-database integration', () => {
     await expect(restoreMobileE2EBaselineLocation(harness.prisma, ' ')).rejects.toThrow(
       'requires a member ID'
     )
+  })
+  it('1.2b-INT-17 a save that loses the location-limit race leaves no snapshot behind', async () => {
+    const harness = await harnessFor('openweather')
+    const viewer = await member(harness)
+    const springfields = await search(harness, viewer.token, 'Springfield')
+    await saveCandidate(harness, viewer.token, springfields[0]!, 'Capital')
+    await saveCandidate(harness, viewer.token, springfields[1]!, 'Ozarks')
+
+    // Two places no run has saved, so neither key has a snapshot yet. Both
+    // saves pass the pre-forecast limit check at two locations; the
+    // repository's per-member lock lets exactly one become the third.
+    const nonce = randomUUID().replace(/-/g, '').slice(0, 10)
+    const suffixes = ['a', 'b'].map((side) => {
+      const place = sentinelPlace(`race${side}${nonce}`)
+      return coordinateKeySuffix(place.lat, place.lon)
+    })
+    const [first] = await search(harness, viewer.token, `Sentinel racea${nonce}`)
+    const [second] = await search(harness, viewer.token, `Sentinel raceb${nonce}`)
+    const responses = await Promise.all([
+      save(harness, viewer.token, first!.candidateToken, 'First'),
+      save(harness, viewer.token, second!.candidateToken, 'Second'),
+    ])
+
+    const statuses = responses.map((response) => response.status).sort()
+    expect(statuses).toEqual([201, 400])
+    const loser = responses.find((response) => response.status === 400)!
+    expect(exactRequestErrorSchema.parse(loser.body).code).toBe('location_limit_reached')
+    const winner = createSavedLocationFromSearchResponseSchema.parse(
+      responses.find((response) => response.status === 201)!.body
+    ).data
+    snapshotKeys.add(winner.locationKey)
+
+    const snapshots = await harness.prisma.weatherSnapshot.findMany({
+      where: {
+        OR: suffixes.map((suffix) => ({ location_key: { endsWith: suffix } })),
+      },
+      select: { location_key: true },
+    })
+    // The winner's snapshot committed with its location; the loser's rolled back.
+    expect(snapshots.map((snapshot) => snapshot.location_key)).toEqual([
+      winner.locationKey,
+    ])
+    expect(
+      await harness.prisma.savedLocation.count({ where: { user_id: viewer.id } })
+    ).toBe(3)
   })
 })

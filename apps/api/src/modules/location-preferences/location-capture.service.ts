@@ -124,7 +124,7 @@ export class LocationCaptureService {
     @Inject(PrismaLocationPreferencesRepository)
     private readonly repository: LocationPreferencesRepository,
     @Inject(WeatherRepository)
-    private readonly weatherRepository: Pick<WeatherRepository, 'persistForecast'>,
+    private readonly weatherRepository: Pick<WeatherRepository, 'persistForecastWithin'>,
     @Inject(LOCATION_GEOCODER)
     private readonly geocoder: ILocationGeocoder,
     @Inject(LOCATION_FORECAST_PROVIDER)
@@ -235,19 +235,26 @@ export class LocationCaptureService {
       locationKey,
       existing.length
     )
-    await this.weatherRepository.persistForecast(forecast)
-
     try {
-      const location = await this.repository.create(userId, {
-        label: label.trim(),
-        locationKey,
-        latitude: candidate.latitude,
-        longitude: candidate.longitude,
-        timezone: forecast.timezone,
-        city: candidate.city,
-        region: candidate.region,
-        country: candidate.country,
-      })
+      // The snapshot commits with the location: a save that loses the
+      // duplicate or limit race leaves no orphan snapshot behind.
+      const location = await this.repository.create(
+        userId,
+        {
+          label: label.trim(),
+          locationKey,
+          latitude: candidate.latitude,
+          longitude: candidate.longitude,
+          timezone: forecast.timezone,
+          city: candidate.city,
+          region: candidate.region,
+          country: candidate.country,
+        },
+        {
+          withinTransaction: (transaction) =>
+            this.weatherRepository.persistForecastWithin(transaction, forecast),
+        }
+      )
       await this.recordSave(userId, platform, 'saved', existing.length + 1)
       return toSavedLocation(location)
     } catch (error) {

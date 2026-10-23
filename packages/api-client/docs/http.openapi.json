@@ -2030,8 +2030,7 @@
           "longitude",
           "displayLabel",
           "candidateToken"
-        ],
-        "additionalProperties": false
+        ]
       },
       "LocationSearchResponse": {
         "type": "object",
@@ -2091,16 +2090,14 @@
                 "longitude",
                 "displayLabel",
                 "candidateToken"
-              ],
-              "additionalProperties": false
+              ]
             },
             "maxItems": 5
           }
         },
         "required": [
           "data"
-        ],
-        "additionalProperties": false
+        ]
       },
       "CreateSavedLocationFromSearchInput": {
         "type": "object",
@@ -2252,8 +2249,7 @@
           "code",
           "message",
           "error"
-        ],
-        "additionalProperties": false
+        ]
       },
       "LocationUnavailableResponse": {
         "type": "object",
@@ -2294,8 +2290,7 @@
           "retryable",
           "message",
           "error"
-        ],
-        "additionalProperties": false
+        ]
       },
       "ModerationActionInput": {
         "type": "object",

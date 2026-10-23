@@ -26,10 +26,19 @@ export interface UpdateSavedLocationCommand {
   sortOrder?: number
 }
 
+export interface CreateSavedLocationOptions {
+  /**
+   * Story 1.2b: work that must commit or roll back with the new location, run
+   * inside its transaction after the duplicate and limit checks pass.
+   */
+  withinTransaction?: (transaction: Prisma.TransactionClient) => Promise<void>
+}
+
 export interface LocationPreferencesRepository {
   create(
     userId: string,
-    command: CreateSavedLocationCommand
+    command: CreateSavedLocationCommand,
+    options?: CreateSavedLocationOptions
   ): Promise<SavedLocationRecord>
   delete(userId: string, locationId: string): Promise<SavedLocationRecord | null>
   findByIdForUser(userId: string, locationId: string): Promise<SavedLocationRecord | null>
@@ -86,7 +95,8 @@ export class PrismaLocationPreferencesRepository
 
   async create(
     userId: string,
-    command: CreateSavedLocationCommand
+    command: CreateSavedLocationCommand,
+    options: CreateSavedLocationOptions = {}
   ): Promise<SavedLocationRecord> {
     try {
       return await this.prisma.$transaction(async (transaction) => {
@@ -112,6 +122,8 @@ export class PrismaLocationPreferencesRepository
         if (count >= MAX_SAVED_LOCATIONS) {
           throw new SavedLocationLimitExceededError()
         }
+
+        await options.withinTransaction?.(transaction)
 
         const lastLocation = await transaction.savedLocation.findFirst({
           where: { user_id: userId },

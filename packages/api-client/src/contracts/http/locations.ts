@@ -152,36 +152,37 @@ export const locationSearchQueryParamsSchema = z
   })
   .strict()
 
-export const locationSearchCandidateSchema = z
-  .object({
-    city: z.string().min(1).max(120).describe("The provider's default place name."),
-    region: optionalDisplayFieldSchema,
-    country: z
-      .string()
-      .regex(/^[A-Z]{2}$/)
-      .describe('ISO 3166-1 alpha-2 country code.'),
-    latitude: z.number().finite().min(-90).max(90),
-    longitude: z.number().finite().min(-180).max(180),
-    displayLabel: z
-      .string()
-      .min(1)
-      .max(400)
-      .describe('Localized label for display only. Not part of the signed candidate.'),
-    candidateToken: z
-      .string()
-      .min(1)
-      .max(2048)
-      .describe(
-        'Signed, identity-free candidate valid for 15 minutes. Pass it to POST /api/v1/locations/from-search.'
-      ),
-  })
-  .strict()
+/**
+ * Response bodies strip unknown keys rather than reject them, so an installed
+ * mobile build keeps working when the server adds a field. Request bodies stay
+ * strict. The integration suite pins the exact server output with `.strict()`.
+ */
+export const locationSearchCandidateSchema = z.object({
+  city: z.string().min(1).max(120).describe("The provider's default place name."),
+  region: optionalDisplayFieldSchema,
+  country: z
+    .string()
+    .regex(/^[A-Z]{2}$/)
+    .describe('ISO 3166-1 alpha-2 country code.'),
+  latitude: z.number().finite().min(-90).max(90),
+  longitude: z.number().finite().min(-180).max(180),
+  displayLabel: z
+    .string()
+    .min(1)
+    .max(400)
+    .describe('Localized label for display only. Not part of the signed candidate.'),
+  candidateToken: z
+    .string()
+    .min(1)
+    .max(2048)
+    .describe(
+      'Signed, identity-free candidate valid for 15 minutes. Pass it to POST /api/v1/locations/from-search.'
+    ),
+})
 
-export const locationSearchResponseSchema = z
-  .object({
-    data: z.array(locationSearchCandidateSchema).max(LOCATION_SEARCH_MAX_RESULTS),
-  })
-  .strict()
+export const locationSearchResponseSchema = z.object({
+  data: z.array(locationSearchCandidateSchema).max(LOCATION_SEARCH_MAX_RESULTS),
+})
 
 export const createSavedLocationFromSearchInputSchema = z
   .object({
@@ -201,29 +202,25 @@ export const locationRequestErrorCodeSchema = z.enum([
   'location_duplicate',
 ])
 
-export const locationRequestErrorResponseSchema = z
-  .object({
-    statusCode: z.literal(400),
-    code: locationRequestErrorCodeSchema,
-    message: nonEmptyStringSchema,
-    error: z.literal('Bad Request'),
-  })
-  .strict()
+export const locationRequestErrorResponseSchema = z.object({
+  statusCode: z.literal(400),
+  code: locationRequestErrorCodeSchema,
+  message: nonEmptyStringSchema,
+  error: z.literal('Bad Request'),
+})
 
 export const locationUnavailableErrorCodeSchema = z.enum([
   'provider_unavailable',
   'location_service_unavailable',
 ])
 
-export const locationUnavailableResponseSchema = z
-  .object({
-    statusCode: z.literal(503),
-    code: locationUnavailableErrorCodeSchema,
-    retryable: z.literal(true),
-    message: nonEmptyStringSchema,
-    error: z.literal('Service Unavailable'),
-  })
-  .strict()
+export const locationUnavailableResponseSchema = z.object({
+  statusCode: z.literal(503),
+  code: locationUnavailableErrorCodeSchema,
+  retryable: z.literal(true),
+  message: nonEmptyStringSchema,
+  error: z.literal('Service Unavailable'),
+})
 
 export type SavedLocationIdPathParams = z.infer<typeof savedLocationIdPathParamsSchema>
 export type SavedLocation = z.infer<typeof savedLocationSchema>

@@ -3,6 +3,7 @@ import {
   type HttpException,
   ServiceUnavailableException,
 } from '@nestjs/common'
+import type { Prisma } from '@prisma/client'
 import { afterEach, beforeEach, describe, expect, it, vi, type Mock } from 'vitest'
 import type {
   GeocodedPlace,
@@ -30,6 +31,7 @@ import {
 import {
   SavedLocationDuplicateError,
   type CreateSavedLocationCommand,
+  type CreateSavedLocationOptions,
   type LocationPreferencesRepository,
   type SavedLocationRecord,
 } from './location-preferences.repository'
@@ -45,6 +47,9 @@ const chicago: GeocodedPlace = {
   longitude: -87.63,
   localizedName: 'シカゴ',
 }
+
+/** Stands in for the Prisma transaction client the repository opens. */
+const transaction = { sentinel: 'transaction' } as unknown as Prisma.TransactionClient
 
 function record(overrides: Partial<SavedLocationRecord> = {}): SavedLocationRecord {
   return {
@@ -119,7 +124,7 @@ describe('LocationCaptureService', () => {
   let repository: {
     [K in keyof LocationPreferencesRepository]: Mock<LocationPreferencesRepository[K]>
   }
-  let persistForecast: ReturnType<typeof vi.fn>
+  let persistForecastWithin: ReturnType<typeof vi.fn>
   let geocoder: ILocationGeocoder & { search: ReturnType<typeof vi.fn> }
   let fetchForecast: Mock<IWeatherProvider['fetchForecast']>
   let captureEvent: ReturnType<typeof vi.fn>
@@ -130,23 +135,31 @@ describe('LocationCaptureService', () => {
     saved = []
     searches = 0
     repository = {
-      create: vi.fn((_owner: string, command: CreateSavedLocationCommand) => {
-        const created = record({
-          id: `location-${saved.length + 1}`,
-          label: command.label,
-          location_key: command.locationKey,
-          latitude: command.latitude,
-          longitude: command.longitude,
-          timezone: command.timezone,
-          city: command.city ?? null,
-          region: command.region ?? null,
-          country: command.country ?? null,
-          is_primary: saved.length === 0,
-          sort_order: saved.length,
-        })
-        saved.push(created)
-        return Promise.resolve(created)
-      }),
+      create: vi.fn(
+        async (
+          _owner: string,
+          command: CreateSavedLocationCommand,
+          options?: CreateSavedLocationOptions
+        ) => {
+          // The real repository runs this inside the location's transaction.
+          await options?.withinTransaction?.(transaction)
+          const created = record({
+            id: `location-${saved.length + 1}`,
+            label: command.label,
+            location_key: command.locationKey,
+            latitude: command.latitude,
+            longitude: command.longitude,
+            timezone: command.timezone,
+            city: command.city ?? null,
+            region: command.region ?? null,
+            country: command.country ?? null,
+            is_primary: saved.length === 0,
+            sort_order: saved.length,
+          })
+          saved.push(created)
+          return created
+        }
+      ),
       delete: vi.fn<LocationPreferencesRepository['delete']>(),
       findByIdForUser: vi.fn<LocationPreferencesRepository['findByIdForUser']>(),
       findByLocationKeyForUser:
@@ -162,7 +175,7 @@ describe('LocationCaptureService', () => {
       setPrimary: vi.fn<LocationPreferencesRepository['setPrimary']>(),
       update: vi.fn<LocationPreferencesRepository['update']>(),
     }
-    persistForecast = vi.fn().mockResolvedValue({ id: 'snapshot-1' })
+    persistForecastWithin = vi.fn().mockResolvedValue(undefined)
     geocoder = {
       provider: 'openweather',
       search: vi.fn().mockResolvedValue([chicago]),
@@ -173,7 +186,10 @@ describe('LocationCaptureService', () => {
     captureEvent = vi.fn().mockResolvedValue(undefined)
     service = new LocationCaptureService(
       repository,
-      { persistForecast } as unknown as Pick<WeatherRepository, 'persistForecast'>,
+      { persistForecastWithin } as unknown as Pick<
+        WeatherRepository,
+        'persistForecastWithin'
+      >,
       geocoder,
       { fetchForecast },
       { captureEvent } as unknown as Pick<TelemetryService, 'captureEvent'>,
@@ -346,13 +362,13 @@ describe('LocationCaptureService', () => {
         },
         expect.any(AbortSignal)
       )
-      expect(persistForecast).toHaveBeenCalledTimes(1)
+      expect(persistForecastWithin).toHaveBeenCalledTimes(1)
+      // Inside the location's own transaction, so it commits with the location.
+      expect(persistForecastWithin.mock.calls[0]![0]).toBe(transaction)
       // The persisted snapshot resolves the climate band on its own.
-      const persisted = persistForecast.mock.calls[0]![0] as NormalizedWeatherForecast
+      const persisted = persistForecastWithin.mock
+        .calls[0]![1] as NormalizedWeatherForecast
       expect(classifyClimateBand(persisted.daily ?? [])).not.toBeNull()
-      expect(persistForecast.mock.invocationCallOrder[0]).toBeLessThan(
-        repository.create.mock.invocationCallOrder[0]!
-      )
       expect(location).toMatchObject({
         label: 'Home',
         locationKey: 'chicago-illinois-us-41-878n-87-630w',
@@ -419,7 +435,7 @@ describe('LocationCaptureService', () => {
         })
       }
 
-      expect(persistForecast).not.toHaveBeenCalled()
+      expect(persistForecastWithin).not.toHaveBeenCalled()
       expect(repository.create).not.toHaveBeenCalled()
       expect(captureEvent).toHaveBeenLastCalledWith(userId, 'location_saved', {
         platform: 'web',
@@ -505,8 +521,16 @@ describe('LocationCaptureService', () => {
 
       await service.saveFromSearch('member-2', token, 'Borrowed', 'mobile')
 
-      expect(repository.create).toHaveBeenCalledWith('member-2', expect.anything())
-      expect(repository.create).not.toHaveBeenCalledWith(userId, expect.anything())
+      expect(repository.create).toHaveBeenCalledWith(
+        'member-2',
+        expect.anything(),
+        expect.anything()
+      )
+      expect(repository.create).not.toHaveBeenCalledWith(
+        userId,
+        expect.anything(),
+        expect.anything()
+      )
     })
 
     it('1.2b-UNIT-CAP-15 gives every display locale the same location key', async () => {
