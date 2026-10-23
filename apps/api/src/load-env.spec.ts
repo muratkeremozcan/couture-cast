@@ -2,6 +2,7 @@
 // See _bmad-output/project-knowledge/learning-path-step-by-step.md#step-9-observability-bootstrap-with-opentelemetry
 /* eslint-disable @typescript-eslint/no-unsafe-member-access */
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
+import { loadEnvKeepingCallerOwned } from '../../../scripts/lib/caller-owned-env.mjs'
 
 const loadEnvMock = vi.fn()
 const existsSyncMock = vi.fn()
@@ -104,5 +105,92 @@ describe('load-env', () => {
 
     expect(process.env.CC12B_TEST_DATABASE_URL).toBe('postgresql://isolated/test')
     expect(process.env.MISSING_KEY).toBeUndefined()
+  })
+})
+
+// Story 1.2b R22: the migrate wrapper and the Playwright environment loader
+// share scripts/lib/caller-owned-env.mjs, which the Nest build cannot import,
+// so load-env keeps its own copy of the caller-owned rule. Both copies get the
+// same cases here and must agree, so neither can drift alone.
+describe('load-env caller-owned rule matches scripts/lib/caller-owned-env.mjs', () => {
+  type ParityCase = {
+    inherited: Record<string, string>
+    owned: string
+    envLocal: Record<string, string>
+  }
+  const KEYS = ['CC12B_PARITY_A', 'CC12B_PARITY_B', 'CC12B_PARITY_C']
+  const cases: [string, ParityCase][] = [
+    [
+      'keeps every listed key that holds a value',
+      {
+        inherited: { CC12B_PARITY_A: 'caller-a', CC12B_PARITY_B: 'caller-b' },
+        owned: 'CC12B_PARITY_A,CC12B_PARITY_B',
+        envLocal: { CC12B_PARITY_A: 'local-a', CC12B_PARITY_B: 'local-b' },
+      },
+    ],
+    [
+      'lets .env.local win for a key the caller did not list',
+      {
+        inherited: { CC12B_PARITY_A: 'caller-a', CC12B_PARITY_B: 'caller-b' },
+        owned: 'CC12B_PARITY_A',
+        envLocal: { CC12B_PARITY_A: 'local-a', CC12B_PARITY_B: 'local-b' },
+      },
+    ],
+    [
+      'trims names and ignores blanks and listed keys with no value',
+      {
+        inherited: { CC12B_PARITY_A: 'caller-a' },
+        owned: ' CC12B_PARITY_A , ,CC12B_PARITY_C',
+        envLocal: { CC12B_PARITY_A: 'local-a', CC12B_PARITY_C: 'local-c' },
+      },
+    ],
+    [
+      'keeps a listed key that .env.local does not define',
+      {
+        inherited: { CC12B_PARITY_B: 'caller-b' },
+        owned: 'CC12B_PARITY_B',
+        envLocal: { CC12B_PARITY_A: 'local-a' },
+      },
+    ],
+    [
+      'changes nothing without a list',
+      {
+        inherited: { CC12B_PARITY_A: 'caller-a' },
+        owned: '',
+        envLocal: { CC12B_PARITY_A: 'local-a', CC12B_PARITY_C: 'local-c' },
+      },
+    ],
+  ]
+
+  const snapshot = (env: NodeJS.ProcessEnv) =>
+    Object.fromEntries(KEYS.map((key) => [key, env[key]]))
+
+  beforeEach(() => {
+    loadEnvMock.mockReset()
+    existsSyncMock
+      .mockReset()
+      .mockImplementation((target: string) => target.endsWith('.env.local'))
+  })
+
+  afterEach(() => {
+    vi.resetModules()
+    delete process.env.TEST_ENV
+    delete process.env.E2E_CALLER_OWNED_ENV_KEYS
+    for (const key of KEYS) delete process.env[key]
+  })
+
+  it.each(cases)('%s', async (_name, { inherited, owned, envLocal }) => {
+    const shared: NodeJS.ProcessEnv = { ...inherited, E2E_CALLER_OWNED_ENV_KEYS: owned }
+    loadEnvKeepingCallerOwned(() => Object.assign(shared, envLocal), shared)
+
+    process.env.TEST_ENV = 'local'
+    Object.assign(process.env, inherited, { E2E_CALLER_OWNED_ENV_KEYS: owned })
+    // The mocked loader does what the real .env.local override does.
+    loadEnvMock.mockImplementation(() => {
+      Object.assign(process.env, envLocal)
+    })
+    await import('#load-env')
+
+    expect(snapshot(process.env)).toEqual(snapshot(shared))
   })
 })

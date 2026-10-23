@@ -782,4 +782,27 @@ describe('LocationsSection', () => {
     )
     expect(screen.queryByRole('button', { name: 'Try again' })).toBeNull()
   })
+
+  it('1.2b-WEB-22 moves focus to the delete confirmation so a second Enter deletes', async () => {
+    signIn()
+    saved = [location(), office]
+    useMswHandlers(
+      listHandler(),
+      http.delete('/api/v1/locations/loc-1', () => {
+        saved = [{ ...office, isPrimary: true }]
+        return HttpResponse.json({ data: { deleted: true } })
+      })
+    )
+
+    renderSection()
+    ;(await screen.findByRole('button', { name: 'Delete, Home' })).focus()
+    await user.keyboard('{Enter}')
+
+    // The confirmation replaces the item's actions; the key the user just
+    // pressed must not leave focus on Cancel, which took the Delete slot.
+    expect(screen.getByRole('button', { name: 'Yes, delete' })).toHaveFocus()
+    await user.keyboard('{Enter}')
+    await waitFor(() => expect(status().textContent).toBe('Home deleted.'))
+    expect(screen.getAllByTestId('location-item')).toHaveLength(1)
+  })
 })
