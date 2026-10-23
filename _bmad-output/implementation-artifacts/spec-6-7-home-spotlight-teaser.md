@@ -390,6 +390,44 @@ playwright/tests/community-comments.spec.ts --repeat-each=3`, went out without t
     on later frames. After `NATIVE_FOCUS_FRAMES` refusals it sends React Native's own request for
     the target still wanted (6.7-MOB-049). The JS wrapper reads the module on each call
     (6.7-MOB-055 to 057).
+  - R22 (decision B): a TalkBack probe on GitHub-hosted emulators (run 40034636703) found no
+    TalkBack package on the API 34 `google_apis_playstore` x86_64 image; on API 35 and 36 TalkBack
+    binds from adb and touch exploration turns on. `.github/workflows/pr-accessibility-focus.yml`
+    keeps the Android unit and build job and the iOS module tests, drops the probe, and adds
+    "Android module against TalkBack (API 35)". It runs
+    `scripts/ci/accessibility-focus-device-tests.sh`: TalkBack on over adb
+    (`scripts/ci/android-talkback.sh`), the module's androidTest suite on real views, then the same
+    suite with `suppressFocus=true`, a control that must fail. The suite covers the focus action,
+    the `TYPE_VIEW_ACCESSIBILITY_FOCUSED` report with its ancestors, delegate chaining and
+    restore, the API 29 gate through its code path, and attach and detach without an Activity.
+    Its first device run found a defect: TalkBack refuses `ACTION_ACCESSIBILITY_FOCUS` on a view
+    it already holds and sends no event, so the module reported a refusal and the hook retried
+    without ever confirming. `moveFocus` now counts a held view as moved and reports the focus it
+    holds (red in `runs/r4-talkback-already-held-red`, green with the control failing in
+    `runs/r4-android-talkback-instrumentation-local-3`). The test APK leaves out the React Native
+    and Expo native libraries, which no test touches; at 170 MB it overflowed the emulator's
+    storage. The workflow is path filtered on the module, the teaser hook and component, the two
+    scripts and itself, and PR Gate makes it required when it runs. The full Home teaser flow
+    under TalkBack stays local evidence through `scripts/run-story67-talkback.mjs`:
+    `runs/r2b-*`, `runs/r2c-talkback-return`, `runs/r2c-talkback-fallback`, `runs/r2d-*`, with
+    `runs/r2-talkback-suppressed-return` and `runs/r2-talkback-suppressed-fallback` red as they
+    must be. A CI lane for it would need the development build, the API, Supabase, an OTP proxy
+    and Metro on the runner.
+  - R23: `maestro/community-feed.yaml` failed on CI with the feed card's author row at y 2224 to
+    2190, just below the list's bottom edge, and the flow only searched upward. Nothing on this
+    branch moved that layout; the row's position depends on the device's height. The flow now
+    makes a short slow drag first, which brings a row clipped at the edge into view.
+  - R24: `maestro/commerce-affiliate.yaml` switched affiliate suggestions off, then stalled in
+    Maestro's app launch until the 360 s watchdog killed it. The retry inherited the member's
+    opt-out and found no affiliate block. The per-flow reset in
+    `scripts/lib/mobile-e2e-flow-state.mjs` now deletes the member's `CommercePreference`, with an
+    integration case in `apps/api/integration/mobile-e2e-flow-state.integration.spec.ts` that
+    fails without it.
+  - Engagement isolation: the Story 6.5 engagement tests shared the seeded post `lookbook-5`, so
+    parallel `--repeat-each` runs collided on its reaction counts. Each test now publishes its own
+    look from a fresh owner (`publishOwnLook` and the `look` fixture), and the tests that read the
+    shared feed take a cross-worker lock (`playwright/support/helpers/exclusive-lock.ts`), with the
+    test timeout suspended while one waits. `runs/r4-engagement-repeat-parallel-6`: 30 passed.
 
 ## Spec Change Log
 
