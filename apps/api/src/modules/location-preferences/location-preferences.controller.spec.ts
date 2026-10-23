@@ -26,6 +26,8 @@ const authHeaders = {
   authorization: 'Bearer location-token',
 }
 
+const fromSearchBody = { candidateToken: 'payload.signature', label: 'Home' }
+
 const savedLocation = {
   id: 'location-1',
   label: 'Home',
@@ -248,16 +250,32 @@ describe('LocationPreferencesController', () => {
   })
 
   it('1.2b-API-03 requires auth and the platform header on both new routes', async () => {
-    expect(
-      (await request(getHttpServer()).get('/api/v1/locations/search').query({ q: 'Ch' }))
-        .status
-    ).toBe(401)
-    const missingPlatform = await request(getHttpServer())
+    const searchWithoutAuth = await request(getHttpServer())
+      .get('/api/v1/locations/search')
+      .query({ q: 'Ch' })
+      .set({ 'x-couture-platform': 'web' })
+    const searchWithoutPlatform = await request(getHttpServer())
+      .get('/api/v1/locations/search')
+      .query({ q: 'Chicago' })
+      .set(authHeaders)
+    const saveWithoutAuth = await request(getHttpServer())
+      .post('/api/v1/locations/from-search')
+      .set({ 'x-couture-platform': 'web' })
+      .send(fromSearchBody)
+    const saveWithoutPlatform = await request(getHttpServer())
       .post('/api/v1/locations/from-search')
       .set(authHeaders)
-      .send({ candidateToken: 'payload.signature', label: 'Home' })
+      .send(fromSearchBody)
 
-    expect(missingPlatform.status).toBe(400)
+    expect(searchWithoutAuth.status).toBe(401)
+    expect(saveWithoutAuth.status).toBe(401)
+    for (const missingPlatform of [searchWithoutPlatform, saveWithoutPlatform]) {
+      expect(missingPlatform.status).toBe(400)
+      expect(locationRequestErrorResponseSchema.parse(missingPlatform.body).code).toBe(
+        'invalid_request'
+      )
+    }
+    expect(captureService.search).not.toHaveBeenCalled()
     expect(captureService.saveFromSearch).not.toHaveBeenCalled()
   })
 
@@ -278,7 +296,7 @@ describe('LocationPreferencesController', () => {
     const response = await request(getHttpServer())
       .post('/api/v1/locations/from-search')
       .set({ ...authHeaders, 'x-couture-platform': 'mobile' })
-      .send({ candidateToken: 'payload.signature', label: 'Home' })
+      .send(fromSearchBody)
 
     expect(response.status).toBe(201)
     expect(createSavedLocationFromSearchResponseSchema.parse(response.body).data).toEqual(
@@ -300,7 +318,7 @@ describe('LocationPreferencesController', () => {
       const refused = await request(getHttpServer())
         .post('/api/v1/locations/from-search')
         .set({ ...authHeaders, 'x-couture-platform': 'web' })
-        .send({ candidateToken: 'payload.signature', label: 'Home', ...extra })
+        .send({ ...fromSearchBody, ...extra })
       expect(refused.status).toBe(400)
     }
     expect(captureService.saveFromSearch).toHaveBeenCalledTimes(1)

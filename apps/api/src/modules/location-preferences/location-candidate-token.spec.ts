@@ -3,13 +3,14 @@ import {
   decodeLocationCandidate,
   encodeLocationCandidate,
   InvalidLocationCandidateError,
-  LOCATION_CANDIDATE_TTL_MS,
   resolveLocationCandidateSecret,
 } from './location-candidate-token'
 
 const secret = 'location-candidate-secret-for-tests-0123456789'
 const otherEnvironmentSecret = 'another-environment-secret-for-tests-987654321'
 const issuedAt = new Date('2026-10-22T12:00:00.000Z')
+// The spec's lifetime, written out so a change to the production constant fails.
+const FIFTEEN_MINUTES_MS = 900_000
 const candidate = {
   city: 'Chicago',
   region: 'Illinois',
@@ -39,14 +40,14 @@ describe('location candidate token', () => {
       decodeLocationCandidate(
         token,
         secret,
-        new Date(issuedAt.getTime() + LOCATION_CANDIDATE_TTL_MS - 1)
+        new Date(issuedAt.getTime() + FIFTEEN_MINUTES_MS - 1)
       )
     ).not.toThrow()
     expect(() =>
       decodeLocationCandidate(
         token,
         secret,
-        new Date(issuedAt.getTime() + LOCATION_CANDIDATE_TTL_MS)
+        new Date(issuedAt.getTime() + FIFTEEN_MINUTES_MS)
       )
     ).toThrow(InvalidLocationCandidateError)
   })
@@ -102,12 +103,29 @@ describe('resolveLocationCandidateSecret', () => {
     ).toBeNull()
   })
 
-  it('1.2b-UNIT-TOKEN-08 falls back to a test secret only in local and test runtimes', () => {
-    expect(resolveLocationCandidateSecret({ NODE_ENV: 'test' })).toEqual(
-      expect.any(String)
-    )
-    expect(resolveLocationCandidateSecret({ TEST_ENV: 'local' })).toEqual(
-      expect.any(String)
-    )
+  it('1.2b-UNIT-TOKEN-08 falls back to a usable test secret only in local and test runtimes', () => {
+    for (const env of [{ NODE_ENV: 'test' }, { TEST_ENV: 'local' }]) {
+      const fallback = resolveLocationCandidateSecret(env)
+      expect(fallback?.length).toBeGreaterThanOrEqual(32)
+      // The fallback must sign a token it can verify again.
+      const token = encodeLocationCandidate(candidate, fallback!, issuedAt)
+      expect(decodeLocationCandidate(token, fallback!, issuedAt)).toEqual(candidate)
+    }
+  })
+
+  it('1.2b-UNIT-TOKEN-09 requires a configured secret of at least 32 characters', () => {
+    const deployed = { VERCEL_ENV: 'production' }
+    expect(
+      resolveLocationCandidateSecret({
+        ...deployed,
+        LOCATION_CANDIDATE_SECRET: 'x'.repeat(31),
+      })
+    ).toBeNull()
+    expect(
+      resolveLocationCandidateSecret({
+        ...deployed,
+        LOCATION_CANDIDATE_SECRET: 'x'.repeat(32),
+      })
+    ).toBe('x'.repeat(32))
   })
 })

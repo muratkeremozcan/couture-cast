@@ -1,7 +1,11 @@
 // Learning path Step 16: Weather API ingestion service and durable worker ingestion.
 // See _bmad-output/project-knowledge/learning-path-step-by-step.md#step-16-weather-api-ingestion-service-and-durable-worker-ingestion
 import { describe, expect, it } from 'vitest'
-import { loadWeatherConfig, WeatherConfigError } from './weather.config.js'
+import {
+  loadWeatherConfig,
+  resolveWeatherProviderMode,
+  WeatherConfigError,
+} from './weather.config.js'
 
 describe('loadWeatherConfig', () => {
   it('parses typed weather settings and canonical targets', () => {
@@ -120,5 +124,23 @@ describe('loadWeatherConfig', () => {
     ],
   ])('rejects invalid %s without echoing configured values', (_name, env) => {
     expect(() => loadWeatherConfig(env)).toThrow(WeatherConfigError)
+  })
+})
+
+describe('resolveWeatherProviderMode', () => {
+  it('1.2b-UNIT-MODE-01 defaults an unset mode to OpenWeather', () => {
+    expect(resolveWeatherProviderMode({})).toBe('openweather')
+  })
+
+  it('1.2b-UNIT-MODE-02 honors weatherapi', () => {
+    expect(resolveWeatherProviderMode({ WEATHER_PROVIDER_MODE: 'weatherapi' })).toBe(
+      'weatherapi'
+    )
+  })
+
+  it('1.2b-UNIT-MODE-03 refuses an unknown mode as a configuration error', () => {
+    expect(() => resolveWeatherProviderMode({ WEATHER_PROVIDER_MODE: 'bogus' })).toThrow(
+      new WeatherConfigError(['WEATHER_PROVIDER_MODE'])
+    )
   })
 })

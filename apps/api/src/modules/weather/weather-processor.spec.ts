@@ -7,6 +7,10 @@ import {
   createWeatherLocationJobId,
 } from './weather-processor.js'
 
+// 13:44 falls in the 30-minute bucket that starts at 13:30.
+const bucketMs = Date.parse('2026-07-06T13:30:00.000Z')
+const newYorkJobId = `weather-refresh-location__new-york-ny__${bucketMs}`
+
 const target = {
   locationKey: 'new-york-ny',
   latitude: 40.7128,
@@ -17,7 +21,7 @@ describe('weather processor', () => {
   it('creates stable interval-bucketed location job IDs', () => {
     expect(
       createWeatherLocationJobId('new-york-ny', new Date('2026-07-06T13:44:00.000Z'), 30)
-    ).toBe('weather-refresh-location__new-york-ny__1783344600000')
+    ).toBe(newYorkJobId)
   })
 
   it('coalesces duplicate targets and enqueues retryable location jobs per key', async () => {
@@ -53,7 +57,7 @@ describe('weather processor', () => {
       expect.objectContaining({
         attempts: 3,
         backoff: { type: 'exponential', delay: 1000 },
-        jobId: 'weather-refresh-location__new-york-ny__1783344600000',
+        jobId: newYorkJobId,
       })
     )
     expect(ingestionService.ingestTarget).not.toHaveBeenCalled()

@@ -1,4 +1,8 @@
-import { describe, expect, it } from 'vitest'
+import { afterEach, describe, expect, it, vi } from 'vitest'
+import { OpenWeatherGeocodingClient } from './openweather-geocoding.client'
+import { OpenWeatherProvider } from './openweather.provider'
+import { WeatherApiGeocodingClient } from './weatherapi-geocoding.client'
+import { WeatherApiProvider } from './weatherapi.provider'
 import {
   isProductionRuntime,
   OPENWEATHER_DEFAULT_ORIGIN,
@@ -57,4 +61,75 @@ describe('resolveWeatherProviderOrigin', () => {
     expect(isProductionRuntime({ NODE_ENV: 'development' })).toBe(false)
     expect(isProductionRuntime({ DEPLOY_ENV: 'production', NODE_ENV: 'test' })).toBe(true)
   })
+})
+
+describe('provider clients in production', () => {
+  const override = 'http://127.0.0.1:4010'
+  const production = {
+    VERCEL_ENV: 'production',
+    OPENWEATHER_API_ORIGIN: override,
+    WEATHERAPI_API_ORIGIN: override,
+  }
+  const target = { locationKey: 'chicago-il', latitude: 41.878, longitude: -87.63 }
+
+  afterEach(() => {
+    vi.restoreAllMocks()
+  })
+
+  it.each([
+    [
+      'OpenWeatherGeocodingClient',
+      OPENWEATHER_DEFAULT_ORIGIN,
+      (signal: AbortSignal) =>
+        new OpenWeatherGeocodingClient({ apiKey: 'key', env: production }).search(
+          'Chicago',
+          'en',
+          signal
+        ),
+    ],
+    [
+      'WeatherApiGeocodingClient',
+      WEATHERAPI_DEFAULT_ORIGIN,
+      (signal: AbortSignal) =>
+        new WeatherApiGeocodingClient({ apiKey: 'key', env: production }).search(
+          'Chicago',
+          'en',
+          signal
+        ),
+    ],
+    [
+      'OpenWeatherProvider',
+      OPENWEATHER_DEFAULT_ORIGIN,
+      (signal: AbortSignal) =>
+        new OpenWeatherProvider({ apiKey: 'key', env: production }).fetchForecast(
+          target,
+          signal
+        ),
+    ],
+    [
+      'WeatherApiProvider',
+      WEATHERAPI_DEFAULT_ORIGIN,
+      (signal: AbortSignal) =>
+        new WeatherApiProvider({
+          apiKey: 'key',
+          env: production,
+          forecastDays: 3,
+        }).fetchForecast(target, signal),
+    ],
+  ])(
+    '1.2b-UNIT-ORIGIN-05 %s ignores an origin override in production',
+    async (_client, liveOrigin, call) => {
+      // Rejects every request, so nothing reaches the network either way.
+      const fetchSpy = vi
+        .spyOn(globalThis, 'fetch')
+        .mockRejectedValue(new Error('request recorded'))
+
+      await call(AbortSignal.timeout(3000)).catch(() => undefined)
+
+      expect(fetchSpy).toHaveBeenCalledTimes(1)
+      const [input] = fetchSpy.mock.calls[0]!
+      const url = new URL(input instanceof Request ? input.url : String(input))
+      expect(url.origin).toBe(liveOrigin)
+    }
+  )
 })

@@ -20,16 +20,13 @@ import type { TelemetryService } from '../telemetry/telemetry.service'
 import type { WeatherRepository } from '../weather/weather.repository'
 import {
   encodeLocationCandidate,
-  LOCATION_CANDIDATE_TTL_MS,
   resolveLocationCandidateSecret,
 } from './location-candidate-token'
 import { LocationSearchRateLimitException } from './location-capture.errors'
-import {
-  LOCATION_PROVIDER_TIMEOUT_MS,
-  LocationCaptureService,
-} from './location-capture.service'
+import { LocationCaptureService } from './location-capture.service'
 import {
   SavedLocationDuplicateError,
+  SavedLocationLimitExceededError,
   type CreateSavedLocationCommand,
   type CreateSavedLocationOptions,
   type LocationPreferencesRepository,
@@ -38,6 +35,9 @@ import {
 
 const now = new Date('2026-10-22T12:00:30.000Z')
 const userId = 'member-1'
+// The spec's numbers, written out so a change to a production constant fails.
+const PROVIDER_DEADLINE_MS = 3000
+const CANDIDATE_LIFETIME_MS = 15 * 60_000
 
 const chicago: GeocodedPlace = {
   city: 'Chicago',
@@ -199,6 +199,8 @@ describe('LocationCaptureService', () => {
 
   afterEach(() => {
     vi.unstubAllEnvs()
+    vi.restoreAllMocks()
+    vi.useRealTimers()
   })
 
   async function searchToken(place: GeocodedPlace = chicago): Promise<string> {
@@ -311,8 +313,9 @@ describe('LocationCaptureService', () => {
 
       await service.search(userId, 'Chicago', 'en-US', 'web')
 
-      expect(timeout).toHaveBeenCalledWith(LOCATION_PROVIDER_TIMEOUT_MS)
-      timeout.mockRestore()
+      expect(timeout).toHaveBeenCalledWith(PROVIDER_DEADLINE_MS)
+      // The deadline is the signal the geocoder actually receives.
+      expect(geocoder.search.mock.calls[0]?.[2]).toBe(timeout.mock.results[0]?.value)
     })
 
     it('1.2b-UNIT-CAP-06 refuses the 31st search in a minute before any provider call', async () => {
@@ -344,6 +347,11 @@ describe('LocationCaptureService', () => {
         code: 'location_service_unavailable',
       })
       expect(geocoder.search).not.toHaveBeenCalled()
+      expect(captureEvent).toHaveBeenCalledWith(userId, 'location_search_failed', {
+        platform: 'web',
+        outcome: 'service_unavailable',
+        resultCount: 0,
+      })
     })
   })
 
@@ -452,7 +460,7 @@ describe('LocationCaptureService', () => {
         encodeLocationCandidate(
           chicago,
           secret,
-          new Date(now.getTime() - LOCATION_CANDIDATE_TTL_MS)
+          new Date(now.getTime() - CANDIDATE_LIFETIME_MS)
         ),
       ]
 
@@ -502,6 +510,9 @@ describe('LocationCaptureService', () => {
         outcome: 'limit_reached',
         resultCount: 3,
       })
+      // Refused before the provider is asked, so a full collection costs no quota.
+      expect(fetchForecast).not.toHaveBeenCalled()
+      expect(persistForecastWithin).not.toHaveBeenCalled()
     })
 
     it('1.2b-UNIT-CAP-13 maps a duplicate that races in under the lock to 400', async () => {
@@ -513,6 +524,93 @@ describe('LocationCaptureService', () => {
 
       expect((error as HttpException).getResponse()).toMatchObject({
         code: 'location_duplicate',
+      })
+    })
+
+    it('1.2b-UNIT-CAP-19 maps a limit that races in under the lock to 400', async () => {
+      repository.create.mockRejectedValueOnce(new SavedLocationLimitExceededError())
+
+      const error = await service
+        .saveFromSearch(userId, await searchToken(), 'Home', 'web')
+        .catch((caught: unknown) => caught)
+
+      expect(error).toBeInstanceOf(BadRequestException)
+      expect((error as HttpException).getResponse()).toMatchObject({
+        code: 'location_limit_reached',
+      })
+      expect(captureEvent).toHaveBeenLastCalledWith(userId, 'location_saved', {
+        platform: 'web',
+        outcome: 'limit_reached',
+        resultCount: 3,
+      })
+    })
+
+    it('1.2b-UNIT-CAP-20 gives up on the save forecast at 3 seconds and saves nothing', async () => {
+      const token = await searchToken()
+      // Node's AbortSignal.timeout runs on an internal timer that fake timers
+      // cannot reach, so the deadline is rebuilt on the faked setTimeout.
+      vi.useFakeTimers()
+      vi.spyOn(AbortSignal, 'timeout').mockImplementation((milliseconds) => {
+        const controller = new AbortController()
+        setTimeout(() => controller.abort(), milliseconds)
+        return controller.signal
+      })
+      fetchForecast.mockImplementationOnce(
+        (_target, signal) =>
+          new Promise((_resolve, reject) => {
+            signal?.addEventListener('abort', () =>
+              reject(
+                new WeatherProviderError('slow', {
+                  provider: 'openweather',
+                  kind: 'timeout',
+                })
+              )
+            )
+          })
+      )
+      let settled = false
+      const outcome = service
+        .saveFromSearch(userId, token, 'Home', 'web')
+        .catch((caught: unknown) => caught)
+        .finally(() => {
+          settled = true
+        })
+
+      await vi.advanceTimersByTimeAsync(PROVIDER_DEADLINE_MS - 1)
+      expect(settled).toBe(false)
+      await vi.advanceTimersByTimeAsync(1)
+      expect(settled).toBe(true)
+
+      expect(((await outcome) as HttpException).getResponse()).toMatchObject({
+        statusCode: 503,
+        code: 'provider_unavailable',
+        retryable: true,
+      })
+      expect(persistForecastWithin).not.toHaveBeenCalled()
+      expect(repository.create).not.toHaveBeenCalled()
+    })
+
+    it('1.2b-UNIT-CAP-21 fails closed with a 503 on save when the candidate secret is missing', async () => {
+      const token = await searchToken()
+      vi.stubEnv('NODE_ENV', 'production')
+      vi.stubEnv('TEST_ENV', '')
+      vi.stubEnv('LOCATION_CANDIDATE_SECRET', '')
+
+      const failure = await service
+        .saveFromSearch(userId, token, 'Home', 'web')
+        .catch((caught: unknown) => caught)
+
+      expect(failure).toBeInstanceOf(ServiceUnavailableException)
+      expect((failure as HttpException).getResponse()).toMatchObject({
+        statusCode: 503,
+        code: 'location_service_unavailable',
+      })
+      expect(fetchForecast).not.toHaveBeenCalled()
+      expect(repository.create).not.toHaveBeenCalled()
+      expect(captureEvent).toHaveBeenLastCalledWith(userId, 'location_saved', {
+        platform: 'web',
+        outcome: 'service_unavailable',
+        resultCount: 0,
       })
     })
 
@@ -535,7 +633,7 @@ describe('LocationCaptureService', () => {
 
     it('1.2b-UNIT-CAP-15 gives every display locale the same location key', async () => {
       geocoder.search.mockResolvedValueOnce([{ ...chicago, localizedName: 'シカゴ' }])
-      const [ja] = await service.search(userId, 'Chicago', 'en-US', 'web')
+      const [ja] = await service.search(userId, 'Chicago', 'tr-TR', 'web')
       geocoder.search.mockResolvedValueOnce([{ ...chicago, localizedName: null }])
       const [en] = await service.search(userId, 'Chicago', 'en-US', 'web')
 
