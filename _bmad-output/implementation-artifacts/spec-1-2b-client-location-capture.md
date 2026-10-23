@@ -303,6 +303,18 @@ SUPERUSER attribute`; 4 to 7 files red per run). `apps/api/vitest.config.ts` pin
   reported a row it was showing as not found. Both steps now wait for the row to be fully visible.
   R27: iOS judges that visibility from unclipped XCUI frames, so each step is followed by a `scroll`
   that pins the list end, where the row clears the tab bar on both platforms.
+- 2026-10-23, R28 (CI job 120347100806, `community-feed.yaml`): both 360 s attempts stalled in the
+  flow's first command, Maestro's `pm clear host.exp.exponent`, while the next flow's identical
+  clear took 1.6 s. The cause is not proven: the job kept no device log for that window, and
+  background dexopt holding the package lock was tested locally and did not block `pm clear`. The
+  working hypothesis is a package manager not ready yet after Expo Go's install on a freshly
+  restored emulator, so the runner now waits, per Android device, for a `pm clear` probe to finish
+  within 20 s before the first flow (15 min overall), logs every probe, and saves logcat,
+  `ps -A`, `dumpsys package` and `dumpsys activity processes` for any slow probe. Separately, a
+  flow killed at the watchdog is now reported as that kill with the last command Maestro started,
+  and every attempt starts with its previous JUnit report removed: locally a timed-out flow had
+  been judged by a stale passing report. Failed Android flows also save the device log tail and
+  process list.
 
 ## Spec Change Log
 
