@@ -185,7 +185,12 @@ export const HomeSpotlightTeaserSlot = memo(function HomeSpotlightTeaserSlot({
 })
 
 const styles = StyleSheet.create({
+  // Out of flow, so a fallback move leaves Home with no reserved space. It sits
+  // at the end of the scroll content, where the teaser would be.
   focusMarker: {
+    position: 'absolute',
+    bottom: 0,
+    left: 0,
     width: 1,
     height: 1,
   },

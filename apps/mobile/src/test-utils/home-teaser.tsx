@@ -185,6 +185,20 @@ export function teaserNodes(): Element[] {
   )
 }
 
+/**
+ * Proves an element takes no room in its parent's layout: the parent measures the
+ * same height with the element detached as with it in place.
+ */
+export function expectOccupiesNoLayout(element: Element) {
+  const parent = element.parentElement!
+  const next = element.nextSibling
+  const withElement = parent.getBoundingClientRect().height
+  parent.removeChild(element)
+  const withoutElement = parent.getBoundingClientRect().height
+  parent.insertBefore(element, next)
+  expect(withElement).toBe(withoutElement)
+}
+
 export function follows(first: Element, second: Element): boolean {
   return Boolean(first.compareDocumentPosition(second) & Node.DOCUMENT_POSITION_FOLLOWING)
 }

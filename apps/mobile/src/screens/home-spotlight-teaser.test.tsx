@@ -56,6 +56,7 @@ import {
   advance,
   cityPage,
   deferSpotlightReads,
+  expectOccupiesNoLayout,
   follows,
   recordOpens,
   renderHome,
@@ -403,7 +404,9 @@ describe('6.7 mobile Home spotlight teaser', () => {
     ;(document.activeElement as HTMLElement | null)?.blur()
     act(() => screenFocus.set(true))
     await waitFor(() => expect(document.activeElement).toBe(link))
-    await screen.findByTestId('home-spotlight-teaser-focused-link-1')
+    expectOccupiesNoLayout(
+      await screen.findByTestId('home-spotlight-teaser-focused-link-1')
+    )
 
     // The return is consumed: a later refocus moves nothing.
     ;(document.activeElement as HTMLElement | null)?.blur()
@@ -433,7 +436,11 @@ describe('6.7 mobile Home spotlight teaser', () => {
         screen.getByTestId('hero-experience-scrollview')
       )
     )
-    await screen.findByTestId('home-spotlight-teaser-focused-scroll-view-1')
+    // The automation marker is all that is left of the teaser, and it reserves
+    // no space after the hero.
+    expectOccupiesNoLayout(
+      await screen.findByTestId('home-spotlight-teaser-focused-scroll-view-1')
+    )
   })
 
   it('6.7-MOB-012 a teaser that leaves while it holds keyboard focus hands focus to the scroll view', async () => {
