@@ -3,7 +3,6 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import {
   SPOTLIGHT_TEASER_EXPIRY_MS,
-  SPOTLIGHT_TEASER_MAX_DEFERRAL_MS,
   SPOTLIGHT_TEASER_READ_FLOOR_MS,
   SPOTLIGHT_TEASER_REREAD_MS,
   SpotlightTeaserState,
@@ -338,22 +337,43 @@ describe('6.7 spotlight teaser lifecycle', () => {
     })
   })
 
-  it('6.7-UNIT-036 caps a Retry-After deferral and ignores a non-finite one', async () => {
+  it('6.7-UNIT-036 honors a long finite Retry-After to the millisecond', async () => {
     const { state, reads, settle } = harness()
     state.setActive(true)
     state.setMember('member-1')
-    await settle(0, new RateLimited(86_400))
-    await vi.advanceTimersByTimeAsync(SPOTLIGHT_TEASER_MAX_DEFERRAL_MS - 1)
+    await settle(0, new RateLimited(600))
+    // Past the floor, the re-read interval and the value's expiry: still deferred.
+    await vi.advanceTimersByTimeAsync(SPOTLIGHT_TEASER_EXPIRY_MS + 1_000)
+    state.trigger()
+    expect(reads).toHaveLength(1)
+    await vi.advanceTimersByTimeAsync(600_000 - SPOTLIGHT_TEASER_EXPIRY_MS - 1_000 - 1)
     state.trigger()
     expect(reads).toHaveLength(1)
     await vi.advanceTimersByTimeAsync(1)
     state.trigger()
     expect(reads).toHaveLength(2)
-    await settle(1, new RateLimited(Number.POSITIVE_INFINITY))
-    await vi.advanceTimersByTimeAsync(SPOTLIGHT_TEASER_READ_FLOOR_MS)
-    state.trigger()
-    expect(reads).toHaveLength(3)
   })
+
+  it.each([
+    ['infinity', Number.POSITIVE_INFINITY],
+    ['NaN', Number.NaN],
+    ['zero', 0],
+    ['minus 30', -30],
+  ])(
+    '6.7-UNIT-043 ignores a Retry-After of %s and keeps only the read floor',
+    async (_label, retryAfterSeconds) => {
+      const { state, reads, settle } = harness()
+      state.setActive(true)
+      state.setMember('member-1')
+      await settle(0, new RateLimited(retryAfterSeconds))
+      await vi.advanceTimersByTimeAsync(SPOTLIGHT_TEASER_READ_FLOOR_MS - 1)
+      state.trigger()
+      expect(reads).toHaveLength(1)
+      await vi.advanceTimersByTimeAsync(1)
+      state.trigger()
+      expect(reads).toHaveLength(2)
+    }
+  )
 
   it('6.7-UNIT-032 the Retry-After deferral belongs to the member who earned it', async () => {
     const { state, reads, settle } = harness()
