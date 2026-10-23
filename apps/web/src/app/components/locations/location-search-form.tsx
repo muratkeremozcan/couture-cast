@@ -285,6 +285,10 @@ export function LocationSearchForm({
                 selected
                   ? undefined
                   : () => {
+                      // Leave 'done' first: clearing the error on a finished,
+                      // empty search would announce "no cities match" before
+                      // the retry has asked anything.
+                      setSearchState('searching')
                       setError(null)
                       setSearchAttempt((attempt) => attempt + 1)
                     }
