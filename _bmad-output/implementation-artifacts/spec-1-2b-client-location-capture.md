@@ -321,7 +321,9 @@ SUPERUSER attribute`; 4 to 7 files red per run). `apps/api/vitest.config.ts` pin
   log and swallow filesystem errors so a capture never replaces an outcome or stops the run; before
   each attempt every same-named report under the artifact tree is removed, so the basename fallback
   cannot read a stale one; and the last command named for a killed flow comes only from a log
-  written since that flow started.
+  written since that flow started. R29b: an unready probe captures the device state only on the
+  first, every tenth and the final probe, so a 15-minute wait cannot pile up hundreds of megabytes;
+  every probe is still logged.
 
 ## Spec Change Log
 
