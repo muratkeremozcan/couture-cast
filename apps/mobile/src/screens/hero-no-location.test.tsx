@@ -18,7 +18,11 @@ import itIT from '@/assets/locales/it-IT.json'
 import ptBR from '@/assets/locales/pt-BR.json'
 import ptPT from '@/assets/locales/pt-PT.json'
 import trTR from '@/assets/locales/tr-TR.json'
-import { saveLocationFromSearchFromMobile } from '@/src/lib/locations'
+import {
+  deleteLocationFromMobile,
+  saveLocationFromSearchFromMobile,
+  setPrimaryLocationFromMobile,
+} from '@/src/lib/locations'
 import { setMobileAccessTokenResolver } from '@/src/lib/mobile-auth'
 import { clearRitualMemoryCache } from '@/src/lib/ritual-cache'
 import i18n, { initI18n } from '@/src/lib/i18n'
@@ -129,6 +133,8 @@ describe('TabOneScreen without a saved location', () => {
 
     const action = await screen.findByTestId('hero-add-location')
     expect(action.textContent).toBe('Add a location')
+    // WCAG 2.5.8 and the platform guidance: a 44pt minimum touch target.
+    expect(action.getBoundingClientRect().height).toBeGreaterThanOrEqual(44)
     action.click()
     expect(routerPush).toHaveBeenCalledWith('/locations?guided=1')
   })
@@ -183,4 +189,90 @@ describe('TabOneScreen without a saved location', () => {
     })
     expect(screen.queryByTestId('hero-no-location-state')).toBeNull()
   })
+
+  it.each([
+    [
+      'deleting the last location answers no-location',
+      () => deleteLocationFromMobile('loc-1'),
+      () =>
+        HttpResponse.json(
+          {
+            message: 'No location preferences found for user',
+            error: 'Bad Request',
+            statusCode: 400,
+          },
+          { status: 400 }
+        ),
+      'hero-no-location-state',
+    ],
+    [
+      'switching to a primary without weather answers unavailable',
+      () => setPrimaryLocationFromMobile('loc-2'),
+      () =>
+        HttpResponse.json(
+          {
+            message: 'Weather unavailable',
+            error: 'Service Unavailable',
+            statusCode: 503,
+          },
+          { status: 503 }
+        ),
+      'hero-error-state',
+    ],
+  ])(
+    '1.2b-MOB-HERO-03 never restores the previous primary ritual after %s',
+    async (_name, change, answerAfterChange, expectedState) => {
+      let changed = false
+      server.use(
+        http.get('*/api/v1/ritual', () =>
+          changed ? answerAfterChange() : HttpResponse.json(mockRitualResponse)
+        ),
+        http.delete('*/api/v1/locations/:locationId', () => {
+          changed = true
+          return HttpResponse.json({ data: { deleted: true } })
+        }),
+        http.post('*/api/v1/locations/:locationId/primary', () => {
+          changed = true
+          return HttpResponse.json({
+            data: {
+              id: 'loc-2',
+              label: 'Office',
+              locationKey: 'monaco-mc-43-738n-7-425e',
+              latitude: 43.738,
+              longitude: 7.425,
+              timezone: 'Europe/Monaco',
+              city: 'Monaco',
+              region: null,
+              country: 'MC',
+              isPrimary: true,
+              sortOrder: 1,
+              createdAt: '2026-10-22T12:00:00.000Z',
+              updatedAt: '2026-10-22T12:00:00.000Z',
+            },
+          })
+        })
+      )
+
+      const first = await render(<TabOneScreen />)
+      await screen.findByTestId('outfit-recommendation-card')
+
+      await change()
+
+      await waitFor(() => {
+        expect(screen.getByTestId(expectedState)).toBeTruthy()
+      })
+      expect(screen.queryByTestId('outfit-recommendation-card')).toBeNull()
+      expect(screen.queryByTestId('stale-cache-banner')).toBeNull()
+
+      // A fresh mount inside the fifteen-minute window reads the device cache
+      // first; the previous primary's ritual is gone from it too.
+      await first.unmount()
+      clearRitualMemoryCache()
+      await render(<TabOneScreen />)
+      await waitFor(() => {
+        expect(screen.getByTestId(expectedState)).toBeTruthy()
+      })
+      expect(screen.queryByTestId('outfit-recommendation-card')).toBeNull()
+    }
+  )
 })

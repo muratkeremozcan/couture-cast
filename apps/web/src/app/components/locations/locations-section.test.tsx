@@ -360,7 +360,7 @@ describe('LocationsSection', () => {
     await waitFor(() => expect(push).toHaveBeenCalledWith('/'))
   })
 
-  it('1.2b-WEB-11 ignores a return target outside this origin', async () => {
+  it('1.2b-WEB-11 sends a return target outside this origin home', async () => {
     signIn()
     searchParams = new URLSearchParams('addLocation=1&returnTo=%2F%2Fevil.example')
     useMswHandlers(
@@ -377,8 +377,8 @@ describe('LocationsSection', () => {
     fireEvent.click(await screen.findByTestId('location-search-option'))
     fireEvent.click(await screen.findByTestId('location-save-button'))
 
-    await screen.findByTestId('location-primary-badge')
-    expect(push).not.toHaveBeenCalled()
+    await waitFor(() => expect(push).toHaveBeenCalledWith('/'))
+    expect(push).not.toHaveBeenCalledWith('//evil.example')
   })
 
   it('1.2b-WEB-12 passes axe with results open and with a saved list', async () => {

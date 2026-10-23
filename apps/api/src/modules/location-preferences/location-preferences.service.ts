@@ -3,7 +3,6 @@ import {
   Inject,
   Injectable,
   NotFoundException,
-  Optional,
 } from '@nestjs/common'
 import { createBaseLogger } from '../../logger/pino.config.js'
 import { TelemetryService } from '../telemetry/telemetry.service'
@@ -26,6 +25,7 @@ import {
   type SavedLocationRecord,
   type UpdateSavedLocationCommand,
 } from './location-preferences.repository'
+import { LOCATION_CLOCK, type LocationClock } from './location-clock.js'
 
 function normalizeLocationKey(locationKey: string): string {
   const normalized = locationKey
@@ -143,12 +143,6 @@ export const PRIMARY_REFRESH_STALE_AFTER_MS = 5 * 60 * 1000
 /** Enqueueing never holds a primary switch longer than this. */
 export const PRIMARY_REFRESH_ENQUEUE_DEADLINE_MS = 1000
 
-export const LOCATION_PREFERENCES_CLOCK = Symbol('LOCATION_PREFERENCES_CLOCK')
-
-export interface LocationPreferencesClock {
-  now(): Date
-}
-
 function withDeadline(work: Promise<void>, ms: number): Promise<void> {
   let timer: ReturnType<typeof setTimeout> | undefined
   const deadline = new Promise<void>((_resolve, reject) => {
@@ -173,14 +167,9 @@ export class LocationPreferencesService {
     >,
     @Inject(WeatherRefreshQueue)
     private readonly weatherRefresh: WeatherRefreshPublisher,
-    @Optional()
-    @Inject(LOCATION_PREFERENCES_CLOCK)
-    clock?: LocationPreferencesClock
-  ) {
-    this.clock = clock ?? { now: () => new Date() }
-  }
-
-  private readonly clock: LocationPreferencesClock
+    @Inject(LOCATION_CLOCK)
+    private readonly clock: LocationClock
+  ) {}
 
   async listLocations(userId: string): Promise<SavedLocation[]> {
     const locations = await this.repository.findManyByUserId(userId)

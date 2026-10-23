@@ -1,4 +1,6 @@
 import { Inject, Injectable } from '@nestjs/common'
+import { classifyClimateBand } from '@couture/utils'
+import type { Prisma } from '@prisma/client'
 import type {
   LocationPlatform,
   LocationSearchCandidate,
@@ -14,7 +16,7 @@ import type {
 import { WeatherProviderError } from '../weather/providers/weather-provider.error.js'
 import type { IWeatherProvider } from '../weather/providers/weather-provider.interface.js'
 import type { NormalizedWeatherForecast } from '../weather/providers/weather.types.js'
-import { WeatherRepository } from '../weather/weather.repository.js'
+import { parseDailySummaries, WeatherRepository } from '../weather/weather.repository.js'
 import {
   decodeLocationCandidate,
   encodeLocationCandidate,
@@ -35,23 +37,15 @@ import {
   SavedLocationLimitExceededError,
   type LocationPreferencesRepository,
 } from './location-preferences.repository.js'
+import { LOCATION_CLOCK, type LocationClock } from './location-clock.js'
 import { toSavedLocation } from './location-preferences.service.js'
 
 export const LOCATION_GEOCODER = Symbol('LOCATION_GEOCODER')
 export const LOCATION_FORECAST_PROVIDER = Symbol('LOCATION_FORECAST_PROVIDER')
-export const LOCATION_CAPTURE_CLOCK = Symbol('LOCATION_CAPTURE_CLOCK')
 
 /** Story 1.2b: provider calls on the capture path give up after 3 seconds. */
 export const LOCATION_PROVIDER_TIMEOUT_MS = 3000
 export const LOCATION_SEARCHES_PER_MINUTE = 30
-
-export interface LocationCaptureClock {
-  now(): Date
-}
-
-export const systemLocationCaptureClock: LocationCaptureClock = {
-  now: () => new Date(),
-}
 
 type SearchFailureOutcome =
   | 'no_results'
@@ -137,8 +131,8 @@ export class LocationCaptureService {
     private readonly forecastProvider: IWeatherProvider,
     @Inject(TelemetryService)
     private readonly telemetryService: Pick<TelemetryService, 'captureEvent'>,
-    @Inject(LOCATION_CAPTURE_CLOCK)
-    private readonly clock: LocationCaptureClock
+    @Inject(LOCATION_CLOCK)
+    private readonly clock: LocationClock
   ) {}
 
   async search(
@@ -293,6 +287,18 @@ export class LocationCaptureService {
       )
       if (!isValidTimeZone(forecast.timezone)) {
         throw new WeatherProviderError('Forecast timezone is invalid', {
+          provider: forecast.provider,
+          kind: 'invalid_response',
+        })
+      }
+      // Weather-ready means the climate band can resolve from this snapshot:
+      // the daily projection, read back exactly as Community reads it, has to
+      // hold the band's minimum usable days.
+      const daily = parseDailySummaries(forecast.daily as unknown as Prisma.JsonValue, {
+        warn: (message, meta) => this.logger.warn({ meta }, message),
+      })
+      if (!classifyClimateBand(daily)) {
+        throw new WeatherProviderError('Forecast has too few usable days', {
           provider: forecast.provider,
           kind: 'invalid_response',
         })

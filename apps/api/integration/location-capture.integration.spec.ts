@@ -2,9 +2,9 @@ import { listenHttpApp, httpTestUrl } from './helpers/loopback-http-app.js'
 import 'reflect-metadata'
 import { type INestApplication } from '@nestjs/common'
 import { Test } from '@nestjs/testing'
-import { PrismaClient } from '@prisma/client'
+import { PrismaClient, type TelemetryEvent } from '@prisma/client'
 import { Queue } from 'bullmq'
-import { randomUUID } from 'node:crypto'
+import { createHmac, randomUUID } from 'node:crypto'
 import request from 'supertest'
 import { afterAll, afterEach, beforeAll, describe, expect, it, vi } from 'vitest'
 import {
@@ -23,6 +23,11 @@ import {
   type WeatherProviderDouble,
 } from '../../../scripts/weather-provider-double.mjs'
 import { getRedisConfig, redisOptionsFromConfig } from '../src/config/redis'
+import type * as PinoConfig from '../src/logger/pino.config.js'
+import {
+  ANALYTICS_CLIENT,
+  type AnalyticsCaptureEvent,
+} from '../src/analytics/analytics.service'
 import type { AccessTokenIdentityService } from '../src/modules/auth/access-token-identity.service'
 import { GuardianConsentStateService } from '../src/modules/auth/guardian-consent-state.service'
 import { RequestAuthGuard } from '../src/modules/auth/security.guards'
@@ -32,11 +37,14 @@ import {
   resolveLocationCandidateSecret,
 } from '../src/modules/location-preferences/location-candidate-token'
 import {
-  LOCATION_CAPTURE_CLOCK,
   LOCATION_FORECAST_PROVIDER,
   LOCATION_GEOCODER,
   LocationCaptureService,
 } from '../src/modules/location-preferences/location-capture.service'
+import {
+  LOCATION_CLOCK,
+  type LocationClock,
+} from '../src/modules/location-preferences/location-clock.js'
 import { LocationPreferencesController } from '../src/modules/location-preferences/location-preferences.controller'
 import { PrismaLocationPreferencesRepository } from '../src/modules/location-preferences/location-preferences.repository'
 import { LocationPreferencesService } from '../src/modules/location-preferences/location-preferences.service'
@@ -71,6 +79,32 @@ import {
 const runRealDatabase = process.env.LOCATION_PREFERENCES_REAL_DB_INTEGRATION === 'true'
 const describeRealDatabase = runRealDatabase ? describe : describe.skip
 
+// Capture the real Pino serialization at its output boundary, including child
+// bindings and every log level. HTTP request logging is outside this module.
+const { capturedLogLines } = vi.hoisted(() => ({ capturedLogLines: [] as string[] }))
+vi.mock('../src/logger/pino.config.js', async (importOriginal) => {
+  const actual = await importOriginal<typeof PinoConfig>()
+  return {
+    ...actual,
+    createBaseLogger: (options: Parameters<typeof actual.createBaseLogger>[0] = {}) =>
+      actual.createBaseLogger({
+        ...options,
+        env: { ...process.env, LOG_LEVEL: 'trace', PINO_PRETTY: 'false' },
+        destination: { write: (line) => capturedLogLines.push(line) },
+      }),
+  }
+})
+
+function controlledClock(): LocationClock & { advance(milliseconds: number): void } {
+  let milliseconds = Date.parse('2026-10-22T12:04:59.999Z')
+  return {
+    now: () => new Date(milliseconds),
+    advance: (elapsed) => {
+      milliseconds += elapsed
+    },
+  }
+}
+
 type Mode = 'openweather' | 'weatherapi'
 
 interface Harness {
@@ -78,6 +112,9 @@ interface Harness {
   prisma: PrismaClient
   queue: Queue
   captured: { event: string; properties: unknown }[]
+  analytics: AnalyticsCaptureEvent[]
+  telemetryRows: TelemetryEvent[]
+  clock: ReturnType<typeof controlledClock>
   tokens: Map<string, string>
   close(): Promise<void>
 }
@@ -102,7 +139,8 @@ function authGuard(tokens: Map<string, string>) {
 
 async function createHarness(
   mode: Mode,
-  double: WeatherProviderDouble
+  double: WeatherProviderDouble,
+  realTelemetry = false
 ): Promise<Harness> {
   const prisma = new PrismaClient()
   // Schema probe: fails the suite, never skips it, when a migration is absent.
@@ -117,6 +155,24 @@ async function createHarness(
   const prefix = `cc12b-test-${randomUUID()}`
   const tokens = new Map<string, string>()
   const captured: Harness['captured'] = []
+  const analytics: AnalyticsCaptureEvent[] = []
+  const telemetryRows: TelemetryEvent[] = []
+  // Retain IDs of this harness's actual writes for assertions and cleanup;
+  // pseudonymous rows cannot be selected by a user FK.
+  const trackedPrisma = prisma.$extends({
+    query: {
+      telemetryEvent: {
+        async create({ args, query }) {
+          const row = await query(args)
+          // TelemetryService creates without a projection. Prisma's generic
+          // extension result also models selected rows, so narrow this full row.
+          telemetryRows.push(row as TelemetryEvent)
+          return row
+        },
+      },
+    },
+  })
+  const clock = controlledClock()
   const auth = authGuard(tokens)
   const geocoder =
     mode === 'weatherapi'
@@ -130,7 +186,7 @@ async function createHarness(
   const moduleRef = await Test.createTestingModule({
     controllers: [LocationPreferencesController],
     providers: [
-      { provide: PrismaClient, useValue: prisma },
+      { provide: PrismaClient, useValue: trackedPrisma },
       PrismaLocationPreferencesRepository,
       LocationPreferencesService,
       LocationCaptureService,
@@ -139,20 +195,31 @@ async function createHarness(
       { provide: WEATHER_REFRESH_QUEUE_OPTIONS, useValue: { prefix } },
       { provide: LOCATION_GEOCODER, useValue: geocoder },
       { provide: LOCATION_FORECAST_PROVIDER, useValue: forecastProvider },
-      { provide: LOCATION_CAPTURE_CLOCK, useValue: { now: () => new Date() } },
+      { provide: LOCATION_CLOCK, useValue: clock },
+      {
+        provide: ANALYTICS_CLIENT,
+        useValue: {
+          capture: (event: AnalyticsCaptureEvent) =>
+            analytics.push(structuredClone(event)),
+        },
+      },
       {
         provide: GuardianConsentStateService,
         useValue: auth.guardianConsentStateService,
       },
-      {
-        provide: TelemetryService,
-        useValue: {
-          captureEvent: vi.fn((_userId: string, event: string, properties: unknown) => {
-            captured.push({ event, properties })
-            return Promise.resolve()
-          }),
-        },
-      },
+      realTelemetry
+        ? TelemetryService
+        : {
+            provide: TelemetryService,
+            useValue: {
+              captureEvent: vi.fn(
+                (_userId: string, event: string, properties: unknown) => {
+                  captured.push({ event, properties })
+                  return Promise.resolve()
+                }
+              ),
+            },
+          },
     ],
   })
     .overrideGuard(RequestAuthGuard)
@@ -172,6 +239,9 @@ async function createHarness(
     prisma,
     queue,
     captured,
+    analytics,
+    telemetryRows,
+    clock,
     tokens,
     async close() {
       await app.close()
@@ -194,6 +264,7 @@ describeRealDatabase('Location capture real-database integration', () => {
 
   afterEach(() => {
     vi.unstubAllEnvs()
+    vi.restoreAllMocks()
   })
 
   afterAll(async () => {
@@ -213,8 +284,8 @@ describeRealDatabase('Location capture real-database integration', () => {
     await double?.close()
   })
 
-  async function harnessFor(mode: Mode): Promise<Harness> {
-    const harness = await createHarness(mode, double)
+  async function harnessFor(mode: Mode, realTelemetry = false): Promise<Harness> {
+    const harness = await createHarness(mode, double, realTelemetry)
     harnesses.push(harness)
     return harness
   }
@@ -442,12 +513,12 @@ describeRealDatabase('Location capture real-database integration', () => {
       encodeLocationCandidate(
         place,
         'another-environment-secret-0123456789abc',
-        new Date()
+        harness.clock.now()
       ),
       encodeLocationCandidate(
         place,
         secret,
-        new Date(Date.now() - LOCATION_CANDIDATE_TTL_MS - 1000)
+        new Date(harness.clock.now().getTime() - LOCATION_CANDIDATE_TTL_MS - 1000)
       ),
     ]
 
@@ -565,6 +636,12 @@ describeRealDatabase('Location capture real-database integration', () => {
     const viewer = await member(harness)
     const [chicago] = await search(harness, viewer.token, 'Chicago')
     const searched = await saveCandidate(harness, viewer.token, chicago!)
+    // Exactly five minutes old is still fresh. Provider HTTP timestamps stay
+    // real; only the snapshot under this boundary test uses the controlled clock.
+    await harness.prisma.weatherSnapshot.updateMany({
+      where: { location_key: searched.locationKey },
+      data: { fetched_at: new Date(harness.clock.now().getTime() - 5 * 60_000) },
+    })
     const legacyKey = `cc12b-legacy-${randomUUID().slice(0, 8)}`
     const legacy = await request(httpTestUrl(harness.app))
       .post('/api/v1/locations')
@@ -585,7 +662,7 @@ describeRealDatabase('Location capture real-database integration', () => {
       .set(headers(viewer.token))
     expect(switched.status).toBe(200)
 
-    const jobId = createWeatherLocationJobId(legacyKey, new Date(), 5)
+    const jobId = createWeatherLocationJobId(legacyKey, harness.clock.now(), 5)
     const job = await harness.queue.getJob(jobId)
     expect(job?.data).toEqual({
       type: 'location',
@@ -616,15 +693,11 @@ describeRealDatabase('Location capture real-database integration', () => {
     expect(list).toEqual([expect.objectContaining({ id: searched.id, isPrimary: true })])
     expect(
       await harness.queue.getJob(
-        createWeatherLocationJobId(searched.locationKey, new Date(), 5)
+        createWeatherLocationJobId(searched.locationKey, harness.clock.now(), 5)
       )
     ).toBeUndefined()
 
-    // A stale promoted primary is refreshed.
-    await harness.prisma.weatherSnapshot.updateMany({
-      where: { location_key: searched.locationKey },
-      data: { fetched_at: new Date(Date.now() - 6 * 60_000) },
-    })
+    // Promotion one millisecond later must refresh in the next job bucket.
     const relegacy = await request(httpTestUrl(harness.app))
       .post('/api/v1/locations')
       .set(headers(viewer.token))
@@ -636,15 +709,25 @@ describeRealDatabase('Location capture real-database integration', () => {
         timezone: 'America/New_York',
       })
     const secondId = (relegacy.body as { data: { id: string } }).data.id
+    expect(relegacy.status).toBe(201)
     await request(httpTestUrl(harness.app))
       .post(`/api/v1/locations/${secondId}/primary`)
       .set(headers(viewer.token))
+      .expect(200)
+    const previousBucketJobId = createWeatherLocationJobId(
+      searched.locationKey,
+      harness.clock.now(),
+      5
+    )
+    harness.clock.advance(1)
     await request(httpTestUrl(harness.app))
       .delete(`/api/v1/locations/${secondId}`)
       .set(headers(viewer.token))
+      .expect(200)
+    expect(await harness.queue.getJob(previousBucketJobId)).toBeUndefined()
     expect(
       await harness.queue.getJob(
-        createWeatherLocationJobId(searched.locationKey, new Date(), 5)
+        createWeatherLocationJobId(searched.locationKey, harness.clock.now(), 5)
       )
     ).toBeDefined()
   })
@@ -665,11 +748,7 @@ describeRealDatabase('Location capture real-database integration', () => {
   it('1.2b-INT-13 refuses the 31st search in a minute with the shared 429 and Retry-After', async () => {
     const harness = await harnessFor('openweather')
     const viewer = await member(harness)
-    // Start at the top of a window so all 31 land in one minute.
-    const secondsIntoMinute = new Date().getUTCSeconds()
-    if (secondsIntoMinute > 50) {
-      await new Promise((resolve) => setTimeout(resolve, (61 - secondsIntoMinute) * 1000))
-    }
+    // Hold the final millisecond of a window while real HTTP calls complete.
 
     for (let index = 0; index < 30; index += 1) {
       await search(harness, viewer.token, 'Chicago')
@@ -680,8 +759,15 @@ describeRealDatabase('Location capture real-database integration', () => {
       .set(headers(viewer.token))
 
     expect(refused.status).toBe(429)
-    expect(Number(refused.headers['retry-after'])).toBeGreaterThanOrEqual(1)
+    expect(Number(refused.headers['retry-after'])).toBe(1)
     expect(tooManyRequestsHttpErrorSchema.parse(refused.body).statusCode).toBe(429)
+    harness.clock.advance(1)
+    await search(harness, viewer.token, 'Chicago')
+    expect(
+      await harness.prisma.locationSearchWindow.findUnique({
+        where: { user_id: viewer.id },
+      })
+    ).toMatchObject({ searches: 1, window_start: harness.clock.now() })
   }, 30_000)
 
   it('1.2b-INT-14 fails closed with 503 on both endpoints when the secret is missing in a deployed environment', async () => {
@@ -706,19 +792,195 @@ describeRealDatabase('Location capture real-database integration', () => {
     }
   })
 
-  it('1.2b-INT-15 keeps query text, coordinates, place names and keys out of analytics', async () => {
-    const harness = await harnessFor('openweather')
+  it('1.2b-INT-15 correlates real HTTP location analytics to the member HMAC and excludes private data from events and new logs', async () => {
+    const secret = 'location-privacy-test-secret-at-least-32-bytes'
+    vi.stubEnv('ANALYTICS_ID_SECRET', secret)
+    const harness = await harnessFor('openweather', true)
     const viewer = await member(harness)
-    const [chicago] = await search(harness, viewer.token, 'Chicago')
-    await saveCandidate(harness, viewer.token, chicago!)
-    await search(harness, viewer.token, 'Nowhere special').catch(() => [])
+    const bystander = await member(harness)
+    const subject = (userId: string) =>
+      createHmac('sha256', secret).update(userId).digest('base64url')
+    const keys: string[] = []
+    capturedLogLines.length = 0
 
-    const serialized = JSON.stringify(harness.captured)
-    expect(harness.captured.map((entry) => entry.event)).toEqual([
-      'location_saved',
-      'location_search_failed',
-    ])
-    expect(serialized).not.toMatch(/chicago|illinois|nowhere|41\.8|87\.6|-us-|home/i)
+    async function add(token: string, query: string) {
+      const [candidate] = await search(harness, token, query)
+      const saved = await saveCandidate(harness, token, candidate!)
+      keys.push(saved.locationKey)
+      return saved
+    }
+
+    try {
+      // Unrelated real events deliberately coexist with the journey under test.
+      // They must never satisfy a missing capture for this member.
+      await add(bystander.token, 'Chicago')
+      const other = await add(bystander.token, 'Monaco')
+      await request(httpTestUrl(harness.app))
+        .post(`/api/v1/locations/${other.id}/primary`)
+        .set(headers(bystander.token))
+        .expect(200)
+      await search(harness, bystander.token, 'Nowhere special')
+
+      expect(await search(harness, viewer.token, 'Nowhere special')).toEqual([])
+      await request(httpTestUrl(harness.app))
+        .get('/api/v1/locations/search')
+        .query({ q: 'Provider down' })
+        .set(headers(viewer.token))
+        .expect(503)
+      const [failing] = await search(harness, viewer.token, 'Failtown')
+      expect((await save(harness, viewer.token, failing!.candidateToken)).status).toBe(
+        503
+      )
+
+      const first = await add(viewer.token, 'Chicago')
+      const second = await add(viewer.token, 'Monaco')
+      await request(httpTestUrl(harness.app))
+        .post(`/api/v1/locations/${second.id}/primary`)
+        .set(headers(viewer.token))
+        .expect(200)
+
+      // Exercise the new enqueue-failure log during delete promotion. Its error
+      // deliberately contains private values, which the logger must exclude.
+      await harness.prisma.weatherSnapshot.updateMany({
+        where: { location_key: first.locationKey },
+        data: { fetched_at: new Date(harness.clock.now().getTime() - 300_001) },
+      })
+      vi.spyOn(
+        harness.app.get(WeatherRefreshQueue),
+        'enqueueLocationRefresh'
+      ).mockRejectedValueOnce(
+        new Error(`Chicago 41.878 ${viewer.id} ${first.locationKey}`)
+      )
+      await request(httpTestUrl(harness.app))
+        .delete(`/api/v1/locations/${second.id}`)
+        .set(headers(viewer.token))
+        .expect(200)
+      expect(
+        await harness.prisma.savedLocation.findUnique({ where: { id: first.id } })
+      ).toMatchObject({ is_primary: true })
+
+      const expected = [
+        {
+          event: 'location_search_failed',
+          properties: {
+            platform: 'web',
+            outcome: 'no_results',
+            result_count: 0,
+            $ip: null,
+          },
+        },
+        {
+          event: 'location_search_failed',
+          properties: {
+            platform: 'web',
+            outcome: 'provider_unavailable',
+            result_count: 0,
+            $ip: null,
+          },
+        },
+        {
+          event: 'location_saved',
+          properties: {
+            platform: 'mobile',
+            outcome: 'forecast_unavailable',
+            result_count: 0,
+            $ip: null,
+          },
+        },
+        {
+          event: 'location_saved',
+          properties: {
+            platform: 'mobile',
+            outcome: 'saved',
+            result_count: 1,
+            $ip: null,
+          },
+        },
+        {
+          event: 'location_saved',
+          properties: {
+            platform: 'mobile',
+            outcome: 'saved',
+            result_count: 2,
+            $ip: null,
+          },
+        },
+        { event: 'location_switched', properties: { $ip: null } },
+      ].map((event) => ({ ...event, distinctId: subject(viewer.id) }))
+      const assertJourney = (events: AnalyticsCaptureEvent[]) => {
+        expect(events.filter((event) => event.distinctId === subject(viewer.id))).toEqual(
+          expected
+        )
+      }
+      assertJourney(harness.analytics)
+      const unrelated = harness.analytics.filter(
+        (event) => event.distinctId === subject(bystander.id)
+      )
+      expect(unrelated.map((event) => event.event)).toEqual([
+        'location_saved',
+        'location_saved',
+        'location_switched',
+        'location_search_failed',
+      ])
+      // Negative control: suppress all journey captures while preserving genuine
+      // unrelated saved, switched and failed-search events. The proof must fail.
+      expect(() => assertJourney(unrelated)).toThrow()
+
+      const rows = harness.telemetryRows
+      expect(rows).toHaveLength(harness.analytics.length)
+      for (const row of rows) {
+        expect(row.user_id).toBeNull()
+        expect(Object.keys(row.properties as object).sort()).toEqual(
+          row.event_type === 'location_switched'
+            ? []
+            : ['outcome', 'platform', 'result_count']
+        )
+      }
+
+      const logs = capturedLogLines
+        .map((line) => JSON.parse(line) as Record<string, unknown>)
+        .filter((line) =>
+          ['location-capture', 'location-preferences'].includes(String(line.feature))
+        )
+      expect(logs.map((line) => line.message)).toEqual([
+        'location search failed',
+        'location save forecast failed',
+        'primary location refresh enqueue failed',
+      ])
+      const serialized = JSON.stringify({
+        events: harness.analytics,
+        rows: rows.map((row) => ({
+          user_id: row.user_id,
+          event_type: row.event_type,
+          properties: row.properties,
+        })),
+        logs,
+      })
+      for (const privateValue of [
+        'Nowhere special',
+        'Provider down',
+        'Failtown',
+        'Chicago',
+        'Illinois',
+        'Monaco',
+        'Home',
+        '41.878',
+        '-87.63',
+        '43.738',
+        '7.425',
+        viewer.id,
+        bystander.id,
+        ...keys,
+      ]) {
+        expect(serialized.toLowerCase()).not.toContain(privateValue.toLowerCase())
+      }
+    } finally {
+      // Pseudonymous rows have no user FK, so member cleanup cannot remove them.
+      const rows = harness.telemetryRows
+      await harness.prisma.telemetryEvent.deleteMany({
+        where: { id: { in: rows.map((row) => row.id) } },
+      })
+    }
   })
 
   it('1.2b-INT-16 clears the Maestro member to zero locations around the flow and restores the baseline after', async () => {

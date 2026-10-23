@@ -10,12 +10,11 @@ import { WeatherApiProvider } from '../weather/providers/weatherapi.provider'
 import { WeatherRefreshQueue } from '../weather/weather-refresh.queue'
 import { WeatherRepository } from '../weather/weather.repository'
 import {
-  LOCATION_CAPTURE_CLOCK,
   LOCATION_FORECAST_PROVIDER,
   LOCATION_GEOCODER,
   LocationCaptureService,
-  systemLocationCaptureClock,
 } from './location-capture.service'
+import { LOCATION_CLOCK, systemLocationClock } from './location-clock'
 import { LocationPreferencesController } from './location-preferences.controller'
 import { PrismaLocationPreferencesRepository } from './location-preferences.repository'
 import { LocationPreferencesService } from './location-preferences.service'
@@ -47,7 +46,7 @@ import { TelemetryModule } from '../telemetry/telemetry.module'
           ? new WeatherApiProvider()
           : new OpenWeatherProvider(),
     },
-    { provide: LOCATION_CAPTURE_CLOCK, useValue: systemLocationCaptureClock },
+    { provide: LOCATION_CLOCK, useValue: systemLocationClock },
   ],
   exports: [LocationPreferencesService, PrismaLocationPreferencesRepository],
 })

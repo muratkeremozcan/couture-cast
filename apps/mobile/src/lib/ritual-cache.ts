@@ -4,6 +4,7 @@ import {
   ritualResponseSchema,
   type AlertPreferences,
   type RitualResponse,
+  supportedLocales,
   type SupportedLocale,
 } from '@couture/api-client/contracts/http'
 import { shareWidgetData } from './widget-share'
@@ -81,6 +82,22 @@ async function writeStoredValue(key: string, value: string) {
     `${fileSystem.documentDirectory}${storageFileName(key)}`,
     value
   )
+}
+
+async function deleteStoredValue(key: string) {
+  if (Platform.OS === 'web') {
+    globalThis.localStorage?.removeItem(key)
+    return
+  }
+
+  const fileSystem = await loadNativeFileSystem()
+  if (!fileSystem.documentDirectory) {
+    return
+  }
+
+  await fileSystem.deleteAsync(`${fileSystem.documentDirectory}${storageFileName(key)}`, {
+    idempotent: true,
+  })
 }
 
 async function publishWidgetData(
@@ -211,6 +228,26 @@ export async function saveRitualCache(
   }
   // Story 3.3 Task 1 step 2 owner: update widgets only after the durable cache writes finish.
   await publishWidgetData(entry, locale)
+}
+
+/**
+ * Story 1.2b: the member's primary location changed (saved, switched or deleted),
+ * so no cached ritual names the right place any more. Dropping the latest-location
+ * pointer in every locale means neither the fifteen-minute fast path nor the
+ * offline fallback can serve the previous primary's ritual; entries for a
+ * location are only reachable through that pointer.
+ */
+export async function forgetLatestRitual(userId: string): Promise<void> {
+  await Promise.all(
+    supportedLocales.map(async (locale) => {
+      delete latestLocationByUserLocale[userLocaleKey(userId, locale)]
+      try {
+        await deleteStoredValue(latestLocationCacheKey(userId, locale))
+      } catch (error) {
+        console.warn('[RitualCache] Latest ritual pointer delete failed', error)
+      }
+    })
+  )
 }
 
 export function clearRitualMemoryCache() {

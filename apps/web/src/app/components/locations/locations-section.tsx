@@ -46,7 +46,7 @@ export function LocationsSection() {
   const searchParams = useSearchParams()
   const locale = resolveSupportedLocale(i18n.language) ?? 'en-US'
   const guided = searchParams.get(ADD_LOCATION_QUERY) === '1'
-  const returnTo = safeReturnPath(searchParams.get(RETURN_TO_QUERY))
+  const returnTo = searchParams.get(RETURN_TO_QUERY)
   const [sectionState, setSectionState] = useState<SectionState>('checking')
   const [locations, setLocations] = useState<SavedLocation[]>([])
   const [status, setStatus] = useState('')
@@ -161,7 +161,8 @@ export function LocationsSection() {
     await reload().catch(() => setSectionState('load_failed'))
     announce(t('locations.saved', { label: location.label }))
     pendingFocusRef.current = location.id
-    if (returnTo) router.push(returnTo)
+    const target = safeReturnPath(returnTo, window.location.origin)
+    if (target) router.push(target)
   }
 
   const isFull = locations.length >= MAX_SAVED_LOCATIONS

@@ -10,7 +10,11 @@ import type {
 } from '../weather/providers/location-geocoding'
 import { WeatherProviderError } from '../weather/providers/weather-provider.error'
 import type { IWeatherProvider } from '../weather/providers/weather-provider.interface'
-import type { NormalizedWeatherForecast } from '../weather/providers/weather.types'
+import { classifyClimateBand } from '@couture/utils'
+import type {
+  NormalizedDailyWeatherEntry,
+  NormalizedWeatherForecast,
+} from '../weather/providers/weather.types'
 import type { TelemetryService } from '../telemetry/telemetry.service'
 import type { WeatherRepository } from '../weather/weather.repository'
 import {
@@ -62,6 +66,27 @@ function record(overrides: Partial<SavedLocationRecord> = {}): SavedLocationReco
   }
 }
 
+function day(localDate: string): NormalizedDailyWeatherEntry {
+  return {
+    localDate,
+    condition: 'drizzle',
+    temperatureMin: 24,
+    temperatureMax: 33,
+    precipitationProbability: 0.4,
+    precipitationAmount: 1.2,
+    windSpeed: 3,
+  }
+}
+
+/** Five days: comfortably above the climate band's three-day minimum. */
+const usableDaily = [
+  '2026-10-22',
+  '2026-10-23',
+  '2026-10-24',
+  '2026-10-25',
+  '2026-10-26',
+].map(day)
+
 function forecast(
   overrides: Partial<NormalizedWeatherForecast> = {}
 ): NormalizedWeatherForecast {
@@ -83,6 +108,7 @@ function forecast(
       providerWeatherCode: '300',
     },
     hourly: [],
+    daily: usableDaily,
     alerts: [],
     ...overrides,
   }
@@ -321,6 +347,9 @@ describe('LocationCaptureService', () => {
         expect.any(AbortSignal)
       )
       expect(persistForecast).toHaveBeenCalledTimes(1)
+      // The persisted snapshot resolves the climate band on its own.
+      const persisted = persistForecast.mock.calls[0]![0] as NormalizedWeatherForecast
+      expect(classifyClimateBand(persisted.daily ?? [])).not.toBeNull()
       expect(persistForecast.mock.invocationCallOrder[0]).toBeLessThan(
         repository.create.mock.invocationCallOrder[0]!
       )
@@ -340,7 +369,7 @@ describe('LocationCaptureService', () => {
       })
     })
 
-    it('1.2b-UNIT-CAP-09 saves nothing when the forecast fails, times out or has an invalid timezone', async () => {
+    it('1.2b-UNIT-CAP-09 saves nothing when the forecast fails, times out, has an invalid timezone or cannot resolve a climate band', async () => {
       const token = await searchToken()
 
       for (const failure of [
@@ -356,6 +385,28 @@ describe('LocationCaptureService', () => {
             new WeatherProviderError('slow', { provider: 'openweather', kind: 'timeout' })
           ),
         () => fetchForecast.mockResolvedValueOnce(forecast({ timezone: 'Mars/Olympus' })),
+        () => fetchForecast.mockResolvedValueOnce(forecast({ daily: undefined })),
+        () => fetchForecast.mockResolvedValueOnce(forecast({ daily: [] })),
+        // Two usable days: one short of the band's minimum.
+        () =>
+          fetchForecast.mockResolvedValueOnce(
+            forecast({ daily: usableDaily.slice(0, 2) })
+          ),
+        // Five days, but a refreshed row repeats a date: three distinct is the
+        // minimum, so repeating two dates leaves too few.
+        () =>
+          fetchForecast.mockResolvedValueOnce(
+            forecast({ daily: [...usableDaily.slice(0, 2), ...usableDaily.slice(0, 2)] })
+          ),
+        // Malformed rows are discarded on read, exactly as Community reads them.
+        () =>
+          fetchForecast.mockResolvedValueOnce(
+            forecast({
+              daily: usableDaily.map((entry, index) =>
+                index < 3 ? { ...entry, precipitationProbability: 7 } : entry
+              ),
+            })
+          ),
       ]) {
         failure()
         const error = await service

@@ -150,22 +150,8 @@ test.describe('1.2b client location capture @local-lane', () => {
         area_city: 'sentinelville',
       })
 
-      await log.step('analytics carry no query, place, coordinates, key or member id')
-      const events = await prisma.telemetryEvent.findMany({
-        where: { event_type: { in: ['location_saved', 'location_search_failed'] } },
-        orderBy: { created_at: 'desc' },
-        take: 20,
-      })
-      const mine = events.filter((event) =>
-        JSON.stringify(event.properties).includes('"outcome":"saved"')
-      )
-      expect(mine.length).toBeGreaterThan(0)
-      for (const event of events) {
-        expect(event.user_id).toBeNull()
-        const serialized = JSON.stringify(event.properties)
-        expect(serialized).not.toMatch(/sentinel|home|denver|location_key|-\d{3}[ns]-/i)
-        expect(serialized).not.toContain(locationSession.userId)
-      }
+      // Server analytics privacy is covered by 1.2b-INT-15, which observes the
+      // real telemetry transport and correlates events to this member's HMAC.
     } finally {
       await prisma.$disconnect()
     }

@@ -49,8 +49,24 @@ export function errorKey(reason: LocationFailureReason): string {
   }
 }
 
-/** Only a same-origin path may be a return target. */
-export function safeReturnPath(value: string | null): string | null {
-  if (!value || !value.startsWith('/') || value.startsWith('//')) return null
-  return value
+const HOME_PATH = '/'
+
+/**
+ * The guided path's return target. No target means stay here (`null`). A target
+ * must be a plain same-origin path: it is resolved against `origin` and kept only
+ * when it stays on that origin. A backslash, or a percent-encoded slash,
+ * backslash or percent sign anywhere (which a browser or a later decode can turn
+ * into `//other.host`), is refused. A refused target returns home.
+ */
+export function safeReturnPath(value: string | null, origin: string): string | null {
+  if (!value) return null
+  if (!value.startsWith(HOME_PATH) || /\\|%(2f|5c|25)/i.test(value)) return HOME_PATH
+  let resolved: URL
+  try {
+    resolved = new URL(value, origin)
+  } catch {
+    return HOME_PATH
+  }
+  if (resolved.origin !== new URL(origin).origin) return HOME_PATH
+  return `${resolved.pathname}${resolved.search}${resolved.hash}`
 }

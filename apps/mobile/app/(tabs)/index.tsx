@@ -26,6 +26,7 @@ import {
   subscribeMobileApplicationUser,
 } from '@/src/lib/mobile-auth'
 import {
+  forgetLatestRitual,
   readLatestRitualCache,
   ritualCacheOwner,
   saveRitualCache,
@@ -275,13 +276,15 @@ export default function TabOneScreen() {
     }
   }
 
-  const loadData = async (forceRefresh = false) => {
+  const loadData = async (forceRefresh = false, allowCacheFallback = true) => {
     const loadId = ++latestLoadId.current
     setIsLoading(true)
     setError(null)
     setIsStale(false)
 
-    const cached = await readLatestRitualCache(cacheOwner, activeLocale)
+    const cached = allowCacheFallback
+      ? await readLatestRitualCache(cacheOwner, activeLocale)
+      : null
     const now = Date.now()
 
     if (!forceRefresh && cached && now - cached.timestamp < 15 * 60 * 1000) {
@@ -348,14 +351,25 @@ export default function TabOneScreen() {
     }
   }
 
-  // Story 1.2b: a saved, switched or deleted location changes the ritual, so the
-  // hero refetches past its cache the moment any screen reports the change.
-  const loadDataRef = useRef(loadData)
-  loadDataRef.current = loadData
+  // Story 1.2b: a saved, switched or deleted location changes the ritual. The
+  // previous primary's ritual leaves the screen and the device cache at once, and
+  // the refetch never falls back to it: a no-location or weather-unavailable
+  // answer shows as itself.
+  const reloadForLocationChange = async () => {
+    latestLoadId.current += 1
+    setIsLoading(true)
+    setRitual(null)
+    setIsCacheServed(false)
+    setIsStale(false)
+    await forgetLatestRitual(cacheOwner)
+    await loadData(true, false)
+  }
+  const reloadForLocationChangeRef = useRef(reloadForLocationChange)
+  reloadForLocationChangeRef.current = reloadForLocationChange
   useEffect(
     () =>
       onLocationsChanged(() => {
-        void loadDataRef.current(true)
+        void reloadForLocationChangeRef.current()
       }),
     []
   )
@@ -970,6 +984,8 @@ const styles = StyleSheet.create({
   },
   retryButton: {
     minWidth: 120,
+    minHeight: 44,
+    justifyContent: 'center',
     borderRadius: 999,
     paddingVertical: 12,
     paddingHorizontal: 24,

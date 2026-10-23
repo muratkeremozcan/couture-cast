@@ -27,6 +27,10 @@ import {
 import { LocationPreferencesService } from '../src/modules/location-preferences/location-preferences.service'
 import { TelemetryService } from '../src/modules/telemetry/telemetry.service'
 import { LocationCaptureService } from '../src/modules/location-preferences/location-capture.service'
+import {
+  LOCATION_CLOCK,
+  systemLocationClock,
+} from '../src/modules/location-preferences/location-clock'
 import { WeatherRefreshQueue } from '../src/modules/weather/weather-refresh.queue'
 import { WeatherRepository } from '../src/modules/weather/weather.repository'
 
@@ -274,6 +278,7 @@ describe('Location preferences API integration', () => {
           useClass: InMemoryLocationPreferencesRepository,
         },
         LocationPreferencesService,
+        { provide: LOCATION_CLOCK, useValue: systemLocationClock },
         {
           provide: WeatherRepository,
           useValue: { findLatestByLocationKey: vi.fn().mockResolvedValue(null) },
@@ -428,6 +433,7 @@ describeRealDatabase('Location preferences API Prisma integration', () => {
         },
         PrismaLocationPreferencesRepository,
         LocationPreferencesService,
+        { provide: LOCATION_CLOCK, useValue: systemLocationClock },
         WeatherRepository,
         refreshQueueStub,
         captureServiceStub,

@@ -70,6 +70,7 @@ vi.mock('@/src/lib/ritual-cache', async (importOriginal) => {
     readLatestRitualCache: readLatestRitualCacheMock,
     saveRitualCache: saveRitualCacheMock,
     clearRitualMemoryCache: () => undefined,
+    forgetLatestRitual: vi.fn().mockResolvedValue(undefined),
   }
 })
 
