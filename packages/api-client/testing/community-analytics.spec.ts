@@ -229,7 +229,7 @@ const reactionEventCases: CommunityEventCase[] = (
 communityEventCases.push(...reactionEventCases)
 
 // Story 6.6: the two spotlight events carry only platform, dedupe key, level and
-// an item count or rank.
+// an item count or rank. Story 6.7 adds the reading or opening surface.
 communityEventCases.push(
   {
     name: 'community_spotlight_viewed',
@@ -237,13 +237,15 @@ communityEventCases.push(
       trackCommunitySpotlightViewed({
         analyticsSubjectId: SUBJECT,
         platform: 'web',
-        dedupeKey: 'community_spotlight_viewed:token:177000',
+        dedupeKey: 'community_spotlight_viewed:token:177000:community',
+        surface: 'community',
         level: 'city',
         itemCount: 6,
       }),
     properties: {
       platform: 'web',
-      dedupe_key: 'community_spotlight_viewed:token:177000',
+      dedupe_key: 'community_spotlight_viewed:token:177000:community',
+      surface: 'community',
       level: 'city',
       item_count: 6,
     },
@@ -254,13 +256,15 @@ communityEventCases.push(
       trackCommunitySpotlightOpened({
         analyticsSubjectId: SUBJECT,
         platform: 'mobile',
-        dedupeKey: 'community_spotlight_opened:post-token:spotlight',
+        dedupeKey: 'community_spotlight_opened:post-token:home_teaser',
+        surface: 'home_teaser',
         level: 'region',
         rank: 7,
       }),
     properties: {
       platform: 'mobile',
-      dedupe_key: 'community_spotlight_opened:post-token:spotlight',
+      dedupe_key: 'community_spotlight_opened:post-token:home_teaser',
+      surface: 'home_teaser',
       level: 'region',
       rank: 7,
     },
@@ -324,6 +328,7 @@ describe('6.6 spotlight event bounds', () => {
         analyticsSubjectId: SUBJECT,
         platform: 'web',
         dedupeKey: 'k',
+        surface: 'community',
         level: 'none' as never,
         rank: 1,
       })
@@ -332,6 +337,7 @@ describe('6.6 spotlight event bounds', () => {
       communitySpotlightOpenedPropertiesSchema.safeParse({
         platform: 'web',
         dedupe_key: 'k',
+        surface: 'community',
         level: 'none',
         rank: 1,
       }).success
@@ -342,6 +348,7 @@ describe('6.6 spotlight event bounds', () => {
           analyticsSubjectId: SUBJECT,
           platform: 'web',
           dedupeKey: 'k',
+          surface: 'community',
           level: 'city',
           rank,
         })
@@ -351,6 +358,7 @@ describe('6.6 spotlight event bounds', () => {
         analyticsSubjectId: SUBJECT,
         platform: 'web',
         dedupeKey: 'k',
+        surface: 'community',
         level: 'none',
         itemCount: 13,
       })
@@ -360,6 +368,7 @@ describe('6.6 spotlight event bounds', () => {
         analyticsSubjectId: SUBJECT,
         platform: 'web',
         dedupeKey: 'k',
+        surface: 'community',
         level: 'city',
         rank: 1.5,
       })
@@ -373,10 +382,17 @@ describe('6.6 spotlight event bounds', () => {
           analyticsSubjectId: SUBJECT,
           platform: 'web',
           dedupeKey: 'k',
+          surface: 'community',
           level: 'country',
           rank,
         }).properties
-      ).toEqual({ platform: 'web', dedupe_key: 'k', level: 'country', rank })
+      ).toEqual({
+        platform: 'web',
+        dedupe_key: 'k',
+        surface: 'community',
+        level: 'country',
+        rank,
+      })
     for (const [level, itemCount] of [
       ['none', 0],
       ['city', COMMUNITY_SPOTLIGHT_MAX_LIMIT],
@@ -386,10 +402,63 @@ describe('6.6 spotlight event bounds', () => {
           analyticsSubjectId: SUBJECT,
           platform: 'mobile',
           dedupeKey: 'k',
+          surface: 'community',
           level,
           itemCount,
         }).properties
-      ).toEqual({ platform: 'mobile', dedupe_key: 'k', level, item_count: itemCount })
+      ).toEqual({
+        platform: 'mobile',
+        dedupe_key: 'k',
+        surface: 'community',
+        level,
+        item_count: itemCount,
+      })
+  })
+
+  it('6.7-CON-001 requires a known surface on both spotlight events', () => {
+    for (const surface of ['community', 'home_teaser'] as const) {
+      expect(
+        trackCommunitySpotlightViewed({
+          analyticsSubjectId: SUBJECT,
+          platform: 'web',
+          dedupeKey: 'k',
+          surface,
+          level: 'city',
+          itemCount: 1,
+        }).properties.surface
+      ).toBe(surface)
+      expect(
+        trackCommunitySpotlightOpened({
+          analyticsSubjectId: SUBJECT,
+          platform: 'mobile',
+          dedupeKey: 'k',
+          surface,
+          level: 'city',
+          rank: 1,
+        }).properties.surface
+      ).toBe(surface)
+    }
+    for (const surface of [undefined, 'spotlight', 'home', '']) {
+      expect(() =>
+        trackCommunitySpotlightViewed({
+          analyticsSubjectId: SUBJECT,
+          platform: 'web',
+          dedupeKey: 'k',
+          surface: surface as never,
+          level: 'city',
+          itemCount: 1,
+        })
+      ).toThrow()
+      expect(
+        communitySpotlightOpenedPropertiesSchema.safeParse({
+          platform: 'web',
+          dedupe_key: 'k',
+          ...(surface === undefined ? {} : { surface }),
+          level: 'city',
+          rank: 1,
+        }).success
+      ).toBe(false)
+    }
   })
 })
 

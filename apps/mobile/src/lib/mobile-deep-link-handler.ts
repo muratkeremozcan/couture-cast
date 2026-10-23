@@ -44,9 +44,11 @@ export interface ProcessMobileDeepLinkOptions {
   setIsInvalidDeepLink: (invalid: boolean) => void
   resolveWeatherAlert?: typeof loadMobileWeatherAlertTarget
   pushToCommunity: (params: {
-    source: 'notification'
+    source: 'notification' | 'app'
     type: 'community'
     cardId: string
+    focus?: 'spotlight'
+    focusToken?: string
     expiresAt?: string
   }) => void
 }
@@ -141,12 +143,24 @@ export async function processMobileDeepLink(
   }
 
   if (payload.type === 'community' && payload.cardId) {
-    options.pushToCommunity({
-      source: 'notification',
-      type: 'community',
-      cardId: payload.cardId,
-      ...(payload.expiresAt ? { expiresAt: payload.expiresAt } : {}),
-    })
+    // Story 6.7: an in-app spotlight focus intent keeps its source and token, so
+    // Community resolves it as a spotlight focus and never as a notification.
+    options.pushToCommunity(
+      payload.source === 'app' && payload.focus && payload.focusToken
+        ? {
+            source: 'app',
+            type: 'community',
+            cardId: payload.cardId,
+            focus: payload.focus,
+            focusToken: payload.focusToken,
+          }
+        : {
+            source: 'notification',
+            type: 'community',
+            cardId: payload.cardId,
+            ...(payload.expiresAt ? { expiresAt: payload.expiresAt } : {}),
+          }
+    )
     return
   }
 

@@ -118,6 +118,7 @@ describe('6.6 stalled spotlight Redis', () => {
         userId: viewer,
         platform: 'web',
         limit: 3,
+        surface: 'community',
         reactions: true,
         ...(cursor ? { cursor } : {}),
       })

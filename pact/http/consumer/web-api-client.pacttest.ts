@@ -128,6 +128,9 @@ import {
   verifyCommunitySpotlightInvalidCursorInteraction,
   verifyCommunitySpotlightDisabledInteraction,
   verifyOpenCommunitySpotlightPostInteraction,
+  // Story 6.7 Home teaser read and open.
+  verifyCommunitySpotlightHomeTeaserInteraction,
+  verifyOpenCommunityHomeTeaserPostInteraction,
   verifyOpenCommunityFeedPostInteraction,
   verifyCommunityPostInteraction,
   verifyCommunityPostNotFoundInteraction,
@@ -681,6 +684,22 @@ describe('CoutureCastWeb -> CoutureCastApi HTTP contract', () => {
 
   it('records a spotlight card open with its rank', async () => {
     await verifyOpenCommunitySpotlightPostInteraction(
+      pact,
+      createWebClientForMockServer,
+      'web'
+    )
+  })
+
+  it('reads the top spotlight entry for the home teaser', async () => {
+    await verifyCommunitySpotlightHomeTeaserInteraction(
+      pact,
+      createWebClientForMockServer,
+      'web'
+    )
+  })
+
+  it('records a home teaser open with rank one', async () => {
+    await verifyOpenCommunityHomeTeaserPostInteraction(
       pact,
       createWebClientForMockServer,
       'web'

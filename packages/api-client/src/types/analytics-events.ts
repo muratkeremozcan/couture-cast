@@ -14,6 +14,7 @@ import {
   communityPlatformSchema,
   communityReportReasonSchema,
   communityServedSpotlightLevelSchema,
+  communitySpotlightSurfaceSchema,
   communitySpotlightLevelSchema,
   COMMUNITY_SPOTLIGHT_MAX_LIMIT,
   COMMUNITY_SPOTLIGHT_MAX_RANK,
@@ -885,6 +886,8 @@ export const communitySpotlightViewedEventSchema = z
     analyticsSubjectId: nonEmptyString,
     platform: communityPlatformSchema,
     dedupeKey: communityDedupeKeySchema,
+    // Story 6.7: the reading surface, Community or the Home teaser.
+    surface: communitySpotlightSurfaceSchema,
     level: communitySpotlightLevelSchema,
     itemCount: z.number().int().min(0).max(COMMUNITY_SPOTLIGHT_MAX_LIMIT),
   })
@@ -900,6 +903,8 @@ export const communitySpotlightOpenedEventSchema = z
     analyticsSubjectId: nonEmptyString,
     platform: communityPlatformSchema,
     dedupeKey: communityDedupeKeySchema,
+    // Story 6.7: where the entry was opened, Community or the Home teaser.
+    surface: communitySpotlightSurfaceSchema,
     // Only a served level carries cards to open; `none` serves none.
     level: communityServedSpotlightLevelSchema,
     rank: z.number().int().min(1).max(COMMUNITY_SPOTLIGHT_MAX_RANK),
@@ -2161,6 +2166,7 @@ export const communitySpotlightViewedPropertiesSchema = z
   .object({
     platform: communityPlatformSchema,
     dedupe_key: nonEmptyString,
+    surface: communitySpotlightSurfaceSchema,
     level: communitySpotlightLevelSchema,
     item_count: z.number().int().min(0).max(COMMUNITY_SPOTLIGHT_MAX_LIMIT),
   })
@@ -2174,6 +2180,7 @@ export const communitySpotlightOpenedPropertiesSchema = z
   .object({
     platform: communityPlatformSchema,
     dedupe_key: nonEmptyString,
+    surface: communitySpotlightSurfaceSchema,
     level: communityServedSpotlightLevelSchema,
     rank: z.number().int().min(1).max(COMMUNITY_SPOTLIGHT_MAX_RANK),
   })
@@ -2503,6 +2510,7 @@ export function trackCommunitySpotlightViewed(
     properties: communitySpotlightViewedPropertiesSchema.parse({
       platform: parsed.platform,
       dedupe_key: parsed.dedupeKey,
+      surface: parsed.surface,
       level: parsed.level,
       item_count: parsed.itemCount,
     }),
@@ -2523,6 +2531,7 @@ export function trackCommunitySpotlightOpened(
     properties: communitySpotlightOpenedPropertiesSchema.parse({
       platform: parsed.platform,
       dedupe_key: parsed.dedupeKey,
+      surface: parsed.surface,
       level: parsed.level,
       rank: parsed.rank,
     }),

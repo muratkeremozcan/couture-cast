@@ -179,6 +179,7 @@ export function spotlightTestContext(label: string) {
       userId: viewer,
       platform: 'web',
       limit: 6,
+      surface: 'community',
       reactions: true,
       ...overrides,
     })

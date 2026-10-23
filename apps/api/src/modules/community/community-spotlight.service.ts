@@ -8,6 +8,8 @@ import {
   type CommunityReactionSpotlight as CommunitySpotlight,
   type CommunityReactionSpotlightItem as CommunitySpotlightItem,
   type CommunitySpotlightLevel,
+  type CommunitySpotlightOpenSurface,
+  type CommunitySpotlightSurface,
   type OpenCommunityPostResponse,
 } from '@couture/api-client/contracts/http'
 import { TelemetryService } from '../telemetry/telemetry.service.js'
@@ -66,6 +68,8 @@ export interface GetSpotlightParams {
   platform: CommunityPlatform
   cursor?: string
   limit: number
+  /** Story 6.7: the reading surface; it changes only the viewed event's `surface`. */
+  surface: CommunitySpotlightSurface
   reactions?: boolean
 }
 
@@ -99,12 +103,24 @@ function errorCode(error: unknown): string | null {
   return typeof error.code === 'string' ? error.code : null
 }
 
-export function spotlightViewDedupeKey(userId: string, now: number): string {
+export function spotlightViewDedupeKey(
+  userId: string,
+  now: number,
+  surface: CommunitySpotlightSurface
+): string {
   return [
     'community_spotlight_viewed',
     communitySubjectToken(userId),
     String(Math.floor(now / SPOTLIGHT_VIEW_BUCKET_MS)),
+    surface,
   ].join(':')
+}
+
+/** Story 6.7: the analytics surface an opened body's `surface` reports as. */
+export function spotlightEventSurface(
+  surface: CommunitySpotlightOpenSurface
+): CommunitySpotlightSurface {
+  return surface === 'home_teaser' ? 'home_teaser' : 'community'
 }
 
 @Injectable()
@@ -389,23 +405,24 @@ export class CommunitySpotlightService {
 
   /**
    * The spotlight branch of the opened endpoint. It records only
-   * `community_spotlight_opened`, never `community_card_opened`.
-   */
-  /**
-   * The served level and rank come from the validated body: the open records
-   * what the member saw, and runs no cohort query of its own.
+   * `community_spotlight_opened`, never `community_card_opened`. The served
+   * level and rank come from the validated body: the open records what the
+   * member saw, and runs no cohort query of its own.
    */
   async recordOpened(params: {
     userId: string
     postId: string
     platform: CommunityPlatform
+    surface: CommunitySpotlightOpenSurface
     rank: number
     level: SpotlightAreaLevel
   }): Promise<OpenCommunityPostResponse> {
     await this.community.assertPublicPostReadable(params.userId, params.postId)
+    const surface = spotlightEventSurface(params.surface)
     await this.capture(params.userId, 'community_spotlight_opened', {
       platform: params.platform,
-      dedupeKey: spotlightOpenDedupeKey(params.userId, params.postId),
+      dedupeKey: spotlightOpenDedupeKey(params.userId, params.postId, surface),
+      surface,
       level: params.level,
       rank: params.rank,
     })
@@ -419,7 +436,12 @@ export class CommunitySpotlightService {
   ): Promise<void> {
     return this.capture(params.userId, 'community_spotlight_viewed', {
       platform: params.platform,
-      dedupeKey: spotlightViewDedupeKey(params.userId, this.clock.now().getTime()),
+      dedupeKey: spotlightViewDedupeKey(
+        params.userId,
+        this.clock.now().getTime(),
+        params.surface
+      ),
+      surface: params.surface,
       level,
       itemCount,
     })

@@ -176,6 +176,7 @@ export class CommunityController {
         platform: headersResult.data['x-couture-platform'],
         cursor: queryResult.data.cursor,
         limit: queryResult.data.limit,
+        surface: queryResult.data.surface,
         ...(reactions ? { reactions: true } : {}),
       })
     )
@@ -379,6 +380,7 @@ export class CommunityController {
           userId: auth.userId,
           postId,
           platform: headersResult.data['x-couture-platform'],
+          surface: input.surface,
           rank: input.rank,
           level: input.level,
         })

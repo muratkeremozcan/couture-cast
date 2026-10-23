@@ -177,6 +177,104 @@ export async function verifyOpenCommunitySpotlightPostInteraction(
     })
 }
 
+/**
+ * Story 6.7: the Home teaser read. One rank-1 entry from the same ranking the
+ * Community module serves; `surface=home_teaser` changes only analytics.
+ */
+export async function verifyCommunitySpotlightHomeTeaserInteraction(
+  pact: PactV4,
+  createClient: CreateClient,
+  platform: CommunityPlatform
+) {
+  // Provider endpoint: apps/api/src/modules/community/community.controller.ts -> GET /api/v1/community/spotlight
+  await pact
+    .addInteraction()
+    .given(
+      ...createProviderState({
+        name: 'A city spotlight page exists for the viewer area',
+        params: { userId: pactEventAuth.userId },
+      })
+    )
+    .uponReceiving(`a ${platform} home teaser read of the top city spotlight entry`)
+    .withRequest(
+      'GET',
+      SPOTLIGHT_PATH,
+      setJsonContent({
+        headers: negotiatedHeaders(platform),
+        query: { limit: '1', surface: 'home_teaser' },
+      })
+    )
+    .willRespondWith(
+      200,
+      setJsonContent({
+        body: {
+          data: {
+            level: string('city'),
+            label: like(SPOTLIGHT_LABEL),
+            items: [
+              {
+                ...publishedItemBody(),
+                rank: 1,
+                reactions: reactionSummaryMatchers(),
+              },
+            ],
+            nextCursor: like(SPOTLIGHT_NEXT_CURSOR),
+          },
+        },
+      })
+    )
+    .executeTest(async (mockServer: V3MockServer) => {
+      const response = await createClient(mockServer).getCommunitySpotlight({
+        xCouturePlatform: platform,
+        xCoutureReactions: '1',
+        limit: 1,
+        surface: 'home_teaser',
+      })
+      const parsed = communityReactionSpotlightResponseSchema.parse(response)
+      expect(parsed.data.label).toBe(SPOTLIGHT_LABEL)
+      expect(parsed.data.items.map((item) => [item.id, item.rank])).toEqual([
+        [PUBLISHED_POST_ID, 1],
+      ])
+      expect(parsed.data.items[0]!.reactions).toEqual(currentReactionSummary)
+    })
+}
+
+/** Story 6.7: a Home teaser activation, the spotlight branch with its own surface. */
+export async function verifyOpenCommunityHomeTeaserPostInteraction(
+  pact: PactV4,
+  createClient: CreateClient,
+  platform: CommunityPlatform
+) {
+  await pact
+    .addInteraction()
+    .given(
+      ...createProviderState({
+        name: 'A city spotlight page exists for the viewer area',
+        params: { userId: pactEventAuth.userId },
+      })
+    )
+    .uponReceiving('a home teaser open with rank one and its served level')
+    .withRequest(
+      'POST',
+      `/api/v1/community/posts/${PUBLISHED_POST_ID}/opened`,
+      setJsonContent({
+        headers: communityHeaders(platform),
+        body: { surface: 'home_teaser', rank: 1, level: 'city' },
+      })
+    )
+    .willRespondWith(200, setJsonContent({ body: { tracked: like(true) } }))
+    .executeTest(async (mockServer: V3MockServer) => {
+      const response = await createClient(mockServer).apiV1CommunityPostsPostIdOpenedPost(
+        {
+          postId: PUBLISHED_POST_ID,
+          xCouturePlatform: platform,
+          openCommunityPostInput: { surface: 'home_teaser', rank: 1, level: 'city' },
+        }
+      )
+      expect(response).toEqual({ tracked: true })
+    })
+}
+
 /** The installed clients' feed open, unchanged: only the served experiment arm. */
 export async function verifyOpenCommunityFeedPostInteraction(
   pact: PactV4,

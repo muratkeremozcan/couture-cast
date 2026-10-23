@@ -179,8 +179,9 @@ describe('6.6 spotlight analytics', () => {
     expect(views[0]!.properties).toEqual({
       platform: 'web',
       dedupe_key: expect.stringMatching(
-        /^community_spotlight_viewed:[0-9a-f]{16}:\d+$/
+        /^community_spotlight_viewed:[0-9a-f]{16}:\d+:community$/
       ) as string,
+      surface: 'community',
       level: 'city',
       item_count: 6,
       $ip: null,
@@ -222,6 +223,7 @@ describe('6.6 spotlight analytics', () => {
     expect(ctx.analytics[0]!.properties).toEqual({
       platform: 'web',
       dedupe_key: expect.any(String) as string,
+      surface: 'community',
       level: 'city',
       rank: 3,
       $ip: null,
@@ -229,7 +231,7 @@ describe('6.6 spotlight analytics', () => {
     // Event name, then opaque hex components, then the surface. The member
     // component is the shared HMAC subject token and the post component is an
     // HMAC of the post id, so neither raw identifier can appear.
-    expect(key).toMatch(/^community_spotlight_opened:([0-9a-f]{16,64}:){2}spotlight$/)
+    expect(key).toMatch(/^community_spotlight_opened:([0-9a-f]{16,64}:){2}community$/)
     const components = String(key).split(':').slice(1, -1)
     const subject = communitySubjectToken(viewer)
     expect(components).toContain(subject)
@@ -263,6 +265,76 @@ describe('6.6 spotlight analytics', () => {
       area.country,
     ])
       expect(serialized).not.toContain(forbidden.toLowerCase())
+  })
+
+  it('6.7-HTTP-001 a home_teaser read and open report the Home teaser surface with their own dedupe keys', async () => {
+    const { viewer, cohort } = await seeded('home-teaser')
+    ctx.analytics.splice(0)
+    const teaser = communitySpotlightResponseSchema.parse(
+      (
+        await request(url)
+          .get('/api/v1/community/spotlight?limit=1&surface=home_teaser')
+          .set(as(viewer))
+          .expect(200)
+      ).body
+    )
+    // Ranking is the Community module's: rank 1 is the module's first entry.
+    expect(teaser.data.level).toBe('city')
+    expect(teaser.data.items.map((item) => [item.id, item.rank])).toEqual([
+      [cohort.expectedOrder[0], 1],
+    ])
+    await request(url).get('/api/v1/community/spotlight?limit=1').set(as(viewer))
+    const views = ctx.analytics.filter(
+      (event) => event.event === 'community_spotlight_viewed'
+    )
+    expect(views.map((event) => event.properties!.surface)).toEqual([
+      'home_teaser',
+      'community',
+    ])
+    expect(views[0]!.properties).toEqual({
+      platform: 'web',
+      dedupe_key: expect.stringMatching(
+        /^community_spotlight_viewed:[0-9a-f]{16}:\d+:home_teaser$/
+      ) as string,
+      surface: 'home_teaser',
+      level: 'city',
+      item_count: 1,
+      $ip: null,
+    })
+    expect(views[1]!.properties!.dedupe_key).not.toBe(views[0]!.properties!.dedupe_key)
+
+    ctx.analytics.splice(0)
+    const open = (surface: string) =>
+      request(url)
+        .post(`/api/v1/community/posts/${cohort.expectedOrder[0]!}/opened`)
+        .set(as(viewer))
+        .send({ surface, rank: 1, level: 'city' })
+        .expect(200)
+    await open('home_teaser')
+    await open('spotlight')
+    expect(ctx.analytics.map((event) => event.event)).toEqual([
+      'community_spotlight_opened',
+      'community_spotlight_opened',
+    ])
+    expect(ctx.analytics[0]!.properties).toEqual({
+      platform: 'web',
+      dedupe_key: expect.stringMatching(
+        /^community_spotlight_opened:([0-9a-f]{16,64}:){2}home_teaser$/
+      ) as string,
+      surface: 'home_teaser',
+      level: 'city',
+      rank: 1,
+      $ip: null,
+    })
+    expect(ctx.analytics[1]!.properties!.surface).toBe('community')
+    const serialized = JSON.stringify(ctx.analytics).toLowerCase()
+    for (const forbidden of [viewer, ...cohort.posts.map((post) => post.id)])
+      expect(serialized).not.toContain(forbidden.toLowerCase())
+
+    await request(url)
+      .get('/api/v1/community/spotlight?surface=spotlight')
+      .set(as(viewer))
+      .expect(400)
   })
 
   it('6.6-HTTP-012 refuses a bad rank, a bad or missing level, a mixed body and a hidden post', async () => {

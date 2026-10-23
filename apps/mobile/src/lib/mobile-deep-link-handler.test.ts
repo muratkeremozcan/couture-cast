@@ -303,6 +303,42 @@ describe('processMobileDeepLink', () => {
         expiresAt: '2099-12-31T23:59:59.000Z',
       })
     })
+
+    it('6.7-MOB-030 keeps an in-app spotlight focus intent with its token', async () => {
+      const { options, capture } = createMockOptions({
+        source: 'app',
+        type: 'community',
+        cardId: 'look-42',
+        focus: 'spotlight',
+        focusToken: 'token-7',
+      })
+
+      await processMobileDeepLink(options)
+
+      expect(options.pushToCommunity).toHaveBeenCalledWith({
+        source: 'app',
+        type: 'community',
+        cardId: 'look-42',
+        focus: 'spotlight',
+        focusToken: 'token-7',
+      })
+      expect(capture).not.toHaveBeenCalledWith('deep_link_invalid', expect.anything())
+    })
+
+    it('6.7-MOB-031 refuses a focus intent without its token', async () => {
+      const { options, capture } = createMockOptions({
+        source: 'app',
+        type: 'community',
+        cardId: 'look-42',
+        focus: 'spotlight',
+      })
+
+      await processMobileDeepLink(options)
+
+      expect(options.pushToCommunity).not.toHaveBeenCalled()
+      expect(options.setIsInvalidDeepLink).toHaveBeenCalledWith(true)
+      expect(capture).toHaveBeenCalledWith('deep_link_invalid', expect.anything())
+    })
   })
 
   describe('invalid deep link payloads', () => {

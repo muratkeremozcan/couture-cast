@@ -6,6 +6,7 @@ import {
   ianaTimeZoneSchema,
   openCommunityPostInputSchema,
   isSpotlightOpenInput,
+  communitySpotlightQuerySchema,
   publishCommunityPostInputSchema,
   updateCommunityChallengeInputSchema,
 } from '../src/contracts/http'
@@ -124,6 +125,40 @@ describe('community HTTP contracts', () => {
         isSpotlightOpenInput({ surface: 'spotlight', rank: 2, level: 'region' })
       ).toBe(true)
       expect(isSpotlightOpenInput({ experimentVariant: 'auto' })).toBe(false)
+    })
+
+    it('6.7-CON-002 accepts the Home teaser open with the same rank and level rules', () => {
+      expect(
+        openCommunityPostInputSchema.parse({
+          surface: 'home_teaser',
+          rank: 1,
+          level: 'country',
+        })
+      ).toEqual({ surface: 'home_teaser', rank: 1, level: 'country' })
+      expect(
+        isSpotlightOpenInput({ surface: 'home_teaser', rank: 1, level: 'city' })
+      ).toBe(true)
+      for (const body of [
+        { surface: 'home_teaser', rank: 0, level: 'city' },
+        { surface: 'home_teaser', rank: 1, level: 'none' },
+        { surface: 'home_teaser', rank: 1 },
+        { surface: 'home_teaser', rank: 1, level: 'city', experimentVariant: 'auto' },
+        { surface: 'home', rank: 1, level: 'city' },
+        { surface: 'community', rank: 1, level: 'city' },
+      ])
+        expect(openCommunityPostInputSchema.safeParse(body).success).toBe(false)
+    })
+
+    it('6.7-CON-003 reads the spotlight surface with community as the default', () => {
+      expect(communitySpotlightQuerySchema.parse({})).toEqual({
+        limit: 6,
+        surface: 'community',
+      })
+      expect(
+        communitySpotlightQuerySchema.parse({ limit: '1', surface: 'home_teaser' })
+      ).toEqual({ limit: 1, surface: 'home_teaser' })
+      for (const surface of ['spotlight', 'HOME_TEASER', ''])
+        expect(communitySpotlightQuerySchema.safeParse({ surface }).success).toBe(false)
     })
   })
 

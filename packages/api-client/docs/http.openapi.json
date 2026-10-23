@@ -15752,7 +15752,8 @@
           "surface": {
             "type": "string",
             "enum": [
-              "spotlight"
+              "spotlight",
+              "home_teaser"
             ]
           },
           "rank": {
@@ -15770,7 +15771,7 @@
           }
         },
         "additionalProperties": false,
-        "description": "Either a feed open with experimentVariant, or a spotlight open with surface spotlight, a rank from 1 to 60 and the served level. The two forms never mix."
+        "description": "Either a feed open with experimentVariant, or a spotlight open with surface spotlight or home_teaser, a rank from 1 to 60 and the served level. The two forms never mix."
       },
       "UpdateCommunityChallengeInput": {
         "type": "object",
@@ -23836,6 +23837,20 @@
               "default": 6
             },
             "description": "Number of ranked positions to read (1-12, default 6)."
+          },
+          {
+            "name": "surface",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "string",
+              "enum": [
+                "community",
+                "home_teaser"
+              ],
+              "default": "community"
+            },
+            "description": "The surface reading the spotlight. home_teaser is the Home teaser; it changes only analytics, never ranking, level, cursor or caching."
           }
         ],
         "responses": {

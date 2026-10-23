@@ -1,5 +1,8 @@
 import { createHash, createHmac } from 'node:crypto'
-import type { CommunityExperimentVariant } from '@couture/api-client/contracts/http'
+import type {
+  CommunityExperimentVariant,
+  CommunitySpotlightSurface,
+} from '@couture/api-client/contracts/http'
 import { requireAnalyticsIdSecret } from '../telemetry/telemetry.service.js'
 
 /**
@@ -52,12 +55,16 @@ export function communityPostToken(postId: string): string {
  * Story 6.6: one spotlight open per post, viewer and surface. Both identity
  * components are HMAC tokens, so neither raw id leaves the server.
  */
-export function spotlightOpenDedupeKey(userId: string, postId: string): string {
+export function spotlightOpenDedupeKey(
+  userId: string,
+  postId: string,
+  surface: CommunitySpotlightSurface
+): string {
   return buildCommunityDedupeKey(
     'community_spotlight_opened',
     communitySubjectToken(userId),
     communityPostToken(postId),
-    'spotlight'
+    surface
   )
 }
 
