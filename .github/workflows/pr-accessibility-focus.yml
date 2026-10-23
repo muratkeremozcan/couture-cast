@@ -96,9 +96,13 @@ jobs:
           xcodebuild test -scheme AccessibilityFocusTarget -destination "platform=iOS Simulator,name=$device"
 
   talkback-probe:
-    name: TalkBack on a GitHub-hosted emulator
+    name: TalkBack on a GitHub-hosted emulator (API ${{ matrix.api-level }})
     runs-on: ubuntu-latest
     timeout-minutes: 40
+    strategy:
+      fail-fast: false
+      matrix:
+        api-level: ['34', '35', '36']
     steps:
       - uses: actions/checkout@v4
 
@@ -116,7 +120,7 @@ jobs:
       - name: Probe TalkBack
         uses: reactivecircus/android-emulator-runner@v2
         with:
-          api-level: ${{ env.ANDROID_API_LEVEL }}
+          api-level: ${{ matrix.api-level }}
           target: ${{ env.ANDROID_TARGET }}
           arch: ${{ env.ANDROID_ARCH }}
           profile: ${{ env.ANDROID_PROFILE }}
