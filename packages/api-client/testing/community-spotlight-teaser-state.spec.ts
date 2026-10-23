@@ -232,6 +232,75 @@ describe('6.7 spotlight teaser lifecycle', () => {
     expect(reads).toHaveLength(2)
   })
 
+  it('6.7-UNIT-039 a quick return re-arms the timed re-read from the last attempt', async () => {
+    const { state, reads, settle } = harness()
+    state.setActive(true)
+    state.setMember('member-1')
+    await settle(0, page())
+    state.setActive(false)
+    await vi.advanceTimersByTimeAsync(30_000)
+    state.setActive(true)
+    expect(reads).toHaveLength(1)
+    await vi.advanceTimersByTimeAsync(SPOTLIGHT_TEASER_REREAD_MS - 30_001)
+    expect(reads).toHaveLength(1)
+    await vi.advanceTimersByTimeAsync(1)
+    expect(reads).toHaveLength(2)
+    expect(state.getSnapshot()?.item.id).toBe('post-1')
+  })
+
+  it('6.7-UNIT-040 a successful read with nothing to show still schedules the timed re-read', async () => {
+    const { state, reads, settle } = harness()
+    state.setActive(true)
+    state.setMember('member-1')
+    await settle(0, { level: 'none', label: null, items: [], nextCursor: null })
+    expect(state.getSnapshot()).toBeNull()
+    await vi.advanceTimersByTimeAsync(SPOTLIGHT_TEASER_REREAD_MS - 1)
+    expect(reads).toHaveLength(1)
+    await vi.advanceTimersByTimeAsync(1)
+    expect(reads).toHaveLength(2)
+    // The cohort became eligible: the timed re-read shows it without a trigger.
+    await settle(1, page('post-2'))
+    expect(state.getSnapshot()?.item.id).toBe('post-2')
+  })
+
+  it.each([
+    ['level none', { level: 'none', label: null, items: [], nextCursor: null }],
+    ['no items', { ...page(), items: [] }],
+  ] as const)(
+    '6.7-UNIT-041 a re-read that answers %s removes the withdrawn entry and keeps re-reading',
+    async (_, withdrawn) => {
+      const { state, reads, settle } = harness()
+      const changes = vi.fn()
+      state.subscribe(changes)
+      state.setActive(true)
+      state.setMember('member-1')
+      await settle(0, page('post-1'))
+      expect(state.getSnapshot()?.item.id).toBe('post-1')
+      changes.mockClear()
+      await vi.advanceTimersByTimeAsync(SPOTLIGHT_TEASER_REREAD_MS)
+      await settle(1, withdrawn as CommunityReactionSpotlight)
+      expect(state.getSnapshot()).toBeNull()
+      expect(changes).toHaveBeenCalledTimes(1)
+      await vi.advanceTimersByTimeAsync(SPOTLIGHT_TEASER_REREAD_MS)
+      expect(reads).toHaveLength(3)
+    }
+  )
+
+  it('6.7-UNIT-042 a quick return after a failed read arms no timed retry', async () => {
+    const { state, reads, settle } = harness()
+    state.setActive(true)
+    state.setMember('member-1')
+    await settle(0, new Error('500'))
+    state.setActive(false)
+    await vi.advanceTimersByTimeAsync(30_000)
+    state.setActive(true)
+    await vi.advanceTimersByTimeAsync(SPOTLIGHT_TEASER_REREAD_MS * 2)
+    expect(reads).toHaveLength(1)
+    // Only the next focus, foreground or visibility trigger reads again.
+    state.trigger()
+    expect(reads).toHaveLength(2)
+  })
+
   it('6.7-UNIT-030 a 429 Retry-After defers the next read until it passes', async () => {
     const { state, reads, settle } = harness()
     state.setActive(true)
