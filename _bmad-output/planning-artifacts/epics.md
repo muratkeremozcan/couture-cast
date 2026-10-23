@@ -7,6 +7,8 @@
 **Project Level:** Level 3  
 **Target Scale:** 2–3 cross-functional squads with shared moderation support
 
+_Updated: 2026-10-23: moved CC-6.7's sponsored CTA to new CC-6.7b; no post sponsorship model existed._
+
 _Updated: 2026-10-22: added CC-1.2b client location capture, found during CC-6.6 review._
 
 _Updated: 2026-10-22: added CC-6.14 complimentary full access for owner-selected testers._
@@ -587,9 +589,21 @@ interrupting my daily ritual.
    when highlight data is empty, stale, disabled, or unavailable.
 2. Link the teaser to the corresponding Community result and maintain focus and screen-reader
    context across navigation.
-3. Localize every state and show a disclosed affiliate CTA with click analytics only when the
-   selected highlight has an eligible sponsorship.
-   **Prerequisites:** CC-6.6, CC-5.1, CC-3.2.
+3. Localize every state on web and mobile. The sponsored affiliate CTA moved to CC-6.7b.
+   **Prerequisites:** CC-6.6, CC-3.2.
+
+**Story CC-6.7b: Sponsored community highlights**
+As a member, I want sponsored community highlights to be clearly disclosed so that I can trust what
+I see and shop a look only when I choose to.
+**Acceptance Criteria**
+
+1. Link a community post to an eligible affiliate offer with an effective window, partner status
+   checks, and an owner-only audited way to create and end the link.
+2. Show a disclosed affiliate CTA on community cards, the City Spotlight, and the Home teaser only
+   when the post's sponsorship is eligible for the viewer, honoring the commerce flag and opt-out.
+3. Record privacy-safe click analytics through the existing affiliate click flow with a community
+   surface, and localize and announce every state on web and mobile.
+   **Prerequisites:** CC-6.7, CC-5.1.
 
 **Story CC-6.8: Safe branded share-card export**
 As a trendsetter, I want to create and save a privacy-safe CoutureCast card so that I control the
@@ -751,7 +765,7 @@ This decision does not block drafting Story 6.2. It must close before Community 
 **Feature Epics (Phase 1-3) Parallel Opportunities:**
 
 - Parallel-ready stories: CC-1.1 & CC-1.4 (telemetry) can run concurrently once API schema agreed. CC-3.2 (localization) and CC-3.3 (widgets) can overlap after CC-3.1 design tokens settle. In Epic 6, the content-screening, reactions, export, and moderator-queue lanes can begin after CC-6.1 while production controls remain disabled.
-- Sequential chains: CC-2.1 → CC-2.2 → CC-2.3; CC-6.3 → CC-6.6 → CC-6.7; CC-6.2 + CC-6.4 → CC-6.5; CC-6.8 → CC-6.9; CC-6.10 → CC-6.11 → CC-6.13; CC-6.10 → CC-6.12; CC-4.1 → CC-4.2 → CC-4.3; CC-5.2 gates CC-5.3, CC-5.4 & CC-5.5.
+- Sequential chains: CC-2.1 → CC-2.2 → CC-2.3; CC-6.3 → CC-6.6 → CC-6.7 → CC-6.7b; CC-6.2 + CC-6.4 → CC-6.5; CC-6.8 → CC-6.9; CC-6.10 → CC-6.11 → CC-6.13; CC-6.10 → CC-6.12; CC-4.1 → CC-4.2 → CC-4.3; CC-5.2 gates CC-5.3, CC-5.4 & CC-5.5.
 
 ### Key files / components
 
