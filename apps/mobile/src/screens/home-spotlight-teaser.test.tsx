@@ -703,6 +703,53 @@ describe('6.7 mobile Home spotlight teaser timers', () => {
     expect(teaserReadCalls()).toBe(2)
   })
 
+  it('6.7-MOB-054 the image deadline counts only while Home is active: time in the background never removes the teaser', async () => {
+    let releaseImage!: () => void
+    const imageHeld = new Promise<void>((resolve) => {
+      releaseImage = resolve
+    })
+    onTestFinished(() => releaseImage())
+    server.use(
+      http.get('*/teaser/:file', async () => {
+        await imageHeld
+        return HttpResponse.error()
+      })
+    )
+    const listeners: ((state: AppStateStatus) => void)[] = []
+    vi.spyOn(AppState, 'addEventListener').mockImplementation((_type, listener) => {
+      listeners.push(listener as (state: AppStateStatus) => void)
+      return { remove: () => undefined } as ReturnType<typeof AppState.addEventListener>
+    })
+    const emit = (state: AppStateStatus) =>
+      act(() => {
+        for (const listener of listeners) listener(state)
+      })
+    const { reads } = deferSpotlightReads()
+    fakeClock()
+    setMobileApplicationUserId('member-1')
+    await renderHome()
+    await untilFrame(() => reads.length === 1)
+    reads[0]!.resolve({ status: 200, body: { data: cityPage() } })
+    await untilFrame(
+      () => document.querySelector('[data-testid="home-spotlight-teaser-link"]') !== null
+    )
+
+    // Backgrounded almost at once, and away well past the deadline but inside the
+    // read floor, so coming back starts no read.
+    await advance(1_000)
+    emit('background')
+    await advance(40_000)
+    expect(teaserNodes().length).toBeGreaterThan(0)
+
+    // Back in the foreground the image gets a whole deadline of its own.
+    emit('active')
+    await advance(IMAGE_LOAD_TIMEOUT_MS - 1)
+    expect(teaserNodes().length).toBeGreaterThan(0)
+    await advance(1)
+    await untilFrame(() => teaserNodes().length === 0)
+    expect(teaserReadCalls()).toBe(1)
+  })
+
   it('6.7-MOB-039 an image that settles neither way within 15 seconds removes the teaser', async () => {
     // The image host never answers: no onLoad, no onError. Released at the end so
     // the held request outlives nothing.

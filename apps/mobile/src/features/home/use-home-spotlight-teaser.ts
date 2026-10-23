@@ -28,6 +28,8 @@ export interface HomeSpotlightTeaserView {
   value: SpotlightTeaserValue | null
   /** The image failed to load: the teaser leaves and reserves no space. */
   removeValue: () => void
+  /** Home is focused and the app is in the foreground. */
+  active: boolean
 }
 
 /**
@@ -117,7 +119,7 @@ export function useHomeSpotlightTeaser({
   // A value belongs to one member: in the render where the member changes, the
   // previous member's value is already hidden.
   const value = snapshot && snapshot.memberId === memberId ? snapshot : null
-  return { value, removeValue: state.removeValue }
+  return { value, removeValue: state.removeValue, active: focused && foreground }
 }
 
 /** A fresh token per activation, so Community moves focus once per tap. */

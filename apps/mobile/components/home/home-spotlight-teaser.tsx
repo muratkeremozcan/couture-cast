@@ -29,6 +29,12 @@ export interface HomeSpotlightTeaserProps {
   onOpen: () => void
   /** The image failed or never answered: the teaser leaves and reserves no space. */
   onImageError: () => void
+  /**
+   * Home is focused and in the foreground. The image deadline runs only then:
+   * an app in the background loads nothing and reports nothing, so time spent
+   * there would fail an image that never had its chance.
+   */
+  active: boolean
   onFocus?: () => void
   onBlur?: () => void
 }
@@ -44,7 +50,10 @@ export function teaserAuthorName(
 }
 
 export const HomeSpotlightTeaser = forwardRef<View, HomeSpotlightTeaserProps>(
-  function HomeSpotlightTeaser({ value, onOpen, onImageError, onFocus, onBlur }, ref) {
+  function HomeSpotlightTeaser(
+    { value, onOpen, onImageError, active, onFocus, onBlur },
+    ref
+  ) {
     const { t } = useTranslation()
     const palette = useHeroPalette()
     const ctaColor = CTA_GOLD[useColorScheme() === 'dark' ? 'dark' : 'light']
@@ -59,10 +68,10 @@ export const HomeSpotlightTeaser = forwardRef<View, HomeSpotlightTeaserProps>(
     // A load that settles neither way counts as a failure: some Android stacks
     // fire no onError for a host that never answers.
     useEffect(() => {
-      if (loadedUrl === imageUrl) return
+      if (!active || loadedUrl === imageUrl) return
       const timer = setTimeout(onImageError, IMAGE_LOAD_TIMEOUT_MS)
       return () => clearTimeout(timer)
-    }, [imageUrl, loadedUrl, onImageError])
+    }, [active, imageUrl, loadedUrl, onImageError])
 
     return (
       <View testID="home-spotlight-teaser" style={styles.section}>
@@ -169,6 +178,7 @@ export const HomeSpotlightTeaserSlot = memo(function HomeSpotlightTeaserSlot({
           value={teaser.value}
           onOpen={teaser.open}
           onImageError={teaser.removeValue}
+          active={teaser.active}
           onFocus={teaser.onFocus}
           onBlur={teaser.onBlur}
         />
