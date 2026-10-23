@@ -24,6 +24,11 @@ const osFocus = vi.hoisted(() => ({
   moves: [] as number[],
   /** How many more requests the platform refuses, as before a view is reattached. */
   refusals: 0,
+  /**
+   * The device's order: TalkBack reports the new focus from inside the native
+   * call, before the call's promise resolves in JavaScript.
+   */
+  reportsBeforeResolving: false,
   report(tags: number[]) {
     for (const listener of [...this.listeners]) listener({ tags })
   },
@@ -46,6 +51,7 @@ vi.mock('@/modules/accessibility-focus', () => ({
       osFocus.refusals -= 1
       return Promise.resolve(false)
     }
+    if (osFocus.reportsBeforeResolving) osFocus.report([tag])
     return Promise.resolve(true)
   },
   observeAccessibilityFocus: (listener: AccessibilityFocusListener) => {
@@ -220,6 +226,7 @@ beforeEach(async () => {
   osFocus.listeners.clear()
   osFocus.moves.length = 0
   osFocus.refusals = 0
+  osFocus.reportsBeforeResolving = false
   heroCardRenders.count = 0
   token = 'session-token'
   restoreToken = setMobileAccessTokenResolver(() => token)
@@ -369,6 +376,17 @@ describe('6.7 mobile Home teaser native focus', () => {
     expect(
       document.querySelector('[data-testid^="home-spotlight-teaser-focus-requested-"]')
     ).toBeNull()
+  })
+
+  it('6.7-MOB-050 a TalkBack report that arrives before the native call resolves still confirms the move', async () => {
+    const { link } = await shownTeaser()
+    iosFocusHandles()
+    osFocus.reportsBeforeResolving = true
+    await activateAndReturn(link)
+
+    await screen.findByTestId('home-spotlight-teaser-focused-link-1')
+    await screen.findByTestId('home-spotlight-teaser-focus-requested-link-1')
+    expect(focusCalls()).toHaveLength(1)
   })
 
   it('6.7-MOB-047 a re-read that fails between the return and its focus frame sends focus to the scroll view, once', async () => {

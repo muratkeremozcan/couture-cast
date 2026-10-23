@@ -175,12 +175,14 @@ const nextFrame = () =>
  * is chosen again in every frame, so a teaser that left since the request was
  * queued is never the target; a native view that refuses focus is asked again
  * on the next frame, up to `NATIVE_FOCUS_FRAMES`. `onChosen` runs once, at the
- * first frame that has a destination. Resolves the request that went through,
- * or null when nothing was focused.
+ * first frame that has a destination; `onDispatch` runs just before each native
+ * request, because the OS can report the focus before the request resolves.
+ * Resolves the request that went through, or null when nothing was focused.
  */
 async function moveAccessibilityFocus(
   destination: () => FocusDestination | null,
-  onChosen: () => void
+  onChosen: () => void,
+  onDispatch: (request: FocusRequest) => void
 ): Promise<FocusRequest | null> {
   for (let frame = 0; frame < NATIVE_FOCUS_FRAMES; frame += 1) {
     await nextFrame()
@@ -202,6 +204,8 @@ async function moveAccessibilityFocus(
     }
     const handle = safeFindNodeHandle(chosen.node)
     if (!handle) return null
+    const request = { target: chosen.target, handle, landed: false }
+    onDispatch(request)
     // The module moves the screen reader's cursor itself; React Native's call is
     // the fallback where the build has none (Expo Go), and it cannot say whether
     // the move was taken.
@@ -265,7 +269,7 @@ export function useHomeSpotlightTeaserLink({
   const inputFocusRef = useRef(false)
   /** The OS reports accessibility focus on the link. */
   const osFocusOnLinkRef = useRef(false)
-  /** A native focus request the OS has not confirmed yet. */
+  /** A native focus request the OS has not confirmed yet, set as it is sent. */
   const unconfirmedRef = useRef<FocusRequest | null>(null)
   const mountedRef = useRef(true)
   /** Each focus move takes this serial; a later move ends any earlier one still trying. */
@@ -308,12 +312,18 @@ export function useHomeSpotlightTeaserLink({
           isHomeFocusedRef.current
             ? destination()
             : null,
-        onChosen
+        onChosen,
+        (request) => {
+          unconfirmedRef.current = request
+        }
       ).then((request) => {
-        if (!request || !mountedRef.current) return
+        if (!request) {
+          if (serial === moveSerialRef.current) unconfirmedRef.current = null
+          return
+        }
+        if (!mountedRef.current) return
         setFocusRequested(nextMove(request.target))
         if (request.landed) setFocusLanded(nextMove(request.target))
-        else if (request.handle) unconfirmedRef.current = request
       })
     },
     []
