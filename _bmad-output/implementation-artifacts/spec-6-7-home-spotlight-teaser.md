@@ -342,6 +342,11 @@ and links to that entry inside the existing City Spotlight with focus and screen
   - Test review items: the native "moves nothing" checks wait five frames; 6.7-MOB-035 takes its
     baseline once hero renders hold steady and drives an identity change; the native suite clicks
     through `userEvent`.
+  - CodeRabbit, round 2: Community keeps its focus in state as well as the ref, so an intent the
+    router delivers before the focus event resolves once focus arrives, and each notice takes
+    focus once (6.7-MOB-051 to 053). The web hero layout check now fails on an empty hero canvas.
+    The Android second tap in `home-spotlight-teaser.yaml` keeps its swipe: the teaser is the last
+    item on Home, so the scroll clamps at the end of the content and cannot carry it off screen.
 
 ## Spec Change Log
 
