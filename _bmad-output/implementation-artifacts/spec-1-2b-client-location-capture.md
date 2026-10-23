@@ -212,6 +212,48 @@ missing location blocks the member today.
 - External prerequisite: `LOCATION_CANDIDATE_SECRET` (32 characters or more, one value per
   environment) must be set on the preview and production API; until then those deployments answer
   the fail-closed 503 on search and save from search.
+- 2026-10-23, code review rounds 1 to 4 (cc12b-impl), decisions that change the notes above:
+  - Save (supersedes the save bullet above): the forecast must hold the climate band's minimum usable
+    days, read back exactly as Community reads them, or nothing is saved and the typed retryable 503
+    answers. The snapshot is written inside the location's own transaction
+    (`WeatherRepository.persistForecastWithin`), so a save that loses the limit or duplicate race leaves
+    no snapshot behind (INT-17).
+  - One injected `LOCATION_CLOCK` feeds both location services: search windows, token expiry,
+    snapshot staleness and the refresh job bucket.
+  - Production detection: any of `APP_ENV`, `DEPLOY_ENV` or `VERCEL_ENV` saying `production` (or
+    `prod`) wins, so a Vercel production deployment always refuses provider origin overrides.
+  - Location response schemas strip unknown keys so installed clients survive an additive server
+    field; request bodies and the search query stay strict, and the integration suite pins the exact
+    server output with `.strict()`.
+  - A save-time forecast outage has its own copy (`locations.errors.save_unavailable`, all 20
+    catalogs). Mobile location errors are announced once, through the announcer only. The web
+    locations-changed event had no listener and was removed; web surfaces reload on navigation.
+  - Mobile ritual cache: a saved, switched or deleted primary drops the latest-location pointer in
+    every locale and the hero refetches without cache fallback. Cache mutations are serialized per
+    member, each holds the queue until every native write it started settles, and an invalidation
+    bumps a generation that makes a save queued before it skip its pointer (MOB-CACHE-01 to 05).
+  - Maestro: the runner signs up until its member is on the community `auto` arm, the only arm that
+    names the viewer's band; a random signup made the band proof a coin flip (CI job 120178429887).
+- 2026-10-23, where each acceptance lane runs (corrects the harness claim above): CI runs the
+  Playwright local lane and the Android Maestro shards, which include `location-capture.yaml`. CI has
+  no iOS Maestro lane. iOS `location-capture.yaml` was run locally on an iPhone 17 simulator (iOS 26.1)
+  with run-evidence; it needs `MOBILE_E2E_EXPO_NO_OPEN=1` on this machine because its Xcode ships no
+  Simulator.app for `expo start --ios` to open, and it cannot run inside the agent sandbox (Expo's
+  osascript lookup and the XCTest driver are blocked there).
+- 2026-10-23, API test tier flakes, root causes and fixes:
+  - Connection exhaustion: Prisma sizes each client's pool from the core count (`num_cpus * 2 + 1`),
+    29 per client on a 14-core machine against 9 on CI's 4 vCPU, and the full tier then exhausted the
+    100-connection local Postgres (`remaining connection slots are reserved for roles with the
+SUPERUSER attribute`; 4 to 7 files red per run). `apps/api/vitest.config.ts` pins
+    `connection_limit=9` on the integration URL.
+  - Wall-clock budget overruns: the DB-backed suites assert real budgets (the 1 s interactive
+    transaction in community fan-out, the 1950 ms community authorization budget, provider barrier
+    deadlines, 5 s and 10 s test timeouts) while each file also runs child processes, servers and
+    BullMQ workers against the one shared Postgres and Redis. Vitest's one worker per core put 13
+    files on that database at once; measured 1 to 15 failures per full run (expired transactions,
+    `CommunityUnavailableException` from the spent budget, hook timeouts, and assertions downstream
+    of them), each file green alone. The config now caps workers at four (CI keeps three): three
+    consecutive full runs green from load average 23, and two more green with four extra CPU burners.
 
 ## Spec Change Log
 
