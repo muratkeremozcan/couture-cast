@@ -52,7 +52,9 @@ tags:
 
 - assertVisible:
     id: 'home-spotlight-teaser-link'
-    text: 'Standout look in Chicago by .+, 6 reactions\. Opens the City Spotlight\.'
+    # Authors show under a random stored alias, so the format is what is pinned:
+    # never a caption, a raw id or the profile name.
+    text: 'Standout look in Chicago by Style Explorer [0-9A-F]{8}, 6 reactions\. Opens the City Spotlight\.'
     label: 'One link names the area, the author and the reaction count'
 - takeScreenshot:
     path: maestro/artifacts/home-spotlight-teaser
@@ -78,6 +80,7 @@ tags:
     text: 'Rank 1, Position 1 of 6'
 - assertNotVisible:
     id: 'deep-link-info-banner'
+    # The spotlight notices and the invalid-link message share this banner.
     label: 'An entry that is there reports no notice and never the invalid banner'
 
 - tapOn:

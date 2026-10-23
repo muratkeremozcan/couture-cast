@@ -7,6 +7,7 @@ import {
   SEEDED_SPOTLIGHT_REACTION_COUNTS,
   assertSeededSpotlight,
   placeViewerInArea,
+  seededSpotlightTopAuthorAlias,
 } from '../support/helpers/community-spotlight'
 import { SEEDED_SPOTLIGHT_AREA } from '@couture/testing'
 
@@ -81,7 +82,9 @@ test.describe('Story 6.7 Home spotlight teaser', () => {
       await expect(page.getByTestId('home-spotlight-teaser-reactions')).toHaveText(
         `${SEEDED_SPOTLIGHT_REACTION_COUNTS[0]} reactions`
       )
-      await expect(page.getByTestId('home-spotlight-teaser-author')).not.toHaveText('')
+      // The served page already resolved the author's stored alias.
+      const author = await seededSpotlightTopAuthorAlias()
+      await expect(page.getByTestId('home-spotlight-teaser-author')).toHaveText(author)
       const image = page.getByTestId('home-spotlight-teaser-image')
       await expect(image).toHaveAttribute('alt', '')
       await expect
@@ -90,7 +93,7 @@ test.describe('Story 6.7 Home spotlight teaser', () => {
       await expect(link).toHaveAttribute('href', `#spotlight-lookbook-card-${top}`)
       await expect(link).toHaveAccessibleName(
         new RegExp(
-          `^Standout look in ${SEEDED_SPOTLIGHT_AREA.city} by .+, 6 reactions\\.`
+          `^Standout look in ${SEEDED_SPOTLIGHT_AREA.city} by ${author}, ${SEEDED_SPOTLIGHT_REACTION_COUNTS[0]} reactions\\.`
         )
       )
       const box = await link.boundingBox()
@@ -157,11 +160,14 @@ test.describe('Story 6.7 Home spotlight teaser', () => {
       // The teaser resolves its member and visibility on mount, before the
       // module's own read settles, so any read it made would be out by now.
       await expect(page.getByTestId('community-spotlight-list')).toBeVisible()
-      expect(teaserReads).toEqual([])
       await expect(page.locator('[data-testid^="home-spotlight-teaser"]')).toHaveCount(0)
 
-      // Positive control: the same page stacked reads and shows the teaser.
+      // Positive control: the same page stacked reads and shows the teaser. The
+      // read must be caused by the resize, so none may have happened before it.
+      expect(teaserReads).toEqual([])
+      const stackedRead = page.waitForRequest(isTeaserRead)
       await page.setViewportSize(NARROW)
+      await stackedRead
       await expect(teaserLink(page)).toBeVisible()
       expect(teaserReads).toHaveLength(1)
     } finally {
@@ -175,10 +181,9 @@ test.describe('Story 6.7 Home spotlight teaser', () => {
     communitySession,
   }) => {
     expect(communitySession.userId).toBeTruthy()
-    const teaserReads: string[] = []
-    page.on('response', (response) => {
-      if (isTeaserRead(response.request())) teaserReads.push(response.url())
-    })
+    const teaserRead = page.waitForResponse((response) =>
+      isTeaserRead(response.request())
+    )
     await page.setViewportSize(NARROW)
     await page.goto('/')
     await settledModule(page)
@@ -186,7 +191,16 @@ test.describe('Story 6.7 Home spotlight teaser', () => {
       'data-level',
       'none'
     )
-    await expect.poll(() => teaserReads.length).toBeGreaterThan(0)
+    // The teaser's own read answered none, and React had frames to render
+    // whatever it would render for it, before absence is asserted.
+    const answered: unknown = await (await teaserRead).json()
+    expect(answered).toMatchObject({ data: { level: 'none', items: [] } })
+    await page.evaluate(
+      () =>
+        new Promise((resolve) =>
+          requestAnimationFrame(() => requestAnimationFrame(resolve))
+        )
+    )
     await expect(page.locator('[data-testid^="home-spotlight-teaser"]')).toHaveCount(0)
     // The hero ends with the outfit tiles: nothing is reserved after them.
     const gap = await heroCanvas(page).evaluate((canvas) => {
