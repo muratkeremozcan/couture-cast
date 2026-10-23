@@ -234,10 +234,7 @@ export default function TabOneScreen() {
 
   // Story 6.7: the teaser reads on its own and never waits on, hides or
   // re-renders the hero.
-  const teaser = useHomeSpotlightTeaserLink({
-    memberId: applicationUserId,
-    scrollViewRef,
-  })
+  const teaser = useHomeSpotlightTeaserLink({ applicationUserId, scrollViewRef })
 
   const [ritual, setRitual] = useState<RitualResponse | null>(null)
   const [isLoading, setIsLoading] = useState(true)

@@ -213,6 +213,8 @@ function renderHome() {
 
 describe('6.7 mobile Home spotlight teaser', () => {
   let restoreToken: (() => void) | undefined
+  /** The bearer the app holds; undefined is a signed-out or not yet restored session. */
+  let token: string | undefined
 
   beforeAll(async () => {
     process.env.EXPO_PUBLIC_API_BASE_URL = window.location.origin
@@ -223,7 +225,8 @@ describe('6.7 mobile Home spotlight teaser', () => {
     focusControl.focused = true
     focusControl.listeners.clear()
     routerPush.mockClear()
-    restoreToken = setMobileAccessTokenResolver(() => 'session-token')
+    token = 'session-token'
+    restoreToken = setMobileAccessTokenResolver(() => token)
     setMobileApplicationUserId(null)
     await i18n.changeLanguage('en-US')
     server.use(http.get('*/api/v1/ritual', () => HttpResponse.json(mockRitualResponse)))
@@ -344,16 +347,16 @@ describe('6.7 mobile Home spotlight teaser', () => {
   ] as const)(
     '6.7-MOB-004 %s renders nothing and leaves Home exactly as without the teaser',
     async (_name, refusal) => {
-      // Reference: the same Home for a signed-out viewer, who never reads.
-      const reference = await renderHome()
-      await screen.findByTestId('outfit-recommendation-card')
-      const expected = screen.getByTestId('hero-experience-scrollview').innerHTML
-      await reference.unmount()
-
       const { reads, answer } = deferSpotlightReads()
       setMobileApplicationUserId('member-1')
       await renderHome()
       await screen.findByTestId('outfit-recommendation-card')
+      // Reference: the same Home while the teaser read is still out.
+      await waitFor(() => expect(reads).toHaveLength(1))
+      await act(async () => {
+        await new Promise((resolve) => setTimeout(resolve, 200))
+      })
+      const expected = screen.getByTestId('hero-experience-scrollview').innerHTML
       await answer(0, refusal as Answer)
       await act(async () => {
         await new Promise((resolve) => setTimeout(resolve, 300))
@@ -400,9 +403,14 @@ describe('6.7 mobile Home spotlight teaser', () => {
 
   it('6.7-MOB-006 a cold start reads nothing until the member resolves, then reads at once', async () => {
     const { reads, answer } = deferSpotlightReads()
+    // Before the stored session is restored there is no bearer and no member.
+    token = undefined
     await renderHome()
-    await screen.findByTestId('outfit-recommendation-card')
+    await act(async () => {
+      await new Promise((resolve) => setTimeout(resolve, 300))
+    })
     expect(reads).toHaveLength(0)
+    token = 'restored-token'
     act(() => setMobileApplicationUserId('member-1'))
     await answer(0, cityPage())
     await screen.findByTestId('home-spotlight-teaser-link')
@@ -417,7 +425,7 @@ describe('6.7 mobile Home spotlight teaser', () => {
     await screen.findByTestId('home-spotlight-teaser-link')
 
     act(() => setMobileApplicationUserId('member-2'))
-    expect(teaserNodes()).toEqual([])
+    await waitFor(() => expect(teaserNodes()).toEqual([]))
     // The new member reads at once, inside the previous member's 60-second floor.
     await waitFor(() => expect(reads).toHaveLength(2))
     act(() => setMobileApplicationUserId('member-3'))
@@ -431,8 +439,10 @@ describe('6.7 mobile Home spotlight teaser', () => {
     await answer(2, cityPage(spotlightItem('look-member-3')))
     await screen.findByTestId('home-spotlight-teaser-link')
 
+    // Sign-out: the session and its bearer are gone.
+    token = undefined
     act(() => setMobileApplicationUserId(null))
-    expect(teaserNodes()).toEqual([])
+    await waitFor(() => expect(teaserNodes()).toEqual([]))
     await act(async () => {
       await new Promise((resolve) => setTimeout(resolve, 200))
     })
@@ -516,6 +526,7 @@ describe('6.7 mobile Home spotlight teaser', () => {
     fireEvent.click(await screen.findByTestId('home-spotlight-teaser-link'))
     act(() => focusControl.set(false))
     // Signing out while away removes the teaser.
+    token = undefined
     act(() => setMobileApplicationUserId(null))
     act(() => focusControl.set(true))
     await waitFor(() =>

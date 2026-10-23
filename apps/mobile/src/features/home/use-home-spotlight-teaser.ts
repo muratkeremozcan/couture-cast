@@ -12,6 +12,7 @@ import { AccessibilityInfo, AppState, Platform, type View } from 'react-native'
 import { useFocusEffect, useRouter } from 'expo-router'
 import { SpotlightTeaserState, type SpotlightTeaserValue } from '@couture/api-client'
 import {
+  communityCommentsSessionFromMobile,
   communityRetryAfterSeconds,
   getCommunitySpotlightFromMobile,
   recordCommunitySpotlightOpenedFromMobile,
@@ -25,18 +26,44 @@ export interface HomeSpotlightTeaserView {
 }
 
 /**
+ * The member the Community screen reads for: the verified application user, or
+ * the bearer's subject while that verification is pending. Undefined until the
+ * first resolution; null when signed out. Each application-user change, sign-in
+ * and sign-out included, resolves it again.
+ */
+function useCommunityMember(applicationUserId: string | null): string | null | undefined {
+  const [member, setMember] = useState<string | null | undefined>(undefined)
+  useEffect(() => {
+    let active = true
+    communityCommentsSessionFromMobile().then(
+      (identity) => {
+        if (active) setMember(identity)
+      },
+      () => {
+        if (active) setMember(null)
+      }
+    )
+    return () => {
+      active = false
+    }
+  }, [applicationUserId])
+  return member
+}
+
+/**
  * The teaser has its own read, state and failures; nothing here touches the
  * hero. It reads only for a resolved member while Home is focused and the app
  * is in the foreground, and each regained focus or foreground is a trigger the
  * shared 60-second floor may refuse.
  */
 export function useHomeSpotlightTeaser({
-  memberId,
+  applicationUserId,
   focused,
 }: {
-  memberId: string | null
+  applicationUserId: string | null
   focused: boolean
 }): HomeSpotlightTeaserView {
+  const memberId = useCommunityMember(applicationUserId)
   const [state] = useState(
     () =>
       new SpotlightTeaserState({
@@ -115,15 +142,15 @@ export interface HomeSpotlightTeaserLink extends HomeSpotlightTeaserView {
  * view.
  */
 export function useHomeSpotlightTeaserLink({
-  memberId,
+  applicationUserId,
   scrollViewRef,
 }: {
-  memberId: string | null
+  applicationUserId: string | null
   scrollViewRef: RefObject<unknown>
 }): HomeSpotlightTeaserLink {
   const router = useRouter()
   const [isHomeFocused, setIsHomeFocused] = useState(false)
-  const teaser = useHomeSpotlightTeaser({ memberId, focused: isHomeFocused })
+  const teaser = useHomeSpotlightTeaser({ applicationUserId, focused: isHomeFocused })
   const linkRef = useRef<View>(null)
   /** The activation whose return to Home still owes a focus move; consumed once. */
   const pendingReturnRef = useRef<string | null>(null)

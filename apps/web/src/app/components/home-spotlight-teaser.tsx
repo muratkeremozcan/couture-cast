@@ -201,7 +201,6 @@ export function HomeSpotlightTeaser({
       ref={linkRef}
       href={`#${spotlightCardElementId(item.id)}`}
       data-testid="home-spotlight-teaser-link"
-      aria-label={t('home.spotlightTeaser.linkLabel', { label, author, count })}
       onClick={(event) => {
         event.preventDefault()
         onOpen()
@@ -220,7 +219,14 @@ export function HomeSpotlightTeaser({
         onError={onImageError}
         className="h-[72px] w-[72px] shrink-0 rounded-[6px] bg-[#E6E6ED] object-cover"
       />
-      <span className="flex min-w-0 flex-col gap-0.5">
+      {/*
+        The name comes from content, so it always contains what the link says.
+        The visual lines repeat it in short form and stay out of the tree.
+      */}
+      <span className="sr-only">
+        {t('home.spotlightTeaser.linkLabel', { label, author, count })}
+      </span>
+      <span aria-hidden="true" className="flex min-w-0 flex-col gap-0.5">
         <span
           data-testid="home-spotlight-teaser-heading"
           className="lookbook-display text-base font-semibold text-[#111111]"

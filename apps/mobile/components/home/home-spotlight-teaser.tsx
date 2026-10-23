@@ -1,14 +1,17 @@
 // Story 6.7 owner: the compact Home teaser for the viewer's top City Spotlight entry.
 import React, { forwardRef, useCallback, useEffect, useState } from 'react'
-import { Image, Pressable, StyleSheet, Text, View } from 'react-native'
+import { Image, Pressable, StyleSheet, Text, View, useColorScheme } from 'react-native'
 import { useTranslation } from 'react-i18next'
 import type { SpotlightTeaserValue } from '@couture/api-client'
 import type { HomeSpotlightTeaserLink } from '@/src/features/home/use-home-spotlight-teaser'
 import { useHeroPalette } from '@/components/hero/hero-theme'
 import { IMAGE_LOAD_TIMEOUT_MS } from '@/components/community/community-card'
 
-/** Same derived gold the community surfaces use for their accents. */
-const ACCENT_GOLD = '#C9A14A'
+/**
+ * The CTA is text, so it needs AA contrast: the deep gold the web hero uses on
+ * light surfaces (#C9A14A on white is about 2.3:1), the accent gold on dark ones.
+ */
+const CTA_GOLD = { light: '#8A691F', dark: '#C9A14A' } as const
 const THUMBNAIL_SIZE = 72
 
 export interface HomeSpotlightTeaserProps {
@@ -34,6 +37,7 @@ export const HomeSpotlightTeaser = forwardRef<View, HomeSpotlightTeaserProps>(
   function HomeSpotlightTeaser({ value, onOpen, onImageError, onFocus, onBlur }, ref) {
     const { t } = useTranslation()
     const palette = useHeroPalette()
+    const ctaColor = CTA_GOLD[useColorScheme() === 'dark' ? 'dark' : 'light']
     const { item, label } = value
     const imageUrl = item.imageAccess.url
     const [loadedUrl, setLoadedUrl] = useState<string | null>(null)
@@ -91,15 +95,6 @@ export const HomeSpotlightTeaser = forwardRef<View, HomeSpotlightTeaserProps>(
               onError={onImageError}
               onLoad={handleLoad}
             />
-            {loadedUrl === imageUrl ? (
-              // UI automation marker: only a completed load renders it.
-              <View
-                testID="home-spotlight-teaser-image-loaded"
-                collapsable={false}
-                pointerEvents="none"
-                style={styles.loadedMarker}
-              />
-            ) : null}
           </View>
           <View style={styles.body}>
             <Text
@@ -122,11 +117,21 @@ export const HomeSpotlightTeaser = forwardRef<View, HomeSpotlightTeaserProps>(
             >
               {t('home.spotlightTeaser.reactions', { count })}
             </Text>
-            <Text style={[styles.cta, { color: ACCENT_GOLD }]}>
+            <Text style={[styles.cta, { color: ctaColor }]}>
               {t('home.spotlightTeaser.cta')}
             </Text>
           </View>
         </Pressable>
+        {loadedUrl === imageUrl ? (
+          // UI automation marker: only a completed load renders it. A sibling of
+          // the link, because iOS hides an accessible element's descendants.
+          <View
+            testID="home-spotlight-teaser-image-loaded"
+            collapsable={false}
+            pointerEvents="none"
+            style={styles.loadedMarker}
+          />
+        ) : null}
       </View>
     )
   }
@@ -173,9 +178,10 @@ const styles = StyleSheet.create({
   },
   loadedMarker: {
     position: 'absolute',
+    top: 0,
+    left: 0,
     width: 1,
     height: 1,
-    opacity: 0,
   },
   body: {
     flex: 1,

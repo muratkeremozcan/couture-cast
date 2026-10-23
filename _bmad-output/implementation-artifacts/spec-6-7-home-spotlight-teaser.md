@@ -214,6 +214,59 @@ and links to that entry inside the existing City Spotlight with focus and screen
 
 ## Implementation Notes
 
+- 2026-10-23, implementation. Decisions and surprises, each with its reason:
+  - One lifecycle for both clients: `SpotlightTeaserState` in `@couture/api-client` owns the
+    member-scoped value, the 4-minute re-read anchored to the last attempt, the 5-minute expiry
+    from read completion, the 60-second floor and the `Retry-After` deferral. Web and mobile only
+    bind it to their identity, focus, foreground and layout signals. A successful read that is
+    not renderable (`none`, no items) still schedules the timed re-read; only a failed attempt
+    schedules nothing.
+  - Analytics dedupe keys carry the event `surface`: the viewed key gains a trailing
+    `community|home_teaser`, and the opened key's last component, which was the literal
+    `spotlight`, is now the event surface. An opened body with `surface: 'spotlight'` reports
+    `surface: 'community'`. Existing 6.6 calls omit the query `surface`, so the server's default
+    records `community` for them.
+  - Mobile member: the same identity the Community screen reads for, from
+    `communityCommentsSessionFromMobile` (the verified application user, else the bearer's
+    subject), resolved again on every `subscribeMobileApplicationUser` change. Using the
+    application user alone left the teaser without a member in every build that holds a bearer
+    but never verifies a native session, which is how the Maestro harness runs; the first local
+    Android run of `home-spotlight-teaser.yaml` found no teaser for that reason.
+  - Web member: the grid's session source and sync (one-second sync plus the `storage`,
+    `couture:session` and `couture:account-erased` events). Web teaser reads run under a
+    10-second deadline, because the web spotlight wrapper has none and a hung read would
+    otherwise hold the lifecycle's in-flight slot for good.
+  - Mobile image: a load that settles neither way within the card's 15-second image timeout
+    counts as an image failure, matching the card rule for Android stacks that never fire
+    `onError`. Its loaded marker sits beside the link, because iOS hides an accessible element's
+    descendants from automation.
+  - Web link name: the `linkLabel` copy is screen-reader text inside the link and the visible
+    lines are `aria-hidden`. With `aria-label` instead, axe reported
+    `label-content-name-mismatch` (WCAG 2.5.3) on the first local Playwright run.
+  - Focus when the teaser leaves while focused: web checks `document.activeElement` in a layout
+    effect cleanup, which runs before React removes the link. React Native has no screen-reader
+    focus event, so mobile tracks the link's `onFocus`/`onBlur` and its own return-focus move.
+  - Notices: mobile reuses the Community `InfoBanner`, which now forwards a ref to its message
+    element, takes `liveRegion={false}` for this notice only, and keeps one mounted instance whose
+    dismissal belongs to the message it was dismissed on. Web renders
+    `community-spotlight-notice`, a `tabIndex={-1}` paragraph heading the Community aside with
+    no live region; it stays until the next activation or an identity change.
+  - Maestro: `scripts/run-maestro.mjs` discovers every flow in `maestro/`, so the new flow needs
+    no list entry there; it is not user scoped (it only reads the shared seeded cohort).
+    `scripts/maestro-flow-durations.json` carries its estimate.
+  - Defect fixed along the way: 6.6-MOB-053 replaced `communityCommentsSessionFromMobile` with
+    a `member-1` mock and never restored it, so every later case in `community-screen.test.tsx`
+    ran as `member-1` whatever its own setup said. It now restores the spy when it finishes.
+  - Local E2E ran against an isolated `tea_community_<uuid>` database on the local Supabase
+    cluster (the Playwright cleanup guard's accepted isolated name) with
+    `PLAYWRIGHT_SKIP_DB_RESET=true` and the `cc67-redis` container, so the default database was
+    never reset.
+  - Mobile CTA text uses `#8A691F` on light surfaces and `#C9A14A` on dark ones. The accent gold
+    on white measured about 2.3:1 in the first iOS screenshot, under the AA floor for 13 pt text.
+  - Local iOS Maestro ran with `MOBILE_E2E_EXPO_NO_OPEN=1`: Xcode 27.1 on this machine ships no
+    `Simulator.app`, so `expo start --ios` exits before serving. The flag is the runner's existing
+    no-open path; Maestro opens the app through its link endpoint either way.
+
 ## Spec Change Log
 
 - 2026-10-23, iteration 5 (rereview 3): read floor, last-attempt time and `Retry-After` are
