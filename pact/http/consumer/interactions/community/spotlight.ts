@@ -209,7 +209,8 @@ export async function verifyCommunitySpotlightHomeTeaserInteraction(
       setJsonContent({
         body: {
           data: {
-            level: string('city'),
+            // The teaser renders only a served level: `none` with an item must not verify.
+            level: MatchersV3.regex('^(city|region|country)$', 'city'),
             label: like(SPOTLIGHT_LABEL),
             items: [
               {
@@ -231,6 +232,7 @@ export async function verifyCommunitySpotlightHomeTeaserInteraction(
         surface: 'home_teaser',
       })
       const parsed = communityReactionSpotlightResponseSchema.parse(response)
+      expect(parsed.data.level).toBe('city')
       expect(parsed.data.label).toBe(SPOTLIGHT_LABEL)
       expect(parsed.data.items.map((item) => [item.id, item.rank])).toEqual([
         [PUBLISHED_POST_ID, 1],
