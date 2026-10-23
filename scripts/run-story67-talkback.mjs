@@ -32,8 +32,11 @@ import { MAESTRO_PINNED_VERSION } from './maestro-version.mjs'
 const root = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..')
 const flows = path.join(root, 'maestro', 'story67')
 const appId = 'com.couturecast.story65'
-const adbPath = '/Users/murat/Library/Android/sdk/platform-tools/adb'
-const maestroPath = '/opt/homebrew/bin/maestro'
+// Tools come from the environment: ADB or the Android SDK, MAESTRO_BIN, else PATH.
+const androidSdk = process.env.ANDROID_HOME ?? process.env.ANDROID_SDK_ROOT
+const adbPath =
+  process.env.ADB ?? (androidSdk ? path.join(androidSdk, 'platform-tools', 'adb') : 'adb')
+const maestroPath = process.env.MAESTRO_BIN ?? 'maestro'
 const talkBack =
   'com.google.android.marvin.talkback/com.google.android.marvin.talkback.TalkBackService'
 
@@ -148,9 +151,7 @@ function maestro(flow, step, { env = {}, secrets = [], allowFail = false } = {})
       env: {
         PATH: process.env.PATH,
         HOME: process.env.HOME,
-        JAVA_HOME:
-          process.env.JAVA_HOME ??
-          '/Library/Java/JavaVirtualMachines/temurin-21.jdk/Contents/Home',
+        ...(process.env.JAVA_HOME ? { JAVA_HOME: process.env.JAVA_HOME } : {}),
         MAESTRO_APP_ID: appId,
         MAESTRO_CLI_NO_ANALYTICS: '1',
         MAESTRO_CLI_ANALYSIS_NOTIFICATION_DISABLED: 'true',

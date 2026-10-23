@@ -1,0 +1,126 @@
+# Story 6.7: the accessibility-focus native module. CI has no development-build
+# lane for the mobile app, so this workflow compiles and unit-tests the module on
+# both platforms and builds an Android app that contains it, whenever the module,
+# the Home teaser hook or the TalkBack runner changes. PR Gate makes every job
+# that runs here required.
+name: Accessibility focus module
+
+on:
+  pull_request:
+    paths:
+      - 'apps/mobile/modules/accessibility-focus/**'
+      - 'apps/mobile/src/features/home/use-home-spotlight-teaser.ts'
+      - 'apps/mobile/components/home/home-spotlight-teaser.tsx'
+      - 'scripts/run-story67-talkback.mjs'
+      - 'scripts/ci/probe-android-talkback.sh'
+      - 'maestro/story67/**'
+      - '.github/workflows/pr-accessibility-focus.yml'
+  push:
+    branches: [main]
+    paths:
+      - 'apps/mobile/modules/accessibility-focus/**'
+      - 'apps/mobile/src/features/home/use-home-spotlight-teaser.ts'
+      - 'apps/mobile/components/home/home-spotlight-teaser.tsx'
+      - 'scripts/run-story67-talkback.mjs'
+      - 'scripts/ci/probe-android-talkback.sh'
+      - 'maestro/story67/**'
+      - '.github/workflows/pr-accessibility-focus.yml'
+  workflow_dispatch:
+
+concurrency:
+  group: accessibility-focus-${{ github.event.pull_request.number || github.ref }}
+  cancel-in-progress: true
+
+permissions:
+  contents: read
+
+env:
+  ANDROID_API_LEVEL: '34'
+  # The Play image: the plain google_apis image carries no TalkBack.
+  ANDROID_TARGET: google_apis_playstore
+  ANDROID_ARCH: x86_64
+  ANDROID_PROFILE: medium_phone
+
+jobs:
+  android:
+    name: Android module tests and app build
+    runs-on: ubuntu-latest
+    timeout-minutes: 45
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Setup Node environment
+        uses: ./.github/actions/install
+        with:
+          install-command: npm ci
+
+      - name: Setup Java
+        uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: '21'
+
+      - name: Setup Android SDK
+        uses: android-actions/setup-android@v3
+        with:
+          packages: platform-tools
+
+      - name: Robolectric tests for the focus observer
+        working-directory: apps/mobile
+        env:
+          CI: '1'
+          EXPO_NO_GIT_STATUS: '1'
+        run: npm run test:accessibility-focus:android
+
+      - name: Build an Android app containing the module
+        working-directory: apps/mobile/android
+        run: |
+          ./gradlew :app:assembleDebug --console=plain
+          apk=app/build/outputs/apk/debug/app-debug.apk
+          count=$(unzip -p "$apk" 'classes*.dex' | strings | grep -c -F 'Lexpo/modules/accessibilityfocus/AccessibilityFocusModule;')
+          echo "AccessibilityFocusModule class descriptors in the APK dex: $count"
+          test "$count" -gt 0
+
+  ios:
+    name: iOS module tests
+    runs-on: macos-15
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: XCTest for the focus target decisions
+        working-directory: apps/mobile/modules/accessibility-focus/ios
+        run: |
+          device=$(xcrun simctl list devices available | grep -m1 -oE 'iPhone [0-9]+[^(]*' | sed 's/ *$//')
+          echo "Simulator: $device"
+          xcodebuild test -scheme AccessibilityFocusTarget -destination "platform=iOS Simulator,name=$device"
+
+  talkback-probe:
+    name: TalkBack on a GitHub-hosted emulator
+    runs-on: ubuntu-latest
+    timeout-minutes: 40
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Setup Android SDK
+        uses: android-actions/setup-android@v3
+        with:
+          packages: platform-tools
+
+      - name: Enable KVM
+        run: |
+          echo 'KERNEL=="kvm", GROUP="kvm", MODE="0666", OPTIONS+="static_node=kvm"' | sudo tee /etc/udev/rules.d/99-kvm4all.rules
+          sudo udevadm control --reload-rules
+          sudo udevadm trigger --name-match=kvm
+
+      - name: Probe TalkBack
+        uses: reactivecircus/android-emulator-runner@v2
+        with:
+          api-level: ${{ env.ANDROID_API_LEVEL }}
+          target: ${{ env.ANDROID_TARGET }}
+          arch: ${{ env.ANDROID_ARCH }}
+          profile: ${{ env.ANDROID_PROFILE }}
+          emulator-options: -no-snapshot -no-window -gpu swiftshader_indirect -noaudio -no-boot-anim -camera-back none
+          emulator-boot-timeout: 900
+          disable-animations: true
+          script: bash scripts/ci/probe-android-talkback.sh
