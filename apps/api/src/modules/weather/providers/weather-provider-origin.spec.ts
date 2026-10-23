@@ -35,6 +35,11 @@ describe('resolveWeatherProviderOrigin', () => {
     { VERCEL_ENV: 'production', TEST_ENV: 'local' },
     { APP_ENV: 'prod' },
     { NODE_ENV: 'production' },
+    // A Vercel production deployment wins over any other declared environment.
+    { VERCEL_ENV: 'production', APP_ENV: 'preview' },
+    { VERCEL_ENV: 'production', DEPLOY_ENV: 'local', TEST_ENV: 'local' },
+    { VERCEL_ENV: 'production', APP_ENV: 'development', DEPLOY_ENV: 'preview' },
+    { APP_ENV: 'preview', DEPLOY_ENV: 'production' },
   ])('1.2b-UNIT-ORIGIN-03 ignores overrides in production %j', (env) => {
     expect(
       resolveWeatherProviderOrigin('openweather', {
