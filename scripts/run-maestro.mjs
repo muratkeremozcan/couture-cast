@@ -165,30 +165,6 @@ const MAESTRO_ARTIFACT_DIR = process.env.MAESTRO_ARTIFACT_DIR || 'maestro/artifa
  */
 const CI_FLOW_TIMEOUT_MS = Number(process.env.MOBILE_E2E_CI_FLOW_TIMEOUT_MS || 360_000)
 
-/**
- * Flows whose real work outlasts the default ceiling, each with its reason.
- *
- * - `home-spotlight-teaser-fallback.yaml` (Story 6.7) waits out the teaser
- *   value's real five-minute expiry on Community before it returns Home, so it
- *   needs the expiry plus its launch preamble and two round trips. Nothing in
- *   the app is shortened for a test, so the ceiling moves instead.
- *
- * The default still governs every other flow, and `MOBILE_E2E_CI_FLOW_TIMEOUT_MS`
- * still raises all of them when set higher.
- */
-const LONG_FLOW_TIMEOUT_MS = {
-  'maestro/home-spotlight-teaser-fallback.yaml': 600_000,
-}
-
-/** The ceiling for one flow: its documented long budget, or the default. */
-const flowTimeoutMs = (flowPath) =>
-  Math.max(
-    CI_FLOW_TIMEOUT_MS,
-    LONG_FLOW_TIMEOUT_MS[
-      toPosixPath(path.relative(projectRoot, path.resolve(projectRoot, flowPath)))
-    ] ?? 0
-  )
-
 const START_SERVER = process.env.MOBILE_E2E_SKIP_SERVER !== '1'
 const AUTO_BOOT_ANDROID = process.env.MOBILE_E2E_AUTO_BOOT_ANDROID !== '0'
 // How Android addresses Metro and the API on the host. `127.0.0.1` is the
@@ -3587,7 +3563,7 @@ const runUserScopedFlows = async (
         {
           env: maestroEnv,
           logFile: WRITE_ARTIFACTS ? getFlowLogPath(flowPath) : undefined,
-          timeoutMs: flowTimeoutMs(flowPath),
+          timeoutMs: CI_FLOW_TIMEOUT_MS,
         },
         flowPath,
         identity
@@ -3848,7 +3824,7 @@ const runFlowsSerially = async (target, maestroEnv, mobileIdentity, flowFailures
         {
           env: maestroEnv,
           logFile: maestroLogFile,
-          timeoutMs: flowTimeoutMs(flowPath),
+          timeoutMs: CI_FLOW_TIMEOUT_MS,
         },
         flowPath,
         mobileIdentity
