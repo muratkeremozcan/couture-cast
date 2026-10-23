@@ -664,6 +664,24 @@ test.describe('Story 6.5 real engagement transport', () => {
       await expect(page.getByTestId(`lookbook-card-${erased}`)).toBeVisible()
       await openComments(page, erased)
       await thread(page).getByLabel('Add a comment').fill('Erased look draft')
+      // An unrelated seeded card that is on the loaded page now. A fixed one may not
+      // be: posts other tests publish lead the feed and push it past the first
+      // page. Seeded cards never go away, unlike another test's own posts.
+      const survivor = await page
+        .locator('[data-testid^="lookbook-card-"]')
+        .evaluateAll(
+          (cards, excluded) =>
+            cards
+              .map((card) => card.getAttribute('data-testid'))
+              .find(
+                (id) =>
+                  id !== null &&
+                  !excluded.includes(id) &&
+                  /^lookbook-card-(lookbook|seed)-/.test(id)
+              ) ?? null,
+          [`lookbook-card-${takenDown}`, `lookbook-card-${erased}`]
+        )
+      expect(survivor, 'An unrelated seeded card is on the loaded page').not.toBeNull()
       expectErasedAuthorDenial(authorPage)
       await requestCommunityAccountErasure(communityApi.userId)
       await expect(page.getByTestId(`lookbook-card-${erased}`)).toHaveCount(0, {
@@ -674,7 +692,7 @@ test.describe('Story 6.5 real engagement transport', () => {
       })
       await expect(thread(page)).toHaveCount(0)
       await expect(thread(authorPage)).toHaveCount(0)
-      await expect(page.getByTestId('lookbook-card-lookbook-3')).toBeVisible()
+      await expect(page.getByTestId(survivor!)).toBeVisible()
       const denied = await apiRequest<unknown>({
         method: 'GET',
         path: '/api/v1/community/events?mode=all',
