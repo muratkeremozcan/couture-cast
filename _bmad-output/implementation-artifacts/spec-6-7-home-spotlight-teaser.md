@@ -353,6 +353,20 @@ and links to that entry inside the existing City Spotlight with focus and screen
     focused and in the foreground, and each return gives the image a whole deadline
     (6.7-MOB-054). The Community Spotlight carousel flow waits for the carousel to settle between
     swipes and allows sixteen of them, after eight unsettled swipes stopped on #5 under load.
+  - R16, incident: on 2026-10-23 at 21:52:56Z a validation run, `npx playwright test
+playwright/tests/community-comments.spec.ts --repeat-each=3`, went out without the isolated
+    database env. Playwright's global teardown then ran `npm run db:reset` on the default local
+    database at 127.0.0.1:54322: dropped, migrated and re-seeded. Rows beyond the seed were lost.
+    Cause: the teardown reset every local run that did not opt out, and the environment loader
+    supplies a local `DATABASE_URL` on its own, so a raw run qualified. Fix: the reset is opt-in.
+    `playwright/support/helpers/db-reset-policy.ts` decides, `npm run test:pw-local` alone sets
+    `PLAYWRIGHT_DB_RESET=true`, and a raw run skips with a message naming that script. The CI,
+    non-local TEST_ENV, missing or remote DATABASE_URL and `PLAYWRIGHT_SKIP_DB_RESET` guards
+    still win over the opt-in. `db-reset-policy.spec.ts` covers the table, the one opting-in
+    script and the teardown itself with `execSync` mocked; four cases fail on the old rule.
+  - Playwright fixture: the community session closes its pages before deleting its rows. A page
+    left open reacted to the cleanup's realtime events, read the replies of a just-erased root,
+    got a 400, and failed the Story 6.4 tombstone test through the network monitor.
 
 ## Spec Change Log
 
