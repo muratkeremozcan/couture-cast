@@ -282,6 +282,25 @@ SUPERUSER attribute`; 4 to 7 files red per run). `apps/api/vitest.config.ts` pin
   animation settings and on none of 80 with it, so the animation-scale lead was ruled out and
   animations stay disabled (13.1 s against 17.0 s per launch). The Android-only 15 s wait for a
   sheet that can no longer rise was removed from `open-app.yaml`.
+- 2026-10-23, R25 (CI job 120315875135, `wardrobe-onboarding-flow.yaml`): the R24 endpoint's new 30 s
+  bound answered 504 because `am start -W` never returned. The device log showed Android killing
+  Expo Go's fresh process right after `clearState` ("Destroy timeout of remove-task"), so the
+  launched activity never drew and `-W`, which waits for the draw, waited forever. Maestro's
+  `openLink` never waited for a draw, and `open-app.yaml` already recovers such a launch by opening
+  the link again. The endpoint now runs `am start` without `-W`: it returns once the intent is
+  delivered, and the bound still catches a wedged adb.
+- 2026-10-23, R26 (CI, quality-gate on cb3d07b8): `6.1-MOB-022` read 2 of 3 feed requests. The card
+  shows its image fallback in the same tick it starts its last refetch, and that request reaches
+  MSW only after the async access-token lookup, so a loaded coverage run could assert before it
+  arrived. Not a product defect: the budget allows exactly two refetches. The test now slows the
+  token lookup on purpose, waits for the third request and then checks no fourth follows; with
+  the old synchronous assertion it fails every time (3 of 3), fixed it passed 25 of 25 under six
+  CPU burners.
+- 2026-10-23, found while proving R25 locally: `premium-planner.yaml` and `palette-advisor.yaml`
+  scrolled to their Settings rows with `centerElement: true`, but both rows sit at the end of the
+  list and can never reach the middle. Maestro then makes five more settling swipes before it
+  accepts a visible row, and on a slow emulator those outlasted the 15 s timeout, so the step
+  reported a row it was showing as not found. Both steps now wait for the row to be fully visible.
 
 ## Spec Change Log
 
