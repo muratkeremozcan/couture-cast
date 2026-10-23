@@ -411,21 +411,25 @@ export async function getCommunitySpotlightFromWeb({
   signal,
 }: CommunitySpotlightRequest = {}): Promise<CommunityReactionSpotlight> {
   const accessToken = readAccessToken()
-  try {
-    const response = await retryOnceWhenCommunityUnavailable(
-      () =>
-        createWebApiClient({ accessToken }).getCommunitySpotlight(
-          {
-            xCouturePlatform: 'web',
-            xCoutureReactions: '1',
-            cursor,
-            limit,
-            ...(surface ? { surface } : {}),
-          },
-          { signal }
-        ),
-      signal
+  const attempt = () =>
+    createWebApiClient({ accessToken }).getCommunitySpotlight(
+      {
+        xCouturePlatform: 'web',
+        xCoutureReactions: '1',
+        cursor,
+        limit,
+        ...(surface ? { surface } : {}),
+      },
+      { signal }
     )
+  try {
+    // Story 6.7: the Home teaser makes one transport attempt. Its lifecycle owns
+    // every retry, so a contention 503 removes the teaser and waits for the next
+    // trigger instead of reading again inside the 60-second floor.
+    const response =
+      surface === 'home_teaser'
+        ? await attempt()
+        : await retryOnceWhenCommunityUnavailable(attempt, signal)
     return communityReactionSpotlightResponseSchema.parse(response).data
   } catch (error: unknown) {
     // Developer-facing. The spotlight renders `community.spotlight.error`.

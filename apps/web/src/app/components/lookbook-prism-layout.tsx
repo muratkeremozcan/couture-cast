@@ -237,11 +237,25 @@ export function LookbookPrismLayout() {
     setActiveTab(CHIP_DEFAULT_FILTER[category])
   }
 
+  // The frame that scrolls the preview into view; an unmount cancels it, so it
+  // never runs against a layout that is gone.
+  const previewScrollFrameRef = useRef<number | null>(null)
+  useEffect(
+    () => () => {
+      if (previewScrollFrameRef.current !== null)
+        cancelAnimationFrame(previewScrollFrameRef.current)
+    },
+    []
+  )
+
   const handleMobilePreviewToggle = () => {
     const willEnablePreview = !isMobilePreview
     setIsMobilePreview(willEnablePreview)
     if (willEnablePreview) {
-      requestAnimationFrame(() => {
+      if (previewScrollFrameRef.current !== null)
+        cancelAnimationFrame(previewScrollFrameRef.current)
+      previewScrollFrameRef.current = requestAnimationFrame(() => {
+        previewScrollFrameRef.current = null
         containerRef.current?.scrollIntoView({ block: 'start' })
       })
     }

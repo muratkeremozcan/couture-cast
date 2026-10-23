@@ -59,7 +59,7 @@ import {
   TouchableOpacity,
   View,
 } from 'react-native'
-import { useLocalSearchParams, useRouter } from 'expo-router'
+import { useFocusEffect, useLocalSearchParams, useRouter } from 'expo-router'
 import { hasDeepLinkIntent, parseDeepLink } from '@couture/utils'
 import {
   communityModerationReasonCategories,
@@ -324,6 +324,28 @@ export function CommunityScreen() {
   // Read by the realtime callbacks, which outlive any one render.
   const spotlightRef = useRef(spotlight)
   spotlightRef.current = spotlight
+
+  /**
+   * Story 6.7: a teaser intent belongs to the visit that received it. Leaving
+   * Community (the Home tab, Android back) retires the intent and any targeted
+   * focus not yet carried out, so nothing resolves, announces or moves focus on
+   * a screen the member has left. Declared before the intent effects, so their
+   * first run already sees this visit as focused.
+   */
+  const screenFocusedRef = useRef(false)
+  useFocusEffect(
+    useCallback(() => {
+      screenFocusedRef.current = true
+      return () => {
+        screenFocusedRef.current = false
+        setSpotlightIntent(null)
+        const request = spotlightRef.current.focusRequest
+        if (request?.kind === 'targeted')
+          spotlightRef.current.acknowledgeFocusRequest(request.serial)
+      }
+    }, [])
+  )
+  const canMoveSpotlightFocus = useCallback(() => screenFocusedRef.current, [])
   const [spotlightDetail, setSpotlightDetail] =
     useState<CommunityReactionSpotlightItem | null>(null)
   const spotlightRankRefs = useRef(new Map<string, View | null>())
@@ -1387,8 +1409,9 @@ export function CommunityScreen() {
   const focusSpotlightEntry = spotlight.focusEntry
   const feedListRef = feedScroll.listRef
   useEffect(() => {
-    if (!spotlightIntent) return
+    if (!spotlightIntent || !screenFocusedRef.current) return
     const report = (key: SpotlightNoticeKey) => {
+      if (!screenFocusedRef.current) return
       setSpotlightIntent(null)
       spotlightNoticeSerialRef.current += 1
       setSpotlightNotice({ key, serial: spotlightNoticeSerialRef.current })
@@ -1429,9 +1452,10 @@ export function CommunityScreen() {
   // Focusing the notice is its single announcement: the list returns to its
   // top, then focus moves to the message. No live region repeats it.
   useEffect(() => {
-    if (!spotlightNotice) return
+    if (!spotlightNotice || !screenFocusedRef.current) return
     feedListRef.current?.scrollToOffset({ offset: 0, animated: false })
     requestAnimationFrame(() => {
+      if (!screenFocusedRef.current) return
       if (Platform.OS === 'web') {
         ;(noticeRef.current as unknown as { focus?: () => void } | null)?.focus?.()
         return
@@ -1760,6 +1784,8 @@ export function CommunityScreen() {
           isLoadingMore={spotlight.isLoadingMore}
           loadMoreFailed={spotlight.loadMoreFailed}
           focusRequest={spotlight.focusRequest}
+          onFocusRequestHandled={spotlight.acknowledgeFocusRequest}
+          canMoveFocus={canMoveSpotlightFocus}
           onRetry={spotlight.reload}
           onViewMore={spotlight.loadMore}
           renderCard={(post) => renderSpotlightCard(post, false)}

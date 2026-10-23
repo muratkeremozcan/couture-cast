@@ -1,6 +1,8 @@
 /* eslint-disable @typescript-eslint/await-thenable */
 // Story 6.7 owner: a Home teaser activation resolved by the mobile Community screen.
 import { item, setMockParams } from './harness'
+import { CommunitySyncState, type CommunitySyncCallbacks } from '@couture/api-client'
+import { screenFocus } from '../focus-effect'
 import { routing } from './mock-state'
 import { act, screen, waitFor } from '@testing-library/react'
 import { http, HttpResponse } from 'msw'
@@ -273,5 +275,117 @@ export function registerCommunitySpotlightFocusCases() {
         handles.get(rank)
       )
     )
+  })
+
+  it('6.7-MOB-026 a consumed focus request never replays when the module recovers from an availability lapse', async () => {
+    const syncs: CommunitySyncState[] = []
+    vi.spyOn(CommunitySyncState.prototype, 'start').mockImplementation(function (
+      this: CommunitySyncState
+    ) {
+      syncs.push(this)
+    })
+    const handles = iosFocusHandles()
+    vi.mocked(AccessibilityInfo.announceForAccessibility).mockClear()
+    vi.mocked(AccessibilityInfo.setAccessibilityFocus).mockClear()
+    serveSpotlight(() => page())
+    setMockParams(teaserIntent('spot-1', 'token-026'))
+    await render(<CommunityScreen />)
+    const rank = await screen.findByTestId('community-spotlight-rank-spot-1')
+    await waitFor(() =>
+      expect(AccessibilityInfo.setAccessibilityFocus).toHaveBeenCalledWith(
+        handles.get(rank)
+      )
+    )
+    const focusedBefore = vi.mocked(AccessibilityInfo.setAccessibilityFocus).mock.calls
+      .length
+    expect(announcementsOf(ANNOUNCE_FOCUSED)).toHaveLength(1)
+
+    // Access verification lapses, then recovers: the module unmounts and mounts.
+    await waitFor(() => expect(syncs).toHaveLength(1))
+    const callbacks = (syncs[0] as unknown as { callbacks: CommunitySyncCallbacks })
+      .callbacks
+    act(() => callbacks.availability('unavailable', false))
+    await waitFor(() => expect(screen.queryByTestId('community-spotlight')).toBeNull())
+    act(() => callbacks.availability('connected', false))
+    await screen.findByTestId('community-spotlight-rank-spot-1')
+    for (let frame = 0; frame < 3; frame += 1)
+      await act(async () => {
+        await new Promise((resolve) => requestAnimationFrame(resolve))
+      })
+    expect(announcementsOf(ANNOUNCE_FOCUSED)).toHaveLength(1)
+    expect(vi.mocked(AccessibilityInfo.setAccessibilityFocus).mock.calls).toHaveLength(
+      focusedBefore
+    )
+  })
+
+  // The Home tab and Android back both reach Community as a navigation blur.
+  it.each(['the Home tab', 'Android back'])(
+    '6.7-MOB-027 leaving through %s retires a pending destination: a later response announces and focuses nothing',
+    async (way) => {
+      let release: (() => void) | undefined
+      serveSpotlight(
+        () =>
+          new Promise<Response>((resolve) => {
+            release = () => resolve(page())
+          })
+      )
+      const handles = iosFocusHandles()
+      vi.mocked(AccessibilityInfo.announceForAccessibility).mockClear()
+      vi.mocked(AccessibilityInfo.setAccessibilityFocus).mockClear()
+      setMockParams(teaserIntent('spot-1', `token-027-${way}`))
+      await render(<CommunityScreen />)
+      await waitFor(() => expect(release).toBeTypeOf('function'))
+      act(() => screenFocus.set(false))
+
+      release!()
+      const rank = await screen.findByTestId('community-spotlight-rank-spot-1')
+      for (let frame = 0; frame < 3; frame += 1)
+        await act(async () => {
+          await new Promise((resolve) => requestAnimationFrame(resolve))
+        })
+      act(() => screenFocus.set(true))
+      for (let frame = 0; frame < 3; frame += 1)
+        await act(async () => {
+          await new Promise((resolve) => requestAnimationFrame(resolve))
+        })
+      expect(announcementsOf(ANNOUNCE_FOCUSED)).toHaveLength(0)
+      expect(AccessibilityInfo.setAccessibilityFocus).not.toHaveBeenCalledWith(
+        handles.get(rank)
+      )
+      expect(screen.queryByTestId('deep-link-info-banner')).toBeNull()
+    }
+  )
+
+  it('6.7-MOB-028 leaving before the 10-second destination deadline shows and focuses no notice', async () => {
+    serveSpotlight(() => new Promise<Response>(() => undefined))
+    iosFocusHandles()
+    vi.mocked(AccessibilityInfo.setAccessibilityFocus).mockClear()
+    const startedAt = Date.now()
+    let now = startedAt
+    const dateNow = vi.spyOn(Date, 'now').mockImplementation(() => now)
+    vi.useFakeTimers({ toFake: ['setTimeout', 'clearTimeout'] })
+    try {
+      setMockParams(teaserIntent('spot-1', 'token-028'))
+      await render(<CommunityScreen />)
+      await act(async () => {
+        await vi.advanceTimersByTimeAsync(0)
+      })
+      act(() => screenFocus.set(false))
+      now = startedAt + 10_000
+      await act(async () => {
+        await vi.advanceTimersByTimeAsync(10_000)
+      })
+      vi.useRealTimers()
+      act(() => screenFocus.set(true))
+      for (let frame = 0; frame < 3; frame += 1)
+        await act(async () => {
+          await new Promise((resolve) => requestAnimationFrame(resolve))
+        })
+      expect(screen.queryByTestId('deep-link-info-banner')).toBeNull()
+      expect(AccessibilityInfo.setAccessibilityFocus).not.toHaveBeenCalled()
+    } finally {
+      vi.useRealTimers()
+      dateNow.mockRestore()
+    }
   })
 }

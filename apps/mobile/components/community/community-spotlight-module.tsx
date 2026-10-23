@@ -67,6 +67,10 @@ export interface CommunitySpotlightModuleProps {
   isLoadingMore: boolean
   loadMoreFailed: boolean
   focusRequest: SpotlightFocusRequest | null
+  /** Retires a handled request in its owner, so a remount never replays it. */
+  onFocusRequestHandled?: (serial: number) => void
+  /** Checked when a queued focus move runs; false drops it (the screen was left). */
+  canMoveFocus?: () => boolean
   onRetry: () => void
   onViewMore: () => void
   renderCard: (item: CommunityReactionSpotlightItem) => React.ReactNode
@@ -83,6 +87,8 @@ export function CommunitySpotlightModule({
   isLoadingMore,
   loadMoreFailed,
   focusRequest,
+  onFocusRequestHandled,
+  canMoveFocus,
   onRetry,
   onViewMore,
   renderCard,
@@ -97,6 +103,10 @@ export function CommunitySpotlightModule({
   const handledFocusRef = useRef(0)
   const translationRef = useRef(t)
   translationRef.current = t
+  const handledCallbackRef = useRef(onFocusRequestHandled)
+  handledCallbackRef.current = onFocusRequestHandled
+  const canMoveFocusRef = useRef(canMoveFocus)
+  canMoveFocusRef.current = canMoveFocus
   const itemsRef = useRef(items)
   itemsRef.current = items
   const stepRef = useRef(step)
@@ -117,6 +127,7 @@ export function CommunitySpotlightModule({
   useEffect(() => {
     if (!focusRequest || handledFocusRef.current === focusRequest.serial) return
     handledFocusRef.current = focusRequest.serial
+    handledCallbackRef.current?.(focusRequest.serial)
     AccessibilityInfo.announceForAccessibility(
       focusRequest.kind === 'appended'
         ? translationRef.current('community.spotlight.announceLoadedMore', {
@@ -129,6 +140,7 @@ export function CommunitySpotlightModule({
     const { firstId } = focusRequest
     if (firstId === null) return
     requestAnimationFrame(() => {
+      if (canMoveFocusRef.current && !canMoveFocusRef.current()) return
       const index = itemsRef.current.findIndex((item) => item.id === firstId)
       if (index >= 0)
         carouselRef.current?.scrollTo({ x: index * stepRef.current, animated: true })

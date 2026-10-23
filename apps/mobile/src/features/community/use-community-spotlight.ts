@@ -62,6 +62,11 @@ export interface CommunitySpotlightView {
    * when the entry is not shown, so the caller can report that instead.
    */
   focusEntry: (postId: string) => boolean
+  /**
+   * Retires a handled focus request, so a module that unmounts and mounts again
+   * (an availability lapse and recovery) never replays it.
+   */
+  acknowledgeFocusRequest: (serial: number) => void
 }
 
 /** Same read refusals as the feed render the localized disabled state. */
@@ -342,6 +347,10 @@ export function useCommunitySpotlight({
     return true
   }, [])
 
+  const acknowledgeFocusRequest = useCallback((serial: number) => {
+    setFocusRequest((current) => (current?.serial === serial ? null : current))
+  }, [])
+
   return {
     status,
     level,
@@ -358,5 +367,6 @@ export function useCommunitySpotlight({
     evict,
     refreshItem,
     focusEntry,
+    acknowledgeFocusRequest,
   }
 }

@@ -286,23 +286,27 @@ export async function getCommunitySpotlightFromMobile({
   signal,
 }: CommunitySpotlightRequest = {}): Promise<CommunityReactionSpotlight> {
   const accessToken = await readAccessToken()
-  try {
-    const response = await retryOnceWhenCommunityUnavailable(
-      () =>
-        withRequestTimeout(signal, (requestSignal) =>
-          communityClient(accessToken).getCommunitySpotlight(
-            {
-              xCouturePlatform: 'mobile',
-              xCoutureReactions: '1',
-              cursor,
-              limit,
-              ...(surface ? { surface } : {}),
-            },
-            { signal: requestSignal }
-          )
-        ),
-      signal
+  const attempt = () =>
+    withRequestTimeout(signal, (requestSignal) =>
+      communityClient(accessToken).getCommunitySpotlight(
+        {
+          xCouturePlatform: 'mobile',
+          xCoutureReactions: '1',
+          cursor,
+          limit,
+          ...(surface ? { surface } : {}),
+        },
+        { signal: requestSignal }
+      )
     )
+  try {
+    // Story 6.7: the Home teaser makes one transport attempt. Its lifecycle owns
+    // every retry, so a contention 503 removes the teaser and waits for the next
+    // trigger instead of reading again inside the 60-second floor.
+    const response =
+      surface === 'home_teaser'
+        ? await attempt()
+        : await retryOnceWhenCommunityUnavailable(attempt, signal)
     return communityReactionSpotlightResponseSchema.parse(response).data
   } catch (error: unknown) {
     throw await communityError(error, 'Unable to load the City Spotlight.')

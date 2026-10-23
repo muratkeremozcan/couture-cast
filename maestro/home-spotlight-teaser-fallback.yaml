@@ -1,0 +1,70 @@
+# Story 6.7: the return-focus fallback when the teaser is gone.
+#
+# DATA. The same harness member and read-only seeded Chicago cohort as
+# `home-spotlight-teaser.yaml`; the flow never reacts or changes the member.
+#
+# HOW THE TEASER GOES. A teaser value expires five minutes after its read and
+# Home does not re-read while it is away, so staying on Community past that
+# point leaves Home with no teaser to return to. The return must then move
+# accessibility focus to the Home scroll view, which the focus marker records.
+# Nothing in the app is shortened for this: the wait is the real expiry.
+appId: ${MAESTRO_APP_ID}
+name: 'Home spotlight teaser return fallback'
+tags:
+  - e2e
+  - community
+  - hero
+  - maestro
+---
+- launchApp:
+    appId: ${MAESTRO_APP_ID}
+    clearState: true
+    stopApp: false
+
+- runFlow: subflows/open-app.yaml
+
+- scrollUntilVisible:
+    element:
+      id: 'home-spotlight-teaser-link'
+    direction: DOWN
+    timeout: 30000
+- swipe:
+    start: '50%, 70%'
+    end: '50%, 35%'
+    duration: 400
+- waitForAnimationToEnd
+- extendedWaitUntil:
+    visible:
+      id: 'home-spotlight-teaser-image-loaded'
+    timeout: 20000
+
+- tapOn:
+    id: 'home-spotlight-teaser-link'
+    label: 'Open the entry in the City Spotlight'
+- extendedWaitUntil:
+    visible:
+      id: 'community-spotlight-rank-seed-spotlight-1'
+    timeout: 20000
+
+# Waits out the five-minute expiry on Community. The element never exists, so
+# the optional wait always runs to its timeout and then continues.
+- extendedWaitUntil:
+    visible:
+      id: 'home-spotlight-teaser-expiry-wait-never-shown'
+    timeout: 305000
+    optional: true
+    label: 'Stay on Community past the teaser value expiry'
+
+- tapOn:
+    id: 'tab-home'
+    retryTapIfNoChange: true
+    label: 'Return to Home with the teaser expired'
+
+- scrollUntilVisible:
+    element:
+      id: 'home-spotlight-teaser-focused-scroll-view-1'
+    direction: DOWN
+    timeout: 15000
+    label: 'With no teaser to return to, accessibility focus moved to the Home scroll view'
+- assertNotVisible:
+    id: 'home-spotlight-teaser-focused-link-1'

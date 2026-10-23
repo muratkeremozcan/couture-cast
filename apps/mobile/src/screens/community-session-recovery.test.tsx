@@ -49,9 +49,10 @@ vi.mock('react-native', async (importOriginal) => {
     },
   }
 })
-vi.mock('expo-router', () => ({
+vi.mock('expo-router', async () => ({
   useLocalSearchParams: () => ({}),
   useRouter: () => ({ setParams: vi.fn(), push: vi.fn() }),
+  useFocusEffect: (await import('../test-utils/focus-effect.js')).useFocusEffect,
 }))
 vi.mock('expo-haptics', () => ({ selectionAsync: () => Promise.resolve() }))
 vi.mock('expo-localization', () => ({

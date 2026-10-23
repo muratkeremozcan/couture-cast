@@ -12,6 +12,12 @@ export const SPOTLIGHT_TEASER_EXPIRY_MS = 5 * 60_000
 export const SPOTLIGHT_TEASER_REREAD_MS = 4 * 60_000
 /** Reads never run more often than once per this interval. */
 export const SPOTLIGHT_TEASER_READ_FLOOR_MS = 60_000
+/**
+ * The longest `Retry-After` deferral the teaser honors. The spotlight's read
+ * limit counts per minute, so a longer answer is a fault, never a reason to keep
+ * the teaser off Home for the rest of the session.
+ */
+export const SPOTLIGHT_TEASER_MAX_DEFERRAL_MS = 5 * 60_000
 
 /** One renderable teaser: the viewer's rank-1 spotlight entry. */
 export interface SpotlightTeaserValue {
@@ -45,8 +51,9 @@ const systemTimers: SpotlightTeaserTimers = {
 }
 
 /**
- * The render rule: a served level, one entry, a label to name the area and an
- * image to show. Anything else renders nothing and reserves no space.
+ * The render rule: a served level, one entry and a label to name the area (the
+ * contract requires every entry's signed image URL). Anything else renders
+ * nothing and reserves no space.
  */
 export function spotlightTeaserValueOf(
   spotlight: CommunityReactionSpotlight,
@@ -55,7 +62,6 @@ export function spotlightTeaserValueOf(
 ): SpotlightTeaserValue | null {
   const item = spotlight.items[0]
   if (spotlight.level === 'none' || !item || !spotlight.label) return null
-  if (!item.imageAccess.url) return null
   return {
     memberId,
     item,
@@ -190,8 +196,10 @@ export class SpotlightTeaserState {
       this.controller = null
       this.lastAttemptFailed = true
       const retryAfter = this.dependencies.retryAfterSeconds(error)
-      if (retryAfter !== undefined && retryAfter > 0)
-        this.deferredUntil = this.timers.now() + retryAfter * 1000
+      if (retryAfter !== undefined && Number.isFinite(retryAfter) && retryAfter > 0)
+        this.deferredUntil =
+          this.timers.now() +
+          Math.min(retryAfter * 1000, SPOTLIGHT_TEASER_MAX_DEFERRAL_MS)
       this.setValue(null)
     }
   }

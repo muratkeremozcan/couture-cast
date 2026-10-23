@@ -267,6 +267,39 @@ and links to that entry inside the existing City Spotlight with focus and screen
     `Simulator.app`, so `expo start --ios` exits before serving. The flag is the runner's existing
     no-open path; Maestro opens the app through its link endpoint either way.
 
+- 2026-10-23, code review round 1 (`reviews/code-triage-1.md`, R1 to R10). Each fix has a test
+  that fails without it; the mutation runs are listed in the repair reply.
+  - R1: the mobile member is keyed by the application user it was resolved for, so a change
+    hides the previous member's value in the same render and the lifecycle clears and aborts
+    before the next identity resolves (6.7-MOB-018). Web already resolves synchronously; 6.7-WEB-007
+    now asserts the clear in the same commit.
+  - R2: on native the teaser counts as holding focus only for 10 seconds
+    (`TEASER_RETURN_FOCUS_HOLD_MS`) after a return focus, or while the link reports input focus.
+    Home blur and activation end the window, so a later removal never pulls a screen reader away
+    from what the member swiped to (6.7-MOB-033, 6.7-MOB-034).
+  - R3: `HomeSpotlightTeaserSlot` owns the lifecycle, focus state and return focus as a memoized
+    child, so teaser updates never re-render the hero (6.7-MOB-035 counts hero card renders).
+  - R4: the spotlight hook retires a handled focus request (`acknowledgeFocusRequest`), so a module
+    that remounts after an availability lapse never replays it (6.7-MOB-026).
+  - R5: Community retires a pending teaser intent and any unexecuted targeted focus on navigation
+    blur, and guards its deadline timer and animation-frame callbacks (6.7-MOB-027, 6.7-MOB-028).
+  - R6: native return focus is covered with native handles and exact call counts (6.7-MOB-030 to
+    6.7-MOB-032). Home renders a 1-point automation marker,
+    `home-spotlight-teaser-focused-<target>-<count>`, after a focus request reached a real node, and
+    the Maestro flows assert it for the Home tab return, Android back and, in
+    `home-spotlight-teaser-fallback.yaml`, the return after the value expired.
+  - R7: `surface=home_teaser` reads make one transport attempt on both clients; the Community
+    module keeps its single contention retry (6.7-MOB-015, 6.7-WEB-017).
+  - R8: absence assertions wait on the wrapper's own settled promise or on synchronous read starts,
+    never on sleeps; new rows cover the disabled 503, a network error, a 429 `Retry-After` and the
+    client deadlines (mobile 15 s, web 10 s). The mobile teaser suites share
+    `src/test-utils/home-teaser.tsx`, which releases any read a test left unanswered so it cannot
+    hold a browser connection into the next test.
+  - R10: the layout cancels its preview scroll frame on unmount, and the web teaser suite stubs
+    `scrollIntoView`, which jsdom lacks, restoring it afterwards (6.7-WEB-004, 6.7-WEB-019).
+  - CodeRabbit: `Retry-After` deferrals ignore non-finite values and are capped at five minutes
+    (`SPOTLIGHT_TEASER_MAX_DEFERRAL_MS`), since the spotlight read limit counts per minute.
+
 ## Spec Change Log
 
 - 2026-10-23, iteration 5 (rereview 3): read floor, last-attempt time and `Retry-After` are

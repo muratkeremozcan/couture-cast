@@ -3,6 +3,7 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import {
   SPOTLIGHT_TEASER_EXPIRY_MS,
+  SPOTLIGHT_TEASER_MAX_DEFERRAL_MS,
   SPOTLIGHT_TEASER_READ_FLOOR_MS,
   SPOTLIGHT_TEASER_REREAD_MS,
   SpotlightTeaserState,
@@ -268,6 +269,23 @@ describe('6.7 spotlight teaser lifecycle', () => {
     })
   })
 
+  it('6.7-UNIT-036 caps a Retry-After deferral and ignores a non-finite one', async () => {
+    const { state, reads, settle } = harness()
+    state.setActive(true)
+    state.setMember('member-1')
+    await settle(0, new RateLimited(86_400))
+    await vi.advanceTimersByTimeAsync(SPOTLIGHT_TEASER_MAX_DEFERRAL_MS - 1)
+    state.trigger()
+    expect(reads).toHaveLength(1)
+    await vi.advanceTimersByTimeAsync(1)
+    state.trigger()
+    expect(reads).toHaveLength(2)
+    await settle(1, new RateLimited(Number.POSITIVE_INFINITY))
+    await vi.advanceTimersByTimeAsync(SPOTLIGHT_TEASER_READ_FLOOR_MS)
+    state.trigger()
+    expect(reads).toHaveLength(3)
+  })
+
   it('6.7-UNIT-032 the Retry-After deferral belongs to the member who earned it', async () => {
     const { state, reads, settle } = harness()
     state.setActive(true)
@@ -300,6 +318,35 @@ describe('6.7 spotlight teaser lifecycle', () => {
     await settle(1, page('post-2'))
     expect(state.getSnapshot()?.item.id).toBe('post-2')
     expect(reads).toHaveLength(2)
+  })
+
+  it('6.7-UNIT-037 drops a late failure from an earlier member and ignores a repeated activity signal', async () => {
+    const { state, reads, settle } = harness()
+    state.setActive(true)
+    state.setActive(true)
+    expect(reads).toHaveLength(0)
+    state.setMember('member-1')
+    await settle(0, page('post-1'))
+    await vi.advanceTimersByTimeAsync(SPOTLIGHT_TEASER_REREAD_MS)
+    state.setMember('member-2')
+    await settle(2, page('post-2'))
+    // Member 1's re-read fails after the change: no deferral, no removal.
+    await settle(1, new RateLimited(600))
+    expect(state.getSnapshot()?.item.id).toBe('post-2')
+    await vi.advanceTimersByTimeAsync(SPOTLIGHT_TEASER_READ_FLOOR_MS)
+    state.trigger()
+    expect(reads).toHaveLength(4)
+  })
+
+  it('6.7-UNIT-038 an unsubscribed listener hears nothing more', async () => {
+    const { state, settle } = harness()
+    const listener = vi.fn()
+    const unsubscribe = state.subscribe(listener)
+    unsubscribe()
+    state.setActive(true)
+    state.setMember('member-1')
+    await settle(0, page())
+    expect(listener).not.toHaveBeenCalled()
   })
 
   it('6.7-UNIT-035 notifies subscribers on every change and stops after dispose', async () => {

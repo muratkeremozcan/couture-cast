@@ -1,63 +1,33 @@
 /* eslint-disable @typescript-eslint/await-thenable */
 // Story 6.7: the Home spotlight teaser on mobile. Reads are deferred through MSW
-// so each test decides when a read settles; time-driven rows use fake timers.
-import React from 'react'
-import type * as ReactModule from 'react'
+// so each test decides when a read settles; absence is asserted only after the
+// read or the member resolution it depends on has settled, and time-driven rows
+// use fake timers.
 import type * as RitualCacheModule from '@/src/lib/ritual-cache'
 import { act, configure, fireEvent, screen, waitFor } from '@testing-library/react'
 import { AppState, type AppStateStatus } from 'react-native'
-import { render } from 'vitest-browser-react'
 import { afterEach, beforeAll, beforeEach, describe, expect, it, vi } from 'vitest'
 import { http, HttpResponse } from 'msw'
-import type {
-  CommunityReactionSpotlight,
-  CommunityReactionSpotlightItem,
-} from '@couture/api-client/contracts/http'
+import { COMMUNITY_FEED_DISABLED_MESSAGE } from '@couture/api-client/contracts/http'
 import {
   SPOTLIGHT_TEASER_EXPIRY_MS,
   SPOTLIGHT_TEASER_READ_FLOOR_MS,
   SPOTLIGHT_TEASER_REREAD_MS,
 } from '@couture/api-client'
 
-const focusControl = vi.hoisted(() => ({
-  focused: true,
-  listeners: new Set<(focused: boolean) => void>(),
-  set(focused: boolean) {
-    this.focused = focused
-    for (const listener of this.listeners) listener(focused)
-  },
-}))
 const routerPush = vi.hoisted(() => vi.fn())
 
-vi.mock('expo-router', async () => {
-  const { useEffect } = await vi.importActual<typeof ReactModule>('react')
-  return {
-    useLocalSearchParams: () => ({}),
-    useRouter: () => ({ setParams: vi.fn(), push: routerPush }),
-    // A navigator double: the screen gains and loses focus when the test says so.
-    useFocusEffect: (effect: () => void | (() => void)) => {
-      useEffect(() => {
-        let cleanup: (() => void) | undefined
-        const apply = (focused: boolean) => {
-          if (focused && !cleanup) cleanup = effect() ?? (() => undefined)
-          else if (!focused && cleanup) {
-            cleanup()
-            cleanup = undefined
-          }
-        }
-        apply(focusControl.focused)
-        focusControl.listeners.add(apply)
-        return () => {
-          focusControl.listeners.delete(apply)
-          cleanup?.()
-        }
-      }, [effect])
-    },
-  }
-})
+vi.mock('expo-router', async () => ({
+  useLocalSearchParams: () => ({}),
+  useRouter: () => ({ setParams: vi.fn(), push: routerPush }),
+  useFocusEffect: (await import('../test-utils/focus-effect.js')).useFocusEffect,
+}))
 vi.mock('expo-localization', () => ({
   getLocales: () => [{ languageTag: 'en-US', languageCode: 'en', regionCode: 'US' }],
 }))
+// Passthrough spies: reads stay on the real HTTP boundary, and the wrapper's own
+// promises tell a test when a read has settled.
+vi.mock('@/src/lib/community', { spy: true })
 vi.mock('@/src/analytics/mobile-analytics', () => ({
   useMobileAnalytics: () => ({
     capture: vi.fn(),
@@ -78,166 +48,62 @@ vi.mock('@/src/lib/ritual-cache', async (importOriginal) => {
   }
 })
 
-import TabOneScreen from '@/app/(tabs)/index'
+import { screenFocus } from '@/src/test-utils/focus-effect'
 import { server } from '@/src/test-utils/msw/server'
 import { mockRitualResponse } from '@/src/test-utils/msw/handlers'
 import { noLocationResponse } from '@/src/test-utils/locations'
 import {
+  advance,
+  cityPage,
+  deferSpotlightReads,
+  follows,
+  recordOpens,
+  renderHome,
+  serveTeaserImages,
+  settledIdentity,
+  settledRead,
+  showTeaser,
+  spotlightItem,
+  teaserNodes,
+  teaserReadCalls,
+  teaserReadSignal,
+  untilFrame,
+  type Answer,
+} from '@/src/test-utils/home-teaser'
+import {
   setMobileAccessTokenResolver,
   setMobileApplicationUserId,
 } from '@/src/lib/mobile-auth'
-import { AccessibilityAnnouncerProvider } from '@/src/hooks/use-accessibility-announcer'
 import i18n, { initI18n } from '@/src/lib/i18n'
+import { getCommunitySpotlightFromMobile } from '@/src/lib/community'
 
-const TEASER_PREFIX = 'home-spotlight-teaser'
-let imageSerial = 0
+/** The bearer the app holds; undefined is a signed-out or not yet restored session. */
+let token: string | undefined | Promise<string | undefined>
+let restoreToken: (() => void) | undefined
 
-function spotlightItem(
-  id: string,
-  overrides: Partial<CommunityReactionSpotlightItem> = {}
-): CommunityReactionSpotlightItem {
-  return {
-    id,
-    caption: 'Private caption that the teaser never shows.',
-    altText: 'A camel coat over a grey knit.',
-    climateBand: 'temperate_wet',
-    imageAccess: {
-      // Unique per call: the browser image cache would otherwise answer a URL a
-      // previous test already loaded, without asking the test server.
-      url: `${window.location.origin}/teaser/${id}-${(imageSerial += 1)}.png`,
-      expiresAt: '2099-01-01T00:00:00.000Z',
-    },
-    publishedAt: '2026-10-22T09:00:00.000Z',
-    createdAt: '2026-10-22T08:59:00.000Z',
-    status: 'published',
-    challengeId: null,
-    author: { displayName: 'Ana', isSelf: false },
-    rank: 1,
-    reactions: {
-      counts: { applause: 2, love: 1, inspiration: 0 },
-      total: 3,
-      viewerReaction: null,
-      revision: 1,
-      generation: 1,
-    },
-    ...overrides,
-  }
-}
-
-const cityPage = (item = spotlightItem('look-1')): CommunityReactionSpotlight => ({
-  level: 'city',
-  label: 'Lisbon',
-  items: [item],
-  nextCursor: null,
+beforeAll(async () => {
+  process.env.EXPO_PUBLIC_API_BASE_URL = window.location.origin
+  configure({ asyncUtilTimeout: 5_000 })
+  await initI18n()
+})
+beforeEach(async () => {
+  vi.clearAllMocks()
+  screenFocus.reset()
+  token = 'session-token'
+  restoreToken = setMobileAccessTokenResolver(() => token)
+  setMobileApplicationUserId(null)
+  await i18n.changeLanguage('en-US')
+  server.use(http.get('*/api/v1/ritual', () => HttpResponse.json(mockRitualResponse)))
+  serveTeaserImages()
+})
+afterEach(() => {
+  vi.useRealTimers()
+  vi.restoreAllMocks()
+  restoreToken?.()
+  setMobileApplicationUserId(null)
 })
 
-type Answer = { status: number; body: unknown; headers?: Record<string, string> }
-interface PendingRead {
-  url: URL
-  authorization: string | null
-  resolve: (answer: Answer) => void
-}
-
-/** Every spotlight read waits until the test answers it. */
-function deferSpotlightReads() {
-  const reads: PendingRead[] = []
-  server.use(
-    http.get('*/api/v1/community/spotlight', async ({ request }) => {
-      const answer = await new Promise<Answer>((resolve) => {
-        reads.push({
-          url: new URL(request.url),
-          authorization: request.headers.get('authorization'),
-          resolve,
-        })
-      })
-      return HttpResponse.json(answer.body as never, {
-        status: answer.status,
-        headers: answer.headers,
-      })
-    })
-  )
-  const answer = async (index: number, value: CommunityReactionSpotlight | Answer) => {
-    await waitFor(() => expect(reads.length).toBeGreaterThan(index))
-    reads[index]!.resolve(
-      'status' in value ? value : { status: 200, body: { data: value } }
-    )
-  }
-  return { reads, answer }
-}
-
-function recordOpens() {
-  const opens: { postId: string; body: unknown }[] = []
-  server.use(
-    http.post('*/api/v1/community/posts/:postId/opened', async ({ params, request }) => {
-      opens.push({ postId: String(params.postId), body: await request.json() })
-      return HttpResponse.json({ tracked: true })
-    })
-  )
-  return opens
-}
-
-/** A one-pixel PNG for every teaser image URL. */
-function serveTeaserImages() {
-  server.use(
-    http.get('*/teaser/:file', () =>
-      HttpResponse.arrayBuffer(
-        Uint8Array.from(
-          atob(
-            'iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mNkYAAAAAYAAjCB0C8AAAAASUVORK5CYII='
-          ),
-          (char) => char.charCodeAt(0)
-        ).buffer,
-        { headers: { 'content-type': 'image/png' } }
-      )
-    )
-  )
-}
-
-function teaserNodes(): Element[] {
-  return Array.from(
-    document.querySelectorAll<Element>(`[data-testid^="${TEASER_PREFIX}"]`)
-  )
-}
-
-function follows(first: Element, second: Element): boolean {
-  return Boolean(first.compareDocumentPosition(second) & Node.DOCUMENT_POSITION_FOLLOWING)
-}
-
-function renderHome() {
-  return render(
-    <AccessibilityAnnouncerProvider>
-      <TabOneScreen />
-    </AccessibilityAnnouncerProvider>
-  )
-}
-
 describe('6.7 mobile Home spotlight teaser', () => {
-  let restoreToken: (() => void) | undefined
-  /** The bearer the app holds; undefined is a signed-out or not yet restored session. */
-  let token: string | undefined
-
-  beforeAll(async () => {
-    process.env.EXPO_PUBLIC_API_BASE_URL = window.location.origin
-    configure({ asyncUtilTimeout: 5_000 })
-    await initI18n()
-  })
-  beforeEach(async () => {
-    focusControl.focused = true
-    focusControl.listeners.clear()
-    routerPush.mockClear()
-    token = 'session-token'
-    restoreToken = setMobileAccessTokenResolver(() => token)
-    setMobileApplicationUserId(null)
-    await i18n.changeLanguage('en-US')
-    server.use(http.get('*/api/v1/ritual', () => HttpResponse.json(mockRitualResponse)))
-    serveTeaserImages()
-  })
-  afterEach(() => {
-    vi.useRealTimers()
-    restoreToken?.()
-    setMobileApplicationUserId(null)
-  })
-
   it('6.7-MOB-001 shows the area label, decorative image, author and reaction count after the hero', async () => {
     const { reads, answer } = deferSpotlightReads()
     setMobileApplicationUserId('member-1')
@@ -272,7 +138,7 @@ describe('6.7 mobile Home spotlight teaser', () => {
     expect(link.getBoundingClientRect().height).toBeGreaterThanOrEqual(44)
   })
 
-  it('6.7-MOB-002 the author rule names the viewer You and falls back for a blank name', async () => {
+  it('6.7-MOB-002 the author rule names the viewer You', async () => {
     const { answer } = deferSpotlightReads()
     setMobileApplicationUserId('member-1')
     await renderHome()
@@ -336,16 +202,24 @@ describe('6.7 mobile Home spotlight teaser', () => {
         body: {
           statusCode: 403,
           code: 'denied',
-          message: 'Community is not available for this account yet.',
+          message: COMMUNITY_FEED_DISABLED_MESSAGE,
         },
+      },
+    ],
+    [
+      'the disabled 503',
+      {
+        status: 503,
+        body: { statusCode: 503, message: COMMUNITY_FEED_DISABLED_MESSAGE },
       },
     ],
     [
       'a 500',
       { status: 500, body: { statusCode: 500, message: 'Internal server error' } },
     ],
+    ['a network error', 'network-error'],
   ] as const)(
-    '6.7-MOB-004 %s renders nothing and leaves Home exactly as without the teaser',
+    '6.7-MOB-004 %s renders nothing, reads once and leaves Home exactly as without the teaser',
     async (_name, refusal) => {
       const { reads, answer } = deferSpotlightReads()
       setMobileApplicationUserId('member-1')
@@ -353,18 +227,14 @@ describe('6.7 mobile Home spotlight teaser', () => {
       await screen.findByTestId('outfit-recommendation-card')
       // Reference: the same Home while the teaser read is still out.
       await waitFor(() => expect(reads).toHaveLength(1))
-      await act(async () => {
-        await new Promise((resolve) => setTimeout(resolve, 200))
-      })
       const expected = screen.getByTestId('hero-experience-scrollview').innerHTML
       await answer(0, refusal as Answer)
-      await act(async () => {
-        await new Promise((resolve) => setTimeout(resolve, 300))
-      })
+      await settledRead(0)
       expect(teaserNodes()).toEqual([])
       expect(screen.getByTestId('hero-experience-scrollview').innerHTML).toBe(expected)
-      // A refusal starts no retry loop.
+      // A refusal starts no retry, in the wrapper or in the lifecycle.
       expect(reads).toHaveLength(1)
+      expect(teaserReadCalls()).toBe(1)
     }
   )
 
@@ -406,10 +276,8 @@ describe('6.7 mobile Home spotlight teaser', () => {
     // Before the stored session is restored there is no bearer and no member.
     token = undefined
     await renderHome()
-    await act(async () => {
-      await new Promise((resolve) => setTimeout(resolve, 300))
-    })
-    expect(reads).toHaveLength(0)
+    await settledIdentity()
+    expect(teaserReadCalls()).toBe(0)
     token = 'restored-token'
     act(() => setMobileApplicationUserId('member-1'))
     await answer(0, cityPage())
@@ -425,16 +293,15 @@ describe('6.7 mobile Home spotlight teaser', () => {
     await screen.findByTestId('home-spotlight-teaser-link')
 
     act(() => setMobileApplicationUserId('member-2'))
-    await waitFor(() => expect(teaserNodes()).toEqual([]))
+    expect(teaserNodes()).toEqual([])
     // The new member reads at once, inside the previous member's 60-second floor.
     await waitFor(() => expect(reads).toHaveLength(2))
     act(() => setMobileApplicationUserId('member-3'))
+    expect(teaserReadSignal(1)?.aborted).toBe(true)
     await waitFor(() => expect(reads).toHaveLength(3))
     // Member 2's response lands after the change and is dropped.
     await answer(1, cityPage(spotlightItem('look-member-2')))
-    await act(async () => {
-      await new Promise((resolve) => setTimeout(resolve, 200))
-    })
+    await settledRead(1)
     expect(teaserNodes()).toEqual([])
     await answer(2, cityPage(spotlightItem('look-member-3')))
     await screen.findByTestId('home-spotlight-teaser-link')
@@ -442,11 +309,41 @@ describe('6.7 mobile Home spotlight teaser', () => {
     // Sign-out: the session and its bearer are gone.
     token = undefined
     act(() => setMobileApplicationUserId(null))
-    await waitFor(() => expect(teaserNodes()).toEqual([]))
-    await act(async () => {
-      await new Promise((resolve) => setTimeout(resolve, 200))
+    expect(teaserNodes()).toEqual([])
+    await settledIdentity()
+    expect(teaserReadCalls()).toBe(3)
+  })
+
+  it('6.7-MOB-018 the previous member is gone while the next identity is still resolving', async () => {
+    let now = Date.parse('2026-10-23T12:00:00.000Z')
+    vi.spyOn(Date, 'now').mockImplementation(() => now)
+    const { reads, answer } = deferSpotlightReads()
+    setMobileApplicationUserId('member-1')
+    await renderHome()
+    await answer(0, cityPage(spotlightItem('look-member-1')))
+    await screen.findByTestId('home-spotlight-teaser-link')
+    // A re-read for member 1 is in flight.
+    act(() => screenFocus.set(false))
+    now += SPOTLIGHT_TEASER_READ_FLOOR_MS
+    act(() => screenFocus.set(true))
+    await waitFor(() => expect(reads).toHaveLength(2))
+
+    // The session changes principal; the new bearer is still being verified.
+    let releaseToken!: (value: string | undefined) => void
+    token = new Promise((resolve) => {
+      releaseToken = resolve
     })
-    expect(reads).toHaveLength(3)
+    act(() => setMobileApplicationUserId(null))
+    expect(teaserNodes()).toEqual([])
+    expect(teaserReadSignal(1)?.aborted).toBe(true)
+    // Member 1's re-read answers inside the gap and never renders.
+    await answer(1, cityPage(spotlightItem('late-member-1')))
+    await settledRead(1)
+    expect(teaserNodes()).toEqual([])
+    releaseToken(undefined)
+    await settledIdentity()
+    expect(teaserNodes()).toEqual([])
+    expect(teaserReadCalls()).toBe(2)
   })
 
   it('6.7-MOB-008 an image that fails to load removes the teaser', async () => {
@@ -502,19 +399,21 @@ describe('6.7 mobile Home spotlight teaser', () => {
     const link = await screen.findByTestId('home-spotlight-teaser-link')
 
     fireEvent.click(link)
-    act(() => focusControl.set(false))
+    act(() => screenFocus.set(false))
     ;(document.activeElement as HTMLElement | null)?.blur()
-    act(() => focusControl.set(true))
+    act(() => screenFocus.set(true))
     await waitFor(() => expect(document.activeElement).toBe(link))
+    await screen.findByTestId('home-spotlight-teaser-focused-link-1')
 
     // The return is consumed: a later refocus moves nothing.
     ;(document.activeElement as HTMLElement | null)?.blur()
-    act(() => focusControl.set(false))
-    act(() => focusControl.set(true))
+    act(() => screenFocus.set(false))
+    act(() => screenFocus.set(true))
     await act(async () => {
       await new Promise((resolve) => requestAnimationFrame(resolve))
     })
     expect(document.activeElement).not.toBe(link)
+    expect(screen.queryByTestId('home-spotlight-teaser-focused-link-2')).toBeNull()
   })
 
   it('6.7-MOB-011 a return with the teaser gone lands on the Home scroll view', async () => {
@@ -524,19 +423,20 @@ describe('6.7 mobile Home spotlight teaser', () => {
     await renderHome()
     await answer(0, cityPage())
     fireEvent.click(await screen.findByTestId('home-spotlight-teaser-link'))
-    act(() => focusControl.set(false))
+    act(() => screenFocus.set(false))
     // Signing out while away removes the teaser.
     token = undefined
     act(() => setMobileApplicationUserId(null))
-    act(() => focusControl.set(true))
+    act(() => screenFocus.set(true))
     await waitFor(() =>
       expect(document.activeElement).toBe(
         screen.getByTestId('hero-experience-scrollview')
       )
     )
+    await screen.findByTestId('home-spotlight-teaser-focused-scroll-view-1')
   })
 
-  it('6.7-MOB-012 a teaser that leaves while focused hands focus to the scroll view', async () => {
+  it('6.7-MOB-012 a teaser that leaves while it holds keyboard focus hands focus to the scroll view', async () => {
     const { answer } = deferSpotlightReads()
     setMobileApplicationUserId('member-1')
     await renderHome()
@@ -561,18 +461,17 @@ describe('6.7 mobile Home spotlight teaser', () => {
     await answer(0, cityPage())
     await screen.findByTestId('home-spotlight-teaser-link')
 
-    act(() => focusControl.set(false))
+    act(() => screenFocus.set(false))
     now += SPOTLIGHT_TEASER_READ_FLOOR_MS - 1
-    act(() => focusControl.set(true))
-    await act(async () => {
-      await new Promise((resolve) => setTimeout(resolve, 100))
-    })
-    expect(reads).toHaveLength(1)
+    // A trigger starts its read synchronously, so the count is final here.
+    act(() => screenFocus.set(true))
+    expect(teaserReadCalls()).toBe(1)
     expect(screen.getByTestId('home-spotlight-teaser-link')).toBeTruthy()
 
-    act(() => focusControl.set(false))
+    act(() => screenFocus.set(false))
     now += 1
-    act(() => focusControl.set(true))
+    act(() => screenFocus.set(true))
+    expect(teaserReadCalls()).toBe(2)
     await waitFor(() => expect(reads).toHaveLength(2))
     // The current value stays on screen while the re-read is in flight.
     expect(screen.getByTestId('home-spotlight-teaser-link')).toBeTruthy()
@@ -583,20 +482,17 @@ describe('6.7 mobile Home spotlight teaser', () => {
     await waitFor(() =>
       expect(screen.getByTestId('home-spotlight-teaser-author').textContent).toBe('Bea')
     )
-    vi.mocked(Date.now).mockRestore()
   })
 
   it('6.7-MOB-017 returning to the foreground re-reads only when the last attempt is older than 60 seconds', async () => {
     let now = Date.parse('2026-10-23T12:00:00.000Z')
-    const dateNow = vi.spyOn(Date, 'now').mockImplementation(() => now)
+    vi.spyOn(Date, 'now').mockImplementation(() => now)
     const listeners: ((state: AppStateStatus) => void)[] = []
-    const addListener = vi
-      .spyOn(AppState, 'addEventListener')
-      .mockImplementation((_type, listener) => {
-        listeners.push(listener as (state: AppStateStatus) => void)
-        return { remove: () => undefined } as ReturnType<typeof AppState.addEventListener>
-      })
-    const { reads, answer } = deferSpotlightReads()
+    vi.spyOn(AppState, 'addEventListener').mockImplementation((_type, listener) => {
+      listeners.push(listener as (state: AppStateStatus) => void)
+      return { remove: () => undefined } as ReturnType<typeof AppState.addEventListener>
+    })
+    const { answer } = deferSpotlightReads()
     setMobileApplicationUserId('member-1')
     await renderHome()
     await answer(0, cityPage())
@@ -609,72 +505,54 @@ describe('6.7 mobile Home spotlight teaser', () => {
     emit('background')
     now += 30_000
     emit('active')
-    await act(async () => {
-      await new Promise((resolve) => setTimeout(resolve, 100))
-    })
-    expect(reads).toHaveLength(1)
+    expect(teaserReadCalls()).toBe(1)
     emit('background')
     now += 31_000
     emit('active')
-    await waitFor(() => expect(reads).toHaveLength(2))
-    addListener.mockRestore()
-    dateNow.mockRestore()
+    expect(teaserReadCalls()).toBe(2)
+  })
+
+  it('6.7-MOB-019 a 429 Retry-After removes the teaser and defers the next read until it passes', async () => {
+    let now = Date.parse('2026-10-23T12:00:00.000Z')
+    vi.spyOn(Date, 'now').mockImplementation(() => now)
+    const { answer } = deferSpotlightReads()
+    setMobileApplicationUserId('member-1')
+    await renderHome()
+    await answer(0, cityPage())
+    await screen.findByTestId('home-spotlight-teaser-link')
+    act(() => screenFocus.set(false))
+    now += SPOTLIGHT_TEASER_READ_FLOOR_MS
+    act(() => screenFocus.set(true))
+    await answer(1, {
+      status: 429,
+      headers: { 'Retry-After': '90' },
+      body: { statusCode: 429, message: 'Too many spotlight reads.' },
+    })
+    await settledRead(1)
+    expect(teaserNodes()).toEqual([])
+
+    act(() => screenFocus.set(false))
+    now += 89_000
+    act(() => screenFocus.set(true))
+    expect(teaserReadCalls()).toBe(2)
+    act(() => screenFocus.set(false))
+    now += 1_000
+    act(() => screenFocus.set(true))
+    expect(teaserReadCalls()).toBe(3)
   })
 })
 
 describe('6.7 mobile Home spotlight teaser timers', () => {
-  let restoreToken: (() => void) | undefined
+  const start = Date.parse('2026-10-23T12:00:00.000Z')
 
-  beforeAll(async () => {
-    process.env.EXPO_PUBLIC_API_BASE_URL = window.location.origin
-    await initI18n()
-  })
-  beforeEach(async () => {
-    focusControl.focused = true
-    focusControl.listeners.clear()
-    restoreToken = setMobileAccessTokenResolver(() => 'session-token')
-    setMobileApplicationUserId(null)
-    await i18n.changeLanguage('en-US')
-    server.use(http.get('*/api/v1/ritual', () => HttpResponse.json(mockRitualResponse)))
-    serveTeaserImages()
-  })
-  afterEach(() => {
-    vi.useRealTimers()
-    restoreToken?.()
-    setMobileApplicationUserId(null)
-  })
-
-  /** Waits on real frames, never on the faked clock, so no timer fires early. */
-  async function until(check: () => boolean) {
-    for (let frame = 0; frame < 600 && !check(); frame += 1) {
-      await act(async () => {
-        await new Promise((resolve) => requestAnimationFrame(resolve))
-      })
-    }
-    expect(check()).toBe(true)
-  }
-
-  async function advance(ms: number) {
-    await act(async () => {
-      await vi.advanceTimersByTimeAsync(ms)
-    })
-  }
-
-  async function showTeaser(reads: PendingRead[]) {
-    await until(() => reads.length === 1)
-    reads[0]!.resolve({ status: 200, body: { data: cityPage() } })
-    await until(
-      () =>
-        document.querySelector('[data-testid="home-spotlight-teaser-image-loaded"]') !==
-        null
-    )
+  function fakeClock() {
+    vi.useFakeTimers({ toFake: ['setTimeout', 'clearTimeout', 'Date'] })
+    vi.setSystemTime(start)
   }
 
   it('6.7-MOB-014 re-reads 4 minutes after the last attempt and keeps the value while it is in flight', async () => {
     const { reads } = deferSpotlightReads()
-    vi.useFakeTimers({ toFake: ['setTimeout', 'clearTimeout', 'Date'] })
-    const start = Date.parse('2026-10-23T12:00:00.000Z')
-    vi.setSystemTime(start)
+    fakeClock()
     setMobileApplicationUserId('member-1')
     await renderHome()
     await showTeaser(reads)
@@ -682,9 +560,10 @@ describe('6.7 mobile Home spotlight teaser timers', () => {
     expect(Date.now()).toBe(start)
 
     await advance(SPOTLIGHT_TEASER_REREAD_MS - 1)
-    expect(reads).toHaveLength(1)
+    expect(teaserReadCalls()).toBe(1)
     await advance(1)
-    await until(() => reads.length === 2)
+    expect(teaserReadCalls()).toBe(2)
+    await untilFrame(() => reads.length === 2)
     expect(reads[1]!.url.searchParams.get('surface')).toBe('home_teaser')
     // The re-read is in flight: the current value stays until it settles.
     await advance(5_000)
@@ -698,7 +577,7 @@ describe('6.7 mobile Home spotlight teaser timers', () => {
         ),
       },
     })
-    await until(
+    await untilFrame(
       () =>
         document.querySelector('[data-testid="home-spotlight-teaser-author"]')
           ?.textContent === 'Bea'
@@ -707,43 +586,83 @@ describe('6.7 mobile Home spotlight teaser timers', () => {
 
   it('6.7-MOB-016 expires 5 minutes after the read when no re-read succeeds', async () => {
     const { reads } = deferSpotlightReads()
-    vi.useFakeTimers({ toFake: ['setTimeout', 'clearTimeout', 'Date'] })
-    vi.setSystemTime(Date.parse('2026-10-23T12:00:00.000Z'))
+    fakeClock()
     setMobileApplicationUserId('member-1')
     await renderHome()
     await showTeaser(reads)
     // Away from Home nothing re-reads, so only expiry can end the value.
-    act(() => focusControl.set(false))
+    act(() => screenFocus.set(false))
     await advance(SPOTLIGHT_TEASER_EXPIRY_MS - 1)
     expect(teaserNodes().length).toBeGreaterThan(0)
     await advance(1)
-    await until(() => teaserNodes().length === 0)
-    expect(reads).toHaveLength(1)
+    await untilFrame(() => teaserNodes().length === 0)
+    expect(teaserReadCalls()).toBe(1)
     // Coming back reads again: the last attempt is older than 60 seconds.
-    act(() => focusControl.set(true))
-    await until(() => reads.length === 2)
+    act(() => screenFocus.set(true))
+    expect(teaserReadCalls()).toBe(2)
   })
 
-  it('6.7-MOB-015 a failed re-read removes the teaser and schedules no timed retry', async () => {
+  it.each([
+    [
+      'a 500',
+      { status: 500, body: { statusCode: 500, message: 'Internal server error' } },
+    ],
+    [
+      'a contention 503 with a one-second retry hint',
+      {
+        status: 503,
+        body: {
+          statusCode: 503,
+          code: 'unavailable',
+          retryAfterSeconds: 1,
+          message: 'Community is temporarily unavailable.',
+        },
+      },
+    ],
+  ] as const)(
+    '6.7-MOB-015 %s on the re-read removes the teaser at once and reads nothing more on its own',
+    async (_name, failure) => {
+      const { reads } = deferSpotlightReads()
+      fakeClock()
+      setMobileApplicationUserId('member-1')
+      await renderHome()
+      await showTeaser(reads)
+      await advance(SPOTLIGHT_TEASER_REREAD_MS)
+      await untilFrame(() => reads.length === 2)
+      reads[1]!.resolve(failure)
+      await untilFrame(() => teaserNodes().length === 0)
+      // Past the advertised retry, the floor and three re-read periods: one
+      // transport attempt per lifecycle read, and no timed retry after a failure.
+      await advance(2_000)
+      await advance(SPOTLIGHT_TEASER_REREAD_MS * 3)
+      expect(teaserReadCalls()).toBe(2)
+      expect(reads).toHaveLength(2)
+    }
+  )
+
+  it('6.7-MOB-020 a re-read that never answers times out at the client and removes the teaser', async () => {
     const { reads } = deferSpotlightReads()
-    vi.useFakeTimers({ toFake: ['setTimeout', 'clearTimeout', 'Date'] })
-    vi.setSystemTime(Date.parse('2026-10-23T12:00:00.000Z'))
+    fakeClock()
     setMobileApplicationUserId('member-1')
     await renderHome()
     await showTeaser(reads)
     await advance(SPOTLIGHT_TEASER_REREAD_MS)
-    await until(() => reads.length === 2)
-    reads[1]!.resolve({ status: 503, body: { statusCode: 503, message: 'unavailable' } })
-    await until(() => teaserNodes().length === 0)
-    await advance(SPOTLIGHT_TEASER_REREAD_MS * 3)
-    for (let frame = 0; frame < 30; frame += 1)
-      await act(async () => {
-        await new Promise((resolve) => requestAnimationFrame(resolve))
-      })
-    // The read wrapper retries a retryable 503 once inside the same attempt.
-    expect(reads.length).toBeLessThanOrEqual(3)
-    const settled = reads.length
-    await advance(SPOTLIGHT_TEASER_REREAD_MS * 3)
-    expect(reads).toHaveLength(settled)
+    await untilFrame(() => reads.length === 2)
+    let settled = false
+    void (
+      vi.mocked(getCommunitySpotlightFromMobile).mock.results[1]!
+        .value as Promise<unknown>
+    ).then(
+      () => (settled = true),
+      () => (settled = true)
+    )
+    // Just inside the wrapper's 15-second request deadline the value is still shown.
+    await advance(15_000 - 1)
+    expect(settled).toBe(false)
+    expect(teaserNodes().length).toBeGreaterThan(0)
+    await advance(1)
+    await untilFrame(() => settled)
+    await untilFrame(() => teaserNodes().length === 0)
+    expect(teaserReadCalls()).toBe(2)
   })
 })

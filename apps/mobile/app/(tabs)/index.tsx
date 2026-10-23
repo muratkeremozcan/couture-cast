@@ -71,7 +71,6 @@ import { useAccessibilityAnnouncer } from '@/src/hooks/use-accessibility-announc
 import { useReducedMotion } from '@/src/hooks/use-reduced-motion'
 import { safeFindNodeHandle } from '@/src/lib/accessibility-focus'
 import { HomeSpotlightTeaserSlot } from '@/components/home/home-spotlight-teaser'
-import { useHomeSpotlightTeaserLink } from '@/src/features/home/use-home-spotlight-teaser'
 
 type ScenarioType = 'morning' | 'midday' | 'evening'
 type SwapFocusTarget = number | { focus?: () => void }
@@ -231,10 +230,6 @@ export default function TabOneScreen() {
   const firstSwapOptionRef = useRef<ComponentRef<typeof Pressable>>(null)
   const swapTriggerRef = useRef<SwapFocusTarget | null>(null)
   const garmentRefs = useRef(new Map<string, ComponentRef<typeof Pressable> | null>())
-
-  // Story 6.7: the teaser reads on its own and never waits on, hides or
-  // re-renders the hero.
-  const teaser = useHomeSpotlightTeaserLink({ applicationUserId, scrollViewRef })
 
   const [ritual, setRitual] = useState<RitualResponse | null>(null)
   const [isLoading, setIsLoading] = useState(true)
@@ -840,8 +835,14 @@ export default function TabOneScreen() {
           </>
         )}
 
-        {/* Story 6.7: after the whole hero conditional, so it follows in focus order. */}
-        <HomeSpotlightTeaserSlot teaser={teaser} />
+        {/*
+          Story 6.7: after the whole hero conditional, so it follows in focus
+          order. It reads on its own and never waits on, hides or re-renders the hero.
+        */}
+        <HomeSpotlightTeaserSlot
+          applicationUserId={applicationUserId}
+          scrollViewRef={scrollViewRef}
+        />
       </ScrollView>
 
       {/* Garment Swap Modal */}

@@ -1,9 +1,16 @@
 // Story 6.7 owner: the compact Home teaser for the viewer's top City Spotlight entry.
-import React, { forwardRef, useCallback, useEffect, useState } from 'react'
+import React, {
+  type RefObject,
+  forwardRef,
+  memo,
+  useCallback,
+  useEffect,
+  useState,
+} from 'react'
 import { Image, Pressable, StyleSheet, Text, View, useColorScheme } from 'react-native'
 import { useTranslation } from 'react-i18next'
 import type { SpotlightTeaserValue } from '@couture/api-client'
-import type { HomeSpotlightTeaserLink } from '@/src/features/home/use-home-spotlight-teaser'
+import { useHomeSpotlightTeaserLink } from '@/src/features/home/use-home-spotlight-teaser'
 import { useHeroPalette } from '@/components/hero/hero-theme'
 import { IMAGE_LOAD_TIMEOUT_MS } from '@/components/community/community-card'
 
@@ -137,22 +144,51 @@ export const HomeSpotlightTeaser = forwardRef<View, HomeSpotlightTeaserProps>(
   }
 )
 
-/** Renders the teaser only for a valid value; anything else reserves no space. */
-export function HomeSpotlightTeaserSlot({ teaser }: { teaser: HomeSpotlightTeaserLink }) {
-  if (!teaser.value) return null
+/**
+ * Owns the teaser's lifecycle, so a teaser change re-renders this subtree and
+ * never the hero above it. Renders the teaser only for a valid value; anything
+ * else reserves no space.
+ */
+export const HomeSpotlightTeaserSlot = memo(function HomeSpotlightTeaserSlot({
+  applicationUserId,
+  scrollViewRef,
+}: {
+  applicationUserId: string | null
+  scrollViewRef: RefObject<unknown>
+}) {
+  const teaser = useHomeSpotlightTeaserLink({ applicationUserId, scrollViewRef })
+  const { focusMove } = teaser
   return (
-    <HomeSpotlightTeaser
-      ref={teaser.linkRef}
-      value={teaser.value}
-      onOpen={teaser.open}
-      onImageError={teaser.removeValue}
-      onFocus={teaser.onFocus}
-      onBlur={teaser.onBlur}
-    />
+    <>
+      {teaser.value ? (
+        <HomeSpotlightTeaser
+          ref={teaser.linkRef}
+          value={teaser.value}
+          onOpen={teaser.open}
+          onImageError={teaser.removeValue}
+          onFocus={teaser.onFocus}
+          onBlur={teaser.onBlur}
+        />
+      ) : null}
+      {focusMove ? (
+        // UI automation marker: names the target and count of the last focus
+        // move this Home made. It has no label and takes no touches.
+        <View
+          testID={`home-spotlight-teaser-focused-${focusMove.target}-${focusMove.count}`}
+          collapsable={false}
+          pointerEvents="none"
+          style={styles.focusMarker}
+        />
+      ) : null}
+    </>
   )
-}
+})
 
 const styles = StyleSheet.create({
+  focusMarker: {
+    width: 1,
+    height: 1,
+  },
   section: {
     marginHorizontal: 16,
     marginTop: 8,

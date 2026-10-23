@@ -90,3 +90,41 @@ tags:
       id: 'home-spotlight-teaser-link'
     timeout: 15000
     label: 'The teaser is still on Home after the round trip'
+
+# The focus marker renders only after the native accessibility-focus request
+# resolved a handle for its target; its suffix counts the moves this Home made.
+- scrollUntilVisible:
+    element:
+      id: 'home-spotlight-teaser-focused-link-1'
+    direction: DOWN
+    timeout: 15000
+    label: 'The Home tab return moved accessibility focus to the teaser link, once'
+
+# Android back is a second, separate way home, with its own activation.
+- runFlow:
+    when:
+      platform: Android
+    commands:
+      - swipe:
+          start: '50%, 70%'
+          end: '50%, 35%'
+          duration: 400
+      - waitForAnimationToEnd
+      - tapOn:
+          id: 'home-spotlight-teaser-link'
+          label: 'Open the entry again'
+      - extendedWaitUntil:
+          visible:
+            id: 'community-spotlight-rank-seed-spotlight-1'
+          timeout: 20000
+      - back
+      - extendedWaitUntil:
+          visible:
+            id: 'home-spotlight-teaser-link'
+          timeout: 15000
+      - scrollUntilVisible:
+          element:
+            id: 'home-spotlight-teaser-focused-link-2'
+          direction: DOWN
+          timeout: 15000
+          label: 'Android back moved accessibility focus to the teaser link, once more'
