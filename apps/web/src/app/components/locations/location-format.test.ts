@@ -4,7 +4,7 @@ import { errorKey, formatPlace, safeReturnPath } from './location-format'
 const ORIGIN = 'https://couture.example'
 
 describe('safeReturnPath', () => {
-  it('1.2b-WEB-13 keeps no target as no navigation', () => {
+  it('1.2b-WEB-FMT-01 keeps no target as no navigation', () => {
     expect(safeReturnPath(null, ORIGIN)).toBeNull()
     expect(safeReturnPath('', ORIGIN)).toBeNull()
   })
@@ -13,7 +13,7 @@ describe('safeReturnPath', () => {
     ['root', '/', '/'],
     ['path with query and hash', '/wardrobe?tab=all#top', '/wardrobe?tab=all#top'],
     ['dot segments that stay on this origin', '/a/../community', '/community'],
-  ])('1.2b-WEB-14 keeps a same-origin %s', (_name, value, expected) => {
+  ])('1.2b-WEB-FMT-02 keeps a same-origin %s', (_name, value, expected) => {
     expect(safeReturnPath(value, ORIGIN)).toBe(expected)
   })
 
@@ -29,13 +29,13 @@ describe('safeReturnPath', () => {
     ['absolute URL', 'https://evil.example/'],
     ['javascript scheme', 'javascript:alert(1)'],
     ['relative path', 'settings'],
-  ])('1.2b-WEB-15 sends a %s target home', (_name, value) => {
+  ])('1.2b-WEB-FMT-03 sends a %s target home', (_name, value) => {
     expect(safeReturnPath(value, ORIGIN)).toBe('/')
   })
 })
 
 describe('errorKey', () => {
-  it('1.2b-WEB-16b names save, search, limit and unknown failures apart', () => {
+  it('1.2b-WEB-FMT-04 names save, search, limit and unknown failures apart', () => {
     expect(errorKey('provider_unavailable')).toBe('locations.errors.provider_unavailable')
     expect(errorKey('provider_unavailable', 'save')).toBe(
       'locations.errors.save_unavailable'
@@ -47,7 +47,7 @@ describe('errorKey', () => {
 })
 
 describe('formatPlace', () => {
-  it('1.2b-WEB-16c localizes an ISO country and keeps a legacy free-text one', () => {
+  it('1.2b-WEB-FMT-05 localizes an ISO country and keeps a legacy free-text one', () => {
     expect(formatPlace({ city: 'Lyon', region: null, country: 'FR' }, 'en-US')).toBe(
       'Lyon, France'
     )

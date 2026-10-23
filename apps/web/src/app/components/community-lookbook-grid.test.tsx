@@ -1,6 +1,6 @@
 // Community grid journeys through the real web transport and MSW.
 import { delay, http, HttpResponse } from 'msw'
-import { screen, waitFor, within } from '@testing-library/react'
+import { act, screen, waitFor, within } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import { describe, expect, it, vi } from 'vitest'
 import { CLIMATE_BANDS } from '@couture/utils'
@@ -279,6 +279,37 @@ describe('CommunityLookbookGrid (Story 6.1)', () => {
         }
       }
     )
+
+    // A reader with no session never loads a feed, so this is reachable only by
+    // signing out under a notice that is already showing. The notice described
+    // the member who left; it goes with its action, not after it.
+    it('1.2b-WEB-GRID-02 withdraws the band notice and its add-location action on sign-out', async () => {
+      signIn()
+      useMswHandlers(
+        feedHandler({
+          items: [item()],
+          viewerBand: null,
+          bandResolved: false,
+          bandUnresolvedReason: 'no_location',
+          mode: 'auto',
+        })
+      )
+      renderGrid()
+
+      const notice = await screen.findByTestId('community-band-unresolved')
+      expect(within(notice).getByTestId('community-add-location')).toBeInTheDocument()
+
+      window.sessionStorage.clear()
+      act(() => {
+        window.dispatchEvent(new Event('couture:session'))
+      })
+
+      await waitFor(() =>
+        expect(screen.queryByTestId('community-add-location')).not.toBeInTheDocument()
+      )
+      expect(screen.queryByTestId('community-band-unresolved')).not.toBeInTheDocument()
+      expect(screen.queryByText(UNRESOLVED_COPY.no_location)).not.toBeInTheDocument()
+    })
 
     it('6.1-WEB-009 hides the band notice when the band resolved', async () => {
       signIn()

@@ -1,5 +1,10 @@
 // Story 1.2b: every locations key ships in all ten web locales.
 import { describe, expect, it } from 'vitest'
+import type { LocationFailureReason } from '../lib/locations'
+import {
+  errorKey,
+  type LocationFailureStep,
+} from '../app/components/locations/location-format'
 import { SUPPORTED_LOCALES, type SupportedLocale } from './index'
 
 import deDE from './locales/de-DE.json'
@@ -56,6 +61,35 @@ function placeholders(value: string): string[] {
 }
 
 const reference = flatten(locationsTree(enUS as Catalog))
+
+/** The value at a dotted catalog key, or `undefined` when any segment is missing. */
+function lookup(catalog: Catalog, key: string): unknown {
+  return key
+    .split('.')
+    .reduce<unknown>(
+      (node, segment) =>
+        typeof node === 'object' && node !== null
+          ? (node as Record<string, unknown>)[segment]
+          : undefined,
+      catalog
+    )
+}
+
+// Records, so a reason or step added to the union fails to compile here until
+// it is listed, and its catalog key is then checked below.
+const FAILURE_REASONS: Record<LocationFailureReason, true> = {
+  signed_out: true,
+  invalid_query: true,
+  invalid_candidate: true,
+  limit_reached: true,
+  duplicate: true,
+  provider_unavailable: true,
+  service_unavailable: true,
+  rate_limited: true,
+  not_found: true,
+  unknown: true,
+}
+const FAILURE_STEPS: Record<LocationFailureStep, true> = { search: true, save: true }
 
 describe('1.2b locations locale parity (web)', () => {
   it('1.2b-I18N-WEB-01 ships a locations tree for every supported locale', () => {
@@ -117,10 +151,34 @@ describe('1.2b locations locale parity (web)', () => {
   // The settings page hosts the Locations section; its heading was English on
   // every locale before Story 1.2b.
   it('1.2b-I18N-WEB-07 ships a translated settings page title in every locale', () => {
+    expect(lookup(CATALOGS['en-US'], 'settings.title')).toBe('Settings')
     for (const locale of SUPPORTED_LOCALES) {
-      const settings = CATALOGS[locale].settings as { title?: unknown } | undefined
-      expect(typeof settings?.title, locale).toBe('string')
-      if (!locale.startsWith('en-')) expect(settings?.title, locale).not.toBe('Settings')
+      const title = lookup(CATALOGS[locale], 'settings.title')
+      expect(typeof title, locale).toBe('string')
+      expect(String(title).trim().length, locale).toBeGreaterThan(0)
+      if (!locale.startsWith('en-')) expect(title, locale).not.toBe('Settings')
+    }
+  })
+
+  // Parity proves the catalogs agree with each other; this proves they hold the
+  // keys the UI builds, so a key renamed in every catalog cannot render raw.
+  it('1.2b-I18N-WEB-08 ships every error key the Locations UI builds in every locale', () => {
+    const keys = new Set(
+      Object.keys(FAILURE_REASONS).flatMap((reason) =>
+        Object.keys(FAILURE_STEPS).map((step) =>
+          errorKey(reason as LocationFailureReason, step as LocationFailureStep)
+        )
+      )
+    )
+    expect(keys.size).toBeGreaterThan(5)
+    for (const locale of SUPPORTED_LOCALES) {
+      for (const key of keys) {
+        const value = lookup(CATALOGS[locale], key)
+        expect(
+          typeof value === 'string' && value.trim().length > 0,
+          `${locale} ${key}`
+        ).toBe(true)
+      }
     }
   })
 })

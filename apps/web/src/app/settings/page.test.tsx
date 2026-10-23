@@ -11,6 +11,8 @@ import axe from 'axe-core'
 import { http, HttpResponse } from 'msw'
 import { fireEvent, render, screen, waitFor } from '@testing-library/react'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
+import { getI18n } from '../../i18n'
+import deDE from '../../i18n/locales/de-DE.json'
 import { WEB_ACCESS_TOKEN_STORAGE_KEY } from '../../lib/wardrobe'
 import { useMswHandlers } from '../../test-utils/msw/runtime'
 import SettingsPage from './page'
@@ -168,8 +170,9 @@ describe('Web settings page', () => {
     window.sessionStorage.clear()
   })
 
-  afterEach(() => {
+  afterEach(async () => {
     window.sessionStorage.clear()
+    await getI18n().changeLanguage('en-US')
   })
 
   /**
@@ -493,5 +496,20 @@ describe('Web settings page', () => {
     expect(labelled).toHaveAccessibleDescription(
       /Turn this off to hide all partner and affiliate suggestions\./
     )
+  })
+
+  // Story 1.2b: the page heading was English on every locale before the
+  // Locations section moved in; it now reads the catalog.
+  it("1.2b-WEB-SETTINGS-01 titles the page in the reader's language", () => {
+    // `getI18n()` follows the browser languages on every call, so the page reads
+    // German only when the browser asks for it.
+    vi.spyOn(window.navigator, 'languages', 'get').mockReturnValue(['de-DE'])
+
+    render(<SettingsPage />)
+
+    expect(
+      screen.getByRole('heading', { level: 1, name: deDE.settings.title })
+    ).toBeInTheDocument()
+    expect(deDE.settings.title).not.toBe('Settings')
   })
 })
