@@ -8,7 +8,7 @@ import {
   serveFeed,
   setMockParams,
 } from './harness'
-import { userEvent as browserUser } from '@vitest/browser/context'
+import { userEvent as browserUser } from 'vitest/browser'
 import { CommunityReactionState } from '@couture/api-client'
 import * as communityClient from '@/src/lib/community'
 import { act, screen, waitFor, within } from '@testing-library/react'

@@ -2,7 +2,7 @@
 // latest-location pointer of a save that started before an invalidation must
 // never land after it, and an older save must never overwrite a newer primary.
 import { beforeEach, describe, expect, it, vi } from 'vitest'
-import type { RitualResponse } from '@couture/api-client/contracts/http'
+import { supportedLocales, type RitualResponse } from '@couture/api-client/contracts/http'
 import { mockRitualResponse } from '../test-utils/msw/handlers'
 
 const nativeStorage = vi.hoisted(() => {
@@ -213,5 +213,33 @@ describe('ritual cache mutation order on native storage', () => {
     expect(pointerWrites).toHaveLength(0)
     clearRitualMemoryCache()
     await expect(readLatestRitualCache('member-1', 'en-US')).resolves.toBeNull()
+  })
+
+  it('1.2b-MOB-CACHE-06 an invalidation drops the pointer in every locale, past a failed delete', async () => {
+    for (const locale of supportedLocales) {
+      await saveRitualCache('member-1', locale, {
+        data: ritualFor('previous-primary'),
+        timestamp: 100,
+      })
+    }
+    // One locale's delete fails; the rest still go, and the caller is not failed.
+    const warn = vi.spyOn(console, 'warn').mockImplementation(() => undefined)
+    nativeStorage.fileSystem.deleteAsync.mockImplementationOnce(() =>
+      Promise.reject(new Error('busy'))
+    )
+
+    await forgetLatestRitual('member-1')
+
+    clearRitualMemoryCache()
+    const survivors: string[] = []
+    for (const locale of supportedLocales) {
+      if (await readLatestRitualCache('member-1', locale)) survivors.push(locale)
+    }
+    // The pointer whose delete failed is the only one left.
+    expect(survivors).toHaveLength(1)
+    expect(warn).toHaveBeenCalledWith(
+      '[RitualCache] Latest ritual pointer delete failed',
+      expect.any(Error)
+    )
   })
 })

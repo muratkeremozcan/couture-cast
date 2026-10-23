@@ -5,6 +5,7 @@
 import React from 'react'
 import { screen, waitFor } from '@testing-library/react'
 import { render } from 'vitest-browser-react'
+import { userEvent } from 'vitest/browser'
 import { afterEach, beforeAll, beforeEach, describe, expect, it, vi } from 'vitest'
 import { http, HttpResponse } from 'msw'
 import TabOneScreen from '@/app/(tabs)/index'
@@ -26,6 +27,12 @@ import {
 import { setMobileAccessTokenResolver } from '@/src/lib/mobile-auth'
 import { clearRitualMemoryCache } from '@/src/lib/ritual-cache'
 import i18n, { initI18n } from '@/src/lib/i18n'
+import {
+  noLocationEnvelope,
+  noLocationResponse,
+  officeLocation,
+  savedLocation,
+} from '@/src/test-utils/locations'
 import { mockRitualResponse } from '@/src/test-utils/msw/handlers'
 import { server } from '@/src/test-utils/msw/server'
 
@@ -49,11 +56,15 @@ vi.mock('@/src/analytics/mobile-analytics', () => ({
   MobileAnalyticsDiagnosticsPanel: () => null,
 }))
 
-// The API's Nest error envelope for a user with no saved location.
-function answerRitualWith(status: number, message: string) {
+function answerRitualWithNoLocation() {
+  server.use(http.get('*/api/v1/ritual', noLocationResponse))
+}
+
+// The same Nest 400 envelope with any other message.
+function answerRitualWithBadRequest(message: string) {
   server.use(
     http.get('*/api/v1/ritual', () =>
-      HttpResponse.json({ message, error: 'Bad Request', statusCode: status }, { status })
+      HttpResponse.json({ ...noLocationEnvelope(), message }, { status: 400 })
     )
   )
 }
@@ -86,7 +97,7 @@ describe('TabOneScreen without a saved location', () => {
     '6.5-MOB-POLISH-04 shows the localized add-location hint without Retry in %s',
     async (locale, hint) => {
       await i18n.changeLanguage(locale)
-      answerRitualWith(400, 'No location preferences found for user')
+      answerRitualWithNoLocation()
 
       await render(<TabOneScreen />)
 
@@ -104,7 +115,7 @@ describe('TabOneScreen without a saved location', () => {
   )
 
   it('6.5-MOB-POLISH-05 keeps the generic load error and Retry for any other 400', async () => {
-    answerRitualWith(400, 'Invalid locale')
+    answerRitualWithBadRequest('Invalid locale')
 
     await render(<TabOneScreen />)
 
@@ -127,7 +138,7 @@ describe('TabOneScreen without a saved location', () => {
   })
 
   it('1.2b-MOB-HERO-01 opens the guided add-location screen from the no-location state', async () => {
-    answerRitualWith(400, 'No location preferences found for user')
+    answerRitualWithNoLocation()
 
     await render(<TabOneScreen />)
 
@@ -135,7 +146,7 @@ describe('TabOneScreen without a saved location', () => {
     expect(action.textContent).toBe('Add a location')
     // WCAG 2.5.8 and the platform guidance: a 44pt minimum touch target.
     expect(action.getBoundingClientRect().height).toBeGreaterThanOrEqual(44)
-    action.click()
+    await userEvent.click(action)
     expect(routerPush).toHaveBeenCalledWith('/locations?guided=1')
   })
 
@@ -143,39 +154,11 @@ describe('TabOneScreen without a saved location', () => {
     let hasLocation = false
     server.use(
       http.get('*/api/v1/ritual', () =>
-        hasLocation
-          ? HttpResponse.json(mockRitualResponse)
-          : HttpResponse.json(
-              {
-                message: 'No location preferences found for user',
-                error: 'Bad Request',
-                statusCode: 400,
-              },
-              { status: 400 }
-            )
+        hasLocation ? HttpResponse.json(mockRitualResponse) : noLocationResponse()
       ),
       http.post('*/api/v1/locations/from-search', () => {
         hasLocation = true
-        return HttpResponse.json(
-          {
-            data: {
-              id: 'loc-1',
-              label: 'Home',
-              locationKey: 'chicago-illinois-us-41-878n-87-630w',
-              latitude: 41.878,
-              longitude: -87.63,
-              timezone: 'America/Chicago',
-              city: 'Chicago',
-              region: 'Illinois',
-              country: 'US',
-              isPrimary: true,
-              sortOrder: 0,
-              createdAt: '2026-10-22T12:00:00.000Z',
-              updatedAt: '2026-10-22T12:00:00.000Z',
-            },
-          },
-          { status: 201 }
-        )
+        return HttpResponse.json({ data: savedLocation() }, { status: 201 })
       })
     )
 
@@ -194,15 +177,7 @@ describe('TabOneScreen without a saved location', () => {
     [
       'deleting the last location answers no-location',
       () => deleteLocationFromMobile('loc-1'),
-      () =>
-        HttpResponse.json(
-          {
-            message: 'No location preferences found for user',
-            error: 'Bad Request',
-            statusCode: 400,
-          },
-          { status: 400 }
-        ),
+      noLocationResponse,
       'hero-no-location-state',
     ],
     [
@@ -233,23 +208,7 @@ describe('TabOneScreen without a saved location', () => {
         }),
         http.post('*/api/v1/locations/:locationId/primary', () => {
           changed = true
-          return HttpResponse.json({
-            data: {
-              id: 'loc-2',
-              label: 'Office',
-              locationKey: 'monaco-mc-43-738n-7-425e',
-              latitude: 43.738,
-              longitude: 7.425,
-              timezone: 'Europe/Monaco',
-              city: 'Monaco',
-              region: null,
-              country: 'MC',
-              isPrimary: true,
-              sortOrder: 1,
-              createdAt: '2026-10-22T12:00:00.000Z',
-              updatedAt: '2026-10-22T12:00:00.000Z',
-            },
-          })
+          return HttpResponse.json({ data: officeLocation({ isPrimary: true }) })
         })
       )
 
