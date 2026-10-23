@@ -88,7 +88,8 @@ tags:
 # load a swipe that lands while the last one is still snapping moves nothing (a
 # 2026-10-23 run stopped on #5 after eight swipes), so each swipe waits for the
 # carousel to settle, and the loop, which ends as soon as View more shows,
-# allows twice the swipes the cohort needs.
+# allows twice the swipes the cohort needs. A swipe can also land as a tap and
+# open a look's detail, so a detail a swipe opened is closed before the next one.
 - extendedWaitUntil:
     visible:
       id: 'community-spotlight-row'
@@ -99,6 +100,14 @@ tags:
         id: 'community-spotlight-view-more'
     times: 16
     commands:
+      - runFlow:
+          when:
+            visible:
+              id: 'community-spotlight-detail-close'
+          commands:
+            - tapOn:
+                id: 'community-spotlight-detail-close'
+            - waitForAnimationToEnd
       - swipe:
           start: '90%, 62%'
           end: '5%, 62%'
@@ -125,16 +134,26 @@ tags:
     text: 'Rank 7, Position 7 of 7'
 - assertNotVisible:
     id: 'community-spotlight-view-more'
+# Back to the start the same way (a 2026-10-23 run opened Rank 3's detail here).
 - repeat:
     while:
       notVisible:
         id: 'community-spotlight-rank-seed-spotlight-1'
-    times: 9
+    times: 16
     commands:
+      - runFlow:
+          when:
+            visible:
+              id: 'community-spotlight-detail-close'
+          commands:
+            - tapOn:
+                id: 'community-spotlight-detail-close'
+            - waitForAnimationToEnd
       - swipe:
           start: '10%, 62%'
           end: '95%, 62%'
           duration: 400
+      - waitForAnimationToEnd
 - assertVisible:
     id: 'community-spotlight-rank-seed-spotlight-1'
     text: 'Rank 1, Position 1 of 7'
