@@ -53,7 +53,6 @@ describe('Expo Go link endpoint', () => {
         'shell',
         'am',
         'start',
-        '-W',
         '-a',
         'android.intent.action.VIEW',
         '-d',
@@ -74,9 +73,8 @@ describe('Expo Go link endpoint', () => {
   })
 
   it('1.2b-R24-03 quotes a single quote for the device shell', () => {
-    expect(expoGoOpenLinkArgs('emulator-5554', "exp://host/--/a'b")[9]).toBe(
-      "'exp://host/--/a'\\''b'"
-    )
+    const args = expoGoOpenLinkArgs('emulator-5554', "exp://host/--/a'b")
+    expect(args[args.indexOf('-d') + 1]).toBe("'exp://host/--/a'\\''b'")
   })
 
   it.each([
@@ -147,7 +145,9 @@ describe('Expo Go link endpoint', () => {
     expect(response.status).toBe(504)
     const body = await response.text()
     expect(body).toContain('emulator-5554')
-    expect(body).toContain('/sdk/adb -s emulator-5554 shell am start -W')
+    expect(body).toContain(
+      '/sdk/adb -s emulator-5554 shell am start -a android.intent.action.VIEW'
+    )
     expect(received?.aborted).toBe(true)
   })
 
@@ -162,7 +162,7 @@ describe('Expo Go link endpoint', () => {
       const started = await startExpoGoLinkEndpoint({
         adbBinary: stuckAdb,
         devices: ['emulator-5554'],
-        timeoutMs: 300,
+        timeoutMs: 2000,
       })
       close = started.close
 

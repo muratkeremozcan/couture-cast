@@ -47,7 +47,6 @@ export function expoGoOpenLinkArgs(device, url, { disableOnboarding = true } = {
     'shell',
     'am',
     'start',
-    '-W',
     '-a',
     'android.intent.action.VIEW',
     '-d',
@@ -74,9 +73,16 @@ const runCommand = (binary, args, signal) =>
   })
 
 /**
- * How long one `am start -W` may take. A launch normally reports within a few
- * seconds; without a bound a wedged adb or device held the flow until Maestro's
+ * How long one `am start` may take. Delivering the intent takes well under a
+ * second; without a bound a wedged adb or device held the flow until Maestro's
  * own HTTP timeout, minutes later, with nothing naming the cause.
+ *
+ * No `-W`: like Maestro's `openLink`, this returns once the intent is delivered
+ * and leaves readiness to the flow's own waits. `-W` waits for the launched
+ * activity to draw, and on CI Android sometimes kills Expo Go's fresh process
+ * right after `clearState` ("Destroy timeout of remove-task"), so the launch
+ * never draws and `-W` never returns, where `open-app.yaml`'s retry recovers by
+ * opening the link again (CI job 120315875135).
  */
 export const OPEN_LINK_TIMEOUT_MS = 30_000
 
@@ -93,7 +99,7 @@ const readBody = async (request) => {
 /**
  * Starts the loopback endpoint `POST /open` with a JSON body `{ device, url }`.
  *
- * Answers 200 once `am start -W` reports the activity launched, 400 for a body
+ * Answers 200 once `am start` has delivered the intent, 400 for a body
  * that names an unknown device or a link that is not exp:// or exps://, and 502
  * when adb or the activity manager refuses (`am start` reports some failures on
  * stdout with exit code 0). A launch that has not reported within `timeoutMs`
