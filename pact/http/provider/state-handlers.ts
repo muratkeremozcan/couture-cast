@@ -1,6 +1,8 @@
 import {
   configureProviderEngagementState,
+  configureProviderLocationState,
   type ProviderEngagementScenario,
+  type ProviderLocationScenario,
 } from './state'
 import type { VerifierOptions } from '@pact-foundation/pact'
 import type {
@@ -88,7 +90,41 @@ type PremiumThemeStateParams = {
   theme?: PremiumThemeKey
 }
 
+const locationState =
+  (scenario: ProviderLocationScenario, description: string) => (parameters?: unknown) => {
+    const { userId } = (parameters ?? {}) as { userId?: string }
+    configureProviderLocationState({ userId, scenario })
+    return Promise.resolve({ description })
+  }
+
 export const stateHandlers: StateHandlers = {
+  /* ----------------------------------------------------------------------- *
+   * Story 1.2b client location capture.
+   * ----------------------------------------------------------------------- */
+  'A city search returns candidates for user': locationState(
+    'search-candidates',
+    'Configured a city search with one candidate'
+  ),
+  'The user has no saved locations': locationState(
+    'no-locations',
+    'Configured an empty saved-location collection'
+  ),
+  'The user holds an expired location candidate': locationState(
+    'expired-candidate',
+    'Configured an expired location candidate'
+  ),
+  'The user has three saved locations': locationState(
+    'three-locations',
+    'Configured a full saved-location collection'
+  ),
+  'The user has two saved locations': locationState(
+    'two-locations',
+    'Configured two saved locations'
+  ),
+  'The location provider is unavailable for user': locationState(
+    'provider-unavailable',
+    'Configured a location provider outage'
+  ),
   /* ----------------------------------------------------------------------- *
    * Story 4.3 outfit capsules.
    * Deterministic states: the provider is configured to present a known

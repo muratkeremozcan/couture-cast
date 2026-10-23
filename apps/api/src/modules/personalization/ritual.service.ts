@@ -23,6 +23,7 @@ const RITUAL_CAPSULE_CANDIDATE_LIMIT = 1_000
 
 import { WeatherQueryService } from '../weather/weather-query.service.js'
 import { LocationPreferencesService } from '../location-preferences/location-preferences.service.js'
+import { isSearchLocationKey } from '../location-preferences/location-key.js'
 import {
   InjectAnalyticsClient,
   type AnalyticsClient,
@@ -242,10 +243,14 @@ export class RitualService implements OnModuleDestroy {
       throw new BadRequestException('No location preferences found for user')
     }
 
+    // Story 1.2b: a location saved from search is weather-ready when its save
+    // returns, so the synthetic test weather never stands in for it. Acceptance
+    // journeys prove the ritual consumed the persisted provider forecast.
     const isTestEnv =
-      process.env.TEST_ENV === 'local' ||
-      process.env.TEST_ENV === 'preview' ||
-      process.env.VERCEL_ENV === 'preview'
+      (process.env.TEST_ENV === 'local' ||
+        process.env.TEST_ENV === 'preview' ||
+        process.env.VERCEL_ENV === 'preview') &&
+      !isSearchLocationKey(selectedLocation.locationKey)
 
     // 2. Load Comfort Preferences, User Profile, and Weather Snapshot
     const [comfortPrefs, userProfile, weatherResult] = await Promise.all([

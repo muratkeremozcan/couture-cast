@@ -353,23 +353,57 @@ describe('TelemetryService', () => {
       })
     })
 
-    it('preserves a null previous location on the first location switch', async () => {
-      await service.captureEvent('user-1', 'location_switched', {
-        fromLocation: null,
-        toLocation: 'austin-tx',
-      })
+    // Story 1.2b: location events are pseudonymous. The raw member id never
+    // reaches PostHog or the persisted row, and no place property survives.
+    it('captures location_switched under the HMAC subject with no properties', async () => {
+      await service.captureEvent('user-1', 'location_switched', {})
 
+      const subject = createHmac('sha256', 'telemetry-test-secret-at-least-32-bytes')
+        .update('user-1')
+        .digest('base64url')
       expect(analyticsCapture).toHaveBeenCalledWith({
-        distinctId: 'user-1',
+        distinctId: subject,
         event: 'location_switched',
-        properties: {
-          user_id: 'user-1',
-          from_location: null,
-          to_location: 'austin-tx',
-          timestamp: '2026-07-16T12:00:00.000Z',
-        },
+        properties: { $ip: null },
+      })
+      expect(telemetryCreate).toHaveBeenCalledWith({
+        data: { user_id: null, event_type: 'location_switched', properties: {} },
       })
     })
+
+    it('refuses place keys on location_switched', async () => {
+      await expect(
+        service.captureEvent('user-1', 'location_switched', {
+          toLocation: 'austin-tx',
+        } as never)
+      ).rejects.toThrow()
+      expect(analyticsCapture).not.toHaveBeenCalled()
+    })
+
+    it.each([
+      [
+        'location_saved',
+        { platform: 'web', outcome: 'saved', resultCount: 2 },
+        { platform: 'web', outcome: 'saved', result_count: 2 },
+      ],
+      [
+        'location_search_failed',
+        { platform: 'mobile', outcome: 'no_results', resultCount: 0 },
+        { platform: 'mobile', outcome: 'no_results', result_count: 0 },
+      ],
+    ] as const)(
+      'captures %s pseudonymously with closed properties',
+      async (event, input, expected) => {
+        await service.captureEvent('user-1', event, input)
+
+        const captured = analyticsCapture.mock.calls[0]?.[0] as CapturedEvent
+        expect(captured.distinctId).not.toBe('user-1')
+        expect(captured.properties).toEqual({ ...expected, $ip: null })
+        expect(telemetryCreate).toHaveBeenCalledWith({
+          data: { user_id: null, event_type: event, properties: expected },
+        })
+      }
+    )
 
     it('honors an explicit isFirstOutfit override', async () => {
       await service.captureEvent('user-1', 'first_outfit_generated', {

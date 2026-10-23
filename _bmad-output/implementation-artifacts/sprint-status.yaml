@@ -59,7 +59,7 @@ development_status:
   epic-1: in-progress
   1-1-weather-api-ingestion-service: done
   1-2-multi-location-preferences: done
-  1-2b-client-location-capture: backlog
+  1-2b-client-location-capture: in-progress
   1-3-alert-rules-notification-pipeline: done
   1-4-telemetry-audit-baseline: done
 

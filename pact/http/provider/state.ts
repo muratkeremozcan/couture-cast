@@ -537,3 +537,39 @@ export function getProviderEngagementState() {
 export function resetProviderEngagementState() {
   providerEngagementState = 'ready'
 }
+
+/* --------------------------------------------------------------------------- *
+ * Story 1.2b client location capture. Each scenario names the arrangement an
+ * interaction records an outcome for: an empty collection (save succeeds), an expired
+ * candidate, a full one (the limit), two locations (list, switch,
+ * delete), and a provider outage (typed retryable 503 on search and save).
+ * --------------------------------------------------------------------------- */
+export type ProviderLocationScenario =
+  | 'search-candidates'
+  | 'no-locations'
+  | 'expired-candidate'
+  | 'three-locations'
+  | 'two-locations'
+  | 'provider-unavailable'
+
+export type ProviderLocationState = {
+  userId: string | null
+  scenario: ProviderLocationScenario
+}
+
+let providerLocationState: ProviderLocationState | null = null
+
+export function configureProviderLocationState(state: {
+  userId?: string
+  scenario: ProviderLocationScenario
+}) {
+  providerLocationState = { userId: state.userId ?? null, scenario: state.scenario }
+}
+
+export function getProviderLocationState(): ProviderLocationState | null {
+  return providerLocationState
+}
+
+export function resetProviderLocationState() {
+  providerLocationState = null
+}

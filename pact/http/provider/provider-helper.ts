@@ -87,6 +87,10 @@ import { createPremiumEntitlementDouble } from './doubles/premium-entitlement'
 import { createPaletteAdvisorDoubles } from './doubles/palette-advisor'
 import { createPlannerDoubles } from './doubles/planner'
 import { createCommunityDoubles } from './doubles/community'
+import { createLocationDoubles } from './doubles/locations'
+import { LocationPreferencesController } from '../../../apps/api/src/modules/location-preferences/location-preferences.controller'
+import { LocationPreferencesService } from '../../../apps/api/src/modules/location-preferences/location-preferences.service'
+import { LocationCaptureService } from '../../../apps/api/src/modules/location-preferences/location-capture.service'
 import {
   resetProviderEngagementState,
   resetProviderCapsuleState,
@@ -95,6 +99,7 @@ import {
   resetProviderPaletteAdvisorState,
   resetProviderPlannerState,
   resetProviderCommunityState,
+  resetProviderLocationState,
   resetProviderPremiumThemeState,
   resetProviderSilhouetteState,
   resetProviderSubscriptionState,
@@ -144,6 +149,7 @@ export function resetProviderState() {
   resetProviderPlannerState()
   resetProviderCommunityState()
   resetProviderEngagementState()
+  resetProviderLocationState()
 }
 
 export function parsePactEvent(event: PactEvent | string) {
@@ -237,6 +243,8 @@ export async function startLocalPactProvider({
   const { mockPlannerService } = createPlannerDoubles()
   const { mockCommunityService, mockCommunitySpotlightService } = createCommunityDoubles()
   const engagement = createCommunityEngagementDoubles()
+  const { mockLocationPreferencesService, mockLocationCaptureService } =
+    createLocationDoubles()
   const moduleFixture = await Test.createTestingModule({
     controllers: [
       CommunitySyncController,
@@ -261,6 +269,7 @@ export async function startLocalPactProvider({
       PlannerController,
       CommunityController,
       CommunityCommentsController,
+      LocationPreferencesController,
     ],
     providers: [
       { provide: CommunityPreferencesService, useValue: engagement.preferences },
@@ -269,6 +278,8 @@ export async function startLocalPactProvider({
       { provide: PushRegistrationService, useValue: engagement.registrations },
       { provide: AlertsService, useValue: engagement.alerts },
       { provide: CommunityCommentsService, useValue: createCommunityCommentsDouble() },
+      { provide: LocationPreferencesService, useValue: mockLocationPreferencesService },
+      { provide: LocationCaptureService, useValue: mockLocationCaptureService },
       EventsService,
       {
         provide: EventsRepository,

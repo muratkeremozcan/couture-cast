@@ -38,6 +38,7 @@ export interface LocationPreferencesRepository {
     locationKey: string
   ): Promise<SavedLocationRecord | null>
   findManyByUserId(userId: string): Promise<SavedLocationRecord[]>
+  recordSearch(userId: string, now: Date): Promise<LocationSearchWindowCount>
   setPrimary(userId: string, locationId: string): Promise<SavedLocationRecord | null>
   update(
     userId: string,
@@ -46,7 +47,12 @@ export interface LocationPreferencesRepository {
   ): Promise<SavedLocationRecord | null>
 }
 
-const MAX_SAVED_LOCATIONS = 3
+export interface LocationSearchWindowCount {
+  searches: number
+  windowStart: Date
+}
+
+export const MAX_SAVED_LOCATIONS = 3
 
 const savedLocationOrderBy = [
   { sort_order: 'asc' },
@@ -200,6 +206,28 @@ export class PrismaLocationPreferencesRepository
       where: { user_id: userId },
       orderBy: savedLocationOrderBy,
     })
+  }
+
+  /**
+   * Story 1.2b: counts one city search in the member's fixed one-minute window
+   * and returns the window's count, in one atomic statement, so concurrent
+   * searches serialize on the member's row and none is lost.
+   */
+  async recordSearch(userId: string, now: Date): Promise<LocationSearchWindowCount> {
+    const [row] = await this.prisma.$queryRaw<{ searches: number; window_start: Date }[]>`
+      INSERT INTO "LocationSearchWindow" AS w (user_id, window_start, searches)
+      VALUES (${userId}, date_trunc('minute', ${now.toISOString()}::timestamptz), 1)
+      ON CONFLICT (user_id) DO UPDATE SET
+        searches = CASE
+          WHEN w.window_start = EXCLUDED.window_start THEN w.searches + 1
+          ELSE 1
+        END,
+        window_start = EXCLUDED.window_start
+      RETURNING searches, window_start`
+    if (!row) {
+      throw new Error('Location search window upsert returned no row')
+    }
+    return { searches: row.searches, windowStart: row.window_start }
   }
 
   setPrimary(userId: string, locationId: string): Promise<SavedLocationRecord | null> {

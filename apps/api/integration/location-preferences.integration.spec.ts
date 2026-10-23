@@ -26,6 +26,17 @@ import {
 } from '../src/modules/location-preferences/location-preferences.repository'
 import { LocationPreferencesService } from '../src/modules/location-preferences/location-preferences.service'
 import { TelemetryService } from '../src/modules/telemetry/telemetry.service'
+import { LocationCaptureService } from '../src/modules/location-preferences/location-capture.service'
+import { WeatherRefreshQueue } from '../src/modules/weather/weather-refresh.queue'
+import { WeatherRepository } from '../src/modules/weather/weather.repository'
+
+// Story 1.2b collaborators these suites do not exercise; the capture path has its
+// own real-database suite in location-capture.integration.spec.ts.
+const refreshQueueStub = {
+  provide: WeatherRefreshQueue,
+  useValue: { enqueueLocationRefresh: vi.fn().mockResolvedValue(undefined) },
+}
+const captureServiceStub = { provide: LocationCaptureService, useValue: {} }
 
 const primaryUserHeaders = {
   authorization: 'Bearer location-token',
@@ -122,6 +133,12 @@ class InMemoryLocationPreferencesRepository implements LocationPreferencesReposi
     }
 
     return Promise.resolve(deleted)
+  }
+
+  recordSearch(): Promise<{ searches: number; windowStart: Date }> {
+    return Promise.reject(
+      new Error('Search is covered by location-capture.integration.spec.ts')
+    )
   }
 
   findByIdForUser(
@@ -258,6 +275,12 @@ describe('Location preferences API integration', () => {
         },
         LocationPreferencesService,
         {
+          provide: WeatherRepository,
+          useValue: { findLatestByLocationKey: vi.fn().mockResolvedValue(null) },
+        },
+        refreshQueueStub,
+        captureServiceStub,
+        {
           provide: GuardianConsentStateService,
           useValue: auth.guardianConsentStateService,
         },
@@ -374,6 +397,8 @@ describeRealDatabase('Location preferences API Prisma integration', () => {
 
   beforeEach(async () => {
     prisma = new PrismaClient()
+    // Schema probe: with the opt-in flag set this suite fails, never skips.
+    await prisma.$queryRaw`SELECT 1 FROM "SavedLocation" LIMIT 1`
     primaryUserId = `real-location-user-${randomUUID()}`
     foreignUserId = `real-location-foreign-${randomUUID()}`
     const auth = createLocationRequestAuthGuard({
@@ -403,6 +428,9 @@ describeRealDatabase('Location preferences API Prisma integration', () => {
         },
         PrismaLocationPreferencesRepository,
         LocationPreferencesService,
+        WeatherRepository,
+        refreshQueueStub,
+        captureServiceStub,
         {
           provide: GuardianConsentStateService,
           useValue: auth.guardianConsentStateService,

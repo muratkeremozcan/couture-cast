@@ -122,6 +122,11 @@ export const analyticsEventNameSchema = z.enum([
   // coordinates or raw identifiers.
   'community_spotlight_viewed',
   'community_spotlight_opened',
+  // Story 1.2b. Server-side only, pseudonymous. Closed properties only: platform,
+  // outcome and a result count. No query text, place names, coordinates,
+  // location keys or raw identifiers.
+  'location_saved',
+  'location_search_failed',
 ])
 
 export type AnalyticsEventName = z.infer<typeof analyticsEventNameSchema>
@@ -225,14 +230,59 @@ export const alertSentEventSchema = z.object({
 
 export type AlertSentEvent = z.infer<typeof alertSentEventSchema>
 
-export const locationSwitchedEventSchema = z.object({
-  userId: nonEmptyString,
-  fromLocation: z.string().nullable(),
-  toLocation: nonEmptyString,
-  timestamp: isoTimestamp,
-})
+// Story 1.2b: pseudonymous since the first client caller shipped. The place
+// keys it used to carry identified where a member lives, so they are gone.
+export const locationSwitchedEventSchema = z
+  .object({
+    analyticsSubjectId: nonEmptyString,
+  })
+  .strict()
 
 export type LocationSwitchedEvent = z.infer<typeof locationSwitchedEventSchema>
+
+const locationPlatformAnalyticsEnum = z.enum(['web', 'mobile'])
+
+export const locationSavedOutcomeSchema = z.enum([
+  'saved',
+  'limit_reached',
+  'duplicate',
+  'invalid_candidate',
+  'forecast_unavailable',
+  'service_unavailable',
+])
+
+// Story 1.2b. `resultCount` is the member's saved-location count after the
+// attempt, 0 to 3.
+export const locationSavedEventSchema = z
+  .object({
+    analyticsSubjectId: nonEmptyString,
+    platform: locationPlatformAnalyticsEnum,
+    outcome: locationSavedOutcomeSchema,
+    resultCount: z.number().int().min(0).max(3),
+  })
+  .strict()
+
+export type LocationSavedEvent = z.infer<typeof locationSavedEventSchema>
+
+export const locationSearchFailedOutcomeSchema = z.enum([
+  'no_results',
+  'provider_unavailable',
+  'provider_timeout',
+  'provider_unconfigured',
+  'service_unavailable',
+])
+
+// Story 1.2b. `resultCount` is the number of candidates returned, 0 to 5.
+export const locationSearchFailedEventSchema = z
+  .object({
+    analyticsSubjectId: nonEmptyString,
+    platform: locationPlatformAnalyticsEnum,
+    outcome: locationSearchFailedOutcomeSchema,
+    resultCount: z.number().int().min(0).max(5),
+  })
+  .strict()
+
+export type LocationSearchFailedEvent = z.infer<typeof locationSearchFailedEventSchema>
 
 export const apiErrorOccurredEventSchema = z.object({
   userId: z.string().nullable(),
@@ -968,6 +1018,8 @@ export const analyticsEventSchemas = {
   community_challenge_participated: communityChallengeParticipatedEventSchema,
   community_spotlight_viewed: communitySpotlightViewedEventSchema,
   community_spotlight_opened: communitySpotlightOpenedEventSchema,
+  location_saved: locationSavedEventSchema,
+  location_search_failed: locationSearchFailedEventSchema,
 }
 
 export const ritualCreatedPropertiesSchema = z.object({
@@ -1065,14 +1117,31 @@ export const alertSentPropertiesSchema = z.object({
 
 export type AlertSentProperties = z.infer<typeof alertSentPropertiesSchema>
 
-export const locationSwitchedPropertiesSchema = z.object({
-  user_id: nonEmptyString,
-  from_location: z.string().nullable(),
-  to_location: nonEmptyString,
-  timestamp: isoTimestamp,
-})
+export const locationSwitchedPropertiesSchema = z.object({}).strict()
 
 export type LocationSwitchedProperties = z.infer<typeof locationSwitchedPropertiesSchema>
+
+export const locationSavedPropertiesSchema = z
+  .object({
+    platform: locationPlatformAnalyticsEnum,
+    outcome: locationSavedOutcomeSchema,
+    result_count: z.number().int().min(0).max(3),
+  })
+  .strict()
+
+export type LocationSavedProperties = z.infer<typeof locationSavedPropertiesSchema>
+
+export const locationSearchFailedPropertiesSchema = z
+  .object({
+    platform: locationPlatformAnalyticsEnum,
+    outcome: locationSearchFailedOutcomeSchema,
+    result_count: z.number().int().min(0).max(5),
+  })
+  .strict()
+
+export type LocationSearchFailedProperties = z.infer<
+  typeof locationSearchFailedPropertiesSchema
+>
 
 export const apiErrorOccurredPropertiesSchema = z.object({
   user_id: z.string().nullable(),
@@ -1342,13 +1411,40 @@ export function trackLocationSwitched(
   const parsed = locationSwitchedEventSchema.parse(event)
 
   return {
-    distinctId: parsed.userId,
+    distinctId: parsed.analyticsSubjectId,
     event: 'location_switched',
-    properties: locationSwitchedPropertiesSchema.parse({
-      user_id: parsed.userId,
-      from_location: parsed.fromLocation,
-      to_location: parsed.toLocation,
-      timestamp: parsed.timestamp,
+    properties: locationSwitchedPropertiesSchema.parse({}),
+  }
+}
+
+export function trackLocationSaved(
+  event: LocationSavedEvent
+): AnalyticsCapturePayload<'location_saved', LocationSavedProperties> {
+  const parsed = locationSavedEventSchema.parse(event)
+
+  return {
+    distinctId: parsed.analyticsSubjectId,
+    event: 'location_saved',
+    properties: locationSavedPropertiesSchema.parse({
+      platform: parsed.platform,
+      outcome: parsed.outcome,
+      result_count: parsed.resultCount,
+    }),
+  }
+}
+
+export function trackLocationSearchFailed(
+  event: LocationSearchFailedEvent
+): AnalyticsCapturePayload<'location_search_failed', LocationSearchFailedProperties> {
+  const parsed = locationSearchFailedEventSchema.parse(event)
+
+  return {
+    distinctId: parsed.analyticsSubjectId,
+    event: 'location_search_failed',
+    properties: locationSearchFailedPropertiesSchema.parse({
+      platform: parsed.platform,
+      outcome: parsed.outcome,
+      result_count: parsed.resultCount,
     }),
   }
 }

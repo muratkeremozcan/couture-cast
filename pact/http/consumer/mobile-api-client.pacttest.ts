@@ -142,6 +142,15 @@ import {
   verifyCreateCommunityChallengeInteraction,
   verifyCreateCommunityChallengeRejectionInteraction,
   communityChallengeRejections,
+  verifyLocationSearchInteraction,
+  verifyLocationSearchUnavailableInteraction,
+  verifyLocationSaveFromSearchInteraction,
+  verifyLocationSaveErrorInteraction,
+  locationSaveErrorInteractions,
+  verifyLocationListInteraction,
+  verifyLocationSetPrimaryInteraction,
+  verifyLocationSetPrimaryForeignInteraction,
+  verifyLocationDeleteInteraction,
 } from './api-contract-interactions'
 
 const pact = new PactV4({
@@ -760,4 +769,44 @@ describe('CoutureCastMobile -> CoutureCastApi HTTP contract', () => {
       await verifyCreateCommunityChallengeRejectionInteraction(pact, rejection)
     }
   )
+
+  // Story 1.2b: client location capture.
+  it('searches cities for a location', async () => {
+    await verifyLocationSearchInteraction(pact, createMobileClientForMockServer, 'mobile')
+  })
+
+  it('preserves the typed retryable envelope when the location provider is down', async () => {
+    await verifyLocationSearchUnavailableInteraction(pact, 'mobile')
+  })
+
+  it('saves a searched city as a location', async () => {
+    await verifyLocationSaveFromSearchInteraction(
+      pact,
+      createMobileClientForMockServer,
+      'mobile'
+    )
+  })
+
+  it.each(locationSaveErrorInteractions)(
+    'preserves the save-from-search error envelope that $description',
+    async (interaction) => {
+      await verifyLocationSaveErrorInteraction(pact, interaction, 'mobile')
+    }
+  )
+
+  it('lists saved locations', async () => {
+    await verifyLocationListInteraction(pact, createMobileClientForMockServer)
+  })
+
+  it('switches the primary saved location', async () => {
+    await verifyLocationSetPrimaryInteraction(pact, createMobileClientForMockServer)
+  })
+
+  it('refuses to make a foreign location primary', async () => {
+    await verifyLocationSetPrimaryForeignInteraction(pact)
+  })
+
+  it('deletes a saved location', async () => {
+    await verifyLocationDeleteInteraction(pact, createMobileClientForMockServer)
+  })
 })

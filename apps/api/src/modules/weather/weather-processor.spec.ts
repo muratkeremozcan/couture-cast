@@ -17,7 +17,7 @@ describe('weather processor', () => {
   it('creates stable interval-bucketed location job IDs', () => {
     expect(
       createWeatherLocationJobId('new-york-ny', new Date('2026-07-06T13:44:00.000Z'), 30)
-    ).toBe('weather-refresh-location:new-york-ny:2026-07-06T13:30:00.000Z')
+    ).toBe('weather-refresh-location__new-york-ny__1783344600000')
   })
 
   it('coalesces duplicate targets and enqueues retryable location jobs per key', async () => {
@@ -53,7 +53,7 @@ describe('weather processor', () => {
       expect.objectContaining({
         attempts: 3,
         backoff: { type: 'exponential', delay: 1000 },
-        jobId: 'weather-refresh-location:new-york-ny:2026-07-06T13:30:00.000Z',
+        jobId: 'weather-refresh-location__new-york-ny__1783344600000',
       })
     )
     expect(ingestionService.ingestTarget).not.toHaveBeenCalled()

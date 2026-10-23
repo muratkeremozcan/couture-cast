@@ -3,8 +3,15 @@ import {
   Inject,
   Injectable,
   NotFoundException,
+  Optional,
 } from '@nestjs/common'
+import { createBaseLogger } from '../../logger/pino.config.js'
 import { TelemetryService } from '../telemetry/telemetry.service'
+import {
+  WeatherRefreshQueue,
+  type WeatherRefreshPublisher,
+} from '../weather/weather-refresh.queue.js'
+import { WeatherRepository } from '../weather/weather.repository.js'
 import type {
   CreateSavedLocationInput,
   SavedLocation,
@@ -65,7 +72,7 @@ function handleRepositoryError(error: unknown): never {
   throw error
 }
 
-function toSavedLocation(record: SavedLocationRecord): SavedLocation {
+export function toSavedLocation(record: SavedLocationRecord): SavedLocation {
   return {
     id: record.id,
     label: record.label,
@@ -131,14 +138,49 @@ function buildUpdateCommand(input: UpdateSavedLocationInput): UpdateSavedLocatio
   return command
 }
 
+/** Story 1.2b: a new primary whose snapshot is older than this gets a refresh. */
+export const PRIMARY_REFRESH_STALE_AFTER_MS = 5 * 60 * 1000
+/** Enqueueing never holds a primary switch longer than this. */
+export const PRIMARY_REFRESH_ENQUEUE_DEADLINE_MS = 1000
+
+export const LOCATION_PREFERENCES_CLOCK = Symbol('LOCATION_PREFERENCES_CLOCK')
+
+export interface LocationPreferencesClock {
+  now(): Date
+}
+
+function withDeadline(work: Promise<void>, ms: number): Promise<void> {
+  let timer: ReturnType<typeof setTimeout> | undefined
+  const deadline = new Promise<void>((_resolve, reject) => {
+    timer = setTimeout(() => reject(new Error('refresh enqueue deadline exceeded')), ms)
+  })
+  return Promise.race([work, deadline]).finally(() => clearTimeout(timer))
+}
+
 @Injectable()
 export class LocationPreferencesService {
+  private readonly logger = createBaseLogger().child({ feature: 'location-preferences' })
+
   constructor(
     @Inject(PrismaLocationPreferencesRepository)
     private readonly repository: LocationPreferencesRepository,
     @Inject(TelemetryService)
-    private readonly telemetryService: TelemetryService
-  ) {}
+    private readonly telemetryService: Pick<TelemetryService, 'captureEvent'>,
+    @Inject(WeatherRepository)
+    private readonly weatherRepository: Pick<
+      WeatherRepository,
+      'findLatestByLocationKey'
+    >,
+    @Inject(WeatherRefreshQueue)
+    private readonly weatherRefresh: WeatherRefreshPublisher,
+    @Optional()
+    @Inject(LOCATION_PREFERENCES_CLOCK)
+    clock?: LocationPreferencesClock
+  ) {
+    this.clock = clock ?? { now: () => new Date() }
+  }
+
+  private readonly clock: LocationPreferencesClock
 
   async listLocations(userId: string): Promise<SavedLocation[]> {
     const locations = await this.repository.findManyByUserId(userId)
@@ -224,11 +266,8 @@ export class LocationPreferencesService {
     const savedLocation = toSavedLocation(updated)
 
     if (fromLocation !== savedLocation.locationKey) {
-      await this.telemetryService.captureEvent(userId, 'location_switched', {
-        userId,
-        fromLocation,
-        toLocation: savedLocation.locationKey,
-      })
+      await this.telemetryService.captureEvent(userId, 'location_switched', {})
+      await this.refreshPrimaryIfStale(updated)
     }
 
     return savedLocation
@@ -240,6 +279,53 @@ export class LocationPreferencesService {
       throw new NotFoundException('Saved location not found')
     }
 
+    if (deleted.is_primary) {
+      const remaining = await this.repository.findManyByUserId(userId)
+      const promoted = remaining.find((location) => location.is_primary)
+      if (promoted) {
+        await this.refreshPrimaryIfStale(promoted)
+      }
+    }
+
     return { deleted: true }
+  }
+
+  /**
+   * Story 1.2b: a new primary location whose snapshot is absent or older than
+   * five minutes gets the existing `weather-refresh-location` job. Until it
+   * lands the ritual serves its stale-data fallback, or weather-unavailable
+   * for a location that never had a snapshot. A slow or failed enqueue never
+   * fails the request; the next sweep covers the location either way.
+   */
+  private async refreshPrimaryIfStale(location: SavedLocationRecord): Promise<void> {
+    try {
+      const now = this.clock.now()
+      const snapshot = await this.weatherRepository.findLatestByLocationKey(
+        location.location_key
+      )
+      if (
+        snapshot &&
+        now.getTime() - snapshot.fetched_at.getTime() <= PRIMARY_REFRESH_STALE_AFTER_MS
+      ) {
+        return
+      }
+      await withDeadline(
+        this.weatherRefresh.enqueueLocationRefresh(
+          {
+            locationKey: location.location_key,
+            locationName: location.city?.trim() || location.label.trim(),
+            latitude: location.latitude,
+            longitude: location.longitude,
+          },
+          now
+        ),
+        PRIMARY_REFRESH_ENQUEUE_DEADLINE_MS
+      )
+    } catch (error) {
+      this.logger.warn(
+        { reason: error instanceof Error ? error.name : 'unknown' },
+        'primary location refresh enqueue failed'
+      )
+    }
   }
 }

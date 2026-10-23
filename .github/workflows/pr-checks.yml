@@ -20,6 +20,9 @@ env:
   # environment. `RLS_TEST_DATABASE_URL` falls back to this, so one URL serves
   # both the schema suites and the RLS actor matrix.
   DATABASE_URL: postgresql://postgres:postgres@127.0.0.1:5432/postgres
+  # Story 1.2b: the real-database location suites run here and fail, never
+  # skip, when their schema probe fails.
+  LOCATION_PREFERENCES_REAL_DB_INTEGRATION: 'true'
   COVERAGE_GIST_ID: 64348ebdc6e662b93ade9f40bdc03442
 
 jobs:

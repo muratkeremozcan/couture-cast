@@ -46,6 +46,8 @@ import {
   communityPostSubmittedPropertiesSchema,
   communityPostWithdrawnPropertiesSchema,
   communitySpotlightOpenedPropertiesSchema,
+  locationSavedPropertiesSchema,
+  locationSearchFailedPropertiesSchema,
   communitySpotlightViewedPropertiesSchema,
   type AnalyticsEventName,
 } from '../types/analytics-events'
@@ -114,6 +116,8 @@ export const analyticsPropertySchemas = {
   community_challenge_participated: communityChallengeParticipatedPropertiesSchema,
   community_spotlight_viewed: communitySpotlightViewedPropertiesSchema,
   community_spotlight_opened: communitySpotlightOpenedPropertiesSchema,
+  location_saved: locationSavedPropertiesSchema,
+  location_search_failed: locationSearchFailedPropertiesSchema,
 }
 
 const formatCapturedEvents = (events: readonly MemoryTrackedAnalyticsEvent[]) =>

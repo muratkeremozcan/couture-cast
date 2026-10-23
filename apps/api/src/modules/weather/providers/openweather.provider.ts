@@ -8,6 +8,7 @@ import {
   WeatherProviderError,
 } from './weather-provider.error.js'
 import type { IWeatherProvider } from './weather-provider.interface.js'
+import { resolveWeatherProviderOrigin } from './weather-provider-origin.js'
 import {
   type OpenWeatherHourlySchema,
   NormalizedDailyWeatherEntrySchema,
@@ -23,7 +24,7 @@ import type {
 } from './weather.types.js'
 
 const PROVIDER = 'openweather' as const
-const DEFAULT_BASE_URL = 'https://api.openweathermap.org/data/3.0/onecall'
+const FORECAST_PATH = '/data/3.0/onecall'
 const LOCATION_TOLERANCE_DEGREES = 0.02
 
 function longitudeDistance(left: number, right: number): number {
@@ -44,7 +45,9 @@ export class OpenWeatherProvider implements IWeatherProvider {
   constructor(options: OpenWeatherProviderOptions = {}) {
     const env = options.env ?? process.env
     this.apiKey = options.apiKey ?? env.OPENWEATHER_API_KEY ?? ''
-    this.baseUrl = options.baseUrl ?? DEFAULT_BASE_URL
+    this.baseUrl =
+      options.baseUrl ??
+      `${resolveWeatherProviderOrigin('openweather', env)}${FORECAST_PATH}`
   }
 
   async fetchForecast(

@@ -4,6 +4,10 @@ import { Test, type TestingModule } from '@nestjs/testing'
 import request from 'supertest'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import {
+  createSavedLocationFromSearchResponseSchema,
+  locationRequestErrorResponseSchema,
+  locationSearchResponseSchema,
+  tooManyRequestsHttpErrorSchema,
   createSavedLocationResponseSchema,
   listSavedLocationsResponseSchema,
   setPrimarySavedLocationResponseSchema,
@@ -13,6 +17,8 @@ import {
 import type { AccessTokenIdentityService } from '../auth/access-token-identity.service.js'
 import { GuardianConsentStateService } from '../auth/guardian-consent-state.service'
 import { RequestAuthGuard } from '../auth/security.guards'
+import { LocationSearchRateLimitException } from './location-capture.errors'
+import { LocationCaptureService } from './location-capture.service'
 import { LocationPreferencesController } from './location-preferences.controller'
 import { LocationPreferencesService } from './location-preferences.service'
 
@@ -46,6 +52,21 @@ describe('LocationPreferencesController', () => {
     updateLocation: vi.fn().mockResolvedValue({ ...savedLocation, label: 'Office' }),
   }
 
+  const captureService = {
+    search: vi.fn().mockResolvedValue([
+      {
+        city: 'Chicago',
+        region: 'Illinois',
+        country: 'US',
+        latitude: 41.878,
+        longitude: -87.63,
+        displayLabel: 'Chicago, Illinois, United States',
+        candidateToken: 'payload.signature',
+      },
+    ]),
+    saveFromSearch: vi.fn().mockResolvedValue(savedLocation),
+  }
+
   const getHttpServer = (): Parameters<typeof request>[0] => {
     if (!app) {
       throw new Error('App is not initialized')
@@ -74,6 +95,10 @@ describe('LocationPreferencesController', () => {
           useValue: service,
         },
         {
+          provide: LocationCaptureService,
+          useValue: captureService,
+        },
+        {
           provide: GuardianConsentStateService,
           useValue: guardianConsentStateService,
         },
@@ -96,6 +121,8 @@ describe('LocationPreferencesController', () => {
     service.listLocations.mockClear()
     service.setPrimary.mockClear()
     service.updateLocation.mockClear()
+    captureService.search.mockClear()
+    captureService.saveFromSearch.mockClear()
 
     if (app) {
       await app.close()
@@ -183,5 +210,99 @@ describe('LocationPreferencesController', () => {
       data: savedLocation,
     })
     expect(service.setPrimary).toHaveBeenCalledWith('user-1', 'location-1')
+  })
+
+  it('1.2b-API-01 searches with the validated query, locale and platform', async () => {
+    const response = await request(getHttpServer())
+      .get('/api/v1/locations/search')
+      .query({ q: ' Chicago ', locale: 'fr-FR' })
+      .set({ ...authHeaders, 'x-couture-platform': 'web' })
+
+    expect(response.status).toBe(200)
+    expect(locationSearchResponseSchema.parse(response.body).data).toHaveLength(1)
+    expect(captureService.search).toHaveBeenCalledWith(
+      'user-1',
+      'Chicago',
+      'fr-FR',
+      'web'
+    )
+  })
+
+  it.each([
+    [{ q: 'C' }],
+    [{ q: 'x'.repeat(81) }],
+    [{}],
+    [{ q: 'Chicago', locale: 'xx-XX' }],
+    [{ q: 'Chicago', extra: '1' }],
+  ])('1.2b-API-02 refuses %j with a typed 400 and no service call', async (query) => {
+    const response = await request(getHttpServer())
+      .get('/api/v1/locations/search')
+      .query(query)
+      .set({ ...authHeaders, 'x-couture-platform': 'web' })
+
+    expect(response.status).toBe(400)
+    expect(locationRequestErrorResponseSchema.parse(response.body).code).toBe(
+      'invalid_request'
+    )
+    expect(captureService.search).not.toHaveBeenCalled()
+  })
+
+  it('1.2b-API-03 requires auth and the platform header on both new routes', async () => {
+    expect(
+      (await request(getHttpServer()).get('/api/v1/locations/search').query({ q: 'Ch' }))
+        .status
+    ).toBe(401)
+    const missingPlatform = await request(getHttpServer())
+      .post('/api/v1/locations/from-search')
+      .set(authHeaders)
+      .send({ candidateToken: 'payload.signature', label: 'Home' })
+
+    expect(missingPlatform.status).toBe(400)
+    expect(captureService.saveFromSearch).not.toHaveBeenCalled()
+  })
+
+  it('1.2b-API-04 sets Retry-After on the shared 429 body', async () => {
+    captureService.search.mockRejectedValueOnce(new LocationSearchRateLimitException(17))
+
+    const response = await request(getHttpServer())
+      .get('/api/v1/locations/search')
+      .query({ q: 'Chicago' })
+      .set({ ...authHeaders, 'x-couture-platform': 'mobile' })
+
+    expect(response.status).toBe(429)
+    expect(response.headers['retry-after']).toBe('17')
+    expect(tooManyRequestsHttpErrorSchema.parse(response.body).statusCode).toBe(429)
+  })
+
+  it('1.2b-API-05 saves from search for the caller and refuses client-held fields', async () => {
+    const response = await request(getHttpServer())
+      .post('/api/v1/locations/from-search')
+      .set({ ...authHeaders, 'x-couture-platform': 'mobile' })
+      .send({ candidateToken: 'payload.signature', label: 'Home' })
+
+    expect(response.status).toBe(201)
+    expect(createSavedLocationFromSearchResponseSchema.parse(response.body).data).toEqual(
+      savedLocation
+    )
+    expect(captureService.saveFromSearch).toHaveBeenCalledWith(
+      'user-1',
+      'payload.signature',
+      'Home',
+      'mobile'
+    )
+
+    for (const extra of [
+      { latitude: 1 },
+      { timezone: 'UTC' },
+      { country: 'US' },
+      { userId: 'other' },
+    ]) {
+      const refused = await request(getHttpServer())
+        .post('/api/v1/locations/from-search')
+        .set({ ...authHeaders, 'x-couture-platform': 'web' })
+        .send({ candidateToken: 'payload.signature', label: 'Home', ...extra })
+      expect(refused.status).toBe(400)
+    }
+    expect(captureService.saveFromSearch).toHaveBeenCalledTimes(1)
   })
 })

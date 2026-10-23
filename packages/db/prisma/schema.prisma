@@ -251,6 +251,7 @@ model User {
   moderation_reviews                  ModerationEvent[]                 @relation("ReviewedByRelation")
   push_tokens                         PushToken[]
   saved_locations                     SavedLocation[]
+  location_search_window              LocationSearchWindow?
   alert_rules                         AlertRule[]
   notification_preference             NotificationPreference?
   event_envelopes                     EventEnvelope[]
@@ -413,6 +414,14 @@ model SavedLocation {
   @@unique([id, user_id])
   @@index([user_id, sort_order, created_at, id])
   @@index([location_key])
+}
+
+/// RLS: API-only per-member fixed one-minute window for city search (Story 1.2b)
+model LocationSearchWindow {
+  user_id      String   @id
+  user         User     @relation(fields: [user_id], references: [id], onDelete: Cascade)
+  window_start DateTime @db.Timestamptz(6)
+  searches     Int
 }
 
 /// RLS: configurable weather alert rules are scoped to the owning user_id
