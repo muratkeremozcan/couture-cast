@@ -734,6 +734,7 @@
     },
     "errors": {
       "provider_unavailable": "La ricerca delle città non è disponibile al momento. Riprova.",
+      "save_unavailable": "Non è stato possibile salvare questa città al momento. Riprova.",
       "service_unavailable": "I luoghi non sono disponibili al momento. Riprova più tardi.",
       "invalid_candidate": "Questo risultato è scaduto. Cerca di nuovo.",
       "duplicate": "Questo luogo è già salvato.",

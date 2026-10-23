@@ -33,9 +33,21 @@ export function distinctPlaceParts(
   })
 }
 
-export function errorKey(reason: LocationFailureReason): string {
+/** Which request failed: the same provider outage reads differently on save. */
+export type LocationFailureStep = 'search' | 'save'
+
+export function errorKey(
+  reason: LocationFailureReason,
+  step: LocationFailureStep = 'search'
+): string {
   switch (reason) {
     case 'provider_unavailable':
+      // The save-time forecast is a different request from city search, and
+      // telling the member search is down when their pick could not be saved
+      // sends them to the wrong fix.
+      return step === 'save'
+        ? 'locations.errors.save_unavailable'
+        : 'locations.errors.provider_unavailable'
     case 'service_unavailable':
     case 'invalid_candidate':
     case 'duplicate':

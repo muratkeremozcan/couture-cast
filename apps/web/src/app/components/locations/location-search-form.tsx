@@ -19,7 +19,7 @@ import {
   searchLocationsFromWeb,
   type LocationFailureReason,
 } from '../../../lib/locations'
-import { errorKey } from './location-format'
+import { errorKey, type LocationFailureStep } from './location-format'
 
 /** Story 1.2b: search waits for 300 ms of quiet typing. */
 export const LOCATION_SEARCH_DEBOUNCE_MS = 300
@@ -61,7 +61,10 @@ export function LocationSearchForm({
   const [selected, setSelected] = useState<LocationSearchCandidate | null>(null)
   const [label, setLabel] = useState('')
   const [isSaving, setIsSaving] = useState(false)
-  const [error, setError] = useState<LocationFailureReason | null>(null)
+  const [error, setError] = useState<{
+    reason: LocationFailureReason
+    step: LocationFailureStep
+  } | null>(null)
   const [searchAttempt, setSearchAttempt] = useState(0)
 
   const resultCountMessage = t('locations.resultCount', { count: candidates.length })
@@ -98,7 +101,7 @@ export function LocationSearchForm({
           setCandidates([])
           setIsOpen(false)
           setSearchState('done')
-          setError(failureReason(caught))
+          setError({ reason: failureReason(caught), step: 'search' })
         })
     }, LOCATION_SEARCH_DEBOUNCE_MS)
     return () => {
@@ -163,7 +166,7 @@ export function LocationSearchForm({
       // An expired candidate cannot be retried; every other failure keeps the
       // chosen city so a retry is one press.
       if (reason === 'invalid_candidate') setSelected(null)
-      setError(reason)
+      setError({ reason, step: 'save' })
     } finally {
       setIsSaving(false)
     }
@@ -171,7 +174,8 @@ export function LocationSearchForm({
 
   const activeOptionId =
     isOpen && activeIndex >= 0 ? `${listboxId}-option-${activeIndex}` : undefined
-  const canRetry = error === 'provider_unavailable' || error === 'service_unavailable'
+  const canRetry =
+    error?.reason === 'provider_unavailable' || error?.reason === 'service_unavailable'
 
   return (
     <form
@@ -272,7 +276,7 @@ export function LocationSearchForm({
       {error && (
         <div className="flex flex-col gap-2">
           <p role="alert" className="text-sm text-red-300" data-testid="location-error">
-            {t(errorKey(error))}
+            {t(errorKey(error.reason, error.step))}
           </p>
           {canRetry && (
             <button

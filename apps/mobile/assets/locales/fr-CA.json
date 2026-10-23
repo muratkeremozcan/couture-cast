@@ -920,6 +920,7 @@
     },
     "errors": {
       "provider_unavailable": "La recherche de villes est temporairement indisponible. Réessayez.",
+      "save_unavailable": "Cette ville n’a pas pu être enregistrée pour le moment. Réessayez.",
       "service_unavailable": "Les lieux sont temporairement indisponibles. Réessayez plus tard.",
       "invalid_candidate": "Ce résultat a expiré. Relancez la recherche.",
       "duplicate": "Ce lieu est déjà enregistré.",

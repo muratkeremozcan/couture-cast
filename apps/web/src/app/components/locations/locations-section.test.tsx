@@ -223,7 +223,7 @@ describe('LocationsSection', () => {
     fireEvent.click(await screen.findByTestId('location-save-button'))
 
     expect((await screen.findByTestId('location-error')).textContent).toBe(
-      'City search is temporarily unavailable. Try again.'
+      'This city could not be saved right now. Try again.'
     )
     expect(screen.getByTestId('location-selected')).toBeInTheDocument()
     fireEvent.click(screen.getByTestId('location-retry-button'))

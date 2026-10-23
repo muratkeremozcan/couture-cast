@@ -25,9 +25,6 @@ import { WEB_ACCESS_TOKEN_STORAGE_KEY } from './wardrobe'
 
 export { hasWebSession } from './commerce'
 
-/** Fired on `window` after any saved-location change, so open surfaces reload. */
-export const LOCATIONS_CHANGED_EVENT = 'couture:locations-changed'
-
 export type LocationFailureReason =
   | 'signed_out'
   | 'invalid_query'
@@ -112,12 +109,6 @@ function client() {
   return createWebApiClient({ accessToken: readAccessToken() })
 }
 
-function announceChange(): void {
-  if (typeof window !== 'undefined') {
-    window.dispatchEvent(new Event(LOCATIONS_CHANGED_EVENT))
-  }
-}
-
 export async function listLocationsFromWeb(
   signal?: AbortSignal
 ): Promise<SavedLocation[]> {
@@ -155,7 +146,6 @@ export async function saveLocationFromSearchFromWeb(
       createSavedLocationFromSearchInput: { candidateToken, label },
     })
     const saved = createSavedLocationFromSearchResponseSchema.parse(response).data
-    announceChange()
     return saved
   } catch (error) {
     throw await locationError(error)
@@ -168,7 +158,6 @@ export async function setPrimaryLocationFromWeb(
   try {
     const response = await client().apiV1LocationsLocationIdPrimaryPost({ locationId })
     const saved = setPrimarySavedLocationResponseSchema.parse(response).data
-    announceChange()
     return saved
   } catch (error) {
     throw await locationError(error)
@@ -185,7 +174,6 @@ export async function renameLocationFromWeb(
       updateSavedLocationInput: { label },
     })
     const saved = updateSavedLocationResponseSchema.parse(response).data
-    announceChange()
     return saved
   } catch (error) {
     throw await locationError(error)
@@ -196,7 +184,6 @@ export async function deleteLocationFromWeb(locationId: string): Promise<void> {
   try {
     const response = await client().apiV1LocationsLocationIdDelete({ locationId })
     deleteSavedLocationResponseSchema.parse(response)
-    announceChange()
   } catch (error) {
     throw await locationError(error)
   }

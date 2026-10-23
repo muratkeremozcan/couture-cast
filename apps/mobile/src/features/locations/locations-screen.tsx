@@ -46,9 +46,21 @@ const MIN_QUERY_LENGTH = 2
 
 type ScreenState = 'loading' | 'ready' | 'signed_out' | 'load_failed'
 
-export function errorKey(reason: LocationFailureReason): string {
+/** Which request failed: the same provider outage reads differently on save. */
+export type LocationFailureStep = 'search' | 'save'
+
+export function errorKey(
+  reason: LocationFailureReason,
+  step: LocationFailureStep = 'search'
+): string {
   switch (reason) {
     case 'provider_unavailable':
+      // The save-time forecast is a different request from city search, and
+      // telling the member search is down when their pick could not be saved
+      // sends them to the wrong fix.
+      return step === 'save'
+        ? 'locations.errors.save_unavailable'
+        : 'locations.errors.provider_unavailable'
     case 'service_unavailable':
     case 'invalid_candidate':
     case 'duplicate':
@@ -111,7 +123,10 @@ export function LocationsScreen({ guided = false }: LocationsScreenProps) {
   const [selected, setSelected] = useState<LocationSearchCandidate | null>(null)
   const [label, setLabel] = useState('')
   const [isSaving, setIsSaving] = useState(false)
-  const [formError, setFormError] = useState<LocationFailureReason | null>(null)
+  const [formError, setFormError] = useState<{
+    reason: LocationFailureReason
+    step: LocationFailureStep
+  } | null>(null)
   const headingRef = useRef<Text>(null)
   const announceRef = useRef(announce)
   announceRef.current = announce
@@ -169,8 +184,8 @@ export function LocationsScreen({ guided = false }: LocationsScreenProps) {
           if (controller.signal.aborted) return
           setCandidates([])
           const reason = locationFailureReason(error)
-          setFormError(reason)
-          announceRef.current('error', tRef.current(errorKey(reason)))
+          setFormError({ reason, step: 'search' })
+          announceRef.current('error', tRef.current(errorKey(reason, 'search')))
         })
         .finally(() => {
           if (!controller.signal.aborted) setIsSearching(false)
@@ -231,8 +246,8 @@ export function LocationsScreen({ guided = false }: LocationsScreenProps) {
     } catch (error) {
       const reason = locationFailureReason(error)
       if (reason === 'invalid_candidate') setSelected(null)
-      setFormError(reason)
-      announce('error', t(errorKey(reason)))
+      setFormError({ reason, step: 'save' })
+      announce('error', t(errorKey(reason, 'save')))
     } finally {
       setIsSaving(false)
     }
@@ -243,7 +258,8 @@ export function LocationsScreen({ guided = false }: LocationsScreenProps) {
   const inputStyle = [styles.input, { color: palette.text, borderColor: palette.divider }]
   const isFull = locations.length >= MAX_SAVED_LOCATIONS
   const canRetry =
-    formError === 'provider_unavailable' || formError === 'service_unavailable'
+    formError?.reason === 'provider_unavailable' ||
+    formError?.reason === 'service_unavailable'
 
   return (
     <ScrollView
@@ -425,12 +441,10 @@ export function LocationsScreen({ guided = false }: LocationsScreenProps) {
               )}
             </View>
           ))}
+          {/* Announced once through the announcer in runListAction; an alert
+              role here would read it a second time. */}
           {listError && (
-            <Text
-              accessibilityRole="alert"
-              style={{ color: palette.danger }}
-              testID="locations-list-error"
-            >
+            <Text style={{ color: palette.danger }} testID="locations-list-error">
               {t(errorKey(listError))}
             </Text>
           )}
@@ -518,12 +532,10 @@ export function LocationsScreen({ guided = false }: LocationsScreenProps) {
 
               {formError && (
                 <View style={styles.form}>
-                  <Text
-                    accessibilityRole="alert"
-                    style={{ color: palette.danger }}
-                    testID="location-error"
-                  >
-                    {t(errorKey(formError))}
+                  {/* Announced once through the announcer by search and save;
+                      an alert role here would read it a second time. */}
+                  <Text style={{ color: palette.danger }} testID="location-error">
+                    {t(errorKey(formError.reason, formError.step))}
                   </Text>
                   {canRetry && (
                     <Pressable

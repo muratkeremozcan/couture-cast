@@ -216,14 +216,52 @@ describe('LocationsScreen', () => {
     press(await screen.findByTestId('location-search-option-0'))
     press(await screen.findByTestId('location-save-button'))
 
-    expect((await screen.findByTestId('location-error')).textContent).toBe(
-      'City search is temporarily unavailable. Try again.'
-    )
+    const message = 'This city could not be saved right now. Try again.'
+    expect((await screen.findByTestId('location-error')).textContent).toBe(message)
+    // Announced exactly once: by the announcer's live region, and by no alert
+    // role on the visible error.
+    await waitFor(() => expect(liveRegion()).toBe(message))
+    expect(
+      Array.from(document.querySelectorAll('[role="alert"]')).filter((node) =>
+        node.textContent?.includes(message)
+      )
+    ).toHaveLength(0)
     expect(screen.getByTestId('location-selected')).toBeTruthy()
     press(screen.getByTestId('location-retry-button'))
 
     await screen.findByTestId('location-primary-badge-0')
     expect(attempts).toBe(2)
+  })
+
+  it('1.2b-MOB-05b says search is down, once, when city search answers 503', async () => {
+    server.use(
+      http.get('*/api/v1/locations/search', () =>
+        HttpResponse.json(
+          {
+            statusCode: 503,
+            code: 'provider_unavailable',
+            retryable: true,
+            message: 'down',
+            error: 'Service Unavailable',
+          },
+          { status: 503 }
+        )
+      )
+    )
+
+    renderScreen()
+    fireEvent.change(await screen.findByTestId('locations-search-input'), {
+      target: { value: 'Chicago' },
+    })
+
+    const message = 'City search is temporarily unavailable. Try again.'
+    expect((await screen.findByTestId('location-error')).textContent).toBe(message)
+    await waitFor(() => expect(liveRegion()).toBe(message))
+    expect(
+      Array.from(document.querySelectorAll('[role="alert"]')).filter((node) =>
+        node.textContent?.includes(message)
+      )
+    ).toHaveLength(0)
   })
 
   it('1.2b-MOB-06 explains the three-location limit instead of the add form', async () => {

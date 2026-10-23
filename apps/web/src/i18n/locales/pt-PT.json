@@ -734,6 +734,7 @@
     },
     "errors": {
       "provider_unavailable": "A pesquisa de cidades está temporariamente indisponível. Tente novamente.",
+      "save_unavailable": "Não foi possível guardar esta cidade agora. Tente novamente.",
       "service_unavailable": "Os locais estão temporariamente indisponíveis. Tente mais tarde.",
       "invalid_candidate": "Esse resultado expirou. Pesquise novamente.",
       "duplicate": "Esse local já está guardado.",

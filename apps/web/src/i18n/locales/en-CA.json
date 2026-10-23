@@ -734,6 +734,7 @@
     },
     "errors": {
       "provider_unavailable": "City search is temporarily unavailable. Try again.",
+      "save_unavailable": "This city could not be saved right now. Try again.",
       "service_unavailable": "Locations are temporarily unavailable. Try again later.",
       "invalid_candidate": "That search result expired. Search again.",
       "duplicate": "That location is already saved.",

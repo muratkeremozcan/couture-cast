@@ -920,6 +920,7 @@
     },
     "errors": {
       "provider_unavailable": "Şehir araması şu anda kullanılamıyor. Tekrar deneyin.",
+      "save_unavailable": "Bu şehir şu anda kaydedilemedi. Tekrar deneyin.",
       "service_unavailable": "Konumlar şu anda kullanılamıyor. Daha sonra tekrar deneyin.",
       "invalid_candidate": "Bu arama sonucunun süresi doldu. Yeniden arayın.",
       "duplicate": "Bu konum zaten kayıtlı.",

@@ -920,6 +920,7 @@
     },
     "errors": {
       "provider_unavailable": "A busca de cidades está indisponível no momento. Tente novamente.",
+      "save_unavailable": "Não foi possível salvar esta cidade agora. Tente novamente.",
       "service_unavailable": "Os locais estão indisponíveis no momento. Tente mais tarde.",
       "invalid_candidate": "Esse resultado expirou. Busque novamente.",
       "duplicate": "Esse local já está salvo.",

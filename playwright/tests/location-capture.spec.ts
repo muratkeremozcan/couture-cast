@@ -264,7 +264,7 @@ test.describe('1.2b client location capture @local-lane', () => {
       await section.getByRole('option', { name: /Failtown/ }).click()
       await section.getByRole('button', { name: 'Save location' }).click()
       await expect(section.getByTestId('location-error')).toHaveText(
-        'City search is temporarily unavailable. Try again.'
+        'This city could not be saved right now. Try again.'
       )
       await expect(section.getByTestId('location-selected')).toBeVisible()
       await expect(section.getByTestId('location-retry-button')).toBeVisible()

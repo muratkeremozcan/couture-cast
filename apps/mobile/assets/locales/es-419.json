@@ -920,6 +920,7 @@
     },
     "errors": {
       "provider_unavailable": "La búsqueda de ciudades no está disponible por ahora. Intenta de nuevo.",
+      "save_unavailable": "No pudimos guardar esta ciudad por ahora. Intenta de nuevo.",
       "service_unavailable": "Las ubicaciones no están disponibles por ahora. Intenta más tarde.",
       "invalid_candidate": "Ese resultado venció. Busca de nuevo.",
       "duplicate": "Esa ubicación ya está guardada.",
