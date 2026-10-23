@@ -263,10 +263,10 @@ describe('6.7 spotlight teaser lifecycle', () => {
     expect(state.getSnapshot()?.item.id).toBe('post-2')
   })
 
-  it.each([
+  it.each<[string, CommunityReactionSpotlight]>([
     ['level none', { level: 'none', label: null, items: [], nextCursor: null }],
     ['no items', { ...page(), items: [] }],
-  ] as const)(
+  ])(
     '6.7-UNIT-041 a re-read that answers %s removes the withdrawn entry and keeps re-reading',
     async (_, withdrawn) => {
       const { state, reads, settle } = harness()
@@ -278,7 +278,7 @@ describe('6.7 spotlight teaser lifecycle', () => {
       expect(state.getSnapshot()?.item.id).toBe('post-1')
       changes.mockClear()
       await vi.advanceTimersByTimeAsync(SPOTLIGHT_TEASER_REREAD_MS)
-      await settle(1, withdrawn as CommunityReactionSpotlight)
+      await settle(1, withdrawn)
       expect(state.getSnapshot()).toBeNull()
       expect(changes).toHaveBeenCalledTimes(1)
       await vi.advanceTimersByTimeAsync(SPOTLIGHT_TEASER_REREAD_MS)
