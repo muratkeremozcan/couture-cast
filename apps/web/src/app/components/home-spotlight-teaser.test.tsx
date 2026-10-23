@@ -180,9 +180,10 @@ function heroCanvas() {
 
 /** True when the hero canvas ends with the outfit tiles: nothing is reserved after them. */
 function heroEndsWithOutfits(): boolean {
-  return (
-    heroCanvas().lastElementChild?.querySelector('[data-testid="outfit-scroll"]') !== null
-  )
+  // An empty hero canvas proves nothing about what follows the tiles.
+  const last = heroCanvas().lastElementChild
+  expect(last).not.toBeNull()
+  return Boolean(last?.querySelector('[data-testid="outfit-scroll"]'))
 }
 
 /** The hero canvas markup with the teaser link taken out. */
