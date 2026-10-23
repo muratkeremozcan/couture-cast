@@ -267,7 +267,7 @@ describe('6.6 spotlight analytics', () => {
       expect(serialized).not.toContain(forbidden.toLowerCase())
   })
 
-  it('6.7-HTTP-001 a home_teaser read and open report the Home teaser surface with their own dedupe keys', async () => {
+  it('6.7-HTTP-001 a home_teaser read serves rank 1 and records a Home teaser view with its own dedupe key', async () => {
     const { viewer, cohort } = await seeded('home-teaser')
     ctx.analytics.splice(0)
     const teaser = communitySpotlightResponseSchema.parse(
@@ -283,7 +283,10 @@ describe('6.6 spotlight analytics', () => {
     expect(teaser.data.items.map((item) => [item.id, item.rank])).toEqual([
       [cohort.expectedOrder[0], 1],
     ])
-    await request(url).get('/api/v1/community/spotlight?limit=1').set(as(viewer))
+    await request(url)
+      .get('/api/v1/community/spotlight?limit=1')
+      .set(as(viewer))
+      .expect(200)
     const views = ctx.analytics.filter(
       (event) => event.event === 'community_spotlight_viewed'
     )
@@ -302,7 +305,10 @@ describe('6.6 spotlight analytics', () => {
       $ip: null,
     })
     expect(views[1]!.properties!.dedupe_key).not.toBe(views[0]!.properties!.dedupe_key)
+  })
 
+  it('6.7-HTTP-002 a teaser open and a legacy spotlight open report their surfaces with no raw identifier', async () => {
+    const { viewer, cohort } = await seeded('home-teaser-open')
     ctx.analytics.splice(0)
     const open = (surface: string) =>
       request(url)
@@ -330,11 +336,16 @@ describe('6.6 spotlight analytics', () => {
     const serialized = JSON.stringify(ctx.analytics).toLowerCase()
     for (const forbidden of [viewer, ...cohort.posts.map((post) => post.id)])
       expect(serialized).not.toContain(forbidden.toLowerCase())
+  })
 
+  it('6.7-HTTP-003 a read with an unknown surface is refused and records nothing', async () => {
+    const { viewer } = await seeded('home-teaser-refused')
+    ctx.analytics.splice(0)
     await request(url)
       .get('/api/v1/community/spotlight?surface=spotlight')
       .set(as(viewer))
       .expect(400)
+    expect(ctx.analytics).toEqual([])
   })
 
   it('6.6-HTTP-012 refuses a bad rank, a bad or missing level, a mixed body and a hidden post', async () => {
