@@ -707,14 +707,11 @@
     "loadError": "Impossibile caricare i tuoi luoghi.",
     "primary": "Principale",
     "makePrimary": "Imposta come principale",
-    "makePrimaryLabel": "Imposta {{label}} come luogo principale",
     "rename": "Rinomina",
-    "renameLabel": "Rinomina {{label}}",
     "renameField": "Nuovo nome",
     "renameSave": "Salva nome",
     "cancel": "Annulla",
     "delete": "Elimina",
-    "deleteLabel": "Elimina {{label}}",
     "deleteConfirm": "Eliminare {{label}}?",
     "deleteConfirmAction": "Sì, elimina",
     "searchLabel": "Cerca una città",
@@ -744,5 +741,8 @@
       "invalid_query": "Digita da 2 a 80 caratteri.",
       "unknown": "Qualcosa è andato storto. Riprova."
     }
+  },
+  "settings": {
+    "title": "Impostazioni"
   }
 }

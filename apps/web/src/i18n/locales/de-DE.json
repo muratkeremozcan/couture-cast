@@ -707,14 +707,11 @@
     "loadError": "Deine Orte konnten nicht geladen werden.",
     "primary": "Hauptort",
     "makePrimary": "Als Hauptort festlegen",
-    "makePrimaryLabel": "{{label}} als Hauptort festlegen",
     "rename": "Umbenennen",
-    "renameLabel": "{{label}} umbenennen",
     "renameField": "Neuer Name",
     "renameSave": "Namen speichern",
     "cancel": "Abbrechen",
     "delete": "Löschen",
-    "deleteLabel": "{{label}} löschen",
     "deleteConfirm": "{{label}} löschen?",
     "deleteConfirmAction": "Ja, löschen",
     "searchLabel": "Nach einer Stadt suchen",
@@ -744,5 +741,8 @@
       "invalid_query": "Gib zwischen 2 und 80 Zeichen ein.",
       "unknown": "Etwas ist schiefgelaufen. Versuche es erneut."
     }
+  },
+  "settings": {
+    "title": "Einstellungen"
   }
 }

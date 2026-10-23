@@ -707,14 +707,11 @@
     "loadError": "No se pudieron cargar tus ubicaciones.",
     "primary": "Principal",
     "makePrimary": "Hacer principal",
-    "makePrimaryLabel": "Hacer de {{label}} tu ubicación principal",
     "rename": "Cambiar nombre",
-    "renameLabel": "Cambiar el nombre de {{label}}",
     "renameField": "Nombre nuevo",
     "renameSave": "Guardar nombre",
     "cancel": "Cancelar",
     "delete": "Eliminar",
-    "deleteLabel": "Eliminar {{label}}",
     "deleteConfirm": "¿Eliminar {{label}}?",
     "deleteConfirmAction": "Sí, eliminar",
     "searchLabel": "Busca una ciudad",
@@ -744,5 +741,8 @@
       "invalid_query": "Escribe entre 2 y 80 caracteres.",
       "unknown": "Algo salió mal. Intenta de nuevo."
     }
+  },
+  "settings": {
+    "title": "Ajustes"
   }
 }

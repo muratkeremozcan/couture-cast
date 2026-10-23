@@ -27,7 +27,15 @@ import os from 'node:os'
 import { fileURLToPath, URL } from 'node:url'
 import path from 'node:path'
 import { MAESTRO_BIN, MAESTRO_PINNED_VERSION } from './maestro-version.mjs'
-import { resetMobileE2EFlowState } from './lib/mobile-e2e-flow-state.mjs'
+import {
+  clearMobileE2ELocations,
+  resetMobileE2EFlowState,
+  restoreMobileE2EBaselineLocation,
+} from './lib/mobile-e2e-flow-state.mjs'
+import {
+  coordinateKeySuffix,
+  sentinelPlace,
+} from './lib/weather-provider-double-data.mjs'
 import { runMobileE2EFlow } from './lib/mobile-e2e-flow-retry.mjs'
 import { buildMobileE2EAccessToken } from './lib/mobile-e2e-token.mjs'
 
@@ -1449,13 +1457,50 @@ const clearMobileE2EDeviceSettings = async () => {
   }
 }
 
-const resetMobileE2EPerFlowState = async (identity) => {
+/**
+ * Story 1.2b: one sentinel place per run. `Sentinel <nonce>` geocodes, on the
+ * weather provider double the E2E API reaches, to coordinates no run has saved,
+ * so the location capture flow always saves a key with no prior snapshot.
+ */
+const LOCATION_SENTINEL_NONCE = randomUUID().replace(/-/g, '').slice(0, 10)
+const LOCATION_SENTINEL_QUERY = `Sentinel ${LOCATION_SENTINEL_NONCE}`
+const LOCATION_SENTINEL_KEY_SUFFIX = (() => {
+  const place = sentinelPlace(LOCATION_SENTINEL_NONCE)
+  return coordinateKeySuffix(place.lat, place.lon)
+})()
+
+/**
+ * State a flow needs beyond the shared per-flow reset. `before` runs ahead of
+ * every attempt; `after` runs once the flow finishes, pass or fail, so the
+ * flows after it start from the baseline the identity setup created.
+ */
+const FLOW_STATE_HOOKS = {
+  'maestro/location-capture.yaml': {
+    before: (prisma, userId) =>
+      clearMobileE2ELocations(prisma, userId, LOCATION_SENTINEL_KEY_SUFFIX),
+    after: (prisma, userId) => restoreMobileE2EBaselineLocation(prisma, userId),
+  },
+}
+
+const withMobileE2EPrisma = async (work) => {
   const prisma = new PrismaClient({ datasourceUrl: MOBILE_E2E_DATABASE_URL })
   try {
-    await resetMobileE2EFlowState(prisma, identity.userId)
+    await work(prisma)
   } finally {
     await prisma.$disconnect()
   }
+}
+
+const resetMobileE2EPerFlowState = async (identity, flowPath) =>
+  withMobileE2EPrisma(async (prisma) => {
+    await resetMobileE2EFlowState(prisma, identity.userId)
+    await FLOW_STATE_HOOKS[flowPath]?.before(prisma, identity.userId)
+  })
+
+const restoreMobileE2EStateAfterFlow = async (identity, flowPath) => {
+  const hook = FLOW_STATE_HOOKS[flowPath]?.after
+  if (!identity || !hook) return
+  await withMobileE2EPrisma((prisma) => hook(prisma, identity.userId))
 }
 
 const setupMobileE2EIdentity = async (apiBaseUrl) => {
@@ -3020,6 +3065,8 @@ const buildMaestroFlowEnvArgs = () => [
   '-e',
   `REPLACEMENT_GARMENT_ID=${process.env.REPLACEMENT_GARMENT_ID ?? ''}`,
   '-e',
+  `LOCATION_SENTINEL_QUERY=${LOCATION_SENTINEL_QUERY}`,
+  '-e',
   `APP_URL=${process.env.APP_URL}`,
   '-e',
   `WARDROBE_URL=${process.env.WARDROBE_URL}`,
@@ -3186,7 +3233,13 @@ const runMaestroCommandWithWatchdogRetry = async (args, options, label, reset) =
  * @param {string[]} flowFailures collected in place
  * @returns {Promise<void>}
  */
-const runUserScopedFlows = async (serialFlows, target, maestroEnv, flowFailures) => {
+const runUserScopedFlows = async (
+  serialFlows,
+  target,
+  maestroEnv,
+  flowFailures,
+  identity
+) => {
   for (const flowPath of serialFlows) {
     const serialArgs = [
       '--platform',
@@ -3220,12 +3273,16 @@ const runUserScopedFlows = async (serialFlows, target, maestroEnv, flowFailures)
           timeoutMs: CI_FLOW_TIMEOUT_MS,
         },
         flowPath,
-        () => Promise.resolve()
+        identity
+          ? () => resetMobileE2EPerFlowState(identity, flowPath)
+          : () => Promise.resolve()
       )
       log(`PASS ${flowPath}`)
     } catch (error) {
       flowFailures.push(flowPath)
       log(`FAIL ${flowPath} (${error.message})`)
+    } finally {
+      await restoreMobileE2EStateAfterFlow(identity, flowPath)
     }
   }
 }
@@ -3406,11 +3463,13 @@ const runFlowsSerially = async (target, maestroEnv, mobileIdentity, flowFailures
         },
         flowPath,
         mobileIdentity
-          ? () => resetMobileE2EPerFlowState(mobileIdentity)
+          ? () => resetMobileE2EPerFlowState(mobileIdentity, flowPath)
           : () => Promise.resolve()
       )
     } catch (error) {
       maestroExitError = error
+    } finally {
+      await restoreMobileE2EStateAfterFlow(mobileIdentity, flowPath)
     }
 
     recordSingleFlowOutcome(flowPath, maestroExitError, flowFailures)
@@ -3441,6 +3500,9 @@ const USER_SCOPED_FLOWS = [
   'maestro/deep-link-handling.yaml',
   'maestro/garment-capsule-create-flow.yaml',
   'maestro/garment-capsule-repair-flow.yaml',
+  // Story 1.2b: removes and restores the member's saved locations around
+  // itself, which only the per-flow hooks of a serial run can do safely.
+  'maestro/location-capture.yaml',
 ]
 
 /**
@@ -3465,7 +3527,14 @@ const runParallelSuite = async (target, maestroEnv, mobileIdentities, flowFailur
     await runShardedFlows(shardedFlows, target, maestroEnv, flowFailures)
   }
 
-  await runUserScopedFlows(serialFlows, target, maestroEnv, flowFailures)
+  // The first shard device runs these; its identity is the first one created.
+  await runUserScopedFlows(
+    serialFlows,
+    target,
+    maestroEnv,
+    flowFailures,
+    mobileIdentities[0]
+  )
 }
 
 /**

@@ -707,14 +707,11 @@
     "loadError": "Unable to load your locations.",
     "primary": "Primary",
     "makePrimary": "Make primary",
-    "makePrimaryLabel": "Make {{label}} your primary location",
     "rename": "Rename",
-    "renameLabel": "Rename {{label}}",
     "renameField": "New name",
     "renameSave": "Save name",
     "cancel": "Cancel",
     "delete": "Delete",
-    "deleteLabel": "Delete {{label}}",
     "deleteConfirm": "Delete {{label}}?",
     "deleteConfirmAction": "Yes, delete",
     "searchLabel": "Search for a city",
@@ -744,5 +741,8 @@
       "invalid_query": "Type between 2 and 80 characters.",
       "unknown": "Something went wrong. Try again."
     }
+  },
+  "settings": {
+    "title": "Settings"
   }
 }

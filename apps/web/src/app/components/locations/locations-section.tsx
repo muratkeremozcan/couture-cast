@@ -324,12 +324,10 @@ export function LocationsSection() {
                       {!location.isPrimary && (
                         <button
                           type="button"
-                          aria-label={t('locations.makePrimaryLabel', {
-                            label: location.label,
-                          })}
                           aria-busy={busyId === location.id}
                           onClick={() => makePrimary(location)}
                           className="min-h-[44px] rounded-md border border-[#c9a14a] px-3 text-white"
+                          aria-label={`${t('locations.makePrimary')}, ${location.label}`}
                           data-testid="location-make-primary"
                         >
                           {t('locations.makePrimary')}
@@ -337,25 +335,25 @@ export function LocationsSection() {
                       )}
                       <button
                         type="button"
-                        aria-label={t('locations.renameLabel', { label: location.label })}
                         onClick={() => {
                           setConfirmingId(null)
                           setRenameValue(location.label)
                           setRenamingId(location.id)
                         }}
                         className="min-h-[44px] rounded-md border border-neutral-500 px-3 text-white"
+                        aria-label={`${t('locations.rename')}, ${location.label}`}
                         data-testid="location-rename"
                       >
                         {t('locations.rename')}
                       </button>
                       <button
                         type="button"
-                        aria-label={t('locations.deleteLabel', { label: location.label })}
                         onClick={() => {
                           setRenamingId(null)
                           setConfirmingId(location.id)
                         }}
                         className="min-h-[44px] rounded-md border border-neutral-500 px-3 text-white"
+                        aria-label={`${t('locations.delete')}, ${location.label}`}
                         data-testid="location-delete"
                       >
                         {t('locations.delete')}

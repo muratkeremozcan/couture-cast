@@ -15,6 +15,9 @@ const holdsBypassSecret = Boolean(process.env.VERCEL_AUTOMATION_BYPASS_SECRET?.t
 export default defineConfig(
   merge({}, baseConfig, {
     globalSetup: path.resolve(__dirname, '..', 'global-setup-vercel-bypass.ts'),
+    // Story 1.2b: specs tagged @local-lane write locations and need the local
+    // weather provider double, so the preview run never selects them.
+    grepInvert: /@local-lane/,
     use: {
       baseURL: environment.webBaseUrl,
       // Vercel bypass cookies minted by global setup; see that file for why

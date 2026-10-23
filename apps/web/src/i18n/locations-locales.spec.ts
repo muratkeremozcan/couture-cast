@@ -113,4 +113,14 @@ describe('1.2b locations locale parity (web)', () => {
       'City search is temporarily unavailable. Try again.'
     )
   })
+
+  // The settings page hosts the Locations section; its heading was English on
+  // every locale before Story 1.2b.
+  it('1.2b-I18N-WEB-07 ships a translated settings page title in every locale', () => {
+    for (const locale of SUPPORTED_LOCALES) {
+      const settings = CATALOGS[locale].settings as { title?: unknown } | undefined
+      expect(typeof settings?.title, locale).toBe('string')
+      if (!locale.startsWith('en-')) expect(settings?.title, locale).not.toBe('Settings')
+    }
+  })
 })

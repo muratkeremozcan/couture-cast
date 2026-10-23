@@ -171,6 +171,47 @@ missing location blocks the member today.
   delegated by the owner to the coordinator.
 - Build note: the key example `41.871n-87.631w` becomes `41-871n-87-631w` after `normalizeLocationKey`;
   a unit test asserts the final slug against `locationKeySchema`, including a long name at the 120-character cap.
+- 2026-10-22, implementation (cc12b-impl). Decisions the spec left open:
+  - Analytics: `location_saved` outcomes are `saved`, `limit_reached`, `duplicate`, `invalid_candidate`,
+    `forecast_unavailable` and `service_unavailable`, with `resultCount` the member's saved count after
+    the attempt; `location_search_failed` outcomes are `no_results`, `provider_unavailable`,
+    `provider_timeout`, `provider_unconfigured` and `service_unavailable`. `location_switched` carries
+    the HMAC subject and no properties. Platform comes from a required `x-couture-platform` header on
+    the two new routes only, so the existing location routes keep their shapes.
+  - Typed errors: 400 bodies carry `code` (`invalid_request`, `invalid_candidate`,
+    `location_limit_reached`, `location_duplicate`); 503 bodies carry `code` (`provider_unavailable`,
+    `location_service_unavailable`) and `retryable: true`. Clients localize by code.
+  - Search rate limit: a `LocationSearchWindow` row per member (fixed one-minute window, atomic upsert,
+    cascades with the user, API-only RLS); the 31st search answers the shared 429 with `Retry-After`.
+  - Save: duplicate and limit are checked before the provider call, then one forecast call to the
+    provider `WEATHER_PROVIDER_MODE` selects (no failover, 3 seconds) is persisted through
+    `WeatherRepository.persistForecast` before the location row is created.
+  - Provider base URLs: `OPENWEATHER_API_ORIGIN` and `WEATHERAPI_API_ORIGIN`, ignored whenever
+    `isProductionRuntime` holds.
+  - The ritual's test-env weather fallback never applies to a key that ends in the search coordinate
+    suffix, in every test environment, so a search-saved location always reads its persisted forecast.
+  - Primary refresh: `WeatherRefreshQueue`, a lazy BullMQ producer on `weather-ingestion` with the
+    worker's bucketed job id; the enqueue is bounded to 1 second and never fails the request.
+  - Display labels name a repeated part once (Monaco, Moscow).
+  - Guided entry: web Community links to `/settings?addLocation=1&returnTo=%2F#locations` and a save
+    returns there; mobile hero and Community push `/locations?guided=1`, a save goes back, and an
+    `onLocationsChanged` emitter reloads the hero and the Community tab.
+  - Harness: `scripts/weather-provider-double.mjs` (data in `scripts/lib/weather-provider-double-data.mjs`)
+    starts inside `start-api-e2e-with-workers.mjs`; the Playwright spec is tagged `@local-lane`, which
+    the preview and production configs `grepInvert`; the Maestro flow is user-scoped and its
+    `FLOW_STATE_HOOKS` clear the member's locations before it and restore the baseline after it, with a
+    per-run sentinel query.
+- 2026-10-22, defects fixed outside the story surface:
+  - Weather location job ids contained colons (`name:key:iso`), which BullMQ 5 rejects ("Custom Id
+    cannot contain :"), so every sweep enqueue failed. Ids are now `name__key__bucketMs`, proven
+    against real Redis.
+  - `apps/api/src/load-env.ts` re-applied the `.env.local` override in every E2E child, discarding the
+    launcher's explicit `DATABASE_URL`; the launcher now passes its caller-owned keys in
+    `E2E_CALLER_OWNED_ENV_KEYS` (a loopback `REDIS_URL` included) and load-env keeps them.
+  - The web settings heading was English on every locale; it reads `settings.title` in all ten.
+- External prerequisite: `LOCATION_CANDIDATE_SECRET` (32 characters or more, one value per
+  environment) must be set on the preview and production API; until then those deployments answer
+  the fail-closed 503 on search and save from search.
 
 ## Spec Change Log
 

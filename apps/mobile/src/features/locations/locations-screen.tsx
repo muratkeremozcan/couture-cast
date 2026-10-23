@@ -382,9 +382,7 @@ export function LocationsScreen({ guided = false }: LocationsScreenProps) {
                   {!location.isPrimary && (
                     <Pressable
                       accessibilityRole="button"
-                      accessibilityLabel={t('locations.makePrimaryLabel', {
-                        label: location.label,
-                      })}
+                      accessibilityLabel={`${t('locations.makePrimary')}, ${location.label}`}
                       accessibilityState={{ busy: busyId === location.id }}
                       onPress={() => {
                         void runListAction(location.id, async () => {
@@ -400,9 +398,7 @@ export function LocationsScreen({ guided = false }: LocationsScreenProps) {
                   )}
                   <Pressable
                     accessibilityRole="button"
-                    accessibilityLabel={t('locations.renameLabel', {
-                      label: location.label,
-                    })}
+                    accessibilityLabel={`${t('locations.rename')}, ${location.label}`}
                     onPress={() => {
                       setConfirmingId(null)
                       setRenameValue(location.label)
@@ -415,9 +411,7 @@ export function LocationsScreen({ guided = false }: LocationsScreenProps) {
                   </Pressable>
                   <Pressable
                     accessibilityRole="button"
-                    accessibilityLabel={t('locations.deleteLabel', {
-                      label: location.label,
-                    })}
+                    accessibilityLabel={`${t('locations.delete')}, ${location.label}`}
                     onPress={() => {
                       setRenamingId(null)
                       setConfirmingId(location.id)

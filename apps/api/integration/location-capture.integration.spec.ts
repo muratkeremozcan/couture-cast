@@ -52,6 +52,15 @@ import {
   WeatherRefreshQueue,
 } from '../src/modules/weather/weather-refresh.queue'
 import { WeatherRepository } from '../src/modules/weather/weather.repository'
+import {
+  clearMobileE2ELocations,
+  MOBILE_E2E_BASELINE_LOCATION,
+  restoreMobileE2EBaselineLocation,
+} from '../../../scripts/lib/mobile-e2e-flow-state.mjs'
+import {
+  coordinateKeySuffix,
+  sentinelPlace,
+} from '../../../scripts/lib/weather-provider-double-data.mjs'
 
 /**
  * Story 1.2b: the capture path against a real migrated database, a real Redis
@@ -710,5 +719,53 @@ describeRealDatabase('Location capture real-database integration', () => {
       'location_search_failed',
     ])
     expect(serialized).not.toMatch(/chicago|illinois|nowhere|41\.8|87\.6|-us-|home/i)
+  })
+
+  it('1.2b-INT-16 clears the Maestro member to zero locations around the flow and restores the baseline after', async () => {
+    const harness = await harnessFor('openweather')
+    const member1 = await member(harness)
+    const bystander = await member(harness)
+    const place = sentinelPlace('int16')
+    const suffix = coordinateKeySuffix(place.lat, place.lon)
+    for (const viewer of [member1, bystander]) {
+      await restoreMobileE2EBaselineLocation(harness.prisma, viewer.id)
+    }
+    const [sentinel] = await search(harness, member1.token, 'Sentinel int16')
+    const saved = await saveCandidate(harness, member1.token, sentinel!)
+    expect(saved.locationKey.endsWith(suffix)).toBe(true)
+
+    await clearMobileE2ELocations(harness.prisma, member1.id, suffix)
+
+    expect(
+      await harness.prisma.savedLocation.count({ where: { user_id: member1.id } })
+    ).toBe(0)
+    expect(
+      await harness.prisma.weatherSnapshot.count({
+        where: { location_key: { endsWith: suffix } },
+      })
+    ).toBe(0)
+    expect(
+      await harness.prisma.savedLocation.count({ where: { user_id: bystander.id } })
+    ).toBe(1)
+
+    await restoreMobileE2EBaselineLocation(harness.prisma, member1.id)
+    expect(
+      await harness.prisma.savedLocation.findMany({
+        where: { user_id: member1.id },
+        select: { location_key: true, is_primary: true, city: true },
+      })
+    ).toEqual([
+      {
+        location_key: MOBILE_E2E_BASELINE_LOCATION.location_key,
+        is_primary: true,
+        city: 'Chicago',
+      },
+    ])
+    await expect(clearMobileE2ELocations(harness.prisma, member1.id, '')).rejects.toThrow(
+      'sentinel key suffix'
+    )
+    await expect(restoreMobileE2EBaselineLocation(harness.prisma, ' ')).rejects.toThrow(
+      'requires a member ID'
+    )
   })
 })

@@ -294,9 +294,7 @@ describe('LocationsSection', () => {
     )
 
     renderSection()
-    fireEvent.click(
-      await screen.findByRole('button', { name: 'Make Office your primary location' })
-    )
+    fireEvent.click(await screen.findByRole('button', { name: 'Make primary, Office' }))
 
     await waitFor(() =>
       expect(status().textContent).toBe('Office is now your primary location.')
@@ -323,14 +321,14 @@ describe('LocationsSection', () => {
     )
 
     renderSection()
-    fireEvent.click(await screen.findByRole('button', { name: 'Rename Office' }))
+    fireEvent.click(await screen.findByRole('button', { name: 'Rename, Office' }))
     const rename = screen.getByTestId('location-rename-input')
     expect(document.activeElement).toBe(rename)
     fireEvent.change(rename, { target: { value: 'Studio' } })
     fireEvent.click(screen.getByTestId('location-rename-save'))
     await waitFor(() => expect(status().textContent).toBe('Renamed to Studio.'))
 
-    fireEvent.click(screen.getByRole('button', { name: 'Delete Home' }))
+    fireEvent.click(screen.getByRole('button', { name: 'Delete, Home' }))
     expect(screen.getByText('Delete Home?')).toBeInTheDocument()
     fireEvent.click(screen.getByTestId('location-delete-confirm'))
     await waitFor(() => expect(status().textContent).toBe('Home deleted.'))

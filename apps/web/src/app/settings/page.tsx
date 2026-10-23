@@ -2,7 +2,7 @@
 'use client'
 
 import { Suspense } from 'react'
-import { I18nextProvider } from 'react-i18next'
+import { I18nextProvider, useTranslation } from 'react-i18next'
 import { getI18n } from '../../i18n'
 import { CommercePreferencesSection } from '../components/commerce-preferences-section'
 import { LocationsSection } from '../components/locations/locations-section'
@@ -25,6 +25,12 @@ import { SubscriptionSection } from '../components/subscription-section'
  * That suite loads the route signed out, so every child has to render cleanly
  * with no session.
  */
+/** Inside the provider, so the heading follows the reader's locale. */
+function SettingsTitle() {
+  const { t } = useTranslation()
+  return <h1 className="text-4xl font-semibold">{t('settings.title')}</h1>
+}
+
 export default function SettingsPage() {
   return (
     <I18nextProvider i18n={getI18n()}>
@@ -34,7 +40,7 @@ export default function SettingsPage() {
         data-focus-surface="dark"
         className="min-h-screen bg-neutral-950 px-6 py-16 pb-[calc(5.5rem+env(safe-area-inset-bottom,0px))] text-white outline-none"
       >
-        <h1 className="text-4xl font-semibold">Settings</h1>
+        <SettingsTitle />
         {/* `useSearchParams` reads the guided-entry query, which needs a boundary. */}
         <Suspense fallback={null}>
           <LocationsSection />

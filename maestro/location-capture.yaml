@@ -1,0 +1,119 @@
+# Story 1.2b: client location capture through the guided entry.
+#
+# The runner removes this member's saved locations before the flow and restores
+# the baseline Chicago location after it (`FLOW_STATE_HOOKS` in
+# scripts/run-maestro.mjs), so the hero opens on its no-location state. The E2E
+# API reaches the local weather provider double (scripts/weather-provider-double.mjs),
+# never a live provider. `LOCATION_SENTINEL_QUERY` geocodes to a place no run
+# has saved, and its forecast carries the sentinel 31 C (88 F) the ritual's
+# synthetic test weather never produces, so the hero showing 88 degrees proves
+# the ritual consumed the forecast persisted at save.
+appId: ${MAESTRO_APP_ID}
+name: 'Location capture guided entry'
+tags:
+  - e2e
+  - locations
+  - maestro
+---
+- launchApp:
+    appId: ${MAESTRO_APP_ID}
+    clearState: true
+    stopApp: false
+
+- runFlow: subflows/open-app.yaml
+
+# --- The hero explains the missing location and offers the guided action -----
+- extendedWaitUntil:
+    visible:
+      id: 'hero-no-location-state'
+    timeout: 30000
+    label: 'Hero opens on the no-location state'
+- tapOn:
+    id: 'hero-add-location'
+    label: 'Open Locations from the hero'
+
+# --- Search, pick and save -------------------------------------------------------
+- extendedWaitUntil:
+    visible:
+      id: 'locations-search-input'
+    timeout: 15000
+    label: 'Locations opened with the search field'
+- tapOn:
+    id: 'locations-search-input'
+- inputText: ${LOCATION_SENTINEL_QUERY}
+- extendedWaitUntil:
+    visible:
+      id: 'location-search-option-0'
+    timeout: 15000
+    label: 'The sentinel city is offered'
+- hideKeyboard
+- tapOn:
+    id: 'location-search-option-0'
+    label: 'Pick the sentinel city'
+- extendedWaitUntil:
+    visible:
+      id: 'location-label-input'
+    timeout: 10000
+- tapOn:
+    id: 'location-label-input'
+- eraseText: 40
+- inputText: 'Home'
+- hideKeyboard
+- tapOn:
+    id: 'location-save-button'
+    label: 'Save the location'
+
+# --- The save returns to the hero, which shows a ritual on the saved forecast ---
+- extendedWaitUntil:
+    visible:
+      id: 'outfit-recommendation-card'
+    timeout: 30000
+    label: 'Hero shows a ritual without a manual reload'
+- assertNotVisible:
+    id: 'hero-no-location-state'
+- assertVisible:
+    id: 'current-temperature'
+    text: '.*88.*'
+    label: 'The ritual reports the sentinel forecast'
+- takeScreenshot:
+    path: maestro/artifacts/location-capture-hero
+
+# --- Community resolves the climate band ------------------------------------------
+- tapOn:
+    id: 'tab-community'
+    retryTapIfNoChange: true
+- extendedWaitUntil:
+    visible:
+      id: 'community-screen'
+    timeout: 20000
+- extendedWaitUntil:
+    visible:
+      id: 'community-filter-chip-auto'
+    timeout: 20000
+- assertVisible:
+    id: 'community-filter-chip-auto'
+    text: 'Your climate: .*'
+    label: 'The auto chip names the resolved band'
+- assertNotVisible:
+    id: 'community-band-unresolved'
+
+# --- Settings lists the saved location as primary ----------------------------------
+- runFlow: subflows/open-settings.yaml
+- scrollUntilVisible:
+    element:
+      id: 'locations-link'
+    direction: DOWN
+    centerElement: true
+    timeout: 15000
+- tapOn:
+    id: 'locations-link'
+- extendedWaitUntil:
+    visible:
+      id: 'location-primary-badge-0'
+    timeout: 15000
+    label: 'The saved location is primary'
+- assertVisible:
+    id: 'location-label-0'
+    text: 'Home'
+- takeScreenshot:
+    path: maestro/artifacts/location-capture-settings

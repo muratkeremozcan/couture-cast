@@ -707,14 +707,11 @@
     "loadError": "Não foi possível carregar os seus locais.",
     "primary": "Principal",
     "makePrimary": "Definir como principal",
-    "makePrimaryLabel": "Definir {{label}} como local principal",
     "rename": "Mudar o nome",
-    "renameLabel": "Mudar o nome de {{label}}",
     "renameField": "Novo nome",
     "renameSave": "Guardar nome",
     "cancel": "Cancelar",
     "delete": "Eliminar",
-    "deleteLabel": "Eliminar {{label}}",
     "deleteConfirm": "Eliminar {{label}}?",
     "deleteConfirmAction": "Sim, eliminar",
     "searchLabel": "Pesquisar uma cidade",
@@ -744,5 +741,8 @@
       "invalid_query": "Escreva entre 2 e 80 caracteres.",
       "unknown": "Algo correu mal. Tente novamente."
     }
+  },
+  "settings": {
+    "title": "Definições"
   }
 }

@@ -33,6 +33,8 @@ describe('load-env', () => {
     delete process.env.NODE_ENV
     delete process.env.TEST_ENV
     delete process.env.POSTHOG_API_KEY
+    delete process.env.E2E_CALLER_OWNED_ENV_KEYS
+    delete process.env.CC12B_TEST_DATABASE_URL
   })
 
   it('loads root .env files in expected precedence order for development', async () => {
@@ -86,5 +88,21 @@ describe('load-env', () => {
 
     expect(loadEnvMock).toHaveBeenCalledTimes(1)
     expect(String(loadEnvMock.mock.calls[0]?.[0]?.path)).toContain('.env.prod')
+  })
+
+  it('keeps the values the E2E launcher marked caller-owned against the .env.local override', async () => {
+    // Story 1.2b: an isolated DATABASE_URL reached the launcher's seed step while
+    // the API it spawned wrote to whatever .env.local named.
+    process.env.TEST_ENV = 'local'
+    process.env.CC12B_TEST_DATABASE_URL = 'postgresql://isolated/test'
+    process.env.E2E_CALLER_OWNED_ENV_KEYS = 'CC12B_TEST_DATABASE_URL, MISSING_KEY'
+    loadEnvMock.mockImplementation(() => {
+      process.env.CC12B_TEST_DATABASE_URL = 'postgresql://default/postgres'
+    })
+
+    await import('#load-env')
+
+    expect(process.env.CC12B_TEST_DATABASE_URL).toBe('postgresql://isolated/test')
+    expect(process.env.MISSING_KEY).toBeUndefined()
   })
 })
