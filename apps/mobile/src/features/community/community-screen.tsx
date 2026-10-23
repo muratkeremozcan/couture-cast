@@ -786,6 +786,11 @@ export function CommunityScreen() {
       setNewLooks([])
       setAuthorStates([])
       setNextCursor(null)
+      // The band and its no-location notice describe the previous member. Web
+      // clears them the same way in clearScope.
+      setViewerBand(null)
+      setBandResolved(true)
+      setBandUnresolvedReason(null)
       setDeepLinkPost(null)
       setCommentsPostId(null)
       setCommentTarget(undefined)

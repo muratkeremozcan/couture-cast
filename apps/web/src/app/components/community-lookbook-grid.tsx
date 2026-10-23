@@ -2237,6 +2237,11 @@ export function CommunityLookbookGrid({
       setItems([])
       itemsRef.current = []
       setAuthorStates([])
+      // The band and why it did not resolve describe the member who left; the
+      // notice and its add-location action go with them.
+      setViewerBand(null)
+      setBandResolved(true)
+      setBandUnresolvedReason(null)
       setOpenedItem(null)
       setDeepLinkedItem(null)
       setNewLooks([])
