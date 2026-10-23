@@ -295,7 +295,10 @@ export function LocationsSection() {
                       </button>
                     </form>
                   ) : confirmingId === location.id ? (
-                    <div className="mt-3 flex flex-wrap items-center gap-2">
+                    // Distinct keys keep React from reusing the actions row's
+                    // buttons here: the focused Delete would become Cancel and
+                    // "Yes, delete" would never mount, so autoFocus would not run.
+                    <div key="confirm" className="mt-3 flex flex-wrap items-center gap-2">
                       <p className="text-sm text-white">
                         {t('locations.deleteConfirm', { label: location.label })}
                       </p>
@@ -321,7 +324,7 @@ export function LocationsSection() {
                       </button>
                     </div>
                   ) : (
-                    <div className="mt-3 flex flex-wrap gap-2">
+                    <div key="actions" className="mt-3 flex flex-wrap gap-2">
                       {!location.isPrimary && (
                         <button
                           type="button"
