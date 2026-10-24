@@ -485,6 +485,18 @@ playwright/tests/community-comments.spec.ts --repeat-each=3`, went out without t
     "Selected" announcement, then clears the record before saving, so the save's announcements
     are exactly the error and, for an expired result, the second search's count.
 
+- 2026-10-24, round 7 (`reviews/code-triage-1.md`, R34, R35).
+  - R34: the automatic feed-lock fixture ran before the community fixtures' non-local skip, so a
+    preview or prod run would have connected to a database for the lock. The fixture body is now
+    `holdEngagementFeed` in `playwright/support/helpers/engagement-feed-lock.ts`, which skips a
+    non-local run first; its spec shows no database URL is read and no lock is taken there, and
+    fails with the skip moved after the lock.
+  - R35: the advisory-lock integration spec keeps every worker it starts, runs each as one Node
+    process so a signal reaches it, rejects a spawn error, and in `afterEach` kills and awaits
+    every worker still running. A test cuts a run short with a worker holding the lock and checks
+    that the worker exits, `pg_locks` shows no holder, and the lock is free; it fails when the
+    cleanup does not kill.
+
 ## Spec Change Log
 
 - 2026-10-23, iteration 5 (rereview 3): read floor, last-attempt time and `Retry-After` are
