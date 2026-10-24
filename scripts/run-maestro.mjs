@@ -51,6 +51,7 @@ import {
   removeReportEverywhere,
 } from './lib/maestro-flow-outcome.mjs'
 import { runMobileE2EFlow } from './lib/mobile-e2e-flow-retry.mjs'
+import { createMaestroDriverReuse, withTestOptions } from './lib/maestro-driver-reuse.mjs'
 import {
   adbDeviceStates,
   captureSlowProbeState,
@@ -1810,6 +1811,31 @@ const failFlowWithCause = (flowPath, cause, flowFailures) => {
     flowFailures[index] = `${flowFailures[index]} (${cause})`
   }
 }
+
+/**
+ * Story 6.7 R62: the first flow on an Android device reinstalls Maestro's driver;
+ * later flows reuse it once the device shows it complete
+ * (scripts/lib/maestro-driver-reuse.mjs).
+ */
+const maestroDriverReuse = createMaestroDriverReuse({
+  inspect: async (device) => {
+    const adbBinary = resolveAdbBinary()
+    const target = device ? ['-s', device] : []
+    const [packagesOutput, instrumentationOutput] = await Promise.all([
+      captureProcess(
+        adbBinary,
+        [...target, 'shell', 'pm', 'list', 'packages', 'dev.mobile.maestro'],
+        {
+          timeoutMs: 15_000,
+        }
+      ),
+      captureProcess(adbBinary, [...target, 'shell', 'pm', 'list', 'instrumentation'], {
+        timeoutMs: 15_000,
+      }),
+    ])
+    return { packagesOutput, instrumentationOutput }
+  },
+})
 
 /**
  * The community beta arm, as `community-analytics.ts` assigns it:
@@ -3619,6 +3645,13 @@ const runUserScopedFlows = async (
       failFlowWithCause(flowPath, refusal, flowFailures)
       continue
     }
+    let driverArgs
+    try {
+      driverArgs = await maestroDriverReuse.argsFor(target.platform, SHARD_DEVICE_IDS[0])
+    } catch (error) {
+      failFlowWithCause(flowPath, error.message, flowFailures)
+      continue
+    }
     const doubleWatch = await watchWeatherDouble(flowPath)
     if (doubleWatch?.cause) {
       failFlowWithCause(flowPath, doubleWatch.cause, flowFailures)
@@ -3649,7 +3682,7 @@ const runUserScopedFlows = async (
     log(`Running user-scoped flow on ${SHARD_DEVICE_IDS[0]}: ${flowPath}`)
     try {
       await runMaestroCommandWithWatchdogRetry(
-        serialArgs,
+        withTestOptions(serialArgs, driverArgs),
         {
           env: maestroEnv,
           logFile: WRITE_ARTIFACTS ? getFlowLogPath(flowPath) : undefined,
@@ -3666,6 +3699,7 @@ const runUserScopedFlows = async (
       flowFailures.push(flowPath)
       log(`FAIL ${flowPath} (${error.message})`)
     }
+    maestroDriverReuse.recordInvocation(target.platform, SHARD_DEVICE_IDS[0])
     const restoreCause = await restoreMobileE2EStateOrCause(identity, flowPath)
     const doubleCause = await doubleWatch?.verify?.()
     for (const cause of [doubleCause, restoreCause]) {
@@ -3898,12 +3932,27 @@ const runFlowsSerially = async (target, maestroEnv, mobileIdentity, flowFailures
       failFlowWithCause(flowPath, refusal, flowFailures)
       continue
     }
+    // Maestro Cloud runs on its own devices; only a local device reuses the driver.
+    const cloud = Boolean(
+      process.env.MAESTRO_CLOUD_API_KEY && process.env.MAESTRO_CLOUD_WORKSPACE
+    )
+    let driverArgs = []
+    if (!cloud) {
+      try {
+        driverArgs = await maestroDriverReuse.argsFor(target.platform, androidSerial)
+      } catch (error) {
+        failFlowWithCause(flowPath, error.message, flowFailures)
+        continue
+      }
+    }
     const doubleWatch = await watchWeatherDouble(flowPath)
     if (doubleWatch?.cause) {
       failFlowWithCause(flowPath, doubleWatch.cause, flowFailures)
       continue
     }
-    const { maestroArgs, maestroLogFile } = buildSingleFlowMaestroArgs(flowPath, target)
+    const built = buildSingleFlowMaestroArgs(flowPath, target)
+    const maestroArgs = withTestOptions(built.maestroArgs, driverArgs)
+    const { maestroLogFile } = built
 
     log(`Running Maestro flow (${maestroArgs.join(' ')})`)
     const flowStartedAt = Date.now()
@@ -3924,6 +3973,7 @@ const runFlowsSerially = async (target, maestroEnv, mobileIdentity, flowFailures
     } catch (error) {
       maestroExitError = error
     }
+    if (!cloud) maestroDriverReuse.recordInvocation(target.platform, androidSerial)
     const restoreCause = await restoreMobileE2EStateOrCause(mobileIdentity, flowPath)
     const doubleCause = await doubleWatch?.verify?.()
 
