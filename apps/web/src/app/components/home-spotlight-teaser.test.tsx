@@ -186,10 +186,10 @@ function heroEndsWithOutfits(): boolean {
   return Boolean(last?.querySelector('[data-testid="outfit-scroll"]'))
 }
 
-/** The hero canvas markup with the teaser link taken out. */
+/** The hero canvas markup with the teaser taken out. */
 function heroWithoutTeaser(): string {
   const clone = heroCanvas().cloneNode(true) as HTMLElement
-  clone.querySelector(`[data-testid="${TEASER_PREFIX}-link"]`)?.remove()
+  clone.querySelector(`[data-testid="${TEASER_PREFIX}"]`)?.remove()
   return clone.innerHTML
 }
 
@@ -257,8 +257,12 @@ describe('6.7 web Home spotlight teaser', () => {
     await answer(0, cityPage())
     const link = await screen.findByTestId('home-spotlight-teaser-link')
 
-    // The hero is unchanged apart from the teaser appended after it.
-    expect(heroCanvas().lastElementChild).toBe(link)
+    // The hero is unchanged apart from the teaser appended after it. Story 6.7b:
+    // the link sits in a teaser root that can also hold a sponsored CTA beside it.
+    const root = screen.getByTestId(TEASER_PREFIX)
+    expect(heroCanvas().lastElementChild).toBe(root)
+    expect(root.firstElementChild).toBe(link)
+    expect(root.childElementCount).toBe(1)
     expect(heroWithoutTeaser()).toBe(heroBefore)
     expect(teaserReads[0]!.url.searchParams.get('limit')).toBe('1')
     expect(heroCanvas().contains(link)).toBe(true)

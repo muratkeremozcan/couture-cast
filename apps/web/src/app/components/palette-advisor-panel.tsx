@@ -914,9 +914,7 @@ export function PaletteAdvisorPanel() {
       // Only navigate once the click is attributed. Traffic the partner cannot
       // attribute is worth nothing to them and cannot be audited by us, so a
       // failed mint stops here.
-      if (!openAffiliatePartnerSite(redirectUrl)) {
-        setSponsoredErrorItemKey(card.itemKey)
-      }
+      openAffiliatePartnerSite(redirectUrl)
     } catch {
       setSponsoredErrorItemKey(card.itemKey)
     }

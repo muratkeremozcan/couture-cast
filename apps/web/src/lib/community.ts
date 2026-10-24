@@ -33,13 +33,15 @@ import {
 
 import {
   allocateCommunityPostResponseSchema,
-  communityReactionFeedResponseSchema,
-  communityReactionPostResponseSchema,
   communityReactionResponseSchema,
   communityReactionConflictResponseSchema,
-  communityReactionSpotlightResponseSchema,
+  communitySponsoredFeedResponseSchema,
+  communitySponsoredPostResponseSchema,
+  communitySponsoredSpotlightResponseSchema,
   COMMUNITY_SPOTLIGHT_DEFAULT_LIMIT,
-  type CommunityReactionSpotlight,
+  type CommunityReactionFeedItem,
+  type CommunitySponsoredSpotlight,
+  type CommunitySponsorship,
   type CommunityServedSpotlightLevel,
   type CommunitySpotlightOpenSurface,
   type CommunitySpotlightSurface,
@@ -59,8 +61,8 @@ import {
   COMMUNITY_COMMENT_SELF_REPORT_MESSAGE,
   COMMUNITY_COMMENT_REPORT_REASON_CHANGED_MESSAGE,
   type CommunityExperimentVariant,
-  type CommunityReactionFeed as CommunityFeed,
-  type CommunityReactionFeedItem as CommunityFeedItem,
+  type CommunitySponsoredFeed as CommunityFeed,
+  type CommunitySponsoredFeedItem as CommunityFeedItem,
   type CommunityFeedMode,
   type CommunityReportReason,
   type CreateCommunityCommentInput,
@@ -278,6 +280,31 @@ export function communityRetryAfterSeconds(error: unknown): number | undefined {
   return error instanceof CommunityRequestError ? error.retryAfterSeconds : undefined
 }
 
+/**
+ * Story 6.7b: every community read opts in to the per-viewer sponsorship block
+ * with `x-couture-sponsorship: 1`, beside the Story 6.3 reactions opt-in. The
+ * opted-in variants extend the reaction variants with an optional
+ * `sponsorship`, so one parse accepts a response with or without reactions and
+ * with or without a block. The block is read only from the response that
+ * carried it: nothing here caches or persists it.
+ */
+const OPT_IN_HEADERS = {
+  xCouturePlatform: 'web',
+  xCoutureReactions: '1',
+  xCoutureSponsorship: '1',
+} as const
+
+/**
+ * The sponsorship block on an item, when the live read that produced it carried
+ * one. Items that reached the grid through a path that does not opt in (the
+ * realtime target resolve, a publish) have none, which means no CTA.
+ */
+export function sponsorshipOf(
+  item: CommunityReactionFeedItem
+): CommunitySponsorship | undefined {
+  return (item as CommunityFeedItem).sponsorship
+}
+
 export interface CommunityFeedRequest {
   mode: CommunityFeedMode
   /**
@@ -302,12 +329,12 @@ export async function getCommunityFeedFromWeb({
     const response = await retryOnceWhenCommunityUnavailable(
       () =>
         createWebApiClient({ accessToken }).apiV1CommunityFeedGet(
-          { xCouturePlatform: 'web', xCoutureReactions: '1', mode, cursor, limit },
+          { ...OPT_IN_HEADERS, mode, cursor, limit },
           { signal }
         ),
       signal
     )
-    return communityReactionFeedResponseSchema.parse(response).data
+    return communitySponsoredFeedResponseSchema.parse(response).data
   } catch (error: unknown) {
     // Developer-facing. The grid renders `community.error.load`.
     throw await communityError(error, 'Unable to load the community feed.')
@@ -328,11 +355,8 @@ export async function getCommunityPostFromWeb(
   try {
     const response = await createWebApiClient({
       accessToken,
-    }).apiV1CommunityPostsPostIdGet(
-      { postId, xCouturePlatform: 'web', xCoutureReactions: '1' },
-      { signal }
-    )
-    return communityReactionPostResponseSchema.parse(response).data
+    }).apiV1CommunityPostsPostIdGet({ postId, ...OPT_IN_HEADERS }, { signal })
+    return communitySponsoredPostResponseSchema.parse(response).data
   } catch (error: unknown) {
     throw await communityError(error, 'Unable to load this community post.')
   }
@@ -409,13 +433,12 @@ export async function getCommunitySpotlightFromWeb({
   limit = COMMUNITY_SPOTLIGHT_DEFAULT_LIMIT,
   surface,
   signal,
-}: CommunitySpotlightRequest = {}): Promise<CommunityReactionSpotlight> {
+}: CommunitySpotlightRequest = {}): Promise<CommunitySponsoredSpotlight> {
   const accessToken = readAccessToken()
   const attempt = () =>
     createWebApiClient({ accessToken }).getCommunitySpotlight(
       {
-        xCouturePlatform: 'web',
-        xCoutureReactions: '1',
+        ...OPT_IN_HEADERS,
         cursor,
         limit,
         ...(surface ? { surface } : {}),
@@ -430,7 +453,7 @@ export async function getCommunitySpotlightFromWeb({
       surface === 'home_teaser'
         ? await attempt()
         : await retryOnceWhenCommunityUnavailable(attempt, signal)
-    return communityReactionSpotlightResponseSchema.parse(response).data
+    return communitySponsoredSpotlightResponseSchema.parse(response).data
   } catch (error: unknown) {
     // Developer-facing. The spotlight renders `community.spotlight.error`.
     throw await communityError(error, 'Unable to load the City Spotlight.')

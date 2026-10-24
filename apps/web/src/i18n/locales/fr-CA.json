@@ -498,8 +498,10 @@
       "report": "Signaler",
       "reported": "Signalé",
       "withdraw": "Retirer",
-      "sponsored": "Commandité",
-      "sponsoredAnnounce": "Look commandité"
+      "sponsored": "Partenariat",
+      "sponsoredAnnounce": "En partenariat avec {{partner}}",
+      "shopCta": "Magasiner ce look chez {{partner}}",
+      "shopOpensInBrowser": "Ouvre le site du partenaire dans un nouvel onglet"
     },
     "status": {
       "draft": "Brouillon",

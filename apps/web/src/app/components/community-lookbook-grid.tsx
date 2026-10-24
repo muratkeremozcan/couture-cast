@@ -63,6 +63,11 @@ import {
 } from '../../lib/community'
 import { resolveWebApiBaseUrl } from '../../lib/api-client'
 import { CommunityReactions } from './community-reactions'
+import {
+  CommunitySponsoredCta,
+  useSponsoredShownRegistry,
+  type SponsoredShownRegistry,
+} from './community-sponsored-cta'
 import { useCommunityScrollRestore } from './community-scroll-restore'
 import {
   CommunitySpotlightSection,
@@ -95,9 +100,10 @@ import {
   type CommunityBandUnresolvedReason,
   type CommunityExperimentVariant,
   type CommunityReactionSummary,
-  type CommunityReactionFeed as CommunityFeed,
-  type CommunityReactionFeedItem as CommunityFeedItem,
-  type CommunityReactionSpotlightItem as CommunitySpotlightItem,
+  type AffiliateCommunitySurface,
+  type CommunitySponsoredFeed as CommunityFeed,
+  type CommunitySponsoredFeedItem as CommunityFeedItem,
+  type CommunitySponsoredSpotlightItem as CommunitySpotlightItem,
   type CommunityFeedMode,
   type CommunityReportReason,
   type EmbeddedCommunityChallenge,
@@ -568,18 +574,21 @@ interface LookbookCardImageSurfaceProps {
   scope: string
   item: CommunityFeedItem
   isFailedImage: boolean
-  isSponsored: boolean
   t: Translate
   onImageError: (item: CommunityFeedItem) => void
   onImageRetry: (item: CommunityFeedItem) => void
   onOpen: (item: CommunityFeedItem) => void
 }
 
+/** The id of a card's sponsorship disclosure, which the card's name includes. */
+function sponsoredDisclosureId(scope: string, postId: string): string {
+  return `${scope}lookbook-card-sponsored-${postId}`
+}
+
 function LookbookCardImageSurface({
   scope,
   item,
   isFailedImage,
-  isSponsored,
   t,
   onImageError,
   onImageRetry,
@@ -653,7 +662,16 @@ function LookbookCardImageSurface({
         </button>
       )}
 
-      <div className="pointer-events-none absolute left-3 top-3 flex flex-wrap items-center gap-2">
+      {/*
+       * Bounded on the right so the badges wrap inside the card. A spotlight
+       * card also carries the rank pill in its top-right corner, so its badges
+       * stop short of it.
+       */}
+      <div
+        className={`pointer-events-none absolute left-3 top-3 flex flex-wrap items-center gap-2 ${
+          scope === SPOTLIGHT_CARD_SCOPE ? 'right-14' : 'right-3'
+        }`}
+      >
         {/*
          * One band badge, not two. The old surface carried a `location-badge`
          * beside this one, but `communityFeedItemSchema` publishes no location:
@@ -674,13 +692,22 @@ function LookbookCardImageSurface({
             {t(`community.status.${item.status}`)}
           </span>
         )}
-        {isSponsored && (
+        {/*
+         * Story 6.7b: only a live response's sponsorship block makes a card
+         * claim a commercial relationship, and the card's accessible name
+         * carries the partner through `aria-labelledby`.
+         */}
+        {item.sponsorship && (
           <span
             data-testid={`${scope}sponsored-badge-${item.id}`}
             className="lookbook-metrics rounded-md border border-[color:var(--theme-secondary)] bg-white/95 px-2 py-0.5 text-[9px] font-semibold uppercase text-[color:var(--theme-card-text)]"
           >
             <span aria-hidden="true">{t('community.card.sponsored')}</span>
-            <span className="sr-only">{t('community.card.sponsoredAnnounce')}</span>
+            <span id={sponsoredDisclosureId(scope, item.id)} className="sr-only">
+              {t('community.card.sponsoredAnnounce', {
+                partner: item.sponsorship.partnerDisplayName,
+              })}
+            </span>
           </span>
         )}
       </div>
@@ -789,14 +816,56 @@ interface LookbookCardProps {
   isHighlighted: boolean
   isFailedImage: boolean
   isReported: boolean
-  isSponsored: boolean
   canAct: boolean
   t: Translate
+  sponsored: SponsoredCtaHost
   onImageError: (item: CommunityFeedItem) => void
   onImageRetry: (item: CommunityFeedItem) => void
   onOpen: (item: CommunityFeedItem) => void
   onReport: (postId: string) => void
   onWithdraw: (postId: string) => void
+}
+
+/** What every sponsored CTA on this surface shares with its host. */
+interface SponsoredCtaHost {
+  surface: AffiliateCommunitySurface
+  language: string
+  shown: SponsoredShownRegistry
+  announce: (key: string) => void
+}
+
+/**
+ * The CTA for one post on one surface. Outside every open action, and only for
+ * a viewer who can act: a click is minted against the viewer's session.
+ */
+function SponsoredCtaSlot({
+  scope,
+  item,
+  canAct,
+  t,
+  host,
+}: {
+  scope: string
+  item: CommunityFeedItem
+  canAct: boolean
+  t: Translate
+  host: SponsoredCtaHost
+}) {
+  if (!canAct || !item.sponsorship) return null
+  return (
+    <div className="px-5 pt-3">
+      <CommunitySponsoredCta
+        postId={item.id}
+        sponsorship={item.sponsorship}
+        surface={host.surface}
+        scope={scope}
+        language={host.language}
+        t={t}
+        shown={host.shown}
+        announce={host.announce}
+      />
+    </div>
+  )
 }
 
 function LookbookCard({
@@ -807,22 +876,25 @@ function LookbookCard({
   isHighlighted,
   isFailedImage,
   isReported,
-  isSponsored,
   canAct,
   t,
+  sponsored,
   onImageError,
   onImageRetry,
   onOpen,
   onReport,
   onWithdraw,
 }: LookbookCardProps) {
+  const titleId = `${scope}lookbook-card-title-${item.id}`
   return (
     <article
       data-focus-surface="light"
       id={`${scope}lookbook-card-${item.id}`}
       data-testid={`${scope}lookbook-card-${item.id}`}
       tabIndex={-1}
-      aria-labelledby={`${scope}lookbook-card-title-${item.id}`}
+      aria-labelledby={
+        item.sponsorship ? `${titleId} ${sponsoredDisclosureId(scope, item.id)}` : titleId
+      }
       data-highlighted={isHighlighted ? 'true' : 'false'}
       className={`flex flex-col overflow-hidden rounded-[8px] border bg-[var(--theme-card-bg)] text-[color:var(--theme-card-text)] shadow-sm motion-safe:transition-[border-color,box-shadow] motion-safe:duration-300 motion-reduce:transition-none focus-visible:outline focus-visible:outline-2 focus-visible:outline-[color:var(--theme-secondary)] ${
         isHighlighted
@@ -834,11 +906,17 @@ function LookbookCard({
         scope={scope}
         item={item}
         isFailedImage={isFailedImage}
-        isSponsored={isSponsored}
         t={t}
         onImageError={onImageError}
         onImageRetry={onImageRetry}
         onOpen={onOpen}
+      />
+      <SponsoredCtaSlot
+        scope={scope}
+        item={item}
+        canAct={canAct}
+        t={t}
+        host={sponsored}
       />
       <button
         type="button"
@@ -893,6 +971,8 @@ interface LookbookDetailDialogProps {
   reactionFeedback: { key: string; id: number } | null
   reactionControls: ReactionControls
   item: CommunityFeedItem
+  canAct: boolean
+  sponsored: SponsoredCtaHost
   t: Translate
   onClose: () => void
 }
@@ -912,6 +992,8 @@ function LookbookDetailDialog({
   comments,
   reactionFeedback,
   item,
+  canAct,
+  sponsored,
   t,
   onClose,
   reactionControls,
@@ -965,6 +1047,19 @@ function LookbookDetailDialog({
           >
             {authorName}
           </span>
+          {item.sponsorship && (
+            <span
+              data-testid={`community-detail-sponsored-${item.id}`}
+              className="lookbook-metrics rounded-md border border-[color:var(--theme-secondary)] px-2 py-0.5 text-[9px] font-semibold uppercase text-[color:var(--theme-card-text)]"
+            >
+              <span aria-hidden="true">{t('community.card.sponsored')}</span>
+              <span className="sr-only">
+                {t('community.card.sponsoredAnnounce', {
+                  partner: item.sponsorship.partnerDisplayName,
+                })}
+              </span>
+            </span>
+          )}
         </div>
 
         {item.caption && (
@@ -974,6 +1069,18 @@ function LookbookDetailDialog({
           >
             {item.caption}
           </p>
+        )}
+        {canAct && item.sponsorship && (
+          <CommunitySponsoredCta
+            postId={item.id}
+            sponsorship={item.sponsorship}
+            surface={sponsored.surface}
+            scope="community-detail-"
+            language={sponsored.language}
+            t={t}
+            shown={sponsored.shown}
+            announce={sponsored.announce}
+          />
         )}
         <CommunityComments
           postId={item.id}
@@ -1775,12 +1882,6 @@ export interface CommunityLookbookGridProps {
   highlightedCardId?: string
   showFilterNav?: boolean
   /**
-   * Posts that carry a paid placement. The feed contract has no sponsorship
-   * field, so the only honest source is the caller; a card never claims a
-   * commercial relationship the server did not state.
-   */
-  sponsoredPostIds?: readonly string[]
-  /**
    * Reports the band the server resolved for the viewer.
    *
    * `lookbook-prism-layout.tsx` renders a SECOND `LookbookFilterNav` outside
@@ -1884,7 +1985,6 @@ export function CommunityLookbookGrid({
   chipCategory = 'Personal',
   highlightedCardId,
   showFilterNav = false,
-  sponsoredPostIds,
   onViewerBandChange,
   onServedModeChange,
   spotlightFocusIntent,
@@ -1950,6 +2050,14 @@ export function CommunityLookbookGrid({
   const [openedItem, setOpenedItem] = useState<CommunityFeedItem | null>(null)
   const openedItemRef = useRef(openedItem)
   openedItemRef.current = openedItem
+  /**
+   * Story 6.7b: which surface the open detail came from, so its sponsored CTA
+   * mints with the surface the reader actually used. A deep link resolves into
+   * the feed.
+   */
+  const [detailSurface, setDetailSurface] =
+    useState<AffiliateCommunitySurface>('community_feed')
+  const sponsoredShown = useSponsoredShownRegistry()
   const reactionAnnouncementId = useRef(0)
   // Set once the spotlight hook exists below; reaction updates reach its copies too.
   const spotlightApplyRef = useRef<
@@ -2510,8 +2618,15 @@ export function CommunityLookbookGrid({
           item.id === target.post.id ? updated : item
         )
         setNewLooks(newLooksRef.current)
+        // Story 6.7b: the target resolve does not opt in to sponsorship, so a
+        // live block from this visit's last community read stays on the post
+        // until the next read decides it.
         const update = (item: CommunityFeedItem | null) =>
-          item?.id === target.post.id ? updated : item
+          item?.id === target.post.id
+            ? item.sponsorship
+              ? { ...updated, sponsorship: item.sponsorship }
+              : updated
+            : item
         setItems((previous) => previous.map((item) => update(item)!))
         setOpenedItem(update)
         setDeepLinkedItem(update)
@@ -2759,6 +2874,7 @@ export function CommunityLookbookGrid({
         const focus = target.comment ?? target.parent
         const post = reactionState.read(target.post, readTicket)
         if (!post) return
+        setDetailSurface('community_feed')
         setOpenedItem(post)
         if (focus)
           setCommentTarget({
@@ -2855,16 +2971,25 @@ export function CommunityLookbookGrid({
    * seeing a photograph. The event's `isSelf` is decided server-side from the
    * stored author id, so nothing here compares ids.
    */
-  const showDetail = (item: CommunityFeedItem, commentsFocus: boolean) => {
+  const showDetail = (
+    item: CommunityFeedItem,
+    commentsFocus: boolean,
+    surface: AffiliateCommunitySurface
+  ) => {
     notificationIntentRef.current++
+    setDetailSurface(surface)
     setFocusComments(commentsFocus)
     setAnnouncement(null)
     setReactionFeedback(null)
     setOpenedItem(reactionState.current(item))
   }
 
-  const handleOpenCard = (item: CommunityFeedItem, commentsFocus = false) => {
-    showDetail(item, commentsFocus)
+  const handleOpenCard = (
+    item: CommunityFeedItem,
+    commentsFocus = false,
+    surface: AffiliateCommunitySurface = 'community_feed'
+  ) => {
+    showDetail(item, commentsFocus, surface)
     if (commentsFocus || experimentVariant === null) {
       return
     }
@@ -2879,7 +3004,7 @@ export function CommunityLookbookGrid({
    */
   const handleOpenSpotlightCard = (item: CommunitySpotlightItem) => {
     const { rank, ...post } = item
-    showDetail(post, false)
+    showDetail(post, false, 'community_spotlight')
     const { level } = spotlight.state
     if (level === 'none') return
     void openCommunitySpotlightPostFromWeb(item.id, rank, level).catch(() => undefined)
@@ -3099,7 +3224,22 @@ export function CommunityLookbookGrid({
     }
   }
 
-  const sponsored = useMemo(() => new Set(sponsoredPostIds ?? []), [sponsoredPostIds])
+  /**
+   * Story 6.7b: a CTA's loading and error states go through the same polite
+   * region a reaction uses, the dialog's while it is open and the grid's
+   * otherwise, so each is announced once and focus never moves.
+   */
+  const announceSponsored = (key: string) => {
+    const id = ++reactionAnnouncementId.current
+    if (openedItemRef.current) setReactionFeedback({ key, id })
+    else setAnnouncement({ key, announcementId: id })
+  }
+  const sponsoredHost = (surface: AffiliateCommunitySurface): SponsoredCtaHost => ({
+    surface,
+    language: i18n.language,
+    shown: sponsoredShown,
+    announce: announceSponsored,
+  })
   const altTextSuggestion = suggestionOf(allocated)
   const gridColumns = isMobilePreview
     ? 'grid-cols-1'
@@ -3200,15 +3340,15 @@ export function CommunityLookbookGrid({
             isHighlighted={false}
             isFailedImage={failedImages.spotlight[item.id]?.url === item.imageAccess.url}
             isReported={reportedPostIds.has(item.id)}
-            isSponsored={sponsored.has(item.id)}
             canAct={presentation.canAct}
             t={t}
+            sponsored={sponsoredHost('community_spotlight')}
             onImageError={handleSpotlightImageError}
             onImageRetry={handleSpotlightImageRetry}
             onOpen={() => {
               handleOpenSpotlightCard(item)
             }}
-            onComments={(post) => handleOpenCard(post, true)}
+            onComments={(post) => handleOpenCard(post, true, 'community_spotlight')}
             onReport={(postId) => {
               setReportError(null)
               setReportingPostId(postId)
@@ -3280,9 +3420,9 @@ export function CommunityLookbookGrid({
             isHighlighted={item.id === highlightedCardId}
             isFailedImage={failedImages.feed[item.id]?.url === item.imageAccess.url}
             isReported={reportedPostIds.has(item.id)}
-            isSponsored={sponsored.has(item.id)}
             canAct={presentation.canAct}
             t={t}
+            sponsored={sponsoredHost('community_feed')}
             onImageError={handleImageError}
             onImageRetry={handleImageRetry}
             onOpen={handleOpenCard}
@@ -3343,6 +3483,8 @@ export function CommunityLookbookGrid({
           reactionControls={reactionState.controls(presentation.detail.id)}
           reactionFeedback={reactionFeedback}
           item={presentation.detail}
+          canAct={presentation.canAct}
+          sponsored={sponsoredHost(detailSurface)}
           t={t}
           onClose={() => {
             notificationIntentRef.current++

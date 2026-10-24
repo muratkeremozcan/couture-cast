@@ -498,8 +498,10 @@
       "report": "Şikayet et",
       "reported": "Şikayet edildi",
       "withdraw": "Geri çek",
-      "sponsored": "Sponsorlu",
-      "sponsoredAnnounce": "Sponsorlu kombin"
+      "sponsored": "İş birliği",
+      "sponsoredAnnounce": "{{partner}} ile iş birliği",
+      "shopCta": "Bu görünümü {{partner}} sitesinden satın al",
+      "shopOpensInBrowser": "İş ortağının sitesini yeni sekmede açar"
     },
     "status": {
       "draft": "Taslak",

@@ -158,19 +158,36 @@ export async function mintAffiliateClickFromWeb(
   }
 }
 
+/** The `'*'` sentinel: an offer published for every region. */
+export const GLOBAL_LOCALE_REGION = '*'
+
+/**
+ * Story 6.7b: the region subtag of the active UI locale, uppercased, which is
+ * the rule `resolveLocaleRegion` applies on the server and the key the catalog's
+ * `locale_region` column uses. A locale with no usable region subtag yields the
+ * global sentinel. Mirrors `resolveAffiliateLocaleRegion` on mobile.
+ */
+export function resolveAffiliateLocaleRegion(locale: string): string {
+  const region = locale.split('-')[1]?.toUpperCase()
+  return region && /^[A-Z0-9]{2,3}$/.test(region) ? region : GLOBAL_LOCALE_REGION
+}
+
 /**
  * Hands the minted URL to a new browsing context.
  *
  * `noopener,noreferrer` rather than a bare `window.open`: the partner host is
  * third-party, and without `noopener` the opened page keeps a live
- * `window.opener` handle back into this origin's tab. Returns false when the
- * browser blocked the popup, which the caller surfaces as a failed handoff
- * rather than silently doing nothing.
+ * `window.opener` handle back into this origin's tab.
+ *
+ * Returns nothing. With `noopener` the HTML spec makes `window.open` return
+ * `null` for a tab it opened, so the return value cannot tell an opened tab from
+ * a blocked one. Reading `null` as "blocked" showed an error after every
+ * successful handoff in a real browser; a blocked popup is reported by the
+ * browser's own popup indicator.
  */
-export function openAffiliatePartnerSite(redirectUrl: string): boolean {
+export function openAffiliatePartnerSite(redirectUrl: string): void {
   if (typeof window === 'undefined') {
-    return false
+    return
   }
-  const opened = window.open(redirectUrl, '_blank', 'noopener,noreferrer')
-  return opened !== null
+  window.open(redirectUrl, '_blank', 'noopener,noreferrer')
 }

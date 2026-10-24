@@ -963,12 +963,14 @@ describe('PaletteAdvisorPanel (Story 5.4)', () => {
       }
     })
 
-    it('5.4-WEB-040 surfaces a blocked popup on the card even though the click was attributed', async () => {
+    it('5.4-WEB-040 treats the null return of a noopener open as a completed handoff', async () => {
       signIn()
       const originalOpen = window.open
-      // A blocked popup returns null, which is a failed handoff rather than a
-      // failed attribution: the click row exists and must not be minted twice.
-      window.open = function blockedOpen(): null {
+      const opened: string[] = []
+      // With `noopener` a browser returns null for the tab it opened, so null is
+      // the success case and must not read as a failure.
+      window.open = function noopenerOpen(url?: string | URL): null {
+        opened.push(String(url))
         return null
       } as typeof window.open
 
@@ -989,9 +991,14 @@ describe('PaletteAdvisorPanel (Story 5.4)', () => {
           )
         )
 
-        await screen.findByTestId(
-          `palette-advisor-sponsored-error-${FOUNDATION_WARM_MEDIUM.itemKey}`
+        await waitFor(() =>
+          expect(opened).toEqual(['https://partner.example.com/offer?click=token'])
         )
+        expect(
+          screen.queryByTestId(
+            `palette-advisor-sponsored-error-${FOUNDATION_WARM_MEDIUM.itemKey}`
+          )
+        ).not.toBeInTheDocument()
       } finally {
         window.open = originalOpen
       }

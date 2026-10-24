@@ -8,17 +8,18 @@ import {
   communityReactionSpotlightResponseSchema,
   type CommunityReactionFeedItem,
   type CommunityReactionSpotlight,
-  type CommunityReactionSpotlightItem,
   type CommunityReactionSummary,
+  type CommunitySponsoredSpotlightItem,
 } from '@couture/api-client/contracts/http'
 import { useMswHandlers } from './msw/runtime'
 import { FEED_PATH, OPENED_PATH, feed, item } from './community-lookbook-grid'
 
 export const SPOTLIGHT_PATH = '/api/v1/community/spotlight'
 
+/** A ranked entry; Story 6.7b fixtures may add the opted-in `sponsorship` block. */
 export function ranked(
   rank: number,
-  overrides: Partial<CommunityReactionSpotlightItem> = {}
+  overrides: Partial<CommunitySponsoredSpotlightItem> = {}
 ) {
   return {
     ...item({
@@ -28,7 +29,7 @@ export function ranked(
     }),
     rank,
     ...overrides,
-  } satisfies CommunityReactionSpotlightItem
+  } satisfies CommunitySponsoredSpotlightItem
 }
 
 export function spotlightBody(overrides: Partial<CommunityReactionSpotlight> = {}) {
