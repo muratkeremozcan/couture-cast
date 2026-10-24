@@ -1254,21 +1254,25 @@ export class TelemetryService {
       isPseudonymousEvent && payload ? payload.properties : properties
 
     // 1. Start database persistence asynchronously (without awaiting)
-    const persist = (linkedUserId: string | null) =>
-      this.prisma.telemetryEvent.create({
+    const dbPromise = this.prisma.telemetryEvent
+      .create({
         data: {
-          user_id: linkedUserId,
+          user_id: isPseudonymousEvent ? null : userId,
           event_type: eventType,
           properties: persistedProperties as Prisma.InputJsonValue,
         },
       })
-    const linkedUserId = isPseudonymousEvent ? null : userId
-    const dbPromise = persist(linkedUserId)
       .catch((dbError: unknown) => {
         // An actor with no user row (an erased account whose token is still
-        // valid, a synthetic test token) keeps its event, without the link.
-        if (linkedUserId !== null && isTelemetryUserForeignKeyViolation(dbError))
-          return persist(null)
+        // valid, a synthetic test token): its row would carry raw identifiers
+        // the account's cascade erasure can no longer reach, so it is not kept.
+        if (isTelemetryUserForeignKeyViolation(dbError)) {
+          this.logger.info(
+            { eventType },
+            'Telemetry event for an unknown user not persisted'
+          )
+          return
+        }
         throw dbError
       })
       .catch((dbError: unknown) => {
