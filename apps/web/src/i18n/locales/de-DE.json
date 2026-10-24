@@ -498,8 +498,10 @@
       "report": "Melden",
       "reported": "Gemeldet",
       "withdraw": "Zurückziehen",
-      "sponsored": "Gesponsert",
-      "sponsoredAnnounce": "Gesponserter Look"
+      "sponsored": "In Partnerschaft",
+      "sponsoredAnnounce": "In Partnerschaft mit {{partner}}",
+      "shopCta": "Diesen Look bei {{partner}} shoppen",
+      "shopOpensInBrowser": "Öffnet die Partnerseite in einem neuen Tab"
     },
     "status": {
       "draft": "Entwurf",

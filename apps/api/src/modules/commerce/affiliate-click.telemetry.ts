@@ -2,6 +2,7 @@ import { Inject, Injectable } from '@nestjs/common'
 import {
   type AdvisorOfferClickedEvent,
   type AffiliateCtaClickedEvent,
+  type DistributiveOmit,
 } from '@couture/api-client'
 import { createBaseLogger } from '../../logger/pino.config.js'
 import { TelemetryService } from '../telemetry/telemetry.service.js'
@@ -27,7 +28,7 @@ import { TelemetryService } from '../telemetry/telemetry.service.js'
  * `@couture/api-client` is `.strict()`, so no URL, product title, or garment id
  * can be attached here by accident.
  */
-export type AffiliateCtaClickedInput = Omit<
+export type AffiliateCtaClickedInput = DistributiveOmit<
   AffiliateCtaClickedEvent,
   'analyticsSubjectId'
 > & {

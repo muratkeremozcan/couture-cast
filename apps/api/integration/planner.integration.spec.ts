@@ -1,4 +1,4 @@
-import { listenHttpApp, httpTestUrl } from './helpers/loopback-http-app.js'
+import { listenHttpApp, httpTestUrl } from '../src/testing/loopback-http-app.js'
 // Story 5.5 Task 10: the premium 7-day outfit planner against real PostgreSQL
 // and real HTTP.
 import 'reflect-metadata'

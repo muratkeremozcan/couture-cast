@@ -1,4 +1,4 @@
-import { listenHttpApp, httpTestUrl } from './helpers/loopback-http-app.js'
+import { listenHttpApp, httpTestUrl } from '../src/testing/loopback-http-app.js'
 // Learning path Step 36: Colour palette, beauty and accessory advisor.
 // See _bmad-output/project-knowledge/learning-path-step-by-step.md#step-36-colour-palette-beauty-and-accessory-advisor
 import 'reflect-metadata'
@@ -307,6 +307,10 @@ describe('5.4 palette advisor against real PostgreSQL and real HTTP', () => {
     })
     if (stalePartners.length > 0) {
       const staleIds = stalePartners.map((row) => row.id)
+      // Story 6.7b: a sponsorship link holds its offer with ON DELETE RESTRICT.
+      await prisma.communityPostSponsorship.deleteMany({
+        where: { offer: { partner_id: { in: staleIds } } },
+      })
       await prisma.affiliateOffer.deleteMany({
         where: { partner_id: { in: staleIds } },
       })
@@ -406,6 +410,9 @@ describe('5.4 palette advisor against real PostgreSQL and real HTTP', () => {
       })
       await prisma.paletteProfile.deleteMany({
         where: { user: { email: { startsWith: namespace } } },
+      })
+      await prisma.communityPostSponsorship.deleteMany({
+        where: { offer: { partner_id: partnerId } },
       })
       await prisma.affiliateOffer.deleteMany({ where: { partner_id: partnerId } })
       await prisma.commercePartner.deleteMany({ where: { id: partnerId } })

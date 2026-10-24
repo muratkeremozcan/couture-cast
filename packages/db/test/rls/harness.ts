@@ -103,6 +103,9 @@ export const workerOnlyTables = [
   'CommunitySpotlightReadWindow',
   // Story 1.2b: the per-member city search window.
   'LocationSearchWindow',
+  // Story 6.7b: post-to-offer sponsorship links, written only by the owner's
+  // operator command and read only by the API.
+  'CommunityPostSponsorship',
 ] as const
 
 export const selfOnlyTables = [

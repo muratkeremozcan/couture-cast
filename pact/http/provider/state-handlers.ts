@@ -428,6 +428,52 @@ export const stateHandlers: StateHandlers = {
   },
 
   /* ----------------------------------------------------------------------- *
+   * Story 6.7b sponsored community highlights.
+   *
+   * Every sponsorship state sets the commerce scenario the sponsorship seams
+   * read: `eligible` keeps the one link in `doubles/community-sponsorship.ts`
+   * live, and `community-sponsorship-ended` keeps every gate open while the
+   * link no longer resolves. The read states also set the community page the
+   * block is attached to, which is why each read surface has its own state.
+   * ----------------------------------------------------------------------- */
+  'A sponsored community post is in the viewer feed': (parameters?: unknown) => {
+    const { userId } = (parameters ?? {}) as CommunityStateParams
+    configureProviderCommunityState({ userId, scenario: 'reaction-feed' })
+    configureProviderCommerceState({ userId, scenario: 'eligible' })
+    return Promise.resolve({
+      description: 'Configured a negotiated feed whose post has a live sponsorship',
+    })
+  },
+  'A sponsored community post leads the viewer city spotlight': (
+    parameters?: unknown
+  ) => {
+    const { userId } = (parameters ?? {}) as CommunityStateParams
+    configureProviderCommunityState({ userId, scenario: 'spotlight-city' })
+    configureProviderCommerceState({ userId, scenario: 'eligible' })
+    return Promise.resolve({
+      description: 'Configured a city spotlight whose rank-1 post has a live sponsorship',
+    })
+  },
+  'A sponsored community post is visible to the caller': (parameters?: unknown) => {
+    const { userId, postId } = (parameters ?? {}) as CommunityStateParams
+    configureProviderCommunityState({ userId, postId, scenario: 'post-visible' })
+    configureProviderCommerceState({ userId, scenario: 'eligible' })
+    return Promise.resolve({
+      description: 'Configured a visible community post with a live sponsorship',
+    })
+  },
+  'A community sponsorship links the offer to the post': (parameters?: unknown) => {
+    const { userId } = (parameters ?? {}) as CommunityStateParams
+    configureProviderCommerceState({ userId, scenario: 'eligible' })
+    return Promise.resolve({ description: 'Configured a live community sponsorship' })
+  },
+  'The community sponsorship on the post has ended': (parameters?: unknown) => {
+    const { userId } = (parameters ?? {}) as CommunityStateParams
+    configureProviderCommerceState({ userId, scenario: 'community-sponsorship-ended' })
+    return Promise.resolve({ description: 'Configured an ended community sponsorship' })
+  },
+
+  /* ----------------------------------------------------------------------- *
    * Story 5.2 premium subscription lifecycle.
    *
    * Each state names an arrangement the contract records an outcome for, not

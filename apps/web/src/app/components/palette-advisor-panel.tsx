@@ -31,7 +31,10 @@ import {
   type PaletteAdvisorProfile,
   type PaletteAnalysisFailureReason,
 } from '@couture/api-client/contracts/http'
-import { mintAffiliateClickFromWeb, openAffiliatePartnerSite } from '../../lib/commerce'
+import {
+  beginAffiliatePartnerHandoff,
+  mintAffiliateClickFromWeb,
+} from '../../lib/commerce'
 import {
   analyzeWardrobePaletteFromWeb,
   erasePaletteAdvisorFromWeb,
@@ -900,6 +903,13 @@ export function PaletteAdvisorPanel() {
     const profileId = profile?.profileId ?? null
     if (!sponsored || !profileId) return
 
+    // Claimed before the first await, while the press still counts as a user
+    // gesture. A blocked tab mints nothing.
+    const handoff = beginAffiliatePartnerHandoff()
+    if (!handoff) {
+      setSponsoredErrorItemKey(card.itemKey)
+      return
+    }
     setSponsoredErrorItemKey(null)
     try {
       const redirectUrl = await mintAffiliateClickFromWeb({
@@ -914,10 +924,9 @@ export function PaletteAdvisorPanel() {
       // Only navigate once the click is attributed. Traffic the partner cannot
       // attribute is worth nothing to them and cannot be audited by us, so a
       // failed mint stops here.
-      if (!openAffiliatePartnerSite(redirectUrl)) {
-        setSponsoredErrorItemKey(card.itemKey)
-      }
+      handoff.navigate(redirectUrl)
     } catch {
+      handoff.cancel()
       setSponsoredErrorItemKey(card.itemKey)
     }
   }

@@ -69,7 +69,7 @@ import {
   type CommunityAuthorPostState,
   type CommunityBandUnresolvedReason,
   type CommunityExperimentVariant,
-  type CommunityReactionFeedItem as CommunityFeedItem,
+  type CommunitySponsoredFeedItem as CommunityFeedItem,
   type CommunityFeedMode,
   type CommunityReactionSpotlightItem,
   type CommunityReportReason,
@@ -85,6 +85,8 @@ import { CommunityCard } from '@/components/community/community-card'
 import { CommunityReportModal } from '@/components/community/community-report-modal'
 import { CommunitySpotlightModule } from '@/components/community/community-spotlight-module'
 import { CommunitySpotlightDetail } from '@/components/community/community-spotlight-detail'
+import { SponsoredCtaImpressions } from '@/src/features/community/sponsored-cta-impressions'
+import { LiveCommunitySponsorships } from '@/src/features/community/live-sponsorships'
 import {
   useCommunitySpotlight,
   type CommunitySpotlightView,
@@ -335,7 +337,21 @@ export function CommunityScreen() {
     reactionState.getVersion,
     reactionState.getVersion
   )
-  const spotlight = useCommunitySpotlight({ sessionScope, reactionState })
+  // Story 6.7b: the latest live sponsorship answer per post, for every copy.
+  const [sponsorships] = useState(() => new LiveCommunitySponsorships())
+  const spotlight = useCommunitySpotlight({ sessionScope, reactionState, sponsorships })
+  // Every live read (feed page, rebuild, single post, spotlight) applies its
+  // sponsorship answers to the copies already on screen.
+  useEffect(
+    () =>
+      sponsorships.subscribe(() => {
+        setItems((previous) => sponsorships.applyAll(previous))
+        newLooksRef.current = sponsorships.applyAll(newLooksRef.current)
+        setNewLooks(newLooksRef.current)
+        setDeepLinkPost((item) => (item ? sponsorships.apply(item) : item))
+      }),
+    [sponsorships]
+  )
   spotlightReactionRef.current = spotlight.applyReactionChange
   // Read by the realtime callbacks, which outlive any one render.
   const spotlightRef = useRef(spotlight)
@@ -481,6 +497,20 @@ export function CommunityScreen() {
     const deadline = performance.now() + 10_000
     // The bearer is read first, so the admission check sees the time it took: an attempt
     // that can no longer dispatch and answer inside the 10 s bound is never started.
+    // A live read: stamped as it starts, so an answer that lands after a newer
+    // read of the same post cannot overwrite it.
+    const readTargetPost = (timeout: number, token: string) => {
+      const stamp = sponsorships.begin()
+      return getCommunityPostFromMobile(
+        targetPostId,
+        controller.signal,
+        timeout,
+        token
+      ).then((post) => {
+        sponsorships.record([post], stamp)
+        return post
+      })
+    }
     const requestTarget = async () => {
       const token = (await resolveMobileAccessToken()) ?? ''
       const remaining = deadline - performance.now()
@@ -502,12 +532,7 @@ export function CommunityScreen() {
               signal
             )
           ).then((result) => result.targets[0])
-        : getCommunityPostFromMobile(
-            targetPostId,
-            controller.signal,
-            timeout,
-            token
-          ).then((post) => ({
+        : readTargetPost(timeout, token).then((post) => ({
             status: 'available' as const,
             post,
             comment: null,
@@ -563,27 +588,28 @@ export function CommunityScreen() {
           surface: 'mobile',
         })
     }
+    /** The target post is gone for this viewer: every copy and its state leave. */
+    const forgetTarget = () => {
+      if (realtimeOpenPost.current === targetPostId) realtimeOpenPost.current = null
+      if (realtimeDeepLink.current?.id === targetPostId) realtimeDeepLink.current = null
+      newLooksRef.current = newLooksRef.current.filter((item) => item.id !== targetPostId)
+      setNewLooks(newLooksRef.current)
+      reactionState.evict(targetPostId)
+      comments.evict(targetPostId)
+    }
     void Promise.race([targetRequest(), aborted])
       .then((target) => {
         if (!active || detailGeneration !== detailGenerationRef.current) return
         if (!target || target.status === 'unavailable') {
-          if (target?.status === 'unavailable') {
-            if (realtimeOpenPost.current === targetPostId) realtimeOpenPost.current = null
-            if (realtimeDeepLink.current?.id === targetPostId)
-              realtimeDeepLink.current = null
-            newLooksRef.current = newLooksRef.current.filter(
-              (item) => item.id !== targetPostId
-            )
-            setNewLooks(newLooksRef.current)
-            reactionState.evict(targetPostId)
-            comments.evict(targetPostId)
-          }
+          if (target?.status === 'unavailable') forgetTarget()
           setDeepLinkPost(null)
           if (intent === notificationIntentRef.current) setIsInvalidDeepLink(true)
           return
         }
+        // A comment target resolves through the sync route, which carries no
+        // sponsorship answer; the latest live one applies.
         const post = reactionState.read(target.post, readTicket)
-        setDeepLinkPost(post)
+        setDeepLinkPost(() => (post ? sponsorships.apply(post) : post))
         if (!post) return
         setIsInvalidDeepLink(false)
         reportHandled()
@@ -740,8 +766,15 @@ export function CommunityScreen() {
         generation === requestGenerationRef.current &&
         detailGeneration === detailGenerationRef.current
       try {
+        const stamp = sponsorships.begin()
         const post = await getCommunityPostFromMobile(target, signal)
-        if (isCurrent()) setDeepLinkPost(reactionState.read(post, readTicket))
+        if (isCurrent()) sponsorships.record([post], stamp)
+        if (isCurrent()) {
+          const read = reactionState.read(post, readTicket)
+          // Normalized as the state commits, so a newer answer recorded in the
+          // meantime wins over this response's own block.
+          setDeepLinkPost(() => (read ? sponsorships.apply(read) : read))
+        }
       } catch (error: unknown) {
         if (isCurrent() && communityFailureReason(error) === 'not_found') {
           reactionState.evict(target)
@@ -785,6 +818,7 @@ export function CommunityScreen() {
         // cursor can be rejected as stale, so the loop cannot come round again.
         for (;;) {
           try {
+            const stamp = sponsorships.begin()
             const feed = await getCommunityFeedFromMobile({
               mode: targetMode,
               cursor: pageCursor,
@@ -794,6 +828,7 @@ export function CommunityScreen() {
             if (!isCurrent()) {
               return
             }
+            sponsorships.record(feed.items, stamp)
             const isAppend = pageCursor !== undefined
             const page = feed.items.flatMap((post) => {
               const current = reactionState.read(post, readTicket)
@@ -801,13 +836,17 @@ export function CommunityScreen() {
             })
             setItems((previous) => {
               const seen = new Set(previous.map((item) => item.id))
+              // Normalized as the state commits: a page whose read started
+              // before the latest recorded answer never shows its own block.
               return (
                 isAppend
                   ? [...previous, ...page.filter((item) => !seen.has(item.id))]
                   : page
-              ).map((post) => reactionState.current(post))
+              ).map((post) => sponsorships.apply(reactionState.current(post)))
             })
-            setDeepLinkPost((post) => (post ? reactionState.current(post) : null))
+            setDeepLinkPost((post) =>
+              post ? sponsorships.apply(reactionState.current(post)) : null
+            )
             await revalidateHighlighted(
               refresh ? highlightedTargetRef.current : null,
               readTicket,
@@ -879,6 +918,8 @@ export function CommunityScreen() {
       comments.setSession(identity)
       setSessionScope(identity)
       if (previous === undefined || previous === identity) return
+      // A block is per viewer: a new member starts with no live answers.
+      sponsorships.clear()
       commentDrafts.forgetAll()
       feedScopeRef.current++
       requestGenerationRef.current++
@@ -989,7 +1030,9 @@ export function CommunityScreen() {
           }
       }
       setItems((previous) => [
-        ...new Map([...fresh, ...previous].map((post) => [post.id, post])).values(),
+        ...new Map(
+          [...fresh, ...previous].map((post) => [post.id, sponsorships.apply(post)])
+        ).values(),
       ])
       newLooksRef.current = []
       setNewLooks([])
@@ -1005,6 +1048,7 @@ export function CommunityScreen() {
     let active = true
     const refreshFeed = async (signal?: AbortSignal) => {
       const generation = requestGenerationRef.current
+      const stamp = sponsorships.begin()
       const page = await getCommunityFeedFromMobile({
         mode,
         limit: FEED_PAGE_SIZE,
@@ -1014,6 +1058,9 @@ export function CommunityScreen() {
       if (signal?.aborted) throw new CommunityRequestSuperseded()
       if (generation !== requestGenerationRef.current)
         throw new CommunityRequestSuperseded()
+      // Story 6.7b: the rebuild is a live read, so it is the latest word on the
+      // block of every post it carries, including posts already on screen.
+      sponsorships.record(page.items, stamp)
       setAuthorStates(page.authorStates)
       setNextCursor(page.nextCursor)
       setServedMode(page.mode)
@@ -1025,11 +1072,15 @@ export function CommunityScreen() {
 
       const ids = new Set(realtimeItems.current.map((item) => item.id))
       const incoming = page.items.filter((item) => !ids.has(item.id))
-      if (!realtimeItems.current.length) setItems(page.items)
+      if (!realtimeItems.current.length)
+        setItems(() => page.items.map((item) => sponsorships.apply(item)))
       else if (incoming.length) {
         const buffered = [
           ...new Map(
-            [...incoming, ...newLooksRef.current].map((item) => [item.id, item])
+            [...incoming, ...newLooksRef.current].map((item) => [
+              item.id,
+              sponsorships.apply(item),
+            ])
           ).values(),
         ]
         newLooksRef.current = buffered
@@ -1084,14 +1135,14 @@ export function CommunityScreen() {
         } else {
           const updated = reactionState.read(target.post, reactionState.beginRead())
           if (!updated) return
-          newLooksRef.current = newLooksRef.current.map((item) =>
-            item.id === target.post.id ? updated : item
-          )
+          // Story 6.7b: a resolved copy carries no sponsorship answer (the route
+          // takes no opt-in), so each copy takes the latest live answer.
+          const replace = <T extends CommunityFeedItem>(item: T) =>
+            item.id === target.post.id ? sponsorships.apply(updated) : item
+          newLooksRef.current = newLooksRef.current.map(replace)
           setNewLooks(newLooksRef.current)
-          setItems((previous) =>
-            previous.map((item) => (item.id === target.post.id ? updated : item))
-          )
-          setDeepLinkPost((item) => (item?.id === target.post.id ? updated : item))
+          setItems((previous) => previous.map(replace))
+          setDeepLinkPost((item) => (item ? replace(item) : item))
           spotlightRef.current.applyPost(updated)
         }
       },
@@ -1700,6 +1751,7 @@ export function CommunityScreen() {
         }
         reactionControls={reactionState.controls(post.id)}
         item={reactionState.current(post)}
+        shopSurface="community_spotlight"
         isReported={reportedPostIds.has(post.id)}
         onReport={(target) =>
           viaDetail(() => {
@@ -1861,156 +1913,159 @@ export function CommunityScreen() {
   }
 
   return (
-    <View
-      style={[styles.container, { backgroundColor: palette.background }]}
-      testID="community-screen"
-    >
-      {/* The tab header already names the screen, as on every other tab. */}
-      <View style={styles.header}>
-        <TouchableOpacity
-          ref={newPostButtonRef}
-          testID="community-new-post-button"
-          style={[styles.primaryButton, { backgroundColor: ACCENT_GOLD }]}
-          onPress={() => openPostSheet(false)}
-          accessibilityRole="button"
-          accessibilityLabel={t('community.newPost')}
-        >
-          <Text style={[styles.primaryButtonText, { color: ON_ACCENT }]}>
-            {t('community.newPost')}
-          </Text>
-        </TouchableOpacity>
-      </View>
+    <SponsoredCtaImpressions focused={screenFocused}>
+      <View
+        style={[styles.container, { backgroundColor: palette.background }]}
+        testID="community-screen"
+      >
+        {/* The tab header already names the screen, as on every other tab. */}
+        <View style={styles.header}>
+          <TouchableOpacity
+            ref={newPostButtonRef}
+            testID="community-new-post-button"
+            style={[styles.primaryButton, { backgroundColor: ACCENT_GOLD }]}
+            onPress={() => openPostSheet(false)}
+            accessibilityRole="button"
+            accessibilityLabel={t('community.newPost')}
+          >
+            <Text style={[styles.primaryButtonText, { color: ON_ACCENT }]}>
+              {t('community.newPost')}
+            </Text>
+          </TouchableOpacity>
+        </View>
 
-      <CommunityFilterChips
-        selectedMode={servedMode}
-        onSelectMode={handleSelectMode}
-        viewerBand={viewerBand}
-      />
+        <CommunityFilterChips
+          selectedMode={servedMode}
+          onSelectMode={handleSelectMode}
+          viewerBand={viewerBand}
+        />
 
-      {newLooks.length > 0 && communityAvailable && (
-        <TouchableOpacity
-          accessibilityRole="button"
-          style={[styles.primaryButton, { backgroundColor: ACCENT_GOLD }]}
-          disabled={isInsertingLooks}
-          onPress={() => {
-            void insertNewLooks()
-          }}
-        >
-          <Text style={{ color: ON_ACCENT }}>
-            {t('community.realtime.showNewLooks', { count: newLooks.length })}
-          </Text>
-        </TouchableOpacity>
-      )}
-      <FlatList
-        ref={feedScroll.listRef}
-        testID="community-feed-list"
-        data={feedRows}
-        onScroll={feedScroll.onScroll}
-        onScrollBeginDrag={feedScroll.onScrollBeginDrag}
-        onContentSizeChange={feedScroll.onContentSizeChange}
-        scrollEventThrottle={16}
-        keyExtractor={(item) => item.id}
-        renderItem={({ item }) => (
-          <CommunityCard
-            onComments={(post) => {
-              notificationIntentRef.current++
-              commentsInvokerRef.current = commentsButtonRefs.current.get(post.id) ?? null
-              setCommentsPostId(post.id)
+        {newLooks.length > 0 && communityAvailable && (
+          <TouchableOpacity
+            accessibilityRole="button"
+            style={[styles.primaryButton, { backgroundColor: ACCENT_GOLD }]}
+            disabled={isInsertingLooks}
+            onPress={() => {
+              void insertNewLooks()
             }}
-            commentsButtonRef={(node) => {
-              commentsButtonRefs.current.set(item.id, node)
-            }}
-            reactionControls={reactionState.controls(item.id)}
-            item={item}
-            isReported={reportedPostIds.has(item.id)}
-            containerRef={(node) => {
-              cardRefs.current.set(item.id, node)
-            }}
-            onReport={handleReportPost}
-            onWithdraw={handleWithdrawPost}
-            onImageExpiry={handleImageExpiry}
-            onOpen={handleOpenCard}
-          />
+          >
+            <Text style={{ color: ON_ACCENT }}>
+              {t('community.realtime.showNewLooks', { count: newLooks.length })}
+            </Text>
+          </TouchableOpacity>
         )}
-        refreshControl={
-          <RefreshControl
-            refreshing={isRefreshing}
-            onRefresh={handleRefresh}
-            tintColor={ACCENT_GOLD}
-          />
-        }
-        onEndReached={handleLoadMore}
-        onEndReachedThreshold={0.5}
-        ListHeaderComponent={renderHeaderComponent()}
-        // Elements keep the empty state and the load-more control mounted across
-        // renders; a fresh function per render would remount them and drop focus.
-        ListEmptyComponent={renderEmptyComponent()}
-        ListFooterComponent={renderFooterComponent()}
-        contentContainerStyle={styles.listContent}
-      />
+        <FlatList
+          ref={feedScroll.listRef}
+          testID="community-feed-list"
+          data={feedRows}
+          onScroll={feedScroll.onScroll}
+          onScrollBeginDrag={feedScroll.onScrollBeginDrag}
+          onContentSizeChange={feedScroll.onContentSizeChange}
+          scrollEventThrottle={16}
+          keyExtractor={(item) => item.id}
+          renderItem={({ item }) => (
+            <CommunityCard
+              onComments={(post) => {
+                notificationIntentRef.current++
+                commentsInvokerRef.current =
+                  commentsButtonRefs.current.get(post.id) ?? null
+                setCommentsPostId(post.id)
+              }}
+              commentsButtonRef={(node) => {
+                commentsButtonRefs.current.set(item.id, node)
+              }}
+              reactionControls={reactionState.controls(item.id)}
+              item={item}
+              isReported={reportedPostIds.has(item.id)}
+              containerRef={(node) => {
+                cardRefs.current.set(item.id, node)
+              }}
+              onReport={handleReportPost}
+              onWithdraw={handleWithdrawPost}
+              onImageExpiry={handleImageExpiry}
+              onOpen={handleOpenCard}
+            />
+          )}
+          refreshControl={
+            <RefreshControl
+              refreshing={isRefreshing}
+              onRefresh={handleRefresh}
+              tintColor={ACCENT_GOLD}
+            />
+          }
+          onEndReached={handleLoadMore}
+          onEndReachedThreshold={0.5}
+          ListHeaderComponent={renderHeaderComponent()}
+          // Elements keep the empty state and the load-more control mounted across
+          // renders; a fresh function per render would remount them and drop focus.
+          ListEmptyComponent={renderEmptyComponent()}
+          ListFooterComponent={renderFooterComponent()}
+          contentContainerStyle={styles.listContent}
+        />
 
-      <CommunityReportModal
-        suspended={!communityAvailable}
-        visible={reportingPost !== null}
-        post={reportingPost}
-        errorMessage={reportErrorMessage}
-        isSubmitting={isSubmittingReport}
-        onClose={closeReportModal}
-        onSubmit={handleSubmitReport}
-      />
+        <CommunityReportModal
+          suspended={!communityAvailable}
+          visible={reportingPost !== null}
+          post={reportingPost}
+          errorMessage={reportErrorMessage}
+          isSubmitting={isSubmittingReport}
+          onClose={closeReportModal}
+          onSubmit={handleSubmitReport}
+        />
 
-      <CommunityCommentsSheet
-        postId={sheetPostId(commentsPostId, communityAvailable, screenFocused)}
-        target={commentsPostId === deepLinkPost?.id ? commentTarget : undefined}
-        state={comments}
-        drafts={commentDrafts}
-        member={sessionScope ?? null}
-        locale={locale}
-        onClose={() => {
-          notificationIntentRef.current++
-          if (commentsPostId) comments.retireFocus(commentsPostId)
-          setCommentTarget(undefined)
-          const highlighted =
-            deepLinkPost?.id === commentsPostId
-              ? highlightedCommentsButtonRef.current
+        <CommunityCommentsSheet
+          postId={sheetPostId(commentsPostId, communityAvailable, screenFocused)}
+          target={commentsPostId === deepLinkPost?.id ? commentTarget : undefined}
+          state={comments}
+          drafts={commentDrafts}
+          member={sessionScope ?? null}
+          locale={locale}
+          onClose={() => {
+            notificationIntentRef.current++
+            if (commentsPostId) comments.retireFocus(commentsPostId)
+            setCommentTarget(undefined)
+            const highlighted =
+              deepLinkPost?.id === commentsPostId
+                ? highlightedCommentsButtonRef.current
+                : null
+            const feed = commentsPostId
+              ? (commentsButtonRefs.current.get(commentsPostId) ?? null)
               : null
-          const feed = commentsPostId
-            ? (commentsButtonRefs.current.get(commentsPostId) ?? null)
-            : null
-          const spotlightInvoker = commentsPostId
-            ? (spotlightCommentsButtonRefs.current.get(commentsPostId) ??
-              spotlightRankRefs.current.get(commentsPostId) ??
-              null)
-            : null
-          const original = commentsInvokerRef.current
-          const target =
-            original &&
-            (original === highlighted ||
-              original === feed ||
-              original === spotlightInvoker)
-              ? original
-              : (highlighted ?? feed)
-          const node = safeFindNodeHandle(target)
-          setCommentsPostId(null)
-          if (node) AccessibilityInfo.setAccessibilityFocus(node)
-        }}
-      />
-      <CommunitySpotlightDetail
-        item={communityAvailable ? spotlightDetailItem : null}
-        onClose={() => closeSpotlightDetail()}
-        onDismissed={runPendingSpotlightAction}
-        renderCard={(post) => renderSpotlightCard(post, true)}
-      />
-      <CommunityPostSheet
-        key={sessionScope ?? 'anonymous'}
-        suspended={!communityAvailable}
-        visible={isPostSheetVisible}
-        challenge={activeChallenge}
-        defaultChallengeOptIn={challengeOptIn}
-        onClose={closePostSheet}
-        onPublished={handlePostPublished}
-      />
-    </View>
+            const spotlightInvoker = commentsPostId
+              ? (spotlightCommentsButtonRefs.current.get(commentsPostId) ??
+                spotlightRankRefs.current.get(commentsPostId) ??
+                null)
+              : null
+            const original = commentsInvokerRef.current
+            const target =
+              original &&
+              (original === highlighted ||
+                original === feed ||
+                original === spotlightInvoker)
+                ? original
+                : (highlighted ?? feed)
+            const node = safeFindNodeHandle(target)
+            setCommentsPostId(null)
+            if (node) AccessibilityInfo.setAccessibilityFocus(node)
+          }}
+        />
+        <CommunitySpotlightDetail
+          item={communityAvailable ? spotlightDetailItem : null}
+          onClose={() => closeSpotlightDetail()}
+          onDismissed={runPendingSpotlightAction}
+          renderCard={(post) => renderSpotlightCard(post, true)}
+        />
+        <CommunityPostSheet
+          key={sessionScope ?? 'anonymous'}
+          suspended={!communityAvailable}
+          visible={isPostSheetVisible}
+          challenge={activeChallenge}
+          defaultChallengeOptIn={challengeOptIn}
+          onClose={closePostSheet}
+          onPublished={handlePostPublished}
+        />
+      </View>
+    </SponsoredCtaImpressions>
   )
 }
 

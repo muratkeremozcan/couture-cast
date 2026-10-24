@@ -1,5 +1,8 @@
 import { z } from 'zod'
-import { affiliateSurfaceSchema } from '../contracts/http/commerce'
+import {
+  affiliateCommunitySurfaceSchema,
+  affiliateRecommendationSurfaceSchema,
+} from '../contracts/http/commerce'
 import {
   advisorSlotSchema,
   paletteAnalysisFailureReasonSchema,
@@ -536,11 +539,20 @@ export type WardrobeOnboardingCompletedEvent = z.infer<
 // both are operator-controlled and safe to log. The `analyticsSubjectId` on the
 // two server events is the HMAC pseudonym, never a raw user id.
 
-// Story 5.4: derived from affiliateSurfaceSchema by import, not hand-copied.
-// The hand-copy this replaced is exactly the shape of bug Decision 13 warns
-// about: a surface added to the contract enum and not here fails every
-// affected event's `.strict()` parse silently inside TelemetryService.
-const affiliateSurfaceAnalyticsEnum = affiliateSurfaceSchema
+// Story 5.4: derived from the contract's surface enums by import, not
+// hand-copied. The hand-copy this replaced is exactly the shape of bug
+// Decision 13 warns about: a surface added to the contract enum and not here
+// fails every affected event's `.strict()` parse silently inside
+// TelemetryService.
+//
+// Story 6.7b keys both CTA events by `surface`. The hero and advisor member
+// keeps the fields it always had; the community member carries the partner,
+// the offer, the surface and the region and nothing else. It is `.strict()` at
+// the event layer too, so a caller that passes a scenario, a recommendation id
+// or any post, author, caption or user identifier is refused before a payload
+// exists, rather than having the field silently stripped.
+const affiliateRecommendationSurfaceAnalyticsEnum = affiliateRecommendationSurfaceSchema
+const affiliateCommunitySurfaceAnalyticsEnum = affiliateCommunitySurfaceSchema
 const affiliateScenarioAnalyticsEnum = z.enum(['morning', 'midday', 'evening'])
 /** Uppercase region subtag, or the '*' sentinel meaning "published globally". */
 const affiliateLocaleRegionSchema = z.union([
@@ -553,14 +565,14 @@ const affiliateConversionStatusAnalyticsEnum = z.enum([
   'reversed',
 ])
 
-export const affiliateCtaShownEventSchema = z.object({
-  // Client-side only: this event uses the mobile analytics client's own
-  // distinctId, exactly like trackMobileRitualCreated. It does NOT go through
-  // TelemetryService and writes no TelemetryEvent row, because a mobile client
-  // can neither compute the server-side HMAC subject nor write that table.
+// Client-side only: the shown event uses the client analytics identity,
+// exactly like trackMobileRitualCreated. It does NOT go through
+// TelemetryService and writes no TelemetryEvent row, because a client can
+// neither compute the server-side HMAC subject nor write that table.
+export const affiliateCtaShownRecommendationEventSchema = z.object({
   partnerId: nonEmptyString.max(128),
   scenario: affiliateScenarioAnalyticsEnum,
-  surface: affiliateSurfaceAnalyticsEnum,
+  surface: z.enum(['mobile_hero']),
   localeRegion: affiliateLocaleRegionSchema,
   /**
    * The ScenarioOutfit.id. This is the once-per-payload dedupe key the client
@@ -573,19 +585,53 @@ export const affiliateCtaShownEventSchema = z.object({
   recommendationId: nonEmptyString.max(128),
 })
 
+export const affiliateCtaShownCommunityEventSchema = z
+  .object({
+    partnerId: nonEmptyString.max(128),
+    offerId: nonEmptyString.max(128),
+    surface: affiliateCommunitySurfaceAnalyticsEnum,
+    localeRegion: affiliateLocaleRegionSchema,
+  })
+  .strict()
+
+export const affiliateCtaShownEventSchema = z.discriminatedUnion('surface', [
+  affiliateCtaShownRecommendationEventSchema,
+  affiliateCtaShownCommunityEventSchema,
+])
+
 export type AffiliateCtaShownEvent = z.infer<typeof affiliateCtaShownEventSchema>
 
-export const affiliateCtaClickedEventSchema = z.object({
+export const affiliateCtaClickedRecommendationEventSchema = z.object({
   analyticsSubjectId: nonEmptyString,
   partnerId: nonEmptyString.max(128),
   offerId: nonEmptyString.max(128),
   scenario: affiliateScenarioAnalyticsEnum,
-  surface: affiliateSurfaceAnalyticsEnum,
+  surface: affiliateRecommendationSurfaceAnalyticsEnum,
   localeRegion: affiliateLocaleRegionSchema,
   recommendationId: nonEmptyString.max(128),
 })
 
+export const affiliateCtaClickedCommunityEventSchema = z
+  .object({
+    analyticsSubjectId: nonEmptyString,
+    partnerId: nonEmptyString.max(128),
+    offerId: nonEmptyString.max(128),
+    surface: affiliateCommunitySurfaceAnalyticsEnum,
+    localeRegion: affiliateLocaleRegionSchema,
+  })
+  .strict()
+
+export const affiliateCtaClickedEventSchema = z.discriminatedUnion('surface', [
+  affiliateCtaClickedRecommendationEventSchema,
+  affiliateCtaClickedCommunityEventSchema,
+])
+
 export type AffiliateCtaClickedEvent = z.infer<typeof affiliateCtaClickedEventSchema>
+
+/** `Omit` over each member of a union, so a keyed union stays keyed. */
+export type DistributiveOmit<T, K extends PropertyKey> = T extends unknown
+  ? Omit<T, K>
+  : never
 
 export const affiliateConversionRecordedEventSchema = z.object({
   /**
@@ -702,7 +748,7 @@ export type PremiumThemeSelectedEvent = z.infer<typeof premiumThemeSelectedEvent
 /**
  * Story 5.4: three server-side, pseudonymous events. `undertone` and `depth`
  * are pinned against the contract enums by import (Decision 13), not
- * re-listed, for the same reason `affiliateSurfaceAnalyticsEnum` now is.
+ * re-listed, for the same reason the affiliate surface enums now are.
  *
  * No raw hex, no confidence score, and no image metadata in any property: a
  * hex value is closer to a biometric fingerprint than an analytics
@@ -1827,34 +1873,58 @@ export function trackWardrobeOnboardingCompleted(
 // silent leak into PostHog. The negative fixtures in
 // `packages/api-client/testing/commerce-contract.spec.ts` exercise exactly that.
 
-export const affiliateCtaShownPropertiesSchema = z
+const affiliateCtaShownRecommendationPropertiesSchema = z
   .object({
     partner_id: nonEmptyString.max(128),
-    scenario: z.enum(['morning', 'midday', 'evening']),
+    scenario: affiliateScenarioAnalyticsEnum,
     surface: z.enum(['mobile_hero']),
-    locale_region: z.union([z.literal('*'), z.string().regex(/^[A-Z0-9]{2,3}$/)]),
+    locale_region: affiliateLocaleRegionSchema,
     recommendation_id: nonEmptyString.max(128),
   })
   .strict()
+
+/**
+ * Story 6.7b: the community member. It carries no `scenario`, no
+ * `recommendation_id` and no post, author, caption or user identifier;
+ * `.strict()` rejects every one of them.
+ */
+const affiliateCtaCommunityPropertiesSchema = z
+  .object({
+    partner_id: nonEmptyString.max(128),
+    offer_id: nonEmptyString.max(128),
+    surface: affiliateCommunitySurfaceAnalyticsEnum,
+    locale_region: affiliateLocaleRegionSchema,
+  })
+  .strict()
+
+export const affiliateCtaShownPropertiesSchema = z.discriminatedUnion('surface', [
+  affiliateCtaShownRecommendationPropertiesSchema,
+  affiliateCtaCommunityPropertiesSchema,
+])
 
 export type AffiliateCtaShownProperties = z.infer<
   typeof affiliateCtaShownPropertiesSchema
 >
 
-export const affiliateCtaClickedPropertiesSchema = z
+const affiliateCtaClickedRecommendationPropertiesSchema = z
   .object({
     partner_id: nonEmptyString.max(128),
     offer_id: nonEmptyString.max(128),
-    scenario: z.enum(['morning', 'midday', 'evening']),
-    // Derived from affiliateSurfaceSchema by import, not hand-copied: a
+    scenario: affiliateScenarioAnalyticsEnum,
+    // Derived from the contract enum by import, not hand-copied: a
     // hand-copied enum here is exactly what let Story 5.4's advisor click
     // fail this .strict() parse silently the moment `palette_advisor` was
     // added to the contract enum and not here.
-    surface: affiliateSurfaceSchema,
-    locale_region: z.union([z.literal('*'), z.string().regex(/^[A-Z0-9]{2,3}$/)]),
+    surface: affiliateRecommendationSurfaceAnalyticsEnum,
+    locale_region: affiliateLocaleRegionSchema,
     recommendation_id: nonEmptyString.max(128),
   })
   .strict()
+
+export const affiliateCtaClickedPropertiesSchema = z.discriminatedUnion('surface', [
+  affiliateCtaClickedRecommendationPropertiesSchema,
+  affiliateCtaCommunityPropertiesSchema,
+])
 
 export type AffiliateCtaClickedProperties = z.infer<
   typeof affiliateCtaClickedPropertiesSchema
@@ -1881,18 +1951,27 @@ export function trackAffiliateCtaShown(
   const parsed = affiliateCtaShownEventSchema.parse(event)
 
   // The distinctId is passed in rather than read off the event, because this is
-  // the one commerce event with no server subject: the mobile analytics client
-  // owns its own identity here, matching trackMobileRitualCreated.
+  // the one commerce event with no server subject: the client analytics
+  // identity owns it, matching trackMobileRitualCreated.
   return {
     distinctId,
     event: 'affiliate_cta_shown',
-    properties: affiliateCtaShownPropertiesSchema.parse({
-      partner_id: parsed.partnerId,
-      scenario: parsed.scenario,
-      surface: parsed.surface,
-      locale_region: parsed.localeRegion,
-      recommendation_id: parsed.recommendationId,
-    }),
+    properties: affiliateCtaShownPropertiesSchema.parse(
+      parsed.surface === 'mobile_hero'
+        ? {
+            partner_id: parsed.partnerId,
+            scenario: parsed.scenario,
+            surface: parsed.surface,
+            locale_region: parsed.localeRegion,
+            recommendation_id: parsed.recommendationId,
+          }
+        : {
+            partner_id: parsed.partnerId,
+            offer_id: parsed.offerId,
+            surface: parsed.surface,
+            locale_region: parsed.localeRegion,
+          }
+    ),
   }
 }
 
@@ -1904,14 +1983,23 @@ export function trackAffiliateCtaClicked(
   return {
     distinctId: parsed.analyticsSubjectId,
     event: 'affiliate_cta_clicked',
-    properties: affiliateCtaClickedPropertiesSchema.parse({
-      partner_id: parsed.partnerId,
-      offer_id: parsed.offerId,
-      scenario: parsed.scenario,
-      surface: parsed.surface,
-      locale_region: parsed.localeRegion,
-      recommendation_id: parsed.recommendationId,
-    }),
+    properties: affiliateCtaClickedPropertiesSchema.parse(
+      'scenario' in parsed
+        ? {
+            partner_id: parsed.partnerId,
+            offer_id: parsed.offerId,
+            scenario: parsed.scenario,
+            surface: parsed.surface,
+            locale_region: parsed.localeRegion,
+            recommendation_id: parsed.recommendationId,
+          }
+        : {
+            partner_id: parsed.partnerId,
+            offer_id: parsed.offerId,
+            surface: parsed.surface,
+            locale_region: parsed.localeRegion,
+          }
+    ),
   }
 }
 

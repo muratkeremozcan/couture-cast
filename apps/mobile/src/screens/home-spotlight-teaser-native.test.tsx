@@ -419,6 +419,104 @@ describe('6.7 mobile Home teaser native focus', () => {
     await settleFrames()
     expect(focusCalls()).toHaveLength(1)
   })
+
+  describe('6.7b sponsored Shop control', () => {
+    const BLOCK = {
+      partnerId: 'atelier-north',
+      partnerDisplayName: 'Atelier North',
+      offerId: 'offer-coat',
+      offerTitle: 'Wool overcoat',
+    }
+    const sponsoredPage = () =>
+      cityPage({ ...spotlightItem('look-1'), sponsorship: BLOCK } as ReturnType<
+        typeof spotlightItem
+      >)
+
+    /** A sponsored teaser, then a refocus after the floor that starts read 2. */
+    async function sponsoredTeaserWithPendingReread() {
+      let now = Date.parse('2026-10-23T12:00:00.000Z')
+      vi.spyOn(Date, 'now').mockImplementation(() => now)
+      const { answer, reads } = deferSpotlightReads()
+      setMobileApplicationUserId('member-1')
+      await renderHome()
+      await answer(0, sponsoredPage())
+      await screen.findByTestId('home-spotlight-teaser-shop')
+      act(() => screenFocus.set(false))
+      now += SPOTLIGHT_TEASER_READ_FLOOR_MS + 1_000
+      act(() => screenFocus.set(true))
+      await waitFor(() => expect(reads).toHaveLength(2))
+      return { answer }
+    }
+
+    it('6.7b-MOB-063 a teaser that leaves while VoiceOver is on Shop hands focus to the scroll view, once', async () => {
+      const { answer } = deferSpotlightReads()
+      setMobileApplicationUserId('member-1')
+      await renderHome()
+      await answer(0, sponsoredPage())
+      const shop = await screen.findByTestId('home-spotlight-teaser-shop')
+      const { domOf, handleOf } = iosFocusHandles()
+      osFocusLandsOn(handleOf(shop))
+
+      signOut()
+
+      await waitFor(() => expect(focusCalls()).toHaveLength(1))
+      expect(domOf(focusCalls()[0]!)).toBe(
+        screen.getByTestId('hero-experience-scrollview')
+      )
+      await settleFrames()
+      expect(focusCalls()).toHaveLength(1)
+    })
+
+    it('6.7b-MOB-064 a re-read that drops only the sponsorship moves VoiceOver from Shop to the link, once', async () => {
+      const { answer } = await sponsoredTeaserWithPendingReread()
+      const shop = screen.getByTestId('home-spotlight-teaser-shop')
+      const { domOf, handleOf } = iosFocusHandles()
+      osFocusLandsOn(handleOf(shop))
+
+      await answer(1, cityPage())
+
+      await waitFor(() =>
+        expect(screen.queryByTestId('home-spotlight-teaser-shop')).toBeNull()
+      )
+      await waitFor(() => expect(focusCalls()).toHaveLength(1))
+      expect(domOf(focusCalls()[0]!)).toBe(
+        screen.getByTestId('home-spotlight-teaser-link')
+      )
+      await settleFrames()
+      expect(focusCalls()).toHaveLength(1)
+    })
+
+    it('6.7b-MOB-065 keyboard focus on Shop moves to the link when the sponsorship leaves', async () => {
+      const { answer } = await sponsoredTeaserWithPendingReread()
+      const shop = screen.getByTestId('home-spotlight-teaser-shop')
+      act(() => shop.focus())
+      expect(document.activeElement).toBe(shop)
+
+      await answer(1, cityPage())
+
+      await waitFor(() =>
+        expect(document.activeElement).toBe(
+          screen.getByTestId('home-spotlight-teaser-link')
+        )
+      )
+    })
+
+    it('6.7b-MOB-066 a member who moved off Shop keeps their focus when the sponsorship leaves', async () => {
+      const { answer } = await sponsoredTeaserWithPendingReread()
+      const shop = screen.getByTestId('home-spotlight-teaser-shop')
+      const { handleOf } = iosFocusHandles()
+      osFocusLandsOn(handleOf(shop))
+      osFocusLandsOn(777)
+
+      await answer(1, cityPage())
+
+      await waitFor(() =>
+        expect(screen.queryByTestId('home-spotlight-teaser-shop')).toBeNull()
+      )
+      await settleFrames()
+      expect(focusCalls()).toEqual([])
+    })
+  })
 })
 
 /** Waits until the hero card has rendered the same count for several frames. */

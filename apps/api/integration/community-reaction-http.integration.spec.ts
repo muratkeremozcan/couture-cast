@@ -1,4 +1,4 @@
-import { listenHttpApp, httpTestUrl } from './helpers/loopback-http-app.js'
+import { listenHttpApp, httpTestUrl } from '../src/testing/loopback-http-app.js'
 import { communityReactionResponseSchema } from '@couture/api-client/contracts/http'
 import { Test } from '@nestjs/testing'
 import 'reflect-metadata'
@@ -6,6 +6,8 @@ import request from 'supertest'
 import { describe, expect, it, vi } from 'vitest'
 import { AccessTokenIdentityService } from '../src/modules/auth/access-token-identity.service.js'
 import { GuardianConsentStateService } from '../src/modules/auth/guardian-consent-state.service.js'
+import { CommunitySponsorshipService } from '../src/modules/commerce/community-sponsorship.service.js'
+import { noSponsorships } from './helpers/community-sponsorship-fixtures.js'
 import { CommunityController } from '../src/modules/community/community.controller.js'
 import { CommunityService } from '../src/modules/community/community.service.js'
 import { CommunitySpotlightService } from '../src/modules/community/community-spotlight.service.js'
@@ -37,6 +39,7 @@ describe('Story 6.3 guarded reaction HTTP routes', () => {
       providers: [
         { provide: CommunityService, useValue: service },
         { provide: CommunitySpotlightService, useValue: {} },
+        { provide: CommunitySponsorshipService, useValue: noSponsorships },
         {
           provide: GuardianConsentStateService,
           useValue: { canTeenAccess: vi.fn().mockResolvedValue(false) },
@@ -108,6 +111,7 @@ describe('Story 6.3 guarded reaction HTTP routes', () => {
       providers: [
         { provide: CommunityService, useValue: service },
         { provide: CommunitySpotlightService, useValue: {} },
+        { provide: CommunitySponsorshipService, useValue: noSponsorships },
         {
           provide: GuardianConsentStateService,
           useValue: { canTeenAccess: vi.fn().mockResolvedValue(true) },

@@ -238,6 +238,8 @@ export type ProviderCommerceScenario =
   | 'unknown-offer'
   | 'click-deduped'
   | 'invalid-signature'
+  /** Story 6.7b: the post's sponsorship link ended; every other gate passes. */
+  | 'community-sponsorship-ended'
 
 export type ProviderCommerceState = {
   userId: string | null

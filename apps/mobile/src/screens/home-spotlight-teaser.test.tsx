@@ -27,6 +27,7 @@ import {
 import { IMAGE_LOAD_TIMEOUT_MS } from '@/components/community/community-card'
 
 const routerPush = vi.hoisted(() => vi.fn())
+const capture = vi.hoisted(() => vi.fn())
 
 vi.mock('expo-router', async () => ({
   useLocalSearchParams: () => ({}),
@@ -41,7 +42,7 @@ vi.mock('expo-localization', () => ({
 vi.mock('@/src/lib/community', { spy: true })
 vi.mock('@/src/analytics/mobile-analytics', () => ({
   useMobileAnalytics: () => ({
-    capture: vi.fn(),
+    capture,
     getDistinctId: () => 'test-user-id',
     screen: vi.fn(),
   }),
@@ -547,6 +548,60 @@ describe('6.7 mobile Home spotlight teaser', () => {
     now += 31_000
     emit('active')
     expect(teaserReadCalls()).toBe(2)
+  })
+
+  it('6.7b-MOB-062 a foreground return is not a new visit: the sponsored teaser counts once', async () => {
+    const listeners: ((state: AppStateStatus) => void)[] = []
+    vi.spyOn(AppState, 'addEventListener').mockImplementation((_type, listener) => {
+      listeners.push(listener as (state: AppStateStatus) => void)
+      return { remove: () => undefined } as ReturnType<typeof AppState.addEventListener>
+    })
+    const emit = (state: AppStateStatus) =>
+      act(() => {
+        for (const listener of listeners) listener(state)
+      })
+    // The hero records its own impression; only the teaser's counts here.
+    const shown = () =>
+      capture.mock.calls.filter(
+        ([event, properties]) =>
+          event === 'affiliate_cta_shown' &&
+          (properties as { surface?: string }).surface === 'home_teaser'
+      )
+    const { answer } = deferSpotlightReads()
+    setMobileApplicationUserId('member-1')
+    await renderHome()
+    await answer(
+      0,
+      cityPage({
+        ...spotlightItem('look-1'),
+        sponsorship: {
+          partnerId: 'atelier-north',
+          partnerDisplayName: 'Atelier North',
+          offerId: 'offer-coat',
+          offerTitle: 'Wool overcoat',
+        },
+      } as ReturnType<typeof spotlightItem>)
+    )
+    await screen.findByTestId('home-spotlight-teaser-shop')
+    await waitFor(() => expect(shown()).toHaveLength(1))
+
+    // The CTA's in-app browser, or any app switch, backgrounds the app.
+    emit('background')
+    emit('active')
+    await untilFrame(() => true)
+    await screen.findByTestId('home-spotlight-teaser-shop')
+    expect(shown()).toHaveLength(1)
+
+    // Leaving Home and coming back is a new visit.
+    act(() => screenFocus.set(false))
+    act(() => screenFocus.set(true))
+    await waitFor(() => expect(shown()).toHaveLength(2))
+    expect(shown()[1]![1]).toEqual({
+      partner_id: 'atelier-north',
+      offer_id: 'offer-coat',
+      surface: 'home_teaser',
+      locale_region: 'US',
+    })
   })
 
   it('6.7-MOB-019 a 429 Retry-After removes the teaser and defers the next read until it passes', async () => {

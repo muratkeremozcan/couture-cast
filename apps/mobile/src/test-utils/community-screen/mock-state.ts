@@ -25,3 +25,6 @@ export const imageEvents = {
 }
 /** The list's pull-to-refresh handler, which react-native-web renders no gesture for. */
 export const refreshEvents = { onRefresh: undefined as (() => void) | undefined }
+
+/** Story 6.7b: the in-app browser a sponsored CTA hands the partner URL to. */
+export const webBrowser = { openBrowserAsync: vi.fn() }

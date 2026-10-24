@@ -7,6 +7,7 @@ import type { INestApplication } from '@nestjs/common'
 import { generateHttpOpenApiDocument } from '@couture/api-client/contracts/http'
 import { Test } from '@nestjs/testing'
 import { afterEach, beforeEach, describe, expect, it } from 'vitest'
+import { listenHttpApp, httpTestUrl } from './testing/loopback-http-app.js'
 import request from 'supertest'
 import { ApiHealthController } from './controllers/api-health.controller'
 import { HealthController } from './controllers/health.controller'
@@ -44,7 +45,7 @@ describe('OpenAPI integration', () => {
     // createNestApplication() gives us a real Nest app instance for routing/middleware/docs.
     app = moduleFixture.createNestApplication()
     configureOpenApi(app)
-    await app.init()
+    await listenHttpApp(app)
   })
 
   afterEach(async () => {
@@ -57,7 +58,7 @@ describe('OpenAPI integration', () => {
 
   it('serves the canonical contract-derived document', async () => {
     // supertest talks to Nest's HTTP server directly, so this is a real HTTP request path.
-    const server = app!.getHttpServer() as Parameters<typeof request>[0]
+    const server = httpTestUrl(app!)
     const response = await request(server).get(OPENAPI_JSON_ROUTE)
     const spec = response.body as OpenApiSpec
     const canonicalSpec = generateHttpOpenApiDocument()
@@ -76,7 +77,7 @@ describe('OpenAPI integration', () => {
   })
 
   it('serves the Swagger UI', async () => {
-    const server = app!.getHttpServer() as Parameters<typeof request>[0]
+    const server = httpTestUrl(app!)
     const response = await request(server).get(OPENAPI_DOCS_ROUTE)
 
     expect(response.status).toBe(200)

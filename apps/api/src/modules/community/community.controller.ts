@@ -38,6 +38,11 @@ import {
   communitySpotlightQuerySchema,
   communitySpotlightResponseSchema,
   communityReactionSpotlightResponseSchema,
+  communitySponsoredFeedResponseSchema,
+  communitySponsoredPostResponseSchema,
+  communitySponsoredSpotlightResponseSchema,
+  COMMUNITY_SPONSORSHIP_HEADER,
+  type CommunitySponsorship,
   type CommunitySpotlightResponse,
   reportCommunityPostInputSchema,
   reportCommunityPostResponseSchema,
@@ -59,6 +64,7 @@ import {
 } from '../auth/security.decorators.js'
 import { RequestAuthGuard, RolesGuard } from '../auth/security.guards.js'
 import type { RequestAuthContext } from '../auth/security.types.js'
+import { CommunitySponsorshipService } from '../commerce/community-sponsorship.service.js'
 import { CommunityRateLimitException } from './community-rate-limit.exception.js'
 import { CommunityService } from './community.service.js'
 import { CommunitySpotlightService } from './community-spotlight.service.js'
@@ -86,6 +92,15 @@ async function withRetryAfterHeader<T>(
   }
 }
 
+/**
+ * Story 6.7b: every public community read negotiates the sponsorship block with
+ * this header and must say so to caches.
+ */
+const COMMUNITY_READ_VARY =
+  'x-couture-reactions, x-couture-sponsorship, x-couture-platform, Authorization'
+
+type WithSponsorship<T> = T & { sponsorship?: CommunitySponsorship }
+
 @Controller('/api/v1/community')
 @UseGuards(RequestAuthGuard)
 export class CommunityController {
@@ -93,18 +108,43 @@ export class CommunityController {
     @Inject(CommunityService)
     private readonly communityService: CommunityService,
     @Inject(CommunitySpotlightService)
-    private readonly spotlightService: CommunitySpotlightService
+    private readonly spotlightService: CommunitySpotlightService,
+    @Inject(CommunitySponsorshipService)
+    private readonly sponsorships: CommunitySponsorshipService
   ) {}
+
+  /**
+   * Story 6.7b: attaches the per-viewer sponsorship block to items that have
+   * one, after the community read (and so after the spotlight read model) has
+   * produced them. The service fails closed, so a sponsorship fault never fails
+   * the read; it only removes the blocks.
+   */
+  private async attachSponsorships<T extends { id: string }>(
+    items: readonly T[],
+    userId: string,
+    acceptLanguage: string | undefined
+  ): Promise<WithSponsorship<T>[]> {
+    const blocks = await this.sponsorships.resolveForPosts({
+      userId,
+      postIds: items.map((item) => item.id),
+      acceptLanguage,
+    })
+    return items.map((item) => {
+      const sponsorship = blocks.get(item.id)
+      return sponsorship ? { ...item, sponsorship } : item
+    })
+  }
 
   @Get('feed')
   @Header('Cache-Control', 'private, no-store')
-  @Header('Vary', 'x-couture-reactions, x-couture-platform, Authorization')
+  @Header('Vary', COMMUNITY_READ_VARY)
   async getFeed(
     @AuthContext() auth: RequestAuthContext,
     @Headers('x-couture-platform') platformHeader: string | undefined,
     @Headers('accept-language') acceptLanguage: string | undefined,
     @Query() rawQuery: Record<string, unknown>,
-    @Headers('x-couture-reactions') reactionsHeader?: string
+    @Headers('x-couture-reactions') reactionsHeader?: string,
+    @Headers(COMMUNITY_SPONSORSHIP_HEADER) sponsorshipHeader?: string
   ): Promise<CommunityFeedResponse> {
     const headersResult = communityHeadersSchema.safeParse({
       'x-couture-platform': platformHeader,
@@ -134,6 +174,15 @@ export class CommunityController {
       ...(reactionsHeader === '1' ? { reactions: true } : {}),
     })
 
+    if (sponsorshipHeader === '1') {
+      return communitySponsoredFeedResponseSchema.parse({
+        data: {
+          ...data,
+          items: await this.attachSponsorships(data.items, auth.userId, acceptLanguage),
+        },
+      })
+    }
+
     return (
       reactionsHeader === '1'
         ? communityReactionFeedResponseSchema
@@ -147,13 +196,15 @@ export class CommunityController {
    */
   @Get('spotlight')
   @Header('Cache-Control', 'private, no-store')
-  @Header('Vary', 'x-couture-reactions, x-couture-platform, Authorization')
+  @Header('Vary', COMMUNITY_READ_VARY)
   async getSpotlight(
     @AuthContext() auth: RequestAuthContext,
     @Headers('x-couture-platform') platformHeader: string | undefined,
     @Query() rawQuery: Record<string, unknown>,
     @Res({ passthrough: true }) response: Response,
-    @Headers('x-couture-reactions') reactionsHeader?: string
+    @Headers('x-couture-reactions') reactionsHeader?: string,
+    @Headers('accept-language') acceptLanguage?: string,
+    @Headers(COMMUNITY_SPONSORSHIP_HEADER) sponsorshipHeader?: string
   ): Promise<CommunitySpotlightResponse> {
     const headersResult = communityHeadersSchema.safeParse({
       'x-couture-platform': platformHeader,
@@ -180,6 +231,14 @@ export class CommunityController {
         ...(reactions ? { reactions: true } : {}),
       })
     )
+    if (sponsorshipHeader === '1') {
+      return communitySponsoredSpotlightResponseSchema.parse({
+        data: {
+          ...data,
+          items: await this.attachSponsorships(data.items, auth.userId, acceptLanguage),
+        },
+      })
+    }
     return (
       reactions
         ? communityReactionSpotlightResponseSchema
@@ -194,12 +253,14 @@ export class CommunityController {
    */
   @Get('posts/:postId')
   @Header('Cache-Control', 'private, no-store')
-  @Header('Vary', 'x-couture-reactions, x-couture-platform, Authorization')
+  @Header('Vary', COMMUNITY_READ_VARY)
   async getPost(
     @AuthContext() auth: RequestAuthContext,
     @Param('postId') postId: string,
     @Headers('x-couture-platform') platformHeader: string | undefined,
-    @Headers('x-couture-reactions') reactionsHeader?: string
+    @Headers('x-couture-reactions') reactionsHeader?: string,
+    @Headers('accept-language') acceptLanguage?: string,
+    @Headers(COMMUNITY_SPONSORSHIP_HEADER) sponsorshipHeader?: string
   ): Promise<CommunityPostResponse> {
     const headersResult = communityHeadersSchema.safeParse({
       'x-couture-platform': platformHeader,
@@ -215,6 +276,11 @@ export class CommunityController {
       postId,
       ...(reactionsHeader === '1' ? { reactions: true } : {}),
     })
+
+    if (sponsorshipHeader === '1') {
+      const [item] = await this.attachSponsorships([data], auth.userId, acceptLanguage)
+      return communitySponsoredPostResponseSchema.parse({ data: item })
+    }
 
     return (
       reactionsHeader === '1'

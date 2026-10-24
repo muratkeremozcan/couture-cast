@@ -1,4 +1,4 @@
-import { listenHttpApp, httpTestUrl } from './helpers/loopback-http-app.js'
+import { listenHttpApp, httpTestUrl } from '../src/testing/loopback-http-app.js'
 // Learning path Step 8: Shared analytics contracts and event tracking.
 // See _bmad-output/project-knowledge/learning-path-step-by-step.md#step-8-shared-analytics-contracts-and-event-tracking
 import 'reflect-metadata'
@@ -104,7 +104,7 @@ describe('Analytics tracking endpoints (integration)', () => {
     identities.set(token, { userId, role })
     return { authorization: `Bearer ${token}` }
   }
-  const getHttpServer = (): Parameters<typeof request>[0] => {
+  const baseUrl = (): string => {
     if (!app) {
       throw new Error('App is not initialized')
     }
@@ -145,13 +145,11 @@ describe('Analytics tracking endpoints (integration)', () => {
 
   // Flow ref S0.7/T3/1: exercise both authorized and unauthorized HTTP paths.
   it('returns 401 for guardian consent when auth headers are missing', async () => {
-    const response = await request(getHttpServer())
-      .post('/api/v1/auth/guardian-consent')
-      .send({
-        guardianId: guardian.id,
-        teenId: teen.id,
-        consentLevel: 'full',
-      })
+    const response = await request(baseUrl()).post('/api/v1/auth/guardian-consent').send({
+      guardianId: guardian.id,
+      teenId: teen.id,
+      consentLevel: 'full',
+    })
 
     // Flow ref S0.7/T2/2: assert the exact emitted payload so property drift is
     // caught at the integration boundary.
@@ -161,7 +159,7 @@ describe('Analytics tracking endpoints (integration)', () => {
   })
 
   it('returns 400 for guardian consent when payload fails the shared contract', async () => {
-    const response = await request(getHttpServer())
+    const response = await request(baseUrl())
       .post('/api/v1/auth/guardian-consent')
       .set(createHeaders(guardian.id, 'guardian'))
       .send({
@@ -174,7 +172,7 @@ describe('Analytics tracking endpoints (integration)', () => {
   })
 
   it('returns 403 for guardian consent when role is not permitted', async () => {
-    const response = await request(getHttpServer())
+    const response = await request(baseUrl())
       .post('/api/v1/auth/guardian-consent')
       .set(createHeaders('mod-1', 'moderator'))
       .send({
@@ -189,7 +187,7 @@ describe('Analytics tracking endpoints (integration)', () => {
   })
 
   it('returns 403 for guardian consent when authenticated guardian does not match payload', async () => {
-    const response = await request(getHttpServer())
+    const response = await request(baseUrl())
       .post('/api/v1/auth/guardian-consent')
       .set(createHeaders(alternateGuardian.id, 'guardian'))
       .send({
@@ -205,7 +203,7 @@ describe('Analytics tracking endpoints (integration)', () => {
 
   it('tracks guardian consent via HTTP endpoint for authorized guardian', async () => {
     const eventCursor = eventExpectations.createCursor()
-    const response = await request(getHttpServer())
+    const response = await request(baseUrl())
       .post('/api/v1/auth/guardian-consent')
       .set(createHeaders(guardian.id, 'guardian'))
       .send({
@@ -232,14 +230,12 @@ describe('Analytics tracking endpoints (integration)', () => {
   })
 
   it('returns 401 for moderation action when auth headers are missing', async () => {
-    const response = await request(getHttpServer())
-      .post('/api/v1/moderation/actions')
-      .send({
-        moderatorId: 'mod-1',
-        targetId: 'post-1',
-        action: 'hide',
-        reason: 'policy_violation',
-      })
+    const response = await request(baseUrl()).post('/api/v1/moderation/actions').send({
+      moderatorId: 'mod-1',
+      targetId: 'post-1',
+      action: 'hide',
+      reason: 'policy_violation',
+    })
 
     expect(response.status).toBe(401)
     unauthorizedHttpErrorSchema.parse(response.body)
@@ -247,7 +243,7 @@ describe('Analytics tracking endpoints (integration)', () => {
   })
 
   it('returns 400 for moderation action when payload fails the shared contract', async () => {
-    const response = await request(getHttpServer())
+    const response = await request(baseUrl())
       .post('/api/v1/moderation/actions')
       .set(createHeaders('mod-1', 'moderator'))
       .send({
@@ -260,7 +256,7 @@ describe('Analytics tracking endpoints (integration)', () => {
   })
 
   it('returns 403 for moderation action when role is not permitted', async () => {
-    const response = await request(getHttpServer())
+    const response = await request(baseUrl())
       .post('/api/v1/moderation/actions')
       .set(createHeaders(guardian.id, 'guardian'))
       .send({
@@ -276,7 +272,7 @@ describe('Analytics tracking endpoints (integration)', () => {
   })
 
   it('returns 403 for moderation action when authenticated moderator does not match payload', async () => {
-    const response = await request(getHttpServer())
+    const response = await request(baseUrl())
       .post('/api/v1/moderation/actions')
       .set(createHeaders('mod-2', 'moderator'))
       .send({
@@ -293,7 +289,7 @@ describe('Analytics tracking endpoints (integration)', () => {
 
   it('tracks moderation action via HTTP endpoint for authorized moderator', async () => {
     const eventCursor = eventExpectations.createCursor()
-    const response = await request(getHttpServer())
+    const response = await request(baseUrl())
       .post('/api/v1/moderation/actions')
       .set(createHeaders('mod-1', 'moderator'))
       .send({

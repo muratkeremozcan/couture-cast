@@ -101,6 +101,35 @@ module.exports = {
       },
     },
     {
+      // Supertest given a Nest server listens on the dual-stack wildcard and then requests
+      // 127.0.0.1. macOS can give that wildcard a port another local process already holds
+      // on 127.0.0.1, and that process answers: a foreign 401 failed the wardrobe commit
+      // spec, a 404 the ritual spec, a socket hang up the community privacy spec, all only
+      // under the full API coverage run. The loopback helper binds 127.0.0.1 itself.
+      files: [
+        'apps/api/**/*.{spec,test}.ts',
+        'apps/api/integration/**/*.ts',
+        'apps/api/src/testing/**/*.ts',
+      ],
+      excludedFiles: ['apps/api/src/testing/loopback-http-app.ts'],
+      rules: {
+        'no-restricted-syntax': [
+          'error',
+          {
+            selector: "CallExpression[callee.property.name='getHttpServer']",
+            message:
+              'Do not hand supertest the Nest server. Bind it with listenHttpApp() from apps/api/src/testing/loopback-http-app.ts and pass request() the URL it returns.',
+          },
+          {
+            selector:
+              "CallExpression[callee.name='request'] > Identifier.arguments[name='app']",
+            message:
+              'Do not hand supertest an app. Bind it with listenHttpApp() or listenHttpHandler() from apps/api/src/testing/loopback-http-app.ts and pass request() the URL.',
+          },
+        ],
+      },
+    },
+    {
       files: ['apps/web/**/*.{ts,tsx}'],
       parserOptions: {
         project: ['./apps/web/tsconfig.eslint.json'],

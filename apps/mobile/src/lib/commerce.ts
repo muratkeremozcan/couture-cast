@@ -16,10 +16,12 @@ import { withRequestDeadline } from '@couture/api-client'
 //    unauditable for us.
 import {
   affiliateClickResponseSchema,
+  communitySponsorshipSchema,
   commercePreferenceResponseSchema,
   updateCommercePreferenceResponseSchema,
   type AffiliateClickRequest,
   type CommercePreference,
+  type CommunitySponsorship,
   type ScenarioOutfit,
   type ShopThisLook,
 } from '@couture/api-client/contracts/http'
@@ -84,6 +86,25 @@ export function resolveRenderableShopThisLook(
     return null
   }
   return outfit.shopThisLook
+}
+
+/**
+ * Story 6.7b: the community twin of `resolveRenderableShopThisLook`, and the one
+ * predicate the sponsored CTA and its shown event both call. Only a block that
+ * came off a live, opted-in read qualifies, and it must still parse strictly, so
+ * a payload that picked up anything else renders no CTA at all.
+ */
+export function resolveRenderableCommunitySponsorship(
+  // Any community item: the teaser's shared state types its item without the
+  // field, though the live opted-in read it holds carries it.
+  item: object | null | undefined,
+  isCacheServed = false
+): CommunitySponsorship | null {
+  if (!item || isCacheServed || !('sponsorship' in item) || !item.sponsorship) {
+    return null
+  }
+  const parsed = communitySponsorshipSchema.safeParse(item.sponsorship)
+  return parsed.success ? parsed.data : null
 }
 
 export async function getCommercePreferenceFromMobile(

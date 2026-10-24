@@ -498,8 +498,10 @@
       "report": "Report",
       "reported": "Reported",
       "withdraw": "Withdraw",
-      "sponsored": "Sponsored",
-      "sponsoredAnnounce": "Sponsored look"
+      "sponsored": "Partnered",
+      "sponsoredAnnounce": "Partnered with {{partner}}",
+      "shopCta": "Shop this look at {{partner}}",
+      "shopOpensInBrowser": "Opens the partner site in a new tab"
     },
     "status": {
       "draft": "Draft",

@@ -66,7 +66,12 @@ test.describe('Story 6.3 curated reactions', () => {
     const allFeed = completedCommunityFeed(page, 'all')
     await page.getByTestId('community-filter-all').click()
     const body = (await allFeed).responseJson as { data: { items: { id: string }[] } }
-    const target = body.data.items[1]!.id
+    // A seeded look past the first card. Looks other workers publish lead this
+    // feed too and are deleted when their test ends, so one of those picked
+    // here could be gone by the deep link and resolve as an invalid link.
+    const target = body.data.items
+      .slice(1)
+      .find((post) => /^(seed-spotlight|lookbook)-/.test(post.id))!.id
     await page.goto(`/?source=notification&type=community&cardId=${target}`)
     await expect(page.getByTestId(`lookbook-card-${target}`)).toHaveAttribute(
       'data-highlighted',

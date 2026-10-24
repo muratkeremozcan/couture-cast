@@ -5,11 +5,13 @@ import {
   COMMERCE_DISABLED_MESSAGE,
   COMMERCE_OFFER_NOT_FOUND_MESSAGE,
   COMMERCE_OPTED_OUT_MESSAGE,
+  COMMERCE_SPONSORSHIP_NOT_FOUND_MESSAGE,
   WEBHOOK_SIGNATURE_INVALID_MESSAGE,
   affiliateClickResponseSchema,
   affiliateWebhookResponseSchema,
   commercePreferenceResponseSchema,
   updateCommercePreferenceResponseSchema,
+  type AffiliateCommunitySurface,
 } from '@couture/api-client/contracts/http'
 import { expect } from 'vitest'
 import {
@@ -38,10 +40,10 @@ import {
  * Both sides must agree or the pinned `string()` matchers fail verification.
  * ------------------------------------------------------------------------- */
 
-const COMMERCE_PARTNER_SLUG = 'sample-partner'
-const COMMERCE_PARTNER_NAME = 'Sample Partner'
-const COMMERCE_OFFER_ID = 'offer-pact-1'
-const COMMERCE_OFFER_TITLE = 'Everyday Layering Tee'
+export const COMMERCE_PARTNER_SLUG = 'sample-partner'
+export const COMMERCE_PARTNER_NAME = 'Sample Partner'
+export const COMMERCE_OFFER_ID = 'offer-pact-1'
+export const COMMERCE_OFFER_TITLE = 'Everyday Layering Tee'
 const COMMERCE_RECOMMENDATION_ID = 'rec-morning-1'
 const COMMERCE_REDIRECT_URL = 'https://partner.couturecast.test/shop?cc=pact-click-token'
 
@@ -435,6 +437,123 @@ export async function verifyAffiliateClickErrorInteraction(
       expect(payload.error).toBe(interaction.reason)
       // There is no machine-readable code to branch on, by design.
       expect(payload).not.toHaveProperty('code')
+    })
+}
+
+/* ---------------------------------------------------------------------------
+ * Story 6.7b sponsored community highlights.
+ *
+ * A community CTA posts the same click body with a community surface, and
+ * `recommendationId` is the sponsored post id. The provider re-checks the
+ * post's sponsorship link for that post and offer before anything else about
+ * the offer, so the post id here must match the one the provider double links,
+ * `PUBLISHED_POST_ID` in `community/fixtures.ts`. It is repeated as a literal
+ * because this module sits outside the community fixtures.
+ * ------------------------------------------------------------------------- */
+
+const COMMUNITY_SPONSORED_POST_ID = 'post-6100-published-0001'
+
+const communityClickRequestBody = (surface: AffiliateCommunitySurface) => ({
+  offerId: COMMERCE_OFFER_ID,
+  recommendationId: COMMUNITY_SPONSORED_POST_ID,
+  surface,
+})
+
+/** The three surfaces a sponsored post renders its CTA on, one interaction each. */
+export const communityAffiliateClickSurfaces: AffiliateCommunitySurface[] = [
+  'community_feed',
+  'community_spotlight',
+  'home_teaser',
+]
+
+export async function verifyCommunityAffiliateClickMintInteraction(
+  pact: PactV4,
+  createClient: CreateClient,
+  surface: AffiliateCommunitySurface
+) {
+  // Provider endpoint: apps/api/src/modules/commerce/affiliate-click.controller.ts -> POST /api/v1/commerce/affiliate/clicks
+  const body = communityClickRequestBody(surface)
+  await pact
+    .addInteraction()
+    .given(
+      ...createProviderState({
+        name: 'A community sponsorship links the offer to the post',
+        params: { userId: pactEventAuth.userId, postId: COMMUNITY_SPONSORED_POST_ID },
+      })
+    )
+    .uponReceiving(`a first activation of the sponsored ${surface} CTA`)
+    .withRequest(
+      'POST',
+      '/api/v1/commerce/affiliate/clicks',
+      setJsonContent({ headers: pactEventHeaders, body })
+    )
+    .willRespondWith(
+      201,
+      setJsonContent({
+        headers: { 'Cache-Control': string('private, no-store') },
+        body: { data: { redirectUrl: string(COMMERCE_REDIRECT_URL) } },
+      })
+    )
+    .executeTest(async (mockServer: V3MockServer) => {
+      const response = await createClient(mockServer).apiV1CommerceAffiliateClicksPostRaw(
+        { affiliateClickRequest: body }
+      )
+
+      expect(response.raw.status).toBe(201)
+      const parsed = affiliateClickResponseSchema.parse(await response.value())
+      expect(new URL(parsed.data.redirectUrl).protocol).toBe('https:')
+      expect(new URL(parsed.data.redirectUrl).hostname).toBe('partner.couturecast.test')
+    })
+}
+
+/**
+ * The link ended between the read that rendered the CTA and the tap. The click
+ * is refused with the sponsorship message: no redirect, and no click row.
+ */
+export async function verifyCommunityAffiliateClickEndedInteraction(pact: PactV4) {
+  // Provider endpoint: apps/api/src/modules/commerce/affiliate-click.controller.ts -> POST /api/v1/commerce/affiliate/clicks
+  const body = communityClickRequestBody('community_feed')
+  await pact
+    .addInteraction()
+    .given(
+      ...createProviderState({
+        name: 'The community sponsorship on the post has ended',
+        params: { userId: pactEventAuth.userId, postId: COMMUNITY_SPONSORED_POST_ID },
+      })
+    )
+    .uponReceiving('a sponsored community CTA activation after the sponsorship ended')
+    .withRequest(
+      'POST',
+      '/api/v1/commerce/affiliate/clicks',
+      setJsonContent({ headers: pactEventHeaders, body })
+    )
+    .willRespondWith(
+      404,
+      setJsonContent({
+        headers: { 'Cache-Control': string('private, no-store') },
+        body: {
+          statusCode: like(404),
+          message: string(COMMERCE_SPONSORSHIP_NOT_FOUND_MESSAGE),
+          error: string('Not Found'),
+        },
+      })
+    )
+    .executeTest(async (mockServer: V3MockServer) => {
+      // The generated SDK throws on 404, so the request goes out directly.
+      const response = await fetch(`${mockServer.url}/api/v1/commerce/affiliate/clicks`, {
+        method: 'POST',
+        headers: { ...pactEventHeaders, 'Content-Type': 'application/json' },
+        body: JSON.stringify(body),
+      })
+
+      expect(response.status).toBe(404)
+      expect(response.headers.get('cache-control')).toBe('private, no-store')
+
+      const payload = (await response.json()) as Record<string, unknown>
+      expect(payload.message).toBe(COMMERCE_SPONSORSHIP_NOT_FOUND_MESSAGE)
+      expect(payload.error).toBe('Not Found')
+      expect(payload).not.toHaveProperty('redirectUrl')
+      expect(payload).not.toHaveProperty('data')
     })
 }
 

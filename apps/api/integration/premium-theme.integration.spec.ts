@@ -5,6 +5,7 @@ import { UnauthorizedException, type INestApplication } from '@nestjs/common'
 import { Test, type TestingModule } from '@nestjs/testing'
 import request from 'supertest'
 import { afterAll, beforeAll, beforeEach, describe, expect, it, vi } from 'vitest'
+import { listenHttpApp, httpTestUrl } from '../src/testing/loopback-http-app.js'
 import {
   buildPremiumEntitlementCreateInput,
   createPremiumEntitlement,
@@ -181,7 +182,7 @@ describe('5.3 premium theme preference against real PostgreSQL and real HTTP', (
       .compile()
 
     const nestApp = moduleFixture.createNestApplication()
-    await nestApp.init()
+    await listenHttpApp(nestApp)
     return nestApp
   }
 
@@ -189,7 +190,7 @@ describe('5.3 premium theme preference against real PostgreSQL and real HTTP', (
     if (!instance) {
       throw new Error('App is not initialized')
     }
-    return instance.getHttpServer() as Parameters<typeof request>[0]
+    return httpTestUrl(instance)
   }
 
   function getTheme(instance: INestApplication | undefined, id: string) {

@@ -3,11 +3,12 @@
 import express from 'express'
 import request from 'supertest'
 import { Writable } from 'node:stream'
-import { describe, expect, it } from 'vitest'
+import { afterEach, describe, expect, it } from 'vitest'
 import type { AuthenticatedRequest } from '../modules/auth/security.types'
 import { bindRequestContext, updateRequestContext } from './request-context'
 import { createBaseLogger } from './pino.config'
 import { createRequestLoggerMiddleware } from './request-logger.middleware'
+import { listenHttpHandler } from '../testing/loopback-http-app.js'
 
 class MemoryStream extends Writable {
   readonly chunks: string[] = []
@@ -30,6 +31,17 @@ function parseLogs(stream: MemoryStream) {
 }
 
 describe('request-logger middleware', () => {
+  const listening: (() => Promise<void>)[] = []
+  afterEach(async () => {
+    await Promise.all(listening.splice(0).map((close) => close()))
+  })
+  /** Binds the app on 127.0.0.1 and returns its URL for supertest. */
+  async function serve(app: express.Express) {
+    const served = await listenHttpHandler(app)
+    listening.push(served.close)
+    return served.url
+  }
+
   it('logs request/response lifecycle and returns an x-request-id header', async () => {
     const stream = new MemoryStream()
     const app = express()
@@ -53,7 +65,7 @@ describe('request-logger middleware', () => {
       res.status(200).json({ tracked: true })
     })
 
-    const response = await request(app).get('/api/v1/auth/guardian-consent')
+    const response = await request(await serve(app)).get('/api/v1/auth/guardian-consent')
 
     expect(response.status).toBe(200)
     expect(response.headers['x-request-id']).toMatch(
@@ -89,7 +101,9 @@ describe('request-logger middleware', () => {
       res.status(204).end()
     })
 
-    await request(app).put('/api/v1/wardrobe/uploads/private-session?token=secret')
+    await request(await serve(app)).put(
+      '/api/v1/wardrobe/uploads/private-session?token=secret'
+    )
 
     for (const log of parseLogs(stream)) {
       expect(log.path).toBe('/api/v1/wardrobe/uploads/:uploadSessionId')

@@ -15,8 +15,8 @@
 
 import React, { useCallback, useEffect, useRef, useState } from 'react'
 import type {
-  CommunityReactionFeedItem as CommunityFeedItem,
-  CommunityReactionSpotlightItem as CommunitySpotlightItem,
+  CommunitySponsoredFeedItem as CommunityFeedItem,
+  CommunitySponsoredSpotlightItem as CommunitySpotlightItem,
   CommunitySpotlightLevel,
 } from '@couture/api-client/contracts/http'
 import {

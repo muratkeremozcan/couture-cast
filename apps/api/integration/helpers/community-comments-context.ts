@@ -19,6 +19,8 @@ import { AccessTokenIdentityService } from '../../src/modules/auth/access-token-
 import { GuardianConsentStateService } from '../../src/modules/auth/guardian-consent-state.service.js'
 import { CommunityCommentsController } from '../../src/modules/community/community-comments.controller.js'
 import { CommunityCacheHeadersMiddleware } from '../../src/modules/community/community-cache-headers.middleware.js'
+import { CommunitySponsorshipService } from '../../src/modules/commerce/community-sponsorship.service.js'
+import { noSponsorships } from './community-sponsorship-fixtures.js'
 import { CommunityController } from '../../src/modules/community/community.controller.js'
 import { CommunitySpotlightService } from '../../src/modules/community/community-spotlight.service.js'
 import { CommunityService } from '../../src/modules/community/community.service.js'
@@ -28,7 +30,7 @@ import { CommunityCommentsProcessor } from '../../src/modules/community/communit
 import { CommunityCommentsService } from '../../src/modules/community/community-comments.service.js'
 import { DefaultCommunityModerationEngine } from '../../src/modules/community/community-moderation.engine.js'
 import { GuardianService } from '../../src/modules/guardian/guardian.service.js'
-import { listenHttpApp } from './loopback-http-app.js'
+import { listenHttpApp } from '../../src/testing/loopback-http-app.js'
 import { isolatedCommunityDatabase } from './isolated-community-database.js'
 
 export const SECOND_MS = 1000
@@ -182,6 +184,7 @@ export function commentsTestContext() {
         { provide: CommunityCommentsService, useValue: service },
         { provide: CommunityService, useValue: posts },
         { provide: CommunitySpotlightService, useValue: {} },
+        { provide: CommunitySponsorshipService, useValue: noSponsorships },
         {
           provide: GuardianConsentStateService,
           useValue: {

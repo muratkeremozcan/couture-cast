@@ -31,7 +31,36 @@ import { garmentCategoryEnum } from './wardrobe'
  * every advisor click fail a `.strict()` parse silently inside
  * `TelemetryService` the moment this member was added here and not there.
  */
-export const affiliateSurfaceSchema = z.enum(['mobile_hero', 'palette_advisor'])
+export const affiliateRecommendationSurfaceSchema = z.enum([
+  'mobile_hero',
+  'palette_advisor',
+])
+
+/**
+ * Story 6.7b: the three community surfaces a sponsored post renders its CTA
+ * on. A click from one of these carries the community post id as its
+ * `recommendationId`, and the server re-checks the post's sponsorship link
+ * before anything else about the offer.
+ */
+export const affiliateCommunitySurfaceSchema = z.enum([
+  'community_feed',
+  'community_spotlight',
+  'home_teaser',
+])
+
+export const affiliateSurfaceSchema = z.enum([
+  ...affiliateRecommendationSurfaceSchema.options,
+  ...affiliateCommunitySurfaceSchema.options,
+])
+
+export type AffiliateSurface = z.infer<typeof affiliateSurfaceSchema>
+export type AffiliateCommunitySurface = z.infer<typeof affiliateCommunitySurfaceSchema>
+
+export function isAffiliateCommunitySurface(
+  surface: AffiliateSurface
+): surface is AffiliateCommunitySurface {
+  return affiliateCommunitySurfaceSchema.safeParse(surface).success
+}
 
 export const affiliateConversionStatusSchema = z.enum([
   'pending',
@@ -56,6 +85,32 @@ export const shopThisLookSchema = z
   .strict()
 
 export type ShopThisLook = z.infer<typeof shopThisLookSchema>
+
+/**
+ * Story 6.7b: the per-viewer sponsorship block on an opted-in community item.
+ * Like `shopThisLookSchema` it carries no URL, and it also carries no window,
+ * no operator reason and no agreement reference: the deep link is built at
+ * click time, and everything else about the link stays server-side. An absent
+ * block means no CTA.
+ */
+export const communitySponsorshipSchema = z
+  .object({
+    partnerId: nonEmptyStringSchema.describe(
+      'CommercePartner.slug. Stable, safe to log.'
+    ),
+    partnerDisplayName: nonEmptyStringSchema.describe(
+      'Rendered in the Partnered disclosure and the CTA label.'
+    ),
+    offerId: nonEmptyStringSchema.describe(
+      'Pass back to POST /api/v1/commerce/affiliate/clicks with the post id.'
+    ),
+    offerTitle: nonEmptyStringSchema.describe(
+      'Partner-authored, already localized by the catalog row.'
+    ),
+  })
+  .strict()
+
+export type CommunitySponsorship = z.infer<typeof communitySponsorshipSchema>
 
 // --- Preferences -----------------------------------------------------------
 
@@ -100,7 +155,7 @@ export const affiliateClickRequestSchema = z
     recommendationId: nonEmptyStringSchema
       .max(128)
       .describe(
-        'The ScenarioOutfit.id the CTA was rendered on, or the PaletteProfile.id for an advisor click.'
+        'The ScenarioOutfit.id the CTA was rendered on, the PaletteProfile.id for an advisor click, or the community post id for a community surface.'
       ),
     surface: affiliateSurfaceSchema.describe('Where the CTA was activated.'),
     // Story 5.4: optional, and read only on the advisor branch (Decision 7,
@@ -206,6 +261,15 @@ export const COMMERCE_AUDIENCE_INELIGIBLE_MESSAGE =
   'Affiliate suggestions are unavailable for this account.'
 
 export const COMMERCE_OFFER_NOT_FOUND_MESSAGE = 'Affiliate offer not found.'
+
+/**
+ * Story 6.7b: a community-surface click whose post has no eligible sponsorship
+ * link for this offer and viewer right now. That covers an ended or expired
+ * link, an inactive or out-of-window offer or partner, a region mismatch and a
+ * post that is no longer publicly visible, including a replay inside 60 seconds
+ * after the link ended. No click row is created and nothing is redirected.
+ */
+export const COMMERCE_SPONSORSHIP_NOT_FOUND_MESSAGE = 'Community sponsorship not found.'
 
 /**
  * Operator error surfaced as a user-visible failure: a catalog row whose
@@ -345,7 +409,7 @@ export function registerCommerceContracts(
     tags: ['commerce'],
     summary: 'Mint an attributed affiliate click',
     description:
-      'Creates one AffiliateClick and returns the outbound partner URL. 201 on a fresh mint, 200 when an identical activation inside 60 seconds is deduped to the existing row. Status precedence is fixed so assertions are deterministic: 503 (feature disabled) outranks 403 (audience), which outranks 403 (opted out), which outranks 404 (unknown, inactive, or out-of-window offer), which outranks 500 (invalid resolved URL).',
+      'Creates one AffiliateClick and returns the outbound partner URL. 201 on a fresh mint, 200 when an identical activation inside 60 seconds is deduped to the existing row. Status precedence is fixed so assertions are deterministic: 503 (feature disabled) outranks 403 (audience), which outranks 403 (opted out), which outranks 404 (no eligible community sponsorship for a community surface, then unknown, inactive, or out-of-window offer), which outranks 500 (invalid resolved URL). A community surface (community_feed, community_spotlight, home_teaser) sends the post id as recommendationId and is re-checked against the live sponsorship link before the dedupe lookup.',
     security: [{ bearerAuth: [] }],
     request: {
       body: {
@@ -388,7 +452,7 @@ export function registerCommerceContracts(
         },
       },
       404: {
-        description: `Unknown, inactive, or out-of-window offer ("${COMMERCE_OFFER_NOT_FOUND_MESSAGE}")`,
+        description: `No eligible community sponsorship for a community surface ("${COMMERCE_SPONSORSHIP_NOT_FOUND_MESSAGE}"), or an unknown, inactive, or out-of-window offer ("${COMMERCE_OFFER_NOT_FOUND_MESSAGE}")`,
         content: {
           'application/json': { schema: commonSchemas.notFoundHttpErrorSchema },
         },

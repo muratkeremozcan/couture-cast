@@ -11,7 +11,7 @@ import {
   engagementHarness,
   type EngagementHarness,
 } from './helpers/community-engagement-harness.js'
-import { listenHttpApp } from './helpers/loopback-http-app.js'
+import { listenHttpApp } from '../src/testing/loopback-http-app.js'
 import type { TelemetryService } from '../src/modules/telemetry/telemetry.service.js'
 import type * as NotificationsRuntime from '../src/modules/notifications/notifications.module.js'
 import type * as PushRuntime from '../src/modules/notifications/push-notification.service.js'

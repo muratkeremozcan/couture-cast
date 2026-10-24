@@ -1,4 +1,4 @@
-import { listenHttpApp, httpTestUrl } from './helpers/loopback-http-app.js'
+import { listenHttpApp, httpTestUrl } from '../src/testing/loopback-http-app.js'
 // Learning path Step 17: Weather alert rules and notification pipeline.
 // See _bmad-output/project-knowledge/learning-path-step-by-step.md#step-17-weather-alert-rules-and-notification-pipeline
 import 'reflect-metadata'
@@ -244,7 +244,7 @@ describe('Alerts API integration', () => {
   let app: INestApplication | undefined
   let prisma: TransactionalAlertsPrisma
 
-  const getHttpServer = (): Parameters<typeof request>[0] => {
+  const baseUrl = (): string => {
     if (!app) {
       throw new Error('App is not initialized')
     }
@@ -300,7 +300,7 @@ describe('Alerts API integration', () => {
   })
 
   it('round-trips all rules and push preferences without crossing owners', async () => {
-    const rulesResponse = await request(getHttpServer())
+    const rulesResponse = await request(baseUrl())
       .put('/api/v1/alerts/rules')
       .set(primaryUserHeaders)
       .send({ rules: allRules })
@@ -316,7 +316,7 @@ describe('Alerts API integration', () => {
     expect(prisma.$transaction).toHaveBeenCalledTimes(1)
     expect(prisma.transactionRuleUpsertCounts).toEqual([3])
 
-    const preferencesResponse = await request(getHttpServer())
+    const preferencesResponse = await request(baseUrl())
       .put('/api/v1/alerts/preferences')
       .set(primaryUserHeaders)
       .send(notificationPreferences)
@@ -331,14 +331,14 @@ describe('Alerts API integration', () => {
       threshold: 2,
       enabled: false,
     }
-    const foreignRulesResponse = await request(getHttpServer())
+    const foreignRulesResponse = await request(baseUrl())
       .put('/api/v1/alerts/rules')
       .set(foreignUserHeaders)
       .send({ rules: [foreignRule] })
 
     expect(foreignRulesResponse.status).toBe(200)
 
-    const primarySettingsResponse = await request(getHttpServer())
+    const primarySettingsResponse = await request(baseUrl())
       .get('/api/v1/alerts/preferences')
       .set(primaryUserHeaders)
     const primarySettings = getAlertPreferencesResponseSchema.parse(
@@ -353,7 +353,7 @@ describe('Alerts API integration', () => {
       },
     })
 
-    const foreignSettingsResponse = await request(getHttpServer())
+    const foreignSettingsResponse = await request(baseUrl())
       .get('/api/v1/alerts/preferences')
       .set(foreignUserHeaders)
     const foreignSettings = getAlertPreferencesResponseSchema.parse(
@@ -376,14 +376,14 @@ describe('Alerts API integration', () => {
   })
 
   it('derives ownership from the bearer token instead of spoofable headers', async () => {
-    const createResponse = await request(getHttpServer())
+    const createResponse = await request(baseUrl())
       .put('/api/v1/alerts/rules')
       .set(primaryUserHeaders)
       .send({ rules: allRules })
 
     expect(createResponse.status).toBe(200)
 
-    const spoofedResponse = await request(getHttpServer())
+    const spoofedResponse = await request(baseUrl())
       .get('/api/v1/alerts/preferences')
       .set({
         authorization: primaryUserHeaders.authorization,
@@ -397,7 +397,7 @@ describe('Alerts API integration', () => {
   })
 
   it('rolls back the complete rule update when the second upsert fails', async () => {
-    const initialResponse = await request(getHttpServer())
+    const initialResponse = await request(baseUrl())
       .put('/api/v1/alerts/rules')
       .set(primaryUserHeaders)
       .send({ rules: allRules })
@@ -410,7 +410,7 @@ describe('Alerts API integration', () => {
       { ...allRules[1], threshold: 0.8 },
       { ...allRules[2], enabled: false },
     ]
-    const failedResponse = await request(getHttpServer())
+    const failedResponse = await request(baseUrl())
       .put('/api/v1/alerts/rules')
       .set(primaryUserHeaders)
       .send({ rules: replacementRules })
@@ -419,7 +419,7 @@ describe('Alerts API integration', () => {
     expect(prisma.$transaction).toHaveBeenCalledTimes(2)
     expect(prisma.transactionRuleUpsertCounts).toEqual([3, 2])
 
-    const settingsResponse = await request(getHttpServer())
+    const settingsResponse = await request(baseUrl())
       .get('/api/v1/alerts/preferences')
       .set(primaryUserHeaders)
     const settings = getAlertPreferencesResponseSchema.parse(settingsResponse.body)

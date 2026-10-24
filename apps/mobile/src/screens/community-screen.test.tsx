@@ -24,6 +24,10 @@ vi.mock('@/src/analytics/mobile-analytics', async () => {
     MobileAnalyticsDiagnosticsPanel: () => null,
   }
 })
+vi.mock('expo-web-browser', async () => {
+  const { webBrowser } = await import('../test-utils/community-screen/mock-state.js')
+  return webBrowser
+})
 vi.mock('expo-image-picker', async () => {
   const { imagePicker } = await import('../test-utils/community-screen/mock-state.js')
   return imagePicker
@@ -103,6 +107,7 @@ import { registerCommunityClientCases } from '../test-utils/community-screen/cli
 import { registerCommunitySpotlightCases } from '../test-utils/community-screen/spotlight.cases'
 import { registerCommunitySpotlightReviewCases } from '../test-utils/community-screen/spotlight-review.cases'
 import { registerCommunitySpotlightFocusCases } from '../test-utils/community-screen/spotlight-focus.cases'
+import { registerCommunitySponsoredCases } from '../test-utils/community-screen/sponsored.cases'
 import { refreshEvents } from '../test-utils/community-screen/mock-state'
 import { screenFocus } from '../test-utils/focus-effect'
 import { configure } from '@testing-library/react'
@@ -176,6 +181,7 @@ describe('Mobile community screen (Story 6.1)', () => {
   registerCommunitySpotlightCases()
   registerCommunitySpotlightReviewCases()
   registerCommunitySpotlightFocusCases()
+  registerCommunitySponsoredCases()
 })
 
 /**

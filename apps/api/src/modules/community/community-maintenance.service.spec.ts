@@ -17,6 +17,7 @@ describe('CommunityMaintenanceService', () => {
     const updateMany = vi.fn().mockResolvedValue({ count: 1 })
     const deleteMany = vi.fn()
     const jobFailureCreate = vi.fn().mockResolvedValue({ id: 'jf-1' })
+    const sponsorshipDeleteMany = vi.fn().mockResolvedValue({ count: 0 })
     const firstRows = async (): Promise<Record<string, unknown>[]> => {
       const result = findMany.mock.results[0]
       return result?.type === 'return' ? await result.value : []
@@ -27,6 +28,7 @@ describe('CommunityMaintenanceService', () => {
       $executeRaw: vi.fn().mockResolvedValue(1),
       $queryRaw: vi.fn().mockResolvedValue([]),
       lookbookPost: { findMany, findFirst, update, updateMany, deleteMany },
+      communityPostSponsorship: { deleteMany: sponsorshipDeleteMany },
       jobFailure: { create: jobFailureCreate },
     }
     const prisma = {
@@ -46,6 +48,7 @@ describe('CommunityMaintenanceService', () => {
       updateMany,
       deleteMany,
       jobFailureCreate,
+      sponsorshipDeleteMany,
     }
   }
 
@@ -177,11 +180,21 @@ describe('CommunityMaintenanceService', () => {
     })
 
     it('anonymizes the retained content fields and stamps each step separately', async () => {
-      const { service, findMany, update, updateMany } = createService()
+      const { service, findMany, update, updateMany, sponsorshipDeleteMany } =
+        createService()
       findMany.mockResolvedValueOnce([erasureRow()])
       updateMany.mockResolvedValueOnce({ count: 1 })
 
       await service.sweepErasureRequests(now)
+
+      // Story 6.7b: erasure removes the post's sponsorship links in the same
+      // transaction, before the row is anonymized.
+      expect(sponsorshipDeleteMany).toHaveBeenCalledWith({
+        where: { post_id: 'post-erase' },
+      })
+      expect(sponsorshipDeleteMany.mock.invocationCallOrder[0]!).toBeLessThan(
+        update.mock.invocationCallOrder[0]!
+      )
 
       expect(update).toHaveBeenCalledWith({
         where: { id: 'post-erase' },

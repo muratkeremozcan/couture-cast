@@ -32,6 +32,8 @@ import {
   choosePhoto,
   setupCommunityGridClock,
   setupCommunityGridSurface,
+  sponsoredFeedHandler,
+  sponsoredItem,
 } from '../../test-utils/community-lookbook-grid'
 
 vi.mock('posthog-js', () => ({
@@ -225,14 +227,19 @@ describe('CommunityLookbookGrid (Story 6.1)', () => {
   describe('surface details', () => {
     it('6.1-WEB-048 announces a sponsored look to a screen reader as well as showing it', async () => {
       signIn()
-      useMswHandlers(feedHandler({ items: [item(), item({ id: 'post-2' })] }))
-      renderGrid({ sponsoredPostIds: ['post-1'] })
+      useMswHandlers(
+        sponsoredFeedHandler({ items: [sponsoredItem(), item({ id: 'post-2' })] })
+      )
+      renderGrid()
 
       const badge = await screen.findByTestId('sponsored-badge-post-1')
-      expect(within(badge).getByText('Sponsored')).toHaveAttribute('aria-hidden', 'true')
-      expect(within(badge).getByText('Sponsored look')).toHaveClass('sr-only')
-      // The feed contract has no sponsorship field, so a card only claims a
-      // commercial relationship the caller stated.
+      expect(within(badge).getByText('Partnered')).toHaveAttribute('aria-hidden', 'true')
+      expect(within(badge).getByText('Partnered with Atelier North')).toHaveClass(
+        'sr-only'
+      )
+      // Story 6.7b: only the response's own sponsorship block makes a card claim
+      // a commercial relationship.
+      await screen.findByTestId('lookbook-card-post-2')
       expect(screen.queryByTestId('sponsored-badge-post-2')).not.toBeInTheDocument()
     })
 
@@ -462,8 +469,8 @@ describe('CommunityLookbookGrid (Story 6.1)', () => {
     it('6.1-WEB-052 has no axe violations in the loaded feed state', async () => {
       signIn()
       useMswHandlers(
-        feedHandler({
-          items: [item(), item({ id: 'post-2', caption: null, altText: null })],
+        sponsoredFeedHandler({
+          items: [item(), sponsoredItem({ id: 'post-2', caption: null, altText: null })],
           authorStates: [
             authorState({
               id: 'as-flagged',
@@ -475,9 +482,10 @@ describe('CommunityLookbookGrid (Story 6.1)', () => {
           nextCursor: cursorFor(),
         })
       )
-      const { container } = renderGrid({ sponsoredPostIds: ['post-2'] })
+      const { container } = renderGrid()
 
       await screen.findByTestId('lookbook-card-post-1')
+      await screen.findByTestId('sponsored-cta-post-2')
 
       const results = await axe.run(container, {
         runOnly: { type: 'tag', values: ['wcag2a', 'wcag2aa', 'wcag21a', 'wcag21aa'] },

@@ -14,9 +14,12 @@ import {
   COMMERCE_OFFER_INVALID_MESSAGE,
   COMMERCE_OFFER_NOT_FOUND_MESSAGE,
   COMMERCE_OPTED_OUT_MESSAGE,
+  COMMERCE_SPONSORSHIP_NOT_FOUND_MESSAGE,
   PALETTE_CONSENT_REQUIRED_MESSAGE,
+  isAffiliateCommunitySurface,
   scenarioNameSchema,
   type AffiliateClickRequest,
+  type AffiliateCommunitySurface,
 } from '../../contracts/http.js'
 import { createBaseLogger } from '../../logger/pino.config.js'
 import { FeatureFlagsService } from '../feature-flags/feature-flags.service.js'
@@ -31,7 +34,10 @@ import {
   CommerceRepository,
   type CommerceClickOffer,
   type CommerceClickRow,
+  type CommerceUserContext,
 } from './commerce.repository.js'
+import { COMMUNITY_SCENARIO } from './community-sponsorship.constants.js'
+import { CommunitySponsorshipService } from './community-sponsorship.service.js'
 
 export type RecordAffiliateClickInput = AffiliateClickRequest & {
   readonly userId: string
@@ -114,7 +120,9 @@ export class AffiliateClickService {
     @Inject(CommerceRepository)
     private readonly repository: CommerceRepository,
     @Inject(AffiliateClickTelemetry)
-    private readonly telemetry: AffiliateClickTelemetry
+    private readonly telemetry: AffiliateClickTelemetry,
+    @Inject(CommunitySponsorshipService)
+    private readonly sponsorships: CommunitySponsorshipService
   ) {}
 
   /**
@@ -164,6 +172,15 @@ export class AffiliateClickService {
       throw new ForbiddenException(COMMERCE_OPTED_OUT_MESSAGE)
     }
 
+    // Story 6.7b: a community surface is decided by the post's sponsorship
+    // link, re-checked here in full before the dedupe lookup and before the
+    // offer-row branch below. The surface only selects which rule applies;
+    // the rule itself reads server data, so a caller cannot reach a garment or
+    // advisor offer through it.
+    if (isAffiliateCommunitySurface(input.surface)) {
+      return this.recordCommunityClick(input, input.surface, userContext)
+    }
+
     /**
      * The offer is re-checked for status and window; the outfit is deliberately
      * NOT re-derived. The recommendation the CTA was rendered on may be minutes
@@ -211,48 +228,20 @@ export class AffiliateClickService {
         scenario === null ? UNRESOLVED_RECOMMENDATION_ID : input.recommendationId
     }
 
-    const existing = await this.repository.findRecentClick(
-      input.userId,
-      input.offerId,
-      recommendationId
-    )
-    if (existing) {
-      // A deduped replay emits no second analytics event, by design: two taps
-      // inside a minute are one intent, and double-counting them would inflate
-      // the PRD's click-through metric.
-      return {
-        redirectUrl: this.resolveRedirectUrl(offer, existing.token),
-        created: false,
-      }
-    }
-
     const localeRegion = resolveLocaleRegion({
       savedLocale: userContext.locale,
       acceptLanguage: input.acceptLanguage,
     })
-    const clickId = randomUUID()
-    const token = mintClickToken(clickId, this.getClickTokenSecret())
-    // Built and validated BEFORE the insert. An offer whose resolved URL fails
-    // validation must create no click row at all, so the check cannot come after
-    // the write.
-    const redirectUrl = this.resolveRedirectUrl(offer, token)
-
-    const click = await this.insertClick({
-      id: clickId,
-      token,
+    const minted = await this.mintOrReplay({
       userId: input.userId,
-      offerId: offer.offer_id,
-      partnerId: offer.partner_id,
+      offer,
       recommendationId,
       scenario: scenario ?? UNRESOLVED_SCENARIO,
       surface: input.surface,
       localeRegion,
     })
-
-    if (click.id !== clickId) {
-      // The unique dedupe index rejected this insert and the winner's row was
-      // re-read. That is a deduped replay, not a fresh mint.
-      return { redirectUrl: this.resolveRedirectUrl(offer, click.token), created: false }
+    if (!minted.created) {
+      return minted
     }
 
     // After the row commits, and fail-open: a degraded PostHog must never drop a
@@ -287,6 +276,120 @@ export class AffiliateClickService {
           { recommendationId: input.recommendationId },
           'affiliate_cta_clicked_scenario_unresolved'
         )
+      }
+    }
+
+    return minted
+  }
+
+  /**
+   * Story 6.7b: a click from a community card, the City Spotlight or the Home
+   * teaser. `recommendationId` is the post id. The full eligibility rule runs
+   * first (link, window, offer, partner, region, public post), so a link that
+   * ended between the read and the tap, or a replay inside 60 seconds after it
+   * ended, is a 404 with no redirect and no row. The stored row carries the
+   * post id and `scenario = 'community'`; the event carries neither.
+   */
+  private async recordCommunityClick(
+    input: RecordAffiliateClickInput,
+    surface: AffiliateCommunitySurface,
+    userContext: CommerceUserContext
+  ): Promise<RecordAffiliateClickResult> {
+    const clickable = await this.sponsorships.isClickable({
+      postId: input.recommendationId,
+      offerId: input.offerId,
+      locale: userContext.locale,
+      acceptLanguage: input.acceptLanguage,
+    })
+    if (!clickable) {
+      throw new NotFoundException(COMMERCE_SPONSORSHIP_NOT_FOUND_MESSAGE)
+    }
+
+    // The eligibility query already proved the offer active, in window and a
+    // garment offer; this read fetches what building the URL needs.
+    const offer = await this.repository.findActiveClickOffer(input.offerId)
+    if (!offer || offer.advisor_slot !== null) {
+      throw new NotFoundException(COMMERCE_SPONSORSHIP_NOT_FOUND_MESSAGE)
+    }
+
+    const localeRegion = resolveLocaleRegion({
+      savedLocale: userContext.locale,
+      acceptLanguage: input.acceptLanguage,
+    })
+    const minted = await this.mintOrReplay({
+      userId: input.userId,
+      offer,
+      recommendationId: input.recommendationId,
+      scenario: COMMUNITY_SCENARIO,
+      surface,
+      localeRegion,
+    })
+
+    // After the row commits, and fail-open, exactly like the hero event.
+    if (minted.created) {
+      await this.telemetry.recordCtaClicked({
+        userId: input.userId,
+        partnerId: offer.partner_slug,
+        offerId: offer.offer_id,
+        surface,
+        localeRegion,
+      })
+    }
+
+    return minted
+  }
+
+  /**
+   * The 60-second dedupe, then a fresh mint. A deduped replay emits no second
+   * analytics event, by design: two taps inside a minute are one intent, and
+   * double-counting them would inflate the PRD's click-through metric. Callers
+   * emit on `created` only.
+   */
+  private async mintOrReplay(input: {
+    readonly userId: string
+    readonly offer: CommerceClickOffer
+    readonly recommendationId: string
+    readonly scenario: string
+    readonly surface: string
+    readonly localeRegion: string
+  }): Promise<RecordAffiliateClickResult> {
+    const existing = await this.repository.findRecentClick(
+      input.userId,
+      input.offer.offer_id,
+      input.recommendationId
+    )
+    if (existing) {
+      return {
+        redirectUrl: this.resolveRedirectUrl(input.offer, existing.token),
+        created: false,
+      }
+    }
+
+    const clickId = randomUUID()
+    const token = mintClickToken(clickId, this.getClickTokenSecret())
+    // Built and validated BEFORE the insert. An offer whose resolved URL fails
+    // validation must create no click row at all, so the check cannot come after
+    // the write.
+    const redirectUrl = this.resolveRedirectUrl(input.offer, token)
+
+    const click = await this.insertClick({
+      id: clickId,
+      token,
+      userId: input.userId,
+      offerId: input.offer.offer_id,
+      partnerId: input.offer.partner_id,
+      recommendationId: input.recommendationId,
+      scenario: input.scenario,
+      surface: input.surface,
+      localeRegion: input.localeRegion,
+    })
+
+    if (click.id !== clickId) {
+      // The unique dedupe index rejected this insert and the winner's row was
+      // re-read. That is a deduped replay, not a fresh mint.
+      return {
+        redirectUrl: this.resolveRedirectUrl(input.offer, click.token),
+        created: false,
       }
     }
 

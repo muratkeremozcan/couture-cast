@@ -124,6 +124,12 @@ export {
   affiliateSurfaceSchema,
   affiliateConversionStatusSchema,
   shopThisLookSchema,
+  // Story 6.7b community sponsorships.
+  communitySponsorshipSchema,
+  isAffiliateCommunitySurface,
+  COMMERCE_SPONSORSHIP_NOT_FOUND_MESSAGE,
+  type CommunitySponsorship,
+  type AffiliateCommunitySurface,
   commercePreferenceSchema,
   commercePreferenceResponseSchema,
   updateCommercePreferenceInputSchema,

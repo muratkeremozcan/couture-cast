@@ -21,8 +21,15 @@ import {
   communityRetryAfterSeconds,
   getCommunitySpotlightFromWeb,
   openCommunitySpotlightPostFromWeb,
+  sponsorshipOf,
 } from '../../lib/community'
+import { getI18n } from '../../i18n'
 import { spotlightCardElementId } from './community-spotlight'
+import {
+  CommunitySponsoredCta,
+  useSponsoredShownRegistry,
+  type SponsoredShownRegistry,
+} from './community-sponsored-cta'
 import type { SpotlightFocusIntent } from './community-lookbook-grid'
 
 type Translate = (key: string, options?: Record<string, unknown>) => string
@@ -70,6 +77,8 @@ function usePageVisible(): boolean {
 export interface HomeSpotlightTeaserLifecycle {
   value: SpotlightTeaserValue | null
   removeValue: () => void
+  /** Story 6.7b: shown blocks for this Home visit, kept across the teaser's unmount. */
+  sponsoredShown: SponsoredShownRegistry
 }
 
 /**
@@ -98,6 +107,7 @@ export function useHomeSpotlightTeaser({
       })
   )
   const value = useSyncExternalStore(state.subscribe, state.getSnapshot, () => null)
+  const sponsoredShown = useSponsoredShownRegistry()
   const member = useCommunityMember()
   const visible = usePageVisible()
 
@@ -117,7 +127,7 @@ export function useHomeSpotlightTeaser({
     [state]
   )
 
-  return { value, removeValue: state.removeValue }
+  return { value, removeValue: state.removeValue, sponsoredShown }
 }
 
 export interface HomeSpotlightTeaserLink extends HomeSpotlightTeaserLifecycle {
@@ -168,6 +178,7 @@ export function teaserAuthorName(value: SpotlightTeaserValue, t: Translate): str
 export interface HomeSpotlightTeaserProps {
   value: SpotlightTeaserValue
   t: Translate
+  sponsoredShown: SponsoredShownRegistry
   onOpen: () => void
   onImageError: () => void
   /** Called when the teaser leaves while its link holds focus. */
@@ -177,79 +188,137 @@ export interface HomeSpotlightTeaserProps {
 export function HomeSpotlightTeaser({
   value,
   t,
+  sponsoredShown,
   onOpen,
   onImageError,
   onLeaveWhileFocused,
 }: HomeSpotlightTeaserProps) {
-  const linkRef = useRef<HTMLAnchorElement>(null)
+  const rootRef = useRef<HTMLDivElement>(null)
   const leaveRef = useRef(onLeaveWhileFocused)
   leaveRef.current = onLeaveWhileFocused
   const { item, label } = value
   const count = item.reactions?.total ?? 0
   const author = teaserAuthorName(value, t)
+  // Story 6.7b: the block exactly as the live teaser read returned it.
+  const sponsorship = sponsorshipOf(item)
+  const [announcement, setAnnouncement] = useState<{ key: string; id: number } | null>(
+    null
+  )
+  const announcementIdRef = useRef(0)
 
-  // Layout cleanup runs before React removes the link, so focus is still on it.
+  // Layout cleanup runs before React removes the teaser, so focus is still on
+  // its link or its CTA.
   useLayoutEffect(() => {
-    const link = linkRef.current
+    const root = rootRef.current
     return () => {
-      if (link && link === document.activeElement) leaveRef.current()
+      if (root?.contains(document.activeElement)) leaveRef.current()
     }
   }, [])
 
   return (
-    <a
-      ref={linkRef}
-      href={`#${spotlightCardElementId(item.id)}`}
-      data-testid="home-spotlight-teaser-link"
-      onClick={(event) => {
-        event.preventDefault()
-        onOpen()
-      }}
-      className="group flex min-h-[44px] items-center gap-4 rounded-[8px] border border-[#E6E6ED] bg-[#FFFFFF] p-4 text-left motion-safe:transition-colors motion-safe:duration-300 hover:border-[#C9A14A] focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[#C9A14A] motion-reduce:transition-none"
+    <div
+      ref={rootRef}
+      data-testid="home-spotlight-teaser"
+      className="flex flex-col gap-3"
     >
-      <Image
-        data-testid="home-spotlight-teaser-image"
-        src={item.imageAccess.url}
-        alt=""
-        aria-hidden="true"
-        width={72}
-        height={72}
-        // Signed, short-lived URLs, like the community cards.
-        unoptimized
-        onError={onImageError}
-        className="h-[72px] w-[72px] shrink-0 rounded-[6px] bg-[#E6E6ED] object-cover"
-      />
-      {/*
+      <a
+        href={`#${spotlightCardElementId(item.id)}`}
+        data-testid="home-spotlight-teaser-link"
+        onClick={(event) => {
+          event.preventDefault()
+          onOpen()
+        }}
+        className="group flex min-h-[44px] items-center gap-4 rounded-[8px] border border-[#E6E6ED] bg-[#FFFFFF] p-4 text-left motion-safe:transition-colors motion-safe:duration-300 hover:border-[#C9A14A] focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[#C9A14A] motion-reduce:transition-none"
+      >
+        <Image
+          data-testid="home-spotlight-teaser-image"
+          src={item.imageAccess.url}
+          alt=""
+          aria-hidden="true"
+          width={72}
+          height={72}
+          // Signed, short-lived URLs, like the community cards.
+          unoptimized
+          onError={onImageError}
+          className="h-[72px] w-[72px] shrink-0 rounded-[6px] bg-[#E6E6ED] object-cover"
+        />
+        {/*
         The name comes from content, so it always contains what the link says.
         The visual lines repeat it in short form and stay out of the tree.
       */}
-      <span className="sr-only">
-        {t('home.spotlightTeaser.linkLabel', { label, author, count })}
-      </span>
-      <span aria-hidden="true" className="flex min-w-0 flex-col gap-0.5">
-        <span
-          data-testid="home-spotlight-teaser-heading"
-          className="lookbook-display text-base font-semibold text-[#111111]"
+        <span className="sr-only">
+          {t('home.spotlightTeaser.linkLabel', { label, author, count })}
+          {sponsorship
+            ? ` ${t('community.card.sponsoredAnnounce', {
+                partner: sponsorship.partnerDisplayName,
+              })}`
+            : null}
+        </span>
+        <span aria-hidden="true" className="flex min-w-0 flex-col gap-0.5">
+          <span
+            data-testid="home-spotlight-teaser-heading"
+            className="lookbook-display text-base font-semibold text-[#111111]"
+          >
+            {t('home.spotlightTeaser.heading', { label })}
+          </span>
+          <span
+            data-testid="home-spotlight-teaser-author"
+            className="truncate text-xs text-[#36363D]"
+          >
+            {author}
+          </span>
+          {sponsorship && (
+            <span
+              data-testid="home-spotlight-teaser-sponsored"
+              className="lookbook-metrics self-start rounded-md border border-[#C9A14A] px-2 py-0.5 text-[9px] font-semibold uppercase text-[#111111]"
+            >
+              {t('community.card.sponsored')}
+            </span>
+          )}
+          <span
+            data-testid="home-spotlight-teaser-reactions"
+            className="lookbook-metrics text-xs text-[#5C5C66]"
+          >
+            {t('home.spotlightTeaser.reactions', { count })}
+          </span>
+          <span className="mt-1 text-xs font-semibold text-[#8A691F] group-hover:underline">
+            {t('home.spotlightTeaser.cta')}
+          </span>
+        </span>
+      </a>
+      {/*
+        Story 6.7b: a sibling of the link, so activating the CTA leaves focus
+        here and records no spotlight open.
+      */}
+      {sponsorship && (
+        // Inset by the link's own padding, so the CTA lines up with its image.
+        <div className="px-4">
+          <CommunitySponsoredCta
+            postId={item.id}
+            sponsorship={sponsorship}
+            surface="home_teaser"
+            scope="home-spotlight-teaser-"
+            language={getI18n().language}
+            t={t}
+            shown={sponsoredShown}
+            announce={(key) => {
+              announcementIdRef.current += 1
+              setAnnouncement({ key, id: announcementIdRef.current })
+            }}
+          />
+        </div>
+      )}
+      {sponsorship && (
+        <div
+          role="status"
+          aria-live="polite"
+          className="sr-only"
+          data-testid="home-spotlight-teaser-cta-live"
         >
-          {t('home.spotlightTeaser.heading', { label })}
-        </span>
-        <span
-          data-testid="home-spotlight-teaser-author"
-          className="truncate text-xs text-[#36363D]"
-        >
-          {author}
-        </span>
-        <span
-          data-testid="home-spotlight-teaser-reactions"
-          className="lookbook-metrics text-xs text-[#5C5C66]"
-        >
-          {t('home.spotlightTeaser.reactions', { count })}
-        </span>
-        <span className="mt-1 text-xs font-semibold text-[#8A691F] group-hover:underline">
-          {t('home.spotlightTeaser.cta')}
-        </span>
-      </span>
-    </a>
+          <span key={announcement?.id}>{announcement ? t(announcement.key) : null}</span>
+        </div>
+      )}
+    </div>
   )
 }
 
@@ -273,6 +342,7 @@ export function HomeSpotlightTeaserSlot({
     <HomeSpotlightTeaser
       value={teaser.value}
       t={t}
+      sponsoredShown={teaser.sponsoredShown}
       onOpen={teaser.open}
       onImageError={teaser.removeValue}
       onLeaveWhileFocused={onLeaveWhileFocused}

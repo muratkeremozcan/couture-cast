@@ -159,6 +159,41 @@ Local E2E with clean DB:
 4. Run tests: `npm run test:pw-local`.
 5. Schema changes: use Prisma (`db:migrate`/`db:seed`), then `supabase db push --local` to sync into the local Supabase DB. Push to the Preview cloud project later via `supabase db push`.
 
+### Community sponsorships (operator command)
+
+Story 6.7b links a community post to a garment affiliate offer so the post shows a disclosed
+"Partnered" CTA. Only the owner creates or ends a link, through an audited command with no HTTP
+route. Each run writes the link change and one `AuditLog` row in a single transaction.
+
+```bash
+# Link (add --dry-run first to print the plan and write nothing)
+npm run community:sponsorship -- link --env-file .env.local \
+  --actor-email owner@example.com --post <postId> --offer <offerId> \
+  --reason owner_pick --author-agreement agr_01JB8Z2Q4M5N6P7R8S9T0V1W2X \
+  [--starts-at 2026-11-01T09:00:00Z] [--ends-at 2026-12-01T00:00:00Z]
+
+# End the post's open link
+npm run community:sponsorship -- end --env-file .env.local \
+  --actor-email owner@example.com --post <postId> --reason campaign_ended
+```
+
+- `--env-file` is required and is the only source of `DATABASE_URL`. A loopback host
+  (`localhost`, `127.0.0.1`, `::1`) runs as is. Any other host also needs
+  `--confirm-target <project ref>` matching the ref in the URL (`postgres.<ref>` pooler user or
+  `db.<ref>.supabase.co` host); a remote URL without a parseable ref is refused. Develop and test
+  against a local database only.
+- `--actor-email` must be a Supabase auth user whose `app_metadata.app_role` is `admin` and whose
+  app `User` (via `app_metadata.app_user_id`, else the email) has the same email.
+- Reasons are closed codes. Link: `partner_campaign`, `owner_pick`. End: `campaign_ended`,
+  `author_withdrew`, `partner_inactive`, `correction`.
+- `--author-agreement` is the id of the owner's off-system author agreement record: `agr_` plus a
+  ULID. A lowercase ULID is uppercased before the check. Mint a new id with:
+  `node -e "const a='0123456789ABCDEFGHJKMNPQRSTVWXYZ';let t=Date.now(),s='';for(let i=0;i<10;i++){s=a[t%32]+s;t=Math.floor(t/32)}const r=require('crypto').randomBytes(16);for(let i=0;i<16;i++)s+=a[r[i]%32];console.log('agr_'+s)"`
+- Times are ISO 8601 with `Z` or an offset. `--starts-at` defaults to the database clock and
+  `--ends-at` to open-ended; an end at or before the start, or already in the past, is refused.
+- The command also refuses a post that is not publicly visible, a post whose author has not reached
+  the age of majority, an advisor offer, and a second link while one is open on the post.
+
 ## E2E smoke (Playwright + Maestro)
 
 **One-time setup:** https://github.com/murat/opensource/couture-cast/blob/main/_bmad-output/implementation-artifacts/0-13-scaffold-cross-surface-e2e-automation.md#maestro-setup--operational-notes

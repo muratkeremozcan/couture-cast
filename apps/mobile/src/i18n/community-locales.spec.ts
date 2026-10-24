@@ -239,8 +239,17 @@ describe('6.1 community locale parity', () => {
    * documented exception rather than a gap: an unexplained absence would look
    * like a missed translation, and adding unused strings to mobile's catalogs to
    * satisfy the comparison would be worse than the asymmetry it papers over.
+   *
+   * Story 6.7b: `card.shopOpensInBrowser` is web's "opens in a new tab" hint for
+   * the sponsored CTA. Mobile opens the partner in an in-app browser and reuses
+   * `commerce.shopThisLook.opensInBrowser`, which already says exactly that.
    */
-  const WEB_ONLY_KEYS = ['card.detailClose', 'card.open', 'card.openLabel']
+  const WEB_ONLY_KEYS = [
+    'card.detailClose',
+    'card.open',
+    'card.openLabel',
+    'card.shopOpensInBrowser',
+  ]
 
   it('6.2-I18N-MOB-11 explains every moderation reason category in every locale', () => {
     const expected = [...communityModerationReasonCategorySchema.options].sort()

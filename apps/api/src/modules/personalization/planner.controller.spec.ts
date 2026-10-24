@@ -15,6 +15,7 @@ import {
 import { Test, type TestingModule } from '@nestjs/testing'
 import request from 'supertest'
 import { afterEach, describe, expect, it, vi } from 'vitest'
+import { listenHttpApp, httpTestUrl } from '../../testing/loopback-http-app.js'
 import { RequestAuthGuard } from '../auth/security.guards.js'
 import type { AuthenticatedRequest } from '../auth/security.types.js'
 import { PremiumEntitlementGuard } from '../commerce/premium-entitlement.guard.js'
@@ -121,7 +122,7 @@ describe('PlannerController', () => {
       .compile()
 
     app = moduleFixture.createNestApplication()
-    await app.init()
+    await listenHttpApp(app)
   }
 
   afterEach(async () => {
@@ -131,11 +132,11 @@ describe('PlannerController', () => {
     }
   })
 
-  const server = (): Parameters<typeof request>[0] => {
+  const server = (): string => {
     if (!app) {
       throw new Error('App is not initialized')
     }
-    return app.getHttpServer() as Parameters<typeof request>[0]
+    return httpTestUrl(app)
   }
 
   const authedGet = (query: Record<string, string> = {}, platform = 'web') =>

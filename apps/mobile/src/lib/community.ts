@@ -28,13 +28,13 @@ import {
 // shape for `expo-web-browser`.
 import {
   allocateCommunityPostResponseSchema,
-  communityReactionFeedResponseSchema,
-  communityReactionSpotlightResponseSchema,
-  type CommunityReactionSpotlight,
+  communitySponsoredFeedResponseSchema,
+  communitySponsoredPostResponseSchema,
+  communitySponsoredSpotlightResponseSchema,
+  type CommunitySponsoredSpotlight,
   type CommunityServedSpotlightLevel,
   type CommunitySpotlightOpenSurface,
   type CommunitySpotlightSurface,
-  communityReactionPostResponseSchema,
   communityReactionResponseSchema,
   communityReactionConflictResponseSchema,
   type SetCommunityReactionInput,
@@ -53,8 +53,8 @@ import {
   COMMUNITY_COMMENT_SELF_REPORT_MESSAGE,
   COMMUNITY_COMMENT_REPORT_REASON_CHANGED_MESSAGE,
   type CommunityExperimentVariant,
-  type CommunityReactionFeed as CommunityFeed,
-  type CommunityReactionFeedItem as CommunityFeedItem,
+  type CommunitySponsoredFeed as CommunityFeed,
+  type CommunitySponsoredFeedItem as CommunityFeedItem,
   type CommunityFeedMode,
   type CommunityReportReason,
   type CreateCommunityCommentInput,
@@ -241,6 +241,13 @@ export interface CommunityFeedRequest {
   signal?: AbortSignal
 }
 
+/**
+ * Story 6.7b: the feed, single-post and spotlight reads all opt into the
+ * per-viewer sponsorship block with `x-couture-sponsorship: 1`. An item carries
+ * it only while its link is eligible for this viewer. No mobile code stores a
+ * community payload, and `resolveRenderableCommunitySponsorship` renders a block
+ * only from a live read, never from a cache-served one.
+ */
 export async function getCommunityFeedFromMobile({
   mode,
   cursor,
@@ -254,13 +261,20 @@ export async function getCommunityFeedFromMobile({
       () =>
         withRequestTimeout(signal, (requestSignal) =>
           communityClient(accessToken).apiV1CommunityFeedGet(
-            { xCouturePlatform: 'mobile', xCoutureReactions: '1', mode, cursor, limit },
+            {
+              xCouturePlatform: 'mobile',
+              xCoutureReactions: '1',
+              xCoutureSponsorship: '1',
+              mode,
+              cursor,
+              limit,
+            },
             { signal: requestSignal }
           )
         ),
       signal
     )
-    return communityReactionFeedResponseSchema.parse(response).data
+    return communitySponsoredFeedResponseSchema.parse(response).data
   } catch (error: unknown) {
     throw await communityError(error, 'Unable to load the community feed.')
   }
@@ -284,7 +298,7 @@ export async function getCommunitySpotlightFromMobile({
   limit,
   surface,
   signal,
-}: CommunitySpotlightRequest = {}): Promise<CommunityReactionSpotlight> {
+}: CommunitySpotlightRequest = {}): Promise<CommunitySponsoredSpotlight> {
   const accessToken = await readAccessToken()
   const attempt = () =>
     withRequestTimeout(signal, (requestSignal) =>
@@ -292,6 +306,7 @@ export async function getCommunitySpotlightFromMobile({
         {
           xCouturePlatform: 'mobile',
           xCoutureReactions: '1',
+          xCoutureSponsorship: '1',
           cursor,
           limit,
           ...(surface ? { surface } : {}),
@@ -307,7 +322,7 @@ export async function getCommunitySpotlightFromMobile({
       surface === 'home_teaser'
         ? await attempt()
         : await retryOnceWhenCommunityUnavailable(attempt, signal)
-    return communityReactionSpotlightResponseSchema.parse(response).data
+    return communitySponsoredSpotlightResponseSchema.parse(response).data
   } catch (error: unknown) {
     throw await communityError(error, 'Unable to load the City Spotlight.')
   }
@@ -326,12 +341,17 @@ export async function getCommunityPostFromMobile(
       signal,
       (requestSignal) =>
         communityClient(accessToken).apiV1CommunityPostsPostIdGet(
-          { postId, xCouturePlatform: 'mobile', xCoutureReactions: '1' },
+          {
+            postId,
+            xCouturePlatform: 'mobile',
+            xCoutureReactions: '1',
+            xCoutureSponsorship: '1',
+          },
           { signal: requestSignal }
         ),
       timeoutMs
     )
-    return communityReactionPostResponseSchema.parse(response).data
+    return communitySponsoredPostResponseSchema.parse(response).data
   } catch (error: unknown) {
     throw await communityError(error, 'Unable to load this community post.')
   }

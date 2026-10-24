@@ -5,6 +5,7 @@ import { type INestApplication } from '@nestjs/common'
 import { Test, type TestingModule } from '@nestjs/testing'
 import request from 'supertest'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
+import { listenHttpApp, httpTestUrl } from '../../testing/loopback-http-app.js'
 import {
   getAlertPreferencesResponseSchema,
   updateAlertRulesResponseSchema,
@@ -45,12 +46,12 @@ describe('AlertsController', () => {
     updateRules: vi.fn().mockResolvedValue(rules),
   }
 
-  const getHttpServer = (): Parameters<typeof request>[0] => {
+  const baseUrl = (): string => {
     if (!app) {
       throw new Error('App is not initialized')
     }
 
-    return app.getHttpServer() as Parameters<typeof request>[0]
+    return httpTestUrl(app)
   }
 
   beforeEach(async () => {
@@ -85,7 +86,7 @@ describe('AlertsController', () => {
       .compile()
 
     app = moduleFixture.createNestApplication()
-    await app.init()
+    await listenHttpApp(app)
   })
 
   afterEach(async () => {
@@ -101,12 +102,12 @@ describe('AlertsController', () => {
   })
 
   it('requires auth and returns settings for the authenticated user', async () => {
-    const unauthorizedResponse = await request(getHttpServer()).get(
+    const unauthorizedResponse = await request(baseUrl()).get(
       '/api/v1/alerts/preferences'
     )
     expect(unauthorizedResponse.status).toBe(401)
 
-    const response = await request(getHttpServer())
+    const response = await request(baseUrl())
       .get('/api/v1/alerts/preferences')
       .set(authHeaders)
 
@@ -118,7 +119,7 @@ describe('AlertsController', () => {
   })
 
   it('upserts rules for the authenticated user and rejects client ownership', async () => {
-    const rejectedResponse = await request(getHttpServer())
+    const rejectedResponse = await request(baseUrl())
       .put('/api/v1/alerts/rules')
       .set(authHeaders)
       .send({ userId: 'other-user', rules })
@@ -126,7 +127,7 @@ describe('AlertsController', () => {
     expect(rejectedResponse.status).toBe(400)
     expect(service.updateRules).not.toHaveBeenCalled()
 
-    const response = await request(getHttpServer())
+    const response = await request(baseUrl())
       .put('/api/v1/alerts/rules')
       .set({
         ...authHeaders,
@@ -147,7 +148,7 @@ describe('AlertsController', () => {
       { ...preferences, quietHoursStart: '7:00' },
       { ...preferences, timezone: 'Not/A_Timezone' },
     ]) {
-      const invalidResponse = await request(getHttpServer())
+      const invalidResponse = await request(baseUrl())
         .put('/api/v1/alerts/preferences')
         .set(authHeaders)
         .send(invalidInput)
@@ -157,7 +158,7 @@ describe('AlertsController', () => {
 
     expect(service.updateNotificationPreferences).not.toHaveBeenCalled()
 
-    const response = await request(getHttpServer())
+    const response = await request(baseUrl())
       .put('/api/v1/alerts/preferences')
       .set(authHeaders)
       .send(preferences)

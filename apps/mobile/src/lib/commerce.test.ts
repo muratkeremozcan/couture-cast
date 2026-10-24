@@ -17,6 +17,7 @@ import {
   mintAffiliateClickFromMobile,
   openAffiliatePartnerSite,
   resolveAffiliateLocaleRegion,
+  resolveRenderableCommunitySponsorship,
   resolveRenderableShopThisLook,
   updateCommercePreferenceFromMobile,
 } from './commerce'
@@ -98,6 +99,39 @@ describe('mobile commerce boundary', () => {
     it('returns null when the server marked the card ineligible', () => {
       expect(
         resolveRenderableShopThisLook({ ...baseOutfit, shopThisLook: null }, false)
+      ).toBeNull()
+    })
+  })
+
+  describe('community sponsorship (Story 6.7b)', () => {
+    const sponsorship = {
+      partnerId: 'atelier-north',
+      partnerDisplayName: 'Atelier North',
+      offerId: 'offer-coat',
+      offerTitle: 'Wool overcoat',
+    }
+
+    it('6.7b-MOB-040 renders a block only from a live payload', () => {
+      expect(
+        resolveRenderableCommunitySponsorship({ id: 'post-a', sponsorship })
+      ).toEqual(sponsorship)
+      expect(
+        resolveRenderableCommunitySponsorship({ id: 'post-a', sponsorship }, true)
+      ).toBeNull()
+      expect(resolveRenderableCommunitySponsorship({ id: 'post-a' })).toBeNull()
+      expect(resolveRenderableCommunitySponsorship(null)).toBeNull()
+    })
+
+    it('6.7b-MOB-041 renders nothing for a block that fails the strict contract', () => {
+      expect(
+        resolveRenderableCommunitySponsorship({
+          sponsorship: { ...sponsorship, url: 'https://partner.example/coat' },
+        })
+      ).toBeNull()
+      expect(
+        resolveRenderableCommunitySponsorship({
+          sponsorship: { ...sponsorship, partnerDisplayName: '' },
+        })
       ).toBeNull()
     })
   })

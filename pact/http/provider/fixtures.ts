@@ -62,6 +62,15 @@ export const PACT_COMMERCE_OFFER_TITLE = 'Everyday Layering Tee'
 export const PACT_COMMERCE_REDIRECT_URL =
   'https://partner.couturecast.test/shop?cc=pact-click-token'
 /**
+ * Story 6.7b sponsored community highlights. The one post the sponsorship
+ * seam links to the commerce offer above, in the one region the pact viewer's
+ * saved `en-US` locale resolves to. Mirrors `PUBLISHED_POST_ID` in
+ * `pact/http/consumer/interactions/community/fixtures.ts`.
+ */
+export const PACT_COMMUNITY_SPONSORED_POST_ID = 'post-6100-published-0001'
+export const PACT_COMMUNITY_SPONSORSHIP_REGION = 'US'
+export const PACT_COMMUNITY_VIEWER_LOCALE = 'en-US'
+/**
  * Story 5.2 premium subscription. Mirrors the identifiers the consumer pins in
  * `pact/http/consumer/api-contract-interactions.ts`; both sides must agree or
  * the `string()` matchers fail verification. Hosts are RFC-2606 `.test`,
