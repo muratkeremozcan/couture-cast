@@ -577,6 +577,28 @@ playwright/tests/community-comments.spec.ts --repeat-each=3`, went out without t
     location capture red; off: none and green). `community-feed.yaml`'s second tab tap, after a
     relaunch, now retries and waits like the first.
 
+- 2026-10-24, round 9 (`reviews/code-triage-1.md`, R39 to R42).
+  - R39: `garment_image_signing_failed` logged the object path, which carries the owner's id;
+    it now logs the garment id and the error's class, and the unit case asserts exactly those
+    fields.
+  - R40: the storage adapter logged Supabase's message verbatim, which can echo the object
+    key. It now logs the operation, the error name, the numeric status and a reason from a
+    fixed list (`object_missing`, `bucket_missing`, `unauthorized`, `too_large`,
+    `server_error`, `no_client`, `other`); a test with an echoing message asserts the fields and
+    that the owner's id never reaches the log.
+  - R41: the pool-wait case slept 50 ms and never checked that the gate waited. The holder now
+    signals from its transaction callback, which runs on the pool's only connection, and the
+    case asserts the read was authorized no earlier than the release.
+  - R42: the feed tests read a look they own, published by a fresh author just before the test
+    reads the feed, so it is among the newest and on the first page; E2E-07's report lands on
+    it instead of piling up on a seeded look. E2E-001 also inserted buffered looks only once,
+    while a look another spec published could raise the banner first; it keeps the first
+    insert on the keyboard and inserts again until its own card is in.
+  - Shared integration database: other community integration specs still share it and leave
+    small public resync batches when they delete published posts (77 rows in one local run),
+    which the appender drains within about a second; CI runs integration and Playwright in
+    separate jobs on separate databases, and the local gates run Playwright first.
+
 ## Spec Change Log
 
 - 2026-10-23, iteration 5 (rereview 3): read floor, last-attempt time and `Retry-After` are
