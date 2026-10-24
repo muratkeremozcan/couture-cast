@@ -1043,8 +1043,9 @@ function zonedWallClock(isoTimestamp: string, timeZone: string): ZonedWallClock 
       second: '2-digit',
       hourCycle: 'h23',
     }).formatToParts(new Date(isoTimestamp))
-    const read = (type: Intl.DateTimeFormatPartTypes): string =>
-      parts.find((part) => part.type === type)?.value ?? ''
+    // formatToParts yields every requested part for a valid zone and timestamp.
+    const value = Object.fromEntries(parts.map((part) => [part.type, part.value]))
+    const read = (type: Intl.DateTimeFormatPartTypes): string => value[type]!
     return {
       weekday: read('weekday'),
       year: Number(read('year')),

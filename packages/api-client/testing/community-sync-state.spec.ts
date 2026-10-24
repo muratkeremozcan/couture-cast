@@ -799,6 +799,18 @@ describe('Story 6.5 reconciliation ownership', () => {
   })
 })
 
+describe('target validation of an unavailable target', () => {
+  it('applies an unavailable target as the server reported it', async () => {
+    const { client, callbacks, state } = setup()
+    const unavailable = { key: 'post', status: 'unavailable' } as Awaited<
+      ReturnType<CommunitySyncClient['resolve']>
+    >['targets'][number]
+    client.resolve.mockResolvedValue({ targets: [unavailable] })
+    await state.catchUp()
+    expect(callbacks.apply).toHaveBeenCalledExactlyOnceWith(unavailable)
+  })
+})
+
 describe('target validation after a stop', () => {
   it('applies nothing from a response that settled just before the stop', async () => {
     const { client, callbacks, state } = setup()

@@ -282,7 +282,8 @@ export class CommunitySyncState {
   ): Promise<T> {
     const controller = new AbortController()
     this.pending.add(controller)
-    let timer: ReturnType<typeof setTimeout> | undefined
+    // The executor runs synchronously, so the deadline timer always exists below.
+    let timer!: ReturnType<typeof setTimeout>
     const aborted = new Promise<never>((_, reject) => {
       controller.signal.addEventListener(
         'abort',
@@ -294,7 +295,7 @@ export class CommunitySyncState {
     try {
       return await Promise.race([work(controller.signal), aborted])
     } finally {
-      if (timer) clearTimeout(timer)
+      clearTimeout(timer)
       this.pending.delete(controller)
     }
   }
