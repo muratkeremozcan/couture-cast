@@ -1,5 +1,5 @@
 import { localPlaywrightDatabaseUrl } from './user-test-data'
-import { randomUUID, createHash } from 'node:crypto'
+import { randomUUID } from 'node:crypto'
 import { PrismaClient } from '@prisma/client'
 import {
   type APIRequestContext,
@@ -35,15 +35,7 @@ import { log } from '@seontechnologies/playwright-utils/log'
 import { buildUniqueId } from './api-test'
 import { WEB_ACCESS_TOKEN_STORAGE_KEY } from './commerce-session'
 import { localE2EAccessToken as engagementToken } from './local-e2e-token'
-import { acquireExclusiveLock } from './exclusive-lock'
-import os from 'node:os'
-import path from 'node:path'
-
-/** One lock per checkout, so separate checkouts on one machine never wait on each other. */
-const feedLockKey = createHash('sha256')
-  .update(path.resolve(__dirname, '../../..'))
-  .digest('hex')
-  .slice(0, 16)
+import { acquireAdvisoryLock } from './advisory-lock'
 export { engagementToken }
 
 export type Utilities = {
@@ -190,15 +182,16 @@ export const test = communityApiTest.extend<{
       const budget = testInfo.timeout
       const waitingSince = Date.now()
       testInfo.setTimeout(0)
-      const release = await acquireExclusiveLock(
-        path.join(os.tmpdir(), `couture-cast-engagement-feed-${feedLockKey}`),
+      const release = await acquireAdvisoryLock(
+        localPlaywrightDatabaseUrl().toString(),
+        'couture-cast:story-6.5-engagement-feed',
         { timeoutMs: 30 * 60_000 }
       )
       testInfo.setTimeout(budget + (Date.now() - waitingSince))
       try {
         await use()
       } finally {
-        release()
+        await release()
       }
     },
     { auto: true },
