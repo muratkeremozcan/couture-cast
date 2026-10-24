@@ -429,6 +429,44 @@ playwright/tests/community-comments.spec.ts --repeat-each=3`, went out without t
     shared feed take a cross-worker lock (`playwright/support/helpers/exclusive-lock.ts`), with the
     test timeout suspended while one waits. `runs/r4-engagement-repeat-parallel-6`: 30 passed.
 
+- 2026-10-23, round 5 (`reviews/code-triage-1.md`, R25 to R29).
+  - R25: the Android module job builds the release app and the module's androidTest APK.
+    `scripts/ci/check-accessibility-focus-builds.sh` checks that the app keeps the module class,
+    Expo's module list and `libreactnative.so`, and that the test APK has no native libraries and
+    still holds the TalkBack tests, so the `**/*.so` exclusion reaches the test APK only. The iOS
+    job adds a release simulator app build after the SwiftPM XCTest: it compiles
+    `AccessibilityFocusModule.swift` with ExpoModulesCore, and the same script checks that the
+    binary links it and `ExpoModulesProvider.swift` registers it. Locally the dev-build TalkBack
+    return and fallback flows and both release builds rerun at the final head.
+  - R26: the cross-worker lock is a run of generations inside its directory. Each change of hands
+    renames a directory that already holds its owner token onto the next generation, which exactly
+    one claimant wins. Taking over from a dead holder claims the next generation, so it never
+    deletes a newer holder's lock and two waiters that both saw the dead holder cannot both get
+    in. A generation pruned while a waiter reads it means look again. A release frees the lock
+    only while its own token holds it. Hook-driven boundary tests cover both races, and each
+    fails on a one-line break (`runs/r5-exclusive-lock-mutant-*`).
+  - R27: the device runner gives the TalkBack run and the suppressed-focus control fresh,
+    separate result directories, and `scripts/ci/check-accessibility-focus-results.mjs` decides
+    the lane from their JUnit XML. Every test must pass with TalkBack; the control must fail
+    exactly the four tests that need the OS focus report, on that assertion, and pass the API 28
+    case. A control that failed to build or install, or failed some other way, fails the job.
+    The runner's spec drives the real script with a fake `gradlew` and `adb`; it is red on the
+    previous runner and on one that keeps stale results.
+  - R28: the lane's path filters add the lockfile, the mobile `package.json`, `app.config.ts`
+    and `app.json`, the JS wrapper `src/lib/accessibility-focus.ts`, the new checks and
+    `scripts/run-story67-talkback.mjs`; a spec holds both triggers to that list.
+  - R29: the delegate-forwarding device test puts TalkBack on the first view after attaching,
+    confirms it, clears what it recorded, then moves to the second view and checks that the
+    window's own delegate saw that event. Without forwarding it fails
+    (`runs/r5-talkback-chain-no-forwarding-red`); before, TalkBack's initial focus event could
+    satisfy it.
+  - Found by the round 4 gates: the locations screen cleared a refused save's explanation when the
+    query searched again on its own, about 300 ms later, so 1.2b-MOB-05d failed under coverage
+    load. A search result now clears search errors only, and the test checks the error after the
+    second search.
+  - Declined: Astra F4, the full app return and fallback flow in CI; see the triage decision
+    record (option B, 2026-10-23).
+
 ## Spec Change Log
 
 - 2026-10-23, iteration 5 (rereview 3): read floor, last-attempt time and `Retry-After` are
