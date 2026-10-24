@@ -169,10 +169,13 @@ test.describe('Story 6.5 real engagement transport', () => {
     await insert.focus()
     await page.keyboard.press('Enter')
     // Other specs publish in parallel, so the first banner can announce their look
-    // before this one is buffered; insert again until this look is in.
+    // before this one is buffered; insert again, from the keyboard each time, until
+    // this look is in.
     await expect(async () => {
-      if ((await ownCard.count()) === 0 && (await insert.isVisible()))
-        await insert.click()
+      if ((await ownCard.count()) === 0 && (await insert.isVisible())) {
+        await insert.focus()
+        await page.keyboard.press('Enter')
+      }
       await expect(ownCard).toBeVisible({ timeout: 1_000 })
     }).toPass({ timeout: 20_000 })
     await checkA11y(page)
