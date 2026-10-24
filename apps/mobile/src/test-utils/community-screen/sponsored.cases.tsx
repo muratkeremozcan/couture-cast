@@ -421,4 +421,80 @@ export function registerCommunitySponsoredCases() {
       'Look by Style Explorer A1B2. Partnered with Atelier North'
     )
   })
+
+  it.each([
+    [
+      'a newer feed read without the block wins over an older spotlight page with it',
+      true,
+    ],
+    [
+      'a newer feed read with the block wins over an older spotlight page without it',
+      false,
+    ],
+  ] as const)('6.7b-MOB-058 %s', async (_case, olderHasBlock) => {
+    const sync = serveRealSync()
+    // The older read: spotlight page one, which starts as the member resolves
+    // and is held open until the newer feed read has landed.
+    let releaseSpotlight!: () => void
+    const spotlightHeld = new Promise<void>((resolve) => {
+      releaseSpotlight = resolve
+    })
+    server.use(
+      http.get('*/api/v1/community/spotlight', async () => {
+        await spotlightHeld
+        return HttpResponse.json({
+          data: {
+            level: 'city',
+            label: 'Lisbon',
+            items: [
+              {
+                ...item({ id: 'spot-1', caption: 'Spotlight look' }),
+                rank: 1,
+                reactions: ZERO,
+                ...(olderHasBlock ? { sponsorship: SPONSORSHIP } : {}),
+              },
+            ],
+            nextCursor: null,
+          },
+        })
+      })
+    )
+    // The newer read: the sync's rebuild, which starts after page one did.
+    serveFeed((_url, index) =>
+      feedJson({
+        items:
+          index === 0
+            ? [item({ id: 'post-a' })]
+            : [
+                item({
+                  id: 'spot-1',
+                  ...(olderHasBlock ? {} : { sponsorship: SPONSORSHIP }),
+                }),
+                item({ id: 'post-a' }),
+              ],
+      })
+    )
+
+    await render(<CommunityScreen />)
+    await screen.findByTestId('community-post-card-post-a')
+    await waitFor(() => expect(feedUrls.length).toBeGreaterThan(1))
+    await waitFor(() => expect(sync.resolves()).toBeGreaterThan(0))
+    releaseSpotlight()
+
+    const moduleItem = await screen.findByTestId('community-spotlight-item-spot-1')
+    await within(moduleItem).findByTestId('community-post-card-spot-1')
+    if (olderHasBlock) {
+      expect(within(moduleItem).queryByTestId('community-card-shop-spot-1')).toBeNull()
+      expect(
+        within(moduleItem).queryByTestId('community-card-partnered-spot-1')
+      ).toBeNull()
+    } else {
+      expect(
+        within(moduleItem).getByTestId('community-card-shop-spot-1').textContent
+      ).toBe('Shop this look at Atelier North')
+      expect(
+        within(moduleItem).getByTestId('community-card-partnered-spot-1').textContent
+      ).toBe('Partnered')
+    }
+  })
 }

@@ -608,9 +608,8 @@ export function CommunityScreen() {
         }
         // A comment target resolves through the sync route, which carries no
         // sponsorship answer; the latest live one applies.
-        const read = reactionState.read(target.post, readTicket)
-        const post = read ? sponsorships.apply(read) : read
-        setDeepLinkPost(post)
+        const post = reactionState.read(target.post, readTicket)
+        setDeepLinkPost(() => (post ? sponsorships.apply(post) : post))
         if (!post) return
         setIsInvalidDeepLink(false)
         reportHandled()
@@ -770,7 +769,12 @@ export function CommunityScreen() {
         const stamp = sponsorships.begin()
         const post = await getCommunityPostFromMobile(target, signal)
         if (isCurrent()) sponsorships.record([post], stamp)
-        if (isCurrent()) setDeepLinkPost(reactionState.read(post, readTicket))
+        if (isCurrent()) {
+          const read = reactionState.read(post, readTicket)
+          // Normalized as the state commits, so a newer answer recorded in the
+          // meantime wins over this response's own block.
+          setDeepLinkPost(() => (read ? sponsorships.apply(read) : read))
+        }
       } catch (error: unknown) {
         if (isCurrent() && communityFailureReason(error) === 'not_found') {
           reactionState.evict(target)
@@ -832,13 +836,17 @@ export function CommunityScreen() {
             })
             setItems((previous) => {
               const seen = new Set(previous.map((item) => item.id))
+              // Normalized as the state commits: a page whose read started
+              // before the latest recorded answer never shows its own block.
               return (
                 isAppend
                   ? [...previous, ...page.filter((item) => !seen.has(item.id))]
                   : page
-              ).map((post) => reactionState.current(post))
+              ).map((post) => sponsorships.apply(reactionState.current(post)))
             })
-            setDeepLinkPost((post) => (post ? reactionState.current(post) : null))
+            setDeepLinkPost((post) =>
+              post ? sponsorships.apply(reactionState.current(post)) : null
+            )
             await revalidateHighlighted(
               refresh ? highlightedTargetRef.current : null,
               readTicket,
@@ -1018,11 +1026,13 @@ export function CommunityScreen() {
         for (const target of result.targets)
           if (target.status === 'available') {
             const post = reactionState.read(target.post, ticket)
-            if (post) fresh.push(sponsorships.apply(post))
+            if (post) fresh.push(post)
           }
       }
       setItems((previous) => [
-        ...new Map([...fresh, ...previous].map((post) => [post.id, post])).values(),
+        ...new Map(
+          [...fresh, ...previous].map((post) => [post.id, sponsorships.apply(post)])
+        ).values(),
       ])
       newLooksRef.current = []
       setNewLooks([])
@@ -1062,11 +1072,15 @@ export function CommunityScreen() {
 
       const ids = new Set(realtimeItems.current.map((item) => item.id))
       const incoming = page.items.filter((item) => !ids.has(item.id))
-      if (!realtimeItems.current.length) setItems(page.items)
+      if (!realtimeItems.current.length)
+        setItems(() => page.items.map((item) => sponsorships.apply(item)))
       else if (incoming.length) {
         const buffered = [
           ...new Map(
-            [...incoming, ...newLooksRef.current].map((item) => [item.id, item])
+            [...incoming, ...newLooksRef.current].map((item) => [
+              item.id,
+              sponsorships.apply(item),
+            ])
           ).values(),
         ]
         newLooksRef.current = buffered
@@ -1123,9 +1137,8 @@ export function CommunityScreen() {
           if (!updated) return
           // Story 6.7b: a resolved copy carries no sponsorship answer (the route
           // takes no opt-in), so each copy takes the latest live answer.
-          const fresh = sponsorships.apply(updated)
           const replace = <T extends CommunityFeedItem>(item: T) =>
-            item.id === target.post.id ? fresh : item
+            item.id === target.post.id ? sponsorships.apply(updated) : item
           newLooksRef.current = newLooksRef.current.map(replace)
           setNewLooks(newLooksRef.current)
           setItems((previous) => previous.map(replace))

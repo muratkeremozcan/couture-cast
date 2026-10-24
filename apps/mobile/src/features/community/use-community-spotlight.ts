@@ -169,7 +169,10 @@ export function useCommunitySpotlight({
         const shown = newEntries([], readItems(page.items, ticket))
         setLevel(page.level)
         setLabel(page.label)
-        setItems(shown)
+        // Normalized as the state commits: a page whose read started before the
+        // latest recorded answer (say a newer feed read) never shows its own
+        // block, and takes a newer block it lacked.
+        setItems(() => shown.map((item) => sponsorships.apply(item)))
         setNextCursor(page.nextCursor)
         if (restarted) {
           focusSerialRef.current += 1
@@ -214,7 +217,10 @@ export function useCommunitySpotlight({
         if (!isCurrent()) return
         sponsorships.record(page.items, stamp)
         const added = newEntries(itemsRef.current, readItems(page.items, ticket))
-        setItems((previous) => [...previous, ...newEntries(previous, added)])
+        setItems((previous) => [
+          ...previous,
+          ...newEntries(previous, added).map((item) => sponsorships.apply(item)),
+        ])
         // View more stays for the cursor this page returned.
         setNextCursor(page.nextCursor)
         // A page whose posts were all filtered or already shown changes nothing
