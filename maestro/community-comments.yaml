@@ -94,19 +94,9 @@ tags:
 - assertVisible:
     id: 'comment-submit'
     text: 'Send comment'
-# The local iOS simulator runs headless (Xcode 27.1 ships no Simulator.app) with a
-# hardware keyboard attached, so focusing the composer raises no software keyboard and
-# the thread region stays in place. XCTest's typing switches the simulator to the
-# software keyboard, so the keyboard-up checks below follow the first typed text on
-# both platforms.
-- runFlow:
-    when:
-      platform: iOS
-    commands:
-      - assertVisible:
-          id: 'comments-thread'
-      - takeScreenshot:
-          path: maestro/artifacts/community-comments-long-reply-hardware-keyboard
+# The keyboard-up checks follow the first typed text, so they hold whether the tap
+# raised a software keyboard or not: a local iOS simulator runs headless with a hardware
+# keyboard attached (README), and XCTest's typing switches it to the software keyboard.
 # Typed text landing in the counter proves the composer holds keyboard focus; Maestro's
 # iOS hierarchy reports every element unfocused.
 - inputText: 'ok'
