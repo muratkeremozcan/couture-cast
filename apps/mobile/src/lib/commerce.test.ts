@@ -111,13 +111,10 @@ describe('mobile commerce boundary', () => {
       offerTitle: 'Wool overcoat',
     }
 
-    it('6.7b-MOB-040 renders a block only from a live payload', () => {
+    it('6.7b-MOB-040 renders the block an item carries and nothing without one', () => {
       expect(
         resolveRenderableCommunitySponsorship({ id: 'post-a', sponsorship })
       ).toEqual(sponsorship)
-      expect(
-        resolveRenderableCommunitySponsorship({ id: 'post-a', sponsorship }, true)
-      ).toBeNull()
       expect(resolveRenderableCommunitySponsorship({ id: 'post-a' })).toBeNull()
       expect(resolveRenderableCommunitySponsorship(null)).toBeNull()
     })

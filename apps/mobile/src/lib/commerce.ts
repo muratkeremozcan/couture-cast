@@ -92,15 +92,16 @@ export function resolveRenderableShopThisLook(
  * Story 6.7b: the community twin of `resolveRenderableShopThisLook`, and the one
  * predicate the sponsored CTA and its shown event both call. Only a block that
  * came off a live, opted-in read qualifies, and it must still parse strictly, so
- * a payload that picked up anything else renders no CTA at all.
+ * a payload that picked up anything else renders no CTA at all. No mobile code
+ * stores a community payload, so there is no cache-served item to refuse here:
+ * a failed read leaves nothing behind to render from.
  */
 export function resolveRenderableCommunitySponsorship(
   // Any community item: the teaser's shared state types its item without the
   // field, though the live opted-in read it holds carries it.
-  item: object | null | undefined,
-  isCacheServed = false
+  item: object | null | undefined
 ): CommunitySponsorship | null {
-  if (!item || isCacheServed || !('sponsorship' in item) || !item.sponsorship) {
+  if (!item || !('sponsorship' in item) || !item.sponsorship) {
     return null
   }
   const parsed = communitySponsorshipSchema.safeParse(item.sponsorship)
