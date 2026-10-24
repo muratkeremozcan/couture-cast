@@ -454,8 +454,18 @@ tags:
     clearState: false
     stopApp: true
 - runFlow: subflows/open-app.yaml
+# Home may still be mounting after the relaunch (a Metro rebundle makes it
+# slower), and a tap in that window is dropped; retry and wait for the screen as
+# the first entry to the tab does.
 - tapOn:
     id: 'tab-community'
+    retryTapIfNoChange: true
+    label: 'Reopen the community tab after the relaunch'
+- extendedWaitUntil:
+    visible:
+      id: 'community-screen'
+    timeout: 15000
+    label: 'Community screen is on top again'
 - tapOn:
     id: 'community-filter-chip-all'
 # The chip refetches the feed, and while it loads the list renders empty, which

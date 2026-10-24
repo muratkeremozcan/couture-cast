@@ -531,6 +531,45 @@ const suppressAndroidErrorDialogs = async () => {
 }
 
 /**
+ * Stop Gboard covering the app with its stylus education sheet.
+ *
+ * On a Play image with Gboard (the local API 36 AVD), every text-field tap
+ * Maestro makes reaches Gboard as a stylus tool event, and Gboard answers with a
+ * full-screen "Try out your stylus" sheet over the app. Location capture,
+ * capsule create and screened comments then failed on a field the sheet hid.
+ * With stylus handwriting off Gboard schedules no education. CI's google_apis
+ * image has no Gboard, so there this is a no-op. Read back like
+ * `hide_error_dialogs`, so a write that did nothing is reported.
+ *
+ * @returns {Promise<void>}
+ */
+const disableAndroidStylusHandwriting = async () => {
+  const adbBinary = resolveAdbBinary()
+  try {
+    await captureProcess(
+      adbBinary,
+      ['shell', 'settings', 'put', 'secure', 'stylus_handwriting_enabled', '0'],
+      { timeoutMs: 15_000 }
+    )
+    const readBack = await captureProcess(
+      adbBinary,
+      ['shell', 'settings', 'get', 'secure', 'stylus_handwriting_enabled'],
+      { timeoutMs: 15_000 }
+    )
+    if (readBack.stdout.trim() === '0') {
+      log(`stylus_handwriting_enabled=0 set on ${androidSerial || 'the attached device'}`)
+    } else {
+      log(
+        `Could not turn off stylus handwriting: stylus_handwriting_enabled reads "${readBack.stdout.trim()}". ` +
+          'Gboard may cover text fields with its stylus education sheet.'
+      )
+    }
+  } catch (error) {
+    log(`Could not set stylus_handwriting_enabled: ${error.message}`)
+  }
+}
+
+/**
  * The host ports an Android device needs a route to: Metro (the chosen port and the
  * 8081 fallback), the local API, and local Supabase.
  *
@@ -4073,6 +4112,7 @@ const run = async () => {
   // run this early.
   if (target.platform === 'android') {
     await forEachAndroidDevice(suppressAndroidErrorDialogs)
+    await forEachAndroidDevice(disableAndroidStylusHandwriting)
   }
 
   if (target.platform === 'android' && !process.env.MOBILE_E2E_ANDROID_HOST) {
