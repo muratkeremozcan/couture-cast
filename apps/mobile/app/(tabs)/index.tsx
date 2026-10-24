@@ -11,7 +11,6 @@ import {
   Pressable,
   StyleSheet,
   ScrollView,
-  Modal,
   Platform,
   View as NativeView,
 } from 'react-native'
@@ -65,11 +64,13 @@ import {
   garmentTitle,
   parseGarmentId,
 } from '@/components/hero/garment-item-tile'
+import { EdgeToEdgeModal, useModalInsets } from '@/components/edge-to-edge-modal'
 import { useHeroPalette } from '@/components/hero/hero-theme'
 import { MobileChipNavigation, type ChipCategory } from '@/components/chip-navigation'
 import { useAccessibilityAnnouncer } from '@/src/hooks/use-accessibility-announcer'
 import { useReducedMotion } from '@/src/hooks/use-reduced-motion'
 import { safeFindNodeHandle } from '@/src/lib/accessibility-focus'
+import { HomeSpotlightTeaserSlot } from '@/components/home/home-spotlight-teaser'
 
 type ScenarioType = 'morning' | 'midday' | 'evening'
 type SwapFocusTarget = number | { focus?: () => void }
@@ -215,6 +216,7 @@ export default function TabOneScreen() {
     resolveSupportedLocale(i18n.resolvedLanguage ?? i18n.language) ??
     defaultSupportedLocale
   const palette = useHeroPalette()
+  const modalInsets = useModalInsets()
   const { announce } = useAccessibilityAnnouncer()
   const reduceMotion = useReducedMotion()
   const latestLoadId = useRef(0)
@@ -697,6 +699,9 @@ export default function TabOneScreen() {
         contentContainerStyle={styles.contentContainer}
         stickyHeaderIndices={[0]}
         testID="hero-experience-scrollview"
+        // Focusable from code on web without becoming a tab stop, so focus can
+        // land here when the teaser leaves.
+        {...(Platform.OS === 'web' ? { tabIndex: -1 as const } : {})}
       >
         <MobileChipNavigation
           activeCategory={activeChipCategory}
@@ -830,15 +835,24 @@ export default function TabOneScreen() {
             />
           </>
         )}
+
+        {/*
+          Story 6.7: after the whole hero conditional, so it follows in focus
+          order. It reads on its own and never waits on, hides or re-renders the hero.
+        */}
+        <HomeSpotlightTeaserSlot
+          applicationUserId={applicationUserId}
+          scrollViewRef={scrollViewRef}
+        />
       </ScrollView>
 
       {/* Garment Swap Modal */}
-      <Modal
+      <EdgeToEdgeModal
         visible={isSwapModalVisible}
-        transparent={true}
         animationType={reduceMotion ? 'none' : 'slide'}
         onShow={focusFirstSwapOption}
         onRequestClose={closeSwapModal}
+        scrim="rgba(0,0,0,0.5)"
       >
         <View style={styles.modalOverlay}>
           {(() => {
@@ -846,7 +860,7 @@ export default function TabOneScreen() {
             const localizedCategory = t(categoryKey, { defaultValue: swapCategory })
             return (
               <View
-                style={styles.modalContent}
+                style={[styles.modalContent, { paddingBottom: 20 + modalInsets.bottom }]}
                 testID="garment-swap-modal"
                 accessibilityViewIsModal
                 role="dialog"
@@ -917,7 +931,7 @@ export default function TabOneScreen() {
             )
           })()}
         </View>
-      </Modal>
+      </EdgeToEdgeModal>
     </SafeAreaView>
   )
 }
@@ -998,7 +1012,6 @@ const styles = StyleSheet.create({
   },
   modalOverlay: {
     flex: 1,
-    backgroundColor: 'rgba(0,0,0,0.5)',
     justifyContent: 'flex-end',
   },
   modalContent: {
@@ -1006,7 +1019,6 @@ const styles = StyleSheet.create({
     borderTopLeftRadius: 16,
     borderTopRightRadius: 16,
     paddingTop: 20,
-    paddingBottom: Platform.OS === 'ios' ? 34 : 20,
     paddingHorizontal: 16,
     maxHeight: '60%',
   },

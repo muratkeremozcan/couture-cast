@@ -184,20 +184,21 @@ export function resolveCommunityStorageCredentials(
 }
 
 /**
- * Uploads one deterministic placeholder object for `postId` at `objectPath`.
+ * Uploads one deterministic placeholder PNG to `bucket` at `objectPath`, its
+ * colour derived from `colourKey`.
  *
  * `x-upsert` makes re-seeding replace the object in place rather than orphan
- * the previous one, matching the path itself, which is derived from the post id
+ * the previous one, matching the path itself, which is derived from the row id
  * rather than randomised for the same reason.
  */
-export async function uploadSeededCommunityObject(
-  postId: string,
+export async function uploadSeededPlaceholder(
+  bucket: string,
+  colourKey: string,
   objectPath: string,
   credentials: CommunityStorageCredentials
 ): Promise<SeededCommunityObject> {
-  const body = encodeSolidPng(PLACEHOLDER_SIZE_PX, placeholderColour(postId))
-  const endpoint = `${credentials.url}/storage/v1/object/${BUCKET}/${objectPath}`
-
+  const body = encodeSolidPng(PLACEHOLDER_SIZE_PX, placeholderColour(colourKey))
+  const endpoint = `${credentials.url}/storage/v1/object/${bucket}/${objectPath}`
   const response = await fetch(endpoint, {
     method: 'POST',
     headers: {
@@ -211,15 +212,24 @@ export async function uploadSeededCommunityObject(
   if (!response.ok) {
     const detail = await response.text().catch(() => '<unreadable body>')
     throw new Error(
-      `Community seed failed to upload ${objectPath} to the ${BUCKET} bucket ` +
+      `Seed failed to upload ${objectPath} to the ${bucket} bucket ` +
         `(HTTP ${response.status}): ${detail}\n` +
         'A 403 "Invalid Compact JWS" here usually means SUPABASE_SERVICE_ROLE_KEY is ' +
         'stale relative to the running stack; re-read it from `npx supabase status`. ' +
-        'The seed fails rather than continuing, because a LookbookPost row pointing at ' +
-        'an object that does not exist is dropped from the feed without any error, ' +
-        'which is far harder to diagnose than this message.'
+        'The seed fails rather than continuing, because a row pointing at an object ' +
+        'that does not exist breaks its reads without saying why, which is far harder ' +
+        'to diagnose than this message.'
     )
   }
 
   return { objectPath, contentType: 'image/png', byteSize: body.length }
+}
+
+/** Uploads the placeholder object for the seeded community post `postId`. */
+export function uploadSeededCommunityObject(
+  postId: string,
+  objectPath: string,
+  credentials: CommunityStorageCredentials
+): Promise<SeededCommunityObject> {
+  return uploadSeededPlaceholder(BUCKET, postId, objectPath, credentials)
 }

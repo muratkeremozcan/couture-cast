@@ -63,6 +63,29 @@ describe('6.6 community unavailable retry', () => {
     }
   })
 
+  it('6.6-CON-012a never retries a 503 whose body is not JSON and leaves that body readable', async () => {
+    const error = new ResponseError(
+      new Response('Service Unavailable', { status: 503 }),
+      'refused'
+    )
+    const work = vi.fn().mockRejectedValue(error)
+    await expect(retryOnceWhenCommunityUnavailable(work)).rejects.toBe(error)
+    expect(work).toHaveBeenCalledTimes(1)
+    await expect(error.response.text()).resolves.toBe('Service Unavailable')
+  })
+
+  it('6.6-CON-012b never retries an unavailable 503 that advises no usable pause', async () => {
+    for (const error of [
+      refusal(503, null),
+      refusal(503, 'unavailable'),
+      unavailable(-1),
+    ]) {
+      const work = vi.fn().mockRejectedValue(error)
+      await expect(retryOnceWhenCommunityUnavailable(work)).rejects.toBe(error)
+      expect(work).toHaveBeenCalledTimes(1)
+    }
+  })
+
   it('6.6-CON-013 stops waiting when the caller aborts during the pause', async () => {
     const controller = new AbortController()
     const work = vi.fn().mockRejectedValueOnce(unavailable(2))

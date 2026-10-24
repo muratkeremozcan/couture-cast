@@ -1,0 +1,34 @@
+# Story 6.7 owner: the identity change behind the teaser fallback. Signs out through the
+# product UI while Home is in the background; Home drops the member's teaser at once.
+appId: ${MAESTRO_APP_ID}
+---
+- runFlow: ../story65/open-notification-settings.yaml
+- tapOn: ${MAESTRO_SIGNOUT}
+- extendedWaitUntil:
+    notVisible: ${MAESTRO_ENABLED}
+    timeout: 15000
+    label: 'The member controls are gone: signed out'
+# Back to the Settings tab root, so one Android back from here is the way Home.
+- repeat:
+    while:
+      notVisible:
+        id: 'settings-screen'
+    times: 3
+    commands:
+      - runFlow:
+          when:
+            visible: 'Navigate up'
+          commands:
+            - tapOn: 'Navigate up'
+      - runFlow:
+          when:
+            visible:
+              id: 'BackButton'
+          commands:
+            - tapOn:
+                id: 'BackButton'
+- extendedWaitUntil:
+    visible:
+      id: 'settings-screen'
+    timeout: 15000
+    label: 'The Settings tab is up, one back away from Home'

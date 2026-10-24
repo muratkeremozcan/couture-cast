@@ -1,0 +1,10 @@
+# Story 6.7 owner: real sign-in UI, step 3 of 3. verifyNativeOtp resolves the app account and
+# the screen returns to settings, which renders the member's preference controls.
+appId: ${MAESTRO_APP_ID}
+---
+- hideKeyboard:
+    optional: true
+- tapOn: ${MAESTRO_VERIFY}
+- extendedWaitUntil:
+    visible: ${MAESTRO_ENABLED}
+    timeout: 30000

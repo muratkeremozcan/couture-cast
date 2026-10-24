@@ -3,7 +3,8 @@
 import React, { createElement, useState } from 'react'
 import { run as runAxe } from 'axe-core'
 import type * as ReactNativeModule from 'react-native'
-import { fireEvent, render, screen, waitFor } from '@testing-library/react'
+import type * as EdgeToEdgeTestUtils from '@/src/test-utils/edge-to-edge-modal'
+import { act, fireEvent, render, screen, waitFor } from '@testing-library/react'
 import { afterEach, beforeAll, beforeEach, describe, expect, it, vi } from 'vitest'
 import {
   communityReportReasonSchema,
@@ -24,8 +25,36 @@ const touchableSpy = vi.hoisted(() => ({
   props: new Map<string, Record<string, unknown>>(),
   createElement: null as unknown as typeof createElement,
 }))
+/**
+ * react-native-web never reports a software keyboard, so the R66 cases drive the
+ * platform's keyboard events through these listeners.
+ */
+const keyboard = vi.hoisted(() => {
+  const listeners = new Map<string, Set<() => void>>()
+  return {
+    addListener: (event: string, listener: () => void) => {
+      const set = listeners.get(event) ?? new Set()
+      set.add(listener)
+      listeners.set(event, set)
+      return { remove: () => set.delete(listener) }
+    },
+    emit: (event: string) => {
+      listeners.get(event)?.forEach((listener) => listener())
+    },
+  }
+})
+vi.mock('react-native-safe-area-context', async (importOriginal) => {
+  const actual = await importOriginal<Record<string, unknown>>()
+  const { TEST_SAFE_AREA_INSETS } = await vi.importActual<typeof EdgeToEdgeTestUtils>(
+    '@/src/test-utils/edge-to-edge-modal'
+  )
+  return { ...actual, useSafeAreaInsets: () => TEST_SAFE_AREA_INSETS }
+})
 vi.mock('react-native', async (importOriginal) => {
   const actual = await importOriginal<typeof ReactNativeModule>()
+  const { recordModalProps } = await vi.importActual<typeof EdgeToEdgeTestUtils>(
+    '@/src/test-utils/edge-to-edge-modal'
+  )
   const RealTouchable = actual.TouchableOpacity
   function RecordingTouchable(props: Record<string, unknown>) {
     if (typeof props.testID === 'string') {
@@ -35,6 +64,7 @@ vi.mock('react-native', async (importOriginal) => {
   }
   return {
     ...actual,
+    Modal: recordModalProps(actual.Modal),
     // `Platform.OS` is redefined per test because the dialog's focus move only
     // runs off web, and react-native-web's own `findNodeHandle` throws
     // unconditionally. Same shape as `wardrobe/capsule-builder-modal.test.tsx`.
@@ -45,6 +75,11 @@ vi.mock('react-native', async (importOriginal) => {
     findNodeHandle: vi.fn(),
     Platform: { ...actual.Platform, OS: 'web' },
     TouchableOpacity: RecordingTouchable,
+    Keyboard: {
+      ...actual.Keyboard,
+      isVisible: () => false,
+      addListener: keyboard.addListener,
+    },
   }
 })
 
@@ -55,6 +90,13 @@ import enUS from '@/assets/locales/en-US.json'
 import i18n, { initI18n } from '@/src/lib/i18n'
 import { press } from '@/src/test-utils/press'
 import { CommunityReportModal } from './community-report-modal'
+import {
+  EDGE_TO_EDGE_MODAL_PROPS,
+  TEST_SAFE_AREA_INSETS,
+  lastModalProps,
+  paddingBottomOf,
+  paddingTopOf,
+} from '@/src/test-utils/edge-to-edge-modal'
 
 const AXE_TAGS = ['wcag2a', 'wcag2aa', 'wcag21a', 'wcag21aa']
 
@@ -336,5 +378,95 @@ describe('CommunityReportModal (Story 6.1)', () => {
         reason === 'violence' ? 'true' : 'false'
       )
     )
+  })
+})
+
+describe('R52 CommunityReportModal over the system bars', () => {
+  it('covers the status and navigation bars and keeps the dialog clear of both', () => {
+    renderModal()
+    expect(lastModalProps()).toMatchObject({
+      ...EDGE_TO_EDGE_MODAL_PROPS,
+      transparent: true,
+      visible: true,
+    })
+    const overlay = screen.getByTestId('community-report-modal-overlay')
+    expect(paddingTopOf(overlay)).toBe(20 + TEST_SAFE_AREA_INSETS.top)
+    expect(paddingBottomOf(overlay)).toBe(20 + TEST_SAFE_AREA_INSETS.bottom)
+    expect(
+      getComputedStyle(screen.getByTestId('community-report-modal-scrim')).backgroundColor
+    ).toBe('rgba(0, 0, 0, 0.6)')
+  })
+
+  it('R57 lifts its fields with the wrapper keyboard view under a scrim of its own layer', () => {
+    renderModal()
+    const keyboardView = screen.getByTestId('edge-to-edge-modal-keyboard-view')
+    expect(keyboardView.contains(screen.getByTestId('report-details-input'))).toBe(true)
+    // The wrapper paints the scrim; no layer inside the keyboard view adds a second one.
+    for (
+      let node = screen.getByTestId('report-details-input').parentElement;
+      node && node !== keyboardView;
+      node = node.parentElement
+    )
+      expect(getComputedStyle(node).backgroundColor).not.toMatch(
+        /^rgba\(0, 0, 0, 0\.[1-9]/
+      )
+  })
+})
+
+/**
+ * R66: with the keyboard up for the details field, the lifted dialog cut the field at
+ * the scroll edge and left a sliver of a reason row above it. The reasons now leave the
+ * layout while the member writes details, and return when the keyboard closes.
+ */
+describe('R66 CommunityReportModal with the keyboard up', () => {
+  const reasons = () => screen.getByTestId('report-reasons')
+  const details = () => screen.getByTestId('report-details-input')
+  beforeAll(async () => {
+    await initI18n()
+    await i18n.changeLanguage('en-US')
+  })
+
+  /** The modal fades in; its content counts as visible once the fade ends. */
+  async function openModal() {
+    renderModal()
+    await waitFor(() => expect(screen.getByTestId('cancel-report-button')).toBeVisible())
+  }
+
+  it('shows the details field without the reasons while the member writes', async () => {
+    await openModal()
+    press(screen.getByTestId('report-reason-spam'))
+    act(() => details().focus())
+    act(() => keyboard.emit('keyboardDidShow'))
+    expect(reasons()).not.toBeVisible()
+    expect(details()).toBeVisible()
+    expect(screen.getByTestId('report-details-count')).toBeVisible()
+    expect(screen.getByTestId('cancel-report-button')).toBeVisible()
+    expect(screen.getByTestId('submit-report-button')).toBeVisible()
+    expect(document.activeElement).toBe(details())
+
+    act(() => keyboard.emit('keyboardDidHide'))
+    expect(reasons()).toBeVisible()
+    // The chosen reason survived the round trip.
+    expect(
+      touchableSpy.props.get('report-reason-spam')?.accessibilityState
+    ).toMatchObject({
+      checked: true,
+    })
+  })
+
+  it('keeps the reasons when the keyboard rises for another reason than the details', async () => {
+    await openModal()
+    act(() => keyboard.emit('keyboardDidShow'))
+    expect(reasons()).toBeVisible()
+  })
+
+  it('brings the reasons back when the details field loses focus', async () => {
+    await openModal()
+    act(() => details().focus())
+    act(() => keyboard.emit('keyboardDidShow'))
+    expect(reasons()).not.toBeVisible()
+    act(() => details().blur())
+    expect(reasons()).toBeVisible()
+    act(() => keyboard.emit('keyboardDidHide'))
   })
 })

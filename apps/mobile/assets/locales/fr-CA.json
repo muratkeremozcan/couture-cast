@@ -881,7 +881,9 @@
       "announceLoadedMore": "{{count}} looks vedettes de plus chargés.",
       "announceLoadedMore_one": "{{count}} look vedette de plus chargé.",
       "announceLoadedMore_other": "{{count}} looks vedettes de plus chargés.",
-      "announceRefreshed": "Les vedettes de la ville ont été actualisées selon le classement le plus récent."
+      "announceRefreshed": "Les vedettes de la ville ont été actualisées selon le classement le plus récent.",
+      "targetUnavailable": "Ce look ne fait plus partie des Vedettes de la ville.",
+      "destinationUnavailable": "Les Vedettes de la ville ne sont pas disponibles pour le moment."
     }
   },
   "locations": {
@@ -927,6 +929,18 @@
       "rate_limited": "Trop de recherches. Attendez un instant puis réessayez.",
       "invalid_query": "Entrez entre 2 et 80 caractères.",
       "unknown": "Un problème est survenu. Réessayez."
+    }
+  },
+  "home": {
+    "spotlightTeaser": {
+      "heading": "Look vedette à {{label}}",
+      "reactions": "{{count}} réactions",
+      "reactions_one": "{{count}} réaction",
+      "reactions_other": "{{count}} réactions",
+      "linkLabel": "Look vedette à {{label}} par {{author}}, {{count}} réactions. Ouvre les Vedettes de la ville.",
+      "linkLabel_one": "Look vedette à {{label}} par {{author}}, {{count}} réaction. Ouvre les Vedettes de la ville.",
+      "linkLabel_other": "Look vedette à {{label}} par {{author}}, {{count}} réactions. Ouvre les Vedettes de la ville.",
+      "cta": "Voir dans les Vedettes de la ville"
     }
   }
 }

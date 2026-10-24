@@ -9,6 +9,7 @@ dist/
 build/
 .turbo
 .next
+.next-real-session/
 .cache/
 **/garment-tagging-model/
 coverage/
@@ -35,6 +36,7 @@ playwright/.auth/
 .lighthouseci/
 .auth/
 blob-report/
+.real-session-e2e/
 downloads/
 pacts/
 pact/artifacts/

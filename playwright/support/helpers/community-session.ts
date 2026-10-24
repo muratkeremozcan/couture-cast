@@ -210,6 +210,15 @@ export function assertSeededFeed(items: FeedItem[]): void {
   ).toEqual([])
 }
 
+/**
+ * The community feed on the page has rendered at least one look. Which looks lead it
+ * is not fixed: the seeded City Spotlight cohort and the looks other tests publish
+ * come before the seeded lookbook posts, so no particular card is the signal.
+ */
+export async function expectCommunityFeedLoaded(page: Page) {
+  await expect(page.locator('[data-testid^="lookbook-card-"]').first()).toBeVisible()
+}
+
 /** Statuses no moderation run will move a post away from. */
 export const COMMUNITY_TERMINAL_STATUSES = [
   'published',
@@ -483,6 +492,11 @@ export const communityTest = test.extend<{ communitySession: CommunitySession }>
 
     await use({ userId, accessToken, apiBaseUrl })
 
+    // This fixture tears down before `page`, so a page still open would react
+    // to the cleanup's own realtime events and read rows that are going away:
+    // a thread re-read the replies of a just-erased root and got a 400, which
+    // the network monitor failed the test on. No page outlives the session.
+    await Promise.all(context.pages().map((page) => page.close()))
     await deleteCommunityRowsForUser(userId)
   },
 })

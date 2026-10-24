@@ -237,7 +237,13 @@ describe('6.6 spotlight read model', () => {
     const viewer = await ctx.member(area)
     const offline = ctx.serviceWith(unavailableRedis)
     const read = (cursor?: string) =>
-      offline.getSpotlight({ userId: viewer, platform: 'web', limit: 6, cursor })
+      offline.getSpotlight({
+        userId: viewer,
+        platform: 'web',
+        limit: 6,
+        surface: 'community',
+        cursor,
+      })
     const first = await read()
     expect(first.level).toBe('city')
     expect(first.items.map((i) => i.id)).toEqual(cohort.expectedOrder.slice(0, 6))

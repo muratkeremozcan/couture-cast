@@ -406,7 +406,22 @@ describe('check-artifact-secrets', () => {
     ).toEqual({
       names: ['A', 'B', 'C', 'D'],
       storageStates: ['s.json'],
+      otpFiles: [],
+      rejectJwt: false,
       targets: ['dir', 'other'],
+    })
+    expect(
+      parseArgs([
+        '--otp-file',
+        'otps.json',
+        '--reject-jwt',
+        '--otp-file=more.json',
+        'dir',
+      ])
+    ).toMatchObject({
+      otpFiles: ['otps.json', 'more.json'],
+      rejectJwt: true,
+      targets: ['dir'],
     })
   })
 
@@ -499,6 +514,103 @@ describe('check-artifact-secrets', () => {
 
       expect(code).toBe(2)
       expect(output).not.toContain('abc')
+    })
+
+    describe('values minted during the run (R54)', () => {
+      const CODE = '482913'
+      const JWT =
+        'eyJhbGciOiJIUzI1NiJ9.eyJzdWIiOiJkdW1teS1zdWJqZWN0In0.ZHVtbXktc2lnbmF0dXJlLXZhbHVl'
+      const otpFile = () => write('outside/issued-otps.json', JSON.stringify([CODE]))
+      const artifacts = () => path.join(workDir, 'artifacts')
+
+      it('fails on an issued OTP code in a failure message, without printing it', () => {
+        const file = otpFile()
+        write(
+          'artifacts/junit.xml',
+          `<failure message="locator.fill: Timeout 5000ms exceeded. fill(&quot;${CODE}&quot;)"/>`
+        )
+
+        const { code, output } = run([
+          '--names',
+          'DUMMY_SECRET',
+          '--otp-file',
+          file,
+          artifacts(),
+        ])
+
+        expect(code).toBe(1)
+        expect(output).toContain('Secret value of issued OTP #1 found in')
+        expect(output).not.toContain(CODE)
+      })
+
+      it('finds an OTP code inside a gzip layer and ignores it inside a longer number', () => {
+        const file = otpFile()
+        write('artifacts/nested.gz', zlib.gzipSync(Buffer.from(`code=${CODE};`)))
+        write('artifacts/timings.txt', `started 1${CODE}0 and 9${CODE}`)
+
+        const { code, output } = run([
+          '--names',
+          'DUMMY_SECRET',
+          '--otp-file',
+          file,
+          artifacts(),
+        ])
+
+        expect(code).toBe(1)
+        expect(output).toContain('nested.gz!gunzip')
+        expect(output).not.toContain('timings.txt')
+      })
+
+      it('fails on a JWT shape with --reject-jwt, and only with it', () => {
+        write('artifacts/output.log', `Authorization: Bearer ${JWT}`)
+
+        const rejected = run(['--names', 'DUMMY_SECRET', '--reject-jwt', artifacts()])
+        const ignored = run(['--names', 'DUMMY_SECRET', artifacts()])
+
+        expect(rejected.code).toBe(1)
+        expect(rejected.output).toContain('Secret value of a JWT-shaped value found in')
+        expect(rejected.output).not.toContain(JWT)
+        expect(ignored.code).toBe(0)
+      })
+
+      it('fails closed on a missing or malformed OTP file without echoing it', () => {
+        write('artifacts/clean.txt', 'nothing here')
+        const missing = run([
+          '--names',
+          'DUMMY_SECRET',
+          '--otp-file',
+          path.join(workDir, 'absent.json'),
+          artifacts(),
+        ])
+        const malformed = write('outside/bad.json', JSON.stringify([CODE, 'not-a-code']))
+        const bad = run(['--names', 'DUMMY_SECRET', '--otp-file', malformed, artifacts()])
+        const noPath = run(['--names', 'DUMMY_SECRET', artifacts(), '--otp-file'])
+
+        expect(missing.code).toBe(2)
+        expect(bad.code).toBe(2)
+        expect(bad.output).not.toContain(CODE)
+        expect(noPath.code).toBe(2)
+      })
+
+      it('passes a redacted set that carries neither', () => {
+        const file = otpFile()
+        write(
+          'artifacts/junit.xml',
+          '<failure message="fill(&quot;[REDACTED]&quot;) bearer [REDACTED_JWT]"/>'
+        )
+
+        const { code, output } = run([
+          '--names',
+          'DUMMY_SECRET',
+          '--otp-file',
+          file,
+          '--reject-jwt',
+          artifacts(),
+        ])
+
+        expect(code).toBe(0)
+        expect(output).toContain('No secret values found.')
+      })
     })
 
     it('requires names and targets', () => {

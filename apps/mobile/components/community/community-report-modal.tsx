@@ -2,7 +2,6 @@ import React, { useCallback, useEffect, useRef, useState } from 'react'
 import {
   AccessibilityInfo,
   ActivityIndicator,
-  Modal,
   Platform,
   ScrollView,
   StyleSheet,
@@ -17,6 +16,11 @@ import {
   type CommunityFeedItem,
   type CommunityReportReason,
 } from '@couture/api-client/contracts/http'
+import {
+  EdgeToEdgeModal,
+  useKeyboardOpen,
+  useModalInsets,
+} from '@/components/edge-to-edge-modal'
 import { useHeroPalette } from '@/components/hero/hero-theme'
 import { safeFindNodeHandle } from '@/src/lib/accessibility-focus'
 
@@ -57,6 +61,14 @@ export function CommunityReportModal({
 }: CommunityReportModalProps) {
   const { t } = useTranslation()
   const palette = useHeroPalette()
+  // R66: while the keyboard is up for the details field the reasons leave the layout,
+  // so the lifted dialog shows the label, the field and its count whole, with no
+  // reason row cut by the scroll edge. They return as the keyboard closes; the chosen
+  // reason is kept either way.
+  const [keyboardOpen] = useKeyboardOpen()
+  const [detailsFocused, setDetailsFocused] = useState(false)
+  const writingDetails = keyboardOpen && detailsFocused
+  const insets = useModalInsets(keyboardOpen)
 
   const [selectedReason, setSelectedReason] = useState<CommunityReportReason | null>(null)
   const [details, setDetails] = useState('')
@@ -92,14 +104,21 @@ export function CommunityReportModal({
   const isSubmitDisabled = !selectedReason || isSubmitting
 
   return (
-    <Modal
+    <EdgeToEdgeModal
       visible={visible && !suspended}
-      transparent
       animationType="fade"
       onRequestClose={onClose}
       testID="community-report-modal"
+      scrim="rgba(0, 0, 0, 0.6)"
+      scrimTestID="community-report-modal-scrim"
     >
-      <View style={styles.overlay}>
+      <View
+        testID="community-report-modal-overlay"
+        style={[
+          styles.overlay,
+          { paddingTop: 20 + insets.top, paddingBottom: 20 + insets.bottom },
+        ]}
+      >
         <View
           ref={dialogRef}
           accessibilityViewIsModal
@@ -117,63 +136,65 @@ export function CommunityReportModal({
           </Text>
 
           <ScrollView style={styles.reasonsList} keyboardShouldPersistTaps="handled">
-            <Text style={[styles.groupLabel, { color: palette.text }]}>
-              {t('community.report.reasonLabel')}
-            </Text>
+            <View testID="report-reasons" style={writingDetails && styles.hidden}>
+              <Text style={[styles.groupLabel, { color: palette.text }]}>
+                {t('community.report.reasonLabel')}
+              </Text>
 
-            <View accessibilityRole="radiogroup">
-              {communityReportReasonSchema.options.map((reason) => {
-                const isSelected = selectedReason === reason
-                const label = t(`community.report.reason.${reason}`)
-                return (
-                  <TouchableOpacity
-                    key={reason}
-                    testID={`report-reason-${reason}`}
-                    accessibilityRole="radio"
-                    accessibilityState={{ selected: isSelected, checked: isSelected }}
-                    // `accessibilityState` is native-only: react-native-web's
-                    // forwardedProps table has no entry for the object form, so on
-                    // the web target (`app.json` ships one) this radio rendered with
-                    // no `aria-checked` at all and axe failed `aria-required-attr`.
-                    // RN 0.81 accepts the `aria-*` props directly on both platforms.
-                    aria-checked={isSelected}
-                    accessibilityLabel={label}
-                    style={[
-                      styles.reasonOption,
-                      { borderColor: isSelected ? palette.text : 'transparent' },
-                    ]}
-                    onPress={() => setSelectedReason(reason)}
-                  >
-                    <View
+              <View accessibilityRole="radiogroup">
+                {communityReportReasonSchema.options.map((reason) => {
+                  const isSelected = selectedReason === reason
+                  const label = t(`community.report.reason.${reason}`)
+                  return (
+                    <TouchableOpacity
+                      key={reason}
+                      testID={`report-reason-${reason}`}
+                      accessibilityRole="radio"
+                      accessibilityState={{ selected: isSelected, checked: isSelected }}
+                      // `accessibilityState` is native-only: react-native-web's
+                      // forwardedProps table has no entry for the object form, so on
+                      // the web target (`app.json` ships one) this radio rendered with
+                      // no `aria-checked` at all and axe failed `aria-required-attr`.
+                      // RN 0.81 accepts the `aria-*` props directly on both platforms.
+                      aria-checked={isSelected}
+                      accessibilityLabel={label}
                       style={[
-                        styles.radioCircle,
-                        {
-                          // 3:1 against the surface in both schemes, where the
-                          // old #55555C on #222228 computed to 2.14:1.
-                          borderColor: isSelected ? palette.text : palette.mutedText,
-                          backgroundColor: isSelected ? ACCENT_GOLD : 'transparent',
-                        },
+                        styles.reasonOption,
+                        { borderColor: isSelected ? palette.text : 'transparent' },
                       ]}
+                      onPress={() => setSelectedReason(reason)}
                     >
-                      {/* Shape, not colour: the check mark is what says selected. */}
-                      {isSelected ? (
-                        <Text style={[styles.radioCheck, { color: ON_ACCENT }]}>✓</Text>
-                      ) : null}
-                    </View>
-                    <Text
-                      style={[
-                        styles.reasonLabel,
-                        {
-                          color: palette.text,
-                          fontWeight: isSelected ? '700' : '400',
-                        },
-                      ]}
-                    >
-                      {label}
-                    </Text>
-                  </TouchableOpacity>
-                )
-              })}
+                      <View
+                        style={[
+                          styles.radioCircle,
+                          {
+                            // 3:1 against the surface in both schemes, where the
+                            // old #55555C on #222228 computed to 2.14:1.
+                            borderColor: isSelected ? palette.text : palette.mutedText,
+                            backgroundColor: isSelected ? ACCENT_GOLD : 'transparent',
+                          },
+                        ]}
+                      >
+                        {/* Shape, not colour: the check mark is what says selected. */}
+                        {isSelected ? (
+                          <Text style={[styles.radioCheck, { color: ON_ACCENT }]}>✓</Text>
+                        ) : null}
+                      </View>
+                      <Text
+                        style={[
+                          styles.reasonLabel,
+                          {
+                            color: palette.text,
+                            fontWeight: isSelected ? '700' : '400',
+                          },
+                        ]}
+                      >
+                        {label}
+                      </Text>
+                    </TouchableOpacity>
+                  )
+                })}
+              </View>
             </View>
 
             <Text style={[styles.detailsLabel, { color: palette.text }]}>
@@ -198,6 +219,8 @@ export function CommunityReportModal({
               maxLength={500}
               value={details}
               onChangeText={setDetails}
+              onFocus={() => setDetailsFocused(true)}
+              onBlur={() => setDetailsFocused(false)}
             />
             <Text
               style={[styles.detailsCount, { color: palette.mutedText }]}
@@ -269,14 +292,13 @@ export function CommunityReportModal({
           </View>
         </View>
       </View>
-    </Modal>
+    </EdgeToEdgeModal>
   )
 }
 
 const styles = StyleSheet.create({
   overlay: {
     flex: 1,
-    backgroundColor: 'rgba(0, 0, 0, 0.6)',
     justifyContent: 'center',
     alignItems: 'center',
     padding: 20,
@@ -302,6 +324,7 @@ const styles = StyleSheet.create({
   reasonsList: {
     maxHeight: 340,
   },
+  hidden: { display: 'none' },
   groupLabel: {
     fontSize: 13,
     fontWeight: '700',

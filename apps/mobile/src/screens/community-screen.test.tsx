@@ -7,9 +7,11 @@ vi.mock('expo-haptics', () => ({ selectionAsync: vi.fn().mockResolvedValue(undef
 vi.mock('@/src/lib/community', { spy: true })
 vi.mock('expo-router', async () => {
   const { routing } = await import('../test-utils/community-screen/mock-state.js')
+  const { useFocusEffect } = await import('../test-utils/focus-effect.js')
   return {
     useLocalSearchParams: () => routing.params,
     useRouter: () => routing.router,
+    useFocusEffect,
   }
 })
 vi.mock('expo-localization', () => ({
@@ -100,7 +102,9 @@ import { registerCommunityNotificationRecoveryCases } from '../test-utils/commun
 import { registerCommunityClientCases } from '../test-utils/community-screen/client.cases'
 import { registerCommunitySpotlightCases } from '../test-utils/community-screen/spotlight.cases'
 import { registerCommunitySpotlightReviewCases } from '../test-utils/community-screen/spotlight-review.cases'
+import { registerCommunitySpotlightFocusCases } from '../test-utils/community-screen/spotlight-focus.cases'
 import { refreshEvents } from '../test-utils/community-screen/mock-state'
+import { screenFocus } from '../test-utils/focus-effect'
 import { configure } from '@testing-library/react'
 import { delay } from 'msw'
 import { afterAll, afterEach, beforeAll, beforeEach, describe, vi } from 'vitest'
@@ -132,6 +136,7 @@ describe('Mobile community screen (Story 6.1)', () => {
     // restore the real coordinator and exercise its HTTP bootstrap/reconciliation separately.
     vi.spyOn(CommunitySyncState.prototype, 'start').mockImplementation(() => undefined)
     setMockParams({})
+    screenFocus.reset()
     imageEvents.errors.clear()
     refreshEvents.onRefresh = undefined
     resetFeedUrls()
@@ -170,6 +175,7 @@ describe('Mobile community screen (Story 6.1)', () => {
   registerCommunityNotificationRecoveryCases()
   registerCommunitySpotlightCases()
   registerCommunitySpotlightReviewCases()
+  registerCommunitySpotlightFocusCases()
 })
 
 /**

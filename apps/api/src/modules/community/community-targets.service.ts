@@ -131,7 +131,7 @@ export class CommunityTargetsService {
       {
         isolationLevel: Prisma.TransactionIsolationLevel.RepeatableRead,
         timeout: budget.remaining(),
-        maxWait: Math.min(100, budget.remaining()),
+        maxWait: budget.remaining(),
       }
     )
     const projected = new Map(

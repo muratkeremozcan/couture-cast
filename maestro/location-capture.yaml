@@ -46,8 +46,26 @@ tags:
       id: 'locations-search-input'
     timeout: 15000
     label: 'Locations opened with the search field'
-- tapOn:
-    id: 'locations-search-input'
+# The guided entry focuses the search field itself (`autoFocus`), so on Android Gboard
+# rises while the next step runs and a tap aimed from the hierarchy read before it can
+# land on the keyboard instead (Story 6.7 R70, the same race the comments flow hit).
+# Android waits for the field to hold focus and types into it; iOS raises no software
+# keyboard on focus, so its tap moves nothing.
+- runFlow:
+    when:
+      platform: Android
+    commands:
+      - extendedWaitUntil:
+          visible:
+            id: 'locations-search-input'
+            focused: true
+          timeout: 10000
+- runFlow:
+    when:
+      platform: iOS
+    commands:
+      - tapOn:
+          id: 'locations-search-input'
 - inputText: ${LOCATION_SENTINEL_QUERY}
 - extendedWaitUntil:
     visible:

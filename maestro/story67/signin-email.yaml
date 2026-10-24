@@ -1,0 +1,13 @@
+# Story 6.7 owner: real sign-in UI, step 1 of 3, on the development build. Opens the email
+# field; the runner types the address with `adb shell input text`, because Maestro's own
+# inputText stalls its device server on the Gboard emulator image this lane uses.
+appId: ${MAESTRO_APP_ID}
+---
+- runFlow: ../story65/open-signin.yaml
+- tapOn: ${MAESTRO_SIGNIN}
+- extendedWaitUntil:
+    visible: ${MAESTRO_SEND}
+    timeout: 15000
+- tapOn:
+    text: ${MAESTRO_EMAIL_LABEL}
+    index: 1

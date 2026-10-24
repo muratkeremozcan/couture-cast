@@ -1,18 +1,21 @@
 // Story 6.4 owner: independently focusable native thread controls and modal feedback.
-import React, { useEffect, useRef, useState, useSyncExternalStore } from 'react'
+import React, {
+  useEffect,
+  useLayoutEffect,
+  useRef,
+  useState,
+  useSyncExternalStore,
+} from 'react'
 import {
   AccessibilityInfo,
   Keyboard,
-  KeyboardAvoidingView,
-  Platform,
-  Modal,
   ScrollView,
   StyleSheet,
-  StatusBar,
   Text,
   TextInput,
   TouchableOpacity,
   View,
+  type NativeScrollPoint,
 } from 'react-native'
 import { useTranslation } from 'react-i18next'
 import type { CommunityCommentsState } from '@couture/api-client'
@@ -22,23 +25,64 @@ import {
   type CommunityReportReason,
   type SupportedLocale,
 } from '@couture/api-client/contracts/http'
+import {
+  EdgeToEdgeModal,
+  useKeyboardOpen,
+  useModalInsets,
+} from '@/components/edge-to-edge-modal'
 import { useHeroPalette } from '@/components/hero/hero-theme'
 import { safeFindNodeHandle } from '@/src/lib/accessibility-focus'
+import type {
+  CommunityCommentDraft,
+  CommunityCommentDrafts,
+} from '@/src/features/community/community-comment-drafts'
 
-// Android's non-translucent modal starts below the native status-bar inset.
-function modalKeyboardOffset(): number {
-  return Platform.OS === 'android' ? (StatusBar.currentHeight ?? 0) : 0
+/** The author and body that name a comment's actions and a reply's target. */
+function commentContext(item: CommunityComment, unavailable: string): string {
+  return [item.author, item.unavailable ? unavailable : item.body]
+    .filter(Boolean)
+    .join('. ')
+}
+
+/** R51: the thread region leaves the layout while the keyboard is open. */
+function threadRegionStyle(keyboardOpen: boolean) {
+  return [styles.discussion, keyboardOpen && styles.hidden]
+}
+
+/**
+ * R46: reports once, as the sheet unmounts, while the composer is still attached. React
+ * runs this wrapper's layout cleanup before it removes the composer's host node, so the
+ * composer's own focus state is still live here, whatever blur the platform sends for
+ * the removal itself.
+ */
+function ComposerUnmount({
+  onUnmount,
+  children,
+}: {
+  onUnmount: () => void
+  children: React.ReactNode
+}) {
+  const latest = useRef(onUnmount)
+  latest.current = onUnmount
+  useLayoutEffect(() => () => latest.current(), [])
+  return children
 }
 
 export function CommunityCommentsSheet({
   postId,
   state,
+  drafts,
+  member,
   locale,
   target,
   onClose,
 }: {
   postId: string | null
   state: CommunityCommentsState
+  /** The screen's in-memory copy of the member's own unsent comments (R46). */
+  drafts: CommunityCommentDrafts
+  /** The signed-in member the drafts belong to; null holds nothing. */
+  member: string | null
   target?: {
     commentId: string
     parentId: string | null
@@ -64,7 +108,22 @@ export function CommunityCommentsSheet({
   const entries = useRef(new Map<string, View | null>())
   const focused = useRef<string | null>(null)
   const removedFocus = useRef<string | null>(null)
+  const refocusComposer = useRef(false)
+  const closedByMember = useRef(false)
   const thread = state.current(postId ?? '__closed__')
+  // R51 layout rule: while the software keyboard is open the thread region is hidden,
+  // with or without a reply target and at any window height. The title row, the reply
+  // banner and the composer then own the space above the keyboard, so the region never
+  // shows as a clipped sliver. It stays mounted, and returns when the keyboard closes at
+  // the offset it had. Focus stays in the composer both ways; nothing here moves it.
+  const threadOffset = useRef<NativeScrollPoint>({ x: 0, y: 0 })
+  const [restoreOffset, setRestoreOffset] = useState<NativeScrollPoint>()
+  // A native view the hidden region drops is rebuilt at the offset it had.
+  const [keyboardOpen, setKeyboardOpen] = useKeyboardOpen(() =>
+    setRestoreOffset({ ...threadOffset.current })
+  )
+  // R52: the sheet keeps clear of the gesture bar while the keyboard is down.
+  const insets = useModalInsets(keyboardOpen)
   const focus = (ref: React.RefObject<Text | View | null>) => {
     const node = safeFindNodeHandle(ref.current)
     if (node) AccessibilityInfo.setAccessibilityFocus(node)
@@ -77,6 +136,24 @@ export function CommunityCommentsSheet({
     void state.statuses(postId)
     return state.watchSubmissions(postId)
   }, [postId, state, target])
+  useEffect(() => {
+    // R46: an unverified-access hide unmounts the sheet mid-comment. On the next mount
+    // for the same member and post, the held draft fills a composer the comment state
+    // lost, and focus returns only to a composer that had it.
+    refocusComposer.current = false
+    closedByMember.current = false
+    if (!postId || !member) return
+    const held = drafts.restore(member, postId)
+    if (!held) return
+    const current = state.current(postId).draft
+    if (!current.body && !current.parentId)
+      state.draft(postId, { body: held.body, parentId: held.parentId })
+    // R47: a resend of a submission the wipe interrupted reuses its mutation ID.
+    if (held.unresolved) state.resumeUnresolved(postId, held.unresolved)
+    if (!held.focused) return
+    refocusComposer.current = true
+    composerRef.current?.focus()
+  }, [drafts, member, postId, state])
   useEffect(() => {
     if (!postId) return
     const announcement = state.consumeAnnouncement(postId)
@@ -142,19 +219,53 @@ export function CommunityCommentsSheet({
       </Text>
     </TouchableOpacity>
   )
+  const edit = (draft: Partial<Pick<CommunityCommentDraft, 'body' | 'parentId'>>) => {
+    state.draft(postId, draft)
+    if (member) drafts.remember(member, postId, draft)
+  }
+  // R51: closing the keyboard keeps the sheet, and the thread region returns at once.
+  const dismissKeyboard = () => {
+    Keyboard.dismiss()
+    setKeyboardOpen(false)
+  }
+  const close = () => {
+    // Story 6.4: an explicit close keeps the unsent text, in the thread and held, for the
+    // next open. That open starts on the title, so the composer is recorded unfocused.
+    closedByMember.current = true
+    onClose()
+  }
   const submit = () => {
     Keyboard.dismiss()
-    void state.submit(postId, locale)
+    // The thread returns now, so the private status it holds can take focus on an
+    // accepted submission even before the platform reports the keyboard closed.
+    setKeyboardOpen(false)
+    const submitted = state.current(postId)
+    void state.submit(postId, locale).then(() => {
+      // Only an outcome in this same thread updates the held copy. A reset or eviction
+      // during the request leaves the draft and its mutation for the sheet to give back.
+      if (!member || state.current(postId) !== submitted || submitted.unresolved) return
+      // A definitive rejection keeps the draft for an edit and retires the mutation.
+      if (submitted.error) {
+        drafts.remember(member, postId, { unresolved: null })
+        return
+      }
+      const { body, parentId } = submitted.draft
+      if (!body && !parentId) drafts.forget(member, postId)
+      else drafts.remember(member, postId, { body, parentId, unresolved: null })
+    })
+    // R47: the submission fixes its mutation ID before the request leaves. It is held
+    // with the draft until this thread learns the outcome.
+    if (member && submitted.unresolved)
+      drafts.remember(member, postId, { unresolved: submitted.unresolved })
   }
   const context = (item: CommunityComment) =>
-    [item.author, item.unavailable ? t('community.comments.unavailable') : item.body]
-      .filter(Boolean)
-      .join('. ')
+    commentContext(item, t('community.comments.unavailable'))
   const actionName = (action: string, item: CommunityComment) =>
     `${action}: ${context(item)}`
-  const replyContext = () => {
+  const replying = () => {
     const root = thread.roots?.items.find((item) => item.id === thread.draft.parentId)
-    return root ? `: ${context(root)}` : ''
+    const replyingTo = t('community.comments.replying')
+    return root ? `${replyingTo}: ${context(root)}` : replyingTo
   }
 
   const entry = (item: CommunityComment) => (
@@ -180,7 +291,7 @@ export function CommunityCommentsSheet({
           button(
             t('community.comments.reply'),
             () => {
-              state.draft(postId, { parentId: item.id })
+              edit({ parentId: item.id })
               composerRef.current?.focus()
             },
             false,
@@ -260,24 +371,44 @@ export function CommunityCommentsSheet({
   )
 
   return (
-    <Modal
+    <EdgeToEdgeModal
       visible
-      transparent
       animationType="slide"
-      onRequestClose={onClose}
+      scrim="rgba(0,0,0,0.5)"
+      scrimTestID="comments-scrim"
+      onRequestClose={() => {
+        // R51: Back with the keyboard open closes the keyboard and keeps the sheet. On
+        // Android 16 the modal otherwise takes that Back as a close request.
+        if (!keyboardOpen) return close()
+        dismissKeyboard()
+      }}
       onShow={() => {
+        // A native composer can only take focus once its modal is on screen.
+        if (refocusComposer.current) {
+          refocusComposer.current = false
+          composerRef.current?.focus()
+          return
+        }
         if (!target) focus(titleRef)
       }}
     >
-      <KeyboardAvoidingView
-        style={styles.backdrop}
-        behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
-        keyboardVerticalOffset={modalKeyboardOffset()}
-      >
+      <View style={styles.anchor}>
         <View
-          style={[styles.sheet, { backgroundColor: palette.surface }]}
+          testID="comments-sheet"
+          style={[
+            styles.sheet,
+            { backgroundColor: palette.surface, paddingBottom: 32 + insets.bottom },
+          ]}
           accessibilityViewIsModal
           accessible={false}
+          // R51: iOS has no Back, the thread region is hidden and the return key sends,
+          // so a tap on the sheet outside its controls closes the keyboard. Controls and
+          // the composer take their own taps first.
+          onStartShouldSetResponder={() => keyboardOpen}
+          onResponderRelease={dismissKeyboard}
+          // The screen reader's escape gesture follows Back: the keyboard first, then
+          // the sheet.
+          onAccessibilityEscape={() => (keyboardOpen ? dismissKeyboard() : close())}
         >
           <View style={styles.row}>
             <Text
@@ -287,12 +418,18 @@ export function CommunityCommentsSheet({
             >
               {t('community.comments.title')}
             </Text>
-            {button(t('community.comments.close'), onClose, false, 'comments-close')}
+            {button(t('community.comments.close'), close, false, 'comments-close')}
           </View>
           <ScrollView
+            testID="comments-thread"
             keyboardShouldPersistTaps="handled"
-            style={styles.discussion}
+            style={threadRegionStyle(keyboardOpen)}
             contentContainerStyle={styles.content}
+            contentOffset={restoreOffset}
+            onScroll={(event) => {
+              threadOffset.current = event.nativeEvent.contentOffset
+            }}
+            scrollEventThrottle={16}
             accessible={false}
           >
             {button(
@@ -387,37 +524,56 @@ export function CommunityCommentsSheet({
           <View style={styles.composer}>
             {thread.draft.parentId && (
               <View style={styles.row}>
-                <Text style={{ color: palette.text }}>
-                  {t('community.comments.replying')}
-                  {replyContext()}
+                {/* R51: three lines at most on screen; the label keeps the whole context. */}
+                <Text
+                  testID="comments-reply-context"
+                  accessibilityLabel={replying()}
+                  numberOfLines={3}
+                  ellipsizeMode="tail"
+                  style={{ color: palette.text }}
+                >
+                  {replying()}
                 </Text>
-                {button(t('community.comments.cancel'), () =>
-                  state.draft(postId, { parentId: null })
-                )}
+                {button(t('community.comments.cancel'), () => edit({ parentId: null }))}
               </View>
             )}
             <Text style={[styles.author, { color: palette.text }]}>
               {t('community.comments.compose')}
             </Text>
-            <TextInput
-              ref={composerRef}
-              testID="comment-body"
-              accessibilityLabel={t('community.comments.compose')}
-              value={thread.draft.body}
-              multiline={false}
-              returnKeyType="send"
-              onChangeText={(body) => state.draft(postId, { body })}
-              onEndEditing={(event) => {
-                const body = event.nativeEvent.text
-                if (state.current(postId).draft.body === body)
-                  state.draft(postId, { body: body.normalize('NFC') })
+            <ComposerUnmount
+              onUnmount={() => {
+                if (member)
+                  drafts.retainFocus(
+                    member,
+                    postId,
+                    !closedByMember.current && (composerRef.current?.isFocused() ?? false)
+                  )
               }}
-              onSubmitEditing={submit}
-              style={[
-                styles.input,
-                { color: palette.text, borderColor: palette.mutedText },
-              ]}
-            />
+            >
+              <TextInput
+                ref={composerRef}
+                testID="comment-body"
+                accessibilityLabel={t('community.comments.compose')}
+                value={thread.draft.body}
+                multiline={false}
+                returnKeyType="send"
+                onChangeText={(body) => edit({ body })}
+                onFocus={() => {
+                  // Holds even an empty draft, so a focused composer keeps its focus.
+                  if (member) drafts.remember(member, postId, {})
+                }}
+                onEndEditing={(event) => {
+                  const body = event.nativeEvent.text
+                  if (state.current(postId).draft.body === body)
+                    edit({ body: body.normalize('NFC') })
+                }}
+                onSubmitEditing={submit}
+                style={[
+                  styles.input,
+                  { color: palette.text, borderColor: palette.mutedText },
+                ]}
+              />
+            </ComposerUnmount>
             <Text style={{ color: palette.text }}>
               {t('community.comments.count', {
                 count: thread.draft.body.normalize('NFC').trim().length,
@@ -445,21 +601,21 @@ export function CommunityCommentsSheet({
             )}
           </View>
         </View>
-      </KeyboardAvoidingView>
-    </Modal>
+      </View>
+    </EdgeToEdgeModal>
   )
 }
 
 const styles = StyleSheet.create({
-  backdrop: { flex: 1, justifyContent: 'flex-end', backgroundColor: 'rgba(0,0,0,0.5)' },
+  anchor: { flex: 1, justifyContent: 'flex-end' },
   sheet: {
     maxHeight: '90%',
     padding: 16,
-    paddingBottom: 32,
     borderTopLeftRadius: 20,
     borderTopRightRadius: 20,
   },
   discussion: { flexShrink: 1 },
+  hidden: { display: 'none' },
   content: { gap: 12, paddingBottom: 12 },
   composer: { gap: 12, paddingTop: 12 },
   row: { flexDirection: 'row', flexWrap: 'wrap', gap: 8, alignItems: 'center' },

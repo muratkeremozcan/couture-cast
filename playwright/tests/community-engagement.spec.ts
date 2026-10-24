@@ -26,6 +26,7 @@ import {
   takeDownCommunityLook,
   requestCommunityAccountErasure,
   expectErasedAuthorDenial,
+  publishOwnLook,
 } from '../support/helpers/community-engagement'
 import {
   loadCommunityFixture,
@@ -35,7 +36,6 @@ import {
 import { checkA11y } from '../support/helpers/accessibility'
 import { WEB_ACCESS_TOKEN_STORAGE_KEY } from '../support/helpers/commerce-session'
 
-const POST = 'lookbook-5'
 const evidenceJson = (value: unknown) =>
   JSON.stringify(
     value,
@@ -53,6 +53,7 @@ test.describe('Story 6.5 real engagement transport', () => {
   test.setTimeout(120_000)
 
   test('[P0] E2E-001 healthy socket delivers two-browser reactions, comments and buffered new looks without healthy fallback polling', async ({
+    look,
     page,
     authorPage,
     communitySession,
@@ -72,8 +73,8 @@ test.describe('Story 6.5 real engagement transport', () => {
       { timeout: 10_000 }
     )
     const before = transport.doorbells
-    const reaction = page.getByTestId(`community-reactions-${POST}`)
-    const actorReaction = authorPage.getByTestId(`community-reactions-${POST}`)
+    const reaction = page.getByTestId(`community-reactions-${look}`)
+    const actorReaction = authorPage.getByTestId(`community-reactions-${look}`)
     const initial = Number(
       (await reaction
         .getByRole('button', { name: /^Applaud,/ })
@@ -81,21 +82,21 @@ test.describe('Story 6.5 real engagement transport', () => {
     )
     const mutation = interceptFor(authorPage)({
       method: 'PUT',
-      url: `**/community/posts/${POST}/reaction`,
+      url: `**/community/posts/${look}/reaction`,
     })
     await actorReaction.getByRole('button', { name: /^Applaud,/ }).click()
     expect((await mutation).status).toBe(200)
     await expect(
       reaction.getByRole('button', { name: `Applaud, ${initial + 1}`, exact: true })
     ).toBeVisible({ timeout: 10_000 })
-    await openComments(page, POST)
+    await openComments(page, look)
     await thread(page).getByLabel('Add a comment').fill('My retained reader draft')
-    await openComments(authorPage, POST)
+    await openComments(authorPage, look)
     const body = `Wool layers ${digits()}`
     await thread(authorPage).getByLabel('Add a comment').fill(body)
     const created = interceptFor(authorPage)({
       method: 'POST',
-      url: `**/community/posts/${POST}/comments`,
+      url: `**/community/posts/${look}/comments`,
     })
     await thread(authorPage)
       .getByRole('button', { name: 'Send comment', exact: true })
@@ -106,7 +107,7 @@ test.describe('Story 6.5 real engagement transport', () => {
       result.responseJson
     ).data
     expect(
-      (await settleComment({ apiRequest, recurse }, communityApi, POST, comment.id))
+      (await settleComment({ apiRequest, recurse }, communityApi, look, comment.id))
         .status
     ).toBe('published')
     await expect(thread(page).getByTestId(`comment-${comment.id}`)).toContainText(body, {
@@ -163,10 +164,20 @@ test.describe('Story 6.5 real engagement transport', () => {
     await closeComments(page)
     const insert = page.getByRole('button', { name: /Show \d+ new look/ })
     await expect(insert).toBeVisible({ timeout: 10_000 })
-    await expect(page.getByTestId(`lookbook-card-${published.postId}`)).toHaveCount(0)
+    const ownCard = page.getByTestId(`lookbook-card-${published.postId}`)
+    await expect(ownCard).toHaveCount(0)
     await insert.focus()
     await page.keyboard.press('Enter')
-    await expect(page.getByTestId(`lookbook-card-${published.postId}`)).toBeVisible()
+    // Other specs publish in parallel, so the first banner can announce their look
+    // before this one is buffered; insert again, from the keyboard each time, until
+    // this look is in.
+    await expect(async () => {
+      if ((await ownCard.count()) === 0 && (await insert.isVisible())) {
+        await insert.focus()
+        await page.keyboard.press('Enter')
+      }
+      await expect(ownCard).toBeVisible({ timeout: 1_000 })
+    }).toPass({ timeout: 20_000 })
     await checkA11y(page)
     await page.screenshot({
       path: testInfo.outputPath('healthy-new-look.png'),
@@ -178,7 +189,7 @@ test.describe('Story 6.5 real engagement transport', () => {
     '[P0] E2E-002 real socket outage falls back within eight seconds, reconnects and resyncs an expired epoch',
     { annotation: [{ type: 'expectedCommunityResync' }] },
     async (
-      { page, authorPage, communitySession, communityApi, apiRequest, recurse },
+      { look, page, authorPage, communitySession, communityApi, apiRequest, recurse },
       testInfo
     ) => {
       expect(communitySession.userId).not.toBe(communityApi.userId)
@@ -190,21 +201,21 @@ test.describe('Story 6.5 real engagement transport', () => {
         (value) => value > 0,
         { timeout: 10_000 }
       )
-      await openComments(page, POST)
+      await openComments(page, look)
       await thread(page).getByLabel('Add a comment').fill('Draft across an outage')
       // D3/D9: a reconnecting socket is not an outage. The card, the open thread and
       // the draft stay visible while HTTP fallback serves events.
-      const stopWatching = await watchContentStaysVisible(page, POST)
+      const stopWatching = await watchContentStaysVisible(page, look)
       const outage = Date.now()
       await transport.disconnect()
       const comment = await submitComment(
         { apiRequest, recurse },
         communityApi,
-        POST,
+        look,
         `Recovery layers ${digits()}`
       )
       expect(
-        (await settleComment({ apiRequest, recurse }, communityApi, POST, comment.id))
+        (await settleComment({ apiRequest, recurse }, communityApi, look, comment.id))
           .status
       ).toBe('published')
       await expect(thread(page).getByTestId(`comment-${comment.id}`)).toBeVisible({
@@ -218,7 +229,7 @@ test.describe('Story 6.5 real engagement transport', () => {
       await expect(thread(page).getByLabel('Add a comment')).toHaveValue(
         'Draft across an outage'
       )
-      await expect(page.getByTestId(`lookbook-card-${POST}`)).toBeVisible()
+      await expect(page.getByTestId(`lookbook-card-${look}`)).toBeVisible()
       expect(await stopWatching()).toEqual([])
       const handshakes = transport.handshakes
       // A different owner keeps a valid cursor throughout this worker's private reset.
@@ -295,6 +306,7 @@ test.describe('Story 6.5 real engagement transport', () => {
   )
 
   test('[P0] E2E-003 private screening status stays on its author and deletion invalidates the other browser', async ({
+    look,
     page,
     authorPage,
     communitySession,
@@ -309,8 +321,8 @@ test.describe('Story 6.5 real engagement transport', () => {
     const authorSocket = await observeCommunitySocket(authorPage)
     await openAll(page)
     await openAll(authorPage)
-    await openComments(page, POST)
-    await openComments(authorPage, POST)
+    await openComments(page, look)
+    await openComments(authorPage, look)
     await recurse(
       () => Promise.resolve(readerSocket.handshakes > 0 && authorSocket.handshakes > 0),
       Boolean,
@@ -320,11 +332,11 @@ test.describe('Story 6.5 real engagement transport', () => {
     const held = await submitComment(
       { apiRequest, recurse },
       communityApi,
-      POST,
+      look,
       heldBody
     )
     expect(
-      (await settleComment({ apiRequest, recurse }, communityApi, POST, held.id)).status
+      (await settleComment({ apiRequest, recurse }, communityApi, look, held.id)).status
     ).toBe('held_for_review')
     await expect(
       thread(authorPage).getByTestId(`comment-submission-${held.id}`)
@@ -334,17 +346,17 @@ test.describe('Story 6.5 real engagement transport', () => {
     const publicComment = await submitComment(
       { apiRequest, recurse },
       communityApi,
-      POST,
+      look,
       `Soft coat ${digits()}`
     )
     expect(
-      (await settleComment({ apiRequest, recurse }, communityApi, POST, publicComment.id))
+      (await settleComment({ apiRequest, recurse }, communityApi, look, publicComment.id))
         .status
     ).toBe('published')
     await expect(thread(page).getByTestId(`comment-${publicComment.id}`)).toBeVisible()
     const erased = await apiRequest({
       method: 'DELETE',
-      path: `/api/v1/community/posts/${POST}/comments/${publicComment.id}`,
+      path: `/api/v1/community/posts/${look}/comments/${publicComment.id}`,
       baseUrl: communityApi.apiBaseUrl,
       headers: communityApi.headers,
     })
@@ -359,6 +371,7 @@ test.describe('Story 6.5 real engagement transport', () => {
   })
 
   test('[P0] E2E-004 off-page notification focuses the exact reply and reconciles its removal', async ({
+    look,
     page,
     communitySession,
     communityApi,
@@ -375,14 +388,14 @@ test.describe('Story 6.5 real engagement transport', () => {
     try {
       await db.$transaction(async (tx) => {
         const post = await tx.lookbookPost.update({
-          where: { id: POST },
+          where: { id: look },
           data: { comment_publication_sequence: { increment: 45 } },
         })
         const last = post.comment_publication_sequence
         await tx.communityComment.createMany({
           data: Array.from({ length: 45 }, (_, i) => ({
             id: i === 22 ? rootId : i === 44 ? replyId : `${prefix}-${i}`,
-            post_id: POST,
+            post_id: look,
             user_id: communityApi.userId,
             parent_id: i > 22 ? rootId : null,
             body: `Historical linen ${i}`,
@@ -402,7 +415,7 @@ test.describe('Story 6.5 real engagement transport', () => {
       path: '/api/v1/community/targets/resolve',
       baseUrl: communitySession.apiBaseUrl,
       headers: accountFor(communitySession).headers,
-      body: { targets: [{ key: 'notification', postId: POST, commentId: replyId }] },
+      body: { targets: [{ key: 'notification', postId: look, commentId: replyId }] },
     })
     expect(targetProof.status).toBe(200)
     const target = resolveCommunityTargetsResponseSchema.parse(targetProof.body).data
@@ -461,7 +474,7 @@ test.describe('Story 6.5 real engagement transport', () => {
       url: '**/community/targets/resolve',
     })
     await page.goto(
-      `/?source=notification&type=community&cardId=${POST}&commentId=${replyId}`
+      `/?source=notification&type=community&cardId=${look}&commentId=${replyId}`
     )
     expect((await located).status).toBe(200)
     const focused = thread(page).getByTestId(`comment-${replyId}`)
@@ -481,7 +494,7 @@ test.describe('Story 6.5 real engagement transport', () => {
     await page.screenshot({ path: testInfo.outputPath('off-page-exact-reply.png') })
     const removed = await apiRequest({
       method: 'DELETE',
-      path: `/api/v1/community/posts/${POST}/comments/${replyId}`,
+      path: `/api/v1/community/posts/${look}/comments/${replyId}`,
       baseUrl: communityApi.apiBaseUrl,
       headers: communityApi.headers,
     })
@@ -495,22 +508,31 @@ test.describe('Story 6.5 real engagement transport', () => {
   })
 
   test('[P0] E2E-005 a late prior-account target result cannot replace the new account or draft', async ({
+    look,
+    request,
     page,
     communitySession,
     communityApi,
     interceptNetworkCall,
     apiRequest,
     recurse,
-  }) => {
+  }, testInfo) => {
+    // A second look of this test's own, for the new account's draft. A fixed seed
+    // card is pushed past the first page by looks other tests publish.
+    const other = await publishOwnLook(
+      { communityApi, request, apiRequest, recurse },
+      testInfo,
+      'Second look'
+    )
     expect(communitySession.userId).not.toBe(communityApi.userId)
     const targetComment = await submitComment(
       { apiRequest, recurse },
       communityApi,
-      POST,
+      look,
       `Prior account linen ${digits()}`
     )
     expect(
-      (await settleComment({ apiRequest, recurse }, communityApi, POST, targetComment.id))
+      (await settleComment({ apiRequest, recurse }, communityApi, look, targetComment.id))
         .status
     ).toBe('published')
     const transport = await observeCommunitySocket(page)
@@ -568,7 +590,7 @@ test.describe('Story 6.5 real engagement transport', () => {
       },
     })
     await page.goto(
-      `/?source=notification&type=community&cardId=${POST}&commentId=${targetComment.id}`
+      `/?source=notification&type=community&cardId=${look}&commentId=${targetComment.id}`
     )
     await entered
     await recurse(
@@ -591,7 +613,7 @@ test.describe('Story 6.5 real engagement transport', () => {
       )
       await closeComments(page)
       await page.getByTestId('community-filter-all').click()
-      await openComments(page, 'lookbook-3')
+      await openComments(page, other.postId)
       await thread(page).getByLabel('Add a comment').fill('New owner draft')
     } finally {
       release()
@@ -599,7 +621,9 @@ test.describe('Story 6.5 real engagement transport', () => {
     await held
     await settled
     await expect(thread(page).getByLabel('Add a comment')).toHaveValue('New owner draft')
-    await expect(page.getByTestId('community-detail-caption')).toContainText('Look 3')
+    await expect(page.getByTestId('community-detail-caption')).toContainText(
+      other.caption
+    )
     await expect(thread(page).getByTestId(`comment-${targetComment.id}`)).toHaveCount(0)
     expect(nextOwnerReads).toContain('/api/v1/community/feed')
     expect(nextOwnerReads).toContain('/api/v1/community/events')
@@ -664,6 +688,24 @@ test.describe('Story 6.5 real engagement transport', () => {
       await expect(page.getByTestId(`lookbook-card-${erased}`)).toBeVisible()
       await openComments(page, erased)
       await thread(page).getByLabel('Add a comment').fill('Erased look draft')
+      // An unrelated seeded card that is on the loaded page now. A fixed one may not
+      // be: posts other tests publish lead the feed and push it past the first
+      // page. Seeded cards never go away, unlike another test's own posts.
+      const survivor = await page
+        .locator('[data-testid^="lookbook-card-"]')
+        .evaluateAll(
+          (cards, excluded) =>
+            cards
+              .map((card) => card.getAttribute('data-testid'))
+              .find(
+                (id) =>
+                  id !== null &&
+                  !excluded.includes(id) &&
+                  /^lookbook-card-(lookbook|seed)-/.test(id)
+              ) ?? null,
+          [`lookbook-card-${takenDown}`, `lookbook-card-${erased}`]
+        )
+      expect(survivor, 'An unrelated seeded card is on the loaded page').not.toBeNull()
       expectErasedAuthorDenial(authorPage)
       await requestCommunityAccountErasure(communityApi.userId)
       await expect(page.getByTestId(`lookbook-card-${erased}`)).toHaveCount(0, {
@@ -674,7 +716,7 @@ test.describe('Story 6.5 real engagement transport', () => {
       })
       await expect(thread(page)).toHaveCount(0)
       await expect(thread(authorPage)).toHaveCount(0)
-      await expect(page.getByTestId('lookbook-card-lookbook-3')).toBeVisible()
+      await expect(page.getByTestId(survivor!)).toBeVisible()
       const denied = await apiRequest<unknown>({
         method: 'GET',
         path: '/api/v1/community/events?mode=all',

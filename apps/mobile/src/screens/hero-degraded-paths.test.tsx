@@ -2,8 +2,10 @@
 // Covers the hero screen's degraded and native-only paths: a durable cache
 // that refuses writes, a widget slot that maps to a named scenario, and the
 // iOS accessibility-focus routes the web renderer never takes.
+import type * as FocusEffectModule from '@/src/test-utils/focus-effect'
 import React from 'react'
 import type * as ReactNativeModule from 'react-native'
+import type * as EdgeToEdgeTestUtils from '@/src/test-utils/edge-to-edge-modal'
 import type * as RitualCacheModule from '@/src/lib/ritual-cache'
 import { act, configure, fireEvent, screen, waitFor } from '@testing-library/react'
 import { render } from 'vitest-browser-react'
@@ -11,15 +13,32 @@ import { afterEach, beforeAll, beforeEach, describe, expect, it, vi } from 'vite
 import { http, HttpResponse } from 'msw'
 import { AccessibilityInfo, Platform, findNodeHandle } from 'react-native'
 import { createWeatherAlertPolledEvent } from '@couture/api-client/testing/deep-link-events'
+import {
+  EDGE_TO_EDGE_MODAL_PROPS,
+  TEST_SAFE_AREA_INSETS,
+  modalRenders,
+  paddingBottomOf,
+} from '@/src/test-utils/edge-to-edge-modal'
 
 const { NATIVE_NODE_HANDLE } = vi.hoisted(() => ({ NATIVE_NODE_HANDLE: 4242 }))
 
 // react-native-web throws from findNodeHandle and no-ops setAccessibilityFocus,
 // so the native focus routes can only be observed by standing in for both.
+vi.mock('react-native-safe-area-context', async (importOriginal) => {
+  const actual = await importOriginal<Record<string, unknown>>()
+  const { TEST_SAFE_AREA_INSETS } = await vi.importActual<typeof EdgeToEdgeTestUtils>(
+    '@/src/test-utils/edge-to-edge-modal'
+  )
+  return { ...actual, useSafeAreaInsets: () => TEST_SAFE_AREA_INSETS }
+})
 vi.mock('react-native', async (importOriginal) => {
   const actual = await importOriginal<typeof ReactNativeModule>()
+  const { recordModalProps } = await vi.importActual<typeof EdgeToEdgeTestUtils>(
+    '@/src/test-utils/edge-to-edge-modal'
+  )
   return {
     ...actual,
+    Modal: recordModalProps(actual.Modal),
     findNodeHandle: vi.fn(() => NATIVE_NODE_HANDLE),
     AccessibilityInfo: {
       ...actual.AccessibilityInfo,
@@ -32,9 +51,12 @@ let mockParams: Record<string, string> = {}
 const mockSetParams = vi.fn()
 const mockPush = vi.fn()
 
-vi.mock('expo-router', () => ({
+vi.mock('expo-router', async () => ({
   useLocalSearchParams: () => mockParams,
   useRouter: () => ({ setParams: mockSetParams, push: mockPush }),
+  useFocusEffect: (
+    await vi.importActual<typeof FocusEffectModule>('@/src/test-utils/focus-effect')
+  ).useFocusEffect,
 }))
 
 vi.mock('expo-localization', () => ({
@@ -224,6 +246,24 @@ describe('TabOneScreen degraded and native-only paths', () => {
     await waitFor(() => {
       expect(screen.queryByTestId('garment-swap-modal')).toBeNull()
     })
+  })
+
+  it('R52 the swap sheet covers the system bars and stays above the gesture bar', async () => {
+    renderScreen()
+    await waitFor(() => {
+      expect(screen.getByText('Classic Trench Coat')).toBeTruthy()
+    })
+    fireEvent.click(screen.getByTestId('garment-tile-classic-trench-coat'))
+    await waitFor(() => {
+      expect(screen.getByTestId('garment-swap-modal')).toBeTruthy()
+    })
+    expect(modalRenders.filter((props) => props.visible).at(-1)).toMatchObject({
+      ...EDGE_TO_EDGE_MODAL_PROPS,
+      transparent: true,
+    })
+    expect(paddingBottomOf(screen.getByTestId('garment-swap-modal'))).toBe(
+      20 + TEST_SAFE_AREA_INSETS.bottom
+    )
   })
 
   it('3.3-MOB-HERO-22 ignores a superseded ritual load that fails after a newer one succeeded', async () => {

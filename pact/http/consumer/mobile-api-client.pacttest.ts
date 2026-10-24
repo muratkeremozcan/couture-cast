@@ -125,6 +125,10 @@ import {
   verifyCommunitySpotlightInvalidCursorInteraction,
   verifyCommunitySpotlightDisabledInteraction,
   verifyOpenCommunitySpotlightPostInteraction,
+  // Story 6.7 Home teaser read and open.
+  verifyCommunitySpotlightHomeTeaserInteraction,
+  verifyOpenCommunityHomeTeaserPostInteraction,
+  verifyCommunitySpotlightHomeTeaserRateLimitedInteraction,
   verifyOpenCommunityFeedPostInteraction,
   verifyCommunityPostInteraction,
   verifyCommunityPostNotFoundInteraction,
@@ -680,6 +684,30 @@ describe('CoutureCastMobile -> CoutureCastApi HTTP contract', () => {
 
   it('records a spotlight card open with its rank', async () => {
     await verifyOpenCommunitySpotlightPostInteraction(
+      pact,
+      createMobileClientForMockServer,
+      'mobile'
+    )
+  })
+
+  it('reads the top spotlight entry for the home teaser', async () => {
+    await verifyCommunitySpotlightHomeTeaserInteraction(
+      pact,
+      createMobileClientForMockServer,
+      'mobile'
+    )
+  })
+
+  it('records a home teaser open with rank one', async () => {
+    await verifyOpenCommunityHomeTeaserPostInteraction(
+      pact,
+      createMobileClientForMockServer,
+      'mobile'
+    )
+  })
+
+  it('reports a home teaser read over the limit with its Retry-After', async () => {
+    await verifyCommunitySpotlightHomeTeaserRateLimitedInteraction(
       pact,
       createMobileClientForMockServer,
       'mobile'

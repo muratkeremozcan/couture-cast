@@ -28,11 +28,13 @@ import { fileURLToPath, URL } from 'node:url'
 import path from 'node:path'
 import { MAESTRO_BIN, MAESTRO_PINNED_VERSION } from './maestro-version.mjs'
 import {
-  clearMobileE2ELocations,
+  COMMUNITY_COMMENTS_FLOW,
+  COMMUNITY_COMMENTS_LONG_ROOT,
+  LOCATION_CAPTURE_FLOW,
   locationCaptureWeatherDoubleCause,
   mobileE2EBaselineLocationRequestBody,
+  mobileE2EFlowStateHooks,
   resetMobileE2EFlowState,
-  restoreMobileE2EBaselineLocation,
 } from './lib/mobile-e2e-flow-state.mjs'
 import {
   coordinateKeySuffix,
@@ -49,6 +51,11 @@ import {
   removeReportEverywhere,
 } from './lib/maestro-flow-outcome.mjs'
 import { runMobileE2EFlow } from './lib/mobile-e2e-flow-retry.mjs'
+import {
+  createMaestroDriverReuse,
+  launchShardedSuite,
+  withTestOptions,
+} from './lib/maestro-driver-reuse.mjs'
 import {
   adbDeviceStates,
   captureSlowProbeState,
@@ -527,6 +534,96 @@ const suppressAndroidErrorDialogs = async () => {
     }
   } catch (error) {
     log(`Could not set hide_error_dialogs: ${error.message}`)
+  }
+}
+
+/**
+ * Bring a Play image's Gboard closer to CI's keyboard-less google_apis image.
+ *
+ * On the local API 36 AVD every text-field tap Maestro makes reaches Gboard as a
+ * stylus tool event, and Gboard answers with a full-screen "Try out your stylus"
+ * sheet over the app: location capture, capsule create and screened comments
+ * failed on a field the sheet hid. With stylus handwriting off it schedules no
+ * education. Gboard's spell checking also janks every keystroke of a long
+ * `inputText` (frames of 0.7 to 1.3 s, 76 s for a 273-character comment), long
+ * enough for the community socket to drop mid-comment; it is turned off too.
+ * Each setting is read back like `hide_error_dialogs`, so a write that did
+ * nothing is reported. CI's image has no Gboard, so there this is a no-op.
+ *
+ * @returns {Promise<void>}
+ */
+const quietAndroidKeyboard = async () => {
+  const adbBinary = resolveAdbBinary()
+  const settings = [
+    [
+      'stylus_handwriting_enabled',
+      'Gboard may cover text fields with its stylus education sheet.',
+    ],
+    ['spell_checker_enabled', 'Gboard spell checking may slow long text input.'],
+  ]
+  for (const [name, consequence] of settings) {
+    try {
+      await captureProcess(adbBinary, ['shell', 'settings', 'put', 'secure', name, '0'], {
+        timeoutMs: 15_000,
+      })
+      const readBack = await captureProcess(
+        adbBinary,
+        ['shell', 'settings', 'get', 'secure', name],
+        { timeoutMs: 15_000 }
+      )
+      if (readBack.stdout.trim() === '0') {
+        log(`${name}=0 set on ${androidSerial || 'the attached device'}`)
+      } else {
+        log(
+          `Could not turn off ${name}: it reads "${readBack.stdout.trim()}". ${consequence}`
+        )
+      }
+    } catch (error) {
+      log(`Could not set ${name}: ${error.message}`)
+    }
+  }
+}
+
+/**
+ * Turn Android's window, transition and animator animations off, as CI's
+ * emulator runs them (`disable-animations: true` in pr-mobile-e2e.yml).
+ *
+ * A local AVD keeps every scale at 1, so each tap, sheet, scroll and keyboard
+ * waits out its animation before Maestro sees the screen settle, and local flow
+ * timings drift from the ones CI records. Each scale is read back like `hide_error_dialogs`, so a write that did nothing
+ * is reported. On CI's emulator the scales are already 0 and this changes nothing.
+ *
+ * @returns {Promise<void>}
+ */
+const disableAndroidAnimations = async () => {
+  const adbBinary = resolveAdbBinary()
+  const scales = [
+    'window_animation_scale',
+    'transition_animation_scale',
+    'animator_duration_scale',
+  ]
+  for (const name of scales) {
+    try {
+      await captureProcess(adbBinary, ['shell', 'settings', 'put', 'global', name, '0'], {
+        timeoutMs: 15_000,
+      })
+      const readBack = await captureProcess(
+        adbBinary,
+        ['shell', 'settings', 'get', 'global', name],
+        { timeoutMs: 15_000 }
+      )
+      // `settings get` prints a float scale as written; both spellings mean off.
+      if (['0', '0.0'].includes(readBack.stdout.trim())) {
+        log(`${name}=0 set on ${androidSerial || 'the attached device'}`)
+      } else {
+        log(
+          `Could not turn off ${name}: it reads "${readBack.stdout.trim()}". ` +
+            'Animations will slow every flow on this device.'
+        )
+      }
+    } catch (error) {
+      log(`Could not set ${name}: ${error.message}`)
+    }
   }
 }
 
@@ -1498,8 +1595,6 @@ const LOCATION_SENTINEL_PLACE_TEXT = `${LOCATION_SENTINEL_PLACE.name}, ${LOCATIO
  */
 const LOCATION_SENTINEL_TEMP_F = String(Math.round((SENTINEL_TEMPERATURE_C * 9) / 5 + 32))
 
-const LOCATION_CAPTURE_FLOW = 'maestro/location-capture.yaml'
-
 /**
  * The weather provider double the E2E API's providers point at. The API
  * launcher (scripts/start-api-e2e-with-workers.mjs) keeps a caller's own pair of
@@ -1512,17 +1607,14 @@ const WEATHER_DOUBLE_ORIGIN =
     : `http://127.0.0.1:${process.env.E2E_WEATHER_DOUBLE_PORT || '4010'}`
 
 /**
- * State a flow needs beyond the shared per-flow reset. `before` runs ahead of
- * every attempt; `after` runs once the flow finishes, pass or fail, so the
- * flows after it start from the baseline the identity setup created.
+ * State a flow needs beyond the shared per-flow reset: the location capture
+ * flow's empty member, and the long root `community-comments.yaml` replies to.
+ * See `mobileE2EFlowStateHooks` for when each hook runs.
  */
-const FLOW_STATE_HOOKS = {
-  [LOCATION_CAPTURE_FLOW]: {
-    before: (prisma, userId) =>
-      clearMobileE2ELocations(prisma, userId, LOCATION_SENTINEL_KEY_SUFFIX),
-    after: (prisma, userId) => restoreMobileE2EBaselineLocation(prisma, userId),
-  },
-}
+const FLOW_STATE_HOOKS = mobileE2EFlowStateHooks({
+  locationSentinelKeySuffix: LOCATION_SENTINEL_KEY_SUFFIX,
+  cleanupComments: cleanupCommunityCommentFixtures,
+})
 
 const withMobileE2EPrisma = async (work) => {
   const prisma = new PrismaClient({ datasourceUrl: MOBILE_E2E_DATABASE_URL })
@@ -1723,6 +1815,49 @@ const failFlowWithCause = (flowPath, cause, flowFailures) => {
     flowFailures[index] = `${flowFailures[index]} (${cause})`
   }
 }
+
+/** The device a serial run drives when no serial is pinned: adb's own default. */
+const DEFAULT_ADB_DEVICE = 'the default adb device'
+
+/**
+ * Story 6.7 R62: Maestro's Android driver is installed once per device per run. Its
+ * first flow starts from a removed driver, later flows reuse it once the device
+ * shows it complete (scripts/lib/maestro-driver-reuse.mjs).
+ */
+const maestroDriverReuse = createMaestroDriverReuse({
+  inspect: async (device) => {
+    const adbBinary = resolveAdbBinary()
+    const target = device === DEFAULT_ADB_DEVICE ? [] : ['-s', device]
+    const [packages, instrumentation] = await Promise.all([
+      captureProcess(
+        adbBinary,
+        [...target, 'shell', 'pm', 'list', 'packages', 'dev.mobile.maestro'],
+        {
+          timeoutMs: 15_000,
+        }
+      ),
+      captureProcess(adbBinary, [...target, 'shell', 'pm', 'list', 'instrumentation'], {
+        timeoutMs: 15_000,
+      }),
+    ])
+    return {
+      packagesOutput: packages.stdout,
+      instrumentationOutput: instrumentation.stdout,
+    }
+  },
+  uninstall: (device, packageName) =>
+    captureProcess(
+      resolveAdbBinary(),
+      [
+        ...(device === DEFAULT_ADB_DEVICE ? [] : ['-s', device]),
+        'shell',
+        'pm',
+        'uninstall',
+        packageName,
+      ],
+      { timeoutMs: 30_000 }
+    ),
+})
 
 /**
  * The community beta arm, as `community-analytics.ts` assigns it:
@@ -3316,6 +3451,9 @@ const buildMaestroFlowEnvArgs = () => [
   `LOCATION_SENTINEL_PLACE=${LOCATION_SENTINEL_PLACE_TEXT}`,
   '-e',
   `LOCATION_SENTINEL_TEMP_F=${LOCATION_SENTINEL_TEMP_F}`,
+  // Seeded only while community-comments.yaml runs; the text is fixed.
+  '-e',
+  `COMMUNITY_COMMENTS_LONG_ROOT=${COMMUNITY_COMMENTS_LONG_ROOT}`,
   '-e',
   `APP_URL=${process.env.APP_URL}`,
   '-e',
@@ -3441,16 +3579,28 @@ const runShardedFlows = async (shardedFlows, target, maestroEnv, flowFailures) =
   let maestroExitError
   // Same rule as the serial path: never read an earlier run's report (R28).
   removeMaestroReport(parallelArgs)
-  try {
-    await runMaestroCommand(parallelArgs, {
-      env: maestroEnv,
-      logFile: WRITE_ARTIFACTS
-        ? path.resolve(projectRoot, MAESTRO_ARTIFACT_DIR, 'parallel-suite.log')
-        : undefined,
-    })
-  } catch (error) {
-    maestroExitError = error
+  // Story 6.7 R68: every shard device gets the serial path's driver lifecycle, and the
+  // user-scoped pass that follows reuses what this invocation installed.
+  const launch = await launchShardedSuite({
+    reuse: maestroDriverReuse,
+    platform: target.platform,
+    devices: SHARD_DEVICE_IDS,
+    args: parallelArgs,
+    run: (args) =>
+      runMaestroCommand(args, {
+        env: maestroEnv,
+        logFile: WRITE_ARTIFACTS
+          ? path.resolve(projectRoot, MAESTRO_ARTIFACT_DIR, 'parallel-suite.log')
+          : undefined,
+      }),
+  })
+  if (launch.refused) {
+    // A device that could not be prepared stops the launch; every flow carries why.
+    for (const flowPath of shardedFlows)
+      failFlowWithCause(flowPath, launch.refused, flowFailures)
+    return
   }
+  maestroExitError = launch.exitError
 
   const resolvedReportPath = resolveReportPath(reportPath) ?? reportPath
   const report = readSuiteReport(resolvedReportPath)
@@ -3529,6 +3679,13 @@ const runUserScopedFlows = async (
       failFlowWithCause(flowPath, refusal, flowFailures)
       continue
     }
+    let driverArgs
+    try {
+      driverArgs = await maestroDriverReuse.argsFor(target.platform, SHARD_DEVICE_IDS[0])
+    } catch (error) {
+      failFlowWithCause(flowPath, error.message, flowFailures)
+      continue
+    }
     const doubleWatch = await watchWeatherDouble(flowPath)
     if (doubleWatch?.cause) {
       failFlowWithCause(flowPath, doubleWatch.cause, flowFailures)
@@ -3559,7 +3716,7 @@ const runUserScopedFlows = async (
     log(`Running user-scoped flow on ${SHARD_DEVICE_IDS[0]}: ${flowPath}`)
     try {
       await runMaestroCommandWithWatchdogRetry(
-        serialArgs,
+        withTestOptions(serialArgs, driverArgs),
         {
           env: maestroEnv,
           logFile: WRITE_ARTIFACTS ? getFlowLogPath(flowPath) : undefined,
@@ -3576,6 +3733,7 @@ const runUserScopedFlows = async (
       flowFailures.push(flowPath)
       log(`FAIL ${flowPath} (${error.message})`)
     }
+    maestroDriverReuse.recordInvocation(target.platform, SHARD_DEVICE_IDS[0])
     const restoreCause = await restoreMobileE2EStateOrCause(identity, flowPath)
     const doubleCause = await doubleWatch?.verify?.()
     for (const cause of [doubleCause, restoreCause]) {
@@ -3808,12 +3966,30 @@ const runFlowsSerially = async (target, maestroEnv, mobileIdentity, flowFailures
       failFlowWithCause(flowPath, refusal, flowFailures)
       continue
     }
+    // Maestro Cloud runs on its own devices; only a local device reuses the driver.
+    const cloud = Boolean(
+      process.env.MAESTRO_CLOUD_API_KEY && process.env.MAESTRO_CLOUD_WORKSPACE
+    )
+    let driverArgs = []
+    if (!cloud) {
+      try {
+        driverArgs = await maestroDriverReuse.argsFor(
+          target.platform,
+          androidSerial || DEFAULT_ADB_DEVICE
+        )
+      } catch (error) {
+        failFlowWithCause(flowPath, error.message, flowFailures)
+        continue
+      }
+    }
     const doubleWatch = await watchWeatherDouble(flowPath)
     if (doubleWatch?.cause) {
       failFlowWithCause(flowPath, doubleWatch.cause, flowFailures)
       continue
     }
-    const { maestroArgs, maestroLogFile } = buildSingleFlowMaestroArgs(flowPath, target)
+    const built = buildSingleFlowMaestroArgs(flowPath, target)
+    const maestroArgs = withTestOptions(built.maestroArgs, driverArgs)
+    const { maestroLogFile } = built
 
     log(`Running Maestro flow (${maestroArgs.join(' ')})`)
     const flowStartedAt = Date.now()
@@ -3834,6 +4010,11 @@ const runFlowsSerially = async (target, maestroEnv, mobileIdentity, flowFailures
     } catch (error) {
       maestroExitError = error
     }
+    if (!cloud)
+      maestroDriverReuse.recordInvocation(
+        target.platform,
+        androidSerial || DEFAULT_ADB_DEVICE
+      )
     const restoreCause = await restoreMobileE2EStateOrCause(mobileIdentity, flowPath)
     const doubleCause = await doubleWatch?.verify?.()
 
@@ -3870,7 +4051,10 @@ const USER_SCOPED_FLOWS = [
   'maestro/garment-capsule-repair-flow.yaml',
   // Story 1.2b: removes and restores the member's saved locations around
   // itself, which only the per-flow hooks of a serial run can do safely.
-  'maestro/location-capture.yaml',
+  LOCATION_CAPTURE_FLOW,
+  // Story 6.4: replies to a long root seeded and removed by its per-flow
+  // hooks, which only a serial run calls.
+  COMMUNITY_COMMENTS_FLOW,
 ]
 
 /**
@@ -4073,6 +4257,8 @@ const run = async () => {
   // run this early.
   if (target.platform === 'android') {
     await forEachAndroidDevice(suppressAndroidErrorDialogs)
+    await forEachAndroidDevice(quietAndroidKeyboard)
+    await forEachAndroidDevice(disableAndroidAnimations)
   }
 
   if (target.platform === 'android' && !process.env.MOBILE_E2E_ANDROID_HOST) {

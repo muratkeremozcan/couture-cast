@@ -18,6 +18,10 @@ import { PlannerRail } from './planner-rail'
 import { ChipNavigation, type ChipCategory } from './chip-navigation'
 import { StickyBottomNav } from './sticky-bottom-nav'
 import { InfoBanner } from './info-banner'
+import {
+  HomeSpotlightTeaserSlot,
+  useHomeSpotlightTeaserLink,
+} from './home-spotlight-teaser'
 
 /**
  * Story 6.1: every chip category lands on the `auto` feed.
@@ -193,6 +197,12 @@ export function LookbookPrismLayout() {
   // hydration completes, which is the standard fix for viewport-dependent
   // state in an SSR'd component.
   const [isNarrowViewport, setIsNarrowViewport] = useState(false)
+  // Story 6.7: below 1280px the hero sits above the community section. Same
+  // SSR-safe `false` default as above, measured after mount.
+  const [isBelowSplit, setIsBelowSplit] = useState(false)
+  const isStacked = isMobilePreview || isBelowSplit
+  const heroCanvasRef = useRef<HTMLElement>(null)
+  const teaser = useHomeSpotlightTeaserLink({ stacked: isStacked })
   const plannerOpenerRef = useRef<HTMLElement | null>(null)
   const [activeTab, setActiveTab] = useState<FilterCategory>('auto')
   const [chipCategory, setChipCategory] = useState<ChipCategory>('Personal')
@@ -227,11 +237,25 @@ export function LookbookPrismLayout() {
     setActiveTab(CHIP_DEFAULT_FILTER[category])
   }
 
+  // The frame that scrolls the preview into view; an unmount cancels it, so it
+  // never runs against a layout that is gone.
+  const previewScrollFrameRef = useRef<number | null>(null)
+  useEffect(
+    () => () => {
+      if (previewScrollFrameRef.current !== null)
+        cancelAnimationFrame(previewScrollFrameRef.current)
+    },
+    []
+  )
+
   const handleMobilePreviewToggle = () => {
     const willEnablePreview = !isMobilePreview
     setIsMobilePreview(willEnablePreview)
     if (willEnablePreview) {
-      requestAnimationFrame(() => {
+      if (previewScrollFrameRef.current !== null)
+        cancelAnimationFrame(previewScrollFrameRef.current)
+      previewScrollFrameRef.current = requestAnimationFrame(() => {
+        previewScrollFrameRef.current = null
         containerRef.current?.scrollIntoView({ block: 'start' })
       })
     }
@@ -272,6 +296,7 @@ export function LookbookPrismLayout() {
   useEffect(() => {
     function handleResize() {
       setIsNarrowViewport(window.innerWidth < 1440)
+      setIsBelowSplit(window.innerWidth < 1280)
     }
     // Correct the SSR-safe `false` default to the real viewport immediately
     // on mount -- this runs after hydration has already committed with the
@@ -445,8 +470,11 @@ export function LookbookPrismLayout() {
       >
         {/* Left Column / Slot 1: Hero Ritual Canvas */}
         <section
+          ref={heroCanvasRef}
           aria-label="Hero Ritual Canvas"
-          className={`flex min-w-0 self-start flex-col gap-6 rounded-[8px] border border-[#E6E6ED] bg-[#F5F5F7] p-6 shadow-sm ${
+          // Focusable from code, so focus has somewhere to land when the teaser leaves.
+          tabIndex={-1}
+          className={`flex min-w-0 self-start flex-col gap-6 rounded-[8px] border border-[#E6E6ED] bg-[#F5F5F7] p-6 shadow-sm focus-visible:outline focus-visible:outline-2 focus-visible:outline-[#C9A14A] ${
             isMobilePreview ? '' : 'sm:p-8'
           }`}
         >
@@ -566,6 +594,16 @@ export function LookbookPrismLayout() {
               )}
             </div>
           </div>
+
+          {/* Story 6.7: only while stacked; the value itself lives above. */}
+          <HomeSpotlightTeaserSlot
+            stacked={isStacked}
+            teaser={teaser}
+            t={(key, options) => i18n.t(key, options)}
+            onLeaveWhileFocused={() => {
+              requestAnimationFrame(() => heroCanvasRef.current?.focus())
+            }}
+          />
         </section>
 
         {/* Right Column / Slot 2: Community Lookbook Grid */}
@@ -577,6 +615,7 @@ export function LookbookPrismLayout() {
             highlightedCardId={highlightedCardId}
             onViewerBandChange={setViewerBand}
             onServedModeChange={setServedMode}
+            spotlightFocusIntent={teaser.focusIntent}
           />
         </section>
 

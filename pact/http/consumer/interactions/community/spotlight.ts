@@ -11,6 +11,7 @@ import { ResponseError } from '@couture/api-client'
 import {
   COMMUNITY_CURSOR_INVALID_MESSAGE,
   COMMUNITY_FEED_DISABLED_MESSAGE,
+  COMMUNITY_SPOTLIGHT_RATE_LIMITED_MESSAGE,
   communityReactionSpotlightResponseSchema,
   communitySpotlightDeniedResponseSchema,
   communitySpotlightInvalidCursorResponseSchema,
@@ -171,6 +172,106 @@ export async function verifyOpenCommunitySpotlightPostInteraction(
             rank: SPOTLIGHT_RANK,
             level: 'city',
           },
+        }
+      )
+      expect(response).toEqual({ tracked: true })
+    })
+}
+
+/**
+ * Story 6.7: the Home teaser read. One rank-1 entry from the same ranking the
+ * Community module serves; `surface=home_teaser` changes only analytics.
+ */
+export async function verifyCommunitySpotlightHomeTeaserInteraction(
+  pact: PactV4,
+  createClient: CreateClient,
+  platform: CommunityPlatform
+) {
+  // Provider endpoint: apps/api/src/modules/community/community.controller.ts -> GET /api/v1/community/spotlight
+  await pact
+    .addInteraction()
+    .given(
+      ...createProviderState({
+        name: 'A city spotlight page exists for the viewer area',
+        params: { userId: pactEventAuth.userId },
+      })
+    )
+    .uponReceiving(`a ${platform} home teaser read of the top city spotlight entry`)
+    .withRequest(
+      'GET',
+      SPOTLIGHT_PATH,
+      setJsonContent({
+        headers: negotiatedHeaders(platform),
+        query: { limit: '1', surface: 'home_teaser' },
+      })
+    )
+    .willRespondWith(
+      200,
+      setJsonContent({
+        body: {
+          data: {
+            // The teaser renders only a served level: `none` with an item must not verify.
+            level: MatchersV3.regex('^(city|region|country)$', 'city'),
+            label: like(SPOTLIGHT_LABEL),
+            items: [
+              {
+                ...publishedItemBody(),
+                rank: 1,
+                reactions: reactionSummaryMatchers(),
+              },
+            ],
+            nextCursor: like(SPOTLIGHT_NEXT_CURSOR),
+          },
+        },
+      })
+    )
+    .executeTest(async (mockServer: V3MockServer) => {
+      const response = await createClient(mockServer).getCommunitySpotlight({
+        xCouturePlatform: platform,
+        xCoutureReactions: '1',
+        limit: 1,
+        surface: 'home_teaser',
+      })
+      const parsed = communityReactionSpotlightResponseSchema.parse(response)
+      expect(parsed.data.level).toBe('city')
+      expect(parsed.data.label).toBe(SPOTLIGHT_LABEL)
+      expect(parsed.data.items.map((item) => [item.id, item.rank])).toEqual([
+        [PUBLISHED_POST_ID, 1],
+      ])
+      expect(parsed.data.items[0]!.reactions).toEqual(currentReactionSummary)
+    })
+}
+
+/** Story 6.7: a Home teaser activation, the spotlight branch with its own surface. */
+export async function verifyOpenCommunityHomeTeaserPostInteraction(
+  pact: PactV4,
+  createClient: CreateClient,
+  platform: CommunityPlatform
+) {
+  await pact
+    .addInteraction()
+    .given(
+      ...createProviderState({
+        name: 'A city spotlight page exists for the viewer area',
+        params: { userId: pactEventAuth.userId },
+      })
+    )
+    .uponReceiving('a home teaser open with rank one and its served level')
+    .withRequest(
+      'POST',
+      `/api/v1/community/posts/${PUBLISHED_POST_ID}/opened`,
+      setJsonContent({
+        headers: communityHeaders(platform),
+        body: { surface: 'home_teaser', rank: 1, level: 'city' },
+      })
+    )
+    .willRespondWith(200, setJsonContent({ body: { tracked: like(true) } }))
+    .executeTest(async (mockServer: V3MockServer) => {
+      const response = await createClient(mockServer).apiV1CommunityPostsPostIdOpenedPost(
+        {
+          postId: PUBLISHED_POST_ID,
+          xCouturePlatform: platform,
+          openCommunityPostInput: { surface: 'home_teaser', rank: 1, level: 'city' },
         }
       )
       expect(response).toEqual({ tracked: true })
@@ -438,5 +539,59 @@ export async function verifyCommunitySpotlightDisabledInteraction(
       expect(
         communitySpotlightDeniedResponseSchema.parse(await error.response.json())
       ).toEqual(envelope)
+    })
+}
+
+/**
+ * Story 6.7: a Home teaser read over the page-one limit. The teaser defers its
+ * next read by `Retry-After`, so the header is part of the contract.
+ */
+export async function verifyCommunitySpotlightHomeTeaserRateLimitedInteraction(
+  pact: PactV4,
+  createClient: CreateClient,
+  platform: CommunityPlatform
+) {
+  // Provider endpoint: apps/api/src/modules/community/community.controller.ts -> GET /api/v1/community/spotlight
+  const envelope = {
+    statusCode: 429,
+    error: 'Too Many Requests',
+    message: COMMUNITY_SPOTLIGHT_RATE_LIMITED_MESSAGE,
+  }
+  await pact
+    .addInteraction()
+    .given(
+      ...createProviderState({
+        name: 'The viewer has exhausted the spotlight read limit',
+        params: { userId: pactEventAuth.userId },
+      })
+    )
+    .uponReceiving(`a ${platform} home teaser read over the spotlight read limit`)
+    .withRequest(
+      'GET',
+      SPOTLIGHT_PATH,
+      setJsonContent({
+        headers: negotiatedHeaders(platform),
+        query: { limit: '1', surface: 'home_teaser' },
+      })
+    )
+    .willRespondWith(
+      429,
+      setJsonContent({ headers: { 'Retry-After': '37' }, body: envelope })
+    )
+    .executeTest(async (mockServer: V3MockServer) => {
+      const error: unknown = await createClient(mockServer)
+        .getCommunitySpotlight({
+          xCouturePlatform: platform,
+          xCoutureReactions: '1',
+          limit: 1,
+          surface: 'home_teaser',
+        })
+        .catch((failure: unknown) => failure)
+      expect(error).toBeInstanceOf(ResponseError)
+      if (!(error instanceof ResponseError))
+        throw new Error('Expected generated-client ResponseError')
+      expect(error.response.status).toBe(429)
+      expect(error.response.headers.get('Retry-After')).toBe('37')
+      expect(await error.response.json()).toEqual(envelope)
     })
 }

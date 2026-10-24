@@ -9,6 +9,7 @@ const runnerFiles = [
   'scripts/run-maestro.mjs',
   'scripts/maestro-version.mjs',
   'scripts/lib/expo-go-link-endpoint.mjs',
+  'scripts/lib/maestro-driver-reuse.mjs',
   'scripts/lib/maestro-flow-outcome.mjs',
   'scripts/lib/mobile-e2e-flow-state.mjs',
   'scripts/lib/mobile-e2e-flow-retry.mjs',

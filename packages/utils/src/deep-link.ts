@@ -19,6 +19,13 @@ export type DeepLinkNotificationType = z.infer<typeof deepLinkNotificationTypeSc
 
 const nonEmptyIdentifierSchema = z.string().trim().min(1)
 
+/**
+ * Story 6.7: an in-app link that asks Community to focus one entry in the City
+ * Spotlight. The token is fresh per activation, so a repeated token moves no focus.
+ */
+export const deepLinkFocusSchema = z.enum(['spotlight'])
+export type DeepLinkFocus = z.infer<typeof deepLinkFocusSchema>
+
 const deepLinkFields = z.object({
   source: deepLinkSourceSchema,
   slot: deepLinkSlotSchema.optional(),
@@ -28,6 +35,8 @@ const deepLinkFields = z.object({
   cardId: nonEmptyIdentifierSchema.optional(),
   commentId: nonEmptyIdentifierSchema.optional(),
   parentId: nonEmptyIdentifierSchema.optional(),
+  focus: deepLinkFocusSchema.optional(),
+  focusToken: nonEmptyIdentifierSchema.optional(),
   expiresAt: z.string().datetime({ offset: true }).optional(),
 })
 
@@ -47,6 +56,22 @@ function validateCommentTarget(payload: DeepLinkFields, context: z.RefinementCtx
     })
   }
 }
+function validateFocusTarget(payload: DeepLinkFields, context: z.RefinementCtx) {
+  if (payload.focus === undefined && payload.focusToken === undefined) return
+  if (
+    payload.source !== 'app' ||
+    payload.type !== 'community' ||
+    !payload.cardId ||
+    !payload.focus ||
+    !payload.focusToken
+  ) {
+    context.addIssue({
+      code: z.ZodIssueCode.custom,
+      path: [payload.focus ? 'focusToken' : 'focus'],
+      message: 'Focus targets require an app community card with a focus and its token.',
+    })
+  }
+}
 function validateRequiredTarget(payload: DeepLinkFields, context: z.RefinementCtx) {
   let missingField: 'slot' | 'type' | 'cardId' | 'alertId' | undefined
   if ((payload.source === 'widget' || payload.source === 'watch') && !payload.slot) {
@@ -54,7 +79,7 @@ function validateRequiredTarget(payload: DeepLinkFields, context: z.RefinementCt
   } else if (payload.source === 'notification' && !payload.type) {
     missingField = 'type'
   } else if (
-    payload.source === 'notification' &&
+    (payload.source === 'notification' || payload.source === 'app') &&
     payload.type === 'community' &&
     !payload.cardId
   ) {
@@ -77,6 +102,7 @@ function validateRequiredTarget(payload: DeepLinkFields, context: z.RefinementCt
 }
 export const deepLinkSchema = deepLinkFields.superRefine((payload, context) => {
   validateCommentTarget(payload, context)
+  validateFocusTarget(payload, context)
   validateRequiredTarget(payload, context)
 })
 
@@ -97,6 +123,8 @@ const deepLinkIntentKeys = [
   'cardId',
   'commentId',
   'parentId',
+  'focus',
+  'focusToken',
   'expiresAt',
 ] as const
 

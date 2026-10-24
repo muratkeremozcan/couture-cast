@@ -50,6 +50,7 @@ describe('6.6 spotlight controller', () => {
       platform: 'mobile',
       cursor: undefined,
       limit: 6,
+      surface: 'community',
     })
     await subject.getSpotlight(auth, 'web', { limit: '12', cursor: 'next' }, res, '1')
     expect(getSpotlight).toHaveBeenLastCalledWith({
@@ -57,8 +58,32 @@ describe('6.6 spotlight controller', () => {
       platform: 'web',
       cursor: 'next',
       limit: 12,
+      surface: 'community',
       reactions: true,
     })
+  })
+
+  it('6.7-UNIT-001 passes the home_teaser surface through and refuses unknown surfaces', async () => {
+    const { subject, getSpotlight } = controller()
+    await subject.getSpotlight(
+      auth,
+      'mobile',
+      { limit: '1', surface: 'home_teaser' },
+      res
+    )
+    expect(getSpotlight).toHaveBeenLastCalledWith({
+      userId: 'viewer-1',
+      platform: 'mobile',
+      cursor: undefined,
+      limit: 1,
+      surface: 'home_teaser',
+    })
+    getSpotlight.mockClear()
+    for (const surface of ['spotlight', 'home', ''])
+      await expect(subject.getSpotlight(auth, 'web', { surface }, res)).rejects.toThrow(
+        BadRequestException
+      )
+    expect(getSpotlight).not.toHaveBeenCalled()
   })
 
   it('6.6-UNIT-061 refuses a missing platform and limits outside 1 to 12', async () => {
@@ -94,8 +119,27 @@ describe('6.6 spotlight controller', () => {
       userId: 'viewer-1',
       postId: 'post-1',
       platform: 'web',
+      surface: 'spotlight',
       rank: 4,
       level: 'region',
+    })
+    expect(recordCardOpened).not.toHaveBeenCalled()
+  })
+
+  it('6.7-UNIT-002 routes a Home teaser open to the spotlight service with its surface', async () => {
+    const { subject, recordOpened, recordCardOpened } = controller()
+    await subject.openPost(auth, 'post-1', 'mobile', {
+      surface: 'home_teaser',
+      rank: 1,
+      level: 'city',
+    })
+    expect(recordOpened).toHaveBeenCalledWith({
+      userId: 'viewer-1',
+      postId: 'post-1',
+      platform: 'mobile',
+      surface: 'home_teaser',
+      rank: 1,
+      level: 'city',
     })
     expect(recordCardOpened).not.toHaveBeenCalled()
   })

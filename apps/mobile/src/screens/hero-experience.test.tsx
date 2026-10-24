@@ -3,6 +3,7 @@
 // Learning path Step 26: Chip navigation and sticky bottom nav.
 // See _bmad-output/project-knowledge/learning-path-step-by-step.md#step-26-chip-navigation-and-sticky-bottom-nav
 /* eslint-disable @typescript-eslint/await-thenable */
+import type * as FocusEffectModule from '@/src/test-utils/focus-effect'
 import React from 'react'
 import { screen, fireEvent, waitFor } from '@testing-library/react'
 import { render } from 'vitest-browser-react'
@@ -28,9 +29,12 @@ vi.mock('expo-localization', () => ({
   getLocales: () => [{ languageTag: 'en-US', languageCode: 'en', regionCode: 'US' }],
 }))
 
-vi.mock('expo-router', () => ({
+vi.mock('expo-router', async () => ({
   useLocalSearchParams: () => ({}),
   useRouter: () => mockRouter,
+  useFocusEffect: (
+    await vi.importActual<typeof FocusEffectModule>('@/src/test-utils/focus-effect')
+  ).useFocusEffect,
 }))
 
 const mockCapture = vi.fn()

@@ -881,7 +881,9 @@
       "announceLoadedMore": "Se cargaron {{count}} looks destacados más.",
       "announceLoadedMore_one": "Se cargó {{count}} look destacado más.",
       "announceLoadedMore_other": "Se cargaron {{count}} looks destacados más.",
-      "announceRefreshed": "Los destacados de la ciudad se actualizaron con la clasificación más reciente."
+      "announceRefreshed": "Los destacados de la ciudad se actualizaron con la clasificación más reciente.",
+      "targetUnavailable": "Ese look ya no está en Destacados de la ciudad.",
+      "destinationUnavailable": "Destacados de la ciudad no está disponible en este momento."
     }
   },
   "locations": {
@@ -927,6 +929,18 @@
       "rate_limited": "Demasiadas búsquedas. Espera un momento e intenta de nuevo.",
       "invalid_query": "Escribe entre 2 y 80 caracteres.",
       "unknown": "Algo salió mal. Intenta de nuevo."
+    }
+  },
+  "home": {
+    "spotlightTeaser": {
+      "heading": "Look destacado en {{label}}",
+      "reactions": "{{count}} reacciones",
+      "reactions_one": "{{count}} reacción",
+      "reactions_other": "{{count}} reacciones",
+      "linkLabel": "Look destacado en {{label}} de {{author}}, {{count}} reacciones. Abre Destacados de la ciudad.",
+      "linkLabel_one": "Look destacado en {{label}} de {{author}}, {{count}} reacción. Abre Destacados de la ciudad.",
+      "linkLabel_other": "Look destacado en {{label}} de {{author}}, {{count}} reacciones. Abre Destacados de la ciudad.",
+      "cta": "Ver en Destacados de la ciudad"
     }
   }
 }

@@ -8,9 +8,11 @@ import {
   provisionRealCommunityAccount,
   readCommunityMailCode,
   readGeneratedCommunityCode,
+  realSessionMailIssueMode,
   realSessionSkipReason,
   signInRealCommunityWeb,
 } from '../support/helpers/community-real-session'
+import { expectCommunityFeedLoaded } from '../support/helpers/community-session'
 
 const skipReason = realSessionSkipReason()
 test.skip(Boolean(skipReason), skipReason ?? '')
@@ -27,7 +29,7 @@ test('N1 real OTP canonical identity, restore, refresh, account switch and offli
   const mailProof = path.join(directory, 'real-mail-proof.json')
   const first = await provisionRealCommunityAccount(apiRequest, {
     mapping: 'metadata',
-    issueMode: fs.existsSync(mailProof) ? 'generated' : 'real-email',
+    issueMode: realSessionMailIssueMode(directory),
     label: 'web-real-mail',
   })
   const second = await provisionRealCommunityAccount(apiRequest, {
@@ -74,7 +76,7 @@ test('N1 real OTP canonical identity, restore, refresh, account switch and offli
         2
       )
     )
-  await expect(page.getByTestId('lookbook-card-lookbook-1')).toBeVisible()
+  await expectCommunityFeedLoaded(page)
 
   const readIdentity = () =>
     page.evaluate(() => {
@@ -85,6 +87,9 @@ test('N1 real OTP canonical identity, restore, refresh, account switch and offli
         bearer: window.sessionStorage.getItem('couturecast.access-token'),
       }
     })
+  // The bearer is stored once canonical verification completes, which can be after the
+  // feed first renders.
+  await expect.poll(async () => (await readIdentity()).bearer).toBeTruthy()
   const identity = await readIdentity()
   expect(identity.sub).toBe(first.authUserId)
   expect(identity.sub).not.toBe(first.appUserId)
@@ -113,7 +118,7 @@ test('N1 real OTP canonical identity, restore, refresh, account switch and offli
   const restored = interceptNetworkCall({ method: 'GET', url: '**/api/v1/user/profile' })
   await page.reload()
   expect((await restored).status).toBe(200)
-  await expect(page.getByTestId('lookbook-card-lookbook-1')).toBeVisible()
+  await expectCommunityFeedLoaded(page)
   expect((await readIdentity()).sub).toBe(first.authUserId)
 
   // Arrange only persisted SDK expiry metadata. The signed JWT stays untouched;
@@ -128,13 +133,22 @@ test('N1 real OTP canonical identity, restore, refresh, account switch and offli
   const refresh = interceptNetworkCall({ method: 'POST', url: '**/auth/v1/token*' })
   await page.reload()
   expect((await refresh).status).toBe(200)
-  await expect(page.getByTestId('lookbook-card-lookbook-1')).toBeVisible()
+  await expectCommunityFeedLoaded(page)
   expect((await readIdentity()).sub).toBe(first.authUserId)
 
   await signInRealCommunityWeb(page, second, () =>
     Promise.resolve(readGeneratedCommunityCode(second))
   )
-  await expect(page.getByTestId('lookbook-card-lookbook-1')).toBeVisible()
+  await expectCommunityFeedLoaded(page)
+  // The switched session's own bearer replaces the first one once its verification completes.
+  await expect
+    .poll(async () => {
+      const now = await readIdentity()
+      return (
+        now.sub === second.authUserId && !!now.bearer && now.bearer !== identity.bearer
+      )
+    })
+    .toBe(true)
   const switched = await readIdentity()
   expect(switched.sub).toBe(second.authUserId)
   const switchedApi = createApiClient('http://127.0.0.1:4077', {
@@ -170,7 +184,12 @@ test('N1 real OTP canonical identity, restore, refresh, account switch and offli
       {
         // A generated-issuance run links the earlier real-mail milestone instead of claiming it.
         realMailOtp: first.issueMode === 'real-email',
-        realMailProof: first.issueMode === 'real-email' ? 'this run' : mailProof,
+        realMailProof:
+          first.issueMode === 'real-email'
+            ? 'this run'
+            : fs.existsSync(mailProof)
+              ? mailProof
+              : 'not run: generated issuance mode',
         realVerifyOtp: true,
         trustedMetadataCanonicalOwner: first.appUserId,
         trustedMetadataAuthSub: first.authUserId,

@@ -15,7 +15,6 @@ import {
   ActivityIndicator,
   Image,
   Linking,
-  Modal,
   Platform,
   Pressable,
   ScrollView,
@@ -34,6 +33,7 @@ import {
 import { resolveMobileApiBaseUrl } from '@/src/lib/api-client'
 import { resolveMobileAccessToken } from '@/src/lib/mobile-auth'
 import { sha256Hex } from '@/src/lib/expo-native-helpers'
+import { EdgeToEdgeModal, useModalInsets } from '@/components/edge-to-edge-modal'
 import { safeFindNodeHandle } from '@/src/lib/accessibility-focus'
 
 type CaptureStep = 'source' | 'crop' | 'uploading' | 'complete'
@@ -84,6 +84,7 @@ export function MobileGarmentCaptureModal({
   invokingNodeHandle,
 }: MobileGarmentCaptureModalProps) {
   const { t } = useTranslation()
+  const insets = useModalInsets()
   const [step, setStep] = useState<CaptureStep>('source')
   const [selectedImage, setSelectedImage] = useState<SelectedImage | null>(null)
   const [aspectRatio, setAspectRatio] = useState<AspectRatio>('1:1')
@@ -316,9 +317,17 @@ export function MobileGarmentCaptureModal({
   }
 
   return (
-    <Modal animationType="slide" visible={visible} onRequestClose={handleClose}>
+    <EdgeToEdgeModal
+      transparent={false}
+      animationType="slide"
+      visible={visible}
+      onRequestClose={handleClose}
+    >
       <View
-        style={styles.modal}
+        style={[
+          styles.modal,
+          { paddingTop: Math.max(64, insets.top), paddingBottom: 20 + insets.bottom },
+        ]}
         testID="garment-capture-modal"
         accessibilityViewIsModal={true}
         onAccessibilityEscape={handleClose}
@@ -466,12 +475,12 @@ export function MobileGarmentCaptureModal({
           </View>
         ) : null}
       </View>
-    </Modal>
+    </EdgeToEdgeModal>
   )
 }
 
 const styles = StyleSheet.create({
-  modal: { flex: 1, padding: 20, paddingTop: 64 },
+  modal: { flex: 1, paddingHorizontal: 20 },
   modalHeader: {
     flexDirection: 'row',
     alignItems: 'center',

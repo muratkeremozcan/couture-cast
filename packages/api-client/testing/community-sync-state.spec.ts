@@ -663,6 +663,33 @@ describe('Story 6.5 reconciliation ownership', () => {
     state.stop()
   })
 
+  it('a catch-up over a still-connected socket cancels the fallback poll a failed read armed', async () => {
+    vi.useFakeTimers()
+    vi.spyOn(Math, 'random').mockReturnValue(0)
+    const { client, callbacks, state } = setup()
+    state.start('https://fixtures.invalid', () =>
+      Promise.resolve('synthetic-test-bearer')
+    )
+    const transport = vi.mocked(connectCommunityTransport).mock.calls[0]![0]
+    try {
+      transport.state('connected')
+      await state.catchUp()
+      // A transient read failure arms the 5 s fallback while the socket stays up.
+      client.events.mockRejectedValueOnce(new Error('network down'))
+      transport.changed()
+      await vi.advanceTimersByTimeAsync(0)
+      expect(callbacks.availability).toHaveBeenLastCalledWith('recovering', false)
+      transport.changed()
+      await vi.advanceTimersByTimeAsync(0)
+      expect(callbacks.availability).toHaveBeenLastCalledWith('connected', true)
+      const calls = client.events.mock.calls.length
+      await vi.advanceTimersByTimeAsync(8000)
+      expect(client.events).toHaveBeenCalledTimes(calls)
+    } finally {
+      state.stop()
+    }
+  })
+
   it('6.5-UNIT-006: unavailable retains ownership and denial tears it down', async () => {
     const { client, callbacks, state } = setup()
     await state.catchUp()
@@ -769,5 +796,34 @@ describe('Story 6.5 reconciliation ownership', () => {
     } finally {
       state.stop()
     }
+  })
+})
+
+describe('target validation of an unavailable target', () => {
+  it('applies an unavailable target as the server reported it', async () => {
+    const { client, callbacks, state } = setup()
+    const unavailable = { key: 'post', status: 'unavailable' } as Awaited<
+      ReturnType<CommunitySyncClient['resolve']>
+    >['targets'][number]
+    client.resolve.mockResolvedValue({ targets: [unavailable] })
+    await state.catchUp()
+    expect(callbacks.apply).toHaveBeenCalledExactlyOnceWith(unavailable)
+  })
+})
+
+describe('target validation after a stop', () => {
+  it('applies nothing from a response that settled just before the stop', async () => {
+    const { client, callbacks, state } = setup()
+    // The response settles; a stop queued in the same turn runs before the
+    // validation's continuation does, as an unmount racing the answer would.
+    client.resolve.mockImplementation(() => {
+      queueMicrotask(() => state.stop())
+      return Promise.resolve({
+        targets: [{ key: 'post', status: 'available', communityRevision: '7' }],
+      } as Awaited<ReturnType<CommunitySyncClient['resolve']>>)
+    })
+    await state.catchUp()
+    expect(client.resolve).toHaveBeenCalledOnce()
+    expect(callbacks.apply).not.toHaveBeenCalled()
   })
 })

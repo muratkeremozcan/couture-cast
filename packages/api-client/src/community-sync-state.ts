@@ -48,7 +48,6 @@ export type CommunitySyncCallbacks = {
 export class CommunitySyncState {
   private cursor: string | undefined
   private generation = 0
-  private request = 0
   private readonly revisions = new Map<string, bigint>()
   private readonly projections = new Map<string, bigint>()
   private readonly pending = new Set<AbortController>()
@@ -142,7 +141,6 @@ export class CommunitySyncState {
   }
   private resync(retryImmediately: boolean, unavailable = true) {
     this.generation++
-    this.request++
     this.cursor = undefined
     this.revisions.clear()
     this.projections.clear()
@@ -214,11 +212,8 @@ export class CommunitySyncState {
     if (bootstrap) await this.ownedOperation((signal) => this.callbacks.rebuild(signal))
     if (!this.current(generation)) return
     const filtered = this.newerEvents(page.events)
-    // Increment ownership before any replacing fetch. A late response loses its ticket.
-    if (filtered.length) {
-      this.request++
+    if (filtered.length)
       await this.ownedOperation((signal) => this.callbacks.changed(filtered, signal))
-    }
     if (!this.current(generation)) return
     if (
       bootstrap ||
@@ -256,8 +251,6 @@ export class CommunitySyncState {
   }
   private async validateTargets() {
     const ids = [...new Set(this.callbacks.rendered())]
-    const generation = this.generation
-    const request = ++this.request
     for (let offset = 0; offset < ids.length; offset += 50) {
       const targets = ids
         .slice(offset, offset + 50)
@@ -265,8 +258,9 @@ export class CommunitySyncState {
       const result = await this.ownedRequest((signal) =>
         this.client.resolve({ targets }, signal)
       )
-      if (this.stopped || generation !== this.generation || request !== this.request)
-        return
+      // The run is the only flight, so only a stop can intervene: one that lands after
+      // the response settled and before this continuation. Nothing applies after it.
+      if (this.stopped) return
       for (const target of result.targets) {
         if (target.status === 'available') {
           const revision = BigInt(target.communityRevision)
@@ -288,7 +282,8 @@ export class CommunitySyncState {
   ): Promise<T> {
     const controller = new AbortController()
     this.pending.add(controller)
-    let timer: ReturnType<typeof setTimeout> | undefined
+    // The executor runs synchronously, so the deadline timer always exists below.
+    let timer!: ReturnType<typeof setTimeout>
     const aborted = new Promise<never>((_, reject) => {
       controller.signal.addEventListener(
         'abort',
@@ -300,7 +295,7 @@ export class CommunitySyncState {
     try {
       return await Promise.race([work(controller.signal), aborted])
     } finally {
-      if (timer) clearTimeout(timer)
+      clearTimeout(timer)
       this.pending.delete(controller)
     }
   }

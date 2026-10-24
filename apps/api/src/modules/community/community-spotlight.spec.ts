@@ -225,26 +225,34 @@ describe('6.6 hierarchical areas', () => {
 
 describe('6.6 spotlight open dedupe key', () => {
   it('6.6-UNIT-012 keys on HMAC tokens for viewer and post, never a raw id', () => {
-    const key = spotlightOpenDedupeKey('viewer-raw-id', 'post-raw-id')
+    const key = spotlightOpenDedupeKey('viewer-raw-id', 'post-raw-id', 'community')
     expect(key).toBe(
       [
         'community_spotlight_opened',
         communitySubjectToken('viewer-raw-id'),
         communityPostToken('post-raw-id'),
-        'spotlight',
+        'community',
       ].join(':')
     )
     expect(key).toMatch(
-      /^community_spotlight_opened:[0-9a-f]{16}:[0-9a-f]{16}:spotlight$/
+      /^community_spotlight_opened:[0-9a-f]{16}:[0-9a-f]{16}:community$/
     )
     expect(key).not.toContain('viewer-raw-id')
     expect(key).not.toContain('post-raw-id')
     expect(communityPostToken('post-raw-id')).not.toBe(
       communitySubjectToken('post-raw-id')
     )
-    expect(spotlightOpenDedupeKey('viewer-raw-id', 'post-raw-id')).toBe(key)
-    expect(spotlightOpenDedupeKey('viewer-raw-id', 'other-post')).not.toBe(key)
-    expect(spotlightOpenDedupeKey('other-viewer', 'post-raw-id')).not.toBe(key)
+    expect(spotlightOpenDedupeKey('viewer-raw-id', 'post-raw-id', 'community')).toBe(key)
+    expect(spotlightOpenDedupeKey('viewer-raw-id', 'other-post', 'community')).not.toBe(
+      key
+    )
+    expect(spotlightOpenDedupeKey('other-viewer', 'post-raw-id', 'community')).not.toBe(
+      key
+    )
+    // Story 6.7: the Home teaser and Community count as separate opens.
+    expect(spotlightOpenDedupeKey('viewer-raw-id', 'post-raw-id', 'home_teaser')).toBe(
+      key.replace(/:community$/, ':home_teaser')
+    )
   })
 })
 

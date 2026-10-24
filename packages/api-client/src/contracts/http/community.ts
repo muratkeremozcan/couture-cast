@@ -786,14 +786,23 @@ export type CommunityServedSpotlightLevel = z.infer<
 >
 
 /**
+ * Story 6.7: where a spotlight entry was opened from. `spotlight` is the City
+ * Spotlight module on Community; `home_teaser` is the Home teaser.
+ */
+export const communitySpotlightOpenSurfaceSchema = z.enum(['spotlight', 'home_teaser'])
+export type CommunitySpotlightOpenSurface = z.infer<
+  typeof communitySpotlightOpenSurfaceSchema
+>
+
+/**
  * Story 6.6: an open from the City Spotlight module. It carries the card's rank
  * and the level the module was served at, and never an experiment arm, because
  * the spotlight is outside the feed experiment; this branch records only
- * `community_spotlight_opened`.
+ * `community_spotlight_opened`. Story 6.7 adds the Home teaser as a surface.
  */
 export const openCommunitySpotlightPostInputSchema = z
   .object({
-    surface: z.literal('spotlight'),
+    surface: communitySpotlightOpenSurfaceSchema,
     rank: z.number().int().min(1).max(COMMUNITY_SPOTLIGHT_MAX_RANK),
     level: communityServedSpotlightLevelSchema,
   })
@@ -816,12 +825,12 @@ export type OpenCommunityPostInput =
  * installed client's body stays valid under the same object schema.
  */
 const OPEN_COMMUNITY_POST_INPUT_DESCRIPTION =
-  'Either a feed open with experimentVariant, or a spotlight open with surface spotlight, a rank from 1 to 60 and the served level. The two forms never mix.'
+  'Either a feed open with experimentVariant, or a spotlight open with surface spotlight or home_teaser, a rank from 1 to 60 and the served level. The two forms never mix.'
 
 export const openCommunityPostInputSchema = z
   .object({
     experimentVariant: communityExperimentVariantSchema.optional(),
-    surface: z.literal('spotlight').optional(),
+    surface: communitySpotlightOpenSurfaceSchema.optional(),
     rank: z.number().int().min(1).max(COMMUNITY_SPOTLIGHT_MAX_RANK).optional(),
     level: communityServedSpotlightLevelSchema.optional(),
   })
@@ -836,7 +845,7 @@ export const openCommunityPostInputSchema = z
       context.addIssue({
         code: z.ZodIssueCode.custom,
         message: spotlight
-          ? 'A spotlight open needs surface spotlight, a rank and the served level, and no experiment variant.'
+          ? 'A spotlight open needs surface spotlight or home_teaser, a rank and the served level, and no experiment variant.'
           : 'A feed open needs the served experiment variant.',
       })
   })
@@ -919,9 +928,21 @@ export type CommunityReactionSpotlightResponse = z.infer<
   typeof communityReactionSpotlightResponseSchema
 >
 
+/**
+ * Story 6.7: which surface asked for the spotlight. It changes only the
+ * `surface` property of `community_spotlight_viewed`; ranking, level, cursor
+ * and caching are the same for both.
+ */
+export const communitySpotlightSurfaceSchema = z.enum(['community', 'home_teaser'])
+export type CommunitySpotlightSurface = z.infer<typeof communitySpotlightSurfaceSchema>
+
 export const communitySpotlightQuerySchema = z
   .object({
     cursor: z.string().min(1).optional(),
+    surface: communitySpotlightSurfaceSchema.default('community').openapi({
+      description:
+        'The surface reading the spotlight: community (default) or home_teaser. Affects analytics only.',
+    }),
     limit: z.coerce
       .number()
       .int()
@@ -1022,8 +1043,9 @@ function zonedWallClock(isoTimestamp: string, timeZone: string): ZonedWallClock 
       second: '2-digit',
       hourCycle: 'h23',
     }).formatToParts(new Date(isoTimestamp))
-    const read = (type: Intl.DateTimeFormatPartTypes): string =>
-      parts.find((part) => part.type === type)?.value ?? ''
+    // formatToParts yields every requested part for a valid zone and timestamp.
+    const value = Object.fromEntries(parts.map((part) => [part.type, part.value]))
+    const read = (type: Intl.DateTimeFormatPartTypes): string => value[type]!
     return {
       weekday: read('weekday'),
       year: Number(read('year')),
@@ -1082,13 +1104,10 @@ const communityChallengeWindowShape = {
  * generated SDK and both clients.
  */
 function refineChallengeWindow(
-  value: { startsAt?: string; endsAt?: string; timeZone?: string },
+  value: { startsAt: string; endsAt: string; timeZone: string },
   ctx: z.RefinementCtx
 ) {
   const { startsAt, endsAt, timeZone } = value
-  if (startsAt === undefined || endsAt === undefined || timeZone === undefined) {
-    return
-  }
   const start = new Date(startsAt).getTime()
   const end = new Date(endsAt).getTime()
   if (end <= start) {
@@ -1199,7 +1218,10 @@ export const updateCommunityChallengeInputSchema = z
       })
       return
     }
-    refineChallengeWindow(value, ctx)
+    refineChallengeWindow(
+      { startsAt: value.startsAt, endsAt: value.endsAt, timeZone: value.timeZone },
+      ctx
+    )
   })
   .openapi({
     description:
@@ -1852,6 +1874,18 @@ export function registerCommunityContracts(
           default: COMMUNITY_SPOTLIGHT_DEFAULT_LIMIT,
         },
         description: 'Number of ranked positions to read (1-12, default 6).',
+      },
+      {
+        name: 'surface',
+        in: 'query',
+        required: false,
+        schema: {
+          type: 'string',
+          enum: ['community', 'home_teaser'],
+          default: 'community',
+        },
+        description:
+          'The surface reading the spotlight. home_teaser is the Home teaser; it changes only analytics, never ranking, level, cursor or caching.',
       },
     ],
     responses: {

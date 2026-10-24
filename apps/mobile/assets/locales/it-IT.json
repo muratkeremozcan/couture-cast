@@ -881,7 +881,9 @@
       "announceLoadedMore": "Caricati altri {{count}} look in evidenza.",
       "announceLoadedMore_one": "Caricato {{count}} altro look in evidenza.",
       "announceLoadedMore_other": "Caricati altri {{count}} look in evidenza.",
-      "announceRefreshed": "I look in evidenza in città sono stati aggiornati con la classifica più recente."
+      "announceRefreshed": "I look in evidenza in città sono stati aggiornati con la classifica più recente.",
+      "targetUnavailable": "Questo look non è più in In evidenza in città.",
+      "destinationUnavailable": "In evidenza in città non è disponibile in questo momento."
     }
   },
   "locations": {
@@ -927,6 +929,18 @@
       "rate_limited": "Troppe ricerche. Attendi un momento e riprova.",
       "invalid_query": "Digita da 2 a 80 caratteri.",
       "unknown": "Qualcosa è andato storto. Riprova."
+    }
+  },
+  "home": {
+    "spotlightTeaser": {
+      "heading": "Look in evidenza a {{label}}",
+      "reactions": "{{count}} reazioni",
+      "reactions_one": "{{count}} reazione",
+      "reactions_other": "{{count}} reazioni",
+      "linkLabel": "Look in evidenza a {{label}} di {{author}}, {{count}} reazioni. Apre In evidenza in città.",
+      "linkLabel_one": "Look in evidenza a {{label}} di {{author}}, {{count}} reazione. Apre In evidenza in città.",
+      "linkLabel_other": "Look in evidenza a {{label}} di {{author}}, {{count}} reazioni. Apre In evidenza in città.",
+      "cta": "Vedi in In evidenza in città"
     }
   }
 }

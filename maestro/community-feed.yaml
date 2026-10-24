@@ -268,6 +268,23 @@ tags:
 # The card is a screen tall, so no swipe skips it. `scrollUntilVisible` checks
 # before it scrolls, so a row already on screen costs nothing here. Every check
 # after this one is for a part BELOW the row, so only downward walks follow.
+#
+# One exception: the card can stop with its padding inside the list and its author
+# row just past the list's bottom edge. CI job 120691261993 (2026-10-23) logged
+# the row at y 2224-2190 against a list ending at 2190, so "visible card" held
+# while the row was BELOW, and the UP walk carried it further away. A short, slow
+# drag (no fling) lifts a row clipped at the bottom into view; a row above the
+# list is still found by the UP walk that follows.
+- runFlow:
+    when:
+      notVisible:
+        id: 'community-card-author-lookbook-5'
+    commands:
+      - swipe:
+          start: '50%, 70%'
+          end: '50%, 55%'
+          duration: 1500
+      - waitForAnimationToEnd
 - scrollUntilVisible:
     element:
       id: 'community-card-author-lookbook-5'
@@ -339,6 +356,52 @@ tags:
     id: 'community-card-report-lookbook-5'
     text: 'Report'
     label: 'Reporting is offered on another member post'
+
+# Story 6.7 R57: the report dialog with the keyboard up. Its translucent window is
+# edge to edge, so only the dialog's own keyboard view keeps its buttons above the
+# keyboard. Cancel sits below the details field: a tap that landed on the keyboard
+# instead would leave the dialog open, and the assertion after it would fail.
+- tapOn:
+    id: 'community-card-report-lookbook-5'
+- extendedWaitUntil:
+    visible:
+      id: 'submit-report-button'
+    timeout: 15000
+# The details field sits below the reasons, inside the dialog's own scroll view.
+# Centered, so the dialog really scrolls on iOS too: Maestro's iOS hierarchy gives a
+# clipped field its whole frame, counts it visible without scrolling, and the tap
+# landed on Cancel below it (R64).
+- scrollUntilVisible:
+    element:
+      id: 'report-details-input'
+    direction: DOWN
+    centerElement: true
+    timeout: 15000
+- tapOn:
+    id: 'report-details-input'
+# A three-line value, so the field shows its multiline height above the keyboard.
+- inputText: 'Keyboard check'
+- pressKey: Enter
+- inputText: 'second line'
+- pressKey: Enter
+- inputText: 'third line'
+# The counter under the field proves the whole value reached it: 14 + 1 + 11 + 1 + 10.
+- assertVisible:
+    id: 'report-details-count'
+    text: '37 of 500 characters'
+# R66: while the member writes details the reasons leave the layout, so no reason row
+# is cut by the scroll edge above the field, and the field and its counter show whole.
+- assertNotVisible:
+    id: 'report-reason-spam'
+- takeScreenshot:
+    path: maestro/artifacts/community-report-keyboard
+- tapOn:
+    id: 'cancel-report-button'
+    label: 'Cancel, with the keyboard still up, sends nothing'
+- assertNotVisible:
+    id: 'report-details-input'
+- assertVisible:
+    id: 'community-card-report-lookbook-5'
 
 # The withdraw control belongs to the author alone. It must not appear on a post
 # this user did not write, and it is the only ownership control on the card.
@@ -437,8 +500,18 @@ tags:
     clearState: false
     stopApp: true
 - runFlow: subflows/open-app.yaml
+# Home may still be mounting after the relaunch (a Metro rebundle makes it
+# slower), and a tap in that window is dropped; retry and wait for the screen as
+# the first entry to the tab does.
 - tapOn:
     id: 'tab-community'
+    retryTapIfNoChange: true
+    label: 'Reopen the community tab after the relaunch'
+- extendedWaitUntil:
+    visible:
+      id: 'community-screen'
+    timeout: 15000
+    label: 'Community screen is on top again'
 - tapOn:
     id: 'community-filter-chip-all'
 # The chip refetches the feed, and while it loads the list renders empty, which
@@ -546,6 +619,31 @@ tags:
 
 - takeScreenshot:
     path: maestro/artifacts/community-compose-sheet
+
+# Story 6.7 R57: the caption with the keyboard up. The sheet's keyboard view lifts it
+# above the keyboard; the screenshot shows the field and its counter there.
+- tapOn:
+    id: 'community-caption-input'
+- inputText: 'Keyboard check'
+- assertVisible:
+    id: 'community-caption-count'
+    text: '14 of 280 characters'
+- takeScreenshot:
+    path: maestro/artifacts/community-compose-keyboard
+# R65: Publish sits below the caption and stays disabled without a photo, so a tap on
+# it changes nothing when the sheet is lifted. A sheet left under the keyboard would
+# put that tap on a key and type into the caption, and the counter would move.
+- assertVisible:
+    id: 'community-caption-input'
+- assertVisible:
+    id: 'community-publish-button'
+- tapOn:
+    id: 'community-publish-button'
+    label: 'Tap Publish with the keyboard still up'
+- assertVisible:
+    id: 'community-caption-count'
+    text: '14 of 280 characters'
+    label: 'The tap reached Publish, above the keyboard, and typed nothing'
 
 - tapOn:
     id: 'community-post-sheet-close'

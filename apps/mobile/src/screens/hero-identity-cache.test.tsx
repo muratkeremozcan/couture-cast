@@ -2,6 +2,7 @@
 // Home on a shared device: member A loads today's ritual, then member B signs in within the
 // 15-minute cache window. The identity reload must fetch B's ritual. A's cached location,
 // outfit and alert data are A's personal data and must never render for B.
+import type * as FocusEffectModule from '@/src/test-utils/focus-effect'
 import React from 'react'
 import { act, screen, waitFor } from '@testing-library/react'
 import { render } from 'vitest-browser-react'
@@ -22,9 +23,12 @@ vi.mock('expo-localization', () => ({
   getLocales: () => [{ languageTag: 'en-US', languageCode: 'en', regionCode: 'US' }],
 }))
 
-vi.mock('expo-router', () => ({
+vi.mock('expo-router', async () => ({
   useLocalSearchParams: () => ({}),
   useRouter: () => ({ setParams: vi.fn(), push: vi.fn() }),
+  useFocusEffect: (
+    await vi.importActual<typeof FocusEffectModule>('@/src/test-utils/focus-effect')
+  ).useFocusEffect,
 }))
 
 // One analytics identity for the device, whoever is signed in: the cache must not key on it.

@@ -74,6 +74,27 @@ describe('Story 6.3 mobile flow fixture reset', () => {
     })
     expect(await readMemberState(other.userId)).toEqual(sentinel)
   })
+  it('turns a member back to the default affiliate suggestions that a stalled flow switched off, and leaves other members alone', async () => {
+    const member = await fixture()
+    const other = await fixture()
+    await prisma.commercePreference.createMany({
+      data: [
+        { user_id: member.userId, affiliate_ctas_enabled: false },
+        { user_id: other.userId, affiliate_ctas_enabled: false },
+      ],
+    })
+
+    await resetMobileE2EFlowState(prisma, member.userId)
+
+    expect(
+      await prisma.commercePreference.findUnique({ where: { user_id: member.userId } })
+    ).toBeNull()
+    expect(
+      await prisma.commercePreference.findUniqueOrThrow({
+        where: { user_id: other.userId },
+      })
+    ).toMatchObject({ affiliate_ctas_enabled: false })
+  })
   it('rolls back every deletion and generation when a later deletion fails', async () => {
     const member = await fixture()
     await mutate(member.userId, member.postId, input('love'))

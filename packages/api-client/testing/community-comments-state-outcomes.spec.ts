@@ -326,6 +326,80 @@ describe('pagination across snapshots', () => {
       ['post', undefined],
     ])
   })
+
+  it('refresh rereads every page the member has loaded in the same snapshot', async () => {
+    const { state, transport } = setup()
+    transport.roots
+      .mockResolvedValueOnce(page([item('a', 1)], 'next', 5))
+      .mockResolvedValueOnce(page([item('b', 2)], null, 5))
+      .mockResolvedValueOnce(page([item('a', 1)], 'fresh-next', 7))
+      .mockResolvedValueOnce(page([item('b', 2), item('c', 3)], null, 7))
+    await state.load('post')
+    await state.load('post', null, true)
+    await state.refresh('post')
+    expect(transport.roots.mock.calls.slice(2)).toEqual([
+      ['post', undefined],
+      ['post', 'fresh-next'],
+    ])
+    expect(state.current('post').roots).toEqual(
+      page([item('a', 1), item('b', 2), item('c', 3)], null, 7)
+    )
+  })
+})
+
+describe('resumed transport-uncertain submissions', () => {
+  const dropped = {
+    mutationId: '00000000-0000-4000-8000-0000000000aa',
+    body: 'Dropped by the reset.',
+    parentId: null,
+    locale: 'en-US',
+  } as const
+
+  it('gives the thread its dropped submission back and resends the same mutation ID', async () => {
+    const { state, transport, id } = setup()
+    const listener = vi.fn()
+    state.subscribe(listener)
+    state.resumeUnresolved('post', dropped)
+    expect(state.current('post').unresolved).toEqual(dropped)
+    expect(listener).toHaveBeenCalledTimes(1)
+    await state.submit('post', 'en-US')
+    expect(transport.create).toHaveBeenCalledWith('post', dropped)
+    expect(id).not.toHaveBeenCalled()
+    expect(state.current('post').unresolved).toBeNull()
+  })
+
+  it('keeps the submission a thread already owns', () => {
+    const { state } = setup()
+    state.resumeUnresolved('post', dropped)
+    const listener = vi.fn()
+    state.subscribe(listener)
+    state.resumeUnresolved('post', {
+      ...dropped,
+      mutationId: '00000000-0000-4000-8000-0000000000bb',
+    })
+    expect(state.current('post').unresolved).toEqual(dropped)
+    expect(listener).not.toHaveBeenCalled()
+  })
+
+  it('ignores a resume while the thread has a submission in flight', async () => {
+    const { state, transport } = setup()
+    const created = deferred<CommunityCommentSubmission>()
+    transport.create.mockReturnValueOnce(created.promise)
+    state.draft('post', { body: 'Beautiful layers.' })
+    const submitting = state.submit('post', 'en-US')
+    const inFlight = state.current('post').unresolved
+    expect(state.current('post').pending).toBe(true)
+    const listener = vi.fn()
+    state.subscribe(listener)
+    state.resumeUnresolved('post', dropped)
+    expect(state.current('post').unresolved).toBe(inFlight)
+    expect(listener).not.toHaveBeenCalled()
+    created.resolve(own())
+    await submitting
+    expect(transport.create).toHaveBeenCalledTimes(1)
+    expect(transport.create).toHaveBeenCalledWith('post', inFlight)
+    expect(state.current('post').unresolved).toBeNull()
+  })
 })
 
 describe('R07 authoritative thread recovery', () => {

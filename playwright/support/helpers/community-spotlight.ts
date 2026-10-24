@@ -37,6 +37,28 @@ const SPOTLIGHT_WINDOW_MS = 7 * 24 * 60 * 60 * 1000
 export const SEEDED_SPOTLIGHT_REACTION_COUNTS = [6, 5, 4, 3, 2, 1, 1]
 
 /**
+ * The public alias the top seeded entry's author is shown under. Aliases are
+ * random and stored on first use, so this reads the stored one; call it after
+ * the page has rendered the author.
+ */
+export async function seededSpotlightTopAuthorAlias(): Promise<string> {
+  const db = communityTestDatabase()
+  try {
+    const post = await db.lookbookPost.findUniqueOrThrow({
+      where: { id: SEEDED_SPOTLIGHT_POST_IDS[0]! },
+      select: { user_id: true },
+    })
+    const { alias } = await db.communityAlias.findUniqueOrThrow({
+      where: { user_id: post.user_id },
+      select: { alias: true },
+    })
+    return alias
+  } finally {
+    await db.$disconnect()
+  }
+}
+
+/**
  * The seeded posts publish relative to the time the seed ran, and the spotlight
  * ranks the last seven days only, so a local database seeded more than a week
  * ago legitimately shows no seeded spotlight.

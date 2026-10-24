@@ -1,8 +1,10 @@
-import React from 'react'
-import { fireEvent, render, screen, waitFor, within } from '@testing-library/react'
+import React, { createElement } from 'react'
+import { act, fireEvent, render, screen, waitFor, within } from '@testing-library/react'
 import { http, HttpResponse } from 'msw'
 import { beforeAll, beforeEach, afterEach, describe, expect, it, vi } from 'vitest'
+import { page as browserPage } from 'vitest/browser'
 import * as ReactNative from 'react-native'
+import type * as EdgeToEdgeTestUtils from '@/src/test-utils/edge-to-edge-modal'
 import { CommunityCommentsState } from '@couture/api-client'
 import type { CommunityCommentSubmission } from '@couture/api-client/contracts/http'
 import {
@@ -21,7 +23,14 @@ import {
 } from '@/src/lib/community'
 import i18n, { initI18n } from '@/src/lib/i18n'
 import { server } from '@/src/test-utils/msw/server'
+import { CommunityCommentDrafts } from '@/src/features/community/community-comment-drafts'
 import { press } from '@/src/test-utils/press'
+import {
+  EDGE_TO_EDGE_MODAL_PROPS,
+  TEST_SAFE_AREA_INSETS,
+  lastModalProps,
+  paddingBottomOf,
+} from '@/src/test-utils/edge-to-edge-modal'
 import { CommunityCommentsSheet } from './community-comments-sheet'
 
 /**
@@ -46,10 +55,67 @@ vi.mock('expo-localization', () => ({
   getLocales: () => [{ languageTag: 'en-US', languageCode: 'en', regionCode: 'US' }],
 }))
 
+/**
+ * react-native-web never reports a software keyboard, so the R51 cases drive the
+ * platform's keyboard events through these listeners.
+ */
+const keyboard = vi.hoisted(() => {
+  const listeners = new Map<string, Set<() => void>>()
+  return {
+    addListener: (event: string, listener: () => void) => {
+      const set = listeners.get(event) ?? new Set()
+      set.add(listener)
+      listeners.set(event, set)
+      return { remove: () => set.delete(listener) }
+    },
+    emit: (event: string) => {
+      listeners.get(event)?.forEach((listener) => listener())
+    },
+  }
+})
+
+/** The props each KeyboardAvoidingView render received, newest last (R52). */
+const keyboardAvoider = vi.hoisted(() => {
+  const renders: { enabled?: boolean }[] = []
+  return {
+    renders,
+    record:
+      (Real: React.ComponentType<Record<string, unknown>>) =>
+      (props: Record<string, unknown>) => {
+        renders.push(props)
+        return createElement(Real, props)
+      },
+  }
+})
+
+/**
+ * The newest props of the sheet's own View. react-native-web drops the iOS-only
+ * `onAccessibilityEscape`, so the escape gesture is driven through this record.
+ */
+const sheetView = vi.hoisted(() => ({ props: {} as Record<string, unknown> }))
+
 vi.mock('react-native', async (original) => {
   const actual = await original<typeof ReactNative>()
+  const { recordModalProps } = await vi.importActual<typeof EdgeToEdgeTestUtils>(
+    '@/src/test-utils/edge-to-edge-modal'
+  )
+  const { forwardRef } = await vi.importActual<typeof React>('react')
+  const RealView = actual.View as unknown as React.ComponentType<Record<string, unknown>>
   return {
     ...actual,
+    View: forwardRef<unknown, Record<string, unknown>>(
+      function RecordingView(props, ref) {
+        if (props.testID === 'comments-sheet') sheetView.props = props
+        return createElement(RealView, { ...props, ref })
+      }
+    ),
+    Modal: recordModalProps(actual.Modal),
+    KeyboardAvoidingView: keyboardAvoider.record(actual.KeyboardAvoidingView),
+    Keyboard: {
+      ...actual.Keyboard,
+      isVisible: () => false,
+      addListener: keyboard.addListener,
+    },
     AccessibilityInfo: {
       ...actual.AccessibilityInfo,
       announceForAccessibility: vi.fn(),
@@ -57,11 +123,19 @@ vi.mock('react-native', async (original) => {
     },
   }
 })
+vi.mock('react-native-safe-area-context', async (original) => {
+  const actual = await original<Record<string, unknown>>()
+  const { TEST_SAFE_AREA_INSETS } = await vi.importActual<typeof EdgeToEdgeTestUtils>(
+    '@/src/test-utils/edge-to-edge-modal'
+  )
+  return { ...actual, useSafeAreaInsets: () => TEST_SAFE_AREA_INSETS }
+})
 const { announceForAccessibility, setAccessibilityFocus } = ReactNative.AccessibilityInfo
 const root = createCommunityComment({ id: 'root', replyCount: 1 })
 // The factory's own author and body, joined the way every entry names its actions.
 const ROOT_CONTEXT = 'Style Explorer A1B2C3D4. A lovely layered look.'
 const POST_ID = root.postId
+const MEMBER = 'member-a'
 const base = `*/api/v1/community/posts/${POST_ID}`
 const page = (items = [root]) => ({
   data: { items, nextCursor: null, snapshot: 2, hasNewer: false },
@@ -78,7 +152,7 @@ const reportReceipt = () => ({
     reviewDueAt: '2026-10-20T12:00:00.000Z',
   },
 })
-const makeState = () =>
+const makeState = (newId = () => '00000000-0000-4000-8000-000000000064') =>
   new CommunityCommentsState(
     {
       roots: communityCommentsRootsFromMobile,
@@ -88,21 +162,27 @@ const makeState = () =>
       delete: communityCommentsDeleteFromMobile,
       report: communityCommentsReportFromMobile,
     },
-    () => '00000000-0000-4000-8000-000000000064',
+    newId,
     communityFailureReason
   )
 const sheet = ({
   state,
   onClose = vi.fn(),
   postId = POST_ID,
+  drafts = new CommunityCommentDrafts(),
+  member = MEMBER,
 }: {
   state: CommunityCommentsState
   onClose?: () => void
   postId?: string | null
+  drafts?: CommunityCommentDrafts
+  member?: string | null
 }) => (
   <CommunityCommentsSheet
     postId={postId}
     state={state}
+    drafts={drafts}
+    member={member}
     locale="en-US"
     onClose={onClose}
   />
@@ -696,6 +776,8 @@ it('R07 moves a removed notification target to the stable thread landmark once',
     <CommunityCommentsSheet
       postId={POST_ID}
       state={state}
+      drafts={new CommunityCommentDrafts()}
+      member={MEMBER}
       locale="en-US"
       onClose={vi.fn()}
       target={{
@@ -723,4 +805,473 @@ it('R07 moves a removed notification target to the stable thread landmark once',
   expect(vi.mocked(announceForAccessibility).mock.calls.slice(before)).toEqual([
     ['Unavailable.'],
   ])
+})
+
+/**
+ * Story 6.5 R46: an unverified-access hide unmounts the sheet while the member types
+ * (the screen passes a null post), and a reset or eviction meanwhile wipes the shared
+ * comment state. Only the screen's in-memory drafts can give the comment back.
+ */
+describe('R46 unsent comment across an unverified-access hide', () => {
+  /** Types into the composer, hides the sheet, wipes the comment state, shows it again. */
+  async function typeHideWipeAndReturn({
+    focused,
+    member = MEMBER,
+  }: {
+    focused: boolean
+    member?: string
+  }) {
+    const state = makeState()
+    const drafts = new CommunityCommentDrafts()
+    const view = render(sheet({ state, drafts }))
+    await screen.findByText('A lovely layered look.')
+    const composer = screen.getByTestId<HTMLInputElement>('comment-body')
+    composer.focus()
+    fireEvent.change(composer, { target: { value: 'Half a thought about the coat' } })
+    if (!focused) composer.blur()
+    expect(document.activeElement === composer).toBe(focused)
+
+    view.rerender(sheet({ state, drafts, postId: null }))
+    expect(screen.queryByTestId('comment-body')).toBeNull()
+    act(() => state.reset())
+    view.rerender(sheet({ state, drafts, member }))
+    await screen.findByText('A lovely layered look.')
+    return {
+      state,
+      drafts,
+      view,
+      composer: screen.getByTestId<HTMLInputElement>('comment-body'),
+    }
+  }
+
+  it('restores the draft and the composer focus it had when the sheet unmounted', async () => {
+    const { composer } = await typeHideWipeAndReturn({ focused: true })
+    expect(composer).toHaveValue('Half a thought about the coat')
+    await waitFor(() => expect(document.activeElement).toBe(composer))
+  })
+
+  it('restores a draft whose composer was not focused without taking focus', async () => {
+    const { composer } = await typeHideWipeAndReturn({ focused: false })
+    expect(composer).toHaveValue('Half a thought about the coat')
+    // The sheet opens on its title, as for any other open.
+    await waitFor(() =>
+      expect(setAccessibilityFocus).toHaveBeenLastCalledWith(nodeHandle(sheetTitle()))
+    )
+    expect(document.activeElement).not.toBe(composer)
+  })
+
+  it('never gives one member the draft of another', async () => {
+    const { composer, drafts } = await typeHideWipeAndReturn({
+      focused: true,
+      member: 'member-b',
+    })
+    expect(composer).toHaveValue('')
+    expect(document.activeElement).not.toBe(composer)
+    expect(drafts.restore('member-b', POST_ID)).toBeNull()
+  })
+
+  it('keeps the draft when the member closes the sheet (Story 6.4)', async () => {
+    const state = makeState()
+    const drafts = new CommunityCommentDrafts()
+    const close = vi.fn()
+    const view = render(sheet({ state, drafts, onClose: close }))
+    await screen.findByText('A lovely layered look.')
+    const composer = screen.getByTestId<HTMLInputElement>('comment-body')
+    composer.focus()
+    fireEvent.change(composer, { target: { value: 'Keep this' } })
+    press(screen.getByTestId('comments-close'))
+    expect(close).toHaveBeenCalledOnce()
+
+    // Even a wipe of the comment state meanwhile gives the draft back; the reopened
+    // sheet starts on its title, not the composer.
+    view.rerender(sheet({ state, drafts, onClose: close, postId: null }))
+    act(() => state.reset())
+    view.rerender(sheet({ state, drafts, onClose: close }))
+    await screen.findByText('A lovely layered look.')
+    expect(screen.getByTestId('comment-body')).toHaveValue('Keep this')
+    expect(document.activeElement).not.toBe(screen.getByTestId('comment-body'))
+    expect(drafts.restore(MEMBER, POST_ID)).toMatchObject({
+      body: 'Keep this',
+      focused: false,
+    })
+  })
+
+  it('R49 reopens on the kept draft and reply target after the member closed it', async () => {
+    const state = makeState()
+    const drafts = new CommunityCommentDrafts()
+    const close = vi.fn()
+    const view = render(sheet({ state, drafts, onClose: close }))
+    await screen.findByText('A lovely layered look.')
+    press(screen.getByTestId('comment-reply-root'))
+    fireEvent.change(screen.getByTestId('comment-body'), {
+      target: { value: 'Keep this reply' },
+    })
+    expect(screen.getByText(`Replying to a comment: ${ROOT_CONTEXT}`)).toBeVisible()
+    press(screen.getByTestId('comments-close'))
+    expect(close).toHaveBeenCalledOnce()
+
+    view.rerender(sheet({ state, drafts, onClose: close, postId: null }))
+    view.rerender(sheet({ state, drafts, onClose: close }))
+    await screen.findByText('A lovely layered look.')
+    expect(screen.getByTestId('comment-body')).toHaveValue('Keep this reply')
+    expect(screen.getByText(`Replying to a comment: ${ROOT_CONTEXT}`)).toBeVisible()
+    expect(state.current(POST_ID).draft.body).toBe('Keep this reply')
+  })
+
+  it('R47 resends a submission a wipe interrupted under its first mutation ID', async () => {
+    const mutationIds: string[] = []
+    let answerFirst!: () => void
+    server.use(
+      http.post(`${base}/comments`, async ({ request }) => {
+        const { mutationId } = (await request.json()) as { mutationId: string }
+        mutationIds.push(mutationId)
+        // The first request reaches the server, which stores the comment, but its answer
+        // only arrives after the wipe, too late for the thread that sent it.
+        if (mutationIds.length === 1)
+          await new Promise<void>((resolve) => {
+            answerFirst = resolve
+          })
+        return HttpResponse.json({
+          data: createCommunityCommentSubmission({ body: 'Posted once' }),
+        })
+      })
+    )
+    let issued = 0
+    const state = makeState(
+      () => `00000000-0000-4000-8000-${String(++issued).padStart(12, '0')}`
+    )
+    const drafts = new CommunityCommentDrafts()
+    const view = render(sheet({ state, drafts }))
+    await screen.findByText('A lovely layered look.')
+    fireEvent.change(screen.getByTestId('comment-body'), {
+      target: { value: 'Posted once' },
+    })
+    press(screen.getByRole('button', { name: 'Send comment' }))
+    await waitFor(() => expect(mutationIds).toHaveLength(1))
+
+    view.rerender(sheet({ state, drafts, postId: null }))
+    act(() => state.reset())
+    answerFirst()
+    view.rerender(sheet({ state, drafts }))
+    await screen.findByText('A lovely layered look.')
+    expect(screen.getByTestId('comment-body')).toHaveValue('Posted once')
+
+    press(screen.getByTestId('comment-submit'))
+    await waitFor(() => expect(mutationIds).toHaveLength(2))
+    // The server keys a comment by member and mutation ID, so this resend cannot add
+    // a second one.
+    expect(mutationIds[1]).toBe(mutationIds[0])
+    await waitFor(() => expect(screen.getByTestId('comment-body')).toHaveValue(''))
+    expect(drafts.restore(MEMBER, POST_ID)).toBeNull()
+  })
+
+  it('drops the draft once the comment is accepted', async () => {
+    let posted = 0
+    server.use(
+      http.post(`${base}/comments`, () => {
+        posted++
+        return HttpResponse.json({
+          data: createCommunityCommentSubmission({ body: 'Sent for good' }),
+        })
+      })
+    )
+    const state = makeState()
+    const drafts = new CommunityCommentDrafts()
+    const view = render(sheet({ state, drafts }))
+    await screen.findByText('A lovely layered look.')
+    fireEvent.change(screen.getByTestId('comment-body'), {
+      target: { value: 'Sent for good' },
+    })
+    expect(drafts.restore(MEMBER, POST_ID)?.body).toBe('Sent for good')
+    press(screen.getByRole('button', { name: 'Send comment' }))
+    await waitFor(() => expect(screen.getByTestId('comment-body')).toHaveValue(''))
+    expect(posted).toBe(1)
+    expect(drafts.restore(MEMBER, POST_ID)).toBeNull()
+
+    view.rerender(sheet({ state, drafts, postId: null }))
+    act(() => state.reset())
+    view.rerender(sheet({ state, drafts }))
+    await screen.findByText('A lovely layered look.')
+    expect(screen.getByTestId('comment-body')).toHaveValue('')
+  })
+})
+
+/**
+ * R51: with the keyboard open and a long reply context, the thread region used to shrink
+ * to a clipped sliver of an empty card under Refresh. The reply context now stops at
+ * three lines, and the thread region hides while the keyboard is open.
+ */
+describe('R51 comments sheet with the keyboard open', () => {
+  const longBody = 'Layered charcoal wool over a cream merino knit and boots. '
+    .repeat(5)
+    .slice(0, 279)
+    .concat('.')
+  const longRoot = createCommunityComment({ id: 'root-long', body: longBody })
+  const longContext = `Replying to a comment: Style Explorer A1B2C3D4. ${longBody}`
+  // Enough roots to scroll the thread region.
+  const roots = [
+    longRoot,
+    ...Array.from({ length: 12 }, (_, index) =>
+      createCommunityComment({
+        id: `root-${index}`,
+        body: `Scroll filler ${index}`,
+        publicationSequence: index + 3,
+      })
+    ),
+  ]
+  const thread = () => screen.getByTestId('comments-thread')
+  const composer = () => screen.getByTestId('comment-body')
+  const keyboardShown = () => act(() => keyboard.emit('keyboardDidShow'))
+  const keyboardHidden = () => act(() => keyboard.emit('keyboardDidHide'))
+
+  beforeEach(() => {
+    server.use(http.get(`${base}/comments`, () => HttpResponse.json(page(roots))))
+  })
+  afterEach(async () => {
+    await browserPage.viewport(414, 896)
+  })
+
+  async function replyToLongRoot() {
+    renderSheet()
+    press(
+      await screen.findByRole('button', {
+        name: `Reply: Style Explorer A1B2C3D4. ${longBody}`,
+      })
+    )
+  }
+
+  it('shows at most three lines of the reply context and labels it with all of it', async () => {
+    await replyToLongRoot()
+    const context = screen.getByTestId('comments-reply-context')
+    expect(context).toHaveAttribute('aria-label', longContext)
+    expect(getComputedStyle(context).webkitLineClamp).toBe('3')
+    // The tail is clipped on screen: the text runs past the three lines it shows.
+    expect(context.scrollHeight).toBeGreaterThan(context.clientHeight)
+  })
+
+  it('hides the thread region while the keyboard is up for a reply, then restores it in place', async () => {
+    await replyToLongRoot()
+    const region = thread()
+    region.scrollTop = 200
+    fireEvent.scroll(region)
+    const offset = region.scrollTop
+    expect(offset).toBeGreaterThan(0)
+    act(() => composer().focus())
+    vi.mocked(setAccessibilityFocus).mockClear()
+
+    keyboardShown()
+    expect(thread()).not.toBeVisible()
+    expect(screen.getByTestId('comments-reply-context')).toBeVisible()
+    expect(screen.getByTestId('comment-submit')).toBeVisible()
+    expect(document.activeElement).toBe(composer())
+
+    keyboardHidden()
+    expect(thread()).toBeVisible()
+    expect(thread().scrollTop).toBe(offset)
+    expect(document.activeElement).toBe(composer())
+    expect(setAccessibilityFocus).not.toHaveBeenCalled()
+  })
+
+  it.each([
+    ['a phone-height window', 414, 896],
+    ['a short window', 320, 480],
+  ])(
+    'hides the thread region for a root comment with the keyboard up in %s',
+    async (_name, width, height) => {
+      await browserPage.viewport(width, height)
+      renderSheet()
+      await screen.findByTestId('comment-root-long')
+      act(() => composer().focus())
+      keyboardShown()
+      expect(thread()).not.toBeVisible()
+      expect(screen.getByTestId('comment-submit')).toBeVisible()
+      expect(document.activeElement).toBe(composer())
+      keyboardHidden()
+      expect(thread()).toBeVisible()
+    }
+  )
+
+  it('closes only the keyboard on Back while it is open, then the sheet on the next Back', async () => {
+    const onClose = vi.fn()
+    renderSheet({ onClose })
+    await screen.findByTestId('comment-root-long')
+    // The modal takes Back (Escape on the web) once its open animation reports it shown.
+    await waitFor(() =>
+      expect(setAccessibilityFocus).toHaveBeenCalledWith(nodeHandle(sheetTitle()))
+    )
+    act(() => composer().focus())
+    keyboardShown()
+    fireEvent.keyUp(document, { key: 'Escape' })
+    expect(onClose).not.toHaveBeenCalled()
+    expect(thread()).toBeVisible()
+    fireEvent.keyUp(document, { key: 'Escape' })
+    expect(onClose).toHaveBeenCalledOnce()
+  })
+
+  // On the web the responder system starts on mousedown and releases on mouseup.
+  const tapOutsideControls = (element: HTMLElement) => {
+    fireEvent.mouseDown(element)
+    fireEvent.mouseUp(element)
+  }
+
+  it('closes only the keyboard on a tap outside the controls, keeping the reply', async () => {
+    const onClose = vi.fn()
+    renderSheet({ onClose })
+    press(
+      await screen.findByRole('button', {
+        name: `Reply: Style Explorer A1B2C3D4. ${longBody}`,
+      })
+    )
+    act(() => composer().focus())
+    keyboardShown()
+    expect(thread()).not.toBeVisible()
+
+    tapOutsideControls(sheetTitle())
+    expect(thread()).toBeVisible()
+    expect(document.activeElement).not.toBe(composer())
+    expect(screen.getByTestId('comments-reply-context')).toHaveAttribute(
+      'aria-label',
+      longContext
+    )
+    expect(onClose).not.toHaveBeenCalled()
+  })
+
+  it('leaves a tap on a control to that control while the keyboard is open', async () => {
+    const onClose = vi.fn()
+    renderSheet({ onClose })
+    press(
+      await screen.findByRole('button', {
+        name: `Reply: Style Explorer A1B2C3D4. ${longBody}`,
+      })
+    )
+    act(() => composer().focus())
+    keyboardShown()
+    const cancel = screen.getByRole('button', { name: 'Cancel' })
+    // R59: the whole touch the sheet's responder would claim, then the press itself. A
+    // sheet that took the touch would close the keyboard and bring the thread back.
+    tapOutsideControls(cancel)
+    expect(thread()).not.toBeVisible()
+    expect(document.activeElement).toBe(composer())
+    press(cancel)
+    expect(screen.queryByTestId('comments-reply-context')).not.toBeInTheDocument()
+    expect(onClose).not.toHaveBeenCalled()
+  })
+
+  it('ignores a tap outside the controls while the keyboard is closed', async () => {
+    await replyToLongRoot()
+    act(() => composer().focus())
+    tapOutsideControls(sheetTitle())
+    expect(document.activeElement).toBe(composer())
+  })
+
+  it('closes the keyboard on the screen reader escape gesture, then the sheet', async () => {
+    const onClose = vi.fn()
+    renderSheet({ onClose })
+    await screen.findByTestId('comment-root-long')
+    act(() => composer().focus())
+    keyboardShown()
+    const escape = () => (sheetView.props.onAccessibilityEscape as () => void)()
+    act(escape)
+    expect(thread()).toBeVisible()
+    expect(document.activeElement).not.toBe(composer())
+    expect(onClose).not.toHaveBeenCalled()
+    act(escape)
+    expect(onClose).toHaveBeenCalledOnce()
+  })
+
+  it('brings the thread region back as Send dismisses the keyboard', async () => {
+    server.use(
+      http.post(`${base}/comments`, () =>
+        HttpResponse.json({
+          data: createCommunityCommentSubmission({ id: 'private-r51', body: 'Agreed.' }),
+        })
+      )
+    )
+    renderSheet()
+    await screen.findByTestId('comment-root-long')
+    act(() => composer().focus())
+    keyboardShown()
+    fireEvent.change(composer(), { target: { value: 'Agreed.' } })
+    press(screen.getByRole('button', { name: 'Send comment' }))
+    expect(thread()).toBeVisible()
+    await screen.findByTestId('comment-submission-private-r51')
+  })
+})
+
+/**
+ * R52: the sheet's modal window stopped at the Android status and navigation bars, so the
+ * tab bar showed undimmed below the scrim. It now covers both bars, and the sheet keeps
+ * its content above the gesture bar while the keyboard is down.
+ */
+describe('R52 comments sheet over the system bars', () => {
+  const keyboardShown = () => act(() => keyboard.emit('keyboardDidShow'))
+  const keyboardHidden = () => act(() => keyboard.emit('keyboardDidHide'))
+
+  it('covers the status and navigation bars with a transparent scrim', async () => {
+    renderSheet()
+    await screen.findByTestId('comment-root')
+    expect(lastModalProps()).toMatchObject({
+      ...EDGE_TO_EDGE_MODAL_PROPS,
+      transparent: true,
+      visible: true,
+    })
+  })
+
+  it('keeps the sheet above the gesture bar until the keyboard covers it', async () => {
+    renderSheet()
+    await screen.findByTestId('comment-root')
+    const sheetView = screen.getByTestId('comments-sheet')
+    expect(paddingBottomOf(sheetView)).toBe(32 + TEST_SAFE_AREA_INSETS.bottom)
+    keyboardShown()
+    expect(paddingBottomOf(sheetView)).toBe(32)
+    expect(screen.getByTestId('comments-thread')).not.toBeVisible()
+    keyboardHidden()
+    expect(paddingBottomOf(sheetView)).toBe(32 + TEST_SAFE_AREA_INSETS.bottom)
+    expect(screen.getByTestId('comments-thread')).toBeVisible()
+  })
+
+  it('dims the whole screen from its own layer, whatever height the keyboard view takes', async () => {
+    renderSheet()
+    await screen.findByTestId('comment-root')
+    const scrim = screen.getByTestId('comments-scrim')
+    expect(getComputedStyle(scrim).backgroundColor).toBe('rgba(0, 0, 0, 0.5)')
+    // The keyboard view and everything between it and the sheet stay transparent, so the
+    // scrim layer that holds them alone dims the screen at any keyboard view height.
+    const keyboardView = screen.getByTestId('edge-to-edge-modal-keyboard-view')
+    expect(keyboardView.parentElement).toBe(scrim)
+    for (
+      let node = screen.getByTestId('comments-sheet').parentElement;
+      node && node !== scrim;
+      node = node.parentElement
+    )
+      expect(getComputedStyle(node).backgroundColor).toBe('rgba(0, 0, 0, 0)')
+  })
+
+  describe.each([
+    ['android', [false, true, false]],
+    ['ios', [true, true, true]],
+  ] as const)('on %s', (os, [closed, open, reclosed]) => {
+    const latest = () => keyboardAvoider.renders.at(-1)?.enabled
+    beforeEach(() => {
+      Object.defineProperty(ReactNative.Platform, 'OS', { value: os, configurable: true })
+    })
+    afterEach(() => {
+      Object.defineProperty(ReactNative.Platform, 'OS', {
+        value: 'web',
+        configurable: true,
+      })
+    })
+
+    it('lets the keyboard view resize only while it has a keyboard to avoid', async () => {
+      renderSheet()
+      await screen.findByTestId('comment-root')
+      const shown = os === 'ios' ? 'keyboardWillShow' : 'keyboardDidShow'
+      const hidden = os === 'ios' ? 'keyboardWillHide' : 'keyboardDidHide'
+      expect(latest()).toBe(closed)
+      act(() => keyboard.emit(shown))
+      expect(latest()).toBe(open)
+      act(() => keyboard.emit(hidden))
+      expect(latest()).toBe(reclosed)
+    })
+  })
 })

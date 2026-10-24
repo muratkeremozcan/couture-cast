@@ -133,6 +133,7 @@ export interface GetCommunitySpotlightRequest {
   xCoutureReactions?: GetCommunitySpotlightXCoutureReactionsEnum
   cursor?: string
   limit?: number
+  surface?: GetCommunitySpotlightSurfaceEnum
 }
 
 export interface ReportCommunityCommentRequest {
@@ -1494,6 +1495,10 @@ export class CommunityApi extends runtime.BaseAPI {
       queryParameters['limit'] = requestParameters['limit']
     }
 
+    if (requestParameters['surface'] != null) {
+      queryParameters['surface'] = requestParameters['surface']
+    }
+
     const headerParameters: runtime.HTTPHeaders = {}
 
     if (requestParameters['xCoutureReactions'] != null) {
@@ -1820,6 +1825,15 @@ export const GetCommunitySpotlightXCoutureReactionsEnum = {
 } as const
 export type GetCommunitySpotlightXCoutureReactionsEnum =
   (typeof GetCommunitySpotlightXCoutureReactionsEnum)[keyof typeof GetCommunitySpotlightXCoutureReactionsEnum]
+/**
+ * @export
+ */
+export const GetCommunitySpotlightSurfaceEnum = {
+  community: 'community',
+  home_teaser: 'home_teaser',
+} as const
+export type GetCommunitySpotlightSurfaceEnum =
+  (typeof GetCommunitySpotlightSurfaceEnum)[keyof typeof GetCommunitySpotlightSurfaceEnum]
 /**
  * @export
  */

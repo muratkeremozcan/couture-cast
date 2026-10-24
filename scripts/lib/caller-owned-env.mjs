@@ -125,8 +125,11 @@ const LAUNCHER_CALLER_OWNED_KEYS = [
 /**
  * The launcher's env resolution: runs `loadEnvFiles`, keeps what the caller
  * settled (explicit empty-string disables, the launcher's own keys, the
- * inherited loopback stack), and lists the kept keys in
- * E2E_CALLER_OWNED_ENV_KEYS for every child it spawns.
+ * inherited loopback stack, and any keys a caller above the launcher already
+ * listed in E2E_CALLER_OWNED_ENV_KEYS), and lists the kept keys in
+ * E2E_CALLER_OWNED_ENV_KEYS for every child it spawns. The real-session harness
+ * (`scripts/e2e-real-session/run.mjs`) uses that inbound list for its ports and
+ * origins, which a developer's `.env.local` would otherwise replace.
  *
  * @param {NodeJS.ProcessEnv} env
  * @param {() => void} loadEnvFiles
@@ -141,7 +144,7 @@ export function loadLauncherEnv(env, loadEnvFiles) {
     const value = env[key]
     if (value) kept[key] = value
   }
-  Object.assign(kept, inheritedLocalStackEnv(env))
+  Object.assign(kept, inheritedLocalStackEnv(env), callerOwnedEnv(env))
   loadEnvFiles()
   Object.assign(env, explicitlyDisabled, kept)
   env.E2E_CALLER_OWNED_ENV_KEYS = Object.keys(kept).join(',')

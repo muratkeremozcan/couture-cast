@@ -65,6 +65,9 @@ const posthogAssetsHost = posthogHost.includes('.i.posthog.com')
   : 'https://us-assets.i.posthog.com'
 
 const nextConfig: NextConfig = {
+  // The real-session E2E harness (scripts/e2e-real-session/run.mjs) builds a
+  // real-auth web into its own output so the fixture-auth build stays intact.
+  distDir: process.env.WEB_NEXT_DIST_DIR || '.next',
   env: {
     BUILD_GIT_SHA: buildGitSha ?? '',
     BUILD_GIT_BRANCH: buildGitBranch ?? '',

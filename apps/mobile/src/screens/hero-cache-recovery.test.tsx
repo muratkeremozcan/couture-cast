@@ -1,4 +1,5 @@
 /* eslint-disable @typescript-eslint/await-thenable */
+import type * as FocusEffectModule from '@/src/test-utils/focus-effect'
 import React from 'react'
 import { fireEvent, screen, waitFor } from '@testing-library/react'
 import { render } from 'vitest-browser-react'
@@ -10,9 +11,12 @@ const mockSetParams = vi.fn()
 const mockPush = vi.fn()
 const mockRouter = { setParams: mockSetParams, push: mockPush }
 
-vi.mock('expo-router', () => ({
+vi.mock('expo-router', async () => ({
   useLocalSearchParams: () => mockParams,
   useRouter: () => mockRouter,
+  useFocusEffect: (
+    await vi.importActual<typeof FocusEffectModule>('@/src/test-utils/focus-effect')
+  ).useFocusEffect,
 }))
 
 vi.mock('expo-localization', () => ({

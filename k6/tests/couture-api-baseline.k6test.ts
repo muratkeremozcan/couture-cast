@@ -80,6 +80,9 @@ export const options = {
     http_req_duration: [`p(95)<${SLO.aggregate + infraDelay}`],
     http_req_failed: ['rate<0.01'],
     checks: ['rate>0.95'],
+    // The seeded wardrobe lists with signed images; it once answered 503 on every run.
+    'http_req_failed{name:capsules/garment-lookup}': ['rate==0'],
+    garment_images_signed: ['rate==1'],
     'http_req_duration{name:api/health}': [`p(95)<${SLO.health + infraDelay}`],
     'http_req_duration{name:api/events-poll}': [`p(95)<${SLO.eventsPoll + infraDelay}`],
     'http_req_duration{name:api/queue-health}': [`p(95)<${SLO.queueHealth + infraDelay}`],

@@ -2,11 +2,18 @@
 // See _bmad-output/project-knowledge/learning-path-step-by-step.md#step-30-smart-tagging-and-comfort-metadata
 import React from 'react'
 import type * as ReactNativeModule from 'react-native'
+import type * as EdgeToEdgeTestUtils from '@/src/test-utils/edge-to-edge-modal'
 import { act, render, screen, fireEvent, waitFor } from '@testing-library/react'
 import { afterEach, beforeEach, describe, it, expect, vi } from 'vitest'
 import { AccessibilityInfo, findNodeHandle, Platform } from 'react-native'
 import type { GarmentItemContract } from '@couture/api-client/contracts/http'
 import { MobileGarmentTaggingModal } from './garment-tagging-modal'
+import {
+  EDGE_TO_EDGE_MODAL_PROPS,
+  TEST_SAFE_AREA_INSETS,
+  lastModalProps,
+  paddingBottomOf,
+} from '@/src/test-utils/edge-to-edge-modal'
 import {
   createReadyGarmentFixture,
   createSuggestGarmentTagsDataFixture,
@@ -28,8 +35,18 @@ const backHandler = vi.hoisted(() => ({
   addEventListener: vi.fn(() => ({ remove: vi.fn() })),
 }))
 
+vi.mock('react-native-safe-area-context', async (importOriginal) => {
+  const actual = await importOriginal<Record<string, unknown>>()
+  const { TEST_SAFE_AREA_INSETS } = await vi.importActual<typeof EdgeToEdgeTestUtils>(
+    '@/src/test-utils/edge-to-edge-modal'
+  )
+  return { ...actual, useSafeAreaInsets: () => TEST_SAFE_AREA_INSETS }
+})
 vi.mock('react-native', async (importOriginal) => {
   const actual = await importOriginal<typeof ReactNativeModule>()
+  const { recordModalProps } = await vi.importActual<typeof EdgeToEdgeTestUtils>(
+    '@/src/test-utils/edge-to-edge-modal'
+  )
   return {
     ...actual,
     AccessibilityInfo: {
@@ -38,8 +55,10 @@ vi.mock('react-native', async (importOriginal) => {
     },
     BackHandler: backHandler,
     findNodeHandle: vi.fn(),
-    Modal: ({ children, visible }: { children: React.ReactNode; visible: boolean }) =>
-      visible ? children : null,
+    Modal: recordModalProps(
+      ({ children, visible }: { children: React.ReactNode; visible: boolean }) =>
+        visible ? children : null
+    ),
     Platform: { ...actual.Platform, OS: 'web' },
   }
 })
@@ -489,5 +508,26 @@ describe('MobileGarmentTaggingModal Component', () => {
     })
     expect(handleConfirmed).not.toHaveBeenCalled()
     expect(handleClose).not.toHaveBeenCalled()
+  })
+})
+
+describe('R52 MobileGarmentTaggingModal over the system bars', () => {
+  it('covers the status and navigation bars and keeps the sheet above the gesture bar', () => {
+    render(
+      <MobileGarmentTaggingModal
+        visible={true}
+        onClose={vi.fn()}
+        garmentId={null}
+        accessToken="test_token"
+      />
+    )
+    expect(lastModalProps()).toMatchObject({
+      ...EDGE_TO_EDGE_MODAL_PROPS,
+      transparent: true,
+      visible: true,
+    })
+    expect(paddingBottomOf(screen.getByTestId('garment-tagging-modal'))).toBe(
+      20 + TEST_SAFE_AREA_INSETS.bottom
+    )
   })
 })

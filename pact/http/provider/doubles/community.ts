@@ -7,6 +7,7 @@ import { decodeSpotlightCursor } from '../../../../apps/api/src/modules/communit
 import {
   COMMUNITY_REACTION_CONFLICT_MESSAGE,
   COMMUNITY_REACTION_RATE_LIMITED_MESSAGE,
+  COMMUNITY_SPOTLIGHT_RATE_LIMITED_MESSAGE,
   COMMUNITY_CHALLENGE_OVERLAP_MESSAGE,
   COMMUNITY_CONSENT_SUSPENDED_MESSAGE,
   COMMUNITY_FEED_DISABLED_MESSAGE,
@@ -17,6 +18,8 @@ import {
   COMMUNITY_SELF_REPORT_MESSAGE,
   COMMUNITY_UPLOAD_SESSION_MISMATCH_MESSAGE,
   communityServedSpotlightLevelSchema,
+  communitySpotlightOpenSurfaceSchema,
+  communitySpotlightSurfaceSchema,
   encodeCommunityFeedCursor,
   safeDecodeCommunityFeedCursor,
   type ClimateBand,
@@ -525,9 +528,16 @@ export function createCommunityDoubles() {
       userId: string
       cursor?: string
       limit: number
+      surface: string
       reactions?: boolean
     }): Promise<CommunitySpotlight | CommunityReactionSpotlight> => {
       const scenario = scenarioOf()
+      // Story 6.7: the controller must hand the parsed surface, its default
+      // included, to the service, or the viewed event loses it.
+      if (!communitySpotlightSurfaceSchema.safeParse(params.surface).success)
+        return Promise.reject(
+          new Error('A spotlight read reached the double without a surface')
+        )
       // The shared read gate's refusal, byte for byte: CommunityService.readAuthorized.
       if (scenario === 'spotlight-disabled')
         return Promise.reject(
@@ -536,6 +546,11 @@ export function createCommunityDoubles() {
             code: 'denied',
             message: COMMUNITY_FEED_DISABLED_MESSAGE,
           })
+        )
+      // The page-one read limit's refusal: CommunitySpotlightService.getSpotlight.
+      if (scenario === 'spotlight-rate-limited')
+        return Promise.reject(
+          new CommunityRateLimitException(COMMUNITY_SPOTLIGHT_RATE_LIMITED_MESSAGE, 37)
         )
       const reactions = params.reactions === true
       if (params.cursor) {
@@ -572,14 +587,16 @@ export function createCommunityDoubles() {
     /**
      * The spotlight branch of the opened endpoint. It refuses a body that lost
      * its served level, its rank or the post id, so a controller that drops one
-     * fails verification.
+     * fails verification. Story 6.7 adds the opened surface.
      */
     recordOpened: (params: {
       postId: string
+      surface: unknown
       rank: number
       level: unknown
     }): Promise<{ tracked: true }> =>
       params.postId === PUBLISHED_POST_ID &&
+      communitySpotlightOpenSurfaceSchema.safeParse(params.surface).success &&
       Number.isInteger(params.rank) &&
       communityServedSpotlightLevelSchema.safeParse(params.level).success
         ? Promise.resolve({ tracked: true })

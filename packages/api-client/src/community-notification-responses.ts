@@ -21,8 +21,12 @@ export class CommunityNotificationResponses {
     if (!parsed.success) return
     const key = `${parsed.data.notificationId}:${action}`
     if (this.consumed.has(key)) return
+    // Bounded: the oldest unrouted response gives way to the newest.
     if (this.pending.size >= 32)
-      this.pending.delete(this.pending.keys().next().value ?? '')
+      for (const oldest of this.pending.keys()) {
+        this.pending.delete(oldest)
+        break
+      }
     this.pending.set(key, parsed.data)
     this.drain()
   }
@@ -35,7 +39,10 @@ export class CommunityNotificationResponses {
       this.pending.delete(key)
       this.consumed.add(key)
       if (this.consumed.size > 256)
-        this.consumed.delete(this.consumed.values().next().value ?? '')
+        for (const oldest of this.consumed) {
+          this.consumed.delete(oldest)
+          break
+        }
       this.options.consumed()
     }
   }

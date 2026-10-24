@@ -4,7 +4,6 @@ import { useTranslation } from 'react-i18next'
 import {
   AccessibilityInfo,
   BackHandler,
-  Modal,
   View,
   Text,
   TouchableOpacity,
@@ -25,6 +24,7 @@ import {
   updateGarmentTagsFromMobile,
 } from '../../src/lib/wardrobe'
 import { useAccessibilityAnnouncer } from '../../src/hooks/use-accessibility-announcer'
+import { EdgeToEdgeModal, useModalInsets } from '@/components/edge-to-edge-modal'
 import { safeFindNodeHandle } from '@/src/lib/accessibility-focus'
 
 export interface MobileGarmentTaggingModalProps {
@@ -114,6 +114,7 @@ export function MobileGarmentTaggingModal({
   invokingNodeHandle,
 }: MobileGarmentTaggingModalProps) {
   const { t } = useTranslation()
+  const insets = useModalInsets()
   const { announce } = useAccessibilityAnnouncer()
   const [selectedCategory, setSelectedCategory] = useState<GarmentCategory | null>(null)
   const [selectedMaterial, setSelectedMaterial] = useState<GarmentMaterial | null>(null)
@@ -281,16 +282,16 @@ export function MobileGarmentTaggingModal({
     !selectedCategory || !selectedComfort || isSaving || isAnalysisPending
 
   return (
-    <Modal
+    <EdgeToEdgeModal
       visible={visible}
       animationType="slide"
-      transparent={true}
       onRequestClose={onClose}
+      scrim="rgba(0, 0, 0, 0.5)"
     >
       <View style={styles.overlay}>
         <View
           testID="garment-tagging-modal"
-          style={styles.container}
+          style={[styles.container, { paddingBottom: 20 + insets.bottom }]}
           accessibilityViewIsModal={true}
           onAccessibilityEscape={() => onCloseRef.current()}
         >
@@ -546,14 +547,13 @@ export function MobileGarmentTaggingModal({
           </View>
         </View>
       </View>
-    </Modal>
+    </EdgeToEdgeModal>
   )
 }
 
 const styles = StyleSheet.create({
   overlay: {
     flex: 1,
-    backgroundColor: 'rgba(0, 0, 0, 0.5)',
     justifyContent: 'flex-end',
   },
   container: {

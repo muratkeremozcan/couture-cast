@@ -1,6 +1,8 @@
 /* eslint-disable @typescript-eslint/await-thenable */
 // Story 6.5 R43: a client-side deadline is transient and keeps verified content, and a
 // required D3 hide gives the member back their place in the feed when the same items return.
+// R46: the same hide gives back an unsent comment and the composer focus it had.
+// R48: and only on Community, when access returns while another tab is on screen.
 import { CommunitySyncState } from '@couture/api-client'
 import { act, fireEvent, screen, waitFor } from '@testing-library/react'
 import { View } from 'react-native'
@@ -9,6 +11,8 @@ import { render } from 'vitest-browser-react'
 import { expect, it, vi } from 'vitest'
 import { CommunityScreen } from '@/src/features/community/community-screen'
 import { server } from '@/src/test-utils/msw/server'
+import { press } from '@/src/test-utils/press'
+import { screenFocus } from '@/src/test-utils/focus-effect'
 import { feedJson, item, serveFeed } from './harness'
 
 const summary = {
@@ -96,6 +100,55 @@ async function openVerifiedFeed(feed: ReturnType<typeof verifiedFeed>) {
   return screen.findByTestId('community-post-card-post-a')
 }
 
+/**
+ * Opens the post-a comments sheet, types into its focused composer, and lets the
+ * verification's stale timer hide the content (D3). `whileHidden` runs during the hide,
+ * before access returns.
+ */
+async function typeThroughStaleHide(whileHidden?: () => void) {
+  const feed = verifiedFeed()
+  server.use(
+    http.get('*/api/v1/community/posts/post-a/comments', () =>
+      HttpResponse.json({
+        data: { items: [], nextCursor: null, snapshot: 1, hasNewer: false },
+      })
+    ),
+    http.get('*/api/v1/community/posts/post-a/comment-submissions', () =>
+      HttpResponse.json({ data: { items: [], nextCursor: null } })
+    )
+  )
+  await openVerifiedFeed(feed)
+  press(screen.getByTestId('community-card-comments-post-a'))
+  const composer = await screen.findByTestId<HTMLInputElement>('comment-body')
+  composer.focus()
+  fireEvent.change(composer, { target: { value: 'Typing on a slow phone' } })
+
+  // This catch-up verifies access at `verifiedFrom` or a little later.
+  const verifiedFrom = Date.now()
+  await act(() => feed.sync().catchUp())
+  const release = feed.hold()
+  let pending!: Promise<void>
+  // The socket drops 7.8 s after that verification. Content stays for the rest of the
+  // 8 s bound (D3), then the verification's stale timer hides it while the held
+  // catch-up still cannot verify access.
+  const clock = vi.spyOn(Date, 'now').mockReturnValue(verifiedFrom + 7_800)
+  try {
+    await act(() => {
+      const sync = feed.sync()
+      sync.foreground()
+      pending = sync.catchUp()
+    })
+    expect(screen.getByTestId('comment-body')).toBe(composer)
+    await waitFor(() => expect(screen.queryByTestId('comment-body')).toBeNull())
+    expect(screen.getByTestId('community-feed-unavailable')).toBeTruthy()
+    whileHidden?.()
+  } finally {
+    clock.mockRestore()
+    release()
+    await act(() => pending)
+  }
+}
+
 export function registerCommunityAvailabilityRestoreCases() {
   it('6.5-R43-MOB-001 a catch-up aborted at its 2 s client deadline keeps the verified feed', async () => {
     const feed = verifiedFeed()
@@ -147,5 +200,26 @@ export function registerCommunityAvailabilityRestoreCases() {
     }
     await screen.findByTestId('community-post-card-post-a')
     await waitFor(() => expect(list.scrollTop).toBe(600))
+  })
+
+  it('6.5-R46-MOB-001 gives the composer back its draft and focus after a stale-access hide', async () => {
+    await typeThroughStaleHide()
+    const restored = await screen.findByTestId<HTMLInputElement>('comment-body')
+    expect(restored.value).toBe('Typing on a slow phone')
+    await waitFor(() => expect(document.activeElement).toBe(restored))
+  })
+
+  it('6.5-R48-MOB-001 keeps the comments sheet off Home when access returns there', async () => {
+    // The member leaves for the Home tab while the hide is up.
+    await typeThroughStaleHide(() => act(() => screenFocus.set(false)))
+    // Access is back: the feed renders behind Home, and the sheet waits for Community.
+    await screen.findByTestId('community-post-card-post-a')
+    expect(screen.queryByTestId('comment-body')).toBeNull()
+    expect(screen.queryByTestId('comments-close')).toBeNull()
+
+    act(() => screenFocus.set(true))
+    const restored = await screen.findByTestId<HTMLInputElement>('comment-body')
+    expect(restored.value).toBe('Typing on a slow phone')
+    await waitFor(() => expect(document.activeElement).toBe(restored))
   })
 }

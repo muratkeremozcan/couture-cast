@@ -881,7 +881,9 @@
       "announceLoadedMore": "Loaded {{count}} more spotlight looks.",
       "announceLoadedMore_one": "Loaded {{count}} more spotlight look.",
       "announceLoadedMore_other": "Loaded {{count}} more spotlight looks.",
-      "announceRefreshed": "The City Spotlight was refreshed with the latest ranking."
+      "announceRefreshed": "The City Spotlight was refreshed with the latest ranking.",
+      "targetUnavailable": "That look is no longer in the City Spotlight.",
+      "destinationUnavailable": "The City Spotlight is not available right now."
     }
   },
   "locations": {
@@ -927,6 +929,18 @@
       "rate_limited": "Too many searches. Wait a moment and try again.",
       "invalid_query": "Type between 2 and 80 characters.",
       "unknown": "Something went wrong. Try again."
+    }
+  },
+  "home": {
+    "spotlightTeaser": {
+      "heading": "Standout look in {{label}}",
+      "reactions": "{{count}} reactions",
+      "reactions_one": "{{count}} reaction",
+      "reactions_other": "{{count}} reactions",
+      "linkLabel": "Standout look in {{label}} by {{author}}, {{count}} reactions. Opens the City Spotlight.",
+      "linkLabel_one": "Standout look in {{label}} by {{author}}, {{count}} reaction. Opens the City Spotlight.",
+      "linkLabel_other": "Standout look in {{label}} by {{author}}, {{count}} reactions. Opens the City Spotlight.",
+      "cta": "See it in the City Spotlight"
     }
   }
 }

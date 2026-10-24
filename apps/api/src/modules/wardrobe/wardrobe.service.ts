@@ -295,6 +295,27 @@ function assertCommitReplayMatches(
   }
 }
 
+/** A garment as the API returns it, with the image access the caller could sign. */
+function garmentData(
+  garment: GarmentItem,
+  imageAccess: GarmentItemResponse['data']['imageAccess']
+): GarmentItemResponse['data'] {
+  return {
+    id: garment.id,
+    status: garment.upload_status,
+    category: garment.category as GarmentCategory | null,
+    material: garment.material as GarmentMaterial | null,
+    comfortRange: garment.comfort_range as GarmentComfortRange | null,
+    tagsConfirmedAt: garment.tags_confirmed_at?.toISOString() ?? null,
+    fileSizeBytes: garment.file_size_bytes,
+    mimeType: garment.mime_type as GarmentMimeType | null,
+    retentionStatus: garment.retention_status,
+    createdAt: garment.created_at.toISOString(),
+    committedAt: garment.committed_at?.toISOString() ?? null,
+    imageAccess,
+  }
+}
+
 @Injectable()
 export class WardrobeService {
   private readonly uploadTokenSecret: string
@@ -512,23 +533,38 @@ export class WardrobeService {
       READ_URL_EXPIRY_SECONDS
     )
     return {
-      data: {
-        id: garment.id,
-        status: garment.upload_status,
-        category: garment.category as GarmentCategory | null,
-        material: garment.material as GarmentMaterial | null,
-        comfortRange: garment.comfort_range as GarmentComfortRange | null,
-        tagsConfirmedAt: garment.tags_confirmed_at?.toISOString() ?? null,
-        fileSizeBytes: garment.file_size_bytes,
-        mimeType: garment.mime_type as GarmentMimeType | null,
-        retentionStatus: garment.retention_status,
-        createdAt: garment.created_at.toISOString(),
-        committedAt: garment.committed_at?.toISOString() ?? null,
-        imageAccess: {
-          url: readUrl,
-          expiresAt: new Date(Date.now() + READ_URL_EXPIRY_SECONDS * 1000).toISOString(),
+      data: garmentData(garment, {
+        url: readUrl,
+        expiresAt: new Date(Date.now() + READ_URL_EXPIRY_SECONDS * 1000).toISOString(),
+      }),
+    }
+  }
+
+  /**
+   * One garment of a list. An image that cannot be signed (an object missing
+   * from storage, a storage fault) leaves that garment without one, as the
+   * contract allows and the capsule list already does, instead of failing the
+   * member's whole wardrobe. A row with no object at all still fails closed.
+   */
+  private async toListedGarment(
+    garment: GarmentItem
+  ): Promise<GarmentItemResponse['data']> {
+    if (!garment.object_path) {
+      throw new ServiceUnavailableException('STORAGE_UNAVAILABLE')
+    }
+    try {
+      return (await this.toResponse(garment)).data
+    } catch (error) {
+      // The garment id and the error's class only: the object path and the
+      // storage message both carry the owner's id.
+      this.logger.error(
+        {
+          garmentId: garment.id,
+          errorClass: error instanceof Error ? error.constructor.name : typeof error,
         },
-      },
+        'garment_image_signing_failed'
+      )
+      return garmentData(garment, null)
     }
   }
 
@@ -543,10 +579,9 @@ export class WardrobeService {
       orderBy: { created_at: 'desc' },
       take: 100,
     })
-    const responses = await Promise.all(
-      garments.map((garment) => this.toResponse(garment))
-    )
-    return { data: responses.map((response) => response.data) }
+    return {
+      data: await Promise.all(garments.map((garment) => this.toListedGarment(garment))),
+    }
   }
 
   async suggestGarmentTags(

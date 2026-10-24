@@ -1,6 +1,7 @@
 import { describe, expect } from 'https://jslib.k6.io/k6chaijs/4.5.0.1/index.js'
 import { fail, sleep } from 'k6'
 import http from 'k6/http'
+import { Rate } from 'k6/metrics'
 import { apiUrl, authHeaders, uniqueEmail } from '../helpers/config'
 import { signUp } from '../helpers/api'
 import { deleteRequest, getJson, patchJson, postJson } from '../helpers/http'
@@ -100,6 +101,13 @@ export function testCapsuleReadPaths() {
  */
 const SEEDED_WARDROBE_OWNER = 'teen-1'
 
+/**
+ * Whether the seeded owner's garment lookup carried signed images: one sample per
+ * write-path iteration, held at 1 by a threshold in the baseline test. A plain
+ * check would hide inside the overall checks rate.
+ */
+export const garmentImagesSigned = new Rate('garment_images_signed')
+
 function resolveWriteOwner(): string {
   return typeof EXPLICIT_CAPSULE_OWNER === 'string' && EXPLICIT_CAPSULE_OWNER.length > 0
     ? EXPLICIT_CAPSULE_OWNER
@@ -114,41 +122,35 @@ export function testCapsuleWritePaths() {
     // Tagging it `capsules/list` folded its failures into the capsule list
     // error rate and made a healthy list endpoint read as 50 percent failed.
     //
-    // Garment listing signs object-storage URLs, so it returns 503 wherever
-    // storage is not provisioned. That is an environment gap rather than a
-    // capsule regression, so 503 is an expected status here and must not count
-    // toward http_req_failed. The write path reports and returns instead.
+    // The seed uploads an image behind every seeded garment and the list signs
+    // each one on its own, so the lookup answers 200 with signed images. It
+    // used to answer 503 on every run, tolerated here as "storage not
+    // provisioned", while the seed had simply never uploaded the objects.
     const garments = http.get(apiUrl('/api/v1/wardrobe/garments'), {
       headers: capsuleHeaders(owner),
       tags: { name: 'capsules/garment-lookup' },
-      responseCallback: http.expectedStatuses(200, 503),
     })
-
-    const listedGarmentIds =
+    expect(garments.status, 'garment lookup status').to.equal(200)
+    const listed =
       garments.status === 200
-        ? (
-            (JSON.parse(garments.body as string) as { data?: { id: string }[] }).data ??
-            []
-          )
-            .slice(0, 2)
-            .map((item) => item.id)
+        ? ((
+            JSON.parse(garments.body as string) as {
+              data?: { id: string; imageAccess: { url: string } | null }[]
+            }
+          ).data ?? [])
         : []
-
-    // Fall back to the seeded ids when listing is unavailable. The wardrobe seed
-    // names them deterministically, so the mutation path stays exercised even
-    // where object storage is absent.
-    const garmentIds =
-      listedGarmentIds.length >= 2
-        ? listedGarmentIds
-        : owner === SEEDED_WARDROBE_OWNER
-          ? [`${owner}-garment-1`, `${owner}-garment-2`]
-          : []
+    const signed = listed.filter((item) => item.imageAccess?.url)
+    if (owner === SEEDED_WARDROBE_OWNER) {
+      garmentImagesSigned.add(signed.length >= 2)
+      expect(signed.length, 'seeded garments with a signed image').to.be.at.least(2)
+    }
+    const garmentIds = listed.slice(0, 2).map((item) => item.id)
 
     if (garmentIds.length < 2) {
       console.warn(
         `[capsules] skipping write path: garment lookup returned ${garments.status} ` +
-          `with ${listedGarmentIds.length} eligible garments for "${owner}", and no ` +
-          'seeded fallback applies. Seed at least two ready, active garments.'
+          `with ${listed.length} garments for "${owner}". Seed at least two ready, ` +
+          'active garments.'
       )
       return
     }

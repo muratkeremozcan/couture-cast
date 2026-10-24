@@ -7,7 +7,18 @@ export declare const MIN_SECRET_LENGTH: number
 
 export type SecretNeedle = { encoding: string; bytes: Buffer }
 
-export type ScannableSecret = { name: string; needles: SecretNeedle[] }
+export type ScannableSecret =
+  | { name: string; needles: SecretNeedle[]; pattern?: undefined }
+  | { name: string; pattern: RegExp; encoding: string; needles?: undefined }
+
+export declare const JWT_SHAPE: RegExp
+
+export declare function mintedValuePatterns(
+  codes: readonly string[],
+  rejectJwt: boolean
+): ScannableSecret[]
+
+export declare function readOtpFile(file: string): string[]
 
 export declare function secretEncodings(value: string): SecretNeedle[]
 
@@ -37,6 +48,8 @@ export declare function resolveStorageStateSecrets(files: readonly string[]): {
 export declare function parseArgs(argv: readonly string[]): {
   names: string[]
   storageStates: string[]
+  otpFiles: string[]
+  rejectJwt: boolean
   targets: string[]
 }
 

@@ -77,13 +77,23 @@ tags:
 # `create-capsule-button` visible on it again. Nothing else runs between those
 # two steps.
 #
-# Android does not need it in the first place: text arrives through adb rather
-# than the soft keyboard, so there is nothing covering the checkboxes to dismiss.
+# Android keeps its keyboard up instead. Gboard rises when the name field takes
+# focus (CI job 120835242721 shows it over the garment list), and since Story 6.7
+# R57 the builder's keyboard view lifts the whole sheet above it, so the garment
+# search below scrolls within the space the keyboard leaves. Selecting garments
+# with the keyboard up is that check: a builder left under the keyboard cannot
+# scroll a garment into view, which is exactly how that CI job failed.
 - runFlow:
     when:
       platform: iOS
     commands:
       - hideKeyboard
+- runFlow:
+    when:
+      platform: Android
+    commands:
+      - takeScreenshot:
+          path: maestro/artifacts/capsule-builder-keyboard
 
 # Select two garments BY ID, not by position.
 #
@@ -162,12 +172,29 @@ tags:
       - tapOn:
           id: 'garment-checkbox-${GARMENT_A_ID}'
           label: 'Select the first seeded garment'
-      - extendedWaitUntil:
-          visible:
-            id: 'garment-checkbox-${GARMENT_A_ID}'
-            checked: true
-          timeout: 10000
-          label: 'The first garment registered as selected'
+      # Maestro's iOS hierarchy never reports `checked` (R64: it stayed false while
+      # the row toggled, so each retry unselected the garment again). iOS reads the
+      # builder's own count instead, above the list.
+      - runFlow:
+          when:
+            platform: Android
+          commands:
+            - extendedWaitUntil:
+                visible:
+                  id: 'garment-checkbox-${GARMENT_A_ID}'
+                  checked: true
+                timeout: 10000
+                label: 'The first garment registered as selected'
+      - runFlow:
+          when:
+            platform: iOS
+          commands:
+            - scrollUntilVisible:
+                element:
+                  text: 'Garments \(1 of \d+ selected\)'
+                direction: UP
+                timeout: 10000
+                label: 'The first garment registered as selected'
 
 # Back to the top of the builder before searching for the second garment.
 #
@@ -207,12 +234,29 @@ tags:
       - tapOn:
           id: 'garment-checkbox-${GARMENT_B_ID}'
           label: 'Select the second seeded garment'
-      - extendedWaitUntil:
-          visible:
-            id: 'garment-checkbox-${GARMENT_B_ID}'
-            checked: true
-          timeout: 10000
-          label: 'The second garment registered as selected'
+      # Maestro's iOS hierarchy never reports `checked` (R64: it stayed false while
+      # the row toggled, so each retry unselected the garment again). iOS reads the
+      # builder's own count instead, above the list.
+      - runFlow:
+          when:
+            platform: Android
+          commands:
+            - extendedWaitUntil:
+                visible:
+                  id: 'garment-checkbox-${GARMENT_B_ID}'
+                  checked: true
+                timeout: 10000
+                label: 'The second garment registered as selected'
+      - runFlow:
+          when:
+            platform: iOS
+          commands:
+            - scrollUntilVisible:
+                element:
+                  text: 'Garments \(2 of \d+ selected\)'
+                direction: UP
+                timeout: 10000
+                label: 'The second garment registered as selected'
 
 # The postcondition, so a mis-tap fails here rather than several steps later as
 # a confusing message about a missing reorder button.

@@ -2,6 +2,7 @@
 // See _bmad-output/project-knowledge/learning-path-step-by-step.md#step-31-outfit-capsule-builder
 import React from 'react'
 import type * as ReactNativeModule from 'react-native'
+import type * as EdgeToEdgeTestUtils from '@/src/test-utils/edge-to-edge-modal'
 import { fireEvent, render, screen, waitFor } from '@testing-library/react'
 import { afterEach, beforeAll, beforeEach, describe, expect, it, vi } from 'vitest'
 import { AccessibilityInfo, Platform, findNodeHandle } from 'react-native'
@@ -20,10 +21,21 @@ vi.mock('expo-localization', () => ({
  * react-native-web export. `findNodeHandle` is mocked because the real
  * react-native-web implementation throws unconditionally.
  */
+vi.mock('react-native-safe-area-context', async (importOriginal) => {
+  const actual = await importOriginal<Record<string, unknown>>()
+  const { TEST_SAFE_AREA_INSETS } = await vi.importActual<typeof EdgeToEdgeTestUtils>(
+    '@/src/test-utils/edge-to-edge-modal'
+  )
+  return { ...actual, useSafeAreaInsets: () => TEST_SAFE_AREA_INSETS }
+})
 vi.mock('react-native', async (importOriginal) => {
   const actual = await importOriginal<typeof ReactNativeModule>()
+  const { recordModalProps } = await vi.importActual<typeof EdgeToEdgeTestUtils>(
+    '@/src/test-utils/edge-to-edge-modal'
+  )
   return {
     ...actual,
+    Modal: recordModalProps(actual.Modal),
     AccessibilityInfo: {
       ...actual.AccessibilityInfo,
       announceForAccessibility: vi.fn(),
@@ -36,6 +48,12 @@ vi.mock('react-native', async (importOriginal) => {
 
 import i18n, { initI18n } from '@/src/lib/i18n'
 import { MobileCapsuleBuilderModal } from './capsule-builder-modal'
+import {
+  EDGE_TO_EDGE_MODAL_PROPS,
+  TEST_SAFE_AREA_INSETS,
+  lastModalProps,
+  paddingBottomOf,
+} from '@/src/test-utils/edge-to-edge-modal'
 
 function garment(
   id: string,
@@ -606,5 +624,39 @@ describe('MobileCapsuleBuilderModal', () => {
 
       expect(AccessibilityInfo.setAccessibilityFocus).toHaveBeenCalledWith(7)
     })
+  })
+})
+
+describe('R52 MobileCapsuleBuilderModal over the system bars', () => {
+  beforeAll(async () => {
+    await initI18n()
+    await i18n.changeLanguage('en-US')
+  })
+
+  it('covers the status and navigation bars and keeps the sheet above the gesture bar', () => {
+    renderModal()
+    expect(lastModalProps()).toMatchObject({
+      ...EDGE_TO_EDGE_MODAL_PROPS,
+      transparent: true,
+      visible: true,
+    })
+    expect(paddingBottomOf(screen.getByTestId('mobile-capsule-builder-container'))).toBe(
+      16 + TEST_SAFE_AREA_INSETS.bottom
+    )
+  })
+
+  it('R57 lifts its fields with the wrapper keyboard view under a scrim of its own layer', () => {
+    renderModal()
+    const keyboardView = screen.getByTestId('edge-to-edge-modal-keyboard-view')
+    expect(keyboardView.contains(screen.getByTestId('capsule-name-input'))).toBe(true)
+    // The wrapper paints the scrim; no layer inside the keyboard view adds a second one.
+    for (
+      let node = screen.getByTestId('capsule-name-input').parentElement;
+      node && node !== keyboardView;
+      node = node.parentElement
+    )
+      expect(getComputedStyle(node).backgroundColor).not.toMatch(
+        /^rgba\(0, 0, 0, 0\.[1-9]/
+      )
   })
 })

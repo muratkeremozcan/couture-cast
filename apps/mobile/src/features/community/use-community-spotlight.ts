@@ -24,6 +24,8 @@ export type SpotlightStatus = 'idle' | 'loading' | 'ready' | 'disabled' | 'error
 export type SpotlightFocusRequest =
   | { kind: 'appended'; firstId: string; count: number; serial: number }
   | { kind: 'refreshed'; firstId: string | null; serial: number }
+  /** Story 6.7: a Home teaser activation asked for this entry. */
+  | { kind: 'targeted'; firstId: string; serial: number }
 
 export interface CommunitySpotlightView {
   status: SpotlightStatus
@@ -55,6 +57,16 @@ export interface CommunitySpotlightView {
    * spotlight copy, so every loaded page and the reader's place survive.
    */
   refreshItem: (postId: string) => void
+  /**
+   * Story 6.7: focuses one shown entry and announces it once. Returns false
+   * when the entry is not shown, so the caller can report that instead.
+   */
+  focusEntry: (postId: string) => boolean
+  /**
+   * Retires a handled focus request, so a module that unmounts and mounts again
+   * (an availability lapse and recovery) never replays it.
+   */
+  acknowledgeFocusRequest: (serial: number) => void
 }
 
 /** Same read refusals as the feed render the localized disabled state. */
@@ -328,6 +340,17 @@ export function useCommunitySpotlight({
     [applyPost, evict, reactionState]
   )
 
+  const focusEntry = useCallback((postId: string) => {
+    if (!itemsRef.current.some((item) => item.id === postId)) return false
+    focusSerialRef.current += 1
+    setFocusRequest({ kind: 'targeted', firstId: postId, serial: focusSerialRef.current })
+    return true
+  }, [])
+
+  const acknowledgeFocusRequest = useCallback((serial: number) => {
+    setFocusRequest((current) => (current?.serial === serial ? null : current))
+  }, [])
+
   return {
     status,
     level,
@@ -343,5 +366,7 @@ export function useCommunitySpotlight({
     applyPost,
     evict,
     refreshItem,
+    focusEntry,
+    acknowledgeFocusRequest,
   }
 }

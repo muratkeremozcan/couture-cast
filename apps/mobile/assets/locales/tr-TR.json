@@ -881,7 +881,9 @@
       "announceLoadedMore": "{{count}} vitrin kombini daha yüklendi.",
       "announceLoadedMore_one": "{{count}} vitrin kombini daha yüklendi.",
       "announceLoadedMore_other": "{{count}} vitrin kombini daha yüklendi.",
-      "announceRefreshed": "Şehir vitrini en güncel sıralamayla yenilendi."
+      "announceRefreshed": "Şehir vitrini en güncel sıralamayla yenilendi.",
+      "targetUnavailable": "Bu kombin artık Şehir Vitrininde değil.",
+      "destinationUnavailable": "Şehir Vitrini şu anda kullanılamıyor."
     }
   },
   "locations": {
@@ -927,6 +929,18 @@
       "rate_limited": "Çok fazla arama yapıldı. Biraz bekleyip tekrar deneyin.",
       "invalid_query": "2 ile 80 karakter arasında yazın.",
       "unknown": "Bir sorun oluştu. Tekrar deneyin."
+    }
+  },
+  "home": {
+    "spotlightTeaser": {
+      "heading": "{{label}} öne çıkan kombini",
+      "reactions": "{{count}} tepki",
+      "reactions_one": "{{count}} tepki",
+      "reactions_other": "{{count}} tepki",
+      "linkLabel": "{{label}} öne çıkan kombini, {{author}} tarafından, {{count}} tepki. Şehir Vitrini açılır.",
+      "linkLabel_one": "{{label}} öne çıkan kombini, {{author}} tarafından, {{count}} tepki. Şehir Vitrini açılır.",
+      "linkLabel_other": "{{label}} öne çıkan kombini, {{author}} tarafından, {{count}} tepki. Şehir Vitrini açılır.",
+      "cta": "Şehir Vitrininde gör"
     }
   }
 }

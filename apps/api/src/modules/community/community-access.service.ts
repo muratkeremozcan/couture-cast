@@ -52,7 +52,7 @@ export class CommunityAccessService {
                 )
                 await this.assertDatabase(member, connection)
               },
-              { timeout: budget.remaining(), maxWait: Math.min(100, budget.remaining()) }
+              { timeout: budget.remaining(), maxWait: budget.remaining() }
             )
           : this.assertDatabase(member, tx)
       )
@@ -88,7 +88,7 @@ export async function assertCommunitySubjectPresent(
           )
           await assertCommunitySubjectAvailable(tx, member)
         },
-        { timeout: budget.remaining(), maxWait: Math.min(100, budget.remaining()) }
+        { timeout: budget.remaining(), maxWait: budget.remaining() }
       )
     )
   )
@@ -138,7 +138,7 @@ export async function assertCommunityReadEligibility(
           )
           await assertCommunityDatabaseReadAccess(tx, member, true)
         },
-        { timeout: budget.remaining(), maxWait: Math.min(100, budget.remaining()) }
+        { timeout: budget.remaining(), maxWait: budget.remaining() }
       )
     )
   )

@@ -881,7 +881,9 @@
       "announceLoadedMore": "Mais {{count}} visuais em destaque carregados.",
       "announceLoadedMore_one": "Mais {{count}} visual em destaque carregado.",
       "announceLoadedMore_other": "Mais {{count}} visuais em destaque carregados.",
-      "announceRefreshed": "Os destaques da cidade foram atualizados com a classificação mais recente."
+      "announceRefreshed": "Os destaques da cidade foram atualizados com a classificação mais recente.",
+      "targetUnavailable": "Esse visual já não está nos Destaques da cidade.",
+      "destinationUnavailable": "Os Destaques da cidade não estão disponíveis neste momento."
     }
   },
   "locations": {
@@ -927,6 +929,18 @@
       "rate_limited": "Demasiadas pesquisas. Aguarde um momento e tente novamente.",
       "invalid_query": "Escreva entre 2 e 80 caracteres.",
       "unknown": "Algo correu mal. Tente novamente."
+    }
+  },
+  "home": {
+    "spotlightTeaser": {
+      "heading": "Visual em destaque em {{label}}",
+      "reactions": "{{count}} reações",
+      "reactions_one": "{{count}} reação",
+      "reactions_other": "{{count}} reações",
+      "linkLabel": "Visual em destaque em {{label}} de {{author}}, {{count}} reações. Abre os Destaques da cidade.",
+      "linkLabel_one": "Visual em destaque em {{label}} de {{author}}, {{count}} reação. Abre os Destaques da cidade.",
+      "linkLabel_other": "Visual em destaque em {{label}} de {{author}}, {{count}} reações. Abre os Destaques da cidade.",
+      "cta": "Ver nos Destaques da cidade"
     }
   }
 }

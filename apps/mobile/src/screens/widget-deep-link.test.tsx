@@ -6,6 +6,7 @@
 // See _bmad-output/project-knowledge/learning-path-step-by-step.md#step-27-widget-and-notification-deep-link-handling
 /* eslint-disable @typescript-eslint/await-thenable */
 // Story 3.3 Task 5 step 1 owner: verify the production now/next widget link contract.
+import type * as FocusEffectModule from '@/src/test-utils/focus-effect'
 import React from 'react'
 import { screen, waitFor } from '@testing-library/react'
 import { render } from 'vitest-browser-react'
@@ -32,9 +33,12 @@ function deepLinkParams(params: Record<string, string>) {
   return params
 }
 
-vi.mock('expo-router', () => ({
+vi.mock('expo-router', async () => ({
   useLocalSearchParams: () => mockParams,
   useRouter: () => mockRouter,
+  useFocusEffect: (
+    await vi.importActual<typeof FocusEffectModule>('@/src/test-utils/focus-effect')
+  ).useFocusEffect,
 }))
 
 vi.mock('expo-localization', () => ({

@@ -499,6 +499,7 @@ export type ProviderCommunityScenario =
   | 'spotlight-page-two'
   | 'spotlight-none'
   | 'spotlight-disabled'
+  | 'spotlight-rate-limited'
 
 export type ProviderCommunityState = {
   userId: string | null

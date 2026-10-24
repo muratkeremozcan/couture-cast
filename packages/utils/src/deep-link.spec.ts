@@ -44,6 +44,49 @@ describe('parseDeepLink', () => {
     })
   })
 
+  it('6.7-UNIT-010 parses an in-app spotlight focus intent', () => {
+    const result = parseDeepLink({
+      source: 'app',
+      type: 'community',
+      cardId: 'card-456',
+      focus: 'spotlight',
+      focusToken: 'token-1',
+    })
+    expect(result).toEqual({
+      valid: true,
+      payload: {
+        source: 'app',
+        type: 'community',
+        cardId: 'card-456',
+        focus: 'spotlight',
+        focusToken: 'token-1',
+      },
+    })
+  })
+
+  it('6.7-UNIT-011 refuses a focus intent without its card, token or app source', () => {
+    const intent = {
+      source: 'app',
+      type: 'community',
+      cardId: 'card-456',
+      focus: 'spotlight',
+      focusToken: 'token-1',
+    }
+    for (const params of [
+      { ...intent, cardId: undefined },
+      { ...intent, focusToken: undefined },
+      { ...intent, focus: undefined },
+      { ...intent, focus: 'feed' },
+      { ...intent, source: 'notification' },
+      { ...intent, type: undefined },
+      { ...intent, type: 'weather_alert' },
+    ])
+      expect(parseDeepLink(params).valid).toBe(false)
+    expect(parseDeepLink({ source: 'app', type: 'community' }).valid).toBe(false)
+    expect(hasDeepLinkIntent({ focusToken: 'token-1' })).toBe(true)
+    expect(hasDeepLinkIntent({ focus: 'spotlight' })).toBe(true)
+  })
+
   it('handles array parameters from query string resolvers', () => {
     const result = parseDeepLink({ source: ['widget'], slot: ['evening'] })
     expect(result.valid).toBe(true)

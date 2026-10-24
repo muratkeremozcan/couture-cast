@@ -1125,6 +1125,15 @@ const eventBuilders: Partial<
   api_error_occurred: (uid, p, ts) => buildApiErrorOccurred(uid, p, ts),
 }
 
+/** The telemetry row named a user id that has no `User` row. */
+function isTelemetryUserForeignKeyViolation(error: unknown): boolean {
+  return (
+    error instanceof Prisma.PrismaClientKnownRequestError &&
+    error.code === 'P2003' &&
+    JSON.stringify(error.meta ?? {}).includes('telemetry_events_user_id_fkey')
+  )
+}
+
 @Injectable()
 export class TelemetryService {
   private readonly logger = createBaseLogger().child({ feature: 'telemetry' })
@@ -1252,6 +1261,19 @@ export class TelemetryService {
           event_type: eventType,
           properties: persistedProperties as Prisma.InputJsonValue,
         },
+      })
+      .catch((dbError: unknown) => {
+        // An actor with no user row (an erased account whose token is still
+        // valid, a synthetic test token): its row would carry raw identifiers
+        // the account's cascade erasure can no longer reach, so it is not kept.
+        if (isTelemetryUserForeignKeyViolation(dbError)) {
+          this.logger.info(
+            { eventType },
+            'Telemetry event for an unknown user not persisted'
+          )
+          return
+        }
+        throw dbError
       })
       .catch((dbError: unknown) => {
         // Robustness: Database failures MUST NOT crash the application or prevent PostHog delivery.

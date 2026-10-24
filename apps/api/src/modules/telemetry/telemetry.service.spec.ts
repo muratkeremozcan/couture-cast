@@ -13,7 +13,7 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { createHmac } from 'node:crypto'
 import { TelemetryService } from './telemetry.service'
-import type { PrismaClient } from '@prisma/client'
+import { Prisma, type PrismaClient } from '@prisma/client'
 import { type AnalyticsClient } from '../../analytics/analytics.service'
 
 type CapturedEvent = {
@@ -59,6 +59,61 @@ describe('TelemetryService', () => {
       mockPrisma as unknown as PrismaClient,
       mockAnalyticsClient
     )
+  })
+
+  it('persists nothing for an actor with no user row and logs only the event name', async () => {
+    const logger = (
+      service as unknown as {
+        logger: {
+          info: (...args: unknown[]) => void
+          error: (...args: unknown[]) => void
+        }
+      }
+    ).logger
+    const info = vi.spyOn(logger, 'info').mockImplementation(() => undefined)
+    const error = vi.spyOn(logger, 'error').mockImplementation(() => undefined)
+    telemetryCreate.mockRejectedValueOnce(
+      new Prisma.PrismaClientKnownRequestError('Foreign key constraint violated', {
+        code: 'P2003',
+        clientVersion: 'test',
+        meta: {
+          modelName: 'TelemetryEvent',
+          constraint: 'telemetry_events_user_id_fkey',
+        },
+      })
+    )
+
+    await service.captureEvent('erased-user-7f3a', 'profile_completed', {
+      age: 25,
+      guardianConsentRequired: false,
+    })
+
+    await vi.waitFor(() => expect(info).toHaveBeenCalled())
+    // The failed write is the only one: no row keeps the raw identifiers the
+    // account's erasure would no longer reach.
+    expect(telemetryCreate).toHaveBeenCalledTimes(1)
+    expect(info).toHaveBeenCalledExactlyOnceWith(
+      { eventType: 'profile_completed' },
+      'Telemetry event for an unknown user not persisted'
+    )
+    expect(error).not.toHaveBeenCalled()
+    expect(JSON.stringify([info.mock.calls, error.mock.calls])).not.toContain(
+      'erased-user-7f3a'
+    )
+    // The sink capture is unchanged.
+    expect(analyticsCapture).toHaveBeenCalled()
+  })
+
+  it('still reports any other persistence failure without a second write', async () => {
+    telemetryCreate.mockRejectedValueOnce(new Error('connection reset'))
+
+    await service.captureEvent('user-1', 'profile_completed', {
+      age: 25,
+      guardianConsentRequired: false,
+    })
+
+    await new Promise((resolve) => setTimeout(resolve, 0))
+    expect(telemetryCreate).toHaveBeenCalledTimes(1)
   })
 
   it('persists events to database and dispatches to PostHog', async () => {

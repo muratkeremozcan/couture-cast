@@ -22,6 +22,7 @@ production without payment.
 - Story 6.5: Realtime engagement and notifications
 - Story 6.6: Community City Spotlight
 - Story 6.7: Home spotlight teaser
+- Story 6.7b: Sponsored community highlights (post-to-offer link, disclosed CTA on cards, spotlight and teaser)
 - Story 6.8: Safe branded share-card export
 - Story 6.9: Native platform sharing
 - Story 6.10: Moderator queue and case detail
@@ -99,7 +100,7 @@ production without payment.
 
 - Story 6.1 is the community foundation. Stories 6.2 and 6.2b supply production screening and
   release evidence; comments consume that screening boundary.
-- Reactions feed City Spotlight, then the Home teaser. Realtime consumes durable reaction and
+- Reactions feed City Spotlight, then the Home teaser, then sponsored highlights (6.7b). Realtime consumes durable reaction and
   comment writes. Safe export precedes native sharing.
 - Moderator queue precedes decisions and SLA monitoring; decisions precede immutable-history proof.
 - Story 6.14 builds on the Story 5.2 billing and entitlement stack and on Story 6.5 push dispatch.

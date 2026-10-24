@@ -2,6 +2,7 @@
 // Home without a saved location: GET /ritual answers 400 "No location preferences found for
 // user". That is a setup gap, so Home shows a localized hint with no Retry (retrying cannot
 // succeed). Every other failure keeps the generic load error and its Retry.
+import type * as FocusEffectModule from '@/src/test-utils/focus-effect'
 import React from 'react'
 import { screen, waitFor } from '@testing-library/react'
 import { render } from 'vitest-browser-react'
@@ -42,9 +43,12 @@ vi.mock('expo-localization', () => ({
 
 const routerPush = vi.hoisted(() => vi.fn())
 
-vi.mock('expo-router', () => ({
+vi.mock('expo-router', async () => ({
   useLocalSearchParams: () => ({}),
   useRouter: () => ({ setParams: vi.fn(), push: routerPush }),
+  useFocusEffect: (
+    await vi.importActual<typeof FocusEffectModule>('@/src/test-utils/focus-effect')
+  ).useFocusEffect,
 }))
 
 vi.mock('@/src/analytics/mobile-analytics', () => ({

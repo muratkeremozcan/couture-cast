@@ -492,6 +492,47 @@ describe('WardrobeService failure and degraded-dependency paths', () => {
     })
 
     /**
+     * One image that cannot be signed, such as an object missing from storage,
+     * costs that garment its image; the member keeps the rest of the wardrobe.
+     */
+    it('lists every garment when one image cannot be signed', async () => {
+      h.prisma.garmentItem.findMany.mockResolvedValue([
+        garmentFixture({
+          id: 'g-1',
+          upload_status: 'ready',
+          object_path: 'users/u/g-1.png',
+        }),
+        garmentFixture({
+          id: 'g-2',
+          upload_status: 'ready',
+          object_path: 'users/u/g-2.png',
+        }),
+      ])
+      h.signReadUrl.mockImplementation((objectPath: string) =>
+        objectPath.endsWith('g-2.png')
+          ? Promise.reject(new ServiceUnavailableException('STORAGE_PERMISSION_DENIED'))
+          : Promise.resolve('https://storage.test/signed.png')
+      )
+
+      const logged = vi.spyOn(
+        (h.service as unknown as { logger: { error: (...args: unknown[]) => void } })
+          .logger,
+        'error'
+      )
+
+      const result = await h.service.listGarments(USER_ID)
+
+      expect(result.data.map((item) => item.id)).toEqual(['g-1', 'g-2'])
+      expect(result.data[0]?.imageAccess?.url).toBe('https://storage.test/signed.png')
+      expect(result.data[1]?.imageAccess).toBeNull()
+      // The garment id and the error's class only: the object path carries the owner's id.
+      expect(logged).toHaveBeenCalledWith(
+        { garmentId: 'g-2', errorClass: 'ServiceUnavailableException' },
+        'garment_image_signing_failed'
+      )
+    })
+
+    /**
      * A row with no object path has nothing to sign. Failing closed keeps the
      * response contract honest instead of emitting a garment with no image.
      */

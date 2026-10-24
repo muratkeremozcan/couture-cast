@@ -8,15 +8,27 @@ import { screen, waitFor } from '@testing-library/react'
 import { render } from 'vitest-browser-react'
 import { beforeAll, beforeEach, describe, expect, it, vi } from 'vitest'
 import type * as ReactNativeModule from 'react-native'
+import type * as EdgeToEdgeTestUtils from '@/src/test-utils/edge-to-edge-modal'
 import type { CommunityReactionSpotlightItem } from '@couture/api-client/contracts/http'
 
 vi.mock('expo-localization', () => ({
   getLocales: () => [{ languageTag: 'en-US', languageCode: 'en', regionCode: 'US' }],
 }))
+vi.mock('react-native-safe-area-context', async (importOriginal) => {
+  const actual = await importOriginal<Record<string, unknown>>()
+  const { TEST_SAFE_AREA_INSETS } = await vi.importActual<typeof EdgeToEdgeTestUtils>(
+    '@/src/test-utils/edge-to-edge-modal'
+  )
+  return { ...actual, useSafeAreaInsets: () => TEST_SAFE_AREA_INSETS }
+})
 vi.mock('react-native', async (importOriginal) => {
   const actual = await importOriginal<typeof ReactNativeModule>()
+  const { recordModalProps } = await vi.importActual<typeof EdgeToEdgeTestUtils>(
+    '@/src/test-utils/edge-to-edge-modal'
+  )
   return {
     ...actual,
+    Modal: recordModalProps(actual.Modal),
     AccessibilityInfo: {
       ...actual.AccessibilityInfo,
       announceForAccessibility: vi.fn(),
@@ -34,6 +46,12 @@ import {
   CommunitySpotlightDetail,
   type CommunitySpotlightDetailProps,
 } from '@/components/community/community-spotlight-detail'
+import {
+  EDGE_TO_EDGE_MODAL_PROPS,
+  TEST_SAFE_AREA_INSETS,
+  lastModalProps,
+  paddingBottomOf,
+} from '@/src/test-utils/edge-to-edge-modal'
 
 const FOCUSED = 'Focused on the highlighted look.'
 const TITLE_HANDLE = 901
@@ -182,5 +200,24 @@ describe('CommunitySpotlightDetail focus and announcement (Story 6.6 R20)', () =
     expect(close.getAttribute('aria-label')).toBe('Back')
     press(close)
     expect(onClose).toHaveBeenCalledTimes(1)
+  })
+})
+
+describe('R52 CommunitySpotlightDetail over the system bars', () => {
+  beforeAll(async () => {
+    await initI18n()
+    await i18n.changeLanguage('en-US')
+  })
+
+  it('covers the status and navigation bars and keeps the sheet above the gesture bar', async () => {
+    await render(<Harness item={look(1)} />)
+    expect(lastModalProps()).toMatchObject({
+      ...EDGE_TO_EDGE_MODAL_PROPS,
+      transparent: true,
+      visible: true,
+    })
+    expect(paddingBottomOf(screen.getByTestId('community-spotlight-detail'))).toBe(
+      32 + TEST_SAFE_AREA_INSETS.bottom
+    )
   })
 })

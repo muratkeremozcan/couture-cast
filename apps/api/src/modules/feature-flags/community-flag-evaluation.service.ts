@@ -91,7 +91,7 @@ export class CommunityFlagEvaluationService {
       `
           )[0]
         },
-        { timeout, maxWait: Math.min(100, budget.remaining()) }
+        { timeout, maxWait: budget.remaining() }
       )
     )
   }
@@ -176,7 +176,7 @@ export class CommunityFlagEvaluationService {
       `
         )[0]
       },
-      { timeout, maxWait: Math.min(100, budget.remaining()) }
+      { timeout, maxWait: budget.remaining() }
     )
   }
 
@@ -235,7 +235,7 @@ export class CommunityFlagEvaluationService {
           },
           {
             timeout: Math.min(400, budget.remaining()),
-            maxWait: Math.min(100, budget.remaining()),
+            maxWait: budget.remaining(),
           }
         )
       )

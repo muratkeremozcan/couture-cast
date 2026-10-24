@@ -1,0 +1,211 @@
+# Story 6.7: the accessibility-focus native module. CI has no development-build
+# lane for the mobile app, so this workflow unit-tests the module on both
+# platforms, builds a release Android app and a release iOS simulator app that
+# compile and register it, and runs its instrumentation tests against real
+# TalkBack on an emulator, with a suppressed-focus control that must fail on the
+# OS focus report. The full Home teaser flow under TalkBack is local evidence
+# (scripts/run-story67-talkback.mjs). PR Gate makes every job that runs here
+# required.
+name: Accessibility focus module
+
+on:
+  pull_request:
+    paths:
+      - 'apps/mobile/modules/accessibility-focus/**'
+      - 'apps/mobile/src/lib/accessibility-focus.ts'
+      - 'apps/mobile/src/features/home/use-home-spotlight-teaser.ts'
+      - 'apps/mobile/components/home/home-spotlight-teaser.tsx'
+      - 'apps/mobile/package.json'
+      - 'apps/mobile/app.config.ts'
+      - 'apps/mobile/app.json'
+      - 'package-lock.json'
+      - 'scripts/ci/android-talkback.sh'
+      - 'scripts/ci/accessibility-focus-device-tests.sh'
+      - 'scripts/ci/check-accessibility-focus-results.mjs'
+      - 'scripts/ci/check-accessibility-focus-builds.sh'
+      - 'scripts/run-story67-talkback.mjs'
+      - '.github/workflows/pr-accessibility-focus.yml'
+  push:
+    branches: [main]
+    paths:
+      - 'apps/mobile/modules/accessibility-focus/**'
+      - 'apps/mobile/src/lib/accessibility-focus.ts'
+      - 'apps/mobile/src/features/home/use-home-spotlight-teaser.ts'
+      - 'apps/mobile/components/home/home-spotlight-teaser.tsx'
+      - 'apps/mobile/package.json'
+      - 'apps/mobile/app.config.ts'
+      - 'apps/mobile/app.json'
+      - 'package-lock.json'
+      - 'scripts/ci/android-talkback.sh'
+      - 'scripts/ci/accessibility-focus-device-tests.sh'
+      - 'scripts/ci/check-accessibility-focus-results.mjs'
+      - 'scripts/ci/check-accessibility-focus-builds.sh'
+      - 'scripts/run-story67-talkback.mjs'
+      - '.github/workflows/pr-accessibility-focus.yml'
+  workflow_dispatch:
+
+concurrency:
+  group: accessibility-focus-${{ github.event.pull_request.number || github.ref }}
+  cancel-in-progress: true
+
+permissions:
+  contents: read
+
+env:
+  ANDROID_API_LEVEL: '35'
+  # The Play image: the plain google_apis image carries no TalkBack.
+  ANDROID_TARGET: google_apis_playstore
+  ANDROID_ARCH: x86_64
+  ANDROID_PROFILE: medium_phone
+
+jobs:
+  android:
+    name: Android module tests and app build
+    runs-on: ubuntu-latest
+    timeout-minutes: 45
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Setup Node environment
+        uses: ./.github/actions/install
+        with:
+          install-command: npm ci
+
+      - name: Setup Java
+        uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: '21'
+
+      - name: Setup Android SDK
+        uses: android-actions/setup-android@v3
+        with:
+          packages: platform-tools
+
+      - name: Robolectric tests for the focus observer
+        working-directory: apps/mobile
+        env:
+          CI: '1'
+          EXPO_NO_GIT_STATUS: '1'
+        run: npm run test:accessibility-focus:android
+
+      # The release app must keep React Native's native libraries, which the
+      # module's build.gradle leaves out of its own androidTest APK only.
+      - name: Build the release app and the module's test APK
+        working-directory: apps/mobile/android
+        env:
+          NODE_ENV: production
+        run: ./gradlew :app:assembleRelease :accessibility-focus:assembleDebugAndroidTest -PreactNativeArchitectures=x86_64 --console=plain
+
+      - name: Check what each APK carries
+        run: |
+          bash scripts/ci/check-accessibility-focus-builds.sh android-app apps/mobile/android/app/build/outputs/apk/release/app-release.apk
+          bash scripts/ci/check-accessibility-focus-builds.sh android-test apps/mobile/modules/accessibility-focus/android/build/outputs/apk/androidTest/debug/accessibility-focus-debug-androidTest.apk
+
+  ios:
+    name: iOS module tests and app build
+    runs-on: macos-15
+    timeout-minutes: 90
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: XCTest for the focus target decisions
+        working-directory: apps/mobile/modules/accessibility-focus/ios
+        run: |
+          device=$(xcrun simctl list devices available | grep -m1 -oE 'iPhone [0-9]+[^(]*' | sed 's/ *$//')
+          echo "Simulator: $device"
+          xcodebuild test -scheme AccessibilityFocusTarget -destination "platform=iOS Simulator,name=$device"
+
+      - name: Setup Node
+        uses: actions/setup-node@v4
+        with:
+          node-version-file: '.nvmrc'
+          cache: npm
+
+      - name: Install dependencies
+        run: npm ci
+
+      # The SwiftPM target above leaves out AccessibilityFocusModule.swift, which
+      # needs ExpoModulesCore; the app build compiles it with its Expo dependency.
+      - name: Generate the iOS project
+        working-directory: apps/mobile
+        env:
+          CI: '1'
+          EXPO_NO_GIT_STATUS: '1'
+        run: npx expo prebuild --platform ios
+
+      - name: Build the release simulator app
+        working-directory: apps/mobile/ios
+        env:
+          NODE_ENV: production
+        run: |
+          workspace=$(find . -maxdepth 1 -name '*.xcworkspace' | head -1)
+          workspace=${workspace#./}
+          scheme=${workspace%.xcworkspace}
+          echo "scheme=$scheme" >> "$GITHUB_ENV"
+          xcodebuild -workspace "$workspace" -scheme "$scheme" -configuration Release \
+            -destination 'generic/platform=iOS Simulator' -derivedDataPath build \
+            CODE_SIGNING_ALLOWED=NO build
+
+      - name: Check the app links and registers the module
+        run: |
+          bash scripts/ci/check-accessibility-focus-builds.sh ios-app \
+            "apps/mobile/ios/build/Build/Products/Release-iphonesimulator/$scheme.app/$scheme" apps/mobile/ios
+
+  android-talkback:
+    name: Android module against TalkBack (API 35)
+    runs-on: ubuntu-latest
+    timeout-minutes: 60
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Setup Node environment
+        uses: ./.github/actions/install
+        with:
+          install-command: npm ci
+
+      - name: Setup Java
+        uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: '21'
+
+      - name: Setup Android SDK
+        uses: android-actions/setup-android@v3
+        with:
+          packages: platform-tools
+
+      - name: Generate the Android project
+        working-directory: apps/mobile
+        env:
+          CI: '1'
+          EXPO_NO_GIT_STATUS: '1'
+        run: npx expo prebuild --platform android --no-install
+
+      - name: Enable KVM
+        run: |
+          echo 'KERNEL=="kvm", GROUP="kvm", MODE="0666", OPTIONS+="static_node=kvm"' | sudo tee /etc/udev/rules.d/99-kvm4all.rules
+          sudo udevadm control --reload-rules
+          sudo udevadm trigger --name-match=kvm
+
+      # The API 35 Play image carries TalkBack and starts it from adb; the API 34
+      # image on these runners has none (probed 2026-10-23, run 40034636703).
+      - name: Instrumentation tests with TalkBack, then the suppressed-focus control
+        uses: reactivecircus/android-emulator-runner@v2
+        with:
+          api-level: ${{ env.ANDROID_API_LEVEL }}
+          target: ${{ env.ANDROID_TARGET }}
+          arch: ${{ env.ANDROID_ARCH }}
+          profile: ${{ env.ANDROID_PROFILE }}
+          emulator-options: -no-snapshot -no-window -gpu swiftshader_indirect -noaudio -no-boot-anim -camera-back none
+          emulator-boot-timeout: 900
+          disable-animations: true
+          script: bash scripts/ci/accessibility-focus-device-tests.sh
+
+      - name: Upload both runs' results
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: accessibility-focus-talkback-results
+          path: apps/mobile/modules/accessibility-focus/android/build/talkback-results
+          if-no-files-found: warn

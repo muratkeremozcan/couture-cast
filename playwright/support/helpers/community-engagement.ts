@@ -1,7 +1,12 @@
 import { localPlaywrightDatabaseUrl } from './user-test-data'
 import { randomUUID } from 'node:crypto'
 import { PrismaClient } from '@prisma/client'
-import { type Page, type WebSocketRoute, type TestInfo } from '@playwright/test'
+import {
+  type APIRequestContext,
+  type Page,
+  type WebSocketRoute,
+  type TestInfo,
+} from '@playwright/test'
 import type {
   ApiRequestParams,
   ApiRequestResponse,
@@ -19,6 +24,9 @@ import {
 import {
   communityApiTest,
   signUpCommunityUser,
+  loadCommunityFixture,
+  publishCommunityLook,
+  waitForTerminalAuthorState,
   type CommunitySession,
   COMMUNITY_FEED_PATH,
   expect,
@@ -27,6 +35,7 @@ import { log } from '@seontechnologies/playwright-utils/log'
 import { buildUniqueId } from './api-test'
 import { WEB_ACCESS_TOKEN_STORAGE_KEY } from './commerce-session'
 import { localE2EAccessToken as engagementToken } from './local-e2e-token'
+import { holdEngagementFeed } from './engagement-feed-lock'
 export { engagementToken }
 
 export type Utilities = {
@@ -56,24 +65,30 @@ async function monitorPage(
     !author && info.annotations.some((item) => item.type === 'expectedCommunityResync')
   const expectsErasure =
     author && info.annotations.some((item) => item.type === 'expectedAuthorErasureDenial')
-  const excluded = /\/api\/v1\/community\/events(?:\?|$)/
+  const events = /\/api\/v1\/community\/events(?:\?|$)/
+  // An erased author's open thread can still be reading the comments of a look the
+  // erasure removed; that read answers 404 and the thread then closes.
+  const erasedComments = /\/api\/v1\/community\/posts\/[^/?]+\/comments(?:\?|$)/
+  const excluded = expectsErasure ? [events, erasedComments] : [events]
   const failures: string[] = []
   // playwright-utils deviation: the monitor supports URL exclusions, not status/body-scoped expected errors.
   // Its excluded cursor responses remain status-checked; the scenario validates the canonical body through the same actual HTTP cursor.
   if (expectsResync || expectsErasure)
     page.on('response', (response) => {
-      if (!excluded.test(response.url()) || response.status() < 400) return
+      const url = response.url()
+      if (!excluded.some((pattern) => pattern.test(url)) || response.status() < 400)
+        return
       try {
         if (expectsErasure) {
           expect(expectedErasedAuthors.has(page)).toBe(true)
-          expect(response.status()).toBe(403)
+          expect(response.status()).toBe(events.test(url) ? 403 : 404)
         } else expect(response.status()).toBe(409)
       } catch (error) {
         failures.push(error instanceof Error ? error.message : String(error))
       }
     })
   const monitor = createNetworkErrorMonitorFixture(
-    expectsResync || expectsErasure ? { excludePatterns: [excluded] } : undefined
+    expectsResync || expectsErasure ? { excludePatterns: excluded } : undefined
   ).networkErrorMonitor[0] as (
     args: { page: Page },
     use: () => Promise<void>,
@@ -94,11 +109,79 @@ function seedSessionToken({ key, token }: { key: string; token: string }) {
   if (window.location.origin !== 'null') window.sessionStorage.setItem(key, token)
 }
 
+/**
+ * Publishes a look for one test, by an owner who is neither the reader nor the
+ * actor, so both can react and comment on it. The owner is cleaned up with the
+ * API context's accounts. A newly published look leads the "all" feed, so it is on
+ * the first page wherever other tests' looks land.
+ */
+export async function publishOwnLook(
+  {
+    communityApi,
+    request,
+    apiRequest,
+    recurse,
+  }: {
+    communityApi: { apiBaseUrl: string; trackUser: (userId: string) => void }
+    request: APIRequestContext
+    apiRequest: Parameters<typeof waitForTerminalAuthorState>[0]['apiRequest']
+    recurse: Parameters<typeof waitForTerminalAuthorState>[0]['recurse']
+  },
+  testInfo: TestInfo,
+  label = 'Engagement look'
+): Promise<{ postId: string; caption: string }> {
+  const ownerId = await signUpCommunityUser(
+    request,
+    communityApi.apiBaseUrl,
+    // One owner per look, so a test can publish more than one.
+    buildUniqueId(
+      `engagement-owner-${label.toLowerCase().replace(/\W+/g, '-')}`,
+      testInfo
+    )
+  )
+  communityApi.trackUser(ownerId)
+  const caption = `${label} ${randomUUID().slice(0, 8)}`
+  const published = await publishCommunityLook(request, {
+    apiBaseUrl: communityApi.apiBaseUrl,
+    userId: ownerId,
+    fixture: loadCommunityFixture('safe-satin-plum-512x512.jpg'),
+    altText: 'Synthetic plum satin fabric',
+    caption,
+  })
+  const terminal = await waitForTerminalAuthorState(
+    { apiRequest, recurse },
+    { apiBaseUrl: communityApi.apiBaseUrl, userId: ownerId, postId: published.postId }
+  )
+  expect(terminal.status).toBe('published')
+  return { postId: published.postId, caption }
+}
+
 export const test = communityApiTest.extend<{
   authorPage: Page
   communitySession: CommunitySession
+  /**
+   * The id of a look this test alone reads and changes. A shared seeded post
+   * collided when the spec ran in parallel: another worker's reaction or comment
+   * landed on the same card between a test's read and its assertion.
+   */
+  look: string
+  exclusiveFeed: void
   networkErrorMonitor: void
 }>({
+  /**
+   * These tests assert on the shared "all" feed: their looks lead it, new looks
+   * buffer on it, and their cleanup removes looks from it. Two of them at once,
+   * as parallel workers or --repeat-each run them, displace each other's looks and
+   * read looks the other's cleanup just deleted. One runs at a time; set up first
+   * and torn down last, the lock also covers each test's cleanup.
+   */
+  exclusiveFeed: [
+    async ({}, use, testInfo) =>
+      holdEngagementFeed(testInfo, () => use(), {
+        databaseUrl: () => localPlaywrightDatabaseUrl().toString(),
+      }),
+    { auto: true },
+  ],
   networkErrorMonitor: [
     async ({ page }, use, info) => monitorPage(page, use, info),
     { auto: true },
@@ -116,6 +199,19 @@ export const test = communityApiTest.extend<{
       token: accessToken,
     })
     await use({ userId, accessToken, apiBaseUrl: communityApi.apiBaseUrl })
+
+    // As in `communityTest`: this fixture tears down before `communityApi`, whose
+    // cleanup deletes the test's look. A page still open then re-read the
+    // deep-linked look, got 404 and failed E2E-004 through the network monitor.
+    // No page outlives the session.
+    await Promise.all(context.pages().map((open) => open.close()))
+  },
+  look: async ({ communityApi, request, apiRequest, recurse }, use, testInfo) => {
+    const { postId } = await publishOwnLook(
+      { communityApi, request, apiRequest, recurse },
+      testInfo
+    )
+    await use(postId)
   },
   authorPage: async ({ browser, communityApi, baseURL }, use, testInfo) => {
     const context = await browser.newContext({ baseURL })

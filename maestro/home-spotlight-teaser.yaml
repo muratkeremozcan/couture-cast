@@ -1,0 +1,136 @@
+# Story 6.7: the Home spotlight teaser and its link into the City Spotlight.
+#
+# DATA. `run-maestro.mjs` signs up a fresh member whose only saved location is
+# Chicago, Illinois, United States, the area of the shared, read-only cohort the
+# database seed publishes (`packages/db/prisma/seeds/community-spotlight.ts`,
+# posts `seed-spotlight-1` through `seed-spotlight-7`). `seed-spotlight-1` ranks
+# first with six non-author reactions, so it is the teaser's entry. The flow
+# never reacts, so it shares the cohort with every other device and stays out of
+# `USER_SCOPED_FLOWS`.
+#
+# SELECTORS. The teaser link is one accessible element, so iOS exposes none of
+# its children: every check reads the link's own label. The image's loaded
+# marker sits beside the link for the same reason.
+#
+# SCROLLING. The teaser is the last item on Home, so it can never reach the
+# middle of the screen: no `centerElement`. One extra swipe settles it clear of
+# the tab bar before the tap.
+appId: ${MAESTRO_APP_ID}
+name: 'Home spotlight teaser'
+tags:
+  - e2e
+  - community
+  - hero
+  - maestro
+---
+- launchApp:
+    appId: ${MAESTRO_APP_ID}
+    clearState: true
+    stopApp: false
+
+- runFlow: subflows/open-app.yaml
+
+- scrollUntilVisible:
+    element:
+      id: 'home-spotlight-teaser-link'
+    direction: DOWN
+    timeout: 30000
+    label: 'The teaser follows the hero on Home'
+- swipe:
+    start: '50%, 70%'
+    end: '50%, 35%'
+    duration: 400
+- waitForAnimationToEnd
+
+# The image element exists before its bytes arrive; the marker appears only
+# after onLoad fires, so this proves the signed image actually loaded.
+- extendedWaitUntil:
+    visible:
+      id: 'home-spotlight-teaser-image-loaded'
+    timeout: 20000
+    label: 'The teaser loaded its signed image over the real API'
+
+- assertVisible:
+    id: 'home-spotlight-teaser-link'
+    # Authors show under a random stored alias, so the format is what is pinned:
+    # never a caption, a raw id or the profile name.
+    text: 'Standout look in Chicago by Style Explorer [0-9A-F]{8}, 6 reactions\. Opens the City Spotlight\.'
+    label: 'One link names the area, the author and the reaction count'
+- takeScreenshot:
+    path: maestro/artifacts/home-spotlight-teaser
+
+- tapOn:
+    id: 'home-spotlight-teaser-link'
+    label: 'Open the entry in the City Spotlight'
+
+- extendedWaitUntil:
+    visible:
+      id: 'community-screen'
+    timeout: 15000
+    label: 'Community is the one on top'
+
+# The module heads the Community list, so the spotlight copy is the first match.
+- extendedWaitUntil:
+    visible:
+      id: 'community-spotlight-rank-seed-spotlight-1'
+    timeout: 20000
+    label: 'The teaser entry is shown in the City Spotlight'
+- assertVisible:
+    id: 'community-spotlight-rank-seed-spotlight-1'
+    text: 'Rank 1, Position 1 of 6'
+- assertNotVisible:
+    id: 'deep-link-info-banner'
+    # The spotlight notices and the invalid-link message share this banner.
+    label: 'An entry that is there reports no notice and never the invalid banner'
+
+- tapOn:
+    id: 'tab-home'
+    retryTapIfNoChange: true
+    label: 'Return to Home from the tab bar'
+
+- extendedWaitUntil:
+    visible:
+      id: 'home-spotlight-teaser-link'
+    timeout: 15000
+    label: 'The teaser is still on Home after the round trip'
+
+# Expo Go carries no accessibility-focus observer and no screen reader runs
+# here, so this flow proves the request: `focus-requested` renders after the
+# native focus call reached a real node, and its suffix counts the requests.
+# The OS-confirmed `focused` marker is asserted on the development build with
+# TalkBack (`maestro/story67/teaser-talkback-focus.yaml`).
+- scrollUntilVisible:
+    element:
+      id: 'home-spotlight-teaser-focus-requested-link-1'
+    direction: DOWN
+    timeout: 15000
+    label: 'The Home tab return requested accessibility focus on the teaser link, once'
+
+# Android back is a second, separate way home, with its own activation.
+- runFlow:
+    when:
+      platform: Android
+    commands:
+      - swipe:
+          start: '50%, 70%'
+          end: '50%, 35%'
+          duration: 400
+      - waitForAnimationToEnd
+      - tapOn:
+          id: 'home-spotlight-teaser-link'
+          label: 'Open the entry again'
+      - extendedWaitUntil:
+          visible:
+            id: 'community-spotlight-rank-seed-spotlight-1'
+          timeout: 20000
+      - back
+      - extendedWaitUntil:
+          visible:
+            id: 'home-spotlight-teaser-link'
+          timeout: 15000
+      - scrollUntilVisible:
+          element:
+            id: 'home-spotlight-teaser-focus-requested-link-2'
+          direction: DOWN
+          timeout: 15000
+          label: 'Android back requested accessibility focus on the teaser link, once more'

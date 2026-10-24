@@ -5,7 +5,7 @@ import { CommunitySyncState } from '@couture/api-client'
 import { act, screen, waitFor } from '@testing-library/react'
 import { http, HttpResponse } from 'msw'
 import { render } from 'vitest-browser-react'
-import { expect, it, vi } from 'vitest'
+import { expect, it, onTestFinished, vi } from 'vitest'
 import {
   communityReactionSpotlightResponseSchema,
   type CommunityReactionSpotlightItem,
@@ -190,6 +190,9 @@ export function registerCommunitySpotlightReviewCases() {
           ? Promise.reject(new Error('secure storage unavailable'))
           : Promise.resolve('member-1')
       )
+    // The module mock is shared by the whole file: later cases must see the
+    // real identity resolution again.
+    onTestFinished(() => resolveIdentity.mockRestore())
     const reads = serveSpotlight([rankedLook('spot-1', 1)])
     await render(<CommunityScreen />)
     await screen.findByTestId('community-post-card-post-a')
