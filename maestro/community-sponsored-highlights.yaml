@@ -52,6 +52,7 @@ tags:
     element:
       id: 'home-spotlight-teaser-shop'
     direction: DOWN
+    centerElement: true
     timeout: 30000
     label: 'The sponsored teaser CTA follows the teaser link on Home'
 - swipe:
@@ -139,13 +140,16 @@ tags:
     label: 'The spotlight card shows the Partnered disclosure in its header'
 
 # The CTA sits under the photo and the caption, below the fold on a phone.
+# iOS reports an element under the tab bar as visible, so the first iOS run
+# tapped the Wardrobe tab through it; centring the CTA keeps the tap on it.
 - scrollUntilVisible:
     element:
       id: 'community-card-shop-seed-spotlight-1'
       index: 0
     direction: DOWN
+    centerElement: true
     timeout: 30000
-    label: 'Bring the spotlight card CTA on screen'
+    label: 'Bring the spotlight card CTA to the middle of the screen'
 - waitForAnimationToEnd
 - assertVisible:
     id: 'community-card-shop-seed-spotlight-1'
