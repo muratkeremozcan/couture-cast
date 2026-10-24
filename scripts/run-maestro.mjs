@@ -3816,17 +3816,20 @@ const buildSingleFlowMaestroArgs = (flowPath, target) => {
  * @param {Error | undefined} maestroExitError
  * @param {string[]} flowFailures collected in place
  * @param {number} [startedAtMs] when the flow's first attempt began
+ * @param {string} [platform] the platform the flow ran on
  * @returns {void}
  */
 const recordSingleFlowOutcome = (
   flowPath,
   maestroExitError,
   flowFailures,
-  startedAtMs
+  startedAtMs,
+  platform
 ) => {
   const failuresBefore = flowFailures.length
   recordFlowOutcome(flowPath, maestroExitError, flowFailures, startedAtMs)
-  if (flowFailures.length > failuresBefore) captureAndroidWindowStack(flowPath)
+  if (flowFailures.length > failuresBefore && platform === 'android')
+    captureAndroidWindowStack(flowPath)
 }
 
 /**
@@ -4018,7 +4021,13 @@ const runFlowsSerially = async (target, maestroEnv, mobileIdentity, flowFailures
     const restoreCause = await restoreMobileE2EStateOrCause(mobileIdentity, flowPath)
     const doubleCause = await doubleWatch?.verify?.()
 
-    recordSingleFlowOutcome(flowPath, maestroExitError, flowFailures, flowStartedAt)
+    recordSingleFlowOutcome(
+      flowPath,
+      maestroExitError,
+      flowFailures,
+      flowStartedAt,
+      target.platform
+    )
     for (const cause of [doubleCause, restoreCause]) {
       if (cause) failFlowWithCause(flowPath, cause, flowFailures)
     }
