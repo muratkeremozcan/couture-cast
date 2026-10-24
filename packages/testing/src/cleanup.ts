@@ -54,6 +54,7 @@ export interface CleanupPrismaClient {
   communityModerationOutbox: CleanupDelegate
   communityAlias: CleanupDelegate
   communityPostReport: CleanupDelegate
+  communityPostSponsorship: CleanupDelegate
 }
 
 export interface CleanupConfiguration {
@@ -303,6 +304,24 @@ async function deleteByUserIds(
   }
 }
 
+function buildSponsorshipWhere(
+  offerIds: readonly string[],
+  postIds: readonly string[],
+  userIds: readonly string[]
+): { OR: Record<string, unknown>[] } | null {
+  const clauses: Record<string, unknown>[] = []
+  if (offerIds.length > 0) clauses.push({ offer_id: { in: [...offerIds] } })
+  if (postIds.length > 0) clauses.push({ post_id: { in: [...postIds] } })
+  if (userIds.length > 0) {
+    clauses.push(
+      { created_by_id: { in: [...userIds] } },
+      { ended_by_id: { in: [...userIds] } },
+      { post: { user_id: { in: [...userIds] } } }
+    )
+  }
+  return clauses.length > 0 ? { OR: clauses } : null
+}
+
 export async function cleanup(options: CleanupOptions = {}): Promise<void> {
   const prisma = resolveCleanupPrisma(options.prisma)
   const registry = options.registry ?? factoryRegistry
@@ -478,6 +497,19 @@ export async function cleanup(options: CleanupOptions = {}): Promise<void> {
       await prisma.moderationEvent.deleteMany({
         where: moderationEventWhere,
       })
+    }
+
+    // Story 6.7b: a sponsorship link holds RESTRICT foreign keys onto its offer
+    // and onto the users who created and ended it, so it goes before both. Its
+    // post cascades, but a link on a tracked post is removed here as well so
+    // the order does not depend on that.
+    const sponsorshipWhere = buildSponsorshipWhere(
+      affiliateOfferIds,
+      lookbookPostIds,
+      userIds
+    )
+    if (sponsorshipWhere) {
+      await prisma.communityPostSponsorship.deleteMany({ where: sponsorshipWhere })
     }
 
     if (lookbookPostWhere) {

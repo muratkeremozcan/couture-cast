@@ -5,6 +5,7 @@ import * as factoryModule from '../../../testing/src/factories/factory.ts'
 import {
   seedAdvisorOfferCatalog,
   seedCommerceCatalog,
+  seedCommunitySponsorship,
   seedPaletteAdvisorWardrobe,
   seedPremiumEntitlements,
 } from './commerce.js'
@@ -31,7 +32,10 @@ async function main() {
   await seedFeatureFlags(prisma)
   // Story 5.1 decision 14. Self-guarded: a no-op outside non-production, so it
   // is safe to call unconditionally here.
-  await seedCommerceCatalog(prisma)
+  const catalog = await seedCommerceCatalog(prisma)
+  // Story 6.7b: one sponsored spotlight post. Same self-guard; must run after
+  // both the spotlight seed and the catalog.
+  await seedCommunitySponsorship(prisma, catalog)
   // Story 5.2 decision 9. Same self-guard.
   await seedPremiumEntitlements(prisma)
   // Story 5.4 prerequisites. Same self-guard; one wildcard-undertone advisor

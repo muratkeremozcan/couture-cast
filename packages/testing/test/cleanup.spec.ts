@@ -54,6 +54,7 @@ function createCleanupPrismaStub(
     guardianConsent: createDelegate('guardianConsent'),
     guardianInvitation: createDelegate('guardianInvitation'),
     lookbookPost: createDelegate('lookbookPost'),
+    communityPostSponsorship: createDelegate('communityPostSponsorship'),
     notificationPreference: createDelegate('notificationPreference'),
     outfitRecommendation: createDelegate('outfitRecommendation'),
     outfitCapsule: createDelegate('outfitCapsule'),
@@ -194,6 +195,9 @@ describe('cleanup', () => {
       'communityModerationOutbox',
       'communityPostReport',
       'moderationEvent',
+      // Story 6.7b: sponsorship links precede the post, the offer and the
+      // users they reference; reachable through the tracked user alone.
+      'communityPostSponsorship',
       'lookbookPost',
       'communityAlias',
       // Story 5.1: commerce first, and in reverse dependency order.
@@ -519,5 +523,34 @@ describe('cleanup', () => {
       id: { in: ['user-shared'] },
     })
     expect(snapshotCleanupRegistry().users).toEqual([])
+  })
+  it('6.7b-TEST-001 deletes sponsorship links before the offers, posts and users they reference', async () => {
+    const registry = createFactoryRegistry(DEFAULT_FACTORY_REGISTRY_KEYS)
+    const calls: CleanupCall[] = []
+    const prisma = createCleanupPrismaStub(calls)
+
+    registry.track('users', 'user-1')
+    registry.track('lookbookPosts', 'post-1')
+    registry.track('affiliateOffers', 'offer-1')
+
+    await cleanup({ prisma, registry })
+
+    const order = calls.map((call) => call.delegate)
+    const sponsorship = order.indexOf('communityPostSponsorship')
+    expect(sponsorship).toBeGreaterThanOrEqual(0)
+    for (const later of ['lookbookPost', 'affiliateOffer', 'user'] as const) {
+      expect(sponsorship).toBeLessThan(order.indexOf(later))
+    }
+    expect(
+      calls.find((call) => call.delegate === 'communityPostSponsorship')?.where
+    ).toEqual({
+      OR: [
+        { offer_id: { in: ['offer-1'] } },
+        { post_id: { in: ['post-1'] } },
+        { created_by_id: { in: ['user-1'] } },
+        { ended_by_id: { in: ['user-1'] } },
+        { post: { user_id: { in: ['user-1'] } } },
+      ],
+    })
   })
 })

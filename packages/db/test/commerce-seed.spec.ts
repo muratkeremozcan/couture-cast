@@ -9,10 +9,14 @@ import {
   SAMPLE_PARTNER_ALLOWED_HOST,
   SAMPLE_PARTNER_SLUG,
   SAMPLE_PARTNER_WEBHOOK_SECRET_REF,
+  SEEDED_SPONSORED_POST_ID,
+  SEEDED_SPONSORSHIP_OPERATOR,
   allowsCommerceSeeding,
   seedCommerceCatalog,
+  seedCommunitySponsorship,
   seedPremiumEntitlements,
 } from '../prisma/seeds/commerce.js'
+import { SEEDED_SPOTLIGHT_NAMESPACE } from '../prisma/seeds/community-spotlight.js'
 
 /**
  * Story 5.1 decision 14.
@@ -67,6 +71,14 @@ const removeSeededCatalog = async () => {
   })
   const offerIds = offers.map((offer) => offer.id)
 
+  // Story 6.7b: CommunityPostSponsorship holds a RESTRICT foreign key onto the
+  // offer, so the seeded link goes before the offers it points at.
+  if (offerIds.length > 0) {
+    await prisma.communityPostSponsorship.deleteMany({
+      where: { offer_id: { in: offerIds } },
+    })
+  }
+
   // AffiliateConversion holds a RESTRICT foreign key onto the partner directly,
   // as well as a SetNull one onto the click, so it has to go before both.
   await prisma.affiliateConversion.deleteMany({ where: { partner_id: partner.id } })
@@ -80,10 +92,15 @@ const removeSeededCatalog = async () => {
 }
 
 let seededCatalogExistedOnEntry = false
+let seededSponsorshipExistedOnEntry = false
 
 beforeAll(async () => {
   seededCatalogExistedOnEntry =
     (await prisma.commercePartner.count({ where: { slug: SAMPLE_PARTNER_SLUG } })) > 0
+  seededSponsorshipExistedOnEntry =
+    (await prisma.communityPostSponsorship.count({
+      where: { post_id: SEEDED_SPONSORED_POST_ID, ended_at: null },
+    })) > 0
 })
 
 // Each test starts from a known-empty catalog rather than from whatever the
@@ -94,7 +111,10 @@ beforeEach(removeSeededCatalog)
 afterAll(async () => {
   if (seededCatalogExistedOnEntry) {
     // The seed is idempotent, so re-running it restores the row exactly.
-    await seedCommerceCatalog(prisma, { NODE_ENV: 'test' })
+    const catalog = await seedCommerceCatalog(prisma, { NODE_ENV: 'test' })
+    if (seededSponsorshipExistedOnEntry) {
+      await seedCommunitySponsorship(prisma, catalog, { NODE_ENV: 'test' })
+    }
   } else {
     await removeSeededCatalog()
   }
@@ -190,6 +210,97 @@ describe('commerce catalog seed', () => {
       where: { partner_id: first?.partnerId },
     })
     expect(offerCount).toBe(4)
+  })
+})
+
+describe('community sponsorship seed', () => {
+  const ownsSeededPost = { value: false }
+
+  /** The seeded spotlight post, created here only when `db:seed` has not run. */
+  async function ensureSeededPost(): Promise<void> {
+    const existing = await prisma.lookbookPost.findUnique({
+      where: { id: SEEDED_SPONSORED_POST_ID },
+      select: { id: true },
+    })
+    if (existing) return
+    ownsSeededPost.value = true
+    await prisma.user.upsert({
+      where: { id: 'spotlight-author-1' },
+      update: {},
+      create: {
+        id: 'spotlight-author-1',
+        email: 'spotlight-author-1@example.com',
+        profile: { create: { birthdate: new Date('1990-01-01T00:00:00.000Z') } },
+      },
+    })
+    const publishedAt = new Date('2026-10-24T09:00:00.000Z')
+    await prisma.lookbookPost.create({
+      data: {
+        id: SEEDED_SPONSORED_POST_ID,
+        user_id: 'spotlight-author-1',
+        status: 'published',
+        alt_text: 'A seeded spotlight look',
+        alt_text_confirmed_at: publishedAt,
+        submitted_at: publishedAt,
+        published_at: publishedAt,
+      },
+    })
+  }
+
+  afterAll(async () => {
+    if (!ownsSeededPost.value) return
+    await prisma.lookbookPost.deleteMany({ where: { id: SEEDED_SPONSORED_POST_ID } })
+    await prisma.userProfile.deleteMany({ where: { user_id: 'spotlight-author-1' } })
+    await prisma.user.deleteMany({ where: { id: 'spotlight-author-1' } })
+  })
+
+  it('6.7b-DB-001 sponsors rank 1 of the seeded spotlight cohort', () => {
+    expect(SEEDED_SPONSORED_POST_ID).toBe(`${SEEDED_SPOTLIGHT_NAMESPACE}-spotlight-1`)
+  })
+
+  it('6.7b-DB-002 writes nothing outside a test or local environment', async () => {
+    const catalog = await seedCommerceCatalog(prisma, { NODE_ENV: 'test' })
+    await ensureSeededPost()
+
+    for (const env of [{ NODE_ENV: 'production' }, { NODE_ENV: 'development' }, {}]) {
+      await expect(seedCommunitySponsorship(prisma, catalog, env)).resolves.toBeNull()
+    }
+    await expect(
+      prisma.communityPostSponsorship.count({
+        where: { post_id: SEEDED_SPONSORED_POST_ID },
+      })
+    ).resolves.toBe(0)
+  })
+
+  it('6.7b-DB-003 links the seeded post to the seeded top offer once, open-ended', async () => {
+    const catalog = await seedCommerceCatalog(prisma, { NODE_ENV: 'test' })
+    await ensureSeededPost()
+
+    const first = await seedCommunitySponsorship(prisma, catalog, { NODE_ENV: 'test' })
+    const second = await seedCommunitySponsorship(prisma, catalog, { NODE_ENV: 'test' })
+
+    expect(first).not.toBeNull()
+    expect(second).toBe(first)
+    const links = await prisma.communityPostSponsorship.findMany({
+      where: { post_id: SEEDED_SPONSORED_POST_ID },
+      include: { offer: { select: { garment_category: true, advisor_slot: true } } },
+    })
+    expect(links).toHaveLength(1)
+    expect(links[0]).toMatchObject({
+      offer_id: catalog?.offerIds[0],
+      ends_at: null,
+      ended_at: null,
+      created_by_id: SEEDED_SPONSORSHIP_OPERATOR.id,
+      create_reason: 'owner_pick',
+      offer: { garment_category: 'top', advisor_slot: null },
+    })
+    expect(links[0]!.starts_at.getTime()).toBeLessThan(Date.now())
+  })
+
+  it('6.7b-DB-004 is a no-op without a catalog', async () => {
+    await expect(
+      seedCommunitySponsorship(prisma, null, { NODE_ENV: 'test' })
+    ).resolves.toBeNull()
   })
 })
 
