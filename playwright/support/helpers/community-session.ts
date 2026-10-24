@@ -210,6 +210,27 @@ export function assertSeededFeed(items: FeedItem[]): void {
   ).toEqual([])
 }
 
+/**
+ * The first seeded lookbook post, in feed order, whose card is on the loaded page.
+ * A fixed one may not be there: the seeded City Spotlight cohort and the looks
+ * other tests publish lead the feed, and `lookbook-1` already sits last on the
+ * first page, so one more look pushes it past. Seeded posts never go away.
+ */
+export async function seededPostOnLoadedPage(page: Page) {
+  const cards = page.locator('[data-testid^="lookbook-card-"]')
+  await expect(cards.first()).toBeVisible()
+  const onPage = await cards.evaluateAll((nodes) =>
+    nodes.map((node) => node.getAttribute('data-testid'))
+  )
+  const post = onPage
+    .map((testId) =>
+      SEEDED_COMMUNITY_POSTS.find((seeded) => testId === `lookbook-card-${seeded.id}`)
+    )
+    .find((seeded) => seeded !== undefined)
+  expect(post, 'A seeded lookbook post is on the loaded page').toBeDefined()
+  return post!
+}
+
 /** Statuses no moderation run will move a post away from. */
 export const COMMUNITY_TERMINAL_STATUSES = [
   'published',

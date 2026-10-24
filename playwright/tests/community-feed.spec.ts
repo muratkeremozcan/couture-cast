@@ -14,6 +14,7 @@ import {
   expect,
   SEEDED_BAND,
   SEEDED_COMMUNITY_POSTS,
+  seededPostOnLoadedPage,
 } from '../support/helpers/community-session'
 
 /*
@@ -200,7 +201,7 @@ test.describe('6.1 community feed by climate band', () => {
     expect(communitySession.userId).toBeTruthy()
     await page.goto(COMMUNITY_ROUTE)
 
-    const firstSeeded = SEEDED_COMMUNITY_POSTS[0]
+    const firstSeeded = await seededPostOnLoadedPage(page)
     const card = page.getByTestId(`lookbook-card-${firstSeeded.id}`)
     await expect(card).toBeVisible()
     await expect(page.getByTestId(`caption-${firstSeeded.id}`)).toHaveText(
@@ -231,7 +232,8 @@ test.describe('6.1 community feed by climate band', () => {
     expect(communitySession.userId).toBeTruthy()
     await page.goto(COMMUNITY_ROUTE)
 
-    await page.getByTestId(`report-button-${SEEDED_COMMUNITY_POSTS[0].id}`).click()
+    const seeded = await seededPostOnLoadedPage(page)
+    await page.getByTestId(`report-button-${seeded.id}`).click()
     await expect(page.getByTestId('report-reason-select')).toBeVisible()
     await checkA11y(page)
 

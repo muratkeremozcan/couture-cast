@@ -11,6 +11,7 @@ import {
   realSessionSkipReason,
   signInRealCommunityWeb,
 } from '../support/helpers/community-real-session'
+import { seededPostOnLoadedPage } from '../support/helpers/community-session'
 
 const skipReason = realSessionSkipReason()
 test.skip(Boolean(skipReason), skipReason ?? '')
@@ -74,7 +75,7 @@ test('N1 real OTP canonical identity, restore, refresh, account switch and offli
         2
       )
     )
-  await expect(page.getByTestId('lookbook-card-lookbook-1')).toBeVisible()
+  await seededPostOnLoadedPage(page)
 
   const readIdentity = () =>
     page.evaluate(() => {
@@ -113,7 +114,7 @@ test('N1 real OTP canonical identity, restore, refresh, account switch and offli
   const restored = interceptNetworkCall({ method: 'GET', url: '**/api/v1/user/profile' })
   await page.reload()
   expect((await restored).status).toBe(200)
-  await expect(page.getByTestId('lookbook-card-lookbook-1')).toBeVisible()
+  await seededPostOnLoadedPage(page)
   expect((await readIdentity()).sub).toBe(first.authUserId)
 
   // Arrange only persisted SDK expiry metadata. The signed JWT stays untouched;
@@ -128,13 +129,13 @@ test('N1 real OTP canonical identity, restore, refresh, account switch and offli
   const refresh = interceptNetworkCall({ method: 'POST', url: '**/auth/v1/token*' })
   await page.reload()
   expect((await refresh).status).toBe(200)
-  await expect(page.getByTestId('lookbook-card-lookbook-1')).toBeVisible()
+  await seededPostOnLoadedPage(page)
   expect((await readIdentity()).sub).toBe(first.authUserId)
 
   await signInRealCommunityWeb(page, second, () =>
     Promise.resolve(readGeneratedCommunityCode(second))
   )
-  await expect(page.getByTestId('lookbook-card-lookbook-1')).toBeVisible()
+  await seededPostOnLoadedPage(page)
   const switched = await readIdentity()
   expect(switched.sub).toBe(second.authUserId)
   const switchedApi = createApiClient('http://127.0.0.1:4077', {
