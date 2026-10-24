@@ -17,8 +17,10 @@ import {
   mintAffiliateClickFromMobile,
   openAffiliatePartnerSite,
   resolveAffiliateLocaleRegion,
+  resolveRenderableCommunitySponsorship,
   resolveRenderableShopThisLook,
   updateCommercePreferenceFromMobile,
+  withoutCommunitySponsorship,
 } from './commerce'
 
 const baseOutfit = {
@@ -99,6 +101,56 @@ describe('mobile commerce boundary', () => {
       expect(
         resolveRenderableShopThisLook({ ...baseOutfit, shopThisLook: null }, false)
       ).toBeNull()
+    })
+  })
+
+  describe('community sponsorship (Story 6.7b)', () => {
+    const sponsorship = {
+      partnerId: 'atelier-north',
+      partnerDisplayName: 'Atelier North',
+      offerId: 'offer-coat',
+      offerTitle: 'Wool overcoat',
+    }
+
+    it('6.7b-MOB-040 renders a block only from a live payload', () => {
+      expect(
+        resolveRenderableCommunitySponsorship({ id: 'post-a', sponsorship })
+      ).toEqual(sponsorship)
+      expect(
+        resolveRenderableCommunitySponsorship({ id: 'post-a', sponsorship }, true)
+      ).toBeNull()
+      expect(resolveRenderableCommunitySponsorship({ id: 'post-a' })).toBeNull()
+      expect(resolveRenderableCommunitySponsorship(null)).toBeNull()
+    })
+
+    it('6.7b-MOB-041 renders nothing for a block that fails the strict contract', () => {
+      expect(
+        resolveRenderableCommunitySponsorship({
+          sponsorship: { ...sponsorship, url: 'https://partner.example/coat' },
+        })
+      ).toBeNull()
+      expect(
+        resolveRenderableCommunitySponsorship({
+          sponsorship: { ...sponsorship, partnerDisplayName: '' },
+        })
+      ).toBeNull()
+    })
+
+    it('6.7b-MOB-042 strips the block before anything is stored', () => {
+      const live = { id: 'post-a', caption: 'Wool', sponsorship }
+
+      const stored = withoutCommunitySponsorship(live)
+
+      expect(stored).toEqual({ id: 'post-a', caption: 'Wool' })
+      expect(stored).not.toHaveProperty('sponsorship')
+      // A round trip through storage cannot bring the CTA back.
+      expect(
+        resolveRenderableCommunitySponsorship(
+          JSON.parse(JSON.stringify(stored)) as object
+        )
+      ).toBeNull()
+      // The live copy the screen renders is untouched.
+      expect(live.sponsorship).toBe(sponsorship)
     })
   })
 

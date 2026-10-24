@@ -1,0 +1,18 @@
+# Story 6.7b: close the in-app browser `expo-web-browser` opened and return to
+# the app. Android's Custom Tab holds one page, so back closes it; iOS's
+# SFSafariViewController closes from its Done button.
+appId: ${MAESTRO_APP_ID}
+---
+- runFlow:
+    when:
+      platform: Android
+    commands:
+      - back
+- runFlow:
+    when:
+      platform: iOS
+    commands:
+      - tapOn:
+          text: 'Done'
+          label: 'Close the in-app browser'
+- waitForAnimationToEnd

@@ -1,0 +1,33 @@
+# Story 6.7b: a Chrome Custom Tab on a fresh Android image can open behind
+# Chrome's own first-run screens before it shows the page. Each step acts only
+# when its screen is up, so a device that already finished first run passes
+# straight through. iOS opens an SFSafariViewController, which has none.
+appId: ${MAESTRO_APP_ID}
+---
+- runFlow:
+    when:
+      platform: Android
+    commands:
+      - extendedWaitUntil:
+          visible:
+            text: '(Use without an account|Accept & continue|No thanks|.*partner\.couturecast\.test.*)'
+          timeout: 20000
+          label: 'Chrome raised its first-run screen or the page itself'
+      - runFlow:
+          when:
+            visible: 'Use without an account'
+          commands:
+            - tapOn: 'Use without an account'
+            - waitForAnimationToEnd
+      - runFlow:
+          when:
+            visible: 'Accept & continue'
+          commands:
+            - tapOn: 'Accept & continue'
+            - waitForAnimationToEnd
+      - runFlow:
+          when:
+            visible: 'No thanks'
+          commands:
+            - tapOn: 'No thanks'
+            - waitForAnimationToEnd

@@ -9,7 +9,7 @@ import { run as runAxe } from 'axe-core'
 import type * as ReactNativeModule from 'react-native'
 import { act, render, screen } from '@testing-library/react'
 import { afterEach, beforeAll, beforeEach, describe, expect, it, vi } from 'vitest'
-import type { CommunityFeedItem } from '@couture/api-client/contracts/http'
+import type { CommunitySponsoredFeedItem as CommunityFeedItem } from '@couture/api-client/contracts/http'
 
 vi.mock('expo-localization', () => ({
   getLocales: () => [{ languageTag: 'en-US', languageCode: 'en', regionCode: 'US' }],
@@ -278,16 +278,40 @@ describe('CommunityCard (Story 6.1)', () => {
     )
   })
 
-  it('6.1-MOB-034 renders and announces the sponsored variant', () => {
-    renderCard({ isSponsored: true })
+  it('6.7b-MOB-001 renders the Partnered disclosure only from the item sponsorship', () => {
+    renderCard({
+      item: item({
+        sponsorship: {
+          partnerId: 'atelier-north',
+          partnerDisplayName: 'Atelier North',
+          offerId: 'offer-coat',
+          offerTitle: 'Wool overcoat',
+        },
+      }),
+    })
 
-    const badge = screen.getByTestId('community-card-sponsored-post-a')
-    expect(badge.textContent).toBe(enUS.community.card.sponsored)
-    expect(badge.getAttribute('aria-label')).toBe(enUS.community.card.sponsoredAnnounce)
-    // The sponsorship rides on the card's own label too, so it is announced first.
+    const badge = screen.getByTestId('community-card-partnered-post-a')
+    expect(badge.textContent).toBe('Partnered')
+    expect(badge.getAttribute('aria-label')).toBe('Partnered with Atelier North')
+    // The disclosure rides on the card's own label too, so it is announced first.
     expect(
       screen.getByTestId('community-post-card-post-a').getAttribute('aria-label')
-    ).toBe('Look by Style Explorer A1B2. Sponsored look')
+    ).toBe('Look by Style Explorer A1B2. Partnered with Atelier North')
+    expect(screen.getByTestId('community-card-shop-post-a').textContent).toBe(
+      'Shop this look at Atelier North'
+    )
+  })
+
+  it('6.7b-MOB-002 renders no disclosure and no CTA without a sponsorship', () => {
+    renderCard()
+
+    // The card itself is loaded, so the absences below are real.
+    expect(screen.getByTestId('community-card-author-post-a')).toBeInTheDocument()
+    expect(screen.queryByTestId('community-card-partnered-post-a')).toBeNull()
+    expect(screen.queryByTestId('community-card-shop-post-a')).toBeNull()
+    expect(
+      screen.getByTestId('community-post-card-post-a').getAttribute('aria-label')
+    ).toBe('Look by Style Explorer A1B2')
   })
 
   it('6.1-MOB-088 emphasises the look a deep link landed on', () => {
@@ -692,7 +716,17 @@ describe('CommunityCard (Story 6.1)', () => {
   })
 
   it('6.1-MOB-041 has no axe violations', async () => {
-    const { container } = renderCard({ isSponsored: true })
+    const { container } = renderCard({
+      item: item({
+        sponsorship: {
+          partnerId: 'atelier-north',
+          partnerDisplayName: 'Atelier North',
+          offerId: 'offer-coat',
+          offerTitle: 'Wool overcoat',
+        },
+      }),
+    })
+    expect(screen.getByTestId('community-card-shop-post-a')).toBeInTheDocument()
 
     const results = await runAxe(container, {
       runOnly: { type: 'tag', values: AXE_TAGS },

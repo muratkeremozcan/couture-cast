@@ -16,6 +16,13 @@ import {
 } from '@/src/features/home/use-home-spotlight-teaser'
 import { useHeroPalette } from '@/components/hero/hero-theme'
 import { IMAGE_LOAD_TIMEOUT_MS } from '@/components/community/community-card'
+import {
+  CommunitySponsoredShop,
+  withDisclosure,
+} from '@/components/community/community-sponsored-shop'
+import { resolveRenderableCommunitySponsorship } from '@/src/lib/commerce'
+import { SponsoredCtaImpressions } from '@/src/features/community/sponsored-cta-impressions'
+import { useSponsoredCtaShown } from '@/src/features/community/sponsored-cta-shown'
 
 /**
  * The CTA is text, so it needs AA contrast: the deep gold the web hero uses on
@@ -23,6 +30,9 @@ import { IMAGE_LOAD_TIMEOUT_MS } from '@/components/community/community-card'
  */
 const CTA_GOLD = { light: '#8A691F', dark: '#C9A14A' } as const
 const THUMBNAIL_SIZE = 72
+/** The community card's Partnered pill colours, so both read as one disclosure. */
+const ACCENT_GOLD = '#C9A14A'
+const ON_ACCENT = '#111111'
 
 export interface HomeSpotlightTeaserProps {
   value: SpotlightTeaserValue
@@ -64,6 +74,14 @@ export const HomeSpotlightTeaser = forwardRef<View, HomeSpotlightTeaserProps>(
     const author = teaserAuthorName(value, t)
     // Stable, so a Home re-render never restarts the image load.
     const handleLoad = useCallback(() => setLoadedUrl(imageUrl), [imageUrl])
+    // Story 6.7b: the teaser value is only ever a live read held in memory for
+    // five minutes, so a block on it is renderable as served.
+    const sponsorship = resolveRenderableCommunitySponsorship(item)
+    useSponsoredCtaShown('home_teaser', item.id, sponsorship)
+    const sponsoredAnnounce = sponsorship
+      ? t('community.card.sponsoredAnnounce', { partner: sponsorship.partnerDisplayName })
+      : null
+    const linkLabel = t('home.spotlightTeaser.linkLabel', { label, author, count })
 
     // A load that settles neither way counts as a failure: some Android stacks
     // fire no onError for a host that never answers.
@@ -79,11 +97,9 @@ export const HomeSpotlightTeaser = forwardRef<View, HomeSpotlightTeaserProps>(
           ref={ref}
           testID="home-spotlight-teaser-link"
           accessibilityRole="link"
-          accessibilityLabel={t('home.spotlightTeaser.linkLabel', {
-            label,
-            author,
-            count,
-          })}
+          accessibilityLabel={
+            sponsoredAnnounce ? withDisclosure(linkLabel, sponsoredAnnounce) : linkLabel
+          }
           onPress={onOpen}
           onFocus={onFocus}
           onBlur={onBlur}
@@ -141,6 +157,30 @@ export const HomeSpotlightTeaser = forwardRef<View, HomeSpotlightTeaserProps>(
             </Text>
           </View>
         </Pressable>
+        {sponsorship && sponsoredAnnounce ? (
+          // Siblings of the link: the disclosure stays visible to automation on
+          // iOS, and the CTA is its own focus stop.
+          <View testID="home-spotlight-teaser-sponsored" style={styles.sponsored}>
+            <View
+              testID="home-spotlight-teaser-partnered"
+              accessible
+              accessibilityLabel={sponsoredAnnounce}
+              style={[styles.partneredPill, { backgroundColor: ACCENT_GOLD }]}
+            >
+              <Text style={[styles.partneredText, { color: ON_ACCENT }]}>
+                {t('community.card.sponsored')}
+              </Text>
+            </View>
+            <CommunitySponsoredShop
+              postId={item.id}
+              sponsorship={sponsorship}
+              surface="home_teaser"
+              testID="home-spotlight-teaser-shop"
+              errorTestID="home-spotlight-teaser-shop-error"
+              style={styles.shop}
+            />
+          </View>
+        ) : null}
         {loadedUrl === imageUrl ? (
           // UI automation marker: only a completed load renders it. A sibling of
           // the link, because iOS hides an accessible element's descendants.
@@ -171,7 +211,7 @@ export const HomeSpotlightTeaserSlot = memo(function HomeSpotlightTeaserSlot({
   const teaser = useHomeSpotlightTeaserLink({ applicationUserId, scrollViewRef })
   const { focusRequested, focusLanded } = teaser
   return (
-    <>
+    <SponsoredCtaImpressions focused={teaser.active}>
       {teaser.value ? (
         <HomeSpotlightTeaser
           ref={teaser.linkRef}
@@ -187,7 +227,7 @@ export const HomeSpotlightTeaserSlot = memo(function HomeSpotlightTeaserSlot({
         <FocusMarker kind="focus-requested" move={focusRequested} />
       ) : null}
       {focusLanded ? <FocusMarker kind="focused" move={focusLanded} /> : null}
-    </>
+    </SponsoredCtaImpressions>
   )
 })
 
@@ -245,6 +285,23 @@ const styles = StyleSheet.create({
   thumbnailImage: {
     width: '100%',
     height: '100%',
+  },
+  sponsored: {
+    marginTop: 8,
+    gap: 8,
+    alignItems: 'flex-start',
+  },
+  partneredPill: {
+    paddingHorizontal: 8,
+    paddingVertical: 4,
+    borderRadius: 10,
+  },
+  partneredText: {
+    fontSize: 11,
+    fontWeight: '700',
+  },
+  shop: {
+    alignSelf: 'stretch',
   },
   loadedMarker: {
     position: 'absolute',
