@@ -12,6 +12,7 @@ import { MODULE_METADATA } from '@nestjs/common/constants'
 import { HttpAdapterHost } from '@nestjs/core'
 import { Test } from '@nestjs/testing'
 import request from 'supertest'
+import type { Server } from 'node:http'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import {
   COMMUNITY_POST_NOT_FOUND_MESSAGE,
@@ -114,6 +115,7 @@ class LocalDependenciesModule {}
 
 describe('CommunityModule HTTP privacy wiring', () => {
   let app: INestApplication | undefined
+  let baseUrl: string | undefined
   const service = {
     getFeed: vi.fn(({ userId, reactions }: { userId: string; reactions?: boolean }) =>
       Promise.resolve({
@@ -172,18 +174,27 @@ describe('CommunityModule HTTP privacy wiring', () => {
         captureEvent: vi.fn().mockResolvedValue(undefined),
       } as unknown as TelemetryService)
     )
+    // One explicit IPv4 listener per app. Handing supertest the bare server
+    // made it open an implicit listener per request, and under the full API
+    // coverage run one of those requests ended in "socket hang up".
     await app.init()
+    await app.listen(0, '127.0.0.1')
+    const address = (app.getHttpServer() as Server).address()
+    if (!address || typeof address === 'string')
+      throw new Error('HTTP test app is not bound')
+    baseUrl = `http://127.0.0.1:${address.port}`
   })
 
   afterEach(async () => {
     await app?.close()
     app = undefined
+    baseUrl = undefined
     vi.restoreAllMocks()
   })
 
-  function server(): Parameters<typeof request>[0] {
-    if (!app) throw new Error('Community app is not initialized')
-    return app.getHttpServer() as Parameters<typeof request>[0]
+  function server(): string {
+    if (!app || !baseUrl) throw new Error('Community app is not initialized')
+    return baseUrl
   }
 
   function expectPrivate(headers: Record<string, string>) {
