@@ -5,8 +5,9 @@
 #   android-test APK       the module's androidTest APK leaves every native library
 #                          out (its build.gradle excludes them for that APK only)
 #                          and still holds the instrumentation tests.
-#   ios-app BINARY IOSDIR  the app binary links the module's Swift code and the
-#                          generated Expo modules provider registers it.
+#   ios-app BINARY IOSDIR  the app binary links the module's Swift class (matched by
+#                          its mangled runtime name and demangled type metadata) and
+#                          the generated Expo modules provider registers it.
 set -euo pipefail
 
 dex_count() { unzip -p "$1" 'classes*.dex' | strings | grep -c -F "$2" || true; }
@@ -39,11 +40,15 @@ case "${1:-}" in
   ios-app)
     binary=$2
     ios=$3
-    symbols=$(nm "$binary" | grep -c AccessibilityFocusModule || true)
-    provider=$(grep -rl --include=ExpoModulesProvider.swift AccessibilityFocusModule "$ios" | head -1 || true)
-    echo "$binary: AccessibilityFocusModule symbols $symbols, provider ${provider:-none}"
-    [ "$symbols" -gt 0 ] || fail "$binary links no AccessibilityFocusModule code"
-    [ -n "$provider" ] || fail "no ExpoModulesProvider.swift under $ios registers AccessibilityFocusModule"
+    # Swift mangles the class name, so match the runtime class
+    # _TtC18AccessibilityFocus24AccessibilityFocusModule and the demangled type metadata.
+    runtime=$(nm "$binary" | grep -c '_TtC18AccessibilityFocus24AccessibilityFocusModule' || true)
+    metadata=$(nm "$binary" | xcrun swift-demangle | grep -c 'type metadata for AccessibilityFocus\.AccessibilityFocusModule' || true)
+    provider=$(grep -rl --include=ExpoModulesProvider.swift -F 'AccessibilityFocusModule.self' "$ios" | head -1 || true)
+    echo "$binary: runtime class symbols $runtime, type metadata $metadata, provider ${provider:-none}"
+    [ "$runtime" -gt 0 ] || fail "$binary has no _TtC18AccessibilityFocus24AccessibilityFocusModule class"
+    [ "$metadata" -gt 0 ] || fail "$binary has no type metadata for AccessibilityFocus.AccessibilityFocusModule"
+    [ -n "$provider" ] || fail "no ExpoModulesProvider.swift under $ios registers AccessibilityFocusModule.self"
     ;;
   *)
     echo "usage: $0 android-app APK | android-test APK | ios-app BINARY IOSDIR" >&2
