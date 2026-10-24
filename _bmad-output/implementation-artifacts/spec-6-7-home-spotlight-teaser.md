@@ -594,6 +594,9 @@ playwright/tests/community-comments.spec.ts --repeat-each=3`, went out without t
     it instead of piling up on a seeded look. E2E-001 also inserted buffered looks only once,
     while a look another spec published could raise the banner first; it keeps the first
     insert on the keyboard and inserts again until its own card is in.
+  - R43 (round 10): every one of those insertion attempts is keyboard-driven (focus, then
+    Enter), so a broken Enter handler cannot pass on a retried click; the bounded retry and
+    the own-card assertion stay. The red control blocks Enter on the insert button.
   - Shared integration database: other community integration specs still share it and leave
     small public resync batches when they delete published posts (77 rows in one local run),
     which the appender drains within about a second; CI runs integration and Playwright in
