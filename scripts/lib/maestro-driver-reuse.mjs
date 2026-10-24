@@ -8,11 +8,15 @@
  * instrumentation app's install never finished, and the flow died 102 s later with
  * `DeviceServerDiedException` during `deviceInfo`, before its first command.
  *
- * The first flow on a device still reinstalls, so a cached AVD snapshot can never
- * keep a driver from another Maestro version. Every later flow on that device passes
- * `--no-reinstall-driver`, after the device shows both packages installed and the
- * instrumentation registered. When it does not, that flow fails at once with a cause
- * naming what is missing, and the device's next flow reinstalls.
+ * Every flow passes `--no-reinstall-driver`: Maestro then installs the driver only
+ * when it is missing and leaves it installed when the invocation closes (the default
+ * mode uninstalls it at close, so nothing would be left to reuse). Before a device's
+ * first flow the runner removes any driver already there and checks it is gone, so a
+ * cached AVD snapshot can never hand this run a driver from another Maestro version;
+ * that flow's Maestro installs a fresh one. Every later flow on the device first
+ * checks both packages are installed and the instrumentation registered. When they
+ * are not, that flow fails at once with a cause naming what is missing, and the
+ * device's next flow starts fresh again.
  */
 
 export const MAESTRO_DRIVER_PACKAGES = ['dev.mobile.maestro', 'dev.mobile.maestro.test']
@@ -64,35 +68,76 @@ export function missingMaestroDriverParts(packagesOutput, instrumentationOutput)
 }
 
 /**
+ * The driver packages a device still holds, from `pm list packages dev.mobile.maestro`.
+ *
+ * @param {string} packagesOutput
+ * @returns {string[]}
+ */
+function presentDriverPackages(packagesOutput) {
+  const lines = new Set(packagesOutput.split(/\r?\n/).map((line) => line.trim()))
+  return MAESTRO_DRIVER_PACKAGES.filter((name) => lines.has(`package:${name}`))
+}
+
+/**
  * @param {{
  *   inspect: (device: string) => Promise<{ packagesOutput: string, instrumentationOutput: string }>
+ *   uninstall: (device: string, packageName: string) => Promise<unknown>
  * }} options
  */
-export function createMaestroDriverReuse({ inspect }) {
+export function createMaestroDriverReuse({ inspect, uninstall }) {
   /** Devices whose driver an earlier invocation of this run installed. */
   const installed = new Set()
+
+  /** Removes any driver already on `device` and proves it is gone. */
+  const startFresh = async (device) => {
+    for (const name of [...MAESTRO_DRIVER_PACKAGES].reverse()) {
+      // A package that is not installed fails to uninstall; the listing decides.
+      await uninstall(device, name).catch(() => undefined)
+    }
+    let left
+    try {
+      left = presentDriverPackages((await inspect(device)).packagesOutput)
+    } catch (error) {
+      throw new MaestroDriverNotReady(device, [
+        `adb could not list the driver (${error.message})`,
+      ])
+    }
+    if (left.length > 0)
+      throw new MaestroDriverNotReady(
+        device,
+        left.map((name) => `package ${name} could not be removed before a fresh install`)
+      )
+  }
+
+  /** Checks the driver an earlier flow installed is still complete. */
+  const checkReusable = async (device) => {
+    let missing
+    try {
+      const { packagesOutput, instrumentationOutput } = await inspect(device)
+      missing = missingMaestroDriverParts(packagesOutput, instrumentationOutput)
+    } catch (error) {
+      missing = [`adb could not list the driver (${error.message})`]
+    }
+    if (missing.length > 0) {
+      installed.delete(device)
+      throw new MaestroDriverNotReady(device, missing)
+    }
+  }
+
   return {
     /**
-     * The extra `maestro test` arguments for the next flow on `device`. Throws
-     * `MaestroDriverNotReady` when a reused driver is incomplete.
+     * The extra `maestro test` arguments for the next flow on `device`, after the
+     * device's driver is either removed (its first flow) or checked complete. Throws
+     * `MaestroDriverNotReady` naming what is wrong.
      *
      * @param {'android' | 'ios'} platform
      * @param {string} device
      * @returns {Promise<string[]>}
      */
     async argsFor(platform, device) {
-      if (platform !== 'android' || !installed.has(device)) return []
-      let missing
-      try {
-        const { packagesOutput, instrumentationOutput } = await inspect(device)
-        missing = missingMaestroDriverParts(packagesOutput, instrumentationOutput)
-      } catch (error) {
-        missing = [`adb could not list the driver (${error.message})`]
-      }
-      if (missing.length > 0) {
-        installed.delete(device)
-        throw new MaestroDriverNotReady(device, missing)
-      }
+      if (platform !== 'android') return []
+      if (installed.has(device)) await checkReusable(device)
+      else await startFresh(device)
       return [NO_REINSTALL_DRIVER_ARG]
     },
     /**

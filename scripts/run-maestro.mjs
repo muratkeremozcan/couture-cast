@@ -1816,9 +1816,9 @@ const failFlowWithCause = (flowPath, cause, flowFailures) => {
 const DEFAULT_ADB_DEVICE = 'the default adb device'
 
 /**
- * Story 6.7 R62: the first flow on an Android device reinstalls Maestro's driver;
- * later flows reuse it once the device shows it complete
- * (scripts/lib/maestro-driver-reuse.mjs).
+ * Story 6.7 R62: Maestro's Android driver is installed once per device per run. Its
+ * first flow starts from a removed driver, later flows reuse it once the device
+ * shows it complete (scripts/lib/maestro-driver-reuse.mjs).
  */
 const maestroDriverReuse = createMaestroDriverReuse({
   inspect: async (device) => {
@@ -1841,6 +1841,18 @@ const maestroDriverReuse = createMaestroDriverReuse({
       instrumentationOutput: instrumentation.stdout,
     }
   },
+  uninstall: (device, packageName) =>
+    captureProcess(
+      resolveAdbBinary(),
+      [
+        ...(device === DEFAULT_ADB_DEVICE ? [] : ['-s', device]),
+        'shell',
+        'pm',
+        'uninstall',
+        packageName,
+      ],
+      { timeoutMs: 30_000 }
+    ),
 })
 
 /**

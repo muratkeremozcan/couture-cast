@@ -16,6 +16,7 @@ export declare function createMaestroDriverReuse(options: {
   inspect: (
     device: string
   ) => Promise<{ packagesOutput: string; instrumentationOutput: string }>
+  uninstall: (device: string, packageName: string) => Promise<unknown>
 }): {
   argsFor(platform: 'android' | 'ios', device: string): Promise<string[]>
   recordInvocation(platform: 'android' | 'ios', device: string): void
