@@ -175,7 +175,8 @@ export function LocationsScreen({ guided = false }: LocationsScreenProps) {
         .then((results) => {
           if (controller.signal.aborted) return
           setCandidates(results)
-          setFormError(null)
+          // A refused save stays explained while the query searches again.
+          setFormError((current) => (current?.step === 'save' ? current : null))
           announceRef.current(
             'feedback',
             results.length > 0

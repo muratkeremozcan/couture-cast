@@ -368,12 +368,24 @@ describe('LocationsScreen', () => {
       )
 
       renderScreen()
-      await userEvent.click(await searchAndChoose())
+      const saveButton = await searchAndChoose()
+      const { announcements, stop } = recordAnnouncements()
+      cleanups.push(stop)
+      await userEvent.click(saveButton)
 
-      expect((await screen.findByTestId('location-error')).textContent).toBe(message)
-      await waitFor(() => expect(liveRegion()).toBe(message))
-      // An expired candidate cannot be saved again; the member has to search.
+      await waitFor(() =>
+        expect(announcements.map(({ text }) => text)).toContain(message)
+      )
+      // An expired candidate cannot be saved again; the member has to search, and
+      // the query searches again on its own. Its results keep the save error.
       expect(screen.queryByTestId('location-selected') !== null).toBe(keepsSelection)
+      if (!keepsSelection) {
+        await waitFor(() =>
+          expect(announcements.map(({ text }) => text)).toEqual([message, 'Results: 1'])
+        )
+        expect(screen.getByTestId('location-search-option-0')).toBeTruthy()
+      }
+      expect(screen.getByTestId('location-error').textContent).toBe(message)
       expect(screen.queryByTestId('location-retry-button')).toBeNull()
     }
   )
