@@ -462,10 +462,11 @@ playwright/tests/community-comments.spec.ts --repeat-each=3`, went out without t
 
 - 2026-10-24, round 6 (`reviews/code-triage-1.md`, R30 to R33).
   - R30: the iOS check matched the plain name `AccessibilityFocusModule`, which a Swift binary
-    does not carry as a symbol. `check-accessibility-focus-builds.sh ios-app` now requires the
-    runtime class `_TtC18AccessibilityFocus24AccessibilityFocusModule`, the demangled type
-    metadata for `AccessibilityFocus.AccessibilityFocusModule`, and the provider's
-    `AccessibilityFocusModule.self`. The red control is a release build with the module's
+    does not carry as a symbol, and a stripped release binary keeps no symbols at all.
+    `check-accessibility-focus-builds.sh ios-app` now reads the binary's strings for the runtime
+    class name `_TtC18AccessibilityFocus24AccessibilityFocusModule`, which survives stripping,
+    and requires `AccessibilityFocusModule.self` in the generated provider. The local release
+    build also checks a stripped copy. The red control is a release build with the module's
     `expo-module.config.json` set aside, so autolinking leaves it out.
   - R31: the final-head runs (dev-build TalkBack return and fallback, both release builds and the
     red iOS control) are listed with their `runs/` labels in the REPAIR_READY handoff; this spec
