@@ -1,6 +1,10 @@
 import type { PrismaClient } from '@prisma/client'
 import * as wardrobeFactories from '../../../testing/src/factories/wardrobe-item.factory.ts'
 
+import {
+  resolveCommunityStorageCredentials,
+  uploadSeededPlaceholder,
+} from './community-storage.js'
 import { unwrapCjsNamespace } from './interop.js'
 
 const {
@@ -12,6 +16,9 @@ const {
 } = unwrapCjsNamespace(wardrobeFactories)
 
 export type SeededGarment = { id: string; userId: string }
+
+/** Bucket created by the garment capture migration (20260804180000). Private; the API signs every read. */
+const WARDROBE_BUCKET = 'wardrobe-images'
 
 const seededPaletteCycle = [
   ['#111111', '#C9A14A', '#7E889A'],
@@ -26,6 +33,10 @@ export async function seedWardrobeItems(
 ): Promise<SeededGarment[]> {
   const garments: SeededGarment[] = []
   const garmentUpserts: Promise<unknown>[] = []
+  // Every seeded garment is `ready`, and a ready garment's image is signed on
+  // every read. Its object goes up first: a row pointing at nothing made the
+  // list of a seeded wardrobe fail with 503 on every k6 run.
+  const storageCredentials = resolveCommunityStorageCredentials()
 
   for (const teen of teens) {
     for (let i = 0; i < 10; i++) {
@@ -54,6 +65,7 @@ export async function seedWardrobeItems(
 
       const objectPath = buildGarmentObjectPath(teen.id, id, 'png')
       garments.push({ id, userId: teen.id })
+      await uploadSeededPlaceholder(WARDROBE_BUCKET, id, objectPath, storageCredentials)
       garmentUpserts.push(
         prisma.garmentItem.upsert({
           where: { id },
