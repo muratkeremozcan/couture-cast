@@ -139,7 +139,8 @@ jobs:
         env:
           NODE_ENV: production
         run: |
-          workspace=$(ls -d *.xcworkspace | head -1)
+          workspace=$(find . -maxdepth 1 -name '*.xcworkspace' | head -1)
+          workspace=${workspace#./}
           scheme=${workspace%.xcworkspace}
           echo "scheme=$scheme" >> "$GITHUB_ENV"
           xcodebuild -workspace "$workspace" -scheme "$scheme" -configuration Release \
