@@ -357,6 +357,32 @@ tags:
     text: 'Report'
     label: 'Reporting is offered on another member post'
 
+# Story 6.7 R57: the report dialog with the keyboard up. Its translucent window is
+# edge to edge, so only the dialog's own keyboard view keeps its buttons above the
+# keyboard. Cancel sits below the details field: a tap that landed on the keyboard
+# instead would leave the dialog open, and the assertion after it would fail.
+- tapOn:
+    id: 'community-card-report-lookbook-5'
+- extendedWaitUntil:
+    visible:
+      id: 'report-details-input'
+    timeout: 15000
+- tapOn:
+    id: 'report-details-input'
+- inputText: 'Keyboard check'
+- assertVisible:
+    id: 'report-details-input'
+    text: 'Keyboard check'
+- takeScreenshot:
+    path: maestro/artifacts/community-report-keyboard
+- tapOn:
+    id: 'cancel-report-button'
+    label: 'Cancel, with the keyboard still up, sends nothing'
+- assertNotVisible:
+    id: 'report-details-input'
+- assertVisible:
+    id: 'community-card-report-lookbook-5'
+
 # The withdraw control belongs to the author alone. It must not appear on a post
 # this user did not write, and it is the only ownership control on the card.
 - assertNotVisible:
@@ -573,6 +599,17 @@ tags:
 
 - takeScreenshot:
     path: maestro/artifacts/community-compose-sheet
+
+# Story 6.7 R57: the caption with the keyboard up. The sheet's keyboard view lifts it
+# above the keyboard; the screenshot shows the field and its counter there.
+- tapOn:
+    id: 'community-caption-input'
+- inputText: 'Keyboard check'
+- assertVisible:
+    id: 'community-caption-count'
+    text: '14 of 280 characters'
+- takeScreenshot:
+    path: maestro/artifacts/community-compose-keyboard
 
 - tapOn:
     id: 'community-post-sheet-close'

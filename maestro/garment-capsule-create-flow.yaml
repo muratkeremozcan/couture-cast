@@ -77,13 +77,23 @@ tags:
 # `create-capsule-button` visible on it again. Nothing else runs between those
 # two steps.
 #
-# Android does not need it in the first place: text arrives through adb rather
-# than the soft keyboard, so there is nothing covering the checkboxes to dismiss.
+# Android keeps its keyboard up instead. Gboard rises when the name field takes
+# focus (CI job 120835242721 shows it over the garment list), and since Story 6.7
+# R57 the builder's keyboard view lifts the whole sheet above it, so the garment
+# search below scrolls within the space the keyboard leaves. Selecting garments
+# with the keyboard up is that check: a builder left under the keyboard cannot
+# scroll a garment into view, which is exactly how that CI job failed.
 - runFlow:
     when:
       platform: iOS
     commands:
       - hideKeyboard
+- runFlow:
+    when:
+      platform: Android
+    commands:
+      - takeScreenshot:
+          path: maestro/artifacts/capsule-builder-keyboard
 
 # Select two garments BY ID, not by position.
 #
