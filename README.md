@@ -176,6 +176,11 @@ Local E2E with clean DB:
 - Install Maestro CLI: `npm run maestro:install --silent`.
 - Android runs install Expo Go automatically after the emulator is attached. Manual helper:
   `npm run mobile:expo-go`.
+- Local iOS simulators run headless (Xcode 27.1 ships no Simulator.app) with a hardware
+  keyboard attached, so focusing a text field raises no software keyboard until Maestro
+  types into it (XCTest's typing switches the simulator to the software keyboard). Flows
+  that check a keyboard-up layout assert it after the first typed text; a tap that only
+  focuses a field leaves iOS without a keyboard and with the system AutoFill pill shown.
 
 **Per-run defaults:** web `http://localhost:3005`, API `http://localhost:4000`,
 Expo `exp://10.0.2.2:8081/--/` on Android emulator and `exp://127.0.0.1:8081/--/`

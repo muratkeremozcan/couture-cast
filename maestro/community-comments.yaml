@@ -94,14 +94,43 @@ tags:
 - assertVisible:
     id: 'comment-submit'
     text: 'Send comment'
+# The local iOS simulator runs headless (Xcode 27.1 ships no Simulator.app) with a
+# hardware keyboard attached, so focusing the composer raises no software keyboard and
+# the thread region stays in place. XCTest's typing switches the simulator to the
+# software keyboard, so the keyboard-up checks below follow the first typed text on
+# both platforms.
+- runFlow:
+    when:
+      platform: iOS
+    commands:
+      - assertVisible:
+          id: 'comments-thread'
+      - takeScreenshot:
+          path: maestro/artifacts/community-comments-long-reply-hardware-keyboard
+# Typed text landing in the counter proves the composer holds keyboard focus; Maestro's
+# iOS hierarchy reports every element unfocused.
+- inputText: 'ok'
+- assertVisible: '^2 / 280 characters$'
 # R51: with the keyboard up the thread region is hidden, so no clipped sliver of a
 # card shows under the title row.
 - assertNotVisible:
     id: 'comments-thread'
 - takeScreenshot:
     path: maestro/artifacts/community-comments-long-reply-keyboard
-# Closing the keyboard brings the thread region back.
-- hideKeyboard
+- eraseText: 2
+- assertVisible: '^0 / 280 characters$'
+# Closing the keyboard brings the thread region back. Android closes it with Back; iOS
+# has no Back, so a tap on the sheet title outside the controls closes it.
+- runFlow:
+    when:
+      platform: Android
+    commands:
+      - hideKeyboard
+- runFlow:
+    when:
+      platform: iOS
+    commands:
+      - tapOn: '^Comments$'
 - assertVisible:
     id: 'comments-thread'
 - assertVisible:
