@@ -130,6 +130,26 @@ module.exports = {
       },
     },
     {
+      // Test helpers under apps/api/src/testing are excluded from the production build
+      // (tsconfig.build.json), so a production module importing one would fail at runtime.
+      files: ['apps/api/src/**/*.ts'],
+      excludedFiles: ['apps/api/src/**/*.{spec,test}.ts', 'apps/api/src/testing/**'],
+      rules: {
+        'no-restricted-imports': [
+          'error',
+          {
+            patterns: [
+              {
+                group: ['**/testing/*', '!@couture/testing', '!@couture/testing/*'],
+                message:
+                  'apps/api/src/testing holds test helpers and is not in the production build; import it only from specs and integration suites.',
+              },
+            ],
+          },
+        ],
+      },
+    },
+    {
       files: ['apps/web/**/*.{ts,tsx}'],
       parserOptions: {
         project: ['./apps/web/tsconfig.eslint.json'],
