@@ -43,33 +43,40 @@ describe('community read gate while the pool is busy', () => {
     await database.drop()
   })
 
-  it('waits for the connection another request holds and authorizes the read', async () => {
-    let released = 0
-    const holder = prisma.$transaction(
+  /** Holds the pool's only connection for `ms`; resolves `holding` once it has it. */
+  function holdTheConnection(ms: number) {
+    let signal: () => void = () => undefined
+    const holding = new Promise<void>((resolve) => (signal = resolve))
+    let releasedAt = 0
+    const done = prisma.$transaction(
       async (tx) => {
-        await tx.$executeRaw`SELECT pg_sleep(0.3)`
-        released = performance.now()
+        // The callback runs on the connection, so the pool has none left now.
+        signal()
+        await tx.$executeRaw`SELECT pg_sleep(${ms / 1000})`
+        releasedAt = performance.now()
       },
       { timeout: 5_000 }
     )
-    // Let the holder take the only connection first.
-    await new Promise((resolve) => setTimeout(resolve, 50))
+    return { holding, done, releasedAt: () => releasedAt }
+  }
+
+  it('waits for the connection another request holds and authorizes the read', async () => {
+    const holder = holdTheConnection(300)
+    await holder.holding
 
     await expect(
       assertCommunityReadEligibility(prisma, member, new CommunityAuthorizationBudget())
     ).resolves.toBeUndefined()
-    await holder
-    expect(released).toBeGreaterThan(0)
+    const authorizedAt = performance.now()
+    await holder.done
+    // It waited for the release: it could only have run once the holder let go.
+    expect(holder.releasedAt()).toBeGreaterThan(0)
+    expect(authorizedAt).toBeGreaterThanOrEqual(holder.releasedAt())
   }, 30_000)
 
   it('still answers unavailable once the budget runs out', async () => {
-    const holder = prisma.$transaction(
-      async (tx) => {
-        await tx.$executeRaw`SELECT pg_sleep(0.6)`
-      },
-      { timeout: 5_000 }
-    )
-    await new Promise((resolve) => setTimeout(resolve, 50))
+    const holder = holdTheConnection(600)
+    await holder.holding
 
     await expect(
       assertCommunityReadEligibility(
@@ -78,6 +85,6 @@ describe('community read gate while the pool is busy', () => {
         new CommunityAuthorizationBudget(performance.now() + 250)
       )
     ).rejects.toMatchObject({ status: 503 })
-    await holder
+    await holder.done
   }, 30_000)
 })
