@@ -199,6 +199,12 @@ export const test = communityApiTest.extend<{
       token: accessToken,
     })
     await use({ userId, accessToken, apiBaseUrl: communityApi.apiBaseUrl })
+
+    // As in `communityTest`: this fixture tears down before `communityApi`, whose
+    // cleanup deletes the test's look. A page still open then re-read the
+    // deep-linked look, got 404 and failed E2E-004 through the network monitor.
+    // No page outlives the session.
+    await Promise.all(context.pages().map((open) => open.close()))
   },
   look: async ({ communityApi, request, apiRequest, recurse }, use, testInfo) => {
     const { postId } = await publishOwnLook(
