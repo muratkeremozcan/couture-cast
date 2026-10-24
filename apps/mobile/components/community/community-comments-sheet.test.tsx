@@ -2,6 +2,7 @@ import React from 'react'
 import { act, fireEvent, render, screen, waitFor, within } from '@testing-library/react'
 import { http, HttpResponse } from 'msw'
 import { beforeAll, beforeEach, afterEach, describe, expect, it, vi } from 'vitest'
+import { page as browserPage } from 'vitest/browser'
 import * as ReactNative from 'react-native'
 import { CommunityCommentsState } from '@couture/api-client'
 import type { CommunityCommentSubmission } from '@couture/api-client/contracts/http'
@@ -47,10 +48,34 @@ vi.mock('expo-localization', () => ({
   getLocales: () => [{ languageTag: 'en-US', languageCode: 'en', regionCode: 'US' }],
 }))
 
+/**
+ * react-native-web never reports a software keyboard, so the R51 cases drive the
+ * platform's keyboard events through these listeners.
+ */
+const keyboard = vi.hoisted(() => {
+  const listeners = new Map<string, Set<() => void>>()
+  return {
+    addListener: (event: string, listener: () => void) => {
+      const set = listeners.get(event) ?? new Set()
+      set.add(listener)
+      listeners.set(event, set)
+      return { remove: () => set.delete(listener) }
+    },
+    emit: (event: string) => {
+      listeners.get(event)?.forEach((listener) => listener())
+    },
+  }
+})
+
 vi.mock('react-native', async (original) => {
   const actual = await original<typeof ReactNative>()
   return {
     ...actual,
+    Keyboard: {
+      ...actual.Keyboard,
+      isVisible: () => false,
+      addListener: keyboard.addListener,
+    },
     AccessibilityInfo: {
       ...actual.AccessibilityInfo,
       announceForAccessibility: vi.fn(),
@@ -921,5 +946,136 @@ describe('R46 unsent comment across an unverified-access hide', () => {
     view.rerender(sheet({ state, drafts }))
     await screen.findByText('A lovely layered look.')
     expect(screen.getByTestId('comment-body')).toHaveValue('')
+  })
+})
+
+/**
+ * R51: with the keyboard open and a long reply context, the thread region used to shrink
+ * to a clipped sliver of an empty card under Refresh. The reply context now stops at
+ * three lines, and the thread region hides while the keyboard is open.
+ */
+describe('R51 comments sheet with the keyboard open', () => {
+  const longBody = 'Layered charcoal wool over a cream merino knit and boots. '
+    .repeat(5)
+    .slice(0, 279)
+    .concat('.')
+  const longRoot = createCommunityComment({ id: 'root-long', body: longBody })
+  const longContext = `Replying to a comment: Style Explorer A1B2C3D4. ${longBody}`
+  // Enough roots to scroll the thread region.
+  const roots = [
+    longRoot,
+    ...Array.from({ length: 12 }, (_, index) =>
+      createCommunityComment({
+        id: `root-${index}`,
+        body: `Scroll filler ${index}`,
+        publicationSequence: index + 3,
+      })
+    ),
+  ]
+  const thread = () => screen.getByTestId('comments-thread')
+  const composer = () => screen.getByTestId('comment-body')
+  const keyboardShown = () => act(() => keyboard.emit('keyboardDidShow'))
+  const keyboardHidden = () => act(() => keyboard.emit('keyboardDidHide'))
+
+  beforeEach(() => {
+    server.use(http.get(`${base}/comments`, () => HttpResponse.json(page(roots))))
+  })
+  afterEach(async () => {
+    await browserPage.viewport(414, 896)
+  })
+
+  async function replyToLongRoot() {
+    renderSheet()
+    press(
+      await screen.findByRole('button', {
+        name: `Reply: Style Explorer A1B2C3D4. ${longBody}`,
+      })
+    )
+  }
+
+  it('shows at most three lines of the reply context and labels it with all of it', async () => {
+    await replyToLongRoot()
+    const context = screen.getByTestId('comments-reply-context')
+    expect(context).toHaveAttribute('aria-label', longContext)
+    expect(getComputedStyle(context).webkitLineClamp).toBe('3')
+    // The tail is clipped on screen: the text runs past the three lines it shows.
+    expect(context.scrollHeight).toBeGreaterThan(context.clientHeight)
+  })
+
+  it('hides the thread region while the keyboard is up for a reply, then restores it in place', async () => {
+    await replyToLongRoot()
+    const region = thread()
+    region.scrollTop = 200
+    fireEvent.scroll(region)
+    const offset = region.scrollTop
+    expect(offset).toBeGreaterThan(0)
+    act(() => composer().focus())
+    vi.mocked(setAccessibilityFocus).mockClear()
+
+    keyboardShown()
+    expect(thread()).not.toBeVisible()
+    expect(screen.getByTestId('comments-reply-context')).toBeVisible()
+    expect(screen.getByTestId('comment-submit')).toBeVisible()
+    expect(document.activeElement).toBe(composer())
+
+    keyboardHidden()
+    expect(thread()).toBeVisible()
+    expect(thread().scrollTop).toBe(offset)
+    expect(document.activeElement).toBe(composer())
+    expect(setAccessibilityFocus).not.toHaveBeenCalled()
+  })
+
+  it.each([
+    ['a phone-height window', 414, 896],
+    ['a short window', 320, 480],
+  ])(
+    'hides the thread region for a root comment with the keyboard up in %s',
+    async (_name, width, height) => {
+      await browserPage.viewport(width, height)
+      renderSheet()
+      await screen.findByTestId('comment-root-long')
+      act(() => composer().focus())
+      keyboardShown()
+      expect(thread()).not.toBeVisible()
+      expect(screen.getByTestId('comment-submit')).toBeVisible()
+      expect(document.activeElement).toBe(composer())
+      keyboardHidden()
+      expect(thread()).toBeVisible()
+    }
+  )
+
+  it('closes only the keyboard on Back while it is open, then the sheet on the next Back', async () => {
+    const onClose = vi.fn()
+    renderSheet({ onClose })
+    await screen.findByTestId('comment-root-long')
+    // The modal takes Back (Escape on the web) once its open animation reports it shown.
+    await waitFor(() =>
+      expect(setAccessibilityFocus).toHaveBeenCalledWith(nodeHandle(sheetTitle()))
+    )
+    act(() => composer().focus())
+    keyboardShown()
+    fireEvent.keyUp(document, { key: 'Escape' })
+    expect(onClose).not.toHaveBeenCalled()
+    expect(thread()).toBeVisible()
+    fireEvent.keyUp(document, { key: 'Escape' })
+    expect(onClose).toHaveBeenCalledOnce()
+  })
+
+  it('brings the thread region back as Send dismisses the keyboard', async () => {
+    server.use(
+      http.post(`${base}/comments`, () =>
+        HttpResponse.json({
+          data: createCommunityCommentSubmission({ id: 'private-r51', body: 'Agreed.' }),
+        })
+      )
+    )
+    renderSheet()
+    await screen.findByTestId('comment-root-long')
+    act(() => composer().focus())
+    keyboardShown()
+    fireEvent.change(composer(), { target: { value: 'Agreed.' } })
+    press(screen.getByRole('button', { name: 'Send comment' }))
+    expect(thread()).toBeVisible()
+    await screen.findByTestId('comment-submission-private-r51')
   })
 })

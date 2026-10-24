@@ -19,6 +19,7 @@ import {
   TextInput,
   TouchableOpacity,
   View,
+  type NativeScrollPoint,
 } from 'react-native'
 import { useTranslation } from 'react-i18next'
 import type { CommunityCommentsState } from '@couture/api-client'
@@ -38,6 +39,48 @@ import type {
 // Android's non-translucent modal starts below the native status-bar inset.
 function modalKeyboardOffset(): number {
   return Platform.OS === 'android' ? (StatusBar.currentHeight ?? 0) : 0
+}
+
+/** The author and body that name a comment's actions and a reply's target. */
+function commentContext(item: CommunityComment, unavailable: string): string {
+  return [item.author, item.unavailable ? unavailable : item.body]
+    .filter(Boolean)
+    .join('. ')
+}
+
+/** R51: the thread region leaves the layout while the keyboard is open. */
+function threadRegionStyle(keyboardOpen: boolean) {
+  return [styles.discussion, keyboardOpen && styles.hidden]
+}
+
+/**
+ * R51: whether the software keyboard is open. iOS reports the change as the keyboard
+ * starts to move, so the thread region leaves with it; Android reports it once the
+ * keyboard is up, the same event the KeyboardAvoidingView resizes on.
+ */
+function useKeyboardOpen(onShow: () => void): [boolean, (open: boolean) => void] {
+  const [open, setOpen] = useState(() => Keyboard.isVisible())
+  const latestOnShow = useRef(onShow)
+  latestOnShow.current = onShow
+  useEffect(() => {
+    const ios = Platform.OS === 'ios'
+    const shown = Keyboard.addListener(
+      ios ? 'keyboardWillShow' : 'keyboardDidShow',
+      () => {
+        latestOnShow.current()
+        setOpen(true)
+      }
+    )
+    const hidden = Keyboard.addListener(
+      ios ? 'keyboardWillHide' : 'keyboardDidHide',
+      () => setOpen(false)
+    )
+    return () => {
+      shown.remove()
+      hidden.remove()
+    }
+  }, [])
+  return [open, setOpen]
 }
 
 /**
@@ -102,6 +145,17 @@ export function CommunityCommentsSheet({
   const refocusComposer = useRef(false)
   const closedByMember = useRef(false)
   const thread = state.current(postId ?? '__closed__')
+  // R51 layout rule: while the software keyboard is open the thread region is hidden,
+  // with or without a reply target and at any window height. The title row, the reply
+  // banner and the composer then own the space above the keyboard, so the region never
+  // shows as a clipped sliver. It stays mounted, and returns when the keyboard closes at
+  // the offset it had. Focus stays in the composer both ways; nothing here moves it.
+  const threadOffset = useRef<NativeScrollPoint>({ x: 0, y: 0 })
+  const [restoreOffset, setRestoreOffset] = useState<NativeScrollPoint>()
+  // A native view the hidden region drops is rebuilt at the offset it had.
+  const [keyboardOpen, setKeyboardOpen] = useKeyboardOpen(() =>
+    setRestoreOffset({ ...threadOffset.current })
+  )
   const focus = (ref: React.RefObject<Text | View | null>) => {
     const node = safeFindNodeHandle(ref.current)
     if (node) AccessibilityInfo.setAccessibilityFocus(node)
@@ -209,6 +263,9 @@ export function CommunityCommentsSheet({
   }
   const submit = () => {
     Keyboard.dismiss()
+    // The thread returns now, so the private status it holds can take focus on an
+    // accepted submission even before the platform reports the keyboard closed.
+    setKeyboardOpen(false)
     const submitted = state.current(postId)
     void state.submit(postId, locale).then(() => {
       // Only an outcome in this same thread updates the held copy. A reset or eviction
@@ -229,14 +286,13 @@ export function CommunityCommentsSheet({
       drafts.remember(member, postId, { unresolved: submitted.unresolved })
   }
   const context = (item: CommunityComment) =>
-    [item.author, item.unavailable ? t('community.comments.unavailable') : item.body]
-      .filter(Boolean)
-      .join('. ')
+    commentContext(item, t('community.comments.unavailable'))
   const actionName = (action: string, item: CommunityComment) =>
     `${action}: ${context(item)}`
-  const replyContext = () => {
+  const replying = () => {
     const root = thread.roots?.items.find((item) => item.id === thread.draft.parentId)
-    return root ? `: ${context(root)}` : ''
+    const replyingTo = t('community.comments.replying')
+    return root ? `${replyingTo}: ${context(root)}` : replyingTo
   }
 
   const entry = (item: CommunityComment) => (
@@ -346,7 +402,13 @@ export function CommunityCommentsSheet({
       visible
       transparent
       animationType="slide"
-      onRequestClose={close}
+      onRequestClose={() => {
+        // R51: Back with the keyboard open closes the keyboard and keeps the sheet. On
+        // Android 16 the modal otherwise takes that Back as a close request.
+        if (!keyboardOpen) return close()
+        Keyboard.dismiss()
+        setKeyboardOpen(false)
+      }}
       onShow={() => {
         // A native composer can only take focus once its modal is on screen.
         if (refocusComposer.current) {
@@ -378,9 +440,15 @@ export function CommunityCommentsSheet({
             {button(t('community.comments.close'), close, false, 'comments-close')}
           </View>
           <ScrollView
+            testID="comments-thread"
             keyboardShouldPersistTaps="handled"
-            style={styles.discussion}
+            style={threadRegionStyle(keyboardOpen)}
             contentContainerStyle={styles.content}
+            contentOffset={restoreOffset}
+            onScroll={(event) => {
+              threadOffset.current = event.nativeEvent.contentOffset
+            }}
+            scrollEventThrottle={16}
             accessible={false}
           >
             {button(
@@ -475,9 +543,15 @@ export function CommunityCommentsSheet({
           <View style={styles.composer}>
             {thread.draft.parentId && (
               <View style={styles.row}>
-                <Text style={{ color: palette.text }}>
-                  {t('community.comments.replying')}
-                  {replyContext()}
+                {/* R51: three lines at most on screen; the label keeps the whole context. */}
+                <Text
+                  testID="comments-reply-context"
+                  accessibilityLabel={replying()}
+                  numberOfLines={3}
+                  ellipsizeMode="tail"
+                  style={{ color: palette.text }}
+                >
+                  {replying()}
                 </Text>
                 {button(t('community.comments.cancel'), () => edit({ parentId: null }))}
               </View>
@@ -561,6 +635,7 @@ const styles = StyleSheet.create({
     borderTopRightRadius: 20,
   },
   discussion: { flexShrink: 1 },
+  hidden: { display: 'none' },
   content: { gap: 12, paddingBottom: 12 },
   composer: { gap: 12, paddingTop: 12 },
   row: { flexDirection: 'row', flexWrap: 'wrap', gap: 8, alignItems: 'center' },

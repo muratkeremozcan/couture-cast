@@ -82,12 +82,29 @@ tags:
     text: ${output.longReplyAction}
 - tapOn:
     id: 'comment-body'
-- assertVisible: ${output.longReplyContext}
+# R51: the banner shows three lines at most; its accessibility label keeps the whole
+# context, so the exact regex still matches the long root.
+- assertVisible:
+    id: 'comments-reply-context'
+    text: ${output.longReplyContext}
 - assertVisible:
     id: 'comment-submit'
     text: 'Send comment'
+# R51: with the keyboard up the thread region is hidden, so no clipped sliver of a
+# card shows under the title row.
+- assertNotVisible:
+    id: 'comments-thread'
 - takeScreenshot:
     path: maestro/artifacts/community-comments-long-reply-keyboard
+# Closing the keyboard brings the thread region back.
+- hideKeyboard
+- assertVisible:
+    id: 'comments-thread'
+- assertVisible:
+    id: 'comments-reply-context'
+    text: ${output.longReplyContext}
+- takeScreenshot:
+    path: maestro/artifacts/community-comments-long-reply-dismissed
 # Cancel leaves the reply unsent; the root below starts from a top-level draft.
 - tapOn: '^Cancel$'
 - assertNotVisible: ${output.longReplyContext}
