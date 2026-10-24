@@ -35,7 +35,7 @@ import { log } from '@seontechnologies/playwright-utils/log'
 import { buildUniqueId } from './api-test'
 import { WEB_ACCESS_TOKEN_STORAGE_KEY } from './commerce-session'
 import { localE2EAccessToken as engagementToken } from './local-e2e-token'
-import { acquireAdvisoryLock } from './advisory-lock'
+import { holdEngagementFeed } from './engagement-feed-lock'
 export { engagementToken }
 
 export type Utilities = {
@@ -176,24 +176,10 @@ export const test = communityApiTest.extend<{
    * and torn down last, the lock also covers each test's cleanup.
    */
   exclusiveFeed: [
-    async ({}, use, testInfo) => {
-      // Time spent queued behind another engagement test is not this test's time:
-      // the wait has its own deadline, and the test keeps its whole budget after it.
-      const budget = testInfo.timeout
-      const waitingSince = Date.now()
-      testInfo.setTimeout(0)
-      const release = await acquireAdvisoryLock(
-        localPlaywrightDatabaseUrl().toString(),
-        'couture-cast:story-6.5-engagement-feed',
-        { timeoutMs: 30 * 60_000 }
-      )
-      testInfo.setTimeout(budget + (Date.now() - waitingSince))
-      try {
-        await use()
-      } finally {
-        await release()
-      }
-    },
+    async ({}, use, testInfo) =>
+      holdEngagementFeed(testInfo, () => use(), {
+        databaseUrl: () => localPlaywrightDatabaseUrl().toString(),
+      }),
     { auto: true },
   ],
   networkErrorMonitor: [
