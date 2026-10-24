@@ -468,9 +468,20 @@ playwright/tests/community-comments.spec.ts --repeat-each=3`, went out without t
     and requires `AccessibilityFocusModule.self` in the generated provider. The local release
     build also checks a stripped copy. The red control is a release build with the module's
     `expo-module.config.json` set aside, so autolinking leaves it out.
-  - R31: the final-head runs (dev-build TalkBack return and fallback, both release builds and the
-    red iOS control) are listed with their `runs/` labels in the REPAIR_READY handoff; this spec
-    claims only runs that existed when it was written.
+  - R31: the dev-build and release evidence ran at `e6ce9d47`, each through `run-evidence.py`
+    with no source change during the run:
+    `runs/r7f-dev-build-android`; `runs/r7f-talkback-return` (OS focus landed on the link) and
+    `runs/r7f-talkback-fallback` (landed on the scroll view); the app-level controls
+    `runs/r7f-talkback-suppressed-return` and `runs/r7f-talkback-suppressed-fallback`, red with
+    "No OS-confirmed focus" as they must be; `runs/r7f-release-android` (module class, package
+    list and `libreactnative.so` in the app; no native library in the test APK);
+    `runs/r7f-release-ios` (runtime class name in the binary and in a stripped copy, provider
+    registration); and the iOS red control `runs/r7f-release-ios-without-module` (build
+    succeeded, check failed). Each TalkBack run holds `workspace.json` with the workspace's
+    source head, a hash over its source files and the hook's hash; the controls also hold
+    `suppression.patch`, the one-line change to the harness copy of the hook that skips the
+    module's focus call. Later commits change only the advisory-lock integration spec and this
+    file.
   - R32: two review rounds kept finding races in the file-lock protocol (a waiter acting on a
     stale observation could claim a pruned generation beside a live holder). The lock is now a
     Postgres session advisory lock on the test database
@@ -496,6 +507,14 @@ playwright/tests/community-comments.spec.ts --repeat-each=3`, went out without t
     every worker still running. A test cuts a run short with a worker holding the lock and checks
     that the worker exits, `pg_locks` shows no holder, and the lock is free; it fails when the
     cleanup does not kill.
+
+- 2026-10-24, round 8 (`reviews/code-triage-1.md`, R36).
+  - R36: after a worker exits, its socket closes at once but the server backend drops its locks
+    a moment later, so the cut-short case asserted an empty `pg_locks` too early. It now polls
+    the holders to a five-second deadline and fails naming each holder's pid, state and backend
+    start, then still reacquires the lock. Two cases without a database cover the wait: a holder
+    seen just after exit and then gone passes, and a holder that never goes fails at the
+    deadline (the first is red when the wait looks only once).
 
 ## Spec Change Log
 
