@@ -694,6 +694,167 @@ describe('Sponsored community CTA (Story 6.7b)', () => {
     }
   )
 
+  it.each([
+    ['the newer read answers no block first, the older read a block later', false],
+    ['the newer read answers a block first, the older read no block later', true],
+  ])(
+    '6.7b-WEB-024 overlapping live reads of one post: %s; the read that started last wins',
+    async (_label, newerHasBlock) => {
+      signIn()
+      let releaseFeed!: () => void
+      const feedHeld = new Promise<void>((resolve) => {
+        releaseFeed = resolve
+      })
+      const answered: string[] = []
+      useMswHandlers(
+        // The older read: the feed starts at mount and is held.
+        http.get(FEED_PATH, async () => {
+          await feedHeld
+          answered.push('feed')
+          const post = newerHasBlock
+            ? { ...item({ id: 'spot-2' }) }
+            : sponsoredItem({ id: 'spot-2' })
+          return HttpResponse.json(
+            communitySponsoredFeedResponseSchema.parse({
+              data: feed({ items: [post] }),
+            }) as unknown as Record<string, unknown>
+          )
+        }),
+        // The newer read: View more starts after the feed read and answers at once.
+        http.get(SPOTLIGHT_PATH, ({ request }) => {
+          const cursor = new URL(request.url).searchParams.get('cursor')
+          const items =
+            cursor === null
+              ? [ranked(1)]
+              : [ranked(2, newerHasBlock ? { sponsorship: SPONSORSHIP } : {})]
+          if (cursor !== null) answered.push('spotlight')
+          return HttpResponse.json(
+            communitySponsoredSpotlightResponseSchema.parse({
+              data: {
+                level: 'city',
+                label: 'Lisbon',
+                items,
+                nextCursor: cursor === null ? 'cursor-2' : null,
+              },
+            }) as unknown as Record<string, unknown>
+          )
+        })
+      )
+      const user = userEvent.setup()
+      renderGrid()
+
+      await user.click(await screen.findByTestId('community-spotlight-view-more'))
+      await screen.findByTestId('spotlight-lookbook-card-spot-2')
+      // Only now does the older feed read answer, about the same post.
+      releaseFeed()
+      await screen.findByTestId('lookbook-card-spot-2')
+      expect(answered).toEqual(['spotlight', 'feed'])
+      await waitFor(() =>
+        expect(screen.getByTestId('community-card-grid')).toHaveAttribute(
+          'aria-busy',
+          'false'
+        )
+      )
+
+      for (const scope of ['', 'spotlight-']) {
+        const cta = screen.queryByTestId(`${scope}sponsored-cta-spot-2`)
+        const badge = screen.queryByTestId(`${scope}sponsored-badge-spot-2`)
+        if (newerHasBlock) {
+          expect(cta, `${scope || 'feed '}CTA`).toBeInTheDocument()
+          expect(badge, `${scope || 'feed '}badge`).toBeInTheDocument()
+        } else {
+          expect(cta, `${scope || 'feed '}CTA`).not.toBeInTheDocument()
+          expect(badge, `${scope || 'feed '}badge`).not.toBeInTheDocument()
+        }
+      }
+    }
+  )
+
+  it.each([
+    ['an older spotlight block after a newer feed absence', false],
+    ['an older spotlight absence after a newer feed block', true],
+  ])(
+    '6.7b-WEB-025 %s never reaches the screen; every copy shows the newer answer',
+    async (_label, newerHasBlock) => {
+      signIn()
+      let releaseSpotlight!: () => void
+      const spotlightHeld = new Promise<void>((resolve) => {
+        releaseSpotlight = resolve
+      })
+      useMswHandlers(
+        // The newer read: the "Every climate" feed, started after View more.
+        http.get(FEED_PATH, ({ request }) => {
+          const all = new URL(request.url).searchParams.get('mode') === 'all'
+          const post = newerHasBlock
+            ? sponsoredItem({ id: 'spot-2' })
+            : { ...item({ id: 'spot-2' }) }
+          return HttpResponse.json(
+            communitySponsoredFeedResponseSchema.parse({
+              data: feed({ items: all ? [post] : [], mode: all ? 'all' : 'auto' }),
+            }) as unknown as Record<string, unknown>
+          )
+        }),
+        // The older read: View more starts first and is held until the feed answered.
+        http.get(SPOTLIGHT_PATH, async ({ request }) => {
+          const cursor = new URL(request.url).searchParams.get('cursor')
+          if (cursor !== null) await spotlightHeld
+          const items =
+            cursor === null
+              ? [ranked(1)]
+              : [ranked(2, newerHasBlock ? {} : { sponsorship: SPONSORSHIP })]
+          return HttpResponse.json(
+            communitySponsoredSpotlightResponseSchema.parse({
+              data: {
+                level: 'city',
+                label: 'Lisbon',
+                items,
+                nextCursor: cursor === null ? 'cursor-2' : null,
+              },
+            }) as unknown as Record<string, unknown>
+          )
+        })
+      )
+      const user = userEvent.setup()
+      renderGrid()
+
+      await user.click(await screen.findByTestId('community-spotlight-view-more'))
+      await user.click(screen.getByTestId('community-filter-all'))
+      await screen.findByTestId('lookbook-card-spot-2')
+
+      // From here on, any frame that shows the stale answer is recorded.
+      const staleFrames: string[] = []
+      const observer = new MutationObserver(() => {
+        const badges = document.querySelectorAll(
+          '[data-testid$="sponsored-badge-spot-2"]'
+        )
+        if (
+          newerHasBlock
+            ? badges.length < 2 &&
+              document.querySelector('[data-testid="spotlight-lookbook-card-spot-2"]')
+            : badges.length > 0
+        )
+          staleFrames.push(String(badges.length))
+      })
+      observer.observe(document.body, { childList: true, subtree: true })
+      releaseSpotlight()
+      await screen.findByTestId('spotlight-lookbook-card-spot-2')
+      await waitFor(() =>
+        expect(screen.getByTestId('community-spotlight')).toHaveAttribute(
+          'aria-busy',
+          'false'
+        )
+      )
+      observer.disconnect()
+      expect(staleFrames).toEqual([])
+
+      for (const scope of ['', 'spotlight-']) {
+        const cta = screen.queryByTestId(`${scope}sponsored-cta-spot-2`)
+        if (newerHasBlock) expect(cta, `${scope || 'feed '}CTA`).toBeInTheDocument()
+        else expect(cta, `${scope || 'feed '}CTA`).not.toBeInTheDocument()
+      }
+    }
+  )
+
   it('6.7b-WEB-020 has no axe violations with sponsored feed and spotlight cards and an error state', async () => {
     signIn()
     const clicks = clickHandler(() => errorBody(500, 'Internal server error', 'Error'))

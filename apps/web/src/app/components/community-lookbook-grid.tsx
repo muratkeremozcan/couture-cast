@@ -62,6 +62,11 @@ import {
   type CommunityFailureReason,
 } from '../../lib/community'
 import { resolveWebApiBaseUrl } from '../../lib/api-client'
+import {
+  LiveSponsorshipLedger,
+  type LiveReadStamp,
+  type LiveSponsorshipAnswers,
+} from '../../lib/live-sponsorships'
 import { CommunityReactions } from './community-reactions'
 import {
   CommunitySponsoredCta,
@@ -104,7 +109,6 @@ import {
   type CommunitySponsoredFeed as CommunityFeed,
   type CommunitySponsoredFeedItem as CommunityFeedItem,
   type CommunitySponsoredSpotlightItem as CommunitySpotlightItem,
-  type CommunitySponsorship,
   type CommunityFeedMode,
   type CommunityReportReason,
   type EmbeddedCommunityChallenge,
@@ -2099,26 +2103,36 @@ export function CommunityLookbookGrid({
    * resolve path, which does not opt in, keeps a block from the last live read.
    */
   /**
-   * The latest live answer per post, block or explicit absence. Realtime
-   * resolve copies do not opt in, so every resolve consumer settles its post
-   * against this ledger when it commits, never against an older copy.
+   * The latest live answer per post, block or explicit absence, ordered by when
+   * each read STARTED. Realtime resolve copies do not opt in, so every resolve
+   * consumer settles its post against this ledger when it commits.
    */
-  const liveSponsorshipRef = useRef(new Map<string, CommunitySponsorship | undefined>())
-  const applyLiveSponsorship = useCallback((posts: readonly CommunityFeedItem[]) => {
-    const live = liveSponsorshipOf(posts)
-    if (live.size === 0) return
-    for (const [postId, block] of live) liveSponsorshipRef.current.set(postId, block)
-    const update = (post: CommunityFeedItem | null) =>
-      post ? withLiveSponsorship(post, live) : post
-    setItems((previous) => previous.map((post) => withLiveSponsorship(post, live)))
-    newLooksRef.current = newLooksRef.current.map((post) =>
-      withLiveSponsorship(post, live)
-    )
-    setNewLooks(newLooksRef.current)
-    setOpenedItem(update)
-    setDeepLinkedItem(update)
-    spotlightApplyRef.current?.(update)
-  }, [])
+  const [liveSponsorships] = useState(() => new LiveSponsorshipLedger())
+  /**
+   * Records one live read, started at `stamp`, then settles every copy of each
+   * post it carried against the ledger. Call it as the read lands, BEFORE
+   * writing the read's own items; every write of live items then normalizes
+   * them through the ledger inside its state update, so a read that started
+   * before the answer already recorded for a post never puts its stale block
+   * on screen, not even for one render.
+   */
+  const applyLiveSponsorship = useCallback(
+    (posts: readonly CommunityFeedItem[], stamp: LiveReadStamp) => {
+      if (posts.length === 0) return
+      liveSponsorships.record(posts, stamp)
+      const ids = new Set(posts.map((post) => post.id))
+      const settle = <T extends CommunityFeedItem>(post: T): T =>
+        ids.has(post.id) ? withLiveSponsorship(post, liveSponsorships) : post
+      const update = (post: CommunityFeedItem | null) => (post ? settle(post) : post)
+      setItems((previous) => previous.map(settle))
+      newLooksRef.current = newLooksRef.current.map(settle)
+      setNewLooks(newLooksRef.current)
+      setOpenedItem(update)
+      setDeepLinkedItem(update)
+      spotlightApplyRef.current?.(update)
+    },
+    [liveSponsorships]
+  )
   const [activeChallenge, setActiveChallenge] =
     useState<EmbeddedCommunityChallenge | null>(null)
   const [isLoading, setIsLoading] = useState(false)
@@ -2175,14 +2189,25 @@ export function CommunityLookbookGrid({
   // Story 6.6: the City Spotlight heads this section. Its pages run through the
   // same reaction state as the feed, and its one View more announcement goes
   // through this surface's single live region.
+  // Story 6.7b: the sponsorship stamp of each spotlight page read, taken as the
+  // read starts and keyed by the reaction ticket the hook hands back with it.
+  const [spotlightStamps] = useState(() => new Map<number, LiveReadStamp>())
   const spotlight = useCommunitySpotlight({
     scope: sessionScope,
-    beginRead: () => reactionState.beginRead(),
+    beginRead: () => {
+      const ticket = reactionState.beginRead()
+      spotlightStamps.set(ticket, liveSponsorships.begin())
+      return ticket
+    },
     reconcile: (page, ticket) => {
-      applyLiveSponsorship(page)
+      const stamp = spotlightStamps.get(ticket) ?? liveSponsorships.begin()
+      spotlightStamps.delete(ticket)
+      applyLiveSponsorship(page, stamp)
       return page.flatMap((post) => {
         const current = reactionState.read(post, ticket)
-        return current ? [{ ...current, rank: post.rank }] : []
+        return current
+          ? [{ ...withLiveSponsorship(current, liveSponsorships), rank: post.rank }]
+          : []
       })
     },
     announce: (message) => {
@@ -2318,13 +2343,15 @@ export function CommunityLookbookGrid({
         detailGeneration === detailGenerationRef.current
       for (const target of targets) {
         try {
+          const stamp = liveSponsorships.begin()
           const post = await getCommunityPostFromWeb(target, signal)
           if (!isCurrent()) return
-          applyLiveSponsorship([post])
-          const current = reactionState.read(post, readTicket)
+          applyLiveSponsorship([post], stamp)
+          const read = reactionState.read(post, readTicket)
+          const live = () => (read ? withLiveSponsorship(read, liveSponsorships) : read)
           if (target === highlightedIdRef.current)
-            setDeepLinkedItem(loadedIds.has(target) ? null : current)
-          setOpenedItem((opened) => (opened?.id === target ? current : opened))
+            setDeepLinkedItem(() => (loadedIds.has(target) ? null : live()))
+          setOpenedItem((opened) => (opened?.id === target ? live() : opened))
         } catch (error: unknown) {
           if (isCurrent() && communityFailureReason(error) === 'not_found') {
             reactionState.evict(target)
@@ -2333,7 +2360,7 @@ export function CommunityLookbookGrid({
         }
       }
     },
-    [applyLiveSponsorship, comments, reactionState]
+    [applyLiveSponsorship, comments, liveSponsorships, reactionState]
   )
 
   const loadFeed = useCallback(
@@ -2355,6 +2382,7 @@ export function CommunityLookbookGrid({
         setAnnouncement({ key: 'community.feed.loading' })
       }
 
+      const stamp = liveSponsorships.begin()
       try {
         const { feed, restarted } = await readFeedPage(mode, cursor, controller.signal)
         if (generation !== feedGenerationRef.current) {
@@ -2376,23 +2404,25 @@ export function CommunityLookbookGrid({
           ...previous,
           feed: pruneFailedImages(previous.feed, feed.items),
         }))
+        applyLiveSponsorship(feed.items, stamp)
         const page = feed.items.flatMap((post) => {
           const current = reactionState.read(post, readTicket)
           return current ? [current] : []
         })
-        setOpenedItem((post) => (post ? reactionState.current(post) : null))
+        const live = <T extends CommunityFeedItem>(post: T): T =>
+          withLiveSponsorship(post, liveSponsorships)
+        setOpenedItem((post) => (post ? live(reactionState.current(post)) : null))
         const merged =
           append && !restarted ? mergeFeedPages(itemsRef.current, page) : page
         const loadedIds = new Set(merged.map((post) => post.id))
         setDeepLinkedItem((post) =>
-          post && !loadedIds.has(post.id) ? reactionState.current(post) : null
+          post && !loadedIds.has(post.id) ? live(reactionState.current(post)) : null
         )
         setItems((previous) =>
           (append && !restarted ? mergeFeedPages(previous, page) : page).map((post) =>
-            reactionState.current(post)
+            live(reactionState.current(post))
           )
         )
-        applyLiveSponsorship(feed.items)
         setAnnouncement({
           key:
             append && !restarted
@@ -2436,7 +2466,7 @@ export function CommunityLookbookGrid({
         }
       }
     },
-    [applyLiveSponsorship, reactionState, revalidateHighlighted]
+    [applyLiveSponsorship, liveSponsorships, reactionState, revalidateHighlighted]
   )
 
   useEffect(() => {
@@ -2449,7 +2479,8 @@ export function CommunityLookbookGrid({
       reactionState.reset()
       resetSpotlight()
       // Live answers are per viewer.
-      liveSponsorshipRef.current.clear()
+      liveSponsorships.clear()
+      spotlightStamps.clear()
       // A teaser intent and its notice belong to the member who tapped it.
       setPendingFocus(null)
       setSpotlightNotice(null)
@@ -2505,7 +2536,14 @@ export function CommunityLookbookGrid({
       window.removeEventListener('couture:session', syncSession)
       window.removeEventListener('couture:account-erased', erase)
     }
-  }, [comments, reactionState, loadFeed, resetSpotlight])
+  }, [
+    comments,
+    reactionState,
+    loadFeed,
+    resetSpotlight,
+    liveSponsorships,
+    spotlightStamps,
+  ])
 
   useEffect(() => {
     // Cleared alongside the request, so the chips answer with the mode just
@@ -2553,7 +2591,7 @@ export function CommunityLookbookGrid({
       setItems((previous) => [
         ...new Map(
           [
-            ...fresh.map((post) => withLiveSponsorship(post, liveSponsorshipRef.current)),
+            ...fresh.map((post) => withLiveSponsorship(post, liveSponsorships)),
             ...previous,
           ].map((post) => [post.id, post])
         ).values(),
@@ -2572,6 +2610,7 @@ export function CommunityLookbookGrid({
     let active = true
     const refreshFeed = async (signal?: AbortSignal) => {
       const generation = feedGenerationRef.current
+      const stamp = liveSponsorships.begin()
       const page = await getCommunityFeedFromWeb({
         mode: currentMode,
         limit: FEED_PAGE_SIZE,
@@ -2581,7 +2620,9 @@ export function CommunityLookbookGrid({
       if (signal?.aborted) throw new CommunityRequestSuperseded()
       if (generation !== feedGenerationRef.current) throw new CommunityRequestSuperseded()
       // Rows already shown stay where they are, but their blocks follow this read.
-      applyLiveSponsorship(page.items)
+      applyLiveSponsorship(page.items, stamp)
+      const live = <T extends CommunityFeedItem>(post: T): T =>
+        withLiveSponsorship(post, liveSponsorships)
       setAuthorStates(page.authorStates)
       setNextCursor(page.nextCursor)
       setServedMode(page.mode)
@@ -2592,9 +2633,9 @@ export function CommunityLookbookGrid({
 
       const existing = new Set(itemsRef.current.map((item) => item.id))
       const incoming = page.items.filter((item) => !existing.has(item.id))
-      if (!itemsRef.current.length) setItems(page.items)
+      if (!itemsRef.current.length) setItems(() => page.items.map(live))
       else if (incoming.length) {
-        const buffered = mergeFeedPages(incoming, newLooksRef.current)
+        const buffered = mergeFeedPages(incoming, newLooksRef.current).map(live)
         newLooksRef.current = buffered
         setNewLooks(buffered)
         setAnnouncement({
@@ -2660,7 +2701,7 @@ export function CommunityLookbookGrid({
         // Story 6.7b: the target resolve does not opt in to sponsorship, so the
         // post carries the latest live answer for it, block or absence, on
         // every copy, the New looks buffer included.
-        const updated = withLiveSponsorship(resolved, liveSponsorshipRef.current)
+        const updated = withLiveSponsorship(resolved, liveSponsorships)
         newLooksRef.current = newLooksRef.current.map((item) =>
           item.id === target.post.id ? updated : item
         )
@@ -2714,7 +2755,8 @@ export function CommunityLookbookGrid({
           comments.reset()
           reactionState.reset()
           resetSpotlight()
-          liveSponsorshipRef.current.clear()
+          liveSponsorships.clear()
+          spotlightStamps.clear()
           setItems([])
           setOpenedItem(null)
           setNewLooks([])
@@ -2746,6 +2788,8 @@ export function CommunityLookbookGrid({
     }
   }, [
     applyLiveSponsorship,
+    liveSponsorships,
+    spotlightStamps,
     comments,
     currentMode,
     sessionScope,
@@ -2788,11 +2832,15 @@ export function CommunityLookbookGrid({
       highlightedCardId &&
       !itemsRef.current.some((item) => item.id === highlightedCardId)
     ) {
+      const stamp = liveSponsorships.begin()
       void getCommunityPostFromWeb(highlightedCardId, controller.signal)
         .then((post) => {
           if (!cancelled && detailGeneration === detailGenerationRef.current) {
-            applyLiveSponsorship([post])
-            setDeepLinkedItem(reactionState.read(post, readTicket))
+            applyLiveSponsorship([post], stamp)
+            const read = reactionState.read(post, readTicket)
+            setDeepLinkedItem(() =>
+              read ? withLiveSponsorship(read, liveSponsorships) : read
+            )
           }
         })
         .catch((error: unknown) => {
@@ -2814,7 +2862,14 @@ export function CommunityLookbookGrid({
       cancelled = true
       controller.abort()
     }
-  }, [applyLiveSponsorship, comments, highlightedCardId, reactionState, sessionScope])
+  }, [
+    applyLiveSponsorship,
+    comments,
+    highlightedCardId,
+    liveSponsorships,
+    reactionState,
+    sessionScope,
+  ])
 
   useEffect(() => {
     if (!highlightedCardId || !sessionScope) return
@@ -2918,7 +2973,8 @@ export function CommunityLookbookGrid({
         const post = reactionState.read(target.post, readTicket)
         if (!post) return
         setDetailSurface('community_feed')
-        setOpenedItem(post)
+        // A resolve copy: it takes the latest live answer for its post.
+        setOpenedItem(() => withLiveSponsorship(post, liveSponsorships))
         if (focus)
           setCommentTarget({
             commentId: focus.id,
@@ -2952,7 +3008,7 @@ export function CommunityLookbookGrid({
       active = false
       controller.abort()
     }
-  }, [sessionScope, highlightedCardId, reactionState, comments])
+  }, [sessionScope, highlightedCardId, reactionState, comments, liveSponsorships])
 
   /**
    * The rows on screen: the loaded pages, with a deep-link target that is not
@@ -3575,22 +3631,12 @@ export function CommunityLookbookGrid({
 }
 
 /**
- * Story 6.7b: what one live community read said about each post it carried,
- * the sponsorship block or its absence (`undefined`).
- */
-type LiveSponsorship = ReadonlyMap<string, CommunitySponsorship | undefined>
-
-function liveSponsorshipOf(posts: readonly CommunityFeedItem[]): LiveSponsorship {
-  return new Map(posts.map((post) => [post.id, post.sponsorship]))
-}
-
-/**
- * A copy of `item` carrying exactly what the latest live read said about its
- * block. A post the read did not carry is returned unchanged.
+ * Story 6.7b: a copy of `item` carrying exactly what the latest live read said
+ * about its block. A post no live read answered for is returned unchanged.
  */
 function withLiveSponsorship<T extends CommunityFeedItem>(
   item: T,
-  live: LiveSponsorship
+  live: LiveSponsorshipAnswers
 ): T {
   if (!live.has(item.id)) return item
   const block = live.get(item.id)
