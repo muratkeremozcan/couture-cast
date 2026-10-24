@@ -367,10 +367,17 @@ describe('LocationsScreen', () => {
         )
       )
 
-      renderScreen()
-      const saveButton = await searchAndChoose()
       const { announcements, stop } = recordAnnouncements()
       cleanups.push(stop)
+      renderScreen()
+      const saveButton = await searchAndChoose()
+      // The choice announces itself; once it has, everything after belongs to the save.
+      await waitFor(() =>
+        expect(announcements.at(-1)?.text).toBe(
+          'Selected: Chicago, Illinois, United States'
+        )
+      )
+      announcements.splice(0)
       await userEvent.click(saveButton)
 
       await waitFor(() =>
@@ -379,7 +386,9 @@ describe('LocationsScreen', () => {
       // An expired candidate cannot be saved again; the member has to search, and
       // the query searches again on its own. Its results keep the save error.
       expect(screen.queryByTestId('location-selected') !== null).toBe(keepsSelection)
-      if (!keepsSelection) {
+      if (keepsSelection) {
+        expect(announcements.map(({ text }) => text)).toEqual([message])
+      } else {
         await waitFor(() =>
           expect(announcements.map(({ text }) => text)).toEqual([message, 'Results: 1'])
         )
