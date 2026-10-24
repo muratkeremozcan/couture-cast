@@ -852,6 +852,7 @@ export default function TabOneScreen() {
         animationType={reduceMotion ? 'none' : 'slide'}
         onShow={focusFirstSwapOption}
         onRequestClose={closeSwapModal}
+        scrim="rgba(0,0,0,0.5)"
       >
         <View style={styles.modalOverlay}>
           {(() => {
@@ -1011,7 +1012,6 @@ const styles = StyleSheet.create({
   },
   modalOverlay: {
     flex: 1,
-    backgroundColor: 'rgba(0,0,0,0.5)',
     justifyContent: 'flex-end',
   },
   modalContent: {

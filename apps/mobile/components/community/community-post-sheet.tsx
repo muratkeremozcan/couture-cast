@@ -503,6 +503,7 @@ export function CommunityPostSheet({
       visible={visible && !suspended}
       animationType="slide"
       onRequestClose={handleClose}
+      scrim="rgba(0, 0, 0, 0.6)"
     >
       <View style={styles.overlay}>
         <View
@@ -694,7 +695,6 @@ export function CommunityPostSheet({
 const styles = StyleSheet.create({
   overlay: {
     flex: 1,
-    backgroundColor: 'rgba(0, 0, 0, 0.6)',
     justifyContent: 'flex-end',
   },
   sheet: {

@@ -88,13 +88,27 @@ const keyboardAvoider = vi.hoisted(() => {
   }
 })
 
+/**
+ * The newest props of the sheet's own View. react-native-web drops the iOS-only
+ * `onAccessibilityEscape`, so the escape gesture is driven through this record.
+ */
+const sheetView = vi.hoisted(() => ({ props: {} as Record<string, unknown> }))
+
 vi.mock('react-native', async (original) => {
   const actual = await original<typeof ReactNative>()
   const { recordModalProps } = await vi.importActual<typeof EdgeToEdgeTestUtils>(
     '@/src/test-utils/edge-to-edge-modal'
   )
+  const { forwardRef } = await vi.importActual<typeof React>('react')
+  const RealView = actual.View as unknown as React.ComponentType<Record<string, unknown>>
   return {
     ...actual,
+    View: forwardRef<unknown, Record<string, unknown>>(
+      function RecordingView(props, ref) {
+        if (props.testID === 'comments-sheet') sheetView.props = props
+        return createElement(RealView, { ...props, ref })
+      }
+    ),
     Modal: recordModalProps(actual.Modal),
     KeyboardAvoidingView: keyboardAvoider.record(actual.KeyboardAvoidingView),
     Keyboard: {
@@ -1123,11 +1137,24 @@ describe('R51 comments sheet with the keyboard open', () => {
   })
 
   it('leaves a tap on a control to that control while the keyboard is open', async () => {
-    await replyToLongRoot()
+    const onClose = vi.fn()
+    renderSheet({ onClose })
+    press(
+      await screen.findByRole('button', {
+        name: `Reply: Style Explorer A1B2C3D4. ${longBody}`,
+      })
+    )
     act(() => composer().focus())
     keyboardShown()
-    press(screen.getByRole('button', { name: 'Cancel' }))
+    const cancel = screen.getByRole('button', { name: 'Cancel' })
+    // R59: the whole touch the sheet's responder would claim, then the press itself. A
+    // sheet that took the touch would close the keyboard and bring the thread back.
+    tapOutsideControls(cancel)
+    expect(thread()).not.toBeVisible()
+    expect(document.activeElement).toBe(composer())
+    press(cancel)
     expect(screen.queryByTestId('comments-reply-context')).not.toBeInTheDocument()
+    expect(onClose).not.toHaveBeenCalled()
   })
 
   it('ignores a tap outside the controls while the keyboard is closed', async () => {
@@ -1135,6 +1162,21 @@ describe('R51 comments sheet with the keyboard open', () => {
     act(() => composer().focus())
     tapOutsideControls(sheetTitle())
     expect(document.activeElement).toBe(composer())
+  })
+
+  it('closes the keyboard on the screen reader escape gesture, then the sheet', async () => {
+    const onClose = vi.fn()
+    renderSheet({ onClose })
+    await screen.findByTestId('comment-root-long')
+    act(() => composer().focus())
+    keyboardShown()
+    const escape = () => (sheetView.props.onAccessibilityEscape as () => void)()
+    act(escape)
+    expect(thread()).toBeVisible()
+    expect(document.activeElement).not.toBe(composer())
+    expect(onClose).not.toHaveBeenCalled()
+    act(escape)
+    expect(onClose).toHaveBeenCalledOnce()
   })
 
   it('brings the thread region back as Send dismisses the keyboard', async () => {
@@ -1193,9 +1235,17 @@ describe('R52 comments sheet over the system bars', () => {
     await screen.findByTestId('comment-root')
     const scrim = screen.getByTestId('comments-scrim')
     expect(getComputedStyle(scrim).backgroundColor).toBe('rgba(0, 0, 0, 0.5)')
-    const avoider = screen.getByTestId('comments-sheet').parentElement as Element
-    expect(scrim.contains(avoider)).toBe(true)
-    expect(getComputedStyle(avoider).backgroundColor).toBe('rgba(0, 0, 0, 0)')
+    expect(getComputedStyle(scrim).position).toBe('absolute')
+    // The keyboard view and everything between it and the sheet stay transparent, so the
+    // scrim layer alone dims the screen at any keyboard view height.
+    const keyboardView = screen.getByTestId('edge-to-edge-modal-keyboard-view')
+    expect(scrim.contains(keyboardView)).toBe(false)
+    for (
+      let node = screen.getByTestId('comments-sheet').parentElement;
+      node && node !== scrim.parentElement;
+      node = node.parentElement
+    )
+      expect(getComputedStyle(node).backgroundColor).toBe('rgba(0, 0, 0, 0)')
   })
 
   describe.each([

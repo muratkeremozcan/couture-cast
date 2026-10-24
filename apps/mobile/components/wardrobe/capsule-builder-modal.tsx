@@ -263,6 +263,7 @@ export function MobileCapsuleBuilderModal({
       animationType="slide"
       onRequestClose={onClose}
       accessibilityViewIsModal
+      scrim="rgba(0,0,0,0.5)"
     >
       <View style={styles.overlay}>
         <View
@@ -506,7 +507,6 @@ export function MobileCapsuleBuilderModal({
 const styles = StyleSheet.create({
   overlay: {
     flex: 1,
-    backgroundColor: 'rgba(0,0,0,0.5)',
     justifyContent: 'flex-end',
   },
   modalContainer: {

@@ -282,7 +282,12 @@ export function MobileGarmentTaggingModal({
     !selectedCategory || !selectedComfort || isSaving || isAnalysisPending
 
   return (
-    <EdgeToEdgeModal visible={visible} animationType="slide" onRequestClose={onClose}>
+    <EdgeToEdgeModal
+      visible={visible}
+      animationType="slide"
+      onRequestClose={onClose}
+      scrim="rgba(0, 0, 0, 0.5)"
+    >
       <View style={styles.overlay}>
         <View
           testID="garment-tagging-modal"
@@ -549,7 +554,6 @@ export function MobileGarmentTaggingModal({
 const styles = StyleSheet.create({
   overlay: {
     flex: 1,
-    backgroundColor: 'rgba(0, 0, 0, 0.5)',
     justifyContent: 'flex-end',
   },
   container: {

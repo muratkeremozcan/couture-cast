@@ -51,6 +51,7 @@ export function CommunitySpotlightDetail({
       animationType="slide"
       onRequestClose={onClose}
       onDismiss={onDismissed}
+      scrim="rgba(0,0,0,0.5)"
       onShow={() => {
         // The feed's own focused-look announcement, so both surfaces say the same.
         AccessibilityInfo.announceForAccessibility(t('community.feed.announceFocused'))
@@ -107,7 +108,7 @@ export function CommunitySpotlightDetail({
 }
 
 const styles = StyleSheet.create({
-  backdrop: { flex: 1, justifyContent: 'flex-end', backgroundColor: 'rgba(0,0,0,0.5)' },
+  backdrop: { flex: 1, justifyContent: 'flex-end' },
   sheet: {
     maxHeight: '90%',
     paddingTop: 16,

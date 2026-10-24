@@ -98,9 +98,11 @@ export function CommunityReportModal({
       animationType="fade"
       onRequestClose={onClose}
       testID="community-report-modal"
+      scrim="rgba(0, 0, 0, 0.6)"
+      scrimTestID="community-report-modal-scrim"
     >
       <View
-        testID="community-report-modal-scrim"
+        testID="community-report-modal-overlay"
         style={[
           styles.overlay,
           { paddingTop: 20 + insets.top, paddingBottom: 20 + insets.bottom },
@@ -282,7 +284,6 @@ export function CommunityReportModal({
 const styles = StyleSheet.create({
   overlay: {
     flex: 1,
-    backgroundColor: 'rgba(0, 0, 0, 0.6)',
     justifyContent: 'center',
     alignItems: 'center',
     padding: 20,

@@ -366,8 +366,26 @@ describe('R52 CommunityReportModal over the system bars', () => {
       transparent: true,
       visible: true,
     })
-    const scrim = screen.getByTestId('community-report-modal-scrim')
-    expect(paddingTopOf(scrim)).toBe(20 + TEST_SAFE_AREA_INSETS.top)
-    expect(paddingBottomOf(scrim)).toBe(20 + TEST_SAFE_AREA_INSETS.bottom)
+    const overlay = screen.getByTestId('community-report-modal-overlay')
+    expect(paddingTopOf(overlay)).toBe(20 + TEST_SAFE_AREA_INSETS.top)
+    expect(paddingBottomOf(overlay)).toBe(20 + TEST_SAFE_AREA_INSETS.bottom)
+    expect(
+      getComputedStyle(screen.getByTestId('community-report-modal-scrim')).backgroundColor
+    ).toBe('rgba(0, 0, 0, 0.6)')
+  })
+
+  it('R57 lifts its fields with the wrapper keyboard view under a scrim of its own layer', () => {
+    renderModal()
+    const keyboardView = screen.getByTestId('edge-to-edge-modal-keyboard-view')
+    expect(keyboardView.contains(screen.getByTestId('report-details-input'))).toBe(true)
+    // The wrapper paints the scrim; no layer inside the keyboard view adds a second one.
+    for (
+      let node = screen.getByTestId('report-details-input').parentElement;
+      node && node !== keyboardView;
+      node = node.parentElement
+    )
+      expect(getComputedStyle(node).backgroundColor).not.toMatch(
+        /^rgba\(0, 0, 0, 0\.[1-9]/
+      )
   })
 })

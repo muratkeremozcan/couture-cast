@@ -754,4 +754,21 @@ describe('R52 CommunityPostSheet over the system bars', () => {
       24 + TEST_SAFE_AREA_INSETS.bottom
     )
   })
+
+  it('R57 lifts its fields with the wrapper keyboard view under a scrim of its own layer', () => {
+    renderSheet()
+    const keyboardView = screen.getByTestId('edge-to-edge-modal-keyboard-view')
+    expect(keyboardView.contains(screen.getByTestId('community-caption-input'))).toBe(
+      true
+    )
+    // The wrapper paints the scrim; no layer inside the keyboard view adds a second one.
+    for (
+      let node = screen.getByTestId('community-caption-input').parentElement;
+      node && node !== keyboardView;
+      node = node.parentElement
+    )
+      expect(getComputedStyle(node).backgroundColor).not.toMatch(
+        /^rgba\(0, 0, 0, 0\.[1-9]/
+      )
+  })
 })
