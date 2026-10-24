@@ -17,7 +17,7 @@ import * as SplashScreen from 'expo-splash-screen'
 import { useEffect, useRef, useState } from 'react'
 import 'react-native-reanimated'
 
-import { Platform, useColorScheme } from 'react-native'
+import { Platform, StyleSheet, useColorScheme, View } from 'react-native'
 import {
   MobileAnalyticsProvider,
   mobileAnalyticsClient,
@@ -239,6 +239,16 @@ function RootLayoutNav() {
               />
               <Stack.Screen name="locations" options={{ title: t('locations.title') }} />
             </Stack>
+            {/* UI automation marker: commits with the navigator, so it exists on
+                every route once the JS tree has mounted and never on the splash.
+                maestro/subflows/open-app.yaml waits for it before deciding
+                whether a pushed route needs popping. */}
+            <View
+              testID="app-root-mounted"
+              collapsable={false}
+              pointerEvents="none"
+              style={styles.mountedMarker}
+            />
           </ThemeProvider>
         </AppThemeProvider>
       </AccessibilityAnnouncerProvider>
@@ -246,3 +256,15 @@ function RootLayoutNav() {
   )
   /* eslint-enable @typescript-eslint/no-unsafe-assignment */
 }
+
+const styles = StyleSheet.create({
+  // Mid-screen: at the window's top-left it sat under the status bar, and the
+  // Android accessibility tree dropped it there.
+  mountedMarker: {
+    position: 'absolute',
+    top: '50%',
+    left: 0,
+    width: 1,
+    height: 1,
+  },
+})
