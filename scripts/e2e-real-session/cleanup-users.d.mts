@@ -12,11 +12,20 @@ export type CleanupSummary = {
   failed: { label: string; reason: string }[]
 }
 
+export type FindUserResult =
+  | { status: 'found'; authUserId: string }
+  | { status: 'absent' }
+  | { status: 'failed'; reason?: string }
+
 export declare function deleteRecordedUsers(options: {
   directory: string
   deleteUser: (authUserId: string) => Promise<DeleteUserResult>
+  findUserByEmail?: (email: string) => Promise<FindUserResult>
 }): Promise<CleanupSummary>
 
-export declare function localAuthUserDeleter(
+export declare function localAuthUsers(
   env?: NodeJS.ProcessEnv | Record<string, string | undefined>
-): (authUserId: string) => Promise<DeleteUserResult>
+): {
+  deleteUser(authUserId: string): Promise<DeleteUserResult>
+  findUserByEmail(email: string): Promise<FindUserResult>
+}

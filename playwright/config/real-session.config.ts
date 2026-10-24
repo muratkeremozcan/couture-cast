@@ -10,6 +10,7 @@ import path from 'node:path'
 import { defineConfig, devices } from '@playwright/test'
 import {
   API_BASE_URL,
+  RAW_DIR,
   WEB_BASE_URL,
   assertIsolatedDatabaseUrl,
 } from '../../scripts/e2e-real-session/harness.mjs'
@@ -28,7 +29,11 @@ const owned = JSON.parse(
 Object.assign(process.env, owned)
 assertIsolatedDatabaseUrl(process.env.DATABASE_URL)
 
-const artifacts = path.join(directory, 'artifacts')
+// Raw output stays outside the upload directory: run.mjs redacts it into a staging
+// directory and publishes that only once redaction finished
+// (scripts/e2e-real-session/artifacts.mjs). Failure messages can carry filled
+// values, OTP codes included, so nothing here is ever uploaded as written.
+const raw = path.join(directory, RAW_DIR)
 const metadata = { environment: 'local', apiBaseUrl: API_BASE_URL, baseUrl: WEB_BASE_URL }
 
 export default defineConfig({
@@ -41,9 +46,9 @@ export default defineConfig({
   fullyParallel: false,
   workers: 1,
   retries: 0,
-  outputDir: path.join(artifacts, 'test-results'),
+  outputDir: path.join(raw, 'test-results'),
   // No HTML report: its step titles carry filled values, OTP codes included.
-  reporter: [['list'], ['junit', { outputFile: path.join(artifacts, 'junit.xml') }]],
+  reporter: [['list'], ['junit', { outputFile: path.join(raw, 'junit.xml') }]],
   metadata,
   projects: [{ name: 'chromium', use: { ...devices['Desktop Chrome'] }, metadata }],
   use: {

@@ -23,6 +23,13 @@
  *
  * A container that cannot be opened fails the scan. Uploading bytes the guard could
  * not read would be uploading bytes nobody checked.
+ *
+ * Two checks cover values minted during a run, which no secret name holds:
+ * `--otp-file FILE` reads a JSON list of the sign-in codes the run issued and fails
+ * on any of them standing as its own number (no digit on either side) in any layer;
+ * `--reject-jwt` fails on anything shaped like a JWT (`eyJ...` header, payload and
+ * signature) in any layer. An OTP file that is missing or unreadable fails the
+ * scan, since a missing list would let every code through.
  */
 import fs from 'node:fs'
 import path from 'node:path'
@@ -123,8 +130,64 @@ export function resolveSecrets(names, env = process.env) {
   return { secrets, unset, tooShort }
 }
 
+/** The same JWT shape `scripts/e2e-real-session/harness.mjs` redacts. */
+export const JWT_SHAPE = /eyJ[A-Za-z0-9_-]+\.[A-Za-z0-9_-]+\.[A-Za-z0-9_-]+/
+
+/** A minted code is digits only; anything else in an OTP file is not a code. */
+const OTP_CODE = /^\d{6,10}$/
+
+/**
+ * A pattern searched for in every layer, reported under `name`: one issued OTP
+ * code each, matched only as a whole number, and the JWT shape.
+ *
+ * @param {readonly string[]} codes
+ * @param {boolean} rejectJwt
+ */
+export function mintedValuePatterns(codes, rejectJwt) {
+  const patterns = [...new Set(codes)].map((code, index) => ({
+    name: `issued OTP #${index + 1}`,
+    pattern: new RegExp(`(?<!\\d)${code}(?!\\d)`),
+    encoding: 'whole-number match',
+  }))
+  if (rejectJwt)
+    patterns.push({
+      name: 'a JWT-shaped value',
+      pattern: JWT_SHAPE,
+      encoding: 'JWT shape',
+    })
+  return patterns
+}
+
+/**
+ * The codes in an OTP file. Throws, without quoting the file, when it is missing,
+ * is not JSON, or holds anything but a list of codes.
+ *
+ * @param {string} file
+ */
+export function readOtpFile(file) {
+  let codes
+  try {
+    codes = JSON.parse(fs.readFileSync(file, 'utf8'))
+  } catch {
+    throw new Error('missing or not JSON')
+  }
+  if (
+    !Array.isArray(codes) ||
+    codes.some((code) => typeof code !== 'string' || !OTP_CODE.test(code))
+  )
+    throw new Error('not a list of sign-in codes')
+  return codes
+}
+
 function searchLayer(buffer, location, secrets, findings) {
+  let text
   for (const secret of secrets) {
+    if (secret.pattern) {
+      text ??= buffer.toString('latin1')
+      if (secret.pattern.test(text))
+        findings.push({ location, name: secret.name, encoding: secret.encoding })
+      continue
+    }
     const hit = secret.needles.find((needle) => buffer.includes(needle.bytes))
     if (hit) findings.push({ location, name: secret.name, encoding: hit.encoding })
   }
@@ -344,10 +407,20 @@ export function scanPaths(targets, secrets) {
 export function parseArgs(argv) {
   const names = []
   const storageStates = []
+  const otpFiles = []
+  let rejectJwt = false
   const targets = []
   for (let index = 0; index < argv.length; index += 1) {
     const arg = argv[index]
-    if (arg === '--names') {
+    if (arg === '--reject-jwt') {
+      rejectJwt = true
+    } else if (arg === '--otp-file') {
+      // Kept even when empty, so a missing value fails the scan instead of vanishing.
+      otpFiles.push(argv[index + 1] ?? '')
+      index += 1
+    } else if (arg.startsWith('--otp-file=')) {
+      otpFiles.push(arg.slice('--otp-file='.length))
+    } else if (arg === '--names') {
       names.push(...(argv[index + 1] ?? '').split(/[\s,]+/))
       index += 1
     } else if (arg.startsWith('--names=')) {
@@ -364,6 +437,8 @@ export function parseArgs(argv) {
   return {
     names: [...new Set(names.filter(Boolean))],
     storageStates: storageStates.filter(Boolean),
+    otpFiles,
+    rejectJwt,
     targets,
   }
 }
@@ -392,11 +467,31 @@ export function resolveStorageStateSecrets(files) {
   return { secrets, missing }
 }
 
+/**
+ * Every code in the OTP files, or undefined after reporting the first file that
+ * cannot be read. The reason is ours; a file's contents are codes and are never
+ * echoed.
+ */
+function readOtpFiles(files, out) {
+  const codes = []
+  for (const file of files) {
+    try {
+      codes.push(...readOtpFile(file))
+    } catch (error) {
+      out.error(
+        `Cannot read the OTP file ${file || '(no path given)'}: ${error.message}.`
+      )
+      return undefined
+    }
+  }
+  return codes
+}
+
 export function main(argv = process.argv.slice(2), env = process.env, out = console) {
-  const { names, storageStates, targets } = parseArgs(argv)
+  const { names, storageStates, otpFiles, rejectJwt, targets } = parseArgs(argv)
   if (names.length === 0 || targets.length === 0) {
     out.error(
-      'Usage: check-artifact-secrets.mjs --names NAME[,NAME...] [--storage-state FILE] <path>...'
+      'Usage: check-artifact-secrets.mjs --names NAME[,NAME...] [--storage-state FILE] [--otp-file FILE] [--reject-jwt] <path>...'
     )
     return 2
   }
@@ -423,6 +518,10 @@ export function main(argv = process.argv.slice(2), env = process.env, out = cons
     out.log(`No storage state, skipped: ${minted.missing.join(', ')}`)
   }
   secrets.push(...minted.secrets)
+
+  const codes = readOtpFiles(otpFiles, out)
+  if (!codes) return 2
+  secrets.push(...mintedValuePatterns(codes, rejectJwt))
 
   const result = scanPaths(targets, secrets)
   if (result.missing.length > 0)

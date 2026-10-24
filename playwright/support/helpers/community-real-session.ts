@@ -4,6 +4,11 @@ import { createHash, randomUUID } from 'node:crypto'
 import { createClient } from '@supabase/supabase-js'
 import { signupResponseSchema } from '@couture/api-client/contracts/http'
 import type { Page } from '@playwright/test'
+import { realSessionSkipReason as harnessSkipReason } from '../../../scripts/e2e-real-session/harness.mjs'
+import {
+  recordCreatedIdentity,
+  recordPendingIdentity,
+} from '../../../scripts/e2e-real-session/identities.mjs'
 import type { ApiRequestFixture } from './api-test'
 
 export type RealCommunityAccount = {
@@ -25,23 +30,12 @@ export type RealCommunityAccount = {
 /**
  * Real-session acceptance needs an owned harness: an isolated UUID database, the local Auth
  * proxy and a web build without fixture auth. Normal Playwright runs have none of these, so
- * the specs skip with this reason instead of failing.
+ * the specs skip with this reason instead of failing. Under the harness
+ * (STORY65_REAL_SESSION_REQUIRED=true) a reason throws instead, so a drifted harness fails
+ * the run. The rule lives in `scripts/e2e-real-session/harness.mjs`, where it is unit tested.
  */
 export function realSessionSkipReason(): string | undefined {
-  const directory = process.env.STORY65_REAL_SESSION_DIR
-  if (!directory)
-    return 'Story 6.5 real-session acceptance runs only in an owned harness (STORY65_REAL_SESSION_DIR is unset).'
-  if (!fs.existsSync(path.join(directory, 'auth-harness.json')))
-    return 'Story 6.5 real-session acceptance needs the owned local Auth harness (auth-harness.json is missing).'
-  let database = ''
-  try {
-    database = new URL(process.env.DATABASE_URL ?? '').pathname
-  } catch {
-    database = ''
-  }
-  if (!/^\/tea_community_[a-f0-9]{32}$/.test(database))
-    return 'Story 6.5 real-session acceptance needs an isolated UUID database.'
-  return undefined
+  return harnessSkipReason(process.env)
 }
 
 /**
@@ -100,7 +94,9 @@ export async function signupRealCommunityAppUser(
 
 /**
  * Node-only local Auth account creation. Admin credentials never enter application code or
- * bundles. Every created identity is recorded so the owned Auth harness will issue its OTP.
+ * bundles. Every identity is recorded write-ahead (`scripts/e2e-real-session/identities.mjs`):
+ * a pending row before the Auth Admin call, so a worker stopped mid-call still leaves the
+ * address for cleanup to resolve, then the full account, which the Auth harness issues OTPs for.
  */
 export async function createRealCommunityAuthAccount(options: {
   email: string
@@ -111,29 +107,26 @@ export async function createRealCommunityAuthAccount(options: {
   label: string
 }): Promise<RealCommunityAccount> {
   const directory = harnessDirectory()
-  const { data, error } = await adminClient().auth.admin.createUser({
-    email: options.email,
-    email_confirm: true,
-    ...(options.appMetadata ? { app_metadata: options.appMetadata } : {}),
-  })
-  if (error || !data.user) throw new Error('Owned local Auth account creation failed.')
-  if (data.user.id === options.appUserId)
-    throw new Error('The auth/app identity mismatch is required.')
-  const account: RealCommunityAccount = {
+  const admin = adminClient()
+  const pending = {
     appUserId: options.appUserId,
-    authUserId: data.user.id,
     email: options.email,
     mapping: options.mapping,
     issueMode: options.issueMode ?? 'generated',
     label: options.label,
   }
-  const file = path.join(directory, 'created-identities.json')
-  const rows = (
-    fs.existsSync(file) ? JSON.parse(fs.readFileSync(file, 'utf8')) : []
-  ) as RealCommunityAccount[]
-  fs.writeFileSync(file, `${JSON.stringify([...rows, account], null, 2)}\n`, {
-    mode: 0o600,
+  recordPendingIdentity(directory, pending)
+  const { data, error } = await admin.auth.admin.createUser({
+    email: options.email,
+    email_confirm: true,
+    ...(options.appMetadata ? { app_metadata: options.appMetadata } : {}),
   })
+  // A failed call leaves the pending row: cleanup finds no user for it and drops it.
+  if (error || !data.user) throw new Error('Owned local Auth account creation failed.')
+  const account: RealCommunityAccount = { ...pending, authUserId: data.user.id }
+  recordCreatedIdentity(directory, account)
+  if (data.user.id === options.appUserId)
+    throw new Error('The auth/app identity mismatch is required.')
   return account
 }
 

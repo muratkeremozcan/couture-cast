@@ -6,8 +6,10 @@
  *
  * In order:
  * 1. Resolves the local Supabase URL and keys (from the environment, else from
- *    `supabase status`), refuses anything that is not on this machine, deletes
- *    the Auth users a killed earlier run left recorded, and picks the OTP mode.
+ *    `supabase status`), refuses anything that is not on this machine, checks the
+ *    Storage buckets the seed needs exist (`scripts/local-storage-buckets.mjs`),
+ *    deletes the Auth users a killed earlier run left recorded, and picks the OTP
+ *    mode.
  * 2. Creates `tea_community_<32 hex>` on the local Supabase Postgres with the same
  *    auth bootstrap as `apps/api/integration/helpers/isolated-community-database.ts`.
  * 3. Starts the OTP Auth proxy (`auth-proxy.mjs`) on 53051.
@@ -19,26 +21,43 @@
  *    build on 127.0.0.1:3077.
  * 6. Runs the two specs through `playwright/config/real-session.config.ts`, holds
  *    their output until the run's keys, OTP codes and JWTs are redacted from it,
- *    then prints it.
- * 7. Always: deletes the Auth users the run created, stops every process, redacts
- *    the artifacts and drops the database.
+ *    then prints it. The run passes only when Playwright exits 0 AND its JUnit
+ *    report shows every expected test ran, none skipped (`junitOutcome`).
+ * 7. Always (`lifecycle.mjs`): stops every process group it started and waits for
+ *    them and their workers to exit, waits for the startup sequence to settle,
+ *    then closes the proxy, collects the issued OTP codes, deletes the Auth users
+ *    the run created, drops the database and publishes the redacted artifacts
+ *    (`artifacts.mjs`). A failed code collection withholds the artifacts.
+ *
+ * Every process is started through `process-owner.mjs`, each as the leader of its
+ * own process group, and every await in the startup sequence is followed by
+ * `owner.assertRunning()`, so once teardown begins nothing new starts.
  *
  * Everything the run keeps lives in STORY65_REAL_SESSION_DIR (default
- * `.real-session-e2e/`). Only `artifacts/` inside it is meant for upload.
+ * `.real-session-e2e/`). Only `artifacts/` inside it is meant for upload, and only
+ * while `artifacts-complete.json` vouches for it (`artifacts.mjs verify`).
  */
-import { execFileSync, spawn } from 'node:child_process'
+import { execFileSync } from 'node:child_process'
 import fs from 'node:fs'
 import path from 'node:path'
 import { fileURLToPath } from 'node:url'
 import { parse as parseEnvFile } from 'dotenv'
 import pg from 'pg'
 import { LOCAL_E2E_DATABASE_URL, ROOT_ENV_FILES } from '../local-e2e-database.mjs'
+import {
+  assertBucketsPresent,
+  bucketDefinitionsFromMigrations,
+  listWhenReady,
+  localStorageApi,
+} from '../local-storage-buckets.mjs'
+import { RAW_DIR, finalizeArtifacts, resetArtifacts } from './artifacts.mjs'
 import { startAuthProxy } from './auth-proxy.mjs'
-import { deleteRecordedUsers, localAuthUserDeleter } from './cleanup-users.mjs'
+import { deleteRecordedUsers, localAuthUsers } from './cleanup-users.mjs'
 import {
   API_BASE_URL,
   API_PORT,
   AUTH_PROXY_PORT,
+  EXPECTED_REAL_SESSION_TESTS,
   ISOLATED_DATABASE_NAME,
   MAILPIT_URL,
   RUN_STATE_FILES,
@@ -51,10 +70,14 @@ import {
   isLoopbackHost,
   isolatedDatabaseName,
   isolatedDatabaseUrl,
+  junitOutcome,
   redactSecrets,
   resolveHarnessDir,
   resolveOtpMode,
 } from './harness.mjs'
+import { IDENTITIES_FILE, readIdentities } from './identities.mjs'
+import { startRunLifecycle } from './lifecycle.mjs'
+import { createProcessOwner } from './process-owner.mjs'
 
 const repoRoot = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '../..')
 const webRoot = path.join(repoRoot, 'apps/web')
@@ -141,33 +164,51 @@ async function mailpitReachable() {
   }
 }
 
-/** Every sign-in code Mailpit holds for the given addresses, for redaction only. */
+/**
+ * Every sign-in code Mailpit holds for the given addresses, for redaction and the
+ * artifact scan. Throws on any Mailpit error when there are addresses to read:
+ * a code that could not be collected could not be redacted, so the caller must
+ * withhold the artifacts rather than publish them unchecked.
+ *
+ * @param {readonly string[]} emails
+ */
 async function mailpitCodes(emails) {
   if (emails.length === 0) return []
-  try {
-    const response = await fetch(`${MAILPIT_URL}/api/v1/messages`)
-    if (!response.ok) return []
-    const { messages } = await response.json()
-    const wanted = new Set(emails.map((email) => email.toLowerCase()))
-    const codes = []
-    for (const message of messages ?? []) {
+  const wanted = new Set(emails.map((email) => email.toLowerCase()))
+  const read = async (url) => {
+    const response = await fetch(url, { signal: AbortSignal.timeout(10_000) })
+    if (!response.ok) throw new Error(`Mailpit answered ${response.status}`)
+    return response.json()
+  }
+  const codes = []
+  const pageSize = 500
+  for (let start = 0; ; start += pageSize) {
+    const page = await read(
+      `${MAILPIT_URL}/api/v1/messages?start=${start}&limit=${pageSize}`
+    )
+    const messages = page.messages ?? []
+    for (const message of messages) {
       if (!message.To?.some((to) => wanted.has(String(to.Address).toLowerCase())))
         continue
-      const body = await fetch(`${MAILPIT_URL}/api/v1/message/${message.ID}`)
-      if (!body.ok) continue
-      const content = await body.json()
+      const content = await read(`${MAILPIT_URL}/api/v1/message/${message.ID}`)
       const code = extractMailCode(`${content.Text ?? ''}\n${content.HTML ?? ''}`)
       if (code) codes.push(code)
     }
-    return codes
-  } catch {
-    return []
+    if (messages.length < pageSize) return codes
   }
 }
 
-async function createIsolatedDatabase(sourceUrl) {
+/**
+ * Reserves the database's name before creating it, so a teardown that starts
+ * while CREATE DATABASE is in flight still knows what to drop.
+ *
+ * @param {string} sourceUrl
+ * @param {(database: { name: string; url: string }) => void} reserve
+ */
+async function createIsolatedDatabase(sourceUrl, reserve) {
   const name = isolatedDatabaseName()
   const url = isolatedDatabaseUrl(sourceUrl, name)
+  reserve({ name, url })
   const admin = new pg.Client({ connectionString: sourceUrl })
   await admin.connect()
   try {
@@ -205,36 +246,16 @@ function rootEnvFileKeys() {
   })
 }
 
-function startProcess(name, command, args, { cwd, env, logDir }) {
-  const out = fs.openSync(path.join(logDir, `${name}.log`), 'w', 0o600)
-  const child = spawn(command, args, { cwd, env, stdio: ['ignore', out, out] })
-  fs.closeSync(out)
-  const exited = new Promise((resolve) => {
-    child.once('exit', (code, signal) => resolve({ code, signal }))
-    child.once('error', () => resolve({ code: 1, signal: null }))
-  })
-  return { name, child, exited }
-}
-
-async function stopProcess(handle) {
-  if (!handle || handle.child.exitCode !== null || handle.child.signalCode !== null)
-    return
-  handle.child.kill('SIGTERM')
-  const stopped = await Promise.race([
-    handle.exited.then(() => true),
-    new Promise((resolve) => setTimeout(() => resolve(false), 20_000)),
-  ])
-  if (!stopped) {
-    handle.child.kill('SIGKILL')
-    await handle.exited
-  }
-}
-
-async function waitForHealthy(url, handle, timeoutMs, readLog) {
+/**
+ * Polls `url` until it answers 200, the process behind it exits, the deadline
+ * passes, or teardown begins (`assertRunning` throws).
+ */
+async function waitForHealthy(url, handle, timeoutMs, readLog, assertRunning) {
   const deadline = Date.now() + timeoutMs
   let early
   void handle.exited.then((result) => (early = result))
   while (Date.now() < deadline) {
+    assertRunning()
     if (early)
       throw new Error(
         `${handle.name} exited (${early.code ?? early.signal}) before ${url} answered.\n${readLog()}`
@@ -249,37 +270,6 @@ async function waitForHealthy(url, handle, timeoutMs, readLog) {
   throw new Error(
     `Timed out after ${timeoutMs / 1000}s waiting for ${url}.\n${readLog()}`
   )
-}
-
-function runToCompletion(command, args, { cwd, env, logFile }) {
-  return new Promise((resolve) => {
-    const out = fs.openSync(logFile, 'w', 0o600)
-    const child = spawn(command, args, { cwd, env, stdio: ['ignore', out, out] })
-    fs.closeSync(out)
-    child.once('exit', (code) => resolve(code ?? 1))
-    child.once('error', () => resolve(1))
-  })
-}
-
-function walkFiles(directory) {
-  if (!fs.existsSync(directory)) return []
-  return fs.readdirSync(directory, { withFileTypes: true }).flatMap((entry) => {
-    const full = path.join(directory, entry.name)
-    return entry.isDirectory() ? walkFiles(full) : [full]
-  })
-}
-
-/** Rewrites every text file under `directory` with the secrets redacted. */
-function redactTree(directory, secrets) {
-  for (const file of walkFiles(directory)) {
-    const bytes = fs.readFileSync(file)
-    if (bytes.includes(0)) {
-      // Binary output (a screenshot, a trace) cannot be redacted, so it is not kept.
-      fs.rmSync(file)
-      continue
-    }
-    fs.writeFileSync(file, redactSecrets(bytes.toString('utf8'), secrets))
-  }
 }
 
 function tail(file, lines = 60) {
@@ -297,22 +287,19 @@ function summarize(lines) {
   }
 }
 
-/** The real-email addresses the specs recorded, for reading their codes back. */
+/**
+ * The real-email addresses the specs recorded, for reading their codes back. An
+ * unreadable file throws: the codes behind it could not be collected.
+ */
 function recordedRealEmailAddresses(directory) {
-  const file = path.join(directory, 'created-identities.json')
-  if (!fs.existsSync(file)) return []
-  try {
-    return JSON.parse(fs.readFileSync(file, 'utf8'))
-      .filter((row) => row.issueMode === 'real-email')
-      .map((row) => row.email)
-  } catch {
-    return []
-  }
+  return readIdentities(directory)
+    .filter((row) => row.issueMode === 'real-email' && typeof row.email === 'string')
+    .map((row) => /** @type {string} */ (row.email))
 }
 
 async function main() {
   const directory = resolveHarnessDir(process.env, repoRoot)
-  const artifacts = path.join(directory, 'artifacts')
+  const raw = path.join(directory, RAW_DIR)
   const logDir = path.join(directory, 'logs')
   fs.mkdirSync(directory, { recursive: true, mode: 0o700 })
 
@@ -320,19 +307,32 @@ async function main() {
   const redisUrl = resolveRedisUrl(process.env)
   const sourceDatabaseUrl =
     process.env.LOCAL_DATABASE_URL?.trim() || LOCAL_E2E_DATABASE_URL
-  const deleteUser = localAuthUserDeleter({ ...process.env, ...supabase })
+  const auth = localAuthUsers({ ...process.env, ...supabase })
+
+  // The seed uploads into these; without them it fails minutes in, after the
+  // migrations, with a Storage 404. Checked before anything is created.
+  assertBucketsPresent(
+    bucketDefinitionsFromMigrations(),
+    await listWhenReady(
+      localStorageApi({
+        supabaseUrl: supabase.SUPABASE_URL,
+        serviceRoleKey: supabase.SUPABASE_SERVICE_ROLE_KEY,
+      }),
+      { timeoutMs: 10_000, intervalMs: 1_000 }
+    )
+  )
 
   // A killed run never reached its own cleanup; its recorded users go first.
-  const leftover = await deleteRecordedUsers({ directory, deleteUser })
+  const leftover = await deleteRecordedUsers({ directory, ...auth })
   if (leftover.recorded > 0)
     log(`Deleted ${leftover.deleted} Auth user(s) an earlier run left recorded.`)
   if (leftover.failed.length > 0)
     throw new Error('Auth users from an earlier run could not be deleted.')
-  for (const file of [...RUN_STATE_FILES, 'created-identities.json'])
+  for (const file of [...RUN_STATE_FILES, IDENTITIES_FILE])
     fs.rmSync(path.join(directory, file), { force: true })
-  for (const folder of [artifacts, logDir])
-    fs.rmSync(folder, { recursive: true, force: true })
-  fs.mkdirSync(artifacts, { recursive: true })
+  // The record goes first, so nothing from an earlier run can verify for this one.
+  resetArtifacts(directory)
+  fs.rmSync(logDir, { recursive: true, force: true })
   fs.mkdirSync(logDir, { recursive: true, mode: 0o700 })
 
   const otpMode = resolveOtpMode(
@@ -345,11 +345,18 @@ async function main() {
       : 'OTP issuance mode: generated (the Auth Admin API mints every code; Mailpit is not used)'
   )
 
+  // Five seconds each: GitHub kills a cancelled step about ten seconds after its
+  // first signal, and the API stack's own shutdown allows its children five.
+  const owner = createProcessOwner({ graceMs: 5_000, killWaitMs: 5_000 })
   const state = {
+    /** @type {Awaited<ReturnType<typeof startAuthProxy>> | undefined} */
     proxy: undefined,
-    stack: undefined,
-    web: undefined,
+    /** @type {{ name: string; url: string } | undefined} */
     database: undefined,
+    /** Playwright's stdout and stderr, printed only once it is redacted. */
+    output: /** @type {Buffer[]} */ ([]),
+    /** The codes to redact the output with; undefined when collection failed. */
+    otpCodes: /** @type {string[] | undefined} */ (undefined),
     /** Every value the run's output must not carry, settled before cleanup. */
     secrets: [
       supabase.SUPABASE_ANON_KEY,
@@ -357,58 +364,16 @@ async function main() {
       process.env.GUARDIAN_INVITE_JWT_SECRET,
     ],
   }
-  let exitCode = 1
-  /** @type {Promise<void> | undefined} */
-  let tearingDown
-  // One teardown per run, whether the specs finish, a step throws or a signal arrives.
-  const teardown = () => (tearingDown ??= tearDown())
-  const tearDown = async () => {
-    // Codes first: cleanup empties the identities file the Mailpit lookup reads.
-    state.secrets.push(
-      ...(state.proxy?.issuedCodes() ?? []),
-      ...(await mailpitCodes(recordedRealEmailAddresses(directory)))
-    )
-    try {
-      const cleanup = await deleteRecordedUsers({ directory, deleteUser })
-      log(`Auth user cleanup: ${JSON.stringify(cleanup)}`)
-      if (cleanup.failed.length > 0) exitCode = 1
-    } catch (error) {
-      log(`Auth user cleanup failed: ${error.message}`)
-      exitCode = 1
-    }
-    await stopProcess(state.web)
-    await stopProcess(state.stack)
-    await state.proxy?.close()
-    if (state.database) {
-      try {
-        await dropIsolatedDatabase(sourceDatabaseUrl, state.database.name)
-        log(`Dropped ${state.database.name}.`)
-      } catch (error) {
-        log(`Dropping ${state.database.name} failed: ${error.message}`)
-        exitCode = 1
-      }
-    }
-    fs.mkdirSync(path.join(artifacts, 'logs'), { recursive: true })
-    for (const file of walkFiles(logDir))
-      fs.copyFileSync(file, path.join(artifacts, 'logs', path.basename(file)))
-    // The proofs and observations; owned-env.json and auth-harness.json are
-    // local plumbing.
-    for (const file of RUN_STATE_FILES) {
-      if (['auth-harness.json', 'owned-env.json'].includes(file)) continue
-      const source = path.join(directory, file)
-      if (fs.existsSync(source)) fs.copyFileSync(source, path.join(artifacts, file))
-    }
-    redactTree(artifacts, state.secrets)
-  }
-  for (const signal of ['SIGINT', 'SIGTERM'])
-    process.once(signal, () => {
-      log(`${signal} received; cleaning up.`)
-      void teardown().finally(() => process.exit(1))
-    })
+  const readLog = (name) => () =>
+    redactSecrets(tail(path.join(logDir, `${name}.log`)), state.secrets)
 
-  try {
-    state.database = await createIsolatedDatabase(sourceDatabaseUrl)
-    log(`Created isolated database ${state.database.name}.`)
+  /** The startup sequence and the specs; returns the run's exit code. */
+  const run = async () => {
+    await createIsolatedDatabase(sourceDatabaseUrl, (database) => {
+      state.database = database
+    })
+    owner.assertRunning()
+    log(`Created isolated database ${state.database?.name}.`)
 
     state.proxy = await startAuthProxy({
       directory,
@@ -417,13 +382,15 @@ async function main() {
       webOrigin: WEB_BASE_URL,
       port: AUTH_PROXY_PORT,
     })
+    owner.assertRunning()
     log(`Auth proxy listening at ${state.proxy.proxyUrl}.`)
+    const database = /** @type {{ name: string; url: string }} */ (state.database)
 
     // Read by playwright/config/real-session.config.ts after the local config has
     // loaded .env.local. Locations only: the keys stay in the process environment.
     const owned = {
       TEST_ENV: 'local',
-      DATABASE_URL: state.database.url,
+      DATABASE_URL: database.url,
       REDIS_URL: redisUrl,
       SUPABASE_URL: supabase.SUPABASE_URL,
       NEXT_PUBLIC_SUPABASE_URL: state.proxy.proxyUrl,
@@ -431,6 +398,8 @@ async function main() {
       WEB_E2E_BASE_URL: WEB_BASE_URL,
       STORY65_REAL_SESSION_DIR: directory,
       STORY65_REAL_SESSION_OTP_MODE: otpMode,
+      // A skip reason now throws: six skipped specs would exit 0.
+      STORY65_REAL_SESSION_REQUIRED: 'true',
       PLAYWRIGHT_SKIP_DB_RESET: 'true',
     }
     fs.writeFileSync(
@@ -442,7 +411,7 @@ async function main() {
       path.join(directory, 'resources.json'),
       `${JSON.stringify(
         {
-          database: state.database.name,
+          database: database.name,
           otpMode,
           apiBaseUrl: API_BASE_URL,
           webBaseUrl: WEB_BASE_URL,
@@ -496,22 +465,29 @@ async function main() {
         `Building the web with NEXT_PUBLIC_E2E_AUTH=false into apps/web/${WEB_DIST_DIR}...`
       )
       const buildLog = path.join(logDir, 'web-build.log')
-      const status = await runToCompletion('node', [nextBin, 'build'], {
+      const build = owner.spawn('web-build', 'node', [nextBin, 'build'], {
         cwd: webRoot,
         env: webEnv,
         logFile: buildLog,
       })
-      if (status !== 0)
-        throw new Error(`The web build failed (${status}).\n${tail(buildLog)}`)
+      const status = await build.exited
+      owner.assertRunning()
+      if (status.code !== 0)
+        throw new Error(
+          `The web build failed (${status.code ?? status.signal}).\n${tail(buildLog)}`
+        )
     }
 
     const stackOverrides = {
       TEST_ENV: 'local',
-      DATABASE_URL: state.database.url,
+      DATABASE_URL: database.url,
       REDIS_URL: redisUrl,
       REDIS_TLS: 'false',
       ...supabase,
       PORT: String(API_PORT),
+      // apps/api/src/main.ts binds this host; without it the API listens on
+      // every interface.
+      API_LISTEN_HOST: '127.0.0.1',
       API_BASE_URL,
       PUBLIC_API_URL: API_BASE_URL,
       WEB_E2E_BASE_URL: WEB_BASE_URL,
@@ -533,25 +509,35 @@ async function main() {
     delete stackEnv.COMMUNITY_NSFW_SCREENER
     delete stackEnv.SKIP_E2E_SEED
     log('Starting the API stack (migrate deploy, seed, API build, workers)...')
-    state.stack = startProcess('api-stack', 'node', [launcher], {
+    const stack = owner.spawn('api-stack', 'node', [launcher], {
       cwd: repoRoot,
       env: stackEnv,
-      logDir,
+      logFile: path.join(logDir, 'api-stack.log'),
     })
-    await waitForHealthy(`${API_BASE_URL}/api/health`, state.stack, 15 * 60_000, () =>
-      redactSecrets(tail(path.join(logDir, 'api-stack.log')), state.secrets)
+    await waitForHealthy(
+      `${API_BASE_URL}/api/health`,
+      stack,
+      15 * 60_000,
+      readLog('api-stack'),
+      owner.assertRunning
     )
+    owner.assertRunning()
     log(`API ready at ${API_BASE_URL}.`)
 
-    state.web = startProcess(
+    const web = owner.spawn(
       'web',
       'node',
       [nextBin, 'start', '--hostname', '127.0.0.1', '--port', String(WEB_PORT)],
-      { cwd: webRoot, env: webEnv, logDir }
+      { cwd: webRoot, env: webEnv, logFile: path.join(logDir, 'web.log') }
     )
-    await waitForHealthy(`${WEB_BASE_URL}/api/health`, state.web, 2 * 60_000, () =>
-      redactSecrets(tail(path.join(logDir, 'web.log')), state.secrets)
+    await waitForHealthy(
+      `${WEB_BASE_URL}/api/health`,
+      web,
+      2 * 60_000,
+      readLog('web'),
+      owner.assertRunning
     )
+    owner.assertRunning()
     log(`Web ready at ${WEB_BASE_URL}.`)
 
     const playwrightEnv = {
@@ -564,27 +550,130 @@ async function main() {
       DISABLE_CONSOLE_LOGS: 'true',
     }
     log('Running the real-session specs; output is printed once it is redacted...')
-    const output = []
-    exitCode = await new Promise((resolve) => {
-      const child = spawn(
-        'node',
-        [playwrightCli, 'test', '--config', ownedConfig, ...playwrightArgs],
-        { cwd: repoRoot, env: playwrightEnv, stdio: ['ignore', 'pipe', 'pipe'] }
+    const playwright = owner.spawn(
+      'playwright',
+      'node',
+      [playwrightCli, 'test', '--config', ownedConfig, ...playwrightArgs],
+      { cwd: repoRoot, env: playwrightEnv }
+    )
+    playwright.child.stdout?.on('data', (chunk) => state.output.push(chunk))
+    playwright.child.stderr?.on('data', (chunk) => state.output.push(chunk))
+    const result = await playwright.exited
+    owner.assertRunning()
+    if (result.code !== 0) return 1
+
+    // Playwright exits 0 when every test skipped; the report says whether they ran.
+    const junit = path.join(raw, 'junit.xml')
+    const outcome = junitOutcome(
+      fs.existsSync(junit) ? fs.readFileSync(junit, 'utf8') : '',
+      // Playwright arguments may filter the specs; the full run must hold all six.
+      playwrightArgs.length === 0 ? EXPECTED_REAL_SESSION_TESTS : undefined
+    )
+    if (!outcome.ok) {
+      log(`Playwright exited 0, but ${outcome.reason}; failing the run.`)
+      return 1
+    }
+    log(`JUnit: ${outcome.tests} test(s) passed, none skipped.`)
+    return 0
+  }
+
+  /** Everything the run holds besides processes, freed once they have all exited. */
+  const release = async () => {
+    let code = 0
+    try {
+      await state.proxy?.close()
+    } catch (error) {
+      log(`Closing the Auth proxy failed: ${error.message}`)
+      code = 1
+    }
+    // Codes before cleanup: cleanup empties the identities file the Mailpit
+    // lookup reads.
+    try {
+      state.otpCodes = [
+        ...(state.proxy?.issuedCodes() ?? []),
+        ...(await mailpitCodes(recordedRealEmailAddresses(directory))),
+      ]
+    } catch (error) {
+      log(
+        `Collecting the issued OTP codes failed (${error.message}); the artifacts and the Playwright output are withheld.`
       )
-      child.stdout.on('data', (chunk) => output.push(chunk))
-      child.stderr.on('data', (chunk) => output.push(chunk))
-      child.once('exit', (code) => resolve(code ?? 1))
-      child.once('error', () => resolve(1))
+      code = 1
+    }
+    try {
+      const cleanup = await deleteRecordedUsers({ directory, ...auth })
+      log(`Auth user cleanup: ${JSON.stringify(cleanup)}`)
+      if (cleanup.failed.length > 0) code = 1
+    } catch (error) {
+      log(`Auth user cleanup failed: ${error.message}`)
+      code = 1
+    }
+    if (state.database) {
+      try {
+        await dropIsolatedDatabase(sourceDatabaseUrl, state.database.name)
+        log(`Dropped ${state.database.name}.`)
+      } catch (error) {
+        log(`Dropping ${state.database.name} failed: ${error.message}`)
+        code = 1
+      }
+    }
+    if (state.otpCodes) {
+      try {
+        const published = finalizeArtifacts({
+          directory,
+          sources: [
+            { to: 'junit.xml', from: path.join(raw, 'junit.xml') },
+            { to: 'test-results', from: path.join(raw, 'test-results') },
+            { to: 'logs', from: logDir },
+            // The proofs and observations; owned-env.json and auth-harness.json
+            // are local plumbing.
+            ...RUN_STATE_FILES.filter(
+              (file) => !['auth-harness.json', 'owned-env.json'].includes(file)
+            ).map((file) => ({ to: file, from: path.join(directory, file) })),
+          ],
+          texts: [
+            {
+              to: 'playwright-output.log',
+              content: Buffer.concat(state.output).toString('utf8'),
+            },
+          ],
+          secrets: state.secrets,
+          otpCodes: state.otpCodes,
+        })
+        log(`Published ${published.files} redacted artifact file(s).`)
+      } catch (error) {
+        log(`Publishing the artifacts failed: ${error.message}`)
+        code = 1
+      }
+    }
+    return code
+  }
+
+  const lifecycle = startRunLifecycle({
+    owner,
+    run,
+    release,
+    log,
+    reportError: (error) =>
+      console.error(
+        `[real-session] ${redactSecrets(String(error instanceof Error ? error.message : error), state.secrets)}`
+      ),
+  })
+  // `on`, so a second signal (GitHub sends SIGINT, then SIGTERM) cannot kill this
+  // process mid-teardown and orphan the process groups it owns.
+  for (const signal of ['SIGINT', 'SIGTERM'])
+    process.on(signal, () => {
+      log(`${signal} received; stopping every process, then cleaning up.`)
+      void lifecycle.teardown('signal')
     })
-    await teardown()
-    const redacted = redactSecrets(Buffer.concat(output).toString('utf8'), state.secrets)
-    process.stdout.write(redacted)
-    fs.writeFileSync(path.join(artifacts, 'playwright-output.log'), redacted)
-  } catch (error) {
-    console.error(`[real-session] ${redactSecrets(String(error.message), state.secrets)}`)
-    exitCode = 1
-  } finally {
-    await teardown()
+
+  const exitCode = await lifecycle.done
+  if (state.otpCodes) {
+    process.stdout.write(
+      redactSecrets(Buffer.concat(state.output).toString('utf8'), [
+        ...state.secrets,
+        ...state.otpCodes,
+      ])
+    )
   }
   log(`Finished with exit code ${exitCode} (OTP mode ${otpMode}).`)
   summarize([

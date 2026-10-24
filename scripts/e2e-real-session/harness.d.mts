@@ -11,6 +11,7 @@ export declare const AUTH_PROXY_PORT: number
 export declare const WEATHER_DOUBLE_PORT: number
 export declare const MAILPIT_URL: string
 export declare const WEB_DIST_DIR: string
+export declare const RAW_DIR: string
 export declare const DEFAULT_HARNESS_DIR: string
 export declare const ISOLATED_DATABASE_NAME: RegExp
 export declare const REAL_SESSION_EMAIL: RegExp
@@ -24,14 +25,19 @@ export declare function isolatedDatabaseUrl(sourceUrl: string, name: string): st
 export declare function assertIsolatedDatabaseUrl(url: string | undefined): string
 export declare function isLoopbackHost(hostname: string): boolean
 export declare function otpFileName(email: string): string
-export declare function findIssuableAccount<T extends { email?: unknown }>(
-  rows: readonly T[],
-  email: unknown
-): T | undefined
+export declare function findIssuableAccount<
+  T extends { email?: unknown; pending?: unknown },
+>(rows: readonly T[], email: unknown): T | undefined
 export declare function selectRecordedUsers(
-  rows: readonly { email?: unknown; authUserId?: unknown; label?: unknown }[]
+  rows: readonly {
+    email?: unknown
+    authUserId?: unknown
+    label?: unknown
+    pending?: unknown
+  }[]
 ): {
   deletable: { authUserId: string; email: string; label: string }[]
+  pending: { email: string; label: string }[]
   refused: string[]
 }
 export declare function resolveOtpMode(
@@ -47,6 +53,14 @@ export declare function envKeysToBlank(
   fileKeys: Iterable<string>,
   provided: Record<string, string>
 ): string[]
+export declare function realSessionSkipReason(
+  env?: NodeJS.ProcessEnv | Record<string, string | undefined>
+): string | undefined
+export declare const EXPECTED_REAL_SESSION_TESTS: number
+export declare function junitOutcome(
+  xml: string,
+  expected: number | undefined
+): { ok: true; tests: number } | { ok: false; reason: string }
 export declare function resolveHarnessDir(
   env: NodeJS.ProcessEnv | Record<string, string | undefined>,
   repoRoot: string

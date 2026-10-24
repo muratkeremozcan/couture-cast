@@ -12,6 +12,7 @@
  * tests in `playwright/support/helpers/real-session-harness.spec.ts` can hold them.
  */
 import { createHash, randomUUID } from 'node:crypto'
+import fs from 'node:fs'
 import path from 'node:path'
 
 /** The specs hard-code these origins, so the harness serves exactly them. */
@@ -35,6 +36,13 @@ export const MAILPIT_URL = 'http://127.0.0.1:54324'
  * reads it from WEB_NEXT_DIST_DIR.
  */
 export const WEB_DIST_DIR = '.next-real-session'
+
+/**
+ * Where Playwright writes its JUnit and failure output inside the run directory,
+ * outside the upload directory (`artifacts.mjs` publishes a redacted copy). Kept
+ * here, with no `import.meta`, so the owned Playwright config can import it.
+ */
+export const RAW_DIR = 'raw'
 
 /** Where a run keeps its state when STORY65_REAL_SESSION_DIR is not set. */
 export const DEFAULT_HARNESS_DIR = '.real-session-e2e'
@@ -123,36 +131,54 @@ export function otpFileName(email) {
 /**
  * The recorded account the proxy may issue an OTP for, or undefined. Only an exact
  * match on an address the harness itself created qualifies, so the proxy can never
- * mint a code for any other user of the local Auth server.
+ * mint a code for any other user of the local Auth server. A pending row (written
+ * ahead of the Auth call, see `identities.mjs`) names no user yet and never
+ * qualifies.
  *
- * @template {{ email?: unknown }} T
+ * @template {{ email?: unknown; pending?: unknown }} T
  * @param {readonly T[]} rows
  * @param {unknown} email
  * @returns {T | undefined}
  */
 export function findIssuableAccount(rows, email) {
   if (typeof email !== 'string' || !REAL_SESSION_EMAIL.test(email)) return undefined
-  return rows.find((row) => row.email === email)
+  return rows.find((row) => row.email === email && row.pending !== true)
 }
 
 /**
- * Splits the recorded identities into the Auth users cleanup may delete and the
- * rows it must refuse. A row qualifies only with a harness email and a UUID Auth
- * id; anything else means the file holds something the specs did not write.
+ * Splits the recorded identities into the Auth users cleanup may delete, the
+ * pending rows whose Auth id it must first resolve from the address, and the rows
+ * it must refuse. A created row qualifies only with a harness email and a UUID Auth
+ * id; a pending row only with a harness email and no Auth id. Anything else means
+ * the file holds something the specs did not write.
  *
- * @param {readonly { email?: unknown; authUserId?: unknown; label?: unknown }[]} rows
+ * @param {readonly { email?: unknown; authUserId?: unknown; label?: unknown; pending?: unknown }[]} rows
  */
 export function selectRecordedUsers(rows) {
   /** @type {{ authUserId: string; email: string; label: string }[]} */
   const deletable = []
+  /** @type {{ email: string; label: string }[]} */
+  const pending = []
   /** @type {string[]} */
   const refused = []
   const seen = new Set()
+  const pendingSeen = new Set()
   for (const row of rows) {
     const label = typeof row.label === 'string' ? row.label : 'unlabelled'
+    const harnessEmail =
+      typeof row.email === 'string' && REAL_SESSION_EMAIL.test(row.email)
+    if (row.pending === true) {
+      if (!harnessEmail || row.authUserId !== undefined) {
+        refused.push(label)
+        continue
+      }
+      if (pendingSeen.has(row.email)) continue
+      pendingSeen.add(row.email)
+      pending.push({ email: /** @type {string} */ (row.email), label })
+      continue
+    }
     if (
-      typeof row.email !== 'string' ||
-      !REAL_SESSION_EMAIL.test(row.email) ||
+      !harnessEmail ||
       typeof row.authUserId !== 'string' ||
       !UUID.test(row.authUserId)
     ) {
@@ -161,9 +187,20 @@ export function selectRecordedUsers(rows) {
     }
     if (seen.has(row.authUserId)) continue
     seen.add(row.authUserId)
-    deletable.push({ authUserId: row.authUserId, email: row.email, label })
+    deletable.push({
+      authUserId: row.authUserId,
+      email: /** @type {string} */ (row.email),
+      label,
+    })
   }
-  return { deletable, refused }
+  // A pending row whose created row is also present needs no lookup: deleting the
+  // created row's user covers it.
+  const created = new Set(deletable.map((user) => user.email))
+  return {
+    deletable,
+    pending: pending.filter((row) => !created.has(row.email)),
+    refused,
+  }
 }
 
 /**
@@ -234,6 +271,85 @@ export function redactSecrets(text, secrets) {
  */
 export function envKeysToBlank(fileKeys, provided) {
   return [...new Set(fileKeys)].filter((key) => !(key in provided)).sort()
+}
+
+/**
+ * Why the real-session specs cannot run here, or undefined when they can. Normal
+ * Playwright runs have no owned harness, so the specs skip with this reason. Under
+ * `run.mjs` (and the CI job) STORY65_REAL_SESSION_REQUIRED=true turns a reason into
+ * an error: a harness that drifted (a renamed file, a different DATABASE_URL shape)
+ * must fail the run, because six skipped tests exit 0.
+ *
+ * @param {NodeJS.ProcessEnv | Record<string, string | undefined>} [env]
+ * @returns {string | undefined}
+ */
+export function realSessionSkipReason(env = process.env) {
+  const reason = skipReasonFor(env)
+  if (reason && env.STORY65_REAL_SESSION_REQUIRED === 'true')
+    throw new Error(
+      `STORY65_REAL_SESSION_REQUIRED=true, but the specs would skip: ${reason}`
+    )
+  return reason
+}
+
+/** @param {NodeJS.ProcessEnv | Record<string, string | undefined>} env */
+function skipReasonFor(env) {
+  const directory = env.STORY65_REAL_SESSION_DIR
+  if (!directory)
+    return 'Story 6.5 real-session acceptance runs only in an owned harness (STORY65_REAL_SESSION_DIR is unset).'
+  if (!fs.existsSync(path.join(directory, 'auth-harness.json')))
+    return 'Story 6.5 real-session acceptance needs the owned local Auth harness (auth-harness.json is missing).'
+  let database = ''
+  try {
+    database = new URL(env.DATABASE_URL ?? '').pathname.slice(1)
+  } catch {
+    database = ''
+  }
+  if (!ISOLATED_DATABASE_NAME.test(database))
+    return 'Story 6.5 real-session acceptance needs an isolated UUID database.'
+  return undefined
+}
+
+/**
+ * The tests the two real-session specs hold: one in `community-real-session.spec.ts`
+ * and five in `community-real-session-identity.spec.ts`. A full run must report
+ * exactly this many, none skipped.
+ */
+export const EXPECTED_REAL_SESSION_TESTS = 6
+
+/**
+ * Whether a JUnit report shows a complete passing run: `expected` tests (any count
+ * above zero when `expected` is undefined, for a run filtered with Playwright
+ * arguments), with no failure, error or skip. Playwright exits 0 when every test
+ * skipped, so its exit code alone cannot say the specs ran.
+ *
+ * @param {string} xml
+ * @param {number | undefined} expected
+ * @returns {{ ok: true; tests: number } | { ok: false; reason: string }}
+ */
+export function junitOutcome(xml, expected) {
+  const root = xml.match(/<testsuites\b([^>]*)>/)
+  if (!root) return { ok: false, reason: 'the JUnit report has no <testsuites> element' }
+  /** @param {string} name */
+  const count = (name) => {
+    const value = root[1].match(new RegExp(`\\b${name}="(\\d+)"`))?.[1]
+    return value === undefined ? undefined : Number(value)
+  }
+  const tests = count('tests')
+  const failures = count('failures')
+  const skipped = count('skipped')
+  const errors = count('errors') ?? 0
+  if (tests === undefined || failures === undefined || skipped === undefined)
+    return { ok: false, reason: 'the JUnit report lacks its test, failure or skip count' }
+  if (skipped > 0) return { ok: false, reason: `${skipped} of ${tests} test(s) skipped` }
+  if (failures > 0 || errors > 0)
+    return { ok: false, reason: `${failures + errors} of ${tests} test(s) failed` }
+  if (expected === undefined ? tests === 0 : tests !== expected)
+    return {
+      ok: false,
+      reason: `the JUnit report holds ${tests} test(s), expected ${expected ?? 'at least 1'}`,
+    }
+  return { ok: true, tests }
 }
 
 /**

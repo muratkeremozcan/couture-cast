@@ -95,7 +95,12 @@ every normal run, because they need a stack nothing else starts.
 
 1. An isolated `tea_community_<32 hex>` database on the local Supabase Postgres,
    bootstrapped like `apps/api/integration/helpers/isolated-community-database.ts`.
-   The default `postgres` database is never written, so no reset is involved.
+   The run's migrations and app rows never touch the default `postgres` database,
+   so no reset is involved. Supabase Storage keeps its buckets there, and the
+   isolated database has no Storage schema, so the run first checks that every
+   bucket the migrations define exists and fails naming each missing one. The
+   check lives in `scripts/local-storage-buckets.mjs`, and its `provision`
+   command creates the buckets.
 2. The OTP Auth proxy (`auth-proxy.mjs`, port 53051). It forwards every Auth call
    to local Supabase Auth and issues an OTP only for an address the specs recorded
    in `created-identities.json`. In `generated` mode it mints the code with the
@@ -105,24 +110,48 @@ every normal run, because they need a stack nothing else starts.
    URL, in `apps/web/.next-real-session` so the fixture-auth build stays intact,
    served on `127.0.0.1:3077`.
 4. The API stack (`scripts/start-api-e2e-with-workers.mjs`) on `127.0.0.1:4077`
-   against the isolated database: migrate deploy, seed, API and both workers.
+   against the isolated database: migrate deploy, seed, API and both workers. The
+   run sets `API_LISTEN_HOST=127.0.0.1`, so the API binds loopback only like the
+   proxy, the web server and the weather double (`apps/api/src/main.ts` binds
+   every interface when it is unset).
 5. Playwright through `config/real-session.config.ts`: these two specs only, one
    worker, no retries, no web server, no global setup or teardown, and no
-   trace, video, screenshot or HTML report. Output is held until the Supabase
-   keys, every OTP code and anything shaped like a JWT are redacted.
-6. Always, at the end: the Auth users the run recorded are deleted
-   (`cleanup-users.mjs`, which refuses to delete anything if a recorded row is
-   not a `story65-real-<uuid>@example.test` user), every process stops, the
-   artifacts are redacted and the database is dropped.
+   trace, video, screenshot or HTML report. Its JUnit and failure output go to
+   `raw/`, outside the upload directory. Console output is held until the
+   Supabase keys, every OTP code and anything shaped like a JWT are redacted.
+   The run passes only when Playwright exits 0 and its JUnit report shows all six
+   tests ran with no failure and no skip; `STORY65_REAL_SESSION_REQUIRED=true`
+   also makes a spec skip reason throw, so a drifted harness cannot pass as six
+   skips.
+6. Always, at the end (`lifecycle.mjs`): every process group the run started
+   (web build, API stack, web server, Playwright and their workers) is stopped
+   and awaited first, so no test worker can record another user during cleanup;
+   then the proxy closes, the issued OTP codes are collected, the recorded Auth
+   users are deleted, the database is dropped, and the redacted artifacts are
+   published (`artifacts.mjs`). Users are recorded write-ahead: a pending row
+   goes in before the Auth Admin call, so a worker stopped mid-call still leaves
+   the address, and cleanup resolves it (`cleanup-users.mjs`, which refuses to
+   delete anything if a recorded row is not a `story65-real-<uuid>@example.test`
+   user). If the codes cannot be collected, the artifacts and output are withheld.
+
+Publishing redacts `raw/`, the logs and the proof files into a staging directory,
+moves it to `artifacts/`, and writes `artifacts-complete.json` (the SHA-256 of
+every published file) last. `node scripts/e2e-real-session/artifacts.mjs verify`
+passes only when that record matches `artifacts/` exactly, so a run killed before
+it finished leaves nothing uploadable.
 
 CI runs it as the **Real-session community E2E** job in
 `.github/workflows/pr-pw-e2e-local.yml`, on the same commits as the local
-Playwright lane. The job starts Supabase with Mailpit included, sets
-`STORY65_REAL_SESSION_OTP_MODE=real-email` (a Mailpit that did not start fails
-the run instead of downgrading it), prints the mode in its log and step
-summary, runs `cleanup-users.mjs` again in an `always()` step, scans the
-artifacts with `scripts/check-artifact-secrets.mjs` and uploads them as
-`real-session-e2e`. PR Gate picks the job up like every other check.
+Playwright lane. The job starts Supabase with Mailpit included (the shared
+`start-local-supabase` action provisions the Storage buckets for every job that
+starts one), sets `STORY65_REAL_SESSION_OTP_MODE=real-email` (a Mailpit that did
+not start fails the run instead of downgrading it) and
+`STORY65_REAL_SESSION_REQUIRED=true`, prints the mode in its log and step summary,
+runs `cleanup-users.mjs` again in an `always()` step, then uploads
+`real-session-e2e` only after `artifacts.mjs verify` passes and
+`scripts/check-artifact-secrets.mjs` finds no key, no issued OTP code
+(`--otp-file`, from `issued-otps.json` outside the upload directory) and no JWT
+(`--reject-jwt`). PR Gate picks the job up like every other check.
 
 To run it locally:
 
@@ -136,7 +165,8 @@ docker stop real-session-redis
 Ports 4077, 3077, 4087 and 53051 must be free. Pass `-- --skip-web-build` to
 reuse the last real-auth web build, and any Playwright arguments after `--`.
 State lives in `.real-session-e2e/` (or `STORY65_REAL_SESSION_DIR`); only its
-`artifacts/` folder holds redacted output. The run reads the Supabase URL and keys
+`artifacts/` folder holds redacted output, and only while `artifacts-complete.json`
+vouches for it. The run reads the Supabase URL and keys
 from `supabase status` when the shell does not export them, and refuses a
 non-local Supabase, Postgres or Redis.
 

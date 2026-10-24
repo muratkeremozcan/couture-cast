@@ -17,19 +17,29 @@ import os from 'node:os'
 import path from 'node:path'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { startAuthProxy } from '../../../scripts/e2e-real-session/auth-proxy.mjs'
-import { deleteRecordedUsers } from '../../../scripts/e2e-real-session/cleanup-users.mjs'
 import {
+  deleteRecordedUsers,
+  type DeleteUserResult,
+} from '../../../scripts/e2e-real-session/cleanup-users.mjs'
+import {
+  EXPECTED_REAL_SESSION_TESTS,
   assertIsolatedDatabaseUrl,
   envKeysToBlank,
   findIssuableAccount,
   isolatedDatabaseName,
   isolatedDatabaseUrl,
+  junitOutcome,
   otpFileName,
+  realSessionSkipReason,
   redactSecrets,
   resolveHarnessDir,
   resolveOtpMode,
   selectRecordedUsers,
 } from '../../../scripts/e2e-real-session/harness.mjs'
+import {
+  recordCreatedIdentity,
+  recordPendingIdentity,
+} from '../../../scripts/e2e-real-session/identities.mjs'
 
 const SOURCE = 'postgresql://postgres:postgres@127.0.0.1:54322/postgres'
 const ISOLATED = `tea_community_${'a1'.repeat(16)}`
@@ -190,6 +200,208 @@ describe('Auth user cleanup', () => {
       failed: [],
     })
     expect(deleteUser).not.toHaveBeenCalled()
+  })
+})
+
+describe('write-ahead identity records (R53)', () => {
+  const THIRD_EMAIL = 'story65-real-3b4c5d6e-7f80-4a91-8b2c-3d4e5f6a7b8c@example.test'
+  const THIRD_AUTH_ID = '3e4f5a6b-7c8d-4e9f-8a0b-1c2d3e4f5a6b'
+
+  it('R53-RS-01 records a pending row before the Auth call and replaces it after', () => {
+    recordPendingIdentity(directory, {
+      email: EMAIL,
+      label: 'first',
+      issueMode: 'generated',
+      authUserId: 'ignored',
+    })
+    expect(readIdentities()).toEqual([
+      { email: EMAIL, label: 'first', issueMode: 'generated', pending: true },
+    ])
+
+    recordPendingIdentity(directory, { email: OTHER_EMAIL, label: 'second' })
+    recordCreatedIdentity(directory, {
+      email: EMAIL,
+      authUserId: AUTH_ID,
+      label: 'first',
+    })
+
+    expect(readIdentities()).toEqual([
+      { email: EMAIL, authUserId: AUTH_ID, label: 'first' },
+      { email: OTHER_EMAIL, label: 'second', pending: true },
+    ])
+    expect(
+      fs.statSync(path.join(directory, 'created-identities.json')).mode & 0o777
+    ).toBe(0o600)
+  })
+
+  it('R53-RS-02 selects a pending row only with a harness address and no Auth id', () => {
+    const { deletable, pending, refused } = selectRecordedUsers([
+      { email: EMAIL, authUserId: AUTH_ID, label: 'created' },
+      { email: EMAIL, pending: true, label: 'created-pending' },
+      { email: OTHER_EMAIL, pending: true, label: 'pending' },
+      { email: OTHER_EMAIL, pending: true, label: 'pending-again' },
+      { email: 'admin@example.com', pending: true, label: 'foreign-pending' },
+      {
+        email: THIRD_EMAIL,
+        pending: true,
+        authUserId: THIRD_AUTH_ID,
+        label: 'pending-with-id',
+      },
+    ])
+    expect(deletable).toEqual([{ authUserId: AUTH_ID, email: EMAIL, label: 'created' }])
+    expect(pending).toEqual([{ email: OTHER_EMAIL, label: 'pending' }])
+    expect(refused).toEqual(['foreign-pending', 'pending-with-id'])
+  })
+
+  it('R53-RS-03 never issues an OTP for a pending row', () => {
+    const rows = [{ email: EMAIL, pending: true }]
+    expect(findIssuableAccount(rows, EMAIL)).toBeUndefined()
+    expect(findIssuableAccount([...rows, { email: EMAIL }], EMAIL)).toEqual({
+      email: EMAIL,
+    })
+  })
+
+  it('R53-RS-04 resolves pending rows by address: deletes a found user, drops an absent one, keeps a failed lookup', async () => {
+    recordIdentities([
+      { email: EMAIL, pending: true, label: 'created-before-the-kill' },
+      { email: OTHER_EMAIL, pending: true, label: 'never-created' },
+      { email: THIRD_EMAIL, pending: true, label: 'lookup-fails' },
+    ])
+    const deleteUser = vi.fn(() => Promise.resolve({ status: 'deleted' as const }))
+    const findUserByEmail = vi.fn((email: string) =>
+      Promise.resolve(
+        email === EMAIL
+          ? { status: 'found' as const, authUserId: AUTH_ID }
+          : email === OTHER_EMAIL
+            ? { status: 'absent' as const }
+            : { status: 'failed' as const, reason: 'Auth unavailable' }
+      )
+    )
+
+    const summary = await deleteRecordedUsers({ directory, deleteUser, findUserByEmail })
+
+    expect(deleteUser.mock.calls).toEqual([[AUTH_ID]])
+    expect(summary).toEqual({
+      recorded: 3,
+      deleted: 1,
+      missing: 1,
+      failed: [{ label: 'lookup-fails', reason: 'Auth unavailable' }],
+    })
+    expect(readIdentities()).toEqual([
+      { email: THIRD_EMAIL, pending: true, label: 'lookup-fails' },
+    ])
+  })
+
+  it('R53-RS-05 keeps a row appended while a delete is in flight, so a second cleanup deletes it', async () => {
+    recordIdentities([{ email: EMAIL, authUserId: AUTH_ID, label: 'A' }])
+    let releaseDelete!: (result: DeleteUserResult) => void
+    let deleteStarted!: () => void
+    const started = new Promise<void>((resolve) => (deleteStarted = resolve))
+    const deleted: string[] = []
+    const deleteUser = (id: string) => {
+      deleted.push(id)
+      if (id !== AUTH_ID) return Promise.resolve({ status: 'deleted' as const })
+      deleteStarted()
+      return new Promise<DeleteUserResult>((resolve) => (releaseDelete = resolve))
+    }
+
+    const first = deleteRecordedUsers({ directory, deleteUser })
+    await started
+    // A live writer records B while the delete of A is pending.
+    recordCreatedIdentity(directory, {
+      email: OTHER_EMAIL,
+      authUserId: OTHER_AUTH_ID,
+      label: 'B',
+    })
+    releaseDelete({ status: 'deleted' })
+    expect(await first).toMatchObject({ recorded: 1, deleted: 1 })
+
+    expect(readIdentities()).toEqual([
+      { email: OTHER_EMAIL, authUserId: OTHER_AUTH_ID, label: 'B' },
+    ])
+    expect(await deleteRecordedUsers({ directory, deleteUser })).toMatchObject({
+      recorded: 1,
+      deleted: 1,
+    })
+    expect(deleted).toEqual([AUTH_ID, OTHER_AUTH_ID])
+    expect(readIdentities()).toEqual([])
+  })
+})
+
+describe('the run fails unless the specs ran (R56)', () => {
+  const junit = (attributes: string) =>
+    `<?xml version="1.0" encoding="UTF-8"?>\n<testsuites id="" name="" ${attributes} time="12.5">\n<testsuite name="x" tests="9" skipped="0"/>\n</testsuites>`
+
+  it('R56-RS-01 passes six tests with no failure, error or skip', () => {
+    expect(EXPECTED_REAL_SESSION_TESTS).toBe(6)
+    expect(
+      junitOutcome(junit('tests="6" failures="0" skipped="0" errors="0"'), 6)
+    ).toEqual({ ok: true, tests: 6 })
+  })
+
+  it('R56-RS-02 fails a report with skips even though Playwright exited 0', () => {
+    expect(
+      junitOutcome(junit('tests="6" failures="0" skipped="6" errors="0"'), 6)
+    ).toEqual({
+      ok: false,
+      reason: '6 of 6 test(s) skipped',
+    })
+    expect(
+      junitOutcome(junit('tests="6" failures="0" skipped="1" errors="0"'), 6).ok
+    ).toBe(false)
+  })
+
+  it('R56-RS-03 fails failures, errors, a wrong count and a missing or malformed report', () => {
+    expect(
+      junitOutcome(junit('tests="6" failures="1" skipped="0" errors="0"'), 6).ok
+    ).toBe(false)
+    expect(
+      junitOutcome(junit('tests="6" failures="0" skipped="0" errors="1"'), 6).ok
+    ).toBe(false)
+    expect(
+      junitOutcome(junit('tests="5" failures="0" skipped="0" errors="0"'), 6)
+    ).toEqual({
+      ok: false,
+      reason: 'the JUnit report holds 5 test(s), expected 6',
+    })
+    expect(junitOutcome('', 6).ok).toBe(false)
+    expect(junitOutcome(junit('failures="0" skipped="0"'), 6).ok).toBe(false)
+  })
+
+  it('R56-RS-04 accepts any non-zero count for a run filtered with Playwright arguments', () => {
+    expect(junitOutcome(junit('tests="2" failures="0" skipped="0"'), undefined)).toEqual({
+      ok: true,
+      tests: 2,
+    })
+    expect(junitOutcome(junit('tests="0" failures="0" skipped="0"'), undefined).ok).toBe(
+      false
+    )
+  })
+
+  it('R56-RS-05 turns a skip reason into an error when the harness requires the specs', () => {
+    const database = `postgresql://postgres:postgres@127.0.0.1:54322/${ISOLATED}`
+    const env = { STORY65_REAL_SESSION_DIR: directory, DATABASE_URL: database }
+
+    expect(realSessionSkipReason({})).toMatch(/STORY65_REAL_SESSION_DIR is unset/)
+    expect(realSessionSkipReason(env)).toMatch(/auth-harness\.json is missing/)
+    expect(() =>
+      realSessionSkipReason({ ...env, STORY65_REAL_SESSION_REQUIRED: 'true' })
+    ).toThrow(/STORY65_REAL_SESSION_REQUIRED=true.*auth-harness\.json is missing/)
+    expect(() =>
+      realSessionSkipReason({ STORY65_REAL_SESSION_REQUIRED: 'true' })
+    ).toThrow(/STORY65_REAL_SESSION_DIR is unset/)
+
+    fs.writeFileSync(path.join(directory, 'auth-harness.json'), '{}')
+    expect(() =>
+      realSessionSkipReason({
+        ...env,
+        DATABASE_URL: 'postgresql://postgres:postgres@127.0.0.1:54322/postgres',
+        STORY65_REAL_SESSION_REQUIRED: 'true',
+      })
+    ).toThrow(/isolated UUID database/)
+    expect(realSessionSkipReason({ ...env, STORY65_REAL_SESSION_REQUIRED: 'true' })).toBe(
+      undefined
+    )
   })
 })
 
