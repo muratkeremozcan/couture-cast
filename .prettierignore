@@ -24,6 +24,8 @@ playwright/artifacts
 playwright/playwright-report
 apps/**/dist
 apps/**/.next
+apps/**/.next-real-session
+.real-session-e2e
 apps/mobile/.expo
 apps/mobile/expo-env.d.ts
 apps/web/public/mockServiceWorker.js

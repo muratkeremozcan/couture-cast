@@ -209,4 +209,39 @@ describe('caller-owned environment keys survive the .env.local override', () => 
     expect(worker).toEqual(ENV_LOCAL_STACK)
     expect(resolveLauncher(runner).stack).toEqual(ENV_LOCAL_STACK)
   })
+
+  it('1.2b-ENV-05 keeps the keys a caller above the launcher already listed as owned', () => {
+    // The real-session harness settles its own ports and origins before it starts
+    // the launcher; an .env.local PORT must not move its API off 4077.
+    fs.writeFileSync(
+      path.join(directory, '.env.local'),
+      'PORT=4000\nHTTP_CORS_ORIGIN=http://127.0.0.1:3005\n'
+    )
+    const resolve = (env: NodeJS.ProcessEnv) => {
+      loadLauncherEnv(env, () => {
+        loadEnv({
+          path: path.join(directory, '.env.local'),
+          override: true,
+          processEnv: env as Record<string, string>,
+          quiet: true,
+        })
+      })
+      return env
+    }
+
+    const listed = resolve({
+      PORT: '4077',
+      HTTP_CORS_ORIGIN: 'http://127.0.0.1:3077',
+      E2E_CALLER_OWNED_ENV_KEYS: 'PORT,HTTP_CORS_ORIGIN',
+    })
+    expect(listed.PORT).toBe('4077')
+    expect(listed.HTTP_CORS_ORIGIN).toBe('http://127.0.0.1:3077')
+    expect(listed.E2E_CALLER_OWNED_ENV_KEYS?.split(',')).toEqual(
+      expect.arrayContaining(['PORT', 'HTTP_CORS_ORIGIN'])
+    )
+
+    const unlisted = resolve({ PORT: '4077', HTTP_CORS_ORIGIN: 'http://127.0.0.1:3077' })
+    expect(unlisted.PORT).toBe('4000')
+    expect(unlisted.HTTP_CORS_ORIGIN).toBe('http://127.0.0.1:3005')
+  })
 })

@@ -84,6 +84,62 @@ playwright/
   Use it when you want to inspect the smoke environment manually before
   or after running `npm run test:pw-local`.
 
+## Real-session community E2E
+
+`tests/community-real-session.spec.ts` and
+`tests/community-real-session-identity.spec.ts` sign in through the product
+sign-in UI with a real local Supabase Auth OTP: real `verifyOtp`, refresh,
+account switch, offline sign-out and the identity-mapping denials. They skip in
+every normal run, because they need a stack nothing else starts.
+`scripts/e2e-real-session/run.mjs` owns that stack:
+
+1. An isolated `tea_community_<32 hex>` database on the local Supabase Postgres,
+   bootstrapped like `apps/api/integration/helpers/isolated-community-database.ts`.
+   The default `postgres` database is never written, so no reset is involved.
+2. The OTP Auth proxy (`auth-proxy.mjs`, port 53051). It forwards every Auth call
+   to local Supabase Auth and issues an OTP only for an address the specs recorded
+   in `created-identities.json`. In `generated` mode it mints the code with the
+   Auth Admin API into a 0700 temp directory; in `real-email` mode local Auth
+   sends a real email and the spec reads the code from Mailpit (54324).
+3. A web build with `NEXT_PUBLIC_E2E_AUTH=false` and the proxy as its Supabase
+   URL, in `apps/web/.next-real-session` so the fixture-auth build stays intact,
+   served on `127.0.0.1:3077`.
+4. The API stack (`scripts/start-api-e2e-with-workers.mjs`) on `127.0.0.1:4077`
+   against the isolated database: migrate deploy, seed, API and both workers.
+5. Playwright through `config/real-session.config.ts`: these two specs only, one
+   worker, no retries, no web server, no global setup or teardown, and no
+   trace, video, screenshot or HTML report. Output is held until the Supabase
+   keys, every OTP code and anything shaped like a JWT are redacted.
+6. Always, at the end: the Auth users the run recorded are deleted
+   (`cleanup-users.mjs`, which refuses to delete anything if a recorded row is
+   not a `story65-real-<uuid>@example.test` user), every process stops, the
+   artifacts are redacted and the database is dropped.
+
+CI runs it as the **Real-session community E2E** job in
+`.github/workflows/pr-pw-e2e-local.yml`, on the same commits as the local
+Playwright lane. The job starts Supabase with Mailpit included, sets
+`STORY65_REAL_SESSION_OTP_MODE=real-email` (a Mailpit that did not start fails
+the run instead of downgrading it), prints the mode in its log and step
+summary, runs `cleanup-users.mjs` again in an `always()` step, scans the
+artifacts with `scripts/check-artifact-secrets.mjs` and uploads them as
+`real-session-e2e`. PR Gate picks the job up like every other check.
+
+To run it locally:
+
+```bash
+npm run supabase:start   # Mailpit included; or set STORY65_REAL_SESSION_OTP_MODE=generated
+docker run -d --rm --name real-session-redis -p 127.0.0.1:6390:6379 redis:7-alpine
+REDIS_URL=redis://127.0.0.1:6390 npm run test:pw-real-session
+docker stop real-session-redis
+```
+
+Ports 4077, 3077, 4087 and 53051 must be free. Pass `-- --skip-web-build` to
+reuse the last real-auth web build, and any Playwright arguments after `--`.
+State lives in `.real-session-e2e/` (or `STORY65_REAL_SESSION_DIR`); only its
+`artifacts/` folder holds redacted output. The run reads the Supabase URL and keys
+from `supabase status` when the shell does not export them, and refuses a
+non-local Supabase, Postgres or Redis.
+
 ## Fixture set (merge-friendly)
 
 - `support/fixtures/api-client.ts`: wraps the pure `apiRequest` helper

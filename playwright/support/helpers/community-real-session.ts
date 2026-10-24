@@ -44,6 +44,22 @@ export function realSessionSkipReason(): string | undefined {
   return undefined
 }
 
+/**
+ * How the first web account receives its sign-in code. The harness passes the mode
+ * it resolved in STORY65_REAL_SESSION_OTP_MODE (`real-email` when Mailpit is up);
+ * without it, a directory that already holds a real-mail proof uses generated codes.
+ */
+export function realSessionMailIssueMode(
+  directory: string,
+  env: NodeJS.ProcessEnv = process.env
+): RealCommunityAccount['issueMode'] {
+  const mode = env.STORY65_REAL_SESSION_OTP_MODE
+  if (mode === 'generated' || mode === 'real-email') return mode
+  return fs.existsSync(path.join(directory, 'real-mail-proof.json'))
+    ? 'generated'
+    : 'real-email'
+}
+
 function harnessDirectory() {
   const directory = process.env.STORY65_REAL_SESSION_DIR
   if (!directory) throw new Error('An owned real-session harness is required.')

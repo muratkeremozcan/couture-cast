@@ -168,6 +168,101 @@ jobs:
             blob-report
           retention-days: 5
 
+  # Story 6.5 real-session acceptance: the product sign-in UI with a real local
+  # Supabase Auth OTP, verifyOtp, refresh, account switch and identity mapping.
+  # The pw-e2e lane skips these specs (it has no owned harness), so they run
+  # here against a stack scripts/e2e-real-session/run.mjs owns: an isolated
+  # tea_community_<32 hex> database, the OTP Auth proxy, the API on 4077 and a
+  # NEXT_PUBLIC_E2E_AUTH=false web build on 3077. See playwright/README.md.
+  real-session-e2e:
+    name: Real-session community E2E
+    needs: [vars, burn-in]
+    # Same gate as pw-e2e, so the two lanes run on the same commits.
+    if: |
+      always() && (
+        github.event_name != 'pull_request' ||
+        needs.vars.outputs.SKIP_BURN_IN == 'true' ||
+        (needs.burn-in.result == 'success' && needs.burn-in.outputs.runE2E == 'true') ||
+        (needs.burn-in.result == 'skipped')
+      )
+    # Estimated, not yet measured: about 3 min install and browsers, the Supabase
+    # start budget (600 s) plus about 3 min of image cache restore and save, about
+    # 3 min web build, about 3 min migrate, seed and API build, and about 2 min for
+    # the six specs.
+    timeout-minutes: 30
+    runs-on: ubuntu-latest
+    services:
+      redis:
+        image: redis:7-alpine
+        ports:
+          - 6379:6379
+        options: >-
+          --health-cmd "redis-cli ping"
+          --health-interval 10s
+          --health-timeout 5s
+          --health-retries 5
+    env:
+      # Source server for the isolated database; the run never writes to this one.
+      LOCAL_DATABASE_URL: postgresql://postgres:postgres@127.0.0.1:54322/postgres
+      # The job owns this Redis service, so no other stack shares its queues.
+      REDIS_URL: redis://127.0.0.1:6379
+      STORY65_REAL_SESSION_DIR: ${{ github.workspace }}/.real-session-e2e
+      # Explicit, so a Mailpit that failed to start fails the run instead of
+      # quietly downgrading it to generated codes.
+      STORY65_REAL_SESSION_OTP_MODE: real-email
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+        with:
+          ref: ${{ github.event.pull_request.head.sha || github.sha }}
+
+      - name: Setup Node environment
+        uses: ./.github/actions/install
+        with:
+          install-command: ${{ needs.vars.outputs.install_command }}
+
+      - name: Cache Playwright browsers
+        uses: ./.github/actions/setup-playwright-browsers
+
+      - name: Start local Supabase services with Mailpit
+        uses: ./.github/actions/start-local-supabase
+        with:
+          # The action's default list without mailpit: the real-email path reads
+          # the first sign-in code from Mailpit on 54324.
+          exclude: 'realtime,studio,postgres-meta,logflare,vector,edge-runtime,supavisor,imgproxy'
+
+      - name: Install Playwright Chromium only
+        run: npx playwright install chromium
+
+      - name: Run real-session specs
+        run: npm run test:pw-real-session
+
+      # run.mjs deletes its users itself; this covers a run that was killed first.
+      - name: Delete the Auth users the run created
+        if: always()
+        run: node scripts/e2e-real-session/cleanup-users.mjs
+
+      # Fails closed: if the scan cannot run, nothing is uploaded.
+      - name: Check real-session artifacts for secret values
+        id: secret_scan
+        if: always()
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          mkdir -p "$STORY65_REAL_SESSION_DIR/artifacts"
+          node scripts/check-artifact-secrets.mjs \
+            --names SUPABASE_SERVICE_ROLE_KEY,SUPABASE_ANON_KEY,GH_TOKEN \
+            "$STORY65_REAL_SESSION_DIR/artifacts"
+
+      - name: Upload redacted real-session artifacts
+        if: always() && steps.secret_scan.outcome == 'success'
+        uses: actions/upload-artifact@v4
+        with:
+          name: real-session-e2e
+          path: ${{ env.STORY65_REAL_SESSION_DIR }}/artifacts
+          include-hidden-files: true
+          retention-days: 5
+
   merge-reports:
     needs: [vars, burn-in, pw-e2e]
     if: ${{ always() }}

@@ -52,6 +52,7 @@
     "pretest:playwright-unit": "npm run verify:community-screening-fixtures",
     "test:playwright-unit": "vitest run playwright/support/helpers",
     "test:pw-local": "npm run prepare:playwright && cross-env PLAYWRIGHT_SHARED_DEPS_PREPARED=true PLAYWRIGHT_DB_RESET=true TEST_ENV=local npx playwright test",
+    "test:pw-real-session": "npm run prepare:playwright && node scripts/e2e-real-session/run.mjs",
     "test:pw-local-ui": "npm run prepare:playwright && cross-env PLAYWRIGHT_SHARED_DEPS_PREPARED=true TEST_ENV=local npx playwright test --ui",
     "fixtures:community-screening": "node scripts/community-moderation-fixtures.mjs",
     "verify:community-screening-fixtures": "node scripts/community-moderation-fixtures.mjs --verify-only",

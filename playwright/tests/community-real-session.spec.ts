@@ -8,6 +8,7 @@ import {
   provisionRealCommunityAccount,
   readCommunityMailCode,
   readGeneratedCommunityCode,
+  realSessionMailIssueMode,
   realSessionSkipReason,
   signInRealCommunityWeb,
 } from '../support/helpers/community-real-session'
@@ -28,7 +29,7 @@ test('N1 real OTP canonical identity, restore, refresh, account switch and offli
   const mailProof = path.join(directory, 'real-mail-proof.json')
   const first = await provisionRealCommunityAccount(apiRequest, {
     mapping: 'metadata',
-    issueMode: fs.existsSync(mailProof) ? 'generated' : 'real-email',
+    issueMode: realSessionMailIssueMode(directory),
     label: 'web-real-mail',
   })
   const second = await provisionRealCommunityAccount(apiRequest, {
@@ -183,7 +184,12 @@ test('N1 real OTP canonical identity, restore, refresh, account switch and offli
       {
         // A generated-issuance run links the earlier real-mail milestone instead of claiming it.
         realMailOtp: first.issueMode === 'real-email',
-        realMailProof: first.issueMode === 'real-email' ? 'this run' : mailProof,
+        realMailProof:
+          first.issueMode === 'real-email'
+            ? 'this run'
+            : fs.existsSync(mailProof)
+              ? mailProof
+              : 'not run: generated issuance mode',
         realVerifyOtp: true,
         trustedMetadataCanonicalOwner: first.appUserId,
         trustedMetadataAuthSub: first.authUserId,
