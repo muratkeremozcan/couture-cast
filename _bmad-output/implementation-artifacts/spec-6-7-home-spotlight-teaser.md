@@ -630,8 +630,8 @@ playwright/tests/community-comments.spec.ts --repeat-each=3`, went out without t
     comments sheet unmounted; it came back with the composer unfocused. The runner's keyboard
     prep now also sets `spell_checker_enabled=0` (read back).
   - R46 (coordinator decision A): the gate stays. `CommunityCommentDrafts` holds the member's own
-    unsent comment in memory only, keyed by member and post, cleared on an accepted submit, an
-    explicit close and an identity change. On the next mount for the same member and post the
+    unsent comment in memory only, keyed by member and post, cleared on an accepted submit and
+    an identity change (see the R49 correction: an explicit close keeps it). On the next mount for the same member and post the
     sheet refills a composer the comment state lost and refocuses it only if it had focus when
     the sheet unmounted. The drafts module, the sheet and `6.5-R46-MOB-001` (the real stale
     path on the screen) cover it; four of those tests fail without the fix
@@ -645,8 +645,13 @@ playwright/tests/community-comments.spec.ts --repeat-each=3`, went out without t
     (user, mutation id) dedupe keeps it to one comment.
   - R48: the sheet mounts, and R46 refocuses its composer, only while the Community screen is
     focused; access returning while Home shows no longer opens it there (6.5-R48-MOB-001).
-  - R49: an explicit close clears the thread's visible draft and reply target as well as the
-    held copy; the access-hide restore is unchanged.
+  - R49, corrected: Story 6.4's contract wins (`spec-6-4-threaded-comments.md`: on close the
+    confirmed state, draft and retry identity survive, and its Maestro flow reopens the draft).
+    An explicit close keeps the thread's draft and reply target and the held copy; the reopened
+    sheet starts on its title, so the composer is recorded unfocused. Drafts clear on an
+    accepted submit and an identity change only. The R49 tests now assert the kept draft after
+    an explicit close, with and without a wipe of the comment state in between; both fail on the
+    clearing close (`runs/r12-r49-kept-draft-red`).
   - Five tests fail without these changes (`runs/r12-r47-r49-mobile-red`); green in
     `runs/r12-r47-r49-mobile-green` and the api-client suite (`runs/r12-api-client-tests`).
 
