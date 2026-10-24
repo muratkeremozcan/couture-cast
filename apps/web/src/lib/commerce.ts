@@ -173,21 +173,48 @@ export function resolveAffiliateLocaleRegion(locale: string): string {
 }
 
 /**
- * Hands the minted URL to a new browsing context.
- *
- * `noopener,noreferrer` rather than a bare `window.open`: the partner host is
- * third-party, and without `noopener` the opened page keeps a live
- * `window.opener` handle back into this origin's tab.
- *
- * Returns nothing. With `noopener` the HTML spec makes `window.open` return
- * `null` for a tab it opened, so the return value cannot tell an opened tab from
- * a blocked one. Reading `null` as "blocked" showed an error after every
- * successful handoff in a real browser; a blocked popup is reported by the
- * browser's own popup indicator.
+ * Story 6.7b R1: the partner tab, claimed inside the user gesture and navigated
+ * once the click is minted.
  */
-export function openAffiliatePartnerSite(redirectUrl: string): void {
-  if (typeof window === 'undefined') {
-    return
+export interface AffiliatePartnerHandoff {
+  /** Sends the claimed tab to the minted partner URL. */
+  navigate(redirectUrl: string): void
+  /** Closes the claimed tab after a failed mint. */
+  cancel(): void
+}
+
+/**
+ * Claims a blank tab synchronously, in the click handler, before anything is
+ * awaited. A popup blocker only permits `window.open` during the user gesture,
+ * and the mint is a network round trip, so opening after it is what a blocker
+ * stops. Returns null when the browser blocked the tab; the caller then shows
+ * its error and mints nothing.
+ *
+ * The tab is opened without `noopener`, because that flag makes `window.open`
+ * return null for an opened tab too, which leaves no handle to navigate and no
+ * way to tell success from a block. The spec's `noopener,noreferrer` holds by
+ * other means:
+ *
+ * - noopener: `opener` is set to null on the claimed tab before it leaves
+ *   about:blank, so the partner page gets no reference back into this tab.
+ * - noreferrer: the navigation is an `<a rel="noreferrer">` activated inside
+ *   the claimed tab, so the partner request carries no Referer header.
+ */
+export function beginAffiliatePartnerHandoff(): AffiliatePartnerHandoff | null {
+  if (typeof window === 'undefined') return null
+  const tab = window.open('about:blank', '_blank')
+  if (!tab) return null
+  tab.opener = null
+  return {
+    navigate(redirectUrl) {
+      const link = tab.document.createElement('a')
+      link.href = redirectUrl
+      link.rel = 'noreferrer'
+      tab.document.body.appendChild(link)
+      link.click()
+    },
+    cancel() {
+      tab.close()
+    },
   }
-  window.open(redirectUrl, '_blank', 'noopener,noreferrer')
 }

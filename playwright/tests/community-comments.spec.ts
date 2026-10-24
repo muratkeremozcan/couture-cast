@@ -10,7 +10,7 @@ import {
   communityCommentSubmissionResponseSchema,
   communityCommentSubmissionsResponseSchema,
   communityCommentsResponseSchema,
-  communityReactionFeedResponseSchema,
+  communitySponsoredFeedResponseSchema,
   guardianConsentRevokeResponseSchema,
   reportCommunityCommentResponseSchema,
   type CommunityComment,
@@ -182,7 +182,9 @@ async function openThread(page: Page, interceptNetworkCall: InterceptNetworkCall
   await page.getByTestId('community-filter-all').click()
   const acceptedFeed = await allFeed
   expect(acceptedFeed.status).toBe(200)
-  const { experimentVariant } = communityReactionFeedResponseSchema.parse(
+  // The web client opts every feed read in to reactions and sponsorship, so the
+  // response it rendered is parsed with the variant those headers select.
+  const { experimentVariant } = communitySponsoredFeedResponseSchema.parse(
     acceptedFeed.responseJson
   ).data
   await expect(grid).toHaveAttribute('aria-busy', 'false')

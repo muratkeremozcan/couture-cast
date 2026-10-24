@@ -11,6 +11,7 @@ import {
 } from '@couture/api-client/contracts/http'
 import { CommunitySyncState } from '@couture/api-client'
 import { useMswHandlers } from '../../test-utils/msw/runtime'
+import { stubPartnerTab, type PartnerTabStub } from '../../test-utils/partner-tab'
 import { WEB_ACCESS_TOKEN_STORAGE_KEY } from '../../lib/wardrobe'
 import { CLICKS_PATH, SPONSORSHIP } from '../../test-utils/community-lookbook-grid'
 import { LookbookPrismLayout } from './lookbook-prism-layout'
@@ -109,7 +110,7 @@ describe('6.7b web Home teaser sponsored CTA', () => {
     HTMLElement.prototype,
     'scrollIntoView'
   )
-  let openSpy: ReturnType<typeof vi.fn>
+  let partner: PartnerTabStub
   beforeEach(() => {
     Object.defineProperty(HTMLElement.prototype, 'scrollIntoView', {
       configurable: true,
@@ -126,9 +127,7 @@ describe('6.7b web Home teaser sponsored CTA', () => {
     })
     window.__enableAnalyticsTestHook = true
     window.__capturedAnalyticsEvents = []
-    // A real browser returns null for a tab opened with `noopener`.
-    openSpy = vi.fn(() => null)
-    vi.stubGlobal('open', openSpy)
+    partner = stubPartnerTab()
   })
   afterEach(() => {
     vi.unstubAllGlobals()
@@ -188,7 +187,8 @@ describe('6.7b web Home teaser sponsored CTA', () => {
     const cta = await screen.findByTestId('home-spotlight-teaser-sponsored-cta-look-1')
     await user.click(cta)
 
-    await waitFor(() => expect(openSpy).toHaveBeenCalledTimes(1))
+    await waitFor(() => expect(partner.navigations).toHaveLength(1))
+    expect(partner.openSpy).toHaveBeenCalledWith('about:blank', '_blank')
     expect(clicks.bodies).toEqual([
       {
         offerId: SPONSORSHIP.offerId,
@@ -197,7 +197,8 @@ describe('6.7b web Home teaser sponsored CTA', () => {
         platform: 'web',
       },
     ])
-    expect(openSpy).toHaveBeenCalledWith(REDIRECT_URL, '_blank', 'noopener,noreferrer')
+    expect(partner.tab.opener).toBeNull()
+    expect(partner.navigations).toEqual([{ href: REDIRECT_URL, rel: 'noreferrer' }])
     expect(cta).toHaveFocus()
     await waitFor(() => expect(cta).not.toHaveAttribute('aria-busy'))
     expect(
@@ -243,12 +244,13 @@ describe('6.7b web Home teaser sponsored CTA', () => {
     await waitFor(() => expect(status).toHaveAttribute('data-state', 'error'))
     expect(status.textContent).toBe(ERROR_COPY)
     expect(cta).toHaveFocus()
-    expect(openSpy).not.toHaveBeenCalled()
+    expect(partner.navigations).toEqual([])
+    expect(partner.tab.close).toHaveBeenCalledTimes(1)
     expect(seen).toEqual([LOADING_COPY, ERROR_COPY])
     observer.disconnect()
 
     await user.keyboard('{Enter}')
-    await waitFor(() => expect(openSpy).toHaveBeenCalledTimes(1))
+    await waitFor(() => expect(partner.navigations).toHaveLength(1))
     expect(clicks.bodies).toHaveLength(2)
   })
 

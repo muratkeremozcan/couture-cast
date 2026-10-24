@@ -67,16 +67,21 @@ async function assertSeededSponsorship(): Promise<string> {
 
 /**
  * The partner host is a reserved `.test` name. Every navigation to it is answered
- * here, so the opened tab loads at once and its URL is the evidence.
+ * here, so the opened tab loads at once and its URL is the evidence. Each
+ * request's Referer header is kept, so the no-referrer handoff is checked on the
+ * wire.
  */
 async function stubPartnerSite(context: BrowserContext) {
-  await context.route(`https://${PARTNER_HOST}/**`, (route) =>
-    route.fulfill({
+  const referers: (string | null)[] = []
+  await context.route(`https://${PARTNER_HOST}/**`, (route) => {
+    referers.push(route.request().headers()['referer'] ?? null)
+    return route.fulfill({
       status: 200,
       contentType: 'text/html',
       body: '<!doctype html><title>Partner</title><p>Partner</p>',
     })
-  )
+  })
+  return referers
 }
 
 function isClick(request: Request): boolean {
@@ -89,8 +94,9 @@ function isClick(request: Request): boolean {
 /**
  * Activates a CTA and returns the click body and the opened tab's URL. The tab,
  * the click request and the click response are all registered before the press.
- * A completed handoff leaves focus on the CTA and shows no status: a browser
- * returns null from a `noopener` open, which once read as a failure.
+ * The tab is claimed inside the press and navigated after the mint; the partner
+ * page must hold no `opener` back into this tab. A completed handoff leaves
+ * focus on the CTA and shows no status.
  */
 async function activate(page: Page, ctaTestId: string) {
   const cta = page.getByTestId(ctaTestId)
@@ -102,6 +108,7 @@ async function activate(page: Page, ctaTestId: string) {
   expect([200, 201]).toContain(response.status())
   await partner.waitForURL(`https://${PARTNER_HOST}/**`)
   const url = new URL(partner.url())
+  expect(await partner.evaluate(() => window.opener === null)).toBe(true)
   await partner.close()
   await expect(cta).toBeFocused()
   await expect(cta).not.toHaveAttribute('aria-busy', 'true')
@@ -158,7 +165,7 @@ test.describe('Story 6.7b sponsored community highlights', () => {
       SEEDED_SPOTLIGHT_AREA
     )
     try {
-      await stubPartnerSite(context)
+      const referers = await stubPartnerSite(context)
       const shownEvents = await recordShownEvents(page)
       await page.goto('/')
       await settledSpotlight(page)
@@ -225,6 +232,8 @@ test.describe('Story 6.7b sponsored community highlights', () => {
         platform: 'web',
       })
       expectPartnerUrl(url)
+      // noreferrer on the wire: the partner request carries no Referer.
+      expect(referers).toEqual([null])
       await expect(page.getByRole('dialog')).toHaveCount(0)
     } finally {
       await page.goto('about:blank')
@@ -244,7 +253,7 @@ test.describe('Story 6.7b sponsored community highlights', () => {
       SEEDED_SPOTLIGHT_AREA
     )
     try {
-      await stubPartnerSite(context)
+      const referers = await stubPartnerSite(context)
       // A deep link puts the sponsored post at the head of the feed, wherever its
       // page would be: the single-post read is opted in like the feed.
       await page.goto(`/?source=notification&type=community&cardId=${SPONSORED_POST_ID}`)
@@ -304,6 +313,7 @@ test.describe('Story 6.7b sponsored community highlights', () => {
         platform: 'web',
       })
       expectPartnerUrl(fromDialog.url)
+      expect(referers).toEqual([null, null])
     } finally {
       await page.goto('about:blank')
       await removeLocation()
@@ -322,7 +332,7 @@ test.describe('Story 6.7b sponsored community highlights', () => {
       SEEDED_SPOTLIGHT_AREA
     )
     try {
-      await stubPartnerSite(context)
+      const referers = await stubPartnerSite(context)
       const opens: unknown[] = []
       page.on('request', (request) => {
         if (
@@ -381,8 +391,59 @@ test.describe('Story 6.7b sponsored community highlights', () => {
         platform: 'web',
       })
       expectPartnerUrl(url)
+      expect(referers).toEqual([null])
       // The CTA is not the teaser's open action: no spotlight open was recorded.
       expect(opens).toEqual([])
+    } finally {
+      await page.goto('about:blank')
+      await removeLocation()
+    }
+  })
+
+  test('[P1] 6.7b-E2E-06 a blocked popup shows the localized error on the spotlight CTA, keeps focus and records no click', async ({
+    page,
+    communitySession,
+  }) => {
+    await assertSeededSpotlight()
+    await assertSeededSponsorship()
+    const removeLocation = await placeViewerInArea(
+      communitySession.userId,
+      SEEDED_SPOTLIGHT_AREA
+    )
+    try {
+      // A popup blocker answers `window.open` with null.
+      await page.addInitScript(() => {
+        window.open = () => null
+      })
+      const clicks: string[] = []
+      page.on('request', (request) => {
+        if (isClick(request)) clicks.push(request.url())
+      })
+      const pages: string[] = []
+      page.context().on('page', (opened) => pages.push(opened.url()))
+      await page.goto('/')
+      await settledSpotlight(page)
+
+      const ctaId = `spotlight-sponsored-cta-${SPONSORED_POST_ID}`
+      const cta = page.getByTestId(ctaId)
+      await cta.click()
+
+      const status = page.getByTestId(`${ctaId}-status`)
+      await expect(status).toHaveText(
+        'Unable to open the partner site. Please try again.'
+      )
+      await expect(status).toHaveAttribute('data-state', 'error')
+      await expect(cta).toBeFocused()
+      await expect(cta).toHaveAccessibleDescription(
+        `${OPENS_COPY} Unable to open the partner site. Please try again.`
+      )
+      await expect(page.getByTestId('community-live-region')).toHaveText(
+        'Unable to open the partner site. Please try again.'
+      )
+      // A blocked tab mints nothing and opens nothing.
+      expect(clicks).toEqual([])
+      expect(pages).toEqual([])
+      await checkA11y(page)
     } finally {
       await page.goto('about:blank')
       await removeLocation()

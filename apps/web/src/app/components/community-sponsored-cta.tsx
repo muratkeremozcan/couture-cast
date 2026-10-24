@@ -23,7 +23,7 @@ import type {
 import { browserAnalytics } from '../../analytics/browser-analytics'
 import {
   mintAffiliateClickFromWeb,
-  openAffiliatePartnerSite,
+  beginAffiliatePartnerHandoff,
   resolveAffiliateLocaleRegion,
 } from '../../lib/commerce'
 
@@ -138,6 +138,13 @@ export function CommunitySponsoredCta({
     // `aria-disabled` keeps the focused button focusable while a mint is in
     // flight; a second press returns here.
     if (stateRef.current === 'loading') return
+    // Claimed before the first await, while the press still counts as a user
+    // gesture. A blocked tab mints nothing.
+    const handoff = beginAffiliatePartnerHandoff()
+    if (!handoff) {
+      move('error')
+      return
+    }
     move('loading')
     try {
       const redirectUrl = await mintAffiliateClickFromWeb({
@@ -149,9 +156,10 @@ export function CommunitySponsoredCta({
         platform: 'web',
       })
       // Only a recorded click navigates.
-      openAffiliatePartnerSite(redirectUrl)
+      handoff.navigate(redirectUrl)
       move('idle')
     } catch {
+      handoff.cancel()
       move('error')
     }
   }

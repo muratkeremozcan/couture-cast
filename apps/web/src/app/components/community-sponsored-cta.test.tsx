@@ -7,15 +7,19 @@ import userEvent from '@testing-library/user-event'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import {
   COMMERCE_SPONSORSHIP_NOT_FOUND_MESSAGE,
+  communitySponsoredFeedResponseSchema,
   communitySponsoredSpotlightResponseSchema,
   type CommunitySponsoredSpotlightItem,
 } from '@couture/api-client/contracts/http'
 import { useMswHandlers } from '../../test-utils/msw/runtime'
+import { stubPartnerTab, type PartnerTabStub } from '../../test-utils/partner-tab'
 import {
   CLICKS_PATH,
+  FEED_PATH,
   OPENED_PATH,
   SPONSORSHIP,
   errorBody,
+  feed,
   item,
   renderGrid,
   setupCommunityGridClock,
@@ -54,17 +58,25 @@ function sponsoredSpotlight(items: CommunitySponsoredSpotlightItem[]) {
   )
 }
 
-/** Records every click body and answers each with the next scripted response. */
+/** The partner tab stand-in for the running test. */
+let partner: PartnerTabStub
+
+/**
+ * Records every click body, and how many partner tabs were already claimed when
+ * the mint request arrived, then answers with the next scripted response.
+ */
 function clickHandler(...answers: (() => Response)[]) {
   const bodies: unknown[] = []
+  const claimedAtMint: number[] = []
   const handler = http.post(CLICKS_PATH, async ({ request }) => {
+    claimedAtMint.push(partner.openSpy.mock.calls.length)
     bodies.push(await request.json())
     const answer = answers[Math.min(bodies.length - 1, answers.length - 1)]
     return answer
       ? answer()
       : HttpResponse.json({ data: { redirectUrl: REDIRECT_URL } }, { status: 201 })
   })
-  return { bodies, handler }
+  return { bodies, claimedAtMint, handler }
 }
 
 function minted() {
@@ -80,13 +92,10 @@ function shownEvents() {
 describe('Sponsored community CTA (Story 6.7b)', () => {
   setupCommunityGridSurface()
 
-  let openSpy: ReturnType<typeof vi.fn>
   beforeEach(() => {
     window.__enableAnalyticsTestHook = true
     window.__capturedAnalyticsEvents = []
-    // A real browser returns null for a tab opened with `noopener`.
-    openSpy = vi.fn(() => null)
-    vi.stubGlobal('open', openSpy)
+    partner = stubPartnerTab()
   })
   afterEach(() => {
     delete window.__enableAnalyticsTestHook
@@ -139,7 +148,7 @@ describe('Sponsored community CTA (Story 6.7b)', () => {
     expect(shownEvents()).toEqual([])
   })
 
-  it('6.7b-WEB-012 mints a feed click with the post id and opens it with noopener,noreferrer', async () => {
+  it('6.7b-WEB-012 claims the tab inside the gesture, mints with the post id and navigates with no opener and no referrer', async () => {
     signIn()
     const clicks = clickHandler(minted)
     useMswHandlers(sponsoredFeedHandler({ items: [sponsoredItem()] }), clicks.handler)
@@ -149,7 +158,10 @@ describe('Sponsored community CTA (Story 6.7b)', () => {
     const cta = await screen.findByTestId('sponsored-cta-post-1')
     await user.click(cta)
 
-    await waitFor(() => expect(openSpy).toHaveBeenCalledTimes(1))
+    await waitFor(() => expect(partner.navigations).toHaveLength(1))
+    // R1: the tab was claimed before the mint request left, inside the press.
+    expect(clicks.claimedAtMint).toEqual([1])
+    expect(partner.openSpy).toHaveBeenCalledWith('about:blank', '_blank')
     expect(clicks.bodies).toEqual([
       {
         offerId: SPONSORSHIP.offerId,
@@ -158,7 +170,11 @@ describe('Sponsored community CTA (Story 6.7b)', () => {
         platform: 'web',
       },
     ])
-    expect(openSpy).toHaveBeenCalledWith(REDIRECT_URL, '_blank', 'noopener,noreferrer')
+    // noopener: the claimed tab holds no reference back; noreferrer: the
+    // navigation is a `rel="noreferrer"` link activated inside that tab.
+    expect(partner.tab.opener).toBeNull()
+    expect(partner.navigations).toEqual([{ href: REDIRECT_URL, rel: 'noreferrer' }])
+    expect(partner.tab.close).not.toHaveBeenCalled()
     expect(cta).toHaveFocus()
     // A click never opens the look underneath it.
     expect(screen.queryByTestId('community-detail')).not.toBeInTheDocument()
@@ -193,7 +209,8 @@ describe('Sponsored community CTA (Story 6.7b)', () => {
       surface: 'community_spotlight',
       platform: 'web',
     })
-    await waitFor(() => expect(openSpy).toHaveBeenCalledTimes(1))
+    await waitFor(() => expect(partner.navigations).toHaveLength(1))
+    expect(clicks.claimedAtMint).toEqual([1])
   })
 
   it('6.7b-WEB-014 the detail dialog discloses the partner and mints with the surface it opened from', async () => {
@@ -257,7 +274,9 @@ describe('Sponsored community CTA (Story 6.7b)', () => {
     expect(status.textContent).toBe(ERROR_COPY)
     expect(cta).toHaveFocus()
     expect(cta).toHaveAccessibleDescription(`${OPENS_COPY} ${ERROR_COPY}`)
-    expect(openSpy).not.toHaveBeenCalled()
+    // The claimed tab is closed and never navigated.
+    expect(partner.navigations).toEqual([])
+    expect(partner.tab.close).toHaveBeenCalledTimes(1)
     expect(announcements.seen.filter((text) => text === LOADING_COPY)).toHaveLength(1)
     expect(announcements.seen.filter((text) => text === ERROR_COPY)).toHaveLength(1)
     expect(screen.getByTestId('community-live-region').textContent).toBe(ERROR_COPY)
@@ -265,7 +284,8 @@ describe('Sponsored community CTA (Story 6.7b)', () => {
 
     // The reader retries from where they are.
     await user.keyboard('{Enter}')
-    await waitFor(() => expect(openSpy).toHaveBeenCalledTimes(1))
+    await waitFor(() => expect(partner.navigations).toHaveLength(1))
+    expect(partner.openSpy).toHaveBeenCalledTimes(2)
     expect(clicks.bodies).toHaveLength(2)
     expect(cta).toHaveFocus()
   })
@@ -289,12 +309,14 @@ describe('Sponsored community CTA (Story 6.7b)', () => {
       await waitFor(() => expect(status).toHaveAttribute('data-state', 'error'))
       expect(status.textContent).toBe(ERROR_COPY)
       expect(cta).toHaveFocus()
-      expect(openSpy).not.toHaveBeenCalled()
+      expect(partner.navigations).toEqual([])
+      expect(partner.tab.close).toHaveBeenCalledTimes(1)
     }
   )
 
-  it('6.7b-WEB-017 the null return of a noopener open is a completed handoff', async () => {
+  it('6.7b-WEB-017 a blocked tab shows the error once, keeps focus and mints nothing', async () => {
     signIn()
+    partner = stubPartnerTab({ blocked: true })
     const clicks = clickHandler(minted)
     useMswHandlers(sponsoredFeedHandler({ items: [sponsoredItem()] }), clicks.handler)
     const user = userEvent.setup()
@@ -304,12 +326,15 @@ describe('Sponsored community CTA (Story 6.7b)', () => {
     const announcements = recordAnnouncements()
     await user.click(cta)
 
-    await waitFor(() => expect(openSpy).toHaveReturnedWith(null))
-    await waitFor(() => expect(cta).not.toHaveAttribute('aria-busy'))
-    expect(screen.queryByTestId('sponsored-cta-post-1-status')).not.toBeInTheDocument()
-    expect(announcements.seen).not.toContain(ERROR_COPY)
+    const status = await screen.findByTestId('sponsored-cta-post-1-status')
+    expect(status).toHaveAttribute('data-state', 'error')
+    expect(status.textContent).toBe(ERROR_COPY)
+    expect(cta).toHaveFocus()
+    expect(partner.openSpy).toHaveBeenCalledTimes(1)
+    expect(announcements.seen.filter((text) => text === ERROR_COPY)).toHaveLength(1)
+    expect(announcements.seen).not.toContain(LOADING_COPY)
     announcements.stop()
-    expect(clicks.bodies).toHaveLength(1)
+    expect(clicks.bodies).toEqual([])
   })
 
   it('6.7b-WEB-018 ignores a second press while the first mint is in flight', async () => {
@@ -342,7 +367,8 @@ describe('Sponsored community CTA (Story 6.7b)', () => {
       await gate
     })
 
-    await waitFor(() => expect(openSpy).toHaveBeenCalledTimes(1))
+    await waitFor(() => expect(partner.navigations).toHaveLength(1))
+    expect(partner.openSpy).toHaveBeenCalledTimes(1)
     expect(bodies).toHaveLength(1)
     expect(cta).not.toHaveAttribute('aria-busy')
   })
@@ -463,6 +489,86 @@ describe('Sponsored community CTA (Story 6.7b)', () => {
     )
     expect(screen.getByTestId('sponsored-cta-post-1')).toHaveAccessibleName(CTA_LABEL)
     expect(shownEvents()).toHaveLength(1)
+  })
+
+  it('6.7b-WEB-022 a live rebuild without the block removes the CTA, and a realtime copy does not bring it back', async () => {
+    signIn()
+    const catchUp = captureSync()
+    const state = { ended: false }
+    const resolvedPost = (id: string) => ({
+      key: id,
+      status: 'available',
+      communityRevision: '1',
+      post: { ...item({ id }), reactions: ZERO },
+      comment: null,
+      parent: null,
+      pageCursor: null,
+      parentPageCursor: null,
+      threadPosition: null,
+    })
+    useMswHandlers(
+      // The owner ends the link between the first read and the rebuild.
+      http.get(FEED_PATH, () =>
+        HttpResponse.json(
+          communitySponsoredFeedResponseSchema.parse({
+            data: feed({
+              items: state.ended
+                ? [
+                    { ...item({ id: 'post-new' }), reactions: ZERO },
+                    { ...item(), reactions: ZERO },
+                  ]
+                : [sponsoredItem({ reactions: ZERO })],
+            }),
+          }) as unknown as Record<string, unknown>
+        )
+      ),
+      http.get('/api/v1/community/events', () =>
+        HttpResponse.json({
+          data: {
+            events: state.ended
+              ? [
+                  {
+                    version: 1,
+                    kind: 'post.published',
+                    postId: 'post-new',
+                    communityRevision: '1',
+                  },
+                  {
+                    version: 1,
+                    kind: 'reactions.changed',
+                    postId: 'post-1',
+                    communityRevision: '1',
+                  },
+                ]
+              : [],
+            nextCursor: `cursor-${state.ended ? 'ended' : 'live'}`,
+            hasMore: false,
+            resyncRequired: false,
+          },
+        })
+      ),
+      http.post('/api/v1/community/targets/resolve', async ({ request }) => {
+        const { targets } = (await request.json()) as { targets: { key: string }[] }
+        return HttpResponse.json({
+          data: { targets: targets.map((target) => resolvedPost(target.key)) },
+        })
+      })
+    )
+    renderGrid()
+
+    await screen.findByTestId('sponsored-cta-post-1')
+    await catchUp()
+    state.ended = true
+    await catchUp()
+
+    // The rebuild landed: the newly published look is buffered behind its button.
+    await screen.findByRole('button', { name: 'Show 1 new looks' })
+    const card = screen.getByTestId('lookbook-card-post-1')
+    await waitFor(() =>
+      expect(screen.queryByTestId('sponsored-cta-post-1')).not.toBeInTheDocument()
+    )
+    expect(screen.queryByTestId('sponsored-badge-post-1')).not.toBeInTheDocument()
+    expect(card).toHaveAttribute('aria-labelledby', 'lookbook-card-title-post-1')
   })
 
   it('6.7b-WEB-020 has no axe violations with sponsored feed and spotlight cards and an error state', async () => {

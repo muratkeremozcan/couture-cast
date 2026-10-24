@@ -104,6 +104,7 @@ import {
   type CommunitySponsoredFeed as CommunityFeed,
   type CommunitySponsoredFeedItem as CommunityFeedItem,
   type CommunitySponsoredSpotlightItem as CommunitySpotlightItem,
+  type CommunitySponsorship,
   type CommunityFeedMode,
   type CommunityReportReason,
   type EmbeddedCommunityChallenge,
@@ -2091,6 +2092,26 @@ export function CommunityLookbookGrid({
     },
     []
   )
+  /**
+   * Story 6.7b: every live read (feed, post, spotlight) is the authority on a
+   * post's sponsorship block, so its answer, block or no block, replaces the
+   * block on every copy of that post this surface holds. Only the realtime
+   * resolve path, which does not opt in, keeps a block from the last live read.
+   */
+  const applyLiveSponsorship = useCallback((posts: readonly CommunityFeedItem[]) => {
+    const live = liveSponsorshipOf(posts)
+    if (live.size === 0) return
+    const update = (post: CommunityFeedItem | null) =>
+      post ? withLiveSponsorship(post, live) : post
+    setItems((previous) => previous.map((post) => withLiveSponsorship(post, live)))
+    newLooksRef.current = newLooksRef.current.map((post) =>
+      withLiveSponsorship(post, live)
+    )
+    setNewLooks(newLooksRef.current)
+    setOpenedItem(update)
+    setDeepLinkedItem(update)
+    spotlightApplyRef.current?.(update)
+  }, [])
   const [activeChallenge, setActiveChallenge] =
     useState<EmbeddedCommunityChallenge | null>(null)
   const [isLoading, setIsLoading] = useState(false)
@@ -2150,11 +2171,13 @@ export function CommunityLookbookGrid({
   const spotlight = useCommunitySpotlight({
     scope: sessionScope,
     beginRead: () => reactionState.beginRead(),
-    reconcile: (page, ticket) =>
-      page.flatMap((post) => {
+    reconcile: (page, ticket) => {
+      applyLiveSponsorship(page)
+      return page.flatMap((post) => {
         const current = reactionState.read(post, ticket)
         return current ? [{ ...current, rank: post.rank }] : []
-      }),
+      })
+    },
     announce: (message) => {
       setAnnouncement({ ...message, announcementId: ++reactionAnnouncementId.current })
     },
@@ -2290,6 +2313,7 @@ export function CommunityLookbookGrid({
         try {
           const post = await getCommunityPostFromWeb(target, signal)
           if (!isCurrent()) return
+          applyLiveSponsorship([post])
           const current = reactionState.read(post, readTicket)
           if (target === highlightedIdRef.current)
             setDeepLinkedItem(loadedIds.has(target) ? null : current)
@@ -2302,7 +2326,7 @@ export function CommunityLookbookGrid({
         }
       }
     },
-    [comments, reactionState]
+    [applyLiveSponsorship, comments, reactionState]
   )
 
   const loadFeed = useCallback(
@@ -2361,6 +2385,7 @@ export function CommunityLookbookGrid({
             reactionState.current(post)
           )
         )
+        applyLiveSponsorship(feed.items)
         setAnnouncement({
           key:
             append && !restarted
@@ -2404,7 +2429,7 @@ export function CommunityLookbookGrid({
         }
       }
     },
-    [reactionState, revalidateHighlighted]
+    [applyLiveSponsorship, reactionState, revalidateHighlighted]
   )
 
   useEffect(() => {
@@ -2539,6 +2564,8 @@ export function CommunityLookbookGrid({
       if (!active) return
       if (signal?.aborted) throw new CommunityRequestSuperseded()
       if (generation !== feedGenerationRef.current) throw new CommunityRequestSuperseded()
+      // Rows already shown stay where they are, but their blocks follow this read.
+      applyLiveSponsorship(page.items)
       setAuthorStates(page.authorStates)
       setNextCursor(page.nextCursor)
       setServedMode(page.mode)
@@ -2618,9 +2645,9 @@ export function CommunityLookbookGrid({
           item.id === target.post.id ? updated : item
         )
         setNewLooks(newLooksRef.current)
-        // Story 6.7b: the target resolve does not opt in to sponsorship, so a
-        // live block from this visit's last community read stays on the post
-        // until the next read decides it.
+        // Story 6.7b: the target resolve does not opt in to sponsorship, so the
+        // block from this post's last live read stays until the next live read
+        // replaces it or removes it.
         const update = (item: CommunityFeedItem | null) =>
           item?.id === target.post.id
             ? item.sponsorship
@@ -2704,6 +2731,7 @@ export function CommunityLookbookGrid({
       window.removeEventListener('online', foreground)
     }
   }, [
+    applyLiveSponsorship,
     comments,
     currentMode,
     sessionScope,
@@ -2749,6 +2777,7 @@ export function CommunityLookbookGrid({
       void getCommunityPostFromWeb(highlightedCardId, controller.signal)
         .then((post) => {
           if (!cancelled && detailGeneration === detailGenerationRef.current) {
+            applyLiveSponsorship([post])
             setDeepLinkedItem(reactionState.read(post, readTicket))
           }
         })
@@ -2771,7 +2800,7 @@ export function CommunityLookbookGrid({
       cancelled = true
       controller.abort()
     }
-  }, [comments, highlightedCardId, reactionState, sessionScope])
+  }, [applyLiveSponsorship, comments, highlightedCardId, reactionState, sessionScope])
 
   useEffect(() => {
     if (!highlightedCardId || !sessionScope) return
@@ -3529,6 +3558,33 @@ export function CommunityLookbookGrid({
       )}
     </aside>
   )
+}
+
+/**
+ * Story 6.7b: what one live community read said about each post it carried,
+ * the sponsorship block or its absence (`undefined`).
+ */
+type LiveSponsorship = ReadonlyMap<string, CommunitySponsorship | undefined>
+
+function liveSponsorshipOf(posts: readonly CommunityFeedItem[]): LiveSponsorship {
+  return new Map(posts.map((post) => [post.id, post.sponsorship]))
+}
+
+/**
+ * A copy of `item` carrying exactly what the latest live read said about its
+ * block. A post the read did not carry is returned unchanged.
+ */
+function withLiveSponsorship<T extends CommunityFeedItem>(
+  item: T,
+  live: LiveSponsorship
+): T {
+  if (!live.has(item.id)) return item
+  const block = live.get(item.id)
+  if (block) return { ...item, sponsorship: block }
+  if (!item.sponsorship) return item
+  const ended = { ...item }
+  delete ended.sponsorship
+  return ended
 }
 
 /** Appends a page without duplicating a row the previous page already carried. */

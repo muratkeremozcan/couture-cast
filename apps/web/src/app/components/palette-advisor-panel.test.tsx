@@ -27,6 +27,7 @@ import {
 import { getI18n } from '../../i18n'
 import { WEB_ACCESS_TOKEN_STORAGE_KEY } from '../../lib/wardrobe'
 import { useMswHandlers } from '../../test-utils/msw/runtime'
+import { stubPartnerTab } from '../../test-utils/partner-tab'
 import { PaletteAdvisorPanel } from './palette-advisor-panel'
 
 const PALETTE_PATH = '/api/v1/commerce/premium/palette'
@@ -469,6 +470,7 @@ describe('PaletteAdvisorPanel (Story 5.4)', () => {
 
     it('5.4-WEB-024 mints the click with the profile id and the web platform', async () => {
       signIn()
+      stubPartnerTab()
       let clickBody: unknown = null
       useMswHandlers(
         getHandler({
@@ -930,78 +932,91 @@ describe('PaletteAdvisorPanel (Story 5.4)', () => {
       ],
     }
 
-    it('5.4-WEB-039 surfaces a failed mint on the card and never opens a partner tab', async () => {
+    it('5.4-WEB-039 surfaces a failed mint on the card, closes the claimed tab and never navigates it', async () => {
       signIn()
-      const opened: string[] = []
-      const originalOpen = window.open
-      window.open = function stubOpen(url?: string | URL): Window {
-        opened.push(String(url))
-        return {} as Window
-      } as typeof window.open
-
-      try {
-        useMswHandlers(
-          getHandler(sponsoredProfile),
-          http.post('/api/v1/commerce/affiliate/clicks', () =>
-            errorBody(403, PALETTE_CONSENT_REQUIRED_MESSAGE, 'Forbidden')
-          )
+      const partner = stubPartnerTab()
+      useMswHandlers(
+        getHandler(sponsoredProfile),
+        http.post('/api/v1/commerce/affiliate/clicks', () =>
+          errorBody(403, PALETTE_CONSENT_REQUIRED_MESSAGE, 'Forbidden')
         )
-        renderPanel()
+      )
+      renderPanel()
 
-        await userEvent.click(
-          await screen.findByTestId(
-            `palette-advisor-sponsored-cta-${FOUNDATION_WARM_MEDIUM.itemKey}`
-          )
-        )
-
+      await userEvent.click(
         await screen.findByTestId(
-          `palette-advisor-sponsored-error-${FOUNDATION_WARM_MEDIUM.itemKey}`
+          `palette-advisor-sponsored-cta-${FOUNDATION_WARM_MEDIUM.itemKey}`
         )
-        expect(opened).toEqual([])
-      } finally {
-        window.open = originalOpen
-      }
+      )
+
+      await screen.findByTestId(
+        `palette-advisor-sponsored-error-${FOUNDATION_WARM_MEDIUM.itemKey}`
+      )
+      expect(partner.navigations).toEqual([])
+      expect(partner.tab.close).toHaveBeenCalledTimes(1)
     })
 
-    it('5.4-WEB-040 treats the null return of a noopener open as a completed handoff', async () => {
+    it('5.4-WEB-040 claims the tab inside the gesture and navigates it with no opener and no referrer', async () => {
       signIn()
-      const originalOpen = window.open
-      const opened: string[] = []
-      // With `noopener` a browser returns null for the tab it opened, so null is
-      // the success case and must not read as a failure.
-      window.open = function noopenerOpen(url?: string | URL): null {
-        opened.push(String(url))
-        return null
-      } as typeof window.open
+      const partner = stubPartnerTab()
+      const claimedAtMint: number[] = []
+      useMswHandlers(
+        getHandler(sponsoredProfile),
+        http.post('/api/v1/commerce/affiliate/clicks', () => {
+          claimedAtMint.push(partner.openSpy.mock.calls.length)
+          return HttpResponse.json({
+            data: { redirectUrl: 'https://partner.example.com/offer?click=token' },
+          })
+        })
+      )
+      renderPanel()
 
-      try {
-        useMswHandlers(
-          getHandler(sponsoredProfile),
-          http.post('/api/v1/commerce/affiliate/clicks', () =>
-            HttpResponse.json({
-              data: { redirectUrl: 'https://partner.example.com/offer?click=token' },
-            })
-          )
+      await userEvent.click(
+        await screen.findByTestId(
+          `palette-advisor-sponsored-cta-${FOUNDATION_WARM_MEDIUM.itemKey}`
         )
-        renderPanel()
+      )
 
-        await userEvent.click(
-          await screen.findByTestId(
-            `palette-advisor-sponsored-cta-${FOUNDATION_WARM_MEDIUM.itemKey}`
-          )
+      await waitFor(() => expect(partner.navigations).toHaveLength(1))
+      // A popup blocker only allows the open during the press, before the mint.
+      expect(claimedAtMint).toEqual([1])
+      expect(partner.openSpy).toHaveBeenCalledWith('about:blank', '_blank')
+      expect(partner.tab.opener).toBeNull()
+      expect(partner.navigations).toEqual([
+        { href: 'https://partner.example.com/offer?click=token', rel: 'noreferrer' },
+      ])
+      expect(
+        screen.queryByTestId(
+          `palette-advisor-sponsored-error-${FOUNDATION_WARM_MEDIUM.itemKey}`
         )
+      ).not.toBeInTheDocument()
+    })
 
-        await waitFor(() =>
-          expect(opened).toEqual(['https://partner.example.com/offer?click=token'])
-        )
-        expect(
-          screen.queryByTestId(
-            `palette-advisor-sponsored-error-${FOUNDATION_WARM_MEDIUM.itemKey}`
-          )
-        ).not.toBeInTheDocument()
-      } finally {
-        window.open = originalOpen
-      }
+    it('5.4-WEB-041 a blocked tab surfaces the error and mints nothing', async () => {
+      signIn()
+      stubPartnerTab({ blocked: true })
+      let mints = 0
+      useMswHandlers(
+        getHandler(sponsoredProfile),
+        http.post('/api/v1/commerce/affiliate/clicks', () => {
+          mints += 1
+          return HttpResponse.json({
+            data: { redirectUrl: 'https://partner.example.com/offer?click=token' },
+          })
+        })
+      )
+      renderPanel()
+
+      const cta = await screen.findByTestId(
+        `palette-advisor-sponsored-cta-${FOUNDATION_WARM_MEDIUM.itemKey}`
+      )
+      await userEvent.click(cta)
+
+      await screen.findByTestId(
+        `palette-advisor-sponsored-error-${FOUNDATION_WARM_MEDIUM.itemKey}`
+      )
+      expect(cta).toHaveFocus()
+      expect(mints).toBe(0)
     })
   })
 
