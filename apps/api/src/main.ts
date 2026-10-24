@@ -5,6 +5,7 @@ import { CommunityAccessService } from './modules/community/community-access.ser
 import { CommunityStreamRepository } from './modules/community/community-stream.repository.js'
 import { PrismaClient } from '@prisma/client'
 import { resolveHttpCorsOrigins } from './bootstrap/configure-app.js'
+import { resolveListenHost } from './bootstrap/listen-host.js'
 // Step 2 step 4 owner: searchable owner anchor
 // Step 9 bootstrap order owner: searchable owner anchor
 import 'reflect-metadata'
@@ -107,7 +108,10 @@ async function bootstrap() {
       origins: resolveHttpCorsOrigins(),
     })
   )
-  await app.listen(port)
+  // Every interface unless API_LISTEN_HOST narrows it (bootstrap/listen-host.ts).
+  const host = resolveListenHost(process.env)
+  if (host) await app.listen(port, host)
+  else await app.listen(port)
 
   try {
     void app.get<AnalyticsClient>(ANALYTICS_CLIENT).capture({
