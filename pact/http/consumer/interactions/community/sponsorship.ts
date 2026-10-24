@@ -13,10 +13,12 @@ import { MatchersV3, type PactV4, type V3MockServer } from '@pact-foundation/pac
 import { createProviderState, setJsonContent } from '@seontechnologies/pactjs-utils'
 import {
   COMMUNITY_SPONSORSHIP_HEADER,
-  communitySponsoredFeedResponseSchema,
-  communitySponsoredPostResponseSchema,
-  communitySponsoredSpotlightResponseSchema,
+  type CommunityFeedMode,
   type CommunityPlatform,
+  type CommunitySponsoredFeed,
+  type CommunitySponsoredFeedItem,
+  type CommunitySponsoredSpotlight,
+  type CommunitySpotlightSurface,
 } from '@couture/api-client/contracts/http'
 import { expect } from 'vitest'
 import {
@@ -25,7 +27,7 @@ import {
   COMMERCE_PARTNER_NAME,
   COMMERCE_PARTNER_SLUG,
 } from '../commerce-affiliate'
-import { like, pactEventAuth, string, type CreateClient } from '../shared'
+import { like, pactEventAuth, string } from '../shared'
 
 /* ---------------------------------------------------------------------------
  * Story 6.7b sponsored community highlights: the opted-in reads.
@@ -35,6 +37,10 @@ import { like, pactEventAuth, string, type CreateClient } from '../shared'
  * schemas. These interactions record the request the clients actually make and
  * the `sponsorship` block a linked post carries: four fields, one partner, and
  * no URL. The deep link is built server-side on click.
+ *
+ * Each interaction runs the app's own read function, injected by the pacttest
+ * as {@link CommunitySponsoredReads}, so a wrapper that stops sending either
+ * opt-in header misses the recorded request and fails here.
  *
  * The block is the commerce fixture's partner and offer, and the sponsored post
  * is `PUBLISHED_POST_ID`. `pact/http/provider/doubles/community-sponsorship.ts`
@@ -48,6 +54,23 @@ import { like, pactEventAuth, string, type CreateClient } from '../shared'
  * region and the public visibility rule are proven in the API unit suite and in
  * `apps/api/integration`.
  * ------------------------------------------------------------------------- */
+
+/**
+ * The app read functions these interactions exercise, pointed at the mock
+ * server by the pacttest: `apps/web/src/lib/community.ts` for web and
+ * `apps/mobile/src/lib/community.ts` for mobile. Each resolves the parsed `data`.
+ */
+export type CommunitySponsoredReads = {
+  feed: (
+    mockServer: V3MockServer,
+    request: { mode: CommunityFeedMode; limit: number }
+  ) => Promise<CommunitySponsoredFeed>
+  spotlight: (
+    mockServer: V3MockServer,
+    request: { limit: number; surface?: CommunitySpotlightSurface }
+  ) => Promise<CommunitySponsoredSpotlight>
+  post: (mockServer: V3MockServer, postId: string) => Promise<CommunitySponsoredFeedItem>
+}
 
 /** What both clients send on every community read since Story 6.7b. */
 const optedInHeaders = (platform: CommunityPlatform) => ({
@@ -77,7 +100,7 @@ function expectSponsorshipBlock(item: { sponsorship?: unknown }) {
 
 export async function verifyCommunitySponsoredFeedInteraction(
   pact: PactV4,
-  createClient: CreateClient,
+  reads: CommunitySponsoredReads,
   platform: CommunityPlatform
 ) {
   // Provider endpoint: apps/api/src/modules/community/community.controller.ts -> GET /api/v1/community/feed
@@ -123,16 +146,9 @@ export async function verifyCommunitySponsoredFeedInteraction(
       })
     )
     .executeTest(async (mockServer: V3MockServer) => {
-      const response = await createClient(mockServer).apiV1CommunityFeedGet({
-        xCouturePlatform: platform,
-        xCoutureReactions: '1',
-        xCoutureSponsorship: '1',
-        mode: 'auto',
-        limit: PAGE_LIMIT,
-      })
-      const parsed = communitySponsoredFeedResponseSchema.parse(response)
-      expect(parsed.data.items).toHaveLength(1)
-      const item = parsed.data.items[0]!
+      const feed = await reads.feed(mockServer, { mode: 'auto', limit: PAGE_LIMIT })
+      expect(feed.items).toHaveLength(1)
+      const item = feed.items[0]!
       expect(item.id).toBe(PUBLISHED_POST_ID)
       expect(item.reactions).toEqual(currentReactionSummary)
       expectSponsorshipBlock(item)
@@ -141,7 +157,7 @@ export async function verifyCommunitySponsoredFeedInteraction(
 
 export async function verifyCommunitySponsoredSpotlightInteraction(
   pact: PactV4,
-  createClient: CreateClient,
+  reads: CommunitySponsoredReads,
   platform: CommunityPlatform
 ) {
   // Provider endpoint: apps/api/src/modules/community/community.controller.ts -> GET /api/v1/community/spotlight
@@ -183,18 +199,12 @@ export async function verifyCommunitySponsoredSpotlightInteraction(
       })
     )
     .executeTest(async (mockServer: V3MockServer) => {
-      const response = await createClient(mockServer).getCommunitySpotlight({
-        xCouturePlatform: platform,
-        xCoutureReactions: '1',
-        xCoutureSponsorship: '1',
-        limit: SPOTLIGHT_LIMIT,
-      })
-      const parsed = communitySponsoredSpotlightResponseSchema.parse(response)
-      expect(parsed.data.items.map((item) => [item.id, item.rank])).toEqual([
+      const spotlight = await reads.spotlight(mockServer, { limit: SPOTLIGHT_LIMIT })
+      expect(spotlight.items.map((item) => [item.id, item.rank])).toEqual([
         [PUBLISHED_POST_ID, 1],
       ])
-      expect(parsed.data.items[0]!.reactions).toEqual(currentReactionSummary)
-      expectSponsorshipBlock(parsed.data.items[0]!)
+      expect(spotlight.items[0]!.reactions).toEqual(currentReactionSummary)
+      expectSponsorshipBlock(spotlight.items[0]!)
     })
 }
 
@@ -204,7 +214,7 @@ export async function verifyCommunitySponsoredSpotlightInteraction(
  */
 export async function verifyCommunitySponsoredHomeTeaserInteraction(
   pact: PactV4,
-  createClient: CreateClient,
+  reads: CommunitySponsoredReads,
   platform: CommunityPlatform
 ) {
   // Provider endpoint: apps/api/src/modules/community/community.controller.ts -> GET /api/v1/community/spotlight
@@ -247,25 +257,21 @@ export async function verifyCommunitySponsoredHomeTeaserInteraction(
       })
     )
     .executeTest(async (mockServer: V3MockServer) => {
-      const response = await createClient(mockServer).getCommunitySpotlight({
-        xCouturePlatform: platform,
-        xCoutureReactions: '1',
-        xCoutureSponsorship: '1',
+      const teaser = await reads.spotlight(mockServer, {
         limit: 1,
         surface: 'home_teaser',
       })
-      const parsed = communitySponsoredSpotlightResponseSchema.parse(response)
-      expect(parsed.data.items.map((item) => [item.id, item.rank])).toEqual([
+      expect(teaser.items.map((item) => [item.id, item.rank])).toEqual([
         [PUBLISHED_POST_ID, 1],
       ])
-      expectSponsorshipBlock(parsed.data.items[0]!)
+      expectSponsorshipBlock(teaser.items[0]!)
     })
 }
 
 /** The detail dialog's read: the single post carries the same block. */
 export async function verifyCommunitySponsoredPostInteraction(
   pact: PactV4,
-  createClient: CreateClient,
+  reads: CommunitySponsoredReads,
   platform: CommunityPlatform
 ) {
   // Provider endpoint: apps/api/src/modules/community/community.controller.ts -> GET /api/v1/community/posts/:postId
@@ -303,15 +309,9 @@ export async function verifyCommunitySponsoredPostInteraction(
       })
     )
     .executeTest(async (mockServer: V3MockServer) => {
-      const response = await createClient(mockServer).apiV1CommunityPostsPostIdGet({
-        postId: PUBLISHED_POST_ID,
-        xCouturePlatform: platform,
-        xCoutureReactions: '1',
-        xCoutureSponsorship: '1',
-      })
-      const parsed = communitySponsoredPostResponseSchema.parse(response)
-      expect(parsed.data.id).toBe(PUBLISHED_POST_ID)
-      expect(parsed.data.reactions).toEqual(summary)
-      expectSponsorshipBlock(parsed.data)
+      const post = await reads.post(mockServer, PUBLISHED_POST_ID)
+      expect(post.id).toBe(PUBLISHED_POST_ID)
+      expect(post.reactions).toEqual(summary)
+      expectSponsorshipBlock(post)
     })
 }

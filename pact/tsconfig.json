@@ -2,6 +2,10 @@
   "extends": "../apps/api/tsconfig.json",
   "compilerOptions": {
     "types": ["node", "vitest/globals"],
+    // The consumer drives the web and mobile read wrappers, whose dynamic imports
+    // follow the apps' bundler resolution rather than the API's nodenext.
+    "module": "preserve",
+    "moduleResolution": "bundler",
     "noEmit": true
   },
   "include": ["**/*.ts", "**/*.mts"]

@@ -19,6 +19,7 @@ import {
   verifyCommunitySponsoredSpotlightInteraction,
   verifyCommunitySponsoredHomeTeaserInteraction,
   verifyCommunitySponsoredPostInteraction,
+  type CommunitySponsoredReads,
 } from './interactions/community'
 // Learning path Step 19: Scenario outfit generator.
 // See _bmad-output/project-knowledge/learning-path-step-by-step.md#step-19-scenario-outfit-generator
@@ -40,6 +41,12 @@ import { PactV4, type V3MockServer } from '@pact-foundation/pact'
 import path from 'node:path'
 import { describe, it } from 'vitest'
 import { createMobileApiClient } from '../../../apps/mobile/src/lib/api-client'
+import {
+  getCommunityFeedFromMobile,
+  getCommunityPostFromMobile,
+  getCommunitySpotlightFromMobile,
+} from '../../../apps/mobile/src/lib/community'
+import { setMobileAccessTokenResolver } from '../../../apps/mobile/src/lib/mobile-auth'
 import {
   pactEventAuth,
   pactTeenAuth,
@@ -182,6 +189,36 @@ function createMobileClientForMockServer(mockServer: V3MockServer) {
     baseUrl: mockServer.url,
     accessToken: pactEventAuth.accessToken,
   })
+}
+
+/**
+ * Story 6.7b: runs a real `apps/mobile/src/lib/community.ts` read against the
+ * mock server. `createMobileApiClient` reads `EXPO_PUBLIC_API_BASE_URL` per
+ * request and the wrapper asks `mobile-auth` for its bearer, so this points the
+ * one and installs a resolver for the other for the call, then restores both.
+ * The wrapper code is real, so the opt-in headers recorded are the ones the
+ * mobile app sends.
+ */
+async function withMobileApp<T>(mockServer: V3MockServer, read: () => Promise<T>) {
+  const previousBaseUrl = process.env.EXPO_PUBLIC_API_BASE_URL
+  process.env.EXPO_PUBLIC_API_BASE_URL = mockServer.url
+  const restoreResolver = setMobileAccessTokenResolver(() => pactEventAuth.accessToken)
+  try {
+    return await read()
+  } finally {
+    restoreResolver()
+    if (previousBaseUrl === undefined) delete process.env.EXPO_PUBLIC_API_BASE_URL
+    else process.env.EXPO_PUBLIC_API_BASE_URL = previousBaseUrl
+  }
+}
+
+const mobileSponsoredReads: CommunitySponsoredReads = {
+  feed: (mockServer, request) =>
+    withMobileApp(mockServer, () => getCommunityFeedFromMobile(request)),
+  spotlight: (mockServer, request) =>
+    withMobileApp(mockServer, () => getCommunitySpotlightFromMobile(request)),
+  post: (mockServer, postId) =>
+    withMobileApp(mockServer, () => getCommunityPostFromMobile(postId)),
 }
 
 function createMobileTeenClientForMockServer(mockServer: V3MockServer) {
@@ -758,17 +795,13 @@ describe('CoutureCastMobile -> CoutureCastApi HTTP contract', () => {
   })
 
   it('reads an opted-in feed whose item carries a sponsorship block', async () => {
-    await verifyCommunitySponsoredFeedInteraction(
-      pact,
-      createMobileClientForMockServer,
-      'mobile'
-    )
+    await verifyCommunitySponsoredFeedInteraction(pact, mobileSponsoredReads, 'mobile')
   })
 
   it('reads an opted-in city spotlight whose item carries a sponsorship block', async () => {
     await verifyCommunitySponsoredSpotlightInteraction(
       pact,
-      createMobileClientForMockServer,
+      mobileSponsoredReads,
       'mobile'
     )
   })
@@ -776,17 +809,13 @@ describe('CoutureCastMobile -> CoutureCastApi HTTP contract', () => {
   it('reads an opted-in home teaser whose item carries a sponsorship block', async () => {
     await verifyCommunitySponsoredHomeTeaserInteraction(
       pact,
-      createMobileClientForMockServer,
+      mobileSponsoredReads,
       'mobile'
     )
   })
 
   it('reads one opted-in sponsored post with its sponsorship block', async () => {
-    await verifyCommunitySponsoredPostInteraction(
-      pact,
-      createMobileClientForMockServer,
-      'mobile'
-    )
+    await verifyCommunitySponsoredPostInteraction(pact, mobileSponsoredReads, 'mobile')
   })
 
   it('allocates a community post upload session', async () => {
