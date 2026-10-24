@@ -162,9 +162,10 @@ export function useCommunitySpotlight({
       setLoadMoreFailed(false)
       setStatus('loading')
       try {
+        const stamp = sponsorships.begin()
         const page = await getCommunitySpotlightFromMobile({ signal: controller.signal })
         if (!isCurrent()) return
-        sponsorships.record(page.items)
+        sponsorships.record(page.items, stamp)
         const shown = newEntries([], readItems(page.items, ticket))
         setLevel(page.level)
         setLabel(page.label)
@@ -207,10 +208,11 @@ export function useCommunitySpotlight({
     const { controller, isCurrent } = begin()
     setIsLoadingMore(true)
     setLoadMoreFailed(false)
+    const stamp = sponsorships.begin()
     void getCommunitySpotlightFromMobile({ cursor, signal: controller.signal })
       .then((page) => {
         if (!isCurrent()) return
-        sponsorships.record(page.items)
+        sponsorships.record(page.items, stamp)
         const added = newEntries(itemsRef.current, readItems(page.items, ticket))
         setItems((previous) => [...previous, ...newEntries(previous, added)])
         // View more stays for the cursor this page returned.
@@ -342,10 +344,11 @@ export function useCommunitySpotlight({
       const controller = new AbortController()
       refreshes.set(postId, controller)
       const ticket = reactionState.beginRead()
+      const stamp = sponsorships.begin()
       void getCommunityPostFromMobile(postId, controller.signal)
         .then((post) => {
           if (controller.signal.aborted) return
-          sponsorships.record([post])
+          sponsorships.record([post], stamp)
           // A null read means the post left the community while this was in flight.
           const fresh = reactionState.read(post, ticket)
           if (fresh) applyPost(fresh)

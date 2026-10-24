@@ -497,6 +497,20 @@ export function CommunityScreen() {
     const deadline = performance.now() + 10_000
     // The bearer is read first, so the admission check sees the time it took: an attempt
     // that can no longer dispatch and answer inside the 10 s bound is never started.
+    // A live read: stamped as it starts, so an answer that lands after a newer
+    // read of the same post cannot overwrite it.
+    const readTargetPost = (timeout: number, token: string) => {
+      const stamp = sponsorships.begin()
+      return getCommunityPostFromMobile(
+        targetPostId,
+        controller.signal,
+        timeout,
+        token
+      ).then((post) => {
+        sponsorships.record([post], stamp)
+        return post
+      })
+    }
     const requestTarget = async () => {
       const token = (await resolveMobileAccessToken()) ?? ''
       const remaining = deadline - performance.now()
@@ -518,19 +532,14 @@ export function CommunityScreen() {
               signal
             )
           ).then((result) => result.targets[0])
-        : getCommunityPostFromMobile(targetPostId, controller.signal, timeout, token)
-            .then((post) => {
-              sponsorships.record([post])
-              return post
-            })
-            .then((post) => ({
-              status: 'available' as const,
-              post,
-              comment: null,
-              parent: null,
-              pageCursor: null,
-              parentPageCursor: null,
-            }))
+        : readTargetPost(timeout, token).then((post) => ({
+            status: 'available' as const,
+            post,
+            comment: null,
+            parent: null,
+            pageCursor: null,
+            parentPageCursor: null,
+          }))
     }
     let retryTimer: ReturnType<typeof setTimeout> | undefined
     const targetRequest = async () => {
@@ -758,8 +767,9 @@ export function CommunityScreen() {
         generation === requestGenerationRef.current &&
         detailGeneration === detailGenerationRef.current
       try {
+        const stamp = sponsorships.begin()
         const post = await getCommunityPostFromMobile(target, signal)
-        if (isCurrent()) sponsorships.record([post])
+        if (isCurrent()) sponsorships.record([post], stamp)
         if (isCurrent()) setDeepLinkPost(reactionState.read(post, readTicket))
       } catch (error: unknown) {
         if (isCurrent() && communityFailureReason(error) === 'not_found') {
@@ -804,6 +814,7 @@ export function CommunityScreen() {
         // cursor can be rejected as stale, so the loop cannot come round again.
         for (;;) {
           try {
+            const stamp = sponsorships.begin()
             const feed = await getCommunityFeedFromMobile({
               mode: targetMode,
               cursor: pageCursor,
@@ -813,7 +824,7 @@ export function CommunityScreen() {
             if (!isCurrent()) {
               return
             }
-            sponsorships.record(feed.items)
+            sponsorships.record(feed.items, stamp)
             const isAppend = pageCursor !== undefined
             const page = feed.items.flatMap((post) => {
               const current = reactionState.read(post, readTicket)
@@ -1027,6 +1038,7 @@ export function CommunityScreen() {
     let active = true
     const refreshFeed = async (signal?: AbortSignal) => {
       const generation = requestGenerationRef.current
+      const stamp = sponsorships.begin()
       const page = await getCommunityFeedFromMobile({
         mode,
         limit: FEED_PAGE_SIZE,
@@ -1038,7 +1050,7 @@ export function CommunityScreen() {
         throw new CommunityRequestSuperseded()
       // Story 6.7b: the rebuild is a live read, so it is the latest word on the
       // block of every post it carries, including posts already on screen.
-      sponsorships.record(page.items)
+      sponsorships.record(page.items, stamp)
       setAuthorStates(page.authorStates)
       setNextCursor(page.nextCursor)
       setServedMode(page.mode)

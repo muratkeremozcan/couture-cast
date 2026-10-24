@@ -131,8 +131,9 @@ export const CommunitySponsoredShop = forwardRef<View, CommunitySponsoredShopPro
           // The visible label leads, so a speech-input user can say what they read;
           // it names the action and the partner, then that it leaves the app. That
           // last part sits in the name, which every screen reader speaks; a hint
-          // goes unspoken when a reader has hints switched off.
-          accessibilityLabel={`${ctaLabel}. ${opensInBrowser}`}
+          // goes unspoken when a reader has hints switched off. While busy the
+          // name is the loading state alone.
+          accessibilityLabel={isPending ? ctaLabel : `${ctaLabel}. ${opensInBrowser}`}
           onFocus={onFocus}
           onBlur={onBlur}
           // Busy state keeps the control enabled: a disabled control can drop

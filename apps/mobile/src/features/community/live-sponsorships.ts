@@ -9,6 +9,10 @@
 // - every live read records its answer here, and every rendered copy of that
 //   post (feed, New looks, deep-link card, spotlight) takes it at once, so a
 //   live read without the block removes a block shown earlier;
+// - the newest read wins: each read takes a stamp from `begin()` when it starts,
+//   and an answer from a read that started before the one already recorded for
+//   that post is dropped, whichever call site made either read and whatever
+//   order the responses land in;
 // - a resolve copy takes the latest live answer for its post, and a post no live
 //   read has answered for renders no block.
 import type {
@@ -32,20 +36,38 @@ function sameBlock(
   )
 }
 
-export class LiveCommunitySponsorships {
-  private readonly answers = new Map<string, CommunitySponsorship | null>()
-  private readonly listeners = new Set<() => void>()
+/** When a live read started, from `LiveCommunitySponsorships.begin()`. */
+export type LiveReadStamp = number
 
-  /** Records what one live opted-in read said for each of its posts. */
-  record(items: readonly SponsoredCopy[]): void {
+export class LiveCommunitySponsorships {
+  private readonly answers = new Map<
+    string,
+    { answer: CommunitySponsorship | null; stamp: LiveReadStamp }
+  >()
+  private readonly listeners = new Set<() => void>()
+  private lastStamp = 0
+  /** Reads that started before the last `clear()` belong to another member. */
+  private clearedAt = 0
+
+  /** Call as a live read starts; pass the stamp to `record` with its answer. */
+  begin(): LiveReadStamp {
+    this.lastStamp += 1
+    return this.lastStamp
+  }
+
+  /** Records what one live opted-in read, started at `stamp`, said for each post. */
+  record(items: readonly SponsoredCopy[], stamp: LiveReadStamp): void {
+    if (stamp <= this.clearedAt) return
     let changed = false
     for (const item of items) {
       const answer =
         item.status === 'published' && item.sponsorship ? item.sponsorship : null
       const previous = this.answers.get(item.id)
-      if (previous !== undefined && sameBlock(previous ?? undefined, answer ?? undefined))
+      // A read that started before the recorded one is stale, however late it lands.
+      if (previous && previous.stamp > stamp) continue
+      this.answers.set(item.id, { answer, stamp })
+      if (previous && sameBlock(previous.answer ?? undefined, answer ?? undefined))
         continue
-      this.answers.set(item.id, answer)
       changed = true
     }
     if (changed) for (const listener of [...this.listeners]) listener()
@@ -56,7 +78,7 @@ export class LiveCommunitySponsorships {
    * nothing changes, so applying it to a list re-renders nothing.
    */
   apply<T extends SponsoredCopy>(item: T): T {
-    const answer = this.answers.get(item.id)
+    const answer = this.answers.get(item.id)?.answer
     if (answer === undefined) {
       // No live read answered for this post: a block on the copy is not ours to
       // vouch for, and a resolve copy carries none.
@@ -90,8 +112,9 @@ export class LiveCommunitySponsorships {
     }
   }
 
-  /** A new member starts with no answers. */
+  /** A new member starts with no answers, and earlier reads record nothing. */
   clear(): void {
     this.answers.clear()
+    this.clearedAt = this.lastStamp
   }
 }

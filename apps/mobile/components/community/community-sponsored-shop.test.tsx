@@ -282,6 +282,9 @@ describe('sponsored community CTA (Story 6.7b)', () => {
       press(button)
 
       await waitFor(() => expect(button.textContent).toBe('Opening partner site'))
+      // Busy, the name is the loading state alone; the browser suffix returns
+      // with the idle label.
+      expect(button.getAttribute('aria-label')).toBe('Opening partner site')
       expect(
         pressableProps.get('community-card-shop-post-a')?.accessibilityState
       ).toEqual({ busy: true })
@@ -440,6 +443,30 @@ describe('sponsored community CTA (Story 6.7b)', () => {
         (await screen.findByTestId('home-spotlight-teaser-shop-error')).textContent
       ).toBe('Unable to open the partner site. Please try again.')
       expect(document.activeElement).toBe(button)
+    })
+
+    it('6.7b-MOB-023 names the busy teaser CTA by its loading state alone, then restores the browser suffix', async () => {
+      let release: (() => void) | undefined
+      serveClicks(
+        () =>
+          new Promise<Response>((resolve) => {
+            release = () => resolve(new HttpResponse(null, { status: 500 }))
+          })
+      )
+      render(teaser(teaserValue(SPONSORSHIP)))
+      const button = screen.getByTestId('home-spotlight-teaser-shop')
+
+      press(button)
+
+      await waitFor(() => expect(button.textContent).toBe('Opening partner site'))
+      expect(button.getAttribute('aria-label')).toBe('Opening partner site')
+      await waitFor(() => expect(release).toBeDefined())
+      act(() => release?.())
+      await screen.findByTestId('home-spotlight-teaser-shop-error')
+      // The error state keeps the idle name with the suffix.
+      expect(button.getAttribute('aria-label')).toBe(
+        'Shop this look at Atelier North. Opens in an in-app browser'
+      )
     })
 
     it('6.7b-MOB-022 leaves an unsponsored teaser as it was', () => {

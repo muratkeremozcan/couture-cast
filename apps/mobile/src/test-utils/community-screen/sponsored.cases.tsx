@@ -2,8 +2,8 @@
 // Story 6.7b owner: sponsored community CTAs on the Community screen, through the
 // real HTTP boundary. Each card is found by its loaded content first, so every
 // absence asserted below is an absence on a rendered card.
-import { feedJson, item, serveFeed, setMockParams } from './harness'
-import { mockCapture, webBrowser } from './mock-state'
+import { feedJson, feedUrls, item, serveFeed, setMockParams } from './harness'
+import { mockCapture, refreshEvents, webBrowser } from './mock-state'
 import { screen, waitFor, within } from '@testing-library/react'
 import { http, HttpResponse } from 'msw'
 import { render } from 'vitest-browser-react'
@@ -316,5 +316,109 @@ export function registerCommunitySponsoredCases() {
     expect(within(module).queryByTestId('community-card-shop-spot-1')).toBeNull()
     expect(within(module).queryByTestId('community-card-partnered-spot-1')).toBeNull()
     expect(within(module).getByTestId('community-post-card-spot-1')).toBeInTheDocument()
+  })
+
+  it.each([
+    ['the newer read answers first', true],
+    ['the older read answers first', false],
+  ] as const)(
+    '6.7b-MOB-056 the newest live answer wins when two reads of one post overlap (%s)',
+    async (_case, newerFirst) => {
+      // The older read: the notification's single-post read, held open. It
+      // carries the block the link had when it started.
+      let releaseOlder!: () => void
+      const olderHeld = new Promise<void>((resolve) => {
+        releaseOlder = resolve
+      })
+      let postReads = 0
+      setMockParams({ source: 'notification', type: 'community', cardId: 'post-a' })
+      server.use(
+        http.get('*/api/v1/community/posts/post-a', async () => {
+          postReads++
+          if (postReads === 1) {
+            await olderHeld
+            return HttpResponse.json({
+              data: item({ id: 'post-a', sponsorship: SPONSORSHIP }),
+            })
+          }
+          return HttpResponse.json({ data: item({ id: 'post-a' }) })
+        })
+      )
+      // The newer reads: a pull to refresh started after the older read went
+      // out; the link ended in between, so they carry no block.
+      serveFeed(() => feedJson({ items: [item({ id: 'post-a' })] }))
+
+      await render(<CommunityScreen />)
+      await screen.findByTestId('community-post-card-post-a')
+      await waitFor(() => expect(postReads).toBe(1))
+      await waitFor(() => expect(refreshEvents.onRefresh).toBeTypeOf('function'))
+
+      if (!newerFirst) {
+        releaseOlder()
+        await screen.findByTestId('community-card-shop-post-a')
+      }
+      // Opening the comments retires the notification intent, so the older read
+      // is not re-requested once it lands: its answer is the last word from
+      // that call site, and only its start order can say it is stale.
+      press(screen.getByTestId('community-card-comments-post-a'))
+      // The single-post read gives up after 2 s, so the refresh's feed read
+      // must land inside that window for the two reads to overlap.
+      const feedReadsBefore = feedUrls.length
+      act(() => refreshEvents.onRefresh!())
+      await waitFor(() => expect(feedUrls.length).toBeGreaterThan(feedReadsBefore), {
+        interval: 10,
+      })
+      await act(async () => {
+        await new Promise((resolve) => setTimeout(resolve, 50))
+      })
+      if (newerFirst) releaseOlder()
+
+      // Let every response land, then let any late record reach the cards.
+      await act(async () => {
+        await olderHeld
+        await new Promise((resolve) => setTimeout(resolve, 50))
+      })
+      expect(screen.getByTestId('community-post-card-post-a')).toBeInTheDocument()
+      expect(screen.queryByTestId('community-card-shop-post-a')).toBeNull()
+      expect(screen.queryByTestId('community-card-partnered-post-a')).toBeNull()
+    }
+  )
+
+  it('6.7b-MOB-057 a sponsored look revealed through New looks shows Partnered and the CTA', async () => {
+    const sync = serveRealSync()
+    // The first read shows post-a; the sync's rebuild, a live read, carries a
+    // newly published sponsored look that waits in New looks. Its later copies
+    // come from `targets/resolve`, which never carries the block.
+    serveFeed((_url, index) =>
+      feedJson({
+        items:
+          index === 0
+            ? [item({ id: 'post-a' })]
+            : [
+                item({ id: 'post-new', caption: 'New look', sponsorship: SPONSORSHIP }),
+                item({ id: 'post-a' }),
+              ],
+      })
+    )
+
+    await render(<CommunityScreen />)
+    const reveal = await screen.findByRole('button', { name: 'Show 1 new looks' })
+    await waitFor(() => expect(sync.resolves()).toBeGreaterThan(0))
+    expect(screen.queryByTestId('community-post-card-post-new')).toBeNull()
+
+    press(reveal)
+
+    // The revealed card is the resolved copy, with the rebuild's live answer.
+    await screen.findByText('Resolved post-new')
+    const card = screen.getByTestId('community-post-card-post-new')
+    expect(
+      within(card).getByTestId('community-card-partnered-post-new').textContent
+    ).toBe('Partnered')
+    expect(within(card).getByTestId('community-card-shop-post-new').textContent).toBe(
+      'Shop this look at Atelier North'
+    )
+    expect(card.getAttribute('aria-label')).toBe(
+      'Look by Style Explorer A1B2. Partnered with Atelier North'
+    )
   })
 }
