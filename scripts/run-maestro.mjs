@@ -147,10 +147,10 @@ const MAESTRO_ARTIFACT_DIR = process.env.MAESTRO_ARTIFACT_DIR || 'maestro/artifa
  * override with `MOBILE_E2E_CI_FLOW_TIMEOUT_MS` for the rare case (a flow
  * genuinely growing past this) rather than special-casing either environment.
  *
- * Sized well above every flow's recorded cost in
- * `scripts/maestro-flow-durations.json` (worst case recorded there is under
- * three minutes) and well below the CI job's 45-minute ceiling, so a normal
- * flow never comes close to it.
+ * Sized above every flow's recorded cost in
+ * `scripts/maestro-flow-durations.json` (the worst case recorded there is
+ * community-feed.yaml at 291s) and well below the CI job's 45-minute ceiling,
+ * so a normal flow stays under it.
  *
  * This exists because a flow can silently stall rather than fail. Observed on
  * three different flows across three different runs on 2026-08-20, always the
