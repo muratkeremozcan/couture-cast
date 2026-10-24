@@ -130,8 +130,11 @@ module.exports = {
       },
     },
     {
-      // Test helpers under apps/api/src/testing are excluded from the production build
-      // (tsconfig.build.json), so a production module importing one would fail at runtime.
+      // apps/api/tsconfig.build.json excludes apps/api/src/testing from the build's input
+      // files, so no helper there is compiled on its own. The exclusion does not stop tsc
+      // from following an import: a production module importing a helper would pull it,
+      // and its test-only dependencies such as supertest, into dist. This rule keeps
+      // production modules from importing those helpers, so dist holds none of them.
       files: ['apps/api/src/**/*.ts'],
       excludedFiles: ['apps/api/src/**/*.{spec,test}.ts', 'apps/api/src/testing/**'],
       rules: {
@@ -142,7 +145,7 @@ module.exports = {
               {
                 group: ['**/testing/*', '!@couture/testing', '!@couture/testing/*'],
                 message:
-                  'apps/api/src/testing holds test helpers and is not in the production build; import it only from specs and integration suites.',
+                  'apps/api/src/testing holds test helpers that the production build leaves out; import them only from specs and integration suites so none is compiled into dist.',
               },
             ],
           },
