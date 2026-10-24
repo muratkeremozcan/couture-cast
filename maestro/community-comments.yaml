@@ -84,8 +84,20 @@ tags:
 - tapOn:
     id: 'comment-reply-.*'
     text: ${output.longReplyAction}
-- tapOn:
-    id: 'comment-body'
+# Reply focuses the composer itself. On Android, Gboard then rises and the sheet lifts
+# while the next step runs, so a tap aimed at the composer from the hierarchy read before
+# the lift can land on the keyboard: in CI it hit Gboard's G key and the field held
+# "Gok" (R70, job 120874667743). The flow types into the composer Reply focused, after
+# the keyboard-up layout has settled, which on Android is when the thread region has
+# left (R51). iOS raises no software keyboard on focus, so nothing moves there.
+- runFlow:
+    when:
+      platform: Android
+    commands:
+      - extendedWaitUntil:
+          notVisible:
+            id: 'comments-thread'
+          timeout: 15000
 # R51: the banner shows three lines at most; its accessibility label keeps the whole
 # context, so the exact regex still matches the long root.
 - assertVisible:
@@ -94,8 +106,8 @@ tags:
 - assertVisible:
     id: 'comment-submit'
     text: 'Send comment'
-# The keyboard-up checks follow the first typed text, so they hold whether the tap
-# raised a software keyboard or not: a local iOS simulator runs headless with a hardware
+# The keyboard-up checks follow the first typed text, so they hold whether focusing the
+# composer raised a software keyboard or not: a local iOS simulator runs headless with a hardware
 # keyboard attached (README), and XCTest's typing switches it to the software keyboard.
 # Typed text landing in the counter proves the composer holds keyboard focus; Maestro's
 # iOS hierarchy reports every element unfocused.
@@ -182,14 +194,15 @@ tags:
 - tapOn:
     id: 'comment-reply-.*'
     text: ${output.replyAction}
-- scrollUntilVisible:
-    element:
-      id: 'comment-body'
-    direction: DOWN
-    centerElement: true
-    timeout: 15000
-- tapOn:
-    id: 'comment-body'
+# Same as the first reply: type into the composer Reply focused once the layout settled.
+- runFlow:
+    when:
+      platform: Android
+    commands:
+      - extendedWaitUntil:
+          notVisible:
+            id: 'comments-thread'
+          timeout: 15000
 - inputText: ${output.commentReply}
 - assertVisible:
     id: 'comment-submit'
