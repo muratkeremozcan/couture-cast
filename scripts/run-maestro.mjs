@@ -531,41 +531,49 @@ const suppressAndroidErrorDialogs = async () => {
 }
 
 /**
- * Stop Gboard covering the app with its stylus education sheet.
+ * Bring a Play image's Gboard closer to CI's keyboard-less google_apis image.
  *
- * On a Play image with Gboard (the local API 36 AVD), every text-field tap
- * Maestro makes reaches Gboard as a stylus tool event, and Gboard answers with a
- * full-screen "Try out your stylus" sheet over the app. Location capture,
- * capsule create and screened comments then failed on a field the sheet hid.
- * With stylus handwriting off Gboard schedules no education. CI's google_apis
- * image has no Gboard, so there this is a no-op. Read back like
- * `hide_error_dialogs`, so a write that did nothing is reported.
+ * On the local API 36 AVD every text-field tap Maestro makes reaches Gboard as a
+ * stylus tool event, and Gboard answers with a full-screen "Try out your stylus"
+ * sheet over the app: location capture, capsule create and screened comments
+ * failed on a field the sheet hid. With stylus handwriting off it schedules no
+ * education. Gboard's spell checking also janks every keystroke of a long
+ * `inputText` (frames of 0.7 to 1.3 s, 76 s for a 273-character comment), long
+ * enough for the community socket to drop mid-comment; it is turned off too.
+ * Each setting is read back like `hide_error_dialogs`, so a write that did
+ * nothing is reported. CI's image has no Gboard, so there this is a no-op.
  *
  * @returns {Promise<void>}
  */
-const disableAndroidStylusHandwriting = async () => {
+const quietAndroidKeyboard = async () => {
   const adbBinary = resolveAdbBinary()
-  try {
-    await captureProcess(
-      adbBinary,
-      ['shell', 'settings', 'put', 'secure', 'stylus_handwriting_enabled', '0'],
-      { timeoutMs: 15_000 }
-    )
-    const readBack = await captureProcess(
-      adbBinary,
-      ['shell', 'settings', 'get', 'secure', 'stylus_handwriting_enabled'],
-      { timeoutMs: 15_000 }
-    )
-    if (readBack.stdout.trim() === '0') {
-      log(`stylus_handwriting_enabled=0 set on ${androidSerial || 'the attached device'}`)
-    } else {
-      log(
-        `Could not turn off stylus handwriting: stylus_handwriting_enabled reads "${readBack.stdout.trim()}". ` +
-          'Gboard may cover text fields with its stylus education sheet.'
+  const settings = [
+    [
+      'stylus_handwriting_enabled',
+      'Gboard may cover text fields with its stylus education sheet.',
+    ],
+    ['spell_checker_enabled', 'Gboard spell checking may slow long text input.'],
+  ]
+  for (const [name, consequence] of settings) {
+    try {
+      await captureProcess(adbBinary, ['shell', 'settings', 'put', 'secure', name, '0'], {
+        timeoutMs: 15_000,
+      })
+      const readBack = await captureProcess(
+        adbBinary,
+        ['shell', 'settings', 'get', 'secure', name],
+        { timeoutMs: 15_000 }
       )
+      if (readBack.stdout.trim() === '0') {
+        log(`${name}=0 set on ${androidSerial || 'the attached device'}`)
+      } else {
+        log(
+          `Could not turn off ${name}: it reads "${readBack.stdout.trim()}". ${consequence}`
+        )
+      }
+    } catch (error) {
+      log(`Could not set ${name}: ${error.message}`)
     }
-  } catch (error) {
-    log(`Could not set stylus_handwriting_enabled: ${error.message}`)
   }
 }
 
@@ -4112,7 +4120,7 @@ const run = async () => {
   // run this early.
   if (target.platform === 'android') {
     await forEachAndroidDevice(suppressAndroidErrorDialogs)
-    await forEachAndroidDevice(disableAndroidStylusHandwriting)
+    await forEachAndroidDevice(quietAndroidKeyboard)
   }
 
   if (target.platform === 'android' && !process.env.MOBILE_E2E_ANDROID_HOST) {
