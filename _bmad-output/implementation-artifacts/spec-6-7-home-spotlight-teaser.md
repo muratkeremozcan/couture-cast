@@ -2,7 +2,7 @@
 title: 'Story 6.7: Home spotlight teaser'
 type: 'feature'
 created: '2026-10-23'
-status: 'ready-for-dev'
+status: 'done'
 baseline_commit: '27041941a0ec4b2528b8309b5cf8558adbb69f6e'
 route: 'dispatch'
 story_key: '6-7-home-spotlight-teaser'
