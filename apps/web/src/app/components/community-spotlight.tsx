@@ -67,18 +67,22 @@ const IDLE: CommunitySpotlightState = {
 
 type PostUpdate = (post: CommunityFeedItem | null) => CommunityFeedItem | null
 
-export interface UseCommunitySpotlightOptions {
+export interface UseCommunitySpotlightOptions<Token = number> {
   /** The session identity. Null keeps the module idle; a change reloads page one. */
   scope: string | null
   /**
-   * Takes a reaction read ticket. The hook takes it before each request, so an
-   * eviction that lands while the request is in flight outranks its response.
+   * Starts one read and returns its token. The hook takes it before each
+   * request, so state that changes while the request is in flight (a reaction
+   * eviction, a newer sponsorship answer) outranks its response. The token
+   * lives only as long as that request: the hook hands it back to `reconcile`
+   * with the page, and on a failed, aborted or superseded read it is simply
+   * dropped, so the caller never keeps per-read bookkeeping.
    */
-  beginRead: () => number
-  /** Runs an arrived page through the grid's reaction state under its ticket. */
+  beginRead: () => Token
+  /** Runs an arrived page through the grid's state under its read's token. */
   reconcile: (
     items: readonly CommunitySpotlightItem[],
-    ticket: number
+    token: Token
   ) => CommunitySpotlightItem[]
   announce: (message: SpotlightAnnouncement) => void
 }
@@ -106,12 +110,12 @@ function isDisabledRefusal(error: unknown): boolean {
   return reason === 'disabled' || reason === 'age_gate'
 }
 
-export function useCommunitySpotlight({
+export function useCommunitySpotlight<Token = number>({
   scope,
   beginRead,
   reconcile,
   announce,
-}: UseCommunitySpotlightOptions) {
+}: UseCommunitySpotlightOptions<Token>) {
   const [state, setState] = useState<CommunitySpotlightState>(IDLE)
   const stateRef = useRef(state)
   stateRef.current = state

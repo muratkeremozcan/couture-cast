@@ -302,3 +302,47 @@ describe('6.6 spotlight reads against realtime evictions', () => {
     expect(result.current.state.items).toEqual([])
   })
 })
+
+describe('6.7b spotlight read tokens', () => {
+  it('6.7b-WEB-026 hands each page its own read token and never one from a superseded or failed read', async () => {
+    let issued = 0
+    const reconciled: number[] = []
+    const first = deferred<CommunityReactionSpotlight>()
+    lib.getCommunitySpotlightFromWeb
+      // Read 1: superseded by the session change below.
+      .mockReturnValueOnce(first.promise)
+      // Read 2: the new member's first page.
+      .mockResolvedValueOnce(page([item('a', 1)], 'next'))
+      // Read 3: a View more that fails.
+      .mockRejectedValueOnce({ reason: 'unknown' })
+      // Read 4: the View more retry.
+      .mockResolvedValueOnce(page([item('b', 2)]))
+    const { result, rerender } = renderHook(
+      ({ scope }: { scope: string | null }) =>
+        useCommunitySpotlight<{ read: number }>({
+          scope,
+          beginRead: () => ({ read: ++issued }),
+          reconcile: (items, token) => {
+            reconciled.push(token.read)
+            return [...items]
+          },
+          announce: vi.fn(),
+        }),
+      { initialProps: { scope: 'member-1' as string | null } }
+    )
+    rerender({ scope: 'member-2' })
+    await waitFor(() => expect(result.current.state.status).toBe('ready'))
+    await act(async () => {
+      first.resolve(page([item('stale', 1)]))
+      await first.promise
+    })
+    await act(() => result.current.loadMore())
+    expect(result.current.state.moreFailed).toBe(true)
+    await act(() => result.current.loadMore())
+
+    expect(issued).toBe(4)
+    // Only the reads whose pages landed are reconciled, each under its own token.
+    expect(reconciled).toEqual([2, 4])
+    expect(result.current.state.items.map((entry) => entry.id)).toEqual(['a', 'b'])
+  })
+})

@@ -2189,19 +2189,17 @@ export function CommunityLookbookGrid({
   // Story 6.6: the City Spotlight heads this section. Its pages run through the
   // same reaction state as the feed, and its one View more announcement goes
   // through this surface's single live region.
-  // Story 6.7b: the sponsorship stamp of each spotlight page read, taken as the
-  // read starts and keyed by the reaction ticket the hook hands back with it.
-  const [spotlightStamps] = useState(() => new Map<number, LiveReadStamp>())
-  const spotlight = useCommunitySpotlight({
+  // Story 6.7b: each spotlight read carries its reaction ticket and its
+  // sponsorship stamp, both taken as the read starts, in the token the hook
+  // hands back with the page. Nothing is stored per read, so a failed, aborted
+  // or superseded read leaves nothing behind.
+  const spotlight = useCommunitySpotlight<{ ticket: number; stamp: LiveReadStamp }>({
     scope: sessionScope,
-    beginRead: () => {
-      const ticket = reactionState.beginRead()
-      spotlightStamps.set(ticket, liveSponsorships.begin())
-      return ticket
-    },
-    reconcile: (page, ticket) => {
-      const stamp = spotlightStamps.get(ticket) ?? liveSponsorships.begin()
-      spotlightStamps.delete(ticket)
+    beginRead: () => ({
+      ticket: reactionState.beginRead(),
+      stamp: liveSponsorships.begin(),
+    }),
+    reconcile: (page, { ticket, stamp }) => {
       applyLiveSponsorship(page, stamp)
       return page.flatMap((post) => {
         const current = reactionState.read(post, ticket)
@@ -2480,7 +2478,6 @@ export function CommunityLookbookGrid({
       resetSpotlight()
       // Live answers are per viewer.
       liveSponsorships.clear()
-      spotlightStamps.clear()
       // A teaser intent and its notice belong to the member who tapped it.
       setPendingFocus(null)
       setSpotlightNotice(null)
@@ -2536,14 +2533,7 @@ export function CommunityLookbookGrid({
       window.removeEventListener('couture:session', syncSession)
       window.removeEventListener('couture:account-erased', erase)
     }
-  }, [
-    comments,
-    reactionState,
-    loadFeed,
-    resetSpotlight,
-    liveSponsorships,
-    spotlightStamps,
-  ])
+  }, [comments, reactionState, loadFeed, resetSpotlight, liveSponsorships])
 
   useEffect(() => {
     // Cleared alongside the request, so the chips answer with the mode just
@@ -2756,7 +2746,6 @@ export function CommunityLookbookGrid({
           reactionState.reset()
           resetSpotlight()
           liveSponsorships.clear()
-          spotlightStamps.clear()
           setItems([])
           setOpenedItem(null)
           setNewLooks([])
@@ -2789,7 +2778,6 @@ export function CommunityLookbookGrid({
   }, [
     applyLiveSponsorship,
     liveSponsorships,
-    spotlightStamps,
     comments,
     currentMode,
     sessionScope,
