@@ -426,7 +426,7 @@ playwright/tests/community-comments.spec.ts --repeat-each=3`, went out without t
   - Engagement isolation: the Story 6.5 engagement tests shared the seeded post `lookbook-5`, so
     parallel `--repeat-each` runs collided on its reaction counts. Each test now publishes its own
     look from a fresh owner (`publishOwnLook` and the `look` fixture), and the tests that read the
-    shared feed take a cross-worker lock (`playwright/support/helpers/exclusive-lock.ts`), with the
+    shared feed take a cross-worker lock (`playwright/support/helpers/exclusive-lock.ts`, replaced by a Postgres advisory lock in R32), with the
     test timeout suspended while one waits. `runs/r4-engagement-repeat-parallel-6`: 30 passed.
 
 - 2026-10-23, round 5 (`reviews/code-triage-1.md`, R25 to R29).
@@ -436,15 +436,8 @@ playwright/tests/community-comments.spec.ts --repeat-each=3`, went out without t
     still holds the TalkBack tests, so the `**/*.so` exclusion reaches the test APK only. The iOS
     job adds a release simulator app build after the SwiftPM XCTest: it compiles
     `AccessibilityFocusModule.swift` with ExpoModulesCore, and the same script checks that the
-    binary links it and `ExpoModulesProvider.swift` registers it. Locally the dev-build TalkBack
-    return and fallback flows and both release builds rerun at the final head.
-  - R26: the cross-worker lock is a run of generations inside its directory. Each change of hands
-    renames a directory that already holds its owner token onto the next generation, which exactly
-    one claimant wins. Taking over from a dead holder claims the next generation, so it never
-    deletes a newer holder's lock and two waiters that both saw the dead holder cannot both get
-    in. A generation pruned while a waiter reads it means look again. A release frees the lock
-    only while its own token holds it. Hook-driven boundary tests cover both races, and each
-    fails on a one-line break (`runs/r5-exclusive-lock-mutant-*`).
+    binary links it and `ExpoModulesProvider.swift` registers it.
+  - R26: superseded by R32 (round 6).
   - R27: the device runner gives the TalkBack run and the suppressed-focus control fresh,
     separate result directories, and `scripts/ci/check-accessibility-focus-results.mjs` decides
     the lane from their JUnit XML. Every test must pass with TalkBack; the control must fail
@@ -466,6 +459,30 @@ playwright/tests/community-comments.spec.ts --repeat-each=3`, went out without t
     second search.
   - Declined: Astra F4, the full app return and fallback flow in CI; see the triage decision
     record (option B, 2026-10-23).
+
+- 2026-10-24, round 6 (`reviews/code-triage-1.md`, R30 to R33).
+  - R30: the iOS check matched the plain name `AccessibilityFocusModule`, which a Swift binary
+    does not carry as a symbol. `check-accessibility-focus-builds.sh ios-app` now requires the
+    runtime class `_TtC18AccessibilityFocus24AccessibilityFocusModule`, the demangled type
+    metadata for `AccessibilityFocus.AccessibilityFocusModule`, and the provider's
+    `AccessibilityFocusModule.self`. The red control is a release build with the module's
+    `expo-module.config.json` set aside, so autolinking leaves it out.
+  - R31: the final-head runs (dev-build TalkBack return and fallback, both release builds and the
+    red iOS control) are listed with their `runs/` labels in the REPAIR_READY handoff; this spec
+    claims only runs that existed when it was written.
+  - R32: two review rounds kept finding races in the file-lock protocol (a waiter acting on a
+    stale observation could claim a pruned generation beside a live holder). The lock is now a
+    Postgres session advisory lock on the test database
+    (`playwright/support/helpers/advisory-lock.ts`): Postgres grants the key to one session at a
+    time and releases it when the session's connection closes, so there is no stale-holder or
+    generation handling. The generation protocol and its tests are gone.
+    `apps/api/integration/playwright-advisory-lock.integration.spec.ts` runs three worker
+    processes and asserts their holds never overlap (red with a per-worker key), that a holder
+    dying without releasing frees the lock, and that a wait ends with `lock_not_available` at
+    its deadline.
+  - R33: 1.2b-MOB-05d records announcements from the start, waits for the choice's own
+    "Selected" announcement, then clears the record before saving, so the save's announcements
+    are exactly the error and, for an expired result, the second search's count.
 
 ## Spec Change Log
 
