@@ -82,22 +82,53 @@ async function stopWorkers() {
   )
 }
 
-/** Advisory locks on `lockName`'s key that any session holds now. */
-async function holders(lockName: string) {
+type Holder = { pid: number; state: string | null; backendStart: string | null }
+
+/** The sessions holding `lockName`'s key now, with what Postgres says each is doing. */
+async function holders(lockName: string): Promise<Holder[]> {
   const client = new pg.Client({ connectionString: databaseUrl })
   await client.connect()
   try {
-    const key = BigInt(advisoryLockKey(lockName))
-    const unsigned = BigInt.asUintN(64, key)
-    const { rows } = await client.query<{ pid: number }>(
-      `SELECT pid FROM pg_locks
-        WHERE locktype = 'advisory' AND granted
-          AND classid = $1::bigint::oid AND objid = $2::bigint::oid AND objsubid = 1`,
+    const unsigned = BigInt.asUintN(64, BigInt(advisoryLockKey(lockName)))
+    const { rows } = await client.query<{
+      pid: number
+      state: string | null
+      backend_start: Date | null
+    }>(
+      `SELECT l.pid, a.state, a.backend_start FROM pg_locks l
+         LEFT JOIN pg_stat_activity a ON a.pid = l.pid
+        WHERE l.locktype = 'advisory' AND l.granted
+          AND l.classid = $1::bigint::oid AND l.objid = $2::bigint::oid AND l.objsubid = 1`,
       [(unsigned >> 32n).toString(), (unsigned & 0xffffffffn).toString()]
     )
-    return rows.map(({ pid }) => pid)
+    return rows.map((row) => ({
+      pid: row.pid,
+      state: row.state,
+      backendStart: row.backend_start?.toISOString() ?? null,
+    }))
   } finally {
     await client.end()
+  }
+}
+
+/**
+ * Waits until no session holds the lock. A client's exit closes its socket at
+ * once, but the server backend finishes its cleanup, and drops its locks, a
+ * moment later; failing at the deadline names the sessions still holding it.
+ */
+async function waitForNoHolders(
+  observe: () => Promise<Holder[]>,
+  { timeoutMs = 5_000, pollMs = 50 }: { timeoutMs?: number; pollMs?: number } = {}
+) {
+  const deadline = Date.now() + timeoutMs
+  for (;;) {
+    const current = await observe()
+    if (current.length === 0) return
+    if (Date.now() > deadline)
+      throw new Error(
+        `the advisory lock is still held after ${timeoutMs} ms by ${JSON.stringify(current)}`
+      )
+    await new Promise((resolve) => setTimeout(resolve, pollMs))
   }
 }
 
@@ -120,6 +151,23 @@ function intervals(directory: string, name: string) {
     spans.push({ enter: at(lines[index]), leave: at(lines[index + 1]) })
   return spans
 }
+
+describe('waiting for advisory-lock holders to go', () => {
+  const holder: Holder = { pid: 4242, state: 'idle', backendStart: null }
+
+  it('passes once a holder seen just after its client exited is gone', async () => {
+    const seen = [[holder], [holder], []]
+    const observe = () => Promise.resolve(seen.shift() ?? [])
+    await waitForNoHolders(observe, { timeoutMs: 1_000, pollMs: 10 })
+    expect(seen).toEqual([])
+  })
+
+  it('fails at its deadline naming a holder that never goes', async () => {
+    await expect(
+      waitForNoHolders(() => Promise.resolve([holder]), { timeoutMs: 100, pollMs: 10 })
+    ).rejects.toThrow(/still held after 100 ms by .*"pid":4242/)
+  })
+})
 
 describe('Playwright cross-worker advisory lock', () => {
   let directory: string
@@ -167,12 +215,12 @@ describe('Playwright cross-worker advisory lock', () => {
     const holding = worker(directory, 'holder', lockName, { rounds: 1, holdMs: 120_000 })
     const log = path.join(directory, 'holder.log')
     await waitFor(() => fs.existsSync(log))
-    expect(await holders(lockName)).toHaveLength(1)
+    expect((await holders(lockName)).map(({ pid }) => typeof pid)).toEqual(['number'])
 
     // What afterEach does when a test times out with a worker still holding the lock.
     await stopWorkers()
     expect(await holding).toBeNull()
-    expect(await holders(lockName)).toEqual([])
+    await waitForNoHolders(() => holders(lockName))
     const release = await acquireAdvisoryLock(databaseUrl, lockName, { timeoutMs: 2_000 })
     await release()
   }, 30_000)
