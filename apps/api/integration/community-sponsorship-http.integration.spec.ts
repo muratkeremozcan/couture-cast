@@ -30,7 +30,7 @@ import { CommunityService } from '../src/modules/community/community.service.js'
 import { CommunitySpotlightService } from '../src/modules/community/community-spotlight.service.js'
 import { InMemoryCommunityStorage } from '../src/modules/community/community-storage.fake.js'
 import type { FeatureFlagsService } from '../src/modules/feature-flags/feature-flags.service.js'
-import { listenHttpApp } from './helpers/loopback-http-app.js'
+import { listenHttpApp } from '../src/testing/loopback-http-app.js'
 import { spotlightTestContext } from './helpers/community-spotlight-context.js'
 import {
   HOUR,

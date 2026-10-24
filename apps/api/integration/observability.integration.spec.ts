@@ -1,4 +1,4 @@
-import { listenHttpApp, httpTestUrl } from './helpers/loopback-http-app.js'
+import { listenHttpApp, httpTestUrl } from '../src/testing/loopback-http-app.js'
 // Learning path Step 9: Observability bootstrap with OpenTelemetry.
 // See _bmad-output/project-knowledge/learning-path-step-by-step.md#step-9-observability-bootstrap-with-opentelemetry
 // Learning path Step 10: Grafana Cloud setup, telemetry inventory, and dashboard planning.
@@ -192,7 +192,7 @@ async function createOtlpCaptureServer() {
 describe('observability integration', () => {
   let app: INestApplication | undefined
 
-  const getHttpServer = (): Parameters<typeof request>[0] => {
+  const baseUrl = (): string => {
     if (!app) {
       throw new Error('App is not initialized')
     }
@@ -301,7 +301,7 @@ describe('observability integration', () => {
     await listenHttpApp(app)
 
     const logCursor = logExpectations.createCursor()
-    const response = await request(getHttpServer())
+    const response = await request(baseUrl())
       .post('/api/v1/auth/guardian-consent')
       .set('authorization', 'Bearer test-token')
       .set('x-request-id', requestId)

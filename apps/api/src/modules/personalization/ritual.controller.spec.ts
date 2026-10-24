@@ -9,6 +9,7 @@ import { type INestApplication } from '@nestjs/common'
 import { Test, type TestingModule } from '@nestjs/testing'
 import request from 'supertest'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
+import { listenHttpApp, httpTestUrl } from '../../testing/loopback-http-app.js'
 import { ritualResponseSchema, type RitualResponse } from '../../contracts/http.js'
 import type { AccessTokenIdentityService } from '../auth/access-token-identity.service.js'
 import { GuardianConsentStateService } from '../auth/guardian-consent-state.service.js'
@@ -307,7 +308,7 @@ describe('RitualController', () => {
       .compile()
 
     app = moduleFixture.createNestApplication()
-    await app.init()
+    await listenHttpApp(app)
   })
 
   afterEach(async () => {
@@ -319,20 +320,20 @@ describe('RitualController', () => {
     }
   })
 
-  const getHttpServer = (): Parameters<typeof request>[0] => {
+  const baseUrl = (): string => {
     if (!app) {
       throw new Error('App is not initialized')
     }
-    return app.getHttpServer() as Parameters<typeof request>[0]
+    return httpTestUrl(app)
   }
 
   it('requires authentication to access /api/v1/ritual', async () => {
-    const unauthResponse = await request(getHttpServer()).get('/api/v1/ritual')
+    const unauthResponse = await request(baseUrl()).get('/api/v1/ritual')
     expect(unauthResponse.status).toBe(401)
   })
 
   it('generates outfit recommendations, persists to DB, and caches in Redis', async () => {
-    const response = await request(getHttpServer())
+    const response = await request(baseUrl())
       .get('/api/v1/ritual')
       .set({ authorization: 'Bearer ritual-token' })
 
@@ -361,7 +362,7 @@ describe('RitualController', () => {
     expect(redisStore[cacheKey]?.ttl).toBe(900)
 
     outfitRecommendationCreateMock.mockClear()
-    const cachedResponse = await request(getHttpServer())
+    const cachedResponse = await request(baseUrl())
       .get('/api/v1/ritual')
       .set({ authorization: 'Bearer ritual-token' })
 
@@ -379,7 +380,7 @@ describe('RitualController', () => {
       partner_display_name: 'Sample Partner',
     })
 
-    const response = await request(getHttpServer())
+    const response = await request(baseUrl())
       .get('/api/v1/ritual')
       .set({ authorization: 'Bearer ritual-token' })
 
@@ -417,7 +418,7 @@ describe('RitualController', () => {
       partner_display_name: 'Sample Partner',
     })
 
-    const response = await request(getHttpServer())
+    const response = await request(baseUrl())
       .get('/api/v1/ritual')
       .set({ authorization: 'Bearer ritual-token' })
 
@@ -432,7 +433,7 @@ describe('RitualController', () => {
   })
 
   it('uses an explicit locale query and isolates the localized cache entry', async () => {
-    const response = await request(getHttpServer())
+    const response = await request(baseUrl())
       .get('/api/v1/ritual')
       .query({ locale: 'tr-TR' })
       .set({
@@ -448,7 +449,7 @@ describe('RitualController', () => {
   })
 
   it('rejects unsupported explicit locales', async () => {
-    const response = await request(getHttpServer())
+    const response = await request(baseUrl())
       .get('/api/v1/ritual')
       .query({ locale: 'ja-JP' })
       .set({ authorization: 'Bearer ritual-token' })

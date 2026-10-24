@@ -1,4 +1,4 @@
-import { listenHttpApp, httpTestUrl } from './helpers/loopback-http-app.js'
+import { listenHttpApp, httpTestUrl } from '../src/testing/loopback-http-app.js'
 // Learning path Step 16: Weather API ingestion service and durable worker ingestion.
 // See _bmad-output/project-knowledge/learning-path-step-by-step.md#step-16-weather-api-ingestion-service-and-durable-worker-ingestion
 import 'reflect-metadata'
@@ -145,7 +145,7 @@ describe('Weather API integration', () => {
   let app: INestApplication | undefined
   let prisma: ReturnType<typeof createPrismaStub>['prisma']
 
-  const getHttpServer = (): Parameters<typeof request>[0] => {
+  const baseUrl = (): string => {
     if (!app) {
       throw new Error('App is not initialized')
     }
@@ -350,14 +350,14 @@ describe('Weather API integration', () => {
   )
 
   it('requires auth and validates the canonical latest-weather response over HTTP', async () => {
-    const unauthorizedResponse = await request(getHttpServer()).get(
+    const unauthorizedResponse = await request(baseUrl()).get(
       `/api/v1/weather/${locationKey}`
     )
 
     expect(unauthorizedResponse.status).toBe(401)
     unauthorizedHttpErrorSchema.parse(unauthorizedResponse.body)
 
-    const missingLocationResponse = await request(getHttpServer())
+    const missingLocationResponse = await request(baseUrl())
       .get('/api/v1/weather/')
       .set(authHeaders)
 
@@ -366,7 +366,7 @@ describe('Weather API integration', () => {
     // whether Nest's router answered or something else on the socket did.
     expect(missingLocationResponse.status, missingLocationResponse.text).toBe(400)
 
-    const response = await request(getHttpServer())
+    const response = await request(baseUrl())
       .get(`/api/v1/weather/${locationKey}`)
       .set(authHeaders)
 

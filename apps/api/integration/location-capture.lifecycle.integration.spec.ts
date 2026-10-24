@@ -1,4 +1,4 @@
-import { httpTestUrl } from './helpers/loopback-http-app.js'
+import { httpTestUrl } from '../src/testing/loopback-http-app.js'
 import { InternalServerErrorException } from '@nestjs/common'
 import { createHmac, randomUUID } from 'node:crypto'
 import request from 'supertest'

@@ -12,8 +12,8 @@ import { MODULE_METADATA } from '@nestjs/common/constants'
 import { HttpAdapterHost } from '@nestjs/core'
 import { Test } from '@nestjs/testing'
 import request from 'supertest'
-import type { Server } from 'node:http'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
+import { listenHttpApp } from '../../testing/loopback-http-app.js'
 import {
   COMMUNITY_POST_NOT_FOUND_MESSAGE,
   COMMUNITY_AGE_GATE_DENIED_MESSAGE,
@@ -174,15 +174,7 @@ describe('CommunityModule HTTP privacy wiring', () => {
         captureEvent: vi.fn().mockResolvedValue(undefined),
       } as unknown as TelemetryService)
     )
-    // One explicit IPv4 listener per app. Handing supertest the bare server
-    // made it open an implicit listener per request, and under the full API
-    // coverage run one of those requests ended in "socket hang up".
-    await app.init()
-    await app.listen(0, '127.0.0.1')
-    const address = (app.getHttpServer() as Server).address()
-    if (!address || typeof address === 'string')
-      throw new Error('HTTP test app is not bound')
-    baseUrl = `http://127.0.0.1:${address.port}`
+    baseUrl = await listenHttpApp(app)
   })
 
   afterEach(async () => {

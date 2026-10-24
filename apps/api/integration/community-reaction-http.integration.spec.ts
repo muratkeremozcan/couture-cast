@@ -1,4 +1,4 @@
-import { listenHttpApp, httpTestUrl } from './helpers/loopback-http-app.js'
+import { listenHttpApp, httpTestUrl } from '../src/testing/loopback-http-app.js'
 import { communityReactionResponseSchema } from '@couture/api-client/contracts/http'
 import { Test } from '@nestjs/testing'
 import 'reflect-metadata'

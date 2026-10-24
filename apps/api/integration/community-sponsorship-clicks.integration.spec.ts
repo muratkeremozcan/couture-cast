@@ -22,7 +22,7 @@ import { FeatureFlagsService } from '../src/modules/feature-flags/feature-flags.
 import { FeatureFlagsWarmup } from '../src/modules/feature-flags/feature-flags.warmup.js'
 import { TelemetryService } from '../src/modules/telemetry/telemetry.service.js'
 import { isolatedCommunityDatabase } from './helpers/isolated-community-database.js'
-import { listenHttpApp } from './helpers/loopback-http-app.js'
+import { listenHttpApp } from '../src/testing/loopback-http-app.js'
 import {
   HOUR,
   SPONSOR_ALLOWED_HOST,

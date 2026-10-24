@@ -3,6 +3,7 @@ import { type INestApplication } from '@nestjs/common'
 import { Test, type TestingModule } from '@nestjs/testing'
 import request from 'supertest'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
+import { listenHttpApp, httpTestUrl } from '../../testing/loopback-http-app.js'
 import {
   createSavedLocationFromSearchResponseSchema,
   locationRequestErrorResponseSchema,
@@ -69,12 +70,12 @@ describe('LocationPreferencesController', () => {
     saveFromSearch: vi.fn().mockResolvedValue(savedLocation),
   }
 
-  const getHttpServer = (): Parameters<typeof request>[0] => {
+  const baseUrl = (): string => {
     if (!app) {
       throw new Error('App is not initialized')
     }
 
-    return app.getHttpServer() as Parameters<typeof request>[0]
+    return httpTestUrl(app)
   }
 
   beforeEach(async () => {
@@ -113,7 +114,7 @@ describe('LocationPreferencesController', () => {
       .compile()
 
     app = moduleFixture.createNestApplication()
-    await app.init()
+    await listenHttpApp(app)
   })
 
   afterEach(async () => {
@@ -133,13 +134,11 @@ describe('LocationPreferencesController', () => {
   })
 
   it('requires auth and lists saved locations for the authenticated user', async () => {
-    const unauthorizedResponse = await request(getHttpServer()).get('/api/v1/locations')
+    const unauthorizedResponse = await request(baseUrl()).get('/api/v1/locations')
 
     expect(unauthorizedResponse.status).toBe(401)
 
-    const response = await request(getHttpServer())
-      .get('/api/v1/locations')
-      .set(authHeaders)
+    const response = await request(baseUrl()).get('/api/v1/locations').set(authHeaders)
 
     expect(response.status).toBe(200)
     expect(listSavedLocationsResponseSchema.parse(response.body)).toEqual({
@@ -149,7 +148,7 @@ describe('LocationPreferencesController', () => {
   })
 
   it('creates, updates, and sets primary without accepting client ownership', async () => {
-    const createResponse = await request(getHttpServer())
+    const createResponse = await request(baseUrl())
       .post('/api/v1/locations')
       .set(authHeaders)
       .send({
@@ -163,7 +162,7 @@ describe('LocationPreferencesController', () => {
 
     expect(createResponse.status).toBe(400)
 
-    const validCreateResponse = await request(getHttpServer())
+    const validCreateResponse = await request(baseUrl())
       .post('/api/v1/locations')
       .set(authHeaders)
       .send({
@@ -186,7 +185,7 @@ describe('LocationPreferencesController', () => {
       expect.objectContaining({ locationKey: 'chicago-il' })
     )
 
-    const patchResponse = await request(getHttpServer())
+    const patchResponse = await request(baseUrl())
       .patch('/api/v1/locations/location-1')
       .set(authHeaders)
       .send({
@@ -203,7 +202,7 @@ describe('LocationPreferencesController', () => {
       expect.objectContaining({ label: 'Office' })
     )
 
-    const primaryResponse = await request(getHttpServer())
+    const primaryResponse = await request(baseUrl())
       .post('/api/v1/locations/location-1/primary')
       .set(authHeaders)
 
@@ -215,7 +214,7 @@ describe('LocationPreferencesController', () => {
   })
 
   it('1.2b-API-01 searches with the validated query, locale and platform', async () => {
-    const response = await request(getHttpServer())
+    const response = await request(baseUrl())
       .get('/api/v1/locations/search')
       .query({ q: ' Chicago ', locale: 'fr-FR' })
       .set({ ...authHeaders, 'x-couture-platform': 'web' })
@@ -237,7 +236,7 @@ describe('LocationPreferencesController', () => {
     [{ q: 'Chicago', locale: 'xx-XX' }],
     [{ q: 'Chicago', extra: '1' }],
   ])('1.2b-API-02 refuses %j with a typed 400 and no service call', async (query) => {
-    const response = await request(getHttpServer())
+    const response = await request(baseUrl())
       .get('/api/v1/locations/search')
       .query(query)
       .set({ ...authHeaders, 'x-couture-platform': 'web' })
@@ -250,19 +249,19 @@ describe('LocationPreferencesController', () => {
   })
 
   it('1.2b-API-03 requires auth and the platform header on both new routes', async () => {
-    const searchWithoutAuth = await request(getHttpServer())
+    const searchWithoutAuth = await request(baseUrl())
       .get('/api/v1/locations/search')
       .query({ q: 'Ch' })
       .set({ 'x-couture-platform': 'web' })
-    const searchWithoutPlatform = await request(getHttpServer())
+    const searchWithoutPlatform = await request(baseUrl())
       .get('/api/v1/locations/search')
       .query({ q: 'Chicago' })
       .set(authHeaders)
-    const saveWithoutAuth = await request(getHttpServer())
+    const saveWithoutAuth = await request(baseUrl())
       .post('/api/v1/locations/from-search')
       .set({ 'x-couture-platform': 'web' })
       .send(fromSearchBody)
-    const saveWithoutPlatform = await request(getHttpServer())
+    const saveWithoutPlatform = await request(baseUrl())
       .post('/api/v1/locations/from-search')
       .set(authHeaders)
       .send(fromSearchBody)
@@ -282,7 +281,7 @@ describe('LocationPreferencesController', () => {
   it('1.2b-API-04 sets Retry-After on the shared 429 body', async () => {
     captureService.search.mockRejectedValueOnce(new LocationSearchRateLimitException(17))
 
-    const response = await request(getHttpServer())
+    const response = await request(baseUrl())
       .get('/api/v1/locations/search')
       .query({ q: 'Chicago' })
       .set({ ...authHeaders, 'x-couture-platform': 'mobile' })
@@ -293,7 +292,7 @@ describe('LocationPreferencesController', () => {
   })
 
   it('1.2b-API-05 saves from search for the caller and refuses client-held fields', async () => {
-    const response = await request(getHttpServer())
+    const response = await request(baseUrl())
       .post('/api/v1/locations/from-search')
       .set({ ...authHeaders, 'x-couture-platform': 'mobile' })
       .send(fromSearchBody)
@@ -315,7 +314,7 @@ describe('LocationPreferencesController', () => {
       { country: 'US' },
       { userId: 'other' },
     ]) {
-      const refused = await request(getHttpServer())
+      const refused = await request(baseUrl())
         .post('/api/v1/locations/from-search')
         .set({ ...authHeaders, 'x-couture-platform': 'web' })
         .send({ ...fromSearchBody, ...extra })

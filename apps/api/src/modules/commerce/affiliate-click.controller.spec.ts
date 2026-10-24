@@ -10,6 +10,7 @@ import {
 import { Test, type TestingModule } from '@nestjs/testing'
 import request from 'supertest'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
+import { listenHttpApp, httpTestUrl } from '../../testing/loopback-http-app.js'
 import {
   COMMERCE_DISABLED_MESSAGE,
   COMMERCE_OFFER_NOT_FOUND_MESSAGE,
@@ -60,7 +61,7 @@ describe('AffiliateClickController', () => {
       .compile()
 
     app = moduleFixture.createNestApplication()
-    await app.init()
+    await listenHttpApp(app)
   })
 
   afterEach(async () => {
@@ -74,7 +75,7 @@ describe('AffiliateClickController', () => {
     if (!app) {
       throw new Error('App is not initialized')
     }
-    return request(app.getHttpServer() as Parameters<typeof request>[0])
+    return request(httpTestUrl(app))
       .post('/api/v1/commerce/affiliate/clicks')
       .set({ authorization: 'Bearer commerce-token' })
       .send(body)
@@ -117,7 +118,7 @@ describe('AffiliateClickController', () => {
       throw new Error('App is not initialized')
     }
 
-    await request(app.getHttpServer() as Parameters<typeof request>[0])
+    await request(httpTestUrl(app))
       .post('/api/v1/commerce/affiliate/clicks')
       .set({ authorization: 'Bearer commerce-token', 'accept-language': 'fr-CA' })
       .send(validBody)
@@ -134,7 +135,7 @@ describe('AffiliateClickController', () => {
       throw new Error('App is not initialized')
     }
 
-    const response = await request(app.getHttpServer() as Parameters<typeof request>[0])
+    const response = await request(httpTestUrl(app))
       .post('/api/v1/commerce/affiliate/clicks')
       .send(validBody)
 

@@ -30,7 +30,7 @@ import { CommunityCommentsProcessor } from '../../src/modules/community/communit
 import { CommunityCommentsService } from '../../src/modules/community/community-comments.service.js'
 import { DefaultCommunityModerationEngine } from '../../src/modules/community/community-moderation.engine.js'
 import { GuardianService } from '../../src/modules/guardian/guardian.service.js'
-import { listenHttpApp } from './loopback-http-app.js'
+import { listenHttpApp } from '../../src/testing/loopback-http-app.js'
 import { isolatedCommunityDatabase } from './isolated-community-database.js'
 
 export const SECOND_MS = 1000

@@ -17,7 +17,7 @@ import { CommunityController } from '../src/modules/community/community.controll
 import { CommunityService } from '../src/modules/community/community.service.js'
 import { CommunitySpotlightService } from '../src/modules/community/community-spotlight.service.js'
 import { communitySubjectToken } from '../src/modules/community/community-analytics.js'
-import { listenHttpApp } from './helpers/loopback-http-app.js'
+import { listenHttpApp } from '../src/testing/loopback-http-app.js'
 import {
   SPOTLIGHT_TEST_GRANT_VALID_UNTIL,
   spotlightTestContext,

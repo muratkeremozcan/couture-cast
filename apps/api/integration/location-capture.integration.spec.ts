@@ -1,4 +1,4 @@
-import { httpTestUrl } from './helpers/loopback-http-app.js'
+import { httpTestUrl } from '../src/testing/loopback-http-app.js'
 import { classifyClimateBand, canonicalSpotlightArea } from '@couture/utils'
 import request from 'supertest'
 import { expect, it } from 'vitest'

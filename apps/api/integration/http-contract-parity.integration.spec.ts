@@ -1,4 +1,4 @@
-import { listenHttpApp, httpTestUrl } from './helpers/loopback-http-app.js'
+import { listenHttpApp, httpTestUrl } from '../src/testing/loopback-http-app.js'
 // Learning path Step 13: Serve one canonical OpenAPI contract from the API boundary.
 // See _bmad-output/project-knowledge/learning-path-step-by-step.md#step-13-serve-one-canonical-openapi-contract-from-the-api-boundary
 // Learning path Step 15: Validate, generate, and consume the canonical contract.
@@ -60,7 +60,7 @@ describe('HTTP contract parity (integration)', () => {
     authorization: `Bearer test-token:${role}:${userId}`,
   })
 
-  const getHttpServer = (): Parameters<typeof request>[0] => {
+  const baseUrl = (): string => {
     if (!app) {
       throw new Error('App is not initialized')
     }
@@ -148,7 +148,7 @@ describe('HTTP contract parity (integration)', () => {
   })
 
   it('validates the API health route against the shared health schema', async () => {
-    const response = await request(getHttpServer()).get('/api/health')
+    const response = await request(baseUrl()).get('/api/health')
 
     expect(response.status).toBe(200)
     const body = apiHealthResponseSchema.parse(response.body)
@@ -157,7 +157,7 @@ describe('HTTP contract parity (integration)', () => {
   })
 
   it('validates the queue health route against the shared health schema', async () => {
-    const response = await request(getHttpServer()).get('/api/v1/health/queues')
+    const response = await request(baseUrl()).get('/api/v1/health/queues')
 
     expect(response.status).toBe(200)
     const body = queueHealthResponseSchema.parse(response.body)
@@ -176,11 +176,11 @@ describe('HTTP contract parity (integration)', () => {
       },
     ])
 
-    const unauthorizedResponse = await request(getHttpServer()).get('/api/v1/events/poll')
+    const unauthorizedResponse = await request(baseUrl()).get('/api/v1/events/poll')
     expect(unauthorizedResponse.status).toBe(401)
     unauthorizedHttpErrorSchema.parse(unauthorizedResponse.body)
 
-    const response = await request(getHttpServer())
+    const response = await request(baseUrl())
       .get('/api/v1/events/poll')
       .set({
         ...createHeaders('guardian-1', 'guardian'),
@@ -201,7 +201,7 @@ describe('HTTP contract parity (integration)', () => {
   })
 
   it('validates invalid poll cursors against the shared graceful-error schema', async () => {
-    const response = await request(getHttpServer())
+    const response = await request(baseUrl())
       .get('/api/v1/events/poll?since=not-a-date')
       .set(createHeaders('guardian-1', 'guardian'))
 
@@ -212,7 +212,7 @@ describe('HTTP contract parity (integration)', () => {
   })
 
   it('validates unauthorized profile requests against the shared error schema', async () => {
-    const response = await request(getHttpServer()).get('/api/v1/user/profile')
+    const response = await request(baseUrl()).get('/api/v1/user/profile')
 
     expect(response.status).toBe(401)
     unauthorizedHttpErrorSchema.parse(response.body)
@@ -233,7 +233,7 @@ describe('HTTP contract parity (integration)', () => {
       )
     )
 
-    const response = await request(getHttpServer())
+    const response = await request(baseUrl())
       .get('/api/v1/user/profile')
       .set(createHeaders(teen.id, 'teen'))
 
@@ -249,7 +249,7 @@ describe('HTTP contract parity (integration)', () => {
   it('validates missing profiles against the shared not-found schema', async () => {
     prismaUserFindUniqueMock.mockResolvedValue(null)
 
-    const response = await request(getHttpServer())
+    const response = await request(baseUrl())
       .get('/api/v1/user/profile')
       .set(createHeaders('missing-user', 'guardian'))
 

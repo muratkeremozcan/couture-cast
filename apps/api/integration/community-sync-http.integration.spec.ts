@@ -15,7 +15,7 @@ import {
   persistUser,
 } from '@couture/testing'
 import { isolatedCommunityDatabase } from './helpers/isolated-community-database.js'
-import { listenHttpApp } from './helpers/loopback-http-app.js'
+import { listenHttpApp } from '../src/testing/loopback-http-app.js'
 import { CommunitySyncController } from '../src/modules/community/community-sync.controller.js'
 import { CommunitySyncService } from '../src/modules/community/community-sync.service.js'
 import { CommunityTargetsService } from '../src/modules/community/community-targets.service.js'
