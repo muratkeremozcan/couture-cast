@@ -1,6 +1,7 @@
 /* eslint-disable @typescript-eslint/await-thenable */
 // Story 6.5 R43: a client-side deadline is transient and keeps verified content, and a
 // required D3 hide gives the member back their place in the feed when the same items return.
+// R46: the same hide gives back an unsent comment and the composer focus it had.
 import { CommunitySyncState } from '@couture/api-client'
 import { act, fireEvent, screen, waitFor } from '@testing-library/react'
 import { View } from 'react-native'
@@ -9,6 +10,7 @@ import { render } from 'vitest-browser-react'
 import { expect, it, vi } from 'vitest'
 import { CommunityScreen } from '@/src/features/community/community-screen'
 import { server } from '@/src/test-utils/msw/server'
+import { press } from '@/src/test-utils/press'
 import { feedJson, item, serveFeed } from './harness'
 
 const summary = {
@@ -147,5 +149,51 @@ export function registerCommunityAvailabilityRestoreCases() {
     }
     await screen.findByTestId('community-post-card-post-a')
     await waitFor(() => expect(list.scrollTop).toBe(600))
+  })
+
+  it('6.5-R46-MOB-001 gives the composer back its draft and focus after a stale-access hide', async () => {
+    const feed = verifiedFeed()
+    server.use(
+      http.get('*/api/v1/community/posts/post-a/comments', () =>
+        HttpResponse.json({
+          data: { items: [], nextCursor: null, snapshot: 1, hasNewer: false },
+        })
+      ),
+      http.get('*/api/v1/community/posts/post-a/comment-submissions', () =>
+        HttpResponse.json({ data: { items: [], nextCursor: null } })
+      )
+    )
+    await openVerifiedFeed(feed)
+    press(screen.getByTestId('community-card-comments-post-a'))
+    const composer = await screen.findByTestId<HTMLInputElement>('comment-body')
+    composer.focus()
+    fireEvent.change(composer, { target: { value: 'Typing on a slow phone' } })
+
+    // This catch-up verifies access at `verifiedFrom` or a little later.
+    const verifiedFrom = Date.now()
+    await act(() => feed.sync().catchUp())
+    const release = feed.hold()
+    let pending!: Promise<void>
+    // The socket drops 7.8 s after that verification. Content stays for the rest of the
+    // 8 s bound (D3), then the verification's stale timer hides it while the held
+    // catch-up still cannot verify access.
+    const clock = vi.spyOn(Date, 'now').mockReturnValue(verifiedFrom + 7_800)
+    try {
+      await act(() => {
+        const sync = feed.sync()
+        sync.foreground()
+        pending = sync.catchUp()
+      })
+      expect(screen.getByTestId('comment-body')).toBe(composer)
+      await waitFor(() => expect(screen.queryByTestId('comment-body')).toBeNull())
+      expect(screen.getByTestId('community-feed-unavailable')).toBeTruthy()
+    } finally {
+      clock.mockRestore()
+      release()
+      await act(() => pending)
+    }
+    const restored = await screen.findByTestId<HTMLInputElement>('comment-body')
+    expect(restored.value).toBe('Typing on a slow phone')
+    await waitFor(() => expect(document.activeElement).toBe(restored))
   })
 }

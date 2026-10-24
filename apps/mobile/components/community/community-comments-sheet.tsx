@@ -1,5 +1,11 @@
 // Story 6.4 owner: independently focusable native thread controls and modal feedback.
-import React, { useEffect, useRef, useState, useSyncExternalStore } from 'react'
+import React, {
+  useEffect,
+  useLayoutEffect,
+  useRef,
+  useState,
+  useSyncExternalStore,
+} from 'react'
 import {
   AccessibilityInfo,
   Keyboard,
@@ -24,21 +30,50 @@ import {
 } from '@couture/api-client/contracts/http'
 import { useHeroPalette } from '@/components/hero/hero-theme'
 import { safeFindNodeHandle } from '@/src/lib/accessibility-focus'
+import type {
+  CommunityCommentDraft,
+  CommunityCommentDrafts,
+} from '@/src/features/community/community-comment-drafts'
 
 // Android's non-translucent modal starts below the native status-bar inset.
 function modalKeyboardOffset(): number {
   return Platform.OS === 'android' ? (StatusBar.currentHeight ?? 0) : 0
 }
 
+/**
+ * R46: reports once, as the sheet unmounts, while the composer is still attached. React
+ * runs this wrapper's layout cleanup before it removes the composer's host node, so the
+ * composer's own focus state is still live here, whatever blur the platform sends for
+ * the removal itself.
+ */
+function ComposerUnmount({
+  onUnmount,
+  children,
+}: {
+  onUnmount: () => void
+  children: React.ReactNode
+}) {
+  const latest = useRef(onUnmount)
+  latest.current = onUnmount
+  useLayoutEffect(() => () => latest.current(), [])
+  return children
+}
+
 export function CommunityCommentsSheet({
   postId,
   state,
+  drafts,
+  member,
   locale,
   target,
   onClose,
 }: {
   postId: string | null
   state: CommunityCommentsState
+  /** The screen's in-memory copy of the member's own unsent comments (R46). */
+  drafts: CommunityCommentDrafts
+  /** The signed-in member the drafts belong to; null holds nothing. */
+  member: string | null
   target?: {
     commentId: string
     parentId: string | null
@@ -64,6 +99,7 @@ export function CommunityCommentsSheet({
   const entries = useRef(new Map<string, View | null>())
   const focused = useRef<string | null>(null)
   const removedFocus = useRef<string | null>(null)
+  const refocusComposer = useRef(false)
   const thread = state.current(postId ?? '__closed__')
   const focus = (ref: React.RefObject<Text | View | null>) => {
     const node = safeFindNodeHandle(ref.current)
@@ -77,6 +113,21 @@ export function CommunityCommentsSheet({
     void state.statuses(postId)
     return state.watchSubmissions(postId)
   }, [postId, state, target])
+  useEffect(() => {
+    // R46: an unverified-access hide unmounts the sheet mid-comment. On the next mount
+    // for the same member and post, the held draft fills a composer the comment state
+    // lost, and focus returns only to a composer that had it.
+    refocusComposer.current = false
+    if (!postId || !member) return
+    const held = drafts.restore(member, postId)
+    if (!held) return
+    const current = state.current(postId).draft
+    if (!current.body && !current.parentId)
+      state.draft(postId, { body: held.body, parentId: held.parentId })
+    if (!held.focused) return
+    refocusComposer.current = true
+    composerRef.current?.focus()
+  }, [drafts, member, postId, state])
   useEffect(() => {
     if (!postId) return
     const announcement = state.consumeAnnouncement(postId)
@@ -142,9 +193,31 @@ export function CommunityCommentsSheet({
       </Text>
     </TouchableOpacity>
   )
+  const edit = (draft: Partial<Pick<CommunityCommentDraft, 'body' | 'parentId'>>) => {
+    state.draft(postId, draft)
+    if (member) drafts.remember(member, postId, draft)
+  }
+  const close = () => {
+    if (member) drafts.forget(member, postId)
+    onClose()
+  }
   const submit = () => {
     Keyboard.dismiss()
-    void state.submit(postId, locale)
+    const submitted = state.current(postId)
+    void state.submit(postId, locale).then(() => {
+      // Only an accepted submission in this same thread releases the held copy. A reset
+      // or eviction during the request leaves it for the sheet to give back.
+      if (
+        !member ||
+        state.current(postId) !== submitted ||
+        submitted.unresolved ||
+        submitted.error
+      )
+        return
+      const { body, parentId } = submitted.draft
+      if (!body && !parentId) drafts.forget(member, postId)
+      else drafts.remember(member, postId, { body, parentId })
+    })
   }
   const context = (item: CommunityComment) =>
     [item.author, item.unavailable ? t('community.comments.unavailable') : item.body]
@@ -180,7 +253,7 @@ export function CommunityCommentsSheet({
           button(
             t('community.comments.reply'),
             () => {
-              state.draft(postId, { parentId: item.id })
+              edit({ parentId: item.id })
               composerRef.current?.focus()
             },
             false,
@@ -264,8 +337,14 @@ export function CommunityCommentsSheet({
       visible
       transparent
       animationType="slide"
-      onRequestClose={onClose}
+      onRequestClose={close}
       onShow={() => {
+        // A native composer can only take focus once its modal is on screen.
+        if (refocusComposer.current) {
+          refocusComposer.current = false
+          composerRef.current?.focus()
+          return
+        }
         if (!target) focus(titleRef)
       }}
     >
@@ -287,7 +366,7 @@ export function CommunityCommentsSheet({
             >
               {t('community.comments.title')}
             </Text>
-            {button(t('community.comments.close'), onClose, false, 'comments-close')}
+            {button(t('community.comments.close'), close, false, 'comments-close')}
           </View>
           <ScrollView
             keyboardShouldPersistTaps="handled"
@@ -391,33 +470,46 @@ export function CommunityCommentsSheet({
                   {t('community.comments.replying')}
                   {replyContext()}
                 </Text>
-                {button(t('community.comments.cancel'), () =>
-                  state.draft(postId, { parentId: null })
-                )}
+                {button(t('community.comments.cancel'), () => edit({ parentId: null }))}
               </View>
             )}
             <Text style={[styles.author, { color: palette.text }]}>
               {t('community.comments.compose')}
             </Text>
-            <TextInput
-              ref={composerRef}
-              testID="comment-body"
-              accessibilityLabel={t('community.comments.compose')}
-              value={thread.draft.body}
-              multiline={false}
-              returnKeyType="send"
-              onChangeText={(body) => state.draft(postId, { body })}
-              onEndEditing={(event) => {
-                const body = event.nativeEvent.text
-                if (state.current(postId).draft.body === body)
-                  state.draft(postId, { body: body.normalize('NFC') })
+            <ComposerUnmount
+              onUnmount={() => {
+                if (member)
+                  drafts.retainFocus(
+                    member,
+                    postId,
+                    composerRef.current?.isFocused() ?? false
+                  )
               }}
-              onSubmitEditing={submit}
-              style={[
-                styles.input,
-                { color: palette.text, borderColor: palette.mutedText },
-              ]}
-            />
+            >
+              <TextInput
+                ref={composerRef}
+                testID="comment-body"
+                accessibilityLabel={t('community.comments.compose')}
+                value={thread.draft.body}
+                multiline={false}
+                returnKeyType="send"
+                onChangeText={(body) => edit({ body })}
+                onFocus={() => {
+                  // Holds even an empty draft, so a focused composer keeps its focus.
+                  if (member) drafts.remember(member, postId, {})
+                }}
+                onEndEditing={(event) => {
+                  const body = event.nativeEvent.text
+                  if (state.current(postId).draft.body === body)
+                    edit({ body: body.normalize('NFC') })
+                }}
+                onSubmitEditing={submit}
+                style={[
+                  styles.input,
+                  { color: palette.text, borderColor: palette.mutedText },
+                ]}
+              />
+            </ComposerUnmount>
             <Text style={{ color: palette.text }}>
               {t('community.comments.count', {
                 count: thread.draft.body.normalize('NFC').trim().length,

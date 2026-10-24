@@ -17,6 +17,7 @@ import {
 } from '@couture/api-client'
 import { CommunityCommentsSheet } from '@/components/community/community-comments-sheet'
 import { useCommunityScrollRestore } from './use-community-scroll-restore'
+import { CommunityCommentDrafts } from './community-comment-drafts'
 import {
   communityCommentsSessionFromMobile,
   communitySyncFromMobile,
@@ -281,6 +282,8 @@ export function CommunityScreen() {
   const commentsInvokerRef = useRef<View | null>(null)
   const highlightedCommentsButtonRef = useRef<View | null>(null)
   const commentsButtonRefs = useRef(new Map<string, View | null>())
+  // R46: the member's own unsent comments outlive an unverified-access hide.
+  const [commentDrafts] = useState(() => new CommunityCommentDrafts())
   const [comments] = useState(
     () =>
       new CommunityCommentsState(
@@ -863,6 +866,7 @@ export function CommunityScreen() {
       comments.setSession(identity)
       setSessionScope(identity)
       if (previous === undefined || previous === identity) return
+      commentDrafts.forgetAll()
       feedScopeRef.current++
       requestGenerationRef.current++
       detailGenerationRef.current++
@@ -927,7 +931,7 @@ export function CommunityScreen() {
       clearInterval(timer)
       comments.reset()
     }
-  }, [comments, reactionState, loadFeed])
+  }, [commentDrafts, comments, reactionState, loadFeed])
 
   useEffect(() => {
     void loadFeed(mode)
@@ -1946,6 +1950,8 @@ export function CommunityScreen() {
         postId={communityAvailable ? commentsPostId : null}
         target={commentsPostId === deepLinkPost?.id ? commentTarget : undefined}
         state={comments}
+        drafts={commentDrafts}
+        member={sessionScope ?? null}
         locale={locale}
         onClose={() => {
           notificationIntentRef.current++

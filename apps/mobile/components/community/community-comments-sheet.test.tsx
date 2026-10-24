@@ -1,5 +1,5 @@
 import React from 'react'
-import { fireEvent, render, screen, waitFor, within } from '@testing-library/react'
+import { act, fireEvent, render, screen, waitFor, within } from '@testing-library/react'
 import { http, HttpResponse } from 'msw'
 import { beforeAll, beforeEach, afterEach, describe, expect, it, vi } from 'vitest'
 import * as ReactNative from 'react-native'
@@ -21,6 +21,7 @@ import {
 } from '@/src/lib/community'
 import i18n, { initI18n } from '@/src/lib/i18n'
 import { server } from '@/src/test-utils/msw/server'
+import { CommunityCommentDrafts } from '@/src/features/community/community-comment-drafts'
 import { press } from '@/src/test-utils/press'
 import { CommunityCommentsSheet } from './community-comments-sheet'
 
@@ -62,6 +63,7 @@ const root = createCommunityComment({ id: 'root', replyCount: 1 })
 // The factory's own author and body, joined the way every entry names its actions.
 const ROOT_CONTEXT = 'Style Explorer A1B2C3D4. A lovely layered look.'
 const POST_ID = root.postId
+const MEMBER = 'member-a'
 const base = `*/api/v1/community/posts/${POST_ID}`
 const page = (items = [root]) => ({
   data: { items, nextCursor: null, snapshot: 2, hasNewer: false },
@@ -95,14 +97,20 @@ const sheet = ({
   state,
   onClose = vi.fn(),
   postId = POST_ID,
+  drafts = new CommunityCommentDrafts(),
+  member = MEMBER,
 }: {
   state: CommunityCommentsState
   onClose?: () => void
   postId?: string | null
+  drafts?: CommunityCommentDrafts
+  member?: string | null
 }) => (
   <CommunityCommentsSheet
     postId={postId}
     state={state}
+    drafts={drafts}
+    member={member}
     locale="en-US"
     onClose={onClose}
   />
@@ -696,6 +704,8 @@ it('R07 moves a removed notification target to the stable thread landmark once',
     <CommunityCommentsSheet
       postId={POST_ID}
       state={state}
+      drafts={new CommunityCommentDrafts()}
+      member={MEMBER}
       locale="en-US"
       onClose={vi.fn()}
       target={{
@@ -723,4 +733,119 @@ it('R07 moves a removed notification target to the stable thread landmark once',
   expect(vi.mocked(announceForAccessibility).mock.calls.slice(before)).toEqual([
     ['Unavailable.'],
   ])
+})
+
+/**
+ * Story 6.5 R46: an unverified-access hide unmounts the sheet while the member types
+ * (the screen passes a null post), and a reset or eviction meanwhile wipes the shared
+ * comment state. Only the screen's in-memory drafts can give the comment back.
+ */
+describe('R46 unsent comment across an unverified-access hide', () => {
+  /** Types into the composer, hides the sheet, wipes the comment state, shows it again. */
+  async function typeHideWipeAndReturn({
+    focused,
+    member = MEMBER,
+  }: {
+    focused: boolean
+    member?: string
+  }) {
+    const state = makeState()
+    const drafts = new CommunityCommentDrafts()
+    const view = render(sheet({ state, drafts }))
+    await screen.findByText('A lovely layered look.')
+    const composer = screen.getByTestId<HTMLInputElement>('comment-body')
+    composer.focus()
+    fireEvent.change(composer, { target: { value: 'Half a thought about the coat' } })
+    if (!focused) composer.blur()
+    expect(document.activeElement === composer).toBe(focused)
+
+    view.rerender(sheet({ state, drafts, postId: null }))
+    expect(screen.queryByTestId('comment-body')).toBeNull()
+    act(() => state.reset())
+    view.rerender(sheet({ state, drafts, member }))
+    await screen.findByText('A lovely layered look.')
+    return {
+      state,
+      drafts,
+      view,
+      composer: screen.getByTestId<HTMLInputElement>('comment-body'),
+    }
+  }
+
+  it('restores the draft and the composer focus it had when the sheet unmounted', async () => {
+    const { composer } = await typeHideWipeAndReturn({ focused: true })
+    expect(composer).toHaveValue('Half a thought about the coat')
+    await waitFor(() => expect(document.activeElement).toBe(composer))
+  })
+
+  it('restores a draft whose composer was not focused without taking focus', async () => {
+    const { composer } = await typeHideWipeAndReturn({ focused: false })
+    expect(composer).toHaveValue('Half a thought about the coat')
+    // The sheet opens on its title, as for any other open.
+    await waitFor(() =>
+      expect(setAccessibilityFocus).toHaveBeenLastCalledWith(nodeHandle(sheetTitle()))
+    )
+    expect(document.activeElement).not.toBe(composer)
+  })
+
+  it('never gives one member the draft of another', async () => {
+    const { composer, drafts } = await typeHideWipeAndReturn({
+      focused: true,
+      member: 'member-b',
+    })
+    expect(composer).toHaveValue('')
+    expect(document.activeElement).not.toBe(composer)
+    expect(drafts.restore('member-b', POST_ID)).toBeNull()
+  })
+
+  it('drops the draft when the member closes the sheet', async () => {
+    const state = makeState()
+    const drafts = new CommunityCommentDrafts()
+    const close = vi.fn()
+    const view = render(sheet({ state, drafts, onClose: close }))
+    await screen.findByText('A lovely layered look.')
+    const composer = screen.getByTestId<HTMLInputElement>('comment-body')
+    composer.focus()
+    fireEvent.change(composer, { target: { value: 'Never mind' } })
+    press(screen.getByTestId('comments-close'))
+    expect(close).toHaveBeenCalledOnce()
+
+    view.rerender(sheet({ state, drafts, onClose: close, postId: null }))
+    act(() => state.reset())
+    view.rerender(sheet({ state, drafts, onClose: close }))
+    await screen.findByText('A lovely layered look.')
+    expect(screen.getByTestId('comment-body')).toHaveValue('')
+    expect(document.activeElement).not.toBe(screen.getByTestId('comment-body'))
+    expect(drafts.restore(MEMBER, POST_ID)).toBeNull()
+  })
+
+  it('drops the draft once the comment is accepted', async () => {
+    let posted = 0
+    server.use(
+      http.post(`${base}/comments`, () => {
+        posted++
+        return HttpResponse.json({
+          data: createCommunityCommentSubmission({ body: 'Sent for good' }),
+        })
+      })
+    )
+    const state = makeState()
+    const drafts = new CommunityCommentDrafts()
+    const view = render(sheet({ state, drafts }))
+    await screen.findByText('A lovely layered look.')
+    fireEvent.change(screen.getByTestId('comment-body'), {
+      target: { value: 'Sent for good' },
+    })
+    expect(drafts.restore(MEMBER, POST_ID)?.body).toBe('Sent for good')
+    press(screen.getByRole('button', { name: 'Send comment' }))
+    await waitFor(() => expect(screen.getByTestId('comment-body')).toHaveValue(''))
+    expect(posted).toBe(1)
+    expect(drafts.restore(MEMBER, POST_ID)).toBeNull()
+
+    view.rerender(sheet({ state, drafts, postId: null }))
+    act(() => state.reset())
+    view.rerender(sheet({ state, drafts }))
+    await screen.findByText('A lovely layered look.')
+    expect(screen.getByTestId('comment-body')).toHaveValue('')
+  })
 })
