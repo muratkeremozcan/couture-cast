@@ -365,7 +365,13 @@ tags:
     id: 'community-card-report-lookbook-5'
 - extendedWaitUntil:
     visible:
+      id: 'submit-report-button'
+    timeout: 15000
+# The details field sits below the reasons, inside the dialog's own scroll view.
+- scrollUntilVisible:
+    element:
       id: 'report-details-input'
+    direction: DOWN
     timeout: 15000
 - tapOn:
     id: 'report-details-input'
