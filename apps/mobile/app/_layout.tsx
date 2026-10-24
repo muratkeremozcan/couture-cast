@@ -246,7 +246,6 @@ function RootLayoutNav() {
             <View
               testID="app-root-mounted"
               collapsable={false}
-              pointerEvents="none"
               style={styles.mountedMarker}
             />
           </ThemeProvider>
@@ -262,6 +261,7 @@ const styles = StyleSheet.create({
   // Android accessibility tree dropped it there.
   mountedMarker: {
     position: 'absolute',
+    pointerEvents: 'none',
     top: '50%',
     left: 0,
     width: 1,

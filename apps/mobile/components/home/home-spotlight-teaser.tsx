@@ -217,7 +217,6 @@ export const HomeSpotlightTeaser = forwardRef<View, HomeSpotlightTeaserProps>(
           <View
             testID="home-spotlight-teaser-image-loaded"
             collapsable={false}
-            pointerEvents="none"
             style={styles.loadedMarker}
           />
         ) : null}
@@ -282,7 +281,6 @@ function FocusMarker({
     <View
       testID={`home-spotlight-teaser-${kind}-${move.target}-${move.count}`}
       collapsable={false}
-      pointerEvents="none"
       style={styles.focusMarker}
     />
   )
@@ -293,6 +291,7 @@ const styles = StyleSheet.create({
   // at the end of the scroll content, where the teaser would be.
   focusMarker: {
     position: 'absolute',
+    pointerEvents: 'none',
     bottom: 0,
     left: 0,
     width: 1,
@@ -344,6 +343,7 @@ const styles = StyleSheet.create({
   },
   loadedMarker: {
     position: 'absolute',
+    pointerEvents: 'none',
     top: 0,
     left: 0,
     width: 1,

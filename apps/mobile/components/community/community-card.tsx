@@ -133,7 +133,6 @@ function CommunityCardMedia({
             <View
               testID={`community-card-image-loaded-${postId}`}
               collapsable={false}
-              pointerEvents="none"
               style={styles.loadedMarker}
             />
           ) : null}
@@ -599,6 +598,7 @@ const styles = StyleSheet.create({
   },
   loadedMarker: {
     position: 'absolute',
+    pointerEvents: 'none',
     top: 0,
     left: 0,
     width: 1,

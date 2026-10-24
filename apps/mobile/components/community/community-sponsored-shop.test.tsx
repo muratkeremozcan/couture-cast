@@ -75,6 +75,7 @@ import { mockAffiliateRedirectUrl } from '@/src/test-utils/msw/handlers'
 import { setMobileAccessTokenResolver } from '@/src/lib/mobile-auth'
 import { SponsoredCtaImpressions } from '@/src/features/community/sponsored-cta-impressions'
 import { HomeSpotlightTeaser } from '@/components/home/home-spotlight-teaser'
+import { failOnConsoleWarn } from '@/src/test-utils/console-guard'
 import { CommunityCard } from './community-card'
 
 const PIXEL =
@@ -159,6 +160,10 @@ const minted = () =>
 const shownEvents = () =>
   captureMock.mock.calls.filter(([event]) => event === 'affiliate_cta_shown')
 
+// The card's image-loaded marker renders here (MOB-018 waits for it), and a
+// marker that passes `pointerEvents` as a prop warns on react-native-web.
+failOnConsoleWarn()
+
 describe('sponsored community CTA (Story 6.7b)', () => {
   let restoreAccessToken: (() => void) | undefined
 
@@ -183,6 +188,14 @@ describe('sponsored community CTA (Story 6.7b)', () => {
   })
 
   describe('community card', () => {
+    it('6.7b-MOB-018 renders the sponsored card through its image load without a warning', async () => {
+      render(card())
+
+      // The marker that proves the load; the suite guard fails on any warning.
+      await screen.findByTestId('community-card-image-loaded-post-a')
+      expect(screen.getByTestId('community-card-shop-post-a')).toBeInTheDocument()
+    })
+
     it('6.7b-MOB-010 mints a community_feed click for the post, then opens the in-app browser', async () => {
       const bodies = serveClicks(minted)
       render(card())

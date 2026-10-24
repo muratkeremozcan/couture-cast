@@ -78,6 +78,7 @@ import {
   recordPersistedWrites,
 } from '@/src/test-utils/persisted-writes'
 import { saveRitualCache } from '@/src/lib/ritual-cache'
+import { failOnConsoleWarn } from '@/src/test-utils/console-guard'
 import { server } from '@/src/test-utils/msw/server'
 import {
   mockAffiliateRedirectUrl,
@@ -136,6 +137,11 @@ afterEach(() => {
   restoreToken?.()
   setMobileApplicationUserId(null)
 })
+
+// The teaser's image-loaded marker (MOB-001) and focus markers (MOB-010,
+// MOB-011) render here, and a marker that passes `pointerEvents` as a prop warns
+// on react-native-web.
+failOnConsoleWarn()
 
 describe('6.7 mobile Home spotlight teaser', () => {
   it('6.7-MOB-001 shows the area label, decorative image, author and reaction count after the hero', async () => {
