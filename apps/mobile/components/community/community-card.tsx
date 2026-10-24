@@ -180,17 +180,20 @@ function CommunityCardActions({
   // "Reported, dimmed" rather than an unexplained button.
   const label = isReported ? t('community.card.reported') : t('community.card.report')
 
+  // A Pressable: this control is disabled once reported, and react-native-web's
+  // disabled TouchableOpacity hands its View a deprecated `pointerEvents` prop.
   return (
-    <TouchableOpacity
+    <Pressable
       testID={`community-card-report-${item.id}`}
       accessibilityRole="button"
       accessibilityLabel={label}
       accessibilityState={{ disabled: isReported }}
       disabled={isReported}
-      style={[
+      style={({ pressed }) => [
         styles.secondaryButton,
         { borderColor: palette.mutedText },
         isReported && styles.secondaryButtonSettled,
+        pressed && styles.pressed,
       ]}
       onPress={() => {
         void onReport(item)
@@ -204,7 +207,7 @@ function CommunityCardActions({
       >
         {label}
       </Text>
-    </TouchableOpacity>
+    </Pressable>
   )
 }
 
@@ -633,6 +636,10 @@ const styles = StyleSheet.create({
     gap: 8,
     paddingHorizontal: 14,
     paddingVertical: 10,
+  },
+  pressed: {
+    // TouchableOpacity's default `activeOpacity`.
+    opacity: 0.2,
   },
   secondaryButton: {
     paddingHorizontal: 14,

@@ -90,7 +90,12 @@ imageSpy.createElement = createElement
 import enUS from '@/assets/locales/en-US.json'
 import i18n, { initI18n } from '@/src/lib/i18n'
 import { press } from '@/src/test-utils/press'
+import { failOnConsoleWarn } from '@/src/test-utils/console-guard'
 import { CommunityCard, IMAGE_LOAD_TIMEOUT_MS } from './community-card'
+
+// Every card state renders here, the disabled Reported control and the
+// image-loaded marker among them, so a deprecated prop warns and fails.
+failOnConsoleWarn()
 
 /** A real 1x1 PNG: `ImageLoader` resolves it without touching the network. */
 const PIXEL =
