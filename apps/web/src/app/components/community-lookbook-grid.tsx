@@ -2098,9 +2098,16 @@ export function CommunityLookbookGrid({
    * block on every copy of that post this surface holds. Only the realtime
    * resolve path, which does not opt in, keeps a block from the last live read.
    */
+  /**
+   * The latest live answer per post, block or explicit absence. Realtime
+   * resolve copies do not opt in, so every resolve consumer settles its post
+   * against this ledger when it commits, never against an older copy.
+   */
+  const liveSponsorshipRef = useRef(new Map<string, CommunitySponsorship | undefined>())
   const applyLiveSponsorship = useCallback((posts: readonly CommunityFeedItem[]) => {
     const live = liveSponsorshipOf(posts)
     if (live.size === 0) return
+    for (const [postId, block] of live) liveSponsorshipRef.current.set(postId, block)
     const update = (post: CommunityFeedItem | null) =>
       post ? withLiveSponsorship(post, live) : post
     setItems((previous) => previous.map((post) => withLiveSponsorship(post, live)))
@@ -2441,6 +2448,8 @@ export function CommunityLookbookGrid({
       actionControllerRef.current?.abort()
       reactionState.reset()
       resetSpotlight()
+      // Live answers are per viewer.
+      liveSponsorshipRef.current.clear()
       // A teaser intent and its notice belong to the member who tapped it.
       setPendingFocus(null)
       setSpotlightNotice(null)
@@ -2539,8 +2548,15 @@ export function CommunityLookbookGrid({
             if (post) fresh.push(post)
           }
       }
+      // Story 6.7b: the resolve carries no sponsorship answer, so each revealed
+      // look takes the latest live answer at the moment it is inserted.
       setItems((previous) => [
-        ...new Map([...fresh, ...previous].map((post) => [post.id, post])).values(),
+        ...new Map(
+          [
+            ...fresh.map((post) => withLiveSponsorship(post, liveSponsorshipRef.current)),
+            ...previous,
+          ].map((post) => [post.id, post])
+        ).values(),
       ])
       newLooksRef.current = []
       setNewLooks([])
@@ -2639,21 +2655,18 @@ export function CommunityLookbookGrid({
           applySpotlight((item) => (item?.id === target.key ? null : item))
           return
         }
-        const updated = reactionState.read(target.post, reactionState.beginRead())
-        if (!updated) return
+        const resolved = reactionState.read(target.post, reactionState.beginRead())
+        if (!resolved) return
+        // Story 6.7b: the target resolve does not opt in to sponsorship, so the
+        // post carries the latest live answer for it, block or absence, on
+        // every copy, the New looks buffer included.
+        const updated = withLiveSponsorship(resolved, liveSponsorshipRef.current)
         newLooksRef.current = newLooksRef.current.map((item) =>
           item.id === target.post.id ? updated : item
         )
         setNewLooks(newLooksRef.current)
-        // Story 6.7b: the target resolve does not opt in to sponsorship, so the
-        // block from this post's last live read stays until the next live read
-        // replaces it or removes it.
         const update = (item: CommunityFeedItem | null) =>
-          item?.id === target.post.id
-            ? item.sponsorship
-              ? { ...updated, sponsorship: item.sponsorship }
-              : updated
-            : item
+          item?.id === target.post.id ? updated : item
         setItems((previous) => previous.map((item) => update(item)!))
         setOpenedItem(update)
         setDeepLinkedItem(update)
@@ -2701,6 +2714,7 @@ export function CommunityLookbookGrid({
           comments.reset()
           reactionState.reset()
           resetSpotlight()
+          liveSponsorshipRef.current.clear()
           setItems([])
           setOpenedItem(null)
           setNewLooks([])

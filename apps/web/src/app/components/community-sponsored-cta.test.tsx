@@ -571,6 +571,129 @@ describe('Sponsored community CTA (Story 6.7b)', () => {
     expect(card).toHaveAttribute('aria-labelledby', 'lookbook-card-title-post-1')
   })
 
+  it.each([
+    ['keeps the live block across both resolves', false],
+    ['takes a removal read before the reveal', true],
+  ])(
+    '6.7b-WEB-023 a sponsored look revealed through Show new looks %s',
+    async (_label, endsBeforeReveal) => {
+      signIn()
+      const catchUp = captureSync()
+      const state = { published: false, ended: false, cursor: 0, feedReads: 0 }
+      const resolved: string[][] = []
+      useMswHandlers(
+        http.get(FEED_PATH, () => {
+          state.feedReads += 1
+          return HttpResponse.json(
+            communitySponsoredFeedResponseSchema.parse({
+              data: feed({
+                items: state.published
+                  ? [
+                      state.ended
+                        ? { ...item({ id: 'post-new' }), reactions: ZERO }
+                        : sponsoredItem({ id: 'post-new', reactions: ZERO }),
+                      { ...item(), reactions: ZERO },
+                    ]
+                  : [{ ...item(), reactions: ZERO }],
+              }),
+            }) as unknown as Record<string, unknown>
+          )
+        }),
+        http.get('/api/v1/community/events', () =>
+          HttpResponse.json({
+            data: {
+              events: state.published
+                ? [
+                    {
+                      version: 1,
+                      kind: 'post.published',
+                      postId: 'post-new',
+                      communityRevision: state.ended ? '2' : '1',
+                    },
+                    {
+                      version: 1,
+                      kind: 'reactions.changed',
+                      postId: 'post-new',
+                      communityRevision: state.ended ? '2' : '1',
+                    },
+                  ]
+                : [],
+              nextCursor: `cursor-${(state.cursor += 1)}`,
+              hasMore: false,
+              resyncRequired: false,
+            },
+          })
+        ),
+        // The resolve route does not opt in, so it never carries a block.
+        http.post('/api/v1/community/targets/resolve', async ({ request }) => {
+          const { targets } = (await request.json()) as { targets: { key: string }[] }
+          resolved.push(targets.map((target) => target.key))
+          return HttpResponse.json({
+            data: {
+              targets: targets.map((target) => ({
+                key: target.key,
+                status: 'available',
+                communityRevision: '1',
+                post: { ...item({ id: target.key }), reactions: ZERO },
+                comment: null,
+                parent: null,
+                pageCursor: null,
+                parentPageCursor: null,
+                threadPosition: null,
+              })),
+            },
+          })
+        })
+      )
+      const user = userEvent.setup()
+      renderGrid()
+
+      await screen.findByTestId('lookbook-card-post-1')
+      await catchUp()
+      state.published = true
+      await catchUp()
+
+      // The opted-in rebuild buffered the sponsored look, and target validation
+      // resolved the buffered copy without a block.
+      const reveal = await screen.findByRole('button', { name: 'Show 1 new looks' })
+      await waitFor(() => expect(resolved.flat()).toContain('post-new'))
+      if (endsBeforeReveal) {
+        // The owner ends the link; the next opted-in rebuild answers no block.
+        state.ended = true
+        const reads = state.feedReads
+        await catchUp()
+        await waitFor(() => expect(state.feedReads).toBeGreaterThan(reads))
+      }
+      const resolvesBeforeReveal = resolved.length
+      await user.click(reveal)
+      // The reveal resolves the look again before inserting it.
+      await waitFor(() => expect(resolved.length).toBeGreaterThan(resolvesBeforeReveal))
+
+      const card = await screen.findByTestId('lookbook-card-post-new')
+      if (endsBeforeReveal) {
+        expect(screen.queryByTestId('sponsored-cta-post-new')).not.toBeInTheDocument()
+        expect(screen.queryByTestId('sponsored-badge-post-new')).not.toBeInTheDocument()
+        expect(card).toHaveAttribute('aria-labelledby', 'lookbook-card-title-post-new')
+        return
+      }
+      const cta = await screen.findByTestId('sponsored-cta-post-new')
+      expect(cta).toHaveAccessibleName(CTA_LABEL)
+      expect(
+        within(screen.getByTestId('sponsored-badge-post-new')).getByText('Partnered')
+      ).toBeVisible()
+      expect(card).toHaveAttribute(
+        'aria-labelledby',
+        'lookbook-card-title-post-new lookbook-card-sponsored-post-new'
+      )
+      expect(screen.queryByTestId('sponsored-cta-post-1')).not.toBeInTheDocument()
+      await waitFor(() =>
+        expect(shownEvents().map((event) => event.properties.surface)).toEqual([
+          'community_feed',
+        ])
+      )
+    }
+  )
+
   it('6.7b-WEB-020 has no axe violations with sponsored feed and spotlight cards and an error state', async () => {
     signIn()
     const clicks = clickHandler(() => errorBody(500, 'Internal server error', 'Error'))
