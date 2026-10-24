@@ -263,6 +263,11 @@ export function CommunityCommentsSheet({
     state.draft(postId, draft)
     if (member) drafts.remember(member, postId, draft)
   }
+  // R51: closing the keyboard keeps the sheet, and the thread region returns at once.
+  const dismissKeyboard = () => {
+    Keyboard.dismiss()
+    setKeyboardOpen(false)
+  }
   const close = () => {
     // Story 6.4: an explicit close keeps the unsent text, in the thread and held, for the
     // next open. That open starts on the title, so the composer is recorded unfocused.
@@ -413,8 +418,7 @@ export function CommunityCommentsSheet({
         // R51: Back with the keyboard open closes the keyboard and keeps the sheet. On
         // Android 16 the modal otherwise takes that Back as a close request.
         if (!keyboardOpen) return close()
-        Keyboard.dismiss()
-        setKeyboardOpen(false)
+        dismissKeyboard()
       }}
       onShow={() => {
         // A native composer can only take focus once its modal is on screen.
@@ -439,6 +443,11 @@ export function CommunityCommentsSheet({
             ]}
             accessibilityViewIsModal
             accessible={false}
+            // R51: iOS has no Back, the thread region is hidden and the return key sends,
+            // so a tap on the sheet outside its controls closes the keyboard. Controls and
+            // the composer take their own taps first.
+            onStartShouldSetResponder={() => keyboardOpen}
+            onResponderRelease={dismissKeyboard}
           >
             <View style={styles.row}>
               <Text

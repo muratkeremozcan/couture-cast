@@ -1094,6 +1094,49 @@ describe('R51 comments sheet with the keyboard open', () => {
     expect(onClose).toHaveBeenCalledOnce()
   })
 
+  // On the web the responder system starts on mousedown and releases on mouseup.
+  const tapOutsideControls = (element: HTMLElement) => {
+    fireEvent.mouseDown(element)
+    fireEvent.mouseUp(element)
+  }
+
+  it('closes only the keyboard on a tap outside the controls, keeping the reply', async () => {
+    const onClose = vi.fn()
+    renderSheet({ onClose })
+    press(
+      await screen.findByRole('button', {
+        name: `Reply: Style Explorer A1B2C3D4. ${longBody}`,
+      })
+    )
+    act(() => composer().focus())
+    keyboardShown()
+    expect(thread()).not.toBeVisible()
+
+    tapOutsideControls(sheetTitle())
+    expect(thread()).toBeVisible()
+    expect(document.activeElement).not.toBe(composer())
+    expect(screen.getByTestId('comments-reply-context')).toHaveAttribute(
+      'aria-label',
+      longContext
+    )
+    expect(onClose).not.toHaveBeenCalled()
+  })
+
+  it('leaves a tap on a control to that control while the keyboard is open', async () => {
+    await replyToLongRoot()
+    act(() => composer().focus())
+    keyboardShown()
+    press(screen.getByRole('button', { name: 'Cancel' }))
+    expect(screen.queryByTestId('comments-reply-context')).not.toBeInTheDocument()
+  })
+
+  it('ignores a tap outside the controls while the keyboard is closed', async () => {
+    await replyToLongRoot()
+    act(() => composer().focus())
+    tapOutsideControls(sheetTitle())
+    expect(document.activeElement).toBe(composer())
+  })
+
   it('brings the thread region back as Send dismisses the keyboard', async () => {
     server.use(
       http.post(`${base}/comments`, () =>
