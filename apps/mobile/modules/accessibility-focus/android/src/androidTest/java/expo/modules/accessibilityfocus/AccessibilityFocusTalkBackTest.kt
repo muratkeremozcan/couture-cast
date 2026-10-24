@@ -147,6 +147,17 @@ class AccessibilityFocusTalkBackTest {
     val focus = observer()
     focus.start { decor }
     idle()
+    // Wherever TalkBack put its cursor when the window appeared, it is on the
+    // first view now, and nothing recorded so far counts.
+    assertTrue("the focus action was taken", focus.move(decor, FocusTestActivity.FIRST))
+    assertTrue("the OS reported focus on the first view", awaitReport(FocusTestActivity.FIRST))
+    var onFirst = false
+    instrumentation.runOnMainSync {
+      onFirst = decor.findViewById<View>(FocusTestActivity.FIRST).isAccessibilityFocused
+    }
+    assertTrue("TalkBack holds the first view", onFirst)
+    reports.clear()
+    events.clear()
 
     assertTrue("the focus action was taken", focus.move(decor, FocusTestActivity.SECOND))
     assertTrue("the OS reported focus on the view", awaitReport(FocusTestActivity.SECOND))
