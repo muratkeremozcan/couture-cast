@@ -11,7 +11,7 @@ import {
   realSessionSkipReason,
   signInRealCommunityWeb,
 } from '../support/helpers/community-real-session'
-import { seededPostOnLoadedPage } from '../support/helpers/community-session'
+import { expectCommunityFeedLoaded } from '../support/helpers/community-session'
 
 const skipReason = realSessionSkipReason()
 test.skip(Boolean(skipReason), skipReason ?? '')
@@ -75,7 +75,7 @@ test('N1 real OTP canonical identity, restore, refresh, account switch and offli
         2
       )
     )
-  await seededPostOnLoadedPage(page)
+  await expectCommunityFeedLoaded(page)
 
   const readIdentity = () =>
     page.evaluate(() => {
@@ -86,6 +86,9 @@ test('N1 real OTP canonical identity, restore, refresh, account switch and offli
         bearer: window.sessionStorage.getItem('couturecast.access-token'),
       }
     })
+  // The bearer is stored once canonical verification completes, which can be after the
+  // feed first renders.
+  await expect.poll(async () => (await readIdentity()).bearer).toBeTruthy()
   const identity = await readIdentity()
   expect(identity.sub).toBe(first.authUserId)
   expect(identity.sub).not.toBe(first.appUserId)
@@ -114,7 +117,7 @@ test('N1 real OTP canonical identity, restore, refresh, account switch and offli
   const restored = interceptNetworkCall({ method: 'GET', url: '**/api/v1/user/profile' })
   await page.reload()
   expect((await restored).status).toBe(200)
-  await seededPostOnLoadedPage(page)
+  await expectCommunityFeedLoaded(page)
   expect((await readIdentity()).sub).toBe(first.authUserId)
 
   // Arrange only persisted SDK expiry metadata. The signed JWT stays untouched;
@@ -129,13 +132,22 @@ test('N1 real OTP canonical identity, restore, refresh, account switch and offli
   const refresh = interceptNetworkCall({ method: 'POST', url: '**/auth/v1/token*' })
   await page.reload()
   expect((await refresh).status).toBe(200)
-  await seededPostOnLoadedPage(page)
+  await expectCommunityFeedLoaded(page)
   expect((await readIdentity()).sub).toBe(first.authUserId)
 
   await signInRealCommunityWeb(page, second, () =>
     Promise.resolve(readGeneratedCommunityCode(second))
   )
-  await seededPostOnLoadedPage(page)
+  await expectCommunityFeedLoaded(page)
+  // The switched session's own bearer replaces the first one once its verification completes.
+  await expect
+    .poll(async () => {
+      const now = await readIdentity()
+      return (
+        now.sub === second.authUserId && !!now.bearer && now.bearer !== identity.bearer
+      )
+    })
+    .toBe(true)
   const switched = await readIdentity()
   expect(switched.sub).toBe(second.authUserId)
   const switchedApi = createApiClient('http://127.0.0.1:4077', {

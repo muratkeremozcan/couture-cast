@@ -14,7 +14,7 @@ import {
   signupRealCommunityAppUser,
   verifyRealCommunityOtp,
 } from '../support/helpers/community-real-session'
-import { seededPostOnLoadedPage } from '../support/helpers/community-session'
+import { expectCommunityFeedLoaded } from '../support/helpers/community-session'
 
 const skipReason = realSessionSkipReason()
 test.skip(Boolean(skipReason), skipReason ?? '')
@@ -182,7 +182,7 @@ test('N1 a late profile response from the previous session cannot replace the sw
   )
   // The home document restores the session again; its bearer is stored once that
   // canonical verification completes.
-  await seededPostOnLoadedPage(page)
+  await expectCommunityFeedLoaded(page)
   await expect
     .poll(() => page.evaluate((key) => sessionStorage.getItem(key), bearerKey))
     .toBeTruthy()
@@ -246,7 +246,11 @@ test('N1 a late profile response from the previous session cannot replace the sw
 
   await expect(page).toHaveURL(/\/signin$/)
   await page.goto('/')
-  await seededPostOnLoadedPage(page)
+  await expectCommunityFeedLoaded(page)
+  // The restored session stores its bearer once canonical verification completes.
+  await expect
+    .poll(() => page.evaluate((key) => sessionStorage.getItem(key), bearerKey))
+    .toBeTruthy()
   const stored = await page.evaluate((key) => sessionStorage.getItem(key), bearerKey)
   const owner = await profileWithBearer(apiRequest, stored!)
   expect((owner.body as { user: { id: string } }).user.id).toBe(second.appUserId)
