@@ -16,6 +16,7 @@ import { RequestAuthGuard, RolesGuard } from '../auth/security.guards.js'
 import { FeatureFlagsModule } from '../feature-flags/feature-flags.module.js'
 import { TelemetryModule } from '../telemetry/telemetry.module.js'
 import { GuardianModule } from '../guardian/guardian.module.js'
+import { CommerceModule } from '../commerce/commerce.module.js'
 import { WeatherModule } from '../weather/weather.module.js'
 import { CommunityController } from './community.controller.js'
 import { CommunityRepository } from './community.repository.js'
@@ -71,6 +72,9 @@ import { CommunitySpotlightRepository } from './community-spotlight.repository.j
     WeatherModule,
     TelemetryModule,
     GuardianModule,
+    // Story 6.7b: one-way, for CommunitySponsorshipService. CommerceModule must
+    // never import this module back.
+    CommerceModule,
   ],
   controllers: [
     CommunityController,

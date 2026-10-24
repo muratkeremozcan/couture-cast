@@ -659,6 +659,49 @@ describe('TelemetryService', () => {
       expect(persisted.data.user_id).toBeNull()
     })
 
+    it('6.7b-UNIT-040 emits a community click with only partner, offer, surface and region', async () => {
+      await service.captureEvent('raw-user-1', 'affiliate_cta_clicked', {
+        partnerId: 'sample-partner',
+        offerId: 'offer-1',
+        surface: 'home_teaser',
+        localeRegion: '*',
+      })
+
+      expect(analyticsCapture).toHaveBeenCalledWith({
+        distinctId: subjectFor('raw-user-1'),
+        event: 'affiliate_cta_clicked',
+        properties: {
+          partner_id: 'sample-partner',
+          offer_id: 'offer-1',
+          surface: 'home_teaser',
+          locale_region: '*',
+          $ip: null,
+        },
+      })
+    })
+
+    it.each([
+      { name: 'a recommendation id', extra: { recommendationId: 'post-1' } },
+      { name: 'a scenario', extra: { scenario: 'morning' } },
+      { name: 'a post id', extra: { postId: 'post-1' } },
+      { name: 'an author id', extra: { authorId: 'user-2' } },
+    ])(
+      '6.7b-UNIT-041 refuses a community click carrying $name before anything is written',
+      async ({ extra }) => {
+        await expect(
+          service.captureEvent('raw-user-1', 'affiliate_cta_clicked', {
+            partnerId: 'sample-partner',
+            offerId: 'offer-1',
+            surface: 'community_feed',
+            localeRegion: 'US',
+            ...extra,
+          } as never)
+        ).rejects.toThrow()
+        expect(telemetryCreate).not.toHaveBeenCalled()
+        expect(analyticsCapture).not.toHaveBeenCalled()
+      }
+    )
+
     it('refuses to emit a click with no authenticated user', async () => {
       await expect(
         service.captureEvent(null, 'affiliate_cta_clicked', {

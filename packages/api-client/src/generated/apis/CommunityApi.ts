@@ -48,6 +48,7 @@ export interface ApiV1CommunityChallengesPostRequest {
 export interface ApiV1CommunityFeedGetRequest {
   xCouturePlatform: ApiV1CommunityFeedGetXCouturePlatformEnum
   xCoutureReactions?: ApiV1CommunityFeedGetXCoutureReactionsEnum
+  xCoutureSponsorship?: ApiV1CommunityFeedGetXCoutureSponsorshipEnum
   mode?: ApiV1CommunityFeedGetModeEnum
   cursor?: string
   limit?: number
@@ -63,6 +64,7 @@ export interface ApiV1CommunityPostsPostIdGetRequest {
   postId: string
   xCouturePlatform: ApiV1CommunityPostsPostIdGetXCouturePlatformEnum
   xCoutureReactions?: ApiV1CommunityPostsPostIdGetXCoutureReactionsEnum
+  xCoutureSponsorship?: ApiV1CommunityPostsPostIdGetXCoutureSponsorshipEnum
 }
 
 export interface ApiV1CommunityPostsPostIdOpenedPostRequest {
@@ -131,6 +133,7 @@ export interface GetCommunityCommentsRequest {
 export interface GetCommunitySpotlightRequest {
   xCouturePlatform: GetCommunitySpotlightXCouturePlatformEnum
   xCoutureReactions?: GetCommunitySpotlightXCoutureReactionsEnum
+  xCoutureSponsorship?: GetCommunitySpotlightXCoutureSponsorshipEnum
   cursor?: string
   limit?: number
   surface?: GetCommunitySpotlightSurfaceEnum
@@ -331,6 +334,12 @@ export class CommunityApi extends runtime.BaseAPI {
       )
     }
 
+    if (requestParameters['xCoutureSponsorship'] != null) {
+      headerParameters['x-couture-sponsorship'] = String(
+        requestParameters['xCoutureSponsorship']
+      )
+    }
+
     if (requestParameters['xCouturePlatform'] != null) {
       headerParameters['x-couture-platform'] = String(
         requestParameters['xCouturePlatform']
@@ -502,6 +511,12 @@ export class CommunityApi extends runtime.BaseAPI {
     if (requestParameters['xCoutureReactions'] != null) {
       headerParameters['x-couture-reactions'] = String(
         requestParameters['xCoutureReactions']
+      )
+    }
+
+    if (requestParameters['xCoutureSponsorship'] != null) {
+      headerParameters['x-couture-sponsorship'] = String(
+        requestParameters['xCoutureSponsorship']
       )
     }
 
@@ -1507,6 +1522,12 @@ export class CommunityApi extends runtime.BaseAPI {
       )
     }
 
+    if (requestParameters['xCoutureSponsorship'] != null) {
+      headerParameters['x-couture-sponsorship'] = String(
+        requestParameters['xCoutureSponsorship']
+      )
+    }
+
     if (requestParameters['xCouturePlatform'] != null) {
       headerParameters['x-couture-platform'] = String(
         requestParameters['xCouturePlatform']
@@ -1680,6 +1701,14 @@ export type ApiV1CommunityFeedGetXCoutureReactionsEnum =
 /**
  * @export
  */
+export const ApiV1CommunityFeedGetXCoutureSponsorshipEnum = {
+  _1: '1',
+} as const
+export type ApiV1CommunityFeedGetXCoutureSponsorshipEnum =
+  (typeof ApiV1CommunityFeedGetXCoutureSponsorshipEnum)[keyof typeof ApiV1CommunityFeedGetXCoutureSponsorshipEnum]
+/**
+ * @export
+ */
 export const ApiV1CommunityFeedGetModeEnum = {
   auto: 'auto',
   all: 'all',
@@ -1718,6 +1747,14 @@ export const ApiV1CommunityPostsPostIdGetXCoutureReactionsEnum = {
 } as const
 export type ApiV1CommunityPostsPostIdGetXCoutureReactionsEnum =
   (typeof ApiV1CommunityPostsPostIdGetXCoutureReactionsEnum)[keyof typeof ApiV1CommunityPostsPostIdGetXCoutureReactionsEnum]
+/**
+ * @export
+ */
+export const ApiV1CommunityPostsPostIdGetXCoutureSponsorshipEnum = {
+  _1: '1',
+} as const
+export type ApiV1CommunityPostsPostIdGetXCoutureSponsorshipEnum =
+  (typeof ApiV1CommunityPostsPostIdGetXCoutureSponsorshipEnum)[keyof typeof ApiV1CommunityPostsPostIdGetXCoutureSponsorshipEnum]
 /**
  * @export
  */
@@ -1825,6 +1862,14 @@ export const GetCommunitySpotlightXCoutureReactionsEnum = {
 } as const
 export type GetCommunitySpotlightXCoutureReactionsEnum =
   (typeof GetCommunitySpotlightXCoutureReactionsEnum)[keyof typeof GetCommunitySpotlightXCoutureReactionsEnum]
+/**
+ * @export
+ */
+export const GetCommunitySpotlightXCoutureSponsorshipEnum = {
+  _1: '1',
+} as const
+export type GetCommunitySpotlightXCoutureSponsorshipEnum =
+  (typeof GetCommunitySpotlightXCoutureSponsorshipEnum)[keyof typeof GetCommunitySpotlightXCoutureSponsorshipEnum]
 /**
  * @export
  */

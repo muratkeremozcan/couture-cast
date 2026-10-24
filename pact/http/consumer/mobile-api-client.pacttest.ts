@@ -14,6 +14,11 @@ import {
   communityReactionInteractions,
   verifyCommunityReactionPostInteraction,
   verifyCommunityReactionInteraction,
+  // Story 6.7b opted-in sponsored reads.
+  verifyCommunitySponsoredFeedInteraction,
+  verifyCommunitySponsoredSpotlightInteraction,
+  verifyCommunitySponsoredHomeTeaserInteraction,
+  verifyCommunitySponsoredPostInteraction,
 } from './interactions/community'
 // Learning path Step 19: Scenario outfit generator.
 // See _bmad-output/project-knowledge/learning-path-step-by-step.md#step-19-scenario-outfit-generator
@@ -88,6 +93,10 @@ import {
   verifyAffiliateWebhookInteraction,
   verifyAffiliateWebhookErrorInteraction,
   affiliateWebhookErrorInteractions,
+  // Story 6.7b sponsored community CTA clicks.
+  communityAffiliateClickSurfaces,
+  verifyCommunityAffiliateClickMintInteraction,
+  verifyCommunityAffiliateClickEndedInteraction,
   verifyEntitledSubscriptionStatusInteraction,
   verifySubscriptionRefreshInteraction,
   verifyEntitledThemeReadInteraction,
@@ -403,6 +412,21 @@ describe('CoutureCastMobile -> CoutureCastApi HTTP contract', () => {
       await verifyAffiliateClickErrorInteraction(pact, interaction)
     }
   )
+
+  it.each(communityAffiliateClickSurfaces)(
+    'mints an attributed click from the sponsored %s CTA',
+    async (surface) => {
+      await verifyCommunityAffiliateClickMintInteraction(
+        pact,
+        createMobileClientForMockServer,
+        surface
+      )
+    }
+  )
+
+  it('refuses a sponsored community click after the sponsorship ended', async () => {
+    await verifyCommunityAffiliateClickEndedInteraction(pact)
+  })
 
   it('records a signed partner conversion webhook', async () => {
     await verifyAffiliateWebhookInteraction(pact, createMobileClientForMockServer)
@@ -728,6 +752,38 @@ describe('CoutureCastMobile -> CoutureCastApi HTTP contract', () => {
 
   it('rejects a community post the caller cannot see', async () => {
     await verifyCommunityPostNotFoundInteraction(pact, 'mobile')
+  })
+
+  it('reads an opted-in feed whose item carries a sponsorship block', async () => {
+    await verifyCommunitySponsoredFeedInteraction(
+      pact,
+      createMobileClientForMockServer,
+      'mobile'
+    )
+  })
+
+  it('reads an opted-in city spotlight whose item carries a sponsorship block', async () => {
+    await verifyCommunitySponsoredSpotlightInteraction(
+      pact,
+      createMobileClientForMockServer,
+      'mobile'
+    )
+  })
+
+  it('reads an opted-in home teaser whose item carries a sponsorship block', async () => {
+    await verifyCommunitySponsoredHomeTeaserInteraction(
+      pact,
+      createMobileClientForMockServer,
+      'mobile'
+    )
+  })
+
+  it('reads one opted-in sponsored post with its sponsorship block', async () => {
+    await verifyCommunitySponsoredPostInteraction(
+      pact,
+      createMobileClientForMockServer,
+      'mobile'
+    )
   })
 
   it('allocates a community post upload session', async () => {

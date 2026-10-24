@@ -145,6 +145,19 @@ export function isPubliclyVisiblePost(post: {
   )
 }
 
+/**
+ * The same rule as `PUBLICLY_VISIBLE_POST_WHERE`, inlined for raw SQL over the
+ * `LookbookPost` alias given. The spotlight ranking and the Story 6.7b
+ * sponsorship eligibility query both use it, and their integration suites pin
+ * it to the Prisma predicate above.
+ */
+export function publiclyVisiblePostSql(alias: string): Prisma.Sql {
+  const p = Prisma.raw(alias)
+  return Prisma.sql`${p}.status = 'published' AND ${p}.published_at IS NOT NULL
+    AND ${p}.erasure_requested_at IS NULL AND ${p}.anonymized_at IS NULL
+    AND ${p}.user_id NOT LIKE ${`${COMMUNITY_CANARY_USER_ID_PREFIX}%`}`
+}
+
 /** Author-owned states that never appear in the public `items` array. */
 const AUTHOR_STATE_STATUSES = [
   'draft',

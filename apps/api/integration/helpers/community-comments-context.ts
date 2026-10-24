@@ -19,6 +19,8 @@ import { AccessTokenIdentityService } from '../../src/modules/auth/access-token-
 import { GuardianConsentStateService } from '../../src/modules/auth/guardian-consent-state.service.js'
 import { CommunityCommentsController } from '../../src/modules/community/community-comments.controller.js'
 import { CommunityCacheHeadersMiddleware } from '../../src/modules/community/community-cache-headers.middleware.js'
+import { CommunitySponsorshipService } from '../../src/modules/commerce/community-sponsorship.service.js'
+import { noSponsorships } from './community-sponsorship-fixtures.js'
 import { CommunityController } from '../../src/modules/community/community.controller.js'
 import { CommunitySpotlightService } from '../../src/modules/community/community-spotlight.service.js'
 import { CommunityService } from '../../src/modules/community/community.service.js'
@@ -182,6 +184,7 @@ export function commentsTestContext() {
         { provide: CommunityCommentsService, useValue: service },
         { provide: CommunityService, useValue: posts },
         { provide: CommunitySpotlightService, useValue: {} },
+        { provide: CommunitySponsorshipService, useValue: noSponsorships },
         {
           provide: GuardianConsentStateService,
           useValue: {

@@ -428,6 +428,10 @@ describe('5.1 affiliate offer query plans', () => {
       // Scoped to this run's two partners. The seeded `sample-partner` catalog
       // that Playwright and Maestro depend on is never touched.
       const partnerIds = [bulkPartnerId, matchPartnerId]
+      // Story 6.7b: a sponsorship link holds its offer with ON DELETE RESTRICT.
+      await prisma.communityPostSponsorship.deleteMany({
+        where: { offer: { partner_id: { in: partnerIds } } },
+      })
       await prisma.affiliateOffer.deleteMany({
         where: { partner_id: { in: partnerIds } },
       })

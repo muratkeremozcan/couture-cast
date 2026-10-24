@@ -11,6 +11,8 @@ import {
 } from '@couture/api-client/contracts/http'
 import { AccessTokenIdentityService } from '../src/modules/auth/access-token-identity.service.js'
 import { GuardianConsentStateService } from '../src/modules/auth/guardian-consent-state.service.js'
+import { CommunitySponsorshipService } from '../src/modules/commerce/community-sponsorship.service.js'
+import { noSponsorships } from './helpers/community-sponsorship-fixtures.js'
 import { CommunityController } from '../src/modules/community/community.controller.js'
 import { CommunityService } from '../src/modules/community/community.service.js'
 import { CommunitySpotlightService } from '../src/modules/community/community-spotlight.service.js'
@@ -41,6 +43,7 @@ beforeAll(async () => {
     providers: [
       { provide: CommunityService, useValue: ctx.community },
       { provide: CommunitySpotlightService, useValue: ctx.service },
+      { provide: CommunitySponsorshipService, useValue: noSponsorships },
       {
         provide: GuardianConsentStateService,
         useValue: {

@@ -140,6 +140,10 @@ describe('Story 5.1 affiliate conversion webhook against real PostgreSQL', () =>
     onTestFinished(async () => {
       await prisma.affiliateConversion.deleteMany({ where: { partner_id: partner.id } })
       await prisma.affiliateClick.deleteMany({ where: { partner_id: partner.id } })
+      // Story 6.7b: a sponsorship link holds its offer with ON DELETE RESTRICT.
+      await prisma.communityPostSponsorship.deleteMany({
+        where: { offer: { partner_id: partner.id } },
+      })
       await prisma.affiliateOffer.deleteMany({ where: { partner_id: partner.id } })
       await prisma.commercePartner.deleteMany({ where: { id: partner.id } })
       await prisma.telemetryEvent.deleteMany({

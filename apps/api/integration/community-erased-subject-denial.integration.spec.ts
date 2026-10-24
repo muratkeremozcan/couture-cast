@@ -16,6 +16,8 @@ import { CommunitySyncController } from '../src/modules/community/community-sync
 import { CommunitySyncService } from '../src/modules/community/community-sync.service.js'
 import { CommunityTargetsService } from '../src/modules/community/community-targets.service.js'
 import { CommunityPreferencesService } from '../src/modules/community/community-preferences.service.js'
+import { CommunitySponsorshipService } from '../src/modules/commerce/community-sponsorship.service.js'
+import { noSponsorships } from './helpers/community-sponsorship-fixtures.js'
 import { CommunityController } from '../src/modules/community/community.controller.js'
 import { CommunityService } from '../src/modules/community/community.service.js'
 import {
@@ -171,6 +173,7 @@ beforeAll(async () => {
       },
       { provide: CommunityService, useValue: community },
       { provide: CommunitySpotlightService, useValue: spotlight },
+      { provide: CommunitySponsorshipService, useValue: noSponsorships },
       { provide: AccessTokenIdentityService, useValue: identity },
       {
         provide: GuardianConsentStateService,

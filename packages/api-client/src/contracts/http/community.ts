@@ -9,6 +9,7 @@ import {
   type RegisteredCommonHttpSchemas,
   trackedResponseSchema,
 } from './common'
+import { communitySponsorshipSchema } from './commerce'
 import { supportedLocaleSchema } from './localization'
 
 // --- Error message constants ------------------------------------------------
@@ -655,6 +656,42 @@ export const communityReactionPostResponseSchema = z
   .object({ data: communityReactionFeedItemSchema })
   .strict()
 
+/**
+ * Story 6.7b: sponsorship blocks are opt-in per request with this header, set
+ * to `1`, exactly like the Story 6.3 reactions header. Installed clients that
+ * do not send it keep parsing today's strict shapes, which have no
+ * `sponsorship` field. The opted-in variants below extend the reaction variants,
+ * whose `reactions` field is itself optional, so one variant serves a request
+ * with or without `x-couture-reactions`.
+ */
+export const COMMUNITY_SPONSORSHIP_HEADER = 'x-couture-sponsorship'
+
+export const communitySponsoredFeedItemSchema = communityReactionFeedItemSchema
+  .extend({
+    sponsorship: communitySponsorshipSchema.optional().openapi({
+      description:
+        'Present only when this post has an eligible sponsorship for this viewer right now. Absent means no CTA.',
+    }),
+  })
+  .strict()
+export type CommunitySponsoredFeedItem = z.infer<typeof communitySponsoredFeedItemSchema>
+export const communitySponsoredFeedSchema = communityFeedSchema
+  .extend({ items: z.array(communitySponsoredFeedItemSchema) })
+  .strict()
+export type CommunitySponsoredFeed = z.infer<typeof communitySponsoredFeedSchema>
+export const communitySponsoredFeedResponseSchema = z
+  .object({ data: communitySponsoredFeedSchema })
+  .strict()
+export type CommunitySponsoredFeedResponse = z.infer<
+  typeof communitySponsoredFeedResponseSchema
+>
+export const communitySponsoredPostResponseSchema = z
+  .object({ data: communitySponsoredFeedItemSchema })
+  .strict()
+export type CommunitySponsoredPostResponse = z.infer<
+  typeof communitySponsoredPostResponseSchema
+>
+
 // --- Post Upload & Creation Schemas -----------------------------------------
 
 export const allocateCommunityPostInputSchema = z
@@ -926,6 +963,26 @@ export const communityReactionSpotlightResponseSchema = z
   .strict()
 export type CommunityReactionSpotlightResponse = z.infer<
   typeof communityReactionSpotlightResponseSchema
+>
+
+/** Story 6.7b: the spotlight's opted-in variant; see `COMMUNITY_SPONSORSHIP_HEADER`. */
+export const communitySponsoredSpotlightItemSchema = communitySponsoredFeedItemSchema
+  .extend({ rank: communitySpotlightRankSchema })
+  .strict()
+export type CommunitySponsoredSpotlightItem = z.infer<
+  typeof communitySponsoredSpotlightItemSchema
+>
+export const communitySponsoredSpotlightSchema = communitySpotlightSchema
+  .extend({ items: z.array(communitySponsoredSpotlightItemSchema) })
+  .strict()
+export type CommunitySponsoredSpotlight = z.infer<
+  typeof communitySponsoredSpotlightSchema
+>
+export const communitySponsoredSpotlightResponseSchema = z
+  .object({ data: communitySponsoredSpotlightSchema })
+  .strict()
+export type CommunitySponsoredSpotlightResponse = z.infer<
+  typeof communitySponsoredSpotlightResponseSchema
 >
 
 /**
@@ -1722,6 +1779,20 @@ export function registerCommunityContracts(
     communityChallengeResponseSchema
   )
 
+  registry.register('CommunitySponsorship', communitySponsorshipSchema)
+  const registeredSponsoredFeedResponse = registry.register(
+    'CommunitySponsoredFeedResponse',
+    communitySponsoredFeedResponseSchema
+  )
+  const registeredSponsoredPostResponse = registry.register(
+    'CommunitySponsoredPostResponse',
+    communitySponsoredPostResponseSchema
+  )
+  const registeredSponsoredSpotlightResponse = registry.register(
+    'CommunitySponsoredSpotlightResponse',
+    communitySponsoredSpotlightResponseSchema
+  )
+
   registry.registerPath({
     method: 'get',
     path: '/api/v1/community/feed',
@@ -1738,6 +1809,14 @@ export function registerCommunityContracts(
         schema: { type: 'string', enum: ['1'] },
         description:
           'Opt in to reaction summaries. Omission preserves the strict legacy response.',
+      },
+      {
+        name: COMMUNITY_SPONSORSHIP_HEADER,
+        in: 'header',
+        required: false,
+        schema: { type: 'string', enum: ['1'] },
+        description:
+          'Opt in to the per-viewer sponsorship block on each item. Omission preserves the response shape with no sponsorship field. Combines with x-couture-reactions.',
       },
       {
         name: 'x-couture-platform',
@@ -1782,6 +1861,7 @@ export function registerCommunityContracts(
             schema: z.union([
               registeredFeedResponse,
               communityReactionFeedResponseSchema,
+              registeredSponsoredFeedResponse,
             ]),
           },
         },
@@ -1849,6 +1929,14 @@ export function registerCommunityContracts(
           'Opt in to live reaction summaries on each item, exactly like the feed.',
       },
       {
+        name: COMMUNITY_SPONSORSHIP_HEADER,
+        in: 'header',
+        required: false,
+        schema: { type: 'string', enum: ['1'] },
+        description:
+          'Opt in to the per-viewer sponsorship block on each item. Omission preserves the response shape with no sponsorship field. Combines with x-couture-reactions.',
+      },
+      {
         name: 'x-couture-platform',
         in: 'header',
         required: true,
@@ -1896,6 +1984,7 @@ export function registerCommunityContracts(
             schema: z.union([
               registeredSpotlightResponse,
               registeredReactionSpotlightResponse,
+              registeredSponsoredSpotlightResponse,
             ]),
           },
         },
@@ -2050,6 +2139,14 @@ export function registerCommunityContracts(
           'Opt in to reaction summaries. Omission preserves the strict legacy response.',
       },
       {
+        name: COMMUNITY_SPONSORSHIP_HEADER,
+        in: 'header',
+        required: false,
+        schema: { type: 'string', enum: ['1'] },
+        description:
+          'Opt in to the per-viewer sponsorship block on each item. Omission preserves the response shape with no sponsorship field. Combines with x-couture-reactions.',
+      },
+      {
         name: 'postId',
         in: 'path',
         required: true,
@@ -2072,6 +2169,7 @@ export function registerCommunityContracts(
             schema: z.union([
               registeredPostResponse,
               communityReactionPostResponseSchema,
+              registeredSponsoredPostResponse,
             ]),
           },
         },

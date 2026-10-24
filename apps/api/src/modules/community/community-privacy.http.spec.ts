@@ -20,6 +20,8 @@ import {
   COMMUNITY_REACTION_CONFLICT_MESSAGE,
   COMMUNITY_REACTION_RATE_LIMITED_MESSAGE,
   communityFeedResponseSchema,
+  communitySponsoredFeedResponseSchema,
+  communitySponsoredPostResponseSchema,
   communityReactionFeedResponseSchema,
   communityReactionPostResponseSchema,
   communityPostResponseSchema,
@@ -39,6 +41,7 @@ import { AccessTokenIdentityService } from '../auth/access-token-identity.servic
 import { AuthStateModule } from '../auth/auth-state.module.js'
 import { GuardianConsentStateService } from '../auth/guardian-consent-state.service.js'
 import { RequestAuthGuard, RolesGuard } from '../auth/security.guards.js'
+import { CommunitySponsorshipService } from '../commerce/community-sponsorship.service.js'
 import { CommunityModule } from './community.module.js'
 import { CommunityRateLimitException } from './community-rate-limit.exception.js'
 import { CommunityService } from './community.service.js'
@@ -97,7 +100,16 @@ const publishedPost = {
 })
 class LocalAuthModule {}
 
-@Module({})
+// Story 6.7b: CommunityModule imports CommerceModule for this one service. The
+// stub answers "no sponsorship" so these tests keep proving the privacy wiring.
+const sponsorships = {
+  resolveForPosts: vi.fn(() => Promise.resolve(new Map())),
+}
+
+@Module({
+  providers: [{ provide: CommunitySponsorshipService, useValue: sponsorships }],
+  exports: [CommunitySponsorshipService],
+})
 class LocalDependenciesModule {}
 
 describe('CommunityModule HTTP privacy wiring', () => {
@@ -179,6 +191,7 @@ describe('CommunityModule HTTP privacy wiring', () => {
     expect(headers.vary?.toLowerCase().split(/\s*,\s*/)).toEqual(
       expect.arrayContaining([
         'x-couture-reactions',
+        'x-couture-sponsorship',
         'x-couture-platform',
         'authorization',
       ])
@@ -236,6 +249,40 @@ describe('CommunityModule HTTP privacy wiring', () => {
     expect(
       communityFeedResponseSchema.parse(response.body).data.items[0]
     ).not.toHaveProperty('reactions')
+  })
+
+  it('6.7b-UNIT-020 keeps an opted-in sponsorship block private to the requesting viewer', async () => {
+    const block = {
+      partnerId: 'sample-partner',
+      partnerDisplayName: 'Sample Partner',
+      offerId: 'offer-1',
+      offerTitle: 'Trench coat',
+    }
+    sponsorships.resolveForPosts.mockImplementation(() =>
+      Promise.resolve(new Map([[postId, block]]))
+    )
+    const feed = await request(server())
+      .get(feedPath)
+      .set('Authorization', 'Bearer viewer-a')
+      .set('x-couture-platform', 'web')
+      .set('x-couture-sponsorship', '1')
+      .expect(200)
+    expectPrivate(feed.headers)
+    expect(
+      communitySponsoredFeedResponseSchema.parse(feed.body).data.items[0]?.sponsorship
+    ).toEqual(block)
+
+    const detail = await request(server())
+      .get(detailPath)
+      .set('Authorization', 'Bearer viewer-a')
+      .set('x-couture-platform', 'mobile')
+      .set('x-couture-sponsorship', '1')
+      .expect(200)
+    expectPrivate(detail.headers)
+    expect(
+      communitySponsoredPostResponseSchema.parse(detail.body).data.sponsorship
+    ).toEqual(block)
+    sponsorships.resolveForPosts.mockImplementation(() => Promise.resolve(new Map()))
   })
 
   it('[P1] preserves the strict legacy detail projection with privacy headers', async () => {

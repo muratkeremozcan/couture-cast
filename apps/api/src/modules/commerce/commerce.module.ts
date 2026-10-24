@@ -25,6 +25,8 @@ import { CommercePreferencesController } from './commerce-preferences.controller
 import { CommercePreferencesService } from './commerce-preferences.service.js'
 import { CommerceRepository } from './commerce.repository.js'
 import { CommerceRetentionService } from './commerce-retention.service.js'
+import { CommunitySponsorshipOperatorService } from './community-sponsorship-operator.service.js'
+import { CommunitySponsorshipService } from './community-sponsorship.service.js'
 import { PaletteAdvisorController } from './palette-advisor.controller.js'
 import { PaletteAdvisorService } from './palette-advisor.service.js'
 import { PaletteAnalysisProcessingQueue } from './palette-analysis-processing.queue.js'
@@ -129,10 +131,24 @@ import { SubscriptionService } from './subscription.service.js'
     SupabaseWardrobeStorageAdapter,
     PaletteAdvisorService,
     PaletteAnalysisProcessingQueue,
+    // Story 6.7b: the per-viewer sponsorship block for opted-in community reads
+    // and the community click re-check. The operator service has no route; it
+    // is registered so the moderator console (Story 6.10) can inject the same
+    // logic `npm run community:sponsorship` runs.
+    CommunitySponsorshipService,
+    CommunitySponsorshipOperatorService,
   ],
   // PremiumEntitlementService and the guard are exported for CC-5.3/5.4/5.5,
   // whose surfaces (themes, palette analysis, planner API) gate on them.
-  exports: [AffiliateOfferService, PremiumEntitlementService, PremiumEntitlementGuard],
+  // CommunitySponsorshipService is exported for CommunityModule (Story 6.7b),
+  // which imports this module one-way, like PersonalizationModule.
+  exports: [
+    AffiliateOfferService,
+    PremiumEntitlementService,
+    PremiumEntitlementGuard,
+    CommunitySponsorshipService,
+    CommunitySponsorshipOperatorService,
+  ],
 })
 export class CommerceModule implements NestModule {
   configure(consumer: MiddlewareConsumer): void {

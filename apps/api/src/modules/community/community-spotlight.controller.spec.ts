@@ -8,6 +8,7 @@ import type { RequestAuthContext } from '../auth/security.types'
 import { CommunityController } from './community.controller'
 import { CommunityRateLimitException } from './community-rate-limit.exception'
 import type { CommunityService } from './community.service'
+import type { CommunitySponsorshipService } from '../commerce/community-sponsorship.service'
 import type { CommunitySpotlightService } from './community-spotlight.service'
 
 const auth: RequestAuthContext = { token: 't', userId: 'viewer-1', role: 'guardian' }
@@ -34,7 +35,12 @@ function controller() {
     recordCardOpened,
     subject: new CommunityController(
       { recordCardOpened } as unknown as CommunityService,
-      { getSpotlight, recordOpened } as unknown as CommunitySpotlightService
+      { getSpotlight, recordOpened } as unknown as CommunitySpotlightService,
+      {
+        resolveForPosts: vi
+          .fn()
+          .mockRejectedValue(new Error('unexpected sponsorship read')),
+      } as unknown as CommunitySponsorshipService
     ),
   }
 }

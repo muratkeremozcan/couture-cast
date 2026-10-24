@@ -53,6 +53,9 @@ import { WardrobeOnboardingService } from '../../../apps/api/src/modules/wardrob
 import { WardrobeSilhouetteController } from '../../../apps/api/src/modules/wardrobe/wardrobe-silhouette.controller'
 import { AffiliateClickController } from '../../../apps/api/src/modules/commerce/affiliate-click.controller'
 import { AffiliateClickService } from '../../../apps/api/src/modules/commerce/affiliate-click.service'
+// The `.js` specifier matches how community.controller.ts imports it, so the
+// controller's injection token is this class object.
+import { CommunitySponsorshipService } from '../../../apps/api/src/modules/commerce/community-sponsorship.service.js'
 import { AffiliateOfferService } from '../../../apps/api/src/modules/commerce/affiliate-offer.service'
 import { AffiliateWebhookController } from '../../../apps/api/src/modules/commerce/affiliate-webhook.controller'
 import { AffiliateWebhookService } from '../../../apps/api/src/modules/commerce/affiliate-webhook.service'
@@ -81,6 +84,7 @@ import { createOnboardingDoubles } from './doubles/onboarding'
 import { createSilhouetteDoubles } from './doubles/silhouette'
 import { createGuardianDoubles } from './doubles/guardian'
 import { createCommerceAffiliateDoubles } from './doubles/commerce-affiliate'
+import { createCommunitySponsorshipDoubles } from './doubles/community-sponsorship'
 import { createSubscriptionDoubles } from './doubles/subscription'
 import { createPremiumThemeDoubles } from './doubles/premium-theme'
 import { createPremiumEntitlementDouble } from './doubles/premium-entitlement'
@@ -238,12 +242,13 @@ export async function startLocalPactProvider({
   const { mockWardrobeOnboardingService } = createOnboardingDoubles()
   const { mockWardrobeSilhouetteService } = createSilhouetteDoubles()
   const { mockGuardianService } = createGuardianDoubles()
+  const { communitySponsorshipService } = createCommunitySponsorshipDoubles()
   const {
     mockAffiliateOfferService,
     mockCommercePreferencesService,
     mockAffiliateClickService,
     mockAffiliateWebhookService,
-  } = createCommerceAffiliateDoubles()
+  } = createCommerceAffiliateDoubles(communitySponsorshipService)
   const { mockSubscriptionService, mockStripeBillingService } =
     createSubscriptionDoubles()
   const { mockPremiumThemeService } = createPremiumThemeDoubles()
@@ -396,6 +401,13 @@ export async function startLocalPactProvider({
       {
         provide: CommunitySpotlightService,
         useValue: mockCommunitySpotlightService,
+      },
+      // Story 6.7b: a real CommunitySponsorshipService over faked flag and
+      // repository seams, shared with the click double; see
+      // doubles/community-sponsorship.ts.
+      {
+        provide: CommunitySponsorshipService,
+        useValue: communitySponsorshipService,
       },
       {
         provide: PremiumEntitlementService,
