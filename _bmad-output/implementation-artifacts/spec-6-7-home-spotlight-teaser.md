@@ -540,6 +540,43 @@ playwright/tests/community-comments.spec.ts --repeat-each=3`, went out without t
     the community Playwright specs, and k6 smoke locally several times. CI at the final head
     runs every Maestro lane and is the final gate.
 
+- 2026-10-24, R38 and the reused-database findings (`reviews/code-triage-1.md`).
+  - R38: every k6 smoke run had `GET /api/v1/wardrobe/garments` for the seeded `teen-1` answer
+    503, which the scenario accepted as "storage not provisioned". Two defects: the wardrobe seed
+    wrote `ready` garments whose objects were never uploaded, and the list signed every garment
+    together, so one unsignable image failed the whole wardrobe. `wardrobe.service.ts` now signs
+    each garment on its own: a failed image leaves `imageAccess` null (the contract allows it and
+    both clients render a garment without one) and is logged, and a row with no object still
+    fails closed. `wardrobe-storage.adapter.ts` logs what Supabase answered before mapping it to
+    `STORAGE_PERMISSION_DENIED`. The wardrobe seed uploads a deterministic placeholder through
+    the community seed's helper before writing each row, and fails when storage refuses.
+    `capsules.scenarios.ts` no longer accepts 503: the lookup must answer 200 (its own
+    `http_req_failed` threshold at zero) and the seeded list must carry signed images
+    (`garment_images_signed` at 1). Tests: a unit case for one unsignable garment (red on the
+    old all-or-nothing list) and a seed spec with a stubbed storage endpoint (red without the
+    upload).
+  - Local storage writes: the coordinator allowed idempotent upserts of the byte-identical seed
+    placeholders at their fixed seed paths in the local Supabase buckets, exactly what
+    `npm run db:seed` does; nothing else is written, read or deleted in storage. The community
+    seed already filled missing storage credentials from the running local stack, so local
+    k6 runs that seeded their own databases wrote those community placeholders before this was
+    recorded.
+  - Shared integration database: `community-feed-query-plan.integration.spec.ts` seeded 2000
+    posts into the shared database, and deleting them queued 2002 public resync outbox rows (0
+    before, 2002 after, reproduced). The appender drains oldest first, so a Playwright run on
+    the same database got no doorbell for its own events and E2E-001 failed. The spec now uses
+    an isolated database (0 pending after).
+  - Feed page displacement: `lookbook-1` sits last on the first feed page behind the seeded City
+    Spotlight cohort, so a look published by a parallel test pushed it off and 6.1-E2E-06 and
+    E2E-07 failed. `seededPostOnLoadedPage` picks the first seeded look the page shows; the
+    real-session specs use it too.
+  - Local Android flows: the r8f repeats failed location capture, capsule create and screened
+    comments because Gboard on the Play emulator image answers Maestro's text-field taps with a
+    full-screen stylus education sheet (CI's google_apis image has no Gboard). The runner sets
+    `stylus_handwriting_enabled=0` and reads it back (default: the sheet scheduled 4 times and
+    location capture red; off: none and green). `community-feed.yaml`'s second tab tap, after a
+    relaunch, now retries and waits like the first.
+
 ## Spec Change Log
 
 - 2026-10-23, iteration 5 (rereview 3): read floor, last-attempt time and `Retry-After` are
