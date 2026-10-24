@@ -86,6 +86,7 @@ import { CommunityReportModal } from '@/components/community/community-report-mo
 import { CommunitySpotlightModule } from '@/components/community/community-spotlight-module'
 import { CommunitySpotlightDetail } from '@/components/community/community-spotlight-detail'
 import { SponsoredCtaImpressions } from '@/src/features/community/sponsored-cta-impressions'
+import { keepLiveCommunitySponsorship } from '@/src/lib/commerce'
 import {
   useCommunitySpotlight,
   type CommunitySpotlightView,
@@ -1085,15 +1086,17 @@ export function CommunityScreen() {
         } else {
           const updated = reactionState.read(target.post, reactionState.beginRead())
           if (!updated) return
-          newLooksRef.current = newLooksRef.current.map((item) =>
-            item.id === target.post.id ? updated : item
-          )
+          // Story 6.7b: a resolved copy carries no sponsorship block (the route
+          // takes no opt-in), so each copy keeps the block its live read had.
+          const replace = <T extends CommunityFeedItem>(item: T) =>
+            item.id === target.post.id
+              ? keepLiveCommunitySponsorship(updated, item)
+              : item
+          newLooksRef.current = newLooksRef.current.map(replace)
           setNewLooks(newLooksRef.current)
-          setItems((previous) =>
-            previous.map((item) => (item.id === target.post.id ? updated : item))
-          )
-          setDeepLinkPost((item) => (item?.id === target.post.id ? updated : item))
-          spotlightRef.current.applyPost(updated)
+          setItems((previous) => previous.map(replace))
+          setDeepLinkPost((item) => (item ? replace(item) : item))
+          spotlightRef.current.applyPost(updated, 'resolve')
         }
       },
       changed: async (events, signal) => {

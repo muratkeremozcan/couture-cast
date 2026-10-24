@@ -524,6 +524,10 @@ const styles = StyleSheet.create({
   },
   header: {
     flexDirection: 'row',
+    // Story 6.7b: a narrow spotlight card cannot fit the author, the Partnered
+    // pill and the climate pill on one line, so the pills wrap onto a second
+    // line and the name keeps a readable width.
+    flexWrap: 'wrap',
     justifyContent: 'space-between',
     alignItems: 'center',
     paddingHorizontal: 14,
@@ -534,7 +538,9 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'center',
     gap: 10,
+    flexGrow: 1,
     flexShrink: 1,
+    minWidth: 150,
   },
   authorMeta: {
     flexShrink: 1,
@@ -611,7 +617,7 @@ const styles = StyleSheet.create({
   },
   shop: {
     paddingHorizontal: 14,
-    paddingTop: 10,
+    paddingVertical: 10,
   },
   caption: {
     paddingHorizontal: 14,
@@ -623,6 +629,7 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     justifyContent: 'flex-end',
     alignItems: 'center',
+    gap: 8,
     paddingHorizontal: 14,
     paddingVertical: 10,
   },

@@ -93,94 +93,97 @@ export const HomeSpotlightTeaser = forwardRef<View, HomeSpotlightTeaserProps>(
 
     return (
       <View testID="home-spotlight-teaser" style={styles.section}>
-        <Pressable
-          ref={ref}
-          testID="home-spotlight-teaser-link"
-          accessibilityRole="link"
-          accessibilityLabel={
-            sponsoredAnnounce ? withDisclosure(linkLabel, sponsoredAnnounce) : linkLabel
-          }
-          onPress={onOpen}
-          onFocus={onFocus}
-          onBlur={onBlur}
-          style={({ pressed }) => [
-            styles.link,
-            {
-              backgroundColor: palette.surface,
-              borderColor: palette.divider,
-              opacity: pressed ? 0.85 : 1,
-            },
+        {/* The card chrome wraps the link and the sponsored row, so the
+            disclosure and CTA read as part of the teaser while staying
+            outside the link's touch target. */}
+        <View
+          style={[
+            styles.card,
+            { backgroundColor: palette.surface, borderColor: palette.divider },
           ]}
         >
-          <View
-            style={[styles.thumbnail, { backgroundColor: palette.skeleton }]}
-            // Decorative: the link label already names the look.
-            accessible={false}
-            accessibilityElementsHidden
-            importantForAccessibility="no-hide-descendants"
-            aria-hidden
+          <Pressable
+            ref={ref}
+            testID="home-spotlight-teaser-link"
+            accessibilityRole="link"
+            accessibilityLabel={
+              sponsoredAnnounce ? withDisclosure(linkLabel, sponsoredAnnounce) : linkLabel
+            }
+            onPress={onOpen}
+            onFocus={onFocus}
+            onBlur={onBlur}
+            style={({ pressed }) => [styles.link, { opacity: pressed ? 0.85 : 1 }]}
           >
-            <Image
-              testID="home-spotlight-teaser-image"
-              source={{ uri: imageUrl }}
-              style={styles.thumbnailImage}
-              resizeMode="cover"
-              accessible={false}
-              alt=""
-              onError={onImageError}
-              onLoad={handleLoad}
-            />
-          </View>
-          <View style={styles.body}>
-            <Text
-              testID="home-spotlight-teaser-heading"
-              numberOfLines={2}
-              style={[styles.heading, { color: palette.text }]}
-            >
-              {t('home.spotlightTeaser.heading', { label })}
-            </Text>
-            <Text
-              testID="home-spotlight-teaser-author"
-              numberOfLines={1}
-              style={[styles.meta, { color: palette.mutedText }]}
-            >
-              {author}
-            </Text>
-            <Text
-              testID="home-spotlight-teaser-reactions"
-              style={[styles.meta, { color: palette.mutedText }]}
-            >
-              {t('home.spotlightTeaser.reactions', { count })}
-            </Text>
-            <Text style={[styles.cta, { color: ctaColor }]}>
-              {t('home.spotlightTeaser.cta')}
-            </Text>
-          </View>
-        </Pressable>
-        {sponsorship && sponsoredAnnounce ? (
-          // Siblings of the link: the disclosure stays visible to automation on
-          // iOS, and the CTA is its own focus stop.
-          <View testID="home-spotlight-teaser-sponsored" style={styles.sponsored}>
             <View
-              testID="home-spotlight-teaser-partnered"
-              accessible
-              accessibilityLabel={sponsoredAnnounce}
-              style={[styles.partneredPill, { backgroundColor: ACCENT_GOLD }]}
+              style={[styles.thumbnail, { backgroundColor: palette.skeleton }]}
+              // Decorative: the link label already names the look.
+              accessible={false}
+              accessibilityElementsHidden
+              importantForAccessibility="no-hide-descendants"
+              aria-hidden
             >
-              <Text style={[styles.partneredText, { color: ON_ACCENT }]}>
-                {t('community.card.sponsored')}
+              <Image
+                testID="home-spotlight-teaser-image"
+                source={{ uri: imageUrl }}
+                style={styles.thumbnailImage}
+                resizeMode="cover"
+                accessible={false}
+                alt=""
+                onError={onImageError}
+                onLoad={handleLoad}
+              />
+            </View>
+            <View style={styles.body}>
+              <Text
+                testID="home-spotlight-teaser-heading"
+                numberOfLines={2}
+                style={[styles.heading, { color: palette.text }]}
+              >
+                {t('home.spotlightTeaser.heading', { label })}
+              </Text>
+              <Text
+                testID="home-spotlight-teaser-author"
+                numberOfLines={1}
+                style={[styles.meta, { color: palette.mutedText }]}
+              >
+                {author}
+              </Text>
+              <Text
+                testID="home-spotlight-teaser-reactions"
+                style={[styles.meta, { color: palette.mutedText }]}
+              >
+                {t('home.spotlightTeaser.reactions', { count })}
+              </Text>
+              <Text style={[styles.cta, { color: ctaColor }]}>
+                {t('home.spotlightTeaser.cta')}
               </Text>
             </View>
-            <CommunitySponsoredShop
-              postId={item.id}
-              sponsorship={sponsorship}
-              surface="home_teaser"
-              testID="home-spotlight-teaser-shop"
-              errorTestID="home-spotlight-teaser-shop-error"
-              style={styles.shop}
-            />
-          </View>
-        ) : null}
+          </Pressable>
+          {sponsorship && sponsoredAnnounce ? (
+            // Siblings of the link: the disclosure stays visible to automation on
+            // iOS, and the CTA is its own focus stop.
+            <View testID="home-spotlight-teaser-sponsored" style={styles.sponsored}>
+              <View
+                testID="home-spotlight-teaser-partnered"
+                accessible
+                accessibilityLabel={sponsoredAnnounce}
+                style={[styles.partneredPill, { backgroundColor: ACCENT_GOLD }]}
+              >
+                <Text style={[styles.partneredText, { color: ON_ACCENT }]}>
+                  {t('community.card.sponsored')}
+                </Text>
+              </View>
+              <CommunitySponsoredShop
+                postId={item.id}
+                sponsorship={sponsorship}
+                surface="home_teaser"
+                testID="home-spotlight-teaser-shop"
+                errorTestID="home-spotlight-teaser-shop-error"
+                style={styles.shop}
+              />
+            </View>
+          ) : null}
+        </View>
         {loadedUrl === imageUrl ? (
           // UI automation marker: only a completed load renders it. A sibling of
           // the link, because iOS hides an accessible element's descendants.
@@ -268,13 +271,16 @@ const styles = StyleSheet.create({
     marginTop: 8,
     marginBottom: 16,
   },
+  card: {
+    borderRadius: 12,
+    borderWidth: 1,
+    overflow: 'hidden',
+  },
   link: {
     minHeight: 44,
     flexDirection: 'row',
     alignItems: 'center',
     padding: 12,
-    borderRadius: 12,
-    borderWidth: 1,
   },
   thumbnail: {
     width: THUMBNAIL_SIZE,
@@ -287,7 +293,8 @@ const styles = StyleSheet.create({
     height: '100%',
   },
   sponsored: {
-    marginTop: 8,
+    paddingHorizontal: 12,
+    paddingBottom: 12,
     gap: 8,
     alignItems: 'flex-start',
   },

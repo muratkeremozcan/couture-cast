@@ -12,6 +12,7 @@ import {
   getCommunityPostFromMobile,
   getCommunitySpotlightFromMobile,
 } from '@/src/lib/community'
+import { keepLiveCommunitySponsorship } from '@/src/lib/commerce'
 
 /** `idle` while no member is signed in: the module hides and reads nothing. */
 export type SpotlightStatus = 'idle' | 'loading' | 'ready' | 'disabled' | 'error'
@@ -47,9 +48,10 @@ export interface CommunitySpotlightView {
    * Replaces a spotlight copy with a newer read of the post, keeping its rank. A
    * read that is no longer `published` removes the copy: the single-post read
    * returns an author their own withdrawn or flagged post, and the spotlight
-   * ranks public posts only.
+   * ranks public posts only. Story 6.7b: `resolve` marks a sync copy, which
+   * keeps the sponsorship block of the live read it replaces.
    */
-  applyPost: (post: CommunityReactionFeedItem) => void
+  applyPost: (post: CommunityReactionFeedItem, source?: 'live' | 'resolve') => void
   /** Removes a post the viewer can no longer see, such as a withdrawn or hidden one. */
   evict: (postId: string) => void
   /**
@@ -295,16 +297,26 @@ export function useCommunitySpotlight({
     []
   )
 
-  const applyPost = useCallback((post: CommunityReactionFeedItem) => {
-    setItems((previous) => {
-      if (!previous.some((item) => item.id === post.id)) return previous
-      if (post.status !== 'published')
-        return previous.filter((item) => item.id !== post.id)
-      return previous.map((item) =>
-        item.id === post.id ? { ...post, rank: item.rank } : item
-      )
-    })
-  }, [])
+  const applyPost = useCallback(
+    (post: CommunityReactionFeedItem, source: 'live' | 'resolve' = 'live') => {
+      setItems((previous) => {
+        if (!previous.some((item) => item.id === post.id)) return previous
+        if (post.status !== 'published')
+          return previous.filter((item) => item.id !== post.id)
+        return previous.map((item) =>
+          item.id === post.id
+            ? {
+                ...(source === 'resolve'
+                  ? keepLiveCommunitySponsorship(post, item)
+                  : post),
+                rank: item.rank,
+              }
+            : item
+        )
+      })
+    },
+    []
+  )
 
   const evict = useCallback((postId: string) => {
     setItems((previous) =>

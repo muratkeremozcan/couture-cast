@@ -1,13 +1,16 @@
 # Story 6.7b: close the in-app browser `expo-web-browser` opened and return to
-# the app. Android's Custom Tab holds one page, so back closes it; iOS's
-# SFSafariViewController closes from its Done button.
+# the app. Android closes the Custom Tab from its close button: a back press on
+# the tab's error page for the unresolvable seeded host left the tab on top in
+# the first device run. iOS's SFSafariViewController closes from Done.
 appId: ${MAESTRO_APP_ID}
 ---
 - runFlow:
     when:
       platform: Android
     commands:
-      - back
+      - tapOn:
+          id: 'com.android.chrome:id/close_button'
+          label: 'Close the Custom Tab'
 - runFlow:
     when:
       platform: iOS

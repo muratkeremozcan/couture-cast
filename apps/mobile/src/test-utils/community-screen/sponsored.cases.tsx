@@ -8,7 +8,8 @@ import { screen, waitFor, within } from '@testing-library/react'
 import { http, HttpResponse } from 'msw'
 import { render } from 'vitest-browser-react'
 import { act } from 'react'
-import { expect, it } from 'vitest'
+import { expect, it, vi } from 'vitest'
+import { CommunitySyncState } from '@couture/api-client'
 import type { CommunitySponsorship } from '@couture/api-client/contracts/http'
 import { CommunityScreen } from '@/src/features/community/community-screen'
 import { press } from '@/src/test-utils/press'
@@ -200,5 +201,71 @@ export function registerCommunitySponsoredCases() {
 
     await waitFor(() => expect(shown()).toHaveLength(2))
     expect(shown()[1]).toEqual(shown()[0])
+  })
+
+  it('6.7b-MOB-054 keeps the live block when the sync revalidates rendered posts', async () => {
+    // The real coordinator: its bootstrap resolves every rendered post through
+    // `targets/resolve`, which takes no sponsorship opt-in, and applies each copy
+    // over the feed, the deep-link card and the spotlight.
+    let resolves = 0
+    vi.spyOn(CommunitySyncState.prototype, 'start').mockImplementation(function (
+      this: CommunitySyncState
+    ) {
+      void this.catchUp()
+    })
+    serveFeed(() =>
+      feedJson({ items: [item({ id: 'post-a', sponsorship: SPONSORSHIP })] })
+    )
+    serveSponsoredSpotlight()
+    server.use(
+      http.get('*/api/v1/community/events', () =>
+        HttpResponse.json({
+          data: {
+            events: [],
+            nextCursor: 'sponsored',
+            hasMore: false,
+            resyncRequired: false,
+          },
+        })
+      ),
+      http.post('*/api/v1/community/targets/resolve', async ({ request }) => {
+        resolves++
+        const body = (await request.json()) as { targets: { key: string }[] }
+        return HttpResponse.json({
+          data: {
+            targets: body.targets.map(({ key }) => ({
+              key,
+              status: 'available',
+              communityRevision: '1',
+              post: item({ id: key, caption: `Resolved ${key}`, reactions: ZERO }),
+              comment: null,
+              parent: null,
+              pageCursor: null,
+              parentPageCursor: null,
+              threadPosition: null,
+            })),
+          },
+        })
+      })
+    )
+
+    await render(<CommunityScreen />)
+
+    // The resolved copies landed: their captions replaced the live ones.
+    await screen.findByText('Resolved post-a')
+    await waitFor(() =>
+      expect(screen.getAllByText('Resolved spot-1').length).toBeGreaterThan(0)
+    )
+    expect(resolves).toBeGreaterThan(0)
+    expect(screen.getByTestId('community-card-shop-post-a').textContent).toBe(
+      'Shop this look at Atelier North'
+    )
+    const moduleItem = screen.getByTestId('community-spotlight-item-spot-1')
+    expect(
+      within(moduleItem).getByTestId('community-card-partnered-spot-1').textContent
+    ).toBe('Partnered')
+    expect(
+      within(moduleItem).getByTestId('community-card-shop-spot-1')
+    ).toBeInTheDocument()
   })
 }

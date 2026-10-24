@@ -124,6 +124,30 @@ export function withoutCommunitySponsorship<
   return copy
 }
 
+/**
+ * Story 6.7b: a copy from the sync coordinator's `targets/resolve` never
+ * carries the sponsorship block, because that route takes no opt-in. Its
+ * missing field says nothing about the link, so a resolved copy of a published
+ * post keeps the block this visit's last live read of the same post carried.
+ * The click re-checks the link, so a block that ended since answers 404 there.
+ * Only the resolve path calls this; a live read that omits the block replaces
+ * it as served.
+ */
+export function keepLiveCommunitySponsorship<T extends CommunitySponsoredFeedItem>(
+  resolved: T,
+  previous: CommunitySponsoredFeedItem | null | undefined
+): T {
+  if (
+    !previous?.sponsorship ||
+    previous.id !== resolved.id ||
+    resolved.status !== 'published' ||
+    resolved.sponsorship
+  ) {
+    return resolved
+  }
+  return { ...resolved, sponsorship: previous.sponsorship }
+}
+
 export async function getCommercePreferenceFromMobile(
   signal?: AbortSignal
 ): Promise<CommercePreference> {

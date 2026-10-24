@@ -19,6 +19,7 @@ import {
   resolveAffiliateLocaleRegion,
   resolveRenderableCommunitySponsorship,
   resolveRenderableShopThisLook,
+  keepLiveCommunitySponsorship,
   updateCommercePreferenceFromMobile,
   withoutCommunitySponsorship,
 } from './commerce'
@@ -151,6 +152,50 @@ describe('mobile commerce boundary', () => {
       ).toBeNull()
       // The live copy the screen renders is untouched.
       expect(live.sponsorship).toBe(sponsorship)
+    })
+  })
+
+  describe('keepLiveCommunitySponsorship (Story 6.7b)', () => {
+    const sponsorship = {
+      partnerId: 'atelier-north',
+      partnerDisplayName: 'Atelier North',
+      offerId: 'offer-coat',
+      offerTitle: 'Wool overcoat',
+    }
+    const post = (overrides: Record<string, unknown> = {}) =>
+      ({
+        id: 'post-a',
+        caption: null,
+        altText: 'A coat.',
+        climateBand: null,
+        imageAccess: { url: 'https://img.test/a.jpg', expiresAt: '2099-01-01T00:00:00Z' },
+        publishedAt: '2026-10-22T09:00:00.000Z',
+        createdAt: '2026-10-22T08:59:00.000Z',
+        status: 'published',
+        challengeId: null,
+        author: { displayName: 'Ana', isSelf: false },
+        ...overrides,
+      }) as Parameters<typeof keepLiveCommunitySponsorship>[0]
+
+    it('6.7b-MOB-043 carries the live block onto a resolved copy of the same post', () => {
+      const resolved = post({ caption: 'Resolved' })
+      expect(keepLiveCommunitySponsorship(resolved, post({ sponsorship }))).toEqual({
+        ...resolved,
+        sponsorship,
+      })
+    })
+
+    it('6.7b-MOB-044 carries nothing to another post, a hidden post or a copy with its own block', () => {
+      const live = post({ sponsorship })
+      const other = post({ id: 'post-b' })
+      expect(keepLiveCommunitySponsorship(other, live)).toBe(other)
+      const withdrawn = post({ status: 'withdrawn' })
+      expect(keepLiveCommunitySponsorship(withdrawn, live)).toBe(withdrawn)
+      const own = post({ sponsorship: { ...sponsorship, offerId: 'offer-new' } })
+      expect(keepLiveCommunitySponsorship(own, live)).toBe(own)
+      const plain = post()
+      expect(keepLiveCommunitySponsorship(plain, post())).toBe(plain)
+      expect(keepLiveCommunitySponsorship(plain, null)).toBe(plain)
     })
   })
 
