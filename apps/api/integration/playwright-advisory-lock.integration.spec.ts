@@ -1,9 +1,13 @@
-import { spawn } from 'node:child_process'
+import { type ChildProcess, spawn } from 'node:child_process'
 import fs from 'node:fs'
 import os from 'node:os'
 import path from 'node:path'
 import { afterEach, beforeEach, describe, expect, it } from 'vitest'
-import { acquireAdvisoryLock } from '../../../playwright/support/helpers/advisory-lock'
+import pg from 'pg'
+import {
+  acquireAdvisoryLock,
+  advisoryLockKey,
+} from '../../../playwright/support/helpers/advisory-lock'
 
 const databaseUrl =
   process.env.INTEGRATION_TEST_DATABASE_URL ??
@@ -11,7 +15,6 @@ const databaseUrl =
   'postgresql://postgres:postgres@127.0.0.1:54322/postgres'
 
 const repo = path.resolve(__dirname, '../../..')
-const tsx = path.join(repo, 'node_modules/.bin/tsx')
 const lockModule = path.join(repo, 'playwright/support/helpers/advisory-lock.ts')
 
 /**
@@ -43,11 +46,67 @@ for (let round = 0; round < ${options.rounds}; round += 1) {
 })()
 `
   )
-  const child = spawn(tsx, [script], {
+  // One process, loading TypeScript through tsx's hooks, so a signal reaches the worker itself.
+  const child = spawn(process.execPath, ['--import', 'tsx', script], {
     cwd: repo,
     stdio: ['ignore', 'inherit', 'inherit'],
   })
-  return new Promise<number | null>((resolve) => child.once('exit', resolve))
+  const exited = new Promise<number | null>((resolve, reject) => {
+    child.once('error', reject)
+    child.once('exit', (code) => resolve(code))
+  })
+  workers.add({ child, exited })
+  return exited
+}
+
+/** Every worker a test started, so a test that times out cannot leave one behind. */
+const workers = new Set<{ child: ChildProcess; exited: Promise<number | null> }>()
+
+/**
+ * Ends every worker still running and waits for each to exit; its database
+ * session, and any advisory lock it holds, closes with the process.
+ */
+async function stopWorkers() {
+  const running = [...workers]
+  workers.clear()
+  await Promise.all(
+    running.map(async ({ child, exited }) => {
+      if (child.exitCode === null && child.signalCode === null) child.kill('SIGKILL')
+      await Promise.race([
+        exited.catch(() => null),
+        new Promise((_, reject) =>
+          setTimeout(() => reject(new Error(`worker ${child.pid} did not exit`)), 10_000)
+        ),
+      ])
+    })
+  )
+}
+
+/** Advisory locks on `lockName`'s key that any session holds now. */
+async function holders(lockName: string) {
+  const client = new pg.Client({ connectionString: databaseUrl })
+  await client.connect()
+  try {
+    const key = BigInt(advisoryLockKey(lockName))
+    const unsigned = BigInt.asUintN(64, key)
+    const { rows } = await client.query<{ pid: number }>(
+      `SELECT pid FROM pg_locks
+        WHERE locktype = 'advisory' AND granted
+          AND classid = $1::bigint::oid AND objid = $2::bigint::oid AND objsubid = 1`,
+      [(unsigned >> 32n).toString(), (unsigned & 0xffffffffn).toString()]
+    )
+    return rows.map(({ pid }) => pid)
+  } finally {
+    await client.end()
+  }
+}
+
+async function waitFor(condition: () => boolean, timeoutMs = 10_000) {
+  const deadline = Date.now() + timeoutMs
+  while (!condition()) {
+    if (Date.now() > deadline) throw new Error('condition not met')
+    await new Promise((resolve) => setTimeout(resolve, 50))
+  }
 }
 
 function intervals(directory: string, name: string) {
@@ -69,7 +128,13 @@ describe('Playwright cross-worker advisory lock', () => {
     directory = fs.mkdtempSync(path.join(os.tmpdir(), 'advisory-lock-'))
     lockName = `advisory-lock-spec:${path.basename(directory)}`
   })
-  afterEach(() => fs.rmSync(directory, { recursive: true, force: true }))
+  afterEach(async () => {
+    try {
+      await stopWorkers()
+    } finally {
+      fs.rmSync(directory, { recursive: true, force: true })
+    }
+  })
 
   it('never lets two workers hold it at once', async () => {
     const exits = await Promise.all(
@@ -97,6 +162,20 @@ describe('Playwright cross-worker advisory lock', () => {
     const release = await acquireAdvisoryLock(databaseUrl, lockName, { timeoutMs: 5_000 })
     await release()
   }, 60_000)
+
+  it('leaves no worker or session behind when a run is cut short', async () => {
+    const holding = worker(directory, 'holder', lockName, { rounds: 1, holdMs: 120_000 })
+    const log = path.join(directory, 'holder.log')
+    await waitFor(() => fs.existsSync(log))
+    expect(await holders(lockName)).toHaveLength(1)
+
+    // What afterEach does when a test times out with a worker still holding the lock.
+    await stopWorkers()
+    expect(await holding).toBeNull()
+    expect(await holders(lockName)).toEqual([])
+    const release = await acquireAdvisoryLock(databaseUrl, lockName, { timeoutMs: 2_000 })
+    await release()
+  }, 30_000)
 
   it('gives up at its deadline while another session holds it', async () => {
     const release = await acquireAdvisoryLock(databaseUrl, lockName, { timeoutMs: 1_000 })
