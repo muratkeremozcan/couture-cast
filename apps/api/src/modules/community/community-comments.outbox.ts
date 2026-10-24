@@ -1,5 +1,6 @@
 // Story 6.4 owner: comment work shares the existing worker and PostgreSQL sweeps.
 import { createBaseLogger } from '../../logger/pino.config.js'
+import { analyticsDeliveryFailureReason } from './community-analytics-delivery.js'
 import { randomUUID } from 'node:crypto'
 import type { PrismaClient } from '@prisma/client'
 import type { TelemetryService } from '../telemetry/telemetry.service.js'
@@ -155,8 +156,12 @@ export class CommunityCommentsOutbox {
                 }
               )
               delivered = true
-            } catch {
-              this.deliveryFailed(row.attempts, row.created_at)
+            } catch (failure) {
+              this.deliveryFailed(
+                row.attempts,
+                row.created_at,
+                analyticsDeliveryFailureReason(failure)
+              )
             }
             await tx.communityCommentAnalyticsOutbox.updateMany({
               where: { id: row.id, lease_id: lease, delivered_at: null },
@@ -178,16 +183,16 @@ export class CommunityCommentsOutbox {
         )
       } catch {
         // A lost lease or database timeout remains recoverable after its bounded expiry.
-        this.deliveryFailed(row.attempts, row.created_at)
+        this.deliveryFailed(row.attempts, row.created_at, 'settlement_failed')
       }
     }
   }
 
-  private deliveryFailed(attempt: number, createdAt: Date): void {
+  private deliveryFailed(attempt: number, createdAt: Date, reason: string): void {
     this.logger.warn(
       {
         event: 'community_comment_delivery_failed',
-        reason: 'delivery_failed',
+        reason,
         attempt,
         pendingAgeMs: Math.max(0, Date.now() - createdAt.getTime()),
       },

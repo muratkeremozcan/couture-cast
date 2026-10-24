@@ -1,4 +1,5 @@
 import { randomUUID } from 'node:crypto'
+import { analyticsDeliveryFailureReason } from './community-analytics-delivery.js'
 import { Inject, Injectable } from '@nestjs/common'
 import { PrismaClient } from '@prisma/client'
 import { TelemetryService } from '../telemetry/telemetry.service.js'
@@ -15,14 +16,6 @@ interface ClaimedReaction {
   payload: unknown
   attempts: number
   created_at: Date
-}
-
-function failureReason(error: unknown): string {
-  if (!(error instanceof Error)) return 'delivery_failed'
-  if (error.name === 'TimeoutError' || error.name === 'AbortError') return 'sink_timeout'
-  if (/unconfigured|transport unavailable/.test(error.message)) return 'sink_unconfigured'
-  if (/refused|acknowledgement|quota limited/.test(error.message)) return 'sink_rejected'
-  return 'delivery_failed'
 }
 
 /** Story 6.3 owner: committed leases, bounded sweeps, observable delivery, 30-day retention. */
@@ -75,7 +68,7 @@ export class CommunityReactionOutboxDispatcher {
         this.logger.warn(
           {
             event: 'community_reaction_delivery_failed',
-            reason: failureReason(failure),
+            reason: analyticsDeliveryFailureReason(failure),
             attempt: row.attempts,
             pendingAgeMs: Math.max(0, Date.now() - row.created_at.getTime()),
           },

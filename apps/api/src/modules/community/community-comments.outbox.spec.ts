@@ -42,7 +42,7 @@ it('signals enqueue failure with bounded reason/attempt/age fields and no conten
   )
   expect(JSON.stringify(log.warn.mock.calls)).not.toMatch(/secret|member-id|private body/)
 })
-it('signals delivery failure safely and leaves its durable lease recoverable', async () => {
+it('signals a settlement failure safely and leaves its durable lease recoverable', async () => {
   const row = {
     id: 'secret-event-id',
     actor: 'secret-actor',
@@ -65,7 +65,7 @@ it('signals delivery failure safely and leaves its durable lease recoverable', a
   expect(log.warn).toHaveBeenCalledExactlyOnceWith(
     {
       event: 'community_comment_delivery_failed',
-      reason: 'delivery_failed',
+      reason: 'settlement_failed',
       attempt: 4,
       pendingAgeMs: expect.any(Number) as unknown,
     },
@@ -76,6 +76,70 @@ it('signals delivery failure safely and leaves its durable lease recoverable', a
   )
 })
 
+it.each([
+  [
+    'an unconfigured sink',
+    new Error('Analytics ingestion is unconfigured'),
+    'sink_unconfigured',
+  ],
+  [
+    'a sink that times out',
+    Object.assign(new Error('timed out'), { name: 'TimeoutError' }),
+    'sink_timeout',
+  ],
+  ['any other failure', new Error('socket hang up'), 'delivery_failed'],
+])(
+  'names %s as its deferral reason and reschedules the event',
+  async (_, failure, reason) => {
+    const row = {
+      id: 'secret-event-id',
+      actor: 'secret-actor',
+      event_type: 'community_comment_submitted',
+      payload: { private: 'never logged' },
+      created_at: new Date(),
+      attempts: 1,
+    }
+    const updateMany = vi.fn().mockResolvedValue({ count: 1 })
+    const tx = {
+      $executeRaw: vi.fn().mockResolvedValue(0),
+      $queryRaw: vi
+        .fn()
+        .mockResolvedValueOnce([{ actor: row.actor }])
+        .mockResolvedValueOnce([{ id: row.id }]),
+      communityCommentAnalyticsOutbox: { updateMany },
+    }
+    const prisma = {
+      communityCommentScreeningOutbox: { findMany: vi.fn().mockResolvedValue([]) },
+      $queryRaw: vi.fn().mockResolvedValueOnce([row]).mockResolvedValue([]),
+      $transaction: vi.fn((work: (client: typeof tx) => Promise<unknown>) => work(tx)),
+    }
+    await new CommunityCommentsOutbox(
+      prisma as never,
+      {} as never,
+      { captureCommentEvent: vi.fn().mockRejectedValue(failure) } as never,
+      {} as never
+    ).dispatchPending()
+    expect(log.warn).toHaveBeenCalledExactlyOnceWith(
+      {
+        event: 'community_comment_delivery_failed',
+        reason,
+        attempt: 1,
+        pendingAgeMs: expect.any(Number) as unknown,
+      },
+      'Comment analytics delivery deferred'
+    )
+    // Not delivered: the lease is released and the next attempt is scheduled.
+    expect(updateMany).toHaveBeenCalledWith(
+      expect.objectContaining({
+        data: expect.objectContaining({
+          lease_id: null,
+          next_attempt_at: expect.any(Date) as unknown,
+        }) as unknown,
+      })
+    )
+    expect(JSON.stringify(log.warn.mock.calls)).not.toMatch(/secret|never logged/)
+  }
+)
 it('R14 continues the stale sweep after one dependency failure', async () => {
   const failed = vi
     .fn()
