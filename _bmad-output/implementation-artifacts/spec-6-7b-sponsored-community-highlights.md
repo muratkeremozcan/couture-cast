@@ -2,7 +2,7 @@
 title: 'Story 6.7b: Sponsored community highlights'
 type: 'feature'
 created: '2026-10-24'
-status: 'in-progress'
+status: 'done'
 baseline_commit: 'f7045a7b734c44720291a49ca4f253e09cc92e43'
 route: 'dispatch'
 story_key: '6-7b-sponsored-community-highlights'
