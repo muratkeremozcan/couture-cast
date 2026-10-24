@@ -1812,6 +1812,9 @@ const failFlowWithCause = (flowPath, cause, flowFailures) => {
   }
 }
 
+/** The device a serial run drives when no serial is pinned: adb's own default. */
+const DEFAULT_ADB_DEVICE = 'the default adb device'
+
 /**
  * Story 6.7 R62: the first flow on an Android device reinstalls Maestro's driver;
  * later flows reuse it once the device shows it complete
@@ -1820,8 +1823,8 @@ const failFlowWithCause = (flowPath, cause, flowFailures) => {
 const maestroDriverReuse = createMaestroDriverReuse({
   inspect: async (device) => {
     const adbBinary = resolveAdbBinary()
-    const target = device ? ['-s', device] : []
-    const [packagesOutput, instrumentationOutput] = await Promise.all([
+    const target = device === DEFAULT_ADB_DEVICE ? [] : ['-s', device]
+    const [packages, instrumentation] = await Promise.all([
       captureProcess(
         adbBinary,
         [...target, 'shell', 'pm', 'list', 'packages', 'dev.mobile.maestro'],
@@ -1833,7 +1836,10 @@ const maestroDriverReuse = createMaestroDriverReuse({
         timeoutMs: 15_000,
       }),
     ])
-    return { packagesOutput, instrumentationOutput }
+    return {
+      packagesOutput: packages.stdout,
+      instrumentationOutput: instrumentation.stdout,
+    }
   },
 })
 
@@ -3939,7 +3945,10 @@ const runFlowsSerially = async (target, maestroEnv, mobileIdentity, flowFailures
     let driverArgs = []
     if (!cloud) {
       try {
-        driverArgs = await maestroDriverReuse.argsFor(target.platform, androidSerial)
+        driverArgs = await maestroDriverReuse.argsFor(
+          target.platform,
+          androidSerial || DEFAULT_ADB_DEVICE
+        )
       } catch (error) {
         failFlowWithCause(flowPath, error.message, flowFailures)
         continue
@@ -3973,7 +3982,11 @@ const runFlowsSerially = async (target, maestroEnv, mobileIdentity, flowFailures
     } catch (error) {
       maestroExitError = error
     }
-    if (!cloud) maestroDriverReuse.recordInvocation(target.platform, androidSerial)
+    if (!cloud)
+      maestroDriverReuse.recordInvocation(
+        target.platform,
+        androidSerial || DEFAULT_ADB_DEVICE
+      )
     const restoreCause = await restoreMobileE2EStateOrCause(mobileIdentity, flowPath)
     const doubleCause = await doubleWatch?.verify?.()
 
