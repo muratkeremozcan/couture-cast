@@ -139,7 +139,7 @@ describe('R57 EdgeToEdgeModal over the software keyboard', () => {
     expect(getComputedStyle(keyboardView).flexGrow).toBe('1')
   })
 
-  it('dims the whole screen from its own layer behind the keyboard view', () => {
+  it('dims the whole screen from the layer that holds the keyboard view', () => {
     render(
       <EdgeToEdgeModal visible scrim="rgba(0, 0, 0, 0.6)" scrimTestID="scrim">
         <Text>Sheet</Text>
@@ -148,11 +148,9 @@ describe('R57 EdgeToEdgeModal over the software keyboard', () => {
     const scrim = screen.getByTestId('scrim')
     const keyboardView = screen.getByTestId('edge-to-edge-modal-keyboard-view')
     expect(getComputedStyle(scrim).backgroundColor).toBe('rgba(0, 0, 0, 0.6)')
-    expect(getComputedStyle(scrim).position).toBe('absolute')
-    expect(getComputedStyle(scrim).pointerEvents).toBe('none')
-    // A sibling: the keyboard view can shrink without uncovering any undimmed screen.
-    expect(scrim.contains(keyboardView)).toBe(false)
-    expect(scrim.parentElement).toBe(keyboardView.parentElement)
+    expect(getComputedStyle(scrim).flexGrow).toBe('1')
+    // The keyboard view shrinks inside the scrim, so no undimmed screen shows below it.
+    expect(keyboardView.parentElement).toBe(scrim)
     expect(getComputedStyle(keyboardView).backgroundColor).toBe('rgba(0, 0, 0, 0)')
   })
 

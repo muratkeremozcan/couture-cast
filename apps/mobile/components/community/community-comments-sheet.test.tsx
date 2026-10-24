@@ -1235,14 +1235,13 @@ describe('R52 comments sheet over the system bars', () => {
     await screen.findByTestId('comment-root')
     const scrim = screen.getByTestId('comments-scrim')
     expect(getComputedStyle(scrim).backgroundColor).toBe('rgba(0, 0, 0, 0.5)')
-    expect(getComputedStyle(scrim).position).toBe('absolute')
     // The keyboard view and everything between it and the sheet stay transparent, so the
-    // scrim layer alone dims the screen at any keyboard view height.
+    // scrim layer that holds them alone dims the screen at any keyboard view height.
     const keyboardView = screen.getByTestId('edge-to-edge-modal-keyboard-view')
-    expect(scrim.contains(keyboardView)).toBe(false)
+    expect(keyboardView.parentElement).toBe(scrim)
     for (
       let node = screen.getByTestId('comments-sheet').parentElement;
-      node && node !== scrim.parentElement;
+      node && node !== scrim;
       node = node.parentElement
     )
       expect(getComputedStyle(node).backgroundColor).toBe('rgba(0, 0, 0, 0)')

@@ -63,9 +63,9 @@ type EdgeToEdgeModalProps = Omit<
   'statusBarTranslucent' | 'navigationBarTranslucent'
 > & {
   /**
-   * The scrim's color. It is painted as its own full-screen layer behind the keyboard
-   * view, so the space that view gives up while the keyboard moves never shows the
-   * screen below undimmed.
+   * The scrim's color, painted by the full-screen layer that holds the keyboard view,
+   * so the space that view gives up while the keyboard moves never shows the screen
+   * below undimmed.
    */
   scrim?: string
   scrimTestID?: string
@@ -91,20 +91,15 @@ export function EdgeToEdgeModal({
   const [keyboardOpen] = useKeyboardOpen()
   return (
     <Modal transparent {...props} statusBarTranslucent navigationBarTranslucent>
-      {scrim !== undefined && (
-        <View
-          testID={scrimTestID}
-          pointerEvents="none"
-          style={[StyleSheet.absoluteFill, { backgroundColor: scrim }]}
-        />
-      )}
-      <KeyboardAvoidingView
-        testID="edge-to-edge-modal-keyboard-view"
-        style={styles.keyboardView}
-        {...modalKeyboardAvoiding(keyboardOpen)}
-      >
-        {children}
-      </KeyboardAvoidingView>
+      <View testID={scrimTestID} style={[styles.fill, { backgroundColor: scrim }]}>
+        <KeyboardAvoidingView
+          testID="edge-to-edge-modal-keyboard-view"
+          style={styles.fill}
+          {...modalKeyboardAvoiding(keyboardOpen)}
+        >
+          {children}
+        </KeyboardAvoidingView>
+      </View>
     </Modal>
   )
 }
@@ -126,5 +121,5 @@ export function useModalInsets(keyboardOpen?: boolean): { top: number; bottom: n
 }
 
 const styles = StyleSheet.create({
-  keyboardView: { flex: 1 },
+  fill: { flex: 1 },
 })
