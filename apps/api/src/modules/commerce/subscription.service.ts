@@ -197,7 +197,7 @@ export class SubscriptionService {
   }
 
   private async withTimeout<T>(promise: Promise<T>, timeoutMs: number): Promise<T> {
-    let timer: NodeJS.Timeout | undefined
+    let timer: ReturnType<typeof setTimeout> | undefined
     try {
       return await Promise.race([
         promise,
