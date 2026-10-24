@@ -7,15 +7,57 @@
 // the default screener fails closed and every post terminates at `flagged`. A
 // green run of this file is evidence about the publication pipeline, the feed,
 // the cursor and the page. It is not evidence about image safety.
+import { randomUUID } from 'node:crypto'
 import { log } from '@seontechnologies/playwright-utils/log'
 import { checkA11y } from '../support/helpers/accessibility'
+import { buildUniqueId, resolveApiBaseUrl } from '../support/helpers/api-test'
 import {
-  communityTest as test,
+  communityTest,
+  deleteCommunityRowsForUser,
   expect,
+  loadCommunityFixture,
+  publishCommunityLook,
   SEEDED_BAND,
   SEEDED_COMMUNITY_POSTS,
-  seededPostOnLoadedPage,
+  signUpCommunityUser,
+  waitForTerminalAuthorState,
 } from '../support/helpers/community-session'
+
+/**
+ * A look this test owns, published by its own author just before the test reads
+ * the feed, so it is among the newest and on the first page. Seeded looks are no
+ * anchor there: the seeded City Spotlight cohort and the looks other tests
+ * publish lead the feed and can push every one of them past the first page.
+ */
+const test = communityTest.extend<{ ownLook: { postId: string; caption: string } }>({
+  ownLook: async ({ communitySession, request, apiRequest, recurse }, use, testInfo) => {
+    expect(communitySession.userId).toBeTruthy()
+    const apiBaseUrl = resolveApiBaseUrl(testInfo, { fallback: 'http://localhost:4000' })
+    const ownerId = await signUpCommunityUser(
+      request,
+      apiBaseUrl,
+      buildUniqueId('feed-look-owner', testInfo)
+    )
+    try {
+      const caption = `Feed look ${randomUUID().slice(0, 8)}`
+      const published = await publishCommunityLook(request, {
+        apiBaseUrl,
+        userId: ownerId,
+        fixture: loadCommunityFixture('safe-satin-plum-512x512.jpg'),
+        altText: 'Synthetic plum satin fabric',
+        caption,
+      })
+      const terminal = await waitForTerminalAuthorState(
+        { apiRequest, recurse },
+        { apiBaseUrl, userId: ownerId, postId: published.postId }
+      )
+      expect(terminal.status).toBe('published')
+      await use({ postId: published.postId, caption })
+    } finally {
+      await deleteCommunityRowsForUser(ownerId)
+    }
+  },
+})
 
 /*
  * The community grid lives on the Lookbook Prism home page, inside its "Community
@@ -194,20 +236,18 @@ test.describe('6.1 community feed by climate band', () => {
     await checkA11y(page)
   })
 
-  test('6.1-E2E-06 renders the seeded feed and keeps the author pseudonymous', async ({
+  test('6.1-E2E-06 renders the feed and keeps the author pseudonymous', async ({
     page,
-    communitySession,
+    ownLook,
   }) => {
-    expect(communitySession.userId).toBeTruthy()
     await page.goto(COMMUNITY_ROUTE)
 
-    const firstSeeded = await seededPostOnLoadedPage(page)
-    const card = page.getByTestId(`lookbook-card-${firstSeeded.id}`)
-    await expect(card).toBeVisible()
-    await expect(page.getByTestId(`caption-${firstSeeded.id}`)).toHaveText(
-      firstSeeded.caption
+    const card = page.getByTestId(`lookbook-card-${ownLook.postId}`)
+    await expect(card, 'The look this test published is on the first page').toBeVisible()
+    await expect(page.getByTestId(`caption-${ownLook.postId}`)).toHaveText(
+      ownLook.caption
     )
-    await expect(page.getByTestId(`climate-badge-${firstSeeded.id}`)).toBeVisible()
+    await expect(page.getByTestId(`climate-badge-${ownLook.postId}`)).toBeVisible()
 
     // PSEUDONYMITY IS ASSERTED POSITIVELY, AS THE ALIAS FORMAT. This was
     // `not.toHaveText(/[0-9a-f]{8}-[0-9a-f]{4}/)`, which only excludes a lowercase
@@ -217,23 +257,23 @@ test.describe('6.1 community feed by climate band', () => {
     // actual identity. `generateCommunityAuthorAlias` mints
     // `Style Explorer <8 uppercase hex>` and `CommunityAlias` stores it, so the
     // rendered name has exactly one legal shape and anything else is a leak.
-    const authorName = page.getByTestId(`author-name-${firstSeeded.id}`)
+    const authorName = page.getByTestId(`author-name-${ownLook.postId}`)
     await expect(authorName).toBeVisible()
     await expect(authorName).toHaveText(/^Style Explorer [0-9A-F]{8}$/)
 
-    await expect(page.getByTestId(`report-button-${firstSeeded.id}`)).toBeVisible()
-    await expect(page.getByTestId(`withdraw-button-${firstSeeded.id}`)).toHaveCount(0)
+    await expect(page.getByTestId(`report-button-${ownLook.postId}`)).toBeVisible()
+    await expect(page.getByTestId(`withdraw-button-${ownLook.postId}`)).toHaveCount(0)
   })
 
   test('6.1-E2E-07 report modal passes axe and records one report', async ({
     page,
-    communitySession,
+    ownLook,
   }) => {
-    expect(communitySession.userId).toBeTruthy()
     await page.goto(COMMUNITY_ROUTE)
 
-    const seeded = await seededPostOnLoadedPage(page)
-    await page.getByTestId(`report-button-${seeded.id}`).click()
+    // Reports land on a look this test owns: reports on a seeded look outlive the
+    // run and pile up across runs on a shared database.
+    await page.getByTestId(`report-button-${ownLook.postId}`).click()
     await expect(page.getByTestId('report-reason-select')).toBeVisible()
     await checkA11y(page)
 
