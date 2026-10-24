@@ -180,18 +180,17 @@ test.describe('Story 6.7b sponsored community highlights', () => {
     })
   })
 
-  test('[P1] 6.7b-E2E-01 the spotlight card discloses the partner beside unchanged ranked cards and reports one strict shown event', async ({
+  test('[P1] 6.7b-E2E-01 the spotlight card discloses the partner beside unchanged ranked cards', async ({
     page,
     communitySession,
   }) => {
     await assertSeededSpotlight()
-    const offerId = await assertSeededSponsorship()
+    await assertSeededSponsorship()
     const removeLocation = await placeViewerInArea(
       communitySession.userId,
       SEEDED_SPOTLIGHT_AREA
     )
     try {
-      const shownEvents = await recordShownEvents(page)
       await page.goto('/')
       await settledSpotlight(page)
 
@@ -225,6 +224,29 @@ test.describe('Story 6.7b sponsored community highlights', () => {
         await expect(page.getByTestId(`spotlight-sponsored-cta-${postId}`)).toHaveCount(0)
       }
       await checkA11y(page)
+    } finally {
+      await page.goto('about:blank')
+      await removeLocation()
+    }
+  })
+
+  test('[P1] 6.7b-E2E-10 the sponsored spotlight card reports one strict community_spotlight shown event', async ({
+    page,
+    communitySession,
+  }) => {
+    await assertSeededSpotlight()
+    const offerId = await assertSeededSponsorship()
+    const removeLocation = await placeViewerInArea(
+      communitySession.userId,
+      SEEDED_SPOTLIGHT_AREA
+    )
+    try {
+      const shownEvents = await recordShownEvents(page)
+      await page.goto('/')
+      await settledSpotlight(page)
+      await expect(
+        page.getByTestId(`spotlight-sponsored-cta-${SPONSORED_POST_ID}`)
+      ).toBeVisible()
 
       await log.step('The shown event is the strict community payload')
       await expect
@@ -371,13 +393,12 @@ test.describe('Story 6.7b sponsored community highlights', () => {
     communitySession,
   }) => {
     await assertSeededSpotlight()
-    const offerId = await assertSeededSponsorship()
+    await assertSeededSponsorship()
     const removeLocation = await placeViewerInArea(
       communitySession.userId,
       SEEDED_SPOTLIGHT_AREA
     )
     try {
-      const shownEvents = await recordShownEvents(page)
       await page.setViewportSize(NARROW)
       await page.goto('/')
       await settledSpotlight(page)
@@ -403,6 +424,30 @@ test.describe('Story 6.7b sponsored community highlights', () => {
       await expect(link.getByTestId(ctaId)).toHaveCount(0)
       expect(await cta.evaluate((element) => element.closest('a') === null)).toBe(true)
       await checkA11y(page)
+    } finally {
+      await page.goto('about:blank')
+      await removeLocation()
+    }
+  })
+
+  test('[P1] 6.7b-E2E-11 the narrow-layout Home teaser reports one strict home_teaser shown event', async ({
+    page,
+    communitySession,
+  }) => {
+    await assertSeededSpotlight()
+    const offerId = await assertSeededSponsorship()
+    const removeLocation = await placeViewerInArea(
+      communitySession.userId,
+      SEEDED_SPOTLIGHT_AREA
+    )
+    try {
+      const shownEvents = await recordShownEvents(page)
+      await page.setViewportSize(NARROW)
+      await page.goto('/')
+      await settledSpotlight(page)
+      await expect(
+        page.getByTestId(`home-spotlight-teaser-sponsored-cta-${SPONSORED_POST_ID}`)
+      ).toBeVisible()
 
       await log.step('The shown event is the strict community payload')
       await expect

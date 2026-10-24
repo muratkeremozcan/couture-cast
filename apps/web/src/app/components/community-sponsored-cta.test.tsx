@@ -578,6 +578,7 @@ describe('Sponsored community CTA (Story 6.7b)', () => {
     )
     expect(screen.queryByTestId('sponsored-badge-post-1')).not.toBeInTheDocument()
     expect(card).toHaveAttribute('aria-labelledby', 'lookbook-card-title-post-1')
+    expect(resolve.optIns.length).toBeGreaterThan(0)
     expect(resolve.optIns.filter((optIn) => optIn !== null)).toEqual([])
   })
 
@@ -661,6 +662,7 @@ describe('Sponsored community CTA (Story 6.7b)', () => {
       await waitFor(() => expect(resolved.length).toBeGreaterThan(resolvesBeforeReveal))
 
       const card = await screen.findByTestId('lookbook-card-post-new')
+      expect(resolve.optIns.length).toBeGreaterThan(0)
       expect(resolve.optIns.filter((optIn) => optIn !== null)).toEqual([])
       if (endsBeforeReveal) {
         expect(screen.queryByTestId('sponsored-cta-post-new')).not.toBeInTheDocument()
