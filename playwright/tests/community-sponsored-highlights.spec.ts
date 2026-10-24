@@ -5,18 +5,37 @@
 //
 // Read-only on shared state: the seeded cohort and its sponsorship are never
 // changed. The opt-out test changes only its own fresh account's preference and
-// restores it.
+// restores it. The Show new looks journey links a look it publishes itself, on
+// the isolated local database, and removes the link and the look afterwards.
 import type { BrowserContext, Page, Request } from '@playwright/test'
 import { log } from '@seontechnologies/playwright-utils/log'
 import { SEEDED_SPOTLIGHT_AREA } from '@couture/testing'
 import { checkA11y } from '../support/helpers/accessibility'
-import { authHeaders } from '../support/helpers/api-test'
+import { authHeaders, buildUniqueId } from '../support/helpers/api-test'
 import {
   AFFILIATE_CLICKS_PATH,
   COMMERCE_PREFERENCES_PATH,
 } from '../support/helpers/commerce-session'
-import { communityTest as test, expect } from '../support/helpers/community-session'
-import { communityTestDatabase } from '../support/helpers/community-engagement'
+import {
+  communityTest as test,
+  deleteCommunityRowsForUser,
+  expect,
+  loadCommunityFixture,
+  publishCommunityLook,
+  signUpCommunityUser,
+  waitForTerminalAuthorState,
+} from '../support/helpers/community-session'
+import {
+  communityTestDatabase,
+  test as engagementTest,
+  observeCommunitySocket,
+  openAll,
+} from '../support/helpers/community-engagement'
+import {
+  SEEDED_SPONSOR,
+  linkTestSponsorship,
+  type TestSponsorship,
+} from '../support/helpers/community-sponsorship'
 import {
   SEEDED_SPOTLIGHT_POST_IDS,
   assertSeededSpotlight,
@@ -582,4 +601,105 @@ test.describe('Story 6.7b sponsored community highlights', () => {
       await removeLocation()
     }
   })
+})
+
+/*
+ * The realtime journey runs on the engagement fixtures: their socket observer,
+ * and the lock that keeps one "all"-feed journey at a time, so another
+ * engagement test's looks and cleanup cannot displace this one's.
+ */
+engagementTest.describe('Story 6.7b sponsored look through Show new looks', () => {
+  engagementTest.setTimeout(120_000)
+
+  engagementTest(
+    '[P1] 6.7b-E2E-07 a sponsored look another member publishes is revealed from Show new looks with Partnered and its CTA',
+    async (
+      { page, communitySession, communityApi, request, apiRequest, recurse },
+      testInfo
+    ) => {
+      expect(communitySession.userId).not.toBe(communityApi.userId)
+      const transport = await observeCommunitySocket(page)
+      await openAll(page)
+      await recurse(
+        () => Promise.resolve(transport.handshakes),
+        (count) => count > 0,
+        { timeout: 10_000 }
+      )
+
+      const ownerId = await signUpCommunityUser(
+        request,
+        communityApi.apiBaseUrl,
+        buildUniqueId('sponsored-new-look-owner', testInfo)
+      )
+      communityApi.trackUser(ownerId)
+      let sponsorship: TestSponsorship | undefined
+      try {
+        await log.step(
+          'A second member publishes a look that is sponsored before it goes public'
+        )
+        const published = await publishCommunityLook(request, {
+          apiBaseUrl: communityApi.apiBaseUrl,
+          userId: ownerId,
+          fixture: loadCommunityFixture('safe-satin-plum-512x512.jpg'),
+          altText: 'Synthetic plum satin fabric',
+          caption: `Sponsored new look ${testInfo.testId.slice(0, 8)}`,
+          // Linked while still a draft, so the opted-in rebuild that buffers it
+          // already finds the live block.
+          beforePublish: async (postId) => {
+            sponsorship = await linkTestSponsorship(postId)
+          },
+        })
+        expect(
+          (
+            await waitForTerminalAuthorState(
+              { apiRequest, recurse },
+              {
+                apiBaseUrl: communityApi.apiBaseUrl,
+                userId: ownerId,
+                postId: published.postId,
+              }
+            )
+          ).status
+        ).toBe('published')
+
+        await log.step('The reader reveals it from Show new looks')
+        const insert = page.getByRole('button', { name: /Show \d+ new look/ })
+        await expect(insert).toBeVisible({ timeout: 10_000 })
+        const card = page.getByTestId(`lookbook-card-${published.postId}`)
+        await expect(card).toHaveCount(0)
+        await insert.focus()
+        await page.keyboard.press('Enter')
+        // Other specs publish in parallel, so the first banner can announce their
+        // look before this one is buffered; insert again until this one is in.
+        await expect(async () => {
+          if ((await card.count()) === 0 && (await insert.isVisible())) {
+            await insert.focus()
+            await page.keyboard.press('Enter')
+          }
+          await expect(card).toBeVisible({ timeout: 1_000 })
+        }).toPass({ timeout: 20_000 })
+
+        await log.step('The revealed card discloses the partner and offers the CTA')
+        await expect(page.getByTestId(`sponsored-badge-${published.postId}`)).toHaveText(
+          /^Partnered/
+        )
+        await expect(card).toHaveAccessibleName(
+          new RegExp(`Partnered with ${SEEDED_SPONSOR.partnerName}$`)
+        )
+        const cta = page.getByTestId(`sponsored-cta-${published.postId}`)
+        await expect(cta).toBeVisible()
+        await expect(cta).toHaveAccessibleName(
+          `Shop this look at ${SEEDED_SPONSOR.partnerName}`
+        )
+        await expect(cta).toHaveAccessibleDescription(OPENS_COPY)
+        await checkA11y(page)
+      } finally {
+        await page.goto('about:blank')
+        // The link first, then the look; the fixture's own teardown repeats the
+        // row cleanup harmlessly.
+        await sponsorship?.remove()
+        await deleteCommunityRowsForUser(ownerId)
+      }
+    }
+  )
 })
