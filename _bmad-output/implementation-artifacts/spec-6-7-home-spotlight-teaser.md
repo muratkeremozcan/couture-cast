@@ -516,6 +516,30 @@ playwright/tests/community-comments.spec.ts --repeat-each=3`, went out without t
     seen just after exit and then gone passes, and a holder that never goes fails at the
     deadline (the first is red when the wait looks only once).
 
+- 2026-10-24, R37 (`reviews/code-triage-1.md`), found by k6 smoke on `2e60b719`.
+  - The band-filtered community feed read answered 503 "Access could not be verified" while
+    the concurrent unfiltered read succeeded. The Story 6.5 authorization gate opened its
+    transactions with `maxWait` capped at 100 ms, so a request queued for a pooled connection
+    during k6's start-up burst got Prisma P2028, and `communityDependency` turned that into a
+    503 without logging it. The gate's transactions in `community-access.service.ts`,
+    `community-sync.service.ts`, `community-targets.service.ts` and
+    `community-flag-evaluation.service.ts` now wait up to the remaining authorization budget
+    (1950 ms), which still bounds them, and `communityDependency` logs the cause (Prisma code
+    and SQL state, or the error type) before answering unavailable.
+  - Proof: `apps/api/integration/community-gate-pool-wait.integration.spec.ts` holds the only
+    connection of a one-connection pool for 300 ms; the read is authorized once it frees, and
+    with the old wait it fails with P2028. A budget that runs out still answers 503. A unit case
+    checks the logged cause. Local k6 smoke did not reproduce the 503 at `2e60b719`, even with a
+    one-connection pool: this machine finishes the gate's transactions well inside 100 ms, so
+    the integration spec is the deterministic proof and the local k6 runs show the smoke stays
+    green.
+  - Rerun scope, as the coordinator set it: the change is server-side and only relaxes a pool
+    wait, so the native module lanes, the release builds and the r7f TalkBack evidence stay
+    valid, as do the Android flow runs at `2e60b719` for R23 and R24. At the R37 head, through
+    `run-evidence.py`: API unit and integration (including the new spec), the Pact provider,
+    the community Playwright specs, and k6 smoke locally several times. CI at the final head
+    runs every Maestro lane and is the final gate.
+
 ## Spec Change Log
 
 - 2026-10-23, iteration 5 (rereview 3): read floor, last-attempt time and `Retry-After` are
