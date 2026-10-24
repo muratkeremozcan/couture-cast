@@ -81,6 +81,16 @@ inputs:
       the rest are skipped, and the save step never fails the job.
     required: false
     default: 'true'
+  provision-storage-buckets:
+    description: >-
+      Create or update the Storage buckets the Prisma migrations define, through
+      the Storage API, right after the start (scripts/local-storage-buckets.mjs).
+      The migrations insert them only into a database that has the Storage
+      schema, so a job that migrates an isolated database (the real-session lane)
+      would otherwise seed against no bucket. Every job that starts a local
+      Supabase gets the same buckets from this one step.
+    required: false
+    default: 'true'
 
 runs:
   using: composite
@@ -340,6 +350,11 @@ runs:
           sleep "$sleep_seconds"
           attempt=$(( attempt + 1 ))
         done
+
+    - name: Provision the local Storage buckets
+      if: inputs.provision-storage-buckets == 'true'
+      shell: bash
+      run: node scripts/local-storage-buckets.mjs provision
 
     - name: Save the Supabase image cache
       # Any caller, only on a miss, and only after a start that produced the
