@@ -233,6 +233,29 @@ changing hero or palette advisor offers; enabling any production flag.
 
 ## Implementation Notes
 
+- 2026-10-24: Opted-in variants extend the reaction variants (their `reactions` is optional), so one
+  sponsored schema per route serves requests with or without `x-couture-reactions`.
+- The block is attached in `CommunityController` after the community read and after the spotlight
+  read model, through `CommunitySponsorshipService.resolveForPosts` (one batched query). The public
+  visibility rule is shared as `publiclyVisiblePostSql`, which the spotlight ranking now also uses.
+- Post erasure anonymizes rows rather than deleting them, so `eraseMetadata` deletes the post's
+  links in the same transaction; the FK cascade covers hard deletes. Audit rows stay.
+- The operator command is `scripts/community-sponsorship.ts` run with
+  `tsx --tsconfig apps/api/tsconfig.json` (the root tsconfig has no decorator support). Its logic is
+  `community-sponsorship.cli.ts` and `CommunitySponsorshipOperatorService`, registered in
+  `CommerceModule` for Story 6.10. `--ends-at` in the past with a defaulted start refuses as
+  `window_invalid`; with both times given it refuses as `window_in_past`. Both write nothing.
+- The `community_sponsorship_ended` audit row repeats the agreement reference by reading the
+  matching `community_sponsorship_linked` row; the link table carries no agreement column.
+- Surprise: with `noopener`, `window.open` always returns null, so the web open helper reported every
+  successful handoff as an error. Fixed for the community CTA and the Story 5.4 palette advisor CTA.
+- Surprise: the realtime catch-up re-reads visible posts through `targets/resolve`, which carries no
+  sponsorship, and replaced the live copies on both clients. Resolve copies now keep the block from
+  the visit's last live read of the same published post; live reads still replace it, and the click
+  re-checks server-side.
+- Device runs: Android closes the Custom Tab from its close button; iOS reports elements under the
+  tab bar as visible, so the Maestro flow centres each CTA before tapping.
+
 ## Spec Change Log
 
 - 2026-10-24, iteration 2 (story review 1, coordinator under owner delegation): operator command
