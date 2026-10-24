@@ -227,7 +227,7 @@ tags:
 # the newest feed-seed post instead of expecting it in the first viewport. The
 # spotlight carousel and seven newer feed cards, each nearly a screen tall, sit
 # above it. A fast scroll command opened the card under it on Android, so the
-# card is reached with long, steady swipes instead. A card is
+# card is reached with straight swipes instead. A card is
 # taller than the space between the header and the tab bar on a phone, so the
 # checks below walk it top to bottom, scrolling each part into view before
 # asserting it: a part asserted earlier may already have scrolled away.
@@ -236,60 +236,67 @@ tags:
       id: 'community-spotlight-heading'
     timeout: 20000
     label: 'The spotlight header rendered above the feed, over the real API'
-# Long straight swipes, each moving most of a screen, reach the card in about
-# half the steps of a scroll command, and each step checks for it first.
+# TWO PHASES, SO THE CARD ARRIVES FROM THE BOTTOM, AUTHOR ROW FIRST.
+#
+# Above `lookbook-5` sit the seven spotlight cohort posts, `seed-spotlight-1`
+# (newest) to `seed-spotlight-7` (oldest, directly above it). Fast swipes cover
+# the distance until `seed-spotlight-6` shows. Each moves the list less than one
+# card plus the list's height, so no card is skipped; the module's own copy of
+# that post sits off screen in its horizontal row. From there `seed-spotlight-7`,
+# a whole card, separates the list from `lookbook-5`, so short, slow swipes take
+# over: each drags 40% of the screen over 1.5 s, carries little fling and moves
+# the list less than its own height (list [750,2752] on a 2992 px Android
+# screen, 233-784 pt on an iPhone 17 Pro). The card is checked before every
+# swipe, so when it first shows, its author row, the card's topmost part, is in
+# the list or just past its bottom edge, never above the list top.
+#
+# History. Fast swipes all the way could carry the author row from below the
+# list to above its top (CI job 120208110948, Android), and the UP walk added for
+# that ran the wrong way when the row sat just below the bottom edge (CI job
+# 120691261993, Android; and twice in a row on an iPhone 17 Pro in Story 6.7b,
+# where iOS counted the clipped row as visible, skipped the corrective drag, and
+# the UP walk ran to the top of the feed). Slow swipes all the way pushed the
+# flow past the runner's six-minute budget on iOS.
+- repeat:
+    while:
+      notVisible:
+        id: 'community-post-card-seed-spotlight-6'
+    times: 20
+    commands:
+      - swipe:
+          start: '50%, 85%'
+          end: '50%, 25%'
+          duration: 500
 - repeat:
     while:
       notVisible:
         id: 'community-post-card-lookbook-5'
-    times: 30
+    times: 12
     commands:
       - swipe:
           start: '50%, 85%'
-          end: '50%, 20%'
-          duration: 500
+          end: '50%, 45%'
+          duration: 1500
 - extendedWaitUntil:
     visible:
       id: 'community-post-card-lookbook-5'
     timeout: 10000
     label: 'The newest feed-seed post renders in the feed'
-
-# UP, NOT DOWN, TO THE AUTHOR ROW.
-#
-# The author row is the card's topmost part, so once any part of the card is on
-# screen the row is either on screen too or ABOVE the list. It is never below.
-# This used to scroll DOWN to it, and CI job 120208110948 failed there (`No
-# visible element found: id: community-card-author-lookbook-5`): the feed list
-# spans [580,2190] on that 2400 px screen, the swipe drags 1560 px, and with the
-# fling after release the last swipe carried the card from wholly below the list
-# to its author row above the list top, under the sticky filter strip, so DOWN
-# ran to the end of the feed. Waiting on the row itself instead of the card does
-# not help: a swipe that can carry the row past the whole list can skip the row.
-# The card is a screen tall, so no swipe skips it. `scrollUntilVisible` checks
-# before it scrolls, so a row already on screen costs nothing here. Every check
-# after this one is for a part BELOW the row, so only downward walks follow.
-#
-# One exception: the card can stop with its padding inside the list and its author
-# row just past the list's bottom edge. CI job 120691261993 (2026-10-23) logged
-# the row at y 2224-2190 against a list ending at 2190, so "visible card" held
-# while the row was BELOW, and the UP walk carried it further away. A short, slow
-# drag (no fling) lifts a row clipped at the bottom into view; a row above the
-# list is still found by the UP walk that follows.
-- runFlow:
-    when:
+# The card can stop with only its top padding inside the list and the author row
+# just past the bottom edge (CI job 120691261993 logged the row at y 2224 against
+# a list ending at 2190). A short, slow drag lifts it into view; it moves the
+# list far less than its height, so the row cannot pass the list top.
+- repeat:
+    while:
       notVisible:
         id: 'community-card-author-lookbook-5'
+    times: 3
     commands:
       - swipe:
           start: '50%, 70%'
           end: '50%, 55%'
           duration: 1500
       - waitForAnimationToEnd
-- scrollUntilVisible:
-    element:
-      id: 'community-card-author-lookbook-5'
-    direction: UP
-    timeout: 20000
 - assertVisible:
     id: 'community-card-author-lookbook-5'
     label: 'The author line renders a pseudonym rather than being absent'
@@ -347,10 +354,15 @@ tags:
     text: 'Look 5 — weather-ready layers'
     label: 'The caption is the seeded row, so this is live data and not a fixture'
 
+# Centred, slowly, before it is tapped: iOS reports a control under the tab bar
+# as visible, and a tap there lands on the Settings tab (Story 6.7b iOS run 6). A
+# centring scroll at the default speed overshot the row under the filter strip.
 - scrollUntilVisible:
     element:
       id: 'community-card-report-lookbook-5'
     direction: DOWN
+    centerElement: true
+    speed: 10
     timeout: 20000
 - assertVisible:
     id: 'community-card-report-lookbook-5'
@@ -441,10 +453,15 @@ tags:
     timeout: 20000
 
 # Story 6.3: desired-state add, replace, reload, and remove against the real API.
+# Centred, slowly, before any chip is tapped: iOS reports a chip under the tab
+# bar as visible, and a tap there landed on the Wardrobe tab (Story 6.7b iOS run
+# 3); at the default speed the centring scroll overshot under the filter strip.
 - scrollUntilVisible:
     element:
       id: 'community-reaction-total-lookbook-5'
     direction: DOWN
+    centerElement: true
+    speed: 10
 - copyTextFrom:
     id: 'community-reaction-count-applause-lookbook-5'
 - evalScript: ${output.initialApplause = Number(maestro.copiedText.replace(/[^0-9]/g, ''))}
@@ -525,9 +542,10 @@ tags:
       id: 'community-spotlight-heading'
     timeout: 20000
 # The spotlight and the newer seeded feed cards sit above `lookbook-5` again
-# after the relaunch, so the card is reached the same way as the first time.
-# Long straight swipes, each moving most of a screen, reach the card in about
-# half the steps of a scroll command, and each step checks for it first.
+# after the relaunch. This time the target is the reaction row, which sits low
+# in the card and is reached by a downward walk, so the card only has to show:
+# long straight swipes, each moving most of a screen, reach it in about half
+# the steps of a scroll command, and each step checks for it first.
 - repeat:
     while:
       notVisible:
@@ -542,10 +560,13 @@ tags:
     visible:
       id: 'community-post-card-lookbook-5'
     timeout: 10000
+# Centred for the same reason as before the first reaction tap.
 - scrollUntilVisible:
     element:
       id: 'community-reaction-total-lookbook-5'
     direction: DOWN
+    centerElement: true
+    speed: 10
     timeout: 20000
 - assertVisible:
     id: 'community-reaction-love-lookbook-5'

@@ -17,10 +17,12 @@
 #
 # BROWSER. The click redirects to the seeded partner host
 # `partner.couturecast.test`, which never resolves, so the in-app browser opens
-# on its error page. That page and the browser's address bar both name the host,
-# which is what proves the browser opened on the minted URL. Android opens a
-# Custom Tab (Android back closes it); iOS opens an SFSafariViewController
-# (Done closes it).
+# on its error page. That page and the browser's address bar both name the host;
+# the address bar is what proves the browser opened on the minted URL, so the
+# host is read from the URL bar element on each platform
+# (`subflows/assert-in-app-browser-host.yaml`). Android opens a Custom Tab
+# (its close button closes it); iOS opens an SFSafariViewController (Done
+# closes it).
 #
 # SELECTORS. The Partnered pill is one accessible element whose label names the
 # partner, and the CTA's label names the action and the partner, so both are
@@ -94,11 +96,7 @@ tags:
     label: 'Shop the teaser look'
 
 - runFlow: subflows/dismiss-chrome-first-run.yaml
-- extendedWaitUntil:
-    visible:
-      text: '.*partner\.couturecast\.test.*'
-    timeout: 20000
-    label: 'The in-app browser opened on the minted partner URL'
+- runFlow: subflows/assert-in-app-browser-host.yaml
 - takeScreenshot:
     path: maestro/artifacts/community-sponsored-teaser-browser
 
@@ -163,11 +161,7 @@ tags:
     label: 'Shop the spotlight look'
 
 - runFlow: subflows/dismiss-chrome-first-run.yaml
-- extendedWaitUntil:
-    visible:
-      text: '.*partner\.couturecast\.test.*'
-    timeout: 20000
-    label: 'The in-app browser opened on the minted partner URL'
+- runFlow: subflows/assert-in-app-browser-host.yaml
 
 - runFlow: subflows/close-in-app-browser.yaml
 
