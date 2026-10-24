@@ -379,12 +379,18 @@ tags:
     timeout: 15000
 - tapOn:
     id: 'report-details-input'
+# A three-line value, so the field shows its multiline height above the keyboard.
 - inputText: 'Keyboard check'
+- pressKey: Enter
+- inputText: 'second line'
+- pressKey: Enter
+- inputText: 'third line'
+# The counter under the field proves the whole value reached it: 14 + 1 + 11 + 1 + 10.
 - assertVisible:
-    id: 'report-details-input'
-    text: 'Keyboard check'
+    id: 'report-details-count'
+    text: '37 of 500 characters'
 # R66: while the member writes details the reasons leave the layout, so no reason row
-# is cut by the scroll edge above the field.
+# is cut by the scroll edge above the field, and the field and its counter show whole.
 - assertNotVisible:
     id: 'report-reason-spam'
 - takeScreenshot:
@@ -627,12 +633,17 @@ tags:
 # R65: Publish sits below the caption and stays disabled without a photo, so a tap on
 # it changes nothing when the sheet is lifted. A sheet left under the keyboard would
 # put that tap on a key and type into the caption, and the counter would move.
+- assertVisible:
+    id: 'community-caption-input'
+- assertVisible:
+    id: 'community-publish-button'
 - tapOn:
     id: 'community-publish-button'
     label: 'Tap Publish with the keyboard still up'
 - assertVisible:
     id: 'community-caption-count'
     text: '14 of 280 characters'
+    label: 'The tap reached Publish, above the keyboard, and typed nothing'
 
 - tapOn:
     id: 'community-post-sheet-close'
