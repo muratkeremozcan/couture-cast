@@ -22,11 +22,13 @@ import {
   CommunityRepository,
   type FindFeedPostsParams,
 } from '../src/modules/community/community.repository.js'
+import { isolatedCommunityDatabase } from './helpers/isolated-community-database.js'
 
-const databaseUrl =
-  process.env.INTEGRATION_TEST_DATABASE_URL ??
-  process.env.DATABASE_URL ??
-  'postgresql://postgres:postgres@127.0.0.1:54322/postgres'
+// A database of its own: deleting the 2000 seeded posts afterwards makes the
+// realtime triggers queue one anonymous public resync per published post, and in
+// a shared database that backlog sat ahead of every later reader's own events.
+const database = isolatedCommunityDatabase()
+const databaseUrl = database.url
 
 const prisma = new PrismaClient({ datasources: { db: { url: databaseUrl } } })
 
@@ -150,6 +152,7 @@ describe('6.1 community feed query plans', () => {
   let cursorSeedId: string
 
   beforeAll(async () => {
+    await database.migrate()
     await probeSchema()
     if (!schemaReady) return
 
@@ -219,16 +222,8 @@ describe('6.1 community feed query plans', () => {
   })
 
   afterAll(async () => {
-    if (!schemaReady) {
-      await prisma.$disconnect()
-      return
-    }
-
-    await prisma.lookbookPost.deleteMany({ where: { user_id: authorUserId } })
-    await prisma.userProfile.deleteMany({ where: { user_id: authorUserId } })
-    await prisma.user.deleteMany({ where: { id: authorUserId } })
-    await prisma.$executeRawUnsafe('ANALYZE "LookbookPost"')
     await prisma.$disconnect()
+    await database.drop()
   })
 
   /*
