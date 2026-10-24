@@ -597,6 +597,14 @@ playwright/tests/community-comments.spec.ts --repeat-each=3`, went out without t
   - R43 (round 10): every one of those insertion attempts is keyboard-driven (focus, then
     Enter), so a broken Enter handler cannot pass on a retried click; the bounded retry and
     the own-card assertion stay. The red control blocks Enter on the insert button.
+  - R44: CI burn-in (run 40060449494) failed E2E-004 with one network error after its body
+    passed: the `communityApi` teardown deleted the deep-linked look while the main page was
+    still open, the page's next events poll re-read it and got 404, and the network monitor
+    failed the test. The `community_comment_delivery_failed` warnings in that window are the
+    analytics outbox deferring delivery in every run, unrelated. `communityTest` already closed
+    its pages before cleanup; the engagement session fixture now does too, and tears down
+    before `communityApi`. The failure needs an events poll inside the roughly 280 ms cleanup
+    window, so the proof is parallel repeats.
   - Shared integration database: other community integration specs still share it and leave
     small public resync batches when they delete published posts (77 rows in one local run),
     which the appender drains within about a second; CI runs integration and Playwright in
