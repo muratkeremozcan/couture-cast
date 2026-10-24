@@ -9,6 +9,14 @@
 // the isolated local database, and removes the link and the look afterwards.
 import type { BrowserContext, Page, Request } from '@playwright/test'
 import { log } from '@seontechnologies/playwright-utils/log'
+import {
+  communityFeedResponseSchema,
+  communityPostResponseSchema,
+  communitySpotlightResponseSchema,
+  communitySponsoredFeedResponseSchema,
+  communitySponsoredPostResponseSchema,
+  communitySponsoredSpotlightResponseSchema,
+} from '@couture/api-client/contracts/http'
 import { SEEDED_SPOTLIGHT_AREA } from '@couture/testing'
 import { checkA11y } from '../support/helpers/accessibility'
 import { authHeaders, buildUniqueId } from '../support/helpers/api-test'
@@ -172,9 +180,8 @@ test.describe('Story 6.7b sponsored community highlights', () => {
     })
   })
 
-  test('[P1] 6.7b-E2E-01 the spotlight card discloses the partner, mints a community_spotlight click and opens the partner', async ({
+  test('[P1] 6.7b-E2E-01 the spotlight card discloses the partner beside unchanged ranked cards and reports one strict shown event', async ({
     page,
-    context,
     communitySession,
   }) => {
     await assertSeededSpotlight()
@@ -184,7 +191,6 @@ test.describe('Story 6.7b sponsored community highlights', () => {
       SEEDED_SPOTLIGHT_AREA
     )
     try {
-      const referers = await stubPartnerSite(context)
       const shownEvents = await recordShownEvents(page)
       await page.goto('/')
       await settledSpotlight(page)
@@ -238,6 +244,27 @@ test.describe('Story 6.7b sponsored community highlights', () => {
             },
           },
         ])
+    } finally {
+      await page.goto('about:blank')
+      await removeLocation()
+    }
+  })
+
+  test('[P1] 6.7b-E2E-08 activating the spotlight CTA mints a community_spotlight click and opens the partner with no referrer', async ({
+    page,
+    context,
+    communitySession,
+  }) => {
+    await assertSeededSpotlight()
+    const offerId = await assertSeededSponsorship()
+    const removeLocation = await placeViewerInArea(
+      communitySession.userId,
+      SEEDED_SPOTLIGHT_AREA
+    )
+    try {
+      const referers = await stubPartnerSite(context)
+      await page.goto('/')
+      await settledSpotlight(page)
 
       await log.step('Activation records the click and opens the partner')
       const { body, url } = await activate(
@@ -277,7 +304,7 @@ test.describe('Story 6.7b sponsored community highlights', () => {
       // page would be: the single-post read is opted in like the feed.
       await page.goto(`/?source=notification&type=community&cardId=${SPONSORED_POST_ID}`)
 
-      const card = page.locator(`#lookbook-card-${SPONSORED_POST_ID}`)
+      const card = page.getByTestId(`lookbook-card-${SPONSORED_POST_ID}`)
       await expect(card).toBeFocused()
       await expect(page.getByTestId(`sponsored-badge-${SPONSORED_POST_ID}`)).toHaveText(
         /^Partnered/
@@ -339,7 +366,66 @@ test.describe('Story 6.7b sponsored community highlights', () => {
     }
   })
 
-  test('[P1] 6.7b-E2E-03 the narrow-layout Home teaser renders the CTA beside its link and mints home_teaser', async ({
+  test('[P1] 6.7b-E2E-03 the narrow-layout Home teaser discloses the partner and renders the CTA beside its link', async ({
+    page,
+    communitySession,
+  }) => {
+    await assertSeededSpotlight()
+    const offerId = await assertSeededSponsorship()
+    const removeLocation = await placeViewerInArea(
+      communitySession.userId,
+      SEEDED_SPOTLIGHT_AREA
+    )
+    try {
+      const shownEvents = await recordShownEvents(page)
+      await page.setViewportSize(NARROW)
+      await page.goto('/')
+      await settledSpotlight(page)
+
+      await log.step('The teaser link carries the disclosure')
+      const link = page.getByTestId('home-spotlight-teaser-link')
+      await expect(link).toBeVisible()
+      await expect(page.getByTestId('home-spotlight-teaser-sponsored')).toHaveText(
+        'Partnered'
+      )
+      await expect(link).toHaveAccessibleName(
+        new RegExp(`Partnered with ${PARTNER.name}$`)
+      )
+
+      await log.step('The CTA is a sibling of the link inside the teaser root')
+      const ctaId = `home-spotlight-teaser-sponsored-cta-${SPONSORED_POST_ID}`
+      const cta = page.getByTestId(ctaId)
+      await expect(cta).toHaveAccessibleName(CTA_NAME)
+      await expect(cta).toHaveAccessibleDescription(OPENS_COPY)
+      await expect(
+        page.getByTestId('home-spotlight-teaser').getByTestId(ctaId)
+      ).toHaveCount(1)
+      await expect(link.getByTestId(ctaId)).toHaveCount(0)
+      expect(await cta.evaluate((element) => element.closest('a') === null)).toBe(true)
+      await checkA11y(page)
+
+      await log.step('The shown event is the strict community payload')
+      await expect
+        .poll(async () =>
+          (await shownEvents())
+            .filter((event) => event.properties.surface === 'home_teaser')
+            .map((event) => event.properties)
+        )
+        .toEqual([
+          {
+            partner_id: PARTNER.id,
+            offer_id: offerId,
+            surface: 'home_teaser',
+            locale_region: 'US',
+          },
+        ])
+    } finally {
+      await page.goto('about:blank')
+      await removeLocation()
+    }
+  })
+
+  test('[P1] 6.7b-E2E-09 activating the Home teaser CTA mints home_teaser, opens the partner and records no spotlight open', async ({
     page,
     context,
     communitySession,
@@ -360,48 +446,12 @@ test.describe('Story 6.7b sponsored community highlights', () => {
         )
           opens.push(request.postDataJSON())
       })
-      const shownEvents = await recordShownEvents(page)
       await page.setViewportSize(NARROW)
       await page.goto('/')
       await settledSpotlight(page)
 
-      const link = page.getByTestId('home-spotlight-teaser-link')
-      await expect(link).toBeVisible()
-      await expect(page.getByTestId('home-spotlight-teaser-sponsored')).toHaveText(
-        'Partnered'
-      )
-      await expect(link).toHaveAccessibleName(
-        new RegExp(`Partnered with ${PARTNER.name}$`)
-      )
-      const cta = page.getByTestId(
-        `home-spotlight-teaser-sponsored-cta-${SPONSORED_POST_ID}`
-      )
-      await expect(cta).toHaveAccessibleName(CTA_NAME)
-      await expect(cta).toHaveAccessibleDescription(OPENS_COPY)
-      // A sibling of the teaser link, inside the teaser root.
+      await log.step('Activation records the click and opens the partner')
       const ctaId = `home-spotlight-teaser-sponsored-cta-${SPONSORED_POST_ID}`
-      await expect(
-        page.getByTestId('home-spotlight-teaser').getByTestId(ctaId)
-      ).toHaveCount(1)
-      await expect(link.getByTestId(ctaId)).toHaveCount(0)
-      expect(await cta.evaluate((element) => element.closest('a') === null)).toBe(true)
-      await checkA11y(page)
-
-      await expect
-        .poll(async () =>
-          (await shownEvents())
-            .filter((event) => event.properties.surface === 'home_teaser')
-            .map((event) => event.properties)
-        )
-        .toEqual([
-          {
-            partner_id: PARTNER.id,
-            offer_id: offerId,
-            surface: 'home_teaser',
-            locale_region: 'US',
-          },
-        ])
-
       const { body, url } = await activate(page, ctaId)
       expect(body).toEqual({
         offerId,
@@ -537,7 +587,7 @@ test.describe('Story 6.7b sponsored community highlights', () => {
     }
   })
 
-  test('[P1] 6.7b-E2E-05 a read without the opt-in header keeps today’s shape; with it the block is served', async ({
+  test('[P1] 6.7b-E2E-05 a read without the opt-in header parses with today’s strict schemas; with it the block is served', async ({
     request,
     communitySession,
   }) => {
@@ -548,54 +598,82 @@ test.describe('Story 6.7b sponsored community highlights', () => {
       SEEDED_SPOTLIGHT_AREA
     )
     const base = communitySession.apiBaseUrl
-    const headers = {
+    const legacyHeaders = {
       ...authHeaders(communitySession.userId, 'guardian'),
       'x-couture-platform': 'web',
     }
+    const optedHeaders = { ...legacyHeaders, 'x-couture-sponsorship': '1' }
     const block = {
       partnerId: PARTNER.id,
       partnerDisplayName: PARTNER.name,
       offerId,
       offerTitle: OFFER_TITLE,
     }
+    // playwright-utils deviation: the opted-in reads assert the Vary response
+    // header, which apiRequest does not return; both halves share this call.
+    const read = async (path: string, headers: Record<string, string>) => {
+      const response = await request.get(`${base}${path}`, { headers })
+      expect(response.status(), path).toBe(200)
+      return {
+        body: (await response.json()) as unknown,
+        vary: response.headers()['vary'],
+      }
+    }
+    /**
+     * Walks the every-climate feed, parsing every page, until one carries the
+     * sponsored post: its place in the feed moves as other tests publish.
+     */
+    const findInFeed = async <Item extends { id: string }>(
+      headers: Record<string, string>,
+      parse: (body: unknown) => { data: { items: Item[]; nextCursor: string | null } }
+    ) => {
+      let cursor: string | null = null
+      do {
+        const query = new URLSearchParams({ mode: 'all', limit: '30' })
+        if (cursor) query.set('cursor', cursor)
+        const { body, vary } = await read(`/api/v1/community/feed?${query}`, headers)
+        const page = parse(body)
+        const item = page.data.items.find((entry) => entry.id === SPONSORED_POST_ID)
+        if (item) return { item, vary }
+        cursor = page.data.nextCursor
+      } while (cursor)
+      throw new Error(`${SPONSORED_POST_ID} is on no every-climate feed page`)
+    }
     try {
       for (const route of [
         '/api/v1/community/spotlight',
         '/api/v1/community/spotlight?surface=home_teaser&limit=1',
       ]) {
-        const legacy = await request.get(`${base}${route}`, { headers })
-        expect(legacy.status()).toBe(200)
-        const legacyBody = (await legacy.json()) as {
-          data: { items: Record<string, unknown>[] }
-        }
-        expect(legacyBody.data.items[0]?.id).toBe(SPONSORED_POST_ID)
-        for (const item of legacyBody.data.items)
-          expect(item).not.toHaveProperty('sponsorship')
+        await log.step(`Spotlight ${route}`)
+        // The pre-6.7b schema is strict, so any field added to a legacy read fails.
+        const legacy = communitySpotlightResponseSchema.parse(
+          (await read(route, legacyHeaders)).body
+        )
+        expect(legacy.data.items[0]?.id).toBe(SPONSORED_POST_ID)
 
-        const opted = await request.get(`${base}${route}`, {
-          headers: { ...headers, 'x-couture-sponsorship': '1' },
-        })
-        expect(opted.status()).toBe(200)
-        expect(opted.headers()['vary'] ?? '').toMatch(/x-couture-sponsorship/i)
-        const optedBody = (await opted.json()) as {
-          data: { items: Record<string, unknown>[] }
-        }
-        expect(optedBody.data.items[0]?.sponsorship).toEqual(block)
-        for (const item of optedBody.data.items.slice(1))
+        const opted = await read(route, optedHeaders)
+        expect(opted.vary ?? '').toMatch(/x-couture-sponsorship/i)
+        const optedItems = communitySponsoredSpotlightResponseSchema.parse(opted.body)
+          .data.items
+        expect(optedItems[0]?.sponsorship).toEqual(block)
+        for (const item of optedItems.slice(1))
           expect(item).not.toHaveProperty('sponsorship')
       }
 
-      const post = `${base}/api/v1/community/posts/${SPONSORED_POST_ID}`
-      const legacyPost = await request.get(post, { headers })
-      expect(legacyPost.status()).toBe(200)
-      expect(((await legacyPost.json()) as { data: object }).data).not.toHaveProperty(
-        'sponsorship'
+      await log.step('Feed')
+      await findInFeed(legacyHeaders, (body) => communityFeedResponseSchema.parse(body))
+      const optedFeed = await findInFeed(optedHeaders, (body) =>
+        communitySponsoredFeedResponseSchema.parse(body)
       )
-      const optedPost = await request.get(post, {
-        headers: { ...headers, 'x-couture-sponsorship': '1' },
-      })
+      expect(optedFeed.vary ?? '').toMatch(/x-couture-sponsorship/i)
+      expect(optedFeed.item.sponsorship).toEqual(block)
+
+      await log.step('Single post')
+      const post = `/api/v1/community/posts/${SPONSORED_POST_ID}`
+      communityPostResponseSchema.parse((await read(post, legacyHeaders)).body)
       expect(
-        ((await optedPost.json()) as { data: { sponsorship?: unknown } }).data.sponsorship
+        communitySponsoredPostResponseSchema.parse((await read(post, optedHeaders)).body)
+          .data.sponsorship
       ).toEqual(block)
     } finally {
       await removeLocation()

@@ -1,27 +1,30 @@
 // Story 6.7: the web Home spotlight teaser in the Lookbook Prism layout. Reads
-// are deferred through MSW so each test decides when one settles.
+// are deferred through MSW so each test decides when one settles. The fake-clock
+// re-read, expiry and deadline cases live in home-spotlight-teaser.timers.test.tsx.
 import { act, fireEvent, render, screen, waitFor, within } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
-import { afterEach, beforeEach, describe, expect, it, onTestFinished, vi } from 'vitest'
+import { describe, expect, it, onTestFinished, vi } from 'vitest'
 import { http, HttpResponse } from 'msw'
-import {
-  COMMUNITY_FEED_DISABLED_MESSAGE,
-  communityReactionSpotlightResponseSchema,
-  type CommunityReactionSpotlight,
-  type CommunityReactionSpotlightItem,
-} from '@couture/api-client/contracts/http'
-import {
-  CommunitySyncState,
-  SPOTLIGHT_TEASER_EXPIRY_MS,
-  SPOTLIGHT_TEASER_READ_FLOOR_MS,
-  SPOTLIGHT_TEASER_REREAD_MS,
-} from '@couture/api-client'
+import { COMMUNITY_FEED_DISABLED_MESSAGE } from '@couture/api-client/contracts/http'
+import { CommunitySyncState, SPOTLIGHT_TEASER_READ_FLOOR_MS } from '@couture/api-client'
 import { useMswHandlers } from '../../test-utils/msw/runtime'
-import { WEB_ACCESS_TOKEN_STORAGE_KEY } from '../../lib/wardrobe'
+import {
+  SPOTLIGHT_PATH,
+  TEASER_PREFIX,
+  cityPage,
+  setViewport,
+  setVisibility,
+  settledTeaserRead,
+  setupHomeTeaserSuite,
+  signIn,
+  spotlightItem,
+  teaserCalls,
+  teaserNodes,
+  useServedSpotlight,
+  type Answer,
+} from '../../test-utils/home-spotlight-teaser'
 import enUS from '../../i18n/locales/en-US.json'
 import { LookbookPrismLayout } from './lookbook-prism-layout'
-import { getCommunitySpotlightFromWeb } from '../../lib/community'
-import { SPOTLIGHT_TEASER_REQUEST_TIMEOUT_MS } from './home-spotlight-teaser'
 import { SPOTLIGHT_FOCUS_WAIT_MS } from './community-lookbook-grid'
 
 vi.mock('posthog-js', () => ({ default: { capture: vi.fn() } }))
@@ -30,119 +33,8 @@ vi.mock('posthog-js', () => ({ default: { capture: vi.fn() } }))
 vi.mock('../../lib/community', { spy: true })
 vi.mock('next/navigation', () => ({ usePathname: () => '/' }))
 
-const SPOTLIGHT_PATH = '/api/v1/community/spotlight'
 /** The `Retry-After` hint, in seconds, the 429 case answers with. */
 const RETRY_AFTER_S = 90
-const TEASER_PREFIX = 'home-spotlight-teaser'
-
-function spotlightItem(
-  id: string,
-  rank = 1,
-  overrides: Partial<CommunityReactionSpotlightItem> = {}
-): CommunityReactionSpotlightItem {
-  return {
-    id,
-    caption: 'Private caption that the teaser never shows.',
-    altText: 'A camel coat over a grey knit.',
-    climateBand: 'temperate_wet',
-    imageAccess: {
-      url: `https://storage.local/community/${id}.jpg`,
-      expiresAt: '2099-01-01T00:00:00.000Z',
-    },
-    publishedAt: '2026-10-22T09:00:00.000Z',
-    createdAt: '2026-10-22T08:59:00.000Z',
-    status: 'published',
-    challengeId: null,
-    author: { displayName: 'Ana', isSelf: false },
-    rank,
-    reactions: {
-      counts: { applause: 2, love: 1, inspiration: 0 },
-      total: 3,
-      viewerReaction: null,
-      revision: 1,
-      generation: 1,
-    },
-    ...overrides,
-  }
-}
-
-function cityPage(items = [spotlightItem('look-1')]): CommunityReactionSpotlight {
-  return { level: 'city', label: 'Lisbon', items, nextCursor: null }
-}
-
-type Answer =
-  | { status: number; body: unknown; headers?: Record<string, string> }
-  | 'network-error'
-interface PendingRead {
-  url: URL
-  resolve: (answer: Answer) => void
-}
-
-/**
- * Teaser reads (`surface=home_teaser`) wait for the test; the Community
- * module's own reads answer `module()` at once.
- */
-function useServedSpotlight(
-  module: () => Answer = () => ({ status: 200, body: { data: cityPage() } })
-) {
-  const teaserReads: PendingRead[] = []
-  const moduleReads: URL[] = []
-  useMswHandlers(
-    http.get(SPOTLIGHT_PATH, async ({ request }) => {
-      const url = new URL(request.url)
-      if (url.searchParams.get('surface') !== 'home_teaser') {
-        moduleReads.push(url)
-        return respond(module())
-      }
-      const answer = await new Promise<Answer>((resolve) => {
-        teaserReads.push({ url, resolve })
-      })
-      return respond(answer)
-    })
-  )
-  const answer = async (index: number, value: CommunityReactionSpotlight | Answer) => {
-    await waitFor(() => expect(teaserReads.length).toBeGreaterThan(index))
-    teaserReads[index]!.resolve(
-      value === 'network-error' || 'status' in value
-        ? value
-        : {
-            status: 200,
-            body: communityReactionSpotlightResponseSchema.parse({ data: value }),
-          }
-    )
-    // Waits on the wrapper's own promise, then lets React commit the result.
-    await settledTeaserRead(index)
-  }
-  return { teaserReads, moduleReads, answer }
-}
-
-function respond(answer: Answer) {
-  if (answer === 'network-error') return HttpResponse.error()
-  return HttpResponse.json(answer.body as never, {
-    status: answer.status,
-    headers: answer.headers,
-  })
-}
-
-/** The wrapper calls the teaser made, in order; the Community module's are left out. */
-function teaserCalls() {
-  const mock = vi.mocked(getCommunitySpotlightFromWeb).mock
-  return mock.calls.flatMap(([request], index) =>
-    request?.surface === 'home_teaser' ? [mock.results[index]!] : []
-  )
-}
-
-/** Waits until teaser read `index` settled at the client, then lets React commit. */
-async function settledTeaserRead(index: number) {
-  await waitFor(() => expect(teaserCalls().length).toBeGreaterThan(index))
-  await (teaserCalls()[index]!.value as Promise<unknown>).then(
-    () => undefined,
-    () => undefined
-  )
-  await act(async () => {
-    await Promise.resolve()
-  })
-}
 
 function useRecordedOpens() {
   const opens: { postId: string; body: unknown }[] = []
@@ -153,25 +45,6 @@ function useRecordedOpens() {
     })
   )
   return opens
-}
-
-function signIn(token = 'test-access-token') {
-  window.sessionStorage.setItem(WEB_ACCESS_TOKEN_STORAGE_KEY, token)
-  window.dispatchEvent(new Event('couture:session'))
-}
-
-function setViewport(width: number) {
-  Object.defineProperty(window, 'innerWidth', { value: width, configurable: true })
-  window.dispatchEvent(new Event('resize'))
-}
-
-function setVisibility(state: 'visible' | 'hidden') {
-  Object.defineProperty(document, 'visibilityState', { value: state, configurable: true })
-  document.dispatchEvent(new Event('visibilitychange'))
-}
-
-function teaserNodes(): Element[] {
-  return [...document.querySelectorAll(`[data-testid^="${TEASER_PREFIX}"]`)]
 }
 
 function heroCanvas() {
@@ -219,32 +92,7 @@ async function nextFrames(count = 3) {
 }
 
 describe('6.7 web Home spotlight teaser', () => {
-  const scrollIntoView = Object.getOwnPropertyDescriptor(
-    HTMLElement.prototype,
-    'scrollIntoView'
-  )
-  const scrollIntoViewStub = vi.fn()
-  beforeEach(() => {
-    vi.clearAllMocks()
-    // jsdom has no layout, so it has no scrollIntoView; the mobile preview and the
-    // community focus moves call it.
-    Object.defineProperty(HTMLElement.prototype, 'scrollIntoView', {
-      configurable: true,
-      writable: true,
-      value: scrollIntoViewStub,
-    })
-    vi.spyOn(CommunitySyncState.prototype, 'start').mockImplementation(() => undefined)
-    window.sessionStorage.clear()
-    setViewport(1024)
-    setVisibility('visible')
-  })
-  afterEach(() => {
-    vi.useRealTimers()
-    window.sessionStorage.clear()
-    if (scrollIntoView)
-      Object.defineProperty(HTMLElement.prototype, 'scrollIntoView', scrollIntoView)
-    else Reflect.deleteProperty(HTMLElement.prototype, 'scrollIntoView')
-  })
+  const { scrollIntoViewStub } = setupHomeTeaserSuite()
 
   it('6.7-WEB-001 a stacked layout shows the label, decorative image, author and count inside the hero canvas', async () => {
     signIn()
@@ -799,71 +647,6 @@ describe('6.7 web Home spotlight teaser', () => {
     now.mockRestore()
   })
 
-  it('6.7-WEB-015 re-reads 4 minutes after the last attempt and expires 5 minutes after the read when hidden', async () => {
-    vi.useFakeTimers({
-      toFake: ['setTimeout', 'clearTimeout', 'setInterval', 'clearInterval', 'Date'],
-    })
-    vi.setSystemTime(Date.parse('2026-10-23T12:00:00.000Z'))
-    signIn()
-    const teaserReads: PendingRead[] = []
-    useMswHandlers(
-      http.get(SPOTLIGHT_PATH, async ({ request }) => {
-        const url = new URL(request.url)
-        if (url.searchParams.get('surface') !== 'home_teaser')
-          return HttpResponse.json({ data: cityPage() })
-        const answer = await new Promise<Answer>((resolve) => {
-          teaserReads.push({ url, resolve })
-        })
-        return respond(answer)
-      })
-    )
-    const flush = async () => {
-      for (let round = 0; round < 20; round += 1)
-        await act(async () => {
-          await vi.advanceTimersByTimeAsync(0)
-        })
-    }
-    render(<LookbookPrismLayout />)
-    for (let round = 0; round < 50 && teaserReads.length === 0; round += 1) await flush()
-    teaserReads[0]!.resolve({ status: 200, body: { data: cityPage() } })
-    await flush()
-    expect(screen.getByTestId('home-spotlight-teaser-link')).toBeInTheDocument()
-
-    await act(async () => {
-      await vi.advanceTimersByTimeAsync(SPOTLIGHT_TEASER_REREAD_MS - 1)
-    })
-    expect(teaserReads).toHaveLength(1)
-    await act(async () => {
-      await vi.advanceTimersByTimeAsync(1)
-    })
-    for (let round = 0; round < 50 && teaserReads.length === 1; round += 1) await flush()
-    expect(teaserReads).toHaveLength(2)
-    // In flight, the current value stays.
-    expect(screen.getByTestId('home-spotlight-teaser-link')).toBeInTheDocument()
-    teaserReads[1]!.resolve({
-      status: 200,
-      body: {
-        data: cityPage([
-          spotlightItem('look-2', 1, { author: { displayName: 'Bea', isSelf: false } }),
-        ]),
-      },
-    })
-    await flush()
-    expect(screen.getByTestId('home-spotlight-teaser-author').textContent).toBe('Bea')
-
-    // Hidden, nothing re-reads; the value expires 5 minutes after its read.
-    act(() => setVisibility('hidden'))
-    await act(async () => {
-      await vi.advanceTimersByTimeAsync(SPOTLIGHT_TEASER_EXPIRY_MS - 1)
-    })
-    expect(screen.getByTestId('home-spotlight-teaser-link')).toBeInTheDocument()
-    await act(async () => {
-      await vi.advanceTimersByTimeAsync(1)
-    })
-    expect(teaserNodes()).toEqual([])
-    expect(teaserReads).toHaveLength(2)
-  })
-
   it('6.7-WEB-016 a 429 Retry-After removes the teaser and defers the next read until it passes', async () => {
     let clock = Date.parse('2026-10-23T12:00:00.000Z')
     vi.spyOn(Date, 'now').mockImplementation(() => clock)
@@ -892,133 +675,5 @@ describe('6.7 web Home spotlight teaser', () => {
     clock += 1000
     act(() => setVisibility('visible'))
     expect(teaserCalls()).toHaveLength(3)
-  })
-
-  describe('under a fake clock', () => {
-    const teaserReads: PendingRead[] = []
-    const flush = async () => {
-      for (let round = 0; round < 20; round += 1)
-        await act(async () => {
-          await vi.advanceTimersByTimeAsync(0)
-        })
-    }
-
-    /** Fakes the clock and makes every teaser read wait for the test. */
-    function useFakeClockTeaserReads() {
-      teaserReads.length = 0
-      vi.useFakeTimers({
-        toFake: ['setTimeout', 'clearTimeout', 'setInterval', 'clearInterval', 'Date'],
-      })
-      vi.setSystemTime(Date.parse('2026-10-23T12:00:00.000Z'))
-      signIn()
-      useMswHandlers(
-        http.get(SPOTLIGHT_PATH, async ({ request }) => {
-          const url = new URL(request.url)
-          if (url.searchParams.get('surface') !== 'home_teaser')
-            return HttpResponse.json({ data: cityPage() })
-          const answer = await new Promise<Answer>((resolve) => {
-            teaserReads.push({ url, resolve })
-          })
-          return respond(answer)
-        })
-      )
-    }
-
-    /** Shows the teaser, then lets the 4-minute re-read start and hang. */
-    async function showTeaserWithRereadOut() {
-      render(<LookbookPrismLayout />)
-      for (let round = 0; round < 50 && teaserReads.length === 0; round += 1)
-        await flush()
-      teaserReads[0]!.resolve({ status: 200, body: { data: cityPage() } })
-      await flush()
-      expect(screen.getByTestId('home-spotlight-teaser-link')).toBeInTheDocument()
-      await act(async () => {
-        await vi.advanceTimersByTimeAsync(SPOTLIGHT_TEASER_REREAD_MS)
-      })
-      for (let round = 0; round < 50 && teaserReads.length === 1; round += 1)
-        await flush()
-      expect(teaserReads).toHaveLength(2)
-    }
-
-    it.each([
-      [
-        'the disabled 403',
-        {
-          status: 403,
-          body: {
-            statusCode: 403,
-            code: 'denied',
-            message: 'Community is not available for this account yet.',
-          },
-        },
-      ],
-      [
-        'the disabled 503',
-        {
-          status: 503,
-          body: { statusCode: 503, message: COMMUNITY_FEED_DISABLED_MESSAGE },
-        },
-      ],
-      [
-        'a 500',
-        { status: 500, body: { statusCode: 500, message: 'Internal server error' } },
-      ],
-    ] as const)(
-      '6.7-WEB-025 %s on the first read starts no retry loop',
-      async (_name, refusal) => {
-        useFakeClockTeaserReads()
-        render(<LookbookPrismLayout />)
-        for (let round = 0; round < 50 && teaserReads.length === 0; round += 1)
-          await flush()
-        teaserReads[0]!.resolve(refusal)
-        await flush()
-        expect(teaserNodes()).toEqual([])
-        await act(async () => {
-          await vi.advanceTimersByTimeAsync(SPOTLIGHT_TEASER_REREAD_MS * 2)
-        })
-        await flush()
-        expect(teaserReads).toHaveLength(1)
-        expect(teaserCalls()).toHaveLength(1)
-      }
-    )
-
-    it('6.7-WEB-017 a contention 503 on the re-read removes the teaser at once and reads nothing after the hint', async () => {
-      useFakeClockTeaserReads()
-      await showTeaserWithRereadOut()
-      teaserReads[1]!.resolve({
-        status: 503,
-        body: {
-          statusCode: 503,
-          code: 'unavailable',
-          retryAfterSeconds: 1,
-          message: 'Community is temporarily unavailable.',
-        },
-      })
-      await flush()
-      expect(teaserNodes()).toEqual([])
-      // Past the one-second hint and three re-read periods: no second attempt.
-      await act(async () => {
-        await vi.advanceTimersByTimeAsync(2_000 + SPOTLIGHT_TEASER_REREAD_MS * 3)
-      })
-      await flush()
-      expect(teaserReads).toHaveLength(2)
-      expect(teaserCalls()).toHaveLength(2)
-    })
-
-    it('6.7-WEB-018 a re-read that never answers hits the 10-second deadline and removes the teaser', async () => {
-      useFakeClockTeaserReads()
-      await showTeaserWithRereadOut()
-      await act(async () => {
-        await vi.advanceTimersByTimeAsync(SPOTLIGHT_TEASER_REQUEST_TIMEOUT_MS - 1)
-      })
-      await flush()
-      expect(screen.getByTestId('home-spotlight-teaser-link')).toBeInTheDocument()
-      await act(async () => {
-        await vi.advanceTimersByTimeAsync(1)
-      })
-      await flush()
-      expect(teaserNodes()).toEqual([])
-      expect(teaserCalls()).toHaveLength(2)
-    })
   })
 })

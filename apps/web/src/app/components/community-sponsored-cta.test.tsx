@@ -8,7 +8,6 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import {
   COMMERCE_SPONSORSHIP_NOT_FOUND_MESSAGE,
   communitySponsoredFeedResponseSchema,
-  communitySponsoredSpotlightResponseSchema,
   type CommunitySponsoredSpotlightItem,
 } from '@couture/api-client/contracts/http'
 import { useMswHandlers } from '../../test-utils/msw/runtime'
@@ -32,8 +31,12 @@ import {
   SPOTLIGHT_PATH,
   ZERO,
   captureSync,
+  eventsBody,
   ranked,
   recordAnnouncements,
+  resolveBody,
+  resolvedTarget,
+  sponsoredSpotlightBody,
 } from '../../test-utils/community-spotlight'
 
 vi.mock('posthog-js', () => ({
@@ -49,13 +52,24 @@ const LOADING_COPY = 'Opening partner site'
 const ERROR_COPY = 'Unable to open the partner site. Please try again.'
 
 function sponsoredSpotlight(items: CommunitySponsoredSpotlightItem[]) {
-  return http.get(SPOTLIGHT_PATH, () =>
-    HttpResponse.json(
-      communitySponsoredSpotlightResponseSchema.parse({
-        data: { level: 'city', label: 'Lisbon', items, nextCursor: null },
-      }) as unknown as Record<string, unknown>
-    )
-  )
+  return http.get(SPOTLIGHT_PATH, () => sponsoredSpotlightBody(items))
+}
+
+/**
+ * Serves targets/resolve and records whether each request carried the
+ * sponsorship opt-in; the resolve route never asks for a block.
+ */
+function resolveHandler(answer: (keys: string[]) => ReturnType<typeof resolvedTarget>[]) {
+  const resolved: string[][] = []
+  const optIns: (string | null)[] = []
+  const handler = http.post('/api/v1/community/targets/resolve', async ({ request }) => {
+    optIns.push(request.headers.get('x-couture-sponsorship'))
+    const { targets } = (await request.json()) as { targets: { key: string }[] }
+    const keys = targets.map((target) => target.key)
+    resolved.push(keys)
+    return resolveBody(answer(keys))
+  })
+  return { handler, resolved, optIns }
 }
 
 /** The partner tab stand-in for the running test. */
@@ -181,6 +195,32 @@ describe('Sponsored community CTA (Story 6.7b)', () => {
     await waitFor(() =>
       expect(screen.queryByTestId('sponsored-cta-post-1-status')).not.toBeInTheDocument()
     )
+  })
+
+  it('6.7b-WEB-027 the CTA is its own Tab stop after the card open control, and Enter mints', async () => {
+    signIn()
+    const clicks = clickHandler(minted)
+    useMswHandlers(sponsoredFeedHandler({ items: [sponsoredItem()] }), clicks.handler)
+    const user = userEvent.setup()
+    renderGrid()
+
+    const cta = await screen.findByTestId('sponsored-cta-post-1')
+    act(() => screen.getByTestId('lookbook-open-post-1').focus())
+    await user.tab()
+    expect(cta).toHaveFocus()
+
+    await user.keyboard('{Enter}')
+    await waitFor(() => expect(partner.navigations).toHaveLength(1))
+    expect(clicks.bodies).toEqual([
+      {
+        offerId: SPONSORSHIP.offerId,
+        recommendationId: 'post-1',
+        surface: 'community_feed',
+        platform: 'web',
+      },
+    ])
+    expect(cta).toHaveFocus()
+    expect(screen.queryByTestId('community-detail')).not.toBeInTheDocument()
   })
 
   it('6.7b-WEB-013 mints a spotlight card click as community_spotlight', async () => {
@@ -421,53 +461,37 @@ describe('Sponsored community CTA (Story 6.7b)', () => {
   it('6.7b-WEB-021 a realtime refresh of the post keeps the block from the live read', async () => {
     signIn()
     const catchUp = captureSync()
+    // The resolve route does not opt in, so it carries no block.
+    const resolve = resolveHandler(() => [
+      resolvedTarget(
+        {
+          ...item(),
+          reactions: {
+            ...ZERO,
+            counts: { applause: 4, love: 0, inspiration: 0 },
+            total: 4,
+            revision: 1,
+          },
+        },
+        '1'
+      ),
+    ])
     useMswHandlers(
       sponsoredFeedHandler({ items: [sponsoredItem({ reactions: ZERO })] }),
       http.get('/api/v1/community/events', () =>
-        HttpResponse.json({
-          data: {
-            events: [
-              {
-                version: 1,
-                kind: 'reactions.changed',
-                postId: 'post-1',
-                communityRevision: '1',
-              },
-            ],
-            nextCursor: 'cursor-1',
-            hasMore: false,
-            resyncRequired: false,
-          },
-        })
+        eventsBody(
+          [
+            {
+              version: 1,
+              kind: 'reactions.changed',
+              postId: 'post-1',
+              communityRevision: '1',
+            },
+          ],
+          'cursor-1'
+        )
       ),
-      http.post('/api/v1/community/targets/resolve', () =>
-        HttpResponse.json({
-          data: {
-            targets: [
-              {
-                key: 'post-1',
-                status: 'available',
-                communityRevision: '1',
-                // The resolve route does not opt in, so it carries no block.
-                post: {
-                  ...item(),
-                  reactions: {
-                    ...ZERO,
-                    counts: { applause: 4, love: 0, inspiration: 0 },
-                    total: 4,
-                    revision: 1,
-                  },
-                },
-                comment: null,
-                parent: null,
-                pageCursor: null,
-                parentPageCursor: null,
-                threadPosition: null,
-              },
-            ],
-          },
-        })
-      )
+      resolve.handler
     )
     renderGrid()
 
@@ -489,23 +513,17 @@ describe('Sponsored community CTA (Story 6.7b)', () => {
     )
     expect(screen.getByTestId('sponsored-cta-post-1')).toHaveAccessibleName(CTA_LABEL)
     expect(shownEvents()).toHaveLength(1)
+    expect(resolve.optIns.length).toBeGreaterThan(0)
+    expect(resolve.optIns.filter((optIn) => optIn !== null)).toEqual([])
   })
 
   it('6.7b-WEB-022 a live rebuild without the block removes the CTA, and a realtime copy does not bring it back', async () => {
     signIn()
     const catchUp = captureSync()
     const state = { ended: false }
-    const resolvedPost = (id: string) => ({
-      key: id,
-      status: 'available',
-      communityRevision: '1',
-      post: { ...item({ id }), reactions: ZERO },
-      comment: null,
-      parent: null,
-      pageCursor: null,
-      parentPageCursor: null,
-      threadPosition: null,
-    })
+    const resolve = resolveHandler((keys) =>
+      keys.map((id) => resolvedTarget({ ...item({ id }), reactions: ZERO }, '1'))
+    )
     useMswHandlers(
       // The owner ends the link between the first read and the rebuild.
       http.get(FEED_PATH, () =>
@@ -523,36 +541,27 @@ describe('Sponsored community CTA (Story 6.7b)', () => {
         )
       ),
       http.get('/api/v1/community/events', () =>
-        HttpResponse.json({
-          data: {
-            events: state.ended
-              ? [
-                  {
-                    version: 1,
-                    kind: 'post.published',
-                    postId: 'post-new',
-                    communityRevision: '1',
-                  },
-                  {
-                    version: 1,
-                    kind: 'reactions.changed',
-                    postId: 'post-1',
-                    communityRevision: '1',
-                  },
-                ]
-              : [],
-            nextCursor: `cursor-${state.ended ? 'ended' : 'live'}`,
-            hasMore: false,
-            resyncRequired: false,
-          },
-        })
+        eventsBody(
+          state.ended
+            ? [
+                {
+                  version: 1,
+                  kind: 'post.published',
+                  postId: 'post-new',
+                  communityRevision: '1',
+                },
+                {
+                  version: 1,
+                  kind: 'reactions.changed',
+                  postId: 'post-1',
+                  communityRevision: '1',
+                },
+              ]
+            : [],
+          `cursor-${state.ended ? 'ended' : 'live'}`
+        )
       ),
-      http.post('/api/v1/community/targets/resolve', async ({ request }) => {
-        const { targets } = (await request.json()) as { targets: { key: string }[] }
-        return HttpResponse.json({
-          data: { targets: targets.map((target) => resolvedPost(target.key)) },
-        })
-      })
+      resolve.handler
     )
     renderGrid()
 
@@ -569,6 +578,7 @@ describe('Sponsored community CTA (Story 6.7b)', () => {
     )
     expect(screen.queryByTestId('sponsored-badge-post-1')).not.toBeInTheDocument()
     expect(card).toHaveAttribute('aria-labelledby', 'lookbook-card-title-post-1')
+    expect(resolve.optIns.filter((optIn) => optIn !== null)).toEqual([])
   })
 
   it.each([
@@ -580,7 +590,11 @@ describe('Sponsored community CTA (Story 6.7b)', () => {
       signIn()
       const catchUp = captureSync()
       const state = { published: false, ended: false, cursor: 0, feedReads: 0 }
-      const resolved: string[][] = []
+      // The resolve route does not opt in, so it never carries a block.
+      const resolve = resolveHandler((keys) =>
+        keys.map((id) => resolvedTarget({ ...item({ id }), reactions: ZERO }, '1'))
+      )
+      const resolved = resolve.resolved
       useMswHandlers(
         http.get(FEED_PATH, () => {
           state.feedReads += 1
@@ -600,50 +614,27 @@ describe('Sponsored community CTA (Story 6.7b)', () => {
           )
         }),
         http.get('/api/v1/community/events', () =>
-          HttpResponse.json({
-            data: {
-              events: state.published
-                ? [
-                    {
-                      version: 1,
-                      kind: 'post.published',
-                      postId: 'post-new',
-                      communityRevision: state.ended ? '2' : '1',
-                    },
-                    {
-                      version: 1,
-                      kind: 'reactions.changed',
-                      postId: 'post-new',
-                      communityRevision: state.ended ? '2' : '1',
-                    },
-                  ]
-                : [],
-              nextCursor: `cursor-${(state.cursor += 1)}`,
-              hasMore: false,
-              resyncRequired: false,
-            },
-          })
+          eventsBody(
+            state.published
+              ? [
+                  {
+                    version: 1,
+                    kind: 'post.published',
+                    postId: 'post-new',
+                    communityRevision: state.ended ? '2' : '1',
+                  },
+                  {
+                    version: 1,
+                    kind: 'reactions.changed',
+                    postId: 'post-new',
+                    communityRevision: state.ended ? '2' : '1',
+                  },
+                ]
+              : [],
+            `cursor-${(state.cursor += 1)}`
+          )
         ),
-        // The resolve route does not opt in, so it never carries a block.
-        http.post('/api/v1/community/targets/resolve', async ({ request }) => {
-          const { targets } = (await request.json()) as { targets: { key: string }[] }
-          resolved.push(targets.map((target) => target.key))
-          return HttpResponse.json({
-            data: {
-              targets: targets.map((target) => ({
-                key: target.key,
-                status: 'available',
-                communityRevision: '1',
-                post: { ...item({ id: target.key }), reactions: ZERO },
-                comment: null,
-                parent: null,
-                pageCursor: null,
-                parentPageCursor: null,
-                threadPosition: null,
-              })),
-            },
-          })
-        })
+        resolve.handler
       )
       const user = userEvent.setup()
       renderGrid()
@@ -670,6 +661,7 @@ describe('Sponsored community CTA (Story 6.7b)', () => {
       await waitFor(() => expect(resolved.length).toBeGreaterThan(resolvesBeforeReveal))
 
       const card = await screen.findByTestId('lookbook-card-post-new')
+      expect(resolve.optIns.filter((optIn) => optIn !== null)).toEqual([])
       if (endsBeforeReveal) {
         expect(screen.queryByTestId('sponsored-cta-post-new')).not.toBeInTheDocument()
         expect(screen.queryByTestId('sponsored-badge-post-new')).not.toBeInTheDocument()
@@ -728,16 +720,9 @@ describe('Sponsored community CTA (Story 6.7b)', () => {
               ? [ranked(1)]
               : [ranked(2, newerHasBlock ? { sponsorship: SPONSORSHIP } : {})]
           if (cursor !== null) answered.push('spotlight')
-          return HttpResponse.json(
-            communitySponsoredSpotlightResponseSchema.parse({
-              data: {
-                level: 'city',
-                label: 'Lisbon',
-                items,
-                nextCursor: cursor === null ? 'cursor-2' : null,
-              },
-            }) as unknown as Record<string, unknown>
-          )
+          return sponsoredSpotlightBody(items, {
+            nextCursor: cursor === null ? 'cursor-2' : null,
+          })
         })
       )
       const user = userEvent.setup()
@@ -802,16 +787,9 @@ describe('Sponsored community CTA (Story 6.7b)', () => {
             cursor === null
               ? [ranked(1)]
               : [ranked(2, newerHasBlock ? {} : { sponsorship: SPONSORSHIP })]
-          return HttpResponse.json(
-            communitySponsoredSpotlightResponseSchema.parse({
-              data: {
-                level: 'city',
-                label: 'Lisbon',
-                items,
-                nextCursor: cursor === null ? 'cursor-2' : null,
-              },
-            }) as unknown as Record<string, unknown>
-          )
+          return sponsoredSpotlightBody(items, {
+            nextCursor: cursor === null ? 'cursor-2' : null,
+          })
         })
       )
       const user = userEvent.setup()
