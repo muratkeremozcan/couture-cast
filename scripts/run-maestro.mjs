@@ -28,11 +28,13 @@ import { fileURLToPath, URL } from 'node:url'
 import path from 'node:path'
 import { MAESTRO_BIN, MAESTRO_PINNED_VERSION } from './maestro-version.mjs'
 import {
-  clearMobileE2ELocations,
+  COMMUNITY_COMMENTS_FLOW,
+  COMMUNITY_COMMENTS_LONG_ROOT,
+  LOCATION_CAPTURE_FLOW,
   locationCaptureWeatherDoubleCause,
   mobileE2EBaselineLocationRequestBody,
+  mobileE2EFlowStateHooks,
   resetMobileE2EFlowState,
-  restoreMobileE2EBaselineLocation,
 } from './lib/mobile-e2e-flow-state.mjs'
 import {
   coordinateKeySuffix,
@@ -569,6 +571,49 @@ const quietAndroidKeyboard = async () => {
       } else {
         log(
           `Could not turn off ${name}: it reads "${readBack.stdout.trim()}". ${consequence}`
+        )
+      }
+    } catch (error) {
+      log(`Could not set ${name}: ${error.message}`)
+    }
+  }
+}
+
+/**
+ * Turn Android's window, transition and animator animations off, as CI's
+ * emulator runs them (`disable-animations: true` in pr-mobile-e2e.yml).
+ *
+ * A local AVD keeps every scale at 1, so each tap, sheet, scroll and keyboard
+ * waits out its animation before Maestro sees the screen settle, and local flow
+ * timings drift from the ones CI records. Each scale is read back like `hide_error_dialogs`, so a write that did nothing
+ * is reported. On CI's emulator the scales are already 0 and this changes nothing.
+ *
+ * @returns {Promise<void>}
+ */
+const disableAndroidAnimations = async () => {
+  const adbBinary = resolveAdbBinary()
+  const scales = [
+    'window_animation_scale',
+    'transition_animation_scale',
+    'animator_duration_scale',
+  ]
+  for (const name of scales) {
+    try {
+      await captureProcess(adbBinary, ['shell', 'settings', 'put', 'global', name, '0'], {
+        timeoutMs: 15_000,
+      })
+      const readBack = await captureProcess(
+        adbBinary,
+        ['shell', 'settings', 'get', 'global', name],
+        { timeoutMs: 15_000 }
+      )
+      // `settings get` prints a float scale as written; both spellings mean off.
+      if (['0', '0.0'].includes(readBack.stdout.trim())) {
+        log(`${name}=0 set on ${androidSerial || 'the attached device'}`)
+      } else {
+        log(
+          `Could not turn off ${name}: it reads "${readBack.stdout.trim()}". ` +
+            'Animations will slow every flow on this device.'
         )
       }
     } catch (error) {
@@ -1545,8 +1590,6 @@ const LOCATION_SENTINEL_PLACE_TEXT = `${LOCATION_SENTINEL_PLACE.name}, ${LOCATIO
  */
 const LOCATION_SENTINEL_TEMP_F = String(Math.round((SENTINEL_TEMPERATURE_C * 9) / 5 + 32))
 
-const LOCATION_CAPTURE_FLOW = 'maestro/location-capture.yaml'
-
 /**
  * The weather provider double the E2E API's providers point at. The API
  * launcher (scripts/start-api-e2e-with-workers.mjs) keeps a caller's own pair of
@@ -1559,17 +1602,14 @@ const WEATHER_DOUBLE_ORIGIN =
     : `http://127.0.0.1:${process.env.E2E_WEATHER_DOUBLE_PORT || '4010'}`
 
 /**
- * State a flow needs beyond the shared per-flow reset. `before` runs ahead of
- * every attempt; `after` runs once the flow finishes, pass or fail, so the
- * flows after it start from the baseline the identity setup created.
+ * State a flow needs beyond the shared per-flow reset: the location capture
+ * flow's empty member, and the long root `community-comments.yaml` replies to.
+ * See `mobileE2EFlowStateHooks` for when each hook runs.
  */
-const FLOW_STATE_HOOKS = {
-  [LOCATION_CAPTURE_FLOW]: {
-    before: (prisma, userId) =>
-      clearMobileE2ELocations(prisma, userId, LOCATION_SENTINEL_KEY_SUFFIX),
-    after: (prisma, userId) => restoreMobileE2EBaselineLocation(prisma, userId),
-  },
-}
+const FLOW_STATE_HOOKS = mobileE2EFlowStateHooks({
+  locationSentinelKeySuffix: LOCATION_SENTINEL_KEY_SUFFIX,
+  cleanupComments: cleanupCommunityCommentFixtures,
+})
 
 const withMobileE2EPrisma = async (work) => {
   const prisma = new PrismaClient({ datasourceUrl: MOBILE_E2E_DATABASE_URL })
@@ -3363,6 +3403,9 @@ const buildMaestroFlowEnvArgs = () => [
   `LOCATION_SENTINEL_PLACE=${LOCATION_SENTINEL_PLACE_TEXT}`,
   '-e',
   `LOCATION_SENTINEL_TEMP_F=${LOCATION_SENTINEL_TEMP_F}`,
+  // Seeded only while community-comments.yaml runs; the text is fixed.
+  '-e',
+  `COMMUNITY_COMMENTS_LONG_ROOT=${COMMUNITY_COMMENTS_LONG_ROOT}`,
   '-e',
   `APP_URL=${process.env.APP_URL}`,
   '-e',
@@ -3917,7 +3960,10 @@ const USER_SCOPED_FLOWS = [
   'maestro/garment-capsule-repair-flow.yaml',
   // Story 1.2b: removes and restores the member's saved locations around
   // itself, which only the per-flow hooks of a serial run can do safely.
-  'maestro/location-capture.yaml',
+  LOCATION_CAPTURE_FLOW,
+  // Story 6.4: replies to a long root seeded and removed by its per-flow
+  // hooks, which only a serial run calls.
+  COMMUNITY_COMMENTS_FLOW,
 ]
 
 /**
@@ -4121,6 +4167,7 @@ const run = async () => {
   if (target.platform === 'android') {
     await forEachAndroidDevice(suppressAndroidErrorDialogs)
     await forEachAndroidDevice(quietAndroidKeyboard)
+    await forEachAndroidDevice(disableAndroidAnimations)
   }
 
   if (target.platform === 'android' && !process.env.MOBILE_E2E_ANDROID_HOST) {

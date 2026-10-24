@@ -7,13 +7,22 @@ tags:
   - maestro
 ---
 # ASCII words/spaces/digits keep the exact contextual-label regex literal-safe.
-# A 273-unit root also exercises the longest reply context with the keyboard open.
-- evalScript: ${output.commentRoot = 'A lovely rainy day look with soft layers and warm fabric '.repeat(5).slice(0, 260) + Date.now()}
+# The root stays short: typing a 273-unit one ran a single inputText past Maestro's
+# 120 s per-command deadline on the local Play AVD.
+- evalScript: ${output.commentRoot = 'Rainy day look with soft layers ' + Date.now()}
 - evalScript: ${output.commentReply = 'A matching scarf ' + Date.now()}
 - evalScript: >-
     ${output.replyAction = '^Reply: .*' + output.commentRoot + String.fromCharCode(36)}
 - evalScript: >-
     ${output.repliesAction = '^Replies \\(1\\): .*' + output.commentRoot + String.fromCharCode(36)}
+# The runner seeds COMMUNITY_COMMENTS_LONG_ROOT, a 270-unit published root by another
+# seeded member, on lookbook-5 for this flow alone, and removes it afterwards
+# (`mobileE2EFlowStateHooks` in scripts/lib/mobile-e2e-flow-state.mjs). Replying to it
+# proves the longest reply context with the keyboard open.
+- evalScript: >-
+    ${output.longReplyAction = '^Reply: .*' + COMMUNITY_COMMENTS_LONG_ROOT + String.fromCharCode(36)}
+- evalScript: >-
+    ${output.longReplyContext = '^Replying to a comment: .*' + COMMUNITY_COMMENTS_LONG_ROOT + String.fromCharCode(36)}
 - launchApp:
     appId: ${MAESTRO_APP_ID}
     clearState: true
@@ -61,6 +70,27 @@ tags:
 - tapOn:
     id: 'community-card-comments-lookbook-5'
 - assertVisible: 'Close comments'
+- scrollUntilVisible:
+    element:
+      id: 'comment-reply-.*'
+      text: ${output.longReplyAction}
+    direction: DOWN
+    centerElement: true
+    timeout: 15000
+- tapOn:
+    id: 'comment-reply-.*'
+    text: ${output.longReplyAction}
+- tapOn:
+    id: 'comment-body'
+- assertVisible: ${output.longReplyContext}
+- assertVisible:
+    id: 'comment-submit'
+    text: 'Send comment'
+- takeScreenshot:
+    path: maestro/artifacts/community-comments-long-reply-keyboard
+# Cancel leaves the reply unsent; the root below starts from a top-level draft.
+- tapOn: '^Cancel$'
+- assertNotVisible: ${output.longReplyContext}
 - scrollUntilVisible:
     element:
       id: 'comment-body'

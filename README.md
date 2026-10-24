@@ -164,7 +164,15 @@ Local E2E with clean DB:
 **One-time setup:** https://github.com/murat/opensource/couture-cast/blob/main/_bmad-output/implementation-artifacts/0-13-scaffold-cross-surface-e2e-automation.md#maestro-setup--operational-notes
 
 - Xcode + CLI tools on macOS (`sudo xcode-select --switch /Applications/Xcode.app`).
-- Android Studio SDK + AVD (e.g., Pixel 8 API 34) booted once.
+- Android Studio SDK + AVD (e.g., Pixel 8 API 34) booted once. Give the AVD 4 cores to
+  match CI's emulator: with the emulator stopped, set `hw.cpu.ncore=4` in
+  `~/.android/avd/<name>.avd/config.ini`. An AVD left at `hw.cpu.ncore=1` slows long
+  text input and scrolling well past CI's timings.
+- `scripts/run-maestro.mjs` prepares every attached Android device before the flows run:
+  it sets `hide_error_dialogs=1`, turns Gboard's stylus handwriting and spell checking
+  off, and sets `window_animation_scale`, `transition_animation_scale` and
+  `animator_duration_scale` to 0, as CI's emulator runs. Each setting is read back
+  and logged.
 - Install Maestro CLI: `npm run maestro:install --silent`.
 - Android runs install Expo Go automatically after the emulator is attached. Manual helper:
   `npm run mobile:expo-go`.
