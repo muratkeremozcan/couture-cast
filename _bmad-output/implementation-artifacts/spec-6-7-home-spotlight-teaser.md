@@ -623,6 +623,20 @@ playwright/tests/community-comments.spec.ts --repeat-each=3`, went out without t
     which the appender drains within about a second; CI runs integration and Playwright in
     separate jobs on separate databases, and the local gates run Playwright first.
 
+- 2026-10-24, R46 and the local comments flow.
+  - The local screened-comments flow failed in both r10f Android runs: Gboard on the Play AVD
+    janked every keystroke of Maestro's 273-character `inputText` (76 s), the community socket
+    dropped mid-comment, `CommunityVerification` hid community content as unverified, and the
+    comments sheet unmounted; it came back with the composer unfocused. The runner's keyboard
+    prep now also sets `spell_checker_enabled=0` (read back).
+  - R46 (coordinator decision A): the gate stays. `CommunityCommentDrafts` holds the member's own
+    unsent comment in memory only, keyed by member and post, cleared on an accepted submit, an
+    explicit close and an identity change. On the next mount for the same member and post the
+    sheet refills a composer the comment state lost and refocuses it only if it had focus when
+    the sheet unmounted. The drafts module, the sheet and `6.5-R46-MOB-001` (the real stale
+    path on the screen) cover it; four of those tests fail without the fix
+    (`runs/r12-r46-mobile-red`).
+
 ## Spec Change Log
 
 - 2026-10-23, iteration 5 (rereview 3): read floor, last-attempt time and `Retry-After` are
