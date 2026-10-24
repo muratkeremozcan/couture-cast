@@ -1103,13 +1103,10 @@ const communityChallengeWindowShape = {
  * generated SDK and both clients.
  */
 function refineChallengeWindow(
-  value: { startsAt?: string; endsAt?: string; timeZone?: string },
+  value: { startsAt: string; endsAt: string; timeZone: string },
   ctx: z.RefinementCtx
 ) {
   const { startsAt, endsAt, timeZone } = value
-  if (startsAt === undefined || endsAt === undefined || timeZone === undefined) {
-    return
-  }
   const start = new Date(startsAt).getTime()
   const end = new Date(endsAt).getTime()
   if (end <= start) {
@@ -1220,7 +1217,10 @@ export const updateCommunityChallengeInputSchema = z
       })
       return
     }
-    refineChallengeWindow(value, ctx)
+    refineChallengeWindow(
+      { startsAt: value.startsAt, endsAt: value.endsAt, timeZone: value.timeZone },
+      ctx
+    )
   })
   .openapi({
     description:

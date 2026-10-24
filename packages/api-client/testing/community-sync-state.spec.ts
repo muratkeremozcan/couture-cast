@@ -798,3 +798,20 @@ describe('Story 6.5 reconciliation ownership', () => {
     }
   })
 })
+
+describe('target validation after a stop', () => {
+  it('applies nothing from a response that settled just before the stop', async () => {
+    const { client, callbacks, state } = setup()
+    // The response settles; a stop queued in the same turn runs before the
+    // validation's continuation does, as an unmount racing the answer would.
+    client.resolve.mockImplementation(() => {
+      queueMicrotask(() => state.stop())
+      return Promise.resolve({
+        targets: [{ key: 'post', status: 'available', communityRevision: '7' }],
+      } as Awaited<ReturnType<CommunitySyncClient['resolve']>>)
+    })
+    await state.catchUp()
+    expect(client.resolve).toHaveBeenCalledOnce()
+    expect(callbacks.apply).not.toHaveBeenCalled()
+  })
+})
