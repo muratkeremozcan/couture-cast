@@ -605,6 +605,18 @@ playwright/tests/community-comments.spec.ts --repeat-each=3`, went out without t
     its pages before cleanup; the engagement session fixture now does too, and tears down
     before `communityApi`. The failure needs an events poll inside the roughly 280 ms cleanup
     window, so the proof is parallel repeats.
+  - Burn-in log check (coordinator): the 131 `community_comment_delivery_failed` warnings are the
+    intended durable deferral of comment analytics. CI sets no `POSTHOG_API_KEY`, so
+    `PostHogService.captureAcknowledged` throws "Analytics ingestion is unconfigured" inside
+    `TelemetryService.captureCommentEvent`, and `CommunityCommentsOutbox` reschedules the event.
+    It logged every deferral as `reason: delivery_failed`, so a real failure would have hidden
+    among them; it now shares the reaction outbox's classifier (`sink_unconfigured`,
+    `sink_timeout`, `sink_rejected`, `delivery_failed`) and logs a lost lease or database fault
+    while settling as `settlement_failed`. No comment, reaction or notification delivery
+    failed in that run: the only other warnings are the 25 reaction deferrals, already
+    `sink_unconfigured`. The run's 12 errors were telemetry rows for actors with no `User` row,
+    rejected by `telemetry_events_user_id_fkey` and lost; such an event is now kept without
+    the user link.
   - Shared integration database: other community integration specs still share it and leave
     small public resync batches when they delete published posts (77 rows in one local run),
     which the appender drains within about a second; CI runs integration and Playwright in
