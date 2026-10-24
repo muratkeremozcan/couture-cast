@@ -100,6 +100,7 @@ export function CommunityCommentsSheet({
   const focused = useRef<string | null>(null)
   const removedFocus = useRef<string | null>(null)
   const refocusComposer = useRef(false)
+  const closedByMember = useRef(false)
   const thread = state.current(postId ?? '__closed__')
   const focus = (ref: React.RefObject<Text | View | null>) => {
     const node = safeFindNodeHandle(ref.current)
@@ -118,6 +119,7 @@ export function CommunityCommentsSheet({
     // for the same member and post, the held draft fills a composer the comment state
     // lost, and focus returns only to a composer that had it.
     refocusComposer.current = false
+    closedByMember.current = false
     if (!postId || !member) return
     const held = drafts.restore(member, postId)
     if (!held) return
@@ -200,18 +202,9 @@ export function CommunityCommentsSheet({
     if (member) drafts.remember(member, postId, draft)
   }
   const close = () => {
-    // R49: closing discards the unsent text in the thread and the held copy alike. A
-    // submission with no known outcome stays held, so its resend keeps one mutation ID.
-    const { unresolved } = state.current(postId)
-    state.draft(postId, { body: '', parentId: null })
-    if (member && unresolved)
-      drafts.remember(member, postId, {
-        body: '',
-        parentId: null,
-        focused: false,
-        unresolved,
-      })
-    else if (member) drafts.forget(member, postId)
+    // Story 6.4: an explicit close keeps the unsent text, in the thread and held, for the
+    // next open. That open starts on the title, so the composer is recorded unfocused.
+    closedByMember.current = true
     onClose()
   }
   const submit = () => {
@@ -498,7 +491,7 @@ export function CommunityCommentsSheet({
                   drafts.retainFocus(
                     member,
                     postId,
-                    composerRef.current?.isFocused() ?? false
+                    !closedByMember.current && (composerRef.current?.isFocused() ?? false)
                   )
               }}
             >

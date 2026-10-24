@@ -798,7 +798,7 @@ describe('R46 unsent comment across an unverified-access hide', () => {
     expect(drafts.restore('member-b', POST_ID)).toBeNull()
   })
 
-  it('drops the draft when the member closes the sheet', async () => {
+  it('keeps the draft when the member closes the sheet (Story 6.4)', async () => {
     const state = makeState()
     const drafts = new CommunityCommentDrafts()
     const close = vi.fn()
@@ -806,20 +806,25 @@ describe('R46 unsent comment across an unverified-access hide', () => {
     await screen.findByText('A lovely layered look.')
     const composer = screen.getByTestId<HTMLInputElement>('comment-body')
     composer.focus()
-    fireEvent.change(composer, { target: { value: 'Never mind' } })
+    fireEvent.change(composer, { target: { value: 'Keep this' } })
     press(screen.getByTestId('comments-close'))
     expect(close).toHaveBeenCalledOnce()
 
+    // Even a wipe of the comment state meanwhile gives the draft back; the reopened
+    // sheet starts on its title, not the composer.
     view.rerender(sheet({ state, drafts, onClose: close, postId: null }))
     act(() => state.reset())
     view.rerender(sheet({ state, drafts, onClose: close }))
     await screen.findByText('A lovely layered look.')
-    expect(screen.getByTestId('comment-body')).toHaveValue('')
+    expect(screen.getByTestId('comment-body')).toHaveValue('Keep this')
     expect(document.activeElement).not.toBe(screen.getByTestId('comment-body'))
-    expect(drafts.restore(MEMBER, POST_ID)).toBeNull()
+    expect(drafts.restore(MEMBER, POST_ID)).toMatchObject({
+      body: 'Keep this',
+      focused: false,
+    })
   })
 
-  it('R49 opens on an empty composer after the member closed it', async () => {
+  it('R49 reopens on the kept draft and reply target after the member closed it', async () => {
     const state = makeState()
     const drafts = new CommunityCommentDrafts()
     const close = vi.fn()
@@ -827,22 +832,18 @@ describe('R46 unsent comment across an unverified-access hide', () => {
     await screen.findByText('A lovely layered look.')
     press(screen.getByTestId('comment-reply-root'))
     fireEvent.change(screen.getByTestId('comment-body'), {
-      target: { value: 'Never mind' },
+      target: { value: 'Keep this reply' },
     })
     expect(screen.getByText(`Replying to a comment: ${ROOT_CONTEXT}`)).toBeVisible()
     press(screen.getByTestId('comments-close'))
     expect(close).toHaveBeenCalledOnce()
 
-    // No reset this time: the thread itself must not keep the discarded text.
     view.rerender(sheet({ state, drafts, onClose: close, postId: null }))
     view.rerender(sheet({ state, drafts, onClose: close }))
     await screen.findByText('A lovely layered look.')
-    expect(screen.getByTestId('comment-body')).toHaveValue('')
-    expect(
-      screen.queryByText(`Replying to a comment: ${ROOT_CONTEXT}`)
-    ).not.toBeInTheDocument()
-    expect(state.current(POST_ID).draft).toEqual({ body: '', parentId: null })
-    expect(drafts.restore(MEMBER, POST_ID)).toBeNull()
+    expect(screen.getByTestId('comment-body')).toHaveValue('Keep this reply')
+    expect(screen.getByText(`Replying to a comment: ${ROOT_CONTEXT}`)).toBeVisible()
+    expect(state.current(POST_ID).draft.body).toBe('Keep this reply')
   })
 
   it('R47 resends a submission a wipe interrupted under its first mutation ID', async () => {
