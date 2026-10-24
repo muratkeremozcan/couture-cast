@@ -143,12 +143,6 @@ describe('CommunityModule HTTP privacy wiring', () => {
 
   beforeEach(async () => {
     vi.clearAllMocks()
-    // Reset here, not at the end of a test body: a test that opts into a block
-    // and then fails an assertion must not leak that block into the next test.
-    // restoreAllMocks() leaves a vi.fn implementation in place.
-    sponsorships.resolveForPosts
-      .mockReset()
-      .mockImplementation(() => Promise.resolve(new Map()))
     const builder = Test.createTestingModule({ imports: [CommunityModule] })
     // Import CommunityModule unchanged. Only outbound collaborators are replaced;
     // configure(), controller routing, middleware and both guards remain real.
@@ -188,6 +182,12 @@ describe('CommunityModule HTTP privacy wiring', () => {
     app = undefined
     baseUrl = undefined
     vi.restoreAllMocks()
+    // Reset after every test, not at the end of a test body: a test that opts
+    // into a block and then fails an assertion must not leak that block into the
+    // next test. restoreAllMocks() leaves a vi.fn implementation in place.
+    sponsorships.resolveForPosts
+      .mockReset()
+      .mockImplementation(() => Promise.resolve(new Map()))
   })
 
   function server(): string {

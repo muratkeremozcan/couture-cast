@@ -159,32 +159,85 @@ async function untilDecided<T>(loop: string, pass: () => Promise<T | undefined>)
 }
 
 /**
+ * The shortest server-side wait any dispatch pass enforces: the 100 ms lock_timeout of
+ * the claim and of the flag evaluation. Every other limit (the guard's 250 ms lock wait
+ * and pool wait, 500 ms statements, the 2 s pre-send deadline) is longer.
+ */
+const LOAD_FLOOR_MS = 100
+const LOAD_DEFERRAL_REASON = 'no_call:guard_failure'
+
+/**
  * Dispatches until the guard reaches a decision: a provider call, or a status other than
  * pending or deferred. A pass that left the delivery pending or deferred made no provider
  * call, so it is made due again and repeated. `startedAt` is when the deciding pass began.
+ *
+ * D7 allows exactly one kind of non-deciding pass: a live pre-send lock or budget failure,
+ * proven to precede the provider call, which defers with `no_call:guard_failure`. So the
+ * retry is bounded by evidence of load. Each non-deciding pass must have lasted at least
+ * one server-side wait, and any attempt it deferred must carry that load reason. A
+ * regression that defers a first pass without load (or for another reason) fails here
+ * instead of being absorbed by the retry.
  */
-const dispatched = (
+const dispatched = async (
   guard: CommunitySendGuard,
   delivery: { id: string; group_id: string }
-) =>
-  untilDecided('dispatch', async () => {
+) => {
+  const deferrals: { elapsed: number; reasons: (string | null)[]; error?: Error }[] = []
+  const decided = await untilDecided('dispatch', async () => {
     const startedAt = Date.now()
     const calls = sent.length
-    await guard.dispatch(delivery.id)
+    const ordinalBefore = (await allAttempts(delivery.id)).length
+    let error: Error | undefined
+    try {
+      await guard.dispatch(delivery.id)
+    } catch (caught) {
+      error = caught instanceof Error ? caught : new Error(String(caught))
+    }
     const current = await state(delivery.id)
-    if (sent.length > calls || !['pending', 'deferred'].includes(current.status))
+    if (
+      error === undefined &&
+      (sent.length > calls || !['pending', 'deferred'].includes(current.status))
+    )
       return { current, startedAt }
+    deferrals.push({
+      elapsed: Date.now() - startedAt,
+      reasons: (await allAttempts(delivery.id))
+        .filter((attempt) => attempt.ordinal > ordinalBefore)
+        .map((attempt) => attempt.reason),
+      error,
+    })
+    if (error !== undefined) throw error
     await due(delivery.id, delivery.group_id)
     return undefined
   })
+  for (const deferral of deferrals) {
+    expect(
+      deferral.elapsed,
+      `a dispatch pass made no decision in ${deferral.elapsed} ms, faster than any load limit (${deferral.error?.message ?? deferral.reasons.join(', ')})`
+    ).toBeGreaterThanOrEqual(LOAD_FLOOR_MS)
+    for (const reason of deferral.reasons) expect(reason).toBe(LOAD_DEFERRAL_REASON)
+  }
+  return decided
+}
 const state = (id: string) =>
   prisma.communityTokenDelivery.findUniqueOrThrow({ where: { id } })
-/** Attempts that decided the delivery; a guard pass deferred by load leaves a deferred one. */
-const attempts = (deliveryId: string) =>
+const allAttempts = (deliveryId: string) =>
   prisma.communityDeliveryAttempt.findMany({
-    where: { delivery_id: deliveryId, status: { not: 'deferred' } },
+    where: { delivery_id: deliveryId },
     orderBy: { ordinal: 'asc' },
   })
+/**
+ * Attempts that decided the delivery. A guard pass deferred by load leaves a deferred
+ * attempt; `dispatched` bounds each one, and none may carry any other reason.
+ */
+const attempts = async (deliveryId: string) => {
+  const all = await allAttempts(deliveryId)
+  const deferred = all.filter((attempt) => attempt.status === 'deferred')
+  expect(deferred.map((attempt) => attempt.reason)).toEqual(
+    deferred.map(() => LOAD_DEFERRAL_REASON)
+  )
+  return all.filter((attempt) => attempt.status !== 'deferred')
+}
 /** Moves a scheduled retry to now so the next dispatch may claim it. */
 const due = async (deliveryId: string, groupId: string) => {
   await prisma.communityTokenDelivery.update({

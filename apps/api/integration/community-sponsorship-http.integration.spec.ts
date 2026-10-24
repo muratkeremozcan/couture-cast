@@ -174,6 +174,40 @@ async function feedThrough(
   return { items, vary }
 }
 
+/** Page size of the not-opted-in feed walk. */
+const LEGACY_FEED_PAGE = 30
+
+/**
+ * Pages the `all` feed with no sponsorship header until `postId` appears.
+ * Every page must parse with today's strict schema and carry no `sponsorship`
+ * text, so the check holds wherever the post lands. Fails if the post never
+ * appears, so a short first page cannot make the check vacuous.
+ */
+async function legacyFeedThrough(
+  viewer: string,
+  postId: string,
+  headers: Record<string, string>,
+  parse: (body: unknown) => {
+    data: { items: { id: string }[]; nextCursor: string | null }
+  }
+): Promise<{ id: string }> {
+  let cursor: string | null = null
+  for (let page = 0; page < 200; page += 1) {
+    const query: string = cursor ? `&cursor=${encodeURIComponent(cursor)}` : ''
+    const response = await request(url)
+      .get(`/api/v1/community/feed?mode=all&limit=${LEGACY_FEED_PAGE}${query}`)
+      .set(as(viewer, headers))
+      .expect(200)
+    expect(JSON.stringify(response.body)).not.toContain('sponsorship')
+    const body = parse(response.body)
+    const found = body.data.items.find((item) => item.id === postId)
+    if (found) return found
+    if (!body.data.nextCursor) break
+    cursor = body.data.nextCursor
+  }
+  throw new Error(`post ${postId} never appeared in the not-opted-in feed`)
+}
+
 describe('6.7b opted-in reads carry the block on the sponsored item only', () => {
   it('6.7b-INT-201 feed, post, spotlight and Home teaser, with and without reactions', async () => {
     const { cohort, viewer } = await seeded('opted-in')
@@ -250,20 +284,15 @@ describe('6.7b opted-in reads carry the block on the sponsored item only', () =>
     const sponsoredId = cohort.expectedOrder[0]!
     await link(sponsoredId)
 
-    const feed = await request(url)
-      .get('/api/v1/community/feed?mode=all&limit=30')
-      .set(as(viewer))
-      .expect(200)
-    expect(communityFeedResponseSchema.safeParse(feed.body).success).toBe(true)
-    expect(JSON.stringify(feed.body)).not.toContain('sponsorship')
-    const reactionFeed = await request(url)
-      .get('/api/v1/community/feed?mode=all&limit=30')
-      .set(as(viewer, REACTIONS))
-      .expect(200)
-    expect(communityReactionFeedResponseSchema.safeParse(reactionFeed.body).success).toBe(
-      true
+    // The sponsored post itself, found by walking the feed, carries no block.
+    const legacyItem = await legacyFeedThrough(viewer, sponsoredId, {}, (body) =>
+      communityFeedResponseSchema.parse(body)
     )
-    expect(JSON.stringify(reactionFeed.body)).not.toContain('sponsorship')
+    expect('sponsorship' in legacyItem).toBe(false)
+    const reactionItem = await legacyFeedThrough(viewer, sponsoredId, REACTIONS, (body) =>
+      communityReactionFeedResponseSchema.parse(body)
+    )
+    expect('sponsorship' in reactionItem).toBe(false)
 
     const post = await request(url)
       .get(`/api/v1/community/posts/${sponsoredId}`)
@@ -290,7 +319,12 @@ describe('6.7b opted-in reads carry the block on the sponsored item only', () =>
       ).toBe(true)
       expect(JSON.stringify(reactions.body)).not.toContain('sponsorship')
     }
-    // Not vacuous: the same post opted in does carry the block.
+    // Not vacuous: the same post opted in does carry the block, on the feed
+    // and on the direct read.
+    const optedFeed = await feedThrough(viewer, sponsoredId, SPONSORED)
+    expect(optedFeed.items.find((item) => item.id === sponsoredId)?.sponsorship).toEqual(
+      expectedBlock()
+    )
     const opted = communitySponsoredPostResponseSchema.parse(
       (
         await request(url)
