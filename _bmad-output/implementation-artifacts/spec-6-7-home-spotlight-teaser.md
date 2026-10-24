@@ -637,6 +637,19 @@ playwright/tests/community-comments.spec.ts --repeat-each=3`, went out without t
     path on the screen) cover it; four of those tests fail without the fix
     (`runs/r12-r46-mobile-red`).
 
+- 2026-10-24, round 14 (`reviews/code-triage-1.md`, R47 to R49).
+  - R47: a reset or eviction during an in-flight submit dropped the thread's unresolved
+    submission while the held draft survived, so a resend could post twice. The held draft keeps
+    the mutation id until the same thread learns the outcome, and the restore puts it back
+    through `CommunityCommentsState.resumeUnresolved`, so a resend reuses it and the server's
+    (user, mutation id) dedupe keeps it to one comment.
+  - R48: the sheet mounts, and R46 refocuses its composer, only while the Community screen is
+    focused; access returning while Home shows no longer opens it there (6.5-R48-MOB-001).
+  - R49: an explicit close clears the thread's visible draft and reply target as well as the
+    held copy; the access-hide restore is unchanged.
+  - Five tests fail without these changes (`runs/r12-r47-r49-mobile-red`); green in
+    `runs/r12-r47-r49-mobile-green` and the api-client suite (`runs/r12-api-client-tests`).
+
 ## Spec Change Log
 
 - 2026-10-23, iteration 5 (rereview 3): read floor, last-attempt time and `Retry-After` are
