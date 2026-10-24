@@ -13,6 +13,7 @@ describe('CommunityCommentDrafts (R46)', () => {
       body: 'Half a thought',
       parentId: 'root-1',
       focused: false,
+      unresolved: null,
     })
     expect(drafts.restore('member-b', 'post-a')).toBeNull()
     expect(drafts.restore('member-a', 'post-b')).toBeNull()
@@ -37,6 +38,7 @@ describe('CommunityCommentDrafts (R46)', () => {
       body: '',
       parentId: null,
       focused: true,
+      unresolved: null,
     })
     drafts.retainFocus('member-a', 'post-a', false)
     expect(drafts.restore('member-a', 'post-a')?.focused).toBe(false)

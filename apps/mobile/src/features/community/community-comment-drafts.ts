@@ -1,12 +1,18 @@
 // Story 6.5 (R46): content that hides as unverified (D3) unmounts the comments sheet, and
 // a reset or eviction meanwhile wipes the shared comment state. The member's own unsent
 // comment stays here, in memory only, so the sheet can give it back when access returns.
+import type { CreateCommunityCommentInput } from '@couture/api-client/contracts/http'
 
 export type CommunityCommentDraft = {
   body: string
   parentId: string | null
   /** Whether the composer had focus when the sheet last unmounted. */
   focused: boolean
+  /**
+   * R47: the submission whose outcome the client never learned. Its mutation ID returns
+   * with the draft, so a resend after access returns posts the comment at most once.
+   */
+  unresolved: CreateCommunityCommentInput | null
 }
 
 /** One member's unsent comments, keyed by member and post. Never persisted. */
@@ -20,7 +26,12 @@ export class CommunityCommentDrafts {
       posts = new Map()
       this.members.set(member, posts)
     }
-    const previous = posts.get(postId) ?? { body: '', parentId: null, focused: false }
+    const previous = posts.get(postId) ?? {
+      body: '',
+      parentId: null,
+      focused: false,
+      unresolved: null,
+    }
     posts.set(postId, { ...previous, ...draft })
   }
 

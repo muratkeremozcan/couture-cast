@@ -124,6 +124,8 @@ export function CommunityCommentsSheet({
     const current = state.current(postId).draft
     if (!current.body && !current.parentId)
       state.draft(postId, { body: held.body, parentId: held.parentId })
+    // R47: a resend of a submission the wipe interrupted reuses its mutation ID.
+    if (held.unresolved) state.resumeUnresolved(postId, held.unresolved)
     if (!held.focused) return
     refocusComposer.current = true
     composerRef.current?.focus()
@@ -198,26 +200,40 @@ export function CommunityCommentsSheet({
     if (member) drafts.remember(member, postId, draft)
   }
   const close = () => {
-    if (member) drafts.forget(member, postId)
+    // R49: closing discards the unsent text in the thread and the held copy alike. A
+    // submission with no known outcome stays held, so its resend keeps one mutation ID.
+    const { unresolved } = state.current(postId)
+    state.draft(postId, { body: '', parentId: null })
+    if (member && unresolved)
+      drafts.remember(member, postId, {
+        body: '',
+        parentId: null,
+        focused: false,
+        unresolved,
+      })
+    else if (member) drafts.forget(member, postId)
     onClose()
   }
   const submit = () => {
     Keyboard.dismiss()
     const submitted = state.current(postId)
     void state.submit(postId, locale).then(() => {
-      // Only an accepted submission in this same thread releases the held copy. A reset
-      // or eviction during the request leaves it for the sheet to give back.
-      if (
-        !member ||
-        state.current(postId) !== submitted ||
-        submitted.unresolved ||
-        submitted.error
-      )
+      // Only an outcome in this same thread updates the held copy. A reset or eviction
+      // during the request leaves the draft and its mutation for the sheet to give back.
+      if (!member || state.current(postId) !== submitted || submitted.unresolved) return
+      // A definitive rejection keeps the draft for an edit and retires the mutation.
+      if (submitted.error) {
+        drafts.remember(member, postId, { unresolved: null })
         return
+      }
       const { body, parentId } = submitted.draft
       if (!body && !parentId) drafts.forget(member, postId)
-      else drafts.remember(member, postId, { body, parentId })
+      else drafts.remember(member, postId, { body, parentId, unresolved: null })
     })
+    // R47: the submission fixes its mutation ID before the request leaves. It is held
+    // with the draft until this thread learns the outcome.
+    if (member && submitted.unresolved)
+      drafts.remember(member, postId, { unresolved: submitted.unresolved })
   }
   const context = (item: CommunityComment) =>
     [item.author, item.unavailable ? t('community.comments.unavailable') : item.body]

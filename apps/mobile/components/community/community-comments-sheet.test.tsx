@@ -80,7 +80,7 @@ const reportReceipt = () => ({
     reviewDueAt: '2026-10-20T12:00:00.000Z',
   },
 })
-const makeState = () =>
+const makeState = (newId = () => '00000000-0000-4000-8000-000000000064') =>
   new CommunityCommentsState(
     {
       roots: communityCommentsRootsFromMobile,
@@ -90,7 +90,7 @@ const makeState = () =>
       delete: communityCommentsDeleteFromMobile,
       report: communityCommentsReportFromMobile,
     },
-    () => '00000000-0000-4000-8000-000000000064',
+    newId,
     communityFailureReason
   )
 const sheet = ({
@@ -816,6 +816,79 @@ describe('R46 unsent comment across an unverified-access hide', () => {
     await screen.findByText('A lovely layered look.')
     expect(screen.getByTestId('comment-body')).toHaveValue('')
     expect(document.activeElement).not.toBe(screen.getByTestId('comment-body'))
+    expect(drafts.restore(MEMBER, POST_ID)).toBeNull()
+  })
+
+  it('R49 opens on an empty composer after the member closed it', async () => {
+    const state = makeState()
+    const drafts = new CommunityCommentDrafts()
+    const close = vi.fn()
+    const view = render(sheet({ state, drafts, onClose: close }))
+    await screen.findByText('A lovely layered look.')
+    press(screen.getByTestId('comment-reply-root'))
+    fireEvent.change(screen.getByTestId('comment-body'), {
+      target: { value: 'Never mind' },
+    })
+    expect(screen.getByText(`Replying to a comment: ${ROOT_CONTEXT}`)).toBeVisible()
+    press(screen.getByTestId('comments-close'))
+    expect(close).toHaveBeenCalledOnce()
+
+    // No reset this time: the thread itself must not keep the discarded text.
+    view.rerender(sheet({ state, drafts, onClose: close, postId: null }))
+    view.rerender(sheet({ state, drafts, onClose: close }))
+    await screen.findByText('A lovely layered look.')
+    expect(screen.getByTestId('comment-body')).toHaveValue('')
+    expect(
+      screen.queryByText(`Replying to a comment: ${ROOT_CONTEXT}`)
+    ).not.toBeInTheDocument()
+    expect(state.current(POST_ID).draft).toEqual({ body: '', parentId: null })
+    expect(drafts.restore(MEMBER, POST_ID)).toBeNull()
+  })
+
+  it('R47 resends a submission a wipe interrupted under its first mutation ID', async () => {
+    const mutationIds: string[] = []
+    let answerFirst!: () => void
+    server.use(
+      http.post(`${base}/comments`, async ({ request }) => {
+        const { mutationId } = (await request.json()) as { mutationId: string }
+        mutationIds.push(mutationId)
+        // The first request reaches the server, which stores the comment, but its answer
+        // only arrives after the wipe, too late for the thread that sent it.
+        if (mutationIds.length === 1)
+          await new Promise<void>((resolve) => {
+            answerFirst = resolve
+          })
+        return HttpResponse.json({
+          data: createCommunityCommentSubmission({ body: 'Posted once' }),
+        })
+      })
+    )
+    let issued = 0
+    const state = makeState(
+      () => `00000000-0000-4000-8000-${String(++issued).padStart(12, '0')}`
+    )
+    const drafts = new CommunityCommentDrafts()
+    const view = render(sheet({ state, drafts }))
+    await screen.findByText('A lovely layered look.')
+    fireEvent.change(screen.getByTestId('comment-body'), {
+      target: { value: 'Posted once' },
+    })
+    press(screen.getByRole('button', { name: 'Send comment' }))
+    await waitFor(() => expect(mutationIds).toHaveLength(1))
+
+    view.rerender(sheet({ state, drafts, postId: null }))
+    act(() => state.reset())
+    answerFirst()
+    view.rerender(sheet({ state, drafts }))
+    await screen.findByText('A lovely layered look.')
+    expect(screen.getByTestId('comment-body')).toHaveValue('Posted once')
+
+    press(screen.getByTestId('comment-submit'))
+    await waitFor(() => expect(mutationIds).toHaveLength(2))
+    // The server keys a comment by member and mutation ID, so this resend cannot add
+    // a second one.
+    expect(mutationIds[1]).toBe(mutationIds[0])
+    await waitFor(() => expect(screen.getByTestId('comment-body')).toHaveValue(''))
     expect(drafts.restore(MEMBER, POST_ID)).toBeNull()
   })
 

@@ -174,6 +174,19 @@ function moderationReasonText(
     .join(' ')
 }
 
+/**
+ * R48: the open post outlives a blur, and access can return while another tab is on
+ * screen. The comments sheet mounts, and gives back composer focus, only while verified
+ * content shows on a focused Community screen.
+ */
+function sheetPostId(
+  postId: string | null,
+  available: boolean,
+  focused: boolean
+): string | null {
+  return available && focused ? postId : null
+}
+
 export function CommunityScreen() {
   const { t, i18n } = useTranslation()
   const palette = useHeroPalette()
@@ -1947,7 +1960,7 @@ export function CommunityScreen() {
       />
 
       <CommunityCommentsSheet
-        postId={communityAvailable ? commentsPostId : null}
+        postId={sheetPostId(commentsPostId, communityAvailable, screenFocused)}
         target={commentsPostId === deepLinkPost?.id ? commentTarget : undefined}
         state={comments}
         drafts={commentDrafts}

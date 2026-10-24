@@ -191,6 +191,17 @@ export class CommunityCommentsState {
     Object.assign(this.current(postId).draft, draft)
     this.emit()
   }
+  /**
+   * Gives a thread back a transport-uncertain submission that a reset or eviction
+   * dropped. Its resend then carries the same mutation ID, which the server accepts at
+   * most once. A thread that already owns a submission keeps its own.
+   */
+  resumeUnresolved(postId: string, input: CreateCommunityCommentInput): void {
+    const state = this.current(postId)
+    if (state.unresolved || state.pending) return
+    state.unresolved = input
+    this.emit()
+  }
   private announce(state: CommentThreadState, key: string) {
     state.announcement = { key, id: ++this.announcementId }
   }
