@@ -4,7 +4,7 @@ import React, { createElement, useState } from 'react'
 import { run as runAxe } from 'axe-core'
 import type * as ReactNativeModule from 'react-native'
 import type * as EdgeToEdgeTestUtils from '@/src/test-utils/edge-to-edge-modal'
-import { fireEvent, render, screen, waitFor } from '@testing-library/react'
+import { act, fireEvent, render, screen, waitFor } from '@testing-library/react'
 import { afterEach, beforeAll, beforeEach, describe, expect, it, vi } from 'vitest'
 import {
   communityReportReasonSchema,
@@ -25,6 +25,24 @@ const touchableSpy = vi.hoisted(() => ({
   props: new Map<string, Record<string, unknown>>(),
   createElement: null as unknown as typeof createElement,
 }))
+/**
+ * react-native-web never reports a software keyboard, so the R66 cases drive the
+ * platform's keyboard events through these listeners.
+ */
+const keyboard = vi.hoisted(() => {
+  const listeners = new Map<string, Set<() => void>>()
+  return {
+    addListener: (event: string, listener: () => void) => {
+      const set = listeners.get(event) ?? new Set()
+      set.add(listener)
+      listeners.set(event, set)
+      return { remove: () => set.delete(listener) }
+    },
+    emit: (event: string) => {
+      listeners.get(event)?.forEach((listener) => listener())
+    },
+  }
+})
 vi.mock('react-native-safe-area-context', async (importOriginal) => {
   const actual = await importOriginal<Record<string, unknown>>()
   const { TEST_SAFE_AREA_INSETS } = await vi.importActual<typeof EdgeToEdgeTestUtils>(
@@ -57,6 +75,11 @@ vi.mock('react-native', async (importOriginal) => {
     findNodeHandle: vi.fn(),
     Platform: { ...actual.Platform, OS: 'web' },
     TouchableOpacity: RecordingTouchable,
+    Keyboard: {
+      ...actual.Keyboard,
+      isVisible: () => false,
+      addListener: keyboard.addListener,
+    },
   }
 })
 
@@ -387,5 +410,63 @@ describe('R52 CommunityReportModal over the system bars', () => {
       expect(getComputedStyle(node).backgroundColor).not.toMatch(
         /^rgba\(0, 0, 0, 0\.[1-9]/
       )
+  })
+})
+
+/**
+ * R66: with the keyboard up for the details field, the lifted dialog cut the field at
+ * the scroll edge and left a sliver of a reason row above it. The reasons now leave the
+ * layout while the member writes details, and return when the keyboard closes.
+ */
+describe('R66 CommunityReportModal with the keyboard up', () => {
+  const reasons = () => screen.getByTestId('report-reasons')
+  const details = () => screen.getByTestId('report-details-input')
+  beforeAll(async () => {
+    await initI18n()
+    await i18n.changeLanguage('en-US')
+  })
+
+  /** The modal fades in; its content counts as visible once the fade ends. */
+  async function openModal() {
+    renderModal()
+    await waitFor(() => expect(screen.getByTestId('cancel-report-button')).toBeVisible())
+  }
+
+  it('shows the details field without the reasons while the member writes', async () => {
+    await openModal()
+    press(screen.getByTestId('report-reason-spam'))
+    act(() => details().focus())
+    act(() => keyboard.emit('keyboardDidShow'))
+    expect(reasons()).not.toBeVisible()
+    expect(details()).toBeVisible()
+    expect(screen.getByTestId('report-details-count')).toBeVisible()
+    expect(screen.getByTestId('cancel-report-button')).toBeVisible()
+    expect(screen.getByTestId('submit-report-button')).toBeVisible()
+    expect(document.activeElement).toBe(details())
+
+    act(() => keyboard.emit('keyboardDidHide'))
+    expect(reasons()).toBeVisible()
+    // The chosen reason survived the round trip.
+    expect(
+      touchableSpy.props.get('report-reason-spam')?.accessibilityState
+    ).toMatchObject({
+      checked: true,
+    })
+  })
+
+  it('keeps the reasons when the keyboard rises for another reason than the details', async () => {
+    await openModal()
+    act(() => keyboard.emit('keyboardDidShow'))
+    expect(reasons()).toBeVisible()
+  })
+
+  it('brings the reasons back when the details field loses focus', async () => {
+    await openModal()
+    act(() => details().focus())
+    act(() => keyboard.emit('keyboardDidShow'))
+    expect(reasons()).not.toBeVisible()
+    act(() => details().blur())
+    expect(reasons()).toBeVisible()
+    act(() => keyboard.emit('keyboardDidHide'))
   })
 })
