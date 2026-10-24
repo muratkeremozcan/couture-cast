@@ -184,6 +184,12 @@ export function registerCommunitySponsoredCases() {
     // Structural guard: no mobile code keeps a community payload, so nothing can
     // render a block from a copy that outlived its live read.
     const writes = recordPersistedWrites()
+    // Positive control: a write through Web Storage and one through the native
+    // storage mock both reach the recorder, so an empty list below is evidence.
+    localStorage.setItem('persisted-writes-probe', 'web-probe')
+    localStorage.removeItem('persisted-writes-probe')
+    await (await import('expo-secure-store')).setItemAsync('probe', 'native-probe')
+    expect(writes()).toEqual(['persisted-writes-probe web-probe', 'probe native-probe'])
     const bodies = serveClicks()
     setMockParams({ source: 'notification', type: 'community', cardId: 'post-z' })
     server.use(

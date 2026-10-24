@@ -72,16 +72,34 @@ export interface PendingRead {
   resolve: (answer: Answer) => void
 }
 
-/** Every spotlight read waits until the test answers it. */
+let readScope = 0
+
+/**
+ * Every spotlight read waits until the test answers it.
+ *
+ * Each test reads under its own API base path. A read the previous test still
+ * had in flight is aborted when its Home unmounts, but the service worker can
+ * deliver the request after this test's handler is installed. Without the path
+ * it would be taken as this test's first read and answered in its place, and the
+ * test's own read would wait forever: the 6.7-MOB-013 flake, seen under load.
+ */
 export function deferSpotlightReads() {
   const reads: PendingRead[] = []
+  const scope = `/teaser-test-${(readScope += 1)}`
+  const previousBase = process.env.EXPO_PUBLIC_API_BASE_URL
+  process.env.EXPO_PUBLIC_API_BASE_URL = `${window.location.origin}${scope}`
   // A read left unanswered holds a browser connection past its test, and enough
   // of them stall every later request to the test origin.
   onTestFinished(() => {
+    process.env.EXPO_PUBLIC_API_BASE_URL = previousBase
     for (const read of reads) read.resolve('network-error')
   })
   server.use(
     http.get('*/api/v1/community/spotlight', async ({ request }) => {
+      // Another test's read: refused at once, never recorded here.
+      if (!new URL(request.url).pathname.startsWith(`${scope}/`)) {
+        return HttpResponse.error()
+      }
       const answer = await new Promise<Answer>((resolve) => {
         reads.push({
           url: new URL(request.url),
