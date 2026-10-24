@@ -508,11 +508,16 @@ export async function verifyCommunityAffiliateClickMintInteraction(
 
 /**
  * The link ended between the read that rendered the CTA and the tap. The click
- * is refused with the sponsorship message: no redirect, and no click row.
+ * is refused with the sponsorship message: no redirect, and no click row. One
+ * interaction per surface, so a surface the provider stops treating as a
+ * community surface answers 201 and fails verification.
  */
-export async function verifyCommunityAffiliateClickEndedInteraction(pact: PactV4) {
+export async function verifyCommunityAffiliateClickEndedInteraction(
+  pact: PactV4,
+  surface: AffiliateCommunitySurface
+) {
   // Provider endpoint: apps/api/src/modules/commerce/affiliate-click.controller.ts -> POST /api/v1/commerce/affiliate/clicks
-  const body = communityClickRequestBody('community_feed')
+  const body = communityClickRequestBody(surface)
   await pact
     .addInteraction()
     .given(
@@ -521,7 +526,7 @@ export async function verifyCommunityAffiliateClickEndedInteraction(pact: PactV4
         params: { userId: pactEventAuth.userId, postId: COMMUNITY_SPONSORED_POST_ID },
       })
     )
-    .uponReceiving('a sponsored community CTA activation after the sponsorship ended')
+    .uponReceiving(`a sponsored ${surface} CTA activation after the sponsorship ended`)
     .withRequest(
       'POST',
       '/api/v1/commerce/affiliate/clicks',
@@ -533,7 +538,7 @@ export async function verifyCommunityAffiliateClickEndedInteraction(pact: PactV4
         headers: { 'Cache-Control': string('private, no-store') },
         body: {
           statusCode: like(404),
-          message: string(COMMERCE_SPONSORSHIP_NOT_FOUND_MESSAGE),
+          message: equal(COMMERCE_SPONSORSHIP_NOT_FOUND_MESSAGE),
           error: string('Not Found'),
         },
       })

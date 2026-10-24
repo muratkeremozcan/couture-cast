@@ -41,10 +41,11 @@ import { like, pactEventAuth, string, type CreateClient } from '../shared'
  * links exactly that pair, and the real `CommunitySponsorshipService` builds the
  * block from it, so a renamed or dropped field fails verification.
  *
- * Absence of the block is the not-opted-in path, and the existing feed,
- * spotlight and post interactions already record that response with no
- * sponsorship header. Which posts are eligible, the window, the region and the
- * public visibility rule are proven in the API unit suite and in
+ * Absence of the block is the not-opted-in path. Pact cannot assert that a key
+ * is missing, so the existing feed, spotlight and post interactions with no
+ * sponsorship header do not prove it; `community-sponsorship.controller.spec.ts`
+ * and the HTTP integration suite do. Which posts are eligible, the window, the
+ * region and the public visibility rule are proven in the API unit suite and in
  * `apps/api/integration`.
  * ------------------------------------------------------------------------- */
 
@@ -69,10 +70,9 @@ const expectedSponsorship = {
   offerTitle: COMMERCE_OFFER_TITLE,
 }
 
-/** The block carries exactly four fields and no URL at any nesting level. */
+/** The block carries exactly these four fields, none of them a URL. */
 function expectSponsorshipBlock(item: { sponsorship?: unknown }) {
   expect(item.sponsorship).toEqual(expectedSponsorship)
-  expect(JSON.stringify(item.sponsorship)).not.toContain('http')
 }
 
 export async function verifyCommunitySponsoredFeedInteraction(

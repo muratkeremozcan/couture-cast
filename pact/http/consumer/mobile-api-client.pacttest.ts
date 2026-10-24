@@ -424,9 +424,12 @@ describe('CoutureCastMobile -> CoutureCastApi HTTP contract', () => {
     }
   )
 
-  it('refuses a sponsored community click after the sponsorship ended', async () => {
-    await verifyCommunityAffiliateClickEndedInteraction(pact)
-  })
+  it.each(communityAffiliateClickSurfaces)(
+    'refuses a sponsored %s click after the sponsorship ended',
+    async (surface) => {
+      await verifyCommunityAffiliateClickEndedInteraction(pact, surface)
+    }
+  )
 
   it('records a signed partner conversion webhook', async () => {
     await verifyAffiliateWebhookInteraction(pact, createMobileClientForMockServer)
