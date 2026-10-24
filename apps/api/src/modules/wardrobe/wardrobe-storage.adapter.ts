@@ -13,22 +13,49 @@ export interface WardrobeStorage {
   upload(objectPath: string, bytes: Buffer, mimeType: GarmentMimeType): Promise<void>
 }
 
-const logger = createBaseLogger().child({ feature: 'wardrobe-storage' })
+export const wardrobeStorageLogger = createBaseLogger().child({
+  feature: 'wardrobe-storage',
+})
+
+type StorageError = { message?: string; name?: string; statusCode?: string | number }
 
 /**
- * Every storage failure answers the same 503 to callers. What Supabase said is
- * logged first, so "object not found" is not mistaken for a permission fault.
+ * What kind of failure Supabase reported, from a fixed list. The message itself
+ * is never logged: it can echo the object key, which carries the owner's id.
+ */
+function storageFailureReason(error?: StorageError | null): string {
+  if (!error) return 'no_client'
+  const message = (error.message ?? '').toLowerCase()
+  const status = Number(error.statusCode)
+  if (message.includes('bucket not found')) return 'bucket_missing'
+  if (message.includes('not found') || status === 404) return 'object_missing'
+  if (
+    status === 401 ||
+    status === 403 ||
+    /jws|jwt|signature|unauthori[sz]ed/.test(message)
+  )
+    return 'unauthorized'
+  if (message.includes('exceeded') || status === 413) return 'too_large'
+  if (status >= 500) return 'server_error'
+  return 'other'
+}
+
+/**
+ * Every storage failure answers the same 503 to callers. The operation, the
+ * error's name, its numeric status and an allow-listed reason are logged first,
+ * so "object not found" is not mistaken for a permission fault.
  */
 function storageUnavailable(
   operation: string,
-  error?: { message?: string; name?: string; statusCode?: string | number } | null
+  error?: StorageError | null
 ): ServiceUnavailableException {
-  logger.warn(
+  const status = Number(error?.statusCode)
+  wardrobeStorageLogger.warn(
     {
       operation,
-      storageError: error
-        ? { name: error.name, message: error.message, statusCode: error.statusCode }
-        : null,
+      reason: storageFailureReason(error),
+      errorName: error?.name ?? null,
+      statusCode: Number.isFinite(status) ? status : null,
     },
     'wardrobe_storage_failed'
   )

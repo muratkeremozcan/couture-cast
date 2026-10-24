@@ -514,11 +514,22 @@ describe('WardrobeService failure and degraded-dependency paths', () => {
           : Promise.resolve('https://storage.test/signed.png')
       )
 
+      const logged = vi.spyOn(
+        (h.service as unknown as { logger: { error: (...args: unknown[]) => void } })
+          .logger,
+        'error'
+      )
+
       const result = await h.service.listGarments(USER_ID)
 
       expect(result.data.map((item) => item.id)).toEqual(['g-1', 'g-2'])
       expect(result.data[0]?.imageAccess?.url).toBe('https://storage.test/signed.png')
       expect(result.data[1]?.imageAccess).toBeNull()
+      // The garment id and the error's class only: the object path carries the owner's id.
+      expect(logged).toHaveBeenCalledWith(
+        { garmentId: 'g-2', errorClass: 'ServiceUnavailableException' },
+        'garment_image_signing_failed'
+      )
     })
 
     /**

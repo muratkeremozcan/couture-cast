@@ -555,11 +555,12 @@ export class WardrobeService {
     try {
       return (await this.toResponse(garment)).data
     } catch (error) {
+      // The garment id and the error's class only: the object path and the
+      // storage message both carry the owner's id.
       this.logger.error(
         {
           garmentId: garment.id,
-          objectPath: garment.object_path,
-          error: error instanceof Error ? error.message : String(error),
+          errorClass: error instanceof Error ? error.constructor.name : typeof error,
         },
         'garment_image_signing_failed'
       )

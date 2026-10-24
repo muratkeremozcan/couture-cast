@@ -2,7 +2,10 @@
 // See _bmad-output/project-knowledge/learning-path-step-by-step.md#step-29-garment-capture-flow
 import { ServiceUnavailableException } from '@nestjs/common'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
-import { SupabaseWardrobeStorageAdapter } from './wardrobe-storage.adapter'
+import {
+  SupabaseWardrobeStorageAdapter,
+  wardrobeStorageLogger,
+} from './wardrobe-storage.adapter'
 
 const supabaseMocks = vi.hoisted(() => {
   const bucket = {
@@ -102,6 +105,38 @@ describe('SupabaseWardrobeStorageAdapter', () => {
         upsert: false,
       }
     )
+  })
+
+  it('logs an allow-listed reason and the status, never the storage message', async () => {
+    vi.stubEnv('SUPABASE_URL', 'http://storage.test')
+    vi.stubEnv('SUPABASE_SERVICE_ROLE_KEY', 'service-role-key')
+    const warn = vi
+      .spyOn(wardrobeStorageLogger, 'warn')
+      .mockImplementation(() => undefined)
+    supabaseMocks.bucket.createSignedUrl.mockResolvedValue({
+      data: null,
+      error: {
+        name: 'StorageApiError',
+        message: 'Object not found: users/owner-7f3a/garments/g-2.png',
+        statusCode: '400',
+      },
+    })
+    const adapter = new SupabaseWardrobeStorageAdapter()
+
+    await expect(
+      adapter.signReadUrl('users/owner-7f3a/garments/g-2.png', 600)
+    ).rejects.toThrow(ServiceUnavailableException)
+
+    expect(warn).toHaveBeenCalledWith(
+      {
+        operation: 'sign',
+        reason: 'object_missing',
+        errorName: 'StorageApiError',
+        statusCode: 400,
+      },
+      'wardrobe_storage_failed'
+    )
+    expect(JSON.stringify(warn.mock.calls)).not.toContain('owner-7f3a')
   })
 
   it('normalizes Supabase failures to a storage unavailable response', async () => {
