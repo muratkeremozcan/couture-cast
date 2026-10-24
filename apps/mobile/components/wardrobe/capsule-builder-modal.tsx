@@ -4,7 +4,6 @@ import { useTranslation } from 'react-i18next'
 import { randomUuidV4 } from '@/src/lib/uuid'
 import {
   AccessibilityInfo,
-  Modal,
   View,
   Text,
   TextInput,
@@ -19,6 +18,7 @@ import type {
   GarmentItemContract,
   OutfitCapsuleContract,
 } from '@couture/api-client/contracts/http'
+import { EdgeToEdgeModal, useModalInsets } from '@/components/edge-to-edge-modal'
 import { safeFindNodeHandle } from '@/src/lib/accessibility-focus'
 
 export interface MobileCapsuleSaveOptions {
@@ -77,6 +77,7 @@ export function MobileCapsuleBuilderModal({
   invokingNodeHandle,
 }: MobileCapsuleBuilderModalProps) {
   const { t } = useTranslation()
+  const insets = useModalInsets()
   const [name, setName] = useState('')
   const [description, setDescription] = useState('')
   const [selectedOccasions, setSelectedOccasions] = useState<CapsuleOccasion[]>([
@@ -257,15 +258,17 @@ export function MobileCapsuleBuilderModal({
   }
 
   return (
-    <Modal
+    <EdgeToEdgeModal
       visible={visible}
       animationType="slide"
-      transparent
       onRequestClose={onClose}
       accessibilityViewIsModal
     >
       <View style={styles.overlay}>
-        <View style={styles.modalContainer} testID="mobile-capsule-builder-container">
+        <View
+          style={[styles.modalContainer, { paddingBottom: 16 + insets.bottom }]}
+          testID="mobile-capsule-builder-container"
+        >
           <View style={styles.header}>
             <Text
               ref={titleRef}
@@ -496,7 +499,7 @@ export function MobileCapsuleBuilderModal({
           </View>
         </View>
       </View>
-    </Modal>
+    </EdgeToEdgeModal>
   )
 }
 

@@ -11,10 +11,8 @@ import {
   Keyboard,
   KeyboardAvoidingView,
   Platform,
-  Modal,
   ScrollView,
   StyleSheet,
-  StatusBar,
   Text,
   TextInput,
   TouchableOpacity,
@@ -29,6 +27,7 @@ import {
   type CommunityReportReason,
   type SupportedLocale,
 } from '@couture/api-client/contracts/http'
+import { EdgeToEdgeModal, useModalInsets } from '@/components/edge-to-edge-modal'
 import { useHeroPalette } from '@/components/hero/hero-theme'
 import { safeFindNodeHandle } from '@/src/lib/accessibility-focus'
 import type {
@@ -36,16 +35,23 @@ import type {
   CommunityCommentDrafts,
 } from '@/src/features/community/community-comment-drafts'
 
-// Android's non-translucent modal starts below the native status-bar inset.
-function modalKeyboardOffset(): number {
-  return Platform.OS === 'android' ? (StatusBar.currentHeight ?? 0) : 0
-}
-
 /** The author and body that name a comment's actions and a reply's target. */
 function commentContext(item: CommunityComment, unavailable: string): string {
   return [item.author, item.unavailable ? unavailable : item.body]
     .filter(Boolean)
     .join('. ')
+}
+
+/**
+ * R52: how the keyboard view lifts the sheet. Android reports a closed keyboard at the
+ * bottom of the visible frame, above the navigation bar, so there it acts only while the
+ * keyboard is open; otherwise it would stay that much short of the full-screen modal.
+ */
+function keyboardAvoiding(keyboardOpen: boolean) {
+  return {
+    behavior: Platform.OS === 'ios' ? 'padding' : 'height',
+    enabled: Platform.OS !== 'android' || keyboardOpen,
+  } as const
 }
 
 /** R51: the thread region leaves the layout while the keyboard is open. */
@@ -156,6 +162,8 @@ export function CommunityCommentsSheet({
   const [keyboardOpen, setKeyboardOpen] = useKeyboardOpen(() =>
     setRestoreOffset({ ...threadOffset.current })
   )
+  // R52: the sheet keeps clear of the gesture bar while the keyboard is down.
+  const insets = useModalInsets(keyboardOpen)
   const focus = (ref: React.RefObject<Text | View | null>) => {
     const node = safeFindNodeHandle(ref.current)
     if (node) AccessibilityInfo.setAccessibilityFocus(node)
@@ -398,9 +406,8 @@ export function CommunityCommentsSheet({
   )
 
   return (
-    <Modal
+    <EdgeToEdgeModal
       visible
-      transparent
       animationType="slide"
       onRequestClose={() => {
         // R51: Back with the keyboard open closes the keyboard and keeps the sheet. On
@@ -419,218 +426,230 @@ export function CommunityCommentsSheet({
         if (!target) focus(titleRef)
       }}
     >
-      <KeyboardAvoidingView
-        style={styles.backdrop}
-        behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
-        keyboardVerticalOffset={modalKeyboardOffset()}
-      >
-        <View
-          style={[styles.sheet, { backgroundColor: palette.surface }]}
-          accessibilityViewIsModal
-          accessible={false}
-        >
-          <View style={styles.row}>
-            <Text
-              ref={titleRef}
-              accessibilityRole="header"
-              style={[styles.title, { color: palette.text }]}
-            >
-              {t('community.comments.title')}
-            </Text>
-            {button(t('community.comments.close'), close, false, 'comments-close')}
-          </View>
-          <ScrollView
-            testID="comments-thread"
-            keyboardShouldPersistTaps="handled"
-            style={threadRegionStyle(keyboardOpen)}
-            contentContainerStyle={styles.content}
-            contentOffset={restoreOffset}
-            onScroll={(event) => {
-              threadOffset.current = event.nativeEvent.contentOffset
-            }}
-            scrollEventThrottle={16}
+      {/* R52: the scrim is its own full-screen layer, so the space the keyboard view gives
+          up never shows the screen below. The modal window spans the whole screen on both
+          platforms, so the keyboard's screen position needs no offset. */}
+      <View testID="comments-scrim" style={styles.backdrop}>
+        <KeyboardAvoidingView style={styles.avoider} {...keyboardAvoiding(keyboardOpen)}>
+          <View
+            testID="comments-sheet"
+            style={[
+              styles.sheet,
+              { backgroundColor: palette.surface, paddingBottom: 32 + insets.bottom },
+            ]}
+            accessibilityViewIsModal
             accessible={false}
           >
-            {button(
-              t('community.comments.refresh'),
-              () => {
-                void state.load(postId)
-                void state.statuses(postId)
-              },
-              thread.loading
-            )}
-            {thread.roots?.hasNewer && (
-              <Text style={{ color: palette.text }}>{t('community.comments.newer')}</Text>
-            )}
-            {thread.loading && (
-              <Text accessibilityLiveRegion="polite" style={{ color: palette.text }}>
-                {t('community.comments.loading')}
+            <View style={styles.row}>
+              <Text
+                ref={titleRef}
+                accessibilityRole="header"
+                style={[styles.title, { color: palette.text }]}
+              >
+                {t('community.comments.title')}
               </Text>
-            )}
-            {thread.roots?.items.length === 0 && (
-              <Text style={{ color: palette.text }}>{t('community.comments.empty')}</Text>
-            )}
-            {thread.roots?.items.map((root) => (
-              <View key={root.id} accessible={false}>
-                {entry(root)}
-                {thread.replies.has(root.id) && (
-                  <View style={styles.replies} accessible={false}>
-                    {thread.replies.get(root.id)?.items.map(entry)}
-                    {thread.replies.get(root.id)?.nextCursor &&
-                      button(
-                        t('community.comments.moreReplies'),
-                        () => {
-                          void state.load(postId, root.id, true)
-                        },
-                        thread.loading
-                      )}
-                  </View>
-                )}
-              </View>
-            ))}
-            {thread.roots?.nextCursor &&
-              button(
-                t('community.comments.more'),
+              {button(t('community.comments.close'), close, false, 'comments-close')}
+            </View>
+            <ScrollView
+              testID="comments-thread"
+              keyboardShouldPersistTaps="handled"
+              style={threadRegionStyle(keyboardOpen)}
+              contentContainerStyle={styles.content}
+              contentOffset={restoreOffset}
+              onScroll={(event) => {
+                threadOffset.current = event.nativeEvent.contentOffset
+              }}
+              scrollEventThrottle={16}
+              accessible={false}
+            >
+              {button(
+                t('community.comments.refresh'),
                 () => {
-                  void state.load(postId, null, true)
+                  void state.load(postId)
+                  void state.statuses(postId)
                 },
                 thread.loading
               )}
-            <View accessible={false}>
-              {thread.submissions.length > 0 && (
-                <Text
-                  ref={statusRef}
-                  accessible={true}
-                  accessibilityRole="header"
-                  style={[styles.author, { color: palette.text }]}
-                >
-                  {t('community.comments.private')}
+              {thread.roots?.hasNewer && (
+                <Text style={{ color: palette.text }}>
+                  {t('community.comments.newer')}
                 </Text>
               )}
-              {thread.submissions.map((item) => (
-                <View
-                  key={item.id}
-                  testID={`comment-submission-${item.id}`}
-                  style={[styles.entry, { borderColor: palette.divider }]}
-                  accessible={false}
-                >
-                  <Text style={{ color: palette.text }}>
-                    {t(`community.comments.status.${item.status}`)}
-                  </Text>
-                  {item.body && <Text style={{ color: palette.text }}>{item.body}</Text>}
-                  {!['author_deleted', 'erased'].includes(item.status) &&
-                    button(t('community.comments.delete'), () => {
-                      void state.delete(postId, item.id)
-                    })}
-                  {[
-                    'held_for_review',
-                    'blocked',
-                    'screening_failed',
-                    'consent_suspended',
-                  ].includes(item.status) && (
-                    <Text style={{ color: palette.text }}>
-                      {t('community.comments.recovery')}
-                    </Text>
+              {thread.loading && (
+                <Text accessibilityLiveRegion="polite" style={{ color: palette.text }}>
+                  {t('community.comments.loading')}
+                </Text>
+              )}
+              {thread.roots?.items.length === 0 && (
+                <Text style={{ color: palette.text }}>
+                  {t('community.comments.empty')}
+                </Text>
+              )}
+              {thread.roots?.items.map((root) => (
+                <View key={root.id} accessible={false}>
+                  {entry(root)}
+                  {thread.replies.has(root.id) && (
+                    <View style={styles.replies} accessible={false}>
+                      {thread.replies.get(root.id)?.items.map(entry)}
+                      {thread.replies.get(root.id)?.nextCursor &&
+                        button(
+                          t('community.comments.moreReplies'),
+                          () => {
+                            void state.load(postId, root.id, true)
+                          },
+                          thread.loading
+                        )}
+                    </View>
                   )}
                 </View>
               ))}
-              {thread.submissionsCursor &&
-                button(t('community.comments.morePrivate'), () => {
-                  void state.statuses(postId, true)
-                })}
-            </View>
-          </ScrollView>
-          <View style={styles.composer}>
-            {thread.draft.parentId && (
-              <View style={styles.row}>
-                {/* R51: three lines at most on screen; the label keeps the whole context. */}
-                <Text
-                  testID="comments-reply-context"
-                  accessibilityLabel={replying()}
-                  numberOfLines={3}
-                  ellipsizeMode="tail"
-                  style={{ color: palette.text }}
-                >
-                  {replying()}
-                </Text>
-                {button(t('community.comments.cancel'), () => edit({ parentId: null }))}
+              {thread.roots?.nextCursor &&
+                button(
+                  t('community.comments.more'),
+                  () => {
+                    void state.load(postId, null, true)
+                  },
+                  thread.loading
+                )}
+              <View accessible={false}>
+                {thread.submissions.length > 0 && (
+                  <Text
+                    ref={statusRef}
+                    accessible={true}
+                    accessibilityRole="header"
+                    style={[styles.author, { color: palette.text }]}
+                  >
+                    {t('community.comments.private')}
+                  </Text>
+                )}
+                {thread.submissions.map((item) => (
+                  <View
+                    key={item.id}
+                    testID={`comment-submission-${item.id}`}
+                    style={[styles.entry, { borderColor: palette.divider }]}
+                    accessible={false}
+                  >
+                    <Text style={{ color: palette.text }}>
+                      {t(`community.comments.status.${item.status}`)}
+                    </Text>
+                    {item.body && (
+                      <Text style={{ color: palette.text }}>{item.body}</Text>
+                    )}
+                    {!['author_deleted', 'erased'].includes(item.status) &&
+                      button(t('community.comments.delete'), () => {
+                        void state.delete(postId, item.id)
+                      })}
+                    {[
+                      'held_for_review',
+                      'blocked',
+                      'screening_failed',
+                      'consent_suspended',
+                    ].includes(item.status) && (
+                      <Text style={{ color: palette.text }}>
+                        {t('community.comments.recovery')}
+                      </Text>
+                    )}
+                  </View>
+                ))}
+                {thread.submissionsCursor &&
+                  button(t('community.comments.morePrivate'), () => {
+                    void state.statuses(postId, true)
+                  })}
               </View>
-            )}
-            <Text style={[styles.author, { color: palette.text }]}>
-              {t('community.comments.compose')}
-            </Text>
-            <ComposerUnmount
-              onUnmount={() => {
-                if (member)
-                  drafts.retainFocus(
-                    member,
-                    postId,
-                    !closedByMember.current && (composerRef.current?.isFocused() ?? false)
-                  )
-              }}
-            >
-              <TextInput
-                ref={composerRef}
-                testID="comment-body"
-                accessibilityLabel={t('community.comments.compose')}
-                value={thread.draft.body}
-                multiline={false}
-                returnKeyType="send"
-                onChangeText={(body) => edit({ body })}
-                onFocus={() => {
-                  // Holds even an empty draft, so a focused composer keeps its focus.
-                  if (member) drafts.remember(member, postId, {})
-                }}
-                onEndEditing={(event) => {
-                  const body = event.nativeEvent.text
-                  if (state.current(postId).draft.body === body)
-                    edit({ body: body.normalize('NFC') })
-                }}
-                onSubmitEditing={submit}
-                style={[
-                  styles.input,
-                  { color: palette.text, borderColor: palette.mutedText },
-                ]}
-              />
-            </ComposerUnmount>
-            <Text style={{ color: palette.text }}>
-              {t('community.comments.count', {
-                count: thread.draft.body.normalize('NFC').trim().length,
-              })}
-            </Text>
-            {thread.unresolved && (
-              <Text style={{ color: palette.text }}>
-                {t('community.comments.unresolved')}
+            </ScrollView>
+            <View style={styles.composer}>
+              {thread.draft.parentId && (
+                <View style={styles.row}>
+                  {/* R51: three lines at most on screen; the label keeps the whole context. */}
+                  <Text
+                    testID="comments-reply-context"
+                    accessibilityLabel={replying()}
+                    numberOfLines={3}
+                    ellipsizeMode="tail"
+                    style={{ color: palette.text }}
+                  >
+                    {replying()}
+                  </Text>
+                  {button(t('community.comments.cancel'), () => edit({ parentId: null }))}
+                </View>
+              )}
+              <Text style={[styles.author, { color: palette.text }]}>
+                {t('community.comments.compose')}
               </Text>
-            )}
-            {button(
-              t(
-                thread.pending
-                  ? 'community.comments.sending'
-                  : thread.unresolved
-                    ? 'community.comments.retry'
-                    : 'community.comments.send'
-              ),
-              submit,
-              thread.pending,
-              'comment-submit'
-            )}
-            {thread.error && (
-              <Text style={{ color: palette.text }}>{t(thread.error)}</Text>
-            )}
+              <ComposerUnmount
+                onUnmount={() => {
+                  if (member)
+                    drafts.retainFocus(
+                      member,
+                      postId,
+                      !closedByMember.current &&
+                        (composerRef.current?.isFocused() ?? false)
+                    )
+                }}
+              >
+                <TextInput
+                  ref={composerRef}
+                  testID="comment-body"
+                  accessibilityLabel={t('community.comments.compose')}
+                  value={thread.draft.body}
+                  multiline={false}
+                  returnKeyType="send"
+                  onChangeText={(body) => edit({ body })}
+                  onFocus={() => {
+                    // Holds even an empty draft, so a focused composer keeps its focus.
+                    if (member) drafts.remember(member, postId, {})
+                  }}
+                  onEndEditing={(event) => {
+                    const body = event.nativeEvent.text
+                    if (state.current(postId).draft.body === body)
+                      edit({ body: body.normalize('NFC') })
+                  }}
+                  onSubmitEditing={submit}
+                  style={[
+                    styles.input,
+                    { color: palette.text, borderColor: palette.mutedText },
+                  ]}
+                />
+              </ComposerUnmount>
+              <Text style={{ color: palette.text }}>
+                {t('community.comments.count', {
+                  count: thread.draft.body.normalize('NFC').trim().length,
+                })}
+              </Text>
+              {thread.unresolved && (
+                <Text style={{ color: palette.text }}>
+                  {t('community.comments.unresolved')}
+                </Text>
+              )}
+              {button(
+                t(
+                  thread.pending
+                    ? 'community.comments.sending'
+                    : thread.unresolved
+                      ? 'community.comments.retry'
+                      : 'community.comments.send'
+                ),
+                submit,
+                thread.pending,
+                'comment-submit'
+              )}
+              {thread.error && (
+                <Text style={{ color: palette.text }}>{t(thread.error)}</Text>
+              )}
+            </View>
           </View>
-        </View>
-      </KeyboardAvoidingView>
-    </Modal>
+        </KeyboardAvoidingView>
+      </View>
+    </EdgeToEdgeModal>
   )
 }
 
 const styles = StyleSheet.create({
-  backdrop: { flex: 1, justifyContent: 'flex-end', backgroundColor: 'rgba(0,0,0,0.5)' },
+  backdrop: { flex: 1, backgroundColor: 'rgba(0,0,0,0.5)' },
+  avoider: { flex: 1, justifyContent: 'flex-end' },
   sheet: {
     maxHeight: '90%',
     padding: 16,
-    paddingBottom: 32,
     borderTopLeftRadius: 20,
     borderTopRightRadius: 20,
   },

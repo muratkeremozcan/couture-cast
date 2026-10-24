@@ -2,7 +2,6 @@ import React, { useCallback, useEffect, useRef, useState } from 'react'
 import {
   AccessibilityInfo,
   ActivityIndicator,
-  Modal,
   Platform,
   ScrollView,
   StyleSheet,
@@ -17,6 +16,7 @@ import {
   type CommunityFeedItem,
   type CommunityReportReason,
 } from '@couture/api-client/contracts/http'
+import { EdgeToEdgeModal, useModalInsets } from '@/components/edge-to-edge-modal'
 import { useHeroPalette } from '@/components/hero/hero-theme'
 import { safeFindNodeHandle } from '@/src/lib/accessibility-focus'
 
@@ -57,6 +57,7 @@ export function CommunityReportModal({
 }: CommunityReportModalProps) {
   const { t } = useTranslation()
   const palette = useHeroPalette()
+  const insets = useModalInsets()
 
   const [selectedReason, setSelectedReason] = useState<CommunityReportReason | null>(null)
   const [details, setDetails] = useState('')
@@ -92,14 +93,19 @@ export function CommunityReportModal({
   const isSubmitDisabled = !selectedReason || isSubmitting
 
   return (
-    <Modal
+    <EdgeToEdgeModal
       visible={visible && !suspended}
-      transparent
       animationType="fade"
       onRequestClose={onClose}
       testID="community-report-modal"
     >
-      <View style={styles.overlay}>
+      <View
+        testID="community-report-modal-scrim"
+        style={[
+          styles.overlay,
+          { paddingTop: 20 + insets.top, paddingBottom: 20 + insets.bottom },
+        ]}
+      >
         <View
           ref={dialogRef}
           accessibilityViewIsModal
@@ -269,7 +275,7 @@ export function CommunityReportModal({
           </View>
         </View>
       </View>
-    </Modal>
+    </EdgeToEdgeModal>
   )
 }
 

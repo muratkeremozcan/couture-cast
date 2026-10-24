@@ -2,7 +2,6 @@
 import React, { useRef } from 'react'
 import {
   AccessibilityInfo,
-  Modal,
   ScrollView,
   StyleSheet,
   Text,
@@ -11,6 +10,7 @@ import {
 } from 'react-native'
 import { useTranslation } from 'react-i18next'
 import type { CommunityReactionSpotlightItem } from '@couture/api-client/contracts/http'
+import { EdgeToEdgeModal, useModalInsets } from '@/components/edge-to-edge-modal'
 import { useHeroPalette } from '@/components/hero/hero-theme'
 import { safeFindNodeHandle } from '@/src/lib/accessibility-focus'
 
@@ -36,6 +36,7 @@ export function CommunitySpotlightDetail({
 }: CommunitySpotlightDetailProps) {
   const { t } = useTranslation()
   const palette = useHeroPalette()
+  const insets = useModalInsets()
   const titleRef = useRef<Text>(null)
   // The sheet stays mounted while it animates away, showing the look it opened.
   const shownRef = useRef<CommunityReactionSpotlightItem | null>(null)
@@ -45,9 +46,8 @@ export function CommunitySpotlightDetail({
   if (!shown) return null
 
   return (
-    <Modal
+    <EdgeToEdgeModal
       visible={item !== null}
-      transparent
       animationType="slide"
       onRequestClose={onClose}
       onDismiss={onDismissed}
@@ -61,7 +61,10 @@ export function CommunitySpotlightDetail({
       <View style={styles.backdrop}>
         <View
           testID="community-spotlight-detail"
-          style={[styles.sheet, { backgroundColor: palette.surface }]}
+          style={[
+            styles.sheet,
+            { backgroundColor: palette.surface, paddingBottom: 32 + insets.bottom },
+          ]}
           accessibilityViewIsModal
           accessible={false}
         >
@@ -99,7 +102,7 @@ export function CommunitySpotlightDetail({
           </ScrollView>
         </View>
       </View>
-    </Modal>
+    </EdgeToEdgeModal>
   )
 }
 
@@ -108,7 +111,6 @@ const styles = StyleSheet.create({
   sheet: {
     maxHeight: '90%',
     paddingTop: 16,
-    paddingBottom: 32,
     borderTopLeftRadius: 20,
     borderTopRightRadius: 20,
   },

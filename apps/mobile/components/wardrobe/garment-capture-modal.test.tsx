@@ -4,6 +4,7 @@
 // See _bmad-output/project-knowledge/learning-path-step-by-step.md#step-32-wardrobe-onboarding-and-silhouette-setup
 import React from 'react'
 import type * as ReactNativeModule from 'react-native'
+import type * as EdgeToEdgeTestUtils from '@/src/test-utils/edge-to-edge-modal'
 import { act, fireEvent, render, screen, waitFor } from '@testing-library/react'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { AccessibilityInfo, findNodeHandle, Platform } from 'react-native'
@@ -12,6 +13,13 @@ import { http, HttpResponse } from 'msw'
 import { server } from '@/src/test-utils/msw/server'
 import { setMobileAccessTokenResolver } from '@/src/lib/mobile-auth'
 import { MobileGarmentCaptureModal } from './garment-capture-modal'
+import {
+  EDGE_TO_EDGE_MODAL_PROPS,
+  TEST_SAFE_AREA_INSETS,
+  lastModalProps,
+  paddingBottomOf,
+  paddingTopOf,
+} from '@/src/test-utils/edge-to-edge-modal'
 
 vi.mock('react-i18next', () => ({
   useTranslation: () => ({ t: (key: string) => key }),
@@ -19,8 +27,18 @@ vi.mock('react-i18next', () => ({
 
 const openSettingsMock = vi.hoisted(() => vi.fn())
 
+vi.mock('react-native-safe-area-context', async (importOriginal) => {
+  const actual = await importOriginal<Record<string, unknown>>()
+  const { TEST_SAFE_AREA_INSETS } = await vi.importActual<typeof EdgeToEdgeTestUtils>(
+    '@/src/test-utils/edge-to-edge-modal'
+  )
+  return { ...actual, useSafeAreaInsets: () => TEST_SAFE_AREA_INSETS }
+})
 vi.mock('react-native', async (importOriginal) => {
   const actual = await importOriginal<typeof ReactNativeModule>()
+  const { recordModalProps } = await vi.importActual<typeof EdgeToEdgeTestUtils>(
+    '@/src/test-utils/edge-to-edge-modal'
+  )
   return {
     ...actual,
     AccessibilityInfo: {
@@ -32,8 +50,10 @@ vi.mock('react-native', async (importOriginal) => {
       openSettings: openSettingsMock,
     },
     findNodeHandle: vi.fn(),
-    Modal: ({ children, visible }: { children: React.ReactNode; visible: boolean }) =>
-      visible ? children : null,
+    Modal: recordModalProps(
+      ({ children, visible }: { children: React.ReactNode; visible: boolean }) =>
+        visible ? children : null
+    ),
   }
 })
 
@@ -525,5 +545,19 @@ describe('MobileGarmentCaptureModal', () => {
       />
     )
     expect(AccessibilityInfo.setAccessibilityFocus).toHaveBeenCalledWith(99)
+  })
+})
+
+describe('R52 MobileGarmentCaptureModal over the system bars', () => {
+  it('covers the status and navigation bars as an opaque page clear of both', () => {
+    renderModal()
+    expect(lastModalProps()).toMatchObject({
+      ...EDGE_TO_EDGE_MODAL_PROPS,
+      transparent: false,
+      visible: true,
+    })
+    const page = screen.getByTestId('garment-capture-modal')
+    expect(paddingTopOf(page)).toBe(64)
+    expect(paddingBottomOf(page)).toBe(20 + TEST_SAFE_AREA_INSETS.bottom)
   })
 })

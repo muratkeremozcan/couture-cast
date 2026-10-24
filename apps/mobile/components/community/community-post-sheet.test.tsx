@@ -8,6 +8,7 @@
 import React, { createElement, useState } from 'react'
 import { run as runAxe } from 'axe-core'
 import type * as ReactNativeModule from 'react-native'
+import type * as EdgeToEdgeTestUtils from '@/src/test-utils/edge-to-edge-modal'
 import { delay, http, HttpResponse } from 'msw'
 import {
   configure,
@@ -71,8 +72,18 @@ const touchableSpy = vi.hoisted(() => ({
   props: new Map<string, Record<string, unknown>>(),
   createElement: null as unknown as typeof createElement,
 }))
+vi.mock('react-native-safe-area-context', async (importOriginal) => {
+  const actual = await importOriginal<Record<string, unknown>>()
+  const { TEST_SAFE_AREA_INSETS } = await vi.importActual<typeof EdgeToEdgeTestUtils>(
+    '@/src/test-utils/edge-to-edge-modal'
+  )
+  return { ...actual, useSafeAreaInsets: () => TEST_SAFE_AREA_INSETS }
+})
 vi.mock('react-native', async (importOriginal) => {
   const actual = await importOriginal<typeof ReactNativeModule>()
+  const { recordModalProps } = await vi.importActual<typeof EdgeToEdgeTestUtils>(
+    '@/src/test-utils/edge-to-edge-modal'
+  )
   const RealTouchable = actual.TouchableOpacity
   function RecordingTouchable(props: Record<string, unknown>) {
     if (typeof props.testID === 'string') {
@@ -82,6 +93,7 @@ vi.mock('react-native', async (importOriginal) => {
   }
   return {
     ...actual,
+    Modal: recordModalProps(actual.Modal),
     // `Platform.OS` is redefined per test because the sheet's focus move only
     // runs off web, and react-native-web's own `findNodeHandle` throws
     // unconditionally. Same shape as `wardrobe/capsule-builder-modal.test.tsx`.
@@ -114,6 +126,12 @@ import {
   communityErrorTranslation,
   useResolvedCommunityLocale,
 } from './community-post-sheet'
+import {
+  EDGE_TO_EDGE_MODAL_PROPS,
+  TEST_SAFE_AREA_INSETS,
+  lastModalProps,
+  paddingBottomOf,
+} from '@/src/test-utils/edge-to-edge-modal'
 
 const AXE_TAGS = ['wcag2a', 'wcag2aa', 'wcag21a', 'wcag21aa']
 const UPLOAD_URL = 'https://mock-upload.test/upload'
@@ -721,5 +739,19 @@ describe('CommunityPostSheet (Story 6.1)', () => {
         node.getAttribute('aria-checked')
       )
     ).toEqual(['false', 'false'])
+  })
+})
+
+describe('R52 CommunityPostSheet over the system bars', () => {
+  it('covers the status and navigation bars and keeps the sheet above the gesture bar', () => {
+    renderSheet()
+    expect(lastModalProps()).toMatchObject({
+      ...EDGE_TO_EDGE_MODAL_PROPS,
+      transparent: true,
+      visible: true,
+    })
+    expect(paddingBottomOf(screen.getByTestId('community-post-sheet-content'))).toBe(
+      24 + TEST_SAFE_AREA_INSETS.bottom
+    )
   })
 })

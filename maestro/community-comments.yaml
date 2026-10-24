@@ -70,6 +70,10 @@ tags:
 - tapOn:
     id: 'community-card-comments-lookbook-5'
 - assertVisible: 'Close comments'
+# R52: the scrim covers the tab bar and the navigation bar, and the sheet ends above
+# the gesture bar. The keyboard-up and dismissed shots below show the same sheet.
+- takeScreenshot:
+    path: maestro/artifacts/community-comments-sheet-open
 - scrollUntilVisible:
     element:
       id: 'comment-reply-.*'

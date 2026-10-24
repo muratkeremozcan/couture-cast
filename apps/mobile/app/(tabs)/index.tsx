@@ -11,7 +11,6 @@ import {
   Pressable,
   StyleSheet,
   ScrollView,
-  Modal,
   Platform,
   View as NativeView,
 } from 'react-native'
@@ -65,6 +64,7 @@ import {
   garmentTitle,
   parseGarmentId,
 } from '@/components/hero/garment-item-tile'
+import { EdgeToEdgeModal, useModalInsets } from '@/components/edge-to-edge-modal'
 import { useHeroPalette } from '@/components/hero/hero-theme'
 import { MobileChipNavigation, type ChipCategory } from '@/components/chip-navigation'
 import { useAccessibilityAnnouncer } from '@/src/hooks/use-accessibility-announcer'
@@ -216,6 +216,7 @@ export default function TabOneScreen() {
     resolveSupportedLocale(i18n.resolvedLanguage ?? i18n.language) ??
     defaultSupportedLocale
   const palette = useHeroPalette()
+  const modalInsets = useModalInsets()
   const { announce } = useAccessibilityAnnouncer()
   const reduceMotion = useReducedMotion()
   const latestLoadId = useRef(0)
@@ -846,9 +847,8 @@ export default function TabOneScreen() {
       </ScrollView>
 
       {/* Garment Swap Modal */}
-      <Modal
+      <EdgeToEdgeModal
         visible={isSwapModalVisible}
-        transparent={true}
         animationType={reduceMotion ? 'none' : 'slide'}
         onShow={focusFirstSwapOption}
         onRequestClose={closeSwapModal}
@@ -859,7 +859,7 @@ export default function TabOneScreen() {
             const localizedCategory = t(categoryKey, { defaultValue: swapCategory })
             return (
               <View
-                style={styles.modalContent}
+                style={[styles.modalContent, { paddingBottom: 20 + modalInsets.bottom }]}
                 testID="garment-swap-modal"
                 accessibilityViewIsModal
                 role="dialog"
@@ -930,7 +930,7 @@ export default function TabOneScreen() {
             )
           })()}
         </View>
-      </Modal>
+      </EdgeToEdgeModal>
     </SafeAreaView>
   )
 }
@@ -1019,7 +1019,6 @@ const styles = StyleSheet.create({
     borderTopLeftRadius: 16,
     borderTopRightRadius: 16,
     paddingTop: 20,
-    paddingBottom: Platform.OS === 'ios' ? 34 : 20,
     paddingHorizontal: 16,
     maxHeight: '60%',
   },

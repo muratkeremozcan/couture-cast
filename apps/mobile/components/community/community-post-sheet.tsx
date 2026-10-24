@@ -3,7 +3,6 @@ import {
   AccessibilityInfo,
   ActivityIndicator,
   Image,
-  Modal,
   Platform,
   ScrollView,
   StyleSheet,
@@ -32,6 +31,7 @@ import {
   type CommunityPhotoAsset,
   type CommunityPublishState,
 } from '@/src/lib/community'
+import { EdgeToEdgeModal, useModalInsets } from '@/components/edge-to-edge-modal'
 import { useHeroPalette } from '@/components/hero/hero-theme'
 import { safeFindNodeHandle } from '@/src/lib/accessibility-focus'
 
@@ -262,6 +262,7 @@ export function CommunityPostSheet({
 }: CommunityPostSheetProps) {
   const { t, i18n } = useTranslation()
   const palette = useHeroPalette()
+  const insets = useModalInsets()
   // Multilingual moderation screening needs the reader's real locale; the first
   // draft hardcoded 'en-US' and screened every non-English caption as English.
   const locale = useResolvedCommunityLocale(i18n.language)
@@ -497,10 +498,9 @@ export function CommunityPostSheet({
       : t('community.compose.uploading')
 
   return (
-    <Modal
+    <EdgeToEdgeModal
       testID="community-post-sheet"
       visible={visible && !suspended}
-      transparent
       animationType="slide"
       onRequestClose={handleClose}
     >
@@ -512,7 +512,11 @@ export function CommunityPostSheet({
           accessibilityLabel={t('community.compose.title')}
           style={[
             styles.sheet,
-            { backgroundColor: palette.surface, borderColor: palette.divider },
+            {
+              backgroundColor: palette.surface,
+              borderColor: palette.divider,
+              paddingBottom: 24 + insets.bottom,
+            },
           ]}
         >
           <View style={[styles.header, { borderBottomColor: palette.divider }]}>
@@ -683,7 +687,7 @@ export function CommunityPostSheet({
           </View>
         </View>
       </View>
-    </Modal>
+    </EdgeToEdgeModal>
   )
 }
 
@@ -697,7 +701,6 @@ const styles = StyleSheet.create({
     borderTopLeftRadius: 20,
     borderTopRightRadius: 20,
     maxHeight: '90%',
-    paddingBottom: 24,
     borderWidth: 1,
   },
   header: {

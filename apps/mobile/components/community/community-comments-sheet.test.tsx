@@ -1,9 +1,10 @@
-import React from 'react'
+import React, { createElement } from 'react'
 import { act, fireEvent, render, screen, waitFor, within } from '@testing-library/react'
 import { http, HttpResponse } from 'msw'
 import { beforeAll, beforeEach, afterEach, describe, expect, it, vi } from 'vitest'
 import { page as browserPage } from 'vitest/browser'
 import * as ReactNative from 'react-native'
+import type * as EdgeToEdgeTestUtils from '@/src/test-utils/edge-to-edge-modal'
 import { CommunityCommentsState } from '@couture/api-client'
 import type { CommunityCommentSubmission } from '@couture/api-client/contracts/http'
 import {
@@ -24,6 +25,12 @@ import i18n, { initI18n } from '@/src/lib/i18n'
 import { server } from '@/src/test-utils/msw/server'
 import { CommunityCommentDrafts } from '@/src/features/community/community-comment-drafts'
 import { press } from '@/src/test-utils/press'
+import {
+  EDGE_TO_EDGE_MODAL_PROPS,
+  TEST_SAFE_AREA_INSETS,
+  lastModalProps,
+  paddingBottomOf,
+} from '@/src/test-utils/edge-to-edge-modal'
 import { CommunityCommentsSheet } from './community-comments-sheet'
 
 /**
@@ -67,10 +74,29 @@ const keyboard = vi.hoisted(() => {
   }
 })
 
+/** The props each KeyboardAvoidingView render received, newest last (R52). */
+const keyboardAvoider = vi.hoisted(() => {
+  const renders: { enabled?: boolean }[] = []
+  return {
+    renders,
+    record:
+      (Real: React.ComponentType<Record<string, unknown>>) =>
+      (props: Record<string, unknown>) => {
+        renders.push(props)
+        return createElement(Real, props)
+      },
+  }
+})
+
 vi.mock('react-native', async (original) => {
   const actual = await original<typeof ReactNative>()
+  const { recordModalProps } = await vi.importActual<typeof EdgeToEdgeTestUtils>(
+    '@/src/test-utils/edge-to-edge-modal'
+  )
   return {
     ...actual,
+    Modal: recordModalProps(actual.Modal),
+    KeyboardAvoidingView: keyboardAvoider.record(actual.KeyboardAvoidingView),
     Keyboard: {
       ...actual.Keyboard,
       isVisible: () => false,
@@ -82,6 +108,13 @@ vi.mock('react-native', async (original) => {
       setAccessibilityFocus: vi.fn(),
     },
   }
+})
+vi.mock('react-native-safe-area-context', async (original) => {
+  const actual = await original<Record<string, unknown>>()
+  const { TEST_SAFE_AREA_INSETS } = await vi.importActual<typeof EdgeToEdgeTestUtils>(
+    '@/src/test-utils/edge-to-edge-modal'
+  )
+  return { ...actual, useSafeAreaInsets: () => TEST_SAFE_AREA_INSETS }
 })
 const { announceForAccessibility, setAccessibilityFocus } = ReactNative.AccessibilityInfo
 const root = createCommunityComment({ id: 'root', replyCount: 1 })
@@ -1077,5 +1110,76 @@ describe('R51 comments sheet with the keyboard open', () => {
     press(screen.getByRole('button', { name: 'Send comment' }))
     expect(thread()).toBeVisible()
     await screen.findByTestId('comment-submission-private-r51')
+  })
+})
+
+/**
+ * R52: the sheet's modal window stopped at the Android status and navigation bars, so the
+ * tab bar showed undimmed below the scrim. It now covers both bars, and the sheet keeps
+ * its content above the gesture bar while the keyboard is down.
+ */
+describe('R52 comments sheet over the system bars', () => {
+  const keyboardShown = () => act(() => keyboard.emit('keyboardDidShow'))
+  const keyboardHidden = () => act(() => keyboard.emit('keyboardDidHide'))
+
+  it('covers the status and navigation bars with a transparent scrim', async () => {
+    renderSheet()
+    await screen.findByTestId('comment-root')
+    expect(lastModalProps()).toMatchObject({
+      ...EDGE_TO_EDGE_MODAL_PROPS,
+      transparent: true,
+      visible: true,
+    })
+  })
+
+  it('keeps the sheet above the gesture bar until the keyboard covers it', async () => {
+    renderSheet()
+    await screen.findByTestId('comment-root')
+    const sheetView = screen.getByTestId('comments-sheet')
+    expect(paddingBottomOf(sheetView)).toBe(32 + TEST_SAFE_AREA_INSETS.bottom)
+    keyboardShown()
+    expect(paddingBottomOf(sheetView)).toBe(32)
+    expect(screen.getByTestId('comments-thread')).not.toBeVisible()
+    keyboardHidden()
+    expect(paddingBottomOf(sheetView)).toBe(32 + TEST_SAFE_AREA_INSETS.bottom)
+    expect(screen.getByTestId('comments-thread')).toBeVisible()
+  })
+
+  it('dims the whole screen from its own layer, whatever height the keyboard view takes', async () => {
+    renderSheet()
+    await screen.findByTestId('comment-root')
+    const scrim = screen.getByTestId('comments-scrim')
+    expect(getComputedStyle(scrim).backgroundColor).toBe('rgba(0, 0, 0, 0.5)')
+    const avoider = screen.getByTestId('comments-sheet').parentElement as Element
+    expect(scrim.contains(avoider)).toBe(true)
+    expect(getComputedStyle(avoider).backgroundColor).toBe('rgba(0, 0, 0, 0)')
+  })
+
+  describe.each([
+    ['android', [false, true, false]],
+    ['ios', [true, true, true]],
+  ] as const)('on %s', (os, [closed, open, reclosed]) => {
+    const latest = () => keyboardAvoider.renders.at(-1)?.enabled
+    beforeEach(() => {
+      Object.defineProperty(ReactNative.Platform, 'OS', { value: os, configurable: true })
+    })
+    afterEach(() => {
+      Object.defineProperty(ReactNative.Platform, 'OS', {
+        value: 'web',
+        configurable: true,
+      })
+    })
+
+    it('lets the keyboard view resize only while it has a keyboard to avoid', async () => {
+      renderSheet()
+      await screen.findByTestId('comment-root')
+      const shown = os === 'ios' ? 'keyboardWillShow' : 'keyboardDidShow'
+      const hidden = os === 'ios' ? 'keyboardWillHide' : 'keyboardDidHide'
+      expect(latest()).toBe(closed)
+      act(() => keyboard.emit(shown))
+      expect(latest()).toBe(open)
+      act(() => keyboard.emit(hidden))
+      expect(latest()).toBe(reclosed)
+    })
   })
 })

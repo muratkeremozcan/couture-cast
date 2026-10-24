@@ -3,6 +3,7 @@
 import React, { createElement, useState } from 'react'
 import { run as runAxe } from 'axe-core'
 import type * as ReactNativeModule from 'react-native'
+import type * as EdgeToEdgeTestUtils from '@/src/test-utils/edge-to-edge-modal'
 import { fireEvent, render, screen, waitFor } from '@testing-library/react'
 import { afterEach, beforeAll, beforeEach, describe, expect, it, vi } from 'vitest'
 import {
@@ -24,8 +25,18 @@ const touchableSpy = vi.hoisted(() => ({
   props: new Map<string, Record<string, unknown>>(),
   createElement: null as unknown as typeof createElement,
 }))
+vi.mock('react-native-safe-area-context', async (importOriginal) => {
+  const actual = await importOriginal<Record<string, unknown>>()
+  const { TEST_SAFE_AREA_INSETS } = await vi.importActual<typeof EdgeToEdgeTestUtils>(
+    '@/src/test-utils/edge-to-edge-modal'
+  )
+  return { ...actual, useSafeAreaInsets: () => TEST_SAFE_AREA_INSETS }
+})
 vi.mock('react-native', async (importOriginal) => {
   const actual = await importOriginal<typeof ReactNativeModule>()
+  const { recordModalProps } = await vi.importActual<typeof EdgeToEdgeTestUtils>(
+    '@/src/test-utils/edge-to-edge-modal'
+  )
   const RealTouchable = actual.TouchableOpacity
   function RecordingTouchable(props: Record<string, unknown>) {
     if (typeof props.testID === 'string') {
@@ -35,6 +46,7 @@ vi.mock('react-native', async (importOriginal) => {
   }
   return {
     ...actual,
+    Modal: recordModalProps(actual.Modal),
     // `Platform.OS` is redefined per test because the dialog's focus move only
     // runs off web, and react-native-web's own `findNodeHandle` throws
     // unconditionally. Same shape as `wardrobe/capsule-builder-modal.test.tsx`.
@@ -55,6 +67,13 @@ import enUS from '@/assets/locales/en-US.json'
 import i18n, { initI18n } from '@/src/lib/i18n'
 import { press } from '@/src/test-utils/press'
 import { CommunityReportModal } from './community-report-modal'
+import {
+  EDGE_TO_EDGE_MODAL_PROPS,
+  TEST_SAFE_AREA_INSETS,
+  lastModalProps,
+  paddingBottomOf,
+  paddingTopOf,
+} from '@/src/test-utils/edge-to-edge-modal'
 
 const AXE_TAGS = ['wcag2a', 'wcag2aa', 'wcag21a', 'wcag21aa']
 
@@ -336,5 +355,19 @@ describe('CommunityReportModal (Story 6.1)', () => {
         reason === 'violence' ? 'true' : 'false'
       )
     )
+  })
+})
+
+describe('R52 CommunityReportModal over the system bars', () => {
+  it('covers the status and navigation bars and keeps the dialog clear of both', () => {
+    renderModal()
+    expect(lastModalProps()).toMatchObject({
+      ...EDGE_TO_EDGE_MODAL_PROPS,
+      transparent: true,
+      visible: true,
+    })
+    const scrim = screen.getByTestId('community-report-modal-scrim')
+    expect(paddingTopOf(scrim)).toBe(20 + TEST_SAFE_AREA_INSETS.top)
+    expect(paddingBottomOf(scrim)).toBe(20 + TEST_SAFE_AREA_INSETS.bottom)
   })
 })
