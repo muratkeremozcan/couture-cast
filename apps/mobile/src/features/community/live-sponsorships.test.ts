@@ -100,6 +100,22 @@ describe('LiveCommunitySponsorships (Story 6.7b)', () => {
     expect(ledger.apply(post()).sponsorship).toEqual(BLOCK)
   })
 
+  it('6.7b-MOB-049 a newer read repeating the same block still outranks a read that started before it', () => {
+    const ledger = new LiveCommunitySponsorships()
+    const first = ledger.begin()
+    const middle = ledger.begin()
+    const last = ledger.begin()
+
+    ledger.record([post({ sponsorship: BLOCK })], first)
+    // The same block again, from the newest read: nothing changes on screen, but
+    // the recorded answer now dates from `last`.
+    ledger.record([post({ sponsorship: { ...BLOCK } })], last)
+    // The middle read started before `last`, so its absence is stale.
+    ledger.record([post()], middle)
+
+    expect(ledger.apply(post()).sponsorship).toEqual(BLOCK)
+  })
+
   it('6.7b-MOB-048 a read started for the previous member records nothing after clear', () => {
     const ledger = new LiveCommunitySponsorships()
     const previousMember = ledger.begin()

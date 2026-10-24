@@ -41,18 +41,34 @@ vi.mock('expo-image-manipulator', async () => {
     SaveFormat: { JPEG: 'jpeg' },
   }
 })
-vi.mock('expo-file-system', () => ({
-  File: class {
-    uri: string
-    constructor(uri: string) {
-      this.uri = uri
-    }
-    bytes() {
-      return Promise.resolve(new Uint8Array([1, 2, 3, 4]))
-    }
-  },
-  Paths: { cache: 'file:///cache/' },
-}))
+vi.mock('expo-file-system', async () => {
+  const { nativeStorageMocks } = await import('../test-utils/persisted-writes.js')
+  return {
+    File: class {
+      uri: string
+      constructor(uri: string) {
+        this.uri = uri
+      }
+      bytes() {
+        return Promise.resolve(new Uint8Array([1, 2, 3, 4]))
+      }
+      write(content: unknown) {
+        return nativeStorageMocks.fileWrite(this.uri, content)
+      }
+    },
+    Paths: { cache: 'file:///cache/' },
+  }
+})
+// Story 6.7b: the remaining device storage modules, recorded so the sponsored
+// cases can prove no block is ever persisted.
+vi.mock('expo-file-system/legacy', async () => {
+  const { nativeStorageMocks } = await import('../test-utils/persisted-writes.js')
+  return nativeStorageMocks.legacyFileSystem
+})
+vi.mock('expo-secure-store', async () => {
+  const { nativeStorageMocks } = await import('../test-utils/persisted-writes.js')
+  return nativeStorageMocks.secureStore
+})
 vi.mock('expo-crypto', () => ({
   digest: vi.fn().mockResolvedValue(new Uint8Array(32).buffer),
   CryptoDigestAlgorithm: { SHA256: 'SHA-256' },

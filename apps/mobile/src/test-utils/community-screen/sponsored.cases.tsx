@@ -6,16 +6,22 @@ import { feedJson, feedUrls, item, serveFeed, setMockParams } from './harness'
 import { mockCapture, refreshEvents, webBrowser } from './mock-state'
 import { screen, waitFor, within } from '@testing-library/react'
 import { http, HttpResponse } from 'msw'
+import { userEvent as browserUser } from 'vitest/browser'
 import { render } from 'vitest-browser-react'
 import { act } from 'react'
 import { expect, it, vi } from 'vitest'
 import { CommunitySyncState } from '@couture/api-client'
 import type { CommunitySponsorship } from '@couture/api-client/contracts/http'
 import { CommunityScreen } from '@/src/features/community/community-screen'
+import { getCommunityPostFromMobile } from '@/src/lib/community'
 import { press } from '@/src/test-utils/press'
 import { server } from '@/src/test-utils/msw/server'
 import { mockAffiliateRedirectUrl } from '@/src/test-utils/msw/handlers'
 import { screenFocus } from '@/src/test-utils/focus-effect'
+import {
+  expectNoSponsorshipPersisted,
+  recordPersistedWrites,
+} from '@/src/test-utils/persisted-writes'
 
 const SPONSORSHIP: CommunitySponsorship = {
   partnerId: 'atelier-north',
@@ -119,9 +125,10 @@ const shown = () =>
     .filter(([event]) => event === 'affiliate_cta_shown')
     .map(([, properties]) => properties as Record<string, unknown>)
 
+// The CTA is activated with a real pointer click (Playwright, hit-tested at the
+// element's centre), so a control laid over the Shop row would take the tap.
 export function registerCommunitySponsoredCases() {
   it('6.7b-MOB-050 shows Partnered and the CTA on the sponsored feed card only', async () => {
-    const bodies = serveClicks()
     serveFeed(() =>
       feedJson({
         items: [
@@ -142,20 +149,28 @@ export function registerCommunitySponsoredCases() {
     expect(sponsored.getAttribute('aria-label')).toBe(
       'Look by Style Explorer A1B2. Partnered with Atelier North'
     )
+    expect(within(sponsored).getByTestId('community-card-shop-post-a').textContent).toBe(
+      'Shop this look at Atelier North'
+    )
     expect(screen.queryByTestId('community-card-partnered-post-b')).toBeNull()
     expect(screen.queryByTestId('community-card-shop-post-b')).toBeNull()
-    await waitFor(() =>
-      expect(shown()).toEqual([
-        {
-          partner_id: 'atelier-north',
-          offer_id: 'offer-coat',
-          surface: 'community_feed',
-          locale_region: 'US',
-        },
-      ])
+  })
+
+  it('6.7b-MOB-059 a click on the feed card mints community_feed, then opens the in-app browser', async () => {
+    const bodies = serveClicks()
+    serveFeed(() =>
+      feedJson({
+        items: [
+          item({ id: 'post-a', sponsorship: SPONSORSHIP }),
+          item({ id: 'post-b', caption: 'Plain look' }),
+        ],
+      })
     )
 
-    press(within(sponsored).getByTestId('community-card-shop-post-a'))
+    await render(<CommunityScreen />)
+
+    const sponsored = await screen.findByTestId('community-post-card-post-a')
+    await browserUser.click(within(sponsored).getByTestId('community-card-shop-post-a'))
 
     await waitFor(() =>
       expect(webBrowser.openBrowserAsync).toHaveBeenCalledWith(mockAffiliateRedirectUrl)
@@ -165,6 +180,39 @@ export function registerCommunitySponsoredCases() {
     ])
   })
 
+  it('6.7b-MOB-060 persists no block from the feed, the deep-link card, the spotlight or its detail', async () => {
+    // Structural guard: no mobile code keeps a community payload, so nothing can
+    // render a block from a copy that outlived its live read.
+    const writes = recordPersistedWrites()
+    const bodies = serveClicks()
+    setMockParams({ source: 'notification', type: 'community', cardId: 'post-z' })
+    server.use(
+      http.get('*/api/v1/community/posts/post-z', () =>
+        HttpResponse.json({ data: item({ id: 'post-z', sponsorship: SPONSORSHIP }) })
+      )
+    )
+    serveFeed(() =>
+      feedJson({ items: [item({ id: 'post-a', sponsorship: SPONSORSHIP })] })
+    )
+    serveSponsoredSpotlight()
+
+    await render(<CommunityScreen />)
+
+    const target = await screen.findByTestId('highlighted-community-card-post-z')
+    await browserUser.click(within(target).getByTestId('community-card-shop-post-z'))
+    await browserUser.click(await screen.findByTestId('community-card-shop-post-a'))
+    const moduleItem = await screen.findByTestId('community-spotlight-item-spot-1')
+    await browserUser.click(within(moduleItem).getByTestId('community-card-shop-spot-1'))
+    await browserUser.click(within(moduleItem).getByTestId('community-card-open-spot-1'))
+    await screen.findByTestId('community-spotlight-detail-title')
+    const copies = await screen.findAllByTestId('community-card-shop-spot-1')
+    await browserUser.click(copies.find((copy) => !moduleItem.contains(copy))!)
+    await waitFor(() => expect(bodies).toHaveLength(4))
+    await waitFor(() => expect(webBrowser.openBrowserAsync).toHaveBeenCalledTimes(4))
+
+    expectNoSponsorshipPersisted(writes(), SPONSORSHIP)
+  })
+
   it('6.7b-MOB-051 reports community_spotlight from the module card and its detail', async () => {
     const bodies = serveClicks()
     serveSponsoredSpotlight()
@@ -172,16 +220,16 @@ export function registerCommunitySponsoredCases() {
     await render(<CommunityScreen />)
 
     const moduleItem = await screen.findByTestId('community-spotlight-item-spot-1')
-    press(within(moduleItem).getByTestId('community-card-shop-spot-1'))
+    await browserUser.click(within(moduleItem).getByTestId('community-card-shop-spot-1'))
     await waitFor(() => expect(bodies).toHaveLength(1))
 
-    press(within(moduleItem).getByTestId('community-card-open-spot-1'))
+    await browserUser.click(within(moduleItem).getByTestId('community-card-open-spot-1'))
     await screen.findByTestId('community-spotlight-detail-title')
     const copies = await screen.findAllByTestId('community-card-shop-spot-1')
     expect(copies).toHaveLength(2)
     const detailCopy = copies.find((copy) => !moduleItem.contains(copy))
     expect(detailCopy).toBeDefined()
-    press(detailCopy as HTMLElement)
+    await browserUser.click(detailCopy as HTMLElement)
     await waitFor(() => expect(bodies).toHaveLength(2))
 
     expect(bodies).toEqual([
@@ -224,7 +272,7 @@ export function registerCommunitySponsoredCases() {
     expect(
       within(target).getByTestId('community-card-partnered-post-z').textContent
     ).toBe('Partnered')
-    press(within(target).getByTestId('community-card-shop-post-z'))
+    await browserUser.click(within(target).getByTestId('community-card-shop-post-z'))
 
     await waitFor(() =>
       expect(bodies).toEqual([
@@ -240,7 +288,16 @@ export function registerCommunitySponsoredCases() {
 
     await render(<CommunityScreen />)
     await screen.findByTestId('community-card-shop-post-a')
-    await waitFor(() => expect(shown()).toHaveLength(1))
+    await waitFor(() =>
+      expect(shown()).toEqual([
+        {
+          partner_id: 'atelier-north',
+          offer_id: 'offer-coat',
+          surface: 'community_feed',
+          locale_region: 'US',
+        },
+      ])
+    )
 
     act(() => screenFocus.set(false))
     act(() => screenFocus.set(true))
@@ -338,47 +395,74 @@ export function registerCommunitySponsoredCases() {
           if (postReads === 1) {
             await olderHeld
             return HttpResponse.json({
-              data: item({ id: 'post-a', sponsorship: SPONSORSHIP }),
+              data: item({
+                id: 'post-a',
+                caption: 'Older read',
+                sponsorship: SPONSORSHIP,
+              }),
             })
           }
-          return HttpResponse.json({ data: item({ id: 'post-a' }) })
+          // The refresh's re-read of the highlighted post.
+          return HttpResponse.json({
+            data: item({ id: 'post-a', caption: 'Newer read' }),
+          })
         })
       )
       // The newer reads: a pull to refresh started after the older read went
-      // out; the link ended in between, so they carry no block.
-      serveFeed(() => feedJson({ items: [item({ id: 'post-a' })] }))
+      // out; the link ended in between, so they carry no block. Each read has
+      // its own caption, so the screen shows which one it rendered.
+      serveFeed((_url, index) =>
+        feedJson({
+          items: [
+            item({ id: 'post-a', caption: index === 0 ? 'First read' : 'Newer read' }),
+          ],
+        })
+      )
+      // The older read's own promise: it settles once the screen has recorded
+      // its answer, and rejects if the single-post read's 2 s deadline aborted it.
+      const olderAnswer = async () => {
+        const read = vi.mocked(getCommunityPostFromMobile).mock.results[0]!
+          .value as Promise<unknown>
+        await expect(read).resolves.toMatchObject({
+          caption: 'Older read',
+          sponsorship: SPONSORSHIP,
+        })
+      }
 
       await render(<CommunityScreen />)
-      await screen.findByTestId('community-post-card-post-a')
+      await screen.findByText('First read')
       await waitFor(() => expect(postReads).toBe(1))
+      expect(vi.mocked(getCommunityPostFromMobile).mock.calls[0]?.[0]).toBe('post-a')
       await waitFor(() => expect(refreshEvents.onRefresh).toBeTypeOf('function'))
 
       if (!newerFirst) {
         releaseOlder()
-        await screen.findByTestId('community-card-shop-post-a')
+        await act(olderAnswer)
+        const olderCard = await screen.findByTestId('highlighted-community-card-post-a')
+        expect(within(olderCard).getByText('Older read')).toBeInTheDocument()
+        expect(
+          within(olderCard).getByTestId('community-card-shop-post-a')
+        ).toBeInTheDocument()
       }
       // Opening the comments retires the notification intent, so the older read
       // is not re-requested once it lands: its answer is the last word from
       // that call site, and only its start order can say it is stale.
       press(screen.getByTestId('community-card-comments-post-a'))
-      // The single-post read gives up after 2 s, so the refresh's feed read
-      // must land inside that window for the two reads to overlap.
-      const feedReadsBefore = feedUrls.length
       act(() => refreshEvents.onRefresh!())
-      await waitFor(() => expect(feedUrls.length).toBeGreaterThan(feedReadsBefore), {
-        interval: 10,
-      })
-      await act(async () => {
-        await new Promise((resolve) => setTimeout(resolve, 50))
-      })
-      if (newerFirst) releaseOlder()
+      // The refresh's feed read and its re-read of the highlighted post both
+      // landed: the highlighted card shows their caption.
+      const highlighted = await screen.findByTestId('highlighted-community-card-post-a')
+      await within(highlighted).findByText('Newer read')
 
-      // Let every response land, then let any late record reach the cards.
-      await act(async () => {
-        await olderHeld
-        await new Promise((resolve) => setTimeout(resolve, 50))
-      })
-      expect(screen.getByTestId('community-post-card-post-a')).toBeInTheDocument()
+      if (newerFirst) {
+        // Released only now, so the older answer lands last. Awaited inside act,
+        // so whatever its record changed has rendered before the checks below.
+        releaseOlder()
+        await act(olderAnswer)
+      }
+
+      const card = screen.getByTestId('community-post-card-post-a')
+      expect(within(card).getByText('Newer read')).toBeInTheDocument()
       expect(screen.queryByTestId('community-card-shop-post-a')).toBeNull()
       expect(screen.queryByTestId('community-card-partnered-post-a')).toBeNull()
     }

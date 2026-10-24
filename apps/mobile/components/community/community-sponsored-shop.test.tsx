@@ -2,12 +2,15 @@
 // the Home teaser, end to end through the real click boundary. The click is
 // served by MSW, so a 404, a 5xx and a dropped connection each reach the
 // component exactly as the device would see them; only the in-app browser and
-// the analytics client are doubles.
+// the analytics client are doubles. Every activation is a real pointer click
+// (Playwright, hit-tested at the element's centre), so a control laid over the
+// Shop row would take the tap and fail the test.
 import React, { createElement } from 'react'
 import type * as ReactNativeModule from 'react-native'
 import { act, render, screen, waitFor } from '@testing-library/react'
 import { http, HttpResponse } from 'msw'
 import { afterEach, beforeAll, beforeEach, describe, expect, it, vi } from 'vitest'
+import { userEvent } from 'vitest/browser'
 import {
   COMMERCE_SPONSORSHIP_NOT_FOUND_MESSAGE,
   type CommunitySponsoredFeedItem,
@@ -67,7 +70,6 @@ reactRef.createElement = createElement
 
 import { AccessibilityInfo } from 'react-native'
 import i18n, { initI18n } from '@/src/lib/i18n'
-import { press } from '@/src/test-utils/press'
 import { server } from '@/src/test-utils/msw/server'
 import { mockAffiliateRedirectUrl } from '@/src/test-utils/msw/handlers'
 import { setMobileAccessTokenResolver } from '@/src/lib/mobile-auth'
@@ -185,7 +187,7 @@ describe('sponsored community CTA (Story 6.7b)', () => {
       const bodies = serveClicks(minted)
       render(card())
 
-      press(screen.getByTestId('community-card-shop-post-a'))
+      await userEvent.click(screen.getByTestId('community-card-shop-post-a'))
 
       await waitFor(() =>
         expect(openBrowserAsyncMock).toHaveBeenCalledWith(mockAffiliateRedirectUrl)
@@ -202,7 +204,7 @@ describe('sponsored community CTA (Story 6.7b)', () => {
       const bodies = serveClicks(minted)
       render(card({ shopSurface: 'community_spotlight' }))
 
-      press(screen.getByTestId('community-card-shop-post-a'))
+      await userEvent.click(screen.getByTestId('community-card-shop-post-a'))
 
       await waitFor(() => expect(openBrowserAsyncMock).toHaveBeenCalledTimes(1))
       expect(bodies).toEqual([
@@ -238,7 +240,7 @@ describe('sponsored community CTA (Story 6.7b)', () => {
         const button = screen.getByTestId('community-card-shop-post-a')
         button.focus()
 
-        press(button)
+        await userEvent.click(button)
 
         const error = await screen.findByTestId('community-card-shop-error-post-a')
         expect(error.textContent).toBe(
@@ -256,7 +258,7 @@ describe('sponsored community CTA (Story 6.7b)', () => {
         ).toHaveLength(1)
 
         fail = false
-        press(button)
+        await userEvent.click(button)
         await waitFor(() =>
           expect(openBrowserAsyncMock).toHaveBeenCalledWith(mockAffiliateRedirectUrl)
         )
@@ -278,8 +280,7 @@ describe('sponsored community CTA (Story 6.7b)', () => {
       render(card())
       const button = screen.getByTestId('community-card-shop-post-a')
 
-      press(button)
-      press(button)
+      await userEvent.dblClick(button)
 
       await waitFor(() => expect(button.textContent).toBe('Opening partner site'))
       // Busy, the name is the loading state alone; the browser suffix returns
@@ -383,8 +384,7 @@ describe('sponsored community CTA (Story 6.7b)', () => {
   })
 
   describe('Home teaser', () => {
-    it('6.7b-MOB-020 discloses the partner and offers the CTA beside the link', async () => {
-      const bodies = serveClicks(minted)
+    it('6.7b-MOB-020 discloses the partner and offers the CTA beside the link', () => {
       render(teaser(teaserValue(SPONSORSHIP)))
       const link = screen.getByTestId('home-spotlight-teaser-link')
       const partnered = screen.getByTestId('home-spotlight-teaser-partnered')
@@ -410,6 +410,11 @@ describe('sponsored community CTA (Story 6.7b)', () => {
       expect(screen.getByTestId('home-spotlight-teaser-shop-opens').textContent).toBe(
         'Opens in an in-app browser'
       )
+    })
+
+    it('6.7b-MOB-024 records one strict home_teaser shown event for the sponsored teaser', () => {
+      render(teaser(teaserValue(SPONSORSHIP)))
+
       expect(shownEvents()).toEqual([
         [
           'affiliate_cta_shown',
@@ -421,8 +426,14 @@ describe('sponsored community CTA (Story 6.7b)', () => {
           },
         ],
       ])
+    })
 
-      press(button)
+    it('6.7b-MOB-025 a click on the teaser CTA mints home_teaser, then opens the in-app browser', async () => {
+      const bodies = serveClicks(minted)
+      render(teaser(teaserValue(SPONSORSHIP)))
+
+      await userEvent.click(screen.getByTestId('home-spotlight-teaser-shop'))
+
       await waitFor(() =>
         expect(openBrowserAsyncMock).toHaveBeenCalledWith(mockAffiliateRedirectUrl)
       )
@@ -437,7 +448,7 @@ describe('sponsored community CTA (Story 6.7b)', () => {
       const button = screen.getByTestId('home-spotlight-teaser-shop')
       button.focus()
 
-      press(button)
+      await userEvent.click(button)
 
       expect(
         (await screen.findByTestId('home-spotlight-teaser-shop-error')).textContent
@@ -456,7 +467,7 @@ describe('sponsored community CTA (Story 6.7b)', () => {
       render(teaser(teaserValue(SPONSORSHIP)))
       const button = screen.getByTestId('home-spotlight-teaser-shop')
 
-      press(button)
+      await userEvent.click(button)
 
       await waitFor(() => expect(button.textContent).toBe('Opening partner site'))
       expect(button.getAttribute('aria-label')).toBe('Opening partner site')

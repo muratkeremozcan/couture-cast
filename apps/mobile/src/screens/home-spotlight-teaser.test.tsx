@@ -28,12 +28,24 @@ import { IMAGE_LOAD_TIMEOUT_MS } from '@/components/community/community-card'
 
 const routerPush = vi.hoisted(() => vi.fn())
 const capture = vi.hoisted(() => vi.fn())
+const openBrowserAsync = vi.hoisted(() => vi.fn())
 
 vi.mock('expo-router', async () => ({
   useLocalSearchParams: () => ({}),
   useRouter: () => ({ setParams: vi.fn(), push: routerPush }),
   useFocusEffect: (await import('../test-utils/focus-effect.js')).useFocusEffect,
 }))
+vi.mock('expo-web-browser', () => ({ openBrowserAsync }))
+// Story 6.7b: the device storage modules, recorded so a test can prove no
+// sponsorship block is ever persisted.
+vi.mock('expo-file-system/legacy', async () => {
+  const { nativeStorageMocks } = await import('../test-utils/persisted-writes.js')
+  return nativeStorageMocks.legacyFileSystem
+})
+vi.mock('expo-secure-store', async () => {
+  const { nativeStorageMocks } = await import('../test-utils/persisted-writes.js')
+  return nativeStorageMocks.secureStore
+})
 vi.mock('expo-localization', () => ({
   getLocales: () => [{ languageTag: 'en-US', languageCode: 'en', regionCode: 'US' }],
 }))
@@ -61,8 +73,16 @@ vi.mock('@/src/lib/ritual-cache', async (importOriginal) => {
 })
 
 import { screenFocus } from '@/src/test-utils/focus-effect'
+import {
+  expectNoSponsorshipPersisted,
+  recordPersistedWrites,
+} from '@/src/test-utils/persisted-writes'
+import { saveRitualCache } from '@/src/lib/ritual-cache'
 import { server } from '@/src/test-utils/msw/server'
-import { mockRitualResponse } from '@/src/test-utils/msw/handlers'
+import {
+  mockAffiliateRedirectUrl,
+  mockRitualResponse,
+} from '@/src/test-utils/msw/handlers'
 import { noLocationResponse } from '@/src/test-utils/locations'
 import {
   advance,
@@ -604,6 +624,41 @@ describe('6.7 mobile Home spotlight teaser', () => {
     })
   })
 
+  it('6.7b-MOB-068 persists no block from the sponsored teaser, before or after its CTA', async () => {
+    // Structural guard: Home caches the ritual (without its own CTA block) and
+    // nothing else, so the teaser's block never outlives its live read.
+    const writes = recordPersistedWrites()
+    const sponsorship = {
+      partnerId: 'atelier-north',
+      partnerDisplayName: 'Atelier North',
+      offerId: 'offer-coat',
+      offerTitle: 'Wool overcoat',
+    }
+    const { answer } = deferSpotlightReads()
+    setMobileApplicationUserId('member-1')
+    await renderHome()
+    await answer(
+      0,
+      cityPage({ ...spotlightItem('look-1'), sponsorship } as ReturnType<
+        typeof spotlightItem
+      >)
+    )
+    await userEvent.click(await screen.findByTestId('home-spotlight-teaser-shop'))
+    await waitFor(() =>
+      expect(openBrowserAsync).toHaveBeenCalledWith(mockAffiliateRedirectUrl)
+    )
+    // The hero's own ritual cache write went through, so Home did persist.
+    await waitFor(() => expect(saveRitualCache).toHaveBeenCalled())
+
+    expectNoSponsorshipPersisted(
+      [
+        ...writes(),
+        ...vi.mocked(saveRitualCache).mock.calls.map((call) => JSON.stringify(call)),
+      ],
+      sponsorship
+    )
+  })
+
   it('6.7-MOB-019 a 429 Retry-After removes the teaser and defers the next read until it passes', async () => {
     let now = Date.parse('2026-10-23T12:00:00.000Z')
     vi.spyOn(Date, 'now').mockImplementation(() => now)
@@ -731,6 +786,45 @@ describe('6.7 mobile Home spotlight teaser timers', () => {
       expect(reads).toHaveLength(2)
     }
   )
+
+  it('6.7b-MOB-067 a sponsored teaser whose re-read fails leaves with its CTA and records no second impression', async () => {
+    // Nothing on the device keeps a community payload: once the live read fails,
+    // there is no earlier copy for the Shop control to render from.
+    const shown = () =>
+      capture.mock.calls.filter(
+        ([event, properties]) =>
+          event === 'affiliate_cta_shown' &&
+          (properties as { surface?: string }).surface === 'home_teaser'
+      )
+    const { reads } = deferSpotlightReads()
+    fakeClock()
+    setMobileApplicationUserId('member-1')
+    await renderHome()
+    await showTeaser(
+      reads,
+      cityPage({
+        ...spotlightItem('look-1'),
+        sponsorship: {
+          partnerId: 'atelier-north',
+          partnerDisplayName: 'Atelier North',
+          offerId: 'offer-coat',
+          offerTitle: 'Wool overcoat',
+        },
+      } as ReturnType<typeof spotlightItem>)
+    )
+    expect(screen.getByTestId('home-spotlight-teaser-shop')).toBeTruthy()
+    await untilFrame(() => shown().length === 1)
+
+    await advance(SPOTLIGHT_TEASER_REREAD_MS)
+    await untilFrame(() => reads.length === 2)
+    // The device went offline: the re-read never reaches the server.
+    reads[1]!.resolve('network-error')
+
+    await untilFrame(() => teaserNodes().length === 0)
+    expect(screen.queryByTestId('home-spotlight-teaser-shop')).toBeNull()
+    expect(screen.queryByTestId('home-spotlight-teaser-partnered')).toBeNull()
+    expect(shown()).toHaveLength(1)
+  })
 
   it('6.7-MOB-036 a re-read that never answers times out at the client and removes the teaser', async () => {
     const { reads } = deferSpotlightReads()
