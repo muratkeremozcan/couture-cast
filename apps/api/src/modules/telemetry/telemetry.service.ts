@@ -1125,6 +1125,15 @@ const eventBuilders: Partial<
   api_error_occurred: (uid, p, ts) => buildApiErrorOccurred(uid, p, ts),
 }
 
+/** The telemetry row named a user id that has no `User` row. */
+function isTelemetryUserForeignKeyViolation(error: unknown): boolean {
+  return (
+    error instanceof Prisma.PrismaClientKnownRequestError &&
+    error.code === 'P2003' &&
+    JSON.stringify(error.meta ?? {}).includes('telemetry_events_user_id_fkey')
+  )
+}
+
 @Injectable()
 export class TelemetryService {
   private readonly logger = createBaseLogger().child({ feature: 'telemetry' })
@@ -1245,13 +1254,22 @@ export class TelemetryService {
       isPseudonymousEvent && payload ? payload.properties : properties
 
     // 1. Start database persistence asynchronously (without awaiting)
-    const dbPromise = this.prisma.telemetryEvent
-      .create({
+    const persist = (linkedUserId: string | null) =>
+      this.prisma.telemetryEvent.create({
         data: {
-          user_id: isPseudonymousEvent ? null : userId,
+          user_id: linkedUserId,
           event_type: eventType,
           properties: persistedProperties as Prisma.InputJsonValue,
         },
+      })
+    const linkedUserId = isPseudonymousEvent ? null : userId
+    const dbPromise = persist(linkedUserId)
+      .catch((dbError: unknown) => {
+        // An actor with no user row (an erased account whose token is still
+        // valid, a synthetic test token) keeps its event, without the link.
+        if (linkedUserId !== null && isTelemetryUserForeignKeyViolation(dbError))
+          return persist(null)
+        throw dbError
       })
       .catch((dbError: unknown) => {
         // Robustness: Database failures MUST NOT crash the application or prevent PostHog delivery.

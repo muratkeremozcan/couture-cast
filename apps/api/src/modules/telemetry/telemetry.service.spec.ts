@@ -13,7 +13,7 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { createHmac } from 'node:crypto'
 import { TelemetryService } from './telemetry.service'
-import type { PrismaClient } from '@prisma/client'
+import { Prisma, type PrismaClient } from '@prisma/client'
 import { type AnalyticsClient } from '../../analytics/analytics.service'
 
 type CapturedEvent = {
@@ -59,6 +59,44 @@ describe('TelemetryService', () => {
       mockPrisma as unknown as PrismaClient,
       mockAnalyticsClient
     )
+  })
+
+  it('keeps an event whose actor has no user row, without the user link', async () => {
+    telemetryCreate
+      .mockRejectedValueOnce(
+        new Prisma.PrismaClientKnownRequestError('Foreign key constraint violated', {
+          code: 'P2003',
+          clientVersion: 'test',
+          meta: {
+            modelName: 'TelemetryEvent',
+            constraint: 'telemetry_events_user_id_fkey',
+          },
+        })
+      )
+      .mockResolvedValueOnce({ id: 'event-2' })
+
+    await service.captureEvent('erased-user', 'profile_completed', {
+      age: 25,
+      guardianConsentRequired: false,
+    })
+
+    await vi.waitFor(() => expect(telemetryCreate).toHaveBeenCalledTimes(2))
+    const linked = telemetryCreate.mock.calls.map(
+      ([args]) => (args as { data: { user_id: string | null } }).data.user_id
+    )
+    expect(linked).toEqual(['erased-user', null])
+  })
+
+  it('still reports any other persistence failure without a second write', async () => {
+    telemetryCreate.mockRejectedValueOnce(new Error('connection reset'))
+
+    await service.captureEvent('user-1', 'profile_completed', {
+      age: 25,
+      guardianConsentRequired: false,
+    })
+
+    await new Promise((resolve) => setTimeout(resolve, 0))
+    expect(telemetryCreate).toHaveBeenCalledTimes(1)
   })
 
   it('persists events to database and dispatches to PostHog', async () => {
