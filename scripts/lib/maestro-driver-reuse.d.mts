@@ -26,3 +26,18 @@ export declare function withTestOptions(
   args: readonly string[],
   extra: readonly string[]
 ): string[]
+
+export declare function runWithDriverOnDevices<T>(
+  reuse: ReturnType<typeof createMaestroDriverReuse>,
+  platform: 'android' | 'ios',
+  devices: readonly string[],
+  invoke: (driverArgs: string[]) => Promise<T>
+): Promise<T>
+
+export declare function launchShardedSuite(options: {
+  reuse: ReturnType<typeof createMaestroDriverReuse>
+  platform: 'android' | 'ios'
+  devices: readonly string[]
+  args: readonly string[]
+  run: (args: string[]) => Promise<unknown>
+}): Promise<{ refused: string } | { refused?: undefined; exitError?: Error }>

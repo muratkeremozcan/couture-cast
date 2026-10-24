@@ -51,7 +51,11 @@ import {
   removeReportEverywhere,
 } from './lib/maestro-flow-outcome.mjs'
 import { runMobileE2EFlow } from './lib/mobile-e2e-flow-retry.mjs'
-import { createMaestroDriverReuse, withTestOptions } from './lib/maestro-driver-reuse.mjs'
+import {
+  createMaestroDriverReuse,
+  launchShardedSuite,
+  withTestOptions,
+} from './lib/maestro-driver-reuse.mjs'
 import {
   adbDeviceStates,
   captureSlowProbeState,
@@ -3575,16 +3579,28 @@ const runShardedFlows = async (shardedFlows, target, maestroEnv, flowFailures) =
   let maestroExitError
   // Same rule as the serial path: never read an earlier run's report (R28).
   removeMaestroReport(parallelArgs)
-  try {
-    await runMaestroCommand(parallelArgs, {
-      env: maestroEnv,
-      logFile: WRITE_ARTIFACTS
-        ? path.resolve(projectRoot, MAESTRO_ARTIFACT_DIR, 'parallel-suite.log')
-        : undefined,
-    })
-  } catch (error) {
-    maestroExitError = error
+  // Story 6.7 R68: every shard device gets the serial path's driver lifecycle, and the
+  // user-scoped pass that follows reuses what this invocation installed.
+  const launch = await launchShardedSuite({
+    reuse: maestroDriverReuse,
+    platform: target.platform,
+    devices: SHARD_DEVICE_IDS,
+    args: parallelArgs,
+    run: (args) =>
+      runMaestroCommand(args, {
+        env: maestroEnv,
+        logFile: WRITE_ARTIFACTS
+          ? path.resolve(projectRoot, MAESTRO_ARTIFACT_DIR, 'parallel-suite.log')
+          : undefined,
+      }),
+  })
+  if (launch.refused) {
+    // A device that could not be prepared stops the launch; every flow carries why.
+    for (const flowPath of shardedFlows)
+      failFlowWithCause(flowPath, launch.refused, flowFailures)
+    return
   }
+  maestroExitError = launch.exitError
 
   const resolvedReportPath = resolveReportPath(reportPath) ?? reportPath
   const report = readSuiteReport(resolvedReportPath)

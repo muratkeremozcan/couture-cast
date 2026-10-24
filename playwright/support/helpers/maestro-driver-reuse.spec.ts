@@ -8,6 +8,7 @@ import {
   MaestroDriverNotReady,
   createMaestroDriverReuse,
   missingMaestroDriverParts,
+  launchShardedSuite,
   withTestOptions,
 } from '../../../scripts/lib/maestro-driver-reuse.mjs'
 
@@ -176,5 +177,149 @@ describe('Maestro driver reuse (R62)', () => {
       'flow.yaml',
     ])
     expect(withTestOptions(['test', 'flow.yaml'], [])).toEqual(['test', 'flow.yaml'])
+  })
+})
+
+/** Several devices, each with its own driver packages. */
+function fakeFleet(devices: string[]) {
+  const packages = new Map(devices.map((device) => [device, new Set<string>()]))
+  const on = (device: string) => {
+    const set = packages.get(device)
+    if (!set) throw new Error(`unknown device ${device}`)
+    return set
+  }
+  const inspect = vi.fn((device: string) =>
+    Promise.resolve({
+      packagesOutput: [...on(device)].map((name) => `package:${name}\n`).join(''),
+      instrumentationOutput: on(device).has('dev.mobile.maestro.test')
+        ? INSTRUMENTATION
+        : '',
+    })
+  )
+  const uninstall = vi.fn((device: string, name: string) => {
+    on(device).delete(name)
+    return Promise.resolve()
+  })
+  const maestroInstallsOn = (device: string) => {
+    on(device).add('dev.mobile.maestro')
+    on(device).add('dev.mobile.maestro.test')
+  }
+  return { packages, inspect, uninstall, maestroInstallsOn }
+}
+
+describe('Maestro driver lifecycle on the parallel shard path (R68)', () => {
+  const DEVICES = ['emulator-5554', 'emulator-5556']
+  const ARGS = [
+    '--platform',
+    'android',
+    '--udid',
+    DEVICES.join(','),
+    'test',
+    '--shard-split',
+    '2',
+    'maestro/a.yaml',
+    'maestro/b.yaml',
+  ]
+
+  it('R68-01 prepares both shard devices, launches once with the option, and lets the user-scoped flow reuse the driver', async () => {
+    const fleet = fakeFleet(DEVICES)
+    const reuse = createMaestroDriverReuse(fleet)
+    const run = vi.fn((args: string[]) => {
+      // Both devices were cleared before the launch.
+      expect(fleet.uninstall.mock.calls.map(([device]) => device)).toEqual([
+        'emulator-5554',
+        'emulator-5554',
+        'emulator-5556',
+        'emulator-5556',
+      ])
+      expect(args.slice(4, 6)).toEqual(['test', '--no-reinstall-driver'])
+      for (const device of DEVICES) fleet.maestroInstallsOn(device)
+      return Promise.resolve()
+    })
+    expect(
+      await launchShardedSuite({
+        reuse,
+        platform: 'android',
+        devices: DEVICES,
+        args: ARGS,
+        run,
+      })
+    ).toEqual({ exitError: undefined })
+    expect(run).toHaveBeenCalledOnce()
+
+    // The user-scoped pass on device zero checks the driver and reuses it.
+    fleet.uninstall.mockClear()
+    fleet.inspect.mockClear()
+    expect(await reuse.argsFor('android', 'emulator-5554')).toEqual([
+      '--no-reinstall-driver',
+    ])
+    expect(fleet.uninstall).not.toHaveBeenCalled()
+    expect(fleet.inspect).toHaveBeenCalledWith('emulator-5554')
+  })
+
+  it('R68-02 launches nothing when a shard device cannot be prepared, and names it', async () => {
+    const fleet = fakeFleet(DEVICES)
+    fleet.packages.get('emulator-5556')?.add('dev.mobile.maestro')
+    fleet.uninstall.mockImplementation((device: string, name: string) => {
+      if (device === 'emulator-5554') fleet.packages.get(device)?.delete(name)
+      return Promise.reject(new Error('Failure'))
+    })
+    const reuse = createMaestroDriverReuse(fleet)
+    const run = vi.fn(() => Promise.resolve())
+    expect(
+      await launchShardedSuite({
+        reuse,
+        platform: 'android',
+        devices: DEVICES,
+        args: ARGS,
+        run,
+      })
+    ).toEqual({
+      refused:
+        'Maestro driver not ready on emulator-5556: package dev.mobile.maestro could not be removed before a fresh install',
+    })
+    expect(run).not.toHaveBeenCalled()
+    // Nothing ran, so the next flow on device zero starts fresh rather than reusing.
+    fleet.uninstall.mockClear()
+    fleet.uninstall.mockImplementation(() => Promise.resolve())
+    await reuse.argsFor('android', 'emulator-5554')
+    expect(fleet.uninstall).toHaveBeenCalledTimes(2)
+  })
+
+  it("R68-03 returns Maestro's failure and still records every shard device", async () => {
+    const fleet = fakeFleet(DEVICES)
+    const reuse = createMaestroDriverReuse(fleet)
+    const failure = new Error('maestro exited with code 1')
+    const outcome = await launchShardedSuite({
+      reuse,
+      platform: 'android',
+      devices: DEVICES,
+      args: ARGS,
+      run: () => {
+        for (const device of DEVICES) fleet.maestroInstallsOn(device)
+        return Promise.reject(failure)
+      },
+    })
+    expect(outcome).toEqual({ exitError: failure })
+    fleet.uninstall.mockClear()
+    expect(await reuse.argsFor('android', 'emulator-5556')).toEqual([
+      '--no-reinstall-driver',
+    ])
+    expect(fleet.uninstall).not.toHaveBeenCalled()
+  })
+
+  it('R68-04 leaves an iOS shard launch on Maestro defaults', async () => {
+    const fleet = fakeFleet(DEVICES)
+    const reuse = createMaestroDriverReuse(fleet)
+    const run = vi.fn(() => Promise.resolve())
+    await launchShardedSuite({
+      reuse,
+      platform: 'ios',
+      devices: DEVICES,
+      args: ARGS,
+      run,
+    })
+    expect(run).toHaveBeenCalledWith(ARGS)
+    expect(fleet.uninstall).not.toHaveBeenCalled()
   })
 })

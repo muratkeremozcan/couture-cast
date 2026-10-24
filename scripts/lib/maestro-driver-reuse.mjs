@@ -166,3 +166,57 @@ export function withTestOptions(args, extra) {
   if (index === -1) throw new Error('Maestro arguments have no test subcommand.')
   return [...args.slice(0, index + 1), ...extra, ...args.slice(index + 1)]
 }
+
+/**
+ * R68: one Maestro invocation across several devices (the parallel shard path) under
+ * the same lifecycle as a serial flow. Every device is prepared first; if one cannot
+ * be, nothing launches and the refusal names it. Each device the invocation ran on is
+ * recorded, so a later serial flow on it reuses the driver.
+ *
+ * @template T
+ * @param {ReturnType<typeof createMaestroDriverReuse>} reuse
+ * @param {'android' | 'ios'} platform
+ * @param {readonly string[]} devices
+ * @param {(driverArgs: string[]) => Promise<T>} invoke
+ * @returns {Promise<T>}
+ */
+export async function runWithDriverOnDevices(reuse, platform, devices, invoke) {
+  let driverArgs = []
+  for (const device of devices) driverArgs = await reuse.argsFor(platform, device)
+  try {
+    return await invoke(driverArgs)
+  } finally {
+    for (const device of devices) reuse.recordInvocation(platform, device)
+  }
+}
+
+/**
+ * R68: the parallel shard launch as `run-maestro.mjs` performs it. `args` is the
+ * whole `maestro` command line for every device; the driver option goes in after
+ * `test`. A refusal launches nothing and is returned as the cause every flow fails
+ * with; Maestro's own failure is returned for the caller to weigh against the report.
+ *
+ * @param {{
+ *   reuse: ReturnType<typeof createMaestroDriverReuse>
+ *   platform: 'android' | 'ios'
+ *   devices: readonly string[]
+ *   args: readonly string[]
+ *   run: (args: string[]) => Promise<unknown>
+ * }} options
+ * @returns {Promise<{ refused: string } | { refused?: undefined, exitError?: Error }>}
+ */
+export async function launchShardedSuite({ reuse, platform, devices, args, run }) {
+  let exitError
+  try {
+    await runWithDriverOnDevices(reuse, platform, devices, async (driverArgs) => {
+      try {
+        await run(withTestOptions(args, driverArgs))
+      } catch (error) {
+        exitError = error
+      }
+    })
+  } catch (error) {
+    return { refused: error.message }
+  }
+  return { exitError }
+}
