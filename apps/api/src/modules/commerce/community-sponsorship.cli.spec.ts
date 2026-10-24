@@ -1,6 +1,9 @@
 // Story 6.7b: the operator command's targeting and argument rules. Link and
 // end against PostgreSQL run in integration/community-sponsorship-operator.integration.spec.ts.
-import type { PrismaClient } from '@prisma/client'
+import { mkdtempSync, rmSync, writeFileSync } from 'node:fs'
+import { tmpdir } from 'node:os'
+import { join } from 'node:path'
+import { PrismaClient } from '@prisma/client'
 import { describe, expect, it, vi } from 'vitest'
 import {
   EXIT_OK,
@@ -15,6 +18,22 @@ import {
   COMMUNITY_SPONSORSHIP_AGREEMENT_PATTERN,
   normalizeAgreementReference,
 } from './community-sponsorship.constants.js'
+
+// The production deps construct PrismaClient. This stand-in records the
+// options it was built with and answers every transaction with an error, so
+// the command fails after construction without opening a connection.
+vi.mock('@prisma/client', async (importOriginal) => {
+  const actual = await importOriginal<Record<string, unknown>>()
+  return {
+    ...actual,
+    PrismaClient: vi.fn(function PrismaClientStandIn() {
+      return {
+        $transaction: () => Promise.reject(new Error('no database in a unit test')),
+        $disconnect: () => Promise.resolve(),
+      }
+    }),
+  }
+})
 
 const AGREEMENT = 'agr_01JB8Z2Q4M5N6P7R8S9T0V1W2X'
 
@@ -75,7 +94,12 @@ describe('agreement references', () => {
     ['spaces', 'agr_01JB8Z2Q4M5N6 P7R8S9T0V1W2X'],
     ['a URL', 'agr_https://drive.example.com/agreement'],
     ['a bare ULID', '01JB8Z2Q4M5N6P7R8S9T0V1W2X'],
+    // One row per letter Crockford base32 excludes, each a 26-character body
+    // that is valid apart from that letter.
     ['the excluded letter I', 'agr_01JB8Z2Q4M5N6P7R8S9T0V1W2I'],
+    ['the excluded letter L', 'agr_01JB8Z2Q4M5N6P7R8S9T0V1W2L'],
+    ['the excluded letter O', 'agr_01JB8Z2Q4M5N6P7R8S9T0V1W2O'],
+    ['the excluded letter U', 'agr_01JB8Z2Q4M5N6P7R8S9T0V1W2U'],
     ['a short body', 'agr_01JB8Z2Q4M5N6P7R8S9T0V1W2'],
     ['a long body', 'agr_01JB8Z2Q4M5N6P7R8S9T0V1W2XY'],
   ])('6.7b-UNIT-034 rejects %s', (_name, value) => {
@@ -203,5 +227,38 @@ describe('runCommunitySponsorshipCli usage', () => {
     ).resolves.toBe(EXIT_REFUSED)
     expect(remote.err[0]).toContain('cannot be parsed')
     expect(remote.createPrisma).not.toHaveBeenCalled()
+  })
+})
+
+describe('runCommunitySponsorshipCli production deps', () => {
+  it('6.7b-UNIT-042 with no injected deps, PrismaClient is bound to the env-file URL, never the ambient DATABASE_URL', async () => {
+    const envFileUrl = 'postgresql://postgres:postgres@127.0.0.1:1/env_file_target'
+    const directory = mkdtempSync(join(tmpdir(), 'community-sponsorship-cli-'))
+    const envFile = join(directory, '.env.operator')
+    writeFileSync(envFile, `DATABASE_URL="${envFileUrl}"\n`)
+    const previous = process.env.DATABASE_URL
+    process.env.DATABASE_URL = 'postgresql://postgres:postgres@127.0.0.1:2/ambient_target'
+    const stdout = vi.spyOn(process.stdout, 'write').mockImplementation(() => true)
+    const stderr = vi.spyOn(process.stderr, 'write').mockImplementation(() => true)
+    vi.mocked(PrismaClient).mockClear()
+    try {
+      const argv = [...LINK]
+      argv[argv.indexOf('.env.local')] = envFile
+      await expect(runCommunitySponsorshipCli(argv)).resolves.toBe(EXIT_REFUSED)
+
+      expect(vi.mocked(PrismaClient).mock.calls).toEqual([
+        [{ datasources: { db: { url: envFileUrl } } }],
+      ])
+      expect(stderr).toHaveBeenCalledWith(
+        'community:sponsorship failed: no database in a unit test\n'
+      )
+      expect(stdout).not.toHaveBeenCalled()
+    } finally {
+      stdout.mockRestore()
+      stderr.mockRestore()
+      if (previous === undefined) delete process.env.DATABASE_URL
+      else process.env.DATABASE_URL = previous
+      rmSync(directory, { recursive: true, force: true })
+    }
   })
 })

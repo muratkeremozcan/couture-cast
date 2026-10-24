@@ -13,6 +13,7 @@ import {
   communityPostResponseSchema,
   communityReactionFeedResponseSchema,
   communityReactionSpotlightResponseSchema,
+  communityReactionSummarySchema,
   communitySponsoredFeedResponseSchema,
   communitySponsoredPostResponseSchema,
   communitySponsoredSpotlightResponseSchema,
@@ -180,17 +181,26 @@ describe('6.7b opted-in reads carry the block on the sponsored item only', () =>
     await link(sponsoredId)
 
     for (const extra of [{}, REACTIONS]) {
+      // Both paths assert on every route: reactions present only when the
+      // viewer asked for them, absent otherwise, whatever the sponsorship header.
+      const expectReactions = (item: object | undefined) => {
+        if ('x-couture-reactions' in extra) {
+          expect(
+            communityReactionSummarySchema.safeParse(
+              (item as { reactions?: unknown } | undefined)?.reactions
+            ).success
+          ).toBe(true)
+        } else {
+          expect(item && 'reactions' in item).toBe(false)
+        }
+      }
       const feed = await feedThrough(viewer, sponsoredId, { ...SPONSORED, ...extra })
       const feedItem = feed.items.find((item) => item.id === sponsoredId)
       expect(feedItem?.sponsorship).toEqual(expectedBlock())
       expect(
         feed.items.filter((item) => item.id !== sponsoredId && 'sponsorship' in item)
       ).toEqual([])
-      if ('x-couture-reactions' in extra) {
-        expect(feedItem?.reactions).toBeDefined()
-      } else {
-        expect(feedItem && 'reactions' in feedItem).toBe(false)
-      }
+      expectReactions(feedItem)
 
       const post = communitySponsoredPostResponseSchema.parse(
         (
@@ -201,6 +211,7 @@ describe('6.7b opted-in reads carry the block on the sponsored item only', () =>
         ).body
       )
       expect(post.data.sponsorship).toEqual(expectedBlock())
+      expectReactions(post.data)
       const unsponsoredPost = communitySponsoredPostResponseSchema.parse(
         (
           await request(url)
@@ -210,6 +221,7 @@ describe('6.7b opted-in reads carry the block on the sponsored item only', () =>
         ).body
       )
       expect('sponsorship' in unsponsoredPost.data).toBe(false)
+      expectReactions(unsponsoredPost.data)
 
       for (const query of ['limit=12', 'limit=1&surface=home_teaser']) {
         const spotlight = communitySponsoredSpotlightResponseSchema.parse(
@@ -228,9 +240,7 @@ describe('6.7b opted-in reads carry the block on the sponsored item only', () =>
         expect(
           spotlight.data.items.slice(1).filter((item) => 'sponsorship' in item)
         ).toEqual([])
-        if ('x-couture-reactions' in extra) {
-          expect(spotlight.data.items[0]!.reactions).toBeDefined()
-        }
+        for (const item of spotlight.data.items) expectReactions(item)
       }
     }
   })

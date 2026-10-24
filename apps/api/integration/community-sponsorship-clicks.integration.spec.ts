@@ -141,12 +141,19 @@ const clicksFor = (postId: string) =>
   prisma.affiliateClick.findMany({ where: { recommendation_id: postId } })
 
 describe('6.7b community click re-check over real HTTP', () => {
+  // One concern per test, per surface: a failed analytics assertion cannot
+  // hide the replay or the ended-link branch-order proof.
   for (const [index, surface] of COMMUNITY_SURFACES.entries()) {
-    it(`6.7b-INT-30${index + 1} ${surface}: mints, replays inside 60 s, then 404s the replay once the link ends`, async () => {
-      const { postId, linkId } = await sponsoredPost()
-      const body = { offerId: usOffer.id, recommendationId: postId, surface }
+    const id = `6.7b-INT-30${index + 1}`
 
-      const minted = await click(body)
+    it(`${id}a ${surface}: mints one row with scenario 'community' and the post id as recommendation_id`, async () => {
+      const { postId } = await sponsoredPost()
+
+      const minted = await click({
+        offerId: usOffer.id,
+        recommendationId: postId,
+        surface,
+      })
       expect(minted.status).toBe(201)
       const redirectUrl = (minted.body as { data: { redirectUrl: string } }).data
         .redirectUrl
@@ -164,7 +171,14 @@ describe('6.7b community click re-check over real HTTP', () => {
       })
       expect(COMMUNITY_SCENARIO).toBe('community')
       expect(redirectUrl).toContain(rows[0]!.token)
+    })
 
+    it(`${id}b ${surface}: the clicked event and its persisted row carry only partner, offer, surface and region`, async () => {
+      const { postId } = await sponsoredPost()
+
+      expect(
+        (await click({ offerId: usOffer.id, recommendationId: postId, surface })).status
+      ).toBe(201)
       const clicked = analytics.filter((event) => event.event === 'affiliate_cta_clicked')
       expect(clicked).toHaveLength(1)
       expect(clicked[0]!.properties).toEqual({
@@ -190,17 +204,35 @@ describe('6.7b community click re-check over real HTTP', () => {
       for (const identifier of [postId, viewer, author]) {
         expect(serialized).not.toContain(identifier)
       }
+    })
+
+    it(`${id}c ${surface}: a replay inside 60 s answers the same redirect with one row and no second event`, async () => {
+      const { postId } = await sponsoredPost()
+      const body = { offerId: usOffer.id, recommendationId: postId, surface }
+      const clickedEvents = () =>
+        analytics.filter((event) => event.event === 'affiliate_cta_clicked').length
+      const minted = await click(body)
+      expect(minted.status).toBe(201)
+      // The event's own shape is 30Xb's concern; this test only counts.
+      const afterMint = clickedEvents()
 
       const replay = await click(body)
       expect(replay.status).toBe(200)
       expect((replay.body as { data: { redirectUrl: string } }).data.redirectUrl).toBe(
-        redirectUrl
+        (minted.body as { data: { redirectUrl: string } }).data.redirectUrl
       )
       expect(await clicksFor(postId)).toHaveLength(1)
-      expect(
-        analytics.filter((event) => event.event === 'affiliate_cta_clicked')
-      ).toHaveLength(1)
+      expect(clickedEvents()).toBe(afterMint)
+    })
 
+    it(`${id}d ${surface}: once the link ends, a replay inside 60 s is a 404 with no redirect and no new row`, async () => {
+      const { postId, linkId } = await sponsoredPost()
+      const body = { offerId: usOffer.id, recommendationId: postId, surface }
+      expect((await click(body)).status).toBe(201)
+      const [mintedRow] = await clicksFor(postId)
+
+      // The minted row is inside the 60 s dedupe window, so only the
+      // eligibility re-check running first can turn this replay into a 404.
       await endLink(prisma, linkId, adminId)
       const afterEnd = await click(body)
       expect(afterEnd.status).toBe(404)
@@ -208,7 +240,7 @@ describe('6.7b community click re-check over real HTTP', () => {
         message: COMMERCE_SPONSORSHIP_NOT_FOUND_MESSAGE,
       })
       expect(JSON.stringify(afterEnd.body)).not.toContain(SPONSOR_ALLOWED_HOST)
-      expect(await clicksFor(postId)).toHaveLength(1)
+      expect(await clicksFor(postId)).toEqual([mintedRow])
     })
   }
 
@@ -289,6 +321,25 @@ describe('6.7b community click re-check over real HTTP', () => {
         recommendationId: postId,
         surface: 'community_feed',
       })
+      expect(response.status).toBe(404)
+      expect(response.body).toMatchObject({
+        message: COMMERCE_SPONSORSHIP_NOT_FOUND_MESSAGE,
+      })
+      expect(JSON.stringify(response.body)).not.toContain(SPONSOR_ALLOWED_HOST)
+      expect(await clicksFor(postId)).toHaveLength(0)
+      expect(analytics).toEqual([])
+    })
+  }
+
+  for (const [index, status] of (['withdrawn', 'flagged'] as const).entries()) {
+    it(`6.7b-INT-321.${index + 1} the author clicking their own ${status} sponsored post gets 404 with no row`, async () => {
+      // The author can still read their own non-public post (6.7b-INT-210), but
+      // the click re-check admits public posts only, whoever taps.
+      const { postId } = await sponsoredPost(usOffer.id, { status })
+      const response = await click(
+        { offerId: usOffer.id, recommendationId: postId, surface: 'community_feed' },
+        author
+      )
       expect(response.status).toBe(404)
       expect(response.body).toMatchObject({
         message: COMMERCE_SPONSORSHIP_NOT_FOUND_MESSAGE,

@@ -143,6 +143,12 @@ describe('CommunityModule HTTP privacy wiring', () => {
 
   beforeEach(async () => {
     vi.clearAllMocks()
+    // Reset here, not at the end of a test body: a test that opts into a block
+    // and then fails an assertion must not leak that block into the next test.
+    // restoreAllMocks() leaves a vi.fn implementation in place.
+    sponsorships.resolveForPosts
+      .mockReset()
+      .mockImplementation(() => Promise.resolve(new Map()))
     const builder = Test.createTestingModule({ imports: [CommunityModule] })
     // Import CommunityModule unchanged. Only outbound collaborators are replaced;
     // configure(), controller routing, middleware and both guards remain real.
@@ -285,7 +291,11 @@ describe('CommunityModule HTTP privacy wiring', () => {
     expect(
       communitySponsoredPostResponseSchema.parse(detail.body).data.sponsorship
     ).toEqual(block)
-    sponsorships.resolveForPosts.mockImplementation(() => Promise.resolve(new Map()))
+    // Each read resolved the block for the requesting viewer and nobody else.
+    expect(sponsorships.resolveForPosts.mock.calls).toEqual([
+      [expect.objectContaining({ userId: 'viewer-a', postIds: [postId] })],
+      [expect.objectContaining({ userId: 'viewer-a', postIds: [postId] })],
+    ])
   })
 
   it('[P1] preserves the strict legacy detail projection with privacy headers', async () => {

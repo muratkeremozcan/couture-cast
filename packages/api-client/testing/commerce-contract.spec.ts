@@ -720,6 +720,32 @@ describe('analytics property allowlists', () => {
       ).toThrow()
     })
 
+    // The union split must leave both recommendation members intact: a garment
+    // offer clicked on the advisor surface carries a scenario and a
+    // recommendation id exactly like the hero click.
+    it.each(['mobile_hero', 'palette_advisor'] as const)(
+      '6.7b-CON-006 the %s recommendation click parses through the schema and the event wrapper',
+      (surface) => {
+        const properties = { ...validProperties.affiliate_cta_clicked, surface }
+        expect(affiliateCtaClickedPropertiesSchema.parse(properties)).toEqual(properties)
+        expect(
+          trackAffiliateCtaClicked({
+            analyticsSubjectId: 'hmac-subject',
+            partnerId: properties.partner_id,
+            offerId: properties.offer_id,
+            scenario: properties.scenario,
+            surface,
+            localeRegion: properties.locale_region,
+            recommendationId: properties.recommendation_id,
+          })
+        ).toEqual({
+          distinctId: 'hmac-subject',
+          event: 'affiliate_cta_clicked',
+          properties,
+        })
+      }
+    )
+
     it('6.7b-CON-005 the event wrappers refuse identifiers before a payload exists', () => {
       expect(() =>
         trackAffiliateCtaShown(

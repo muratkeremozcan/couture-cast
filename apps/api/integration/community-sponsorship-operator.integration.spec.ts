@@ -321,6 +321,50 @@ describe('6.7b operator link and end', () => {
   })
 })
 
+describe('6.7b operator agreement reference is stored in canonical form', () => {
+  /** The frozen spec's literal pattern, independent of the production constant. */
+  const CANONICAL_AGREEMENT = /^agr_[0-9A-HJKMNP-TV-Z]{26}$/
+
+  it('6.7b-INT-107 a lowercase body with an AGR_ prefix is stored canonical on the link audit and repeated on the end audit', async () => {
+    const postId = await publicPost()
+    const canonical = agreementReference()
+    const typed = `AGR_${canonical.slice(4).toLowerCase()}`
+    expect(typed).not.toBe(canonical)
+
+    expect((await cli(linkArgs(postId, { 'author-agreement': typed }))).code).toBe(
+      EXIT_OK
+    )
+    expect((await cli(endArgs(postId))).code).toBe(EXIT_OK)
+
+    const link = await prisma.communityPostSponsorship.findFirstOrThrow({
+      where: { post_id: postId },
+    })
+    const audits = await prisma.auditLog.findMany({
+      where: {
+        event_type: {
+          in: [COMMUNITY_SPONSORSHIP_LINKED_EVENT, COMMUNITY_SPONSORSHIP_ENDED_EVENT],
+        },
+        event_data: { path: ['sponsorshipId'], equals: link.id },
+      },
+      orderBy: { id: 'asc' },
+    })
+    expect(audits).toHaveLength(2)
+    const agreements = Object.fromEntries(
+      audits.map((row) => [
+        row.event_type,
+        (row.event_data as { authorAgreement?: unknown }).authorAgreement,
+      ])
+    )
+    expect(agreements).toEqual({
+      [COMMUNITY_SPONSORSHIP_LINKED_EVENT]: canonical,
+      [COMMUNITY_SPONSORSHIP_ENDED_EVENT]: canonical,
+    })
+    for (const value of Object.values(agreements)) {
+      expect(value).toMatch(CANONICAL_AGREEMENT)
+    }
+  })
+})
+
 describe('6.7b operator refusals write nothing', () => {
   type Refusal = {
     name: string
@@ -353,44 +397,55 @@ describe('6.7b operator refusals write nothing', () => {
     return email
   }
 
-  const refusals: Refusal[] = [
-    {
-      name: 'an actor with no auth user',
-      args: async () =>
-        linkArgs(await publicPost(), {}, `ghost-${randomUUID()}@sponsorship.test`),
-      stderr: 'actor_auth_user_missing',
-    },
-    {
-      name: 'an actor whose role is not admin',
-      args: async () =>
-        linkArgs(await publicPost(), {}, await authUserWith({ app_role: 'adult' })),
-      stderr: 'actor_not_admin',
-    },
-    {
-      name: 'an actor with no app metadata',
-      args: async () => linkArgs(await publicPost(), {}, await authUserWith(null)),
-      stderr: 'actor_not_admin',
-    },
-    {
-      name: 'an admin with no app user',
-      args: async () =>
-        linkArgs(await publicPost(), {}, await authUserWith({ app_role: 'admin' }, null)),
-      stderr: 'actor_app_user_missing',
-    },
-    {
-      name: 'an admin whose app_user_id names a user with another email',
-      args: async () => {
-        const other = await prisma.user.create({
-          data: { email: `other-${randomUUID()}@sponsorship.test` },
-        })
-        const email = await authUserWith(
-          { app_role: 'admin', app_user_id: other.id },
-          `mirror-${randomUUID()}@sponsorship.test`
-        )
-        return linkArgs(await publicPost(), {}, email)
+  /**
+   * The actor refusals, shared by `link` and `end`: both resolve the actor
+   * through the same admin check, and both must refuse every row here.
+   */
+  const actorRefusals: { name: string; email: () => Promise<string>; stderr: string }[] =
+    [
+      {
+        name: 'an actor with no auth user',
+        email: () => Promise.resolve(`ghost-${randomUUID()}@sponsorship.test`),
+        stderr: 'actor_auth_user_missing',
       },
-      stderr: 'actor_identity_mismatch',
-    },
+      {
+        name: 'an actor whose role is not admin',
+        email: () => authUserWith({ app_role: 'adult' }),
+        stderr: 'actor_not_admin',
+      },
+      {
+        name: 'an actor with no app metadata',
+        email: () => authUserWith(null),
+        stderr: 'actor_not_admin',
+      },
+      {
+        name: 'an admin with no app user',
+        email: () => authUserWith({ app_role: 'admin' }, null),
+        stderr: 'actor_app_user_missing',
+      },
+      {
+        name: 'an admin whose app_user_id names a user with another email',
+        email: async () => {
+          const other = await prisma.user.create({
+            data: { email: `other-${randomUUID()}@sponsorship.test` },
+          })
+          return authUserWith(
+            { app_role: 'admin', app_user_id: other.id },
+            `mirror-${randomUUID()}@sponsorship.test`
+          )
+        },
+        stderr: 'actor_identity_mismatch',
+      },
+    ]
+
+  const refusals: Refusal[] = [
+    ...actorRefusals.map(
+      ({ name, email, stderr }): Refusal => ({
+        name,
+        args: async () => linkArgs(await publicPost(), {}, await email()),
+        stderr,
+      })
+    ),
     {
       name: 'a free-text link reason',
       args: async () =>
@@ -521,6 +576,18 @@ describe('6.7b operator refusals write nothing', () => {
       expect(run.code).toBe(refusal.exit ?? 1)
       expect(run.stdout).toEqual([])
       expect(run.stderr.join('\n')).toContain(refusal.stderr)
+      expect(await snapshot()).toEqual(before)
+    })
+  }
+
+  for (const [index, actor] of actorRefusals.entries()) {
+    it(`6.7b-INT-112.${index + 1} end refuses ${actor.name} and leaves the open link as it was`, async () => {
+      const args = endArgs(await linkedPost(), 'campaign_ended', await actor.email())
+      const before = await snapshot()
+      const run = await cli(args)
+      expect(run.code).toBe(1)
+      expect(run.stdout).toEqual([])
+      expect(run.stderr.join('\n')).toContain(actor.stderr)
       expect(await snapshot()).toEqual(before)
     })
   }

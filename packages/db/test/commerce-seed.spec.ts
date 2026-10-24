@@ -2,6 +2,7 @@
 // See _bmad-output/project-knowledge/learning-path-step-by-step.md#step-33-affiliate-shop-this-look-cta
 import { afterAll, beforeAll, beforeEach, describe, expect, it } from 'vitest'
 import { PrismaClient } from '@prisma/client'
+import { calculateAge } from '@couture/utils'
 
 import {
   PREMIUM_SEED_STRIPE_CUSTOMER_ID,
@@ -213,6 +214,10 @@ describe('commerce catalog seed', () => {
   })
 })
 
+/** Mirrors `AGE_OF_MAJORITY` in apps/api/src/modules/guardian/guardian.service.ts. */
+const AGE_OF_MAJORITY = 18
+const SPONSORSHIP_AGE_REFERENCE_DATE = new Date('2026-10-24T00:00:00.000Z')
+
 describe('community sponsorship seed', () => {
   const ownsSeededPost = { value: false }
 
@@ -283,7 +288,12 @@ describe('community sponsorship seed', () => {
     expect(second).toBe(first)
     const links = await prisma.communityPostSponsorship.findMany({
       where: { post_id: SEEDED_SPONSORED_POST_ID },
-      include: { offer: { select: { garment_category: true, advisor_slot: true } } },
+      include: {
+        offer: { select: { garment_category: true, advisor_slot: true } },
+        post: {
+          select: { user: { select: { profile: { select: { birthdate: true } } } } },
+        },
+      },
     })
     expect(links).toHaveLength(1)
     expect(links[0]).toMatchObject({
@@ -295,6 +305,16 @@ describe('community sponsorship seed', () => {
       offer: { garment_category: 'top', advisor_slot: null },
     })
     expect(links[0]!.starts_at.getTime()).toBeLessThan(Date.now())
+
+    // The spec puts the seeded sponsorship on an adult author's post. The rule
+    // is the operator's: `calculateAge` (the helper behind
+    // `hasReachedAgeOfMajority`) at or above AGE_OF_MAJORITY, here against a
+    // fixed reference date so the check cannot drift with the wall clock.
+    const birthdate = links[0]!.post.user.profile?.birthdate
+    expect(birthdate).toBeInstanceOf(Date)
+    expect(
+      calculateAge(birthdate!, SPONSORSHIP_AGE_REFERENCE_DATE)
+    ).toBeGreaterThanOrEqual(AGE_OF_MAJORITY)
   })
 
   it('6.7b-DB-004 is a no-op without a catalog', async () => {
