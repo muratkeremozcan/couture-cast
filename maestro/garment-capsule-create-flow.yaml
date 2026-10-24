@@ -172,12 +172,29 @@ tags:
       - tapOn:
           id: 'garment-checkbox-${GARMENT_A_ID}'
           label: 'Select the first seeded garment'
-      - extendedWaitUntil:
-          visible:
-            id: 'garment-checkbox-${GARMENT_A_ID}'
-            checked: true
-          timeout: 10000
-          label: 'The first garment registered as selected'
+      # Maestro's iOS hierarchy never reports `checked` (R64: it stayed false while
+      # the row toggled, so each retry unselected the garment again). iOS reads the
+      # builder's own count instead, above the list.
+      - runFlow:
+          when:
+            platform: Android
+          commands:
+            - extendedWaitUntil:
+                visible:
+                  id: 'garment-checkbox-${GARMENT_A_ID}'
+                  checked: true
+                timeout: 10000
+                label: 'The first garment registered as selected'
+      - runFlow:
+          when:
+            platform: iOS
+          commands:
+            - scrollUntilVisible:
+                element:
+                  text: 'Garments \(1 of \d+ selected\)'
+                direction: UP
+                timeout: 10000
+                label: 'The first garment registered as selected'
 
 # Back to the top of the builder before searching for the second garment.
 #
@@ -217,12 +234,29 @@ tags:
       - tapOn:
           id: 'garment-checkbox-${GARMENT_B_ID}'
           label: 'Select the second seeded garment'
-      - extendedWaitUntil:
-          visible:
-            id: 'garment-checkbox-${GARMENT_B_ID}'
-            checked: true
-          timeout: 10000
-          label: 'The second garment registered as selected'
+      # Maestro's iOS hierarchy never reports `checked` (R64: it stayed false while
+      # the row toggled, so each retry unselected the garment again). iOS reads the
+      # builder's own count instead, above the list.
+      - runFlow:
+          when:
+            platform: Android
+          commands:
+            - extendedWaitUntil:
+                visible:
+                  id: 'garment-checkbox-${GARMENT_B_ID}'
+                  checked: true
+                timeout: 10000
+                label: 'The second garment registered as selected'
+      - runFlow:
+          when:
+            platform: iOS
+          commands:
+            - scrollUntilVisible:
+                element:
+                  text: 'Garments \(2 of \d+ selected\)'
+                direction: UP
+                timeout: 10000
+                label: 'The second garment registered as selected'
 
 # The postcondition, so a mis-tap fails here rather than several steps later as
 # a confusing message about a missing reorder button.

@@ -368,10 +368,14 @@ tags:
       id: 'submit-report-button'
     timeout: 15000
 # The details field sits below the reasons, inside the dialog's own scroll view.
+# Centered, so the dialog really scrolls on iOS too: Maestro's iOS hierarchy gives a
+# clipped field its whole frame, counts it visible without scrolling, and the tap
+# landed on Cancel below it (R64).
 - scrollUntilVisible:
     element:
       id: 'report-details-input'
     direction: DOWN
+    centerElement: true
     timeout: 15000
 - tapOn:
     id: 'report-details-input'
@@ -379,6 +383,10 @@ tags:
 - assertVisible:
     id: 'report-details-input'
     text: 'Keyboard check'
+# R66: while the member writes details the reasons leave the layout, so no reason row
+# is cut by the scroll edge above the field.
+- assertNotVisible:
+    id: 'report-reason-spam'
 - takeScreenshot:
     path: maestro/artifacts/community-report-keyboard
 - tapOn:
@@ -616,6 +624,15 @@ tags:
     text: '14 of 280 characters'
 - takeScreenshot:
     path: maestro/artifacts/community-compose-keyboard
+# R65: Publish sits below the caption and stays disabled without a photo, so a tap on
+# it changes nothing when the sheet is lifted. A sheet left under the keyboard would
+# put that tap on a key and type into the caption, and the counter would move.
+- tapOn:
+    id: 'community-publish-button'
+    label: 'Tap Publish with the keyboard still up'
+- assertVisible:
+    id: 'community-caption-count'
+    text: '14 of 280 characters'
 
 - tapOn:
     id: 'community-post-sheet-close'
