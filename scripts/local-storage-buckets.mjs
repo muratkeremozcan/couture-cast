@@ -8,10 +8,16 @@
  *
  * The buckets come from the Prisma migrations, which stay their only definition:
  * each `INSERT INTO storage.buckets` there (id, public flag, size limit, MIME types)
- * is read back here, later migrations overriding earlier ones the way their
- * `ON CONFLICT DO UPDATE` does. A migration that touches `storage.buckets` in any
- * other way fails the read, so a definition this file cannot follow never passes
- * silently.
+ * is read back here and applied the way PostgreSQL applies it. Exactly one
+ * statement form is supported, the full-assignment upsert both bucket migrations
+ * use: all five columns inserted, then `ON CONFLICT (id) DO UPDATE SET` assigning
+ * `public`, `file_size_limit` and `allowed_mime_types` (and optionally `name`) each
+ * from its own `EXCLUDED` column, with no `WHERE`. On a conflict the assigned
+ * columns replace the earlier definition and an unassigned `name` keeps its earlier
+ * value, as in PostgreSQL. Any other form (a plain insert, `DO NOTHING`, a partial
+ * or computed `SET`, a `WHERE` condition, other columns) and any other statement
+ * touching `storage.buckets` fails the read with the migration named, so a
+ * definition this file would apply differently from PostgreSQL never passes.
  *
  * Why the migrations are not enough on their own: they insert only when the
  * database they run against has the Storage schema, and Supabase Storage keeps its
@@ -43,10 +49,55 @@ export const MIGRATIONS_DIR = path.join(repoRoot, 'packages/db/prisma/migrations
  * }} BucketDefinition
  */
 
+// The whole statement up to its `;`: columns, VALUES tuple, then whatever follows.
 const INSERT =
-  /INSERT\s+INTO\s+storage\.buckets\s*\(([^)]*)\)\s*VALUES\s*\(([\s\S]*?)\)\s*(?:ON\s+CONFLICT|;)/gi
+  /INSERT\s+INTO\s+storage\.buckets\s*\(([^)]*)\)\s*VALUES\s*\(([\s\S]*?)\)\s*((?:ON\s+CONFLICT\b[^;]*)?);/gi
 const ANY_MENTION = /storage\.buckets/gi
 const REGCLASS_PROBE = /to_regclass\(\s*'storage\.buckets'\s*\)/gi
+
+const INSERTED_COLUMNS = ['id', 'name', 'public', 'file_size_limit', 'allowed_mime_types']
+/** The columns the supported upsert must assign on a conflict. */
+const REQUIRED_ASSIGNMENTS = ['public', 'file_size_limit', 'allowed_mime_types']
+const UPSERT = /^ON\s+CONFLICT\s*\(\s*id\s*\)\s*DO\s+UPDATE\s+SET\s+([\s\S]+)$/i
+const ASSIGNMENT = /^(\w+)\s*=\s*EXCLUDED\.(\w+)$/i
+
+/**
+ * The columns the conflict action assigns, or a thrown error naming `source` when
+ * it is anything but the supported full-assignment upsert.
+ *
+ * @param {string} clause the statement text after its VALUES tuple
+ * @param {string} source
+ * @returns {string[]}
+ */
+function supportedAssignments(clause, source) {
+  const reject = (why) => {
+    throw new Error(
+      `${source}: a storage.buckets insert ${why}; only ON CONFLICT (id) DO UPDATE SET ${REQUIRED_ASSIGNMENTS.map((column) => `${column} = EXCLUDED.${column}`).join(', ')} (name optional, no WHERE) is supported.`
+    )
+  }
+  const text = clause.trim()
+  if (text === '') reject('has no ON CONFLICT action')
+  if (/\bWHERE\b/i.test(text)) reject('has a WHERE condition on its conflict action')
+  const upsert = text.match(UPSERT)
+  if (!upsert)
+    reject(
+      `has an unsupported conflict action (${text.split(/\s+/).slice(0, 6).join(' ')})`
+    )
+  const assigned = upsert[1].split(',').map((assignment) => {
+    const match = assignment.trim().match(ASSIGNMENT)
+    if (!match || match[1].toLowerCase() !== match[2].toLowerCase())
+      reject(`assigns ${assignment.trim()} on conflict`)
+    return match[1].toLowerCase()
+  })
+  if (new Set(assigned).size !== assigned.length)
+    reject('assigns a column twice on conflict')
+  for (const column of assigned)
+    if (!['name', ...REQUIRED_ASSIGNMENTS].includes(column))
+      reject(`assigns ${column} on conflict`)
+  for (const column of REQUIRED_ASSIGNMENTS)
+    if (!assigned.includes(column)) reject(`leaves ${column} unassigned on conflict`)
+  return assigned
+}
 
 /** Splits a VALUES list at its top-level commas: none inside quotes or brackets. */
 function splitValues(list) {
@@ -79,48 +130,108 @@ function parseLiteral(token) {
 }
 
 /**
- * The bucket definitions in one migration's SQL, in statement order.
+ * The definition one insert's VALUES tuple holds, with every column of its type.
+ *
+ * @param {readonly string[]} columns
+ * @param {string} tuple
+ * @param {string} source
+ * @returns {BucketDefinition}
+ */
+function bucketDefinitionFromValues(columns, tuple, source) {
+  const values = splitValues(tuple).map((token) => parseLiteral(token))
+  if (columns.length !== values.length)
+    throw new Error(
+      `${source}: a storage.buckets insert has ${columns.length} columns and ${values.length} values.`
+    )
+  const row = Object.fromEntries(columns.map((column, index) => [column, values[index]]))
+  if (typeof row.id !== 'string' || row.id === '')
+    throw new Error(`${source}: a storage.buckets insert has no id.`)
+  const mimeTypes = row.allowed_mime_types
+  if (
+    typeof row.name !== 'string' ||
+    typeof row.public !== 'boolean' ||
+    (row.file_size_limit !== null && typeof row.file_size_limit !== 'number') ||
+    (mimeTypes !== null &&
+      !(Array.isArray(mimeTypes) && mimeTypes.every((type) => typeof type === 'string')))
+  )
+    throw new Error(`${source}: a storage.buckets insert has a value of the wrong type.`)
+  return {
+    id: row.id,
+    name: row.name,
+    public: row.public,
+    file_size_limit: row.file_size_limit,
+    allowed_mime_types: mimeTypes,
+  }
+}
+
+/**
+ * The bucket upserts in one migration's SQL, in statement order: each definition
+ * with the columns its conflict action assigns.
+ *
+ * @param {string} sql
+ * @param {string} [source] named in errors
+ * @returns {{ definition: BucketDefinition; assigned: string[] }[]}
+ */
+export function bucketUpsertsFromSql(sql, source = 'migration') {
+  const upserts = []
+  for (const match of sql.matchAll(INSERT)) {
+    const columns = match[1].split(',').map((column) => column.trim().toLowerCase())
+    if (
+      columns.length !== INSERTED_COLUMNS.length ||
+      !INSERTED_COLUMNS.every((column) => columns.includes(column))
+    )
+      throw new Error(
+        `${source}: a storage.buckets insert must list exactly ${INSERTED_COLUMNS.join(', ')}.`
+      )
+    const assigned = supportedAssignments(match[3], source)
+    upserts.push({
+      definition: bucketDefinitionFromValues(columns, match[2], source),
+      assigned,
+    })
+  }
+  const mentions = (sql.match(ANY_MENTION) ?? []).length
+  const probes = (sql.match(REGCLASS_PROBE) ?? []).length
+  if (mentions !== probes + upserts.length)
+    throw new Error(
+      `${source} touches storage.buckets in a way scripts/local-storage-buckets.mjs cannot read; extend it before relying on that migration.`
+    )
+  return upserts
+}
+
+/**
+ * Applies upserts to `buckets` as PostgreSQL would: a new id is inserted whole; an
+ * existing one takes only the columns its conflict action assigns.
+ *
+ * @param {Map<string, BucketDefinition>} buckets
+ * @param {readonly { definition: BucketDefinition; assigned: readonly string[] }[]} upserts
+ */
+function applyUpserts(buckets, upserts) {
+  for (const { definition, assigned } of upserts) {
+    const prior = buckets.get(definition.id)
+    if (!prior) {
+      buckets.set(definition.id, definition)
+      continue
+    }
+    const next = { ...prior }
+    for (const column of assigned) next[column] = definition[column]
+    buckets.set(definition.id, next)
+  }
+  return buckets
+}
+
+/**
+ * The bucket definitions one migration's SQL leaves, applied in statement order.
  *
  * @param {string} sql
  * @param {string} [source] named in errors
  * @returns {BucketDefinition[]}
  */
 export function bucketDefinitionsFromSql(sql, source = 'migration') {
-  const definitions = []
-  for (const match of sql.matchAll(INSERT)) {
-    const columns = match[1].split(',').map((column) => column.trim())
-    const values = splitValues(match[2]).map((token) => parseLiteral(token))
-    if (columns.length !== values.length)
-      throw new Error(
-        `${source}: a storage.buckets insert has ${columns.length} columns and ${values.length} values.`
-      )
-    const row = Object.fromEntries(
-      columns.map((column, index) => [column, values[index]])
-    )
-    if (typeof row.id !== 'string' || row.id === '')
-      throw new Error(`${source}: a storage.buckets insert has no id.`)
-    definitions.push({
-      id: row.id,
-      name: typeof row.name === 'string' ? row.name : row.id,
-      public: row.public === true,
-      file_size_limit:
-        typeof row.file_size_limit === 'number' ? row.file_size_limit : null,
-      allowed_mime_types: Array.isArray(row.allowed_mime_types)
-        ? row.allowed_mime_types.map(String)
-        : null,
-    })
-  }
-  const mentions = (sql.match(ANY_MENTION) ?? []).length
-  const probes = (sql.match(REGCLASS_PROBE) ?? []).length
-  if (mentions !== probes + definitions.length)
-    throw new Error(
-      `${source} touches storage.buckets in a way scripts/local-storage-buckets.mjs cannot read; extend it before relying on that migration.`
-    )
-  return definitions
+  return [...applyUpserts(new Map(), bucketUpsertsFromSql(sql, source)).values()]
 }
 
 /**
- * Every bucket the migrations define, the last definition of each id winning.
+ * Every bucket the migrations define, applied in migration order.
  *
  * @param {string} [migrationsDir]
  * @returns {BucketDefinition[]}
@@ -131,11 +242,7 @@ export function bucketDefinitionsFromMigrations(migrationsDir = MIGRATIONS_DIR) 
   for (const entry of fs.readdirSync(migrationsDir).sort()) {
     const file = path.join(migrationsDir, entry, 'migration.sql')
     if (!fs.existsSync(file)) continue
-    for (const definition of bucketDefinitionsFromSql(
-      fs.readFileSync(file, 'utf8'),
-      entry
-    ))
-      buckets.set(definition.id, definition)
+    applyUpserts(buckets, bucketUpsertsFromSql(fs.readFileSync(file, 'utf8'), entry))
   }
   return [...buckets.values()]
 }

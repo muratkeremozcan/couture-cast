@@ -10,6 +10,11 @@ export type BucketDefinition = {
 
 export declare const MIGRATIONS_DIR: string
 
+export declare function bucketUpsertsFromSql(
+  sql: string,
+  source?: string
+): { definition: BucketDefinition; assigned: string[] }[]
+
 export declare function bucketDefinitionsFromSql(
   sql: string,
   source?: string

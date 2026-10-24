@@ -24,7 +24,19 @@ import {
 
 const repoRoot = path.resolve(__dirname, '../../..')
 
-const insert = (id: string, isPublic = 'false', limit = '10485760') => `
+/** The full-assignment upsert both bucket migrations use. */
+const FULL_UPSERT = `ON CONFLICT (id) DO UPDATE SET
+      public = EXCLUDED.public,
+      file_size_limit = EXCLUDED.file_size_limit,
+      allowed_mime_types = EXCLUDED.allowed_mime_types`
+
+const insert = (
+  id: string,
+  isPublic = 'false',
+  limit = '10485760',
+  conflict = FULL_UPSERT,
+  name = id
+) => `
 DO $storage$
 BEGIN
   IF to_regclass('storage.buckets') IS NOT NULL THEN
@@ -37,12 +49,12 @@ BEGIN
     )
     VALUES (
       '${id}',
-      '${id}',
+      '${name}',
       ${isPublic},
       ${limit},
       ARRAY['image/jpeg', 'image/png']
     )
-    ON CONFLICT (id) DO UPDATE SET public = EXCLUDED.public;
+    ${conflict};
   END IF;
 END
 $storage$;`
@@ -62,13 +74,15 @@ describe('local Storage buckets', () => {
       'community-images',
       'wardrobe-images',
     ])
-    expect(buckets.find((bucket) => bucket.id === 'wardrobe-images')).toEqual({
-      id: 'wardrobe-images',
-      name: 'wardrobe-images',
+    // Today's settings, exactly as the two migrations leave them in PostgreSQL.
+    const settings = (id: string) => ({
+      id,
+      name: id,
       public: false,
       file_size_limit: 10485760,
       allowed_mime_types: ['image/jpeg', 'image/png', 'image/webp'],
     })
+    expect(buckets).toEqual([settings('wardrobe-images'), settings('community-images')])
 
     // The seed names its buckets in constants; each must be one the migrations define.
     const seeds = path.join(repoRoot, 'packages/db/prisma/seeds')
@@ -86,22 +100,106 @@ describe('local Storage buckets', () => {
       expect(buckets.map((entry) => entry.id)).toContain(bucket)
   })
 
-  it('R63-SB-02 parses one insert and lets a later definition win', () => {
+  it('R63-SB-02 parses one upsert and applies a later one the way PostgreSQL does', () => {
     expect(bucketDefinitionsFromSql(insert('wardrobe-images'))).toEqual([wardrobe])
+    // Every assigned column takes the later value; the unassigned name keeps the first.
     expect(
-      bucketDefinitionsFromSql(`${insert('a')}\n${insert('a', 'true', 'NULL')}`).at(-1)
-    ).toMatchObject({ id: 'a', public: true, file_size_limit: null })
+      bucketDefinitionsFromSql(
+        `${insert('a')}\n${insert('a', 'true', 'NULL', FULL_UPSERT, 'renamed')}`
+      )
+    ).toEqual([
+      {
+        id: 'a',
+        name: 'a',
+        public: true,
+        file_size_limit: null,
+        allowed_mime_types: ['image/jpeg', 'image/png'],
+      },
+    ])
+    expect(
+      bucketDefinitionsFromSql(
+        `${insert('a')}\n${insert('a', 'false', '5', `${FULL_UPSERT}, name = EXCLUDED.name`, 'renamed')}`
+      )
+    ).toMatchObject([{ id: 'a', name: 'renamed', file_size_limit: 5 }])
+  })
+
+  it('R69-SB-01 rejects a partial DO UPDATE, naming the migration', () => {
+    expect(() =>
+      bucketDefinitionsFromSql(
+        `${insert('a')}\n${insert('a', 'true', 'NULL', 'ON CONFLICT (id) DO UPDATE SET public = EXCLUDED.public')}`,
+        '20990101000000_partial_bucket_update'
+      )
+    ).toThrow(
+      /^20990101000000_partial_bucket_update: a storage\.buckets insert leaves file_size_limit unassigned on conflict/
+    )
+  })
+
+  it('R69-SB-02 rejects DO NOTHING, naming the migration', () => {
+    expect(() =>
+      bucketDefinitionsFromSql(
+        insert('a', 'false', '10485760', 'ON CONFLICT (id) DO NOTHING'),
+        '20990101000000_bucket_do_nothing'
+      )
+    ).toThrow(
+      /^20990101000000_bucket_do_nothing: a storage\.buckets insert has an unsupported conflict action/
+    )
+    expect(() =>
+      bucketDefinitionsFromSql(
+        insert('a', 'false', '10485760', 'ON CONFLICT DO NOTHING'),
+        'm2'
+      )
+    ).toThrow(/^m2: .*unsupported conflict action/)
+  })
+
+  it('R69-SB-03 rejects a WHERE-conditioned update, naming the migration', () => {
+    expect(() =>
+      bucketDefinitionsFromSql(
+        insert(
+          'a',
+          'false',
+          '10485760',
+          `${FULL_UPSERT}\n    WHERE EXCLUDED.public = false`
+        ),
+        '20990101000000_bucket_conditional_update'
+      )
+    ).toThrow(
+      /^20990101000000_bucket_conditional_update: a storage\.buckets insert has a WHERE condition/
+    )
+  })
+
+  it('R69-SB-04 rejects every other upsert form it cannot apply exactly', () => {
+    const reject = (conflict: string) => () =>
+      bucketDefinitionsFromSql(insert('a', 'false', '10485760', conflict), 'm3')
+    // A plain insert, a computed or cross-column value, a column twice.
+    expect(reject('')).toThrow(/^m3: .*has no ON CONFLICT action/)
+    expect(
+      reject(
+        'ON CONFLICT (id) DO UPDATE SET public = true, file_size_limit = EXCLUDED.file_size_limit, allowed_mime_types = EXCLUDED.allowed_mime_types'
+      )
+    ).toThrow(/^m3: .*assigns public = true on conflict/)
+    expect(
+      reject(
+        'ON CONFLICT (id) DO UPDATE SET public = EXCLUDED.public, file_size_limit = EXCLUDED.public, allowed_mime_types = EXCLUDED.allowed_mime_types'
+      )
+    ).toThrow(/^m3: .*assigns file_size_limit = EXCLUDED\.public/)
+    expect(reject(`${FULL_UPSERT}, public = EXCLUDED.public`)).toThrow(
+      /^m3: .*assigns a column twice/
+    )
+    expect(() =>
+      bucketDefinitionsFromSql(
+        `INSERT INTO storage.buckets (id, name, public) VALUES ('a', 'a', true) ${FULL_UPSERT};`,
+        'm4'
+      )
+    ).toThrow(/^m4: a storage\.buckets insert must list exactly/)
   })
 
   it('R63-SB-03 refuses a migration that touches storage.buckets in a way it cannot read', () => {
     expect(() =>
       bucketDefinitionsFromSql("DELETE FROM storage.buckets WHERE id = 'x';", 'm1')
     ).toThrow(/m1 touches storage\.buckets/)
-    expect(() =>
-      bucketDefinitionsFromSql(
-        "INSERT INTO storage.buckets (id, name) VALUES ('x', lower('X')) ON CONFLICT DO NOTHING;"
-      )
-    ).toThrow(/unsupported SQL literal/)
+    expect(() => bucketDefinitionsFromSql(insert('x', 'false', "lower('X')"))).toThrow(
+      /unsupported SQL literal/
+    )
   })
 
   it('R63-SB-04 plans a create for an absent bucket and an update for a drifted one', () => {
