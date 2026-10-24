@@ -21,7 +21,6 @@ import {
   updateCommercePreferenceResponseSchema,
   type AffiliateClickRequest,
   type CommercePreference,
-  type CommunitySponsoredFeedItem,
   type CommunitySponsorship,
   type ScenarioOutfit,
   type ShopThisLook,
@@ -106,46 +105,6 @@ export function resolveRenderableCommunitySponsorship(
   }
   const parsed = communitySponsorshipSchema.safeParse(item.sponsorship)
   return parsed.success ? parsed.data : null
-}
-
-/**
- * Story 6.7b: the community twin of `withoutShopThisLook`. A sponsorship is
- * per viewer and can end at any moment, so a community item passes through this
- * before any storage write and a stored copy can never draw a CTA.
- */
-export function withoutCommunitySponsorship<
-  T extends Pick<CommunitySponsoredFeedItem, 'sponsorship'>,
->(item: T): T {
-  if (!('sponsorship' in item)) {
-    return item
-  }
-  const copy = { ...item }
-  delete copy.sponsorship
-  return copy
-}
-
-/**
- * Story 6.7b: a copy from the sync coordinator's `targets/resolve` never
- * carries the sponsorship block, because that route takes no opt-in. Its
- * missing field says nothing about the link, so a resolved copy of a published
- * post keeps the block this visit's last live read of the same post carried.
- * The click re-checks the link, so a block that ended since answers 404 there.
- * Only the resolve path calls this; a live read that omits the block replaces
- * it as served.
- */
-export function keepLiveCommunitySponsorship<T extends CommunitySponsoredFeedItem>(
-  resolved: T,
-  previous: CommunitySponsoredFeedItem | null | undefined
-): T {
-  if (
-    !previous?.sponsorship ||
-    previous.id !== resolved.id ||
-    resolved.status !== 'published' ||
-    resolved.sponsorship
-  ) {
-    return resolved
-  }
-  return { ...resolved, sponsorship: previous.sponsorship }
 }
 
 export async function getCommercePreferenceFromMobile(

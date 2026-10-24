@@ -75,11 +75,10 @@ tags:
     label: 'The teaser link announces the disclosure with the look'
 - assertVisible:
     id: 'home-spotlight-teaser-partnered'
-    text: 'Partnered with Sample Partner'
-    label: 'The Partnered pill names the partner'
+    label: 'The Partnered pill is shown; the link carries the spoken disclosure'
 - assertVisible:
     id: 'home-spotlight-teaser-shop'
-    text: 'Shop this look at Sample Partner'
+    text: 'Shop this look at Sample Partner\. Opens in an in-app browser'
     label: 'The CTA names the action and the partner'
 - assertVisible:
     id: 'home-spotlight-teaser-shop'
@@ -108,7 +107,7 @@ tags:
 - extendedWaitUntil:
     visible:
       id: 'home-spotlight-teaser-shop'
-      text: 'Shop this look at Sample Partner'
+      text: 'Shop this look at Sample Partner\. Opens in an in-app browser'
     timeout: 15000
     label: 'Home is back with the CTA at rest'
 - assertNotVisible:
@@ -154,7 +153,7 @@ tags:
 - assertVisible:
     id: 'community-card-shop-seed-spotlight-1'
     index: 0
-    text: 'Shop this look at Sample Partner'
+    text: 'Shop this look at Sample Partner\. Opens in an in-app browser'
 - takeScreenshot:
     path: maestro/artifacts/community-sponsored-spotlight-card
 
@@ -176,7 +175,7 @@ tags:
     visible:
       id: 'community-card-shop-seed-spotlight-1'
       index: 0
-      text: 'Shop this look at Sample Partner'
+      text: 'Shop this look at Sample Partner\. Opens in an in-app browser'
     timeout: 15000
     label: 'Community is back with the CTA at rest'
 - assertNotVisible:

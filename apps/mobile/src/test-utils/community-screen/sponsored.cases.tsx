@@ -68,6 +68,52 @@ function serveSponsoredSpotlight() {
   )
 }
 
+/**
+ * The real sync coordinator: its bootstrap rebuilds the feed with a live read,
+ * then resolves every rendered post through `targets/resolve`, which takes no
+ * sponsorship opt-in, and applies each copy over every surface.
+ */
+function serveRealSync() {
+  let resolves = 0
+  vi.spyOn(CommunitySyncState.prototype, 'start').mockImplementation(function (
+    this: CommunitySyncState
+  ) {
+    void this.catchUp()
+  })
+  server.use(
+    http.get('*/api/v1/community/events', () =>
+      HttpResponse.json({
+        data: {
+          events: [],
+          nextCursor: 'sponsored',
+          hasMore: false,
+          resyncRequired: false,
+        },
+      })
+    ),
+    http.post('*/api/v1/community/targets/resolve', async ({ request }) => {
+      resolves++
+      const body = (await request.json()) as { targets: { key: string }[] }
+      return HttpResponse.json({
+        data: {
+          targets: body.targets.map(({ key }) => ({
+            key,
+            status: 'available',
+            communityRevision: '1',
+            post: item({ id: key, caption: `Resolved ${key}`, reactions: ZERO }),
+            comment: null,
+            parent: null,
+            pageCursor: null,
+            parentPageCursor: null,
+            threadPosition: null,
+          })),
+        },
+      })
+    })
+  )
+  return { resolves: () => resolves }
+}
+
 const shown = () =>
   mockCapture.mock.calls
     .filter(([event]) => event === 'affiliate_cta_shown')
@@ -207,47 +253,11 @@ export function registerCommunitySponsoredCases() {
     // The real coordinator: its bootstrap resolves every rendered post through
     // `targets/resolve`, which takes no sponsorship opt-in, and applies each copy
     // over the feed, the deep-link card and the spotlight.
-    let resolves = 0
-    vi.spyOn(CommunitySyncState.prototype, 'start').mockImplementation(function (
-      this: CommunitySyncState
-    ) {
-      void this.catchUp()
-    })
+    const sync = serveRealSync()
     serveFeed(() =>
       feedJson({ items: [item({ id: 'post-a', sponsorship: SPONSORSHIP })] })
     )
     serveSponsoredSpotlight()
-    server.use(
-      http.get('*/api/v1/community/events', () =>
-        HttpResponse.json({
-          data: {
-            events: [],
-            nextCursor: 'sponsored',
-            hasMore: false,
-            resyncRequired: false,
-          },
-        })
-      ),
-      http.post('*/api/v1/community/targets/resolve', async ({ request }) => {
-        resolves++
-        const body = (await request.json()) as { targets: { key: string }[] }
-        return HttpResponse.json({
-          data: {
-            targets: body.targets.map(({ key }) => ({
-              key,
-              status: 'available',
-              communityRevision: '1',
-              post: item({ id: key, caption: `Resolved ${key}`, reactions: ZERO }),
-              comment: null,
-              parent: null,
-              pageCursor: null,
-              parentPageCursor: null,
-              threadPosition: null,
-            })),
-          },
-        })
-      })
-    )
 
     await render(<CommunityScreen />)
 
@@ -256,7 +266,7 @@ export function registerCommunitySponsoredCases() {
     await waitFor(() =>
       expect(screen.getAllByText('Resolved spot-1').length).toBeGreaterThan(0)
     )
-    expect(resolves).toBeGreaterThan(0)
+    expect(sync.resolves()).toBeGreaterThan(0)
     expect(screen.getByTestId('community-card-shop-post-a').textContent).toBe(
       'Shop this look at Atelier North'
     )
@@ -267,5 +277,44 @@ export function registerCommunitySponsoredCases() {
     expect(
       within(moduleItem).getByTestId('community-card-shop-spot-1')
     ).toBeInTheDocument()
+  })
+
+  it('6.7b-MOB-055 a live rebuild without the block removes it from the feed and the spotlight', async () => {
+    const sync = serveRealSync()
+    // The first feed read carries the block for both posts; the sync's rebuild,
+    // a later live read, carries none (the link ended or the viewer opted out).
+    serveFeed((_url, index) =>
+      feedJson({
+        items:
+          index === 0
+            ? [
+                item({ id: 'post-a', sponsorship: SPONSORSHIP }),
+                item({ id: 'spot-1', caption: 'Spot in feed', sponsorship: SPONSORSHIP }),
+              ]
+            : [item({ id: 'post-a' }), item({ id: 'spot-1', caption: 'Spot in feed' })],
+      })
+    )
+    serveSponsoredSpotlight()
+
+    await render(<CommunityScreen />)
+    // The live block rendered first, on both surfaces.
+    await screen.findByTestId('community-card-shop-post-a')
+    const moduleItem = await screen.findByTestId('community-spotlight-item-spot-1')
+    await within(moduleItem).findByTestId('community-card-shop-spot-1')
+
+    // The rebuild and the resolve both landed.
+    await screen.findByText('Resolved post-a')
+    await waitFor(() => expect(sync.resolves()).toBeGreaterThan(0))
+    await waitFor(() =>
+      expect(screen.queryByTestId('community-card-shop-post-a')).toBeNull()
+    )
+    expect(screen.queryByTestId('community-card-partnered-post-a')).toBeNull()
+    expect(
+      screen.getByTestId('community-post-card-post-a').getAttribute('aria-label')
+    ).toBe('Look by Style Explorer A1B2')
+    const module = screen.getByTestId('community-spotlight-item-spot-1')
+    expect(within(module).queryByTestId('community-card-shop-spot-1')).toBeNull()
+    expect(within(module).queryByTestId('community-card-partnered-spot-1')).toBeNull()
+    expect(within(module).getByTestId('community-post-card-spot-1')).toBeInTheDocument()
   })
 }

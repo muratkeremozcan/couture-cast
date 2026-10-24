@@ -27,9 +27,19 @@ import {
 } from './sponsored-cta-shown'
 
 /**
- * Owns one screen's shown events. `focused` is the screen's visit: each time it
- * turns true the dedupe set starts over, and while it is false nothing is
- * reported, because a block on a screen the member left is not being shown.
+ * Owns one screen's shown events: one `affiliate_cta_shown` per rendered block
+ * per screen visit.
+ *
+ * A visit starts when the screen gains navigation focus and ends when it loses
+ * it. The app going to the background and back (including the round trip
+ * through the in-app browser the CTA opens) does not start a new visit. While
+ * the screen is unfocused nothing is reported, because a block on a screen the
+ * member left is not being shown.
+ *
+ * Ordering: children report from their own effects, which run before this
+ * component's effects in the same commit. So the tracker stays null from the
+ * render that sees focus arrive until this component's effect has started the
+ * visit with an empty dedupe set; only then do children report, once.
  */
 export function SponsoredCtaImpressions({
   focused,
@@ -41,17 +51,23 @@ export function SponsoredCtaImpressions({
   const activeLocale =
     resolveSupportedLocale(i18n.resolvedLanguage ?? i18n.language) ??
     defaultSupportedLocale
-  const [visit, setVisit] = useState(0)
+  /** The visit in progress, or null between visits. */
+  const [visit, setVisit] = useState<number | null>(null)
+  const visitCount = useRef(0)
   const seen = useRef(new Set<string>())
 
   useEffect(() => {
-    if (!focused) return
+    if (!focused) {
+      setVisit(null)
+      return
+    }
     seen.current = new Set()
-    setVisit((previous) => previous + 1)
+    visitCount.current += 1
+    setVisit(visitCount.current)
   }, [focused])
 
   const tracker = useMemo<SponsoredCtaImpressionTracker | null>(() => {
-    if (!focused || visit === 0) return null
+    if (!focused || visit === null) return null
     return {
       visit,
       report(surface, postId, sponsorship) {

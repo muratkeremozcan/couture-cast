@@ -12,7 +12,7 @@ import {
   getCommunityPostFromMobile,
   getCommunitySpotlightFromMobile,
 } from '@/src/lib/community'
-import { keepLiveCommunitySponsorship } from '@/src/lib/commerce'
+import type { LiveCommunitySponsorships } from './live-sponsorships'
 
 /** `idle` while no member is signed in: the module hides and reads nothing. */
 export type SpotlightStatus = 'idle' | 'loading' | 'ready' | 'disabled' | 'error'
@@ -48,10 +48,10 @@ export interface CommunitySpotlightView {
    * Replaces a spotlight copy with a newer read of the post, keeping its rank. A
    * read that is no longer `published` removes the copy: the single-post read
    * returns an author their own withdrawn or flagged post, and the spotlight
-   * ranks public posts only. Story 6.7b: `resolve` marks a sync copy, which
-   * keeps the sponsorship block of the live read it replaces.
+   * ranks public posts only. Story 6.7b: the copy takes the latest live
+   * sponsorship answer for its post (see `live-sponsorships.ts`).
    */
-  applyPost: (post: CommunityReactionFeedItem, source?: 'live' | 'resolve') => void
+  applyPost: (post: CommunityReactionFeedItem) => void
   /** Removes a post the viewer can no longer see, such as a withdrawn or hidden one. */
   evict: (postId: string) => void
   /**
@@ -97,10 +97,13 @@ function newEntries(
 export function useCommunitySpotlight({
   sessionScope,
   reactionState,
+  sponsorships,
 }: {
   /** Undefined until the screen first resolves the member; null when signed out. */
   sessionScope: string | null | undefined
   reactionState: CommunityReactionState
+  /** Story 6.7b: the screen's live sponsorship answers, shared with the feed. */
+  sponsorships: LiveCommunitySponsorships
 }): CommunitySpotlightView {
   const [status, setStatus] = useState<SpotlightStatus>('loading')
   const [level, setLevel] = useState<CommunitySpotlightLevel>('none')
@@ -161,6 +164,7 @@ export function useCommunitySpotlight({
       try {
         const page = await getCommunitySpotlightFromMobile({ signal: controller.signal })
         if (!isCurrent()) return
+        sponsorships.record(page.items)
         const shown = newEntries([], readItems(page.items, ticket))
         setLevel(page.level)
         setLabel(page.label)
@@ -185,7 +189,7 @@ export function useCommunitySpotlight({
         setStatus(isDisabledRefusal(error) ? 'disabled' : 'error')
       }
     },
-    [begin, reactionState, readItems, setNextCursor]
+    [begin, reactionState, readItems, setNextCursor, sponsorships]
   )
 
   // Pull to refresh and Retry read page one only for a signed-in member.
@@ -206,6 +210,7 @@ export function useCommunitySpotlight({
     void getCommunitySpotlightFromMobile({ cursor, signal: controller.signal })
       .then((page) => {
         if (!isCurrent()) return
+        sponsorships.record(page.items)
         const added = newEntries(itemsRef.current, readItems(page.items, ticket))
         setItems((previous) => [...previous, ...newEntries(previous, added)])
         // View more stays for the cursor this page returned.
@@ -239,7 +244,7 @@ export function useCommunitySpotlight({
         loadingMoreRef.current = false
         setIsLoadingMore(false)
       })
-  }, [begin, load, reactionState, readItems, setNextCursor])
+  }, [begin, load, reactionState, readItems, setNextCursor, sponsorships])
 
   const abortItemRefreshes = useCallback(() => {
     for (const controller of itemRefreshesRef.current.values()) controller.abort()
@@ -298,24 +303,27 @@ export function useCommunitySpotlight({
   )
 
   const applyPost = useCallback(
-    (post: CommunityReactionFeedItem, source: 'live' | 'resolve' = 'live') => {
+    (post: CommunityReactionFeedItem) => {
       setItems((previous) => {
         if (!previous.some((item) => item.id === post.id)) return previous
         if (post.status !== 'published')
           return previous.filter((item) => item.id !== post.id)
         return previous.map((item) =>
-          item.id === post.id
-            ? {
-                ...(source === 'resolve'
-                  ? keepLiveCommunitySponsorship(post, item)
-                  : post),
-                rank: item.rank,
-              }
-            : item
+          item.id === post.id ? { ...sponsorships.apply(post), rank: item.rank } : item
         )
       })
     },
-    []
+    [sponsorships]
+  )
+
+  // A live read anywhere on the screen (feed, single post, this module) is the
+  // latest word on a post's block, for every spotlight copy of it.
+  useEffect(
+    () =>
+      sponsorships.subscribe(() => {
+        setItems((previous) => sponsorships.applyAll(previous))
+      }),
+    [sponsorships]
   )
 
   const evict = useCallback((postId: string) => {
@@ -337,6 +345,7 @@ export function useCommunitySpotlight({
       void getCommunityPostFromMobile(postId, controller.signal)
         .then((post) => {
           if (controller.signal.aborted) return
+          sponsorships.record([post])
           // A null read means the post left the community while this was in flight.
           const fresh = reactionState.read(post, ticket)
           if (fresh) applyPost(fresh)
@@ -349,7 +358,7 @@ export function useCommunitySpotlight({
           if (refreshes.get(postId) === controller) refreshes.delete(postId)
         })
     },
-    [applyPost, evict, reactionState]
+    [applyPost, evict, reactionState, sponsorships]
   )
 
   const focusEntry = useCallback((postId: string) => {

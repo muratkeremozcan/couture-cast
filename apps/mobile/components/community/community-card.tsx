@@ -483,6 +483,7 @@ export function CommunityCard({
           surface={shopSurface}
           testID={`community-card-shop-${item.id}`}
           errorTestID={`community-card-shop-error-${item.id}`}
+          opensTestID={`community-card-shop-opens-${item.id}`}
           style={styles.shop}
         />
       ) : null}

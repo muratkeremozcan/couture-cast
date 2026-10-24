@@ -86,7 +86,7 @@ import { CommunityReportModal } from '@/components/community/community-report-mo
 import { CommunitySpotlightModule } from '@/components/community/community-spotlight-module'
 import { CommunitySpotlightDetail } from '@/components/community/community-spotlight-detail'
 import { SponsoredCtaImpressions } from '@/src/features/community/sponsored-cta-impressions'
-import { keepLiveCommunitySponsorship } from '@/src/lib/commerce'
+import { LiveCommunitySponsorships } from '@/src/features/community/live-sponsorships'
 import {
   useCommunitySpotlight,
   type CommunitySpotlightView,
@@ -337,7 +337,21 @@ export function CommunityScreen() {
     reactionState.getVersion,
     reactionState.getVersion
   )
-  const spotlight = useCommunitySpotlight({ sessionScope, reactionState })
+  // Story 6.7b: the latest live sponsorship answer per post, for every copy.
+  const [sponsorships] = useState(() => new LiveCommunitySponsorships())
+  const spotlight = useCommunitySpotlight({ sessionScope, reactionState, sponsorships })
+  // Every live read (feed page, rebuild, single post, spotlight) applies its
+  // sponsorship answers to the copies already on screen.
+  useEffect(
+    () =>
+      sponsorships.subscribe(() => {
+        setItems((previous) => sponsorships.applyAll(previous))
+        newLooksRef.current = sponsorships.applyAll(newLooksRef.current)
+        setNewLooks(newLooksRef.current)
+        setDeepLinkPost((item) => (item ? sponsorships.apply(item) : item))
+      }),
+    [sponsorships]
+  )
   spotlightReactionRef.current = spotlight.applyReactionChange
   // Read by the realtime callbacks, which outlive any one render.
   const spotlightRef = useRef(spotlight)
@@ -504,19 +518,19 @@ export function CommunityScreen() {
               signal
             )
           ).then((result) => result.targets[0])
-        : getCommunityPostFromMobile(
-            targetPostId,
-            controller.signal,
-            timeout,
-            token
-          ).then((post) => ({
-            status: 'available' as const,
-            post,
-            comment: null,
-            parent: null,
-            pageCursor: null,
-            parentPageCursor: null,
-          }))
+        : getCommunityPostFromMobile(targetPostId, controller.signal, timeout, token)
+            .then((post) => {
+              sponsorships.record([post])
+              return post
+            })
+            .then((post) => ({
+              status: 'available' as const,
+              post,
+              comment: null,
+              parent: null,
+              pageCursor: null,
+              parentPageCursor: null,
+            }))
     }
     let retryTimer: ReturnType<typeof setTimeout> | undefined
     const targetRequest = async () => {
@@ -565,26 +579,28 @@ export function CommunityScreen() {
           surface: 'mobile',
         })
     }
+    /** The target post is gone for this viewer: every copy and its state leave. */
+    const forgetTarget = () => {
+      if (realtimeOpenPost.current === targetPostId) realtimeOpenPost.current = null
+      if (realtimeDeepLink.current?.id === targetPostId) realtimeDeepLink.current = null
+      newLooksRef.current = newLooksRef.current.filter((item) => item.id !== targetPostId)
+      setNewLooks(newLooksRef.current)
+      reactionState.evict(targetPostId)
+      comments.evict(targetPostId)
+    }
     void Promise.race([targetRequest(), aborted])
       .then((target) => {
         if (!active || detailGeneration !== detailGenerationRef.current) return
         if (!target || target.status === 'unavailable') {
-          if (target?.status === 'unavailable') {
-            if (realtimeOpenPost.current === targetPostId) realtimeOpenPost.current = null
-            if (realtimeDeepLink.current?.id === targetPostId)
-              realtimeDeepLink.current = null
-            newLooksRef.current = newLooksRef.current.filter(
-              (item) => item.id !== targetPostId
-            )
-            setNewLooks(newLooksRef.current)
-            reactionState.evict(targetPostId)
-            comments.evict(targetPostId)
-          }
+          if (target?.status === 'unavailable') forgetTarget()
           setDeepLinkPost(null)
           if (intent === notificationIntentRef.current) setIsInvalidDeepLink(true)
           return
         }
-        const post = reactionState.read(target.post, readTicket)
+        // A comment target resolves through the sync route, which carries no
+        // sponsorship answer; the latest live one applies.
+        const read = reactionState.read(target.post, readTicket)
+        const post = read ? sponsorships.apply(read) : read
         setDeepLinkPost(post)
         if (!post) return
         setIsInvalidDeepLink(false)
@@ -743,6 +759,7 @@ export function CommunityScreen() {
         detailGeneration === detailGenerationRef.current
       try {
         const post = await getCommunityPostFromMobile(target, signal)
+        if (isCurrent()) sponsorships.record([post])
         if (isCurrent()) setDeepLinkPost(reactionState.read(post, readTicket))
       } catch (error: unknown) {
         if (isCurrent() && communityFailureReason(error) === 'not_found') {
@@ -796,6 +813,7 @@ export function CommunityScreen() {
             if (!isCurrent()) {
               return
             }
+            sponsorships.record(feed.items)
             const isAppend = pageCursor !== undefined
             const page = feed.items.flatMap((post) => {
               const current = reactionState.read(post, readTicket)
@@ -881,6 +899,8 @@ export function CommunityScreen() {
       comments.setSession(identity)
       setSessionScope(identity)
       if (previous === undefined || previous === identity) return
+      // A block is per viewer: a new member starts with no live answers.
+      sponsorships.clear()
       commentDrafts.forgetAll()
       feedScopeRef.current++
       requestGenerationRef.current++
@@ -987,7 +1007,7 @@ export function CommunityScreen() {
         for (const target of result.targets)
           if (target.status === 'available') {
             const post = reactionState.read(target.post, ticket)
-            if (post) fresh.push(post)
+            if (post) fresh.push(sponsorships.apply(post))
           }
       }
       setItems((previous) => [
@@ -1016,6 +1036,9 @@ export function CommunityScreen() {
       if (signal?.aborted) throw new CommunityRequestSuperseded()
       if (generation !== requestGenerationRef.current)
         throw new CommunityRequestSuperseded()
+      // Story 6.7b: the rebuild is a live read, so it is the latest word on the
+      // block of every post it carries, including posts already on screen.
+      sponsorships.record(page.items)
       setAuthorStates(page.authorStates)
       setNextCursor(page.nextCursor)
       setServedMode(page.mode)
@@ -1086,17 +1109,16 @@ export function CommunityScreen() {
         } else {
           const updated = reactionState.read(target.post, reactionState.beginRead())
           if (!updated) return
-          // Story 6.7b: a resolved copy carries no sponsorship block (the route
-          // takes no opt-in), so each copy keeps the block its live read had.
+          // Story 6.7b: a resolved copy carries no sponsorship answer (the route
+          // takes no opt-in), so each copy takes the latest live answer.
+          const fresh = sponsorships.apply(updated)
           const replace = <T extends CommunityFeedItem>(item: T) =>
-            item.id === target.post.id
-              ? keepLiveCommunitySponsorship(updated, item)
-              : item
+            item.id === target.post.id ? fresh : item
           newLooksRef.current = newLooksRef.current.map(replace)
           setNewLooks(newLooksRef.current)
           setItems((previous) => previous.map(replace))
           setDeepLinkPost((item) => (item ? replace(item) : item))
-          spotlightRef.current.applyPost(updated, 'resolve')
+          spotlightRef.current.applyPost(updated)
         }
       },
       changed: async (events, signal) => {

@@ -244,9 +244,9 @@ export interface CommunityFeedRequest {
 /**
  * Story 6.7b: the feed, single-post and spotlight reads all opt into the
  * per-viewer sponsorship block with `x-couture-sponsorship: 1`. An item carries
- * it only while its link is eligible for this viewer; no mobile code stores a
- * community payload, and `withoutCommunitySponsorship` in `commerce.ts` is the
- * boundary any future storage write must pass through.
+ * it only while its link is eligible for this viewer. No mobile code stores a
+ * community payload, and `resolveRenderableCommunitySponsorship` renders a block
+ * only from a live read, never from a cache-served one.
  */
 export async function getCommunityFeedFromMobile({
   mode,

@@ -47,6 +47,13 @@ export interface HomeSpotlightTeaserProps {
   active: boolean
   onFocus?: () => void
   onBlur?: () => void
+  /**
+   * Story 6.7b: the sponsored Shop control, registered with Home's focus
+   * recovery like the link.
+   */
+  shopRef?: RefObject<View | null>
+  onShopFocus?: () => void
+  onShopBlur?: () => void
 }
 
 /** The existing card rule: the viewer reads "You", a blank name the fallback. */
@@ -61,7 +68,17 @@ export function teaserAuthorName(
 
 export const HomeSpotlightTeaser = forwardRef<View, HomeSpotlightTeaserProps>(
   function HomeSpotlightTeaser(
-    { value, onOpen, onImageError, active, onFocus, onBlur },
+    {
+      value,
+      onOpen,
+      onImageError,
+      active,
+      onFocus,
+      onBlur,
+      shopRef,
+      onShopFocus,
+      onShopBlur,
+    },
     ref
   ) {
     const { t } = useTranslation()
@@ -160,20 +177,30 @@ export const HomeSpotlightTeaser = forwardRef<View, HomeSpotlightTeaserProps>(
             </View>
           </Pressable>
           {sponsorship && sponsoredAnnounce ? (
-            // Siblings of the link: the disclosure stays visible to automation on
-            // iOS, and the CTA is its own focus stop.
+            // Siblings of the link, so the CTA is its own focus stop. The link's
+            // name already ends with the disclosure, so the visible pill is
+            // announced nowhere else; its container keeps the testID for
+            // automation.
             <View testID="home-spotlight-teaser-sponsored" style={styles.sponsored}>
               <View
                 testID="home-spotlight-teaser-partnered"
-                accessible
-                accessibilityLabel={sponsoredAnnounce}
                 style={[styles.partneredPill, { backgroundColor: ACCENT_GOLD }]}
               >
-                <Text style={[styles.partneredText, { color: ON_ACCENT }]}>
+                <Text
+                  accessible={false}
+                  accessibilityElementsHidden
+                  importantForAccessibility="no-hide-descendants"
+                  aria-hidden
+                  style={[styles.partneredText, { color: ON_ACCENT }]}
+                >
                   {t('community.card.sponsored')}
                 </Text>
               </View>
               <CommunitySponsoredShop
+                ref={shopRef}
+                onFocus={onShopFocus}
+                onBlur={onShopBlur}
+                opensTestID="home-spotlight-teaser-shop-opens"
                 postId={item.id}
                 sponsorship={sponsorship}
                 surface="home_teaser"
@@ -214,7 +241,9 @@ export const HomeSpotlightTeaserSlot = memo(function HomeSpotlightTeaserSlot({
   const teaser = useHomeSpotlightTeaserLink({ applicationUserId, scrollViewRef })
   const { focusRequested, focusLanded } = teaser
   return (
-    <SponsoredCtaImpressions focused={teaser.active}>
+    // A Home visit is navigation focus: the CTA's in-app browser backgrounds the
+    // app, and coming back from it is the same visit.
+    <SponsoredCtaImpressions focused={teaser.homeFocused}>
       {teaser.value ? (
         <HomeSpotlightTeaser
           ref={teaser.linkRef}
@@ -224,6 +253,9 @@ export const HomeSpotlightTeaserSlot = memo(function HomeSpotlightTeaserSlot({
           active={teaser.active}
           onFocus={teaser.onFocus}
           onBlur={teaser.onBlur}
+          shopRef={teaser.shopRef}
+          onShopFocus={teaser.onShopFocus}
+          onShopBlur={teaser.onShopBlur}
         />
       ) : null}
       {focusRequested ? (

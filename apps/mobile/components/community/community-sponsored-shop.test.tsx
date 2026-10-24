@@ -296,7 +296,7 @@ describe('sponsored community CTA (Story 6.7b)', () => {
       expect(bodies).toHaveLength(1)
     })
 
-    it('6.7b-MOB-014 keeps the CTA outside the open target with its own name and hint', () => {
+    it('6.7b-MOB-014 keeps the CTA outside the open target and says it opens a browser', () => {
       render(card())
       const open = screen.getByTestId('community-card-open-post-a')
       const button = screen.getByTestId('community-card-shop-post-a')
@@ -305,10 +305,17 @@ describe('sponsored community CTA (Story 6.7b)', () => {
       expect(button.contains(open)).toBe(false)
       expect(screen.getByTestId('community-post-card-post-a').contains(button)).toBe(true)
       expect(button.getAttribute('role')).toBe('button')
-      expect(button.getAttribute('aria-label')).toBe('Shop this look at Atelier North')
-      expect(pressableProps.get('community-card-shop-post-a')?.accessibilityHint).toBe(
-        'Opens in an in-app browser'
+      // In the announced name, so a reader with hints switched off still hears
+      // it, and on screen for everyone else.
+      expect(button.getAttribute('aria-label')).toBe(
+        'Shop this look at Atelier North. Opens in an in-app browser'
       )
+      expect(pressableProps.get('community-card-shop-post-a')?.accessibilityHint).toBe(
+        undefined
+      )
+      const opens = screen.getByTestId('community-card-shop-opens-post-a')
+      expect(opens.textContent).toBe('Opens in an in-app browser')
+      expect(button.contains(opens)).toBe(false)
       const { minHeight, minWidth } = getComputedStyle(button)
       expect(minHeight).toBe('44px')
       expect(minWidth).toBe('44px')
@@ -346,6 +353,22 @@ describe('sponsored community CTA (Story 6.7b)', () => {
       unmount()
     })
 
+    it('6.7b-MOB-017 a block that arrived while the screen was left counts once on return', () => {
+      const offerB = { ...SPONSORSHIP, offerId: 'offer-b' }
+      const { rerender } = render(card())
+      // Left the screen; a read finished meanwhile with a different offer.
+      rerender(card({ item: item({ sponsorship: offerB }) }, false))
+      expect(shownEvents()).toHaveLength(1)
+
+      rerender(card({ item: item({ sponsorship: offerB }) }, true))
+
+      expect(
+        shownEvents().map(
+          ([, properties]) => (properties as { offer_id: string }).offer_id
+        )
+      ).toEqual(['offer-coat', 'offer-b'])
+    })
+
     it('6.7b-MOB-016 renders no CTA and records nothing without a block', () => {
       render(card({ item: item({ sponsorship: undefined }) }))
 
@@ -365,13 +388,25 @@ describe('sponsored community CTA (Story 6.7b)', () => {
       const button = screen.getByTestId('home-spotlight-teaser-shop')
 
       expect(partnered.textContent).toBe('Partnered')
-      expect(partnered.getAttribute('aria-label')).toBe('Partnered with Atelier North')
+      // The link carries the disclosure; the visible pill is not announced again.
+      expect(partnered.getAttribute('aria-label')).toBeNull()
+      expect(partnered.getAttribute('role')).toBeNull()
+      expect(
+        Array.from(partnered.querySelectorAll('*')).every(
+          (node) => node.closest('[aria-hidden="true"]') !== null
+        )
+      ).toBe(true)
       expect(link.getAttribute('aria-label')).toBe(
         'Standout look in Lisbon by Ana, 0 reactions. Opens the City Spotlight. Partnered with Atelier North'
       )
       expect(link.contains(button)).toBe(false)
       expect(link.contains(partnered)).toBe(false)
-      expect(button.getAttribute('aria-label')).toBe('Shop this look at Atelier North')
+      expect(button.getAttribute('aria-label')).toBe(
+        'Shop this look at Atelier North. Opens in an in-app browser'
+      )
+      expect(screen.getByTestId('home-spotlight-teaser-shop-opens').textContent).toBe(
+        'Opens in an in-app browser'
+      )
       expect(shownEvents()).toEqual([
         [
           'affiliate_cta_shown',
