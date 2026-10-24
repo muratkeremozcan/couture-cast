@@ -615,8 +615,9 @@ playwright/tests/community-comments.spec.ts --repeat-each=3`, went out without t
     while settling as `settlement_failed`. No comment, reaction or notification delivery
     failed in that run: the only other warnings are the 25 reaction deferrals, already
     `sink_unconfigured`. The run's 12 errors were telemetry rows for actors with no `User` row,
-    rejected by `telemetry_events_user_id_fkey` and lost; such an event is now kept without
-    the user link.
+    rejected by `telemetry_events_user_id_fkey`. R45: such a row is not persisted (keeping it
+    unlinked would leave raw properties the account's cascade erasure cannot reach); the drop
+    is logged at info with the event name only, and the sink capture is unchanged.
   - Shared integration database: other community integration specs still share it and leave
     small public resync batches when they delete published posts (77 rows in one local run),
     which the appender drains within about a second; CI runs integration and Playwright in
