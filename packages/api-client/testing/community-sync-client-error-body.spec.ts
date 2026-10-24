@@ -69,6 +69,15 @@ describe('community sync client error bodies', () => {
     }
   )
 
+  it('passes an error whose body was already read through with its original response', async () => {
+    const response = new Response(JSON.stringify({ statusCode: 403 }), { status: 403 })
+    await response.text()
+    const error = await rejection(client(response).events('all', 'cursor'))
+    // Nothing is left to drain or buffer, so the caller sees the response it was given.
+    expect(error.response).toBe(response)
+    expect(error.response.status).toBe(403)
+  })
+
   it('releases a handled 403 target resolution body', async () => {
     const tracked = trackedResponse(403, { statusCode: 403, error: 'Forbidden' })
     const error = await rejection(

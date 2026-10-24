@@ -663,6 +663,33 @@ describe('Story 6.5 reconciliation ownership', () => {
     state.stop()
   })
 
+  it('a catch-up over a still-connected socket cancels the fallback poll a failed read armed', async () => {
+    vi.useFakeTimers()
+    vi.spyOn(Math, 'random').mockReturnValue(0)
+    const { client, callbacks, state } = setup()
+    state.start('https://fixtures.invalid', () =>
+      Promise.resolve('synthetic-test-bearer')
+    )
+    const transport = vi.mocked(connectCommunityTransport).mock.calls[0]![0]
+    try {
+      transport.state('connected')
+      await state.catchUp()
+      // A transient read failure arms the 5 s fallback while the socket stays up.
+      client.events.mockRejectedValueOnce(new Error('network down'))
+      transport.changed()
+      await vi.advanceTimersByTimeAsync(0)
+      expect(callbacks.availability).toHaveBeenLastCalledWith('recovering', false)
+      transport.changed()
+      await vi.advanceTimersByTimeAsync(0)
+      expect(callbacks.availability).toHaveBeenLastCalledWith('connected', true)
+      const calls = client.events.mock.calls.length
+      await vi.advanceTimersByTimeAsync(8000)
+      expect(client.events).toHaveBeenCalledTimes(calls)
+    } finally {
+      state.stop()
+    }
+  })
+
   it('6.5-UNIT-006: unavailable retains ownership and denial tears it down', async () => {
     const { client, callbacks, state } = setup()
     await state.catchUp()

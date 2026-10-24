@@ -332,6 +332,19 @@ describe('community HTTP contracts', () => {
       ).toBe(false)
     })
 
+    it('6.1-CON-022a rejects a two-week window whose both edges are local Monday midnight', () => {
+      // Both edges pass the Monday-midnight check, so only the seven-local-day rule
+      // can refuse this window, and it reports the problem on endsAt.
+      const result = createCommunityChallengeInputSchema.safeParse(
+        createInput({ endsAt: '2026-09-20T12:00:00.000Z' })
+      )
+
+      expect(result.success).toBe(false)
+      expect(
+        result.success ? [] : result.error.issues.map((issue) => issue.path.join('.'))
+      ).toEqual(['endsAt'])
+    })
+
     it('6.1-CON-023 rejects an end that precedes the start', () => {
       expect(
         createCommunityChallengeInputSchema.safeParse(
