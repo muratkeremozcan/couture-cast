@@ -1,6 +1,8 @@
 import { getRequestContext } from '../../logger/request-context.js'
 // Story 6.5: one monotonic authorization budget, carried through final use.
 import { HttpException, ServiceUnavailableException } from '@nestjs/common'
+import { Prisma } from '@prisma/client'
+import { createBaseLogger } from '../../logger/pino.config.js'
 export class CommunityUnavailableException extends ServiceUnavailableException {
   constructor(readonly retryAfterSeconds = 2) {
     super({
@@ -59,11 +61,35 @@ export class CommunityAuthorizationBudget {
     }
   }
 }
+export const communityAvailabilityLogger = createBaseLogger().child({
+  feature: 'community-availability',
+})
+
+/** What failed, without its message: a Prisma code and SQL state, or the error's type. */
+function dependencyCause(error: unknown) {
+  if (error instanceof Prisma.PrismaClientKnownRequestError)
+    return {
+      type: error.name,
+      prismaCode: error.code,
+      sqlState: (error.meta as { code?: unknown } | undefined)?.code ?? null,
+    }
+  return { type: error instanceof Error ? error.name : typeof error }
+}
+
+/**
+ * Runs a dependency an authorization decision needs. A denial passes through;
+ * anything else answers "unavailable", and is logged first, so the cause behind
+ * the 503 can be found.
+ */
 export async function communityDependency<T>(work: () => Promise<T>): Promise<T> {
   try {
     return await work()
   } catch (error) {
     if (error instanceof HttpException) throw error
+    communityAvailabilityLogger.warn(
+      { cause: dependencyCause(error) },
+      'community_dependency_unavailable'
+    )
     throw new CommunityUnavailableException()
   }
 }

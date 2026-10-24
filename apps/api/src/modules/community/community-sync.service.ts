@@ -77,7 +77,7 @@ export class CommunitySyncService {
             )
             await assertCommunitySubjectAvailable(tx, member)
           },
-          { timeout: budget.remaining(), maxWait: Math.min(100, budget.remaining()) }
+          { timeout: budget.remaining(), maxWait: budget.remaining() }
         )
         let grant = await this.access.authorize(member, budget)
         const scope = await this.community.syncScope(member, mode)
@@ -126,7 +126,7 @@ export class CommunitySyncService {
           {
             isolationLevel: Prisma.TransactionIsolationLevel.RepeatableRead,
             timeout: budget.remaining(),
-            maxWait: Math.min(100, budget.remaining()),
+            maxWait: budget.remaining(),
           }
         )
         // A fresh primary visibility check happens after ending the captured snapshot.

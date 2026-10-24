@@ -1,8 +1,10 @@
 import { afterEach, describe, expect, it, vi } from 'vitest'
 import { ForbiddenException } from '@nestjs/common'
+import { Prisma } from '@prisma/client'
 import {
   CommunityAuthorizationBudget,
   CommunityUnavailableException,
+  communityAvailabilityLogger,
   communityDependency,
   optionalCommunityAssist,
 } from './community-availability.js'
@@ -28,6 +30,33 @@ describe('community dependency and final authorization ownership', () => {
     await expect(
       communityDependency(() => Promise.reject(new Error('database offline')))
     ).rejects.toBeInstanceOf(CommunityUnavailableException)
+  })
+  it('logs the cause behind an unavailable answer, and nothing for a denial', async () => {
+    const warn = vi
+      .spyOn(communityAvailabilityLogger, 'warn')
+      .mockImplementation(() => undefined)
+    const poolWait = new Prisma.PrismaClientKnownRequestError(
+      'Transaction API error: Unable to start a transaction in the given time.',
+      { code: 'P2028', clientVersion: 'test' }
+    )
+    await expect(
+      communityDependency(() => Promise.reject(poolWait))
+    ).rejects.toBeInstanceOf(CommunityUnavailableException)
+    expect(warn).toHaveBeenCalledWith(
+      {
+        cause: {
+          type: 'PrismaClientKnownRequestError',
+          prismaCode: 'P2028',
+          sqlState: null,
+        },
+      },
+      'community_dependency_unavailable'
+    )
+    warn.mockClear()
+    await expect(
+      communityDependency(() => Promise.reject(new ForbiddenException('denied')))
+    ).rejects.toBeInstanceOf(ForbiddenException)
+    expect(warn).not.toHaveBeenCalled()
   })
   it('bounds a held optional assist, tolerates failure, and clears successful assist timers', async () => {
     vi.useFakeTimers()
