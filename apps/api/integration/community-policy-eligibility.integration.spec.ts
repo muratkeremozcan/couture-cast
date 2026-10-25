@@ -34,7 +34,7 @@ import {
   persistUser,
 } from '@couture/testing'
 import { isolatedCommunityDatabase } from './helpers/isolated-community-database.js'
-import { listenHttpApp } from './helpers/loopback-http-app.js'
+import { listenHttpApp } from '../src/testing/loopback-http-app.js'
 import { bindRequestContext } from '../src/logger/request-context.js'
 import { AccessTokenIdentityService } from '../src/modules/auth/access-token-identity.service.js'
 import { GuardianConsentStateService } from '../src/modules/auth/guardian-consent-state.service.js'

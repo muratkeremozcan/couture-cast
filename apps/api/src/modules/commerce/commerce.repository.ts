@@ -7,6 +7,7 @@ import {
   type GarmentComfortRange,
   type SkinUndertone,
 } from '@prisma/client'
+import { publiclyVisiblePostSql } from '../community/community.repository.js'
 
 /**
  * Story 5.1: every database access the commerce module makes.
@@ -97,6 +98,19 @@ export type CommerceClickOffer = {
   readonly allowed_host: string
   readonly deep_link_template: string
   readonly advisor_slot: AdvisorSlot | null
+}
+
+/**
+ * Story 6.7b: one eligible sponsorship for one community post, joined to its
+ * offer and partner. The window, the reason and the agreement reference are
+ * never selected, so they cannot reach a response by accident.
+ */
+export type CommunitySponsorshipMatch = {
+  readonly post_id: string
+  readonly offer_id: string
+  readonly offer_title: string
+  readonly partner_slug: string
+  readonly partner_display_name: string
 }
 
 export type CommerceClickRow = {
@@ -429,6 +443,57 @@ export class CommerceRepository {
     `)
 
     return rows[0] ?? null
+  }
+
+  // --- Community sponsorships (Story 6.7b) ----------------------------------
+
+  /**
+   * Every eligible sponsorship among `postIds`, in one statement.
+   *
+   * The link must be open and inside its window; the offer active, a garment
+   * offer and inside its window; the partner active; the offer region equal to
+   * the viewer's region or `'*'`; and the post publicly visible by the same rule
+   * as every other public read. An author reading their own withdrawn or
+   * moderated post therefore gets no row, whatever their read authorization.
+   *
+   * `offerId`, when given, narrows the match to that offer: the click re-check
+   * asks "is THIS offer still sponsored on THIS post for THIS viewer".
+   *
+   * The partial unique index on open links means at most one row per post.
+   */
+  async findEligibleCommunitySponsorships(
+    postIds: readonly string[],
+    localeRegion: string,
+    offerId?: string
+  ): Promise<readonly CommunitySponsorshipMatch[]> {
+    if (postIds.length === 0) {
+      return []
+    }
+
+    return this.prisma.$queryRaw<CommunitySponsorshipMatch[]>(Prisma.sql`
+      SELECT s."post_id"        AS post_id,
+             o."id"             AS offer_id,
+             o."title"          AS offer_title,
+             p."slug"           AS partner_slug,
+             p."display_name"   AS partner_display_name
+      FROM "CommunityPostSponsorship" s
+      JOIN "LookbookPost" lp ON lp."id" = s."post_id"
+      JOIN "AffiliateOffer" o ON o."id" = s."offer_id"
+      JOIN "CommercePartner" p ON p."id" = o."partner_id"
+      WHERE s."post_id" IN (${Prisma.join([...postIds])})
+        ${offerId === undefined ? Prisma.empty : Prisma.sql`AND s."offer_id" = ${offerId}`}
+        AND s."ended_at" IS NULL
+        AND s."starts_at" <= (now() AT TIME ZONE 'UTC')
+        AND (s."ends_at" IS NULL OR (now() AT TIME ZONE 'UTC') < s."ends_at")
+        AND o."status" = 'active'::"AffiliateOfferStatus"
+        AND o."advisor_slot" IS NULL
+        AND o."garment_category" IS NOT NULL
+        AND o."effective_from" <= (now() AT TIME ZONE 'UTC')
+        AND (o."effective_to" IS NULL OR (now() AT TIME ZONE 'UTC') < o."effective_to")
+        AND p."status" = 'active'::"CommercePartnerStatus"
+        AND (o."locale_region" = ${localeRegion} OR o."locale_region" = '*')
+        AND ${publiclyVisiblePostSql('lp')}
+    `)
   }
 
   // --- Clicks --------------------------------------------------------------

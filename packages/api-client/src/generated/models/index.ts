@@ -161,7 +161,7 @@ export interface AffiliateClickRequest {
    */
   offerId: string
   /**
-   * The ScenarioOutfit.id the CTA was rendered on, or the PaletteProfile.id for an advisor click.
+   * The ScenarioOutfit.id the CTA was rendered on, the PaletteProfile.id for an advisor click, or the community post id for a community surface.
    * @type {string}
    * @memberof AffiliateClickRequest
    */
@@ -186,6 +186,9 @@ export interface AffiliateClickRequest {
 export const AffiliateClickRequestSurfaceEnum = {
   mobile_hero: 'mobile_hero',
   palette_advisor: 'palette_advisor',
+  community_feed: 'community_feed',
+  community_spotlight: 'community_spotlight',
+  home_teaser: 'home_teaser',
 } as const
 export type AffiliateClickRequestSurfaceEnum =
   (typeof AffiliateClickRequestSurfaceEnum)[keyof typeof AffiliateClickRequestSurfaceEnum]
@@ -246,6 +249,9 @@ export type AffiliateConversionStatus =
 export const AffiliateSurface = {
   mobile_hero: 'mobile_hero',
   palette_advisor: 'palette_advisor',
+  community_feed: 'community_feed',
+  community_spotlight: 'community_spotlight',
+  home_teaser: 'home_teaser',
 } as const
 export type AffiliateSurface = (typeof AffiliateSurface)[keyof typeof AffiliateSurface]
 
@@ -852,10 +858,10 @@ export type ApiHealthResponseServiceEnum =
 export interface ApiV1CommunityFeedGet200Response {
   /**
    *
-   * @type {ApiV1CommunityFeedGet200ResponseAnyOfData}
+   * @type {CommunitySponsoredFeedResponseData}
    * @memberof ApiV1CommunityFeedGet200Response
    */
-  data: ApiV1CommunityFeedGet200ResponseAnyOfData
+  data: CommunitySponsoredFeedResponseData
 }
 /**
  *
@@ -1378,10 +1384,10 @@ export interface ApiV1CommunityFeedGet200ResponseAnyOfDataItemsInnerReactionsCou
 export interface ApiV1CommunityPostsPostIdGet200Response {
   /**
    *
-   * @type {ApiV1CommunityPostsPostIdGet200ResponseAnyOfData}
+   * @type {CommunitySponsoredFeedResponseDataItemsInner}
    * @memberof ApiV1CommunityPostsPostIdGet200Response
    */
-  data: ApiV1CommunityPostsPostIdGet200ResponseAnyOfData
+  data: CommunitySponsoredFeedResponseDataItemsInner
 }
 /**
  *
@@ -4089,6 +4095,492 @@ export type CommunityReportReason =
 /**
  *
  * @export
+ * @interface CommunitySponsoredFeedResponse
+ */
+export interface CommunitySponsoredFeedResponse {
+  /**
+   *
+   * @type {CommunitySponsoredFeedResponseData}
+   * @memberof CommunitySponsoredFeedResponse
+   */
+  data: CommunitySponsoredFeedResponseData
+}
+/**
+ *
+ * @export
+ * @interface CommunitySponsoredFeedResponseData
+ */
+export interface CommunitySponsoredFeedResponseData {
+  /**
+   *
+   * @type {Array<CommunitySponsoredFeedResponseDataItemsInner>}
+   * @memberof CommunitySponsoredFeedResponseData
+   */
+  items: Array<CommunitySponsoredFeedResponseDataItemsInner>
+  /**
+   *
+   * @type {Array<ApiV1CommunityFeedGet200ResponseAnyOfDataAuthorStatesInner>}
+   * @memberof CommunitySponsoredFeedResponseData
+   */
+  authorStates: Array<ApiV1CommunityFeedGet200ResponseAnyOfDataAuthorStatesInner>
+  /**
+   *
+   * @type {string}
+   * @memberof CommunitySponsoredFeedResponseData
+   */
+  nextCursor: string | null
+  /**
+   *
+   * @type {CommunitySponsoredFeedResponseDataModeEnum}
+   * @memberof CommunitySponsoredFeedResponseData
+   */
+  mode: CommunitySponsoredFeedResponseDataModeEnum
+  /**
+   * The climate band resolved for the viewer, or null if unresolvable.
+   * @type {CommunitySponsoredFeedResponseDataViewerBandEnum}
+   * @memberof CommunitySponsoredFeedResponseData
+   */
+  viewerBand: CommunitySponsoredFeedResponseDataViewerBandEnum | null
+  /**
+   *
+   * @type {boolean}
+   * @memberof CommunitySponsoredFeedResponseData
+   */
+  bandResolved: boolean
+  /**
+   * Why the viewer band could not be resolved, or null when it resolved. Clients render a localized banner from this.
+   * @type {CommunitySponsoredFeedResponseDataBandUnresolvedReasonEnum}
+   * @memberof CommunitySponsoredFeedResponseData
+   */
+  bandUnresolvedReason: CommunitySponsoredFeedResponseDataBandUnresolvedReasonEnum | null
+  /**
+   *
+   * @type {CommunitySponsoredFeedResponseDataExperimentVariantEnum}
+   * @memberof CommunitySponsoredFeedResponseData
+   */
+  experimentVariant: CommunitySponsoredFeedResponseDataExperimentVariantEnum
+  /**
+   *
+   * @type {ApiV1CommunityFeedGet200ResponseAnyOfDataActiveChallenge}
+   * @memberof CommunitySponsoredFeedResponseData
+   */
+  activeChallenge: ApiV1CommunityFeedGet200ResponseAnyOfDataActiveChallenge | null
+}
+
+/**
+ * @export
+ */
+export const CommunitySponsoredFeedResponseDataModeEnum = {
+  auto: 'auto',
+  all: 'all',
+  cold_wet: 'cold_wet',
+  cold_dry: 'cold_dry',
+  temperate_wet: 'temperate_wet',
+  temperate_dry: 'temperate_dry',
+  warm_wet: 'warm_wet',
+  warm_dry: 'warm_dry',
+} as const
+export type CommunitySponsoredFeedResponseDataModeEnum =
+  (typeof CommunitySponsoredFeedResponseDataModeEnum)[keyof typeof CommunitySponsoredFeedResponseDataModeEnum]
+
+/**
+ * @export
+ */
+export const CommunitySponsoredFeedResponseDataViewerBandEnum = {
+  cold_wet: 'cold_wet',
+  cold_dry: 'cold_dry',
+  temperate_wet: 'temperate_wet',
+  temperate_dry: 'temperate_dry',
+  warm_wet: 'warm_wet',
+  warm_dry: 'warm_dry',
+} as const
+export type CommunitySponsoredFeedResponseDataViewerBandEnum =
+  (typeof CommunitySponsoredFeedResponseDataViewerBandEnum)[keyof typeof CommunitySponsoredFeedResponseDataViewerBandEnum]
+
+/**
+ * @export
+ */
+export const CommunitySponsoredFeedResponseDataBandUnresolvedReasonEnum = {
+  no_location: 'no_location',
+  weather_unavailable: 'weather_unavailable',
+  weather_stale: 'weather_stale',
+  weather_malformed: 'weather_malformed',
+  insufficient_usable_days: 'insufficient_usable_days',
+} as const
+export type CommunitySponsoredFeedResponseDataBandUnresolvedReasonEnum =
+  (typeof CommunitySponsoredFeedResponseDataBandUnresolvedReasonEnum)[keyof typeof CommunitySponsoredFeedResponseDataBandUnresolvedReasonEnum]
+
+/**
+ * @export
+ */
+export const CommunitySponsoredFeedResponseDataExperimentVariantEnum = {
+  auto: 'auto',
+  all: 'all',
+} as const
+export type CommunitySponsoredFeedResponseDataExperimentVariantEnum =
+  (typeof CommunitySponsoredFeedResponseDataExperimentVariantEnum)[keyof typeof CommunitySponsoredFeedResponseDataExperimentVariantEnum]
+
+/**
+ *
+ * @export
+ * @interface CommunitySponsoredFeedResponseDataItemsInner
+ */
+export interface CommunitySponsoredFeedResponseDataItemsInner {
+  /**
+   *
+   * @type {string}
+   * @memberof CommunitySponsoredFeedResponseDataItemsInner
+   */
+  id: string
+  /**
+   *
+   * @type {string}
+   * @memberof CommunitySponsoredFeedResponseDataItemsInner
+   */
+  caption: string | null
+  /**
+   *
+   * @type {string}
+   * @memberof CommunitySponsoredFeedResponseDataItemsInner
+   */
+  altText: string | null
+  /**
+   * The climate band stamped when the post was published, or null if unclassified.
+   * @type {CommunitySponsoredFeedResponseDataItemsInnerClimateBandEnum}
+   * @memberof CommunitySponsoredFeedResponseDataItemsInner
+   */
+  climateBand: CommunitySponsoredFeedResponseDataItemsInnerClimateBandEnum | null
+  /**
+   *
+   * @type {ApiV1CommunityFeedGet200ResponseAnyOfDataItemsInnerImageAccess}
+   * @memberof CommunitySponsoredFeedResponseDataItemsInner
+   */
+  imageAccess: ApiV1CommunityFeedGet200ResponseAnyOfDataItemsInnerImageAccess
+  /**
+   *
+   * @type {string}
+   * @memberof CommunitySponsoredFeedResponseDataItemsInner
+   */
+  publishedAt: string | null
+  /**
+   *
+   * @type {string}
+   * @memberof CommunitySponsoredFeedResponseDataItemsInner
+   */
+  createdAt: string
+  /**
+   *
+   * @type {CommunitySponsoredFeedResponseDataItemsInnerStatusEnum}
+   * @memberof CommunitySponsoredFeedResponseDataItemsInner
+   */
+  status: CommunitySponsoredFeedResponseDataItemsInnerStatusEnum
+  /**
+   *
+   * @type {string}
+   * @memberof CommunitySponsoredFeedResponseDataItemsInner
+   */
+  challengeId: string | null
+  /**
+   *
+   * @type {ApiV1CommunityFeedGet200ResponseAnyOfDataItemsInnerAuthor}
+   * @memberof CommunitySponsoredFeedResponseDataItemsInner
+   */
+  author: ApiV1CommunityFeedGet200ResponseAnyOfDataItemsInnerAuthor
+  /**
+   *
+   * @type {ApiV1CommunityPostsPostIdGet200ResponseAnyOfDataReactions}
+   * @memberof CommunitySponsoredFeedResponseDataItemsInner
+   */
+  reactions?: ApiV1CommunityPostsPostIdGet200ResponseAnyOfDataReactions
+  /**
+   *
+   * @type {CommunitySponsoredFeedResponseDataItemsInnerSponsorship}
+   * @memberof CommunitySponsoredFeedResponseDataItemsInner
+   */
+  sponsorship?: CommunitySponsoredFeedResponseDataItemsInnerSponsorship
+}
+
+/**
+ * @export
+ */
+export const CommunitySponsoredFeedResponseDataItemsInnerClimateBandEnum = {
+  cold_wet: 'cold_wet',
+  cold_dry: 'cold_dry',
+  temperate_wet: 'temperate_wet',
+  temperate_dry: 'temperate_dry',
+  warm_wet: 'warm_wet',
+  warm_dry: 'warm_dry',
+} as const
+export type CommunitySponsoredFeedResponseDataItemsInnerClimateBandEnum =
+  (typeof CommunitySponsoredFeedResponseDataItemsInnerClimateBandEnum)[keyof typeof CommunitySponsoredFeedResponseDataItemsInnerClimateBandEnum]
+
+/**
+ * @export
+ */
+export const CommunitySponsoredFeedResponseDataItemsInnerStatusEnum = {
+  draft: 'draft',
+  uploading: 'uploading',
+  pending_review: 'pending_review',
+  published: 'published',
+  flagged: 'flagged',
+  review_failed: 'review_failed',
+  withdrawn: 'withdrawn',
+  consent_suspended: 'consent_suspended',
+} as const
+export type CommunitySponsoredFeedResponseDataItemsInnerStatusEnum =
+  (typeof CommunitySponsoredFeedResponseDataItemsInnerStatusEnum)[keyof typeof CommunitySponsoredFeedResponseDataItemsInnerStatusEnum]
+
+/**
+ * Present only when this post has an eligible sponsorship for this viewer right now. Absent means no CTA.
+ * @export
+ * @interface CommunitySponsoredFeedResponseDataItemsInnerSponsorship
+ */
+export interface CommunitySponsoredFeedResponseDataItemsInnerSponsorship {
+  /**
+   * CommercePartner.slug. Stable, safe to log.
+   * @type {string}
+   * @memberof CommunitySponsoredFeedResponseDataItemsInnerSponsorship
+   */
+  partnerId: string
+  /**
+   * Rendered in the Partnered disclosure and the CTA label.
+   * @type {string}
+   * @memberof CommunitySponsoredFeedResponseDataItemsInnerSponsorship
+   */
+  partnerDisplayName: string
+  /**
+   * Pass back to POST /api/v1/commerce/affiliate/clicks with the post id.
+   * @type {string}
+   * @memberof CommunitySponsoredFeedResponseDataItemsInnerSponsorship
+   */
+  offerId: string
+  /**
+   * Partner-authored, already localized by the catalog row.
+   * @type {string}
+   * @memberof CommunitySponsoredFeedResponseDataItemsInnerSponsorship
+   */
+  offerTitle: string
+}
+/**
+ *
+ * @export
+ * @interface CommunitySponsoredPostResponse
+ */
+export interface CommunitySponsoredPostResponse {
+  /**
+   *
+   * @type {CommunitySponsoredFeedResponseDataItemsInner}
+   * @memberof CommunitySponsoredPostResponse
+   */
+  data: CommunitySponsoredFeedResponseDataItemsInner
+}
+/**
+ *
+ * @export
+ * @interface CommunitySponsoredSpotlightResponse
+ */
+export interface CommunitySponsoredSpotlightResponse {
+  /**
+   *
+   * @type {CommunitySponsoredSpotlightResponseData}
+   * @memberof CommunitySponsoredSpotlightResponse
+   */
+  data: CommunitySponsoredSpotlightResponseData
+}
+/**
+ *
+ * @export
+ * @interface CommunitySponsoredSpotlightResponseData
+ */
+export interface CommunitySponsoredSpotlightResponseData {
+  /**
+   *
+   * @type {CommunitySponsoredSpotlightResponseDataLevelEnum}
+   * @memberof CommunitySponsoredSpotlightResponseData
+   */
+  level: CommunitySponsoredSpotlightResponseDataLevelEnum
+  /**
+   * The viewer's own place name at the ranked level, or null for none. Never derived from authors.
+   * @type {string}
+   * @memberof CommunitySponsoredSpotlightResponseData
+   */
+  label: string | null
+  /**
+   *
+   * @type {Array<CommunitySponsoredSpotlightResponseDataItemsInner>}
+   * @memberof CommunitySponsoredSpotlightResponseData
+   */
+  items: Array<CommunitySponsoredSpotlightResponseDataItemsInner>
+  /**
+   *
+   * @type {string}
+   * @memberof CommunitySponsoredSpotlightResponseData
+   */
+  nextCursor: string | null
+}
+
+/**
+ * @export
+ */
+export const CommunitySponsoredSpotlightResponseDataLevelEnum = {
+  city: 'city',
+  region: 'region',
+  country: 'country',
+  none: 'none',
+} as const
+export type CommunitySponsoredSpotlightResponseDataLevelEnum =
+  (typeof CommunitySponsoredSpotlightResponseDataLevelEnum)[keyof typeof CommunitySponsoredSpotlightResponseDataLevelEnum]
+
+/**
+ *
+ * @export
+ * @interface CommunitySponsoredSpotlightResponseDataItemsInner
+ */
+export interface CommunitySponsoredSpotlightResponseDataItemsInner {
+  /**
+   *
+   * @type {string}
+   * @memberof CommunitySponsoredSpotlightResponseDataItemsInner
+   */
+  id: string
+  /**
+   *
+   * @type {string}
+   * @memberof CommunitySponsoredSpotlightResponseDataItemsInner
+   */
+  caption: string | null
+  /**
+   *
+   * @type {string}
+   * @memberof CommunitySponsoredSpotlightResponseDataItemsInner
+   */
+  altText: string | null
+  /**
+   * The climate band stamped when the post was published, or null if unclassified.
+   * @type {CommunitySponsoredSpotlightResponseDataItemsInnerClimateBandEnum}
+   * @memberof CommunitySponsoredSpotlightResponseDataItemsInner
+   */
+  climateBand: CommunitySponsoredSpotlightResponseDataItemsInnerClimateBandEnum | null
+  /**
+   *
+   * @type {ApiV1CommunityFeedGet200ResponseAnyOfDataItemsInnerImageAccess}
+   * @memberof CommunitySponsoredSpotlightResponseDataItemsInner
+   */
+  imageAccess: ApiV1CommunityFeedGet200ResponseAnyOfDataItemsInnerImageAccess
+  /**
+   *
+   * @type {string}
+   * @memberof CommunitySponsoredSpotlightResponseDataItemsInner
+   */
+  publishedAt: string | null
+  /**
+   *
+   * @type {string}
+   * @memberof CommunitySponsoredSpotlightResponseDataItemsInner
+   */
+  createdAt: string
+  /**
+   *
+   * @type {CommunitySponsoredSpotlightResponseDataItemsInnerStatusEnum}
+   * @memberof CommunitySponsoredSpotlightResponseDataItemsInner
+   */
+  status: CommunitySponsoredSpotlightResponseDataItemsInnerStatusEnum
+  /**
+   *
+   * @type {string}
+   * @memberof CommunitySponsoredSpotlightResponseDataItemsInner
+   */
+  challengeId: string | null
+  /**
+   *
+   * @type {ApiV1CommunityFeedGet200ResponseAnyOfDataItemsInnerAuthor}
+   * @memberof CommunitySponsoredSpotlightResponseDataItemsInner
+   */
+  author: ApiV1CommunityFeedGet200ResponseAnyOfDataItemsInnerAuthor
+  /**
+   *
+   * @type {ApiV1CommunityPostsPostIdGet200ResponseAnyOfDataReactions}
+   * @memberof CommunitySponsoredSpotlightResponseDataItemsInner
+   */
+  reactions?: ApiV1CommunityPostsPostIdGet200ResponseAnyOfDataReactions
+  /**
+   *
+   * @type {CommunitySponsoredFeedResponseDataItemsInnerSponsorship}
+   * @memberof CommunitySponsoredSpotlightResponseDataItemsInner
+   */
+  sponsorship?: CommunitySponsoredFeedResponseDataItemsInnerSponsorship
+  /**
+   * One-based position of the post in the ranked snapshot.
+   * @type {number}
+   * @memberof CommunitySponsoredSpotlightResponseDataItemsInner
+   */
+  rank: number
+}
+
+/**
+ * @export
+ */
+export const CommunitySponsoredSpotlightResponseDataItemsInnerClimateBandEnum = {
+  cold_wet: 'cold_wet',
+  cold_dry: 'cold_dry',
+  temperate_wet: 'temperate_wet',
+  temperate_dry: 'temperate_dry',
+  warm_wet: 'warm_wet',
+  warm_dry: 'warm_dry',
+} as const
+export type CommunitySponsoredSpotlightResponseDataItemsInnerClimateBandEnum =
+  (typeof CommunitySponsoredSpotlightResponseDataItemsInnerClimateBandEnum)[keyof typeof CommunitySponsoredSpotlightResponseDataItemsInnerClimateBandEnum]
+
+/**
+ * @export
+ */
+export const CommunitySponsoredSpotlightResponseDataItemsInnerStatusEnum = {
+  draft: 'draft',
+  uploading: 'uploading',
+  pending_review: 'pending_review',
+  published: 'published',
+  flagged: 'flagged',
+  review_failed: 'review_failed',
+  withdrawn: 'withdrawn',
+  consent_suspended: 'consent_suspended',
+} as const
+export type CommunitySponsoredSpotlightResponseDataItemsInnerStatusEnum =
+  (typeof CommunitySponsoredSpotlightResponseDataItemsInnerStatusEnum)[keyof typeof CommunitySponsoredSpotlightResponseDataItemsInnerStatusEnum]
+
+/**
+ *
+ * @export
+ * @interface CommunitySponsorship
+ */
+export interface CommunitySponsorship {
+  /**
+   * CommercePartner.slug. Stable, safe to log.
+   * @type {string}
+   * @memberof CommunitySponsorship
+   */
+  partnerId: string
+  /**
+   * Rendered in the Partnered disclosure and the CTA label.
+   * @type {string}
+   * @memberof CommunitySponsorship
+   */
+  partnerDisplayName: string
+  /**
+   * Pass back to POST /api/v1/commerce/affiliate/clicks with the post id.
+   * @type {string}
+   * @memberof CommunitySponsorship
+   */
+  offerId: string
+  /**
+   * Partner-authored, already localized by the catalog row.
+   * @type {string}
+   * @memberof CommunitySponsorship
+   */
+  offerTitle: string
+}
+/**
+ *
+ * @export
  * @interface CommunitySpotlightItem
  */
 export interface CommunitySpotlightItem {
@@ -6493,10 +6985,10 @@ export interface GetCommunityNotificationPreferencesResponse {
 export interface GetCommunitySpotlight200Response {
   /**
    *
-   * @type {CommunityReactionSpotlightResponseData}
+   * @type {CommunitySponsoredSpotlightResponseData}
    * @memberof GetCommunitySpotlight200Response
    */
-  data: CommunityReactionSpotlightResponseData
+  data: CommunitySponsoredSpotlightResponseData
 }
 /**
  *

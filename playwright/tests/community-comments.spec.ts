@@ -1,5 +1,5 @@
 import { randomInt, randomUUID } from 'node:crypto'
-import { mergeTests, type Locator, type Page } from '@playwright/test'
+import { mergeTests, type Locator, type Page, type Request } from '@playwright/test'
 import type {
   ApiRequestParams,
   ApiRequestResponse,
@@ -10,7 +10,7 @@ import {
   communityCommentSubmissionResponseSchema,
   communityCommentSubmissionsResponseSchema,
   communityCommentsResponseSchema,
-  communityReactionFeedResponseSchema,
+  communitySponsoredFeedResponseSchema,
   guardianConsentRevokeResponseSchema,
   reportCommunityCommentResponseSchema,
   type CommunityComment,
@@ -171,8 +171,50 @@ async function recordThreadAlerts(thread: Locator): Promise<() => Promise<string
       )
 }
 
+/**
+ * Thread reads (roots and status submissions) still in flight on each page.
+ *
+ * A thread that mounts while a status read for its post is in flight joins that
+ * read instead of sending another (`CommunityCommentsState.statuses`), and the
+ * read a closed thread started is not cancelled. So a Comments reopen right
+ * after the look's own thread, or a Refresh during a read, can legitimately
+ * send no status request at all, and an observer registered for one waits for a
+ * request that never comes. Every reopen and refresh below waits for these to
+ * settle first, so the reads it observes are the ones it caused.
+ */
+const threadReadsInFlight = new WeakMap<Page, Set<Request>>()
+
+function isThreadRead(request: Request): boolean {
+  const { pathname } = new URL(request.url())
+  return (
+    request.method() === 'GET' &&
+    (pathname === COMMENTS_PATH || pathname === SUBMISSIONS_PATH)
+  )
+}
+
+function trackThreadReads(page: Page) {
+  if (threadReadsInFlight.has(page)) return
+  const inFlight = new Set<Request>()
+  threadReadsInFlight.set(page, inFlight)
+  page.on('request', (request) => {
+    if (isThreadRead(request)) inFlight.add(request)
+  })
+  const settle = (request: Request) => inFlight.delete(request)
+  page.on('requestfinished', settle)
+  page.on('requestfailed', settle)
+}
+
+async function threadReadsSettled(page: Page) {
+  await expect
+    .poll(() => threadReadsInFlight.get(page)?.size ?? 0, {
+      message: 'thread reads still in flight',
+    })
+    .toBe(0)
+}
+
 /** Network-first: every read the journey waits on is registered before it fires. */
 async function openThread(page: Page, interceptNetworkCall: InterceptNetworkCallFn) {
+  trackThreadReads(page)
   const grid = page.getByTestId('community-card-grid')
   const initialFeed = completedCommunityFeed(page)
   await page.goto('/')
@@ -182,7 +224,9 @@ async function openThread(page: Page, interceptNetworkCall: InterceptNetworkCall
   await page.getByTestId('community-filter-all').click()
   const acceptedFeed = await allFeed
   expect(acceptedFeed.status).toBe(200)
-  const { experimentVariant } = communityReactionFeedResponseSchema.parse(
+  // The web client opts every feed read in to reactions and sponsorship, so the
+  // response it rendered is parsed with the variant those headers select.
+  const { experimentVariant } = communitySponsoredFeedResponseSchema.parse(
     acceptedFeed.responseJson
   ).data
   await expect(grid).toHaveAttribute('aria-busy', 'false')
@@ -201,6 +245,7 @@ async function reopenThread(
   opener: ReturnType<Page['getByTestId']>,
   interceptNetworkCall: InterceptNetworkCallFn
 ) {
+  await threadReadsSettled(opener.page())
   const rootsRead = interceptNetworkCall({ method: 'GET', url: ROOTS_URL })
   const submissionsRead = interceptNetworkCall({ method: 'GET', url: SUBMISSIONS_URL })
   await opener.click()
@@ -211,6 +256,7 @@ async function refreshThread(
   thread: ReturnType<Page['getByTestId']>,
   interceptNetworkCall: InterceptNetworkCallFn
 ) {
+  await threadReadsSettled(thread.page())
   const rootsRead = interceptNetworkCall({ method: 'GET', url: ROOTS_URL })
   const submissionsRead = interceptNetworkCall({ method: 'GET', url: SUBMISSIONS_URL })
   await thread.getByRole('button', { name: 'Refresh', exact: true }).click()
@@ -275,6 +321,14 @@ test.describe('Story 6.4 screened threaded comments', () => {
     interceptNetworkCall,
   }) => {
     expect(communitySession.userId).toBeTruthy()
+    // CI timing, made deterministic: every status read answers 1.5 s late, so
+    // the look's own thread read is still in flight when Comments reopens. The
+    // reopen must wait for it (see `threadReadsInFlight`).
+    await page.route(`**${SUBMISSIONS_PATH}*`, async (route) => {
+      const response = await route.fetch()
+      await new Promise((resolve) => setTimeout(resolve, 1_500))
+      await route.fulfill({ response })
+    })
     const openedPath = `/api/v1/community/posts/${POST_ID}/opened`
     const measurements: unknown[] = []
     page.on('request', (request) => {

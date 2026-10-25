@@ -1,4 +1,4 @@
-import { listenHttpApp, httpTestUrl } from './helpers/loopback-http-app.js'
+import { listenHttpApp, httpTestUrl } from '../src/testing/loopback-http-app.js'
 import 'reflect-metadata'
 import { randomUUID } from 'node:crypto'
 import { PrismaClient } from '@prisma/client'

@@ -11,6 +11,7 @@ import {
   communityFeedModeSchema,
   communityFeedResponseSchema,
   communityPostResponseSchema,
+  communitySponsoredFeedResponseSchema,
   encodeCommunityFeedCursor,
   publishCommunityPostResponseSchema,
   type CommunityAuthorPostState,
@@ -19,6 +20,9 @@ import {
   type CommunityFeedCursorPayload,
   type CommunityFeedItem,
   type CommunityPostStatus,
+  type CommunitySponsoredFeed,
+  type CommunitySponsoredFeedItem,
+  type CommunitySponsorship,
   type EmbeddedCommunityChallenge,
 } from '@couture/api-client/contracts/http'
 import { WEB_ACCESS_TOKEN_STORAGE_KEY } from '../lib/wardrobe'
@@ -177,6 +181,34 @@ export function feedHandler(overrides: Partial<CommunityFeed> = {}) {
       ...overrides,
     })
   })
+}
+
+/** Story 6.7b: the block an opted-in read carries for an eligible post. */
+export const SPONSORSHIP: CommunitySponsorship = {
+  partnerId: 'atelier-north',
+  partnerDisplayName: 'Atelier North',
+  offerId: 'offer-community-coat',
+  offerTitle: 'Charcoal wool coat',
+}
+
+export const CLICKS_PATH = '/api/v1/commerce/affiliate/clicks'
+
+/** A feed item carrying the sponsorship block. */
+export function sponsoredItem(
+  overrides: Partial<CommunitySponsoredFeedItem> = {}
+): CommunitySponsoredFeedItem {
+  return { ...item(), sponsorship: SPONSORSHIP, ...overrides }
+}
+
+/** The opted-in feed, parsed by the sponsored contract before it is served. */
+export function sponsoredFeedHandler(overrides: Partial<CommunitySponsoredFeed> = {}) {
+  return http.get(FEED_PATH, () =>
+    HttpResponse.json(
+      communitySponsoredFeedResponseSchema.parse({
+        data: { ...feed(), ...overrides },
+      }) as unknown as Record<string, unknown>
+    )
+  )
 }
 
 /** The single-post read, which is how a deep link resolves a target off page one. */

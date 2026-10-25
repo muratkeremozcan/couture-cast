@@ -30,7 +30,18 @@ import {
 } from '../../../scripts/e2e-real-session/identities.mjs'
 
 const [role, control, runDir, authDir, name] = process.argv.slice(2)
-const mark = (file, content = '') => fs.writeFileSync(path.join(control, file), content)
+/**
+ * Publishes a barrier file in one step. The test polls for the name and reads it
+ * at once, and a plain `writeFileSync` creates the file before it writes it, so
+ * under load the test read pids and user ids as ''. A pid read as '' became 0,
+ * and `process.kill(0, 0)` signals the test's own process group, so the test saw
+ * a live process at the first delete (Story 6.7b R21 follow-up).
+ */
+const mark = (file, content = '') => {
+  const temporary = path.join(control, `.${file}.${process.pid}.tmp`)
+  fs.writeFileSync(temporary, content)
+  fs.renameSync(temporary, path.join(control, file))
+}
 const waitFor = async (file) => {
   while (!fs.existsSync(path.join(control, file)))
     await new Promise((resolve) => setTimeout(resolve, 10))

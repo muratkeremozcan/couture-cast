@@ -13,8 +13,8 @@ import {
   encodeCommunityFeedCursor,
   type ClimateBand,
   type CommunityAuthorPostState,
-  type CommunityReactionFeed as CommunityFeed,
-  type CommunityReactionFeedItem as CommunityFeedItem,
+  type CommunitySponsoredFeed as CommunityFeed,
+  type CommunitySponsoredFeedItem as CommunityFeedItem,
   type CommunityFeedMode,
   type CommunityPostStatus,
 } from '@couture/api-client/contracts/http'

@@ -1,0 +1,97 @@
+name: Reserve the local Supabase host ports
+description: >-
+  Add every host port supabase/config.toml assigns to
+  net.ipv4.ip_local_reserved_ports, so the kernel never hands one to an
+  outgoing connection as its local port. The ports (5432x) sit inside Linux's
+  ephemeral range (32768-60999), and a client socket on one makes Docker's bind
+  of 0.0.0.0:<port> fail with "address already in use" (mobile e2e run
+  40162761978 lost a shard to that on 54322). A reservation only steers new
+  connections; a socket opened before it keeps its port until it closes. Run
+  this as the first step after checkout in every job that starts local
+  Supabase, since a local action needs the checkout and every later step adds
+  network traffic. start-local-supabase runs it again, which changes nothing
+  when the ports are already reserved. The step reads the sysctl back and fails
+  when any configured port is left uncovered, when the write fails, or when a
+  Linux runner lacks passwordless sudo. A non-Linux runner has no such sysctl
+  and skips, by design.
+
+runs:
+  using: composite
+  steps:
+    - name: Reserve the Supabase host ports from ephemeral use
+      shell: bash
+      run: |
+        set -u -o pipefail
+        # The reservation is a Linux sysctl; on another OS there is nothing to
+        # apply, by design. Every caller runs on ubuntu-latest.
+        if [ "$(uname -s)" != Linux ]; then
+          echo "Not a Linux runner ($(uname -s)): net.ipv4.ip_local_reserved_ports does not exist here, so nothing is reserved."
+          exit 0
+        fi
+
+        mapfile -t ports < <(
+          grep -E '^[[:space:]]*(shadow_)?port[[:space:]]*=[[:space:]]*[0-9]+' supabase/config.toml |
+            grep -oE '[0-9]+' | sort -un
+        )
+        if [ "${#ports[@]}" -eq 0 ]; then
+          echo "::error::supabase/config.toml assigns no host ports, so none can be reserved."
+          exit 1
+        fi
+        # GitHub's Linux runners grant passwordless sudo; a runner without it
+        # cannot protect the ports and must say so.
+        if ! sudo -n true 2> /dev/null; then
+          echo "::error::Reserving the Supabase host ports needs passwordless sudo, which this Linux runner lacks."
+          exit 1
+        fi
+
+        read_reserved() {
+          sysctl -n net.ipv4.ip_local_reserved_ports 2> /dev/null
+        }
+
+        # Prints the configured ports the sysctl value $1 does not cover. The
+        # value is a comma list of ports and lo-hi ranges.
+        uncovered_ports() {
+          local port entry covered entries
+          IFS=, read -r -a entries <<< "${1//[[:space:]]/}"
+          for port in "${ports[@]}"; do
+            covered=false
+            for entry in "${entries[@]}"; do
+              [[ "$entry" =~ ^[0-9]+(-[0-9]+)?$ ]] || continue
+              if [ "$port" -ge "${entry%-*}" ] && [ "$port" -le "${entry#*-}" ]; then
+                covered=true
+                break
+              fi
+            done
+            if [ "$covered" = false ]; then echo "$port"; fi
+          done
+        }
+
+        if ! reserved="$(read_reserved)"; then
+          echo "::error::Could not read net.ipv4.ip_local_reserved_ports."
+          exit 1
+        fi
+        mapfile -t missing < <(uncovered_ports "$reserved")
+        if [ "${#missing[@]}" -eq 0 ]; then
+          echo "The Supabase host ports $(IFS=,; echo "${ports[*]}") are already reserved: ${reserved}."
+          exit 0
+        fi
+
+        additions="$(IFS=,; echo "${missing[*]}")"
+        # Existing reservations stay; the new ports are appended.
+        if ! sudo -n sysctl -q -w "net.ipv4.ip_local_reserved_ports=${reserved:+${reserved},}${additions}"; then
+          echo "::error::sysctl could not reserve the Supabase host ports ${additions}."
+          exit 1
+        fi
+
+        # A write can report success and still not take effect, so the value
+        # the kernel holds is what counts.
+        if ! reserved="$(read_reserved)"; then
+          echo "::error::Could not read net.ipv4.ip_local_reserved_ports back after reserving ${additions}."
+          exit 1
+        fi
+        mapfile -t missing < <(uncovered_ports "$reserved")
+        if [ "${#missing[@]}" -gt 0 ]; then
+          echo "::error::net.ipv4.ip_local_reserved_ports reads back as '${reserved}', which leaves the Supabase host ports $(IFS=,; echo "${missing[*]}") unreserved."
+          exit 1
+        fi
+        echo "Reserved the Supabase host ports from ephemeral use: ${additions} (now ${reserved})."

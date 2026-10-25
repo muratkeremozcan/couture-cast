@@ -10,12 +10,14 @@ import { io, type Socket } from 'socket.io-client'
 import { afterAll, afterEach, beforeAll, describe, expect, it, vi } from 'vitest'
 import { createUser, persistUser } from '@couture/testing'
 import { isolatedCommunityDatabase } from './helpers/isolated-community-database.js'
-import { listenHttpApp } from './helpers/loopback-http-app.js'
+import { listenHttpApp } from '../src/testing/loopback-http-app.js'
 import { bindRequestContext } from '../src/logger/request-context.js'
 import { CommunitySyncController } from '../src/modules/community/community-sync.controller.js'
 import { CommunitySyncService } from '../src/modules/community/community-sync.service.js'
 import { CommunityTargetsService } from '../src/modules/community/community-targets.service.js'
 import { CommunityPreferencesService } from '../src/modules/community/community-preferences.service.js'
+import { CommunitySponsorshipService } from '../src/modules/commerce/community-sponsorship.service.js'
+import { noSponsorships } from './helpers/community-sponsorship-fixtures.js'
 import { CommunityController } from '../src/modules/community/community.controller.js'
 import { CommunityService } from '../src/modules/community/community.service.js'
 import {
@@ -171,6 +173,7 @@ beforeAll(async () => {
       },
       { provide: CommunityService, useValue: community },
       { provide: CommunitySpotlightService, useValue: spotlight },
+      { provide: CommunitySponsorshipService, useValue: noSponsorships },
       { provide: AccessTokenIdentityService, useValue: identity },
       {
         provide: GuardianConsentStateService,

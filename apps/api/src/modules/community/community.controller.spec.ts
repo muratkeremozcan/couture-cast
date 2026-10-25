@@ -13,6 +13,7 @@ import type { RequestAuthContext } from '../auth/security.types'
 import { CommunityRateLimitException } from './community-rate-limit.exception'
 import { CommunityController } from './community.controller'
 import type { CommunityService } from './community.service'
+import type { CommunitySponsorshipService } from '../commerce/community-sponsorship.service'
 import type { CommunitySpotlightService } from './community-spotlight.service'
 
 /**
@@ -129,7 +130,19 @@ describe('CommunityController', () => {
       recordOpened: vi.fn().mockRejectedValue(new Error('unexpected spotlight open')),
     } as unknown as CommunitySpotlightService
 
-    const controller = new CommunityController(communityService, spotlightService)
+    // Story 6.7b: none of these requests opts in, so the sponsorship service
+    // must never be asked.
+    const sponsorships = {
+      resolveForPosts: vi
+        .fn()
+        .mockRejectedValue(new Error('unexpected sponsorship read')),
+    } as unknown as CommunitySponsorshipService
+
+    const controller = new CommunityController(
+      communityService,
+      spotlightService,
+      sponsorships
+    )
     return {
       controller,
       setReaction,

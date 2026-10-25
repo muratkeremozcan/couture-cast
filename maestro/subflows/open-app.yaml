@@ -162,6 +162,22 @@ appId: ${MAESTRO_APP_ID}
       # `Couture Cast` is the app `name` from apps/mobile/app.json, which Expo
       # Go paints under the splash image. It cannot collide with a screen of
       # ours: every user-facing string in the app spells it `CoutureCast`.
+      # Decide whether a route is pushed only once the app's JS tree has
+      # mounted. `app-root-mounted` (apps/mobile/app/_layout.tsx) commits with
+      # the navigator, so it is on screen with whatever route the app opened on
+      # and never on the project splash. Measured locally on 2026-10-24 (Story
+      # 6.7b, community-feed): without this gate the first block's question was
+      # answered on the splash, the app mounted Home during the lookups that
+      # followed, and the second block's BACK landed on the Home tab, which
+      # sends Expo Go's task to the background (logcat `moveTaskToBack`). The
+      # flow then sat on Expo Go's home for the 45 s wait below on both launches
+      # and ran out its 360 s cap. A mount that never happens fails here and the
+      # `retry` re-opens the link, exactly as the wait below would.
+      - extendedWaitUntil:
+          visible:
+            id: 'app-root-mounted'
+          timeout: 45000
+          label: 'App JS tree mounted'
       - runFlow:
           when:
             notVisible:
@@ -177,7 +193,17 @@ appId: ${MAESTRO_APP_ID}
                   notVisible:
                     text: 'Something went wrong.|Development servers|Couture Cast|This is the developer menu.*|Connected to expo-cli.*'
                 commands:
-                  - back
+                  # Asked again at the last moment. The block's own question
+                  # was answered before the optional BackButton lookup, which
+                  # can take seconds, and an app that finished mounting in
+                  # between is now on a tab: BACK there moves Expo Go's task to
+                  # the background and the wait below fails on Expo Go's home.
+                  - runFlow:
+                      when:
+                        notVisible:
+                          id: 'tab-home'
+                      commands:
+                        - back
             # Let the pop finish before the second block asks the same question.
             # The two blocks are independent evaluations of `notVisible:
             # tab-home`, and a stack transition still animating answers with the
@@ -199,7 +225,17 @@ appId: ${MAESTRO_APP_ID}
                   notVisible:
                     text: 'Something went wrong.|Development servers|Couture Cast|This is the developer menu.*|Connected to expo-cli.*'
                 commands:
-                  - back
+                  # Asked again at the last moment. The block's own question
+                  # was answered before the optional BackButton lookup, which
+                  # can take seconds, and an app that finished mounting in
+                  # between is now on a tab: BACK there moves Expo Go's task to
+                  # the background and the wait below fails on Expo Go's home.
+                  - runFlow:
+                      when:
+                        notVisible:
+                          id: 'tab-home'
+                      commands:
+                        - back
 
       # The tab bar is the app's own first painted chrome, so a failure to mount
       # is reported here, at the launch step, rather than as a confusing

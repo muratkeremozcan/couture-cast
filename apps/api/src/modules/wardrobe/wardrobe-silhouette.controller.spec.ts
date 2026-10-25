@@ -6,6 +6,7 @@ import { Test, type TestingModule } from '@nestjs/testing'
 import type { Request, Response } from 'express'
 import request from 'supertest'
 import { describe, expect, it, vi } from 'vitest'
+import { listenHttpApp } from '../../testing/loopback-http-app.js'
 import { RequestAuthGuard } from '../auth/security.guards.js'
 import type { RequestAuthContext } from '../auth/security.types.js'
 import { WardrobeUploadGuard } from './wardrobe.guard.js'
@@ -448,11 +449,18 @@ describe('WardrobeSilhouetteController', () => {
         .compile()
 
       const app = moduleFixture.createNestApplication()
-      await app.init()
 
       try {
+        // Handing supertest the bare server makes it listen(0) on the dual-stack
+        // wildcard and then request 127.0.0.1. macOS can give that wildcard a port
+        // another process already holds on 127.0.0.1, and that more specific
+        // listener answers instead: a 401, 404 or reset from an unrelated local
+        // process, a few times per 10,000 requests on a developer machine. A listener
+        // bound to 127.0.0.1 owns its port or fails to bind, so every request
+        // reaches this app.
+        const baseUrl = await listenHttpApp(app)
         const postCommit = () =>
-          request(app.getHttpServer() as Parameters<typeof request>[0])
+          request(baseUrl)
             .post('/api/v1/wardrobe/silhouette/my-form/commit')
             .set('Idempotency-Key', VALID_IDEMPOTENCY_KEY)
             .send({ uploadSessionId: 'session-1', confirmsBasewearGuidance: true })

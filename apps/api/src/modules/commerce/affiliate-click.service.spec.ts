@@ -10,11 +10,13 @@ import {
   COMMERCE_OFFER_INVALID_MESSAGE,
   COMMERCE_OFFER_NOT_FOUND_MESSAGE,
   COMMERCE_OPTED_OUT_MESSAGE,
+  COMMERCE_SPONSORSHIP_NOT_FOUND_MESSAGE,
 } from '../../contracts/http.js'
 import type { FeatureFlagsService } from '../feature-flags/feature-flags.service.js'
 import { AffiliateClickService } from './affiliate-click.service.js'
 import type { AffiliateClickTelemetry } from './affiliate-click.telemetry.js'
 import type { CommerceClickOffer, CommerceRepository } from './commerce.repository.js'
+import type { CommunitySponsorshipService } from './community-sponsorship.service.js'
 
 const OFFER: CommerceClickOffer = {
   offer_id: 'offer-1',
@@ -54,6 +56,7 @@ describe('AffiliateClickService', () => {
     findLatestClick: vi.fn(),
   }
   const telemetry = { recordCtaClicked: vi.fn(), recordAdvisorOfferClicked: vi.fn() }
+  const sponsorships = { isClickable: vi.fn() }
 
   let service: AffiliateClickService
 
@@ -76,11 +79,13 @@ describe('AffiliateClickService', () => {
     repository.findLatestClick.mockReset().mockResolvedValue(null)
     telemetry.recordCtaClicked.mockReset().mockResolvedValue(undefined)
     telemetry.recordAdvisorOfferClicked.mockReset().mockResolvedValue(undefined)
+    sponsorships.isClickable.mockReset().mockResolvedValue(true)
 
     service = new AffiliateClickService(
       featureFlags as unknown as FeatureFlagsService,
       repository as unknown as CommerceRepository,
-      telemetry as unknown as AffiliateClickTelemetry
+      telemetry as unknown as AffiliateClickTelemetry,
+      sponsorships as unknown as CommunitySponsorshipService
     )
   })
 
@@ -115,7 +120,8 @@ describe('AffiliateClickService', () => {
             new AffiliateClickService(
               featureFlags as unknown as FeatureFlagsService,
               repository as unknown as CommerceRepository,
-              telemetry as unknown as AffiliateClickTelemetry
+              telemetry as unknown as AffiliateClickTelemetry,
+              sponsorships as unknown as CommunitySponsorshipService
             )
         ).not.toThrow()
       } finally {
@@ -642,5 +648,151 @@ describe('AffiliateClickService', () => {
       expect(repository.createClick).not.toHaveBeenCalled()
       expect(telemetry.recordAdvisorOfferClicked).not.toHaveBeenCalled()
     })
+  })
+  describe('Story 6.7b community surfaces', () => {
+    const COMMUNITY_REQUEST = {
+      userId: 'user-1',
+      offerId: 'offer-1',
+      recommendationId: 'post-1',
+      surface: 'community_feed',
+      acceptLanguage: 'fr-CA,fr;q=0.9',
+    } as const
+
+    it.each(['community_feed', 'community_spotlight', 'home_teaser'] as const)(
+      '6.7b-API-CLICK-001 a %s click re-checks the link, stores the post id and scenario community, and emits the community event',
+      async (surface) => {
+        const result = await service.recordClick({ ...COMMUNITY_REQUEST, surface })
+
+        expect(result.created).toBe(true)
+        expect(result.redirectUrl).toMatch(
+          /^https:\/\/partner\.couturecast\.test\/shop\?cc=/
+        )
+        expect(sponsorships.isClickable).toHaveBeenCalledWith({
+          postId: 'post-1',
+          offerId: 'offer-1',
+          locale: 'en-US',
+          acceptLanguage: 'fr-CA,fr;q=0.9',
+        })
+        expect(repository.findRecentClick).toHaveBeenCalledWith(
+          'user-1',
+          'offer-1',
+          'post-1'
+        )
+        expect(repository.createClick).toHaveBeenCalledWith(
+          expect.objectContaining({
+            recommendationId: 'post-1',
+            scenario: 'community',
+            surface,
+            localeRegion: 'US',
+          })
+        )
+        // The garment scenario lookup and the advisor profile lookup never run.
+        expect(repository.findRecommendationScenario).not.toHaveBeenCalled()
+        expect(repository.findPaletteProfileId).not.toHaveBeenCalled()
+        expect(telemetry.recordCtaClicked).toHaveBeenCalledTimes(1)
+        expect(telemetry.recordCtaClicked).toHaveBeenCalledWith({
+          userId: 'user-1',
+          partnerId: 'sample-partner',
+          offerId: 'offer-1',
+          surface,
+          localeRegion: 'US',
+        })
+      }
+    )
+
+    it('6.7b-API-CLICK-002 no eligible link is a 404 before the dedupe lookup, with no row and no event', async () => {
+      sponsorships.isClickable.mockResolvedValue(false)
+      // A recent row exists, as it would on a replay inside 60 seconds after
+      // the link ended. It must not be returned.
+      repository.findRecentClick.mockResolvedValue({
+        id: 'click-0',
+        token: 'token-0',
+        offer_id: 'offer-1',
+      })
+
+      await expect(service.recordClick(COMMUNITY_REQUEST)).rejects.toMatchObject({
+        status: 404,
+        message: COMMERCE_SPONSORSHIP_NOT_FOUND_MESSAGE,
+      })
+      expect(repository.findRecentClick).not.toHaveBeenCalled()
+      expect(repository.findActiveClickOffer).not.toHaveBeenCalled()
+      expect(repository.createClick).not.toHaveBeenCalled()
+      expect(telemetry.recordCtaClicked).not.toHaveBeenCalled()
+    })
+
+    it('6.7b-API-CLICK-003 an advisor offer behind a community surface is a 404', async () => {
+      repository.findActiveClickOffer.mockResolvedValue({
+        ...OFFER,
+        advisor_slot: 'blush',
+      })
+
+      await expect(service.recordClick(COMMUNITY_REQUEST)).rejects.toMatchObject({
+        status: 404,
+        message: COMMERCE_SPONSORSHIP_NOT_FOUND_MESSAGE,
+      })
+      expect(repository.createClick).not.toHaveBeenCalled()
+      expect(telemetry.recordAdvisorOfferClicked).not.toHaveBeenCalled()
+    })
+
+    it('6.7b-API-CLICK-004 an offer that went inactive after the re-check is a 404', async () => {
+      repository.findActiveClickOffer.mockResolvedValue(null)
+
+      await expect(service.recordClick(COMMUNITY_REQUEST)).rejects.toMatchObject({
+        status: 404,
+        message: COMMERCE_SPONSORSHIP_NOT_FOUND_MESSAGE,
+      })
+      expect(repository.createClick).not.toHaveBeenCalled()
+    })
+
+    it('6.7b-API-CLICK-005 a replay of an eligible click inside 60 seconds returns the same URL and emits nothing', async () => {
+      repository.findRecentClick.mockResolvedValue({
+        id: 'click-0',
+        token: 'token-0',
+        offer_id: 'offer-1',
+      })
+
+      const result = await service.recordClick(COMMUNITY_REQUEST)
+
+      expect(result).toEqual({
+        redirectUrl: 'https://partner.couturecast.test/shop?cc=token-0',
+        created: false,
+      })
+      expect(repository.createClick).not.toHaveBeenCalled()
+      expect(telemetry.recordCtaClicked).not.toHaveBeenCalled()
+    })
+
+    it('6.7b-API-CLICK-006 a lost insert race on a community click is a replay without an event', async () => {
+      repository.createClick.mockRejectedValue(conflict())
+      repository.findLatestClick.mockResolvedValue({
+        id: 'click-winner',
+        token: 'token-winner',
+        offer_id: 'offer-1',
+      })
+
+      const result = await service.recordClick(COMMUNITY_REQUEST)
+
+      expect(result).toEqual({
+        redirectUrl: 'https://partner.couturecast.test/shop?cc=token-winner',
+        created: false,
+      })
+      expect(telemetry.recordCtaClicked).not.toHaveBeenCalled()
+    })
+
+    it.each([
+      ['flag off', 503, COMMERCE_DISABLED_MESSAGE],
+      ['opted out', 403, COMMERCE_OPTED_OUT_MESSAGE],
+    ] as const)(
+      '6.7b-API-CLICK-007 %s keeps the existing precedence over the community re-check',
+      async (state, status, message) => {
+        if (state === 'flag off') featureFlags.getFeatureFlag.mockResolvedValue(false)
+        else repository.findAffiliateCtasEnabled.mockResolvedValue(false)
+
+        await expect(service.recordClick(COMMUNITY_REQUEST)).rejects.toMatchObject({
+          status,
+          message,
+        })
+        expect(sponsorships.isClickable).not.toHaveBeenCalled()
+      }
+    )
   })
 })

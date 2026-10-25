@@ -1,8 +1,10 @@
 // Story 6.6 owner: City Spotlight eligibility, cohort and ranking reads.
 import { Inject, Injectable } from '@nestjs/common'
 import { Prisma, PrismaClient, type LookbookPost } from '@prisma/client'
-import { COMMUNITY_CANARY_USER_ID_PREFIX } from './community-analytics.js'
-import { PUBLICLY_VISIBLE_POST_WHERE } from './community.repository.js'
+import {
+  PUBLICLY_VISIBLE_POST_WHERE,
+  publiclyVisiblePostSql as visibleSql,
+} from './community.repository.js'
 import { assertCommunitySubjectAvailable } from './community-privacy.js'
 import {
   findSpotlightLocation,
@@ -31,19 +33,6 @@ export interface SpotlightRanking {
 }
 
 export type SpotlightCohorts = Record<SpotlightAreaLevel, number>
-
-const CANARY_PATTERN = `${COMMUNITY_CANARY_USER_ID_PREFIX}%`
-
-/**
- * The public visibility rule, inlined for raw SQL. It must stay equal to
- * `PUBLICLY_VISIBLE_POST_WHERE`; the integration suite pins the two together.
- */
-function visibleSql(alias: string): Prisma.Sql {
-  const p = Prisma.raw(alias)
-  return Prisma.sql`${p}.status = 'published' AND ${p}.published_at IS NOT NULL
-    AND ${p}.erasure_requested_at IS NULL AND ${p}.anonymized_at IS NULL
-    AND ${p}.user_id NOT LIKE ${CANARY_PATTERN}`
-}
 
 function areaSql(area: SpotlightAreaComponents, level: SpotlightAreaLevel): Prisma.Sql {
   const country = Prisma.sql`p.area_country = ${area.country}`

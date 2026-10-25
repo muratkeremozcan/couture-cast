@@ -1,4 +1,4 @@
-import { listenHttpApp, httpTestUrl } from './helpers/loopback-http-app.js'
+import { listenHttpApp, httpTestUrl } from '../src/testing/loopback-http-app.js'
 // Learning path Step 33: Affiliate "Shop this look" CTA.
 // See _bmad-output/project-knowledge/learning-path-step-by-step.md#step-33-affiliate-shop-this-look-cta
 import 'reflect-metadata'
@@ -28,6 +28,7 @@ import { AffiliateClickTelemetry } from '../src/modules/commerce/affiliate-click
 import { TelemetryService } from '../src/modules/telemetry/telemetry.service.js'
 import { CommerceModule } from '../src/modules/commerce/commerce.module.js'
 import { CommerceRepository } from '../src/modules/commerce/commerce.repository.js'
+import { CommunitySponsorshipService } from '../src/modules/commerce/community-sponsorship.service.js'
 import { FeatureFlagsWarmup } from '../src/modules/feature-flags/feature-flags.warmup.js'
 import { FeatureFlagsService } from '../src/modules/feature-flags/feature-flags.service.js'
 import { RequestAuthGuard } from '../src/modules/auth/security.guards.js'
@@ -274,6 +275,10 @@ describe('5.1 affiliate clicks against real PostgreSQL and real HTTP', () => {
         },
       })
       await prismaA.affiliateClick.deleteMany({ where: { user_id: userId } })
+      // Story 6.7b: a sponsorship link holds its offer with ON DELETE RESTRICT.
+      await prismaA.communityPostSponsorship.deleteMany({
+        where: { offer: { partner_id: partnerId } },
+      })
       await prismaA.affiliateOffer.deleteMany({ where: { partner_id: partnerId } })
       await prismaA.commercePreference.deleteMany({ where: { user_id: userId } })
       await prismaA.outfitRecommendation.deleteMany({ where: { user_id: userId } })
@@ -483,7 +488,11 @@ describe('5.1 affiliate clicks against real PostgreSQL and real HTTP', () => {
         new AffiliateClickService(
           featureFlags as unknown as FeatureFlagsService,
           new CommerceRepository(client),
-          telemetry
+          telemetry,
+          new CommunitySponsorshipService(
+            featureFlags as unknown as FeatureFlagsService,
+            new CommerceRepository(client)
+          )
         )
 
       // Both services skip the read-then-write dedupe check at the same instant,

@@ -1,0 +1,180 @@
+# Story 6.7b: the Partnered disclosure and "Shop this look" CTA on a sponsored
+# community post, on the Home teaser and on the City Spotlight module card.
+#
+# DATA. `run-maestro.mjs` signs up a fresh member whose only saved location is
+# Chicago, Illinois, United States, the area of the shared, read-only cohort the
+# database seed publishes (`packages/db/prisma/seeds/community-spotlight.ts`).
+# `seed-spotlight-1` ranks first, so it is the teaser's entry and the module's
+# first card. `seedCommunitySponsorship` (`packages/db/prisma/seeds/commerce.ts`)
+# links that post to the first `sample-partner` garment offer, which publishes
+# at `locale_region: '*'`, with no end date, so every member reads the block
+# while `commerce_affiliate_enabled` is on. A fresh member has no commerce
+# preference row, which reads as suggestions on; the per-flow reset deletes the
+# row before every flow and retry. The flow never reacts, never ends the link
+# and never opts out, so it shares the cohort with every other device and stays
+# out of `USER_SCOPED_FLOWS`. Its two clicks write `AffiliateClick` rows that
+# nothing else reads.
+#
+# BROWSER. The click redirects to the seeded partner host
+# `partner.couturecast.test`, which never resolves, so the in-app browser opens
+# on its error page. That page and the browser's address bar both name the host;
+# the address bar is what proves the browser opened on the minted URL, so the
+# host is read from the URL bar element on each platform
+# (`subflows/assert-in-app-browser-host.yaml`). Android opens a Custom Tab
+# (its close button closes it); iOS opens an SFSafariViewController (Done
+# closes it).
+#
+# SELECTORS. The Partnered pill is one accessible element whose label names the
+# partner, and the CTA's label names the action and the partner, so both are
+# read by id with their full label. The teaser link is one accessible element:
+# its label carries the disclosure. A spotlight post can also appear in the feed
+# below the module; the module heads the list, so its copy is the first match
+# (`index: 0`).
+appId: ${MAESTRO_APP_ID}
+name: 'Community sponsored highlights'
+tags:
+  - e2e
+  - community
+  - commerce
+  - maestro
+---
+- launchApp:
+    appId: ${MAESTRO_APP_ID}
+    clearState: true
+    stopApp: false
+
+- runFlow: subflows/open-app.yaml
+
+# --- Home teaser --------------------------------------------------------------
+
+# The disclosure and the CTA sit below the teaser link, the last items on Home.
+# Scroll to the CTA, then one extra swipe settles the whole block clear of the
+# tab bar before anything is read or tapped.
+- scrollUntilVisible:
+    element:
+      id: 'home-spotlight-teaser-shop'
+    direction: DOWN
+    centerElement: true
+    timeout: 30000
+    label: 'The sponsored teaser CTA follows the teaser link on Home'
+- swipe:
+    start: '50%, 70%'
+    end: '50%, 35%'
+    duration: 400
+- waitForAnimationToEnd
+
+# The image element exists before its bytes arrive; the marker appears only
+# after onLoad fires, so this proves the teaser came from a real read.
+- extendedWaitUntil:
+    visible:
+      id: 'home-spotlight-teaser-image-loaded'
+    timeout: 20000
+    label: 'The teaser loaded its signed image over the real API'
+
+- assertVisible:
+    id: 'home-spotlight-teaser-link'
+    text: 'Standout look in Chicago by Style Explorer [0-9A-F]{8}, 6 reactions\. Opens the City Spotlight\. Partnered with Sample Partner'
+    label: 'The teaser link announces the disclosure with the look'
+- assertVisible:
+    id: 'home-spotlight-teaser-partnered'
+    label: 'The Partnered pill is shown; the link carries the spoken disclosure'
+- assertVisible:
+    id: 'home-spotlight-teaser-shop'
+    text: 'Shop this look at Sample Partner\. Opens in an in-app browser'
+    label: 'The CTA names the action and the partner'
+- assertVisible:
+    id: 'home-spotlight-teaser-shop'
+    below:
+      id: 'home-spotlight-teaser-link'
+    label: 'The CTA is its own control below the link'
+- takeScreenshot:
+    path: maestro/artifacts/community-sponsored-teaser
+
+# No `retryTapIfNoChange`: a retried tap would mint a second click.
+- tapOn:
+    id: 'home-spotlight-teaser-shop'
+    label: 'Shop the teaser look'
+
+- runFlow: subflows/dismiss-chrome-first-run.yaml
+- runFlow: subflows/assert-in-app-browser-host.yaml
+- takeScreenshot:
+    path: maestro/artifacts/community-sponsored-teaser-browser
+
+- runFlow: subflows/close-in-app-browser.yaml
+
+- extendedWaitUntil:
+    visible:
+      id: 'home-spotlight-teaser-shop'
+      text: 'Shop this look at Sample Partner\. Opens in an in-app browser'
+    timeout: 15000
+    label: 'Home is back with the CTA at rest'
+- assertNotVisible:
+    id: 'home-spotlight-teaser-shop-error'
+    label: 'An accepted click shows no error'
+
+# --- City Spotlight module card ----------------------------------------------
+
+- runFlow: subflows/open-community-tab.yaml
+
+# The loaded markers: the ranked list replaces the loading state only after a
+# real page arrived, and the card's image marker only after onLoad fired.
+- extendedWaitUntil:
+    visible:
+      id: 'community-spotlight-item-seed-spotlight-1'
+    timeout: 20000
+    label: 'The first ranked spotlight card loaded over the real API'
+- extendedWaitUntil:
+    visible:
+      id: 'community-card-image-loaded-seed-spotlight-1'
+      index: 0
+    timeout: 20000
+    label: 'The spotlight card loaded its signed image'
+
+- assertVisible:
+    id: 'community-card-partnered-seed-spotlight-1'
+    index: 0
+    text: 'Partnered with Sample Partner'
+    label: 'The spotlight card shows the Partnered disclosure in its header'
+
+# The CTA sits under the photo and the caption, below the fold on a phone.
+# iOS reports an element under the tab bar as visible, so the first iOS run
+# tapped the Wardrobe tab through it; centring the CTA keeps the tap on it.
+- scrollUntilVisible:
+    element:
+      id: 'community-card-shop-seed-spotlight-1'
+      index: 0
+    direction: DOWN
+    centerElement: true
+    timeout: 30000
+    label: 'Bring the spotlight card CTA to the middle of the screen'
+- waitForAnimationToEnd
+- assertVisible:
+    id: 'community-card-shop-seed-spotlight-1'
+    index: 0
+    text: 'Shop this look at Sample Partner\. Opens in an in-app browser'
+- takeScreenshot:
+    path: maestro/artifacts/community-sponsored-spotlight-card
+
+- tapOn:
+    id: 'community-card-shop-seed-spotlight-1'
+    index: 0
+    label: 'Shop the spotlight look'
+
+- runFlow: subflows/dismiss-chrome-first-run.yaml
+- runFlow: subflows/assert-in-app-browser-host.yaml
+
+- runFlow: subflows/close-in-app-browser.yaml
+
+- extendedWaitUntil:
+    visible:
+      id: 'community-card-shop-seed-spotlight-1'
+      index: 0
+      text: 'Shop this look at Sample Partner\. Opens in an in-app browser'
+    timeout: 15000
+    label: 'Community is back with the CTA at rest'
+- assertNotVisible:
+    id: 'community-card-shop-error-seed-spotlight-1'
+    label: 'An accepted click shows no error'
+- assertNotVisible:
+    id: 'community-spotlight-detail-title'
+    label: 'The CTA never opened the card detail'

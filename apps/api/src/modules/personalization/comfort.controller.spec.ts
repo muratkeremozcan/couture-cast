@@ -6,6 +6,7 @@ import { type INestApplication } from '@nestjs/common'
 import { Test, type TestingModule } from '@nestjs/testing'
 import request from 'supertest'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
+import { listenHttpApp, httpTestUrl } from '../../testing/loopback-http-app.js'
 import {
   comfortPreferencesResponseSchema,
   updateComfortPreferencesResponseSchema,
@@ -76,7 +77,7 @@ describe('ComfortController', () => {
       .compile()
 
     app = moduleFixture.createNestApplication()
-    await app.init()
+    await listenHttpApp(app)
   })
 
   afterEach(async () => {
@@ -87,25 +88,23 @@ describe('ComfortController', () => {
     }
   })
 
-  const getHttpServer = (): Parameters<typeof request>[0] => {
+  const baseUrl = (): string => {
     if (!app) {
       throw new Error('App not initialized')
     }
-    return app.getHttpServer() as Parameters<typeof request>[0]
+    return httpTestUrl(app)
   }
 
   describe('GET /api/v1/personalization/comfort', () => {
     it('returns 401 when unauthenticated', async () => {
-      const response = await request(getHttpServer()).get(
-        '/api/v1/personalization/comfort'
-      )
+      const response = await request(baseUrl()).get('/api/v1/personalization/comfort')
       expect(response.status).toBe(401)
     })
 
     it('returns 200 with default comfort preferences when none exist in DB', async () => {
       findUniqueMock.mockResolvedValue(null)
 
-      const response = await request(getHttpServer())
+      const response = await request(baseUrl())
         .get('/api/v1/personalization/comfort')
         .set('Authorization', 'Bearer valid-token')
 
@@ -130,7 +129,7 @@ describe('ComfortController', () => {
         precip_preparedness: 'high',
       })
 
-      const response = await request(getHttpServer())
+      const response = await request(baseUrl())
         .get('/api/v1/personalization/comfort')
         .set('Authorization', 'Bearer valid-token')
 
@@ -146,7 +145,7 @@ describe('ComfortController', () => {
 
   describe('PUT /api/v1/personalization/comfort', () => {
     it('returns 401 when unauthenticated', async () => {
-      const response = await request(getHttpServer())
+      const response = await request(baseUrl())
         .put('/api/v1/personalization/comfort')
         .send({
           runsColdWarm: 'warm',
@@ -157,7 +156,7 @@ describe('ComfortController', () => {
     })
 
     it('returns 400 when payload is invalid/malformed', async () => {
-      const response = await request(getHttpServer())
+      const response = await request(baseUrl())
         .put('/api/v1/personalization/comfort')
         .set('Authorization', 'Bearer valid-token')
         .send({
@@ -177,7 +176,7 @@ describe('ComfortController', () => {
         precip_preparedness: 'low',
       })
 
-      const response = await request(getHttpServer())
+      const response = await request(baseUrl())
         .put('/api/v1/personalization/comfort')
         .set('Authorization', 'Bearer valid-token')
         .send({

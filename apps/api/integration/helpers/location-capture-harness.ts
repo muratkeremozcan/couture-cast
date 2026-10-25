@@ -54,7 +54,7 @@ import {
   WeatherRefreshQueue,
 } from '../../src/modules/weather/weather-refresh.queue'
 import { WeatherRepository } from '../../src/modules/weather/weather.repository'
-import { httpTestUrl, listenHttpApp } from './loopback-http-app.js'
+import { httpTestUrl, listenHttpApp } from '../../src/testing/loopback-http-app.js'
 
 /**
  * Story 1.2b: the shared harness for the location capture suites. Each test

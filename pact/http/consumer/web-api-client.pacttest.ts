@@ -14,6 +14,12 @@ import {
   communityReactionInteractions,
   verifyCommunityReactionPostInteraction,
   verifyCommunityReactionInteraction,
+  // Story 6.7b opted-in sponsored reads.
+  verifyCommunitySponsoredFeedInteraction,
+  verifyCommunitySponsoredSpotlightInteraction,
+  verifyCommunitySponsoredHomeTeaserInteraction,
+  verifyCommunitySponsoredPostInteraction,
+  type CommunitySponsoredReads,
 } from './interactions/community'
 // Learning path Step 19: Scenario outfit generator.
 // See _bmad-output/project-knowledge/learning-path-step-by-step.md#step-19-scenario-outfit-generator
@@ -32,7 +38,13 @@ import {
 import { PactV4 } from '@pact-foundation/pact'
 import { createApiClient } from '@couture/api-client'
 import path from 'node:path'
-import { describe, it } from 'vitest'
+import { describe, it, vi } from 'vitest'
+import {
+  getCommunityFeedFromWeb,
+  getCommunityPostFromWeb,
+  getCommunitySpotlightFromWeb,
+} from '../../../apps/web/src/lib/community'
+import { WEB_ACCESS_TOKEN_STORAGE_KEY } from '../../../apps/web/src/lib/wardrobe'
 import {
   pactEventAuth,
   pactTeenAuth,
@@ -88,6 +100,10 @@ import {
   verifyAffiliateWebhookInteraction,
   verifyAffiliateWebhookErrorInteraction,
   affiliateWebhookErrorInteractions,
+  // Story 6.7b sponsored community CTA clicks.
+  communityAffiliateClickSurfaces,
+  verifyCommunityAffiliateClickMintInteraction,
+  verifyCommunityAffiliateClickEndedInteraction,
   verifyNeverSubscribedStatusInteraction,
   verifyCheckoutSessionInteraction,
   verifyPortalSessionInteraction,
@@ -175,6 +191,40 @@ const createWebClientForMockServer = (mockServer: { url: string }) =>
   createApiClient(mockServer.url, {
     accessToken: pactEventAuth.accessToken,
   })
+
+/**
+ * Story 6.7b: runs a real `apps/web/src/lib/community.ts` read against the mock
+ * server. `createWebApiClient` reads `NEXT_PUBLIC_API_BASE_URL` per request and
+ * the wrapper reads its bearer from `sessionStorage`, so this points the one and
+ * seeds the other for the call, then restores both. The wrapper code is real,
+ * so the opt-in headers recorded are the ones the web app sends.
+ */
+async function withWebApp<T>(mockServer: { url: string }, read: () => Promise<T>) {
+  const previousBaseUrl = process.env.NEXT_PUBLIC_API_BASE_URL
+  process.env.NEXT_PUBLIC_API_BASE_URL = mockServer.url
+  vi.stubGlobal('window', {
+    sessionStorage: {
+      getItem: (key: string) =>
+        key === WEB_ACCESS_TOKEN_STORAGE_KEY ? pactEventAuth.accessToken : null,
+    },
+  })
+  try {
+    return await read()
+  } finally {
+    vi.unstubAllGlobals()
+    if (previousBaseUrl === undefined) delete process.env.NEXT_PUBLIC_API_BASE_URL
+    else process.env.NEXT_PUBLIC_API_BASE_URL = previousBaseUrl
+  }
+}
+
+const webSponsoredReads: CommunitySponsoredReads = {
+  feed: (mockServer, request) =>
+    withWebApp(mockServer, () => getCommunityFeedFromWeb(request)),
+  spotlight: (mockServer, request) =>
+    withWebApp(mockServer, () => getCommunitySpotlightFromWeb(request)),
+  post: (mockServer, postId) =>
+    withWebApp(mockServer, () => getCommunityPostFromWeb(postId)),
+}
 
 const createWebTeenClientForMockServer = (mockServer: { url: string }) =>
   createApiClient(mockServer.url, {
@@ -405,6 +455,24 @@ describe('CoutureCastWeb -> CoutureCastApi HTTP contract', () => {
     'preserves the documented affiliate click error envelope that $description',
     async (interaction) => {
       await verifyAffiliateClickErrorInteraction(pact, interaction)
+    }
+  )
+
+  it.each(communityAffiliateClickSurfaces)(
+    'mints an attributed click from the sponsored %s CTA',
+    async (surface) => {
+      await verifyCommunityAffiliateClickMintInteraction(
+        pact,
+        createWebClientForMockServer,
+        surface
+      )
+    }
+  )
+
+  it.each(communityAffiliateClickSurfaces)(
+    'refuses a sponsored %s click after the sponsorship ended',
+    async (surface) => {
+      await verifyCommunityAffiliateClickEndedInteraction(pact, surface)
     }
   )
 
@@ -729,6 +797,22 @@ describe('CoutureCastWeb -> CoutureCastApi HTTP contract', () => {
 
   it('rejects a community post the caller cannot see', async () => {
     await verifyCommunityPostNotFoundInteraction(pact, 'web')
+  })
+
+  it('reads an opted-in feed whose item carries a sponsorship block', async () => {
+    await verifyCommunitySponsoredFeedInteraction(pact, webSponsoredReads, 'web')
+  })
+
+  it('reads an opted-in city spotlight whose item carries a sponsorship block', async () => {
+    await verifyCommunitySponsoredSpotlightInteraction(pact, webSponsoredReads, 'web')
+  })
+
+  it('reads an opted-in home teaser whose item carries a sponsorship block', async () => {
+    await verifyCommunitySponsoredHomeTeaserInteraction(pact, webSponsoredReads, 'web')
+  })
+
+  it('reads one opted-in sponsored post with its sponsorship block', async () => {
+    await verifyCommunitySponsoredPostInteraction(pact, webSponsoredReads, 'web')
   })
 
   it('allocates a community post upload session', async () => {

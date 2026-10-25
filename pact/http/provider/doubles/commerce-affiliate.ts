@@ -1,14 +1,20 @@
-import type { AffiliateClickService } from '../../../../apps/api/src/modules/commerce/affiliate-click.service'
+import type {
+  AffiliateClickService,
+  RecordAffiliateClickInput,
+} from '../../../../apps/api/src/modules/commerce/affiliate-click.service'
 import type { AffiliateOfferService } from '../../../../apps/api/src/modules/commerce/affiliate-offer.service'
 import type { AffiliateWebhookService } from '../../../../apps/api/src/modules/commerce/affiliate-webhook.service'
 import type { CommercePreferencesService } from '../../../../apps/api/src/modules/commerce/commerce-preferences.service'
+import type { CommunitySponsorshipService } from '../../../../apps/api/src/modules/commerce/community-sponsorship.service.js'
 import {
   COMMERCE_AUDIENCE_INELIGIBLE_MESSAGE,
   COMMERCE_DISABLED_MESSAGE,
   COMMERCE_OFFER_NOT_FOUND_MESSAGE,
   COMMERCE_OPTED_OUT_MESSAGE,
+  COMMERCE_SPONSORSHIP_NOT_FOUND_MESSAGE,
   WEBHOOK_SIGNATURE_INVALID_MESSAGE,
   affiliateWebhookPayloadSchema,
+  isAffiliateCommunitySurface,
 } from '@couture/api-client/contracts/http'
 import {
   BadRequestException,
@@ -23,6 +29,7 @@ import {
   PACT_COMMERCE_PARTNER_NAME,
   PACT_COMMERCE_PARTNER_SLUG,
   PACT_COMMERCE_REDIRECT_URL,
+  PACT_COMMUNITY_VIEWER_LOCALE,
 } from '../fixtures'
 import { getProviderCommerceState } from '../state'
 
@@ -34,7 +41,9 @@ import { getProviderCommerceState } from '../state'
  * registers is returned; the scenario readers and response shapers stay private
  * to this module.
  */
-export function createCommerceAffiliateDoubles() {
+export function createCommerceAffiliateDoubles(
+  communitySponsorships: CommunitySponsorshipService
+) {
   const mockAffiliateOfferService = {
     resolveShopThisLook: (input: { outfits: readonly { id: string }[] }) => {
       const state = getProviderCommerceState()
@@ -76,9 +85,15 @@ export function createCommerceAffiliateDoubles() {
    * re-derived rules. The consumer pins one status per interaction; which
    * condition wins when several hold at once is asserted in
    * `apps/api/src/modules/commerce/affiliate-click.service.spec.ts`.
+   *
+   * Story 6.7b: a community surface is decided by the real
+   * `CommunitySponsorshipService.isClickable` over the post id and offer id the
+   * request carried, after the three gates and before anything else, the same
+   * place `recordCommunityClick` runs it. A controller that dropped the surface
+   * or the post id fails here.
    */
   const mockAffiliateClickService = {
-    recordClick: () => {
+    recordClick: async (input: RecordAffiliateClickInput) => {
       const scenario = getProviderCommerceState()?.scenario
       if (scenario === 'flag-disabled') {
         throw new ServiceUnavailableException(COMMERCE_DISABLED_MESSAGE)
@@ -89,14 +104,25 @@ export function createCommerceAffiliateDoubles() {
       if (scenario === 'opted-out') {
         throw new ForbiddenException(COMMERCE_OPTED_OUT_MESSAGE)
       }
+      if (isAffiliateCommunitySurface(input.surface)) {
+        const clickable = await communitySponsorships.isClickable({
+          postId: input.recommendationId,
+          offerId: input.offerId,
+          locale: PACT_COMMUNITY_VIEWER_LOCALE,
+          acceptLanguage: input.acceptLanguage,
+        })
+        if (!clickable) {
+          throw new NotFoundException(COMMERCE_SPONSORSHIP_NOT_FOUND_MESSAGE)
+        }
+      }
       if (scenario === 'unknown-offer') {
         throw new NotFoundException(COMMERCE_OFFER_NOT_FOUND_MESSAGE)
       }
-      return Promise.resolve({
+      return {
         redirectUrl: PACT_COMMERCE_REDIRECT_URL,
         // A replay inside the dedupe window returns the SAME URL with a 200.
         created: scenario !== 'click-deduped',
-      })
+      }
     },
   } as unknown as AffiliateClickService
 

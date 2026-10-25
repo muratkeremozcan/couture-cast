@@ -250,6 +250,9 @@ export class CommunityMaintenanceService {
       if (!post) return null
       const hidden = post.status === 'withdrawn' ? 0 : 1
       const anonymized = post.anonymized_at ? 0 : 1
+      // Story 6.7b: erasure removes the post's sponsorship links with it. The
+      // audit rows that recorded linking and ending them stay.
+      await tx.communityPostSponsorship.deleteMany({ where: { post_id: id } })
       await tx.lookbookPost.update({
         where: { id },
         data: {

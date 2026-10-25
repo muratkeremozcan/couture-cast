@@ -5,6 +5,7 @@ import { UnauthorizedException, type INestApplication } from '@nestjs/common'
 import { PrismaClient } from '@prisma/client'
 import request from 'supertest'
 import { afterEach, beforeEach, describe, expect, it } from 'vitest'
+import { listenHttpApp, httpTestUrl } from '../../testing/loopback-http-app.js'
 import { createMockPrisma, type MockPrisma } from '../../testing/prisma-mock.js'
 import type { AuthenticatedRequest } from '../auth/security.types.js'
 import { RequestAuthGuard } from '../auth/security.guards.js'
@@ -56,7 +57,7 @@ describe('CommercePreferencesController', () => {
       .compile()
 
     app = moduleFixture.createNestApplication()
-    await app.init()
+    await listenHttpApp(app)
   })
 
   afterEach(async () => {
@@ -66,11 +67,11 @@ describe('CommercePreferencesController', () => {
     }
   })
 
-  const server = (): Parameters<typeof request>[0] => {
+  const server = (): string => {
     if (!app) {
       throw new Error('App is not initialized')
     }
-    return app.getHttpServer() as Parameters<typeof request>[0]
+    return httpTestUrl(app)
   }
 
   const authorized = (path: string) =>

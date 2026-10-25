@@ -81,7 +81,7 @@ export class CommerceApi extends runtime.BaseAPI {
   }
 
   /**
-   * Creates one AffiliateClick and returns the outbound partner URL. 201 on a fresh mint, 200 when an identical activation inside 60 seconds is deduped to the existing row. Status precedence is fixed so assertions are deterministic: 503 (feature disabled) outranks 403 (audience), which outranks 403 (opted out), which outranks 404 (unknown, inactive, or out-of-window offer), which outranks 500 (invalid resolved URL).
+   * Creates one AffiliateClick and returns the outbound partner URL. 201 on a fresh mint, 200 when an identical activation inside 60 seconds is deduped to the existing row. Status precedence is fixed so assertions are deterministic: 503 (feature disabled) outranks 403 (audience), which outranks 403 (opted out), which outranks 404 (no eligible community sponsorship for a community surface, then unknown, inactive, or out-of-window offer), which outranks 500 (invalid resolved URL). A community surface (community_feed, community_spotlight, home_teaser) sends the post id as recommendationId and is re-checked against the live sponsorship link before the dedupe lookup.
    * Mint an attributed affiliate click
    */
   async apiV1CommerceAffiliateClicksPostRaw(
@@ -96,7 +96,7 @@ export class CommerceApi extends runtime.BaseAPI {
   }
 
   /**
-   * Creates one AffiliateClick and returns the outbound partner URL. 201 on a fresh mint, 200 when an identical activation inside 60 seconds is deduped to the existing row. Status precedence is fixed so assertions are deterministic: 503 (feature disabled) outranks 403 (audience), which outranks 403 (opted out), which outranks 404 (unknown, inactive, or out-of-window offer), which outranks 500 (invalid resolved URL).
+   * Creates one AffiliateClick and returns the outbound partner URL. 201 on a fresh mint, 200 when an identical activation inside 60 seconds is deduped to the existing row. Status precedence is fixed so assertions are deterministic: 503 (feature disabled) outranks 403 (audience), which outranks 403 (opted out), which outranks 404 (no eligible community sponsorship for a community surface, then unknown, inactive, or out-of-window offer), which outranks 500 (invalid resolved URL). A community surface (community_feed, community_spotlight, home_teaser) sends the post id as recommendationId and is re-checked against the live sponsorship link before the dedupe lookup.
    * Mint an attributed affiliate click
    */
   async apiV1CommerceAffiliateClicksPost(

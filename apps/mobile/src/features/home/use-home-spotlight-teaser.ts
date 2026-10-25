@@ -19,6 +19,7 @@ import {
   recordCommunitySpotlightOpenedFromMobile,
 } from '@/src/lib/community'
 import { safeFindNodeHandle } from '@/src/lib/accessibility-focus'
+import { resolveRenderableCommunitySponsorship } from '@/src/lib/commerce'
 import {
   focusAccessibilityElement,
   observeAccessibilityFocus,
@@ -237,7 +238,16 @@ const nextMove = (target: TeaserFocusTarget) => (previous: TeaserFocusMove | nul
 })
 
 export interface HomeSpotlightTeaserLink extends HomeSpotlightTeaserView {
+  /**
+   * Story 6.7b: Home holds navigation focus. A Home visit starts when this turns
+   * true; the app's background and foreground do not start a new one.
+   */
+  homeFocused: boolean
   linkRef: RefObject<View | null>
+  /** Story 6.7b: the sponsored Shop control, a second focus stop in the teaser. */
+  shopRef: RefObject<View | null>
+  onShopFocus: () => void
+  onShopBlur: () => void
   open: () => void
   onFocus: () => void
   onBlur: () => void
@@ -275,11 +285,15 @@ export function useHomeSpotlightTeaserLink({
   const isHomeFocusedRef = useRef(false)
   const teaser = useHomeSpotlightTeaser({ applicationUserId, focused: isHomeFocused })
   const linkRef = useRef<View>(null)
+  const shopRef = useRef<View>(null)
   /** The activation whose return to Home still owes a focus move; consumed once. */
   const pendingReturnRef = useRef<string | null>(null)
   const inputFocusRef = useRef(false)
   /** The OS reports accessibility focus on the link. */
   const osFocusOnLinkRef = useRef(false)
+  /** Story 6.7b: the same two signals for the sponsored Shop control. */
+  const shopInputFocusRef = useRef(false)
+  const osFocusOnShopRef = useRef(false)
   /** A native focus request the OS has not confirmed yet, set as it is sent. */
   const unconfirmedRef = useRef<FocusRequest | null>(null)
   const mountedRef = useRef(true)
@@ -300,6 +314,8 @@ export function useHomeSpotlightTeaserLink({
       observeAccessibilityFocus(({ tags }) => {
         const linkHandle = safeFindNodeHandle(linkRef.current)
         osFocusOnLinkRef.current = linkHandle !== null && tags.includes(linkHandle)
+        const shopHandle = safeFindNodeHandle(shopRef.current)
+        osFocusOnShopRef.current = shopHandle !== null && tags.includes(shopHandle)
         const request = unconfirmedRef.current
         if (request?.handle && tags.includes(request.handle)) {
           unconfirmedRef.current = null
@@ -362,6 +378,8 @@ export function useHomeSpotlightTeaserLink({
         isHomeFocusedRef.current = false
         inputFocusRef.current = false
         osFocusOnLinkRef.current = false
+        shopInputFocusRef.current = false
+        osFocusOnShopRef.current = false
         setIsHomeFocused(false)
       }
     }, [moveFocus, scrollViewRef])
@@ -371,12 +389,37 @@ export function useHomeSpotlightTeaserLink({
   // could describe where the platform put focus after the removal.
   useLayoutEffect(() => {
     if (teaser.value) return
-    const held = inputFocusRef.current || osFocusOnLinkRef.current
+    const held =
+      inputFocusRef.current ||
+      osFocusOnLinkRef.current ||
+      shopInputFocusRef.current ||
+      osFocusOnShopRef.current
     inputFocusRef.current = false
     osFocusOnLinkRef.current = false
+    shopInputFocusRef.current = false
+    osFocusOnShopRef.current = false
     if (held)
       void moveFocus(() => ({ target: 'scroll-view', node: scrollViewRef.current }))
   }, [moveFocus, scrollViewRef, teaser.value])
+
+  // Story 6.7b: a re-read that drops only the sponsorship removes the Shop
+  // control while the teaser stays. Focus it held goes to the surviving link,
+  // or to the scroll view when the link is gone by the frame focus moves in.
+  const hasShop = Boolean(
+    teaser.value && resolveRenderableCommunitySponsorship(teaser.value.item)
+  )
+  useLayoutEffect(() => {
+    if (!teaser.value || hasShop) return
+    const held = shopInputFocusRef.current || osFocusOnShopRef.current
+    shopInputFocusRef.current = false
+    osFocusOnShopRef.current = false
+    if (held)
+      void moveFocus(() =>
+        linkRef.current
+          ? { target: 'link', node: linkRef.current }
+          : { target: 'scroll-view', node: scrollViewRef.current }
+      )
+  }, [hasShop, moveFocus, scrollViewRef, teaser.value])
 
   const value = teaser.value
   const open = useCallback(() => {
@@ -410,6 +453,24 @@ export function useHomeSpotlightTeaserLink({
   const onBlur = useCallback(() => {
     inputFocusRef.current = false
   }, [])
+  const onShopFocus = useCallback(() => {
+    shopInputFocusRef.current = true
+  }, [])
+  const onShopBlur = useCallback(() => {
+    shopInputFocusRef.current = false
+  }, [])
 
-  return { ...teaser, linkRef, open, onFocus, onBlur, focusRequested, focusLanded }
+  return {
+    ...teaser,
+    homeFocused: isHomeFocused,
+    linkRef,
+    shopRef,
+    onShopFocus,
+    onShopBlur,
+    open,
+    onFocus,
+    onBlur,
+    focusRequested,
+    focusLanded,
+  }
 }

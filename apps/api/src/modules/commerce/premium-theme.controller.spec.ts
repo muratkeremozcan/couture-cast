@@ -12,6 +12,7 @@ import { Test, type TestingModule } from '@nestjs/testing'
 import { PrismaClient } from '@prisma/client'
 import request from 'supertest'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
+import { listenHttpApp, httpTestUrl } from '../../testing/loopback-http-app.js'
 import {
   PREMIUM_REQUIRED_MESSAGE,
   PREMIUM_THEMES_DISABLED_MESSAGE,
@@ -162,7 +163,7 @@ describe('PremiumThemeController', () => {
       .compile()
 
     app = moduleFixture.createNestApplication()
-    await app.init()
+    await listenHttpApp(app)
   }
 
   afterEach(async () => {
@@ -172,11 +173,11 @@ describe('PremiumThemeController', () => {
     }
   })
 
-  const server = (): Parameters<typeof request>[0] => {
+  const server = (): string => {
     if (!app) {
       throw new Error('App is not initialized')
     }
-    return app.getHttpServer() as Parameters<typeof request>[0]
+    return httpTestUrl(app)
   }
 
   const authorizedGet = (path = ROUTE) =>

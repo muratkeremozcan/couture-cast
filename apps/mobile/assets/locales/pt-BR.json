@@ -662,8 +662,9 @@
       "report": "Denunciar",
       "reported": "Denunciado",
       "withdraw": "Retirar",
-      "sponsored": "Patrocinado",
-      "sponsoredAnnounce": "Look patrocinado"
+      "sponsored": "Parceria",
+      "sponsoredAnnounce": "Em parceria com {{partner}}",
+      "shopCta": "Comprar este look em {{partner}}"
     },
     "status": {
       "draft": "Rascunho",

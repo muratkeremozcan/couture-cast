@@ -28,44 +28,44 @@ tags:
     clearState: true
     stopApp: false
 - runFlow: subflows/open-app.yaml
-- runFlow: subflows/open-community-tab.yaml
-- tapOn:
-    id: 'community-filter-chip-all'
-# The chip refetches the feed, and while it loads the list renders empty, which
-# resets any scroll; scrolling starts only once the page is in.
+# Story 6.7b R17: the notification deep link opens Community with `lookbook-5`
+# as the highlighted card at the top of the list. It replaces the tab, the All
+# filter and a swipe walk past the spotlight cohort and seven screen-tall cards,
+# which cost about 50 s of this flow's 305 s in CI run 40145652214 against the
+# runner's 360 s per-flow cap. The comments sheet is the same component either
+# way; the card it opens from is the highlighted copy.
+- runFlow:
+    file: subflows/open-link.yaml
+    env:
+      LINK: '${APP_URL}?source=notification&type=community&cardId=lookbook-5'
+- extendedWaitUntil:
+    visible:
+      id: 'community-screen'
+    timeout: 15000
+    label: 'The notification link opened Community'
 - extendedWaitUntil:
     notVisible:
       id: 'community-feed-skeleton'
     timeout: 20000
-# Story 6.6: the City Spotlight heads the list and the seeded spotlight posts
-# lead the feed, so `lookbook-5` sits about eight screen-tall cards down. The
-# card is reached first with long, steady swipes, as in community-feed.yaml.
 - extendedWaitUntil:
     visible:
-      id: 'community-spotlight-heading'
+      id: 'highlighted-community-card-lookbook-5'
     timeout: 20000
-# Long straight swipes, each moving most of a screen, reach the card in about
-# half the steps of a scroll command, and each step checks for it first.
-- repeat:
-    while:
-      notVisible:
-        id: 'community-post-card-lookbook-5'
-    times: 30
-    commands:
-      - swipe:
-          start: '50%, 85%'
-          end: '50%, 20%'
-          duration: 500
+    label: 'The linked post renders as the highlighted card over the real API'
 - extendedWaitUntil:
     visible:
       id: 'community-post-card-lookbook-5'
     timeout: 10000
+# Centred, slowly: iOS reports a control under the tab bar as visible, and the
+# highlighted card's actions start there (Story 6.7b R17 iOS run 1, where the tap
+# landed on the tab bar). The highlighted card heads the list, so centring never
+# meets the scroll boundary.
 - scrollUntilVisible:
     element:
       id: 'community-card-comments-lookbook-5'
     direction: DOWN
-    # A fully visible action can remain below center at the scroll boundary.
-    centerElement: false
+    centerElement: true
+    speed: 10
     timeout: 20000
 - tapOn:
     id: 'community-card-comments-lookbook-5'

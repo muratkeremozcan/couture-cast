@@ -3,8 +3,14 @@ import { CommunityReactions } from './community-reactions'
 import React, { useCallback, useEffect, useRef, useState } from 'react'
 import { Image, Pressable, StyleSheet, Text, TouchableOpacity, View } from 'react-native'
 import { useTranslation } from 'react-i18next'
-import type { CommunityReactionFeedItem as CommunityFeedItem } from '@couture/api-client/contracts/http'
+import type {
+  AffiliateCommunitySurface,
+  CommunitySponsoredFeedItem as CommunityFeedItem,
+} from '@couture/api-client/contracts/http'
 import { useHeroPalette } from '@/components/hero/hero-theme'
+import { resolveRenderableCommunitySponsorship } from '@/src/lib/commerce'
+import { useSponsoredCtaShown } from '@/src/features/community/sponsored-cta-shown'
+import { CommunitySponsoredShop, withDisclosure } from './community-sponsored-shop'
 
 /**
  * `hero-theme.ts` carries no premium accent and no destructive token -- its
@@ -127,7 +133,6 @@ function CommunityCardMedia({
             <View
               testID={`community-card-image-loaded-${postId}`}
               collapsable={false}
-              pointerEvents="none"
               style={styles.loadedMarker}
             />
           ) : null}
@@ -175,17 +180,20 @@ function CommunityCardActions({
   // "Reported, dimmed" rather than an unexplained button.
   const label = isReported ? t('community.card.reported') : t('community.card.report')
 
+  // A Pressable: this control is disabled once reported, and react-native-web's
+  // disabled TouchableOpacity hands its View a deprecated `pointerEvents` prop.
   return (
-    <TouchableOpacity
+    <Pressable
       testID={`community-card-report-${item.id}`}
       accessibilityRole="button"
       accessibilityLabel={label}
       accessibilityState={{ disabled: isReported }}
       disabled={isReported}
-      style={[
+      style={({ pressed }) => [
         styles.secondaryButton,
         { borderColor: palette.mutedText },
         isReported && styles.secondaryButtonSettled,
+        pressed && styles.pressed,
       ]}
       onPress={() => {
         void onReport(item)
@@ -199,7 +207,7 @@ function CommunityCardActions({
       >
         {label}
       </Text>
-    </TouchableOpacity>
+    </Pressable>
   )
 }
 
@@ -210,8 +218,15 @@ export interface CommunityCardProps {
   item: CommunityFeedItem
   /** Settles the report control into its disabled "Reported" state. */
   isReported?: boolean
-  /** Renders the sponsorship label variant required by the UX contract. */
-  isSponsored?: boolean
+  /**
+   * Story 6.7b: the affiliate surface a sponsored card's click and shown event
+   * report. Module and detail cards of the City Spotlight pass
+   * `community_spotlight`; every card reached from the feed keeps the default.
+   */
+  shopSurface?: Extract<
+    AffiliateCommunitySurface,
+    'community_feed' | 'community_spotlight'
+  >
   /** Emphasises the look a notification deep link landed on. Mirrors web's `isHighlighted`. */
   isHighlighted?: boolean
   /** Lets the screen return accessibility focus here when a modal closes. */
@@ -229,7 +244,7 @@ export function CommunityCard({
   reactionControls,
   item,
   isReported = false,
-  isSponsored = false,
+  shopSurface = 'community_feed',
   isHighlighted = false,
   containerRef,
   onReport,
@@ -356,8 +371,16 @@ export function CommunityCard({
     ? t(`community.band.${item.climateBand}`)
     : t('community.band.unclassified')
 
-  const cardLabel = isSponsored
-    ? `${t('community.card.label', { author: authorName })}. ${t('community.card.sponsoredAnnounce')}`
+  // Derived from the item alone: only a live, opted-in read carries a block, and
+  // the disclosure and the CTA render from the same answer.
+  const sponsorship = resolveRenderableCommunitySponsorship(item)
+  useSponsoredCtaShown(shopSurface, item.id, sponsorship)
+  const sponsoredAnnounce = sponsorship
+    ? t('community.card.sponsoredAnnounce', { partner: sponsorship.partnerDisplayName })
+    : null
+
+  const cardLabel = sponsoredAnnounce
+    ? withDisclosure(t('community.card.label', { author: authorName }), sponsoredAnnounce)
     : t('community.card.label', { author: authorName })
 
   const imageLabel =
@@ -410,11 +433,11 @@ export function CommunityCard({
         </View>
 
         <View style={styles.headerTags}>
-          {isSponsored && (
+          {sponsoredAnnounce && (
             <View
-              testID={`community-card-sponsored-${item.id}`}
+              testID={`community-card-partnered-${item.id}`}
               accessible
-              accessibilityLabel={t('community.card.sponsoredAnnounce')}
+              accessibilityLabel={sponsoredAnnounce}
               style={[styles.sponsoredPill, { backgroundColor: ACCENT_GOLD }]}
             >
               <Text style={[styles.sponsoredPillText, { color: ON_ACCENT }]}>
@@ -454,6 +477,19 @@ export function CommunityCard({
         </Text>
       ) : null}
 
+      {sponsorship ? (
+        // A sibling of the photo's open target.
+        <CommunitySponsoredShop
+          postId={item.id}
+          sponsorship={sponsorship}
+          surface={shopSurface}
+          testID={`community-card-shop-${item.id}`}
+          errorTestID={`community-card-shop-error-${item.id}`}
+          opensTestID={`community-card-shop-opens-${item.id}`}
+          style={styles.shop}
+        />
+      ) : null}
+
       {reactionControls && <CommunityReactions item={item} controls={reactionControls} />}
       <View style={styles.actionsRow}>
         {onComments && (
@@ -491,6 +527,10 @@ const styles = StyleSheet.create({
   },
   header: {
     flexDirection: 'row',
+    // Story 6.7b: a narrow spotlight card cannot fit the author, the Partnered
+    // pill and the climate pill on one line, so the pills wrap onto a second
+    // line and the name keeps a readable width.
+    flexWrap: 'wrap',
     justifyContent: 'space-between',
     alignItems: 'center',
     paddingHorizontal: 14,
@@ -501,7 +541,9 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'center',
     gap: 10,
+    flexGrow: 1,
     flexShrink: 1,
+    minWidth: 150,
   },
   authorMeta: {
     flexShrink: 1,
@@ -559,6 +601,7 @@ const styles = StyleSheet.create({
   },
   loadedMarker: {
     position: 'absolute',
+    pointerEvents: 'none',
     top: 0,
     left: 0,
     width: 1,
@@ -576,6 +619,10 @@ const styles = StyleSheet.create({
     fontWeight: '600',
     textAlign: 'center',
   },
+  shop: {
+    paddingHorizontal: 14,
+    paddingVertical: 10,
+  },
   caption: {
     paddingHorizontal: 14,
     paddingTop: 10,
@@ -586,8 +633,13 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     justifyContent: 'flex-end',
     alignItems: 'center',
+    gap: 8,
     paddingHorizontal: 14,
     paddingVertical: 10,
+  },
+  pressed: {
+    // TouchableOpacity's default `activeOpacity`.
+    opacity: 0.2,
   },
   secondaryButton: {
     paddingHorizontal: 14,

@@ -179,6 +179,44 @@ describe('Story 6.4 rendered comments through real web wrappers', () => {
     }
   )
 
+  it('6.7b-WEB-080 names a published comment whose author has no alias with the card fallback rule', async () => {
+    // The contract lets an available comment carry `author: null` (an author with
+    // no community alias); the thread applies the card rule so every entry names
+    // someone: "You" for the viewer, the localized fallback for anyone else.
+    const nameless = createCommunityComment({
+      id: 'root-nameless',
+      author: null,
+      isOwn: false,
+      body: 'Seeded long root without an alias.',
+      publicationSequence: 2,
+    })
+    const ownNameless = createCommunityComment({
+      id: 'root-own',
+      author: null,
+      isOwn: true,
+      body: 'My own look notes.',
+      publicationSequence: 3,
+    })
+    useMswHandlers(
+      http.get(`${base}/comments`, () =>
+        HttpResponse.json(page([root, nameless, ownNameless]))
+      )
+    )
+    render(<Journey state={makeState()} />)
+
+    const other = within(await screen.findByTestId('comment-root-nameless'))
+    expect(other.getByText('Style explorer')).toBeVisible()
+    expect(within(screen.getByTestId('comment-root-own')).getByText('You')).toBeVisible()
+    expect(
+      screen.getByRole('button', {
+        name: 'Reply: Style explorer. Seeded long root without an alias.',
+      })
+    ).toBeVisible()
+    expect(
+      within(screen.getByTestId('comment-root')).getByText(root.author!)
+    ).toBeVisible()
+  })
+
   it('pages through root, reply and private submission pages', async () => {
     const secondRoot = createCommunityComment({
       id: 'root-next',

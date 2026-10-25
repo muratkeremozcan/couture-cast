@@ -1,6 +1,7 @@
 // Story 6.5 owner (D7): each provider outcome settles the durable delivery exactly once,
 // and the guarded message names only what still survives at the final handoff.
 import { randomUUID } from 'node:crypto'
+import { setTimeout as delay } from 'node:timers/promises'
 import { PrismaClient } from '@prisma/client'
 import {
   buildLookbookPostCreateInput,
@@ -8,7 +9,7 @@ import {
   createUser,
   persistUser,
 } from '@couture/testing'
-import { afterAll, beforeAll, beforeEach, describe, expect, it } from 'vitest'
+import { afterAll, beforeAll, beforeEach, describe, expect, it, vi } from 'vitest'
 import { isolatedCommunityDatabase } from './helpers/isolated-community-database.js'
 import { CommunityRepository } from '../src/modules/community/community.repository.js'
 import { recordCommunityEngagement } from '../src/modules/community/community-engagement-intent.js'
@@ -21,6 +22,9 @@ import { CommunityFlagEvaluationService } from '../src/modules/feature-flags/com
 import { PushRegistrationService } from '../src/modules/notifications/push-registration.service.js'
 
 const db = isolatedCommunityDatabase()
+// A test repeats runtime loop passes for up to 20 s each (see `untilDecided`), so the
+// file's limit has to outlast a fixture fanout plus three dispatches.
+vi.setConfig({ testTimeout: 90_000 })
 const prisma = new PrismaClient({ datasources: { db: { url: db.url } } })
 const flags = new CommunityFlagEvaluationService(prisma, {
   getFeatureFlagValue: () => Promise.resolve(true),
@@ -118,21 +122,122 @@ async function fixture(source: 'reaction' | 'reply' = 'reaction', locale?: strin
   const worker = new CommunityNotificationsWorker(prisma, {
     dispatch: () => Promise.resolve(),
   })
-  await worker.group()
-  await worker.fanout()
-  const delivery = await prisma.communityTokenDelivery.findFirstOrThrow({
-    where: { owner_id: author.id, group: { post_id: post.id } },
+  const delivery = await untilDecided('fanout', async () => {
+    await worker.group()
+    await worker.fanout()
+    const created = await prisma.communityTokenDelivery.findFirst({
+      where: { owner_id: author.id, group: { post_id: post.id } },
+    })
+    return created ?? undefined
   })
   await prisma.$executeRaw`UPDATE "CommunityRuntimeCapability" SET privacy_version = 1 WHERE id = 1`
   return { author, actor, post, parent, reply, delivery }
 }
+
+/**
+ * Repeats one pass of a runtime loop until the pass decides, as the runtime does: it
+ * runs group and fanout every 250 ms and dispatch every 50 ms. Each pass enforces real
+ * wall-clock limits (the 1 s fanout transaction, the 1950 ms flag authorization budget,
+ * the guard's 250 ms transaction wait and 500 ms statements). On a loaded machine a pass
+ * can exceed one of them; it then fails or defers without a provider call, by design,
+ * and the next pass recovers. A loop that never decides fails with its last error as cause.
+ */
+async function untilDecided<T>(loop: string, pass: () => Promise<T | undefined>) {
+  const deadline = Date.now() + 20_000
+  for (;;) {
+    let failure: unknown
+    try {
+      const decided = await pass()
+      if (decided !== undefined) return decided
+    } catch (error) {
+      failure = error
+    }
+    if (Date.now() >= deadline)
+      throw new Error(`The ${loop} loop did not decide within 20 s`, { cause: failure })
+    await delay(50)
+  }
+}
+
+/**
+ * The shortest server-side wait any dispatch pass enforces: the 100 ms lock_timeout of
+ * the claim and of the flag evaluation. Every other limit (the guard's 250 ms lock wait
+ * and pool wait, 500 ms statements, the 2 s pre-send deadline) is longer.
+ */
+const LOAD_FLOOR_MS = 100
+const LOAD_DEFERRAL_REASON = 'no_call:guard_failure'
+
+/**
+ * Dispatches until the guard reaches a decision: a provider call, or a status other than
+ * pending or deferred. A pass that left the delivery pending or deferred made no provider
+ * call, so it is made due again and repeated. `startedAt` is when the deciding pass began.
+ *
+ * D7 allows exactly one kind of non-deciding pass: a live pre-send lock or budget failure,
+ * proven to precede the provider call, which defers with `no_call:guard_failure`. So the
+ * retry is bounded by evidence of load. Each non-deciding pass must have lasted at least
+ * one server-side wait, and any attempt it deferred must carry that load reason. A
+ * regression that defers a first pass without load (or for another reason) fails here
+ * instead of being absorbed by the retry.
+ */
+const dispatched = async (
+  guard: CommunitySendGuard,
+  delivery: { id: string; group_id: string }
+) => {
+  const deferrals: { elapsed: number; reasons: (string | null)[]; error?: Error }[] = []
+  const decided = await untilDecided('dispatch', async () => {
+    const startedAt = Date.now()
+    const calls = sent.length
+    const ordinalBefore = (await allAttempts(delivery.id)).length
+    let error: Error | undefined
+    try {
+      await guard.dispatch(delivery.id)
+    } catch (caught) {
+      error = caught instanceof Error ? caught : new Error(String(caught))
+    }
+    const current = await state(delivery.id)
+    if (
+      error === undefined &&
+      (sent.length > calls || !['pending', 'deferred'].includes(current.status))
+    )
+      return { current, startedAt }
+    deferrals.push({
+      elapsed: Date.now() - startedAt,
+      reasons: (await allAttempts(delivery.id))
+        .filter((attempt) => attempt.ordinal > ordinalBefore)
+        .map((attempt) => attempt.reason),
+      error,
+    })
+    if (error !== undefined) throw error
+    await due(delivery.id, delivery.group_id)
+    return undefined
+  })
+  for (const deferral of deferrals) {
+    expect(
+      deferral.elapsed,
+      `a dispatch pass made no decision in ${deferral.elapsed} ms, faster than any load limit (${deferral.error?.message ?? deferral.reasons.join(', ')})`
+    ).toBeGreaterThanOrEqual(LOAD_FLOOR_MS)
+    for (const reason of deferral.reasons) expect(reason).toBe(LOAD_DEFERRAL_REASON)
+  }
+  return decided
+}
 const state = (id: string) =>
   prisma.communityTokenDelivery.findUniqueOrThrow({ where: { id } })
-const attempts = (deliveryId: string) =>
+const allAttempts = (deliveryId: string) =>
   prisma.communityDeliveryAttempt.findMany({
     where: { delivery_id: deliveryId },
     orderBy: { ordinal: 'asc' },
   })
+/**
+ * Attempts that decided the delivery. A guard pass deferred by load leaves a deferred
+ * attempt; `dispatched` bounds each one, and none may carry any other reason.
+ */
+const attempts = async (deliveryId: string) => {
+  const all = await allAttempts(deliveryId)
+  const deferred = all.filter((attempt) => attempt.status === 'deferred')
+  expect(deferred.map((attempt) => attempt.reason)).toEqual(
+    deferred.map(() => LOAD_DEFERRAL_REASON)
+  )
+  return all.filter((attempt) => attempt.status !== 'deferred')
+}
 /** Moves a scheduled retry to now so the next dispatch may claim it. */
 const due = async (deliveryId: string, groupId: string) => {
   await prisma.communityTokenDelivery.update({
@@ -148,7 +253,7 @@ const due = async (deliveryId: string, groupId: string) => {
 describe('guarded handoff message', () => {
   it('names the reply and its parent for a single surviving comment, in the owner locale', async () => {
     const { delivery, post, parent, reply } = await fixture('reply', 'fr-FR')
-    await new CommunitySendGuard(prisma, flags, provider(accepted)).dispatch(delivery.id)
+    await dispatched(new CommunitySendGuard(prisma, flags, provider(accepted)), delivery)
     expect(sent).toHaveLength(1)
     expect(sent[0]).toMatchObject({
       body: 'Une nouvelle interaction sur votre publication.',
@@ -168,7 +273,7 @@ describe('guarded handoff message', () => {
       data: { status: 'held_for_review' },
     })
     await prisma.$executeRaw`UPDATE "CommunityRuntimeCapability" SET privacy_version = 1 WHERE id = 1`
-    await new CommunitySendGuard(prisma, flags, provider(accepted)).dispatch(delivery.id)
+    await dispatched(new CommunitySendGuard(prisma, flags, provider(accepted)), delivery)
     expect(sent).toHaveLength(0)
     expect(await state(delivery.id)).toMatchObject({ status: 'suppressed' })
     expect((await attempts(delivery.id)).map((attempt) => attempt.reason)).toEqual([
@@ -190,9 +295,8 @@ describe('provider outcomes', () => {
     const delays: number[] = []
     for (let round = 0; round < 3; round++) {
       if (round) await due(delivery.id, delivery.group_id)
-      const before = Date.now()
-      await guard.dispatch(delivery.id)
-      delays.push((await state(delivery.id)).next_attempt_at.getTime() - before)
+      const { current, startedAt } = await dispatched(guard, delivery)
+      delays.push(current.next_attempt_at.getTime() - startedAt)
     }
     expect(sent).toHaveLength(3)
     expect(delays[0]).toBeGreaterThanOrEqual(2000)
@@ -218,7 +322,7 @@ describe('provider outcomes', () => {
         Promise.resolve({ status: 'invalid_token', reason: 'device_not_registered' })
       )
     )
-    await guard.dispatch(delivery.id)
+    await dispatched(guard, delivery)
     expect(await state(delivery.id)).toMatchObject({ status: 'failed' })
     expect(
       await prisma.communityDeliveryReceipt.count({
@@ -237,7 +341,7 @@ describe('provider outcomes', () => {
       flags,
       provider(() => Promise.reject(new Error('Controlled provider crash')))
     )
-    await guard.dispatch(delivery.id)
+    await dispatched(guard, delivery)
     expect(await state(delivery.id)).toMatchObject({ status: 'unknown' })
     expect(await attempts(delivery.id)).toEqual([
       expect.objectContaining({ status: 'unknown', reason: 'handoff_uncertain' }),
@@ -254,7 +358,7 @@ describe('flag evaluation before the claim', () => {
     const denied = new CommunityFlagEvaluationService(prisma, {
       getFeatureFlagValue: () => Promise.resolve(false),
     })
-    await new CommunitySendGuard(prisma, denied, provider(accepted)).dispatch(delivery.id)
+    await dispatched(new CommunitySendGuard(prisma, denied, provider(accepted)), delivery)
     expect(sent).toHaveLength(0)
     expect(await state(delivery.id)).toMatchObject({ status: 'suppressed' })
   })

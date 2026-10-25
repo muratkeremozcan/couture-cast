@@ -258,7 +258,10 @@ function requiresGuardianComplianceState(
   )
 }
 
-function hasReachedAgeOfMajority(birthdate: Date | null | undefined, today = new Date()) {
+export function hasReachedAgeOfMajority(
+  birthdate: Date | null | undefined,
+  today = new Date()
+) {
   if (!(birthdate instanceof Date)) {
     return false
   }

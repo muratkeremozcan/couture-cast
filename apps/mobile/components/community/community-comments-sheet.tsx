@@ -37,11 +37,29 @@ import type {
   CommunityCommentDrafts,
 } from '@/src/features/community/community-comment-drafts'
 
+/**
+ * The author line of a comment, by the community card's rule: the alias, else
+ * "You" for the viewer, else the localized fallback. The contract lets an
+ * available comment carry no alias, so every published comment still has a
+ * name. A comment that is no longer available names nobody.
+ */
+export function commentAuthor(
+  item: CommunityComment,
+  t: (key: string) => string
+): string | null {
+  if (item.unavailable) return null
+  const alias = item.author?.trim()
+  if (alias) return alias
+  return item.isOwn ? t('community.card.authorSelf') : t('community.card.authorFallback')
+}
+
 /** The author and body that name a comment's actions and a reply's target. */
-function commentContext(item: CommunityComment, unavailable: string): string {
-  return [item.author, item.unavailable ? unavailable : item.body]
-    .filter(Boolean)
-    .join('. ')
+function commentContext(
+  item: CommunityComment,
+  author: string | null,
+  unavailable: string
+): string {
+  return [author, item.unavailable ? unavailable : item.body].filter(Boolean).join('. ')
 }
 
 /** R51: the thread region leaves the layout while the keyboard is open. */
@@ -259,7 +277,7 @@ export function CommunityCommentsSheet({
       drafts.remember(member, postId, { unresolved: submitted.unresolved })
   }
   const context = (item: CommunityComment) =>
-    commentContext(item, t('community.comments.unavailable'))
+    commentContext(item, commentAuthor(item, t), t('community.comments.unavailable'))
   const actionName = (action: string, item: CommunityComment) =>
     `${action}: ${context(item)}`
   const replying = () => {
@@ -268,107 +286,113 @@ export function CommunityCommentsSheet({
     return root ? `${replyingTo}: ${context(root)}` : replyingTo
   }
 
-  const entry = (item: CommunityComment) => (
-    <View
-      key={item.id}
-      testID={`comment-${item.id}`}
-      ref={(node) => {
-        entries.current.set(item.id, node)
-      }}
-      accessibilityLabel={[item.author, item.body].filter(Boolean).join('. ')}
-      style={[styles.entry, { borderColor: palette.divider }]}
-      accessible={Boolean(target && target.commentId === item.id)}
-    >
-      {item.author && (
-        <Text style={[styles.author, { color: palette.text }]}>{item.author}</Text>
-      )}
-      <Text style={{ color: palette.text }}>
-        {item.unavailable ? t('community.comments.unavailable') : item.body}
-      </Text>
-      <View style={styles.row} accessible={false}>
-        {!item.parentId &&
-          !item.unavailable &&
-          button(
-            t('community.comments.reply'),
+  const entry = (item: CommunityComment) => {
+    const author = commentAuthor(item, t)
+    return (
+      <View
+        key={item.id}
+        testID={`comment-${item.id}`}
+        ref={(node) => {
+          entries.current.set(item.id, node)
+        }}
+        accessibilityLabel={[author, item.body].filter(Boolean).join('. ')}
+        style={[styles.entry, { borderColor: palette.divider }]}
+        accessible={Boolean(target && target.commentId === item.id)}
+      >
+        {author && <Text style={[styles.author, { color: palette.text }]}>{author}</Text>}
+        <Text style={{ color: palette.text }}>
+          {item.unavailable ? t('community.comments.unavailable') : item.body}
+        </Text>
+        <View style={styles.row} accessible={false}>
+          {!item.parentId &&
+            !item.unavailable &&
+            button(
+              t('community.comments.reply'),
+              () => {
+                edit({ parentId: item.id })
+                composerRef.current?.focus()
+              },
+              false,
+              `comment-reply-${item.id}`,
+              actionName(t('community.comments.reply'), item)
+            )}
+          {item.isOwn &&
+            button(
+              t('community.comments.delete'),
+              () => {
+                void state.delete(postId, item.id)
+              },
+              false,
+              undefined,
+              actionName(t('community.comments.delete'), item)
+            )}
+          {button(
+            t('community.card.report'),
             () => {
-              edit({ parentId: item.id })
-              composerRef.current?.focus()
+              reportGeneration.current++
+              setReason('spam')
+              setReporting(item.id)
             },
-            false,
-            `comment-reply-${item.id}`,
-            actionName(t('community.comments.reply'), item)
-          )}
-        {item.isOwn &&
-          button(
-            t('community.comments.delete'),
-            () => {
-              void state.delete(postId, item.id)
-            },
-            false,
+            item.isOwn,
             undefined,
-            actionName(t('community.comments.delete'), item)
+            actionName(t('community.card.report'), item)
           )}
-        {button(
-          t('community.card.report'),
-          () => {
-            reportGeneration.current++
-            setReason('spam')
-            setReporting(item.id)
-          },
-          item.isOwn,
-          undefined,
-          actionName(t('community.card.report'), item)
-        )}
-        {!item.parentId &&
-          item.replyCount > 0 &&
-          button(
-            t('community.comments.replies', { count: item.replyCount }),
-            () => {
-              void state.load(postId, item.id)
-            },
-            false,
-            `comment-replies-${item.id}`,
-            actionName(t('community.comments.replies', { count: item.replyCount }), item)
-          )}
-      </View>
-      {reporting === item.id && (
-        <View accessible={false}>
-          <Text style={{ color: palette.text }}>{t('community.report.reasonLabel')}</Text>
-          {communityReportReasonSchema.options.map((option) => (
-            <TouchableOpacity
-              key={option}
-              accessibilityRole="radio"
-              accessibilityState={{ checked: reason === option }}
-              aria-checked={reason === option}
-              accessibilityLabel={t(`community.report.reason.${option}`)}
-              style={[
-                styles.button,
-                { borderColor: reason === option ? '#C9A14A' : palette.divider },
-              ]}
-              onPress={() => setReason(option)}
-            >
-              <Text style={{ color: palette.text }}>
-                {t(`community.report.reason.${option}`)}
-              </Text>
-            </TouchableOpacity>
-          ))}
-          {button(t('community.comments.sendReport'), () => {
-            const owner = reportGeneration.current
-            void state.report(postId, item.id, reason).then((accepted) => {
-              if (accepted && reportGeneration.current === owner) {
-                reportGeneration.current++
-                setReporting(null)
-              }
-            })
-          })}
-          {button(t('community.comments.cancel'), () => {
-            reportGeneration.current++
-            setReporting(null)
-          })}
+          {!item.parentId &&
+            item.replyCount > 0 &&
+            button(
+              t('community.comments.replies', { count: item.replyCount }),
+              () => {
+                void state.load(postId, item.id)
+              },
+              false,
+              `comment-replies-${item.id}`,
+              actionName(
+                t('community.comments.replies', { count: item.replyCount }),
+                item
+              )
+            )}
         </View>
-      )}
-    </View>
-  )
+        {reporting === item.id && (
+          <View accessible={false}>
+            <Text style={{ color: palette.text }}>
+              {t('community.report.reasonLabel')}
+            </Text>
+            {communityReportReasonSchema.options.map((option) => (
+              <TouchableOpacity
+                key={option}
+                accessibilityRole="radio"
+                accessibilityState={{ checked: reason === option }}
+                aria-checked={reason === option}
+                accessibilityLabel={t(`community.report.reason.${option}`)}
+                style={[
+                  styles.button,
+                  { borderColor: reason === option ? '#C9A14A' : palette.divider },
+                ]}
+                onPress={() => setReason(option)}
+              >
+                <Text style={{ color: palette.text }}>
+                  {t(`community.report.reason.${option}`)}
+                </Text>
+              </TouchableOpacity>
+            ))}
+            {button(t('community.comments.sendReport'), () => {
+              const owner = reportGeneration.current
+              void state.report(postId, item.id, reason).then((accepted) => {
+                if (accepted && reportGeneration.current === owner) {
+                  reportGeneration.current++
+                  setReporting(null)
+                }
+              })
+            })}
+            {button(t('community.comments.cancel'), () => {
+              reportGeneration.current++
+              setReporting(null)
+            })}
+          </View>
+        )}
+      </View>
+    )
+  }
 
   return (
     <EdgeToEdgeModal

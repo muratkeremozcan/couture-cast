@@ -1,0 +1,29 @@
+# Story 6.7b: the in-app browser opened on the minted partner URL, read from the
+# browser's own URL bar. The seeded host never resolves, so the page body is an
+# error page that names the host too; an unscoped text match could be satisfied
+# by either element. The ids come from hierarchy dumps of the open browser
+# (`_bmad-output/test-artifacts/story-6-7b/runs/tea-l8-hierarchy/`): Chrome's
+# Custom Tab URL bar on Android, the SFSafariViewController address field
+# (accessibility label "Address") on iOS.
+appId: ${MAESTRO_APP_ID}
+---
+- runFlow:
+    when:
+      platform: Android
+    commands:
+      - extendedWaitUntil:
+          visible:
+            id: 'com.android.chrome:id/url_bar'
+            text: '.*partner\.couturecast\.test.*'
+          timeout: 20000
+          label: 'The Custom Tab URL bar shows the minted partner host'
+- runFlow:
+    when:
+      platform: iOS
+    commands:
+      - extendedWaitUntil:
+          visible:
+            id: 'URL'
+            text: '.*partner\.couturecast\.test.*'
+          timeout: 20000
+          label: 'The in-app browser address field shows the minted partner host'

@@ -65,6 +65,20 @@ import {
   waitForPackageManagerReady,
 } from './lib/package-manager-readiness.mjs'
 import { buildMobileE2EAccessToken } from './lib/mobile-e2e-token.mjs'
+import {
+  preparedFlowPath,
+  prepareAndroidFlowTree,
+  requestedPermissionsFromDumpsys,
+} from './lib/maestro-android-permissions.mjs'
+import {
+  waitForDevicePortFree,
+  waitForStaleMaestroSessions,
+} from './lib/maestro-android-driver-session.mjs'
+import {
+  createLaunchStallCheck,
+  launchStallError,
+} from './lib/maestro-launch-watchdog.mjs'
+import { runAndroidDeviceShards } from './lib/maestro-android-shards.mjs'
 
 const scriptDir = path.dirname(fileURLToPath(import.meta.url))
 const projectRoot = path.resolve(scriptDir, '..')
@@ -147,10 +161,10 @@ const MAESTRO_ARTIFACT_DIR = process.env.MAESTRO_ARTIFACT_DIR || 'maestro/artifa
  * override with `MOBILE_E2E_CI_FLOW_TIMEOUT_MS` for the rare case (a flow
  * genuinely growing past this) rather than special-casing either environment.
  *
- * Sized well above every flow's recorded cost in
- * `scripts/maestro-flow-durations.json` (worst case recorded there is under
- * three minutes) and well below the CI job's 45-minute ceiling, so a normal
- * flow never comes close to it.
+ * Sized above every flow's recorded cost in
+ * `scripts/maestro-flow-durations.json` (the worst case recorded there is
+ * community-feed.yaml at 291s) and well below the CI job's 45-minute ceiling,
+ * so a normal flow stays under it.
  *
  * This exists because a flow can silently stall rather than fail. Observed on
  * three different flows across three different runs on 2026-08-20, always the
@@ -1857,7 +1871,130 @@ const maestroDriverReuse = createMaestroDriverReuse({
       ],
       { timeoutMs: 30_000 }
     ),
+  settle: (device, driverPort) => settleAndroidDriver(device, driverPort),
 })
+
+/**
+ * Story 6.7b R18: the copy of `maestro/` that Android flows run from, with every
+ * permission-less `launchApp` naming Expo Go's requested permissions. Unset until
+ * the devices are probed, and on iOS. It sits under the artifact directory, which
+ * git ignores and CI uploads, so a report's `file=` stays a short relative path
+ * and the exact flows Maestro ran are kept with its output.
+ *
+ * @type {{ sourceDir: string, targetDir: string } | undefined}
+ */
+let androidFlowTree
+
+/**
+ * Reads Expo Go's requested permissions from every device (they must agree) and
+ * writes the Android copy of the flow tree, replacing any copy an earlier run left.
+ *
+ * @param {string} appId
+ * @param {readonly string[]} devices
+ * @returns {Promise<{ sourceDir: string, targetDir: string }>}
+ */
+const prepareAndroidFlows = async (appId, devices) => {
+  /** @type {string[] | undefined} */
+  let permissions
+  for (const serial of devices.length > 0 ? devices : [DEFAULT_ADB_DEVICE]) {
+    const target = serial === DEFAULT_ADB_DEVICE ? [] : ['-s', serial]
+    // eslint-disable-next-line no-await-in-loop -- one device at a time
+    const { stdout } = await captureProcess(
+      resolveAdbBinary(),
+      [...target, 'shell', 'dumpsys', 'package', appId],
+      { timeoutMs: 30_000 }
+    )
+    const found = requestedPermissionsFromDumpsys(stdout, appId)
+    if (permissions && found.join('\n') !== permissions.join('\n')) {
+      throw new Error(
+        `${serial} requests other permissions for ${appId} than ${devices[0]}`
+      )
+    }
+    permissions = found
+  }
+  const sourceDir = path.resolve(projectRoot, 'maestro')
+  const targetDir = path.resolve(projectRoot, MAESTRO_ARTIFACT_DIR, 'android-flows')
+  const { files, rewritten } = prepareAndroidFlowTree({
+    sourceDir,
+    targetDir,
+    permissions: permissions ?? [],
+    skip: [path.basename(MAESTRO_ARTIFACT_DIR)],
+  })
+  log(
+    `Android flows name ${appId}'s ${permissions?.length ?? 0} requested permissions in ` +
+      `${rewritten} launchApp commands across ${files} files, so Maestro pulls no APK ` +
+      `(flows run from ${path.relative(process.cwd(), targetDir)})`
+  )
+  return { sourceDir, targetDir }
+}
+
+/**
+ * The flow file Maestro is handed: the Android copy once it exists, else `flowPath`.
+ *
+ * @param {string} flowPath
+ * @param {'android' | 'ios'} platform
+ * @returns {string}
+ */
+const maestroFlowPath = (flowPath, platform) =>
+  platform === 'android' && androidFlowTree
+    ? path.relative(
+        process.cwd(),
+        preparedFlowPath(flowPath, androidFlowTree.sourceDir, androidFlowTree.targetDir)
+      )
+    : flowPath
+
+/**
+ * Story 6.7b R18: what every Android flow's driver needs from the device before
+ * Maestro starts. See scripts/lib/maestro-android-driver-session.mjs.
+ *
+ * The driver an earlier flow started stays alive after its Maestro exits
+ * (`--no-reinstall-driver` keeps the app, and nothing stops the instrumentation),
+ * listening on the pinned port until the next `am instrument` kills it. Stopping
+ * it here first means the port check sees only what would really block the new
+ * driver. Then a session record left by an invocation whose driver never started
+ * is waited out, so this flow's Maestro starts its own driver.
+ *
+ * @param {string} device
+ * @param {number | null} driverPort the pinned port to check, `null` when Maestro picks one
+ * @returns {Promise<void>}
+ */
+const settleAndroidDriver = async (device, driverPort) => {
+  const adbBinary = resolveAdbBinary()
+  const target = device === DEFAULT_ADB_DEVICE ? [] : ['-s', device]
+  await captureProcess(
+    adbBinary,
+    [...target, 'shell', 'am', 'force-stop', 'dev.mobile.maestro'],
+    {
+      timeoutMs: 15_000,
+    }
+  )
+  await waitForStaleMaestroSessions({
+    device: device === DEFAULT_ADB_DEVICE ? undefined : device,
+    log,
+  })
+  if (driverPort === null) return
+  await waitForDevicePortFree({
+    readProcNet: async () => {
+      try {
+        const { stdout } = await captureProcess(
+          adbBinary,
+          [...target, 'shell', 'cat', '/proc/net/tcp', '/proc/net/tcp6'],
+          { timeoutMs: 15_000 }
+        )
+        return stdout
+      } catch (error) {
+        // An image that hides its socket table cannot be checked; the flow still runs.
+        log(
+          `Could not read the TCP socket table on ${device} (${error.message}), ` +
+            `so driver port ${driverPort} is not checked`
+        )
+        return ''
+      }
+    },
+    port: driverPort,
+    device,
+  })
+}
 
 /**
  * The community beta arm, as `community-analytics.ts` assigns it:
@@ -2098,6 +2235,9 @@ const waitForCondition = async (condition, timeoutMs = 60000, intervalMs = 2000)
  * @property {NodeJS.ProcessEnv} [env]
  * @property {string} [cwd]
  * @property {string} [logFile]
+ * @property {{ intervalMs: number, check: () => Promise<string | undefined> }} [stallCheck]
+ *   polled while the child runs; a message stops the child and fails it with
+ *   that message, which the flow does not retry (Story 6.7b R18)
  */
 
 /**
@@ -2113,7 +2253,7 @@ const waitForCondition = async (condition, timeoutMs = 60000, intervalMs = 2000)
  */
 const spawnProcess = (command, args, options = {}) =>
   new Promise((resolve, reject) => {
-    const { timeoutMs, signal, logFile, ...spawnOptions } = options
+    const { timeoutMs, signal, logFile, stallCheck, ...spawnOptions } = options
     let logStream
     if (logFile) {
       fs.mkdirSync(path.dirname(logFile), { recursive: true })
@@ -2132,6 +2272,28 @@ const spawnProcess = (command, args, options = {}) =>
             child.kill('SIGINT')
           }, timeoutMs)
         : null
+    /** @type {string | undefined} */
+    let stalled
+    let checking = false
+    const stallTimer = stallCheck
+      ? setInterval(() => {
+          if (checking || stalled || timedOut) return
+          checking = true
+          stallCheck
+            .check()
+            .then((message) => {
+              if (message && !stalled && !timedOut) {
+                stalled = message
+                child.kill('SIGINT')
+              }
+            })
+            // A check that cannot read its evidence leaves the flow to its own timeout.
+            .catch(() => undefined)
+            .finally(() => {
+              checking = false
+            })
+        }, stallCheck.intervalMs)
+      : null
 
     if (logFile && child.stdout && child.stderr && logStream) {
       child.stdout.on('data', (data) => {
@@ -2154,6 +2316,11 @@ const spawnProcess = (command, args, options = {}) =>
 
     child.on('exit', (code) => {
       if (timeout) clearTimeout(timeout)
+      if (stallTimer) clearInterval(stallTimer)
+      if (stalled) {
+        finish(() => reject(launchStallError(stalled)))
+        return
+      }
       if (timedOut) {
         const error = new Error(`${command} timed out after ${timeoutMs}ms`)
         error.timedOut = true
@@ -2170,6 +2337,7 @@ const spawnProcess = (command, args, options = {}) =>
     })
     child.on('error', (err) => {
       if (timeout) clearTimeout(timeout)
+      if (stallTimer) clearInterval(stallTimer)
       finish(() => reject(err))
     })
     if (signal) {
@@ -3530,7 +3698,76 @@ const recordShardedSuiteOutcome = (
 }
 
 /**
- * Run the shardable flows as one Maestro invocation across every device.
+ * Story 6.7b R21: the Android shardable flows, one queue per device, each flow
+ * with the serial path's flow cap, its single cap retry and the launch watchdog,
+ * on the device's own pinned driver port.
+ *
+ * @param {string[]} shardedFlows
+ * @param {{ platform: 'android' | 'ios' }} target
+ * @param {NodeJS.ProcessEnv} maestroEnv
+ * @param {string[]} flowFailures collected in place
+ * @returns {Promise<void>}
+ */
+const runAndroidShardedFlows = async (shardedFlows, target, maestroEnv, flowFailures) => {
+  /** @type {Record<string, number>} */
+  let durations = {}
+  try {
+    durations = JSON.parse(
+      fs.readFileSync(path.join(scriptDir, 'maestro-flow-durations.json'), 'utf8')
+    )
+  } catch (error) {
+    log(`Flow durations unreadable (${error.message}); every flow counts the same`)
+  }
+  const runnable = shardedFlows.filter((flowPath) => {
+    const refusal = flowRefusals.get(flowPath)
+    if (refusal) failFlowWithCause(flowPath, refusal, flowFailures)
+    return !refusal
+  })
+  log(`Running ${runnable.length} flows across ${SHARD_DEVICE_IDS.length} devices`)
+  await runAndroidDeviceShards({
+    flows: runnable,
+    devices: SHARD_DEVICE_IDS,
+    durations,
+    timeoutMs: CI_FLOW_TIMEOUT_MS,
+    prepareDriver: (device, driverPort) =>
+      maestroDriverReuse.argsFor(target.platform, device, { driverPort }),
+    buildArgs: (flowPath, device) =>
+      buildSingleFlowMaestroArgs(flowPath, target, device).maestroArgs,
+    stallCheckFor: (flowPath, device) =>
+      launchStallCheckFor(flowPath, target.platform, device),
+    spawnOptionsFor: (flowPath) => ({
+      env: maestroEnv,
+      logFile: WRITE_ARTIFACTS ? getFlowLogPath(flowPath) : undefined,
+    }),
+    runMaestro: (args, options) => {
+      log(`Running Maestro flow (${args.join(' ')})`)
+      return runMaestroCommand(args, options)
+    },
+    // Same rule as the serial path: no attempt reads an earlier report (R28).
+    beforeAttempt: (args) => removeMaestroReport(args),
+    onRetry: (flowPath, device, error) =>
+      log(`RETRY ${flowPath} on ${device} (${error.message})`),
+    recordInvocation: (device) =>
+      maestroDriverReuse.recordInvocation(target.platform, device),
+    onRefused: (flowPath, device, cause) =>
+      failFlowWithCause(flowPath, `${device}: ${cause}`, flowFailures),
+    onFinished: (flowPath, device, error, startedAtMs) =>
+      recordSingleFlowOutcome(
+        flowPath,
+        error,
+        flowFailures,
+        startedAtMs,
+        target.platform,
+        device
+      ),
+    log,
+  })
+}
+
+/**
+ * Run the shardable flows across every device. Android gives each device its own
+ * queue of single-flow invocations (scripts/lib/maestro-android-shards.mjs); iOS
+ * keeps one Maestro invocation with `--shard-split`.
  *
  * @param {string[]} shardedFlows
  * @param {{ platform: 'android' | 'ios' }} target
@@ -3539,6 +3776,10 @@ const recordShardedSuiteOutcome = (
  * @returns {Promise<void>}
  */
 const runShardedFlows = async (shardedFlows, target, maestroEnv, flowFailures) => {
+  if (target.platform === 'android') {
+    await runAndroidShardedFlows(shardedFlows, target, maestroEnv, flowFailures)
+    return
+  }
   const reportPath = toPosixPath(
     path.join(MAESTRO_ARTIFACT_DIR, 'parallel-suite-report.xml')
   )
@@ -3567,7 +3808,9 @@ const runShardedFlows = async (shardedFlows, target, maestroEnv, flowFailures) =
       MAESTRO_ARTIFACT_DIR
     )
   }
-  parallelArgs.push(...shardedFlows)
+  parallelArgs.push(
+    ...shardedFlows.map((flowPath) => maestroFlowPath(flowPath, target.platform))
+  )
 
   log(`Running ${shardedFlows.length} flows across ${SHARD_DEVICE_IDS.length} devices`)
   // The exit code is not trusted on its own here. A sharded invocation
@@ -3623,8 +3866,16 @@ const runShardedFlows = async (shardedFlows, target, maestroEnv, flowFailures) =
  * @param {SpawnProcessOptions} options
  * @param {string} label
  * @param {() => Promise<void>} reset per-flow fixture reset
+ * @param {(attemptStartedAtMs: number) => SpawnProcessOptions['stallCheck']} [stallCheckFor]
+ *   builds the launch stall check for one attempt
  */
-const runMaestroCommandWithWatchdogRetry = async (args, options, label, reset) =>
+const runMaestroCommandWithWatchdogRetry = async (
+  args,
+  options,
+  label,
+  reset,
+  stallCheckFor
+) =>
   runMobileE2EFlow({
     run: () => {
       // Each attempt starts with no report on disk. A report left by an earlier
@@ -3632,11 +3883,59 @@ const runMaestroCommandWithWatchdogRetry = async (args, options, label, reset) =
       // outcome when Maestro is killed before writing one: locally a timed-out
       // flow was judged by a stale passing report (Story 1.2b R28).
       removeMaestroReport(args)
-      return runMaestroCommand(args, options)
+      // Every attempt watches its own launches (Story 6.7b R18).
+      const stallCheck = stallCheckFor?.(Date.now())
+      return runMaestroCommand(args, stallCheck ? { ...options, stallCheck } : options)
     },
     reset,
     onRetry: (error) => log(`RETRY ${label} (${error.message})`),
   })
+
+/**
+ * Story 6.7b R18: fails an Android flow whose Maestro `launchApp` has stopped
+ * making progress, naming the step and what the device is running, long before
+ * the flow cap. It reads the attempt's live debug log, so it needs `--artifacts`.
+ * See scripts/lib/maestro-launch-watchdog.mjs.
+ *
+ * @param {string} flowPath
+ * @param {'android' | 'ios'} platform
+ * @param {string} device adb serial, or DEFAULT_ADB_DEVICE
+ * @returns {((attemptStartedAtMs: number) => SpawnProcessOptions['stallCheck']) | undefined}
+ */
+const launchStallCheckFor = (flowPath, platform, device) => {
+  // Maestro Cloud runs on its own devices and writes no local debug log.
+  const cloud = Boolean(
+    process.env.MAESTRO_CLOUD_API_KEY && process.env.MAESTRO_CLOUD_WORKSPACE
+  )
+  if (platform !== 'android' || !WRITE_ARTIFACTS || cloud) return undefined
+  const title = flowTitleOf(fs.readFileSync(flowPath, 'utf8'))
+  if (!title) return undefined
+  return (attemptStartedAtMs) =>
+    createLaunchStallCheck({
+      device,
+      readDebugLog: () => {
+        const logFile = newestFlowDebugLog(MAESTRO_ARTIFACT_DIR, title, {
+          sinceMs: attemptStartedAtMs,
+        })
+        return logFile ? fs.readFileSync(logFile, 'utf8') : undefined
+      },
+      readDeviceProcesses: async () =>
+        (
+          await captureProcess(
+            resolveAdbBinary(),
+            [
+              ...(device === DEFAULT_ADB_DEVICE ? [] : ['-s', device]),
+              'shell',
+              'ps',
+              '-A',
+              '-o',
+              'PID,S,ARGS',
+            ],
+            { timeoutMs: 10_000 }
+          )
+        ).stdout,
+    })
+}
 
 /**
  * Delete the JUnit report a Maestro invocation is about to write.
@@ -3711,7 +4010,7 @@ const runUserScopedFlows = async (
         MAESTRO_ARTIFACT_DIR
       )
     }
-    serialArgs.push(flowPath)
+    serialArgs.push(maestroFlowPath(flowPath, target.platform))
 
     log(`Running user-scoped flow on ${SHARD_DEVICE_IDS[0]}: ${flowPath}`)
     try {
@@ -3725,7 +4024,8 @@ const runUserScopedFlows = async (
         flowPath,
         identity
           ? () => resetMobileE2EPerFlowState(identity, flowPath)
-          : () => Promise.resolve()
+          : () => Promise.resolve(),
+        launchStallCheckFor(flowPath, target.platform, SHARD_DEVICE_IDS[0])
       )
       flowPasses.add(flowPath)
       log(`PASS ${flowPath}`)
@@ -3747,9 +4047,10 @@ const runUserScopedFlows = async (
  *
  * @param {string} flowPath
  * @param {{ platform: 'android' | 'ios' }} target
+ * @param {string} [serial] the Android device, when not the run's current one
  * @returns {{ maestroArgs: string[], maestroLogFile: string | undefined }}
  */
-const buildSingleFlowMaestroArgs = (flowPath, target) => {
+const buildSingleFlowMaestroArgs = (flowPath, target, serial = androidSerial) => {
   const maestroArgs = []
   let maestroLogFile
   if (process.env.MAESTRO_CLOUD_API_KEY && process.env.MAESTRO_CLOUD_WORKSPACE) {
@@ -3769,11 +4070,11 @@ const buildSingleFlowMaestroArgs = (flowPath, target) => {
       // Maestro picks first.
       maestroArgs.push('--udid', iosSimulatorUdid)
     }
-    if (target.platform === 'android' && androidSerial) {
+    if (target.platform === 'android' && serial) {
       // The same for a chosen emulator: with a second one attached, Maestro
       // would otherwise drive whichever it lists first, not the one every adb
       // step of this run acted on.
-      maestroArgs.push('--udid', androidSerial)
+      maestroArgs.push('--udid', serial)
     }
     maestroArgs.push('test')
     maestroArgs.push(...buildMaestroFlowEnvArgs())
@@ -3793,7 +4094,7 @@ const buildSingleFlowMaestroArgs = (flowPath, target) => {
         MAESTRO_ARTIFACT_DIR
       )
     }
-    maestroArgs.push(flowPath)
+    maestroArgs.push(maestroFlowPath(flowPath, target.platform))
   }
 
   return { maestroArgs, maestroLogFile }
@@ -3816,17 +4117,22 @@ const buildSingleFlowMaestroArgs = (flowPath, target) => {
  * @param {Error | undefined} maestroExitError
  * @param {string[]} flowFailures collected in place
  * @param {number} [startedAtMs] when the flow's first attempt began
+ * @param {string} [platform] the platform the flow ran on
+ * @param {string} [serial] the Android device it ran on
  * @returns {void}
  */
 const recordSingleFlowOutcome = (
   flowPath,
   maestroExitError,
   flowFailures,
-  startedAtMs
+  startedAtMs,
+  platform,
+  serial = androidSerial
 ) => {
   const failuresBefore = flowFailures.length
   recordFlowOutcome(flowPath, maestroExitError, flowFailures, startedAtMs)
-  if (flowFailures.length > failuresBefore) captureAndroidWindowStack(flowPath)
+  if (flowFailures.length > failuresBefore && platform === 'android')
+    captureAndroidWindowStack(flowPath, serial)
 }
 
 /**
@@ -3842,9 +4148,10 @@ const recordSingleFlowOutcome = (
  * artifact secret scan runs over all of it before upload.
  *
  * @param {string} flowPath
+ * @param {string} [serial] the device to capture, the run's current one by default
  * @returns {void}
  */
-const captureAndroidWindowStack = (flowPath) => {
+const captureAndroidWindowStack = (flowPath, serial = androidSerial) => {
   if (!WRITE_ARTIFACTS || IOS_UDIDS.length > 0) return
   // Story 1.2b R28: a flow killed at its watchdog leaves no Maestro debug
   // output, so the device side of the stall is captured here too. In CI job
@@ -3862,9 +4169,7 @@ const captureAndroidWindowStack = (flowPath) => {
       encoding: 'utf8',
       timeout: 15_000,
       maxBuffer: 64 * 1024 * 1024,
-      env: androidSerial
-        ? { ...process.env, ANDROID_SERIAL: androidSerial }
-        : process.env,
+      env: serial ? { ...process.env, ANDROID_SERIAL: serial } : process.env,
     })
     if (result.status !== 0 || !result.stdout) {
       log(`Could not capture the Android ${label} for ${flowPath}`)
@@ -4005,7 +4310,12 @@ const runFlowsSerially = async (target, maestroEnv, mobileIdentity, flowFailures
         flowPath,
         mobileIdentity
           ? () => resetMobileE2EPerFlowState(mobileIdentity, flowPath)
-          : () => Promise.resolve()
+          : () => Promise.resolve(),
+        launchStallCheckFor(
+          flowPath,
+          target.platform,
+          androidSerial || DEFAULT_ADB_DEVICE
+        )
       )
     } catch (error) {
       maestroExitError = error
@@ -4018,7 +4328,13 @@ const runFlowsSerially = async (target, maestroEnv, mobileIdentity, flowFailures
     const restoreCause = await restoreMobileE2EStateOrCause(mobileIdentity, flowPath)
     const doubleCause = await doubleWatch?.verify?.()
 
-    recordSingleFlowOutcome(flowPath, maestroExitError, flowFailures, flowStartedAt)
+    recordSingleFlowOutcome(
+      flowPath,
+      maestroExitError,
+      flowFailures,
+      flowStartedAt,
+      target.platform
+    )
     for (const cause of [doubleCause, restoreCause]) {
       if (cause) failFlowWithCause(flowPath, cause, flowFailures)
     }
@@ -4398,6 +4714,11 @@ const run = async () => {
         log: (message) => log(`[${serial}] ${message}`),
       })
     }
+    // Story 6.7b R18: Android flows run from a copy that names Expo Go's
+    // permissions, which spares Maestro its APK pull. See
+    // scripts/lib/maestro-android-permissions.mjs.
+    if (target.platform === 'android')
+      androidFlowTree = await prepareAndroidFlows(target.appId, androidDevices)
     const expoGoLinks =
       target.platform === 'android'
         ? await startExpoGoLinkEndpoint({

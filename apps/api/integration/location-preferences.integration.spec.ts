@@ -1,4 +1,4 @@
-import { listenHttpApp, httpTestUrl } from './helpers/loopback-http-app.js'
+import { listenHttpApp, httpTestUrl } from '../src/testing/loopback-http-app.js'
 import 'reflect-metadata'
 import { type INestApplication } from '@nestjs/common'
 import { Test, type TestingModule } from '@nestjs/testing'
@@ -256,7 +256,7 @@ function createLocationInput(label: string, locationKey: string) {
 describe('Location preferences API integration', () => {
   let app: INestApplication | undefined
 
-  const getHttpServer = (): Parameters<typeof request>[0] => {
+  const baseUrl = (): string => {
     if (!app) {
       throw new Error('App is not initialized')
     }
@@ -315,7 +315,7 @@ describe('Location preferences API integration', () => {
   })
 
   it('enforces max-three, duplicate keys, ownership, and primary promotion over HTTP', async () => {
-    const firstResponse = await request(getHttpServer())
+    const firstResponse = await request(baseUrl())
       .post('/api/v1/locations')
       .set(primaryUserHeaders)
       .send(createLocationInput('Home', 'chicago-il'))
@@ -329,7 +329,7 @@ describe('Location preferences API integration', () => {
       ['Office', 'office'],
       ['Gym', 'gym'],
     ] as const) {
-      const response = await request(getHttpServer())
+      const response = await request(baseUrl())
         .post('/api/v1/locations')
         .set(primaryUserHeaders)
         .send(createLocationInput(label, key))
@@ -337,39 +337,39 @@ describe('Location preferences API integration', () => {
       expect(response.status).toBe(201)
     }
 
-    const duplicateResponse = await request(getHttpServer())
+    const duplicateResponse = await request(baseUrl())
       .post('/api/v1/locations')
       .set(primaryUserHeaders)
       .send(createLocationInput('Duplicate', 'office'))
 
     expect(duplicateResponse.status).toBe(400)
 
-    const fourthResponse = await request(getHttpServer())
+    const fourthResponse = await request(baseUrl())
       .post('/api/v1/locations')
       .set(primaryUserHeaders)
       .send(createLocationInput('Airport', 'airport'))
 
     expect(fourthResponse.status).toBe(400)
 
-    const foreignPrimaryResponse = await request(getHttpServer())
+    const foreignPrimaryResponse = await request(baseUrl())
       .post(`/api/v1/locations/${firstLocation.id}/primary`)
       .set(foreignUserHeaders)
 
     expect(foreignPrimaryResponse.status).toBe(404)
 
-    const primaryResponse = await request(getHttpServer())
+    const primaryResponse = await request(baseUrl())
       .post('/api/v1/locations/location-2/primary')
       .set(primaryUserHeaders)
 
     expect(primaryResponse.status).toBe(200)
 
-    const deletePrimaryResponse = await request(getHttpServer())
+    const deletePrimaryResponse = await request(baseUrl())
       .delete('/api/v1/locations/location-2')
       .set(primaryUserHeaders)
 
     expect(deletePrimaryResponse.status).toBe(200)
 
-    const listResponse = await request(getHttpServer())
+    const listResponse = await request(baseUrl())
       .get('/api/v1/locations')
       .set(primaryUserHeaders)
 
@@ -392,7 +392,7 @@ describeRealDatabase('Location preferences API Prisma integration', () => {
   let primaryUserId: string
   let foreignUserId: string
 
-  const getHttpServer = (): Parameters<typeof request>[0] => {
+  const baseUrl = (): string => {
     if (!app) {
       throw new Error('App is not initialized')
     }
@@ -485,7 +485,7 @@ describeRealDatabase('Location preferences API Prisma integration', () => {
       authorization: 'Bearer real-location-foreign-token',
     }
 
-    const firstResponse = await request(getHttpServer())
+    const firstResponse = await request(baseUrl())
       .post('/api/v1/locations')
       .set(primaryHeaders)
       .send(createLocationInput('Home', 'chicago-il'))
@@ -495,7 +495,7 @@ describeRealDatabase('Location preferences API Prisma integration', () => {
     expect(firstLocation.locationKey).toBe('chicago-il')
     expect(firstLocation.isPrimary).toBe(true)
 
-    const whitespaceTimezoneResponse = await request(getHttpServer())
+    const whitespaceTimezoneResponse = await request(baseUrl())
       .post('/api/v1/locations')
       .set(primaryHeaders)
       .send({
@@ -505,14 +505,14 @@ describeRealDatabase('Location preferences API Prisma integration', () => {
 
     expect(whitespaceTimezoneResponse.status).toBe(400)
 
-    const partialIdentityResponse = await request(getHttpServer())
+    const partialIdentityResponse = await request(baseUrl())
       .patch(`/api/v1/locations/${firstLocation.id}`)
       .set(primaryHeaders)
       .send({ locationKey: 'new-york-ny' })
 
     expect(partialIdentityResponse.status).toBe(400)
 
-    const patchPrimaryResponse = await request(getHttpServer())
+    const patchPrimaryResponse = await request(baseUrl())
       .patch(`/api/v1/locations/${firstLocation.id}`)
       .set(primaryHeaders)
       .send({ isPrimary: true })
@@ -523,7 +523,7 @@ describeRealDatabase('Location preferences API Prisma integration', () => {
       ['Office', 'office'],
       ['Gym', 'gym'],
     ] as const) {
-      const response = await request(getHttpServer())
+      const response = await request(baseUrl())
         .post('/api/v1/locations')
         .set(primaryHeaders)
         .send(createLocationInput(label, key))
@@ -531,27 +531,27 @@ describeRealDatabase('Location preferences API Prisma integration', () => {
       expect(response.status).toBe(201)
     }
 
-    const duplicateResponse = await request(getHttpServer())
+    const duplicateResponse = await request(baseUrl())
       .post('/api/v1/locations')
       .set(primaryHeaders)
       .send(createLocationInput('Duplicate', 'office'))
 
     expect(duplicateResponse.status).toBe(400)
 
-    const fourthResponse = await request(getHttpServer())
+    const fourthResponse = await request(baseUrl())
       .post('/api/v1/locations')
       .set(primaryHeaders)
       .send(createLocationInput('Airport', 'airport'))
 
     expect(fourthResponse.status).toBe(400)
 
-    const foreignPrimaryResponse = await request(getHttpServer())
+    const foreignPrimaryResponse = await request(baseUrl())
       .post(`/api/v1/locations/${firstLocation.id}/primary`)
       .set(foreignHeaders)
 
     expect(foreignPrimaryResponse.status).toBe(404)
 
-    const listResponse = await request(getHttpServer())
+    const listResponse = await request(baseUrl())
       .get('/api/v1/locations')
       .set(primaryHeaders)
 
@@ -562,19 +562,19 @@ describeRealDatabase('Location preferences API Prisma integration', () => {
       throw new Error('Expected office saved location to exist')
     }
 
-    const primaryResponse = await request(getHttpServer())
+    const primaryResponse = await request(baseUrl())
       .post(`/api/v1/locations/${officeLocation.id}/primary`)
       .set(primaryHeaders)
 
     expect(primaryResponse.status).toBe(200)
 
-    const deletePrimaryResponse = await request(getHttpServer())
+    const deletePrimaryResponse = await request(baseUrl())
       .delete(`/api/v1/locations/${officeLocation.id}`)
       .set(primaryHeaders)
 
     expect(deletePrimaryResponse.status).toBe(200)
 
-    const promotedListResponse = await request(getHttpServer())
+    const promotedListResponse = await request(baseUrl())
       .get('/api/v1/locations')
       .set(primaryHeaders)
 

@@ -498,8 +498,10 @@
       "report": "Segnala",
       "reported": "Segnalato",
       "withdraw": "Ritira",
-      "sponsored": "Sponsorizzato",
-      "sponsoredAnnounce": "Look sponsorizzato"
+      "sponsored": "In collaborazione",
+      "sponsoredAnnounce": "In collaborazione con {{partner}}",
+      "shopCta": "Acquista questo look da {{partner}}",
+      "shopOpensInBrowser": "Apre il sito del partner in una nuova scheda"
     },
     "status": {
       "draft": "Bozza",

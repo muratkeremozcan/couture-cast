@@ -4,21 +4,27 @@ import { http, HttpResponse } from 'msw'
 import { act, fireEvent, screen, waitFor } from '@testing-library/react'
 import { expect, vi } from 'vitest'
 import {
+  communityEventsResponseSchema,
   communityReactionFeedResponseSchema,
   communityReactionSpotlightResponseSchema,
+  communitySponsoredSpotlightResponseSchema,
+  resolveCommunityTargetsResponseSchema,
   type CommunityReactionFeedItem,
   type CommunityReactionSpotlight,
-  type CommunityReactionSpotlightItem,
   type CommunityReactionSummary,
+  type CommunitySponsoredSpotlight,
+  type CommunitySponsoredSpotlightItem,
+  type CommunityStreamEvent,
 } from '@couture/api-client/contracts/http'
 import { useMswHandlers } from './msw/runtime'
 import { FEED_PATH, OPENED_PATH, feed, item } from './community-lookbook-grid'
 
 export const SPOTLIGHT_PATH = '/api/v1/community/spotlight'
 
+/** A ranked entry; Story 6.7b fixtures may add the opted-in `sponsorship` block. */
 export function ranked(
   rank: number,
-  overrides: Partial<CommunityReactionSpotlightItem> = {}
+  overrides: Partial<CommunitySponsoredSpotlightItem> = {}
 ) {
   return {
     ...item({
@@ -28,7 +34,7 @@ export function ranked(
     }),
     rank,
     ...overrides,
-  } satisfies CommunityReactionSpotlightItem
+  } satisfies CommunitySponsoredSpotlightItem
 }
 
 export function spotlightBody(overrides: Partial<CommunityReactionSpotlight> = {}) {
@@ -41,6 +47,64 @@ export function spotlightBody(overrides: Partial<CommunityReactionSpotlight> = {
         nextCursor: null,
         ...overrides,
       },
+    }) as unknown as Record<string, unknown>
+  )
+}
+
+/** Story 6.7b: the opted-in spotlight, parsed by the sponsored contract before it is served. */
+export function sponsoredSpotlightBody(
+  items: CommunitySponsoredSpotlightItem[],
+  overrides: Partial<CommunitySponsoredSpotlight> = {}
+) {
+  return HttpResponse.json(
+    communitySponsoredSpotlightResponseSchema.parse({
+      data: { level: 'city', label: 'Lisbon', items, nextCursor: null, ...overrides },
+    }) as unknown as Record<string, unknown>
+  )
+}
+
+/** One page of the realtime catch-up, parsed by the events contract before it is served. */
+export function eventsBody(events: CommunityStreamEvent[], nextCursor: string) {
+  return HttpResponse.json(
+    communityEventsResponseSchema.parse({
+      data: { events, nextCursor, hasMore: false, resyncRequired: false },
+    }) as unknown as Record<string, unknown>
+  )
+}
+
+/**
+ * An `available` target answer for `post`, keyed by its id. The resolve route
+ * never opts in to sponsorship, so the strict contract refuses a post that
+ * carries a block.
+ */
+export function resolvedTarget(
+  post: CommunityReactionFeedItem & { reactions: CommunityReactionSummary },
+  communityRevision = '0'
+) {
+  return {
+    key: post.id,
+    status: 'available' as const,
+    communityRevision,
+    post,
+    comment: null,
+    parent: null,
+    pageCursor: null,
+    parentPageCursor: null,
+    threadPosition: null,
+  }
+}
+
+export function unavailableTarget(key: string) {
+  return { key, status: 'unavailable' as const }
+}
+
+/** The targets/resolve answer, parsed by its contract before it is served. */
+export function resolveBody(
+  targets: (ReturnType<typeof resolvedTarget> | ReturnType<typeof unavailableTarget>)[]
+) {
+  return HttpResponse.json(
+    resolveCommunityTargetsResponseSchema.parse({
+      data: { targets },
     }) as unknown as Record<string, unknown>
   )
 }
@@ -118,47 +182,30 @@ export function useSpotlightOnlyRemoval() {
     }),
     http.post(OPENED_PATH, () => HttpResponse.json({ tracked: true })),
     http.get('/api/v1/community/events', () =>
-      HttpResponse.json({
-        data: {
-          events:
-            state.phase === 'removed'
-              ? [
-                  {
-                    version: 1,
-                    kind: 'reactions.changed',
-                    postId: 'spot-only',
-                    communityRevision: '1',
-                  },
-                ]
-              : [],
-          nextCursor: `cursor-${state.phase}`,
-          hasMore: false,
-          resyncRequired: false,
-        },
-      })
+      eventsBody(
+        state.phase === 'removed'
+          ? [
+              {
+                version: 1,
+                kind: 'reactions.changed',
+                postId: 'spot-only',
+                communityRevision: '1',
+              },
+            ]
+          : [],
+        `cursor-${state.phase}`
+      )
     ),
     http.post('/api/v1/community/targets/resolve', async ({ request }) => {
       const { targets } = (await request.json()) as { targets: { key: string }[] }
       resolved.push(targets.map((target) => target.key))
-      return HttpResponse.json({
-        data: {
-          targets: targets.map((target) =>
-            state.phase === 'removed' && target.key === 'spot-only'
-              ? { key: target.key, status: 'unavailable' }
-              : {
-                  key: target.key,
-                  status: 'available',
-                  communityRevision: '0',
-                  post: { ...item({ id: target.key }), reactions: ZERO },
-                  comment: null,
-                  parent: null,
-                  pageCursor: null,
-                  parentPageCursor: null,
-                  threadPosition: null,
-                }
-          ),
-        },
-      })
+      return resolveBody(
+        targets.map((target) =>
+          state.phase === 'removed' && target.key === 'spot-only'
+            ? unavailableTarget(target.key)
+            : resolvedTarget({ ...item({ id: target.key }), reactions: ZERO })
+        )
+      )
     })
   )
   return { catchUp, state, resolved }

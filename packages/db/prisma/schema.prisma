@@ -282,6 +282,8 @@ model User {
   community_alias                     CommunityAlias?
   community_spotlight_read_window     CommunitySpotlightReadWindow?
   community_reports_filed             CommunityPostReport[]             @relation("CommunityReporter")
+  community_sponsorships_created      CommunityPostSponsorship[]        @relation("CommunitySponsorshipCreator")
+  community_sponsorships_ended        CommunityPostSponsorship[]        @relation("CommunitySponsorshipEnder")
 }
 
 /// RLS: user-scoped profile data keyed by user_id
@@ -645,6 +647,7 @@ model LookbookPost {
   reactions                    CommunityReaction[]
   reaction_receipts            CommunityReactionReceipt[]
   reaction_outbox              CommunityReactionOutbox[]
+  sponsorships                 CommunityPostSponsorship[]
 
   @@unique([user_id, idempotency_key])
   @@index([user_id])
@@ -1182,6 +1185,7 @@ model AffiliateOffer {
   created_at         DateTime             @default(now())
   updated_at         DateTime             @updatedAt
   clicks             AffiliateClick[]
+  sponsorships       CommunityPostSponsorship[]
 
   @@index([status, locale_region, garment_category, priority(sort: Desc)])
   @@index([partner_id])
@@ -1920,4 +1924,42 @@ model CommunityEligibilityChange {
   eligible_at DateTime
   reason String
   @@index([group_id, recorded_at])
+}
+
+/// Story 6.7b: links one community post to one garment affiliate offer for an
+/// effective window. Only the owner creates or ends a link, through the audited
+/// operator command (`npm run community:sponsorship`); no HTTP route writes it.
+///
+/// `starts_at` is inclusive and `ends_at` exclusive, NULL meaning open-ended,
+/// compared with `now() AT TIME ZONE 'UTC'` exactly like the offer window.
+/// Ending a link stamps `ended_at`, `ended_by_id` and `end_reason` and never
+/// deletes the row. Erasing the post deletes its links; the audit rows stay.
+///
+/// Objects the Prisma DSL cannot express live only in the migration
+/// 20261024120000_community_post_sponsorship: the partial unique index
+/// `CommunityPostSponsorship_open_post_key` (at most one non-ended link per
+/// post), the window, reason and end-state CHECK constraints, and RLS with zero
+/// client grants.
+model CommunityPostSponsorship {
+  id            String         @id @default(cuid())
+  post          LookbookPost   @relation(fields: [post_id], references: [id], onDelete: Cascade)
+  post_id       String
+  offer         AffiliateOffer @relation(fields: [offer_id], references: [id], onDelete: Restrict)
+  offer_id      String
+  starts_at     DateTime
+  ends_at       DateTime?
+  created_by    User           @relation("CommunitySponsorshipCreator", fields: [created_by_id], references: [id], onDelete: Restrict)
+  created_by_id String
+  create_reason String
+  ended_at      DateTime?
+  ended_by      User?          @relation("CommunitySponsorshipEnder", fields: [ended_by_id], references: [id], onDelete: Restrict)
+  ended_by_id   String?
+  end_reason    String?
+  created_at    DateTime       @default(now())
+  updated_at    DateTime       @updatedAt
+
+  @@index([post_id])
+  @@index([offer_id])
+  @@index([created_by_id])
+  @@index([ended_by_id])
 }

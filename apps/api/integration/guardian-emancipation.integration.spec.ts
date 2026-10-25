@@ -1,4 +1,4 @@
-import { listenHttpApp, httpTestUrl } from './helpers/loopback-http-app.js'
+import { listenHttpApp, httpTestUrl } from '../src/testing/loopback-http-app.js'
 import 'reflect-metadata'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { type TestingModule, Test } from '@nestjs/testing'
@@ -250,7 +250,7 @@ describe('Guardian emancipation sweep (integration)', () => {
     authorization: `Bearer test-token:${role}:${userId}`,
   })
 
-  const getHttpServer = (): Parameters<typeof request>[0] => {
+  const baseUrl = (): string => {
     if (!app) {
       throw new Error('App is not initialized')
     }
@@ -389,7 +389,7 @@ describe('Guardian emancipation sweep (integration)', () => {
       status: 'granted',
     })
 
-    const pendingTeenBeforeSweep = await request(getHttpServer())
+    const pendingTeenBeforeSweep = await request(baseUrl())
       .get('/api/v1/user/profile')
       .set(createHeaders(pendingTeen.id, 'teen'))
 
@@ -404,7 +404,7 @@ describe('Guardian emancipation sweep (integration)', () => {
       notificationsQueued: 2,
     })
 
-    const pendingTeenAfterSweep = await request(getHttpServer())
+    const pendingTeenAfterSweep = await request(baseUrl())
       .get('/api/v1/user/profile')
       .set(createHeaders(pendingTeen.id, 'teen'))
 
@@ -412,7 +412,7 @@ describe('Guardian emancipation sweep (integration)', () => {
     const pendingTeenBody = userProfileResponseSchema.parse(pendingTeenAfterSweep.body)
     expect(pendingTeenBody.user.id).toBe(pendingTeen.id)
 
-    const consentedTeenAfterSweep = await request(getHttpServer())
+    const consentedTeenAfterSweep = await request(baseUrl())
       .get('/api/v1/user/profile')
       .set(createHeaders(consentedTeen.id, 'teen'))
 

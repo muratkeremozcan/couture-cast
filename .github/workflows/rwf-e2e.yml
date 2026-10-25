@@ -76,6 +76,12 @@ jobs:
         with:
           ref: ${{ inputs.gh_ref }}
 
+      # First step after checkout, before this job's own network traffic, so
+      # no outgoing connection can take a Supabase host port as its local port.
+      - name: Reserve the local Supabase host ports
+        if: inputs.test_env == 'local'
+        uses: ./.github/actions/reserve-supabase-ports
+
       - name: Resolve expected SHA
         id: expected_sha
         shell: bash

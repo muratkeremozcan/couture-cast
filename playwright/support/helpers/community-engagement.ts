@@ -19,7 +19,7 @@ import { createNetworkErrorMonitorFixture } from '@seontechnologies/playwright-u
 import {
   communityCommentSubmissionResponseSchema,
   communityCommentSubmissionsResponseSchema,
-  communityReactionFeedResponseSchema,
+  communitySponsoredFeedResponseSchema,
 } from '@couture/api-client/contracts/http'
 import {
   communityApiTest,
@@ -287,7 +287,10 @@ export async function openAll(page: Page) {
   await page.getByTestId('community-filter-all').click()
   const result = await all
   expect(result.status()).toBe(200)
-  const data = communityReactionFeedResponseSchema.parse(await result.json()).data
+  // The web client opts every feed read in to reactions and sponsorship, so the
+  // response it rendered is parsed with the variant those headers select.
+  expect(result.request().headers()['x-couture-sponsorship']).toBe('1')
+  const data = communitySponsoredFeedResponseSchema.parse(await result.json()).data
   await expect(page.getByTestId('community-card-grid')).toHaveAttribute(
     'aria-busy',
     'false'

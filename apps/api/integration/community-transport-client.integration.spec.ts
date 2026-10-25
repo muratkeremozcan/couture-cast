@@ -16,7 +16,8 @@ import {
   persistUser,
 } from '@couture/testing'
 import { isolatedCommunityDatabase } from './helpers/isolated-community-database.js'
-import { listenHttpApp } from './helpers/loopback-http-app.js'
+import { drainCommunityOutbox } from './helpers/community-outbox-drain.js'
+import { listenHttpApp } from '../src/testing/loopback-http-app.js'
 import { createCommunityRealtimeServer } from '../src/realtime/community-realtime.server.js'
 import { AccessTokenIdentityService } from '../src/modules/auth/access-token-identity.service.js'
 import { GuardianConsentStateService } from '../src/modules/auth/guardian-consent-state.service.js'
@@ -127,7 +128,9 @@ async function setup() {
       createLookbookPost({ userId: owner.id, status: 'published' })
     ),
   })
-  await streams.append()
+  // The previous case's sync reads and realtime ticks leave detached assists that can
+  // still hold a head; drain the way the runtime does.
+  await drainCommunityOutbox(prisma, streams)
   const runtime = createCommunityRealtimeServer(() =>
     Promise.resolve({
       prisma,

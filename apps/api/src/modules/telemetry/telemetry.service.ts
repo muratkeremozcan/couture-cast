@@ -40,7 +40,8 @@ import {
   trackCommunityPostWithdrawn,
   trackCommunityChallengeParticipated,
   garmentTaggingCompletedEventSchema,
-  affiliateCtaClickedEventSchema,
+  affiliateCtaClickedCommunityEventSchema,
+  affiliateCtaClickedRecommendationEventSchema,
   affiliateConversionRecordedEventSchema,
   premiumCheckoutStartedEventSchema,
   premiumEntitlementActivatedEventSchema,
@@ -63,6 +64,7 @@ import {
   communityChallengeParticipatedEventSchema,
   type AnalyticsEventName,
   type AffiliateCtaClickedEvent,
+  type DistributiveOmit,
   type AffiliateConversionRecordedEvent,
   type GarmentTaggingCompletedProperties,
   type PremiumCheckoutStartedEvent,
@@ -186,7 +188,7 @@ export interface TelemetryPropertiesMap {
    * not hold the pseudonymization secret, so the subject is derived here from the
    * raw user id passed as `captureEvent`'s first argument.
    */
-  affiliate_cta_clicked: Omit<AffiliateCtaClickedEvent, 'analyticsSubjectId'>
+  affiliate_cta_clicked: DistributiveOmit<AffiliateCtaClickedEvent, 'analyticsSubjectId'>
   affiliate_conversion_recorded: Omit<
     AffiliateConversionRecordedEvent,
     'analyticsSubjectId'
@@ -268,9 +270,14 @@ export interface TelemetryPropertiesMap {
  * what stops a caller from smuggling a URL, a product title, or a raw user id
  * into a commerce event.
  */
-const affiliateCtaClickedInputSchema = affiliateCtaClickedEventSchema
-  .omit({ analyticsSubjectId: true })
-  .strict()
+// Story 6.7b: keyed by `surface`, one strict member per event shape. A union
+// has no `.omit`, so each member is omitted on its own.
+const affiliateCtaClickedInputSchema = z.discriminatedUnion('surface', [
+  affiliateCtaClickedRecommendationEventSchema
+    .omit({ analyticsSubjectId: true })
+    .strict(),
+  affiliateCtaClickedCommunityEventSchema.omit({ analyticsSubjectId: true }).strict(),
+])
 
 const affiliateConversionRecordedInputSchema = affiliateConversionRecordedEventSchema
   .omit({ analyticsSubjectId: true })

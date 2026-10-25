@@ -5067,7 +5067,7 @@ API unit and boundary tests:
   PostHog, database, and safe-default fallback chain used by the kill switch.
 - [`apps/api/src/modules/personalization/ritual.controller.spec.ts`](../../apps/api/src/modules/personalization/ritual.controller.spec.ts): proves
   commerce is assembled after cache reads and never written into Ritual caches.
-- [`apps/api/src/modules/telemetry/telemetry.service.spec.ts`](../../apps/api/src/modules/telemetry/telemetry.service.spec.ts): proves click and
+- [`apps/api/src/modules/telemetry/telemetry.affiliate.service.spec.ts`](../../apps/api/src/modules/telemetry/telemetry.affiliate.service.spec.ts): proves click and
   conversion pseudonymization, property validation, and independent sinks.
 
 Real-infrastructure integration tests:
@@ -5883,7 +5883,7 @@ API unit tests:
   stack over HTTP, the `403`-before-`503` precedence for a non-entitled caller, the
   entitled caller's `503` when the kill switch is off, and that the GET response carries
   the inherited `private, no-store` header.
-- [`apps/api/src/modules/telemetry/telemetry.service.spec.ts`](../../apps/api/src/modules/telemetry/telemetry.service.spec.ts): proves the palette
+- [`apps/api/src/modules/telemetry/telemetry.premium.service.spec.ts`](../../apps/api/src/modules/telemetry/telemetry.premium.service.spec.ts): proves the palette
   selection emits under the acting user's pseudonym, that a reset records a null theme
   rather than skipping the event, that no event is emitted without an authenticated user,
   and that a palette the contract does not ship is rejected.

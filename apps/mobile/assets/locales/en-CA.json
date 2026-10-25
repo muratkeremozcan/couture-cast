@@ -662,8 +662,9 @@
       "report": "Report",
       "reported": "Reported",
       "withdraw": "Withdraw",
-      "sponsored": "Sponsored",
-      "sponsoredAnnounce": "Sponsored look"
+      "sponsored": "Partnered",
+      "sponsoredAnnounce": "Partnered with {{partner}}",
+      "shopCta": "Shop this look at {{partner}}"
     },
     "status": {
       "draft": "Draft",

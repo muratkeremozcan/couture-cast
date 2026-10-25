@@ -84,6 +84,10 @@ describe('5.1 affiliate offer selection against real PostgreSQL', () => {
    */
   function cleanupOffers(offerIds: readonly string[]): void {
     onTestFinished(async () => {
+      // Story 6.7b: a sponsorship link holds its offer with ON DELETE RESTRICT.
+      await prisma.communityPostSponsorship.deleteMany({
+        where: { offer_id: { in: [...offerIds] } },
+      })
       await prisma.affiliateOffer.deleteMany({ where: { id: { in: [...offerIds] } } })
     })
   }
@@ -206,6 +210,9 @@ describe('5.1 affiliate offer selection against real PostgreSQL', () => {
     if (schemaReady) {
       // Reverse dependency order: clicks and offers before partners and users.
       await prisma.affiliateClick.deleteMany({ where: { user_id: userId } })
+      await prisma.communityPostSponsorship.deleteMany({
+        where: { offer: { partner_id: partnerId } },
+      })
       await prisma.affiliateOffer.deleteMany({ where: { partner_id: partnerId } })
       await prisma.commercePreference.deleteMany({ where: { user_id: userId } })
       await prisma.garmentItem.deleteMany({ where: { user_id: userId } })

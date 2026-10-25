@@ -7,99 +7,37 @@
 // exercised by the same tests that cover the UI states. That matters more here than it
 // did for 5.3: three of this panel's states are reached only by a *rejected* write
 // (403 no-consent, 403 not-entitled, 503 kill switch), and a mocked lib would have let
-// the reason-classification bug those states exist to survive go unnoticed.
+// the reason-classification bug those states exist to survive go unnoticed. The
+// sponsored-CTA handoff cases live in palette-advisor-panel.sponsored.test.tsx.
 import axe from 'axe-core'
-import { I18nextProvider } from 'react-i18next'
 import { http, HttpResponse } from 'msw'
-import { render, screen, waitFor } from '@testing-library/react'
+import { screen, waitFor } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import { beforeEach, describe, expect, it } from 'vitest'
 import {
   ADVISOR_RULES,
-  ADVISOR_RULES_VERSION,
-  type AdvisorRecommendationCard,
   PALETTE_ANALYSIS_DISABLED_MESSAGE,
   PALETTE_ANALYSIS_IN_PROGRESS_MESSAGE,
   PALETTE_CONSENT_REQUIRED_MESSAGE,
   PREMIUM_REQUIRED_MESSAGE,
-  type PaletteAdvisorProfile,
 } from '@couture/api-client/contracts/http'
-import { getI18n } from '../../i18n'
-import { WEB_ACCESS_TOKEN_STORAGE_KEY } from '../../lib/wardrobe'
 import { useMswHandlers } from '../../test-utils/msw/runtime'
-import { PaletteAdvisorPanel } from './palette-advisor-panel'
-
-const PALETTE_PATH = '/api/v1/commerce/premium/palette'
+import { stubPartnerTab } from '../../test-utils/partner-tab'
+import {
+  PALETTE_PATH,
+  card,
+  errorBody,
+  getHandler,
+  profile,
+  readyAnalysis,
+  renderPanel,
+  signIn,
+  type ProfileOverrides,
+} from '../../test-utils/palette-advisor-panel'
 
 const FOUNDATION_WARM_MEDIUM = ADVISOR_RULES.warm.foundation.withDepth.medium
 const FOUNDATION_WARM_FAMILY = ADVISOR_RULES.warm.foundation.withoutDepth
 const JEWELRY_WARM = ADVISOR_RULES.warm.jewelry
-
-type ProfileOverrides = Partial<PaletteAdvisorProfile>
-
-function profile(overrides: ProfileOverrides = {}): PaletteAdvisorProfile {
-  return {
-    profileId: 'palette-profile-1',
-    isEntitled: true,
-    analysisEnabled: true,
-    hasConsent: false,
-    analysis: null,
-    recommendations: [],
-    ...overrides,
-  } as PaletteAdvisorProfile
-}
-
-function readyAnalysis(depth: 'medium' | null) {
-  return {
-    status: 'ready' as const,
-    failureReason: null,
-    source: depth === null ? ('wardrobe' as const) : ('selfie' as const),
-    undertone: 'warm' as const,
-    depth,
-    confidence: 0.82,
-    // The contract's own constant, not a copy of its current value: a rules
-    // bump must not silently turn every ready-state fixture here into the
-    // stale-palette case 5.4-WEB-043 owns.
-    analysisVersion: ADVISOR_RULES_VERSION,
-    analyzedAt: '2026-08-25T10:00:00.000Z',
-  }
-}
-
-function card(
-  entry: { itemKey: string; labelKey: string; swatchHex: string },
-  overrides: Partial<AdvisorRecommendationCard> = {}
-): AdvisorRecommendationCard {
-  return {
-    slot: 'foundation',
-    itemKey: entry.itemKey,
-    labelKey: entry.labelKey,
-    swatchHex: entry.swatchHex,
-    saved: false,
-    sponsored: null,
-    ...overrides,
-  }
-}
-
-function getHandler(overrides: ProfileOverrides = {}) {
-  return http.get(PALETTE_PATH, () => HttpResponse.json({ data: profile(overrides) }))
-}
-
-function signIn() {
-  window.sessionStorage.setItem(WEB_ACCESS_TOKEN_STORAGE_KEY, 'test-access-token')
-}
-
-function renderPanel() {
-  return render(
-    <I18nextProvider i18n={getI18n()}>
-      <PaletteAdvisorPanel />
-    </I18nextProvider>
-  )
-}
-
-/** The shared `.strict()` error envelope, which is how every reason is classified. */
-function errorBody(statusCode: number, message: string, error: string) {
-  return HttpResponse.json({ statusCode, message, error }, { status: statusCode })
-}
 
 describe('PaletteAdvisorPanel (Story 5.4)', () => {
   beforeEach(() => {
@@ -469,6 +407,7 @@ describe('PaletteAdvisorPanel (Story 5.4)', () => {
 
     it('5.4-WEB-024 mints the click with the profile id and the web platform', async () => {
       signIn()
+      stubPartnerTab()
       let clickBody: unknown = null
       useMswHandlers(
         getHandler({
@@ -905,96 +844,6 @@ describe('PaletteAdvisorPanel (Story 5.4)', () => {
 
       expect(allocateCount).toBe(0)
       expect(screen.queryByTestId('palette-advisor-error')).not.toBeInTheDocument()
-    })
-  })
-
-  /**
-   * The sponsored handoff's failure doors. `handleSponsoredActivate` refuses to
-   * navigate unless the click was attributed first: "traffic the partner cannot
-   * attribute is worth nothing to them and cannot be audited by us". Both ways that
-   * can fail were untested.
-   */
-  describe('sponsored handoff failures', () => {
-    const sponsoredProfile: ProfileOverrides = {
-      hasConsent: true,
-      analysis: readyAnalysis('medium'),
-      recommendations: [
-        card(FOUNDATION_WARM_MEDIUM, {
-          sponsored: {
-            partnerId: 'lumen-beauty',
-            partnerDisplayName: 'Lumen Beauty',
-            offerId: 'offer-foundation-1',
-            offerTitle: 'Lumen Skin Tint',
-          },
-        }),
-      ],
-    }
-
-    it('5.4-WEB-039 surfaces a failed mint on the card and never opens a partner tab', async () => {
-      signIn()
-      const opened: string[] = []
-      const originalOpen = window.open
-      window.open = function stubOpen(url?: string | URL): Window {
-        opened.push(String(url))
-        return {} as Window
-      } as typeof window.open
-
-      try {
-        useMswHandlers(
-          getHandler(sponsoredProfile),
-          http.post('/api/v1/commerce/affiliate/clicks', () =>
-            errorBody(403, PALETTE_CONSENT_REQUIRED_MESSAGE, 'Forbidden')
-          )
-        )
-        renderPanel()
-
-        await userEvent.click(
-          await screen.findByTestId(
-            `palette-advisor-sponsored-cta-${FOUNDATION_WARM_MEDIUM.itemKey}`
-          )
-        )
-
-        await screen.findByTestId(
-          `palette-advisor-sponsored-error-${FOUNDATION_WARM_MEDIUM.itemKey}`
-        )
-        expect(opened).toEqual([])
-      } finally {
-        window.open = originalOpen
-      }
-    })
-
-    it('5.4-WEB-040 surfaces a blocked popup on the card even though the click was attributed', async () => {
-      signIn()
-      const originalOpen = window.open
-      // A blocked popup returns null, which is a failed handoff rather than a
-      // failed attribution: the click row exists and must not be minted twice.
-      window.open = function blockedOpen(): null {
-        return null
-      } as typeof window.open
-
-      try {
-        useMswHandlers(
-          getHandler(sponsoredProfile),
-          http.post('/api/v1/commerce/affiliate/clicks', () =>
-            HttpResponse.json({
-              data: { redirectUrl: 'https://partner.example.com/offer?click=token' },
-            })
-          )
-        )
-        renderPanel()
-
-        await userEvent.click(
-          await screen.findByTestId(
-            `palette-advisor-sponsored-cta-${FOUNDATION_WARM_MEDIUM.itemKey}`
-          )
-        )
-
-        await screen.findByTestId(
-          `palette-advisor-sponsored-error-${FOUNDATION_WARM_MEDIUM.itemKey}`
-        )
-      } finally {
-        window.open = originalOpen
-      }
     })
   })
 

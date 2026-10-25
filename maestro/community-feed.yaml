@@ -62,6 +62,12 @@
 # while its own summary printed `Passed: 16/17`". The missing-flow guard catches
 # it and turns the suite red, so it is a known open question rather than a hole.
 #
+# SPLIT IN STORY 6.7B (R15). This flow and its reactions journey together cost
+# about 290 s in CI against the runner's 360 s per-flow cap. The reactions, with
+# their cold relaunch, now run in `community-reactions.yaml`; this flow keeps the
+# shell, the filters, the feed walk with its card and ordering checks, the report
+# keyboard check and the compose sheet.
+#
 # The `all` filter is selected before asserting on cards, deliberately. Under
 # `auto` the result depends on whether the shared fixture user happens to have a
 # saved location by the time this flow runs — another flow on the same device may
@@ -227,7 +233,7 @@ tags:
 # the newest feed-seed post instead of expecting it in the first viewport. The
 # spotlight carousel and seven newer feed cards, each nearly a screen tall, sit
 # above it. A fast scroll command opened the card under it on Android, so the
-# card is reached with long, steady swipes instead. A card is
+# card is reached with straight swipes instead. A card is
 # taller than the space between the header and the tab bar on a phone, so the
 # checks below walk it top to bottom, scrolling each part into view before
 # asserting it: a part asserted earlier may already have scrolled away.
@@ -236,60 +242,67 @@ tags:
       id: 'community-spotlight-heading'
     timeout: 20000
     label: 'The spotlight header rendered above the feed, over the real API'
-# Long straight swipes, each moving most of a screen, reach the card in about
-# half the steps of a scroll command, and each step checks for it first.
+# TWO PHASES, SO THE CARD ARRIVES FROM THE BOTTOM, AUTHOR ROW FIRST.
+#
+# Above `lookbook-5` sit the seven spotlight cohort posts, `seed-spotlight-1`
+# (newest) to `seed-spotlight-7` (oldest, directly above it). Fast swipes cover
+# the distance until `seed-spotlight-6` shows. Each moves the list less than one
+# card plus the list's height, so no card is skipped; the module's own copy of
+# that post sits off screen in its horizontal row. From there `seed-spotlight-7`,
+# a whole card, separates the list from `lookbook-5`, so short, slow swipes take
+# over: each drags 40% of the screen over 1.5 s, carries little fling and moves
+# the list less than its own height (list [750,2752] on a 2992 px Android
+# screen, 233-784 pt on an iPhone 17 Pro). The card is checked before every
+# swipe, so when it first shows, its author row, the card's topmost part, is in
+# the list or just past its bottom edge, never above the list top.
+#
+# History. Fast swipes all the way could carry the author row from below the
+# list to above its top (CI job 120208110948, Android), and the UP walk added for
+# that ran the wrong way when the row sat just below the bottom edge (CI job
+# 120691261993, Android; and twice in a row on an iPhone 17 Pro in Story 6.7b,
+# where iOS counted the clipped row as visible, skipped the corrective drag, and
+# the UP walk ran to the top of the feed). Slow swipes all the way pushed the
+# flow past the runner's six-minute budget on iOS.
+- repeat:
+    while:
+      notVisible:
+        id: 'community-post-card-seed-spotlight-6'
+    times: 20
+    commands:
+      - swipe:
+          start: '50%, 85%'
+          end: '50%, 25%'
+          duration: 500
 - repeat:
     while:
       notVisible:
         id: 'community-post-card-lookbook-5'
-    times: 30
+    times: 12
     commands:
       - swipe:
           start: '50%, 85%'
-          end: '50%, 20%'
-          duration: 500
+          end: '50%, 45%'
+          duration: 1500
 - extendedWaitUntil:
     visible:
       id: 'community-post-card-lookbook-5'
     timeout: 10000
     label: 'The newest feed-seed post renders in the feed'
-
-# UP, NOT DOWN, TO THE AUTHOR ROW.
-#
-# The author row is the card's topmost part, so once any part of the card is on
-# screen the row is either on screen too or ABOVE the list. It is never below.
-# This used to scroll DOWN to it, and CI job 120208110948 failed there (`No
-# visible element found: id: community-card-author-lookbook-5`): the feed list
-# spans [580,2190] on that 2400 px screen, the swipe drags 1560 px, and with the
-# fling after release the last swipe carried the card from wholly below the list
-# to its author row above the list top, under the sticky filter strip, so DOWN
-# ran to the end of the feed. Waiting on the row itself instead of the card does
-# not help: a swipe that can carry the row past the whole list can skip the row.
-# The card is a screen tall, so no swipe skips it. `scrollUntilVisible` checks
-# before it scrolls, so a row already on screen costs nothing here. Every check
-# after this one is for a part BELOW the row, so only downward walks follow.
-#
-# One exception: the card can stop with its padding inside the list and its author
-# row just past the list's bottom edge. CI job 120691261993 (2026-10-23) logged
-# the row at y 2224-2190 against a list ending at 2190, so "visible card" held
-# while the row was BELOW, and the UP walk carried it further away. A short, slow
-# drag (no fling) lifts a row clipped at the bottom into view; a row above the
-# list is still found by the UP walk that follows.
-- runFlow:
-    when:
+# The card can stop with only its top padding inside the list and the author row
+# just past the bottom edge (CI job 120691261993 logged the row at y 2224 against
+# a list ending at 2190). A short, slow drag lifts it into view; it moves the
+# list far less than its height, so the row cannot pass the list top.
+- repeat:
+    while:
       notVisible:
         id: 'community-card-author-lookbook-5'
+    times: 3
     commands:
       - swipe:
           start: '50%, 70%'
           end: '50%, 55%'
           duration: 1500
       - waitForAnimationToEnd
-- scrollUntilVisible:
-    element:
-      id: 'community-card-author-lookbook-5'
-    direction: UP
-    timeout: 20000
 - assertVisible:
     id: 'community-card-author-lookbook-5'
     label: 'The author line renders a pseudonym rather than being absent'
@@ -347,10 +360,15 @@ tags:
     text: 'Look 5 — weather-ready layers'
     label: 'The caption is the seeded row, so this is live data and not a fixture'
 
+# Centred, slowly, before it is tapped: iOS reports a control under the tab bar
+# as visible, and a tap there lands on the Settings tab (Story 6.7b iOS run 6). A
+# centring scroll at the default speed overshot the row under the filter strip.
 - scrollUntilVisible:
     element:
       id: 'community-card-report-lookbook-5'
     direction: DOWN
+    centerElement: true
+    speed: 10
     timeout: 20000
 - assertVisible:
     id: 'community-card-report-lookbook-5'
@@ -440,147 +458,9 @@ tags:
     direction: UP
     timeout: 20000
 
-# Story 6.3: desired-state add, replace, reload, and remove against the real API.
-- scrollUntilVisible:
-    element:
-      id: 'community-reaction-total-lookbook-5'
-    direction: DOWN
-- copyTextFrom:
-    id: 'community-reaction-count-applause-lookbook-5'
-- evalScript: ${output.initialApplause = Number(maestro.copiedText.replace(/[^0-9]/g, ''))}
-- copyTextFrom:
-    id: 'community-reaction-count-love-lookbook-5'
-- evalScript: ${output.initialLove = Number(maestro.copiedText.replace(/[^0-9]/g, ''))}
-- copyTextFrom:
-    id: 'community-reaction-count-inspiration-lookbook-5'
-- evalScript: ${output.initialInspired = Number(maestro.copiedText.replace(/[^0-9]/g, ''))}
-- copyTextFrom:
-    id: 'community-reaction-total-lookbook-5'
-- evalScript: ${output.initialTotal = Number(maestro.copiedText.replace(/[^0-9]/g, ''))}
-- tapOn:
-    id: 'community-reaction-applause-lookbook-5'
-- extendedWaitUntil:
-    visible:
-      id: 'community-reaction-applause-lookbook-5'
-      selected: true
-    timeout: 10000
-- assertVisible:
-    id: 'community-reaction-count-applause-lookbook-5'
-    text: ${'👏 ' + (output.initialApplause + 1)}
-- assertVisible:
-    id: 'community-reaction-count-love-lookbook-5'
-    text: ${'❤️ ' + output.initialLove}
-- assertVisible:
-    id: 'community-reaction-count-inspiration-lookbook-5'
-    text: ${'✨ ' + output.initialInspired}
-- assertVisible:
-    id: 'community-reaction-total-lookbook-5'
-    text: >-
-      ${String(output.initialTotal + 1) + (output.initialTotal === 0 ? ' reaction' : ' reactions')}
-- tapOn:
-    id: 'community-reaction-love-lookbook-5'
-- assertVisible:
-    id: 'community-reaction-love-lookbook-5'
-    selected: true
-- assertVisible:
-    id: 'community-reaction-count-applause-lookbook-5'
-    text: ${'👏 ' + output.initialApplause}
-- assertVisible:
-    id: 'community-reaction-count-love-lookbook-5'
-    text: ${'❤️ ' + (output.initialLove + 1)}
-- assertVisible:
-    id: 'community-reaction-count-inspiration-lookbook-5'
-    text: ${'✨ ' + output.initialInspired}
-- assertVisible:
-    id: 'community-reaction-total-lookbook-5'
-    text: >-
-      ${String(output.initialTotal + 1) + (output.initialTotal === 0 ? ' reaction' : ' reactions')}
-- launchApp:
-    appId: ${MAESTRO_APP_ID}
-    clearState: false
-    stopApp: true
-- runFlow: subflows/open-app.yaml
-# Home may still be mounting after the relaunch (a Metro rebundle makes it
-# slower), and a tap in that window is dropped; retry and wait for the screen as
-# the first entry to the tab does.
-- tapOn:
-    id: 'tab-community'
-    retryTapIfNoChange: true
-    label: 'Reopen the community tab after the relaunch'
-- extendedWaitUntil:
-    visible:
-      id: 'community-screen'
-    timeout: 15000
-    label: 'Community screen is on top again'
-- tapOn:
-    id: 'community-filter-chip-all'
-# The chip refetches the feed, and while it loads the list renders empty, which
-# resets any scroll; scrolling starts only once the page is in.
-- extendedWaitUntil:
-    notVisible:
-      id: 'community-feed-skeleton'
-    timeout: 20000
-- extendedWaitUntil:
-    visible:
-      id: 'community-spotlight-heading'
-    timeout: 20000
-# The spotlight and the newer seeded feed cards sit above `lookbook-5` again
-# after the relaunch, so the card is reached the same way as the first time.
-# Long straight swipes, each moving most of a screen, reach the card in about
-# half the steps of a scroll command, and each step checks for it first.
-- repeat:
-    while:
-      notVisible:
-        id: 'community-post-card-lookbook-5'
-    times: 30
-    commands:
-      - swipe:
-          start: '50%, 85%'
-          end: '50%, 20%'
-          duration: 500
-- extendedWaitUntil:
-    visible:
-      id: 'community-post-card-lookbook-5'
-    timeout: 10000
-- scrollUntilVisible:
-    element:
-      id: 'community-reaction-total-lookbook-5'
-    direction: DOWN
-    timeout: 20000
-- assertVisible:
-    id: 'community-reaction-love-lookbook-5'
-    selected: true
-- assertVisible:
-    id: 'community-reaction-count-applause-lookbook-5'
-    text: ${'👏 ' + output.initialApplause}
-- assertVisible:
-    id: 'community-reaction-count-love-lookbook-5'
-    text: ${'❤️ ' + (output.initialLove + 1)}
-- assertVisible:
-    id: 'community-reaction-count-inspiration-lookbook-5'
-    text: ${'✨ ' + output.initialInspired}
-- assertVisible:
-    id: 'community-reaction-total-lookbook-5'
-    text: >-
-      ${String(output.initialTotal + 1) + (output.initialTotal === 0 ? ' reaction' : ' reactions')}
-- tapOn:
-    id: 'community-reaction-love-lookbook-5'
-- assertVisible:
-    id: 'community-reaction-love-lookbook-5'
-    selected: false
-- assertVisible:
-    id: 'community-reaction-count-applause-lookbook-5'
-    text: ${'👏 ' + output.initialApplause}
-- assertVisible:
-    id: 'community-reaction-count-love-lookbook-5'
-    text: ${'❤️ ' + output.initialLove}
-- assertVisible:
-    id: 'community-reaction-count-inspiration-lookbook-5'
-    text: ${'✨ ' + output.initialInspired}
-- assertVisible:
-    id: 'community-reaction-total-lookbook-5'
-    text: >-
-      ${String(output.initialTotal) + (output.initialTotal === 1 ? ' reaction' : ' reactions')}
+# Story 6.3's reactions (add, replace, a cold relaunch, remove) live in
+# `community-reactions.yaml`, which reaches this card through the notification
+# deep link (Story 6.7b R15).
 
 - takeScreenshot:
     path: maestro/artifacts/community-feed-populated
@@ -628,6 +508,15 @@ tags:
 - assertVisible:
     id: 'community-caption-count'
     text: '14 of 280 characters'
+# R16: iOS reports an element the scroll view clips as visible, so the two checks
+# above pass for a field hidden under the pinned Publish button. The sheet renders
+# this marker only while the caption's label row, counter and field all lie inside
+# the scroll view's visible frame, computed from its scroll state.
+- extendedWaitUntil:
+    visible:
+      id: 'community-caption-in-view'
+    timeout: 5000
+    label: 'The focused caption and its counter are inside the visible scroll frame'
 - takeScreenshot:
     path: maestro/artifacts/community-compose-keyboard
 # R65: Publish sits below the caption and stays disabled without a photo, so a tap on
@@ -644,6 +533,55 @@ tags:
     id: 'community-caption-count'
     text: '14 of 280 characters'
     label: 'The tap reached Publish, above the keyboard, and typed nothing'
+
+# R20: writing alt text means looking at the photo. With the description field
+# focused and the keyboard up, the member scrolls the sheet back to the photo, and
+# the frame must stay there. It used to snap back to the focused field on every
+# scroll. iOS reports a control the frame clips as visible, so the check reads
+# `community-photo-in-view`, which the sheet renders only while the whole photo
+# section lies inside the frame, from its scroll state. The swipes drag inside the
+# sheet, above the keyboard, and the marker is checked after the frame settles,
+# so a snap back fails here.
+- tapOn:
+    id: 'community-alt-text-input'
+    label: 'Focus the image description with the keyboard up'
+- repeat:
+    while:
+      notVisible:
+        id: 'community-photo-in-view'
+    times: 4
+    commands:
+      - swipe:
+          start: '50%, 20%'
+          end: '50%, 50%'
+          duration: 600
+      - waitForAnimationToEnd
+- waitForAnimationToEnd
+- assertVisible:
+    id: 'community-photo-in-view'
+    label: 'The whole photo stays in view after the member scrolls to it'
+- assertVisible:
+    id: 'community-pick-image-button'
+# The field kept focus while out of view: what is typed now lands in it.
+- inputText: 'A'
+- repeat:
+    while:
+      notVisible:
+        id: 'community-alt-text-input'
+        text: 'A'
+    times: 4
+    commands:
+      - swipe:
+          start: '50%, 45%'
+          end: '50%, 25%'
+          duration: 600
+      - waitForAnimationToEnd
+- assertVisible:
+    id: 'community-alt-text-input'
+    text: 'A'
+    label: 'The image description kept focus while the member looked at the photo'
+- takeScreenshot:
+    path: maestro/artifacts/community-compose-alt-focused
 
 - tapOn:
     id: 'community-post-sheet-close'

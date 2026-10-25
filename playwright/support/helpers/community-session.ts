@@ -254,6 +254,12 @@ export async function publishCommunityLook(
     altText: string
     caption?: string
     locale?: string
+    /**
+     * Runs after the bytes are uploaded and before publish, while the post is a
+     * draft only its author can see. A fixture that must exist before the look
+     * becomes public (and before its `post.published` event) goes here.
+     */
+    beforePublish?: (postId: string) => Promise<void>
   }
 ): Promise<PublishedCommunityLook> {
   const { apiBaseUrl, userId, fixture, altText } = options
@@ -306,6 +312,8 @@ export async function publishCommunityLook(
     uploadResponse.ok(),
     `Upload to the signed URL failed: ${uploadResponse.status()} ${await uploadResponse.text()}`
   ).toBe(true)
+
+  await options.beforePublish?.(session.postId)
 
   const publishResponse = await request.post(`${apiBaseUrl}${COMMUNITY_PUBLISH_PATH}`, {
     headers: { ...headers, 'Idempotency-Key': idempotencyKey },

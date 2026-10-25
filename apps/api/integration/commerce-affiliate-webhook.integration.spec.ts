@@ -1,4 +1,4 @@
-import { listenHttpApp, httpTestUrl } from './helpers/loopback-http-app.js'
+import { listenHttpApp, httpTestUrl } from '../src/testing/loopback-http-app.js'
 // Learning path Step 33: Affiliate "Shop this look" CTA.
 // See _bmad-output/project-knowledge/learning-path-step-by-step.md#step-33-affiliate-shop-this-look-cta
 import 'reflect-metadata'
@@ -117,7 +117,7 @@ describe('Story 5.1 affiliate conversion webhook against real PostgreSQL', () =>
   let app: INestApplication | undefined
   let capturedEvents: { distinctId: string; event: string; properties: unknown }[] = []
 
-  const httpServer = (): Parameters<typeof request>[0] => {
+  const httpServer = (): string => {
     if (!app) {
       throw new Error('App is not initialized')
     }
@@ -140,6 +140,10 @@ describe('Story 5.1 affiliate conversion webhook against real PostgreSQL', () =>
     onTestFinished(async () => {
       await prisma.affiliateConversion.deleteMany({ where: { partner_id: partner.id } })
       await prisma.affiliateClick.deleteMany({ where: { partner_id: partner.id } })
+      // Story 6.7b: a sponsorship link holds its offer with ON DELETE RESTRICT.
+      await prisma.communityPostSponsorship.deleteMany({
+        where: { offer: { partner_id: partner.id } },
+      })
       await prisma.affiliateOffer.deleteMany({ where: { partner_id: partner.id } })
       await prisma.commercePartner.deleteMany({ where: { id: partner.id } })
       await prisma.telemetryEvent.deleteMany({

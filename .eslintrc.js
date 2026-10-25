@@ -101,6 +101,58 @@ module.exports = {
       },
     },
     {
+      // Supertest given a Nest server listens on the dual-stack wildcard and then requests
+      // 127.0.0.1. macOS can give that wildcard a port another local process already holds
+      // on 127.0.0.1, and that process answers: a foreign 401 failed the wardrobe commit
+      // spec, a 404 the ritual spec, a socket hang up the community privacy spec, all only
+      // under the full API coverage run. The loopback helper binds 127.0.0.1 itself.
+      files: [
+        'apps/api/**/*.{spec,test}.ts',
+        'apps/api/integration/**/*.ts',
+        'apps/api/src/testing/**/*.ts',
+      ],
+      excludedFiles: ['apps/api/src/testing/loopback-http-app.ts'],
+      rules: {
+        'no-restricted-syntax': [
+          'error',
+          {
+            selector: "CallExpression[callee.property.name='getHttpServer']",
+            message:
+              'Do not hand supertest the Nest server. Bind it with listenHttpApp() from apps/api/src/testing/loopback-http-app.ts and pass request() the URL it returns.',
+          },
+          {
+            selector:
+              "CallExpression[callee.name='request'] > Identifier.arguments[name='app']",
+            message:
+              'Do not hand supertest an app. Bind it with listenHttpApp() or listenHttpHandler() from apps/api/src/testing/loopback-http-app.ts and pass request() the URL.',
+          },
+        ],
+      },
+    },
+    {
+      // apps/api/tsconfig.build.json excludes apps/api/src/testing from the build's input
+      // files, so no helper there is compiled on its own. The exclusion does not stop tsc
+      // from following an import: a production module importing a helper would pull it,
+      // and its test-only dependencies such as supertest, into dist. This rule keeps
+      // production modules from importing those helpers, so dist holds none of them.
+      files: ['apps/api/src/**/*.ts'],
+      excludedFiles: ['apps/api/src/**/*.{spec,test}.ts', 'apps/api/src/testing/**'],
+      rules: {
+        'no-restricted-imports': [
+          'error',
+          {
+            patterns: [
+              {
+                group: ['**/testing/*', '!@couture/testing', '!@couture/testing/*'],
+                message:
+                  'apps/api/src/testing holds test helpers that the production build leaves out; import them only from specs and integration suites so none is compiled into dist.',
+              },
+            ],
+          },
+        ],
+      },
+    },
+    {
       files: ['apps/web/**/*.{ts,tsx}'],
       parserOptions: {
         project: ['./apps/web/tsconfig.eslint.json'],

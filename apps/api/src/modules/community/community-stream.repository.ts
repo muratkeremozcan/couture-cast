@@ -29,8 +29,8 @@ function subjectIdentity(subjects: Subject[]): string {
   return JSON.stringify(subjects)
 }
 
-class AppendBudgetExceeded extends Error {}
-function appendFailure(error: unknown) {
+export class AppendBudgetExceeded extends Error {}
+export function appendFailure(error: unknown) {
   if (error instanceof AppendBudgetExceeded) return 'budget_pressure'
   if (error instanceof Prisma.PrismaClientKnownRequestError) {
     const sql = String(error.meta?.code)
@@ -39,6 +39,10 @@ function appendFailure(error: unknown) {
       return 'budget_pressure'
   }
   return 'dependency_unavailable'
+}
+/** Head contention and budget pressure defer a batch; the append loop retries it. */
+export function isAppendDeferral(error: unknown): boolean {
+  return appendFailure(error) !== 'dependency_unavailable'
 }
 
 @Injectable()

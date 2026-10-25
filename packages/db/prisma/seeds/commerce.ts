@@ -182,6 +182,73 @@ export async function seedCommerceCatalog(
 }
 
 /**
+ * Story 6.7b: the seeded spotlight post that carries a sponsorship locally and
+ * in tests. It is rank 1 of the seeded City Spotlight cohort
+ * (`${SEEDED_SPOTLIGHT_NAMESPACE}-spotlight-1` in `seeds/community-spotlight.ts`),
+ * written by an adult seed author, so the CTA is reachable on the feed card,
+ * the spotlight and the Home teaser. Restated here rather than imported because
+ * this module must stay free of the factory graph (see the import note above);
+ * `packages/db/test/commerce-seed.spec.ts` pins the two together.
+ */
+export const SEEDED_SPONSORED_POST_ID = 'seed-spotlight-1'
+
+/** The app user recorded as the seeded link's creator. Holds no auth identity. */
+export const SEEDED_SPONSORSHIP_OPERATOR = {
+  id: 'seed-sponsorship-operator',
+  email: 'sponsorship-operator@example.com',
+} as const
+
+/**
+ * Links the seeded post to the seeded `top` offer through an open-ended,
+ * backdated window. Gated like the rest of this file, idempotent (an open link
+ * on the post is kept), and a no-op when the spotlight seed has not run.
+ */
+export async function seedCommunitySponsorship(
+  prisma: PrismaClient,
+  catalog: SeededCommerceCatalog | null,
+  env: Readonly<NodeJS.ProcessEnv> = process.env
+): Promise<string | null> {
+  if (!allowsCommerceSeeding(env) || !catalog) {
+    return null
+  }
+  const offerId = catalog.offerIds[0]
+  const post = await prisma.lookbookPost.findUnique({
+    where: { id: SEEDED_SPONSORED_POST_ID },
+    select: { id: true },
+  })
+  if (!offerId || !post) {
+    return null
+  }
+
+  await prisma.user.upsert({
+    where: { id: SEEDED_SPONSORSHIP_OPERATOR.id },
+    update: {},
+    create: { ...SEEDED_SPONSORSHIP_OPERATOR },
+  })
+
+  const open = await prisma.communityPostSponsorship.findFirst({
+    where: { post_id: post.id, ended_at: null },
+    select: { id: true },
+  })
+  if (open) {
+    return open.id
+  }
+
+  const created = await prisma.communityPostSponsorship.create({
+    data: {
+      post_id: post.id,
+      offer_id: offerId,
+      starts_at: new Date('2020-01-01T00:00:00.000Z'),
+      ends_at: null,
+      created_by_id: SEEDED_SPONSORSHIP_OPERATOR.id,
+      create_reason: 'owner_pick',
+    },
+    select: { id: true },
+  })
+  return created.id
+}
+
+/**
  * The literal `{clickToken}` placeholder is mandatory: the click endpoint
  * rejects a template without it as operator misconfiguration rather than
  * redirecting to a URL that carries no attribution.

@@ -32,6 +32,8 @@ import {
   affiliateConversionRecordedPropertiesSchema,
   affiliateCtaClickedPropertiesSchema,
   affiliateCtaShownPropertiesSchema,
+  trackAffiliateCtaClicked,
+  trackAffiliateCtaShown,
 } from '../src/types/analytics-events'
 import {
   createAffiliateClickRequestFixture,
@@ -215,9 +217,16 @@ describe('attributed click request', () => {
   })
 
   it('closes the surface enum so it cannot become free text', () => {
-    // Story 5.4 adds palette_advisor deliberately (Decision 7). The enum stays
-    // closed: a new surface has to be added here on purpose.
-    expect(affiliateSurfaceSchema.options).toEqual(['mobile_hero', 'palette_advisor'])
+    // Story 5.4 adds palette_advisor deliberately (Decision 7), and Story 6.7b
+    // the three community surfaces. The enum stays closed: a new surface has
+    // to be added here on purpose.
+    expect(affiliateSurfaceSchema.options).toEqual([
+      'mobile_hero',
+      'palette_advisor',
+      'community_feed',
+      'community_spotlight',
+      'home_teaser',
+    ])
     expect(() =>
       affiliateClickRequestSchema.parse(
         createAffiliateClickRequestFixture({
@@ -642,5 +651,140 @@ describe('analytics property allowlists', () => {
         locale_region: localeRegion,
       })
     ).toThrow()
+  })
+  describe('Story 6.7b community member', () => {
+    const communityProperties = {
+      partner_id: 'sample-partner',
+      offer_id: 'offer-fixture-1',
+      surface: 'community_feed',
+      locale_region: 'US',
+    } as const
+
+    it.each(['community_feed', 'community_spotlight', 'home_teaser'] as const)(
+      '6.7b-CON-001 accepts the %s member on both CTA events',
+      (surface) => {
+        for (const schema of [
+          affiliateCtaShownPropertiesSchema,
+          affiliateCtaClickedPropertiesSchema,
+        ]) {
+          expect(schema.parse({ ...communityProperties, surface })).toEqual({
+            ...communityProperties,
+            surface,
+          })
+        }
+      }
+    )
+
+    it.each([
+      { name: 'a scenario', extra: { scenario: 'morning' } },
+      { name: 'a recommendation id', extra: { recommendation_id: 'post-1' } },
+      { name: 'a post id', extra: { post_id: 'post-1' } },
+      { name: 'an author id', extra: { author_id: 'user-2' } },
+      { name: 'an author name', extra: { author_name: 'Style Explorer' } },
+      { name: 'a caption', extra: { caption: 'Autumn layers' } },
+      { name: 'a user id', extra: { user_id: 'user-1' } },
+      { name: 'an offer URL', extra: { offer_url: 'https://partner.example/x' } },
+    ])('6.7b-CON-002 the community member rejects $name', ({ extra }) => {
+      for (const schema of [
+        affiliateCtaShownPropertiesSchema,
+        affiliateCtaClickedPropertiesSchema,
+      ]) {
+        expect(() => schema.parse({ ...communityProperties, ...extra })).toThrow()
+      }
+    })
+
+    it.each(DISALLOWED_ANALYTICS_PROPERTY_FIXTURES)(
+      '6.7b-CON-003 the community member rejects %o',
+      (disallowed) => {
+        for (const schema of [
+          affiliateCtaShownPropertiesSchema,
+          affiliateCtaClickedPropertiesSchema,
+        ]) {
+          expect(() => schema.parse({ ...communityProperties, ...disallowed })).toThrow()
+        }
+      }
+    )
+
+    it('6.7b-CON-004 a hero surface cannot drop its scenario or recommendation id', () => {
+      expect(() =>
+        affiliateCtaShownPropertiesSchema.parse({
+          ...communityProperties,
+          surface: 'mobile_hero',
+        })
+      ).toThrow()
+      expect(() =>
+        affiliateCtaClickedPropertiesSchema.parse({
+          ...communityProperties,
+          surface: 'palette_advisor',
+        })
+      ).toThrow()
+    })
+
+    // The union split must leave both recommendation members intact: a garment
+    // offer clicked on the advisor surface carries a scenario and a
+    // recommendation id exactly like the hero click.
+    it.each(['mobile_hero', 'palette_advisor'] as const)(
+      '6.7b-CON-006 the %s recommendation click parses through the schema and the event wrapper',
+      (surface) => {
+        const properties = { ...validProperties.affiliate_cta_clicked, surface }
+        expect(affiliateCtaClickedPropertiesSchema.parse(properties)).toEqual(properties)
+        expect(
+          trackAffiliateCtaClicked({
+            analyticsSubjectId: 'hmac-subject',
+            partnerId: properties.partner_id,
+            offerId: properties.offer_id,
+            scenario: properties.scenario,
+            surface,
+            localeRegion: properties.locale_region,
+            recommendationId: properties.recommendation_id,
+          })
+        ).toEqual({
+          distinctId: 'hmac-subject',
+          event: 'affiliate_cta_clicked',
+          properties,
+        })
+      }
+    )
+
+    it('6.7b-CON-005 the event wrappers refuse identifiers before a payload exists', () => {
+      expect(() =>
+        trackAffiliateCtaShown(
+          {
+            partnerId: 'sample-partner',
+            offerId: 'offer-fixture-1',
+            surface: 'home_teaser',
+            localeRegion: 'US',
+            recommendationId: 'post-1',
+          } as never,
+          'distinct-1'
+        )
+      ).toThrow()
+      expect(() =>
+        trackAffiliateCtaClicked({
+          analyticsSubjectId: 'hmac',
+          partnerId: 'sample-partner',
+          offerId: 'offer-fixture-1',
+          surface: 'community_spotlight',
+          localeRegion: 'US',
+          scenario: 'morning',
+        } as never)
+      ).toThrow()
+      expect(
+        trackAffiliateCtaShown(
+          {
+            partnerId: 'sample-partner',
+            offerId: 'offer-fixture-1',
+            surface: 'home_teaser',
+            localeRegion: '*',
+          },
+          'distinct-1'
+        ).properties
+      ).toEqual({
+        partner_id: 'sample-partner',
+        offer_id: 'offer-fixture-1',
+        surface: 'home_teaser',
+        locale_region: '*',
+      })
+    })
   })
 })

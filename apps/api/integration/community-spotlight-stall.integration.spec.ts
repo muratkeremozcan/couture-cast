@@ -23,6 +23,7 @@ import {
 } from '../src/modules/community/community-spotlight-invalidator.js'
 import { startCommunityEngagementRuntime } from '../src/modules/community/community-engagement.runtime.js'
 import { spotlightTestContext } from './helpers/community-spotlight-context.js'
+import { drainCommunityOutbox } from './helpers/community-outbox-drain.js'
 
 const ctx = spotlightTestContext('stall')
 
@@ -151,9 +152,7 @@ describe('6.6 stalled spotlight Redis', () => {
       ctx.prisma,
       new CommunitySpotlightCache(redis, ctx.prefix)
     )
-    while ((await ctx.streams.append()) > 0) {
-      // Drain the outbox the cohort wrote.
-    }
+    await drainCommunityOutbox(ctx.prisma, ctx.streams)
     await expect(invalidator.processWithin()).resolves.toMatchObject({
       status: expect.stringMatching(/^(resumed_at_head|advanced|idle)$/) as string,
     })
@@ -186,9 +185,8 @@ describe('6.6 stalled spotlight Redis', () => {
     vi.stubEnv('COMMUNITY_DISPATCH_ENABLED', 'false')
     const area = ctx.area('stalled-runtime')
     const cohort = await ctx.cohort(area, 5)
-    while ((await ctx.streams.append()) > 0) {
-      // Start from an empty outbox so every append below is the runtime's.
-    }
+    // Start from an empty outbox so every append below is the runtime's.
+    await drainCommunityOutbox(ctx.prisma, ctx.streams)
     const { proxy, client } = await stallableClient()
     const remote = { getFeatureFlagValue: () => Promise.resolve<unknown>(true) }
     const runtime = await startCommunityEngagementRuntime(ctx.prisma, remote, 'general', {

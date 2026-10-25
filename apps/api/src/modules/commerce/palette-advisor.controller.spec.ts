@@ -18,6 +18,7 @@ import { Test, type TestingModule } from '@nestjs/testing'
 import { PrismaClient } from '@prisma/client'
 import request from 'supertest'
 import { afterEach, describe, expect, it, vi } from 'vitest'
+import { listenHttpApp, httpTestUrl } from '../../testing/loopback-http-app.js'
 import { PALETTE_CONSENT_REQUIRED_MESSAGE } from '../../contracts/http.js'
 import { RequestAuthGuard } from '../auth/security.guards.js'
 import type { AuthenticatedRequest } from '../auth/security.types.js'
@@ -138,7 +139,7 @@ describe('PaletteAdvisorController', () => {
       .compile()
 
     app = moduleFixture.createNestApplication()
-    await app.init()
+    await listenHttpApp(app)
   }
 
   afterEach(async () => {
@@ -148,11 +149,11 @@ describe('PaletteAdvisorController', () => {
     }
   })
 
-  const server = (): Parameters<typeof request>[0] => {
+  const server = (): string => {
     if (!app) {
       throw new Error('App is not initialized')
     }
-    return app.getHttpServer() as Parameters<typeof request>[0]
+    return httpTestUrl(app)
   }
 
   const authed = {

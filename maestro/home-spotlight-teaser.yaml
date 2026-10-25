@@ -53,8 +53,10 @@ tags:
 - assertVisible:
     id: 'home-spotlight-teaser-link'
     # Authors show under a random stored alias, so the format is what is pinned:
-    # never a caption, a raw id or the profile name.
-    text: 'Standout look in Chicago by Style Explorer [0-9A-F]{8}, 6 reactions\. Opens the City Spotlight\.'
+    # never a caption, a raw id or the profile name. Story 6.7b: where the
+    # commerce seed links `seed-spotlight-1` to Sample Partner, the label ends
+    # with its disclosure; `community-sponsored-highlights.yaml` requires it.
+    text: 'Standout look in Chicago by Style Explorer [0-9A-F]{8}, 6 reactions\. Opens the City Spotlight\.( Partnered with Sample Partner)?'
     label: 'One link names the area, the author and the reaction count'
 - takeScreenshot:
     path: maestro/artifacts/home-spotlight-teaser
