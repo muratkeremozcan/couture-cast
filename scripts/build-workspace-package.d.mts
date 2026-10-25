@@ -5,14 +5,13 @@ export declare function replaceDistFromStaging(
   dist: string
 ): { moved: number; removed: number }
 
-export declare function pidAlive(pid: number): boolean
-
 export declare function acquireBuildLock(options: {
-  lockFile: string
-  waitMs?: number
-  log?: (message: string) => void
-  now?: () => number
-  sleep?: (ms: number) => void
-}): () => void
+  packageDir: string
+  waitMs: number
+  staleMs: number
+  onCompromised: (error: Error) => void
+}): Promise<{ release: () => Promise<void>; token: string }>
 
-export declare function removeAbandonedStaging(packageDir: string): void
+export declare function ownsBuildLock(packageDir: string, token: string): boolean
+
+export declare function removeAbandonedStaging(packageDir: string, keep?: string): void
