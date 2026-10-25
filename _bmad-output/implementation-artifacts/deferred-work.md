@@ -1338,7 +1338,10 @@ them lost runs to it in one day.
   each emitted file is renamed over its `dist` counterpart, and files the build
   no longer emits are removed afterwards. A rebuild stays a full rebuild but is
   no longer destructive, so a reader sees the old or the new build at every
-  moment; outputs are byte-identical to the old build. The rebuild is still
+  moment; outputs are byte-identical to the old build. R23 added a per-package
+  lock and a per-build staging directory, so overlapping builds of one package
+  run one at a time, and a missing or empty staging directory leaves `dist`
+  untouched. The rebuild is still
   repeated on every pre-hook (not cached), and `db:generate`'s Prisma client
   regeneration is unchanged.
 

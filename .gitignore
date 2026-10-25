@@ -16,7 +16,8 @@ coverage/
 apps/**/dist
 apps/**/build
 packages/**/dist
-packages/**/.dist-staging
+packages/**/.dist-staging-*
+packages/**/.dist-build.lock*
 packages/**/build
 tsconfig.tsbuildinfo
 
