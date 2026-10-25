@@ -212,6 +212,24 @@ describe('deployment workflows', () => {
     // The ports sit in the ephemeral range. Reserving them steers new
     // connections away; the action's own first step repeats it for any caller.
     expect(reserve).toMatch(/net\.ipv4\.ip_local_reserved_ports=/)
+    // The write is verified by reading the sysctl back, ranges included, and
+    // every way the reservation can fail on Linux stops the job, named.
+    const write = reserve.indexOf('sudo -n sysctl -q -w')
+    const readBack = reserve.indexOf(
+      'mapfile -t missing < <(uncovered_ports "$reserved")',
+      write
+    )
+    expect(write).toBeGreaterThan(-1)
+    expect(readBack).toBeGreaterThan(write)
+    expect(reserve).toMatch(/entry%-\*/)
+    for (const failure of [
+      /::error::sysctl could not reserve the Supabase host ports[^\n]*"\n\s+exit 1/,
+      /::error::net\.ipv4\.ip_local_reserved_ports reads back as[^\n]*"\n\s+exit 1/,
+      /::error::Reserving the Supabase host ports needs passwordless sudo[^\n]*"\n\s+exit 1/,
+    ]) {
+      expect(reserve).toMatch(failure)
+    }
+    expect(reserve).not.toMatch(/::warning::/)
     expect(at(reservePortsUse)).toBeLessThan(
       at('name: Compute the Supabase image cache key')
     )
