@@ -34,6 +34,7 @@ import {
 import { EdgeToEdgeModal, useModalInsets } from '@/components/edge-to-edge-modal'
 import { useHeroPalette } from '@/components/hero/hero-theme'
 import { safeFindNodeHandle } from '@/src/lib/accessibility-focus'
+import { useComposeFieldReveal } from './compose-field-reveal'
 
 /**
  * `hero-theme.ts` carries neither the premium gold accent nor the community
@@ -278,6 +279,9 @@ export function CommunityPostSheet({
   const [errorMessage, setErrorMessage] = useState<string | null>(null)
 
   const sheetRef = useRef<View>(null)
+  // Story 6.7b R16: keeps the focused field, its label row and counter inside
+  // the scroll frame the keyboard shrinks (see `compose-field-reveal.ts`).
+  const reveal = useComposeFieldReveal()
   const controllerRef = useRef<AbortController | null>(null)
   // One key per attempt, reused across allocate, upload, publish and any retry of
   // that attempt, so a retry replays the first session instead of allocating a second.
@@ -535,7 +539,11 @@ export function CommunityPostSheet({
             </TouchableOpacity>
           </View>
 
-          <ScrollView style={styles.content} keyboardShouldPersistTaps="handled">
+          <ScrollView
+            {...reveal.scrollProps}
+            contentContainerStyle={styles.contentContainer}
+            keyboardShouldPersistTaps="handled"
+          >
             <Text style={[styles.helperText, { color: palette.mutedText }]}>
               {t('community.compose.description')}
             </Text>
@@ -549,7 +557,7 @@ export function CommunityPostSheet({
               }}
             />
             {/* Alt text: server suggestion, author edit, explicit confirmation */}
-            <View style={styles.section}>
+            <View style={styles.section} onLayout={reveal.sectionLayout('alt')}>
               <Text style={[styles.sectionLabel, { color: palette.text }]}>
                 {t('community.compose.altLabel')}
               </Text>
@@ -569,6 +577,7 @@ export function CommunityPostSheet({
                 accessibilityLabel={t('community.compose.altLabel')}
                 multiline
                 maxLength={200}
+                {...reveal.fieldFocus('alt')}
                 value={altText}
                 onChangeText={(next) => {
                   setAltText(next)
@@ -588,7 +597,7 @@ export function CommunityPostSheet({
             </View>
 
             {/* Caption */}
-            <View style={styles.section}>
+            <View style={styles.section} onLayout={reveal.sectionLayout('caption')}>
               <View style={styles.captionHeader}>
                 <Text style={[styles.sectionLabel, { color: palette.text }]}>
                   {t('community.compose.captionLabel')}
@@ -610,6 +619,7 @@ export function CommunityPostSheet({
                 placeholderTextColor={palette.mutedText}
                 accessibilityLabel={t('community.compose.captionLabel')}
                 multiline
+                {...reveal.fieldFocus('caption')}
                 value={caption}
                 onChangeText={setCaption}
               />
@@ -655,6 +665,17 @@ export function CommunityPostSheet({
               />
             ) : null}
           </ScrollView>
+          {reveal.inView('caption') ? (
+            // UI automation marker: the caption's label row, counter and field are
+            // all inside the scroll view's visible frame, computed from the scroll
+            // state, so it cannot report a field the frame clips. No label, no touches.
+            <View
+              testID="community-caption-in-view"
+              collapsable={false}
+              pointerEvents="none"
+              style={styles.marker}
+            />
+          ) : null}
 
           <View style={styles.footer}>
             <TouchableOpacity
@@ -725,9 +746,18 @@ const styles = StyleSheet.create({
   closeButtonText: {
     fontSize: 18,
   },
-  content: {
+  // On the content container, so scroll offsets and the sections' layout share
+  // one coordinate space.
+  contentContainer: {
     paddingHorizontal: 20,
     paddingVertical: 12,
+  },
+  marker: {
+    position: 'absolute',
+    top: 0,
+    left: 0,
+    width: 1,
+    height: 1,
   },
   section: {
     marginBottom: 16,

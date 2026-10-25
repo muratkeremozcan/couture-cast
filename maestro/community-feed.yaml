@@ -508,6 +508,15 @@ tags:
 - assertVisible:
     id: 'community-caption-count'
     text: '14 of 280 characters'
+# R16: iOS reports an element the scroll view clips as visible, so the two checks
+# above pass for a field hidden under the pinned Publish button. The sheet renders
+# this marker only while the caption's label row, counter and field all lie inside
+# the scroll view's visible frame, computed from its scroll state.
+- extendedWaitUntil:
+    visible:
+      id: 'community-caption-in-view'
+    timeout: 5000
+    label: 'The focused caption and its counter are inside the visible scroll frame'
 - takeScreenshot:
     path: maestro/artifacts/community-compose-keyboard
 # R65: Publish sits below the caption and stays disabled without a photo, so a tap on
