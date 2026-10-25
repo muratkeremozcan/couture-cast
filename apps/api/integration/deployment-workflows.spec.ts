@@ -32,6 +32,13 @@ const vercelConfig = path.join(repoRoot, 'apps', 'api', 'vercel.json')
 const apiHandler = path.join(repoRoot, 'apps', 'api', 'api', 'index.ts')
 const apiPackageJson = path.join(repoRoot, 'apps', 'api', 'package.json')
 const rootPackageJson = path.join(repoRoot, 'package.json')
+const startLocalSupabaseAction = path.join(
+  repoRoot,
+  '.github',
+  'actions',
+  'start-local-supabase',
+  'action.yml'
+)
 
 describe('deployment workflows', () => {
   it('vercel preview smoke workflow exists and resolves preview URLs', () => {
@@ -111,6 +118,61 @@ describe('deployment workflows', () => {
       scripts?: { prepare?: string }
     }
     expect(pkg.scripts?.prepare).toBe('node .husky/install.mjs')
+  })
+
+  it('every job that starts local Supabase uses the shared action', () => {
+    const workflowsDir = path.join(repoRoot, '.github', 'workflows')
+    const callers: string[] = []
+    for (const file of fs.readdirSync(workflowsDir).filter((f) => f.endsWith('.yml'))) {
+      const content = fs.readFileSync(path.join(workflowsDir, file), 'utf8')
+      // A direct start would skip the image cache, the port guard and the retries.
+      expect(content, file).not.toMatch(/^\s*(run:\s*)?npx supabase start/m)
+      if (content.includes('uses: ./.github/actions/start-local-supabase')) {
+        callers.push(file)
+      }
+    }
+    expect(callers.sort()).toEqual([
+      'k6-smoke-prs.yml',
+      'pr-mobile-e2e.yml',
+      'pr-pw-e2e-local.yml',
+      'rwf-burn-in.yml',
+      'rwf-e2e.yml',
+    ])
+  })
+
+  it('local Supabase starts from the image cache with its host ports guarded', () => {
+    const content = fs.readFileSync(startLocalSupabaseAction, 'utf8')
+    const at = (needle: string) => {
+      const index = content.indexOf(needle)
+      expect(index, needle).toBeGreaterThan(-1)
+      return index
+    }
+
+    // Images restore and load before the start; the registry pull is the fallback.
+    expect(at('uses: actions/cache/restore@v4')).toBeLessThan(
+      at('name: Load the cached Supabase images')
+    )
+    expect(at('name: Load the cached Supabase images')).toBeLessThan(
+      at('name: Start local Supabase with retry')
+    )
+    expect(content).toMatch(/registries\+=\("\$CACHED_REGISTRY"\)/)
+
+    // The Supabase ports sit in the ephemeral range: they are reserved once and
+    // any client socket on one is closed before every attempt.
+    expect(content).toMatch(/net\.ipv4\.ip_local_reserved_ports=/)
+    expect(content).toMatch(/ss -K -tn state connected "\$port_filter"/)
+    expect(
+      at('if [ "$port_guard" = true ]; then reserve_supabase_ports; fi')
+    ).toBeLessThan(at('if [ "$port_guard" = true ]; then free_supabase_ports; fi'))
+    expect(at('if [ "$port_guard" = true ]; then free_supabase_ports; fi')).toBeLessThan(
+      at('run_start "$remaining" 2>&1 | tee "$attempt_log"')
+    )
+    // Listeners alone miss a client socket on the port; diagnostics show every state.
+    expect(content).toMatch(/ss -tanp state all "\$port_filter"/)
+    expect(content).not.toMatch(/ss -ltnp/)
+
+    // Only a failed or cut-off pull moves to another registry.
+    expect(content).toMatch(/if pull_failed "\$exit_code"; then\s+registry_index=/)
   })
 
   it('api vercel build applies committed Prisma migrations before building', () => {
