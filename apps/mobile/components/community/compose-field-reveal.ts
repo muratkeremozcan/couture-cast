@@ -58,48 +58,52 @@ export function revealOffset(
 }
 
 export type ComposeField = 'alt' | 'caption'
+/** A section the sheet measures: a field, or the photo above them. */
+export type ComposeSection = ComposeField | 'photo'
 
 function sameRect(previous: ContentRect | undefined, next: ContentRect): boolean {
   return previous?.top === next.top && previous.bottom === next.bottom
 }
 
 /**
- * Wires the reveal into a scroll view and its field sections: whenever the
- * frame, the offset or the focused section's size changes, the frame moves just
- * enough to show the whole focused section (label row, counter and field).
+ * Wires the reveal into a scroll view and its field sections. The frame moves
+ * just enough to show the whole focused section (label row, counter and field)
+ * when a field gains focus, when the frame's height changes (the keyboard view
+ * shrinking or growing it) and when the focused section's size changes (a
+ * caption growing a line). A scroll alone never moves it: a member writing alt
+ * text scrolls up to look at the photo, and the frame stays where they put it.
  */
 export function useComposeFieldReveal() {
   const scrollRef = useRef<ScrollView>(null)
-  const [viewport, setViewport] = useState<ScrollViewport>({ offset: 0, height: 0 })
-  const [rects, setRects] = useState<Partial<Record<ComposeField, ContentRect>>>({})
+  // Read by the reveal, which must not re-run on scroll, and mirrored into
+  // state only so the in-view marker re-renders as the member scrolls.
+  const offsetRef = useRef(0)
+  const [offset, setOffset] = useState(0)
+  const [height, setHeight] = useState(0)
+  const [rects, setRects] = useState<Partial<Record<ComposeSection, ContentRect>>>({})
   const [focused, setFocused] = useState<ComposeField | null>(null)
   const focusedRect = focused ? rects[focused] : undefined
 
   useEffect(() => {
     if (!focusedRect) return
-    const target = revealOffset(focusedRect, viewport)
+    const target = revealOffset(focusedRect, { offset: offsetRef.current, height })
     if (target !== null) scrollRef.current?.scrollTo({ y: target, animated: false })
-  }, [focusedRect, viewport])
+  }, [focusedRect, height])
 
   const scrollProps = {
     ref: scrollRef,
     scrollEventThrottle: 16,
     onLayout: (event: LayoutChangeEvent) => {
-      const { height } = event.nativeEvent.layout
-      setViewport((previous) =>
-        previous.height === height ? previous : { ...previous, height }
-      )
+      setHeight(event.nativeEvent.layout.height)
     },
     onScroll: (event: NativeSyntheticEvent<NativeScrollEvent>) => {
-      const offset = event.nativeEvent.contentOffset.y
-      setViewport((previous) =>
-        previous.offset === offset ? previous : { ...previous, offset }
-      )
+      offsetRef.current = event.nativeEvent.contentOffset.y
+      setOffset(offsetRef.current)
     },
   }
 
-  /** `onLayout` for a field's section, a direct child of the scroll content. */
-  const sectionLayout = (field: ComposeField) => (event: LayoutChangeEvent) => {
+  /** `onLayout` for a section, a direct child of the scroll content. */
+  const sectionLayout = (field: ComposeSection) => (event: LayoutChangeEvent) => {
     const { y, height } = event.nativeEvent.layout
     const next = { top: y, bottom: y + height }
     setRects((previous) =>
@@ -113,9 +117,9 @@ export function useComposeFieldReveal() {
     onBlur: () => setFocused((current) => (current === field ? null : current)),
   })
 
-  const inView = (field: ComposeField) => {
+  const inView = (field: ComposeSection) => {
     const rect = rects[field]
-    return rect !== undefined && isRectInViewport(rect, viewport)
+    return rect !== undefined && isRectInViewport(rect, { offset, height })
   }
 
   return { scrollProps, sectionLayout, fieldFocus, inView }

@@ -534,6 +534,55 @@ tags:
     text: '14 of 280 characters'
     label: 'The tap reached Publish, above the keyboard, and typed nothing'
 
+# R20: writing alt text means looking at the photo. With the description field
+# focused and the keyboard up, the member scrolls the sheet back to the photo, and
+# the frame must stay there. It used to snap back to the focused field on every
+# scroll. iOS reports a control the frame clips as visible, so the check reads
+# `community-photo-in-view`, which the sheet renders only while the whole photo
+# section lies inside the frame, from its scroll state. The swipes drag inside the
+# sheet, above the keyboard, and the marker is checked after the frame settles,
+# so a snap back fails here.
+- tapOn:
+    id: 'community-alt-text-input'
+    label: 'Focus the image description with the keyboard up'
+- repeat:
+    while:
+      notVisible:
+        id: 'community-photo-in-view'
+    times: 4
+    commands:
+      - swipe:
+          start: '50%, 20%'
+          end: '50%, 50%'
+          duration: 600
+      - waitForAnimationToEnd
+- waitForAnimationToEnd
+- assertVisible:
+    id: 'community-photo-in-view'
+    label: 'The whole photo stays in view after the member scrolls to it'
+- assertVisible:
+    id: 'community-pick-image-button'
+# The field kept focus while out of view: what is typed now lands in it.
+- inputText: 'A'
+- repeat:
+    while:
+      notVisible:
+        id: 'community-alt-text-input'
+        text: 'A'
+    times: 4
+    commands:
+      - swipe:
+          start: '50%, 45%'
+          end: '50%, 25%'
+          duration: 600
+      - waitForAnimationToEnd
+- assertVisible:
+    id: 'community-alt-text-input'
+    text: 'A'
+    label: 'The image description kept focus while the member looked at the photo'
+- takeScreenshot:
+    path: maestro/artifacts/community-compose-alt-focused
+
 - tapOn:
     id: 'community-post-sheet-close'
     retryTapIfNoChange: true

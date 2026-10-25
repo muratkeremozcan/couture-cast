@@ -809,4 +809,43 @@ describe('R16 CommunityPostSheet keeps the focused field in view', () => {
       expect(rect.bottom).toBeLessThanOrEqual(visible.bottom + 1)
     }
   })
+
+  it('6.7b-MOB-076 a member who scrolls away from the focused field stays where they scrolled', async () => {
+    // Writing alt text means looking at the photo above the field. The reveal
+    // runs on focus and when the frame or the field changes size; a scroll the
+    // member makes must not snap the frame back to the field.
+    // Tall enough for the whole photo section, short enough that the caption
+    // starts below the frame.
+    await browserPage.viewport(414, 600)
+    renderSheet()
+    const caption = screen.getByTestId('community-caption-input')
+    await waitFor(() =>
+      expect(screen.getByTestId('community-post-sheet-content')).toBeVisible()
+    )
+    act(() => caption.focus({ preventScroll: true }))
+    await screen.findByTestId('community-caption-in-view')
+    const frame = caption.closest('[data-testid="community-post-sheet-content"]')!
+    const scroller = Array.from(frame.querySelectorAll<HTMLElement>('div')).find(
+      (node) => node.scrollHeight > node.clientHeight && node.contains(caption)
+    )!
+    expect(scroller.scrollTop).toBeGreaterThan(0)
+
+    // The member scrolls back up to the top, the field still focused.
+    act(() => {
+      scroller.scrollTop = 0
+      scroller.dispatchEvent(new Event('scroll'))
+    })
+    await waitFor(() =>
+      expect(screen.queryByTestId('community-caption-in-view')).toBeNull()
+    )
+    await act(async () => {
+      await new Promise((resolve) => setTimeout(resolve, 200))
+    })
+
+    expect(scroller.scrollTop).toBe(0)
+    expect(document.activeElement).toBe(caption)
+    // The marker automation reads: the whole photo section is in the frame.
+    expect(screen.getByTestId('community-photo-in-view')).toBeInTheDocument()
+    expect(screen.getByTestId('community-pick-image-button')).toBeVisible()
+  })
 })

@@ -5,6 +5,7 @@ import {
   Image,
   Platform,
   ScrollView,
+  type LayoutChangeEvent,
   StyleSheet,
   Text,
   TextInput,
@@ -182,17 +183,24 @@ function ComposeErrorPanel({ testID, message, isAlert = false }: ComposeErrorPan
 }
 
 interface ComposePhotoSectionProps {
+  /** Story 6.7b R20: reports the section's place in the scroll content. */
+  onLayout?: (event: LayoutChangeEvent) => void
   asset: CommunityPhotoAsset | null
   isBusy: boolean
   onPick: () => void
 }
 
-function ComposePhotoSection({ asset, isBusy, onPick }: ComposePhotoSectionProps) {
+function ComposePhotoSection({
+  asset,
+  isBusy,
+  onPick,
+  onLayout,
+}: ComposePhotoSectionProps) {
   const { t } = useTranslation()
   const palette = useHeroPalette()
 
   return (
-    <View style={styles.section}>
+    <View style={styles.section} onLayout={onLayout}>
       <Text style={[styles.sectionLabel, { color: palette.text }]}>
         {t('community.compose.photoLabel')}
       </Text>
@@ -550,6 +558,7 @@ export function CommunityPostSheet({
 
             {/* Photo */}
             <ComposePhotoSection
+              onLayout={reveal.sectionLayout('photo')}
               asset={asset}
               isBusy={isBusy}
               onPick={() => {
@@ -671,6 +680,16 @@ export function CommunityPostSheet({
             // state, so it cannot report a field the frame clips. No label, no touches.
             <View
               testID="community-caption-in-view"
+              collapsable={false}
+              pointerEvents="none"
+              style={styles.marker}
+            />
+          ) : null}
+          {reveal.inView('photo') ? (
+            // Story 6.7b R20: the same marker for the photo section, so automation
+            // can tell the photo is fully in view after the member scrolls to it.
+            <View
+              testID="community-photo-in-view"
               collapsable={false}
               pointerEvents="none"
               style={styles.marker}
