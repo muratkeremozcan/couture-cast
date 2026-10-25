@@ -1,0 +1,199 @@
+# Story 6.3: community reactions on mobile, against the real API: add, replace,
+# survive a cold relaunch, and remove.
+#
+# Split out of `community-feed.yaml` (Story 6.7b R15). Together the two journeys
+# cost about 290 s in CI against the runner's 360 s per-flow cap, and almost a
+# third of that was two swipe walks past the spotlight cohort to `lookbook-5`.
+# This flow reaches the card through the community notification deep link,
+# which renders it as the highlighted card at the top of the list on every
+# launch. The feed's own ordering, card content and report journey stay in
+# `community-feed.yaml`, which still walks the feed to the card.
+#
+# DATA. `lookbook-5` is a public, already-published seed row
+# (`packages/db/prisma/seeds/rituals.ts`) every shard's user can read, so this
+# flow is not user-scoped and stays out of `USER_SCOPED_FLOWS`. The counts are
+# read from the card before the first tap and every later assertion is relative
+# to them, so other devices' reactions on the same row cannot break it. The
+# runner's per-flow reset (`scripts/lib/mobile-e2e-flow-state.mjs`) deletes this
+# member's reactions before the flow and before any watchdog retry, so the flow
+# always starts unreacted, and it removes its own reaction before it ends.
+#
+# THE RELAUNCH IS THE POINT of the middle section: the selection and counts are
+# read back from the server after a cold start, through the same deep link, so a
+# reaction kept only in client state fails there.
+appId: ${MAESTRO_APP_ID}
+name: 'Community reactions'
+tags:
+  - e2e
+  - community
+  - maestro
+---
+- launchApp:
+    appId: ${MAESTRO_APP_ID}
+    clearState: true
+    stopApp: false
+
+- runFlow: subflows/open-app.yaml
+
+- runFlow:
+    file: subflows/open-link.yaml
+    env:
+      LINK: '${APP_URL}?source=notification&type=community&cardId=lookbook-5'
+- extendedWaitUntil:
+    visible:
+      id: 'community-screen'
+    timeout: 15000
+    label: 'The notification link opened Community'
+- extendedWaitUntil:
+    visible:
+      id: 'highlighted-community-card-lookbook-5'
+    timeout: 20000
+    label: 'The linked post renders as the highlighted card over the real API'
+
+# Centred, slowly, before any chip is tapped: iOS reports a chip under the tab
+# bar as visible, and a tap there landed on the Wardrobe tab (Story 6.7b iOS run
+# 3); at the default speed the centring scroll overshot under the filter strip.
+# The highlighted card heads the list, so the first match is its row.
+- scrollUntilVisible:
+    element:
+      id: 'community-reaction-total-lookbook-5'
+    direction: DOWN
+    centerElement: true
+    speed: 10
+    timeout: 20000
+- copyTextFrom:
+    id: 'community-reaction-count-applause-lookbook-5'
+- evalScript: ${output.initialApplause = Number(maestro.copiedText.replace(/[^0-9]/g, ''))}
+- copyTextFrom:
+    id: 'community-reaction-count-love-lookbook-5'
+- evalScript: ${output.initialLove = Number(maestro.copiedText.replace(/[^0-9]/g, ''))}
+- copyTextFrom:
+    id: 'community-reaction-count-inspiration-lookbook-5'
+- evalScript: ${output.initialInspired = Number(maestro.copiedText.replace(/[^0-9]/g, ''))}
+- copyTextFrom:
+    id: 'community-reaction-total-lookbook-5'
+- evalScript: ${output.initialTotal = Number(maestro.copiedText.replace(/[^0-9]/g, ''))}
+- tapOn:
+    id: 'community-reaction-applause-lookbook-5'
+- extendedWaitUntil:
+    visible:
+      id: 'community-reaction-applause-lookbook-5'
+      selected: true
+    timeout: 10000
+- assertVisible:
+    id: 'community-reaction-count-applause-lookbook-5'
+    text: ${'👏 ' + (output.initialApplause + 1)}
+- assertVisible:
+    id: 'community-reaction-count-love-lookbook-5'
+    text: ${'❤️ ' + output.initialLove}
+- assertVisible:
+    id: 'community-reaction-count-inspiration-lookbook-5'
+    text: ${'✨ ' + output.initialInspired}
+- assertVisible:
+    id: 'community-reaction-total-lookbook-5'
+    text: >-
+      ${String(output.initialTotal + 1) + (output.initialTotal === 0 ? ' reaction' : ' reactions')}
+- tapOn:
+    id: 'community-reaction-love-lookbook-5'
+- assertVisible:
+    id: 'community-reaction-love-lookbook-5'
+    selected: true
+- assertVisible:
+    id: 'community-reaction-count-applause-lookbook-5'
+    text: ${'👏 ' + output.initialApplause}
+- assertVisible:
+    id: 'community-reaction-count-love-lookbook-5'
+    text: ${'❤️ ' + (output.initialLove + 1)}
+- assertVisible:
+    id: 'community-reaction-count-inspiration-lookbook-5'
+    text: ${'✨ ' + output.initialInspired}
+- assertVisible:
+    id: 'community-reaction-total-lookbook-5'
+    text: >-
+      ${String(output.initialTotal + 1) + (output.initialTotal === 0 ? ' reaction' : ' reactions')}
+
+# --- A cold relaunch reads the reaction back from the server -----------------
+
+- launchApp:
+    appId: ${MAESTRO_APP_ID}
+    clearState: false
+    stopApp: true
+- runFlow: subflows/open-app.yaml
+# Home may still be mounting after the relaunch (a Metro rebundle makes it
+# slower), and a tap in that window is dropped; retry and wait for the screen as
+# the first entry to the tab does.
+- tapOn:
+    id: 'tab-community'
+    retryTapIfNoChange: true
+    label: 'Reopen the community tab after the relaunch'
+- extendedWaitUntil:
+    visible:
+      id: 'community-screen'
+    timeout: 15000
+    label: 'Community screen is on top again'
+- tapOn:
+    id: 'community-filter-chip-all'
+# The chip refetches the feed, and while it loads the list renders empty, which
+# resets any scroll; the link opens only once the page is in.
+- extendedWaitUntil:
+    notVisible:
+      id: 'community-feed-skeleton'
+    timeout: 20000
+- extendedWaitUntil:
+    visible:
+      id: 'community-spotlight-heading'
+    timeout: 20000
+- runFlow:
+    file: subflows/open-link.yaml
+    env:
+      LINK: '${APP_URL}?source=notification&type=community&cardId=lookbook-5'
+- extendedWaitUntil:
+    visible:
+      id: 'highlighted-community-card-lookbook-5'
+    timeout: 20000
+    label: 'The linked post is read again from the server after the relaunch'
+# Centred for the same reason as before the first reaction tap.
+- scrollUntilVisible:
+    element:
+      id: 'community-reaction-total-lookbook-5'
+    direction: DOWN
+    centerElement: true
+    speed: 10
+    timeout: 20000
+- assertVisible:
+    id: 'community-reaction-love-lookbook-5'
+    selected: true
+- assertVisible:
+    id: 'community-reaction-count-applause-lookbook-5'
+    text: ${'👏 ' + output.initialApplause}
+- assertVisible:
+    id: 'community-reaction-count-love-lookbook-5'
+    text: ${'❤️ ' + (output.initialLove + 1)}
+- assertVisible:
+    id: 'community-reaction-count-inspiration-lookbook-5'
+    text: ${'✨ ' + output.initialInspired}
+- assertVisible:
+    id: 'community-reaction-total-lookbook-5'
+    text: >-
+      ${String(output.initialTotal + 1) + (output.initialTotal === 0 ? ' reaction' : ' reactions')}
+- tapOn:
+    id: 'community-reaction-love-lookbook-5'
+- assertVisible:
+    id: 'community-reaction-love-lookbook-5'
+    selected: false
+- assertVisible:
+    id: 'community-reaction-count-applause-lookbook-5'
+    text: ${'👏 ' + output.initialApplause}
+- assertVisible:
+    id: 'community-reaction-count-love-lookbook-5'
+    text: ${'❤️ ' + output.initialLove}
+- assertVisible:
+    id: 'community-reaction-count-inspiration-lookbook-5'
+    text: ${'✨ ' + output.initialInspired}
+- assertVisible:
+    id: 'community-reaction-total-lookbook-5'
+    text: >-
+      ${String(output.initialTotal) + (output.initialTotal === 1 ? ' reaction' : ' reactions')}
+
+- takeScreenshot:
+    path: maestro/artifacts/community-reactions

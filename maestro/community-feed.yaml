@@ -62,6 +62,12 @@
 # while its own summary printed `Passed: 16/17`". The missing-flow guard catches
 # it and turns the suite red, so it is a known open question rather than a hole.
 #
+# SPLIT IN STORY 6.7B (R15). This flow and its reactions journey together cost
+# about 290 s in CI against the runner's 360 s per-flow cap. The reactions, with
+# their cold relaunch, now run in `community-reactions.yaml`; this flow keeps the
+# shell, the filters, the feed walk with its card and ordering checks, the report
+# keyboard check and the compose sheet.
+#
 # The `all` filter is selected before asserting on cards, deliberately. Under
 # `auto` the result depends on whether the shared fixture user happens to have a
 # saved location by the time this flow runs — another flow on the same device may
@@ -452,156 +458,9 @@ tags:
     direction: UP
     timeout: 20000
 
-# Story 6.3: desired-state add, replace, reload, and remove against the real API.
-# Centred, slowly, before any chip is tapped: iOS reports a chip under the tab
-# bar as visible, and a tap there landed on the Wardrobe tab (Story 6.7b iOS run
-# 3); at the default speed the centring scroll overshot under the filter strip.
-- scrollUntilVisible:
-    element:
-      id: 'community-reaction-total-lookbook-5'
-    direction: DOWN
-    centerElement: true
-    speed: 10
-- copyTextFrom:
-    id: 'community-reaction-count-applause-lookbook-5'
-- evalScript: ${output.initialApplause = Number(maestro.copiedText.replace(/[^0-9]/g, ''))}
-- copyTextFrom:
-    id: 'community-reaction-count-love-lookbook-5'
-- evalScript: ${output.initialLove = Number(maestro.copiedText.replace(/[^0-9]/g, ''))}
-- copyTextFrom:
-    id: 'community-reaction-count-inspiration-lookbook-5'
-- evalScript: ${output.initialInspired = Number(maestro.copiedText.replace(/[^0-9]/g, ''))}
-- copyTextFrom:
-    id: 'community-reaction-total-lookbook-5'
-- evalScript: ${output.initialTotal = Number(maestro.copiedText.replace(/[^0-9]/g, ''))}
-- tapOn:
-    id: 'community-reaction-applause-lookbook-5'
-- extendedWaitUntil:
-    visible:
-      id: 'community-reaction-applause-lookbook-5'
-      selected: true
-    timeout: 10000
-- assertVisible:
-    id: 'community-reaction-count-applause-lookbook-5'
-    text: ${'👏 ' + (output.initialApplause + 1)}
-- assertVisible:
-    id: 'community-reaction-count-love-lookbook-5'
-    text: ${'❤️ ' + output.initialLove}
-- assertVisible:
-    id: 'community-reaction-count-inspiration-lookbook-5'
-    text: ${'✨ ' + output.initialInspired}
-- assertVisible:
-    id: 'community-reaction-total-lookbook-5'
-    text: >-
-      ${String(output.initialTotal + 1) + (output.initialTotal === 0 ? ' reaction' : ' reactions')}
-- tapOn:
-    id: 'community-reaction-love-lookbook-5'
-- assertVisible:
-    id: 'community-reaction-love-lookbook-5'
-    selected: true
-- assertVisible:
-    id: 'community-reaction-count-applause-lookbook-5'
-    text: ${'👏 ' + output.initialApplause}
-- assertVisible:
-    id: 'community-reaction-count-love-lookbook-5'
-    text: ${'❤️ ' + (output.initialLove + 1)}
-- assertVisible:
-    id: 'community-reaction-count-inspiration-lookbook-5'
-    text: ${'✨ ' + output.initialInspired}
-- assertVisible:
-    id: 'community-reaction-total-lookbook-5'
-    text: >-
-      ${String(output.initialTotal + 1) + (output.initialTotal === 0 ? ' reaction' : ' reactions')}
-- launchApp:
-    appId: ${MAESTRO_APP_ID}
-    clearState: false
-    stopApp: true
-- runFlow: subflows/open-app.yaml
-# Home may still be mounting after the relaunch (a Metro rebundle makes it
-# slower), and a tap in that window is dropped; retry and wait for the screen as
-# the first entry to the tab does.
-- tapOn:
-    id: 'tab-community'
-    retryTapIfNoChange: true
-    label: 'Reopen the community tab after the relaunch'
-- extendedWaitUntil:
-    visible:
-      id: 'community-screen'
-    timeout: 15000
-    label: 'Community screen is on top again'
-- tapOn:
-    id: 'community-filter-chip-all'
-# The chip refetches the feed, and while it loads the list renders empty, which
-# resets any scroll; scrolling starts only once the page is in.
-- extendedWaitUntil:
-    notVisible:
-      id: 'community-feed-skeleton'
-    timeout: 20000
-- extendedWaitUntil:
-    visible:
-      id: 'community-spotlight-heading'
-    timeout: 20000
-# The spotlight and the newer seeded feed cards sit above `lookbook-5` again
-# after the relaunch. This time the target is the reaction row, which sits low
-# in the card and is reached by a downward walk, so the card only has to show:
-# long straight swipes, each moving most of a screen, reach it in about half
-# the steps of a scroll command, and each step checks for it first.
-- repeat:
-    while:
-      notVisible:
-        id: 'community-post-card-lookbook-5'
-    times: 30
-    commands:
-      - swipe:
-          start: '50%, 85%'
-          end: '50%, 20%'
-          duration: 500
-- extendedWaitUntil:
-    visible:
-      id: 'community-post-card-lookbook-5'
-    timeout: 10000
-# Centred for the same reason as before the first reaction tap.
-- scrollUntilVisible:
-    element:
-      id: 'community-reaction-total-lookbook-5'
-    direction: DOWN
-    centerElement: true
-    speed: 10
-    timeout: 20000
-- assertVisible:
-    id: 'community-reaction-love-lookbook-5'
-    selected: true
-- assertVisible:
-    id: 'community-reaction-count-applause-lookbook-5'
-    text: ${'👏 ' + output.initialApplause}
-- assertVisible:
-    id: 'community-reaction-count-love-lookbook-5'
-    text: ${'❤️ ' + (output.initialLove + 1)}
-- assertVisible:
-    id: 'community-reaction-count-inspiration-lookbook-5'
-    text: ${'✨ ' + output.initialInspired}
-- assertVisible:
-    id: 'community-reaction-total-lookbook-5'
-    text: >-
-      ${String(output.initialTotal + 1) + (output.initialTotal === 0 ? ' reaction' : ' reactions')}
-- tapOn:
-    id: 'community-reaction-love-lookbook-5'
-- assertVisible:
-    id: 'community-reaction-love-lookbook-5'
-    selected: false
-- assertVisible:
-    id: 'community-reaction-count-applause-lookbook-5'
-    text: ${'👏 ' + output.initialApplause}
-- assertVisible:
-    id: 'community-reaction-count-love-lookbook-5'
-    text: ${'❤️ ' + output.initialLove}
-- assertVisible:
-    id: 'community-reaction-count-inspiration-lookbook-5'
-    text: ${'✨ ' + output.initialInspired}
-- assertVisible:
-    id: 'community-reaction-total-lookbook-5'
-    text: >-
-      ${String(output.initialTotal) + (output.initialTotal === 1 ? ' reaction' : ' reactions')}
+# Story 6.3's reactions (add, replace, a cold relaunch, remove) live in
+# `community-reactions.yaml`, which reaches this card through the notification
+# deep link (Story 6.7b R15).
 
 - takeScreenshot:
     path: maestro/artifacts/community-feed-populated
