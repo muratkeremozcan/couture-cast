@@ -15,6 +15,22 @@ import { getI18n } from '../../i18n'
 const control =
   'min-h-[44px] min-w-[44px] rounded px-3 py-2 text-sm font-medium focus-visible:outline focus-visible:outline-2 focus-visible:outline-[color:var(--theme-secondary)]'
 
+/**
+ * The author line of a comment, by the community card's rule: the alias, else
+ * "You" for the viewer, else the localized fallback. The contract lets an
+ * available comment carry no alias, so every published comment still has a
+ * name. A comment that is no longer available names nobody.
+ */
+export function commentAuthor(
+  item: CommunityComment,
+  t: (key: string) => string
+): string | null {
+  if (item.unavailable) return null
+  const alias = item.author?.trim()
+  if (alias) return alias
+  return item.isOwn ? t('community.card.authorSelf') : t('community.card.authorFallback')
+}
+
 export function CommunityComments({
   postId,
   state,
@@ -109,7 +125,10 @@ export function CommunityComments({
     reportTriggers.current.get(id)?.focus()
   }
   const context = (item: CommunityComment) =>
-    [item.author, item.unavailable ? t('community.comments.unavailable') : item.body]
+    [
+      commentAuthor(item, t),
+      item.unavailable ? t('community.comments.unavailable') : item.body,
+    ]
       .filter(Boolean)
       .join('. ')
   const actionName = (action: string, item: CommunityComment) =>
@@ -123,126 +142,133 @@ export function CommunityComments({
     void state.load(postId)
     void state.statuses(postId)
   }
-  const renderEntry = (item: CommunityComment) => (
-    <article
-      key={item.id}
-      data-testid={`comment-${item.id}`}
-      id={`community-comment-${item.id}`}
-      tabIndex={-1}
-      onFocusCapture={() => {
-        focusedEntry.current = item.id
-      }}
-      onBlurCapture={(event) => {
-        if (
-          event.relatedTarget &&
-          !event.currentTarget.contains(event.relatedTarget as Node)
-        )
-          focusedEntry.current = null
-      }}
-      className="space-y-2 rounded-lg border border-[color:var(--theme-card-border)] p-3"
-    >
-      {item.author && <p className="text-sm font-semibold">{item.author}</p>}
-      <p className="break-words text-sm">
-        {item.unavailable ? t('community.comments.unavailable') : item.body}
-      </p>
-      <div className="flex flex-wrap items-center gap-2">
-        {item.parentId === null && !item.unavailable && (
-          <button
-            type="button"
-            className={control}
-            aria-label={actionName(t('community.comments.reply'), item)}
-            onClick={() => {
-              state.draft(postId, { parentId: item.id })
-              composerRef.current?.focus()
-            }}
-          >
-            {t('community.comments.reply')}
-          </button>
-        )}
-        {item.isOwn && (
-          <button
-            type="button"
-            className={control}
-            aria-label={actionName(t('community.comments.delete'), item)}
-            onClick={() => {
-              void state.delete(postId, item.id).then(() => statusRef.current?.focus())
-            }}
-          >
-            {t('community.comments.delete')}
-          </button>
-        )}
-        <button
-          type="button"
-          className={control}
-          disabled={item.isOwn}
-          ref={(element) => {
-            if (element) reportTriggers.current.set(item.id, element)
-            else reportTriggers.current.delete(item.id)
-          }}
-          aria-label={actionName(t('community.card.report'), item)}
-          onClick={() => {
-            reportGeneration.current++
-            setReason('spam')
-            setReporting(item.id)
-          }}
-        >
-          {t('community.card.report')}
-        </button>
-        {item.parentId === null && item.replyCount > 0 && (
-          <button
-            type="button"
-            className={control}
-            aria-label={actionName(
-              t('community.comments.replies', { count: item.replyCount }),
-              item
-            )}
-            aria-expanded={thread.replies.has(item.id)}
-            onClick={() => {
-              void state.load(postId, item.id)
-            }}
-          >
-            {t('community.comments.replies', { count: item.replyCount })}
-          </button>
-        )}
-      </div>
-      {reporting === item.id && (
-        <form
-          className="space-y-2"
-          onSubmit={(event) => {
-            event.preventDefault()
-            const owner = reportGeneration.current
-            void state.report(postId, item.id, reason).then((accepted) => {
-              if (accepted && reportGeneration.current === owner) closeReport(item.id)
-            })
-          }}
-        >
-          <label className="block text-sm">
-            {t('community.report.reasonLabel')}
-            <select
-              ref={reasonRef}
-              className={`${control} block w-full border bg-[var(--theme-card-bg)]`}
-              value={reason}
-              onChange={(event) =>
-                setReason(communityReportReasonSchema.parse(event.target.value))
-              }
+  const renderEntry = (item: CommunityComment) => {
+    const author = commentAuthor(item, t)
+    return (
+      <article
+        key={item.id}
+        data-testid={`comment-${item.id}`}
+        id={`community-comment-${item.id}`}
+        tabIndex={-1}
+        onFocusCapture={() => {
+          focusedEntry.current = item.id
+        }}
+        onBlurCapture={(event) => {
+          if (
+            event.relatedTarget &&
+            !event.currentTarget.contains(event.relatedTarget as Node)
+          )
+            focusedEntry.current = null
+        }}
+        className="space-y-2 rounded-lg border border-[color:var(--theme-card-border)] p-3"
+      >
+        {author && <p className="text-sm font-semibold">{author}</p>}
+        <p className="break-words text-sm">
+          {item.unavailable ? t('community.comments.unavailable') : item.body}
+        </p>
+        <div className="flex flex-wrap items-center gap-2">
+          {item.parentId === null && !item.unavailable && (
+            <button
+              type="button"
+              className={control}
+              aria-label={actionName(t('community.comments.reply'), item)}
+              onClick={() => {
+                state.draft(postId, { parentId: item.id })
+                composerRef.current?.focus()
+              }}
             >
-              {communityReportReasonSchema.options.map((value) => (
-                <option key={value} value={value}>
-                  {t(`community.report.reason.${value}`)}
-                </option>
-              ))}
-            </select>
-          </label>
-          <button type="submit" className={control}>
-            {t('community.comments.sendReport')}
+              {t('community.comments.reply')}
+            </button>
+          )}
+          {item.isOwn && (
+            <button
+              type="button"
+              className={control}
+              aria-label={actionName(t('community.comments.delete'), item)}
+              onClick={() => {
+                void state.delete(postId, item.id).then(() => statusRef.current?.focus())
+              }}
+            >
+              {t('community.comments.delete')}
+            </button>
+          )}
+          <button
+            type="button"
+            className={control}
+            disabled={item.isOwn}
+            ref={(element) => {
+              if (element) reportTriggers.current.set(item.id, element)
+              else reportTriggers.current.delete(item.id)
+            }}
+            aria-label={actionName(t('community.card.report'), item)}
+            onClick={() => {
+              reportGeneration.current++
+              setReason('spam')
+              setReporting(item.id)
+            }}
+          >
+            {t('community.card.report')}
           </button>
-          <button type="button" className={control} onClick={() => closeReport(item.id)}>
-            {t('community.comments.cancel')}
-          </button>
-        </form>
-      )}
-    </article>
-  )
+          {item.parentId === null && item.replyCount > 0 && (
+            <button
+              type="button"
+              className={control}
+              aria-label={actionName(
+                t('community.comments.replies', { count: item.replyCount }),
+                item
+              )}
+              aria-expanded={thread.replies.has(item.id)}
+              onClick={() => {
+                void state.load(postId, item.id)
+              }}
+            >
+              {t('community.comments.replies', { count: item.replyCount })}
+            </button>
+          )}
+        </div>
+        {reporting === item.id && (
+          <form
+            className="space-y-2"
+            onSubmit={(event) => {
+              event.preventDefault()
+              const owner = reportGeneration.current
+              void state.report(postId, item.id, reason).then((accepted) => {
+                if (accepted && reportGeneration.current === owner) closeReport(item.id)
+              })
+            }}
+          >
+            <label className="block text-sm">
+              {t('community.report.reasonLabel')}
+              <select
+                ref={reasonRef}
+                className={`${control} block w-full border bg-[var(--theme-card-bg)]`}
+                value={reason}
+                onChange={(event) =>
+                  setReason(communityReportReasonSchema.parse(event.target.value))
+                }
+              >
+                {communityReportReasonSchema.options.map((value) => (
+                  <option key={value} value={value}>
+                    {t(`community.report.reason.${value}`)}
+                  </option>
+                ))}
+              </select>
+            </label>
+            <button type="submit" className={control}>
+              {t('community.comments.sendReport')}
+            </button>
+            <button
+              type="button"
+              className={control}
+              onClick={() => closeReport(item.id)}
+            >
+              {t('community.comments.cancel')}
+            </button>
+          </form>
+        )}
+      </article>
+    )
+  }
 
   return (
     <section

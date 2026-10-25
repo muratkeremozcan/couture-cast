@@ -384,6 +384,47 @@ describe('Story 6.4 native comments sheet through real wrappers', () => {
     ])
   })
 
+  it('6.7b-MOB-080 names a published comment whose author has no alias with the card fallback rule', async () => {
+    // The contract lets an available comment carry `author: null` (an author with
+    // no community alias), so the sheet applies the card rule: the viewer reads
+    // "You", anyone else the localized fallback, and every entry has a name.
+    const nameless = createCommunityComment({
+      id: 'root-nameless',
+      author: null,
+      isOwn: false,
+      body: 'Seeded long root without an alias.',
+      publicationSequence: 2,
+    })
+    const ownNameless = createCommunityComment({
+      id: 'root-own',
+      author: null,
+      isOwn: true,
+      body: 'My own look notes.',
+      publicationSequence: 3,
+    })
+    server.use(
+      http.get(`${base}/comments`, () =>
+        HttpResponse.json(page([root, nameless, ownNameless]))
+      )
+    )
+    renderSheet()
+
+    const other = within(await screen.findByTestId('comment-root-nameless'))
+    expect(other.getByText('Style explorer')).toBeVisible()
+    const own = within(screen.getByTestId('comment-root-own'))
+    expect(own.getByText('You')).toBeVisible()
+    // Actions are named after the same author line.
+    expect(
+      screen.getByRole('button', {
+        name: 'Reply: Style explorer. Seeded long root without an alias.',
+      })
+    ).toBeVisible()
+    // A named author keeps their alias.
+    expect(
+      within(screen.getByTestId('comment-root')).getByText('Style Explorer A1B2C3D4')
+    ).toBeVisible()
+  })
+
   it('keeps a newer report form open when an earlier report is accepted', async () => {
     const secondRoot = createCommunityComment({
       id: 'root-two',

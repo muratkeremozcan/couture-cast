@@ -7,7 +7,7 @@
 import React, { createElement } from 'react'
 import { run as runAxe } from 'axe-core'
 import type * as ReactNativeModule from 'react-native'
-import { act, render, screen } from '@testing-library/react'
+import { act, render, screen, waitFor } from '@testing-library/react'
 import { afterEach, beforeAll, beforeEach, describe, expect, it, vi } from 'vitest'
 import type { CommunitySponsoredFeedItem as CommunityFeedItem } from '@couture/api-client/contracts/http'
 
@@ -528,10 +528,14 @@ describe('CommunityCard (Story 6.1)', () => {
     expect(unavailable()).toBeInTheDocument()
 
     imageSpy.prefetch.mockResolvedValue(true)
+    // The recovered image must not complete a load of its own: the test's pixel is
+    // a data URL the browser decodes at once, and a load landing before the error
+    // below would restore the budget and turn that error into a refresh. Under a
+    // loaded runner that race went either way (Story 6.7b R19 full-suite run).
+    imageSpy.silent = true
     rerender(card(2))
     expect(unavailable()).toBeInTheDocument()
-    await act(() => Promise.resolve())
-    expect(unavailable()).toBeNull()
+    await waitFor(() => expect(unavailable()).toBeNull())
     expect(screen.getByTestId('community-card-image-post-a')).toBeInTheDocument()
 
     act(() => onError()())
