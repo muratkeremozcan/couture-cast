@@ -80,13 +80,13 @@ describe('workspace package build', () => {
     expect(fs.readdirSync(root).filter((name) => name.startsWith('.dist-'))).toEqual([])
   })
 
-  it('6.7b-R21F-03 replaces dist file by file from staging and reports the counts', () => {
+  it('6.7b-R21F-03 replaces dist file by file from staging and reports the counts', async () => {
     const root = fakePackage()
     const staging = path.join(root, 'staging')
     fs.mkdirSync(path.join(staging, 'added'), { recursive: true })
     fs.writeFileSync(path.join(staging, 'index.js'), 'new entry')
     fs.writeFileSync(path.join(staging, 'added', 'new.js'), 'new file')
-    expect(replaceDistFromStaging(staging, path.join(root, 'dist'))).toEqual({
+    expect(await replaceDistFromStaging(staging, path.join(root, 'dist'))).toEqual({
       moved: 2,
       removed: 2,
     })
@@ -121,9 +121,8 @@ for (let i = 0; i < 6; i++) {
   const marker = process.env.SLOW_TSC_DISPLACE_MARKER
   if (mode === 'displace' && i === 2 && marker && !fs.existsSync(marker)) {
     fs.writeFileSync(marker, '')
-    fs.rmSync('.dist-build.lock', { recursive: true, force: true })
-    fs.mkdirSync('.dist-build.lock')
-    fs.writeFileSync('.dist-build.lock.owner', 'another-build')
+    fs.rmSync('.dist-build-lock', { recursive: true, force: true })
+    fs.mkdirSync('.dist-build-lock')
     fs.writeFileSync(path.join(outDir, 'displaced-attempt.js'), 'must never be published')
   }
 }
@@ -177,24 +176,29 @@ const leftovers = (root: string) =>
     .filter((name) => !['dist', 'slow-tsc.cjs', 'compiles.log'].includes(name))
 
 describe('overlapping builds of one package', () => {
-  it('6.7b-R23-01 two overlapping builds both succeed and leave the same complete dist as one build', async () => {
-    directory = fs.mkdtempSync(path.join(os.tmpdir(), 'r23-overlap-'))
-    const single = slowPackage(directory, 'single')
-    expect((await buildAsync(single)).code).toBe(0)
-    const expected = tree(path.join(single, 'dist'))
-    expect(Object.keys(expected)).toHaveLength(6)
+  it(
+    '6.7b-R23-01 two overlapping builds both succeed and leave the same complete dist as one build',
+    { timeout: 30_000 },
+    async () => {
+      directory = fs.mkdtempSync(path.join(os.tmpdir(), 'r23-overlap-'))
+      const single = slowPackage(directory, 'single')
+      expect((await buildAsync(single)).code).toBe(0)
+      const expected = tree(path.join(single, 'dist'))
+      expect(Object.keys(expected)).toHaveLength(6)
 
-    const shared = slowPackage(directory, 'shared')
-    const first = buildAsync(shared)
-    // The second build starts while the first is mid-compile.
-    await new Promise((resolve) => setTimeout(resolve, 150))
-    const second = buildAsync(shared)
-    const results = await Promise.all([first, second])
-    for (const result of results) expect(result, result.output).toMatchObject({ code: 0 })
-    expect(tree(path.join(shared, 'dist'))).toEqual(expected)
-    // No staging directory, lock or incremental state is left behind.
-    expect(leftovers(shared)).toEqual([])
-  })
+      const shared = slowPackage(directory, 'shared')
+      const first = buildAsync(shared)
+      // The second build starts while the first is mid-compile.
+      await new Promise((resolve) => setTimeout(resolve, 150))
+      const second = buildAsync(shared)
+      const results = await Promise.all([first, second])
+      for (const result of results)
+        expect(result, result.output).toMatchObject({ code: 0 })
+      expect(tree(path.join(shared, 'dist'))).toEqual(expected)
+      // No staging directory, lock or incremental state is left behind.
+      expect(leftovers(shared)).toEqual([])
+    }
+  )
 
   it('6.7b-R23-02 removes the staging a crashed build left', async () => {
     directory = fs.mkdtempSync(path.join(os.tmpdir(), 'r23-staging-'))
@@ -213,7 +217,7 @@ describe('overlapping builds of one package', () => {
     const root = slowPackage(directory, 'package')
     // This test process holds the lock and keeps it alive, like a running build.
     const release = await lock(root, {
-      lockfilePath: path.join(root, '.dist-build.lock'),
+      lockfilePath: path.join(root, '.dist-build-lock'),
       realpath: false,
       stale: 2_000,
       update: 1_000,
@@ -225,7 +229,7 @@ describe('overlapping builds of one package', () => {
       })
       expect(result.code).toBe(1)
       expect(result.output).toMatch(
-        /build lock .*\.dist-build\.lock is still held after 600 ms by a build that keeps it alive/
+        /build lock .*\.dist-build-lock is still held after 600 ms by a build that keeps it alive/
       )
       expect(fs.readFileSync(path.join(root, 'dist', 'file-0.js'), 'utf8')).toBe(
         'old output 0'
@@ -235,22 +239,26 @@ describe('overlapping builds of one package', () => {
     }
   })
 
-  it('6.7b-R23-04 keeps a complete dist when a build that fails mid-compile follows one that publishes', async () => {
-    directory = fs.mkdtempSync(path.join(os.tmpdir(), 'r23-fail-after-'))
-    const single = slowPackage(directory, 'single')
-    expect((await buildAsync(single)).code).toBe(0)
-    const expected = tree(path.join(single, 'dist'))
+  it(
+    '6.7b-R23-04 keeps a complete dist when a build that fails mid-compile follows one that publishes',
+    { timeout: 30_000 },
+    async () => {
+      directory = fs.mkdtempSync(path.join(os.tmpdir(), 'r23-fail-after-'))
+      const single = slowPackage(directory, 'single')
+      expect((await buildAsync(single)).code).toBe(0)
+      const expected = tree(path.join(single, 'dist'))
 
-    const shared = slowPackage(directory, 'shared')
-    const publishing = buildAsync(shared)
-    await new Promise((resolve) => setTimeout(resolve, 150))
-    const failing = buildAsync(shared, { SLOW_TSC_MODE: 'fail' })
-    const [published, failed] = await Promise.all([publishing, failing])
-    expect(published, published.output).toMatchObject({ code: 0 })
-    expect(failed.code).toBe(2)
-    expect(tree(path.join(shared, 'dist'))).toEqual(expected)
-    expect(leftovers(shared)).toEqual([])
-  })
+      const shared = slowPackage(directory, 'shared')
+      const publishing = buildAsync(shared)
+      await new Promise((resolve) => setTimeout(resolve, 150))
+      const failing = buildAsync(shared, { SLOW_TSC_MODE: 'fail' })
+      const [published, failed] = await Promise.all([publishing, failing])
+      expect(published, published.output).toMatchObject({ code: 0 })
+      expect(failed.code).toBe(2)
+      expect(tree(path.join(shared, 'dist'))).toEqual(expected)
+      expect(leftovers(shared)).toEqual([])
+    }
+  )
 
   it.each([
     { mode: 'empty', label: 'empty', message: 'emitted nothing' },
@@ -291,43 +299,50 @@ const expectSerialized = (ran: [number, number][]) => {
 
 /** A short stale window, so the tests see takeovers in seconds. */
 const STALE = { BUILD_WORKSPACE_PACKAGE_LOCK_STALE_MS: '2000' }
+/** A wider window for the takeover-timing tests, so a loaded runner cannot displace a live holder. */
+const WIDE_STALE = { BUILD_WORKSPACE_PACKAGE_LOCK_STALE_MS: '6000' }
 
 /** A lock directory whose heartbeat stopped `ageMs` ago, as a crashed build leaves it. */
 function abandonedLock(root: string, ageMs: number) {
-  const lock = path.join(root, '.dist-build.lock')
+  const lock = path.join(root, '.dist-build-lock')
   fs.mkdirSync(lock)
   const then = new Date(Date.now() - ageMs)
   fs.utimesSync(lock, then, then)
 }
 
 describe('heartbeat build lock (R24)', () => {
-  it('6.7b-R24-01 three waiters on an abandoned lock run one at a time and leave one complete dist', async () => {
-    directory = fs.mkdtempSync(path.join(os.tmpdir(), 'r24-waiters-'))
-    const single = slowPackage(directory, 'single')
-    expect((await buildAsync(single)).code).toBe(0)
-    const expected = tree(path.join(single, 'dist'))
+  it(
+    '6.7b-R24-01 three waiters on an abandoned lock run one at a time and leave one complete dist',
+    { timeout: 30_000 },
+    async () => {
+      directory = fs.mkdtempSync(path.join(os.tmpdir(), 'r24-waiters-'))
+      const single = slowPackage(directory, 'single')
+      expect((await buildAsync(single)).code).toBe(0)
+      const expected = tree(path.join(single, 'dist'))
 
-    const root = slowPackage(directory, 'shared')
-    abandonedLock(root, 60_000)
-    const env = {
-      ...STALE,
-      SLOW_TSC_PAUSE_MS: '120',
-      BUILD_WORKSPACE_PACKAGE_LOCK_WAIT_MS: '20000',
+      const root = slowPackage(directory, 'shared')
+      abandonedLock(root, 60_000)
+      const env = {
+        ...STALE,
+        SLOW_TSC_PAUSE_MS: '120',
+        BUILD_WORKSPACE_PACKAGE_LOCK_WAIT_MS: '20000',
+      }
+      const first = buildAsync(root, env)
+      const second = buildAsync(root, env)
+      await wait(300)
+      const third = buildAsync(root, env)
+      const results = await Promise.all([first, second, third])
+      for (const result of results)
+        expect(result, result.output).toMatchObject({ code: 0 })
+      const ran = compiles(root)
+      expect(ran).toHaveLength(3)
+      expectSerialized(ran)
+      expect(tree(path.join(root, 'dist'))).toEqual(expected)
+      expect(leftovers(root)).toEqual([])
     }
-    const first = buildAsync(root, env)
-    const second = buildAsync(root, env)
-    await wait(300)
-    const third = buildAsync(root, env)
-    const results = await Promise.all([first, second, third])
-    for (const result of results) expect(result, result.output).toMatchObject({ code: 0 })
-    const ran = compiles(root)
-    expect(ran).toHaveLength(3)
-    expectSerialized(ran)
-    expect(tree(path.join(root, 'dist'))).toEqual(expected)
-    expect(leftovers(root)).toEqual([])
-  })
+  )
 
-  it("6.7b-R24-02 takes over a dead build's lock even when its pid now names a live process", async () => {
+  it('6.7b-R24-02 is never blocked by an old pid lock whose pid now names a live process', async () => {
     directory = fs.mkdtempSync(path.join(os.tmpdir(), 'r24-reused-pid-'))
     const root = slowPackage(directory, 'package')
     // A lock file from the pid-lock version, whose pid the OS has since given to a
@@ -349,63 +364,77 @@ describe('heartbeat build lock (R24)', () => {
     })
     expect(result, result.output).toMatchObject({ code: 0 })
     expect(Object.keys(tree(path.join(root, 'dist')))).toHaveLength(6)
-    expect(leftovers(root)).toEqual([])
+    // The old pid lock is left as it was: this script removes no lock state.
+    expect(leftovers(root)).toEqual(['.dist-build.lock'])
   })
 
-  it('6.7b-R24-03 takes over the lock of a build killed mid-compile once its heartbeat is stale', async () => {
-    directory = fs.mkdtempSync(path.join(os.tmpdir(), 'r24-killed-'))
-    const root = slowPackage(directory, 'package')
-    const killed = spawn(
-      process.execPath,
-      [SCRIPT, '--tsc', process.execPath, 'slow-tsc.cjs'],
-      {
-        cwd: root,
-        env: { ...process.env, ...STALE, SLOW_TSC_PAUSE_MS: '500' },
-        stdio: 'ignore',
-        detached: true,
+  it(
+    '6.7b-R24-03 takes over the lock of a build killed mid-compile once its heartbeat is stale',
+    { timeout: 30_000 },
+    async () => {
+      directory = fs.mkdtempSync(path.join(os.tmpdir(), 'r24-killed-'))
+      const root = slowPackage(directory, 'package')
+      const killed = spawn(
+        process.execPath,
+        [SCRIPT, '--tsc', process.execPath, 'slow-tsc.cjs'],
+        {
+          cwd: root,
+          env: { ...process.env, ...WIDE_STALE, SLOW_TSC_PAUSE_MS: '1500' },
+          stdio: 'ignore',
+          detached: true,
+        }
+      )
+      const exited = new Promise((resolve) => killed.once('exit', resolve))
+      // Kill the build and its compiler outright once it holds the lock.
+      for (
+        let tries = 0;
+        !fs.existsSync(path.join(root, '.dist-build-lock'));
+        tries += 1
+      ) {
+        if (tries > 100) throw new Error('the build never took the lock')
+        await wait(20)
       }
-    )
-    const exited = new Promise((resolve) => killed.once('exit', resolve))
-    // Kill the build and its compiler outright once it holds the lock.
-    for (let tries = 0; !fs.existsSync(path.join(root, '.dist-build.lock')); tries += 1) {
-      if (tries > 100) throw new Error('the build never took the lock')
-      await wait(20)
+      await wait(300)
+      process.kill(-killed.pid!, 'SIGKILL')
+      await exited
+      expect(fs.existsSync(path.join(root, '.dist-build-lock'))).toBe(true)
+
+      const startedAt = Date.now()
+      const next = await buildAsync(root, {
+        ...WIDE_STALE,
+        BUILD_WORKSPACE_PACKAGE_LOCK_WAIT_MS: '20000',
+      })
+      expect(next, next.output).toMatchObject({ code: 0 })
+      // It waited for the heartbeat to go stale, then took the lock over.
+      expect(Date.now() - startedAt).toBeGreaterThanOrEqual(3_000)
+      expect(Object.keys(tree(path.join(root, 'dist')))).toHaveLength(6)
+      expect(leftovers(root)).toEqual([])
     }
-    await wait(300)
-    process.kill(-killed.pid!, 'SIGKILL')
-    await exited
-    expect(fs.existsSync(path.join(root, '.dist-build.lock'))).toBe(true)
+  )
 
-    const startedAt = Date.now()
-    const next = await buildAsync(root, {
-      ...STALE,
-      BUILD_WORKSPACE_PACKAGE_LOCK_WAIT_MS: '20000',
-    })
-    expect(next, next.output).toMatchObject({ code: 0 })
-    // It waited for the heartbeat to go stale, then took the lock over.
-    expect(Date.now() - startedAt).toBeGreaterThanOrEqual(1_000)
-    expect(Object.keys(tree(path.join(root, 'dist')))).toHaveLength(6)
-    expect(leftovers(root)).toEqual([])
-  })
-
-  it('6.7b-R24-04 never takes over a live build that compiles longer than the stale window', async () => {
-    directory = fs.mkdtempSync(path.join(os.tmpdir(), 'r24-slow-holder-'))
-    const root = slowPackage(directory, 'package')
-    // Six 600 ms steps: 3.6 s of compile against a 2 s stale window.
-    const holder = buildAsync(root, { ...STALE, SLOW_TSC_PAUSE_MS: '600' })
-    await wait(400)
-    const waiter = buildAsync(root, {
-      ...STALE,
-      BUILD_WORKSPACE_PACKAGE_LOCK_WAIT_MS: '20000',
-    })
-    const results = await Promise.all([holder, waiter])
-    for (const result of results) expect(result, result.output).toMatchObject({ code: 0 })
-    const ran = compiles(root)
-    expect(ran).toHaveLength(2)
-    expectSerialized(ran)
-    expect(ran[0]![1] - ran[0]![0]).toBeGreaterThan(2_000)
-    expect(leftovers(root)).toEqual([])
-  })
+  it(
+    '6.7b-R24-04 never takes over a live build that compiles longer than the stale window',
+    { timeout: 30_000 },
+    async () => {
+      directory = fs.mkdtempSync(path.join(os.tmpdir(), 'r24-slow-holder-'))
+      const root = slowPackage(directory, 'package')
+      // Six 1500 ms steps: 9 s of compile against a 6 s stale window.
+      const holder = buildAsync(root, { ...WIDE_STALE, SLOW_TSC_PAUSE_MS: '1500' })
+      await wait(400)
+      const waiter = buildAsync(root, {
+        ...WIDE_STALE,
+        BUILD_WORKSPACE_PACKAGE_LOCK_WAIT_MS: '20000',
+      })
+      const results = await Promise.all([holder, waiter])
+      for (const result of results)
+        expect(result, result.output).toMatchObject({ code: 0 })
+      const ran = compiles(root)
+      expect(ran).toHaveLength(2)
+      expectSerialized(ran)
+      expect(ran[0]![1] - ran[0]![0]).toBeGreaterThan(6_000)
+      expect(leftovers(root)).toEqual([])
+    }
+  )
 })
 
 /** The relative module specifiers a compiled `.js` file loads. */
@@ -428,35 +457,42 @@ const unresolved = (dist: string) =>
     )
 
 describe('displaced builds (R24)', () => {
-  it('6.7b-R24-07 a build whose lock is taken over mid-compile discards that attempt, rebuilds and exits 0', async () => {
-    directory = fs.mkdtempSync(path.join(os.tmpdir(), 'r24-displaced-'))
-    const single = slowPackage(directory, 'single')
-    expect((await buildAsync(single)).code).toBe(0)
-    const expected = tree(path.join(single, 'dist'))
+  it(
+    '6.7b-R24-07 a build whose lock is taken over mid-compile discards that attempt, rebuilds and exits 0',
+    { timeout: 30_000 },
+    async () => {
+      directory = fs.mkdtempSync(path.join(os.tmpdir(), 'r24-displaced-'))
+      const single = slowPackage(directory, 'single')
+      expect((await buildAsync(single)).code).toBe(0)
+      const expected = tree(path.join(single, 'dist'))
 
-    const root = slowPackage(directory, 'package')
-    const result = await buildAsync(root, {
-      ...STALE,
-      SLOW_TSC_MODE: 'displace',
-      SLOW_TSC_DISPLACE_MARKER: path.join(directory, 'displaced-once'),
-      BUILD_WORKSPACE_PACKAGE_LOCK_WAIT_MS: '20000',
-    })
-    expect(result, result.output).toMatchObject({ code: 0 })
-    expect(result.output).toContain('discarding that compile and building again')
-    // Two compiles: the displaced one and the rebuild that published.
-    const ran = compiles(root)
-    expect(ran).toHaveLength(2)
-    // The displaced build left the other build's lock alone: the rebuild had to
-    // wait for that lock to go stale before taking it.
-    expect(ran[1]![0] - ran[0]![1]).toBeGreaterThanOrEqual(1_000)
-    // Nothing from the displaced attempt reached dist.
-    expect(tree(path.join(root, 'dist'))).toEqual(expected)
-    expect(leftovers(root)).toEqual([])
-  })
+      const root = slowPackage(directory, 'package')
+      const result = await buildAsync(root, {
+        ...STALE,
+        SLOW_TSC_MODE: 'displace',
+        // 1.5 s of compile after the takeover: longer than one 1 s refresh round.
+        SLOW_TSC_PAUSE_MS: '500',
+        SLOW_TSC_DISPLACE_MARKER: path.join(directory, 'displaced-once'),
+        BUILD_WORKSPACE_PACKAGE_LOCK_WAIT_MS: '20000',
+      })
+      expect(result, result.output).toMatchObject({ code: 0 })
+      expect(result.output).toContain('discarding that compile and building again')
+      // Two compiles: the displaced one and the rebuild that published.
+      const ran = compiles(root)
+      expect(ran).toHaveLength(2)
+      // The displaced build left the other build's lock alone: the rebuild took
+      // it only once it had gone a whole stale window (2 s) without a refresh.
+      const takenOverAt = fs.statSync(path.join(directory, 'displaced-once')).mtimeMs
+      expect(ran[1]![0] - takenOverAt).toBeGreaterThanOrEqual(1_900)
+      // Nothing from the displaced attempt reached dist.
+      expect(tree(path.join(root, 'dist'))).toEqual(expected)
+      expect(leftovers(root)).toEqual([])
+    }
+  )
 })
 
 describe('publication order (R24)', () => {
-  it('6.7b-R24-05 publishes new files first, then changed ones, then removes deleted ones, so every import resolves at every step', () => {
+  it('6.7b-R24-05 publishes new files first, then changed ones, then removes deleted ones, so every import resolves at every step', async () => {
     directory = fs.mkdtempSync(path.join(os.tmpdir(), 'r24-order-'))
     const dist = path.join(directory, 'dist')
     const staging = path.join(directory, 'staging')
@@ -501,7 +537,7 @@ describe('publication order (R24)', () => {
         check(`remove ${path.relative(directory!, String(target))}`)
     })
     try {
-      replaceDistFromStaging(staging, dist)
+      await replaceDistFromStaging(staging, dist)
     } finally {
       renames.mockRestore()
       removals.mockRestore()
@@ -517,7 +553,7 @@ describe('publication order (R24)', () => {
     ])
   })
 
-  it('6.7b-R24-06 a Node reader requiring the package entry succeeds at every step of publication', () => {
+  it('6.7b-R24-06 a Node reader requiring the package entry succeeds at every step of publication', async () => {
     directory = fs.mkdtempSync(path.join(os.tmpdir(), 'r24-reader-'))
     const dist = path.join(directory, 'dist')
     const staging = path.join(directory, 'staging')
@@ -567,7 +603,7 @@ describe('publication order (R24)', () => {
         read(`after remove ${path.basename(String(target))}`)
     })
     try {
-      replaceDistFromStaging(staging, dist)
+      await replaceDistFromStaging(staging, dist)
     } finally {
       renames.mockRestore()
       removals.mockRestore()
@@ -578,4 +614,79 @@ describe('publication order (R24)', () => {
       'after remove old-dependency.cjs: generation 2',
     ])
   })
+
+  it('6.7b-R25-02 publishes a declaration file after the declarations it imports', async () => {
+    directory = fs.mkdtempSync(path.join(os.tmpdir(), 'r25-declarations-'))
+    const dist = path.join(directory, 'dist')
+    const staging = path.join(directory, 'staging')
+    fs.mkdirSync(dist)
+    fs.mkdirSync(path.join(staging, 'lib'), { recursive: true })
+    fs.writeFileSync(path.join(dist, 'index.d.ts'), 'export declare const old: 1\n')
+    // The changed entry and a new declaration both import a new one in lib/.
+    fs.writeFileSync(
+      path.join(staging, 'index.d.ts'),
+      "export * from './api.js'\nexport type { Shape } from './lib/shape'\n"
+    )
+    fs.writeFileSync(
+      path.join(staging, 'api.d.ts'),
+      "import type { Shape } from './lib/shape.js'\nexport declare const make: () => Shape\n"
+    )
+    fs.writeFileSync(
+      path.join(staging, 'lib', 'shape.d.ts'),
+      'export type Shape = { a: 1 }\n'
+    )
+    const order: string[] = []
+    const rename = fs.renameSync.bind(fs)
+    const renames = vi.spyOn(fs, 'renameSync').mockImplementation((from, to) => {
+      rename(from, to)
+      order.push(path.relative(dist, String(to)))
+    })
+    try {
+      await replaceDistFromStaging(staging, dist)
+    } finally {
+      renames.mockRestore()
+    }
+    expect(order).toEqual([path.join('lib', 'shape.d.ts'), 'api.d.ts', 'index.d.ts'])
+  })
+})
+
+describe('lock lost during publication (R25)', () => {
+  it(
+    '6.7b-R25-01 a publisher stalled past its lease stops at once and exits named, with a failing successor',
+    { timeout: 30_000 },
+    async () => {
+      directory = fs.mkdtempSync(path.join(os.tmpdir(), 'r25-stalled-publisher-'))
+      const root = slowPackage(directory, 'package')
+      // astra r9's case, scaled: the publisher blocks for 3.5 s after its first
+      // publication step against a 2 s stale window.
+      const publisher = buildAsync(root, {
+        ...STALE,
+        BUILD_WORKSPACE_PACKAGE_TEST_PUBLISH_PAUSE_MS: '3500',
+      })
+      const published = () =>
+        Object.values(tree(path.join(root, 'dist'))).filter((content) =>
+          content.startsWith('build output')
+        ).length
+      for (let tries = 0; published() === 0; tries += 1) {
+        if (tries > 200) throw new Error('the publisher never started publishing')
+        await wait(20)
+      }
+      // The successor takes the expired lease, then its compiler fails.
+      const successor = buildAsync(root, {
+        ...STALE,
+        SLOW_TSC_MODE: 'fail',
+        BUILD_WORKSPACE_PACKAGE_LOCK_WAIT_MS: '20000',
+      })
+      const [stalled, failed] = await Promise.all([publisher, successor])
+      expect(failed.code, failed.output).toBe(2)
+      expect(stalled.code, stalled.output).toBe(1)
+      expect(stalled.output).toMatch(
+        /The build lost its lock during publication after 1 of \d+ steps .*it stopped publishing/
+      )
+      // It stopped where the check caught the loss: one file published, nothing
+      // after it, no old file removed.
+      expect(published()).toBe(1)
+      expect(fs.existsSync(path.join(root, 'dist', 'old', 'removed.js'))).toBe(true)
+    }
+  )
 })

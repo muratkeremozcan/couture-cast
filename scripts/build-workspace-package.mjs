@@ -27,20 +27,25 @@
  * `.dist-staging-<pid>-<random>` directory, and a missing or empty staging
  * directory publishes nothing.
  *
- * Story 6.7b R24: the lock is a heartbeat lock from `proper-lockfile`. It is a
- * directory (`.dist-build.lock`) made with an atomic `mkdir`; its holder
- * refreshes the directory's mtime every `stale / 2` ms, and a lock with no
- * refresh for `stale` ms counts as abandoned and is taken over. Liveness never
+ * Story 6.7b R24/R25: the lock is `proper-lockfile`'s heartbeat lock and only
+ * that: a directory (`.dist-build-lock`) made with an atomic `mkdir`, whose
+ * holder refreshes its mtime every `stale / 2` ms; with no refresh for `stale`
+ * ms it counts as abandoned and `proper-lockfile` takes it over. Liveness never
  * depends on a pid, so a reused pid, another host or a container cannot keep a
  * dead build's lock alive, and a live build compiling longer than `stale` keeps
- * its lock because it keeps refreshing it. The compile runs as an async child so
- * the refresh timer keeps running. A holder whose lock is compromised (a refresh
- * failed, or another build took the lock over) aborts without publishing, and
- * right before publishing every build checks the lock is still its own, by the
- * token it wrote to `.dist-build.lock.owner`. A displaced build discards its
- * staging and builds again (at most three displacements, then it fails naming
- * why), so a rare double takeover of an abandoned lock costs a rebuild and
- * never fails the npm hook that started the build.
+ * its lock because it keeps refreshing it. This script adds no ownership state
+ * of its own and never removes lock state itself. (The pid lock of earlier
+ * versions was a plain file named `.dist-build.lock`; it is ignored.)
+ *
+ * The compile runs as an async child and publication yields between steps, so
+ * the refresh timer keeps running throughout. Before each publication step the
+ * build checks `onCompromised`; after any stall longer than half a refresh
+ * interval it first waits one refresh round, so `proper-lockfile` can notice a
+ * takeover that happened while this process was not running. A lock lost
+ * before publication starts discards that compile and builds again (at most
+ * three times, then the build fails naming why). A lock lost during publication
+ * stops it at once and the build exits non-zero, naming how far it got; the
+ * build that took the lock over publishes its own complete build.
  *
  * Usage, from the package directory:
  *   node ../../scripts/build-workspace-package.mjs [--tsc <command...>]
@@ -50,7 +55,6 @@
  * (default 10000, at least 2000, the minimum `proper-lockfile` accepts).
  */
 import { spawn } from 'node:child_process'
-import { randomUUID } from 'node:crypto'
 import fs from 'node:fs'
 import path from 'node:path'
 import { pathToFileURL } from 'node:url'
@@ -58,8 +62,7 @@ import { lock } from 'proper-lockfile'
 
 const DIST = 'dist'
 const STAGING_PREFIX = '.dist-staging-'
-const LOCK = '.dist-build.lock'
-const OWNER = `${LOCK}.owner`
+const LOCK = '.dist-build-lock'
 const TSBUILDINFO = 'tsconfig.build.tsbuildinfo'
 const DEFAULT_LOCK_WAIT_MS = 300_000
 const DEFAULT_LOCK_STALE_MS = 10_000
@@ -72,68 +75,24 @@ const MAX_DISPLACEMENTS = 3
  * build holds it. Throws, naming the lock, when it is still held after that.
  * `onCompromised` runs if this build loses the lock later.
  *
- * A plain file at the lock path is the pid lock of an earlier version of this
- * script; it carries no heartbeat, so once it is older than `staleMs` it is
- * removed, and until then it counts as held.
- *
  * @param {{
  *   packageDir: string,
  *   waitMs: number,
  *   staleMs: number,
  *   onCompromised: (error: Error) => void,
  * }} options
- * @returns {Promise<{ release: () => Promise<void>, token: string }>}
+ * @returns {Promise<() => Promise<void>>} releases the lock
  */
 export async function acquireBuildLock({ packageDir, waitMs, staleMs, onCompromised }) {
   const lockPath = path.join(packageDir, LOCK)
-  const deadline = Date.now() + waitMs
-  for (;;) {
-    let legacy
-    try {
-      legacy = fs.statSync(lockPath)
-    } catch {
-      break
-    }
-    if (legacy.isDirectory()) break
-    if (Date.now() - legacy.mtimeMs > staleMs) {
-      fs.rmSync(lockPath, { force: true })
-      break
-    }
-    if (Date.now() >= deadline) break
-    await new Promise((resolve) => setTimeout(resolve, LOCK_POLL_MS))
-  }
-  const token = randomUUID()
-  const state = { holding: false }
-  /**
-   * `proper-lockfile` removes its directory on release and at process exit
-   * without checking it still owns it. Once this build holds the lock, those
-   * removals go ahead only while the owner record is still this build's, so a
-   * build that lost the lock never deletes the lock of the build that took it.
-   * Before that, the only removal is of an abandoned lock, which is allowed.
-   */
-  const guardedFs = Object.assign(Object.create(fs), {
-    rmdir: (target, callback) => {
-      if (state.holding && !ownsBuildLock(packageDir, token)) return callback(null)
-      return fs.rmdir(target, callback)
-    },
-    rmdirSync: (target) => {
-      if (state.holding && !ownsBuildLock(packageDir, token)) return undefined
-      return fs.rmdirSync(target)
-    },
-  })
-  let release
   try {
-    release = await lock(packageDir, {
-      fs: guardedFs,
+    return await lock(packageDir, {
       lockfilePath: lockPath,
       realpath: false,
       stale: staleMs,
       update: Math.floor(staleMs / 2),
       retries: {
-        retries: Math.max(
-          0,
-          Math.ceil(Math.max(0, deadline - Date.now()) / LOCK_POLL_MS)
-        ),
+        retries: Math.max(0, Math.ceil(waitMs / LOCK_POLL_MS)),
         factor: 1,
         minTimeout: LOCK_POLL_MS,
         maxTimeout: LOCK_POLL_MS,
@@ -147,41 +106,6 @@ export async function acquireBuildLock({ packageDir, waitMs, staleMs, onCompromi
         `build that keeps it alive (its heartbeat is under ${staleMs} ms old); ` +
         'wait for that build or stop it'
     )
-  }
-  const owner = path.join(packageDir, OWNER)
-  const temporary = `${owner}.${process.pid}.tmp`
-  fs.writeFileSync(temporary, token)
-  fs.renameSync(temporary, owner)
-  state.holding = true
-  return {
-    token,
-    release: async () => {
-      const mine = ownsBuildLock(packageDir, token)
-      try {
-        // Stops the heartbeat; the guard keeps it from removing a lock not ours.
-        await release()
-      } catch {
-        // Already released, or compromised and so released by proper-lockfile.
-      }
-      if (mine) fs.rmSync(owner, { force: true })
-    },
-  }
-}
-
-/**
- * Whether the lock is still this build's: the lock directory exists and the
- * owner record carries `token`. A build that took the lock over wrote its own.
- *
- * @param {string} packageDir
- * @param {string} token
- * @returns {boolean}
- */
-export function ownsBuildLock(packageDir, token) {
-  try {
-    if (!fs.statSync(path.join(packageDir, LOCK)).isDirectory()) return false
-    return fs.readFileSync(path.join(packageDir, OWNER), 'utf8') === token
-  } catch {
-    return false
   }
 }
 
@@ -220,8 +144,30 @@ const RELATIVE_SPECIFIER =
   /(?:\bfrom\s*|\bimport\s*\(?\s*|\brequire\s*\(\s*)['"](\.{1,2}\/[^'"]+)['"]/g
 
 /**
- * The files of `files` that `relative` (a `.js`, `.cjs` or `.mjs` file in
- * `root`) loads by relative specifier, as written or with `.js` or `/index.js`.
+ * Where a relative specifier written in `relative` can point among `files`: for
+ * JavaScript the specifier as written, with `.js`, or `/index.js`; for a
+ * declaration file the declaration of that module (`./x.js` and `./x` both
+ * mean `./x.d.ts`, `./x.mjs` means `./x.d.mts`, `./x.cjs` means `./x.d.cts`).
+ *
+ * @param {string} relative
+ * @param {string} base the specifier joined to the file's directory
+ * @returns {string[]}
+ */
+function candidatesFor(relative, base) {
+  if (!/\.d\.[cm]?ts$/.test(relative))
+    return [base, `${base}.js`, path.join(base, 'index.js')]
+  const stem = base.replace(/\.[cm]?js$/, '')
+  const extension = base.endsWith('.mjs')
+    ? '.d.mts'
+    : base.endsWith('.cjs')
+      ? '.d.cts'
+      : '.d.ts'
+  return [`${stem}${extension}`, path.join(stem, `index${extension}`)]
+}
+
+/**
+ * The files of `files` that `relative` (JavaScript or a declaration file in
+ * `root`) loads or imports types from by relative specifier.
  *
  * @param {string} root
  * @param {string} relative
@@ -229,14 +175,12 @@ const RELATIVE_SPECIFIER =
  * @returns {string[]}
  */
 function localDependencies(root, relative, files) {
-  if (!/\.[cm]?js$/.test(relative)) return []
+  if (!/\.[cm]?js$|\.d\.[cm]?ts$/.test(relative)) return []
   const source = fs.readFileSync(path.join(root, relative), 'utf8')
   const found = []
   for (const match of source.matchAll(RELATIVE_SPECIFIER)) {
     const base = path.normalize(path.join(path.dirname(relative), match[1] ?? ''))
-    const target = [base, `${base}.js`, path.join(base, 'index.js')].find((candidate) =>
-      files.has(candidate)
-    )
+    const target = candidatesFor(relative, base).find((candidate) => files.has(candidate))
     if (target) found.push(target)
   }
   return found
@@ -269,20 +213,29 @@ function dependenciesFirst(root, group) {
 /**
  * Publishes `staging` into `dist` one rename per file, in an order a concurrent
  * reader can follow (R24): first the files `dist` does not have yet, then the
- * ones it has, each group with every file after the files of that group it
- * loads, and only then removes the `dist` files the new build no longer emits,
- * and the directories that leaves empty. A reader that loads a just-published
- * module finds every module it imports, old or new. Each rename replaces one
- * file in one step, so no file of `dist` is ever absent or partial.
+ * ones it has, each group with every file (JavaScript and declarations alike)
+ * after the files of that group it loads or imports types from, and only then
+ * removes the `dist` files the new build no longer emits, and the directories
+ * that leaves empty. A reader that loads a just-published module finds every
+ * module it imports, old or new. Each rename replaces one file in one step, so
+ * no file of `dist` is ever absent or partial.
+ *
+ * Between steps it yields to the event loop (R25), so the lock's heartbeat keeps
+ * running, and awaits `beforeStep`, which throws to stop publishing at once.
  *
  * A missing or empty staging directory throws before `dist` is touched (R23),
  * so a lost or empty compile prunes nothing and publishes nothing.
  *
  * @param {string} staging
  * @param {string} dist
- * @returns {{ moved: number, removed: number }}
+ * @param {{
+ *   beforeStep?: (done: number, total: number) => Promise<void> | void,
+ *   afterStep?: (done: number, total: number) => void,
+ * }} [hooks]
+ * @returns {Promise<{ moved: number, removed: number }>}
  */
-export function replaceDistFromStaging(staging, dist) {
+export async function replaceDistFromStaging(staging, dist, hooks = {}) {
+  const { beforeStep = () => undefined, afterStep = () => undefined } = hooks
   if (!fs.existsSync(staging)) {
     throw new Error(
       `The staging directory ${path.resolve(staging)} is missing after the compile, ` +
@@ -304,14 +257,27 @@ export function replaceDistFromStaging(staging, dist) {
     staging,
     fresh.filter((relative) => existing.has(relative))
   )
-  for (const relative of [...added, ...replaced]) {
-    const target = path.join(dist, relative)
-    fs.mkdirSync(path.dirname(target), { recursive: true })
-    fs.renameSync(path.join(staging, relative), target)
-  }
   const keep = new Set(fresh)
   const stale = [...existing].filter((relative) => !keep.has(relative))
-  for (const relative of stale) fs.rmSync(path.join(dist, relative), { force: true })
+  /** @type {(() => void)[]} */
+  const steps = [
+    ...[...added, ...replaced].map((relative) => () => {
+      const target = path.join(dist, relative)
+      fs.mkdirSync(path.dirname(target), { recursive: true })
+      fs.renameSync(path.join(staging, relative), target)
+    }),
+    ...stale.map(
+      (relative) => () => fs.rmSync(path.join(dist, relative), { force: true })
+    ),
+  ]
+  for (const [index, step] of steps.entries()) {
+    // eslint-disable-next-line no-await-in-loop -- one step at a time, yielding between
+    await new Promise((resolve) => setImmediate(resolve))
+    // eslint-disable-next-line no-await-in-loop -- the check guards this very step
+    await beforeStep(index, steps.length)
+    step()
+    afterStep(index + 1, steps.length)
+  }
   // Deepest first, so a parent is empty by the time it is checked.
   const directories = fs.existsSync(dist)
     ? fs
@@ -325,6 +291,33 @@ export function replaceDistFromStaging(staging, dist) {
   }
   fs.rmSync(staging, { recursive: true, force: true })
   return { moved: fresh.length, removed: stale.length }
+}
+
+/** Raised by the lease check: the lock was lost, `published` steps were done. */
+class LeaseLost extends Error {
+  /**
+   * @param {string} reason
+   * @param {number} published
+   * @param {number} total
+   */
+  constructor(reason, published, total) {
+    super(reason)
+    this.published = published
+    this.total = total
+  }
+}
+
+/**
+ * Test hook: `BUILD_WORKSPACE_PACKAGE_TEST_PUBLISH_PAUSE_MS=13000` blocks this
+ * process for that long after the first publication step, the way a stalled
+ * disk or a suspended process would (R25). Unset, it does nothing.
+ *
+ * @param {number} done
+ */
+const testPauseAfterStep = (done) => {
+  const pauseMs = Number(process.env.BUILD_WORKSPACE_PACKAGE_TEST_PUBLISH_PAUSE_MS || 0)
+  if (done === 1 && pauseMs > 0)
+    Atomics.wait(new Int32Array(new SharedArrayBuffer(4)), 0, 0, pauseMs)
 }
 
 /**
@@ -367,33 +360,34 @@ const main = async () => {
     if (outcome.kind === 'done') return
     if (displaced + 1 >= MAX_DISPLACEMENTS) {
       fail(
-        `The build was displaced from its lock ${MAX_DISPLACEMENTS} times ` +
+        `The build lost its lock before publishing ${MAX_DISPLACEMENTS} times ` +
           `(last: ${outcome.reason}), so dist is left as the last complete build`
       )
       return
     }
     console.error(
-      `The build lock was taken over during the compile (${outcome.reason}); ` +
+      `The build lock was lost before publishing (${outcome.reason}); ` +
         'discarding that compile and building again'
     )
   }
 }
 
 /**
- * One attempt: take the lock, compile into a fresh staging directory, and
- * publish only while the lock is still this build's. A displaced attempt (its
- * lock compromised, or taken over by another build) discards its staging and
- * publishes nothing, so the caller can build again.
+ * One attempt: take the lock, compile into a fresh staging directory, publish
+ * while the lock holds. A lock lost before publication starts makes the attempt
+ * `displaced`, with nothing published, so the caller builds again. A lock lost
+ * during publication stops it and fails the build, naming how far it got.
  *
  * @param {{ command: string, args: string[], waitMs: number, staleMs: number }} options
  * @returns {Promise<{ kind: 'done' } | { kind: 'displaced', reason: string }>}
  */
 async function buildOnce({ command, args, waitMs, staleMs }) {
+  const refreshMs = Math.floor(staleMs / 2)
   /** @type {Error | undefined} */
   let compromised
-  let held
+  let release
   try {
-    held = await acquireBuildLock({
+    release = await acquireBuildLock({
       packageDir: '.',
       waitMs,
       staleMs,
@@ -419,28 +413,51 @@ async function buildOnce({ command, args, waitMs, staleMs }) {
       '--declarationDir',
       staging,
     ])
-    // Checked first: a build that took the lock over may have removed this
-    // attempt's staging, which makes the compile itself fail.
-    if (compromised || !ownsBuildLock('.', held.token)) {
-      return {
-        kind: 'displaced',
-        reason: compromised?.message ?? 'another build took the lock over',
-      }
-    }
+    // Checked first: the build that took the lock over removes this attempt's
+    // staging, which can make the compile itself fail.
+    if (compromised) return { kind: 'displaced', reason: compromised.message }
     // A failed compile leaves the last good `dist` in place.
     if (code !== 0) {
       process.exitCode = code
       return { kind: 'done' }
     }
+    let lastStep = Date.now()
+    const beforeStep = async (done, total) => {
+      // A stall longer than half a refresh interval may have let the lease
+      // expire; one refresh round lets proper-lockfile see a takeover.
+      if (Date.now() - lastStep > refreshMs / 2)
+        await new Promise((resolve) => setTimeout(resolve, refreshMs + 250))
+      if (compromised) throw new LeaseLost(compromised.message, done, total)
+      lastStep = Date.now()
+    }
     try {
-      replaceDistFromStaging(staging, DIST)
+      await replaceDistFromStaging(staging, DIST, {
+        beforeStep,
+        afterStep: (done) => {
+          testPauseAfterStep(done)
+        },
+      })
     } catch (error) {
+      if (error instanceof LeaseLost && error.published === 0)
+        return { kind: 'displaced', reason: error.message }
+      if (error instanceof LeaseLost) {
+        fail(
+          `The build lost its lock during publication after ${error.published} of ` +
+            `${error.total} steps (${error.message}); it stopped publishing, and the ` +
+            'build that took the lock over publishes its own complete build'
+        )
+        return { kind: 'done' }
+      }
       fail(error instanceof Error ? error.message : String(error))
     }
     return { kind: 'done' }
   } finally {
     fs.rmSync(staging, { recursive: true, force: true })
-    await held.release()
+    try {
+      await release()
+    } catch {
+      // Compromised locks are already released by proper-lockfile.
+    }
   }
 }
 

@@ -18,6 +18,7 @@ apps/**/build
 packages/**/dist
 packages/**/.dist-staging-*
 packages/**/.dist-build.lock*
+packages/**/.dist-build-lock
 packages/**/build
 tsconfig.tsbuildinfo
 
