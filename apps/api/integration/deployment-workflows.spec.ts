@@ -39,6 +39,34 @@ const startLocalSupabaseAction = path.join(
   'start-local-supabase',
   'action.yml'
 )
+const reserveSupabasePortsAction = path.join(
+  repoRoot,
+  '.github',
+  'actions',
+  'reserve-supabase-ports',
+  'action.yml'
+)
+const startLocalSupabaseUse = 'uses: ./.github/actions/start-local-supabase'
+const reservePortsUse = 'uses: ./.github/actions/reserve-supabase-ports'
+
+/** Each job's steps in order, as the raw text of each `- ` step entry. */
+function jobSteps(workflow: string): Map<string, string[]> {
+  const jobs = new Map<string, string[]>()
+  const body = workflow.slice(workflow.search(/^jobs:\s*$/m))
+  for (const block of body.split(/^(?= {2}[A-Za-z0-9_-]+:\s*$)/m).slice(1)) {
+    const name = block.slice(2, block.indexOf(':'))
+    const stepsAt = block.search(/^ {4}steps:\s*$/m)
+    if (stepsAt === -1) continue
+    jobs.set(
+      name,
+      block
+        .slice(stepsAt)
+        .split(/^ {6}- /m)
+        .slice(1)
+    )
+  }
+  return jobs
+}
 
 describe('deployment workflows', () => {
   it('vercel preview smoke workflow exists and resolves preview URLs', () => {
@@ -127,7 +155,7 @@ describe('deployment workflows', () => {
       const content = fs.readFileSync(path.join(workflowsDir, file), 'utf8')
       // A direct start would skip the image cache, the port guard and the retries.
       expect(content, file).not.toMatch(/^\s*(run:\s*)?npx supabase start/m)
-      if (content.includes('uses: ./.github/actions/start-local-supabase')) {
+      if (content.includes(startLocalSupabaseUse)) {
         callers.push(file)
       }
     }
@@ -140,8 +168,32 @@ describe('deployment workflows', () => {
     ])
   })
 
+  it('every job that starts local Supabase reserves its ports right after checkout', () => {
+    const workflowsDir = path.join(repoRoot, '.github', 'workflows')
+    let startingJobs = 0
+    for (const file of fs.readdirSync(workflowsDir).filter((f) => f.endsWith('.yml'))) {
+      const content = fs.readFileSync(path.join(workflowsDir, file), 'utf8')
+      for (const [job, steps] of jobSteps(content)) {
+        const start = steps.findIndex((step) => step.includes(startLocalSupabaseUse))
+        if (start === -1) continue
+        startingJobs += 1
+        const checkout = steps.findIndex((step) =>
+          step.includes('uses: actions/checkout@')
+        )
+        const reserve = steps.findIndex((step) => step.includes(reservePortsUse))
+        // A local action needs the checkout; every later step adds network
+        // traffic that could take a Supabase port as its local port.
+        expect(checkout, `${file} ${job}`).toBe(0)
+        expect(reserve, `${file} ${job}`).toBe(checkout + 1)
+        expect(reserve, `${file} ${job}`).toBeLessThan(start)
+      }
+    }
+    expect(startingJobs).toBe(6)
+  })
+
   it('local Supabase starts from the image cache with its host ports guarded', () => {
     const content = fs.readFileSync(startLocalSupabaseAction, 'utf8')
+    const reserve = fs.readFileSync(reserveSupabasePortsAction, 'utf8')
     const at = (needle: string) => {
       const index = content.indexOf(needle)
       expect(index, needle).toBeGreaterThan(-1)
@@ -157,22 +209,43 @@ describe('deployment workflows', () => {
     )
     expect(content).toMatch(/registries\+=\("\$CACHED_REGISTRY"\)/)
 
-    // The Supabase ports sit in the ephemeral range: they are reserved once and
-    // any client socket on one is closed before every attempt.
-    expect(content).toMatch(/net\.ipv4\.ip_local_reserved_ports=/)
-    expect(content).toMatch(/ss -K -tn state connected "\$port_filter"/)
-    expect(
-      at('if [ "$port_guard" = true ]; then reserve_supabase_ports; fi')
-    ).toBeLessThan(at('if [ "$port_guard" = true ]; then free_supabase_ports; fi'))
-    expect(at('if [ "$port_guard" = true ]; then free_supabase_ports; fi')).toBeLessThan(
+    // The ports sit in the ephemeral range. Reserving them steers new
+    // connections away; the action's own first step repeats it for any caller.
+    expect(reserve).toMatch(/net\.ipv4\.ip_local_reserved_ports=/)
+    expect(at(reservePortsUse)).toBeLessThan(
+      at('name: Compute the Supabase image cache key')
+    )
+
+    // A socket already on a port is never closed by this action: each attempt
+    // waits for it to go and, when it stays, fails that attempt naming it.
+    expect(at('! wait_for_free_ports; then ports_free=false; fi')).toBeLessThan(
       at('run_start "$remaining" 2>&1 | tee "$attempt_log"')
     )
-    // Listeners alone miss a client socket on the port; diagnostics show every state.
-    expect(content).toMatch(/ss -tanp state all "\$port_filter"/)
+    expect(content).toMatch(/::error::Supabase host ports are still in use after/)
+    expect(content).toMatch(/held by \$\{owners/)
+    expect(content).toMatch(/ss_sockets -tanp state all "\$port_filter"/)
     expect(content).not.toMatch(/ss -ltnp/)
 
     // Only a failed or cut-off pull moves to another registry.
-    expect(content).toMatch(/if pull_failed "\$exit_code"; then\s+registry_index=/)
+    expect(content).toMatch(/elif pull_failed "\$exit_code"; then\s+registry_index=/)
+  })
+
+  it('no workflow or action closes sockets it does not own', () => {
+    const files = [
+      ...fs
+        .readdirSync(path.join(repoRoot, '.github', 'workflows'))
+        .map((f) => path.join(repoRoot, '.github', 'workflows', f)),
+      ...fs
+        .readdirSync(path.join(repoRoot, '.github', 'actions'))
+        .map((d) => path.join(repoRoot, '.github', 'actions', d, 'action.yml'))
+        .filter((f) => fs.existsSync(f)),
+    ]
+    for (const file of files) {
+      const content = fs.readFileSync(file, 'utf8')
+      // `ss -K` (or --kill) destroys every socket its filter matches,
+      // whoever owns it.
+      expect(content, file).not.toMatch(/\bss\b[^\n]*\s(-[a-zA-Z]*K|--kill)\b/)
+    }
   })
 
   it('api vercel build applies committed Prisma migrations before building', () => {

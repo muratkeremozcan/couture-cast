@@ -43,6 +43,11 @@ jobs:
         with:
           ref: ${{ github.event.pull_request.head.sha || github.sha }}
 
+      # First step after checkout, before this job's own network traffic, so
+      # no outgoing connection can take a Supabase host port as its local port.
+      - name: Reserve the local Supabase host ports
+        uses: ./.github/actions/reserve-supabase-ports
+
       - name: Setup Node environment
         uses: ./.github/actions/install
 

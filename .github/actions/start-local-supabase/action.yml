@@ -3,8 +3,10 @@ description: >-
   Start local Supabase services from a cached image set when one exists, else
   pull with retries that move to the next image registry after a failed pull,
   back off exponentially with jitter, and never run past a total time budget.
-  Before each attempt the Supabase host ports are kept out of the kernel's
-  ephemeral range and any client socket already sitting on one is closed.
+  The Supabase host ports are reserved from the kernel's ephemeral range
+  (reserve-supabase-ports, which callers also run right after checkout), and
+  each attempt first waits, bounded, for any socket on a port it binds to close
+  on its own. Sockets this action does not own are never closed by it.
 
 inputs:
   max-attempts:
@@ -98,6 +100,11 @@ inputs:
 runs:
   using: composite
   steps:
+    # Callers run this right after checkout; here it is a no-op for them and a
+    # late reservation for any caller that did not.
+    - name: Reserve the Supabase host ports
+      uses: ./.github/actions/reserve-supabase-ports
+
     - name: Compute the Supabase image cache key
       id: cache-key
       if: inputs.image-cache == 'true'
@@ -204,90 +211,83 @@ runs:
           echo $(( TIME_BUDGET - ($(date +%s) - started_at) ))
         }
 
-        # Every host port supabase/config.toml assigns (api 54321, db 54322, the
-        # shadow db 54320, ...). They sit inside Linux's ephemeral range
-        # (32768-60999), so the kernel can hand one to an outgoing connection
-        # as its local port. Docker binds 0.0.0.0:<port>, and a client socket
-        # on that port without SO_REUSEADDR makes the bind fail with "address
-        # already in use" while `ss -ltn` shows no listener at all. Mobile e2e
-        # run 40162761978 lost all six attempts to that on port 54322.
-        mapfile -t supabase_ports < <(
-          grep -E '^[[:space:]]*(shadow_)?port[[:space:]]*=[[:space:]]*[0-9]+' supabase/config.toml |
-            grep -oE '[0-9]+' | sort -un
-        )
+        # The host ports this start publishes: [api] and [db] always, and an
+        # optional service's port only when it is enabled and its container is
+        # not excluded. They sit inside Linux's ephemeral range (32768-60999),
+        # so an outgoing connection can hold one as its local port, and Docker's
+        # bind of 0.0.0.0:<port> then fails with "address already in use" while
+        # `ss -ltn` shows no listener (mobile e2e run 40162761978, port 54322).
+        section_value() {
+          awk -v section="[$1]" -v key="$2" '
+            $0 == section { inside = 1; next }
+            /^\[/ { inside = 0 }
+            inside && $1 == key && $2 == "=" { print $3; exit }
+          ' supabase/config.toml
+        }
+        bound_ports=()
+        for service in api:- db:- studio:studio inbucket:mailpit analytics:logflare db.pooler:supavisor; do
+          section="${service%%:*}"
+          container="${service#*:}"
+          if [ "$container" != - ]; then
+            if [[ ",${EXCLUDE}," == *",${container},"* ]]; then continue; fi
+            if [ "$(section_value "$section" enabled)" = false ]; then continue; fi
+          fi
+          port="$(section_value "$section" port)"
+          if [[ "$port" =~ ^[0-9]+$ ]]; then bound_ports+=("$port"); fi
+        done
         port_filter=""
-        for port in "${supabase_ports[@]}"; do
+        for port in "${bound_ports[@]}"; do
           port_filter+="${port_filter:+ or }sport = :${port}"
         done
         if [ -n "$port_filter" ]; then port_filter="( ${port_filter} )"; fi
-        # The ports need root to reserve and to close a socket on; a runner
-        # without passwordless sudo skips both and keeps the plain retries.
         port_guard=false
-        if [ "${#supabase_ports[@]}" -gt 0 ] && [ "$(uname -s)" = Linux ] &&
-          command -v ss > /dev/null && sudo -n true 2> /dev/null; then
+        if [ -n "$port_filter" ] && [ "$(uname -s)" = Linux ] && command -v ss > /dev/null; then
           port_guard=true
         fi
-
-        # Reserved ports are skipped when the kernel picks a local port for a
-        # connection, so nothing opened from here on can take one. The
-        # existing reservations stay.
-        reserve_supabase_ports() {
-          local reserved ports
-          ports="$(IFS=,; echo "${supabase_ports[*]}")"
-          reserved="$(sysctl -n net.ipv4.ip_local_reserved_ports 2> /dev/null || true)"
-          if sudo -n sysctl -q -w "net.ipv4.ip_local_reserved_ports=${reserved:+${reserved},}${ports}"; then
-            echo "Reserved the Supabase host ports from ephemeral use: ${ports}."
-          else
-            echo "::warning::Could not reserve the Supabase host ports ${ports}."
-          fi
+        # Root lets ss name the process behind each socket.
+        ss_sockets() {
+          if sudo -n true 2> /dev/null; then sudo -n ss "$@"; else ss "$@"; fi
         }
 
-        # A reservation does not move a socket that already holds a port, so a
-        # client socket on one is closed (ss -K, a TCP reset to its owner, which
-        # reconnects from a port outside the reserved set). A listener is left
-        # alone: it is a real service on the port, and the start reports it.
-        free_supabase_ports() {
-          local holders waited=0 wait_cap
-          if [ -n "$(sudo -n ss -Htln "$port_filter" 2> /dev/null)" ]; then
-            echo "::warning::A listener already holds a Supabase host port:"
-            sudo -n ss -tlnp "$port_filter" || true
-            return 0
-          fi
-          holders="$(sudo -n ss -Htanp state connected "$port_filter" 2> /dev/null || true)"
-          if [ -z "$holders" ]; then return 0; fi
-          echo "::warning::Client sockets hold Supabase host ports; closing them before the start:"
-          printf '%s\n' "$holders"
-          sudo -n ss -K -tn state connected "$port_filter" > /dev/null 2>&1 || true
-          # A socket ss -K leaves behind ends on a kernel timer: TIME_WAIT and an
-          # orphaned FIN-WAIT-2 each last 60 seconds. A live connection on a
-          # kernel without INET_DIAG_DESTROY may last longer, so the wait stops
-          # at 75 seconds and inside the budget, and the retries take over.
+        # The reservation keeps new connections off the ports, but a socket
+        # opened before it keeps its port until its owner closes it. Whoever
+        # owns it, this action leaves it alone and waits: a short-lived client
+        # finishes, and TIME_WAIT or an orphaned FIN-WAIT-2 ends after 60
+        # seconds. The wait stops at 75 seconds, inside the budget and leaving
+        # room for the attempt; a socket still there fails the attempt, named.
+        wait_for_free_ports() {
+          local waited=0 wait_cap held owners step
           wait_cap=$(( $(remaining_seconds) - MIN_ATTEMPT ))
           if [ "$wait_cap" -gt 75 ]; then wait_cap=75; fi
-          while [ -n "$(sudo -n ss -Htan state connected "$port_filter" 2> /dev/null)" ]; do
-            if [ "$waited" -ge "$wait_cap" ]; then
-              echo "::warning::Supabase host ports still held after ${waited}s:"
-              sudo -n ss -tanp state connected "$port_filter" || true
-              return 0
+          if [ "$wait_cap" -lt 0 ]; then wait_cap=0; fi
+          while held="$(ss_sockets -Htanp state all "$port_filter" 2> /dev/null)" && [ -n "$held" ]; do
+            if [ "$waited" -eq 0 ]; then
+              echo "Waiting up to ${wait_cap}s for sockets on the Supabase host ports to close:"
+              printf '%s\n' "$held"
             fi
-            sleep 5
-            waited=$(( waited + 5 ))
+            if [ "$waited" -ge "$wait_cap" ]; then
+              owners="$(grep -oE 'users:\(\("[^"]+",pid=[0-9]+' <<< "$held" |
+                sed -E 's/users:\(\("([^"]+)",pid=([0-9]+)/\1 (pid \2)/' | sort -u | paste -sd, - || true)"
+              echo "::error::Supabase host ports are still in use after ${waited}s: $(awk '{print $4}' <<< "$held" | sort -u | paste -sd' ' -), held by ${owners:-no process (a kernel timer state, or ss without root)}. This attempt is skipped."
+              return 1
+            fi
+            step=$(( wait_cap - waited < 5 ? wait_cap - waited : 5 ))
+            sleep "$step"
+            waited=$(( waited + step ))
           done
-          echo "Supabase host ports are free (waited ${waited}s)."
+          if [ "$waited" -gt 0 ]; then echo "The Supabase host ports are free (waited ${waited}s)."; fi
+          return 0
         }
 
         diagnose_ports() {
           echo "::group::Supabase host port diagnostics"
           echo "Containers and their published ports:"
           docker ps --all --format 'table {{.ID}}\t{{.Names}}\t{{.Status}}\t{{.Ports}}' || true
-          if [ -z "$port_filter" ]; then
-            echo "No host ports found in supabase/config.toml."
-          elif [ "$port_guard" = true ]; then
-            echo "Sockets in any state on the Supabase host ports (${supabase_ports[*]}):"
-            sudo -n ss -tanp state all "$port_filter" || true
+          if [ "$port_guard" = true ]; then
+            echo "Sockets in any state on the Supabase host ports (${bound_ports[*]}):"
+            ss_sockets -tanp state all "$port_filter" || true
           else
-            echo "Sockets in any state on the Supabase host ports (${supabase_ports[*]}):"
-            ss -tan state all "$port_filter" || true
+            echo "No host ports to check (none found in supabase/config.toml, or no Linux ss)."
           fi
           echo "::endgroup::"
         }
@@ -385,62 +385,74 @@ runs:
             grep -qE 'failed to pull|toomanyrequests' "$attempt_log"
         }
 
-        if [ "$port_guard" = true ]; then reserve_supabase_ports; fi
         attempt_log="$(mktemp)"
         registry_index=0
         tried_registries=()
         attempt=1
         exit_code=1
         while [ "$attempt" -le "$MAX_ATTEMPTS" ]; do
-          if [ "$port_guard" = true ]; then free_supabase_ports; fi
           remaining=$(remaining_seconds)
           if [ "$remaining" -lt "$MIN_ATTEMPT" ]; then
             echo "::error::Supabase start time budget (${TIME_BUDGET}s) exhausted after $(( attempt - 1 )) attempts; ${remaining}s left is under min-attempt-seconds (${MIN_ATTEMPT}s)."
             exit "$exit_code"
           fi
+          # The wait spends at most the budget above min-attempt-seconds, so a
+          # start that follows it still has room to run.
+          ports_free=true
+          if [ "$port_guard" = true ] && ! wait_for_free_ports; then ports_free=false; fi
+          remaining=$(remaining_seconds)
           registry="${registries[$(( registry_index % ${#registries[@]} ))]}"
-          if [[ " ${tried_registries[*]-} " != *" ${registry} "* ]]; then
-            tried_registries+=("$registry")
-          fi
           export SUPABASE_INTERNAL_IMAGE_REGISTRY="$registry"
-          login_for "$registry"
-          echo "::group::Start local Supabase (attempt ${attempt}/${MAX_ATTEMPTS}, registry ${registry}, ${remaining}s of budget left)"
+          : > "$attempt_log"
 
-          # tee keeps the live log and a copy for pull_failed; pipefail makes
-          # the pipeline's status the start's own.
-          if run_start "$remaining" 2>&1 | tee "$attempt_log"; then
-            echo "Supabase services started successfully from ${registry}."
-            npx supabase status || true
-            # Without -e a failed export would fall through to success and leave
-            # later steps without SUPABASE_URL or the keys.
-            if ! export_supabase_environment; then
-              echo "::endgroup::"
-              echo "::error::Supabase started but its URL and keys could not be exported."
-              exit 1
+          if [ "$ports_free" = false ]; then
+            # The start would only fail on the bind; the wait above named why.
+            exit_code=1
+          else
+            if [[ " ${tried_registries[*]-} " != *" ${registry} "* ]]; then
+              tried_registries+=("$registry")
             fi
-            echo "::endgroup::"
-            if [ "$CACHE_LOADED" = true ]; then check_cache_hit_pulled_nothing; fi
-            if [ "$SAVE_IMAGE_CACHE" = true ]; then write_image_cache "$registry"; fi
-            exit 0
-          else
-            exit_code=$?
-          fi
+            login_for "$registry"
+            echo "::group::Start local Supabase (attempt ${attempt}/${MAX_ATTEMPTS}, registry ${registry}, ${remaining}s of budget left)"
 
-          if [ "$exit_code" -eq 124 ] || [ "$exit_code" -eq 137 ]; then
-            echo "Supabase startup was cut off by the time budget (exit ${exit_code}, registry ${registry})."
-          else
-            echo "Supabase startup failed with exit code ${exit_code} (registry ${registry})."
+            # tee keeps the live log and a copy for pull_failed; pipefail makes
+            # the pipeline's status the start's own.
+            if run_start "$remaining" 2>&1 | tee "$attempt_log"; then
+              echo "Supabase services started successfully from ${registry}."
+              npx supabase status || true
+              # Without -e a failed export would fall through to success and leave
+              # later steps without SUPABASE_URL or the keys.
+              if ! export_supabase_environment; then
+                echo "::endgroup::"
+                echo "::error::Supabase started but its URL and keys could not be exported."
+                exit 1
+              fi
+              echo "::endgroup::"
+              if [ "$CACHE_LOADED" = true ]; then check_cache_hit_pulled_nothing; fi
+              if [ "$SAVE_IMAGE_CACHE" = true ]; then write_image_cache "$registry"; fi
+              exit 0
+            else
+              exit_code=$?
+            fi
+
+            if [ "$exit_code" -eq 124 ] || [ "$exit_code" -eq 137 ]; then
+              echo "Supabase startup was cut off by the time budget (exit ${exit_code}, registry ${registry})."
+            else
+              echo "Supabase startup failed with exit code ${exit_code} (registry ${registry})."
+            fi
+            npx supabase status || true
+            echo "::endgroup::"
           fi
-          npx supabase status || true
-          echo "::endgroup::"
           diagnose_ports
 
           if [ "$attempt" -eq "$MAX_ATTEMPTS" ]; then
-            echo "::error::Failed to start local Supabase after ${MAX_ATTEMPTS} attempts across: ${tried_registries[*]}."
+            echo "::error::Failed to start local Supabase after ${MAX_ATTEMPTS} attempts across: ${tried_registries[*]-no registry, the host ports never came free}."
             exit "$exit_code"
           fi
 
-          if pull_failed "$exit_code"; then
+          if [ "$ports_free" = false ]; then
+            echo "No start ran; the next attempt waits for the host ports again."
+          elif pull_failed "$exit_code"; then
             registry_index=$(( registry_index + 1 ))
             echo "The pull from ${registry} failed; the next attempt uses ${registries[$(( registry_index % ${#registries[@]} ))]}."
           else
