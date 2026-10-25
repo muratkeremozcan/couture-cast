@@ -11,6 +11,7 @@ import {
   persistUser,
 } from '@couture/testing'
 import { isolatedCommunityDatabase } from './helpers/isolated-community-database.js'
+import { drainCommunityOutbox } from './helpers/community-outbox-drain.js'
 import { createCommunityRealtimeServer } from '../src/realtime/community-realtime.server.js'
 import { communityRealtimeInstance } from '../src/realtime/community-realtime-instance.js'
 import { communityRealtimeConnectedSchema } from '@couture/api-client/contracts/http'
@@ -206,7 +207,9 @@ describe('Story 6.5 real local websocket-only transport with isolated fixture au
         createLookbookPost({ userId: member.id, status: 'published' })
       ),
     })
-    await streams.append()
+    // An earlier case's detached assist can still hold the head; drain the way the
+    // runtime does so the head advance this socket waits for always lands.
+    await drainCommunityOutbox(prisma, streams)
     expect(await received).toEqual({ version: 1, type: 'community:changed' })
     expect(socket.connected).toBe(true)
   }, 5000)

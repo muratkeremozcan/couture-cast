@@ -13,6 +13,7 @@ import {
   spotlightTestContext,
   unavailableRedis,
 } from './helpers/community-spotlight-context.js'
+import { drainCommunityOutbox } from './helpers/community-outbox-drain.js'
 import { buildLookbookPostCreateInput, createLookbookPost } from '@couture/testing'
 
 const ctx = spotlightTestContext('invalidation')
@@ -85,9 +86,7 @@ describe('6.6 spotlight read model', () => {
     })
     const newcomer = await freshPost(await ctx.member(), area)
     await ctx.react(cohort.authorIds[1]!, newcomer, 'love')
-    while ((await ctx.streams.append()) > 0) {
-      // drain the outbox into appended events
-    }
+    await drainCommunityOutbox(ctx.prisma, ctx.streams)
     const failing = new CommunitySpotlightInvalidator(
       ctx.prisma,
       new CommunitySpotlightCache(unavailableRedis, ctx.prefix)

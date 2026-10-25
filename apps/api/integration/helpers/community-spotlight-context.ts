@@ -18,6 +18,7 @@ import type { AnalyticsCaptureEvent } from '../../src/analytics/analytics.servic
 import { CommunityRepository } from '../../src/modules/community/community.repository.js'
 import { CommunityService } from '../../src/modules/community/community.service.js'
 import { CommunityStreamRepository } from '../../src/modules/community/community-stream.repository.js'
+import { drainCommunityOutbox } from './community-outbox-drain.js'
 import { InMemoryCommunityStorage } from '../../src/modules/community/community-storage.fake.js'
 import {
   CommunitySpotlightCache,
@@ -168,9 +169,7 @@ export function spotlightTestContext(label: string) {
 
   /** Commits stream events for everything written so far, then lets the invalidator run. */
   async function drain() {
-    while ((await streams.append()) > 0) {
-      // Append is bounded per batch; keep going until the outbox is empty.
-    }
+    await drainCommunityOutbox(prisma, streams)
     return invalidator.process()
   }
 

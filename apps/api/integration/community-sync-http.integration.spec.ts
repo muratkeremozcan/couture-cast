@@ -15,6 +15,7 @@ import {
   persistUser,
 } from '@couture/testing'
 import { isolatedCommunityDatabase } from './helpers/isolated-community-database.js'
+import { drainCommunityOutbox } from './helpers/community-outbox-drain.js'
 import { listenHttpApp } from '../src/testing/loopback-http-app.js'
 import { CommunitySyncController } from '../src/modules/community/community-sync.controller.js'
 import { CommunitySyncService } from '../src/modules/community/community-sync.service.js'
@@ -410,8 +411,7 @@ describe('Story 6.5 actual HTTP controllers and generated client wrappers', () =
         createLookbookPost({ userId: owner.id, status: 'published' })
       ),
     })
-    while (await prisma.communityDomainOutbox.count({ where: { appended_at: null } }))
-      await streams.append()
+    await drainCommunityOutbox(prisma, streams)
     const client = clients(owner.id)
     const heads = await client.events('all')
     const data = {
@@ -432,8 +432,7 @@ describe('Story 6.5 actual HTTP controllers and generated client wrappers', () =
     const child = await prisma.communityComment.create({
       data: { ...data, parent_id: a.id, publication_sequence: 3 },
     })
-    while (await prisma.communityDomainOutbox.count({ where: { appended_at: null } }))
-      await streams.append()
+    await drainCommunityOutbox(prisma, streams)
     await expect(
       prisma.communityComment.update({
         where: { id: child.id },
@@ -504,8 +503,7 @@ describe('Story 6.5 actual HTTP controllers and generated client wrappers', () =
   })
   it('A01 scans200 actual public/private events with batched fresh visibility and no skipped cursor', async () => {
     const owner = await fixture()
-    while (await prisma.communityDomainOutbox.count({ where: { appended_at: null } }))
-      await streams.append()
+    await drainCommunityOutbox(prisma, streams)
     const client = clients(owner.id)
     const heads = await client.events('all')
     const posts = await Promise.all(
@@ -527,8 +525,9 @@ describe('Story 6.5 actual HTTP controllers and generated client wrappers', () =
         status: 'pending_screening',
       })),
     })
-    while (await prisma.communityDomainOutbox.count({ where: { appended_at: null } }))
-      await streams.append()
+    // Appending this 200-row backlog is fixture setup: it runs at the appender's bounded
+    // batch rate, so it gets its own deadline and only the replay below is held to 2s.
+    await drainCommunityOutbox(prisma, streams, 15_000)
     databaseQueries.length = 0
     const started = performance.now()
     const result = await client.events('all', heads.nextCursor)
@@ -553,7 +552,7 @@ describe('Story 6.5 actual HTTP controllers and generated client wrappers', () =
         elapsedMs: performance.now() - started,
       })
     )
-  })
+  }, 20_000)
 
   it('R03 shares the absolute HTTP deadline across identity, DB eligibility and final projection', async () => {
     const owner = await fixture()
@@ -847,13 +846,7 @@ describe('Story 6.5 actual HTTP controllers and generated client wrappers', () =
     const client = clients(owner.id)
     // Earlier independent cases leave committed outboxes. A bounded append call may drain
     // only part of that backlog, so establish an empty baseline before capturing heads.
-    for (
-      let batch = 0;
-      batch < 20 &&
-      (await prisma.communityDomainOutbox.count({ where: { appended_at: null } }));
-      batch++
-    )
-      await streams.append()
+    await drainCommunityOutbox(prisma, streams)
     expect(
       await prisma.communityDomainOutbox.count({ where: { appended_at: null } })
     ).toBe(0)
