@@ -255,12 +255,47 @@ runs:
         # finishes, and TIME_WAIT or an orphaned FIN-WAIT-2 ends after 60
         # seconds. The wait stops at 75 seconds, inside the budget and leaving
         # room for the attempt; a socket still there fails the attempt, named.
+        #
+        # TIME_WAIT blocks only sometimes. One left by a listener that is gone
+        # (a previous attempt's own database) carries SO_REUSEADDR, and Docker
+        # binds over it. One left by an outgoing connection that held the port
+        # does not, and Docker's bind fails on it exactly as on a live one
+        # (measured on kernel 6.10). ss cannot show that flag, so a TIME_WAIT
+        # port counts as held only while a SO_REUSEADDR bind of 0.0.0.0 on it,
+        # the bind Docker makes, fails. Node's listen sets SO_REUSEADDR.
+        bind_blocked() {
+          ! node -e '
+            const server = require("node:net").createServer()
+            server.once("error", () => process.exit(1))
+            server.listen({ port: Number(process.argv[1]), host: "0.0.0.0" }, () =>
+              server.close(() => process.exit(0)))
+          ' "$1" 2> /dev/null
+        }
+
+        # Prints the sockets that would stop the start: any listener or
+        # connection in a state other than TIME_WAIT, then TIME_WAIT sockets on
+        # a port Docker could not bind.
+        blocking_sockets() {
+          local others tw port on_port
+          others="$(ss_sockets -Htanp state all exclude time-wait "$port_filter" 2> /dev/null || true)"
+          if [ -n "$others" ]; then printf '%s\n' "$others"; fi
+          # Listed through `state all`: a single-state listing drops the State
+          # column and shifts the local address out of field 4.
+          tw="$(ss_sockets -Htanp state all "$port_filter" 2> /dev/null | awk '$1 == "TIME-WAIT"' || true)"
+          if [ -z "$tw" ]; then return 0; fi
+          for port in "${bound_ports[@]}"; do
+            # Field 4 is the local address; its last ':' part is the port.
+            on_port="$(awk -v port="$port" '{ n = split($4, part, ":"); if (part[n] == port) print }' <<< "$tw")"
+            if [ -n "$on_port" ] && bind_blocked "$port"; then printf '%s\n' "$on_port"; fi
+          done
+        }
+
         wait_for_free_ports() {
           local waited=0 wait_cap held owners step
           wait_cap=$(( $(remaining_seconds) - MIN_ATTEMPT ))
           if [ "$wait_cap" -gt 75 ]; then wait_cap=75; fi
           if [ "$wait_cap" -lt 0 ]; then wait_cap=0; fi
-          while held="$(ss_sockets -Htanp state all "$port_filter" 2> /dev/null)" && [ -n "$held" ]; do
+          while held="$(blocking_sockets)" && [ -n "$held" ]; do
             if [ "$waited" -eq 0 ]; then
               echo "Waiting up to ${wait_cap}s for sockets on the Supabase host ports to close:"
               printf '%s\n' "$held"

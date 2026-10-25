@@ -241,6 +241,16 @@ describe('deployment workflows', () => {
     )
     expect(content).toMatch(/::error::Supabase host ports are still in use after/)
     expect(content).toMatch(/held by \$\{owners/)
+    // Listeners and live or closing connections always block. TIME_WAIT blocks
+    // only while Docker's bind (SO_REUSEADDR on 0.0.0.0) would fail on it: one
+    // left by a listener that is gone does not, so the start must not wait on it.
+    expect(content).toMatch(/while held="\$\(blocking_sockets\)"/)
+    expect(content).toMatch(
+      /ss_sockets -Htanp state all exclude time-wait "\$port_filter"/
+    )
+    expect(content).toMatch(/awk '\$1 == "TIME-WAIT"'/)
+    expect(content).toMatch(/if \[ -n "\$on_port" \] && bind_blocked "\$port"; then/)
+    expect(content).toMatch(/host: "0\.0\.0\.0"/)
     expect(content).toMatch(/ss_sockets -tanp state all "\$port_filter"/)
     expect(content).not.toMatch(/ss -ltnp/)
 
