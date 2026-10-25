@@ -71,16 +71,14 @@ import {
   requestedPermissionsFromDumpsys,
 } from './lib/maestro-android-permissions.mjs'
 import {
-  MAESTRO_ANDROID_DRIVER_PORT,
   waitForDevicePortFree,
   waitForStaleMaestroSessions,
 } from './lib/maestro-android-driver-session.mjs'
 import {
-  createLaunchStallDetector,
-  describeLaunchStall,
-  deviceCommandsInFlight,
+  createLaunchStallCheck,
   launchStallError,
 } from './lib/maestro-launch-watchdog.mjs'
+import { runAndroidDeviceShards } from './lib/maestro-android-shards.mjs'
 
 const scriptDir = path.dirname(fileURLToPath(import.meta.url))
 const projectRoot = path.resolve(scriptDir, '..')
@@ -1873,7 +1871,7 @@ const maestroDriverReuse = createMaestroDriverReuse({
       ],
       { timeoutMs: 30_000 }
     ),
-  settle: (device) => settleAndroidDriver(device),
+  settle: (device, driverPort) => settleAndroidDriver(device, driverPort),
 })
 
 /**
@@ -1957,9 +1955,10 @@ const maestroFlowPath = (flowPath, platform) =>
  * is waited out, so this flow's Maestro starts its own driver.
  *
  * @param {string} device
+ * @param {number | null} driverPort the pinned port to check, `null` when Maestro picks one
  * @returns {Promise<void>}
  */
-const settleAndroidDriver = async (device) => {
+const settleAndroidDriver = async (device, driverPort) => {
   const adbBinary = resolveAdbBinary()
   const target = device === DEFAULT_ADB_DEVICE ? [] : ['-s', device]
   await captureProcess(
@@ -1973,6 +1972,7 @@ const settleAndroidDriver = async (device) => {
     device: device === DEFAULT_ADB_DEVICE ? undefined : device,
     log,
   })
+  if (driverPort === null) return
   await waitForDevicePortFree({
     readProcNet: async () => {
       try {
@@ -1986,12 +1986,12 @@ const settleAndroidDriver = async (device) => {
         // An image that hides its socket table cannot be checked; the flow still runs.
         log(
           `Could not read the TCP socket table on ${device} (${error.message}), ` +
-            `so driver port ${MAESTRO_ANDROID_DRIVER_PORT} is not checked`
+            `so driver port ${driverPort} is not checked`
         )
         return ''
       }
     },
-    port: MAESTRO_ANDROID_DRIVER_PORT,
+    port: driverPort,
     device,
   })
 }
@@ -3698,7 +3698,76 @@ const recordShardedSuiteOutcome = (
 }
 
 /**
- * Run the shardable flows as one Maestro invocation across every device.
+ * Story 6.7b R21: the Android shardable flows, one queue per device, each flow
+ * with the serial path's flow cap, its single cap retry and the launch watchdog,
+ * on the device's own pinned driver port.
+ *
+ * @param {string[]} shardedFlows
+ * @param {{ platform: 'android' | 'ios' }} target
+ * @param {NodeJS.ProcessEnv} maestroEnv
+ * @param {string[]} flowFailures collected in place
+ * @returns {Promise<void>}
+ */
+const runAndroidShardedFlows = async (shardedFlows, target, maestroEnv, flowFailures) => {
+  /** @type {Record<string, number>} */
+  let durations = {}
+  try {
+    durations = JSON.parse(
+      fs.readFileSync(path.join(scriptDir, 'maestro-flow-durations.json'), 'utf8')
+    )
+  } catch (error) {
+    log(`Flow durations unreadable (${error.message}); every flow counts the same`)
+  }
+  const runnable = shardedFlows.filter((flowPath) => {
+    const refusal = flowRefusals.get(flowPath)
+    if (refusal) failFlowWithCause(flowPath, refusal, flowFailures)
+    return !refusal
+  })
+  log(`Running ${runnable.length} flows across ${SHARD_DEVICE_IDS.length} devices`)
+  await runAndroidDeviceShards({
+    flows: runnable,
+    devices: SHARD_DEVICE_IDS,
+    durations,
+    timeoutMs: CI_FLOW_TIMEOUT_MS,
+    prepareDriver: (device, driverPort) =>
+      maestroDriverReuse.argsFor(target.platform, device, { driverPort }),
+    buildArgs: (flowPath, device) =>
+      buildSingleFlowMaestroArgs(flowPath, target, device).maestroArgs,
+    stallCheckFor: (flowPath, device) =>
+      launchStallCheckFor(flowPath, target.platform, device),
+    spawnOptionsFor: (flowPath) => ({
+      env: maestroEnv,
+      logFile: WRITE_ARTIFACTS ? getFlowLogPath(flowPath) : undefined,
+    }),
+    runMaestro: (args, options) => {
+      log(`Running Maestro flow (${args.join(' ')})`)
+      return runMaestroCommand(args, options)
+    },
+    // Same rule as the serial path: no attempt reads an earlier report (R28).
+    beforeAttempt: (args) => removeMaestroReport(args),
+    onRetry: (flowPath, device, error) =>
+      log(`RETRY ${flowPath} on ${device} (${error.message})`),
+    recordInvocation: (device) =>
+      maestroDriverReuse.recordInvocation(target.platform, device),
+    onRefused: (flowPath, device, cause) =>
+      failFlowWithCause(flowPath, `${device}: ${cause}`, flowFailures),
+    onFinished: (flowPath, device, error, startedAtMs) =>
+      recordSingleFlowOutcome(
+        flowPath,
+        error,
+        flowFailures,
+        startedAtMs,
+        target.platform,
+        device
+      ),
+    log,
+  })
+}
+
+/**
+ * Run the shardable flows across every device. Android gives each device its own
+ * queue of single-flow invocations (scripts/lib/maestro-android-shards.mjs); iOS
+ * keeps one Maestro invocation with `--shard-split`.
  *
  * @param {string[]} shardedFlows
  * @param {{ platform: 'android' | 'ios' }} target
@@ -3707,6 +3776,10 @@ const recordShardedSuiteOutcome = (
  * @returns {Promise<void>}
  */
 const runShardedFlows = async (shardedFlows, target, maestroEnv, flowFailures) => {
+  if (target.platform === 'android') {
+    await runAndroidShardedFlows(shardedFlows, target, maestroEnv, flowFailures)
+    return
+  }
   const reportPath = toPosixPath(
     path.join(MAESTRO_ARTIFACT_DIR, 'parallel-suite-report.xml')
   )
@@ -3837,19 +3910,18 @@ const launchStallCheckFor = (flowPath, platform, device) => {
   if (platform !== 'android' || !WRITE_ARTIFACTS || cloud) return undefined
   const title = flowTitleOf(fs.readFileSync(flowPath, 'utf8'))
   if (!title) return undefined
-  return (attemptStartedAtMs) => {
-    const detector = createLaunchStallDetector()
-    return {
-      intervalMs: 2_000,
-      check: async () => {
+  return (attemptStartedAtMs) =>
+    createLaunchStallCheck({
+      device,
+      readDebugLog: () => {
         const logFile = newestFlowDebugLog(MAESTRO_ARTIFACT_DIR, title, {
           sinceMs: attemptStartedAtMs,
         })
-        if (!logFile) return undefined
-        const stall = detector.observe(fs.readFileSync(logFile, 'utf8'))
-        if (!stall) return undefined
-        try {
-          const { stdout } = await captureProcess(
+        return logFile ? fs.readFileSync(logFile, 'utf8') : undefined
+      },
+      readDeviceProcesses: async () =>
+        (
+          await captureProcess(
             resolveAdbBinary(),
             [
               ...(device === DEFAULT_ADB_DEVICE ? [] : ['-s', device]),
@@ -3861,16 +3933,8 @@ const launchStallCheckFor = (flowPath, platform, device) => {
             ],
             { timeoutMs: 10_000 }
           )
-          return describeLaunchStall(stall, {
-            device,
-            commands: deviceCommandsInFlight(stdout),
-          })
-        } catch (error) {
-          return describeLaunchStall(stall, { device, captureError: error.message })
-        }
-      },
-    }
-  }
+        ).stdout,
+    })
 }
 
 /**
@@ -3983,9 +4047,10 @@ const runUserScopedFlows = async (
  *
  * @param {string} flowPath
  * @param {{ platform: 'android' | 'ios' }} target
+ * @param {string} [serial] the Android device, when not the run's current one
  * @returns {{ maestroArgs: string[], maestroLogFile: string | undefined }}
  */
-const buildSingleFlowMaestroArgs = (flowPath, target) => {
+const buildSingleFlowMaestroArgs = (flowPath, target, serial = androidSerial) => {
   const maestroArgs = []
   let maestroLogFile
   if (process.env.MAESTRO_CLOUD_API_KEY && process.env.MAESTRO_CLOUD_WORKSPACE) {
@@ -4005,11 +4070,11 @@ const buildSingleFlowMaestroArgs = (flowPath, target) => {
       // Maestro picks first.
       maestroArgs.push('--udid', iosSimulatorUdid)
     }
-    if (target.platform === 'android' && androidSerial) {
+    if (target.platform === 'android' && serial) {
       // The same for a chosen emulator: with a second one attached, Maestro
       // would otherwise drive whichever it lists first, not the one every adb
       // step of this run acted on.
-      maestroArgs.push('--udid', androidSerial)
+      maestroArgs.push('--udid', serial)
     }
     maestroArgs.push('test')
     maestroArgs.push(...buildMaestroFlowEnvArgs())
@@ -4053,6 +4118,7 @@ const buildSingleFlowMaestroArgs = (flowPath, target) => {
  * @param {string[]} flowFailures collected in place
  * @param {number} [startedAtMs] when the flow's first attempt began
  * @param {string} [platform] the platform the flow ran on
+ * @param {string} [serial] the Android device it ran on
  * @returns {void}
  */
 const recordSingleFlowOutcome = (
@@ -4060,12 +4126,13 @@ const recordSingleFlowOutcome = (
   maestroExitError,
   flowFailures,
   startedAtMs,
-  platform
+  platform,
+  serial = androidSerial
 ) => {
   const failuresBefore = flowFailures.length
   recordFlowOutcome(flowPath, maestroExitError, flowFailures, startedAtMs)
   if (flowFailures.length > failuresBefore && platform === 'android')
-    captureAndroidWindowStack(flowPath)
+    captureAndroidWindowStack(flowPath, serial)
 }
 
 /**
@@ -4081,9 +4148,10 @@ const recordSingleFlowOutcome = (
  * artifact secret scan runs over all of it before upload.
  *
  * @param {string} flowPath
+ * @param {string} [serial] the device to capture, the run's current one by default
  * @returns {void}
  */
-const captureAndroidWindowStack = (flowPath) => {
+const captureAndroidWindowStack = (flowPath, serial = androidSerial) => {
   if (!WRITE_ARTIFACTS || IOS_UDIDS.length > 0) return
   // Story 1.2b R28: a flow killed at its watchdog leaves no Maestro debug
   // output, so the device side of the stall is captured here too. In CI job
@@ -4101,9 +4169,7 @@ const captureAndroidWindowStack = (flowPath) => {
       encoding: 'utf8',
       timeout: 15_000,
       maxBuffer: 64 * 1024 * 1024,
-      env: androidSerial
-        ? { ...process.env, ANDROID_SERIAL: androidSerial }
-        : process.env,
+      env: serial ? { ...process.env, ANDROID_SERIAL: serial } : process.env,
     })
     if (result.status !== 0 || !result.stdout) {
       log(`Could not capture the Android ${label} for ${flowPath}`)

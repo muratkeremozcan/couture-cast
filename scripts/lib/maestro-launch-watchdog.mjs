@@ -104,6 +104,52 @@ export function createLaunchStallDetector({
 }
 
 /**
+ * One attempt's launch stall check, as `spawnProcess` polls it: reads the
+ * attempt's live debug log and, once a `launchApp` has been open for `boundMs`,
+ * reads the device's processes and answers with the named stall. A log that is
+ * not there yet answers nothing. A process list that cannot be read still names
+ * the stall, with that reason.
+ *
+ * @param {{
+ *   device: string,
+ *   readDebugLog: () => string | undefined,
+ *   readDeviceProcesses: () => Promise<string>,
+ *   boundMs?: number,
+ *   intervalMs?: number,
+ *   now?: () => number,
+ * }} options
+ * @returns {{ intervalMs: number, check: () => Promise<string | undefined> }}
+ */
+export function createLaunchStallCheck({
+  device,
+  readDebugLog,
+  readDeviceProcesses,
+  boundMs = LAUNCH_APP_STALL_MS,
+  intervalMs = 2_000,
+  now = Date.now,
+}) {
+  const detector = createLaunchStallDetector({ boundMs, now })
+  return {
+    intervalMs,
+    check: async () => {
+      const logText = readDebugLog()
+      if (logText === undefined) return undefined
+      const stall = detector.observe(logText)
+      if (!stall) return undefined
+      try {
+        const commands = deviceCommandsInFlight(await readDeviceProcesses())
+        return describeLaunchStall(stall, { device, commands })
+      } catch (error) {
+        return describeLaunchStall(stall, {
+          device,
+          captureError: error instanceof Error ? error.message : String(error),
+        })
+      }
+    },
+  }
+}
+
+/**
  * The error a launch-stall kill fails its flow with. It carries no `timedOut`,
  * so `runMobileE2EFlow` does not retry it: the message already names the stalled
  * step and the device state, and a rerun would hide a stall that should be fixed.

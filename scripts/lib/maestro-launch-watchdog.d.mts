@@ -16,6 +16,15 @@ export declare function createLaunchStallDetector(options?: {
   observe(logText: string): (OpenLaunchApp & { elapsedMs: number }) | undefined
 }
 
+export declare function createLaunchStallCheck(options: {
+  device: string
+  readDebugLog: () => string | undefined
+  readDeviceProcesses: () => Promise<string>
+  boundMs?: number
+  intervalMs?: number
+  now?: () => number
+}): { intervalMs: number; check: () => Promise<string | undefined> }
+
 export declare function launchStallError(message: string): Error & { stalled: true }
 
 export declare function deviceCommandsInFlight(psOutput: string): string[]

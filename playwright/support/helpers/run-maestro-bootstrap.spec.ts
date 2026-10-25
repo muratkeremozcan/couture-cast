@@ -11,6 +11,7 @@ const runnerFiles = [
   'scripts/lib/expo-go-link-endpoint.mjs',
   'scripts/lib/maestro-android-driver-session.mjs',
   'scripts/lib/maestro-android-permissions.mjs',
+  'scripts/lib/maestro-android-shards.mjs',
   'scripts/lib/maestro-driver-reuse.mjs',
   'scripts/lib/maestro-flow-outcome.mjs',
   'scripts/lib/maestro-launch-watchdog.mjs',

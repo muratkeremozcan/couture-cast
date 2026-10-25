@@ -129,8 +129,9 @@ describe('Maestro driver reuse (R62)', () => {
 
   it('6.7b-R18-15 settles the device before every Android flow and names a settle failure', async () => {
     const device = fakeDevice()
-    const settle = vi.fn((serial: string) => {
+    const settle = vi.fn((serial: string, port: number | null) => {
       void serial
+      void port
       return Promise.resolve()
     })
     const reuse = createMaestroDriverReuse({ ...device, settle })
@@ -138,7 +139,10 @@ describe('Maestro driver reuse (R62)', () => {
     device.maestroInstalls()
     reuse.recordInvocation('android', 'emulator-5554')
     await reuse.argsFor('android', 'emulator-5554')
-    expect(settle.mock.calls).toEqual([['emulator-5554'], ['emulator-5554']])
+    expect(settle.mock.calls).toEqual([
+      ['emulator-5554', 17001],
+      ['emulator-5554', 17001],
+    ])
 
     settle.mockImplementation(() =>
       Promise.reject(new Error('device port 17001 on emulator-5554 is still in use'))
@@ -148,6 +152,18 @@ describe('Maestro driver reuse (R62)', () => {
     )
     expect(await reuse.argsFor('ios', 'booted')).toEqual([])
     expect(settle).toHaveBeenCalledTimes(3)
+
+    // Each device of a per-device shard run gets its own pinned port, settled there.
+    settle.mockImplementation(() => Promise.resolve())
+    expect(
+      await reuse.argsFor('android', 'emulator-5556', { driverPort: 17002 })
+    ).toEqual(['--no-reinstall-driver', '--driver-host-port', '17002'])
+    expect(settle).toHaveBeenLastCalledWith('emulator-5556', 17002)
+    // Without a pinned port Maestro picks one, and the settle step skips the port check.
+    expect(await reuse.argsFor('android', 'emulator-5558', { driverPort: null })).toEqual(
+      ['--no-reinstall-driver']
+    )
+    expect(settle).toHaveBeenLastCalledWith('emulator-5558', null)
   })
 
   it('R62-07 reads only exact package and instrumentation lines', () => {
