@@ -5,6 +5,7 @@
  */
 import { spawn, spawnSync } from 'node:child_process'
 import fs from 'node:fs'
+import { createRequire } from 'node:module'
 import os from 'node:os'
 import path from 'node:path'
 import { afterEach, describe, expect, it, vi } from 'vitest'
@@ -12,6 +13,27 @@ import { lock } from 'proper-lockfile'
 import { replaceDistFromStaging } from '../../../scripts/build-workspace-package.mjs'
 
 const SCRIPT = path.resolve('scripts/build-workspace-package.mjs')
+/** The installed proper-lockfile, which a fake package links into its own node_modules. */
+const PROPER_LOCKFILE = path.dirname(
+  createRequire(path.resolve('package.json')).resolve('proper-lockfile/package.json')
+)
+
+/**
+ * Makes `root` a package that declares and installs proper-lockfile, as every
+ * package built with the script does: the script resolves the lock from the
+ * package it builds (R32).
+ */
+function installLock(root: string) {
+  fs.mkdirSync(path.join(root, 'node_modules'), { recursive: true })
+  fs.writeFileSync(
+    path.join(root, 'package.json'),
+    JSON.stringify({
+      name: path.basename(root),
+      devDependencies: { 'proper-lockfile': '4.1.2' },
+    })
+  )
+  fs.symlinkSync(PROPER_LOCKFILE, path.join(root, 'node_modules', 'proper-lockfile'))
+}
 /** The same build with a stall after one publication step, for the R25/R28 cases. */
 const PAUSED = path.resolve(
   'playwright/support/helpers/build-workspace-package-paused.mjs'
@@ -50,6 +72,7 @@ function fakePackage() {
   fs.writeFileSync(path.join(root, 'dist', 'gone', 'stale.js'), 'stale')
   fs.writeFileSync(path.join(root, 'tsconfig.build.tsbuildinfo'), '{}')
   fs.writeFileSync(path.join(root, 'fake-tsc.cjs'), FAKE_TSC)
+  installLock(root)
   return root
 }
 
@@ -158,6 +181,7 @@ function slowPackage(parent: string, name: string) {
   fs.writeFileSync(path.join(root, 'dist', 'file-0.js'), 'old output 0')
   fs.writeFileSync(path.join(root, 'dist', 'old', 'removed.js'), 'old only')
   fs.writeFileSync(path.join(root, 'slow-tsc.cjs'), SLOW_TSC)
+  installLock(root)
   return root
 }
 
@@ -182,7 +206,16 @@ const buildAsync = (root: string, env: NodeJS.ProcessEnv = {}, script = SCRIPT) 
 const leftovers = (root: string) =>
   fs
     .readdirSync(root)
-    .filter((name) => !['dist', 'slow-tsc.cjs', 'compiles.log'].includes(name))
+    .filter(
+      (name) =>
+        ![
+          'dist',
+          'slow-tsc.cjs',
+          'compiles.log',
+          'package.json',
+          'node_modules',
+        ].includes(name)
+    )
 
 describe('overlapping builds of one package', () => {
   it(
@@ -829,6 +862,28 @@ describe('lock lost during publication (R25)', () => {
       expect(ran).toHaveLength(2)
       expectSerialized(ran)
       expect(tree(path.join(root, 'dist'))).toEqual(expected)
+      expect(leftovers(root)).toEqual([])
+    }
+  )
+
+  it(
+    '6.7b-R32-01 builds when proper-lockfile is installed only under the package, not at the repository root',
+    { timeout: 30_000 },
+    async () => {
+      directory = fs.mkdtempSync(path.join(os.tmpdir(), 'r32-nested-'))
+      // A repository whose root has no node_modules: the script sits in scripts/
+      // and the lock is installed only under the package it builds.
+      const repo = path.join(directory, 'repo')
+      fs.mkdirSync(path.join(repo, 'scripts'), { recursive: true })
+      fs.mkdirSync(path.join(repo, 'packages'), { recursive: true })
+      const script = path.join(repo, 'scripts', 'build-workspace-package.mjs')
+      fs.copyFileSync(SCRIPT, script)
+      // slowPackage installs the lock in the package's own node_modules only.
+      const root = slowPackage(path.join(repo, 'packages'), 'nested')
+      expect(fs.existsSync(path.join(repo, 'node_modules'))).toBe(false)
+      const result = await buildAsync(root, {}, script)
+      expect(result, result.output).toMatchObject({ code: 0 })
+      expect(Object.keys(tree(path.join(root, 'dist')))).toHaveLength(6)
       expect(leftovers(root)).toEqual([])
     }
   )

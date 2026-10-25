@@ -51,9 +51,10 @@
  * build took the lock over during a stall, so this build leaves that lock alone
  * and exits non-zero ("lease lost after publish").
  *
- * Story 6.7b R26: every package built with this script declares
+ * Story 6.7b R26/R32: every package built with this script declares
  * `proper-lockfile` as a devDependency of its own, so any install that includes
- * the package installs the lock with it. A Vercel project whose root directory
+ * the package installs the lock with it, and the script resolves it from that
+ * package, wherever npm placed it. A Vercel project whose root directory
  * is one app (`npm ci` there installs that workspace's tree, without the
  * repository root's own dependencies) gets it through the packages it uses.
  *
@@ -66,9 +67,32 @@
  */
 import { spawn } from 'node:child_process'
 import fs from 'node:fs'
+import { createRequire } from 'node:module'
 import path from 'node:path'
 import { pathToFileURL } from 'node:url'
-import { lock } from 'proper-lockfile'
+
+/**
+ * `proper-lockfile` as the package being built resolves it (R32). Each package
+ * declares it as a devDependency, and resolving it from that package's own
+ * `package.json` works whether npm hoisted it to the repository root or kept it
+ * under the package, which this script's location alone cannot see.
+ *
+ * @param {string} packageDir
+ * @returns {typeof import('proper-lockfile')}
+ */
+function loadLockfile(packageDir) {
+  const manifest = path.resolve(packageDir, 'package.json')
+  try {
+    return createRequire(manifest)('proper-lockfile')
+  } catch (error) {
+    throw new Error(
+      `proper-lockfile cannot be resolved from ${manifest} ` +
+        `(${error instanceof Error ? error.message.split('\n')[0] : String(error)}); ` +
+        'it is a devDependency of every package this script builds, so install ' +
+        'that package with its devDependencies'
+    )
+  }
+}
 
 const DIST = 'dist'
 const STAGING_PREFIX = '.dist-staging-'
@@ -123,7 +147,7 @@ export async function acquireBuildLock({ packageDir, waitMs, staleMs, onCompromi
   })
   let release
   try {
-    release = await lock(packageDir, {
+    release = await loadLockfile(packageDir).lock(packageDir, {
       fs: observedFs,
       lockfilePath: lockPath,
       realpath: false,
@@ -548,8 +572,11 @@ async function buildOnce({ command, args, waitMs, staleMs, afterStep }) {
   }
 }
 
+// Compared by real path: run through a symlinked directory (macOS's /var is
+// /private/var), the entry path and this module's URL differ, and a build that
+// silently did nothing would exit 0.
 if (
   process.argv[1] &&
-  import.meta.url === pathToFileURL(path.resolve(process.argv[1])).href
+  import.meta.url === pathToFileURL(fs.realpathSync(path.resolve(process.argv[1]))).href
 )
   await runBuild()
