@@ -60,7 +60,7 @@
     }
   },
   "scripts": {
-    "build": "rm -rf dist tsconfig.build.tsbuildinfo && tsc -p tsconfig.build.json",
+    "build": "node ../../scripts/build-workspace-package.mjs --tsc tsc",
     "lint": "npm run typecheck",
     "typecheck": "tsc --noEmit -p tsconfig.json",
     "test": "npm run typecheck"

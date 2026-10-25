@@ -1332,6 +1332,16 @@ them lost runs to it in one day.
   against whatever `dist` happens to be on disk, which is the same defect the
   `pretest:cov` entry above describes.
 
+  **Partly resolved, Story 6.7b R21 follow-up (2026-10-24).** Every package
+  `build:packages` builds (config, utils, api-client, testing, k6-utils) now
+  builds through `scripts/build-workspace-package.mjs`: `tsc` writes to `.dist-staging`,
+  each emitted file is renamed over its `dist` counterpart, and files the build
+  no longer emits are removed afterwards. A rebuild stays a full rebuild but is
+  no longer destructive, so a reader sees the old or the new build at every
+  moment; outputs are byte-identical to the old build. The rebuild is still
+  repeated on every pre-hook (not cached), and `db:generate`'s Prisma client
+  regeneration is unchanged.
+
 ## Tests that construct their own subject, found across story 6.1 (2026-09-06)
 
 Four defects on this branch had the same shape, and naming the shape is worth
