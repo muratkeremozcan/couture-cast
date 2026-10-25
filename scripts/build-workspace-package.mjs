@@ -106,18 +106,17 @@ export async function acquireBuildLock({ packageDir, waitMs, staleMs, onCompromi
   let lastBeat
   let lost = false
   const observedFs = Object.assign(Object.create(fs), {
-    utimes: (target, atime, mtime, callback) =>
-      fs.utimes(target, atime, mtime, (error) => {
-        if (!error && path.resolve(String(target)) === path.resolve(lockPath)) {
-          // What the disk now holds, at whatever precision it keeps mtimes.
-          try {
-            lastBeat = fs.statSync(lockPath).mtime.getTime()
-          } catch {
-            lastBeat = undefined
-          }
-        }
+    utimes: (target, atime, mtime, callback) => {
+      // The value this invocation writes, taken before the call (R29): after a
+      // stall the directory at this path can carry another build's stamp, and
+      // reading it back would adopt that stamp as this build's own.
+      const written = new Date(mtime).getTime()
+      return fs.utimes(target, atime, mtime, (error) => {
+        if (!error && path.resolve(String(target)) === path.resolve(lockPath))
+          lastBeat = written
         callback(error)
-      }),
+      })
+    },
     // Once `settle` has seen another build's mtime, the directory is theirs.
     rmdir: (target, callback) => (lost ? callback(null) : fs.rmdir(target, callback)),
     rmdirSync: (target) => (lost ? undefined : fs.rmdirSync(target)),
@@ -155,10 +154,25 @@ export async function acquireBuildLock({ packageDir, waitMs, staleMs, onCompromi
       } catch {
         current = undefined
       }
-      lost = lastBeat === undefined || current !== lastBeat
+      lost =
+        lastBeat === undefined || current === undefined || !sameStamp(current, lastBeat)
       return !lost
     },
   }
+}
+
+/**
+ * Whether `disk`, a lock mtime read back, is the stamp `written`. A filesystem
+ * that keeps whole seconds stores a written millisecond stamp truncated; any
+ * other build's stamp differs by at least the 2 s stale minimum.
+ *
+ * @param {number} disk
+ * @param {number} written
+ */
+function sameStamp(disk, written) {
+  return (
+    disk === written || (disk % 1000 === 0 && Math.floor(written / 1000) * 1000 === disk)
+  )
 }
 
 /**
@@ -457,7 +471,12 @@ async function buildOnce({ command, args, waitMs, staleMs, afterStep }) {
     return { kind: 'done' }
   }
   const staging = fs.mkdtempSync(`${STAGING_PREFIX}${process.pid}-`)
+  /** Set when a check found another build's stamp on the lock (R29). */
+  const takenOver = 'another build took the lock over (its stamp is on the lock)'
   try {
+    // The lock may already carry another build's stamp, when this process
+    // stalled between writing its first stamp and seeing the write complete.
+    if (!held.settle()) return { kind: 'displaced', reason: takenOver }
     removeAbandonedStaging('.', staging)
     fs.rmSync(TSBUILDINFO, { force: true })
     const code = await run(command, [
@@ -473,6 +492,7 @@ async function buildOnce({ command, args, waitMs, staleMs, afterStep }) {
     // Checked first: the build that took the lock over removes this attempt's
     // staging, which can make the compile itself fail.
     if (compromised) return { kind: 'displaced', reason: compromised.message }
+    if (!held.settle()) return { kind: 'displaced', reason: takenOver }
     // A failed compile leaves the last good `dist` in place.
     if (code !== 0) {
       process.exitCode = code
@@ -485,6 +505,7 @@ async function buildOnce({ command, args, waitMs, staleMs, afterStep }) {
       if (Date.now() - lastStep > refreshMs / 2)
         await new Promise((resolve) => setTimeout(resolve, refreshMs + 250))
       if (compromised) throw new LeaseLost(compromised.message, done, total)
+      if (!held.settle()) throw new LeaseLost(takenOver, done, total)
       lastStep = Date.now()
     }
     try {
@@ -503,24 +524,26 @@ async function buildOnce({ command, args, waitMs, staleMs, afterStep }) {
         return { kind: 'done' }
       }
       fail(error instanceof Error ? error.message : String(error))
+      return { kind: 'done' }
     }
-    return { kind: 'done' }
-  } finally {
-    fs.rmSync(staging, { recursive: true, force: true })
-    // Terminal settlement (R28): release only a lock that still carries this
-    // build's last heartbeat. Another mtime means another build took the lock
-    // over during a stall after the last check; releasing would remove its lock.
+    // Terminal settlement (R28): the lock must still carry this build's own last
+    // stamp. Another stamp means another build took the lock over during a stall
+    // after the last check.
     if (!compromised && !held.settle()) {
       fail(
         `The build lock ${path.resolve(LOCK)} was taken over after this build's last ` +
           'check (lease lost after publish); it is left to the build that holds it now'
       )
-    } else {
-      try {
-        await held.release()
-      } catch {
-        // Compromised locks are already released by proper-lockfile.
-      }
+    }
+    return { kind: 'done' }
+  } finally {
+    fs.rmSync(staging, { recursive: true, force: true })
+    // Stops the heartbeat. Once a check has seen another build's stamp,
+    // `release` leaves the directory alone: it is that build's lock.
+    try {
+      await held.release()
+    } catch {
+      // Compromised locks are already released by proper-lockfile.
     }
   }
 }

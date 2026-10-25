@@ -783,4 +783,53 @@ describe('lock lost during publication (R25)', () => {
       expect(leftovers(root)).toEqual([])
     }
   )
+
+  it(
+    '6.7b-R29-01 a build stalled right after its first stamp never adopts the successor stamp',
+    { timeout: 40_000 },
+    async () => {
+      directory = fs.mkdtempSync(path.join(os.tmpdir(), 'r29-adopted-stamp-'))
+      const single = slowPackage(directory, 'single')
+      expect((await buildAsync(single)).code).toBe(0)
+      const expected = tree(path.join(single, 'dist'))
+
+      const root = slowPackage(directory, 'package')
+      // astra r11's case: A's first stamp is written, then A stalls 3.5 s before
+      // it sees the write complete, against a 2 s stale window.
+      const a = buildAsync(
+        root,
+        {
+          ...STALE,
+          UTIMES_PAUSE_MS: '3500',
+          BUILD_WORKSPACE_PACKAGE_LOCK_WAIT_MS: '30000',
+        },
+        PAUSED
+      )
+      for (
+        let tries = 0;
+        !fs.existsSync(path.join(root, '.dist-build-lock'));
+        tries += 1
+      ) {
+        if (tries > 300) throw new Error('A never made its lock')
+        await wait(20)
+      }
+      // B takes the expired lease and stamps it, then compiles for about 2.4 s.
+      const b = buildAsync(root, {
+        ...STALE,
+        SLOW_TSC_PAUSE_MS: '400',
+        BUILD_WORKSPACE_PACKAGE_LOCK_WAIT_MS: '30000',
+      })
+      const [first, successor] = await Promise.all([a, b])
+      // B kept its lock to the end; A saw B's stamp, stood down and built after B.
+      expect(successor, successor.output).toMatchObject({ code: 0 })
+      expect(successor.output).not.toContain('lease lost')
+      expect(first, first.output).toMatchObject({ code: 0 })
+      expect(first.output).toContain('another build took the lock over')
+      const ran = compiles(root)
+      expect(ran).toHaveLength(2)
+      expectSerialized(ran)
+      expect(tree(path.join(root, 'dist'))).toEqual(expected)
+      expect(leftovers(root)).toEqual([])
+    }
+  )
 })
