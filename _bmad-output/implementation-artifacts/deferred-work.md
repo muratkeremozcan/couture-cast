@@ -1334,16 +1334,20 @@ them lost runs to it in one day.
 
   **Partly resolved, Story 6.7b R21 follow-up (2026-10-24).** Every package
   `build:packages` builds (config, utils, api-client, testing, k6-utils) now
-  builds through `scripts/build-workspace-package.mjs`: `tsc` writes to `.dist-staging`,
-  each emitted file is renamed over its `dist` counterpart, and files the build
-  no longer emits are removed afterwards. A rebuild stays a full rebuild but is
-  no longer destructive, so a reader sees the old or the new build at every
-  moment; outputs are byte-identical to the old build. R23 added a per-package
-  lock and a per-build staging directory, so overlapping builds of one package
-  run one at a time, and a missing or empty staging directory leaves `dist`
-  untouched. The rebuild is still
-  repeated on every pre-hook (not cached), and `db:generate`'s Prisma client
-  regeneration is unchanged.
+  builds through `scripts/build-workspace-package.mjs`: `tsc` writes to a
+  private `.dist-staging-<pid>-<random>` directory with its own incremental
+  state, each emitted file is renamed over its `dist` counterpart (new files
+  first, then changed ones, each after the modules it imports), and files the
+  build no longer emits are removed afterwards. A rebuild stays a full rebuild
+  but is no longer destructive, so a reader sees the old or the new build at
+  every moment; outputs are byte-identical to the old build. A failed compile
+  or a missing or empty staging directory leaves `dist` untouched. Overlapping
+  builds of one package need no lock (R34, decision D5): each compiles
+  privately and, from the same source, publishes the same file set, so the last
+  publish leaves a complete tree, and neither fails when the other prunes a
+  stale directory first. The rebuild is still repeated on every
+  pre-hook (not cached), and `db:generate`'s Prisma client regeneration is
+  unchanged.
 
 ## Tests that construct their own subject, found across story 6.1 (2026-09-06)
 

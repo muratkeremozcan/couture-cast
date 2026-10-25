@@ -45,8 +45,5 @@
     "@couture/utils": "file:../utils",
     "@faker-js/faker": "10.1.0",
     "@prisma/client": "6.19.0"
-  },
-  "devDependencies": {
-    "proper-lockfile": "4.1.2"
   }
 }

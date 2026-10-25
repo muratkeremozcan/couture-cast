@@ -20,8 +20,5 @@
     "typecheck": "tsc --noEmit -p tsconfig.typecheck.json",
     "test": "vitest run --config vitest.config.ts",
     "test:coverage": "vitest run --config vitest.config.ts --coverage"
-  },
-  "devDependencies": {
-    "proper-lockfile": "4.1.2"
   }
 }

@@ -73,8 +73,5 @@
   "engines": {
     "node": ">=24.0.0",
     "k6": ">=1.0.0"
-  },
-  "devDependencies": {
-    "proper-lockfile": "4.1.2"
   }
 }
