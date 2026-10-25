@@ -17,7 +17,17 @@
  * checks both packages are installed and the instrumentation registered. When they
  * are not, that flow fails at once with a cause naming what is missing, and the
  * device's next flow starts fresh again.
+ *
+ * Story 6.7b R18: before every Android flow the runner's `settle` step stops the
+ * driver an earlier flow left running, waits out a Maestro session record left by
+ * an invocation whose driver never started, and checks the driver port is free on
+ * the device (scripts/lib/maestro-android-driver-session.mjs). A single-device
+ * invocation then pins the driver to that port with `--driver-host-port`.
  */
+import {
+  DRIVER_HOST_PORT_ARG,
+  MAESTRO_ANDROID_DRIVER_PORT,
+} from './maestro-android-driver-session.mjs'
 
 export const MAESTRO_DRIVER_PACKAGES = ['dev.mobile.maestro', 'dev.mobile.maestro.test']
 
@@ -82,9 +92,10 @@ function presentDriverPackages(packagesOutput) {
  * @param {{
  *   inspect: (device: string) => Promise<{ packagesOutput: string, instrumentationOutput: string }>
  *   uninstall: (device: string, packageName: string) => Promise<unknown>
+ *   settle?: (device: string) => Promise<void>
  * }} options
  */
-export function createMaestroDriverReuse({ inspect, uninstall }) {
+export function createMaestroDriverReuse({ inspect, uninstall, settle }) {
   /** Devices whose driver an earlier invocation of this run installed. */
   const installed = new Set()
 
@@ -130,15 +141,32 @@ export function createMaestroDriverReuse({ inspect, uninstall }) {
      * device's driver is either removed (its first flow) or checked complete. Throws
      * `MaestroDriverNotReady` naming what is wrong.
      *
+     * `fixedPort` pins the driver port; an invocation across several devices
+     * leaves it to Maestro, which would otherwise give every device the same one.
+     *
      * @param {'android' | 'ios'} platform
      * @param {string} device
+     * @param {{ fixedPort?: boolean }} [options]
      * @returns {Promise<string[]>}
      */
-    async argsFor(platform, device) {
+    async argsFor(platform, device, { fixedPort = true } = {}) {
       if (platform !== 'android') return []
       if (installed.has(device)) await checkReusable(device)
       else await startFresh(device)
-      return [NO_REINSTALL_DRIVER_ARG]
+      if (settle) {
+        try {
+          await settle(device)
+        } catch (error) {
+          throw new MaestroDriverNotReady(device, [error.message])
+        }
+      }
+      return fixedPort
+        ? [
+            NO_REINSTALL_DRIVER_ARG,
+            DRIVER_HOST_PORT_ARG,
+            String(MAESTRO_ANDROID_DRIVER_PORT),
+          ]
+        : [NO_REINSTALL_DRIVER_ARG]
     },
     /**
      * Records that an invocation on `device` ran, so it installed the driver.
@@ -182,7 +210,10 @@ export function withTestOptions(args, extra) {
  */
 export async function runWithDriverOnDevices(reuse, platform, devices, invoke) {
   let driverArgs = []
-  for (const device of devices) driverArgs = await reuse.argsFor(platform, device)
+  for (const device of devices)
+    driverArgs = await reuse.argsFor(platform, device, {
+      fixedPort: devices.length === 1,
+    })
   try {
     return await invoke(driverArgs)
   } finally {

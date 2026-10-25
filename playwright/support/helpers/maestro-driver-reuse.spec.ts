@@ -13,6 +13,8 @@ import {
 } from '../../../scripts/lib/maestro-driver-reuse.mjs'
 
 const PACKAGES = 'package:dev.mobile.maestro\npackage:dev.mobile.maestro.test\n'
+/** A single-device Android flow's arguments: driver reuse and the pinned port (R18). */
+const PINNED = ['--no-reinstall-driver', '--driver-host-port', '17001']
 const INSTRUMENTATION = [
   'instrumentation:androidx.test.services/.TestService (target=android)',
   `instrumentation:${MAESTRO_DRIVER_INSTRUMENTATION} (target=dev.mobile.maestro)`,
@@ -49,9 +51,7 @@ describe('Maestro driver reuse (R62)', () => {
   it('R62-01 removes a leftover driver before the first flow, then reuses the fresh one', async () => {
     const device = fakeDevice(['dev.mobile.maestro', 'dev.mobile.maestro.test'])
     const reuse = createMaestroDriverReuse(device)
-    expect(await reuse.argsFor('android', 'emulator-5554')).toEqual([
-      '--no-reinstall-driver',
-    ])
+    expect(await reuse.argsFor('android', 'emulator-5554')).toEqual(PINNED)
     // The test app goes first: it targets the driver app.
     expect(device.uninstall.mock.calls).toEqual([
       ['emulator-5554', 'dev.mobile.maestro.test'],
@@ -60,23 +60,17 @@ describe('Maestro driver reuse (R62)', () => {
     expect(device.packages.size).toBe(0)
     device.maestroInstalls()
     reuse.recordInvocation('android', 'emulator-5554')
-    expect(await reuse.argsFor('android', 'emulator-5554')).toEqual([
-      '--no-reinstall-driver',
-    ])
+    expect(await reuse.argsFor('android', 'emulator-5554')).toEqual(PINNED)
     expect(device.uninstall).toHaveBeenCalledTimes(2)
     // Another device has its own first flow.
-    expect(await reuse.argsFor('android', 'emulator-5556')).toEqual([
-      '--no-reinstall-driver',
-    ])
+    expect(await reuse.argsFor('android', 'emulator-5556')).toEqual(PINNED)
     expect(device.uninstall).toHaveBeenCalledTimes(4)
   })
 
   it('R62-02 starts fresh on a device that has no driver yet', async () => {
     const device = fakeDevice()
     const reuse = createMaestroDriverReuse(device)
-    expect(await reuse.argsFor('android', 'emulator-5554')).toEqual([
-      '--no-reinstall-driver',
-    ])
+    expect(await reuse.argsFor('android', 'emulator-5554')).toEqual(PINNED)
   })
 
   it('R62-03 leaves iOS on Maestro defaults', async () => {
@@ -104,9 +98,7 @@ describe('Maestro driver reuse (R62)', () => {
         `instrumentation ${MAESTRO_DRIVER_INSTRUMENTATION} is not registered`
     )
     device.uninstall.mockClear()
-    expect(await reuse.argsFor('android', 'emulator-5554')).toEqual([
-      '--no-reinstall-driver',
-    ])
+    expect(await reuse.argsFor('android', 'emulator-5554')).toEqual(PINNED)
     expect(device.uninstall).toHaveBeenCalledTimes(2)
     expect(device.packages.size).toBe(0)
   })
@@ -133,6 +125,29 @@ describe('Maestro driver reuse (R62)', () => {
     await expect(reuse.argsFor('android', 'emulator-5554')).rejects.toThrow(
       'Maestro driver not ready on emulator-5554: adb could not list the driver (device offline)'
     )
+  })
+
+  it('6.7b-R18-15 settles the device before every Android flow and names a settle failure', async () => {
+    const device = fakeDevice()
+    const settle = vi.fn((serial: string) => {
+      void serial
+      return Promise.resolve()
+    })
+    const reuse = createMaestroDriverReuse({ ...device, settle })
+    await reuse.argsFor('android', 'emulator-5554')
+    device.maestroInstalls()
+    reuse.recordInvocation('android', 'emulator-5554')
+    await reuse.argsFor('android', 'emulator-5554')
+    expect(settle.mock.calls).toEqual([['emulator-5554'], ['emulator-5554']])
+
+    settle.mockImplementation(() =>
+      Promise.reject(new Error('device port 17001 on emulator-5554 is still in use'))
+    )
+    await expect(reuse.argsFor('android', 'emulator-5554')).rejects.toThrow(
+      'Maestro driver not ready on emulator-5554: device port 17001 on emulator-5554 is still in use'
+    )
+    expect(await reuse.argsFor('ios', 'booted')).toEqual([])
+    expect(settle).toHaveBeenCalledTimes(3)
   })
 
   it('R62-07 reads only exact package and instrumentation lines', () => {
@@ -232,7 +247,8 @@ describe('Maestro driver lifecycle on the parallel shard path (R68)', () => {
         'emulator-5556',
         'emulator-5556',
       ])
-      expect(args.slice(4, 6)).toEqual(['test', '--no-reinstall-driver'])
+      // Several devices: one fixed host port cannot serve them all, so Maestro picks.
+      expect(args.slice(4, 7)).toEqual(['test', '--no-reinstall-driver', '--shard-split'])
       for (const device of DEVICES) fleet.maestroInstallsOn(device)
       return Promise.resolve()
     })
@@ -250,9 +266,7 @@ describe('Maestro driver lifecycle on the parallel shard path (R68)', () => {
     // The user-scoped pass on device zero checks the driver and reuses it.
     fleet.uninstall.mockClear()
     fleet.inspect.mockClear()
-    expect(await reuse.argsFor('android', 'emulator-5554')).toEqual([
-      '--no-reinstall-driver',
-    ])
+    expect(await reuse.argsFor('android', 'emulator-5554')).toEqual(PINNED)
     expect(fleet.uninstall).not.toHaveBeenCalled()
     expect(fleet.inspect).toHaveBeenCalledWith('emulator-5554')
   })
@@ -302,9 +316,7 @@ describe('Maestro driver lifecycle on the parallel shard path (R68)', () => {
     })
     expect(outcome).toEqual({ exitError: failure })
     fleet.uninstall.mockClear()
-    expect(await reuse.argsFor('android', 'emulator-5556')).toEqual([
-      '--no-reinstall-driver',
-    ])
+    expect(await reuse.argsFor('android', 'emulator-5556')).toEqual(PINNED)
     expect(fleet.uninstall).not.toHaveBeenCalled()
   })
 

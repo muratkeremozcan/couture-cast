@@ -17,8 +17,13 @@ export declare function createMaestroDriverReuse(options: {
     device: string
   ) => Promise<{ packagesOutput: string; instrumentationOutput: string }>
   uninstall: (device: string, packageName: string) => Promise<unknown>
+  settle?: (device: string) => Promise<void>
 }): {
-  argsFor(platform: 'android' | 'ios', device: string): Promise<string[]>
+  argsFor(
+    platform: 'android' | 'ios',
+    device: string,
+    options?: { fixedPort?: boolean }
+  ): Promise<string[]>
   recordInvocation(platform: 'android' | 'ios', device: string): void
 }
 
