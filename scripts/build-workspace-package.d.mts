@@ -14,6 +14,11 @@ export declare function acquireBuildLock(options: {
   waitMs: number
   staleMs: number
   onCompromised: (error: Error) => void
-}): Promise<() => Promise<void>>
+}): Promise<{ release: () => Promise<void>; settle: () => boolean }>
 
 export declare function removeAbandonedStaging(packageDir: string, keep?: string): void
+
+export declare function runBuild(options?: {
+  argv?: string[]
+  afterStep?: (done: number, total: number) => void
+}): Promise<void>

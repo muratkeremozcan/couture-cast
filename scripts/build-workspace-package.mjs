@@ -33,9 +33,10 @@
  * ms it counts as abandoned and `proper-lockfile` takes it over. Liveness never
  * depends on a pid, so a reused pid, another host or a container cannot keep a
  * dead build's lock alive, and a live build compiling longer than `stale` keeps
- * its lock because it keeps refreshing it. This script adds no ownership state
- * of its own and never removes lock state itself. (The pid lock of earlier
- * versions was a plain file named `.dist-build.lock`; it is ignored.)
+ * its lock because it keeps refreshing it. This script keeps no ownership
+ * record of its own (it only reads the mtimes `proper-lockfile` stamps) and
+ * never removes lock state itself. (The pid lock of earlier versions was a
+ * plain file named `.dist-build.lock`; it is ignored.)
  *
  * The compile runs as an async child and publication yields between steps, so
  * the refresh timer keeps running throughout. Before each publication step the
@@ -44,8 +45,17 @@
  * takeover that happened while this process was not running. A lock lost
  * before publication starts discards that compile and builds again (at most
  * three times, then the build fails naming why). A lock lost during publication
- * stops it at once and the build exits non-zero, naming how far it got; the
- * build that took the lock over publishes its own complete build.
+ * stops it at once and the build exits non-zero, naming how far it got.
+ * After the last step (R28) the build releases the lock only if the lock still
+ * carries the mtime of its own last heartbeat; another mtime means another
+ * build took the lock over during a stall, so this build leaves that lock alone
+ * and exits non-zero ("lease lost after publish").
+ *
+ * Story 6.7b R26: every package built with this script declares
+ * `proper-lockfile` as a devDependency of its own, so any install that includes
+ * the package installs the lock with it. A Vercel project whose root directory
+ * is one app (`npm ci` there installs that workspace's tree, without the
+ * repository root's own dependencies) gets it through the packages it uses.
  *
  * Usage, from the package directory:
  *   node ../../scripts/build-workspace-package.mjs [--tsc <command...>]
@@ -75,18 +85,47 @@ const MAX_DISPLACEMENTS = 3
  * build holds it. Throws, naming the lock, when it is still held after that.
  * `onCompromised` runs if this build loses the lock later.
  *
+ * The returned `settle` (R28) tells whether the lock directory still carries
+ * the mtime of this build's own last heartbeat. `proper-lockfile` keeps that
+ * value to itself, so this reads it off the `utimes` calls `proper-lockfile`
+ * makes on the lock (its first stamp and every refresh), changing none of them.
+ * When `settle` finds another build's mtime, `release` and the exit cleanup of
+ * `proper-lockfile` leave the directory alone: it is the other build's lock.
+ *
  * @param {{
  *   packageDir: string,
  *   waitMs: number,
  *   staleMs: number,
  *   onCompromised: (error: Error) => void,
  * }} options
- * @returns {Promise<() => Promise<void>>} releases the lock
+ * @returns {Promise<{ release: () => Promise<void>, settle: () => boolean }>}
  */
 export async function acquireBuildLock({ packageDir, waitMs, staleMs, onCompromised }) {
   const lockPath = path.join(packageDir, LOCK)
+  /** @type {number | undefined} the mtime of this build's last heartbeat */
+  let lastBeat
+  let lost = false
+  const observedFs = Object.assign(Object.create(fs), {
+    utimes: (target, atime, mtime, callback) =>
+      fs.utimes(target, atime, mtime, (error) => {
+        if (!error && path.resolve(String(target)) === path.resolve(lockPath)) {
+          // What the disk now holds, at whatever precision it keeps mtimes.
+          try {
+            lastBeat = fs.statSync(lockPath).mtime.getTime()
+          } catch {
+            lastBeat = undefined
+          }
+        }
+        callback(error)
+      }),
+    // Once `settle` has seen another build's mtime, the directory is theirs.
+    rmdir: (target, callback) => (lost ? callback(null) : fs.rmdir(target, callback)),
+    rmdirSync: (target) => (lost ? undefined : fs.rmdirSync(target)),
+  })
+  let release
   try {
-    return await lock(packageDir, {
+    release = await lock(packageDir, {
+      fs: observedFs,
       lockfilePath: lockPath,
       realpath: false,
       stale: staleMs,
@@ -106,6 +145,19 @@ export async function acquireBuildLock({ packageDir, waitMs, staleMs, onCompromi
         `build that keeps it alive (its heartbeat is under ${staleMs} ms old); ` +
         'wait for that build or stop it'
     )
+  }
+  return {
+    release,
+    settle: () => {
+      let current
+      try {
+        current = fs.statSync(lockPath).mtime.getTime()
+      } catch {
+        current = undefined
+      }
+      lost = lastBeat === undefined || current !== lastBeat
+      return !lost
+    },
   }
 }
 
@@ -308,19 +360,6 @@ class LeaseLost extends Error {
 }
 
 /**
- * Test hook: `BUILD_WORKSPACE_PACKAGE_TEST_PUBLISH_PAUSE_MS=13000` blocks this
- * process for that long after the first publication step, the way a stalled
- * disk or a suspended process would (R25). Unset, it does nothing.
- *
- * @param {number} done
- */
-const testPauseAfterStep = (done) => {
-  const pauseMs = Number(process.env.BUILD_WORKSPACE_PACKAGE_TEST_PUBLISH_PAUSE_MS || 0)
-  if (done === 1 && pauseMs > 0)
-    Atomics.wait(new Int32Array(new SharedArrayBuffer(4)), 0, 0, pauseMs)
-}
-
-/**
  * @param {string} command
  * @param {string[]} args
  * @returns {Promise<number>} the exit code, 1 for a signal or a spawn error
@@ -341,12 +380,24 @@ const fail = (message) => {
   process.exitCode = 1
 }
 
-const main = async () => {
-  const tscIndex = process.argv.indexOf('--tsc')
+/**
+ * The whole build, as the CLI runs it. `afterStep` runs after each publication
+ * step; tests use it to stall a build at a chosen step.
+ *
+ * @param {{
+ *   argv?: string[],
+ *   afterStep?: (done: number, total: number) => void,
+ * }} [options]
+ */
+export const runBuild = async ({
+  argv = process.argv,
+  afterStep = () => undefined,
+} = {}) => {
+  const tscIndex = argv.indexOf('--tsc')
   const tsc =
     tscIndex === -1
       ? ['npm', 'exec', '--yes', '--package=typescript@5.9.3', '--', 'tsc']
-      : process.argv.slice(tscIndex + 1)
+      : argv.slice(tscIndex + 1)
   const waitMs = Number(
     process.env.BUILD_WORKSPACE_PACKAGE_LOCK_WAIT_MS || DEFAULT_LOCK_WAIT_MS
   )
@@ -356,7 +407,7 @@ const main = async () => {
   const [command, ...args] = tsc
   for (let displaced = 0; ; displaced += 1) {
     // eslint-disable-next-line no-await-in-loop -- one attempt at a time
-    const outcome = await buildOnce({ command, args, waitMs, staleMs })
+    const outcome = await buildOnce({ command, args, waitMs, staleMs, afterStep })
     if (outcome.kind === 'done') return
     if (displaced + 1 >= MAX_DISPLACEMENTS) {
       fail(
@@ -378,16 +429,22 @@ const main = async () => {
  * `displaced`, with nothing published, so the caller builds again. A lock lost
  * during publication stops it and fails the build, naming how far it got.
  *
- * @param {{ command: string, args: string[], waitMs: number, staleMs: number }} options
+ * @param {{
+ *   command: string,
+ *   args: string[],
+ *   waitMs: number,
+ *   staleMs: number,
+ *   afterStep: (done: number, total: number) => void,
+ * }} options
  * @returns {Promise<{ kind: 'done' } | { kind: 'displaced', reason: string }>}
  */
-async function buildOnce({ command, args, waitMs, staleMs }) {
+async function buildOnce({ command, args, waitMs, staleMs, afterStep }) {
   const refreshMs = Math.floor(staleMs / 2)
   /** @type {Error | undefined} */
   let compromised
-  let release
+  let held
   try {
-    release = await acquireBuildLock({
+    held = await acquireBuildLock({
       packageDir: '.',
       waitMs,
       staleMs,
@@ -433,18 +490,15 @@ async function buildOnce({ command, args, waitMs, staleMs }) {
     try {
       await replaceDistFromStaging(staging, DIST, {
         beforeStep,
-        afterStep: (done) => {
-          testPauseAfterStep(done)
-        },
+        afterStep,
       })
     } catch (error) {
       if (error instanceof LeaseLost && error.published === 0)
         return { kind: 'displaced', reason: error.message }
       if (error instanceof LeaseLost) {
         fail(
-          `The build lost its lock during publication after ${error.published} of ` +
-            `${error.total} steps (${error.message}); it stopped publishing, and the ` +
-            'build that took the lock over publishes its own complete build'
+          `The build lost its lock during publication (${error.message}), so it ` +
+            `stopped after ${error.published} of ${error.total} steps`
         )
         return { kind: 'done' }
       }
@@ -453,10 +507,20 @@ async function buildOnce({ command, args, waitMs, staleMs }) {
     return { kind: 'done' }
   } finally {
     fs.rmSync(staging, { recursive: true, force: true })
-    try {
-      await release()
-    } catch {
-      // Compromised locks are already released by proper-lockfile.
+    // Terminal settlement (R28): release only a lock that still carries this
+    // build's last heartbeat. Another mtime means another build took the lock
+    // over during a stall after the last check; releasing would remove its lock.
+    if (!compromised && !held.settle()) {
+      fail(
+        `The build lock ${path.resolve(LOCK)} was taken over after this build's last ` +
+          'check (lease lost after publish); it is left to the build that holds it now'
+      )
+    } else {
+      try {
+        await held.release()
+      } catch {
+        // Compromised locks are already released by proper-lockfile.
+      }
     }
   }
 }
@@ -465,4 +529,4 @@ if (
   process.argv[1] &&
   import.meta.url === pathToFileURL(path.resolve(process.argv[1])).href
 )
-  await main()
+  await runBuild()

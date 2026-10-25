@@ -12,6 +12,10 @@ import { lock } from 'proper-lockfile'
 import { replaceDistFromStaging } from '../../../scripts/build-workspace-package.mjs'
 
 const SCRIPT = path.resolve('scripts/build-workspace-package.mjs')
+/** The same build with a stall after one publication step, for the R25/R28 cases. */
+const PAUSED = path.resolve(
+  'playwright/support/helpers/build-workspace-package-paused.mjs'
+)
 
 /**
  * A stand-in for `tsc -p tsconfig.build.json --outDir <dir>`: while it "compiles"
@@ -112,6 +116,11 @@ const startedAt = Date.now()
 // Each compile's interval, so a test can tell whether two of them overlapped.
 process.on('exit', () => fs.appendFileSync('compiles.log', startedAt + ' ' + Date.now() + '\\n'))
 if (mode === 'empty') process.exit(0)
+if (mode === 'single') {
+  pause()
+  fs.writeFileSync(path.join(outDir, 'only.js'), 'build output single')
+  process.exit(0)
+}
 fs.mkdirSync(path.join(outDir, 'nested'), { recursive: true })
 for (let i = 0; i < 6; i++) {
   pause()
@@ -152,11 +161,11 @@ function slowPackage(parent: string, name: string) {
   return root
 }
 
-const buildAsync = (root: string, env: NodeJS.ProcessEnv = {}) =>
+const buildAsync = (root: string, env: NodeJS.ProcessEnv = {}, script = SCRIPT) =>
   new Promise<{ code: number | null; output: string }>((resolve) => {
     const child = spawn(
       process.execPath,
-      [SCRIPT, '--tsc', process.execPath, 'slow-tsc.cjs'],
+      [script, '--tsc', process.execPath, 'slow-tsc.cjs'],
       {
         cwd: root,
         env: { ...process.env, ...env },
@@ -659,10 +668,11 @@ describe('lock lost during publication (R25)', () => {
       const root = slowPackage(directory, 'package')
       // astra r9's case, scaled: the publisher blocks for 3.5 s after its first
       // publication step against a 2 s stale window.
-      const publisher = buildAsync(root, {
-        ...STALE,
-        BUILD_WORKSPACE_PACKAGE_TEST_PUBLISH_PAUSE_MS: '3500',
-      })
+      const publisher = buildAsync(
+        root,
+        { ...STALE, PAUSE_AFTER_STEP: 'first', PAUSE_MS: '3500' },
+        PAUSED
+      )
       const published = () =>
         Object.values(tree(path.join(root, 'dist'))).filter((content) =>
           content.startsWith('build output')
@@ -681,12 +691,96 @@ describe('lock lost during publication (R25)', () => {
       expect(failed.code, failed.output).toBe(2)
       expect(stalled.code, stalled.output).toBe(1)
       expect(stalled.output).toMatch(
-        /The build lost its lock during publication after 1 of \d+ steps .*it stopped publishing/
+        /The build lost its lock during publication \(.*\), so it stopped after 1 of \d+ steps$/m
       )
       // It stopped where the check caught the loss: one file published, nothing
       // after it, no old file removed.
       expect(published()).toBe(1)
       expect(fs.existsSync(path.join(root, 'dist', 'old', 'removed.js'))).toBe(true)
+    }
+  )
+
+  it(
+    '6.7b-R28-01 a publisher stalled after its last step keeps its hands off the successor lock, and a third build waits for that successor',
+    { timeout: 40_000 },
+    async () => {
+      directory = fs.mkdtempSync(path.join(os.tmpdir(), 'r28-final-step-'))
+      const single = slowPackage(directory, 'single')
+      expect((await buildAsync(single)).code).toBe(0)
+      const expected = tree(path.join(single, 'dist'))
+
+      const root = slowPackage(directory, 'package')
+      // astra r10's case, scaled: A stalls 3.5 s after its final publication step
+      // (the old file's removal) against a 2 s stale window.
+      const a = buildAsync(
+        root,
+        { ...STALE, PAUSE_AFTER_STEP: 'last', PAUSE_MS: '3500' },
+        PAUSED
+      )
+      const removed = path.join(root, 'dist', 'old', 'removed.js')
+      for (let tries = 0; fs.existsSync(removed); tries += 1) {
+        if (tries > 300) throw new Error('A never reached its last step')
+        await wait(20)
+      }
+      const waiting = {
+        ...STALE,
+        SLOW_TSC_PAUSE_MS: '400',
+        BUILD_WORKSPACE_PACKAGE_LOCK_WAIT_MS: '30000',
+      }
+      // B takes A's expired lease and compiles for about 2.4 s; C arrives while B holds it.
+      const b = buildAsync(root, waiting)
+      await wait(2_500)
+      const c = buildAsync(root, waiting)
+      const [stalled, successor, third] = await Promise.all([a, b, c])
+      expect(stalled.code, stalled.output).toBe(1)
+      expect(stalled.output).toContain('lease lost after publish')
+      expect(successor, successor.output).toMatchObject({ code: 0 })
+      expect(third, third.output).toMatchObject({ code: 0 })
+      // A, B and C compiled one after another: A left B's lock in place, so C
+      // waited for B.
+      const ran = compiles(root)
+      expect(ran).toHaveLength(3)
+      expectSerialized(ran)
+      expect(tree(path.join(root, 'dist'))).toEqual(expected)
+      expect(leftovers(root)).toEqual([])
+    }
+  )
+
+  it(
+    '6.7b-R28-02 a one-step build stalled after its only step leaves the successor lock alone',
+    { timeout: 40_000 },
+    async () => {
+      directory = fs.mkdtempSync(path.join(os.tmpdir(), 'r28-one-step-'))
+      const root = slowPackage(directory, 'package')
+      fs.rmSync(path.join(root, 'dist'), { recursive: true, force: true })
+      fs.mkdirSync(path.join(root, 'dist'))
+      const a = buildAsync(
+        root,
+        { ...STALE, SLOW_TSC_MODE: 'single', PAUSE_AFTER_STEP: 'last', PAUSE_MS: '3500' },
+        PAUSED
+      )
+      const only = path.join(root, 'dist', 'only.js')
+      for (let tries = 0; !fs.existsSync(only); tries += 1) {
+        if (tries > 300) throw new Error('A never published its only step')
+        await wait(20)
+      }
+      // B takes the expired lease and compiles for 3.6 s.
+      const b = buildAsync(root, {
+        ...STALE,
+        SLOW_TSC_PAUSE_MS: '600',
+        BUILD_WORKSPACE_PACKAGE_LOCK_WAIT_MS: '30000',
+      })
+      const stalled = await a
+      expect(stalled.code, stalled.output).toBe(1)
+      expect(stalled.output).toContain('lease lost after publish')
+      // A exited and B's lock is still there while B compiles.
+      expect(fs.existsSync(path.join(root, '.dist-build-lock'))).toBe(true)
+      const successor = await b
+      expect(successor, successor.output).toMatchObject({ code: 0 })
+      const ran = compiles(root)
+      expect(ran).toHaveLength(2)
+      expectSerialized(ran)
+      expect(leftovers(root)).toEqual([])
     }
   )
 })
