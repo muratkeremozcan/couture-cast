@@ -866,14 +866,14 @@ export default function TabOneScreen() {
             <OutfitRecommendationCard
               outfit={activeOutfit}
               onExport={(recommendationId, opener) => {
-                if (Platform.OS === 'android') {
+                if (
                   openAndroidShareCard(
                     { kind: 'outfit', recommendationId },
                     'outfit',
                     opener
                   )
+                )
                   return
-                }
                 shareCardInvoker.current = {
                   node: opener,
                   member: mobileApplicationUserId(),

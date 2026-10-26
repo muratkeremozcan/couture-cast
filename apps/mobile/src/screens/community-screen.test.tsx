@@ -3,6 +3,9 @@ import { CommunitySyncState } from '@couture/api-client'
 import type * as ReactNativeModule from 'react-native'
 import type * as EdgeToEdgeTestUtils from '../test-utils/edge-to-edge-modal'
 // Keep mock registration in the test entrypoint so it precedes every case import.
+vi.mock('@/src/lib/use-share-card-status-bar', () => ({
+  useShareCardStatusBar: () => true,
+}))
 vi.mock('expo-haptics', () => ({ selectionAsync: vi.fn().mockResolvedValue(undefined) }))
 // Passthrough spies keep community requests on the real HTTP boundary.
 vi.mock('@/src/lib/community', { spy: true })

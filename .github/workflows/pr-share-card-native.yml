@@ -23,7 +23,7 @@ jobs:
             platform: android
             api: 36
             target: google_apis_playstore
-          - os: macos-15
+          - os: macos-15-intel
             platform: ios
             api: 0
     runs-on: ${{ matrix.os }}
@@ -36,6 +36,12 @@ jobs:
       - uses: ./.github/actions/reserve-supabase-ports
         if: runner.os == 'Linux'
       - uses: ./.github/actions/install
+      - name: Provision pinned share-card browser dependencies
+        if: matrix.platform == 'android' && matrix.api == 36
+        timeout-minutes: 12
+        run: |
+          node --test scripts/ci/share-card-browser-deps.test.mjs
+          node scripts/ci/share-card-browser-deps.mjs
       - uses: actions/setup-java@v4
         with:
           distribution: temurin
@@ -47,8 +53,9 @@ jobs:
       - name: Start owned Docker VM for local Auth on macOS
         if: runner.os == 'macOS'
         run: |
-          brew install colima docker qemu xcodegen lima-additional-guestagents coreutils
-          colima start --vm-type=qemu --arch=aarch64 --cpu-type=max --cpu=2 --memory=3 --disk=40
+          bash scripts/ci/share-card-ios-host.sh
+      - name: Verify startup deadline controls
+        run: node --test scripts/ci/supabase-start-deadline.test.mjs scripts/ci/share-card-ios-host.test.mjs
       - uses: ./.github/actions/start-local-supabase
       - name: Prepare isolated UUID runtime and built renderer
         run: |
@@ -63,11 +70,10 @@ jobs:
           node scripts/maestro-install.mjs
       - name: Verify localized native accessibility announcements and focus bridge
         run: |
-          npx playwright install --with-deps chromium firefox webkit
           node scripts/e2e-share-card/bridge-a11y.mjs
           node --test apps/mobile/plugins/with-share-card-permissions.test.js apps/mobile/plugins/with-story68-release-network.test.js
-          node --test scripts/lib/story68-rapid-watermark.test.mjs scripts/lib/story68-rapid-watermark-control.test.mjs scripts/lib/story68-rapid-watermark-flow.test.mjs scripts/lib/story68-native-build-env.test.mjs scripts/lib/story68-fallback-post.test.mjs scripts/lib/story68-fallback-focus.test.mjs scripts/lib/story68-cold-font-scale.test.mjs scripts/lib/story68-release-live-font.test.mjs
-          node --test scripts/ci/share-card-native-failure.spec.mjs
+          node --test scripts/lib/story68-rapid-watermark.test.mjs scripts/lib/story68-rapid-watermark-control.test.mjs scripts/lib/story68-rapid-watermark-flow.test.mjs scripts/lib/story68-native-build-env.test.mjs scripts/lib/story68-fallback-post.test.mjs scripts/lib/story68-fallback-focus.test.mjs scripts/lib/story68-cold-font-scale.test.mjs scripts/lib/story68-release-live-font.test.mjs scripts/lib/story68-ios-focus-observation.test.mjs scripts/lib/story68-browser-watermark.test.mjs
+          node --test scripts/ci/share-card-native-failure.spec.mjs scripts/ci/share-card-android.test.mjs scripts/lib/share-card-native-diagnostics.test.mjs
       - name: Verify native paragraph heading semantics
         if: runner.os == 'macOS'
         run: bash scripts/ci/share-card-header-semantics.sh
@@ -100,6 +106,8 @@ jobs:
       - name: Android real original and API32 denied/permanent permission proof
         if: matrix.platform == 'android'
         uses: reactivecircus/android-emulator-runner@v2
+        env:
+          CC68_ANDROID_API: ${{ matrix.api }}
         with:
           api-level: ${{ matrix.api }}
           avd-name: cc68-api${{ matrix.api }}
@@ -128,6 +136,10 @@ jobs:
           node scripts/run-story68-native.mjs expo-go-proof --platform ios --device "$device"
       - name: Select and scan closed evidence
         if: always()
+        env:
+          CC68_CI_PLATFORM: ${{ matrix.platform }}
+          CC68_CI_API: ${{ matrix.api }}
+          CC68_CI_JOB_STATUS: ${{ job.status }}
         run: node scripts/e2e-share-card/public-evidence.mjs
       - name: Collect original PNG proof
         if: always()

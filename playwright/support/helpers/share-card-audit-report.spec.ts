@@ -103,3 +103,9 @@ it('requires current-owned Saving, reopened Finishing, watermark recovery and ex
     expect(report(nodes, incomplete).passed).toBe(false)
   }
 })
+
+it('describes actual posted UIKit targets and header traits with the approved simulator limitation', () => {
+  expect(report().focusEvidence).toBe(
+    'posted UIKit layoutChanged requests, attached targets, actual header traits and AX traversal; approved simulator substitute; physical VoiceOver cursor unavailable'
+  )
+})

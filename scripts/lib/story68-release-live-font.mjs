@@ -139,6 +139,27 @@ function expectedState(config) {
     fail('release_font_catalog_required')
   return { title: values[0], label: [...values.slice(1), 'CoutureCast'].join('. ') }
 }
+// Read the configuration held by the actual foreground Activity in its process.
+// ActivityManager's global/requested config can precede client delivery.
+function appliedActivity(dump) {
+  const blocks = dump.split(/(?=^\s*ACTIVITY )/m)
+  const owned = blocks.filter((block) =>
+    /^\s*ACTIVITY com\.couturecast\.story68\/(?:\.MainActivity|com\.couturecast\.story68\.MainActivity)\s/m.test(
+      block
+    )
+  )
+  if (owned.length !== 1) return null
+  const block = owned[0]
+  const identity = /^\s*ACTIVITY \S+ (\S+) pid=(\d+)/m.exec(block)
+  if (
+    !identity ||
+    !/^\s*mResumed=true mStopped=false mFinished=false\s*$/m.test(block) ||
+    !/^\s*mChangingConfigurations=false\s*$/m.test(block)
+  )
+    return null
+  const config = /^\s*mCurrentConfig=(\{1\.5\s[^\n]+)$/m.exec(block)?.[1]
+  return config ? `${identity[1]}:${identity[2]}:${config}` : null
+}
 async function restoredState(
   io,
   expected,
@@ -147,21 +168,49 @@ async function restoredState(
   pause = (ms) => new Promise((resolve) => setTimeout(resolve, ms))
 ) {
   const deadline = now() + timeoutMs
-  let lastFailure = new Error('release_production_preview_required')
+  const stableWindowMs = 1000
+  let stableSince
+  let stableActivity
+  let lastFailure = new Error('release_applied_font_configuration_required')
   do {
-    const tree = await io.hierarchy(Math.max(1, deadline - now()), 'after')
-    await io.recordTree('after', tree)
-    if (!noErrorSurface(tree)) fail('release_error_surface')
+    const remaining = () => Math.max(1, deadline - now())
+    const activity = appliedActivity(
+      await io.shell(['dumpsys', 'activity', 'top', '-a'], remaining())
+    )
     if (now() > deadline) fail('release_restore_deadline')
-    try {
-      return {
-        ...releaseState(tree, expected),
-        ...assertReleaseTextPreserved(before, tree),
+    if (activity) {
+      const tree = await io.hierarchy(remaining(), 'after')
+      await io.recordTree('after', tree)
+      if (!noErrorSurface(tree)) fail('release_error_surface')
+      const current = appliedActivity(
+        await io.shell(['dumpsys', 'activity', 'top', '-a'], remaining())
+      )
+      if (now() > deadline) fail('release_restore_deadline')
+      try {
+        if (activity !== current) fail('release_applied_font_configuration_required')
+        const state = {
+          ...releaseState(tree, expected),
+          ...assertReleaseTextPreserved(before, tree),
+        }
+        lastFailure = new Error('release_stable_state_required')
+        if (stableActivity !== activity) {
+          stableActivity = activity
+          stableSince = now()
+        } else if (now() - stableSince >= stableWindowMs) return state
+      } catch (error) {
+        lastFailure = error
+        stableSince = undefined
+        stableActivity = undefined
       }
-    } catch (error) {
-      lastFailure = error
+    } else {
+      lastFailure = new Error('release_applied_font_configuration_required')
+      stableSince = undefined
+      stableActivity = undefined
     }
-    if (now() < deadline) await pause(Math.min(100, deadline - now()))
+    if (now() < deadline)
+      await pause(
+        Math.min(stableSince === undefined ? 100 : stableWindowMs, deadline - now())
+      )
   } while (now() < deadline)
   throw lastFailure
 }

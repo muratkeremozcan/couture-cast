@@ -21,12 +21,15 @@ final class ShareCardFallbackUITests: XCTestCase {
     XCTAssertEqual(cancel.label, fixture["cancel"]!)
     for _ in 0..<8 where !cancel.isHittable { app.swipeUp() }
     XCTAssertTrue(cancel.isHittable)
+    let focusSequence = try readShareCardFocusObservation(self).sequence
     cancel.tap()
     let dismissed = XCTNSPredicateExpectation(predicate: NSPredicate(format: "exists == false"), object: element("share-card-title"))
     XCTAssertEqual(XCTWaiter.wait(for: [dismissed], timeout: 20), .completed)
     XCTAssertFalse(element("community-share-card-open-\(post)").exists)
     XCTAssertFalse(element("community-card-author-\(post)").exists)
     let header = try existingShareCardHeader(in: app, expected: fixture["community"]!)
+    try assertPostedShareCardFocus(self, after: focusSequence, label: fixture["community"]!, identifier: nil, header: true)
+    try assertNativeShareCardHeader(self, label: fixture["community"]!)
     XCTAssertTrue(header.isHittable)
     XCTAssertEqual(header.label, fixture["community"]!)
     XCTAssertFalse(app.staticTexts.matching(NSPredicate(format: "label == %@", fixture["removedHeading"]!)).firstMatch.exists)

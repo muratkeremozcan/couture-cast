@@ -37,3 +37,35 @@ print("PASS lower tab label remains outside navigation heading selection")
   print("FAIL unexpected error: \(error)")
   exit(1)
 }
+
+let request = ShareCardFocusObservation(session: "session", sequence: 2, identifier: "heading", label: "Home", attached: true, header: true, posted: true)
+try requirePostedShareCardFocus(request, after: 1, label: "Home", identifier: "heading", header: true)
+for mutant in [
+  ShareCardFocusObservation(session: "session", sequence: 1, identifier: "heading", label: "Home", attached: true, header: true, posted: true),
+  ShareCardFocusObservation(session: "session", sequence: 2, identifier: "heading", label: "Home", attached: true, header: false, posted: true),
+  ShareCardFocusObservation(session: "session", sequence: 2, identifier: "heading", label: "Home", attached: true, header: true, posted: false),
+  ShareCardFocusObservation(session: "session", sequence: 2, identifier: "heading", label: "Home", attached: false, header: true, posted: true)
+] {
+  do {
+    try requirePostedShareCardFocus(mutant, after: 1, label: "Home", identifier: "heading", header: true)
+    print("FAIL accepts removed request, header role, notification or attachment")
+    exit(1)
+  } catch { print("PASS rejects native focus/trait mutant") }
+}
+var headers = request
+headers.headings = ["Home"]
+try requireNativeShareCardHeader(headers, label: "Home")
+for labels in [[], ["Community"], ["Home", "Home"]] {
+  headers.headings = labels
+  do {
+    try requireNativeShareCardHeader(headers, label: "Home")
+    print("FAIL accepts missing or duplicated actual UIKit header trait")
+    exit(1)
+  } catch { print("PASS rejects native header-trait removal/duplication") }
+}
+try requireNoNewShareCardFocus(request, after: 2)
+do {
+  try requireNoNewShareCardFocus(request, after: 1)
+  print("FAIL current-owned Saving accepts a new focus jump")
+  exit(1)
+} catch { print("PASS current-owned Saving rejects a new focus request") }

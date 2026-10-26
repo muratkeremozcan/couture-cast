@@ -72,3 +72,32 @@ test('Supabase startup fails closed before npx when no deadline tool exists', as
   assert.match(result.stdout + result.stderr, /GNU timeout or gtimeout/)
   await assert.rejects(readFile(capture), { code: 'ENOENT' })
 })
+
+test('mandatory native CI executes startup deadline controls before starting Supabase', async () => {
+  const { parse } = await import('yaml')
+  const workflow = parse(
+    await readFile(path.join(root, '.github/workflows/pr-share-card-native.yml'), 'utf8')
+  )
+  const jobs = Object.values(workflow.jobs).filter((job) =>
+    job.steps?.some((step) => step.uses === './.github/actions/start-local-supabase')
+  )
+  assert.ok(jobs.length)
+  for (const job of jobs) {
+    const startup = job.steps.findIndex(
+      (step) => step.uses === './.github/actions/start-local-supabase'
+    )
+    const controls = job.steps.findIndex((step) =>
+      step.run?.split(/\r?\n/).some((line) => {
+        const args = line.trim().split(/\s+/)
+        return (
+          args[0] === 'node' &&
+          args[1] === '--test' &&
+          args.includes('scripts/ci/supabase-start-deadline.test.mjs')
+        )
+      })
+    )
+    assert.ok(controls >= 0 && controls < startup)
+    assert.equal(job.steps[controls].if, undefined)
+    assert.equal(job.steps[controls]['continue-on-error'], undefined)
+  }
+})

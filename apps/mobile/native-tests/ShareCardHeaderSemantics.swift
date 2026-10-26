@@ -44,3 +44,40 @@ func selectShareCardHeader(
   }) else { throw ShareCardHeaderSelectionError.malformedParagraphContainer }
   return leaf
 }
+
+/// Actual attached UIKit target of a posted layoutChanged request. This record
+/// does not report the VoiceOver cursor on a simulator.
+struct ShareCardFocusObservation: Codable {
+  let session: String
+  let sequence: Int
+  let identifier: String
+  let label: String
+  let attached: Bool
+  let header: Bool
+  let posted: Bool
+  var headings: [String] = []
+}
+
+enum ShareCardFocusObservationError: Error { case missingPostedTargetOrHeaderTrait }
+func requirePostedShareCardFocus(
+  _ observation: ShareCardFocusObservation, after sequence: Int,
+  label: String, identifier: String?, header: Bool
+) throws {
+  guard !observation.session.isEmpty, observation.sequence > sequence,
+    observation.posted, observation.attached, observation.label == label,
+    identifier == nil || observation.identifier == identifier,
+    !header || observation.header
+  else { throw ShareCardFocusObservationError.missingPostedTargetOrHeaderTrait }
+}
+
+func requireNativeShareCardHeader(_ observation: ShareCardFocusObservation, label: String) throws {
+  guard observation.headings.filter({ $0 == label }).count == 1 else {
+    throw ShareCardFocusObservationError.missingPostedTargetOrHeaderTrait
+  }
+}
+
+func requireNoNewShareCardFocus(_ observation: ShareCardFocusObservation, after sequence: Int) throws {
+  guard observation.sequence == sequence else {
+    throw ShareCardFocusObservationError.missingPostedTargetOrHeaderTrait
+  }
+}

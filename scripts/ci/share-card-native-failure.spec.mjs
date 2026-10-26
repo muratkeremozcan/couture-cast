@@ -130,14 +130,55 @@ function evidenceFixture(t) {
   t.after(() => fs.rmSync(directory, { recursive: true, force: true }))
   const write = (name, value) =>
     fs.writeFileSync(path.join(directory, name), JSON.stringify(value))
-  const run = () =>
+  const run = (environment = {}) =>
     spawnSync(process.execPath, ['scripts/e2e-share-card/public-evidence.mjs'], {
       cwd: root,
-      env: { ...process.env, CC68_HARNESS_DIR: directory },
+      env: { ...process.env, CC68_HARNESS_DIR: directory, ...environment },
       encoding: 'utf8',
     })
   return { directory, write, run }
 }
+
+test('an early CI provisioning failure still produces a closed truthful artifact', (t) => {
+  const { directory, run } = evidenceFixture(t)
+  assert.equal(
+    run({
+      CC68_CI_PLATFORM: 'ios',
+      CC68_CI_API: '0',
+      CC68_CI_JOB_STATUS: 'failure',
+    }).status,
+    0
+  )
+  assert.deepEqual(
+    JSON.parse(
+      fs.readFileSync(path.join(directory, 'public-evidence/ci-job-status.json'))
+    ),
+    {
+      platform: 'ios',
+      api: 0,
+      jobStatus: 'failure',
+    }
+  )
+})
+
+test('early CI evidence rejects unreviewed fields before publishing any proof', (t) => {
+  const { directory, run } = evidenceFixture(t)
+  for (const patch of [
+    { CC68_CI_PLATFORM: personal },
+    { CC68_CI_API: '36' },
+    { CC68_CI_JOB_STATUS: personal },
+    { CC68_CI_JOB_STATUS: '' },
+  ]) {
+    const result = run({
+      CC68_CI_PLATFORM: 'ios',
+      CC68_CI_API: '0',
+      CC68_CI_JOB_STATUS: 'failure',
+      ...patch,
+    })
+    assert.notEqual(result.status, 0)
+    assert.deepEqual(fs.readdirSync(path.join(directory, 'public-evidence')), [])
+  }
+})
 
 const releaseFontProof = {
   platform: 'android',

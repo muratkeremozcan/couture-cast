@@ -11,8 +11,8 @@
 // EVERY LANGUAGE RUNS AGAINST EVERY SUBMISSION. `locale` arrives from the
 // client on the publish request, so treating it as a dictionary routing key would
 // make it a one-field opt-out. It scopes ordinary low/medium grammatical contexts;
-// every dictionary still runs, and reviewed high-term constructions depend only
-// on their exact occurrence grammar. It is also checked for a language this
+// every dictionary still runs. Reviewed high-term constructions require their
+// declared native language and exclude person-directed insult frames. It is also checked for a language this
 // screener holds no list for. A policy that set `allDictionariesAlwaysRun` to
 // false would be asking for exactly that bypass, so construction refuses it.
 //
@@ -277,7 +277,8 @@ const literalContextSchema = z.object({
 })
 
 // Coordinator-reviewed native-sense constructions. Each marks only its exact
-// target occurrence in raw contiguous words, independently of declared locale.
+// target occurrence in raw contiguous words. High-term rules also require the
+// reviewed declared language and reject the reviewed insult-frame grammar.
 const REVIEWED_OCCURRENCE_CONSTRUCTIONS = z
   .object({
     version: z.literal(1),
@@ -302,6 +303,14 @@ const REVIEWED_OCCURRENCE_CONSTRUCTIONS = z
               .min(1)
               .max(64),
             reason: z.string().min(20),
+            requiredDeclaredLanguages: z
+              .array(z.enum(SCREENING_LANGUAGES))
+              .min(1)
+              .optional(),
+            rejectedPrefixFrames: z
+              .array(z.string().regex(/^\p{Script=Latin}+(?: +\p{Script=Latin}+)*$/u))
+              .min(1)
+              .optional(),
             developmentEvidence: z
               .array(
                 z
@@ -320,6 +329,9 @@ const REVIEWED_OCCURRENCE_CONSTRUCTIONS = z
           .refine(
             (rule) =>
               rule.nativeLanguages.includes(rule.language) &&
+              (rule.requiredDeclaredLanguages ?? []).every((language) =>
+                rule.nativeLanguages.includes(language)
+              ) &&
               rule.target.toLowerCase() === rule.target &&
               rule.phrases.every(
                 (phrase) =>
@@ -609,8 +621,18 @@ function reviewedOccurrencePhrases(
     language: ScreeningLanguage
     occurrenceConstructions?: z.infer<typeof occurrenceConstructionSchema>[]
   }[]
-): { target: string; phrase: string }[] {
-  const phrases: { target: string; phrase: string }[] = []
+): {
+  target: string
+  phrase: string
+  requiredDeclaredLanguages?: readonly ScreeningLanguage[]
+  rejectedPrefixFrames?: readonly string[]
+}[] {
+  const phrases: {
+    target: string
+    phrase: string
+    requiredDeclaredLanguages?: readonly ScreeningLanguage[]
+    rejectedPrefixFrames?: readonly string[]
+  }[] = []
   const targets = new Set<string>()
   for (const list of lists) {
     for (const rule of list.occurrenceConstructions ?? []) {
@@ -626,7 +648,14 @@ function reviewedOccurrencePhrases(
       if (targets.has(rule.target))
         throw new CommunityTextScreenerConfigError('duplicate occurrence construction')
       targets.add(rule.target)
-      phrases.push(...rule.phrases.map((phrase) => ({ target: rule.target, phrase })))
+      phrases.push(
+        ...rule.phrases.map((phrase) => ({
+          target: rule.target,
+          phrase,
+          requiredDeclaredLanguages: reviewed.requiredDeclaredLanguages,
+          rejectedPrefixFrames: reviewed.rejectedPrefixFrames,
+        }))
+      )
     }
   }
   return phrases
@@ -998,6 +1027,8 @@ export class CommunityTextScreener {
     words: readonly string[]
     target: string
     pattern: RegExp
+    requiredDeclaredLanguages?: readonly ScreeningLanguage[]
+    rejectedPrefixFrames: readonly string[]
   }[]
   private readonly listVersions: Readonly<Record<string, string>>
   private readonly loadedLanguages: readonly ScreeningLanguage[]
@@ -1096,8 +1127,12 @@ export class CommunityTextScreener {
       }))
     )
     this.occurrenceConstructions = reviewedOccurrencePhrases(allowLists).map(
-      ({ target, phrase }) => ({
+      ({ target, phrase, requiredDeclaredLanguages, rejectedPrefixFrames }) => ({
         target,
+        requiredDeclaredLanguages,
+        rejectedPrefixFrames: (rejectedPrefixFrames ?? []).map((frame) =>
+          toLeetClassForm(toFoldedForm(toLiteralForm(frame))).replaceAll(' ', '')
+        ),
         words: phrase.split(' '),
         pattern: new RegExp(
           `(?<![\\p{L}\\p{N}])${phrase.replaceAll(' ', ' +')}(?![\\p{L}\\p{N}])`,
@@ -1202,7 +1237,7 @@ export class CommunityTextScreener {
       (token, index) => this.allowSingles.has(token) || (phraseAllowed[index] as boolean)
     )
     this.markLiteralContexts(literal, literalTokens, allowed, declaredLocale)
-    this.markOccurrenceConstructions(boundedRaw, literalTokens, allowed)
+    this.markOccurrenceConstructions(boundedRaw, literalTokens, allowed, declaredLocale)
 
     for (const outcome of this.collectMatches(
       literal,
@@ -1338,12 +1373,34 @@ export class CommunityTextScreener {
   private markOccurrenceConstructions(
     raw: string,
     tokens: readonly string[],
-    allowed: boolean[]
+    allowed: boolean[],
+    declaredLocale?: string | null
   ): void {
     const exact = raw.toLowerCase()
+    const language = this.resolveLanguage(declaredLocale)
     for (const construction of this.occurrenceConstructions) {
+      if (
+        construction.requiredDeclaredLanguages &&
+        (!language || !construction.requiredDeclaredLanguages.includes(language))
+      )
+        continue
       for (const match of exact.matchAll(construction.pattern)) {
-        const at = tokenize(toLiteralForm(exact.slice(0, match.index))).length
+        const prefix = exact.slice(0, match.index)
+        // Screening folds may only remove an exception here. The construction
+        // itself still requires exact raw spelling and ordinary spaces.
+        const prefixWords = tokenize(toLeetRunForm(toFoldedForm(toLiteralForm(prefix))))
+        let frame = ''
+        let rejected = false
+        for (const word of prefixWords.slice(-32).toReversed()) {
+          frame = collapseRepeats(word + frame)
+          if (construction.rejectedPrefixFrames.includes(frame)) {
+            rejected = true
+            break
+          }
+          if (frame.length > 32) break
+        }
+        if (rejected) continue
+        const at = tokenize(toLiteralForm(prefix)).length
         if (!construction.words.every((word, index) => tokens[at + index] === word))
           continue
         allowed[at + construction.words.indexOf(construction.target)] = true

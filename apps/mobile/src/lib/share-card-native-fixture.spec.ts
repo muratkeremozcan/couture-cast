@@ -4,6 +4,10 @@ import { decodeShareCardBase64 } from '@couture/api-client'
 import { sha256Hex } from './share-card-digest'
 import * as fallback from './share-card-save'
 import * as browserFixture from './share-card-native-fixture'
+const observe = vi.hoisted(() => vi.fn(() => Promise.resolve(true)))
+vi.mock('../../modules/accessibility-focus', () => ({
+  enableStory68FocusObservation: observe,
+}))
 const environment = vi.hoisted(() => ({
   app: 'com.couturecast.story68',
   enabled: true,
@@ -57,6 +61,20 @@ afterEach(() => {
   vi.unstubAllGlobals()
 })
 describe('isolated native fixtures and browser boundaries', () => {
+  it('enables read-only native observations only inside the owned Debug fixture and disarms on cleanup', () => {
+    observe.mockClear()
+    const stop = nativeFixture.startShareCardNativeFixture()
+    expect(observe).toHaveBeenCalledWith()
+    stop()
+    expect(observe).toHaveBeenLastCalledWith(false)
+    for (const gate of ['flag', 'release']) {
+      observe.mockClear()
+      environment.enabled = gate !== 'flag'
+      vi.stubGlobal('__DEV__', gate !== 'release')
+      nativeFixture.startShareCardNativeFixture()()
+      expect(observe).not.toHaveBeenCalled()
+    }
+  })
   it.each(['flag', 'production'])(
     'fixture activation requires isolated identity, flag and development build: %s',
     (gate) => {

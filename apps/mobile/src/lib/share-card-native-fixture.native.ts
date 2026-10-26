@@ -1,3 +1,4 @@
+import { enableStory68FocusObservation } from '../../modules/accessibility-focus'
 import { abortError } from '@couture/api-client'
 import {
   isShareCardNativeFixtureBuild,
@@ -43,6 +44,8 @@ export function shareCardPreviewTestId(loaded: boolean, digest: string) {
 }
 export function startShareCardNativeFixture(): () => void {
   if (!fixtureBuild()) return () => undefined
+  // The module also checks Debug and the exact owned bundle before recording.
+  void enableStory68FocusObservation()?.catch(() => undefined)
   const subscription = Linking.addEventListener('url', ({ url }) => {
     if (!isShareCardNativeFixtureUrl(url)) return
     const parsed = new URL(url)
@@ -55,7 +58,10 @@ export function startShareCardNativeFixture(): () => void {
     }
     if (modes.some((candidate) => candidate === next)) mode = next as Mode
   })
-  return () => subscription.remove()
+  return () => {
+    subscription.remove()
+    void enableStory68FocusObservation(false)?.catch(() => undefined)
+  }
 }
 export async function runShareCardNativeAdapter(
   fileUri: string,

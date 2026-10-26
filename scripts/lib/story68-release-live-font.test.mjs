@@ -80,6 +80,7 @@ function fixture(overrides = {}) {
       const command = args.join(' ')
       events.push(command)
       if (command === 'settings put system font_scale 1.5') live = true
+      if (command === 'dumpsys activity top -a') return activityDump()
       if (command === 'getprop ro.build.version.sdk') return '36'
       if (command === `dumpsys package ${app}`)
         return `Package [${app}]\nflags=[ HAS_CODE ALLOW_CLEAR_USER_DATA ]`
@@ -454,12 +455,12 @@ test('snapshot commands use measured 20s headroom and the remaining restoration 
     timeouts.push(timeout)
     snapshots++
     if (snapshots === 1) return tree()
-    await f.io.pause(8000)
+    await f.io.pause(snapshots === 4 ? 2000 : 8000)
     return snapshots === 2 ? { children: [] } : tree({ height: 138 })
   }
   const result = await proveReleaseLiveFont(configuration(), f.io)
   assert.equal(result.passed, true)
-  assert.deepEqual(timeouts, [20000, 20000, 11900])
+  assert.deepEqual(timeouts, [20000, 20000, 11900, 2900])
 })
 
 test('a snapshot arriving after the restoration deadline cannot pass', async () => {
@@ -784,6 +785,7 @@ test('after snapshot skips driver reinstall only after the verified production b
   assert.deepEqual(stages, [
     { timeout: 20000, stage: 'before', live: false },
     { timeout: 20000, stage: 'after', live: true },
+    { timeout: 19000, stage: 'after', live: true },
   ])
 })
 
@@ -907,4 +909,123 @@ test('real attempt entry removes stale owned trees even on a runtime guard failu
   } finally {
     fs.rmSync(directory, { recursive: true, force: true })
   }
+})
+
+function activityDump({
+  scale = '1.5',
+  component = app,
+  token = 'a123',
+  resumed = true,
+} = {}) {
+  return `TASK ${component} id=37\n  ACTIVITY ${component}/.MainActivity ${token} pid=12345\n    mResumed=${resumed} mStopped=false mFinished=false\n    mChangingConfigurations=false\n    mCurrentConfig={${scale} 310mcc260mnc [en_US] 420dpi s.7}\n`
+}
+for (const [name, dump] of [
+  ['old app configuration', activityDump({ scale: '1.0' })],
+  ['another app only', activityDump({ component: 'com.other.app' })],
+  ['paused app configuration', activityDump({ resumed: false })],
+  ['global configuration only', 'mGlobalConfig={1.5 420dpi}'],
+]) {
+  test(`preserved pre-recreation hierarchy cannot pass with ${name}`, async () => {
+    const f = fixture()
+    const shell = f.io.shell
+    f.io.shell = (args) =>
+      args.join(' ') === 'dumpsys activity top -a' ? dump : shell(args)
+    await assert.rejects(
+      proveReleaseLiveFont(configuration(), f.io),
+      /release_applied_font_configuration_required/
+    )
+    assert.equal(f.now(), 20000)
+  })
+}
+test('applied app configuration and two preserved states must span the stable observation window', async () => {
+  const f = fixture()
+  const shell = f.io.shell
+  let observed = 0
+  let afterReads = 0
+  f.io.shell = (args) => {
+    if (args.join(' ') === 'dumpsys activity top -a') {
+      observed++
+      return activityDump()
+    }
+    return shell(args)
+  }
+  f.io.hierarchy = async (_timeout, stage) => {
+    if (stage === 'after') {
+      afterReads++
+      assert.ok(observed > 0)
+    }
+    return tree()
+  }
+  assert.equal((await proveReleaseLiveFont(configuration(), f.io)).passed, true)
+  assert.ok(afterReads >= 2)
+  assert.ok(f.now() >= 1000)
+  assert.ok(observed >= afterReads * 2)
+})
+test('a delayed recreation after the first valid snapshot still fails state preservation', async () => {
+  const f = fixture()
+  const shell = f.io.shell
+  f.io.shell = (args) =>
+    args.join(' ') === 'dumpsys activity top -a' ? activityDump() : shell(args)
+  let afterReads = 0
+  f.io.hierarchy = async (_timeout, stage) =>
+    stage === 'after' && afterReads++ > 0 ? { children: [] } : tree()
+  await assert.rejects(
+    proveReleaseLiveFont(configuration(), f.io),
+    /release_production_preview_required/
+  )
+})
+
+test('configuration changing during capture cannot establish restored state', async () => {
+  const f = fixture()
+  const shell = f.io.shell
+  let queries = 0
+  f.io.shell = (args) =>
+    args.join(' ') === 'dumpsys activity top -a'
+      ? activityDump({ scale: ++queries % 2 ? '1.5' : '1.0' })
+      : shell(args)
+  await assert.rejects(
+    proveReleaseLiveFont(configuration(), f.io),
+    /release_applied_font_configuration_required/
+  )
+  assert.equal(f.now(), 20000)
+})
+test('replacement Activity must establish its own stable observation window', async () => {
+  const f = fixture()
+  const shell = f.io.shell
+  let queries = 0
+  f.io.shell = (args) =>
+    args.join(' ') === 'dumpsys activity top -a'
+      ? activityDump({ token: ++queries <= 2 ? 'old' : 'new' })
+      : shell(args)
+  assert.equal((await proveReleaseLiveFont(configuration(), f.io)).passed, true)
+  assert.ok(f.now() >= 2000)
+})
+test('the real shell adapter receives the remaining app-configuration observation deadline', async () => {
+  const f = adapterFixture(async (_config, io) => {
+    await io.shell(['dumpsys', 'activity', 'top', '-a'], 427)
+    return { passed: true }
+  })
+  await f.invoke()
+  assert.equal(f.processes.length, 1)
+  assert.equal(f.processes[0].options.timeout, 427)
+  assert.deepEqual(f.processes[0].args.slice(-5), [
+    'shell',
+    'dumpsys',
+    'activity',
+    'top',
+    '-a',
+  ])
+})
+
+test('a first preserved state too late for a stable window cannot report applied-configuration success', async () => {
+  const f = fixture()
+  f.io.hierarchy = async (_timeout, stage) => {
+    if (stage === 'after') await f.io.pause(19500)
+    return tree()
+  }
+  await assert.rejects(
+    proveReleaseLiveFont(configuration(), f.io),
+    /release_stable_state_required/
+  )
+  assert.equal(f.now(), 20000)
 })

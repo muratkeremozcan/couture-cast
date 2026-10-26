@@ -158,7 +158,7 @@ export function closedShareCardAuditReport(summary, tree, log) {
     states: observedStates,
     strictIssues: issues,
     focusEvidence:
-      'intended AX targets plus native focus bridge call tests; physical VoiceOver cursor unavailable',
+      'posted UIKit layoutChanged requests, attached targets, actual header traits and AX traversal; approved simulator substitute; physical VoiceOver cursor unavailable',
     announcementEvidence:
       'own localized AX status plus exact RN posted announcement bridge tests; physical VoiceOver delivery unavailable',
   }

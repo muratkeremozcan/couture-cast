@@ -21,3 +21,7 @@ export function observeAccessibilityFocus(
 export function focusAccessibilityElement(_tag: number): Promise<boolean> | null {
   return null
 }
+
+export function enableStory68FocusObservation(_enabled = true): Promise<boolean> | null {
+  return null
+}

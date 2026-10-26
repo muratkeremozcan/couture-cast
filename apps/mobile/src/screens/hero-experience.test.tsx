@@ -11,6 +11,8 @@ import { describe, expect, it, beforeAll, beforeEach, afterEach, vi } from 'vite
 import { server } from '@/src/test-utils/msw/server'
 import { http, HttpResponse } from 'msw'
 import TabOneScreen from '@/app/(tabs)/index'
+import { Platform } from 'react-native'
+import { AndroidShareCardPresentation } from '@/components/android-share-card-presentation'
 import {
   setMobileAccessTokenResolver,
   setMobileApplicationUserId,
@@ -35,6 +37,10 @@ vi.mock('expo-router', async () => ({
   useFocusEffect: (
     await vi.importActual<typeof FocusEffectModule>('@/src/test-utils/focus-effect')
   ).useFocusEffect,
+}))
+
+vi.mock('@/src/lib/use-share-card-status-bar', () => ({
+  useShareCardStatusBar: () => true,
 }))
 
 const mockCapture = vi.fn()
@@ -75,6 +81,31 @@ describe('Mobile Hero Experience (TabOneScreen)', () => {
     vi.clearAllMocks()
     clearRitualMemoryCache()
     localStorage.clear()
+  })
+
+  it('Android null-member token session opens the outfit share-card composer', async () => {
+    const previousPlatform = Platform.OS
+    Object.defineProperty(Platform, 'OS', { value: 'android', configurable: true })
+    setMobileApplicationUserId(null)
+    try {
+      await render(
+        <AndroidShareCardPresentation pathname="/">
+          <TabOneScreen />
+        </AndroidShareCardPresentation>
+      )
+      const opener = await screen.findByTestId('outfit-share-card-open')
+      fireEvent.click(opener)
+      expect(await screen.findByTestId('share-card-title')).toBeVisible()
+      fireEvent.click(screen.getByTestId('share-card-cancel'))
+      await waitFor(() =>
+        expect(screen.queryByTestId('share-card-title')).not.toBeInTheDocument()
+      )
+    } finally {
+      Object.defineProperty(Platform, 'OS', {
+        value: previousPlatform,
+        configurable: true,
+      })
+    }
   })
 
   it('displays skeleton state while loading and then loads current weather, 48-hour ribbon, and morning outfit card', async () => {

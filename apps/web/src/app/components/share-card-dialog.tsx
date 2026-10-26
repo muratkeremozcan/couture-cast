@@ -1,5 +1,5 @@
 'use client'
-import { useEffect, useRef, useState, useSyncExternalStore } from 'react'
+import { useEffect, useLayoutEffect, useRef, useState, useSyncExternalStore } from 'react'
 import { useTranslation } from 'react-i18next'
 import type { PreparedShareCard, ShareCardSource } from '@couture/api-client'
 import { resolveSupportedLocale } from '@couture/api-client/contracts/http'
@@ -96,6 +96,13 @@ export function ShareCardDialog({
   const saveUnavailable = saveIsDisabled(valid, loaded, presentation)
   const latest = useRef({ member, key, open })
   latest.current = { member, key, open }
+  useLayoutEffect(() => {
+    if (recoveryAction !== 'prepare' || busy || error || saveUnavailable) return
+    // Keep recovery focus until the replacement image enables Save, then move
+    // focus before removing the control that currently owns it.
+    saveRef.current?.focus({ preventScroll: true })
+    setRecoveryAction(null)
+  }, [recoveryAction, busy, error, saveUnavailable])
   useEffect(() => {
     setPreview(null)
     setLoaded(null)
@@ -169,7 +176,7 @@ export function ShareCardDialog({
     setPresentationEpoch((value) => value + 1)
     onClose()
   }
-  const save = async (restoreSaveFocus = true) => {
+  const save = async () => {
     if (!current || !valid || loaded !== presentation || saving.current || busy) return
     saving.current = true
     setBusy(true)
@@ -206,7 +213,8 @@ export function ShareCardDialog({
       await downloadShareCard(current.card, abort.signal)
       if (stillCurrent()) {
         setMessage('downloadStarted')
-        if (restoreSaveFocus) saveRef.current?.focus({ preventScroll: true })
+        saveRef.current?.focus({ preventScroll: true })
+        setRecoveryAction(null)
       }
     } catch (failure) {
       if (stillCurrent()) {
@@ -298,7 +306,7 @@ export function ShareCardDialog({
             onClick={() => {
               if (busy) return
               if (recoveryAction === 'save' && valid && loaded === presentation) {
-                void save(false)
+                void save()
               } else {
                 setChanged(true)
                 setRefresh((n) => n + 1)

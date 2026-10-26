@@ -199,7 +199,38 @@ function buildDisallowed(language, allowed) {
       throw new Error(`${language} produced only ${produced} ${family} cases`)
     }
   }
-  return [...cases, ...buildDeletionRegressionCases(language, allowed)]
+  return [
+    ...cases,
+    ...buildDeletionRegressionCases(language, allowed),
+    ...buildInsultFrameRegressionCases(language),
+  ]
+}
+
+/** Round6 reported single-occurrence attacks and every reviewed frame run in all locales. */
+function buildInsultFrameRegressionCases(language) {
+  const development = readJson(path.join(corpusDir, 'development-round6.json'))
+  const bank = readJson(
+    path.join(
+      projectRoot,
+      'apps/api/policies/community-screening/reviewed-occurrence-constructions-v1.json'
+    )
+  ).constructions
+  const rows = [
+    ...development.reported.map((row) => row.text),
+    ...development.removedConstructions,
+    ...development.frameAdversarial,
+  ]
+  for (const rule of bank)
+    for (const phrase of rule.phrases)
+      for (const frame of rule.rejectedPrefixFrames ?? [])
+        for (const separator of [' ', ', ', ' - ', '\n', ' 😃 '])
+          rows.push(frame + separator + phrase)
+  return [...new Set(rows)].map((text, index) => ({
+    id: `${language}-round6-insult-frame-${String(index + 1).padStart(3, '0')}`,
+    family: 'round6-insult-frame',
+    field: index % 2 ? 'altText' : 'caption',
+    text,
+  }))
 }
 
 /** Reviewed reports plus the full multi-dictionary deletion class run in every locale. */
@@ -376,6 +407,7 @@ async function main() {
           ...Object.keys(FAMILIES),
           'doubled-letter-deletion',
           'context-separator-adversarial',
+          'round6-insult-frame',
         ],
         entries: buildDisallowed(language, allowed),
       },

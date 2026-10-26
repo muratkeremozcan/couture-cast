@@ -396,10 +396,8 @@ export function CommunityScreen() {
     setShareCardOpen(false)
   }, [sessionScope])
   const openShareCard = (postId: string, opener: () => number | null) => {
-    if (Platform.OS === 'android') {
-      openAndroidShareCard({ kind: 'community_post', postId }, 'community', opener)
+    if (openAndroidShareCard({ kind: 'community_post', postId }, 'community', opener))
       return
-    }
     shareCardInvoker.current = { node: opener, member: mobileApplicationUserId() }
     setShareCardSource({ kind: 'community_post', postId })
     setShareCardOpen(true)

@@ -43,7 +43,8 @@ import { ShareCardComposer } from './share-card-composer'
 
 // Other platforms retain their existing screen-owned composer lifecycle.
 export function ScreenShareCardComposer(props: ComponentProps<typeof ShareCardComposer>) {
-  return Platform.OS === 'android' ? null : <ShareCardComposer {...props} />
+  const root = useAndroidPresentationRoot()
+  return root ? null : <ShareCardComposer {...props} />
 }
 
 const PresentationRoot = createContext<object | null>(null)
@@ -72,7 +73,9 @@ export function useShareCardPresentationOpener() {
     scope: ShareCardHeadingScope,
     node?: () => number | null
   ) => {
-    if (root) openShareCardPresentation(root, source, scope, node)
+    if (!root) return false
+    openShareCardPresentation(root, source, scope, node)
+    return true
   }
 }
 
@@ -141,7 +144,7 @@ export function AndroidShareCardPresentation({
       ? draft
       : null
   return (
-    <PresentationRoot.Provider value={android ? root : null}>
+    <PresentationRoot.Provider value={android && member ? root : null}>
       {children}
       {current && (
         <ShareCardComposer

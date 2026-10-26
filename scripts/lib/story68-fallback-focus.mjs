@@ -1,7 +1,9 @@
 import fs from 'node:fs'
 import path from 'node:path'
-import { spawnSync } from 'node:child_process'
+import { spawn, spawnSync } from 'node:child_process'
 import pg from 'pg'
+import { createServer } from 'node:http'
+import { story68FocusObservationHandler } from './story68-ios-focus-observation.mjs'
 import { assertRapidWatermarkRuntime } from './story68-rapid-watermark.mjs'
 import { withUnavailableOwnedFallbackPost } from './story68-fallback-post.mjs'
 
@@ -27,6 +29,58 @@ function recorded(ctx, binary, args, name, env = {}) {
   if (result.error || result.status !== 0)
     throw new Error('fallback_native_assertion_failed')
   return fs.readFileSync(file, 'utf8')
+}
+export async function recordedIosTest(ctx, args, name, spawnChild = spawn) {
+  const file = path.join(ctx.directory, name)
+  const fd = fs.openSync(file, 'w', 0o600)
+  try {
+    await new Promise((resolve, reject) => {
+      const child = spawnChild('xcodebuild', args, {
+        cwd: ctx.root,
+        stdio: ['ignore', fd, fd],
+        detached: true,
+      })
+      const timer = setTimeout(() => {
+        try {
+          process.kill(-child.pid, 'SIGKILL')
+        } catch (error) {
+          if (error.code !== 'ESRCH') reject(error)
+        }
+      }, 180_000)
+      child.once('error', (error) => {
+        clearTimeout(timer)
+        reject(error)
+      })
+      child.once('close', (code) => {
+        clearTimeout(timer)
+        if (code === 0) resolve()
+        else reject(new Error('fallback_native_assertion_failed'))
+      })
+    })
+    return fs.readFileSync(file, 'utf8')
+  } finally {
+    fs.closeSync(fd)
+  }
+}
+export async function withIosFocusObservation(ctx, work, port = 63068) {
+  const observe = story68FocusObservationHandler({
+    device: ctx.device,
+    appId: ctx.appId,
+    readContainer: () =>
+      ctx.run('xcrun', ['simctl', 'get_app_container', ctx.device, ctx.appId, 'data']),
+  })
+  const server = createServer((request, response) => {
+    if (!observe(request, response)) response.writeHead(404).end()
+  })
+  await new Promise((resolve, reject) => {
+    server.once('error', reject)
+    server.listen(port, '127.0.0.1', resolve)
+  })
+  try {
+    return await work(server.address().port)
+  } finally {
+    await new Promise((resolve) => server.close(resolve))
+  }
 }
 function freshRuntime(ctx) {
   if (ctx.platform === 'ios')
@@ -118,14 +172,13 @@ function iosAssertion(ctx, fixtures) {
     ['build-for-testing', ...args],
     'fallback-native-ios-build.log'
   )
-  return () => {
+  return async () => {
     const result = path.join(
       ctx.directory,
       `fallback-accessibility-${Date.now()}.xcresult`
     )
-    const log = recorded(
+    const log = await recordedIosTest(
       ctx,
-      'xcodebuild',
       ['test-without-building', ...args, '-resultBundlePath', result],
       'fallback-native-ios.log'
     )
@@ -317,7 +370,9 @@ export async function runStory68FallbackFocus(ctx) {
         ? await withTalkBack(ctx, () =>
             journey(ctx, runtime, fixtures, androidAssertion(ctx, fixtures))
           )
-        : await journey(ctx, runtime, fixtures, iosAssertion(ctx, fixtures))
+        : await withIosFocusObservation(ctx, () =>
+            journey(ctx, runtime, fixtures, iosAssertion(ctx, fixtures))
+          )
     ctx.privateJson(`native-fallback-focus-${ctx.platform}.json`, {
       platform: ctx.platform,
       passed: true,

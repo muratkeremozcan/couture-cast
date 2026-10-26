@@ -14,6 +14,7 @@ export function closedShareCardAuditReport(
   log: string
 ): {
   passed: boolean
+  focusEvidence: string
   counts: { total: number; passed: number; failed: number; skipped: number }
   failedTestIDs: string[]
   nativeBehaviors: string[]

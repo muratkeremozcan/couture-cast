@@ -1,38 +1,51 @@
 {
   "version": 1,
-  "provenance": "Explicit coordinator round4 and round5 decisions, 2026-10-26. Exact occurrence-bound native senses with finite reviewed grammatical word inventories; generic high-severity contexts remain forbidden.",
+  "provenance": "Explicit coordinator round4, round5 and round6 decisions, 2026-10-26. Exact occurrence-bound native senses; high-severity exceptions require reviewed declared language and reject person-directed insult frames. Generic high contexts remain forbidden.",
   "constructions": [
     {
       "language": "fr",
       "target": "retard",
-      "phrases": [
-        "en retard",
-        "du retard",
-        "un retard",
-        "de retard",
-        "retard de",
-        "retard du",
-        "retard des",
-        "sans retard",
-        "avec retard"
-      ],
-      "reason": "Coordinator round4 decision: these contiguous grammatical constructions mean lateness independently of declared locale. Clear only that exact raw ASCII-word occurrence, with ordinary spaces between words. Punctuation, line breaks, emoji, folding/obfuscation and every separate bare occurrence retain high-severity screening.",
-      "nativeLanguages": ["fr"]
+      "phrases": ["en retard"],
+      "reason": "Coordinator round6 evidence-only decision: en retard is supported by retired French development caption fr-holdout-010. Clear only this literal occurrence when declared French, outside English person-directed insult frames. All other constructions and every independent high occurrence remain blocked.",
+      "nativeLanguages": ["fr"],
+      "requiredDeclaredLanguages": ["fr"],
+      "rejectedPrefixFrames": ["you are", "such a", "what a", "stupid", "you absolute"],
+      "developmentEvidence": [
+        {
+          "phrase": "en retard",
+          "source": "apps/api/test/fixtures/community-text-corpus/holdout-v1/fr.json",
+          "id": "fr-holdout-010",
+          "baselineDisposition": "block",
+          "reasonCode": "text_policy_match"
+        }
+      ]
     },
     {
       "language": "pt",
       "target": "tapete",
-      "phrases": [
-        "um tapete",
-        "o tapete",
-        "do tapete",
-        "no tapete",
-        "sobre o tapete",
-        "un tapete",
-        "el tapete"
+      "phrases": ["um tapete"],
+      "reason": "Coordinator round6 evidence-only decision: the exact carpet noun phrase um tapete is supported by retired development row pt-holdout-v2-354. It requires declared Portuguese or Spanish and refuses French person-directed insult frames. Bare, disguised and every separate occurrence retain high-severity screening.",
+      "nativeLanguages": ["pt", "es"],
+      "requiredDeclaredLanguages": ["pt", "es"],
+      "rejectedPrefixFrames": [
+        "t es",
+        "tu es",
+        "espece de",
+        "sale",
+        "quel",
+        "quelle",
+        "ce",
+        "c est un"
       ],
-      "reason": "Coordinator round4 reviewed Portuguese and Spanish native carpet noun constructions. Only the exact contiguous literal occurrence is cleared; bare/deleted slur and separate occurrences remain blocked.",
-      "nativeLanguages": ["pt", "es"]
+      "developmentEvidence": [
+        {
+          "phrase": "um tapete",
+          "source": "apps/api/test/fixtures/community-text-corpus/holdout-v2/pt.json",
+          "id": "pt-holdout-v2-354",
+          "baselineDisposition": "block",
+          "reasonCode": "text_policy_match"
+        }
+      ]
     },
     {
       "language": "en",

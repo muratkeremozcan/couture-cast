@@ -76,40 +76,23 @@ describe('round4 deletion and occurrence-bound context development regressions',
     ).not.toBe('pass')
   })
 
-  it.each([
-    'en retard',
-    'du retard',
-    'un retard',
-    'de retard',
-    'retard de',
-    'retard du',
-    'retard des',
-    'sans retard',
-    'avec retard',
-  ])('clears only the reviewed grammatical occurrence in %s', (text) => {
+  it('preserves only the round6 evidenced French occurrence under declared French', () => {
     for (const locale of [...locales, undefined]) {
-      expect(screener.screen({ text, locale, field: 'caption' }).disposition).toBe('pass')
-      for (const mixed of [`you retard. ${text}`, `${text} you retard`, `${text}. niga`])
-        expect(
-          screener.screen({ text: mixed, locale, field: 'caption' }).disposition
-        ).toBe('block')
+      expect(
+        screener.screen({ text: 'en retard', locale, field: 'caption' }).disposition
+      ).toBe(locale === 'fr-FR' ? 'pass' : 'block')
+      for (const text of [
+        'you retard. en retard',
+        'en retard you retard',
+        'en retard. niga',
+        'you retard du retard',
+        'you retard de retard',
+      ])
+        expect(screener.screen({ text, locale, field: 'caption' }).disposition).toBe(
+          'block'
+        )
     }
   })
-
-  it.each(['you retard du retard', 'you retard de retard'])(
-    'allows both explicitly bound overlapping occurrences in %s',
-    (text) => {
-      for (const locale of [...locales, undefined]) {
-        expect(screener.screen({ text, locale, field: 'caption' }).disposition).toBe(
-          'pass'
-        )
-        expect(
-          screener.screen({ text: `${text} you retard`, locale, field: 'caption' })
-            .disposition
-        ).toBe('block')
-      }
-    }
-  )
 
   it.each(['you retard en retard', 'en retard you retard'])(
     'keeps an independent whitespace-separated bare occurrence blocked: %s',
@@ -142,9 +125,9 @@ describe('round4 deletion and occurrence-bound context development regressions',
   const historicalRules = reviewedOccurrenceBank.constructions.filter((rule) =>
     ['retard', 'tapete'].includes(rule.target)
   )
-  it('pins the approved two-target sixteen-phrase authoritative surface', () => {
+  it('pins the round6 two-target two-phrase authoritative surface', () => {
     expect(historicalRules.map((rule) => rule.target)).toEqual(['retard', 'tapete'])
-    expect(historicalRules.map((rule) => rule.phrases.length)).toEqual([9, 7])
+    expect(historicalRules.map((rule) => rule.phrases.length)).toEqual([1, 1])
     expect(historicalRules.map((rule) => rule.nativeLanguages)).toEqual([
       ['fr'],
       ['pt', 'es'],
@@ -155,16 +138,20 @@ describe('round4 deletion and occurrence-bound context development regressions',
       createHash('sha256')
         .update(historicalRules.flatMap((rule) => rule.phrases).join('\n'))
         .digest('hex')
-    ).toBe('8be8972f0c06a77106c2359d98a6398dad78fbe3d7c6870fad3a5f5fab260a62')
+    ).toBe('3a18e189706e4e52681d4df33ca7d7025c006903000a01264686f53b63e4effc')
   })
   describe.each(historicalRules)(
     'reviewed occurrence surface $target',
-    ({ target, phrases }) => {
+    ({ target, phrases, requiredDeclaredLanguages }) => {
       it.each(phrases)('clears only the exact bound occurrence in %s', (phrase) => {
         for (const locale of [...locales, undefined]) {
           expect(
             screener.screen({ text: phrase, locale, field: 'caption' }).disposition
-          ).toBe('pass')
+          ).toBe(
+            requiredDeclaredLanguages?.some((language) => locale?.startsWith(language))
+              ? 'pass'
+              : 'block'
+          )
           for (const text of [
             target,
             `${phrase} you ${target}`,

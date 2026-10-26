@@ -117,7 +117,7 @@ runs:
         cli_version="$(node -p "require('supabase/package.json').version")"
         exclude_hash="$(printf '%s' "$EXCLUDE" | sha256sum | cut -c1-16)"
         {
-          echo "key=supabase-images-v1-${RUNNER_OS}-cli${cli_version}-config${CONFIG_HASH:0:16}-exclude${exclude_hash}"
+          echo "key=supabase-images-v2-${RUNNER_OS}-${RUNNER_ARCH}-cli${cli_version}-config${CONFIG_HASH:0:16}-exclude${exclude_hash}"
           echo "dir=${RUNNER_TEMP}/supabase-image-cache"
         } >> "$GITHUB_OUTPUT"
 

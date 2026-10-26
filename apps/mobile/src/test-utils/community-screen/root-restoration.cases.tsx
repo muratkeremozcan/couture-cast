@@ -15,7 +15,7 @@ import { CommunityScreen } from '@/src/features/community/community-screen'
 import { setMobileApplicationUserId } from '@/src/lib/mobile-auth'
 import { androidNavigationSnapshot } from '@/src/lib/android-navigation-restoration'
 import { server } from '@/src/test-utils/msw/server'
-import { item } from './harness'
+import { item, serveFeed, feedJson } from './harness'
 import { press } from '@/src/test-utils/press'
 function Home({ navigate }: { navigate: () => void }) {
   const intent = useAndroidNavigationIntent()
@@ -88,6 +88,42 @@ async function open() {
   return view
 }
 export function registerCommunityRootRestorationCases() {
+  it('Android null-member token session opens Spotlight detail through the real screen', async () => {
+    Object.defineProperty(Platform, 'OS', { value: 'android', configurable: true })
+    act(() => setMobileApplicationUserId(null))
+    server.use(http.get('*/api/v1/community/spotlight', () => page()))
+    render(<Harness />)
+    const entry = await screen.findByTestId('community-spotlight-item-restored-spot')
+    press(within(entry).getByTestId('community-card-open-restored-spot'))
+    const title = await screen.findByTestId('community-spotlight-detail-title')
+    expect(title).toBeVisible()
+    expect(screen.getByTestId('community-spotlight-detail')).toHaveTextContent(
+      'Original before font'
+    )
+    press(screen.getByTestId('community-spotlight-detail-close'))
+    await waitFor(() =>
+      expect(
+        screen.queryByTestId('community-spotlight-detail-title')
+      ).not.toBeInTheDocument()
+    )
+    expect(androidNavigationSnapshot().checkpoint).toBeNull()
+  })
+  it('Android null-member token session opens its own community share-card composer', async () => {
+    Object.defineProperty(Platform, 'OS', { value: 'android', configurable: true })
+    act(() => setMobileApplicationUserId(null))
+    serveFeed(() =>
+      feedJson({ items: [item({ author: { displayName: 'Own look', isSelf: true } })] })
+    )
+    render(<Harness />)
+    const opener = await screen.findByTestId('community-share-card-open-post-a')
+    press(opener)
+    expect(await screen.findByTestId('share-card-title')).toBeVisible()
+    press(screen.getByTestId('share-card-cancel'))
+    await waitFor(() =>
+      expect(screen.queryByTestId('share-card-title')).not.toBeInTheDocument()
+    )
+    expect(androidNavigationSnapshot().checkpoint).toBeNull()
+  })
   it('Android root restores detail only after fresh Spotlight membership and preserves explicit Cancel', async () => {
     let opened = 0
     server.use(

@@ -811,6 +811,109 @@ repository-relative. Proposed files are identified in the tasks.
   current commands have unchanged source during execution. Pipeline reports and full private
   evidence are under `_bmad-output/test-artifacts/story-6-8/`.
 
+### External review round 2 and screening round 6
+
+- Coordinator tightened the high-severity occurrence table after Opus demonstrated English
+  insult readings of French article constructions. Independent development evidence supports
+  `en retard` in declared French and `um tapete` in declared Portuguese or Spanish. English
+  insult frames refuse the French exemption; French insult frames refuse the rug exemption.
+  Every occurrence remains independently screened. Unsupported article and preposition entries
+  were removed. Eight existing low or medium constructions remain unchanged. The final table has
+  ten entries. Round6 adds658 attack cases; all10,640 attacks refuse publication. Prior9,982
+  attack rows and all2,940 clean rows remain intact. Balls behavior remains unchanged.
+- Round6 frozen51 manifest SHA256 is
+  `7b33f73895622ce85b6900cb965406ebba04de2533d1cb94997727218ce57201`.
+  Development suites pass882 tests with and without coverage; real HTTP proof passes17 tests.
+  Historical Round4 and Round5 identities remain verified at their original commits. TEA owns
+  release eligibility and independent V6 authoring, seal and evaluation. Builder has accessed
+  no V6 contents or results.
+- Android presentation now treats a missing canonical member as screen-owned. Actual Home
+  and Community component taps reproduce the prior absent detail or composer, then pass after
+  the repair. Authenticated root restoration remains in place. Mobile coverage passes1,581 tests.
+- Web retry success clears the recovery action after moving focus to Save. Held-request
+  cancellation is witnessed on the exact Request; a bounded download event window detects late
+  handoff. A mounted outfit control test preserves DOM identity across account changes. The
+  production ritual launcher unmounts on departure, as verified in source. Browser30 passes
+  across Chromium and WebKit for these review changes.
+- The Release font proof now verifies the app's resumed MainActivity client configuration at
+  scale1.5, then compares two complete stable snapshots spanning one second within its existing
+  deadline. Six failing-first controls cover stale, global, foreign, paused and unstable samples.
+  The coordinator's prior RN clipping and shared-font rollback decisions remain applicable.
+- iOS focus evidence observes the actual posted UIKit layout-change target, its attachment,
+  label, identifier, sequence and header trait. Concrete UIView and UIAccessibilityElement
+  getters repair the runtime protocol-cast failure found by real UIKit tests. Ten UIKit tests,
+  the rebuilt dev client, nine strict accessibility tests and removed-post fallback pass.
+  This remains the approved simulator substitute; physical VoiceOver cursor delivery is not
+  claimed. Current original Photos extraction matches the preview digest, with one fresh asset,
+  an empty feature cache and only IHDR, IDAT and IEND chunks. Fresh Expo Go also passes; its
+  owned simulator is deleted immediately after proof.
+- Native CI reads the Android SDK once, validates the canonical number against its matrix API,
+  and fails before installation on invalid input. Startup-deadline controls run before Supabase.
+  The iOS job uses an Intel runner with an HVF precheck and architecture-specific image cache.
+  Published ARM macOS logs show Colima using TCG and exhausting the unchanged startup budget.
+- Published API32 CI completed original-resource extraction and eight matrix states, then
+  failed the first locale's outfit flow. Its four-field summary and nine uploaded artifacts
+  omit the failed selector, screen and device logs. The exact log confirms4GiB and failure
+  about14m41s after boot. A published-source ARM replay passes all39 states; the CI cause stays
+  unestablished. Coordinator authorized actionable, privacy-safe failure capture for the next
+  attempt. Diagnosis is recorded in `reviews/cc68-round2-api32-ci-diagnosis-1.md`.
+- Published API36 failed the WebKit harness1500ms assertion at2005.593ms before starting its
+  emulator. The source remained blocked and OFF, ON and authenticated-profile checks completed.
+  Product preparation retains its15-second deadline. APT separately downloaded116MB in52m44s
+  from the Azure mirror. Browser provisioning now runs only in the API36 browser lane, uses the
+  lockfile-matched CLI and official Ubuntu archive, restores original APT sources, and has a
+  ten-minute process deadline plus kill grace within a twelve-minute CI step. The common
+  accessibility bridge executes jsdom and requires no browser installation. Eleven controls
+  pass; actual Ubuntu provisioning is validated by the next CI run.
+
+- The actual WebKit delay proof now waits for genuine own-target resolution and a subsequent
+  cursor replay before acquiring the table barrier. This fixes an observed setup race where the
+  barrier blocked bootstrap authorization and the feed correctly hid unverified content. The
+  total two-second delay is split across OFF and ON; a single two-second delay before the first
+  cancellation correctly exceeds the separate1,950ms community authorization budget. That
+  budget and the15-second preparation deadline remain unchanged. With zero503s asserted, old
+  code fails at2,165.82ms against1,500ms; repaired code passes at2,235.51ms held time, with three
+  requests, verified ownership, blocked source and a loaded final preview. Current Chromium and
+  WebKit pass30 cases. Local Firefox repeats the documented macOS profile-launch restriction;
+  all45 cases remain mandatory in the Linux CI lane.
+- Terminal native failures now capture their exact known command and selector, paired geometry,
+  fixed bundled labels, diagnostic signatures and bounded boot, memory and pressure facts.
+  Public visuals explicitly mask all original pixels and are regenerated from validated fields.
+  Raw account-bearing screenshots, hierarchy and logs remain private. Sensitive sign-in flows
+  suppress visual projection. Capture has its own deadline and preserves the original failure.
+  Browser artifacts retain the first closed failure per engine across later successful locales.
+  Sixty-four current Node controls and nine audit/bootstrap tests pass. The original API32 CI
+  failure remains unestablished; the next failure will include this actionable diagnostic record.
+
+### Round2 final current native acceptance and diagnostic capture
+
+Current Android36 acceptance completed on the fresh normal Debug build after the genuine
+Release M4 proof. Original-resource extraction produced the exact preview SHA-256
+`a1657c67ce12ed6395478013e3482a5e8404682403a167dbe7b7e96b86398e59`,
+38,398 bytes, one new asset, empty feature cache and only IHDR/IDAT/IEND chunks. All 39 matrix
+states passed. The actual PostgreSQL source-barrier rapid watermark proof held for
+7,952.31 ms with three requests and zero unavailable responses. Real TalkBack verified modal
+focus, save ownership, cancel restoration and the removed-post fallback cursor. The owned
+API36 AVD was retired immediately after acceptance; the API32 AVD was already retired after
+its published-baseline replay. Evidence: `review-r2-android36-current-pipeline-1.json` and its
+sixteen named run directories. Genuine Release M4 preserved the same process and approved
+watermark-OFF card through the live font change, with two stable complete snapshots spanning
+one second. The accepted upstream clipping measurement remains 92 to 92 pixels.
+
+The current rebuilt iOS app passed original-resource extraction, all nine strict accessibility
+states, the removed-opener substitute and a fresh Expo Go run. Its original resource has the
+same SHA-256 and PNG chunks as Android. Actual UIKit controls assert the posted request,
+attached focus target and header trait. This is the approved simulator substitute. The owned
+Expo Go simulator was deleted after the proof. Evidence: `review-r2-ios-current-pipeline-1.json`.
+
+A controlled actual Maestro missing-watermark failure proved the new capture path before
+commit. The closed record identifies `watermark.yaml`, failed `tapOnElement`, exact selector
+`share-card-watermark`, the recent command statuses, 4 GiB device memory and boot state.
+Commands, hierarchy, screenshot, logcat and system captures all exist. The public PNG was
+visually inspected: every original pixel is masked and the replacement shows allowlisted
+control outlines and fixed labels. It is a redacted diagnostic derivative. Raw captures remain
+private. Evidence: `runs/review-r2-android36-diagnostic-negative-1/native-evidence/`.
+
 ## Spec Change Log
 
 - 2026-10-25, iteration 2 in progress, Astra round 1: accepted A1 and A2. iOS now imports the

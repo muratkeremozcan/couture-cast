@@ -40,9 +40,28 @@ const handler = () =>
     return HttpResponse.json({ data: preparedShareCardFixture })
   })
 describe('exact-byte share-card dialog', () => {
-  it('M5: handoff Retry reauthorizes the retained preview and preserves its recovery focus', async () => {
+  it('M5 R2-L2: handoff Retry retains focus while pending, then removes recovery and focuses Save', async () => {
     const image = await open()
     fireEvent.load(image)
+    let release!: () => void
+    let entered!: () => void
+    const held = new Promise<void>((resolve) => {
+      release = resolve
+    })
+    const started = new Promise<void>((resolve) => {
+      entered = resolve
+    })
+    useMswHandlers(
+      http.post(endpoint, async ({ request }) => {
+        const body = (await request.json()) as { purpose: string }
+        requests.push(body)
+        if (requests.length === 3) {
+          entered()
+          await held
+        }
+        return HttpResponse.json({ data: preparedShareCardFixture })
+      })
+    )
     handoff.mockImplementationOnce(() => {
       throw new Error('observable_handoff_failure')
     })
@@ -50,6 +69,12 @@ describe('exact-byte share-card dialog', () => {
     await screen.findByRole('alert')
     const retry = screen.getByRole('button', { name: 'Try again' })
     await userEvent.click(retry)
+    await started
+    expect(retry).toHaveFocus()
+    await act(async () => {
+      release()
+      await held
+    })
     await waitFor(() => expect(requests).toHaveLength(3))
     expect(requests).toEqual([
       expect.objectContaining({ purpose: 'preview' }),
@@ -60,9 +85,11 @@ describe('exact-byte share-card dialog', () => {
     await waitFor(() =>
       expect(screen.getByRole('status')).toHaveTextContent('Download started')
     )
-    expect(retry).toHaveFocus()
+    expect(retry).not.toBeInTheDocument()
+    expect(screen.getByTestId('share-card-save')).toHaveFocus()
+    expect(handoff).toHaveBeenCalledTimes(2)
   })
-  it('M5: conflict keeps Save focus and Refresh retains its preview and focus through preparation', async () => {
+  it('M5 R2-L2: conflict keeps Save focus and Refresh retires after its loaded preparation succeeds', async () => {
     const image = await open()
     fireEvent.load(image)
     let release!: () => void
@@ -100,6 +127,10 @@ describe('exact-byte share-card dialog', () => {
       image.getAttribute('src')
     )
     expect(refresh).toHaveFocus()
+    fireEvent.load(screen.getByTestId('share-card-preview'))
+    await waitFor(() => expect(refresh).not.toBeInTheDocument())
+    expect(screen.getByTestId('share-card-save')).toHaveFocus()
+    expect(handoff).not.toHaveBeenCalled()
   })
   it('M6: closing a recoverable error clears its alert while retaining approved bytes', async () => {
     const image = await open()
@@ -208,6 +239,72 @@ describe('exact-byte share-card dialog', () => {
     })
     expect(screen.queryByTestId('share-card-preview')).not.toBeInTheDocument()
     expect(handoff).not.toHaveBeenCalled()
+  })
+  it('R2-M2: a mounted outfit dialog aborts its former member request and admits only the new member preview', async () => {
+    let release!: () => void
+    let entered!: () => void
+    let cancelled!: () => void
+    const held = new Promise<void>((resolve) => {
+      release = resolve
+    })
+    const started = new Promise<void>((resolve) => {
+      entered = resolve
+    })
+    const aborted = new Promise<void>((resolve) => {
+      cancelled = resolve
+    })
+    let oldSignal: AbortSignal | undefined
+    let count = 0
+    useMswHandlers(
+      http.post(endpoint, async ({ request }) => {
+        count++
+        if (count === 1) {
+          oldSignal = request.signal
+          request.signal.addEventListener('abort', cancelled, { once: true })
+          entered()
+          await held
+          return HttpResponse.json({
+            data: {
+              ...preparedShareCardFixture,
+              accessibilityLabel: 'Former member outfit',
+            },
+          })
+        }
+        return HttpResponse.json({
+          data: {
+            ...preparedShareCardFixture,
+            accessibilityLabel: 'Current member outfit',
+          },
+        })
+      })
+    )
+    render(<ShareCardControl source={source} />)
+    await userEvent.click(screen.getByTestId('share-card-open'))
+    await started
+    const dialog = screen.getByRole('dialog')
+    try {
+      act(() => {
+        identity.member = 'member-two'
+        window.dispatchEvent(new Event('couture:session'))
+      })
+      expect(screen.getByRole('dialog')).toBe(dialog)
+      await waitFor(() => expect(oldSignal?.aborted).toBe(true))
+      await aborted
+      const image = await screen.findByRole('img', { name: 'Current member outfit' })
+      fireEvent.load(image)
+      await act(async () => {
+        release()
+        await held
+      })
+      expect(screen.getByRole('dialog')).toBe(dialog)
+      expect(screen.getByTestId('share-card-preview')).toBe(image)
+      expect(
+        screen.queryByRole('img', { name: 'Former member outfit' })
+      ).not.toBeInTheDocument()
+      expect(handoff).not.toHaveBeenCalled()
+    } finally {
+      release()
+    }
   })
   it.each(['close-reopen', 'unmount', 'identity'] as const)(
     'U-CANCEL: %s during fresh authorization cancels handoff and transient feedback',

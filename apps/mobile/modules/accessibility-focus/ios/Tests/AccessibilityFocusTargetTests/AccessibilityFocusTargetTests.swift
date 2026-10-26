@@ -65,4 +65,126 @@ final class AccessibilityFocusTargetTests: XCTestCase {
     XCTAssertEqual(AccessibilityFocusTarget.tags(of: element), [44])
     XCTAssertEqual(AccessibilityFocusTarget.tags(of: nil), [])
   }
+  func testPostedObservationFollowsTheActualUIKitLayoutChangedRequestForAttachedView() {
+    let target = UIView()
+    window.addSubview(target)
+    var order: [String] = []
+    XCTAssertTrue(AccessibilityFocusTarget.requestLayoutChange(target, post: { notification, argument in
+      XCTAssertEqual(notification, .layoutChanged)
+      XCTAssertTrue(argument as? UIView === target)
+      order.append("post")
+    }, didPost: { actual in
+      XCTAssertTrue(actual === target)
+      order.append("observe")
+    }))
+    XCTAssertEqual(order, ["post", "observe"])
+    target.removeFromSuperview()
+    XCTAssertFalse(AccessibilityFocusTarget.requestLayoutChange(target, post: { _, _ in XCTFail("Detached target posted") }, didPost: { _ in XCTFail("Detached target observed") }))
+  }
+
+  func testSemanticTargetResolvesSoleAccessibleFabricChildAndReadsItsRealHeaderTrait() throws {
+    let paragraph = UIView(frame: CGRect(x: 20, y: 30, width: 200, height: 40))
+    let leaf = UILabel(frame: paragraph.bounds)
+    leaf.text = "Home"
+    leaf.isAccessibilityElement = true
+    leaf.accessibilityTraits.insert(.header)
+    paragraph.addSubview(leaf)
+    window.addSubview(paragraph)
+    print("CC68_UIKIT_SURROGATE rawAX=\(leaf.accessibilityFrame) converted=\(leaf.convert(leaf.bounds, to: nil)) windowHasWindow=\(window.window != nil) windowAX=\(window.isAccessibilityElement)")
+    // The RN provider supplies its screen frame explicitly. A hostless UILabel
+    // surrogate must supply that same geometry without relying on an AX service.
+    leaf.accessibilityFrame = leaf.convert(leaf.bounds, to: nil)
+    let actual = try XCTUnwrap(AccessibilityFocusTarget.semanticTarget(paragraph))
+    XCTAssertTrue(actual === leaf)
+    XCTAssertTrue(actual.accessibilityTraits.contains(.header))
+    leaf.accessibilityTraits.remove(.header)
+    let changed = try XCTUnwrap(AccessibilityFocusTarget.semanticTarget(paragraph))
+    XCTAssertFalse(changed.accessibilityTraits.contains(.header))
+    let sibling = UILabel(frame: paragraph.bounds)
+    sibling.isAccessibilityElement = true
+    sibling.accessibilityFrame = leaf.accessibilityFrame
+    paragraph.addSubview(sibling)
+    XCTAssertNil(AccessibilityFocusTarget.semanticTarget(paragraph))
+  }
+
+  func testActualFabricProviderElementsCarryHeaderTraitWithoutUIViewSubviewsAndDeduplicateCycles() throws {
+    let paragraph = UIView(frame: CGRect(x: 20, y: 40, width: 200, height: 30))
+    paragraph.isAccessibilityElement = false
+    window.addSubview(paragraph)
+    let element = UIAccessibilityElement(accessibilityContainer: paragraph)
+    element.isAccessibilityElement = true
+    element.accessibilityLabel = "Home"
+    element.accessibilityTraits = [.header, .staticText]
+    element.accessibilityFrame = paragraph.convert(paragraph.bounds, to: nil)
+    paragraph.accessibilityElements = [element, element, paragraph]
+    print("CC68_UIKIT_PROVIDER windowHasWindow=\(window.window != nil) windowAX=\(window.isAccessibilityElement) windowFrame=\(window.convert(window.bounds, to: nil)) providerFrame=\(element.accessibilityFrame)")
+    let actual = try XCTUnwrap(AccessibilityFocusTarget.semanticTarget(paragraph))
+    XCTAssertTrue(actual === element)
+    XCTAssertEqual(AccessibilityFocusTarget.visibleSemanticElements(in: window).count, 1)
+    XCTAssertTrue(actual.accessibilityTraits.contains(.header))
+    element.accessibilityTraits.remove(.header)
+    let changed = try XCTUnwrap(AccessibilityFocusTarget.semanticTarget(paragraph))
+    XCTAssertFalse(changed.accessibilityTraits.contains(.header))
+    paragraph.isHidden = true
+    XCTAssertTrue(AccessibilityFocusTarget.visibleSemanticElements(in: window).isEmpty)
+  }
+
+  func testWindowRootVisibilityAndDetachedNormalViewsRemainStrict() {
+    let paragraph = UIView(frame: CGRect(x: 10, y: 20, width: 100, height: 30))
+    window.addSubview(paragraph)
+    let element = UIAccessibilityElement(accessibilityContainer: paragraph)
+    element.isAccessibilityElement = true
+    element.accessibilityLabel = "Home"
+    element.accessibilityTraits = [.header]
+    element.accessibilityFrame = paragraph.convert(paragraph.bounds, to: nil)
+    paragraph.accessibilityElements = [element]
+    XCTAssertEqual(AccessibilityFocusTarget.visibleSemanticElements(in: window).count, 1)
+    window.isAccessibilityElement = true
+    XCTAssertEqual(AccessibilityFocusTarget.visibleSemanticElements(in: window).count, 1)
+    window.isAccessibilityElement = false
+    let frame = element.accessibilityFrame
+    element.accessibilityFrame = .zero
+    XCTAssertNil(AccessibilityFocusTarget.semanticTarget(paragraph))
+    XCTAssertTrue(AccessibilityFocusTarget.visibleSemanticElements(in: window).isEmpty)
+    element.accessibilityFrame = frame.offsetBy(dx: 1000, dy: 0)
+    XCTAssertTrue(AccessibilityFocusTarget.visibleSemanticElements(in: window).isEmpty)
+    element.accessibilityFrame = frame
+    window.isHidden = true
+    XCTAssertTrue(AccessibilityFocusTarget.visibleSemanticElements(in: window).isEmpty)
+    window.isHidden = false
+    window.alpha = 0
+    XCTAssertTrue(AccessibilityFocusTarget.visibleSemanticElements(in: window).isEmpty)
+    window.alpha = 1
+    paragraph.removeFromSuperview()
+    XCTAssertFalse(AccessibilityFocusTarget.canTakeFocus(paragraph))
+    XCTAssertTrue(AccessibilityFocusTarget.visibleSemanticElements(in: paragraph).isEmpty)
+    XCTAssertTrue(AccessibilityFocusTarget.visibleSemanticElements(in: window).isEmpty)
+  }
+
+  func testObservationIdentifierUsesConcreteUIKitTypesAndRetainsRequestedViewFallback() {
+    let view = UIView()
+    view.accessibilityIdentifier = "requested-title"
+    let element = UIAccessibilityElement(accessibilityContainer: view)
+    func report(_ stage: String) {
+      let erasedView: NSObject = view
+      let erasedProvider: NSObject = element
+      print("CC68_IDENTIFIER_DIAGNOSTIC \(stage) viewID=\(String(describing: view.accessibilityIdentifier)) providerID=\(String(describing: element.accessibilityIdentifier)) viewProtocol=\((erasedView as? UIAccessibilityIdentification) != nil) providerProtocol=\((erasedProvider as? UIAccessibilityIdentification) != nil) viewType=\(type(of: view))")
+    }
+    report("initial")
+    element.accessibilityIdentifier = "semantic-title"
+    report("provider-assigned")
+    XCTAssertEqual(AccessibilityFocusTarget.observationIdentifier(of: element, requestedView: view), "semantic-title")
+    element.accessibilityIdentifier = nil
+    report("provider-nil")
+    XCTAssertEqual(AccessibilityFocusTarget.observationIdentifier(of: element, requestedView: view), "requested-title")
+    element.accessibilityIdentifier = ""
+    report("provider-empty")
+    XCTAssertEqual(AccessibilityFocusTarget.observationIdentifier(of: element, requestedView: view), "requested-title")
+    XCTAssertEqual(AccessibilityFocusTarget.observationIdentifier(of: element, requestedView: nil), "")
+    XCTAssertEqual(AccessibilityFocusTarget.observationIdentifier(of: view, requestedView: nil), "requested-title")
+    XCTAssertEqual(AccessibilityFocusTarget.observationIdentifier(of: NSObject(), requestedView: view), "requested-title")
+    XCTAssertEqual(AccessibilityFocusTarget.observationIdentifier(of: NSObject(), requestedView: nil), "")
+    XCTAssertEqual(AccessibilityFocusTarget.observationIdentifier(of: nil, requestedView: nil), "")
+  }
+
 }

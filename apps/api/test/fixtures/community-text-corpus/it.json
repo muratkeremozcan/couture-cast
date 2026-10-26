@@ -2122,7 +2122,8 @@
       "spaced-letters",
       "leet-and-spaced",
       "doubled-letter-deletion",
-      "context-separator-adversarial"
+      "context-separator-adversarial",
+      "round6-insult-frame"
     ],
     "entries": [
       {
@@ -10680,6 +10681,570 @@
         "family": "context-separator-adversarial",
         "field": "caption",
         "text": "avec retard you retard"
+      },
+      {
+        "id": "it-round6-insult-frame-001",
+        "family": "round6-insult-frame",
+        "field": "caption",
+        "text": "you are un retard"
+      },
+      {
+        "id": "it-round6-insult-frame-002",
+        "family": "round6-insult-frame",
+        "field": "altText",
+        "text": "stupid un retard"
+      },
+      {
+        "id": "it-round6-insult-frame-003",
+        "family": "round6-insult-frame",
+        "field": "caption",
+        "text": "you absolute un retard"
+      },
+      {
+        "id": "it-round6-insult-frame-004",
+        "family": "round6-insult-frame",
+        "field": "altText",
+        "text": "you are du retard"
+      },
+      {
+        "id": "it-round6-insult-frame-005",
+        "family": "round6-insult-frame",
+        "field": "caption",
+        "text": "such a retard des"
+      },
+      {
+        "id": "it-round6-insult-frame-006",
+        "family": "round6-insult-frame",
+        "field": "altText",
+        "text": "retard du jour, you"
+      },
+      {
+        "id": "it-round6-insult-frame-007",
+        "family": "round6-insult-frame",
+        "field": "caption",
+        "text": "what a retard de merde"
+      },
+      {
+        "id": "it-round6-insult-frame-008",
+        "family": "round6-insult-frame",
+        "field": "altText",
+        "text": "du retard"
+      },
+      {
+        "id": "it-round6-insult-frame-009",
+        "family": "round6-insult-frame",
+        "field": "caption",
+        "text": "un retard"
+      },
+      {
+        "id": "it-round6-insult-frame-010",
+        "family": "round6-insult-frame",
+        "field": "altText",
+        "text": "de retard"
+      },
+      {
+        "id": "it-round6-insult-frame-011",
+        "family": "round6-insult-frame",
+        "field": "caption",
+        "text": "retard de"
+      },
+      {
+        "id": "it-round6-insult-frame-012",
+        "family": "round6-insult-frame",
+        "field": "altText",
+        "text": "retard du"
+      },
+      {
+        "id": "it-round6-insult-frame-013",
+        "family": "round6-insult-frame",
+        "field": "caption",
+        "text": "retard des"
+      },
+      {
+        "id": "it-round6-insult-frame-014",
+        "family": "round6-insult-frame",
+        "field": "altText",
+        "text": "sans retard"
+      },
+      {
+        "id": "it-round6-insult-frame-015",
+        "family": "round6-insult-frame",
+        "field": "caption",
+        "text": "avec retard"
+      },
+      {
+        "id": "it-round6-insult-frame-016",
+        "family": "round6-insult-frame",
+        "field": "altText",
+        "text": "o tapete"
+      },
+      {
+        "id": "it-round6-insult-frame-017",
+        "family": "round6-insult-frame",
+        "field": "caption",
+        "text": "do tapete"
+      },
+      {
+        "id": "it-round6-insult-frame-018",
+        "family": "round6-insult-frame",
+        "field": "altText",
+        "text": "no tapete"
+      },
+      {
+        "id": "it-round6-insult-frame-019",
+        "family": "round6-insult-frame",
+        "field": "caption",
+        "text": "sobre o tapete"
+      },
+      {
+        "id": "it-round6-insult-frame-020",
+        "family": "round6-insult-frame",
+        "field": "altText",
+        "text": "un tapete"
+      },
+      {
+        "id": "it-round6-insult-frame-021",
+        "family": "round6-insult-frame",
+        "field": "caption",
+        "text": "el tapete"
+      },
+      {
+        "id": "it-round6-insult-frame-022",
+        "family": "round6-insult-frame",
+        "field": "altText",
+        "text": "y0u 4re en retard"
+      },
+      {
+        "id": "it-round6-insult-frame-023",
+        "family": "round6-insult-frame",
+        "field": "caption",
+        "text": "y o u a r e en retard"
+      },
+      {
+        "id": "it-round6-insult-frame-024",
+        "family": "round6-insult-frame",
+        "field": "altText",
+        "text": "WHAT A en retard"
+      },
+      {
+        "id": "it-round6-insult-frame-025",
+        "family": "round6-insult-frame",
+        "field": "caption",
+        "text": "t’es um tapete"
+      },
+      {
+        "id": "it-round6-insult-frame-026",
+        "family": "round6-insult-frame",
+        "field": "altText",
+        "text": "tu és um tapete"
+      },
+      {
+        "id": "it-round6-insult-frame-027",
+        "family": "round6-insult-frame",
+        "field": "caption",
+        "text": "espèce de um tapete"
+      },
+      {
+        "id": "it-round6-insult-frame-028",
+        "family": "round6-insult-frame",
+        "field": "altText",
+        "text": "c’est un um tapete"
+      },
+      {
+        "id": "it-round6-insult-frame-029",
+        "family": "round6-insult-frame",
+        "field": "caption",
+        "text": "t u e s um tapete"
+      },
+      {
+        "id": "it-round6-insult-frame-030",
+        "family": "round6-insult-frame",
+        "field": "altText",
+        "text": "you are en retard"
+      },
+      {
+        "id": "it-round6-insult-frame-031",
+        "family": "round6-insult-frame",
+        "field": "caption",
+        "text": "you are, en retard"
+      },
+      {
+        "id": "it-round6-insult-frame-032",
+        "family": "round6-insult-frame",
+        "field": "altText",
+        "text": "you are - en retard"
+      },
+      {
+        "id": "it-round6-insult-frame-033",
+        "family": "round6-insult-frame",
+        "field": "caption",
+        "text": "you are\nen retard"
+      },
+      {
+        "id": "it-round6-insult-frame-034",
+        "family": "round6-insult-frame",
+        "field": "altText",
+        "text": "you are 😃 en retard"
+      },
+      {
+        "id": "it-round6-insult-frame-035",
+        "family": "round6-insult-frame",
+        "field": "caption",
+        "text": "such a en retard"
+      },
+      {
+        "id": "it-round6-insult-frame-036",
+        "family": "round6-insult-frame",
+        "field": "altText",
+        "text": "such a, en retard"
+      },
+      {
+        "id": "it-round6-insult-frame-037",
+        "family": "round6-insult-frame",
+        "field": "caption",
+        "text": "such a - en retard"
+      },
+      {
+        "id": "it-round6-insult-frame-038",
+        "family": "round6-insult-frame",
+        "field": "altText",
+        "text": "such a\nen retard"
+      },
+      {
+        "id": "it-round6-insult-frame-039",
+        "family": "round6-insult-frame",
+        "field": "caption",
+        "text": "such a 😃 en retard"
+      },
+      {
+        "id": "it-round6-insult-frame-040",
+        "family": "round6-insult-frame",
+        "field": "altText",
+        "text": "what a en retard"
+      },
+      {
+        "id": "it-round6-insult-frame-041",
+        "family": "round6-insult-frame",
+        "field": "caption",
+        "text": "what a, en retard"
+      },
+      {
+        "id": "it-round6-insult-frame-042",
+        "family": "round6-insult-frame",
+        "field": "altText",
+        "text": "what a - en retard"
+      },
+      {
+        "id": "it-round6-insult-frame-043",
+        "family": "round6-insult-frame",
+        "field": "caption",
+        "text": "what a\nen retard"
+      },
+      {
+        "id": "it-round6-insult-frame-044",
+        "family": "round6-insult-frame",
+        "field": "altText",
+        "text": "what a 😃 en retard"
+      },
+      {
+        "id": "it-round6-insult-frame-045",
+        "family": "round6-insult-frame",
+        "field": "caption",
+        "text": "stupid en retard"
+      },
+      {
+        "id": "it-round6-insult-frame-046",
+        "family": "round6-insult-frame",
+        "field": "altText",
+        "text": "stupid, en retard"
+      },
+      {
+        "id": "it-round6-insult-frame-047",
+        "family": "round6-insult-frame",
+        "field": "caption",
+        "text": "stupid - en retard"
+      },
+      {
+        "id": "it-round6-insult-frame-048",
+        "family": "round6-insult-frame",
+        "field": "altText",
+        "text": "stupid\nen retard"
+      },
+      {
+        "id": "it-round6-insult-frame-049",
+        "family": "round6-insult-frame",
+        "field": "caption",
+        "text": "stupid 😃 en retard"
+      },
+      {
+        "id": "it-round6-insult-frame-050",
+        "family": "round6-insult-frame",
+        "field": "altText",
+        "text": "you absolute en retard"
+      },
+      {
+        "id": "it-round6-insult-frame-051",
+        "family": "round6-insult-frame",
+        "field": "caption",
+        "text": "you absolute, en retard"
+      },
+      {
+        "id": "it-round6-insult-frame-052",
+        "family": "round6-insult-frame",
+        "field": "altText",
+        "text": "you absolute - en retard"
+      },
+      {
+        "id": "it-round6-insult-frame-053",
+        "family": "round6-insult-frame",
+        "field": "caption",
+        "text": "you absolute\nen retard"
+      },
+      {
+        "id": "it-round6-insult-frame-054",
+        "family": "round6-insult-frame",
+        "field": "altText",
+        "text": "you absolute 😃 en retard"
+      },
+      {
+        "id": "it-round6-insult-frame-055",
+        "family": "round6-insult-frame",
+        "field": "caption",
+        "text": "t es um tapete"
+      },
+      {
+        "id": "it-round6-insult-frame-056",
+        "family": "round6-insult-frame",
+        "field": "altText",
+        "text": "t es, um tapete"
+      },
+      {
+        "id": "it-round6-insult-frame-057",
+        "family": "round6-insult-frame",
+        "field": "caption",
+        "text": "t es - um tapete"
+      },
+      {
+        "id": "it-round6-insult-frame-058",
+        "family": "round6-insult-frame",
+        "field": "altText",
+        "text": "t es\num tapete"
+      },
+      {
+        "id": "it-round6-insult-frame-059",
+        "family": "round6-insult-frame",
+        "field": "caption",
+        "text": "t es 😃 um tapete"
+      },
+      {
+        "id": "it-round6-insult-frame-060",
+        "family": "round6-insult-frame",
+        "field": "altText",
+        "text": "tu es um tapete"
+      },
+      {
+        "id": "it-round6-insult-frame-061",
+        "family": "round6-insult-frame",
+        "field": "caption",
+        "text": "tu es, um tapete"
+      },
+      {
+        "id": "it-round6-insult-frame-062",
+        "family": "round6-insult-frame",
+        "field": "altText",
+        "text": "tu es - um tapete"
+      },
+      {
+        "id": "it-round6-insult-frame-063",
+        "family": "round6-insult-frame",
+        "field": "caption",
+        "text": "tu es\num tapete"
+      },
+      {
+        "id": "it-round6-insult-frame-064",
+        "family": "round6-insult-frame",
+        "field": "altText",
+        "text": "tu es 😃 um tapete"
+      },
+      {
+        "id": "it-round6-insult-frame-065",
+        "family": "round6-insult-frame",
+        "field": "caption",
+        "text": "espece de um tapete"
+      },
+      {
+        "id": "it-round6-insult-frame-066",
+        "family": "round6-insult-frame",
+        "field": "altText",
+        "text": "espece de, um tapete"
+      },
+      {
+        "id": "it-round6-insult-frame-067",
+        "family": "round6-insult-frame",
+        "field": "caption",
+        "text": "espece de - um tapete"
+      },
+      {
+        "id": "it-round6-insult-frame-068",
+        "family": "round6-insult-frame",
+        "field": "altText",
+        "text": "espece de\num tapete"
+      },
+      {
+        "id": "it-round6-insult-frame-069",
+        "family": "round6-insult-frame",
+        "field": "caption",
+        "text": "espece de 😃 um tapete"
+      },
+      {
+        "id": "it-round6-insult-frame-070",
+        "family": "round6-insult-frame",
+        "field": "altText",
+        "text": "sale um tapete"
+      },
+      {
+        "id": "it-round6-insult-frame-071",
+        "family": "round6-insult-frame",
+        "field": "caption",
+        "text": "sale, um tapete"
+      },
+      {
+        "id": "it-round6-insult-frame-072",
+        "family": "round6-insult-frame",
+        "field": "altText",
+        "text": "sale - um tapete"
+      },
+      {
+        "id": "it-round6-insult-frame-073",
+        "family": "round6-insult-frame",
+        "field": "caption",
+        "text": "sale\num tapete"
+      },
+      {
+        "id": "it-round6-insult-frame-074",
+        "family": "round6-insult-frame",
+        "field": "altText",
+        "text": "sale 😃 um tapete"
+      },
+      {
+        "id": "it-round6-insult-frame-075",
+        "family": "round6-insult-frame",
+        "field": "caption",
+        "text": "quel um tapete"
+      },
+      {
+        "id": "it-round6-insult-frame-076",
+        "family": "round6-insult-frame",
+        "field": "altText",
+        "text": "quel, um tapete"
+      },
+      {
+        "id": "it-round6-insult-frame-077",
+        "family": "round6-insult-frame",
+        "field": "caption",
+        "text": "quel - um tapete"
+      },
+      {
+        "id": "it-round6-insult-frame-078",
+        "family": "round6-insult-frame",
+        "field": "altText",
+        "text": "quel\num tapete"
+      },
+      {
+        "id": "it-round6-insult-frame-079",
+        "family": "round6-insult-frame",
+        "field": "caption",
+        "text": "quel 😃 um tapete"
+      },
+      {
+        "id": "it-round6-insult-frame-080",
+        "family": "round6-insult-frame",
+        "field": "altText",
+        "text": "quelle um tapete"
+      },
+      {
+        "id": "it-round6-insult-frame-081",
+        "family": "round6-insult-frame",
+        "field": "caption",
+        "text": "quelle, um tapete"
+      },
+      {
+        "id": "it-round6-insult-frame-082",
+        "family": "round6-insult-frame",
+        "field": "altText",
+        "text": "quelle - um tapete"
+      },
+      {
+        "id": "it-round6-insult-frame-083",
+        "family": "round6-insult-frame",
+        "field": "caption",
+        "text": "quelle\num tapete"
+      },
+      {
+        "id": "it-round6-insult-frame-084",
+        "family": "round6-insult-frame",
+        "field": "altText",
+        "text": "quelle 😃 um tapete"
+      },
+      {
+        "id": "it-round6-insult-frame-085",
+        "family": "round6-insult-frame",
+        "field": "caption",
+        "text": "ce um tapete"
+      },
+      {
+        "id": "it-round6-insult-frame-086",
+        "family": "round6-insult-frame",
+        "field": "altText",
+        "text": "ce, um tapete"
+      },
+      {
+        "id": "it-round6-insult-frame-087",
+        "family": "round6-insult-frame",
+        "field": "caption",
+        "text": "ce - um tapete"
+      },
+      {
+        "id": "it-round6-insult-frame-088",
+        "family": "round6-insult-frame",
+        "field": "altText",
+        "text": "ce\num tapete"
+      },
+      {
+        "id": "it-round6-insult-frame-089",
+        "family": "round6-insult-frame",
+        "field": "caption",
+        "text": "ce 😃 um tapete"
+      },
+      {
+        "id": "it-round6-insult-frame-090",
+        "family": "round6-insult-frame",
+        "field": "altText",
+        "text": "c est un um tapete"
+      },
+      {
+        "id": "it-round6-insult-frame-091",
+        "family": "round6-insult-frame",
+        "field": "caption",
+        "text": "c est un, um tapete"
+      },
+      {
+        "id": "it-round6-insult-frame-092",
+        "family": "round6-insult-frame",
+        "field": "altText",
+        "text": "c est un - um tapete"
+      },
+      {
+        "id": "it-round6-insult-frame-093",
+        "family": "round6-insult-frame",
+        "field": "caption",
+        "text": "c est un\num tapete"
+      },
+      {
+        "id": "it-round6-insult-frame-094",
+        "family": "round6-insult-frame",
+        "field": "altText",
+        "text": "c est un 😃 um tapete"
       }
     ]
   }

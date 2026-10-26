@@ -31,6 +31,8 @@ const failures = new Set([
   'release_text_nodes_changed',
   'release_font_restore_failed',
   'release_restore_deadline',
+  'release_applied_font_configuration_required',
+  'release_stable_state_required',
 ])
 
 export async function runReleaseLiveFontCommand(ctx) {
@@ -126,7 +128,8 @@ export async function runReleaseLiveFontCommand(ctx) {
       },
       {
         avdName: () => adb(['emu', 'avd', 'name']),
-        shell: (args) => adb(['shell', ...args]),
+        shell: (args, timeout = 10000) =>
+          execute(ctx.adb, ['-s', ctx.device, 'shell', ...args], timeout),
         connect: () =>
           restoreAndroidReverse({
             adb: ctx.adb,

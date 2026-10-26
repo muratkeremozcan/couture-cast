@@ -6,9 +6,11 @@ import { spawn, spawnSync } from 'node:child_process'
 import { fileURLToPath } from 'node:url'
 import { createHash } from 'node:crypto'
 import { createServer } from 'node:http'
+import { story68FocusObservationHandler } from './lib/story68-ios-focus-observation.mjs'
 import { startWeatherProviderDouble } from './weather-provider-double.mjs'
 import { closedShareCardAuditReport } from './lib/share-card-audit-report.mjs'
 import { summarizeNativeFlowFailure } from './lib/share-card-native-failure.mjs'
+import { recordNativeFlowDiagnostics } from './lib/share-card-native-diagnostics.mjs'
 import { assertShareCardDialogStatusBar } from './lib/share-card-system-bars.mjs'
 import { withColdAndroidFontScale } from './lib/story68-cold-font-scale.mjs'
 import { runReleaseLiveFontCommand } from './lib/story68-release-live-font-command.mjs'
@@ -301,19 +303,44 @@ function maestro(flow, env = {}, secret = '', attempt = 0) {
   }, reverse)
   const driverLog = path.join(output, 'maestro.log')
   const snapshotLog = fs.existsSync(driverLog) ? fs.readFileSync(driverLog, 'utf8') : ''
+  const failureDurationMs = Math.max(0, Date.now() - started)
   const recoverSnapshot =
     result.status !== 0 &&
     shouldRetryIosSnapshot({ platform, attempt, log: snapshotLog, flow })
-  if (result.status !== 0 && !recoverSnapshot)
+  if (result.status !== 0 && !recoverSnapshot) {
     privateJson(
       `native-flow-failure-${platform}.json`,
       summarizeNativeFlowFailure({
         flow,
         platform,
-        durationMs: Math.max(0, Date.now() - started),
+        durationMs: failureDurationMs,
         log: `${snapshotLog}\n${result.stdout ?? ''}\n${result.stderr ?? ''}`,
       })
     )
+    // Capture while the emulator and the exact failed-step artifacts still exist.
+    // The child projects closed diagnostics; raw captures stay runner-private.
+    try {
+      recordNativeFlowDiagnostics({
+        root,
+        directory,
+        output,
+        flow,
+        platform,
+        device,
+        adb,
+        durationMs: failureDurationMs,
+        exitCode: result.status,
+        signal: result.signal ?? null,
+        sensitive: secret !== '',
+        startedAt: started,
+        log: `${snapshotLog}\n${result.stdout ?? ''}\n${result.stderr ?? ''}`.slice(
+          -200000
+        ),
+      })
+    } catch {
+      // Diagnostics must preserve the original Maestro failure.
+    }
+  }
   const log = `${result.stdout}\n${result.stderr}`
     .split(secret || '\0')
     .join('[REDACTED]')
@@ -509,7 +536,7 @@ if (command === 'prebuild') {
           option('derived-data') ?? '/tmp/cc68-ios-build',
           '-jobs',
           '2',
-          'ARCHS=arm64',
+          `ARCHS=${process.arch === 'arm64' ? 'arm64' : 'x86_64'}`,
           'ONLY_ACTIVE_ARCH=YES',
           'CODE_SIGN_IDENTITY=-',
           'CODE_SIGN_LOCAL_EXECUTION_IDENTITY=Ad Hoc',
@@ -694,7 +721,14 @@ if (command === 'prebuild') {
     '--project',
     generated,
   ])
+  const focusObservation = story68FocusObservationHandler({
+    device,
+    appId,
+    readContainer: () =>
+      run('xcrun', ['simctl', 'get_app_container', device, appId, 'data']),
+  })
   const control = createServer((request, response) => {
+    if (focusObservation(request, response)) return
     const url = new URL(request.url, 'http://127.0.0.1:63068')
     const mode = url.searchParams.get('mode')
     if (

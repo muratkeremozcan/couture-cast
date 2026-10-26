@@ -92,7 +92,9 @@ test('only the complete reviewed occurrence bank is generated', () => {
     { ...bank, target: 'nigga' },
     { ...bank, phrases: ['you retard', ...bank.phrases.slice(1)] },
     { ...bank, phrases: bank.phrases.slice(1) },
-    { ...bank, phrases: bank.phrases.map(() => bank.phrases[0]) },
+    { ...bank, phrases: [...bank.phrases, bank.phrases[0]] },
+    { ...bank, requiredDeclaredLanguages: [] },
+    { ...bank, rejectedPrefixFrames: [] },
   ])
     assert.ok(occurrenceConstructionProblems([changed]).length)
   for (const input of [null, {}, [bank, bank], [null]])

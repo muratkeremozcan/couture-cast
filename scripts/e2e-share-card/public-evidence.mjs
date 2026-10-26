@@ -1,11 +1,35 @@
 import fs from 'node:fs'
 import path from 'node:path'
 import { assertNativeFlowFailure } from '../lib/share-card-native-failure.mjs'
+import {
+  assertNativeFlowDiagnostics,
+  writeRedactedNativeFailureImage,
+} from '../lib/share-card-native-diagnostics.mjs'
+import {
+  assertBrowserWatermarkEvidence,
+  browserWatermarkChecks,
+} from '../lib/story68-browser-watermark.mjs'
 const directory = path.resolve(
   process.env.CC68_HARNESS_DIR ?? '_bmad-output/test-artifacts/story-6-8/runtime'
 )
 const output = path.join(directory, 'public-evidence')
+fs.rmSync(output, { recursive: true, force: true })
 fs.mkdirSync(output, { recursive: true })
+let ciStatus
+if (process.env.CC68_CI_PLATFORM !== undefined) {
+  const platform = process.env.CC68_CI_PLATFORM
+  const api = process.env.CC68_CI_API
+  const jobStatus = process.env.CC68_CI_JOB_STATUS
+  if (
+    !['success', 'failure', 'cancelled'].includes(jobStatus) ||
+    !(
+      (platform === 'ios' && api === '0') ||
+      (platform === 'android' && ['32', '36'].includes(api))
+    )
+  )
+    throw new Error('invalid_native_ci_status')
+  ciStatus = { platform, api: Number(api), jobStatus }
+}
 // Validate all failure records before copying any artifact. Filename and fields
 // both use closed values, so raw Maestro output cannot enter public evidence.
 const failures = new Map()
@@ -22,6 +46,22 @@ for (const platform of ['android', 'ios']) {
   assertNativeFlowFailure(record)
   if (record.platform !== platform) throw new Error('invalid_native_flow_failure')
   failures.set(name, record)
+}
+// Validate the entire diagnostic projection before copying any older proof.
+const diagnostics = new Map()
+for (const platform of ['android', 'ios']) {
+  const name = `native-flow-diagnostics-${platform}.json`
+  const file = path.join(directory, name)
+  if (!fs.existsSync(file)) continue
+  let value
+  try {
+    value = JSON.parse(fs.readFileSync(file))
+  } catch {
+    throw new Error('invalid_native_flow_diagnostics')
+  }
+  assertNativeFlowDiagnostics(value)
+  if (value.platform !== platform) throw new Error('invalid_native_flow_diagnostics')
+  diagnostics.set(name, value)
 }
 // Only primitive proof facts cross the native evidence boundary. Private logs and
 // resource identities are deliberately absent from the public projection.
@@ -140,6 +180,55 @@ for (const platform of ['android', 'ios']) {
     proofs.set(name, summary)
   }
 }
+const browserProofs = new Map()
+for (const browser of ['chromium', 'firefox', 'webkit']) {
+  for (const kind of ['', 'failure-']) {
+    const name = `browser-watermark-${kind}${browser}.json`
+    const file = path.join(directory, name)
+    if (!fs.existsSync(file)) continue
+    const invalid = () => {
+      throw new Error('invalid_browser_watermark_evidence')
+    }
+    let value
+    try {
+      value = JSON.parse(fs.readFileSync(file))
+    } catch {
+      invalid()
+    }
+    if (!value || typeof value !== 'object' || Array.isArray(value)) invalid()
+    const {
+      version,
+      passed,
+      code,
+      phase,
+      elapsedMs,
+      heldMs,
+      requests,
+      unavailableResponses,
+    } = value
+    const projected = {
+      version,
+      browser: value.browser,
+      passed,
+      code,
+      phase,
+      elapsedMs,
+      heldMs,
+      requests,
+      unavailableResponses,
+      checks: Object.fromEntries(
+        browserWatermarkChecks.map((key) => [key, value.checks?.[key]])
+      ),
+    }
+    assertBrowserWatermarkEvidence(projected)
+    if (
+      projected.browser !== browser ||
+      (kind === 'failure-' && projected.passed !== false)
+    )
+      invalid()
+    browserProofs.set(name, projected)
+  }
+}
 const closedJSON = (name, value) => {
   const text = JSON.stringify(value, null, 2) + '\n'
   if (
@@ -150,6 +239,19 @@ const closedJSON = (name, value) => {
     throw new Error('private_data_in_public_evidence')
   fs.writeFileSync(path.join(output, name), text)
 }
+// Startup can fail before a native flow exists. Preserve that outcome without
+// fabricating a flow result or publishing provisioning logs.
+if (ciStatus) closedJSON('ci-job-status.json', ciStatus)
+for (const [name, value] of browserProofs) closedJSON(name, value)
+for (const [name, value] of diagnostics) {
+  closedJSON(name, value)
+  // Re-render from validated primitives. Never trust or copy a claimed redacted PNG.
+  await writeRedactedNativeFailureImage(
+    value,
+    path.join(output, name.replace('.json', '-redacted.png'))
+  )
+}
+
 for (const name of fs.readdirSync(directory)) {
   if (failures.has(name)) closedJSON(name, failures.get(name))
   if (proofs.has(name)) closedJSON(name, proofs.get(name))

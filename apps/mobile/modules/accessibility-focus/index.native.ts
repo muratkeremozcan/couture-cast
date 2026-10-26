@@ -14,6 +14,7 @@ export type { AccessibilityFocusChange, AccessibilityFocusListener } from './typ
 interface AccessibilityFocusModule {
   /** False on Android before API 29, where observing could discard another delegate. */
   canObserveFocus?: boolean
+  enableStory68Observation?(fixtureEnabled: boolean): Promise<boolean>
   focus(tag: number): Promise<boolean>
   addListener(
     event: 'onAccessibilityFocusChange',
@@ -46,4 +47,9 @@ export function observeAccessibilityFocus(
 export function focusAccessibilityElement(tag: number): Promise<boolean> | null {
   const module = nativeModule()
   return module ? module.focus(tag) : null
+}
+
+/** Read-only diagnostics, activated only by the isolated Debug fixture boundary. */
+export function enableStory68FocusObservation(enabled = true): Promise<boolean> | null {
+  return nativeModule()?.enableStory68Observation?.(enabled) ?? null
 }

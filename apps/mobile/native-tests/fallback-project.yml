@@ -17,6 +17,7 @@ targets:
         PRODUCT_BUNDLE_IDENTIFIER: com.couturecast.story68.fallbacktests
         GENERATE_INFOPLIST_FILE: YES
         SWIFT_VERSION: '5.0'
+        INFOPLIST_KEY_NSAppTransportSecurity_NSAllowsLocalNetworking: YES
         CODE_SIGN_IDENTITY: '-'
         CODE_SIGNING_ALLOWED: YES
         CODE_SIGNING_REQUIRED: NO

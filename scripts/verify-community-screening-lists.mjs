@@ -62,6 +62,10 @@ export function occurrenceConstructionProblems(rules) {
     )
     return (
       reviewed &&
+      JSON.stringify(rule.requiredDeclaredLanguages ?? []) ===
+        JSON.stringify(reviewed.requiredDeclaredLanguages ?? []) &&
+      JSON.stringify(rule.rejectedPrefixFrames ?? []) ===
+        JSON.stringify(reviewed.rejectedPrefixFrames ?? []) &&
       typeof rule.reason === 'string' &&
       rule.reason.length >= 20 &&
       Array.isArray(rule.phrases) &&

@@ -116,8 +116,8 @@ describe('round 3 development data, including released v4', () => {
       }
       expect(allFailures).toEqual([])
     },
-    // Measured seven locale loops: 4.38..4.66 s plain, 5.29..5.68 s with
-    // coverage. This 20 s batch-only deadline leaves 3.5x measured headroom;
+    // Round6 measured seven locale loops: 4.83..5.02 s plain, 5.59..6.48 s
+    // covered. This 20 s batch-only deadline leaves 3.0x measured headroom;
     // ordinary tests retain Vitest's default and product budgets stay unchanged.
     20_000
   )
@@ -283,8 +283,9 @@ describe('round 3 development data, including released v4', () => {
     (locale) => {
       for (const [index, text] of ordinaryHomographs.entries()) {
         const native = index < 2 ? 'es' : index < 4 ? 'fr' : index < 6 ? 'it' : 'pt'
-        if (native === 'fr' || locale.startsWith(native))
-          expect(clean(text, locale), text).toBe('pass')
+        // Round6 removes the ambiguous article construction even in French.
+        if (text.startsWith('Un retard')) expect(clean(text, locale), text).toBe('block')
+        else if (locale.startsWith(native)) expect(clean(text, locale), text).toBe('pass')
         else expect(clean(text, locale), text).not.toBe('pass')
         expect(clean(text + ' fuck', locale), text).not.toBe('pass')
       }
