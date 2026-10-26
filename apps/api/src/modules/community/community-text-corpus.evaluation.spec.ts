@@ -38,19 +38,20 @@ async function currentInputSetHash(): Promise<string> {
 }
 
 const corpusDir = path.resolve(__dirname, '../../../test/fixtures/community-text-corpus')
-const holdoutVersion: string = JSON.parse(
+const activeHoldout = JSON.parse(
   fs.readFileSync(path.join(corpusDir, 'active-holdout.json'), 'utf8')
-).corpusVersion
+) as { corpusVersion: string }
+const holdoutVersion = activeHoldout.corpusVersion
 if (!/^holdout-v[1-9]\d*$/.test(holdoutVersion)) {
   throw new Error('active text holdout version is invalid')
 }
-const freezeManifest: {
+const freezeManifest = JSON.parse(
+  fs.readFileSync(path.join(corpusDir, holdoutVersion, 'freeze-manifest.json'), 'utf8')
+) as {
   corpusVersion: string
   corpusSha256: string
   files: { language: string; path: string; sha256: string }[]
-} = JSON.parse(
-  fs.readFileSync(path.join(corpusDir, holdoutVersion, 'freeze-manifest.json'), 'utf8')
-)
+}
 
 const LANGUAGE_LOCALE: Record<string, string> = {
   de: 'de-DE',
