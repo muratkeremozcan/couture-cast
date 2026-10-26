@@ -128,3 +128,32 @@ test('the reviewed carpet bank is complete and cannot introduce another exemptio
   ])
     assert.ok(occurrenceConstructionProblems([{ ...bank, ...mutation }]).length)
 })
+
+test('Round5 source views must match the same trusted native construction records', () => {
+  for (const bank of reviewedBank.filter((rule) =>
+    ['balls', 'toppa', 'bale', 'pişen'].includes(rule.target)
+  )) {
+    assert.deepEqual(occurrenceConstructionProblems([bank]), [])
+    for (const changed of [
+      { ...bank, language: 'de' },
+      { ...bank, target: bank.target + 'x' },
+      { ...bank, phrases: bank.phrases.slice(1) },
+      { ...bank, phrases: ['you ' + bank.target, ...bank.phrases.slice(1)] },
+    ])
+      assert.ok(occurrenceConstructionProblems([changed]).length)
+  }
+  for (const value of [
+    'balls',
+    'b4lls',
+    'toppa',
+    't0pa',
+    'bale',
+    'balle',
+    'b4le',
+    'pişen',
+    'p1şen',
+  ])
+    assert.equal(globallyAllowsOccurrenceTarget(value), true, value)
+  for (const value of ['ballroom', 'ballerina', 'topaz'])
+    assert.equal(globallyAllowsOccurrenceTarget(value), false, value)
+})

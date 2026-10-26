@@ -16,7 +16,7 @@
     "upstreamFileSha256": "6c7ae03baee0f3fdc22eed169030567669005dad9a1923e0b571c4bd4f2f2ab5",
     "overlaySha256": "d5bdf19a6efa86e4a221c4d5897964629e4484249af934f3114d96327ef533a2",
     "allowListSha256": "9d3a747e3df02719d7b4e9577b296d86249c805cafb3d7f1491268b4841917a1",
-    "reviewedOccurrenceSha256": "a8002f2c43d830bde37c6e22980e156f6e0b201cbf50c8ece1082cd344b554ff",
+    "reviewedOccurrenceSha256": "cbfb45bc09dd10762cecbc5de40b147b4aedfa1c97be87f132f40849d636676a",
     "counts": {
       "upstreamLines": 142,
       "overlayEntries": 46,

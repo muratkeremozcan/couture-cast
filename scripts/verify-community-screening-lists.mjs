@@ -253,13 +253,32 @@ export function literalContextProblems(contexts, deliberateTerms = [], highTerms
   return problems
 }
 
+function occurrenceAlias(value) {
+  const leet = {
+    0: 'o',
+    1: 'l',
+    i: 'l',
+    '!': 'l',
+    '|': 'l',
+    2: 'z',
+    3: 'e',
+    4: 'a',
+    '@': 'a',
+    5: 's',
+    $: 's',
+    6: 'g',
+    9: 'g',
+    7: 't',
+    '+': 't',
+    8: 'b',
+  }
+  return [...toFolded(toLiteral(value))].map((letter) => leet[letter] ?? letter).join('')
+}
 export function globallyAllowsOccurrenceTarget(value) {
-  const folded = toFolded(toLiteral(value))
-    .replace(/[4@]/g, 'a')
-    .replace(/3/g, 'e')
-    .replace(/[7+]/g, 't')
-  return tokenize(folded).some((token) =>
-    REVIEWED_OCCURRENCE_CONSTRUCTIONS.some((entry) => collapse(token) === entry.target)
+  return tokenize(occurrenceAlias(value)).some((token) =>
+    REVIEWED_OCCURRENCE_CONSTRUCTIONS.some(
+      (entry) => collapse(token) === collapse(occurrenceAlias(entry.target))
+    )
   )
 }
 

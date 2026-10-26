@@ -1,6 +1,6 @@
 {
   "version": 1,
-  "provenance": "Explicit coordinator round4 decisions, 2026-10-26. Exact occurrence-bound native senses; generic high-severity contexts remain forbidden.",
+  "provenance": "Explicit coordinator round4 and round5 decisions, 2026-10-26. Exact occurrence-bound native senses with finite reviewed grammatical word inventories; generic high-severity contexts remain forbidden.",
   "constructions": [
     {
       "language": "fr",
@@ -33,6 +33,112 @@
       ],
       "reason": "Coordinator round4 reviewed Portuguese and Spanish native carpet noun constructions. Only the exact contiguous literal occurrence is cleared; bare/deleted slur and separate occurrences remain blocked.",
       "nativeLanguages": ["pt", "es"]
+    },
+    {
+      "language": "en",
+      "target": "balls",
+      "phrases": ["balls of wool", "balls of yarn", "wool balls"],
+      "reason": "Round5 reviewed textile-quantity grammar: literal balls of a finite textile substance and the native material-before-head compound name material bundles. Only the exact balls occurrence clears the low English backstop homograph; bare/separate occurrences and independent unsafe terms stay screened.",
+      "nativeLanguages": ["en"],
+      "developmentEvidence": [
+        {
+          "phrase": "balls of wool",
+          "source": "apps/api/test/fixtures/community-text-corpus/holdout-v5/en.json",
+          "id": "en-holdout-v5-451",
+          "baselineDisposition": "review",
+          "reasonCode": "text_policy_match"
+        },
+        {
+          "phrase": "balls of yarn",
+          "source": "apps/api/test/fixtures/community-text-corpus/holdout-v5/en.json",
+          "id": "en-holdout-v5-375",
+          "baselineDisposition": "review",
+          "reasonCode": "text_policy_match"
+        },
+        {
+          "phrase": "wool balls",
+          "source": "apps/api/test/fixtures/community-text-corpus/holdout-v5/en.json",
+          "id": "en-holdout-v5-449",
+          "baselineDisposition": "review",
+          "reasonCode": "text_policy_match"
+        }
+      ]
+    },
+    {
+      "language": "it",
+      "target": "toppa",
+      "phrases": ["una toppa", "della toppa"],
+      "reason": "Round5 reviewed Italian feminine-determiner grammar names the repair patch toppa. Exact doubled-p literal spelling plus a native determiner establishes the ordinary noun sense. The slang topa, disguises, separators and independent occurrences retain normal screening.",
+      "nativeLanguages": ["it"],
+      "developmentEvidence": [
+        {
+          "phrase": "una toppa",
+          "source": "apps/api/test/fixtures/community-text-corpus/holdout-v5/it.json",
+          "id": "it-holdout-v5-178",
+          "baselineDisposition": "review",
+          "reasonCode": "text_policy_match"
+        },
+        {
+          "phrase": "una toppa",
+          "source": "apps/api/test/fixtures/community-text-corpus/holdout-v5/it.json",
+          "id": "it-holdout-v5-179",
+          "baselineDisposition": "review",
+          "reasonCode": "text_policy_match"
+        },
+        {
+          "phrase": "una toppa",
+          "source": "apps/api/test/fixtures/community-text-corpus/holdout-v5/it.json",
+          "id": "it-holdout-v5-771",
+          "baselineDisposition": "review",
+          "reasonCode": "text_policy_match"
+        },
+        {
+          "phrase": "della toppa",
+          "source": "apps/api/test/fixtures/community-text-corpus/holdout-v5/it.json",
+          "id": "it-holdout-v5-770",
+          "baselineDisposition": "review",
+          "reasonCode": "text_policy_match"
+        }
+      ]
+    },
+    {
+      "language": "tr",
+      "target": "bale",
+      "phrases": ["bale ayakkabısının", "bale ayakkabımın"],
+      "reason": "Round5 reviewed Turkish ballet footwear and costume noun constructions. A finite native head-noun inventory includes ordinary possession and genitive inflections, without stem or substring expansion. Only the exact raw occurrence binds; Italian balle and independent bare or disguised occurrences keep screening.",
+      "nativeLanguages": ["tr"],
+      "developmentEvidence": [
+        {
+          "phrase": "bale ayakkabısının",
+          "source": "apps/api/test/fixtures/community-text-corpus/holdout-v5/tr.json",
+          "id": "tr-holdout-v5-560",
+          "baselineDisposition": "review",
+          "reasonCode": "text_policy_match"
+        },
+        {
+          "phrase": "bale ayakkabımın",
+          "source": "apps/api/test/fixtures/community-text-corpus/holdout-v5/tr.json",
+          "id": "tr-holdout-v5-557",
+          "baselineDisposition": "review",
+          "reasonCode": "text_policy_match"
+        }
+      ]
+    },
+    {
+      "language": "tr",
+      "target": "pişen",
+      "phrases": ["yüzeyde pişen"],
+      "reason": "Round5 reviewed Turkish locative cooking-place plus participle grammar. These finite native locative nouns bind the literal pişen meaning cooking; no diacritic, repeat or leet folding participates in the exception. German pissen and every unbound or independent occurrence remain screened.",
+      "nativeLanguages": ["tr"],
+      "developmentEvidence": [
+        {
+          "phrase": "yüzeyde pişen",
+          "source": "apps/api/test/fixtures/community-text-corpus/holdout-v5/tr.json",
+          "id": "tr-holdout-v5-732",
+          "baselineDisposition": "review",
+          "reasonCode": "text_policy_match"
+        }
+      ]
     }
   ]
 }

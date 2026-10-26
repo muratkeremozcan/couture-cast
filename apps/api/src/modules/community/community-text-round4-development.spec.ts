@@ -139,28 +139,25 @@ describe('round4 deletion and occurrence-bound context development regressions',
     )
   })
 
+  const historicalRules = reviewedOccurrenceBank.constructions.filter((rule) =>
+    ['retard', 'tapete'].includes(rule.target)
+  )
   it('pins the approved two-target sixteen-phrase authoritative surface', () => {
-    expect(reviewedOccurrenceBank.constructions.map((rule) => rule.target)).toEqual([
-      'retard',
-      'tapete',
+    expect(historicalRules.map((rule) => rule.target)).toEqual(['retard', 'tapete'])
+    expect(historicalRules.map((rule) => rule.phrases.length)).toEqual([9, 7])
+    expect(historicalRules.map((rule) => rule.nativeLanguages)).toEqual([
+      ['fr'],
+      ['pt', 'es'],
     ])
-    expect(
-      reviewedOccurrenceBank.constructions.map((rule) => rule.phrases.length)
-    ).toEqual([9, 7])
-    expect(
-      reviewedOccurrenceBank.constructions.map((rule) => rule.nativeLanguages)
-    ).toEqual([['fr'], ['pt', 'es']])
-    for (const rule of reviewedOccurrenceBank.constructions)
+    for (const rule of historicalRules)
       expect(rule.reason.length).toBeGreaterThanOrEqual(20)
     expect(
       createHash('sha256')
-        .update(
-          reviewedOccurrenceBank.constructions.flatMap((rule) => rule.phrases).join('\n')
-        )
+        .update(historicalRules.flatMap((rule) => rule.phrases).join('\n'))
         .digest('hex')
     ).toBe('8be8972f0c06a77106c2359d98a6398dad78fbe3d7c6870fad3a5f5fab260a62')
   })
-  describe.each(reviewedOccurrenceBank.constructions)(
+  describe.each(historicalRules)(
     'reviewed occurrence surface $target',
     ({ target, phrases }) => {
       it.each(phrases)('clears only the exact bound occurrence in %s', (phrase) => {

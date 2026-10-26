@@ -288,11 +288,45 @@ const REVIEWED_OCCURRENCE_CONSTRUCTIONS = z
           .object({
             language: z.enum(SCREENING_LANGUAGES),
             nativeLanguages: z.array(z.enum(SCREENING_LANGUAGES)).min(1),
-            target: z.string().regex(/^[a-z]+$/),
-            phrases: z.array(z.string()).min(1),
+            target: z
+              .string()
+              .regex(/^\p{Script=Latin}+$/u)
+              .max(40),
+            phrases: z
+              .array(
+                z
+                  .string()
+                  .regex(/^\p{Script=Latin}+(?: +\p{Script=Latin}+)*$/u)
+                  .max(120)
+              )
+              .min(1)
+              .max(64),
             reason: z.string().min(20),
+            developmentEvidence: z
+              .array(
+                z
+                  .object({
+                    phrase: z.string(),
+                    source: z.string(),
+                    id: z.string(),
+                    baselineDisposition: z.enum(['review', 'block']),
+                    reasonCode: z.literal('text_policy_match'),
+                  })
+                  .strict()
+              )
+              .optional(),
           })
           .strict()
+          .refine(
+            (rule) =>
+              rule.nativeLanguages.includes(rule.language) &&
+              rule.target.toLowerCase() === rule.target &&
+              rule.phrases.every(
+                (phrase) =>
+                  phrase.split(/ +/).filter((word) => word === rule.target).length === 1
+              ),
+            'reviewed occurrence must bind exactly one literal target in its native grammar'
+          )
       )
       .min(1),
   })
@@ -300,7 +334,10 @@ const REVIEWED_OCCURRENCE_CONSTRUCTIONS = z
   .parse(reviewedOccurrenceBank).constructions
 
 const occurrenceConstructionSchema = z
-  .object({ target: z.enum(['retard', 'tapete']), phrases: z.array(z.string()) })
+  .object({
+    target: z.string().regex(/^\p{Script=Latin}+$/u),
+    phrases: z.array(z.string()),
+  })
   .strict()
 
 const allowFileSchema = z.object({
@@ -1042,7 +1079,8 @@ export class CommunityTextScreener {
         list.entries.some((entry) =>
           tokenize(toLeetRunForm(toFoldedForm(toLiteralForm(entry)))).some((token) =>
             REVIEWED_OCCURRENCE_CONSTRUCTIONS.some(
-              (entry) => collapseRepeats(token) === entry.target
+              (entry) =>
+                collapseRepeats(token) === toLeetClassForm(toFoldedForm(entry.target))
             )
           )
         )
@@ -1062,7 +1100,7 @@ export class CommunityTextScreener {
         target,
         words: phrase.split(' '),
         pattern: new RegExp(
-          `(?<![\\p{L}\\p{N}])${phrase.replace(' ', ' +')}(?![\\p{L}\\p{N}])`,
+          `(?<![\\p{L}\\p{N}])${phrase.replaceAll(' ', ' +')}(?![\\p{L}\\p{N}])`,
           'gu'
         ),
       })
