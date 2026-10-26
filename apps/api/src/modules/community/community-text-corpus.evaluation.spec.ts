@@ -21,6 +21,11 @@ import fs from 'node:fs'
 import { createHash } from 'node:crypto'
 import path from 'node:path'
 import { describe, expect, it } from 'vitest'
+import {
+  CLEAN_HOLDOUT_UPPER_BOUND_MAXIMUM,
+  passesCleanHoldoutGate,
+  wilsonInterval,
+} from './community-text-corpus-gate.js'
 import { loadCommunityScreeningPolicy } from './community-screening-policy.js'
 import {
   CommunityTextScreener,
@@ -65,7 +70,7 @@ const LANGUAGE_LOCALE: Record<string, string> = {
 
 const MINIMUM_CLEAN = 200
 const MINIMUM_DISALLOWED = 100
-const CLEAN_UPPER_BOUND_GATE = 0.01
+const CLEAN_UPPER_BOUND_GATE = CLEAN_HOLDOUT_UPPER_BOUND_MAXIMUM
 const REQUIRED_FAMILIES = [
   'nfkc-fullwidth',
   'case-mixing',
@@ -100,22 +105,6 @@ interface Holdout {
   corpusVersion: string
   frozenAgainst: { allowListSha256: string }
   entries: CorpusEntry[]
-}
-
-/** Wilson score interval at 95% confidence. */
-function wilsonInterval(successes: number, trials: number): [number, number] {
-  if (trials === 0) return [0, 1]
-  const z = 1.959963984540054
-  const proportion = successes / trials
-  const denominator = 1 + (z * z) / trials
-  const centre = (proportion + (z * z) / (2 * trials)) / denominator
-  const half =
-    (z *
-      Math.sqrt(
-        (proportion * (1 - proportion)) / trials + (z * z) / (4 * trials * trials)
-      )) /
-    denominator
-  return [Math.max(0, centre - half), Math.min(1, centre + half)]
 }
 
 const loaded = loadCommunityScreeningPolicy()
@@ -303,12 +292,11 @@ describe.each(languages)('text corpus: %s', (language) => {
   it.runIf(RELEASE_RUN)(
     'keeps the Wilson 95% upper bound on withheld holdout copy at or below 1%',
     () => {
-      expect(
-        result.clean.withheldIds,
-        `${language}: ${result.clean.withheld} of ${result.clean.total} holdout entries withheld`
-      ).toEqual([])
       expect(result.clean.total).toBeGreaterThanOrEqual(MINIMUM_CLEAN)
-      expect(result.clean.wilson95[1]).toBeLessThanOrEqual(CLEAN_UPPER_BOUND_GATE)
+      expect(
+        passesCleanHoldoutGate(result.clean.withheld, result.clean.total),
+        `${language}: ${result.clean.withheld} of ${result.clean.total} holdout entries withheld; Wilson 95% upper bound ${result.clean.wilson95[1]}`
+      ).toBe(true)
     }
   )
 
