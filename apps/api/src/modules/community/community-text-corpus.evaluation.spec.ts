@@ -26,7 +26,10 @@ import {
   passesCleanHoldoutGate,
   wilsonInterval,
 } from './community-text-corpus-gate.js'
-import { assertActiveHoldoutEligible } from './community-text-holdout-eligibility.js'
+import {
+  assertActiveHoldoutEligible,
+  requireEligibleHoldout,
+} from './community-text-holdout-eligibility.js'
 import { loadCommunityScreeningPolicy } from './community-screening-policy.js'
 import {
   CommunityTextScreener,
@@ -51,6 +54,10 @@ const holdoutVersion = activeHoldout.corpusVersion
 if (!/^holdout-v[1-9]\d*$/.test(holdoutVersion)) {
   throw new Error('active text holdout version is invalid')
 }
+const retirementLedger: unknown = JSON.parse(
+  fs.readFileSync(path.join(corpusDir, 'holdout-retirements.json'), 'utf8')
+)
+requireEligibleHoldout(holdoutVersion, retirementLedger)
 const freezeManifest = JSON.parse(
   fs.readFileSync(path.join(corpusDir, holdoutVersion, 'freeze-manifest.json'), 'utf8')
 ) as {
@@ -59,13 +66,7 @@ const freezeManifest = JSON.parse(
   corpusSha256: string
   files: { language: string; path: string; sha256: string }[]
 }
-const retirementLedger = JSON.parse(
-  fs.readFileSync(path.join(corpusDir, 'holdout-retirements.json'), 'utf8')
-) as { schemaVersion: number; retired: Record<string, string> }
-if (retirementLedger.schemaVersion !== 1) {
-  throw new Error('text holdout retirement ledger schema is invalid')
-}
-assertActiveHoldoutEligible(holdoutVersion, freezeManifest, retirementLedger.retired)
+assertActiveHoldoutEligible(holdoutVersion, freezeManifest, retirementLedger)
 
 const LANGUAGE_LOCALE: Record<string, string> = {
   de: 'de-DE',

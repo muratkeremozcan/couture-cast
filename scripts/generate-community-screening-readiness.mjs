@@ -46,6 +46,10 @@ import { fileURLToPath } from 'node:url'
 import { inputSetHash, inputSetPathspecs } from './lib/community-screening-input-set.mjs'
 import { readCommunityRolloutDefaults } from './lib/community-rollout-flags.mjs'
 import { restartDrillProblems } from './community-screening-canary.mjs'
+import {
+  assertActiveHoldoutEligible,
+  requireEligibleHoldout,
+} from '../apps/api/src/modules/community/community-text-holdout-eligibility-core.mjs'
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url))
 const projectRoot = path.resolve(__dirname, '..')
@@ -87,11 +91,15 @@ const INPUTS = {
   heartbeatSource: 'apps/api/src/modules/community/community-worker-heartbeat.ts',
 }
 export const TEXT_LANGUAGES = ['de', 'en', 'es', 'fr', 'it', 'pt', 'tr']
-const TEXT_HOLDOUT_VERSION = readJson(
-  'apps/api/test/fixtures/community-text-corpus/active-holdout.json'
-)?.corpusVersion
-if (!/^holdout-v[1-9]\d*$/.test(TEXT_HOLDOUT_VERSION ?? '')) {
-  throw new Error('active text holdout version is invalid')
+/** Refuse retired or unknown selectors before reading screening inputs. */
+function activeTextHoldoutVersion() {
+  const corpus = 'apps/api/test/fixtures/community-text-corpus'
+  const version = readJson(`${corpus}/active-holdout.json`)?.corpusVersion
+  const ledger = readJson(`${corpus}/holdout-retirements.json`)
+  requireEligibleHoldout(version, ledger)
+  const seal = readJson(`${corpus}/${version}/freeze-manifest.json`)
+  assertActiveHoldoutEligible(version, seal, ledger)
+  return version
 }
 const DEFAULT_IMAGE = 'couture-cast-community-worker:local'
 const NODE_MODULES_BUDGET_MB = 150
@@ -663,7 +671,7 @@ function summariseClean(result) {
   }
 }
 
-function textSection(current) {
+function textSection(current, holdoutVersion) {
   const evaluation = runProduct('text-corpus-evaluation.json')
   const corpusHashes = Object.fromEntries(
     TEXT_LANGUAGES.flatMap((language) => [
@@ -674,7 +682,7 @@ function textSection(current) {
       [
         `${language}-holdout`,
         sha256File(
-          `apps/api/test/fixtures/community-text-corpus/${TEXT_HOLDOUT_VERSION}/${language}.json`
+          `apps/api/test/fixtures/community-text-corpus/${holdoutVersion}/${language}.json`
         ),
       ],
     ])
@@ -2341,6 +2349,7 @@ function parseArgs(argv) {
 
 async function main() {
   const options = parseArgs(process.argv.slice(2))
+  const holdoutVersion = activeTextHoldoutVersion()
   const current = {
     commitSha: git(['rev-parse', 'HEAD']),
     inputSetHash: inputSetHash(),
@@ -2369,7 +2378,7 @@ async function main() {
     sweep: sweepSection(current),
     calibration: calibrationSection(current, policy, manifest),
     safeCorpus: safeCorpusSection(current, options.dailySubmissions, policy),
-    text: textSection(current),
+    text: textSection(current, holdoutVersion),
     lists: listsSection(),
     model: modelVerification(),
     runtime: runtimeSection(manifest, current),

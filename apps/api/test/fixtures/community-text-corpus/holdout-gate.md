@@ -233,3 +233,45 @@ unchanged and conditional on the independent-item model. In-sample zero
 withholds, disguised zero passes and all count minimums remain unchanged.
 Seal, send the hash and counts, and wait for coordinator release before any
 round 5 inspection, corpus commit, active switch or screening evaluation.
+
+## Secondary motif scope clarification
+
+The user confirmed that the content-concept cap counts specific shared reveal or inner-facing
+motifs. Apply the underlying scenario/visual-motif definition to the actual shared event,
+structure or composition. Broad topic and internal-position labels serve candidate discovery;
+their union alone is not an accepted content concept. Preserve their discovery inventories and
+re-adjudicate actual motifs with overlapping membership and full-text reasons.
+
+Primary-scenario singleton checks remain unchanged. Carrier, material, tool, viewpoint and
+setting variants still share a primary when the core scenario is unchanged. A substantive change
+in purpose, structure or object relationship requires an explicit item-level rationale. This
+clarification leaves the Wilson gate, sample sizes, five-word cap, specific concept cap,
+in-sample zero, disguised zero-pass and all minimum counts unchanged.
+
+## Explicit release eligibility (R2-M1)
+
+The eligibility ledger uses schema version 2. Every sealed version has an explicit disposition:
+`eligible` or `retired`. Versions v1 and v2 are superseded historical cohorts; v3 is
+non-independent; v4 and v5 are development data. All five are retired from release duty.
+A version absent from both maps is ineligible. The current eligible map stays empty until a fresh
+holdout is sealed and released by the coordinator.
+
+An eligible entry registers the exact corpus version, seal timestamp and aggregate SHA-256.
+The active selector and its freeze manifest must match that registration. A valid-looking seal
+alone grants no eligibility. Retirement and eligibility cannot overlap. Invalid ledger schemas,
+invalid registrations and unknown selectors fail closed.
+
+The mandatory API evaluator and readiness generator share this validator. Both check eligibility
+before reading version-specific corpus data. Readiness performs the check before any screening
+input hashes, run products, external commands, containers or database activity. Thus an old passing
+run product cannot make a retired active selector acceptable. Wilson arithmetic, in-sample zero,
+disguised-term zero-pass and corpus minimums remain unchanged.
+
+Regression evidence uses a synthetic sealed v99 for the positive case. Actual CLI startup probes
+for v1 through v5 and an unclassified version reproduced acceptance before the fix; the API bridge
+also accepted v1, v2 and an unclassified version. Tests block the first external command to prove
+refusal occurs before screening activity. No repair inspection or holdout evaluation is required.
+
+The shared runtime validator lives under `apps/api/src/modules/community`, an existing screening
+input-set directory. Its bytes therefore participate in readiness provenance without changing the
+frozen input-set helper.
