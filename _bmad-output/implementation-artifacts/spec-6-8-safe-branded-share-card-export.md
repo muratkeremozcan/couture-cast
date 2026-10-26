@@ -914,6 +914,23 @@ visually inspected: every original pixel is masked and the replacement shows all
 control outlines and fixed labels. It is a redacted diagnostic derivative. Raw captures remain
 private. Evidence: `runs/review-r2-android36-diagnostic-negative-1/native-evidence/`.
 
+### Published Round2 API36 provisioning format repair
+
+The first combined Round2 push failed in API36 browser provisioning before any APT request,
+emulator or native proof. Actual job `121841257470` reports
+`official_ubuntu_archive_required`. Its logged runner image is Ubuntu24 image
+`20261012.334.1`. The exact image's `configure-apt-sources.sh` configures the active source as
+`mirror+file:/etc/apt/apt-mirrors.txt`; the initial provisioning helper recognized direct
+Azure and official archive URLs only. The repair recognizes that exact runner-owned URI in
+active legacy or deb822 source lines and temporarily replaces it with the official Ubuntu
+archive. Unknown mirror-list paths, comments, security sources, keyrings and suite fields
+remain intact. Original sources are restored after installation. Both new regression tests
+fail against the published helper and all 13 provisioning controls pass after repair. The
+12-minute job step, 600-second installer deadline and 15-second kill grace stay unchanged.
+Evidence: `ci-79cd072c-api36/actual-job.log`, downloaded `share-card-android-36` artifact,
+the exact image script archived beside that log, and
+`runs/ci79-api36-mirror-uri-red-1` / `runs/ci79-api36-mirror-uri-green-1`.
+
 ## Spec Change Log
 
 - 2026-10-25, iteration 2 in progress, Astra round 1: accepted A1 and A2. iOS now imports the

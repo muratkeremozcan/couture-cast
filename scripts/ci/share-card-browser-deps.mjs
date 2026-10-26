@@ -6,6 +6,7 @@ import { spawnSync } from 'node:child_process'
 
 const sourceLine = /^[\t ]*(?:URIs:|deb(?:-src)?\s)/
 const azureArchive = /https?:\/\/azure\.archive\.ubuntu\.com\/ubuntu(?=[/\s]|$)/g
+const runnerMirrorList = /mirror\+file:\/etc\/apt\/apt-mirrors\.txt(?=\s|$)/g
 const officialArchive = /https?:\/\/archive\.ubuntu\.com\/ubuntu(?=[/\s]|$)/
 
 /** Keep suites, components, keyrings, security sources and third-party repositories intact. */
@@ -14,7 +15,9 @@ export function officialUbuntuSource(text) {
     .split('\n')
     .map((line) =>
       sourceLine.test(line)
-        ? line.replace(azureArchive, 'https://archive.ubuntu.com/ubuntu')
+        ? line
+            .replace(azureArchive, 'https://archive.ubuntu.com/ubuntu')
+            .replace(runnerMirrorList, 'https://archive.ubuntu.com/ubuntu')
         : line
     )
     .join('\n')

@@ -115,6 +115,43 @@ test('an already official mirror requires no source mutation', async () => {
   await provisionShareCardBrowsers(f.options)
   assert.equal(f.writes.length, 0)
 })
+test('recognizes the exact hosted Ubuntu mirror-list URI and preserves other file sources', async () => {
+  const { officialUbuntuSource } = await helper()
+  // Runner image ubuntu24/20261012.334 configure-apt-sources.sh generates this URI.
+  const uri = 'mirror+file:/etc/apt/apt-mirrors.txt'
+  const source = `${legacy.replace('http://azure.archive.ubuntu.com/ubuntu', uri)}${deb822.replace('http://azure.archive.ubuntu.com/ubuntu/', uri)}`
+  const untouched = [
+    `# URIs: ${uri}`,
+    `URIs: ${uri}.other`,
+    `URIs: ${uri}/other`,
+    'URIs: mirror+file:/tmp/apt-mirrors.txt',
+    'URIs: https://security.ubuntu.com/ubuntu/',
+  ].join('\n')
+  assert.equal(
+    officialUbuntuSource(source + untouched),
+    source.replaceAll(uri, 'https://archive.ubuntu.com/ubuntu') + untouched
+  )
+})
+test('provisions and restores hosted-image mirror-list sources with the original keyring and suites', async () => {
+  const { provisionShareCardBrowsers } = await helper()
+  const uri = 'mirror+file:/etc/apt/apt-mirrors.txt'
+  const source = deb822.replace('http://azure.archive.ubuntu.com/ubuntu/', uri)
+  const f = fixture()
+  f.options.files = ['/etc/apt/sources.list.d/ubuntu.sources']
+  f.sources.set(f.options.files[0], source)
+  let installed = false
+  f.options.install = async () => {
+    installed = true
+    assert.equal(
+      f.sources.get(f.options.files[0]),
+      source.replace(uri, 'https://archive.ubuntu.com/ubuntu')
+    )
+  }
+  await provisionShareCardBrowsers(f.options)
+  assert.equal(installed, true)
+  assert.equal(f.sources.get(f.options.files[0]), source)
+  assert.deepEqual(f.writes, [f.options.files[0], f.options.files[0]])
+})
 test('unexpected host, architecture or runner fails before reads, writes or install', async () => {
   const { provisionShareCardBrowsers } = await helper()
   for (const invalid of [
