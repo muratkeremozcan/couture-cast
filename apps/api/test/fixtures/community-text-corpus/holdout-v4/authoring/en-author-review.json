@@ -1,0 +1,27 @@
+{
+  "author": "cc68-tea (/root)",
+  "language": "en",
+  "sourceRows": [1, 1000],
+  "captionRows": [1, 500],
+  "altTextRows": [501, 1000],
+  "method": "Every complete row was individually written as a literal sentence. No sentence bank, template assembly or text-generating program supplied wording. Metadata synonym consolidation changes only editorial labels.",
+  "semanticReview": "Root reviewed all English items and consolidated equivalent functional scenarios or visual motifs. The authorized independent author edge_paths performed a read-only semantic spot audit and identified two groups above the ten-item cap. Root introduced distinct complete items before sealing; no screening output informed any choice.",
+  "presealWholeItemRewrites": [
+    28, 35, 36, 43, 67, 86, 122, 125, 128, 169, 255, 267, 279, 310, 312, 319, 327, 334,
+    355, 372, 390, 457, 505, 513, 571, 729, 777, 800, 857, 860, 884, 901
+  ],
+  "rewriteReason": "Reduce repeated inner-surface-reveal and practical-extra-layer scenarios with headroom below the preregistered independence cap. Rewrites replace whole authored items with different motifs; all field counts and length constraints remain fixed.",
+  "finalBoundaryGroups": {
+    "revealed-inner-surface": [599, 621, 710, 770, 819],
+    "practical-extra-layer": [152, 762, 769, 854]
+  },
+  "largestConceptEnglishGloss": "Clothing or a bag set aside on a chair.",
+  "screeningDuringAuthoring": false,
+  "additionalRepairInspectionDuringAuthoring": false,
+  "knownContext": "Root retains earlier v2/v3 results and the released repair inspection; this context is disclosed in the central report.",
+  "additionalConservativeConcept": {
+    "concept": "clothing-or-bag-on-chair",
+    "rows": [394, 532, 549, 750, 769, 818, 844, 854, 872, 905],
+    "reason": "Peer audit grouped9 garment drapes. Root additionally includes the backpack hung from the chair, giving10. Existing substantive labels are retained where a row expresses multiple motifs. Wording is unchanged by this annotation."
+  }
+}

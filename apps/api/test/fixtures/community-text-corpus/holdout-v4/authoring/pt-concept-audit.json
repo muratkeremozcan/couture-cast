@@ -1,0 +1,1083 @@
+{
+  "author": "/root/general_review",
+  "locale": "pt",
+  "authoredRows": {
+    "first": 1,
+    "last": 1000
+  },
+  "authorship": "Complete items individually composed directly in Portuguese. Serialization and measurement helpers supplied no generated sentences or fragments.",
+  "conceptCount": 200,
+  "conceptSizeDistribution": {
+    "5": 197,
+    "2": 1,
+    "3": 1,
+    "10": 1
+  },
+  "maximumConceptGroups": [
+    {
+      "concept": "painel-acolchoado-costurado",
+      "englishGloss": "Quilted panels whose visible stitching retains padding, including diamond and wavy stitch paths.",
+      "rows": [449, 450, 451, 452, 453, 454, 455, 456, 913, 914],
+      "count": 10
+    }
+  ],
+  "retainedConsolidation": {
+    "concept": "painel-acolchoado-costurado",
+    "formerLabels": ["quilting-losangos", "quilting-ondas"],
+    "reason": "Different stitch paths retain one underlying quilted-panel construction scene. The two five-item sets are grouped together.",
+    "rows": [449, 450, 451, 452, 453, 454, 455, 456, 913, 914]
+  },
+  "semanticReview": [
+    "Initially reviewed ten pairs for shared underlying motifs across fields, garment categories and construction descriptions.",
+    "Nine secondary five-item scenarios were wholly rewritten as new independently composed visual scenes. This removes incidental variants instead of splitting them with new labels.",
+    "The quilted-panel pair remains consolidated at ten items. All other concepts have at most five items.",
+    "Two satellite-print items were wholly rewritten as letterbox-print items, yielding a new two-item motif and leaving three satellite-print items.",
+    "The former interlaced-ribbon print scenario was wholly rewritten as hanging-mobile illustrations before the final nine-scenario revision.",
+    "The replaced toucan items also remove the secondary foliage label from those rows. The final foliage motif contains only five fern-print items.",
+    "Depicted objects with distinct anatomy or geometry remain distinct motifs; colour, fabric and incidental setting are not sufficient. Composite scenes such as a mushroom house are treated as one coherent visual scenario."
+  ],
+  "whollyReauthoredFiveItemScenarios": [
+    {
+      "concept": "estampa-xilofones",
+      "rows": [53, 54, 55, 56, 814]
+    },
+    {
+      "concept": "estampa-lupas",
+      "rows": [77, 78, 79, 80, 820]
+    },
+    {
+      "concept": "estampa-escorregadores",
+      "rows": [641, 642, 643, 644, 961]
+    },
+    {
+      "concept": "estampa-trompetes",
+      "rows": [69, 70, 71, 72, 818]
+    },
+    {
+      "concept": "estampa-cameras-fole",
+      "rows": [197, 198, 199, 200, 850]
+    },
+    {
+      "concept": "estampa-telefericos",
+      "rows": [205, 206, 207, 208, 852]
+    },
+    {
+      "concept": "estampa-maquinas-escrever",
+      "rows": [781, 782, 783, 784, 996]
+    },
+    {
+      "concept": "estampa-sinetas",
+      "rows": [677, 678, 679, 680, 970]
+    },
+    {
+      "concept": "estampa-tendas-circo",
+      "rows": [637, 638, 639, 640, 960]
+    }
+  ],
+  "additionalWhollyReauthoredScenario": {
+    "concept": "estampa-caixas-correio",
+    "rows": [397, 399]
+  },
+  "allConceptMembership": [
+    {
+      "concept": "alfinete-fralda-acessorio",
+      "count": 5,
+      "rows": [585, 586, 587, 588, 947]
+    },
+    {
+      "concept": "anel-aberto-duas-pedras",
+      "count": 5,
+      "rows": [189, 190, 191, 192, 848]
+    },
+    {
+      "concept": "anel-pedra-giratoria",
+      "count": 5,
+      "rows": [121, 122, 123, 124, 831]
+    },
+    {
+      "concept": "anel-porta-agulha",
+      "count": 5,
+      "rows": [593, 594, 595, 596, 949]
+    },
+    {
+      "concept": "argola-chave-forro",
+      "count": 5,
+      "rows": [541, 542, 543, 544, 936]
+    },
+    {
+      "concept": "aves-tropicais-estampadas",
+      "count": 5,
+      "rows": [201, 202, 203, 204, 851]
+    },
+    {
+      "concept": "baloes-decorativos",
+      "count": 5,
+      "rows": [317, 318, 319, 320, 880]
+    },
+    {
+      "concept": "barra-adesiva-provisoria",
+      "count": 5,
+      "rows": [565, 566, 567, 568, 942]
+    },
+    {
+      "concept": "blusa-barra-pontas",
+      "count": 5,
+      "rows": [41, 42, 43, 44, 811]
+    },
+    {
+      "concept": "blusa-decote-gota-frente",
+      "count": 5,
+      "rows": [97, 98, 99, 100, 825]
+    },
+    {
+      "concept": "blusa-drapeado-ombro",
+      "count": 5,
+      "rows": [605, 606, 607, 608, 952]
+    },
+    {
+      "concept": "blusa-ombro-almofada",
+      "count": 5,
+      "rows": [65, 66, 67, 68, 817]
+    },
+    {
+      "concept": "blusa-tiras-cotovelo",
+      "count": 5,
+      "rows": [657, 658, 659, 660, 965]
+    },
+    {
+      "concept": "bolsa-alca-articulada",
+      "count": 5,
+      "rows": [149, 150, 151, 152, 838]
+    },
+    {
+      "concept": "bolsa-alca-corda-grossa",
+      "count": 5,
+      "rows": [193, 194, 195, 196, 849]
+    },
+    {
+      "concept": "bolsa-bolsos-destacaveis",
+      "count": 5,
+      "rows": [181, 182, 183, 184, 846]
+    },
+    {
+      "concept": "bolsa-contorno-nuvem",
+      "count": 5,
+      "rows": [697, 698, 699, 700, 975]
+    },
+    {
+      "concept": "bolsa-cordao-rede-frutas",
+      "count": 5,
+      "rows": [165, 166, 167, 168, 842]
+    },
+    {
+      "concept": "bolsa-corrente-embutida",
+      "count": 5,
+      "rows": [133, 134, 135, 136, 834]
+    },
+    {
+      "concept": "bolsa-passo-alca",
+      "count": 5,
+      "rows": [597, 598, 599, 600, 950]
+    },
+    {
+      "concept": "bolsa-pochete-vertical",
+      "count": 5,
+      "rows": [125, 126, 127, 128, 832]
+    },
+    {
+      "concept": "bolsa-porta-garrafa-externo",
+      "count": 5,
+      "rows": [101, 102, 103, 104, 826]
+    },
+    {
+      "concept": "bolso-invisivel-ziper",
+      "count": 5,
+      "rows": [489, 490, 491, 492, 923]
+    },
+    {
+      "concept": "bolso-lapela-invertida",
+      "count": 5,
+      "rows": [45, 46, 47, 48, 812]
+    },
+    {
+      "concept": "bordado-bandeirinhas",
+      "count": 5,
+      "rows": [673, 674, 675, 676, 969]
+    },
+    {
+      "concept": "bordado-vagonite",
+      "count": 5,
+      "rows": [413, 414, 415, 416, 904]
+    },
+    {
+      "concept": "botao-forrado",
+      "count": 5,
+      "rows": [425, 426, 427, 428, 907]
+    },
+    {
+      "concept": "bracelete-simbolos-vazados",
+      "count": 5,
+      "rows": [161, 162, 163, 164, 841]
+    },
+    {
+      "concept": "brinco-argolas-encadeadas",
+      "count": 5,
+      "rows": [109, 110, 111, 112, 828]
+    },
+    {
+      "concept": "brinco-disquinho-rotativo",
+      "count": 5,
+      "rows": [185, 186, 187, 188, 847]
+    },
+    {
+      "concept": "broche-leque-articulado",
+      "count": 5,
+      "rows": [693, 694, 695, 696, 974]
+    },
+    {
+      "concept": "cabide-acolchoado",
+      "count": 5,
+      "rows": [517, 518, 519, 520, 930]
+    },
+    {
+      "concept": "cabide-degraus",
+      "count": 5,
+      "rows": [521, 522, 523, 524, 931]
+    },
+    {
+      "concept": "caixa-sapato-foto",
+      "count": 5,
+      "rows": [529, 530, 531, 532, 933]
+    },
+    {
+      "concept": "calca-fecho-ponte",
+      "count": 5,
+      "rows": [93, 94, 95, 96, 824]
+    },
+    {
+      "concept": "calca-jodhpur",
+      "count": 5,
+      "rows": [601, 602, 603, 604, 951]
+    },
+    {
+      "concept": "calca-sanfona-lateral",
+      "count": 5,
+      "rows": [621, 622, 623, 624, 956]
+    },
+    {
+      "concept": "calca-saruel",
+      "count": 5,
+      "rows": [5, 6, 7, 8, 802]
+    },
+    {
+      "concept": "camisa-bolso-dupla-entrada",
+      "count": 5,
+      "rows": [629, 630, 631, 632, 958]
+    },
+    {
+      "concept": "camisa-manga-dobrada-interna",
+      "count": 5,
+      "rows": [617, 618, 619, 620, 955]
+    },
+    {
+      "concept": "camisa-peitilho-removivel",
+      "count": 5,
+      "rows": [81, 82, 83, 84, 821]
+    },
+    {
+      "concept": "camiseta-painel-mesh",
+      "count": 5,
+      "rows": [57, 58, 59, 60, 815]
+    },
+    {
+      "concept": "carimbo-rolinho",
+      "count": 5,
+      "rows": [469, 470, 471, 472, 918]
+    },
+    {
+      "concept": "casaco-barra-pescador",
+      "count": 5,
+      "rows": [625, 626, 627, 628, 957]
+    },
+    {
+      "concept": "casaco-fecho-lateral",
+      "count": 5,
+      "rows": [653, 654, 655, 656, 964]
+    },
+    {
+      "concept": "chinelo-sola-folha",
+      "count": 5,
+      "rows": [145, 146, 147, 148, 837]
+    },
+    {
+      "concept": "cintura-dupla-aparente",
+      "count": 5,
+      "rows": [37, 38, 39, 40, 810]
+    },
+    {
+      "concept": "colar-bolas-graduadas",
+      "count": 5,
+      "rows": [113, 114, 115, 116, 829]
+    },
+    {
+      "concept": "colar-contas-morse",
+      "count": 5,
+      "rows": [685, 686, 687, 688, 972]
+    },
+    {
+      "concept": "colar-escapulario-duplo",
+      "count": 5,
+      "rows": [105, 106, 107, 108, 827]
+    },
+    {
+      "concept": "colar-laco-metal",
+      "count": 5,
+      "rows": [157, 158, 159, 160, 840]
+    },
+    {
+      "concept": "colar-pendulo-inverso",
+      "count": 5,
+      "rows": [129, 130, 131, 132, 833]
+    },
+    {
+      "concept": "colete-aba-arredondada",
+      "count": 5,
+      "rows": [633, 634, 635, 636, 959]
+    },
+    {
+      "concept": "colete-transpassado-sem-fecho",
+      "count": 5,
+      "rows": [61, 62, 63, 64, 816]
+    },
+    {
+      "concept": "corda-tranca-cinco",
+      "count": 5,
+      "rows": [481, 482, 483, 484, 921]
+    },
+    {
+      "concept": "corte-rotativo",
+      "count": 5,
+      "rows": [429, 430, 431, 432, 908]
+    },
+    {
+      "concept": "croche-fio-conduzido",
+      "count": 5,
+      "rows": [485, 486, 487, 488, 922]
+    },
+    {
+      "concept": "croche-tunisiano",
+      "count": 5,
+      "rows": [421, 422, 423, 424, 906]
+    },
+    {
+      "concept": "desembaracar-colar",
+      "count": 5,
+      "rows": [501, 502, 503, 504, 926]
+    },
+    {
+      "concept": "desfiado-controlado",
+      "count": 5,
+      "rows": [457, 458, 459, 460, 915]
+    },
+    {
+      "concept": "embalar-colar-canudo",
+      "count": 5,
+      "rows": [505, 506, 507, 508, 927]
+    },
+    {
+      "concept": "esgrafito-tecido",
+      "count": 5,
+      "rows": [473, 474, 475, 476, 919]
+    },
+    {
+      "concept": "estampa-abacaxi",
+      "count": 5,
+      "rows": [217, 218, 219, 220, 855]
+    },
+    {
+      "concept": "estampa-ampulhetas",
+      "count": 5,
+      "rows": [725, 726, 727, 728, 982]
+    },
+    {
+      "concept": "estampa-arco-iris",
+      "count": 5,
+      "rows": [373, 374, 375, 376, 894]
+    },
+    {
+      "concept": "estampa-argyle",
+      "count": 5,
+      "rows": [669, 670, 671, 672, 968]
+    },
+    {
+      "concept": "estampa-azulejo-estrela",
+      "count": 5,
+      "rows": [281, 282, 283, 284, 871]
+    },
+    {
+      "concept": "estampa-balancas",
+      "count": 5,
+      "rows": [785, 786, 787, 788, 997]
+    },
+    {
+      "concept": "estampa-bananeira",
+      "count": 5,
+      "rows": [221, 222, 223, 224, 856]
+    },
+    {
+      "concept": "estampa-bolhas-sabao",
+      "count": 5,
+      "rows": [249, 250, 251, 252, 863]
+    },
+    {
+      "concept": "estampa-botos",
+      "count": 5,
+      "rows": [213, 214, 215, 216, 854]
+    },
+    {
+      "concept": "estampa-bules",
+      "count": 5,
+      "rows": [361, 362, 363, 364, 891]
+    },
+    {
+      "concept": "estampa-cabides",
+      "count": 5,
+      "rows": [765, 766, 767, 768, 992]
+    },
+    {
+      "concept": "estampa-cachoeiras",
+      "count": 5,
+      "rows": [265, 266, 267, 268, 867]
+    },
+    {
+      "concept": "estampa-caixa-musica",
+      "count": 5,
+      "rows": [797, 798, 799, 800, 1000]
+    },
+    {
+      "concept": "estampa-caixas-correio",
+      "count": 2,
+      "rows": [397, 399]
+    },
+    {
+      "concept": "estampa-cajueiro",
+      "count": 5,
+      "rows": [293, 294, 295, 296, 874]
+    },
+    {
+      "concept": "estampa-cameras-fole",
+      "count": 5,
+      "rows": [197, 198, 199, 200, 850]
+    },
+    {
+      "concept": "estampa-camuflagem-abstrata",
+      "count": 5,
+      "rows": [245, 246, 247, 248, 862]
+    },
+    {
+      "concept": "estampa-capivaras",
+      "count": 5,
+      "rows": [209, 210, 211, 212, 853]
+    },
+    {
+      "concept": "estampa-caracol-geometrico",
+      "count": 5,
+      "rows": [273, 274, 275, 276, 869]
+    },
+    {
+      "concept": "estampa-castelo-areia",
+      "count": 5,
+      "rows": [309, 310, 311, 312, 878]
+    },
+    {
+      "concept": "estampa-casulo",
+      "count": 5,
+      "rows": [237, 238, 239, 240, 860]
+    },
+    {
+      "concept": "estampa-cogumelo-casa",
+      "count": 5,
+      "rows": [333, 334, 335, 336, 884]
+    },
+    {
+      "concept": "estampa-coroas",
+      "count": 5,
+      "rows": [745, 746, 747, 748, 987]
+    },
+    {
+      "concept": "estampa-correntes",
+      "count": 5,
+      "rows": [741, 742, 743, 744, 986]
+    },
+    {
+      "concept": "estampa-dinossauros",
+      "count": 5,
+      "rows": [325, 326, 327, 328, 882]
+    },
+    {
+      "concept": "estampa-discos-vinil",
+      "count": 5,
+      "rows": [709, 710, 711, 712, 978]
+    },
+    {
+      "concept": "estampa-dragao",
+      "count": 5,
+      "rows": [329, 330, 331, 332, 883]
+    },
+    {
+      "concept": "estampa-engrenagens",
+      "count": 5,
+      "rows": [377, 378, 379, 380, 895]
+    },
+    {
+      "concept": "estampa-escamas",
+      "count": 5,
+      "rows": [737, 738, 739, 740, 985]
+    },
+    {
+      "concept": "estampa-escorregadores",
+      "count": 5,
+      "rows": [641, 642, 643, 644, 961]
+    },
+    {
+      "concept": "estampa-favo",
+      "count": 5,
+      "rows": [369, 370, 371, 372, 893]
+    },
+    {
+      "concept": "estampa-fitas-cassete",
+      "count": 5,
+      "rows": [705, 706, 707, 708, 977]
+    },
+    {
+      "concept": "estampa-frascos-perfume",
+      "count": 5,
+      "rows": [761, 762, 763, 764, 991]
+    },
+    {
+      "concept": "estampa-gotas-tinta",
+      "count": 5,
+      "rows": [277, 278, 279, 280, 870]
+    },
+    {
+      "concept": "estampa-ipomeia",
+      "count": 5,
+      "rows": [289, 290, 291, 292, 873]
+    },
+    {
+      "concept": "estampa-jacares",
+      "count": 5,
+      "rows": [757, 758, 759, 760, 990]
+    },
+    {
+      "concept": "estampa-jangadas",
+      "count": 5,
+      "rows": [769, 770, 771, 772, 993]
+    },
+    {
+      "concept": "estampa-jornal-abstrato",
+      "count": 5,
+      "rows": [681, 682, 683, 684, 971]
+    },
+    {
+      "concept": "estampa-labaredas-abstratas",
+      "count": 5,
+      "rows": [381, 382, 383, 384, 896]
+    },
+    {
+      "concept": "estampa-lampadas",
+      "count": 5,
+      "rows": [353, 354, 355, 356, 889]
+    },
+    {
+      "concept": "estampa-lapis",
+      "count": 5,
+      "rows": [793, 794, 795, 796, 999]
+    },
+    {
+      "concept": "estampa-livro-folhas-soltas",
+      "count": 5,
+      "rows": [297, 298, 299, 300, 875]
+    },
+    {
+      "concept": "estampa-lupas",
+      "count": 5,
+      "rows": [77, 78, 79, 80, 820]
+    },
+    {
+      "concept": "estampa-maquinas-escrever",
+      "count": 5,
+      "rows": [781, 782, 783, 784, 996]
+    },
+    {
+      "concept": "estampa-mobiles",
+      "count": 5,
+      "rows": [393, 394, 395, 396, 899]
+    },
+    {
+      "concept": "estampa-moinhos",
+      "count": 5,
+      "rows": [773, 774, 775, 776, 994]
+    },
+    {
+      "concept": "estampa-montanhas",
+      "count": 5,
+      "rows": [261, 262, 263, 264, 866]
+    },
+    {
+      "concept": "estampa-ondas-mar",
+      "count": 5,
+      "rows": [257, 258, 259, 260, 865]
+    },
+    {
+      "concept": "estampa-paineira",
+      "count": 5,
+      "rows": [385, 386, 387, 388, 897]
+    },
+    {
+      "concept": "estampa-paisagem-deserto",
+      "count": 5,
+      "rows": [345, 346, 347, 348, 887]
+    },
+    {
+      "concept": "estampa-patinhos",
+      "count": 5,
+      "rows": [341, 342, 343, 344, 886]
+    },
+    {
+      "concept": "estampa-pecas-xadrez",
+      "count": 5,
+      "rows": [777, 778, 779, 780, 995]
+    },
+    {
+      "concept": "estampa-pinceladas",
+      "count": 5,
+      "rows": [253, 254, 255, 256, 864]
+    },
+    {
+      "concept": "estampa-pioes",
+      "count": 5,
+      "rows": [301, 302, 303, 304, 876]
+    },
+    {
+      "concept": "estampa-pipa-rabiola",
+      "count": 5,
+      "rows": [305, 306, 307, 308, 877]
+    },
+    {
+      "concept": "estampa-pipoca",
+      "count": 5,
+      "rows": [225, 226, 227, 228, 857]
+    },
+    {
+      "concept": "estampa-planetario",
+      "count": 5,
+      "rows": [349, 350, 351, 352, 888]
+    },
+    {
+      "concept": "estampa-pontes-penseis",
+      "count": 5,
+      "rows": [389, 390, 391, 392, 898]
+    },
+    {
+      "concept": "estampa-predios-reflexo",
+      "count": 5,
+      "rows": [313, 314, 315, 316, 879]
+    },
+    {
+      "concept": "estampa-radios",
+      "count": 5,
+      "rows": [717, 718, 719, 720, 980]
+    },
+    {
+      "concept": "estampa-robos",
+      "count": 5,
+      "rows": [321, 322, 323, 324, 881]
+    },
+    {
+      "concept": "estampa-roda-gigante",
+      "count": 5,
+      "rows": [337, 338, 339, 340, 885]
+    },
+    {
+      "concept": "estampa-sacadas",
+      "count": 5,
+      "rows": [733, 734, 735, 736, 984]
+    },
+    {
+      "concept": "estampa-sanduiches",
+      "count": 5,
+      "rows": [789, 790, 791, 792, 998]
+    },
+    {
+      "concept": "estampa-satelites",
+      "count": 3,
+      "rows": [398, 400, 900]
+    },
+    {
+      "concept": "estampa-serpente-circular",
+      "count": 5,
+      "rows": [749, 750, 751, 752, 988]
+    },
+    {
+      "concept": "estampa-sinetas",
+      "count": 5,
+      "rows": [677, 678, 679, 680, 970]
+    },
+    {
+      "concept": "estampa-sorvete",
+      "count": 5,
+      "rows": [229, 230, 231, 232, 858]
+    },
+    {
+      "concept": "estampa-tangerina",
+      "count": 5,
+      "rows": [233, 234, 235, 236, 859]
+    },
+    {
+      "concept": "estampa-tartarugas",
+      "count": 5,
+      "rows": [753, 754, 755, 756, 989]
+    },
+    {
+      "concept": "estampa-telefericos",
+      "count": 5,
+      "rows": [205, 206, 207, 208, 852]
+    },
+    {
+      "concept": "estampa-telefone-antigo",
+      "count": 5,
+      "rows": [713, 714, 715, 716, 979]
+    },
+    {
+      "concept": "estampa-telescopios",
+      "count": 5,
+      "rows": [721, 722, 723, 724, 981]
+    },
+    {
+      "concept": "estampa-tendas-circo",
+      "count": 5,
+      "rows": [637, 638, 639, 640, 960]
+    },
+    {
+      "concept": "estampa-terrazzo",
+      "count": 5,
+      "rows": [241, 242, 243, 244, 861]
+    },
+    {
+      "concept": "estampa-tesoura-botoes",
+      "count": 5,
+      "rows": [357, 358, 359, 360, 890]
+    },
+    {
+      "concept": "estampa-trenas",
+      "count": 5,
+      "rows": [701, 702, 703, 704, 976]
+    },
+    {
+      "concept": "estampa-trigo",
+      "count": 5,
+      "rows": [365, 366, 367, 368, 892]
+    },
+    {
+      "concept": "estampa-trompetes",
+      "count": 5,
+      "rows": [69, 70, 71, 72, 818]
+    },
+    {
+      "concept": "estampa-vulcao",
+      "count": 5,
+      "rows": [269, 270, 271, 272, 868]
+    },
+    {
+      "concept": "estampa-xilofones",
+      "count": 5,
+      "rows": [53, 54, 55, 56, 814]
+    },
+    {
+      "concept": "faixa-camisa-marca-passo",
+      "count": 5,
+      "rows": [553, 554, 555, 556, 939]
+    },
+    {
+      "concept": "folhagem-estampada",
+      "count": 5,
+      "rows": [285, 286, 287, 288, 872]
+    },
+    {
+      "concept": "forro-deslizante",
+      "count": 5,
+      "rows": [581, 582, 583, 584, 946]
+    },
+    {
+      "concept": "franzido-manual-grade",
+      "count": 5,
+      "rows": [497, 498, 499, 500, 925]
+    },
+    {
+      "concept": "fuxicos-circulares",
+      "count": 5,
+      "rows": [409, 410, 411, 412, 903]
+    },
+    {
+      "concept": "gancho-giratorio",
+      "count": 5,
+      "rows": [533, 534, 535, 536, 934]
+    },
+    {
+      "concept": "gola-acolchoada-volumosa",
+      "count": 5,
+      "rows": [85, 86, 87, 88, 822]
+    },
+    {
+      "concept": "gola-canoa",
+      "count": 5,
+      "rows": [25, 26, 27, 28, 807]
+    },
+    {
+      "concept": "limpeza-ziper",
+      "count": 5,
+      "rows": [509, 510, 511, 512, 928]
+    },
+    {
+      "concept": "luva-toque-digital",
+      "count": 5,
+      "rows": [545, 546, 547, 548, 937]
+    },
+    {
+      "concept": "manga-ragla",
+      "count": 5,
+      "rows": [13, 14, 15, 16, 804]
+    },
+    {
+      "concept": "mangas-em-camadas",
+      "count": 5,
+      "rows": [49, 50, 51, 52, 813]
+    },
+    {
+      "concept": "orientacao-bussola-rosa",
+      "count": 5,
+      "rows": [729, 730, 731, 732, 983]
+    },
+    {
+      "concept": "painel-acolchoado-costurado",
+      "count": 10,
+      "rows": [449, 450, 451, 452, 453, 454, 455, 456, 913, 914]
+    },
+    {
+      "concept": "painel-entrelaçado-vazado",
+      "count": 5,
+      "rows": [33, 34, 35, 36, 809]
+    },
+    {
+      "concept": "painel-nervuras-costuradas",
+      "count": 5,
+      "rows": [9, 10, 11, 12, 803]
+    },
+    {
+      "concept": "passador-costurado-cordao",
+      "count": 5,
+      "rows": [493, 494, 495, 496, 924]
+    },
+    {
+      "concept": "passar-vista-aberta",
+      "count": 5,
+      "rows": [561, 562, 563, 564, 941]
+    },
+    {
+      "concept": "pintura-esponja",
+      "count": 5,
+      "rows": [461, 462, 463, 464, 916]
+    },
+    {
+      "concept": "pintura-marmorizada",
+      "count": 5,
+      "rows": [465, 466, 467, 468, 917]
+    },
+    {
+      "concept": "ponto-caseado-borda",
+      "count": 5,
+      "rows": [445, 446, 447, 448, 912]
+    },
+    {
+      "concept": "ponto-cheio",
+      "count": 5,
+      "rows": [437, 438, 439, 440, 910]
+    },
+    {
+      "concept": "ponto-corrente",
+      "count": 5,
+      "rows": [433, 434, 435, 436, 909]
+    },
+    {
+      "concept": "ponto-cruz",
+      "count": 5,
+      "rows": [441, 442, 443, 444, 911]
+    },
+    {
+      "concept": "porta-broches-espuma",
+      "count": 5,
+      "rows": [513, 514, 515, 516, 929]
+    },
+    {
+      "concept": "presilha-distribuida",
+      "count": 5,
+      "rows": [153, 154, 155, 156, 839]
+    },
+    {
+      "concept": "presilha-fivela-reta",
+      "count": 5,
+      "rows": [177, 178, 179, 180, 845]
+    },
+    {
+      "concept": "proteção-botao-lavagem",
+      "count": 5,
+      "rows": [577, 578, 579, 580, 945]
+    },
+    {
+      "concept": "pulseira-fios-soltos",
+      "count": 5,
+      "rows": [689, 690, 691, 692, 973]
+    },
+    {
+      "concept": "pulseira-mola",
+      "count": 5,
+      "rows": [117, 118, 119, 120, 830]
+    },
+    {
+      "concept": "recorte-joelho-oval",
+      "count": 5,
+      "rows": [29, 30, 31, 32, 808]
+    },
+    {
+      "concept": "reforco-alca-cruz",
+      "count": 5,
+      "rows": [573, 574, 575, 576, 944]
+    },
+    {
+      "concept": "regua-curva-cava",
+      "count": 5,
+      "rows": [557, 558, 559, 560, 940]
+    },
+    {
+      "concept": "relogio-capa-removivel",
+      "count": 5,
+      "rows": [589, 590, 591, 592, 948]
+    },
+    {
+      "concept": "remover-alinhavo",
+      "count": 5,
+      "rows": [569, 570, 571, 572, 943]
+    },
+    {
+      "concept": "renda-bilros",
+      "count": 5,
+      "rows": [401, 402, 403, 404, 901]
+    },
+    {
+      "concept": "renda-renascenca",
+      "count": 5,
+      "rows": [405, 406, 407, 408, 902]
+    },
+    {
+      "concept": "saia-camadas-escada",
+      "count": 5,
+      "rows": [21, 22, 23, 24, 806]
+    },
+    {
+      "concept": "saia-envelope-quatro-abas",
+      "count": 5,
+      "rows": [73, 74, 75, 76, 819]
+    },
+    {
+      "concept": "saia-origami-frontal",
+      "count": 5,
+      "rows": [649, 650, 651, 652, 963]
+    },
+    {
+      "concept": "saia-prega-leque-costas",
+      "count": 5,
+      "rows": [609, 610, 611, 612, 953]
+    },
+    {
+      "concept": "saia-recortes-espinha",
+      "count": 5,
+      "rows": [89, 90, 91, 92, 823]
+    },
+    {
+      "concept": "sandalia-ponte-transparente",
+      "count": 5,
+      "rows": [173, 174, 175, 176, 844]
+    },
+    {
+      "concept": "sandalia-tiras-assimetricas",
+      "count": 5,
+      "rows": [137, 138, 139, 140, 835]
+    },
+    {
+      "concept": "sapato-escova-camurca",
+      "count": 5,
+      "rows": [537, 538, 539, 540, 935]
+    },
+    {
+      "concept": "sapato-salto-bola",
+      "count": 5,
+      "rows": [169, 170, 171, 172, 843]
+    },
+    {
+      "concept": "sapato-tela-bordada",
+      "count": 5,
+      "rows": [141, 142, 143, 144, 836]
+    },
+    {
+      "concept": "separador-dias",
+      "count": 5,
+      "rows": [525, 526, 527, 528, 932]
+    },
+    {
+      "concept": "silhueta-arredondada-fechada",
+      "count": 5,
+      "rows": [1, 2, 3, 4, 801]
+    },
+    {
+      "concept": "tecido-reunido-aro",
+      "count": 5,
+      "rows": [613, 614, 615, 616, 954]
+    },
+    {
+      "concept": "touca-abertura-coque",
+      "count": 5,
+      "rows": [549, 550, 551, 552, 938]
+    },
+    {
+      "concept": "transferencia-folha-metal",
+      "count": 5,
+      "rows": [477, 478, 479, 480, 920]
+    },
+    {
+      "concept": "tricot-dedos",
+      "count": 5,
+      "rows": [417, 418, 419, 420, 905]
+    },
+    {
+      "concept": "tricot-ponto-musgo",
+      "count": 5,
+      "rows": [665, 666, 667, 668, 967]
+    },
+    {
+      "concept": "tricot-trancas",
+      "count": 5,
+      "rows": [661, 662, 663, 664, 966]
+    },
+    {
+      "concept": "vestido-cintura-deslocada",
+      "count": 5,
+      "rows": [645, 646, 647, 648, 962]
+    },
+    {
+      "concept": "vestido-torcao-frontal",
+      "count": 5,
+      "rows": [17, 18, 19, 20, 805]
+    }
+  ]
+}

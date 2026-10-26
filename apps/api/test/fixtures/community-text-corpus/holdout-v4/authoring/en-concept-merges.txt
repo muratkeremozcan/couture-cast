@@ -1,0 +1,250 @@
+# Editorial synonym consolidation. Each line is one substantive motif followed by its prior labels.
+visible-mending visible-mending repair-visible-thread knit-repair-stitches
+rail-commute rail-commute commute-platform
+pottery-apron pottery-apron studio-clay
+heirloom-cufflinks heirloom-cufflinks cufflinks-display
+bookbinding-class bookbinding-class bookbinding-sleeves
+raincoat-drying raincoat-drying raincoat-hook
+knit-blocking knit-blocking blocked-knit cardigan-reblock
+archive-gloves archive-gloves archive-desk
+outfit-drawing outfit-drawing outfit-sketch
+button-swap button-swap button-replacement
+reflective-visibility night-shift reflective-nightwear dusk-reflection dusk-reflective-trim
+quiet-footwear quiet-shoes reading-room museum-quiet-day
+theatre-matinee theatre-matinee theatre-programme
+linen-creases linen-creases linen-chair creased-linen-sleeve
+packed-flat packed-flat suitcase-flatpack
+colour-memory colour-memory tile-palette
+seam-experiment seam-experiment exposed-seam
+museum-locker museum-locker museum-lockers museum-locker-token
+scarf-fastener scarf-fastener brooch-scarf scarf-brooch-fold shawl-pin
+shoe-repair shoe-repair shoe-heel-repair
+clothes-swap clothes-swap swap-rack
+chair-comfort chair-comfort seated-waistband
+concert-earplugs concert-earplugs earplug-pouch
+embroidery-initial embroidery-initial inside-initial
+weather-layer weather-layer mist-layers
+shared-wardrobe shared-wardrobe borrowed-jacket
+airport-shoes airport-shoes airport-slipons
+picnic-blanket picnic-blanket picnic-grass
+repair-cafe repair-cafe repair-cafe-buckle
+choir-rehearsal choir-rehearsal choir-chairs community-choir-break
+bag-lining bag-lining bag-bright-lining
+secondhand-fit secondhand-fit shoulder-pin-fitting
+laundry-label laundry-label care-label-closeup
+community-kitchen community-kitchen kitchen-tied-sleeves cooking-club cooking-club-sleeves
+print-scale print-scale mixed-print-scale
+accessibility-closure accessibility-closure magnetic-clasp
+outdoor-cinema outdoor-cinema outdoor-cinema-wrap
+watch-strap watch-strap fabric-watchstrap
+library-steps library-steps step-hem-photo
+garment-origin garment-origin loom-cloth local-loom
+early-swim early-swim after-swim-socks
+festival-dust festival-dust festival-shoes
+reversible-jacket reversible-jacket reversible-coat-display
+alteration-chalk alteration-chalk tailor-chalk
+hearing-device hearing-device earring-device-gap
+canal-walk canal-walk canal-vest
+workshop-safety workshop-safety workshop-close-cuffs
+patchwork-history patchwork-history patchwork-scraps
+tea-spill tea-spill tea-stain-blot
+coastal-salt coastal-salt coastal-coat-brush
+walking-map walking-map map-inner-pocket
+summer-office summer-office summer-office-shirt
+family-wedding family-wedding wedding-suit-repeat
+hemming-help hemming-help hem-pinning
+waterproof-beading bus-shelter rain-beading
+crochet-detail crochet-detail crochet-edge-closeup
+bag-weight bag-weight bag-light-load
+restored-pleats restored-pleats pressed-pleats
+planetarium planetarium planetarium-seating
+walking-cane walking-cane cane-free-hand
+portrait-collar portrait-collar portrait-neckline
+handwoven-belt handwoven-belt weaver-belt-stall
+coat-storage coat-storage coat-cover
+shoe-breakin shoe-breakin loafer-softening
+garment-tracing garment-tracing pattern-trace
+volunteer-badge volunteer-badge volunteer-badge-knit
+orchard-visit orchard-visit orchard-boots
+unplanned-match unplanned-match matching-friends
+braille-label braille-label tactile-tag
+fountain-light fountain-light fountain-shoe-glint
+inherited-buttons inherited-buttons button-tin
+ferry-deck ferry-deck ferry-hat-cord
+cycle-lights cycle-lights bike-bag-light reflective-backpack
+scarf-folding scarf-folding square-scarf-fold scarf-fold-grid
+warming-room warming-room meeting-layer-chair
+charity-shop charity-shop secondhand-lining
+balloon-sleeves balloon-sleeves bloused-sleeves buttoned-cuffs tight-cuff-blouse
+chalk-dust chalk-dust chalk-brush
+small-stage small-stage storytelling-stage
+boots-waterproofing boots-waterproofing boot-wax
+bag-conversion bag-conversion bag-short-handle
+seed-packet seed-packet seed-packet-pocket
+indigo-transfer indigo-transfer denim-wash-basin
+slow-dance slow-dance skirt-dance
+texture-touch texture-touch brushed-overshirt
+postcard-palette postcard-palette postcard-colours
+lost-glove lost-glove glove-in-sleeve
+closed-toe-gallery closed-toe-gallery gallery-standing-shoes
+outfit-calendar outfit-calendar outfit-notebook
+chestnut-walk chestnut-walk chestnut-pockets
+car-seat car-seat car-headrest
+vintage-dating vintage-dating vintage-label-date
+climbing-stairs climbing-stairs station-stairs
+watercolour-class watercolour-class watercolour-cuff
+borrowed-tie borrowed-tie borrowed-tie-knot
+garment-airing garment-airing wool-airing scent-free-event clothes-airing
+library-card-pocket library-card-pocket library-card-slot
+sunhat-shape sunhat-shape hat-steaming
+public-speaking public-speaking presentation-jacket calm-presentation
+weaving-selvedge weaving-selvedge visible-selvedge
+morning-outfit-preparation sleepy-morning outfit-laid-out wardrobe-door-hook tomorrow-hook
+long-hair-collar long-hair-collar hair-smooth-collar
+offcut-scrunchie offcut-scrunchie scrap-hair-tie
+lapel-pin lapel-pin enamel-pin
+chequered-floor chequered-floor check-floor
+shoe-polish shoe-polish polished-toes
+hospital-visit hospital-visit visiting-soft-layers
+threading-needle threading-needle threader-button
+beret-shaping beret-shaping beret-drying
+train-sleep train-sleep train-window scarf-train-blanket train-scarf-pillow
+movement-photo movement-photo walking-photo photo-wind
+lap-blanket lap-blanket wrap-knees
+fitting-mirror fitting-mirror side-fitting
+beach-pebbles beach-pebbles beach-stones-pocket
+early-cycling early-cycling thin-cycle-gloves
+buttonholes buttonholes practice-buttonholes buttonhole-stitches
+rainbow-crossing rainbow-crossing colourful-crossing
+first-sewn-skirt first-sewn-skirt first-skirt-sewing
+stationery-shopping stationery-shopping pencil-ear
+humidity-curls humidity-curls hair-off-neck
+simple-uniform simple-uniform workday-uniform
+harbour-lunch harbour-lunch harbour-chair
+outgrown-reuse outgrown-reuse shirt-shopping-bag
+bead-restringing bead-restringing restringing-beads
+museum-sketchbook museum-sketchbook sketchbook-tote
+sole-grip sole-grip wet-cobbles
+collarless-layer collarless-layer collarless-jacket
+fairground fairground fairground-trainers
+wooden-bangle wooden-bangle carved-bangle
+patch-placement patch-placement patch-pinning
+backpack-straps backpack-straps backpack-scarf-space
+first-frost first-frost fine-underlayer
+school-reunion school-reunion reunion-jacket
+gallery-bench gallery-bench gallery-bench-straps
+spinning-yarn spinning-yarn handspun-hat
+carry-on-coat carry-on-coat bulky-travel-layer
+sensory-softness sensory-softness flat-seam-shirt
+ballet-audience ballet-audience ballet-boots
+tomato-harvest tomato-harvest tomato-apron
+repair-sashiko repair-sashiko running-stitch-denim
+morning-reflection morning-reflection shop-window-outfit
+velvet-nap velvet-nap velvet-brush
+coin-purse coin-purse necktie-purse
+church-organ church-organ organ-recital-skirt
+handbag-repair handbag-repair repaired-bag-handle
+studio-cleanup studio-cleanup studio-dungarees
+thread-colour thread-colour thread-daylight
+marathon-support marathon-support marathon-spectator
+mirror-selfie-angle mirror-selfie-angle low-camera-angle
+overshirt-sharing overshirt-sharing shared-overshirt
+outdoor-chess outdoor-chess outdoor-chess
+sock-darning sock-darning darned-socks
+railway-heritage railway-heritage railway-workshop
+shirt-tuck shirt-tuck partial-tuck
+urban-sketching urban-sketching sketch-supplies-bag
+wind-hat wind-hat chin-cord-hill hat-pin hat-pin-secure
+ornamental-zip ornamental-zip oversized-zip
+hemming-weight hemming-weight hem-weight
+memory-fabric memory-fabric uniform-pouch
+repair-zipper repair-zipper replaced-zip
+outdoor-reading outdoor-reading fingerless-reading
+pattern-drafting pattern-drafting drafted-pocket
+hat-band hat-band hat-ribbon-band
+comfy-travel comfy-travel elastic-back-waist
+shoe-laces shoe-laces short-shoelaces
+found-scarf found-scarf rediscovered-scarf
+theatre-backstage theatre-backstage backstage-layers stagehand-pockets
+pinstripe-direction pinstripe-direction stripe-pocket
+graduation-gown graduation-gown graduation-steps
+foldaway-tote foldaway-tote spare-tote folded-tote-storage
+shawl-shape shawl-shape triangle-shawl
+art-supply art-supply graphite-cuff
+tailor-visit tailor-visit tailor-shoes
+sock-colour sock-colour bright-sock
+community-orchestra community-orchestra orchestra-page noisy-fabric
+handmade-clasp handmade-clasp clasp-demonstration shopkeeper-tip
+woodland-mud woodland-mud woodland-cuffs
+train-picnic train-picnic train-picnic-pockets
+pearlescent-buttons pearlescent-buttons pearl-button-light
+coat-loop coat-loop added-hanging-loop coat-hanger-loop
+charcoal-tones charcoal-tones charcoal-layers
+sunflower-market sunflower-market flower-stall
+shortened-necklace shortened-necklace shortened-chain
+graduated-colour graduated-colour gradient-scarf
+maritime-stripes maritime-stripes harbour-stripes
+insect-repair insect-repair leaf-moth-repair
+travel-laundry travel-laundry guesthouse-laundry
+museum-courtyard museum-courtyard courtyard-pause
+handkerchief-pocket handkerchief-pocket handkerchief-slot
+sole-replacement sole-replacement walking-shoe-resole
+outfit-repeat outfit-repeat repeated-outfit
+fabric-market fabric-market fabric-stall-match
+coat-drape coat-drape untied-coat-belt
+embroidered-map embroidered-map map-embroidery
+reading-glasses reading-glasses glasses-waistcoat
+rain-trousers rain-trousers rain-trouser-zip
+book-fair book-fair book-fair-tote
+shawl-heirloom shawl-heirloom old-shawl-repairs
+braided-belt braided-belt braided-belt-adjust
+train-temperature train-temperature train-unbuttoned-layer
+patch-pocket-shape patch-pocket-shape rounded-pocket-corners
+costume-archive costume-archive costume-study
+magazine-reference magazine-reference magazine-palette
+knotted-strap knotted-strap knotted-bag-strap
+family-sewing family-sewing family-handmade
+repaired-buckle repaired-buckle replaced-belt-buckle
+sun-protection sun-protection wide-brim-shade hat-shadow-face
+food-bank-shift food-bank-shift food-donation-pockets
+accordion-fold accordion-fold accordion-bag-opening
+textile-buttonhole textile-buttonhole bound-buttonhole
+collar-brooch-weight collar-brooch-weight light-brooch-collar
+travel-pocket-list travel-pocket-list packing-list-case
+garment-sun-fading garment-sun-fading sun-faded-shoulder
+seam-finishing seam-finishing enclosed-shirt-seam
+glove-repair glove-repair glove-thumb-stitch
+reversible-bag reversible-bag reversible-tote
+wardrobe-light wardrobe-light lit-wardrobe
+scarf-bag-handle scarf-bag-handle scarf-wrapped-handle
+shoulder-strap-pad shoulder-strap-pad strap-padding
+shoe-tree shoe-tree wooden-shoe-trees
+fabric-covered-clasp fabric-covered-clasp covered-clasp
+repair-documentation repair-documentation repair-photo
+hat-ventilation hat-mesh-band hat-grommet
+hem-moving skirt-walking skirt-dance
+zip-neck-guard zip-guard zip-guard zipper-guard
+cloth-source-remake linen-reuse tablecloth-remake
+rain-cape-portability bicycle-basket festival-cape rain-bonnet
+garment-front-layers long-line-shirt collarless-layer
+shoe-arch-support concert-standing thermal-sole
+shirt-wrist-gather shirt-wrist-gathers balloon-sleeves tight-cuff-blouse
+knit-drape-sharing grandparent-knit shawl-heirloom
+shirt-reverse-surface pattern-reversal reversible-jacket
+wind-hat wind-hat ferry-deck
+lining-reveal hidden-contrast printed-lining-peek novelty-lining collar-lining
+hat-ribbon-detail hat-band hat-ribbon-bow hat-band-buckle
+shawl-fringe-detail shawl-fringe shawl-striped-fringe shawl-knotted-fringe shawl-fringe-shadow
+strap-length-adjustment knotted-strap strap-adjustment bag-strap-slider
+seated-drape seated-skirt-fold lap-blanket
+button-surface-light button-reflection pearlescent-buttons
+portable-spare-bag foldaway-tote foldaway-tote folded-tote-storage
+reinforcing-repair-stitches visible-mending repair-sashiko
+decorative-hole-cover insect-repair decorative-mending embroidered-repair
+sewn-repair-patch patch-colour knit-elbow-patch skirt-denim-patch
+bag-lining-visibility bag-lining bag-check-lining
+elastic-boot-insert boot-side-elastic boot-contrast-panel
+loose-boat-weather maritime-stripes harbour-lunch
+revealed-inner-surface bag-lining-visibility lining-reveal striped-cuff-turn glove-turnback shirt-contrast-facing charity-shop
+practical-extra-layer weather-layer choir-rehearsal outdoor-cinema planetarium hospital-visit first-frost marathon-support waistcoat-layer library-volunteer community-cinema lantern-walk artist-residency seaside-laundrette borrowed-wrap
+textile-fringe-edge shawl-fringe-detail scarf-long-tassels handwoven-scarf-edge

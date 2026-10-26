@@ -1,0 +1,34 @@
+{
+  "corpusVersion": "holdout-v4",
+  "coordinatorDecision": "B9",
+  "independencePreregisteredCommit": "406b3e13b6b788bb81d57be4677bb5ee3132976a",
+  "arithmeticPreregisteredCommit": "621bd3fa0ce191344e2a727968676eadbf6c695f",
+  "requiredPerLocale": { "total": 1000, "caption": 500, "altText": 500 },
+  "authors": [
+    {
+      "identity": "cc68-tea (/root)",
+      "languages": ["en"],
+      "sourceRowsPerLanguage": [1, 1000]
+    },
+    {
+      "identity": "cc68-tea independent author /root/edge_paths",
+      "languages": ["de", "es", "tr"],
+      "sourceRowsPerLanguage": [1, 1000]
+    },
+    {
+      "identity": "cc68-tea independent author /root/general_review",
+      "languages": ["fr", "it", "pt"],
+      "sourceRowsPerLanguage": [1, 1000]
+    }
+  ],
+  "procedure": "Every complete item is individually composed and persisted literally in TSV. Each row contains editorial motif labels, caption or altText, and complete text. No fragment banks, templates, combinatorial assembly or text-generating program is used. Helpers only serialize complete text and measure structural properties. Concept synonym consolidation is editorial metadata, independent of screening outcomes.",
+  "conceptUnitConfirmedByCoordinator": "Underlying scenario or visual motif; group paraphrases and differences limited to colour, fabric or incidental setting. Broad garment categories alone do not define the unit.",
+  "fiveWordMeasure": "NFKC then Unicode casefold; contiguous Unicode letter/number word runs; punctuation ignored; any repeated five-word sequence across two or more items marks every participating item once; denominator all 1000 locale items across both fields.",
+  "diversityMaximumAffectedItems": 10,
+  "diversityMaximumConceptMembers": 10,
+  "historicalReadScope": "Exactly the 28 root and holdout-v1/v2/v3 locale JSON files. Complete-text canonical disjointness checked across all seven languages. Historical content is used only for equality checks, never to construct new wording.",
+  "knownContext": "Root retains prior v2 and v3 outcomes and the previously released repair inspection. New v4 authors are blind to repair. Root performs no additional repair inspection or screening during v4 authoring. The screening implementation is not tuned against this corpus.",
+  "releaseOrder": "Amendment committed first; finish individual authorship and structural/editorial checks; import complete text with documented write-once importer; seal locale and source hashes; send hash and counts to coordinator; wait for explicit release; verify round-2 manifest and all 21 files; commit v4 and selector by explicit paths; evaluate; verify inputs again.",
+  "round2ManifestSha256": "5e97ccffd9c2b23ebe16457301b35ca715421783da940a3cb9677061b8d26128",
+  "previousVersions": "v1 and v2 frozen history. v3 frozen history and rejected as non-independent by B9."
+}

@@ -1,0 +1,151 @@
+{
+  "author": "/root/general_review",
+  "status": "complete; sources ready for once-only import and seal",
+  "historicalScope": "Exactly 28 explicit locale files: de,en,es,fr,it,pt,tr at root and under holdout-v1/v2/v3.",
+  "screeningEvaluationPerformed": false,
+  "builderContactPerformed": false,
+  "commitsPerformed": false,
+  "locales": [
+    {
+      "locale": "fr",
+      "author": "/root/general_review",
+      "source": "/tmp/cc68-tea-holdout-v4/.cc68-tea-authoring/fr.tsv",
+      "rowRange": [1, 1000],
+      "captionCount": 500,
+      "altTextCount": 500,
+      "sha256": "be8d688af3a8ce8a4aa861779281b3b7665bf39e508c3c73af3907f51486a784",
+      "fiveWordAffectedCount": 0,
+      "historicalCompleteTextMatchCount": 0,
+      "conceptCount": 242,
+      "maxConceptItems": 8,
+      "maximumConceptGroups": [
+        {
+          "concept": "bord-retourne-visible",
+          "englishGloss": "A turned-back garment edge exposing a cuff or inner layer.",
+          "count": 8,
+          "rows": [29, 30, 31, 32, 145, 146, 147, 148]
+        },
+        {
+          "concept": "ceinture-textile-nouee",
+          "englishGloss": "A tied textile sash or scarf used as a belt.",
+          "count": 8,
+          "rows": [13, 14, 15, 16, 261, 262, 263, 264]
+        },
+        {
+          "concept": "drapage-epingle-mannequin",
+          "englishGloss": "Fabric draped and pinned on a dressmaking mannequin.",
+          "count": 8,
+          "rows": [437, 438, 439, 440, 949, 950, 951, 952]
+        },
+        {
+          "concept": "essai-longueur-ourlet",
+          "englishGloss": "Testing a new hem length with temporary pins or chalk marks.",
+          "count": 8,
+          "rows": [9, 10, 11, 12, 921, 922, 923, 924]
+        },
+        {
+          "concept": "jupe-plis-deployes",
+          "englishGloss": "A pleated skirt fanning open in movement.",
+          "count": 8,
+          "rows": [201, 202, 203, 204, 653, 654, 655, 656]
+        },
+        {
+          "concept": "ourlet-remonte-coulisse",
+          "englishGloss": "A drawstring lifting a hem into gathered folds.",
+          "count": 8,
+          "rows": [213, 214, 215, 216, 369, 370, 371, 372]
+        },
+        {
+          "concept": "reparation-piece-rapportee",
+          "englishGloss": "A visible applied patch reinforcing a worn garment area.",
+          "count": 8,
+          "rows": [45, 46, 47, 48, 177, 178, 179, 180]
+        },
+        {
+          "concept": "tete-enveloppee-foulard",
+          "englishGloss": "A scarf wrapped around the head.",
+          "count": 8,
+          "rows": [77, 78, 79, 80, 393, 394, 395, 396]
+        }
+      ]
+    },
+    {
+      "locale": "it",
+      "author": "/root/general_review",
+      "source": "/tmp/cc68-tea-holdout-v4/.cc68-tea-authoring/it.tsv",
+      "rowRange": [1, 1000],
+      "captionCount": 500,
+      "altTextCount": 500,
+      "sha256": "5432384073def0440b35744c6ccce8af73553b407f5f4491ed71527d051011fc",
+      "fiveWordAffectedCount": 0,
+      "historicalCompleteTextMatchCount": 0,
+      "conceptCount": 243,
+      "maxConceptItems": 8,
+      "maximumConceptGroups": [
+        {
+          "concept": "bande-riflettenti-indossate",
+          "englishGloss": "Reflective bands worn on the torso or ankles.",
+          "count": 8,
+          "rows": [317, 318, 319, 320, 393, 394, 395, 396]
+        },
+        {
+          "concept": "foglie-impronta-ricamo",
+          "englishGloss": "Foliage depicted through solar printing or embroidered branches.",
+          "count": 8,
+          "rows": [257, 258, 259, 260, 413, 414, 415, 416]
+        },
+        {
+          "concept": "labirinto-geometrico",
+          "englishGloss": "Printed labyrinths with rectangular or circular paths.",
+          "count": 8,
+          "rows": [225, 226, 227, 228, 657, 658, 659, 660]
+        },
+        {
+          "concept": "mani-ricamate",
+          "englishGloss": "Embroidered hands, including a hand-shadow bird composition.",
+          "count": 8,
+          "rows": [261, 262, 263, 264, 661, 662, 663, 664]
+        },
+        {
+          "concept": "nuvole-visuali",
+          "englishGloss": "Cloud shapes printed on clothing or embodied as shaped pockets.",
+          "count": 8,
+          "rows": [205, 206, 207, 208, 277, 278, 279, 280]
+        },
+        {
+          "concept": "origami-illustrato",
+          "englishGloss": "Illustrations of folded-paper objects, including a crane and aeroplane.",
+          "count": 8,
+          "rows": [673, 674, 675, 676, 861, 862, 863, 864]
+        },
+        {
+          "concept": "radiale-sul-busto",
+          "englishGloss": "Lines radiating from a point on the upper body, as folds or printed rays.",
+          "count": 8,
+          "rows": [117, 118, 119, 120, 677, 678, 679, 680]
+        }
+      ]
+    },
+    {
+      "locale": "pt",
+      "author": "/root/general_review",
+      "source": "/tmp/cc68-tea-holdout-v4/.cc68-tea-authoring/pt.tsv",
+      "rowRange": [1, 1000],
+      "captionCount": 500,
+      "altTextCount": 500,
+      "sha256": "f9b12f48c05a08d2ade7f9a2fcec33473e794a77ce44622a965e4304be82dea3",
+      "fiveWordAffectedCount": 0,
+      "historicalCompleteTextMatchCount": 0,
+      "conceptCount": 200,
+      "maxConceptItems": 10,
+      "maximumConceptGroups": [
+        {
+          "concept": "painel-acolchoado-costurado",
+          "englishGloss": "Quilted panels whose visible stitching retains padding, including diamond and wavy stitch paths.",
+          "rows": [449, 450, 451, 452, 453, 454, 455, 456, 913, 914],
+          "count": 10
+        }
+      ]
+    }
+  ]
+}

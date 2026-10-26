@@ -1,0 +1,330 @@
+{
+  "corpusVersion": "holdout-v4",
+  "coordinatorDecision": "B9",
+  "sealedAt": "2026-10-26T08:05:04.440826+00:00",
+  "authoringBaseCommit": "406b3e13b6b788bb81d57be4677bb5ee3132976a",
+  "gatePreregisteredCommit": "621bd3fa0ce191344e2a727968676eadbf6c695f",
+  "independencePreregisteredCommit": "406b3e13b6b788bb81d57be4677bb5ee3132976a",
+  "aggregateRecipe": "SHA-256 over sorted UTF-8 lines: repository-relative-path + NUL + file-SHA-256 + LF",
+  "corpusSha256": "5e922f4c7798a28f04799a7007c695fdccdca74ed5982edd48ee1ed7e3c5bab8",
+  "authoringPolicySha256": "b0daab4ab9d175cc018d88d7c37d3443a4d9425909394da3aee110e15ad98b65",
+  "screeningRunBeforeSeal": false,
+  "additionalRepairInspectionDuringV4Authoring": false,
+  "knownContext": "Root retains earlier v2/v3 outcomes and released repair inspection. Independent authors report no policy, repair, screener or development inspection. No corpus text was supplied to the builder. The importer reads the committed baseline solely for pins and required labels.",
+  "construction": "7000 complete items individually authored and persisted literally, with no shared fragment banks, templates, combinatorial assembly or text-generating program. Helpers serialize complete wording unchanged and measure structural properties. Source rows map one-to-one in order to locale entry IDs.",
+  "authors": [
+    {
+      "identity": "cc68-tea (/root)",
+      "languages": ["en"],
+      "sourceRowsPerLanguage": [1, 1000]
+    },
+    {
+      "identity": "cc68-tea independent author /root/edge_paths",
+      "languages": ["de", "es", "tr"],
+      "sourceRowsPerLanguage": [1, 1000]
+    },
+    {
+      "identity": "cc68-tea independent author /root/general_review",
+      "languages": ["fr", "it", "pt"],
+      "sourceRowsPerLanguage": [1, 1000]
+    }
+  ],
+  "independenceRequirements": {
+    "maximumFiveWordAffectedShare": 0.01,
+    "maximumContentConceptShare": 0.01,
+    "conceptUnit": "Underlying scenario or visual motif, including paraphrases and changes limited to colour, fabric or incidental setting. Rows can carry multiple substantive concept labels.",
+    "semanticAcceptanceRemainsReviewable": true
+  },
+  "files": [
+    {
+      "path": "apps/api/test/fixtures/community-text-corpus/holdout-v4/de.json",
+      "sha256": "aa980a3542e3440a8e95142b2fb3532ce3f52c0d2c76398ffabc750e52256245",
+      "language": "de",
+      "total": 1000,
+      "captions": 500,
+      "altTexts": 500,
+      "gatedClean": 1000,
+      "expectedReview": 0
+    },
+    {
+      "path": "apps/api/test/fixtures/community-text-corpus/holdout-v4/en.json",
+      "sha256": "1e8bbe22cf1693b0488a88e25f70d20260b8c4394847edbe8eb2cbb675cd6c68",
+      "language": "en",
+      "total": 1000,
+      "captions": 500,
+      "altTexts": 500,
+      "gatedClean": 1000,
+      "expectedReview": 0
+    },
+    {
+      "path": "apps/api/test/fixtures/community-text-corpus/holdout-v4/es.json",
+      "sha256": "d67e0fd596e461814253baf900b74ad438da3c10f380f5fb310b656f3b687a88",
+      "language": "es",
+      "total": 1000,
+      "captions": 500,
+      "altTexts": 500,
+      "gatedClean": 1000,
+      "expectedReview": 0
+    },
+    {
+      "path": "apps/api/test/fixtures/community-text-corpus/holdout-v4/fr.json",
+      "sha256": "f20c177a28ef2034b57aa202dbb0fb6f04b715ef29de06f6928b95c9f373d120",
+      "language": "fr",
+      "total": 1000,
+      "captions": 500,
+      "altTexts": 500,
+      "gatedClean": 1000,
+      "expectedReview": 0
+    },
+    {
+      "path": "apps/api/test/fixtures/community-text-corpus/holdout-v4/it.json",
+      "sha256": "88803909e149e1b59afab4c7403e2012fb85d557bd589e57848bb72894118295",
+      "language": "it",
+      "total": 1000,
+      "captions": 500,
+      "altTexts": 500,
+      "gatedClean": 1000,
+      "expectedReview": 0
+    },
+    {
+      "path": "apps/api/test/fixtures/community-text-corpus/holdout-v4/pt.json",
+      "sha256": "9d2903c7de3bb02a02bd1140825e3d0ba994244773c9f2141b6e5734cbb56013",
+      "language": "pt",
+      "total": 1000,
+      "captions": 500,
+      "altTexts": 500,
+      "gatedClean": 1000,
+      "expectedReview": 0
+    },
+    {
+      "path": "apps/api/test/fixtures/community-text-corpus/holdout-v4/tr.json",
+      "sha256": "83f70b5e9678f8d228e381cf1220981d5bf0ff315ae538f4e0a88bfb34a65d19",
+      "language": "tr",
+      "total": 1000,
+      "captions": 500,
+      "altTexts": 500,
+      "gatedClean": 1000,
+      "expectedReview": 0
+    }
+  ],
+  "authoringSources": [
+    {
+      "path": "apps/api/test/fixtures/community-text-corpus/holdout-v4/authoring/audit-crosscheck.py",
+      "sha256": "0f2b1ced51a28215d16bfce9d591c6aa9afeae621c02a4bbd2aebb77af278738"
+    },
+    {
+      "path": "apps/api/test/fixtures/community-text-corpus/holdout-v4/authoring/audit.py",
+      "sha256": "f041e575c840d63fe56081ede19411b18eb24fc9dbdd05b386c19aa2e9327ab1"
+    },
+    {
+      "path": "apps/api/test/fixtures/community-text-corpus/holdout-v4/authoring/authoring-plan.json",
+      "sha256": "6c48c0e7ee1c5f7c6104489b8772b7d0e5c1913c9365e5b6cd7d59e38cf1de88"
+    },
+    {
+      "path": "apps/api/test/fixtures/community-text-corpus/holdout-v4/authoring/de.tsv",
+      "sha256": "caf54a1eea2ab5ecd02fb35d91642e7857d206974525c03e15ef112cbcdc8d54"
+    },
+    {
+      "path": "apps/api/test/fixtures/community-text-corpus/holdout-v4/authoring/edge_paths-final-report.json",
+      "sha256": "0a026ec579eed5c3ac01d28a17f58e3e7d2797e4d3e54005632a118e94192f68"
+    },
+    {
+      "path": "apps/api/test/fixtures/community-text-corpus/holdout-v4/authoring/edge_paths-measure.py",
+      "sha256": "eb21ea10235b43c6c720624c34e67f122bffdacca75a136037612046c5952ada"
+    },
+    {
+      "path": "apps/api/test/fixtures/community-text-corpus/holdout-v4/authoring/en-author-review.json",
+      "sha256": "2a478654828409495755df0cb8d8f6d6024f0eb52656fe9154ff4084b8348ca7"
+    },
+    {
+      "path": "apps/api/test/fixtures/community-text-corpus/holdout-v4/authoring/en-concept-merges.txt",
+      "sha256": "748e5a52df289fa16a79612fd2a9c113abfdc10b3140b693518dfe920adb66eb"
+    },
+    {
+      "path": "apps/api/test/fixtures/community-text-corpus/holdout-v4/authoring/en-peer-review-edge_paths.json",
+      "sha256": "26afa521926ee2397c572323a092f1fb67b887cec85050642852daee46fdbeac"
+    },
+    {
+      "path": "apps/api/test/fixtures/community-text-corpus/holdout-v4/authoring/en.tsv",
+      "sha256": "f48f3aecdff25fa3766a0032fdcf1e214e03f4490cf4d81bb56597117f760388"
+    },
+    {
+      "path": "apps/api/test/fixtures/community-text-corpus/holdout-v4/authoring/es.tsv",
+      "sha256": "dc681eb05c539431ed0aa448f4c471151056300c20487ca24cb476b8d14ec32c"
+    },
+    {
+      "path": "apps/api/test/fixtures/community-text-corpus/holdout-v4/authoring/fr-concept-audit.json",
+      "sha256": "d99d426bb021534551fc604a46975e303a4b9cc0f1b6a62f78186b898f8a73de"
+    },
+    {
+      "path": "apps/api/test/fixtures/community-text-corpus/holdout-v4/authoring/fr.tsv",
+      "sha256": "be8d688af3a8ce8a4aa861779281b3b7665bf39e508c3c73af3907f51486a784"
+    },
+    {
+      "path": "apps/api/test/fixtures/community-text-corpus/holdout-v4/authoring/general-review-final-manifest.json",
+      "sha256": "1da65d1321a0440de26280b9785e32660f8134bad24c15f61d7594b0925e7440"
+    },
+    {
+      "path": "apps/api/test/fixtures/community-text-corpus/holdout-v4/authoring/it-concept-audit.json",
+      "sha256": "e3c3efbd0ad7301cbeb9c7447d14f8a8cea86a48b4767d5528e30b4a08550820"
+    },
+    {
+      "path": "apps/api/test/fixtures/community-text-corpus/holdout-v4/authoring/it.tsv",
+      "sha256": "5432384073def0440b35744c6ccce8af73553b407f5f4491ed71527d051011fc"
+    },
+    {
+      "path": "apps/api/test/fixtures/community-text-corpus/holdout-v4/authoring/measure_authoring.py",
+      "sha256": "72dfa60ac10f39754cf636a1f9e4102239c72c27474e7afa953515dedf5d7aa3"
+    },
+    {
+      "path": "apps/api/test/fixtures/community-text-corpus/holdout-v4/authoring/pt-concept-audit.json",
+      "sha256": "a85c604a4a8e3608e3739339cbace62899597d2a4e62ddfb3142a0f77b051608"
+    },
+    {
+      "path": "apps/api/test/fixtures/community-text-corpus/holdout-v4/authoring/pt-final-authored-replacements.json",
+      "sha256": "534adae9b3d92138c387552815bc36decfc72f6259e9cdce25c29e24a1e4560d"
+    },
+    {
+      "path": "apps/api/test/fixtures/community-text-corpus/holdout-v4/authoring/pt.tsv",
+      "sha256": "f9b12f48c05a08d2ade7f9a2fcec33473e794a77ce44622a965e4304be82dea3"
+    },
+    {
+      "path": "apps/api/test/fixtures/community-text-corpus/holdout-v4/authoring/semantic-consolidation-edge_paths.json",
+      "sha256": "76eaee1cbfcdef683ef55cc0f848f4497bde620cbdafa23d02e7be7e747071a0"
+    },
+    {
+      "path": "apps/api/test/fixtures/community-text-corpus/holdout-v4/authoring/serialize-complete-items.py",
+      "sha256": "65ed015451b109fb11b876e343a40254b0b84c5aac51792c1154d45f510cb10e"
+    },
+    {
+      "path": "apps/api/test/fixtures/community-text-corpus/holdout-v4/authoring/tr.tsv",
+      "sha256": "3e4b3d7f470df37c8e1d4eafe6fb26bcf2501aca86662953c75fe0f89def158a"
+    },
+    {
+      "path": "apps/api/test/fixtures/community-text-corpus/holdout-v4/README.md",
+      "sha256": "afa3a64a53fb6e4dff0b6db8a7b930f2fbeafa9966574550e5f7f9ae84016b49"
+    },
+    {
+      "path": "apps/api/test/fixtures/community-text-corpus/holdout-v4/diversity.json",
+      "sha256": "ff70c0d040e0b288f51384d22f8261a996c16195e3f78a9d332505f3ee226782"
+    }
+  ],
+  "historicalLocaleFiles": [
+    {
+      "path": "apps/api/test/fixtures/community-text-corpus/de.json",
+      "sha256": "6c0e3bfcbcc459bd3bb0e13a3be03668db937af1189d85e7ab4ca08dd28067ba"
+    },
+    {
+      "path": "apps/api/test/fixtures/community-text-corpus/en.json",
+      "sha256": "87b82942efd0c19f07c0f12fd8bd1770c04574478096e38c6e155b118f839fc3"
+    },
+    {
+      "path": "apps/api/test/fixtures/community-text-corpus/es.json",
+      "sha256": "69fc6716328963d930044412f409dbe0e494ebdf547be85904a4ea6c559652b3"
+    },
+    {
+      "path": "apps/api/test/fixtures/community-text-corpus/fr.json",
+      "sha256": "2dc96c4eca25b1cb60a9d40e86833f249f4260b38033dc8d7043d63ce2a8b2b8"
+    },
+    {
+      "path": "apps/api/test/fixtures/community-text-corpus/it.json",
+      "sha256": "1d2a6c7cc62e9b36bcb3f872da1248f795c5974a6671f7e22b020166610edbc1"
+    },
+    {
+      "path": "apps/api/test/fixtures/community-text-corpus/pt.json",
+      "sha256": "b32b8fc24c2c43e766089b20b70996f1921fb625d5d0c666455a9e4ab404f1b7"
+    },
+    {
+      "path": "apps/api/test/fixtures/community-text-corpus/tr.json",
+      "sha256": "611852f4393a0b045397d86c4cf879aa12e08f015df24f9464a122af88fb70ae"
+    },
+    {
+      "path": "apps/api/test/fixtures/community-text-corpus/holdout-v1/de.json",
+      "sha256": "293a13675913cc08e8cc9b36d93ca7c731e605c5e41b238c217dd5534e24b8df"
+    },
+    {
+      "path": "apps/api/test/fixtures/community-text-corpus/holdout-v1/en.json",
+      "sha256": "def0c67a1ed1665d3684658542456ed749f6306a63360a4a786c1561785ae961"
+    },
+    {
+      "path": "apps/api/test/fixtures/community-text-corpus/holdout-v1/es.json",
+      "sha256": "1813ee53111c35ca54a1aefe26bb3fc49ce2a34ee5e3281336b6022269afdea3"
+    },
+    {
+      "path": "apps/api/test/fixtures/community-text-corpus/holdout-v1/fr.json",
+      "sha256": "ad39bdc231fd59c6a561f89049cbe72cd511255ce3cc8986b12d2994343eff0a"
+    },
+    {
+      "path": "apps/api/test/fixtures/community-text-corpus/holdout-v1/it.json",
+      "sha256": "d36932f32b62ee61c47fee8f88ae77a83c1268abd9876a3f51ea76ff88fe8e25"
+    },
+    {
+      "path": "apps/api/test/fixtures/community-text-corpus/holdout-v1/pt.json",
+      "sha256": "d63103233dc99abca22a44cb7a6efa8e7fec3f2d0f1ec931ddc015e4d4c765e2"
+    },
+    {
+      "path": "apps/api/test/fixtures/community-text-corpus/holdout-v1/tr.json",
+      "sha256": "344f03c4d9a31a416c73a9c815e33331fe5b46ac30561aaf6f26b0667653c34b"
+    },
+    {
+      "path": "apps/api/test/fixtures/community-text-corpus/holdout-v2/de.json",
+      "sha256": "786ce564e27f0b83c9b7c5f3cfc8b0d536dcb342d9fe5b1abb16395c7687e27c"
+    },
+    {
+      "path": "apps/api/test/fixtures/community-text-corpus/holdout-v2/en.json",
+      "sha256": "bad2e70e1df7d99ad98fb42bde1c3a78b669df37cf8936a187fa0329ca184a0e"
+    },
+    {
+      "path": "apps/api/test/fixtures/community-text-corpus/holdout-v2/es.json",
+      "sha256": "89b42ec3572535e932cc6bcc61e6bad45e1288207c9fc44d05df64a92d49f3f7"
+    },
+    {
+      "path": "apps/api/test/fixtures/community-text-corpus/holdout-v2/fr.json",
+      "sha256": "e1246971991f9752f10cae6e361db0083a15db9bc08857f407ab929cf7eb8f67"
+    },
+    {
+      "path": "apps/api/test/fixtures/community-text-corpus/holdout-v2/it.json",
+      "sha256": "e1f8c4c8bb4b4e6bcd09b9ff796cda705a02b24108bc66b11f7e6cac39ce5517"
+    },
+    {
+      "path": "apps/api/test/fixtures/community-text-corpus/holdout-v2/pt.json",
+      "sha256": "99a20bc130d3b9337e0169773ff3e873b0b5455555837d316d448c11380160cc"
+    },
+    {
+      "path": "apps/api/test/fixtures/community-text-corpus/holdout-v2/tr.json",
+      "sha256": "2ac13c0351d0e8cd2cb4f6ff30473962a32d3c31070a71cbf9e2d75f4bca9baf"
+    },
+    {
+      "path": "apps/api/test/fixtures/community-text-corpus/holdout-v3/de.json",
+      "sha256": "6ddaf4d73601a91d7f39258fa3850304aeedb76ed2af3108073007243af2b774"
+    },
+    {
+      "path": "apps/api/test/fixtures/community-text-corpus/holdout-v3/en.json",
+      "sha256": "6f116c4f70ec4890cb7eb7f0699a4f6d00c03bc9397d692dfa17400f93d8e8a4"
+    },
+    {
+      "path": "apps/api/test/fixtures/community-text-corpus/holdout-v3/es.json",
+      "sha256": "61ca685bcf56362752c18cfbe554f79a00c9b08bb10a5f709336cbc1ccdf508a"
+    },
+    {
+      "path": "apps/api/test/fixtures/community-text-corpus/holdout-v3/fr.json",
+      "sha256": "862b76f1c1e1a76548f5983788ff27c4817a0353c2397bc87f68e3a983243af2"
+    },
+    {
+      "path": "apps/api/test/fixtures/community-text-corpus/holdout-v3/it.json",
+      "sha256": "95454c0b089068d8810b6f9bcb4cb178e04649733a983a3628621cc9b05aac86"
+    },
+    {
+      "path": "apps/api/test/fixtures/community-text-corpus/holdout-v3/pt.json",
+      "sha256": "f9f57979e3a7395150b324a638ba3bcd09a70a58e8a70b5fa6d63e3979465c0b"
+    },
+    {
+      "path": "apps/api/test/fixtures/community-text-corpus/holdout-v3/tr.json",
+      "sha256": "d599d94f4c80eb014c7db1129e78edcbd341660fbf76f5f51bbfb09df01460b6"
+    }
+  ],
+  "targetRepairManifestSha256": "5e97ccffd9c2b23ebe16457301b35ca715421783da940a3cb9677061b8d26128",
+  "corpusCommitAndEvaluationReleased": false,
+  "activeHoldoutChanged": false,
+  "v3Status": "Frozen historical corpus. Rejected by B9 as non-independent and ineligible as release evidence."
+}

@@ -1,0 +1,1871 @@
+{
+  "author_identity": "/root/edge_paths",
+  "author_role": "cc68-tea independent v4 corpus author",
+  "authorship_method": "Individually composed complete literal TSV rows. No fragment banks, combinatorial text, scripted text generation, or scripted model calls. Helpers serialize or measure complete authored items and concept labels.",
+  "inspection": "Only the explicit 28 historical locale JSON files were read for text disjointness. No repair, policy, screener, development corpus or evaluation inspection during authorship.",
+  "historical_files": [
+    {
+      "path": "/tmp/cc68-tea-holdout-v4/apps/api/test/fixtures/community-text-corpus/de.json",
+      "sha256": "6c0e3bfcbcc459bd3bb0e13a3be03668db937af1189d85e7ab4ca08dd28067ba"
+    },
+    {
+      "path": "/tmp/cc68-tea-holdout-v4/apps/api/test/fixtures/community-text-corpus/en.json",
+      "sha256": "87b82942efd0c19f07c0f12fd8bd1770c04574478096e38c6e155b118f839fc3"
+    },
+    {
+      "path": "/tmp/cc68-tea-holdout-v4/apps/api/test/fixtures/community-text-corpus/es.json",
+      "sha256": "69fc6716328963d930044412f409dbe0e494ebdf547be85904a4ea6c559652b3"
+    },
+    {
+      "path": "/tmp/cc68-tea-holdout-v4/apps/api/test/fixtures/community-text-corpus/fr.json",
+      "sha256": "2dc96c4eca25b1cb60a9d40e86833f249f4260b38033dc8d7043d63ce2a8b2b8"
+    },
+    {
+      "path": "/tmp/cc68-tea-holdout-v4/apps/api/test/fixtures/community-text-corpus/it.json",
+      "sha256": "1d2a6c7cc62e9b36bcb3f872da1248f795c5974a6671f7e22b020166610edbc1"
+    },
+    {
+      "path": "/tmp/cc68-tea-holdout-v4/apps/api/test/fixtures/community-text-corpus/pt.json",
+      "sha256": "b32b8fc24c2c43e766089b20b70996f1921fb625d5d0c666455a9e4ab404f1b7"
+    },
+    {
+      "path": "/tmp/cc68-tea-holdout-v4/apps/api/test/fixtures/community-text-corpus/tr.json",
+      "sha256": "611852f4393a0b045397d86c4cf879aa12e08f015df24f9464a122af88fb70ae"
+    },
+    {
+      "path": "/tmp/cc68-tea-holdout-v4/apps/api/test/fixtures/community-text-corpus/holdout-v1/de.json",
+      "sha256": "293a13675913cc08e8cc9b36d93ca7c731e605c5e41b238c217dd5534e24b8df"
+    },
+    {
+      "path": "/tmp/cc68-tea-holdout-v4/apps/api/test/fixtures/community-text-corpus/holdout-v1/en.json",
+      "sha256": "def0c67a1ed1665d3684658542456ed749f6306a63360a4a786c1561785ae961"
+    },
+    {
+      "path": "/tmp/cc68-tea-holdout-v4/apps/api/test/fixtures/community-text-corpus/holdout-v1/es.json",
+      "sha256": "1813ee53111c35ca54a1aefe26bb3fc49ce2a34ee5e3281336b6022269afdea3"
+    },
+    {
+      "path": "/tmp/cc68-tea-holdout-v4/apps/api/test/fixtures/community-text-corpus/holdout-v1/fr.json",
+      "sha256": "ad39bdc231fd59c6a561f89049cbe72cd511255ce3cc8986b12d2994343eff0a"
+    },
+    {
+      "path": "/tmp/cc68-tea-holdout-v4/apps/api/test/fixtures/community-text-corpus/holdout-v1/it.json",
+      "sha256": "d36932f32b62ee61c47fee8f88ae77a83c1268abd9876a3f51ea76ff88fe8e25"
+    },
+    {
+      "path": "/tmp/cc68-tea-holdout-v4/apps/api/test/fixtures/community-text-corpus/holdout-v1/pt.json",
+      "sha256": "d63103233dc99abca22a44cb7a6efa8e7fec3f2d0f1ec931ddc015e4d4c765e2"
+    },
+    {
+      "path": "/tmp/cc68-tea-holdout-v4/apps/api/test/fixtures/community-text-corpus/holdout-v1/tr.json",
+      "sha256": "344f03c4d9a31a416c73a9c815e33331fe5b46ac30561aaf6f26b0667653c34b"
+    },
+    {
+      "path": "/tmp/cc68-tea-holdout-v4/apps/api/test/fixtures/community-text-corpus/holdout-v2/de.json",
+      "sha256": "786ce564e27f0b83c9b7c5f3cfc8b0d536dcb342d9fe5b1abb16395c7687e27c"
+    },
+    {
+      "path": "/tmp/cc68-tea-holdout-v4/apps/api/test/fixtures/community-text-corpus/holdout-v2/en.json",
+      "sha256": "bad2e70e1df7d99ad98fb42bde1c3a78b669df37cf8936a187fa0329ca184a0e"
+    },
+    {
+      "path": "/tmp/cc68-tea-holdout-v4/apps/api/test/fixtures/community-text-corpus/holdout-v2/es.json",
+      "sha256": "89b42ec3572535e932cc6bcc61e6bad45e1288207c9fc44d05df64a92d49f3f7"
+    },
+    {
+      "path": "/tmp/cc68-tea-holdout-v4/apps/api/test/fixtures/community-text-corpus/holdout-v2/fr.json",
+      "sha256": "e1246971991f9752f10cae6e361db0083a15db9bc08857f407ab929cf7eb8f67"
+    },
+    {
+      "path": "/tmp/cc68-tea-holdout-v4/apps/api/test/fixtures/community-text-corpus/holdout-v2/it.json",
+      "sha256": "e1f8c4c8bb4b4e6bcd09b9ff796cda705a02b24108bc66b11f7e6cac39ce5517"
+    },
+    {
+      "path": "/tmp/cc68-tea-holdout-v4/apps/api/test/fixtures/community-text-corpus/holdout-v2/pt.json",
+      "sha256": "99a20bc130d3b9337e0169773ff3e873b0b5455555837d316d448c11380160cc"
+    },
+    {
+      "path": "/tmp/cc68-tea-holdout-v4/apps/api/test/fixtures/community-text-corpus/holdout-v2/tr.json",
+      "sha256": "2ac13c0351d0e8cd2cb4f6ff30473962a32d3c31070a71cbf9e2d75f4bca9baf"
+    },
+    {
+      "path": "/tmp/cc68-tea-holdout-v4/apps/api/test/fixtures/community-text-corpus/holdout-v3/de.json",
+      "sha256": "6ddaf4d73601a91d7f39258fa3850304aeedb76ed2af3108073007243af2b774"
+    },
+    {
+      "path": "/tmp/cc68-tea-holdout-v4/apps/api/test/fixtures/community-text-corpus/holdout-v3/en.json",
+      "sha256": "6f116c4f70ec4890cb7eb7f0699a4f6d00c03bc9397d692dfa17400f93d8e8a4"
+    },
+    {
+      "path": "/tmp/cc68-tea-holdout-v4/apps/api/test/fixtures/community-text-corpus/holdout-v3/es.json",
+      "sha256": "61ca685bcf56362752c18cfbe554f79a00c9b08bb10a5f709336cbc1ccdf508a"
+    },
+    {
+      "path": "/tmp/cc68-tea-holdout-v4/apps/api/test/fixtures/community-text-corpus/holdout-v3/fr.json",
+      "sha256": "862b76f1c1e1a76548f5983788ff27c4817a0353c2397bc87f68e3a983243af2"
+    },
+    {
+      "path": "/tmp/cc68-tea-holdout-v4/apps/api/test/fixtures/community-text-corpus/holdout-v3/it.json",
+      "sha256": "95454c0b089068d8810b6f9bcb4cb178e04649733a983a3628621cc9b05aac86"
+    },
+    {
+      "path": "/tmp/cc68-tea-holdout-v4/apps/api/test/fixtures/community-text-corpus/holdout-v3/pt.json",
+      "sha256": "f9f57979e3a7395150b324a638ba3bcd09a70a58e8a70b5fa6d63e3979465c0b"
+    },
+    {
+      "path": "/tmp/cc68-tea-holdout-v4/apps/api/test/fixtures/community-text-corpus/holdout-v3/tr.json",
+      "sha256": "d599d94f4c80eb014c7db1129e78edcbd341660fbf76f5f51bbfb09df01460b6"
+    }
+  ],
+  "locales": {
+    "de": {
+      "path": "/tmp/cc68-tea-holdout-v4/.cc68-tea-authoring/de.tsv",
+      "sha256": "caf54a1eea2ab5ecd02fb35d91642e7857d206974525c03e15ef112cbcdc8d54",
+      "authored_range": "de TSV rows 1..1000",
+      "full_count": 1000,
+      "fields": {
+        "caption": 500,
+        "altText": 500
+      },
+      "max_characters": {
+        "caption": 92,
+        "altText": 90
+      },
+      "consolidated_concepts": 189,
+      "largest_concept": 10,
+      "tied_maximum_concepts": [
+        {
+          "concept": "florale-handstickerei",
+          "english_gloss": "Small hand-embroidered flowers or leaves on otherwise plain clothing.",
+          "count": 10,
+          "rows": [171, 172, 173, 174, 175, 641, 642, 643, 644, 645],
+          "membership": [
+            {
+              "row": 171,
+              "field": "caption"
+            },
+            {
+              "row": 172,
+              "field": "caption"
+            },
+            {
+              "row": 173,
+              "field": "caption"
+            },
+            {
+              "row": 174,
+              "field": "altText"
+            },
+            {
+              "row": 175,
+              "field": "altText"
+            },
+            {
+              "row": 641,
+              "field": "caption"
+            },
+            {
+              "row": 642,
+              "field": "caption"
+            },
+            {
+              "row": 643,
+              "field": "altText"
+            },
+            {
+              "row": 644,
+              "field": "altText"
+            },
+            {
+              "row": 645,
+              "field": "altText"
+            }
+          ]
+        },
+        {
+          "concept": "gehaekelter-zierkragenrand",
+          "english_gloss": "A decorative crocheted collar or neckline edge.",
+          "count": 10,
+          "rows": [186, 187, 188, 189, 190, 691, 692, 693, 694, 695],
+          "membership": [
+            {
+              "row": 186,
+              "field": "caption"
+            },
+            {
+              "row": 187,
+              "field": "caption"
+            },
+            {
+              "row": 188,
+              "field": "caption"
+            },
+            {
+              "row": 189,
+              "field": "altText"
+            },
+            {
+              "row": 190,
+              "field": "altText"
+            },
+            {
+              "row": 691,
+              "field": "caption"
+            },
+            {
+              "row": 692,
+              "field": "caption"
+            },
+            {
+              "row": 693,
+              "field": "altText"
+            },
+            {
+              "row": 694,
+              "field": "altText"
+            },
+            {
+              "row": 695,
+              "field": "altText"
+            }
+          ]
+        },
+        {
+          "concept": "geraffte-schulterpasse",
+          "english_gloss": "Gathered blouse fabric falling from a shoulder yoke.",
+          "count": 10,
+          "rows": [226, 227, 228, 229, 230, 436, 437, 438, 439, 440],
+          "membership": [
+            {
+              "row": 226,
+              "field": "caption"
+            },
+            {
+              "row": 227,
+              "field": "caption"
+            },
+            {
+              "row": 228,
+              "field": "caption"
+            },
+            {
+              "row": 229,
+              "field": "altText"
+            },
+            {
+              "row": 230,
+              "field": "altText"
+            },
+            {
+              "row": 436,
+              "field": "caption"
+            },
+            {
+              "row": 437,
+              "field": "caption"
+            },
+            {
+              "row": 438,
+              "field": "caption"
+            },
+            {
+              "row": 439,
+              "field": "altText"
+            },
+            {
+              "row": 440,
+              "field": "altText"
+            }
+          ]
+        },
+        {
+          "concept": "gerundetes-hosenbein",
+          "english_gloss": "A curved or barrel-shaped trouser leg silhouette.",
+          "count": 10,
+          "rows": [276, 277, 278, 279, 280, 726, 727, 728, 729, 730],
+          "membership": [
+            {
+              "row": 276,
+              "field": "caption"
+            },
+            {
+              "row": 277,
+              "field": "caption"
+            },
+            {
+              "row": 278,
+              "field": "caption"
+            },
+            {
+              "row": 279,
+              "field": "altText"
+            },
+            {
+              "row": 280,
+              "field": "altText"
+            },
+            {
+              "row": 726,
+              "field": "caption"
+            },
+            {
+              "row": 727,
+              "field": "caption"
+            },
+            {
+              "row": 728,
+              "field": "altText"
+            },
+            {
+              "row": 729,
+              "field": "altText"
+            },
+            {
+              "row": 730,
+              "field": "altText"
+            }
+          ]
+        },
+        {
+          "concept": "gestuetzte-rockglocke",
+          "english_gloss": "A supported bell-shaped skirt volume.",
+          "count": 10,
+          "rows": [541, 542, 543, 544, 545, 741, 742, 743, 744, 745],
+          "membership": [
+            {
+              "row": 541,
+              "field": "caption"
+            },
+            {
+              "row": 542,
+              "field": "caption"
+            },
+            {
+              "row": 543,
+              "field": "altText"
+            },
+            {
+              "row": 544,
+              "field": "altText"
+            },
+            {
+              "row": 545,
+              "field": "altText"
+            },
+            {
+              "row": 741,
+              "field": "caption"
+            },
+            {
+              "row": 742,
+              "field": "caption"
+            },
+            {
+              "row": 743,
+              "field": "altText"
+            },
+            {
+              "row": 744,
+              "field": "altText"
+            },
+            {
+              "row": 745,
+              "field": "altText"
+            }
+          ]
+        },
+        {
+          "concept": "ruecken-bewegungsfalte",
+          "english_gloss": "A back pleat providing extra movement through the shoulders.",
+          "count": 10,
+          "rows": [56, 57, 58, 59, 60, 861, 862, 863, 864, 865],
+          "membership": [
+            {
+              "row": 56,
+              "field": "caption"
+            },
+            {
+              "row": 57,
+              "field": "caption"
+            },
+            {
+              "row": 58,
+              "field": "caption"
+            },
+            {
+              "row": 59,
+              "field": "altText"
+            },
+            {
+              "row": 60,
+              "field": "altText"
+            },
+            {
+              "row": 861,
+              "field": "caption"
+            },
+            {
+              "row": 862,
+              "field": "caption"
+            },
+            {
+              "row": 863,
+              "field": "altText"
+            },
+            {
+              "row": 864,
+              "field": "altText"
+            },
+            {
+              "row": 865,
+              "field": "altText"
+            }
+          ]
+        },
+        {
+          "concept": "sichtbarer-zierunterkragen",
+          "english_gloss": "A decorative inner collar peeking above an outer neckline.",
+          "count": 10,
+          "rows": [131, 132, 133, 134, 135, 901, 902, 903, 904, 905],
+          "membership": [
+            {
+              "row": 131,
+              "field": "caption"
+            },
+            {
+              "row": 132,
+              "field": "caption"
+            },
+            {
+              "row": 133,
+              "field": "caption"
+            },
+            {
+              "row": 134,
+              "field": "altText"
+            },
+            {
+              "row": 135,
+              "field": "altText"
+            },
+            {
+              "row": 901,
+              "field": "caption"
+            },
+            {
+              "row": 902,
+              "field": "caption"
+            },
+            {
+              "row": 903,
+              "field": "altText"
+            },
+            {
+              "row": 904,
+              "field": "altText"
+            },
+            {
+              "row": 905,
+              "field": "altText"
+            }
+          ]
+        },
+        {
+          "concept": "sichtbares-kontrastfutter",
+          "english_gloss": "Showing contrasting patterned lining by opening or folding a garment or bag.",
+          "count": 10,
+          "rows": [96, 97, 98, 99, 100, 876, 877, 878, 879, 880],
+          "membership": [
+            {
+              "row": 96,
+              "field": "caption"
+            },
+            {
+              "row": 97,
+              "field": "caption"
+            },
+            {
+              "row": 98,
+              "field": "caption"
+            },
+            {
+              "row": 99,
+              "field": "altText"
+            },
+            {
+              "row": 100,
+              "field": "altText"
+            },
+            {
+              "row": 876,
+              "field": "caption"
+            },
+            {
+              "row": 877,
+              "field": "caption"
+            },
+            {
+              "row": 878,
+              "field": "altText"
+            },
+            {
+              "row": 879,
+              "field": "altText"
+            },
+            {
+              "row": 880,
+              "field": "altText"
+            }
+          ]
+        },
+        {
+          "concept": "textile-bluetenverzierung",
+          "english_gloss": "Three-dimensional fabric flowers used as wearable decoration.",
+          "count": 10,
+          "rows": [681, 682, 683, 684, 685, 706, 707, 708, 709, 710],
+          "membership": [
+            {
+              "row": 681,
+              "field": "caption"
+            },
+            {
+              "row": 682,
+              "field": "caption"
+            },
+            {
+              "row": 683,
+              "field": "altText"
+            },
+            {
+              "row": 684,
+              "field": "altText"
+            },
+            {
+              "row": 685,
+              "field": "altText"
+            },
+            {
+              "row": 706,
+              "field": "caption"
+            },
+            {
+              "row": 707,
+              "field": "caption"
+            },
+            {
+              "row": 708,
+              "field": "altText"
+            },
+            {
+              "row": 709,
+              "field": "altText"
+            },
+            {
+              "row": 710,
+              "field": "altText"
+            }
+          ]
+        },
+        {
+          "concept": "transparentes-ueberkleid",
+          "english_gloss": "A transparent outer dress layered above an opaque underdress.",
+          "count": 10,
+          "rows": [281, 282, 283, 284, 285, 671, 672, 673, 674, 675],
+          "membership": [
+            {
+              "row": 281,
+              "field": "caption"
+            },
+            {
+              "row": 282,
+              "field": "caption"
+            },
+            {
+              "row": 283,
+              "field": "caption"
+            },
+            {
+              "row": 284,
+              "field": "altText"
+            },
+            {
+              "row": 285,
+              "field": "altText"
+            },
+            {
+              "row": 671,
+              "field": "caption"
+            },
+            {
+              "row": 672,
+              "field": "caption"
+            },
+            {
+              "row": 673,
+              "field": "altText"
+            },
+            {
+              "row": 674,
+              "field": "altText"
+            },
+            {
+              "row": 675,
+              "field": "altText"
+            }
+          ]
+        },
+        {
+          "concept": "umgeschlagener-stiefelschaft",
+          "english_gloss": "A boot shaft folded outward into a cuff.",
+          "count": 10,
+          "rows": [366, 367, 368, 369, 370, 441, 442, 443, 444, 445],
+          "membership": [
+            {
+              "row": 366,
+              "field": "caption"
+            },
+            {
+              "row": 367,
+              "field": "caption"
+            },
+            {
+              "row": 368,
+              "field": "caption"
+            },
+            {
+              "row": 369,
+              "field": "altText"
+            },
+            {
+              "row": 370,
+              "field": "altText"
+            },
+            {
+              "row": 441,
+              "field": "caption"
+            },
+            {
+              "row": 442,
+              "field": "caption"
+            },
+            {
+              "row": 443,
+              "field": "caption"
+            },
+            {
+              "row": 444,
+              "field": "altText"
+            },
+            {
+              "row": 445,
+              "field": "altText"
+            }
+          ]
+        }
+      ],
+      "five_word_affected_items": 0,
+      "five_word_overlaps": [],
+      "normalized_duplicate_count": 0,
+      "historical_collisions": [],
+      "structural_issues": []
+    },
+    "es": {
+      "path": "/tmp/cc68-tea-holdout-v4/.cc68-tea-authoring/es.tsv",
+      "sha256": "dc681eb05c539431ed0aa448f4c471151056300c20487ca24cb476b8d14ec32c",
+      "authored_range": "es TSV rows 1..1000",
+      "full_count": 1000,
+      "fields": {
+        "caption": 500,
+        "altText": 500
+      },
+      "max_characters": {
+        "caption": 69,
+        "altText": 75
+      },
+      "consolidated_concepts": 191,
+      "largest_concept": 10,
+      "tied_maximum_concepts": [
+        {
+          "concept": "capas-blusa-transparentes",
+          "english_gloss": "A transparent blouse layer revealing an opaque inner top.",
+          "count": 10,
+          "rows": [371, 372, 373, 374, 375, 886, 887, 888, 889, 890],
+          "membership": [
+            {
+              "row": 371,
+              "field": "caption"
+            },
+            {
+              "row": 372,
+              "field": "caption"
+            },
+            {
+              "row": 373,
+              "field": "caption"
+            },
+            {
+              "row": 374,
+              "field": "altText"
+            },
+            {
+              "row": 375,
+              "field": "altText"
+            },
+            {
+              "row": 886,
+              "field": "caption"
+            },
+            {
+              "row": 887,
+              "field": "caption"
+            },
+            {
+              "row": 888,
+              "field": "altText"
+            },
+            {
+              "row": 889,
+              "field": "altText"
+            },
+            {
+              "row": 890,
+              "field": "altText"
+            }
+          ]
+        },
+        {
+          "concept": "cierre-acordonado",
+          "english_gloss": "Garment edges joined by crossing tie cords.",
+          "count": 10,
+          "rows": [56, 57, 58, 59, 60, 676, 677, 678, 679, 680],
+          "membership": [
+            {
+              "row": 56,
+              "field": "caption"
+            },
+            {
+              "row": 57,
+              "field": "caption"
+            },
+            {
+              "row": 58,
+              "field": "caption"
+            },
+            {
+              "row": 59,
+              "field": "altText"
+            },
+            {
+              "row": 60,
+              "field": "altText"
+            },
+            {
+              "row": 676,
+              "field": "caption"
+            },
+            {
+              "row": 677,
+              "field": "caption"
+            },
+            {
+              "row": 678,
+              "field": "altText"
+            },
+            {
+              "row": 679,
+              "field": "altText"
+            },
+            {
+              "row": 680,
+              "field": "altText"
+            }
+          ]
+        },
+        {
+          "concept": "linea-vertical-calceteria",
+          "english_gloss": "A visible vertical contrasting line on hosiery.",
+          "count": 10,
+          "rows": [401, 402, 403, 404, 405, 706, 707, 708, 709, 710],
+          "membership": [
+            {
+              "row": 401,
+              "field": "caption"
+            },
+            {
+              "row": 402,
+              "field": "caption"
+            },
+            {
+              "row": 403,
+              "field": "caption"
+            },
+            {
+              "row": 404,
+              "field": "altText"
+            },
+            {
+              "row": 405,
+              "field": "altText"
+            },
+            {
+              "row": 706,
+              "field": "caption"
+            },
+            {
+              "row": 707,
+              "field": "caption"
+            },
+            {
+              "row": 708,
+              "field": "altText"
+            },
+            {
+              "row": 709,
+              "field": "altText"
+            },
+            {
+              "row": 710,
+              "field": "altText"
+            }
+          ]
+        },
+        {
+          "concept": "panel-superior-superpuesto",
+          "english_gloss": "A short outer panel layered over the upper back or shoulders.",
+          "count": 10,
+          "rows": [576, 577, 578, 579, 580, 666, 667, 668, 669, 670],
+          "membership": [
+            {
+              "row": 576,
+              "field": "caption"
+            },
+            {
+              "row": 577,
+              "field": "caption"
+            },
+            {
+              "row": 578,
+              "field": "altText"
+            },
+            {
+              "row": 579,
+              "field": "altText"
+            },
+            {
+              "row": 580,
+              "field": "altText"
+            },
+            {
+              "row": 666,
+              "field": "caption"
+            },
+            {
+              "row": 667,
+              "field": "caption"
+            },
+            {
+              "row": 668,
+              "field": "altText"
+            },
+            {
+              "row": 669,
+              "field": "altText"
+            },
+            {
+              "row": 670,
+              "field": "altText"
+            }
+          ]
+        },
+        {
+          "concept": "reparacion-visible-jersey",
+          "english_gloss": "Visible repair of a worn or damaged knitted sweater.",
+          "count": 10,
+          "rows": [171, 172, 173, 174, 175, 301, 302, 303, 304, 305],
+          "membership": [
+            {
+              "row": 171,
+              "field": "caption"
+            },
+            {
+              "row": 172,
+              "field": "caption"
+            },
+            {
+              "row": 173,
+              "field": "caption"
+            },
+            {
+              "row": 174,
+              "field": "altText"
+            },
+            {
+              "row": 175,
+              "field": "altText"
+            },
+            {
+              "row": 301,
+              "field": "caption"
+            },
+            {
+              "row": 302,
+              "field": "caption"
+            },
+            {
+              "row": 303,
+              "field": "caption"
+            },
+            {
+              "row": 304,
+              "field": "altText"
+            },
+            {
+              "row": 305,
+              "field": "altText"
+            }
+          ]
+        },
+        {
+          "concept": "reverso-contrastado-visible",
+          "english_gloss": "A contrasting reverse surface revealed by folding or opening clothing.",
+          "count": 10,
+          "rows": [641, 642, 643, 644, 645, 906, 907, 908, 909, 910],
+          "membership": [
+            {
+              "row": 641,
+              "field": "caption"
+            },
+            {
+              "row": 642,
+              "field": "caption"
+            },
+            {
+              "row": 643,
+              "field": "altText"
+            },
+            {
+              "row": 644,
+              "field": "altText"
+            },
+            {
+              "row": 645,
+              "field": "altText"
+            },
+            {
+              "row": 906,
+              "field": "caption"
+            },
+            {
+              "row": 907,
+              "field": "caption"
+            },
+            {
+              "row": 908,
+              "field": "altText"
+            },
+            {
+              "row": 909,
+              "field": "altText"
+            },
+            {
+              "row": 910,
+              "field": "altText"
+            }
+          ]
+        },
+        {
+          "concept": "ribete-contrastado",
+          "english_gloss": "Contrasting trim outlining the garment edges.",
+          "count": 10,
+          "rows": [71, 72, 73, 74, 75, 496, 497, 498, 499, 500],
+          "membership": [
+            {
+              "row": 71,
+              "field": "caption"
+            },
+            {
+              "row": 72,
+              "field": "caption"
+            },
+            {
+              "row": 73,
+              "field": "caption"
+            },
+            {
+              "row": 74,
+              "field": "altText"
+            },
+            {
+              "row": 75,
+              "field": "altText"
+            },
+            {
+              "row": 496,
+              "field": "caption"
+            },
+            {
+              "row": 497,
+              "field": "caption"
+            },
+            {
+              "row": 498,
+              "field": "caption"
+            },
+            {
+              "row": 499,
+              "field": "altText"
+            },
+            {
+              "row": 500,
+              "field": "altText"
+            }
+          ]
+        },
+        {
+          "concept": "superposicion-falda-plana",
+          "english_gloss": "Flat skirt panels overlapping at different lengths.",
+          "count": 10,
+          "rows": [531, 532, 533, 534, 535, 691, 692, 693, 694, 695],
+          "membership": [
+            {
+              "row": 531,
+              "field": "caption"
+            },
+            {
+              "row": 532,
+              "field": "caption"
+            },
+            {
+              "row": 533,
+              "field": "altText"
+            },
+            {
+              "row": 534,
+              "field": "altText"
+            },
+            {
+              "row": 535,
+              "field": "altText"
+            },
+            {
+              "row": 691,
+              "field": "caption"
+            },
+            {
+              "row": 692,
+              "field": "caption"
+            },
+            {
+              "row": 693,
+              "field": "altText"
+            },
+            {
+              "row": 694,
+              "field": "altText"
+            },
+            {
+              "row": 695,
+              "field": "altText"
+            }
+          ]
+        },
+        {
+          "concept": "volantes-finos-delanteros",
+          "english_gloss": "Fine ruffles arranged on the front of a blouse or shirt.",
+          "count": 10,
+          "rows": [471, 472, 473, 474, 475, 806, 807, 808, 809, 810],
+          "membership": [
+            {
+              "row": 471,
+              "field": "caption"
+            },
+            {
+              "row": 472,
+              "field": "caption"
+            },
+            {
+              "row": 473,
+              "field": "caption"
+            },
+            {
+              "row": 474,
+              "field": "altText"
+            },
+            {
+              "row": 475,
+              "field": "altText"
+            },
+            {
+              "row": 806,
+              "field": "caption"
+            },
+            {
+              "row": 807,
+              "field": "caption"
+            },
+            {
+              "row": 808,
+              "field": "altText"
+            },
+            {
+              "row": 809,
+              "field": "altText"
+            },
+            {
+              "row": 810,
+              "field": "altText"
+            }
+          ]
+        }
+      ],
+      "five_word_affected_items": 0,
+      "five_word_overlaps": [],
+      "normalized_duplicate_count": 0,
+      "historical_collisions": [],
+      "structural_issues": []
+    },
+    "tr": {
+      "path": "/tmp/cc68-tea-holdout-v4/.cc68-tea-authoring/tr.tsv",
+      "sha256": "3e4b3d7f470df37c8e1d4eafe6fb26bcf2501aca86662953c75fe0f89def158a",
+      "authored_range": "tr TSV rows 1..1000",
+      "full_count": 1000,
+      "fields": {
+        "caption": 500,
+        "altText": 500
+      },
+      "max_characters": {
+        "caption": 68,
+        "altText": 71
+      },
+      "consolidated_concepts": 185,
+      "largest_concept": 10,
+      "tied_maximum_concepts": [
+        {
+          "concept": "acik-sirt-baglama",
+          "english_gloss": "Open garment back panels held together with ties.",
+          "count": 10,
+          "rows": [406, 407, 408, 409, 410, 946, 947, 948, 949, 950],
+          "membership": [
+            {
+              "row": 406,
+              "field": "caption"
+            },
+            {
+              "row": 407,
+              "field": "caption"
+            },
+            {
+              "row": 408,
+              "field": "caption"
+            },
+            {
+              "row": 409,
+              "field": "altText"
+            },
+            {
+              "row": 410,
+              "field": "altText"
+            },
+            {
+              "row": 946,
+              "field": "caption"
+            },
+            {
+              "row": 947,
+              "field": "caption"
+            },
+            {
+              "row": 948,
+              "field": "altText"
+            },
+            {
+              "row": 949,
+              "field": "altText"
+            },
+            {
+              "row": 950,
+              "field": "altText"
+            }
+          ]
+        },
+        {
+          "concept": "degisen-yogunluklu-atki",
+          "english_gloss": "A scarf with intentionally different weave or knit density along its length.",
+          "count": 10,
+          "rows": [141, 142, 143, 144, 145, 236, 237, 238, 239, 240],
+          "membership": [
+            {
+              "row": 141,
+              "field": "caption"
+            },
+            {
+              "row": 142,
+              "field": "caption"
+            },
+            {
+              "row": 143,
+              "field": "caption"
+            },
+            {
+              "row": 144,
+              "field": "altText"
+            },
+            {
+              "row": 145,
+              "field": "altText"
+            },
+            {
+              "row": 236,
+              "field": "caption"
+            },
+            {
+              "row": 237,
+              "field": "caption"
+            },
+            {
+              "row": 238,
+              "field": "caption"
+            },
+            {
+              "row": 239,
+              "field": "altText"
+            },
+            {
+              "row": 240,
+              "field": "altText"
+            }
+          ]
+        },
+        {
+          "concept": "disarida-gorunen-yapi-dikisi",
+          "english_gloss": "Exterior stitching showing the construction lines of a garment.",
+          "count": 10,
+          "rows": [361, 362, 363, 364, 365, 696, 697, 698, 699, 700],
+          "membership": [
+            {
+              "row": 361,
+              "field": "caption"
+            },
+            {
+              "row": 362,
+              "field": "caption"
+            },
+            {
+              "row": 363,
+              "field": "caption"
+            },
+            {
+              "row": 364,
+              "field": "altText"
+            },
+            {
+              "row": 365,
+              "field": "altText"
+            },
+            {
+              "row": 696,
+              "field": "caption"
+            },
+            {
+              "row": 697,
+              "field": "caption"
+            },
+            {
+              "row": 698,
+              "field": "altText"
+            },
+            {
+              "row": 699,
+              "field": "altText"
+            },
+            {
+              "row": 700,
+              "field": "altText"
+            }
+          ]
+        },
+        {
+          "concept": "dugumlu-tekstil-kolye",
+          "english_gloss": "A necklace whose visual focus is knotted textile cord.",
+          "count": 10,
+          "rows": [246, 247, 248, 249, 250, 666, 667, 668, 669, 670],
+          "membership": [
+            {
+              "row": 246,
+              "field": "caption"
+            },
+            {
+              "row": 247,
+              "field": "caption"
+            },
+            {
+              "row": 248,
+              "field": "caption"
+            },
+            {
+              "row": 249,
+              "field": "altText"
+            },
+            {
+              "row": 250,
+              "field": "altText"
+            },
+            {
+              "row": 666,
+              "field": "caption"
+            },
+            {
+              "row": 667,
+              "field": "caption"
+            },
+            {
+              "row": 668,
+              "field": "altText"
+            },
+            {
+              "row": 669,
+              "field": "altText"
+            },
+            {
+              "row": 670,
+              "field": "altText"
+            }
+          ]
+        },
+        {
+          "concept": "el-yapimi-seramik-taki",
+          "english_gloss": "Handmade glazed ceramic jewelry with a tactile surface.",
+          "count": 10,
+          "rows": [351, 352, 353, 354, 355, 851, 852, 853, 854, 855],
+          "membership": [
+            {
+              "row": 351,
+              "field": "caption"
+            },
+            {
+              "row": 352,
+              "field": "caption"
+            },
+            {
+              "row": 353,
+              "field": "caption"
+            },
+            {
+              "row": 354,
+              "field": "altText"
+            },
+            {
+              "row": 355,
+              "field": "altText"
+            },
+            {
+              "row": 851,
+              "field": "caption"
+            },
+            {
+              "row": 852,
+              "field": "caption"
+            },
+            {
+              "row": 853,
+              "field": "altText"
+            },
+            {
+              "row": 854,
+              "field": "altText"
+            },
+            {
+              "row": 855,
+              "field": "altText"
+            }
+          ]
+        },
+        {
+          "concept": "festelbiseyi-gundeliklestirme",
+          "english_gloss": "Wearing a special-occasion dress casually with everyday flat footwear.",
+          "count": 10,
+          "rows": [171, 172, 173, 174, 175, 766, 767, 768, 769, 770],
+          "membership": [
+            {
+              "row": 171,
+              "field": "caption"
+            },
+            {
+              "row": 172,
+              "field": "caption"
+            },
+            {
+              "row": 173,
+              "field": "caption"
+            },
+            {
+              "row": 174,
+              "field": "altText"
+            },
+            {
+              "row": 175,
+              "field": "altText"
+            },
+            {
+              "row": 766,
+              "field": "caption"
+            },
+            {
+              "row": 767,
+              "field": "caption"
+            },
+            {
+              "row": 768,
+              "field": "altText"
+            },
+            {
+              "row": 769,
+              "field": "altText"
+            },
+            {
+              "row": 770,
+              "field": "altText"
+            }
+          ]
+        },
+        {
+          "concept": "giysi-asma-ilmegi",
+          "english_gloss": "A sewn hanging loop used to support a garment on a hook.",
+          "count": 10,
+          "rows": [321, 322, 323, 324, 325, 986, 987, 988, 989, 990],
+          "membership": [
+            {
+              "row": 321,
+              "field": "caption"
+            },
+            {
+              "row": 322,
+              "field": "caption"
+            },
+            {
+              "row": 323,
+              "field": "caption"
+            },
+            {
+              "row": 324,
+              "field": "altText"
+            },
+            {
+              "row": 325,
+              "field": "altText"
+            },
+            {
+              "row": 986,
+              "field": "caption"
+            },
+            {
+              "row": 987,
+              "field": "caption"
+            },
+            {
+              "row": 988,
+              "field": "altText"
+            },
+            {
+              "row": 989,
+              "field": "altText"
+            },
+            {
+              "row": 990,
+              "field": "altText"
+            }
+          ]
+        },
+        {
+          "concept": "halka-ile-kemer-kapatma",
+          "english_gloss": "A belt secured by passing it through one or more rings.",
+          "count": 10,
+          "rows": [36, 37, 38, 39, 40, 326, 327, 328, 329, 330],
+          "membership": [
+            {
+              "row": 36,
+              "field": "caption"
+            },
+            {
+              "row": 37,
+              "field": "caption"
+            },
+            {
+              "row": 38,
+              "field": "caption"
+            },
+            {
+              "row": 39,
+              "field": "altText"
+            },
+            {
+              "row": 40,
+              "field": "altText"
+            },
+            {
+              "row": 326,
+              "field": "caption"
+            },
+            {
+              "row": 327,
+              "field": "caption"
+            },
+            {
+              "row": 328,
+              "field": "caption"
+            },
+            {
+              "row": 329,
+              "field": "altText"
+            },
+            {
+              "row": 330,
+              "field": "altText"
+            }
+          ]
+        },
+        {
+          "concept": "kemerde-kucuk-canta",
+          "english_gloss": "A small pouch or bag attached directly to a waist belt.",
+          "count": 10,
+          "rows": [476, 477, 478, 479, 480, 871, 872, 873, 874, 875],
+          "membership": [
+            {
+              "row": 476,
+              "field": "caption"
+            },
+            {
+              "row": 477,
+              "field": "caption"
+            },
+            {
+              "row": 478,
+              "field": "caption"
+            },
+            {
+              "row": 479,
+              "field": "altText"
+            },
+            {
+              "row": 480,
+              "field": "altText"
+            },
+            {
+              "row": 871,
+              "field": "caption"
+            },
+            {
+              "row": 872,
+              "field": "caption"
+            },
+            {
+              "row": 873,
+              "field": "altText"
+            },
+            {
+              "row": 874,
+              "field": "altText"
+            },
+            {
+              "row": 875,
+              "field": "altText"
+            }
+          ]
+        },
+        {
+          "concept": "kravat-gorunumlu-bel-bagi",
+          "english_gloss": "A waist tie arranged with the visual form of a necktie.",
+          "count": 10,
+          "rows": [641, 642, 643, 644, 645, 921, 922, 923, 924, 925],
+          "membership": [
+            {
+              "row": 641,
+              "field": "caption"
+            },
+            {
+              "row": 642,
+              "field": "caption"
+            },
+            {
+              "row": 643,
+              "field": "altText"
+            },
+            {
+              "row": 644,
+              "field": "altText"
+            },
+            {
+              "row": 645,
+              "field": "altText"
+            },
+            {
+              "row": 921,
+              "field": "caption"
+            },
+            {
+              "row": 922,
+              "field": "caption"
+            },
+            {
+              "row": 923,
+              "field": "altText"
+            },
+            {
+              "row": 924,
+              "field": "altText"
+            },
+            {
+              "row": 925,
+              "field": "altText"
+            }
+          ]
+        },
+        {
+          "concept": "kucuk-ponpon-susleme",
+          "english_gloss": "Small yarn pompons applied as clothing decoration.",
+          "count": 10,
+          "rows": [226, 227, 228, 229, 230, 506, 507, 508, 509, 510],
+          "membership": [
+            {
+              "row": 226,
+              "field": "caption"
+            },
+            {
+              "row": 227,
+              "field": "caption"
+            },
+            {
+              "row": 228,
+              "field": "caption"
+            },
+            {
+              "row": 229,
+              "field": "altText"
+            },
+            {
+              "row": 230,
+              "field": "altText"
+            },
+            {
+              "row": 506,
+              "field": "caption"
+            },
+            {
+              "row": 507,
+              "field": "caption"
+            },
+            {
+              "row": 508,
+              "field": "altText"
+            },
+            {
+              "row": 509,
+              "field": "altText"
+            },
+            {
+              "row": 510,
+              "field": "altText"
+            }
+          ]
+        },
+        {
+          "concept": "oya-kenar-susleme",
+          "english_gloss": "Fine decorative needle-lace trim along a wearable edge.",
+          "count": 10,
+          "rows": [251, 252, 253, 254, 255, 336, 337, 338, 339, 340],
+          "membership": [
+            {
+              "row": 251,
+              "field": "caption"
+            },
+            {
+              "row": 252,
+              "field": "caption"
+            },
+            {
+              "row": 253,
+              "field": "caption"
+            },
+            {
+              "row": 254,
+              "field": "altText"
+            },
+            {
+              "row": 255,
+              "field": "altText"
+            },
+            {
+              "row": 336,
+              "field": "caption"
+            },
+            {
+              "row": 337,
+              "field": "caption"
+            },
+            {
+              "row": 338,
+              "field": "caption"
+            },
+            {
+              "row": 339,
+              "field": "altText"
+            },
+            {
+              "row": 340,
+              "field": "altText"
+            }
+          ]
+        },
+        {
+          "concept": "sabitlemeli-omuz-sali",
+          "english_gloss": "A shoulder shawl held in place with a fastening.",
+          "count": 10,
+          "rows": [491, 492, 493, 494, 495, 951, 952, 953, 954, 955],
+          "membership": [
+            {
+              "row": 491,
+              "field": "caption"
+            },
+            {
+              "row": 492,
+              "field": "caption"
+            },
+            {
+              "row": 493,
+              "field": "caption"
+            },
+            {
+              "row": 494,
+              "field": "altText"
+            },
+            {
+              "row": 495,
+              "field": "altText"
+            },
+            {
+              "row": 951,
+              "field": "caption"
+            },
+            {
+              "row": 952,
+              "field": "caption"
+            },
+            {
+              "row": 953,
+              "field": "altText"
+            },
+            {
+              "row": 954,
+              "field": "altText"
+            },
+            {
+              "row": 955,
+              "field": "altText"
+            }
+          ]
+        },
+        {
+          "concept": "sarkan-aksesuar-puskulu",
+          "english_gloss": "A dangling bundled tassel attached to an accessory.",
+          "count": 10,
+          "rows": [176, 177, 178, 179, 180, 496, 497, 498, 499, 500],
+          "membership": [
+            {
+              "row": 176,
+              "field": "caption"
+            },
+            {
+              "row": 177,
+              "field": "caption"
+            },
+            {
+              "row": 178,
+              "field": "caption"
+            },
+            {
+              "row": 179,
+              "field": "altText"
+            },
+            {
+              "row": 180,
+              "field": "altText"
+            },
+            {
+              "row": 496,
+              "field": "caption"
+            },
+            {
+              "row": 497,
+              "field": "caption"
+            },
+            {
+              "row": 498,
+              "field": "caption"
+            },
+            {
+              "row": 499,
+              "field": "altText"
+            },
+            {
+              "row": 500,
+              "field": "altText"
+            }
+          ]
+        },
+        {
+          "concept": "yuvarlak-etek-cebi",
+          "english_gloss": "Rounded skirt pockets or curved skirt-pocket entrances.",
+          "count": 10,
+          "rows": [16, 17, 18, 19, 20, 136, 137, 138, 139, 140],
+          "membership": [
+            {
+              "row": 16,
+              "field": "caption"
+            },
+            {
+              "row": 17,
+              "field": "caption"
+            },
+            {
+              "row": 18,
+              "field": "caption"
+            },
+            {
+              "row": 19,
+              "field": "altText"
+            },
+            {
+              "row": 20,
+              "field": "altText"
+            },
+            {
+              "row": 136,
+              "field": "caption"
+            },
+            {
+              "row": 137,
+              "field": "caption"
+            },
+            {
+              "row": 138,
+              "field": "caption"
+            },
+            {
+              "row": 139,
+              "field": "altText"
+            },
+            {
+              "row": 140,
+              "field": "altText"
+            }
+          ]
+        }
+      ],
+      "five_word_affected_items": 0,
+      "five_word_overlaps": [],
+      "normalized_duplicate_count": 0,
+      "historical_collisions": [],
+      "structural_issues": []
+    }
+  }
+}

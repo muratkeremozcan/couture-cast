@@ -1,0 +1,176 @@
+{
+  "author": "/root/general_review",
+  "locale": "fr",
+  "scope": "All 1000 authored rows; French TSV unchanged during Italian authoring.",
+  "consolidations": [
+    {
+      "concept": "ceinture-textile-nouee",
+      "formerLabels": ["ceinture-foulard", "ceinture-obi"],
+      "rows": [13, 14, 15, 16, 261, 262, 263, 264],
+      "reason": "Conservative grouping of a shared visual or functional motif across garment position, material or styling context.",
+      "englishGloss": "A tied textile sash or scarf used as a belt."
+    },
+    {
+      "concept": "ourlet-remonte-coulisse",
+      "formerLabels": ["fronces-coulisse", "jupe-coulisses"],
+      "rows": [213, 214, 215, 216, 369, 370, 371, 372],
+      "reason": "Conservative grouping of a shared visual or functional motif across garment position, material or styling context.",
+      "englishGloss": "A drawstring lifting a hem into gathered folds."
+    },
+    {
+      "concept": "jupe-plis-deployes",
+      "formerLabels": ["plis-accordeon", "jupe-plis-soleil"],
+      "rows": [201, 202, 203, 204, 653, 654, 655, 656],
+      "reason": "Conservative grouping of a shared visual or functional motif across garment position, material or styling context.",
+      "englishGloss": "A pleated skirt fanning open in movement."
+    },
+    {
+      "concept": "essai-longueur-ourlet",
+      "formerLabels": ["ourlet-provisoire", "ourlet-craie"],
+      "rows": [9, 10, 11, 12, 921, 922, 923, 924],
+      "reason": "Conservative grouping of a shared visual or functional motif across garment position, material or styling context.",
+      "englishGloss": "Testing a new hem length with temporary pins or chalk marks."
+    },
+    {
+      "concept": "reparation-piece-rapportee",
+      "formerLabels": ["patch-visible", "reparation-coude"],
+      "rows": [45, 46, 47, 48, 177, 178, 179, 180],
+      "reason": "Conservative grouping of a shared visual or functional motif across garment position, material or styling context.",
+      "englishGloss": "A visible applied patch reinforcing a worn garment area."
+    },
+    {
+      "concept": "drapage-epingle-mannequin",
+      "formerLabels": ["robe-mannequin", "mannequin-drapage-biais"],
+      "rows": [437, 438, 439, 440, 949, 950, 951, 952],
+      "reason": "Conservative grouping of a shared visual or functional motif across garment position, material or styling context.",
+      "englishGloss": "Fabric draped and pinned on a dressmaking mannequin."
+    },
+    {
+      "concept": "bord-retourne-visible",
+      "formerLabels": ["revers-contraste", "roule-cheville"],
+      "rows": [29, 30, 31, 32, 145, 146, 147, 148],
+      "reason": "Conservative grouping of a shared visual or functional motif across garment position, material or styling context.",
+      "englishGloss": "A turned-back garment edge exposing a cuff or inner layer."
+    },
+    {
+      "concept": "tete-enveloppee-foulard",
+      "formerLabels": ["capuche-foulard", "turban-foulard"],
+      "rows": [77, 78, 79, 80, 393, 394, 395, 396],
+      "reason": "Conservative grouping of a shared visual or functional motif across garment position, material or styling context.",
+      "englishGloss": "A scarf wrapped around the head."
+    }
+  ],
+  "topGroups": [
+    {
+      "concept": "bord-retourne-visible",
+      "rows": [29, 30, 31, 32, 145, 146, 147, 148],
+      "count": 8
+    },
+    {
+      "concept": "ceinture-textile-nouee",
+      "rows": [13, 14, 15, 16, 261, 262, 263, 264],
+      "count": 8
+    },
+    {
+      "concept": "drapage-epingle-mannequin",
+      "rows": [437, 438, 439, 440, 949, 950, 951, 952],
+      "count": 8
+    },
+    {
+      "concept": "essai-longueur-ourlet",
+      "rows": [9, 10, 11, 12, 921, 922, 923, 924],
+      "count": 8
+    },
+    {
+      "concept": "jupe-plis-deployes",
+      "rows": [201, 202, 203, 204, 653, 654, 655, 656],
+      "count": 8
+    },
+    {
+      "concept": "ourlet-remonte-coulisse",
+      "rows": [213, 214, 215, 216, 369, 370, 371, 372],
+      "count": 8
+    },
+    {
+      "concept": "reparation-piece-rapportee",
+      "rows": [45, 46, 47, 48, 177, 178, 179, 180],
+      "count": 8
+    },
+    {
+      "concept": "tete-enveloppee-foulard",
+      "rows": [77, 78, 79, 80, 393, 394, 395, 396],
+      "count": 8
+    },
+    {
+      "concept": "accord-chaussure-sac",
+      "rows": [545, 546, 547, 548],
+      "count": 4
+    },
+    {
+      "concept": "atelier-retouche",
+      "rows": [489, 490, 491, 492],
+      "count": 4
+    },
+    {
+      "concept": "atelier-sashiko",
+      "rows": [557, 558, 559, 560],
+      "count": 4
+    },
+    {
+      "concept": "attache-lunettes",
+      "rows": [113, 114, 115, 116],
+      "count": 4
+    }
+  ],
+  "note": "The original four rope-belt rows were individually rewritten as a hinged-bracelet scenario before the French handoff; this prevented a material-only belt variant from fragmenting a shared concept.",
+  "maximumConceptGroups": [
+    {
+      "concept": "bord-retourne-visible",
+      "englishGloss": "A turned-back garment edge exposing a cuff or inner layer.",
+      "count": 8,
+      "rows": [29, 30, 31, 32, 145, 146, 147, 148]
+    },
+    {
+      "concept": "ceinture-textile-nouee",
+      "englishGloss": "A tied textile sash or scarf used as a belt.",
+      "count": 8,
+      "rows": [13, 14, 15, 16, 261, 262, 263, 264]
+    },
+    {
+      "concept": "drapage-epingle-mannequin",
+      "englishGloss": "Fabric draped and pinned on a dressmaking mannequin.",
+      "count": 8,
+      "rows": [437, 438, 439, 440, 949, 950, 951, 952]
+    },
+    {
+      "concept": "essai-longueur-ourlet",
+      "englishGloss": "Testing a new hem length with temporary pins or chalk marks.",
+      "count": 8,
+      "rows": [9, 10, 11, 12, 921, 922, 923, 924]
+    },
+    {
+      "concept": "jupe-plis-deployes",
+      "englishGloss": "A pleated skirt fanning open in movement.",
+      "count": 8,
+      "rows": [201, 202, 203, 204, 653, 654, 655, 656]
+    },
+    {
+      "concept": "ourlet-remonte-coulisse",
+      "englishGloss": "A drawstring lifting a hem into gathered folds.",
+      "count": 8,
+      "rows": [213, 214, 215, 216, 369, 370, 371, 372]
+    },
+    {
+      "concept": "reparation-piece-rapportee",
+      "englishGloss": "A visible applied patch reinforcing a worn garment area.",
+      "count": 8,
+      "rows": [45, 46, 47, 48, 177, 178, 179, 180]
+    },
+    {
+      "concept": "tete-enveloppee-foulard",
+      "englishGloss": "A scarf wrapped around the head.",
+      "count": 8,
+      "rows": [77, 78, 79, 80, 393, 394, 395, 396]
+    }
+  ]
+}
