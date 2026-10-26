@@ -8,6 +8,13 @@ const projectRoot = path.resolve(__dirname, '../..')
 export default defineConfig({
   resolve: {
     alias: {
+      // HTTP consumers import the mobile community adapter, whose native picker
+      // capability is outside this Node protocol runner. Resolve before Vite
+      // transforms React Native's Flow entrypoint; a runtime mock is too late.
+      'react-native': path.resolve(
+        projectRoot,
+        'pact/http/consumer/react-native-platform.ts'
+      ),
       '@couture/api-client/contracts/http': path.resolve(
         projectRoot,
         'packages/api-client/src/contracts/http/index.ts'

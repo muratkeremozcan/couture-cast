@@ -536,6 +536,21 @@ repository-relative. Proposed files are identified in the tasks.
   Coverage statements/branches/functions/lines is 94.96/88.78/96.07/95.70%, clearing every ratchet.
   Exact run-owned UUID database and Redis cleanup is confirmed.
 
+- 2026-10-26 first PR CI root causes: Android original-resource lanes failed before app work
+  because setup-android's default requests the removed SDK package `tools`. The job now explicitly
+  installs `platform-tools`, matching the established native workflows. The iOS original-resource
+  lane's ARM host failed to create its configured x86_64 QEMU guest because Homebrew Lima ships
+  non-native guest agents separately; install `lima-additional-guestagents` with Colima/QEMU,
+  as documented by [Lima installation](https://lima-vm.io/docs/installation/). Product native
+  behavior, real original-resource assertions and the fail-fast disk gate remain unchanged.
+  The Node Pact consumer failed parsing the React Native Flow entrypoint after the mobile
+  community adapter gained a static Platform import. Its protocol-only runner now resolves that
+  platform capability to a minimal iOS shim before Vite transforms dependencies. Actual client,
+  HTTP request/response, Pact server and provider verification remain active; mobile/device tests
+  cover native picker and permission behavior. The exact mobile consumer failure was reproduced
+  locally, then all 210 interactions passed with retries disabled after the alias correction.
+  Evidence is retained under `story-6-8/runs/ci-pact-mobile-*` and original CI logs/artifact.
+
 ## Spec Change Log
 
 - 2026-10-25, iteration 2 in progress, Astra round 1: accepted A1 and A2. iOS now imports the

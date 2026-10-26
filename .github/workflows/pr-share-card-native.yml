@@ -42,10 +42,12 @@ jobs:
           java-version: '21'
       - uses: android-actions/setup-android@v3
         if: matrix.platform == 'android'
+        with:
+          packages: platform-tools
       - name: Start owned Docker VM for local Auth on macOS
         if: runner.os == 'macOS'
         run: |
-          brew install colima docker qemu xcodegen
+          brew install colima docker qemu xcodegen lima-additional-guestagents
           colima start --vm-type=qemu --arch=x86_64 --cpu-type=qemu64 --cpu=2 --memory=3 --disk=40
       - uses: ./.github/actions/start-local-supabase
       - name: Prepare isolated UUID runtime and built renderer
