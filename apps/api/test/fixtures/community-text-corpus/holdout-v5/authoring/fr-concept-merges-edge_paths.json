@@ -1,0 +1,187 @@
+{
+  "author": "/root/edge_paths",
+  "scope": "Manual semantic consolidation of complete French authored cases.",
+  "principle": "Paraphrases and changes limited to fabric, item type, decorative treatment or incidental setting share a concept. Distinct construction mechanisms and distinct garment uses remain separate when those differences carry the scenario.",
+  "merges": [
+    {
+      "concept": "Temporary garment length check",
+      "english_gloss": "Temporary garment length check",
+      "prior_labels": [
+        "Dress hem clipped for shoe comparison",
+        "Coat length checked on stairs"
+      ],
+      "reason": "Both sets check whether the temporary garment length clears footwear or movement; the garment type and fitting location vary.",
+      "rows": [182, 183, 184, 185, 246, 247, 248, 249]
+    },
+    {
+      "concept": "Inner border brought into view",
+      "english_gloss": "Inner border brought into view",
+      "prior_labels": [
+        "Knit facing folded outward",
+        "Vest lining extended as lower band"
+      ],
+      "reason": "Both make a normally inner border visible as an outer band. Different fabric and edge positions share the reveal motif.",
+      "rows": [78, 79, 80, 81, 506, 507, 508, 509]
+    },
+    {
+      "concept": "Sleeve relining work",
+      "english_gloss": "Sleeve relining work",
+      "prior_labels": [
+        "Sleeve lining pinned before stitching",
+        "Coat sleeve lined with striped offcut"
+      ],
+      "reason": "Basting and replacing a worn sleeve lining belong to the same sleeve-relining scenario.",
+      "rows": [298, 299, 300, 301, 778, 779, 780, 781]
+    },
+    {
+      "concept": "Lining pulled outward to dry",
+      "english_gloss": "Lining pulled outward to dry",
+      "prior_labels": [
+        "Lined rain hood dried inside out",
+        "Fine glove lining pulled free for drying"
+      ],
+      "reason": "Both separate the lining from its shell to dry; hood versus glove is an item substitution.",
+      "rows": [598, 599, 600, 601, 722, 723, 724, 725]
+    },
+    {
+      "concept": "Curved form supporting drying knit",
+      "english_gloss": "Curved form supporting drying knit",
+      "prior_labels": [
+        "Open knit blocked on rounded form",
+        "Knit sleeve washed on removable form"
+      ],
+      "reason": "Both maintain a curved knit shape on a padded form during drying.",
+      "rows": [294, 295, 296, 297, 950, 951, 952, 953]
+    },
+    {
+      "concept": "Hat flattened for storage",
+      "english_gloss": "Hat flattened for storage",
+      "prior_labels": [
+        "Hat folded along travel crease",
+        "Hat brim reinforced with removable wire"
+      ],
+      "reason": "Both prepare a hat to be packed flat; fold line and removable wire are variants within that scenario.",
+      "rows": [194, 195, 196, 197, 838, 839, 840, 841]
+    },
+    {
+      "concept": "Sleeve extended with added cuff",
+      "english_gloss": "Sleeve extended with added cuff",
+      "prior_labels": [
+        "Cardigan sleeve repaired with matching knit tube",
+        "Dress sleeves lengthened by cuff band"
+      ],
+      "reason": "Both add a new section to extend the sleeve; knit versus woven fabric does not create a new motif.",
+      "rows": [670, 671, 672, 673, 902, 903, 904, 905]
+    },
+    {
+      "concept": "Shirt closure strip reused as wearable band",
+      "english_gloss": "Shirt closure strip reused as wearable band",
+      "prior_labels": [
+        "Shirt cuff converted into hair band",
+        "Bracelet made from shirt placket"
+      ],
+      "reason": "Both preserve a shirt button-and-hole strip as a new soft wearable band.",
+      "rows": [654, 655, 656, 657, 870, 871, 872, 873]
+    },
+    {
+      "concept": "Jewelry worn over glove fabric",
+      "english_gloss": "Jewelry worn over glove fabric",
+      "prior_labels": [
+        "Wrist watch over long glove",
+        "Ring moved outside fingerless mitt"
+      ],
+      "reason": "Both position jewelry outside hand-covering fabric; changing jewelry or glove style is consolidated.",
+      "rows": [270, 271, 272, 273, 334, 335, 336, 337]
+    },
+    {
+      "concept": "Wrist jewelry retaining sleeve fabric",
+      "english_gloss": "Wrist jewelry retaining sleeve fabric",
+      "prior_labels": [
+        "Long sleeve gathered under bracelet",
+        "Shirt cuffs folded under watch strap"
+      ],
+      "reason": "The wrist accessory holds the sleeve edge in position in both sets.",
+      "rows": [478, 479, 480, 481, 922, 923, 924, 925]
+    },
+    {
+      "concept": "Folded cloth cushioning hard fastening",
+      "english_gloss": "Folded cloth cushioning hard fastening",
+      "prior_labels": [
+        "Small scarf protecting necklace clasp",
+        "Folded scarf used as waist padding"
+      ],
+      "reason": "Both place a soft folded textile between a hard fastening and another surface.",
+      "rows": [286, 287, 288, 289, 926, 927, 928, 929]
+    },
+    {
+      "concept": "Soft backing behind beaded decoration",
+      "english_gloss": "Soft backing behind beaded decoration",
+      "prior_labels": [
+        "Neckline secured with soft backing",
+        "Beaded hair slide padded underneath"
+      ],
+      "reason": "Both cover the reverse of beadwork with smooth backing to prevent snagging.",
+      "rows": [642, 643, 644, 645, 666, 667, 668, 669]
+    },
+    {
+      "concept": "Soft loop easing garment closure",
+      "english_gloss": "Soft loop easing garment closure",
+      "prior_labels": [
+        "Pearl buttons replaced by fabric loops",
+        "Dress waist secured with elastic button loop"
+      ],
+      "reason": "Both use enlarged soft loops at a garment fastening; material and location variants are consolidated.",
+      "rows": [234, 235, 236, 237, 690, 691, 692, 693]
+    },
+    {
+      "concept": "Concealed snaps preventing gaping",
+      "english_gloss": "Concealed snaps preventing gaping",
+      "prior_labels": [
+        "Pocket held shut by invisible snap",
+        "Loose shirt secured with underarm snaps"
+      ],
+      "reason": "Both add hidden snap fasteners to keep an opening from gaping.",
+      "rows": [170, 171, 172, 173, 242, 243, 244, 245]
+    },
+    {
+      "concept": "Scarf secured with small clasp",
+      "english_gloss": "Scarf secured with small clasp",
+      "prior_labels": [
+        "Scarf ends linked by small carabiner",
+        "Scarf clasp placed off shoulder seam"
+      ],
+      "reason": "Both use a small hardware fastening to retain the scarf; placement and clasp shape vary.",
+      "rows": [578, 579, 580, 581, 782, 783, 784, 785]
+    },
+    {
+      "concept": "Bag pocket arranged for easy reach",
+      "english_gloss": "Bag pocket arranged for easy reach",
+      "prior_labels": [
+        "Bag pocket angled for seated reach",
+        "Zipped pocket opening away from elbow"
+      ],
+      "reason": "Both reorient the bag pocket toward the reaching hand; sitting is incidental.",
+      "rows": [538, 539, 540, 541, 694, 695, 696, 697]
+    },
+    {
+      "concept": "Soft bridge across neckline opening",
+      "english_gloss": "Soft bridge across neckline opening",
+      "prior_labels": [
+        "Knot balancing deep neckline",
+        "Collar tips joined with soft ribbon"
+      ],
+      "reason": "Both use a textile tie between the sides of the neckline opening.",
+      "rows": [106, 107, 108, 109, 978, 979, 980, 981]
+    },
+    {
+      "concept": "Steam restoring rounded collar shape",
+      "english_gloss": "Steam restoring rounded collar shape",
+      "prior_labels": [
+        "Coat collar softened by steaming",
+        "Soft lapel stretched on curved cushion"
+      ],
+      "reason": "Both restore the soft roll of a collar or lapel with shaping and steam.",
+      "rows": [30, 31, 32, 33, 862, 863, 864, 865]
+    }
+  ]
+}

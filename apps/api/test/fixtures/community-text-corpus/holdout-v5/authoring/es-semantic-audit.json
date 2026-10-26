@@ -1,0 +1,1197 @@
+{
+  "phase": "V5",
+  "author": "/root/general_review",
+  "language": "es",
+  "authoredRowRange": [1, 1000],
+  "authorship": "Every complete item individually composed directly in Spanish; no item translated or adapted from the English TSV or historical corpus wording. Helpers serialized complete supplied text, assigned semantic labels and measured files; no banks, templates or combinatorial generation.",
+  "initialFiveItemScenarios": 200,
+  "finalConceptCount": 200,
+  "consolidations": [
+    {
+      "concept": "panel-redondeado-flotante",
+      "formerLabels": ["vestido-peto-circular", "blusa-sobrepuesto-oval"],
+      "englishGloss": "A rounded panel floating above the upper front of a garment.",
+      "rows": [21, 22, 23, 24, 25, 646, 647, 648, 649, 650],
+      "count": 10,
+      "reason": "The circular versus oval shape and blouse versus dress category are conservatively consolidated."
+    },
+    {
+      "concept": "bajo-puntas-triangulares",
+      "formerLabels": ["falda-puntas-escalonadas", "chaleco-bajo-triangulado"],
+      "englishGloss": "A garment hem divided into projecting triangular points.",
+      "rows": [11, 12, 13, 14, 15, 626, 627, 628, 629, 630],
+      "count": 10,
+      "reason": "The skirt and waistcoat retain the same pointed-edge motif across garment category and point height."
+    },
+    {
+      "concept": "estampa-abanicos",
+      "formerLabels": ["estampa-abanicos-cerrados", "estampa-abanicos-cuadriculados"],
+      "englishGloss": "Illustrated folding fans, shown closed or open.",
+      "rows": [241, 242, 243, 244, 245, 771, 772, 773, 774, 775],
+      "count": 10,
+      "reason": "The fan object is shared across its closed state and an open checked rendering."
+    },
+    {
+      "concept": "estampa-arcos-abiertos",
+      "formerLabels": ["estampa-medias-lunas-unidas", "estampa-anillos-incompletos"],
+      "englishGloss": "Open circular arcs or crescent forms repeated in a print.",
+      "rows": [806, 807, 808, 809, 810, 851, 852, 853, 854, 855],
+      "count": 10,
+      "reason": "Conservatively group the open-arc motif despite chain layout versus isolated incomplete rings."
+    },
+    {
+      "concept": "estampa-espiral-composicion",
+      "formerLabels": ["estampa-mosaico-espirales", "estampa-puntos-espiral"],
+      "englishGloss": "A large spiral assembled from small printed elements.",
+      "rows": [566, 567, 568, 569, 570, 826, 827, 828, 829, 830],
+      "count": 10,
+      "reason": "Mosaic fragments and round dots do not create separate underlying spiral compositions."
+    },
+    {
+      "concept": "estampa-bloques-desplazados",
+      "formerLabels": ["estampa-rayas-quebradas", "estampa-tableros-moviles"],
+      "englishGloss": "Rectilinear printed elements displaced between adjacent sections.",
+      "rows": [761, 762, 763, 764, 765, 866, 867, 868, 869, 870],
+      "count": 10,
+      "reason": "Conservatively group interrupted stripes and shifted square rows under the shared offset-block motif."
+    },
+    {
+      "concept": "estampa-marcos-poligonales-abiertos",
+      "formerLabels": ["estampa-hexagonos-abiertos", "estampa-cuadrados-hendidos"],
+      "englishGloss": "Polygon frames with a small break in one border.",
+      "rows": [751, 752, 753, 754, 755, 791, 792, 793, 794, 795],
+      "count": 10,
+      "reason": "The number of polygon sides alone does not separate the broken-frame visual motif."
+    },
+    {
+      "concept": "estampa-cafeteras-manuales",
+      "formerLabels": ["estampa-cafeteras-moka", "estampa-prensas-cafe"],
+      "englishGloss": "Illustrations of manually operated coffee makers.",
+      "rows": [876, 877, 878, 879, 880, 931, 932, 933, 934, 935],
+      "count": 10,
+      "reason": "Conservatively group the coffee-making vessels across moka and plunger mechanisms."
+    }
+  ],
+  "maximumConceptGroups": [
+    {
+      "concept": "panel-redondeado-flotante",
+      "formerLabels": ["vestido-peto-circular", "blusa-sobrepuesto-oval"],
+      "englishGloss": "A rounded panel floating above the upper front of a garment.",
+      "rows": [21, 22, 23, 24, 25, 646, 647, 648, 649, 650],
+      "count": 10,
+      "reason": "The circular versus oval shape and blouse versus dress category are conservatively consolidated."
+    },
+    {
+      "concept": "bajo-puntas-triangulares",
+      "formerLabels": ["falda-puntas-escalonadas", "chaleco-bajo-triangulado"],
+      "englishGloss": "A garment hem divided into projecting triangular points.",
+      "rows": [11, 12, 13, 14, 15, 626, 627, 628, 629, 630],
+      "count": 10,
+      "reason": "The skirt and waistcoat retain the same pointed-edge motif across garment category and point height."
+    },
+    {
+      "concept": "estampa-abanicos",
+      "formerLabels": ["estampa-abanicos-cerrados", "estampa-abanicos-cuadriculados"],
+      "englishGloss": "Illustrated folding fans, shown closed or open.",
+      "rows": [241, 242, 243, 244, 245, 771, 772, 773, 774, 775],
+      "count": 10,
+      "reason": "The fan object is shared across its closed state and an open checked rendering."
+    },
+    {
+      "concept": "estampa-arcos-abiertos",
+      "formerLabels": ["estampa-medias-lunas-unidas", "estampa-anillos-incompletos"],
+      "englishGloss": "Open circular arcs or crescent forms repeated in a print.",
+      "rows": [806, 807, 808, 809, 810, 851, 852, 853, 854, 855],
+      "count": 10,
+      "reason": "Conservatively group the open-arc motif despite chain layout versus isolated incomplete rings."
+    },
+    {
+      "concept": "estampa-espiral-composicion",
+      "formerLabels": ["estampa-mosaico-espirales", "estampa-puntos-espiral"],
+      "englishGloss": "A large spiral assembled from small printed elements.",
+      "rows": [566, 567, 568, 569, 570, 826, 827, 828, 829, 830],
+      "count": 10,
+      "reason": "Mosaic fragments and round dots do not create separate underlying spiral compositions."
+    },
+    {
+      "concept": "estampa-bloques-desplazados",
+      "formerLabels": ["estampa-rayas-quebradas", "estampa-tableros-moviles"],
+      "englishGloss": "Rectilinear printed elements displaced between adjacent sections.",
+      "rows": [761, 762, 763, 764, 765, 866, 867, 868, 869, 870],
+      "count": 10,
+      "reason": "Conservatively group interrupted stripes and shifted square rows under the shared offset-block motif."
+    },
+    {
+      "concept": "estampa-marcos-poligonales-abiertos",
+      "formerLabels": ["estampa-hexagonos-abiertos", "estampa-cuadrados-hendidos"],
+      "englishGloss": "Polygon frames with a small break in one border.",
+      "rows": [751, 752, 753, 754, 755, 791, 792, 793, 794, 795],
+      "count": 10,
+      "reason": "The number of polygon sides alone does not separate the broken-frame visual motif."
+    },
+    {
+      "concept": "estampa-cafeteras-manuales",
+      "formerLabels": ["estampa-cafeteras-moka", "estampa-prensas-cafe"],
+      "englishGloss": "Illustrations of manually operated coffee makers.",
+      "rows": [876, 877, 878, 879, 880, 931, 932, 933, 934, 935],
+      "count": 10,
+      "reason": "Conservatively group the coffee-making vessels across moka and plunger mechanisms."
+    }
+  ],
+  "newIndependentTwoItemMotifs": [
+    {
+      "concept": "estampa-pan-concha",
+      "rows": [961, 963],
+      "reason": "Wholly reauthored one caption and one alt text as a new distinct depicted motif, leaving three items in the original motif."
+    },
+    {
+      "concept": "estampa-paletas-heladas",
+      "rows": [966, 968],
+      "reason": "Wholly reauthored one caption and one alt text as a new distinct depicted motif, leaving three items in the original motif."
+    },
+    {
+      "concept": "estampa-gelatinas",
+      "rows": [971, 973],
+      "reason": "Wholly reauthored one caption and one alt text as a new distinct depicted motif, leaving three items in the original motif."
+    },
+    {
+      "concept": "estampa-barquillos",
+      "rows": [976, 978],
+      "reason": "Wholly reauthored one caption and one alt text as a new distinct depicted motif, leaving three items in the original motif."
+    },
+    {
+      "concept": "estampa-empanadas",
+      "rows": [981, 983],
+      "reason": "Wholly reauthored one caption and one alt text as a new distinct depicted motif, leaving three items in the original motif."
+    },
+    {
+      "concept": "estampa-tortilleros",
+      "rows": [986, 988],
+      "reason": "Wholly reauthored one caption and one alt text as a new distinct depicted motif, leaving three items in the original motif."
+    },
+    {
+      "concept": "estampa-cazuelas",
+      "rows": [991, 993],
+      "reason": "Wholly reauthored one caption and one alt text as a new distinct depicted motif, leaving three items in the original motif."
+    },
+    {
+      "concept": "estampa-metates",
+      "rows": [996, 998],
+      "reason": "Wholly reauthored one caption and one alt text as a new distinct depicted motif, leaving three items in the original motif."
+    }
+  ],
+  "distinctions": [
+    "Botanical motifs retain their depicted morphology: a split monstera leaf, a fan-shaped ginkgo leaf, a cacao pod with seeds and a maize cob with rows of kernels are substantive visual differences, not colour or fabric variants.",
+    "Geometric prints are grouped when their primary layout is equivalent; shifted rectilinear elements, broken polygon borders, open arcs and assembled spirals are explicitly consolidated.",
+    "Different represented functions remain distinct: a turning cylindrical bag closure and a sliding bar closure use different operations; a single slit sleeve and a ladder of connecting cuff strips have different physical constructions.",
+    "Composite scenes are treated as a coherent scenario: a courtyard fountain or a train crossing a bridge is not fragmented into labels for every incidental object."
+  ],
+  "labelAndLanguageCorrections": {
+    "estampa-matrieroscas": "estampa-matrioscas",
+    "estampa-celosas": "estampa-celosias",
+    "passadores": "pasadores",
+    "sanfona": "acordeón"
+  },
+  "allConceptMembership": [
+    {
+      "concept": "anillo-doble-aro-desplazado",
+      "count": 5,
+      "rows": [401, 402, 403, 404, 405]
+    },
+    {
+      "concept": "aretes-capsula-abierta",
+      "count": 5,
+      "rows": [106, 107, 108, 109, 110]
+    },
+    {
+      "concept": "aretes-cometas",
+      "count": 5,
+      "rows": [441, 442, 443, 444, 445]
+    },
+    {
+      "concept": "aretes-marcos-cuadrados",
+      "count": 5,
+      "rows": [466, 467, 468, 469, 470]
+    },
+    {
+      "concept": "aretes-petalos-rigidos",
+      "count": 5,
+      "rows": [396, 397, 398, 399, 400]
+    },
+    {
+      "concept": "aretes-tallo-espiral",
+      "count": 5,
+      "rows": [491, 492, 493, 494, 495]
+    },
+    {
+      "concept": "bajo-puntas-triangulares",
+      "count": 10,
+      "rows": [11, 12, 13, 14, 15, 626, 627, 628, 629, 630]
+    },
+    {
+      "concept": "blusa-capa-escote",
+      "count": 5,
+      "rows": [726, 727, 728, 729, 730]
+    },
+    {
+      "concept": "blusa-cuello-puntas-elevadas",
+      "count": 5,
+      "rows": [711, 712, 713, 714, 715]
+    },
+    {
+      "concept": "blusa-manga-torsionada",
+      "count": 5,
+      "rows": [16, 17, 18, 19, 20]
+    },
+    {
+      "concept": "blusa-nudo-bajo-lateral",
+      "count": 5,
+      "rows": [56, 57, 58, 59, 60]
+    },
+    {
+      "concept": "blusa-pliegues-lazo-hombro",
+      "count": 5,
+      "rows": [686, 687, 688, 689, 690]
+    },
+    {
+      "concept": "blusa-punos-escalera",
+      "count": 5,
+      "rows": [86, 87, 88, 89, 90]
+    },
+    {
+      "concept": "bolsa-base-acordeon",
+      "count": 5,
+      "rows": [456, 457, 458, 459, 460]
+    },
+    {
+      "concept": "bolso-asas-desiguales",
+      "count": 5,
+      "rows": [121, 122, 123, 124, 125]
+    },
+    {
+      "concept": "bolso-asas-ventana",
+      "count": 5,
+      "rows": [416, 417, 418, 419, 420]
+    },
+    {
+      "concept": "bolso-broche-cilindro",
+      "count": 5,
+      "rows": [436, 437, 438, 439, 440]
+    },
+    {
+      "concept": "bolso-cierre-corrediza",
+      "count": 5,
+      "rows": [101, 102, 103, 104, 105]
+    },
+    {
+      "concept": "bolso-doble-cuerpo",
+      "count": 5,
+      "rows": [391, 392, 393, 394, 395]
+    },
+    {
+      "concept": "bolso-doblez-esquinas",
+      "count": 5,
+      "rows": [486, 487, 488, 489, 490]
+    },
+    {
+      "concept": "bolso-tapa-circular-mitad",
+      "count": 5,
+      "rows": [471, 472, 473, 474, 475]
+    },
+    {
+      "concept": "botin-puntera-abierta",
+      "count": 5,
+      "rows": [376, 377, 378, 379, 380]
+    },
+    {
+      "concept": "broche-pajarita-plegada",
+      "count": 5,
+      "rows": [426, 427, 428, 429, 430]
+    },
+    {
+      "concept": "camisa-bolsillos-solapa-curva",
+      "count": 5,
+      "rows": [736, 737, 738, 739, 740]
+    },
+    {
+      "concept": "camisa-canesu-curvo",
+      "count": 5,
+      "rows": [666, 667, 668, 669, 670]
+    },
+    {
+      "concept": "camisa-costados-abotonados",
+      "count": 5,
+      "rows": [696, 697, 698, 699, 700]
+    },
+    {
+      "concept": "camisa-cuello-puente",
+      "count": 5,
+      "rows": [61, 62, 63, 64, 65]
+    },
+    {
+      "concept": "camisa-pliegue-codo",
+      "count": 5,
+      "rows": [26, 27, 28, 29, 30]
+    },
+    {
+      "concept": "camisa-punos-redondos",
+      "count": 5,
+      "rows": [636, 637, 638, 639, 640]
+    },
+    {
+      "concept": "camiseta-mangas-hendidura",
+      "count": 5,
+      "rows": [656, 657, 658, 659, 660]
+    },
+    {
+      "concept": "camiseta-tiras-interiores",
+      "count": 5,
+      "rows": [41, 42, 43, 44, 45]
+    },
+    {
+      "concept": "chaleco-bolsas-colgantes",
+      "count": 5,
+      "rows": [706, 707, 708, 709, 710]
+    },
+    {
+      "concept": "chaleco-espalda-ventana",
+      "count": 5,
+      "rows": [76, 77, 78, 79, 80]
+    },
+    {
+      "concept": "chaqueta-cierre-rectangulo",
+      "count": 5,
+      "rows": [721, 722, 723, 724, 725]
+    },
+    {
+      "concept": "chaqueta-cruce-hombro",
+      "count": 5,
+      "rows": [36, 37, 38, 39, 40]
+    },
+    {
+      "concept": "chaqueta-piezas-circulares",
+      "count": 5,
+      "rows": [676, 677, 678, 679, 680]
+    },
+    {
+      "concept": "cinturon-nudo-descentrado",
+      "count": 5,
+      "rows": [461, 462, 463, 464, 465]
+    },
+    {
+      "concept": "cinturon-placas-escalonadas",
+      "count": 5,
+      "rows": [421, 422, 423, 424, 425]
+    },
+    {
+      "concept": "collar-cascada-cuentas",
+      "count": 5,
+      "rows": [406, 407, 408, 409, 410]
+    },
+    {
+      "concept": "collar-cuentas-cubiertas",
+      "count": 5,
+      "rows": [111, 112, 113, 114, 115]
+    },
+    {
+      "concept": "collar-esferas-huecas",
+      "count": 5,
+      "rows": [446, 447, 448, 449, 450]
+    },
+    {
+      "concept": "collar-laminas-panal",
+      "count": 5,
+      "rows": [496, 497, 498, 499, 500]
+    },
+    {
+      "concept": "collar-triangulos-colgantes",
+      "count": 5,
+      "rows": [476, 477, 478, 479, 480]
+    },
+    {
+      "concept": "cuello-rectangular-abierto",
+      "count": 5,
+      "rows": [1, 2, 3, 4, 5]
+    },
+    {
+      "concept": "estampa-abanicos",
+      "count": 10,
+      "rows": [241, 242, 243, 244, 245, 771, 772, 773, 774, 775]
+    },
+    {
+      "concept": "estampa-alcatraces",
+      "count": 5,
+      "rows": [536, 537, 538, 539, 540]
+    },
+    {
+      "concept": "estampa-alebrijes",
+      "count": 5,
+      "rows": [266, 267, 268, 269, 270]
+    },
+    {
+      "concept": "estampa-amapolas",
+      "count": 5,
+      "rows": [531, 532, 533, 534, 535]
+    },
+    {
+      "concept": "estampa-arcos-abiertos",
+      "count": 10,
+      "rows": [806, 807, 808, 809, 810, 851, 852, 853, 854, 855]
+    },
+    {
+      "concept": "estampa-arpas-pequenas",
+      "count": 5,
+      "rows": [326, 327, 328, 329, 330]
+    },
+    {
+      "concept": "estampa-balcones-hierro",
+      "count": 5,
+      "rows": [366, 367, 368, 369, 370]
+    },
+    {
+      "concept": "estampa-bancas-plaza",
+      "count": 5,
+      "rows": [921, 922, 923, 924, 925]
+    },
+    {
+      "concept": "estampa-barquillos",
+      "count": 2,
+      "rows": [976, 978]
+    },
+    {
+      "concept": "estampa-bloques-desplazados",
+      "count": 10,
+      "rows": [761, 762, 763, 764, 765, 866, 867, 868, 869, 870]
+    },
+    {
+      "concept": "estampa-bolas-billar",
+      "count": 3,
+      "rows": [992, 994, 995]
+    },
+    {
+      "concept": "estampa-bugambilia",
+      "count": 5,
+      "rows": [166, 167, 168, 169, 170]
+    },
+    {
+      "concept": "estampa-cacao",
+      "count": 5,
+      "rows": [136, 137, 138, 139, 140]
+    },
+    {
+      "concept": "estampa-cafetales",
+      "count": 5,
+      "rows": [556, 557, 558, 559, 560]
+    },
+    {
+      "concept": "estampa-cafeteras-manuales",
+      "count": 10,
+      "rows": [876, 877, 878, 879, 880, 931, 932, 933, 934, 935]
+    },
+    {
+      "concept": "estampa-cajas-cerillos",
+      "count": 5,
+      "rows": [906, 907, 908, 909, 910]
+    },
+    {
+      "concept": "estampa-calaveras-florales",
+      "count": 5,
+      "rows": [271, 272, 273, 274, 275]
+    },
+    {
+      "concept": "estampa-camiones-carga",
+      "count": 5,
+      "rows": [951, 952, 953, 954, 955]
+    },
+    {
+      "concept": "estampa-campanarios",
+      "count": 5,
+      "rows": [186, 187, 188, 189, 190]
+    },
+    {
+      "concept": "estampa-canastos-tapa",
+      "count": 5,
+      "rows": [341, 342, 343, 344, 345]
+    },
+    {
+      "concept": "estampa-candados-corazones",
+      "count": 5,
+      "rows": [231, 232, 233, 234, 235]
+    },
+    {
+      "concept": "estampa-candelabros",
+      "count": 5,
+      "rows": [911, 912, 913, 914, 915]
+    },
+    {
+      "concept": "estampa-capas-contorno",
+      "count": 5,
+      "rows": [801, 802, 803, 804, 805]
+    },
+    {
+      "concept": "estampa-carretillas-jardin",
+      "count": 5,
+      "rows": [956, 957, 958, 959, 960]
+    },
+    {
+      "concept": "estampa-carritos-nieve",
+      "count": 5,
+      "rows": [946, 947, 948, 949, 950]
+    },
+    {
+      "concept": "estampa-casas-escalonadas",
+      "count": 5,
+      "rows": [201, 202, 203, 204, 205]
+    },
+    {
+      "concept": "estampa-castañuelas",
+      "count": 5,
+      "rows": [296, 297, 298, 299, 300]
+    },
+    {
+      "concept": "estampa-cazuelas",
+      "count": 2,
+      "rows": [991, 993]
+    },
+    {
+      "concept": "estampa-celosias",
+      "count": 5,
+      "rows": [371, 372, 373, 374, 375]
+    },
+    {
+      "concept": "estampa-charangos",
+      "count": 5,
+      "rows": [316, 317, 318, 319, 320]
+    },
+    {
+      "concept": "estampa-cintas-triangular",
+      "count": 5,
+      "rows": [871, 872, 873, 874, 875]
+    },
+    {
+      "concept": "estampa-circulos-descentrados",
+      "count": 5,
+      "rows": [756, 757, 758, 759, 760]
+    },
+    {
+      "concept": "estampa-colgantes-lluvia",
+      "count": 5,
+      "rows": [561, 562, 563, 564, 565]
+    },
+    {
+      "concept": "estampa-corales-abiertos",
+      "count": 5,
+      "rows": [611, 612, 613, 614, 615]
+    },
+    {
+      "concept": "estampa-cristales-hexagonales",
+      "count": 5,
+      "rows": [581, 582, 583, 584, 585]
+    },
+    {
+      "concept": "estampa-cubos-lineales",
+      "count": 5,
+      "rows": [776, 777, 778, 779, 780]
+    },
+    {
+      "concept": "estampa-dalias",
+      "count": 5,
+      "rows": [546, 547, 548, 549, 550]
+    },
+    {
+      "concept": "estampa-diente-leon",
+      "count": 5,
+      "rows": [516, 517, 518, 519, 520]
+    },
+    {
+      "concept": "estampa-domino",
+      "count": 3,
+      "rows": [977, 979, 980]
+    },
+    {
+      "concept": "estampa-dunas-puntos",
+      "count": 5,
+      "rows": [601, 602, 603, 604, 605]
+    },
+    {
+      "concept": "estampa-empanadas",
+      "count": 2,
+      "rows": [981, 983]
+    },
+    {
+      "concept": "estampa-escaleras-incendio",
+      "count": 5,
+      "rows": [216, 217, 218, 219, 220]
+    },
+    {
+      "concept": "estampa-espinas-dobles",
+      "count": 5,
+      "rows": [796, 797, 798, 799, 800]
+    },
+    {
+      "concept": "estampa-espiral-composicion",
+      "count": 10,
+      "rows": [566, 567, 568, 569, 570, 826, 827, 828, 829, 830]
+    },
+    {
+      "concept": "estampa-esquinas-entrelazadas",
+      "count": 5,
+      "rows": [831, 832, 833, 834, 835]
+    },
+    {
+      "concept": "estampa-estalactitas",
+      "count": 5,
+      "rows": [571, 572, 573, 574, 575]
+    },
+    {
+      "concept": "estampa-estrellas-desdobladas",
+      "count": 5,
+      "rows": [841, 842, 843, 844, 845]
+    },
+    {
+      "concept": "estampa-eucalipto",
+      "count": 5,
+      "rows": [526, 527, 528, 529, 530]
+    },
+    {
+      "concept": "estampa-exprimidores",
+      "count": 5,
+      "rows": [881, 882, 883, 884, 885]
+    },
+    {
+      "concept": "estampa-frascos-mermelada",
+      "count": 5,
+      "rows": [896, 897, 898, 899, 900]
+    },
+    {
+      "concept": "estampa-fuente-patio",
+      "count": 5,
+      "rows": [196, 197, 198, 199, 200]
+    },
+    {
+      "concept": "estampa-gelatinas",
+      "count": 2,
+      "rows": [971, 973]
+    },
+    {
+      "concept": "estampa-geodas",
+      "count": 5,
+      "rows": [576, 577, 578, 579, 580]
+    },
+    {
+      "concept": "estampa-ginkgo",
+      "count": 5,
+      "rows": [171, 172, 173, 174, 175]
+    },
+    {
+      "concept": "estampa-girasoles",
+      "count": 5,
+      "rows": [541, 542, 543, 544, 545]
+    },
+    {
+      "concept": "estampa-gotas-invertidas",
+      "count": 5,
+      "rows": [781, 782, 783, 784, 785]
+    },
+    {
+      "concept": "estampa-guayabas",
+      "count": 5,
+      "rows": [126, 127, 128, 129, 130]
+    },
+    {
+      "concept": "estampa-heliconias",
+      "count": 5,
+      "rows": [506, 507, 508, 509, 510]
+    },
+    {
+      "concept": "estampa-hibiscos",
+      "count": 5,
+      "rows": [551, 552, 553, 554, 555]
+    },
+    {
+      "concept": "estampa-higos",
+      "count": 5,
+      "rows": [151, 152, 153, 154, 155]
+    },
+    {
+      "concept": "estampa-hojas-platanera",
+      "count": 5,
+      "rows": [511, 512, 513, 514, 515]
+    },
+    {
+      "concept": "estampa-hornos-barro",
+      "count": 5,
+      "rows": [886, 887, 888, 889, 890]
+    },
+    {
+      "concept": "estampa-jacarandas",
+      "count": 5,
+      "rows": [501, 502, 503, 504, 505]
+    },
+    {
+      "concept": "estampa-jarras-vertiendo",
+      "count": 5,
+      "rows": [901, 902, 903, 904, 905]
+    },
+    {
+      "concept": "estampa-lineas-punteadas",
+      "count": 5,
+      "rows": [786, 787, 788, 789, 790]
+    },
+    {
+      "concept": "estampa-magnolias",
+      "count": 5,
+      "rows": [176, 177, 178, 179, 180]
+    },
+    {
+      "concept": "estampa-maiz",
+      "count": 5,
+      "rows": [141, 142, 143, 144, 145]
+    },
+    {
+      "concept": "estampa-mantas-enrolladas",
+      "count": 5,
+      "rows": [336, 337, 338, 339, 340]
+    },
+    {
+      "concept": "estampa-maquinas-manivela",
+      "count": 5,
+      "rows": [891, 892, 893, 894, 895]
+    },
+    {
+      "concept": "estampa-maracas",
+      "count": 5,
+      "rows": [301, 302, 303, 304, 305]
+    },
+    {
+      "concept": "estampa-marcos-poligonales-abiertos",
+      "count": 10,
+      "rows": [751, 752, 753, 754, 755, 791, 792, 793, 794, 795]
+    },
+    {
+      "concept": "estampa-matrioscas",
+      "count": 5,
+      "rows": [251, 252, 253, 254, 255]
+    },
+    {
+      "concept": "estampa-meandros",
+      "count": 5,
+      "rows": [596, 597, 598, 599, 600]
+    },
+    {
+      "concept": "estampa-mecedoras",
+      "count": 5,
+      "rows": [916, 917, 918, 919, 920]
+    },
+    {
+      "concept": "estampa-metates",
+      "count": 2,
+      "rows": [996, 998]
+    },
+    {
+      "concept": "estampa-molinillos",
+      "count": 5,
+      "rows": [261, 262, 263, 264, 265]
+    },
+    {
+      "concept": "estampa-molinos-cafe",
+      "count": 5,
+      "rows": [926, 927, 928, 929, 930]
+    },
+    {
+      "concept": "estampa-monstera",
+      "count": 5,
+      "rows": [161, 162, 163, 164, 165]
+    },
+    {
+      "concept": "estampa-naipes-abanico",
+      "count": 3,
+      "rows": [982, 984, 985]
+    },
+    {
+      "concept": "estampa-nopales",
+      "count": 5,
+      "rows": [156, 157, 158, 159, 160]
+    },
+    {
+      "concept": "estampa-ocarinas",
+      "count": 5,
+      "rows": [321, 322, 323, 324, 325]
+    },
+    {
+      "concept": "estampa-olas-cuadricula",
+      "count": 5,
+      "rows": [616, 617, 618, 619, 620]
+    },
+    {
+      "concept": "estampa-paletas-heladas",
+      "count": 2,
+      "rows": [966, 968]
+    },
+    {
+      "concept": "estampa-pan-concha",
+      "count": 2,
+      "rows": [961, 963]
+    },
+    {
+      "concept": "estampa-papalotes-estrellas",
+      "count": 5,
+      "rows": [346, 347, 348, 349, 350]
+    },
+    {
+      "concept": "estampa-papel-arrugado",
+      "count": 5,
+      "rows": [846, 847, 848, 849, 850]
+    },
+    {
+      "concept": "estampa-papel-picado",
+      "count": 5,
+      "rows": [256, 257, 258, 259, 260]
+    },
+    {
+      "concept": "estampa-parquimetros",
+      "count": 3,
+      "rows": [967, 969, 970]
+    },
+    {
+      "concept": "estampa-patines-dobles",
+      "count": 5,
+      "rows": [236, 237, 238, 239, 240]
+    },
+    {
+      "concept": "estampa-pinas-pino",
+      "count": 5,
+      "rows": [521, 522, 523, 524, 525]
+    },
+    {
+      "concept": "estampa-piraguas",
+      "count": 5,
+      "rows": [351, 352, 353, 354, 355]
+    },
+    {
+      "concept": "estampa-pitaya",
+      "count": 5,
+      "rows": [131, 132, 133, 134, 135]
+    },
+    {
+      "concept": "estampa-portales",
+      "count": 5,
+      "rows": [191, 192, 193, 194, 195]
+    },
+    {
+      "concept": "estampa-puente-ferroviario",
+      "count": 5,
+      "rows": [206, 207, 208, 209, 210]
+    },
+    {
+      "concept": "estampa-puertas-talladas",
+      "count": 5,
+      "rows": [361, 362, 363, 364, 365]
+    },
+    {
+      "concept": "estampa-puestos-flores",
+      "count": 5,
+      "rows": [211, 212, 213, 214, 215]
+    },
+    {
+      "concept": "estampa-quiosco-musica",
+      "count": 5,
+      "rows": [221, 222, 223, 224, 225]
+    },
+    {
+      "concept": "estampa-radios-portatiles",
+      "count": 5,
+      "rows": [941, 942, 943, 944, 945]
+    },
+    {
+      "concept": "estampa-raices-expuestas",
+      "count": 5,
+      "rows": [606, 607, 608, 609, 610]
+    },
+    {
+      "concept": "estampa-rayas-cruce-oval",
+      "count": 5,
+      "rows": [861, 862, 863, 864, 865]
+    },
+    {
+      "concept": "estampa-redes-circulares",
+      "count": 5,
+      "rows": [621, 622, 623, 624, 625]
+    },
+    {
+      "concept": "estampa-rehiletes",
+      "count": 5,
+      "rows": [286, 287, 288, 289, 290]
+    },
+    {
+      "concept": "estampa-rombos-huecos",
+      "count": 5,
+      "rows": [766, 767, 768, 769, 770]
+    },
+    {
+      "concept": "estampa-ruedas-hilar",
+      "count": 5,
+      "rows": [246, 247, 248, 249, 250]
+    },
+    {
+      "concept": "estampa-ruedas-sin-centro",
+      "count": 5,
+      "rows": [821, 822, 823, 824, 825]
+    },
+    {
+      "concept": "estampa-salinas",
+      "count": 5,
+      "rows": [591, 592, 593, 594, 595]
+    },
+    {
+      "concept": "estampa-semaforos",
+      "count": 3,
+      "rows": [962, 964, 965]
+    },
+    {
+      "concept": "estampa-semicirculos-apilados",
+      "count": 5,
+      "rows": [836, 837, 838, 839, 840]
+    },
+    {
+      "concept": "estampa-semillas-palmera",
+      "count": 5,
+      "rows": [181, 182, 183, 184, 185]
+    },
+    {
+      "concept": "estampa-serpientes-escaleras",
+      "count": 3,
+      "rows": [997, 999, 1000]
+    },
+    {
+      "concept": "estampa-sikus",
+      "count": 5,
+      "rows": [311, 312, 313, 314, 315]
+    },
+    {
+      "concept": "estampa-sombreros-colgados",
+      "count": 5,
+      "rows": [356, 357, 358, 359, 360]
+    },
+    {
+      "concept": "estampa-tablero-triangulos",
+      "count": 3,
+      "rows": [987, 989, 990]
+    },
+    {
+      "concept": "estampa-tamarindo",
+      "count": 5,
+      "rows": [146, 147, 148, 149, 150]
+    },
+    {
+      "concept": "estampa-tambores-cuerdas",
+      "count": 5,
+      "rows": [306, 307, 308, 309, 310]
+    },
+    {
+      "concept": "estampa-telar-marcos",
+      "count": 5,
+      "rows": [331, 332, 333, 334, 335]
+    },
+    {
+      "concept": "estampa-terrarios",
+      "count": 5,
+      "rows": [936, 937, 938, 939, 940]
+    },
+    {
+      "concept": "estampa-terrazas-cultivo",
+      "count": 5,
+      "rows": [586, 587, 588, 589, 590]
+    },
+    {
+      "concept": "estampa-torniquetes",
+      "count": 3,
+      "rows": [972, 974, 975]
+    },
+    {
+      "concept": "estampa-torres-bloques",
+      "count": 5,
+      "rows": [856, 857, 858, 859, 860]
+    },
+    {
+      "concept": "estampa-tortilleros",
+      "count": 2,
+      "rows": [986, 988]
+    },
+    {
+      "concept": "estampa-triangulos-curvos",
+      "count": 5,
+      "rows": [816, 817, 818, 819, 820]
+    },
+    {
+      "concept": "estampa-trompos-cuerda",
+      "count": 5,
+      "rows": [276, 277, 278, 279, 280]
+    },
+    {
+      "concept": "estampa-valeros",
+      "count": 5,
+      "rows": [291, 292, 293, 294, 295]
+    },
+    {
+      "concept": "estampa-ventanas-escalonadas",
+      "count": 5,
+      "rows": [811, 812, 813, 814, 815]
+    },
+    {
+      "concept": "estampa-ventiladores",
+      "count": 5,
+      "rows": [226, 227, 228, 229, 230]
+    },
+    {
+      "concept": "estampa-yoyos-colgantes",
+      "count": 5,
+      "rows": [281, 282, 283, 284, 285]
+    },
+    {
+      "concept": "falda-bolsillo-abanico",
+      "count": 5,
+      "rows": [31, 32, 33, 34, 35]
+    },
+    {
+      "concept": "falda-botonera-diagonal",
+      "count": 5,
+      "rows": [651, 652, 653, 654, 655]
+    },
+    {
+      "concept": "falda-costura-doble-s",
+      "count": 5,
+      "rows": [66, 67, 68, 69, 70]
+    },
+    {
+      "concept": "falda-flecos-en-ondas",
+      "count": 5,
+      "rows": [681, 682, 683, 684, 685]
+    },
+    {
+      "concept": "falda-panel-vertical-movil",
+      "count": 5,
+      "rows": [91, 92, 93, 94, 95]
+    },
+    {
+      "concept": "falda-pliegue-lateral-ancho",
+      "count": 5,
+      "rows": [716, 717, 718, 719, 720]
+    },
+    {
+      "concept": "falda-superposicion-zigzag",
+      "count": 5,
+      "rows": [746, 747, 748, 749, 750]
+    },
+    {
+      "concept": "panel-redondeado-flotante",
+      "count": 10,
+      "rows": [21, 22, 23, 24, 25, 646, 647, 648, 649, 650]
+    },
+    {
+      "concept": "pantalon-cintura-onda",
+      "count": 5,
+      "rows": [701, 702, 703, 704, 705]
+    },
+    {
+      "concept": "pantalon-frente-solapa",
+      "count": 5,
+      "rows": [641, 642, 643, 644, 645]
+    },
+    {
+      "concept": "pantalon-panel-delantal",
+      "count": 5,
+      "rows": [81, 82, 83, 84, 85]
+    },
+    {
+      "concept": "pantalon-paneles-esquinas",
+      "count": 5,
+      "rows": [671, 672, 673, 674, 675]
+    },
+    {
+      "concept": "pantalon-pernera-oval",
+      "count": 5,
+      "rows": [6, 7, 8, 9, 10]
+    },
+    {
+      "concept": "pantalon-pespunte-arco",
+      "count": 5,
+      "rows": [51, 52, 53, 54, 55]
+    },
+    {
+      "concept": "pantalon-punos-separados",
+      "count": 5,
+      "rows": [741, 742, 743, 744, 745]
+    },
+    {
+      "concept": "prendedor-con-peine",
+      "count": 5,
+      "rows": [431, 432, 433, 434, 435]
+    },
+    {
+      "concept": "pulsera-bisagra-central",
+      "count": 5,
+      "rows": [411, 412, 413, 414, 415]
+    },
+    {
+      "concept": "pulsera-cintas-paralelas",
+      "count": 5,
+      "rows": [116, 117, 118, 119, 120]
+    },
+    {
+      "concept": "pulsera-corte-relampago",
+      "count": 5,
+      "rows": [481, 482, 483, 484, 485]
+    },
+    {
+      "concept": "sandalia-tira-trenzada-gruesa",
+      "count": 5,
+      "rows": [381, 382, 383, 384, 385]
+    },
+    {
+      "concept": "vestido-bolsillos-circulares",
+      "count": 5,
+      "rows": [691, 692, 693, 694, 695]
+    },
+    {
+      "concept": "vestido-capa-cintura",
+      "count": 5,
+      "rows": [46, 47, 48, 49, 50]
+    },
+    {
+      "concept": "vestido-cintura-puente",
+      "count": 5,
+      "rows": [71, 72, 73, 74, 75]
+    },
+    {
+      "concept": "vestido-cordon-bajo",
+      "count": 5,
+      "rows": [731, 732, 733, 734, 735]
+    },
+    {
+      "concept": "vestido-plegado-cruz-pecho",
+      "count": 5,
+      "rows": [661, 662, 663, 664, 665]
+    },
+    {
+      "concept": "vestido-sisa-pliegue",
+      "count": 5,
+      "rows": [96, 97, 98, 99, 100]
+    },
+    {
+      "concept": "vestido-sobrefalda-recta",
+      "count": 5,
+      "rows": [631, 632, 633, 634, 635]
+    },
+    {
+      "concept": "zapato-borde-ondulado",
+      "count": 5,
+      "rows": [386, 387, 388, 389, 390]
+    },
+    {
+      "concept": "zapatos-pestanas-superpuestas",
+      "count": 5,
+      "rows": [451, 452, 453, 454, 455]
+    }
+  ]
+}

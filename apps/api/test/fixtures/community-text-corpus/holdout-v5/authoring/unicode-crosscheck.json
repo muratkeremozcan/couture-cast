@@ -1,0 +1,30 @@
+{
+  "de": {
+    "affectedItems": [10, 50, 148, 191, 281, 382, 691, 781],
+    "agrees": true
+  },
+  "en": {
+    "affectedItems": [],
+    "agrees": true
+  },
+  "es": {
+    "affectedItems": [],
+    "agrees": true
+  },
+  "fr": {
+    "affectedItems": [],
+    "agrees": true
+  },
+  "it": {
+    "affectedItems": [],
+    "agrees": true
+  },
+  "pt": {
+    "affectedItems": [919, 953],
+    "agrees": true
+  },
+  "tr": {
+    "affectedItems": [],
+    "agrees": true
+  }
+}

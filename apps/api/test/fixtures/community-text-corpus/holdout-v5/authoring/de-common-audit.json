@@ -1,0 +1,1859 @@
+{
+  "language": "de",
+  "sourceSha256": "c03a51e4162fe83ab18f7c519c2d6e5e3175411a373383fa6df0f03c2e1bd5ed",
+  "total": 1000,
+  "fields": {
+    "caption": 500,
+    "altText": 500
+  },
+  "fiveWordOverlap": {
+    "affectedCount": 8,
+    "affectedShare": 0.008,
+    "affectedItems": [10, 50, 148, 191, 281, 382, 691, 781],
+    "repeatedSequences": [
+      {
+        "sequence": "auf dem foto erkenne ich",
+        "items": [10, 382]
+      },
+      {
+        "sequence": "ein flacher knopf verbindet die",
+        "items": [191, 691]
+      },
+      {
+        "sequence": "eine zweite schlaufe führt den",
+        "items": [281, 781]
+      },
+      {
+        "sequence": "habe ich zum ersten mal",
+        "items": [50, 148]
+      }
+    ]
+  },
+  "concepts": {
+    "distinct": 443,
+    "maximumCount": 8,
+    "maximumShare": 0.008,
+    "groups": [
+      {
+        "concept": "klein-zubehoer-erkennen",
+        "items": [32, 83, 308, 416, 532, 583, 808, 916]
+      },
+      {
+        "concept": "naehstichprobe",
+        "items": [18, 105, 445, 471, 518, 605, 945, 971]
+      },
+      {
+        "concept": "rockfalten-anordnung",
+        "items": [46, 210, 283, 366, 546, 710, 783, 866]
+      },
+      {
+        "concept": "strick-sockenferse",
+        "items": [114, 135, 298, 484, 614, 635, 798, 984]
+      },
+      {
+        "concept": "anpassbare-schuhlasche",
+        "items": [284, 338, 404, 784, 838, 904]
+      },
+      {
+        "concept": "kleider-rueckenbewegungsfalte",
+        "items": [387, 405, 486, 887, 905, 986]
+      },
+      {
+        "concept": "naehen-zwischen-terminen",
+        "items": [35, 190, 329, 535, 690, 829]
+      },
+      {
+        "concept": "regen-schuhabtropfen",
+        "items": [40, 131, 411, 540, 631, 911]
+      },
+      {
+        "concept": "schmuck-reiseetui",
+        "items": [11, 348, 464, 511, 848, 964]
+      },
+      {
+        "concept": "schuh-druckschutz",
+        "items": [62, 270, 452, 562, 770, 952]
+      },
+      {
+        "concept": "stoff-proben-palette",
+        "items": [41, 118, 147, 541, 618, 647]
+      },
+      {
+        "concept": "taschen-schluesselclip",
+        "items": [93, 363, 482, 593, 863, 982]
+      },
+      {
+        "concept": "taschenriemen-verstaerkungsnaht",
+        "items": [242, 316, 333, 742, 816, 833]
+      },
+      {
+        "concept": "beutel-zugverschluss",
+        "items": [383, 462, 883, 962]
+      },
+      {
+        "concept": "ersatzknopf-aufbewahrung",
+        "items": [142, 474, 642, 974]
+      },
+      {
+        "concept": "fahrrad-rock-sicherung",
+        "items": [33, 61, 533, 561]
+      },
+      {
+        "concept": "flache-groesse-tasche",
+        "items": [23, 221, 523, 721]
+      },
+      {
+        "concept": "guertel-riemenende",
+        "items": [295, 418, 795, 918]
+      },
+      {
+        "concept": "gurt-aufhaengeschlaufe",
+        "items": [36, 403, 536, 903]
+      },
+      {
+        "concept": "haarband-haltegummi",
+        "items": [312, 415, 812, 915]
+      },
+      {
+        "concept": "handgepaeck-hemden-packen",
+        "items": [116, 200, 616, 700]
+      },
+      {
+        "concept": "hemdbund-hinterer-riegel",
+        "items": [117, 259, 617, 759]
+      },
+      {
+        "concept": "kleidersack-buegelzugang",
+        "items": [197, 407, 697, 907]
+      },
+      {
+        "concept": "kleidungs-markierungsfaden",
+        "items": [66, 388, 566, 888]
+      },
+      {
+        "concept": "kleinteile-vor-umraeumen",
+        "items": [112, 320, 612, 820]
+      },
+      {
+        "concept": "knoten-verschluss-verstellen",
+        "items": [275, 450, 775, 950]
+      },
+      {
+        "concept": "kopftuch-mit-nadeln",
+        "items": [189, 437, 689, 937]
+      },
+      {
+        "concept": "maschenprobe-nach-waesche",
+        "items": [194, 500, 694, 1000]
+      },
+      {
+        "concept": "reissverschluss-griffhilfe",
+        "items": [146, 498, 646, 998]
+      },
+      {
+        "concept": "rucksack-riemenreste",
+        "items": [195, 281, 695, 781]
+      },
+      {
+        "concept": "saum-oder-bein-reflektierend",
+        "items": [55, 399, 555, 899]
+      },
+      {
+        "concept": "schalenden-mit-knopf",
+        "items": [191, 489, 691, 989]
+      },
+      {
+        "concept": "schuh-trouser-anprobe",
+        "items": [230, 379, 730, 879]
+      },
+      {
+        "concept": "schuheinlage-entnehmen",
+        "items": [89, 419, 589, 919]
+      },
+      {
+        "concept": "schuhzunge-position",
+        "items": [122, 485, 622, 985]
+      },
+      {
+        "concept": "strickende-sichern",
+        "items": [158, 491, 658, 991]
+      },
+      {
+        "concept": "taschenhenkel-anpassung",
+        "items": [52, 305, 552, 805]
+      },
+      {
+        "concept": "taschenriemen-winkel",
+        "items": [17, 459, 517, 959]
+      },
+      {
+        "concept": "textile-anhang-nadelsicherung",
+        "items": [127, 427, 627, 927]
+      },
+      {
+        "concept": "verschluss-unterlage",
+        "items": [342, 466, 842, 966]
+      },
+      {
+        "concept": "alltagsringwahl",
+        "items": [34, 534]
+      },
+      {
+        "concept": "altesschnallenleder",
+        "items": [359, 859]
+      },
+      {
+        "concept": "amateurtheaterkostuem",
+        "items": [203, 703]
+      },
+      {
+        "concept": "anorakbelueftung",
+        "items": [167, 667]
+      },
+      {
+        "concept": "anorakkordelstopper",
+        "items": [92, 592]
+      },
+      {
+        "concept": "applikationsprobe",
+        "items": [77, 577]
+      },
+      {
+        "concept": "armbandflechtmuster",
+        "items": [406, 906]
+      },
+      {
+        "concept": "armbandlaengenwahl",
+        "items": [90, 590]
+      },
+      {
+        "concept": "armbandrechnung",
+        "items": [159, 659]
+      },
+      {
+        "concept": "armbandvergleichsfoto",
+        "items": [328, 828]
+      },
+      {
+        "concept": "armkettensicherung",
+        "items": [236, 736]
+      },
+      {
+        "concept": "armkugeleinhalten",
+        "items": [113, 613]
+      },
+      {
+        "concept": "armpolsterbewegung",
+        "items": [398, 898]
+      },
+      {
+        "concept": "ausgebesserterkragen",
+        "items": [186, 686]
+      },
+      {
+        "concept": "ausgebleichtefalte",
+        "items": [87, 587]
+      },
+      {
+        "concept": "ausstellungstextilkunst",
+        "items": [70, 570]
+      },
+      {
+        "concept": "baenderabschluss",
+        "items": [163, 663]
+      },
+      {
+        "concept": "bandrolllagerung",
+        "items": [133, 633]
+      },
+      {
+        "concept": "bauchbundsitzprobe",
+        "items": [24, 524]
+      },
+      {
+        "concept": "beinstulpenanprobe",
+        "items": [14, 514]
+      },
+      {
+        "concept": "bequemefestkleidung",
+        "items": [160, 660]
+      },
+      {
+        "concept": "besatzbandbreite",
+        "items": [97, 597]
+      },
+      {
+        "concept": "besatzverstaerkung",
+        "items": [397, 897]
+      },
+      {
+        "concept": "besuchwerkstatt",
+        "items": [315, 815]
+      },
+      {
+        "concept": "bleistiftsteckfach",
+        "items": [177, 677]
+      },
+      {
+        "concept": "blumenmusterabstand",
+        "items": [306, 806]
+      },
+      {
+        "concept": "blusenbindefuehrung",
+        "items": [185, 685]
+      },
+      {
+        "concept": "blusenhalteband",
+        "items": [233, 733]
+      },
+      {
+        "concept": "blusenknopfverteilung",
+        "items": [429, 929]
+      },
+      {
+        "concept": "blusenkragenbindung",
+        "items": [371, 871]
+      },
+      {
+        "concept": "blusenkragensteg",
+        "items": [134, 634]
+      },
+      {
+        "concept": "blusenlichtdurchlass",
+        "items": [319, 819]
+      },
+      {
+        "concept": "blusenstoffbruch",
+        "items": [467, 967]
+      },
+      {
+        "concept": "brailleschrankmarke",
+        "items": [264, 764]
+      },
+      {
+        "concept": "brillenetuitaste",
+        "items": [157, 657]
+      },
+      {
+        "concept": "brillenkettengurt",
+        "items": [325, 825]
+      },
+      {
+        "concept": "brokatlichtwechsel",
+        "items": [229, 729]
+      },
+      {
+        "concept": "druckknopfumriss",
+        "items": [393, 893]
+      },
+      {
+        "concept": "einstecktuchfaltung",
+        "items": [120, 620]
+      },
+      {
+        "concept": "emaille-naehmaschine",
+        "items": [257, 757]
+      },
+      {
+        "concept": "ersterarbeitstag",
+        "items": [304, 804]
+      },
+      {
+        "concept": "fadenfarbeunterseite",
+        "items": [175, 675]
+      },
+      {
+        "concept": "fahrradhelmfrisur",
+        "items": [207, 707]
+      },
+      {
+        "concept": "faltenkleidknopf",
+        "items": [448, 948]
+      },
+      {
+        "concept": "faltenpapierfaltlinie",
+        "items": [108, 608]
+      },
+      {
+        "concept": "faltrockwasserbewegung",
+        "items": [310, 810]
+      },
+      {
+        "concept": "familienfesthosenanzug",
+        "items": [302, 802]
+      },
+      {
+        "concept": "fasertastprobe",
+        "items": [101, 601]
+      },
+      {
+        "concept": "federschmuckbefestigung",
+        "items": [244, 744]
+      },
+      {
+        "concept": "filmabendkleid",
+        "items": [322, 822]
+      },
+      {
+        "concept": "filzhutrueckformung",
+        "items": [282, 782]
+      },
+      {
+        "concept": "fleckenkreidemarkierung",
+        "items": [21, 521]
+      },
+      {
+        "concept": "fotoausschnittentscheidung",
+        "items": [30, 530]
+      },
+      {
+        "concept": "fototerminfrisur",
+        "items": [13, 513]
+      },
+      {
+        "concept": "fruehschichtvorbereitung",
+        "items": [311, 811]
+      },
+      {
+        "concept": "fussfreieumkleide",
+        "items": [346, 846]
+      },
+      {
+        "concept": "gamaschensicherung",
+        "items": [231, 731]
+      },
+      {
+        "concept": "garderobenmarke",
+        "items": [43, 543]
+      },
+      {
+        "concept": "garderobensortierung",
+        "items": [172, 672]
+      },
+      {
+        "concept": "garnhaspel",
+        "items": [271, 771]
+      },
+      {
+        "concept": "gelenkschonendeschliesse",
+        "items": [48, 548]
+      },
+      {
+        "concept": "geschenkperlen",
+        "items": [216, 716]
+      },
+      {
+        "concept": "geschenkverpackungstuch",
+        "items": [86, 586]
+      },
+      {
+        "concept": "gewebteetikettenkante",
+        "items": [391, 891]
+      },
+      {
+        "concept": "gliederkettenkuerzung",
+        "items": [395, 895]
+      },
+      {
+        "concept": "guertelschnallenwechsel",
+        "items": [446, 946]
+      },
+      {
+        "concept": "gummibundreparatur",
+        "items": [103, 603]
+      },
+      {
+        "concept": "gummistiefelsohle",
+        "items": [193, 693]
+      },
+      {
+        "concept": "gummizugloesung",
+        "items": [164, 664]
+      },
+      {
+        "concept": "gurtbandfaerbung",
+        "items": [126, 626]
+      },
+      {
+        "concept": "gurtbandrundkante",
+        "items": [375, 875]
+      },
+      {
+        "concept": "haarbandschnalle",
+        "items": [430, 930]
+      },
+      {
+        "concept": "haarbandschutzbrille",
+        "items": [115, 615]
+      },
+      {
+        "concept": "haarbandverdrehung",
+        "items": [225, 725]
+      },
+      {
+        "concept": "haarkammseitenform",
+        "items": [479, 979]
+      },
+      {
+        "concept": "haarkammverzierung",
+        "items": [451, 951]
+      },
+      {
+        "concept": "haarschleifenbreite",
+        "items": [267, 767]
+      },
+      {
+        "concept": "haarschmuckaufstecken",
+        "items": [401, 901]
+      },
+      {
+        "concept": "haarschmuckstein",
+        "items": [179, 679]
+      },
+      {
+        "concept": "haarspangegravur",
+        "items": [297, 797]
+      },
+      {
+        "concept": "haarspangenabdruck",
+        "items": [20, 520]
+      },
+      {
+        "concept": "haarspangendoppelclip",
+        "items": [438, 938]
+      },
+      {
+        "concept": "haarspangenzahnung",
+        "items": [349, 849]
+      },
+      {
+        "concept": "haekelblumenanordnung",
+        "items": [412, 912]
+      },
+      {
+        "concept": "haekelkanteauftrennen",
+        "items": [78, 578]
+      },
+      {
+        "concept": "halbhandschuhfunktion",
+        "items": [421, 921]
+      },
+      {
+        "concept": "halstuchknotenposition",
+        "items": [143, 643]
+      },
+      {
+        "concept": "handgewebeherkunft",
+        "items": [345, 845]
+      },
+      {
+        "concept": "handschuhaufbewahrung",
+        "items": [181, 681]
+      },
+      {
+        "concept": "handschuhdoppelnaht",
+        "items": [431, 931]
+      },
+      {
+        "concept": "handschuhfingerkuerzung",
+        "items": [149, 649]
+      },
+      {
+        "concept": "handschuhfingertasten",
+        "items": [212, 712]
+      },
+      {
+        "concept": "handschuhoberhandmuster",
+        "items": [290, 790]
+      },
+      {
+        "concept": "handschuhwendestelle",
+        "items": [7, 507]
+      },
+      {
+        "concept": "handtaschenfutterreparatur",
+        "items": [440, 940]
+      },
+      {
+        "concept": "handytaschenfenster",
+        "items": [84, 584]
+      },
+      {
+        "concept": "handytaschequerformat",
+        "items": [353, 853]
+      },
+      {
+        "concept": "hausschuhebesuch",
+        "items": [19, 519]
+      },
+      {
+        "concept": "hemdbroschenposition",
+        "items": [313, 813]
+      },
+      {
+        "concept": "hemdenfachtrennung",
+        "items": [247, 747]
+      },
+      {
+        "concept": "hemdenfaltenfoto",
+        "items": [382, 882]
+      },
+      {
+        "concept": "hemdenkragenvergleich",
+        "items": [10, 510]
+      },
+      {
+        "concept": "hemdenmanschettenloch",
+        "items": [214, 714]
+      },
+      {
+        "concept": "hemdkragenentstaerker",
+        "items": [29, 529]
+      },
+      {
+        "concept": "hemdmusterinnenaussen",
+        "items": [355, 855]
+      },
+      {
+        "concept": "hemdnaehtemuster",
+        "items": [293, 793]
+      },
+      {
+        "concept": "hemdschultersonne",
+        "items": [38, 538]
+      },
+      {
+        "concept": "hoherrockschlitz",
+        "items": [370, 870]
+      },
+      {
+        "concept": "holzknopfsammlung",
+        "items": [390, 890]
+      },
+      {
+        "concept": "hosenaufschlagbreite",
+        "items": [151, 651]
+      },
+      {
+        "concept": "hosenbeinlinien",
+        "items": [91, 591]
+      },
+      {
+        "concept": "hosenfalteausrichten",
+        "items": [168, 668]
+      },
+      {
+        "concept": "hosenklettschutz",
+        "items": [54, 554]
+      },
+      {
+        "concept": "hosenknopflochlaenge",
+        "items": [268, 768]
+      },
+      {
+        "concept": "hosentaschenfutterfarbe",
+        "items": [238, 738]
+      },
+      {
+        "concept": "hutformstabilisierung",
+        "items": [67, 567]
+      },
+      {
+        "concept": "hutfotoaufbewahrung",
+        "items": [324, 824]
+      },
+      {
+        "concept": "huttransportklemme",
+        "items": [499, 999]
+      },
+      {
+        "concept": "jackenarmfreiheit",
+        "items": [47, 547]
+      },
+      {
+        "concept": "jackenbuegelform",
+        "items": [162, 662]
+      },
+      {
+        "concept": "jackenfrontabschluss",
+        "items": [289, 789]
+      },
+      {
+        "concept": "kalendermotivtuch",
+        "items": [220, 720]
+      },
+      {
+        "concept": "kappeninnenband",
+        "items": [246, 746]
+      },
+      {
+        "concept": "kapuzenmittellinie",
+        "items": [265, 765]
+      },
+      {
+        "concept": "kapuzenrandweiche",
+        "items": [364, 864]
+      },
+      {
+        "concept": "keramikblattform",
+        "items": [307, 807]
+      },
+      {
+        "concept": "keramikoberflaeche",
+        "items": [378, 878]
+      },
+      {
+        "concept": "kettenverschlussdrehung",
+        "items": [286, 786]
+      },
+      {
+        "concept": "klappfaecherhalter",
+        "items": [262, 762]
+      },
+      {
+        "concept": "klappspiegelreise",
+        "items": [60, 560]
+      },
+      {
+        "concept": "kleidabnaeherende",
+        "items": [254, 754]
+      },
+      {
+        "concept": "kleiderabholung",
+        "items": [1, 501]
+      },
+      {
+        "concept": "kleiderbeutelaufschrift",
+        "items": [150, 650]
+      },
+      {
+        "concept": "kleiderboersepreisschild",
+        "items": [279, 779]
+      },
+      {
+        "concept": "kleiderbuegelnotiz",
+        "items": [76, 576]
+      },
+      {
+        "concept": "kleiderbuendelspende",
+        "items": [356, 856]
+      },
+      {
+        "concept": "kleiderfarbrest",
+        "items": [454, 954]
+      },
+      {
+        "concept": "kleidermustererinnerung",
+        "items": [227, 727]
+      },
+      {
+        "concept": "kleidernahtbogen",
+        "items": [223, 723]
+      },
+      {
+        "concept": "kleiderpaketpost",
+        "items": [215, 715]
+      },
+      {
+        "concept": "kleiderpassformnotiz",
+        "items": [182, 682]
+      },
+      {
+        "concept": "kleiderpuppepapierhuelle",
+        "items": [136, 636]
+      },
+      {
+        "concept": "kleiderrueckgabe",
+        "items": [98, 598]
+      },
+      {
+        "concept": "kleiderschrankduftfrei",
+        "items": [339, 839]
+      },
+      {
+        "concept": "kleiderstaenderrollen",
+        "items": [59, 559]
+      },
+      {
+        "concept": "kleidertauschvereinbarung",
+        "items": [4, 504]
+      },
+      {
+        "concept": "kleidertraegerkuerzung",
+        "items": [296, 796]
+      },
+      {
+        "concept": "kleiderwebkantenetikett",
+        "items": [423, 923]
+      },
+      {
+        "concept": "kleidseitentaschen",
+        "items": [250, 750]
+      },
+      {
+        "concept": "kleidungsetiketttelefon",
+        "items": [255, 755]
+      },
+      {
+        "concept": "kleidungsmusterkarte",
+        "items": [496, 996]
+      },
+      {
+        "concept": "kleidungtrockenpuppe",
+        "items": [155, 655]
+      },
+      {
+        "concept": "klettarmband",
+        "items": [183, 683]
+      },
+      {
+        "concept": "kniefreiheitfahrstuhl",
+        "items": [256, 756]
+      },
+      {
+        "concept": "knopfleistenstabilitaet",
+        "items": [352, 852]
+      },
+      {
+        "concept": "knopflochkanten",
+        "items": [85, 585]
+      },
+      {
+        "concept": "knopfmaterialklang",
+        "items": [106, 606]
+      },
+      {
+        "concept": "knopfrestgeschenk",
+        "items": [173, 673]
+      },
+      {
+        "concept": "koerperlinienzeichnung",
+        "items": [205, 705]
+      },
+      {
+        "concept": "kopfbandfrotteeeinlage",
+        "items": [494, 994]
+      },
+      {
+        "concept": "kopfschmuckbefestigung",
+        "items": [170, 670]
+      },
+      {
+        "concept": "kopftuchregenschutz",
+        "items": [125, 625]
+      },
+      {
+        "concept": "kragenbroschenpaar",
+        "items": [201, 701]
+      },
+      {
+        "concept": "krawattenetikett",
+        "items": [161, 661]
+      },
+      {
+        "concept": "krawattenscherenschnitt",
+        "items": [208, 708]
+      },
+      {
+        "concept": "kuechenarbeitskittel",
+        "items": [213, 713]
+      },
+      {
+        "concept": "kulturhausauftritt",
+        "items": [69, 569]
+      },
+      {
+        "concept": "kunstharzabdruck",
+        "items": [88, 588]
+      },
+      {
+        "concept": "kunstreiseanhanger",
+        "items": [303, 803]
+      },
+      {
+        "concept": "kunststoffknopfalter",
+        "items": [232, 732]
+      },
+      {
+        "concept": "kurzerponchoschlitz",
+        "items": [219, 719]
+      },
+      {
+        "concept": "laerchenzapfenanhaenger",
+        "items": [42, 542]
+      },
+      {
+        "concept": "lederriemenlocher",
+        "items": [413, 913]
+      },
+      {
+        "concept": "ledertaschenabdruck",
+        "items": [266, 766]
+      },
+      {
+        "concept": "leinenbeutelaufdruck",
+        "items": [129, 629]
+      },
+      {
+        "concept": "leinenschuhform",
+        "items": [292, 792]
+      },
+      {
+        "concept": "lupenanhaenger",
+        "items": [72, 572]
+      },
+      {
+        "concept": "mantelarmnahtbuersten",
+        "items": [178, 678]
+      },
+      {
+        "concept": "manteldoppelfunktion",
+        "items": [332, 832]
+      },
+      {
+        "concept": "manteldruckknopf",
+        "items": [169, 669]
+      },
+      {
+        "concept": "mantelfaltenpause",
+        "items": [444, 944]
+      },
+      {
+        "concept": "mantelhakenabstand",
+        "items": [483, 983]
+      },
+      {
+        "concept": "mantelhandschuhclip",
+        "items": [460, 960]
+      },
+      {
+        "concept": "mantelknopfabstand",
+        "items": [25, 525]
+      },
+      {
+        "concept": "mantelknopfstiel",
+        "items": [280, 780]
+      },
+      {
+        "concept": "mantelkopfhoererkabel",
+        "items": [273, 773]
+      },
+      {
+        "concept": "mantelrockweite",
+        "items": [493, 993]
+      },
+      {
+        "concept": "mantelschalkombination",
+        "items": [433, 933]
+      },
+      {
+        "concept": "mantelschulterdruck",
+        "items": [121, 621]
+      },
+      {
+        "concept": "mantelschulternahtprobe",
+        "items": [453, 953]
+      },
+      {
+        "concept": "mantelsteppungabstand",
+        "items": [294, 794]
+      },
+      {
+        "concept": "mantelstoffvergleich",
+        "items": [192, 692]
+      },
+      {
+        "concept": "mantelverschlussgriff",
+        "items": [472, 972]
+      },
+      {
+        "concept": "mantelzwischenlage",
+        "items": [365, 865]
+      },
+      {
+        "concept": "markttagschuerze",
+        "items": [314, 814]
+      },
+      {
+        "concept": "meeresglasbrosche",
+        "items": [95, 595]
+      },
+      {
+        "concept": "metallkettengewicht",
+        "items": [74, 574]
+      },
+      {
+        "concept": "minirockschritttest",
+        "items": [8, 508]
+      },
+      {
+        "concept": "museumsgarderobenbeutel",
+        "items": [361, 861]
+      },
+      {
+        "concept": "nachbarschaftsfoto",
+        "items": [39, 539]
+      },
+      {
+        "concept": "naehenmitlupe",
+        "items": [139, 639]
+      },
+      {
+        "concept": "naehfadensicherung",
+        "items": [481, 981]
+      },
+      {
+        "concept": "naehkorbmitnahme",
+        "items": [234, 734]
+      },
+      {
+        "concept": "naehmaschinenfadenhilfe",
+        "items": [414, 914]
+      },
+      {
+        "concept": "naehmaschinenfusswahl",
+        "items": [300, 800]
+      },
+      {
+        "concept": "naehmaschinentischlicht",
+        "items": [22, 522]
+      },
+      {
+        "concept": "naehnadelaufbewahrung",
+        "items": [81, 581]
+      },
+      {
+        "concept": "naehnadelstaerke",
+        "items": [458, 958]
+      },
+      {
+        "concept": "naehprojektpause",
+        "items": [128, 628]
+      },
+      {
+        "concept": "naehstoffrichtung",
+        "items": [435, 935]
+      },
+      {
+        "concept": "naehstundenkaffee",
+        "items": [392, 892]
+      },
+      {
+        "concept": "naehtreffteilnahme",
+        "items": [50, 550]
+      },
+      {
+        "concept": "nahtkantenbeschnitt",
+        "items": [199, 699]
+      },
+      {
+        "concept": "nahtzugabeplanung",
+        "items": [6, 506]
+      },
+      {
+        "concept": "nahtzugabeversaeuberung",
+        "items": [226, 726]
+      },
+      {
+        "concept": "offenezopfflechtung",
+        "items": [130, 630]
+      },
+      {
+        "concept": "ohrringgewichtsprobe",
+        "items": [360, 860]
+      },
+      {
+        "concept": "ohrringverschlussreserve",
+        "items": [291, 791]
+      },
+      {
+        "concept": "pilgerzeichenpin",
+        "items": [49, 549]
+      },
+      {
+        "concept": "plakettenclip",
+        "items": [248, 748]
+      },
+      {
+        "concept": "plisseelagerung",
+        "items": [102, 602]
+      },
+      {
+        "concept": "portemonnaieunterteilung",
+        "items": [107, 607]
+      },
+      {
+        "concept": "programmhefttasche",
+        "items": [326, 826]
+      },
+      {
+        "concept": "radmantelschlitz",
+        "items": [327, 827]
+      },
+      {
+        "concept": "regencapeaufhaengen",
+        "items": [51, 551]
+      },
+      {
+        "concept": "regencapebefestigung",
+        "items": [386, 886]
+      },
+      {
+        "concept": "regenmantelknie",
+        "items": [456, 956]
+      },
+      {
+        "concept": "regenschirmgriffschlaufe",
+        "items": [152, 652]
+      },
+      {
+        "concept": "reisekragenabdeckung",
+        "items": [235, 735]
+      },
+      {
+        "concept": "reissverschlussende",
+        "items": [137, 637]
+      },
+      {
+        "concept": "reparaturrechnungaufbewahrung",
+        "items": [368, 868]
+      },
+      {
+        "concept": "riemenbreitenwechsel",
+        "items": [228, 728]
+      },
+      {
+        "concept": "ringaufbewahrungsstaender",
+        "items": [475, 975]
+      },
+      {
+        "concept": "ringgravurdatum",
+        "items": [400, 900]
+      },
+      {
+        "concept": "ringgroessentest",
+        "items": [243, 743]
+      },
+      {
+        "concept": "rockausgangsschlitz",
+        "items": [180, 680]
+      },
+      {
+        "concept": "rockbundhaken",
+        "items": [436, 936]
+      },
+      {
+        "concept": "rockfutterlaenge",
+        "items": [27, 527]
+      },
+      {
+        "concept": "rockguerteldurchlass",
+        "items": [477, 977]
+      },
+      {
+        "concept": "rockschnittauflegen",
+        "items": [154, 654]
+      },
+      {
+        "concept": "rocksonnenmuster",
+        "items": [420, 920]
+      },
+      {
+        "concept": "rocktanzprobe",
+        "items": [198, 698]
+      },
+      {
+        "concept": "rocktaschenposition",
+        "items": [68, 568]
+      },
+      {
+        "concept": "rockunterkantekantelung",
+        "items": [277, 777]
+      },
+      {
+        "concept": "rockunterrockbefestigung",
+        "items": [447, 947]
+      },
+      {
+        "concept": "roterfadenrest",
+        "items": [57, 557]
+      },
+      {
+        "concept": "rucksackrueckenpolster",
+        "items": [240, 740]
+      },
+      {
+        "concept": "schalenduhranhanger",
+        "items": [457, 957]
+      },
+      {
+        "concept": "schalgegenlicht",
+        "items": [138, 638]
+      },
+      {
+        "concept": "schalgehaekelterringausschnitt",
+        "items": [287, 787]
+      },
+      {
+        "concept": "schalhaekelschlaufen",
+        "items": [119, 619]
+      },
+      {
+        "concept": "schallplatten-ring",
+        "items": [299, 799]
+      },
+      {
+        "concept": "schalsonneabschattung",
+        "items": [351, 851]
+      },
+      {
+        "concept": "schalspitzenbindung",
+        "items": [334, 834]
+      },
+      {
+        "concept": "schalwebfehler",
+        "items": [469, 969]
+      },
+      {
+        "concept": "schalwickelbreite",
+        "items": [174, 674]
+      },
+      {
+        "concept": "schirmmuetzenpassform",
+        "items": [144, 644]
+      },
+      {
+        "concept": "schlafaugenmaske",
+        "items": [260, 760]
+      },
+      {
+        "concept": "schmuckanhaengerclip",
+        "items": [409, 909]
+      },
+      {
+        "concept": "schmuckanhangerrueckseite",
+        "items": [253, 753]
+      },
+      {
+        "concept": "schmuckdrahtbiegen",
+        "items": [64, 564]
+      },
+      {
+        "concept": "schmuckdrahtrest",
+        "items": [184, 684]
+      },
+      {
+        "concept": "schmuckfaserknoten",
+        "items": [478, 978]
+      },
+      {
+        "concept": "schmuckkartei",
+        "items": [26, 526]
+      },
+      {
+        "concept": "schmuckkartonfenster",
+        "items": [432, 932]
+      },
+      {
+        "concept": "schmuckkastenrillen",
+        "items": [196, 696]
+      },
+      {
+        "concept": "schmuckkettenentwirren",
+        "items": [111, 611]
+      },
+      {
+        "concept": "schmuckschaufensterreflex",
+        "items": [211, 711]
+      },
+      {
+        "concept": "schmucksteinvergleich",
+        "items": [274, 774]
+      },
+      {
+        "concept": "schmuckverzichtaufnahme",
+        "items": [340, 840]
+      },
+      {
+        "concept": "schmuckwerkstattkurs",
+        "items": [148, 648]
+      },
+      {
+        "concept": "schneiderkreideform",
+        "items": [239, 739]
+      },
+      {
+        "concept": "schneiderpuppehoehe",
+        "items": [12, 512]
+      },
+      {
+        "concept": "schnittmusterbeschwerer",
+        "items": [132, 632]
+      },
+      {
+        "concept": "schraenkchenfachnummer",
+        "items": [374, 874]
+      },
+      {
+        "concept": "schrankfundhandschrift",
+        "items": [202, 702]
+      },
+      {
+        "concept": "schriftmotivaufnaehen",
+        "items": [251, 751]
+      },
+      {
+        "concept": "schrittlaengenprobe",
+        "items": [344, 844]
+      },
+      {
+        "concept": "schubladenpapier",
+        "items": [140, 640]
+      },
+      {
+        "concept": "schuerzenkopfband",
+        "items": [261, 761]
+      },
+      {
+        "concept": "schuerzenkreuztraeger",
+        "items": [153, 653]
+      },
+      {
+        "concept": "schuerzentaschenaufteilung",
+        "items": [497, 997]
+      },
+      {
+        "concept": "schuhanziehschlaufe",
+        "items": [443, 943]
+      },
+      {
+        "concept": "schuhausstellungsnotiz",
+        "items": [470, 970]
+      },
+      {
+        "concept": "schuhausziehhilfe",
+        "items": [354, 854]
+      },
+      {
+        "concept": "schuhdrahtbuerste",
+        "items": [141, 641]
+      },
+      {
+        "concept": "schuhkartonfoto",
+        "items": [166, 666]
+      },
+      {
+        "concept": "schuhoesenfarben",
+        "items": [367, 867]
+      },
+      {
+        "concept": "schuhrandnaehte",
+        "items": [495, 995]
+      },
+      {
+        "concept": "schuhrandpolitur",
+        "items": [187, 687]
+      },
+      {
+        "concept": "schuhriemenbewegung",
+        "items": [389, 889]
+      },
+      {
+        "concept": "schuhriemennachruestung",
+        "items": [465, 965]
+      },
+      {
+        "concept": "schuhristweite",
+        "items": [426, 926]
+      },
+      {
+        "concept": "schuhschnallenausrichtung",
+        "items": [109, 609]
+      },
+      {
+        "concept": "schuhsohlengespraech",
+        "items": [317, 817]
+      },
+      {
+        "concept": "schultertaschentausch",
+        "items": [31, 531]
+      },
+      {
+        "concept": "schwimmbadumziehbeutel",
+        "items": [331, 831]
+      },
+      {
+        "concept": "sehnsuchtskleid",
+        "items": [15, 515]
+      },
+      {
+        "concept": "seidenfadenende",
+        "items": [100, 600]
+      },
+      {
+        "concept": "seidenpapierfuellung",
+        "items": [171, 671]
+      },
+      {
+        "concept": "seidentuchzeichnung",
+        "items": [323, 823]
+      },
+      {
+        "concept": "selbstgemachtehaarrolle",
+        "items": [330, 830]
+      },
+      {
+        "concept": "silberspangenpatina",
+        "items": [206, 706]
+      },
+      {
+        "concept": "sitzkissenstoffrest",
+        "items": [79, 579]
+      },
+      {
+        "concept": "sockenbreiterbund",
+        "items": [337, 837]
+      },
+      {
+        "concept": "sockenfuellvolumen",
+        "items": [380, 880]
+      },
+      {
+        "concept": "sockenreparaturkarte",
+        "items": [263, 763]
+      },
+      {
+        "concept": "sockenschafthoehe",
+        "items": [439, 939]
+      },
+      {
+        "concept": "sockenwebetikett",
+        "items": [490, 990]
+      },
+      {
+        "concept": "sommerhandschuh",
+        "items": [58, 558]
+      },
+      {
+        "concept": "sommerhuftguertel",
+        "items": [336, 836]
+      },
+      {
+        "concept": "sommerrocktaschenfutter",
+        "items": [381, 881]
+      },
+      {
+        "concept": "sonnenfleckenspiegel",
+        "items": [75, 575]
+      },
+      {
+        "concept": "sonnenvisierauflage",
+        "items": [385, 885]
+      },
+      {
+        "concept": "spitzenhandschuheaufbewahrung",
+        "items": [241, 741]
+      },
+      {
+        "concept": "steppmantelreihenfolge",
+        "items": [53, 553]
+      },
+      {
+        "concept": "stiefelabsatzkante",
+        "items": [252, 752]
+      },
+      {
+        "concept": "stiefelmanschettenverschluss",
+        "items": [476, 976]
+      },
+      {
+        "concept": "stiefelrandspitze",
+        "items": [373, 873]
+      },
+      {
+        "concept": "stiefelreissfolge",
+        "items": [3, 503]
+      },
+      {
+        "concept": "stiefelschaftverstellung",
+        "items": [461, 961]
+      },
+      {
+        "concept": "stiefelschnuerhaken",
+        "items": [224, 724]
+      },
+      {
+        "concept": "stirnbandhoergeraet",
+        "items": [237, 737]
+      },
+      {
+        "concept": "stoffbahnwind",
+        "items": [204, 704]
+      },
+      {
+        "concept": "stoffbeutelfotos",
+        "items": [288, 788]
+      },
+      {
+        "concept": "stoffbeutelinnenfaltung",
+        "items": [417, 917]
+      },
+      {
+        "concept": "stoffdruckfehlstelle",
+        "items": [217, 717]
+      },
+      {
+        "concept": "stoffdruckhaerchen",
+        "items": [488, 988]
+      },
+      {
+        "concept": "stoffdruckrand",
+        "items": [408, 908]
+      },
+      {
+        "concept": "stoffdruckrichtungswechsel",
+        "items": [362, 862]
+      },
+      {
+        "concept": "stoffgewichtentscheidung",
+        "items": [82, 582]
+      },
+      {
+        "concept": "stoffladenwarteliste",
+        "items": [44, 544]
+      },
+      {
+        "concept": "stofflautstaerke",
+        "items": [5, 505]
+      },
+      {
+        "concept": "stoffmarkierungsaum",
+        "items": [341, 841]
+      },
+      {
+        "concept": "stoffmusterfotos",
+        "items": [442, 942]
+      },
+      {
+        "concept": "stoffpflegegespraech",
+        "items": [94, 594]
+      },
+      {
+        "concept": "stoffrestgeschenkband",
+        "items": [480, 980]
+      },
+      {
+        "concept": "stoffresthaarschleife",
+        "items": [376, 876]
+      },
+      {
+        "concept": "stofftaschenfahrradkorb",
+        "items": [394, 894]
+      },
+      {
+        "concept": "stofftaschenrandfalten",
+        "items": [473, 973]
+      },
+      {
+        "concept": "stoffverlaufsschnitt",
+        "items": [272, 772]
+      },
+      {
+        "concept": "strassenglattsohlen",
+        "items": [321, 821]
+      },
+      {
+        "concept": "streifengrenze",
+        "items": [258, 758]
+      },
+      {
+        "concept": "strickbortezusammenfuegen",
+        "items": [424, 924]
+      },
+      {
+        "concept": "strickfadenwechsel",
+        "items": [396, 896]
+      },
+      {
+        "concept": "strickjackenabstandshalter",
+        "items": [335, 835]
+      },
+      {
+        "concept": "strickkleiderschlitz",
+        "items": [463, 963]
+      },
+      {
+        "concept": "strickkragenumschlag",
+        "items": [104, 604]
+      },
+      {
+        "concept": "stricklochsuche",
+        "items": [56, 556]
+      },
+      {
+        "concept": "strickmaschenzaehlen",
+        "items": [37, 537]
+      },
+      {
+        "concept": "strickmusterlesehilfe",
+        "items": [441, 941]
+      },
+      {
+        "concept": "strickrippenrichtung",
+        "items": [249, 749]
+      },
+      {
+        "concept": "strickrueckenstreifen",
+        "items": [357, 857]
+      },
+      {
+        "concept": "strickschattenmuster",
+        "items": [278, 778]
+      },
+      {
+        "concept": "stricksteifenverbindung",
+        "items": [318, 818]
+      },
+      {
+        "concept": "stricktaschenzugang",
+        "items": [455, 955]
+      },
+      {
+        "concept": "strickteilepannen",
+        "items": [96, 596]
+      },
+      {
+        "concept": "stricktrennungshilfe",
+        "items": [269, 769]
+      },
+      {
+        "concept": "stueckchenwebkante",
+        "items": [123, 623]
+      },
+      {
+        "concept": "stulpenpaarung",
+        "items": [73, 573]
+      },
+      {
+        "concept": "taschenanprobegewicht",
+        "items": [176, 676]
+      },
+      {
+        "concept": "taschenbodenrechteck",
+        "items": [28, 528]
+      },
+      {
+        "concept": "taschendeckelkante",
+        "items": [188, 688]
+      },
+      {
+        "concept": "taschenetikettenbefestigung",
+        "items": [449, 949]
+      },
+      {
+        "concept": "taschenfeuchtigkeitsfach",
+        "items": [276, 776]
+      },
+      {
+        "concept": "taschenflachformat",
+        "items": [377, 877]
+      },
+      {
+        "concept": "taschenformvergleich",
+        "items": [358, 858]
+      },
+      {
+        "concept": "taschenfrontbogen",
+        "items": [487, 987]
+      },
+      {
+        "concept": "taschengroessenzeichnung",
+        "items": [384, 884]
+      },
+      {
+        "concept": "taschenhenkeldrehung",
+        "items": [468, 968]
+      },
+      {
+        "concept": "taschenklappenwinkel",
+        "items": [222, 722]
+      },
+      {
+        "concept": "taschenkopfhoererfach",
+        "items": [422, 922]
+      },
+      {
+        "concept": "taschenlaengefahrrad",
+        "items": [343, 843]
+      },
+      {
+        "concept": "taschenlaermkontrolle",
+        "items": [369, 869]
+      },
+      {
+        "concept": "taschenpapiermodell",
+        "items": [99, 599]
+      },
+      {
+        "concept": "taschenplomben",
+        "items": [309, 809]
+      },
+      {
+        "concept": "taschenquastenpflege",
+        "items": [165, 665]
+      },
+      {
+        "concept": "taschenrechner",
+        "items": [2, 502]
+      },
+      {
+        "concept": "taschenreissverschlussbogen",
+        "items": [428, 928]
+      },
+      {
+        "concept": "taschenriegelkante",
+        "items": [410, 910]
+      },
+      {
+        "concept": "taschenstegverstrebung",
+        "items": [285, 785]
+      },
+      {
+        "concept": "taschenverschlussklang",
+        "items": [156, 656]
+      },
+      {
+        "concept": "taschenverschlusslasche",
+        "items": [492, 992]
+      },
+      {
+        "concept": "taschenverschlussuebung",
+        "items": [9, 509]
+      },
+      {
+        "concept": "teppichschuhabdruck",
+        "items": [209, 709]
+      },
+      {
+        "concept": "textilpostkarte",
+        "items": [63, 563]
+      },
+      {
+        "concept": "textilschleifenbrosche",
+        "items": [372, 872]
+      },
+      {
+        "concept": "textilstiftbeschriftung",
+        "items": [110, 610]
+      },
+      {
+        "concept": "tragetaschenbodenprobe",
+        "items": [434, 934]
+      },
+      {
+        "concept": "tragetaschewaschgang",
+        "items": [124, 624]
+      },
+      {
+        "concept": "umhangrandborte",
+        "items": [402, 902]
+      },
+      {
+        "concept": "umhangschultergewicht",
+        "items": [218, 718]
+      },
+      {
+        "concept": "umhangtragewechsel",
+        "items": [245, 745]
+      },
+      {
+        "concept": "umhangverschlussbreite",
+        "items": [425, 925]
+      },
+      {
+        "concept": "umschlagmanschette",
+        "items": [71, 571]
+      },
+      {
+        "concept": "vorderteilpapierprobe",
+        "items": [350, 850]
+      },
+      {
+        "concept": "waeschesacketiketten",
+        "items": [347, 847]
+      },
+      {
+        "concept": "weichesbrillenband",
+        "items": [65, 565]
+      },
+      {
+        "concept": "wildlederspur",
+        "items": [45, 545]
+      },
+      {
+        "concept": "windradbrosche",
+        "items": [145, 645]
+      },
+      {
+        "concept": "wochenendrucksack",
+        "items": [301, 801]
+      },
+      {
+        "concept": "zollstockklappung",
+        "items": [16, 516]
+      },
+      {
+        "concept": "zwickelwirkung",
+        "items": [80, 580]
+      }
+    ]
+  },
+  "wholeTextDuplicates": [],
+  "historicalCollisions": [],
+  "historicalPaths": [
+    "apps/api/test/fixtures/community-text-corpus/de.json",
+    "apps/api/test/fixtures/community-text-corpus/en.json",
+    "apps/api/test/fixtures/community-text-corpus/es.json",
+    "apps/api/test/fixtures/community-text-corpus/fr.json",
+    "apps/api/test/fixtures/community-text-corpus/it.json",
+    "apps/api/test/fixtures/community-text-corpus/pt.json",
+    "apps/api/test/fixtures/community-text-corpus/tr.json",
+    "apps/api/test/fixtures/community-text-corpus/holdout-v1/de.json",
+    "apps/api/test/fixtures/community-text-corpus/holdout-v1/en.json",
+    "apps/api/test/fixtures/community-text-corpus/holdout-v1/es.json",
+    "apps/api/test/fixtures/community-text-corpus/holdout-v1/fr.json",
+    "apps/api/test/fixtures/community-text-corpus/holdout-v1/it.json",
+    "apps/api/test/fixtures/community-text-corpus/holdout-v1/pt.json",
+    "apps/api/test/fixtures/community-text-corpus/holdout-v1/tr.json",
+    "apps/api/test/fixtures/community-text-corpus/holdout-v2/de.json",
+    "apps/api/test/fixtures/community-text-corpus/holdout-v2/en.json",
+    "apps/api/test/fixtures/community-text-corpus/holdout-v2/es.json",
+    "apps/api/test/fixtures/community-text-corpus/holdout-v2/fr.json",
+    "apps/api/test/fixtures/community-text-corpus/holdout-v2/it.json",
+    "apps/api/test/fixtures/community-text-corpus/holdout-v2/pt.json",
+    "apps/api/test/fixtures/community-text-corpus/holdout-v2/tr.json",
+    "apps/api/test/fixtures/community-text-corpus/holdout-v3/de.json",
+    "apps/api/test/fixtures/community-text-corpus/holdout-v3/en.json",
+    "apps/api/test/fixtures/community-text-corpus/holdout-v3/es.json",
+    "apps/api/test/fixtures/community-text-corpus/holdout-v3/fr.json",
+    "apps/api/test/fixtures/community-text-corpus/holdout-v3/it.json",
+    "apps/api/test/fixtures/community-text-corpus/holdout-v3/pt.json",
+    "apps/api/test/fixtures/community-text-corpus/holdout-v3/tr.json",
+    "apps/api/test/fixtures/community-text-corpus/holdout-v4/de.json",
+    "apps/api/test/fixtures/community-text-corpus/holdout-v4/en.json",
+    "apps/api/test/fixtures/community-text-corpus/holdout-v4/es.json",
+    "apps/api/test/fixtures/community-text-corpus/holdout-v4/fr.json",
+    "apps/api/test/fixtures/community-text-corpus/holdout-v4/it.json",
+    "apps/api/test/fixtures/community-text-corpus/holdout-v4/pt.json",
+    "apps/api/test/fixtures/community-text-corpus/holdout-v4/tr.json"
+  ],
+  "overLengthItems": [],
+  "wordCounts": {
+    "minimum": 7,
+    "median": 9.0,
+    "maximum": 13,
+    "fewerThanFiveWords": 0
+  },
+  "maximumCaptionLength": 87,
+  "maximumAltTextLength": 85
+}

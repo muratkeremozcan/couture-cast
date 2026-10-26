@@ -1,0 +1,17 @@
+{
+  "reviewer": "cc68-tea (/root)",
+  "locale": "tr",
+  "phase": "pre-seal plain-flower boundary review",
+  "originalSourceSha256": "d18d33640236d6d71d27def4a6c4d758c4c76e2e50e1855a1fd33d7a14a21454",
+  "sourceSha256": "ba60813f73ca4f4380c55e950b86d1e9723b1ec039e21534a38d3c8ff0e3a64e",
+  "scope": "Generic floral imagery across needle-lace, chain embroidery, gilt embroidery, hoop photography, cutwork and botanical embellishment, plus final four complete replacement texts.",
+  "finding": "A conservative13-item simple-flower family crossed material, technique and context labels.",
+  "resolution": "The author consolidated all13, individually replaced653..656 with a distinct poppy seed-capsule scenario and kept a9-item multi-label flower family. Specific anatomical botanical distinctions remain in the reviewed codebook.",
+  "remainingFlowerRows": [86, 87, 88, 408, 412, 416, 500, 662, 664],
+  "replacementRows": [653, 654, 655, 656],
+  "replacementAuthor": "/root/general_review",
+  "verdict": "READY",
+  "wordingModifiedByRoot": false,
+  "screeningRun": false,
+  "repairInspection": false
+}

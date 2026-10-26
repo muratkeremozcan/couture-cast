@@ -1,0 +1,5013 @@
+{
+  "language": "en",
+  "corpusVersion": "holdout-v5",
+  "description": "Frozen clean holdout: ordinary fashion captions and alt text written natively in the language after the allow list froze, independently of the clean half, and never used to tune the screener, the lists or the allow list. The release gate's clean-copy figure is computed here. Entries labelled expected review carry one of the policy's deliberate review terms.",
+  "expected": "pass",
+  "frozenAgainst": {
+    "allowListSha256": "22d1f261f3666cf37369e67359aeabc383ac0a689babe04f87023ba1aee70256",
+    "termsSha256": "6f1aed8d5bdaeeedb4c01e4904e43aaa414de1829468120a4593ad4b7508bbac",
+    "languageAllowListSha256": "bebf551640dcbf64b3887736083f2a1f798fc0fe2f86f793cc54a00979abbdd3"
+  },
+  "entries": [
+    {
+      "id": "en-holdout-v5-001",
+      "field": "caption",
+      "text": "That little quarter turn is my favourite part of this bag."
+    },
+    {
+      "id": "en-holdout-v5-002",
+      "field": "caption",
+      "text": "Finally found a clasp I can manage with one hand."
+    },
+    {
+      "id": "en-holdout-v5-003",
+      "field": "altText",
+      "text": "A horizontal metal tab turns inside a rectangular opening on the bag."
+    },
+    {
+      "id": "en-holdout-v5-004",
+      "field": "altText",
+      "text": "The bag flap closes around a small rotating metal bar."
+    },
+    {
+      "id": "en-holdout-v5-005",
+      "field": "caption",
+      "text": "Rolled the top twice before setting off with today's essentials."
+    },
+    {
+      "id": "en-holdout-v5-006",
+      "field": "caption",
+      "text": "This opening leaves room for the extra things I always bring home."
+    },
+    {
+      "id": "en-holdout-v5-007",
+      "field": "altText",
+      "text": "The backpack opening is rolled down and secured with side buckles."
+    },
+    {
+      "id": "en-holdout-v5-008",
+      "field": "altText",
+      "text": "Two folded turns of fabric form the backpack's closed upper edge."
+    },
+    {
+      "id": "en-holdout-v5-009",
+      "field": "caption",
+      "text": "A reassuring click and this wide belt is ready for the day."
+    },
+    {
+      "id": "en-holdout-v5-010",
+      "field": "caption",
+      "text": "I like the chunky clasp against the clean front of these trousers."
+    },
+    {
+      "id": "en-holdout-v5-011",
+      "field": "altText",
+      "text": "A wide belt closes with a two-part buckle resembling a seatbelt clasp."
+    },
+    {
+      "id": "en-holdout-v5-012",
+      "field": "altText",
+      "text": "The belt's flat release button sits at the centre of the waistband."
+    },
+    {
+      "id": "en-holdout-v5-013",
+      "field": "caption",
+      "text": "My hat opens along little ribs like a folding fan."
+    },
+    {
+      "id": "en-holdout-v5-014",
+      "field": "caption",
+      "text": "It fits in a narrow pouch once the sun goes down."
+    },
+    {
+      "id": "en-holdout-v5-015",
+      "field": "altText",
+      "text": "A hat brim folds along several stiff radial ribs."
+    },
+    {
+      "id": "en-holdout-v5-016",
+      "field": "altText",
+      "text": "The collapsed hat forms a narrow stack of curved panels."
+    },
+    {
+      "id": "en-holdout-v5-017",
+      "field": "caption",
+      "text": "The sliding tab lets me adjust this cuff without finding another hole."
+    },
+    {
+      "id": "en-holdout-v5-018",
+      "field": "caption",
+      "text": "Keeping the little clasp on the outside so its shape stays visible."
+    },
+    {
+      "id": "en-holdout-v5-019",
+      "field": "altText",
+      "text": "A rigid ankle cuff has a small sliding closure along its outer edge."
+    },
+    {
+      "id": "en-holdout-v5-020",
+      "field": "altText",
+      "text": "The overlapping ends of the ankle ornament meet inside a narrow track."
+    },
+    {
+      "id": "en-holdout-v5-021",
+      "field": "caption",
+      "text": "A spoon handle has become the ring I reach for most."
+    },
+    {
+      "id": "en-holdout-v5-022",
+      "field": "caption",
+      "text": "The old handle's pattern survived its new curved shape beautifully."
+    },
+    {
+      "id": "en-holdout-v5-023",
+      "field": "altText",
+      "text": "A patterned spoon handle curls into an open ring around one finger."
+    },
+    {
+      "id": "en-holdout-v5-024",
+      "field": "altText",
+      "text": "The ring retains the flared end and engraved border of a spoon handle."
+    },
+    {
+      "id": "en-holdout-v5-025",
+      "field": "caption",
+      "text": "Took a moment to straighten those seams before leaving the house."
+    },
+    {
+      "id": "en-holdout-v5-026",
+      "field": "caption",
+      "text": "A fine line down each leg changes these otherwise simple tights."
+    },
+    {
+      "id": "en-holdout-v5-027",
+      "field": "altText",
+      "text": "A narrow seam runs vertically down the back of each stocking."
+    },
+    {
+      "id": "en-holdout-v5-028",
+      "field": "altText",
+      "text": "Two straight dark lines extend from the calves towards the heels."
+    },
+    {
+      "id": "en-holdout-v5-029",
+      "field": "caption",
+      "text": "Tiny linked circles make this ring flexible enough to move with me."
+    },
+    {
+      "id": "en-holdout-v5-030",
+      "field": "caption",
+      "text": "I keep turning my hand to watch the little links settle."
+    },
+    {
+      "id": "en-holdout-v5-031",
+      "field": "altText",
+      "text": "Interconnected metal rings form a flexible band around the thumb."
+    },
+    {
+      "id": "en-holdout-v5-032",
+      "field": "altText",
+      "text": "The broad thumb ring has a mesh surface made from small circular links."
+    },
+    {
+      "id": "en-holdout-v5-033",
+      "field": "caption",
+      "text": "This bracelet expands when I ease it over my hand."
+    },
+    {
+      "id": "en-holdout-v5-034",
+      "field": "caption",
+      "text": "The little folding joints are surprisingly satisfying to watch."
+    },
+    {
+      "id": "en-holdout-v5-035",
+      "field": "altText",
+      "text": "Linked metal sections expand in a zigzag around the wrist."
+    },
+    {
+      "id": "en-holdout-v5-036",
+      "field": "altText",
+      "text": "The bracelet's narrow joints open like a concertina above the hand."
+    },
+    {
+      "id": "en-holdout-v5-037",
+      "field": "caption",
+      "text": "The pin slides into its own guard after catching the scarf."
+    },
+    {
+      "id": "en-holdout-v5-038",
+      "field": "caption",
+      "text": "Glad to have a covered tip when wearing this near my neck."
+    },
+    {
+      "id": "en-holdout-v5-039",
+      "field": "altText",
+      "text": "A long scarf pin slides into a separate protective cap."
+    },
+    {
+      "id": "en-holdout-v5-040",
+      "field": "altText",
+      "text": "Both ends of the fastener remain visible on the folded scarf."
+    },
+    {
+      "id": "en-holdout-v5-041",
+      "field": "caption",
+      "text": "The whole side opens on this little box clutch."
+    },
+    {
+      "id": "en-holdout-v5-042",
+      "field": "caption",
+      "text": "It feels more like carrying a tiny case than a soft bag."
+    },
+    {
+      "id": "en-holdout-v5-043",
+      "field": "altText",
+      "text": "A rigid rectangular clutch opens along a hinge on its short side."
+    },
+    {
+      "id": "en-holdout-v5-044",
+      "field": "altText",
+      "text": "The open clutch shows two shallow hard-sided compartments facing each other."
+    },
+    {
+      "id": "en-holdout-v5-045",
+      "field": "caption",
+      "text": "These ribbon loops form a little cage around each heel."
+    },
+    {
+      "id": "en-holdout-v5-046",
+      "field": "caption",
+      "text": "I left my trouser hems clear of the back detail today."
+    },
+    {
+      "id": "en-holdout-v5-047",
+      "field": "altText",
+      "text": "Ribbon loops connect the heel cup to a band behind the ankle."
+    },
+    {
+      "id": "en-holdout-v5-048",
+      "field": "altText",
+      "text": "An open lattice of straps surrounds the rear of each shoe."
+    },
+    {
+      "id": "en-holdout-v5-049",
+      "field": "caption",
+      "text": "The button on this cap moves to three different positions."
+    },
+    {
+      "id": "en-holdout-v5-050",
+      "field": "caption",
+      "text": "A small adjustment changes where the little gathered section sits."
+    },
+    {
+      "id": "en-holdout-v5-051",
+      "field": "altText",
+      "text": "A fabric tab on the cap can attach to three crown buttons."
+    },
+    {
+      "id": "en-holdout-v5-052",
+      "field": "altText",
+      "text": "One section of the cap gathers beneath a buttoned adjustable tab."
+    },
+    {
+      "id": "en-holdout-v5-053",
+      "field": "caption",
+      "text": "This wrap closes across my palm and leaves every finger free."
+    },
+    {
+      "id": "en-holdout-v5-054",
+      "field": "caption",
+      "text": "Trying a hand accessory that feels more like a soft cuff."
+    },
+    {
+      "id": "en-holdout-v5-055",
+      "field": "altText",
+      "text": "A broad fabric wrap crosses the palm below the fingers."
+    },
+    {
+      "id": "en-holdout-v5-056",
+      "field": "altText",
+      "text": "The hand wrap secures behind the wrist with a flat overlapping flap."
+    },
+    {
+      "id": "en-holdout-v5-057",
+      "field": "caption",
+      "text": "The top of my cuff opens into a tiny keepsake compartment."
+    },
+    {
+      "id": "en-holdout-v5-058",
+      "field": "caption",
+      "text": "It holds a pressed petal without adding another pendant."
+    },
+    {
+      "id": "en-holdout-v5-059",
+      "field": "altText",
+      "text": "A small lid on the bracelet opens to reveal a shallow compartment."
+    },
+    {
+      "id": "en-holdout-v5-060",
+      "field": "altText",
+      "text": "A dried petal lies inside the open rectangular space on the cuff."
+    },
+    {
+      "id": "en-holdout-v5-061",
+      "field": "caption",
+      "text": "These little removable shields sit over the laces like folded wings."
+    },
+    {
+      "id": "en-holdout-v5-062",
+      "field": "caption",
+      "text": "A quick addition changed the whole front of my everyday shoes."
+    },
+    {
+      "id": "en-holdout-v5-063",
+      "field": "altText",
+      "text": "Folded protective panels cover the lacing on a pair of shoes."
+    },
+    {
+      "id": "en-holdout-v5-064",
+      "field": "altText",
+      "text": "Each lace guard forms two pointed flaps above the shoe tongue."
+    },
+    {
+      "id": "en-holdout-v5-065",
+      "field": "caption",
+      "text": "Borrowed proper boot hooks and getting ready became much easier."
+    },
+    {
+      "id": "en-holdout-v5-066",
+      "field": "caption",
+      "text": "Those inside loops finally make sense when you have the right tool."
+    },
+    {
+      "id": "en-holdout-v5-067",
+      "field": "altText",
+      "text": "Two handheld hooks catch the internal pull loops of a tall boot."
+    },
+    {
+      "id": "en-holdout-v5-068",
+      "field": "altText",
+      "text": "A pair of wooden-handled boot hooks rests beside an upright boot."
+    },
+    {
+      "id": "en-holdout-v5-069",
+      "field": "caption",
+      "text": "One little cord stop gathers the neckline exactly where I want it."
+    },
+    {
+      "id": "en-holdout-v5-070",
+      "field": "caption",
+      "text": "I can loosen this collar without undoing a knot."
+    },
+    {
+      "id": "en-holdout-v5-071",
+      "field": "altText",
+      "text": "A sliding toggle controls the gathered edge of the shirt neckline."
+    },
+    {
+      "id": "en-holdout-v5-072",
+      "field": "altText",
+      "text": "Two cord ends pass through a spring-loaded stop below the collar."
+    },
+    {
+      "id": "en-holdout-v5-073",
+      "field": "caption",
+      "text": "The extra hinges make these glasses small enough for my tiny case."
+    },
+    {
+      "id": "en-holdout-v5-074",
+      "field": "caption",
+      "text": "Watching them fold in half still feels like a neat little trick."
+    },
+    {
+      "id": "en-holdout-v5-075",
+      "field": "altText",
+      "text": "The sunglasses fold at the bridge as well as along both arms."
+    },
+    {
+      "id": "en-holdout-v5-076",
+      "field": "altText",
+      "text": "A compact folded pair of glasses rests inside a square case."
+    },
+    {
+      "id": "en-holdout-v5-077",
+      "field": "caption",
+      "text": "The metal cover slides away when I want to check the time."
+    },
+    {
+      "id": "en-holdout-v5-078",
+      "field": "caption",
+      "text": "Closed, my watch looks almost like an ordinary bracelet."
+    },
+    {
+      "id": "en-holdout-v5-079",
+      "field": "altText",
+      "text": "A sliding metal panel partly covers the face of a wristwatch."
+    },
+    {
+      "id": "en-holdout-v5-080",
+      "field": "altText",
+      "text": "The bracelet-style watch reveals its dial beneath a narrow moving cover."
+    },
+    {
+      "id": "en-holdout-v5-081",
+      "field": "caption",
+      "text": "This handle slips into two slots before locking into place."
+    },
+    {
+      "id": "en-holdout-v5-082",
+      "field": "caption",
+      "text": "I removed it to show how simply the bag comes apart."
+    },
+    {
+      "id": "en-holdout-v5-083",
+      "field": "altText",
+      "text": "A rigid handle fits into two slotted mounts on the bag rim."
+    },
+    {
+      "id": "en-holdout-v5-084",
+      "field": "altText",
+      "text": "The detached handle lies beside its two empty attachment slots."
+    },
+    {
+      "id": "en-holdout-v5-085",
+      "field": "caption",
+      "text": "The little fabric cover keeps the zip pull away from my chin."
+    },
+    {
+      "id": "en-holdout-v5-086",
+      "field": "caption",
+      "text": "An easy detail to miss until you wear the jacket zipped up."
+    },
+    {
+      "id": "en-holdout-v5-087",
+      "field": "altText",
+      "text": "A folded fabric tab covers the upper end of the jacket zipper."
+    },
+    {
+      "id": "en-holdout-v5-088",
+      "field": "altText",
+      "text": "The zip pull tucks beneath a small triangular chin guard."
+    },
+    {
+      "id": "en-holdout-v5-089",
+      "field": "caption",
+      "text": "My pendant casts a tiny window shape when sunlight catches it."
+    },
+    {
+      "id": "en-holdout-v5-090",
+      "field": "caption",
+      "text": "I chose the open frame because the empty space is so lovely."
+    },
+    {
+      "id": "en-holdout-v5-091",
+      "field": "altText",
+      "text": "An open window-shaped pendant hangs from a fine chain."
+    },
+    {
+      "id": "en-holdout-v5-092",
+      "field": "altText",
+      "text": "Four rectangular openings divide the small pendant into a window frame."
+    },
+    {
+      "id": "en-holdout-v5-093",
+      "field": "caption",
+      "text": "Took the extra tongue off for a cleaner look this morning."
+    },
+    {
+      "id": "en-holdout-v5-094",
+      "field": "caption",
+      "text": "The detachable panel gives one pair of shoes two quite different fronts."
+    },
+    {
+      "id": "en-holdout-v5-095",
+      "field": "altText",
+      "text": "A separate shoe tongue is detached from snaps near the upper laces."
+    },
+    {
+      "id": "en-holdout-v5-096",
+      "field": "altText",
+      "text": "The removable front panel rests beside the shoe it normally covers."
+    },
+    {
+      "id": "en-holdout-v5-097",
+      "field": "caption",
+      "text": "The outside cord holds my rolled picnic cloth without filling the bag."
+    },
+    {
+      "id": "en-holdout-v5-098",
+      "field": "caption",
+      "text": "I like being able to see what that stretchy lacing actually carries."
+    },
+    {
+      "id": "en-holdout-v5-099",
+      "field": "altText",
+      "text": "Elastic cords cross the backpack front over a rolled cloth."
+    },
+    {
+      "id": "en-holdout-v5-100",
+      "field": "altText",
+      "text": "A web of stretch lacing secures a bundle outside the main compartment."
+    },
+    {
+      "id": "en-holdout-v5-101",
+      "field": "caption",
+      "text": "My braid slips through this narrow opening without pushing the cap forward."
+    },
+    {
+      "id": "en-holdout-v5-102",
+      "field": "caption",
+      "text": "A little vertical slit works better for my hairstyle than the usual gap."
+    },
+    {
+      "id": "en-holdout-v5-103",
+      "field": "altText",
+      "text": "A braid passes through a narrow vertical opening in the back of the cap."
+    },
+    {
+      "id": "en-holdout-v5-104",
+      "field": "altText",
+      "text": "The cap has a bound slit above its rear adjustment strap."
+    },
+    {
+      "id": "en-holdout-v5-105",
+      "field": "caption",
+      "text": "The little weight at the back keeps my pendant facing forward."
+    },
+    {
+      "id": "en-holdout-v5-106",
+      "field": "caption",
+      "text": "I finally stopped chasing the clasp around my neck all afternoon."
+    },
+    {
+      "id": "en-holdout-v5-107",
+      "field": "altText",
+      "text": "A small weight hangs from the necklace clasp behind the neck."
+    },
+    {
+      "id": "en-holdout-v5-108",
+      "field": "altText",
+      "text": "The chain's rear extension ends in a compact teardrop counterweight."
+    },
+    {
+      "id": "en-holdout-v5-109",
+      "field": "caption",
+      "text": "The covered stem of this button looks like a tiny wrapped column."
+    },
+    {
+      "id": "en-holdout-v5-110",
+      "field": "caption",
+      "text": "Sharing a close look at the part that usually stays hidden."
+    },
+    {
+      "id": "en-holdout-v5-111",
+      "field": "altText",
+      "text": "Thread winds tightly around the short stem beneath a large button."
+    },
+    {
+      "id": "en-holdout-v5-112",
+      "field": "altText",
+      "text": "The raised button stands away from the fabric on a wrapped shank."
+    },
+    {
+      "id": "en-holdout-v5-113",
+      "field": "caption",
+      "text": "The front folds back like an envelope on these soft slippers."
+    },
+    {
+      "id": "en-holdout-v5-114",
+      "field": "caption",
+      "text": "Keeping the top detail visible with cropped trousers around the house."
+    },
+    {
+      "id": "en-holdout-v5-115",
+      "field": "altText",
+      "text": "The slipper upper folds into two triangular flaps above the toes."
+    },
+    {
+      "id": "en-holdout-v5-116",
+      "field": "altText",
+      "text": "A soft overlapping panel forms an envelope-like front on each slipper."
+    },
+    {
+      "id": "en-holdout-v5-117",
+      "field": "caption",
+      "text": "Tiny weights keep this scarf's corners from flying into my face."
+    },
+    {
+      "id": "en-holdout-v5-118",
+      "field": "caption",
+      "text": "The beads are functional, though they look like a small decoration."
+    },
+    {
+      "id": "en-holdout-v5-119",
+      "field": "altText",
+      "text": "Small weights are sewn into the four corners of a lightweight scarf."
+    },
+    {
+      "id": "en-holdout-v5-120",
+      "field": "altText",
+      "text": "One scarf corner hangs straight beneath a compact bead inside its hem."
+    },
+    {
+      "id": "en-holdout-v5-121",
+      "field": "caption",
+      "text": "The ruler folds around my wrist into a surprisingly tidy bracelet."
+    },
+    {
+      "id": "en-holdout-v5-122",
+      "field": "caption",
+      "text": "I like pieces that reveal their old purpose when you open them."
+    },
+    {
+      "id": "en-holdout-v5-123",
+      "field": "altText",
+      "text": "Short ruler sections join at hinges to form a bracelet."
+    },
+    {
+      "id": "en-holdout-v5-124",
+      "field": "altText",
+      "text": "The unfolded bracelet shows a continuous line of measurement marks."
+    },
+    {
+      "id": "en-holdout-v5-125",
+      "field": "caption",
+      "text": "A single deep pleat gives these flats their little folded toe."
+    },
+    {
+      "id": "en-holdout-v5-126",
+      "field": "caption",
+      "text": "This little fold gives the shoe all the decoration it needs."
+    },
+    {
+      "id": "en-holdout-v5-127",
+      "field": "altText",
+      "text": "A deep central pleat gathers the upper above each shoe toe."
+    },
+    {
+      "id": "en-holdout-v5-128",
+      "field": "altText",
+      "text": "The front of the flat shoe narrows into a soft vertical fold."
+    },
+    {
+      "id": "en-holdout-v5-129",
+      "field": "caption",
+      "text": "The tiny spacer keeps my two favourite rings from rubbing together."
+    },
+    {
+      "id": "en-holdout-v5-130",
+      "field": "caption",
+      "text": "It disappears between the larger pieces but changes how they sit."
+    },
+    {
+      "id": "en-holdout-v5-131",
+      "field": "altText",
+      "text": "A thin plain spacer separates two larger rings on one finger."
+    },
+    {
+      "id": "en-holdout-v5-132",
+      "field": "altText",
+      "text": "Three stacked bands show a narrow smooth ring between textured ones."
+    },
+    {
+      "id": "en-holdout-v5-133",
+      "field": "caption",
+      "text": "A hidden hook lets this collar meet without a button showing."
+    },
+    {
+      "id": "en-holdout-v5-134",
+      "field": "caption",
+      "text": "I photographed the open edge before fastening the top."
+    },
+    {
+      "id": "en-holdout-v5-135",
+      "field": "altText",
+      "text": "A small hook and loop are sewn beneath the collar edges."
+    },
+    {
+      "id": "en-holdout-v5-136",
+      "field": "altText",
+      "text": "The collar closes with concealed metal hardware under its two ends."
+    },
+    {
+      "id": "en-holdout-v5-137",
+      "field": "caption",
+      "text": "My hand slips right through the padded slot in this clutch."
+    },
+    {
+      "id": "en-holdout-v5-138",
+      "field": "caption",
+      "text": "The cutout gives me somewhere comfortable to hold the bag."
+    },
+    {
+      "id": "en-holdout-v5-139",
+      "field": "altText",
+      "text": "A long padded opening runs through the upper part of the clutch."
+    },
+    {
+      "id": "en-holdout-v5-140",
+      "field": "altText",
+      "text": "The wearer's fingers pass through a horizontal slot below the bag flap."
+    },
+    {
+      "id": "en-holdout-v5-141",
+      "field": "caption",
+      "text": "I threaded the laces into a little flower over each shoe."
+    },
+    {
+      "id": "en-holdout-v5-142",
+      "field": "caption",
+      "text": "A rainy afternoon project using the laces I already had."
+    },
+    {
+      "id": "en-holdout-v5-143",
+      "field": "altText",
+      "text": "Loops of shoelace form a flower above the central eyelets."
+    },
+    {
+      "id": "en-holdout-v5-144",
+      "field": "altText",
+      "text": "The lacing creates five rounded petals on the shoe tongue."
+    },
+    {
+      "id": "en-holdout-v5-145",
+      "field": "caption",
+      "text": "This open cage gathers my hair without hiding the twist inside."
+    },
+    {
+      "id": "en-holdout-v5-146",
+      "field": "caption",
+      "text": "The little latch sits underneath so the curved bars stay clear."
+    },
+    {
+      "id": "en-holdout-v5-147",
+      "field": "altText",
+      "text": "Curved metal bars surround a small twist of hair."
+    },
+    {
+      "id": "en-holdout-v5-148",
+      "field": "altText",
+      "text": "An open cage-shaped hair ornament closes with a latch beneath the bun."
+    },
+    {
+      "id": "en-holdout-v5-149",
+      "field": "caption",
+      "text": "The decorative top unclips, leaving a plain band underneath."
+    },
+    {
+      "id": "en-holdout-v5-150",
+      "field": "caption",
+      "text": "I brought both tops along to see which suits the evening."
+    },
+    {
+      "id": "en-holdout-v5-151",
+      "field": "altText",
+      "text": "A decorative ring top is detached from two mounts on a plain band."
+    },
+    {
+      "id": "en-holdout-v5-152",
+      "field": "altText",
+      "text": "Two small interchangeable ornaments rest beside the empty ring setting."
+    },
+    {
+      "id": "en-holdout-v5-153",
+      "field": "caption",
+      "text": "The sole comes up around the sides like a shallow bowl."
+    },
+    {
+      "id": "en-holdout-v5-154",
+      "field": "caption",
+      "text": "That curved edge is what first caught my eye in this pair."
+    },
+    {
+      "id": "en-holdout-v5-155",
+      "field": "altText",
+      "text": "The shoe sole rises around the toe and both side edges."
+    },
+    {
+      "id": "en-holdout-v5-156",
+      "field": "altText",
+      "text": "A continuous moulded rim cups the lower part of the shoe upper."
+    },
+    {
+      "id": "en-holdout-v5-157",
+      "field": "caption",
+      "text": "A fine chain runs inside the scarf edge and gives it weight."
+    },
+    {
+      "id": "en-holdout-v5-158",
+      "field": "caption",
+      "text": "The fabric falls in a clean curve with that hidden support."
+    },
+    {
+      "id": "en-holdout-v5-159",
+      "field": "altText",
+      "text": "A narrow opening reveals chain inside the scarf's stitched edge channel."
+    },
+    {
+      "id": "en-holdout-v5-160",
+      "field": "altText",
+      "text": "The weighted scarf edge hangs in a smooth curve across the chest."
+    },
+    {
+      "id": "en-holdout-v5-161",
+      "field": "caption",
+      "text": "The extra loop bridges the gap where my belt end used to stick out."
+    },
+    {
+      "id": "en-holdout-v5-162",
+      "field": "caption",
+      "text": "A small movable keeper has made this belt much tidier."
+    },
+    {
+      "id": "en-holdout-v5-163",
+      "field": "altText",
+      "text": "A separate belt keeper holds the free end against the main strap."
+    },
+    {
+      "id": "en-holdout-v5-164",
+      "field": "altText",
+      "text": "The short loop slides along the belt between two fixed trouser loops."
+    },
+    {
+      "id": "en-holdout-v5-165",
+      "field": "caption",
+      "text": "The two leaf ends slide past each other across the top of my wrist."
+    },
+    {
+      "id": "en-holdout-v5-166",
+      "field": "caption",
+      "text": "I wear the open side facing upwards to show their different lengths."
+    },
+    {
+      "id": "en-holdout-v5-167",
+      "field": "altText",
+      "text": "Two elongated leaf-shaped ends overlap on an open bracelet."
+    },
+    {
+      "id": "en-holdout-v5-168",
+      "field": "altText",
+      "text": "The bracelet curves around the wrist with one leaf extending over another."
+    },
+    {
+      "id": "en-holdout-v5-169",
+      "field": "caption",
+      "text": "Sunlight through my pendant makes a tiny patch of colour nearby."
+    },
+    {
+      "id": "en-holdout-v5-170",
+      "field": "caption",
+      "text": "The clear triangular shape goes with nearly everything I own."
+    },
+    {
+      "id": "en-holdout-v5-171",
+      "field": "altText",
+      "text": "A clear triangular prism hangs from a short necklace chain."
+    },
+    {
+      "id": "en-holdout-v5-172",
+      "field": "altText",
+      "text": "Light passes through the faceted pendant onto a nearby pale surface."
+    },
+    {
+      "id": "en-holdout-v5-173",
+      "field": "caption",
+      "text": "The outer strap floats above a second upper on these shoes."
+    },
+    {
+      "id": "en-holdout-v5-174",
+      "field": "caption",
+      "text": "I wanted a side view because the gap disappears from the front."
+    },
+    {
+      "id": "en-holdout-v5-175",
+      "field": "altText",
+      "text": "A broad outer panel arches over a second layer on the shoe."
+    },
+    {
+      "id": "en-holdout-v5-176",
+      "field": "altText",
+      "text": "A narrow air gap separates two overlapping sections above the foot."
+    },
+    {
+      "id": "en-holdout-v5-177",
+      "field": "caption",
+      "text": "The scarf has its own little opening for threading the other end."
+    },
+    {
+      "id": "en-holdout-v5-178",
+      "field": "caption",
+      "text": "One pass through the loop keeps everything together without a bulky knot."
+    },
+    {
+      "id": "en-holdout-v5-179",
+      "field": "altText",
+      "text": "One scarf end passes through a stitched opening in the opposite end."
+    },
+    {
+      "id": "en-holdout-v5-180",
+      "field": "altText",
+      "text": "The short scarf closes through a narrow horizontal slit near its edge."
+    },
+    {
+      "id": "en-holdout-v5-181",
+      "field": "caption",
+      "text": "Flexible strands carry the weave right through the bag's lid join."
+    },
+    {
+      "id": "en-holdout-v5-182",
+      "field": "caption",
+      "text": "Opening the lid shows how the flexible join follows the weave."
+    },
+    {
+      "id": "en-holdout-v5-183",
+      "field": "altText",
+      "text": "A flexible woven strip joins the rigid bag lid to its body."
+    },
+    {
+      "id": "en-holdout-v5-184",
+      "field": "altText",
+      "text": "The open bag shows continuous strands running through its rear hinge."
+    },
+    {
+      "id": "en-holdout-v5-185",
+      "field": "caption",
+      "text": "I moved the little pom onto the side strap for a change."
+    },
+    {
+      "id": "en-holdout-v5-186",
+      "field": "caption",
+      "text": "The clips let me use one decoration in several positions."
+    },
+    {
+      "id": "en-holdout-v5-187",
+      "field": "altText",
+      "text": "A small pompom clips onto the outer strap of a shoe."
+    },
+    {
+      "id": "en-holdout-v5-188",
+      "field": "altText",
+      "text": "The removable round decoration rests beside its open clip fitting."
+    },
+    {
+      "id": "en-holdout-v5-189",
+      "field": "caption",
+      "text": "The sliding knot lets this bracelet fit without a metal clasp."
+    },
+    {
+      "id": "en-holdout-v5-190",
+      "field": "caption",
+      "text": "A gentle pull on either end is all it needs."
+    },
+    {
+      "id": "en-holdout-v5-191",
+      "field": "altText",
+      "text": "A sliding knot joins the bracelet's adjustable cord lengths."
+    },
+    {
+      "id": "en-holdout-v5-192",
+      "field": "altText",
+      "text": "The adjustable bracelet has small stopper knots at both loose ends."
+    },
+    {
+      "id": "en-holdout-v5-193",
+      "field": "caption",
+      "text": "The stones sit one above another like a tiny balanced stack."
+    },
+    {
+      "id": "en-holdout-v5-194",
+      "field": "caption",
+      "text": "I like that each irregular edge stays visible on this necklace."
+    },
+    {
+      "id": "en-holdout-v5-195",
+      "field": "altText",
+      "text": "Three flattened stones are stacked vertically on a pendant pin."
+    },
+    {
+      "id": "en-holdout-v5-196",
+      "field": "altText",
+      "text": "The necklace ornament shows small gaps between its uneven pebble layers."
+    },
+    {
+      "id": "en-holdout-v5-197",
+      "field": "caption",
+      "text": "The tiny feet lift my bag just clear of the table."
+    },
+    {
+      "id": "en-holdout-v5-198",
+      "field": "caption",
+      "text": "Turned it over to show the details that do the quiet work."
+    },
+    {
+      "id": "en-holdout-v5-199",
+      "field": "altText",
+      "text": "Four small metal feet project from the reinforced base of the bag."
+    },
+    {
+      "id": "en-holdout-v5-200",
+      "field": "altText",
+      "text": "The upturned bag shows evenly spaced rounded studs at its bottom corners."
+    },
+    {
+      "id": "en-holdout-v5-201",
+      "field": "caption",
+      "text": "The last eyelet is in, and the lacing can finally begin."
+    },
+    {
+      "id": "en-holdout-v5-202",
+      "field": "caption",
+      "text": "I practised on an offcut before pressing these into the bag."
+    },
+    {
+      "id": "en-holdout-v5-203",
+      "field": "altText",
+      "text": "A hand press sets a metal eyelet into a reinforced bag opening."
+    },
+    {
+      "id": "en-holdout-v5-204",
+      "field": "altText",
+      "text": "Small metal rings line evenly spaced holes along the bag edge."
+    },
+    {
+      "id": "en-holdout-v5-205",
+      "field": "caption",
+      "text": "Wrapped fresh tips around these laces so they stop catching."
+    },
+    {
+      "id": "en-holdout-v5-206",
+      "field": "caption",
+      "text": "Such a tiny repair, but threading my shoes is easier again."
+    },
+    {
+      "id": "en-holdout-v5-207",
+      "field": "altText",
+      "text": "A narrow sleeve wraps around the frayed end of a shoelace."
+    },
+    {
+      "id": "en-holdout-v5-208",
+      "field": "altText",
+      "text": "Two finished lace tips lie beside an unfinished loose end."
+    },
+    {
+      "id": "en-holdout-v5-209",
+      "field": "caption",
+      "text": "Those four rivets finish the handles I attached this afternoon."
+    },
+    {
+      "id": "en-holdout-v5-210",
+      "field": "caption",
+      "text": "The little rounded caps make the join feel properly complete."
+    },
+    {
+      "id": "en-holdout-v5-211",
+      "field": "altText",
+      "text": "A small setting tool presses a rivet through a bag handle base."
+    },
+    {
+      "id": "en-holdout-v5-212",
+      "field": "altText",
+      "text": "Two rounded rivet heads secure each handle end to the bag."
+    },
+    {
+      "id": "en-holdout-v5-213",
+      "field": "caption",
+      "text": "The edge is getting smoother with each pass of the burnisher."
+    },
+    {
+      "id": "en-holdout-v5-214",
+      "field": "caption",
+      "text": "Taking my time over the handle feels worth it when I hold it."
+    },
+    {
+      "id": "en-holdout-v5-215",
+      "field": "altText",
+      "text": "A grooved wooden tool rubs the edge of a leather handle."
+    },
+    {
+      "id": "en-holdout-v5-216",
+      "field": "altText",
+      "text": "The handle edge shows a smooth polished strip beside an unfinished section."
+    },
+    {
+      "id": "en-holdout-v5-217",
+      "field": "caption",
+      "text": "The final crimp keeps all those tiny beads where they belong."
+    },
+    {
+      "id": "en-holdout-v5-218",
+      "field": "caption",
+      "text": "My first bracelet closure that sits neatly against the last bead."
+    },
+    {
+      "id": "en-holdout-v5-219",
+      "field": "altText",
+      "text": "Pliers compress a small crimp beside the bracelet clasp."
+    },
+    {
+      "id": "en-holdout-v5-220",
+      "field": "altText",
+      "text": "A flattened metal bead secures the wire loop at the necklace end."
+    },
+    {
+      "id": "en-holdout-v5-221",
+      "field": "caption",
+      "text": "The fern is sealed inside, with every little leaflet still visible."
+    },
+    {
+      "id": "en-holdout-v5-222",
+      "field": "caption",
+      "text": "I chose a plain cord so the tiny preserved shape gets the attention."
+    },
+    {
+      "id": "en-holdout-v5-223",
+      "field": "altText",
+      "text": "A small fern fragment is suspended inside a clear oval pendant."
+    },
+    {
+      "id": "en-holdout-v5-224",
+      "field": "altText",
+      "text": "The transparent ornament reveals a pressed frond beneath its curved surface."
+    },
+    {
+      "id": "en-holdout-v5-225",
+      "field": "caption",
+      "text": "The wire follows this stone's uneven shape surprisingly well."
+    },
+    {
+      "id": "en-holdout-v5-226",
+      "field": "caption",
+      "text": "Finished the top loop and finally put my handmade pendant on."
+    },
+    {
+      "id": "en-holdout-v5-227",
+      "field": "altText",
+      "text": "Several wire loops hold an irregular stone inside a handmade pendant."
+    },
+    {
+      "id": "en-holdout-v5-228",
+      "field": "altText",
+      "text": "Twisted wire forms a hanging loop above the enclosed stone."
+    },
+    {
+      "id": "en-holdout-v5-229",
+      "field": "caption",
+      "text": "Linking the last few rings before this little charm chain is ready."
+    },
+    {
+      "id": "en-holdout-v5-230",
+      "field": "caption",
+      "text": "I checked every join with my fingertips after closing the loops."
+    },
+    {
+      "id": "en-holdout-v5-231",
+      "field": "altText",
+      "text": "Two small pliers hold opposite sides of an open jump ring."
+    },
+    {
+      "id": "en-holdout-v5-232",
+      "field": "altText",
+      "text": "Loose circular links connect several charms along a short chain."
+    },
+    {
+      "id": "en-holdout-v5-233",
+      "field": "caption",
+      "text": "Thinning the folded edge helps this strap sit much more neatly."
+    },
+    {
+      "id": "en-holdout-v5-234",
+      "field": "caption",
+      "text": "The finished join is flat enough that I can barely feel it."
+    },
+    {
+      "id": "en-holdout-v5-235",
+      "field": "altText",
+      "text": "A broad blade removes a thin layer from the underside of a strap."
+    },
+    {
+      "id": "en-holdout-v5-236",
+      "field": "altText",
+      "text": "The strap end tapers towards a folded attachment point."
+    },
+    {
+      "id": "en-holdout-v5-237",
+      "field": "caption",
+      "text": "Added the little stop before testing the zip on my pouch."
+    },
+    {
+      "id": "en-holdout-v5-238",
+      "field": "caption",
+      "text": "Now the slider stays exactly where it should at the end."
+    },
+    {
+      "id": "en-holdout-v5-239",
+      "field": "altText",
+      "text": "Pliers secure a metal stop at the end of a zipper track."
+    },
+    {
+      "id": "en-holdout-v5-240",
+      "field": "altText",
+      "text": "The pouch zipper terminates at two small fixed metal pieces."
+    },
+    {
+      "id": "en-holdout-v5-241",
+      "field": "caption",
+      "text": "The seam ripper stops at the pin while I open the buttonhole."
+    },
+    {
+      "id": "en-holdout-v5-242",
+      "field": "caption",
+      "text": "My careful little finishing ritual before trying on a new shirt."
+    },
+    {
+      "id": "en-holdout-v5-243",
+      "field": "altText",
+      "text": "A pin crosses the far end of a stitched buttonhole."
+    },
+    {
+      "id": "en-holdout-v5-244",
+      "field": "altText",
+      "text": "A seam ripper opens the narrow space between two stitched borders."
+    },
+    {
+      "id": "en-holdout-v5-245",
+      "field": "caption",
+      "text": "Matching these little notches saved me from turning the sleeve around."
+    },
+    {
+      "id": "en-holdout-v5-246",
+      "field": "caption",
+      "text": "I marked the paired cuts before taking the paper away."
+    },
+    {
+      "id": "en-holdout-v5-247",
+      "field": "altText",
+      "text": "Small triangular notches mark corresponding edges of two garment pieces."
+    },
+    {
+      "id": "en-holdout-v5-248",
+      "field": "altText",
+      "text": "Two cut fabric panels have matching V-shaped marks near their edges."
+    },
+    {
+      "id": "en-holdout-v5-249",
+      "field": "caption",
+      "text": "The little roller presses this seam flat without disturbing the surface."
+    },
+    {
+      "id": "en-holdout-v5-250",
+      "field": "caption",
+      "text": "A useful discovery from today's bag-making session."
+    },
+    {
+      "id": "en-holdout-v5-251",
+      "field": "altText",
+      "text": "A handheld roller presses an open seam on a small bag panel."
+    },
+    {
+      "id": "en-holdout-v5-252",
+      "field": "altText",
+      "text": "The short cylindrical wheel rests over two flattened seam allowances."
+    },
+    {
+      "id": "en-holdout-v5-253",
+      "field": "caption",
+      "text": "The corners finally look square after a gentle push from inside."
+    },
+    {
+      "id": "en-holdout-v5-254",
+      "field": "caption",
+      "text": "My tiny turning tool earned its place in the sewing box today."
+    },
+    {
+      "id": "en-holdout-v5-255",
+      "field": "altText",
+      "text": "A blunt pointed tool shapes the inside corner of a fabric pouch."
+    },
+    {
+      "id": "en-holdout-v5-256",
+      "field": "altText",
+      "text": "The turned pouch has a defined corner beside one still-rounded corner."
+    },
+    {
+      "id": "en-holdout-v5-257",
+      "field": "caption",
+      "text": "I slowed down at the edges to keep this woven band even."
+    },
+    {
+      "id": "en-holdout-v5-258",
+      "field": "caption",
+      "text": "Those tidy sides make the finished strap feel especially satisfying."
+    },
+    {
+      "id": "en-holdout-v5-259",
+      "field": "altText",
+      "text": "The woven strap has compact edges beside its alternating central pattern."
+    },
+    {
+      "id": "en-holdout-v5-260",
+      "field": "altText",
+      "text": "A shuttle draws thread through the outer warp strands of a narrow band."
+    },
+    {
+      "id": "en-holdout-v5-261",
+      "field": "caption",
+      "text": "The comb spaces my threads before the first row of weaving."
+    },
+    {
+      "id": "en-holdout-v5-262",
+      "field": "caption",
+      "text": "I like this quiet stage when the future belt is still just lines."
+    },
+    {
+      "id": "en-holdout-v5-263",
+      "field": "altText",
+      "text": "Parallel threads pass through evenly spaced slots in a loom comb."
+    },
+    {
+      "id": "en-holdout-v5-264",
+      "field": "altText",
+      "text": "A narrow loom holds taut strands ready for a woven belt."
+    },
+    {
+      "id": "en-holdout-v5-265",
+      "field": "caption",
+      "text": "The magnet sits inside its own stitched pocket on this flap."
+    },
+    {
+      "id": "en-holdout-v5-266",
+      "field": "caption",
+      "text": "Closing the pouch feels soft, with all the hardware hidden safely inside."
+    },
+    {
+      "id": "en-holdout-v5-267",
+      "field": "altText",
+      "text": "A small square pocket encloses a magnetic fastener beneath the bag flap."
+    },
+    {
+      "id": "en-holdout-v5-268",
+      "field": "altText",
+      "text": "Stitching surrounds a concealed round magnet inside a folded fabric patch."
+    },
+    {
+      "id": "en-holdout-v5-269",
+      "field": "caption",
+      "text": "The sequins need to face the same way before I finish this panel."
+    },
+    {
+      "id": "en-holdout-v5-270",
+      "field": "caption",
+      "text": "One brush of my hand changes the shimmer across the skirt."
+    },
+    {
+      "id": "en-holdout-v5-271",
+      "field": "altText",
+      "text": "Rows of overlapping sequins cover a skirt panel in one direction."
+    },
+    {
+      "id": "en-holdout-v5-272",
+      "field": "altText",
+      "text": "A hand smooths the sequins into an even reflective surface."
+    },
+    {
+      "id": "en-holdout-v5-273",
+      "field": "caption",
+      "text": "I spaced the bead strands before attaching them along the little bag."
+    },
+    {
+      "id": "en-holdout-v5-274",
+      "field": "caption",
+      "text": "The uneven lengths make a gentle curve across the bottom."
+    },
+    {
+      "id": "en-holdout-v5-275",
+      "field": "altText",
+      "text": "Beaded strands of different lengths hang from a small bag edge."
+    },
+    {
+      "id": "en-holdout-v5-276",
+      "field": "altText",
+      "text": "The fringe forms a shallow curve beneath the rectangular bag body."
+    },
+    {
+      "id": "en-holdout-v5-277",
+      "field": "caption",
+      "text": "The numbered slots help me keep track of this round braid."
+    },
+    {
+      "id": "en-holdout-v5-278",
+      "field": "caption",
+      "text": "Its shape is becoming clear below the braiding disk."
+    },
+    {
+      "id": "en-holdout-v5-279",
+      "field": "altText",
+      "text": "Several cords pass through slots around a circular braiding disk."
+    },
+    {
+      "id": "en-holdout-v5-280",
+      "field": "altText",
+      "text": "A round woven cord emerges through the centre hole of the disk."
+    },
+    {
+      "id": "en-holdout-v5-281",
+      "field": "caption",
+      "text": "The groove gives my stitches a little channel to sit inside."
+    },
+    {
+      "id": "en-holdout-v5-282",
+      "field": "caption",
+      "text": "I followed the curve slowly before sewing the bag edge."
+    },
+    {
+      "id": "en-holdout-v5-283",
+      "field": "altText",
+      "text": "The panel has a shallow channel just inside its outer leather edge."
+    },
+    {
+      "id": "en-holdout-v5-284",
+      "field": "altText",
+      "text": "The stitch line rests inside a shallow channel around the bag."
+    },
+    {
+      "id": "en-holdout-v5-285",
+      "field": "caption",
+      "text": "Two needles take turns through each hole as the strap comes together."
+    },
+    {
+      "id": "en-holdout-v5-286",
+      "field": "caption",
+      "text": "Keeping the tension even is today's bit of patient practice."
+    },
+    {
+      "id": "en-holdout-v5-287",
+      "field": "altText",
+      "text": "Two needles pass from opposite sides through one hole in a strap."
+    },
+    {
+      "id": "en-holdout-v5-288",
+      "field": "altText",
+      "text": "Waxed thread forms a firm row of stitches along the leather edge."
+    },
+    {
+      "id": "en-holdout-v5-289",
+      "field": "caption",
+      "text": "The little binding wraps the inside seam into a clean ribbon."
+    },
+    {
+      "id": "en-holdout-v5-290",
+      "field": "caption",
+      "text": "Sharing the inside finish before I close up my handmade tote."
+    },
+    {
+      "id": "en-holdout-v5-291",
+      "field": "altText",
+      "text": "A narrow binding encloses the raw seam inside an open tote bag."
+    },
+    {
+      "id": "en-holdout-v5-292",
+      "field": "altText",
+      "text": "The interior join is covered by a folded strip stitched along both sides."
+    },
+    {
+      "id": "en-holdout-v5-293",
+      "field": "caption",
+      "text": "I sanded the toggle until the edges felt smooth in my fingers."
+    },
+    {
+      "id": "en-holdout-v5-294",
+      "field": "caption",
+      "text": "It is ready to join the cord loop on my new pouch."
+    },
+    {
+      "id": "en-holdout-v5-295",
+      "field": "altText",
+      "text": "A small wooden toggle is shaped beside a piece of fine sandpaper."
+    },
+    {
+      "id": "en-holdout-v5-296",
+      "field": "altText",
+      "text": "The smooth fastener has two drilled holes for its attachment cord."
+    },
+    {
+      "id": "en-holdout-v5-297",
+      "field": "caption",
+      "text": "A ribbon wrapped around the hoop keeps my fine fabric from slipping."
+    },
+    {
+      "id": "en-holdout-v5-298",
+      "field": "caption",
+      "text": "The little padded edge made today's stitching much easier to manage."
+    },
+    {
+      "id": "en-holdout-v5-299",
+      "field": "altText",
+      "text": "One embroidery hoop ring is wrapped in a narrow ribbon."
+    },
+    {
+      "id": "en-holdout-v5-300",
+      "field": "altText",
+      "text": "The wrapped wooden ring holds a delicate fabric panel under tension."
+    },
+    {
+      "id": "en-holdout-v5-301",
+      "field": "caption",
+      "text": "An otter in a paper boat was all this shirt needed."
+    },
+    {
+      "id": "en-holdout-v5-302",
+      "field": "caption",
+      "text": "The tiny paddle in the drawing makes me smile every time."
+    },
+    {
+      "id": "en-holdout-v5-303",
+      "field": "altText",
+      "text": "A printed otter sits in a folded paper boat holding a paddle."
+    },
+    {
+      "id": "en-holdout-v5-304",
+      "field": "altText",
+      "text": "The shirt illustration shows ripples beneath an otter's small angular boat."
+    },
+    {
+      "id": "en-holdout-v5-305",
+      "field": "caption",
+      "text": "My pocket badger is taking plant care very seriously today."
+    },
+    {
+      "id": "en-holdout-v5-306",
+      "field": "caption",
+      "text": "Look closely and you can see the watering can's little dotted stream."
+    },
+    {
+      "id": "en-holdout-v5-307",
+      "field": "altText",
+      "text": "A badger illustration holds a watering can above a small potted cactus."
+    },
+    {
+      "id": "en-holdout-v5-308",
+      "field": "altText",
+      "text": "The pocket print shows water droplets falling beside a striped animal."
+    },
+    {
+      "id": "en-holdout-v5-309",
+      "field": "caption",
+      "text": "The snail on my tote carries a wonderfully oversized postbag."
+    },
+    {
+      "id": "en-holdout-v5-310",
+      "field": "caption",
+      "text": "I love the little envelope peeking out of this slow delivery scene."
+    },
+    {
+      "id": "en-holdout-v5-311",
+      "field": "altText",
+      "text": "A snail with a shoulder bag is illustrated beside two envelopes."
+    },
+    {
+      "id": "en-holdout-v5-312",
+      "field": "altText",
+      "text": "The tote depicts a spiral-shelled snail carrying a rectangular mail satchel."
+    },
+    {
+      "id": "en-holdout-v5-313",
+      "field": "caption",
+      "text": "This hedgehog has found the cosiest possible place inside a teacup."
+    },
+    {
+      "id": "en-holdout-v5-314",
+      "field": "caption",
+      "text": "The saucer is barely visible beneath all those tiny drawn feet."
+    },
+    {
+      "id": "en-holdout-v5-315",
+      "field": "altText",
+      "text": "An illustrated hedgehog sits inside a teacup resting on a saucer."
+    },
+    {
+      "id": "en-holdout-v5-316",
+      "field": "altText",
+      "text": "Small paws hang over the rim of the cup in the shirt print."
+    },
+    {
+      "id": "en-holdout-v5-317",
+      "field": "caption",
+      "text": "The fox on this scarf flies a leaf like a kite."
+    },
+    {
+      "id": "en-holdout-v5-318",
+      "field": "caption",
+      "text": "A curling string connects the tiny figure to that enormous leaf."
+    },
+    {
+      "id": "en-holdout-v5-319",
+      "field": "altText",
+      "text": "A fox holds a string attached to a large leaf above it."
+    },
+    {
+      "id": "en-holdout-v5-320",
+      "field": "altText",
+      "text": "The scarf print shows a leaf-shaped kite floating over a small fox."
+    },
+    {
+      "id": "en-holdout-v5-321",
+      "field": "caption",
+      "text": "A crescent moon has become a swing in this lovely little drawing."
+    },
+    {
+      "id": "en-holdout-v5-322",
+      "field": "caption",
+      "text": "I kept the rest simple around the scene on my sweatshirt."
+    },
+    {
+      "id": "en-holdout-v5-323",
+      "field": "altText",
+      "text": "A small swing seat hangs by two ropes from a crescent moon."
+    },
+    {
+      "id": "en-holdout-v5-324",
+      "field": "altText",
+      "text": "The sweatshirt illustration places a suspended swing beneath a curved moon."
+    },
+    {
+      "id": "en-holdout-v5-325",
+      "field": "caption",
+      "text": "The moth on my sleeve circles its very own miniature streetlamp."
+    },
+    {
+      "id": "en-holdout-v5-326",
+      "field": "caption",
+      "text": "I like the pale halo drawn around the lamp in this patch."
+    },
+    {
+      "id": "en-holdout-v5-327",
+      "field": "altText",
+      "text": "An embroidered moth flies beside a glowing streetlamp on the sleeve."
+    },
+    {
+      "id": "en-holdout-v5-328",
+      "field": "altText",
+      "text": "Curved stitched lines circle a small lamp beneath a winged insect."
+    },
+    {
+      "id": "en-holdout-v5-329",
+      "field": "caption",
+      "text": "This squirrel uses an acorn cap as a little umbrella."
+    },
+    {
+      "id": "en-holdout-v5-330",
+      "field": "caption",
+      "text": "The patch is small, but the expression in the drawing is brilliant."
+    },
+    {
+      "id": "en-holdout-v5-331",
+      "field": "altText",
+      "text": "A squirrel shelters beneath an acorn cap mounted on a short stick."
+    },
+    {
+      "id": "en-holdout-v5-332",
+      "field": "altText",
+      "text": "The embroidered scene shows raindrops outside a tiny nut-shaped umbrella."
+    },
+    {
+      "id": "en-holdout-v5-333",
+      "field": "caption",
+      "text": "The rabbit on my bag has its telescope aimed at a tiny star."
+    },
+    {
+      "id": "en-holdout-v5-334",
+      "field": "caption",
+      "text": "Those long ears stick out neatly behind the drawn tripod."
+    },
+    {
+      "id": "en-holdout-v5-335",
+      "field": "altText",
+      "text": "A rabbit looks through a telescope mounted on a three-legged stand."
+    },
+    {
+      "id": "en-holdout-v5-336",
+      "field": "altText",
+      "text": "The bag print shows an upright rabbit observing a small star above."
+    },
+    {
+      "id": "en-holdout-v5-337",
+      "field": "caption",
+      "text": "The little whale floats from a string like a very unusual balloon."
+    },
+    {
+      "id": "en-holdout-v5-338",
+      "field": "caption",
+      "text": "A cheerful bit of nonsense for the front of my shirt."
+    },
+    {
+      "id": "en-holdout-v5-339",
+      "field": "altText",
+      "text": "A whale-shaped balloon floats above a small figure holding its string."
+    },
+    {
+      "id": "en-holdout-v5-340",
+      "field": "altText",
+      "text": "An inflated whale's curved tail rises above its thin printed balloon string."
+    },
+    {
+      "id": "en-holdout-v5-341",
+      "field": "caption",
+      "text": "My penguin patch is ready for a trip with its tiny suitcase."
+    },
+    {
+      "id": "en-holdout-v5-342",
+      "field": "caption",
+      "text": "The oversized luggage handle is the detail that won me over."
+    },
+    {
+      "id": "en-holdout-v5-343",
+      "field": "altText",
+      "text": "An embroidered penguin stands beside a small suitcase with an extended handle."
+    },
+    {
+      "id": "en-holdout-v5-344",
+      "field": "altText",
+      "text": "The bag patch shows a penguin leaning on upright rolling luggage."
+    },
+    {
+      "id": "en-holdout-v5-345",
+      "field": "caption",
+      "text": "A stack of thread spools becomes a staircase for this little mouse."
+    },
+    {
+      "id": "en-holdout-v5-346",
+      "field": "caption",
+      "text": "The sewing-themed drawing suits the bag that carries my unfinished projects."
+    },
+    {
+      "id": "en-holdout-v5-347",
+      "field": "altText",
+      "text": "A mouse climbs a stepped arrangement of thread spools in the printed scene."
+    },
+    {
+      "id": "en-holdout-v5-348",
+      "field": "altText",
+      "text": "Three progressively taller spools support a tiny illustrated mouse."
+    },
+    {
+      "id": "en-holdout-v5-349",
+      "field": "caption",
+      "text": "My frog is enjoying a book on a very comfortable lily pad."
+    },
+    {
+      "id": "en-holdout-v5-350",
+      "field": "caption",
+      "text": "I wish all reading spots came with such a peaceful view."
+    },
+    {
+      "id": "en-holdout-v5-351",
+      "field": "altText",
+      "text": "A frog sits on a lily pad holding an open book."
+    },
+    {
+      "id": "en-holdout-v5-352",
+      "field": "altText",
+      "text": "The shirt illustration places a small reading frog above drawn water ripples."
+    },
+    {
+      "id": "en-holdout-v5-353",
+      "field": "caption",
+      "text": "The gull on this tote appears to have planned an entire snack route."
+    },
+    {
+      "id": "en-holdout-v5-354",
+      "field": "caption",
+      "text": "A paper map and one stolen chip make a very funny pair."
+    },
+    {
+      "id": "en-holdout-v5-355",
+      "field": "altText",
+      "text": "A seagull illustration holds a chip beside an unfolded map."
+    },
+    {
+      "id": "en-holdout-v5-356",
+      "field": "altText",
+      "text": "The tote print shows a gull looking down at a dotted paper route."
+    },
+    {
+      "id": "en-holdout-v5-357",
+      "field": "caption",
+      "text": "This bear pulls a cart just big enough for one honey jar."
+    },
+    {
+      "id": "en-holdout-v5-358",
+      "field": "caption",
+      "text": "I like the little wheel spokes in the stitched picture."
+    },
+    {
+      "id": "en-holdout-v5-359",
+      "field": "altText",
+      "text": "An embroidered bear pulls a two-wheeled cart carrying a honey jar."
+    },
+    {
+      "id": "en-holdout-v5-360",
+      "field": "altText",
+      "text": "The patch depicts a bear holding the handle of a tiny wagon."
+    },
+    {
+      "id": "en-holdout-v5-361",
+      "field": "caption",
+      "text": "The crab on my tee carries a sandwich board shaped like a shell."
+    },
+    {
+      "id": "en-holdout-v5-362",
+      "field": "caption",
+      "text": "Its little side-stepping feet make the whole graphic feel lively."
+    },
+    {
+      "id": "en-holdout-v5-363",
+      "field": "altText",
+      "text": "A crab wears two shell-shaped panels joined over its body."
+    },
+    {
+      "id": "en-holdout-v5-364",
+      "field": "altText",
+      "text": "The crab's raised claws extend beyond the two shell-shaped sign panels."
+    },
+    {
+      "id": "en-holdout-v5-365",
+      "field": "caption",
+      "text": "These jellyfish have turned into hanging lanterns along my scarf."
+    },
+    {
+      "id": "en-holdout-v5-366",
+      "field": "caption",
+      "text": "The trailing ribbons give the printed scene such a gentle rhythm."
+    },
+    {
+      "id": "en-holdout-v5-367",
+      "field": "altText",
+      "text": "Jellyfish-shaped lanterns hang from a curved line across the scarf."
+    },
+    {
+      "id": "en-holdout-v5-368",
+      "field": "altText",
+      "text": "Ribbon-like tentacles descend from several suspended bell-shaped forms."
+    },
+    {
+      "id": "en-holdout-v5-369",
+      "field": "caption",
+      "text": "A koala hugs the handle of the teapot on my pocket."
+    },
+    {
+      "id": "en-holdout-v5-370",
+      "field": "caption",
+      "text": "The little paws tucked around the curve are almost too sweet."
+    },
+    {
+      "id": "en-holdout-v5-371",
+      "field": "altText",
+      "text": "An illustrated koala clings to the curved handle of a teapot."
+    },
+    {
+      "id": "en-holdout-v5-372",
+      "field": "altText",
+      "text": "The pocket graphic shows a rounded animal peeking around a teapot lid."
+    },
+    {
+      "id": "en-holdout-v5-373",
+      "field": "caption",
+      "text": "The alpaca on my tote has found a basket full of yarn."
+    },
+    {
+      "id": "en-holdout-v5-374",
+      "field": "caption",
+      "text": "One loose strand curls around its feet in the drawing."
+    },
+    {
+      "id": "en-holdout-v5-375",
+      "field": "altText",
+      "text": "An alpaca stands beside a basket containing several balls of yarn."
+    },
+    {
+      "id": "en-holdout-v5-376",
+      "field": "altText",
+      "text": "A trailing strand circles the illustrated animal's hooves near the basket."
+    },
+    {
+      "id": "en-holdout-v5-377",
+      "field": "caption",
+      "text": "The seal's teacup tower is my favourite bit of this print."
+    },
+    {
+      "id": "en-holdout-v5-378",
+      "field": "caption",
+      "text": "The stack leans just enough to make me hold my breath."
+    },
+    {
+      "id": "en-holdout-v5-379",
+      "field": "altText",
+      "text": "A seal balances three cups stacked above its upturned nose."
+    },
+    {
+      "id": "en-holdout-v5-380",
+      "field": "altText",
+      "text": "The bag illustration shows a slightly tilted tower of small cups."
+    },
+    {
+      "id": "en-holdout-v5-381",
+      "field": "caption",
+      "text": "A red panda rides in the front basket of my illustrated bicycle."
+    },
+    {
+      "id": "en-holdout-v5-382",
+      "field": "caption",
+      "text": "I love how its striped tail hangs over the little wheel."
+    },
+    {
+      "id": "en-holdout-v5-383",
+      "field": "altText",
+      "text": "A red panda sits in a bicycle basket with its tail draped outside."
+    },
+    {
+      "id": "en-holdout-v5-384",
+      "field": "altText",
+      "text": "The shirt print places a small animal above the bicycle's front wheel."
+    },
+    {
+      "id": "en-holdout-v5-385",
+      "field": "caption",
+      "text": "This owl needs a ladder to reach the top book on my tote."
+    },
+    {
+      "id": "en-holdout-v5-386",
+      "field": "caption",
+      "text": "The tiny reading glasses beside the ladder finish the scene nicely."
+    },
+    {
+      "id": "en-holdout-v5-387",
+      "field": "altText",
+      "text": "An owl stands on a short ladder beside a tall stack of books."
+    },
+    {
+      "id": "en-holdout-v5-388",
+      "field": "altText",
+      "text": "The tote illustration shows an owl reaching towards the highest book."
+    },
+    {
+      "id": "en-holdout-v5-389",
+      "field": "caption",
+      "text": "A raccoon stitches a patch onto the moon in this little illustration."
+    },
+    {
+      "id": "en-holdout-v5-390",
+      "field": "caption",
+      "text": "That loose thread winds all the way to the edge of my pocket."
+    },
+    {
+      "id": "en-holdout-v5-391",
+      "field": "altText",
+      "text": "A raccoon holds a needle beside a patched crescent moon."
+    },
+    {
+      "id": "en-holdout-v5-392",
+      "field": "altText",
+      "text": "The pocket scene depicts stitches joining a small patch to the moon."
+    },
+    {
+      "id": "en-holdout-v5-393",
+      "field": "caption",
+      "text": "The platypus on my shirt has packed a picnic for one."
+    },
+    {
+      "id": "en-holdout-v5-394",
+      "field": "caption",
+      "text": "A checked cloth and tiny sandwich make this print especially charming."
+    },
+    {
+      "id": "en-holdout-v5-395",
+      "field": "altText",
+      "text": "A platypus sits beside a picnic cloth and an open lunch basket."
+    },
+    {
+      "id": "en-holdout-v5-396",
+      "field": "altText",
+      "text": "The illustration shows a small sandwich near a flat-billed animal."
+    },
+    {
+      "id": "en-holdout-v5-397",
+      "field": "caption",
+      "text": "The lemur's tail curls around an enormous clock key in this print."
+    },
+    {
+      "id": "en-holdout-v5-398",
+      "field": "caption",
+      "text": "I chose this one for the funny contrast in sizes."
+    },
+    {
+      "id": "en-holdout-v5-399",
+      "field": "altText",
+      "text": "A lemur holds a large winding key with its striped tail curled around it."
+    },
+    {
+      "id": "en-holdout-v5-400",
+      "field": "altText",
+      "text": "The shirt illustration pairs a small animal with an oversized clockwork key."
+    },
+    {
+      "id": "en-holdout-v5-401",
+      "field": "caption",
+      "text": "A paper crown sits crookedly among the porcupine's illustrated quills."
+    },
+    {
+      "id": "en-holdout-v5-402",
+      "field": "caption",
+      "text": "The tiny party guest on my bag is bringing plenty of character."
+    },
+    {
+      "id": "en-holdout-v5-403",
+      "field": "altText",
+      "text": "A porcupine wears a folded paper crown among its long quills."
+    },
+    {
+      "id": "en-holdout-v5-404",
+      "field": "altText",
+      "text": "The printed animal's angular crown tilts to one side of its head."
+    },
+    {
+      "id": "en-holdout-v5-405",
+      "field": "caption",
+      "text": "My flamingo has borrowed a watering can for its one-legged garden visit."
+    },
+    {
+      "id": "en-holdout-v5-406",
+      "field": "caption",
+      "text": "The long handle echoes the curve of the bird's neck."
+    },
+    {
+      "id": "en-holdout-v5-407",
+      "field": "altText",
+      "text": "A flamingo stands beside a watering can with a long curved handle."
+    },
+    {
+      "id": "en-holdout-v5-408",
+      "field": "altText",
+      "text": "The illustrated flamingo rests one foot beside the rim of a plant pot."
+    },
+    {
+      "id": "en-holdout-v5-409",
+      "field": "caption",
+      "text": "An armadillo on roller skates is today's very serious style decision."
+    },
+    {
+      "id": "en-holdout-v5-410",
+      "field": "caption",
+      "text": "I couldn't pass up the tiny wheels under those little feet."
+    },
+    {
+      "id": "en-holdout-v5-411",
+      "field": "altText",
+      "text": "An armadillo illustration wears four small roller skates beneath its body."
+    },
+    {
+      "id": "en-holdout-v5-412",
+      "field": "altText",
+      "text": "The patch shows a segmented animal rolling forward on tiny wheels."
+    },
+    {
+      "id": "en-holdout-v5-413",
+      "field": "caption",
+      "text": "The heron on this scarf holds a bright little star in its beak."
+    },
+    {
+      "id": "en-holdout-v5-414",
+      "field": "caption",
+      "text": "Its long beak holds the unexpected catch very carefully."
+    },
+    {
+      "id": "en-holdout-v5-415",
+      "field": "altText",
+      "text": "A heron holds a five-pointed star at the tip of its beak."
+    },
+    {
+      "id": "en-holdout-v5-416",
+      "field": "altText",
+      "text": "The scarf picture shows a long-legged bird standing in shallow drawn water."
+    },
+    {
+      "id": "en-holdout-v5-417",
+      "field": "caption",
+      "text": "A hamster peeks from the basket beneath this tiny balloon."
+    },
+    {
+      "id": "en-holdout-v5-418",
+      "field": "caption",
+      "text": "The ropes are so fine that I missed them at first."
+    },
+    {
+      "id": "en-holdout-v5-419",
+      "field": "altText",
+      "text": "A hamster sits inside the basket of an illustrated hot-air balloon."
+    },
+    {
+      "id": "en-holdout-v5-420",
+      "field": "altText",
+      "text": "Thin drawn ropes connect the little animal's basket to a striped balloon."
+    },
+    {
+      "id": "en-holdout-v5-421",
+      "field": "caption",
+      "text": "A row of seeds leads this quail around the edge of my scarf."
+    },
+    {
+      "id": "en-holdout-v5-422",
+      "field": "caption",
+      "text": "I like the small feather perched above its head."
+    },
+    {
+      "id": "en-holdout-v5-423",
+      "field": "altText",
+      "text": "A quail follows a curved trail of seeds along the scarf border."
+    },
+    {
+      "id": "en-holdout-v5-424",
+      "field": "altText",
+      "text": "The illustrated bird has a single curved plume above its rounded head."
+    },
+    {
+      "id": "en-holdout-v5-425",
+      "field": "caption",
+      "text": "The chameleon's curled tail holds the end of a tape measure."
+    },
+    {
+      "id": "en-holdout-v5-426",
+      "field": "caption",
+      "text": "This sewing buddy has made itself at home on my project bag."
+    },
+    {
+      "id": "en-holdout-v5-427",
+      "field": "altText",
+      "text": "A chameleon curls its tail around a coiled measuring tape."
+    },
+    {
+      "id": "en-holdout-v5-428",
+      "field": "altText",
+      "text": "A small stitched lizard grips the marked tape against its curled tail."
+    },
+    {
+      "id": "en-holdout-v5-429",
+      "field": "caption",
+      "text": "A beaver builds a little lodge from pencils on this sweatshirt."
+    },
+    {
+      "id": "en-holdout-v5-430",
+      "field": "caption",
+      "text": "The sharpened ends turn the whole roof into a neat zigzag."
+    },
+    {
+      "id": "en-holdout-v5-431",
+      "field": "altText",
+      "text": "A beaver illustration arranges pencils into a small lodge-shaped pile."
+    },
+    {
+      "id": "en-holdout-v5-432",
+      "field": "altText",
+      "text": "Pointed pencil ends form the roof in the sweatshirt's drawn scene."
+    },
+    {
+      "id": "en-holdout-v5-433",
+      "field": "caption",
+      "text": "The hare's long scarf has wound around a miniature windmill."
+    },
+    {
+      "id": "en-holdout-v5-434",
+      "field": "caption",
+      "text": "Its ears and the turning sails make a lovely little silhouette."
+    },
+    {
+      "id": "en-holdout-v5-435",
+      "field": "altText",
+      "text": "A hare stands beside a windmill with its scarf caught around the sails."
+    },
+    {
+      "id": "en-holdout-v5-436",
+      "field": "altText",
+      "text": "The printed scene connects a long-eared animal to a small four-sailed mill."
+    },
+    {
+      "id": "en-holdout-v5-437",
+      "field": "caption",
+      "text": "This walrus wears a bow tie almost as wide as its whiskers."
+    },
+    {
+      "id": "en-holdout-v5-438",
+      "field": "caption",
+      "text": "A walrus this smartly dressed deserved a place in today's outfit."
+    },
+    {
+      "id": "en-holdout-v5-439",
+      "field": "altText",
+      "text": "An illustrated walrus wears a large bow tie below its whiskered face."
+    },
+    {
+      "id": "en-holdout-v5-440",
+      "field": "altText",
+      "text": "The shirt print shows two tusks extending above a neatly drawn bow."
+    },
+    {
+      "id": "en-holdout-v5-441",
+      "field": "caption",
+      "text": "The cheetah in this drawing pushes the world's least hurried tea trolley."
+    },
+    {
+      "id": "en-holdout-v5-442",
+      "field": "caption",
+      "text": "Spots, wheels and a tiny cup make a surprisingly good combination."
+    },
+    {
+      "id": "en-holdout-v5-443",
+      "field": "altText",
+      "text": "A cheetah stands behind a small wheeled trolley carrying a teapot."
+    },
+    {
+      "id": "en-holdout-v5-444",
+      "field": "altText",
+      "text": "The tote illustration shows a spotted animal holding the tea cart handle."
+    },
+    {
+      "id": "en-holdout-v5-445",
+      "field": "caption",
+      "text": "A tiny hummingbird looks through the oversized keyhole on my patch."
+    },
+    {
+      "id": "en-holdout-v5-446",
+      "field": "caption",
+      "text": "I like the space the designer left around that little scene."
+    },
+    {
+      "id": "en-holdout-v5-447",
+      "field": "altText",
+      "text": "A hummingbird hovers beside a large freestanding keyhole shape."
+    },
+    {
+      "id": "en-holdout-v5-448",
+      "field": "altText",
+      "text": "The embroidered bird's long beak points towards the keyhole opening."
+    },
+    {
+      "id": "en-holdout-v5-449",
+      "field": "caption",
+      "text": "The stoat on this shirt pulls a sled loaded with wool balls."
+    },
+    {
+      "id": "en-holdout-v5-450",
+      "field": "caption",
+      "text": "The trailing yarn makes a long looping path across the design."
+    },
+    {
+      "id": "en-holdout-v5-451",
+      "field": "altText",
+      "text": "A stoat pulls a small sled carrying several balls of wool."
+    },
+    {
+      "id": "en-holdout-v5-452",
+      "field": "altText",
+      "text": "A loose strand curls behind the sled in the shirt illustration."
+    },
+    {
+      "id": "en-holdout-v5-453",
+      "field": "caption",
+      "text": "My capybara patch has claimed a hammock made from one enormous leaf."
+    },
+    {
+      "id": "en-holdout-v5-454",
+      "field": "caption",
+      "text": "That relaxed little expression makes this bag feel like a day off."
+    },
+    {
+      "id": "en-holdout-v5-455",
+      "field": "altText",
+      "text": "A capybara rests inside a curved leaf suspended between two stems."
+    },
+    {
+      "id": "en-holdout-v5-456",
+      "field": "altText",
+      "text": "The patch depicts a broad-faced animal lying in a leaf-shaped hammock."
+    },
+    {
+      "id": "en-holdout-v5-457",
+      "field": "caption",
+      "text": "The fennec on my tee studies a star map with oversized ears."
+    },
+    {
+      "id": "en-holdout-v5-458",
+      "field": "caption",
+      "text": "A tiny compass beside the drawing completes the little explorer scene."
+    },
+    {
+      "id": "en-holdout-v5-459",
+      "field": "altText",
+      "text": "A large-eared fox bends over an open map of stars."
+    },
+    {
+      "id": "en-holdout-v5-460",
+      "field": "altText",
+      "text": "The shirt illustration shows a small fox beside a folded celestial chart."
+    },
+    {
+      "id": "en-holdout-v5-461",
+      "field": "caption",
+      "text": "This puffin holds its knitting with a very determined expression."
+    },
+    {
+      "id": "en-holdout-v5-462",
+      "field": "caption",
+      "text": "The bird's unfinished scarf gathers in soft folds beneath the needles."
+    },
+    {
+      "id": "en-holdout-v5-463",
+      "field": "altText",
+      "text": "A puffin holds two knitting needles above a short unfinished scarf."
+    },
+    {
+      "id": "en-holdout-v5-464",
+      "field": "altText",
+      "text": "The patch shows a bird beside a loose wool ball and trailing stitches."
+    },
+    {
+      "id": "en-holdout-v5-465",
+      "field": "caption",
+      "text": "The kangaroo's pouch is full of flowers in this cheerful print."
+    },
+    {
+      "id": "en-holdout-v5-466",
+      "field": "caption",
+      "text": "I chose it for the little stems sticking out in every direction."
+    },
+    {
+      "id": "en-holdout-v5-467",
+      "field": "altText",
+      "text": "An illustrated kangaroo carries several flowers in its front pouch."
+    },
+    {
+      "id": "en-holdout-v5-468",
+      "field": "altText",
+      "text": "Petals and long stems rise from the pouch in the shirt graphic."
+    },
+    {
+      "id": "en-holdout-v5-469",
+      "field": "caption",
+      "text": "A meerkat using a periscope feels like an excellent joke for a tote."
+    },
+    {
+      "id": "en-holdout-v5-470",
+      "field": "caption",
+      "text": "Its upright pose matches the tall little instrument perfectly."
+    },
+    {
+      "id": "en-holdout-v5-471",
+      "field": "altText",
+      "text": "A meerkat stands upright beside a tall periscope with a bent top."
+    },
+    {
+      "id": "en-holdout-v5-472",
+      "field": "altText",
+      "text": "The printed animal looks into the lower opening of the viewing tube."
+    },
+    {
+      "id": "en-holdout-v5-473",
+      "field": "caption",
+      "text": "The pangolin's tail curls around a rolled-up letter on my bag."
+    },
+    {
+      "id": "en-holdout-v5-474",
+      "field": "caption",
+      "text": "The scales are drawn in such tiny careful rows."
+    },
+    {
+      "id": "en-holdout-v5-475",
+      "field": "altText",
+      "text": "A pangolin holds a rolled letter with its curled tail."
+    },
+    {
+      "id": "en-holdout-v5-476",
+      "field": "altText",
+      "text": "The bag illustration shows overlapping scales along a small animal's back."
+    },
+    {
+      "id": "en-holdout-v5-477",
+      "field": "caption",
+      "text": "A kingfisher dives towards a pencil floating in the drawn water."
+    },
+    {
+      "id": "en-holdout-v5-478",
+      "field": "caption",
+      "text": "The sharp little beak and pencil tip almost mirror one another."
+    },
+    {
+      "id": "en-holdout-v5-479",
+      "field": "altText",
+      "text": "A kingfisher points downward towards a floating pencil in the illustration."
+    },
+    {
+      "id": "en-holdout-v5-480",
+      "field": "altText",
+      "text": "A sharp-beaked bird dives towards a pencil above several printed water ripples."
+    },
+    {
+      "id": "en-holdout-v5-481",
+      "field": "caption",
+      "text": "This sloth hangs from a little woven arch on my pocket."
+    },
+    {
+      "id": "en-holdout-v5-482",
+      "field": "caption",
+      "text": "The long arms follow the curve of the hanging cords."
+    },
+    {
+      "id": "en-holdout-v5-483",
+      "field": "altText",
+      "text": "A sloth hangs from the top of a small macramé arch."
+    },
+    {
+      "id": "en-holdout-v5-484",
+      "field": "altText",
+      "text": "Knotted cords frame the illustrated animal's long hanging arms."
+    },
+    {
+      "id": "en-holdout-v5-485",
+      "field": "caption",
+      "text": "The dolphin jumps through a moon-shaped hoop in this scarf drawing."
+    },
+    {
+      "id": "en-holdout-v5-486",
+      "field": "caption",
+      "text": "I like how the curve continues from the tail into the crescent."
+    },
+    {
+      "id": "en-holdout-v5-487",
+      "field": "altText",
+      "text": "A dolphin leaps through a large crescent-shaped hoop above drawn waves."
+    },
+    {
+      "id": "en-holdout-v5-488",
+      "field": "altText",
+      "text": "The scarf illustration aligns the animal's curved body with the moon outline."
+    },
+    {
+      "id": "en-holdout-v5-489",
+      "field": "caption",
+      "text": "The peacock's tail is made from a fan of drawn buttons."
+    },
+    {
+      "id": "en-holdout-v5-490",
+      "field": "caption",
+      "text": "Each little button has its holes visible in the picture."
+    },
+    {
+      "id": "en-holdout-v5-491",
+      "field": "altText",
+      "text": "A peacock illustration spreads a tail composed of round buttons."
+    },
+    {
+      "id": "en-holdout-v5-492",
+      "field": "altText",
+      "text": "Rows of small button shapes fan outward behind the printed bird."
+    },
+    {
+      "id": "en-holdout-v5-493",
+      "field": "caption",
+      "text": "The lobster on my shirt conducts with two very enthusiastic claws."
+    },
+    {
+      "id": "en-holdout-v5-494",
+      "field": "caption",
+      "text": "A tiny music stand finishes this wonderfully odd little scene."
+    },
+    {
+      "id": "en-holdout-v5-495",
+      "field": "altText",
+      "text": "An illustrated lobster stands before a music stand with its claws raised."
+    },
+    {
+      "id": "en-holdout-v5-496",
+      "field": "altText",
+      "text": "The drawn lobster grips a tiny baton beside its open sheet music."
+    },
+    {
+      "id": "en-holdout-v5-497",
+      "field": "caption",
+      "text": "This ferret crosses a bridge shaped like an enormous croissant."
+    },
+    {
+      "id": "en-holdout-v5-498",
+      "field": "caption",
+      "text": "The curved pastry makes a lovely arch in the tote picture."
+    },
+    {
+      "id": "en-holdout-v5-499",
+      "field": "altText",
+      "text": "A ferret walks over a croissant-shaped bridge in a printed scene."
+    },
+    {
+      "id": "en-holdout-v5-500",
+      "field": "altText",
+      "text": "The small animal stands above an arch formed by a crescent pastry."
+    },
+    {
+      "id": "en-holdout-v5-501",
+      "field": "caption",
+      "text": "The little diamond under each arm gives this shirt room to move."
+    },
+    {
+      "id": "en-holdout-v5-502",
+      "field": "caption",
+      "text": "I lifted my arms to show the extra piece hidden in the seam."
+    },
+    {
+      "id": "en-holdout-v5-503",
+      "field": "altText",
+      "text": "A diamond-shaped fabric insert joins the sleeve and body beneath the arm."
+    },
+    {
+      "id": "en-holdout-v5-504",
+      "field": "altText",
+      "text": "The raised sleeve reveals four seams meeting around a small underarm panel."
+    },
+    {
+      "id": "en-holdout-v5-505",
+      "field": "caption",
+      "text": "The inner flap keeps the fly buttons away from the fabric underneath."
+    },
+    {
+      "id": "en-holdout-v5-506",
+      "field": "caption",
+      "text": "The waistband is finished, so here is a closer view of the fly."
+    },
+    {
+      "id": "en-holdout-v5-507",
+      "field": "altText",
+      "text": "A curved fabric shield sits behind a row of trouser fly buttons."
+    },
+    {
+      "id": "en-holdout-v5-508",
+      "field": "altText",
+      "text": "The open waistband reveals a protective panel beneath the button closure."
+    },
+    {
+      "id": "en-holdout-v5-509",
+      "field": "caption",
+      "text": "Each little loop is made from the same narrow covered cord."
+    },
+    {
+      "id": "en-holdout-v5-510",
+      "field": "caption",
+      "text": "The row looks almost like a tiny scalloped border before fastening."
+    },
+    {
+      "id": "en-holdout-v5-511",
+      "field": "altText",
+      "text": "Small cord loops line one edge of the blouse opening."
+    },
+    {
+      "id": "en-holdout-v5-512",
+      "field": "altText",
+      "text": "Rounded loops fit over a closely spaced row of covered buttons."
+    },
+    {
+      "id": "en-holdout-v5-513",
+      "field": "caption",
+      "text": "That hidden opening means I can replace the elastic later."
+    },
+    {
+      "id": "en-holdout-v5-514",
+      "field": "caption",
+      "text": "I left a small gap inside the waistband for future adjustments."
+    },
+    {
+      "id": "en-holdout-v5-515",
+      "field": "altText",
+      "text": "A short opening exposes elastic inside the waistband channel."
+    },
+    {
+      "id": "en-holdout-v5-516",
+      "field": "altText",
+      "text": "The inside waist seam has a bound access gap beside the elastic end."
+    },
+    {
+      "id": "en-holdout-v5-517",
+      "field": "caption",
+      "text": "The small side zip opens a gusset for a little extra calf room."
+    },
+    {
+      "id": "en-holdout-v5-518",
+      "field": "caption",
+      "text": "I like having an adjustment that follows the whole upper boot."
+    },
+    {
+      "id": "en-holdout-v5-519",
+      "field": "altText",
+      "text": "An open side zipper reveals a triangular expansion panel on the boot shaft."
+    },
+    {
+      "id": "en-holdout-v5-520",
+      "field": "altText",
+      "text": "The boot's upper section widens when its narrow gusset is released."
+    },
+    {
+      "id": "en-holdout-v5-521",
+      "field": "caption",
+      "text": "The pointed placket sits neatly above this shirt's cuff opening."
+    },
+    {
+      "id": "en-holdout-v5-522",
+      "field": "caption",
+      "text": "It took a careful fold to get both little towers matching."
+    },
+    {
+      "id": "en-holdout-v5-523",
+      "field": "altText",
+      "text": "A pointed fabric placket finishes the slit above a shirt cuff."
+    },
+    {
+      "id": "en-holdout-v5-524",
+      "field": "altText",
+      "text": "The sleeve opening ends beneath a small stitched triangular tower."
+    },
+    {
+      "id": "en-holdout-v5-525",
+      "field": "caption",
+      "text": "The pocket opening is framed by two very narrow folded edges."
+    },
+    {
+      "id": "en-holdout-v5-526",
+      "field": "caption",
+      "text": "I am pleased with how the little corners meet on this pair."
+    },
+    {
+      "id": "en-holdout-v5-527",
+      "field": "altText",
+      "text": "Two slim fabric welts frame a horizontal trouser pocket opening."
+    },
+    {
+      "id": "en-holdout-v5-528",
+      "field": "altText",
+      "text": "The pocket's narrow folded borders meet at small squared corners."
+    },
+    {
+      "id": "en-holdout-v5-529",
+      "field": "caption",
+      "text": "The tape inside the back hem protects the edge where my shoes touch."
+    },
+    {
+      "id": "en-holdout-v5-530",
+      "field": "caption",
+      "text": "A practical finish for the trousers I wear most often."
+    },
+    {
+      "id": "en-holdout-v5-531",
+      "field": "altText",
+      "text": "A short reinforced tape follows the inside rear hem of each trouser leg."
+    },
+    {
+      "id": "en-holdout-v5-532",
+      "field": "altText",
+      "text": "The lifted trouser edge shows a protective strip along its back section."
+    },
+    {
+      "id": "en-holdout-v5-533",
+      "field": "caption",
+      "text": "A tiny hidden snap keeps this gap between shirt buttons closed."
+    },
+    {
+      "id": "en-holdout-v5-534",
+      "field": "caption",
+      "text": "The front sits smoothly now without adding another visible button."
+    },
+    {
+      "id": "en-holdout-v5-535",
+      "field": "altText",
+      "text": "A small concealed snap joins the shirt edges between two buttons."
+    },
+    {
+      "id": "en-holdout-v5-536",
+      "field": "altText",
+      "text": "The open shirt placket reveals paired snap halves inside the overlap."
+    },
+    {
+      "id": "en-holdout-v5-537",
+      "field": "caption",
+      "text": "The curved stand helps my collar sit upright without feeling stiff."
+    },
+    {
+      "id": "en-holdout-v5-538",
+      "field": "caption",
+      "text": "I traced its shape before attaching the larger collar piece."
+    },
+    {
+      "id": "en-holdout-v5-539",
+      "field": "altText",
+      "text": "A curved narrow band supports the folded collar around the neck."
+    },
+    {
+      "id": "en-holdout-v5-540",
+      "field": "altText",
+      "text": "The shirt collar is mounted on a separate gently shaped stand."
+    },
+    {
+      "id": "en-holdout-v5-541",
+      "field": "caption",
+      "text": "The waistband extends past the fly and hooks into place at the side."
+    },
+    {
+      "id": "en-holdout-v5-542",
+      "field": "caption",
+      "text": "I like the clean little overlap on these new trousers."
+    },
+    {
+      "id": "en-holdout-v5-543",
+      "field": "altText",
+      "text": "A waistband extension closes with a metal hook and flat bar."
+    },
+    {
+      "id": "en-holdout-v5-544",
+      "field": "altText",
+      "text": "The open trouser waist shows concealed hardware beyond the fly opening."
+    },
+    {
+      "id": "en-holdout-v5-545",
+      "field": "caption",
+      "text": "The temporary stitches keep these pleats aligned while I finish the waist."
+    },
+    {
+      "id": "en-holdout-v5-546",
+      "field": "caption",
+      "text": "Almost ready to release the folds and see them move properly."
+    },
+    {
+      "id": "en-holdout-v5-547",
+      "field": "altText",
+      "text": "A short line of loose stitches holds several pleats together near the waist."
+    },
+    {
+      "id": "en-holdout-v5-548",
+      "field": "altText",
+      "text": "The skirt's folded panels remain joined by a removable horizontal thread."
+    },
+    {
+      "id": "en-holdout-v5-549",
+      "field": "caption",
+      "text": "The tape covers every stitched join inside this lightweight rain shell."
+    },
+    {
+      "id": "en-holdout-v5-550",
+      "field": "caption",
+      "text": "I checked the little intersections before packing it for the walk."
+    },
+    {
+      "id": "en-holdout-v5-551",
+      "field": "altText",
+      "text": "Thin sealing tape runs over the interior seams of a rain shell."
+    },
+    {
+      "id": "en-holdout-v5-552",
+      "field": "altText",
+      "text": "Several taped strips meet at the jacket's inner shoulder junction."
+    },
+    {
+      "id": "en-holdout-v5-553",
+      "field": "caption",
+      "text": "The clear side panels help me see without pushing my hood back."
+    },
+    {
+      "id": "en-holdout-v5-554",
+      "field": "caption",
+      "text": "A clever little window beside each cheek on this rain hat."
+    },
+    {
+      "id": "en-holdout-v5-555",
+      "field": "altText",
+      "text": "Clear panels fill the two sides of the hood near the face."
+    },
+    {
+      "id": "en-holdout-v5-556",
+      "field": "altText",
+      "text": "The hood has small transparent windows beside its forward-projecting brim."
+    },
+    {
+      "id": "en-holdout-v5-557",
+      "field": "caption",
+      "text": "The folded back opening stays closed until I take a longer step."
+    },
+    {
+      "id": "en-holdout-v5-558",
+      "field": "caption",
+      "text": "That extra overlap makes this narrow skirt easier to walk in."
+    },
+    {
+      "id": "en-holdout-v5-559",
+      "field": "altText",
+      "text": "An overlapping fold forms the lower rear opening of a straight skirt."
+    },
+    {
+      "id": "en-holdout-v5-560",
+      "field": "altText",
+      "text": "The skirt's back panels separate slightly to reveal a tucked inner extension."
+    },
+    {
+      "id": "en-holdout-v5-561",
+      "field": "caption",
+      "text": "The little loop below the back yoke lets me hang this shirt easily."
+    },
+    {
+      "id": "en-holdout-v5-562",
+      "field": "caption",
+      "text": "One useful detail from the shirt pattern I chose this time."
+    },
+    {
+      "id": "en-holdout-v5-563",
+      "field": "altText",
+      "text": "A small fabric loop sits beneath the centre back yoke of the shirt."
+    },
+    {
+      "id": "en-holdout-v5-564",
+      "field": "altText",
+      "text": "The narrow hanging loop bridges two points above the shirt's back pleat."
+    },
+    {
+      "id": "en-holdout-v5-565",
+      "field": "caption",
+      "text": "The tiny split at the back lets the waistband move when I sit."
+    },
+    {
+      "id": "en-holdout-v5-566",
+      "field": "caption",
+      "text": "I had never noticed this detail until making a pair myself."
+    },
+    {
+      "id": "en-holdout-v5-567",
+      "field": "altText",
+      "text": "A small V-shaped split interrupts the centre rear waistband."
+    },
+    {
+      "id": "en-holdout-v5-568",
+      "field": "altText",
+      "text": "The trouser waist has two finished edges meeting around a narrow back opening."
+    },
+    {
+      "id": "en-holdout-v5-569",
+      "field": "caption",
+      "text": "The pocket lies flat until I put something inside its folded centre."
+    },
+    {
+      "id": "en-holdout-v5-570",
+      "field": "caption",
+      "text": "It has just enough extra room for the notebook I carry."
+    },
+    {
+      "id": "en-holdout-v5-571",
+      "field": "altText",
+      "text": "A central inverted fold gives the patch pocket room to expand."
+    },
+    {
+      "id": "en-holdout-v5-572",
+      "field": "altText",
+      "text": "The notebook spreads the pocket's folded front without pulling its side seams."
+    },
+    {
+      "id": "en-holdout-v5-573",
+      "field": "caption",
+      "text": "Two button rows let me choose a deep cuff or a shorter one."
+    },
+    {
+      "id": "en-holdout-v5-574",
+      "field": "caption",
+      "text": "I tried both settings before settling on today's sleeve length."
+    },
+    {
+      "id": "en-holdout-v5-575",
+      "field": "altText",
+      "text": "A broad shirt cuff has two horizontal rows of buttonholes."
+    },
+    {
+      "id": "en-holdout-v5-576",
+      "field": "altText",
+      "text": "The cuff folds to a shallower depth using its second fastening position."
+    },
+    {
+      "id": "en-holdout-v5-577",
+      "field": "caption",
+      "text": "A tiny loop lets me lift the skirt while keeping my hand relaxed."
+    },
+    {
+      "id": "en-holdout-v5-578",
+      "field": "caption",
+      "text": "The loop disappears inside again after I cross the steps."
+    },
+    {
+      "id": "en-holdout-v5-579",
+      "field": "altText",
+      "text": "A small loop sewn inside the skirt hem rests around one finger."
+    },
+    {
+      "id": "en-holdout-v5-580",
+      "field": "altText",
+      "text": "The wearer lifts the skirt through a narrow hidden fabric loop."
+    },
+    {
+      "id": "en-holdout-v5-581",
+      "field": "caption",
+      "text": "The small loop behind my tie keeps its narrow end from wandering."
+    },
+    {
+      "id": "en-holdout-v5-582",
+      "field": "caption",
+      "text": "I finally remembered to thread it through before taking the photo."
+    },
+    {
+      "id": "en-holdout-v5-583",
+      "field": "altText",
+      "text": "The narrow end of a tie passes through a keeper on its reverse."
+    },
+    {
+      "id": "en-holdout-v5-584",
+      "field": "altText",
+      "text": "A fabric loop behind the wider tie section holds the shorter end flat."
+    },
+    {
+      "id": "en-holdout-v5-585",
+      "field": "caption",
+      "text": "The little throat strap folds away neatly when I leave the collar open."
+    },
+    {
+      "id": "en-holdout-v5-586",
+      "field": "caption",
+      "text": "I fastened it today to show how the top closes across."
+    },
+    {
+      "id": "en-holdout-v5-587",
+      "field": "altText",
+      "text": "A short strap connects both sides of the raised collar beneath the chin."
+    },
+    {
+      "id": "en-holdout-v5-588",
+      "field": "altText",
+      "text": "The collar tab buttons across a small gap at the throat."
+    },
+    {
+      "id": "en-holdout-v5-589",
+      "field": "caption",
+      "text": "The stitched front line keeps its shape after a full day out."
+    },
+    {
+      "id": "en-holdout-v5-590",
+      "field": "caption",
+      "text": "I like the quiet structure it gives these otherwise loose trousers."
+    },
+    {
+      "id": "en-holdout-v5-591",
+      "field": "altText",
+      "text": "A narrow stitched ridge runs down the front of each trouser leg."
+    },
+    {
+      "id": "en-holdout-v5-592",
+      "field": "altText",
+      "text": "The trousers have permanent raised creases extending from waist to hem."
+    },
+    {
+      "id": "en-holdout-v5-593",
+      "field": "caption",
+      "text": "The curved sleeve bends with my arm without bunching at the elbow."
+    },
+    {
+      "id": "en-holdout-v5-594",
+      "field": "caption",
+      "text": "A small extra panel makes this shape feel surprisingly natural."
+    },
+    {
+      "id": "en-holdout-v5-595",
+      "field": "altText",
+      "text": "A curved inset panel shapes the sleeve around a bent elbow."
+    },
+    {
+      "id": "en-holdout-v5-596",
+      "field": "altText",
+      "text": "Several short seams create a pre-bent outline along the arm."
+    },
+    {
+      "id": "en-holdout-v5-597",
+      "field": "caption",
+      "text": "The rounded hem leaves a smooth opening where the side seams end."
+    },
+    {
+      "id": "en-holdout-v5-598",
+      "field": "caption",
+      "text": "I kept this shirt untucked to show the careful curve."
+    },
+    {
+      "id": "en-holdout-v5-599",
+      "field": "altText",
+      "text": "The shirt hem curves upward where the front and back panels meet."
+    },
+    {
+      "id": "en-holdout-v5-600",
+      "field": "altText",
+      "text": "A rounded gap at each side separates the longer shirt tails."
+    },
+    {
+      "id": "en-holdout-v5-601",
+      "field": "caption",
+      "text": "Counting stitches in my little square before committing to the whole vest."
+    },
+    {
+      "id": "en-holdout-v5-602",
+      "field": "caption",
+      "text": "The ruler says I need a different needle size for this project."
+    },
+    {
+      "id": "en-holdout-v5-603",
+      "field": "altText",
+      "text": "A ruler lies across a knitted square with several rows of stitches."
+    },
+    {
+      "id": "en-holdout-v5-604",
+      "field": "altText",
+      "text": "Two pins mark the measured section of a small knitting sample."
+    },
+    {
+      "id": "en-holdout-v5-605",
+      "field": "caption",
+      "text": "The points of this lace look so different once they are pinned out."
+    },
+    {
+      "id": "en-holdout-v5-606",
+      "field": "caption",
+      "text": "Letting the scarf settle into shape before its first outing."
+    },
+    {
+      "id": "en-holdout-v5-607",
+      "field": "altText",
+      "text": "Pins hold the scalloped points of a lace scarf against a marked mat."
+    },
+    {
+      "id": "en-holdout-v5-608",
+      "field": "altText",
+      "text": "The delicate scarf is stretched evenly along a rectangular blocking surface."
+    },
+    {
+      "id": "en-holdout-v5-609",
+      "field": "caption",
+      "text": "I marked the stretch direction before cutting the fitted sleeves."
+    },
+    {
+      "id": "en-holdout-v5-610",
+      "field": "caption",
+      "text": "A quick check now should make the finished top much more comfortable."
+    },
+    {
+      "id": "en-holdout-v5-611",
+      "field": "altText",
+      "text": "Hands pull a fabric sample sideways beside an arrow marked on paper."
+    },
+    {
+      "id": "en-holdout-v5-612",
+      "field": "altText",
+      "text": "Two small arrows indicate the more flexible direction of the fabric panel."
+    },
+    {
+      "id": "en-holdout-v5-613",
+      "field": "caption",
+      "text": "The washed sample sits beside its original outline for a quick comparison."
+    },
+    {
+      "id": "en-holdout-v5-614",
+      "field": "caption",
+      "text": "Glad I checked this cloth before deciding on the final length."
+    },
+    {
+      "id": "en-holdout-v5-615",
+      "field": "altText",
+      "text": "A fabric square lies inside a slightly larger outline drawn on paper."
+    },
+    {
+      "id": "en-holdout-v5-616",
+      "field": "altText",
+      "text": "Measurement lines show the difference between an unwashed and washed fabric sample."
+    },
+    {
+      "id": "en-holdout-v5-617",
+      "field": "caption",
+      "text": "All the pattern arrows point the same way on my cutting table."
+    },
+    {
+      "id": "en-holdout-v5-618",
+      "field": "caption",
+      "text": "I want the finished panels to catch the light consistently."
+    },
+    {
+      "id": "en-holdout-v5-619",
+      "field": "altText",
+      "text": "Several pattern pieces are arranged with their directional arrows aligned."
+    },
+    {
+      "id": "en-holdout-v5-620",
+      "field": "altText",
+      "text": "The fabric's brushed surface changes shade where one small piece is reversed."
+    },
+    {
+      "id": "en-holdout-v5-621",
+      "field": "caption",
+      "text": "A paper window helped me choose which flower belongs at the centre."
+    },
+    {
+      "id": "en-holdout-v5-622",
+      "field": "caption",
+      "text": "I moved the frame around before cutting the front panel."
+    },
+    {
+      "id": "en-holdout-v5-623",
+      "field": "altText",
+      "text": "A rectangular paper opening frames one motif on a large patterned fabric."
+    },
+    {
+      "id": "en-holdout-v5-624",
+      "field": "altText",
+      "text": "The cutout template isolates a single printed shape beneath its centre mark."
+    },
+    {
+      "id": "en-holdout-v5-625",
+      "field": "caption",
+      "text": "These little clips let the inside curve open without pulling."
+    },
+    {
+      "id": "en-holdout-v5-626",
+      "field": "caption",
+      "text": "Turning the neckline through is much easier after this step."
+    },
+    {
+      "id": "en-holdout-v5-627",
+      "field": "altText",
+      "text": "Short cuts interrupt the seam allowance around a concave neckline curve."
+    },
+    {
+      "id": "en-holdout-v5-628",
+      "field": "altText",
+      "text": "Small clipped gaps spread apart as the curved fabric edge is opened."
+    },
+    {
+      "id": "en-holdout-v5-629",
+      "field": "caption",
+      "text": "The tiny wedges remove extra bulk from this rounded pocket flap."
+    },
+    {
+      "id": "en-holdout-v5-630",
+      "field": "caption",
+      "text": "I stopped each cut well clear of the stitching."
+    },
+    {
+      "id": "en-holdout-v5-631",
+      "field": "altText",
+      "text": "Small triangular wedges are cut from the seam allowance of a rounded flap."
+    },
+    {
+      "id": "en-holdout-v5-632",
+      "field": "altText",
+      "text": "The outer curved edge has evenly spaced notches outside the stitch line."
+    },
+    {
+      "id": "en-holdout-v5-633",
+      "field": "caption",
+      "text": "I trimmed the inside layers to different widths before turning the collar."
+    },
+    {
+      "id": "en-holdout-v5-634",
+      "field": "caption",
+      "text": "The edge feels much lighter now that the bulk is spread out."
+    },
+    {
+      "id": "en-holdout-v5-635",
+      "field": "altText",
+      "text": "Three seam allowances are trimmed to staggered widths along a collar edge."
+    },
+    {
+      "id": "en-holdout-v5-636",
+      "field": "altText",
+      "text": "The layered fabric shows a stepped profile beyond the row of stitching."
+    },
+    {
+      "id": "en-holdout-v5-637",
+      "field": "caption",
+      "text": "The extra stitching keeps the facing tucked neatly inside my neckline."
+    },
+    {
+      "id": "en-holdout-v5-638",
+      "field": "caption",
+      "text": "It is almost invisible from outside, which is exactly what I wanted."
+    },
+    {
+      "id": "en-holdout-v5-639",
+      "field": "altText",
+      "text": "A stitch line secures the facing to the seam allowance beside the neckline."
+    },
+    {
+      "id": "en-holdout-v5-640",
+      "field": "altText",
+      "text": "The turned edge reveals a narrow row of stitching on its inner facing."
+    },
+    {
+      "id": "en-holdout-v5-641",
+      "field": "caption",
+      "text": "Little thread tufts mark the points I need on both fabric layers."
+    },
+    {
+      "id": "en-holdout-v5-642",
+      "field": "caption",
+      "text": "The marks stay clear while I move the cut pieces around."
+    },
+    {
+      "id": "en-holdout-v5-643",
+      "field": "altText",
+      "text": "Short thread tufts protrude from matching points on two separated fabric pieces."
+    },
+    {
+      "id": "en-holdout-v5-644",
+      "field": "altText",
+      "text": "Loose doubled loops mark a dart position on the garment panel."
+    },
+    {
+      "id": "en-holdout-v5-645",
+      "field": "caption",
+      "text": "The loose grid helps me see how this panel shifts while I fit it."
+    },
+    {
+      "id": "en-holdout-v5-646",
+      "field": "caption",
+      "text": "I can follow the centre line even when the fabric is pinned together."
+    },
+    {
+      "id": "en-holdout-v5-647",
+      "field": "altText",
+      "text": "Long basting stitches form a grid across the front of a trial garment."
+    },
+    {
+      "id": "en-holdout-v5-648",
+      "field": "altText",
+      "text": "Horizontal thread lines cross a clearly marked vertical centre line."
+    },
+    {
+      "id": "en-holdout-v5-649",
+      "field": "caption",
+      "text": "These little weights hold the paper steady while I plan the cut."
+    },
+    {
+      "id": "en-holdout-v5-650",
+      "field": "caption",
+      "text": "No shifting corners now that the large pieces are properly anchored."
+    },
+    {
+      "id": "en-holdout-v5-651",
+      "field": "altText",
+      "text": "Flat weights hold several paper pattern pieces against spread fabric."
+    },
+    {
+      "id": "en-holdout-v5-652",
+      "field": "altText",
+      "text": "Rounded weights sit at the corners of a large trouser pattern section."
+    },
+    {
+      "id": "en-holdout-v5-653",
+      "field": "caption",
+      "text": "The expanding gauge makes each button position the same distance apart."
+    },
+    {
+      "id": "en-holdout-v5-654",
+      "field": "caption",
+      "text": "I marked the whole placket before sewing on the first button."
+    },
+    {
+      "id": "en-holdout-v5-655",
+      "field": "altText",
+      "text": "An expanding metal gauge marks evenly spaced positions along a shirt front."
+    },
+    {
+      "id": "en-holdout-v5-656",
+      "field": "altText",
+      "text": "Several hinged points touch the fabric beside small removable button marks."
+    },
+    {
+      "id": "en-holdout-v5-657",
+      "field": "caption",
+      "text": "My friend marked the hem while I stood in the shoes I'll wear."
+    },
+    {
+      "id": "en-holdout-v5-658",
+      "field": "caption",
+      "text": "The circle of chalk marks finally looks level all the way around."
+    },
+    {
+      "id": "en-holdout-v5-659",
+      "field": "altText",
+      "text": "A floor-standing guide marks the skirt hem at a consistent height."
+    },
+    {
+      "id": "en-holdout-v5-660",
+      "field": "altText",
+      "text": "The chalk marks encircle the skirt at an even distance above the floor."
+    },
+    {
+      "id": "en-holdout-v5-661",
+      "field": "caption",
+      "text": "The folded paper keeps each pleat the same depth as I work."
+    },
+    {
+      "id": "en-holdout-v5-662",
+      "field": "caption",
+      "text": "A simple guide saved me from measuring every fold again."
+    },
+    {
+      "id": "en-holdout-v5-663",
+      "field": "altText",
+      "text": "A folded paper strip sits between repeated fabric pleats as a depth guide."
+    },
+    {
+      "id": "en-holdout-v5-664",
+      "field": "altText",
+      "text": "The paper template matches the width of each newly pinned fold."
+    },
+    {
+      "id": "en-holdout-v5-665",
+      "field": "caption",
+      "text": "The cord rolls into its little fabric cover under the machine foot."
+    },
+    {
+      "id": "en-holdout-v5-666",
+      "field": "caption",
+      "text": "Making just enough piping to follow the edge of my pouch."
+    },
+    {
+      "id": "en-holdout-v5-667",
+      "field": "altText",
+      "text": "A narrow fabric strip folds around a length of cord at the machine."
+    },
+    {
+      "id": "en-holdout-v5-668",
+      "field": "altText",
+      "text": "The finished piping has a rounded corded edge beside a flat seam strip."
+    },
+    {
+      "id": "en-holdout-v5-669",
+      "field": "caption",
+      "text": "I covered the ends before sliding these supports into their channels."
+    },
+    {
+      "id": "en-holdout-v5-670",
+      "field": "caption",
+      "text": "The little caps make the inside edges feel smooth against the cloth."
+    },
+    {
+      "id": "en-holdout-v5-671",
+      "field": "altText",
+      "text": "Small protective caps cover both ends of several narrow support strips."
+    },
+    {
+      "id": "en-holdout-v5-672",
+      "field": "altText",
+      "text": "A capped strip is positioned beside an empty stitched garment channel."
+    },
+    {
+      "id": "en-holdout-v5-673",
+      "field": "caption",
+      "text": "The long temporary seam keeps both sides aligned while I add the zip."
+    },
+    {
+      "id": "en-holdout-v5-674",
+      "field": "caption",
+      "text": "I will open that seam after the permanent stitching is finished."
+    },
+    {
+      "id": "en-holdout-v5-675",
+      "field": "altText",
+      "text": "A closed basted seam lies above a zipper pinned underneath the fabric."
+    },
+    {
+      "id": "en-holdout-v5-676",
+      "field": "altText",
+      "text": "The zipper teeth align with a temporary line joining the two garment panels."
+    },
+    {
+      "id": "en-holdout-v5-677",
+      "field": "caption",
+      "text": "The narrow tape keeps this shoulder seam from stretching out of shape."
+    },
+    {
+      "id": "en-holdout-v5-678",
+      "field": "caption",
+      "text": "I added it while joining the front and back of my knit top."
+    },
+    {
+      "id": "en-holdout-v5-679",
+      "field": "altText",
+      "text": "A thin stabilising tape lies along the inside shoulder seam of a knit top."
+    },
+    {
+      "id": "en-holdout-v5-680",
+      "field": "altText",
+      "text": "The garment seam encloses a narrow flat strip that spans the shoulder."
+    },
+    {
+      "id": "en-holdout-v5-681",
+      "field": "caption",
+      "text": "This sample opens into a flat join when I pull the two sides gently."
+    },
+    {
+      "id": "en-holdout-v5-682",
+      "field": "caption",
+      "text": "I am testing the stitch before starting the leggings."
+    },
+    {
+      "id": "en-holdout-v5-683",
+      "field": "altText",
+      "text": "A flat seam joins two knit samples with visible loops on one face."
+    },
+    {
+      "id": "en-holdout-v5-684",
+      "field": "altText",
+      "text": "Hands spread the sample to show the joined edges lying level."
+    },
+    {
+      "id": "en-holdout-v5-685",
+      "field": "caption",
+      "text": "These three sample strips show how much fullness the extra length adds."
+    },
+    {
+      "id": "en-holdout-v5-686",
+      "field": "caption",
+      "text": "The middle gathering ratio looks right for the trim I have in mind."
+    },
+    {
+      "id": "en-holdout-v5-687",
+      "field": "altText",
+      "text": "Three gathered strips of equal finished width display different amounts of fullness."
+    },
+    {
+      "id": "en-holdout-v5-688",
+      "field": "altText",
+      "text": "The sample ruffles are arranged from sparse folds to densely gathered fabric."
+    },
+    {
+      "id": "en-holdout-v5-689",
+      "field": "caption",
+      "text": "I hung the cloth over a ring to see how softly it falls."
+    },
+    {
+      "id": "en-holdout-v5-690",
+      "field": "caption",
+      "text": "The loose folds helped me choose the fabric for my next skirt."
+    },
+    {
+      "id": "en-holdout-v5-691",
+      "field": "altText",
+      "text": "A large fabric circle falls in folds over a small raised ring."
+    },
+    {
+      "id": "en-holdout-v5-692",
+      "field": "altText",
+      "text": "The hanging cloth forms deep curved folds around a central support."
+    },
+    {
+      "id": "en-holdout-v5-693",
+      "field": "caption",
+      "text": "The second test seam lies smoother after adjusting the thread tension."
+    },
+    {
+      "id": "en-holdout-v5-694",
+      "field": "caption",
+      "text": "Keeping both samples in my notebook so I remember the difference."
+    },
+    {
+      "id": "en-holdout-v5-695",
+      "field": "altText",
+      "text": "Two stitched fabric samples show a puckered seam beside a flatter one."
+    },
+    {
+      "id": "en-holdout-v5-696",
+      "field": "altText",
+      "text": "One strip gathers into ripples while the neighbouring stitched strip stays smooth."
+    },
+    {
+      "id": "en-holdout-v5-697",
+      "field": "caption",
+      "text": "I compared these little bonded samples before choosing support for the collar."
+    },
+    {
+      "id": "en-holdout-v5-698",
+      "field": "caption",
+      "text": "The lighter one bends more easily when I roll the edge."
+    },
+    {
+      "id": "en-holdout-v5-699",
+      "field": "altText",
+      "text": "Two small fabric panels contain different supports beneath their outer cloth."
+    },
+    {
+      "id": "en-holdout-v5-700",
+      "field": "altText",
+      "text": "A hand curves the paired samples to compare their stiffness."
+    },
+    {
+      "id": "en-holdout-v5-701",
+      "field": "caption",
+      "text": "The ribbon in this print twists once and seems to keep going forever."
+    },
+    {
+      "id": "en-holdout-v5-702",
+      "field": "caption",
+      "text": "I followed the loop with my finger before realising how it joins."
+    },
+    {
+      "id": "en-holdout-v5-703",
+      "field": "altText",
+      "text": "A broad illustrated ribbon forms a continuous loop with one central twist."
+    },
+    {
+      "id": "en-holdout-v5-704",
+      "field": "altText",
+      "text": "The shirt graphic shows the inside and outside faces of a twisted ring."
+    },
+    {
+      "id": "en-holdout-v5-705",
+      "field": "caption",
+      "text": "This little triangle looks solid until I try to trace its corners."
+    },
+    {
+      "id": "en-holdout-v5-706",
+      "field": "caption",
+      "text": "Keeping the rest of today's outfit quiet around this clever graphic."
+    },
+    {
+      "id": "en-holdout-v5-707",
+      "field": "altText",
+      "text": "Three rectangular bars form an impossible triangular shape in the print."
+    },
+    {
+      "id": "en-holdout-v5-708",
+      "field": "altText",
+      "text": "The drawn triangle joins its edges in a visually contradictory arrangement."
+    },
+    {
+      "id": "en-holdout-v5-709",
+      "field": "caption",
+      "text": "The doorframes get smaller towards the centre of my scarf."
+    },
+    {
+      "id": "en-holdout-v5-710",
+      "field": "caption",
+      "text": "It feels like a tiny corridor whenever I open the whole square."
+    },
+    {
+      "id": "en-holdout-v5-711",
+      "field": "altText",
+      "text": "Nested door-shaped frames shrink towards a central point on the scarf."
+    },
+    {
+      "id": "en-holdout-v5-712",
+      "field": "altText",
+      "text": "The print creates depth through several progressively smaller rectangular openings."
+    },
+    {
+      "id": "en-holdout-v5-713",
+      "field": "caption",
+      "text": "The little paths branch around the shirt like an invented circuit board."
+    },
+    {
+      "id": "en-holdout-v5-714",
+      "field": "caption",
+      "text": "I liked the neat rounded terminals at the end of each line."
+    },
+    {
+      "id": "en-holdout-v5-715",
+      "field": "altText",
+      "text": "Thin right-angled traces connect small circular terminals across the shirt."
+    },
+    {
+      "id": "en-holdout-v5-716",
+      "field": "altText",
+      "text": "The repeating graphic resembles an abstract circuit board without labels."
+    },
+    {
+      "id": "en-holdout-v5-717",
+      "field": "caption",
+      "text": "The waveform swells across my chest before shrinking back to a thin line."
+    },
+    {
+      "id": "en-holdout-v5-718",
+      "field": "caption",
+      "text": "A simple graphic with just enough movement for today."
+    },
+    {
+      "id": "en-holdout-v5-719",
+      "field": "altText",
+      "text": "A band of vertical lines rises and falls like a recorded sound wave."
+    },
+    {
+      "id": "en-holdout-v5-720",
+      "field": "altText",
+      "text": "The shirt print contains closely spaced bars of gradually changing heights."
+    },
+    {
+      "id": "en-holdout-v5-721",
+      "field": "caption",
+      "text": "The heart is built from little squares with a few drifting away."
+    },
+    {
+      "id": "en-holdout-v5-722",
+      "field": "caption",
+      "text": "I like the unfinished corner in this playful patch."
+    },
+    {
+      "id": "en-holdout-v5-723",
+      "field": "altText",
+      "text": "Square pixels form a heart with several detached blocks near one edge."
+    },
+    {
+      "id": "en-holdout-v5-724",
+      "field": "altText",
+      "text": "The embroidered heart has stepped borders and a partially dissolving lower corner."
+    },
+    {
+      "id": "en-holdout-v5-725",
+      "field": "caption",
+      "text": "Every branch splits into smaller branches on this very geometric tree."
+    },
+    {
+      "id": "en-holdout-v5-726",
+      "field": "caption",
+      "text": "The drawing feels delicate even though it is made from straight lines."
+    },
+    {
+      "id": "en-holdout-v5-727",
+      "field": "altText",
+      "text": "A symmetrical tree graphic repeats smaller branching forms along each limb."
+    },
+    {
+      "id": "en-holdout-v5-728",
+      "field": "altText",
+      "text": "Thin angular branches divide repeatedly above a simple central trunk."
+    },
+    {
+      "id": "en-holdout-v5-729",
+      "field": "caption",
+      "text": "The little plugs never quite reach the sockets in this funny print."
+    },
+    {
+      "id": "en-holdout-v5-730",
+      "field": "caption",
+      "text": "It was those curled leads that first caught my eye on the rack."
+    },
+    {
+      "id": "en-holdout-v5-731",
+      "field": "altText",
+      "text": "Illustrated plugs and sockets repeat with looping electrical cords between them."
+    },
+    {
+      "id": "en-holdout-v5-732",
+      "field": "altText",
+      "text": "The scarf pattern leaves small gaps between each plug and matching socket."
+    },
+    {
+      "id": "en-holdout-v5-733",
+      "field": "caption",
+      "text": "The offset blocks make this print look as though it has briefly slipped."
+    },
+    {
+      "id": "en-holdout-v5-734",
+      "field": "caption",
+      "text": "I like that a straight shape can feel so full of movement."
+    },
+    {
+      "id": "en-holdout-v5-735",
+      "field": "altText",
+      "text": "Rectangular graphic blocks are interrupted by short sideways displacements."
+    },
+    {
+      "id": "en-holdout-v5-736",
+      "field": "altText",
+      "text": "The printed bars break into offset segments across the shirt front."
+    },
+    {
+      "id": "en-holdout-v5-737",
+      "field": "caption",
+      "text": "The face becomes clearer when I step back from this dotted print."
+    },
+    {
+      "id": "en-holdout-v5-738",
+      "field": "caption",
+      "text": "Up close it is only a collection of little circles."
+    },
+    {
+      "id": "en-holdout-v5-739",
+      "field": "altText",
+      "text": "Dots of varying sizes form a side profile on the bag panel."
+    },
+    {
+      "id": "en-holdout-v5-740",
+      "field": "altText",
+      "text": "The printed face emerges from a dense field of small circular marks."
+    },
+    {
+      "id": "en-holdout-v5-741",
+      "field": "caption",
+      "text": "The arches build up from several layers of fine crossing lines."
+    },
+    {
+      "id": "en-holdout-v5-742",
+      "field": "caption",
+      "text": "Their sketched texture softens the big shape on my shirt."
+    },
+    {
+      "id": "en-holdout-v5-743",
+      "field": "altText",
+      "text": "Several nested arches contain diagonal crosshatching in the printed design."
+    },
+    {
+      "id": "en-holdout-v5-744",
+      "field": "altText",
+      "text": "Fine intersecting strokes build curved bands above the shirt hem."
+    },
+    {
+      "id": "en-holdout-v5-745",
+      "field": "caption",
+      "text": "These rough-edged blocks look like bits of paper arranged on cloth."
+    },
+    {
+      "id": "en-holdout-v5-746",
+      "field": "caption",
+      "text": "I like the little gaps between the layered shapes."
+    },
+    {
+      "id": "en-holdout-v5-747",
+      "field": "altText",
+      "text": "Overlapping rectangles with irregular torn edges cover the scarf."
+    },
+    {
+      "id": "en-holdout-v5-748",
+      "field": "altText",
+      "text": "The print suggests stacked paper scraps through uneven borders and small shadows."
+    },
+    {
+      "id": "en-holdout-v5-749",
+      "field": "caption",
+      "text": "The corner looks folded over, but it is all part of the print."
+    },
+    {
+      "id": "en-holdout-v5-750",
+      "field": "caption",
+      "text": "That drawn shadow fooled me when I first saw the bag."
+    },
+    {
+      "id": "en-holdout-v5-751",
+      "field": "altText",
+      "text": "A printed triangular flap creates the illusion of a folded bag corner."
+    },
+    {
+      "id": "en-holdout-v5-752",
+      "field": "altText",
+      "text": "The flat panel includes a drawn shadow beneath an apparent turned-back edge."
+    },
+    {
+      "id": "en-holdout-v5-753",
+      "field": "caption",
+      "text": "Two narrow ribbons wind around each other down the length of my scarf."
+    },
+    {
+      "id": "en-holdout-v5-754",
+      "field": "caption",
+      "text": "I left the ends loose to show the full twisting pattern."
+    },
+    {
+      "id": "en-holdout-v5-755",
+      "field": "altText",
+      "text": "Two illustrated ribbons spiral around a shared vertical axis."
+    },
+    {
+      "id": "en-holdout-v5-756",
+      "field": "altText",
+      "text": "The scarf motif shows alternating overlaps along a long double twist."
+    },
+    {
+      "id": "en-holdout-v5-757",
+      "field": "caption",
+      "text": "The cube pattern changes direction depending on where I focus."
+    },
+    {
+      "id": "en-holdout-v5-758",
+      "field": "caption",
+      "text": "I kept staring at this fabric before deciding to make a skirt."
+    },
+    {
+      "id": "en-holdout-v5-759",
+      "field": "altText",
+      "text": "Three rhombus shapes combine repeatedly into an illusion of stacked cubes."
+    },
+    {
+      "id": "en-holdout-v5-760",
+      "field": "altText",
+      "text": "The geometric print alternates apparent raised blocks and recessed spaces."
+    },
+    {
+      "id": "en-holdout-v5-761",
+      "field": "caption",
+      "text": "The dots thin out gradually towards the hem of my top."
+    },
+    {
+      "id": "en-holdout-v5-762",
+      "field": "caption",
+      "text": "A gentle fade made from little marks was enough detail today."
+    },
+    {
+      "id": "en-holdout-v5-763",
+      "field": "altText",
+      "text": "Dense dots at the shoulder become more widely spaced towards the shirt hem."
+    },
+    {
+      "id": "en-holdout-v5-764",
+      "field": "altText",
+      "text": "The dot pattern fades gradually as the marks become more widely separated."
+    },
+    {
+      "id": "en-holdout-v5-765",
+      "field": "caption",
+      "text": "Two sets of lines cross and create bigger waves on this scarf."
+    },
+    {
+      "id": "en-holdout-v5-766",
+      "field": "caption",
+      "text": "The pattern seems to shift when the fabric bends."
+    },
+    {
+      "id": "en-holdout-v5-767",
+      "field": "altText",
+      "text": "Closely spaced curved lines overlap to form broad interference bands."
+    },
+    {
+      "id": "en-holdout-v5-768",
+      "field": "altText",
+      "text": "The scarf print contains two fine wave systems crossing at a shallow angle."
+    },
+    {
+      "id": "en-holdout-v5-769",
+      "field": "caption",
+      "text": "The staircase curls around an open centre on my project bag."
+    },
+    {
+      "id": "en-holdout-v5-770",
+      "field": "caption",
+      "text": "The tiny steps make the drawing feel almost three-dimensional."
+    },
+    {
+      "id": "en-holdout-v5-771",
+      "field": "altText",
+      "text": "A spiral staircase illustration curves around a central circular opening."
+    },
+    {
+      "id": "en-holdout-v5-772",
+      "field": "altText",
+      "text": "Small rectangular steps recede around the printed stairwell."
+    },
+    {
+      "id": "en-holdout-v5-773",
+      "field": "caption",
+      "text": "The stripes are drawn shadows from an imaginary bridge railing."
+    },
+    {
+      "id": "en-holdout-v5-774",
+      "field": "caption",
+      "text": "I like the slanting rhythm across this otherwise plain tote."
+    },
+    {
+      "id": "en-holdout-v5-775",
+      "field": "altText",
+      "text": "Long diagonal stripes spread from an illustrated railing near the bag edge."
+    },
+    {
+      "id": "en-holdout-v5-776",
+      "field": "altText",
+      "text": "The graphic shows a short rail casting extended parallel shadows."
+    },
+    {
+      "id": "en-holdout-v5-777",
+      "field": "caption",
+      "text": "This print follows a winding path without pretending to be a real map."
+    },
+    {
+      "id": "en-holdout-v5-778",
+      "field": "caption",
+      "text": "The narrow lines curl into little bays around the skirt."
+    },
+    {
+      "id": "en-holdout-v5-779",
+      "field": "altText",
+      "text": "Closely spaced contour lines form an imaginary landscape across the skirt."
+    },
+    {
+      "id": "en-holdout-v5-780",
+      "field": "altText",
+      "text": "The print contains irregular nested shapes resembling unlabelled terrain contours."
+    },
+    {
+      "id": "en-holdout-v5-781",
+      "field": "caption",
+      "text": "The printed highlights make this soft bag look crumpled and metallic."
+    },
+    {
+      "id": "en-holdout-v5-782",
+      "field": "caption",
+      "text": "The surface is smooth when I run my hand over it."
+    },
+    {
+      "id": "en-holdout-v5-783",
+      "field": "altText",
+      "text": "Angular printed highlights simulate crumpled foil on a smooth bag panel."
+    },
+    {
+      "id": "en-holdout-v5-784",
+      "field": "altText",
+      "text": "The flat fabric carries sharp light and dark facets suggesting folded metal."
+    },
+    {
+      "id": "en-holdout-v5-785",
+      "field": "caption",
+      "text": "The sun on my pocket is filled with one continuous stitched path."
+    },
+    {
+      "id": "en-holdout-v5-786",
+      "field": "caption",
+      "text": "I followed the little route until it reached the centre."
+    },
+    {
+      "id": "en-holdout-v5-787",
+      "field": "altText",
+      "text": "An embroidered sun contains a curling maze within its round centre."
+    },
+    {
+      "id": "en-holdout-v5-788",
+      "field": "altText",
+      "text": "Short rays surround a circular labyrinth sewn onto the pocket."
+    },
+    {
+      "id": "en-holdout-v5-789",
+      "field": "caption",
+      "text": "The stepped shadows make this panel look deeper than it really is."
+    },
+    {
+      "id": "en-holdout-v5-790",
+      "field": "caption",
+      "text": "The step pattern fills a tidy rectangle just below my neckline."
+    },
+    {
+      "id": "en-holdout-v5-791",
+      "field": "altText",
+      "text": "Printed steps with offset shadows form an ascending geometric pattern."
+    },
+    {
+      "id": "en-holdout-v5-792",
+      "field": "altText",
+      "text": "The graphic uses alternating right angles to suggest a staircase seen from above."
+    },
+    {
+      "id": "en-holdout-v5-793",
+      "field": "caption",
+      "text": "Only the shadow of the paper bird appears on this scarf."
+    },
+    {
+      "id": "en-holdout-v5-794",
+      "field": "caption",
+      "text": "The angular wings leave such a clean shape against the empty space."
+    },
+    {
+      "id": "en-holdout-v5-795",
+      "field": "altText",
+      "text": "An angular bird-shaped shadow is printed beside a small drawn paper fold."
+    },
+    {
+      "id": "en-holdout-v5-796",
+      "field": "altText",
+      "text": "The scarf design shows a long-necked origami silhouette with pointed wings."
+    },
+    {
+      "id": "en-holdout-v5-797",
+      "field": "caption",
+      "text": "The lines bend inside each drawn glass as though water were really there."
+    },
+    {
+      "id": "en-holdout-v5-798",
+      "field": "caption",
+      "text": "These bending lines make such a lovely quiet optical joke."
+    },
+    {
+      "id": "en-holdout-v5-799",
+      "field": "altText",
+      "text": "Parallel stripes change direction inside illustrated drinking glasses."
+    },
+    {
+      "id": "en-holdout-v5-800",
+      "field": "altText",
+      "text": "The printed glasses appear to bend the straight lines passing behind them."
+    },
+    {
+      "id": "en-holdout-v5-801",
+      "field": "caption",
+      "text": "A squeeze at the corners pops this little purse open."
+    },
+    {
+      "id": "en-holdout-v5-802",
+      "field": "caption",
+      "text": "The spring frame snaps flat when I let it go."
+    },
+    {
+      "id": "en-holdout-v5-803",
+      "field": "altText",
+      "text": "A small fabric purse opens through two flexible metal strips at its rim."
+    },
+    {
+      "id": "en-holdout-v5-804",
+      "field": "altText",
+      "text": "Fingers press the purse corners to spread its spring-loaded mouth."
+    },
+    {
+      "id": "en-holdout-v5-805",
+      "field": "caption",
+      "text": "This coin pouch closes into a neat triangle from one long strip."
+    },
+    {
+      "id": "en-holdout-v5-806",
+      "field": "caption",
+      "text": "I opened the folds to show how little construction it needs."
+    },
+    {
+      "id": "en-holdout-v5-807",
+      "field": "altText",
+      "text": "A folded strip forms a triangular coin pouch with a snap closure."
+    },
+    {
+      "id": "en-holdout-v5-808",
+      "field": "altText",
+      "text": "The unfolded pouch reveals several diagonal creases along one continuous piece."
+    },
+    {
+      "id": "en-holdout-v5-809",
+      "field": "caption",
+      "text": "The zip travels almost all the way around this round little bag."
+    },
+    {
+      "id": "en-holdout-v5-810",
+      "field": "caption",
+      "text": "Opening it flat makes the two circular sides look like a pair."
+    },
+    {
+      "id": "en-holdout-v5-811",
+      "field": "altText",
+      "text": "A circular bag unzips around most of its curved outer edge."
+    },
+    {
+      "id": "en-holdout-v5-812",
+      "field": "altText",
+      "text": "Two round bag panels lie open beside a short flexible connecting strip."
+    },
+    {
+      "id": "en-holdout-v5-813",
+      "field": "caption",
+      "text": "The separate sole sections let my practice shoes fold through the arch."
+    },
+    {
+      "id": "en-holdout-v5-814",
+      "field": "caption",
+      "text": "I turned one over so you can see that flexible middle section."
+    },
+    {
+      "id": "en-holdout-v5-815",
+      "field": "altText",
+      "text": "The dance shoe has separate sole pads beneath the heel and forefoot."
+    },
+    {
+      "id": "en-holdout-v5-816",
+      "field": "altText",
+      "text": "A soft fabric arch joins the two reinforced parts of the shoe underside."
+    },
+    {
+      "id": "en-holdout-v5-817",
+      "field": "caption",
+      "text": "The elastic bridge stretches when I slip my foot into these flats."
+    },
+    {
+      "id": "en-holdout-v5-818",
+      "field": "caption",
+      "text": "I like that little bit of movement around the top edge."
+    },
+    {
+      "id": "en-holdout-v5-819",
+      "field": "altText",
+      "text": "A short elastic bridge joins two side sections near the shoe opening."
+    },
+    {
+      "id": "en-holdout-v5-820",
+      "field": "altText",
+      "text": "The flat shoe has a small stretch panel beside its upper rim."
+    },
+    {
+      "id": "en-holdout-v5-821",
+      "field": "caption",
+      "text": "The shorter heel clicks into the same mount for the journey home."
+    },
+    {
+      "id": "en-holdout-v5-822",
+      "field": "caption",
+      "text": "I photographed both heel pieces before choosing the taller pair."
+    },
+    {
+      "id": "en-holdout-v5-823",
+      "field": "altText",
+      "text": "A detached heel stands beside the mounting slot beneath a shoe."
+    },
+    {
+      "id": "en-holdout-v5-824",
+      "field": "altText",
+      "text": "Two heel modules of different heights fit the same shoe base."
+    },
+    {
+      "id": "en-holdout-v5-825",
+      "field": "caption",
+      "text": "The extra fan sits behind my ear stud and peeks out underneath."
+    },
+    {
+      "id": "en-holdout-v5-826",
+      "field": "caption",
+      "text": "One small add-on gives these simple studs a different outline."
+    },
+    {
+      "id": "en-holdout-v5-827",
+      "field": "altText",
+      "text": "A curved decorative plate attaches behind a small front ear stud."
+    },
+    {
+      "id": "en-holdout-v5-828",
+      "field": "altText",
+      "text": "The earring's lower fan shape extends beneath the edge of the earlobe."
+    },
+    {
+      "id": "en-holdout-v5-829",
+      "field": "caption",
+      "text": "The thread winds around the hoop and makes tiny ridges all the way."
+    },
+    {
+      "id": "en-holdout-v5-830",
+      "field": "caption",
+      "text": "I left the finishing knot hidden beside the clasp."
+    },
+    {
+      "id": "en-holdout-v5-831",
+      "field": "altText",
+      "text": "Closely wound thread covers the outer curve of a hoop earring."
+    },
+    {
+      "id": "en-holdout-v5-832",
+      "field": "altText",
+      "text": "A small gap near the earring clasp reveals the metal frame below."
+    },
+    {
+      "id": "en-holdout-v5-833",
+      "field": "caption",
+      "text": "The marble turns inside its little cage when the necklace moves."
+    },
+    {
+      "id": "en-holdout-v5-834",
+      "field": "caption",
+      "text": "I chose an open frame so the whole round shape stays visible."
+    },
+    {
+      "id": "en-holdout-v5-835",
+      "field": "altText",
+      "text": "A glass marble sits inside an open wire cage pendant."
+    },
+    {
+      "id": "en-holdout-v5-836",
+      "field": "altText",
+      "text": "Curved metal ribs hold a loose sphere below the necklace chain."
+    },
+    {
+      "id": "en-holdout-v5-837",
+      "field": "caption",
+      "text": "These three rings fit into each other's curves when I wear them together."
+    },
+    {
+      "id": "en-holdout-v5-838",
+      "field": "caption",
+      "text": "Laid them separately first so the matching edges are easier to see."
+    },
+    {
+      "id": "en-holdout-v5-839",
+      "field": "altText",
+      "text": "Three curved ring bands nest tightly together on one finger."
+    },
+    {
+      "id": "en-holdout-v5-840",
+      "field": "altText",
+      "text": "The separated rings reveal complementary wave-shaped edges."
+    },
+    {
+      "id": "en-holdout-v5-841",
+      "field": "caption",
+      "text": "The little crossbars make this bracelet look like a flexible ladder."
+    },
+    {
+      "id": "en-holdout-v5-842",
+      "field": "caption",
+      "text": "It drapes gently because each narrow section can move on its own."
+    },
+    {
+      "id": "en-holdout-v5-843",
+      "field": "altText",
+      "text": "Two parallel chains are joined by evenly spaced short metal bars."
+    },
+    {
+      "id": "en-holdout-v5-844",
+      "field": "altText",
+      "text": "The bracelet forms a flexible ladder pattern around the wrist."
+    },
+    {
+      "id": "en-holdout-v5-845",
+      "field": "caption",
+      "text": "A flat seam joins the scarf ends into one continuous loop."
+    },
+    {
+      "id": "en-holdout-v5-846",
+      "field": "caption",
+      "text": "I twisted the circle once before letting it settle around my shoulders."
+    },
+    {
+      "id": "en-holdout-v5-847",
+      "field": "altText",
+      "text": "The scarf forms a closed fabric loop with a flat joining seam."
+    },
+    {
+      "id": "en-holdout-v5-848",
+      "field": "altText",
+      "text": "A continuous scarf circle is doubled loosely around the neck."
+    },
+    {
+      "id": "en-holdout-v5-849",
+      "field": "caption",
+      "text": "The broad insert stops the chain from pressing into my shoulder."
+    },
+    {
+      "id": "en-holdout-v5-850",
+      "field": "caption",
+      "text": "I slide that soft section into place before heading out."
+    },
+    {
+      "id": "en-holdout-v5-851",
+      "field": "altText",
+      "text": "A wide soft section interrupts the chain strap above the wearer's shoulder."
+    },
+    {
+      "id": "en-holdout-v5-852",
+      "field": "altText",
+      "text": "Metal links connect to either end of a padded shoulder insert."
+    },
+    {
+      "id": "en-holdout-v5-853",
+      "field": "caption",
+      "text": "The belt end folds back and snaps down over its own strap."
+    },
+    {
+      "id": "en-holdout-v5-854",
+      "field": "caption",
+      "text": "No loose tip today, even after changing the adjustment."
+    },
+    {
+      "id": "en-holdout-v5-855",
+      "field": "altText",
+      "text": "The free belt end folds back to meet a small snap on the strap."
+    },
+    {
+      "id": "en-holdout-v5-856",
+      "field": "altText",
+      "text": "A rounded folded tip rests flat beneath the belt's fastening point."
+    },
+    {
+      "id": "en-holdout-v5-857",
+      "field": "caption",
+      "text": "The lacing stretches enough that I can leave the bow tied."
+    },
+    {
+      "id": "en-holdout-v5-858",
+      "field": "caption",
+      "text": "These are the shoes I reach for when the morning gets busy."
+    },
+    {
+      "id": "en-holdout-v5-859",
+      "field": "altText",
+      "text": "Elastic shoelaces stretch across the eyelets while a tied bow stays in place."
+    },
+    {
+      "id": "en-holdout-v5-860",
+      "field": "altText",
+      "text": "The shoe opens slightly beneath flexible laces without loosening their knot."
+    },
+    {
+      "id": "en-holdout-v5-861",
+      "field": "caption",
+      "text": "The ribbon winds onto a tiny spool inside this bracelet's centre."
+    },
+    {
+      "id": "en-holdout-v5-862",
+      "field": "caption",
+      "text": "I opened the top to show where the adjustable length disappears."
+    },
+    {
+      "id": "en-holdout-v5-863",
+      "field": "altText",
+      "text": "A small central spool takes up the bracelet's loose ribbon end."
+    },
+    {
+      "id": "en-holdout-v5-864",
+      "field": "altText",
+      "text": "The open ornament reveals a coiled band inside a shallow round housing."
+    },
+    {
+      "id": "en-holdout-v5-865",
+      "field": "caption",
+      "text": "A little knot between each bead keeps the strand moving softly."
+    },
+    {
+      "id": "en-holdout-v5-866",
+      "field": "caption",
+      "text": "I can see the fine thread when I spread the beads apart."
+    },
+    {
+      "id": "en-holdout-v5-867",
+      "field": "altText",
+      "text": "Small knots separate each round bead along a fine necklace thread."
+    },
+    {
+      "id": "en-holdout-v5-868",
+      "field": "altText",
+      "text": "The flexible beaded strand bends between regularly spaced knotted joins."
+    },
+    {
+      "id": "en-holdout-v5-869",
+      "field": "caption",
+      "text": "The top gathers into four firm pleats beneath the handle mounts."
+    },
+    {
+      "id": "en-holdout-v5-870",
+      "field": "caption",
+      "text": "Those folded corners give the bag more room than it first appears."
+    },
+    {
+      "id": "en-holdout-v5-871",
+      "field": "altText",
+      "text": "Four deep pinched folds shape the bag opening beneath its handles."
+    },
+    {
+      "id": "en-holdout-v5-872",
+      "field": "altText",
+      "text": "The upper corners are gathered into structured pleats beside two handle fittings."
+    },
+    {
+      "id": "en-holdout-v5-873",
+      "field": "caption",
+      "text": "One pin slides across the other and locks my twist in place."
+    },
+    {
+      "id": "en-holdout-v5-874",
+      "field": "caption",
+      "text": "The crossed ends make a small graphic detail at the back."
+    },
+    {
+      "id": "en-holdout-v5-875",
+      "field": "altText",
+      "text": "Two hair pins intersect through a gathered twist of hair."
+    },
+    {
+      "id": "en-holdout-v5-876",
+      "field": "altText",
+      "text": "The paired pins form an X above the base of the hairstyle."
+    },
+    {
+      "id": "en-holdout-v5-877",
+      "field": "caption",
+      "text": "The little book pendant has a page that actually turns."
+    },
+    {
+      "id": "en-holdout-v5-878",
+      "field": "caption",
+      "text": "I kept opening it while deciding what to wear with it."
+    },
+    {
+      "id": "en-holdout-v5-879",
+      "field": "altText",
+      "text": "A miniature open-book pendant has one hinged page between two fixed covers."
+    },
+    {
+      "id": "en-holdout-v5-880",
+      "field": "altText",
+      "text": "The small necklace ornament shows a thin page lifted at an angle."
+    },
+    {
+      "id": "en-holdout-v5-881",
+      "field": "caption",
+      "text": "The watch sits on one long strap that threads behind the case."
+    },
+    {
+      "id": "en-holdout-v5-882",
+      "field": "caption",
+      "text": "I can swap the band without taking the watch apart."
+    },
+    {
+      "id": "en-holdout-v5-883",
+      "field": "altText",
+      "text": "A continuous fabric strap passes beneath the watch case through two bars."
+    },
+    {
+      "id": "en-holdout-v5-884",
+      "field": "altText",
+      "text": "The watch rests on a removable band extending behind its metal back."
+    },
+    {
+      "id": "en-holdout-v5-885",
+      "field": "caption",
+      "text": "The two little cylinders meet and the necklace is closed."
+    },
+    {
+      "id": "en-holdout-v5-886",
+      "field": "caption",
+      "text": "This clasp is much easier for me to find by touch."
+    },
+    {
+      "id": "en-holdout-v5-887",
+      "field": "altText",
+      "text": "Two cylindrical halves form a magnetic closure at the necklace ends."
+    },
+    {
+      "id": "en-holdout-v5-888",
+      "field": "altText",
+      "text": "The separated clasp reveals flat circular faces that join together."
+    },
+    {
+      "id": "en-holdout-v5-889",
+      "field": "caption",
+      "text": "The single strap crosses itself before returning to the shoe."
+    },
+    {
+      "id": "en-holdout-v5-890",
+      "field": "caption",
+      "text": "I like how one continuous line makes this figure-eight shape."
+    },
+    {
+      "id": "en-holdout-v5-891",
+      "field": "altText",
+      "text": "A continuous shoe strap forms a figure eight over the foot."
+    },
+    {
+      "id": "en-holdout-v5-892",
+      "field": "altText",
+      "text": "The strap crosses at the centre before looping through the side attachment."
+    },
+    {
+      "id": "en-holdout-v5-893",
+      "field": "caption",
+      "text": "A small square folds along its diagonal to make these earrings."
+    },
+    {
+      "id": "en-holdout-v5-894",
+      "field": "caption",
+      "text": "The raised corner catches a little light whenever I turn."
+    },
+    {
+      "id": "en-holdout-v5-895",
+      "field": "altText",
+      "text": "Each earring consists of a square plate bent along one diagonal."
+    },
+    {
+      "id": "en-holdout-v5-896",
+      "field": "altText",
+      "text": "The folded metal corners create shallow triangular faces below the ears."
+    },
+    {
+      "id": "en-holdout-v5-897",
+      "field": "caption",
+      "text": "The bridge leaves room for my knuckle while the band sits lower."
+    },
+    {
+      "id": "en-holdout-v5-898",
+      "field": "caption",
+      "text": "I chose this shape for the gentle arch across the finger."
+    },
+    {
+      "id": "en-holdout-v5-899",
+      "field": "altText",
+      "text": "A raised arched section bridges the upper part of an open ring."
+    },
+    {
+      "id": "en-holdout-v5-900",
+      "field": "altText",
+      "text": "The ring's curved top sits above two lower side supports."
+    },
+    {
+      "id": "en-holdout-v5-901",
+      "field": "caption",
+      "text": "The curved cushion supports my seam while I shape the shoulder."
+    },
+    {
+      "id": "en-holdout-v5-902",
+      "field": "caption",
+      "text": "I can finally press this rounded section without flattening its shape."
+    },
+    {
+      "id": "en-holdout-v5-903",
+      "field": "altText",
+      "text": "A curved garment seam rests over a firm rounded pressing cushion."
+    },
+    {
+      "id": "en-holdout-v5-904",
+      "field": "altText",
+      "text": "The iron follows the fabric curve supported by a tailor's ham."
+    },
+    {
+      "id": "en-holdout-v5-905",
+      "field": "caption",
+      "text": "The narrow board fits inside the sleeve without adding a crease."
+    },
+    {
+      "id": "en-holdout-v5-906",
+      "field": "caption",
+      "text": "Both cuffs are ready now, with the round shape still intact."
+    },
+    {
+      "id": "en-holdout-v5-907",
+      "field": "altText",
+      "text": "A shirt sleeve surrounds a small narrow ironing board."
+    },
+    {
+      "id": "en-holdout-v5-908",
+      "field": "altText",
+      "text": "The cuff extends beyond the end of a slim raised pressing surface."
+    },
+    {
+      "id": "en-holdout-v5-909",
+      "field": "caption",
+      "text": "The wooden block holds the seam flat while the fabric cools."
+    },
+    {
+      "id": "en-holdout-v5-910",
+      "field": "caption",
+      "text": "A quiet finishing step after the steam has done its part."
+    },
+    {
+      "id": "en-holdout-v5-911",
+      "field": "altText",
+      "text": "A smooth wooden clapper rests over a freshly pressed garment seam."
+    },
+    {
+      "id": "en-holdout-v5-912",
+      "field": "altText",
+      "text": "The rectangular pressing block covers a flat join on the fabric panel."
+    },
+    {
+      "id": "en-holdout-v5-913",
+      "field": "caption",
+      "text": "The strip comes out with both edges folded neatly towards the middle."
+    },
+    {
+      "id": "en-holdout-v5-914",
+      "field": "caption",
+      "text": "I pulled slowly while pressing enough binding for the armholes."
+    },
+    {
+      "id": "en-holdout-v5-915",
+      "field": "altText",
+      "text": "A metal folding tool guides a fabric strip into two inward folds."
+    },
+    {
+      "id": "en-holdout-v5-916",
+      "field": "altText",
+      "text": "Prepared binding emerges from the narrow end of the small fabric guide."
+    },
+    {
+      "id": "en-holdout-v5-917",
+      "field": "caption",
+      "text": "That fine wire loop saves me another minute of aiming at the needle."
+    },
+    {
+      "id": "en-holdout-v5-918",
+      "field": "caption",
+      "text": "The thread is through, and my little repair can finally start."
+    },
+    {
+      "id": "en-holdout-v5-919",
+      "field": "altText",
+      "text": "A wire needle threader passes through the eye of a sewing needle."
+    },
+    {
+      "id": "en-holdout-v5-920",
+      "field": "altText",
+      "text": "Thread rests inside the fine loop before it is pulled through the needle."
+    },
+    {
+      "id": "en-holdout-v5-921",
+      "field": "caption",
+      "text": "The thimble takes the pressure while I work through these thicker layers."
+    },
+    {
+      "id": "en-holdout-v5-922",
+      "field": "caption",
+      "text": "A little protection makes the slow hand stitching much more comfortable."
+    },
+    {
+      "id": "en-holdout-v5-923",
+      "field": "altText",
+      "text": "A thimble-covered fingertip pushes a needle through layered bag fabric."
+    },
+    {
+      "id": "en-holdout-v5-924",
+      "field": "altText",
+      "text": "The small metal finger cap has dimples that hold the needle end."
+    },
+    {
+      "id": "en-holdout-v5-925",
+      "field": "caption",
+      "text": "I stitched little sections in my needle book to keep sizes apart."
+    },
+    {
+      "id": "en-holdout-v5-926",
+      "field": "caption",
+      "text": "Now I can find the one I need without emptying the whole case."
+    },
+    {
+      "id": "en-holdout-v5-927",
+      "field": "altText",
+      "text": "A small fabric needle book opens to several divided soft pages."
+    },
+    {
+      "id": "en-holdout-v5-928",
+      "field": "altText",
+      "text": "Different sewing needles are held in separate sections beneath narrow fabric tabs."
+    },
+    {
+      "id": "en-holdout-v5-929",
+      "field": "caption",
+      "text": "The twin needle leaves two tidy rows across the front of the hem."
+    },
+    {
+      "id": "en-holdout-v5-930",
+      "field": "caption",
+      "text": "I checked the stretch on a scrap before finishing my shirt."
+    },
+    {
+      "id": "en-holdout-v5-931",
+      "field": "altText",
+      "text": "Two parallel stitch lines finish the lower edge of a knit shirt."
+    },
+    {
+      "id": "en-holdout-v5-932",
+      "field": "altText",
+      "text": "A double needle sits above a folded knit hem beneath the machine foot."
+    },
+    {
+      "id": "en-holdout-v5-933",
+      "field": "caption",
+      "text": "Only tiny dots show on the outside of this practice hem."
+    },
+    {
+      "id": "en-holdout-v5-934",
+      "field": "caption",
+      "text": "I am getting better at catching just a little of the main cloth."
+    },
+    {
+      "id": "en-holdout-v5-935",
+      "field": "altText",
+      "text": "A folded hem shows widely spaced tiny stitch points on its outer face."
+    },
+    {
+      "id": "en-holdout-v5-936",
+      "field": "altText",
+      "text": "The inside of the sample reveals angled stitches joining the folded edge."
+    },
+    {
+      "id": "en-holdout-v5-937",
+      "field": "caption",
+      "text": "The opening closes as the thread pulls the two folded edges together."
+    },
+    {
+      "id": "en-holdout-v5-938",
+      "field": "caption",
+      "text": "Almost finished with the hand-sewn gap in this little pouch."
+    },
+    {
+      "id": "en-holdout-v5-939",
+      "field": "altText",
+      "text": "A loose ladder of thread spans a small opening between two folded edges."
+    },
+    {
+      "id": "en-holdout-v5-940",
+      "field": "altText",
+      "text": "The hand-sewn pouch opening narrows where the stitches have been tightened."
+    },
+    {
+      "id": "en-holdout-v5-941",
+      "field": "caption",
+      "text": "The crossing stitches leave the inside hem flexible when I move it."
+    },
+    {
+      "id": "en-holdout-v5-942",
+      "field": "caption",
+      "text": "Taking the last few stitches slowly on these favourite trousers."
+    },
+    {
+      "id": "en-holdout-v5-943",
+      "field": "altText",
+      "text": "Crossed hand stitches join a trouser hem to the inner fabric surface."
+    },
+    {
+      "id": "en-holdout-v5-944",
+      "field": "altText",
+      "text": "Small overlapping X shapes run along the turned-up hem edge."
+    },
+    {
+      "id": "en-holdout-v5-945",
+      "field": "caption",
+      "text": "A thin spacer keeps the stitches loose enough to leave a button stem."
+    },
+    {
+      "id": "en-holdout-v5-946",
+      "field": "caption",
+      "text": "The button lifts just clear of the fabric when I remove it."
+    },
+    {
+      "id": "en-holdout-v5-947",
+      "field": "altText",
+      "text": "A narrow spacer lies between the button and fabric during stitching."
+    },
+    {
+      "id": "en-holdout-v5-948",
+      "field": "altText",
+      "text": "The partly attached button rests above a slim removable strip."
+    },
+    {
+      "id": "en-holdout-v5-949",
+      "field": "caption",
+      "text": "The little mesh sleeve keeps this slippery thread from unwinding everywhere."
+    },
+    {
+      "id": "en-holdout-v5-950",
+      "field": "caption",
+      "text": "I can feed it steadily now while the spool stays tidy."
+    },
+    {
+      "id": "en-holdout-v5-951",
+      "field": "altText",
+      "text": "A fine mesh net surrounds a spool of smooth sewing thread."
+    },
+    {
+      "id": "en-holdout-v5-952",
+      "field": "altText",
+      "text": "The thread end feeds from the covered spool towards the machine guide."
+    },
+    {
+      "id": "en-holdout-v5-953",
+      "field": "caption",
+      "text": "Both sides of the zip meet properly after feeding them into the slider."
+    },
+    {
+      "id": "en-holdout-v5-954",
+      "field": "caption",
+      "text": "I tested the movement before attaching this closure to the bag."
+    },
+    {
+      "id": "en-holdout-v5-955",
+      "field": "altText",
+      "text": "Two zipper tapes enter the separate openings of a loose slider."
+    },
+    {
+      "id": "en-holdout-v5-956",
+      "field": "altText",
+      "text": "The newly fitted slider joins the two rows of zipper teeth."
+    },
+    {
+      "id": "en-holdout-v5-957",
+      "field": "caption",
+      "text": "The little grip helps me pull the needle through the last thick section."
+    },
+    {
+      "id": "en-holdout-v5-958",
+      "field": "caption",
+      "text": "Finishing the handle join without straining my fingertips today."
+    },
+    {
+      "id": "en-holdout-v5-959",
+      "field": "altText",
+      "text": "A small rubber grip holds the needle as it emerges from layered fabric."
+    },
+    {
+      "id": "en-holdout-v5-960",
+      "field": "altText",
+      "text": "The needle is pulled through a thick bag handle with a textured pad."
+    },
+    {
+      "id": "en-holdout-v5-961",
+      "field": "caption",
+      "text": "A light pass through the wax keeps my hand-sewing thread from tangling."
+    },
+    {
+      "id": "en-holdout-v5-962",
+      "field": "caption",
+      "text": "Ready to start the long seam with a smoother strand."
+    },
+    {
+      "id": "en-holdout-v5-963",
+      "field": "altText",
+      "text": "A length of sewing thread passes through a groove in a wax block."
+    },
+    {
+      "id": "en-holdout-v5-964",
+      "field": "altText",
+      "text": "The waxed thread lies beside a needle and a small round wax holder."
+    },
+    {
+      "id": "en-holdout-v5-965",
+      "field": "caption",
+      "text": "The paper foundation keeps these narrow points where they belong."
+    },
+    {
+      "id": "en-holdout-v5-966",
+      "field": "caption",
+      "text": "I removed one section to show the little fabric joins underneath."
+    },
+    {
+      "id": "en-holdout-v5-967",
+      "field": "altText",
+      "text": "Small fabric triangles are stitched onto a marked paper foundation."
+    },
+    {
+      "id": "en-holdout-v5-968",
+      "field": "altText",
+      "text": "A partly removed paper backing reveals precise joins in a patchwork block."
+    },
+    {
+      "id": "en-holdout-v5-969",
+      "field": "caption",
+      "text": "The cardboard shape guides the folded edge around this little appliqué."
+    },
+    {
+      "id": "en-holdout-v5-970",
+      "field": "caption",
+      "text": "I can take the guide out once the curve is set."
+    },
+    {
+      "id": "en-holdout-v5-971",
+      "field": "altText",
+      "text": "A fabric shape is folded around a thin cardboard template."
+    },
+    {
+      "id": "en-holdout-v5-972",
+      "field": "altText",
+      "text": "Small gathered stitches pull the fabric edge over the curved guide."
+    },
+    {
+      "id": "en-holdout-v5-973",
+      "field": "caption",
+      "text": "The binding turns the corner in a small diagonal fold."
+    },
+    {
+      "id": "en-holdout-v5-974",
+      "field": "caption",
+      "text": "That neat little point is the part I wanted to get right."
+    },
+    {
+      "id": "en-holdout-v5-975",
+      "field": "altText",
+      "text": "A diagonal fold joins two sections of binding at a square corner."
+    },
+    {
+      "id": "en-holdout-v5-976",
+      "field": "altText",
+      "text": "The finished fabric edge has a neatly mitred right-angle binding join."
+    },
+    {
+      "id": "en-holdout-v5-977",
+      "field": "caption",
+      "text": "A few linked stitches make the tiny loop that holds this button."
+    },
+    {
+      "id": "en-holdout-v5-978",
+      "field": "caption",
+      "text": "I built it directly on the edge so there is nothing extra to attach."
+    },
+    {
+      "id": "en-holdout-v5-979",
+      "field": "altText",
+      "text": "A short chain of thread stitches forms a button loop at the neckline."
+    },
+    {
+      "id": "en-holdout-v5-980",
+      "field": "altText",
+      "text": "The small flexible loop projects from the finished edge of the garment."
+    },
+    {
+      "id": "en-holdout-v5-981",
+      "field": "caption",
+      "text": "Folding the corner flat creates a base wide enough for the bag to stand."
+    },
+    {
+      "id": "en-holdout-v5-982",
+      "field": "caption",
+      "text": "I checked both sides before trimming the little triangles away."
+    },
+    {
+      "id": "en-holdout-v5-983",
+      "field": "altText",
+      "text": "A flattened triangular corner is stitched across to shape the bag base."
+    },
+    {
+      "id": "en-holdout-v5-984",
+      "field": "altText",
+      "text": "The opened bag has a squared bottom formed by two boxed corners."
+    },
+    {
+      "id": "en-holdout-v5-985",
+      "field": "caption",
+      "text": "The second seam encloses the first edge inside a narrow fold."
+    },
+    {
+      "id": "en-holdout-v5-986",
+      "field": "caption",
+      "text": "My tote has a clean interior finish all along its sides."
+    },
+    {
+      "id": "en-holdout-v5-987",
+      "field": "altText",
+      "text": "An enclosed folded seam runs down the inside of the tote bag."
+    },
+    {
+      "id": "en-holdout-v5-988",
+      "field": "altText",
+      "text": "The inner join has no exposed fabric edge along its narrow raised fold."
+    },
+    {
+      "id": "en-holdout-v5-989",
+      "field": "caption",
+      "text": "The fixed guide helps me keep the stitching the same distance from the edge."
+    },
+    {
+      "id": "en-holdout-v5-990",
+      "field": "caption",
+      "text": "I moved it into position before starting this long bag seam."
+    },
+    {
+      "id": "en-holdout-v5-991",
+      "field": "altText",
+      "text": "A small metal guide sits beside the fabric edge under the sewing machine."
+    },
+    {
+      "id": "en-holdout-v5-992",
+      "field": "altText",
+      "text": "The cloth moves against a straight stop parallel to the needle path."
+    },
+    {
+      "id": "en-holdout-v5-993",
+      "field": "caption",
+      "text": "A little card keeps all four button holes pointing the same way."
+    },
+    {
+      "id": "en-holdout-v5-994",
+      "field": "caption",
+      "text": "It is a small detail, but the whole row looks calmer to me."
+    },
+    {
+      "id": "en-holdout-v5-995",
+      "field": "altText",
+      "text": "A marked card guides the orientation of buttons pinned along the shirt."
+    },
+    {
+      "id": "en-holdout-v5-996",
+      "field": "altText",
+      "text": "The four-hole buttons are aligned with matching marks on a paper guide."
+    },
+    {
+      "id": "en-holdout-v5-997",
+      "field": "caption",
+      "text": "The folded support keeps the machine foot level over this thick join."
+    },
+    {
+      "id": "en-holdout-v5-998",
+      "field": "caption",
+      "text": "The last few stitches crossed the bulky section much more smoothly."
+    },
+    {
+      "id": "en-holdout-v5-999",
+      "field": "altText",
+      "text": "A small folded support lifts the sewing machine foot beside a bulky seam."
+    },
+    {
+      "id": "en-holdout-v5-1000",
+      "field": "altText",
+      "text": "The presser foot rests level while crossing several stacked fabric layers."
+    }
+  ]
+}

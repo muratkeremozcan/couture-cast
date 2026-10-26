@@ -1,0 +1,1590 @@
+{
+  "status": "FINAL_READY",
+  "locale": "it",
+  "author": "/root/edge_paths",
+  "authoredRanges": [
+    {
+      "rows": "1..1000",
+      "count": 1000,
+      "caption": 500,
+      "altText": 500,
+      "author": "/root/edge_paths"
+    }
+  ],
+  "rotatedAssignment": "Italian V5 authored by edge_paths; Italian V4 belonged to general_review.",
+  "sourcePath": "/private/tmp/cc68-tea-holdout-v5/.cc68-tea-authoring/it.tsv",
+  "sourceSha256": "c24f7ea97c32a18e8c8a36cd56665f6e40ae4c375f6115e4a2b825570ea6ee33",
+  "total": 1000,
+  "fields": {
+    "caption": 500,
+    "altText": 500
+  },
+  "fiveWordOverlap": {
+    "affectedCount": 0,
+    "affectedShare": 0.0,
+    "affectedItems": [],
+    "repeatedSequences": []
+  },
+  "concepts": {
+    "distinct": 215,
+    "maximumCount": 8,
+    "maximumShare": 0.008,
+    "allTiedMaxima": [
+      {
+        "concept": "Adjustment cord concealed within a garment compartment",
+        "englishGloss": "Adjustment cord concealed within a garment compartment",
+        "rows": [725, 726, 727, 728, 925, 926, 927, 928],
+        "members": [
+          {
+            "row": 725,
+            "field": "caption"
+          },
+          {
+            "row": 726,
+            "field": "caption"
+          },
+          {
+            "row": 727,
+            "field": "altText"
+          },
+          {
+            "row": 728,
+            "field": "altText"
+          },
+          {
+            "row": 925,
+            "field": "caption"
+          },
+          {
+            "row": 926,
+            "field": "caption"
+          },
+          {
+            "row": 927,
+            "field": "altText"
+          },
+          {
+            "row": 928,
+            "field": "altText"
+          }
+        ]
+      },
+      {
+        "concept": "Backing patch protects cloth behind metal hardware",
+        "englishGloss": "Backing patch protects cloth behind metal hardware",
+        "rows": [177, 178, 179, 180, 373, 374, 375, 376],
+        "members": [
+          {
+            "row": 177,
+            "field": "caption"
+          },
+          {
+            "row": 178,
+            "field": "caption"
+          },
+          {
+            "row": 179,
+            "field": "altText"
+          },
+          {
+            "row": 180,
+            "field": "altText"
+          },
+          {
+            "row": 373,
+            "field": "caption"
+          },
+          {
+            "row": 374,
+            "field": "caption"
+          },
+          {
+            "row": 375,
+            "field": "altText"
+          },
+          {
+            "row": 376,
+            "field": "altText"
+          }
+        ]
+      },
+      {
+        "concept": "Bag strap doubled through fittings to shorten carrying length",
+        "englishGloss": "Bag strap doubled through fittings to shorten carrying length",
+        "rows": [773, 774, 775, 776, 881, 882, 883, 884],
+        "members": [
+          {
+            "row": 773,
+            "field": "caption"
+          },
+          {
+            "row": 774,
+            "field": "caption"
+          },
+          {
+            "row": 775,
+            "field": "altText"
+          },
+          {
+            "row": 776,
+            "field": "altText"
+          },
+          {
+            "row": 881,
+            "field": "caption"
+          },
+          {
+            "row": 882,
+            "field": "caption"
+          },
+          {
+            "row": 883,
+            "field": "altText"
+          },
+          {
+            "row": 884,
+            "field": "altText"
+          }
+        ]
+      },
+      {
+        "concept": "Button attachment supported from the reverse",
+        "englishGloss": "Button attachment supported from the reverse",
+        "rows": [425, 426, 427, 428, 905, 906, 907, 908],
+        "members": [
+          {
+            "row": 425,
+            "field": "caption"
+          },
+          {
+            "row": 426,
+            "field": "caption"
+          },
+          {
+            "row": 427,
+            "field": "altText"
+          },
+          {
+            "row": 428,
+            "field": "altText"
+          },
+          {
+            "row": 905,
+            "field": "caption"
+          },
+          {
+            "row": 906,
+            "field": "caption"
+          },
+          {
+            "row": 907,
+            "field": "altText"
+          },
+          {
+            "row": 908,
+            "field": "altText"
+          }
+        ]
+      },
+      {
+        "concept": "Closure or knot moved clear of hand contact",
+        "englishGloss": "Closure or knot moved clear of hand contact",
+        "rows": [297, 298, 299, 300, 941, 942, 943, 944],
+        "members": [
+          {
+            "row": 297,
+            "field": "caption"
+          },
+          {
+            "row": 298,
+            "field": "caption"
+          },
+          {
+            "row": 299,
+            "field": "altText"
+          },
+          {
+            "row": 300,
+            "field": "altText"
+          },
+          {
+            "row": 941,
+            "field": "caption"
+          },
+          {
+            "row": 942,
+            "field": "caption"
+          },
+          {
+            "row": 943,
+            "field": "altText"
+          },
+          {
+            "row": 944,
+            "field": "altText"
+          }
+        ]
+      },
+      {
+        "concept": "Earring parts held on a textile storage support",
+        "englishGloss": "Earring parts held on a textile storage support",
+        "rows": [385, 386, 387, 388, 949, 950, 951, 952],
+        "members": [
+          {
+            "row": 385,
+            "field": "caption"
+          },
+          {
+            "row": 386,
+            "field": "caption"
+          },
+          {
+            "row": 387,
+            "field": "altText"
+          },
+          {
+            "row": 388,
+            "field": "altText"
+          },
+          {
+            "row": 949,
+            "field": "caption"
+          },
+          {
+            "row": 950,
+            "field": "caption"
+          },
+          {
+            "row": 951,
+            "field": "altText"
+          },
+          {
+            "row": 952,
+            "field": "altText"
+          }
+        ]
+      },
+      {
+        "concept": "Fabric folded into a flower ornament",
+        "englishGloss": "Fabric folded into a flower ornament",
+        "rows": [525, 526, 527, 528, 797, 798, 799, 800],
+        "members": [
+          {
+            "row": 525,
+            "field": "caption"
+          },
+          {
+            "row": 526,
+            "field": "caption"
+          },
+          {
+            "row": 527,
+            "field": "altText"
+          },
+          {
+            "row": 528,
+            "field": "altText"
+          },
+          {
+            "row": 797,
+            "field": "caption"
+          },
+          {
+            "row": 798,
+            "field": "caption"
+          },
+          {
+            "row": 799,
+            "field": "altText"
+          },
+          {
+            "row": 800,
+            "field": "altText"
+          }
+        ]
+      },
+      {
+        "concept": "Factory basting removed before wearing",
+        "englishGloss": "Factory basting removed before wearing",
+        "rows": [1, 2, 3, 4, 5, 6, 7, 8],
+        "members": [
+          {
+            "row": 1,
+            "field": "caption"
+          },
+          {
+            "row": 2,
+            "field": "caption"
+          },
+          {
+            "row": 3,
+            "field": "altText"
+          },
+          {
+            "row": 4,
+            "field": "altText"
+          },
+          {
+            "row": 5,
+            "field": "caption"
+          },
+          {
+            "row": 6,
+            "field": "caption"
+          },
+          {
+            "row": 7,
+            "field": "altText"
+          },
+          {
+            "row": 8,
+            "field": "altText"
+          }
+        ]
+      },
+      {
+        "concept": "Fixed pleats released to allow lower garment movement",
+        "englishGloss": "Fixed pleats released to allow lower garment movement",
+        "rows": [73, 74, 75, 76, 541, 542, 543, 544],
+        "members": [
+          {
+            "row": 73,
+            "field": "caption"
+          },
+          {
+            "row": 74,
+            "field": "caption"
+          },
+          {
+            "row": 75,
+            "field": "altText"
+          },
+          {
+            "row": 76,
+            "field": "altText"
+          },
+          {
+            "row": 541,
+            "field": "caption"
+          },
+          {
+            "row": 542,
+            "field": "caption"
+          },
+          {
+            "row": 543,
+            "field": "altText"
+          },
+          {
+            "row": 544,
+            "field": "altText"
+          }
+        ]
+      },
+      {
+        "concept": "Folded upper edge forms a pocket or bag flap",
+        "englishGloss": "Folded upper edge forms a pocket or bag flap",
+        "rows": [213, 214, 215, 216, 585, 586, 587, 588],
+        "members": [
+          {
+            "row": 213,
+            "field": "caption"
+          },
+          {
+            "row": 214,
+            "field": "caption"
+          },
+          {
+            "row": 215,
+            "field": "altText"
+          },
+          {
+            "row": 216,
+            "field": "altText"
+          },
+          {
+            "row": 585,
+            "field": "caption"
+          },
+          {
+            "row": 586,
+            "field": "caption"
+          },
+          {
+            "row": 587,
+            "field": "altText"
+          },
+          {
+            "row": 588,
+            "field": "altText"
+          }
+        ]
+      },
+      {
+        "concept": "Garment fit checked while seated",
+        "englishGloss": "Garment fit checked while seated",
+        "rows": [857, 858, 859, 860, 965, 966, 967, 968],
+        "members": [
+          {
+            "row": 857,
+            "field": "caption"
+          },
+          {
+            "row": 858,
+            "field": "caption"
+          },
+          {
+            "row": 859,
+            "field": "altText"
+          },
+          {
+            "row": 860,
+            "field": "altText"
+          },
+          {
+            "row": 965,
+            "field": "caption"
+          },
+          {
+            "row": 966,
+            "field": "caption"
+          },
+          {
+            "row": 967,
+            "field": "altText"
+          },
+          {
+            "row": 968,
+            "field": "altText"
+          }
+        ]
+      },
+      {
+        "concept": "Garment rolled compactly for storage or travel",
+        "englishGloss": "Garment rolled compactly for storage or travel",
+        "rows": [369, 370, 371, 372, 885, 886, 887, 888],
+        "members": [
+          {
+            "row": 369,
+            "field": "caption"
+          },
+          {
+            "row": 370,
+            "field": "caption"
+          },
+          {
+            "row": 371,
+            "field": "altText"
+          },
+          {
+            "row": 372,
+            "field": "altText"
+          },
+          {
+            "row": 885,
+            "field": "caption"
+          },
+          {
+            "row": 886,
+            "field": "caption"
+          },
+          {
+            "row": 887,
+            "field": "altText"
+          },
+          {
+            "row": 888,
+            "field": "altText"
+          }
+        ]
+      },
+      {
+        "concept": "Garment shoulders supported during storage",
+        "englishGloss": "Garment shoulders supported during storage",
+        "rows": [201, 202, 203, 204, 377, 378, 379, 380],
+        "members": [
+          {
+            "row": 201,
+            "field": "caption"
+          },
+          {
+            "row": 202,
+            "field": "caption"
+          },
+          {
+            "row": 203,
+            "field": "altText"
+          },
+          {
+            "row": 204,
+            "field": "altText"
+          },
+          {
+            "row": 377,
+            "field": "caption"
+          },
+          {
+            "row": 378,
+            "field": "caption"
+          },
+          {
+            "row": 379,
+            "field": "altText"
+          },
+          {
+            "row": 380,
+            "field": "altText"
+          }
+        ]
+      },
+      {
+        "concept": "Hat tilted to change brim position and facial shade",
+        "englishGloss": "Hat tilted to change brim position and facial shade",
+        "rows": [53, 54, 55, 56, 577, 578, 579, 580],
+        "members": [
+          {
+            "row": 53,
+            "field": "caption"
+          },
+          {
+            "row": 54,
+            "field": "caption"
+          },
+          {
+            "row": 55,
+            "field": "altText"
+          },
+          {
+            "row": 56,
+            "field": "altText"
+          },
+          {
+            "row": 577,
+            "field": "caption"
+          },
+          {
+            "row": 578,
+            "field": "caption"
+          },
+          {
+            "row": 579,
+            "field": "altText"
+          },
+          {
+            "row": 580,
+            "field": "altText"
+          }
+        ]
+      },
+      {
+        "concept": "Interior turned outward for viewing",
+        "englishGloss": "Interior turned outward for viewing",
+        "rows": [733, 734, 735, 736, 833, 834, 835, 836],
+        "members": [
+          {
+            "row": 733,
+            "field": "caption"
+          },
+          {
+            "row": 734,
+            "field": "caption"
+          },
+          {
+            "row": 735,
+            "field": "altText"
+          },
+          {
+            "row": 736,
+            "field": "altText"
+          },
+          {
+            "row": 833,
+            "field": "caption"
+          },
+          {
+            "row": 834,
+            "field": "caption"
+          },
+          {
+            "row": 835,
+            "field": "altText"
+          },
+          {
+            "row": 836,
+            "field": "altText"
+          }
+        ]
+      },
+      {
+        "concept": "Internal facing secured with small stitches",
+        "englishGloss": "Internal facing secured with small stitches",
+        "rows": [677, 678, 679, 680, 929, 930, 931, 932],
+        "members": [
+          {
+            "row": 677,
+            "field": "caption"
+          },
+          {
+            "row": 678,
+            "field": "caption"
+          },
+          {
+            "row": 679,
+            "field": "altText"
+          },
+          {
+            "row": 680,
+            "field": "altText"
+          },
+          {
+            "row": 929,
+            "field": "caption"
+          },
+          {
+            "row": 930,
+            "field": "caption"
+          },
+          {
+            "row": 931,
+            "field": "altText"
+          },
+          {
+            "row": 932,
+            "field": "altText"
+          }
+        ]
+      },
+      {
+        "concept": "Internal raw seams enclosed by ribbon binding",
+        "englishGloss": "Internal raw seams enclosed by ribbon binding",
+        "rows": [149, 150, 151, 152, 733, 734, 735, 736],
+        "members": [
+          {
+            "row": 149,
+            "field": "caption"
+          },
+          {
+            "row": 150,
+            "field": "caption"
+          },
+          {
+            "row": 151,
+            "field": "altText"
+          },
+          {
+            "row": 152,
+            "field": "altText"
+          },
+          {
+            "row": 733,
+            "field": "caption"
+          },
+          {
+            "row": 734,
+            "field": "caption"
+          },
+          {
+            "row": 735,
+            "field": "altText"
+          },
+          {
+            "row": 736,
+            "field": "altText"
+          }
+        ]
+      },
+      {
+        "concept": "Lace layered above plain garment fabric",
+        "englishGloss": "Lace layered above plain garment fabric",
+        "rows": [77, 78, 79, 80, 433, 434, 435, 436],
+        "members": [
+          {
+            "row": 77,
+            "field": "caption"
+          },
+          {
+            "row": 78,
+            "field": "caption"
+          },
+          {
+            "row": 79,
+            "field": "altText"
+          },
+          {
+            "row": 80,
+            "field": "altText"
+          },
+          {
+            "row": 433,
+            "field": "caption"
+          },
+          {
+            "row": 434,
+            "field": "caption"
+          },
+          {
+            "row": 435,
+            "field": "altText"
+          },
+          {
+            "row": 436,
+            "field": "altText"
+          }
+        ]
+      },
+      {
+        "concept": "Leaf embroidery decorates a shirt collar",
+        "englishGloss": "Leaf embroidery decorates a shirt collar",
+        "rows": [729, 730, 731, 732, 889, 890, 891, 892],
+        "members": [
+          {
+            "row": 729,
+            "field": "caption"
+          },
+          {
+            "row": 730,
+            "field": "caption"
+          },
+          {
+            "row": 731,
+            "field": "altText"
+          },
+          {
+            "row": 732,
+            "field": "altText"
+          },
+          {
+            "row": 889,
+            "field": "caption"
+          },
+          {
+            "row": 890,
+            "field": "caption"
+          },
+          {
+            "row": 891,
+            "field": "altText"
+          },
+          {
+            "row": 892,
+            "field": "altText"
+          }
+        ]
+      },
+      {
+        "concept": "Lining tethered with a loose thread chain",
+        "englishGloss": "Lining tethered with a loose thread chain",
+        "rows": [37, 38, 39, 40, 969, 970, 971, 972],
+        "members": [
+          {
+            "row": 37,
+            "field": "caption"
+          },
+          {
+            "row": 38,
+            "field": "caption"
+          },
+          {
+            "row": 39,
+            "field": "altText"
+          },
+          {
+            "row": 40,
+            "field": "altText"
+          },
+          {
+            "row": 969,
+            "field": "caption"
+          },
+          {
+            "row": 970,
+            "field": "caption"
+          },
+          {
+            "row": 971,
+            "field": "altText"
+          },
+          {
+            "row": 972,
+            "field": "altText"
+          }
+        ]
+      },
+      {
+        "concept": "Long pendant layered over a short neck scarf",
+        "englishGloss": "Long pendant layered over a short neck scarf",
+        "rows": [137, 138, 139, 140, 985, 986, 987, 988],
+        "members": [
+          {
+            "row": 137,
+            "field": "caption"
+          },
+          {
+            "row": 138,
+            "field": "caption"
+          },
+          {
+            "row": 139,
+            "field": "altText"
+          },
+          {
+            "row": 140,
+            "field": "altText"
+          },
+          {
+            "row": 985,
+            "field": "caption"
+          },
+          {
+            "row": 986,
+            "field": "caption"
+          },
+          {
+            "row": 987,
+            "field": "altText"
+          },
+          {
+            "row": 988,
+            "field": "altText"
+          }
+        ]
+      },
+      {
+        "concept": "Lower garment opening expands during a stride",
+        "englishGloss": "Lower garment opening expands during a stride",
+        "rows": [209, 210, 211, 212, 673, 674, 675, 676],
+        "members": [
+          {
+            "row": 209,
+            "field": "caption"
+          },
+          {
+            "row": 210,
+            "field": "caption"
+          },
+          {
+            "row": 211,
+            "field": "altText"
+          },
+          {
+            "row": 212,
+            "field": "altText"
+          },
+          {
+            "row": 673,
+            "field": "caption"
+          },
+          {
+            "row": 674,
+            "field": "caption"
+          },
+          {
+            "row": 675,
+            "field": "altText"
+          },
+          {
+            "row": 676,
+            "field": "altText"
+          }
+        ]
+      },
+      {
+        "concept": "Metal accessory wrapped in a textile strip",
+        "englishGloss": "Metal accessory wrapped in a textile strip",
+        "rows": [497, 498, 499, 500, 609, 610, 611, 612],
+        "members": [
+          {
+            "row": 497,
+            "field": "caption"
+          },
+          {
+            "row": 498,
+            "field": "caption"
+          },
+          {
+            "row": 499,
+            "field": "altText"
+          },
+          {
+            "row": 500,
+            "field": "altText"
+          },
+          {
+            "row": 609,
+            "field": "caption"
+          },
+          {
+            "row": 610,
+            "field": "caption"
+          },
+          {
+            "row": 611,
+            "field": "altText"
+          },
+          {
+            "row": 612,
+            "field": "altText"
+          }
+        ]
+      },
+      {
+        "concept": "Necklace centred within an open shirt collar",
+        "englishGloss": "Necklace centred within an open shirt collar",
+        "rows": [353, 354, 355, 356, 837, 838, 839, 840],
+        "members": [
+          {
+            "row": 353,
+            "field": "caption"
+          },
+          {
+            "row": 354,
+            "field": "caption"
+          },
+          {
+            "row": 355,
+            "field": "altText"
+          },
+          {
+            "row": 356,
+            "field": "altText"
+          },
+          {
+            "row": 837,
+            "field": "caption"
+          },
+          {
+            "row": 838,
+            "field": "caption"
+          },
+          {
+            "row": 839,
+            "field": "altText"
+          },
+          {
+            "row": 840,
+            "field": "altText"
+          }
+        ]
+      },
+      {
+        "concept": "Outerwear fit checked with arms reaching",
+        "englishGloss": "Outerwear fit checked with arms reaching",
+        "rows": [21, 22, 23, 24, 477, 478, 479, 480],
+        "members": [
+          {
+            "row": 21,
+            "field": "caption"
+          },
+          {
+            "row": 22,
+            "field": "caption"
+          },
+          {
+            "row": 23,
+            "field": "altText"
+          },
+          {
+            "row": 24,
+            "field": "altText"
+          },
+          {
+            "row": 477,
+            "field": "caption"
+          },
+          {
+            "row": 478,
+            "field": "caption"
+          },
+          {
+            "row": 479,
+            "field": "altText"
+          },
+          {
+            "row": 480,
+            "field": "altText"
+          }
+        ]
+      },
+      {
+        "concept": "Paper protects garment folds in storage or packing",
+        "englishGloss": "Paper protects garment folds in storage or packing",
+        "rows": [193, 194, 195, 196, 565, 566, 567, 568],
+        "members": [
+          {
+            "row": 193,
+            "field": "caption"
+          },
+          {
+            "row": 194,
+            "field": "caption"
+          },
+          {
+            "row": 195,
+            "field": "altText"
+          },
+          {
+            "row": 196,
+            "field": "altText"
+          },
+          {
+            "row": 565,
+            "field": "caption"
+          },
+          {
+            "row": 566,
+            "field": "caption"
+          },
+          {
+            "row": 567,
+            "field": "altText"
+          },
+          {
+            "row": 568,
+            "field": "altText"
+          }
+        ]
+      },
+      {
+        "concept": "Pin secures draped garment at a chosen position",
+        "englishGloss": "Pin secures draped garment at a chosen position",
+        "rows": [197, 198, 199, 200, 561, 562, 563, 564],
+        "members": [
+          {
+            "row": 197,
+            "field": "caption"
+          },
+          {
+            "row": 198,
+            "field": "caption"
+          },
+          {
+            "row": 199,
+            "field": "altText"
+          },
+          {
+            "row": 200,
+            "field": "altText"
+          },
+          {
+            "row": 561,
+            "field": "caption"
+          },
+          {
+            "row": 562,
+            "field": "caption"
+          },
+          {
+            "row": 563,
+            "field": "altText"
+          },
+          {
+            "row": 564,
+            "field": "altText"
+          }
+        ]
+      },
+      {
+        "concept": "Scarf anchored to an outer garment",
+        "englishGloss": "Scarf anchored to an outer garment",
+        "rows": [217, 218, 219, 220, 861, 862, 863, 864],
+        "members": [
+          {
+            "row": 217,
+            "field": "caption"
+          },
+          {
+            "row": 218,
+            "field": "caption"
+          },
+          {
+            "row": 219,
+            "field": "altText"
+          },
+          {
+            "row": 220,
+            "field": "altText"
+          },
+          {
+            "row": 861,
+            "field": "caption"
+          },
+          {
+            "row": 862,
+            "field": "caption"
+          },
+          {
+            "row": 863,
+            "field": "altText"
+          },
+          {
+            "row": 864,
+            "field": "altText"
+          }
+        ]
+      },
+      {
+        "concept": "Scarf integrated into tied or braided hair",
+        "englishGloss": "Scarf integrated into tied or braided hair",
+        "rows": [189, 190, 191, 192, 417, 418, 419, 420],
+        "members": [
+          {
+            "row": 189,
+            "field": "caption"
+          },
+          {
+            "row": 190,
+            "field": "caption"
+          },
+          {
+            "row": 191,
+            "field": "altText"
+          },
+          {
+            "row": 192,
+            "field": "altText"
+          },
+          {
+            "row": 417,
+            "field": "caption"
+          },
+          {
+            "row": 418,
+            "field": "caption"
+          },
+          {
+            "row": 419,
+            "field": "altText"
+          },
+          {
+            "row": 420,
+            "field": "altText"
+          }
+        ]
+      },
+      {
+        "concept": "Seam direction checked along a wearable item",
+        "englishGloss": "Seam direction checked along a wearable item",
+        "rows": [529, 530, 531, 532, 757, 758, 759, 760],
+        "members": [
+          {
+            "row": 529,
+            "field": "caption"
+          },
+          {
+            "row": 530,
+            "field": "caption"
+          },
+          {
+            "row": 531,
+            "field": "altText"
+          },
+          {
+            "row": 532,
+            "field": "altText"
+          },
+          {
+            "row": 757,
+            "field": "caption"
+          },
+          {
+            "row": 758,
+            "field": "caption"
+          },
+          {
+            "row": 759,
+            "field": "altText"
+          },
+          {
+            "row": 760,
+            "field": "altText"
+          }
+        ]
+      },
+      {
+        "concept": "Soft divider separates contents inside a carrying bag",
+        "englishGloss": "Soft divider separates contents inside a carrying bag",
+        "rows": [169, 170, 171, 172, 593, 594, 595, 596],
+        "members": [
+          {
+            "row": 169,
+            "field": "caption"
+          },
+          {
+            "row": 170,
+            "field": "caption"
+          },
+          {
+            "row": 171,
+            "field": "altText"
+          },
+          {
+            "row": 172,
+            "field": "altText"
+          },
+          {
+            "row": 593,
+            "field": "caption"
+          },
+          {
+            "row": 594,
+            "field": "caption"
+          },
+          {
+            "row": 595,
+            "field": "altText"
+          },
+          {
+            "row": 596,
+            "field": "altText"
+          }
+        ]
+      },
+      {
+        "concept": "Soft textile spacer separates jewellery elements",
+        "englishGloss": "Soft textile spacer separates jewellery elements",
+        "rows": [581, 582, 583, 584, 605, 606, 607, 608],
+        "members": [
+          {
+            "row": 581,
+            "field": "caption"
+          },
+          {
+            "row": 582,
+            "field": "caption"
+          },
+          {
+            "row": 583,
+            "field": "altText"
+          },
+          {
+            "row": 584,
+            "field": "altText"
+          },
+          {
+            "row": 605,
+            "field": "caption"
+          },
+          {
+            "row": 606,
+            "field": "caption"
+          },
+          {
+            "row": 607,
+            "field": "altText"
+          },
+          {
+            "row": 608,
+            "field": "altText"
+          }
+        ]
+      },
+      {
+        "concept": "Stitched interior symbol identifies a wearable item",
+        "englishGloss": "Stitched interior symbol identifies a wearable item",
+        "rows": [513, 514, 515, 516, 865, 866, 867, 868],
+        "members": [
+          {
+            "row": 513,
+            "field": "caption"
+          },
+          {
+            "row": 514,
+            "field": "caption"
+          },
+          {
+            "row": 515,
+            "field": "altText"
+          },
+          {
+            "row": 516,
+            "field": "altText"
+          },
+          {
+            "row": 865,
+            "field": "caption"
+          },
+          {
+            "row": 866,
+            "field": "caption"
+          },
+          {
+            "row": 867,
+            "field": "altText"
+          },
+          {
+            "row": 868,
+            "field": "altText"
+          }
+        ]
+      },
+      {
+        "concept": "Stored buckle protected with a textile guard",
+        "englishGloss": "Stored buckle protected with a textile guard",
+        "rows": [93, 94, 95, 96, 873, 874, 875, 876],
+        "members": [
+          {
+            "row": 93,
+            "field": "caption"
+          },
+          {
+            "row": 94,
+            "field": "caption"
+          },
+          {
+            "row": 95,
+            "field": "altText"
+          },
+          {
+            "row": 96,
+            "field": "altText"
+          },
+          {
+            "row": 873,
+            "field": "caption"
+          },
+          {
+            "row": 874,
+            "field": "caption"
+          },
+          {
+            "row": 875,
+            "field": "altText"
+          },
+          {
+            "row": 876,
+            "field": "altText"
+          }
+        ]
+      },
+      {
+        "concept": "Textile attachment enlarges a small closure grip",
+        "englishGloss": "Textile attachment enlarges a small closure grip",
+        "rows": [205, 206, 207, 208, 465, 466, 467, 468],
+        "members": [
+          {
+            "row": 205,
+            "field": "caption"
+          },
+          {
+            "row": 206,
+            "field": "caption"
+          },
+          {
+            "row": 207,
+            "field": "altText"
+          },
+          {
+            "row": 208,
+            "field": "altText"
+          },
+          {
+            "row": 465,
+            "field": "caption"
+          },
+          {
+            "row": 466,
+            "field": "caption"
+          },
+          {
+            "row": 467,
+            "field": "altText"
+          },
+          {
+            "row": 468,
+            "field": "altText"
+          }
+        ]
+      },
+      {
+        "concept": "Upper shirt fabric gathered for shoulder and arm room",
+        "englishGloss": "Upper shirt fabric gathered for shoulder and arm room",
+        "rows": [777, 778, 779, 780, 869, 870, 871, 872],
+        "members": [
+          {
+            "row": 777,
+            "field": "caption"
+          },
+          {
+            "row": 778,
+            "field": "caption"
+          },
+          {
+            "row": 779,
+            "field": "altText"
+          },
+          {
+            "row": 780,
+            "field": "altText"
+          },
+          {
+            "row": 869,
+            "field": "caption"
+          },
+          {
+            "row": 870,
+            "field": "caption"
+          },
+          {
+            "row": 871,
+            "field": "altText"
+          },
+          {
+            "row": 872,
+            "field": "altText"
+          }
+        ]
+      },
+      {
+        "concept": "Waist tie stabilised through a double pass",
+        "englishGloss": "Waist tie stabilised through a double pass",
+        "rows": [261, 262, 263, 264, 573, 574, 575, 576],
+        "members": [
+          {
+            "row": 261,
+            "field": "caption"
+          },
+          {
+            "row": 262,
+            "field": "caption"
+          },
+          {
+            "row": 263,
+            "field": "altText"
+          },
+          {
+            "row": 264,
+            "field": "altText"
+          },
+          {
+            "row": 573,
+            "field": "caption"
+          },
+          {
+            "row": 574,
+            "field": "caption"
+          },
+          {
+            "row": 575,
+            "field": "altText"
+          },
+          {
+            "row": 576,
+            "field": "altText"
+          }
+        ]
+      },
+      {
+        "concept": "Wearable circumference extended by an added connector",
+        "englishGloss": "Wearable circumference extended by an added connector",
+        "rows": [257, 258, 259, 260, 501, 502, 503, 504],
+        "members": [
+          {
+            "row": 257,
+            "field": "caption"
+          },
+          {
+            "row": 258,
+            "field": "caption"
+          },
+          {
+            "row": 259,
+            "field": "altText"
+          },
+          {
+            "row": 260,
+            "field": "altText"
+          },
+          {
+            "row": 501,
+            "field": "caption"
+          },
+          {
+            "row": 502,
+            "field": "caption"
+          },
+          {
+            "row": 503,
+            "field": "altText"
+          },
+          {
+            "row": 504,
+            "field": "altText"
+          }
+        ]
+      }
+    ]
+  },
+  "wholeTextDuplicates": [],
+  "historicalCollisions": [],
+  "historicalPaths": [
+    "apps/api/test/fixtures/community-text-corpus/de.json",
+    "apps/api/test/fixtures/community-text-corpus/en.json",
+    "apps/api/test/fixtures/community-text-corpus/es.json",
+    "apps/api/test/fixtures/community-text-corpus/fr.json",
+    "apps/api/test/fixtures/community-text-corpus/it.json",
+    "apps/api/test/fixtures/community-text-corpus/pt.json",
+    "apps/api/test/fixtures/community-text-corpus/tr.json",
+    "apps/api/test/fixtures/community-text-corpus/holdout-v1/de.json",
+    "apps/api/test/fixtures/community-text-corpus/holdout-v1/en.json",
+    "apps/api/test/fixtures/community-text-corpus/holdout-v1/es.json",
+    "apps/api/test/fixtures/community-text-corpus/holdout-v1/fr.json",
+    "apps/api/test/fixtures/community-text-corpus/holdout-v1/it.json",
+    "apps/api/test/fixtures/community-text-corpus/holdout-v1/pt.json",
+    "apps/api/test/fixtures/community-text-corpus/holdout-v1/tr.json",
+    "apps/api/test/fixtures/community-text-corpus/holdout-v2/de.json",
+    "apps/api/test/fixtures/community-text-corpus/holdout-v2/en.json",
+    "apps/api/test/fixtures/community-text-corpus/holdout-v2/es.json",
+    "apps/api/test/fixtures/community-text-corpus/holdout-v2/fr.json",
+    "apps/api/test/fixtures/community-text-corpus/holdout-v2/it.json",
+    "apps/api/test/fixtures/community-text-corpus/holdout-v2/pt.json",
+    "apps/api/test/fixtures/community-text-corpus/holdout-v2/tr.json",
+    "apps/api/test/fixtures/community-text-corpus/holdout-v3/de.json",
+    "apps/api/test/fixtures/community-text-corpus/holdout-v3/en.json",
+    "apps/api/test/fixtures/community-text-corpus/holdout-v3/es.json",
+    "apps/api/test/fixtures/community-text-corpus/holdout-v3/fr.json",
+    "apps/api/test/fixtures/community-text-corpus/holdout-v3/it.json",
+    "apps/api/test/fixtures/community-text-corpus/holdout-v3/pt.json",
+    "apps/api/test/fixtures/community-text-corpus/holdout-v3/tr.json",
+    "apps/api/test/fixtures/community-text-corpus/holdout-v4/de.json",
+    "apps/api/test/fixtures/community-text-corpus/holdout-v4/en.json",
+    "apps/api/test/fixtures/community-text-corpus/holdout-v4/es.json",
+    "apps/api/test/fixtures/community-text-corpus/holdout-v4/fr.json",
+    "apps/api/test/fixtures/community-text-corpus/holdout-v4/it.json",
+    "apps/api/test/fixtures/community-text-corpus/holdout-v4/pt.json",
+    "apps/api/test/fixtures/community-text-corpus/holdout-v4/tr.json"
+  ],
+  "overLengthItems": [],
+  "wordCounts": {
+    "minimum": 9,
+    "median": 13.0,
+    "maximum": 18,
+    "fewerThanFiveWords": 0
+  },
+  "maximumCaptionLength": 106,
+  "maximumAltTextLength": 96,
+  "structuralIssues": [],
+  "provenance": {
+    "composition": "All 1000 items individually composed as complete literal Italian sentences by /root/edge_paths. Shell heredocs and Python helpers serialized those complete literal items and measured them. No text-generating script, fragment bank, template bank, combinatorial assembly, translation, prior-wording adaptation, or scripted model call was used.",
+    "copyeditEntries": 118,
+    "distinctRevisedRows": 113,
+    "revisionLog": "it-authored-revisions-edge_paths.json",
+    "semanticConsolidationLog": "it-concept-merges-edge_paths.json",
+    "semanticRead": "Reviewed complete source rows1..1000 across captions and altText, including conservative cross-category merges and multi-label inner-surface and leaf-embroidery membership.",
+    "historyInspection": "Mechanical complete-text disjointness only against the exact 35 paths listed. No development corpus was read for wording or outcomes.",
+    "excludedMaterialInspection": false,
+    "screening": false,
+    "repairOrPolicyInspection": false,
+    "manifestOrTimeoutSupplementInspection": false,
+    "builderContact": false,
+    "commits": false,
+    "mainCheckoutTouched": false,
+    "additionalAgentsUsed": false
+  },
+  "finalAttestation": "Italian TSV final at this revised source hash. Source bytes will remain unchanged unless coordinator explicitly requests another author revision. French V5 source remains unchanged. Portuguese peer review is read-only.",
+  "semanticReasoning": "Broad garment categories do not establish independence. Thirty-nine initial conservative pair consolidations and explicit multi-label boundaries were followed by the coordinator-authorized interior-reveal amendment. The current interior-reveal family has8 members:733..736 and833..836. Complete source groups249..252 and689..692 were individually rewritten as bicycle-rack bag carrying and thumb-loop cuffs. Twenty-four former four-item groups have now been wholly reauthored as substantive new scenarios before the final audit. Historical annotation and all authored before/after sentences remain in the provenance logs.",
+  "previousFinalAttestation": {
+    "sha256": "d729783f85b0136be32a72ef44d845f8993697ec1f2d65f35c188ff36bacfb1a",
+    "status": "SUPERSEDED_BY_COORDINATOR_AUTHORISED_PRESEAL_REVISION",
+    "reason": "Consolidate all interior-reveal variants and individually replace two complete groups."
+  }
+}

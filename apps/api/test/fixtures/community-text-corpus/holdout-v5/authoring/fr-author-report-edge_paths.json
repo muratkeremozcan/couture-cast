@@ -1,0 +1,797 @@
+{
+  "author_identity": "/root/edge_paths",
+  "role": "cc68-tea independent V5 corpus author with rotated French assignment",
+  "language": "fr",
+  "authored_range": "fr.tsv rows1..1000 inclusive",
+  "source_path": "/private/tmp/cc68-tea-holdout-v5/.cc68-tea-authoring/fr.tsv",
+  "source_sha256": "a4ec9b979d77222c5e2c33d156d716fcc5f6198a8ebcdbcd0c831e6c352d7bd8",
+  "verdict": "READY",
+  "full_count": 1000,
+  "fields": {
+    "caption": 500,
+    "altText": 500
+  },
+  "maximum_caption_characters": 93,
+  "maximum_altText_characters": 91,
+  "word_counts": {
+    "minimum": 9,
+    "median": 13.0,
+    "maximum": 19,
+    "fewerThanFiveWords": 0
+  },
+  "five_word_affected_items": 0,
+  "most_reused_concept_count": 8,
+  "distinct_consolidated_concepts": 232,
+  "tied_maximum_concepts": [
+    {
+      "concept": "Bag pocket arranged for easy reach",
+      "english_gloss": "Bag pocket arranged for easy reach",
+      "count": 8,
+      "rows": [538, 539, 540, 541, 694, 695, 696, 697],
+      "membership": [
+        {
+          "row": 538,
+          "field": "caption"
+        },
+        {
+          "row": 539,
+          "field": "caption"
+        },
+        {
+          "row": 540,
+          "field": "altText"
+        },
+        {
+          "row": 541,
+          "field": "altText"
+        },
+        {
+          "row": 694,
+          "field": "caption"
+        },
+        {
+          "row": 695,
+          "field": "caption"
+        },
+        {
+          "row": 696,
+          "field": "altText"
+        },
+        {
+          "row": 697,
+          "field": "altText"
+        }
+      ]
+    },
+    {
+      "concept": "Concealed snaps preventing gaping",
+      "english_gloss": "Concealed snaps preventing gaping",
+      "count": 8,
+      "rows": [170, 171, 172, 173, 242, 243, 244, 245],
+      "membership": [
+        {
+          "row": 170,
+          "field": "caption"
+        },
+        {
+          "row": 171,
+          "field": "caption"
+        },
+        {
+          "row": 172,
+          "field": "altText"
+        },
+        {
+          "row": 173,
+          "field": "altText"
+        },
+        {
+          "row": 242,
+          "field": "caption"
+        },
+        {
+          "row": 243,
+          "field": "caption"
+        },
+        {
+          "row": 244,
+          "field": "altText"
+        },
+        {
+          "row": 245,
+          "field": "altText"
+        }
+      ]
+    },
+    {
+      "concept": "Curved form supporting drying knit",
+      "english_gloss": "Curved form supporting drying knit",
+      "count": 8,
+      "rows": [294, 295, 296, 297, 950, 951, 952, 953],
+      "membership": [
+        {
+          "row": 294,
+          "field": "caption"
+        },
+        {
+          "row": 295,
+          "field": "caption"
+        },
+        {
+          "row": 296,
+          "field": "altText"
+        },
+        {
+          "row": 297,
+          "field": "altText"
+        },
+        {
+          "row": 950,
+          "field": "caption"
+        },
+        {
+          "row": 951,
+          "field": "caption"
+        },
+        {
+          "row": 952,
+          "field": "altText"
+        },
+        {
+          "row": 953,
+          "field": "altText"
+        }
+      ]
+    },
+    {
+      "concept": "Folded cloth cushioning hard fastening",
+      "english_gloss": "Folded cloth cushioning hard fastening",
+      "count": 8,
+      "rows": [286, 287, 288, 289, 926, 927, 928, 929],
+      "membership": [
+        {
+          "row": 286,
+          "field": "caption"
+        },
+        {
+          "row": 287,
+          "field": "caption"
+        },
+        {
+          "row": 288,
+          "field": "altText"
+        },
+        {
+          "row": 289,
+          "field": "altText"
+        },
+        {
+          "row": 926,
+          "field": "caption"
+        },
+        {
+          "row": 927,
+          "field": "caption"
+        },
+        {
+          "row": 928,
+          "field": "altText"
+        },
+        {
+          "row": 929,
+          "field": "altText"
+        }
+      ]
+    },
+    {
+      "concept": "Hat flattened for storage",
+      "english_gloss": "Hat flattened for storage",
+      "count": 8,
+      "rows": [194, 195, 196, 197, 838, 839, 840, 841],
+      "membership": [
+        {
+          "row": 194,
+          "field": "caption"
+        },
+        {
+          "row": 195,
+          "field": "caption"
+        },
+        {
+          "row": 196,
+          "field": "altText"
+        },
+        {
+          "row": 197,
+          "field": "altText"
+        },
+        {
+          "row": 838,
+          "field": "caption"
+        },
+        {
+          "row": 839,
+          "field": "caption"
+        },
+        {
+          "row": 840,
+          "field": "altText"
+        },
+        {
+          "row": 841,
+          "field": "altText"
+        }
+      ]
+    },
+    {
+      "concept": "Inner border brought into view",
+      "english_gloss": "Inner border brought into view",
+      "count": 8,
+      "rows": [78, 79, 80, 81, 506, 507, 508, 509],
+      "membership": [
+        {
+          "row": 78,
+          "field": "caption"
+        },
+        {
+          "row": 79,
+          "field": "caption"
+        },
+        {
+          "row": 80,
+          "field": "altText"
+        },
+        {
+          "row": 81,
+          "field": "altText"
+        },
+        {
+          "row": 506,
+          "field": "caption"
+        },
+        {
+          "row": 507,
+          "field": "caption"
+        },
+        {
+          "row": 508,
+          "field": "altText"
+        },
+        {
+          "row": 509,
+          "field": "altText"
+        }
+      ]
+    },
+    {
+      "concept": "Jewelry worn over glove fabric",
+      "english_gloss": "Jewelry worn over glove fabric",
+      "count": 8,
+      "rows": [270, 271, 272, 273, 334, 335, 336, 337],
+      "membership": [
+        {
+          "row": 270,
+          "field": "caption"
+        },
+        {
+          "row": 271,
+          "field": "caption"
+        },
+        {
+          "row": 272,
+          "field": "altText"
+        },
+        {
+          "row": 273,
+          "field": "altText"
+        },
+        {
+          "row": 334,
+          "field": "caption"
+        },
+        {
+          "row": 335,
+          "field": "caption"
+        },
+        {
+          "row": 336,
+          "field": "altText"
+        },
+        {
+          "row": 337,
+          "field": "altText"
+        }
+      ]
+    },
+    {
+      "concept": "Lining pulled outward to dry",
+      "english_gloss": "Lining pulled outward to dry",
+      "count": 8,
+      "rows": [598, 599, 600, 601, 722, 723, 724, 725],
+      "membership": [
+        {
+          "row": 598,
+          "field": "caption"
+        },
+        {
+          "row": 599,
+          "field": "caption"
+        },
+        {
+          "row": 600,
+          "field": "altText"
+        },
+        {
+          "row": 601,
+          "field": "altText"
+        },
+        {
+          "row": 722,
+          "field": "caption"
+        },
+        {
+          "row": 723,
+          "field": "caption"
+        },
+        {
+          "row": 724,
+          "field": "altText"
+        },
+        {
+          "row": 725,
+          "field": "altText"
+        }
+      ]
+    },
+    {
+      "concept": "Scarf secured with small clasp",
+      "english_gloss": "Scarf secured with small clasp",
+      "count": 8,
+      "rows": [578, 579, 580, 581, 782, 783, 784, 785],
+      "membership": [
+        {
+          "row": 578,
+          "field": "caption"
+        },
+        {
+          "row": 579,
+          "field": "caption"
+        },
+        {
+          "row": 580,
+          "field": "altText"
+        },
+        {
+          "row": 581,
+          "field": "altText"
+        },
+        {
+          "row": 782,
+          "field": "caption"
+        },
+        {
+          "row": 783,
+          "field": "caption"
+        },
+        {
+          "row": 784,
+          "field": "altText"
+        },
+        {
+          "row": 785,
+          "field": "altText"
+        }
+      ]
+    },
+    {
+      "concept": "Shirt closure strip reused as wearable band",
+      "english_gloss": "Shirt closure strip reused as wearable band",
+      "count": 8,
+      "rows": [654, 655, 656, 657, 870, 871, 872, 873],
+      "membership": [
+        {
+          "row": 654,
+          "field": "caption"
+        },
+        {
+          "row": 655,
+          "field": "caption"
+        },
+        {
+          "row": 656,
+          "field": "altText"
+        },
+        {
+          "row": 657,
+          "field": "altText"
+        },
+        {
+          "row": 870,
+          "field": "caption"
+        },
+        {
+          "row": 871,
+          "field": "caption"
+        },
+        {
+          "row": 872,
+          "field": "altText"
+        },
+        {
+          "row": 873,
+          "field": "altText"
+        }
+      ]
+    },
+    {
+      "concept": "Sleeve extended with added cuff",
+      "english_gloss": "Sleeve extended with added cuff",
+      "count": 8,
+      "rows": [670, 671, 672, 673, 902, 903, 904, 905],
+      "membership": [
+        {
+          "row": 670,
+          "field": "caption"
+        },
+        {
+          "row": 671,
+          "field": "caption"
+        },
+        {
+          "row": 672,
+          "field": "altText"
+        },
+        {
+          "row": 673,
+          "field": "altText"
+        },
+        {
+          "row": 902,
+          "field": "caption"
+        },
+        {
+          "row": 903,
+          "field": "caption"
+        },
+        {
+          "row": 904,
+          "field": "altText"
+        },
+        {
+          "row": 905,
+          "field": "altText"
+        }
+      ]
+    },
+    {
+      "concept": "Sleeve relining work",
+      "english_gloss": "Sleeve relining work",
+      "count": 8,
+      "rows": [298, 299, 300, 301, 778, 779, 780, 781],
+      "membership": [
+        {
+          "row": 298,
+          "field": "caption"
+        },
+        {
+          "row": 299,
+          "field": "caption"
+        },
+        {
+          "row": 300,
+          "field": "altText"
+        },
+        {
+          "row": 301,
+          "field": "altText"
+        },
+        {
+          "row": 778,
+          "field": "caption"
+        },
+        {
+          "row": 779,
+          "field": "caption"
+        },
+        {
+          "row": 780,
+          "field": "altText"
+        },
+        {
+          "row": 781,
+          "field": "altText"
+        }
+      ]
+    },
+    {
+      "concept": "Soft backing behind beaded decoration",
+      "english_gloss": "Soft backing behind beaded decoration",
+      "count": 8,
+      "rows": [642, 643, 644, 645, 666, 667, 668, 669],
+      "membership": [
+        {
+          "row": 642,
+          "field": "caption"
+        },
+        {
+          "row": 643,
+          "field": "caption"
+        },
+        {
+          "row": 644,
+          "field": "altText"
+        },
+        {
+          "row": 645,
+          "field": "altText"
+        },
+        {
+          "row": 666,
+          "field": "caption"
+        },
+        {
+          "row": 667,
+          "field": "caption"
+        },
+        {
+          "row": 668,
+          "field": "altText"
+        },
+        {
+          "row": 669,
+          "field": "altText"
+        }
+      ]
+    },
+    {
+      "concept": "Soft bridge across neckline opening",
+      "english_gloss": "Soft bridge across neckline opening",
+      "count": 8,
+      "rows": [106, 107, 108, 109, 978, 979, 980, 981],
+      "membership": [
+        {
+          "row": 106,
+          "field": "caption"
+        },
+        {
+          "row": 107,
+          "field": "caption"
+        },
+        {
+          "row": 108,
+          "field": "altText"
+        },
+        {
+          "row": 109,
+          "field": "altText"
+        },
+        {
+          "row": 978,
+          "field": "caption"
+        },
+        {
+          "row": 979,
+          "field": "caption"
+        },
+        {
+          "row": 980,
+          "field": "altText"
+        },
+        {
+          "row": 981,
+          "field": "altText"
+        }
+      ]
+    },
+    {
+      "concept": "Soft loop easing garment closure",
+      "english_gloss": "Soft loop easing garment closure",
+      "count": 8,
+      "rows": [234, 235, 236, 237, 690, 691, 692, 693],
+      "membership": [
+        {
+          "row": 234,
+          "field": "caption"
+        },
+        {
+          "row": 235,
+          "field": "caption"
+        },
+        {
+          "row": 236,
+          "field": "altText"
+        },
+        {
+          "row": 237,
+          "field": "altText"
+        },
+        {
+          "row": 690,
+          "field": "caption"
+        },
+        {
+          "row": 691,
+          "field": "caption"
+        },
+        {
+          "row": 692,
+          "field": "altText"
+        },
+        {
+          "row": 693,
+          "field": "altText"
+        }
+      ]
+    },
+    {
+      "concept": "Steam restoring rounded collar shape",
+      "english_gloss": "Steam restoring rounded collar shape",
+      "count": 8,
+      "rows": [30, 31, 32, 33, 862, 863, 864, 865],
+      "membership": [
+        {
+          "row": 30,
+          "field": "caption"
+        },
+        {
+          "row": 31,
+          "field": "caption"
+        },
+        {
+          "row": 32,
+          "field": "altText"
+        },
+        {
+          "row": 33,
+          "field": "altText"
+        },
+        {
+          "row": 862,
+          "field": "caption"
+        },
+        {
+          "row": 863,
+          "field": "caption"
+        },
+        {
+          "row": 864,
+          "field": "altText"
+        },
+        {
+          "row": 865,
+          "field": "altText"
+        }
+      ]
+    },
+    {
+      "concept": "Temporary garment length check",
+      "english_gloss": "Temporary garment length check",
+      "count": 8,
+      "rows": [182, 183, 184, 185, 246, 247, 248, 249],
+      "membership": [
+        {
+          "row": 182,
+          "field": "caption"
+        },
+        {
+          "row": 183,
+          "field": "caption"
+        },
+        {
+          "row": 184,
+          "field": "altText"
+        },
+        {
+          "row": 185,
+          "field": "altText"
+        },
+        {
+          "row": 246,
+          "field": "caption"
+        },
+        {
+          "row": 247,
+          "field": "caption"
+        },
+        {
+          "row": 248,
+          "field": "altText"
+        },
+        {
+          "row": 249,
+          "field": "altText"
+        }
+      ]
+    },
+    {
+      "concept": "Wrist jewelry retaining sleeve fabric",
+      "english_gloss": "Wrist jewelry retaining sleeve fabric",
+      "count": 8,
+      "rows": [478, 479, 480, 481, 922, 923, 924, 925],
+      "membership": [
+        {
+          "row": 478,
+          "field": "caption"
+        },
+        {
+          "row": 479,
+          "field": "caption"
+        },
+        {
+          "row": 480,
+          "field": "altText"
+        },
+        {
+          "row": 481,
+          "field": "altText"
+        },
+        {
+          "row": 922,
+          "field": "caption"
+        },
+        {
+          "row": 923,
+          "field": "caption"
+        },
+        {
+          "row": 924,
+          "field": "altText"
+        },
+        {
+          "row": 925,
+          "field": "altText"
+        }
+      ]
+    }
+  ],
+  "whole_text_duplicate_count": 0,
+  "historical_collision_count": 0,
+  "over_length_items": [],
+  "structural_issues": [],
+  "historical_file_scope": [
+    "apps/api/test/fixtures/community-text-corpus/de.json",
+    "apps/api/test/fixtures/community-text-corpus/en.json",
+    "apps/api/test/fixtures/community-text-corpus/es.json",
+    "apps/api/test/fixtures/community-text-corpus/fr.json",
+    "apps/api/test/fixtures/community-text-corpus/it.json",
+    "apps/api/test/fixtures/community-text-corpus/pt.json",
+    "apps/api/test/fixtures/community-text-corpus/tr.json",
+    "apps/api/test/fixtures/community-text-corpus/holdout-v1/de.json",
+    "apps/api/test/fixtures/community-text-corpus/holdout-v1/en.json",
+    "apps/api/test/fixtures/community-text-corpus/holdout-v1/es.json",
+    "apps/api/test/fixtures/community-text-corpus/holdout-v1/fr.json",
+    "apps/api/test/fixtures/community-text-corpus/holdout-v1/it.json",
+    "apps/api/test/fixtures/community-text-corpus/holdout-v1/pt.json",
+    "apps/api/test/fixtures/community-text-corpus/holdout-v1/tr.json",
+    "apps/api/test/fixtures/community-text-corpus/holdout-v2/de.json",
+    "apps/api/test/fixtures/community-text-corpus/holdout-v2/en.json",
+    "apps/api/test/fixtures/community-text-corpus/holdout-v2/es.json",
+    "apps/api/test/fixtures/community-text-corpus/holdout-v2/fr.json",
+    "apps/api/test/fixtures/community-text-corpus/holdout-v2/it.json",
+    "apps/api/test/fixtures/community-text-corpus/holdout-v2/pt.json",
+    "apps/api/test/fixtures/community-text-corpus/holdout-v2/tr.json",
+    "apps/api/test/fixtures/community-text-corpus/holdout-v3/de.json",
+    "apps/api/test/fixtures/community-text-corpus/holdout-v3/en.json",
+    "apps/api/test/fixtures/community-text-corpus/holdout-v3/es.json",
+    "apps/api/test/fixtures/community-text-corpus/holdout-v3/fr.json",
+    "apps/api/test/fixtures/community-text-corpus/holdout-v3/it.json",
+    "apps/api/test/fixtures/community-text-corpus/holdout-v3/pt.json",
+    "apps/api/test/fixtures/community-text-corpus/holdout-v3/tr.json",
+    "apps/api/test/fixtures/community-text-corpus/holdout-v4/de.json",
+    "apps/api/test/fixtures/community-text-corpus/holdout-v4/en.json",
+    "apps/api/test/fixtures/community-text-corpus/holdout-v4/es.json",
+    "apps/api/test/fixtures/community-text-corpus/holdout-v4/fr.json",
+    "apps/api/test/fixtures/community-text-corpus/holdout-v4/it.json",
+    "apps/api/test/fixtures/community-text-corpus/holdout-v4/pt.json",
+    "apps/api/test/fixtures/community-text-corpus/holdout-v4/tr.json"
+  ],
+  "historical_scope_count": 35,
+  "authorship_provenance": "All1000 items were individually composed as complete literal French sentences in direct author batches. Initial blocks were saved201/200/200/200/199 rows. Complete-sentence revisions and complete four-item semantic replacements were individually written. Helpers only serialized complete authored rows, consolidated editorial annotations, and measured content. No shared fragment bank, template expansion, combinatorial assembly, scripted text-generation model call or prior-corpus wording adaptation was used.",
+  "style": "Conversational first-person French captions paired with complete descriptive French alt text; native craft, dressing, styling, movement and accessory scenarios. Minimum item word count remains well above fragment length.",
+  "semantic_review": "Reviewed underlying operations and visual motifs across fields. Eighteen pairs of groups were conservatively consolidated where item category, material, placement or incidental setting preserved the same motif. Five complete four-item groups were replaced to preserve semantic headroom. Full aliases, reasons and memberships are in fr-concept-merges-edge_paths.json; all rewritten complete sentences are retained in fr-authored-revisions-edge_paths.json.",
+  "semantic_merge_count": 18,
+  "revised_complete_rows": 48,
+  "inspection": "Historical content was read mechanically only by the existing audit.py with exactly35 explicitly allowed root/holdout-v1/v2/v3/v4 locale files. No round3 repair, policy, screener, other development corpus or evaluation inspection. Authorized peer work separately inspected only newly authored German TSV and concept metadata.",
+  "privacy": "Private V5 worktree only. No builder contact, screening, commits, main-checkout edits or historical fixture edits.",
+  "final_source_status": "French TSV is final and will remain unchanged pending coordinator instructions."
+}

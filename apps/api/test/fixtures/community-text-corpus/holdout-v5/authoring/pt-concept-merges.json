@@ -1,0 +1,162 @@
+{
+  "reviewer": "cc68-tea (/root)",
+  "phase": "pre-seal, without screening",
+  "construction": "Concept-label consolidation only. No program generates or edits wording.",
+  "merges": [
+    {
+      "concept": "joia-areia-movel",
+      "formerLabels": ["broche-ampulheta", "pulseira-areia-tubo"],
+      "englishGloss": "Grains moving through a transparent jewellery chamber.",
+      "rows": [1, 2, 967, 968]
+    },
+    {
+      "concept": "pregas-costas-camisa",
+      "formerLabels": ["camisa-pala-plissada", "camisa-prega-caixa-costas"],
+      "englishGloss": "A pleat released from the shirt back yoke.",
+      "rows": [119, 120, 811, 812]
+    },
+    {
+      "concept": "detalhe-refletivo-roupa",
+      "formerLabels": ["calca-faixa-reflexiva", "luva-faixa-refletora"],
+      "englishGloss": "A narrow reflective strip on clothing, consolidated across placement.",
+      "rows": [167, 168, 919, 920]
+    },
+    {
+      "concept": "prova-sentada-cintura",
+      "formerLabels": ["calca-gancho-prova", "calca-banco-prova", "cinto-sentado-ajuste"],
+      "englishGloss": "Checking waistband or belt comfort in a seated fit test.",
+      "rows": [63, 64, 357, 358, 375, 376]
+    },
+    {
+      "concept": "prova-giro-danca",
+      "formerLabels": ["saia-giro-filmado", "vestido-danca-prova"],
+      "englishGloss": "Testing skirt movement through turning or dancing.",
+      "rows": [15, 16, 359, 360]
+    },
+    {
+      "concept": "cerzido-meias",
+      "formerLabels": ["meia-remendo-xadrez", "meia-calcanhar-cerzido"],
+      "englishGloss": "Interwoven darning repairing a sock, consolidated across pattern and position.",
+      "rows": [27, 28, 785, 786]
+    },
+    {
+      "concept": "reforco-cotovelo",
+      "formerLabels": ["jaqueta-cotoveleira-recorte", "jaqueta-remendo-cotovelo"],
+      "englishGloss": "An oval reinforcement or repair patch at a jacket elbow.",
+      "rows": [79, 80, 763, 764]
+    },
+    {
+      "concept": "passadoria-formas",
+      "formerLabels": [
+        "almofada-passador-curva",
+        "tabua-manga-estreita",
+        "rolinho-pressao-costura"
+      ],
+      "englishGloss": "Pressing a garment seam with a supporting or pressure tool.",
+      "rows": [251, 252, 253, 254, 255, 256]
+    },
+    {
+      "concept": "secagem-apoiada",
+      "formerLabels": ["luva-prateleira-tela", "cachecol-malha-deitada"],
+      "englishGloss": "A clothing item drying flat on an airy support.",
+      "rows": [325, 326, 335, 336]
+    },
+    {
+      "concept": "abertura-botao-ombro",
+      "formerLabels": ["blusa-abertura-ombro", "camisa-ombro-abotoado"],
+      "englishGloss": "Buttons opening a garment shoulder seam.",
+      "rows": [171, 172, 693, 694]
+    },
+    {
+      "concept": "alca-material-natural-reutilizado",
+      "formerLabels": ["bolsa-alca-bambu", "bolsa-alca-cinto-antigo", "bolsa-corda-vela"],
+      "englishGloss": "A bag handle made from a retained natural or reused strip/rope, consolidated across material.",
+      "rows": [65, 66, 701, 702, 731, 732]
+    },
+    {
+      "concept": "fecho-rotativo",
+      "formerLabels": ["bolsa-fecho-giro", "sapato-fecho-giro"],
+      "englishGloss": "A quarter-turn metal fastening, consolidated across carrier.",
+      "rows": [659, 660, 661, 662]
+    },
+    {
+      "concept": "alca-vestido-ajuste",
+      "formerLabels": ["vestido-alca-encurtada", "vestido-alca-laco-ombro"],
+      "englishGloss": "Adjusting the supporting dress strap length.",
+      "rows": [781, 782, 983, 984]
+    },
+    {
+      "concept": "forro-saia-comprimento",
+      "formerLabels": ["saia-transparencia-forro", "saia-forro-passo"],
+      "englishGloss": "A skirt lining ending above its outer hem.",
+      "rows": [179, 180, 377, 378]
+    },
+    {
+      "concept": "suporte-interno-calcado",
+      "formerLabels": ["calcado-forma-descanso", "bota-inserto-inflavel"],
+      "englishGloss": "An internal form retaining footwear shape during storage.",
+      "rows": [303, 304, 993, 994]
+    },
+    {
+      "concept": "joia-disco-revela",
+      "formerLabels": ["broche-disco-rotativo", "anel-janela-giratoria"],
+      "englishGloss": "A rotating jewellery disk changing which design is visible.",
+      "rows": [73, 74, 863, 864]
+    },
+    {
+      "concept": "joia-pedra-suspensa",
+      "formerLabels": ["anel-pedra-suspensa", "anel-ponte-dupla"],
+      "englishGloss": "A raised stone suspended over an open ring mount.",
+      "rows": [89, 90, 965, 966]
+    },
+    {
+      "concept": "textura-impressa-molde",
+      "formerLabels": ["presilha-cera-folha", "bolsa-argila-impressao"],
+      "englishGloss": "Texture impressed into a small accessory casting or ceramic model.",
+      "rows": [107, 108, 579, 580]
+    },
+    {
+      "concept": "acabamento-fios-pendentes",
+      "formerLabels": [
+        "xale-franja-desenrolada",
+        "bolsa-franja-niveis",
+        "cachecol-ponta-borla"
+      ],
+      "englishGloss": "Hanging thread bundles finishing an accessory edge.",
+      "rows": [67, 68, 591, 592, 887, 888]
+    },
+    {
+      "concept": "roupa-parte-removivel",
+      "formerLabels": [
+        "casaco-painel-removivel",
+        "vestido-manga-amovivel",
+        "casaco-gola-destacavel",
+        "calca-ziper-transforma",
+        "luva-tira-removivel"
+      ],
+      "englishGloss": "Removing an attached garment component to change its wearing configuration.",
+      "rows": [41, 42, 687, 688, 843, 844, 953, 954, 975, 976]
+    },
+    {
+      "concept": "bordado-memoria-pessoal",
+      "formerLabels": [
+        "bolsa-bordado-coordenadas",
+        "bolsa-bordado-data",
+        "cachecol-bordado-iniciais",
+        "camisa-aplique-bilhete",
+        "saia-patch-mapa"
+      ],
+      "englishGloss": "Personal written memories, coordinates, dates, initials or place names embroidered on an item.",
+      "rows": [553, 554, 757, 758, 759, 760, 761, 762, 955, 956]
+    }
+  ],
+  "completeItemReplacement": {
+    "rows": [547, 548],
+    "formerConcept": "lenço-ponto-canto",
+    "newConcept": "calcador-telescopico",
+    "reason": "Conservative personal-memory embroidery grouping would have12 members. One complete pair was independently replaced by a telescopic shoehorn scenario before seal."
+  },
+  "status": "Historical pre-peer consolidation. Final memberships are in common audit and peer resolution.",
+  "sourceSha256BeforePeer": "cbf2aeedaf5d5b600fbdfa36c7163f4c59bb2787734c94260d482c6d571a8a59",
+  "finalSourceSha256": "a6517ae82b1507dcb6aae85282167fb620e7359536e528b6b3fd8b1f62a25d25"
+}

@@ -1,0 +1,101 @@
+{
+  "phase": "V5",
+  "author": "/root/general_review",
+  "language": "es",
+  "source": "/tmp/cc68-tea-holdout-v5/.cc68-tea-authoring/es.tsv",
+  "authoredRowRange": [1, 1000],
+  "captionItemRange": [1, 500],
+  "altTextItemRange": [1, 500],
+  "counts": {
+    "caption": 500,
+    "altText": 500
+  },
+  "sourceSha256": "898668be68401f674b4d7b4c4773a37dd9b092f70d5f85242f2a83f98718be55",
+  "conceptCount": 200,
+  "largestConceptCount": 10,
+  "allTiedMaximumConcepts": [
+    {
+      "concept": "panel-redondeado-flotante",
+      "formerLabels": ["vestido-peto-circular", "blusa-sobrepuesto-oval"],
+      "englishGloss": "A rounded panel floating above the upper front of a garment.",
+      "rows": [21, 22, 23, 24, 25, 646, 647, 648, 649, 650],
+      "count": 10,
+      "reason": "The circular versus oval shape and blouse versus dress category are conservatively consolidated."
+    },
+    {
+      "concept": "bajo-puntas-triangulares",
+      "formerLabels": ["falda-puntas-escalonadas", "chaleco-bajo-triangulado"],
+      "englishGloss": "A garment hem divided into projecting triangular points.",
+      "rows": [11, 12, 13, 14, 15, 626, 627, 628, 629, 630],
+      "count": 10,
+      "reason": "The skirt and waistcoat retain the same pointed-edge motif across garment category and point height."
+    },
+    {
+      "concept": "estampa-abanicos",
+      "formerLabels": ["estampa-abanicos-cerrados", "estampa-abanicos-cuadriculados"],
+      "englishGloss": "Illustrated folding fans, shown closed or open.",
+      "rows": [241, 242, 243, 244, 245, 771, 772, 773, 774, 775],
+      "count": 10,
+      "reason": "The fan object is shared across its closed state and an open checked rendering."
+    },
+    {
+      "concept": "estampa-arcos-abiertos",
+      "formerLabels": ["estampa-medias-lunas-unidas", "estampa-anillos-incompletos"],
+      "englishGloss": "Open circular arcs or crescent forms repeated in a print.",
+      "rows": [806, 807, 808, 809, 810, 851, 852, 853, 854, 855],
+      "count": 10,
+      "reason": "Conservatively group the open-arc motif despite chain layout versus isolated incomplete rings."
+    },
+    {
+      "concept": "estampa-espiral-composicion",
+      "formerLabels": ["estampa-mosaico-espirales", "estampa-puntos-espiral"],
+      "englishGloss": "A large spiral assembled from small printed elements.",
+      "rows": [566, 567, 568, 569, 570, 826, 827, 828, 829, 830],
+      "count": 10,
+      "reason": "Mosaic fragments and round dots do not create separate underlying spiral compositions."
+    },
+    {
+      "concept": "estampa-bloques-desplazados",
+      "formerLabels": ["estampa-rayas-quebradas", "estampa-tableros-moviles"],
+      "englishGloss": "Rectilinear printed elements displaced between adjacent sections.",
+      "rows": [761, 762, 763, 764, 765, 866, 867, 868, 869, 870],
+      "count": 10,
+      "reason": "Conservatively group interrupted stripes and shifted square rows under the shared offset-block motif."
+    },
+    {
+      "concept": "estampa-marcos-poligonales-abiertos",
+      "formerLabels": ["estampa-hexagonos-abiertos", "estampa-cuadrados-hendidos"],
+      "englishGloss": "Polygon frames with a small break in one border.",
+      "rows": [751, 752, 753, 754, 755, 791, 792, 793, 794, 795],
+      "count": 10,
+      "reason": "The number of polygon sides alone does not separate the broken-frame visual motif."
+    },
+    {
+      "concept": "estampa-cafeteras-manuales",
+      "formerLabels": ["estampa-cafeteras-moka", "estampa-prensas-cafe"],
+      "englishGloss": "Illustrations of manually operated coffee makers.",
+      "rows": [876, 877, 878, 879, 880, 931, 932, 933, 934, 935],
+      "count": 10,
+      "reason": "Conservatively group the coffee-making vessels across moka and plunger mechanisms."
+    }
+  ],
+  "fiveWordAffectedItems": [],
+  "independentUnicodeCategoryScanAgrees": true,
+  "historicalLocaleFilesChecked": 35,
+  "historicalFullTextCollisions": [],
+  "wholeTextDuplicates": [],
+  "lengthViolations": [],
+  "wordCounts": {
+    "minimum": 9,
+    "median": 12.0,
+    "maximum": 16,
+    "fewerThanFiveWords": 0
+  },
+  "maximumCaptionLength": 97,
+  "maximumAltTextLength": 104,
+  "authorshipMethod": "Complete final items individually composed directly in Spanish. Literal batches and complete-sentence revisions serialized without any text-generating helper.",
+  "blindness": "Only35 explicit historical locale files read for mechanical equality. No repair, policy, screener or development inspection; no screening; no builder contact; no commits.",
+  "englishUnchangedSha256": "712f13d228c8f5d3e1314aec760b46c35942678a7bbf3f60ce6ade74fb054565",
+  "status": "Spanish complete, final and ready for common audit/import. Source remains unchanged after handoff unless explicitly revised by request.",
+  "pendingWork": "Turkish has not been started. Wait for the root to activate Turkish rows1–1000 separately."
+}

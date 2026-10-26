@@ -1,0 +1,1050 @@
+{
+  "language": "tr",
+  "sourceSha256": "ba60813f73ca4f4380c55e950b86d1e9723b1ec039e21534a38d3c8ff0e3a64e",
+  "total": 1000,
+  "fields": {
+    "caption": 500,
+    "altText": 500
+  },
+  "fiveWordOverlap": {
+    "affectedCount": 0,
+    "affectedShare": 0.0,
+    "affectedItems": [],
+    "repeatedSequences": []
+  },
+  "concepts": {
+    "distinct": 245,
+    "maximumCount": 9,
+    "maximumShare": 0.009,
+    "groups": [
+      {
+        "concept": "basit-cicek",
+        "items": [86, 87, 88, 408, 412, 416, 500, 662, 664]
+      },
+      {
+        "concept": "cekirdekli-meyve-yarim",
+        "items": [677, 678, 679, 680, 685, 686, 687, 688]
+      },
+      {
+        "concept": "dar-ucta-buzgu",
+        "items": [97, 98, 99, 100, 905, 906, 907, 908]
+      },
+      {
+        "concept": "dar-yaprakli-dal",
+        "items": [625, 626, 627, 628, 661, 662, 663, 664]
+      },
+      {
+        "concept": "disli-karsilikli-yaprak",
+        "items": [665, 666, 667, 668, 689, 690, 691, 692]
+      },
+      {
+        "concept": "elde-boya-tekstil",
+        "items": [477, 478, 479, 480, 481, 482, 483, 484]
+      },
+      {
+        "concept": "gorunur-kumas-onarim",
+        "items": [277, 278, 279, 280, 489, 490, 491, 492]
+      },
+      {
+        "concept": "igne-oya-kenar",
+        "items": [85, 86, 87, 88, 441, 442, 443, 444]
+      },
+      {
+        "concept": "kabartma-sirma-bitki",
+        "items": [89, 90, 91, 92, 409, 410, 411, 412]
+      },
+      {
+        "concept": "musluklu-sicak-kazan",
+        "items": [173, 174, 175, 176, 749, 750, 751, 752]
+      },
+      {
+        "concept": "kadeh-cicek",
+        "items": [417, 419, 609, 610, 611, 612]
+      },
+      {
+        "concept": "ahtapot-kol",
+        "items": [381, 382, 383, 384]
+      },
+      {
+        "concept": "ari-petek",
+        "items": [809, 810, 811, 812]
+      },
+      {
+        "concept": "ari-tul",
+        "items": [581, 582, 583, 584]
+      },
+      {
+        "concept": "askilik-isim",
+        "items": [265, 266, 267, 268]
+      },
+      {
+        "concept": "asma-cardak",
+        "items": [617, 618, 619, 620]
+      },
+      {
+        "concept": "asure-kase",
+        "items": [781, 782, 783, 784]
+      },
+      {
+        "concept": "atesbocegi",
+        "items": [821, 822, 823, 824]
+      },
+      {
+        "concept": "ay-evre",
+        "items": [341, 342, 343, 344]
+      },
+      {
+        "concept": "ayakkabi-kurutma",
+        "items": [241, 242, 243, 244]
+      },
+      {
+        "concept": "ayva-dilim",
+        "items": [681, 682, 683, 684]
+      },
+      {
+        "concept": "bahce-dizlik",
+        "items": [577, 578, 579, 580]
+      },
+      {
+        "concept": "bahriyeli-yaka",
+        "items": [901, 902, 903, 904]
+      },
+      {
+        "concept": "baklava-kat",
+        "items": [717, 718, 719, 720]
+      },
+      {
+        "concept": "bale-kurdele",
+        "items": [557, 558, 559, 560]
+      },
+      {
+        "concept": "balik-etek",
+        "items": [929, 930, 931, 932]
+      },
+      {
+        "concept": "balik-pul",
+        "items": [365, 366, 367, 368]
+      },
+      {
+        "concept": "balon-etek",
+        "items": [921, 922, 923, 924]
+      },
+      {
+        "concept": "basparmak-kol",
+        "items": [989, 990, 991, 992]
+      },
+      {
+        "concept": "batik-mum",
+        "items": [425, 426, 427, 428]
+      },
+      {
+        "concept": "bel-tezgah",
+        "items": [469, 470, 471, 472]
+      },
+      {
+        "concept": "biberiye",
+        "items": [661, 662, 663, 664]
+      },
+      {
+        "concept": "bohca-acma",
+        "items": [49, 50, 51, 52]
+      },
+      {
+        "concept": "borek-sarmal",
+        "items": [769, 770, 771, 772]
+      },
+      {
+        "concept": "bot-temizleme",
+        "items": [245, 246, 247, 248]
+      },
+      {
+        "concept": "bot-tozluk",
+        "items": [985, 986, 987, 988]
+      },
+      {
+        "concept": "boza-bardak",
+        "items": [185, 186, 187, 188]
+      },
+      {
+        "concept": "buz-cicegi",
+        "items": [325, 326, 327, 328]
+      },
+      {
+        "concept": "buz-sarkit",
+        "items": [321, 322, 323, 324]
+      },
+      {
+        "concept": "buzgulu-kagitbel",
+        "items": [977, 978, 979, 980]
+      },
+      {
+        "concept": "camasir-torbasi",
+        "items": [253, 254, 255, 256]
+      },
+      {
+        "concept": "canta-inince-gunes",
+        "items": [29, 30, 31, 32]
+      },
+      {
+        "concept": "canta-sepet",
+        "items": [289, 290, 291, 292]
+      },
+      {
+        "concept": "canta-tartma",
+        "items": [225, 226, 227, 228]
+      },
+      {
+        "concept": "caretta-iz",
+        "items": [389, 390, 391, 392]
+      },
+      {
+        "concept": "caydanlik-ust",
+        "items": [701, 702, 703, 704]
+      },
+      {
+        "concept": "cekirdek-kabuk",
+        "items": [189, 190, 191, 192]
+      },
+      {
+        "concept": "cekirge-sicrayis",
+        "items": [833, 834, 835, 836]
+      },
+      {
+        "concept": "cepken-kaytan",
+        "items": [93, 94, 95, 96]
+      },
+      {
+        "concept": "cezve-kopuk",
+        "items": [709, 710, 711, 712]
+      },
+      {
+        "concept": "cigdem",
+        "items": [609, 610, 611, 612]
+      },
+      {
+        "concept": "cilek-surgun",
+        "items": [669, 670, 671, 672]
+      },
+      {
+        "concept": "cinar-yaprak",
+        "items": [633, 634, 635, 636]
+      },
+      {
+        "concept": "corap-katlama",
+        "items": [261, 262, 263, 264]
+      },
+      {
+        "concept": "cumbali-ev",
+        "items": [149, 150, 151, 152]
+      },
+      {
+        "concept": "dagkecisi-atlayis",
+        "items": [869, 870, 871, 872]
+      },
+      {
+        "concept": "davul-zurna",
+        "items": [65, 66, 67, 68]
+      },
+      {
+        "concept": "deniz-anasi-yuzme",
+        "items": [377, 378, 379, 380]
+      },
+      {
+        "concept": "deniz-ati",
+        "items": [385, 386, 387, 388]
+      },
+      {
+        "concept": "dolmus-tabela",
+        "items": [113, 114, 115, 116]
+      },
+      {
+        "concept": "drape-bogaz",
+        "items": [913, 914, 915, 916]
+      },
+      {
+        "concept": "dut-sarkik",
+        "items": [673, 674, 675, 676]
+      },
+      {
+        "concept": "eger-omuz",
+        "items": [969, 970, 971, 972]
+      },
+      {
+        "concept": "enginar",
+        "items": [613, 614, 615, 616]
+      },
+      {
+        "concept": "eriste-serit",
+        "items": [725, 726, 727, 728]
+      },
+      {
+        "concept": "eskrim-ceket",
+        "items": [561, 562, 563, 564]
+      },
+      {
+        "concept": "fay-hatti",
+        "items": [317, 318, 319, 320]
+      },
+      {
+        "concept": "fermuar-yardim",
+        "items": [213, 214, 215, 216]
+      },
+      {
+        "concept": "fes-firca",
+        "items": [81, 82, 83, 84]
+      },
+      {
+        "concept": "findik-cotanak",
+        "items": [641, 642, 643, 644]
+      },
+      {
+        "concept": "finukuler",
+        "items": [117, 118, 119, 120]
+      },
+      {
+        "concept": "firin-kurek",
+        "items": [761, 762, 763, 764]
+      },
+      {
+        "concept": "firkete",
+        "items": [449, 450, 451, 452]
+      },
+      {
+        "concept": "fok-karada",
+        "items": [885, 886, 887, 888]
+      },
+      {
+        "concept": "gece-yansima",
+        "items": [597, 598, 599, 600]
+      },
+      {
+        "concept": "geyik-boynuz",
+        "items": [873, 874, 875, 876]
+      },
+      {
+        "concept": "gode-etek",
+        "items": [925, 926, 927, 928]
+      },
+      {
+        "concept": "gogus-onluk",
+        "items": [945, 946, 947, 948]
+      },
+      {
+        "concept": "gokkusagi-prizma",
+        "items": [357, 358, 359, 360]
+      },
+      {
+        "concept": "gugum",
+        "items": [753, 754, 755, 756]
+      },
+      {
+        "concept": "gunes-saati",
+        "items": [345, 346, 347, 348]
+      },
+      {
+        "concept": "halay-mendil",
+        "items": [549, 550, 551, 552]
+      },
+      {
+        "concept": "hashas-kapsul",
+        "items": [653, 654, 655, 656]
+      },
+      {
+        "concept": "havan",
+        "items": [741, 742, 743, 744]
+      },
+      {
+        "concept": "helva-lif",
+        "items": [785, 786, 787, 788]
+      },
+      {
+        "concept": "horona-dizilme",
+        "items": [541, 542, 543, 544]
+      },
+      {
+        "concept": "ibrik-leğen",
+        "items": [13, 14, 15, 16]
+      },
+      {
+        "concept": "ihlamur-kanat",
+        "items": [657, 658, 659, 660]
+      },
+      {
+        "concept": "incebelli",
+        "items": [705, 706, 707, 708]
+      },
+      {
+        "concept": "ipek-koza",
+        "items": [473, 474, 475, 476]
+      },
+      {
+        "concept": "ipekbocegi-yaprak",
+        "items": [837, 838, 839, 840]
+      },
+      {
+        "concept": "isitme-sac",
+        "items": [517, 518, 519, 520]
+      },
+      {
+        "concept": "kabak-tatlisi",
+        "items": [777, 778, 779, 780]
+      },
+      {
+        "concept": "kabartma-etiket",
+        "items": [505, 506, 507, 508]
+      },
+      {
+        "concept": "kabuk-spiral",
+        "items": [369, 370, 371, 372]
+      },
+      {
+        "concept": "kamis-bogum",
+        "items": [693, 694, 695, 696]
+      },
+      {
+        "concept": "kanavice",
+        "items": [493, 494, 495, 496]
+      },
+      {
+        "concept": "kanun",
+        "items": [77, 78, 79, 80]
+      },
+      {
+        "concept": "kapakli-eldiven",
+        "items": [993, 994, 995, 996]
+      },
+      {
+        "concept": "kapi-tokmagi",
+        "items": [153, 154, 155, 156]
+      },
+      {
+        "concept": "kapici-zil",
+        "items": [137, 138, 139, 140]
+      },
+      {
+        "concept": "kaplumbaga-kabuk",
+        "items": [845, 846, 847, 848]
+      },
+      {
+        "concept": "karabatak-kanat",
+        "items": [893, 894, 895, 896]
+      },
+      {
+        "concept": "karagoz-perde",
+        "items": [37, 38, 39, 40]
+      },
+      {
+        "concept": "kardelen",
+        "items": [605, 606, 607, 608]
+      },
+      {
+        "concept": "kare-kol",
+        "items": [961, 962, 963, 964]
+      },
+      {
+        "concept": "karisiklik-eldiven",
+        "items": [229, 230, 231, 232]
+      },
+      {
+        "concept": "kart-dokuma",
+        "items": [465, 466, 467, 468]
+      },
+      {
+        "concept": "kasnak-golgesi",
+        "items": [413, 414, 415, 416]
+      },
+      {
+        "concept": "kaynak-baslik",
+        "items": [593, 594, 595, 596]
+      },
+      {
+        "concept": "kece-igne",
+        "items": [437, 438, 439, 440]
+      },
+      {
+        "concept": "kece-tuy",
+        "items": [257, 258, 259, 260]
+      },
+      {
+        "concept": "kece-yogurma",
+        "items": [433, 434, 435, 436]
+      },
+      {
+        "concept": "kelebek-cikis",
+        "items": [825, 826, 827, 828]
+      },
+      {
+        "concept": "kemençe",
+        "items": [61, 62, 63, 64]
+      },
+      {
+        "concept": "kemer-deligi",
+        "items": [269, 270, 271, 272]
+      },
+      {
+        "concept": "kemerli-gecit",
+        "items": [157, 158, 159, 160]
+      },
+      {
+        "concept": "kepce-motif",
+        "items": [53, 54, 55, 56]
+      },
+      {
+        "concept": "kertenkele-ayak",
+        "items": [841, 842, 843, 844]
+      },
+      {
+        "concept": "kestane-diken",
+        "items": [645, 646, 647, 648]
+      },
+      {
+        "concept": "kilim-elibellinde",
+        "items": [21, 22, 23, 24]
+      },
+      {
+        "concept": "kilim-kocboynuzu",
+        "items": [25, 26, 27, 28]
+      },
+      {
+        "concept": "kilim-kurtagzi",
+        "items": [17, 18, 19, 20]
+      },
+      {
+        "concept": "kirik-sap",
+        "items": [281, 282, 283, 284]
+      },
+      {
+        "concept": "kirlangic-camur",
+        "items": [805, 806, 807, 808]
+      },
+      {
+        "concept": "kirpi-top",
+        "items": [853, 854, 855, 856]
+      },
+      {
+        "concept": "kisa-bolero",
+        "items": [953, 954, 955, 956]
+      },
+      {
+        "concept": "kiyi-baba",
+        "items": [161, 162, 163, 164]
+      },
+      {
+        "concept": "koltuk-degnek",
+        "items": [297, 298, 299, 300]
+      },
+      {
+        "concept": "kopan-dugme",
+        "items": [273, 274, 275, 276]
+      },
+      {
+        "concept": "korse-bag",
+        "items": [933, 934, 935, 936]
+      },
+      {
+        "concept": "krinolin",
+        "items": [937, 938, 939, 940]
+      },
+      {
+        "concept": "kupeler-odunc",
+        "items": [217, 218, 219, 220]
+      },
+      {
+        "concept": "kurt-uluma",
+        "items": [865, 866, 867, 868]
+      },
+      {
+        "concept": "kus-evi",
+        "items": [129, 130, 131, 132]
+      },
+      {
+        "concept": "kus-tuyu-iz",
+        "items": [361, 362, 363, 364]
+      },
+      {
+        "concept": "kutu-pili",
+        "items": [973, 974, 975, 976]
+      },
+      {
+        "concept": "kuzey-isigi",
+        "items": [349, 350, 351, 352]
+      },
+      {
+        "concept": "lavanta-demet",
+        "items": [649, 650, 651, 652]
+      },
+      {
+        "concept": "leblebi-kulah",
+        "items": [177, 178, 179, 180]
+      },
+      {
+        "concept": "leylek-yuva",
+        "items": [801, 802, 803, 804]
+      },
+      {
+        "concept": "lokum-kup",
+        "items": [713, 714, 715, 716]
+      },
+      {
+        "concept": "macun-cubuk",
+        "items": [169, 170, 171, 172]
+      },
+      {
+        "concept": "mahalle-camasir",
+        "items": [45, 46, 47, 48]
+      },
+      {
+        "concept": "mangal-kor",
+        "items": [757, 758, 759, 760]
+      },
+      {
+        "concept": "manti-bohca",
+        "items": [721, 722, 723, 724]
+      },
+      {
+        "concept": "marti-korkuluk",
+        "items": [121, 122, 123, 124]
+      },
+      {
+        "concept": "meddah",
+        "items": [41, 42, 43, 44]
+      },
+      {
+        "concept": "mekik-oya",
+        "items": [445, 446, 447, 448]
+      },
+      {
+        "concept": "mekikli-dokuma",
+        "items": [461, 462, 463, 464]
+      },
+      {
+        "concept": "merdane-iz",
+        "items": [737, 738, 739, 740]
+      },
+      {
+        "concept": "merdiven-sahanlik",
+        "items": [145, 146, 147, 148]
+      },
+      {
+        "concept": "mermerleme",
+        "items": [429, 430, 431, 432]
+      },
+      {
+        "concept": "mezun-kep",
+        "items": [537, 538, 539, 540]
+      },
+      {
+        "concept": "midye-yelpaze",
+        "items": [373, 374, 375, 376]
+      },
+      {
+        "concept": "minare-guvercin",
+        "items": [125, 126, 127, 128]
+      },
+      {
+        "concept": "misir-kocan",
+        "items": [193, 194, 195, 196]
+      },
+      {
+        "concept": "nalin",
+        "items": [9, 10, 11, 12]
+      },
+      {
+        "concept": "nar-acik",
+        "items": [621, 622, 623, 624]
+      },
+      {
+        "concept": "ney-kilif",
+        "items": [73, 74, 75, 76]
+      },
+      {
+        "concept": "obsidyen-kirik",
+        "items": [309, 310, 311, 312]
+      },
+      {
+        "concept": "okcu-kolluk",
+        "items": [565, 566, 567, 568]
+      },
+      {
+        "concept": "oklava-hamur",
+        "items": [733, 734, 735, 736]
+      },
+      {
+        "concept": "paca-isaret",
+        "items": [209, 210, 211, 212]
+      },
+      {
+        "concept": "palamut-sapka",
+        "items": [629, 630, 631, 632]
+      },
+      {
+        "concept": "pekmez-akis",
+        "items": [789, 790, 791, 792]
+      },
+      {
+        "concept": "pelerin-kol",
+        "items": [293, 294, 295, 296]
+      },
+      {
+        "concept": "pelikan-kese",
+        "items": [889, 890, 891, 892]
+      },
+      {
+        "concept": "peri-baca",
+        "items": [301, 302, 303, 304]
+      },
+      {
+        "concept": "pestil-kat",
+        "items": [797, 798, 799, 800]
+      },
+      {
+        "concept": "peygamberdevesi",
+        "items": [829, 830, 831, 832]
+      },
+      {
+        "concept": "pide-kayik",
+        "items": [773, 774, 775, 776]
+      },
+      {
+        "concept": "ponco-kose",
+        "items": [957, 958, 959, 960]
+      },
+      {
+        "concept": "protez-paca",
+        "items": [513, 514, 515, 516]
+      },
+      {
+        "concept": "punch",
+        "items": [485, 486, 487, 488]
+      },
+      {
+        "concept": "reglan-hat",
+        "items": [965, 966, 967, 968]
+      },
+      {
+        "concept": "renk-kart",
+        "items": [525, 526, 527, 528]
+      },
+      {
+        "concept": "resim-onluk",
+        "items": [589, 590, 591, 592]
+      },
+      {
+        "concept": "richelieu",
+        "items": [497, 498, 499, 500]
+      },
+      {
+        "concept": "sahaf-yigin",
+        "items": [133, 134, 135, 136]
+      },
+      {
+        "concept": "samanyolu",
+        "items": [353, 354, 355, 356]
+      },
+      {
+        "concept": "samuru-sirtustu",
+        "items": [881, 882, 883, 884]
+      },
+      {
+        "concept": "sapka-ruzgar",
+        "items": [233, 234, 235, 236]
+      },
+      {
+        "concept": "sarmal-pantolon",
+        "items": [981, 982, 983, 984]
+      },
+      {
+        "concept": "saz-aski",
+        "items": [69, 70, 71, 72]
+      },
+      {
+        "concept": "sazlik-puskul",
+        "items": [697, 698, 699, 700]
+      },
+      {
+        "concept": "sefer-tasi",
+        "items": [1, 2, 3, 4]
+      },
+      {
+        "concept": "sekerci-kavanoz",
+        "items": [181, 182, 183, 184]
+      },
+      {
+        "concept": "selale-on",
+        "items": [917, 918, 919, 920]
+      },
+      {
+        "concept": "selvi-sira",
+        "items": [637, 638, 639, 640]
+      },
+      {
+        "concept": "semah-donus",
+        "items": [553, 554, 555, 556]
+      },
+      {
+        "concept": "semender-benek",
+        "items": [849, 850, 851, 852]
+      },
+      {
+        "concept": "semercilik",
+        "items": [5, 6, 7, 8]
+      },
+      {
+        "concept": "semsiye-ikili",
+        "items": [237, 238, 239, 240]
+      },
+      {
+        "concept": "seramik-onluk",
+        "items": [585, 586, 587, 588]
+      },
+      {
+        "concept": "seyyar-kestaneci",
+        "items": [165, 166, 167, 168]
+      },
+      {
+        "concept": "sibori-bag",
+        "items": [421, 422, 423, 424]
+      },
+      {
+        "concept": "sicrama-kare",
+        "items": [533, 534, 535, 536]
+      },
+      {
+        "concept": "sikma-narenciye",
+        "items": [765, 766, 767, 768]
+      },
+      {
+        "concept": "simit-tabla",
+        "items": [33, 34, 35, 36]
+      },
+      {
+        "concept": "sincap-kuyruk",
+        "items": [857, 858, 859, 860]
+      },
+      {
+        "concept": "sis-agac",
+        "items": [333, 334, 335, 336]
+      },
+      {
+        "concept": "sis-ciftuc",
+        "items": [457, 458, 459, 460]
+      },
+      {
+        "concept": "sokak-cesme",
+        "items": [141, 142, 143, 144]
+      },
+      {
+        "concept": "sucuk-ceviz",
+        "items": [793, 794, 795, 796]
+      },
+      {
+        "concept": "suzene",
+        "items": [405, 406, 407, 408]
+      },
+      {
+        "concept": "tabi-parmak",
+        "items": [997, 998, 999, 1000]
+      },
+      {
+        "concept": "takas-numara",
+        "items": [201, 202, 203, 204]
+      },
+      {
+        "concept": "tek-el-manset",
+        "items": [509, 510, 511, 512]
+      },
+      {
+        "concept": "tekerlek-etek",
+        "items": [501, 502, 503, 504]
+      },
+      {
+        "concept": "tel-kirma",
+        "items": [401, 402, 403, 404]
+      },
+      {
+        "concept": "teleferik",
+        "items": [109, 110, 111, 112]
+      },
+      {
+        "concept": "telefon-buyutme",
+        "items": [521, 522, 523, 524]
+      },
+      {
+        "concept": "terazi-kefe",
+        "items": [745, 746, 747, 748]
+      },
+      {
+        "concept": "ters-lale",
+        "items": [601, 602, 603, 604]
+      },
+      {
+        "concept": "tilki-karizi",
+        "items": [861, 862, 863, 864]
+      },
+      {
+        "concept": "tirmanis-kemer",
+        "items": [573, 574, 575, 576]
+      },
+      {
+        "concept": "tramvay-donemeç",
+        "items": [105, 106, 107, 108]
+      },
+      {
+        "concept": "traverten",
+        "items": [305, 306, 307, 308]
+      },
+      {
+        "concept": "tulum-muzik",
+        "items": [57, 58, 59, 60]
+      },
+      {
+        "concept": "tunus-orgu",
+        "items": [453, 454, 455, 456]
+      },
+      {
+        "concept": "turna-dans",
+        "items": [197, 198, 199, 200]
+      },
+      {
+        "concept": "turnur",
+        "items": [941, 942, 943, 944]
+      },
+      {
+        "concept": "ugurbocegi-acik",
+        "items": [817, 818, 819, 820]
+      },
+      {
+        "concept": "uzun-atki-toplama",
+        "items": [285, 286, 287, 288]
+      },
+      {
+        "concept": "vapur-iz",
+        "items": [101, 102, 103, 104]
+      },
+      {
+        "concept": "vasak-kulak",
+        "items": [877, 878, 879, 880]
+      },
+      {
+        "concept": "vatoz-suzulme",
+        "items": [397, 398, 399, 400]
+      },
+      {
+        "concept": "volkan-kesit",
+        "items": [313, 314, 315, 316]
+      },
+      {
+        "concept": "yagmur-halka",
+        "items": [329, 330, 331, 332]
+      },
+      {
+        "concept": "yaka-ayna",
+        "items": [205, 206, 207, 208]
+      },
+      {
+        "concept": "yalicapkini-dalis",
+        "items": [897, 898, 899, 900]
+      },
+      {
+        "concept": "yan-acik-tunik",
+        "items": [949, 950, 951, 952]
+      },
+      {
+        "concept": "yarasa-kol",
+        "items": [909, 910, 911, 912]
+      },
+      {
+        "concept": "yazma-baski",
+        "items": [417, 418, 419, 420]
+      },
+      {
+        "concept": "yelken-yelek",
+        "items": [569, 570, 571, 572]
+      },
+      {
+        "concept": "yengec-yuruyus",
+        "items": [393, 394, 395, 396]
+      },
+      {
+        "concept": "yildiz-kaymasi",
+        "items": [337, 338, 339, 340]
+      },
+      {
+        "concept": "yufka-sac",
+        "items": [729, 730, 731, 732]
+      },
+      {
+        "concept": "yumusak-etiket",
+        "items": [221, 222, 223, 224]
+      },
+      {
+        "concept": "yun-havalandirma",
+        "items": [249, 250, 251, 252]
+      },
+      {
+        "concept": "yuruyus-video",
+        "items": [529, 530, 531, 532]
+      },
+      {
+        "concept": "yusufcuk-kanat",
+        "items": [813, 814, 815, 816]
+      },
+      {
+        "concept": "zeybek-durus",
+        "items": [545, 546, 547, 548]
+      },
+      {
+        "concept": "zeytin-dali",
+        "items": [625, 626, 627, 628]
+      }
+    ]
+  },
+  "wholeTextDuplicates": [],
+  "historicalCollisions": [],
+  "historicalPaths": [
+    "apps/api/test/fixtures/community-text-corpus/de.json",
+    "apps/api/test/fixtures/community-text-corpus/en.json",
+    "apps/api/test/fixtures/community-text-corpus/es.json",
+    "apps/api/test/fixtures/community-text-corpus/fr.json",
+    "apps/api/test/fixtures/community-text-corpus/it.json",
+    "apps/api/test/fixtures/community-text-corpus/pt.json",
+    "apps/api/test/fixtures/community-text-corpus/tr.json",
+    "apps/api/test/fixtures/community-text-corpus/holdout-v1/de.json",
+    "apps/api/test/fixtures/community-text-corpus/holdout-v1/en.json",
+    "apps/api/test/fixtures/community-text-corpus/holdout-v1/es.json",
+    "apps/api/test/fixtures/community-text-corpus/holdout-v1/fr.json",
+    "apps/api/test/fixtures/community-text-corpus/holdout-v1/it.json",
+    "apps/api/test/fixtures/community-text-corpus/holdout-v1/pt.json",
+    "apps/api/test/fixtures/community-text-corpus/holdout-v1/tr.json",
+    "apps/api/test/fixtures/community-text-corpus/holdout-v2/de.json",
+    "apps/api/test/fixtures/community-text-corpus/holdout-v2/en.json",
+    "apps/api/test/fixtures/community-text-corpus/holdout-v2/es.json",
+    "apps/api/test/fixtures/community-text-corpus/holdout-v2/fr.json",
+    "apps/api/test/fixtures/community-text-corpus/holdout-v2/it.json",
+    "apps/api/test/fixtures/community-text-corpus/holdout-v2/pt.json",
+    "apps/api/test/fixtures/community-text-corpus/holdout-v2/tr.json",
+    "apps/api/test/fixtures/community-text-corpus/holdout-v3/de.json",
+    "apps/api/test/fixtures/community-text-corpus/holdout-v3/en.json",
+    "apps/api/test/fixtures/community-text-corpus/holdout-v3/es.json",
+    "apps/api/test/fixtures/community-text-corpus/holdout-v3/fr.json",
+    "apps/api/test/fixtures/community-text-corpus/holdout-v3/it.json",
+    "apps/api/test/fixtures/community-text-corpus/holdout-v3/pt.json",
+    "apps/api/test/fixtures/community-text-corpus/holdout-v3/tr.json",
+    "apps/api/test/fixtures/community-text-corpus/holdout-v4/de.json",
+    "apps/api/test/fixtures/community-text-corpus/holdout-v4/en.json",
+    "apps/api/test/fixtures/community-text-corpus/holdout-v4/es.json",
+    "apps/api/test/fixtures/community-text-corpus/holdout-v4/fr.json",
+    "apps/api/test/fixtures/community-text-corpus/holdout-v4/it.json",
+    "apps/api/test/fixtures/community-text-corpus/holdout-v4/pt.json",
+    "apps/api/test/fixtures/community-text-corpus/holdout-v4/tr.json"
+  ],
+  "overLengthItems": [],
+  "wordCounts": {
+    "minimum": 7,
+    "median": 9.0,
+    "maximum": 13,
+    "fewerThanFiveWords": 0
+  },
+  "maximumCaptionLength": 97,
+  "maximumAltTextLength": 96
+}

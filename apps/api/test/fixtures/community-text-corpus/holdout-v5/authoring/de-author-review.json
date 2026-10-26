@@ -1,0 +1,202 @@
+{
+  "author": "cc68-tea (/root)",
+  "locale": "de",
+  "sourceRows": [1, 1000],
+  "captionRows": [1, 500],
+  "altTextRows": [501, 1000],
+  "v4Author": "/root/edge_paths",
+  "authorRotationSatisfied": true,
+  "wordingMethod": "All 1000 complete sentences individually authored and persisted literally. No banks, templates, translated prior items or text-generating code.",
+  "semanticReview": "Explicit synonym aliases consolidated across both fields and incidental garment position or textile variation. Source codebook records every merge. Broad bag-seam reinforcement grouped conservatively, replacing one entire caption/alt pair with a magnifier-pendant motif before seal.",
+  "presealRewrittenRows": [72, 145, 257, 299, 572, 645, 757, 799],
+  "rewriteReason": "Conservative semantic peer audit identified reinforcement stitches across bags and a coat pocket. Four complete caption/alt pairs were individually replaced before seal, including three distinct jewelry motifs, with no screening or round-3 repair input.",
+  "peerReviewPending": false,
+  "screeningRun": false,
+  "round3RepairInspection": false,
+  "sourceSha256": "c03a51e4162fe83ab18f7c519c2d6e5e3175411a373383fa6df0f03c2e1bd5ed",
+  "metrics": {
+    "total": 1000,
+    "fields": {
+      "caption": 500,
+      "altText": 500
+    },
+    "wordCounts": {
+      "minimum": 7,
+      "median": 9.0,
+      "maximum": 13,
+      "fewerThanFiveWords": 0
+    },
+    "maximumCaptionLength": 87,
+    "maximumAltTextLength": 85,
+    "fiveWordAffected": 8,
+    "maximumConceptCount": 8,
+    "distinctConcepts": 443,
+    "wholeTextDuplicates": 0,
+    "historicalCollisions": 0,
+    "lengthViolations": 0
+  },
+  "allTiedMaximumConcepts": [
+    {
+      "concept": "klein-zubehoer-erkennen",
+      "englishGloss": "Tiny embroidered, woven or numbered identification marks distinguish paired or similar accessories.",
+      "count": 8,
+      "rows": [32, 83, 308, 416, 532, 583, 808, 916],
+      "membership": [
+        {
+          "row": 32,
+          "field": "caption"
+        },
+        {
+          "row": 83,
+          "field": "caption"
+        },
+        {
+          "row": 308,
+          "field": "caption"
+        },
+        {
+          "row": 416,
+          "field": "caption"
+        },
+        {
+          "row": 532,
+          "field": "altText"
+        },
+        {
+          "row": 583,
+          "field": "altText"
+        },
+        {
+          "row": 808,
+          "field": "altText"
+        },
+        {
+          "row": 916,
+          "field": "altText"
+        }
+      ]
+    },
+    {
+      "concept": "naehstichprobe",
+      "englishGloss": "Stitch samples and inspection of stitch spacing or thread tension on a fabric test piece.",
+      "count": 8,
+      "rows": [18, 105, 445, 471, 518, 605, 945, 971],
+      "membership": [
+        {
+          "row": 18,
+          "field": "caption"
+        },
+        {
+          "row": 105,
+          "field": "caption"
+        },
+        {
+          "row": 445,
+          "field": "caption"
+        },
+        {
+          "row": 471,
+          "field": "caption"
+        },
+        {
+          "row": 518,
+          "field": "altText"
+        },
+        {
+          "row": 605,
+          "field": "altText"
+        },
+        {
+          "row": 945,
+          "field": "altText"
+        },
+        {
+          "row": 971,
+          "field": "altText"
+        }
+      ]
+    },
+    {
+      "concept": "rockfalten-anordnung",
+      "englishGloss": "Planning, holding or distributing skirt pleats at the waistband.",
+      "count": 8,
+      "rows": [46, 210, 283, 366, 546, 710, 783, 866],
+      "membership": [
+        {
+          "row": 46,
+          "field": "caption"
+        },
+        {
+          "row": 210,
+          "field": "caption"
+        },
+        {
+          "row": 283,
+          "field": "caption"
+        },
+        {
+          "row": 366,
+          "field": "caption"
+        },
+        {
+          "row": 546,
+          "field": "altText"
+        },
+        {
+          "row": 710,
+          "field": "altText"
+        },
+        {
+          "row": 783,
+          "field": "altText"
+        },
+        {
+          "row": 866,
+          "field": "altText"
+        }
+      ]
+    },
+    {
+      "concept": "strick-sockenferse",
+      "englishGloss": "The knitted sock heel construction, fit and transition into its shaping.",
+      "count": 8,
+      "rows": [114, 135, 298, 484, 614, 635, 798, 984],
+      "membership": [
+        {
+          "row": 114,
+          "field": "caption"
+        },
+        {
+          "row": 135,
+          "field": "caption"
+        },
+        {
+          "row": 298,
+          "field": "caption"
+        },
+        {
+          "row": 484,
+          "field": "caption"
+        },
+        {
+          "row": 614,
+          "field": "altText"
+        },
+        {
+          "row": 635,
+          "field": "altText"
+        },
+        {
+          "row": 798,
+          "field": "altText"
+        },
+        {
+          "row": 984,
+          "field": "altText"
+        }
+      ]
+    }
+  ],
+  "peerReview": "de-peer-review-edge_paths.json: READY for current source SHA after complete-item replacement of the identified reinforcement boundary.",
+  "status": "FINAL. Source text remains unchanged after handoff unless a new pre-seal editorial issue requires an explicit revision."
+}

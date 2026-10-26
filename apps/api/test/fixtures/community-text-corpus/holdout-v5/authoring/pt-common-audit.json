@@ -1,0 +1,1991 @@
+{
+  "language": "pt",
+  "sourceSha256": "a6517ae82b1507dcb6aae85282167fb620e7359536e528b6b3fd8b1f62a25d25",
+  "total": 1000,
+  "fields": {
+    "caption": 500,
+    "altText": 500
+  },
+  "fiveWordOverlap": {
+    "affectedCount": 2,
+    "affectedShare": 0.002,
+    "affectedItems": [919, 953],
+    "repeatedSequences": [
+      {
+        "sequence": "acompanha o dorso da luva",
+        "items": [919, 953]
+      }
+    ]
+  },
+  "concepts": {
+    "distinct": 479,
+    "maximumCount": 10,
+    "maximumShare": 0.01,
+    "groups": [
+      {
+        "concept": "texto-decorativo-tecido",
+        "items": [553, 554, 583, 584, 757, 758, 759, 760, 955, 956]
+      },
+      {
+        "concept": "bordado-memoria-pessoal",
+        "items": [553, 554, 757, 758, 759, 760, 955, 956]
+      },
+      {
+        "concept": "componente-retirado-trocado",
+        "items": [183, 184, 363, 364, 665, 666, 809, 810]
+      },
+      {
+        "concept": "forma-espiral-helicoidal",
+        "items": [11, 12, 147, 148, 559, 560, 575, 576]
+      },
+      {
+        "concept": "ornamento-floral-simples",
+        "items": [561, 562, 573, 574, 877, 878, 925, 926]
+      },
+      {
+        "concept": "tiras-tecido-entrelacadas",
+        "items": [529, 530, 535, 536, 687, 688, 755, 756]
+      },
+      {
+        "concept": "acabamento-fios-pendentes",
+        "items": [67, 68, 591, 592, 887, 888]
+      },
+      {
+        "concept": "alca-material-natural-reutilizado",
+        "items": [65, 66, 701, 702, 731, 732]
+      },
+      {
+        "concept": "passadoria-formas",
+        "items": [251, 252, 253, 254, 255, 256]
+      },
+      {
+        "concept": "prova-sentada-cintura",
+        "items": [63, 64, 357, 358, 375, 376]
+      },
+      {
+        "concept": "abertura-botao-ombro",
+        "items": [171, 172, 693, 694]
+      },
+      {
+        "concept": "alca-vestido-ajuste",
+        "items": [781, 782, 983, 984]
+      },
+      {
+        "concept": "cerzido-meias",
+        "items": [27, 28, 785, 786]
+      },
+      {
+        "concept": "detalhe-refletivo-roupa",
+        "items": [167, 168, 919, 920]
+      },
+      {
+        "concept": "fecho-rotativo",
+        "items": [659, 660, 661, 662]
+      },
+      {
+        "concept": "forro-saia-comprimento",
+        "items": [179, 180, 377, 378]
+      },
+      {
+        "concept": "joia-areia-movel",
+        "items": [1, 2, 967, 968]
+      },
+      {
+        "concept": "joia-disco-revela",
+        "items": [73, 74, 863, 864]
+      },
+      {
+        "concept": "joia-pedra-suspensa",
+        "items": [89, 90, 965, 966]
+      },
+      {
+        "concept": "pregas-costas-camisa",
+        "items": [119, 120, 811, 812]
+      },
+      {
+        "concept": "prova-giro-danca",
+        "items": [15, 16, 359, 360]
+      },
+      {
+        "concept": "reforco-cotovelo",
+        "items": [79, 80, 763, 764]
+      },
+      {
+        "concept": "secagem-apoiada",
+        "items": [325, 326, 335, 336]
+      },
+      {
+        "concept": "suporte-interno-calcado",
+        "items": [303, 304, 993, 994]
+      },
+      {
+        "concept": "textura-impressa-molde",
+        "items": [107, 108, 579, 580]
+      },
+      {
+        "concept": "agulha-dupla-barra",
+        "items": [293, 294]
+      },
+      {
+        "concept": "agulha-passador-arame",
+        "items": [271, 272]
+      },
+      {
+        "concept": "agulhas-livro-feltro",
+        "items": [199, 200]
+      },
+      {
+        "concept": "alfineteiro-pulso",
+        "items": [261, 262]
+      },
+      {
+        "concept": "anel-bandeja-entrada",
+        "items": [307, 308]
+      },
+      {
+        "concept": "anel-camadas-papel",
+        "items": [931, 932]
+      },
+      {
+        "concept": "anel-cristal-janela",
+        "items": [587, 588]
+      },
+      {
+        "concept": "anel-empilhado-espacador",
+        "items": [381, 382]
+      },
+      {
+        "concept": "anel-espelho-interno",
+        "items": [187, 188]
+      },
+      {
+        "concept": "anel-fecho-dobradica",
+        "items": [31, 32]
+      },
+      {
+        "concept": "anel-moeda-relevo",
+        "items": [729, 730]
+      },
+      {
+        "concept": "anel-pedra-furo-central",
+        "items": [829, 830]
+      },
+      {
+        "concept": "anel-pegada-gravada",
+        "items": [897, 898]
+      },
+      {
+        "concept": "anel-ponta-bussola",
+        "items": [795, 796]
+      },
+      {
+        "concept": "anel-textura-casca",
+        "items": [541, 542]
+      },
+      {
+        "concept": "anel-topo-trocavel",
+        "items": [665, 666]
+      },
+      {
+        "concept": "anel-tres-aros-moveis",
+        "items": [609, 610]
+      },
+      {
+        "concept": "aplique-borda-solta",
+        "items": [523, 524]
+      },
+      {
+        "concept": "argola-alicate",
+        "items": [235, 236]
+      },
+      {
+        "concept": "armario-divisoria-altura",
+        "items": [301, 302]
+      },
+      {
+        "concept": "avental-bolso-ferramenta",
+        "items": [155, 156]
+      },
+      {
+        "concept": "avental-rabisco-medidas",
+        "items": [37, 38]
+      },
+      {
+        "concept": "bainha-ponto-invisivel",
+        "items": [221, 222]
+      },
+      {
+        "concept": "barra-com-contrapeso",
+        "items": [3, 4]
+      },
+      {
+        "concept": "barra-recorte-ondas",
+        "items": [517, 518]
+      },
+      {
+        "concept": "barra-regua-chao",
+        "items": [275, 276]
+      },
+      {
+        "concept": "blusa-bordado-janela",
+        "items": [537, 538]
+      },
+      {
+        "concept": "blusa-cava-assimetrica",
+        "items": [999, 1000]
+      },
+      {
+        "concept": "blusa-costura-princesa",
+        "items": [101, 102]
+      },
+      {
+        "concept": "blusa-dobrada-viagem",
+        "items": [311, 312]
+      },
+      {
+        "concept": "blusa-frente-transpassada",
+        "items": [57, 58]
+      },
+      {
+        "concept": "blusa-ponto-rede-ombro",
+        "items": [593, 594]
+      },
+      {
+        "concept": "blusa-punho-cordao",
+        "items": [601, 602]
+      },
+      {
+        "concept": "boina-angulo-espelho",
+        "items": [351, 352]
+      },
+      {
+        "concept": "bolsa-abertura-circular",
+        "items": [681, 682]
+      },
+      {
+        "concept": "bolsa-alca-encaixe",
+        "items": [625, 626]
+      },
+      {
+        "concept": "bolsa-alca-larga-espuma",
+        "items": [837, 838]
+      },
+      {
+        "concept": "bolsa-bordado-favo",
+        "items": [871, 872]
+      },
+      {
+        "concept": "bolsa-bordado-lince",
+        "items": [761, 762]
+      },
+      {
+        "concept": "bolsa-canto-caixa",
+        "items": [165, 166]
+      },
+      {
+        "concept": "bolsa-canto-remendo",
+        "items": [777, 778]
+      },
+      {
+        "concept": "bolsa-carteira-desdobrada",
+        "items": [905, 906]
+      },
+      {
+        "concept": "bolsa-cesto-organizador",
+        "items": [183, 184]
+      },
+      {
+        "concept": "bolsa-enchimento-papel",
+        "items": [313, 314]
+      },
+      {
+        "concept": "bolsa-fecho-catraca",
+        "items": [81, 82]
+      },
+      {
+        "concept": "bolsa-fecho-gancho-madeira",
+        "items": [939, 940]
+      },
+      {
+        "concept": "bolsa-fecho-mola-duas-maos",
+        "items": [605, 606]
+      },
+      {
+        "concept": "bolsa-fita-janela",
+        "items": [803, 804]
+      },
+      {
+        "concept": "bolsa-fole-vinco",
+        "items": [569, 570]
+      },
+      {
+        "concept": "bolsa-forro-ancorado",
+        "items": [121, 122]
+      },
+      {
+        "concept": "bolsa-gancho-mesa",
+        "items": [141, 142]
+      },
+      {
+        "concept": "bolsa-guarda-chuva",
+        "items": [737, 738]
+      },
+      {
+        "concept": "bolsa-interno-gancho-chave",
+        "items": [973, 974]
+      },
+      {
+        "concept": "bolsa-livro-peso",
+        "items": [367, 368]
+      },
+      {
+        "concept": "bolsa-patch-constelacao",
+        "items": [99, 100]
+      },
+      {
+        "concept": "bolsa-quilt-labirinto",
+        "items": [533, 534]
+      },
+      {
+        "concept": "bolsa-sanfona-aberta",
+        "items": [7, 8]
+      },
+      {
+        "concept": "bolsa-sola-pes",
+        "items": [623, 624]
+      },
+      {
+        "concept": "bolsa-tampa-telhado",
+        "items": [647, 648]
+      },
+      {
+        "concept": "bolsa-ziper-reaproveitado",
+        "items": [749, 750]
+      },
+      {
+        "concept": "bolso-camisa-pochete",
+        "items": [709, 710]
+      },
+      {
+        "concept": "bolso-falso-removido",
+        "items": [135, 136]
+      },
+      {
+        "concept": "bolso-fundo-inclinado",
+        "items": [35, 36]
+      },
+      {
+        "concept": "borda-degrade-fios",
+        "items": [497, 498]
+      },
+      {
+        "concept": "bordado-bastidor-forrado",
+        "items": [225, 226]
+      },
+      {
+        "concept": "bordado-carimbo-guia",
+        "items": [283, 284]
+      },
+      {
+        "concept": "bordado-no-frances",
+        "items": [521, 522]
+      },
+      {
+        "concept": "bota-gusset-ziper",
+        "items": [617, 618]
+      },
+      {
+        "concept": "botao-camadas-recicladas",
+        "items": [555, 556]
+      },
+      {
+        "concept": "botao-casa-abertura",
+        "items": [245, 246]
+      },
+      {
+        "concept": "botao-espaco-traseiro",
+        "items": [61, 62]
+      },
+      {
+        "concept": "botao-molde-orientacao",
+        "items": [269, 270]
+      },
+      {
+        "concept": "botao-resina-musgo",
+        "items": [125, 126]
+      },
+      {
+        "concept": "botina-lingueta-canal",
+        "items": [105, 106]
+      },
+      {
+        "concept": "brinco-arco-suspenso",
+        "items": [827, 828]
+      },
+      {
+        "concept": "brinco-camara-bicicleta",
+        "items": [705, 706]
+      },
+      {
+        "concept": "brinco-cartao-assinado",
+        "items": [331, 332]
+      },
+      {
+        "concept": "brinco-contorno-janela",
+        "items": [83, 84]
+      },
+      {
+        "concept": "brinco-corrente-travessia",
+        "items": [793, 794]
+      },
+      {
+        "concept": "brinco-escala-musical",
+        "items": [963, 964]
+      },
+      {
+        "concept": "brinco-esfera-perfurada",
+        "items": [589, 590]
+      },
+      {
+        "concept": "brinco-fios-degraus",
+        "items": [137, 138]
+      },
+      {
+        "concept": "brinco-folha-dobrada",
+        "items": [543, 544]
+      },
+      {
+        "concept": "brinco-gola-espaco",
+        "items": [371, 372]
+      },
+      {
+        "concept": "brinco-gota-oca",
+        "items": [23, 24]
+      },
+      {
+        "concept": "brinco-leque-articulado",
+        "items": [861, 862]
+      },
+      {
+        "concept": "brinco-mini-cabide",
+        "items": [895, 896]
+      },
+      {
+        "concept": "brinco-onda-quadrada",
+        "items": [613, 614]
+      },
+      {
+        "concept": "brinco-papel-aluminio",
+        "items": [929, 930]
+      },
+      {
+        "concept": "brinco-placa-traseira",
+        "items": [667, 668]
+      },
+      {
+        "concept": "broche-balanca-miniatura",
+        "items": [997, 998]
+      },
+      {
+        "concept": "broche-carrinho-roda",
+        "items": [969, 970]
+      },
+      {
+        "concept": "broche-folha-esqueleto",
+        "items": [833, 834]
+      },
+      {
+        "concept": "broche-labirinto",
+        "items": [175, 176]
+      },
+      {
+        "concept": "broche-mecanismo-pino",
+        "items": [131, 132]
+      },
+      {
+        "concept": "broche-papel-dobrado-resina",
+        "items": [901, 902]
+      },
+      {
+        "concept": "broche-pipa-linha",
+        "items": [797, 798]
+      },
+      {
+        "concept": "broche-piramide-janelas",
+        "items": [41, 42]
+      },
+      {
+        "concept": "broche-relogio-sol",
+        "items": [935, 936]
+      },
+      {
+        "concept": "broche-teatro-cortina",
+        "items": [867, 868]
+      },
+      {
+        "concept": "broche-tecla-antiga",
+        "items": [723, 724]
+      },
+      {
+        "concept": "cachecol-bolso-maos",
+        "items": [651, 652]
+      },
+      {
+        "concept": "cachecol-borda-recomposta",
+        "items": [787, 788]
+      },
+      {
+        "concept": "cachecol-botoes-mangas",
+        "items": [819, 820]
+      },
+      {
+        "concept": "cachecol-capuz-dobra",
+        "items": [91, 92]
+      },
+      {
+        "concept": "cachecol-fecho-alfinete",
+        "items": [921, 922]
+      },
+      {
+        "concept": "cachecol-forro-macio",
+        "items": [853, 854]
+      },
+      {
+        "concept": "cachecol-recorte-fechadura",
+        "items": [995, 996]
+      },
+      {
+        "concept": "cachecol-tecido-remendo",
+        "items": [177, 178]
+      },
+      {
+        "concept": "calca-abertura-lateral-barra",
+        "items": [941, 942]
+      },
+      {
+        "concept": "calca-ajuste-interno",
+        "items": [641, 642]
+      },
+      {
+        "concept": "calca-amarra-tornozelo",
+        "items": [807, 808]
+      },
+      {
+        "concept": "calca-bolso-moedas",
+        "items": [197, 198]
+      },
+      {
+        "concept": "calca-cos-fendido",
+        "items": [597, 598]
+      },
+      {
+        "concept": "calca-faixa-interna",
+        "items": [127, 128]
+      },
+      {
+        "concept": "calca-forro-bolso-refeito",
+        "items": [775, 776]
+      },
+      {
+        "concept": "calca-joelho-recorte",
+        "items": [689, 690]
+      },
+      {
+        "concept": "calca-linha-frente-pesponto",
+        "items": [839, 840]
+      },
+      {
+        "concept": "calca-prendedor-barra",
+        "items": [95, 96]
+      },
+      {
+        "concept": "calca-punho-interno-fita",
+        "items": [907, 908]
+      },
+      {
+        "concept": "calca-reparo-passante",
+        "items": [765, 766]
+      },
+      {
+        "concept": "calca-suspensor-interno",
+        "items": [873, 874]
+      },
+      {
+        "concept": "calca-vincos-duplos",
+        "items": [975, 976]
+      },
+      {
+        "concept": "calcador-compensador",
+        "items": [223, 224]
+      },
+      {
+        "concept": "calcador-telescopico",
+        "items": [547, 548]
+      },
+      {
+        "concept": "camisa-aba-abotoada",
+        "items": [947, 948]
+      },
+      {
+        "concept": "camisa-abotoamento-diagonal",
+        "items": [913, 914]
+      },
+      {
+        "concept": "camisa-bainha-curva",
+        "items": [769, 770]
+      },
+      {
+        "concept": "camisa-botoes-alternados",
+        "items": [189, 190]
+      },
+      {
+        "concept": "camisa-colarinho-substituido",
+        "items": [699, 700]
+      },
+      {
+        "concept": "camisa-costura-deslocada",
+        "items": [19, 20]
+      },
+      {
+        "concept": "camisa-gola-dupla-ponta",
+        "items": [879, 880]
+      },
+      {
+        "concept": "camisa-gola-ponte",
+        "items": [149, 150]
+      },
+      {
+        "concept": "camisa-gola-quadrada",
+        "items": [981, 982]
+      },
+      {
+        "concept": "camisa-guia-gravata",
+        "items": [845, 846]
+      },
+      {
+        "concept": "camisa-laco-punho",
+        "items": [639, 640]
+      },
+      {
+        "concept": "camisa-letra-sobreposta",
+        "items": [583, 584]
+      },
+      {
+        "concept": "camisa-luz-opacidade",
+        "items": [383, 384]
+      },
+      {
+        "concept": "camisa-manga-abraco",
+        "items": [345, 346]
+      },
+      {
+        "concept": "camisa-manga-bolso",
+        "items": [725, 726]
+      },
+      {
+        "concept": "camisa-manga-capa",
+        "items": [595, 596]
+      },
+      {
+        "concept": "camisa-papel-colarinho",
+        "items": [365, 366]
+      },
+      {
+        "concept": "camisa-punho-reversivel",
+        "items": [85, 86]
+      },
+      {
+        "concept": "camisa-tira-abaixo-gola",
+        "items": [657, 658]
+      },
+      {
+        "concept": "camiseta-manchinha-cometa",
+        "items": [741, 742]
+      },
+      {
+        "concept": "canto-vira-ferramenta",
+        "items": [273, 274]
+      },
+      {
+        "concept": "capa-bicicleta-vento",
+        "items": [349, 350]
+      },
+      {
+        "concept": "capa-orelha-costura",
+        "items": [805, 806]
+      },
+      {
+        "concept": "capa-presilha-ombro",
+        "items": [111, 112]
+      },
+      {
+        "concept": "capuz-enrolado-gola",
+        "items": [637, 638]
+      },
+      {
+        "concept": "capuz-visao-lateral",
+        "items": [25, 26]
+      },
+      {
+        "concept": "carretel-rede",
+        "items": [201, 202]
+      },
+      {
+        "concept": "casaco-bolso-retalho",
+        "items": [747, 748]
+      },
+      {
+        "concept": "casaco-botao-herdado",
+        "items": [697, 698]
+      },
+      {
+        "concept": "casaco-botoeira-flor",
+        "items": [877, 878]
+      },
+      {
+        "concept": "casaco-escova-sentido",
+        "items": [305, 306]
+      },
+      {
+        "concept": "casaco-fecho-palito",
+        "items": [945, 946]
+      },
+      {
+        "concept": "casaco-forro-substituido",
+        "items": [715, 716]
+      },
+      {
+        "concept": "casaco-gola-apoio",
+        "items": [979, 980]
+      },
+      {
+        "concept": "casaco-gola-botao-duplo",
+        "items": [603, 604]
+      },
+      {
+        "concept": "casaco-lapela-degrau",
+        "items": [843, 844]
+      },
+      {
+        "concept": "casaco-pala-chuva",
+        "items": [911, 912]
+      },
+      {
+        "concept": "casaco-pala-cordao",
+        "items": [557, 558]
+      },
+      {
+        "concept": "casaco-porta-luva",
+        "items": [649, 650]
+      },
+      {
+        "concept": "casaco-punho-encurtado",
+        "items": [773, 774]
+      },
+      {
+        "concept": "casaco-respiro-costas",
+        "items": [685, 686]
+      },
+      {
+        "concept": "casaco-sombra-relevo",
+        "items": [145, 146]
+      },
+      {
+        "concept": "chapeu-aba-costura-circular",
+        "items": [889, 890]
+      },
+      {
+        "concept": "chapeu-aba-lateral-presa",
+        "items": [957, 958]
+      },
+      {
+        "concept": "chapeu-aba-ondulada",
+        "items": [185, 186]
+      },
+      {
+        "concept": "chapeu-aba-ponto-cruzado",
+        "items": [531, 532]
+      },
+      {
+        "concept": "chapeu-altura-porta",
+        "items": [373, 374]
+      },
+      {
+        "concept": "chapeu-banda-ventilada",
+        "items": [923, 924]
+      },
+      {
+        "concept": "chapeu-copa-dobravel",
+        "items": [653, 654]
+      },
+      {
+        "concept": "chapeu-fita-pendurada",
+        "items": [821, 822]
+      },
+      {
+        "concept": "chapeu-fita-recolocada",
+        "items": [783, 784]
+      },
+      {
+        "concept": "chapeu-foto-caixa",
+        "items": [321, 322]
+      },
+      {
+        "concept": "chapeu-preso-mochila",
+        "items": [855, 856]
+      },
+      {
+        "concept": "chapeu-renda-herdada",
+        "items": [733, 734]
+      },
+      {
+        "concept": "chapeu-transporte-molde",
+        "items": [55, 56]
+      },
+      {
+        "concept": "chapéu-cordao-queixo",
+        "items": [123, 124]
+      },
+      {
+        "concept": "chapéu-fita-espiral",
+        "items": [575, 576]
+      },
+      {
+        "concept": "chinelo-ponta-envelope",
+        "items": [675, 676]
+      },
+      {
+        "concept": "cinto-enrolado-fivela",
+        "items": [327, 328]
+      },
+      {
+        "concept": "cinto-fecho-assento",
+        "items": [627, 628]
+      },
+      {
+        "concept": "cinto-furo-oval",
+        "items": [53, 54]
+      },
+      {
+        "concept": "cinto-ponta-botao-pressao",
+        "items": [679, 680]
+      },
+      {
+        "concept": "cinto-ponta-enrolada",
+        "items": [147, 148]
+      },
+      {
+        "concept": "cinto-retalho-trancado",
+        "items": [755, 756]
+      },
+      {
+        "concept": "cola-entretela-amostra",
+        "items": [257, 258]
+      },
+      {
+        "concept": "colar-canal-separado",
+        "items": [315, 316]
+      },
+      {
+        "concept": "colar-ceramica-fio-aparente",
+        "items": [893, 894]
+      },
+      {
+        "concept": "colar-comprimento-papel",
+        "items": [353, 354]
+      },
+      {
+        "concept": "colar-contra-peso",
+        "items": [791, 792]
+      },
+      {
+        "concept": "colar-dobra-papel",
+        "items": [825, 826]
+      },
+      {
+        "concept": "colar-estojo-semente",
+        "items": [927, 928]
+      },
+      {
+        "concept": "colar-fecho-ima-cilindro",
+        "items": [629, 630]
+      },
+      {
+        "concept": "colar-fecho-trocado",
+        "items": [779, 780]
+      },
+      {
+        "concept": "colar-fio-continuo",
+        "items": [961, 962]
+      },
+      {
+        "concept": "colar-fragmento-prato",
+        "items": [735, 736]
+      },
+      {
+        "concept": "colar-lagrima-madeira",
+        "items": [163, 164]
+      },
+      {
+        "concept": "colar-mola-visivel",
+        "items": [11, 12]
+      },
+      {
+        "concept": "colar-nos-escalonados",
+        "items": [565, 566]
+      },
+      {
+        "concept": "colar-pecas-azulejo",
+        "items": [859, 860]
+      },
+      {
+        "concept": "colar-pedra-rolante",
+        "items": [193, 194]
+      },
+      {
+        "concept": "colar-perola-descentrada",
+        "items": [539, 540]
+      },
+      {
+        "concept": "colar-pingente-reversivel",
+        "items": [607, 608]
+      },
+      {
+        "concept": "colar-rolha-corte",
+        "items": [751, 752]
+      },
+      {
+        "concept": "colar-tubo-deslizante",
+        "items": [663, 664]
+      },
+      {
+        "concept": "colete-lateral-aberta",
+        "items": [71, 72]
+      },
+      {
+        "concept": "colete-manta-transformada",
+        "items": [707, 708]
+      },
+      {
+        "concept": "colete-ponta-assimetrica",
+        "items": [655, 656]
+      },
+      {
+        "concept": "colete-regulador-costas",
+        "items": [341, 342]
+      },
+      {
+        "concept": "conta-terminal-amassado",
+        "items": [233, 234]
+      },
+      {
+        "concept": "costura-cor-contraste",
+        "items": [527, 528]
+      },
+      {
+        "concept": "costura-francesa-tote",
+        "items": [279, 280]
+      },
+      {
+        "concept": "costura-margens-graduadas",
+        "items": [219, 220]
+      },
+      {
+        "concept": "costura-remendo-sol",
+        "items": [695, 696]
+      },
+      {
+        "concept": "couro-borda-polida",
+        "items": [237, 238]
+      },
+      {
+        "concept": "couro-desbaste-dobra",
+        "items": [239, 240]
+      },
+      {
+        "concept": "croche-agulha-marcador",
+        "items": [281, 282]
+      },
+      {
+        "concept": "croche-quadrado-vazado",
+        "items": [519, 520]
+      },
+      {
+        "concept": "curva-piques-costura",
+        "items": [215, 216]
+      },
+      {
+        "concept": "dedal-pressao-agulha",
+        "items": [209, 210]
+      },
+      {
+        "concept": "estampa-arvore-chave",
+        "items": [417, 418]
+      },
+      {
+        "concept": "estampa-balao-telhado",
+        "items": [439, 440]
+      },
+      {
+        "concept": "estampa-barco-vela-lua",
+        "items": [403, 404]
+      },
+      {
+        "concept": "estampa-bicicleta-relogio",
+        "items": [399, 400]
+      },
+      {
+        "concept": "estampa-cadeira-estrela",
+        "items": [449, 450]
+      },
+      {
+        "concept": "estampa-canoa-crayon",
+        "items": [475, 476]
+      },
+      {
+        "concept": "estampa-casa-carretel",
+        "items": [397, 398]
+      },
+      {
+        "concept": "estampa-castelo-bule",
+        "items": [407, 408]
+      },
+      {
+        "concept": "estampa-castical-mariposa",
+        "items": [471, 472]
+      },
+      {
+        "concept": "estampa-chaleira-cometa",
+        "items": [459, 460]
+      },
+      {
+        "concept": "estampa-contorno-negativo",
+        "items": [505, 506]
+      },
+      {
+        "concept": "estampa-copo-aquario",
+        "items": [443, 444]
+      },
+      {
+        "concept": "estampa-correio-estrelas",
+        "items": [433, 434]
+      },
+      {
+        "concept": "estampa-elevador-nuvem",
+        "items": [391, 392]
+      },
+      {
+        "concept": "estampa-escada-cabide",
+        "items": [477, 478]
+      },
+      {
+        "concept": "estampa-escada-caracol",
+        "items": [427, 428]
+      },
+      {
+        "concept": "estampa-farol-engrenagem",
+        "items": [437, 438]
+      },
+      {
+        "concept": "estampa-fita-estrada",
+        "items": [445, 446]
+      },
+      {
+        "concept": "estampa-foguete-chaleira",
+        "items": [413, 414]
+      },
+      {
+        "concept": "estampa-folha-escorregador",
+        "items": [469, 470]
+      },
+      {
+        "concept": "estampa-gaveta-passaros",
+        "items": [483, 484]
+      },
+      {
+        "concept": "estampa-guarda-sol-neve",
+        "items": [447, 448]
+      },
+      {
+        "concept": "estampa-janela-bolso",
+        "items": [415, 416]
+      },
+      {
+        "concept": "estampa-janela-nuvens",
+        "items": [461, 462]
+      },
+      {
+        "concept": "estampa-lampada-flor",
+        "items": [425, 426]
+      },
+      {
+        "concept": "estampa-livro-bosque",
+        "items": [429, 430]
+      },
+      {
+        "concept": "estampa-mala-horta",
+        "items": [463, 464]
+      },
+      {
+        "concept": "estampa-maquina-jardim",
+        "items": [435, 436]
+      },
+      {
+        "concept": "estampa-moinho-carretel",
+        "items": [489, 490]
+      },
+      {
+        "concept": "estampa-onda-pentagrama",
+        "items": [431, 432]
+      },
+      {
+        "concept": "estampa-pao-ponteiro",
+        "items": [421, 422]
+      },
+      {
+        "concept": "estampa-pedra-orbita",
+        "items": [451, 452]
+      },
+      {
+        "concept": "estampa-piano-cascata",
+        "items": [423, 424]
+      },
+      {
+        "concept": "estampa-pincel-arco",
+        "items": [453, 454]
+      },
+      {
+        "concept": "estampa-ponte-chuva",
+        "items": [455, 456]
+      },
+      {
+        "concept": "estampa-ponte-flores",
+        "items": [395, 396]
+      },
+      {
+        "concept": "estampa-ponte-meia-lua",
+        "items": [481, 482]
+      },
+      {
+        "concept": "estampa-ponteiro-bussola",
+        "items": [473, 474]
+      },
+      {
+        "concept": "estampa-porta-mar",
+        "items": [405, 406]
+      },
+      {
+        "concept": "estampa-relampago-chave",
+        "items": [117, 118]
+      },
+      {
+        "concept": "estampa-roda-gigante-botoes",
+        "items": [467, 468]
+      },
+      {
+        "concept": "estampa-sapato-vila",
+        "items": [485, 486]
+      },
+      {
+        "concept": "estampa-sino-borboleta",
+        "items": [465, 466]
+      },
+      {
+        "concept": "estampa-sombrinha-jardim",
+        "items": [401, 402]
+      },
+      {
+        "concept": "estampa-telefone-concha",
+        "items": [419, 420]
+      },
+      {
+        "concept": "estampa-telhado-remendo",
+        "items": [457, 458]
+      },
+      {
+        "concept": "estampa-tesoura-voo",
+        "items": [441, 442]
+      },
+      {
+        "concept": "estampa-torre-guarda-chuvas",
+        "items": [487, 488]
+      },
+      {
+        "concept": "estampa-trem-folhas",
+        "items": [409, 410]
+      },
+      {
+        "concept": "estampa-vaso-acordeao",
+        "items": [479, 480]
+      },
+      {
+        "concept": "estampa-violino-cidade",
+        "items": [411, 412]
+      },
+      {
+        "concept": "estampa-xicara-escada",
+        "items": [393, 394]
+      },
+      {
+        "concept": "fita-impermeavel-junta",
+        "items": [259, 260]
+      },
+      {
+        "concept": "fita-ombro-estavel",
+        "items": [265, 266]
+      },
+      {
+        "concept": "fita-viés-passador",
+        "items": [93, 94]
+      },
+      {
+        "concept": "fivela-tampa-concha",
+        "items": [17, 18]
+      },
+      {
+        "concept": "fivela-textura-martelo",
+        "items": [549, 550]
+      },
+      {
+        "concept": "forro-ponto-corrente",
+        "items": [295, 296]
+      },
+      {
+        "concept": "gargantilha-laco-traseiro",
+        "items": [113, 114]
+      },
+      {
+        "concept": "giz-linha-fio",
+        "items": [247, 248]
+      },
+      {
+        "concept": "gola-borda-picotada",
+        "items": [571, 572]
+      },
+      {
+        "concept": "goma-bico-entalhe",
+        "items": [277, 278]
+      },
+      {
+        "concept": "gorro-orelha-dobrada",
+        "items": [33, 34]
+      },
+      {
+        "concept": "gravata-faixa-cabelo",
+        "items": [719, 720]
+      },
+      {
+        "concept": "gravata-ponta-recosturada",
+        "items": [45, 46]
+      },
+      {
+        "concept": "ilhos-prensa-manual",
+        "items": [241, 242]
+      },
+      {
+        "concept": "jaqueta-fenda-pulso",
+        "items": [161, 162]
+      },
+      {
+        "concept": "lenço-anel-passagem",
+        "items": [77, 78]
+      },
+      {
+        "concept": "lenço-argola-bolsa",
+        "items": [849, 850]
+      },
+      {
+        "concept": "lenço-barra-rolada",
+        "items": [883, 884]
+      },
+      {
+        "concept": "lenço-cabeca-passagem",
+        "items": [951, 952]
+      },
+      {
+        "concept": "lenço-casas-invertidas",
+        "items": [917, 918]
+      },
+      {
+        "concept": "lenço-domino-tombando",
+        "items": [129, 130]
+      },
+      {
+        "concept": "lenço-embalagem-cinto",
+        "items": [727, 728]
+      },
+      {
+        "concept": "lenço-encaixe-botao",
+        "items": [159, 160]
+      },
+      {
+        "concept": "lenço-estojo-oculos",
+        "items": [815, 816]
+      },
+      {
+        "concept": "lenço-mapa-inventado",
+        "items": [21, 22]
+      },
+      {
+        "concept": "lenço-no-lateral",
+        "items": [389, 390]
+      },
+      {
+        "concept": "lenço-nó-coulisse",
+        "items": [677, 678]
+      },
+      {
+        "concept": "lenço-preso-relogio",
+        "items": [985, 986]
+      },
+      {
+        "concept": "lenço-rolo-papel",
+        "items": [329, 330]
+      },
+      {
+        "concept": "lenço-saia-bainha",
+        "items": [703, 704]
+      },
+      {
+        "concept": "lenço-tinta-carimbo-rolha",
+        "items": [581, 582]
+      },
+      {
+        "concept": "linha-bordado-quebrada",
+        "items": [507, 508]
+      },
+      {
+        "concept": "linha-cera-bloco",
+        "items": [211, 212]
+      },
+      {
+        "concept": "linha-cor-contraluz",
+        "items": [285, 286]
+      },
+      {
+        "concept": "luva-bolso-punho",
+        "items": [635, 636]
+      },
+      {
+        "concept": "luva-costura-fora",
+        "items": [885, 886]
+      },
+      {
+        "concept": "luva-costura-ziguezague",
+        "items": [987, 988]
+      },
+      {
+        "concept": "luva-dedo-ajustado",
+        "items": [369, 370]
+      },
+      {
+        "concept": "luva-dedos-juntos",
+        "items": [851, 852]
+      },
+      {
+        "concept": "luva-dorso-triangular",
+        "items": [953, 954]
+      },
+      {
+        "concept": "luva-guia-tato",
+        "items": [9, 10]
+      },
+      {
+        "concept": "luva-palma-recortada",
+        "items": [817, 818]
+      },
+      {
+        "concept": "luva-punho-novo",
+        "items": [743, 744]
+      },
+      {
+        "concept": "malha-amostra-lavada",
+        "items": [133, 134]
+      },
+      {
+        "concept": "malha-bloqueio-pontos",
+        "items": [75, 76]
+      },
+      {
+        "concept": "malha-canelado-espiral",
+        "items": [559, 560]
+      },
+      {
+        "concept": "malha-erro-desfeito",
+        "items": [227, 228]
+      },
+      {
+        "concept": "malha-manga-morcego",
+        "items": [103, 104]
+      },
+      {
+        "concept": "malha-sombra-direcao",
+        "items": [511, 512]
+      },
+      {
+        "concept": "maquina-pedal-base",
+        "items": [207, 208]
+      },
+      {
+        "concept": "meia-linha-guia",
+        "items": [143, 144]
+      },
+      {
+        "concept": "meia-punho-suave",
+        "items": [173, 174]
+      },
+      {
+        "concept": "meias-clip-par",
+        "items": [317, 318]
+      },
+      {
+        "concept": "mochila-alca-cruzamento",
+        "items": [379, 380]
+      },
+      {
+        "concept": "mochila-cordao-externo",
+        "items": [339, 340]
+      },
+      {
+        "concept": "mochila-topo-enrolado",
+        "items": [683, 684]
+      },
+      {
+        "concept": "molde-peso-pedra",
+        "items": [205, 206]
+      },
+      {
+        "concept": "oculos-apoio-orelha",
+        "items": [361, 362]
+      },
+      {
+        "concept": "oculos-corrente-argola",
+        "items": [97, 98]
+      },
+      {
+        "concept": "oculos-ponte-dobravel",
+        "items": [673, 674]
+      },
+      {
+        "concept": "pala-papel-ajuste",
+        "items": [5, 6]
+      },
+      {
+        "concept": "papel-transferencia-pinça",
+        "items": [263, 264]
+      },
+      {
+        "concept": "pesponto-guia-magnetico",
+        "items": [297, 298]
+      },
+      {
+        "concept": "pingente-farol-miniatura",
+        "items": [59, 60]
+      },
+      {
+        "concept": "plissado-guia-cartao",
+        "items": [289, 290]
+      },
+      {
+        "concept": "plisse-mudanca-largura",
+        "items": [509, 510]
+      },
+      {
+        "concept": "prata-patina-relevo",
+        "items": [989, 990]
+      },
+      {
+        "concept": "pregas-raios-centro",
+        "items": [495, 496]
+      },
+      {
+        "concept": "presilha-arco-duplo",
+        "items": [169, 170]
+      },
+      {
+        "concept": "presilha-argola-livre",
+        "items": [937, 938]
+      },
+      {
+        "concept": "presilha-botao-forrado",
+        "items": [753, 754]
+      },
+      {
+        "concept": "presilha-cata-vento",
+        "items": [39, 40]
+      },
+      {
+        "concept": "presilha-dentes-desiguais",
+        "items": [903, 904]
+      },
+      {
+        "concept": "presilha-escama-sobreposta",
+        "items": [971, 972]
+      },
+      {
+        "concept": "presilha-mosaico-fragmentos",
+        "items": [545, 546]
+      },
+      {
+        "concept": "presilha-pino-transversal",
+        "items": [631, 632]
+      },
+      {
+        "concept": "presilha-regua-curva",
+        "items": [799, 800]
+      },
+      {
+        "concept": "presilha-seta",
+        "items": [835, 836]
+      },
+      {
+        "concept": "presilha-tecido-ventre",
+        "items": [869, 870]
+      },
+      {
+        "concept": "pulseira-alavanca",
+        "items": [899, 900]
+      },
+      {
+        "concept": "pulseira-bolas-canais",
+        "items": [865, 866]
+      },
+      {
+        "concept": "pulseira-botao-fileira",
+        "items": [713, 714]
+      },
+      {
+        "concept": "pulseira-caixas-encaixe",
+        "items": [801, 802]
+      },
+      {
+        "concept": "pulseira-corrente-seguranca",
+        "items": [633, 634]
+      },
+      {
+        "concept": "pulseira-estojo-miniatura",
+        "items": [669, 670]
+      },
+      {
+        "concept": "pulseira-livro-aberto",
+        "items": [153, 154]
+      },
+      {
+        "concept": "pulseira-no-marinho",
+        "items": [831, 832]
+      },
+      {
+        "concept": "pulseira-pecas-mapa",
+        "items": [933, 934]
+      },
+      {
+        "concept": "pulseira-peso-prova",
+        "items": [355, 356]
+      },
+      {
+        "concept": "pulseira-ramos-encaixados",
+        "items": [49, 50]
+      },
+      {
+        "concept": "pulseira-regua-articulada",
+        "items": [611, 612]
+      },
+      {
+        "concept": "pulseira-tela-metal",
+        "items": [567, 568]
+      },
+      {
+        "concept": "quina-vies-mitra",
+        "items": [217, 218]
+      },
+      {
+        "concept": "rebite-alca-bolsa",
+        "items": [243, 244]
+      },
+      {
+        "concept": "relevo-circulos-concentricos",
+        "items": [491, 492]
+      },
+      {
+        "concept": "relevo-quadrados-inclinados",
+        "items": [501, 502]
+      },
+      {
+        "concept": "relogio-tampa-deslizante",
+        "items": [671, 672]
+      },
+      {
+        "concept": "retalho-tensao-maquina",
+        "items": [249, 250]
+      },
+      {
+        "concept": "rolo-retalho-organizado",
+        "items": [267, 268]
+      },
+      {
+        "concept": "roupa-cabide-pedido",
+        "items": [299, 300]
+      },
+      {
+        "concept": "roupa-etiqueta-arquivo",
+        "items": [115, 116]
+      },
+      {
+        "concept": "roupa-foto-conserto",
+        "items": [333, 334]
+      },
+      {
+        "concept": "roupa-gaveta-vertical",
+        "items": [337, 338]
+      },
+      {
+        "concept": "saia-bainha-arco",
+        "items": [841, 842]
+      },
+      {
+        "concept": "saia-bolso-destacavel",
+        "items": [809, 810]
+      },
+      {
+        "concept": "saia-bolso-papel",
+        "items": [47, 48]
+      },
+      {
+        "concept": "saia-bordado-linha-horizonte",
+        "items": [875, 876]
+      },
+      {
+        "concept": "saia-botoes-conversivel",
+        "items": [645, 646]
+      },
+      {
+        "concept": "saia-camadas-desiguais",
+        "items": [151, 152]
+      },
+      {
+        "concept": "saia-cos-mola",
+        "items": [109, 110]
+      },
+      {
+        "concept": "saia-costas-prega-solta",
+        "items": [771, 772]
+      },
+      {
+        "concept": "saia-costura-ziguezague",
+        "items": [585, 586]
+      },
+      {
+        "concept": "saia-escada-longa",
+        "items": [347, 348]
+      },
+      {
+        "concept": "saia-estampa-chave-sol",
+        "items": [909, 910]
+      },
+      {
+        "concept": "saia-faixa-assimetrica",
+        "items": [977, 978]
+      },
+      {
+        "concept": "saia-fecho-pontes",
+        "items": [599, 600]
+      },
+      {
+        "concept": "saia-fitilho-suspensao",
+        "items": [87, 88]
+      },
+      {
+        "concept": "saia-flor-recortada",
+        "items": [561, 562]
+      },
+      {
+        "concept": "saia-jeans-painel",
+        "items": [711, 712]
+      },
+      {
+        "concept": "saia-rede-peso",
+        "items": [943, 944]
+      },
+      {
+        "concept": "saia-remendo-transparente",
+        "items": [739, 740]
+      },
+      {
+        "concept": "saia-tiras-entretecidas",
+        "items": [535, 536]
+      },
+      {
+        "concept": "saia-volume-bolso",
+        "items": [691, 692]
+      },
+      {
+        "concept": "sandalia-tira-unica",
+        "items": [619, 620]
+      },
+      {
+        "concept": "sapato-aba-calcanhar",
+        "items": [823, 824]
+      },
+      {
+        "concept": "sapato-aba-escova",
+        "items": [13, 14]
+      },
+      {
+        "concept": "sapato-aperto-fim-dia",
+        "items": [343, 344]
+      },
+      {
+        "concept": "sapato-cadarco-lateral",
+        "items": [43, 44]
+      },
+      {
+        "concept": "sapato-cadarco-ponta-nova",
+        "items": [767, 768]
+      },
+      {
+        "concept": "sapato-caixa-recorte",
+        "items": [323, 324]
+      },
+      {
+        "concept": "sapato-capa-sola",
+        "items": [69, 70]
+      },
+      {
+        "concept": "sapato-fivela-deslizante",
+        "items": [181, 182]
+      },
+      {
+        "concept": "sapato-laço-flor",
+        "items": [925, 926]
+      },
+      {
+        "concept": "sapato-meia-espessura",
+        "items": [385, 386]
+      },
+      {
+        "concept": "sapato-palmilha-contorno",
+        "items": [857, 858]
+      },
+      {
+        "concept": "sapato-palmilha-removida",
+        "items": [363, 364]
+      },
+      {
+        "concept": "sapato-papel-secagem",
+        "items": [309, 310]
+      },
+      {
+        "concept": "sapato-ruga-vamp",
+        "items": [157, 158]
+      },
+      {
+        "concept": "sapato-salto-inclinado",
+        "items": [615, 616]
+      },
+      {
+        "concept": "sapato-sola-dividida",
+        "items": [621, 622]
+      },
+      {
+        "concept": "sapato-sola-patch-couro",
+        "items": [891, 892]
+      },
+      {
+        "concept": "sapato-tela-transparente",
+        "items": [959, 960]
+      },
+      {
+        "concept": "sapato-tira-substituida",
+        "items": [745, 746]
+      },
+      {
+        "concept": "sueter-manga-polaina",
+        "items": [721, 722]
+      },
+      {
+        "concept": "sueter-pompons-espacados",
+        "items": [991, 992]
+      },
+      {
+        "concept": "tear-pente-fios",
+        "items": [229, 230]
+      },
+      {
+        "concept": "tecido-dupla-face",
+        "items": [499, 500]
+      },
+      {
+        "concept": "tecido-flor-sem-contorno",
+        "items": [573, 574]
+      },
+      {
+        "concept": "tecido-ourelas-aparentes",
+        "items": [195, 196]
+      },
+      {
+        "concept": "tecido-pintura-respingo",
+        "items": [525, 526]
+      },
+      {
+        "concept": "tecido-pontos-metalicos",
+        "items": [513, 514]
+      },
+      {
+        "concept": "tecido-sombra-arco",
+        "items": [563, 564]
+      },
+      {
+        "concept": "tecido-sombra-folha",
+        "items": [51, 52]
+      },
+      {
+        "concept": "tecido-xadrez-desalinhado",
+        "items": [551, 552]
+      },
+      {
+        "concept": "tesoura-protetor-ponta",
+        "items": [203, 204]
+      },
+      {
+        "concept": "tesoura-recorte-serrilhado",
+        "items": [287, 288]
+      },
+      {
+        "concept": "trama-aberta-irregular",
+        "items": [503, 504]
+      },
+      {
+        "concept": "trama-linhas-interrompidas",
+        "items": [493, 494]
+      },
+      {
+        "concept": "tranca-disco-cordao",
+        "items": [231, 232]
+      },
+      {
+        "concept": "tranca-tecido-aro",
+        "items": [529, 530]
+      },
+      {
+        "concept": "veludo-sentido-pelo",
+        "items": [515, 516]
+      },
+      {
+        "concept": "vestido-abertura-costas",
+        "items": [847, 848]
+      },
+      {
+        "concept": "vestido-alca-cruzada",
+        "items": [191, 192]
+      },
+      {
+        "concept": "vestido-barra-bolsa",
+        "items": [717, 718]
+      },
+      {
+        "concept": "vestido-bolso-cintura",
+        "items": [881, 882]
+      },
+      {
+        "concept": "vestido-cinto-tunel",
+        "items": [915, 916]
+      },
+      {
+        "concept": "vestido-cintura-deslocada",
+        "items": [139, 140]
+      },
+      {
+        "concept": "vestido-faixa-obliqua",
+        "items": [813, 814]
+      },
+      {
+        "concept": "vestido-franzido-fita",
+        "items": [643, 644]
+      },
+      {
+        "concept": "vestido-lateral-entrelacada",
+        "items": [687, 688]
+      },
+      {
+        "concept": "vestido-prega-invertida",
+        "items": [29, 30]
+      },
+      {
+        "concept": "vestido-recorte-movimento",
+        "items": [387, 388]
+      },
+      {
+        "concept": "vestido-rede-sobreposta",
+        "items": [577, 578]
+      },
+      {
+        "concept": "vestido-saco-respiravel",
+        "items": [319, 320]
+      },
+      {
+        "concept": "vestido-saia-dupla-abertura",
+        "items": [949, 950]
+      },
+      {
+        "concept": "vies-tiras-emenda",
+        "items": [291, 292]
+      },
+      {
+        "concept": "ziper-puxador-conta",
+        "items": [789, 790]
+      },
+      {
+        "concept": "zíper-alinhavo-provisorio",
+        "items": [213, 214]
+      }
+    ]
+  },
+  "wholeTextDuplicates": [],
+  "historicalCollisions": [],
+  "historicalPaths": [
+    "apps/api/test/fixtures/community-text-corpus/de.json",
+    "apps/api/test/fixtures/community-text-corpus/en.json",
+    "apps/api/test/fixtures/community-text-corpus/es.json",
+    "apps/api/test/fixtures/community-text-corpus/fr.json",
+    "apps/api/test/fixtures/community-text-corpus/it.json",
+    "apps/api/test/fixtures/community-text-corpus/pt.json",
+    "apps/api/test/fixtures/community-text-corpus/tr.json",
+    "apps/api/test/fixtures/community-text-corpus/holdout-v1/de.json",
+    "apps/api/test/fixtures/community-text-corpus/holdout-v1/en.json",
+    "apps/api/test/fixtures/community-text-corpus/holdout-v1/es.json",
+    "apps/api/test/fixtures/community-text-corpus/holdout-v1/fr.json",
+    "apps/api/test/fixtures/community-text-corpus/holdout-v1/it.json",
+    "apps/api/test/fixtures/community-text-corpus/holdout-v1/pt.json",
+    "apps/api/test/fixtures/community-text-corpus/holdout-v1/tr.json",
+    "apps/api/test/fixtures/community-text-corpus/holdout-v2/de.json",
+    "apps/api/test/fixtures/community-text-corpus/holdout-v2/en.json",
+    "apps/api/test/fixtures/community-text-corpus/holdout-v2/es.json",
+    "apps/api/test/fixtures/community-text-corpus/holdout-v2/fr.json",
+    "apps/api/test/fixtures/community-text-corpus/holdout-v2/it.json",
+    "apps/api/test/fixtures/community-text-corpus/holdout-v2/pt.json",
+    "apps/api/test/fixtures/community-text-corpus/holdout-v2/tr.json",
+    "apps/api/test/fixtures/community-text-corpus/holdout-v3/de.json",
+    "apps/api/test/fixtures/community-text-corpus/holdout-v3/en.json",
+    "apps/api/test/fixtures/community-text-corpus/holdout-v3/es.json",
+    "apps/api/test/fixtures/community-text-corpus/holdout-v3/fr.json",
+    "apps/api/test/fixtures/community-text-corpus/holdout-v3/it.json",
+    "apps/api/test/fixtures/community-text-corpus/holdout-v3/pt.json",
+    "apps/api/test/fixtures/community-text-corpus/holdout-v3/tr.json",
+    "apps/api/test/fixtures/community-text-corpus/holdout-v4/de.json",
+    "apps/api/test/fixtures/community-text-corpus/holdout-v4/en.json",
+    "apps/api/test/fixtures/community-text-corpus/holdout-v4/es.json",
+    "apps/api/test/fixtures/community-text-corpus/holdout-v4/fr.json",
+    "apps/api/test/fixtures/community-text-corpus/holdout-v4/it.json",
+    "apps/api/test/fixtures/community-text-corpus/holdout-v4/pt.json",
+    "apps/api/test/fixtures/community-text-corpus/holdout-v4/tr.json"
+  ],
+  "overLengthItems": [],
+  "wordCounts": {
+    "minimum": 8,
+    "median": 12.0,
+    "maximum": 16,
+    "fewerThanFiveWords": 0
+  },
+  "maximumCaptionLength": 82,
+  "maximumAltTextLength": 85
+}

@@ -1,0 +1,1386 @@
+{
+  "author": "/root/general_review",
+  "phase": "V5",
+  "language": "en",
+  "authoredRowRange": [1, 1000],
+  "authorship": "Each complete caption and alt text was individually composed directly in English. No source text was copied, translated or adapted from historical corpus wording. No fragment bank, template expansion, combinatorial assembly or scripted model call was used.",
+  "semanticScope": "The full 1000-item source was reviewed across caption and altText. Colour, fabric and incidental setting alone do not establish independent concepts.",
+  "initialSubstantiveScenes": 250,
+  "finalConceptCount": 240,
+  "consolidations": [
+    {
+      "concept": "handmade-button-loops",
+      "formerLabels": ["corded-button-loops", "thread-chain-loop"],
+      "englishGloss": "Small handmade flexible loops used to fasten garment buttons.",
+      "rows": [509, 510, 511, 512, 977, 978, 979, 980],
+      "count": 8,
+      "reason": "Covered cord and chained thread are different constructions of the same button-loop scenario."
+    },
+    {
+      "concept": "raised-button-thread-shank",
+      "formerLabels": ["button-woven-shank", "button-foot-spacer"],
+      "englishGloss": "Creating a raised thread shank beneath a sewn button.",
+      "rows": [109, 110, 111, 112, 945, 946, 947, 948],
+      "count": 8,
+      "reason": "Wrapping the stem and using a temporary spacer both depict formation of a raised button attachment."
+    },
+    {
+      "concept": "weighted-scarf-edge",
+      "formerLabels": ["scarf-corner-weights", "scarf-chain-channel"],
+      "englishGloss": "Weights inside scarf corners or edge channels controlling its fall.",
+      "rows": [117, 118, 119, 120, 157, 158, 159, 160],
+      "count": 8,
+      "reason": "Beads and concealed chain do not create separate weighted-fabric drape motifs."
+    },
+    {
+      "concept": "detachable-shoe-lace-cover",
+      "formerLabels": ["wingtip-lace-guard", "shoe-removable-tongue"],
+      "englishGloss": "A removable panel covering the front lacing of a shoe.",
+      "rows": [61, 62, 63, 64, 93, 94, 95, 96],
+      "count": 8,
+      "reason": "Different panel shapes retain the same detachable shoe-front cover scenario."
+    },
+    {
+      "concept": "narrow-loom-strap-work",
+      "formerLabels": ["weaving-selvedge", "loom-warp-comb"],
+      "englishGloss": "Setting up and weaving a narrow strap on a loom.",
+      "rows": [257, 258, 259, 260, 261, 262, 263, 264],
+      "count": 8,
+      "reason": "The edge and thread-spacing views are conservatively consolidated as one narrow-band weaving scene."
+    },
+    {
+      "concept": "pressure-flattened-seam",
+      "formerLabels": ["seam-roller", "wooden-clapper-seam"],
+      "englishGloss": "A seam flattened with a handheld pressure tool.",
+      "rows": [249, 250, 251, 252, 909, 910, 911, 912],
+      "count": 8,
+      "reason": "A rolling cylinder and a flat wooden block change the tool, while retaining the seam-flattening scenario."
+    },
+    {
+      "concept": "trimmed-curved-seam-allowance",
+      "formerLabels": ["seam-curve-clipping", "outer-curve-notches"],
+      "englishGloss": "Trimming curved seam allowances so the turned edge can spread or lie flat.",
+      "rows": [625, 626, 627, 628, 629, 630, 631, 632],
+      "count": 8,
+      "reason": "Straight clips and triangular notches are consolidated across the two curve directions."
+    },
+    {
+      "concept": "hand-stitched-folded-hem",
+      "formerLabels": ["blind-hem-sample", "catchstitch-hem"],
+      "englishGloss": "A folded garment hem attached with small hand stitches.",
+      "rows": [933, 934, 935, 936, 941, 942, 943, 944],
+      "count": 8,
+      "reason": "The stitch shape alone does not separate the shared hand-finished hem scene."
+    },
+    {
+      "concept": "button-layout-guide",
+      "formerLabels": ["button-spacing-gauge", "button-jig-alignment"],
+      "englishGloss": "A guide aligning or spacing the buttons along a garment front.",
+      "rows": [653, 654, 655, 656, 993, 994, 995, 996],
+      "count": 8,
+      "reason": "Spacing and button-hole orientation are grouped as button-row layout rather than separate styling motifs."
+    },
+    {
+      "concept": "enclosed-tote-interior-seam",
+      "formerLabels": ["covered-seam-binding", "french-seam-tote"],
+      "englishGloss": "An enclosed interior tote seam with no raw edge exposed.",
+      "rows": [289, 290, 291, 292, 985, 986, 987, 988],
+      "count": 8,
+      "reason": "Binding and a doubled seam provide the same clean enclosed bag-interior finish and are grouped together."
+    }
+  ],
+  "maximumConceptGroups": [
+    {
+      "concept": "handmade-button-loops",
+      "formerLabels": ["corded-button-loops", "thread-chain-loop"],
+      "englishGloss": "Small handmade flexible loops used to fasten garment buttons.",
+      "rows": [509, 510, 511, 512, 977, 978, 979, 980],
+      "count": 8,
+      "reason": "Covered cord and chained thread are different constructions of the same button-loop scenario."
+    },
+    {
+      "concept": "raised-button-thread-shank",
+      "formerLabels": ["button-woven-shank", "button-foot-spacer"],
+      "englishGloss": "Creating a raised thread shank beneath a sewn button.",
+      "rows": [109, 110, 111, 112, 945, 946, 947, 948],
+      "count": 8,
+      "reason": "Wrapping the stem and using a temporary spacer both depict formation of a raised button attachment."
+    },
+    {
+      "concept": "weighted-scarf-edge",
+      "formerLabels": ["scarf-corner-weights", "scarf-chain-channel"],
+      "englishGloss": "Weights inside scarf corners or edge channels controlling its fall.",
+      "rows": [117, 118, 119, 120, 157, 158, 159, 160],
+      "count": 8,
+      "reason": "Beads and concealed chain do not create separate weighted-fabric drape motifs."
+    },
+    {
+      "concept": "detachable-shoe-lace-cover",
+      "formerLabels": ["wingtip-lace-guard", "shoe-removable-tongue"],
+      "englishGloss": "A removable panel covering the front lacing of a shoe.",
+      "rows": [61, 62, 63, 64, 93, 94, 95, 96],
+      "count": 8,
+      "reason": "Different panel shapes retain the same detachable shoe-front cover scenario."
+    },
+    {
+      "concept": "narrow-loom-strap-work",
+      "formerLabels": ["weaving-selvedge", "loom-warp-comb"],
+      "englishGloss": "Setting up and weaving a narrow strap on a loom.",
+      "rows": [257, 258, 259, 260, 261, 262, 263, 264],
+      "count": 8,
+      "reason": "The edge and thread-spacing views are conservatively consolidated as one narrow-band weaving scene."
+    },
+    {
+      "concept": "pressure-flattened-seam",
+      "formerLabels": ["seam-roller", "wooden-clapper-seam"],
+      "englishGloss": "A seam flattened with a handheld pressure tool.",
+      "rows": [249, 250, 251, 252, 909, 910, 911, 912],
+      "count": 8,
+      "reason": "A rolling cylinder and a flat wooden block change the tool, while retaining the seam-flattening scenario."
+    },
+    {
+      "concept": "trimmed-curved-seam-allowance",
+      "formerLabels": ["seam-curve-clipping", "outer-curve-notches"],
+      "englishGloss": "Trimming curved seam allowances so the turned edge can spread or lie flat.",
+      "rows": [625, 626, 627, 628, 629, 630, 631, 632],
+      "count": 8,
+      "reason": "Straight clips and triangular notches are consolidated across the two curve directions."
+    },
+    {
+      "concept": "hand-stitched-folded-hem",
+      "formerLabels": ["blind-hem-sample", "catchstitch-hem"],
+      "englishGloss": "A folded garment hem attached with small hand stitches.",
+      "rows": [933, 934, 935, 936, 941, 942, 943, 944],
+      "count": 8,
+      "reason": "The stitch shape alone does not separate the shared hand-finished hem scene."
+    },
+    {
+      "concept": "button-layout-guide",
+      "formerLabels": ["button-spacing-gauge", "button-jig-alignment"],
+      "englishGloss": "A guide aligning or spacing the buttons along a garment front.",
+      "rows": [653, 654, 655, 656, 993, 994, 995, 996],
+      "count": 8,
+      "reason": "Spacing and button-hole orientation are grouped as button-row layout rather than separate styling motifs."
+    },
+    {
+      "concept": "enclosed-tote-interior-seam",
+      "formerLabels": ["covered-seam-binding", "french-seam-tote"],
+      "englishGloss": "An enclosed interior tote seam with no raw edge exposed.",
+      "rows": [289, 290, 291, 292, 985, 986, 987, 988],
+      "count": 8,
+      "reason": "Binding and a doubled seam provide the same clean enclosed bag-interior finish and are grouped together."
+    }
+  ],
+  "distinctions": [
+    "Illustrated animal scenes are defined by the depicted action and substantive props, not merely the animal name. A reading frog on a lily pad, a puffin knitting, and an owl climbing a book ladder are different visual compositions.",
+    "Garment construction activities retain their physical purpose and geometry: grading layered seam widths, understitching a facing, transferring point marks, and clipping a curved allowance are not split by incidental textile changes.",
+    "Functional mechanisms with distinct operations remain separate: a spring purse frame, a rotating turnlock, and a roll-top closure are not treated as the same motif merely because all close a bag.",
+    "No repeated styling family based on warm layers, a garment draped over a chair, or displaying a garment lining was authored. Interior sewing views describe construction operations rather than a lining-reveal styling family."
+  ],
+  "labelSpellingCorrections": {
+    "our-ladder-books": "owl-ladder-books",
+    "fenncec-star-map": "fennec-star-map"
+  },
+  "allConceptMembership": [
+    {
+      "concept": "accordion-bracelet",
+      "count": 4,
+      "rows": [33, 34, 35, 36]
+    },
+    {
+      "concept": "alpaca-yarn-basket",
+      "count": 4,
+      "rows": [373, 374, 375, 376]
+    },
+    {
+      "concept": "ankle-sliding-cuff",
+      "count": 4,
+      "rows": [17, 18, 19, 20]
+    },
+    {
+      "concept": "applique-turning-template",
+      "count": 4,
+      "rows": [969, 970, 971, 972]
+    },
+    {
+      "concept": "armadillo-roller-skates",
+      "count": 4,
+      "rows": [409, 410, 411, 412]
+    },
+    {
+      "concept": "back-seam-tights",
+      "count": 4,
+      "rows": [25, 26, 27, 28]
+    },
+    {
+      "concept": "backpack-cord-skeleton",
+      "count": 4,
+      "rows": [97, 98, 99, 100]
+    },
+    {
+      "concept": "badger-watering-cactus",
+      "count": 4,
+      "rows": [305, 306, 307, 308]
+    },
+    {
+      "concept": "bag-bottom-feet",
+      "count": 4,
+      "rows": [197, 198, 199, 200]
+    },
+    {
+      "concept": "bag-chain-shoulder-insert",
+      "count": 4,
+      "rows": [849, 850, 851, 852]
+    },
+    {
+      "concept": "bag-top-pinch-pleats",
+      "count": 4,
+      "rows": [869, 870, 871, 872]
+    },
+    {
+      "concept": "bag-woven-hinge",
+      "count": 4,
+      "rows": [181, 182, 183, 184]
+    },
+    {
+      "concept": "basting-grid-check",
+      "count": 4,
+      "rows": [645, 646, 647, 648]
+    },
+    {
+      "concept": "bead-fringe-spacing",
+      "count": 4,
+      "rows": [273, 274, 275, 276]
+    },
+    {
+      "concept": "bear-honey-cart",
+      "count": 4,
+      "rows": [357, 358, 359, 360]
+    },
+    {
+      "concept": "beaver-pencil-house",
+      "count": 4,
+      "rows": [429, 430, 431, 432]
+    },
+    {
+      "concept": "belt-keeper-bridge",
+      "count": 4,
+      "rows": [161, 162, 163, 164]
+    },
+    {
+      "concept": "belt-snap-tip",
+      "count": 4,
+      "rows": [853, 854, 855, 856]
+    },
+    {
+      "concept": "bias-maker-tool",
+      "count": 4,
+      "rows": [913, 914, 915, 916]
+    },
+    {
+      "concept": "boning-end-cap",
+      "count": 4,
+      "rows": [669, 670, 671, 672]
+    },
+    {
+      "concept": "boot-calf-expansion",
+      "count": 4,
+      "rows": [517, 518, 519, 520]
+    },
+    {
+      "concept": "boot-pull-hooks",
+      "count": 4,
+      "rows": [65, 66, 67, 68]
+    },
+    {
+      "concept": "bound-welt-pocket",
+      "count": 4,
+      "rows": [525, 526, 527, 528]
+    },
+    {
+      "concept": "box-clutch-hinge",
+      "count": 4,
+      "rows": [41, 42, 43, 44]
+    },
+    {
+      "concept": "boxed-bag-corner",
+      "count": 4,
+      "rows": [981, 982, 983, 984]
+    },
+    {
+      "concept": "bracelet-hidden-compartment",
+      "count": 4,
+      "rows": [57, 58, 59, 60]
+    },
+    {
+      "concept": "bracelet-knot-closure",
+      "count": 4,
+      "rows": [189, 190, 191, 192]
+    },
+    {
+      "concept": "bracelet-ladder-links",
+      "count": 4,
+      "rows": [841, 842, 843, 844]
+    },
+    {
+      "concept": "bracelet-leaf-overlap",
+      "count": 4,
+      "rows": [165, 166, 167, 168]
+    },
+    {
+      "concept": "bracelet-ribbon-spool",
+      "count": 4,
+      "rows": [861, 862, 863, 864]
+    },
+    {
+      "concept": "bracelet-ruler-fold",
+      "count": 4,
+      "rows": [121, 122, 123, 124]
+    },
+    {
+      "concept": "bridge-shadow-stripes",
+      "count": 4,
+      "rows": [773, 774, 775, 776]
+    },
+    {
+      "concept": "button-fly-shield",
+      "count": 4,
+      "rows": [505, 506, 507, 508]
+    },
+    {
+      "concept": "button-layout-guide",
+      "count": 8,
+      "rows": [653, 654, 655, 656, 993, 994, 995, 996]
+    },
+    {
+      "concept": "button-spread-concealer",
+      "count": 4,
+      "rows": [533, 534, 535, 536]
+    },
+    {
+      "concept": "buttonhole-cut-guide",
+      "count": 4,
+      "rows": [241, 242, 243, 244]
+    },
+    {
+      "concept": "cap-button-adjustment",
+      "count": 4,
+      "rows": [49, 50, 51, 52]
+    },
+    {
+      "concept": "cap-hair-loop",
+      "count": 4,
+      "rows": [101, 102, 103, 104]
+    },
+    {
+      "concept": "capybara-leaf-hammock",
+      "count": 4,
+      "rows": [453, 454, 455, 456]
+    },
+    {
+      "concept": "chameleon-tape-measure",
+      "count": 4,
+      "rows": [425, 426, 427, 428]
+    },
+    {
+      "concept": "cheetah-teacart",
+      "count": 4,
+      "rows": [441, 442, 443, 444]
+    },
+    {
+      "concept": "circuit-trace-pattern",
+      "count": 4,
+      "rows": [713, 714, 715, 716]
+    },
+    {
+      "concept": "clasp-magnetic-cylinder",
+      "count": 4,
+      "rows": [885, 886, 887, 888]
+    },
+    {
+      "concept": "clutch-wrist-slot",
+      "count": 4,
+      "rows": [137, 138, 139, 140]
+    },
+    {
+      "concept": "coat-throat-latch",
+      "count": 4,
+      "rows": [585, 586, 587, 588]
+    },
+    {
+      "concept": "collar-cord-stop",
+      "count": 4,
+      "rows": [69, 70, 71, 72]
+    },
+    {
+      "concept": "collar-stand-curve",
+      "count": 4,
+      "rows": [537, 538, 539, 540]
+    },
+    {
+      "concept": "collar-underside-hook",
+      "count": 4,
+      "rows": [133, 134, 135, 136]
+    },
+    {
+      "concept": "compassless-map-lines",
+      "count": 4,
+      "rows": [777, 778, 779, 780]
+    },
+    {
+      "concept": "convertible-cuff-depth",
+      "count": 4,
+      "rows": [573, 574, 575, 576]
+    },
+    {
+      "concept": "cord-braid-disk",
+      "count": 4,
+      "rows": [277, 278, 279, 280]
+    },
+    {
+      "concept": "cord-piping-fabric-strip",
+      "count": 4,
+      "rows": [665, 666, 667, 668]
+    },
+    {
+      "concept": "crab-sandwich-board",
+      "count": 4,
+      "rows": [361, 362, 363, 364]
+    },
+    {
+      "concept": "crimp-bead-closure",
+      "count": 4,
+      "rows": [217, 218, 219, 220]
+    },
+    {
+      "concept": "crosshatch-rainbow",
+      "count": 4,
+      "rows": [741, 742, 743, 744]
+    },
+    {
+      "concept": "crumpled-foil-print",
+      "count": 4,
+      "rows": [781, 782, 783, 784]
+    },
+    {
+      "concept": "detachable-shoe-lace-cover",
+      "count": 8,
+      "rows": [61, 62, 63, 64, 93, 94, 95, 96]
+    },
+    {
+      "concept": "dolphin-moon-hoop",
+      "count": 4,
+      "rows": [485, 486, 487, 488]
+    },
+    {
+      "concept": "double-helix-ribbon",
+      "count": 4,
+      "rows": [753, 754, 755, 756]
+    },
+    {
+      "concept": "dress-hidden-hem-loop",
+      "count": 4,
+      "rows": [577, 578, 579, 580]
+    },
+    {
+      "concept": "ear-jacket-backplate",
+      "count": 4,
+      "rows": [825, 826, 827, 828]
+    },
+    {
+      "concept": "earring-folded-square",
+      "count": 4,
+      "rows": [893, 894, 895, 896]
+    },
+    {
+      "concept": "embroidery-hoop-ribbon",
+      "count": 4,
+      "rows": [297, 298, 299, 300]
+    },
+    {
+      "concept": "enclosed-tote-interior-seam",
+      "count": 8,
+      "rows": [289, 290, 291, 292, 985, 986, 987, 988]
+    },
+    {
+      "concept": "eyelet-press",
+      "count": 4,
+      "rows": [201, 202, 203, 204]
+    },
+    {
+      "concept": "fabric-drape-ring",
+      "count": 4,
+      "rows": [689, 690, 691, 692]
+    },
+    {
+      "concept": "fabric-stretch-direction",
+      "count": 4,
+      "rows": [609, 610, 611, 612]
+    },
+    {
+      "concept": "fan-fold-hat",
+      "count": 4,
+      "rows": [13, 14, 15, 16]
+    },
+    {
+      "concept": "fennec-star-map",
+      "count": 4,
+      "rows": [457, 458, 459, 460]
+    },
+    {
+      "concept": "ferret-croissant-bridge",
+      "count": 4,
+      "rows": [497, 498, 499, 500]
+    },
+    {
+      "concept": "fingerless-palm-wrap",
+      "count": 4,
+      "rows": [53, 54, 55, 56]
+    },
+    {
+      "concept": "flamingo-watercan",
+      "count": 4,
+      "rows": [405, 406, 407, 408]
+    },
+    {
+      "concept": "flatlock-sample",
+      "count": 4,
+      "rows": [681, 682, 683, 684]
+    },
+    {
+      "concept": "folded-corner-illusion",
+      "count": 4,
+      "rows": [749, 750, 751, 752]
+    },
+    {
+      "concept": "folded-paper-crane-shadow",
+      "count": 4,
+      "rows": [793, 794, 795, 796]
+    },
+    {
+      "concept": "folding-sunglass-arms",
+      "count": 4,
+      "rows": [73, 74, 75, 76]
+    },
+    {
+      "concept": "fox-flying-leaf",
+      "count": 4,
+      "rows": [317, 318, 319, 320]
+    },
+    {
+      "concept": "fractal-tree",
+      "count": 4,
+      "rows": [725, 726, 727, 728]
+    },
+    {
+      "concept": "frog-lily-reading",
+      "count": 4,
+      "rows": [349, 350, 351, 352]
+    },
+    {
+      "concept": "glitch-block-print",
+      "count": 4,
+      "rows": [733, 734, 735, 736]
+    },
+    {
+      "concept": "hair-slide-pin-pair",
+      "count": 4,
+      "rows": [873, 874, 875, 876]
+    },
+    {
+      "concept": "halftone-profile",
+      "count": 4,
+      "rows": [737, 738, 739, 740]
+    },
+    {
+      "concept": "hamster-hotair-basket",
+      "count": 4,
+      "rows": [417, 418, 419, 420]
+    },
+    {
+      "concept": "hand-stitched-folded-hem",
+      "count": 8,
+      "rows": [933, 934, 935, 936, 941, 942, 943, 944]
+    },
+    {
+      "concept": "handmade-button-loops",
+      "count": 8,
+      "rows": [509, 510, 511, 512, 977, 978, 979, 980]
+    },
+    {
+      "concept": "handmade-toggle-shape",
+      "count": 4,
+      "rows": [293, 294, 295, 296]
+    },
+    {
+      "concept": "hare-windmill-scarf",
+      "count": 4,
+      "rows": [433, 434, 435, 436]
+    },
+    {
+      "concept": "hedgehog-teacup",
+      "count": 4,
+      "rows": [313, 314, 315, 316]
+    },
+    {
+      "concept": "hem-level-floor-guide",
+      "count": 4,
+      "rows": [657, 658, 659, 660]
+    },
+    {
+      "concept": "heron-fishing-starfish",
+      "count": 4,
+      "rows": [413, 414, 415, 416]
+    },
+    {
+      "concept": "hood-side-window",
+      "count": 4,
+      "rows": [553, 554, 555, 556]
+    },
+    {
+      "concept": "hummingbird-keyhole",
+      "count": 4,
+      "rows": [445, 446, 447, 448]
+    },
+    {
+      "concept": "impossible-triangle",
+      "count": 4,
+      "rows": [705, 706, 707, 708]
+    },
+    {
+      "concept": "interchangeable-heel",
+      "count": 4,
+      "rows": [821, 822, 823, 824]
+    },
+    {
+      "concept": "interfacing-test-pair",
+      "count": 4,
+      "rows": [697, 698, 699, 700]
+    },
+    {
+      "concept": "interference-wave-print",
+      "count": 4,
+      "rows": [765, 766, 767, 768]
+    },
+    {
+      "concept": "interlocking-cube-print",
+      "count": 4,
+      "rows": [757, 758, 759, 760]
+    },
+    {
+      "concept": "jellyfish-lantern",
+      "count": 4,
+      "rows": [365, 366, 367, 368]
+    },
+    {
+      "concept": "jump-ring-assembly",
+      "count": 4,
+      "rows": [229, 230, 231, 232]
+    },
+    {
+      "concept": "kangaroo-pocket-flowers",
+      "count": 4,
+      "rows": [465, 466, 467, 468]
+    },
+    {
+      "concept": "kingfisher-pencil-dive",
+      "count": 4,
+      "rows": [477, 478, 479, 480]
+    },
+    {
+      "concept": "knit-gauge-swatch",
+      "count": 4,
+      "rows": [601, 602, 603, 604]
+    },
+    {
+      "concept": "koala-teapot",
+      "count": 4,
+      "rows": [369, 370, 371, 372]
+    },
+    {
+      "concept": "lace-aglet-wrap",
+      "count": 4,
+      "rows": [205, 206, 207, 208]
+    },
+    {
+      "concept": "lace-blocking-pins",
+      "count": 4,
+      "rows": [605, 606, 607, 608]
+    },
+    {
+      "concept": "ladder-stitch-pouch",
+      "count": 4,
+      "rows": [937, 938, 939, 940]
+    },
+    {
+      "concept": "leather-edge-burnish",
+      "count": 4,
+      "rows": [213, 214, 215, 216]
+    },
+    {
+      "concept": "leather-skiving",
+      "count": 4,
+      "rows": [233, 234, 235, 236]
+    },
+    {
+      "concept": "leather-stitch-groove",
+      "count": 4,
+      "rows": [281, 282, 283, 284]
+    },
+    {
+      "concept": "lemur-clockwork",
+      "count": 4,
+      "rows": [397, 398, 399, 400]
+    },
+    {
+      "concept": "lobster-orchestra",
+      "count": 4,
+      "rows": [493, 494, 495, 496]
+    },
+    {
+      "concept": "meerkat-periscope",
+      "count": 4,
+      "rows": [469, 470, 471, 472]
+    },
+    {
+      "concept": "metal-hair-cage",
+      "count": 4,
+      "rows": [145, 146, 147, 148]
+    },
+    {
+      "concept": "mitred-binding-corner",
+      "count": 4,
+      "rows": [973, 974, 975, 976]
+    },
+    {
+      "concept": "mobius-print",
+      "count": 4,
+      "rows": [701, 702, 703, 704]
+    },
+    {
+      "concept": "moon-garden-swing",
+      "count": 4,
+      "rows": [321, 322, 323, 324]
+    },
+    {
+      "concept": "moth-streetlamp",
+      "count": 4,
+      "rows": [325, 326, 327, 328]
+    },
+    {
+      "concept": "mouse-spool-stairs",
+      "count": 4,
+      "rows": [345, 346, 347, 348]
+    },
+    {
+      "concept": "nap-direction-layout",
+      "count": 4,
+      "rows": [617, 618, 619, 620]
+    },
+    {
+      "concept": "narrow-loom-strap-work",
+      "count": 8,
+      "rows": [257, 258, 259, 260, 261, 262, 263, 264]
+    },
+    {
+      "concept": "necklace-counterweight",
+      "count": 4,
+      "rows": [105, 106, 107, 108]
+    },
+    {
+      "concept": "necklace-knotted-silk",
+      "count": 4,
+      "rows": [865, 866, 867, 868]
+    },
+    {
+      "concept": "needle-book-tabs",
+      "count": 4,
+      "rows": [925, 926, 927, 928]
+    },
+    {
+      "concept": "needle-threader-loop",
+      "count": 4,
+      "rows": [917, 918, 919, 920]
+    },
+    {
+      "concept": "otter-paper-boat",
+      "count": 4,
+      "rows": [301, 302, 303, 304]
+    },
+    {
+      "concept": "owl-ladder-books",
+      "count": 4,
+      "rows": [385, 386, 387, 388]
+    },
+    {
+      "concept": "pangolin-rolled-letter",
+      "count": 4,
+      "rows": [473, 474, 475, 476]
+    },
+    {
+      "concept": "paper-piece-block",
+      "count": 4,
+      "rows": [965, 966, 967, 968]
+    },
+    {
+      "concept": "pattern-notches",
+      "count": 4,
+      "rows": [245, 246, 247, 248]
+    },
+    {
+      "concept": "pattern-weight-layout",
+      "count": 4,
+      "rows": [649, 650, 651, 652]
+    },
+    {
+      "concept": "peacock-button-fan",
+      "count": 4,
+      "rows": [489, 490, 491, 492]
+    },
+    {
+      "concept": "peg-bag-handle",
+      "count": 4,
+      "rows": [81, 82, 83, 84]
+    },
+    {
+      "concept": "pendant-cage-marble",
+      "count": 4,
+      "rows": [833, 834, 835, 836]
+    },
+    {
+      "concept": "pendant-open-book",
+      "count": 4,
+      "rows": [877, 878, 879, 880]
+    },
+    {
+      "concept": "pendant-prism",
+      "count": 4,
+      "rows": [169, 170, 171, 172]
+    },
+    {
+      "concept": "pendant-shadow-window",
+      "count": 4,
+      "rows": [89, 90, 91, 92]
+    },
+    {
+      "concept": "pendant-stacked-pebbles",
+      "count": 4,
+      "rows": [193, 194, 195, 196]
+    },
+    {
+      "concept": "penguin-suitcase",
+      "count": 4,
+      "rows": [341, 342, 343, 344]
+    },
+    {
+      "concept": "pixel-heart",
+      "count": 4,
+      "rows": [721, 722, 723, 724]
+    },
+    {
+      "concept": "platypus-picnic",
+      "count": 4,
+      "rows": [393, 394, 395, 396]
+    },
+    {
+      "concept": "pleat-paper-guide",
+      "count": 4,
+      "rows": [661, 662, 663, 664]
+    },
+    {
+      "concept": "pleat-stay-stitch",
+      "count": 4,
+      "rows": [545, 546, 547, 548]
+    },
+    {
+      "concept": "pleated-pocket-volume",
+      "count": 4,
+      "rows": [569, 570, 571, 572]
+    },
+    {
+      "concept": "plug-socket-pattern",
+      "count": 4,
+      "rows": [729, 730, 731, 732]
+    },
+    {
+      "concept": "point-turner",
+      "count": 4,
+      "rows": [253, 254, 255, 256]
+    },
+    {
+      "concept": "porcupine-paper-crown",
+      "count": 4,
+      "rows": [401, 402, 403, 404]
+    },
+    {
+      "concept": "pressure-flattened-seam",
+      "count": 8,
+      "rows": [249, 250, 251, 252, 909, 910, 911, 912]
+    },
+    {
+      "concept": "print-centering-template",
+      "count": 4,
+      "rows": [621, 622, 623, 624]
+    },
+    {
+      "concept": "puffin-knitting",
+      "count": 4,
+      "rows": [461, 462, 463, 464]
+    },
+    {
+      "concept": "quail-seed-trail",
+      "count": 4,
+      "rows": [421, 422, 423, 424]
+    },
+    {
+      "concept": "rabbit-telescope",
+      "count": 4,
+      "rows": [333, 334, 335, 336]
+    },
+    {
+      "concept": "raccoon-mending-moon",
+      "count": 4,
+      "rows": [389, 390, 391, 392]
+    },
+    {
+      "concept": "raised-button-thread-shank",
+      "count": 8,
+      "rows": [109, 110, 111, 112, 945, 946, 947, 948]
+    },
+    {
+      "concept": "receding-doorways",
+      "count": 4,
+      "rows": [709, 710, 711, 712]
+    },
+    {
+      "concept": "red-panda-bicycle-basket",
+      "count": 4,
+      "rows": [381, 382, 383, 384]
+    },
+    {
+      "concept": "resin-fern-pendant",
+      "count": 4,
+      "rows": [221, 222, 223, 224]
+    },
+    {
+      "concept": "ring-knuckle-bridge",
+      "count": 4,
+      "rows": [897, 898, 899, 900]
+    },
+    {
+      "concept": "ring-nesting-bands",
+      "count": 4,
+      "rows": [837, 838, 839, 840]
+    },
+    {
+      "concept": "ring-removable-top",
+      "count": 4,
+      "rows": [149, 150, 151, 152]
+    },
+    {
+      "concept": "ring-stack-spacer",
+      "count": 4,
+      "rows": [129, 130, 131, 132]
+    },
+    {
+      "concept": "rivet-setting",
+      "count": 4,
+      "rows": [209, 210, 211, 212]
+    },
+    {
+      "concept": "rolltop-backpack",
+      "count": 4,
+      "rows": [5, 6, 7, 8]
+    },
+    {
+      "concept": "round-zipper-track-bag",
+      "count": 4,
+      "rows": [809, 810, 811, 812]
+    },
+    {
+      "concept": "rubber-needle-grip",
+      "count": 4,
+      "rows": [957, 958, 959, 960]
+    },
+    {
+      "concept": "ruffle-length-comparison",
+      "count": 4,
+      "rows": [685, 686, 687, 688]
+    },
+    {
+      "concept": "saddle-stitch-two-needles",
+      "count": 4,
+      "rows": [285, 286, 287, 288]
+    },
+    {
+      "concept": "scarf-infinity-join",
+      "count": 4,
+      "rows": [845, 846, 847, 848]
+    },
+    {
+      "concept": "scarf-lock-pin",
+      "count": 4,
+      "rows": [37, 38, 39, 40]
+    },
+    {
+      "concept": "scarf-mini-loop",
+      "count": 4,
+      "rows": [177, 178, 179, 180]
+    },
+    {
+      "concept": "seagull-chip-map",
+      "count": 4,
+      "rows": [353, 354, 355, 356]
+    },
+    {
+      "concept": "seal-stacked-cups",
+      "count": 4,
+      "rows": [377, 378, 379, 380]
+    },
+    {
+      "concept": "seam-grade-layers",
+      "count": 4,
+      "rows": [633, 634, 635, 636]
+    },
+    {
+      "concept": "seam-pucker-sample",
+      "count": 4,
+      "rows": [693, 694, 695, 696]
+    },
+    {
+      "concept": "seam-tape-waterproof",
+      "count": 4,
+      "rows": [549, 550, 551, 552]
+    },
+    {
+      "concept": "seam-thickness-hump-guide",
+      "count": 4,
+      "rows": [997, 998, 999, 1000]
+    },
+    {
+      "concept": "seatbelt-buckle-belt",
+      "count": 4,
+      "rows": [9, 10, 11, 12]
+    },
+    {
+      "concept": "sequin-direction",
+      "count": 4,
+      "rows": [269, 270, 271, 272]
+    },
+    {
+      "concept": "sewing-machine-edge-guide",
+      "count": 4,
+      "rows": [989, 990, 991, 992]
+    },
+    {
+      "concept": "sewn-magnet-pocket",
+      "count": 4,
+      "rows": [265, 266, 267, 268]
+    },
+    {
+      "concept": "shirt-centre-loop",
+      "count": 4,
+      "rows": [561, 562, 563, 564]
+    },
+    {
+      "concept": "shirt-hem-side-curve",
+      "count": 4,
+      "rows": [597, 598, 599, 600]
+    },
+    {
+      "concept": "shirt-tie-anchor",
+      "count": 4,
+      "rows": [581, 582, 583, 584]
+    },
+    {
+      "concept": "shoe-detachable-pom",
+      "count": 4,
+      "rows": [185, 186, 187, 188]
+    },
+    {
+      "concept": "shoe-double-vamp",
+      "count": 4,
+      "rows": [173, 174, 175, 176]
+    },
+    {
+      "concept": "shoe-elastic-side-bridge",
+      "count": 4,
+      "rows": [817, 818, 819, 820]
+    },
+    {
+      "concept": "shoe-flower-lace-path",
+      "count": 4,
+      "rows": [141, 142, 143, 144]
+    },
+    {
+      "concept": "shoe-hidden-elastic-lace",
+      "count": 4,
+      "rows": [857, 858, 859, 860]
+    },
+    {
+      "concept": "shoe-ribbon-cage",
+      "count": 4,
+      "rows": [45, 46, 47, 48]
+    },
+    {
+      "concept": "shoe-strap-figure-eight",
+      "count": 4,
+      "rows": [889, 890, 891, 892]
+    },
+    {
+      "concept": "shoe-toe-pleat",
+      "count": 4,
+      "rows": [125, 126, 127, 128]
+    },
+    {
+      "concept": "shoe-wraparound-sole",
+      "count": 4,
+      "rows": [153, 154, 155, 156]
+    },
+    {
+      "concept": "shoulder-stay-tape",
+      "count": 4,
+      "rows": [677, 678, 679, 680]
+    },
+    {
+      "concept": "shrinkage-test-square",
+      "count": 4,
+      "rows": [613, 614, 615, 616]
+    },
+    {
+      "concept": "skirt-kick-fold",
+      "count": 4,
+      "rows": [557, 558, 559, 560]
+    },
+    {
+      "concept": "sleeve-board-press",
+      "count": 4,
+      "rows": [905, 906, 907, 908]
+    },
+    {
+      "concept": "sleeve-elbow-articulation",
+      "count": 4,
+      "rows": [593, 594, 595, 596]
+    },
+    {
+      "concept": "sleeve-tower-placket",
+      "count": 4,
+      "rows": [521, 522, 523, 524]
+    },
+    {
+      "concept": "slipper-folded-vamp",
+      "count": 4,
+      "rows": [113, 114, 115, 116]
+    },
+    {
+      "concept": "sloth-macrame-arch",
+      "count": 4,
+      "rows": [481, 482, 483, 484]
+    },
+    {
+      "concept": "snail-postbag",
+      "count": 4,
+      "rows": [309, 310, 311, 312]
+    },
+    {
+      "concept": "soundwave-print",
+      "count": 4,
+      "rows": [717, 718, 719, 720]
+    },
+    {
+      "concept": "spiral-staircase-drawing",
+      "count": 4,
+      "rows": [769, 770, 771, 772]
+    },
+    {
+      "concept": "split-sole-dance-shoes",
+      "count": 4,
+      "rows": [813, 814, 815, 816]
+    },
+    {
+      "concept": "spool-net-thread",
+      "count": 4,
+      "rows": [949, 950, 951, 952]
+    },
+    {
+      "concept": "spoon-handle-ring",
+      "count": 4,
+      "rows": [21, 22, 23, 24]
+    },
+    {
+      "concept": "spring-frame-purse",
+      "count": 4,
+      "rows": [801, 802, 803, 804]
+    },
+    {
+      "concept": "squirrel-umbrella-acorn",
+      "count": 4,
+      "rows": [329, 330, 331, 332]
+    },
+    {
+      "concept": "stair-shadow-print",
+      "count": 4,
+      "rows": [789, 790, 791, 792]
+    },
+    {
+      "concept": "stippled-gradient",
+      "count": 4,
+      "rows": [761, 762, 763, 764]
+    },
+    {
+      "concept": "stitched-labyrinth-sun",
+      "count": 4,
+      "rows": [785, 786, 787, 788]
+    },
+    {
+      "concept": "stoat-wool-sled",
+      "count": 4,
+      "rows": [449, 450, 451, 452]
+    },
+    {
+      "concept": "tailor-tack-transfer",
+      "count": 4,
+      "rows": [641, 642, 643, 644]
+    },
+    {
+      "concept": "tailors-ham-pressing",
+      "count": 4,
+      "rows": [901, 902, 903, 904]
+    },
+    {
+      "concept": "thimble-hand-stitch",
+      "count": 4,
+      "rows": [921, 922, 923, 924]
+    },
+    {
+      "concept": "thread-wax-block",
+      "count": 4,
+      "rows": [961, 962, 963, 964]
+    },
+    {
+      "concept": "threaded-hoop-earring",
+      "count": 4,
+      "rows": [829, 830, 831, 832]
+    },
+    {
+      "concept": "thumb-ring-chainmail",
+      "count": 4,
+      "rows": [29, 30, 31, 32]
+    },
+    {
+      "concept": "torn-paper-rectangles",
+      "count": 4,
+      "rows": [745, 746, 747, 748]
+    },
+    {
+      "concept": "triangular-coin-fold",
+      "count": 4,
+      "rows": [805, 806, 807, 808]
+    },
+    {
+      "concept": "trimmed-curved-seam-allowance",
+      "count": 8,
+      "rows": [625, 626, 627, 628, 629, 630, 631, 632]
+    },
+    {
+      "concept": "trouser-hook-bar-extension",
+      "count": 4,
+      "rows": [541, 542, 543, 544]
+    },
+    {
+      "concept": "trouser-inner-hem-tape",
+      "count": 4,
+      "rows": [529, 530, 531, 532]
+    },
+    {
+      "concept": "trouser-seam-crease",
+      "count": 4,
+      "rows": [589, 590, 591, 592]
+    },
+    {
+      "concept": "trouser-split-back-waist",
+      "count": 4,
+      "rows": [565, 566, 567, 568]
+    },
+    {
+      "concept": "turnlock-bag",
+      "count": 4,
+      "rows": [1, 2, 3, 4]
+    },
+    {
+      "concept": "twin-needle-hem",
+      "count": 4,
+      "rows": [929, 930, 931, 932]
+    },
+    {
+      "concept": "underarm-diamond-gusset",
+      "count": 4,
+      "rows": [501, 502, 503, 504]
+    },
+    {
+      "concept": "understitch-neckline",
+      "count": 4,
+      "rows": [637, 638, 639, 640]
+    },
+    {
+      "concept": "waist-elastic-access",
+      "count": 4,
+      "rows": [513, 514, 515, 516]
+    },
+    {
+      "concept": "walrus-bowtie",
+      "count": 4,
+      "rows": [437, 438, 439, 440]
+    },
+    {
+      "concept": "watch-fabric-slip-loop",
+      "count": 4,
+      "rows": [881, 882, 883, 884]
+    },
+    {
+      "concept": "watch-slide-cover",
+      "count": 4,
+      "rows": [77, 78, 79, 80]
+    },
+    {
+      "concept": "waterglass-refraction-print",
+      "count": 4,
+      "rows": [797, 798, 799, 800]
+    },
+    {
+      "concept": "weighted-scarf-edge",
+      "count": 8,
+      "rows": [117, 118, 119, 120, 157, 158, 159, 160]
+    },
+    {
+      "concept": "whale-balloon-string",
+      "count": 4,
+      "rows": [337, 338, 339, 340]
+    },
+    {
+      "concept": "wire-wrapped-stone",
+      "count": 4,
+      "rows": [225, 226, 227, 228]
+    },
+    {
+      "concept": "zipper-basting-bridge",
+      "count": 4,
+      "rows": [673, 674, 675, 676]
+    },
+    {
+      "concept": "zipper-end-stop",
+      "count": 4,
+      "rows": [237, 238, 239, 240]
+    },
+    {
+      "concept": "zipper-safety-tab",
+      "count": 4,
+      "rows": [85, 86, 87, 88]
+    },
+    {
+      "concept": "zipper-slider-install",
+      "count": 4,
+      "rows": [953, 954, 955, 956]
+    }
+  ]
+}

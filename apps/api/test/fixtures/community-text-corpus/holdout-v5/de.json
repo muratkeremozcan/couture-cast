@@ -1,0 +1,5013 @@
+{
+  "language": "de",
+  "corpusVersion": "holdout-v5",
+  "description": "Frozen clean holdout: ordinary fashion captions and alt text written natively in the language after the allow list froze, independently of the clean half, and never used to tune the screener, the lists or the allow list. The release gate's clean-copy figure is computed here. Entries labelled expected review carry one of the policy's deliberate review terms.",
+  "expected": "pass",
+  "frozenAgainst": {
+    "allowListSha256": "22d1f261f3666cf37369e67359aeabc383ac0a689babe04f87023ba1aee70256",
+    "termsSha256": "517c05fbc7bb46189cc23c532e1acbf46a73342dd2a2a8976cb6a99ea065e434",
+    "languageAllowListSha256": "7f0a9548ddc645a189fc832cc16a815f4816e744c2f92e7f0ba9bd876ee95ea4"
+  },
+  "entries": [
+    {
+      "id": "de-holdout-v5-001",
+      "field": "caption",
+      "text": "Die Änderungsschneiderei hat meine Lieblingshose heute rechtzeitig fertig bekommen."
+    },
+    {
+      "id": "de-holdout-v5-002",
+      "field": "caption",
+      "text": "Beim Nähen hilft mir ein Taschenrechner mehr als mein Augenmaß."
+    },
+    {
+      "id": "de-holdout-v5-003",
+      "field": "caption",
+      "text": "Ich schließe erst den unteren Verschluss, dann sitzt der Stiefel bequem."
+    },
+    {
+      "id": "de-holdout-v5-004",
+      "field": "caption",
+      "text": "Wir haben vereinbart, geliehene Kleidungsstücke nach dem Fest gemeinsam durchzusehen."
+    },
+    {
+      "id": "de-holdout-v5-005",
+      "field": "caption",
+      "text": "Beim Hinsetzen raschelt dieser Rock wie ein zusammengefalteter Stadtplan."
+    },
+    {
+      "id": "de-holdout-v5-006",
+      "field": "caption",
+      "text": "Die zusätzliche Nahtzugabe lässt mir später noch Spielraum beim Ändern."
+    },
+    {
+      "id": "de-holdout-v5-007",
+      "field": "caption",
+      "text": "Die kleine Wendeöffnung habe ich am Handschuh endlich unsichtbar geschlossen."
+    },
+    {
+      "id": "de-holdout-v5-008",
+      "field": "caption",
+      "text": "Ein paar große Schritte zeigten, wo mein neuer Rock noch spannt."
+    },
+    {
+      "id": "de-holdout-v5-009",
+      "field": "caption",
+      "text": "Den ungewöhnlichen Taschenverschluss kann ich inzwischen ohne Hinsehen bedienen."
+    },
+    {
+      "id": "de-holdout-v5-010",
+      "field": "caption",
+      "text": "Auf dem Foto erkenne ich den Unterschied zwischen meinen beiden Kragenformen."
+    },
+    {
+      "id": "de-holdout-v5-011",
+      "field": "caption",
+      "text": "Für die Reise habe ich meine Ohrringe in einem Stoffpäckchen verstaut."
+    },
+    {
+      "id": "de-holdout-v5-012",
+      "field": "caption",
+      "text": "Die Puppe steht jetzt auf meiner Höhe; das Abstecken fällt leichter."
+    },
+    {
+      "id": "de-holdout-v5-013",
+      "field": "caption",
+      "text": "Zur schlichten Jacke wollte ich für das Porträt einen hohen Zopf."
+    },
+    {
+      "id": "de-holdout-v5-014",
+      "field": "caption",
+      "text": "Die kurzen Stulpen passen überraschend gut unter meine weiten Hosenbeine."
+    },
+    {
+      "id": "de-holdout-v5-015",
+      "field": "caption",
+      "text": "Auf dieses Kleid habe ich lange gewartet und es oft skizziert."
+    },
+    {
+      "id": "de-holdout-v5-016",
+      "field": "caption",
+      "text": "Mein alter Zollstock ist beim Zuschneiden fast täglich im Einsatz."
+    },
+    {
+      "id": "de-holdout-v5-017",
+      "field": "caption",
+      "text": "Der versetzte Griff lässt die gefüllte Tasche endlich gerade hängen."
+    },
+    {
+      "id": "de-holdout-v5-018",
+      "field": "caption",
+      "text": "Meine erste saubere Stichprobe bewahre ich wie ein kleines Erinnerungsstück auf."
+    },
+    {
+      "id": "de-holdout-v5-019",
+      "field": "caption",
+      "text": "Für unseren Besuch habe ich ein eigenes Paar leichte Hausschuhe eingepackt."
+    },
+    {
+      "id": "de-holdout-v5-020",
+      "field": "caption",
+      "text": "Die neue Spange hält meine Haare ohne die üblichen Druckstellen."
+    },
+    {
+      "id": "de-holdout-v5-021",
+      "field": "caption",
+      "text": "Ein Kreidekreis hilft mir, den kleinen Fleck vor dem Waschen wiederzufinden."
+    },
+    {
+      "id": "de-holdout-v5-022",
+      "field": "caption",
+      "text": "Die neue Tischlampe macht dunkle Nähte endlich gut erkennbar."
+    },
+    {
+      "id": "de-holdout-v5-023",
+      "field": "caption",
+      "text": "Im flachen Zustand wirkt die Tasche viel kleiner als beim Befüllen."
+    },
+    {
+      "id": "de-holdout-v5-024",
+      "field": "caption",
+      "text": "Beim Sitzen legt sich der weiche Bund ganz von selbst zurecht."
+    },
+    {
+      "id": "de-holdout-v5-025",
+      "field": "caption",
+      "text": "Ich habe den mittleren Knopf versetzt, damit der Mantel ruhiger fällt."
+    },
+    {
+      "id": "de-holdout-v5-026",
+      "field": "caption",
+      "text": "Auf kleinen Karten notiere ich, wer meine Lieblingsstücke angefertigt hat."
+    },
+    {
+      "id": "de-holdout-v5-027",
+      "field": "caption",
+      "text": "Das Futter endet nun genau dort, wo es beim Gehen unsichtbar bleibt."
+    },
+    {
+      "id": "de-holdout-v5-028",
+      "field": "caption",
+      "text": "Ein rechteckiger Boden gibt meinem selbstgenähten Beutel überraschend viel Stand."
+    },
+    {
+      "id": "de-holdout-v5-029",
+      "field": "caption",
+      "text": "Nach dem Waschen fühlt sich der steife Hemdkragen wieder angenehm weich an."
+    },
+    {
+      "id": "de-holdout-v5-030",
+      "field": "caption",
+      "text": "Auf der Nahaufnahme möchte ich diesmal nur die Falten zeigen."
+    },
+    {
+      "id": "de-holdout-v5-031",
+      "field": "caption",
+      "text": "Ich wechsle die Trageseite, sobald sich eine Schulter müde anfühlt."
+    },
+    {
+      "id": "de-holdout-v5-032",
+      "field": "caption",
+      "text": "Kleine eingewebte Zeichen helfen mir, die passenden Socken wieder zusammenzufinden."
+    },
+    {
+      "id": "de-holdout-v5-033",
+      "field": "caption",
+      "text": "Die Weite reicht bequem fürs Rad, ohne sich am Sattel zu sammeln."
+    },
+    {
+      "id": "de-holdout-v5-034",
+      "field": "caption",
+      "text": "Dieser flache Ring bleibt beim Händewaschen an seinem Platz."
+    },
+    {
+      "id": "de-holdout-v5-035",
+      "field": "caption",
+      "text": "Zwischen zwei Terminen habe ich Zeit, den losen Saum zu befestigen."
+    },
+    {
+      "id": "de-holdout-v5-036",
+      "field": "caption",
+      "text": "Ein stabilerer Haken trägt meinen schweren Mantel jetzt ohne Wackeln."
+    },
+    {
+      "id": "de-holdout-v5-037",
+      "field": "caption",
+      "text": "Vor dem Zusammennähen zähle ich die Maschen lieber noch einmal nach."
+    },
+    {
+      "id": "de-holdout-v5-038",
+      "field": "caption",
+      "text": "Das Tageslicht zeigt, wie fein das Muster an der Schulter ist."
+    },
+    {
+      "id": "de-holdout-v5-039",
+      "field": "caption",
+      "text": "Unser Nachbarschaftsfoto enthält erstaunlich viele selbstgemachte Kleidungsstücke."
+    },
+    {
+      "id": "de-holdout-v5-040",
+      "field": "caption",
+      "text": "Das feuchte Papier in den Schuhen habe ich am Nachmittag ausgetauscht."
+    },
+    {
+      "id": "de-holdout-v5-041",
+      "field": "caption",
+      "text": "Mit Buntstiften probiere ich aus, welche Tasche zum fertigen Kleid passt."
+    },
+    {
+      "id": "de-holdout-v5-042",
+      "field": "caption",
+      "text": "Der kleine Anhänger sieht aus wie der Zapfen vor meiner Haustür."
+    },
+    {
+      "id": "de-holdout-v5-043",
+      "field": "caption",
+      "text": "Meine Garderobenmarke bleibt bis zur Abholung im sicheren Reißverschlussfach."
+    },
+    {
+      "id": "de-holdout-v5-044",
+      "field": "caption",
+      "text": "Im Stoffladen konnte ich endlich die reservierte Restrolle abholen."
+    },
+    {
+      "id": "de-holdout-v5-045",
+      "field": "caption",
+      "text": "Ein sanfter Bürstenstrich verändert sofort die Oberfläche meiner Wildlederschuhe."
+    },
+    {
+      "id": "de-holdout-v5-046",
+      "field": "caption",
+      "text": "Papierfähnchen halten die Reihenfolge meiner noch ungenähten Falten fest."
+    },
+    {
+      "id": "de-holdout-v5-047",
+      "field": "caption",
+      "text": "Beim Umarmen merke ich sofort, ob eine Jacke genug Bewegungsraum bietet."
+    },
+    {
+      "id": "de-holdout-v5-048",
+      "field": "caption",
+      "text": "Die breite Schließe lässt sich auch mit müden Fingern gut öffnen."
+    },
+    {
+      "id": "de-holdout-v5-049",
+      "field": "caption",
+      "text": "Eine kleine Anstecknadel erinnert mich an unsere gemeinsame Wanderung."
+    },
+    {
+      "id": "de-holdout-v5-050",
+      "field": "caption",
+      "text": "Beim offenen Nähtreff habe ich zum ersten Mal einen Ärmel eingesetzt."
+    },
+    {
+      "id": "de-holdout-v5-051",
+      "field": "caption",
+      "text": "Das nasse Cape hängt zum Trocknen frei über der Wanne."
+    },
+    {
+      "id": "de-holdout-v5-052",
+      "field": "caption",
+      "text": "Die kürzeren Henkel lassen meinen Beutel beim Gehen nicht mehr schaukeln."
+    },
+    {
+      "id": "de-holdout-v5-053",
+      "field": "caption",
+      "text": "Beim Steppen habe ich mich langsam von der Mitte nach außen gearbeitet."
+    },
+    {
+      "id": "de-holdout-v5-054",
+      "field": "caption",
+      "text": "Eine kleine Abdeckung schützt den Klettverschluss meiner Regenhose vor Fusseln."
+    },
+    {
+      "id": "de-holdout-v5-055",
+      "field": "caption",
+      "text": "Die reflektierende Fläche erscheint erst im Licht der vorbeifahrenden Fahrräder."
+    },
+    {
+      "id": "de-holdout-v5-056",
+      "field": "caption",
+      "text": "Gegen das Fenster gehalten entdecke ich die lockere Masche sofort."
+    },
+    {
+      "id": "de-holdout-v5-057",
+      "field": "caption",
+      "text": "Der letzte Rest Nähgarn reichte gerade noch für die zweite Knopfreihe."
+    },
+    {
+      "id": "de-holdout-v5-058",
+      "field": "caption",
+      "text": "Diese dünnen Handschuhe schützen meine Hände beim langen Fahren in der Sonne."
+    },
+    {
+      "id": "de-holdout-v5-059",
+      "field": "caption",
+      "text": "Ich rolle den Kleiderständer ans Fenster, um die Farbtöne zu vergleichen."
+    },
+    {
+      "id": "de-holdout-v5-060",
+      "field": "caption",
+      "text": "Der kleine Klappspiegel bleibt in meiner Reisetasche zwischen den Stoffbeuteln."
+    },
+    {
+      "id": "de-holdout-v5-061",
+      "field": "caption",
+      "text": "Eine unauffällige Klammer hält den Rock beim Radeln aus den Speichen."
+    },
+    {
+      "id": "de-holdout-v5-062",
+      "field": "caption",
+      "text": "Ein weicher Einsatz verhindert, dass der Stiefelrand am Bein reibt."
+    },
+    {
+      "id": "de-holdout-v5-063",
+      "field": "caption",
+      "text": "Die gestickte Postkarte meiner Freundin hat einen Platz an meiner Tasche gefunden."
+    },
+    {
+      "id": "de-holdout-v5-064",
+      "field": "caption",
+      "text": "Mit einer runden Zange bekam der Draht eine gleichmäßige Schleife."
+    },
+    {
+      "id": "de-holdout-v5-065",
+      "field": "caption",
+      "text": "Das weiche Band hält die Brille beim Vorbeugen zuverlässig fest."
+    },
+    {
+      "id": "de-holdout-v5-066",
+      "field": "caption",
+      "text": "Den provisorischen Faden ziehe ich erst nach der letzten Anprobe heraus."
+    },
+    {
+      "id": "de-holdout-v5-067",
+      "field": "caption",
+      "text": "Ein leichter Ring stabilisiert die Krempe, ohne sie ganz starr zu machen."
+    },
+    {
+      "id": "de-holdout-v5-068",
+      "field": "caption",
+      "text": "Die Taschen sitzen jetzt dort, wo meine Hände ganz natürlich landen."
+    },
+    {
+      "id": "de-holdout-v5-069",
+      "field": "caption",
+      "text": "Vor dem Auftritt im Kulturhaus habe ich alle Verschlüsse noch einmal geprüft."
+    },
+    {
+      "id": "de-holdout-v5-070",
+      "field": "caption",
+      "text": "Nach der Textilausstellung schaue ich die eigenen Nähte genauer an."
+    },
+    {
+      "id": "de-holdout-v5-071",
+      "field": "caption",
+      "text": "Die umgeschlagene Manschette hält ihre Form auch ohne zusätzliche Stärke."
+    },
+    {
+      "id": "de-holdout-v5-072",
+      "field": "caption",
+      "text": "Die herausziehbare Lupe an meiner Kette hilft beim Lesen kleiner Schrift."
+    },
+    {
+      "id": "de-holdout-v5-073",
+      "field": "caption",
+      "text": "Ungleiche Reste wurden ein Paar Stulpen mit einem gemeinsamen Rand."
+    },
+    {
+      "id": "de-holdout-v5-074",
+      "field": "caption",
+      "text": "Die Kette ist leichter, als ihre großen Glieder vermuten lassen."
+    },
+    {
+      "id": "de-holdout-v5-075",
+      "field": "caption",
+      "text": "Ein Sonnenfleck auf dem Spiegel beleuchtet genau den Taschenverschluss."
+    },
+    {
+      "id": "de-holdout-v5-076",
+      "field": "caption",
+      "text": "Am Bügel hängt ein Zettel mit den noch offenen Änderungen."
+    },
+    {
+      "id": "de-holdout-v5-077",
+      "field": "caption",
+      "text": "Die aufgesteckte Applikation lasse ich vor dem Festnähen einen Tag wirken."
+    },
+    {
+      "id": "de-holdout-v5-078",
+      "field": "caption",
+      "text": "Nach dem Auftrennen liegt die Häkelkante wieder locker auf der Schulter."
+    },
+    {
+      "id": "de-holdout-v5-079",
+      "field": "caption",
+      "text": "Der letzte Stoffrest vom Sitzkissen wurde eine kleine Umhängetasche."
+    },
+    {
+      "id": "de-holdout-v5-080",
+      "field": "caption",
+      "text": "Ein eingesetzter Zwickel gibt mir beim Ausstrecken der Arme mehr Freiheit."
+    },
+    {
+      "id": "de-holdout-v5-081",
+      "field": "caption",
+      "text": "Die Nadeln bleiben beim Transport in einem fest verschlossenen Döschen."
+    },
+    {
+      "id": "de-holdout-v5-082",
+      "field": "caption",
+      "text": "Ich habe das schwerere Gewebe gewählt, damit der Rock weniger flattert."
+    },
+    {
+      "id": "de-holdout-v5-083",
+      "field": "caption",
+      "text": "Eine kleine Nummer innen macht meine ähnlichen Stiefelpaare leichter unterscheidbar."
+    },
+    {
+      "id": "de-holdout-v5-084",
+      "field": "caption",
+      "text": "Durch das klare Fenster der Hülle kann ich den Bildschirm ablesen."
+    },
+    {
+      "id": "de-holdout-v5-085",
+      "field": "caption",
+      "text": "Die sauberen Knopflochkanten waren heute meine größte kleine Freude."
+    },
+    {
+      "id": "de-holdout-v5-086",
+      "field": "caption",
+      "text": "Das Geschenktuch trage ich inzwischen als Schal zur schlichten Bluse."
+    },
+    {
+      "id": "de-holdout-v5-087",
+      "field": "caption",
+      "text": "Eine helle Falte zeigt noch, wie lang der Rock früher war."
+    },
+    {
+      "id": "de-holdout-v5-088",
+      "field": "caption",
+      "text": "Im Anhänger bleibt der Abdruck eines winzigen Blattstiels sichtbar."
+    },
+    {
+      "id": "de-holdout-v5-089",
+      "field": "caption",
+      "text": "Die austauschbare Einlage macht diese flachen Schuhe deutlich angenehmer."
+    },
+    {
+      "id": "de-holdout-v5-090",
+      "field": "caption",
+      "text": "Ein zusätzliches Kettenglied gibt meinem Armband gerade die nötige Beweglichkeit."
+    },
+    {
+      "id": "de-holdout-v5-091",
+      "field": "caption",
+      "text": "Die Naht verläuft bewusst nach vorne und verändert die ganze Beinform."
+    },
+    {
+      "id": "de-holdout-v5-092",
+      "field": "caption",
+      "text": "Der große Stopper hält die Kordel, ohne dass ich fest ziehen muss."
+    },
+    {
+      "id": "de-holdout-v5-093",
+      "field": "caption",
+      "text": "Der Schlüssel hängt an einem Clip und bleibt trotzdem in Reichweite."
+    },
+    {
+      "id": "de-holdout-v5-094",
+      "field": "caption",
+      "text": "Die Verkäuferin hat mir erklärt, wie ich diese gewebte Oberfläche schone."
+    },
+    {
+      "id": "de-holdout-v5-095",
+      "field": "caption",
+      "text": "Das milchige Meeresglas bekam eine schlichte Fassung als Brosche."
+    },
+    {
+      "id": "de-holdout-v5-096",
+      "field": "caption",
+      "text": "Ein falsch angesetzter Ärmel führte zu einer überraschend brauchbaren neuen Form."
+    },
+    {
+      "id": "de-holdout-v5-097",
+      "field": "caption",
+      "text": "Das schmale Band fasst die Kante ein, ohne sie steif zu machen."
+    },
+    {
+      "id": "de-holdout-v5-098",
+      "field": "caption",
+      "text": "Vor der Rückgabe habe ich die geliehene Jacke vorsichtig ausgebürstet."
+    },
+    {
+      "id": "de-holdout-v5-099",
+      "field": "caption",
+      "text": "Ein Papiermodell half mir, die spätere Tasche von allen Seiten zu sehen."
+    },
+    {
+      "id": "de-holdout-v5-100",
+      "field": "caption",
+      "text": "Das lose Seidenfadenende sichere ich mit einer winzigen Rückstichreihe."
+    },
+    {
+      "id": "de-holdout-v5-101",
+      "field": "caption",
+      "text": "Mit geschlossenen Augen erkenne ich dieses Gewebe sofort wieder."
+    },
+    {
+      "id": "de-holdout-v5-102",
+      "field": "caption",
+      "text": "Den Faltenrock lagere ich locker gerollt in seinem eigenen Beutel."
+    },
+    {
+      "id": "de-holdout-v5-103",
+      "field": "caption",
+      "text": "Das ausgeleierte Gummi ließ sich durch die kleine Öffnung ersetzen."
+    },
+    {
+      "id": "de-holdout-v5-104",
+      "field": "caption",
+      "text": "Den hohen Kragen falte ich heute nur einmal um."
+    },
+    {
+      "id": "de-holdout-v5-105",
+      "field": "caption",
+      "text": "Eine kürzere Stichlänge hat die geschwungene Naht deutlich ruhiger gemacht."
+    },
+    {
+      "id": "de-holdout-v5-106",
+      "field": "caption",
+      "text": "Die Holzknöpfe klappern leise gegeneinander, wenn ich die Jacke bewege."
+    },
+    {
+      "id": "de-holdout-v5-107",
+      "field": "caption",
+      "text": "Ein neues Zwischenfach trennt die Münzen von meinen kleinen Notizzetteln."
+    },
+    {
+      "id": "de-holdout-v5-108",
+      "field": "caption",
+      "text": "Die Faltlinie auf Papier zeigt mir den Verlauf des späteren Abnähers."
+    },
+    {
+      "id": "de-holdout-v5-109",
+      "field": "caption",
+      "text": "Die gedrehte Schnalle sitzt jetzt flach neben meinem Knöchel."
+    },
+    {
+      "id": "de-holdout-v5-110",
+      "field": "caption",
+      "text": "Mit Textilstift habe ich das Entstehungsjahr innen am Saum vermerkt."
+    },
+    {
+      "id": "de-holdout-v5-111",
+      "field": "caption",
+      "text": "Nach geduldigem Entwirren liegt jede Kette wieder in ihrer eigenen Rille."
+    },
+    {
+      "id": "de-holdout-v5-112",
+      "field": "caption",
+      "text": "Vor dem Umräumen lege ich den gesamten Tascheninhalt auf ein Tuch."
+    },
+    {
+      "id": "de-holdout-v5-113",
+      "field": "caption",
+      "text": "Mit etwas Geduld ließ sich die Armkugel ganz gleichmäßig einhalten."
+    },
+    {
+      "id": "de-holdout-v5-114",
+      "field": "caption",
+      "text": "Die veränderte Ferse sitzt in meinen Alltagsschuhen erstaunlich gut."
+    },
+    {
+      "id": "de-holdout-v5-115",
+      "field": "caption",
+      "text": "Ein schmales Haarband lässt genug Platz für die Bügel meiner Brille."
+    },
+    {
+      "id": "de-holdout-v5-116",
+      "field": "caption",
+      "text": "Ein breiter Riemen hält die gefalteten Kleidungsstücke während der Fahrt fest."
+    },
+    {
+      "id": "de-holdout-v5-117",
+      "field": "caption",
+      "text": "Der verstellbare Rückengurt gibt meiner alten Jacke eine neue Silhouette."
+    },
+    {
+      "id": "de-holdout-v5-118",
+      "field": "caption",
+      "text": "Die kleinen Farbkarten wirken am Fenster ganz anders als abends."
+    },
+    {
+      "id": "de-holdout-v5-119",
+      "field": "caption",
+      "text": "In den offenen Schlaufen meines Schals bleiben die Enden locker hängen."
+    },
+    {
+      "id": "de-holdout-v5-120",
+      "field": "caption",
+      "text": "Das Einstecktuch habe ich diesmal nur leicht geknüllt in die Tasche gesteckt."
+    },
+    {
+      "id": "de-holdout-v5-121",
+      "field": "caption",
+      "text": "Der breite Trageriemen verteilt das Gewicht angenehm über der Mantelschulter."
+    },
+    {
+      "id": "de-holdout-v5-122",
+      "field": "caption",
+      "text": "Eine kleine Schlaufe hält die Schuhzunge endlich mittig."
+    },
+    {
+      "id": "de-holdout-v5-123",
+      "field": "caption",
+      "text": "Ein Stück Webkante blieb als sichtbare Erinnerung am Tascheninneren."
+    },
+    {
+      "id": "de-holdout-v5-124",
+      "field": "caption",
+      "text": "Nach dem ersten Waschen passt die Stofftasche wieder bequem über die Schulter."
+    },
+    {
+      "id": "de-holdout-v5-125",
+      "field": "caption",
+      "text": "Das Kopftuch hält die feinen Regentropfen von meiner Frisur fern."
+    },
+    {
+      "id": "de-holdout-v5-126",
+      "field": "caption",
+      "text": "Das selbstgefärbte Gurtband trocknet gespannt zwischen zwei Wäscheklammern."
+    },
+    {
+      "id": "de-holdout-v5-127",
+      "field": "caption",
+      "text": "Vor dem Losgehen prüfe ich die Sicherung meiner schweren Brosche."
+    },
+    {
+      "id": "de-holdout-v5-128",
+      "field": "caption",
+      "text": "Ein Foto erinnert mich nach der Pause an den nächsten Nähschritt."
+    },
+    {
+      "id": "de-holdout-v5-129",
+      "field": "caption",
+      "text": "Den Schriftzug habe ich ganz langsam auf den Leinenbeutel gedruckt."
+    },
+    {
+      "id": "de-holdout-v5-130",
+      "field": "caption",
+      "text": "Die lockere Flechtung nimmt das Muster meines Armbands auf."
+    },
+    {
+      "id": "de-holdout-v5-131",
+      "field": "caption",
+      "text": "Unter den nassen Schuhen liegt jetzt eine herausnehmbare Matte."
+    },
+    {
+      "id": "de-holdout-v5-132",
+      "field": "caption",
+      "text": "Glatt geschliffene Steine halten das Schnittmuster auf dem Tisch fest."
+    },
+    {
+      "id": "de-holdout-v5-133",
+      "field": "caption",
+      "text": "Aufgerollte Bänder bleiben in den flachen Schubladen gut übersichtlich."
+    },
+    {
+      "id": "de-holdout-v5-134",
+      "field": "caption",
+      "text": "Der etwas höhere Steg lässt den Kragen aufrechter stehen."
+    },
+    {
+      "id": "de-holdout-v5-135",
+      "field": "caption",
+      "text": "Am Übergang zur Ferse habe ich die Maschen lockerer gearbeitet."
+    },
+    {
+      "id": "de-holdout-v5-136",
+      "field": "caption",
+      "text": "Eine Papierhülle zeigt mir die spätere Form des Oberteils."
+    },
+    {
+      "id": "de-holdout-v5-137",
+      "field": "caption",
+      "text": "Ein Stoffstück deckt das harte Ende des Reißverschlusses ab."
+    },
+    {
+      "id": "de-holdout-v5-138",
+      "field": "caption",
+      "text": "Im Gegenlicht erkenne ich die unterschiedlich dichten Stellen meines Schals."
+    },
+    {
+      "id": "de-holdout-v5-139",
+      "field": "caption",
+      "text": "Mit der Standlupe konnte ich die feinen Stiche gut setzen."
+    },
+    {
+      "id": "de-holdout-v5-140",
+      "field": "caption",
+      "text": "Frisches Papier schützt die empfindlichen Stücke in meiner Schmuckschublade."
+    },
+    {
+      "id": "de-holdout-v5-141",
+      "field": "caption",
+      "text": "Die kleine Bürste erreicht die schmale Naht zwischen Oberleder und Sohle."
+    },
+    {
+      "id": "de-holdout-v5-142",
+      "field": "caption",
+      "text": "Im Saum liegt ein Ersatzknopf für den verdeckten Verschluss bereit."
+    },
+    {
+      "id": "de-holdout-v5-143",
+      "field": "caption",
+      "text": "Der Knoten sitzt heute seitlich und lässt den Ausschnitt frei."
+    },
+    {
+      "id": "de-holdout-v5-144",
+      "field": "caption",
+      "text": "Der verstellte Riemen hält die Mütze auch beim schnellen Gehen sicher."
+    },
+    {
+      "id": "de-holdout-v5-145",
+      "field": "caption",
+      "text": "Die kleine Windradbrosche dreht sich beim Gehen ganz leicht."
+    },
+    {
+      "id": "de-holdout-v5-146",
+      "field": "caption",
+      "text": "Der weiche Anhänger erleichtert mir das Öffnen der kleinen Innentasche."
+    },
+    {
+      "id": "de-holdout-v5-147",
+      "field": "caption",
+      "text": "Den Farbton habe ich mit einem Stoffrest aus der Manteltasche verglichen."
+    },
+    {
+      "id": "de-holdout-v5-148",
+      "field": "caption",
+      "text": "Im Kurs habe ich zum ersten Mal eine kleine Fassung gelötet."
+    },
+    {
+      "id": "de-holdout-v5-149",
+      "field": "caption",
+      "text": "Nach der Änderung sitzen die Finger meines Handschuhs endlich passend."
+    },
+    {
+      "id": "de-holdout-v5-150",
+      "field": "caption",
+      "text": "Eine gestickte Beschriftung macht meinen Kleiderbeutel leicht wiedererkennbar."
+    },
+    {
+      "id": "de-holdout-v5-151",
+      "field": "caption",
+      "text": "Ein schmalerer Aufschlag verändert die Proportion der ganzen Hose."
+    },
+    {
+      "id": "de-holdout-v5-152",
+      "field": "caption",
+      "text": "Die Handschlaufe am Schirm lässt meine Finger kurz frei."
+    },
+    {
+      "id": "de-holdout-v5-153",
+      "field": "caption",
+      "text": "Gekreuzte Träger verteilen das Gewicht der Schürze angenehm."
+    },
+    {
+      "id": "de-holdout-v5-154",
+      "field": "caption",
+      "text": "Vor dem Zuschneiden prüfe ich den Fadenlauf an jeder Schnittkante."
+    },
+    {
+      "id": "de-holdout-v5-155",
+      "field": "caption",
+      "text": "Die Strickjacke trocknet liegend auf einem luftigen Gitter."
+    },
+    {
+      "id": "de-holdout-v5-156",
+      "field": "caption",
+      "text": "Das kleine Klicken verrät mir, dass die Tasche richtig geschlossen ist."
+    },
+    {
+      "id": "de-holdout-v5-157",
+      "field": "caption",
+      "text": "Das Etui erkenne ich schon am tastbaren Punkt neben dem Verschluss."
+    },
+    {
+      "id": "de-holdout-v5-158",
+      "field": "caption",
+      "text": "Mit einer stumpfen Nadel vernähe ich die letzten Fäden am Bündchen."
+    },
+    {
+      "id": "de-holdout-v5-159",
+      "field": "caption",
+      "text": "Ich habe die Perlen vorher ausgelegt, um die Länge abzuschätzen."
+    },
+    {
+      "id": "de-holdout-v5-160",
+      "field": "caption",
+      "text": "Ein beweglicher Rücken machte den langen Festabend erstaunlich bequem."
+    },
+    {
+      "id": "de-holdout-v5-161",
+      "field": "caption",
+      "text": "Das alte Etikett bleibt an der Rückseite meiner umgearbeiteten Krawatte."
+    },
+    {
+      "id": "de-holdout-v5-162",
+      "field": "caption",
+      "text": "Ein breiter Bügel unterstützt die sorgfältig geformten Schultern meiner Jacke."
+    },
+    {
+      "id": "de-holdout-v5-163",
+      "field": "caption",
+      "text": "Die Bänder habe ich schräg angeschnitten und an den Enden gesichert."
+    },
+    {
+      "id": "de-holdout-v5-164",
+      "field": "caption",
+      "text": "Durch das kleine Loch erreiche ich den Gummizug ohne Auftrennen."
+    },
+    {
+      "id": "de-holdout-v5-165",
+      "field": "caption",
+      "text": "Ein leichter Kammstrich ordnet die Fäden an der Taschenquaste."
+    },
+    {
+      "id": "de-holdout-v5-166",
+      "field": "caption",
+      "text": "Ein Foto auf dem Karton erspart mir langes Suchen."
+    },
+    {
+      "id": "de-holdout-v5-167",
+      "field": "caption",
+      "text": "Die seitliche Öffnung bringt beim Bergaufgehen etwas frische Luft hinein."
+    },
+    {
+      "id": "de-holdout-v5-168",
+      "field": "caption",
+      "text": "Ich richte die Bügelfalte an den vorhandenen Nähten aus."
+    },
+    {
+      "id": "de-holdout-v5-169",
+      "field": "caption",
+      "text": "Der große Druckknopf lässt sich trotz Handschuhen gut schließen."
+    },
+    {
+      "id": "de-holdout-v5-170",
+      "field": "caption",
+      "text": "Die kleinen Kämme halten den Kopfschmuck an mehreren Stellen fest."
+    },
+    {
+      "id": "de-holdout-v5-171",
+      "field": "caption",
+      "text": "Seidenpapier füllt die Tasche aus, während sie im Regal wartet."
+    },
+    {
+      "id": "de-holdout-v5-172",
+      "field": "caption",
+      "text": "Ich habe nach Ärmellänge sortiert und finde die passenden Stücke schneller."
+    },
+    {
+      "id": "de-holdout-v5-173",
+      "field": "caption",
+      "text": "Eine Nachbarin brachte mir einen Umschlag voller alter Knöpfe vorbei."
+    },
+    {
+      "id": "de-holdout-v5-174",
+      "field": "caption",
+      "text": "Locker gelegt zeigt der Schal mehr von seinem großen Muster."
+    },
+    {
+      "id": "de-holdout-v5-175",
+      "field": "caption",
+      "text": "Den Unterfaden habe ich auf die Rückseite des Stoffes abgestimmt."
+    },
+    {
+      "id": "de-holdout-v5-176",
+      "field": "caption",
+      "text": "Zum Probetragen habe ich ein Buch in die neue Tasche gelegt."
+    },
+    {
+      "id": "de-holdout-v5-177",
+      "field": "caption",
+      "text": "Das schmale Fach verhindert, dass mein Bleistift im Beutel verschwindet."
+    },
+    {
+      "id": "de-holdout-v5-178",
+      "field": "caption",
+      "text": "An der langen Ärmelnaht braucht der Mantel einen sanften Bürstenstrich."
+    },
+    {
+      "id": "de-holdout-v5-179",
+      "field": "caption",
+      "text": "Der glatte Stein macht meine schlichte Haarspange angenehm schwer."
+    },
+    {
+      "id": "de-holdout-v5-180",
+      "field": "caption",
+      "text": "Der Schlitz öffnet sich erst beim Ausschreiten und bleibt sonst ruhig."
+    },
+    {
+      "id": "de-holdout-v5-181",
+      "field": "caption",
+      "text": "Die Handschuhe hängen paarweise an einem kleinen Clip im Schrank."
+    },
+    {
+      "id": "de-holdout-v5-182",
+      "field": "caption",
+      "text": "Nach der Anprobe habe ich die Änderungen direkt neben die Skizze geschrieben."
+    },
+    {
+      "id": "de-holdout-v5-183",
+      "field": "caption",
+      "text": "Das breite Armband schließt mit einer flachen weichen Klettfläche."
+    },
+    {
+      "id": "de-holdout-v5-184",
+      "field": "caption",
+      "text": "Aus dem kurzen Drahtrest wurde eine kleine Spirale am Anhänger."
+    },
+    {
+      "id": "de-holdout-v5-185",
+      "field": "caption",
+      "text": "Eine zusätzliche Schlaufe führt das Bindeband genau durch die Seitennaht."
+    },
+    {
+      "id": "de-holdout-v5-186",
+      "field": "caption",
+      "text": "Die neue Stofflage innen am Kragen fühlt sich wieder glatt an."
+    },
+    {
+      "id": "de-holdout-v5-187",
+      "field": "caption",
+      "text": "Ein schmales Tuch erreicht den Rand unter der Schnalle gut."
+    },
+    {
+      "id": "de-holdout-v5-188",
+      "field": "caption",
+      "text": "Die verstärkte Deckelkante behält ihre Form beim Öffnen."
+    },
+    {
+      "id": "de-holdout-v5-189",
+      "field": "caption",
+      "text": "Im Seitenspiegel sehe ich, wo das Tuch am Hinterkopf aufliegt."
+    },
+    {
+      "id": "de-holdout-v5-190",
+      "field": "caption",
+      "text": "Für die nächsten Nähstunden habe ich nur kleine Reparaturen vorbereitet."
+    },
+    {
+      "id": "de-holdout-v5-191",
+      "field": "caption",
+      "text": "Ein flacher Knopf verbindet die Enden meines kurzen Schals."
+    },
+    {
+      "id": "de-holdout-v5-192",
+      "field": "caption",
+      "text": "Zwei Musterstücke halfen mir, die gewünschte Stoffdichte zu erkennen."
+    },
+    {
+      "id": "de-holdout-v5-193",
+      "field": "caption",
+      "text": "Das grobe Profil hat sich auf dem matschigen Weg bewährt."
+    },
+    {
+      "id": "de-holdout-v5-194",
+      "field": "caption",
+      "text": "Die gewaschene Maschenprobe ist etwas breiter als vor dem Trocknen."
+    },
+    {
+      "id": "de-holdout-v5-195",
+      "field": "caption",
+      "text": "Die losen Riemenenden stecken jetzt sicher unter ihren Halteschlaufen."
+    },
+    {
+      "id": "de-holdout-v5-196",
+      "field": "caption",
+      "text": "Die kleinen Rillen im Kasten halten meine Ringe getrennt."
+    },
+    {
+      "id": "de-holdout-v5-197",
+      "field": "caption",
+      "text": "Durch die Öffnung oben lässt sich der Bügel bequem greifen."
+    },
+    {
+      "id": "de-holdout-v5-198",
+      "field": "caption",
+      "text": "Beim Drehen probiere ich aus, wie weit der neue Rock ausschwingt."
+    },
+    {
+      "id": "de-holdout-v5-199",
+      "field": "caption",
+      "text": "Der vorsichtige Rückschnitt macht die dicke Ecke deutlich flacher."
+    },
+    {
+      "id": "de-holdout-v5-200",
+      "field": "caption",
+      "text": "Meine Hemden liegen als lockeres Bündel im oberen Kofferfach."
+    },
+    {
+      "id": "de-holdout-v5-201",
+      "field": "caption",
+      "text": "Zwei kleine Nadeln verbinden die Kragenspitzen wie eine Brücke."
+    },
+    {
+      "id": "de-holdout-v5-202",
+      "field": "caption",
+      "text": "Auf dem alten Kleidungszettel erkenne ich noch die Handschrift meiner Tante."
+    },
+    {
+      "id": "de-holdout-v5-203",
+      "field": "caption",
+      "text": "Für die Probe nehme ich Schuhe mit, in denen ich sicher stehen kann."
+    },
+    {
+      "id": "de-holdout-v5-204",
+      "field": "caption",
+      "text": "Eine Böe zeigte mir unerwartet die ganze Weite des Überrocks."
+    },
+    {
+      "id": "de-holdout-v5-205",
+      "field": "caption",
+      "text": "Die Skizze zeigt, wo die Naht meiner Körperlinie folgen soll."
+    },
+    {
+      "id": "de-holdout-v5-206",
+      "field": "caption",
+      "text": "Die dunklen Vertiefungen lassen das Muster der Silberspange deutlich hervortreten."
+    },
+    {
+      "id": "de-holdout-v5-207",
+      "field": "caption",
+      "text": "Ein tiefer Zopf lässt den Fahrradhelm richtig auf meinem Kopf sitzen."
+    },
+    {
+      "id": "de-holdout-v5-208",
+      "field": "caption",
+      "text": "Die alte Krawatte bekam nach vorsichtigem Kürzen eine neue Spitze."
+    },
+    {
+      "id": "de-holdout-v5-209",
+      "field": "caption",
+      "text": "Die sauberen Sohlen hinterlassen auf dem weichen Teppich nur flache Spuren."
+    },
+    {
+      "id": "de-holdout-v5-210",
+      "field": "caption",
+      "text": "Mit Stoffklammern probiere ich eine neue Verteilung der Rockfalten."
+    },
+    {
+      "id": "de-holdout-v5-211",
+      "field": "caption",
+      "text": "Im Schaufenster sehe ich, wie stark die Kette beim Gehen mitschwingt."
+    },
+    {
+      "id": "de-holdout-v5-212",
+      "field": "caption",
+      "text": "Die kleinen Noppen geben meinen Handschuhen auf glatten Griffen mehr Halt."
+    },
+    {
+      "id": "de-holdout-v5-213",
+      "field": "caption",
+      "text": "Für den Backtag schließe ich den Kittel bis zum obersten Knopf."
+    },
+    {
+      "id": "de-holdout-v5-214",
+      "field": "caption",
+      "text": "Das zusätzliche Loch erlaubt mir, die Manschette etwas weiter zu schließen."
+    },
+    {
+      "id": "de-holdout-v5-215",
+      "field": "caption",
+      "text": "Der verschickte Mantel kam gut geschützt im wiederverwendeten Karton an."
+    },
+    {
+      "id": "de-holdout-v5-216",
+      "field": "caption",
+      "text": "Die geschenkten Perlen habe ich nach Größe auf einem Tuch sortiert."
+    },
+    {
+      "id": "de-holdout-v5-217",
+      "field": "caption",
+      "text": "Die kleine Fehlstelle im Druck macht meine Bluse leicht erkennbar."
+    },
+    {
+      "id": "de-holdout-v5-218",
+      "field": "caption",
+      "text": "Ein unauffälliges Gewicht an der Ecke hält den Umhang ruhig."
+    },
+    {
+      "id": "de-holdout-v5-219",
+      "field": "caption",
+      "text": "Durch den Schlitz erreiche ich meine Tasche unter dem Poncho."
+    },
+    {
+      "id": "de-holdout-v5-220",
+      "field": "caption",
+      "text": "Ein alter Kalenderdruck bildet das Muster meines quadratischen Tuchs."
+    },
+    {
+      "id": "de-holdout-v5-221",
+      "field": "caption",
+      "text": "Ich falte den leeren Beutel zusammen und prüfe seine Größe fürs Reisegepäck."
+    },
+    {
+      "id": "de-holdout-v5-222",
+      "field": "caption",
+      "text": "Der schräge Deckel gibt meiner sonst einfachen Tasche einen klaren Akzent."
+    },
+    {
+      "id": "de-holdout-v5-223",
+      "field": "caption",
+      "text": "Die gebogene Naht setzt sich vom Vorderteil bis in den Rücken fort."
+    },
+    {
+      "id": "de-holdout-v5-224",
+      "field": "caption",
+      "text": "Oben erleichtern offene Haken das schnelle Schnüren meiner Stiefel."
+    },
+    {
+      "id": "de-holdout-v5-225",
+      "field": "caption",
+      "text": "Die kleine Verdrehung sitzt bei diesem Haarband bewusst seitlich."
+    },
+    {
+      "id": "de-holdout-v5-226",
+      "field": "caption",
+      "text": "Mit der schmalen Einfassung sehen die offenen Nahtzugaben ordentlich aus."
+    },
+    {
+      "id": "de-holdout-v5-227",
+      "field": "caption",
+      "text": "Das Muster erinnert mich an die Fenster unseres früheren Treppenhauses."
+    },
+    {
+      "id": "de-holdout-v5-228",
+      "field": "caption",
+      "text": "Der breitere Riemen passt an dieselben Ringe meiner Alltagstasche."
+    },
+    {
+      "id": "de-holdout-v5-229",
+      "field": "caption",
+      "text": "Das eingewebte Muster wird sichtbar, sobald ich mich leicht drehe."
+    },
+    {
+      "id": "de-holdout-v5-230",
+      "field": "caption",
+      "text": "Die gezeichnete Schuhform half mir bei der Wahl der Hosenlänge."
+    },
+    {
+      "id": "de-holdout-v5-231",
+      "field": "caption",
+      "text": "Der Riemen unter dem Schuh hält die Gamasche am richtigen Platz."
+    },
+    {
+      "id": "de-holdout-v5-232",
+      "field": "caption",
+      "text": "Die alten Kunststoffknöpfe haben eine leicht unregelmäßige Oberfläche bekommen."
+    },
+    {
+      "id": "de-holdout-v5-233",
+      "field": "caption",
+      "text": "Ein kleines Band verbindet die Träger, damit sie ruhig sitzen."
+    },
+    {
+      "id": "de-holdout-v5-234",
+      "field": "caption",
+      "text": "In meinem Nähkorb liegt diesmal ein Projekt für die gemeinsame Zugfahrt."
+    },
+    {
+      "id": "de-holdout-v5-235",
+      "field": "caption",
+      "text": "Ein dünnes Tuch schützt den Mantelkragen vor dem scheuernden Rucksackriemen."
+    },
+    {
+      "id": "de-holdout-v5-236",
+      "field": "caption",
+      "text": "Eine zusätzliche Sicherungskette hält das Armband bei geöffnetem Verschluss zusammen."
+    },
+    {
+      "id": "de-holdout-v5-237",
+      "field": "caption",
+      "text": "Das Stirnband lässt die Stelle rund um mein Hörgerät frei."
+    },
+    {
+      "id": "de-holdout-v5-238",
+      "field": "caption",
+      "text": "Das neue Taschenfutter erleichtert mir das Finden kleiner Münzen."
+    },
+    {
+      "id": "de-holdout-v5-239",
+      "field": "caption",
+      "text": "Die flache Kreide liegt beim Zeichnen langer Linien sicher in meiner Hand."
+    },
+    {
+      "id": "de-holdout-v5-240",
+      "field": "caption",
+      "text": "Die eingesetzten Polster verhindern, dass die Buchkante am Rücken drückt."
+    },
+    {
+      "id": "de-holdout-v5-241",
+      "field": "caption",
+      "text": "Die empfindlichen Handschuhe liegen flach zwischen zwei weichen Stofflagen."
+    },
+    {
+      "id": "de-holdout-v5-242",
+      "field": "caption",
+      "text": "Eine doppelte Naht verstärkt die obere Kante meines Einkaufsbeutels."
+    },
+    {
+      "id": "de-holdout-v5-243",
+      "field": "caption",
+      "text": "Am Nachmittag prüfe ich noch einmal, ob der neue Ring bequem sitzt."
+    },
+    {
+      "id": "de-holdout-v5-244",
+      "field": "caption",
+      "text": "Die einzelne Feder ist mit einem schmalen Band an der Spange befestigt."
+    },
+    {
+      "id": "de-holdout-v5-245",
+      "field": "caption",
+      "text": "Heute trage ich den Verschluss des Umhangs auf einer Schulter."
+    },
+    {
+      "id": "de-holdout-v5-246",
+      "field": "caption",
+      "text": "Ein neuer Streifen innen macht meine oft getragene Kappe wieder angenehm."
+    },
+    {
+      "id": "de-holdout-v5-247",
+      "field": "caption",
+      "text": "Die dünnen Trennwände lassen jede gefaltete Bluse im Schrank sichtbar bleiben."
+    },
+    {
+      "id": "de-holdout-v5-248",
+      "field": "caption",
+      "text": "Der flache Clip hält meine kleine Plakette ohne Löcher im Stoff."
+    },
+    {
+      "id": "de-holdout-v5-249",
+      "field": "caption",
+      "text": "Die quer gestrickten Rippen geben dem Oberteil eine andere Wirkung."
+    },
+    {
+      "id": "de-holdout-v5-250",
+      "field": "caption",
+      "text": "Der seitliche Eingriff verschwindet genau zwischen zwei Falten meines Kleides."
+    },
+    {
+      "id": "de-holdout-v5-251",
+      "field": "caption",
+      "text": "Den handgeschriebenen Gruß habe ich mit wenigen Stichen auf die Tasche übertragen."
+    },
+    {
+      "id": "de-holdout-v5-252",
+      "field": "caption",
+      "text": "Die abgeschrägte Absatzkante fällt mir erst auf der Seitenaufnahme auf."
+    },
+    {
+      "id": "de-holdout-v5-253",
+      "field": "caption",
+      "text": "Auf der Rückseite des Anhängers stehen winzige eingeprägte Buchstaben."
+    },
+    {
+      "id": "de-holdout-v5-254",
+      "field": "caption",
+      "text": "Der Abnäher läuft so sanft aus, dass sich keine kleine Spitze bildet."
+    },
+    {
+      "id": "de-holdout-v5-255",
+      "field": "caption",
+      "text": "Ich fotografiere das Pflegeetikett, bevor es beim Tragen unleserlich wird."
+    },
+    {
+      "id": "de-holdout-v5-256",
+      "field": "caption",
+      "text": "Beim Hinhocken merke ich, wie gut die vorgeformte Hose mitgeht."
+    },
+    {
+      "id": "de-holdout-v5-257",
+      "field": "caption",
+      "text": "Ein Emailleanhänger zeigt die Silhouette einer alten Nähmaschine."
+    },
+    {
+      "id": "de-holdout-v5-258",
+      "field": "caption",
+      "text": "Die beiden Streifen treffen genau an der vorderen Öffnung aufeinander."
+    },
+    {
+      "id": "de-holdout-v5-259",
+      "field": "caption",
+      "text": "Ein kleiner Riegel sammelt die Weite hinten an meinem langen Hemd."
+    },
+    {
+      "id": "de-holdout-v5-260",
+      "field": "caption",
+      "text": "Für die Nachtfahrt nehme ich meine weich gepolsterte Augenmaske mit."
+    },
+    {
+      "id": "de-holdout-v5-261",
+      "field": "caption",
+      "text": "Das verstellbare Nackenband lässt sich auf meine Körpergröße einstellen."
+    },
+    {
+      "id": "de-holdout-v5-262",
+      "field": "caption",
+      "text": "Die kleine Schlaufe hält meinen Fächer direkt am Handgelenk."
+    },
+    {
+      "id": "de-holdout-v5-263",
+      "field": "caption",
+      "text": "Auf einer Karte vermerke ich die bereits gestopften Stellen meiner Socken."
+    },
+    {
+      "id": "de-holdout-v5-264",
+      "field": "caption",
+      "text": "Eine tastbare Markierung hilft mir beim Wiederfinden der passenden Schublade."
+    },
+    {
+      "id": "de-holdout-v5-265",
+      "field": "caption",
+      "text": "Die Mittelnaht meiner Kapuze liegt jetzt gerade über dem Kopf."
+    },
+    {
+      "id": "de-holdout-v5-266",
+      "field": "caption",
+      "text": "Eine alte Druckstelle am Leder gehört inzwischen zur Geschichte meiner Tasche."
+    },
+    {
+      "id": "de-holdout-v5-267",
+      "field": "caption",
+      "text": "Die schmale Schleife lässt genug vom geflochtenen Haar sichtbar."
+    },
+    {
+      "id": "de-holdout-v5-268",
+      "field": "caption",
+      "text": "Nach dem Nachmessen passt das Knopfloch genau zum vorhandenen Knopf."
+    },
+    {
+      "id": "de-holdout-v5-269",
+      "field": "caption",
+      "text": "Ein andersfarbiger Faden markiert die spätere Teilung für den Ausschnitt."
+    },
+    {
+      "id": "de-holdout-v5-270",
+      "field": "caption",
+      "text": "Die glatte Innenkante verhindert Druck an der Seite meines Fußes."
+    },
+    {
+      "id": "de-holdout-v5-271",
+      "field": "caption",
+      "text": "Mit der kleinen Haspel lässt sich der Garnstrang ordentlich aufwickeln."
+    },
+    {
+      "id": "de-holdout-v5-272",
+      "field": "caption",
+      "text": "Den Farbverlauf habe ich beim Zuschnitt über beide Vorderteile weitergeführt."
+    },
+    {
+      "id": "de-holdout-v5-273",
+      "field": "caption",
+      "text": "Die Kopfhörerschnur läuft durch eine kleine Schlaufe innen am Mantel."
+    },
+    {
+      "id": "de-holdout-v5-274",
+      "field": "caption",
+      "text": "Nebeneinander zeigen die beiden Steine ihre ganz unterschiedlichen Oberflächen."
+    },
+    {
+      "id": "de-holdout-v5-275",
+      "field": "caption",
+      "text": "Durch das Verschieben der Knoten wird das Armband enger oder weiter."
+    },
+    {
+      "id": "de-holdout-v5-276",
+      "field": "caption",
+      "text": "Das abgetrennte Fach hält den nassen Schirm von meinen Papieren fern."
+    },
+    {
+      "id": "de-holdout-v5-277",
+      "field": "caption",
+      "text": "Eine schmale Kordel gibt der unteren Rockkante einen deutlichen Abschluss."
+    },
+    {
+      "id": "de-holdout-v5-278",
+      "field": "caption",
+      "text": "Erst aus dem seitlichen Blickwinkel erkenne ich das eingestrickte Muster."
+    },
+    {
+      "id": "de-holdout-v5-279",
+      "field": "caption",
+      "text": "Das selbstgeschriebene Schild erklärt die Änderungen am angebotenen Kleid."
+    },
+    {
+      "id": "de-holdout-v5-280",
+      "field": "caption",
+      "text": "Ein längerer Fadenstiel lässt dem dicken Mantelstoff ausreichend Raum."
+    },
+    {
+      "id": "de-holdout-v5-281",
+      "field": "caption",
+      "text": "Eine zweite Schlaufe führt den Trageriemen dicht am Taschenkörper entlang."
+    },
+    {
+      "id": "de-holdout-v5-282",
+      "field": "caption",
+      "text": "Mit vorsichtigem Formen bekam die eingedrückte Hutseite ihre Rundung zurück."
+    },
+    {
+      "id": "de-holdout-v5-283",
+      "field": "caption",
+      "text": "Ich stecke die erste Falte fest und prüfe danach die zweite."
+    },
+    {
+      "id": "de-holdout-v5-284",
+      "field": "caption",
+      "text": "Die längere Lasche lässt sich beim Anziehen leichter festhalten."
+    },
+    {
+      "id": "de-holdout-v5-285",
+      "field": "caption",
+      "text": "Ein schmaler Steg stabilisiert die beiden Griffe an ihrer Verbindung."
+    },
+    {
+      "id": "de-holdout-v5-286",
+      "field": "caption",
+      "text": "Der drehbare Verschluss verhindert, dass sich die Kette ständig verdreht."
+    },
+    {
+      "id": "de-holdout-v5-287",
+      "field": "caption",
+      "text": "Durch den gehäkelten Ring ziehe ich ein Schalende ganz locker hindurch."
+    },
+    {
+      "id": "de-holdout-v5-288",
+      "field": "caption",
+      "text": "Drei Fotos dokumentieren die einzelnen Schritte bis zum fertigen Stoffbeutel."
+    },
+    {
+      "id": "de-holdout-v5-289",
+      "field": "caption",
+      "text": "Die untere Rundung war der schwierigste Teil meiner neuen Jacke."
+    },
+    {
+      "id": "de-holdout-v5-290",
+      "field": "caption",
+      "text": "Das eingestrickte Muster verläuft genau über die Mitte meiner Hand."
+    },
+    {
+      "id": "de-holdout-v5-291",
+      "field": "caption",
+      "text": "Ein Ersatzverschluss bleibt griffbereit in meinem kleinen Schmuckbeutel."
+    },
+    {
+      "id": "de-holdout-v5-292",
+      "field": "caption",
+      "text": "Die Stoffschuhe passen sich nach wenigen Schritten angenehm meinen Füßen an."
+    },
+    {
+      "id": "de-holdout-v5-293",
+      "field": "caption",
+      "text": "Die sichtbar gesetzten Nähte zeichnen den Aufbau des Hemdes nach."
+    },
+    {
+      "id": "de-holdout-v5-294",
+      "field": "caption",
+      "text": "Zwischen den Steppnähten bleibt bewusst genug Platz für die weiche Füllung."
+    },
+    {
+      "id": "de-holdout-v5-295",
+      "field": "caption",
+      "text": "Der Gürtel endet nach dem Durchziehen in einer kleinen Halteschlaufe."
+    },
+    {
+      "id": "de-holdout-v5-296",
+      "field": "caption",
+      "text": "Die kürzeren Träger lassen das Oberteil wieder sicher sitzen."
+    },
+    {
+      "id": "de-holdout-v5-297",
+      "field": "caption",
+      "text": "Die feinen Linien der Gravur sehe ich erst aus nächster Nähe."
+    },
+    {
+      "id": "de-holdout-v5-298",
+      "field": "caption",
+      "text": "Im Garnknäuel wechselte die Farbe genau an der neuen Ferse."
+    },
+    {
+      "id": "de-holdout-v5-299",
+      "field": "caption",
+      "text": "Die Rillen meines Rings erinnern mich an eine Schallplatte."
+    },
+    {
+      "id": "de-holdout-v5-300",
+      "field": "caption",
+      "text": "Der schmale Fuß kommt näher an die dicke Paspel heran."
+    },
+    {
+      "id": "de-holdout-v5-301",
+      "field": "caption",
+      "text": "Für das Wochenende genügt ein Rucksack mit zwei Wechselgarnituren."
+    },
+    {
+      "id": "de-holdout-v5-302",
+      "field": "caption",
+      "text": "Zum Familienfest trage ich meinen selbst geänderten Hosenanzug wieder."
+    },
+    {
+      "id": "de-holdout-v5-303",
+      "field": "caption",
+      "text": "Der Anhänger stammt aus einer kleinen Werkstatt neben dem Museum."
+    },
+    {
+      "id": "de-holdout-v5-304",
+      "field": "caption",
+      "text": "Die vertraute Jacke begleitet mich an meinem ersten Arbeitstag."
+    },
+    {
+      "id": "de-holdout-v5-305",
+      "field": "caption",
+      "text": "Der neue Griff macht die große Tasche angenehm tragbar."
+    },
+    {
+      "id": "de-holdout-v5-306",
+      "field": "caption",
+      "text": "Zwischen den gedruckten Blumen bleibt viel Platz für den hellen Grund."
+    },
+    {
+      "id": "de-holdout-v5-307",
+      "field": "caption",
+      "text": "Die Brosche hat die Form eines eingerollten kleinen Blattes."
+    },
+    {
+      "id": "de-holdout-v5-308",
+      "field": "caption",
+      "text": "Das aufgestickte Zeichen kennzeichnet meinen rechten Handschuh beim schnellen Anziehen."
+    },
+    {
+      "id": "de-holdout-v5-309",
+      "field": "caption",
+      "text": "Die kleinen Metallteile an den Riemen sind sorgfältig entgratet."
+    },
+    {
+      "id": "de-holdout-v5-310",
+      "field": "caption",
+      "text": "Die langen Falten erinnern mich beim Gehen an langsame Wellen."
+    },
+    {
+      "id": "de-holdout-v5-311",
+      "field": "caption",
+      "text": "Vor der Frühschicht liegen Hose und Hemd schon zusammen bereit."
+    },
+    {
+      "id": "de-holdout-v5-312",
+      "field": "caption",
+      "text": "Das weiche Gummi hält meinen Zopf während des ganzen Arbeitstags."
+    },
+    {
+      "id": "de-holdout-v5-313",
+      "field": "caption",
+      "text": "Die Nadel sitzt heute mitten auf der geschlossenen Knopfleiste."
+    },
+    {
+      "id": "de-holdout-v5-314",
+      "field": "caption",
+      "text": "Die Schürze schützt meine Hose beim Auspacken der Marktkisten."
+    },
+    {
+      "id": "de-holdout-v5-315",
+      "field": "caption",
+      "text": "Ich durfte heute zusehen, wie meine neuen Schuhe zusammengesetzt werden."
+    },
+    {
+      "id": "de-holdout-v5-316",
+      "field": "caption",
+      "text": "Die mehrfach abgesteppten Henkel tragen auch einen schweren Einkauf sicher."
+    },
+    {
+      "id": "de-holdout-v5-317",
+      "field": "caption",
+      "text": "Die Schuhmacherin zeigte mir die verschiedenen Schichten unter dem Absatz."
+    },
+    {
+      "id": "de-holdout-v5-318",
+      "field": "caption",
+      "text": "Die zusammengenähten Streifen wirken fast wie ein gemeinsames Flechtmuster."
+    },
+    {
+      "id": "de-holdout-v5-319",
+      "field": "caption",
+      "text": "Das offene Gewebe lässt das Licht durch die lockere Bluse fallen."
+    },
+    {
+      "id": "de-holdout-v5-320",
+      "field": "caption",
+      "text": "Vor dem Ausgehen sammle ich Kleinteile in einer flachen Schale."
+    },
+    {
+      "id": "de-holdout-v5-321",
+      "field": "caption",
+      "text": "Auf dem glatten Pflaster gehe ich mit griffigen Sohlen sicherer."
+    },
+    {
+      "id": "de-holdout-v5-322",
+      "field": "caption",
+      "text": "Das bequeme Kleid hat genug Bewegungsraum für unseren langen Filmabend."
+    },
+    {
+      "id": "de-holdout-v5-323",
+      "field": "caption",
+      "text": "Die gezeichneten Linien auf dem Tuch stammen von einer Stadtkarte."
+    },
+    {
+      "id": "de-holdout-v5-324",
+      "field": "caption",
+      "text": "Das Foto im Hutkarton zeigt, wie die Krempe ursprünglich lag."
+    },
+    {
+      "id": "de-holdout-v5-325",
+      "field": "caption",
+      "text": "Die kleinen Silikonringe halten die Brillenkette an beiden Bügeln fest."
+    },
+    {
+      "id": "de-holdout-v5-326",
+      "field": "caption",
+      "text": "Mein Programmheft passt gefaltet in die breite Jackentasche."
+    },
+    {
+      "id": "de-holdout-v5-327",
+      "field": "caption",
+      "text": "Der lange Rückenschlitz gibt dem Mantel auf dem Fahrrad mehr Weite."
+    },
+    {
+      "id": "de-holdout-v5-328",
+      "field": "caption",
+      "text": "Das Vergleichsfoto zeigt, wie viel kürzer das Armband geworden ist."
+    },
+    {
+      "id": "de-holdout-v5-329",
+      "field": "caption",
+      "text": "In einer Viertelstunde habe ich den losen Taschenrand wieder befestigt."
+    },
+    {
+      "id": "de-holdout-v5-330",
+      "field": "caption",
+      "text": "Eine weiche Stoffrolle hilft mir beim Hochstecken meiner Haare."
+    },
+    {
+      "id": "de-holdout-v5-331",
+      "field": "caption",
+      "text": "Ein separater Beutel hält die feuchte Kleidung von meinen trockenen Sachen fern."
+    },
+    {
+      "id": "de-holdout-v5-332",
+      "field": "caption",
+      "text": "Der abnehmbare Einsatz macht aus dem Mantel eine leichtere Variante."
+    },
+    {
+      "id": "de-holdout-v5-333",
+      "field": "caption",
+      "text": "Die Naht läuft einmal vollständig um den Ansatz des Taschengurts."
+    },
+    {
+      "id": "de-holdout-v5-334",
+      "field": "caption",
+      "text": "Zwei schmale Spitzen lassen sich vorne zu einem lockeren Knoten verbinden."
+    },
+    {
+      "id": "de-holdout-v5-335",
+      "field": "caption",
+      "text": "Ein kleiner Ring hält den Verschluss meiner Strickjacke auf Abstand."
+    },
+    {
+      "id": "de-holdout-v5-336",
+      "field": "caption",
+      "text": "Der breite Gürtel liegt locker über dem Hüftbereich meines Kleides."
+    },
+    {
+      "id": "de-holdout-v5-337",
+      "field": "caption",
+      "text": "Der breite weiche Abschluss drückt auch nach mehreren Stunden kaum."
+    },
+    {
+      "id": "de-holdout-v5-338",
+      "field": "caption",
+      "text": "Die obere Lasche verdeckt die Klettfläche meiner Alltagsschuhe vollständig."
+    },
+    {
+      "id": "de-holdout-v5-339",
+      "field": "caption",
+      "text": "Die Stücke dürfen nach dem Lüften wieder in den Schrank zurück."
+    },
+    {
+      "id": "de-holdout-v5-340",
+      "field": "caption",
+      "text": "Für die Tonaufnahme lege ich mein klapperndes Armband zur Seite."
+    },
+    {
+      "id": "de-holdout-v5-341",
+      "field": "caption",
+      "text": "Der kleine Markierungsstich zeigt mir die Mitte des unteren Saums."
+    },
+    {
+      "id": "de-holdout-v5-342",
+      "field": "caption",
+      "text": "Ein fester Gegenknopf verteilt die Belastung auf der Mantelinnenseite."
+    },
+    {
+      "id": "de-holdout-v5-343",
+      "field": "caption",
+      "text": "Die kurze Tasche bleibt beim Fahren oberhalb des Fahrradsattels."
+    },
+    {
+      "id": "de-holdout-v5-344",
+      "field": "caption",
+      "text": "Beim Treppensteigen merke ich sofort den Vorteil der kürzeren Hose."
+    },
+    {
+      "id": "de-holdout-v5-345",
+      "field": "caption",
+      "text": "Die Weberin erzählte mir, warum sie die Kante unregelmäßig abschließt."
+    },
+    {
+      "id": "de-holdout-v5-346",
+      "field": "caption",
+      "text": "Ich stelle die Schuhe nebeneinander, damit der Umkleidebereich frei bleibt."
+    },
+    {
+      "id": "de-holdout-v5-347",
+      "field": "caption",
+      "text": "Ein Etikett am Wäschesack erinnert mich an die empfindlichen Verschlüsse."
+    },
+    {
+      "id": "de-holdout-v5-348",
+      "field": "caption",
+      "text": "Die einzelnen Fächer schützen die Anhänger vor gegenseitigem Verkratzen."
+    },
+    {
+      "id": "de-holdout-v5-349",
+      "field": "caption",
+      "text": "Die feine Zahnung hält auch die kurzen Haare am Hinterkopf."
+    },
+    {
+      "id": "de-holdout-v5-350",
+      "field": "caption",
+      "text": "Mit einer Papierprobe konnte ich den neuen Ausschnitt gut beurteilen."
+    },
+    {
+      "id": "de-holdout-v5-351",
+      "field": "caption",
+      "text": "Ein locker aufgelegtes Tuch schützt meine Schultern vor der Mittagssonne."
+    },
+    {
+      "id": "de-holdout-v5-352",
+      "field": "caption",
+      "text": "Die verstärkte Knopfleiste bleibt selbst bei offenem Tragen schön gerade."
+    },
+    {
+      "id": "de-holdout-v5-353",
+      "field": "caption",
+      "text": "Das Querformat der kleinen Tasche macht das Herausnehmen meines Telefons leichter."
+    },
+    {
+      "id": "de-holdout-v5-354",
+      "field": "caption",
+      "text": "Die kleine Ausziehhilfe hinter der Tür schont meine Stiefelabsätze."
+    },
+    {
+      "id": "de-holdout-v5-355",
+      "field": "caption",
+      "text": "Das Muster läuft vorne weiter, obwohl die Tasche darüber liegt."
+    },
+    {
+      "id": "de-holdout-v5-356",
+      "field": "caption",
+      "text": "Zum Weitergeben habe ich jedes Stück mit einer kleinen Größenkarte versehen."
+    },
+    {
+      "id": "de-holdout-v5-357",
+      "field": "caption",
+      "text": "Der mittlere Streifen hält das weiche Rückenteil in Form."
+    },
+    {
+      "id": "de-holdout-v5-358",
+      "field": "caption",
+      "text": "Die Rundung unten macht diese Tasche trotz klarer Seiten weich."
+    },
+    {
+      "id": "de-holdout-v5-359",
+      "field": "caption",
+      "text": "Die Schnalle blieb erhalten, als ich den verschlissenen Lederriemen ersetzte."
+    },
+    {
+      "id": "de-holdout-v5-360",
+      "field": "caption",
+      "text": "Nach einer Stunde merke ich, wie angenehm leicht diese Ohrringe sind."
+    },
+    {
+      "id": "de-holdout-v5-361",
+      "field": "caption",
+      "text": "Ein kleiner Stoffbeutel sammelt Handschuhe und Mütze während des Museumsbesuchs."
+    },
+    {
+      "id": "de-holdout-v5-362",
+      "field": "caption",
+      "text": "Beim Ärmel habe ich die Druckrichtung ganz bewusst gedreht."
+    },
+    {
+      "id": "de-holdout-v5-363",
+      "field": "caption",
+      "text": "Die innere Tasche schließt sicher genug für meinen Hausschlüssel."
+    },
+    {
+      "id": "de-holdout-v5-364",
+      "field": "caption",
+      "text": "Eine weiche Einfassung hält die Kante meiner Kapuze vom Gesicht fern."
+    },
+    {
+      "id": "de-holdout-v5-365",
+      "field": "caption",
+      "text": "Die dünne Zwischenlage gibt dem Mantel Form, ohne ihn schwer zu machen."
+    },
+    {
+      "id": "de-holdout-v5-366",
+      "field": "caption",
+      "text": "Die unterschiedlich breiten Falten verteilen das Volumen genau dort, wo ich es möchte."
+    },
+    {
+      "id": "de-holdout-v5-367",
+      "field": "caption",
+      "text": "Die neuen Ösen passen nun zu den alten Metallschnallen."
+    },
+    {
+      "id": "de-holdout-v5-368",
+      "field": "caption",
+      "text": "Die Rechnung lege ich zur kleinen Mappe mit meinen Schuhreparaturen."
+    },
+    {
+      "id": "de-holdout-v5-369",
+      "field": "caption",
+      "text": "Ein Stoffstück verhindert, dass die Metallteile aneinander schlagen."
+    },
+    {
+      "id": "de-holdout-v5-370",
+      "field": "caption",
+      "text": "Der zusätzliche Knopf lässt mich die Öffnung des Rockschlitzes verändern."
+    },
+    {
+      "id": "de-holdout-v5-371",
+      "field": "caption",
+      "text": "Die Kragenenden verbinden sich vorne zu einer flachen Schleife."
+    },
+    {
+      "id": "de-holdout-v5-372",
+      "field": "caption",
+      "text": "Die weiche Schleifenbrosche befestige ich an meinem schlichten Filzhut."
+    },
+    {
+      "id": "de-holdout-v5-373",
+      "field": "caption",
+      "text": "Ein schmaler gestrickter Rand schaut oberhalb des Stiefels hervor."
+    },
+    {
+      "id": "de-holdout-v5-374",
+      "field": "caption",
+      "text": "Die nummerierten Fächer erleichtern mir das Finden kleiner Accessoires."
+    },
+    {
+      "id": "de-holdout-v5-375",
+      "field": "caption",
+      "text": "Die abgerundeten Kanten machen den Gurt angenehm in meiner Hand."
+    },
+    {
+      "id": "de-holdout-v5-376",
+      "field": "caption",
+      "text": "Der schmale Rest vom Kleid wurde eine passende Haarschleife."
+    },
+    {
+      "id": "de-holdout-v5-377",
+      "field": "caption",
+      "text": "Die flache Tasche passt bequem zwischen meinen Mantel und die Sitzlehne."
+    },
+    {
+      "id": "de-holdout-v5-378",
+      "field": "caption",
+      "text": "Die matte Oberfläche des Anhängers trägt noch feine Werkzeugspuren."
+    },
+    {
+      "id": "de-holdout-v5-379",
+      "field": "caption",
+      "text": "Zur letzten Anprobe nehme ich genau die später vorgesehenen Schuhe mit."
+    },
+    {
+      "id": "de-holdout-v5-380",
+      "field": "caption",
+      "text": "Die dickeren Socken lassen in meinen weiten Stiefeln weniger Spielraum."
+    },
+    {
+      "id": "de-holdout-v5-381",
+      "field": "caption",
+      "text": "Das leichte Taschenfutter zeichnet sich unter dem Rock kaum ab."
+    },
+    {
+      "id": "de-holdout-v5-382",
+      "field": "caption",
+      "text": "Auf dem Foto erkenne ich, wo das Hemd beim Sitzen spannt."
+    },
+    {
+      "id": "de-holdout-v5-383",
+      "field": "caption",
+      "text": "Zwei kurze Kordeln ziehen den Schmuckbeutel gleichmäßig zusammen."
+    },
+    {
+      "id": "de-holdout-v5-384",
+      "field": "caption",
+      "text": "Eine kleine Zeichnung erklärt, warum das neue Fach tiefer werden muss."
+    },
+    {
+      "id": "de-holdout-v5-385",
+      "field": "caption",
+      "text": "Das gepolsterte Band hält mein Visier angenehm an der Stirn."
+    },
+    {
+      "id": "de-holdout-v5-386",
+      "field": "caption",
+      "text": "Die Druckknöpfe sichern das Cape seitlich gegen den Wind."
+    },
+    {
+      "id": "de-holdout-v5-387",
+      "field": "caption",
+      "text": "Die einzelne Rückenfalte gibt meinem Leinenmantel beim Gehen viel Bewegung."
+    },
+    {
+      "id": "de-holdout-v5-388",
+      "field": "caption",
+      "text": "Vor dem Auftrennen markiere ich den ursprünglichen Verlauf der Naht."
+    },
+    {
+      "id": "de-holdout-v5-389",
+      "field": "caption",
+      "text": "Der beweglich befestigte Riemen folgt meinem Fuß beim Gehen."
+    },
+    {
+      "id": "de-holdout-v5-390",
+      "field": "caption",
+      "text": "In der Schale liegen die selbst geschliffenen Knöpfe nach Größe sortiert."
+    },
+    {
+      "id": "de-holdout-v5-391",
+      "field": "caption",
+      "text": "Die kleine gewebte Etikettenkante bleibt bewusst außen an meinem Schal sichtbar."
+    },
+    {
+      "id": "de-holdout-v5-392",
+      "field": "caption",
+      "text": "Eine Kaffeepause hilft mir vor der komplizierten Taschenöffnung."
+    },
+    {
+      "id": "de-holdout-v5-393",
+      "field": "caption",
+      "text": "Die aufgemalten Kreise zeigen, wo die neuen Druckknöpfe sitzen sollen."
+    },
+    {
+      "id": "de-holdout-v5-394",
+      "field": "caption",
+      "text": "Mein Beutel hat genau die richtige Breite für den Fahrradkorb."
+    },
+    {
+      "id": "de-holdout-v5-395",
+      "field": "caption",
+      "text": "Nach dem Entfernen zweier Glieder liegt die Kette oberhalb des Ausschnitts."
+    },
+    {
+      "id": "de-holdout-v5-396",
+      "field": "caption",
+      "text": "Den Farbwechsel habe ich in die Seitennaht meiner Strickjacke gelegt."
+    },
+    {
+      "id": "de-holdout-v5-397",
+      "field": "caption",
+      "text": "Die verstärkte Einfassung hält den runden Halsausschnitt dauerhaft in Form."
+    },
+    {
+      "id": "de-holdout-v5-398",
+      "field": "caption",
+      "text": "Beim Heben der Arme bleiben die kleinen Polster an ihrem Platz."
+    },
+    {
+      "id": "de-holdout-v5-399",
+      "field": "caption",
+      "text": "Beim Hochkrempeln erscheint innen ein schmaler reflektierender Streifen."
+    },
+    {
+      "id": "de-holdout-v5-400",
+      "field": "caption",
+      "text": "Das eingravierte Datum verbindet meinen Ring mit einem schönen gemeinsamen Tag."
+    },
+    {
+      "id": "de-holdout-v5-401",
+      "field": "caption",
+      "text": "Die Nadel hält die geflochtene Haarpartie mit einer kleinen Drehung."
+    },
+    {
+      "id": "de-holdout-v5-402",
+      "field": "caption",
+      "text": "Die schwere Borte lässt den Umhang gleichmäßig nach unten fallen."
+    },
+    {
+      "id": "de-holdout-v5-403",
+      "field": "caption",
+      "text": "Eine neue Schlaufe verhindert, dass der Ausschnitt am Haken ausleiert."
+    },
+    {
+      "id": "de-holdout-v5-404",
+      "field": "caption",
+      "text": "Die längere Klettlasche gibt mir mehr Spielraum beim Einstellen."
+    },
+    {
+      "id": "de-holdout-v5-405",
+      "field": "caption",
+      "text": "Die lose Rückenfalte entfaltet sich erst beim Vorbeugen."
+    },
+    {
+      "id": "de-holdout-v5-406",
+      "field": "caption",
+      "text": "Das Flechtmuster habe ich zuerst mit drei dicken Schnüren geübt."
+    },
+    {
+      "id": "de-holdout-v5-407",
+      "field": "caption",
+      "text": "Der Kleidersack lässt sich mittig falten und an zwei Griffen tragen."
+    },
+    {
+      "id": "de-holdout-v5-408",
+      "field": "caption",
+      "text": "Der schmale unbedruckte Rand läuft als Abschluss entlang der Bluse."
+    },
+    {
+      "id": "de-holdout-v5-409",
+      "field": "caption",
+      "text": "Der kleine Clip lässt den Anhänger zwischen verschiedenen Ketten wechseln."
+    },
+    {
+      "id": "de-holdout-v5-410",
+      "field": "caption",
+      "text": "Eine feste Kante erleichtert mir das Greifen des breiten Riegels."
+    },
+    {
+      "id": "de-holdout-v5-411",
+      "field": "caption",
+      "text": "Die Schuhe tropfen auf dem Gitter ab, während die Einlagen trocknen."
+    },
+    {
+      "id": "de-holdout-v5-412",
+      "field": "caption",
+      "text": "Die kleinen Häkelblumen liegen vor dem Annähen in einem lockeren Bogen."
+    },
+    {
+      "id": "de-holdout-v5-413",
+      "field": "caption",
+      "text": "Mit der Lochzange bekam mein Gürtel eine zusätzliche Einstellmöglichkeit."
+    },
+    {
+      "id": "de-holdout-v5-414",
+      "field": "caption",
+      "text": "Eine gute Einfädelhilfe macht den Nadelwechsel viel entspannter."
+    },
+    {
+      "id": "de-holdout-v5-415",
+      "field": "caption",
+      "text": "Ein zusätzlicher Gummiring gibt dem großen Stoffhaargummi mehr Halt."
+    },
+    {
+      "id": "de-holdout-v5-416",
+      "field": "caption",
+      "text": "Ein winziger farbiger Stich kennzeichnet die zusammengehörenden Socken."
+    },
+    {
+      "id": "de-holdout-v5-417",
+      "field": "caption",
+      "text": "Die Innenfalte lässt sich zum Reinigen vollständig nach außen ziehen."
+    },
+    {
+      "id": "de-holdout-v5-418",
+      "field": "caption",
+      "text": "Das freie Ende des Mantelgürtels steckt locker in einer zweiten Schlaufe."
+    },
+    {
+      "id": "de-holdout-v5-419",
+      "field": "caption",
+      "text": "Die Einlagen trocknen separat und bleiben dabei schön eben."
+    },
+    {
+      "id": "de-holdout-v5-420",
+      "field": "caption",
+      "text": "Die radialen Linien geben dem ausgestellten Rock eine klare Richtung."
+    },
+    {
+      "id": "de-holdout-v5-421",
+      "field": "caption",
+      "text": "Die offenen Finger machen das Sortieren meiner Papierunterlagen leichter."
+    },
+    {
+      "id": "de-holdout-v5-422",
+      "field": "caption",
+      "text": "Das runde Fach hält meine gefalteten Kopfhörer sicher zusammen."
+    },
+    {
+      "id": "de-holdout-v5-423",
+      "field": "caption",
+      "text": "Die Herkunft des Gewebes steht auf einem kleinen mitgenähten Zettel."
+    },
+    {
+      "id": "de-holdout-v5-424",
+      "field": "caption",
+      "text": "Die Enden der Borte treffen hinten in einer flachen Naht zusammen."
+    },
+    {
+      "id": "de-holdout-v5-425",
+      "field": "caption",
+      "text": "Der breite Verschluss verteilt das Gewicht des Umhangs auf beide Seiten."
+    },
+    {
+      "id": "de-holdout-v5-426",
+      "field": "caption",
+      "text": "Die neue Schnürung lässt meinem hohen Spann angenehm viel Platz."
+    },
+    {
+      "id": "de-holdout-v5-427",
+      "field": "caption",
+      "text": "Die Sicherungskappe bedeckt die Spitze meiner alten Anstecknadel vollständig."
+    },
+    {
+      "id": "de-holdout-v5-428",
+      "field": "caption",
+      "text": "Die gebogene Öffnung gibt einen guten Blick in das kleine Hauptfach."
+    },
+    {
+      "id": "de-holdout-v5-429",
+      "field": "caption",
+      "text": "Zwischen den oberen Knöpfen habe ich den Abstand etwas verkleinert."
+    },
+    {
+      "id": "de-holdout-v5-430",
+      "field": "caption",
+      "text": "Die flache Schnalle bleibt unter dem Haar fast unsichtbar."
+    },
+    {
+      "id": "de-holdout-v5-431",
+      "field": "caption",
+      "text": "Die doppelte Naht hält die dünne Handfläche an der Kante zusammen."
+    },
+    {
+      "id": "de-holdout-v5-432",
+      "field": "caption",
+      "text": "Durch das kleine Fenster erkenne ich die Ohrringe vor dem Öffnen."
+    },
+    {
+      "id": "de-holdout-v5-433",
+      "field": "caption",
+      "text": "Die schmale Schalform lässt den großen Mantelkragen vollständig sichtbar."
+    },
+    {
+      "id": "de-holdout-v5-434",
+      "field": "caption",
+      "text": "Zum Prüfen des Bodens habe ich die Tasche auf die Kante gestellt."
+    },
+    {
+      "id": "de-holdout-v5-435",
+      "field": "caption",
+      "text": "Ein Pfeil auf der Rückseite markiert die Richtung des Stoffs."
+    },
+    {
+      "id": "de-holdout-v5-436",
+      "field": "caption",
+      "text": "Der zusätzliche Haken hält den Bund oberhalb des Reißverschlusses geschlossen."
+    },
+    {
+      "id": "de-holdout-v5-437",
+      "field": "caption",
+      "text": "Zwei verdeckte Nadeln halten das Tuch hinter meinen Ohren fest."
+    },
+    {
+      "id": "de-holdout-v5-438",
+      "field": "caption",
+      "text": "Die Spange schließt an beiden Seiten mit einem flachen Clip."
+    },
+    {
+      "id": "de-holdout-v5-439",
+      "field": "caption",
+      "text": "Die kürzere Schafthöhe passt besser zu meinen flachen Sommerschuhen."
+    },
+    {
+      "id": "de-holdout-v5-440",
+      "field": "caption",
+      "text": "Die ausgebesserte Innennaht verhindert, dass Kleinteile hinter das Futter rutschen."
+    },
+    {
+      "id": "de-holdout-v5-441",
+      "field": "caption",
+      "text": "Ein Lineal markiert die aktuelle Reihe in meinem Strickmuster."
+    },
+    {
+      "id": "de-holdout-v5-442",
+      "field": "caption",
+      "text": "Ich fotografiere jedes Musterstück direkt neben seiner Materialangabe."
+    },
+    {
+      "id": "de-holdout-v5-443",
+      "field": "caption",
+      "text": "Die breite Schlaufe hinten hilft mir beim Anziehen der festen Stiefel."
+    },
+    {
+      "id": "de-holdout-v5-444",
+      "field": "caption",
+      "text": "Nach dem Aufhängen glätten sich die Sitzfalten langsam von selbst."
+    },
+    {
+      "id": "de-holdout-v5-445",
+      "field": "caption",
+      "text": "Auf der Rückseite kontrolliere ich, ob die Fadenspannung gleichmäßig ist."
+    },
+    {
+      "id": "de-holdout-v5-446",
+      "field": "caption",
+      "text": "Die gleiche Schnalle passt nun zu zwei austauschbaren Riemen."
+    },
+    {
+      "id": "de-holdout-v5-447",
+      "field": "caption",
+      "text": "Kleine Schlaufen halten den Unterrock an den Seitennähten fest."
+    },
+    {
+      "id": "de-holdout-v5-448",
+      "field": "caption",
+      "text": "Ein verdeckter Knopf hält die große Vorderfalte oben zusammen."
+    },
+    {
+      "id": "de-holdout-v5-449",
+      "field": "caption",
+      "text": "Die angenähte Schlaufe lässt das kleine Etikett frei beweglich."
+    },
+    {
+      "id": "de-holdout-v5-450",
+      "field": "caption",
+      "text": "Durch die verschiebbaren Knoten lässt sich das Schmuckband bequem anpassen."
+    },
+    {
+      "id": "de-holdout-v5-451",
+      "field": "caption",
+      "text": "Die kleinen Perlen habe ich einzeln auf dem Kamm befestigt."
+    },
+    {
+      "id": "de-holdout-v5-452",
+      "field": "caption",
+      "text": "Ein weiches Stück Polster schützt die empfindliche Stelle über meinen Zehen."
+    },
+    {
+      "id": "de-holdout-v5-453",
+      "field": "caption",
+      "text": "Die Heftnaht zeigt, wie viel ich an der Schulter auslassen kann."
+    },
+    {
+      "id": "de-holdout-v5-454",
+      "field": "caption",
+      "text": "Der getrocknete Farbtropfen ist eine kleine Erinnerung an den Druckkurs."
+    },
+    {
+      "id": "de-holdout-v5-455",
+      "field": "caption",
+      "text": "Die gestrickte Tasche bleibt durch einen schmalen Reißverschluss geschlossen."
+    },
+    {
+      "id": "de-holdout-v5-456",
+      "field": "caption",
+      "text": "Die vorgeformte Partie lässt das Knie unter dem Regenmantel frei arbeiten."
+    },
+    {
+      "id": "de-holdout-v5-457",
+      "field": "caption",
+      "text": "Die kleine Uhr lässt sich als Anhänger vor dem Hemd tragen."
+    },
+    {
+      "id": "de-holdout-v5-458",
+      "field": "caption",
+      "text": "Die stärkere Nadel gleitet ruhiger durch die dichte Stofflage."
+    },
+    {
+      "id": "de-holdout-v5-459",
+      "field": "caption",
+      "text": "Der schräge Ansatz führt den Riemen natürlicher über meine Schulter."
+    },
+    {
+      "id": "de-holdout-v5-460",
+      "field": "caption",
+      "text": "Der Handschuhclip sitzt innen am Mantel und bleibt leicht erreichbar."
+    },
+    {
+      "id": "de-holdout-v5-461",
+      "field": "caption",
+      "text": "Mit dem seitlichen Riegel kann ich die Schaftweite genau einstellen."
+    },
+    {
+      "id": "de-holdout-v5-462",
+      "field": "caption",
+      "text": "Die beiden Knoten verhindern, dass das Zugband in den Tunnel rutscht."
+    },
+    {
+      "id": "de-holdout-v5-463",
+      "field": "caption",
+      "text": "Ein kurzer Schlitz lässt den Saum meines Strickkleides lockerer fallen."
+    },
+    {
+      "id": "de-holdout-v5-464",
+      "field": "caption",
+      "text": "Die kleinen Spangen reisen in einer flachen Schachtel mit Stoffeinlage."
+    },
+    {
+      "id": "de-holdout-v5-465",
+      "field": "caption",
+      "text": "Der nachgerüstete Riemen hält meinen Fuß sicher im offenen Schuh."
+    },
+    {
+      "id": "de-holdout-v5-466",
+      "field": "caption",
+      "text": "Eine kleine Stoffscheibe verstärkt die Stelle unter dem Druckknopf."
+    },
+    {
+      "id": "de-holdout-v5-467",
+      "field": "caption",
+      "text": "Der Zuschnitt im Stoffbruch erspart mir eine Naht in der Mitte."
+    },
+    {
+      "id": "de-holdout-v5-468",
+      "field": "caption",
+      "text": "Die verdrehten Henkel habe ich vor dem endgültigen Annähen neu ausgerichtet."
+    },
+    {
+      "id": "de-holdout-v5-469",
+      "field": "caption",
+      "text": "Die kleine Unregelmäßigkeit im Gewebe zeigt mir die Vorderseite des Schals."
+    },
+    {
+      "id": "de-holdout-v5-470",
+      "field": "caption",
+      "text": "Im Museum habe ich die ungewöhnliche Sohlenkonstruktion aufgeschrieben."
+    },
+    {
+      "id": "de-holdout-v5-471",
+      "field": "caption",
+      "text": "Vor jeder neuen Stofflage prüfe ich den Stich auf einem Reststück."
+    },
+    {
+      "id": "de-holdout-v5-472",
+      "field": "caption",
+      "text": "Die große Griffmulde macht den Verschluss leicht ertastbar."
+    },
+    {
+      "id": "de-holdout-v5-473",
+      "field": "caption",
+      "text": "Der mehrfach gefaltete Rand gibt dem weichen Beutel Stabilität."
+    },
+    {
+      "id": "de-holdout-v5-474",
+      "field": "caption",
+      "text": "Innen an der Seitennaht wartet ein passender Ersatzknopf."
+    },
+    {
+      "id": "de-holdout-v5-475",
+      "field": "caption",
+      "text": "Auf dem schmalen Ständer kann ich jeden Ring einzeln sehen."
+    },
+    {
+      "id": "de-holdout-v5-476",
+      "field": "caption",
+      "text": "Ein kleiner Druckknopf befestigt den umgeschlagenen Stiefelrand."
+    },
+    {
+      "id": "de-holdout-v5-477",
+      "field": "caption",
+      "text": "Der breite Gürtel läuft durch zwei unauffällige Öffnungen im Rockbund."
+    },
+    {
+      "id": "de-holdout-v5-478",
+      "field": "caption",
+      "text": "Der handgeknotete Abschluss gehört für mich zum fertigen Schmuckstück."
+    },
+    {
+      "id": "de-holdout-v5-479",
+      "field": "caption",
+      "text": "Die gebogene Seite des Kamms folgt bequem meiner Kopfform."
+    },
+    {
+      "id": "de-holdout-v5-480",
+      "field": "caption",
+      "text": "Den letzten schmalen Stoffstreifen verwende ich als wiederverwendbares Geschenkband."
+    },
+    {
+      "id": "de-holdout-v5-481",
+      "field": "caption",
+      "text": "Ein paar Rückstiche sichern den Anfang der langen Seitennaht."
+    },
+    {
+      "id": "de-holdout-v5-482",
+      "field": "caption",
+      "text": "Durch das Knopfloch führe ich eine kleine Schlaufe für den Schlüssel."
+    },
+    {
+      "id": "de-holdout-v5-483",
+      "field": "caption",
+      "text": "Die weiter auseinanderliegenden Haken lassen dem dicken Stoff mehr Bewegungsraum."
+    },
+    {
+      "id": "de-holdout-v5-484",
+      "field": "caption",
+      "text": "Die glatte Ferse bleibt auch nach einem langen Spaziergang ohne Druckfalte."
+    },
+    {
+      "id": "de-holdout-v5-485",
+      "field": "caption",
+      "text": "Die breite Lasche verteilt den Zug der Schnürsenkel über meinem Spann."
+    },
+    {
+      "id": "de-holdout-v5-486",
+      "field": "caption",
+      "text": "Die mittlere Falte beginnt direkt unter dem schmalen Rückensteg."
+    },
+    {
+      "id": "de-holdout-v5-487",
+      "field": "caption",
+      "text": "Die gebogene Frontkante öffnet sich mit einem kurzen Zug am Griff."
+    },
+    {
+      "id": "de-holdout-v5-488",
+      "field": "caption",
+      "text": "Die leicht erhabene Druckfläche spüre ich beim Darüberstreichen deutlich."
+    },
+    {
+      "id": "de-holdout-v5-489",
+      "field": "caption",
+      "text": "Mit einem kleinen Knopf verbinde ich die beiden Schalenden vor der Brust."
+    },
+    {
+      "id": "de-holdout-v5-490",
+      "field": "caption",
+      "text": "Das kleine Etikett habe ich auf die Außenseite des Schafts gesetzt."
+    },
+    {
+      "id": "de-holdout-v5-491",
+      "field": "caption",
+      "text": "Die gelockerte Masche schließe ich mit der stumpfen Nadel vorsichtig."
+    },
+    {
+      "id": "de-holdout-v5-492",
+      "field": "caption",
+      "text": "Die breite Lasche lässt sich auch mit vollen Händen gut greifen."
+    },
+    {
+      "id": "de-holdout-v5-493",
+      "field": "caption",
+      "text": "Die ausgestellte Form gibt meinem Mantel unterhalb der Hüfte viel Raum."
+    },
+    {
+      "id": "de-holdout-v5-494",
+      "field": "caption",
+      "text": "Die herausnehmbare Einlage macht das Stirnband leichter zu reinigen."
+    },
+    {
+      "id": "de-holdout-v5-495",
+      "field": "caption",
+      "text": "Die umlaufende Naht verbindet das Obermaterial sichtbar mit der Sohle."
+    },
+    {
+      "id": "de-holdout-v5-496",
+      "field": "caption",
+      "text": "Eine kleine Karte bewahrt Stoffrest und Garnfarbe für spätere Änderungen auf."
+    },
+    {
+      "id": "de-holdout-v5-497",
+      "field": "caption",
+      "text": "Drei unterschiedlich breite Taschen halten meine Werkzeuge gut erreichbar."
+    },
+    {
+      "id": "de-holdout-v5-498",
+      "field": "caption",
+      "text": "Der große Metallring lässt sich beim Öffnen bequem greifen."
+    },
+    {
+      "id": "de-holdout-v5-499",
+      "field": "caption",
+      "text": "Eine gepolsterte Klemme hält den Hut außen an meiner Reisetasche."
+    },
+    {
+      "id": "de-holdout-v5-500",
+      "field": "caption",
+      "text": "Die beiden gewaschenen Proben zeigen deutlich unterschiedliche Maschengrößen."
+    },
+    {
+      "id": "de-holdout-v5-501",
+      "field": "altText",
+      "text": "Eine gekürzte Hose hängt neben einer Änderungsnotiz am Bügel."
+    },
+    {
+      "id": "de-holdout-v5-502",
+      "field": "altText",
+      "text": "Zwischen Stoffstücken liegt ein Taschenrechner neben handschriftlichen Maßen."
+    },
+    {
+      "id": "de-holdout-v5-503",
+      "field": "altText",
+      "text": "Der hohe Stiefel besitzt zwei übereinander angeordnete Verschlüsse."
+    },
+    {
+      "id": "de-holdout-v5-504",
+      "field": "altText",
+      "text": "Eine geliehene Jacke liegt neben einer kleinen Rückgabekarte."
+    },
+    {
+      "id": "de-holdout-v5-505",
+      "field": "altText",
+      "text": "Der weit ausgestellte Rock bildet steife fächerartige Falten."
+    },
+    {
+      "id": "de-holdout-v5-506",
+      "field": "altText",
+      "text": "Breite Nahtzugaben stehen neben der gehefteten Seitennaht hervor."
+    },
+    {
+      "id": "de-holdout-v5-507",
+      "field": "altText",
+      "text": "Feine Handstiche schließen eine kurze Öffnung am Handschuhsaum."
+    },
+    {
+      "id": "de-holdout-v5-508",
+      "field": "altText",
+      "text": "Der enge Rock spannt leicht über dem angewinkelten Knie."
+    },
+    {
+      "id": "de-holdout-v5-509",
+      "field": "altText",
+      "text": "Zwei Finger greifen den seitlichen Riegel des Taschenverschlusses."
+    },
+    {
+      "id": "de-holdout-v5-510",
+      "field": "altText",
+      "text": "Zwei Hemden zeigen unterschiedlich weit auseinanderliegende Kragenspitzen."
+    },
+    {
+      "id": "de-holdout-v5-511",
+      "field": "altText",
+      "text": "Geöffnete Stofffächer enthalten kleine Ohrringe mit geschlossenen Steckern."
+    },
+    {
+      "id": "de-holdout-v5-512",
+      "field": "altText",
+      "text": "Eine Maßskala verläuft am Ständer der höhenverstellbaren Schneiderpuppe."
+    },
+    {
+      "id": "de-holdout-v5-513",
+      "field": "altText",
+      "text": "Ein hoch gebundener Zopf lässt den Jackenkragen vollständig frei."
+    },
+    {
+      "id": "de-holdout-v5-514",
+      "field": "altText",
+      "text": "Kurze gestrickte Stulpen schließen die Lücke oberhalb der Schuhe."
+    },
+    {
+      "id": "de-holdout-v5-515",
+      "field": "altText",
+      "text": "Mehrere Kleiderskizzen liegen neben dem fertig genähten Modell."
+    },
+    {
+      "id": "de-holdout-v5-516",
+      "field": "altText",
+      "text": "Ein ausgeklappter Zollstock liegt quer über dem Hosenstoff."
+    },
+    {
+      "id": "de-holdout-v5-517",
+      "field": "altText",
+      "text": "Der Taschengriff sitzt leicht außerhalb der mittleren Oberkante."
+    },
+    {
+      "id": "de-holdout-v5-518",
+      "field": "altText",
+      "text": "Gerade Stichreihen durchziehen ein kleines aufbewahrtes Stoffstück."
+    },
+    {
+      "id": "de-holdout-v5-519",
+      "field": "altText",
+      "text": "Flache Hausschuhe stecken in einem schmalen offenen Reisebeutel."
+    },
+    {
+      "id": "de-holdout-v5-520",
+      "field": "altText",
+      "text": "Die Haarspange hat breite glatt abgerundete innere Kontaktflächen."
+    },
+    {
+      "id": "de-holdout-v5-521",
+      "field": "altText",
+      "text": "Ein heller Kreidekreis umrandet einen kleinen Fleck am Ärmel."
+    },
+    {
+      "id": "de-holdout-v5-522",
+      "field": "altText",
+      "text": "Eine verstellbare Lampe beleuchtet die Naht unter dem Maschinenfuß."
+    },
+    {
+      "id": "de-holdout-v5-523",
+      "field": "altText",
+      "text": "Die zusammengedrückte Tasche liegt neben derselben Form auf einer Zeichnung."
+    },
+    {
+      "id": "de-holdout-v5-524",
+      "field": "altText",
+      "text": "Der weiche Hosenbund folgt dem sitzenden Körper ohne scharfe Falte."
+    },
+    {
+      "id": "de-holdout-v5-525",
+      "field": "altText",
+      "text": "Ein alter Knopfabdruck liegt neben dem neu angenähten Mantelknopf."
+    },
+    {
+      "id": "de-holdout-v5-526",
+      "field": "altText",
+      "text": "Kleine Karten liegen unter verschiedenen handgefertigten Schmuckstücken."
+    },
+    {
+      "id": "de-holdout-v5-527",
+      "field": "altText",
+      "text": "Das glatte Rockfutter endet mehrere Zentimeter oberhalb des Außensaums."
+    },
+    {
+      "id": "de-holdout-v5-528",
+      "field": "altText",
+      "text": "Der Stoffbeutel steht auf einem deutlich abgegrenzten rechteckigen Boden."
+    },
+    {
+      "id": "de-holdout-v5-529",
+      "field": "altText",
+      "text": "Der weiche Hemdkragen fällt in einer lockeren runden Kurve."
+    },
+    {
+      "id": "de-holdout-v5-530",
+      "field": "altText",
+      "text": "Die Aufnahme zeigt ausschließlich den gefalteten Stoff zwischen zwei Nähten."
+    },
+    {
+      "id": "de-holdout-v5-531",
+      "field": "altText",
+      "text": "Die Tasche hängt an einem über die linke Schulter gelegten Riemen."
+    },
+    {
+      "id": "de-holdout-v5-532",
+      "field": "altText",
+      "text": "Zwei Socken tragen übereinstimmende kleine Zeichen am oberen Rand."
+    },
+    {
+      "id": "de-holdout-v5-533",
+      "field": "altText",
+      "text": "Der weite Rock liegt locker über dem Fahrradsattel."
+    },
+    {
+      "id": "de-holdout-v5-534",
+      "field": "altText",
+      "text": "Ein flacher Ring folgt eng der Oberseite des Fingers."
+    },
+    {
+      "id": "de-holdout-v5-535",
+      "field": "altText",
+      "text": "Eine Nadel steckt im teilweise befestigten Saum eines Rocks."
+    },
+    {
+      "id": "de-holdout-v5-536",
+      "field": "altText",
+      "text": "Ein kräftiger Wandhaken trägt einen langen schweren Mantel."
+    },
+    {
+      "id": "de-holdout-v5-537",
+      "field": "altText",
+      "text": "Maschenmarkierer unterteilen die offene Kante des gestrickten Vorderteils."
+    },
+    {
+      "id": "de-holdout-v5-538",
+      "field": "altText",
+      "text": "Seitliches Tageslicht macht das feine Schultermuster deutlich sichtbar."
+    },
+    {
+      "id": "de-holdout-v5-539",
+      "field": "altText",
+      "text": "Mehrere Personen tragen unterschiedlich geschnittene selbstgenähte Oberteile."
+    },
+    {
+      "id": "de-holdout-v5-540",
+      "field": "altText",
+      "text": "Feuchtes Zeitungspapier liegt neben offen geschnürten Lederschuhen."
+    },
+    {
+      "id": "de-holdout-v5-541",
+      "field": "altText",
+      "text": "Farbige Stifte umgeben eine Skizze von Kleid und Tasche."
+    },
+    {
+      "id": "de-holdout-v5-542",
+      "field": "altText",
+      "text": "Ein kleiner länglicher Anhänger hat übereinanderliegende zapfenartige Schuppen."
+    },
+    {
+      "id": "de-holdout-v5-543",
+      "field": "altText",
+      "text": "Eine runde Garderobenmarke liegt im geöffneten Reißverschlussfach."
+    },
+    {
+      "id": "de-holdout-v5-544",
+      "field": "altText",
+      "text": "Eine kurze Stoffrolle ist mit einer handschriftlichen Abholnotiz versehen."
+    },
+    {
+      "id": "de-holdout-v5-545",
+      "field": "altText",
+      "text": "Ein gebürsteter Streifen hebt sich vom übrigen Wildleder ab."
+    },
+    {
+      "id": "de-holdout-v5-546",
+      "field": "altText",
+      "text": "Nummerierte Papierstreifen markieren die ungenähten Falten am Rockbund."
+    },
+    {
+      "id": "de-holdout-v5-547",
+      "field": "altText",
+      "text": "Die Jacke bildet beim ausgestreckten Arm nur lockere Rückenfalten."
+    },
+    {
+      "id": "de-holdout-v5-548",
+      "field": "altText",
+      "text": "Eine breite Lasche ragt aus der flachen Metallschließe."
+    },
+    {
+      "id": "de-holdout-v5-549",
+      "field": "altText",
+      "text": "Eine kleine Wanderwegmarkierung ist als Anstecknadel am Kragen befestigt."
+    },
+    {
+      "id": "de-holdout-v5-550",
+      "field": "altText",
+      "text": "Ein eingesetzter Ärmel liegt neben den übrigen Jackenteilen."
+    },
+    {
+      "id": "de-holdout-v5-551",
+      "field": "altText",
+      "text": "Das ausgebreitete Cape hängt oberhalb einer weißen Badewanne."
+    },
+    {
+      "id": "de-holdout-v5-552",
+      "field": "altText",
+      "text": "Zwei kurze Henkel enden knapp oberhalb des gefüllten Beutels."
+    },
+    {
+      "id": "de-holdout-v5-553",
+      "field": "altText",
+      "text": "Die Steppreihen beginnen dicht an der mittleren Markierung."
+    },
+    {
+      "id": "de-holdout-v5-554",
+      "field": "altText",
+      "text": "Eine Stofflasche liegt über dem Klettverschluss der Regenhose."
+    },
+    {
+      "id": "de-holdout-v5-555",
+      "field": "altText",
+      "text": "Ein heller Reflex erscheint auf dem Rücken des dunklen Mantels."
+    },
+    {
+      "id": "de-holdout-v5-556",
+      "field": "altText",
+      "text": "Licht scheint durch eine vergrößerte Masche im hochgehaltenen Strickstoff."
+    },
+    {
+      "id": "de-holdout-v5-557",
+      "field": "altText",
+      "text": "Ein sehr kurzes Fadenende liegt neben der fertigen Knopfreihe."
+    },
+    {
+      "id": "de-holdout-v5-558",
+      "field": "altText",
+      "text": "Dünne Handschuhe bedecken die Hände am Lenkrad vollständig."
+    },
+    {
+      "id": "de-holdout-v5-559",
+      "field": "altText",
+      "text": "Ein fahrbarer Ständer mit Kleidung steht dicht neben dem Fenster."
+    },
+    {
+      "id": "de-holdout-v5-560",
+      "field": "altText",
+      "text": "Ein kleiner geöffneter Spiegel liegt zwischen gepackten Stoffbeuteln."
+    },
+    {
+      "id": "de-holdout-v5-561",
+      "field": "altText",
+      "text": "Eine Klammer fasst den Rockstoff seitlich oberhalb des Fahrradrads."
+    },
+    {
+      "id": "de-holdout-v5-562",
+      "field": "altText",
+      "text": "Ein weicher Stoffeinsatz liegt am oberen Rand des Stiefels."
+    },
+    {
+      "id": "de-holdout-v5-563",
+      "field": "altText",
+      "text": "Eine bestickte Stoffkarte hängt an einer Schlaufe der Tasche."
+    },
+    {
+      "id": "de-holdout-v5-564",
+      "field": "altText",
+      "text": "Eine Rundzange hält eine gleichmäßig geformte kleine Drahtöse."
+    },
+    {
+      "id": "de-holdout-v5-565",
+      "field": "altText",
+      "text": "Ein weiches Band verbindet die Bügel hinter dem Kopf."
+    },
+    {
+      "id": "de-holdout-v5-566",
+      "field": "altText",
+      "text": "Ein lockerer Heftfaden verläuft entlang der vorgesehenen Nahtlinie."
+    },
+    {
+      "id": "de-holdout-v5-567",
+      "field": "altText",
+      "text": "Ein dünner Ring folgt der äußeren Rundung der Hutkrempe."
+    },
+    {
+      "id": "de-holdout-v5-568",
+      "field": "altText",
+      "text": "Die Hände liegen in zwei tief angesetzten Rocktaschen."
+    },
+    {
+      "id": "de-holdout-v5-569",
+      "field": "altText",
+      "text": "Eine Person prüft den seitlichen Verschluss ihrer Bühnenjacke."
+    },
+    {
+      "id": "de-holdout-v5-570",
+      "field": "altText",
+      "text": "Ein Ausstellungsheft liegt neben einer Jacke mit sichtbaren Handnähten."
+    },
+    {
+      "id": "de-holdout-v5-571",
+      "field": "altText",
+      "text": "Die doppelt gelegte Manschette endet in einer klaren geraden Kante."
+    },
+    {
+      "id": "de-holdout-v5-572",
+      "field": "altText",
+      "text": "Ein runder Lupenanhänger hängt an einer langen Kette über dem Hemd."
+    },
+    {
+      "id": "de-holdout-v5-573",
+      "field": "altText",
+      "text": "Unterschiedlich gemusterte Stulpen besitzen einen gemeinsam gestalteten Rand."
+    },
+    {
+      "id": "de-holdout-v5-574",
+      "field": "altText",
+      "text": "Große hohle Metallglieder bilden eine locker fallende Halskette."
+    },
+    {
+      "id": "de-holdout-v5-575",
+      "field": "altText",
+      "text": "Ein heller Lichtfleck fällt auf den Verschluss der Handtasche."
+    },
+    {
+      "id": "de-holdout-v5-576",
+      "field": "altText",
+      "text": "Ein handgeschriebener Änderungszettel hängt unter dem Jackenbügel."
+    },
+    {
+      "id": "de-holdout-v5-577",
+      "field": "altText",
+      "text": "Stecknadeln halten eine lose Stoffapplikation auf dem Vorderteil."
+    },
+    {
+      "id": "de-holdout-v5-578",
+      "field": "altText",
+      "text": "Ein freies Fadenende hängt von der teilweise gelösten Häkelkante."
+    },
+    {
+      "id": "de-holdout-v5-579",
+      "field": "altText",
+      "text": "Ein Sitzkissen und eine kleine Tasche zeigen denselben Webstoff."
+    },
+    {
+      "id": "de-holdout-v5-580",
+      "field": "altText",
+      "text": "Ein dreieckiger Einsatz ist unter dem angehobenen Ärmel sichtbar."
+    },
+    {
+      "id": "de-holdout-v5-581",
+      "field": "altText",
+      "text": "Ein geschlossenes kleines Döschen liegt neben mehreren Garnrollen."
+    },
+    {
+      "id": "de-holdout-v5-582",
+      "field": "altText",
+      "text": "Der schwere Rockstoff fällt in tiefen nahezu geraden Falten."
+    },
+    {
+      "id": "de-holdout-v5-583",
+      "field": "altText",
+      "text": "Eine kleine gestickte Nummer sitzt innen am Stiefelschaft."
+    },
+    {
+      "id": "de-holdout-v5-584",
+      "field": "altText",
+      "text": "Ein Telefonbildschirm erscheint hinter dem klaren Fenster einer Hülle."
+    },
+    {
+      "id": "de-holdout-v5-585",
+      "field": "altText",
+      "text": "Dichte Stiche bilden einen sauberen Rahmen um das Knopfloch."
+    },
+    {
+      "id": "de-holdout-v5-586",
+      "field": "altText",
+      "text": "Ein quadratisches Tuch liegt locker über einer schlichten Bluse."
+    },
+    {
+      "id": "de-holdout-v5-587",
+      "field": "altText",
+      "text": "Eine helle horizontale Linie verläuft oberhalb des neuen Rocksaums."
+    },
+    {
+      "id": "de-holdout-v5-588",
+      "field": "altText",
+      "text": "Eine feine Vertiefung zeichnet den Blattstiel im transparenten Anhänger nach."
+    },
+    {
+      "id": "de-holdout-v5-589",
+      "field": "altText",
+      "text": "Eine herausgenommene Einlage liegt direkt neben dem geöffneten Schuh."
+    },
+    {
+      "id": "de-holdout-v5-590",
+      "field": "altText",
+      "text": "Ein zusätzliches Kettenglied sitzt unmittelbar vor dem Armbandverschluss."
+    },
+    {
+      "id": "de-holdout-v5-591",
+      "field": "altText",
+      "text": "Eine lange Naht wandert vom seitlichen Bund zur vorderen Fußkante."
+    },
+    {
+      "id": "de-holdout-v5-592",
+      "field": "altText",
+      "text": "Ein breiter Stopper sitzt zwischen zwei dicken Kordelenden."
+    },
+    {
+      "id": "de-holdout-v5-593",
+      "field": "altText",
+      "text": "Ein Schlüsselbund hängt an einem Clip im Tascheninneren."
+    },
+    {
+      "id": "de-holdout-v5-594",
+      "field": "altText",
+      "text": "Eine kleine Pflegekarte liegt auf dem locker gewebten Stoff."
+    },
+    {
+      "id": "de-holdout-v5-595",
+      "field": "altText",
+      "text": "Milchiges Glas sitzt in einer schmalen glatten Broschenfassung."
+    },
+    {
+      "id": "de-holdout-v5-596",
+      "field": "altText",
+      "text": "Ein gestrickter Ärmel beginnt ungewöhnlich weit vorne am Oberteil."
+    },
+    {
+      "id": "de-holdout-v5-597",
+      "field": "altText",
+      "text": "Ein schmales Band umschließt die rohe Stoffkante vollständig."
+    },
+    {
+      "id": "de-holdout-v5-598",
+      "field": "altText",
+      "text": "Eine gereinigte Jacke liegt gefaltet neben ihrem ursprünglichen Kleiderbeutel."
+    },
+    {
+      "id": "de-holdout-v5-599",
+      "field": "altText",
+      "text": "Ein kleines gefaltetes Papiermodell zeigt Form und Seiten der Tasche."
+    },
+    {
+      "id": "de-holdout-v5-600",
+      "field": "altText",
+      "text": "Winzige Rückstiche befestigen das Ende eines glänzenden Seidenfadens."
+    },
+    {
+      "id": "de-holdout-v5-601",
+      "field": "altText",
+      "text": "Die Fingerspitzen streichen über eine grob strukturierte Stoffprobe."
+    },
+    {
+      "id": "de-holdout-v5-602",
+      "field": "altText",
+      "text": "Ein locker gerollter Faltenrock steckt in einer langen Stoffhülle."
+    },
+    {
+      "id": "de-holdout-v5-603",
+      "field": "altText",
+      "text": "Aus einer kleinen Bundöffnung ragt ein neues Gummiband hervor."
+    },
+    {
+      "id": "de-holdout-v5-604",
+      "field": "altText",
+      "text": "Ein hoher Strickkragen ist breit nach außen umgeschlagen."
+    },
+    {
+      "id": "de-holdout-v5-605",
+      "field": "altText",
+      "text": "Kurze gleichmäßige Stiche folgen einer sanft geschwungenen Stoffkante."
+    },
+    {
+      "id": "de-holdout-v5-606",
+      "field": "altText",
+      "text": "Zwei große Holzknöpfe liegen übereinander am geöffneten Jackenrand."
+    },
+    {
+      "id": "de-holdout-v5-607",
+      "field": "altText",
+      "text": "Eine dünne Wand trennt zwei Fächer der geöffneten Geldbörse."
+    },
+    {
+      "id": "de-holdout-v5-608",
+      "field": "altText",
+      "text": "Eine gebogene Bleistiftlinie verläuft über die gefaltete Papierprobe."
+    },
+    {
+      "id": "de-holdout-v5-609",
+      "field": "altText",
+      "text": "Die seitliche Schuhschnalle liegt flach über dem Knöchelriemen."
+    },
+    {
+      "id": "de-holdout-v5-610",
+      "field": "altText",
+      "text": "Eine kleine Jahreszahl steht auf dem inneren Saumstreifen."
+    },
+    {
+      "id": "de-holdout-v5-611",
+      "field": "altText",
+      "text": "Mehrere feine Ketten liegen getrennt in schmalen Rillen."
+    },
+    {
+      "id": "de-holdout-v5-612",
+      "field": "altText",
+      "text": "Schlüssel und Notizhefte liegen zwischen zwei offenen Handtaschen."
+    },
+    {
+      "id": "de-holdout-v5-613",
+      "field": "altText",
+      "text": "Kleine Heftstiche verteilen die Mehrweite entlang der Armkugel."
+    },
+    {
+      "id": "de-holdout-v5-614",
+      "field": "altText",
+      "text": "Die Socke besitzt eine deutlich abgewinkelte glatt gestrickte Ferse."
+    },
+    {
+      "id": "de-holdout-v5-615",
+      "field": "altText",
+      "text": "Das schmale Haarband verläuft oberhalb der beiden Brillenbügel."
+    },
+    {
+      "id": "de-holdout-v5-616",
+      "field": "altText",
+      "text": "Ein breiter Riemen hält mehrere gefaltete Kleidungsstücke im Koffer."
+    },
+    {
+      "id": "de-holdout-v5-617",
+      "field": "altText",
+      "text": "Ein kurzer Gurt rafft die Jacke hinten auf Taillenhöhe."
+    },
+    {
+      "id": "de-holdout-v5-618",
+      "field": "altText",
+      "text": "Kleine Farbkarten liegen am Fenster neben zwei Stoffmustern."
+    },
+    {
+      "id": "de-holdout-v5-619",
+      "field": "altText",
+      "text": "Das Schalende hängt durch eine große offen gehäkelte Schlaufe."
+    },
+    {
+      "id": "de-holdout-v5-620",
+      "field": "altText",
+      "text": "Ein locker geknülltes Tuch ragt aus der Brusttasche hervor."
+    },
+    {
+      "id": "de-holdout-v5-621",
+      "field": "altText",
+      "text": "Ein breiter Trageriemen liegt flach über der Mantelschulter."
+    },
+    {
+      "id": "de-holdout-v5-622",
+      "field": "altText",
+      "text": "Ein Schnürsenkel läuft durch die mittlere Schlaufe der Schuhzunge."
+    },
+    {
+      "id": "de-holdout-v5-623",
+      "field": "altText",
+      "text": "Ein kurzer Webkantenstreifen sitzt sichtbar an der Tascheninnenseite."
+    },
+    {
+      "id": "de-holdout-v5-624",
+      "field": "altText",
+      "text": "Die frisch gewaschene Stofftasche hängt offen an zwei Griffen."
+    },
+    {
+      "id": "de-holdout-v5-625",
+      "field": "altText",
+      "text": "Feine Tropfen liegen auf dem übergezogenen glatten Kopftuch."
+    },
+    {
+      "id": "de-holdout-v5-626",
+      "field": "altText",
+      "text": "Ein feuchtes Gurtband spannt sich zwischen zwei Wäscheklammern."
+    },
+    {
+      "id": "de-holdout-v5-627",
+      "field": "altText",
+      "text": "Eine Hand hält die geschlossene Sicherung der schweren Brosche."
+    },
+    {
+      "id": "de-holdout-v5-628",
+      "field": "altText",
+      "text": "Ein Projektfoto liegt zwischen den noch unverbundenen Stoffteilen."
+    },
+    {
+      "id": "de-holdout-v5-629",
+      "field": "altText",
+      "text": "Ein großer gedruckter Schriftzug läuft quer über den Leinenbeutel."
+    },
+    {
+      "id": "de-holdout-v5-630",
+      "field": "altText",
+      "text": "Die Flechtlinien im Haar wiederholen die Struktur des Armbands."
+    },
+    {
+      "id": "de-holdout-v5-631",
+      "field": "altText",
+      "text": "Nasse Schuhe stehen auf einer flachen herausnehmbaren Fußmatte."
+    },
+    {
+      "id": "de-holdout-v5-632",
+      "field": "altText",
+      "text": "Mehrere runde Steine beschweren die Ecken des Papierschnitts."
+    },
+    {
+      "id": "de-holdout-v5-633",
+      "field": "altText",
+      "text": "Schmale Bänder liegen aufgerollt in einer flachen Schublade."
+    },
+    {
+      "id": "de-holdout-v5-634",
+      "field": "altText",
+      "text": "Ein hoher Steg hebt den Kragen vom Schulterbereich ab."
+    },
+    {
+      "id": "de-holdout-v5-635",
+      "field": "altText",
+      "text": "Lockerere Maschen bilden einen Übergang vor der gestrickten Ferse."
+    },
+    {
+      "id": "de-holdout-v5-636",
+      "field": "altText",
+      "text": "Papierbahnen umschließen das Oberteil einer kleinen Schneiderpuppe."
+    },
+    {
+      "id": "de-holdout-v5-637",
+      "field": "altText",
+      "text": "Ein gefaltetes Stoffstück umschließt das harte untere Reißverschlussende."
+    },
+    {
+      "id": "de-holdout-v5-638",
+      "field": "altText",
+      "text": "Licht scheint durch unterschiedlich dicht gewebte Bereiche des Schals."
+    },
+    {
+      "id": "de-holdout-v5-639",
+      "field": "altText",
+      "text": "Eine große Lupe steht über der fein genähten Stoffkante."
+    },
+    {
+      "id": "de-holdout-v5-640",
+      "field": "altText",
+      "text": "Helles Papier kleidet die flache Schmuckschublade vollständig aus."
+    },
+    {
+      "id": "de-holdout-v5-641",
+      "field": "altText",
+      "text": "Eine schmale Bürste liegt an der Naht oberhalb der Schuhsohle."
+    },
+    {
+      "id": "de-holdout-v5-642",
+      "field": "altText",
+      "text": "Ein Ersatzknopf sitzt innen am unteren Rand des Rocks."
+    },
+    {
+      "id": "de-holdout-v5-643",
+      "field": "altText",
+      "text": "Der Halstuchknoten liegt rechts neben dem offenen Halsausschnitt."
+    },
+    {
+      "id": "de-holdout-v5-644",
+      "field": "altText",
+      "text": "Ein verstellbarer Riemen überbrückt die hintere Öffnung der Mütze."
+    },
+    {
+      "id": "de-holdout-v5-645",
+      "field": "altText",
+      "text": "Eine Windradbrosche hat vier gebogene Flügel um eine mittige Achse."
+    },
+    {
+      "id": "de-holdout-v5-646",
+      "field": "altText",
+      "text": "Eine breite weiche Lasche hängt am kleinen Reißverschlussgriff."
+    },
+    {
+      "id": "de-holdout-v5-647",
+      "field": "altText",
+      "text": "Ein kleiner Stoffrest liegt über dem ähnlich gefärbten Mantelärmel."
+    },
+    {
+      "id": "de-holdout-v5-648",
+      "field": "altText",
+      "text": "Eine kleine Metallfassung liegt neben Zange und Lötunterlage."
+    },
+    {
+      "id": "de-holdout-v5-649",
+      "field": "altText",
+      "text": "Die Handschuhspitzen folgen knapp den Enden der ausgestreckten Finger."
+    },
+    {
+      "id": "de-holdout-v5-650",
+      "field": "altText",
+      "text": "Ein gestickter Schriftzug ziert die Vorderseite des langen Kleiderbeutels."
+    },
+    {
+      "id": "de-holdout-v5-651",
+      "field": "altText",
+      "text": "Ein schmaler Aufschlag bildet den Abschluss des geraden Hosenbeins."
+    },
+    {
+      "id": "de-holdout-v5-652",
+      "field": "altText",
+      "text": "Eine breite Handschlaufe hängt unter dem geschlossenen Schirmgriff."
+    },
+    {
+      "id": "de-holdout-v5-653",
+      "field": "altText",
+      "text": "Zwei Träger kreuzen sich auf dem Rücken unter der Schürzenkante."
+    },
+    {
+      "id": "de-holdout-v5-654",
+      "field": "altText",
+      "text": "Ein eingezeichneter Pfeil läuft parallel zur langen Stoffkante."
+    },
+    {
+      "id": "de-holdout-v5-655",
+      "field": "altText",
+      "text": "Eine Strickjacke liegt ausgebreitet auf einem erhöhten Trockengitter."
+    },
+    {
+      "id": "de-holdout-v5-656",
+      "field": "altText",
+      "text": "Ein geschlossener Metallriegel verbindet die beiden Taschenhälften."
+    },
+    {
+      "id": "de-holdout-v5-657",
+      "field": "altText",
+      "text": "Ein erhabener Punkt sitzt neben dem Verschluss des Brillenetuis."
+    },
+    {
+      "id": "de-holdout-v5-658",
+      "field": "altText",
+      "text": "Eine stumpfe Nadel führt ein Fadenende durch das Bündchen."
+    },
+    {
+      "id": "de-holdout-v5-659",
+      "field": "altText",
+      "text": "Die ausgelegten Perlen bilden einen Bogen neben dem Maßband."
+    },
+    {
+      "id": "de-holdout-v5-660",
+      "field": "altText",
+      "text": "Ein weicher Rückeneinsatz verbindet zwei feste Seitenteile der Festjacke."
+    },
+    {
+      "id": "de-holdout-v5-661",
+      "field": "altText",
+      "text": "Ein altes Etikett sitzt auf der Rückseite der gekürzten Krawatte."
+    },
+    {
+      "id": "de-holdout-v5-662",
+      "field": "altText",
+      "text": "Die gerundeten Bügelenden stützen beide Schultern der hängenden Jacke."
+    },
+    {
+      "id": "de-holdout-v5-663",
+      "field": "altText",
+      "text": "Die beiden schräg abgeschnittenen Bänder besitzen fein gesicherte Enden."
+    },
+    {
+      "id": "de-holdout-v5-664",
+      "field": "altText",
+      "text": "Eine kleine seitliche Öffnung gibt den Blick auf das Gummiband frei."
+    },
+    {
+      "id": "de-holdout-v5-665",
+      "field": "altText",
+      "text": "Ein kleiner Kamm ordnet die langen Fäden einer Taschenquaste."
+    },
+    {
+      "id": "de-holdout-v5-666",
+      "field": "altText",
+      "text": "Eine Schuhaufnahme klebt auf der Vorderseite des geschlossenen Kartons."
+    },
+    {
+      "id": "de-holdout-v5-667",
+      "field": "altText",
+      "text": "Eine seitliche Reißverschlussöffnung zeigt das Netzfutter des Anoraks."
+    },
+    {
+      "id": "de-holdout-v5-668",
+      "field": "altText",
+      "text": "Die gepresste Hosenfalte verläuft gerade zwischen den beiden Seitennähten."
+    },
+    {
+      "id": "de-holdout-v5-669",
+      "field": "altText",
+      "text": "Ein großer runder Druckknopf sitzt unter der breiten Mantellasche."
+    },
+    {
+      "id": "de-holdout-v5-670",
+      "field": "altText",
+      "text": "Mehrere kleine Kämme ragen an der Unterseite des Kopfschmucks heraus."
+    },
+    {
+      "id": "de-holdout-v5-671",
+      "field": "altText",
+      "text": "Geknülltes Seidenpapier füllt das Hauptfach der abgestellten Tasche."
+    },
+    {
+      "id": "de-holdout-v5-672",
+      "field": "altText",
+      "text": "Ärmellose Oberteile hängen vor einer Reihe langärmeliger Hemden."
+    },
+    {
+      "id": "de-holdout-v5-673",
+      "field": "altText",
+      "text": "Alte Knöpfe verschiedener Größen liegen auf einem geöffneten Umschlag."
+    },
+    {
+      "id": "de-holdout-v5-674",
+      "field": "altText",
+      "text": "Ein breiter locker gelegter Schal zeigt ein großes ungeteiltes Muster."
+    },
+    {
+      "id": "de-holdout-v5-675",
+      "field": "altText",
+      "text": "Der Unterfaden verläuft farblich passend entlang der Stoffrückseite."
+    },
+    {
+      "id": "de-holdout-v5-676",
+      "field": "altText",
+      "text": "Ein einzelnes dickes Buch steht im offenen Taschenhauptfach."
+    },
+    {
+      "id": "de-holdout-v5-677",
+      "field": "altText",
+      "text": "Ein Bleistift ragt aus einem schmalen Innenfach des Beutels."
+    },
+    {
+      "id": "de-holdout-v5-678",
+      "field": "altText",
+      "text": "Eine Kleiderbürste folgt der langen Naht des Mantelärmels."
+    },
+    {
+      "id": "de-holdout-v5-679",
+      "field": "altText",
+      "text": "Ein glatter ovaler Stein bildet den Mittelpunkt der Haarspange."
+    },
+    {
+      "id": "de-holdout-v5-680",
+      "field": "altText",
+      "text": "Der rückwärtige Rockschlitz öffnet sich über dem ausgestreckten Bein."
+    },
+    {
+      "id": "de-holdout-v5-681",
+      "field": "altText",
+      "text": "Ein kleiner Clip hält zwei Handschuhe paarweise im Schrank."
+    },
+    {
+      "id": "de-holdout-v5-682",
+      "field": "altText",
+      "text": "Handschriftliche Änderungen stehen direkt neben einer gezeichneten Kleidersilhouette."
+    },
+    {
+      "id": "de-holdout-v5-683",
+      "field": "altText",
+      "text": "Eine breite weiche Klettfläche schließt das Armband am Handgelenk."
+    },
+    {
+      "id": "de-holdout-v5-684",
+      "field": "altText",
+      "text": "Eine kleine Drahtspirale hängt unter dem Hauptteil des Anhängers."
+    },
+    {
+      "id": "de-holdout-v5-685",
+      "field": "altText",
+      "text": "Eine schmale Schlaufe führt das Bindeband durch die Blusenseite."
+    },
+    {
+      "id": "de-holdout-v5-686",
+      "field": "altText",
+      "text": "Eine neue glatte Stofflage bedeckt den inneren Kragenrand."
+    },
+    {
+      "id": "de-holdout-v5-687",
+      "field": "altText",
+      "text": "Ein schmales Tuch steckt zwischen Schuhschnalle und Oberleder."
+    },
+    {
+      "id": "de-holdout-v5-688",
+      "field": "altText",
+      "text": "Die feste Deckelkante bildet einen klaren Bogen über der Tasche."
+    },
+    {
+      "id": "de-holdout-v5-689",
+      "field": "altText",
+      "text": "Der Spiegel zeigt den Knoten des Tuchs am Hinterkopf."
+    },
+    {
+      "id": "de-holdout-v5-690",
+      "field": "altText",
+      "text": "Mehrere kleine Reparaturstücke liegen neben den passenden Garnrollen."
+    },
+    {
+      "id": "de-holdout-v5-691",
+      "field": "altText",
+      "text": "Ein flacher Knopf verbindet die zwei Enden des kurzen Schals."
+    },
+    {
+      "id": "de-holdout-v5-692",
+      "field": "altText",
+      "text": "Zwei Stoffproben liegen mit ihren unterschiedlich dichten Kanten nebeneinander."
+    },
+    {
+      "id": "de-holdout-v5-693",
+      "field": "altText",
+      "text": "Tiefe Rillen durchziehen die Unterseite des hochgehobenen Gummistiefels."
+    },
+    {
+      "id": "de-holdout-v5-694",
+      "field": "altText",
+      "text": "Eine gewaschene Strickprobe liegt über einem kleineren eingezeichneten Umriss."
+    },
+    {
+      "id": "de-holdout-v5-695",
+      "field": "altText",
+      "text": "Die Riemenenden liegen flach unter kleinen elastischen Halteschlaufen."
+    },
+    {
+      "id": "de-holdout-v5-696",
+      "field": "altText",
+      "text": "Einzelne Ringe stehen aufrecht in schmalen gepolsterten Rillen."
+    },
+    {
+      "id": "de-holdout-v5-697",
+      "field": "altText",
+      "text": "Der Bügelhaken ragt durch die obere Öffnung der Kleiderhülle."
+    },
+    {
+      "id": "de-holdout-v5-698",
+      "field": "altText",
+      "text": "Der weite Rock bildet beim Drehen eine fast runde Fläche."
+    },
+    {
+      "id": "de-holdout-v5-699",
+      "field": "altText",
+      "text": "Eine zurückgeschnittene Nahtzugabe liegt neben der gewendeten flachen Ecke."
+    },
+    {
+      "id": "de-holdout-v5-700",
+      "field": "altText",
+      "text": "Locker gefaltete Hemden füllen das obere Fach eines geöffneten Koffers."
+    },
+    {
+      "id": "de-holdout-v5-701",
+      "field": "altText",
+      "text": "Zwei kleine Nadeln sind zwischen den Kragenspitzen miteinander verbunden."
+    },
+    {
+      "id": "de-holdout-v5-702",
+      "field": "altText",
+      "text": "Ein vergilbter Zettel mit Handschrift steckt in der Kleidertasche."
+    },
+    {
+      "id": "de-holdout-v5-703",
+      "field": "altText",
+      "text": "Flache feste Schuhe stehen unter einem aufgehängten Bühnenkostüm."
+    },
+    {
+      "id": "de-holdout-v5-704",
+      "field": "altText",
+      "text": "Der dünne Überrock hebt sich in einem breiten Bogen."
+    },
+    {
+      "id": "de-holdout-v5-705",
+      "field": "altText",
+      "text": "Eine gezeichnete Kurve folgt der Silhouette neben dem Kleid."
+    },
+    {
+      "id": "de-holdout-v5-706",
+      "field": "altText",
+      "text": "Dunkle Rillen heben das Muster der silbernen Haarspange hervor."
+    },
+    {
+      "id": "de-holdout-v5-707",
+      "field": "altText",
+      "text": "Ein tiefer Zopf tritt unter dem hinteren Helmrand hervor."
+    },
+    {
+      "id": "de-holdout-v5-708",
+      "field": "altText",
+      "text": "Eine neu geschnittene Spitze endet an der alten Krawattennaht."
+    },
+    {
+      "id": "de-holdout-v5-709",
+      "field": "altText",
+      "text": "Flache Schuhspuren zeichnen sich im weichen Teppichflor ab."
+    },
+    {
+      "id": "de-holdout-v5-710",
+      "field": "altText",
+      "text": "Mehrere Stoffklammern halten unterschiedlich breite Falten am Rockbund."
+    },
+    {
+      "id": "de-holdout-v5-711",
+      "field": "altText",
+      "text": "Eine bewegte Halskette spiegelt sich in der großen Glasscheibe."
+    },
+    {
+      "id": "de-holdout-v5-712",
+      "field": "altText",
+      "text": "Kleine erhabene Noppen bedecken die Fingerflächen der Handschuhe."
+    },
+    {
+      "id": "de-holdout-v5-713",
+      "field": "altText",
+      "text": "Der lange Kittel ist bis unter den Hals zugeknöpft."
+    },
+    {
+      "id": "de-holdout-v5-714",
+      "field": "altText",
+      "text": "Ein zusätzliches Knopfloch sitzt seitlich neben der Manschettenkante."
+    },
+    {
+      "id": "de-holdout-v5-715",
+      "field": "altText",
+      "text": "Ein Mantel liegt geschützt zwischen Papierlagen im offenen Versandkarton."
+    },
+    {
+      "id": "de-holdout-v5-716",
+      "field": "altText",
+      "text": "Kleine und große Perlen liegen getrennt auf einem Tuch."
+    },
+    {
+      "id": "de-holdout-v5-717",
+      "field": "altText",
+      "text": "Eine schmale unbedruckte Stelle unterbricht das gleichmäßige Blusenmuster."
+    },
+    {
+      "id": "de-holdout-v5-718",
+      "field": "altText",
+      "text": "Ein kleines Gewicht sitzt versteckt in der unteren Umhangecke."
+    },
+    {
+      "id": "de-holdout-v5-719",
+      "field": "altText",
+      "text": "Eine Hand greift durch den schmalen Schlitz des Ponchos."
+    },
+    {
+      "id": "de-holdout-v5-720",
+      "field": "altText",
+      "text": "Kalenderzahlen verteilen sich über das ausgebreitete quadratische Tuch."
+    },
+    {
+      "id": "de-holdout-v5-721",
+      "field": "altText",
+      "text": "Ein leerer Stoffbeutel ist zu einem kleinen Rechteck gefaltet."
+    },
+    {
+      "id": "de-holdout-v5-722",
+      "field": "altText",
+      "text": "Die Taschenklappe endet in einer deutlich schrägen unteren Kante."
+    },
+    {
+      "id": "de-holdout-v5-723",
+      "field": "altText",
+      "text": "Eine geschwungene Naht läuft vom Vorderteil über die Seite."
+    },
+    {
+      "id": "de-holdout-v5-724",
+      "field": "altText",
+      "text": "Offene Schnürhaken sitzen oberhalb der geschlossenen Ösen am Stiefel."
+    },
+    {
+      "id": "de-holdout-v5-725",
+      "field": "altText",
+      "text": "Eine einzelne Drehung liegt seitlich über dem linken Ohr."
+    },
+    {
+      "id": "de-holdout-v5-726",
+      "field": "altText",
+      "text": "Ein schmales Einfassband umhüllt beide Seiten der offenen Nahtzugabe."
+    },
+    {
+      "id": "de-holdout-v5-727",
+      "field": "altText",
+      "text": "Rechteckige Fensterformen bilden das aufgedruckte Muster des Kleides."
+    },
+    {
+      "id": "de-holdout-v5-728",
+      "field": "altText",
+      "text": "Ein breiter Riemen hängt an kleinen alten Taschenringen."
+    },
+    {
+      "id": "de-holdout-v5-729",
+      "field": "altText",
+      "text": "Ein eingewebtes Muster glänzt auf der beleuchteten Kleidseite."
+    },
+    {
+      "id": "de-holdout-v5-730",
+      "field": "altText",
+      "text": "Eine Schuhzeichnung steht unter der Skizze einer langen Hose."
+    },
+    {
+      "id": "de-holdout-v5-731",
+      "field": "altText",
+      "text": "Ein schmaler Riemen führt unter der Schuhsohle hindurch."
+    },
+    {
+      "id": "de-holdout-v5-732",
+      "field": "altText",
+      "text": "Die alten Knöpfe haben unterschiedlich stark abgeriebene Oberflächen."
+    },
+    {
+      "id": "de-holdout-v5-733",
+      "field": "altText",
+      "text": "Ein kurzes Band verbindet zwei schmale Träger im Rücken."
+    },
+    {
+      "id": "de-holdout-v5-734",
+      "field": "altText",
+      "text": "Ein Stoffprojekt liegt gefaltet im geöffneten geflochtenen Nähkorb."
+    },
+    {
+      "id": "de-holdout-v5-735",
+      "field": "altText",
+      "text": "Ein dünnes Tuch liegt zwischen Mantelkragen und breitem Rucksackriemen."
+    },
+    {
+      "id": "de-holdout-v5-736",
+      "field": "altText",
+      "text": "Eine feine Zusatzkette überbrückt den geöffneten Verschluss des Armbands."
+    },
+    {
+      "id": "de-holdout-v5-737",
+      "field": "altText",
+      "text": "Das Stirnband verläuft oberhalb des sichtbar freibleibenden Hörgeräts."
+    },
+    {
+      "id": "de-holdout-v5-738",
+      "field": "altText",
+      "text": "Helles Taschenfutter umgibt mehrere Münzen im geöffneten Hosenfach."
+    },
+    {
+      "id": "de-holdout-v5-739",
+      "field": "altText",
+      "text": "Eine flache Kreideform liegt neben einer langen gezeichneten Schnittlinie."
+    },
+    {
+      "id": "de-holdout-v5-740",
+      "field": "altText",
+      "text": "Zwei dicke Polster verlaufen senkrecht am Rücken des Rucksacks."
+    },
+    {
+      "id": "de-holdout-v5-741",
+      "field": "altText",
+      "text": "Zarte Spitzenhandschuhe liegen glatt zwischen weichen Stoffblättern."
+    },
+    {
+      "id": "de-holdout-v5-742",
+      "field": "altText",
+      "text": "Zwei parallele Nähte verstärken die Oberkante des offenen Beutels."
+    },
+    {
+      "id": "de-holdout-v5-743",
+      "field": "altText",
+      "text": "Der Ring liegt locker über dem leicht angewinkelten Finger."
+    },
+    {
+      "id": "de-holdout-v5-744",
+      "field": "altText",
+      "text": "Eine einzelne Feder sitzt an einem schmal umwickelten Spangensteg."
+    },
+    {
+      "id": "de-holdout-v5-745",
+      "field": "altText",
+      "text": "Der Verschluss des Umhangs ruht weit außen auf einer Schulter."
+    },
+    {
+      "id": "de-holdout-v5-746",
+      "field": "altText",
+      "text": "Ein neuer Stoffstreifen umschließt den Innenrand der Kappe."
+    },
+    {
+      "id": "de-holdout-v5-747",
+      "field": "altText",
+      "text": "Dünne senkrechte Trennwände teilen das Regalfach zwischen gefalteten Blusen."
+    },
+    {
+      "id": "de-holdout-v5-748",
+      "field": "altText",
+      "text": "Ein flacher Metallclip hält die kleine Plakette am Jackenrand."
+    },
+    {
+      "id": "de-holdout-v5-749",
+      "field": "altText",
+      "text": "Breite Strickrippen verlaufen quer über die Vorderseite des Oberteils."
+    },
+    {
+      "id": "de-holdout-v5-750",
+      "field": "altText",
+      "text": "Ein seitlicher Tascheneingriff liegt verdeckt zwischen zwei Kleidfalten."
+    },
+    {
+      "id": "de-holdout-v5-751",
+      "field": "altText",
+      "text": "Lockere Stiche zeichnen einen handgeschriebenen Gruß auf der Tasche nach."
+    },
+    {
+      "id": "de-holdout-v5-752",
+      "field": "altText",
+      "text": "Der Absatz endet hinten in einer leicht abgeschrägten Kante."
+    },
+    {
+      "id": "de-holdout-v5-753",
+      "field": "altText",
+      "text": "Winzige Buchstaben sind in die Rückseite des Anhängers geprägt."
+    },
+    {
+      "id": "de-holdout-v5-754",
+      "field": "altText",
+      "text": "Ein Abnäher läuft flach in der glatten Stofffläche aus."
+    },
+    {
+      "id": "de-holdout-v5-755",
+      "field": "altText",
+      "text": "Ein Telefon zeigt eine Aufnahme des ausgebreiteten Pflegeetiketts."
+    },
+    {
+      "id": "de-holdout-v5-756",
+      "field": "altText",
+      "text": "Vorgeformte Kniepartien bilden breite Rundungen an der gebeugten Hose."
+    },
+    {
+      "id": "de-holdout-v5-757",
+      "field": "altText",
+      "text": "Der flache Emailleanhänger besitzt die Form einer kleinen Nähmaschine."
+    },
+    {
+      "id": "de-holdout-v5-758",
+      "field": "altText",
+      "text": "Zwei gedruckte Streifen treffen an der geöffneten Vorderkante aufeinander."
+    },
+    {
+      "id": "de-holdout-v5-759",
+      "field": "altText",
+      "text": "Ein kleiner waagerechter Riegel fasst den weiten Hemdrücken zusammen."
+    },
+    {
+      "id": "de-holdout-v5-760",
+      "field": "altText",
+      "text": "Eine gepolsterte Augenmaske liegt neben einem gefalteten Reisehemd."
+    },
+    {
+      "id": "de-holdout-v5-761",
+      "field": "altText",
+      "text": "Ein kleiner Schieber verkürzt das breite Nackenband der Schürze."
+    },
+    {
+      "id": "de-holdout-v5-762",
+      "field": "altText",
+      "text": "Eine schmale Schlaufe verbindet den geschlossenen Fächer mit dem Handgelenk."
+    },
+    {
+      "id": "de-holdout-v5-763",
+      "field": "altText",
+      "text": "Eine beschriftete Karte liegt neben mehrfach gestopften Socken."
+    },
+    {
+      "id": "de-holdout-v5-764",
+      "field": "altText",
+      "text": "Erhabene Punkte markieren die Front einer schmalen Schublade."
+    },
+    {
+      "id": "de-holdout-v5-765",
+      "field": "altText",
+      "text": "Eine gerade Naht führt über die Mitte der aufgesetzten Kapuze."
+    },
+    {
+      "id": "de-holdout-v5-766",
+      "field": "altText",
+      "text": "Eine flache Druckspur verläuft quer über das alte Taschenleder."
+    },
+    {
+      "id": "de-holdout-v5-767",
+      "field": "altText",
+      "text": "Eine schmale Schleife liegt vor einer breit geflochtenen Haarpartie."
+    },
+    {
+      "id": "de-holdout-v5-768",
+      "field": "altText",
+      "text": "Ein Knopf liegt direkt neben dem passend ausgemessenen Knopfloch."
+    },
+    {
+      "id": "de-holdout-v5-769",
+      "field": "altText",
+      "text": "Ein andersfarbiger Hilfsfaden durchzieht die offenen Maschen am Ausschnitt."
+    },
+    {
+      "id": "de-holdout-v5-770",
+      "field": "altText",
+      "text": "Eine glatte Stoffkante bedeckt den inneren Rand des Schuhs."
+    },
+    {
+      "id": "de-holdout-v5-771",
+      "field": "altText",
+      "text": "Ein Garnstrang spannt sich um die Arme einer kleinen Haspel."
+    },
+    {
+      "id": "de-holdout-v5-772",
+      "field": "altText",
+      "text": "Der Farbverlauf setzt sich über beide Blusenvorderteile fort."
+    },
+    {
+      "id": "de-holdout-v5-773",
+      "field": "altText",
+      "text": "Eine dünne Schnur läuft durch die Schlaufe im Mantelinneren."
+    },
+    {
+      "id": "de-holdout-v5-774",
+      "field": "altText",
+      "text": "Ein glatter und ein rauer Stein liegen nebeneinander."
+    },
+    {
+      "id": "de-holdout-v5-775",
+      "field": "altText",
+      "text": "Zwei verschiebbare Knoten sitzen am schmalen geflochtenen Armband."
+    },
+    {
+      "id": "de-holdout-v5-776",
+      "field": "altText",
+      "text": "Eine Innenwand trennt den feuchten Schirm von flachen Papieren."
+    },
+    {
+      "id": "de-holdout-v5-777",
+      "field": "altText",
+      "text": "Eine dünne Kordel folgt der Rundung am unteren Rockrand."
+    },
+    {
+      "id": "de-holdout-v5-778",
+      "field": "altText",
+      "text": "Seitliches Licht macht flache geometrische Strickmuster sichtbar."
+    },
+    {
+      "id": "de-holdout-v5-779",
+      "field": "altText",
+      "text": "Ein handgeschriebenes Schild hängt am Bügel des geänderten Kleides."
+    },
+    {
+      "id": "de-holdout-v5-780",
+      "field": "altText",
+      "text": "Ein langer Fadenstiel hält den Knopf oberhalb des dicken Mantelstoffs."
+    },
+    {
+      "id": "de-holdout-v5-781",
+      "field": "altText",
+      "text": "Eine zweite Schlaufe führt den Taschenriemen eng am Seitenteil."
+    },
+    {
+      "id": "de-holdout-v5-782",
+      "field": "altText",
+      "text": "Eine wieder gerundete Seite hebt sich über der Filzhutkrempe."
+    },
+    {
+      "id": "de-holdout-v5-783",
+      "field": "altText",
+      "text": "Eine gesteckte Falte liegt neben einer noch losen Stoffbahn."
+    },
+    {
+      "id": "de-holdout-v5-784",
+      "field": "altText",
+      "text": "Eine lange Lasche ragt aus dem geöffneten Schuhverschluss heraus."
+    },
+    {
+      "id": "de-holdout-v5-785",
+      "field": "altText",
+      "text": "Ein kurzer Steg verbindet die beiden Griffe oberhalb der Tasche."
+    },
+    {
+      "id": "de-holdout-v5-786",
+      "field": "altText",
+      "text": "Ein drehbares Gelenk sitzt unmittelbar neben dem Halskettenverschluss."
+    },
+    {
+      "id": "de-holdout-v5-787",
+      "field": "altText",
+      "text": "Ein Schalende läuft locker durch einen großen gehäkelten Ring."
+    },
+    {
+      "id": "de-holdout-v5-788",
+      "field": "altText",
+      "text": "Drei kleine Aufnahmen zeigen aufeinanderfolgende Arbeitsschritte am Stoffbeutel."
+    },
+    {
+      "id": "de-holdout-v5-789",
+      "field": "altText",
+      "text": "Die untere Jackenkante bildet zwei glatt genähte Rundungen."
+    },
+    {
+      "id": "de-holdout-v5-790",
+      "field": "altText",
+      "text": "Ein geometrisches Strickmuster verläuft mittig über dem Handrücken."
+    },
+    {
+      "id": "de-holdout-v5-791",
+      "field": "altText",
+      "text": "Ein kleiner Ersatzstecker liegt im geöffneten Schmuckbeutel."
+    },
+    {
+      "id": "de-holdout-v5-792",
+      "field": "altText",
+      "text": "Die weichen Stoffschuhe folgen eng den Rundungen der Füße."
+    },
+    {
+      "id": "de-holdout-v5-793",
+      "field": "altText",
+      "text": "Kontrastnähte zeichnen die Schulterstücke und Seitenteile des Hemdes nach."
+    },
+    {
+      "id": "de-holdout-v5-794",
+      "field": "altText",
+      "text": "Breite gefüllte Felder liegen zwischen den langen Steppnähten."
+    },
+    {
+      "id": "de-holdout-v5-795",
+      "field": "altText",
+      "text": "Das Gürtelende steckt flach unter einer kleinen Halteschlaufe."
+    },
+    {
+      "id": "de-holdout-v5-796",
+      "field": "altText",
+      "text": "Eine neue kurze Naht markiert den gefalteten Kleidträger."
+    },
+    {
+      "id": "de-holdout-v5-797",
+      "field": "altText",
+      "text": "Sehr feine Linien bedecken die Oberfläche der schmalen Haarspange."
+    },
+    {
+      "id": "de-holdout-v5-798",
+      "field": "altText",
+      "text": "Ein neuer Farbabschnitt beginnt direkt an der gestrickten Ferse."
+    },
+    {
+      "id": "de-holdout-v5-799",
+      "field": "altText",
+      "text": "Feine konzentrische Rillen überziehen die runde Oberseite des Rings."
+    },
+    {
+      "id": "de-holdout-v5-800",
+      "field": "altText",
+      "text": "Ein schmaler Maschinenfuß läuft dicht neben einer dicken Paspel."
+    },
+    {
+      "id": "de-holdout-v5-801",
+      "field": "altText",
+      "text": "Zwei Wechselgarnituren liegen ordentlich im offenen Wochenendrucksack."
+    },
+    {
+      "id": "de-holdout-v5-802",
+      "field": "altText",
+      "text": "Ein geänderter Hosenanzug hängt neben einer kleinen Einladungskarte."
+    },
+    {
+      "id": "de-holdout-v5-803",
+      "field": "altText",
+      "text": "Ein handgefertigter Anhänger liegt auf einer Karte der Werkstatt."
+    },
+    {
+      "id": "de-holdout-v5-804",
+      "field": "altText",
+      "text": "Eine schlichte Jacke hängt neben einer vorbereiteten Arbeitstasche."
+    },
+    {
+      "id": "de-holdout-v5-805",
+      "field": "altText",
+      "text": "Ein neuer breiter Griff verbindet die oberen Taschenränder."
+    },
+    {
+      "id": "de-holdout-v5-806",
+      "field": "altText",
+      "text": "Zwischen einzelnen gedruckten Blumen bleiben große helle Stoffflächen."
+    },
+    {
+      "id": "de-holdout-v5-807",
+      "field": "altText",
+      "text": "Eine Brosche zeigt ein kleines längs eingerolltes Blatt."
+    },
+    {
+      "id": "de-holdout-v5-808",
+      "field": "altText",
+      "text": "Ein gesticktes Zeichen sitzt auf dem rechten Handschuhrücken."
+    },
+    {
+      "id": "de-holdout-v5-809",
+      "field": "altText",
+      "text": "Die Metallenden der Riemen haben glatt gerundete Außenkanten."
+    },
+    {
+      "id": "de-holdout-v5-810",
+      "field": "altText",
+      "text": "Der lange Rock schwingt in gleichmäßigen tiefen Wellen."
+    },
+    {
+      "id": "de-holdout-v5-811",
+      "field": "altText",
+      "text": "Eine Hose liegt unter einem zusammengefalteten Hemd bereit."
+    },
+    {
+      "id": "de-holdout-v5-812",
+      "field": "altText",
+      "text": "Ein breites weiches Haargummi umschließt den kräftigen Zopf."
+    },
+    {
+      "id": "de-holdout-v5-813",
+      "field": "altText",
+      "text": "Eine Nadel sitzt mittig auf der geschlossenen Hemdleiste."
+    },
+    {
+      "id": "de-holdout-v5-814",
+      "field": "altText",
+      "text": "Eine Schürze bedeckt die Hose oberhalb gestapelter Marktkisten."
+    },
+    {
+      "id": "de-holdout-v5-815",
+      "field": "altText",
+      "text": "Ein unvollständiger Schuh steht zwischen Werkzeugen auf der Werkbank."
+    },
+    {
+      "id": "de-holdout-v5-816",
+      "field": "altText",
+      "text": "Mehrere Stichreihen verstärken die breiten Henkel am Einkaufsbeutel."
+    },
+    {
+      "id": "de-holdout-v5-817",
+      "field": "altText",
+      "text": "Deutlich getrennte Lederschichten bilden den Absatz eines aufgeschnittenen Schuhs."
+    },
+    {
+      "id": "de-holdout-v5-818",
+      "field": "altText",
+      "text": "Zusammengenähte Strickstreifen formen ein großes flaches Flechtmuster."
+    },
+    {
+      "id": "de-holdout-v5-819",
+      "field": "altText",
+      "text": "Helles Gegenlicht scheint durch das offene Blusengewebe hindurch."
+    },
+    {
+      "id": "de-holdout-v5-820",
+      "field": "altText",
+      "text": "Schlüssel und Kleingeld liegen in einer flachen Schale neben der Tasche."
+    },
+    {
+      "id": "de-holdout-v5-821",
+      "field": "altText",
+      "text": "Schuhe mit tiefem Profil stehen auf glänzendem Straßenpflaster."
+    },
+    {
+      "id": "de-holdout-v5-822",
+      "field": "altText",
+      "text": "Das weite Kleid bildet lockere Falten über dem Sofasitz."
+    },
+    {
+      "id": "de-holdout-v5-823",
+      "field": "altText",
+      "text": "Straßennamen und feine Kartenlinien bedecken das geöffnete Seidentuch."
+    },
+    {
+      "id": "de-holdout-v5-824",
+      "field": "altText",
+      "text": "Eine ältere Hutaufnahme liegt im Deckel des runden Kartons."
+    },
+    {
+      "id": "de-holdout-v5-825",
+      "field": "altText",
+      "text": "Kleine Silikonringe verbinden die Kette mit den Brillenbügeln."
+    },
+    {
+      "id": "de-holdout-v5-826",
+      "field": "altText",
+      "text": "Ein schmales Programmheft ragt aus der breiten Jackentasche."
+    },
+    {
+      "id": "de-holdout-v5-827",
+      "field": "altText",
+      "text": "Der lange Mantelschlitz öffnet sich über dem hinteren Fahrradsattel."
+    },
+    {
+      "id": "de-holdout-v5-828",
+      "field": "altText",
+      "text": "Ein gekürztes Armband liegt neben seiner früheren Abbildung."
+    },
+    {
+      "id": "de-holdout-v5-829",
+      "field": "altText",
+      "text": "Eine kurze neue Naht befestigt den gelösten Taschenrand."
+    },
+    {
+      "id": "de-holdout-v5-830",
+      "field": "altText",
+      "text": "Eine weiche Stoffrolle stützt die nach oben gelegten Haare."
+    },
+    {
+      "id": "de-holdout-v5-831",
+      "field": "altText",
+      "text": "Ein geschlossener Innenbeutel trennt feuchte Badekleidung vom übrigen Gepäck."
+    },
+    {
+      "id": "de-holdout-v5-832",
+      "field": "altText",
+      "text": "Ein herausgelöster Einsatz liegt neben dem geöffneten Mantel."
+    },
+    {
+      "id": "de-holdout-v5-833",
+      "field": "altText",
+      "text": "Die Befestigungsnaht umschließt den Gurtansatz auf allen vier Seiten."
+    },
+    {
+      "id": "de-holdout-v5-834",
+      "field": "altText",
+      "text": "Zwei schmale Stoffspitzen bilden vorne einen lockeren Doppelknoten."
+    },
+    {
+      "id": "de-holdout-v5-835",
+      "field": "altText",
+      "text": "Ein Ring überbrückt den Abstand zwischen den Strickjackenkanten."
+    },
+    {
+      "id": "de-holdout-v5-836",
+      "field": "altText",
+      "text": "Ein breiter Gürtel liegt unterhalb der Kleiderbundlinie."
+    },
+    {
+      "id": "de-holdout-v5-837",
+      "field": "altText",
+      "text": "Ein breiter weicher Abschluss umschließt den oberen Sockenschaft."
+    },
+    {
+      "id": "de-holdout-v5-838",
+      "field": "altText",
+      "text": "Die breite Schuhlasche bedeckt die darunterliegende Klettfläche vollständig."
+    },
+    {
+      "id": "de-holdout-v5-839",
+      "field": "altText",
+      "text": "Ein gelüftetes Kleid hängt vor der geöffneten Schranktür."
+    },
+    {
+      "id": "de-holdout-v5-840",
+      "field": "altText",
+      "text": "Ein abgelegtes Armband liegt neben Mikrofon und gefalteten Notenblättern."
+    },
+    {
+      "id": "de-holdout-v5-841",
+      "field": "altText",
+      "text": "Ein einzelner bunter Stich markiert die Mitte des Saums."
+    },
+    {
+      "id": "de-holdout-v5-842",
+      "field": "altText",
+      "text": "Ein flacher Gegenknopf sitzt innen hinter dem großen Mantelknopf."
+    },
+    {
+      "id": "de-holdout-v5-843",
+      "field": "altText",
+      "text": "Die kleine Tasche endet deutlich oberhalb der Fahrradsitzfläche."
+    },
+    {
+      "id": "de-holdout-v5-844",
+      "field": "altText",
+      "text": "Die kurzen Hosenbeine lassen beide Schuhe auf der Treppe frei."
+    },
+    {
+      "id": "de-holdout-v5-845",
+      "field": "altText",
+      "text": "Die Stoffkante endet in unregelmäßig langen einzelnen Webfäden."
+    },
+    {
+      "id": "de-holdout-v5-846",
+      "field": "altText",
+      "text": "Ein Schuhpaar steht dicht nebeneinander am Rand der Umkleide."
+    },
+    {
+      "id": "de-holdout-v5-847",
+      "field": "altText",
+      "text": "Ein kleines Verschlusssymbol steht auf dem Etikett des Wäschesacks."
+    },
+    {
+      "id": "de-holdout-v5-848",
+      "field": "altText",
+      "text": "Gepolsterte Fächer trennen mehrere Anhänger im geöffneten Reiseetui."
+    },
+    {
+      "id": "de-holdout-v5-849",
+      "field": "altText",
+      "text": "Feine Zähne verlaufen entlang der Innenseite der geschlossenen Spange."
+    },
+    {
+      "id": "de-holdout-v5-850",
+      "field": "altText",
+      "text": "Eine Papierprobe zeigt einen breiten bogenförmigen Halsausschnitt."
+    },
+    {
+      "id": "de-holdout-v5-851",
+      "field": "altText",
+      "text": "Ein locker aufgelegtes Tuch bedeckt beide Schultern im Sonnenlicht."
+    },
+    {
+      "id": "de-holdout-v5-852",
+      "field": "altText",
+      "text": "Die feste Knopfleiste bleibt neben der offenen Hemdfront gerade."
+    },
+    {
+      "id": "de-holdout-v5-853",
+      "field": "altText",
+      "text": "Das Telefon liegt quer in einer breiten flachen Tasche."
+    },
+    {
+      "id": "de-holdout-v5-854",
+      "field": "altText",
+      "text": "Ein Holzbrett mit Aussparung steht hinter zwei hohen Stiefeln."
+    },
+    {
+      "id": "de-holdout-v5-855",
+      "field": "altText",
+      "text": "Das Hemdmuster setzt sich auf der aufgesetzten Tasche fort."
+    },
+    {
+      "id": "de-holdout-v5-856",
+      "field": "altText",
+      "text": "Kleine Größenkarten hängen an mehreren bereitgelegten Kleidungsstücken."
+    },
+    {
+      "id": "de-holdout-v5-857",
+      "field": "altText",
+      "text": "Ein fester Strickstreifen verläuft mittig durch den weichen Rücken."
+    },
+    {
+      "id": "de-holdout-v5-858",
+      "field": "altText",
+      "text": "Die Tasche besitzt gerade Seiten und eine breite Bodenrundung."
+    },
+    {
+      "id": "de-holdout-v5-859",
+      "field": "altText",
+      "text": "Eine alte Schnalle sitzt an einem deutlich neuen Lederriemen."
+    },
+    {
+      "id": "de-holdout-v5-860",
+      "field": "altText",
+      "text": "Zwei große Ohrringe bestehen aus dünnen hohlen Metallformen."
+    },
+    {
+      "id": "de-holdout-v5-861",
+      "field": "altText",
+      "text": "Mütze und Handschuhe stecken gemeinsam in einem kleinen Stoffbeutel."
+    },
+    {
+      "id": "de-holdout-v5-862",
+      "field": "altText",
+      "text": "Das Muster verläuft am Ärmel quer zum Blusenvorderteil."
+    },
+    {
+      "id": "de-holdout-v5-863",
+      "field": "altText",
+      "text": "Ein kurzer Reißverschluss sichert die innenliegende Hosentasche."
+    },
+    {
+      "id": "de-holdout-v5-864",
+      "field": "altText",
+      "text": "Eine dicke weiche Einfassung umgibt die vordere Kapuzenöffnung."
+    },
+    {
+      "id": "de-holdout-v5-865",
+      "field": "altText",
+      "text": "Eine dünne Zwischenlage liegt lose zwischen zwei Mantelstoffteilen."
+    },
+    {
+      "id": "de-holdout-v5-866",
+      "field": "altText",
+      "text": "Schmale und breite Falten wechseln sich am Rockbund ab."
+    },
+    {
+      "id": "de-holdout-v5-867",
+      "field": "altText",
+      "text": "Neue Metallösen liegen neben älteren Schnallen am Stiefelschaft."
+    },
+    {
+      "id": "de-holdout-v5-868",
+      "field": "altText",
+      "text": "Schuhreparaturbelege liegen in einer schmalen beschrifteten Dokumentenmappe."
+    },
+    {
+      "id": "de-holdout-v5-869",
+      "field": "altText",
+      "text": "Ein Stoffstreifen liegt zwischen zwei aneinanderstoßenden Metallringen."
+    },
+    {
+      "id": "de-holdout-v5-870",
+      "field": "altText",
+      "text": "Eine kleine Knopfreihe verändert die Öffnung des langen Rockschlitzes."
+    },
+    {
+      "id": "de-holdout-v5-871",
+      "field": "altText",
+      "text": "Eine flache Schleife verbindet die verlängerten Kragenenden unter dem Hals."
+    },
+    {
+      "id": "de-holdout-v5-872",
+      "field": "altText",
+      "text": "Eine kleine Stoffschleife sitzt an der vorderen Filzhutseite."
+    },
+    {
+      "id": "de-holdout-v5-873",
+      "field": "altText",
+      "text": "Ein schmaler Strickrand steht über dem festen Stiefelschaft."
+    },
+    {
+      "id": "de-holdout-v5-874",
+      "field": "altText",
+      "text": "Kleine Nummern kennzeichnen die Fächer mit unterschiedlichen Accessoires."
+    },
+    {
+      "id": "de-holdout-v5-875",
+      "field": "altText",
+      "text": "Das breite Gurtband besitzt beidseitig weich gerundete Kanten."
+    },
+    {
+      "id": "de-holdout-v5-876",
+      "field": "altText",
+      "text": "Kleidstoff und Haarschleife zeigen dasselbe kleine Druckmuster."
+    },
+    {
+      "id": "de-holdout-v5-877",
+      "field": "altText",
+      "text": "Eine flache Schultertasche liegt zwischen Mantel und Sitzlehne."
+    },
+    {
+      "id": "de-holdout-v5-878",
+      "field": "altText",
+      "text": "Feine Werkzeugspuren durchziehen die matte Oberfläche des Keramikanhängers."
+    },
+    {
+      "id": "de-holdout-v5-879",
+      "field": "altText",
+      "text": "Die später vorgesehenen Schuhe stehen unter der abgesteckten Hose."
+    },
+    {
+      "id": "de-holdout-v5-880",
+      "field": "altText",
+      "text": "Dicke Socken füllen den breiten Schaft der geöffneten Stiefel."
+    },
+    {
+      "id": "de-holdout-v5-881",
+      "field": "altText",
+      "text": "Ein sehr dünnes Futter bildet die geöffnete Rocktasche."
+    },
+    {
+      "id": "de-holdout-v5-882",
+      "field": "altText",
+      "text": "Ein Sitzfoto zeigt diagonale Zugfalten am Hemdvorderteil."
+    },
+    {
+      "id": "de-holdout-v5-883",
+      "field": "altText",
+      "text": "Zwei Kordeln ziehen die obere Stoffkante des Beutels zusammen."
+    },
+    {
+      "id": "de-holdout-v5-884",
+      "field": "altText",
+      "text": "Eine Maßskizze zeigt das vertiefte Innenfach der Tasche."
+    },
+    {
+      "id": "de-holdout-v5-885",
+      "field": "altText",
+      "text": "Ein gepolstertes Band stützt das offene Visier oberhalb der Stirn."
+    },
+    {
+      "id": "de-holdout-v5-886",
+      "field": "altText",
+      "text": "Mehrere seitliche Druckknöpfe schließen das windbewegte Cape."
+    },
+    {
+      "id": "de-holdout-v5-887",
+      "field": "altText",
+      "text": "Eine große Rückenfalte öffnet den Leinenmantel unterhalb der Schultern."
+    },
+    {
+      "id": "de-holdout-v5-888",
+      "field": "altText",
+      "text": "Ein farbiger Heftfaden markiert die ursprüngliche Nahtführung."
+    },
+    {
+      "id": "de-holdout-v5-889",
+      "field": "altText",
+      "text": "Ein kleiner beweglicher Ring verbindet den Riemen mit dem Schuh."
+    },
+    {
+      "id": "de-holdout-v5-890",
+      "field": "altText",
+      "text": "Glatt geschliffene Holzknöpfe liegen nach Größe in einer Schale."
+    },
+    {
+      "id": "de-holdout-v5-891",
+      "field": "altText",
+      "text": "Ein gewebtes Etikett ragt außen aus der Schalkante heraus."
+    },
+    {
+      "id": "de-holdout-v5-892",
+      "field": "altText",
+      "text": "Eine Tasse steht neben der noch ungenähten Taschenöffnung."
+    },
+    {
+      "id": "de-holdout-v5-893",
+      "field": "altText",
+      "text": "Gezeichnete Kreise markieren die späteren Druckknopfpositionen am Stoff."
+    },
+    {
+      "id": "de-holdout-v5-894",
+      "field": "altText",
+      "text": "Ein gefüllter Stoffbeutel sitzt genau zwischen den Fahrradkorbwänden."
+    },
+    {
+      "id": "de-holdout-v5-895",
+      "field": "altText",
+      "text": "Zwei entfernte Glieder liegen neben der gekürzten Halskette."
+    },
+    {
+      "id": "de-holdout-v5-896",
+      "field": "altText",
+      "text": "Zwei Garnfarben treffen unauffällig an der seitlichen Stricknaht aufeinander."
+    },
+    {
+      "id": "de-holdout-v5-897",
+      "field": "altText",
+      "text": "Ein fester Besatz umschließt den runden Halsausschnitt vollständig."
+    },
+    {
+      "id": "de-holdout-v5-898",
+      "field": "altText",
+      "text": "Zwei kleine Polster liegen unter den angehobenen Schulternähten."
+    },
+    {
+      "id": "de-holdout-v5-899",
+      "field": "altText",
+      "text": "Ein heller Reflexstreifen erscheint im hochgeschlagenen Hosenbein."
+    },
+    {
+      "id": "de-holdout-v5-900",
+      "field": "altText",
+      "text": "Ein kleines Datum ist innen in die Ringschiene graviert."
+    },
+    {
+      "id": "de-holdout-v5-901",
+      "field": "altText",
+      "text": "Eine schmale Nadel steckt quer durch die geflochtene Haarpartie."
+    },
+    {
+      "id": "de-holdout-v5-902",
+      "field": "altText",
+      "text": "Eine breite schwere Borte umschließt den unteren Umhangrand."
+    },
+    {
+      "id": "de-holdout-v5-903",
+      "field": "altText",
+      "text": "Eine feste Aufhängeschlaufe spannt sich über den inneren Ausschnitt."
+    },
+    {
+      "id": "de-holdout-v5-904",
+      "field": "altText",
+      "text": "Eine lange Klettlasche ragt über die äußere Schuhseite hinaus."
+    },
+    {
+      "id": "de-holdout-v5-905",
+      "field": "altText",
+      "text": "Eine lose Rückenfalte öffnet sich zwischen zwei festen Nähten."
+    },
+    {
+      "id": "de-holdout-v5-906",
+      "field": "altText",
+      "text": "Drei dicke Schnüre bilden ein breites geflochtenes Armband."
+    },
+    {
+      "id": "de-holdout-v5-907",
+      "field": "altText",
+      "text": "Zwei Griffe liegen oberhalb des mittig gefalteten Kleidersacks."
+    },
+    {
+      "id": "de-holdout-v5-908",
+      "field": "altText",
+      "text": "Ein unbedruckter Streifen begrenzt das Muster am Blusensaum."
+    },
+    {
+      "id": "de-holdout-v5-909",
+      "field": "altText",
+      "text": "Ein geöffneter Clip verbindet den Anhänger mit der Kette."
+    },
+    {
+      "id": "de-holdout-v5-910",
+      "field": "altText",
+      "text": "Der breite Taschenriegel besitzt eine deutlich vorstehende feste Kante."
+    },
+    {
+      "id": "de-holdout-v5-911",
+      "field": "altText",
+      "text": "Nasse Schuhe stehen über Tropfen auf einem offenen Gitter."
+    },
+    {
+      "id": "de-holdout-v5-912",
+      "field": "altText",
+      "text": "Lose Häkelblumen liegen bogenförmig auf einer noch unbestickten Schulterpartie."
+    },
+    {
+      "id": "de-holdout-v5-913",
+      "field": "altText",
+      "text": "Eine Lochzange liegt neben dem frisch durchbohrten Ledergürtel."
+    },
+    {
+      "id": "de-holdout-v5-914",
+      "field": "altText",
+      "text": "Eine kleine Drahtschlaufe führt den Faden durch das Nadelöhr."
+    },
+    {
+      "id": "de-holdout-v5-915",
+      "field": "altText",
+      "text": "Ein zusätzlicher Gummiring liegt innerhalb des weiten Stoffhaargummis."
+    },
+    {
+      "id": "de-holdout-v5-916",
+      "field": "altText",
+      "text": "Gleiche kleine Farbstiche sitzen an den Bündchen zweier Socken."
+    },
+    {
+      "id": "de-holdout-v5-917",
+      "field": "altText",
+      "text": "Die herausgezogene Innenfalte liegt offen vor dem Stoffbeutel."
+    },
+    {
+      "id": "de-holdout-v5-918",
+      "field": "altText",
+      "text": "Eine zweite Gürtelschlaufe hält das lose Ende des Mantelriemens."
+    },
+    {
+      "id": "de-holdout-v5-919",
+      "field": "altText",
+      "text": "Herausgenommene Einlagen trocknen nebeneinander auf einer ebenen Fläche."
+    },
+    {
+      "id": "de-holdout-v5-920",
+      "field": "altText",
+      "text": "Lange radiale Linien laufen über den weit ausgestellten Rock."
+    },
+    {
+      "id": "de-holdout-v5-921",
+      "field": "altText",
+      "text": "Offene Handschuhfinger halten den Rand mehrerer sortierter Papierblätter."
+    },
+    {
+      "id": "de-holdout-v5-922",
+      "field": "altText",
+      "text": "Gefaltete Kopfhörer liegen in einem gepolsterten runden Taschenfach."
+    },
+    {
+      "id": "de-holdout-v5-923",
+      "field": "altText",
+      "text": "Ein kleiner Herkunftszettel sitzt innen direkt neben der Webkante."
+    },
+    {
+      "id": "de-holdout-v5-924",
+      "field": "altText",
+      "text": "Die Bortenenden treffen hinten in einer unauffälligen flachen Verbindung zusammen."
+    },
+    {
+      "id": "de-holdout-v5-925",
+      "field": "altText",
+      "text": "Ein breiter Verschluss verbindet die vorderen Umhangseiten unter dem Hals."
+    },
+    {
+      "id": "de-holdout-v5-926",
+      "field": "altText",
+      "text": "Eine lockere Schnürung lässt über dem hohen Spann sichtbar Platz."
+    },
+    {
+      "id": "de-holdout-v5-927",
+      "field": "altText",
+      "text": "Eine feste Kappe bedeckt die rückseitige Spitze der Anstecknadel."
+    },
+    {
+      "id": "de-holdout-v5-928",
+      "field": "altText",
+      "text": "Ein langer Reißverschluss folgt dem gebogenen Rand des Taschenhauptfachs."
+    },
+    {
+      "id": "de-holdout-v5-929",
+      "field": "altText",
+      "text": "Die oberen Blusenknöpfe stehen enger beieinander als die unteren."
+    },
+    {
+      "id": "de-holdout-v5-930",
+      "field": "altText",
+      "text": "Eine flache Schnalle schließt das Haarband unter den Haaren."
+    },
+    {
+      "id": "de-holdout-v5-931",
+      "field": "altText",
+      "text": "Zwei Nahtlinien folgen der dünnen Handfläche bis zum Handgelenk."
+    },
+    {
+      "id": "de-holdout-v5-932",
+      "field": "altText",
+      "text": "Ein klares Fenster zeigt zwei Ohrringe im geschlossenen Karton."
+    },
+    {
+      "id": "de-holdout-v5-933",
+      "field": "altText",
+      "text": "Ein schmaler Schal liegt innerhalb des weit geöffneten Mantelkragens."
+    },
+    {
+      "id": "de-holdout-v5-934",
+      "field": "altText",
+      "text": "Die aufgestellte Tasche ruht auf einer ihrer unteren Seitenkanten."
+    },
+    {
+      "id": "de-holdout-v5-935",
+      "field": "altText",
+      "text": "Ein gezeichneter Pfeil markiert die Rückseite des zugeschnittenen Stoffteils."
+    },
+    {
+      "id": "de-holdout-v5-936",
+      "field": "altText",
+      "text": "Ein kleiner Haken verbindet den Bund direkt über dem Reißverschluss."
+    },
+    {
+      "id": "de-holdout-v5-937",
+      "field": "altText",
+      "text": "Zwei Nadeln sichern die Tuchkanten knapp hinter den Ohren."
+    },
+    {
+      "id": "de-holdout-v5-938",
+      "field": "altText",
+      "text": "Beide Enden der Haarspange besitzen einen eigenen kleinen Clip."
+    },
+    {
+      "id": "de-holdout-v5-939",
+      "field": "altText",
+      "text": "Ein kurzer Sockenschaft endet knapp oberhalb des flachen Schuhs."
+    },
+    {
+      "id": "de-holdout-v5-940",
+      "field": "altText",
+      "text": "Eine neue Naht schließt die aufgetrennte Verbindung am Taschenfutter."
+    },
+    {
+      "id": "de-holdout-v5-941",
+      "field": "altText",
+      "text": "Ein schmales Lineal liegt unter der aktuellen Strickmusterreihe."
+    },
+    {
+      "id": "de-holdout-v5-942",
+      "field": "altText",
+      "text": "Materialangaben liegen direkt unter mehreren fotografierten Stoffmustern."
+    },
+    {
+      "id": "de-holdout-v5-943",
+      "field": "altText",
+      "text": "Eine breite Lasche ragt hinten aus dem festen Stiefelschaft."
+    },
+    {
+      "id": "de-holdout-v5-944",
+      "field": "altText",
+      "text": "Weiche horizontale Falten durchziehen den unteren Rücken des Mantels."
+    },
+    {
+      "id": "de-holdout-v5-945",
+      "field": "altText",
+      "text": "Die gewendete Stoffprobe zeigt gleichmäßig angezogene Unterfadenstiche."
+    },
+    {
+      "id": "de-holdout-v5-946",
+      "field": "altText",
+      "text": "Eine Schnalle liegt zwischen zwei austauschbaren unterschiedlich breiten Riemen."
+    },
+    {
+      "id": "de-holdout-v5-947",
+      "field": "altText",
+      "text": "Kleine Fadenschlaufen verbinden Unterrock und Außenteil an den Seitennähten."
+    },
+    {
+      "id": "de-holdout-v5-948",
+      "field": "altText",
+      "text": "Ein verborgener Knopf hält die obere Kante der Vorderfalte."
+    },
+    {
+      "id": "de-holdout-v5-949",
+      "field": "altText",
+      "text": "Ein kleines Etikett hängt beweglich an einer angenähten Schlaufe."
+    },
+    {
+      "id": "de-holdout-v5-950",
+      "field": "altText",
+      "text": "Zwei gleitende Knoten begrenzen den verstellbaren Teil des Schmuckbands."
+    },
+    {
+      "id": "de-holdout-v5-951",
+      "field": "altText",
+      "text": "Kleine einzeln befestigte Perlen folgen dem Rücken eines Haarkamms."
+    },
+    {
+      "id": "de-holdout-v5-952",
+      "field": "altText",
+      "text": "Ein weiches Polster liegt innen oberhalb der Schuhspitze."
+    },
+    {
+      "id": "de-holdout-v5-953",
+      "field": "altText",
+      "text": "Eine Heftlinie markiert zusätzlichen Spielraum an der Mantelschulter."
+    },
+    {
+      "id": "de-holdout-v5-954",
+      "field": "altText",
+      "text": "Ein einzelner getrockneter Farbtropfen sitzt neben dem gedruckten Kleidermuster."
+    },
+    {
+      "id": "de-holdout-v5-955",
+      "field": "altText",
+      "text": "Ein kurzer Reißverschluss schließt die Oberkante der gestrickten Tasche."
+    },
+    {
+      "id": "de-holdout-v5-956",
+      "field": "altText",
+      "text": "Eine geformte Stoffpartie wölbt sich über dem gebeugten Knie."
+    },
+    {
+      "id": "de-holdout-v5-957",
+      "field": "altText",
+      "text": "Eine kleine runde Uhr hängt vor dem geschlossenen Hemd."
+    },
+    {
+      "id": "de-holdout-v5-958",
+      "field": "altText",
+      "text": "Eine kräftige Nadel durchsticht mehrere übereinanderliegende feste Stoffschichten."
+    },
+    {
+      "id": "de-holdout-v5-959",
+      "field": "altText",
+      "text": "Der Riemen setzt schräg an der oberen Taschenecke an."
+    },
+    {
+      "id": "de-holdout-v5-960",
+      "field": "altText",
+      "text": "Ein kleiner Handschuhclip hängt im geöffneten Mantelinneren."
+    },
+    {
+      "id": "de-holdout-v5-961",
+      "field": "altText",
+      "text": "Ein seitlicher Riegel verkürzt die Weite des hohen Stiefelschafts."
+    },
+    {
+      "id": "de-holdout-v5-962",
+      "field": "altText",
+      "text": "Dicke Knoten sitzen an beiden Enden des Beutelzugbands."
+    },
+    {
+      "id": "de-holdout-v5-963",
+      "field": "altText",
+      "text": "Ein kurzer Seitenschlitz teilt den Saum des Strickkleides."
+    },
+    {
+      "id": "de-holdout-v5-964",
+      "field": "altText",
+      "text": "Kleine Spangen liegen auf einer weichen Einlage im flachen Karton."
+    },
+    {
+      "id": "de-holdout-v5-965",
+      "field": "altText",
+      "text": "Ein neuer Riemen verbindet die beiden Seiten des offenen Schuhs."
+    },
+    {
+      "id": "de-holdout-v5-966",
+      "field": "altText",
+      "text": "Eine runde Stoffscheibe liegt unter dem befestigten Druckknopf."
+    },
+    {
+      "id": "de-holdout-v5-967",
+      "field": "altText",
+      "text": "Die zugeschnittene Bluse besitzt ein ungeteiltes mittleres Vorderteil."
+    },
+    {
+      "id": "de-holdout-v5-968",
+      "field": "altText",
+      "text": "Gerade ausgerichtete Henkel liegen neben den noch offenen Befestigungsnähten."
+    },
+    {
+      "id": "de-holdout-v5-969",
+      "field": "altText",
+      "text": "Ein versetzter Faden unterbricht das regelmäßige Gewebe des Schals."
+    },
+    {
+      "id": "de-holdout-v5-970",
+      "field": "altText",
+      "text": "Eine Sohlenzeichnung steht neben Notizen zum ausgestellten Schuh."
+    },
+    {
+      "id": "de-holdout-v5-971",
+      "field": "altText",
+      "text": "Mehrere Testnähte verlaufen über ein kleines Reststück des Hauptstoffs."
+    },
+    {
+      "id": "de-holdout-v5-972",
+      "field": "altText",
+      "text": "Eine große Vertiefung bildet den Griff am Mantelverschluss."
+    },
+    {
+      "id": "de-holdout-v5-973",
+      "field": "altText",
+      "text": "Mehrfach gelegte Stofflagen bilden einen festen oberen Beutelrand."
+    },
+    {
+      "id": "de-holdout-v5-974",
+      "field": "altText",
+      "text": "Ein Ersatzknopf sitzt an der Innenseite der Hemdseitennaht."
+    },
+    {
+      "id": "de-holdout-v5-975",
+      "field": "altText",
+      "text": "Mehrere Ringe stehen einzeln auf schmalen aufrechten Haltern."
+    },
+    {
+      "id": "de-holdout-v5-976",
+      "field": "altText",
+      "text": "Ein Druckknopf fixiert den nach außen umgelegten Stiefelrand."
+    },
+    {
+      "id": "de-holdout-v5-977",
+      "field": "altText",
+      "text": "Zwei schmale Bundöffnungen führen den breiten Gürtel durch den Rock."
+    },
+    {
+      "id": "de-holdout-v5-978",
+      "field": "altText",
+      "text": "Ein dichter Faserknoten bildet das Ende des handgefertigten Schmuckbands."
+    },
+    {
+      "id": "de-holdout-v5-979",
+      "field": "altText",
+      "text": "Die gewölbte Kammseite folgt dem runden Hinterkopf."
+    },
+    {
+      "id": "de-holdout-v5-980",
+      "field": "altText",
+      "text": "Ein schmaler Stoffstreifen bindet das kleine Geschenkpaket zusammen."
+    },
+    {
+      "id": "de-holdout-v5-981",
+      "field": "altText",
+      "text": "Kurze Rückstiche überlagern den Beginn der langen Seitennaht."
+    },
+    {
+      "id": "de-holdout-v5-982",
+      "field": "altText",
+      "text": "Eine Schlüsselschlaufe läuft durch ein einzelnes Knopfloch im Tascheninneren."
+    },
+    {
+      "id": "de-holdout-v5-983",
+      "field": "altText",
+      "text": "Zwischen den Mantelhaken bleiben breite freie Stoffabschnitte."
+    },
+    {
+      "id": "de-holdout-v5-984",
+      "field": "altText",
+      "text": "Eine glatte Sockenferse liegt dicht am Hinterfuß an."
+    },
+    {
+      "id": "de-holdout-v5-985",
+      "field": "altText",
+      "text": "Die breite Zunge liegt unter den gekreuzten Schnürsenkeln."
+    },
+    {
+      "id": "de-holdout-v5-986",
+      "field": "altText",
+      "text": "Eine einzelne Rückenfalte beginnt unter dem schmalen Hemdsteg."
+    },
+    {
+      "id": "de-holdout-v5-987",
+      "field": "altText",
+      "text": "Der gebogene Taschenrand hebt sich am mittleren Griff nach oben."
+    },
+    {
+      "id": "de-holdout-v5-988",
+      "field": "altText",
+      "text": "Die Druckfläche steht als feine erhabene Struktur über dem Gewebe."
+    },
+    {
+      "id": "de-holdout-v5-989",
+      "field": "altText",
+      "text": "Ein kleiner Knopf verbindet die Schalenden mittig vor der Brust."
+    },
+    {
+      "id": "de-holdout-v5-990",
+      "field": "altText",
+      "text": "Ein kleines Webetikett sitzt außen am kurzen Sockenschaft."
+    },
+    {
+      "id": "de-holdout-v5-991",
+      "field": "altText",
+      "text": "Eine stumpfe Nadel erfasst die gelockerte Masche am Strickrand."
+    },
+    {
+      "id": "de-holdout-v5-992",
+      "field": "altText",
+      "text": "Eine breite Griffschlaufe steht über dem geschlossenen Taschenverschluss."
+    },
+    {
+      "id": "de-holdout-v5-993",
+      "field": "altText",
+      "text": "Der Mantel erweitert sich deutlich unterhalb seiner Hüftlinie."
+    },
+    {
+      "id": "de-holdout-v5-994",
+      "field": "altText",
+      "text": "Eine weiche Einlage liegt herausgenommen neben dem geöffneten Stirnband."
+    },
+    {
+      "id": "de-holdout-v5-995",
+      "field": "altText",
+      "text": "Eine durchgehende Naht verläuft sichtbar oberhalb der festen Schuhsohle."
+    },
+    {
+      "id": "de-holdout-v5-996",
+      "field": "altText",
+      "text": "Ein Stoffrest und passendes Garn liegen auf einer beschrifteten Karte."
+    },
+    {
+      "id": "de-holdout-v5-997",
+      "field": "altText",
+      "text": "Drei verschieden breite Fächer durchziehen die Vorderseite der Schürze."
+    },
+    {
+      "id": "de-holdout-v5-998",
+      "field": "altText",
+      "text": "Ein großer Metallring hängt am Verschluss der Tasche."
+    },
+    {
+      "id": "de-holdout-v5-999",
+      "field": "altText",
+      "text": "Eine gepolsterte Klemme verbindet die Hutkrempe mit der Reisetasche."
+    },
+    {
+      "id": "de-holdout-v5-1000",
+      "field": "altText",
+      "text": "Zwei gleich große Strickproben zeigen unterschiedlich viele Maschenreihen."
+    }
+  ]
+}

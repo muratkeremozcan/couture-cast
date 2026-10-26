@@ -1,0 +1,336 @@
+[
+  {
+    "row": 947,
+    "before": "J'ai glissé le renfort dans une coulisse pour pouvoir l'enlever au besoin.",
+    "after": "Le renfort coulisse hors de son passage dès que le sac doit être lavé.",
+    "reason": "Manual complete-sentence overlap or language edit"
+  },
+  {
+    "row": 450,
+    "before": "Le nœud du chemisier repose juste au-dessus de la ceinture fine.",
+    "after": "Le lien du chemisier dessine un premier nœud, puis vient la fine ceinture plus bas.",
+    "reason": "Manual complete-sentence overlap or language edit"
+  },
+  {
+    "row": 912,
+    "before": "Une bande de zip suit les deux côtés de la fente de jupe.",
+    "after": "Les dents métalliques encadrent l'ouverture verticale dans le panneau de jupe.",
+    "reason": "Manual complete-sentence overlap or language edit"
+  },
+  {
+    "row": 545,
+    "before": "La pièce souple reste alignée entre les deux côtés de la chaussure.",
+    "after": "La bride centrale empêche la languette de glisser latéralement sous les lacets.",
+    "reason": "Manual complete-sentence overlap or language edit"
+  },
+  {
+    "row": 858,
+    "before": "J'ai cousu une poche assez haute pour que l'étui à lunettes reste bien droit.",
+    "after": "Mon étui tient verticalement depuis que sa poche dispose de parois plus hautes.",
+    "reason": "Manual complete-sentence overlap or language edit"
+  },
+  {
+    "row": 723,
+    "before": "J'ai séparé les deux couches sans défaire la couture du poignet.",
+    "after": "Les couches sont dégagées l'une de l'autre tout en restant jointes au poignet.",
+    "reason": "Manual complete-sentence overlap or language edit"
+  },
+  {
+    "row": 910,
+    "before": "Le ruban de fermeture encadre la fente même quand je ne l'utilise pas.",
+    "after": "Même ouverte, la fermeture dessine une bordure technique autour de cette fente.",
+    "reason": "Manual complete-sentence overlap or language edit"
+  },
+  {
+    "row": 624,
+    "before": "Une boucle de fil en relief marque l'intérieur de la manche droite.",
+    "after": "Dans la manche droite, un petit relief de fil sert de repère tactile.",
+    "reason": "Manual complete-sentence overlap or language edit"
+  },
+  {
+    "row": 321,
+    "before": "Les attaches discrètes suivent la couture de taille sans ajouter de tissu épais.",
+    "after": "Les minuscules passants de fil disparaissent presque contre la bande de taille.",
+    "reason": "Manual complete-sentence overlap or language edit"
+  },
+  {
+    "row": 521,
+    "before": "Les panneaux inférieurs commencent plus tôt sous la partie ajustée du vêtement.",
+    "after": "La jonction rehaussée fait démarrer les panneaux longs plus près de la poitrine.",
+    "reason": "Manual complete-sentence overlap or language edit"
+  },
+  {
+    "row": 736,
+    "before": "Un ruban intérieur se ferme séparément à la taille de la robe.",
+    "after": "La bride interne possède sa propre attache indépendante sous le corsage.",
+    "reason": "Manual complete-sentence overlap or language edit"
+  },
+  {
+    "row": 335,
+    "before": "La maille fine laisse assez de place pour porter ce large anneau.",
+    "after": "Mon large anneau trouve sa place sur la mitaine sans déformer les mailles fines.",
+    "reason": "Manual complete-sentence overlap or language edit"
+  },
+  {
+    "row": 588,
+    "before": "Une bande intérieure retient le bas replié de la chemise.",
+    "after": "Le bord raccourci est calé contre l'envers par une patte textile horizontale.",
+    "reason": "Manual complete-sentence overlap or language edit"
+  },
+  {
+    "row": 372,
+    "before": "Un lacet croisé relie deux bords sur le côté de la jupe.",
+    "after": "Une rangée d'œillets reçoit les croisements du lacet près de la hanche.",
+    "reason": "Manual complete-sentence overlap or language edit"
+  },
+  {
+    "row": 943,
+    "before": "J'ai cousu quelques centimètres supplémentaires pour garder le haut de la jupe plat.",
+    "after": "Les points ajoutés retiennent le pli en hauteur et laissent le reste s'ouvrir librement.",
+    "reason": "Manual complete-sentence overlap or language edit"
+  },
+  {
+    "row": 196,
+    "before": "Le chapeau est replié le long d'une couture prévue au milieu de la calotte.",
+    "after": "Le chapeau se plie en deux suivant la ligne de voyage marquée sur son sommet.",
+    "reason": "Manual complete-sentence overlap or language edit"
+  },
+  {
+    "row": 570,
+    "before": "Les pinces larges répartissent le poids de la jupe sur le cintre.",
+    "after": "Les attaches rembourrées soutiennent largement la ceinture pour préserver les plis suspendus.",
+    "reason": "Manual complete-sentence overlap or language edit"
+  },
+  {
+    "row": 833,
+    "before": "Les deux pinces du bijou restent reliées par une boucle cousue dans la poche.",
+    "after": "Une bride interne rassemble les petites pinces du bijou rangé dans la poche.",
+    "reason": "Manual complete-sentence overlap or language edit"
+  },
+  {
+    "row": 782,
+    "before": "J'ai décalé le fermoir pour qu'il ne tombe pas sur la couture d'épaule.",
+    "after": "J'ai éloigné le fermoir de la jonction d'épaule pour éviter une bosse sous la sangle.",
+    "reason": "Manual complete-sentence overlap or language edit"
+  },
+  {
+    "row": 941,
+    "before": "Le petit rouleau repose contre la doublure près de la couture latérale.",
+    "after": "La ceinture enroulée demeure fixée contre la doublure par une courte bride.",
+    "reason": "Manual complete-sentence overlap or language edit"
+  },
+  {
+    "row": 738,
+    "before": "Les bouts des lacets se rangent dans une petite poche sur la languette.",
+    "after": "La petite pochette intégrée à ma chaussure reçoit les extrémités libres des lacets.",
+    "reason": "Manual complete-sentence overlap or language edit"
+  },
+  {
+    "row": 273,
+    "before": "Le cadran reste visible au-dessus du tissu uni qui couvre la main.",
+    "after": "La montre se détache nettement sur le gant long qui enveloppe la main.",
+    "reason": "Manual complete-sentence overlap or language edit"
+  },
+  {
+    "row": 581,
+    "before": "La jonction métallique reste visible au-dessus du tissu enroulé autour du cou.",
+    "after": "Le mousqueton relie les boucles cousues aux bouts de l'écharpe portée au cou.",
+    "reason": "Manual complete-sentence overlap or language edit"
+  },
+  {
+    "row": 838,
+    "before": "Le fil métallique se retire quand je veux ranger le chapeau complètement à plat.",
+    "after": "J'enlève le fil de bordure avant d'aplatir mon chapeau pour le ranger.",
+    "reason": "Manual complete-sentence overlap or language edit"
+  },
+  {
+    "row": 844,
+    "before": "Les bretelles se fixent à des boutons placés sur la face intérieure du pantalon.",
+    "after": "Les attaches de bretelles rejoignent des boutons cachés derrière la ceinture du pantalon.",
+    "reason": "Manual complete-sentence overlap or language edit"
+  },
+  {
+    "row": 992,
+    "before": "Une bande amovible est fixée sur la face intérieure du col de veste.",
+    "after": "La protection de col détachable couvre l'envers du tissu au contact du cou.",
+    "reason": "Manual complete-sentence overlap or language edit"
+  },
+  {
+    "row": 806,
+    "before": "J'ai glissé le col de chemise à l'intérieur pour garder une encolure parfaitement ronde.",
+    "after": "Mon col de chemise rentré laisse au pull une ligne ronde sans aucune pointe visible.",
+    "reason": "Manual complete-sentence overlap or language edit"
+  },
+  {
+    "row": 962,
+    "before": "Une petite pression garde le fiyonk de ma robe dans la bonne direction.",
+    "after": "La pression cachée maintient les boucles du nœud bien étalées sur ma robe.",
+    "reason": "Manual complete-sentence overlap or language edit"
+  },
+  {
+    "row": 34,
+    "before": "Le petit ruban posé au genou m'aide à vérifier la longueur du pantalon.",
+    "after": "La toile d'essai me permet de vérifier la robe avant de couper le beau tissu.",
+    "oldConcept": "Ribbon sewn as knee marker",
+    "newConcept": "Muslin mockup before final dress",
+    "reason": "Individually authored replacement for semantic headroom"
+  },
+  {
+    "row": 35,
+    "before": "Avant de couper, je regarde où tombe mon repère quand je m'assieds.",
+    "after": "J'ai porté ce premier montage quelques minutes pour repérer les zones à reprendre.",
+    "oldConcept": "Ribbon sewn as knee marker",
+    "newConcept": "Muslin mockup before final dress",
+    "reason": "Individually authored replacement for semantic headroom"
+  },
+  {
+    "row": 36,
+    "before": "Un morceau de ruban marque le genou sur le pantalon encore en cours d'ajustement.",
+    "after": "Une robe d'essai en coton brut porte plusieurs petits repères de couture.",
+    "oldConcept": "Ribbon sewn as knee marker",
+    "newConcept": "Muslin mockup before final dress",
+    "reason": "Individually authored replacement for semantic headroom"
+  },
+  {
+    "row": 37,
+    "before": "Le repère cousu reste visible sur la jambe pliée pendant l'essayage.",
+    "after": "Le montage provisoire montre des bords non finis et des pinces encore épinglées.",
+    "oldConcept": "Ribbon sewn as knee marker",
+    "newConcept": "Muslin mockup before final dress",
+    "reason": "Individually authored replacement for semantic headroom"
+  },
+  {
+    "row": 282,
+    "before": "J'ai monté l'empiècement avec l'autre face du tissu pour dessiner les épaules.",
+    "after": "La veste de mon tailleur accompagne aujourd'hui un jean que je porte tout le temps.",
+    "oldConcept": "Shirt yoke reversed for contrast",
+    "newConcept": "Matching suit worn as separates",
+    "reason": "Individually authored replacement for semantic headroom"
+  },
+  {
+    "row": 283,
+    "before": "La même étoffe donne deux tons différents selon le côté choisi.",
+    "after": "J'ai séparé les pièces du costume pour retrouver deux tenues faciles au quotidien.",
+    "oldConcept": "Shirt yoke reversed for contrast",
+    "newConcept": "Matching suit worn as separates",
+    "reason": "Individually authored replacement for semantic headroom"
+  },
+  {
+    "row": 284,
+    "before": "L'empiècement d'épaules utilise l'envers du tissu par rapport au corps de chemise.",
+    "after": "Une veste de costume est portée avec un jean décontracté et un haut simple.",
+    "oldConcept": "Shirt yoke reversed for contrast",
+    "newConcept": "Matching suit worn as separates",
+    "reason": "Individually authored replacement for semantic headroom"
+  },
+  {
+    "row": 285,
+    "before": "Une différence de surface distingue le haut du dos sans ajouter de motif imprimé.",
+    "after": "Le pantalon habillé est associé à un tricot tandis que sa veste assortie reste sur cintre.",
+    "oldConcept": "Shirt yoke reversed for contrast",
+    "newConcept": "Matching suit worn as separates",
+    "reason": "Individually authored replacement for semantic headroom"
+  },
+  {
+    "row": 346,
+    "before": "J'ai essayé le nouvel ourlet avec un fil provisoire avant de décider.",
+    "after": "Je vérifie la souplesse de la semelle avant de choisir cette paire pour marcher.",
+    "oldConcept": "Skirt stitched with removable thread",
+    "newConcept": "Shoe sole flex checked before walking",
+    "reason": "Individually authored replacement for semantic headroom"
+  },
+  {
+    "row": 347,
+    "before": "Quelques grands points suffisent pour porter la longueur d'essai à la maison.",
+    "after": "Le soulier plie bien à l'avant et garde son appui sous le talon.",
+    "oldConcept": "Skirt stitched with removable thread",
+    "newConcept": "Shoe sole flex checked before walking",
+    "reason": "Individually authored replacement for semantic headroom"
+  },
+  {
+    "row": 348,
+    "before": "De longs points de bâti maintiennent un ourlet encore provisoire.",
+    "after": "Une main fléchit doucement l'avant de la chaussure pour montrer la souplesse de semelle.",
+    "oldConcept": "Skirt stitched with removable thread",
+    "newConcept": "Shoe sole flex checked before walking",
+    "reason": "Individually authored replacement for semantic headroom"
+  },
+  {
+    "row": 349,
+    "before": "Le fil facilement retirable suit le bas replié de la jupe.",
+    "after": "La chaussure pliée présente une courbe près des orteils tandis que son talon reste stable.",
+    "oldConcept": "Skirt stitched with removable thread",
+    "newConcept": "Shoe sole flex checked before walking",
+    "reason": "Individually authored replacement for semantic headroom"
+  },
+  {
+    "row": 390,
+    "before": "Un morceau de tissu très lisse protège maintenant l'intérieur de ma petite bourse.",
+    "after": "Les longues boucles encadrent mon décolleté dégagé et se voient sous tous les angles.",
+    "oldConcept": "Purse lined with smooth scrap",
+    "newConcept": "Long earrings framing bare neckline",
+    "reason": "Individually authored replacement for semantic headroom"
+  },
+  {
+    "row": 391,
+    "before": "Les objets glissent mieux depuis que j'ai doublé ce contenant tricoté.",
+    "after": "J'ai remonté mes cheveux pour donner de la place aux deux pendants près du cou.",
+    "oldConcept": "Purse lined with smooth scrap",
+    "newConcept": "Long earrings framing bare neckline",
+    "reason": "Individually authored replacement for semantic headroom"
+  },
+  {
+    "row": 392,
+    "before": "Une doublure lisse épouse la forme d'une bourse en maille.",
+    "after": "De longues boucles descendent de chaque côté d'une encolure largement ouverte.",
+    "oldConcept": "Purse lined with smooth scrap",
+    "newConcept": "Long earrings framing bare neckline",
+    "reason": "Individually authored replacement for semantic headroom"
+  },
+  {
+    "row": 393,
+    "before": "Le bord intérieur révèle une pièce fine cousue contre les mailles du sac.",
+    "after": "Les cheveux relevés laissent apparaître les deux bijoux près des épaules nues.",
+    "oldConcept": "Purse lined with smooth scrap",
+    "newConcept": "Long earrings framing bare neckline",
+    "reason": "Individually authored replacement for semantic headroom"
+  },
+  {
+    "row": 434,
+    "before": "J'ai donné au col une courbe douce entre les mains, sans tracer de pli dur.",
+    "after": "La petite ceinture vive est le seul éclat de couleur dans ma tenue claire.",
+    "oldConcept": "Collar rolled rather than pressed",
+    "newConcept": "One vivid belt in neutral outfit",
+    "reason": "Individually authored replacement for semantic headroom"
+  },
+  {
+    "row": 435,
+    "before": "La veste me plaît davantage avec cette ligne roulée qui reste souple.",
+    "after": "J'ai gardé les vêtements très sobres pour laisser cette ceinture attirer le regard.",
+    "oldConcept": "Collar rolled rather than pressed",
+    "newConcept": "One vivid belt in neutral outfit",
+    "reason": "Individually authored replacement for semantic headroom"
+  },
+  {
+    "row": 436,
+    "before": "Le revers arrondi s'éloigne du devant sans angle de repassage marqué.",
+    "after": "Une ceinture fortement colorée traverse un ensemble composé de tons neutres.",
+    "oldConcept": "Collar rolled rather than pressed",
+    "newConcept": "One vivid belt in neutral outfit",
+    "reason": "Individually authored replacement for semantic headroom"
+  },
+  {
+    "row": 437,
+    "before": "Une courbe continue remplace le pli plat le long du col de veste.",
+    "after": "Le pantalon et le haut restent discrets autour de la bande vive à la taille.",
+    "oldConcept": "Collar rolled rather than pressed",
+    "newConcept": "One vivid belt in neutral outfit",
+    "reason": "Individually authored replacement for semantic headroom"
+  },
+  {
+    "row": 392,
+    "before": "De longues boucles descendent de chaque côté d'une encolure largement ouverte.",
+    "after": "Deux bijoux pendants encadrent le cou dégagé au-dessus du vêtement.",
+    "reason": "Manual full-sentence overlap edit after semantic replacements"
+  }
+]

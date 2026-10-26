@@ -1,0 +1,5013 @@
+{
+  "language": "fr",
+  "corpusVersion": "holdout-v5",
+  "description": "Frozen clean holdout: ordinary fashion captions and alt text written natively in the language after the allow list froze, independently of the clean half, and never used to tune the screener, the lists or the allow list. The release gate's clean-copy figure is computed here. Entries labelled expected review carry one of the policy's deliberate review terms.",
+  "expected": "pass",
+  "frozenAgainst": {
+    "allowListSha256": "22d1f261f3666cf37369e67359aeabc383ac0a689babe04f87023ba1aee70256",
+    "termsSha256": "7aa19d35380523111ee2d4c6d0bad7db8e088a3df647afa18a5324ade6ce628d",
+    "languageAllowListSha256": "12fcaedef188405a7d6f9383bf312a16412b06bbefb54ce37349b5c9c5e0db7c"
+  },
+  "entries": [
+    {
+      "id": "fr-holdout-v5-001",
+      "field": "caption",
+      "text": "J'ai fixé mes manches assez haut pour préparer mes couleurs tranquillement."
+    },
+    {
+      "id": "fr-holdout-v5-002",
+      "field": "caption",
+      "text": "Les petits liens aux bras évitent désormais de tremper mes poignets dans la peinture."
+    },
+    {
+      "id": "fr-holdout-v5-003",
+      "field": "caption",
+      "text": "Ma chemise ample a survécu à l'atelier grâce à deux attaches discrètes."
+    },
+    {
+      "id": "fr-holdout-v5-004",
+      "field": "altText",
+      "text": "Les manches retenues au-dessus des coudes dégagent les mains près du bac de peinture."
+    },
+    {
+      "id": "fr-holdout-v5-005",
+      "field": "altText",
+      "text": "Deux rubans maintiennent les revers loin des pots posés sur la table."
+    },
+    {
+      "id": "fr-holdout-v5-006",
+      "field": "caption",
+      "text": "Le pull s'arrête pile sur la couture de taille, sans cacher la forme de la robe."
+    },
+    {
+      "id": "fr-holdout-v5-007",
+      "field": "caption",
+      "text": "J'aime retrouver la ligne de ma robe sous ce petit tricot raccourci."
+    },
+    {
+      "id": "fr-holdout-v5-008",
+      "field": "altText",
+      "text": "Un pull court rejoint exactement la couture horizontale de la robe."
+    },
+    {
+      "id": "fr-holdout-v5-009",
+      "field": "altText",
+      "text": "La partie ajustée du vêtement reste lisible sous le bas du tricot."
+    },
+    {
+      "id": "fr-holdout-v5-010",
+      "field": "caption",
+      "text": "J'ai passé plus de temps à raccorder la poche qu'à couper la chemise."
+    },
+    {
+      "id": "fr-holdout-v5-011",
+      "field": "caption",
+      "text": "De loin, la poche disparaît presque dans les grandes feuilles du tissu."
+    },
+    {
+      "id": "fr-holdout-v5-012",
+      "field": "altText",
+      "text": "Le dessin imprimé se prolonge sans rupture sur la poche rapportée."
+    },
+    {
+      "id": "fr-holdout-v5-013",
+      "field": "altText",
+      "text": "Une feuille traverse le bord cousu en conservant précisément son alignement."
+    },
+    {
+      "id": "fr-holdout-v5-014",
+      "field": "caption",
+      "text": "Portée un peu plus bas, cette ceinture donne une autre allure à ma tunique."
+    },
+    {
+      "id": "fr-holdout-v5-015",
+      "field": "caption",
+      "text": "Aujourd'hui, je laisse le tissu respirer au-dessus de la ceinture descendue."
+    },
+    {
+      "id": "fr-holdout-v5-016",
+      "field": "altText",
+      "text": "La ceinture repose sur les hanches sous un large pli de tunique."
+    },
+    {
+      "id": "fr-holdout-v5-017",
+      "field": "altText",
+      "text": "Une bande souple entoure le vêtement nettement sous sa ligne de taille."
+    },
+    {
+      "id": "fr-holdout-v5-018",
+      "field": "caption",
+      "text": "Les plis changent de sens sur la hanche, et c'est tout l'intérêt de cette jupe."
+    },
+    {
+      "id": "fr-holdout-v5-019",
+      "field": "caption",
+      "text": "J'ai découvert ce petit mouvement en photographiant la jupe de trois quarts."
+    },
+    {
+      "id": "fr-holdout-v5-020",
+      "field": "altText",
+      "text": "Les plis orientés vers le centre repartent vers l'extérieur au niveau des hanches."
+    },
+    {
+      "id": "fr-holdout-v5-021",
+      "field": "altText",
+      "text": "Une interruption nette modifie la direction des plis sur le côté de la jupe."
+    },
+    {
+      "id": "fr-holdout-v5-022",
+      "field": "caption",
+      "text": "La raie sur le côté accompagne joliment l'ouverture décalée de mon haut."
+    },
+    {
+      "id": "fr-holdout-v5-023",
+      "field": "caption",
+      "text": "J'ai simplement changé ma coiffure pour laisser vivre cet encadrement asymétrique."
+    },
+    {
+      "id": "fr-holdout-v5-024",
+      "field": "altText",
+      "text": "La raie latérale et l'encolure décentrée suivent deux lignes parallèles."
+    },
+    {
+      "id": "fr-holdout-v5-025",
+      "field": "altText",
+      "text": "Les cheveux dégagent le côté où le haut présente son ouverture la plus haute."
+    },
+    {
+      "id": "fr-holdout-v5-026",
+      "field": "caption",
+      "text": "Les pointes de ma chemise trouvent chacune une poche pour rester en place."
+    },
+    {
+      "id": "fr-holdout-v5-027",
+      "field": "caption",
+      "text": "Ce pliage croisé raccourcit la chemise sans former de gros nœud devant."
+    },
+    {
+      "id": "fr-holdout-v5-028",
+      "field": "altText",
+      "text": "Les deux pointes de chemise traversent le ventre avant de rejoindre les poches opposées."
+    },
+    {
+      "id": "fr-holdout-v5-029",
+      "field": "altText",
+      "text": "Le bas du chemisier forme un croisement plat au-dessus du pantalon."
+    },
+    {
+      "id": "fr-holdout-v5-030",
+      "field": "caption",
+      "text": "Un peu de vapeur a rendu au col sa courbe tranquille."
+    },
+    {
+      "id": "fr-holdout-v5-031",
+      "field": "caption",
+      "text": "Mon manteau avait gardé le pli du rangement; il retrouve enfin son arrondi."
+    },
+    {
+      "id": "fr-holdout-v5-032",
+      "field": "altText",
+      "text": "Le col du manteau présente une courbe souple après disparition du pli central."
+    },
+    {
+      "id": "fr-holdout-v5-033",
+      "field": "altText",
+      "text": "Un défroisseur repose près du manteau dont le col vient d'être remis en forme."
+    },
+    {
+      "id": "fr-holdout-v5-034",
+      "field": "caption",
+      "text": "La toile d'essai me permet de vérifier la robe avant de couper le beau tissu."
+    },
+    {
+      "id": "fr-holdout-v5-035",
+      "field": "caption",
+      "text": "J'ai porté ce premier montage quelques minutes pour repérer les zones à reprendre."
+    },
+    {
+      "id": "fr-holdout-v5-036",
+      "field": "altText",
+      "text": "Une robe d'essai en coton brut porte plusieurs petits repères de couture."
+    },
+    {
+      "id": "fr-holdout-v5-037",
+      "field": "altText",
+      "text": "Le montage provisoire montre des bords non finis et des pinces encore épinglées."
+    },
+    {
+      "id": "fr-holdout-v5-038",
+      "field": "caption",
+      "text": "Ce gros bouton sur le côté suffit à fermer toute la veste."
+    },
+    {
+      "id": "fr-holdout-v5-039",
+      "field": "caption",
+      "text": "J'ai gardé un seul bouton, placé loin du milieu, pour laisser le tissu tomber."
+    },
+    {
+      "id": "fr-holdout-v5-040",
+      "field": "altText",
+      "text": "Un bouton surdimensionné ferme la veste près de sa couture latérale."
+    },
+    {
+      "id": "fr-holdout-v5-041",
+      "field": "altText",
+      "text": "Les panneaux du devant se rejoignent sous une unique fixation décentrée."
+    },
+    {
+      "id": "fr-holdout-v5-042",
+      "field": "caption",
+      "text": "Mon foulard reste presque invisible, sauf ce trait qui dépasse du col."
+    },
+    {
+      "id": "fr-holdout-v5-043",
+      "field": "caption",
+      "text": "Je voulais un peu de douceur au cou sans ajouter une grosse épaisseur."
+    },
+    {
+      "id": "fr-holdout-v5-044",
+      "field": "altText",
+      "text": "Une fine bande de foulard apparaît entre la peau et le col relevé."
+    },
+    {
+      "id": "fr-holdout-v5-045",
+      "field": "altText",
+      "text": "Le carré plié à plat suit l'intérieur du col sans former de nœud visible."
+    },
+    {
+      "id": "fr-holdout-v5-046",
+      "field": "caption",
+      "text": "La doublure s'arrête avant le bas pour garder une jolie transparence à la cheville."
+    },
+    {
+      "id": "fr-holdout-v5-047",
+      "field": "caption",
+      "text": "Ce pantalon léger montre seulement sa dernière largeur de tissu sans doublure."
+    },
+    {
+      "id": "fr-holdout-v5-048",
+      "field": "altText",
+      "text": "La jambe du pantalon devient légèrement transparente sous la fin de la doublure."
+    },
+    {
+      "id": "fr-holdout-v5-049",
+      "field": "altText",
+      "text": "Une ligne intérieure distingue la partie doublée du bas laissé libre."
+    },
+    {
+      "id": "fr-holdout-v5-050",
+      "field": "caption",
+      "text": "Le petit plastron festonné transforme ma chemise de tous les jours."
+    },
+    {
+      "id": "fr-holdout-v5-051",
+      "field": "caption",
+      "text": "J'ai posé cette pièce arrondie sur un fond uni pour qu'on voie chaque découpe."
+    },
+    {
+      "id": "fr-holdout-v5-052",
+      "field": "altText",
+      "text": "Un plastron indépendant aux bords festonnés couvre le haut de la chemise."
+    },
+    {
+      "id": "fr-holdout-v5-053",
+      "field": "altText",
+      "text": "Les petits arcs du plastron se détachent sur une surface de coton lisse."
+    },
+    {
+      "id": "fr-holdout-v5-054",
+      "field": "caption",
+      "text": "La patte d'épaule empêche enfin la sangle de glisser quand je marche."
+    },
+    {
+      "id": "fr-holdout-v5-055",
+      "field": "caption",
+      "text": "J'ai passé la bandoulière sous l'épaulette plutôt que de la rattraper sans cesse."
+    },
+    {
+      "id": "fr-holdout-v5-056",
+      "field": "altText",
+      "text": "La sangle du sac traverse une patte boutonnée sur l'épaule de la veste."
+    },
+    {
+      "id": "fr-holdout-v5-057",
+      "field": "altText",
+      "text": "Une épaulette maintient la bandoulière contre le tissu du manteau."
+    },
+    {
+      "id": "fr-holdout-v5-058",
+      "field": "caption",
+      "text": "J'ai choisi le sac arrondi en regardant la forme de mes bouts de chaussures."
+    },
+    {
+      "id": "fr-holdout-v5-059",
+      "field": "caption",
+      "text": "Les courbes du sac et des souliers se répondent, même sans partager leur couleur."
+    },
+    {
+      "id": "fr-holdout-v5-060",
+      "field": "altText",
+      "text": "Les chaussures à bouts ronds accompagnent un petit sac aux coins très arrondis."
+    },
+    {
+      "id": "fr-holdout-v5-061",
+      "field": "altText",
+      "text": "La même courbe douce apparaît dans le contour des souliers et celui du sac."
+    },
+    {
+      "id": "fr-holdout-v5-062",
+      "field": "caption",
+      "text": "La cravate tricotée reste bien plate sous mon gilet fermé."
+    },
+    {
+      "id": "fr-holdout-v5-063",
+      "field": "caption",
+      "text": "J'ai glissé le bout de la cravate à l'intérieur pour ne garder que son relief."
+    },
+    {
+      "id": "fr-holdout-v5-064",
+      "field": "altText",
+      "text": "Une cravate en maille disparaît derrière les derniers boutons du gilet."
+    },
+    {
+      "id": "fr-holdout-v5-065",
+      "field": "altText",
+      "text": "Seule la partie haute du lien tricoté reste visible au-dessus du décolleté."
+    },
+    {
+      "id": "fr-holdout-v5-066",
+      "field": "caption",
+      "text": "Ces manches ont une ouverture ronde, sans fente ni bouton à manipuler."
+    },
+    {
+      "id": "fr-holdout-v5-067",
+      "field": "caption",
+      "text": "J'aime la simplicité du cercle qui termine chaque manche."
+    },
+    {
+      "id": "fr-holdout-v5-068",
+      "field": "altText",
+      "text": "L'extrémité de la manche forme un cercle continu autour du poignet."
+    },
+    {
+      "id": "fr-holdout-v5-069",
+      "field": "altText",
+      "text": "Le poignet est bordé d'une bande ronde sans interruption latérale."
+    },
+    {
+      "id": "fr-holdout-v5-070",
+      "field": "caption",
+      "text": "Le cordon intérieur soulève la jupe juste assez pour dégager mes chaussures."
+    },
+    {
+      "id": "fr-holdout-v5-071",
+      "field": "caption",
+      "text": "J'ai tiré seulement d'un côté pour obtenir cette diagonale souple."
+    },
+    {
+      "id": "fr-holdout-v5-072",
+      "field": "altText",
+      "text": "Un cordon intérieur relève le panneau de jupe en une draperie diagonale."
+    },
+    {
+      "id": "fr-holdout-v5-073",
+      "field": "altText",
+      "text": "Les plis du vêtement convergent vers un point réglable près de la hanche."
+    },
+    {
+      "id": "fr-holdout-v5-074",
+      "field": "caption",
+      "text": "La petite bride de ma manche retient mon bracelet pendant que j'écris."
+    },
+    {
+      "id": "fr-holdout-v5-075",
+      "field": "caption",
+      "text": "Ce lien discret évite que le jonc redescende sur ma main."
+    },
+    {
+      "id": "fr-holdout-v5-076",
+      "field": "altText",
+      "text": "Une fine bride de chemise passe autour du bracelet près du poignet."
+    },
+    {
+      "id": "fr-holdout-v5-077",
+      "field": "altText",
+      "text": "Le jonc repose contre la manche, maintenu par une courte languette textile."
+    },
+    {
+      "id": "fr-holdout-v5-078",
+      "field": "caption",
+      "text": "J'ai retourné la parementure du tricot pour montrer sa construction."
+    },
+    {
+      "id": "fr-holdout-v5-079",
+      "field": "caption",
+      "text": "L'envers forme maintenant une bande large, presque comme un petit cadre."
+    },
+    {
+      "id": "fr-holdout-v5-080",
+      "field": "altText",
+      "text": "La parementure en maille est rabattue sur l'extérieur du vêtement."
+    },
+    {
+      "id": "fr-holdout-v5-081",
+      "field": "altText",
+      "text": "Une large bande retournée montre les mailles de l'autre face autour de l'ouverture."
+    },
+    {
+      "id": "fr-holdout-v5-082",
+      "field": "caption",
+      "text": "Le manteau sans manches laisse toute la place aux manches généreuses de ma blouse."
+    },
+    {
+      "id": "fr-holdout-v5-083",
+      "field": "caption",
+      "text": "Enfin une couche extérieure qui ne comprime pas ces poignets volumineux."
+    },
+    {
+      "id": "fr-holdout-v5-084",
+      "field": "altText",
+      "text": "Les manches amples de la blouse sortent d'un long manteau sans manches."
+    },
+    {
+      "id": "fr-holdout-v5-085",
+      "field": "altText",
+      "text": "Une grande emmanchure encadre les plis souples de la couche intérieure."
+    },
+    {
+      "id": "fr-holdout-v5-086",
+      "field": "caption",
+      "text": "J'ai ajouté une petite pièce intérieure pour soutenir l'arrière de mes souliers."
+    },
+    {
+      "id": "fr-holdout-v5-087",
+      "field": "caption",
+      "text": "Le talon du soulier garde mieux sa forme depuis cette réparation."
+    },
+    {
+      "id": "fr-holdout-v5-088",
+      "field": "altText",
+      "text": "Une pièce de renfort épouse l'intérieur de l'arrière d'une chaussure."
+    },
+    {
+      "id": "fr-holdout-v5-089",
+      "field": "altText",
+      "text": "Le contrefort réparé reste bien droit au-dessus de la semelle."
+    },
+    {
+      "id": "fr-holdout-v5-090",
+      "field": "caption",
+      "text": "Mes nouveaux trous suivent une diagonale sur le bout de la ceinture."
+    },
+    {
+      "id": "fr-holdout-v5-091",
+      "field": "caption",
+      "text": "J'ai enfin ajusté cette vieille ceinture à la bonne longueur."
+    },
+    {
+      "id": "fr-holdout-v5-092",
+      "field": "altText",
+      "text": "De petits trous percés à la main forment une ligne oblique sur le cuir."
+    },
+    {
+      "id": "fr-holdout-v5-093",
+      "field": "altText",
+      "text": "Le dernier trou de réglage se trouve près de l'extrémité effilée de la ceinture."
+    },
+    {
+      "id": "fr-holdout-v5-094",
+      "field": "caption",
+      "text": "En retirant quelques fronces, j'ai ouvert le col qui me semblait trop serré."
+    },
+    {
+      "id": "fr-holdout-v5-095",
+      "field": "caption",
+      "text": "La blouse respire mieux depuis que son encolure est moins ramassée."
+    },
+    {
+      "id": "fr-holdout-v5-096",
+      "field": "altText",
+      "text": "Une partie du fil de fronce a été retirée autour de l'encolure."
+    },
+    {
+      "id": "fr-holdout-v5-097",
+      "field": "altText",
+      "text": "Le bord du col s'étale davantage près de la petite ouverture centrale."
+    },
+    {
+      "id": "fr-holdout-v5-098",
+      "field": "caption",
+      "text": "Une assiette a servi de gabarit pour le fond de ce sac."
+    },
+    {
+      "id": "fr-holdout-v5-099",
+      "field": "caption",
+      "text": "La base ronde donne juste le volume qu'il fallait à mon petit pochon."
+    },
+    {
+      "id": "fr-holdout-v5-100",
+      "field": "altText",
+      "text": "Une base circulaire en tissu est posée près de l'assiette utilisée comme gabarit."
+    },
+    {
+      "id": "fr-holdout-v5-101",
+      "field": "altText",
+      "text": "Le fond rond du sac rejoint les côtés par une couture régulière."
+    },
+    {
+      "id": "fr-holdout-v5-102",
+      "field": "caption",
+      "text": "Les manches ont été raccourcies de l'intérieur pour préserver leur finition d'origine."
+    },
+    {
+      "id": "fr-holdout-v5-103",
+      "field": "caption",
+      "text": "J'ai gardé les boutons au même endroit en reprenant la longueur plus haut."
+    },
+    {
+      "id": "fr-holdout-v5-104",
+      "field": "altText",
+      "text": "Le bord de manche d'origine reste intact malgré la longueur raccourcie."
+    },
+    {
+      "id": "fr-holdout-v5-105",
+      "field": "altText",
+      "text": "Une reprise discrète à l'intérieur réduit la manche au-dessus de son poignet décoré."
+    },
+    {
+      "id": "fr-holdout-v5-106",
+      "field": "caption",
+      "text": "Un petit nœud textile remplit juste le haut de ce décolleté profond."
+    },
+    {
+      "id": "fr-holdout-v5-107",
+      "field": "caption",
+      "text": "J'ai placé le lien assez haut pour garder la longue ouverture visible."
+    },
+    {
+      "id": "fr-holdout-v5-108",
+      "field": "altText",
+      "text": "Un nœud court relie les deux côtés d'un décolleté en V profond."
+    },
+    {
+      "id": "fr-holdout-v5-109",
+      "field": "altText",
+      "text": "La petite attache horizontale traverse la partie supérieure de l'ouverture."
+    },
+    {
+      "id": "fr-holdout-v5-110",
+      "field": "caption",
+      "text": "La ceinture passe au-dessus des poches sans gêner leur ouverture."
+    },
+    {
+      "id": "fr-holdout-v5-111",
+      "field": "caption",
+      "text": "J'ai déplacé les poches du tablier plus bas pour pouvoir le ceinturer."
+    },
+    {
+      "id": "fr-holdout-v5-112",
+      "field": "altText",
+      "text": "Deux poches de tablier restent entièrement accessibles sous la ceinture."
+    },
+    {
+      "id": "fr-holdout-v5-113",
+      "field": "altText",
+      "text": "Une bande de taille sépare nettement le corsage des grandes poches basses."
+    },
+    {
+      "id": "fr-holdout-v5-114",
+      "field": "caption",
+      "text": "La broche tient sur le bord roulé du chapeau sans toucher la calotte."
+    },
+    {
+      "id": "fr-holdout-v5-115",
+      "field": "caption",
+      "text": "J'ai déplacé mon petit bijou sur la courbe du chapeau pour changer."
+    },
+    {
+      "id": "fr-holdout-v5-116",
+      "field": "altText",
+      "text": "Une broche étroite est fixée au rebord roulé d'un chapeau."
+    },
+    {
+      "id": "fr-holdout-v5-117",
+      "field": "altText",
+      "text": "Le bijou suit la courbe extérieure du bord, loin du bandeau central."
+    },
+    {
+      "id": "fr-holdout-v5-118",
+      "field": "caption",
+      "text": "Le bas du pantalon rejoint la bottine sans la recouvrir entièrement."
+    },
+    {
+      "id": "fr-holdout-v5-119",
+      "field": "caption",
+      "text": "J'ai testé ce petit espace entre la tige et le tissu avant de sortir."
+    },
+    {
+      "id": "fr-holdout-v5-120",
+      "field": "altText",
+      "text": "Le pantalon s'arrête juste au-dessus de la tige courte des bottines."
+    },
+    {
+      "id": "fr-holdout-v5-121",
+      "field": "altText",
+      "text": "Une séparation étroite reste visible entre les chaussures et le bas du vêtement."
+    },
+    {
+      "id": "fr-holdout-v5-122",
+      "field": "caption",
+      "text": "L'organza caché dans la manche lui permet de garder sa forme."
+    },
+    {
+      "id": "fr-holdout-v5-123",
+      "field": "caption",
+      "text": "Le volume paraît léger, pourtant une seconde étoffe le soutient en dessous."
+    },
+    {
+      "id": "fr-holdout-v5-124",
+      "field": "altText",
+      "text": "Une fine couche d'organza soutient la manche de soie par l'intérieur."
+    },
+    {
+      "id": "fr-holdout-v5-125",
+      "field": "altText",
+      "text": "Le tissu extérieur forme un volume arrondi au-dessus du renfort transparent."
+    },
+    {
+      "id": "fr-holdout-v5-126",
+      "field": "caption",
+      "text": "Le biais posé à cheval couvre enfin le bord qui s'effilochait."
+    },
+    {
+      "id": "fr-holdout-v5-127",
+      "field": "caption",
+      "text": "J'ai choisi une finition fine pour ne pas épaissir l'encolure."
+    },
+    {
+      "id": "fr-holdout-v5-128",
+      "field": "altText",
+      "text": "Un ruban de biais enveloppe le bord brut de l'encolure."
+    },
+    {
+      "id": "fr-holdout-v5-129",
+      "field": "altText",
+      "text": "La petite bande pliée couvre les fils libres autour du passage de tête."
+    },
+    {
+      "id": "fr-holdout-v5-130",
+      "field": "caption",
+      "text": "Sous la poignée, les plis s'ouvrent comme un petit éventail."
+    },
+    {
+      "id": "fr-holdout-v5-131",
+      "field": "caption",
+      "text": "J'ai concentré la largeur du sac en un seul point pour former cette poignée."
+    },
+    {
+      "id": "fr-holdout-v5-132",
+      "field": "altText",
+      "text": "Plusieurs plis rayonnent depuis la base de la poignée du sac."
+    },
+    {
+      "id": "fr-holdout-v5-133",
+      "field": "altText",
+      "text": "Le tissu large est resserré en éventail sous une anse rigide."
+    },
+    {
+      "id": "fr-holdout-v5-134",
+      "field": "caption",
+      "text": "J'ai fait deux passages autour de la boucle pour maintenir ce tissu très souple."
+    },
+    {
+      "id": "fr-holdout-v5-135",
+      "field": "caption",
+      "text": "Le second tour évite que la ceinture se détende en marchant."
+    },
+    {
+      "id": "fr-holdout-v5-136",
+      "field": "altText",
+      "text": "La bande textile effectue deux tours autour de la barre de boucle."
+    },
+    {
+      "id": "fr-holdout-v5-137",
+      "field": "altText",
+      "text": "Une double épaisseur de tissu maintient le réglage de la ceinture."
+    },
+    {
+      "id": "fr-holdout-v5-138",
+      "field": "caption",
+      "text": "Deux perles cachées empêchent les pointes du col de se retourner."
+    },
+    {
+      "id": "fr-holdout-v5-139",
+      "field": "caption",
+      "text": "J'ai lesté le dessous de ce col léger avec de tout petits poids."
+    },
+    {
+      "id": "fr-holdout-v5-140",
+      "field": "altText",
+      "text": "Une perle est cousue sous chaque pointe du col de chemise."
+    },
+    {
+      "id": "fr-holdout-v5-141",
+      "field": "altText",
+      "text": "Les petits poids restent invisibles sur la face extérieure des pointes."
+    },
+    {
+      "id": "fr-holdout-v5-142",
+      "field": "caption",
+      "text": "La poche s'ouvre dans la couture, sans ajouter de forme sur la jupe."
+    },
+    {
+      "id": "fr-holdout-v5-143",
+      "field": "caption",
+      "text": "J'ai réussi à cacher cette poche dans la ligne du côté."
+    },
+    {
+      "id": "fr-holdout-v5-144",
+      "field": "altText",
+      "text": "La main entre dans une poche dissimulée dans la couture latérale."
+    },
+    {
+      "id": "fr-holdout-v5-145",
+      "field": "altText",
+      "text": "Une courte ouverture suit exactement la jonction des panneaux de jupe."
+    },
+    {
+      "id": "fr-holdout-v5-146",
+      "field": "caption",
+      "text": "Le vieux lien rigide du gilet a laissé place à un ruban souple."
+    },
+    {
+      "id": "fr-holdout-v5-147",
+      "field": "caption",
+      "text": "Maintenant je peux régler le dos sans sentir la boucle contre moi."
+    },
+    {
+      "id": "fr-holdout-v5-148",
+      "field": "altText",
+      "text": "Un ruban noué remplace la boucle de réglage à l'arrière du gilet."
+    },
+    {
+      "id": "fr-holdout-v5-149",
+      "field": "altText",
+      "text": "Deux bandes fines rassemblent le tissu du dos en un nœud plat."
+    },
+    {
+      "id": "fr-holdout-v5-150",
+      "field": "caption",
+      "text": "Un pli en diagonale donne une pointe à la manche retroussée."
+    },
+    {
+      "id": "fr-holdout-v5-151",
+      "field": "caption",
+      "text": "J'ai essayé un revers triangulaire sur cette chemise vraiment toute simple."
+    },
+    {
+      "id": "fr-holdout-v5-152",
+      "field": "altText",
+      "text": "Le poignet de chemise est replié en diagonale pour former une pointe."
+    },
+    {
+      "id": "fr-holdout-v5-153",
+      "field": "altText",
+      "text": "Un bord triangulaire dépasse du revers placé sur l'avant-bras."
+    },
+    {
+      "id": "fr-holdout-v5-154",
+      "field": "caption",
+      "text": "La petite chaîne suit une couture ouverte sur le devant de ma veste."
+    },
+    {
+      "id": "fr-holdout-v5-155",
+      "field": "caption",
+      "text": "J'ai utilisé les passages prévus dans le tissu pour guider ce bijou."
+    },
+    {
+      "id": "fr-holdout-v5-156",
+      "field": "altText",
+      "text": "Une fine chaîne traverse plusieurs petites ouvertures le long d'une couture."
+    },
+    {
+      "id": "fr-holdout-v5-157",
+      "field": "altText",
+      "text": "Le métal forme une ligne souple sur le devant de la veste."
+    },
+    {
+      "id": "fr-holdout-v5-158",
+      "field": "caption",
+      "text": "Mon châle se roule et se fixe à sa propre petite boucle."
+    },
+    {
+      "id": "fr-holdout-v5-159",
+      "field": "caption",
+      "text": "J'ai pu le transporter sans sac en refermant le lien cousu au bord."
+    },
+    {
+      "id": "fr-holdout-v5-160",
+      "field": "altText",
+      "text": "Un châle roulé est retenu par une boucle cousue dans son bord."
+    },
+    {
+      "id": "fr-holdout-v5-161",
+      "field": "altText",
+      "text": "Le petit paquet de tissu possède une courte attache permettant de le porter."
+    },
+    {
+      "id": "fr-holdout-v5-162",
+      "field": "caption",
+      "text": "Les boutons disparaissent derrière le grand pli puis réapparaissent plus bas."
+    },
+    {
+      "id": "fr-holdout-v5-163",
+      "field": "caption",
+      "text": "Cette fermeture en deux temps est ma partie préférée de la tunique."
+    },
+    {
+      "id": "fr-holdout-v5-164",
+      "field": "altText",
+      "text": "Un large pli masque la partie centrale de la rangée de boutons."
+    },
+    {
+      "id": "fr-holdout-v5-165",
+      "field": "altText",
+      "text": "La boutonnière reprend au-dessous du panneau replié du devant."
+    },
+    {
+      "id": "fr-holdout-v5-166",
+      "field": "caption",
+      "text": "J'ai retiré le petit capuchon métallique pour refaire le lien du pompon."
+    },
+    {
+      "id": "fr-holdout-v5-167",
+      "field": "caption",
+      "text": "Le gland du sac est réparé et retrouve sa place près de la poignée."
+    },
+    {
+      "id": "fr-holdout-v5-168",
+      "field": "altText",
+      "text": "Le capuchon séparé laisse voir la fixation des fils d'un gland décoratif."
+    },
+    {
+      "id": "fr-holdout-v5-169",
+      "field": "altText",
+      "text": "Un pompon ouvert et sa petite pièce métallique reposent à côté du sac."
+    },
+    {
+      "id": "fr-holdout-v5-170",
+      "field": "caption",
+      "text": "Un mini bouton-pression empêche cette poche de bâiller."
+    },
+    {
+      "id": "fr-holdout-v5-171",
+      "field": "caption",
+      "text": "J'ai fermé discrètement le haut de la poche pour conserver sa jolie ligne."
+    },
+    {
+      "id": "fr-holdout-v5-172",
+      "field": "altText",
+      "text": "Une petite pression intérieure rapproche les deux bords de la poche."
+    },
+    {
+      "id": "fr-holdout-v5-173",
+      "field": "altText",
+      "text": "L'entrée du compartiment reste plate grâce à une fixation cachée."
+    },
+    {
+      "id": "fr-holdout-v5-174",
+      "field": "caption",
+      "text": "La bande côtelée a rendu ce pantalon beaucoup plus souple à la taille."
+    },
+    {
+      "id": "fr-holdout-v5-175",
+      "field": "caption",
+      "text": "J'ai remplacé la ceinture rigide par une pièce tricotée bien plus confortable."
+    },
+    {
+      "id": "fr-holdout-v5-176",
+      "field": "altText",
+      "text": "Une large bande de maille côtelée remplace la taille du pantalon."
+    },
+    {
+      "id": "fr-holdout-v5-177",
+      "field": "altText",
+      "text": "Le corps tissé rejoint une ceinture souple aux reliefs verticaux."
+    },
+    {
+      "id": "fr-holdout-v5-178",
+      "field": "caption",
+      "text": "Les deux chaînes sont accrochées aux épaules pour garder leur écart."
+    },
+    {
+      "id": "fr-holdout-v5-179",
+      "field": "caption",
+      "text": "J'ai ajouté de minuscules attaches pour que ce bijou reste bien réparti."
+    },
+    {
+      "id": "fr-holdout-v5-180",
+      "field": "altText",
+      "text": "Deux chaînes sont fixées à de petites boucles aux épaules du haut."
+    },
+    {
+      "id": "fr-holdout-v5-181",
+      "field": "altText",
+      "text": "Les colliers forment des courbes séparées qui gardent leur distance."
+    },
+    {
+      "id": "fr-holdout-v5-182",
+      "field": "caption",
+      "text": "Je relève le bas avec des pinces pour comparer deux hauteurs de chaussures."
+    },
+    {
+      "id": "fr-holdout-v5-183",
+      "field": "caption",
+      "text": "L'essayage montre vite quelle longueur accompagne le mieux chaque paire."
+    },
+    {
+      "id": "fr-holdout-v5-184",
+      "field": "altText",
+      "text": "Des pinces relèvent le bord de robe au-dessus de deux chaussures différentes."
+    },
+    {
+      "id": "fr-holdout-v5-185",
+      "field": "altText",
+      "text": "Le tissu provisoirement raccourci permet de voir le soulier pendant l'essayage."
+    },
+    {
+      "id": "fr-holdout-v5-186",
+      "field": "caption",
+      "text": "J'ai replié le revers vers l'intérieur pour lui donner une largeur plus discrète."
+    },
+    {
+      "id": "fr-holdout-v5-187",
+      "field": "caption",
+      "text": "Sans couper la veste, j'obtiens déjà une autre ligne près du visage."
+    },
+    {
+      "id": "fr-holdout-v5-188",
+      "field": "altText",
+      "text": "Un revers large est maintenu plus étroit par un pli rentré."
+    },
+    {
+      "id": "fr-holdout-v5-189",
+      "field": "altText",
+      "text": "La doublure intérieure absorbe la partie de tissu rabattue sous le revers."
+    },
+    {
+      "id": "fr-holdout-v5-190",
+      "field": "caption",
+      "text": "La languette tressée remplace celle qui était devenue trop raide."
+    },
+    {
+      "id": "fr-holdout-v5-191",
+      "field": "caption",
+      "text": "J'ai utilisé des lanières souples pour refaire le dessus de mes chaussures."
+    },
+    {
+      "id": "fr-holdout-v5-192",
+      "field": "altText",
+      "text": "La languette de chaussure est constituée de trois bandes textiles tressées."
+    },
+    {
+      "id": "fr-holdout-v5-193",
+      "field": "altText",
+      "text": "Une tresse plate repose sous les lacets entre deux bords de cuir."
+    },
+    {
+      "id": "fr-holdout-v5-194",
+      "field": "caption",
+      "text": "Ce chapeau possède un pli prévu pour voyager sans se déformer."
+    },
+    {
+      "id": "fr-holdout-v5-195",
+      "field": "caption",
+      "text": "J'ai suivi sa ligne centrale avant de le glisser dans la housse."
+    },
+    {
+      "id": "fr-holdout-v5-196",
+      "field": "altText",
+      "text": "Le chapeau se plie en deux suivant la ligne de voyage marquée sur son sommet."
+    },
+    {
+      "id": "fr-holdout-v5-197",
+      "field": "altText",
+      "text": "Les deux moitiés du bord se rejoignent dans une housse étroite."
+    },
+    {
+      "id": "fr-holdout-v5-198",
+      "field": "caption",
+      "text": "En retirant le cordon, mon petit sac devient une pochette presque plate."
+    },
+    {
+      "id": "fr-holdout-v5-199",
+      "field": "caption",
+      "text": "J'aime cette seconde forme, beaucoup plus simple à glisser sous le bras."
+    },
+    {
+      "id": "fr-holdout-v5-200",
+      "field": "altText",
+      "text": "Le sac sans son cordon de serrage présente un bord supérieur droit."
+    },
+    {
+      "id": "fr-holdout-v5-201",
+      "field": "altText",
+      "text": "La pochette dépliée repose à côté du lien qui la transformait en bourse."
+    },
+    {
+      "id": "fr-holdout-v5-202",
+      "field": "caption",
+      "text": "Le col montant dépasse du polo ouvert comme une petite seconde bordure."
+    },
+    {
+      "id": "fr-holdout-v5-203",
+      "field": "caption",
+      "text": "J'ai ressorti mon polo léger avec un dessous fin qui prolonge sa saison."
+    },
+    {
+      "id": "fr-holdout-v5-204",
+      "field": "altText",
+      "text": "Un col roulé étroit apparaît dans l'ouverture boutonnée du polo."
+    },
+    {
+      "id": "fr-holdout-v5-205",
+      "field": "altText",
+      "text": "Le haut à manches courtes recouvre une couche intérieure au cou bien ajusté."
+    },
+    {
+      "id": "fr-holdout-v5-206",
+      "field": "caption",
+      "text": "J'ai vérifié mes bretelles assise avant de choisir leur longueur définitive."
+    },
+    {
+      "id": "fr-holdout-v5-207",
+      "field": "caption",
+      "text": "Le réglage debout paraissait bon, mais quelques centimètres de plus changent tout."
+    },
+    {
+      "id": "fr-holdout-v5-208",
+      "field": "altText",
+      "text": "La personne assise règle le curseur de ses bretelles devant la poitrine."
+    },
+    {
+      "id": "fr-holdout-v5-209",
+      "field": "altText",
+      "text": "Une bande desserrée donne davantage de longueur aux bretelles sur le pantalon."
+    },
+    {
+      "id": "fr-holdout-v5-210",
+      "field": "caption",
+      "text": "La lumière derrière moi montre bien l'ampleur réelle de cette robe."
+    },
+    {
+      "id": "fr-holdout-v5-211",
+      "field": "caption",
+      "text": "Sans changer de pose, j'ai découvert tout le contour du tissu dans le contre-jour."
+    },
+    {
+      "id": "fr-holdout-v5-212",
+      "field": "altText",
+      "text": "Le contre-jour dessine la silhouette évasée de la robe sans en montrer les petits motifs."
+    },
+    {
+      "id": "fr-holdout-v5-213",
+      "field": "altText",
+      "text": "Une lumière arrière souligne les deux bords extérieurs du vêtement ample."
+    },
+    {
+      "id": "fr-holdout-v5-214",
+      "field": "caption",
+      "text": "La poche coupée en biais fait tourner les rayures au milieu de la chemise."
+    },
+    {
+      "id": "fr-holdout-v5-215",
+      "field": "caption",
+      "text": "J'ai préféré un raccord volontairement différent pour cette petite poche."
+    },
+    {
+      "id": "fr-holdout-v5-216",
+      "field": "altText",
+      "text": "Les rayures de la poche sont diagonales sur un fond rayé verticalement."
+    },
+    {
+      "id": "fr-holdout-v5-217",
+      "field": "altText",
+      "text": "Un rectangle incliné interrompt les lignes droites du devant de chemise."
+    },
+    {
+      "id": "fr-holdout-v5-218",
+      "field": "caption",
+      "text": "La petite ouverture de la casquette laisse passer ma queue de cheval sans tirer."
+    },
+    {
+      "id": "fr-holdout-v5-219",
+      "field": "caption",
+      "text": "J'ai trouvé une position confortable entre l'attache des cheveux et le réglage arrière."
+    },
+    {
+      "id": "fr-holdout-v5-220",
+      "field": "altText",
+      "text": "La queue de cheval traverse l'ouverture arrière de la casquette."
+    },
+    {
+      "id": "fr-holdout-v5-221",
+      "field": "altText",
+      "text": "La bande de réglage passe juste sous les cheveux rassemblés."
+    },
+    {
+      "id": "fr-holdout-v5-222",
+      "field": "caption",
+      "text": "Un bouton au milieu suffit pour donner du mouvement aux deux bouts du gilet."
+    },
+    {
+      "id": "fr-holdout-v5-223",
+      "field": "caption",
+      "text": "Aujourd'hui je ferme seulement le centre et je laisse le reste s'écarter."
+    },
+    {
+      "id": "fr-holdout-v5-224",
+      "field": "altText",
+      "text": "Seul le bouton central du gilet est fermé sur la chemise."
+    },
+    {
+      "id": "fr-holdout-v5-225",
+      "field": "altText",
+      "text": "Les extrémités supérieures et inférieures du vêtement restent libres autour du point fermé."
+    },
+    {
+      "id": "fr-holdout-v5-226",
+      "field": "caption",
+      "text": "Le fil visible au poignet retrouve exactement la teinte de mes chaussettes."
+    },
+    {
+      "id": "fr-holdout-v5-227",
+      "field": "caption",
+      "text": "Ce petit rappel entre la manche et les chevilles suffit à relier ma tenue."
+    },
+    {
+      "id": "fr-holdout-v5-228",
+      "field": "altText",
+      "text": "Les coutures du poignet et les chaussettes partagent la même couleur vive."
+    },
+    {
+      "id": "fr-holdout-v5-229",
+      "field": "altText",
+      "text": "Un détail cousu sur la manche répond à la bande visible au-dessus des chaussures."
+    },
+    {
+      "id": "fr-holdout-v5-230",
+      "field": "caption",
+      "text": "J'ai glissé mon bonnet dans la manche du manteau pour ne pas l'oublier."
+    },
+    {
+      "id": "fr-holdout-v5-231",
+      "field": "caption",
+      "text": "Le bonnet accompagne le manteau jusque sur le portemanteau, bien au chaud dans une manche."
+    },
+    {
+      "id": "fr-holdout-v5-232",
+      "field": "altText",
+      "text": "Un bonnet souple dépasse légèrement du poignet d'un manteau suspendu."
+    },
+    {
+      "id": "fr-holdout-v5-233",
+      "field": "altText",
+      "text": "La manche vide contient un petit bonnet replié, visible à son ouverture."
+    },
+    {
+      "id": "fr-holdout-v5-234",
+      "field": "caption",
+      "text": "J'ai remplacé les boutons difficiles par des boucles plus faciles à attraper."
+    },
+    {
+      "id": "fr-holdout-v5-235",
+      "field": "caption",
+      "text": "La nouvelle fermeture garde la douceur du gilet tout en simplifiant le geste."
+    },
+    {
+      "id": "fr-holdout-v5-236",
+      "field": "altText",
+      "text": "De grandes boucles textiles remplacent les anciennes petites attaches du gilet."
+    },
+    {
+      "id": "fr-holdout-v5-237",
+      "field": "altText",
+      "text": "Les nouveaux passants souples se saisissent facilement entre deux doigts."
+    },
+    {
+      "id": "fr-holdout-v5-238",
+      "field": "caption",
+      "text": "Le tablier se noue sur la couture du côté, loin du milieu du dos."
+    },
+    {
+      "id": "fr-holdout-v5-239",
+      "field": "caption",
+      "text": "J'ai déplacé le lien pour pouvoir m'asseoir sans sentir de nœud derrière moi."
+    },
+    {
+      "id": "fr-holdout-v5-240",
+      "field": "altText",
+      "text": "Le nœud du tablier repose sur une hanche plutôt qu'au dos."
+    },
+    {
+      "id": "fr-holdout-v5-241",
+      "field": "altText",
+      "text": "Les deux liens se rejoignent près de la couture latérale de la robe."
+    },
+    {
+      "id": "fr-holdout-v5-242",
+      "field": "caption",
+      "text": "Deux pressions sous les bras évitent que ma chemise s'ouvre quand je lève les mains."
+    },
+    {
+      "id": "fr-holdout-v5-243",
+      "field": "caption",
+      "text": "J'ai ajouté les petites attaches à l'intérieur pour garder le devant très simple."
+    },
+    {
+      "id": "fr-holdout-v5-244",
+      "field": "altText",
+      "text": "Une pression intérieure maintient les côtés de la chemise sous chaque bras."
+    },
+    {
+      "id": "fr-holdout-v5-245",
+      "field": "altText",
+      "text": "Les larges panneaux restent rapprochés grâce à deux attaches cachées dans les coutures."
+    },
+    {
+      "id": "fr-holdout-v5-246",
+      "field": "caption",
+      "text": "J'ai monté quelques marches pour vérifier que ce long manteau me laisse bouger."
+    },
+    {
+      "id": "fr-holdout-v5-247",
+      "field": "caption",
+      "text": "Le nouvel ourlet passe bien au-dessus de la marche quand je plie le genou."
+    },
+    {
+      "id": "fr-holdout-v5-248",
+      "field": "altText",
+      "text": "Le pied monte sur une marche pendant que le manteau reste dégagé du sol."
+    },
+    {
+      "id": "fr-holdout-v5-249",
+      "field": "altText",
+      "text": "Le bas du vêtement est photographié en mouvement sur un petit escalier."
+    },
+    {
+      "id": "fr-holdout-v5-250",
+      "field": "caption",
+      "text": "Les angles des lunettes rappellent ceux des boucles, sans faire un ensemble trop assorti."
+    },
+    {
+      "id": "fr-holdout-v5-251",
+      "field": "caption",
+      "text": "J'ai rapproché mes accessoires pour comparer leurs lignes avant de les porter."
+    },
+    {
+      "id": "fr-holdout-v5-252",
+      "field": "altText",
+      "text": "Des boucles anguleuses accompagnent des lunettes à monture géométrique."
+    },
+    {
+      "id": "fr-holdout-v5-253",
+      "field": "altText",
+      "text": "Les deux accessoires présentent des coins semblables près du visage."
+    },
+    {
+      "id": "fr-holdout-v5-254",
+      "field": "caption",
+      "text": "Le foulard suit la tresse et remplace presque toute décoration dans mes cheveux."
+    },
+    {
+      "id": "fr-holdout-v5-255",
+      "field": "caption",
+      "text": "J'ai gardé une longue pointe de tissu pour finir ma tresse tout simplement."
+    },
+    {
+      "id": "fr-holdout-v5-256",
+      "field": "altText",
+      "text": "Un ruban de foulard passe entre les mèches d'une tresse."
+    },
+    {
+      "id": "fr-holdout-v5-257",
+      "field": "altText",
+      "text": "La longue tresse mélange cheveux et bande de tissu imprimé."
+    },
+    {
+      "id": "fr-holdout-v5-258",
+      "field": "caption",
+      "text": "J'ai placé le renfort juste sous le coude pour qu'il ne plie pas au mauvais endroit."
+    },
+    {
+      "id": "fr-holdout-v5-259",
+      "field": "caption",
+      "text": "L'essayage m'a montré où coudre cette pièce pour garder le bras libre."
+    },
+    {
+      "id": "fr-holdout-v5-260",
+      "field": "altText",
+      "text": "Un renfort ovale est cousu sous la zone d'articulation du coude."
+    },
+    {
+      "id": "fr-holdout-v5-261",
+      "field": "altText",
+      "text": "La pièce rapportée reste plate lorsque le bras se replie."
+    },
+    {
+      "id": "fr-holdout-v5-262",
+      "field": "caption",
+      "text": "Le réglage du col se cache entièrement dans sa petite coulisse intérieure."
+    },
+    {
+      "id": "fr-holdout-v5-263",
+      "field": "caption",
+      "text": "J'ai raccourci les cordons pour qu'aucun bout ne pende devant la veste."
+    },
+    {
+      "id": "fr-holdout-v5-264",
+      "field": "altText",
+      "text": "Une coulisse intérieure permet de resserrer le col sans montrer de cordon extérieur."
+    },
+    {
+      "id": "fr-holdout-v5-265",
+      "field": "altText",
+      "text": "Les petits arrêts de réglage sont rangés sous le bord du col."
+    },
+    {
+      "id": "fr-holdout-v5-266",
+      "field": "caption",
+      "text": "La manche s'étale presque comme un éventail avant de reprendre sa forme sur le bras."
+    },
+    {
+      "id": "fr-holdout-v5-267",
+      "field": "caption",
+      "text": "J'ai photographié le pliage à plat pour comprendre ce patron étonnant."
+    },
+    {
+      "id": "fr-holdout-v5-268",
+      "field": "altText",
+      "text": "La manche retirée du bras est étalée pour montrer ses nombreux plis."
+    },
+    {
+      "id": "fr-holdout-v5-269",
+      "field": "altText",
+      "text": "Les replis de tissu forment une large figure en éventail sur la table."
+    },
+    {
+      "id": "fr-holdout-v5-270",
+      "field": "caption",
+      "text": "Ma montre passe aujourd'hui au-dessus du gant pour rester facile à lire."
+    },
+    {
+      "id": "fr-holdout-v5-271",
+      "field": "caption",
+      "text": "Le bracelet règle aussi la petite épaisseur du gant autour du poignet."
+    },
+    {
+      "id": "fr-holdout-v5-272",
+      "field": "altText",
+      "text": "Une montre est attachée sur le gant long, à hauteur du poignet."
+    },
+    {
+      "id": "fr-holdout-v5-273",
+      "field": "altText",
+      "text": "La montre se détache nettement sur le gant long qui enveloppe la main."
+    },
+    {
+      "id": "fr-holdout-v5-274",
+      "field": "caption",
+      "text": "Je me suis agenouillée pour voir si la coupe me laissait assez de place."
+    },
+    {
+      "id": "fr-holdout-v5-275",
+      "field": "caption",
+      "text": "Ce pantalon a passé mon petit test de mouvement avant sa première sortie."
+    },
+    {
+      "id": "fr-holdout-v5-276",
+      "field": "altText",
+      "text": "Le pantalon conserve une légère aisance au genou pendant une position agenouillée."
+    },
+    {
+      "id": "fr-holdout-v5-277",
+      "field": "altText",
+      "text": "Des plis souples apparaissent autour de l'articulation sans tirer sur la couture."
+    },
+    {
+      "id": "fr-holdout-v5-278",
+      "field": "caption",
+      "text": "Les nœuds se cachent dans la doublure et les anses sont enfin à ma hauteur."
+    },
+    {
+      "id": "fr-holdout-v5-279",
+      "field": "caption",
+      "text": "J'ai ajusté le sac par l'intérieur pour préserver ses deux poignées lisses."
+    },
+    {
+      "id": "fr-holdout-v5-280",
+      "field": "altText",
+      "text": "Un nœud intérieur bloque chaque anse à une longueur plus courte."
+    },
+    {
+      "id": "fr-holdout-v5-281",
+      "field": "altText",
+      "text": "Le sac ouvert montre les extrémités nouées dissimulées sous la doublure."
+    },
+    {
+      "id": "fr-holdout-v5-282",
+      "field": "caption",
+      "text": "La veste de mon tailleur accompagne aujourd'hui un jean que je porte tout le temps."
+    },
+    {
+      "id": "fr-holdout-v5-283",
+      "field": "caption",
+      "text": "J'ai séparé les pièces du costume pour retrouver deux tenues faciles au quotidien."
+    },
+    {
+      "id": "fr-holdout-v5-284",
+      "field": "altText",
+      "text": "Une veste de costume est portée avec un jean décontracté et un haut simple."
+    },
+    {
+      "id": "fr-holdout-v5-285",
+      "field": "altText",
+      "text": "Le pantalon habillé est associé à un tricot tandis que sa veste assortie reste sur cintre."
+    },
+    {
+      "id": "fr-holdout-v5-286",
+      "field": "caption",
+      "text": "Le petit carré évite que le fermoir de mon collier accroche le tricot."
+    },
+    {
+      "id": "fr-holdout-v5-287",
+      "field": "caption",
+      "text": "J'ai glissé un tissu très fin entre le bijou et le col délicat."
+    },
+    {
+      "id": "fr-holdout-v5-288",
+      "field": "altText",
+      "text": "Un carré de tissu sépare le fermoir du collier de la maille du pull."
+    },
+    {
+      "id": "fr-holdout-v5-289",
+      "field": "altText",
+      "text": "La protection textile reste cachée derrière le cou, sous la chaîne."
+    },
+    {
+      "id": "fr-holdout-v5-290",
+      "field": "caption",
+      "text": "Le sac très étroit laisse toute sa place au grand volume de la jupe."
+    },
+    {
+      "id": "fr-holdout-v5-291",
+      "field": "caption",
+      "text": "J'ai choisi une forme fine près du corps pour accompagner cette jupe ample."
+    },
+    {
+      "id": "fr-holdout-v5-292",
+      "field": "altText",
+      "text": "Un petit sac plat repose contre le côté d'une jupe très large."
+    },
+    {
+      "id": "fr-holdout-v5-293",
+      "field": "altText",
+      "text": "La ligne étroite de la pochette contraste avec le tissu déployé autour des jambes."
+    },
+    {
+      "id": "fr-holdout-v5-294",
+      "field": "caption",
+      "text": "J'ai fait sécher le tricot sur une forme arrondie pour garder son volume."
+    },
+    {
+      "id": "fr-holdout-v5-295",
+      "field": "caption",
+      "text": "Le séchage a donné aux mailles la courbe que j'espérais."
+    },
+    {
+      "id": "fr-holdout-v5-296",
+      "field": "altText",
+      "text": "Le tricot humide est tendu sur un support arrondi recouvert de tissu."
+    },
+    {
+      "id": "fr-holdout-v5-297",
+      "field": "altText",
+      "text": "Les mailles ouvertes épousent la forme bombée pendant le séchage."
+    },
+    {
+      "id": "fr-holdout-v5-298",
+      "field": "caption",
+      "text": "La doublure attend son tour, maintenue à petits points dans la manche."
+    },
+    {
+      "id": "fr-holdout-v5-299",
+      "field": "caption",
+      "text": "J'ai bâti le tout avant de fermer la dernière couture du poignet."
+    },
+    {
+      "id": "fr-holdout-v5-300",
+      "field": "altText",
+      "text": "Un fil de bâti maintient la doublure à l'intérieur de la manche."
+    },
+    {
+      "id": "fr-holdout-v5-301",
+      "field": "altText",
+      "text": "Des points provisoires longent le bord qui sera cousu au poignet."
+    },
+    {
+      "id": "fr-holdout-v5-302",
+      "field": "caption",
+      "text": "La cravate dépasse seulement au-dessus du sweat, comme un souvenir de chemise habillée."
+    },
+    {
+      "id": "fr-holdout-v5-303",
+      "field": "caption",
+      "text": "J'ai desserré le lien pour garder cette superposition vraiment tranquille."
+    },
+    {
+      "id": "fr-holdout-v5-304",
+      "field": "altText",
+      "text": "Une cravate souple apparaît entre le col de chemise et l'encolure du sweat."
+    },
+    {
+      "id": "fr-holdout-v5-305",
+      "field": "altText",
+      "text": "Le nœud légèrement relâché reste visible au-dessus de la couche de jersey."
+    },
+    {
+      "id": "fr-holdout-v5-306",
+      "field": "caption",
+      "text": "J'ai passé les gants dans la poignée pour ne pas les perdre en entrant."
+    },
+    {
+      "id": "fr-holdout-v5-307",
+      "field": "caption",
+      "text": "Mes gants attendent sur le sac pendant que je garde les mains libres."
+    },
+    {
+      "id": "fr-holdout-v5-308",
+      "field": "altText",
+      "text": "Les deux gants sont pliés autour de la courte anse du sac."
+    },
+    {
+      "id": "fr-holdout-v5-309",
+      "field": "altText",
+      "text": "Les doigts de gant pendent de chaque côté d'une poignée rigide."
+    },
+    {
+      "id": "fr-holdout-v5-310",
+      "field": "caption",
+      "text": "J'ai libéré les pinces du dos et retrouvé un peu d'aisance dans cette veste."
+    },
+    {
+      "id": "fr-holdout-v5-311",
+      "field": "caption",
+      "text": "La petite marque des anciennes pinces me rappelle le chemin de la transformation."
+    },
+    {
+      "id": "fr-holdout-v5-312",
+      "field": "altText",
+      "text": "Les anciennes lignes de pinces restent légèrement visibles sur la veste élargie."
+    },
+    {
+      "id": "fr-holdout-v5-313",
+      "field": "altText",
+      "text": "Le dos tombe plus droit après ouverture des deux pinces verticales."
+    },
+    {
+      "id": "fr-holdout-v5-314",
+      "field": "caption",
+      "text": "En retirant la bride arrière, mes sandales deviennent plus faciles à enfiler."
+    },
+    {
+      "id": "fr-holdout-v5-315",
+      "field": "caption",
+      "text": "J'ai gardé la bride dans le sac pour pouvoir la remettre plus tard."
+    },
+    {
+      "id": "fr-holdout-v5-316",
+      "field": "altText",
+      "text": "Une bride détachée repose près des sandales ouvertes derrière."
+    },
+    {
+      "id": "fr-holdout-v5-317",
+      "field": "altText",
+      "text": "De petites pressions latérales permettent de remettre la lanière du talon."
+    },
+    {
+      "id": "fr-holdout-v5-318",
+      "field": "caption",
+      "text": "Les passants en fil sont presque invisibles sur cette robe légère."
+    },
+    {
+      "id": "fr-holdout-v5-319",
+      "field": "caption",
+      "text": "J'ai ajouté juste assez d'attaches pour empêcher la ceinture fine de remonter."
+    },
+    {
+      "id": "fr-holdout-v5-320",
+      "field": "altText",
+      "text": "Une ceinture étroite traverse deux petits passants formés de fils cousus."
+    },
+    {
+      "id": "fr-holdout-v5-321",
+      "field": "altText",
+      "text": "Les minuscules passants de fil disparaissent presque contre la bande de taille."
+    },
+    {
+      "id": "fr-holdout-v5-322",
+      "field": "caption",
+      "text": "J'ai rempli la calotte avant de repasser seulement le bord du chapeau."
+    },
+    {
+      "id": "fr-holdout-v5-323",
+      "field": "caption",
+      "text": "Le dessus garde son volume pendant que la visière retrouve une ligne nette."
+    },
+    {
+      "id": "fr-holdout-v5-324",
+      "field": "altText",
+      "text": "La calotte garnie d'un tissu protège sa forme pendant le repassage du bord."
+    },
+    {
+      "id": "fr-holdout-v5-325",
+      "field": "altText",
+      "text": "Un petit support maintient le sommet du chapeau hors de la zone aplatie."
+    },
+    {
+      "id": "fr-holdout-v5-326",
+      "field": "caption",
+      "text": "J'enroule cette jupe fragile sur un rouleau rembourré pour éviter les marques."
+    },
+    {
+      "id": "fr-holdout-v5-327",
+      "field": "caption",
+      "text": "La voilà rangée en douceur, sans pli net au milieu du motif."
+    },
+    {
+      "id": "fr-holdout-v5-328",
+      "field": "altText",
+      "text": "Une jupe légère est roulée autour d'un cylindre recouvert de tissu."
+    },
+    {
+      "id": "fr-holdout-v5-329",
+      "field": "altText",
+      "text": "Le motif reste régulier sur le rouleau sans cassure transversale."
+    },
+    {
+      "id": "fr-holdout-v5-330",
+      "field": "caption",
+      "text": "Le petit bâton de bois traverse une boucle pour fermer le sac."
+    },
+    {
+      "id": "fr-holdout-v5-331",
+      "field": "caption",
+      "text": "J'aime le geste tout simple de ce fermoir fabriqué à la main."
+    },
+    {
+      "id": "fr-holdout-v5-332",
+      "field": "altText",
+      "text": "Un bâtonnet de bois glissé dans une boucle ferme la poche du sac."
+    },
+    {
+      "id": "fr-holdout-v5-333",
+      "field": "altText",
+      "text": "La pièce allongée repose horizontalement sur deux cordons rapprochés."
+    },
+    {
+      "id": "fr-holdout-v5-334",
+      "field": "caption",
+      "text": "J'ai gardé ma bague au-dessus de la mitaine pour voir son petit relief."
+    },
+    {
+      "id": "fr-holdout-v5-335",
+      "field": "caption",
+      "text": "Mon large anneau trouve sa place sur la mitaine sans déformer les mailles fines."
+    },
+    {
+      "id": "fr-holdout-v5-336",
+      "field": "altText",
+      "text": "Un anneau large entoure un doigt couvert de maille fine."
+    },
+    {
+      "id": "fr-holdout-v5-337",
+      "field": "altText",
+      "text": "La bague apparaît au-dessus d'une mitaine qui laisse les dernières phalanges libres."
+    },
+    {
+      "id": "fr-holdout-v5-338",
+      "field": "caption",
+      "text": "Quelques plis discrets donnent un peu de hauteur au col sans le raidir."
+    },
+    {
+      "id": "fr-holdout-v5-339",
+      "field": "caption",
+      "text": "J'ai laissé le bord souple pour qu'il se place différemment à chaque mouvement."
+    },
+    {
+      "id": "fr-holdout-v5-340",
+      "field": "altText",
+      "text": "De petites fronces soutiennent un col droit encore souple."
+    },
+    {
+      "id": "fr-holdout-v5-341",
+      "field": "altText",
+      "text": "Le bord froncé monte légèrement autour du cou puis se replie par endroits."
+    },
+    {
+      "id": "fr-holdout-v5-342",
+      "field": "caption",
+      "text": "Une petite bande relie les deux côtés de la fente sans la fermer complètement."
+    },
+    {
+      "id": "fr-holdout-v5-343",
+      "field": "caption",
+      "text": "J'ai ajouté ce pont textile pour que la chemise longue reste bien en place."
+    },
+    {
+      "id": "fr-holdout-v5-344",
+      "field": "altText",
+      "text": "Une bande courte traverse la fente latérale de la chemise."
+    },
+    {
+      "id": "fr-holdout-v5-345",
+      "field": "altText",
+      "text": "Les deux pans restent séparés sous le petit lien horizontal."
+    },
+    {
+      "id": "fr-holdout-v5-346",
+      "field": "caption",
+      "text": "Je vérifie la souplesse de la semelle avant de choisir cette paire pour marcher."
+    },
+    {
+      "id": "fr-holdout-v5-347",
+      "field": "caption",
+      "text": "Le soulier plie bien à l'avant et garde son appui sous le talon."
+    },
+    {
+      "id": "fr-holdout-v5-348",
+      "field": "altText",
+      "text": "Une main fléchit doucement l'avant de la chaussure pour montrer la souplesse de semelle."
+    },
+    {
+      "id": "fr-holdout-v5-349",
+      "field": "altText",
+      "text": "La chaussure pliée présente une courbe près des orteils tandis que son talon reste stable."
+    },
+    {
+      "id": "fr-holdout-v5-350",
+      "field": "caption",
+      "text": "J'ai rentré les bouts sous le tour de ceinture pour garder un devant propre."
+    },
+    {
+      "id": "fr-holdout-v5-351",
+      "field": "caption",
+      "text": "Les liens disparaissent ainsi sans former de nœud ni de boucle."
+    },
+    {
+      "id": "fr-holdout-v5-352",
+      "field": "altText",
+      "text": "Les deux extrémités du lien sont glissées sous la bande de taille."
+    },
+    {
+      "id": "fr-holdout-v5-353",
+      "field": "altText",
+      "text": "La ceinture textile dessine un tour continu sans bout pendant."
+    },
+    {
+      "id": "fr-holdout-v5-354",
+      "field": "caption",
+      "text": "Le petit lien au dos garde les bretelles croisées à la bonne distance."
+    },
+    {
+      "id": "fr-holdout-v5-355",
+      "field": "caption",
+      "text": "J'ai réglé cette attache pour éviter que les deux bandes se superposent."
+    },
+    {
+      "id": "fr-holdout-v5-356",
+      "field": "altText",
+      "text": "Une courte bande relie deux bretelles croisées dans le dos."
+    },
+    {
+      "id": "fr-holdout-v5-357",
+      "field": "altText",
+      "text": "Le petit pont textile maintient un espace régulier entre les sangles."
+    },
+    {
+      "id": "fr-holdout-v5-358",
+      "field": "caption",
+      "text": "La capuche roulée forme un petit coussin quand je m'appuie au dossier."
+    },
+    {
+      "id": "fr-holdout-v5-359",
+      "field": "caption",
+      "text": "J'ai utilisé le lien pour garder la capuche pliée derrière la nuque."
+    },
+    {
+      "id": "fr-holdout-v5-360",
+      "field": "altText",
+      "text": "La capuche roulée reste fixée sous la nuque par une patte courte."
+    },
+    {
+      "id": "fr-holdout-v5-361",
+      "field": "altText",
+      "text": "Le volume replié forme un petit rouleau au-dessus du col du manteau."
+    },
+    {
+      "id": "fr-holdout-v5-362",
+      "field": "caption",
+      "text": "En brossant dans le sens de la trame, j'ai retiré les petites peluches."
+    },
+    {
+      "id": "fr-holdout-v5-363",
+      "field": "caption",
+      "text": "La diagonale du sergé retrouve une surface bien nette après ce soin."
+    },
+    {
+      "id": "fr-holdout-v5-364",
+      "field": "altText",
+      "text": "Une brosse suit les fines diagonales du tissu de pantalon."
+    },
+    {
+      "id": "fr-holdout-v5-365",
+      "field": "altText",
+      "text": "Les petites fibres libres ont été rassemblées au bord de la zone brossée."
+    },
+    {
+      "id": "fr-holdout-v5-366",
+      "field": "caption",
+      "text": "Le trait tissé au milieu m'aide à placer le châle sans miroir."
+    },
+    {
+      "id": "fr-holdout-v5-367",
+      "field": "caption",
+      "text": "Je repère facilement son centre et les deux pointes tombent à la même hauteur."
+    },
+    {
+      "id": "fr-holdout-v5-368",
+      "field": "altText",
+      "text": "Une bande tissée au centre distingue les deux moitiés du châle."
+    },
+    {
+      "id": "fr-holdout-v5-369",
+      "field": "altText",
+      "text": "Le repère central se place derrière le cou pour équilibrer les pans."
+    },
+    {
+      "id": "fr-holdout-v5-370",
+      "field": "caption",
+      "text": "Le laçage sur le côté permet de desserrer la jupe juste un peu."
+    },
+    {
+      "id": "fr-holdout-v5-371",
+      "field": "caption",
+      "text": "J'ai gardé les cordons courts pour qu'ils restent près de la hanche."
+    },
+    {
+      "id": "fr-holdout-v5-372",
+      "field": "altText",
+      "text": "Une rangée d'œillets reçoit les croisements du lacet près de la hanche."
+    },
+    {
+      "id": "fr-holdout-v5-373",
+      "field": "altText",
+      "text": "Les petits œillets alignés permettent d'ajuster la largeur au niveau des hanches."
+    },
+    {
+      "id": "fr-holdout-v5-374",
+      "field": "caption",
+      "text": "Les petites pinces en diagonale donnent du volume au fond de mon sac."
+    },
+    {
+      "id": "fr-holdout-v5-375",
+      "field": "caption",
+      "text": "J'ai enfin compris pourquoi ces coutures courtes changent autant sa silhouette."
+    },
+    {
+      "id": "fr-holdout-v5-376",
+      "field": "altText",
+      "text": "Une pince diagonale referme chaque angle inférieur du sac."
+    },
+    {
+      "id": "fr-holdout-v5-377",
+      "field": "altText",
+      "text": "Les coutures courtes font remonter les coins pour former une base arrondie."
+    },
+    {
+      "id": "fr-holdout-v5-378",
+      "field": "caption",
+      "text": "La cape s'arrête assez haut pour que je puisse plier les bras sans la soulever."
+    },
+    {
+      "id": "fr-holdout-v5-379",
+      "field": "caption",
+      "text": "J'ai choisi une petite cape qui garde les avant-bras complètement libres."
+    },
+    {
+      "id": "fr-holdout-v5-380",
+      "field": "altText",
+      "text": "Le bord de la cape termine sa courbe au-dessus des coudes."
+    },
+    {
+      "id": "fr-holdout-v5-381",
+      "field": "altText",
+      "text": "Les deux avant-bras restent dégagés sous le court vêtement arrondi."
+    },
+    {
+      "id": "fr-holdout-v5-382",
+      "field": "caption",
+      "text": "J'ai retiré les épaulettes sans les jeter, au cas où je voudrais retrouver l'ancienne ligne."
+    },
+    {
+      "id": "fr-holdout-v5-383",
+      "field": "caption",
+      "text": "La veste tombe plus doucement depuis que ses renforts d'épaule sont de côté."
+    },
+    {
+      "id": "fr-holdout-v5-384",
+      "field": "altText",
+      "text": "Deux épaulettes détachées reposent près de la veste à épaules assouplies."
+    },
+    {
+      "id": "fr-holdout-v5-385",
+      "field": "altText",
+      "text": "L'intérieur ouvert montre l'endroit où les renforts ont été décousus."
+    },
+    {
+      "id": "fr-holdout-v5-386",
+      "field": "caption",
+      "text": "J'ai choisi la position du petit raccord pour qu'il ne tombe pas sous la lanière."
+    },
+    {
+      "id": "fr-holdout-v5-387",
+      "field": "caption",
+      "text": "Ce détail compte beaucoup quand je porte ces chaussures toute la journée."
+    },
+    {
+      "id": "fr-holdout-v5-388",
+      "field": "altText",
+      "text": "La couture de chaussette reste à l'écart de la bride de chaussure."
+    },
+    {
+      "id": "fr-holdout-v5-389",
+      "field": "altText",
+      "text": "Le raccord textile apparaît dans la zone libre entre les deux attaches du soulier."
+    },
+    {
+      "id": "fr-holdout-v5-390",
+      "field": "caption",
+      "text": "Les longues boucles encadrent mon décolleté dégagé et se voient sous tous les angles."
+    },
+    {
+      "id": "fr-holdout-v5-391",
+      "field": "caption",
+      "text": "J'ai remonté mes cheveux pour donner de la place aux deux pendants près du cou."
+    },
+    {
+      "id": "fr-holdout-v5-392",
+      "field": "altText",
+      "text": "Deux bijoux pendants encadrent le cou dégagé au-dessus du vêtement."
+    },
+    {
+      "id": "fr-holdout-v5-393",
+      "field": "altText",
+      "text": "Les cheveux relevés laissent apparaître les deux bijoux près des épaules nues."
+    },
+    {
+      "id": "fr-holdout-v5-394",
+      "field": "caption",
+      "text": "Deux points cachés empêchent cette manche croisée de tourner sur le bras."
+    },
+    {
+      "id": "fr-holdout-v5-395",
+      "field": "caption",
+      "text": "L'ajustement est minuscule, mais l'ouverture reste enfin du bon côté."
+    },
+    {
+      "id": "fr-holdout-v5-396",
+      "field": "altText",
+      "text": "Un point intérieur maintient l'orientation des deux couches croisées de la manche."
+    },
+    {
+      "id": "fr-holdout-v5-397",
+      "field": "altText",
+      "text": "Le bord oblique reste fixe tandis que le bras se plie."
+    },
+    {
+      "id": "fr-holdout-v5-398",
+      "field": "caption",
+      "text": "J'ai ajouté du feutre au fond de la pochette pour amortir les petits objets."
+    },
+    {
+      "id": "fr-holdout-v5-399",
+      "field": "caption",
+      "text": "La base souple se voit à travers le sac et lui donne une ligne plus stable."
+    },
+    {
+      "id": "fr-holdout-v5-400",
+      "field": "altText",
+      "text": "Une plaque de feutre repose dans le fond d'une pochette transparente."
+    },
+    {
+      "id": "fr-holdout-v5-401",
+      "field": "altText",
+      "text": "Le tapis intérieur amortit les objets visibles à travers la paroi claire."
+    },
+    {
+      "id": "fr-holdout-v5-402",
+      "field": "caption",
+      "text": "J'ai emporté un petit échantillon pour choisir la veste sous une vraie lumière."
+    },
+    {
+      "id": "fr-holdout-v5-403",
+      "field": "caption",
+      "text": "Les deux tissus semblaient assortis en boutique; dehors, je vois mieux leur différence."
+    },
+    {
+      "id": "fr-holdout-v5-404",
+      "field": "altText",
+      "text": "Un échantillon est tenu contre la veste près d'une fenêtre ouverte."
+    },
+    {
+      "id": "fr-holdout-v5-405",
+      "field": "altText",
+      "text": "La lumière naturelle éclaire côte à côte le tissu porté et la petite chute."
+    },
+    {
+      "id": "fr-holdout-v5-406",
+      "field": "caption",
+      "text": "La couture aplatie ne frotte plus quand je marche longtemps."
+    },
+    {
+      "id": "fr-holdout-v5-407",
+      "field": "caption",
+      "text": "J'ai recouvert la jonction intérieure du pantalon avec une bande toute douce."
+    },
+    {
+      "id": "fr-holdout-v5-408",
+      "field": "altText",
+      "text": "Une bande souple couvre la couture qui suit l'intérieur de la jambe."
+    },
+    {
+      "id": "fr-holdout-v5-409",
+      "field": "altText",
+      "text": "Le pantalon retourné montre une jonction plate sans bord saillant."
+    },
+    {
+      "id": "fr-holdout-v5-410",
+      "field": "caption",
+      "text": "J'ai choisi un fil qui vieillira avec la toile plutôt qu'un ton trop neuf."
+    },
+    {
+      "id": "fr-holdout-v5-411",
+      "field": "caption",
+      "text": "La reprise se fond déjà dans le tissu délavé après quelques lavages."
+    },
+    {
+      "id": "fr-holdout-v5-412",
+      "field": "altText",
+      "text": "Les petits points de réparation reprennent la nuance adoucie de la toile."
+    },
+    {
+      "id": "fr-holdout-v5-413",
+      "field": "altText",
+      "text": "Le fil mat se distingue à peine autour de la zone reprise."
+    },
+    {
+      "id": "fr-holdout-v5-414",
+      "field": "caption",
+      "text": "Un morceau de carton sépare les plis pendant que je les remets en forme."
+    },
+    {
+      "id": "fr-holdout-v5-415",
+      "field": "caption",
+      "text": "J'avance pli par pli pour ne pas imprimer de nouvelles marques dans la jupe."
+    },
+    {
+      "id": "fr-holdout-v5-416",
+      "field": "altText",
+      "text": "Une bande de carton maintient deux plis écartés pendant le repassage."
+    },
+    {
+      "id": "fr-holdout-v5-417",
+      "field": "altText",
+      "text": "La jupe repose sur la table avec un séparateur glissé sous le pli ouvert."
+    },
+    {
+      "id": "fr-holdout-v5-418",
+      "field": "caption",
+      "text": "Le passepoil fait tout le tour du sac et souligne ses courbes."
+    },
+    {
+      "id": "fr-holdout-v5-419",
+      "field": "caption",
+      "text": "J'ai gardé un fil de contraste pour dessiner cette forme assez ronde."
+    },
+    {
+      "id": "fr-holdout-v5-420",
+      "field": "altText",
+      "text": "Un passepoil fin suit la totalité du contour arrondi du sac."
+    },
+    {
+      "id": "fr-holdout-v5-421",
+      "field": "altText",
+      "text": "La couture en relief encadre les deux faces du petit bagage."
+    },
+    {
+      "id": "fr-holdout-v5-422",
+      "field": "caption",
+      "text": "La petite bande élastique au dos garde l'ouverture stable sans la fermer."
+    },
+    {
+      "id": "fr-holdout-v5-423",
+      "field": "caption",
+      "text": "Je peux bouger librement tout en conservant la découpe de ma tunique."
+    },
+    {
+      "id": "fr-holdout-v5-424",
+      "field": "altText",
+      "text": "Un pont élastique relie les côtés du dos ouvert de la tunique."
+    },
+    {
+      "id": "fr-holdout-v5-425",
+      "field": "altText",
+      "text": "La bande horizontale se place au-dessus d'une large ouverture arrondie."
+    },
+    {
+      "id": "fr-holdout-v5-426",
+      "field": "caption",
+      "text": "J'ai cousu un point tactile pour reconnaître chaque chaussure sans regarder."
+    },
+    {
+      "id": "fr-holdout-v5-427",
+      "field": "caption",
+      "text": "Le minuscule repère se sent du bout des doigts dans la doublure."
+    },
+    {
+      "id": "fr-holdout-v5-428",
+      "field": "altText",
+      "text": "Un petit point en relief est cousu dans le bord intérieur d'une chaussure."
+    },
+    {
+      "id": "fr-holdout-v5-429",
+      "field": "altText",
+      "text": "La paire ouverte présente un seul repère textile près du talon droit."
+    },
+    {
+      "id": "fr-holdout-v5-430",
+      "field": "caption",
+      "text": "Une chemise fine sous le gilet suffit pour adoucir la laine au contact du cou."
+    },
+    {
+      "id": "fr-holdout-v5-431",
+      "field": "caption",
+      "text": "J'aime cette laine, à condition de garder ma couche légère en dessous."
+    },
+    {
+      "id": "fr-holdout-v5-432",
+      "field": "altText",
+      "text": "Le col de chemise sépare la peau du bord du gilet en laine."
+    },
+    {
+      "id": "fr-holdout-v5-433",
+      "field": "altText",
+      "text": "Une fine couche de coton apparaît autour des ouvertures du tricot épais."
+    },
+    {
+      "id": "fr-holdout-v5-434",
+      "field": "caption",
+      "text": "La petite ceinture vive est le seul éclat de couleur dans ma tenue claire."
+    },
+    {
+      "id": "fr-holdout-v5-435",
+      "field": "caption",
+      "text": "J'ai gardé les vêtements très sobres pour laisser cette ceinture attirer le regard."
+    },
+    {
+      "id": "fr-holdout-v5-436",
+      "field": "altText",
+      "text": "Une ceinture fortement colorée traverse un ensemble composé de tons neutres."
+    },
+    {
+      "id": "fr-holdout-v5-437",
+      "field": "altText",
+      "text": "Le pantalon et le haut restent discrets autour de la bande vive à la taille."
+    },
+    {
+      "id": "fr-holdout-v5-438",
+      "field": "caption",
+      "text": "La patte de manche se ferme à l'intérieur, loin du dessus de ma main."
+    },
+    {
+      "id": "fr-holdout-v5-439",
+      "field": "caption",
+      "text": "J'ai déplacé le réglage pour pouvoir poser le poignet sans sentir la boucle."
+    },
+    {
+      "id": "fr-holdout-v5-440",
+      "field": "altText",
+      "text": "La petite boucle de manche se trouve sur la face intérieure du poignet."
+    },
+    {
+      "id": "fr-holdout-v5-441",
+      "field": "altText",
+      "text": "La patte réglable passe sous l'avant-bras avant de rejoindre son bouton."
+    },
+    {
+      "id": "fr-holdout-v5-442",
+      "field": "caption",
+      "text": "Les deux pans se croisent derrière la nuque avant de revenir sur les épaules."
+    },
+    {
+      "id": "fr-holdout-v5-443",
+      "field": "caption",
+      "text": "J'ai suivi le montage doucement pour retrouver le bon sens du drapé."
+    },
+    {
+      "id": "fr-holdout-v5-444",
+      "field": "altText",
+      "text": "Deux bandes larges se croisent derrière le cou puis couvrent les épaules."
+    },
+    {
+      "id": "fr-holdout-v5-445",
+      "field": "altText",
+      "text": "Le tissu du haut forme un croisement plat à la base de la nuque."
+    },
+    {
+      "id": "fr-holdout-v5-446",
+      "field": "caption",
+      "text": "J'ai cousu une boucle en hauteur pour ne plus chercher mes clés au fond."
+    },
+    {
+      "id": "fr-holdout-v5-447",
+      "field": "caption",
+      "text": "Le lien remonte tout seul quand j'ouvre le sac, et ça me simplifie la vie."
+    },
+    {
+      "id": "fr-holdout-v5-448",
+      "field": "altText",
+      "text": "Une courte boucle remonte depuis la doublure vers le bord supérieur du sac."
+    },
+    {
+      "id": "fr-holdout-v5-449",
+      "field": "altText",
+      "text": "Le porte-clés est accroché près de l'ouverture, au-dessus des objets rangés."
+    },
+    {
+      "id": "fr-holdout-v5-450",
+      "field": "caption",
+      "text": "Le lien du chemisier dessine un premier nœud, puis vient la fine ceinture plus bas."
+    },
+    {
+      "id": "fr-holdout-v5-451",
+      "field": "caption",
+      "text": "J'ai séparé les deux attaches pour que la taille reste lisible."
+    },
+    {
+      "id": "fr-holdout-v5-452",
+      "field": "altText",
+      "text": "Un nœud de chemisier est placé quelques centimètres au-dessus d'une ceinture."
+    },
+    {
+      "id": "fr-holdout-v5-453",
+      "field": "altText",
+      "text": "Deux lignes d'attache restent distinctes autour de la taille du vêtement."
+    },
+    {
+      "id": "fr-holdout-v5-454",
+      "field": "caption",
+      "text": "La rayure en biais me sert de guide pour plier ce carré régulièrement."
+    },
+    {
+      "id": "fr-holdout-v5-455",
+      "field": "caption",
+      "text": "Je laisse apparaître cette seule bande après avoir roulé le reste du foulard."
+    },
+    {
+      "id": "fr-holdout-v5-456",
+      "field": "altText",
+      "text": "Le foulard plié suit une rayure diagonale qui reste visible sur toute la longueur."
+    },
+    {
+      "id": "fr-holdout-v5-457",
+      "field": "altText",
+      "text": "Une bande imprimée guide la bordure du carré roulé en ruban."
+    },
+    {
+      "id": "fr-holdout-v5-458",
+      "field": "caption",
+      "text": "J'ai ouvert un peu la tige pour laisser entrer ce pantalon plus large."
+    },
+    {
+      "id": "fr-holdout-v5-459",
+      "field": "caption",
+      "text": "La petite fente réglable permet de porter ces bottes de deux façons."
+    },
+    {
+      "id": "fr-holdout-v5-460",
+      "field": "altText",
+      "text": "Le haut de la botte présente une ouverture latérale légèrement desserrée."
+    },
+    {
+      "id": "fr-holdout-v5-461",
+      "field": "altText",
+      "text": "Le pantalon entre dans la tige grâce à un panneau d'aisance ouvert."
+    },
+    {
+      "id": "fr-holdout-v5-462",
+      "field": "caption",
+      "text": "Le jonc reste sur la peau pour éviter de tirer les mailles du poignet."
+    },
+    {
+      "id": "fr-holdout-v5-463",
+      "field": "caption",
+      "text": "J'ai repoussé le revers assez loin pour que le bracelet bouge librement."
+    },
+    {
+      "id": "fr-holdout-v5-464",
+      "field": "altText",
+      "text": "Un bracelet rigide reste séparé du bord de manche par une bande de peau."
+    },
+    {
+      "id": "fr-holdout-v5-465",
+      "field": "altText",
+      "text": "Le poignet tricoté est repoussé au-dessus du jonc lisse."
+    },
+    {
+      "id": "fr-holdout-v5-466",
+      "field": "caption",
+      "text": "J'ai placé une poche cachée dans la ceinture, accessible même sous un pull."
+    },
+    {
+      "id": "fr-holdout-v5-467",
+      "field": "caption",
+      "text": "La petite ouverture suit le haut de la jupe et ne change pas son volume."
+    },
+    {
+      "id": "fr-holdout-v5-468",
+      "field": "altText",
+      "text": "Une ouverture discrète se trouve directement dans la bande de taille de la jupe."
+    },
+    {
+      "id": "fr-holdout-v5-469",
+      "field": "altText",
+      "text": "Le compartiment étroit se glisse entre la ceinture et la doublure."
+    },
+    {
+      "id": "fr-holdout-v5-470",
+      "field": "caption",
+      "text": "Le foulard plissé se pose autour du cou comme un petit col indépendant."
+    },
+    {
+      "id": "fr-holdout-v5-471",
+      "field": "caption",
+      "text": "J'ai gardé ses plis bien ouverts pour faire une couronne légère au-dessus du haut."
+    },
+    {
+      "id": "fr-holdout-v5-472",
+      "field": "altText",
+      "text": "Un foulard à petits plis entoure le cou en formant un col souple."
+    },
+    {
+      "id": "fr-holdout-v5-473",
+      "field": "altText",
+      "text": "Les replis réguliers dépassent tout autour de l'encolure du vêtement."
+    },
+    {
+      "id": "fr-holdout-v5-474",
+      "field": "caption",
+      "text": "Déplacer les boutons de quelques millimètres a suffi pour mieux respirer dans la chemise."
+    },
+    {
+      "id": "fr-holdout-v5-475",
+      "field": "caption",
+      "text": "Je n'avais pas besoin de refaire toute la coupe pour gagner cette aisance."
+    },
+    {
+      "id": "fr-holdout-v5-476",
+      "field": "altText",
+      "text": "De petites traces montrent l'ancien emplacement des boutons déplacés vers le bord."
+    },
+    {
+      "id": "fr-holdout-v5-477",
+      "field": "altText",
+      "text": "La patte de chemise ferme avec une largeur légèrement augmentée."
+    },
+    {
+      "id": "fr-holdout-v5-478",
+      "field": "caption",
+      "text": "Le bracelet large retient la manche souple comme une manchette provisoire."
+    },
+    {
+      "id": "fr-holdout-v5-479",
+      "field": "caption",
+      "text": "J'ai essayé de réunir le tissu dans le jonc pour garder la main dégagée."
+    },
+    {
+      "id": "fr-holdout-v5-480",
+      "field": "altText",
+      "text": "La manche est glissée sous un large bracelet qui la rassemble au poignet."
+    },
+    {
+      "id": "fr-holdout-v5-481",
+      "field": "altText",
+      "text": "Le tissu forme un petit volume au-dessus du jonc utilisé comme attache."
+    },
+    {
+      "id": "fr-holdout-v5-482",
+      "field": "caption",
+      "text": "Un carré plié en deux donne cette pochette triangulaire toute simple."
+    },
+    {
+      "id": "fr-holdout-v5-483",
+      "field": "caption",
+      "text": "J'ai gardé la diagonale du pli comme ligne principale de mon petit sac."
+    },
+    {
+      "id": "fr-holdout-v5-484",
+      "field": "altText",
+      "text": "Une pochette triangulaire est formée d'un carré textile plié en diagonale."
+    },
+    {
+      "id": "fr-holdout-v5-485",
+      "field": "altText",
+      "text": "La fermeture suit le grand côté de la forme triangulaire."
+    },
+    {
+      "id": "fr-holdout-v5-486",
+      "field": "caption",
+      "text": "J'ai décousu les anciennes poches pour retrouver la surface lisse de cette veste."
+    },
+    {
+      "id": "fr-holdout-v5-487",
+      "field": "caption",
+      "text": "Les marques s'atténuent, et la veste commence une nouvelle vie avec moins de détails."
+    },
+    {
+      "id": "fr-holdout-v5-488",
+      "field": "altText",
+      "text": "Deux zones légèrement marquées indiquent l'emplacement des anciennes poches retirées."
+    },
+    {
+      "id": "fr-holdout-v5-489",
+      "field": "altText",
+      "text": "Le devant de veste est désormais lisse sous la ligne de poitrine."
+    },
+    {
+      "id": "fr-holdout-v5-490",
+      "field": "caption",
+      "text": "Je teste les deux positions de taille avec des épingles avant de choisir."
+    },
+    {
+      "id": "fr-holdout-v5-491",
+      "field": "caption",
+      "text": "L'écart paraît minuscule, mais il change beaucoup la façon dont la jupe tombe."
+    },
+    {
+      "id": "fr-holdout-v5-492",
+      "field": "altText",
+      "text": "Deux épingles maintiennent temporairement un repli sur la ceinture de jupe."
+    },
+    {
+      "id": "fr-holdout-v5-493",
+      "field": "altText",
+      "text": "Un petit excès de tissu est pincé sur le côté pendant l'essayage."
+    },
+    {
+      "id": "fr-holdout-v5-494",
+      "field": "caption",
+      "text": "Les côtés ouverts laissent mes bras rejoindre le guidon sans tirer sur la cape."
+    },
+    {
+      "id": "fr-holdout-v5-495",
+      "field": "caption",
+      "text": "J'ai vérifié la position des mains avant de fermer l'attache du cou."
+    },
+    {
+      "id": "fr-holdout-v5-496",
+      "field": "altText",
+      "text": "Les mains tiennent le guidon sous les pans latéraux ouverts de la cape."
+    },
+    {
+      "id": "fr-holdout-v5-497",
+      "field": "altText",
+      "text": "Le tissu imperméable couvre le torse tout en dégageant le mouvement des bras."
+    },
+    {
+      "id": "fr-holdout-v5-498",
+      "field": "caption",
+      "text": "Un petit nœud de tissu sépare chaque perle et empêche le collier de claquer."
+    },
+    {
+      "id": "fr-holdout-v5-499",
+      "field": "caption",
+      "text": "J'ai espacé les éléments pour laisser apparaître le cordon entre eux."
+    },
+    {
+      "id": "fr-holdout-v5-500",
+      "field": "altText",
+      "text": "Les perles du collier sont séparées par de courts nœuds textiles."
+    },
+    {
+      "id": "fr-holdout-v5-501",
+      "field": "altText",
+      "text": "Le fil apparent forme de petits intervalles réguliers entre les éléments rigides."
+    },
+    {
+      "id": "fr-holdout-v5-502",
+      "field": "caption",
+      "text": "Le bouton caché retient le revers sans qu'il se déroule au fil de la journée."
+    },
+    {
+      "id": "fr-holdout-v5-503",
+      "field": "caption",
+      "text": "J'ai ajouté cette petite sécurité après avoir refait le même pli plusieurs fois."
+    },
+    {
+      "id": "fr-holdout-v5-504",
+      "field": "altText",
+      "text": "Un bouton intérieur maintient le bas de pantalon replié vers l'extérieur."
+    },
+    {
+      "id": "fr-holdout-v5-505",
+      "field": "altText",
+      "text": "La fixation disparaît entre les couches du revers formé au-dessus de la chaussure."
+    },
+    {
+      "id": "fr-holdout-v5-506",
+      "field": "caption",
+      "text": "J'ai laissé la doublure dépasser pour créer une seconde bande au bas du gilet."
+    },
+    {
+      "id": "fr-holdout-v5-507",
+      "field": "caption",
+      "text": "La couche intérieure devient un détail visible sans modifier la longueur extérieure."
+    },
+    {
+      "id": "fr-holdout-v5-508",
+      "field": "altText",
+      "text": "La doublure du gilet dépasse son bord inférieur en une bande régulière."
+    },
+    {
+      "id": "fr-holdout-v5-509",
+      "field": "altText",
+      "text": "Deux niveaux de tissu sont visibles au bas du vêtement sans manches."
+    },
+    {
+      "id": "fr-holdout-v5-510",
+      "field": "caption",
+      "text": "La plaque se retire quand je veux plier le sac à plat."
+    },
+    {
+      "id": "fr-holdout-v5-511",
+      "field": "caption",
+      "text": "J'ai découpé un fond amovible pour que la toile garde un peu de tenue."
+    },
+    {
+      "id": "fr-holdout-v5-512",
+      "field": "altText",
+      "text": "Une petite plaque gainée de tissu soutient le fond du sac souple."
+    },
+    {
+      "id": "fr-holdout-v5-513",
+      "field": "altText",
+      "text": "Le renfort retiré repose près du sac entièrement aplati."
+    },
+    {
+      "id": "fr-holdout-v5-514",
+      "field": "caption",
+      "text": "J'ai tourné le nœud vers la nuque pour laisser les boucles d'oreilles tranquilles."
+    },
+    {
+      "id": "fr-holdout-v5-515",
+      "field": "caption",
+      "text": "Les deux pointes du foulard passent derrière mes épaules au lieu de frôler les bijoux."
+    },
+    {
+      "id": "fr-holdout-v5-516",
+      "field": "altText",
+      "text": "Le foulard est noué derrière le cou, à distance des boucles pendantes."
+    },
+    {
+      "id": "fr-holdout-v5-517",
+      "field": "altText",
+      "text": "Les pans descendent dans le dos tandis que les côtés du visage restent dégagés."
+    },
+    {
+      "id": "fr-holdout-v5-518",
+      "field": "caption",
+      "text": "La nouvelle couture plus haute donne au manteau une allure que je préfère."
+    },
+    {
+      "id": "fr-holdout-v5-519",
+      "field": "caption",
+      "text": "J'ai remonté la jonction des panneaux sans toucher à la longueur totale."
+    },
+    {
+      "id": "fr-holdout-v5-520",
+      "field": "altText",
+      "text": "Une couture horizontale rehaussée marque le haut de la taille du manteau."
+    },
+    {
+      "id": "fr-holdout-v5-521",
+      "field": "altText",
+      "text": "La jonction rehaussée fait démarrer les panneaux longs plus près de la poitrine."
+    },
+    {
+      "id": "fr-holdout-v5-522",
+      "field": "caption",
+      "text": "Les fines lanières laissent apparaître le dessin de mon collant."
+    },
+    {
+      "id": "fr-holdout-v5-523",
+      "field": "caption",
+      "text": "J'ai choisi des chaussures ouvertes sur le dessus pour garder ce motif visible."
+    },
+    {
+      "id": "fr-holdout-v5-524",
+      "field": "altText",
+      "text": "Le motif du collant continue entre les brides étroites des chaussures."
+    },
+    {
+      "id": "fr-holdout-v5-525",
+      "field": "altText",
+      "text": "De petites zones imprimées se voient dans les espaces du soulier à lanières."
+    },
+    {
+      "id": "fr-holdout-v5-526",
+      "field": "caption",
+      "text": "J'ai arrondi les angles de la chemise pour qu'ils ne se replient plus vers l'extérieur."
+    },
+    {
+      "id": "fr-holdout-v5-527",
+      "field": "caption",
+      "text": "Le nouveau bord suit une courbe douce à l'endroit où les pans se séparent."
+    },
+    {
+      "id": "fr-holdout-v5-528",
+      "field": "altText",
+      "text": "Les deux angles inférieurs de la chemise présentent une découpe arrondie."
+    },
+    {
+      "id": "fr-holdout-v5-529",
+      "field": "altText",
+      "text": "Une courbe lisse relie chaque côté au bord horizontal du bas."
+    },
+    {
+      "id": "fr-holdout-v5-530",
+      "field": "caption",
+      "text": "La ceinture pliée sert maintenant de poignée à ce petit sac cousu main."
+    },
+    {
+      "id": "fr-holdout-v5-531",
+      "field": "caption",
+      "text": "J'ai gardé ses anciens trous comme petits indices de sa première vie."
+    },
+    {
+      "id": "fr-holdout-v5-532",
+      "field": "altText",
+      "text": "Une ancienne ceinture forme une courte anse au-dessus du sac."
+    },
+    {
+      "id": "fr-holdout-v5-533",
+      "field": "altText",
+      "text": "Les trous de réglage restent visibles sur la poignée de cuir réutilisée."
+    },
+    {
+      "id": "fr-holdout-v5-534",
+      "field": "caption",
+      "text": "La fente de manche s'arrête juste assez haut pour montrer mon bracelet."
+    },
+    {
+      "id": "fr-holdout-v5-535",
+      "field": "caption",
+      "text": "J'ai laissé la petite ouverture libre au lieu de fermer le dernier bouton."
+    },
+    {
+      "id": "fr-holdout-v5-536",
+      "field": "altText",
+      "text": "Une courte fente au poignet laisse apparaître un bracelet sous la manche."
+    },
+    {
+      "id": "fr-holdout-v5-537",
+      "field": "altText",
+      "text": "Les deux bords du tissu s'écartent légèrement autour du bijou."
+    },
+    {
+      "id": "fr-holdout-v5-538",
+      "field": "caption",
+      "text": "J'ai incliné la poche pour pouvoir l'ouvrir quand le sac repose sur mes genoux."
+    },
+    {
+      "id": "fr-holdout-v5-539",
+      "field": "caption",
+      "text": "Ce petit changement de direction rend l'accès bien plus naturel en position assise."
+    },
+    {
+      "id": "fr-holdout-v5-540",
+      "field": "altText",
+      "text": "La poche extérieure du sac présente une entrée inclinée vers la main."
+    },
+    {
+      "id": "fr-holdout-v5-541",
+      "field": "altText",
+      "text": "Le sac posé sur les jambes laisse sa fermeture latérale facilement accessible."
+    },
+    {
+      "id": "fr-holdout-v5-542",
+      "field": "caption",
+      "text": "Un petit passage textile garde la languette au milieu sous les lacets."
+    },
+    {
+      "id": "fr-holdout-v5-543",
+      "field": "caption",
+      "text": "J'ai enfin empêché cette languette de partir toujours du même côté."
+    },
+    {
+      "id": "fr-holdout-v5-544",
+      "field": "altText",
+      "text": "Le lacet traverse une petite bride cousue au centre de la languette."
+    },
+    {
+      "id": "fr-holdout-v5-545",
+      "field": "altText",
+      "text": "La bride centrale empêche la languette de glisser latéralement sous les lacets."
+    },
+    {
+      "id": "fr-holdout-v5-546",
+      "field": "caption",
+      "text": "Le pull passe dans la large ceinture et garde un peu de volume au-dessus."
+    },
+    {
+      "id": "fr-holdout-v5-547",
+      "field": "caption",
+      "text": "J'ai réglé la hauteur du tricot sans le rentrer dans la jupe."
+    },
+    {
+      "id": "fr-holdout-v5-548",
+      "field": "altText",
+      "text": "Une ceinture entoure le bas du pull et retient sa largeur."
+    },
+    {
+      "id": "fr-holdout-v5-549",
+      "field": "altText",
+      "text": "La maille forme un léger bourrelet au-dessus de la bande portée à la taille."
+    },
+    {
+      "id": "fr-holdout-v5-550",
+      "field": "caption",
+      "text": "La petite toile intérieure empêche le rabat de se recroqueviller."
+    },
+    {
+      "id": "fr-holdout-v5-551",
+      "field": "caption",
+      "text": "J'ai renforcé seulement la poche, pour garder le reste de la veste souple."
+    },
+    {
+      "id": "fr-holdout-v5-552",
+      "field": "altText",
+      "text": "Le rabat ouvert montre un renfort de toile sur sa face intérieure."
+    },
+    {
+      "id": "fr-holdout-v5-553",
+      "field": "altText",
+      "text": "La patte conserve une ligne droite grâce à une seconde couche plus ferme."
+    },
+    {
+      "id": "fr-holdout-v5-554",
+      "field": "caption",
+      "text": "Les bouts du ruban disparaissent sous le bord de la calotte."
+    },
+    {
+      "id": "fr-holdout-v5-555",
+      "field": "caption",
+      "text": "Je voulais un bandeau continu autour du chapeau, sans nœud apparent."
+    },
+    {
+      "id": "fr-holdout-v5-556",
+      "field": "altText",
+      "text": "Le ruban du chapeau forme un tour lisse dont les extrémités sont rentrées."
+    },
+    {
+      "id": "fr-holdout-v5-557",
+      "field": "altText",
+      "text": "Aucun pan de ruban ne dépasse autour de la base de la calotte."
+    },
+    {
+      "id": "fr-holdout-v5-558",
+      "field": "caption",
+      "text": "J'ai tourné le collier pour laisser son joli fermoir devant."
+    },
+    {
+      "id": "fr-holdout-v5-559",
+      "field": "caption",
+      "text": "Aujourd'hui le mécanisme devient presque le pendentif principal."
+    },
+    {
+      "id": "fr-holdout-v5-560",
+      "field": "altText",
+      "text": "Le fermoir décoratif du collier repose au centre de la poitrine."
+    },
+    {
+      "id": "fr-holdout-v5-561",
+      "field": "altText",
+      "text": "La chaîne fait apparaître son attache travaillée sur le devant du vêtement."
+    },
+    {
+      "id": "fr-holdout-v5-562",
+      "field": "caption",
+      "text": "Les petits ponts au crochet relient les panneaux sans fermer tout l'espace."
+    },
+    {
+      "id": "fr-holdout-v5-563",
+      "field": "caption",
+      "text": "J'ai gardé de fines ouvertures entre les bandes de tissu de la robe."
+    },
+    {
+      "id": "fr-holdout-v5-564",
+      "field": "altText",
+      "text": "Des barrettes au crochet relient deux panneaux verticaux de la robe."
+    },
+    {
+      "id": "fr-holdout-v5-565",
+      "field": "altText",
+      "text": "De petits intervalles restent ouverts entre les attaches réalisées en fil."
+    },
+    {
+      "id": "fr-holdout-v5-566",
+      "field": "caption",
+      "text": "J'ai roulé mon gilet pour m'asseoir sur le banc sans le froisser au hasard."
+    },
+    {
+      "id": "fr-holdout-v5-567",
+      "field": "caption",
+      "text": "La maille pliée m'a servi de petit coussin pendant la pause."
+    },
+    {
+      "id": "fr-holdout-v5-568",
+      "field": "altText",
+      "text": "Un gilet roulé forme un coussin compact sur le banc."
+    },
+    {
+      "id": "fr-holdout-v5-569",
+      "field": "altText",
+      "text": "La personne s'assied sur plusieurs couches de maille soigneusement pliées."
+    },
+    {
+      "id": "fr-holdout-v5-570",
+      "field": "caption",
+      "text": "Les attaches rembourrées soutiennent largement la ceinture pour préserver les plis suspendus."
+    },
+    {
+      "id": "fr-holdout-v5-571",
+      "field": "caption",
+      "text": "J'ai protégé les plis avant de suspendre cette pièce légère."
+    },
+    {
+      "id": "fr-holdout-v5-572",
+      "field": "altText",
+      "text": "Deux pinces rembourrées maintiennent la ceinture du vêtement sans marquer les plis."
+    },
+    {
+      "id": "fr-holdout-v5-573",
+      "field": "altText",
+      "text": "La jupe suspendue conserve ses replis réguliers sous les attaches du cintre."
+    },
+    {
+      "id": "fr-holdout-v5-574",
+      "field": "caption",
+      "text": "Un peu de cire rend le fil plus solide pour refixer ce bouton de manteau."
+    },
+    {
+      "id": "fr-holdout-v5-575",
+      "field": "caption",
+      "text": "J'ai préparé le fil avant de reprendre la fermeture qui tirait beaucoup."
+    },
+    {
+      "id": "fr-holdout-v5-576",
+      "field": "altText",
+      "text": "Le fil destiné au bouton passe sur un petit bloc de cire."
+    },
+    {
+      "id": "fr-holdout-v5-577",
+      "field": "altText",
+      "text": "Une aiguille et un fil préparé reposent près du bouton à recoudre."
+    },
+    {
+      "id": "fr-holdout-v5-578",
+      "field": "caption",
+      "text": "Un mini mousqueton réunit les deux boucles cousues au bout de mon écharpe."
+    },
+    {
+      "id": "fr-holdout-v5-579",
+      "field": "caption",
+      "text": "J'ai trouvé une fermeture qui s'ouvre d'une seule main pour ce tour de cou."
+    },
+    {
+      "id": "fr-holdout-v5-580",
+      "field": "altText",
+      "text": "Un petit mousqueton relie deux attaches textiles aux extrémités de l'écharpe."
+    },
+    {
+      "id": "fr-holdout-v5-581",
+      "field": "altText",
+      "text": "Le mousqueton relie les boucles cousues aux bouts de l'écharpe portée au cou."
+    },
+    {
+      "id": "fr-holdout-v5-582",
+      "field": "caption",
+      "text": "Les renforts se déclipsent avant le lavage du pantalon."
+    },
+    {
+      "id": "fr-holdout-v5-583",
+      "field": "caption",
+      "text": "J'ai prévu des attaches discrètes pour remettre les pièces exactement au bon endroit."
+    },
+    {
+      "id": "fr-holdout-v5-584",
+      "field": "altText",
+      "text": "Deux renforts détachés sont posés devant les genoux du pantalon."
+    },
+    {
+      "id": "fr-holdout-v5-585",
+      "field": "altText",
+      "text": "De petites pressions entourent les zones prévues pour les panneaux amovibles."
+    },
+    {
+      "id": "fr-holdout-v5-586",
+      "field": "caption",
+      "text": "Le bas de chemise se replie dans une bande intérieure pour rester raccourci."
+    },
+    {
+      "id": "fr-holdout-v5-587",
+      "field": "caption",
+      "text": "Je peux retrouver sa longueur entière en libérant simplement le tissu."
+    },
+    {
+      "id": "fr-holdout-v5-588",
+      "field": "altText",
+      "text": "Le bord raccourci est calé contre l'envers par une patte textile horizontale."
+    },
+    {
+      "id": "fr-holdout-v5-589",
+      "field": "altText",
+      "text": "L'ourlet d'origine est caché contre l'envers du vêtement raccourci."
+    },
+    {
+      "id": "fr-holdout-v5-590",
+      "field": "caption",
+      "text": "Le foulard passe dans l'épingle du chignon et ne glisse plus."
+    },
+    {
+      "id": "fr-holdout-v5-591",
+      "field": "caption",
+      "text": "J'ai laissé les deux pointes libres derrière la nuque."
+    },
+    {
+      "id": "fr-holdout-v5-592",
+      "field": "altText",
+      "text": "Une épingle à chignon traverse le foulard roulé dans les cheveux."
+    },
+    {
+      "id": "fr-holdout-v5-593",
+      "field": "altText",
+      "text": "Les bouts du carré pendent sous le chignon maintenu par une tige."
+    },
+    {
+      "id": "fr-holdout-v5-594",
+      "field": "caption",
+      "text": "Les petites nervures rapprochent le bord de la robe de mes épaules."
+    },
+    {
+      "id": "fr-holdout-v5-595",
+      "field": "caption",
+      "text": "J'ai repris la largeur tout en gardant un détail cousu bien visible."
+    },
+    {
+      "id": "fr-holdout-v5-596",
+      "field": "altText",
+      "text": "De fines nervures cousues réduisent la largeur au sommet de la robe."
+    },
+    {
+      "id": "fr-holdout-v5-597",
+      "field": "altText",
+      "text": "Deux petits plis piqués longent chaque épaule jusqu'à l'emmanchure."
+    },
+    {
+      "id": "fr-holdout-v5-598",
+      "field": "caption",
+      "text": "J'ai retourné la capuche pour que sa doublure sèche aussi vite que l'extérieur."
+    },
+    {
+      "id": "fr-holdout-v5-599",
+      "field": "caption",
+      "text": "Après l'averse, le côté humide reste à l'air pendant que le manteau attend."
+    },
+    {
+      "id": "fr-holdout-v5-600",
+      "field": "altText",
+      "text": "La capuche retournée expose sa doublure humide au-dessus du manteau suspendu."
+    },
+    {
+      "id": "fr-holdout-v5-601",
+      "field": "altText",
+      "text": "Le bord imperméable entoure le tissu intérieur mis à sécher."
+    },
+    {
+      "id": "fr-holdout-v5-602",
+      "field": "caption",
+      "text": "Une ancienne chambre à air m'a servi à découper ces boucles très légères."
+    },
+    {
+      "id": "fr-holdout-v5-603",
+      "field": "caption",
+      "text": "Les fines lamelles bougent bien, même avec une matière qui paraissait rigide."
+    },
+    {
+      "id": "fr-holdout-v5-604",
+      "field": "altText",
+      "text": "Les boucles sont composées de lamelles noires découpées dans du caoutchouc."
+    },
+    {
+      "id": "fr-holdout-v5-605",
+      "field": "altText",
+      "text": "Une petite courbure de chambre à air reste visible sur les pièces suspendues."
+    },
+    {
+      "id": "fr-holdout-v5-606",
+      "field": "caption",
+      "text": "Le pied de fil laisse assez de place pour fermer les deux épaisseurs du manteau."
+    },
+    {
+      "id": "fr-holdout-v5-607",
+      "field": "caption",
+      "text": "J'ai pris soin d'enrouler le fil sous le bouton pour qu'il ne tire pas."
+    },
+    {
+      "id": "fr-holdout-v5-608",
+      "field": "altText",
+      "text": "Un court pied de fil maintient le bouton au-dessus du tissu épais."
+    },
+    {
+      "id": "fr-holdout-v5-609",
+      "field": "altText",
+      "text": "Le fil enroulé forme une tige entre la base du bouton et le manteau."
+    },
+    {
+      "id": "fr-holdout-v5-610",
+      "field": "caption",
+      "text": "J'ai laissé le ruban de fermeture visible pour tracer une ligne vive devant."
+    },
+    {
+      "id": "fr-holdout-v5-611",
+      "field": "caption",
+      "text": "La fermeture apporte son propre dessin, même quand elle est complètement fermée."
+    },
+    {
+      "id": "fr-holdout-v5-612",
+      "field": "altText",
+      "text": "Le ruban coloré de la fermeture reste apparent de chaque côté des dents."
+    },
+    {
+      "id": "fr-holdout-v5-613",
+      "field": "altText",
+      "text": "Deux lignes textiles encadrent le zip sur le devant uni du vêtement."
+    },
+    {
+      "id": "fr-holdout-v5-614",
+      "field": "caption",
+      "text": "La poche se cache derrière le grand pli et s'ouvre sans déformer la jupe."
+    },
+    {
+      "id": "fr-holdout-v5-615",
+      "field": "caption",
+      "text": "J'ai gardé le secret de cette poche dans le mouvement du tissu."
+    },
+    {
+      "id": "fr-holdout-v5-616",
+      "field": "altText",
+      "text": "Une main soulève légèrement le pli pour atteindre une poche dissimulée."
+    },
+    {
+      "id": "fr-holdout-v5-617",
+      "field": "altText",
+      "text": "L'ouverture du compartiment reste derrière le panneau plié de la jupe."
+    },
+    {
+      "id": "fr-holdout-v5-618",
+      "field": "caption",
+      "text": "J'ai suspendu la robe une nuit pour laisser le biais trouver sa longueur."
+    },
+    {
+      "id": "fr-holdout-v5-619",
+      "field": "caption",
+      "text": "Le tissu s'est placé doucement avant que je termine le bord inférieur."
+    },
+    {
+      "id": "fr-holdout-v5-620",
+      "field": "altText",
+      "text": "La robe coupée en biais pend librement avec un bas encore irrégulier."
+    },
+    {
+      "id": "fr-holdout-v5-621",
+      "field": "altText",
+      "text": "Des repères provisoires attendent que le tissu suspendu finisse de se détendre."
+    },
+    {
+      "id": "fr-holdout-v5-622",
+      "field": "caption",
+      "text": "Une petite boucle à l'intérieur m'indique le devant du haut au toucher."
+    },
+    {
+      "id": "fr-holdout-v5-623",
+      "field": "caption",
+      "text": "Je repère le bon sens sans chercher la couture dans la lumière."
+    },
+    {
+      "id": "fr-holdout-v5-624",
+      "field": "altText",
+      "text": "Dans la manche droite, un petit relief de fil sert de repère tactile."
+    },
+    {
+      "id": "fr-holdout-v5-625",
+      "field": "altText",
+      "text": "Le petit repère tactile est cousu près du bord, accessible du bout des doigts."
+    },
+    {
+      "id": "fr-holdout-v5-626",
+      "field": "caption",
+      "text": "Le même nœud se clipse sur le sac ou sur le serre-tête."
+    },
+    {
+      "id": "fr-holdout-v5-627",
+      "field": "caption",
+      "text": "J'ai préparé une attache simple pour déplacer cet accessoire selon mon envie."
+    },
+    {
+      "id": "fr-holdout-v5-628",
+      "field": "altText",
+      "text": "Un nœud amovible est posé entre un petit sac et un serre-tête."
+    },
+    {
+      "id": "fr-holdout-v5-629",
+      "field": "altText",
+      "text": "La pince au dos du nœud permet de l'accrocher à plusieurs accessoires."
+    },
+    {
+      "id": "fr-holdout-v5-630",
+      "field": "caption",
+      "text": "Une seule pointe descend plus bas sur ce gilet, et je la laisse bien visible."
+    },
+    {
+      "id": "fr-holdout-v5-631",
+      "field": "caption",
+      "text": "La petite asymétrie suffit à changer un ensemble très simple."
+    },
+    {
+      "id": "fr-holdout-v5-632",
+      "field": "altText",
+      "text": "Le gilet présente une pointe longue d'un côté et un bord court de l'autre."
+    },
+    {
+      "id": "fr-holdout-v5-633",
+      "field": "altText",
+      "text": "Les deux pans inférieurs terminent leur course à des hauteurs différentes."
+    },
+    {
+      "id": "fr-holdout-v5-634",
+      "field": "caption",
+      "text": "Le quadrillage m'a aidée à repérer le sens du tissu avant de couper."
+    },
+    {
+      "id": "fr-holdout-v5-635",
+      "field": "caption",
+      "text": "Les lignes du motif restent droites parce que j'ai pris le temps d'aligner le patron."
+    },
+    {
+      "id": "fr-holdout-v5-636",
+      "field": "altText",
+      "text": "Les lignes du tissu quadrillé suivent les repères droits du patron de jupe."
+    },
+    {
+      "id": "fr-holdout-v5-637",
+      "field": "altText",
+      "text": "Une pièce de papier est alignée sur les fils visibles du quadrillage."
+    },
+    {
+      "id": "fr-holdout-v5-638",
+      "field": "caption",
+      "text": "Le petit losange sous le bras me laisse enfin atteindre l'étagère sans tirer la veste."
+    },
+    {
+      "id": "fr-holdout-v5-639",
+      "field": "caption",
+      "text": "J'ai gagné du mouvement grâce à une pièce qu'on remarque à peine."
+    },
+    {
+      "id": "fr-holdout-v5-640",
+      "field": "altText",
+      "text": "Un losange de tissu est inséré à la jonction du bras et du corps de veste."
+    },
+    {
+      "id": "fr-holdout-v5-641",
+      "field": "altText",
+      "text": "Le gousset s'ouvre sous l'aisselle quand le bras est levé."
+    },
+    {
+      "id": "fr-holdout-v5-642",
+      "field": "caption",
+      "text": "J'ai protégé l'arrière des perles avec une bande lisse contre le cou."
+    },
+    {
+      "id": "fr-holdout-v5-643",
+      "field": "caption",
+      "text": "Le décor reste devant et la peau ne rencontre que le petit ruban doux."
+    },
+    {
+      "id": "fr-holdout-v5-644",
+      "field": "altText",
+      "text": "Une bande lisse recouvre les fils et attaches derrière le col perlé."
+    },
+    {
+      "id": "fr-holdout-v5-645",
+      "field": "altText",
+      "text": "L'envers du décor est entièrement caché par une fine protection textile."
+    },
+    {
+      "id": "fr-holdout-v5-646",
+      "field": "caption",
+      "text": "J'ai séparé le tissu de son cadre pour nettoyer la petite bourse plus facilement."
+    },
+    {
+      "id": "fr-holdout-v5-647",
+      "field": "caption",
+      "text": "Les vis du fermoir permettent de tout remettre ensuite à la même place."
+    },
+    {
+      "id": "fr-holdout-v5-648",
+      "field": "altText",
+      "text": "Le cadre métallique est détaché de la partie textile de la bourse."
+    },
+    {
+      "id": "fr-holdout-v5-649",
+      "field": "altText",
+      "text": "De petites vis rangées près du fermoir attendent le remontage du tissu nettoyé."
+    },
+    {
+      "id": "fr-holdout-v5-650",
+      "field": "caption",
+      "text": "Le petit fourreau rend cette bretelle fine beaucoup plus douce sur l'épaule."
+    },
+    {
+      "id": "fr-holdout-v5-651",
+      "field": "caption",
+      "text": "J'ai cousu une protection amovible pour continuer à porter cette robe confortablement."
+    },
+    {
+      "id": "fr-holdout-v5-652",
+      "field": "altText",
+      "text": "Un fourreau rembourré entoure la bretelle au niveau de l'épaule."
+    },
+    {
+      "id": "fr-holdout-v5-653",
+      "field": "altText",
+      "text": "La bande fine disparaît sous une petite pièce textile plus large."
+    },
+    {
+      "id": "fr-holdout-v5-654",
+      "field": "caption",
+      "text": "L'ancien poignet de chemise devient un bandeau grâce à son bouton encore solide."
+    },
+    {
+      "id": "fr-holdout-v5-655",
+      "field": "caption",
+      "text": "J'ai conservé le petit pli d'origine dans cet accessoire récupéré."
+    },
+    {
+      "id": "fr-holdout-v5-656",
+      "field": "altText",
+      "text": "Un ancien poignet boutonné forme un bandeau autour des cheveux."
+    },
+    {
+      "id": "fr-holdout-v5-657",
+      "field": "altText",
+      "text": "La boutonnière de chemise sert toujours à fermer la bande réutilisée."
+    },
+    {
+      "id": "fr-holdout-v5-658",
+      "field": "caption",
+      "text": "La ceinture passe dans deux ouvertures des poches et ressort juste devant."
+    },
+    {
+      "id": "fr-holdout-v5-659",
+      "field": "caption",
+      "text": "L'arrière reste ample pendant que le lien rassemble seulement les pans du manteau."
+    },
+    {
+      "id": "fr-holdout-v5-660",
+      "field": "altText",
+      "text": "Une ceinture traverse deux ouvertures près des poches du manteau."
+    },
+    {
+      "id": "fr-holdout-v5-661",
+      "field": "altText",
+      "text": "Le lien visible sur le devant laisse le dos du vêtement entièrement libre."
+    },
+    {
+      "id": "fr-holdout-v5-662",
+      "field": "caption",
+      "text": "J'ai retiré les bas de jambes pour continuer la journée avec une tenue plus légère."
+    },
+    {
+      "id": "fr-holdout-v5-663",
+      "field": "caption",
+      "text": "Les deux morceaux se rangent dans une petite poche prévue à l'intérieur."
+    },
+    {
+      "id": "fr-holdout-v5-664",
+      "field": "altText",
+      "text": "Les parties inférieures du pantalon sont détachées sous les fermetures circulaires."
+    },
+    {
+      "id": "fr-holdout-v5-665",
+      "field": "altText",
+      "text": "Le short obtenu repose au-dessus des deux panneaux de jambe retirés."
+    },
+    {
+      "id": "fr-holdout-v5-666",
+      "field": "caption",
+      "text": "Le dessous rembourré empêche les perles de la barrette d'accrocher mes cheveux."
+    },
+    {
+      "id": "fr-holdout-v5-667",
+      "field": "caption",
+      "text": "J'ai terminé l'envers avec un petit morceau de feutre très fin."
+    },
+    {
+      "id": "fr-holdout-v5-668",
+      "field": "altText",
+      "text": "Une couche de feutre couvre l'arrière des perles sur la barrette."
+    },
+    {
+      "id": "fr-holdout-v5-669",
+      "field": "altText",
+      "text": "Le mécanisme métallique reste accessible sous le rembourrage du décor."
+    },
+    {
+      "id": "fr-holdout-v5-670",
+      "field": "caption",
+      "text": "Un petit tube de tricot neuf remplace la partie usée du poignet."
+    },
+    {
+      "id": "fr-holdout-v5-671",
+      "field": "caption",
+      "text": "J'ai repris le rythme des mailles pour prolonger la manche sans rupture brutale."
+    },
+    {
+      "id": "fr-holdout-v5-672",
+      "field": "altText",
+      "text": "Une section tricotée neuve prolonge le bas de la manche ancienne."
+    },
+    {
+      "id": "fr-holdout-v5-673",
+      "field": "altText",
+      "text": "La jonction circulaire relie les mailles du poignet réparé au tissu d'origine."
+    },
+    {
+      "id": "fr-holdout-v5-674",
+      "field": "caption",
+      "text": "Le coussin de repassage m'aide à préserver l'arrondi de ce petit sac."
+    },
+    {
+      "id": "fr-holdout-v5-675",
+      "field": "caption",
+      "text": "J'appuie doucement autour de la couture pour ne pas écraser les plis."
+    },
+    {
+      "id": "fr-holdout-v5-676",
+      "field": "altText",
+      "text": "Le sac repose sur un support bombé pendant le repassage de sa couture."
+    },
+    {
+      "id": "fr-holdout-v5-677",
+      "field": "altText",
+      "text": "Les petits plis restent ouverts autour du fond arrondi maintenu en forme."
+    },
+    {
+      "id": "fr-holdout-v5-678",
+      "field": "caption",
+      "text": "Un fil presque invisible garde le col ouvert exactement comme je le souhaite."
+    },
+    {
+      "id": "fr-holdout-v5-679",
+      "field": "caption",
+      "text": "J'ai posé une attache facile à retirer pour stabiliser cette courbe souple."
+    },
+    {
+      "id": "fr-holdout-v5-680",
+      "field": "altText",
+      "text": "Un fil fin relie la pointe du col à l'intérieur du vêtement."
+    },
+    {
+      "id": "fr-holdout-v5-681",
+      "field": "altText",
+      "text": "La petite fixation maintient le revers écarté sans bouton visible."
+    },
+    {
+      "id": "fr-holdout-v5-682",
+      "field": "caption",
+      "text": "Le petit morceau de liège épouse maintenant l'arrière de ma chaussure."
+    },
+    {
+      "id": "fr-holdout-v5-683",
+      "field": "caption",
+      "text": "J'ai découpé cette cale pour mieux maintenir le pied dans le soulier."
+    },
+    {
+      "id": "fr-holdout-v5-684",
+      "field": "altText",
+      "text": "Une mince pièce de liège tapisse l'intérieur du talon de chaussure."
+    },
+    {
+      "id": "fr-holdout-v5-685",
+      "field": "altText",
+      "text": "Le petit renfort arrondi suit la courbe du contrefort."
+    },
+    {
+      "id": "fr-holdout-v5-686",
+      "field": "caption",
+      "text": "Le foulard enveloppe mes affaires et sert de doublure souple au panier."
+    },
+    {
+      "id": "fr-holdout-v5-687",
+      "field": "caption",
+      "text": "Je peux sortir tout le petit paquet d'un seul geste quand je change de sac."
+    },
+    {
+      "id": "fr-holdout-v5-688",
+      "field": "altText",
+      "text": "Un foulard entoure les objets rangés dans un panier ouvert."
+    },
+    {
+      "id": "fr-holdout-v5-689",
+      "field": "altText",
+      "text": "Les quatre coins du carré sont ramenés au-dessus du contenu du sac."
+    },
+    {
+      "id": "fr-holdout-v5-690",
+      "field": "caption",
+      "text": "La boucle élastique laisse une petite marge au bouton de taille."
+    },
+    {
+      "id": "fr-holdout-v5-691",
+      "field": "caption",
+      "text": "J'ai assoupli le point de fermeture sans changer le devant de la robe."
+    },
+    {
+      "id": "fr-holdout-v5-692",
+      "field": "altText",
+      "text": "Une boucle souple entoure le bouton placé à la taille de la robe."
+    },
+    {
+      "id": "fr-holdout-v5-693",
+      "field": "altText",
+      "text": "Le petit lien élastique prolonge légèrement l'ouverture de fermeture."
+    },
+    {
+      "id": "fr-holdout-v5-694",
+      "field": "caption",
+      "text": "J'ai orienté la fermeture pour pouvoir atteindre la poche sans lever le coude."
+    },
+    {
+      "id": "fr-holdout-v5-695",
+      "field": "caption",
+      "text": "La tirette vient désormais vers ma main quand le sac est porté."
+    },
+    {
+      "id": "fr-holdout-v5-696",
+      "field": "altText",
+      "text": "Le curseur de poche se trouve du côté le plus proche de la main."
+    },
+    {
+      "id": "fr-holdout-v5-697",
+      "field": "altText",
+      "text": "La fermeture du sac s'ouvre vers l'avant du corps plutôt que vers le dos."
+    },
+    {
+      "id": "fr-holdout-v5-698",
+      "field": "caption",
+      "text": "Les petits œillets laissent passer le cordon sans tirer sur la paille."
+    },
+    {
+      "id": "fr-holdout-v5-699",
+      "field": "caption",
+      "text": "J'ai renforcé les passages avant d'ajouter une attache à mon chapeau."
+    },
+    {
+      "id": "fr-holdout-v5-700",
+      "field": "altText",
+      "text": "Un cordon fin traverse deux œillets sur les côtés du chapeau."
+    },
+    {
+      "id": "fr-holdout-v5-701",
+      "field": "altText",
+      "text": "Les ouvertures renforcées protègent le bord où passe le lien."
+    },
+    {
+      "id": "fr-holdout-v5-702",
+      "field": "caption",
+      "text": "J'ai laissé le pli du pantalon plus souple au genou pour garder un mouvement naturel."
+    },
+    {
+      "id": "fr-holdout-v5-703",
+      "field": "caption",
+      "text": "La ligne revient ensuite bien droite jusqu'au bas de la jambe."
+    },
+    {
+      "id": "fr-holdout-v5-704",
+      "field": "altText",
+      "text": "Le pli du pantalon s'atténue au genou puis redevient marqué plus bas."
+    },
+    {
+      "id": "fr-holdout-v5-705",
+      "field": "altText",
+      "text": "La ligne verticale reste nette sur le tibia mais souple sur l'articulation."
+    },
+    {
+      "id": "fr-holdout-v5-706",
+      "field": "caption",
+      "text": "L'attache de la cape passe sur l'épaule et libère complètement le devant."
+    },
+    {
+      "id": "fr-holdout-v5-707",
+      "field": "caption",
+      "text": "J'ai essayé ce point de fermeture décalé pour laisser le tissu se répartir autrement."
+    },
+    {
+      "id": "fr-holdout-v5-708",
+      "field": "altText",
+      "text": "La cape se ferme sur une épaule par une petite attache latérale."
+    },
+    {
+      "id": "fr-holdout-v5-709",
+      "field": "altText",
+      "text": "Le panneau avant tombe sans fixation visible au milieu du cou."
+    },
+    {
+      "id": "fr-holdout-v5-710",
+      "field": "caption",
+      "text": "Un pendentif en papier m'aide à choisir la bonne longueur avant de monter le vrai."
+    },
+    {
+      "id": "fr-holdout-v5-711",
+      "field": "caption",
+      "text": "J'ai découpé une forme légère pour comparer sa place sur deux encolures."
+    },
+    {
+      "id": "fr-holdout-v5-712",
+      "field": "altText",
+      "text": "Un gabarit de pendentif en papier est suspendu à une chaîne provisoire."
+    },
+    {
+      "id": "fr-holdout-v5-713",
+      "field": "altText",
+      "text": "La silhouette découpée repose sur le devant du haut pendant l'essayage."
+    },
+    {
+      "id": "fr-holdout-v5-714",
+      "field": "caption",
+      "text": "Les pressions latérales réduisent l'épaisseur du sac quand il est presque vide."
+    },
+    {
+      "id": "fr-holdout-v5-715",
+      "field": "caption",
+      "text": "J'aime pouvoir refermer les deux soufflets pour retrouver une forme plus fine."
+    },
+    {
+      "id": "fr-holdout-v5-716",
+      "field": "altText",
+      "text": "Deux pressions maintiennent les soufflets repliés contre les côtés du sac."
+    },
+    {
+      "id": "fr-holdout-v5-717",
+      "field": "altText",
+      "text": "La poche principale paraît plus étroite lorsque les attaches latérales sont fermées."
+    },
+    {
+      "id": "fr-holdout-v5-718",
+      "field": "caption",
+      "text": "J'ai mis un nombre différent de nœuds sur chaque panneau pour les assembler dans l'ordre."
+    },
+    {
+      "id": "fr-holdout-v5-719",
+      "field": "caption",
+      "text": "Mes petits repères de fil évitent de confondre les morceaux presque identiques."
+    },
+    {
+      "id": "fr-holdout-v5-720",
+      "field": "altText",
+      "text": "Des bouts de fil noués marquent plusieurs panneaux de jupe avant assemblage."
+    },
+    {
+      "id": "fr-holdout-v5-721",
+      "field": "altText",
+      "text": "Les pièces étalées portent de petits groupes de nœuds distincts."
+    },
+    {
+      "id": "fr-holdout-v5-722",
+      "field": "caption",
+      "text": "La doublure des gants se retourne doucement pour sécher jusqu'au bout des doigts."
+    },
+    {
+      "id": "fr-holdout-v5-723",
+      "field": "caption",
+      "text": "Les couches sont dégagées l'une de l'autre tout en restant jointes au poignet."
+    },
+    {
+      "id": "fr-holdout-v5-724",
+      "field": "altText",
+      "text": "La doublure fine sort des gants retournés au niveau des doigts."
+    },
+    {
+      "id": "fr-holdout-v5-725",
+      "field": "altText",
+      "text": "Les deux couches restent réunies par le bord de poignet pendant le séchage."
+    },
+    {
+      "id": "fr-holdout-v5-726",
+      "field": "caption",
+      "text": "Le col du manteau ressort au-dessus du petit débardeur tricoté porté par-dessus."
+    },
+    {
+      "id": "fr-holdout-v5-727",
+      "field": "caption",
+      "text": "J'ai inversé l'ordre habituel des couches pour essayer une nouvelle silhouette."
+    },
+    {
+      "id": "fr-holdout-v5-728",
+      "field": "altText",
+      "text": "Un débardeur en maille est porté sur un manteau fin dont le col reste visible."
+    },
+    {
+      "id": "fr-holdout-v5-729",
+      "field": "altText",
+      "text": "Les larges emmanchures du tricot laissent passer les manches du manteau."
+    },
+    {
+      "id": "fr-holdout-v5-730",
+      "field": "caption",
+      "text": "Une ligne de points retient les fils tout en laissant le bord légèrement effrangé."
+    },
+    {
+      "id": "fr-holdout-v5-731",
+      "field": "caption",
+      "text": "J'ai arrêté la frange avant qu'elle ne remonte davantage dans le tissage."
+    },
+    {
+      "id": "fr-holdout-v5-732",
+      "field": "altText",
+      "text": "Une couture suit la base de la frange courte du foulard."
+    },
+    {
+      "id": "fr-holdout-v5-733",
+      "field": "altText",
+      "text": "Les fils libres se terminent juste avant une ligne de points serrés."
+    },
+    {
+      "id": "fr-holdout-v5-734",
+      "field": "caption",
+      "text": "Le petit ruban intérieur porte le poids de la jupe sans tirer sur le haut."
+    },
+    {
+      "id": "fr-holdout-v5-735",
+      "field": "caption",
+      "text": "J'ai fermé la bride de taille avant de remonter la fermeture de la robe."
+    },
+    {
+      "id": "fr-holdout-v5-736",
+      "field": "altText",
+      "text": "La bride interne possède sa propre attache indépendante sous le corsage."
+    },
+    {
+      "id": "fr-holdout-v5-737",
+      "field": "altText",
+      "text": "La bande de soutien relie les coutures internes sous le corsage."
+    },
+    {
+      "id": "fr-holdout-v5-738",
+      "field": "caption",
+      "text": "La petite pochette intégrée à ma chaussure reçoit les extrémités libres des lacets."
+    },
+    {
+      "id": "fr-holdout-v5-739",
+      "field": "caption",
+      "text": "Aujourd'hui je garde le dessus du soulier net sans raccourcir les lacets."
+    },
+    {
+      "id": "fr-holdout-v5-740",
+      "field": "altText",
+      "text": "Une petite poche de languette contient les extrémités des lacets."
+    },
+    {
+      "id": "fr-holdout-v5-741",
+      "field": "altText",
+      "text": "La chaussure fermée ne laisse dépasser aucune longue boucle de lacet."
+    },
+    {
+      "id": "fr-holdout-v5-742",
+      "field": "caption",
+      "text": "Les revers amovibles se retirent avant de laver le corps du gilet."
+    },
+    {
+      "id": "fr-holdout-v5-743",
+      "field": "caption",
+      "text": "J'ai préparé les petites attaches pour pouvoir remettre chaque côté facilement."
+    },
+    {
+      "id": "fr-holdout-v5-744",
+      "field": "altText",
+      "text": "Deux revers détachés reposent à côté du gilet sans col."
+    },
+    {
+      "id": "fr-holdout-v5-745",
+      "field": "altText",
+      "text": "De petites fixations cousues suivent l'ancien contour du décolleté."
+    },
+    {
+      "id": "fr-holdout-v5-746",
+      "field": "caption",
+      "text": "La doublure possède son propre pli pour suivre les mouvements du manteau."
+    },
+    {
+      "id": "fr-holdout-v5-747",
+      "field": "caption",
+      "text": "J'ai gardé un peu plus de tissu au milieu du dos avant de refermer l'intérieur."
+    },
+    {
+      "id": "fr-holdout-v5-748",
+      "field": "altText",
+      "text": "Un pli d'aisance vertical occupe le centre de la doublure du manteau."
+    },
+    {
+      "id": "fr-holdout-v5-749",
+      "field": "altText",
+      "text": "La couche intérieure présente une petite réserve de largeur au dos."
+    },
+    {
+      "id": "fr-holdout-v5-750",
+      "field": "caption",
+      "text": "Le nœud coulissant rapproche les perles pour régler la taille du bracelet."
+    },
+    {
+      "id": "fr-holdout-v5-751",
+      "field": "caption",
+      "text": "J'ai gardé deux bouts souples assez longs pour ajuster le bijou facilement."
+    },
+    {
+      "id": "fr-holdout-v5-752",
+      "field": "altText",
+      "text": "Un petit nœud réglable rejoint les extrémités du bracelet de perles."
+    },
+    {
+      "id": "fr-holdout-v5-753",
+      "field": "altText",
+      "text": "Les deux bouts du cordon coulissent côte à côte derrière les éléments du bijou."
+    },
+    {
+      "id": "fr-holdout-v5-754",
+      "field": "caption",
+      "text": "J'ai relié les deux pans arrière avant de monter sur le vélo."
+    },
+    {
+      "id": "fr-holdout-v5-755",
+      "field": "caption",
+      "text": "La petite attache garde le manteau près de moi pendant le trajet."
+    },
+    {
+      "id": "fr-holdout-v5-756",
+      "field": "altText",
+      "text": "Une patte intérieure réunit les pans fendus du manteau au-dessus de la roue."
+    },
+    {
+      "id": "fr-holdout-v5-757",
+      "field": "altText",
+      "text": "Le tissu long est rassemblé derrière les jambes par une courte fixation."
+    },
+    {
+      "id": "fr-holdout-v5-758",
+      "field": "caption",
+      "text": "Les panneaux utilisent le même tissu, mais leurs reflets changent avec le sens de coupe."
+    },
+    {
+      "id": "fr-holdout-v5-759",
+      "field": "caption",
+      "text": "J'ai tourné certains morceaux pour obtenir un dessin sans ajouter d'autre étoffe."
+    },
+    {
+      "id": "fr-holdout-v5-760",
+      "field": "altText",
+      "text": "Des panneaux identiques paraissent plus clairs ou plus foncés selon leur orientation."
+    },
+    {
+      "id": "fr-holdout-v5-761",
+      "field": "altText",
+      "text": "Le sens des fils varie d'une partie à l'autre de la jupe assemblée."
+    },
+    {
+      "id": "fr-holdout-v5-762",
+      "field": "caption",
+      "text": "Le ruban de cheveux attend sur le bouton de ma manche jusqu'à ce que j'en aie besoin."
+    },
+    {
+      "id": "fr-holdout-v5-763",
+      "field": "caption",
+      "text": "J'ai trouvé une petite place pour le lien sans le perdre au fond du sac."
+    },
+    {
+      "id": "fr-holdout-v5-764",
+      "field": "altText",
+      "text": "Un ruban est passé autour du bouton de poignet de la chemise."
+    },
+    {
+      "id": "fr-holdout-v5-765",
+      "field": "altText",
+      "text": "Le petit accessoire textile pend près de la main, prêt à servir."
+    },
+    {
+      "id": "fr-holdout-v5-766",
+      "field": "caption",
+      "text": "Le fourreau de poignée se retire après les sorties pour passer au lavage."
+    },
+    {
+      "id": "fr-holdout-v5-767",
+      "field": "caption",
+      "text": "J'ai cousu cette protection simple pour préserver le cuir clair de mon sac."
+    },
+    {
+      "id": "fr-holdout-v5-768",
+      "field": "altText",
+      "text": "Une gaine textile boutonnée recouvre la poignée du sac."
+    },
+    {
+      "id": "fr-holdout-v5-769",
+      "field": "altText",
+      "text": "Le protège-anse retiré montre une fermeture permettant de le laver séparément."
+    },
+    {
+      "id": "fr-holdout-v5-770",
+      "field": "caption",
+      "text": "Le gros-grain intérieur empêche la patte de boutons de se déformer."
+    },
+    {
+      "id": "fr-holdout-v5-771",
+      "field": "caption",
+      "text": "J'ai renforcé cette bande étroite avant de remettre les boutons en place."
+    },
+    {
+      "id": "fr-holdout-v5-772",
+      "field": "altText",
+      "text": "Un ruban de gros-grain est cousu sur l'envers de la patte de fermeture."
+    },
+    {
+      "id": "fr-holdout-v5-773",
+      "field": "altText",
+      "text": "La bande renforcée reste droite entre les petites boutonnières."
+    },
+    {
+      "id": "fr-holdout-v5-774",
+      "field": "caption",
+      "text": "J'ai placé les chaussures en sens inverse pour gagner de la place dans leur housse."
+    },
+    {
+      "id": "fr-holdout-v5-775",
+      "field": "caption",
+      "text": "La paire se cale mieux quand chaque bout rejoint le talon de l'autre."
+    },
+    {
+      "id": "fr-holdout-v5-776",
+      "field": "altText",
+      "text": "Les deux chaussures sont rangées tête-bêche dans une petite housse."
+    },
+    {
+      "id": "fr-holdout-v5-777",
+      "field": "altText",
+      "text": "Le talon de chaque soulier se place contre le bout du second."
+    },
+    {
+      "id": "fr-holdout-v5-778",
+      "field": "caption",
+      "text": "La chute rayée suffit pour refaire une seule doublure de manche."
+    },
+    {
+      "id": "fr-holdout-v5-779",
+      "field": "caption",
+      "text": "J'ai remplacé la zone usée avec ce tissu qui glisse bien sur la chemise."
+    },
+    {
+      "id": "fr-holdout-v5-780",
+      "field": "altText",
+      "text": "Une manche ouverte montre une doublure neuve en tissu rayé."
+    },
+    {
+      "id": "fr-holdout-v5-781",
+      "field": "altText",
+      "text": "Le morceau de remplacement se raccorde à la doublure ancienne près de l'épaule."
+    },
+    {
+      "id": "fr-holdout-v5-782",
+      "field": "caption",
+      "text": "J'ai éloigné le fermoir de la jonction d'épaule pour éviter une bosse sous la sangle."
+    },
+    {
+      "id": "fr-holdout-v5-783",
+      "field": "caption",
+      "text": "Cette petite différence évite une surépaisseur quand je pose la sangle du sac."
+    },
+    {
+      "id": "fr-holdout-v5-784",
+      "field": "altText",
+      "text": "Le fermoir du foulard repose devant la couture de l'épaule."
+    },
+    {
+      "id": "fr-holdout-v5-785",
+      "field": "altText",
+      "text": "La bandoulière passe à côté de l'attache sans appuyer sur elle."
+    },
+    {
+      "id": "fr-holdout-v5-786",
+      "field": "caption",
+      "text": "Le fil élastique discret empêche le bas du pull de s'élargir davantage."
+    },
+    {
+      "id": "fr-holdout-v5-787",
+      "field": "caption",
+      "text": "J'ai passé quelques rangs souples pour retrouver le petit ajustement d'origine."
+    },
+    {
+      "id": "fr-holdout-v5-788",
+      "field": "altText",
+      "text": "Un fil fin parcourt l'intérieur du bord inférieur du pull."
+    },
+    {
+      "id": "fr-holdout-v5-789",
+      "field": "altText",
+      "text": "La maille reste légèrement resserrée grâce à plusieurs passages élastiques."
+    },
+    {
+      "id": "fr-holdout-v5-790",
+      "field": "caption",
+      "text": "La boucle attend dans sa petite enveloppe quand la ceinture est rangée."
+    },
+    {
+      "id": "fr-holdout-v5-791",
+      "field": "caption",
+      "text": "J'ai cousu une poche de protection pour ce métal qui marque facilement."
+    },
+    {
+      "id": "fr-holdout-v5-792",
+      "field": "altText",
+      "text": "Une enveloppe textile recouvre la boucle de la ceinture roulée."
+    },
+    {
+      "id": "fr-holdout-v5-793",
+      "field": "altText",
+      "text": "Le petit protège-boucle s'ouvre sur une face métallique polie."
+    },
+    {
+      "id": "fr-holdout-v5-794",
+      "field": "caption",
+      "text": "La cape passe autour des bretelles pour couvrir aussi le haut du sac."
+    },
+    {
+      "id": "fr-holdout-v5-795",
+      "field": "caption",
+      "text": "J'ai essayé la disposition avant de partir pour garder les mains libres sous la pluie."
+    },
+    {
+      "id": "fr-holdout-v5-796",
+      "field": "altText",
+      "text": "Le tissu de cape recouvre le sommet du sac à dos derrière les épaules."
+    },
+    {
+      "id": "fr-holdout-v5-797",
+      "field": "altText",
+      "text": "Les bretelles restent accessibles sous les plis de la couche imperméable."
+    },
+    {
+      "id": "fr-holdout-v5-798",
+      "field": "caption",
+      "text": "Le long lien se range dans une coulisse pour ne plus traîner au lavage."
+    },
+    {
+      "id": "fr-holdout-v5-799",
+      "field": "caption",
+      "text": "J'ai prévu un passage où glisser la ceinture quand je ne l'utilise pas."
+    },
+    {
+      "id": "fr-holdout-v5-800",
+      "field": "altText",
+      "text": "Le lien de jupe disparaît dans une petite coulisse latérale."
+    },
+    {
+      "id": "fr-holdout-v5-801",
+      "field": "altText",
+      "text": "Une extrémité courte reste visible à l'entrée du passage textile."
+    },
+    {
+      "id": "fr-holdout-v5-802",
+      "field": "caption",
+      "text": "J'ai laissé un petit espace entre les deux ceintures pour garder deux lignes distinctes."
+    },
+    {
+      "id": "fr-holdout-v5-803",
+      "field": "caption",
+      "text": "Les bandes fines superposées donnent une taille graphique à ma robe toute simple."
+    },
+    {
+      "id": "fr-holdout-v5-804",
+      "field": "altText",
+      "text": "Deux ceintures étroites entourent la taille avec un espace entre elles."
+    },
+    {
+      "id": "fr-holdout-v5-805",
+      "field": "altText",
+      "text": "Les deux boucles sont légèrement décalées pour éviter de se superposer."
+    },
+    {
+      "id": "fr-holdout-v5-806",
+      "field": "caption",
+      "text": "Mon col de chemise rentré laisse au pull une ligne ronde sans aucune pointe visible."
+    },
+    {
+      "id": "fr-holdout-v5-807",
+      "field": "caption",
+      "text": "Seule la chemise au bas des manches trahit la couche portée dessous."
+    },
+    {
+      "id": "fr-holdout-v5-808",
+      "field": "altText",
+      "text": "Le col de chemise reste entièrement caché sous l'encolure du pull."
+    },
+    {
+      "id": "fr-holdout-v5-809",
+      "field": "altText",
+      "text": "Les pointes sont rentrées vers l'intérieur, laissant le bord tricoté dégagé."
+    },
+    {
+      "id": "fr-holdout-v5-810",
+      "field": "caption",
+      "text": "Le gilet dépasse largement de ma veste courte et prolonge sa ligne."
+    },
+    {
+      "id": "fr-holdout-v5-811",
+      "field": "caption",
+      "text": "J'ai essayé deux longueurs bien séparées pour donner du rythme à cet ensemble."
+    },
+    {
+      "id": "fr-holdout-v5-812",
+      "field": "altText",
+      "text": "Le gilet long descend sous la veste courte sur toute sa largeur."
+    },
+    {
+      "id": "fr-holdout-v5-813",
+      "field": "altText",
+      "text": "Deux bords horizontaux distincts marquent les couches portées sur la chemise."
+    },
+    {
+      "id": "fr-holdout-v5-814",
+      "field": "caption",
+      "text": "Un chiffon doux a atténué la trace laissée sur le bout du soulier."
+    },
+    {
+      "id": "fr-holdout-v5-815",
+      "field": "caption",
+      "text": "Je prends deux minutes pour entretenir cette paire avant de la remettre."
+    },
+    {
+      "id": "fr-holdout-v5-816",
+      "field": "altText",
+      "text": "Une petite zone frottée paraît plus uniforme sur le bout de chaussure."
+    },
+    {
+      "id": "fr-holdout-v5-817",
+      "field": "altText",
+      "text": "Un chiffon repose près du soulier dont la marque vient d'être polie."
+    },
+    {
+      "id": "fr-holdout-v5-818",
+      "field": "caption",
+      "text": "J'ai remonté la boucle échappée dans le dessin de la torsade."
+    },
+    {
+      "id": "fr-holdout-v5-819",
+      "field": "caption",
+      "text": "Le motif retrouve sa continuité après cette petite réparation patiente."
+    },
+    {
+      "id": "fr-holdout-v5-820",
+      "field": "altText",
+      "text": "Une maille replacée rejoint le croisement central de la torsade."
+    },
+    {
+      "id": "fr-holdout-v5-821",
+      "field": "altText",
+      "text": "Un crochet fin soulève la boucle pour la remettre dans la rangée."
+    },
+    {
+      "id": "fr-holdout-v5-822",
+      "field": "caption",
+      "text": "Les soufflets peuvent se retourner vers l'extérieur pour ouvrir davantage le sac."
+    },
+    {
+      "id": "fr-holdout-v5-823",
+      "field": "caption",
+      "text": "J'ai laissé les plis de côté bien déployés pour transporter un objet plus large."
+    },
+    {
+      "id": "fr-holdout-v5-824",
+      "field": "altText",
+      "text": "Les soufflets du sac sont retournés en deux plis visibles à l'extérieur."
+    },
+    {
+      "id": "fr-holdout-v5-825",
+      "field": "altText",
+      "text": "Le bord supérieur s'élargit quand les panneaux latéraux sont déployés."
+    },
+    {
+      "id": "fr-holdout-v5-826",
+      "field": "caption",
+      "text": "J'ai desserré la couture arrière au niveau des hanches pour m'asseoir plus confortablement."
+    },
+    {
+      "id": "fr-holdout-v5-827",
+      "field": "caption",
+      "text": "La robe garde sa forme avec cette petite réserve de largeur en plus."
+    },
+    {
+      "id": "fr-holdout-v5-828",
+      "field": "altText",
+      "text": "La couture arrière de la robe a été reprise avec davantage d'aisance aux hanches."
+    },
+    {
+      "id": "fr-holdout-v5-829",
+      "field": "altText",
+      "text": "Le tissu reste souple dans le dos pendant la position assise."
+    },
+    {
+      "id": "fr-holdout-v5-830",
+      "field": "caption",
+      "text": "La chaîne de col se range dans la petite poche dès que je veux l'enlever."
+    },
+    {
+      "id": "fr-holdout-v5-831",
+      "field": "caption",
+      "text": "J'ai ajouté une attache intérieure pour garder les deux petites pinces ensemble."
+    },
+    {
+      "id": "fr-holdout-v5-832",
+      "field": "altText",
+      "text": "Une courte chaîne de col est rangée dans la poche de poitrine ouverte."
+    },
+    {
+      "id": "fr-holdout-v5-833",
+      "field": "altText",
+      "text": "Une bride interne rassemble les petites pinces du bijou rangé dans la poche."
+    },
+    {
+      "id": "fr-holdout-v5-834",
+      "field": "caption",
+      "text": "La manche coupée sur le pli n'a aucune couture sur le dessus du bras."
+    },
+    {
+      "id": "fr-holdout-v5-835",
+      "field": "caption",
+      "text": "J'aime la surface continue que ce petit choix de coupe donne au vêtement."
+    },
+    {
+      "id": "fr-holdout-v5-836",
+      "field": "altText",
+      "text": "Le haut de la manche présente une surface de tissu ininterrompue."
+    },
+    {
+      "id": "fr-holdout-v5-837",
+      "field": "altText",
+      "text": "La seule couture de manche se place discrètement sous le bras."
+    },
+    {
+      "id": "fr-holdout-v5-838",
+      "field": "caption",
+      "text": "J'enlève le fil de bordure avant d'aplatir mon chapeau pour le ranger."
+    },
+    {
+      "id": "fr-holdout-v5-839",
+      "field": "caption",
+      "text": "J'ai glissé le renfort dans une petite coulisse tout autour du bord."
+    },
+    {
+      "id": "fr-holdout-v5-840",
+      "field": "altText",
+      "text": "Un fil souple sort partiellement de la coulisse circulaire du chapeau."
+    },
+    {
+      "id": "fr-holdout-v5-841",
+      "field": "altText",
+      "text": "La bordure conserve sa courbe grâce au renfort amovible qui la traverse."
+    },
+    {
+      "id": "fr-holdout-v5-842",
+      "field": "caption",
+      "text": "Les petites attaches des bretelles se cachent dans la ceinture du pantalon."
+    },
+    {
+      "id": "fr-holdout-v5-843",
+      "field": "caption",
+      "text": "J'ai gardé la taille extérieure libre de toute pince métallique."
+    },
+    {
+      "id": "fr-holdout-v5-844",
+      "field": "altText",
+      "text": "Les attaches de bretelles rejoignent des boutons cachés derrière la ceinture du pantalon."
+    },
+    {
+      "id": "fr-holdout-v5-845",
+      "field": "altText",
+      "text": "De courtes boucles textiles disparaissent derrière le bord de la taille."
+    },
+    {
+      "id": "fr-holdout-v5-846",
+      "field": "caption",
+      "text": "J'ai essayé la broche sur une chute pour vérifier qu'elle ne laisse pas de marque."
+    },
+    {
+      "id": "fr-holdout-v5-847",
+      "field": "caption",
+      "text": "Le petit essai me rassure avant de piquer mon vêtement le plus fin."
+    },
+    {
+      "id": "fr-holdout-v5-848",
+      "field": "altText",
+      "text": "Une broche traverse un petit morceau du même tissu que le vêtement."
+    },
+    {
+      "id": "fr-holdout-v5-849",
+      "field": "altText",
+      "text": "La chute retirée montre les deux minuscules points laissés par l'aiguille."
+    },
+    {
+      "id": "fr-holdout-v5-850",
+      "field": "caption",
+      "text": "Le carré tient dans la poche avec un simple bord droit visible."
+    },
+    {
+      "id": "fr-holdout-v5-851",
+      "field": "caption",
+      "text": "J'ai choisi un pli bien plat pour ne pas gonfler la poitrine de la veste."
+    },
+    {
+      "id": "fr-holdout-v5-852",
+      "field": "altText",
+      "text": "Un foulard plié à plat dépasse de la poche par une ligne horizontale."
+    },
+    {
+      "id": "fr-holdout-v5-853",
+      "field": "altText",
+      "text": "Le petit carré est rangé dans la poche sans pointes ni volume apparent."
+    },
+    {
+      "id": "fr-holdout-v5-854",
+      "field": "caption",
+      "text": "Le lien passe dans une grande boutonnière avant de revenir vers la hanche."
+    },
+    {
+      "id": "fr-holdout-v5-855",
+      "field": "caption",
+      "text": "Cette fermeture garde la jupe croisée même quand je desserre le nœud."
+    },
+    {
+      "id": "fr-holdout-v5-856",
+      "field": "altText",
+      "text": "La longue attache de jupe traverse une boutonnière sur le panneau opposé."
+    },
+    {
+      "id": "fr-holdout-v5-857",
+      "field": "altText",
+      "text": "Le tissu croisé reste maintenu par le passage du lien dans une fente renforcée."
+    },
+    {
+      "id": "fr-holdout-v5-858",
+      "field": "caption",
+      "text": "Mon étui tient verticalement depuis que sa poche dispose de parois plus hautes."
+    },
+    {
+      "id": "fr-holdout-v5-859",
+      "field": "caption",
+      "text": "La petite hauteur en plus évite que l'étui bascule dans le sac."
+    },
+    {
+      "id": "fr-holdout-v5-860",
+      "field": "altText",
+      "text": "Un étui à lunettes est rangé verticalement dans une poche étroite du sac."
+    },
+    {
+      "id": "fr-holdout-v5-861",
+      "field": "altText",
+      "text": "Les parois hautes du compartiment entourent presque entièrement l'étui rigide."
+    },
+    {
+      "id": "fr-holdout-v5-862",
+      "field": "caption",
+      "text": "Le coussin bombé m'aide à redonner au revers sa forme naturelle."
+    },
+    {
+      "id": "fr-holdout-v5-863",
+      "field": "caption",
+      "text": "Je laisse refroidir la laine sur le support pour conserver ce joli volume."
+    },
+    {
+      "id": "fr-holdout-v5-864",
+      "field": "altText",
+      "text": "Le revers de veste repose sur un coussin arrondi après le passage de vapeur."
+    },
+    {
+      "id": "fr-holdout-v5-865",
+      "field": "altText",
+      "text": "La laine épouse le support bombé au lieu d'être aplatie sur la table."
+    },
+    {
+      "id": "fr-holdout-v5-866",
+      "field": "caption",
+      "text": "La brosse enlève les petites fibres qui s'accumulent tout au bas du manteau."
+    },
+    {
+      "id": "fr-holdout-v5-867",
+      "field": "caption",
+      "text": "J'ai remis le bord propre avant de le ranger pour quelques jours."
+    },
+    {
+      "id": "fr-holdout-v5-868",
+      "field": "altText",
+      "text": "Une brosse à vêtements suit le bord inférieur du manteau étalé."
+    },
+    {
+      "id": "fr-holdout-v5-869",
+      "field": "altText",
+      "text": "Les fibres retirées sont réunies à côté d'une zone de laine nettoyée."
+    },
+    {
+      "id": "fr-holdout-v5-870",
+      "field": "caption",
+      "text": "L'ancienne patte de boutons forme maintenant un petit bracelet souple."
+    },
+    {
+      "id": "fr-holdout-v5-871",
+      "field": "caption",
+      "text": "J'ai gardé un bouton et son trou pour fermer cette bande récupérée."
+    },
+    {
+      "id": "fr-holdout-v5-872",
+      "field": "altText",
+      "text": "Une bande de chemise boutonnée entoure le poignet comme un bracelet."
+    },
+    {
+      "id": "fr-holdout-v5-873",
+      "field": "altText",
+      "text": "L'ancien bord de fermeture conserve sa boutonnière et son petit bouton."
+    },
+    {
+      "id": "fr-holdout-v5-874",
+      "field": "caption",
+      "text": "Un coin replié suffit pour transformer mon châle en petite capuche."
+    },
+    {
+      "id": "fr-holdout-v5-875",
+      "field": "caption",
+      "text": "J'ai gardé les autres pointes autour des épaules pendant que le haut couvre mes cheveux."
+    },
+    {
+      "id": "fr-holdout-v5-876",
+      "field": "altText",
+      "text": "Un coin du châle est plié en pointe au-dessus de la tête."
+    },
+    {
+      "id": "fr-holdout-v5-877",
+      "field": "altText",
+      "text": "Le grand tissu couvre à la fois les cheveux et le haut des épaules."
+    },
+    {
+      "id": "fr-holdout-v5-878",
+      "field": "caption",
+      "text": "Le lien intérieur empêche le haut plissé de remonter sous ma veste."
+    },
+    {
+      "id": "fr-holdout-v5-879",
+      "field": "caption",
+      "text": "J'ai ajusté cette petite ceinture cachée pour garder les plis dans leur axe."
+    },
+    {
+      "id": "fr-holdout-v5-880",
+      "field": "altText",
+      "text": "Une bande intérieure maintient le haut plissé près de la taille."
+    },
+    {
+      "id": "fr-holdout-v5-881",
+      "field": "altText",
+      "text": "Le lien caché fixe le tissu sous les grands plis visibles du devant."
+    },
+    {
+      "id": "fr-holdout-v5-882",
+      "field": "caption",
+      "text": "J'ai renouvelé le papier à l'intérieur pour laisser sécher la paire doucement."
+    },
+    {
+      "id": "fr-holdout-v5-883",
+      "field": "caption",
+      "text": "Les chaussures gardent leur forme pendant que l'humidité passe dans les feuilles."
+    },
+    {
+      "id": "fr-holdout-v5-884",
+      "field": "altText",
+      "text": "Des feuilles de papier froissées remplissent les chaussures humides."
+    },
+    {
+      "id": "fr-holdout-v5-885",
+      "field": "altText",
+      "text": "Le papier retiré repose à côté d'une nouvelle feuille prête à remplacer la précédente."
+    },
+    {
+      "id": "fr-holdout-v5-886",
+      "field": "caption",
+      "text": "Les angles arrondis de la poche accrochent moins quand je passe la veste."
+    },
+    {
+      "id": "fr-holdout-v5-887",
+      "field": "caption",
+      "text": "J'ai remplacé les anciennes pointes par deux courbes beaucoup plus douces."
+    },
+    {
+      "id": "fr-holdout-v5-888",
+      "field": "altText",
+      "text": "Les coins inférieurs de la poche sont arrondis par une couture courbe."
+    },
+    {
+      "id": "fr-holdout-v5-889",
+      "field": "altText",
+      "text": "La poche rapportée présente deux bords souples sans angle saillant."
+    },
+    {
+      "id": "fr-holdout-v5-890",
+      "field": "caption",
+      "text": "La fermeture sur le côté du cou permet d'enfiler ce col étroit facilement."
+    },
+    {
+      "id": "fr-holdout-v5-891",
+      "field": "caption",
+      "text": "J'ai laissé l'ouverture principale bien nette en cachant le zip près de l'épaule."
+    },
+    {
+      "id": "fr-holdout-v5-892",
+      "field": "altText",
+      "text": "Un petit zip suit le côté de l'encolure montante."
+    },
+    {
+      "id": "fr-holdout-v5-893",
+      "field": "altText",
+      "text": "La fermeture ouverte élargit le passage de tête sans modifier le milieu du devant."
+    },
+    {
+      "id": "fr-holdout-v5-894",
+      "field": "caption",
+      "text": "J'ai alterné points courts et longs pour dessiner le bord du chapeau."
+    },
+    {
+      "id": "fr-holdout-v5-895",
+      "field": "caption",
+      "text": "Le rythme des coutures me plaît surtout quand on regarde le dessus."
+    },
+    {
+      "id": "fr-holdout-v5-896",
+      "field": "altText",
+      "text": "Des points de deux longueurs se succèdent autour du bord du chapeau."
+    },
+    {
+      "id": "fr-holdout-v5-897",
+      "field": "altText",
+      "text": "Le motif cousu forme une ligne régulière de petits traits alternés."
+    },
+    {
+      "id": "fr-holdout-v5-898",
+      "field": "caption",
+      "text": "La petite pochette coulisse sur une bande cousue dans le sac."
+    },
+    {
+      "id": "fr-holdout-v5-899",
+      "field": "caption",
+      "text": "Je la rapproche de l'ouverture quand j'ai besoin de son contenu."
+    },
+    {
+      "id": "fr-holdout-v5-900",
+      "field": "altText",
+      "text": "Une pochette intérieure est suspendue à une bande horizontale du sac."
+    },
+    {
+      "id": "fr-holdout-v5-901",
+      "field": "altText",
+      "text": "Deux petits passants permettent de déplacer le compartiment le long de son support."
+    },
+    {
+      "id": "fr-holdout-v5-902",
+      "field": "caption",
+      "text": "Une bande ajoutée m'a rendu la longueur qui manquait aux manches."
+    },
+    {
+      "id": "fr-holdout-v5-903",
+      "field": "caption",
+      "text": "J'ai souligné la jonction avec une couture simple pour assumer la transformation."
+    },
+    {
+      "id": "fr-holdout-v5-904",
+      "field": "altText",
+      "text": "Les manches se prolongent par une bande de tissu ajoutée au poignet."
+    },
+    {
+      "id": "fr-holdout-v5-905",
+      "field": "altText",
+      "text": "Une couture circulaire distingue le prolongement du tissu d'origine."
+    },
+    {
+      "id": "fr-holdout-v5-906",
+      "field": "caption",
+      "text": "Le petit fil intérieur garde le nœud de tissu ouvert comme je le veux."
+    },
+    {
+      "id": "fr-holdout-v5-907",
+      "field": "caption",
+      "text": "J'ai pu donner du volume au lien sans le serrer davantage."
+    },
+    {
+      "id": "fr-holdout-v5-908",
+      "field": "altText",
+      "text": "Le ruban noué conserve une courbe grâce à un renfort fin caché dedans."
+    },
+    {
+      "id": "fr-holdout-v5-909",
+      "field": "altText",
+      "text": "Les deux boucles du nœud restent déployées au-dessus du vêtement."
+    },
+    {
+      "id": "fr-holdout-v5-910",
+      "field": "caption",
+      "text": "Même ouverte, la fermeture dessine une bordure technique autour de cette fente."
+    },
+    {
+      "id": "fr-holdout-v5-911",
+      "field": "caption",
+      "text": "J'aime cette ligne un peu technique sur une jupe très souple."
+    },
+    {
+      "id": "fr-holdout-v5-912",
+      "field": "altText",
+      "text": "Les dents métalliques encadrent l'ouverture verticale dans le panneau de jupe."
+    },
+    {
+      "id": "fr-holdout-v5-913",
+      "field": "altText",
+      "text": "Les dents restent visibles au bord de l'ouverture laissée libre."
+    },
+    {
+      "id": "fr-holdout-v5-914",
+      "field": "caption",
+      "text": "J'ai raccourci le bout des gants pour sentir les cordes sous mes doigts."
+    },
+    {
+      "id": "fr-holdout-v5-915",
+      "field": "caption",
+      "text": "Les mains restent couvertes, avec juste les extrémités libérées pour jouer."
+    },
+    {
+      "id": "fr-holdout-v5-916",
+      "field": "altText",
+      "text": "Les doigts des gants s'arrêtent avant les dernières phalanges près des cordes."
+    },
+    {
+      "id": "fr-holdout-v5-917",
+      "field": "altText",
+      "text": "De petits ourlets terminent chaque ouverture du gant adapté à la pratique musicale."
+    },
+    {
+      "id": "fr-holdout-v5-918",
+      "field": "caption",
+      "text": "Deux brides empêchent la doublure d'entrer dans la fente du dos."
+    },
+    {
+      "id": "fr-holdout-v5-919",
+      "field": "caption",
+      "text": "J'ai fixé l'intérieur juste assez pour qu'il accompagne le mouvement du manteau."
+    },
+    {
+      "id": "fr-holdout-v5-920",
+      "field": "altText",
+      "text": "De fines attaches retiennent la doublure de chaque côté de la fente arrière."
+    },
+    {
+      "id": "fr-holdout-v5-921",
+      "field": "altText",
+      "text": "Le tissu intérieur reste dégagé de l'ouverture qui sépare les pans du manteau."
+    },
+    {
+      "id": "fr-holdout-v5-922",
+      "field": "caption",
+      "text": "La manche se replie sous le bracelet pour laisser le cadran bien dégagé."
+    },
+    {
+      "id": "fr-holdout-v5-923",
+      "field": "caption",
+      "text": "J'ai glissé juste le bord du poignet sous la sangle de ma montre."
+    },
+    {
+      "id": "fr-holdout-v5-924",
+      "field": "altText",
+      "text": "Le bracelet de montre retient une petite partie du poignet replié."
+    },
+    {
+      "id": "fr-holdout-v5-925",
+      "field": "altText",
+      "text": "Le cadran est entièrement visible devant le bord raccourci de la manche."
+    },
+    {
+      "id": "fr-holdout-v5-926",
+      "field": "caption",
+      "text": "Le foulard plié adoucit l'endroit où repose la boucle du sac."
+    },
+    {
+      "id": "fr-holdout-v5-927",
+      "field": "caption",
+      "text": "J'ai glissé une bande textile entre la ceinture de portage et mon manteau."
+    },
+    {
+      "id": "fr-holdout-v5-928",
+      "field": "altText",
+      "text": "Un foulard plié forme un coussinet sous la ceinture du sac."
+    },
+    {
+      "id": "fr-holdout-v5-929",
+      "field": "altText",
+      "text": "Le tissu souple sépare une boucle rigide du vêtement porté à la taille."
+    },
+    {
+      "id": "fr-holdout-v5-930",
+      "field": "caption",
+      "text": "Je suspends ce pantalon par la taille pour ne pas marquer le milieu des jambes."
+    },
+    {
+      "id": "fr-holdout-v5-931",
+      "field": "caption",
+      "text": "Les pinces rembourrées tiennent bien sans aplatir les plis du devant."
+    },
+    {
+      "id": "fr-holdout-v5-932",
+      "field": "altText",
+      "text": "Le pantalon pend depuis sa ceinture entre deux pinces rembourrées."
+    },
+    {
+      "id": "fr-holdout-v5-933",
+      "field": "altText",
+      "text": "Les jambes restent libres sous le cintre qui maintient seulement le haut."
+    },
+    {
+      "id": "fr-holdout-v5-934",
+      "field": "caption",
+      "text": "Les petits ronds de feutre adoucissent l'arrière de mes boucles à clip."
+    },
+    {
+      "id": "fr-holdout-v5-935",
+      "field": "caption",
+      "text": "J'ai découpé deux protections fines pour mieux répartir la pression des attaches."
+    },
+    {
+      "id": "fr-holdout-v5-936",
+      "field": "altText",
+      "text": "Des disques de feutre recouvrent l'intérieur des clips de boucles d'oreilles."
+    },
+    {
+      "id": "fr-holdout-v5-937",
+      "field": "altText",
+      "text": "Les petits coussinets restent entre le mécanisme métallique et le lobe."
+    },
+    {
+      "id": "fr-holdout-v5-938",
+      "field": "caption",
+      "text": "Une boucle dans la doublure garde la ceinture avec le manteau quand je ne la porte pas."
+    },
+    {
+      "id": "fr-holdout-v5-939",
+      "field": "caption",
+      "text": "Je peux laisser le manteau droit sans égarer son lien amovible."
+    },
+    {
+      "id": "fr-holdout-v5-940",
+      "field": "altText",
+      "text": "La ceinture roulée est maintenue par une boucle à l'intérieur du manteau."
+    },
+    {
+      "id": "fr-holdout-v5-941",
+      "field": "altText",
+      "text": "La ceinture enroulée demeure fixée contre la doublure par une courte bride."
+    },
+    {
+      "id": "fr-holdout-v5-942",
+      "field": "caption",
+      "text": "Le pli reste fermé jusqu'à la hanche, puis s'ouvre librement plus bas."
+    },
+    {
+      "id": "fr-holdout-v5-943",
+      "field": "caption",
+      "text": "Les points ajoutés retiennent le pli en hauteur et laissent le reste s'ouvrir librement."
+    },
+    {
+      "id": "fr-holdout-v5-944",
+      "field": "altText",
+      "text": "Le grand pli de jupe est piqué depuis la taille jusqu'au bas des hanches."
+    },
+    {
+      "id": "fr-holdout-v5-945",
+      "field": "altText",
+      "text": "Les panneaux commencent à s'écarter sous le dernier point de fixation."
+    },
+    {
+      "id": "fr-holdout-v5-946",
+      "field": "caption",
+      "text": "Une baleine souple aide l'ouverture du sac à rester ouverte pendant que je cherche dedans."
+    },
+    {
+      "id": "fr-holdout-v5-947",
+      "field": "caption",
+      "text": "Le renfort coulisse hors de son passage dès que le sac doit être lavé."
+    },
+    {
+      "id": "fr-holdout-v5-948",
+      "field": "altText",
+      "text": "Une fine baleine maintient les deux bords supérieurs du sac écartés."
+    },
+    {
+      "id": "fr-holdout-v5-949",
+      "field": "altText",
+      "text": "Le bord renforcé forme une courbe stable autour de l'ouverture."
+    },
+    {
+      "id": "fr-holdout-v5-950",
+      "field": "caption",
+      "text": "J'ai fait sécher la manche sur un tube pour qu'elle retrouve sa forme sans s'étirer."
+    },
+    {
+      "id": "fr-holdout-v5-951",
+      "field": "caption",
+      "text": "Le support rembourré maintient juste le diamètre dont j'avais besoin."
+    },
+    {
+      "id": "fr-holdout-v5-952",
+      "field": "altText",
+      "text": "Une manche humide entoure un support cylindrique recouvert de tissu."
+    },
+    {
+      "id": "fr-holdout-v5-953",
+      "field": "altText",
+      "text": "Le tricot sèche sans s'affaisser autour de la forme amovible."
+    },
+    {
+      "id": "fr-holdout-v5-954",
+      "field": "caption",
+      "text": "La petite chaîne passe dans la boutonnière du col pour rester centrée."
+    },
+    {
+      "id": "fr-holdout-v5-955",
+      "field": "caption",
+      "text": "J'ai trouvé une façon discrète d'empêcher le pendentif de se décaler."
+    },
+    {
+      "id": "fr-holdout-v5-956",
+      "field": "altText",
+      "text": "Une chaîne fine traverse la boutonnière supérieure de la chemise."
+    },
+    {
+      "id": "fr-holdout-v5-957",
+      "field": "altText",
+      "text": "Le pendentif reste centré sous le col grâce à ce petit passage textile."
+    },
+    {
+      "id": "fr-holdout-v5-958",
+      "field": "caption",
+      "text": "La protection amovible recouvre la semelle pendant l'essai sur le parquet."
+    },
+    {
+      "id": "fr-holdout-v5-959",
+      "field": "caption",
+      "text": "J'ai vérifié le mouvement de la paire avec les petites housses bien en place."
+    },
+    {
+      "id": "fr-holdout-v5-960",
+      "field": "altText",
+      "text": "Une housse fine enveloppe chaque semelle sur le plancher de danse."
+    },
+    {
+      "id": "fr-holdout-v5-961",
+      "field": "altText",
+      "text": "Les attaches des protections se rejoignent au-dessus des chaussures."
+    },
+    {
+      "id": "fr-holdout-v5-962",
+      "field": "caption",
+      "text": "La pression cachée maintient les boucles du nœud bien étalées sur ma robe."
+    },
+    {
+      "id": "fr-holdout-v5-963",
+      "field": "caption",
+      "text": "Le nœud reste droit même quand les liens sont noués sans serrer."
+    },
+    {
+      "id": "fr-holdout-v5-964",
+      "field": "altText",
+      "text": "Une pression cachée relie le nœud de robe au tissu de la ceinture."
+    },
+    {
+      "id": "fr-holdout-v5-965",
+      "field": "altText",
+      "text": "Le grand nœud textile demeure horizontal grâce à une petite fixation intérieure."
+    },
+    {
+      "id": "fr-holdout-v5-966",
+      "field": "caption",
+      "text": "J'ai cousu un petit soleil dans le bandeau pour reconnaître mon chapeau facilement."
+    },
+    {
+      "id": "fr-holdout-v5-967",
+      "field": "caption",
+      "text": "Le symbole reste à l'intérieur et se repère aussi au toucher."
+    },
+    {
+      "id": "fr-holdout-v5-968",
+      "field": "altText",
+      "text": "Un petit soleil brodé marque l'intérieur du bandeau de chapeau."
+    },
+    {
+      "id": "fr-holdout-v5-969",
+      "field": "altText",
+      "text": "Le signe cousu en relief se trouve près de la jonction arrière."
+    },
+    {
+      "id": "fr-holdout-v5-970",
+      "field": "caption",
+      "text": "J'ai essayé des poches en papier avant de décider où les coudre."
+    },
+    {
+      "id": "fr-holdout-v5-971",
+      "field": "caption",
+      "text": "Les gabarits déplacés sur le sac m'ont évité plusieurs coutures inutiles."
+    },
+    {
+      "id": "fr-holdout-v5-972",
+      "field": "altText",
+      "text": "Des rectangles de papier sont épinglés sur le devant du sac."
+    },
+    {
+      "id": "fr-holdout-v5-973",
+      "field": "altText",
+      "text": "Les différents gabarits représentent les poches encore à placer."
+    },
+    {
+      "id": "fr-holdout-v5-974",
+      "field": "caption",
+      "text": "Un bouton de réserve prolonge la patte de réglage du pantalon."
+    },
+    {
+      "id": "fr-holdout-v5-975",
+      "field": "caption",
+      "text": "J'ai gagné juste un peu de place sans refaire toute la ceinture."
+    },
+    {
+      "id": "fr-holdout-v5-976",
+      "field": "altText",
+      "text": "La patte de taille rejoint un nouveau bouton placé plus loin sur le côté."
+    },
+    {
+      "id": "fr-holdout-v5-977",
+      "field": "altText",
+      "text": "L'ancien bouton reste visible près du point d'attache désormais utilisé."
+    },
+    {
+      "id": "fr-holdout-v5-978",
+      "field": "caption",
+      "text": "Un ruban réunit les pointes du col en laissant le cou libre derrière."
+    },
+    {
+      "id": "fr-holdout-v5-979",
+      "field": "caption",
+      "text": "J'ai noué le lien assez bas pour conserver l'ouverture de la chemise."
+    },
+    {
+      "id": "fr-holdout-v5-980",
+      "field": "altText",
+      "text": "Un ruban souple relie les deux pointes du col au-dessus de la poitrine."
+    },
+    {
+      "id": "fr-holdout-v5-981",
+      "field": "altText",
+      "text": "Le petit nœud repose sous le menton entre les bords écartés de la chemise."
+    },
+    {
+      "id": "fr-holdout-v5-982",
+      "field": "caption",
+      "text": "Le panneau intérieur accompagne la fente quand je marche sans bloquer le mouvement."
+    },
+    {
+      "id": "fr-holdout-v5-983",
+      "field": "caption",
+      "text": "J'ai ajouté une pièce flottante derrière cette ouverture assez haute."
+    },
+    {
+      "id": "fr-holdout-v5-984",
+      "field": "altText",
+      "text": "Une seconde pièce de tissu apparaît derrière la fente arrière de la jupe."
+    },
+    {
+      "id": "fr-holdout-v5-985",
+      "field": "altText",
+      "text": "Le panneau libre couvre l'espace entre les deux bords pendant le pas."
+    },
+    {
+      "id": "fr-holdout-v5-986",
+      "field": "caption",
+      "text": "J'ai roulé une petite bande de tissu pour fabriquer cette bague toute douce."
+    },
+    {
+      "id": "fr-holdout-v5-987",
+      "field": "caption",
+      "text": "La couture se cache sous le doigt et le dessus garde sa forme arrondie."
+    },
+    {
+      "id": "fr-holdout-v5-988",
+      "field": "altText",
+      "text": "Une fine bande textile enroulée forme un anneau souple autour du doigt."
+    },
+    {
+      "id": "fr-holdout-v5-989",
+      "field": "altText",
+      "text": "La bague présente un relief rond et une couture discrète sur sa face intérieure."
+    },
+    {
+      "id": "fr-holdout-v5-990",
+      "field": "caption",
+      "text": "Le petit protège-col s'enlève avant de laver seulement cette partie du vêtement."
+    },
+    {
+      "id": "fr-holdout-v5-991",
+      "field": "caption",
+      "text": "J'ai cousu la bande pour qu'elle reste invisible quand la veste est portée."
+    },
+    {
+      "id": "fr-holdout-v5-992",
+      "field": "altText",
+      "text": "La protection de col détachable couvre l'envers du tissu au contact du cou."
+    },
+    {
+      "id": "fr-holdout-v5-993",
+      "field": "altText",
+      "text": "De petits boutons maintiennent la protection lavable contre la doublure du col."
+    },
+    {
+      "id": "fr-holdout-v5-994",
+      "field": "caption",
+      "text": "Deux attaches au fond empêchent la doublure de sortir chaque fois que j'ouvre le sac."
+    },
+    {
+      "id": "fr-holdout-v5-995",
+      "field": "caption",
+      "text": "J'ai laissé un peu de jeu pour que le tissu intérieur suive la forme du crochet."
+    },
+    {
+      "id": "fr-holdout-v5-996",
+      "field": "altText",
+      "text": "Deux brides relient le fond de la doublure au corps du sac crocheté."
+    },
+    {
+      "id": "fr-holdout-v5-997",
+      "field": "altText",
+      "text": "La couche textile reste à l'intérieur lorsque le bord du sac est ouvert."
+    },
+    {
+      "id": "fr-holdout-v5-998",
+      "field": "caption",
+      "text": "Le bouton de réserve a trouvé sa place dans la doublure du poignet."
+    },
+    {
+      "id": "fr-holdout-v5-999",
+      "field": "altText",
+      "text": "Un petit bouton de réserve est cousu dans l'angle intérieur du poignet de chemise."
+    },
+    {
+      "id": "fr-holdout-v5-1000",
+      "field": "altText",
+      "text": "Le poignet ouvert laisse voir une fixation supplémentaire conservée à l'écart du bord."
+    }
+  ]
+}

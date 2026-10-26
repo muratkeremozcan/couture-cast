@@ -1,0 +1,870 @@
+{
+  "language": "es",
+  "sourceSha256": "898668be68401f674b4d7b4c4773a37dd9b092f70d5f85242f2a83f98718be55",
+  "total": 1000,
+  "fields": {
+    "caption": 500,
+    "altText": 500
+  },
+  "fiveWordOverlap": {
+    "affectedCount": 0,
+    "affectedShare": 0.0,
+    "affectedItems": [],
+    "repeatedSequences": []
+  },
+  "concepts": {
+    "distinct": 200,
+    "maximumCount": 10,
+    "maximumShare": 0.01,
+    "groups": [
+      {
+        "concept": "bajo-puntas-triangulares",
+        "items": [11, 12, 13, 14, 15, 626, 627, 628, 629, 630]
+      },
+      {
+        "concept": "estampa-abanicos",
+        "items": [241, 242, 243, 244, 245, 771, 772, 773, 774, 775]
+      },
+      {
+        "concept": "estampa-arcos-abiertos",
+        "items": [806, 807, 808, 809, 810, 851, 852, 853, 854, 855]
+      },
+      {
+        "concept": "estampa-bloques-desplazados",
+        "items": [761, 762, 763, 764, 765, 866, 867, 868, 869, 870]
+      },
+      {
+        "concept": "estampa-cafeteras-manuales",
+        "items": [876, 877, 878, 879, 880, 931, 932, 933, 934, 935]
+      },
+      {
+        "concept": "estampa-espiral-composicion",
+        "items": [566, 567, 568, 569, 570, 826, 827, 828, 829, 830]
+      },
+      {
+        "concept": "estampa-marcos-poligonales-abiertos",
+        "items": [751, 752, 753, 754, 755, 791, 792, 793, 794, 795]
+      },
+      {
+        "concept": "panel-redondeado-flotante",
+        "items": [21, 22, 23, 24, 25, 646, 647, 648, 649, 650]
+      },
+      {
+        "concept": "anillo-doble-aro-desplazado",
+        "items": [401, 402, 403, 404, 405]
+      },
+      {
+        "concept": "aretes-capsula-abierta",
+        "items": [106, 107, 108, 109, 110]
+      },
+      {
+        "concept": "aretes-cometas",
+        "items": [441, 442, 443, 444, 445]
+      },
+      {
+        "concept": "aretes-marcos-cuadrados",
+        "items": [466, 467, 468, 469, 470]
+      },
+      {
+        "concept": "aretes-petalos-rigidos",
+        "items": [396, 397, 398, 399, 400]
+      },
+      {
+        "concept": "aretes-tallo-espiral",
+        "items": [491, 492, 493, 494, 495]
+      },
+      {
+        "concept": "blusa-capa-escote",
+        "items": [726, 727, 728, 729, 730]
+      },
+      {
+        "concept": "blusa-cuello-puntas-elevadas",
+        "items": [711, 712, 713, 714, 715]
+      },
+      {
+        "concept": "blusa-manga-torsionada",
+        "items": [16, 17, 18, 19, 20]
+      },
+      {
+        "concept": "blusa-nudo-bajo-lateral",
+        "items": [56, 57, 58, 59, 60]
+      },
+      {
+        "concept": "blusa-pliegues-lazo-hombro",
+        "items": [686, 687, 688, 689, 690]
+      },
+      {
+        "concept": "blusa-punos-escalera",
+        "items": [86, 87, 88, 89, 90]
+      },
+      {
+        "concept": "bolsa-base-acordeon",
+        "items": [456, 457, 458, 459, 460]
+      },
+      {
+        "concept": "bolso-asas-desiguales",
+        "items": [121, 122, 123, 124, 125]
+      },
+      {
+        "concept": "bolso-asas-ventana",
+        "items": [416, 417, 418, 419, 420]
+      },
+      {
+        "concept": "bolso-broche-cilindro",
+        "items": [436, 437, 438, 439, 440]
+      },
+      {
+        "concept": "bolso-cierre-corrediza",
+        "items": [101, 102, 103, 104, 105]
+      },
+      {
+        "concept": "bolso-doble-cuerpo",
+        "items": [391, 392, 393, 394, 395]
+      },
+      {
+        "concept": "bolso-doblez-esquinas",
+        "items": [486, 487, 488, 489, 490]
+      },
+      {
+        "concept": "bolso-tapa-circular-mitad",
+        "items": [471, 472, 473, 474, 475]
+      },
+      {
+        "concept": "botin-puntera-abierta",
+        "items": [376, 377, 378, 379, 380]
+      },
+      {
+        "concept": "broche-pajarita-plegada",
+        "items": [426, 427, 428, 429, 430]
+      },
+      {
+        "concept": "camisa-bolsillos-solapa-curva",
+        "items": [736, 737, 738, 739, 740]
+      },
+      {
+        "concept": "camisa-canesu-curvo",
+        "items": [666, 667, 668, 669, 670]
+      },
+      {
+        "concept": "camisa-costados-abotonados",
+        "items": [696, 697, 698, 699, 700]
+      },
+      {
+        "concept": "camisa-cuello-puente",
+        "items": [61, 62, 63, 64, 65]
+      },
+      {
+        "concept": "camisa-pliegue-codo",
+        "items": [26, 27, 28, 29, 30]
+      },
+      {
+        "concept": "camisa-punos-redondos",
+        "items": [636, 637, 638, 639, 640]
+      },
+      {
+        "concept": "camiseta-mangas-hendidura",
+        "items": [656, 657, 658, 659, 660]
+      },
+      {
+        "concept": "camiseta-tiras-interiores",
+        "items": [41, 42, 43, 44, 45]
+      },
+      {
+        "concept": "chaleco-bolsas-colgantes",
+        "items": [706, 707, 708, 709, 710]
+      },
+      {
+        "concept": "chaleco-espalda-ventana",
+        "items": [76, 77, 78, 79, 80]
+      },
+      {
+        "concept": "chaqueta-cierre-rectangulo",
+        "items": [721, 722, 723, 724, 725]
+      },
+      {
+        "concept": "chaqueta-cruce-hombro",
+        "items": [36, 37, 38, 39, 40]
+      },
+      {
+        "concept": "chaqueta-piezas-circulares",
+        "items": [676, 677, 678, 679, 680]
+      },
+      {
+        "concept": "cinturon-nudo-descentrado",
+        "items": [461, 462, 463, 464, 465]
+      },
+      {
+        "concept": "cinturon-placas-escalonadas",
+        "items": [421, 422, 423, 424, 425]
+      },
+      {
+        "concept": "collar-cascada-cuentas",
+        "items": [406, 407, 408, 409, 410]
+      },
+      {
+        "concept": "collar-cuentas-cubiertas",
+        "items": [111, 112, 113, 114, 115]
+      },
+      {
+        "concept": "collar-esferas-huecas",
+        "items": [446, 447, 448, 449, 450]
+      },
+      {
+        "concept": "collar-laminas-panal",
+        "items": [496, 497, 498, 499, 500]
+      },
+      {
+        "concept": "collar-triangulos-colgantes",
+        "items": [476, 477, 478, 479, 480]
+      },
+      {
+        "concept": "cuello-rectangular-abierto",
+        "items": [1, 2, 3, 4, 5]
+      },
+      {
+        "concept": "estampa-alcatraces",
+        "items": [536, 537, 538, 539, 540]
+      },
+      {
+        "concept": "estampa-alebrijes",
+        "items": [266, 267, 268, 269, 270]
+      },
+      {
+        "concept": "estampa-amapolas",
+        "items": [531, 532, 533, 534, 535]
+      },
+      {
+        "concept": "estampa-arpas-pequenas",
+        "items": [326, 327, 328, 329, 330]
+      },
+      {
+        "concept": "estampa-balcones-hierro",
+        "items": [366, 367, 368, 369, 370]
+      },
+      {
+        "concept": "estampa-bancas-plaza",
+        "items": [921, 922, 923, 924, 925]
+      },
+      {
+        "concept": "estampa-bugambilia",
+        "items": [166, 167, 168, 169, 170]
+      },
+      {
+        "concept": "estampa-cacao",
+        "items": [136, 137, 138, 139, 140]
+      },
+      {
+        "concept": "estampa-cafetales",
+        "items": [556, 557, 558, 559, 560]
+      },
+      {
+        "concept": "estampa-cajas-cerillos",
+        "items": [906, 907, 908, 909, 910]
+      },
+      {
+        "concept": "estampa-calaveras-florales",
+        "items": [271, 272, 273, 274, 275]
+      },
+      {
+        "concept": "estampa-camiones-carga",
+        "items": [951, 952, 953, 954, 955]
+      },
+      {
+        "concept": "estampa-campanarios",
+        "items": [186, 187, 188, 189, 190]
+      },
+      {
+        "concept": "estampa-canastos-tapa",
+        "items": [341, 342, 343, 344, 345]
+      },
+      {
+        "concept": "estampa-candados-corazones",
+        "items": [231, 232, 233, 234, 235]
+      },
+      {
+        "concept": "estampa-candelabros",
+        "items": [911, 912, 913, 914, 915]
+      },
+      {
+        "concept": "estampa-capas-contorno",
+        "items": [801, 802, 803, 804, 805]
+      },
+      {
+        "concept": "estampa-carretillas-jardin",
+        "items": [956, 957, 958, 959, 960]
+      },
+      {
+        "concept": "estampa-carritos-nieve",
+        "items": [946, 947, 948, 949, 950]
+      },
+      {
+        "concept": "estampa-casas-escalonadas",
+        "items": [201, 202, 203, 204, 205]
+      },
+      {
+        "concept": "estampa-castañuelas",
+        "items": [296, 297, 298, 299, 300]
+      },
+      {
+        "concept": "estampa-celosias",
+        "items": [371, 372, 373, 374, 375]
+      },
+      {
+        "concept": "estampa-charangos",
+        "items": [316, 317, 318, 319, 320]
+      },
+      {
+        "concept": "estampa-cintas-triangular",
+        "items": [871, 872, 873, 874, 875]
+      },
+      {
+        "concept": "estampa-circulos-descentrados",
+        "items": [756, 757, 758, 759, 760]
+      },
+      {
+        "concept": "estampa-colgantes-lluvia",
+        "items": [561, 562, 563, 564, 565]
+      },
+      {
+        "concept": "estampa-corales-abiertos",
+        "items": [611, 612, 613, 614, 615]
+      },
+      {
+        "concept": "estampa-cristales-hexagonales",
+        "items": [581, 582, 583, 584, 585]
+      },
+      {
+        "concept": "estampa-cubos-lineales",
+        "items": [776, 777, 778, 779, 780]
+      },
+      {
+        "concept": "estampa-dalias",
+        "items": [546, 547, 548, 549, 550]
+      },
+      {
+        "concept": "estampa-diente-leon",
+        "items": [516, 517, 518, 519, 520]
+      },
+      {
+        "concept": "estampa-dunas-puntos",
+        "items": [601, 602, 603, 604, 605]
+      },
+      {
+        "concept": "estampa-escaleras-incendio",
+        "items": [216, 217, 218, 219, 220]
+      },
+      {
+        "concept": "estampa-espinas-dobles",
+        "items": [796, 797, 798, 799, 800]
+      },
+      {
+        "concept": "estampa-esquinas-entrelazadas",
+        "items": [831, 832, 833, 834, 835]
+      },
+      {
+        "concept": "estampa-estalactitas",
+        "items": [571, 572, 573, 574, 575]
+      },
+      {
+        "concept": "estampa-estrellas-desdobladas",
+        "items": [841, 842, 843, 844, 845]
+      },
+      {
+        "concept": "estampa-eucalipto",
+        "items": [526, 527, 528, 529, 530]
+      },
+      {
+        "concept": "estampa-exprimidores",
+        "items": [881, 882, 883, 884, 885]
+      },
+      {
+        "concept": "estampa-frascos-mermelada",
+        "items": [896, 897, 898, 899, 900]
+      },
+      {
+        "concept": "estampa-fuente-patio",
+        "items": [196, 197, 198, 199, 200]
+      },
+      {
+        "concept": "estampa-geodas",
+        "items": [576, 577, 578, 579, 580]
+      },
+      {
+        "concept": "estampa-ginkgo",
+        "items": [171, 172, 173, 174, 175]
+      },
+      {
+        "concept": "estampa-girasoles",
+        "items": [541, 542, 543, 544, 545]
+      },
+      {
+        "concept": "estampa-gotas-invertidas",
+        "items": [781, 782, 783, 784, 785]
+      },
+      {
+        "concept": "estampa-guayabas",
+        "items": [126, 127, 128, 129, 130]
+      },
+      {
+        "concept": "estampa-heliconias",
+        "items": [506, 507, 508, 509, 510]
+      },
+      {
+        "concept": "estampa-hibiscos",
+        "items": [551, 552, 553, 554, 555]
+      },
+      {
+        "concept": "estampa-higos",
+        "items": [151, 152, 153, 154, 155]
+      },
+      {
+        "concept": "estampa-hojas-platanera",
+        "items": [511, 512, 513, 514, 515]
+      },
+      {
+        "concept": "estampa-hornos-barro",
+        "items": [886, 887, 888, 889, 890]
+      },
+      {
+        "concept": "estampa-jacarandas",
+        "items": [501, 502, 503, 504, 505]
+      },
+      {
+        "concept": "estampa-jarras-vertiendo",
+        "items": [901, 902, 903, 904, 905]
+      },
+      {
+        "concept": "estampa-lineas-punteadas",
+        "items": [786, 787, 788, 789, 790]
+      },
+      {
+        "concept": "estampa-magnolias",
+        "items": [176, 177, 178, 179, 180]
+      },
+      {
+        "concept": "estampa-maiz",
+        "items": [141, 142, 143, 144, 145]
+      },
+      {
+        "concept": "estampa-mantas-enrolladas",
+        "items": [336, 337, 338, 339, 340]
+      },
+      {
+        "concept": "estampa-maquinas-manivela",
+        "items": [891, 892, 893, 894, 895]
+      },
+      {
+        "concept": "estampa-maracas",
+        "items": [301, 302, 303, 304, 305]
+      },
+      {
+        "concept": "estampa-matrioscas",
+        "items": [251, 252, 253, 254, 255]
+      },
+      {
+        "concept": "estampa-meandros",
+        "items": [596, 597, 598, 599, 600]
+      },
+      {
+        "concept": "estampa-mecedoras",
+        "items": [916, 917, 918, 919, 920]
+      },
+      {
+        "concept": "estampa-molinillos",
+        "items": [261, 262, 263, 264, 265]
+      },
+      {
+        "concept": "estampa-molinos-cafe",
+        "items": [926, 927, 928, 929, 930]
+      },
+      {
+        "concept": "estampa-monstera",
+        "items": [161, 162, 163, 164, 165]
+      },
+      {
+        "concept": "estampa-nopales",
+        "items": [156, 157, 158, 159, 160]
+      },
+      {
+        "concept": "estampa-ocarinas",
+        "items": [321, 322, 323, 324, 325]
+      },
+      {
+        "concept": "estampa-olas-cuadricula",
+        "items": [616, 617, 618, 619, 620]
+      },
+      {
+        "concept": "estampa-papalotes-estrellas",
+        "items": [346, 347, 348, 349, 350]
+      },
+      {
+        "concept": "estampa-papel-arrugado",
+        "items": [846, 847, 848, 849, 850]
+      },
+      {
+        "concept": "estampa-papel-picado",
+        "items": [256, 257, 258, 259, 260]
+      },
+      {
+        "concept": "estampa-patines-dobles",
+        "items": [236, 237, 238, 239, 240]
+      },
+      {
+        "concept": "estampa-pinas-pino",
+        "items": [521, 522, 523, 524, 525]
+      },
+      {
+        "concept": "estampa-piraguas",
+        "items": [351, 352, 353, 354, 355]
+      },
+      {
+        "concept": "estampa-pitaya",
+        "items": [131, 132, 133, 134, 135]
+      },
+      {
+        "concept": "estampa-portales",
+        "items": [191, 192, 193, 194, 195]
+      },
+      {
+        "concept": "estampa-puente-ferroviario",
+        "items": [206, 207, 208, 209, 210]
+      },
+      {
+        "concept": "estampa-puertas-talladas",
+        "items": [361, 362, 363, 364, 365]
+      },
+      {
+        "concept": "estampa-puestos-flores",
+        "items": [211, 212, 213, 214, 215]
+      },
+      {
+        "concept": "estampa-quiosco-musica",
+        "items": [221, 222, 223, 224, 225]
+      },
+      {
+        "concept": "estampa-radios-portatiles",
+        "items": [941, 942, 943, 944, 945]
+      },
+      {
+        "concept": "estampa-raices-expuestas",
+        "items": [606, 607, 608, 609, 610]
+      },
+      {
+        "concept": "estampa-rayas-cruce-oval",
+        "items": [861, 862, 863, 864, 865]
+      },
+      {
+        "concept": "estampa-redes-circulares",
+        "items": [621, 622, 623, 624, 625]
+      },
+      {
+        "concept": "estampa-rehiletes",
+        "items": [286, 287, 288, 289, 290]
+      },
+      {
+        "concept": "estampa-rombos-huecos",
+        "items": [766, 767, 768, 769, 770]
+      },
+      {
+        "concept": "estampa-ruedas-hilar",
+        "items": [246, 247, 248, 249, 250]
+      },
+      {
+        "concept": "estampa-ruedas-sin-centro",
+        "items": [821, 822, 823, 824, 825]
+      },
+      {
+        "concept": "estampa-salinas",
+        "items": [591, 592, 593, 594, 595]
+      },
+      {
+        "concept": "estampa-semicirculos-apilados",
+        "items": [836, 837, 838, 839, 840]
+      },
+      {
+        "concept": "estampa-semillas-palmera",
+        "items": [181, 182, 183, 184, 185]
+      },
+      {
+        "concept": "estampa-sikus",
+        "items": [311, 312, 313, 314, 315]
+      },
+      {
+        "concept": "estampa-sombreros-colgados",
+        "items": [356, 357, 358, 359, 360]
+      },
+      {
+        "concept": "estampa-tamarindo",
+        "items": [146, 147, 148, 149, 150]
+      },
+      {
+        "concept": "estampa-tambores-cuerdas",
+        "items": [306, 307, 308, 309, 310]
+      },
+      {
+        "concept": "estampa-telar-marcos",
+        "items": [331, 332, 333, 334, 335]
+      },
+      {
+        "concept": "estampa-terrarios",
+        "items": [936, 937, 938, 939, 940]
+      },
+      {
+        "concept": "estampa-terrazas-cultivo",
+        "items": [586, 587, 588, 589, 590]
+      },
+      {
+        "concept": "estampa-torres-bloques",
+        "items": [856, 857, 858, 859, 860]
+      },
+      {
+        "concept": "estampa-triangulos-curvos",
+        "items": [816, 817, 818, 819, 820]
+      },
+      {
+        "concept": "estampa-trompos-cuerda",
+        "items": [276, 277, 278, 279, 280]
+      },
+      {
+        "concept": "estampa-valeros",
+        "items": [291, 292, 293, 294, 295]
+      },
+      {
+        "concept": "estampa-ventanas-escalonadas",
+        "items": [811, 812, 813, 814, 815]
+      },
+      {
+        "concept": "estampa-ventiladores",
+        "items": [226, 227, 228, 229, 230]
+      },
+      {
+        "concept": "estampa-yoyos-colgantes",
+        "items": [281, 282, 283, 284, 285]
+      },
+      {
+        "concept": "falda-bolsillo-abanico",
+        "items": [31, 32, 33, 34, 35]
+      },
+      {
+        "concept": "falda-botonera-diagonal",
+        "items": [651, 652, 653, 654, 655]
+      },
+      {
+        "concept": "falda-costura-doble-s",
+        "items": [66, 67, 68, 69, 70]
+      },
+      {
+        "concept": "falda-flecos-en-ondas",
+        "items": [681, 682, 683, 684, 685]
+      },
+      {
+        "concept": "falda-panel-vertical-movil",
+        "items": [91, 92, 93, 94, 95]
+      },
+      {
+        "concept": "falda-pliegue-lateral-ancho",
+        "items": [716, 717, 718, 719, 720]
+      },
+      {
+        "concept": "falda-superposicion-zigzag",
+        "items": [746, 747, 748, 749, 750]
+      },
+      {
+        "concept": "pantalon-cintura-onda",
+        "items": [701, 702, 703, 704, 705]
+      },
+      {
+        "concept": "pantalon-frente-solapa",
+        "items": [641, 642, 643, 644, 645]
+      },
+      {
+        "concept": "pantalon-panel-delantal",
+        "items": [81, 82, 83, 84, 85]
+      },
+      {
+        "concept": "pantalon-paneles-esquinas",
+        "items": [671, 672, 673, 674, 675]
+      },
+      {
+        "concept": "pantalon-pernera-oval",
+        "items": [6, 7, 8, 9, 10]
+      },
+      {
+        "concept": "pantalon-pespunte-arco",
+        "items": [51, 52, 53, 54, 55]
+      },
+      {
+        "concept": "pantalon-punos-separados",
+        "items": [741, 742, 743, 744, 745]
+      },
+      {
+        "concept": "prendedor-con-peine",
+        "items": [431, 432, 433, 434, 435]
+      },
+      {
+        "concept": "pulsera-bisagra-central",
+        "items": [411, 412, 413, 414, 415]
+      },
+      {
+        "concept": "pulsera-cintas-paralelas",
+        "items": [116, 117, 118, 119, 120]
+      },
+      {
+        "concept": "pulsera-corte-relampago",
+        "items": [481, 482, 483, 484, 485]
+      },
+      {
+        "concept": "sandalia-tira-trenzada-gruesa",
+        "items": [381, 382, 383, 384, 385]
+      },
+      {
+        "concept": "vestido-bolsillos-circulares",
+        "items": [691, 692, 693, 694, 695]
+      },
+      {
+        "concept": "vestido-capa-cintura",
+        "items": [46, 47, 48, 49, 50]
+      },
+      {
+        "concept": "vestido-cintura-puente",
+        "items": [71, 72, 73, 74, 75]
+      },
+      {
+        "concept": "vestido-cordon-bajo",
+        "items": [731, 732, 733, 734, 735]
+      },
+      {
+        "concept": "vestido-plegado-cruz-pecho",
+        "items": [661, 662, 663, 664, 665]
+      },
+      {
+        "concept": "vestido-sisa-pliegue",
+        "items": [96, 97, 98, 99, 100]
+      },
+      {
+        "concept": "vestido-sobrefalda-recta",
+        "items": [631, 632, 633, 634, 635]
+      },
+      {
+        "concept": "zapato-borde-ondulado",
+        "items": [386, 387, 388, 389, 390]
+      },
+      {
+        "concept": "zapatos-pestanas-superpuestas",
+        "items": [451, 452, 453, 454, 455]
+      },
+      {
+        "concept": "estampa-bolas-billar",
+        "items": [992, 994, 995]
+      },
+      {
+        "concept": "estampa-domino",
+        "items": [977, 979, 980]
+      },
+      {
+        "concept": "estampa-naipes-abanico",
+        "items": [982, 984, 985]
+      },
+      {
+        "concept": "estampa-parquimetros",
+        "items": [967, 969, 970]
+      },
+      {
+        "concept": "estampa-semaforos",
+        "items": [962, 964, 965]
+      },
+      {
+        "concept": "estampa-serpientes-escaleras",
+        "items": [997, 999, 1000]
+      },
+      {
+        "concept": "estampa-tablero-triangulos",
+        "items": [987, 989, 990]
+      },
+      {
+        "concept": "estampa-torniquetes",
+        "items": [972, 974, 975]
+      },
+      {
+        "concept": "estampa-barquillos",
+        "items": [976, 978]
+      },
+      {
+        "concept": "estampa-cazuelas",
+        "items": [991, 993]
+      },
+      {
+        "concept": "estampa-empanadas",
+        "items": [981, 983]
+      },
+      {
+        "concept": "estampa-gelatinas",
+        "items": [971, 973]
+      },
+      {
+        "concept": "estampa-metates",
+        "items": [996, 998]
+      },
+      {
+        "concept": "estampa-paletas-heladas",
+        "items": [966, 968]
+      },
+      {
+        "concept": "estampa-pan-concha",
+        "items": [961, 963]
+      },
+      {
+        "concept": "estampa-tortilleros",
+        "items": [986, 988]
+      }
+    ]
+  },
+  "wholeTextDuplicates": [],
+  "historicalCollisions": [],
+  "historicalPaths": [
+    "apps/api/test/fixtures/community-text-corpus/de.json",
+    "apps/api/test/fixtures/community-text-corpus/en.json",
+    "apps/api/test/fixtures/community-text-corpus/es.json",
+    "apps/api/test/fixtures/community-text-corpus/fr.json",
+    "apps/api/test/fixtures/community-text-corpus/it.json",
+    "apps/api/test/fixtures/community-text-corpus/pt.json",
+    "apps/api/test/fixtures/community-text-corpus/tr.json",
+    "apps/api/test/fixtures/community-text-corpus/holdout-v1/de.json",
+    "apps/api/test/fixtures/community-text-corpus/holdout-v1/en.json",
+    "apps/api/test/fixtures/community-text-corpus/holdout-v1/es.json",
+    "apps/api/test/fixtures/community-text-corpus/holdout-v1/fr.json",
+    "apps/api/test/fixtures/community-text-corpus/holdout-v1/it.json",
+    "apps/api/test/fixtures/community-text-corpus/holdout-v1/pt.json",
+    "apps/api/test/fixtures/community-text-corpus/holdout-v1/tr.json",
+    "apps/api/test/fixtures/community-text-corpus/holdout-v2/de.json",
+    "apps/api/test/fixtures/community-text-corpus/holdout-v2/en.json",
+    "apps/api/test/fixtures/community-text-corpus/holdout-v2/es.json",
+    "apps/api/test/fixtures/community-text-corpus/holdout-v2/fr.json",
+    "apps/api/test/fixtures/community-text-corpus/holdout-v2/it.json",
+    "apps/api/test/fixtures/community-text-corpus/holdout-v2/pt.json",
+    "apps/api/test/fixtures/community-text-corpus/holdout-v2/tr.json",
+    "apps/api/test/fixtures/community-text-corpus/holdout-v3/de.json",
+    "apps/api/test/fixtures/community-text-corpus/holdout-v3/en.json",
+    "apps/api/test/fixtures/community-text-corpus/holdout-v3/es.json",
+    "apps/api/test/fixtures/community-text-corpus/holdout-v3/fr.json",
+    "apps/api/test/fixtures/community-text-corpus/holdout-v3/it.json",
+    "apps/api/test/fixtures/community-text-corpus/holdout-v3/pt.json",
+    "apps/api/test/fixtures/community-text-corpus/holdout-v3/tr.json",
+    "apps/api/test/fixtures/community-text-corpus/holdout-v4/de.json",
+    "apps/api/test/fixtures/community-text-corpus/holdout-v4/en.json",
+    "apps/api/test/fixtures/community-text-corpus/holdout-v4/es.json",
+    "apps/api/test/fixtures/community-text-corpus/holdout-v4/fr.json",
+    "apps/api/test/fixtures/community-text-corpus/holdout-v4/it.json",
+    "apps/api/test/fixtures/community-text-corpus/holdout-v4/pt.json",
+    "apps/api/test/fixtures/community-text-corpus/holdout-v4/tr.json"
+  ],
+  "overLengthItems": [],
+  "wordCounts": {
+    "minimum": 9,
+    "median": 12.0,
+    "maximum": 16,
+    "fewerThanFiveWords": 0
+  },
+  "maximumCaptionLength": 97,
+  "maximumAltTextLength": 104
+}

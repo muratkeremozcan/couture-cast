@@ -1,0 +1,198 @@
+{
+  "reviewer": "/root/edge_paths",
+  "scope": "Read-only recheck of the German reinforcement boundary after six literal item replacements.",
+  "source_sha256": "c03a51e4162fe83ab18f7c519c2d6e5e3175411a373383fa6df0f03c2e1bd5ed",
+  "verdict": "READY",
+  "findings": [],
+  "resolved_boundary": {
+    "concept": "taschenriemen-verstaerkungsnaht",
+    "english_gloss": "Reinforcing load-bearing bag seams and handle attachments.",
+    "count": 6,
+    "membership": [
+      {
+        "row": 242,
+        "labels": ["taschenriemen-verstaerkungsnaht"],
+        "field": "caption",
+        "text": "Eine doppelte Naht verstärkt die obere Kante meines Einkaufsbeutels."
+      },
+      {
+        "row": 316,
+        "labels": ["taschenriemen-verstaerkungsnaht"],
+        "field": "caption",
+        "text": "Die mehrfach abgesteppten Henkel tragen auch einen schweren Einkauf sicher."
+      },
+      {
+        "row": 333,
+        "labels": ["taschenriemen-verstaerkungsnaht"],
+        "field": "caption",
+        "text": "Die Naht läuft einmal vollständig um den Ansatz des Taschengurts."
+      },
+      {
+        "row": 742,
+        "labels": ["taschenriemen-verstaerkungsnaht"],
+        "field": "altText",
+        "text": "Zwei parallele Nähte verstärken die Oberkante des offenen Beutels."
+      },
+      {
+        "row": 816,
+        "labels": ["taschenriemen-verstaerkungsnaht"],
+        "field": "altText",
+        "text": "Mehrere Stichreihen verstärken die breiten Henkel am Einkaufsbeutel."
+      },
+      {
+        "row": 833,
+        "labels": ["taschenriemen-verstaerkungsnaht"],
+        "field": "altText",
+        "text": "Die Befestigungsnaht umschließt den Gurtansatz auf allen vier Seiten."
+      }
+    ],
+    "status": "RESOLVED",
+    "reason": "The three replaced pairs now express a rotating windmill brooch, an enamel sewing-machine pendant and a record-groove ring surface. They no longer instantiate the bag/pocket reinforcement motif. Six members remain, with headroom below the ten-item cap.",
+    "replacements": [
+      {
+        "row": 145,
+        "labels": ["windradbrosche"],
+        "field": "caption",
+        "text": "Die kleine Windradbrosche dreht sich beim Gehen ganz leicht."
+      },
+      {
+        "row": 257,
+        "labels": ["emaille-naehmaschine"],
+        "field": "caption",
+        "text": "Ein Emailleanhänger zeigt die Silhouette einer alten Nähmaschine."
+      },
+      {
+        "row": 299,
+        "labels": ["schallplatten-ring"],
+        "field": "caption",
+        "text": "Die Rillen meines Rings erinnern mich an eine Schallplatte."
+      },
+      {
+        "row": 645,
+        "labels": ["windradbrosche"],
+        "field": "altText",
+        "text": "Eine Windradbrosche hat vier gebogene Flügel um eine mittige Achse."
+      },
+      {
+        "row": 757,
+        "labels": ["emaille-naehmaschine"],
+        "field": "altText",
+        "text": "Der flache Emailleanhänger besitzt die Form einer kleinen Nähmaschine."
+      },
+      {
+        "row": 799,
+        "labels": ["schallplatten-ring"],
+        "field": "altText",
+        "text": "Feine konzentrische Rillen überziehen die runde Oberseite des Rings."
+      }
+    ]
+  },
+  "row_count": 1000,
+  "field_counts": {
+    "caption": 500,
+    "altText": 500
+  },
+  "largest_explicit_group": 8,
+  "pre_revision_identity": {
+    "source_sha256": "dc3ed00d2d4c97097613c086bebe26cb64f528b37728d5b96ade159035cd4c93",
+    "verified": "Restoring exactly the six previously reviewed rows reproduces the earlier reviewed SHA256. No other German source changes occurred."
+  },
+  "inspection": "Only the current authored German TSV, its concept annotations and prior peer note were inspected. No round3 repair, policy, screener, development corpus or evaluation inspection.",
+  "modifications": "Updated this peer note only. German text and labels unchanged by reviewer.",
+  "prior_review": {
+    "reviewer": "/root/edge_paths",
+    "scope": "Read-only semantic spot audit of root-authored V5 German de.tsv and de-concept-merges.txt.",
+    "source_sha256": "dc3ed00d2d4c97097613c086bebe26cb64f528b37728d5b96ade159035cd4c93",
+    "merge_file_sha256": "66fe0c840ce123a39e8f2902964c23ef5482852f8b58dbe5b009e8f53bb55fa3",
+    "verdict": "CHANGES_REQUIRED",
+    "findings": [
+      {
+        "concept": "taschenriemen-verstaerkungsnaht",
+        "english_gloss": "Reinforcing load-bearing bag or pocket seams with stitched layers or bands.",
+        "existing_count": 10,
+        "existing_membership": [
+          {
+            "row": 242,
+            "labels": ["taschenriemen-verstaerkungsnaht"],
+            "field": "caption",
+            "text": "Eine doppelte Naht verstärkt die obere Kante meines Einkaufsbeutels."
+          },
+          {
+            "row": 257,
+            "labels": ["taschenriemen-verstaerkungsnaht"],
+            "field": "caption",
+            "text": "Eine breite Naht verteilt die Zugkraft am Ansatz des Taschengurts."
+          },
+          {
+            "row": 299,
+            "labels": ["taschenriemen-verstaerkungsnaht"],
+            "field": "caption",
+            "text": "Die Bodennaht habe ich von innen mit einem Band verstärkt."
+          },
+          {
+            "row": 316,
+            "labels": ["taschenriemen-verstaerkungsnaht"],
+            "field": "caption",
+            "text": "Die mehrfach abgesteppten Henkel tragen auch einen schweren Einkauf sicher."
+          },
+          {
+            "row": 333,
+            "labels": ["taschenriemen-verstaerkungsnaht"],
+            "field": "caption",
+            "text": "Die Naht läuft einmal vollständig um den Ansatz des Taschengurts."
+          },
+          {
+            "row": 742,
+            "labels": ["taschenriemen-verstaerkungsnaht"],
+            "field": "altText",
+            "text": "Zwei parallele Nähte verstärken die Oberkante des offenen Beutels."
+          },
+          {
+            "row": 757,
+            "labels": ["taschenriemen-verstaerkungsnaht"],
+            "field": "altText",
+            "text": "Ein breites Nahtrechteck verstärkt den Ansatz des Taschengurts."
+          },
+          {
+            "row": 799,
+            "labels": ["taschenriemen-verstaerkungsnaht"],
+            "field": "altText",
+            "text": "Ein kräftiges Band bedeckt die innere Bodennaht der Tasche."
+          },
+          {
+            "row": 816,
+            "labels": ["taschenriemen-verstaerkungsnaht"],
+            "field": "altText",
+            "text": "Mehrere Stichreihen verstärken die breiten Henkel am Einkaufsbeutel."
+          },
+          {
+            "row": 833,
+            "labels": ["taschenriemen-verstaerkungsnaht"],
+            "field": "altText",
+            "text": "Die Befestigungsnaht umschließt den Gurtansatz auf allen vier Seiten."
+          }
+        ],
+        "additional_membership": [
+          {
+            "row": 145,
+            "labels": ["manteltaschenflicken"],
+            "field": "caption",
+            "text": "Die innen verstärkte Tasche verträgt meinen Schlüsselbund wieder problemlos."
+          },
+          {
+            "row": 645,
+            "labels": ["manteltaschenflicken"],
+            "field": "altText",
+            "text": "Ein festgenähtes Innenstück verstärkt den Boden der Manteltasche."
+          }
+        ],
+        "consolidated_count": 12,
+        "reason": "The existing group already includes reinforced bag upper rims and reinforced internal bag bottom seams, in addition to handles. The extra coat-pocket pair repeats the internal bottom reinforcement motif; changing the carrier from bag to coat pocket does not distinguish that underlying visual scenario. In particular rows299/799 and145/645 describe the same internal load-bearing bottom reinforcement.",
+        "required_amendment": "Consolidate the equivalent pocket reinforcement pair and reduce the resulting12-item motif to at most10 through individually authored replacements, or identify a substantive scenario difference beyond carrier type."
+      }
+    ],
+    "other_spot_checks": "Pleat arrangement versus paper dart drafting, sock-heel geometry versus thick socks filling boots, machine-foot choice versus stitch testing, and accessory identification versus photographed care labels have substantive different operations or goals; no additional over-cap finding recorded.",
+    "inspection": "Only new authored German TSV and its concept merge file were inspected. No repair, policy, screener, development corpus or evaluation inspection.",
+    "modifications": "Peer note only. German source text and labels unchanged."
+  }
+}
