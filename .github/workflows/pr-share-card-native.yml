@@ -94,7 +94,7 @@ jobs:
         uses: actions/download-artifact@v4
         with:
           name: cc68-supabase-amd64
-          path: ${{ runner.temp }}/supabase-image-cache
+          path: ${{ runner.temp }}/share-card-supabase-artifact
       - name: Verify and load the exact Supabase image archive
         id: supabase-artifact
         if: runner.os == 'macOS'

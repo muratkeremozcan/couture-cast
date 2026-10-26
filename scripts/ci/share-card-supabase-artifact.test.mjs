@@ -8,6 +8,7 @@ import { parse } from 'yaml'
 import {
   packSupabaseArtifact,
   loadSupabaseArtifact,
+  supabaseArtifactDirectory,
 } from './share-card-supabase-artifact.mjs'
 
 function fixture(t) {
@@ -133,4 +134,69 @@ test('completed image archives can save even when another step has failed', () =
   const save = action.runs.steps.find((row) => row.uses === 'actions/cache/save@v4')
   assert.ok(save.if.includes('always()'))
   assert.ok(save.if.includes("steps.start.outputs.cache_written == 'true'"))
+})
+
+test('a Mac cache miss writes a reusable cache without changing the verified downloaded archive', async (t) => {
+  const runnerTemp = fs.mkdtempSync(path.join(os.tmpdir(), 'cc68-image-cache-miss-'))
+  t.after(() => fs.rmSync(runnerTemp, { recursive: true, force: true }))
+  const workflow = parse(
+    fs.readFileSync('.github/workflows/pr-share-card-native.yml', 'utf8')
+  )
+  const download = workflow.jobs['original-resource'].steps.find(
+    (row) => row.uses === 'actions/download-artifact@v4'
+  )
+  const directory = download.with.path.replace('${{ runner.temp }}', runnerTemp)
+  assert.equal(directory, supabaseArtifactDirectory('load', runnerTemp))
+  assert.equal(
+    supabaseArtifactDirectory('pack', runnerTemp),
+    path.join(runnerTemp, 'supabase-image-cache')
+  )
+  fs.mkdirSync(directory, { recursive: true })
+  const archive = path.join(directory, 'images.tar.zst')
+  const compressed = spawnSync('zstd', ['-q', '-c'], {
+    input: 'prewarmed image fixture',
+  })
+  assert.equal(compressed.status, 0)
+  fs.writeFileSync(archive, compressed.stdout)
+  fs.writeFileSync(path.join(directory, 'registry'), 'ghcr.io')
+  await packSupabaseArtifact(directory)
+  await loadSupabaseArtifact(directory, (file) => {
+    const loaded = spawnSync('zstd', ['-dc', file], { encoding: 'utf8' })
+    assert.equal(loaded.status, 0)
+    assert.equal(loaded.stdout, 'prewarmed image fixture')
+  })
+  const action = parse(
+    fs.readFileSync('.github/actions/start-local-supabase/action.yml', 'utf8')
+  )
+  const start = action.runs.steps.find((row) => row.id === 'start')
+  const writer = start.run.match(/^write_image_cache\(\) \{[\s\S]*?^\}/m)?.[0]
+  assert.ok(writer, 'execute the actual composite-action cache writer')
+  const cache = path.join(runnerTemp, 'supabase-image-cache')
+  const output = path.join(runnerTemp, 'action-output')
+  fs.writeFileSync(output, '')
+  // Docker is injected; the action function and zstd collision behavior are real.
+  const result = spawnSync(
+    '/bin/bash',
+    [
+      '-c',
+      `set -u -o pipefail
+project_images() { printf '%s\\n' ghcr.io/supabase/postgres:fixture; }
+docker() { test "$1" = save || return 1; printf '%s' 'fresh cache fixture'; }
+${writer}
+write_image_cache ghcr.io`,
+    ],
+    {
+      encoding: 'utf8',
+      env: { ...process.env, CACHE_DIR: cache, GITHUB_OUTPUT: output },
+    }
+  )
+  assert.equal(result.status, 0, result.stderr)
+  assert.match(fs.readFileSync(output, 'utf8'), /cache_written=true/, result.stderr)
+  assert.deepEqual(fs.readFileSync(archive), compressed.stdout)
+  const cached = spawnSync('zstd', ['-dc', path.join(cache, 'images.tar.zst')], {
+    encoding: 'utf8',
+  })
+  assert.equal(cached.status, 0)
+  assert.equal(cached.stdout, 'fresh cache fixture')
+  assert.equal(fs.readFileSync(path.join(cache, 'registry'), 'utf8'), 'ghcr.io')
 })

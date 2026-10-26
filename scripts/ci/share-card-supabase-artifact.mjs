@@ -5,6 +5,12 @@ import { spawnSync } from 'node:child_process'
 import { pathToFileURL } from 'node:url'
 
 const registries = ['ghcr.io', 'public.ecr.aws', 'docker.io']
+export function supabaseArtifactDirectory(mode, runnerTemp) {
+  return path.join(
+    runnerTemp,
+    mode === 'pack' ? 'supabase-image-cache' : 'share-card-supabase-artifact'
+  )
+}
 function regular(file, maximum = 10 * 1024 ** 3) {
   const stat = fs.lstatSync(file)
   if (!stat.isFile() || stat.isSymbolicLink() || stat.size < 1 || stat.size > maximum)
@@ -82,7 +88,7 @@ async function main() {
     !process.env.RUNNER_TEMP
   )
     throw new Error('owned_x64_image_artifact_runner_required')
-  const directory = path.join(process.env.RUNNER_TEMP, 'supabase-image-cache')
+  const directory = supabaseArtifactDirectory(mode, process.env.RUNNER_TEMP)
   if (mode === 'pack') await packSupabaseArtifact(directory)
   else {
     if (!process.env.GITHUB_OUTPUT)

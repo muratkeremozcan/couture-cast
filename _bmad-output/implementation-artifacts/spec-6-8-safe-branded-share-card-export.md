@@ -1006,6 +1006,27 @@ archive and native execution remain required in the instrumented CI run.
 Evidence: `ci-ffa33f67-ios/actual-job.log`, downloaded `share-card-ios-0` and
 `runs/ciffa-ios-prewarm-controls-*`. No product or frozen Round6 source changed.
 
+### Delta review: isolate verified image artifacts from cache output
+
+Astra delta review P2 reproduced an output-path collision in the iOS image prewarm. On a Mac
+cache miss, the workflow had downloaded its verified archive into the composite action's
+cache directory. The unchanged cache writer invokes `zstd -o` without overwrite; an existing
+archive makes that command fail, then the writer's failure branch truncates the archive and
+leaves `cache_written` unset. The `always()` cache save consequently skips publication.
+
+The workflow now downloads and loads the verified artifact in a separate runner-temporary
+`share-card-supabase-artifact` directory. Linux pack keeps the composite cache directory.
+The loader's shared directory selector and workflow path are checked together. A cache-miss
+integration control executes the actual extracted composite writer with real zstd and an
+injected Docker byte source. Before repair it fails with the existing-file refusal and no
+cache-written output. After repair the downloaded archive stays byte-identical and the new
+cache decompresses to the expected bytes with registry and cache-written output present.
+The cache publication guard and 600-second startup deadline are unchanged.
+
+Evidence: `runs/cief22-cache-miss-red-1` and `runs/cief22-cache-miss-green-1` (21 controls pass).
+The in-flight ef22 CI run is preserved until publication of this concrete repair; no CI
+failure is inferred from its pending state.
+
 ## Spec Change Log
 
 - 2026-10-25, iteration 2 in progress, Astra round 1: accepted A1 and A2. iOS now imports the
