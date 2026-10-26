@@ -14,6 +14,7 @@ export interface AccessibleModalProps {
   description?: string
   invokingElementRef?: React.RefObject<HTMLElement | null>
   initialFocusRef?: React.RefObject<HTMLElement | null>
+  fallbackFocusSelector?: string
   closeLabel?: string
   children: React.ReactNode
   ariaLiveMessage?: string | null
@@ -32,6 +33,7 @@ export function AccessibleModal({
   invokingElementRef,
   initialFocusRef,
   closeLabel = 'Close modal',
+  fallbackFocusSelector,
   children,
   ariaLiveMessage,
   errorMessage,
@@ -40,13 +42,35 @@ export function AccessibleModal({
   const closeButtonRef = useRef<HTMLButtonElement | null>(null)
   const resumeFocusRef = useRef<HTMLElement | null>(null)
   const previousActiveElementRef = useRef<HTMLElement | null>(null)
+  const onCloseRef = useRef(onClose)
+  onCloseRef.current = onClose
+
+  useLayoutEffect(() => {
+    if (!isOpen || suspended) return
+    const handleEscape = (event: KeyboardEvent) => {
+      if (event.key !== 'Escape') return
+      const activeDialogs = Array.from(
+        document.querySelectorAll<HTMLElement>('[role="dialog"][aria-modal="true"]')
+      ).filter((dialog) => !dialog.inert && dialog.getAttribute('aria-hidden') !== 'true')
+      if (activeDialogs.at(-1) !== dialogRef.current?.parentElement) return
+      event.preventDefault()
+      event.stopPropagation()
+      onCloseRef.current()
+    }
+    document.addEventListener('keydown', handleEscape, true)
+    return () => document.removeEventListener('keydown', handleEscape, true)
+  }, [isOpen, suspended])
 
   useLayoutEffect(() => {
     if (!isOpen || suspended) {
       return
     }
     previousActiveElementRef.current =
-      document.activeElement instanceof HTMLElement ? document.activeElement : null
+      document.activeElement instanceof HTMLElement &&
+      document.activeElement !== document.body &&
+      document.activeElement !== document.documentElement
+        ? document.activeElement
+        : null
 
     // Lock body scroll
     const originalStyle = document.body.style.overflow
@@ -90,28 +114,37 @@ export function AccessibleModal({
         else element.setAttribute('aria-hidden', hidden)
       }
 
-      // Restore focus to invoking element or previous active element
-      const targetToFocus =
-        currentInvoker?.isConnected === true
-          ? currentInvoker
-          : previousActiveElementRef.current?.isConnected === true
-            ? previousActiveElementRef.current
-            : null
+      const fallback = fallbackFocusSelector
+        ? document.querySelector<HTMLElement>(fallbackFocusSelector)
+        : null
+      const targetToFocus = [
+        currentInvoker,
+        fallback,
+        previousActiveElementRef.current,
+      ].find((target) => {
+        if (!target?.isConnected) return false
+        for (
+          let ancestor: HTMLElement | null = target;
+          ancestor;
+          ancestor = ancestor.parentElement
+        )
+          if (
+            ancestor.inert ||
+            ancestor.hasAttribute('inert') ||
+            ancestor.getAttribute('aria-hidden') === 'true'
+          )
+            return false
+        return true
+      })
       targetToFocus?.focus()
     }
-  }, [initialFocusRef, isOpen, suspended, invokingElementRef])
+  }, [initialFocusRef, isOpen, suspended, invokingElementRef, fallbackFocusSelector])
 
   if (!isOpen || typeof document === 'undefined') {
     return null
   }
 
   const handleKeyDown = (event: React.KeyboardEvent<HTMLDivElement>) => {
-    if (event.key === 'Escape') {
-      event.preventDefault()
-      onClose()
-      return
-    }
-
     if (event.key !== 'Tab') {
       return
     }

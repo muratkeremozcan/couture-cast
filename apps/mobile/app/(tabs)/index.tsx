@@ -1,5 +1,13 @@
+import { ShareCardComposer } from '@/components/share-card-composer'
+import { focusShareCardElement } from '@/src/lib/share-card-focus'
+import {
+  type ShareCardSource,
+  ResponseError,
+  type WeatherAlertDeepLinkTarget,
+} from '@couture/api-client'
 import {
   type ComponentRef,
+  useCallback,
   useEffect,
   useRef,
   useState,
@@ -13,6 +21,7 @@ import {
   ScrollView,
   Platform,
   View as NativeView,
+  Text as NativeText,
 } from 'react-native'
 import { SafeAreaView } from 'react-native-safe-area-context'
 import { Text, View } from '@/components/themed'
@@ -45,12 +54,11 @@ import {
   type RitualResponse,
   type AlertPreferences,
 } from '@couture/api-client/contracts/http'
-import { ResponseError, type WeatherAlertDeepLinkTarget } from '@couture/api-client'
 import {
   trackMobileAffiliateCtaShown,
   trackMobileRitualCreated,
 } from '@/src/analytics/track-events'
-import { useLocalSearchParams, useRouter } from 'expo-router'
+import { useFocusEffect, useLocalSearchParams, useRouter } from 'expo-router'
 
 import { processMobileDeepLink } from '@/src/lib/mobile-deep-link-handler'
 import { InfoBanner } from '@/components/info-banner'
@@ -197,7 +205,32 @@ function resolveGarmentSwap(
   }
 }
 
+function shareComposerIsOpen(open: boolean, owner: string | null, member: string | null) {
+  return open && owner === member
+}
+
 export default function TabOneScreen() {
+  const shareCardInvoker = useRef<{
+    node: (() => number | null) | null
+    member: string | null
+  }>({
+    node: null,
+    member: null,
+  })
+  const shareCardFallback = useRef<NativeText>(null)
+  const shareVisitFocused = useRef(false)
+  const [shareCardSource, setShareCardSource] = useState<ShareCardSource | null>(null)
+  const [shareCardOpen, setShareCardOpen] = useState(false)
+  useFocusEffect(
+    useCallback(() => {
+      shareVisitFocused.current = true
+      return () => {
+        shareVisitFocused.current = false
+        setShareCardSource(null)
+        setShareCardOpen(false)
+      }
+    }, [])
+  )
   const analytics = useMobileAnalytics()
   const router = useRouter()
   const { i18n, t } = useTranslation()
@@ -211,6 +244,10 @@ export default function TabOneScreen() {
     mobileApplicationUserId,
     mobileApplicationUserId
   )
+  useEffect(() => {
+    setShareCardSource(null)
+    setShareCardOpen(false)
+  }, [applicationUserId])
   const cacheOwner = ritualCacheOwner(applicationUserId)
   const activeLocale =
     resolveSupportedLocale(i18n.resolvedLanguage ?? i18n.language) ??
@@ -823,9 +860,29 @@ export default function TabOneScreen() {
               />
             )}
 
+            <NativeText
+              ref={shareCardFallback}
+              accessibilityRole="header"
+              style={{
+                fontSize: 22,
+                fontFamily: 'Playfair Display',
+                color: palette.text,
+                marginHorizontal: 16,
+              }}
+            >
+              {t('shareCard.sourceOutfit')}
+            </NativeText>
             {/* Primary Outfit Card */}
             <OutfitRecommendationCard
               outfit={activeOutfit}
+              onExport={(recommendationId, opener) => {
+                shareCardInvoker.current = {
+                  node: opener,
+                  member: mobileApplicationUserId(),
+                }
+                setShareCardSource({ kind: 'outfit', recommendationId })
+                setShareCardOpen(true)
+              }}
               onSwapGarment={handleSwapGarment}
               onGarmentRef={(garmentId, element) => {
                 garmentRefs.current.set(garmentId, element)
@@ -932,6 +989,26 @@ export default function TabOneScreen() {
           })()}
         </View>
       </EdgeToEdgeModal>
+      <ShareCardComposer
+        source={shareCardSource}
+        open={shareComposerIsOpen(
+          shareCardOpen,
+          shareCardInvoker.current.member,
+          applicationUserId
+        )}
+        onClose={() => setShareCardOpen(false)}
+        onRestoreFocus={() => {
+          if (
+            !shareVisitFocused.current ||
+            shareCardInvoker.current.member !== mobileApplicationUserId()
+          )
+            return
+          const node =
+            shareCardInvoker.current.node?.() ??
+            safeFindNodeHandle(shareCardFallback.current)
+          focusShareCardElement(node)
+        }}
+      />
     </SafeAreaView>
   )
 }

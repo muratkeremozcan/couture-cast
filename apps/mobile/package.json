@@ -14,7 +14,7 @@
     "lint": "cd ../.. && eslint --max-warnings=0 --ext .ts,.tsx apps/mobile",
     "vitest:run": "vitest run --config vitest.config.ts",
     "vitest:open": "vitest --config vitest.config.ts --ui",
-    "test": "npm run vitest:run && npm run test:widget-prebuild && npm run test:watchos-prebuild",
+    "test": "npm run vitest:run && npm run test:widget-prebuild && npm run test:watchos-prebuild && npm run test:share-card-prebuild",
     "test:widget-prebuild": "node --test plugins/with-widgets.test.js",
     "test:watchos-prebuild": "node --test plugins/with-watchos.test.js",
     "test:accessibility-focus:android": "expo prebuild --platform android --no-install && cd android && ./gradlew :accessibility-focus:testDebugUnitTest --console=plain",
@@ -24,7 +24,8 @@
     "start": "expo start",
     "android": "expo run:android",
     "ios": "expo run:ios",
-    "web": "expo start --web"
+    "web": "expo start --web",
+    "test:share-card-prebuild": "node --test plugins/with-share-card-permissions.test.js"
   },
   "dependencies": {
     "@couture/api-client": "file:../../packages/api-client",
@@ -51,6 +52,7 @@
     "expo-image-picker": "~17.0.11",
     "expo-linking": "~8.0.12",
     "expo-localization": "~17.0.9",
+    "expo-media-library": "~18.2.1",
     "expo-notifications": "^0.32.17",
     "expo-router": "~6.0.24",
     "expo-secure-store": "~15.0.8",

@@ -1,6 +1,7 @@
 /* eslint-disable @typescript-eslint/await-thenable */
 import { CommunitySyncState } from '@couture/api-client'
 import type * as ReactNativeModule from 'react-native'
+import type * as EdgeToEdgeTestUtils from '../test-utils/edge-to-edge-modal'
 // Keep mock registration in the test entrypoint so it precedes every case import.
 vi.mock('expo-haptics', () => ({ selectionAsync: vi.fn().mockResolvedValue(undefined) }))
 // Passthrough spies keep community requests on the real HTTP boundary.
@@ -79,6 +80,9 @@ vi.mock('react-native', async (importOriginal) => {
     '../test-utils/community-screen/mock-state.js'
   )
   const actual = await importOriginal<typeof ReactNativeModule>()
+  const { recordModalProps } = await vi.importActual<typeof EdgeToEdgeTestUtils>(
+    '../test-utils/edge-to-edge-modal'
+  )
   function RecordingImage(props: Record<string, unknown>) {
     if (typeof props.testID === 'string' && typeof props.onError === 'function') {
       imageEvents.errors.set(props.testID, props.onError as () => void)
@@ -91,6 +95,7 @@ vi.mock('react-native', async (importOriginal) => {
   }
   return {
     ...actual,
+    Modal: recordModalProps(actual.Modal),
     Image: RecordingImage,
     RefreshControl: RecordingRefreshControl,
     AccessibilityInfo: {

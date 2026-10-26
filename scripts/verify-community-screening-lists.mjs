@@ -157,6 +157,54 @@ export function unindexableReason(literal, allowSingles) {
   return null
 }
 
+function validLiteralTokens(values, required) {
+  return (
+    Array.isArray(values) &&
+    (!required || values.length > 0) &&
+    values.every(
+      (value) =>
+        typeof value === 'string' && /^\p{L}+$/u.test(value) && value === toLiteral(value)
+    ) &&
+    new Set(values).size === values.length
+  )
+}
+
+export function literalContextProblems(contexts, deliberateTerms = []) {
+  const problems = []
+  if (!Array.isArray(contexts)) return ['literal contexts must be an array']
+  for (const context of contexts) {
+    if (!context || typeof context !== 'object') {
+      problems.push('a literal context must be an object')
+      continue
+    }
+    if (
+      !LANGUAGES.includes(context.language) ||
+      typeof context.reason !== 'string' ||
+      context.reason.trim().length < 20
+    )
+      problems.push('a literal context has no valid language or reason')
+    for (const key of ['terms', 'objects', 'connectors']) {
+      const values = context[key]
+      if (!validLiteralTokens(values, key !== 'connectors'))
+        problems.push(`a literal context has invalid ${key}`)
+    }
+    if (
+      Array.isArray(context.terms) &&
+      context.terms.some(
+        (term) => typeof term === 'string' && deliberateTerms.includes(toLiteral(term))
+      )
+    )
+      problems.push('a literal context clears a deliberate review term')
+    if (
+      !Number.isInteger(context.maxDistance) ||
+      context.maxDistance < 1 ||
+      context.maxDistance > 6
+    )
+      problems.push('a literal context must bound distance to 1..6 tokens')
+  }
+  return problems
+}
+
 function loadAllowList() {
   const allow = readJson(allowListPath)
   const problems = []
@@ -176,6 +224,14 @@ function loadAllowList() {
       problems.push(`allow-list entry "${entry.entry}" is listed twice`)
     seen.add(literal)
   }
+  problems.push(
+    ...literalContextProblems(
+      allow.literalContexts ?? [],
+      (readJson(policyPath).text.deliberateReviewTerms ?? []).map((entry) =>
+        toLiteral(entry.term)
+      )
+    )
+  )
   const singles = new Set(
     [...seen]
       .map((literal) => tokenize(literal))
@@ -305,7 +361,7 @@ function buildAllowFile(language, allowState, hashes) {
       retrievedAt: RETRIEVED_AT,
       curator: CURATOR,
       notes:
-        'GENERATED from allow-list-v1.json, where every entry records why it exists; do not edit by hand. Allow lists apply across all seven languages, so an entry here clears the word whichever list would have flagged it.',
+        'GENERATED from allow-list-v1.json, where every entry records why it exists; do not edit by hand. Allow lists apply across all seven languages, so an entry here clears the word whichever list would have flagged it. Literal contexts clear only their exact target token within bounded grammatical object context; other tokens and unsafe phrases remain screened.',
     },
     generated: {
       generator: 'scripts/verify-community-screening-lists.mjs',
@@ -315,6 +371,14 @@ function buildAllowFile(language, allowState, hashes) {
       .filter((entry) => entry.language === language)
       .map((entry) => toLiteral(entry.entry))
       .toSorted(),
+    literalContexts: (allowState.allow.literalContexts ?? [])
+      .filter((context) => context.language === language)
+      .map(({ terms, objects, connectors, maxDistance }) => ({
+        terms,
+        objects,
+        connectors,
+        maxDistance,
+      })),
   }
 }
 
@@ -489,6 +553,7 @@ async function main() {
   if (remote) await verifyRemote(source, problems)
 
   const allowState = loadAllowList()
+  if (allowState.problems.length) throw new Error(allowState.problems.join('; '))
   problems.push(...allowState.problems)
 
   const hashes = {

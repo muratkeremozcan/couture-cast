@@ -1,0 +1,48 @@
+{
+  "version": "development-v2",
+  "provenance": "Authored on 2026-10-26 from garment, embroidery, craft and event-queue vocabulary. These development examples are independent of every frozen holdout and may be used for repairs. The independent holdout reviewer owns release evaluation.",
+  "entries": [
+    {
+      "id": "es-garment-adjective",
+      "locale": "es-419",
+      "text": "La falda queda mona con un lazo color ocre.",
+      "allowPhrase": "queda mona",
+      "ambiguousToken": "mona"
+    },
+    {
+      "id": "fr-embroidered-cat",
+      "locale": "fr-FR",
+      "text": "Une chatte brodée décore la poche de cette veste.",
+      "allowPhrase": "chatte brodée",
+      "ambiguousToken": "chatte"
+    },
+    {
+      "id": "it-round-earrings",
+      "locale": "it-IT",
+      "text": "Gli orecchini a palle illuminano il colletto di lino.",
+      "allowPhrase": "orecchini a palle",
+      "ambiguousToken": "palle"
+    },
+    {
+      "id": "it-felt-ornaments",
+      "locale": "it-IT",
+      "text": "Ho cucito piccole palle di feltro sulla borsa.",
+      "allowPhrase": "palle di feltro",
+      "ambiguousToken": "palle"
+    },
+    {
+      "id": "pt-painted-boots",
+      "locale": "pt-BR",
+      "text": "Pinto as botas de azul para renovar o conjunto.",
+      "allowPhrase": "pinto as botas",
+      "ambiguousToken": "pinto"
+    },
+    {
+      "id": "pt-event-queue",
+      "locale": "pt-PT",
+      "text": "Entrei na bicha para entrar no desfile.",
+      "allowPhrase": "bicha para entrar",
+      "ambiguousToken": "bicha"
+    }
+  ]
+}

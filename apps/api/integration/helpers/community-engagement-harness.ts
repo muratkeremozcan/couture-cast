@@ -20,6 +20,7 @@ import { CommunityPushProvider } from '../../src/modules/community/community-pus
 import { CommunityFlagEvaluationService } from '../../src/modules/feature-flags/community-flag-evaluation.service.js'
 import { PushRegistrationService } from '../../src/modules/notifications/push-registration.service.js'
 import { recordCommunityEngagement } from '../../src/modules/community/community-engagement-intent.js'
+import { prepareNotificationPass } from './community-notification-preparation.js'
 
 const envelope = z.object({
   id: z.number().optional(),
@@ -291,8 +292,8 @@ export async function engagementHarness() {
           input: { selection: 'love', baseRevision: 0, mutationId: randomUUID() },
           assertEligible: () => Promise.resolve(),
         })
-      await worker.group()
-      await worker.fanout()
+      await prepareNotificationPass(() => worker.group())
+      await prepareNotificationPass(() => worker.fanout())
       const delivery = await prisma.communityTokenDelivery.findFirstOrThrow({
         where: { owner_id: recipient.id, group: { post_id: post.id } },
       })

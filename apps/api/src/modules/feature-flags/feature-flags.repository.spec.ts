@@ -24,6 +24,50 @@ const createRepository = () => {
 
 describe('FeatureFlagsRepository', () => {
   describe('findValue', () => {
+    it('shares one in-flight database read per key across 100 cold waiters', async () => {
+      const { findUnique, repository } = createRepository()
+      let release!: () => void
+      const held = new Promise<void>((resolve) => {
+        release = resolve
+      })
+      findUnique.mockImplementation(async ({ where }: { where: { key: string } }) => {
+        await held
+        return { key: where.key, value: where.key === 'community_read_enabled' }
+      })
+      const reads = Array.from({ length: 100 }, () =>
+        Promise.all([
+          repository.findValue('community_read_enabled'),
+          repository.findValue('color_analysis_enabled'),
+        ])
+      )
+      await Promise.resolve()
+      expect(findUnique).toHaveBeenCalledTimes(2)
+      release()
+      expect(await Promise.all(reads)).toEqual(
+        Array.from({ length: 100 }, () => [true, false])
+      )
+      await repository.findValue('community_read_enabled')
+      expect(findUnique).toHaveBeenCalledTimes(3)
+    })
+
+    it('rejects every waiter on a failed shared read and allows a fresh read afterward', async () => {
+      const { findUnique, repository } = createRepository()
+      const failure = new Error('database unavailable')
+      findUnique.mockRejectedValueOnce(failure)
+      const reads = Array.from({ length: 100 }, () =>
+        repository.findValue('community_read_enabled')
+      )
+      expect(
+        (await Promise.allSettled(reads)).every(
+          (result) => result.status === 'rejected' && result.reason === failure
+        )
+      ).toBe(true)
+      expect(findUnique).toHaveBeenCalledOnce()
+      findUnique.mockResolvedValueOnce({ value: false })
+      await expect(repository.findValue('community_read_enabled')).resolves.toBe(false)
+      expect(findUnique).toHaveBeenCalledTimes(2)
+    })
+
     it('returns the cached value for a known flag key', async () => {
       const { findUnique, repository } = createRepository()
       findUnique.mockResolvedValue({ key: 'ritual_v2', value: { enabled: true } })

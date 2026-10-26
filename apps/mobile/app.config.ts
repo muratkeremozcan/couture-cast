@@ -13,7 +13,9 @@ for (const file of rootEnvFiles) {
   loadEnv({ path: path.join(rootDir, file), override: false, quiet: true })
 }
 
-const isolatedNative = process.env.STORY65_NATIVE_TEST_BUILD === '1'
+const story68Native = process.env.STORY68_NATIVE_TEST_BUILD === '1'
+const isolatedNative = process.env.STORY65_NATIVE_TEST_BUILD === '1' || story68Native
+const isolatedStory = story68Native ? '68' : '65'
 if (isolatedNative) {
   for (const value of [
     process.env.EXPO_PUBLIC_API_BASE_URL,
@@ -31,22 +33,28 @@ if (isolatedNative) {
 export default ({ config }: ConfigContext) => ({
   ...config,
   ...(isolatedNative
-    ? { name: 'CoutureCast Story65', scheme: 'couturecast-story65' }
+    ? {
+        name: `CoutureCast Story${isolatedStory}`,
+        scheme: `couturecast-story${isolatedStory}`,
+      }
     : {}),
   ios: {
     ...config.ios,
-    ...(isolatedNative ? { bundleIdentifier: 'com.couturecast.story65' } : {}),
+    ...(isolatedNative
+      ? { bundleIdentifier: `com.couturecast.story${isolatedStory}` }
+      : {}),
   },
   android: {
     ...config.android,
-    ...(isolatedNative ? { package: 'com.couturecast.story65' } : {}),
+    ...(isolatedNative ? { package: `com.couturecast.story${isolatedStory}` } : {}),
     ...(process.env.FIREBASE_GOOGLE_SERVICES_FILE
       ? { googleServicesFile: process.env.FIREBASE_GOOGLE_SERVICES_FILE }
       : {}),
   },
   extra: {
     ...config.extra,
-    story65NativeFixtures: isolatedNative,
+    story65NativeFixtures: isolatedNative && !story68Native,
+    story68NativeFixtures: story68Native,
     supabaseUrl:
       process.env.EXPO_PUBLIC_SUPABASE_URL ?? process.env.NEXT_PUBLIC_SUPABASE_URL ?? '',
     supabaseAnonKey:

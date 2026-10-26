@@ -1,0 +1,26 @@
+{
+  "outfit": "Outfit",
+  "community": "Community look",
+  "scenarios": {
+    "morning": "Morning",
+    "midday": "Midday",
+    "evening": "Evening"
+  },
+  "categories": {
+    "top": "Top",
+    "bottom": "Bottom",
+    "outerwear": "Outerwear",
+    "dress": "Dress",
+    "shoes": "Shoes",
+    "accessory": "Accessory"
+  },
+  "climateBands": {
+    "cold_dry": "Cold and dry",
+    "cold_wet": "Cold and wet",
+    "temperate_dry": "Temperate and dry",
+    "temperate_wet": "Temperate and wet",
+    "warm_dry": "Warm and dry",
+    "warm_wet": "Warm and wet"
+  },
+  "watermarkRole": "Watermark"
+}

@@ -224,13 +224,33 @@ async function verifyEffect(name: string, f: Fixture) {
 describe('6.5-INT-019..024 actual cross-feature privacy entry points and subject roles', () => {
   it('parent harness guard sends only to its owned provider recorder', async () => {
     const f = await h.fixture()
+    await h.prisma
+      .$executeRaw`UPDATE "CommunityTokenDelivery" SET next_attempt_at=clock_timestamp()-interval '1 second' WHERE id=${f.delivery.id}::uuid`
+    const [schedule] = await h.prisma.$queryRaw<
+      { due: boolean }[]
+    >`SELECT next_attempt_at<=clock_timestamp() AS due FROM "CommunityTokenDelivery" WHERE id=${f.delivery.id}::uuid`
+    expect(schedule?.due).toBe(true)
+    await h.worker.dispatch()
+    const delivery = await h.prisma.communityTokenDelivery.findUniqueOrThrow({
+      where: { id: f.delivery.id },
+      include: { attempts: { select: { status: true, reason: true } } },
+    })
+    expect(
+      await h.ledger(),
+      JSON.stringify({ status: delivery.status, attempts: delivery.attempts })
+    ).toHaveLength(1)
+    expect(delivery).toMatchObject({ status: 'accepted' })
+  }, 10_000)
+  it('parent recorder sends nothing before its delivery is due on the database clock', async () => {
+    const f = await h.fixture()
+    await h.prisma
+      .$executeRaw`UPDATE "CommunityTokenDelivery" SET next_attempt_at=clock_timestamp()+interval '1 minute' WHERE id=${f.delivery.id}::uuid`
+    await h.worker.dispatch()
+    expect(await h.ledger()).toHaveLength(0)
+    await h.prisma
+      .$executeRaw`UPDATE "CommunityTokenDelivery" SET next_attempt_at=clock_timestamp()-interval '1 second' WHERE id=${f.delivery.id}::uuid`
     await h.worker.dispatch()
     expect(await h.ledger()).toHaveLength(1)
-    expect(
-      await h.prisma.communityTokenDelivery.findUniqueOrThrow({
-        where: { id: f.delivery.id },
-      })
-    ).toMatchObject({ status: 'accepted' })
   }, 10_000)
   it.each(['actor', 'recipient', 'author', 'parentAuthor'] as const)(
     'erasure of linked %s wins after the durable claim and before final authorization',

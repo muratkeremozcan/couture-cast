@@ -267,12 +267,20 @@ const termsFileSchema = z.object({
   entries: z.array(termEntrySchema).min(1),
 })
 
+const literalContextSchema = z.object({
+  terms: z.array(z.string().regex(/^\p{L}+$/u)).min(1),
+  objects: z.array(z.string().regex(/^\p{L}+$/u)).min(1),
+  connectors: z.array(z.string().regex(/^\p{L}+$/u)),
+  maxDistance: z.number().int().min(1).max(6),
+})
+
 const allowFileSchema = z.object({
   language: z.enum(SCREENING_LANGUAGES),
   listVersion: z.string().trim().min(1),
   listType: z.literal('allowList'),
   provenance: provenanceSchema,
   entries: z.array(z.string().trim().min(1)),
+  literalContexts: z.array(literalContextSchema).default([]),
 })
 
 /**
@@ -500,16 +508,33 @@ function collapseRepeats(value: string): string {
  * second collapse the two never met, and Story 6.2b's corpus found five such
  * leet spellings that published (`f r 3 5 s e`, `p 1 5 s e r`, `u n d r 3 5 s i n g`).
  */
-function toLeetClassForm(value: string): string {
+function toLeetRunForm(value: string): string {
   let classed = ''
   for (const character of value) {
     classed += LEET_CLASSES[character] ?? character
   }
-  return collapseRepeats(classed)
+  return classed
+}
+
+function toLeetClassForm(value: string): string {
+  return collapseRepeats(toLeetRunForm(value))
 }
 
 function tokenize(value: string): string[] {
   return value.split(TOKEN_SPLIT_PATTERN).filter(Boolean)
+}
+
+function connectedLiteralTokens(
+  literal: string,
+  spans: readonly RegExpMatchArray[],
+  at: number,
+  neighbor: number
+): boolean {
+  const left = spans[Math.min(at, neighbor)]
+  const right = spans[Math.max(at, neighbor)]
+  if (!left || !right) return false
+  const gap = literal.slice((left.index ?? 0) + left[0].length, right.index)
+  return /^[\p{Zs}\t,'’-]*$/u.test(gap)
 }
 
 function observeScripts(literal: string): string[] {
@@ -526,6 +551,45 @@ interface TermMeta {
   readonly severity: TextScreeningSeverity
 }
 
+interface TermVariant {
+  readonly form: string
+  readonly meta: TermMeta
+}
+
+type RunIndex = ReadonlyMap<string, readonly TermVariant[]>
+
+/** Repetition can lengthen a canonical run; it cannot supply a missing letter. */
+function isRunExpansion(candidate: string, canonical: string): boolean {
+  const candidateRuns = candidate.match(/(.)\1*/gu) ?? []
+  const canonicalRuns = canonical.match(/(.)\1*/gu) ?? []
+  return (
+    candidateRuns.length === canonicalRuns.length &&
+    canonicalRuns.every((run, index) => {
+      const actual = candidateRuns[index] as string
+      return actual[0] === run[0] && actual.length >= run.length
+    })
+  )
+}
+
+function indexRun(index: Map<string, TermVariant[]>, form: string, meta: TermMeta): void {
+  const key = collapseRepeats(form)
+  const variants = index.get(key) ?? []
+  variants.push({ form, meta })
+  index.set(key, variants)
+}
+
+function matchRun(index: RunIndex, candidate: string): TermMeta | undefined {
+  let worst: TermMeta | undefined
+  for (const variant of index.get(collapseRepeats(candidate)) ?? []) {
+    if (
+      isRunExpansion(candidate, variant.form) &&
+      (!worst || SEVERITY_RANK[variant.meta.severity] > SEVERITY_RANK[worst.severity])
+    )
+      worst = variant.meta
+  }
+  return worst
+}
+
 interface PhraseEntry {
   readonly tokens: readonly string[]
   readonly collapsed: readonly string[]
@@ -538,16 +602,16 @@ interface LanguageIndex {
   readonly listVersion: string
   readonly longestSingleTerm: number
   readonly single: ReadonlyMap<string, TermMeta>
-  readonly singleCollapsed: ReadonlyMap<string, TermMeta>
-  readonly singleLeet: ReadonlyMap<string, TermMeta>
+  readonly singleCollapsed: RunIndex
+  readonly singleLeet: RunIndex
   readonly phrases: readonly PhraseEntry[]
   /**
    * Each phrase's repeat-collapsed concatenation, for the re-split pass: the
    * same letters as the phrase, cut into tokens at different places.
    */
-  readonly phraseConcatenations: ReadonlyMap<string, TermMeta>
+  readonly phraseConcatenations: RunIndex
   /** The same concatenations in leet-class form, for a re-split phrase written in leet. */
-  readonly phraseLeetConcatenations: ReadonlyMap<string, TermMeta>
+  readonly phraseLeetConcatenations: RunIndex
   /** Each phrase's own collapsed tokens joined by a space, which that pass skips. */
   readonly phraseForms: ReadonlySet<string>
 }
@@ -641,8 +705,8 @@ function indexSingleTerm(
   language: ScreeningLanguage,
   allowSingles: ReadonlySet<string>,
   single: Map<string, TermMeta>,
-  singleCollapsed: Map<string, TermMeta>,
-  singleLeet: Map<string, TermMeta>
+  singleCollapsed: Map<string, TermVariant[]>,
+  singleLeet: Map<string, TermVariant[]>
 ): void {
   single.set(term, meta)
   const collapsed = collapseRepeats(term)
@@ -655,8 +719,8 @@ function indexSingleTerm(
       `${language} has a term that collapses to under ${MIN_SINGLE_TERM_LENGTH} characters, which needs that collapsed spelling on an allow list or a reviewed exception before it can be indexed`
     )
   }
-  singleCollapsed.set(collapsed, meta)
-  singleLeet.set(toLeetClassForm(collapsed), meta)
+  indexRun(singleCollapsed, term, meta)
+  indexRun(singleLeet, toLeetRunForm(term), meta)
 }
 
 function buildLanguageIndex(
@@ -665,11 +729,11 @@ function buildLanguageIndex(
   allowSingles: ReadonlySet<string>
 ): LanguageIndex {
   const single = new Map<string, TermMeta>()
-  const singleCollapsed = new Map<string, TermMeta>()
-  const singleLeet = new Map<string, TermMeta>()
+  const singleCollapsed = new Map<string, TermVariant[]>()
+  const singleLeet = new Map<string, TermVariant[]>()
   const phrases: PhraseEntry[] = []
-  const phraseConcatenations = new Map<string, TermMeta>()
-  const phraseLeetConcatenations = new Map<string, TermMeta>()
+  const phraseConcatenations = new Map<string, TermVariant[]>()
+  const phraseLeetConcatenations = new Map<string, TermVariant[]>()
   const phraseForms = new Set<string>()
 
   for (const entry of list.entries) {
@@ -695,11 +759,8 @@ function buildLanguageIndex(
         leet: collapsedTokens.map(toLeetClassForm),
         meta,
       })
-      phraseConcatenations.set(collapseRepeats(foldedTokens.join('')), meta)
-      phraseLeetConcatenations.set(
-        toLeetClassForm(collapseRepeats(foldedTokens.join(''))),
-        meta
-      )
+      indexRun(phraseConcatenations, foldedTokens.join(''), meta)
+      indexRun(phraseLeetConcatenations, toLeetRunForm(foldedTokens.join('')), meta)
       phraseForms.add(collapsedTokens.join(' '))
       // A phrase also has to be findable with its spaces gone. `killyourself`
       // written as one word, or spelled out letter by letter, arrives as a
@@ -773,8 +834,19 @@ function matchPhraseWindow(
   for (let offset = 0; offset < phrase.collapsed.length; offset += 1) {
     const at = start + offset
     if (forms.allowed[at]) return null
-    if (forms.collapsedTokens[at] !== phrase.collapsed[offset]) collapsedHit = false
-    if (forms.leetTokens[at] !== phrase.leet[offset]) leetHit = false
+    if (
+      forms.collapsedTokens[at] !== phrase.collapsed[offset] ||
+      !isRunExpansion(forms.foldedTokens[at] as string, phrase.tokens[offset] as string)
+    )
+      collapsedHit = false
+    if (
+      forms.leetTokens[at] !== phrase.leet[offset] ||
+      !isRunExpansion(
+        toLeetRunForm(forms.foldedTokens[at] as string),
+        toLeetRunForm(phrase.tokens[offset] as string)
+      )
+    )
+      leetHit = false
     if (forms.foldedTokens[at] !== phrase.tokens[offset]) exact = false
     if (forms.carriesLeet[at]) leetPresent = true
   }
@@ -861,6 +933,7 @@ export class CommunityTextScreener {
   private readonly indexes: readonly LanguageIndex[]
   private readonly allowSingles: ReadonlySet<string>
   private readonly allowPhrases: readonly string[][]
+  private readonly literalContexts: readonly z.infer<typeof literalContextSchema>[]
   private readonly listVersions: Readonly<Record<string, string>>
   private readonly loadedLanguages: readonly ScreeningLanguage[]
   private readonly englishFilter: Filter
@@ -936,6 +1009,7 @@ export class CommunityTextScreener {
     }
     this.allowSingles = allowSingles
     this.allowPhrases = allowPhrases
+    this.literalContexts = allowLists.flatMap((list) => list.literalContexts ?? [])
 
     this.indexes = termLists.map((list) =>
       buildLanguageIndex(list, this.policy, allowSingles)
@@ -965,7 +1039,10 @@ export class CommunityTextScreener {
   private assertDeliberateReviewTerms(): void {
     for (const entry of this.policy.deliberateReviewTerms ?? []) {
       const literal = toLiteralForm(entry.term)
-      if (this.allowSingles.has(literal)) {
+      if (
+        this.allowSingles.has(literal) ||
+        this.literalContexts.some((context) => context.terms.includes(literal))
+      ) {
         throw new CommunityTextScreenerConfigError(
           'a deliberate review term is allow-listed, which would silently reverse the policy decision'
         )
@@ -1012,6 +1089,7 @@ export class CommunityTextScreener {
     const allowed = literalTokens.map(
       (token, index) => this.allowSingles.has(token) || (phraseAllowed[index] as boolean)
     )
+    this.markLiteralContexts(literal, literalTokens, allowed)
 
     for (const outcome of this.collectMatches(
       literalTokens,
@@ -1103,6 +1181,37 @@ export class CommunityTextScreener {
         if (!matches) continue
         for (let offset = 0; offset < phrase.length; offset += 1) {
           allowed[start + offset] = true
+        }
+      }
+    }
+  }
+
+  /** Clear only an exact ordinary homograph within a bounded literal clause.
+   * Object and connector tokens remain screened, as do all multi-word terms.
+   */
+  private markLiteralContexts(
+    literal: string,
+    tokens: readonly string[],
+    allowed: boolean[]
+  ): void {
+    const spans = [...literal.matchAll(/[\p{L}\p{N}]+/gu)]
+    for (let position = 0; position < tokens.length; position++) {
+      for (const context of this.literalContexts) {
+        if (!context.terms.includes(tokens[position] as string)) continue
+        for (const direction of [-1, 1]) {
+          for (let distance = 1; distance <= context.maxDistance; distance++) {
+            const at = position + direction * distance
+            const token = tokens[at]
+            if (token === undefined) break
+            if (!connectedLiteralTokens(literal, spans, at, at - direction)) break
+            if (context.objects.includes(token)) {
+              // A preceding object needs an assembly connector ("fibbia da
+              // montare"); a bare verb after a noun is not that construction.
+              if (direction === 1 || distance > 1) allowed[position] = true
+              break
+            }
+            if (!context.connectors.includes(token)) break
+          }
         }
       }
     }
@@ -1229,20 +1338,22 @@ export class CommunityTextScreener {
         end += 1
       ) {
         if (allowed[end]) break
-        joined = collapseRepeats(joined + (collapsed[end] as string))
+        joined += foldedTokens[end] as string
         leetInWindow = leetInWindow || (carriesLeet[end] as boolean)
-        if (joined.length > this.longestTerm) break
+        if (collapseRepeats(joined).length > this.longestTerm) break
         if (end === start) continue
         // Story 6.2b review (EC5): `k1ll yours elf` and `bl0 wjob` published,
         // because the re-split pass compared repeat-collapsed letters only. The
         // leet-class comparison runs only when the window carries a digit or
         // symbol, the same gate the single-token pass uses.
-        const leetJoined = leetInWindow ? toLeetClassForm(joined) : null
+        const leetJoined = leetInWindow ? toLeetRunForm(joined) : null
         const meta =
-          this.worstAcross((index) => index.phraseConcatenations.get(joined)) ??
+          this.worstAcross((index) => matchRun(index.phraseConcatenations, joined)) ??
           (leetJoined === null
             ? null
-            : this.worstAcross((index) => index.phraseLeetConcatenations.get(leetJoined)))
+            : this.worstAcross((index) =>
+                matchRun(index.phraseLeetConcatenations, leetJoined)
+              ))
         if (!meta) continue
         const form = collapsed.slice(start, end + 1).join(' ')
         if (this.indexes.some((index) => index.phraseForms.has(form))) continue
@@ -1313,14 +1424,14 @@ export class CommunityTextScreener {
 
     const collapsed = collapseRepeats(folded)
     if (!budget.spend(collapsed)) return null
-    const repeated = this.worstAcross((index) => index.singleCollapsed.get(collapsed))
+    const repeated = this.worstAcross((index) => matchRun(index.singleCollapsed, folded))
     if (repeated) return { meta: repeated, obfuscated: true }
 
     if (!hasLeetCharacter) return null
 
-    const classed = toLeetClassForm(collapsed)
+    const classed = toLeetRunForm(folded)
     if (!budget.spend(classed)) return null
-    const leet = this.worstAcross((index) => index.singleLeet.get(classed))
+    const leet = this.worstAcross((index) => matchRun(index.singleLeet, classed))
     if (leet) return { meta: leet, obfuscated: true }
 
     return null

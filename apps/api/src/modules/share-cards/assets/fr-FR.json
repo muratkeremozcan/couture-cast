@@ -1,0 +1,26 @@
+{
+  "outfit": "Tenue",
+  "community": "Look de la communauté",
+  "scenarios": {
+    "morning": "Matin",
+    "midday": "Midi",
+    "evening": "Soir"
+  },
+  "categories": {
+    "top": "Haut",
+    "bottom": "Bas",
+    "outerwear": "Manteau",
+    "dress": "Robe",
+    "shoes": "Chaussures",
+    "accessory": "Accessoire"
+  },
+  "climateBands": {
+    "cold_dry": "Froid et sec",
+    "cold_wet": "Froid et humide",
+    "temperate_dry": "Tempéré et sec",
+    "temperate_wet": "Tempéré et humide",
+    "warm_dry": "Chaud et sec",
+    "warm_wet": "Chaud et humide"
+  },
+  "watermarkRole": "Filigrane"
+}

@@ -1,3 +1,4 @@
+import { isShareCardNativeFixtureUrl } from '@/src/lib/share-card-native-fixture-url'
 // Story 6.5: system links Expo Router must not turn into screens.
 import { isNativeNotificationFixtureUrl } from '@/src/lib/native-notification-fixture'
 
@@ -14,6 +15,7 @@ export function redirectSystemPath({
   path: string
   initial: boolean
 }) {
-  if (isNativeNotificationFixtureUrl(path)) return initial ? '/' : ''
+  if (isNativeNotificationFixtureUrl(path) || isShareCardNativeFixtureUrl(path))
+    return initial ? '/' : ''
   return path
 }

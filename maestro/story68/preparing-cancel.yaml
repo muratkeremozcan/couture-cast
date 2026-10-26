@@ -1,0 +1,24 @@
+appId: ${MAESTRO_APP_ID}
+---
+- tapOn:
+    id: tab-wardrobe
+- tapOn:
+    id: tab-home
+- scrollUntilVisible:
+    element:
+      id: outfit-share-card-open
+    direction: DOWN
+    timeout: 30000
+    centerElement: true
+- tapOn:
+    id: outfit-share-card-open
+    index: 0
+- extendedWaitUntil:
+    visible: ${MAESTRO_PREPARING}
+    timeout: 10000
+- assertNotVisible:
+    id: share-card-preview-loaded-.*
+- tapOn:
+    id: share-card-cancel
+- assertNotVisible:
+    id: share-card-title

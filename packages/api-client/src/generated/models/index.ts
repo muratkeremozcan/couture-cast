@@ -10272,6 +10272,565 @@ export type PremiumThemeResponseDataThemeEnum =
 /**
  *
  * @export
+ * @interface PrepareShareCard200Response
+ */
+export interface PrepareShareCard200Response {
+  /**
+   *
+   * @type {PrepareShareCard200ResponseData}
+   * @memberof PrepareShareCard200Response
+   */
+  data: PrepareShareCard200ResponseData
+}
+/**
+ *
+ * @export
+ * @interface PrepareShareCard200ResponseData
+ */
+export interface PrepareShareCard200ResponseData {
+  /**
+   *
+   * @type {string}
+   * @memberof PrepareShareCard200ResponseData
+   */
+  pngBase64: string
+  /**
+   *
+   * @type {string}
+   * @memberof PrepareShareCard200ResponseData
+   */
+  accessibilityLabel: string
+  /**
+   *
+   * @type {string}
+   * @memberof PrepareShareCard200ResponseData
+   */
+  sha256: string
+  /**
+   *
+   * @type {PrepareShareCard200ResponseDataWidthEnum}
+   * @memberof PrepareShareCard200ResponseData
+   */
+  width: PrepareShareCard200ResponseDataWidthEnum
+  /**
+   *
+   * @type {PrepareShareCard200ResponseDataHeightEnum}
+   * @memberof PrepareShareCard200ResponseData
+   */
+  height: PrepareShareCard200ResponseDataHeightEnum
+  /**
+   *
+   * @type {PrepareShareCard200ResponseDataMimeTypeEnum}
+   * @memberof PrepareShareCard200ResponseData
+   */
+  mimeType: PrepareShareCard200ResponseDataMimeTypeEnum
+  /**
+   *
+   * @type {PrepareShareCard200ResponseDataFilenameEnum}
+   * @memberof PrepareShareCard200ResponseData
+   */
+  filename: PrepareShareCard200ResponseDataFilenameEnum
+  /**
+   *
+   * @type {PrepareShareCard200ResponseDataTemplateVersionEnum}
+   * @memberof PrepareShareCard200ResponseData
+   */
+  templateVersion: PrepareShareCard200ResponseDataTemplateVersionEnum
+}
+
+/**
+ * @export
+ */
+export const PrepareShareCard200ResponseDataWidthEnum = {
+  NUMBER_1080: 1080,
+} as const
+export type PrepareShareCard200ResponseDataWidthEnum =
+  (typeof PrepareShareCard200ResponseDataWidthEnum)[keyof typeof PrepareShareCard200ResponseDataWidthEnum]
+
+/**
+ * @export
+ */
+export const PrepareShareCard200ResponseDataHeightEnum = {
+  NUMBER_1350: 1350,
+} as const
+export type PrepareShareCard200ResponseDataHeightEnum =
+  (typeof PrepareShareCard200ResponseDataHeightEnum)[keyof typeof PrepareShareCard200ResponseDataHeightEnum]
+
+/**
+ * @export
+ */
+export const PrepareShareCard200ResponseDataMimeTypeEnum = {
+  image_png: 'image/png',
+} as const
+export type PrepareShareCard200ResponseDataMimeTypeEnum =
+  (typeof PrepareShareCard200ResponseDataMimeTypeEnum)[keyof typeof PrepareShareCard200ResponseDataMimeTypeEnum]
+
+/**
+ * @export
+ */
+export const PrepareShareCard200ResponseDataFilenameEnum = {
+  couturecast_card_png: 'couturecast-card.png',
+} as const
+export type PrepareShareCard200ResponseDataFilenameEnum =
+  (typeof PrepareShareCard200ResponseDataFilenameEnum)[keyof typeof PrepareShareCard200ResponseDataFilenameEnum]
+
+/**
+ * @export
+ */
+export const PrepareShareCard200ResponseDataTemplateVersionEnum = {
+  NUMBER_1: 1,
+} as const
+export type PrepareShareCard200ResponseDataTemplateVersionEnum =
+  (typeof PrepareShareCard200ResponseDataTemplateVersionEnum)[keyof typeof PrepareShareCard200ResponseDataTemplateVersionEnum]
+
+/**
+ * @type PrepareShareCardInput
+ *
+ * @export
+ */
+export type PrepareShareCardInput =
+  | PrepareShareCardInputOneOf
+  | PrepareShareCardRequestOneOf1
+/**
+ *
+ * @export
+ * @interface PrepareShareCardInputOneOf
+ */
+export interface PrepareShareCardInputOneOf {
+  /**
+   *
+   * @type {PrepareShareCardRequestOneOf1Source}
+   * @memberof PrepareShareCardInputOneOf
+   */
+  source: PrepareShareCardRequestOneOf1Source
+  /**
+   *
+   * @type {PrepareShareCardInputOneOfLocaleEnum}
+   * @memberof PrepareShareCardInputOneOf
+   */
+  locale: PrepareShareCardInputOneOfLocaleEnum
+  /**
+   *
+   * @type {boolean}
+   * @memberof PrepareShareCardInputOneOf
+   */
+  watermark: boolean
+  /**
+   *
+   * @type {PrepareShareCardInputOneOfPurposeEnum}
+   * @memberof PrepareShareCardInputOneOf
+   */
+  purpose: PrepareShareCardInputOneOfPurposeEnum
+}
+
+/**
+ * @export
+ */
+export const PrepareShareCardInputOneOfLocaleEnum = {
+  en_US: 'en-US',
+  en_CA: 'en-CA',
+  es_419: 'es-419',
+  fr_CA: 'fr-CA',
+  fr_FR: 'fr-FR',
+  tr_TR: 'tr-TR',
+  de_DE: 'de-DE',
+  it_IT: 'it-IT',
+  pt_BR: 'pt-BR',
+  pt_PT: 'pt-PT',
+} as const
+export type PrepareShareCardInputOneOfLocaleEnum =
+  (typeof PrepareShareCardInputOneOfLocaleEnum)[keyof typeof PrepareShareCardInputOneOfLocaleEnum]
+
+/**
+ * @export
+ */
+export const PrepareShareCardInputOneOfPurposeEnum = {
+  preview: 'preview',
+} as const
+export type PrepareShareCardInputOneOfPurposeEnum =
+  (typeof PrepareShareCardInputOneOfPurposeEnum)[keyof typeof PrepareShareCardInputOneOfPurposeEnum]
+
+/**
+ * @type PrepareShareCardRequest
+ *
+ * @export
+ */
+export type PrepareShareCardRequest =
+  | PrepareShareCardRequestOneOf
+  | PrepareShareCardRequestOneOf1
+/**
+ *
+ * @export
+ * @interface PrepareShareCardRequestOneOf
+ */
+export interface PrepareShareCardRequestOneOf {
+  /**
+   *
+   * @type {PrepareShareCardRequestOneOfSource}
+   * @memberof PrepareShareCardRequestOneOf
+   */
+  source: PrepareShareCardRequestOneOfSource
+  /**
+   *
+   * @type {PrepareShareCardRequestOneOfLocaleEnum}
+   * @memberof PrepareShareCardRequestOneOf
+   */
+  locale: PrepareShareCardRequestOneOfLocaleEnum
+  /**
+   *
+   * @type {boolean}
+   * @memberof PrepareShareCardRequestOneOf
+   */
+  watermark: boolean
+  /**
+   *
+   * @type {PrepareShareCardRequestOneOfPurposeEnum}
+   * @memberof PrepareShareCardRequestOneOf
+   */
+  purpose: PrepareShareCardRequestOneOfPurposeEnum
+}
+
+/**
+ * @export
+ */
+export const PrepareShareCardRequestOneOfLocaleEnum = {
+  en_US: 'en-US',
+  en_CA: 'en-CA',
+  es_419: 'es-419',
+  fr_CA: 'fr-CA',
+  fr_FR: 'fr-FR',
+  tr_TR: 'tr-TR',
+  de_DE: 'de-DE',
+  it_IT: 'it-IT',
+  pt_BR: 'pt-BR',
+  pt_PT: 'pt-PT',
+} as const
+export type PrepareShareCardRequestOneOfLocaleEnum =
+  (typeof PrepareShareCardRequestOneOfLocaleEnum)[keyof typeof PrepareShareCardRequestOneOfLocaleEnum]
+
+/**
+ * @export
+ */
+export const PrepareShareCardRequestOneOfPurposeEnum = {
+  preview: 'preview',
+} as const
+export type PrepareShareCardRequestOneOfPurposeEnum =
+  (typeof PrepareShareCardRequestOneOfPurposeEnum)[keyof typeof PrepareShareCardRequestOneOfPurposeEnum]
+
+/**
+ *
+ * @export
+ * @interface PrepareShareCardRequestOneOf1
+ */
+export interface PrepareShareCardRequestOneOf1 {
+  /**
+   *
+   * @type {PrepareShareCardRequestOneOf1Source}
+   * @memberof PrepareShareCardRequestOneOf1
+   */
+  source: PrepareShareCardRequestOneOf1Source
+  /**
+   *
+   * @type {PrepareShareCardRequestOneOf1LocaleEnum}
+   * @memberof PrepareShareCardRequestOneOf1
+   */
+  locale: PrepareShareCardRequestOneOf1LocaleEnum
+  /**
+   *
+   * @type {boolean}
+   * @memberof PrepareShareCardRequestOneOf1
+   */
+  watermark: boolean
+  /**
+   *
+   * @type {PrepareShareCardRequestOneOf1PurposeEnum}
+   * @memberof PrepareShareCardRequestOneOf1
+   */
+  purpose: PrepareShareCardRequestOneOf1PurposeEnum
+  /**
+   *
+   * @type {string}
+   * @memberof PrepareShareCardRequestOneOf1
+   */
+  expectedSha256: string
+}
+
+/**
+ * @export
+ */
+export const PrepareShareCardRequestOneOf1LocaleEnum = {
+  en_US: 'en-US',
+  en_CA: 'en-CA',
+  es_419: 'es-419',
+  fr_CA: 'fr-CA',
+  fr_FR: 'fr-FR',
+  tr_TR: 'tr-TR',
+  de_DE: 'de-DE',
+  it_IT: 'it-IT',
+  pt_BR: 'pt-BR',
+  pt_PT: 'pt-PT',
+} as const
+export type PrepareShareCardRequestOneOf1LocaleEnum =
+  (typeof PrepareShareCardRequestOneOf1LocaleEnum)[keyof typeof PrepareShareCardRequestOneOf1LocaleEnum]
+
+/**
+ * @export
+ */
+export const PrepareShareCardRequestOneOf1PurposeEnum = {
+  save: 'save',
+} as const
+export type PrepareShareCardRequestOneOf1PurposeEnum =
+  (typeof PrepareShareCardRequestOneOf1PurposeEnum)[keyof typeof PrepareShareCardRequestOneOf1PurposeEnum]
+
+/**
+ * @type PrepareShareCardRequestOneOf1Source
+ *
+ * @export
+ */
+export type PrepareShareCardRequestOneOf1Source =
+  | PrepareShareCardRequestOneOf1SourceOneOf
+  | PrepareShareCardRequestOneOf1SourceOneOf1
+/**
+ *
+ * @export
+ * @interface PrepareShareCardRequestOneOf1SourceOneOf
+ */
+export interface PrepareShareCardRequestOneOf1SourceOneOf {
+  /**
+   *
+   * @type {PrepareShareCardRequestOneOf1SourceOneOfKindEnum}
+   * @memberof PrepareShareCardRequestOneOf1SourceOneOf
+   */
+  kind: PrepareShareCardRequestOneOf1SourceOneOfKindEnum
+  /**
+   *
+   * @type {string}
+   * @memberof PrepareShareCardRequestOneOf1SourceOneOf
+   */
+  recommendationId: string
+}
+
+/**
+ * @export
+ */
+export const PrepareShareCardRequestOneOf1SourceOneOfKindEnum = {
+  outfit: 'outfit',
+} as const
+export type PrepareShareCardRequestOneOf1SourceOneOfKindEnum =
+  (typeof PrepareShareCardRequestOneOf1SourceOneOfKindEnum)[keyof typeof PrepareShareCardRequestOneOf1SourceOneOfKindEnum]
+
+/**
+ *
+ * @export
+ * @interface PrepareShareCardRequestOneOf1SourceOneOf1
+ */
+export interface PrepareShareCardRequestOneOf1SourceOneOf1 {
+  /**
+   *
+   * @type {PrepareShareCardRequestOneOf1SourceOneOf1KindEnum}
+   * @memberof PrepareShareCardRequestOneOf1SourceOneOf1
+   */
+  kind: PrepareShareCardRequestOneOf1SourceOneOf1KindEnum
+  /**
+   *
+   * @type {string}
+   * @memberof PrepareShareCardRequestOneOf1SourceOneOf1
+   */
+  postId: string
+}
+
+/**
+ * @export
+ */
+export const PrepareShareCardRequestOneOf1SourceOneOf1KindEnum = {
+  community_post: 'community_post',
+} as const
+export type PrepareShareCardRequestOneOf1SourceOneOf1KindEnum =
+  (typeof PrepareShareCardRequestOneOf1SourceOneOf1KindEnum)[keyof typeof PrepareShareCardRequestOneOf1SourceOneOf1KindEnum]
+
+/**
+ * @type PrepareShareCardRequestOneOfSource
+ *
+ * @export
+ */
+export type PrepareShareCardRequestOneOfSource =
+  | PrepareShareCardRequestOneOfSourceOneOf
+  | PrepareShareCardRequestOneOfSourceOneOf1
+/**
+ *
+ * @export
+ * @interface PrepareShareCardRequestOneOfSourceOneOf
+ */
+export interface PrepareShareCardRequestOneOfSourceOneOf {
+  /**
+   *
+   * @type {PrepareShareCardRequestOneOfSourceOneOfKindEnum}
+   * @memberof PrepareShareCardRequestOneOfSourceOneOf
+   */
+  kind: PrepareShareCardRequestOneOfSourceOneOfKindEnum
+  /**
+   *
+   * @type {string}
+   * @memberof PrepareShareCardRequestOneOfSourceOneOf
+   */
+  recommendationId: string
+}
+
+/**
+ * @export
+ */
+export const PrepareShareCardRequestOneOfSourceOneOfKindEnum = {
+  outfit: 'outfit',
+} as const
+export type PrepareShareCardRequestOneOfSourceOneOfKindEnum =
+  (typeof PrepareShareCardRequestOneOfSourceOneOfKindEnum)[keyof typeof PrepareShareCardRequestOneOfSourceOneOfKindEnum]
+
+/**
+ *
+ * @export
+ * @interface PrepareShareCardRequestOneOfSourceOneOf1
+ */
+export interface PrepareShareCardRequestOneOfSourceOneOf1 {
+  /**
+   *
+   * @type {PrepareShareCardRequestOneOfSourceOneOf1KindEnum}
+   * @memberof PrepareShareCardRequestOneOfSourceOneOf1
+   */
+  kind: PrepareShareCardRequestOneOfSourceOneOf1KindEnum
+  /**
+   *
+   * @type {string}
+   * @memberof PrepareShareCardRequestOneOfSourceOneOf1
+   */
+  postId: string
+}
+
+/**
+ * @export
+ */
+export const PrepareShareCardRequestOneOfSourceOneOf1KindEnum = {
+  community_post: 'community_post',
+} as const
+export type PrepareShareCardRequestOneOfSourceOneOf1KindEnum =
+  (typeof PrepareShareCardRequestOneOfSourceOneOf1KindEnum)[keyof typeof PrepareShareCardRequestOneOfSourceOneOf1KindEnum]
+
+/**
+ *
+ * @export
+ * @interface PrepareShareCardResponse
+ */
+export interface PrepareShareCardResponse {
+  /**
+   *
+   * @type {PrepareShareCardResponseData}
+   * @memberof PrepareShareCardResponse
+   */
+  data: PrepareShareCardResponseData
+}
+/**
+ *
+ * @export
+ * @interface PrepareShareCardResponseData
+ */
+export interface PrepareShareCardResponseData {
+  /**
+   *
+   * @type {string}
+   * @memberof PrepareShareCardResponseData
+   */
+  pngBase64: string
+  /**
+   *
+   * @type {string}
+   * @memberof PrepareShareCardResponseData
+   */
+  accessibilityLabel: string
+  /**
+   *
+   * @type {string}
+   * @memberof PrepareShareCardResponseData
+   */
+  sha256: string
+  /**
+   *
+   * @type {PrepareShareCardResponseDataWidthEnum}
+   * @memberof PrepareShareCardResponseData
+   */
+  width: PrepareShareCardResponseDataWidthEnum
+  /**
+   *
+   * @type {PrepareShareCardResponseDataHeightEnum}
+   * @memberof PrepareShareCardResponseData
+   */
+  height: PrepareShareCardResponseDataHeightEnum
+  /**
+   *
+   * @type {PrepareShareCardResponseDataMimeTypeEnum}
+   * @memberof PrepareShareCardResponseData
+   */
+  mimeType: PrepareShareCardResponseDataMimeTypeEnum
+  /**
+   *
+   * @type {PrepareShareCardResponseDataFilenameEnum}
+   * @memberof PrepareShareCardResponseData
+   */
+  filename: PrepareShareCardResponseDataFilenameEnum
+  /**
+   *
+   * @type {PrepareShareCardResponseDataTemplateVersionEnum}
+   * @memberof PrepareShareCardResponseData
+   */
+  templateVersion: PrepareShareCardResponseDataTemplateVersionEnum
+}
+
+/**
+ * @export
+ */
+export const PrepareShareCardResponseDataWidthEnum = {
+  NUMBER_1080: 1080,
+} as const
+export type PrepareShareCardResponseDataWidthEnum =
+  (typeof PrepareShareCardResponseDataWidthEnum)[keyof typeof PrepareShareCardResponseDataWidthEnum]
+
+/**
+ * @export
+ */
+export const PrepareShareCardResponseDataHeightEnum = {
+  NUMBER_1350: 1350,
+} as const
+export type PrepareShareCardResponseDataHeightEnum =
+  (typeof PrepareShareCardResponseDataHeightEnum)[keyof typeof PrepareShareCardResponseDataHeightEnum]
+
+/**
+ * @export
+ */
+export const PrepareShareCardResponseDataMimeTypeEnum = {
+  image_png: 'image/png',
+} as const
+export type PrepareShareCardResponseDataMimeTypeEnum =
+  (typeof PrepareShareCardResponseDataMimeTypeEnum)[keyof typeof PrepareShareCardResponseDataMimeTypeEnum]
+
+/**
+ * @export
+ */
+export const PrepareShareCardResponseDataFilenameEnum = {
+  couturecast_card_png: 'couturecast-card.png',
+} as const
+export type PrepareShareCardResponseDataFilenameEnum =
+  (typeof PrepareShareCardResponseDataFilenameEnum)[keyof typeof PrepareShareCardResponseDataFilenameEnum]
+
+/**
+ * @export
+ */
+export const PrepareShareCardResponseDataTemplateVersionEnum = {
+  NUMBER_1: 1,
+} as const
+export type PrepareShareCardResponseDataTemplateVersionEnum =
+  (typeof PrepareShareCardResponseDataTemplateVersionEnum)[keyof typeof PrepareShareCardResponseDataTemplateVersionEnum]
+
+/**
+ *
+ * @export
  * @interface PublishCommunityPostInput
  */
 export interface PublishCommunityPostInput {

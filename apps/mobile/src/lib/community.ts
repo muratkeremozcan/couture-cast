@@ -1,3 +1,4 @@
+import { Platform } from 'react-native'
 import {
   communityCommentsClient,
   communitySyncClient,
@@ -487,12 +488,16 @@ export async function pickCommunityPhoto(): Promise<CommunityPhotoAsset | null> 
     )
   }
 
-  const permission = await imagePicker.requestMediaLibraryPermissionsAsync()
-  if (!permission.granted) {
-    throw new CommunityRequestError(
-      'permission_denied',
-      'Photo library permission was not granted.'
-    )
+  // Supported iOS versions use PHPicker, which grants access only to the
+  // member's explicit selection and needs no broad photo-library permission.
+  if (Platform.OS !== 'ios') {
+    const permission = await imagePicker.requestMediaLibraryPermissionsAsync()
+    if (!permission.granted) {
+      throw new CommunityRequestError(
+        'permission_denied',
+        'Photo library permission was not granted.'
+      )
+    }
   }
 
   let result

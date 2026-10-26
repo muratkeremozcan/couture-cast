@@ -3,7 +3,8 @@
   "functions": {
     "api/index.ts": {
       "maxDuration": 25,
-      "memory": 1024
+      "memory": 1024,
+      "includeFiles": "dist/src/modules/share-cards/assets/**"
     },
     "api/realtime.ts": {
       "maxDuration": 300,

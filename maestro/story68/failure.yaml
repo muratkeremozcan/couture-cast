@@ -1,0 +1,11 @@
+appId: ${MAESTRO_APP_ID}
+---
+- tapOn:
+    id: share-card-save
+- extendedWaitUntil:
+    visible: ${MAESTRO_FAILURE}
+    timeout: 20000
+- assertVisible:
+    id: share-card-preview-loaded-.*
+- assertVisible:
+    id: share-card-cancel

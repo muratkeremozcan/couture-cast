@@ -111,6 +111,58 @@ function next<T>(socket: Socket, event: string): Promise<T> {
 }
 
 describe('Story 6.5 real local websocket-only transport with isolated fixture auth', () => {
+  it('uses all five bounded authorization slots and keeps the sixth real handshake queued', async () => {
+    const member = await fixture()
+    const releases: (() => void)[] = []
+    let gated = true
+    let active = 0
+    let maximum = 0
+    const authorize = vi.fn(async () => {
+      active++
+      maximum = Math.max(maximum, active)
+      try {
+        if (gated) await new Promise<void>((resolve) => releases.push(resolve))
+        return {
+          value: true,
+          expiresAt: new Date(Date.now() + 60_000),
+          validUntil: performance.now() + 60_000,
+        }
+      } finally {
+        active--
+      }
+    })
+    const runtime = createCommunityRealtimeServer(() =>
+      Promise.resolve({
+        prisma,
+        identity: new AccessTokenIdentityService(prisma),
+        access: { assert: () => Promise.resolve(), authorize },
+        streams,
+        origins: ['https://story65.synthetic.test'],
+      })
+    )
+    runtimes.push(runtime)
+    await new Promise<void>((resolve) => runtime.server.listen(0, '127.0.0.1', resolve))
+    const base = `http://127.0.0.1:${(runtime.server.address() as AddressInfo).port}`
+    const connected = Array.from({ length: 6 }, () =>
+      connect(client(base, fixtureToken(member.id)))
+    )
+    try {
+      await vi.waitFor(() => expect(releases).toHaveLength(5), { timeout: 1000 })
+      expect(authorize).toHaveBeenCalledTimes(5)
+      expect(maximum).toBe(5)
+      gated = false
+      releases.forEach((release) => release())
+      await Promise.all(connected)
+      expect(authorize).toHaveBeenCalledTimes(6)
+      expect(sockets.every((socket) => socket.connected)).toBe(true)
+      expect(maximum).toBe(5)
+    } finally {
+      gated = false
+      releases.forEach((release) => release())
+      await Promise.allSettled(connected)
+    }
+  })
+
   it('A02 real identity dependency failures use strict unavailable and recover on a fresh handshake', async () => {
     const member = await fixture()
     vi.stubEnv('SUPABASE_URL', 'https://story65.identity.invalid')

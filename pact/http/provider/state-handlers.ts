@@ -104,6 +104,9 @@ const locationState =
   }
 
 export const stateHandlers: StateHandlers = {
+  'An eligible member prepares a share card': () =>
+    Promise.resolve({ description: 'An eligible member prepares a share card' }),
+
   /* ----------------------------------------------------------------------- *
    * Story 1.2b client location capture.
    * ----------------------------------------------------------------------- */

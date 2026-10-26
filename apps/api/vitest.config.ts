@@ -85,6 +85,11 @@ export default defineConfig({
     exclude: [
       '**/node_modules/**',
       '**/dist/**',
+      // This wall-clock proof has its own mandatory CI job and configuration.
+      // The measured cold-simulator/native-build replay drove SELECT 1 from
+      // sub-3 ms to p95 72.8 ms and exhausted the unchanged authorization budget.
+      // Run it on an idle service pair, with one worker and no package builds.
+      '**/community-realtime-revalidation.integration.spec.ts',
       ...(process.env.RUN_GARMENT_TAGGING_SMOKE === 'true'
         ? []
         : ['**/garment-tagging.smoke.spec.ts']),

@@ -1,7 +1,7 @@
 import 'reflect-metadata'
 import { randomUUID } from 'node:crypto'
 import { Client } from 'pg'
-import { PrismaClient } from '@prisma/client'
+import { PrismaClient, type Prisma } from '@prisma/client'
 import { buildLookbookPostCreateInput, createLookbookPost } from '@couture/testing'
 import { afterAll, beforeAll, beforeEach, describe, expect, it } from 'vitest'
 import { isolatedCommunityDatabase } from './helpers/isolated-community-database.js'
@@ -18,6 +18,44 @@ async function connection() {
   await client.connect()
   clients.push(client)
   return client
+}
+function candidatePreparationLatency(delayMs: number): PrismaClient {
+  if (!delayMs) return prisma
+  return new Proxy(prisma, {
+    get(target, key, receiver) {
+      if (key === '$transaction')
+        return (
+          work: (tx: Prisma.TransactionClient) => Promise<unknown>,
+          options?: {
+            timeout?: number
+            maxWait?: number
+            isolationLevel?: Prisma.TransactionIsolationLevel
+          }
+        ) =>
+          target.$transaction(
+            (tx) =>
+              work(
+                new Proxy(tx, {
+                  get(connection, property, connectionReceiver) {
+                    if (property === '$executeRawUnsafe')
+                      return async (query: string, ...values: unknown[]) => {
+                        if (query === 'SAVEPOINT community_candidate')
+                          await connection.$executeRaw`SELECT pg_sleep(${delayMs / 1000})`
+                        return connection.$executeRawUnsafe(query, ...values)
+                      }
+                    return Reflect.get(
+                      connection,
+                      property,
+                      connectionReceiver
+                    ) as unknown
+                  },
+                })
+              ),
+            options
+          )
+      return Reflect.get(target, key, receiver) as unknown
+    },
+  })
 }
 async function fixture() {
   const user = await prisma.user.create({
@@ -194,46 +232,96 @@ describe('Story 6.5 committed stream append', () => {
     )
   }, 20000)
 
-  it('A03 routine head contention preserves burst capacity and successful work restores a pressured limit', async () => {
-    const { post, user } = await fixture()
-    const appender = new CommunityStreamRepository(prisma)
-    const held = await connection()
-    await held.query('BEGIN')
-    await held.query('SELECT id FROM "CommunityStreamHead" WHERE id=$1 FOR UPDATE', [
-      'public',
-    ])
-    try {
-      for (let attempt = 0; attempt < 5; attempt++)
-        await expect(appender.append()).rejects.toThrow()
-    } finally {
-      await held.query('ROLLBACK')
-    }
-    await prisma.lookbookPost.createMany({
-      data: Array.from({ length: 99 }, () =>
-        buildLookbookPostCreateInput(
-          createLookbookPost({ userId: user.id, status: 'published' })
-        )
-      ),
-    })
-    const start = performance.now()
-    const batches: number[] = []
-    while (await prisma.communityDomainOutbox.count({ where: { appended_at: null } })) {
-      batches.push(await appender.append())
-      expect(performance.now() - start).toBeLessThan(5000)
-    }
-    expect(batches[0]).toBeGreaterThan(1)
-    expect(batches.length).toBeLessThanOrEqual(8)
-    expect(await prisma.communityStreamEvent.count({ where: { post_id: post.id } })).toBe(
-      1
-    )
-    console.info(
-      JSON.stringify({
-        evidence: 'A03-contention-burst',
-        elapsedMs: performance.now() - start,
-        batches,
+  it.each([0, 20])(
+    'A03 routine head contention preserves capacity and commits 100 contiguous events with %ims real candidate latency',
+    async (delayMs) => {
+      const { post, user } = await fixture()
+      const priorTelemetry = await prisma.communityEngagementTelemetry.findMany({
+        select: { id: true },
       })
-    )
-  })
+      const appender = new CommunityStreamRepository(candidatePreparationLatency(delayMs))
+      const held = await connection()
+      await held.query('BEGIN')
+      await held.query('SELECT id FROM "CommunityStreamHead" WHERE id=$1 FOR UPDATE', [
+        'public',
+      ])
+      try {
+        for (let attempt = 0; attempt < 5; attempt++)
+          await expect(appender.append()).rejects.toThrow()
+      } finally {
+        await held.query('ROLLBACK')
+      }
+      const retries = await prisma.communityEngagementTelemetry.findMany({
+        where: {
+          id: { notIn: priorTelemetry.map((row) => row.id) },
+          event_type: 'community_append_retry',
+        },
+        select: { reason: true, backlog_count: true },
+      })
+      expect(retries).toHaveLength(5)
+      expect(retries).toEqual(
+        Array.from({ length: 5 }, () => ({
+          reason: 'head_contention',
+          backlog_count: 25,
+        }))
+      )
+      await prisma.lookbookPost.createMany({
+        data: Array.from({ length: 99 }, () =>
+          buildLookbookPostCreateInput(
+            createLookbookPost({ userId: user.id, status: 'published' })
+          )
+        ),
+      })
+      const start = performance.now()
+      const batches: number[] = []
+      const timings: number[] = []
+      const capacities: unknown[] = []
+      try {
+        while (
+          await prisma.communityDomainOutbox.count({ where: { appended_at: null } })
+        ) {
+          const before = performance.now()
+          batches.push(await appender.append())
+          timings.push(Math.round(performance.now() - before))
+          capacities.push(Reflect.get(appender, 'readyLimit') as unknown)
+          expect(performance.now() - start).toBeLessThan(5000)
+        }
+        expect(batches[0]).toBeGreaterThan(1)
+        const events = await prisma.communityStreamEvent.findMany({
+          where: { stream_id: 'public' },
+          select: { source_outbox_id: true, sequence: true, post_id: true },
+          orderBy: { sequence: 'asc' },
+        })
+        expect(events).toHaveLength(100)
+        expect(new Set(events.map((event) => event.source_outbox_id)).size).toBe(100)
+        expect(
+          events.every(
+            (event, index) => event.sequence === events[0]!.sequence + BigInt(index)
+          )
+        ).toBe(true)
+        expect(events.filter((event) => event.post_id === post.id)).toHaveLength(1)
+      } finally {
+        const telemetry = await prisma.communityEngagementTelemetry.findMany({
+          where: {
+            event_type: { in: ['community_append_retry', 'community_append_contention'] },
+          },
+          select: { reason: true, elapsed_ms: true, backlog_count: true },
+          take: 100,
+          orderBy: { created_at: 'desc' },
+        })
+        console.info(
+          JSON.stringify({
+            evidence: 'A03-contention-burst',
+            elapsedMs: Math.round(performance.now() - start),
+            batches,
+            timings,
+            capacities,
+            telemetry,
+          })
+        )
+      }
+    }
+  )
   it('6.5-INT-001: reverse source commit order and aborted source cannot leave a skipped cursor', async () => {
     const a = await fixture()
     const b = await fixture()

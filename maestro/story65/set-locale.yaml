@@ -8,7 +8,8 @@ appId: ${MAESTRO_APP_ID}
     element:
       id: 'locale-btn-${MAESTRO_LOCALE}'
     direction: UP
-    centerElement: true
+    # A top-row button cannot be centered beyond the scroll boundary.
+    centerElement: false
     timeout: 15000
 - tapOn:
     id: 'locale-btn-${MAESTRO_LOCALE}'

@@ -1,0 +1,125 @@
+name: Share-card native originals
+on:
+  pull_request:
+  push:
+    branches: [main]
+  workflow_dispatch:
+permissions:
+  contents: read
+concurrency:
+  group: share-card-native-${{ github.ref }}
+  cancel-in-progress: true
+jobs:
+  original-resource:
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - os: ubuntu-latest
+            platform: android
+            api: 32
+            target: google_apis
+          - os: ubuntu-latest
+            platform: android
+            api: 36
+            target: google_apis_playstore
+          - os: macos-15
+            platform: ios
+            api: 0
+    runs-on: ${{ matrix.os }}
+    timeout-minutes: 90
+    env:
+      CC68_HARNESS_DIR: _bmad-output/test-artifacts/story-6-8/runtime
+      MAESTRO_CLI_NO_ANALYTICS: '1'
+    steps:
+      - uses: actions/checkout@v4
+      - uses: ./.github/actions/reserve-supabase-ports
+        if: runner.os == 'Linux'
+      - uses: ./.github/actions/install
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: '21'
+      - uses: android-actions/setup-android@v3
+        if: matrix.platform == 'android'
+      - name: Start owned Docker VM for local Auth on macOS
+        if: runner.os == 'macOS'
+        run: |
+          brew install colima docker qemu xcodegen
+          colima start --vm-type=qemu --arch=x86_64 --cpu-type=qemu64 --cpu=2 --memory=3 --disk=40
+      - uses: ./.github/actions/start-local-supabase
+      - name: Prepare isolated UUID runtime and built renderer
+        run: |
+          npm run db:generate
+          npm run build:packages
+          npm run build --workspace api
+          node scripts/e2e-share-card/prepare.mjs
+          node scripts/lib/story68-built-render.mjs
+          node scripts/e2e-share-card/auth.mjs > /tmp/cc68-auth.log 2>&1 &
+          node scripts/run-story68-native.mjs serve > /tmp/cc68-api.log 2>&1 &
+          node scripts/run-story68-native.mjs metro > /tmp/cc68-metro.log 2>&1 &
+          node scripts/maestro-install.mjs
+      - name: Verify localized native accessibility announcements and focus bridge
+        run: |
+          npx playwright install --with-deps chromium firefox webkit
+          node scripts/e2e-share-card/bridge-a11y.mjs
+          node --test apps/mobile/plugins/with-share-card-permissions.test.js
+      - name: Generate and build native development client
+        run: |
+          node scripts/run-story68-native.mjs prebuild --platform ${{ matrix.platform }}
+          node scripts/run-story68-native.mjs build --platform ${{ matrix.platform }}
+      - name: Genuine browser share-card acceptance matrix
+        if: matrix.platform == 'android' && matrix.api == 36
+        run: |
+          node scripts/e2e-share-card/web.mjs > /tmp/cc68-web.log 2>&1 &
+          for attempt in $(seq 1 90); do
+            if curl --fail --silent http://127.0.0.1:3088 > /dev/null; then break; fi
+            echo "Waiting for owned web runtime ($attempt/90)"
+            sleep 1
+          done
+          curl --fail --silent http://127.0.0.1:3088 > /dev/null
+          npx playwright test --config playwright/share-card.config.ts
+          node scripts/e2e-share-card/assert-web-matrix.mjs
+      - name: Android real original and API32 denied/permanent permission proof
+        if: matrix.platform == 'android'
+        uses: reactivecircus/android-emulator-runner@v2
+        with:
+          api-level: ${{ matrix.api }}
+          target: ${{ matrix.target }}
+          arch: x86_64
+          profile: pixel_6
+          disable-animations: true
+          script: bash scripts/ci/share-card-android.sh
+      - name: iOS original Photos resource and add-only save
+        if: matrix.platform == 'ios'
+        run: |
+          device=$(xcrun simctl create cc68-ci 'iPhone 16 Pro')
+          echo "$device" > /tmp/cc68-simulator
+          xcrun simctl boot "$device"
+          xcrun simctl bootstatus "$device" -b
+          xcrun simctl install "$device" /tmp/cc68-ios-build/Build/Products/Debug-iphonesimulator/CoutureCastStory68.app
+          node scripts/run-story68-native.mjs open --platform ios --device "$device"
+          node scripts/run-story68-native.mjs signin --platform ios --device "$device"
+          node scripts/run-story68-native.mjs proof --platform ios --device "$device"
+          node scripts/run-story68-native.mjs matrix --platform ios --device "$device"
+          node scripts/run-story68-native.mjs a11y --platform ios --device "$device"
+          node scripts/run-story68-native.mjs expo-go-proof --platform ios --device "$device"
+      - name: Select and scan closed evidence
+        if: always()
+        run: node scripts/e2e-share-card/public-evidence.mjs
+      - name: Collect original PNG proof
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: share-card-${{ matrix.platform }}-${{ matrix.api }}
+          path: _bmad-output/test-artifacts/story-6-8/runtime/public-evidence/
+          if-no-files-found: error
+      - name: Clean exact owned runtime
+        if: always()
+        run: node scripts/e2e-share-card/cleanup.mjs
+      - name: Delete owned CI simulator
+        if: always() && matrix.platform == 'ios'
+        run: |
+          if [ -f /tmp/cc68-simulator ]; then
+            xcrun simctl delete "$(cat /tmp/cc68-simulator)"
+          fi

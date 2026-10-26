@@ -1,0 +1,534 @@
+import type * as ReactNativeModule from 'react-native'
+import React, { createElement, useEffect, useState } from 'react'
+import { act, fireEvent, render, screen, waitFor } from '@testing-library/react'
+import { beforeEach, describe, expect, it, vi } from 'vitest'
+import { ResponseError } from '@couture/api-client'
+import { supportedLocales } from '@couture/api-client/contracts/http'
+import { preparedShareCardFixture as card } from '@couture/api-client/testing/share-card-fixture'
+import i18n, { initI18n } from '@/src/lib/i18n'
+vi.mock('expo-status-bar', () => ({ StatusBar: () => null }))
+vi.mock('expo-localization', () => ({
+  getLocales: () => [{ languageTag: 'en-US', languageCode: 'en', regionCode: 'US' }],
+}))
+const boundary = vi.hoisted(() => {
+  process.env.EXPO_OS = 'ios'
+  return {
+    prepare: vi.fn(),
+    permission: vi.fn(),
+    save: vi.fn(),
+    available: true,
+    member: 'member-a' as string | null,
+    subscribers: new Set<() => void>(),
+    appState: new Set<(state: string) => void>(),
+    focus: vi.fn(),
+    announce: vi.fn(),
+    settings: vi.fn(),
+    imageLoads: [] as (() => void)[],
+  }
+})
+vi.mock('@/src/lib/mobile-auth', () => ({
+  mobileApplicationUserId: () => boundary.member,
+  subscribeMobileApplicationUser: (listener: () => void) => {
+    boundary.subscribers.add(listener)
+    return () => boundary.subscribers.delete(listener)
+  },
+}))
+vi.mock('@/src/lib/share-cards', () => ({ prepareShareCardFromMobile: boundary.prepare }))
+vi.mock('@/src/lib/share-card-save', () => ({
+  nativeShareCardSaveAvailable: () => boundary.available,
+  shareCardSavePermission: boundary.permission,
+  saveShareCard: boundary.save,
+}))
+vi.mock('@/src/lib/accessibility-focus', () => ({
+  safeFindNodeHandle: (node: HTMLElement | null) =>
+    ({
+      'share-card-title': 41,
+      'share-card-save': 42,
+      'share-card-retry': 43,
+      'share-card-refresh': 43,
+      'share-card-settings': 43,
+      'share-card-cancel': 44,
+    })[node?.getAttribute('data-testid') ?? ''] ?? 41,
+}))
+vi.mock('../modules/accessibility-focus', () => ({
+  focusAccessibilityElement: (tag: number) => {
+    boundary.focus(tag)
+    return Promise.resolve(true)
+  },
+}))
+vi.mock('./edge-to-edge-modal', () => ({
+  useModalInsets: () => ({ top: 10, bottom: 10, left: 0, right: 0 }),
+  EdgeToEdgeModal: ({
+    visible,
+    children,
+    onShow,
+    onDismiss,
+  }: {
+    visible: boolean
+    children: React.ReactNode
+    onShow?: () => void
+    onDismiss?: () => void
+  }) => {
+    useEffect(() => {
+      if (visible) onShow?.()
+      return () => {
+        if (visible) onDismiss?.()
+      }
+    }, [visible])
+    return visible ? createElement('div', { role: 'dialog' }, children) : null
+  },
+}))
+vi.mock('react-native', async (original) => {
+  const actual = await original<typeof ReactNativeModule>()
+  return {
+    ...actual,
+    Platform: { ...actual.Platform, OS: 'ios' },
+    Image: ({
+      testID,
+      accessibilityLabel,
+      onLoad,
+      onError,
+    }: {
+      testID: string
+      accessibilityLabel: string
+      onLoad: () => void
+      onError: () => void
+    }) => {
+      boundary.imageLoads.push(onLoad)
+      return createElement('img', {
+        'data-testid': testID,
+        alt: accessibilityLabel,
+        onLoad,
+        onError,
+      })
+    },
+    AccessibilityInfo: {
+      ...actual.AccessibilityInfo,
+      setAccessibilityFocus: boundary.focus,
+      announceForAccessibilityWithOptions: boundary.announce,
+    },
+    Linking: { ...actual.Linking, openSettings: boundary.settings },
+    AppState: {
+      ...actual.AppState,
+      addEventListener: (_event: string, listener: (state: string) => void) => {
+        boundary.appState.add(listener)
+        return { remove: () => boundary.appState.delete(listener) }
+      },
+    },
+  }
+})
+import { ShareCardComposer } from './share-card-composer'
+import {
+  commitShareCardSave,
+  nativeShareCardSavePending,
+  liveShareCardFiles,
+} from '@/src/lib/share-card-save-operations'
+const source = { kind: 'outfit', recommendationId: 'owned-outfit' } as const
+function deferred<T>() {
+  let resolve!: (value: T) => void
+  const promise = new Promise<T>((yes) => {
+    resolve = yes
+  })
+  return { promise, resolve }
+}
+function Harness({ restore = vi.fn() }: { restore?: () => void }) {
+  const [open, setOpen] = useState(true)
+  return (
+    <>
+      <button onClick={() => setOpen(true)}>Reopen</button>
+      <ShareCardComposer
+        source={source}
+        open={open}
+        onClose={() => setOpen(false)}
+        onRestoreFocus={restore}
+      />
+    </>
+  )
+}
+async function ready() {
+  const image = await screen.findByTestId('share-card-preview')
+  fireEvent.load(image)
+  await waitFor(() =>
+    expect(screen.getByTestId('share-card-save')).not.toHaveAttribute(
+      'aria-disabled',
+      'true'
+    )
+  )
+  return image
+}
+function changeIdentity(member: string | null) {
+  act(() => {
+    boundary.member = member
+    boundary.subscribers.forEach((listener) => listener())
+  })
+}
+beforeEach(async () => {
+  await initI18n()
+  await i18n.changeLanguage('en-US')
+  boundary.member = 'member-a'
+  boundary.available = true
+  boundary.prepare.mockReset().mockResolvedValue(card)
+  boundary.permission.mockReset().mockResolvedValue({ granted: true, canAskAgain: true })
+  boundary.save.mockReset().mockResolvedValue(undefined)
+  boundary.focus.mockClear()
+  boundary.announce.mockClear()
+  boundary.settings.mockClear()
+  boundary.imageLoads.length = 0
+})
+describe('share-card composer lifecycle', () => {
+  it('U-SAVE U-A11Y: loaded image and explicit permission precede final save authorization; native resolution owns success', async () => {
+    const native = deferred<void>()
+    boundary.save.mockReturnValue(native.promise)
+    render(<Harness />)
+    expect(screen.getByTestId('share-card-save')).toHaveAttribute('aria-disabled', 'true')
+    await ready()
+    fireEvent.click(screen.getByTestId('share-card-save'))
+    await waitFor(() => expect(boundary.save).toHaveBeenCalledOnce())
+    expect(boundary.permission).toHaveBeenCalledWith(true)
+    expect(screen.getByTestId('share-card-watermark')).toHaveAttribute(
+      'aria-disabled',
+      'true'
+    )
+    expect(boundary.prepare.mock.calls[1]?.[0]).toMatchObject({
+      purpose: 'save',
+      expectedSha256: card.sha256,
+    })
+    expect(screen.queryByText(i18n.t('shareCard.saved'))).not.toBeInTheDocument()
+    native.resolve()
+    expect(await screen.findByText(i18n.t('shareCard.saved'))).toBeInTheDocument()
+    expect(screen.getByTestId('share-card-watermark')).not.toHaveAttribute(
+      'aria-disabled',
+      'true'
+    )
+    await waitFor(() =>
+      expect(
+        boundary.announce.mock.calls.filter(
+          ([text]) => text === i18n.t('shareCard.saved')
+        )
+      ).toEqual([[i18n.t('shareCard.saved'), { queue: true }]])
+    )
+    expect(boundary.focus).toHaveBeenCalledWith(41)
+  })
+  it('U-A11Y-CANCEL: dismissal restores the invoking control once after its modal closes', async () => {
+    const restore = vi.fn()
+    render(<Harness restore={restore} />)
+    await ready()
+    fireEvent.click(screen.getByTestId('share-card-cancel'))
+    await waitFor(() => expect(restore).toHaveBeenCalledOnce())
+    expect(screen.queryByTestId('share-card-title')).not.toBeInTheDocument()
+    await act(async () => {
+      await Promise.resolve()
+    })
+    expect(restore).toHaveBeenCalledOnce()
+  })
+  it('U-PERMISSION-DENIED U-PERMISSION-PERMANENT: denied retry retains preview; settings return checks without saving', async () => {
+    boundary.permission.mockResolvedValue({ granted: false, canAskAgain: true })
+    render(<Harness />)
+    await ready()
+    fireEvent.click(screen.getByTestId('share-card-save'))
+    expect(
+      await screen.findByText(i18n.t('shareCard.permissionDenied'))
+    ).toBeInTheDocument()
+    expect(boundary.prepare).toHaveBeenCalledOnce()
+    expect(boundary.save).not.toHaveBeenCalled()
+    await waitFor(() =>
+      expect(screen.getByTestId('share-card-save')).not.toHaveAttribute(
+        'aria-disabled',
+        'true'
+      )
+    )
+    boundary.permission.mockResolvedValue({ granted: false, canAskAgain: false })
+    fireEvent.click(screen.getByTestId('share-card-save'))
+    expect(
+      await screen.findByText(i18n.t('shareCard.permissionPermanent'))
+    ).toBeInTheDocument()
+    await waitFor(() => expect(boundary.appState.size).toBe(1))
+    fireEvent.click(screen.getByText(i18n.t('shareCard.openSettings')))
+    expect(boundary.settings).toHaveBeenCalledOnce()
+    boundary.permission.mockResolvedValue({ granted: true, canAskAgain: true })
+    await act(async () => {
+      boundary.appState.forEach((listener) => listener('active'))
+      await Promise.resolve()
+    })
+    await waitFor(() => expect(boundary.permission).toHaveBeenLastCalledWith(false))
+    expect(boundary.save).not.toHaveBeenCalled()
+    expect(screen.getByTestId('share-card-preview-loaded')).toBeInTheDocument()
+  })
+  it('U-REVALIDATE: consent changes during a deferred OS permission dialog block import after grant', async () => {
+    const permission = deferred<{ granted: boolean; canAskAgain: boolean }>()
+    boundary.permission.mockReturnValue(permission.promise)
+    render(<Harness />)
+    await ready()
+    fireEvent.click(screen.getByTestId('share-card-save'))
+    expect(boundary.prepare).toHaveBeenCalledOnce()
+    boundary.prepare.mockRejectedValueOnce(
+      new ResponseError(new Response('{}', { status: 403 }))
+    )
+    permission.resolve({ granted: true, canAskAgain: true })
+    expect(
+      await screen.findByText(i18n.t('shareCard.sourceUnavailable'))
+    ).toBeInTheDocument()
+    expect(boundary.save).not.toHaveBeenCalled()
+  })
+  it.each(['close', 'identity'])(
+    'U-IDENTITY U-PENDING-FILE: %s then returning to same composition suppresses old native completion',
+    async (reason) => {
+      const native = deferred<void>()
+      boundary.save.mockImplementation(() =>
+        commitShareCardSave({
+          fileUri: 'cc68-composer.png',
+          save: () => native.promise,
+          cleanup: () => Promise.resolve(),
+        })
+      )
+      render(<Harness />)
+      await ready()
+      fireEvent.click(screen.getByTestId('share-card-save'))
+      await waitFor(() => expect(boundary.save).toHaveBeenCalledOnce())
+      if (reason === 'close') {
+        fireEvent.click(screen.getByTestId('share-card-cancel'))
+        fireEvent.click(screen.getByText('Reopen'))
+      } else {
+        changeIdentity('member-b')
+        changeIdentity('member-a')
+      }
+      expect(
+        await screen.findByText(i18n.t('shareCard.finishingSave'))
+      ).toBeInTheDocument()
+      native.resolve()
+      await waitFor(() =>
+        expect(
+          screen.queryByText(i18n.t('shareCard.finishingSave'))
+        ).not.toBeInTheDocument()
+      )
+      expect(screen.queryByText(i18n.t('shareCard.saved'))).not.toBeInTheDocument()
+      expect(screen.queryByText(i18n.t('shareCard.saving'))).not.toBeInTheDocument()
+      expect(
+        boundary.announce.mock.calls.some(([text]) => text === i18n.t('shareCard.saved'))
+      ).toBe(false)
+      expect(boundary.save).toHaveBeenCalledOnce()
+    }
+  )
+  it.each([409, 404, 503])(
+    'U-PREPARE-ERROR: final authorization%d retains preview and requires explicit recovery',
+    async (status) => {
+      render(<Harness />)
+      await ready()
+      boundary.prepare.mockRejectedValueOnce(
+        new ResponseError(new Response('{}', { status }))
+      )
+      fireEvent.click(screen.getByTestId('share-card-save'))
+      expect(
+        await screen.findByText(
+          i18n.t(
+            `shareCard.${status === 409 ? 'previewChanged' : status === 404 ? 'sourceUnavailable' : 'render'}`
+          )
+        )
+      ).toBeInTheDocument()
+      expect(boundary.save).not.toHaveBeenCalled()
+      fireEvent.click(
+        screen.getByText(i18n.t(`shareCard.${status === 409 ? 'refresh' : 'retry'}`))
+      )
+      await waitFor(() => expect(boundary.prepare).toHaveBeenCalledTimes(3))
+      expect(boundary.prepare.mock.calls[2]?.[0]).toMatchObject({ purpose: 'preview' })
+    }
+  )
+  it('U-NATIVE-UNAVAILABLE: keeps loaded preview and disables Save before permission activation', async () => {
+    boundary.available = false
+    render(<Harness />)
+    fireEvent.load(await screen.findByTestId('share-card-preview'))
+    expect(
+      screen.getByText(i18n.t('shareCard.nativeSaveUnavailable'))
+    ).toBeInTheDocument()
+    fireEvent.click(screen.getByTestId('share-card-save'))
+    expect(boundary.permission).not.toHaveBeenCalled()
+    expect(boundary.save).not.toHaveBeenCalled()
+  })
+  it('U-A11Y: iOS error announcements are immediate, deduplicated and identity scoped', async () => {
+    boundary.permission.mockResolvedValue({ granted: false, canAskAgain: false })
+    render(<Harness />)
+    await ready()
+    fireEvent.click(screen.getByTestId('share-card-save'))
+    const text = i18n.t('shareCard.permissionPermanent')
+    expect(await screen.findByText(text)).toBeInTheDocument()
+    await waitFor(() =>
+      expect(
+        boundary.announce.mock.calls.filter(([message]) => message === text)
+      ).toEqual([[text, { queue: false }]])
+    )
+    fireEvent.click(screen.getByText(i18n.t('shareCard.openSettings')))
+    expect(
+      boundary.announce.mock.calls.filter(([message]) => message === text)
+    ).toHaveLength(1)
+    changeIdentity('member-b')
+    await waitFor(() => expect(screen.queryByText(text)).not.toBeInTheDocument())
+    expect(
+      boundary.announce.mock.calls.filter(([message]) => message === text)
+    ).toHaveLength(1)
+  })
+  it.each(supportedLocales)(
+    'U-A11Y-PREPARING: %s posts its exact localized preparation announcement and title target',
+    async (locale) => {
+      await i18n.changeLanguage(locale)
+      boundary.prepare.mockReturnValue(new Promise(() => undefined))
+      render(<Harness />)
+      const text = i18n.t('shareCard.preparing')
+      expect(await screen.findByText(text)).toBeInTheDocument()
+      await waitFor(() =>
+        expect(
+          boundary.announce.mock.calls.filter(([message]) => message === text)
+        ).toEqual([[text, { queue: true }]])
+      )
+      expect(boundary.focus).toHaveBeenCalledWith(41)
+    }
+  )
+  it.each(
+    supportedLocales.flatMap((locale) =>
+      [
+        'saved',
+        'storage',
+        'offline',
+        'permissionDenied',
+        'permissionPermanent',
+        'limited',
+        'finishingSave',
+        'nativeSaveUnavailable',
+      ].map((state) => ({ locale, state }))
+    )
+  )(
+    'U-A11Y: $locale $state posts its exact localized announcement with the correct queue',
+    async ({ locale, state }) => {
+      await i18n.changeLanguage(locale)
+      if (state === 'nativeSaveUnavailable') boundary.available = false
+      render(<Harness />)
+      fireEvent.load(await screen.findByTestId('share-card-preview'))
+      let pending: ReturnType<typeof deferred<void>> | undefined
+      let committed: Promise<void> | undefined
+      if (state === 'finishingSave') {
+        pending = deferred<void>()
+        committed = commitShareCardSave({
+          fileUri: 'file:///owned-announcement.png',
+          save: () => pending!.promise,
+          cleanup: () => Promise.resolve(),
+        })
+      } else if (state !== 'nativeSaveUnavailable') {
+        if (state === 'storage') boundary.save.mockRejectedValueOnce(new Error('storage'))
+        if (state === 'offline')
+          boundary.prepare.mockRejectedValueOnce(new Error('offline'))
+        if (state === 'permissionDenied' || state === 'permissionPermanent')
+          boundary.permission.mockResolvedValueOnce({
+            granted: false,
+            canAskAgain: state === 'permissionDenied',
+          })
+        if (state === 'limited')
+          boundary.permission.mockResolvedValueOnce({
+            granted: true,
+            canAskAgain: true,
+            accessPrivileges: 'limited',
+          })
+        await waitFor(() =>
+          expect(screen.getByTestId('share-card-save')).not.toHaveAttribute(
+            'aria-disabled',
+            'true'
+          )
+        )
+        fireEvent.click(screen.getByTestId('share-card-save'))
+      }
+      const key = state === 'limited' ? 'saved' : state
+      const text = i18n.t(`shareCard.${key}`)
+      const polite = ['saved', 'limited', 'finishingSave'].includes(state)
+      try {
+        expect(await screen.findByText(text)).toBeInTheDocument()
+        await waitFor(() =>
+          expect(
+            boundary.announce.mock.calls.filter(([message]) => message === text)
+          ).toEqual([[text, { queue: polite }]])
+        )
+        if (state !== 'nativeSaveUnavailable')
+          expect(boundary.focus).toHaveBeenLastCalledWith(
+            state === 'saved' || state === 'limited'
+              ? 42
+              : state === 'finishingSave'
+                ? 44
+                : 43
+          )
+      } finally {
+        pending?.resolve()
+        await committed
+      }
+    }
+  )
+  it('U-OPTIONS: a delayed old image callback with an identical digest cannot enable a replacement presentation', async () => {
+    render(<Harness />)
+    await ready()
+    const oldLoad = boundary.imageLoads.at(-1)!
+    fireEvent.click(screen.getByRole('switch'))
+    await waitFor(() => expect(boundary.prepare).toHaveBeenCalledTimes(2))
+    await waitFor(() =>
+      expect(screen.getByTestId('share-card-preview')).toBeInTheDocument()
+    )
+    act(() => oldLoad())
+    expect(screen.getByTestId('share-card-save')).toHaveAttribute('aria-disabled', 'true')
+    fireEvent.load(screen.getByTestId('share-card-preview'))
+    await waitFor(() =>
+      expect(screen.getByTestId('share-card-save')).not.toHaveAttribute(
+        'aria-disabled',
+        'true'
+      )
+    )
+  })
+  it('U-OPTIONS U-CANCEL: cached ON/OFF/ON remounts image and close/reopen requires fresh image load', async () => {
+    render(<Harness />)
+    const image = await ready()
+    fireEvent.click(screen.getByRole('switch'))
+    fireEvent.click(screen.getByRole('switch'))
+    expect(screen.getByTestId('share-card-preview')).not.toBe(image)
+    fireEvent.load(screen.getByTestId('share-card-preview'))
+    fireEvent.click(screen.getByTestId('share-card-cancel'))
+    fireEvent.click(screen.getByText('Reopen'))
+    expect(screen.getByTestId('share-card-save')).toHaveAttribute('aria-disabled', 'true')
+    expect(boundary.save).not.toHaveBeenCalled()
+  })
+  it('unmount after retained-preview reopen cancels current authorization before import', async () => {
+    const held = deferred<typeof card>()
+    const view = render(<Harness />)
+    await ready()
+    fireEvent.click(screen.getByTestId('share-card-cancel'))
+    fireEvent.click(screen.getByText('Reopen'))
+    await ready()
+    boundary.prepare.mockReturnValueOnce(held.promise)
+    fireEvent.click(screen.getByTestId('share-card-save'))
+    await waitFor(() => expect(boundary.prepare).toHaveBeenCalledTimes(2))
+    const signal = boundary.prepare.mock.calls[1]?.[1] as AbortSignal
+    view.unmount()
+    expect(signal.aborted).toBe(true)
+    await act(async () => {
+      held.resolve(card)
+      await held.promise
+    })
+    expect(boundary.save).not.toHaveBeenCalled()
+  })
+  it('unmount retains committed native file and pending guard until actual settlement', async () => {
+    const native = deferred<void>()
+    boundary.save.mockImplementation(() =>
+      commitShareCardSave({
+        fileUri: 'cc68-unmounted-committed.png',
+        save: () => native.promise,
+        cleanup: () => Promise.resolve(),
+      })
+    )
+    const view = render(<Harness />)
+    await ready()
+    fireEvent.click(screen.getByTestId('share-card-save'))
+    await waitFor(() => expect(boundary.save).toHaveBeenCalledOnce())
+    view.unmount()
+    expect(nativeShareCardSavePending()).toBe(true)
+    expect(liveShareCardFiles().has('cc68-unmounted-committed.png')).toBe(true)
+    await act(async () => {
+      native.resolve()
+      await native.promise
+    })
+    await waitFor(() => expect(nativeShareCardSavePending()).toBe(false))
+    expect(liveShareCardFiles().has('cc68-unmounted-committed.png')).toBe(false)
+  })
+})

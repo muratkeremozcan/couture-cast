@@ -1,0 +1,8 @@
+appId: ${MAESTRO_APP_ID}
+---
+- assertVisible: ${MAESTRO_CARD_TITLE}
+- assertVisible: ${MAESTRO_WATERMARK}
+- assertVisible: ${MAESTRO_SAVE_LABEL}
+- assertVisible: ${MAESTRO_CANCEL_LABEL}
+- assertVisible:
+    id: share-card-preview-loaded-.*

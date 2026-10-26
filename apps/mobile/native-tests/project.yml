@@ -1,0 +1,29 @@
+name: ShareCardAccessibility
+options:
+  deploymentTarget:
+    iOS: '17.0'
+targets:
+  ShareCardAccessibilityUITests:
+    type: bundle.ui-testing
+    platform: iOS
+    sources:
+      - ShareCardAccessibilityUITests.swift
+      - path: catalogs
+        buildPhase: resources
+    settings:
+      base:
+        PRODUCT_BUNDLE_IDENTIFIER: com.couturecast.story68.accessibilitytests
+        GENERATE_INFOPLIST_FILE: YES
+        SWIFT_VERSION: '5.0'
+        CODE_SIGN_IDENTITY: '-'
+        CODE_SIGNING_ALLOWED: YES
+        CODE_SIGNING_REQUIRED: NO
+        INFOPLIST_KEY_NSAppTransportSecurity_NSAllowsArbitraryLoads: YES
+schemes:
+  ShareCardAccessibility:
+    build:
+      targets:
+        ShareCardAccessibilityUITests: all
+    test:
+      targets:
+        - ShareCardAccessibilityUITests

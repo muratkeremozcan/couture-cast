@@ -21,3 +21,5 @@ export * from './wardrobe'
 export * from './weather'
 
 export * from './community-sync'
+
+export * from './share-cards'

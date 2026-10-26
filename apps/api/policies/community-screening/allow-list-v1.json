@@ -1,8 +1,8 @@
 {
   "listId": "community-screening-allow-list-v1",
   "version": "v1",
-  "updated": "2026-10-16",
-  "summary": "Ordinary words that the vendored LDNOOBW lists, the graded overlay or the bad-words backstop would otherwise flag. Allow lists apply across all seven languages, because every language's list runs against every submission. Lookup runs on the literal case-folded token, before diacritic, confusable and leet folding, so an accented, stretched or disguised spelling of a flagged word still screens.",
+  "updated": "2026-10-26",
+  "summary": "Ordinary words that the vendored LDNOOBW lists, the graded overlay or the bad-words backstop would otherwise flag. Allow lists apply across all seven languages, because every language's list runs against every submission. Lookup runs on the literal case-folded token, before diacritic, confusable and leet folding, so an accented, stretched or disguised spelling of a flagged word still screens. Literal context rules clear only their exact target token within bounded grammatical object context; neighboring tokens and unsafe multi-word phrases continue screening.",
   "rules": "Every entry names the language it is ordinary in and why it is here. An entry that clears an upstream term outright says what it costs. Remove an entry rather than leave one whose reason no longer holds.",
   "entries": [
     {
@@ -439,6 +439,402 @@
       "entry": "sıkı",
       "language": "tr",
       "reason": "Turkish for tight or firm, written with a dotless ı. It folds onto the Turkish term siki, which still screens in its dotted spelling."
+    },
+    {
+      "entry": "queda mona",
+      "language": "es",
+      "reason": "Spanish for looks cute, an ordinary garment or outfit description. Clear this complete phrase; the ambiguous single word and its other uses remain screened."
+    },
+    {
+      "entry": "chatte brodée",
+      "language": "fr",
+      "reason": "French for an embroidered female cat, a literal embroidery motif. Clear this complete craft phrase; the ambiguous single word and other uses remain screened."
+    },
+    {
+      "entry": "orecchini a palle",
+      "language": "it",
+      "reason": "Italian for ball-shaped earrings, a jewellery shape. Clear this complete garment phrase; the ambiguous single word and other uses remain screened."
+    },
+    {
+      "entry": "palle di feltro",
+      "language": "it",
+      "reason": "Italian for felt balls, a material and shape used for trim and bag ornaments. Clear this complete craft phrase; the ambiguous single word and other uses remain screened."
+    },
+    {
+      "entry": "pinto as botas",
+      "language": "pt",
+      "reason": "Portuguese for I paint the boots, an ordinary customisation action. Clear this complete verb phrase; the ambiguous single word and other uses remain screened."
+    },
+    {
+      "entry": "bicha para entrar",
+      "language": "pt",
+      "reason": "European Portuguese for a queue to enter, as at a fashion event. Clear this complete queue phrase; the ambiguous single word and other uses remain screened."
+    },
+    {
+      "entry": "hell und luftig",
+      "language": "de",
+      "reason": "German for bright and airy, an ordinary fabric or garment description. Clear this complete adjective phrase; bare hell and its disguised forms remain screened."
+    },
+    {
+      "entry": "dick und weich",
+      "language": "de",
+      "reason": "German for thick and soft, an ordinary fabric description. Clear this complete texture phrase; bare dick and its other uses remain screened."
+    },
+    {
+      "entry": "dick gestrickter",
+      "language": "de",
+      "reason": "German for thickly knitted, in the inflected phrase dick gestrickter Schal. Clear the complete knit phrase; the ambiguous single word remains screened."
+    },
+    {
+      "entry": "hell beige",
+      "language": "de",
+      "reason": "German for light beige, a literal colour description. Clear this complete colour phrase; the ambiguous single word remains screened."
+    },
+    {
+      "entry": "dick gewebt",
+      "language": "de",
+      "reason": "German for thickly woven, a literal textile construction. Clear this complete weave phrase; the ambiguous single word remains screened."
+    },
+    {
+      "entry": "buro",
+      "language": "de",
+      "reason": "German Büro typed without its accent on a phone, as in Buro Outfit. Eight independently transformed existing training examples reproduce the collision with repeat-collapsed Portuguese burro. Only this literal spelling is cleared; burro and stretched spellings remain screened."
+    },
+    {
+      "entry": "mio bimbo",
+      "language": "it",
+      "reason": "Italian for my baby or little boy, in ordinary family and child-clothing copy. Clear the complete possessive phrase; bare bimbo and other uses remain screened."
+    },
+    {
+      "entry": "palle decorative",
+      "language": "it",
+      "reason": "Italian for decorative balls, literal ornaments on garments and jewellery. Clear this complete craft phrase; the ambiguous single word remains screened."
+    },
+    {
+      "entry": "palle di lana",
+      "language": "it",
+      "reason": "Italian for wool balls, a material and shape for garment trim. Clear this complete craft phrase; the ambiguous single word remains screened."
+    },
+    {
+      "entry": "palle di vetro",
+      "language": "it",
+      "reason": "Italian for glass balls, literal beads used in jewellery. Clear this complete material phrase; the ambiguous single word remains screened."
+    },
+    {
+      "entry": "pinto o tecido",
+      "language": "pt",
+      "reason": "Portuguese for I paint the fabric, an ordinary textile customisation action. Clear this complete verb phrase; the ambiguous single word remains screened."
+    },
+    {
+      "entry": "pinto a camisa",
+      "language": "pt",
+      "reason": "Portuguese for I paint the shirt, an ordinary garment customisation action. Clear this complete verb phrase; the ambiguous single word remains screened."
+    },
+    {
+      "entry": "pinto o cabelo",
+      "language": "pt",
+      "reason": "Portuguese for I dye my hair, ordinary styling copy. Clear this complete verb phrase; the ambiguous single word remains screened."
+    },
+    {
+      "entry": "bicha do desfile",
+      "language": "pt",
+      "reason": "European Portuguese for the queue for a fashion show. Clear this complete queue phrase; the ambiguous single word and other uses remain screened."
+    },
+    {
+      "entry": "bicha da bilheteira",
+      "language": "pt",
+      "reason": "European Portuguese for the ticket-office queue, as at a fashion event. Clear this complete queue phrase; the ambiguous single word and other uses remain screened."
+    },
+    {
+      "entry": "falda mona",
+      "language": "es",
+      "reason": "Spanish for a cute skirt, an ordinary garment description. Clear this complete noun phrase; the ambiguous single word remains screened."
+    },
+    {
+      "entry": "blusa es mona",
+      "language": "es",
+      "reason": "Spanish for the blouse is cute, an ordinary garment description. Clear this complete garment phrase; the ambiguous single word remains screened."
+    },
+    {
+      "entry": "chatte noire est brodée",
+      "language": "fr",
+      "reason": "French for a black female cat is embroidered, a literal embroidery motif. Clear this complete embroidery phrase; the ambiguous single word and other uses remain screened."
+    },
+    {
+      "entry": "bänder",
+      "language": "de",
+      "reason": "German plural of Band, meaning ribbons, ties or bands across clothing, craft and accessory copy. Literal diacritic-preserving lookup distinguishes this ordinary inflection from French bander; the unaccented term, accent-altered disguises and stretched spellings remain screened."
+    },
+    {
+      "entry": "mosse",
+      "language": "it",
+      "reason": "Italian feminine plural of mosso, meaning wavy or moving, used for hair, folds, lines and fabric. This literal inflection differs from German möse; only the ordinary literal word is cleared, preserving the accented German term and disguised forms."
+    }
+  ],
+  "literalContexts": [
+    {
+      "language": "it",
+      "terms": ["monta", "montare"],
+      "objects": [
+        "anello",
+        "anelli",
+        "borsa",
+        "borse",
+        "bottone",
+        "bottoni",
+        "cerniera",
+        "cerniere",
+        "cintura",
+        "cinture",
+        "collana",
+        "collane",
+        "fibbia",
+        "fibbie",
+        "gancio",
+        "ganci",
+        "manico",
+        "manici",
+        "tasca",
+        "tasche"
+      ],
+      "connectors": [
+        "a",
+        "al",
+        "alla",
+        "ancora",
+        "da",
+        "del",
+        "della",
+        "di",
+        "e",
+        "il",
+        "la",
+        "le",
+        "lo",
+        "nuova",
+        "nuove",
+        "nuovi",
+        "nuovo",
+        "per",
+        "piccola",
+        "piccole",
+        "piccoli",
+        "pronta",
+        "pronto",
+        "quei",
+        "quella",
+        "quelle",
+        "quelli",
+        "quello",
+        "su",
+        "sul",
+        "sulla",
+        "sulle",
+        "tutte",
+        "un",
+        "una",
+        "uno",
+        "è"
+      ],
+      "maxDistance": 5,
+      "reason": "Italian assembly verbs carry an upstream slang sense and ordinary craft senses. Clear only the exact literal verb when a garment or hardware object is joined by this bounded assembly grammar in the same clause. Bare uses, unknown intervening words, disguised verbs, separate sentences and independent unsafe terms remain screened."
+    },
+    {
+      "language": "pt",
+      "terms": ["monta", "montar"],
+      "objects": [
+        "alça",
+        "alças",
+        "bolsa",
+        "bolsas",
+        "casaco",
+        "casacos",
+        "colar",
+        "colares",
+        "dobra",
+        "dobras",
+        "fecho",
+        "fechos",
+        "fivela",
+        "fivelas",
+        "gola",
+        "golas",
+        "manga",
+        "mangas",
+        "pano",
+        "panos",
+        "prega",
+        "pregas",
+        "punho",
+        "punhos",
+        "tecido",
+        "tecidos",
+        "trama",
+        "tramas"
+      ],
+      "connectors": [
+        "a",
+        "as",
+        "com",
+        "da",
+        "das",
+        "de",
+        "do",
+        "dos",
+        "e",
+        "em",
+        "na",
+        "nas",
+        "no",
+        "nos",
+        "nova",
+        "novas",
+        "novo",
+        "novos",
+        "o",
+        "os",
+        "pequena",
+        "pequenas",
+        "pequeno",
+        "pequenos",
+        "pronta",
+        "pronto",
+        "um",
+        "uma",
+        "umas",
+        "uns"
+      ],
+      "maxDistance": 5,
+      "reason": "Portuguese montar inflections describe assembling clothing, components and textile shapes. Clear only the exact literal verb within bounded garment or textile-object grammar. The token is still screened in bare slang, across sentence boundaries, beyond the distance bound and with unrecognised intervening words; all other tokens and unsafe phrases keep screening."
+    },
+    {
+      "language": "es",
+      "terms": ["burro"],
+      "objects": [
+        "ropa",
+        "camisa",
+        "camisas",
+        "chaqueta",
+        "chaquetas",
+        "percha",
+        "perchas",
+        "abrigo",
+        "abrigos"
+      ],
+      "connectors": ["de", "del", "la", "las", "los", "para", "con", "en"],
+      "maxDistance": 5,
+      "reason": "Spanish clothing racks are called burro de ropa. Clear the literal noun only within bounded garment-storage grammar; its bare insult, disguised spellings and unrelated unsafe terms remain screened."
+    },
+    {
+      "language": "fr",
+      "terms": ["retard"],
+      "objects": [
+        "tram",
+        "train",
+        "bus",
+        "métro",
+        "metro",
+        "vol",
+        "avion",
+        "arrivée",
+        "depart",
+        "départ"
+      ],
+      "connectors": [
+        "a",
+        "au",
+        "ce",
+        "de",
+        "des",
+        "du",
+        "en",
+        "est",
+        "la",
+        "le",
+        "mon",
+        "sera",
+        "son",
+        "ton",
+        "à",
+        "était"
+      ],
+      "maxDistance": 5,
+      "reason": "French retard means lateness in transport and arrival clauses. Clear the literal word only with bounded transport grammar; bare English slur usage, disguises and independent unsafe words remain screened."
+    },
+    {
+      "language": "it",
+      "terms": ["corno"],
+      "objects": [
+        "bottone",
+        "bottoni",
+        "fibbia",
+        "fibbie",
+        "gancio",
+        "ganci",
+        "orecchino",
+        "orecchini",
+        "pendente",
+        "pendenti"
+      ],
+      "connectors": ["in", "di", "del", "della", "a", "forma", "un", "uno", "una"],
+      "maxDistance": 5,
+      "reason": "Italian corno means horn, an ordinary fastening material and jewellery motif. Clear the literal noun only within bounded component/material grammar. Bare slang, disguised spellings and independent unsafe terms remain screened."
+    },
+    {
+      "language": "pt",
+      "terms": ["penas"],
+      "objects": [
+        "casaco",
+        "casacos",
+        "colete",
+        "coletes",
+        "enchimento",
+        "enchimentos",
+        "almofada",
+        "almofadas",
+        "brinco",
+        "brincos",
+        "adorno",
+        "adornos"
+      ],
+      "connectors": ["de", "das", "com", "em", "um", "uma", "o", "a"],
+      "maxDistance": 5,
+      "reason": "Portuguese penas means feathers used in insulation and trims. Clear the literal plural only within bounded garment/material grammar. Bare words, disguised terms and independently unsafe words remain screened."
+    },
+    {
+      "language": "pt",
+      "terms": ["mofo"],
+      "objects": [
+        "roupa",
+        "roupas",
+        "tecido",
+        "tecidos",
+        "armário",
+        "armarios",
+        "armários",
+        "camisa",
+        "camisas",
+        "casaco",
+        "casacos"
+      ],
+      "connectors": [
+        "a",
+        "da",
+        "das",
+        "de",
+        "do",
+        "dos",
+        "em",
+        "está",
+        "na",
+        "nas",
+        "no",
+        "nos",
+        "o",
+        "sem"
+      ],
+      "maxDistance": 5,
+      "reason": "Portuguese mofo means mold, an ordinary garment-care issue. Clear the literal noun only within bounded garment or storage grammar. Bare English slang, disguises and independent unsafe words remain screened."
     }
   ]
 }

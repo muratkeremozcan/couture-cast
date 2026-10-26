@@ -25,6 +25,8 @@
 //   every banner in the new language.
 'use client'
 
+import { ShareCardControl } from './share-card-dialog'
+
 import { CommunityComments } from './community-comments'
 import {
   ResponseError,
@@ -449,7 +451,11 @@ export function LookbookFilterNav({
       style={{ top: CHIP_NAVIGATION_HEIGHT_PX }}
       className="sticky z-10 flex flex-col gap-3 border-b border-[color:var(--theme-card-border)] bg-white/95 py-3 backdrop-blur"
     >
-      <h2 className="lookbook-display text-2xl font-semibold text-[color:var(--theme-primary)]">
+      <h2
+        tabIndex={-1}
+        data-share-card-focus-fallback="community"
+        className="lookbook-display text-2xl font-semibold text-[color:var(--theme-primary)]"
+      >
         {t('community.heading')}
       </h2>
       <div className="flex items-center gap-2 overflow-x-auto pb-1 scrollbar-thin">
@@ -772,6 +778,9 @@ function LookbookCardContent({
         )}
       </div>
 
+      {canAct && item.author.isSelf && (
+        <ShareCardControl source={{ kind: 'community_post', postId: item.id }} />
+      )}
       {canAct && (
         <CommunityReactions item={item} controls={reactionControls} scope={scope} />
       )}
@@ -1017,6 +1026,9 @@ function LookbookDetailDialog({
       closeLabel={t('community.card.detailClose')}
     >
       <div data-testid="community-detail" className="flex flex-col gap-4">
+        {canAct && item.author.isSelf && (
+          <ShareCardControl source={{ kind: 'community_post', postId: item.id }} />
+        )}
         <CommunityReactions item={item} controls={reactionControls} />
         <div
           role="status"

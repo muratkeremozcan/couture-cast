@@ -92,7 +92,8 @@
     "prestart:workers:wardrobe:prod": "npm run prepare:shared-deps",
     "start:workers:wardrobe:prod": "npm run verify:tagging-model && node dist/src/workers/wardrobe.bootstrap.js",
     "prestart:workers:community:prod": "npm run prepare:shared-deps",
-    "start:workers:community:prod": "npm run verify:community-screening-model && node dist/src/workers/community.bootstrap.js"
+    "start:workers:community:prod": "npm run verify:community-screening-model && node dist/src/workers/community.bootstrap.js",
+    "test:community-realtime-budget": "cross-env NODE_OPTIONS=--conditions=development vitest run --config vitest.realtime-budget.config.ts"
   },
   "dependencies": {
     "@couture/api-client": "file:../../packages/api-client",

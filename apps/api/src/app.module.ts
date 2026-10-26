@@ -1,3 +1,4 @@
+import { ShareCardsModule } from './modules/share-cards/share-cards.module.js'
 import { Module } from '@nestjs/common'
 import { AnalyticsModule } from './analytics/analytics.module'
 import { AppController } from './app.controller'
@@ -51,6 +52,7 @@ const websocketModules = process.env.DISABLE_WEBSOCKETS === 'true' ? [] : [Gatew
     WardrobeModule,
     CommerceModule,
     CommunityModule,
+    ShareCardsModule,
   ],
   controllers: [AppController, ApiHealthController, HealthController, AdminController],
   providers: [AppService, AdminService],

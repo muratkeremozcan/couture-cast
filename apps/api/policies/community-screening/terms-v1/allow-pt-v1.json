@@ -8,14 +8,17 @@
     "licence": "UNLICENSED (repository-owned)",
     "retrievedAt": "2026-10-16",
     "curator": "couture-cast repository owner",
-    "notes": "GENERATED from allow-list-v1.json, where every entry records why it exists; do not edit by hand. Allow lists apply across all seven languages, so an entry here clears the word whichever list would have flagged it."
+    "notes": "GENERATED from allow-list-v1.json, where every entry records why it exists; do not edit by hand. Allow lists apply across all seven languages, so an entry here clears the word whichever list would have flagged it. Literal contexts clear only their exact target token within bounded grammatical object context; other tokens and unsafe phrases remain screened."
   },
   "generated": {
     "generator": "scripts/verify-community-screening-lists.mjs",
-    "allowListSha256": "22d1f261f3666cf37369e67359aeabc383ac0a689babe04f87023ba1aee70256"
+    "allowListSha256": "9bf8429c154834130ec24a2946c646532b6309cd50b514c08e764bb5bacc4cc0"
   },
   "entries": [
     "aranha",
+    "bicha da bilheteira",
+    "bicha do desfile",
+    "bicha para entrar",
     "bissexual",
     "camisinha",
     "cerveja",
@@ -30,6 +33,130 @@
     "níger",
     "pede",
     "pera",
-    "pica"
+    "pica",
+    "pinto a camisa",
+    "pinto as botas",
+    "pinto o cabelo",
+    "pinto o tecido"
+  ],
+  "literalContexts": [
+    {
+      "terms": ["monta", "montar"],
+      "objects": [
+        "alça",
+        "alças",
+        "bolsa",
+        "bolsas",
+        "casaco",
+        "casacos",
+        "colar",
+        "colares",
+        "dobra",
+        "dobras",
+        "fecho",
+        "fechos",
+        "fivela",
+        "fivelas",
+        "gola",
+        "golas",
+        "manga",
+        "mangas",
+        "pano",
+        "panos",
+        "prega",
+        "pregas",
+        "punho",
+        "punhos",
+        "tecido",
+        "tecidos",
+        "trama",
+        "tramas"
+      ],
+      "connectors": [
+        "a",
+        "as",
+        "com",
+        "da",
+        "das",
+        "de",
+        "do",
+        "dos",
+        "e",
+        "em",
+        "na",
+        "nas",
+        "no",
+        "nos",
+        "nova",
+        "novas",
+        "novo",
+        "novos",
+        "o",
+        "os",
+        "pequena",
+        "pequenas",
+        "pequeno",
+        "pequenos",
+        "pronta",
+        "pronto",
+        "um",
+        "uma",
+        "umas",
+        "uns"
+      ],
+      "maxDistance": 5
+    },
+    {
+      "terms": ["penas"],
+      "objects": [
+        "casaco",
+        "casacos",
+        "colete",
+        "coletes",
+        "enchimento",
+        "enchimentos",
+        "almofada",
+        "almofadas",
+        "brinco",
+        "brincos",
+        "adorno",
+        "adornos"
+      ],
+      "connectors": ["de", "das", "com", "em", "um", "uma", "o", "a"],
+      "maxDistance": 5
+    },
+    {
+      "terms": ["mofo"],
+      "objects": [
+        "roupa",
+        "roupas",
+        "tecido",
+        "tecidos",
+        "armário",
+        "armarios",
+        "armários",
+        "camisa",
+        "camisas",
+        "casaco",
+        "casacos"
+      ],
+      "connectors": [
+        "a",
+        "da",
+        "das",
+        "de",
+        "do",
+        "dos",
+        "em",
+        "está",
+        "na",
+        "nas",
+        "no",
+        "nos",
+        "o",
+        "sem"
+      ],
+      "maxDistance": 5
+    }
   ]
 }

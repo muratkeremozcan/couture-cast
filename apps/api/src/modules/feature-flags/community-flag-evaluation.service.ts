@@ -2,7 +2,7 @@
 import { randomUUID } from 'node:crypto'
 import { setTimeout as delay } from 'node:timers/promises'
 import { Inject, Injectable } from '@nestjs/common'
-import { PrismaClient } from '@prisma/client'
+import { Prisma, PrismaClient } from '@prisma/client'
 import {
   InjectRemoteFeatureFlagProvider,
   type RemoteFeatureFlagProvider,
@@ -127,7 +127,17 @@ export class CommunityFlagEvaluationService {
       })
       .catch(() => undefined)
     const claim = await budget.run(() => claiming)
-    if (claim) await this.refresh(member, owner, claim, budget, claimStarted)
+    if (claim) {
+      const refreshObservedAt = performance.now()
+      const refreshed = this.valid(
+        await this.refresh(member, owner, claim, budget, claimStarted),
+        refreshObservedAt
+      )
+      // The guarded UPDATE returns the persisted, generation-checked row after
+      // commit. Its database clock keeps the original expiry, and observing
+      // before the transaction makes the monotonic lifetime conservative.
+      if (refreshed) return refreshed
+    }
     // Never return the pre-claim observation. Its lease may have expired while claiming.
     do {
       observedAt = performance.now()
@@ -153,31 +163,52 @@ export class CommunityFlagEvaluationService {
     owner: string,
     budget: CommunityAuthorizationBudget
   ): Promise<CacheRow | undefined> {
-    const timeout = Math.min(400, budget.remaining())
-    return this.prisma.$transaction(
-      async (tx) => {
-        await tx.$executeRawUnsafe("SET LOCAL lock_timeout = '100ms'")
-        await tx.$executeRaw`SELECT community_privacy_guards(ARRAY[${member}]::text[],ARRAY[]::text[],false)`
-        await tx.$executeRaw`
-        INSERT INTO "CommunityFlagEvaluation" (member_id,flag_key,subject_generation)
-          SELECT member_id,'community_read_enabled',generation FROM "CommunitySubject" WHERE member_id = ${member}
-          ON CONFLICT DO NOTHING
-      `
-        return (
-          await tx.$queryRaw<CacheRow[]>`
-        UPDATE "CommunityFlagEvaluation" e SET refresh_owner = ${owner}::uuid,
-          refresh_until = clock_timestamp() + interval '2 seconds',
-          remote_evaluated_at = CASE WHEN remote_value IS NULL THEN NULL ELSE remote_evaluated_at END,
-          next_claim_at = clock_timestamp() + interval '45 seconds', last_used_at = clock_timestamp()
-        FROM "CommunitySubject" s WHERE e.member_id = ${member} AND e.flag_key = 'community_read_enabled'
-          AND s.member_id = e.member_id AND s.generation = e.subject_generation
-          AND e.next_claim_at <= clock_timestamp() AND (e.refresh_until IS NULL OR e.refresh_until <= clock_timestamp())
-        RETURNING e.*, next_claim_at - interval '45 seconds' AS now
-      `
-        )[0]
-      },
-      { timeout, maxWait: budget.remaining() }
-    )
+    // Another instance can hold an uncommitted INSERT for this member. Its
+    // lock timeout rolls back only our transaction; the original deadline and
+    // guarded claim UPDATE still govern every retry and remote invocation.
+    for (let attempt = 0; ; attempt++) {
+      budget.check()
+      let inserting = false
+      try {
+        const timeout = Math.min(400, budget.remaining())
+        return await this.prisma.$transaction(
+          async (tx) => {
+            await tx.$executeRawUnsafe("SET LOCAL lock_timeout = '100ms'")
+            await tx.$executeRaw`SELECT community_privacy_guards(ARRAY[${member}]::text[],ARRAY[]::text[],false)`
+            inserting = true
+            await tx.$executeRaw`
+            INSERT INTO "CommunityFlagEvaluation" (member_id,flag_key,subject_generation)
+              SELECT member_id,'community_read_enabled',generation FROM "CommunitySubject" WHERE member_id = ${member}
+              ON CONFLICT DO NOTHING
+          `
+            inserting = false
+            return (
+              await tx.$queryRaw<CacheRow[]>`
+            UPDATE "CommunityFlagEvaluation" e SET refresh_owner = ${owner}::uuid,
+              refresh_until = clock_timestamp() + interval '2 seconds',
+              remote_evaluated_at = CASE WHEN remote_value IS NULL THEN NULL ELSE remote_evaluated_at END,
+              next_claim_at = clock_timestamp() + interval '45 seconds', last_used_at = clock_timestamp()
+            FROM "CommunitySubject" s WHERE e.member_id = ${member} AND e.flag_key = 'community_read_enabled'
+              AND s.member_id = e.member_id AND s.generation = e.subject_generation
+              AND e.next_claim_at <= clock_timestamp() AND (e.refresh_until IS NULL OR e.refresh_until <= clock_timestamp())
+            RETURNING e.*, next_claim_at - interval '45 seconds' AS now
+          `
+            )[0]
+          },
+          { timeout, maxWait: budget.remaining() }
+        )
+      } catch (error) {
+        if (
+          !inserting ||
+          attempt >= 2 ||
+          !(error instanceof Prisma.PrismaClientKnownRequestError) ||
+          error.code !== 'P2010' ||
+          error.meta?.code !== '55P03'
+        )
+          throw error
+        await delay(Math.min(25, budget.remaining()))
+      }
+    }
   }
 
   private async refresh(
@@ -218,20 +249,23 @@ export class CommunityFlagEvaluationService {
       return
     }
     try {
-      await budget.run(() =>
+      return await budget.run(() =>
         this.prisma.$transaction(
           async (tx) => {
             await tx.$executeRawUnsafe("SET LOCAL lock_timeout = '100ms'")
             await tx.$executeRaw`SELECT community_privacy_guards(ARRAY[${member}]::text[],ARRAY[]::text[],false)`
             // No upsert: erasure or an expired owner can never recreate a cache result.
-            await tx.$executeRaw`
+            return (
+              await tx.$queryRaw<CacheRow[]>`
         UPDATE "CommunityFlagEvaluation" e SET remote_value = ${value}, remote_evaluated_at = ${origin},
           expires_at = ${origin} + interval '60 seconds', refresh_until = NULL, refresh_owner = NULL
         FROM "CommunitySubject" s WHERE e.member_id = ${member} AND e.flag_key = 'community_read_enabled'
           AND e.refresh_owner = ${owner}::uuid AND e.refresh_until > clock_timestamp()
           AND e.subject_generation = ${claim.subject_generation} AND s.member_id = e.member_id
           AND s.generation = e.subject_generation
+        RETURNING e.*,clock_timestamp() AS now
       `
+            )[0]
           },
           {
             timeout: Math.min(400, budget.remaining()),

@@ -1,0 +1,9 @@
+appId: ${MAESTRO_APP_ID}
+---
+- tapOn:
+    id: tab-wardrobe
+- tapOn:
+    id: tab-settings
+- assertNotVisible:
+    id: share-card-title
+- assertNotVisible: ${MAESTRO_SAVED}

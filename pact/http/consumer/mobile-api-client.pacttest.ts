@@ -1,4 +1,8 @@
 import {
+  shareCardInteractions,
+  verifyShareCardInteraction,
+} from './interactions/share-cards'
+import {
   communityEngagementInteractions,
   verifyCommunityEngagement,
   commentOperations,
@@ -943,5 +947,8 @@ describe('CoutureCastMobile -> CoutureCastApi HTTP contract', () => {
 
   it('refuses to delete a foreign location', async () => {
     await verifyLocationDeleteForeignInteraction(pact)
+  })
+  it.each(shareCardInteractions)('prepares $kind $purpose for $id', async (scenario) => {
+    await verifyShareCardInteraction(pact, createMobileClientForMockServer, scenario)
   })
 })

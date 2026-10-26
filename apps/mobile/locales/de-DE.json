@@ -1,0 +1,6 @@
+{
+  "ios": {
+    "NSPhotoLibraryAddUsageDescription": "Erlaube CoutureCast, deine bestätigte Karte in Fotos zu sichern.",
+    "NSPhotoLibraryUsageDescription": "Erlaube CoutureCast, Fotos für deinen Kleiderschrank auszuwählen."
+  }
+}

@@ -1,3 +1,6 @@
+import { ShareCardsController } from '../../../apps/api/src/modules/share-cards/share-cards.controller'
+import { ShareCardsService } from '../../../apps/api/src/modules/share-cards/share-cards.service'
+import { shareCardServiceDouble } from './doubles/share-cards'
 import { CommunitySyncController } from '../../../apps/api/src/modules/community/community-sync.controller.js'
 import { CommunityPreferencesService } from '../../../apps/api/src/modules/community/community-preferences.service.js'
 import { CommunitySyncService } from '../../../apps/api/src/modules/community/community-sync.service.js'
@@ -260,6 +263,7 @@ export async function startLocalPactProvider({
   const locationSeams = createLocationDoubles()
   const moduleFixture = await Test.createTestingModule({
     controllers: [
+      ShareCardsController,
       CommunitySyncController,
       PushRegistrationController,
       AlertsController,
@@ -285,6 +289,7 @@ export async function startLocalPactProvider({
       LocationPreferencesController,
     ],
     providers: [
+      { provide: ShareCardsService, useValue: shareCardServiceDouble },
       { provide: CommunityPreferencesService, useValue: engagement.preferences },
       { provide: CommunitySyncService, useValue: engagement.sync },
       { provide: CommunityTargetsService, useValue: engagement.targets },

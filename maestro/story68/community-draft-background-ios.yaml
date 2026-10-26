@@ -1,0 +1,60 @@
+appId: ${MAESTRO_APP_ID}
+---
+- runFlow:
+    when:
+      visible:
+        id: community-post-sheet-close
+    commands:
+      - tapOn:
+          id: community-post-sheet-close
+- runFlow:
+    when:
+      notVisible:
+        id: community-new-post-button
+    commands:
+      - tapOn:
+          id: tab-community
+- tapOn:
+    id: community-new-post-button
+- scrollUntilVisible:
+    element:
+      id: community-caption-input
+    direction: DOWN
+    centerElement: false
+    visibilityPercentage: 95
+- tapOn:
+    id: community-caption-input
+- inputText: A draft kept across background
+- hideKeyboard
+- scrollUntilVisible:
+    element:
+      id: community-pick-image-button
+    direction: UP
+    centerElement: false
+- tapOn:
+    id: community-pick-image-button
+- extendedWaitUntil:
+    visible: Cancel
+    timeout: 15000
+- pressKey: Home
+- launchApp:
+    appId: ${MAESTRO_APP_ID}
+    stopApp: false
+    clearState: false
+    # Preserve the current OS grants; Maestro otherwise pregrants every permission.
+    permissions: {}
+- extendedWaitUntil:
+    visible: Cancel
+    timeout: 15000
+- tapOn: Cancel
+- assertVisible:
+    id: community-post-sheet-content
+- scrollUntilVisible:
+    element:
+      id: community-caption-input
+    direction: DOWN
+    centerElement: false
+    visibilityPercentage: 95
+- assertVisible: A draft kept across background
+- tapOn:
+    id: community-post-sheet-close

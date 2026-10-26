@@ -1,3 +1,4 @@
+import { safeFindNodeHandle } from '@/src/lib/accessibility-focus'
 import React, { type ComponentRef, useRef, useState } from 'react'
 import { StyleSheet, Platform, Pressable } from 'react-native'
 import { Text, View } from '@/components/themed'
@@ -12,6 +13,7 @@ import { useHeroPalette } from './hero-theme'
 import { useTranslation } from 'react-i18next'
 
 type OutfitRecommendationCardProps = {
+  onExport?: (recommendationId: string, opener: () => number | null) => void
   outfit?: ScenarioOutfit
   onSwapGarment: (garmentId: string, trigger?: number | { focus?: () => void }) => void
   onGarmentRef?: (
@@ -29,6 +31,7 @@ type OutfitRecommendationCardProps = {
 
 export function OutfitRecommendationCard({
   outfit,
+  onExport,
   onSwapGarment,
   onGarmentRef,
   isLoading,
@@ -45,6 +48,7 @@ export function OutfitRecommendationCard({
   // State alone cannot block a double tap: two presses inside one React batch
   // both read the pre-update value and both mint a click. The ref settles
   // synchronously, so the second press is dropped before it reaches the network.
+  const shareOpener = useRef<ComponentRef<typeof Pressable>>(null)
   const ctaActivationInFlight = useRef(false)
   const { t } = useTranslation()
   const palette = useHeroPalette()
@@ -119,6 +123,26 @@ export function OutfitRecommendationCard({
 
   return (
     <View style={styles.container} testID="outfit-recommendation-card">
+      {onExport && (
+        <Pressable
+          accessibilityRole="button"
+          accessibilityLabel={t('shareCard.title')}
+          testID="outfit-share-card-open"
+          ref={shareOpener}
+          style={{
+            minHeight: 48,
+            padding: 12,
+            borderColor: '#B28D46',
+            borderWidth: 1,
+            borderRadius: 8,
+          }}
+          onPress={() =>
+            onExport(outfit.id, () => safeFindNodeHandle(shareOpener.current))
+          }
+        >
+          <Text>{t('shareCard.title')}</Text>
+        </Pressable>
+      )}
       {/* Comfort Notes */}
       <View
         style={[

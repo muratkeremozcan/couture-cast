@@ -1,3 +1,5 @@
+import { startShareCardNativeFixture } from '@/src/lib/share-card-native-fixture'
+import { cleanOrphanShareCards } from '@/src/lib/share-card-save'
 // Step 2 step 3 owner: searchable owner anchor
 import FontAwesome from '@expo/vector-icons/FontAwesome'
 import { DarkTheme, DefaultTheme, ThemeProvider } from '@react-navigation/native'
@@ -46,6 +48,10 @@ export const unstable_settings = {
 void SplashScreen.preventAutoHideAsync()
 
 export default function RootLayout() {
+  useEffect(() => startShareCardNativeFixture(), [])
+  useEffect(() => {
+    void cleanOrphanShareCards().catch(() => undefined)
+  }, [])
   type FontLoadTuple = readonly [boolean, Error | null]
   /* eslint-disable @typescript-eslint/no-unsafe-assignment */
   // Expo's types return an untyped tuple; narrow locally to satisfy type-aware linting.

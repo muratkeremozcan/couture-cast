@@ -125,4 +125,21 @@ describe('verifyAndNormalizeCommunityImage', () => {
     expect(result.mimeType).toBe('image/png')
     expect(result.widthPx).toBe(512)
   })
+  it('U-MEDIA rejects an actual decoded two-frame WebP with a matching MIME and checksum', async () => {
+    const frames = Buffer.alloc(256 * 512 * 3, 200)
+    frames.fill(20, 256 * 256 * 3)
+    const bytes = await sharp(frames, {
+      raw: { width: 256, height: 512, channels: 3, pageHeight: 256 },
+    })
+      .webp({ loop: 0 })
+      .toBuffer()
+    expect((await sharp(bytes, { animated: true }).metadata()).pages).toBe(2)
+    await expect(
+      verifyAndNormalizeCommunityImage(bytes, {
+        byteSize: bytes.length,
+        mimeType: 'image/webp',
+        sha256: sha256(bytes),
+      })
+    ).rejects.toBeInstanceOf(CommunityImageValidationError)
+  })
 })

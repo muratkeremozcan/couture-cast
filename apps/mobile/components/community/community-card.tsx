@@ -1,3 +1,4 @@
+import { safeFindNodeHandle } from '@/src/lib/accessibility-focus'
 import type { ReactionControls } from '@couture/api-client'
 import { CommunityReactions } from './community-reactions'
 import React, { useCallback, useEffect, useRef, useState } from 'react'
@@ -212,6 +213,7 @@ function CommunityCardActions({
 }
 
 export interface CommunityCardProps {
+  onExport?: (postId: string, opener: () => number | null) => void
   onComments?: (item: CommunityFeedItem) => void
   commentsButtonRef?: React.Ref<View>
   reactionControls?: ReactionControls
@@ -238,7 +240,30 @@ export interface CommunityCardProps {
   onOpen?: (item: CommunityFeedItem) => void
 }
 
+function CommunityShareAction({
+  item,
+  onExport,
+}: Pick<CommunityCardProps, 'item' | 'onExport'>) {
+  const { t } = useTranslation()
+  const palette = useHeroPalette()
+  const opener = useRef<View>(null)
+  if (!item.author.isSelf || !onExport) return null
+  return (
+    <Pressable
+      accessibilityRole="button"
+      accessibilityLabel={t('shareCard.title')}
+      testID={`community-share-card-open-${item.id}`}
+      ref={opener}
+      style={{ minHeight: 48, padding: 12, borderColor: '#B28D46', borderWidth: 1 }}
+      onPress={() => onExport(item.id, () => safeFindNodeHandle(opener.current))}
+    >
+      <Text style={{ color: palette.text }}>{t('shareCard.title')}</Text>
+    </Pressable>
+  )
+}
+
 export function CommunityCard({
+  onExport,
   onComments,
   commentsButtonRef,
   reactionControls,
@@ -491,6 +516,7 @@ export function CommunityCard({
       ) : null}
 
       {reactionControls && <CommunityReactions item={item} controls={reactionControls} />}
+      <CommunityShareAction item={item} onExport={onExport} />
       <View style={styles.actionsRow}>
         {onComments && (
           <TouchableOpacity

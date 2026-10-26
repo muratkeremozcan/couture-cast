@@ -1,0 +1,10 @@
+appId: ${MAESTRO_APP_ID}
+---
+- tapOn:
+    id: share-card-save
+- tapOn: "Don.t allow|Don’t Allow|Don't Allow"
+- extendedWaitUntil:
+    visible: ${MAESTRO_DENIED}
+    timeout: 10000
+- assertVisible:
+    id: share-card-preview-loaded-.*

@@ -1,0 +1,6 @@
+appId: ${MAESTRO_APP_ID}
+---
+- runFlow: ../story65/open-notification-settings.yaml
+- tapOn: ${MAESTRO_SIGNOUT}
+- assertNotVisible:
+    id: share-card-title

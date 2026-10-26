@@ -943,5 +943,48 @@
       "linkLabel_other": "Herausragender Look in {{label}} von {{author}}, {{count}} Reaktionen. Öffnet die Stadt-Highlights.",
       "cta": "In den Stadt-Highlights ansehen"
     }
+  },
+  "shareCard": {
+    "launcher": "Meine Outfitkarte erstellen",
+    "sourceOutfit": "Outfit",
+    "sourceCommunity": "Community-Look",
+    "title": "Deine Karte",
+    "previewDescription": "Vorschau deiner CoutureCast-Karte",
+    "photoPrivacyHelp": "Dein Foto bleibt sichtbar, einschließlich aller Namen und Schilder im Bild. Prüfe die Vorschau vor dem Speichern.",
+    "preparing": "Karte wird vorbereitet",
+    "watermark": "Wasserzeichen anzeigen",
+    "save": "In Fotos sichern",
+    "download": "PNG herunterladen",
+    "saving": "Wird gespeichert",
+    "finishingSave": "Speichern wird abgeschlossen",
+    "saved": "In Fotos gesichert",
+    "downloadStarted": "Download gestartet",
+    "cancel": "Abbrechen",
+    "close": "Schließen",
+    "retry": "Erneut versuchen",
+    "refresh": "Vorschau aktualisieren",
+    "openSettings": "Einstellungen öffnen",
+    "nativeSaveUnavailable": "Aktualisiere die App, um Fotos zu speichern.",
+    "permissionDenied": "Fotozugriff verweigert. Versuche es erneut.",
+    "permissionPermanent": "Erlaube das Speichern von Fotos in den Einstellungen.",
+    "sourceUnavailable": "Diese Quelle ist nicht verfügbar.",
+    "previewChanged": "Die Karte wurde geändert. Aktualisiere die Vorschau vor dem Speichern.",
+    "offline": "Verbinde dich mit dem Internet, um eine Karte vorzubereiten.",
+    "storage": "Speichern fehlgeschlagen. Prüfe den freien Speicher und versuche es erneut.",
+    "render": "Vorbereitung fehlgeschlagen. Versuche es erneut.",
+    "unknown": "Ein Fehler ist aufgetreten. Versuche es erneut.",
+    "scenarios": {
+      "morning": "Morgen",
+      "midday": "Mittag",
+      "evening": "Abend"
+    },
+    "climateBands": {
+      "cold_dry": "Kalt und trocken",
+      "cold_wet": "Kalt und feucht",
+      "temperate_dry": "Mild und trocken",
+      "temperate_wet": "Mild und feucht",
+      "warm_dry": "Warm und trocken",
+      "warm_wet": "Warm und feucht"
+    }
   }
 }

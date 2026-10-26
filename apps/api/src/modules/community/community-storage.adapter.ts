@@ -154,6 +154,72 @@ export class SupabaseCommunityStorageAdapter implements CommunityStorage {
     return Buffer.from(await data.arrayBuffer())
   }
 
+  /** Export-only bounded streaming path. Existing callers keep download(). */
+  async downloadBounded(
+    objectPath: string,
+    maxBytes: number,
+    parentSignal: AbortSignal
+  ): Promise<Buffer> {
+    const base = process.env.SUPABASE_URL?.trim()
+    const key = process.env.SUPABASE_SERVICE_ROLE_KEY?.trim()
+    if (
+      !base ||
+      !key ||
+      !/^community\/[A-Za-z0-9_-]+\/[A-Za-z0-9_-]+\.(?:jpg|jpeg|png|webp)$/.test(
+        objectPath
+      )
+    )
+      throw storageUnavailable()
+    const controller = new AbortController()
+    let reader: ReadableStreamDefaultReader<Uint8Array> | undefined
+    const abort = () => {
+      controller.abort()
+      void reader?.cancel().catch(() => undefined)
+    }
+    parentSignal.addEventListener('abort', abort, { once: true })
+    if (parentSignal.aborted) controller.abort()
+    const timer = setTimeout(abort, 5000)
+    try {
+      const response = await fetch(
+        `${base.replace(/\/+$/, '')}/storage/v1/object/authenticated/${COMMUNITY_IMAGES_BUCKET}/${objectPath}`,
+        {
+          headers: { Authorization: `Bearer ${key}`, apikey: key },
+          signal: controller.signal,
+          redirect: 'error',
+        }
+      )
+      if (
+        !response.ok ||
+        !response.body ||
+        Number(response.headers.get('content-length')) > maxBytes
+      ) {
+        await response.body?.cancel()
+        throw storageUnavailable()
+      }
+      reader = response.body.getReader()
+      const parts: Buffer[] = []
+      let size = 0
+      for (;;) {
+        const next = await reader.read()
+        if (next.done) break
+        size += next.value.byteLength
+        if (size > maxBytes || controller.signal.aborted) {
+          await reader.cancel()
+          throw storageUnavailable()
+        }
+        parts.push(Buffer.from(next.value))
+      }
+      if (controller.signal.aborted) throw storageUnavailable()
+      return Buffer.concat(parts)
+    } catch {
+      throw storageUnavailable()
+    } finally {
+      clearTimeout(timer)
+      parentSignal.removeEventListener('abort', abort)
+      await reader?.cancel().catch(() => undefined)
+    }
+  }
+
   async upload(objectPath: string, bytes: Buffer, mimeType: string): Promise<void> {
     const { error } = await this.storage().upload(objectPath, bytes, {
       cacheControl: 'private, max-age=0',

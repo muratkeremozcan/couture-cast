@@ -163,6 +163,7 @@ describe('deployment workflows', () => {
       'k6-smoke-prs.yml',
       'pr-mobile-e2e.yml',
       'pr-pw-e2e-local.yml',
+      'pr-share-card-native.yml',
       'rwf-burn-in.yml',
       'rwf-e2e.yml',
     ])
@@ -188,7 +189,7 @@ describe('deployment workflows', () => {
         expect(reserve, `${file} ${job}`).toBeLessThan(start)
       }
     }
-    expect(startingJobs).toBe(6)
+    expect(startingJobs).toBe(7)
   })
 
   it('local Supabase starts from the image cache with its host ports guarded', () => {

@@ -1,0 +1,12 @@
+appId: ${MAESTRO_APP_ID}
+---
+- tapOn:
+    id: share-card-watermark
+- tapOn:
+    id: share-card-watermark
+- extendedWaitUntil:
+    visible:
+      id: share-card-preview-loaded-.*
+    timeout: 20000
+- assertVisible:
+    id: share-card-save

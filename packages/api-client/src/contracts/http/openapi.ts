@@ -5,6 +5,7 @@ import {
   extendZodWithOpenApi,
 } from '@asteasolutions/zod-to-openapi'
 import { z } from 'zod'
+import { registerShareCardsContracts } from './share-cards'
 import { registerAlertsContracts } from './alerts'
 import { registerAuthContracts } from './auth'
 import { registerCommonHttpSchemas } from './common'
@@ -119,6 +120,7 @@ export function createHttpOpenApiRegistry() {
   registerPlannerContracts(registry, commonSchemas)
   registerCommunityContracts(registry, commonSchemas)
   registerCommunitySyncContracts(registry, commonSchemas)
+  registerShareCardsContracts(registry)
 
   return registry
 }

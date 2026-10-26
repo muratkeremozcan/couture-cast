@@ -943,5 +943,48 @@
       "linkLabel_other": "Look vedette à {{label}} par {{author}}, {{count}} réactions. Ouvre les Vedettes de la ville.",
       "cta": "Voir dans les Vedettes de la ville"
     }
+  },
+  "shareCard": {
+    "launcher": "Créer ma carte de tenue",
+    "sourceOutfit": "Tenue",
+    "sourceCommunity": "Look de la communauté",
+    "title": "Votre carte",
+    "previewDescription": "Aperçu de votre carte CoutureCast",
+    "photoPrivacyHelp": "Votre photo reste visible, y compris les noms et panneaux qui y figurent. Vérifiez cet aperçu avant de sauvegarder.",
+    "preparing": "Préparation de la carte",
+    "watermark": "Afficher le filigrane",
+    "save": "Enregistrer dans Photos",
+    "download": "Télécharger le PNG",
+    "saving": "Enregistrement",
+    "finishingSave": "Fin de l’enregistrement",
+    "saved": "Enregistré dans Photos",
+    "downloadStarted": "Téléchargement lancé",
+    "cancel": "Annuler",
+    "close": "Fermer",
+    "retry": "Réessayer",
+    "refresh": "Actualiser l’aperçu",
+    "openSettings": "Ouvrir les réglages",
+    "nativeSaveUnavailable": "Mettez l’application à jour pour enregistrer des photos.",
+    "permissionDenied": "Accès aux photos refusé. Vous pouvez réessayer.",
+    "permissionPermanent": "Autorisez l’enregistrement dans les réglages.",
+    "sourceUnavailable": "Cette source est indisponible.",
+    "previewChanged": "La carte a changé. Actualisez l’aperçu avant de l’enregistrer.",
+    "offline": "Connectez-vous à Internet pour préparer une carte.",
+    "storage": "Enregistrement impossible. Vérifiez l’espace disponible et réessayez.",
+    "render": "Préparation impossible. Réessayez.",
+    "unknown": "Une erreur est survenue. Réessayez.",
+    "scenarios": {
+      "morning": "Matin",
+      "midday": "Midi",
+      "evening": "Soir"
+    },
+    "climateBands": {
+      "cold_dry": "Froid et sec",
+      "cold_wet": "Froid et humide",
+      "temperate_dry": "Tempéré et sec",
+      "temperate_wet": "Tempéré et humide",
+      "warm_dry": "Chaud et sec",
+      "warm_wet": "Chaud et humide"
+    }
   }
 }

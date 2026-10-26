@@ -943,5 +943,48 @@
       "linkLabel_other": "Look in evidenza a {{label}} di {{author}}, {{count}} reazioni. Apre In evidenza in città.",
       "cta": "Vedi in In evidenza in città"
     }
+  },
+  "shareCard": {
+    "launcher": "Crea la mia scheda outfit",
+    "sourceOutfit": "Outfit",
+    "sourceCommunity": "Look della community",
+    "title": "La tua scheda",
+    "previewDescription": "Anteprima della scheda CoutureCast",
+    "photoPrivacyHelp": "La tua foto resta visibile, compresi nomi e cartelli presenti. Controlla questa anteprima prima di salvare.",
+    "preparing": "Preparazione della scheda",
+    "watermark": "Mostra filigrana",
+    "save": "Salva in Foto",
+    "download": "Scarica PNG",
+    "saving": "Salvataggio",
+    "finishingSave": "Completamento del salvataggio",
+    "saved": "Salvato in Foto",
+    "downloadStarted": "Download avviato",
+    "cancel": "Annulla",
+    "close": "Chiudi",
+    "retry": "Riprova",
+    "refresh": "Aggiorna anteprima",
+    "openSettings": "Apri impostazioni",
+    "nativeSaveUnavailable": "Aggiorna l’app per salvare le foto.",
+    "permissionDenied": "Accesso alle foto negato. Puoi riprovare.",
+    "permissionPermanent": "Consenti il salvataggio nelle impostazioni.",
+    "sourceUnavailable": "Questa fonte non è disponibile.",
+    "previewChanged": "La scheda è cambiata. Aggiorna l’anteprima prima di salvare.",
+    "offline": "Connettiti a Internet per preparare una scheda.",
+    "storage": "Salvataggio non riuscito. Controlla lo spazio disponibile e riprova.",
+    "render": "Preparazione non riuscita. Riprova.",
+    "unknown": "Si è verificato un errore. Riprova.",
+    "scenarios": {
+      "morning": "Mattina",
+      "midday": "Mezzogiorno",
+      "evening": "Sera"
+    },
+    "climateBands": {
+      "cold_dry": "Freddo e secco",
+      "cold_wet": "Freddo e umido",
+      "temperate_dry": "Temperato e secco",
+      "temperate_wet": "Temperato e umido",
+      "warm_dry": "Caldo e secco",
+      "warm_wet": "Caldo e umido"
+    }
   }
 }

@@ -1,0 +1,67 @@
+appId: ${MAESTRO_APP_ID}
+---
+- tapOn:
+    id: tab-community
+- runFlow:
+    when:
+      platform: iOS
+    commands:
+      # Explicit list-region drags avoid the nested horizontal climate filter.
+      - repeat:
+          while:
+            notVisible:
+              id: community-card-author-${MAESTRO_POST_ID}
+          times: 12
+          commands:
+            - swipe:
+                start: 50%, 45%
+                end: 50%, 80%
+                duration: 800
+            - waitForAnimationToEnd
+      # A freshly mounted feed starts above the post, below the spotlight section.
+      - repeat:
+          while:
+            notVisible:
+              id: community-card-author-${MAESTRO_POST_ID}
+          times: 16
+          commands:
+            - swipe:
+                start: 50%, 75%
+                end: 50%, 40%
+                duration: 800
+            - waitForAnimationToEnd
+      - assertVisible:
+          id: community-card-author-${MAESTRO_POST_ID}
+      - repeat:
+          while:
+            notVisible:
+              id: community-share-card-open-${MAESTRO_POST_ID}
+          times: 10
+          commands:
+            - swipe:
+                start: 50%, 75%
+                end: 50%, 55%
+                duration: 800
+            - waitForAnimationToEnd
+      # AX can count the footer under the tab bar. Lift it a short distance.
+      - swipe:
+          start: 50%, 70%
+          end: 50%, 55%
+          duration: 1000
+      - waitForAnimationToEnd
+- runFlow:
+    when:
+      platform: Android
+    commands:
+      - scrollUntilVisible:
+          element:
+            id: community-share-card-open-${MAESTRO_POST_ID}
+          direction: DOWN
+          timeout: 30000
+          centerElement: false
+- tapOn:
+    id: community-share-card-open-${MAESTRO_POST_ID}
+- extendedWaitUntil:
+    visible:
+      id: share-card-preview-loaded-.*
+    timeout: 20000

@@ -1,0 +1,24 @@
+appId: ${MAESTRO_APP_ID}
+---
+- tapOn:
+    id: share-card-save
+- extendedWaitUntil:
+    visible: ${MAESTRO_PENDING}
+    timeout: 20000
+- tapOn:
+    id: share-card-save
+    optional: true
+- assertVisible: ${MAESTRO_PENDING}
+- runFlow:
+    when:
+      platform: iOS
+    commands:
+      # Expose controls inside the clipped list/ScrollView, above the native bottom bar.
+      - swipe:
+          start: 50%, 70%
+          end: 50%, 30%
+          duration: 500
+- tapOn:
+    id: share-card-cancel
+- assertNotVisible:
+    id: share-card-title

@@ -1,0 +1,15 @@
+appId: ${MAESTRO_APP_ID}
+---
+- tapOn:
+    id: share-card-save
+- runFlow:
+    when:
+      visible: "Don.t allow|Don’t Allow|Don't Allow"
+    commands:
+      - tapOn: "Don.t allow|Don’t Allow|Don't Allow"
+- extendedWaitUntil:
+    visible: ${MAESTRO_PERMANENT}
+    timeout: 10000
+- assertVisible: ${MAESTRO_SETTINGS}
+- assertVisible:
+    id: share-card-preview-loaded-.*

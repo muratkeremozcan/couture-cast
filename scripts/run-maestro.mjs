@@ -1,4 +1,5 @@
 #!/usr/bin/env node
+import { assertTestDiskSpace } from './lib/test-disk-space.mjs'
 // Step 12 step 4 owner: searchable owner anchor
 
 /**
@@ -27,6 +28,7 @@ import os from 'node:os'
 import { fileURLToPath, URL } from 'node:url'
 import path from 'node:path'
 import { MAESTRO_BIN, MAESTRO_PINNED_VERSION } from './maestro-version.mjs'
+import { NATIVE_MAESTRO_FLOWS } from './lib/native-maestro-flows.mjs'
 import {
   COMMUNITY_COMMENTS_FLOW,
   COMMUNITY_COMMENTS_LONG_ROOT,
@@ -137,11 +139,16 @@ const discoverFlows = () => {
   return fs
     .readdirSync(flowDir, { withFileTypes: true })
     .filter((entry) => entry.isFile() && /\.ya?ml$/.test(entry.name))
+    .filter((entry) => !NATIVE_MAESTRO_FLOWS.has(entry.name))
     .map((entry) => `maestro/${entry.name}`)
     .sort()
 }
 
 const flowsToRun = FLOW_PATHS.length > 0 ? FLOW_PATHS : discoverFlows()
+if (flowsToRun.some((flow) => NATIVE_MAESTRO_FLOWS.has(path.basename(flow))))
+  throw new Error(
+    'Use scripts/run-story68-native.mjs for share-card-export.yaml. It requires a rebuilt client and actual OS resource inspection.'
+  )
 const WRITE_ARTIFACTS =
   process.argv.includes('--ci') ||
   process.argv.includes('--artifacts') ||
@@ -1914,6 +1921,7 @@ const prepareAndroidFlows = async (appId, devices) => {
   }
   const sourceDir = path.resolve(projectRoot, 'maestro')
   const targetDir = path.resolve(projectRoot, MAESTRO_ARTIFACT_DIR, 'android-flows')
+  assertTestDiskSpace(projectRoot)
   const { files, rewritten } = prepareAndroidFlowTree({
     sourceDir,
     targetDir,
@@ -3086,28 +3094,6 @@ const resolveReportPath = (requestedPath) => {
     }
   }
   return null
-}
-
-/**
- * Kill iOS driver processes left behind by an earlier run.
- *
- * Maestro's iOS driver listens on a fixed host port. A driver that outlived its
- * run keeps that port, and the next run's first flow dies with
- * `Failed to connect to /127.0.0.1:7001` -- a failure that looks exactly like a
- * flaky device and was recorded as one twice before it was traced here.
- *
- * @returns {Promise<void>}
- */
-const killStaleIosDrivers = async () => {
-  if (!isMac) return
-  for (const pattern of [
-    'maestro-driver-iosUITests-Runner',
-    'maestro-driver-ios-config.xctestrun',
-  ]) {
-    await spawnProcess('pkill', ['-f', pattern], { timeoutMs: 5_000 }).catch(() => {
-      // `pkill` exits non-zero when nothing matched, which is the normal case.
-    })
-  }
 }
 
 /**
@@ -4558,7 +4544,7 @@ const cleanupMobileRun = async (apiSetupBaseUrl, mobileIdentities, children) => 
  * @returns {Promise<void>}
  */
 const run = async () => {
-  await killStaleIosDrivers()
+  assertTestDiskSpace(projectRoot)
   const metroPort = await chooseMetroPort()
   process.env.MOBILE_E2E_METRO_PORT = String(metroPort)
   const target = await ensureMaestroTarget()

@@ -1,5 +1,13 @@
 import { fold } from './weather-provider-double-data.mjs'
 
+// The native harness owns an isolated UUID database, genuine identities and source fixtures.
+// Its flow never uses the shared Expo Go member or reset hooks.
+export const SHARE_CARD_EXPORT_FLOW = {
+  path: 'maestro/share-card-export.yaml',
+  runner: 'scripts/run-story68-native.mjs',
+  stateOwner: 'scripts/e2e-share-card/prepare.mjs',
+}
+
 /**
  * Reset state owned by the synthetic member before each flow and watchdog retry.
  * A timed-out flow can have saved a reaction before stalling during relaunch.

@@ -210,3 +210,158 @@ jobs:
         run: |
           echo "::error::Quality gate failed: tests=${{ steps.tests.outcome }} lighthouse=${{ steps.lighthouse.outcome }}"
           exit 1
+
+  community-realtime-budget:
+    name: Community realtime cold-handshake budget
+    runs-on: ubuntu-24.04
+    timeout-minutes: 15
+    env:
+      NODE_OPTIONS: --conditions=development
+      REDIS_URL: redis://127.0.0.1:6379
+    services:
+      postgres:
+        image: postgres:17-alpine
+        env:
+          POSTGRES_USER: postgres
+          POSTGRES_PASSWORD: postgres
+          POSTGRES_DB: postgres
+        ports: [5432:5432]
+        options: >-
+          --health-cmd "pg_isready -U postgres"
+          --health-interval 5s --health-timeout 5s --health-retries 10
+      redis:
+        image: redis:7-alpine
+        ports: [6379:6379]
+        options: >-
+          --health-cmd "redis-cli ping"
+          --health-interval 5s --health-timeout 5s --health-retries 10
+    steps:
+      - uses: actions/checkout@v4
+      - uses: ./.github/actions/setup-node-env
+      - name: Prepare generated dependencies before the measured phase
+        run: |
+          npm run db:generate
+          npm run build:packages
+      - name: Provision isolated CI roles
+        run: |
+          psql "$DATABASE_URL" -q -v ON_ERROR_STOP=1 <<'SQL'
+          CREATE ROLE anon NOLOGIN;
+          CREATE ROLE authenticated NOLOGIN;
+          CREATE ROLE service_role NOLOGIN BYPASSRLS;
+          CREATE SCHEMA auth;
+          CREATE FUNCTION auth.jwt() RETURNS jsonb LANGUAGE sql STABLE AS $fn$
+            SELECT coalesce(nullif(current_setting('request.jwt.claim', true), ''),
+              nullif(current_setting('request.jwt.claims', true), ''))::jsonb
+          $fn$;
+          GRANT USAGE ON SCHEMA auth TO anon, authenticated, service_role;
+          ALTER DEFAULT PRIVILEGES IN SCHEMA public
+            GRANT SELECT, INSERT, UPDATE, DELETE ON TABLES TO authenticated;
+          SQL
+      # One test worker, its own runner and services, no concurrent builds or suites.
+      # The product keeps its 1950 ms deadline, five-connection pool and 100 cold members.
+      - name: Require five independent cold-start budget proofs
+        working-directory: apps/api
+        run: |
+          set -euo pipefail
+          mkdir -p .cache/realtime-budget
+          for attempt in 1 2 3 4 5; do
+            npx vitest run --config vitest.realtime-budget.config.ts --reporter=default --reporter=json --outputFile=".cache/realtime-budget/run-$attempt.json" 2>&1 | tee ".cache/realtime-budget/run-$attempt.log"
+          done
+      - name: Require execution of every budget proof
+        working-directory: apps/api
+        run: |
+          node --input-type=module <<'JS'
+          import fs from 'node:fs'
+          for (let attempt = 1; attempt <= 5; attempt++) {
+            const report = JSON.parse(fs.readFileSync(`.cache/realtime-budget/run-${attempt}.json`, 'utf8'))
+            if (report.numTotalTests !== 1 || report.numPassedTests !== 1 ||
+                report.numPendingTests !== 0 || report.numFailedTests !== 0 || report.numTodoTests !== 0)
+              throw new Error(`Incomplete realtime budget proof: ${attempt}`)
+          }
+          JS
+      - name: Upload cold-handshake timings and results
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: community-realtime-budget
+          path: apps/api/.cache/realtime-budget/
+          if-no-files-found: error
+
+  community-screening-gates:
+    name: Community corpus and mixed workload budgets
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    env:
+      COMMUNITY_NSFW_SCREENER: tensorflow
+      NODE_OPTIONS: --conditions=development
+      COMMUNITY_SCREENING_RUN_PRODUCT_DIR: .cache/community-screening
+      RUN_COMMENT_RESOURCE_MEASUREMENT: 'true'
+    services:
+      postgres:
+        image: postgres:17-alpine
+        env:
+          POSTGRES_USER: postgres
+          POSTGRES_PASSWORD: postgres
+          POSTGRES_DB: postgres
+        ports: [5432:5432]
+        options: >-
+          --health-cmd "pg_isready -U postgres"
+          --health-interval 5s --health-timeout 5s --health-retries 10
+      redis:
+        image: redis:7-alpine
+        ports: [6379:6379]
+        options: >-
+          --health-cmd "redis-cli ping"
+          --health-interval 5s --health-timeout 5s --health-retries 10
+    steps:
+      - uses: actions/checkout@v4
+      # The pinned model and WASM artifacts ship in npm packages. This action restores
+      # their lockfile-keyed npm cache; the manifest verification also runs on cache hits.
+      - uses: ./.github/actions/setup-node-env
+      - name: Generate Prisma client and shared packages
+        run: |
+          npm run db:generate
+          npm run build:packages
+      - name: Provision isolated CI cluster roles
+        run: |
+          psql "$DATABASE_URL" -q -v ON_ERROR_STOP=1 <<'SQL'
+          CREATE ROLE anon NOLOGIN;
+          CREATE ROLE authenticated NOLOGIN;
+          CREATE ROLE service_role NOLOGIN BYPASSRLS;
+          CREATE SCHEMA auth;
+          CREATE FUNCTION auth.jwt() RETURNS jsonb LANGUAGE sql STABLE AS $fn$
+            SELECT coalesce(nullif(current_setting('request.jwt.claim', true), ''),
+              nullif(current_setting('request.jwt.claims', true), ''))::jsonb
+          $fn$;
+          GRANT USAGE ON SCHEMA auth TO anon, authenticated, service_role;
+          ALTER DEFAULT PRIVILEGES IN SCHEMA public
+            GRANT SELECT, INSERT, UPDATE, DELETE ON TABLES TO authenticated;
+          SQL
+      - name: Verify cached pinned model and compile the production worker
+        run: |
+          node scripts/verify-community-screening-model.mjs
+          npm run build --workspace api
+      - name: Mandatory seven-locale release corpus evaluation
+        working-directory: apps/api
+        run: npx vitest run src/modules/community/community-text-corpus.evaluation.spec.ts --reporter=default --reporter=json --outputFile=.cache/community-screening/corpus-ci-tests.json
+      - name: Mandatory compiled mixed workload and resource budgets
+        working-directory: apps/api
+        run: npx vitest run integration/community-comments-measurement.integration.spec.ts --maxWorkers=1 --reporter=default --reporter=json --outputFile=.cache/community-screening/mixed-ci-tests.json
+      - name: Require complete execution with every opt-in case enabled
+        run: |
+          node --input-type=module <<'JS'
+          import fs from 'node:fs'
+          for (const [file, minimum] of [['corpus-ci-tests.json',52],['mixed-ci-tests.json',1]]) {
+            const report = JSON.parse(fs.readFileSync(`apps/api/.cache/community-screening/${file}`,'utf8'))
+            if (report.numTotalTests < minimum || report.numPassedTests !== report.numTotalTests ||
+                report.numPendingTests !== 0 || report.numFailedTests !== 0 || report.numTodoTests !== 0)
+              throw new Error(`Incomplete mandatory screening execution: ${file}`)
+          }
+          JS
+      - name: Upload corpus and compiled-worker measurements
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: community-screening-gates
+          path: apps/api/.cache/community-screening/
+          if-no-files-found: error

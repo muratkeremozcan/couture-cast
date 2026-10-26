@@ -12,9 +12,11 @@ const fs = require('fs')
 const path = require('path')
 
 const nativeBundleId =
-  process.env.STORY65_NATIVE_TEST_BUILD === '1'
-    ? 'com.couturecast.story65'
-    : 'com.couturecast.app'
+  process.env.STORY68_NATIVE_TEST_BUILD === '1'
+    ? 'com.couturecast.story68'
+    : process.env.STORY65_NATIVE_TEST_BUILD === '1'
+      ? 'com.couturecast.story65'
+      : 'com.couturecast.app'
 const appGroup = `group.${nativeBundleId}`
 const extensionName = 'OutfitWidget'
 const extensionBundleIdentifier = `${nativeBundleId}.OutfitWidget`
