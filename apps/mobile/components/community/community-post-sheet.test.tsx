@@ -281,6 +281,74 @@ describe('CommunityPostSheet (Story 6.1)', () => {
     await i18n.changeLanguage('en-US')
   })
 
+  it.each(['verified', 'denied', 'close', 'identity'] as const)(
+    'retains a deferred PHPicker selection during foreground suspension and resumes only for %s',
+    async (outcome) => {
+      Object.defineProperty(Platform, 'OS', { value: 'ios', configurable: true })
+      let choose!: (value: {
+        canceled: boolean
+        assets: { uri: string; width: number; height: number }[]
+      }) => void
+      const picked = new Promise<{
+        canceled: boolean
+        assets: { uri: string; width: number; height: number }[]
+      }>((resolve) => {
+        choose = resolve
+      })
+      imagePicker.launchImageLibraryAsync.mockReturnValueOnce(picked)
+      let allocations = 0
+      server.use(
+        http.post('*/api/v1/community/posts/allocate', () => {
+          allocations++
+          return HttpResponse.json(allocateSession())
+        })
+      )
+      const callbacks = { onClose: vi.fn(), onPublished: vi.fn() }
+      const view = render(<CommunityPostSheet visible {...callbacks} />)
+      press(screen.getByTestId('community-pick-image-button'))
+      await waitFor(() => expect(imagePicker.launchImageLibraryAsync).toHaveBeenCalled())
+      view.rerender(<CommunityPostSheet visible suspended {...callbacks} />)
+      await act(async () => {
+        choose({
+          canceled: false,
+          assets: [{ uri: 'file:///explicit-selection.jpg', width: 1200, height: 1200 }],
+        })
+        await picked
+      })
+      expect(
+        await screen.findByTestId('community-post-preview-image')
+      ).toBeInTheDocument()
+      expect(allocations).toBe(0)
+      if (outcome === 'verified') {
+        view.rerender(<CommunityPostSheet visible suspended={false} {...callbacks} />)
+        await waitFor(() => expect(allocations).toBe(1))
+        await waitFor(() =>
+          expect(
+            screen.getByTestId<HTMLTextAreaElement>('community-alt-text-input').value
+          ).toBe(SUGGESTION)
+        )
+      } else {
+        if (outcome === 'close') press(screen.getByTestId('community-post-sheet-close'))
+        else if (outcome === 'identity')
+          view.rerender(<CommunityPostSheet key="new-owner" visible {...callbacks} />)
+        else view.rerender(<CommunityPostSheet visible={false} {...callbacks} />)
+        view.rerender(
+          <CommunityPostSheet
+            key={outcome === 'identity' ? 'new-owner' : undefined}
+            visible
+            {...callbacks}
+          />
+        )
+        await act(async () => {
+          await Promise.resolve()
+        })
+        expect(allocations).toBe(0)
+        expect(
+          screen.queryByTestId('community-post-preview-image')
+        ).not.toBeInTheDocument()
+      }
+    }
+  )
   it('6.1-MOB-075 moves accessibility focus into the sheet on a native surface', async () => {
     Object.defineProperty(Platform, 'OS', { value: 'ios', configurable: true })
     vi.mocked(findNodeHandle).mockReturnValue(73)

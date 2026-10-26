@@ -13,7 +13,7 @@ import * as telemetryService from '../src/modules/telemetry/telemetry.service.js
 import * as accessModule from '../src/modules/community/community-access.service.js'
 import * as repositoryModule from '../src/modules/community/community.repository.js'
 import * as providerModule from '../src/modules/community/community-push-provider.js'
-import { PrismaClient } from '@prisma/client'
+import { PrismaClient, type Prisma } from '@prisma/client'
 import { Test } from '@nestjs/testing'
 import type { INestApplication } from '@nestjs/common'
 import {
@@ -148,7 +148,81 @@ function classes() {
 
 const testClasses = classes()
 const db = isolatedCommunityDatabase()
-const prisma = new PrismaClient({ datasources: { db: { url: db.url } } })
+const actualPrisma = new PrismaClient({ datasources: { db: { url: db.url } } })
+let diagnoseDispatch = false
+const transactionFailures: {
+  phase: string
+  elapsedMs: number
+  name: string
+  code: string | null
+  sqlState: string | null
+}[] = []
+const prisma = new Proxy(actualPrisma, {
+  get(target, key) {
+    if (key !== '$transaction') {
+      const value: unknown = Reflect.get(target, key)
+      return value
+    }
+    return async (
+      work: (tx: Prisma.TransactionClient) => Promise<unknown>,
+      options?: { timeout?: number; maxWait?: number }
+    ) => {
+      let phase = 'transaction'
+      const started = performance.now()
+      try {
+        return await target.$transaction(
+          async (tx) =>
+            work(
+              new Proxy(tx, {
+                get(connection, operation) {
+                  const value: unknown = Reflect.get(connection, operation)
+                  if (
+                    !['$executeRawUnsafe', '$executeRaw', '$queryRaw'].includes(
+                      String(operation)
+                    ) ||
+                    typeof value !== 'function'
+                  )
+                    return value
+                  return (...args: unknown[]) => {
+                    const query = args[0]
+                    const text =
+                      typeof query === 'string'
+                        ? query
+                        : Array.isArray(query)
+                          ? query.join('')
+                          : ''
+                    if (text.includes("transaction_timeout = '500ms'")) phase = 'claim'
+                    else if (text.includes("transaction_timeout = '3s'"))
+                      phase = 'authorization'
+                    else if (text.includes('CommunityFlagEvaluation')) phase = 'flag'
+                    const result: unknown = Reflect.apply(value, connection, args)
+                    return result
+                  }
+                },
+              })
+            ),
+          options
+        )
+      } catch (error) {
+        if (diagnoseDispatch) {
+          const closed = error as {
+            name?: unknown
+            code?: unknown
+            meta?: { code?: unknown }
+          }
+          transactionFailures.push({
+            phase,
+            elapsedMs: Math.round(performance.now() - started),
+            name: typeof closed.name === 'string' ? closed.name : 'unknown',
+            code: typeof closed.code === 'string' ? closed.code : null,
+            sqlState: typeof closed.meta?.code === 'string' ? closed.meta.code : null,
+          })
+        }
+        throw error
+      }
+    }
+  },
+})
 const remote = { getFeatureFlagValue: () => Promise.resolve(true) }
 const evaluation = new CommunityFlagEvaluationService(prisma, remote)
 const flags = new FeatureFlagsService(
@@ -347,6 +421,10 @@ describe('T02 actual policy boundaries and HTTP scheduling floors', () => {
 
   it('send authorization crossing into quiet hours records history and a proven no-call deferral', async () => {
     const f = await fixture(true)
+    // The policy phase starts with a completed live flag grant. Cold acquisition has its own COMMIT fault cases.
+    const grant = await evaluation.evaluate(f.author.id)
+    expect(grant.value).toBe(true)
+    expect(grant.validUntil).toBeGreaterThan(performance.now())
     // Fanout happens before the boundary. Send authorization uses live PostgreSQL time inside quiet hours.
     vi.useFakeTimers({ toFake: ['Date'] })
     vi.setSystemTime(f.qualification)
@@ -357,7 +435,35 @@ describe('T02 actual policy boundaries and HTTP scheduling floors', () => {
       where: { group: { post_id: f.post.id } },
     })
     await sender.verifyRuntime()
-    await sender.dispatch(delivery.id)
+    transactionFailures.length = 0
+    diagnoseDispatch = true
+    try {
+      await sender.dispatch(delivery.id)
+    } finally {
+      diagnoseDispatch = false
+      const current = await prisma.communityTokenDelivery.findUniqueOrThrow({
+        where: { id: delivery.id },
+        select: { status: true, next_attempt_at: true },
+      })
+      const attempts = await prisma.communityDeliveryAttempt.findMany({
+        where: { delivery_id: delivery.id },
+        orderBy: { ordinal: 'asc' },
+        select: { status: true, reason: true },
+      })
+      const [clock] = await prisma.$queryRaw<
+        { now: Date; due: boolean }[]
+      >`SELECT clock_timestamp() AS now, next_attempt_at <= clock_timestamp() AS due FROM "CommunityTokenDelivery" WHERE id = ${delivery.id}::uuid`
+      console.info(
+        JSON.stringify({
+          evidence: 'T02-send-dispatch-closed',
+          delivery: current,
+          attempts,
+          clock,
+          transactionFailures,
+          providerCalls: provider.mock.calls.length,
+        })
+      )
+    }
     await assertQuietHistory(f, delivery.group_id)
     expect(
       await prisma.communityTokenDelivery.findUniqueOrThrow({
@@ -370,6 +476,79 @@ describe('T02 actual policy boundaries and HTTP scheduling floors', () => {
       })
     ).toMatchObject([{ status: 'deferred', reason: 'no_call:quiet_hours' }])
   })
+
+  it.each(['claim', 'persist'] as const)(
+    'a500ms actual cold flag %s COMMIT crossing the400ms client budget defers without a provider call',
+    async (phase) => {
+      const f = await fixture(true)
+      vi.useFakeTimers({ toFake: ['Date'] })
+      vi.setSystemTime(f.qualification)
+      await worker.group()
+      await worker.fanout()
+      vi.useRealTimers()
+      const delivery = await prisma.communityTokenDelivery.findFirstOrThrow({
+        where: { group: { post_id: f.post.id } },
+      })
+      const predicate =
+        phase === 'claim'
+          ? 'NEW.refresh_owner IS NOT NULL AND NEW.remote_value IS NULL'
+          : 'NEW.refresh_owner IS NULL AND NEW.remote_value IS NOT NULL'
+      // This runs at actual PostgreSQL COMMIT, after the guarded statements have completed.
+      await prisma.$executeRawUnsafe(
+        `CREATE FUNCTION cc68_flag_commit_delay() RETURNS trigger LANGUAGE plpgsql AS $body$ BEGIN IF ${predicate} THEN PERFORM pg_sleep(0.5); END IF; RETURN NEW; END $body$`
+      )
+      await prisma.$executeRawUnsafe(
+        'CREATE CONSTRAINT TRIGGER cc68_flag_commit_delay AFTER UPDATE ON "CommunityFlagEvaluation" DEFERRABLE INITIALLY DEFERRED FOR EACH ROW EXECUTE FUNCTION cc68_flag_commit_delay()'
+      )
+      transactionFailures.length = 0
+      diagnoseDispatch = true
+      const remoteCalls = vi.spyOn(remote, 'getFeatureFlagValue')
+      try {
+        await sender.dispatch(delivery.id)
+        expect(transactionFailures).toEqual(
+          expect.arrayContaining([
+            expect.objectContaining({ phase: 'flag', code: 'P2028' }),
+          ])
+        )
+        expect(provider).not.toHaveBeenCalled()
+        expect(remoteCalls).toHaveBeenCalledTimes(phase === 'claim' ? 0 : 1)
+        expect(
+          await prisma.communityDeliveryAttempt.count({
+            where: { delivery_id: delivery.id },
+          })
+        ).toBe(0)
+        const deferred = await prisma.communityTokenDelivery.findUniqueOrThrow({
+          where: { id: delivery.id },
+        })
+        expect(deferred.status).toBe('deferred')
+        expect(deferred.next_attempt_at.getTime()).toBeGreaterThan(Date.now())
+        expect(
+          (
+            await prisma.communityNotificationGroup.findUniqueOrThrow({
+              where: { id: delivery.group_id },
+            })
+          ).expires_at
+        ).toEqual(f.intent.expires_at)
+        console.info(
+          JSON.stringify({
+            evidence: 'T02-actual-cold-commit-deferral',
+            phase,
+            delayMs: 500,
+            transactionFailures,
+            attempts: 0,
+            providerCalls: 0,
+          })
+        )
+      } finally {
+        diagnoseDispatch = false
+        remoteCalls.mockRestore()
+        await prisma.$executeRawUnsafe(
+          'DROP TRIGGER cc68_flag_commit_delay ON "CommunityFlagEvaluation"'
+        )
+        await prisma.$executeRawUnsafe('DROP FUNCTION cc68_flag_commit_delay()')
+      }
+    }
+  )
 
   it.each(['PATCH', 'PUT'] as const)(
     '%s retains the pending 30s floor immediately and after actual fanout',
