@@ -1,0 +1,7 @@
+{
+  "schemaVersion": 1,
+  "retired": {
+    "holdout-v3": "Coordinator B9: non-independent fragment-bank corpus; historical evidence only.",
+    "holdout-v4": "Coordinator retirement after failed evaluation: released development data, disclosed to the builder."
+  }
+}

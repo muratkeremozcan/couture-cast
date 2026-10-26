@@ -111,3 +111,23 @@ inspecting the round-3 repair, committing the corpus or evaluating it. A separat
 explicit coordinator release remains required. The Wilson gate and its arithmetic,
 in-sample zero withholds, disguised zero passes and all count minimums are unchanged.
 The release gate stays closed while a fresh eligible holdout is pending.
+
+## Enforced retirement eligibility
+
+Code reviewers Astra A2 and Opus H3 found that a selector pointing at retired v4
+could still pass the mandatory release evaluator. The evaluator now reads
+`holdout-retirements.json` and rejects a retired active version before constructing
+the screener or producing a measurement. The ledger records v3 as non-independent
+and v4 as disclosed development data. Record future retirements in this ledger
+in the same change as their disposition here.
+
+An eligible active version also requires a matching seal identity, a valid seal
+timestamp and a SHA-256 corpus digest. The existing per-language and aggregate
+seal checks still verify the actual corpus bytes. Unit cases reject v3, v4,
+another ledger retirement, invalid selectors and invalid seal identities; a
+sealed unretired version is accepted. They load no screening or repair inputs.
+The Wilson arithmetic and regression requirements remain unchanged.
+
+The active v4 selector intentionally fails until a fresh sealed and unretired
+version is committed under coordinator release. V5 will evaluate the frozen
+round-4 repair after the coordinator supplies its manifest and releases the run.
