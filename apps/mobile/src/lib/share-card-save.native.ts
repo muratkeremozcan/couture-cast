@@ -4,8 +4,8 @@ import {
 } from './share-card-native-fixture'
 import { Platform } from 'react-native'
 import * as FileSystem from 'expo-file-system/legacy'
-import * as MediaLibrary from 'expo-media-library'
 import * as Crypto from 'expo-crypto'
+import { requireOptionalNativeModule } from 'expo-modules-core'
 import {
   abortError,
   decodeShareCardBase64,
@@ -19,20 +19,24 @@ import {
   retryShareCardCleanup,
   reserveShareCardFile,
   ownsCommittedShareCardFile,
+  enqueueShareCardCleanup,
 } from './share-card-save-operations'
 
 export const nativeShareCardSaveAvailable = () =>
   shareCardFixtureMode() !== 'unavailable' &&
+  requireOptionalNativeModule('ExpoMediaLibrary') !== null &&
   (Platform.OS === 'android' ||
     (Platform.OS === 'ios' && shareCardPhotoSaveModule() !== null))
 const needsPermission = () =>
   Platform.OS === 'ios' || (Platform.OS === 'android' && Number(Platform.Version) < 33)
 export async function shareCardSavePermission(request: boolean) {
+  if (!nativeShareCardSaveAvailable()) return { granted: false, canAskAgain: false }
   if (['permission_denied', 'permission_permanent'].includes(shareCardFixtureMode()))
     return { granted: false, canAskAgain: shareCardFixtureMode() === 'permission_denied' }
   if (shareCardFixtureMode() === 'limited')
     return { granted: true, canAskAgain: true, accessPrivileges: 'limited' as const }
   if (!needsPermission()) return { granted: true, canAskAgain: true }
+  const MediaLibrary = await import('expo-media-library')
   const permission = await MediaLibrary.getPermissionsAsync(true)
   if (permission.granted || permission.accessPrivileges === 'limited')
     return { ...permission, granted: true }
@@ -58,7 +62,8 @@ export async function cleanOrphanShareCards() {
 export async function saveShareCard(
   card: PreparedShareCard,
   signal: AbortSignal,
-  isCurrent: () => boolean
+  isCurrent: () => boolean,
+  owner?: object
 ) {
   if (!nativeShareCardSaveAvailable()) throw new Error('nativeSaveUnavailable')
   if (nativeShareCardSavePending()) throw new Error('finishingSave')
@@ -86,12 +91,14 @@ export async function saveShareCard(
     if (Platform.OS === 'ios' && !adapter) throw new Error('nativeSaveUnavailable')
     const pending = commitShareCardSave({
       fileUri,
+      owner,
       save: () =>
-        runShareCardNativeAdapter(fileUri, () =>
-          Platform.OS === 'ios' && adapter
-            ? adapter.saveOriginalPng(fileUri, card.sha256)
-            : MediaLibrary.saveToLibraryAsync(fileUri)
-        ),
+        runShareCardNativeAdapter(fileUri, async () => {
+          if (Platform.OS === 'ios' && adapter)
+            return adapter.saveOriginalPng(fileUri, card.sha256)
+          const MediaLibrary = await import('expo-media-library')
+          await MediaLibrary.saveToLibraryAsync(fileUri)
+        }),
       cleanup: () => FileSystem.deleteAsync(fileUri, { idempotent: true }),
     })
     // If another composer owns the guard, this file was never committed.
@@ -99,6 +106,14 @@ export async function saveShareCard(
     await pending
   } finally {
     releaseFile()
-    if (!committed) await FileSystem.deleteAsync(fileUri, { idempotent: true })
+    if (!committed) {
+      try {
+        await FileSystem.deleteAsync(fileUri, { idempotent: true })
+      } catch {
+        enqueueShareCardCleanup(fileUri, () =>
+          FileSystem.deleteAsync(fileUri, { idempotent: true })
+        )
+      }
+    }
   }
 }

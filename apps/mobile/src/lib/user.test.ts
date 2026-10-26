@@ -1,5 +1,10 @@
 import { http, HttpResponse } from 'msw'
-import { afterEach, beforeEach, describe, expect, it } from 'vitest'
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
+
+// Profile transport/contract tests control secure auth at its native SDK boundary.
+vi.mock('./native-session', () => ({
+  resolveNativeSessionToken: () => Promise.resolve(undefined),
+}))
 
 import { server } from '../test-utils/msw/server'
 import { setMobileAccessTokenResolver } from './mobile-auth'

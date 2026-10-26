@@ -40,6 +40,7 @@ import {
 } from '@/src/lib/share-card-save'
 import {
   nativeShareCardSavePending,
+  ownsPendingShareCardSave,
   subscribeShareCardSave,
 } from '@/src/lib/share-card-save-operations'
 
@@ -58,7 +59,14 @@ const saveDisabled = (
   available: boolean
 ) => !valid || !loaded || busy || pending || !available
 function saveFailure(error: unknown) {
-  if (error instanceof Error && error.message === 'offline') return 'offline'
+  if (error instanceof Error) {
+    const code =
+      'code' in error && typeof error.code === 'string' ? error.code : error.message
+    if (code === 'offline') return 'offline'
+    if (['render', 'invalid_file'].includes(code)) return 'render'
+    if (['permission_denied', 'ERR_PERMISSIONS'].includes(code)) return 'permissionDenied'
+    if (code === 'finishingSave') return 'finishingSave'
+  }
   if (error instanceof ResponseError) {
     if (error.response.status === 409) return 'previewChanged'
     if ([401, 403, 404].includes(error.response.status)) return 'sourceUnavailable'
@@ -67,16 +75,44 @@ function saveFailure(error: unknown) {
   return 'storage'
 }
 
+type SaveOwner = { owner: object; generation: number }
+function foreignNativeSave(save: SaveOwner | null, generation: number, pending: boolean) {
+  return (
+    pending &&
+    !(
+      save !== null &&
+      save.generation === generation &&
+      ownsPendingShareCardSave(save.owner)
+    )
+  )
+}
+
+function useShareCardWatermark(
+  retained: boolean | undefined,
+  onChange: React.Dispatch<React.SetStateAction<boolean>> | undefined
+) {
+  const [local, setLocal] = useState(true)
+  return {
+    watermark: retained ?? local,
+    setWatermark: onChange ?? setLocal,
+    setLocalWatermark: setLocal,
+  }
+}
+
 export function ShareCardComposer({
   source,
   open,
   onClose,
   onRestoreFocus,
+  watermark: retainedWatermark,
+  onWatermarkChange,
 }: {
   source: ShareCardSource | null
   open: boolean
   onClose: () => void
   onRestoreFocus?: () => void
+  watermark?: boolean
+  onWatermarkChange?: React.Dispatch<React.SetStateAction<boolean>>
 }) {
   const { t, i18n } = useTranslation()
   const locale = resolveSupportedLocale(i18n.language) ?? 'en-US'
@@ -88,7 +124,10 @@ export function ShareCardComposer({
     subscribeShareCardSave,
     nativeShareCardSavePending
   )
-  const [watermark, setWatermark] = useState(true)
+  const { watermark, setWatermark, setLocalWatermark } = useShareCardWatermark(
+    retainedWatermark,
+    onWatermarkChange
+  )
   const [preview, setPreview] = useState<{
     card: PreparedShareCard
     key: string
@@ -111,7 +150,9 @@ export function ShareCardComposer({
   const cancelTarget = useRef<View>(null)
   const abortRef = useRef<AbortController | null>(null)
   const generation = useRef(0)
-  const saving = useRef(false)
+  const saveGuard = useRef(false)
+  const [saving, setSaving] = useState(false)
+  const activeSave = useRef<SaveOwner | null>(null)
   const insets = useModalInsets()
   const systemBarsReady = useShareCardStatusBar(
     open && source !== null,
@@ -120,9 +161,8 @@ export function ShareCardComposer({
   const available = nativeShareCardSaveAvailable()
   const sourceIdentity = JSON.stringify(source)
   const key = JSON.stringify({ source, locale, watermark })
-  const feedbackOwner = useRef({ member, key })
-  const ownsFeedback =
-    feedbackOwner.current.member === member && feedbackOwner.current.key === key
+  const [feedbackOwner, setFeedbackOwner] = useState({ member, key })
+  const ownsFeedback = feedbackOwner.member === member && feedbackOwner.key === key
   const latest = useRef({ member, key, open })
   latest.current = { member, key, open }
   const current =
@@ -131,6 +171,11 @@ export function ShareCardComposer({
       : null
   const valid = current?.key === key && !changed
   const presentation = `${key}:${current?.renderId}:${presentationEpoch}`
+  const pendingOtherSave = foreignNativeSave(
+    activeSave.current,
+    generation.current,
+    pendingNative
+  )
   const disabled = saveDisabled(
     valid,
     loaded === presentation,
@@ -151,7 +196,7 @@ export function ShareCardComposer({
   useEffect(() => {
     setPreview(null)
     setLoaded(null)
-    setWatermark(true)
+    setLocalWatermark(true)
   }, [
     source?.kind,
     source && ('postId' in source ? source.postId : source.recommendationId),
@@ -163,7 +208,7 @@ export function ShareCardComposer({
     abortRef.current = abort
     if (valid) return () => abort.abort()
     setBusy(true)
-    feedbackOwner.current = { member, key }
+    setFeedbackOwner({ member, key })
     setError(null)
     setMessage('preparing')
     void prepareShareCardFromMobile(
@@ -258,9 +303,23 @@ export function ShareCardComposer({
     setError(canAskAgain ? 'permissionDenied' : 'permissionPermanent')
     setMessage(null)
   }
+  const reportSaveFailure = async (failure: unknown, stillCurrent: () => boolean) => {
+    const code = saveFailure(failure)
+    if (code === 'permissionDenied') {
+      const result = await shareCardSavePermission(false).catch(() => ({
+        canAskAgain: true,
+      }))
+      if (stillCurrent()) deniedPermission(result.canAskAgain)
+    } else {
+      setError(code === 'finishingSave' ? null : code)
+      setMessage(code === 'finishingSave' ? code : null)
+      if (code === 'previewChanged') setChanged(true)
+    }
+  }
   const save = async () => {
-    if (!source || !current || disabled || saving.current) return
-    saving.current = true
+    if (!source || !current || disabled || saveGuard.current) return
+    saveGuard.current = true
+    setSaving(true)
     setBusy(true)
     setError(null)
     setMessage('saving')
@@ -268,6 +327,8 @@ export function ShareCardComposer({
     const abort = new AbortController()
     abortRef.current = abort
     const captured = { member, key, generation: generation.current }
+    const owner = {}
+    activeSave.current = { owner, generation: captured.generation }
     const stillCurrent = () =>
       !abort.signal.aborted &&
       latest.current.open &&
@@ -298,17 +359,15 @@ export function ShareCardComposer({
         setMessage(null)
         return
       }
-      await saveShareCard(current.card, abort.signal, stillCurrent)
+      await saveShareCard(current.card, abort.signal, stillCurrent, owner)
       if (stillCurrent()) setMessage('saved')
     } catch (failure) {
       if (stillCurrent()) {
-        const code = saveFailure(failure)
-        setError(code)
-        setMessage(null)
-        if (code === 'previewChanged') setChanged(true)
+        await reportSaveFailure(failure, stillCurrent)
       }
     } finally {
-      saving.current = false
+      saveGuard.current = false
+      setSaving(false)
       if (stillCurrent()) setBusy(false)
     }
   }
@@ -324,7 +383,9 @@ export function ShareCardComposer({
         const node = safeFindNodeHandle(title.current)
         if (Platform.OS === 'android' && node)
           void setModalDarkStatusBar(node)?.catch(() => undefined)
-        focusShareCardElement(node)
+        focusShareCardElement(
+          pendingOtherSave ? safeFindNodeHandle(cancelTarget.current) : node
+        )
       }}
     >
       <View
@@ -349,10 +410,10 @@ export function ShareCardComposer({
             <Pressable
               accessibilityRole="switch"
               aria-checked={watermark}
-              aria-disabled={saving.current}
+              aria-disabled={saving}
               accessibilityLabel={t('shareCard.watermark')}
-              accessibilityState={{ checked: watermark, disabled: saving.current }}
-              disabled={saving.current}
+              accessibilityState={{ checked: watermark, disabled: saving }}
+              disabled={saving}
               onPress={() => {
                 setWatermark((value) => !value)
                 setLoaded(null)
@@ -363,11 +424,11 @@ export function ShareCardComposer({
             >
               <View
                 aria-hidden
-                pointerEvents="none"
+                style={{ pointerEvents: 'none' }}
                 accessibilityElementsHidden
                 importantForAccessibility="no-hide-descendants"
               >
-                <Switch value={watermark} disabled={saving.current} />
+                <Switch value={watermark} disabled={saving} />
               </View>
             </Pressable>
           </View>
@@ -401,7 +462,7 @@ export function ShareCardComposer({
             }}
             visible={open}
             scope={`${member}:${key}:${presentationEpoch}`}
-            pending={pendingNative}
+            pending={pendingOtherSave}
             message={ownsFeedback ? message : null}
             error={ownsFeedback ? error : null}
             available={available}

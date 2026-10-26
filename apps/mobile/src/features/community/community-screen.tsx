@@ -1,5 +1,9 @@
-import { ShareCardComposer } from '@/components/share-card-composer'
-import { focusShareCardElement } from '@/src/lib/share-card-focus'
+import { useAndroidSpotlightDetailPresentation } from '@/components/android-spotlight-detail-presentation'
+import {
+  ScreenShareCardComposer,
+  useShareCardPresentationOpener,
+} from '@/components/android-share-card-presentation'
+import { focusShareCardElement, shareCardHeadingNode } from '@/src/lib/share-card-focus'
 import {
   type ShareCardSource,
   abortError,
@@ -192,6 +196,14 @@ function sheetPostId(
   return available && focused ? postId : null
 }
 
+function spotlightDetailForVisit(
+  item: CommunityReactionSpotlightItem | null,
+  available: boolean,
+  currentVisit: boolean
+) {
+  return available && currentVisit ? item : null
+}
+
 export function CommunityScreen() {
   const { t, i18n } = useTranslation()
   const palette = useHeroPalette()
@@ -369,6 +381,7 @@ export function CommunityScreen() {
    * focus arrives after an intent the router delivered first; the ref guards
    * their timers and frames.
    */
+  const openAndroidShareCard = useShareCardPresentationOpener()
   const shareCardInvoker = useRef<{
     node: (() => number | null) | null
     member: string | null
@@ -376,7 +389,6 @@ export function CommunityScreen() {
     node: null,
     member: null,
   })
-  const shareCardFallback = useRef<Text>(null)
   const [shareCardSource, setShareCardSource] = useState<ShareCardSource | null>(null)
   const [shareCardOpen, setShareCardOpen] = useState(false)
   useEffect(() => {
@@ -384,6 +396,10 @@ export function CommunityScreen() {
     setShareCardOpen(false)
   }, [sessionScope])
   const openShareCard = (postId: string, opener: () => number | null) => {
+    if (Platform.OS === 'android') {
+      openAndroidShareCard({ kind: 'community_post', postId }, 'community', opener)
+      return
+    }
     shareCardInvoker.current = { node: opener, member: mobileApplicationUserId() }
     setShareCardSource({ kind: 'community_post', postId })
     setShareCardOpen(true)
@@ -407,6 +423,7 @@ export function CommunityScreen() {
     }, [])
   )
   const canMoveSpotlightFocus = useCallback(() => screenFocusedRef.current, [])
+  const retainedSpotlight = useAndroidSpotlightDetailPresentation()
   const [spotlightDetail, setSpotlightDetail] =
     useState<CommunityReactionSpotlightItem | null>(null)
   const spotlightRankRefs = useRef(new Map<string, View | null>())
@@ -1317,15 +1334,38 @@ export function CommunityScreen() {
           post.rank,
           spotlightLevel
         ).catch(() => undefined)
+      retainedSpotlight.setPostId(post.id)
       setSpotlightDetail(post)
     },
-    [spotlightLevel]
+    [spotlightLevel, retainedSpotlight.setPostId]
   )
 
   // A look that left the spotlight (hidden, erased, withdrawn or the member
   // changed) cannot stay open in its detail. While it stays, the detail shows the
   // live copy, so a refreshed image or realtime update reaches it too.
   const spotlightItems = spotlight.items
+  useEffect(() => {
+    if (!retainedSpotlight.managed) return
+    if (!retainedSpotlight.active || !retainedSpotlight.postId) {
+      setSpotlightDetail(null)
+      return
+    }
+    if (spotlight.status === 'ready') {
+      const fresh = spotlightItems.find((post) => post.id === retainedSpotlight.postId)
+      setSpotlightDetail(fresh ?? null)
+      if (!fresh) retainedSpotlight.setPostId(null)
+    } else if (spotlight.status === 'disabled') {
+      retainedSpotlight.setPostId(null)
+      setSpotlightDetail(null)
+    }
+  }, [
+    retainedSpotlight.managed,
+    retainedSpotlight.active,
+    retainedSpotlight.postId,
+    retainedSpotlight.setPostId,
+    spotlight.status,
+    spotlightItems,
+  ])
   const spotlightDetailItem = spotlightDetail
     ? (spotlightItems.find((post) => post.id === spotlightDetail.id) ?? null)
     : null
@@ -1347,6 +1387,7 @@ export function CommunityScreen() {
   const closeSpotlightDetail = useCallback(
     (action?: () => void) => {
       const closing = spotlightDetail
+      retainedSpotlight.setPostId(null)
       setSpotlightDetail(null)
       if (action) {
         pendingSpotlightActionRef.current = action
@@ -1357,7 +1398,7 @@ export function CommunityScreen() {
       }
       if (closing) focusNode(spotlightRankRefs.current.get(closing.id) ?? null)
     },
-    [focusNode, runPendingSpotlightAction, spotlightDetail]
+    [focusNode, runPendingSpotlightAction, spotlightDetail, retainedSpotlight.setPostId]
   )
 
   const markReported = useCallback((postId: string) => {
@@ -1946,18 +1987,6 @@ export function CommunityScreen() {
         testID="community-screen"
       >
         <View style={styles.header}>
-          <Text
-            ref={shareCardFallback}
-            accessibilityRole="header"
-            style={{
-              fontFamily: 'Playfair Display',
-              fontSize: 22,
-              color: palette.text,
-              flex: 1,
-            }}
-          >
-            {t('community.heading')}
-          </Text>
           <TouchableOpacity
             ref={newPostButtonRef}
             testID="community-new-post-button"
@@ -2089,12 +2118,16 @@ export function CommunityScreen() {
           }}
         />
         <CommunitySpotlightDetail
-          item={communityAvailable ? spotlightDetailItem : null}
+          item={spotlightDetailForVisit(
+            spotlightDetailItem,
+            communityAvailable,
+            retainedSpotlight.active
+          )}
           onClose={() => closeSpotlightDetail()}
           onDismissed={runPendingSpotlightAction}
           renderCard={(post) => renderSpotlightCard(post, true)}
         />
-        <ShareCardComposer
+        <ScreenShareCardComposer
           source={shareCardSource}
           open={
             shareCardOpen && shareCardInvoker.current.member === mobileApplicationUserId()
@@ -2107,8 +2140,7 @@ export function CommunityScreen() {
             )
               return
             const node =
-              shareCardInvoker.current.node?.() ??
-              safeFindNodeHandle(shareCardFallback.current)
+              shareCardInvoker.current.node?.() ?? shareCardHeadingNode('community')
             focusShareCardElement(node)
           }}
         />

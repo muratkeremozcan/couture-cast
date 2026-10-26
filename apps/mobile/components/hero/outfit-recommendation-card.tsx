@@ -126,7 +126,7 @@ export function OutfitRecommendationCard({
       {onExport && (
         <Pressable
           accessibilityRole="button"
-          accessibilityLabel={t('shareCard.title')}
+          accessibilityLabel={t('shareCard.launcher')}
           testID="outfit-share-card-open"
           ref={shareOpener}
           style={{
@@ -140,7 +140,7 @@ export function OutfitRecommendationCard({
             onExport(outfit.id, () => safeFindNodeHandle(shareOpener.current))
           }
         >
-          <Text>{t('shareCard.title')}</Text>
+          <Text>{t('shareCard.launcher')}</Text>
         </Pressable>
       )}
       {/* Comfort Notes */}

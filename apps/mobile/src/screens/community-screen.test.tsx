@@ -104,6 +104,7 @@ vi.mock('react-native', async (importOriginal) => {
       setAccessibilityFocus: vi.fn(),
     },
     findNodeHandle: vi.fn(),
+    Linking: { ...actual.Linking, addEventListener: () => ({ remove: vi.fn() }) },
     Platform: { ...actual.Platform, OS: 'web' },
   }
 })
@@ -117,6 +118,7 @@ import {
   setMockParams,
   resetFeedUrls,
 } from '../test-utils/community-screen/harness'
+import { registerCommunityRootRestorationCases } from '../test-utils/community-screen/root-restoration.cases'
 import { registerCommunityFeedCases } from '../test-utils/community-screen/feed.cases'
 import { registerCommunityModerationCases } from '../test-utils/community-screen/moderation.cases'
 import { registerCommunityPublishingCases } from '../test-utils/community-screen/publishing.cases'
@@ -192,6 +194,7 @@ describe('Mobile community screen (Story 6.1)', () => {
     await delay(50)
   })
 
+  registerCommunityRootRestorationCases()
   registerCommunityFeedCases()
   registerCommunityModerationCases()
   registerCommunityPublishingCases()

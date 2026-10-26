@@ -1,0 +1,21 @@
+appId: ${MAESTRO_APP_ID}
+---
+- tapOn:
+    id: tab-home
+- scrollUntilVisible:
+    element:
+      id: outfit-share-card-open
+    direction: DOWN
+    timeout: 30000
+    centerElement: true
+- runFlow:
+    when:
+      platform: iOS
+    commands:
+      - waitForAnimationToEnd
+- assertVisible:
+    id: outfit-share-card-open
+- assertNotVisible:
+    id: share-card-title
+- assertNotVisible:
+    id: share-card-preview-loaded-.*

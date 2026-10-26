@@ -287,6 +287,8 @@ describe('Story 6.5 committed stream append', () => {
           expect(performance.now() - start).toBeLessThan(5000)
         }
         expect(batches[0]).toBeGreaterThan(1)
+        if (delayMs === 0) expect(batches.length).toBeLessThanOrEqual(8)
+        expect(capacities).toEqual(batches.map(() => 25))
         const events = await prisma.communityStreamEvent.findMany({
           where: { stream_id: 'public' },
           select: { source_outbox_id: true, sequence: true, post_id: true },
@@ -300,6 +302,9 @@ describe('Story 6.5 committed stream append', () => {
           )
         ).toBe(true)
         expect(events.filter((event) => event.post_id === post.id)).toHaveLength(1)
+        expect(
+          await prisma.communityStreamEvent.count({ where: { post_id: post.id } })
+        ).toBe(1)
       } finally {
         const telemetry = await prisma.communityEngagementTelemetry.findMany({
           where: {

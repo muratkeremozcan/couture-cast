@@ -1,6 +1,6 @@
 {
   "ios": {
-    "NSPhotoLibraryAddUsageDescription": "Permita que o CoutureCast salve o cartão aprovado nas suas fotos.",
+    "NSPhotoLibraryAddUsageDescription": "Permita que o CoutureCast guarde o cartão aprovado nas suas fotografias.",
     "NSPhotoLibraryUsageDescription": "Permita que o CoutureCast escolha fotografias do seu guarda-roupa."
   }
 }

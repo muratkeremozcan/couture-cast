@@ -5,7 +5,9 @@ appId: ${MAESTRO_APP_ID}
 - tapOn:
     text: ${MAESTRO_CODE_LABEL}
     index: 1
+- waitForAnimationToEnd
 - inputText: ${MAESTRO_OTP}
+- assertVisible: ${MAESTRO_OTP}
 # iOS reports a failure when the simulator shows no software keyboard.
 - hideKeyboard:
     optional: true

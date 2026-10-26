@@ -7,6 +7,8 @@ targets:
     type: bundle.ui-testing
     platform: iOS
     sources:
+      - ShareCardHeaderSemantics.swift
+      - ShareCardHeaderQuery.swift
       - ShareCardAccessibilityUITests.swift
       - path: catalogs
         buildPhase: resources

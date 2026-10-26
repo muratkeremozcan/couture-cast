@@ -11,6 +11,7 @@ appId: ${MAESTRO_APP_ID}
 - tapOn:
     text: ${MAESTRO_EMAIL_LABEL}
     index: 1
+- waitForAnimationToEnd
 - inputText: ${MAESTRO_EMAIL}
 # iOS reports a failure when the simulator shows no software keyboard.
 - hideKeyboard:

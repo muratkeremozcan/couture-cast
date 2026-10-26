@@ -9,7 +9,8 @@ export function cleanOrphanShareCards(): Promise<void> {
 export function saveShareCard(
   _card: PreparedShareCard,
   _signal: AbortSignal,
-  _isCurrent: () => boolean
+  _isCurrent: () => boolean,
+  _owner?: object
 ): Promise<void> {
   return Promise.reject(new Error('nativeSaveUnavailable'))
 }

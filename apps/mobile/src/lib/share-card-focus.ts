@@ -15,3 +15,19 @@ export function focusShareCardElement(
         if (!focused && isCurrent()) AccessibilityInfo.setAccessibilityFocus(tag)
       })
 }
+
+export type ShareCardHeadingScope = 'outfit' | 'community'
+const headingNodes = new Map<ShareCardHeadingScope, () => number | null>()
+/** The existing navigation title remains the fallback when an invoking card disappears. */
+export function registerShareCardHeading(
+  scope: ShareCardHeadingScope,
+  node: () => number | null
+) {
+  headingNodes.set(scope, node)
+  return () => {
+    if (headingNodes.get(scope) === node) headingNodes.delete(scope)
+  }
+}
+export function shareCardHeadingNode(scope: ShareCardHeadingScope): number | null {
+  return headingNodes.get(scope)?.() ?? null
+}

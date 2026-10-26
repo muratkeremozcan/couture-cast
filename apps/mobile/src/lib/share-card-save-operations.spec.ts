@@ -1,6 +1,7 @@
 import { describe, expect, it, vi } from 'vitest'
 import {
   commitShareCardSave,
+  enqueueShareCardCleanup,
   liveShareCardFiles,
   nativeShareCardSavePending,
   retryShareCardCleanup,
@@ -92,16 +93,47 @@ describe('process-lifetime native save ownership', () => {
       save: () => native.promise,
       cleanup,
     })
-    const ui = await Promise.race([
-      operation.then(() => 'saved'),
-      Promise.resolve('timed-out'),
-    ])
-    expect(ui).toBe('timed-out')
-    expect(nativeShareCardSavePending()).toBe(true)
-    expect(cleanup).not.toHaveBeenCalled()
-    native.resolve()
-    await operation
+    vi.useFakeTimers()
+    try {
+      const ui = Promise.race([
+        operation.then(() => 'saved'),
+        new Promise<string>((resolve) => setTimeout(() => resolve('timed-out'), 1000)),
+      ])
+      let observed: string | undefined
+      void ui.then((value) => {
+        observed = value
+      })
+      await vi.advanceTimersByTimeAsync(999)
+      expect(observed).toBeUndefined()
+      await vi.advanceTimersByTimeAsync(1)
+      expect(await ui).toBe('timed-out')
+      expect(nativeShareCardSavePending()).toBe(true)
+      expect(cleanup).not.toHaveBeenCalled()
+    } finally {
+      native.resolve()
+      await operation
+      vi.useRealTimers()
+    }
     expect(cleanup).toHaveBeenCalledTimes(1)
+  })
+  it('L6: queued precommit cleanup protects the file and retries after reservation release', async () => {
+    vi.useFakeTimers()
+    const uri = 'cache/cc68-precommit-cleanup.png'
+    const release = reserveShareCardFile(uri)
+    const cleanup = vi.fn(() => Promise.resolve())
+    try {
+      enqueueShareCardCleanup(uri, cleanup)
+      expect(liveShareCardFiles().has(uri)).toBe(true)
+      await vi.advanceTimersByTimeAsync(1000)
+      expect(cleanup).not.toHaveBeenCalled()
+      release()
+      await vi.advanceTimersByTimeAsync(1000)
+      expect(cleanup).toHaveBeenCalledOnce()
+      expect(liveShareCardFiles().has(uri)).toBe(false)
+    } finally {
+      release()
+      vi.useRealTimers()
+    }
   })
   it('retries cleanup in-session without reimport and stops after bounded persistent failures', async () => {
     vi.useFakeTimers()

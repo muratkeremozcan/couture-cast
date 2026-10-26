@@ -1,5 +1,8 @@
-import { ShareCardComposer } from '@/components/share-card-composer'
-import { focusShareCardElement } from '@/src/lib/share-card-focus'
+import {
+  ScreenShareCardComposer,
+  useShareCardPresentationOpener,
+} from '@/components/android-share-card-presentation'
+import { focusShareCardElement, shareCardHeadingNode } from '@/src/lib/share-card-focus'
 import {
   type ShareCardSource,
   ResponseError,
@@ -21,7 +24,6 @@ import {
   ScrollView,
   Platform,
   View as NativeView,
-  Text as NativeText,
 } from 'react-native'
 import { SafeAreaView } from 'react-native-safe-area-context'
 import { Text, View } from '@/components/themed'
@@ -210,6 +212,7 @@ function shareComposerIsOpen(open: boolean, owner: string | null, member: string
 }
 
 export default function TabOneScreen() {
+  const openAndroidShareCard = useShareCardPresentationOpener()
   const shareCardInvoker = useRef<{
     node: (() => number | null) | null
     member: string | null
@@ -217,7 +220,6 @@ export default function TabOneScreen() {
     node: null,
     member: null,
   })
-  const shareCardFallback = useRef<NativeText>(null)
   const shareVisitFocused = useRef(false)
   const [shareCardSource, setShareCardSource] = useState<ShareCardSource | null>(null)
   const [shareCardOpen, setShareCardOpen] = useState(false)
@@ -860,22 +862,18 @@ export default function TabOneScreen() {
               />
             )}
 
-            <NativeText
-              ref={shareCardFallback}
-              accessibilityRole="header"
-              style={{
-                fontSize: 22,
-                fontFamily: 'Playfair Display',
-                color: palette.text,
-                marginHorizontal: 16,
-              }}
-            >
-              {t('shareCard.sourceOutfit')}
-            </NativeText>
             {/* Primary Outfit Card */}
             <OutfitRecommendationCard
               outfit={activeOutfit}
               onExport={(recommendationId, opener) => {
+                if (Platform.OS === 'android') {
+                  openAndroidShareCard(
+                    { kind: 'outfit', recommendationId },
+                    'outfit',
+                    opener
+                  )
+                  return
+                }
                 shareCardInvoker.current = {
                   node: opener,
                   member: mobileApplicationUserId(),
@@ -989,7 +987,7 @@ export default function TabOneScreen() {
           })()}
         </View>
       </EdgeToEdgeModal>
-      <ShareCardComposer
+      <ScreenShareCardComposer
         source={shareCardSource}
         open={shareComposerIsOpen(
           shareCardOpen,
@@ -1003,9 +1001,7 @@ export default function TabOneScreen() {
             shareCardInvoker.current.member !== mobileApplicationUserId()
           )
             return
-          const node =
-            shareCardInvoker.current.node?.() ??
-            safeFindNodeHandle(shareCardFallback.current)
+          const node = shareCardInvoker.current.node?.() ?? shareCardHeadingNode('outfit')
           focusShareCardElement(node)
         }}
       />

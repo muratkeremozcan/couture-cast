@@ -136,12 +136,16 @@ async function setup() {
   const record = (kind: string, data: Record<string, unknown> = {}) => {
     if (trace.length < 150) trace.push({ at: performance.now(), kind, ...data })
   }
+  let activeAssistance: Promise<number> | undefined
   const realAssist = streams.assist.bind(streams) as CommunityStreamRepository['assist']
   vi.spyOn(streams, 'assist').mockImplementation(async () => {
     const started = performance.now()
     record('assist-start')
     try {
-      const count = await realAssist()
+      const assistance = realAssist()
+      activeAssistance = assistance
+      const count = await assistance
+      if (activeAssistance === assistance) activeAssistance = undefined
       record('assist-end', { count, elapsedMs: performance.now() - started })
       return count
     } catch (error) {
@@ -226,6 +230,11 @@ async function setup() {
       record('apply', { total: visibleTotal, status: target.status })
     },
     changed,
+    // A UI refresh can finish after the optional append. Await only the real assist
+    // already launched by the HTTP service so the recovery replay sees its commit.
+    reconcile: async () => {
+      await activeAssistance
+    },
     availability,
   })
   coordinators.push(state)
@@ -314,15 +323,17 @@ describe('Story 6.5 R16 V2: real server through production transport and coordin
     await prisma.communityReaction.create({
       data: { user_id: f.actor.id, post_id: f.post.id, selection: 'love' },
     })
-    // Event replay starts from an actual durable stream event. Optional assists can
-    // finish after an earlier target snapshot, independently of HTTP availability.
-    await drainCommunityOutbox(prisma, streams)
+    const started = performance.now()
+    expect(
+      await prisma.communityDomainOutbox.count({
+        where: { post_id: f.post.id, kind: 'reactions.changed', appended_at: null },
+      })
+    ).toBe(1)
     expect(
       await prisma.communityStreamEvent.count({
         where: { post_id: f.post.id, kind: 'reactions.changed' },
       })
-    ).toBe(1)
-    const started = performance.now()
+    ).toBe(0)
     try {
       await vi.waitFor(
         () => {
@@ -338,6 +349,34 @@ describe('Story 6.5 R16 V2: real server through production transport and coordin
         { timeout: 10_000, interval: 50 }
       )
       expect(performance.now() - started).toBeLessThan(10_000)
+      const assistance = f.trace.filter(
+        (entry) =>
+          entry.kind === 'assist-end' &&
+          typeof entry.count === 'number' &&
+          entry.count > 0 &&
+          typeof entry.at === 'number' &&
+          entry.at >= started
+      )
+      expect(assistance.length).toBeGreaterThan(0)
+      expect(
+        f.trace.some(
+          (entry) =>
+            entry.kind === 'assist-start' &&
+            typeof entry.at === 'number' &&
+            entry.at >= started &&
+            entry.at <= (assistance[0]!.at as number)
+        )
+      ).toBe(true)
+      expect(
+        await prisma.communityDomainOutbox.count({
+          where: { post_id: f.post.id, kind: 'reactions.changed', appended_at: null },
+        })
+      ).toBe(0)
+      expect(
+        await prisma.communityStreamEvent.count({
+          where: { post_id: f.post.id, kind: 'reactions.changed' },
+        })
+      ).toBe(1)
       expect(f.eventStarts[beforeOutage]! - outageStarted).toBeLessThanOrEqual(8000)
       const applied = f.trace.find(
         (entry) =>
@@ -367,6 +406,8 @@ describe('Story 6.5 R16 V2: real server through production transport and coordin
       const changedSignal = f.changed.mock.calls.at(-1)![1]!
       expect(changedSignal.aborted).toBe(false)
       expect(f.availability).toHaveBeenLastCalledWith('connected', false)
+      // All proof assertions precede this cleanup flush of the already-observed replay.
+      await f.state.catchUp()
     } finally {
       const backlog = await prisma.communityDomainOutbox.count({
         where: { post_id: f.post.id, appended_at: null },

@@ -206,6 +206,64 @@ describe('share-card actual API and isolated database', () => {
     })
     expect(reads).toBe(0)
   })
+  it('M1-HTTP: rapid replacement waits for a disconnected renderer and returns the newest composition', async () => {
+    const row = await outfit()
+    const body = preview({ kind: 'outfit', recommendationId: row.id })
+    let release!: () => void
+    let entered!: () => void
+    let firstSignal: AbortSignal | undefined
+    const held = new Promise<void>((resolve) => {
+      release = resolve
+    })
+    const rendering = new Promise<void>((resolve) => {
+      entered = resolve
+    })
+    const originalRender = renderer.prepare.bind(renderer) as ShareCardRenderer['prepare']
+    const render = vi
+      .spyOn(renderer, 'prepare')
+      .mockImplementationOnce(async (...args) => {
+        firstSignal = args[4]
+        entered()
+        await held
+        return originalRender(...args)
+      })
+    const prepare = vi.spyOn(service, 'prepare')
+    const parent = new AbortController()
+    const first = fetch(`${url}/api/v1/share-cards/prepare`, {
+      method: 'POST',
+      headers: { Authorization: `Bearer ${member}`, 'Content-Type': 'application/json' },
+      body: JSON.stringify(body),
+      signal: parent.signal,
+    }).catch((error: unknown) => error)
+    let second: Promise<request.Response> | undefined
+    try {
+      await rendering
+      parent.abort()
+      await first
+      await vi.waitFor(() => expect(firstSignal?.aborted).toBe(true))
+      second = post({ ...body, watermark: false }).then((response) => response)
+      await vi.waitFor(() => expect(prepare).toHaveBeenCalledTimes(2))
+      expect(render).toHaveBeenCalledOnce()
+      release()
+      const response = await second
+      expect(response.status).toBe(200)
+      const card = prepareShareCardResponseSchema.parse(response.body).data
+      expect(digest(Buffer.from(decodeShareCardBase64(card.pngBase64)))).toBe(card.sha256)
+      expect(render).toHaveBeenCalledTimes(2)
+      expect(render.mock.calls[1]?.[2]).toBe(false)
+      const expected = await post({ ...body, watermark: false }).expect(200)
+      expect(card.sha256).toBe(
+        prepareShareCardResponseSchema.parse(expected.body).data.sha256
+      )
+    } finally {
+      parent.abort()
+      release()
+      await first
+      await second
+      render.mockRestore()
+      prepare.mockRestore()
+    }
+  })
   it.each(['consent', 'withdrawal', 'source'] as const)(
     'I-AUDIT-RACE: %s during actual audit INSERT await refuses HTTP save and rolls back authorization audit',
     async (change) => {

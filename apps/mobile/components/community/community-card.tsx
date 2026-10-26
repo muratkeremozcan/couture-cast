@@ -247,17 +247,23 @@ function CommunityShareAction({
   const { t } = useTranslation()
   const palette = useHeroPalette()
   const opener = useRef<View>(null)
-  if (!item.author.isSelf || !onExport) return null
+  if (
+    !item.author.isSelf ||
+    item.status !== 'published' ||
+    !item.publishedAt ||
+    !onExport
+  )
+    return null
   return (
     <Pressable
       accessibilityRole="button"
-      accessibilityLabel={t('shareCard.title')}
+      accessibilityLabel={t('shareCard.launcher')}
       testID={`community-share-card-open-${item.id}`}
       ref={opener}
       style={{ minHeight: 48, padding: 12, borderColor: '#B28D46', borderWidth: 1 }}
       onPress={() => onExport(item.id, () => safeFindNodeHandle(opener.current))}
     >
-      <Text style={{ color: palette.text }}>{t('shareCard.title')}</Text>
+      <Text style={{ color: palette.text }}>{t('shareCard.launcher')}</Text>
     </Pressable>
   )
 }

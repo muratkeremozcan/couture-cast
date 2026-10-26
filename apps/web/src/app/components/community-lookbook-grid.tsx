@@ -778,9 +778,12 @@ function LookbookCardContent({
         )}
       </div>
 
-      {canAct && item.author.isSelf && (
-        <ShareCardControl source={{ kind: 'community_post', postId: item.id }} />
-      )}
+      {canAct &&
+        item.author.isSelf &&
+        item.status === 'published' &&
+        item.publishedAt !== null && (
+          <ShareCardControl source={{ kind: 'community_post', postId: item.id }} />
+        )}
       {canAct && (
         <CommunityReactions item={item} controls={reactionControls} scope={scope} />
       )}
@@ -1026,9 +1029,12 @@ function LookbookDetailDialog({
       closeLabel={t('community.card.detailClose')}
     >
       <div data-testid="community-detail" className="flex flex-col gap-4">
-        {canAct && item.author.isSelf && (
-          <ShareCardControl source={{ kind: 'community_post', postId: item.id }} />
-        )}
+        {canAct &&
+          item.author.isSelf &&
+          item.status === 'published' &&
+          item.publishedAt !== null && (
+            <ShareCardControl source={{ kind: 'community_post', postId: item.id }} />
+          )}
         <CommunityReactions item={item} controls={reactionControls} />
         <div
           role="status"

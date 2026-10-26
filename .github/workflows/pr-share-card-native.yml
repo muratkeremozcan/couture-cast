@@ -47,8 +47,8 @@ jobs:
       - name: Start owned Docker VM for local Auth on macOS
         if: runner.os == 'macOS'
         run: |
-          brew install colima docker qemu xcodegen lima-additional-guestagents
-          colima start --vm-type=qemu --arch=x86_64 --cpu-type=qemu64 --cpu=2 --memory=3 --disk=40
+          brew install colima docker qemu xcodegen lima-additional-guestagents coreutils
+          colima start --vm-type=qemu --arch=aarch64 --cpu-type=max --cpu=2 --memory=3 --disk=40
       - uses: ./.github/actions/start-local-supabase
       - name: Prepare isolated UUID runtime and built renderer
         run: |
@@ -65,11 +65,19 @@ jobs:
         run: |
           npx playwright install --with-deps chromium firefox webkit
           node scripts/e2e-share-card/bridge-a11y.mjs
-          node --test apps/mobile/plugins/with-share-card-permissions.test.js
-      - name: Generate and build native development client
-        run: |
-          node scripts/run-story68-native.mjs prebuild --platform ${{ matrix.platform }}
-          node scripts/run-story68-native.mjs build --platform ${{ matrix.platform }}
+          node --test apps/mobile/plugins/with-share-card-permissions.test.js apps/mobile/plugins/with-story68-release-network.test.js
+          node --test scripts/lib/story68-rapid-watermark.test.mjs scripts/lib/story68-rapid-watermark-control.test.mjs scripts/lib/story68-rapid-watermark-flow.test.mjs scripts/lib/story68-native-build-env.test.mjs scripts/lib/story68-fallback-post.test.mjs scripts/lib/story68-fallback-focus.test.mjs scripts/lib/story68-cold-font-scale.test.mjs scripts/lib/story68-release-live-font.test.mjs
+          node --test scripts/ci/share-card-native-failure.spec.mjs
+      - name: Verify native paragraph heading semantics
+        if: runner.os == 'macOS'
+        run: bash scripts/ci/share-card-header-semantics.sh
+      - name: Generate native development client
+        run: node scripts/run-story68-native.mjs prebuild --platform ${{ matrix.platform }}
+      - name: Verify fresh Worklets variant and ABI staging
+        if: matrix.platform == 'android'
+        run: node --test scripts/lib/story68-worklets-staging.test.mjs
+      - name: Build native development client
+        run: node scripts/run-story68-native.mjs build --platform ${{ matrix.platform }}
       - name: Genuine browser share-card acceptance matrix
         if: matrix.platform == 'android' && matrix.api == 36
         run: |
@@ -82,14 +90,24 @@ jobs:
           curl --fail --silent http://127.0.0.1:3088 > /dev/null
           npx playwright test --config playwright/share-card.config.ts
           node scripts/e2e-share-card/assert-web-matrix.mjs
+      - name: Enable and verify Android hardware acceleration
+        if: matrix.platform == 'android'
+        run: |
+          echo 'KERNEL=="kvm", GROUP="kvm", MODE="0666", OPTIONS+="static_node=kvm"' | sudo tee /etc/udev/rules.d/99-kvm4all.rules
+          sudo udevadm control --reload-rules
+          sudo udevadm trigger --name-match=kvm
+          test -r /dev/kvm && test -w /dev/kvm
       - name: Android real original and API32 denied/permanent permission proof
         if: matrix.platform == 'android'
         uses: reactivecircus/android-emulator-runner@v2
         with:
           api-level: ${{ matrix.api }}
+          avd-name: cc68-api${{ matrix.api }}
           target: ${{ matrix.target }}
           arch: x86_64
           profile: pixel_6
+          ram-size: 4096M
+          disable-linux-hw-accel: false
           disable-animations: true
           script: bash scripts/ci/share-card-android.sh
       - name: iOS original Photos resource and add-only save
@@ -104,7 +122,9 @@ jobs:
           node scripts/run-story68-native.mjs signin --platform ios --device "$device"
           node scripts/run-story68-native.mjs proof --platform ios --device "$device"
           node scripts/run-story68-native.mjs matrix --platform ios --device "$device"
+          node scripts/run-story68-native.mjs rapid-watermark --platform ios --device "$device"
           node scripts/run-story68-native.mjs a11y --platform ios --device "$device"
+          node scripts/run-story68-native.mjs fallback-focus --platform ios --device "$device"
           node scripts/run-story68-native.mjs expo-go-proof --platform ios --device "$device"
       - name: Select and scan closed evidence
         if: always()

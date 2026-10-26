@@ -10,7 +10,7 @@ import Constants from 'expo-constants'
 import { AppState } from 'react-native'
 import { userProfileResponseSchema } from '@couture/api-client/contracts/http'
 import { createMobileApiClient } from './api-client'
-import { setMobileAccessTokenResolver, setMobileApplicationUserId } from './mobile-auth'
+import { setMobileApplicationUserId } from './mobile-auth'
 import { secureSessionStorage } from './secure-session-storage'
 import { codeRejected, NativeSignInError } from './native-signin-error'
 
@@ -28,6 +28,13 @@ type VerificationFlight = {
 let verification: VerificationFlight | undefined
 let localSignedOut = false
 const authStorageKey = 'couturecast.auth-session'
+type SessionLifecycle = {
+  owners: Set<object>
+  ready: Promise<void>
+  dispose: () => void
+}
+// Roots lease one process lifecycle. Verification survives an interval with no roots.
+let sessionLifecycle: SessionLifecycle | undefined
 const listeners = new Set<() => void>()
 const logoutHooks = new Set<(token?: string) => Promise<void>>()
 // Logout cleanup hooks get at most this long before sign-out returns.
@@ -190,28 +197,17 @@ export async function resolveNativeSessionToken(): Promise<string | undefined> {
   requireBearerLifetime(data.session)
   return data.session.access_token
 }
-export async function startNativeSession(): Promise<() => void> {
-  if (
-    __DEV__ &&
-    process.env.EXPO_PUBLIC_E2E_AUTH_MODE !== 'real' &&
-    (process.env.EXPO_PUBLIC_E2E_ACCESS_TOKEN ||
-      process.env.EXPO_PUBLIC_E2E_ACCESS_TOKEN_BY_DEVICE)
-  )
-    return () => undefined
+async function installSessionLifecycle(lifecycle: SessionLifecycle) {
   const client = await nativeSupabase()
   let stopped = false
-  const restore = setMobileAccessTokenResolver(resolveNativeSessionToken)
   let unsubscribe: () => void = () => undefined
   let removeLifecycle: () => void = () => undefined
-  const cleanup = () => {
+  lifecycle.dispose = () => {
     if (stopped) return
     stopped = true
-    generation++
-    verification = undefined
     unsubscribe()
     removeLifecycle()
     void client.auth.stopAutoRefresh().catch(() => undefined)
-    restore()
   }
   try {
     const { data } = client.auth.onAuthStateChange((_event, next) => {
@@ -221,13 +217,14 @@ export async function startNativeSession(): Promise<() => void> {
       }, 0)
     })
     unsubscribe = () => data.subscription.unsubscribe()
-    const lifecycle = AppState.addEventListener('change', (state) => {
+    const subscription = AppState.addEventListener('change', (state) => {
+      if (stopped) return
       if (state === 'active') {
         void client.auth.startAutoRefresh().catch(() => undefined)
         void resolveNativeSessionToken().catch(() => undefined)
       } else void client.auth.stopAutoRefresh().catch(() => undefined)
     })
-    removeLifecycle = () => lifecycle.remove()
+    removeLifecycle = () => subscription.remove()
     try {
       const restored = await client.auth.getSession()
       if (restored.error) throw new Error('Session restore is unavailable.')
@@ -237,9 +234,37 @@ export async function startNativeSession(): Promise<() => void> {
     }
     if (AppState.currentState === 'active')
       void client.auth.startAutoRefresh().catch(() => undefined)
+  } catch (error) {
+    lifecycle.dispose()
+    throw error
+  }
+}
+export async function startNativeSession(): Promise<() => void> {
+  if (
+    __DEV__ &&
+    process.env.EXPO_PUBLIC_E2E_AUTH_MODE !== 'real' &&
+    (process.env.EXPO_PUBLIC_E2E_ACCESS_TOKEN ||
+      process.env.EXPO_PUBLIC_E2E_ACCESS_TOKEN_BY_DEVICE)
+  )
+    return () => undefined
+  let lifecycle = sessionLifecycle
+  if (!lifecycle) {
+    lifecycle = { owners: new Set(), ready: Promise.resolve(), dispose: () => undefined }
+    sessionLifecycle = lifecycle
+    lifecycle.ready = installSessionLifecycle(lifecycle)
+  }
+  const ownedLifecycle = lifecycle
+  const owner = {}
+  ownedLifecycle.owners.add(owner)
+  const cleanup = () => {
+    if (!ownedLifecycle.owners.delete(owner) || ownedLifecycle.owners.size > 0) return
+    if (sessionLifecycle === ownedLifecycle) sessionLifecycle = undefined
+    ownedLifecycle.dispose()
+  }
+  try {
+    await ownedLifecycle.ready
     return cleanup
   } catch (error) {
-    // Incomplete installation cannot leave a resolver or subscription behind.
     cleanup()
     throw error
   }

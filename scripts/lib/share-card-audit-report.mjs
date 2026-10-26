@@ -28,10 +28,17 @@ export const shareCardAuditTestIDs = [
   'testUnavailableAndOfflineTraversal',
   'testDeniedPermanentLimitedAndPendingTraversal',
   'testPreparingCancelAndRetryTraversal',
+  'testOwnedSavingAndReopenedFinishingRestoreWatermark',
   'testRasterOCRExceptionRejectsEveryNearMiss',
   'testTextOCRExceptionRejectsEveryNearMiss',
   'testRasterExceptionsRequirePresentExactlyLabelledPreview',
 ].map((name) => `ShareCardAccessibilityUITests/${name}()`)
+export const shareCardNativeBehaviors = [
+  'owned-saving',
+  'reopened-finishing',
+  'watermark-reenabled',
+  'existing-header-labels',
+]
 const knownIssues = new Set([
   'Potentially inaccessible element',
   'Potentially inaccessible text',
@@ -110,6 +117,16 @@ export function closedShareCardAuditReport(summary, tree, log) {
       )
       .map((watermark) => `${locale}:${watermark}`)
   )
+  const nativeBehaviors = [
+    ...new Set(
+      [...log.matchAll(/CC68_NATIVE_BEHAVIOR_PASS ([a-z-]+)(?=\s|$)/g)]
+        .map((match) => match[1])
+        .filter((name) => shareCardNativeBehaviors.includes(name))
+    ),
+  ]
+  const missingNativeBehaviors = shareCardNativeBehaviors.filter(
+    (name) => !nativeBehaviors.includes(name)
+  )
   return {
     platform: 'ios',
     method: 'XCUITest simulator substitute',
@@ -121,7 +138,8 @@ export function closedShareCardAuditReport(summary, tree, log) {
       tests.length === shareCardAuditTestIDs.length &&
       missingTests.length === 0 &&
       missingStates.length === 0 &&
-      missingLocaleWatermarks.length === 0,
+      missingLocaleWatermarks.length === 0 &&
+      missingNativeBehaviors.length === 0,
     counts: {
       total: Number(summary.totalTestCount ?? 0),
       passed: Number(summary.passedTests ?? 0),
@@ -135,6 +153,8 @@ export function closedShareCardAuditReport(summary, tree, log) {
     missingTests,
     missingStates,
     missingLocaleWatermarks,
+    nativeBehaviors,
+    missingNativeBehaviors,
     states: observedStates,
     strictIssues: issues,
     focusEvidence:

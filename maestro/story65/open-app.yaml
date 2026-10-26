@@ -40,6 +40,7 @@ appId: ${MAESTRO_APP_ID}
                   visible: 'Navigate up'
                 commands:
                   - tapOn: 'Navigate up'
+                  - waitForAnimationToEnd
             - runFlow:
                 when:
                   visible:
@@ -47,6 +48,7 @@ appId: ${MAESTRO_APP_ID}
                 commands:
                   - tapOn:
                       id: 'BackButton'
+                  - waitForAnimationToEnd
             - runFlow:
                 when:
                   visible:
@@ -54,6 +56,7 @@ appId: ${MAESTRO_APP_ID}
                 commands:
                   - tapOn:
                       id: 'comments-close'
+                  - waitForAnimationToEnd
       - extendedWaitUntil:
           visible:
             id: 'tab-home'

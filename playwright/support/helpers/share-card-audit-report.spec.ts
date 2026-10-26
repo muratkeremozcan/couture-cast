@@ -25,16 +25,25 @@ const markers = [
       (state) => `CC68_STATE_PASS en-US ${state} ${state === 'preparing' ? 'none' : 'on'}`
     ),
 ]
-const report = (tests = nodes, log = markers.join('\n')) =>
+const behaviorMarkers = [
+  'CC68_NATIVE_BEHAVIOR_PASS owned-saving',
+  'CC68_NATIVE_BEHAVIOR_PASS reopened-finishing',
+  'CC68_NATIVE_BEHAVIOR_PASS watermark-reenabled',
+  'CC68_NATIVE_BEHAVIOR_PASS existing-header-labels',
+]
+const report = (tests = nodes, log = [...markers, ...behaviorMarkers].join('\n')) =>
   closedShareCardAuditReport(summary, { testNodes: tests }, log)
 it('requires every named behavior, state, and supported locale ON and OFF before declaring the all-audit complete', () => {
   expect(report().passed).toBe(true)
   for (const node of nodes)
     expect(report(nodes.filter((n) => n !== node)).passed).toBe(false)
   for (const marker of markers)
-    expect(report(nodes, markers.filter((m) => m !== marker).join('\n')).passed).toBe(
-      false
-    )
+    expect(
+      report(
+        nodes,
+        [...markers.filter((m) => m !== marker), ...behaviorMarkers].join('\n')
+      ).passed
+    ).toBe(false)
   expect(
     closedShareCardAuditReport({ result: 'Passed', totalTestCount: 0 }, {}, '').passed
   ).toBe(false)
@@ -52,7 +61,9 @@ it('requires every named behavior, state, and supported locale ON and OFF before
   expect(
     report(
       nodes,
-      markers.join('\n').replace('en-US preparing none', 'en-US preparing on')
+      [...markers, ...behaviorMarkers]
+        .join('\n')
+        .replace('en-US preparing none', 'en-US preparing on')
     ).passed
   ).toBe(false)
 })
@@ -80,4 +91,15 @@ it('exports closed results and allowlisted locales, excluding raw failures, unkn
     'Potentially inaccessible text',
   ])
   expect(JSON.stringify(output)).not.toContain('PRIVATE_TOKEN')
+})
+
+it('requires current-owned Saving, reopened Finishing, watermark recovery and existing header proof', () => {
+  expect(report().passed).toBe(true)
+  for (const marker of behaviorMarkers) {
+    const incomplete = [
+      ...markers,
+      ...behaviorMarkers.filter((value) => value !== marker),
+    ].join('\n')
+    expect(report(nodes, incomplete).passed).toBe(false)
+  }
 })

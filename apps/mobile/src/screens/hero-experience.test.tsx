@@ -49,6 +49,14 @@ vi.mock('@/src/analytics/mobile-analytics', () => ({
 }))
 
 describe('Mobile Hero Experience (TabOneScreen)', () => {
+  it('L8: the hero content keeps its existing navigation heading as the fallback', async () => {
+    await render(<TabOneScreen />)
+    await screen.findByTestId('weather-header')
+    expect(
+      screen.queryByRole('heading', { name: i18n.t('shareCard.sourceOutfit') })
+    ).toBeNull()
+  })
+
   beforeAll(async () => {
     process.env.EXPO_PUBLIC_API_BASE_URL =
       typeof window !== 'undefined' ? window.location.origin : 'https://mock-api.test'

@@ -7,6 +7,11 @@ node scripts/run-story68-native.mjs open --platform android --device "$ANDROID_S
 node scripts/run-story68-native.mjs signin --platform android --device "$ANDROID_SERIAL"
 node scripts/run-story68-native.mjs proof --platform android --device "$ANDROID_SERIAL" --reinitialize-owned-app yes
 node scripts/run-story68-native.mjs matrix --platform android --device "$ANDROID_SERIAL"
+node scripts/run-story68-native.mjs rapid-watermark --platform android --device "$ANDROID_SERIAL"
 if [ "$(adb -s "$ANDROID_SERIAL" shell getprop ro.build.version.sdk | tr -d '\r')" -ge 33 ]; then
   node scripts/run-story68-native.mjs a11y --platform android --device "$ANDROID_SERIAL"
+  node scripts/run-story68-native.mjs fallback-focus --platform android --device "$ANDROID_SERIAL"
+fi
+if [ "$(adb -s "$ANDROID_SERIAL" shell getprop ro.build.version.sdk | tr -d '\r')" -eq 36 ]; then
+  bash scripts/ci/share-card-android-release-font.sh
 fi

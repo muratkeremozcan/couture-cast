@@ -3,12 +3,13 @@ appId: ${MAESTRO_APP_ID}
 - tapOn:
     id: share-card-save
 - extendedWaitUntil:
-    visible: ${MAESTRO_PENDING}
+    visible: ${MAESTRO_SAVING}
     timeout: 20000
 - tapOn:
     id: share-card-save
     optional: true
-- assertVisible: ${MAESTRO_PENDING}
+- assertVisible: ${MAESTRO_SAVING}
+- assertNotVisible: ${MAESTRO_PENDING}
 - runFlow:
     when:
       platform: iOS

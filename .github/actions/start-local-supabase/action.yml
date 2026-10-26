@@ -402,11 +402,16 @@ runs:
         }
 
         run_start() {
+          local deadline_command
           if command -v timeout > /dev/null; then
-            timeout --kill-after=15 "$1" npx supabase start ${exclude:+--exclude "$exclude"}
+            deadline_command=timeout
+          elif command -v gtimeout > /dev/null; then
+            deadline_command=gtimeout
           else
-            npx supabase start ${exclude:+--exclude "$exclude"}
+            echo "::error::Supabase startup requires GNU timeout or gtimeout; install coreutils."
+            return 2
           fi
+          "$deadline_command" --kill-after=15 "$1" npx supabase start ${exclude:+--exclude "$exclude"}
         }
 
         # A pull that failed or ran out of time says the registry is throttled

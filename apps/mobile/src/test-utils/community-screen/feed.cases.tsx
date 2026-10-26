@@ -47,6 +47,38 @@ function distinctNodeHandles() {
 }
 
 export function registerCommunityFeedCases() {
+  it.each(['pending_review', 'flagged', 'withdrawn'] as const)(
+    'M2: an own %s notification detail keeps export unavailable',
+    async (status) => {
+      setMockParams({ source: 'notification', type: 'community', cardId: 'own-private' })
+      serveFeed(() => feedJson({ items: [] }))
+      server.use(
+        http.get('*/api/v1/community/posts/own-private', () =>
+          HttpResponse.json({
+            data: item({
+              id: 'own-private',
+              status,
+              publishedAt: null,
+              author: { displayName: 'Me', isSelf: true },
+            }),
+          })
+        )
+      )
+      await render(<CommunityScreen />)
+      const detail = await screen.findByTestId('highlighted-community-card-own-private')
+      expect(within(detail).getByTestId('community-post-card-own-private')).toBeVisible()
+      expect(
+        within(detail).queryByTestId('community-share-card-open-own-private')
+      ).toBeNull()
+    }
+  )
+
+  it('L8: the community content keeps its existing navigation heading as the fallback', async () => {
+    await render(<CommunityScreen />)
+    await screen.findByTestId('community-screen')
+    expect(screen.queryByRole('heading', { name: enUS.community.heading })).toBeNull()
+  })
+
   it('R12 keeps a visible late detail card while stripping revoked reaction capability', async () => {
     let release!: () => void
     const held = new Promise<void>((resolve) => {

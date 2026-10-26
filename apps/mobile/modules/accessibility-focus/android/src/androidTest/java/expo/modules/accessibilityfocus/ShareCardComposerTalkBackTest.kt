@@ -4,6 +4,7 @@ import android.accessibilityservice.AccessibilityServiceInfo
 import android.app.UiAutomation
 import android.graphics.Rect
 import android.os.SystemClock
+import android.os.ParcelFileDescriptor
 import android.view.accessibility.AccessibilityManager
 import android.view.accessibility.AccessibilityNodeInfo
 import androidx.test.ext.junit.runners.AndroidJUnit4
@@ -42,6 +43,38 @@ class ShareCardComposerTalkBackTest {
   }
   private fun label(node: AccessibilityNodeInfo) = (node.contentDescription ?: node.text ?: "").toString()
 
+  private fun shell(command: String): String = ParcelFileDescriptor.AutoCloseInputStream(
+    automation.executeShellCommand(command)
+  ).use { String(it.readBytes()) }
+
+  private fun fixture(mode: String) {
+    require(mode in listOf("real", "deferred", "release"))
+    // Runtime.exec treats shell quotes as literal URI characters.
+    val result = shell("am start -W -a android.intent.action.VIEW -d couturecast-story68://__story68__/share-card?mode=$mode com.couturecast.story68")
+    assertTrue("Fixture $mode must reach the Story68 activity: $result", result.lineSequence().any { it.trim() == "Status: ok" })
+  }
+
+  private fun cacheFiles(): Set<String> = shell(
+    "run-as com.couturecast.story68 find cache/share-cards -name cc68-*.png"
+  ).lineSequence().filter { Regex("cache/share-cards/cc68-[a-f0-9-]+\\.png").matches(it) }.toSet()
+
+  private fun assertCacheEnumeration() {
+    val probe = "cache/share-cards/cc68-${java.util.UUID.randomUUID()}.png"
+    shell("run-as com.couturecast.story68 mkdir -p cache/share-cards")
+    shell("run-as com.couturecast.story68 touch $probe")
+    try {
+      assertTrue("Owned sentinel must be returned by the native cache query", probe in cacheFiles())
+    } finally {
+      shell("run-as com.couturecast.story68 rm $probe")
+    }
+  }
+
+  private fun assertHeader(title: String, removedContentHeading: String) {
+    waitFor("Existing $title header") { all().any { label(it) == title && it.isHeading } }
+    assertEquals("Exactly one existing $title header", 1, all().count { label(it) == title && it.isHeading })
+    assertFalse("No duplicate content heading", all().any { label(it) == removedContentHeading && it.isHeading })
+  }
+
   @Test
   fun actualTalkBackOpenSaveCancelTraversalAndFocus() {
     val manager = context.getSystemService(AccessibilityManager::class.java)
@@ -71,4 +104,54 @@ class ShareCardComposerTalkBackTest {
     find("outfit-share-card-open")!!.getBoundsInScreen(rect)
     assertFalse("Restored opener visible", rect.isEmpty)
   }
+  @Test
+  fun actualTalkBackOwnedSavingAndReopenedFinishingRestoreWatermark() {
+    val manager = context.getSystemService(AccessibilityManager::class.java)
+    assertTrue("Actual TalkBack required", manager.isEnabled && manager.isTouchExplorationEnabled)
+    val services = manager.getEnabledAccessibilityServiceList(AccessibilityServiceInfo.FEEDBACK_ALL_MASK)
+    assertTrue("TalkBack service must be bound", services.any { it.id.contains("com.google.android.marvin.talkback") })
+    try {
+      fixture("real")
+      assertCacheEnumeration()
+      if (find("share-card-cancel") != null) click("share-card-cancel")
+      click("tab-home")
+      assertHeader("Home", "Outfit")
+      click("tab-community")
+      assertHeader("Community", "Living community lookbook")
+      click("tab-home")
+      waitFor("Outfit action") { find("outfit-share-card-open") != null }
+      assertEquals("Action label", "Create my outfit card", label(find("outfit-share-card-open")!!))
+      fixture("deferred")
+      click("outfit-share-card-open")
+      waitFor("Approved preview and enabled Save") {
+        all().any { it.viewIdResourceName?.contains("share-card-preview-loaded-") == true } && find("share-card-save")?.isEnabled == true
+      }
+      assertTrue(find("share-card-save")!!.performAction(AccessibilityNodeInfo.ACTION_ACCESSIBILITY_FOCUS))
+      waitFor("Save initially focused") { find("share-card-save")?.isAccessibilityFocused == true }
+      val before = cacheFiles()
+      click("share-card-save")
+      waitFor("Committed file remains owned") { (cacheFiles() - before).isNotEmpty() }
+      waitFor("Owned Saving without a Cancel focus jump") {
+        find("share-card-feedback")?.let { label(it) == "Saving" } == true && find("share-card-save")?.isAccessibilityFocused == true
+      }
+      assertFalse(all().any { label(it) == "Finishing save" })
+      click("share-card-cancel")
+      click("outfit-share-card-open")
+      waitFor("Reopened Finishing save") { find("share-card-feedback")?.let { label(it) == "Finishing save" } == true }
+      waitFor("Old save focuses its Cancel recovery control") { find("share-card-cancel")?.isAccessibilityFocused == true }
+      assertFalse(find("share-card-save")!!.isEnabled)
+      fixture("release")
+      waitFor("Settled old save re-enables the watermark") { find("share-card-watermark")?.isEnabled == true && find("share-card-feedback") == null }
+      val checked = find("share-card-watermark")!!.isChecked
+      click("share-card-watermark")
+      waitFor("Re-enabled watermark toggles") { find("share-card-watermark")?.isChecked != checked }
+      assertFalse(all().any { label(it) == "Saved to photos" })
+      click("share-card-cancel")
+    } finally {
+      fixture("release")
+      fixture("real")
+      if (find("share-card-cancel") != null) click("share-card-cancel")
+    }
+  }
+
 }

@@ -62,6 +62,13 @@ function renderCard(
 }
 
 describe('OutfitRecommendationCard affiliate CTA', () => {
+  it('L8: the outfit export control describes its action', () => {
+    renderCard({ onExport: vi.fn() })
+    expect(screen.getByTestId('outfit-share-card-open')).toHaveAccessibleName(
+      i18n.t('shareCard.launcher')
+    )
+  })
+
   beforeAll(async () => {
     await initI18n()
   })

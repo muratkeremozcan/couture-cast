@@ -3,7 +3,8 @@ import { PrismaClient } from '@prisma/client'
 const expected = process.env.CC68_EXPECTED_DATABASE_URL
 if (!expected || !/^\/tea_community_[a-f0-9]{32}$/.test(new URL(expected).pathname))
   throw new Error('owned_database_required')
-await import('../../apps/api/dist/src/load-env.js')
+// Build outputs are resolved at execution; the quality lane lints before the API build.
+await import(new URL('../../apps/api/dist/src/load-env.js', import.meta.url).href)
 if (process.env.DATABASE_URL !== expected) throw new Error('effective_database_mismatch')
 const prisma = new PrismaClient({ datasourceUrl: expected })
 try {
@@ -19,4 +20,4 @@ console.log(
     database: new URL(expected).pathname.slice(1),
   })
 )
-await import('../../apps/api/dist/src/main.js')
+await import(new URL('../../apps/api/dist/src/main.js', import.meta.url).href)

@@ -16,11 +16,17 @@ import { SupabaseCommunityStorageAdapter } from '../community/community-storage.
 import { verifyAndNormalizeCommunityImage } from '../community/community-image-validation.js'
 import { ShareCardSourceRepository } from './share-card-source.repository.js'
 import { ShareCardRenderer } from './share-card-renderer.js'
+import { ShareCardAdmission } from './share-card-admission.js'
 
 export const SHARE_CARD_GLOBAL_LIMIT = 4
 export const SHARE_CARD_MEMBER_LIMIT = 1
-let active = 0
-const members = new Map<string, number>()
+const unavailable = () =>
+  new ServiceUnavailableException({
+    statusCode: 503,
+    code: 'render_unavailable',
+    message: 'render_unavailable',
+  })
+const admission = new ShareCardAdmission(SHARE_CARD_GLOBAL_LIMIT, unavailable)
 
 @Injectable()
 export class ShareCardsService {
@@ -38,19 +44,6 @@ export class ShareCardsService {
     parent?: AbortSignal
   ): Promise<PreparedShareCard> {
     const controller = new AbortController()
-    const unavailable = () =>
-      new ServiceUnavailableException({
-        statusCode: 503,
-        code: 'render_unavailable',
-        message: 'render_unavailable',
-      })
-    if (
-      active >= SHARE_CARD_GLOBAL_LIMIT ||
-      (members.get(member) ?? 0) >= SHARE_CARD_MEMBER_LIMIT
-    )
-      throw unavailable()
-    active++
-    members.set(member, (members.get(member) ?? 0) + 1)
     const check = () => {
       if (controller.signal.aborted) throw unavailable()
     }
@@ -153,12 +146,14 @@ export class ShareCardsService {
       return result
     }
     // A timed-out/disconnected caller cannot free capacity while native/DB work is still active.
-    const owned = operation().finally(() => {
-      active--
-      const count = (members.get(member) ?? 1) - 1
-      if (count === 0) members.delete(member)
-      else members.set(member, count)
-    })
+    const owned = (async () => {
+      const release = await admission.acquire(member, controller.signal)
+      try {
+        return await operation()
+      } finally {
+        release()
+      }
+    })()
     try {
       return await Promise.race([owned, deadline, cancelled])
     } catch (error) {

@@ -551,6 +551,266 @@ repository-relative. Proposed files are identified in the tasks.
   locally, then all 210 interactions passed with retries disabled after the alias correction.
   Evidence is retained under `story-6-8/runs/ci-pact-mobile-*` and original CI logs/artifact.
 
+- 2026-10-26 external review batch: Astra A1 requires optional native SDK loading after both
+  registry capability checks. Baseline clients now boot with no ExpoMediaLibrary registration;
+  supported development clients retain the actual SDK and original-resource save paths. Actual
+  installed SDK initialization and transpiled import-chain controls fail before the repair and
+  pass after it. Precommit cleanup preserves the original failure and queues bounded owned retries.
+
+- 2026-10-26 external review M1 decision: superseded preparation retains ownership until actual
+  settlement. A cancelled predecessor permits one replaceable waiter for the member; the existing
+  four-active and one-active-per-member bounds remain. The 15-second deadline includes queue time.
+  Actual HTTP disconnect/replacement and PostgreSQL-held browser proofs exercise the boundary.
+  Mobile feedback ownership is reactive state so rapid watermark changes keep Preparing visible.
+  Native proof starts its 12-second SQL hold after the Maestro driver is ready through a one-shot
+  loopback capability; explicit release follows the final held assertion and precedes CLI teardown.
+  The original product deadline and all held-state assertions remain unchanged.
+
+- 2026-10-26 external review H1/H2 decision: restored collapsed deletion matching and worst
+  applicable severity. Generic contexts cannot exempt high-severity targets. The coordinator
+  approved nine contiguous French retard constructions and seven Portuguese/Spanish tapete noun
+  constructions, independent of declared locale. Each exempts its exact literal occurrence only;
+  punctuation, emoji, line breaks, obfuscation, a separate bare occurrence and other high terms
+  remain screened. One reviewed table owns this surface, with per-entry neighbor controls and
+  generated-view integrity checks. Round 4 is committed as
+  `9783ee4701a93b164e13cee2f0aa36aef5eb8d69`; its 38-path manifest SHA-256 is
+  `87dbf164c74999949e87508a76b1bc5c5327f52fe5a3177e8ff414cfd3a2057a`.
+
+- 2026-10-26 coordinator Round 5 decision: v5 was retired to development by
+  `11dda5768f1f2463876b7245e7eb8deb7a458e0d` after the Italian Wilson upper bound exceeded
+  one percent. Its corpus, seal and failed evidence remain preserved. Round 5 may repair general
+  classes from the ten authorized development cases. Every added native-sense construction must
+  cite preexisting development or training evidence and have a blocked-neighbor test; unsupported
+  additions are removed. Existing balls variant behavior remains exact by explicit coordinator
+  decision because ordinary fashion uses make broader indexing unjustified. TEA owns the blind
+  v6 cohort, release selector and evaluator; the builder does not inspect v6 content or results.
+
+- 2026-10-26 current CI failure repairs: bootstrap fixtures copy both disk-space and native-flow
+  dependencies. Prebuild lint uses runtime URLs for generated API entrypoints. Android original
+  lanes explicitly grant and require KVM access after measured software-emulation boot failures.
+  macOS uses the available ARM64 image architecture and a bounded GNU timeout installed through
+  coreutils; the prior missing-timeout fallback exceeded the configured startup budget. Closed
+  native failure artifacts admit only a repository flow basename, classification enum, integer
+  duration and platform. CI execution must confirm the corrected native startup and save lanes.
+
+- 2026-10-26 global API proof ownership: a Nest rebuild deleted dist during a compiled-child test.
+  Builds are serialized before suites that spawn compiled children. Child-exit detection now fails
+  immediately with owned diagnostics; real-process regression controls cover the boundary. The
+  serialized API gate passes 4,881 tests with 94.99/88.96/96.11/95.73 percent global coverage.
+
+- 2026-10-26 Round 5 freeze: final reviewed surface is 24 constructions. The original 16 are
+  exact. Eight additions have preexisting development evidence and per-entry blocked-neighbor
+  controls: three textile quantity/compound phrases name yarn or wool bundles; two Italian
+  determiner phrases name a repair patch; two Turkish possessive/genitive phrases name ballet
+  shoes; one Turkish locative phrase names cooking. The evidence scan removed 37 unsupported
+  additions. All seven retired-v5 development sets withhold zero of 1,000, with Wilson upper
+  bound 0.382676 percent. All 9,982 disguised training cases remain withheld. Focused plain and
+  covered suites each pass 492 tests, and guarded HTTP passes 78 tests. Round 5 is committed as
+  `1cd9441b386945ec2ac6e9590bf36c4ef89863d5`; its 48-input manifest SHA-256 is
+  `8a2ef3a4138b2a50a0052f3aab24749403f6fe861891d2141324e9d695f8a2a1`.
+  Forty-one repair/input paths and seven unchanged retired-v5 inputs are pinned. Independent
+  v6 release acceptance remains owned by TEA; these retired-corpus results are development proof.
+
+- 2026-10-26 current native fixture repairs: iOS sign-in succeeded at Auth, then queried the
+  previous hierarchy during the native pop transition. Each back/close operation now waits for
+  animation settlement. Android live sign-in entered five of six OTP digits, losing the first;
+  the captured code had no leading zero and the owned email matched. The fixture waits for the
+  keyboard before entry and asserts the full code before Verify. A fresh real Auth journey then
+  passed. Sign-in also establishes the tab layout before locale selection, so a failed prior
+  form cannot invalidate that prerequisite. Secret code values remain absent from retained logs.
+
+- 2026-10-26 native heading proof repair: actual iOS traversal found two exact-label StaticText
+  records at identical nonempty bounds. The diagnostic confirms the direct parent/child pair;
+  installed Fabric marks the paragraph container inaccessible and delegates its label and traits
+  to one accessible child. Shared XCTest selection now verifies that structure and counts semantic
+  leaves. Equal-frame siblings, malformed descendants and invalid visibility still fail. Eleven
+  pure controls and three compiled negative controls cover the boundary in mandatory macOS CI.
+  Existing nine audit test IDs, the separate fallback test, duplicate-content checks and all
+  accessibility audit types remain unchanged. No product change was required for this finding.
+
+- 2026-10-26 fallback evidence: the native proof withdraws only its recorded owned post, requires
+  actual foreground target revalidation, dismisses the retained composer and restores the exact
+  row. Fingerprints protect every other post field. Android requires the actual TalkBack cursor
+  on the existing heading; iOS uses the approved strict XCUITest substitute. Public summaries
+  project fixed primitive proof facts and explicitly record the iOS cursor boundary. Private logs,
+  identifiers and runtime capabilities cannot enter those summaries.
+
+- 2026-10-26 current global API proof: the frozen Round 5 build passes 4,934 tests across 320 files,
+  with 94.96/88.82/96.12/95.69 percent global coverage. Product source remains identical to this run.
+  The current fresh-owned Expo Go proof also passes loaded preview, disabled Save and no new asset;
+  its temporary simulator was deleted immediately. Preexisting Expo Go installations remain intact.
+
+- 2026-10-26 fallback fixture correction: the live status transition exercises existing reaction
+  and realtime triggers. They advance `reaction_generation` before RETURNING and
+  `community_revision` afterward. The harness now checks exact expected increments under the
+  row lock, rereads after the AFTER trigger, and fingerprints every remaining field. Restoration
+  restores content and status while retaining monotonic trigger counters. Concurrent content or
+  counter changes refuse overwrite. Unit controls fail before the fix and pass afterward; a real
+  database round trip proves content restoration and exactly two increments per counter. The
+  public fact is named `ownedPostContentRestored`. Actual iOS fallback execution passes the separate
+  strict `.all` audit, retained foreground preview, removed opener and existing semantic heading.
+  The completed primary suite also passes all nine strict audits, and the current matrix passes
+  thirty states. Android startup remains guarded by the unchanged 15 GiB floor.
+
+- 2026-10-26 Android driver diagnosis: the current matrix passed twenty-two checks, then the
+  next Maestro invocation failed before any Cancel command. Device logcat records its gRPC
+  server failing to bind port 49998 with Address already in use. Maestro selected a host-free
+  ephemeral port that was occupied on the device; its device range is 32768 through 60999.
+  Both dedicated test launch paths now reuse the repository's pinned driver port 17001. Four
+  actual-function controls cover normal and rapid launches on Android and iOS, and removing the
+  pin fails both Android controls. The original failed Cancel journey passes through the corrected
+  runner. The closed failure classifier recognizes this fixed startup signature without exporting
+  raw logs or identifiers. The iOS invocation is unchanged. Full Android matrix and cursor proof
+  continue from a fresh matrix invocation after this measured harness repair.
+
+- 2026-10-26 coordinator font-size decision: development matrix setup may cold-stop the owned
+  application before applying the configured large text size, then restore the original size with
+  the same cold-start ordering. A separate mandatory Android Release proof changes system font
+  size from 1.0 to 1.5 while the card is open. It must preserve or restore the card and its watermark
+  choice, keep the same process alive, show no crash or error surface, and measure title growth.
+  Actual stock Release execution reproduced card disappearance after Activity/Fabric root
+  replacement. Its title was 92 pixels before the change. The preserved hierarchy and logs show
+  the same process with no crash or error surface, so this requires a presentation-state repair.
+  A diagnostic manifest `fontScale` flag was rejected: it retained the card while preventing text
+  growth, measured at 92 pixels before and after. Stock Activity configuration remains required.
+
+- 2026-10-26 coordinator Release networking guard: the owned HTTP proof runtime requires an
+  explicit local build exception. Both `CC68_RELEASE_PROOF_LOOPBACK=1` and
+  `STORY68_NATIVE_TEST_BUILD=1` are required, with the exact isolated package and validated local
+  API/Auth origins. Only an unset local EAS profile or `cc68-release-proof` may generate the policy.
+  Production, release and all other named profiles reject that input. The policy keeps base
+  cleartext disabled and system trust, allowing only `localhost`, `127.0.0.1` and `10.0.2.2`, each
+  without subdomains. Normal generation adds no exception. A read-only guard rejects stale owned
+  proof XML or its manifest reference when the input is off, requiring clean normal generation.
+  Twelve actual fresh and sequential prebuild controls pass, including production-policy RED
+  with the explicit input and GREEN without it. Existing EAS profiles and public build inputs
+  remain unchanged. The closed public Release summary validates state, labels, production marker,
+  APK digest, process/crash/error facts, measured growth and successful font cleanup before copying
+  any evidence. Its two new controls fail before selection and pass after the projection repair.
+
+- 2026-10-26 Android presentation repair: one root-owned host retains a process-memory draft
+  containing source IDs, verified member, watermark choice and open state across Fabric root
+  replacement. A successor lease freshly prepares eligible bytes. Old-root openers, close and
+  focus callbacks, navigation effects and finalizers cannot affect that successor. Identity
+  changes destroy the draft synchronously, navigation retires the visit, and Cancel remains
+  closed until explicit reopen. The independent save manager retains ownership of committed
+  native files until settlement; precommit authorization aborts with its old composer. iOS keeps
+  the existing screen-owned composer lifecycle. The real-composer remount reproduction fails
+  for both source kinds before repair. All 329 focused checks and the current 1,536-test mobile
+  global coverage gate pass afterward. Device acceptance remains separate from those source tests.
+
+- 2026-10-26 permanent Release proof: API36 CI installs a non-debuggable Release APK whose
+  extracted installed digest matches its build input. The actual Settings and composer flows
+  require the production preview marker, exact localized title and full watermark-OFF label,
+  then perform the live font change and assert state, process, crash/error and measured title
+  growth. Font restoration always follows a cold stop, including failed assertions. Actual
+  Maestro hierarchy calls measured 9,656.819, 7,790.611 and 7,950.786 milliseconds. The baseline
+  snapshot has a 20-second bound and later snapshots use the remaining original 20-second
+  restoration budget. Private failure diagnostics precede cleanup and preserve the original
+  assertion if collection fails. The command's 33 new controls, 45 existing controls and five
+  native/generic bootstrap cases pass. CI always regenerates clean normal output with the
+  proof input disabled when its Release branch exits.
+
+- 2026-10-26 Release live-font observation diagnosis: the current shared-font/auth/route
+  Release APK retains the watermark-OFF card in the fresh failure screenshot, and its restored
+  preparation returns HTTP200 in 69ms. The acceptance check fails while starting its first
+  post-change Maestro hierarchy capture. Device logs place the font change at 09:50:32, driver
+  APK installations at 09:50:46-47, instrumentation startup at 09:50:49 and accessibility listening
+  at 09:50:52.387, after the original 20-second observation clock expires. A copied after-tree
+  belongs to the earlier proof4 and is excluded by its timestamp. The current failure screenshot,
+  driver logs and source hashes remain preserved. Skipping driver reinstallation measures
+  9,541.47ms for a valid explicit-device snapshot. The harness repair retains every state, label,
+  process, error and measured-growth assertion and the original 20-second deadline. It clears only
+  fixed owned attempt artifacts before capture and records command timing privately. Current
+  rebuilt Release acceptance remains required before source delivery.
+
+- 2026-10-26 follow-on observation repair: disabling reinstall only for the after-capture still
+  leaves cold setup inside the deadline. Installed Maestro 2.8.0 bytecode and device logs show
+  that its default baseline close removes both driver APKs. Both captures now disable reinstall;
+  an absent driver is installed for the baseline, whose exact production-state assertions still
+  precede the live mutation. Actual consecutive explicit-device captures retain both packages'
+  code paths, versions and installation timestamps and complete in 14,044.71 and 5,750.13ms.
+  The original 20-second restoration clock, full-label and watermark checks, measured growth,
+  same-process and error/crash assertions remain unchanged. The failed attempt contains no stale
+  tree. Rich command diagnostics and independently dated failure artifacts preserve its cause.
+
+- 2026-10-26 renderer decision hold: current Release passes the card-specific live-font proof
+  (title92 to137px, full watermark-OFF label, restored state, same process and no error), but
+  visual inspection of Home finds missing paragraphs. An unchanged-source current-build probe
+  records44 visible text nodes before scaling,5 after and when settled, then40 on a cold launch
+  at1.5. The whole-app font repair therefore remains unaccepted. Exact main1d7b9848 Release
+  retains43 nodes before, after and when settled in the same PID, while screenshots show clipping
+  and temperature height stays169px. Clipping is pre-existing; the current repair adds wholesale
+  paragraph loss. Main's tracked source and lockfile are exact. Its generated-only test identity,
+  strict loopback network policy and same-binary Worklets output staging support the controlled
+  local comparison. Full source identities, screenshots and trees are retained privately.
+  Coordinator requires these baseline facts, the release boundary and native backport feasibility
+  before choosing the next path. No further JS renderer workaround is authorized meanwhile.
+- 2026-10-26 upstream trace: RN commit45904c866882f136edde55df2fe453327057d387 first ships in
+  stable RN0.87.0; ExpoSDK58 ships RN0.88 with the native scaling flag enabled. Installed0.81.5
+  consumes older prebuilt renderer artifacts and defaults that flag off. Source-level backport
+  contexts are compatible with limited adaptation, but the public LayoutMetrics layout and
+  configureYogaTree signature change. Coherent native artifacts and matching Fabric consumers
+  must be rebuilt for every shipped ABI. A header or JS patch cannot update the prebuilt renderer.
+  The fix does not modify the stopped-surface zero-measurement/cache path, so a cure for the added
+  blank-text regression still requires native proof. No backport or upgrade has been implemented.
+
+- 2026-10-26 final coordinator font decision and evidence: the shared AppText repair and all
+  27 import migrations plus font-only navigation changes were reverted after actual Release
+  text loss (44 to 5 nodes). Unchanged main 1d7b9848 preserves 43 nodes before and after live
+  scaling. Independent Android composer, route/detail and authenticated-session restoration
+  remain. Facts and upstream version/backport analysis are recorded in
+  `_bmad-output/test-artifacts/story-6-8/review-font-three-facts.md`. The remaining clipping is
+  the pre-existing RN 0.81.5 Fabric stale font-scale issue fixed upstream in RN 0.87. The
+  coordinator assigned the Expo SDK 58 / RN 0.88 upgrade to its own story and rejected an RN
+  source build. Current stock Release proof `review-android-release-live-font-10` preserves
+  the approved watermark-OFF card, process and all four text nodes without crash or error;
+  the measured title is 92 px before and 92 px after. The proof records that unchanged size.
+- 2026-10-26 coordinator semantic-viewport decision: current Release four-family proof
+  `review-android-live-font-text-preservation-3` preserves the exact text multiset on Home
+  (43), feed (26), post detail (16) and settings (28) after live 1.0 to 1.5 scaling. The feed
+  is explicitly scrolled back to the same owned post before comparison. Main also loses
+  scroll/filter/weather context and resets Home on recreation, so the coordinator excluded
+  those additional restorations. The owned Play emulator and CI use 4 GiB after measured
+  system-wide memory/IO starvation and an ANR on the 2 GiB VM before any font mutation.
+- 2026-10-26 fresh-build Worklets repair: the helper stages the verified native artifact into
+  the actual Gradle variant/ABI output path. Same-inode AGP hard links are hash-verified;
+  independent targets use a verified temporary sibling and atomic replacement. All 18
+  controls and actual clean Release/Debug builds pass, with source/target digests archived.
+  The first failed Gradle log was read during diagnosis and later overwritten by a reused
+  runtime filename; its wrapper failure and deterministic hard-link red control remain.
+  Subsequent build logs and artifact proofs are archived per attempt.
+- 2026-10-26 real TalkBack repairs and proof mapping: the existing two-test composer class
+  now rejects unresolved fixture intents and proves its owned cache glob with a cleaned-up
+  UUID sentinel. UiAutomation executes command strings directly, so literal shell quotes
+  had prevented both fixture activation and cache matching. Corrected execution exposed a
+  genuine reopened Finishing focus defect: Modal.onShow moved focus from Cancel to the
+  title. The targeted callback retains Cancel when an older operation owns Save; unit RED
+  (title 41 instead of Cancel 44), composer 119 GREEN, full mobile 1,576 GREEN and actual
+  TalkBack-current-7 (two tests) prove the repair. Matrix6 retains its 39 passing states with
+  the exact three-path focus delta and current focused native proof recorded explicitly.
+- 2026-10-26 removed-post fallback proof transport: actual Android fallback3 passed every
+  native assertion, but the command wrapper rejected the missing completion marker. Logcat
+  proves Kotlin println delivered the marker only to System.out. The marker now uses
+  Instrumentation.sendStatus after all unchanged removal/header/cursor assertions. Actual
+  fallback4 passes the wrapper, real TalkBack cursor and exact owned-content restoration.
+  Android21 records the single instrumentation-only delta and retires cc68-api36. These
+  tests cover I/O matrix U-A11Y and M-A11Y fallback rows together with the strict iOS
+  XCUITest substitute and all existing label, trait and announcement checks.
+- 2026-10-26 current final native acceptance: iOS original3 extracts one Photos resource with
+  approved SHA-256 a1657c67ce12ed6395478013e3482a5e8404682403a167dbe7b7e96b86398e59,
+  38,398 bytes and only IHDR/IDAT/IEND. Current iOS matrix5 passes all 30 cases; rapid5 holds
+  the real source barrier for 6,843.924 ms with three requests and zero unavailable responses.
+  Current strict accessibility6 passes all nine tests, including the coordinator-approved
+  exact heuristic exceptions with strict labels, traits, status announcements and near-miss
+  controls. Fallback3 passes the approved XCUITest simulator substitute with exact fixture
+  restoration. Fresh Expo Go2 loads the preview, disables unsupported Save and preserves the
+  Photos asset count; its owned simulator is deleted immediately. Android current original6,
+  rapid5 (8,390.775 ms), real TalkBack7 (two tests) and removed-post fallback4 pass. Android21
+  verifies the precise test-only transport delta and retires the owned API36 AVD. All cited
+  current commands have unchanged source during execution. Pipeline reports and full private
+  evidence are under `_bmad-output/test-artifacts/story-6-8/`.
+
 ## Spec Change Log
 
 - 2026-10-25, iteration 2 in progress, Astra round 1: accepted A1 and A2. iOS now imports the
@@ -569,6 +829,45 @@ repository-relative. Proposed files are identified in the tasks.
   release evidence. TEA owns a fresh independently written v4 corpus, overlap measurements and
   evaluation against the frozen round-2 repair. The builder keeps all 21 repair files and all
   holdout/gate paths untouched. Independent v4 acceptance is required before delivery.
+
+- 2026-10-26 actual stock Android Release follow-on: the retained watermark-OFF composer restored
+  after Activity recreation, then its preparation returned HTTP401 during the interval between
+  root auth effects. API timing isolates the gap: successful preview requests preceded recreation,
+  the restored preview failed in 3ms, and authenticated profile/Spotlight requests recovered after
+  the new effect installed. The bearer boundary now lazily resolves the canonical secure native
+  session across roots. Unique resolver leases and a shared SDK lifecycle prevent stale cleanup
+  from replacing a successor or stopping its refresh. Actual signout and principal changes still
+  invalidate verified identity immediately. Failing-first unit and real-composer overlap checks
+  cover both source kinds; current rebuilt native acceptance remains required.
+- 2026-10-26 coordinator app-wide font decision: stock Release live scaling from 1.0 to 1.5 clips
+  Home, community feed, Spotlight detail and Settings. Private before/after screenshots and trees
+  preserve each loaded family and same-process transition. The installed React Native 0.81.5
+  Android Fabric surface uses a layout multiplier of 1 with its experimental layout flag disabled.
+  These observations match upstream [RN52895](https://github.com/react/react-native/issues/52895)
+  and [RN51768](https://github.com/react/react-native/issues/51768). The shared AppText primitive
+  supplies current explicit Android metrics from the public fontScale hook and carries unscaled
+  nested metrics, scaling opt-outs, maximum multipliers, native refs and accessibility props.
+  All 27 app-owned runtime Text import sites use the shared boundary. Supported Android navigation
+  title/tab renderers and growing header/tab containers cover those labels. iOS keeps its native
+  automatic text path. One failing-first test per affected family, primitive inheritance controls
+  and a mandatory AST import-boundary CI check guard this app-wide repair. No experimental native
+  feature flag or fontScale manifest handling is introduced.
+- 2026-10-26 native proof setup correction: the Settings locale fragment requires an explicit
+  MAESTRO_LOCALE. The first permanent Release proof supplied none and targeted locale-btn-undefined
+  before changing font size. Exact argument-boundary RED/GREEN controls now require en-US. The
+  failed command, screenshots and source identity remain preserved as harness evidence.
+
+- 2026-10-26 stock Activity recreation also resets Expo Router initial state to Home and closes
+  screen-owned Spotlight detail. Android now retains an allowlisted static path and eligible detail
+  ID in process memory, tied to the canonical member and root lease. A ready successor can replace
+  initial Home once. Explicit tab, link, navigation and identity intents supersede the restore;
+  stale roots cannot publish or reroute. Auth, guardian and enrollment routes are excluded. The
+  composer waits for its restored route and uses that route's newly registered heading. Detail
+  waits for freshly ready Spotlight membership and renders only the fresh item. Missing or refused
+  membership clears it; a transient failure retains the ID for retry without stale card pixels.
+  No query, URL, image bytes or post object enters this checkpoint. Real Community HTTP remount,
+  refusal, late identity, Cancel, navigation and fresh-heading controls pass with the complete
+  affected 360-test suite. Genuine rebuilt Release acceptance remains the next required check.
 
 ## Review Triage Log
 
@@ -667,3 +966,60 @@ with [add-only access](https://developer.apple.com/documentation/photos/phaccess
 - Before implementation: retain each draft as `spec-iteration<N>.md`, report its verified SHA256 to
   cc66-coordinator and wait for the two story reviews. Earlier snapshots remain immutable.
   Sprint remains `backlog` until both reviewers report READY.
+
+### Coordinator decision: revert shared font repair and preserve restoration
+
+On 2026-10-26, the coordinator approved removal of the shared AppText font-scale repair,
+its 27 import migrations and its navigation text changes. The stock Release comparison in
+`_bmad-output/test-artifacts/story-6-8/review-font-three-facts.md` records the evidence:
+unchanged main 1d7b98485485c224063b573207c7e78bace717be retained 43/43/43 text nodes
+before, after and after settling a live system font change from 1.0 to 1.5. The shared repair
+retained only 5 of 44 nodes. This paragraph loss is a regression introduced by that repair.
+
+Composer restoration across Android Activity recreation, route and detail restoration, and
+the secure-session auth-gap repair remain independently required. Current Release acceptance
+checks every visible application text node on Home, feed, detail and settings across the live
+font change, along with card state, process continuity, errors and crashes. The evidence records
+actual measured title heights. It makes no claim that the existing Fabric clipping is fixed.
+
+The unchanged main Release reproduces clipping with retained nodes and unchanged 169px
+temperature height. React Native upstream commit
+45904c866882f136edde55df2fe453327057d387 first ships in stable RN 0.87.0; Expo SDK 58
+ships RN 0.88. The coordinator assigns the clean Expo SDK 58 / RN 0.88 upgrade to its own
+story. RN source builds and renderer-cache workarounds are excluded by this decision.
+The facts report records primary sources and why a source/header patch alone cannot replace
+the RN 0.81.5 prebuilt Android renderer.
+
+The coordinator also approved fixing the fresh-build Worklets artifact staging gap in this PR.
+A fresh unchanged-main build showed Reanimated importing the legacy `intermediates/cmake`
+path while AGP wrote the compiled binary under `intermediates/cxx`. The build harness must
+stage the exact freshly compiled variant and ABI binary before its native consumer runs.
+
+The first clean build of the permanent Worklets staging helper exposed an AGP hard-link case.
+`review-native-android-final-pipeline-12.json` and its actual build log record compilation and
+validation success followed by a failed Sync action. Compiled and legacy paths shared inode
+618591403, link count2, and became empty because copying onto the link truncated the source.
+The staging repair requires a real hard-link regression control, same-file verification without
+overwrite, and safe replacement for independent stale targets. The source bytes must remain
+unchanged and both final hashes must match. No APK from that failed build was installed.
+
+The coordinator clarified the four-screen Release acceptance on 2026-10-26: compare the exact
+text multiset at the same semantic viewport. After the font change, the feed proof explicitly
+scrolls back to the same own post before comparing every text node. The failed first comparison
+retained 26 nodes but compared different posts because Activity recreation reset the list to
+the top. Home already retained all 43 application text nodes. The coordinator confirms main
+also loses feed scroll, filter and weather-header context on recreation and even resets to Home;
+those behaviors are excluded from this PR by this decision. Route/detail and composer state
+restoration remain required. The proof records its explicit viewport repositioning.
+
+The clean Release also encountered an ANR before any live font change on the owned 2 GiB Play
+emulator. `review-native13-anr-root-cause.json` records Android's contemporaneous pressure
+snapshot: memory stalls 66.98%, I/O stalls 59.64%, runnable app main thread in an Android splash
+transaction, an InputManager watchdog stall and a separate Google service ANR. Cumulative
+scheduler counters are identified as lifetime counters. The source APK remained unchanged.
+The owned AVD restarted with 4 GiB and its existing data; the same Release card passed with
+all four text nodes and OFF state retained, same process and no error/crash. The coordinator
+approved retaining 4 GiB in CI. Native timing budgets remain unchanged.
+The original pipeline12 Gradle log was read through the tool transcript before retry; its runtime
+path was then reused. Its command failure and deterministic hard-link RED remain preserved.
+Subsequent build logs and staging reports are copied into their individual evidence directories.

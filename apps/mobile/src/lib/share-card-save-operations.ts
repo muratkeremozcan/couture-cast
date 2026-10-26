@@ -1,10 +1,12 @@
 /** A process-lifetime owner. Navigation and identity changes cannot release a committed file. */
 type Operation = {
+  owner?: object
   fileUri: string
   save: () => Promise<void>
   cleanup: () => Promise<void>
 }
 let pending: Promise<void> | null = null
+let pendingOwner: object | undefined
 const precommitFiles = new Set<string>()
 export function reserveShareCardFile(uri: string) {
   if (cleaningFiles.has(uri)) throw new Error('file_busy')
@@ -41,6 +43,13 @@ const notify = () => {
 }
 export function nativeShareCardSavePending() {
   return pending !== null
+}
+export function ownsPendingShareCardSave(owner: object) {
+  return pending !== null && pendingOwner === owner
+}
+export function enqueueShareCardCleanup(fileUri: string, cleanup: () => Promise<void>) {
+  if (!cleanupRetries.has(fileUri)) cleanupRetries.set(fileUri, { cleanup, attempts: 0 })
+  scheduleCleanup()
 }
 export function subscribeShareCardSave(listener: () => void) {
   listeners.add(listener)
@@ -92,6 +101,7 @@ export function commitShareCardSave(operation: Operation): Promise<void> {
   if (pending || cleaningFiles.has(operation.fileUri))
     return Promise.reject(new Error('finishingSave'))
   activeFile = operation.fileUri
+  pendingOwner = operation.owner
   // Defer invocation until ownership and the duplicate guard are both installed.
   const native = Promise.resolve().then(operation.save)
   const owned = native.finally(async () => {
@@ -102,6 +112,7 @@ export function commitShareCardSave(operation: Operation): Promise<void> {
     } finally {
       activeFile = null
       pending = null
+      pendingOwner = undefined
       scheduleCleanup()
       notify()
     }

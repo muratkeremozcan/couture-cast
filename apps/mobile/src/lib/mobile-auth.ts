@@ -23,7 +23,7 @@ export type MobileAccessTokenResolver = () =>
  * keys them by the simulator's name.
  *
  * Guarded by `__DEV__` exactly like the single-token path it extends: a
- * production bundle resolves no token at all.
+ * production bundle uses the verified secure session.
  *
  * `expo-device` is imported lazily and only once the map is present, which in
  * practice means only under the E2E harness. Importing a native-only Expo
@@ -62,32 +62,45 @@ const resolveDeviceScopedE2EToken = async (): Promise<string | undefined> => {
 }
 
 const defaultAccessTokenResolver: MobileAccessTokenResolver = async () => {
-  if (!__DEV__) {
-    return undefined
+  if (__DEV__ && process.env.EXPO_PUBLIC_E2E_AUTH_MODE !== 'real') {
+    const fixture =
+      (await resolveDeviceScopedE2EToken()) ??
+      (process.env.EXPO_PUBLIC_E2E_ACCESS_TOKEN?.trim() || undefined)
+    if (fixture) return fixture
   }
-
-  return (
-    (await resolveDeviceScopedE2EToken()) ??
-    (process.env.EXPO_PUBLIC_E2E_ACCESS_TOKEN?.trim() || undefined)
-  )
+  // Secure session verification belongs to the JS process. A Fabric root may
+  // prepare an authenticated view before its lifecycle effects reinstall.
+  const { resolveNativeSessionToken } = await import('./native-session.js')
+  return resolveNativeSessionToken()
 }
 
-let accessTokenResolver = defaultAccessTokenResolver
+type ResolverBinding = {
+  resolver: MobileAccessTokenResolver
+  active: boolean
+  previous?: ResolverBinding
+}
+let accessTokenBinding: ResolverBinding = {
+  resolver: defaultAccessTokenResolver,
+  active: true,
+}
 
-/**
- * Authentication owns the session lifecycle; API consumers only request the
- * current bearer token through this boundary.
- */
+/** API consumers resolve the current bearer through this owned boundary. */
 export function setMobileAccessTokenResolver(resolver: MobileAccessTokenResolver) {
-  const previousResolver = accessTokenResolver
-  accessTokenResolver = resolver
+  const binding: ResolverBinding = {
+    resolver,
+    active: true,
+    previous: accessTokenBinding,
+  }
+  accessTokenBinding = binding
   return () => {
-    accessTokenResolver = previousResolver
+    binding.active = false
+    while (!accessTokenBinding.active && accessTokenBinding.previous)
+      accessTokenBinding = accessTokenBinding.previous
   }
 }
 
 export async function resolveMobileAccessToken() {
-  return await accessTokenResolver()
+  return await accessTokenBinding.resolver()
 }
 
 let applicationUserId: string | null = null

@@ -14,6 +14,15 @@ for (const file of rootEnvFiles) {
 }
 
 const story68Native = process.env.STORY68_NATIVE_TEST_BUILD === '1'
+const releaseProofLoopback = process.env.CC68_RELEASE_PROOF_LOOPBACK === '1'
+if (
+  releaseProofLoopback &&
+  (!story68Native ||
+    (process.env.EAS_BUILD_PROFILE &&
+      process.env.EAS_BUILD_PROFILE !== 'cc68-release-proof'))
+)
+  throw new Error('Story 6.8 Release loopback requires an isolated local proof build.')
+
 const isolatedNative = process.env.STORY65_NATIVE_TEST_BUILD === '1' || story68Native
 const isolatedStory = story68Native ? '68' : '65'
 if (isolatedNative) {
@@ -32,6 +41,7 @@ if (isolatedNative) {
 }
 export default ({ config }: ConfigContext) => ({
   ...config,
+  plugins: ['./plugins/with-story68-release-network', ...(config.plugins ?? [])],
   ...(isolatedNative
     ? {
         name: `CoutureCast Story${isolatedStory}`,

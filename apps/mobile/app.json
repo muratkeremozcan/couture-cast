@@ -31,6 +31,7 @@
       "package": "com.couturecast.app",
       "versionCode": 6,
       "blockedPermissions": [
+        "android.permission.READ_MEDIA_VISUAL_USER_SELECTED",
         "android.permission.READ_MEDIA_AUDIO",
         "android.permission.READ_MEDIA_VIDEO",
         "android.permission.ACCESS_MEDIA_LOCATION"

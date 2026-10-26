@@ -142,9 +142,14 @@ describe('share-card preparation boundaries', () => {
     await vi.advanceTimersByTimeAsync(15000)
     await refused
     expect(renderer.prepare.mock.calls[0]?.[4].aborted).toBe(true)
-    await expect(service.prepare('deadline-member', input)).rejects.toMatchObject({
+    const queuedParent = new AbortController()
+    const queued = service.prepare('deadline-member', input, queuedParent.signal)
+    const queuedRefusal = expect(queued).rejects.toMatchObject({
       status: 503,
     })
+    queuedParent.abort()
+    await queuedRefusal
+    expect(renderer.prepare).toHaveBeenCalledOnce()
     late.resolve(rendered)
     await vi.advanceTimersByTimeAsync(0)
     expect(prisma.auditLog.create).not.toHaveBeenCalled()
@@ -192,6 +197,82 @@ describe('share-card preparation boundaries', () => {
     await expect(service.prepare('extra-member', input)).resolves.toEqual(
       preparedShareCardFixture
     )
+  })
+  it('M1: a newer composition waits for its cancelled predecessor without releasing active capacity early', async () => {
+    const oldRender = deferred<typeof rendered>()
+    renderer.prepare.mockReturnValueOnce(oldRender.promise)
+    const parent = new AbortController()
+    const first = service.prepare('rapid-composition', input, parent.signal)
+    const cancelled = expect(first).rejects.toMatchObject({ status: 503 })
+    await vi.waitFor(() => expect(renderer.prepare).toHaveBeenCalledOnce())
+    parent.abort()
+    await cancelled
+    const replacement = service.prepare('rapid-composition', {
+      ...input,
+      watermark: false,
+    })
+    const accepted = expect(replacement).resolves.toEqual(preparedShareCardFixture)
+    try {
+      expect(renderer.prepare).toHaveBeenCalledOnce()
+    } finally {
+      oldRender.resolve(rendered)
+    }
+    await accepted
+    expect(renderer.prepare).toHaveBeenCalledTimes(2)
+    expect(renderer.prepare.mock.calls[1]?.[2]).toBe(false)
+  })
+  it('M1-DEADLINE: waiting and rendering share one15second deadline and timed-out waiters never start', async () => {
+    vi.useFakeTimers()
+    const oldRender = deferred<typeof rendered>()
+    renderer.prepare.mockReturnValueOnce(oldRender.promise)
+    const parent = new AbortController()
+    const first = service.prepare('queued-deadline', input, parent.signal)
+    const cancelled = expect(first).rejects.toMatchObject({ status: 503 })
+    await vi.advanceTimersByTimeAsync(0)
+    parent.abort()
+    await cancelled
+    const queued = service.prepare('queued-deadline', input)
+    const expired = expect(queued).rejects.toMatchObject({ status: 503 })
+    await vi.advanceTimersByTimeAsync(15000)
+    await expired
+    expect(renderer.prepare).toHaveBeenCalledOnce()
+    oldRender.resolve(rendered)
+    await vi.advanceTimersByTimeAsync(0)
+    expect(renderer.prepare).toHaveBeenCalledOnce()
+    await expect(service.prepare('queued-deadline', input)).resolves.toEqual(
+      preparedShareCardFixture
+    )
+
+    const predecessor = deferred<typeof rendered>()
+    const replacement = deferred<typeof rendered>()
+    renderer.prepare
+      .mockReset()
+      .mockReturnValueOnce(predecessor.promise)
+      .mockReturnValueOnce(replacement.promise)
+    const nextParent = new AbortController()
+    const old = service.prepare('shared-deadline', input, nextParent.signal)
+    const oldRefused = expect(old).rejects.toMatchObject({ status: 503 })
+    await vi.advanceTimersByTimeAsync(0)
+    nextParent.abort()
+    await oldRefused
+    const next = service.prepare('shared-deadline', input)
+    let settled = false
+    const nextRefused = expect(next).rejects.toMatchObject({ status: 503 })
+    void next.catch(() => {
+      settled = true
+    })
+    await vi.advanceTimersByTimeAsync(14000)
+    predecessor.resolve(rendered)
+    await vi.advanceTimersByTimeAsync(0)
+    expect(renderer.prepare).toHaveBeenCalledTimes(2)
+    await vi.advanceTimersByTimeAsync(999)
+    expect(settled).toBe(false)
+    await vi.advanceTimersByTimeAsync(1)
+    await nextRefused
+    expect(renderer.prepare.mock.calls[1]?.[4].aborted).toBe(true)
+    replacement.resolve(rendered)
+    await vi.advanceTimersByTimeAsync(0)
+    expect(prisma.auditLog.create).not.toHaveBeenCalled()
   })
   it('U-AUDIT-RACE: late final refusal after audit persistence rejects the transaction and grant', async () => {
     const delayed = deferred<unknown>()

@@ -2,6 +2,11 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 
 import { resolveMobileAccessToken, setMobileAccessTokenResolver } from './mobile-auth'
 
+const native = vi.hoisted(() => ({
+  token: vi.fn<() => Promise<string | undefined>>().mockResolvedValue(undefined),
+}))
+vi.mock('./native-session', () => ({ resolveNativeSessionToken: native.token }))
+
 const deviceName = vi.hoisted(() => ({ current: 'couture-e2e-2' }))
 
 vi.mock('expo-device', () => ({
@@ -15,12 +20,15 @@ const TOKEN_TWO = 'header.payload-two.couturecast-mobile-e2e'
 
 describe('resolveMobileAccessToken', () => {
   beforeEach(() => {
+    native.token.mockReset().mockResolvedValue(undefined)
     deviceName.current = 'couture-e2e-2'
+    delete process.env.EXPO_PUBLIC_E2E_AUTH_MODE
     delete process.env.EXPO_PUBLIC_E2E_ACCESS_TOKEN
     delete process.env.EXPO_PUBLIC_E2E_ACCESS_TOKEN_BY_DEVICE
   })
 
   afterEach(() => {
+    delete process.env.EXPO_PUBLIC_E2E_AUTH_MODE
     delete process.env.EXPO_PUBLIC_E2E_ACCESS_TOKEN
     delete process.env.EXPO_PUBLIC_E2E_ACCESS_TOKEN_BY_DEVICE
     vi.unstubAllGlobals()
@@ -80,5 +88,35 @@ describe('resolveMobileAccessToken', () => {
     restore()
 
     await expect(resolveMobileAccessToken()).resolves.toBe(TOKEN_ONE)
+  })
+  it('uses canonical secure-session auth in production before a root lifecycle installs', async () => {
+    vi.stubGlobal('__DEV__', false)
+    native.token.mockResolvedValue('verified-production-token')
+    await expect(resolveMobileAccessToken()).resolves.toBe('verified-production-token')
+    expect(native.token).toHaveBeenCalledOnce()
+  })
+  it('a retired binding cannot replace a successor using the same resolver function', async () => {
+    const resolver = () => 'shared-session-token'
+    const retireOld = setMobileAccessTokenResolver(resolver)
+    const retireNew = setMobileAccessTokenResolver(resolver)
+    try {
+      retireOld()
+      await expect(resolveMobileAccessToken()).resolves.toBe('shared-session-token')
+      retireNew()
+      native.token.mockResolvedValue('canonical-after-retired-bindings')
+      await expect(resolveMobileAccessToken()).resolves.toBe(
+        'canonical-after-retired-bindings'
+      )
+    } finally {
+      retireOld()
+      retireNew()
+    }
+  })
+  it('real auth mode resolves the secure session even when debug fixture tokens exist', async () => {
+    process.env.EXPO_PUBLIC_E2E_AUTH_MODE = 'real'
+    process.env.EXPO_PUBLIC_E2E_ACCESS_TOKEN = TOKEN_ONE
+    native.token.mockResolvedValue('verified-real-mode-token')
+    await expect(resolveMobileAccessToken()).resolves.toBe('verified-real-mode-token')
+    expect(native.token).toHaveBeenCalledOnce()
   })
 })

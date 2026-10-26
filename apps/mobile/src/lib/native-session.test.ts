@@ -18,6 +18,8 @@ const sdk = vi.hoisted(() => ({
   startRefresh: vi.fn().mockResolvedValue(undefined),
   stopRefresh: vi.fn().mockResolvedValue(undefined),
   installFailure: false,
+  sessionReads: 0,
+  installations: 0,
   signIn: vi
     .fn<() => Promise<{ error: Error | null }>>()
     .mockResolvedValue({ error: null }),
@@ -69,8 +71,10 @@ vi.mock('@supabase/supabase-js', () => ({
     sdk.storage = options.auth.storage
     return {
       auth: {
-        getSession: () =>
-          Promise.resolve({ data: { session: sdk.current }, error: sdk.error }),
+        getSession: () => {
+          sdk.sessionReads++
+          return Promise.resolve({ data: { session: sdk.current }, error: sdk.error })
+        },
         verifyOtp: () =>
           Promise.resolve({ data: { session: sdk.current }, error: sdk.error }),
         signOut: sdk.signOut,
@@ -78,6 +82,7 @@ vi.mock('@supabase/supabase-js', () => ({
         startAutoRefresh: sdk.startRefresh,
         stopAutoRefresh: sdk.stopRefresh,
         onAuthStateChange: (callback: typeof sdk.callback) => {
+          sdk.installations++
           sdk.callback = callback
           return { data: { subscription: { unsubscribe: sdk.unsubscribe } } }
         },
@@ -132,6 +137,79 @@ afterEach(async () => {
   await signOutNativeSession()
 })
 describe('native verified session ownership', () => {
+  it('retains canonical verified bearer supply through a gap between Fabric root owners', async () => {
+    await verifyNativeOtp('session@synthetic.test', 'fixture-code')
+    const retire = await startNativeSession()
+    retire()
+    expect(mobileApplicationUserId()).toBe('canonical-member-a')
+    await expect(resolveMobileAccessToken()).resolves.toBe('local-session-a')
+    cleanup = await startNativeSession()
+    await expect(resolveMobileAccessToken()).resolves.toBe('local-session-a')
+  })
+  it('predecessor teardown preserves successor verification and refresh ownership', async () => {
+    await verifyNativeOtp('session@synthetic.test', 'fixture-code')
+    const retire = await startNativeSession()
+    sdk.current = {
+      access_token: 'root-refresh',
+      user: { id: 'distinct-auth-principal-a' },
+    }
+    let release!: () => void
+    const held = new Promise<void>((resolve) => {
+      release = resolve
+    })
+    let entered = false
+    server.use(
+      http.get('*/api/v1/user/profile', async () => {
+        entered = true
+        await held
+        return HttpResponse.json(profile(owner))
+      })
+    )
+    const installations = sdk.installations
+    const successor = startNativeSession()
+    const supplied = resolveMobileAccessToken()
+    void supplied.catch(() => undefined)
+    try {
+      await vi.waitFor(() => expect(entered).toBe(true))
+      expect(sdk.installations).toBe(installations)
+      const stops = sdk.stopRefresh.mock.calls.length
+      retire()
+      expect(sdk.stopRefresh.mock.calls.length).toBe(stops)
+      release()
+      cleanup = await successor
+      await expect(supplied).resolves.toBe('root-refresh')
+      await expect(resolveMobileAccessToken()).resolves.toBe('root-refresh')
+      expect(mobileApplicationUserId()).toBe('canonical-member-a')
+    } finally {
+      release()
+      ;(await successor)()
+      await supplied?.catch(() => undefined)
+      retire()
+    }
+  })
+
+  it('leases a single SDK lifecycle across overlapping roots and ignores a retired finalizer after reinstall', async () => {
+    await verifyNativeOtp('session@synthetic.test', 'fixture-code')
+    const before = sdk.installations
+    const [old, current] = await Promise.all([startNativeSession(), startNativeSession()])
+    expect(sdk.installations).toBe(before + 1)
+    const starts = sdk.startRefresh.mock.calls.length
+    const callback = sdk.lifecycle!
+    old()
+    expect(sdk.unsubscribe).not.toHaveBeenCalled()
+    expect(sdk.stopRefresh).not.toHaveBeenCalled()
+    current()
+    expect(sdk.unsubscribe).toHaveBeenCalledOnce()
+    expect(sdk.stopRefresh).toHaveBeenCalledOnce()
+    cleanup = await startNativeSession()
+    expect(sdk.installations).toBe(before + 2)
+    old()
+    current()
+    callback('background')
+    expect(sdk.stopRefresh).toHaveBeenCalledOnce()
+    expect(sdk.startRefresh.mock.calls.length).toBe(starts + 1)
+    await expect(resolveMobileAccessToken()).resolves.toBe('local-session-a')
+  })
   it('C01 concurrent cold suppliers join canonical verification without reporting signed out', async () => {
     await verifyNativeOtp('session@synthetic.test', 'fixture-code')
     sdk.current = null

@@ -1,4 +1,5 @@
 import { startShareCardNativeFixture } from '@/src/lib/share-card-native-fixture'
+import { AndroidShareCardPresentation } from '@/components/android-share-card-presentation'
 import { cleanOrphanShareCards } from '@/src/lib/share-card-save'
 // Step 2 step 3 owner: searchable owner anchor
 import FontAwesome from '@expo/vector-icons/FontAwesome'
@@ -227,24 +228,37 @@ function RootLayoutNav() {
           <ThemeProvider value={theme}>
             {/* iOS labels the back button with the previous route's title; the tab
                 group has none, so it read "(tabs)". */}
-            <Stack screenOptions={{ headerBackTitle: t('common.back') }}>
-              <Stack.Screen name="(tabs)" options={{ headerShown: false }} />
-              <Stack.Screen name="modal" options={{ presentation: 'modal' }} />
-              <Stack.Screen
-                name="wardrobe-capsules"
-                options={{ title: t('wardrobe.capsules.title') }}
-              />
-              {/* The native header carries each title; the screens render no second one. */}
-              <Stack.Screen
-                name="signin"
-                options={{ title: t('community.notifications.signin') }}
-              />
-              <Stack.Screen
-                name="notification-settings"
-                options={{ title: t('community.notifications.title') }}
-              />
-              <Stack.Screen name="locations" options={{ title: t('locations.title') }} />
-            </Stack>
+            <AndroidShareCardPresentation
+              pathname={pathname}
+              navigationReady={Boolean(navigation?.key)}
+              onRestoreRoute={(path) => router.replace(path)}
+            >
+              <Stack
+                screenOptions={{
+                  headerBackTitle: t('common.back'),
+                }}
+              >
+                <Stack.Screen name="(tabs)" options={{ headerShown: false }} />
+                <Stack.Screen name="modal" options={{ presentation: 'modal' }} />
+                <Stack.Screen
+                  name="wardrobe-capsules"
+                  options={{ title: t('wardrobe.capsules.title') }}
+                />
+                {/* The native header carries each title; the screens render no second one. */}
+                <Stack.Screen
+                  name="signin"
+                  options={{ title: t('community.notifications.signin') }}
+                />
+                <Stack.Screen
+                  name="notification-settings"
+                  options={{ title: t('community.notifications.title') }}
+                />
+                <Stack.Screen
+                  name="locations"
+                  options={{ title: t('locations.title') }}
+                />
+              </Stack>
+            </AndroidShareCardPresentation>
             {/* UI automation marker: commits with the navigator, so it exists on
                 every route once the JS tree has mounted and never on the splash.
                 maestro/subflows/open-app.yaml waits for it before deciding

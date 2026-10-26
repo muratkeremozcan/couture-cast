@@ -11,6 +11,16 @@ const mocks = vi.hoisted(() => ({
   readDirectory: vi.fn(),
   uuid: 0,
   fixture: 'real',
+  mediaAvailable: true,
+  originalAvailable: false,
+}))
+vi.mock('expo-modules-core', () => ({
+  requireOptionalNativeModule: (name: string) =>
+    name === 'ExpoMediaLibrary' && mocks.mediaAvailable ? {} : null,
+}))
+vi.mock('../../modules/share-card-photo-save', () => ({
+  shareCardPhotoSaveModule: () =>
+    mocks.originalAvailable ? { saveOriginalPng: mocks.nativeSave } : null,
 }))
 vi.mock('./share-card-native-fixture', () => ({
   shareCardFixtureMode: () => mocks.fixture,
@@ -62,6 +72,8 @@ function deferred() {
 }
 beforeEach(() => {
   mocks.fixture = 'real'
+  mocks.mediaAvailable = true
+  mocks.originalAvailable = false
   platform('android', 34)
   mocks.files.clear()
   mocks.readDirectory
@@ -84,12 +96,16 @@ beforeEach(() => {
     return Promise.resolve()
   })
 })
-afterEach(() => platform(originalOS, Number(originalVersion)))
+afterEach(() => {
+  platform(originalOS, Number(originalVersion))
+  vi.useRealTimers()
+})
 describe('native immutable file and permission adapter', () => {
   it.each(['permission_denied', 'permission_permanent', 'limited'])(
     'native permission response fixture %s preserves explicit-request semantics',
     async (mode) => {
       platform('ios', 26)
+      mocks.originalAvailable = true
       mocks.fixture = mode
       expect(await shareCardSavePermission(true)).toMatchObject(
         mode === 'limited'
@@ -252,6 +268,45 @@ describe('native immutable file and permission adapter', () => {
     expect(mocks.getPermission).not.toHaveBeenCalled()
     expect(mocks.nativeSave).not.toHaveBeenCalled()
     expect(mocks.write).not.toHaveBeenCalled()
+  })
+  it.each(['ios', 'android'])(
+    'refuses %s save and permission activation when MediaLibrary is absent',
+    async (os) => {
+      platform(os, 26)
+      mocks.mediaAvailable = false
+      mocks.originalAvailable = true
+      expect(nativeShareCardSaveAvailable()).toBe(false)
+      expect(await shareCardSavePermission(true)).toEqual({
+        granted: false,
+        canAskAgain: false,
+      })
+      await expect(
+        saveShareCard(card, new AbortController().signal, () => true)
+      ).rejects.toThrow('nativeSaveUnavailable')
+      expect(mocks.getPermission).not.toHaveBeenCalled()
+      expect(mocks.requestPermission).not.toHaveBeenCalled()
+      expect(mocks.nativeSave).not.toHaveBeenCalled()
+      expect(mocks.write).not.toHaveBeenCalled()
+    }
+  )
+  it('preserves precommit cancellation when deletion fails and retries cleanup without importing', async () => {
+    vi.useFakeTimers()
+    const abort = new AbortController()
+    mocks.write.mockImplementation((uri: string, bytes: string) => {
+      mocks.files.set(uri, bytes)
+      abort.abort()
+      return Promise.resolve()
+    })
+    mocks.remove.mockRejectedValueOnce(new Error('temporarily_busy'))
+    await expect(saveShareCard(card, abort.signal, () => true)).rejects.toMatchObject({
+      name: 'AbortError',
+    })
+    expect(mocks.nativeSave).not.toHaveBeenCalled()
+    expect(mocks.files.size).toBe(1)
+    await vi.advanceTimersByTimeAsync(1000)
+    expect(mocks.remove).toHaveBeenCalledTimes(2)
+    expect(mocks.files.size).toBe(0)
+    expect(mocks.nativeSave).not.toHaveBeenCalled()
   })
   it('U-STORAGE: rejected cache/native writes clean their files and retain an unlocked retry boundary', async () => {
     mocks.write.mockRejectedValueOnce(new Error('disk_full'))

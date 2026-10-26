@@ -1,6 +1,6 @@
 import React from 'react'
 import { renderToString } from 'react-dom/server'
-import { fireEvent, render, screen } from '@testing-library/react'
+import { act, fireEvent, render, screen } from '@testing-library/react'
 import { describe, expect, it, vi } from 'vitest'
 import { AccessibleModal } from './accessible-modal'
 
@@ -149,7 +149,7 @@ describe('AccessibleModal', () => {
    * A second modal opened over the first hides the first one's portal only
    * while it is open; closing it hands the first dialog back intact.
    */
-  it('leaves an outer modal reachable and focused after a stacked modal closes', () => {
+  it('leaves an outer modal reachable and focused after a stacked modal closes', async () => {
     function Stacked({ inner }: { inner: boolean }) {
       return (
         <>
@@ -187,6 +187,9 @@ describe('AccessibleModal', () => {
     expect(document.activeElement).toBe(screen.getByLabelText('Close inner'))
 
     view.rerender(<Stacked inner={false} />)
+    await act(async () => {
+      await Promise.resolve()
+    })
     expect(screen.queryByRole('dialog', { name: 'Inner' })).not.toBeInTheDocument()
     expect(outer).not.toHaveAttribute('aria-hidden')
     expect(outer.inert).toBe(false)
@@ -345,9 +348,10 @@ describe('AccessibleModal', () => {
     expect(document.activeElement).toBe(screen.getByLabelText('Close modal'))
   })
 
-  it('renders the live region only when there is something to announce', () => {
+  it('L2: keeps one empty status region mounted and updates its text for announcements', () => {
     const { rerender } = renderModal()
-    expect(screen.queryByRole('status')).not.toBeInTheDocument()
+    const status = screen.getByRole('status')
+    expect(status).toBeEmptyDOMElement()
 
     rerender(
       <>
@@ -364,7 +368,8 @@ describe('AccessibleModal', () => {
       </>
     )
 
-    expect(screen.getByRole('status')).toHaveTextContent('Saving changes. Please wait.')
+    expect(screen.getByRole('status')).toBe(status)
+    expect(status).toHaveTextContent('Saving changes. Please wait.')
   })
 
   it('announces an error assertively', () => {
@@ -411,7 +416,7 @@ describe('AccessibleModal', () => {
     expect(appShell).toHaveAttribute('aria-hidden', 'true')
   })
 
-  it('returns focus to the invoking element on close', () => {
+  it('returns focus to the invoking element on close', async () => {
     function Harness() {
       const [isOpen, setIsOpen] = React.useState(false)
       const invokerRef = React.useRef<HTMLButtonElement | null>(null)
@@ -439,6 +444,9 @@ describe('AccessibleModal', () => {
     expect(screen.getByRole('dialog')).toBeInTheDocument()
 
     fireEvent.click(screen.getByLabelText('Close modal'))
+    await act(async () => {
+      await Promise.resolve()
+    })
 
     expect(document.activeElement).toBe(invoker)
   })
@@ -447,7 +455,7 @@ describe('AccessibleModal', () => {
    * Regression risk: a modal opened from a row that the same action removes
    * would otherwise try to focus a detached node and drop the user on <body>.
    */
-  it('falls back to the previously focused element when the invoker is gone', () => {
+  it('falls back to the previously focused element when the invoker is gone', async () => {
     function Harness() {
       const [isOpen, setIsOpen] = React.useState(false)
       const [showInvoker, setShowInvoker] = React.useState(true)
@@ -484,12 +492,15 @@ describe('AccessibleModal', () => {
     fireEvent.click(anchor)
 
     fireEvent.click(screen.getByLabelText('Close modal'))
+    await act(async () => {
+      await Promise.resolve()
+    })
 
     expect(document.activeElement).toBe(anchor)
   })
   it.each(['body', 'documentElement'] as const)(
     'uses the explicit heading fallback after Safari leaves %s active and the opener is removed',
-    (root) => {
+    async (root) => {
       function Harness() {
         const [open, setOpen] = React.useState(false)
         const [showInvoker, setShowInvoker] = React.useState(true)
@@ -527,6 +538,9 @@ describe('AccessibleModal', () => {
         fireEvent.click(screen.getByRole('button', { name: 'Share card' }))
         fireEvent.click(screen.getByRole('button', { name: 'Remove opener' }))
         fireEvent.click(screen.getByLabelText('Close modal'))
+        await act(async () => {
+          await Promise.resolve()
+        })
         expect(screen.getByRole('heading', { name: 'Community' })).toHaveFocus()
       } finally {
         if (previous === null) element.removeAttribute('tabindex')
@@ -534,7 +548,7 @@ describe('AccessibleModal', () => {
       }
     }
   )
-  it('uses the explicit heading after Safari focuses the source article and its child opener is detached', () => {
+  it('uses the explicit heading after Safari focuses the source article and its child opener is detached', async () => {
     function Harness() {
       const [open, setOpen] = React.useState(false)
       const [showInvoker, setShowInvoker] = React.useState(true)
@@ -570,12 +584,15 @@ describe('AccessibleModal', () => {
     fireEvent.click(screen.getByRole('button', { name: 'Share card' }))
     fireEvent.click(screen.getByRole('button', { name: 'Remove child opener' }))
     fireEvent.click(screen.getByLabelText('Close modal'))
+    await act(async () => {
+      await Promise.resolve()
+    })
     expect(screen.getByRole('heading', { name: 'Community heading' })).toHaveFocus()
     expect(article).not.toHaveFocus()
   })
   it.each(['inert', 'aria-hidden'] as const)(
     'rejects an explicit fallback inside an %s ancestor and preserves meaningful previous focus',
-    (hidden) => {
+    async (hidden) => {
       function Harness() {
         const [open, setOpen] = React.useState(false)
         return (
@@ -606,10 +623,13 @@ describe('AccessibleModal', () => {
       previous.focus()
       fireEvent.click(previous)
       fireEvent.click(screen.getByLabelText('Close modal'))
+      await act(async () => {
+        await Promise.resolve()
+      })
       expect(previous).toHaveFocus()
     }
   )
-  it('closing a nested modal rejects the inert page fallback and restores focus inside its parent', () => {
+  it('closing a nested modal rejects the inert page fallback and restores focus inside its parent', async () => {
     function Harness() {
       const [childOpen, setChildOpen] = React.useState(false)
       const [showInvoker, setShowInvoker] = React.useState(true)
@@ -653,7 +673,52 @@ describe('AccessibleModal', () => {
     fireEvent.click(screen.getByRole('button', { name: 'Open child' }))
     fireEvent.click(screen.getByRole('button', { name: 'Remove child invoker' }))
     fireEvent.click(screen.getByLabelText('Close child'))
+    await act(async () => {
+      await Promise.resolve()
+    })
     expect(previous).toHaveFocus()
     expect(screen.getByRole('dialog', { name: 'Parent' })).toBeInTheDocument()
+  })
+  it('L1: restores the heading after React removes the opener ancestor with its open dialog', async () => {
+    function OwnedCard({ remove }: { remove: () => void }) {
+      const invoker = React.useRef<HTMLButtonElement>(null)
+      const [open, setOpen] = React.useState(false)
+      return (
+        <article>
+          <button ref={invoker} onClick={() => setOpen(true)}>
+            Owned card
+          </button>
+          <AccessibleModal
+            isOpen={open}
+            onClose={remove}
+            titleId="removed-card-title"
+            title="Share owned card"
+            invokingElementRef={invoker}
+            fallbackFocusSelector="#surviving-heading"
+          >
+            <button onClick={remove}>Remove owned card</button>
+          </AccessibleModal>
+        </article>
+      )
+    }
+    function Harness() {
+      const [show, setShow] = React.useState(true)
+      return (
+        <>
+          <h2 id="surviving-heading" tabIndex={-1}>
+            Community heading
+          </h2>
+          {show && <OwnedCard remove={() => setShow(false)} />}
+        </>
+      )
+    }
+    render(<Harness />)
+    fireEvent.click(screen.getByRole('button', { name: 'Owned card' }))
+    fireEvent.click(screen.getByRole('button', { name: 'Remove owned card' }))
+    await act(async () => {
+      await Promise.resolve()
+    })
+    expect(screen.queryByRole('article')).not.toBeInTheDocument()
+    expect(screen.getByRole('heading', { name: 'Community heading' })).toHaveFocus()
   })
 })

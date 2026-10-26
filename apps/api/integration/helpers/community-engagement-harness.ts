@@ -1,7 +1,7 @@
 // Story 6.5 acceptance owner: real isolated DB/process/provider and fault boundaries.
 import { fork, type ChildProcess } from 'node:child_process'
 import { randomUUID } from 'node:crypto'
-import { resolve } from 'node:path'
+import { basename, resolve } from 'node:path'
 import { setTimeout as delay } from 'node:timers/promises'
 import { PrismaClient } from '@prisma/client'
 import { z } from 'zod'
@@ -71,7 +71,11 @@ export class OwnedProcess {
     }
   >()
   private exited = false
-  constructor(file: string, variables: NodeJS.ProcessEnv = {}) {
+  private exitStatus: { code: number | null; signal: NodeJS.Signals | null } | undefined
+  constructor(
+    private readonly file: string,
+    variables: NodeJS.ProcessEnv = {}
+  ) {
     this.child = fork(resolve(__dirname, '../support', file), [], {
       execArgv: [],
       env: {
@@ -112,12 +116,21 @@ export class OwnedProcess {
         })
       )
       this.exited = true
+      this.exitStatus = { code, signal }
       for (const waiting of this.pending.values()) {
         clearTimeout(waiting.timer)
         waiting.reject(new Error('Owned child exited during operation'))
       }
       this.pending.clear()
     })
+  }
+  private exitError(context: string) {
+    return new Error(
+      `Owned child exited ${context}: ${JSON.stringify({
+        script: basename(this.file).slice(0, 128),
+        ...this.exitStatus,
+      })}`
+    )
   }
   call(op: string, args?: unknown, timeout = 20_000): Promise<unknown> {
     if (this.exited) return Promise.reject(new Error('Owned child already exited'))
@@ -133,7 +146,12 @@ export class OwnedProcess {
   }
   async event(name: string, timeout = 5000) {
     const event = await until(
-      () => Promise.resolve(this.events.find((entry) => entry.name === name)),
+      () => {
+        const observed = this.events.find((entry) => entry.name === name)
+        if (!observed && this.exited)
+          throw this.exitError(`before event ${name.slice(0, 64)}`)
+        return Promise.resolve(observed)
+      },
       Boolean,
       timeout
     )

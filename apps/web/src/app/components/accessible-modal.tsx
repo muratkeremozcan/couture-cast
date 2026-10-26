@@ -42,6 +42,7 @@ export function AccessibleModal({
   const closeButtonRef = useRef<HTMLButtonElement | null>(null)
   const resumeFocusRef = useRef<HTMLElement | null>(null)
   const previousActiveElementRef = useRef<HTMLElement | null>(null)
+  const focusGenerationRef = useRef({ value: 0 })
   const onCloseRef = useRef(onClose)
   onCloseRef.current = onClose
 
@@ -65,6 +66,8 @@ export function AccessibleModal({
     if (!isOpen || suspended) {
       return
     }
+    const focusGeneration = focusGenerationRef.current
+    focusGeneration.value++
     previousActiveElementRef.current =
       document.activeElement instanceof HTMLElement &&
       document.activeElement !== document.body &&
@@ -114,29 +117,35 @@ export function AccessibleModal({
         else element.setAttribute('aria-hidden', hidden)
       }
 
-      const fallback = fallbackFocusSelector
-        ? document.querySelector<HTMLElement>(fallbackFocusSelector)
-        : null
-      const targetToFocus = [
-        currentInvoker,
-        fallback,
-        previousActiveElementRef.current,
-      ].find((target) => {
-        if (!target?.isConnected) return false
-        for (
-          let ancestor: HTMLElement | null = target;
-          ancestor;
-          ancestor = ancestor.parentElement
-        )
-          if (
-            ancestor.inert ||
-            ancestor.hasAttribute('inert') ||
-            ancestor.getAttribute('aria-hidden') === 'true'
+      const restoreGeneration = ++focusGeneration.value
+      // React detaches a deleted ancestor after its descendant layout cleanups.
+      // Resolve the target after that commit, including its final inert ancestry.
+      queueMicrotask(() => {
+        if (focusGeneration.value !== restoreGeneration) return
+        const fallback = fallbackFocusSelector
+          ? document.querySelector<HTMLElement>(fallbackFocusSelector)
+          : null
+        const targetToFocus = [
+          currentInvoker,
+          fallback,
+          previousActiveElementRef.current,
+        ].find((target) => {
+          if (!target?.isConnected) return false
+          for (
+            let ancestor: HTMLElement | null = target;
+            ancestor;
+            ancestor = ancestor.parentElement
           )
-            return false
-        return true
+            if (
+              ancestor.inert ||
+              ancestor.hasAttribute('inert') ||
+              ancestor.getAttribute('aria-hidden') === 'true'
+            )
+              return false
+          return true
+        })
+        targetToFocus?.focus()
       })
-      targetToFocus?.focus()
     }
   }, [initialFocusRef, isOpen, suspended, invokingElementRef, fallbackFocusSelector])
 
@@ -219,11 +228,9 @@ export function AccessibleModal({
           </button>
         </div>
 
-        {ariaLiveMessage && (
-          <div role="status" aria-live="polite" className="sr-only">
-            {ariaLiveMessage}
-          </div>
-        )}
+        <div role="status" aria-live="polite" className="sr-only">
+          {ariaLiveMessage ?? ''}
+        </div>
 
         {errorMessage && (
           <div

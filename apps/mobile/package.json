@@ -25,7 +25,7 @@
     "android": "expo run:android",
     "ios": "expo run:ios",
     "web": "expo start --web",
-    "test:share-card-prebuild": "node --test plugins/with-share-card-permissions.test.js"
+    "test:share-card-prebuild": "node --test plugins/with-share-card-permissions.test.js plugins/with-story68-release-network.test.js"
   },
   "dependencies": {
     "@couture/api-client": "file:../../packages/api-client",

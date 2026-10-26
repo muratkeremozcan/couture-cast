@@ -8,6 +8,8 @@ import { afterEach, beforeEach, describe, expect, it } from 'vitest'
 const runnerFiles = [
   'scripts/run-maestro.mjs',
   'scripts/maestro-version.mjs',
+  'scripts/lib/test-disk-space.mjs',
+  'scripts/lib/native-maestro-flows.mjs',
   'scripts/lib/expo-go-link-endpoint.mjs',
   'scripts/lib/maestro-android-driver-session.mjs',
   'scripts/lib/maestro-android-permissions.mjs',
@@ -69,21 +71,40 @@ for (const [file, content] of outputs) {
   // The real runner cleans stale iOS drivers before platform validation. Keep
   // that side effect inside the fixture, including on developer macOS hosts.
   write('bin/pkill', '#!/usr/bin/env node\nprocess.exit(1)\n', true)
+  // Bootstrap stops at platform validation and allocates no device/build output.
+  // Its synthetic workspace volume must not depend on the developer host's free space.
+  write(
+    'bootstrap-filesystem.cjs',
+    `const fs = require('node:fs');
+const statfs = fs.statfsSync;
+fs.statfsSync = (...args) => {
+  const stats = statfs(...args);
+  stats.bavail = Math.ceil(80 * 1024 ** 3 / stats.bsize);
+  return stats;
+};\n`
+  )
 })
 
 afterEach(() => fs.rmSync(directory, { recursive: true, force: true }))
 
-function run(failPreparation = false) {
+function run(failPreparation = false, native = false) {
   return new Promise<{ code: number | null; output: string }>((resolve, reject) => {
     const child = spawn(
       process.execPath,
-      ['scripts/run-maestro.mjs', '--platform', 'bootstrap-test-invalid'],
+      native
+        ? [
+            'scripts/run-story68-native.mjs',
+            'bootstrap-test-invalid',
+            '--platform',
+            'bootstrap-test-invalid',
+          ]
+        : ['scripts/run-maestro.mjs', '--platform', 'bootstrap-test-invalid'],
       {
         cwd: directory,
         env: {
           ...process.env,
           PATH: `${path.join(directory, 'bin')}${path.delimiter}${process.env.PATH}`,
-          NODE_OPTIONS: '',
+          NODE_OPTIONS: '--require ./bootstrap-filesystem.cjs',
           MOBILE_E2E_PLATFORM: 'bootstrap-test-invalid',
           MOBILE_E2E_METRO_PORT: '0',
           BOOTSTRAP_TEST_EVENTS: path.join(directory, 'events.jsonl'),
@@ -146,5 +167,51 @@ describe('Maestro shared dependency bootstrap', () => {
     expect(events()).toEqual([
       { type: 'prepare', args: prepareArgs, cwd: fs.realpathSync(directory) },
     ])
+  })
+})
+
+function copyNativeImportClosure(relative: string, seen = new Set<string>()) {
+  if (seen.has(relative)) return
+  seen.add(relative)
+  const source = fs.readFileSync(relative, 'utf8')
+  write(relative, source)
+  for (const match of source.matchAll(
+    /(?:from\s+|import\s*)['"](\.{1,2}\/[^'"]+)['"]/g
+  )) {
+    const dependency = path.normalize(path.join(path.dirname(relative), match[1]!))
+    if (path.isAbsolute(dependency) || dependency.startsWith('..'))
+      throw new Error('Native bootstrap dependency must remain in the repository')
+    copyNativeImportClosure(dependency, seen)
+  }
+}
+
+describe('native runner static dependency bootstrap', () => {
+  it('loads the actual native CLI import closure before its command boundary', async () => {
+    copyNativeImportClosure('scripts/run-story68-native.mjs')
+    fs.mkdirSync(path.join(directory, 'maestro/story65'), { recursive: true })
+    fs.mkdirSync(path.join(directory, 'maestro/story68'), { recursive: true })
+    const result = await run(false, true)
+    expect(result.code).toBe(1)
+    expect(result.output).toContain('Use serve, metro or inspect-png')
+    expect(result.output).not.toContain('ERR_MODULE_NOT_FOUND')
+    expect(events()).toEqual([])
+    for (const name of [
+      'story68-cold-font-scale.mjs',
+      'story68-release-live-font-command.mjs',
+      'story68-release-live-font.mjs',
+    ])
+      expect(fs.existsSync(path.join(directory, 'scripts/lib', name))).toBe(true)
+  })
+
+  it('detects a missing cold-font import in the actual copied native CLI', async () => {
+    copyNativeImportClosure('scripts/run-story68-native.mjs')
+    fs.mkdirSync(path.join(directory, 'maestro/story65'), { recursive: true })
+    fs.mkdirSync(path.join(directory, 'maestro/story68'), { recursive: true })
+    fs.unlinkSync(path.join(directory, 'scripts/lib/story68-cold-font-scale.mjs'))
+    const result = await run(false, true)
+    expect(result.code).toBe(1)
+    expect(result.output).toContain('ERR_MODULE_NOT_FOUND')
+    expect(result.output).toContain('story68-cold-font-scale.mjs')
+    expect(events()).toEqual([])
   })
 })

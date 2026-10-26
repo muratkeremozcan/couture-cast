@@ -8,7 +8,10 @@ import { createHash } from 'node:crypto'
 import { createServer } from 'node:http'
 import { startWeatherProviderDouble } from './weather-provider-double.mjs'
 import { closedShareCardAuditReport } from './lib/share-card-audit-report.mjs'
+import { summarizeNativeFlowFailure } from './lib/share-card-native-failure.mjs'
 import { assertShareCardDialogStatusBar } from './lib/share-card-system-bars.mjs'
+import { withColdAndroidFontScale } from './lib/story68-cold-font-scale.mjs'
+import { runReleaseLiveFontCommand } from './lib/story68-release-live-font-command.mjs'
 import {
   assertIosReadDenied,
   shouldRetryIosSnapshot,
@@ -19,12 +22,40 @@ import {
 } from './lib/story68-native-safety.mjs'
 import { assertStory68DiskSpace } from './lib/test-disk-space.mjs'
 import { MAESTRO_BIN } from './maestro-version.mjs'
+import {
+  prepareWorkletsStaging,
+  verifyWorkletsStaging,
+} from './lib/story68-worklets-staging.mjs'
+import {
+  DRIVER_HOST_PORT_ARG,
+  MAESTRO_ANDROID_DRIVER_PORT,
+} from './lib/maestro-android-driver-session.mjs'
+import {
+  assertRapidWatermarkRuntime,
+  rapidWatermarkRequests,
+  withRapidWatermarkLock,
+} from './lib/story68-rapid-watermark.mjs'
+import {
+  withRapidWatermarkControl,
+  redactRapidWatermarkControl,
+  closedRapidWatermarkFailure,
+} from './lib/story68-rapid-watermark-control.mjs'
 
 const root = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..')
 const argv = process.argv.slice(2)
 const command = argv[0]
 if (
-  ['prebuild', 'build', 'emulator', 'matrix', 'a11y', 'expo-go-proof'].includes(command)
+  [
+    'prebuild',
+    'build',
+    'emulator',
+    'matrix',
+    'a11y',
+    'expo-go-proof',
+    'rapid-watermark',
+    'fallback-focus',
+    'release-live-font',
+  ].includes(command)
 )
   assertStory68DiskSpace(root)
 const option = (name) => {
@@ -220,6 +251,7 @@ function localeEnv() {
 }
 function maestro(flow, env = {}, secret = '', attempt = 0) {
   requireDevice()
+  const started = Date.now()
   const output = path.join(directory, `maestro-${platform}-${Date.now()}`)
   fs.mkdirSync(output, { mode: 0o700 })
   const result = withNativeTransport(() => {
@@ -229,6 +261,9 @@ function maestro(flow, env = {}, secret = '', attempt = 0) {
         '--device',
         device,
         'test',
+        ...(platform === 'android'
+          ? [DRIVER_HOST_PORT_ARG, String(MAESTRO_ANDROID_DRIVER_PORT)]
+          : []),
         '--test-output-dir',
         output,
         '--debug-output',
@@ -269,6 +304,16 @@ function maestro(flow, env = {}, secret = '', attempt = 0) {
   const recoverSnapshot =
     result.status !== 0 &&
     shouldRetryIosSnapshot({ platform, attempt, log: snapshotLog, flow })
+  if (result.status !== 0 && !recoverSnapshot)
+    privateJson(
+      `native-flow-failure-${platform}.json`,
+      summarizeNativeFlowFailure({
+        flow,
+        platform,
+        durationMs: Math.max(0, Date.now() - started),
+        log: `${snapshotLog}\n${result.stdout ?? ''}\n${result.stderr ?? ''}`,
+      })
+    )
   const log = `${result.stdout}\n${result.stderr}`
     .split(secret || '\0')
     .join('[REDACTED]')
@@ -283,6 +328,7 @@ function maestro(flow, env = {}, secret = '', attempt = 0) {
 }
 async function signin() {
   activeLocale = 'en-US'
+  maestro('maestro/story65/open-app.yaml')
   maestro('maestro/story65/set-locale.yaml', { MAESTRO_LOCALE: activeLocale })
   const account = read('fixtures.json').identities.find(
     (identity) => identity.label === (option('account') ?? 'cc68-primary')
@@ -316,13 +362,108 @@ async function signin() {
   maestro('maestro/story65/open-app.yaml')
   console.log('Genuine owned account signed in through product UI.')
 }
+function rapidWatermarkFlow(signal, control) {
+  const started = Date.now()
+  reverse()
+  const output = path.join(directory, `maestro-${platform}-rapid-${Date.now()}`)
+  fs.mkdirSync(output, { mode: 0o700 })
+  const fd = fs.openSync(path.join(output, 'process.log'), 'wx', 0o600)
+  return new Promise((resolve, reject) => {
+    const process = spawn(
+      maestroBinary,
+      [
+        '--device',
+        device,
+        'test',
+        ...(platform === 'android'
+          ? [DRIVER_HOST_PORT_ARG, String(MAESTRO_ANDROID_DRIVER_PORT)]
+          : []),
+        '--test-output-dir',
+        output,
+        '--debug-output',
+        output,
+        '--flatten-debug-output',
+        path.join(root, 'maestro/story68/rapid-watermark-held.yaml'),
+      ],
+      {
+        cwd: root,
+        detached: true,
+        stdio: ['ignore', fd, fd],
+        env: {
+          ...globalThis.process.env,
+          ...localeEnv(),
+          MAESTRO_RAPID_CONTROL_URL: control.url,
+          MAESTRO_CLI_NO_ANALYTICS: '1',
+          JAVA_HOME:
+            globalThis.process.env.JAVA_HOME ??
+            '/Library/Java/JavaVirtualMachines/temurin-21.jdk/Contents/Home',
+        },
+      }
+    )
+    fs.closeSync(fd)
+    let killTimer
+    const kill = (signal) => {
+      if (!process.pid) return
+      try {
+        globalThis.process.kill(-process.pid, signal)
+      } catch (error) {
+        if (error.code !== 'ESRCH') throw error
+      }
+    }
+    const stop = () => {
+      kill('SIGTERM')
+      killTimer = setTimeout(() => kill('SIGKILL'), 500)
+    }
+    signal.addEventListener('abort', stop, { once: true })
+    if (signal.aborted) stop()
+    const cleanup = () => {
+      clearTimeout(killTimer)
+      signal.removeEventListener('abort', stop)
+    }
+    process.once('error', (error) => {
+      cleanup()
+      reject(error)
+    })
+    process.once('close', (code) => {
+      cleanup()
+      if (signal.aborted) reject(signal.reason)
+      else if (code !== 0) reject(new Error('native_rapid_watermark_flow_failed'))
+      else resolve()
+    })
+  })
+    .catch((error) => {
+      const logs = ['maestro.log', 'process.log']
+        .map((name) => {
+          const file = path.join(output, name)
+          return fs.existsSync(file) ? fs.readFileSync(file, 'utf8') : ''
+        })
+        .join('\n')
+      privateJson(
+        `native-flow-failure-${platform}.json`,
+        summarizeNativeFlowFailure({
+          flow: 'maestro/story68/rapid-watermark-held.yaml',
+          platform,
+          durationMs: Math.max(0, Date.now() - started),
+          log: logs,
+        })
+      )
+      throw error
+    })
+    .finally(() => redactRapidWatermarkControl(output, control.url))
+}
 if (command === 'prebuild') {
   ownedEnv()
   const env = read('public-build-env.json')
   const fd = fs.openSync(path.join(directory, `prebuild-${platform}.log`), 'w', 0o600)
   const result = spawnSync(
     path.join(root, 'node_modules/.bin/expo'),
-    ['prebuild', '--platform', platform, '--no-install'],
+    [
+      'prebuild',
+      ...(option('clean') === 'yes' ? ['--clean'] : []),
+      '--platform',
+      platform,
+      '--no-install',
+    ],
     {
       cwd: path.join(root, 'apps/mobile'),
       env: { ...process.env, ...env },
@@ -342,6 +483,16 @@ if (command === 'prebuild') {
     'w',
     0o600
   )
+  const workletsStaging =
+    platform === 'android'
+      ? prepareWorkletsStaging({
+          projectRoot: path.join(root, 'apps/mobile/android'),
+          configuration,
+          architectures:
+            option('arch') ?? (process.arch === 'arm64' ? 'arm64-v8a' : 'x86_64'),
+          evidenceDirectory: directory,
+        })
+      : undefined
   const binary = platform === 'ios' ? 'xcodebuild' : './gradlew'
   const args =
     platform === 'ios'
@@ -368,20 +519,28 @@ if (command === 'prebuild') {
         ]
       : [
           `assemble${configuration}`,
+          ...workletsStaging.args,
           '--no-daemon',
           '--max-workers=2',
           `-PreactNativeArchitectures=${option('arch') ?? (process.arch === 'arm64' ? 'arm64-v8a' : 'x86_64')}`,
         ]
   const result = spawnSync(binary, args, {
     cwd: path.join(root, `apps/mobile/${platform === 'ios' ? 'ios' : 'android'}`),
-    env: { ...process.env, ...read('public-build-env.json') },
+    env: {
+      ...process.env,
+      ...read('public-build-env.json'),
+      ANDROID_HOME: process.env.ANDROID_HOME ?? path.dirname(path.dirname(adb)),
+    },
     stdio: ['ignore', fd, fd],
   })
   fs.closeSync(fd)
   if (result.status !== 0) throw new Error('native_build_failed')
+  if (workletsStaging) verifyWorkletsStaging(workletsStaging)
   console.log(`Owned ${platform} ${configuration} native build passed.`)
 } else if (command === 'a11y' && platform === 'android') {
   requireDevice()
+  activeLocale = 'en-US'
+  maestro('maestro/story65/set-locale.yaml', { MAESTRO_LOCALE: activeLocale })
   const env = {
     ...read('public-build-env.json'),
     ANDROID_SERIAL: device,
@@ -452,7 +611,7 @@ if (command === 'prebuild') {
     fs.writeFileSync(path.join(directory, 'talkback-composer.log'), output, {
       mode: 0o600,
     })
-    if (!/OK \(1 test\)/.test(output) || /FAILURES|INSTRUMENTATION_FAILED/.test(output))
+    if (!/OK \(2 tests\)/.test(output) || /FAILURES|INSTRUMENTATION_FAILED/.test(output))
       throw new Error('actual_talkback_composer_failed')
     privateJson('accessibility-android.json', {
       platform,
@@ -461,6 +620,10 @@ if (command === 'prebuild') {
       openTitleFocus: true,
       saveFocusContained: true,
       cancelOpenerFocus: true,
+      ownedSavingFocus: true,
+      reopenedFinishingFocus: true,
+      watermarkReenabled: true,
+      existingHeaderLabels: true,
       traversalLabelsTraits: true,
     })
   } finally {
@@ -500,7 +663,12 @@ if (command === 'prebuild') {
   requireDevice()
   const generated = path.join(directory, 'accessibility-project')
   fs.mkdirSync(generated, { recursive: true })
-  for (const name of ['project.yml', 'ShareCardAccessibilityUITests.swift'])
+  for (const name of [
+    'project.yml',
+    'ShareCardAccessibilityUITests.swift',
+    'ShareCardHeaderSemantics.swift',
+    'ShareCardHeaderQuery.swift',
+  ])
     fs.copyFileSync(
       path.join(root, 'apps/mobile/native-tests', name),
       path.join(generated, name)
@@ -674,6 +842,10 @@ if (command === 'prebuild') {
       avd,
       '-port',
       port,
+      '-memory',
+      '4096',
+      '-gpu',
+      'swiftshader_indirect',
       '-no-window',
       '-no-audio',
       '-no-boot-anim',
@@ -796,6 +968,119 @@ if (command === 'prebuild') {
       ? 'maestro/share-card-export.yaml'
       : `maestro/story68/${flow}.yaml`
   )
+} else if (command === 'release-live-font') {
+  privateJson('native-release-live-font-android.json', {
+    platform: 'android',
+    configuration: 'Release',
+    passed: false,
+  })
+  requireDevice()
+  activeLocale = 'en-US'
+  await runReleaseLiveFontCommand({
+    root,
+    directory,
+    platform,
+    device,
+    appId,
+    adb,
+    maestroBinary,
+    maestro,
+    read,
+    privateJson,
+    apkPath: path.resolve(
+      option('apk') ??
+        path.join(
+          root,
+          'apps/mobile/android/app/build/outputs/apk/release/app-release.apk'
+        )
+    ),
+  })
+} else if (command === 'fallback-focus') {
+  requireDevice()
+  activeLocale = 'en-US'
+  const { runStory68FallbackFocus } = await import('./lib/story68-fallback-focus.mjs')
+  await runStory68FallbackFocus({
+    root,
+    directory,
+    device,
+    platform,
+    appId,
+    adb,
+    maestro,
+    run,
+    read,
+    privateJson,
+    openUrl,
+  })
+} else if (command === 'rapid-watermark') {
+  requireDevice()
+  const report = { platform, passed: false, stage: 'validating_runtime' }
+  privateJson(`native-rapid-watermark-${platform}.json`, report)
+  try {
+    const connectionString = assertRapidWatermarkRuntime({
+      environment: ownedEnv(),
+      build: read('public-build-env.json'),
+      resources: read('resources.json'),
+      apiLog: fs.readFileSync(path.join(directory, 'api.log'), 'utf8'),
+    })
+    report.stage = 'fresh_runtime'
+    // A new JS runtime removes all retained preview keys and resets restricted adapters to real.
+    if (platform === 'ios') run('xcrun', ['simctl', 'terminate', device, appId])
+    else run(adb, ['-s', device, 'shell', 'am', 'force-stop', appId])
+    openUrl(
+      `couturecast-story68://expo-development-client/?url=${encodeURIComponent('http://127.0.0.1:8089')}`
+    )
+    maestro('maestro/story65/open-app.yaml')
+    maestro('maestro/story65/set-locale.yaml', { MAESTRO_LOCALE: activeLocale })
+    report.stage = 'ready_opener'
+    // Feed requests and the visible opener must settle before the table is held.
+    maestro('maestro/story68/rapid-ready-outfit.yaml')
+    const logPath = path.join(directory, 'api.log')
+    const offset = fs.statSync(logPath).size
+    const { default: pg } = await import('pg')
+    report.stage = 'held_flow'
+    const result = await withRapidWatermarkControl({
+      withLock: (whileLocked) =>
+        withRapidWatermarkLock({
+          connectionString,
+          createClient: (options) =>
+            new pg.Client({
+              ...options,
+              connectionTimeoutMillis: 2000,
+              query_timeout: 2000,
+            }),
+          whileLocked,
+        }),
+      runFlow: (control, signal) => rapidWatermarkFlow(signal, control),
+    })
+    report.stage = 'fresh_preview'
+    maestro('maestro/story68/rapid-watermark-loaded.yaml')
+    maestro('maestro/story68/cancel.yaml')
+    report.stage = 'requests'
+    const requests = rapidWatermarkRequests(
+      fs.readFileSync(logPath).subarray(offset).toString()
+    )
+    privateJson(`native-rapid-watermark-${platform}.json`, {
+      platform,
+      passed: true,
+      stage: 'completed',
+      preparation: 'actual_api_owned_postgresql_source_barrier',
+      lockTiming: 'warmed_host_http_handshake',
+      freshAppRuntime: true,
+      readyOpenerBeforeLock: true,
+      ...result,
+      ...requests,
+    })
+    console.log(
+      `Native ${platform} actual API rapid watermark passed in ${result.heldMs}ms held time.`
+    )
+  } catch (error) {
+    privateJson(`native-rapid-watermark-${platform}.json`, {
+      ...report,
+      code: closedRapidWatermarkFailure(error),
+    })
+    throw error
+  }
 } else if (command === 'proof') {
   requireDevice()
   if (platform === 'ios') {
@@ -905,6 +1190,9 @@ if (command === 'prebuild') {
       addOnlyGranted: true,
     })
   }
+  // Finish the owned dialog before the next command opens Settings through tabs.
+  // Extraction and the iOS permission assertions must complete before dismissal.
+  maestro('maestro/story68/cancel.yaml')
   console.log('Explicit native save and fresh OS original proof passed.')
 } else if (command === 'matrix') {
   requireDevice()
@@ -1072,41 +1360,26 @@ if (command === 'prebuild') {
   const previousFont =
     platform === 'ios'
       ? run('xcrun', ['simctl', 'ui', device, 'content_size']).trim()
-      : run(adb, [
-          '-s',
-          device,
-          'shell',
-          'settings',
-          'get',
-          'system',
-          'font_scale',
-        ]).trim()
-  try {
-    if (platform === 'ios')
-      run('xcrun', ['simctl', 'ui', device, 'content_size', 'accessibility-medium'])
-    else
-      run(adb, ['-s', device, 'shell', 'settings', 'put', 'system', 'font_scale', '1.5'])
+      : undefined
+  const verifyLargeText = () => {
     open('outfit')
     maestro('maestro/story68/large-text.yaml')
     screenshot('large-text')
     close()
     mark('M-A11Y:large-text-pt-PT')
-  } finally {
-    if (platform === 'ios')
+  }
+  if (platform === 'android') {
+    await withColdAndroidFontScale(
+      { appId, adb, device, run, openUrl, maestro },
+      verifyLargeText
+    )
+  } else {
+    try {
+      run('xcrun', ['simctl', 'ui', device, 'content_size', 'accessibility-medium'])
+      verifyLargeText()
+    } finally {
       run('xcrun', ['simctl', 'ui', device, 'content_size', previousFont])
-    else if (previousFont === 'null')
-      run(adb, ['-s', device, 'shell', 'settings', 'delete', 'system', 'font_scale'])
-    else
-      run(adb, [
-        '-s',
-        device,
-        'shell',
-        'settings',
-        'put',
-        'system',
-        'font_scale',
-        previousFont,
-      ])
+    }
   }
   activeLocale = 'en-US'
   maestro('maestro/story65/set-locale.yaml', { MAESTRO_LOCALE: activeLocale })
@@ -1144,11 +1417,23 @@ if (command === 'prebuild') {
     before = originals()
     maestro('maestro/story68/pending.yaml')
     assertUnchanged(before)
+    mark('M-SAVE-OWNERSHIP:current-saving')
+    if (lifecycle === 'close') {
+      open('outfit')
+      maestro('maestro/story68/pending-reopened.yaml')
+      mark('M-SAVE-OWNERSHIP:reopened-finishing')
+    }
     if (lifecycle !== 'close') maestro('maestro/story68/navigate-pending.yaml')
     if (lifecycle === 'signout') maestro('maestro/story68/signout.yaml')
     fixture('release')
     for (let n = 0; n < 80 && originals() === before; n++)
       await new Promise((resolve) => setTimeout(resolve, 100))
+
+    if (lifecycle === 'close') {
+      maestro('maestro/story68/pending-settled.yaml')
+      mark('M-WATERMARK:reopen-after-settlement')
+      close()
+    }
     maestro('maestro/story68/no-late-feedback.yaml')
     extract(`pending-${lifecycle}`)
     mark(`M-SINGLE-WRITE M-IDENTITY:${lifecycle}`)

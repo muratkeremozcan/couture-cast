@@ -1,0 +1,17 @@
+appId: ${MAESTRO_APP_ID}
+---
+- runFlow:
+    when:
+      visible:
+        id: share-card-watermark
+        checked: true
+    commands:
+      - tapOn:
+          id: share-card-watermark
+- assertVisible:
+    id: share-card-watermark
+    checked: false
+- extendedWaitUntil:
+    visible:
+      id: share-card-preview-loaded
+    timeout: 20000

@@ -40,6 +40,84 @@ const handler = () =>
     return HttpResponse.json({ data: preparedShareCardFixture })
   })
 describe('exact-byte share-card dialog', () => {
+  it('M5: handoff Retry reauthorizes the retained preview and preserves its recovery focus', async () => {
+    const image = await open()
+    fireEvent.load(image)
+    handoff.mockImplementationOnce(() => {
+      throw new Error('observable_handoff_failure')
+    })
+    await userEvent.click(screen.getByTestId('share-card-save'))
+    await screen.findByRole('alert')
+    const retry = screen.getByRole('button', { name: 'Try again' })
+    await userEvent.click(retry)
+    await waitFor(() => expect(requests).toHaveLength(3))
+    expect(requests).toEqual([
+      expect.objectContaining({ purpose: 'preview' }),
+      expect.objectContaining({ purpose: 'save' }),
+      expect.objectContaining({ purpose: 'save' }),
+    ])
+    expect(screen.getByTestId('share-card-preview')).toBe(image)
+    await waitFor(() =>
+      expect(screen.getByRole('status')).toHaveTextContent('Download started')
+    )
+    expect(retry).toHaveFocus()
+  })
+  it('M5: conflict keeps Save focus and Refresh retains its preview and focus through preparation', async () => {
+    const image = await open()
+    fireEvent.load(image)
+    let release!: () => void
+    const held = new Promise<void>((resolve) => {
+      release = resolve
+    })
+    useMswHandlers(
+      http.post(endpoint, async ({ request }) => {
+        const body = (await request.json()) as { purpose: string }
+        requests.push(body)
+        if (body.purpose === 'preview') await held
+        return body.purpose === 'save'
+          ? HttpResponse.json({ code: 'preview_changed' }, { status: 409 })
+          : HttpResponse.json({ data: preparedShareCardFixture })
+      })
+    )
+    const save = screen.getByTestId('share-card-save')
+    await userEvent.click(save)
+    await screen.findByRole('alert')
+    expect(save).toHaveFocus()
+    expect(save).toHaveAttribute('aria-disabled', 'true')
+    expect(save).not.toBeDisabled()
+    const refresh = screen.getByRole('button', { name: 'Refresh preview' })
+    await userEvent.click(refresh)
+    await waitFor(() => expect(requests).toHaveLength(3))
+    expect(screen.getByTestId('share-card-preview')).toBe(image)
+    expect(refresh).toHaveFocus()
+    await act(async () => {
+      release()
+      await held
+    })
+    await waitFor(() => expect(screen.getByTestId('share-card-preview')).not.toBe(image))
+    expect(screen.getByTestId('share-card-preview')).toHaveAttribute(
+      'src',
+      image.getAttribute('src')
+    )
+    expect(refresh).toHaveFocus()
+  })
+  it('M6: closing a recoverable error clears its alert while retaining approved bytes', async () => {
+    const image = await open()
+    fireEvent.load(image)
+    Object.defineProperty(navigator, 'onLine', { configurable: true, value: false })
+    await userEvent.click(screen.getByTestId('share-card-save'))
+    await screen.findByRole('alert')
+    await userEvent.keyboard('{Escape}')
+    Object.defineProperty(navigator, 'onLine', { configurable: true, value: true })
+    await userEvent.click(screen.getByTestId('share-card-open'))
+    expect(await screen.findByTestId('share-card-preview')).toHaveAttribute(
+      'src',
+      image.getAttribute('src')
+    )
+    expect(screen.queryByRole('alert')).not.toBeInTheDocument()
+    expect(screen.queryByRole('button', { name: 'Try again' })).not.toBeInTheDocument()
+    expect(requests).toHaveLength(1)
+  })
   it('U-WEB-SAVE U-A11Y: image load gates explicit fresh authorization and truthful download handoff', async () => {
     const image = await open()
     const save = screen.getByTestId('share-card-save')

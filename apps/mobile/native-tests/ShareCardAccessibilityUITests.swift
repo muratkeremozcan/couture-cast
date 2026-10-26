@@ -117,7 +117,7 @@ final class ShareCardAccessibilityUITests: XCTestCase {
     let clientURL = Bundle(for: Self.self).url(forResource: "client-\(currentLocale)", withExtension: "json")!
     let client = try JSONSerialization.jsonObject(with: Data(contentsOf: clientURL)) as! [String: Any]
     let labels = client["shareCard"] as! [String: Any]
-    let statusKeys = ["preparing": "preparing", "saved": "saved", "storage-failure": "storage", "offline": "offline", "denied": "permissionDenied", "permanent-denied": "permissionPermanent", "limited": "saved", "pending": "finishingSave", "unavailable": "nativeSaveUnavailable"]
+    let statusKeys = ["preparing": "preparing", "saved": "saved", "storage-failure": "storage", "offline": "offline", "denied": "permissionDenied", "permanent-denied": "permissionPermanent", "limited": "saved", "pending": "saving", "unavailable": "nativeSaveUnavailable"]
     if let key = statusKeys[state] {
       let status = element(["saved", "limited", "pending", "preparing"].contains(state) ? "share-card-feedback" : "share-card-error")
       XCTAssertTrue(status.exists, "Own exact localized status element: \(state)")
@@ -148,8 +148,8 @@ final class ShareCardAccessibilityUITests: XCTestCase {
     XCTAssertEqual(title.elementType, .staticText, state)
     XCTAssertEqual(save.elementType, .button, state)
     XCTAssertEqual(cancel.elementType, .button, state)
-    XCTAssertFalse(save.label.isEmpty, state)
-    XCTAssertFalse(cancel.label.isEmpty, state)
+    XCTAssertEqual(save.label, labels["save"] as! String, state)
+    XCTAssertEqual(cancel.label, labels["cancel"] as! String, state)
     // One serialized AX snapshot preserves reading order across UIKit's transient
     // audit windows. Recursive index-bound queries can become stale mid-traversal.
     let hierarchy = app.debugDescription
@@ -161,7 +161,7 @@ final class ShareCardAccessibilityUITests: XCTestCase {
     XCTAssertLessThan(position(title.identifier), position(watermark.identifier), state)
     XCTAssertLessThan(position(watermark.identifier), position(save.identifier), state)
     XCTAssertLessThan(position(save.identifier), position(cancel.identifier), state)
-    let targets = ["preparing": "share-card-title", "open": "share-card-title", "unavailable": "share-card-title", "saved": "share-card-save", "limited": "share-card-save", "pending": "share-card-cancel", "denied": "share-card-retry", "permanent-denied": "share-card-settings", "storage-failure": "share-card-retry", "offline": "share-card-retry"]
+    let targets = ["preparing": "share-card-title", "open": "share-card-title", "unavailable": "share-card-title", "saved": "share-card-save", "limited": "share-card-save", "pending": "share-card-save", "denied": "share-card-retry", "permanent-denied": "share-card-settings", "storage-failure": "share-card-retry", "offline": "share-card-retry"]
     if let id = targets[state] {
       let target = element(id)
       XCTAssertTrue(target.exists, "Intended native focus bridge target: \(state)")
@@ -173,6 +173,26 @@ final class ShareCardAccessibilityUITests: XCTestCase {
     attachment.name = "share-card-\(state)"
     attachment.lifetime = .keepAlways
     add(attachment)
+  }
+
+  func exactFeedback(_ expected: String) {
+    let status = element("share-card-feedback")
+    XCTAssertTrue(status.waitForExistence(timeout: 20))
+    let matched = XCTNSPredicateExpectation(predicate: NSPredicate(format: "label == %@", expected), object: status)
+    XCTAssertEqual(XCTWaiter.wait(for: [matched], timeout: 20), .completed)
+    XCTAssertEqual(status.label, expected)
+  }
+
+  func clientCatalog() throws -> [String: Any] {
+    let url = Bundle(for: Self.self).url(forResource: "client-\(currentLocale)", withExtension: "json")!
+    return try JSONSerialization.jsonObject(with: Data(contentsOf: url)) as! [String: Any]
+  }
+
+  func assertExistingHeader(_ expected: String, removedContentHeading: String) throws {
+    let header = try existingShareCardHeader(in: app, expected: expected)
+    XCTAssertEqual(header.label, expected)
+    XCTAssertTrue(header.isHittable)
+    XCTAssertFalse(app.staticTexts.matching(NSPredicate(format: "label == %@", removedContentHeading)).firstMatch.exists)
   }
 
   func fixture(_ mode: String) {
@@ -222,6 +242,16 @@ final class ShareCardAccessibilityUITests: XCTestCase {
     XCTAssertFalse(element("share-card-title").exists)
     XCTAssertTrue(opener.exists)
     XCTAssertTrue(opener.isHittable)
+    let client = try clientCatalog()
+    let labels = client["shareCard"] as! [String: Any]
+    let tabs = client["tabs"] as! [String: String]
+    XCTAssertEqual(opener.label, labels["launcher"] as! String)
+    try assertExistingHeader(tabs["home"]!, removedContentHeading: labels["sourceOutfit"] as! String)
+    element("tab-community").tap()
+    let communityLabels = client["community"] as! [String: Any]
+    try assertExistingHeader(tabs["community"]!, removedContentHeading: communityLabels["heading"] as! String)
+    print("CC68_NATIVE_BEHAVIOR_PASS existing-header-labels")
+    element("tab-home").tap()
     try app.performAccessibilityAudit(for: .all)
     openCard()
     fixture("storage")
@@ -253,6 +283,38 @@ final class ShareCardAccessibilityUITests: XCTestCase {
     element("share-card-cancel").tap()
     fixture("release")
     fixture("real")
+  }
+
+  func testOwnedSavingAndReopenedFinishingRestoreWatermark() throws {
+    fixture("deferred")
+    openCard()
+    let labels = try clientCatalog()["shareCard"] as! [String: Any]
+    let save = element("share-card-save")
+    let ready = XCTNSPredicateExpectation(predicate: NSPredicate(format: "enabled == true"), object: save)
+    XCTAssertEqual(XCTWaiter.wait(for: [ready], timeout: 20), .completed)
+    save.tap()
+    exactFeedback(labels["saving"] as! String)
+    try audit("pending")
+    exactFeedback(labels["saving"] as! String)
+    print("CC68_NATIVE_BEHAVIOR_PASS owned-saving")
+    element("share-card-cancel").tap()
+    openCard()
+    exactFeedback(labels["finishingSave"] as! String)
+    XCTAssertFalse(element("share-card-save").isEnabled)
+    print("CC68_NATIVE_BEHAVIOR_PASS reopened-finishing")
+    fixture("release")
+    let watermark = element("share-card-watermark")
+    let enabled = XCTNSPredicateExpectation(predicate: NSPredicate(format: "enabled == true"), object: watermark)
+    XCTAssertEqual(XCTWaiter.wait(for: [enabled], timeout: 20), .completed)
+    XCTAssertFalse(element("share-card-feedback").exists)
+    for _ in 0..<8 where !watermark.isHittable { app.swipeDown() }
+    XCTAssertTrue(watermark.isHittable)
+    let previous = String(describing: watermark.value)
+    watermark.tap()
+    XCTAssertNotEqual(String(describing: watermark.value), previous)
+    XCTAssertTrue(loaded().waitForExistence(timeout: 20))
+    print("CC68_NATIVE_BEHAVIOR_PASS watermark-reenabled")
+    element("share-card-cancel").tap()
   }
 
   func testPreparingCancelAndRetryTraversal() throws {

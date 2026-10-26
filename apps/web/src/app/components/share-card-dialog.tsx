@@ -18,7 +18,13 @@ const subscribeIdentity = (callback: () => void) => {
 }
 const saveIsDisabled = (valid: boolean, loaded: string | null, presentation: string) =>
   !valid || loaded !== presentation
+const saveButtonState = (changed: boolean, busy: boolean, unavailable: boolean) => ({
+  disabled: !changed && unavailable,
+  'aria-disabled': busy || unavailable || undefined,
+})
 const recoveryLabel = (changed: boolean) => (changed ? 'refresh' : 'retry')
+const recoveryIsVisible = (action: string | null, changed: boolean) =>
+  action !== null || changed
 const buttonLabel = (busy: boolean) => (busy ? 'saving' : 'download')
 export function ShareCardControl({ source }: { source: ShareCardSource }) {
   const { t } = useTranslation(undefined, { i18n: currentI18n() })
@@ -73,6 +79,7 @@ export function ShareCardDialog({
   const [error, setError] = useState<string | null>(null)
   const [refresh, setRefresh] = useState(0)
   const [changed, setChanged] = useState(false)
+  const [recoveryAction, setRecoveryAction] = useState<'prepare' | 'save' | null>(null)
   const controller = useRef<AbortController | null>(null)
   const sequence = useRef(0)
   const saving = useRef(false)
@@ -86,12 +93,14 @@ export function ShareCardDialog({
       : null
   const valid = current?.key === key && !changed
   const presentation = `${key}:${current?.renderId}:${presentationEpoch}`
+  const saveUnavailable = saveIsDisabled(valid, loaded, presentation)
   const latest = useRef({ member, key, open })
   latest.current = { member, key, open }
   useEffect(() => {
     setPreview(null)
     setLoaded(null)
     setChanged(false)
+    setRecoveryAction(null)
     controller.current?.abort()
     sequence.current++
   }, [member])
@@ -118,6 +127,7 @@ export function ShareCardDialog({
       .catch((failure: unknown) => {
         if (!abort.signal.aborted && generation === sequence.current) {
           setError(shareCardErrorKey(failure))
+          setRecoveryAction('prepare')
           setMessage(null)
         }
       })
@@ -136,6 +146,8 @@ export function ShareCardDialog({
       sequence.current++
       setBusy(false)
       setMessage(null)
+      setError(null)
+      setRecoveryAction(null)
     }
   }, [open])
   useEffect(
@@ -151,11 +163,13 @@ export function ShareCardDialog({
     sequence.current++
     setBusy(false)
     setMessage(null)
+    setError(null)
+    setRecoveryAction(null)
     setLoaded(null)
     setPresentationEpoch((value) => value + 1)
     onClose()
   }
-  const save = async () => {
+  const save = async (restoreSaveFocus = true) => {
     if (!current || !valid || loaded !== presentation || saving.current || busy) return
     saving.current = true
     setBusy(true)
@@ -184,6 +198,7 @@ export function ShareCardDialog({
       if (!stillCurrent()) return
       if (authorized.sha256 !== current.card.sha256) {
         setChanged(true)
+        setRecoveryAction('prepare')
         setError('previewChanged')
         setMessage(null)
         return
@@ -191,12 +206,13 @@ export function ShareCardDialog({
       await downloadShareCard(current.card, abort.signal)
       if (stillCurrent()) {
         setMessage('downloadStarted')
-        saveRef.current?.focus({ preventScroll: true })
+        if (restoreSaveFocus) saveRef.current?.focus({ preventScroll: true })
       }
     } catch (failure) {
       if (stillCurrent()) {
         const code = shareCardErrorKey(failure)
         setError(code)
+        setRecoveryAction(code === 'previewChanged' ? 'prepare' : 'save')
         setMessage(null)
         if (code === 'previewChanged') setChanged(true)
       }
@@ -233,6 +249,7 @@ export function ShareCardDialog({
           onChange={(event) => {
             setWatermark(event.target.checked)
             setChanged(false)
+            setRecoveryAction(null)
             setLoaded(null)
           }}
         />
@@ -248,13 +265,14 @@ export function ShareCardDialog({
           height={1350}
           alt={current.card.accessibilityLabel}
           data-testid="share-card-preview"
-          data-loaded={loaded === presentation ? 'true' : 'false'}
+          data-loaded={saveUnavailable ? 'false' : 'true'}
           data-sha256={current.card.sha256}
           className="mx-auto h-auto max-h-[55dvh] w-auto max-w-full"
           onLoad={() => setLoaded(presentation)}
           onError={() => {
             setLoaded(null)
             setError('render')
+            setRecoveryAction('prepare')
           }}
         />
       )}
@@ -264,22 +282,27 @@ export function ShareCardDialog({
           type="button"
           className="min-h-[44px] rounded bg-[#292724] px-5 text-white disabled:opacity-50"
           data-testid="share-card-save"
-          disabled={saveIsDisabled(valid, loaded, presentation)}
-          aria-disabled={busy || undefined}
+          {...saveButtonState(changed, busy, saveUnavailable)}
           aria-busy={busy || undefined}
           onClick={() => void save()}
         >
           {t(`shareCard.${buttonLabel(busy)}`)}
         </button>
-        {(error || changed) && (
+        {recoveryIsVisible(recoveryAction, changed) && (
           <button
+            data-testid="share-card-recovery"
             className="min-h-[44px] px-3"
             type="button"
-            disabled={busy}
+            aria-disabled={busy || undefined}
+            aria-busy={busy || undefined}
             onClick={() => {
-              setChanged(false)
-              setPreview(null)
-              setRefresh((n) => n + 1)
+              if (busy) return
+              if (recoveryAction === 'save' && valid && loaded === presentation) {
+                void save(false)
+              } else {
+                setChanged(true)
+                setRefresh((n) => n + 1)
+              }
             }}
           >
             {t(`shareCard.${recoveryLabel(changed)}`)}

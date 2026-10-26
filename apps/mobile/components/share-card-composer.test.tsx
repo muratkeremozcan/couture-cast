@@ -2,7 +2,7 @@ import type * as ReactNativeModule from 'react-native'
 import React, { createElement, useEffect, useState } from 'react'
 import { act, fireEvent, render, screen, waitFor } from '@testing-library/react'
 import { beforeEach, describe, expect, it, vi } from 'vitest'
-import { ResponseError } from '@couture/api-client'
+import { ResponseError, type PrepareShareCardInput } from '@couture/api-client'
 import { supportedLocales } from '@couture/api-client/contracts/http'
 import { preparedShareCardFixture as card } from '@couture/api-client/testing/share-card-fixture'
 import i18n, { initI18n } from '@/src/lib/i18n'
@@ -209,6 +209,172 @@ describe('share-card composer lifecycle', () => {
     )
     expect(boundary.focus).toHaveBeenCalledWith(41)
   })
+  it('M3: the real manager keeps this save on Saving without moving focus to Cancel', async () => {
+    const native = deferred<void>()
+    boundary.save.mockImplementation((_card, _signal, _isCurrent, owner) =>
+      commitShareCardSave({
+        fileUri: 'cc68-own-save.png',
+        owner,
+        save: () => native.promise,
+        cleanup: () => Promise.resolve(),
+      })
+    )
+    render(<Harness />)
+    await ready()
+    fireEvent.click(screen.getByTestId('share-card-save'))
+    await waitFor(() => expect(nativeShareCardSavePending()).toBe(true))
+    try {
+      expect(screen.getByText(i18n.t('shareCard.saving'))).toBeInTheDocument()
+      expect(
+        screen.queryByText(i18n.t('shareCard.finishingSave'))
+      ).not.toBeInTheDocument()
+      expect(boundary.focus).not.toHaveBeenCalledWith(44)
+    } finally {
+      await act(async () => {
+        native.resolve()
+        await native.promise
+      })
+    }
+  })
+  it('U-A11Y: modal show keeps Cancel focused when reopening an older committed save', async () => {
+    const native = deferred<void>()
+    boundary.save.mockImplementation((_card, _signal, _isCurrent, owner) =>
+      commitShareCardSave({
+        fileUri: 'cc68-reopen-modal-focus.png',
+        owner,
+        save: () => native.promise,
+        cleanup: () => Promise.resolve(),
+      })
+    )
+    render(<Harness />)
+    await ready()
+    fireEvent.click(screen.getByTestId('share-card-save'))
+    await waitFor(() => expect(nativeShareCardSavePending()).toBe(true))
+    try {
+      fireEvent.click(screen.getByTestId('share-card-cancel'))
+      boundary.focus.mockClear()
+      fireEvent.click(screen.getByText('Reopen'))
+      expect(
+        await screen.findByText(i18n.t('shareCard.finishingSave'))
+      ).toBeInTheDocument()
+      await waitFor(() => expect(boundary.focus).toHaveBeenLastCalledWith(44))
+    } finally {
+      await act(async () => {
+        native.resolve()
+        await native.promise
+      })
+    }
+  })
+  it('L5: reopening an older committed save re-enables the watermark after settlement', async () => {
+    const native = deferred<void>()
+    boundary.save.mockImplementation((_card, _signal, _isCurrent, owner) =>
+      commitShareCardSave({
+        fileUri: 'cc68-reopen-watermark.png',
+        owner,
+        save: () => native.promise,
+        cleanup: () => Promise.resolve(),
+      })
+    )
+    render(<Harness />)
+    await ready()
+    fireEvent.click(screen.getByTestId('share-card-save'))
+    await waitFor(() => expect(nativeShareCardSavePending()).toBe(true))
+    fireEvent.click(screen.getByTestId('share-card-cancel'))
+    fireEvent.click(screen.getByText('Reopen'))
+    await act(async () => {
+      native.resolve()
+      await native.promise
+    })
+    await waitFor(() => expect(nativeShareCardSavePending()).toBe(false))
+    expect(screen.getByTestId('share-card-watermark')).not.toHaveAttribute(
+      'aria-disabled',
+      'true'
+    )
+    fireEvent.click(screen.getByTestId('share-card-watermark'))
+    expect(screen.getByTestId('share-card-watermark')).toHaveAttribute(
+      'aria-checked',
+      'false'
+    )
+  })
+  it.each([
+    ['render', 'render'],
+    ['invalid_file', 'render'],
+    ['finishingSave', 'finishingSave'],
+  ])('L4: native %s retains its precise recovery message', async (failure, key) => {
+    boundary.save.mockRejectedValueOnce(new Error(failure))
+    render(<Harness />)
+    await ready()
+    fireEvent.click(screen.getByTestId('share-card-save'))
+    expect(await screen.findByText(i18n.t(`shareCard.${key}`))).toBeInTheDocument()
+    expect(screen.queryByText(i18n.t('shareCard.storage'))).not.toBeInTheDocument()
+  })
+  it('L4: a native rejection uses its stable code when the message contains context', async () => {
+    boundary.save.mockRejectedValueOnce(
+      Object.assign(new Error('The original PNG was rejected'), { code: 'invalid_file' })
+    )
+    render(<Harness />)
+    await ready()
+    fireEvent.click(screen.getByTestId('share-card-save'))
+    expect(await screen.findByText(i18n.t('shareCard.render'))).toBeInTheDocument()
+  })
+  it.each([true, false])(
+    'L4: Android ERR_PERMISSIONS rechecks canAskAgain=%s',
+    async (canAskAgain) => {
+      boundary.permission
+        .mockResolvedValueOnce({ granted: true, canAskAgain: true })
+        .mockResolvedValueOnce({ granted: false, canAskAgain })
+      boundary.save.mockRejectedValueOnce(
+        Object.assign(new Error('Missing MEDIA_LIBRARY write permission.'), {
+          code: 'ERR_PERMISSIONS',
+        })
+      )
+      render(<Harness />)
+      await ready()
+      fireEvent.click(screen.getByTestId('share-card-save'))
+      expect(
+        await screen.findByText(
+          i18n.t(`shareCard.${canAskAgain ? 'permissionDenied' : 'permissionPermanent'}`)
+        )
+      ).toBeInTheDocument()
+      expect(boundary.permission).toHaveBeenLastCalledWith(false)
+    }
+  )
+  it('L4: a plain storage failure with permission words stays storage', async () => {
+    boundary.save.mockRejectedValueOnce(
+      new Error('Missing MEDIA_LIBRARY write permission.')
+    )
+    render(<Harness />)
+    await ready()
+    fireEvent.click(screen.getByTestId('share-card-save'))
+    expect(await screen.findByText(i18n.t('shareCard.storage'))).toBeInTheDocument()
+    expect(boundary.permission).toHaveBeenCalledTimes(1)
+  })
+  it.each([true, false])(
+    'L4: native permission denial rechecks canAskAgain=%s',
+    async (canAskAgain) => {
+      boundary.permission
+        .mockResolvedValueOnce({ granted: true, canAskAgain: true })
+        .mockResolvedValueOnce({ granted: false, canAskAgain })
+      boundary.save.mockRejectedValueOnce(new Error('permission_denied'))
+      render(<Harness />)
+      await ready()
+      fireEvent.click(screen.getByTestId('share-card-save'))
+      expect(
+        await screen.findByText(
+          i18n.t(`shareCard.${canAskAgain ? 'permissionDenied' : 'permissionPermanent'}`)
+        )
+      ).toBeInTheDocument()
+      expect(boundary.permission).toHaveBeenLastCalledWith(false)
+    }
+  )
+  it('L3: European Portuguese uses Guardar in the live composer', async () => {
+    await i18n.changeLanguage('pt-PT')
+    render(<Harness />)
+    await ready()
+    expect(screen.getByTestId('share-card-save')).toHaveTextContent(
+      'Guardar nas Fotografias'
+    )
+  })
   it('U-A11Y-CANCEL: dismissal restores the invoking control once after its modal closes', async () => {
     const restore = vi.fn()
     render(<Harness restore={restore} />)
@@ -365,6 +531,28 @@ describe('share-card composer lifecycle', () => {
     expect(
       boundary.announce.mock.calls.filter(([message]) => message === text)
     ).toHaveLength(1)
+  })
+  it('M1: pending preparation keeps exact feedback through watermark OFF and ON without a response', async () => {
+    boundary.prepare.mockReturnValue(new Promise(() => undefined))
+    render(<Harness />)
+    const preparing = i18n.t('shareCard.preparing')
+    expect(await screen.findByText(preparing)).toBeInTheDocument()
+    expect(boundary.prepare).toHaveBeenCalledTimes(1)
+    for (const checked of ['false', 'true']) {
+      fireEvent.click(screen.getByTestId('share-card-watermark'))
+      expect(screen.getByTestId('share-card-watermark')).toHaveAttribute(
+        'aria-checked',
+        checked
+      )
+      expect(screen.getByText(preparing)).toBeInTheDocument()
+      expect(screen.queryByTestId('share-card-preview-loaded')).not.toBeInTheDocument()
+      expect(screen.queryByTestId('share-card-error')).not.toBeInTheDocument()
+    }
+    expect(boundary.prepare).toHaveBeenCalledTimes(3)
+    const calls = boundary.prepare.mock.calls as [PrepareShareCardInput, AbortSignal][]
+    expect(calls.map(([input]) => input.watermark)).toEqual([true, false, true])
+    expect(calls.slice(0, 2).every(([, signal]) => signal.aborted)).toBe(true)
+    expect(calls[2]![1].aborted).toBe(false)
   })
   it.each(supportedLocales)(
     'U-A11Y-PREPARING: %s posts its exact localized preparation announcement and title target',
