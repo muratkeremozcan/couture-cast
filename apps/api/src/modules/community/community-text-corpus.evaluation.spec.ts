@@ -4,7 +4,7 @@
 // worker builds it from the loaded policy:
 //
 //   - clean copy: at least 200 ordinary fashion captions and alt texts in the
-//     frozen holdout (holdout-v1/<lang>.json), and the Wilson 95% upper bound on
+//     frozen holdout (selected by active-holdout.json), and the Wilson 95% upper bound on
 //     the share withheld must be at or below 1%. The holdout was written after
 //     the allow list froze and nothing was tuned against it (Story 6.2b review,
 //     BH10). The clean half the allow list was built against is still measured
@@ -18,6 +18,7 @@
 // made it. Failure messages carry case ids and reason codes and never the text
 // or a matched term, which keeps raw terms out of logs and evidence.
 import fs from 'node:fs'
+import { createHash } from 'node:crypto'
 import path from 'node:path'
 import { describe, expect, it } from 'vitest'
 import { loadCommunityScreeningPolicy } from './community-screening-policy.js'
@@ -37,6 +38,19 @@ async function currentInputSetHash(): Promise<string> {
 }
 
 const corpusDir = path.resolve(__dirname, '../../../test/fixtures/community-text-corpus')
+const holdoutVersion: string = JSON.parse(
+  fs.readFileSync(path.join(corpusDir, 'active-holdout.json'), 'utf8')
+).corpusVersion
+if (!/^holdout-v[1-9]\d*$/.test(holdoutVersion)) {
+  throw new Error('active text holdout version is invalid')
+}
+const freezeManifest: {
+  corpusVersion: string
+  corpusSha256: string
+  files: { language: string; path: string; sha256: string }[]
+} = JSON.parse(
+  fs.readFileSync(path.join(corpusDir, holdoutVersion, 'freeze-manifest.json'), 'utf8')
+)
 
 const LANGUAGE_LOCALE: Record<string, string> = {
   de: 'de-DE',
@@ -117,7 +131,7 @@ function readCorpus(language: string): Corpus {
 
 function readHoldout(language: string): Holdout {
   return JSON.parse(
-    fs.readFileSync(path.join(corpusDir, 'holdout-v1', `${language}.json`), 'utf8')
+    fs.readFileSync(path.join(corpusDir, holdoutVersion, `${language}.json`), 'utf8')
   ) as Holdout
 }
 
@@ -259,12 +273,25 @@ describe.each(languages)('text corpus: %s', (language) => {
 
   it('holds a frozen holdout disjoint from the clean half it was not tuned on', () => {
     expect(holdout.language).toBe(language)
-    expect(holdout.corpusVersion).toBe('holdout-v1')
+    expect(holdout.corpusVersion).toBe(holdoutVersion)
     expect(holdout.entries.length).toBeGreaterThanOrEqual(MINIMUM_CLEAN)
     const ids = holdout.entries.map((entry) => entry.id)
     expect(new Set(ids).size).toBe(ids.length)
     const inSample = new Set(corpus.clean.entries.map((entry) => entry.text))
     expect(holdout.entries.filter((entry) => inSample.has(entry.text))).toEqual([])
+  })
+
+  it('matches the independent corpus seal recorded before repair inspection', () => {
+    expect(freezeManifest.corpusVersion).toBe(holdoutVersion)
+    const sealed = freezeManifest.files.filter((file) => file.language === language)
+    expect(sealed).toHaveLength(1)
+    expect(sealed[0]?.path).toBe(
+      `apps/api/test/fixtures/community-text-corpus/${holdoutVersion}/${language}.json`
+    )
+    const digest = createHash('sha256')
+      .update(fs.readFileSync(path.join(corpusDir, holdoutVersion, `${language}.json`)))
+      .digest('hex')
+    expect(digest).toBe(sealed[0]?.sha256)
   })
 
   // The holdout is the release gate, so it is asserted by the release command
@@ -310,6 +337,19 @@ describe.each(languages)('text corpus: %s', (language) => {
 })
 
 describe('text corpus run product', () => {
+  it('matches the complete seven-language corpus seal', () => {
+    expect(freezeManifest.files.map((file) => file.language).toSorted()).toEqual(
+      languages.toSorted()
+    )
+    const material = freezeManifest.files
+      .toSorted((a, b) => a.path.localeCompare(b.path, 'en'))
+      .map((file) => `${file.path}\0${file.sha256}\n`)
+      .join('')
+    expect(createHash('sha256').update(material).digest('hex')).toBe(
+      freezeManifest.corpusSha256
+    )
+  })
+
   it('writes the measurement the readiness evidence consumes, when asked to', async () => {
     const outDir = process.env.COMMUNITY_SCREENING_RUN_PRODUCT_DIR?.trim()
     if (!outDir) return
@@ -326,7 +366,8 @@ describe('text corpus run product', () => {
             (entry) => ({ reason: entry.reason })
           ),
           gates: {
-            cleanGatedOn: 'holdout-v1',
+            cleanGatedOn: holdoutVersion,
+            corpusSha256: freezeManifest.corpusSha256,
             cleanWilson95UpperBoundMaximum: CLEAN_UPPER_BOUND_GATE,
             disallowedBypassesMaximum: 0,
             minimumClean: MINIMUM_CLEAN,

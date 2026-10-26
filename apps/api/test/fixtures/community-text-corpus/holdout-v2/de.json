@@ -1,0 +1,2013 @@
+{
+  "language": "de",
+  "corpusVersion": "holdout-v2",
+  "description": "Frozen clean holdout: ordinary fashion captions and alt text written natively in the language after the allow list froze, independently of the clean half, and never used to tune the screener, the lists or the allow list. The release gate's clean-copy figure is computed here. Entries labelled expected review carry one of the policy's deliberate review terms.",
+  "expected": "pass",
+  "frozenAgainst": {
+    "allowListSha256": "22d1f261f3666cf37369e67359aeabc383ac0a689babe04f87023ba1aee70256",
+    "termsSha256": "517c05fbc7bb46189cc23c532e1acbf46a73342dd2a2a8976cb6a99ea065e434",
+    "languageAllowListSha256": "7f0a9548ddc645a189fc832cc16a815f4816e744c2f92e7f0ba9bd876ee95ea4"
+  },
+  "entries": [
+    {
+      "id": "de-holdout-v2-001",
+      "field": "caption",
+      "text": "Die Jacke passt wieder."
+    },
+    {
+      "id": "de-holdout-v2-002",
+      "field": "caption",
+      "text": "Heute trage ich Omas Brosche."
+    },
+    {
+      "id": "de-holdout-v2-003",
+      "field": "caption",
+      "text": "Neue Schnürsenkel für alte Schuhe."
+    },
+    {
+      "id": "de-holdout-v2-004",
+      "field": "caption",
+      "text": "Den Saum habe ich gekürzt."
+    },
+    {
+      "id": "de-holdout-v2-005",
+      "field": "caption",
+      "text": "Mein Schal ist endlich fertig."
+    },
+    {
+      "id": "de-holdout-v2-006",
+      "field": "caption",
+      "text": "Diese Hose bleibt im Schrank."
+    },
+    {
+      "id": "de-holdout-v2-007",
+      "field": "caption",
+      "text": "Die Stiefel waren beim Schuster."
+    },
+    {
+      "id": "de-holdout-v2-008",
+      "field": "caption",
+      "text": "Ein Hemd für den Chorabend."
+    },
+    {
+      "id": "de-holdout-v2-009",
+      "field": "caption",
+      "text": "Meine Mütze trocknet am Fenster."
+    },
+    {
+      "id": "de-holdout-v2-010",
+      "field": "caption",
+      "text": "Der Mantel braucht einen Knopf."
+    },
+    {
+      "id": "de-holdout-v2-011",
+      "field": "caption",
+      "text": "Zum Töpfern nehme ich die Schürze."
+    },
+    {
+      "id": "de-holdout-v2-012",
+      "field": "caption",
+      "text": "Die Ärmel kremple ich hoch."
+    },
+    {
+      "id": "de-holdout-v2-013",
+      "field": "caption",
+      "text": "Die Weste stammt vom Flohmarkt."
+    },
+    {
+      "id": "de-holdout-v2-014",
+      "field": "caption",
+      "text": "Mein Rucksack hat ein neues Futter."
+    },
+    {
+      "id": "de-holdout-v2-015",
+      "field": "caption",
+      "text": "Heute reicht eine dünne Strickjacke."
+    },
+    {
+      "id": "de-holdout-v2-016",
+      "field": "caption",
+      "text": "Den Gürtel habe ich geflochten."
+    },
+    {
+      "id": "de-holdout-v2-017",
+      "field": "caption",
+      "text": "Die Schuhe drücken am Spann."
+    },
+    {
+      "id": "de-holdout-v2-018",
+      "field": "caption",
+      "text": "Meine Tante strickte diese Socken."
+    },
+    {
+      "id": "de-holdout-v2-019",
+      "field": "caption",
+      "text": "Ein Kleid für die Lesung."
+    },
+    {
+      "id": "de-holdout-v2-020",
+      "field": "caption",
+      "text": "Der Kragen liegt jetzt glatt."
+    },
+    {
+      "id": "de-holdout-v2-021",
+      "field": "caption",
+      "text": "Die Tasche fasst mein Skizzenbuch."
+    },
+    {
+      "id": "de-holdout-v2-022",
+      "field": "caption",
+      "text": "Draußen trage ich den Filzhut."
+    },
+    {
+      "id": "de-holdout-v2-023",
+      "field": "caption",
+      "text": "Die Hose hat praktische Seitentaschen."
+    },
+    {
+      "id": "de-holdout-v2-024",
+      "field": "caption",
+      "text": "Mein Ring blieb heute zu Hause."
+    },
+    {
+      "id": "de-holdout-v2-025",
+      "field": "caption",
+      "text": "Neue Einlagen für den Stadtbummel."
+    },
+    {
+      "id": "de-holdout-v2-026",
+      "field": "caption",
+      "text": "Die Bluse fällt schön locker."
+    },
+    {
+      "id": "de-holdout-v2-027",
+      "field": "caption",
+      "text": "Den Reißverschluss habe ich repariert."
+    },
+    {
+      "id": "de-holdout-v2-028",
+      "field": "caption",
+      "text": "Dieses Tuch wärmt meine Schultern."
+    },
+    {
+      "id": "de-holdout-v2-029",
+      "field": "caption",
+      "text": "Ein roter Pullover zum Frühstück."
+    },
+    {
+      "id": "de-holdout-v2-030",
+      "field": "caption",
+      "text": "Die Handschuhe stecken im Mantel."
+    },
+    {
+      "id": "de-holdout-v2-031",
+      "field": "caption",
+      "text": "Die Sandalen bekommen neue Riemen."
+    },
+    {
+      "id": "de-holdout-v2-032",
+      "field": "caption",
+      "text": "Zur Probe trage ich Turnschuhe."
+    },
+    {
+      "id": "de-holdout-v2-033",
+      "field": "caption",
+      "text": "Meine Weste riecht nach Zedernholz."
+    },
+    {
+      "id": "de-holdout-v2-034",
+      "field": "caption",
+      "text": "Das Kleid hat verstellbare Träger."
+    },
+    {
+      "id": "de-holdout-v2-035",
+      "field": "caption",
+      "text": "Ein Lederband hält die Haare."
+    },
+    {
+      "id": "de-holdout-v2-036",
+      "field": "caption",
+      "text": "Den Stoff kaufte ich im Urlaub."
+    },
+    {
+      "id": "de-holdout-v2-037",
+      "field": "caption",
+      "text": "Die Stulpen sind selbst gestrickt."
+    },
+    {
+      "id": "de-holdout-v2-038",
+      "field": "caption",
+      "text": "Mein Hemd trocknet auf dem Bügel."
+    },
+    {
+      "id": "de-holdout-v2-039",
+      "field": "caption",
+      "text": "Der Schal bleibt heute offen."
+    },
+    {
+      "id": "de-holdout-v2-040",
+      "field": "caption",
+      "text": "Ein Rock für den Museumsbesuch."
+    },
+    {
+      "id": "de-holdout-v2-041",
+      "field": "caption",
+      "text": "Die Jackentasche ist wieder ganz."
+    },
+    {
+      "id": "de-holdout-v2-042",
+      "field": "caption",
+      "text": "Den Hut schmückt ein Stoffband."
+    },
+    {
+      "id": "de-holdout-v2-043",
+      "field": "caption",
+      "text": "Diese Jeans hat geflickte Knie."
+    },
+    {
+      "id": "de-holdout-v2-044",
+      "field": "caption",
+      "text": "Das Armband war ein Geschenk."
+    },
+    {
+      "id": "de-holdout-v2-045",
+      "field": "caption",
+      "text": "Heute kombiniere ich Rostrot und Creme."
+    },
+    {
+      "id": "de-holdout-v2-046",
+      "field": "caption",
+      "text": "Die Knopflöcher kosteten mich Geduld."
+    },
+    {
+      "id": "de-holdout-v2-047",
+      "field": "caption",
+      "text": "Mein Mantel passt über den Anzug."
+    },
+    {
+      "id": "de-holdout-v2-048",
+      "field": "caption",
+      "text": "Zur Chorprobe nehme ich die Weste."
+    },
+    {
+      "id": "de-holdout-v2-049",
+      "field": "caption",
+      "text": "Die Socke braucht eine neue Ferse."
+    },
+    {
+      "id": "de-holdout-v2-050",
+      "field": "caption",
+      "text": "Ein Tuch für die Zugfahrt."
+    },
+    {
+      "id": "de-holdout-v2-051",
+      "field": "caption",
+      "text": "Die Schuhe glänzen nach dem Putzen."
+    },
+    {
+      "id": "de-holdout-v2-052",
+      "field": "caption",
+      "text": "Mein Cape lässt die Hände frei."
+    },
+    {
+      "id": "de-holdout-v2-053",
+      "field": "caption",
+      "text": "Dieser Stoff knittert beim Sitzen."
+    },
+    {
+      "id": "de-holdout-v2-054",
+      "field": "caption",
+      "text": "Den Hemdkragen habe ich gebügelt."
+    },
+    {
+      "id": "de-holdout-v2-055",
+      "field": "caption",
+      "text": "Eine Tasche aus alten Vorhängen."
+    },
+    {
+      "id": "de-holdout-v2-056",
+      "field": "caption",
+      "text": "Die Jacke trägt mein Bruder weiter."
+    },
+    {
+      "id": "de-holdout-v2-057",
+      "field": "caption",
+      "text": "Der Hut sitzt trotz Wind."
+    },
+    {
+      "id": "de-holdout-v2-058",
+      "field": "caption",
+      "text": "Meine Bluse hat kleine Perlmuttknöpfe."
+    },
+    {
+      "id": "de-holdout-v2-059",
+      "field": "caption",
+      "text": "Die Hose ist am Bund enger."
+    },
+    {
+      "id": "de-holdout-v2-060",
+      "field": "caption",
+      "text": "Ein Pullover für den Spieleabend."
+    },
+    {
+      "id": "de-holdout-v2-061",
+      "field": "caption",
+      "text": "Die Stiefel tragen mich durch Matsch."
+    },
+    {
+      "id": "de-holdout-v2-062",
+      "field": "caption",
+      "text": "Ich nähe einen Flicken auf."
+    },
+    {
+      "id": "de-holdout-v2-063",
+      "field": "caption",
+      "text": "Mein Schal stammt aus einer Weberei."
+    },
+    {
+      "id": "de-holdout-v2-064",
+      "field": "caption",
+      "text": "Der Gürtel passt durch die Schlaufen."
+    },
+    {
+      "id": "de-holdout-v2-065",
+      "field": "caption",
+      "text": "Diese Weste ist zum Wenden."
+    },
+    {
+      "id": "de-holdout-v2-066",
+      "field": "caption",
+      "text": "Das Futter leuchtet beim Gehen."
+    },
+    {
+      "id": "de-holdout-v2-067",
+      "field": "caption",
+      "text": "Meine Handschuhe blieben im Bus."
+    },
+    {
+      "id": "de-holdout-v2-068",
+      "field": "caption",
+      "text": "Den Rock trage ich zum Konzert."
+    },
+    {
+      "id": "de-holdout-v2-069",
+      "field": "caption",
+      "text": "Ein Schal aus übrigem Garn."
+    },
+    {
+      "id": "de-holdout-v2-070",
+      "field": "caption",
+      "text": "Die Mütze passt unter die Kapuze."
+    },
+    {
+      "id": "de-holdout-v2-071",
+      "field": "caption",
+      "text": "Die Bluse hat weite Ärmel."
+    },
+    {
+      "id": "de-holdout-v2-072",
+      "field": "caption",
+      "text": "Heute benutze ich Opas Manschettenknöpfe."
+    },
+    {
+      "id": "de-holdout-v2-073",
+      "field": "caption",
+      "text": "Der Knopf lag noch im Nähkästchen."
+    },
+    {
+      "id": "de-holdout-v2-074",
+      "field": "caption",
+      "text": "Meine Tasche braucht einen längeren Gurt."
+    },
+    {
+      "id": "de-holdout-v2-075",
+      "field": "caption",
+      "text": "Die Schuhe haben frische Sohlen."
+    },
+    {
+      "id": "de-holdout-v2-076",
+      "field": "caption",
+      "text": "Der Rock schwingt auf der Treppe."
+    },
+    {
+      "id": "de-holdout-v2-077",
+      "field": "caption",
+      "text": "Ein Hemd für die Familienfeier."
+    },
+    {
+      "id": "de-holdout-v2-078",
+      "field": "caption",
+      "text": "Die Strickjacke wartet am Stuhl."
+    },
+    {
+      "id": "de-holdout-v2-079",
+      "field": "caption",
+      "text": "Den Pullover habe ich gestopft."
+    },
+    {
+      "id": "de-holdout-v2-080",
+      "field": "caption",
+      "text": "Die Hose kommt vom Tauschabend."
+    },
+    {
+      "id": "de-holdout-v2-081",
+      "field": "caption",
+      "text": "Die Schürze schützt beim Brotbacken."
+    },
+    {
+      "id": "de-holdout-v2-082",
+      "field": "caption",
+      "text": "Mein Kleid hat versteckte Taschen."
+    },
+    {
+      "id": "de-holdout-v2-083",
+      "field": "caption",
+      "text": "Eine Kette zum schlichten Kragen."
+    },
+    {
+      "id": "de-holdout-v2-084",
+      "field": "caption",
+      "text": "Die Jacke falte ich klein zusammen."
+    },
+    {
+      "id": "de-holdout-v2-085",
+      "field": "caption",
+      "text": "Der Filzhut bleibt im Flur."
+    },
+    {
+      "id": "de-holdout-v2-086",
+      "field": "caption",
+      "text": "Diese Socken sitzen ohne Rutschen."
+    },
+    {
+      "id": "de-holdout-v2-087",
+      "field": "caption",
+      "text": "Die Brosche steckt heute am Hut."
+    },
+    {
+      "id": "de-holdout-v2-088",
+      "field": "caption",
+      "text": "Ein Schal für die Fährfahrt."
+    },
+    {
+      "id": "de-holdout-v2-089",
+      "field": "caption",
+      "text": "Die Knöpfe sehen wie Muscheln aus."
+    },
+    {
+      "id": "de-holdout-v2-090",
+      "field": "caption",
+      "text": "Mein Mantel hält eine weitere Saison."
+    },
+    {
+      "id": "de-holdout-v2-091",
+      "field": "caption",
+      "text": "Das Hemd ist vom Bügel gefallen."
+    },
+    {
+      "id": "de-holdout-v2-092",
+      "field": "caption",
+      "text": "Den Saum nähe ich morgen."
+    },
+    {
+      "id": "de-holdout-v2-093",
+      "field": "caption",
+      "text": "Meine Hose hat einen weichen Bund."
+    },
+    {
+      "id": "de-holdout-v2-094",
+      "field": "caption",
+      "text": "Ein Kleid für den Tanzkurs."
+    },
+    {
+      "id": "de-holdout-v2-095",
+      "field": "caption",
+      "text": "Die Tasche trägt mein Notizheft."
+    },
+    {
+      "id": "de-holdout-v2-096",
+      "field": "caption",
+      "text": "Der Pullover passt unter die Jacke."
+    },
+    {
+      "id": "de-holdout-v2-097",
+      "field": "caption",
+      "text": "Diese Schuhe lassen sich flach packen."
+    },
+    {
+      "id": "de-holdout-v2-098",
+      "field": "caption",
+      "text": "Ich probiere einen anderen Tuchknoten."
+    },
+    {
+      "id": "de-holdout-v2-099",
+      "field": "caption",
+      "text": "Die Weste wärmt beim Zeichnen."
+    },
+    {
+      "id": "de-holdout-v2-100",
+      "field": "caption",
+      "text": "Der Schal fängt das Abendlicht."
+    },
+    {
+      "id": "de-holdout-v2-101",
+      "field": "caption",
+      "text": "Meine Stiefel brauchen etwas Lederpflege."
+    },
+    {
+      "id": "de-holdout-v2-102",
+      "field": "caption",
+      "text": "Der Regenhut passt in die Tasche."
+    },
+    {
+      "id": "de-holdout-v2-103",
+      "field": "caption",
+      "text": "Diese Bluse habe ich selbst genäht."
+    },
+    {
+      "id": "de-holdout-v2-104",
+      "field": "caption",
+      "text": "Die Jacke hat hölzerne Knöpfe."
+    },
+    {
+      "id": "de-holdout-v2-105",
+      "field": "caption",
+      "text": "Ein Rock aus festem Baumwollstoff."
+    },
+    {
+      "id": "de-holdout-v2-106",
+      "field": "caption",
+      "text": "Meine Ohrringe begleiten mich zur Feier."
+    },
+    {
+      "id": "de-holdout-v2-107",
+      "field": "caption",
+      "text": "Der Ärmel ist jetzt länger."
+    },
+    {
+      "id": "de-holdout-v2-108",
+      "field": "caption",
+      "text": "Den Kragen kann man abnehmen."
+    },
+    {
+      "id": "de-holdout-v2-109",
+      "field": "caption",
+      "text": "Ein Tuch für die Bibliothek."
+    },
+    {
+      "id": "de-holdout-v2-110",
+      "field": "caption",
+      "text": "Die Hose bietet Platz beim Radfahren."
+    },
+    {
+      "id": "de-holdout-v2-111",
+      "field": "caption",
+      "text": "Mein Gürtel stammt aus einer Werkstatt."
+    },
+    {
+      "id": "de-holdout-v2-112",
+      "field": "caption",
+      "text": "Die Schuhe quietschen im Treppenhaus."
+    },
+    {
+      "id": "de-holdout-v2-113",
+      "field": "caption",
+      "text": "Der Mantel hängt zum Lüften draußen."
+    },
+    {
+      "id": "de-holdout-v2-114",
+      "field": "caption",
+      "text": "Heute wickle ich den Schal doppelt."
+    },
+    {
+      "id": "de-holdout-v2-115",
+      "field": "caption",
+      "text": "Diese Mütze strickte mein Nachbar."
+    },
+    {
+      "id": "de-holdout-v2-116",
+      "field": "caption",
+      "text": "Die Bluse trage ich zur Latzhose."
+    },
+    {
+      "id": "de-holdout-v2-117",
+      "field": "caption",
+      "text": "Ein Armband aus kleinen Glasperlen."
+    },
+    {
+      "id": "de-holdout-v2-118",
+      "field": "caption",
+      "text": "Der Rock hat einen seitlichen Schlitz."
+    },
+    {
+      "id": "de-holdout-v2-119",
+      "field": "caption",
+      "text": "Meine Jacke bekommt neue Bündchen."
+    },
+    {
+      "id": "de-holdout-v2-120",
+      "field": "caption",
+      "text": "Die Socken sind aus Restwolle."
+    },
+    {
+      "id": "de-holdout-v2-121",
+      "field": "caption",
+      "text": "Die Tasche hat ein helles Innenfach."
+    },
+    {
+      "id": "de-holdout-v2-122",
+      "field": "caption",
+      "text": "Meine Sandalen sind endlich trocken."
+    },
+    {
+      "id": "de-holdout-v2-123",
+      "field": "caption",
+      "text": "Ein Anzug für die Abschlussfeier."
+    },
+    {
+      "id": "de-holdout-v2-124",
+      "field": "caption",
+      "text": "Das Kleid begleitet mich zum Markt."
+    },
+    {
+      "id": "de-holdout-v2-125",
+      "field": "caption",
+      "text": "Den Flicken nähe ich von innen."
+    },
+    {
+      "id": "de-holdout-v2-126",
+      "field": "caption",
+      "text": "Die Kapuze passt über die Kopfhörer."
+    },
+    {
+      "id": "de-holdout-v2-127",
+      "field": "caption",
+      "text": "Mein Hemd hat einen Stehkragen."
+    },
+    {
+      "id": "de-holdout-v2-128",
+      "field": "caption",
+      "text": "Der Gürtel verändert die Silhouette."
+    },
+    {
+      "id": "de-holdout-v2-129",
+      "field": "caption",
+      "text": "Eine Jacke für den Bahnhof."
+    },
+    {
+      "id": "de-holdout-v2-130",
+      "field": "caption",
+      "text": "Die Weste hat einen verstellbaren Rücken."
+    },
+    {
+      "id": "de-holdout-v2-131",
+      "field": "caption",
+      "text": "Die Bluse ist frisch gewaschen."
+    },
+    {
+      "id": "de-holdout-v2-132",
+      "field": "caption",
+      "text": "Mein Rock reicht bis zur Wade."
+    },
+    {
+      "id": "de-holdout-v2-133",
+      "field": "caption",
+      "text": "Diese Stiefel kaufte ich gebraucht."
+    },
+    {
+      "id": "de-holdout-v2-134",
+      "field": "caption",
+      "text": "Der Schal ist länger als gedacht."
+    },
+    {
+      "id": "de-holdout-v2-135",
+      "field": "caption",
+      "text": "Ein Hutband aus blauem Leinen."
+    },
+    {
+      "id": "de-holdout-v2-136",
+      "field": "caption",
+      "text": "Die Handschuhe hängen an einer Klammer."
+    },
+    {
+      "id": "de-holdout-v2-137",
+      "field": "caption",
+      "text": "Mein Mantel hat tiefe Taschen."
+    },
+    {
+      "id": "de-holdout-v2-138",
+      "field": "caption",
+      "text": "Die Hose sitzt auch beim Hocken."
+    },
+    {
+      "id": "de-holdout-v2-139",
+      "field": "caption",
+      "text": "Zum Malen trage ich alte Kleidung."
+    },
+    {
+      "id": "de-holdout-v2-140",
+      "field": "caption",
+      "text": "Der Schal liegt auf dem Sofa."
+    },
+    {
+      "id": "de-holdout-v2-141",
+      "field": "caption",
+      "text": "Meine Jacke hat einen neuen Aufhänger."
+    },
+    {
+      "id": "de-holdout-v2-142",
+      "field": "caption",
+      "text": "Der Rock braucht etwas Bügeldampf."
+    },
+    {
+      "id": "de-holdout-v2-143",
+      "field": "caption",
+      "text": "Diese Schuhe passen zu meiner Tasche."
+    },
+    {
+      "id": "de-holdout-v2-144",
+      "field": "caption",
+      "text": "Eine Weste über dem Leinenhemd."
+    },
+    {
+      "id": "de-holdout-v2-145",
+      "field": "caption",
+      "text": "Die Bluse hat gestickte Blätter."
+    },
+    {
+      "id": "de-holdout-v2-146",
+      "field": "caption",
+      "text": "Mein Armband schließt mit einem Knebel."
+    },
+    {
+      "id": "de-holdout-v2-147",
+      "field": "caption",
+      "text": "Die Mütze steckt im Ärmel."
+    },
+    {
+      "id": "de-holdout-v2-148",
+      "field": "caption",
+      "text": "Ein Kleid für den Klavierabend."
+    },
+    {
+      "id": "de-holdout-v2-149",
+      "field": "caption",
+      "text": "Die Hose hat seitliche Riegel."
+    },
+    {
+      "id": "de-holdout-v2-150",
+      "field": "caption",
+      "text": "Der Mantel bekommt ein neues Futter."
+    },
+    {
+      "id": "de-holdout-v2-151",
+      "field": "caption",
+      "text": "Heute trage ich gestreifte Strümpfe."
+    },
+    {
+      "id": "de-holdout-v2-152",
+      "field": "caption",
+      "text": "Das Hemd hat eine kleine Brusttasche."
+    },
+    {
+      "id": "de-holdout-v2-153",
+      "field": "caption",
+      "text": "Meine Jacke begleitet mich zur Fähre."
+    },
+    {
+      "id": "de-holdout-v2-154",
+      "field": "caption",
+      "text": "Ein Schal für den kühlen Lesesaal."
+    },
+    {
+      "id": "de-holdout-v2-155",
+      "field": "caption",
+      "text": "Die Tasche habe ich umgefärbt."
+    },
+    {
+      "id": "de-holdout-v2-156",
+      "field": "caption",
+      "text": "Der Rock stammt von meiner Schwester."
+    },
+    {
+      "id": "de-holdout-v2-157",
+      "field": "caption",
+      "text": "Diese Handschuhe passen genau."
+    },
+    {
+      "id": "de-holdout-v2-158",
+      "field": "caption",
+      "text": "Ein Tuch hält die Haare zusammen."
+    },
+    {
+      "id": "de-holdout-v2-159",
+      "field": "caption",
+      "text": "Der Pullover ist erstaunlich leicht."
+    },
+    {
+      "id": "de-holdout-v2-160",
+      "field": "caption",
+      "text": "Die Stiefel stehen bereit zum Spaziergang."
+    },
+    {
+      "id": "de-holdout-v2-161",
+      "field": "caption",
+      "text": "Die Brosche zeigt einen kleinen Vogel."
+    },
+    {
+      "id": "de-holdout-v2-162",
+      "field": "caption",
+      "text": "Mein Regenmantel trocknet im Flur."
+    },
+    {
+      "id": "de-holdout-v2-163",
+      "field": "caption",
+      "text": "Diese Hose bleibt auch sitzend bequem."
+    },
+    {
+      "id": "de-holdout-v2-164",
+      "field": "caption",
+      "text": "Der Gürtel hat eine runde Schnalle."
+    },
+    {
+      "id": "de-holdout-v2-165",
+      "field": "caption",
+      "text": "Ein Kleid mit einem Wickelverschluss."
+    },
+    {
+      "id": "de-holdout-v2-166",
+      "field": "caption",
+      "text": "Die Sandalen haben breite Riemen."
+    },
+    {
+      "id": "de-holdout-v2-167",
+      "field": "caption",
+      "text": "Meine Jacke bekam einen Ellenbogenflicken."
+    },
+    {
+      "id": "de-holdout-v2-168",
+      "field": "caption",
+      "text": "Der Schal hat handgedrehte Fransen."
+    },
+    {
+      "id": "de-holdout-v2-169",
+      "field": "caption",
+      "text": "Diese Bluse passt zur Feier."
+    },
+    {
+      "id": "de-holdout-v2-170",
+      "field": "caption",
+      "text": "Mein Hut wartet auf den Sommer."
+    },
+    {
+      "id": "de-holdout-v2-171",
+      "field": "caption",
+      "text": "Die Strickjacke hat Muschelknöpfe."
+    },
+    {
+      "id": "de-holdout-v2-172",
+      "field": "caption",
+      "text": "Den Rock habe ich gefärbt."
+    },
+    {
+      "id": "de-holdout-v2-173",
+      "field": "caption",
+      "text": "Meine Schuhe tragen neue Bänder."
+    },
+    {
+      "id": "de-holdout-v2-174",
+      "field": "caption",
+      "text": "Eine Krawatte aus dunkelblauer Wolle."
+    },
+    {
+      "id": "de-holdout-v2-175",
+      "field": "caption",
+      "text": "Das Kleid passt in den Koffer."
+    },
+    {
+      "id": "de-holdout-v2-176",
+      "field": "caption",
+      "text": "Die Tasche hält meine Stricknadeln."
+    },
+    {
+      "id": "de-holdout-v2-177",
+      "field": "caption",
+      "text": "Mein Hemd hat bestickte Manschetten."
+    },
+    {
+      "id": "de-holdout-v2-178",
+      "field": "caption",
+      "text": "Der Mantel ist für kalte Bahnsteige."
+    },
+    {
+      "id": "de-holdout-v2-179",
+      "field": "caption",
+      "text": "Ein Pullover aus der Tauschbörse."
+    },
+    {
+      "id": "de-holdout-v2-180",
+      "field": "caption",
+      "text": "Diese Mütze hat einen breiten Umschlag."
+    },
+    {
+      "id": "de-holdout-v2-181",
+      "field": "caption",
+      "text": "Die Jacke ist von meinem Vater."
+    },
+    {
+      "id": "de-holdout-v2-182",
+      "field": "caption",
+      "text": "Meine Hose hat einen Tunnelzug."
+    },
+    {
+      "id": "de-holdout-v2-183",
+      "field": "caption",
+      "text": "Ein Schal zum dunkelgrünen Mantel."
+    },
+    {
+      "id": "de-holdout-v2-184",
+      "field": "caption",
+      "text": "Die Schuhe passen über dicke Socken."
+    },
+    {
+      "id": "de-holdout-v2-185",
+      "field": "caption",
+      "text": "Meine Bluse hat einen eckigen Ausschnitt."
+    },
+    {
+      "id": "de-holdout-v2-186",
+      "field": "caption",
+      "text": "Der Rock dreht sich beim Tanzen."
+    },
+    {
+      "id": "de-holdout-v2-187",
+      "field": "caption",
+      "text": "Diese Tasche nähten wir im Kurs."
+    },
+    {
+      "id": "de-holdout-v2-188",
+      "field": "caption",
+      "text": "Die Weste kommt mit ins Museum."
+    },
+    {
+      "id": "de-holdout-v2-189",
+      "field": "caption",
+      "text": "Ein Kleid aus übrigem Leinen."
+    },
+    {
+      "id": "de-holdout-v2-190",
+      "field": "caption",
+      "text": "Meine Handschuhe haben lange Bündchen."
+    },
+    {
+      "id": "de-holdout-v2-191",
+      "field": "caption",
+      "text": "Der Mantel schließt mit Druckknöpfen."
+    },
+    {
+      "id": "de-holdout-v2-192",
+      "field": "caption",
+      "text": "Das Hemd bleibt heute offen."
+    },
+    {
+      "id": "de-holdout-v2-193",
+      "field": "caption",
+      "text": "Meine Schuhe waren beim Regen dabei."
+    },
+    {
+      "id": "de-holdout-v2-194",
+      "field": "caption",
+      "text": "Eine Schürze für den Druckworkshop."
+    },
+    {
+      "id": "de-holdout-v2-195",
+      "field": "caption",
+      "text": "Der Schal hat einen schmalen Streifen."
+    },
+    {
+      "id": "de-holdout-v2-196",
+      "field": "caption",
+      "text": "Die Jacke hängt am Küchenstuhl."
+    },
+    {
+      "id": "de-holdout-v2-197",
+      "field": "caption",
+      "text": "Diese Hose hat doppelte Nähte."
+    },
+    {
+      "id": "de-holdout-v2-198",
+      "field": "caption",
+      "text": "Mein Hut bekam eine neue Krempe."
+    },
+    {
+      "id": "de-holdout-v2-199",
+      "field": "caption",
+      "text": "Der Rock hat ein weiches Futter."
+    },
+    {
+      "id": "de-holdout-v2-200",
+      "field": "caption",
+      "text": "Die Brosche hält mein Tuch zusammen."
+    },
+    {
+      "id": "de-holdout-v2-201",
+      "field": "altText",
+      "text": "Blaue Bluse mit rundem Kragen."
+    },
+    {
+      "id": "de-holdout-v2-202",
+      "field": "altText",
+      "text": "Grauer Mantel an einem Holzknopf."
+    },
+    {
+      "id": "de-holdout-v2-203",
+      "field": "altText",
+      "text": "Grüner Schal über einer Stuhllehne."
+    },
+    {
+      "id": "de-holdout-v2-204",
+      "field": "altText",
+      "text": "Rote Schuhe auf hellen Fliesen."
+    },
+    {
+      "id": "de-holdout-v2-205",
+      "field": "altText",
+      "text": "Beiger Rock mit tiefen Falten."
+    },
+    {
+      "id": "de-holdout-v2-206",
+      "field": "altText",
+      "text": "Gestreifte Socken über braunen Halbschuhen."
+    },
+    {
+      "id": "de-holdout-v2-207",
+      "field": "altText",
+      "text": "Dunkle Weste über weißem Hemd."
+    },
+    {
+      "id": "de-holdout-v2-208",
+      "field": "altText",
+      "text": "Gelbe Tasche neben einer Bank."
+    },
+    {
+      "id": "de-holdout-v2-209",
+      "field": "altText",
+      "text": "Silberne Brosche am Revers."
+    },
+    {
+      "id": "de-holdout-v2-210",
+      "field": "altText",
+      "text": "Leinenhose mit umgeschlagenen Säumen."
+    },
+    {
+      "id": "de-holdout-v2-211",
+      "field": "altText",
+      "text": "Wollmütze mit breitem Rand."
+    },
+    {
+      "id": "de-holdout-v2-212",
+      "field": "altText",
+      "text": "Schwarze Stiefel vor einer Treppe."
+    },
+    {
+      "id": "de-holdout-v2-213",
+      "field": "altText",
+      "text": "Karierte Jacke mit großen Taschen."
+    },
+    {
+      "id": "de-holdout-v2-214",
+      "field": "altText",
+      "text": "Rosa Schal unter grauem Kragen."
+    },
+    {
+      "id": "de-holdout-v2-215",
+      "field": "altText",
+      "text": "Lederhandschuhe auf einer Fensterbank."
+    },
+    {
+      "id": "de-holdout-v2-216",
+      "field": "altText",
+      "text": "Blaues Kleid mit kurzen Ärmeln."
+    },
+    {
+      "id": "de-holdout-v2-217",
+      "field": "altText",
+      "text": "Strohhut mit einem grünen Band."
+    },
+    {
+      "id": "de-holdout-v2-218",
+      "field": "altText",
+      "text": "Baumwollhemd mit offener Manschette."
+    },
+    {
+      "id": "de-holdout-v2-219",
+      "field": "altText",
+      "text": "Roter Gürtel über einem Kleid."
+    },
+    {
+      "id": "de-holdout-v2-220",
+      "field": "altText",
+      "text": "Geflochtene Tasche an einer Garderobe."
+    },
+    {
+      "id": "de-holdout-v2-221",
+      "field": "altText",
+      "text": "Weste mit quadratischer Steppung."
+    },
+    {
+      "id": "de-holdout-v2-222",
+      "field": "altText",
+      "text": "Dunkler Rock mit seitlichem Verschluss."
+    },
+    {
+      "id": "de-holdout-v2-223",
+      "field": "altText",
+      "text": "Weiße Turnschuhe auf Holzplanken."
+    },
+    {
+      "id": "de-holdout-v2-224",
+      "field": "altText",
+      "text": "Blaue Schürze mit überkreuzten Trägern."
+    },
+    {
+      "id": "de-holdout-v2-225",
+      "field": "altText",
+      "text": "Grüne Jacke mit abnehmbarer Kapuze."
+    },
+    {
+      "id": "de-holdout-v2-226",
+      "field": "altText",
+      "text": "Brauner Hut auf einer Steinmauer."
+    },
+    {
+      "id": "de-holdout-v2-227",
+      "field": "altText",
+      "text": "Pullover mit geripptem Halsausschnitt."
+    },
+    {
+      "id": "de-holdout-v2-228",
+      "field": "altText",
+      "text": "Schmaler Gürtel mit ovaler Schnalle."
+    },
+    {
+      "id": "de-holdout-v2-229",
+      "field": "altText",
+      "text": "Schwarze Tasche mit kurzem Henkel."
+    },
+    {
+      "id": "de-holdout-v2-230",
+      "field": "altText",
+      "text": "Wollschal mit langen Fransen."
+    },
+    {
+      "id": "de-holdout-v2-231",
+      "field": "altText",
+      "text": "Cremefarbene Bluse unter einer Strickweste."
+    },
+    {
+      "id": "de-holdout-v2-232",
+      "field": "altText",
+      "text": "Graue Hose mit schmalen Streifen."
+    },
+    {
+      "id": "de-holdout-v2-233",
+      "field": "altText",
+      "text": "Braune Stiefel mit roten Nähten."
+    },
+    {
+      "id": "de-holdout-v2-234",
+      "field": "altText",
+      "text": "Gelber Regenmantel neben einem Fahrrad."
+    },
+    {
+      "id": "de-holdout-v2-235",
+      "field": "altText",
+      "text": "Silberne Uhr unter einer Manschette."
+    },
+    {
+      "id": "de-holdout-v2-236",
+      "field": "altText",
+      "text": "Roter Rock mit aufgesetzten Taschen."
+    },
+    {
+      "id": "de-holdout-v2-237",
+      "field": "altText",
+      "text": "Blaues Tuch um einen Taschenhenkel."
+    },
+    {
+      "id": "de-holdout-v2-238",
+      "field": "altText",
+      "text": "Beige Strickjacke mit Holzknöpfen."
+    },
+    {
+      "id": "de-holdout-v2-239",
+      "field": "altText",
+      "text": "Leinenkleid mit Bindeband."
+    },
+    {
+      "id": "de-holdout-v2-240",
+      "field": "altText",
+      "text": "Dunkle Krawatte mit kleinen Punkten."
+    },
+    {
+      "id": "de-holdout-v2-241",
+      "field": "altText",
+      "text": "Karierter Mantel über einem Anzug."
+    },
+    {
+      "id": "de-holdout-v2-242",
+      "field": "altText",
+      "text": "Weißes Hemd mit Stehkragen."
+    },
+    {
+      "id": "de-holdout-v2-243",
+      "field": "altText",
+      "text": "Grüne Handschuhe auf einer Bank."
+    },
+    {
+      "id": "de-holdout-v2-244",
+      "field": "altText",
+      "text": "Rosa Tasche vor einer Backsteinwand."
+    },
+    {
+      "id": "de-holdout-v2-245",
+      "field": "altText",
+      "text": "Jeansjacke mit geflicktem Ellenbogen."
+    },
+    {
+      "id": "de-holdout-v2-246",
+      "field": "altText",
+      "text": "Wollrock mit einer Kellerfalte."
+    },
+    {
+      "id": "de-holdout-v2-247",
+      "field": "altText",
+      "text": "Schwarzer Hut neben einem Regenschirm."
+    },
+    {
+      "id": "de-holdout-v2-248",
+      "field": "altText",
+      "text": "Blauer Pullover mit Zopfmuster."
+    },
+    {
+      "id": "de-holdout-v2-249",
+      "field": "altText",
+      "text": "Ledergürtel durch helle Gürtelschlaufen."
+    },
+    {
+      "id": "de-holdout-v2-250",
+      "field": "altText",
+      "text": "Sandalen mit breiten Riemen."
+    },
+    {
+      "id": "de-holdout-v2-251",
+      "field": "altText",
+      "text": "Rotes Kleid mit bezogenen Knöpfen."
+    },
+    {
+      "id": "de-holdout-v2-252",
+      "field": "altText",
+      "text": "Graue Jacke mit dunklem Kragen."
+    },
+    {
+      "id": "de-holdout-v2-253",
+      "field": "altText",
+      "text": "Gestreifte Bluse mit Schulterpasse."
+    },
+    {
+      "id": "de-holdout-v2-254",
+      "field": "altText",
+      "text": "Braune Tasche mit Messingschnallen."
+    },
+    {
+      "id": "de-holdout-v2-255",
+      "field": "altText",
+      "text": "Blauer Rock mit abgerundetem Saum."
+    },
+    {
+      "id": "de-holdout-v2-256",
+      "field": "altText",
+      "text": "Weiße Socken über dunklen Schuhen."
+    },
+    {
+      "id": "de-holdout-v2-257",
+      "field": "altText",
+      "text": "Grünes Cape mit Holzverschluss."
+    },
+    {
+      "id": "de-holdout-v2-258",
+      "field": "altText",
+      "text": "Schmale Kette über einem Rollkragen."
+    },
+    {
+      "id": "de-holdout-v2-259",
+      "field": "altText",
+      "text": "Gelbe Mütze mit Rippenmuster."
+    },
+    {
+      "id": "de-holdout-v2-260",
+      "field": "altText",
+      "text": "Beiger Mantel über einem Arm."
+    },
+    {
+      "id": "de-holdout-v2-261",
+      "field": "altText",
+      "text": "Schürze mit einer großen Brusttasche."
+    },
+    {
+      "id": "de-holdout-v2-262",
+      "field": "altText",
+      "text": "Karierter Schal über beiden Schultern."
+    },
+    {
+      "id": "de-holdout-v2-263",
+      "field": "altText",
+      "text": "Rote Stiefel neben einem Koffer."
+    },
+    {
+      "id": "de-holdout-v2-264",
+      "field": "altText",
+      "text": "Cremefarbener Rock mit Tunnelzug."
+    },
+    {
+      "id": "de-holdout-v2-265",
+      "field": "altText",
+      "text": "Blaues Hemd auf einem Bügel."
+    },
+    {
+      "id": "de-holdout-v2-266",
+      "field": "altText",
+      "text": "Schwarze Weste mit Rückenriegel."
+    },
+    {
+      "id": "de-holdout-v2-267",
+      "field": "altText",
+      "text": "Graue Handschuhe mit gestrickten Bündchen."
+    },
+    {
+      "id": "de-holdout-v2-268",
+      "field": "altText",
+      "text": "Grüne Bluse mit weiten Ärmeln."
+    },
+    {
+      "id": "de-holdout-v2-269",
+      "field": "altText",
+      "text": "Geflochtener Gürtel auf Leinen."
+    },
+    {
+      "id": "de-holdout-v2-270",
+      "field": "altText",
+      "text": "Silberne Spange im dunklen Haar."
+    },
+    {
+      "id": "de-holdout-v2-271",
+      "field": "altText",
+      "text": "Wolljacke mit kontrastierenden Taschenklappen."
+    },
+    {
+      "id": "de-holdout-v2-272",
+      "field": "altText",
+      "text": "Heller Hut mit Filzblume."
+    },
+    {
+      "id": "de-holdout-v2-273",
+      "field": "altText",
+      "text": "Dunkle Hose mit Bundfalten."
+    },
+    {
+      "id": "de-holdout-v2-274",
+      "field": "altText",
+      "text": "Rosa Strickjacke neben einer Holztür."
+    },
+    {
+      "id": "de-holdout-v2-275",
+      "field": "altText",
+      "text": "Blauer Mantel mit Rückenfalte."
+    },
+    {
+      "id": "de-holdout-v2-276",
+      "field": "altText",
+      "text": "Weiße Bluse mit besticktem Ärmel."
+    },
+    {
+      "id": "de-holdout-v2-277",
+      "field": "altText",
+      "text": "Braune Schuhe mit frischen Sohlen."
+    },
+    {
+      "id": "de-holdout-v2-278",
+      "field": "altText",
+      "text": "Gelber Schal um einen hohen Kragen."
+    },
+    {
+      "id": "de-holdout-v2-279",
+      "field": "altText",
+      "text": "Rotes Armband aus Glasperlen."
+    },
+    {
+      "id": "de-holdout-v2-280",
+      "field": "altText",
+      "text": "Leinentasche mit verstärktem Boden."
+    },
+    {
+      "id": "de-holdout-v2-281",
+      "field": "altText",
+      "text": "Grüner Rock unter einer kurzen Jacke."
+    },
+    {
+      "id": "de-holdout-v2-282",
+      "field": "altText",
+      "text": "Graues Kleid mit weichem Kragen."
+    },
+    {
+      "id": "de-holdout-v2-283",
+      "field": "altText",
+      "text": "Blaue Kappe auf gefaltetem Stoff."
+    },
+    {
+      "id": "de-holdout-v2-284",
+      "field": "altText",
+      "text": "Schwarzer Gürtel mit rechteckiger Schnalle."
+    },
+    {
+      "id": "de-holdout-v2-285",
+      "field": "altText",
+      "text": "Rosa Hemd mit einer Brusttasche."
+    },
+    {
+      "id": "de-holdout-v2-286",
+      "field": "altText",
+      "text": "Wollhandschuhe an einer Ärmelklammer."
+    },
+    {
+      "id": "de-holdout-v2-287",
+      "field": "altText",
+      "text": "Dunkler Mantel mit breitem Revers."
+    },
+    {
+      "id": "de-holdout-v2-288",
+      "field": "altText",
+      "text": "Heller Pullover mit überschnittenen Schultern."
+    },
+    {
+      "id": "de-holdout-v2-289",
+      "field": "altText",
+      "text": "Rote Tasche mit geknotetem Riemen."
+    },
+    {
+      "id": "de-holdout-v2-290",
+      "field": "altText",
+      "text": "Gestreiftes Kleid neben einem Fenster."
+    },
+    {
+      "id": "de-holdout-v2-291",
+      "field": "altText",
+      "text": "Baumwollweste unter einer offenen Jacke."
+    },
+    {
+      "id": "de-holdout-v2-292",
+      "field": "altText",
+      "text": "Braune Stiefel mit seitlichem Reißverschluss."
+    },
+    {
+      "id": "de-holdout-v2-293",
+      "field": "altText",
+      "text": "Blaues Tuch über einem weißen Hemd."
+    },
+    {
+      "id": "de-holdout-v2-294",
+      "field": "altText",
+      "text": "Karierter Rock bis zum Knie."
+    },
+    {
+      "id": "de-holdout-v2-295",
+      "field": "altText",
+      "text": "Silberner Ring neben geripptem Bündchen."
+    },
+    {
+      "id": "de-holdout-v2-296",
+      "field": "altText",
+      "text": "Grüne Jacke auf einer Stuhllehne."
+    },
+    {
+      "id": "de-holdout-v2-297",
+      "field": "altText",
+      "text": "Dunkle Schuhe neben einem Gehstock."
+    },
+    {
+      "id": "de-holdout-v2-298",
+      "field": "altText",
+      "text": "Gelbe Bluse mit Stoffknöpfen."
+    },
+    {
+      "id": "de-holdout-v2-299",
+      "field": "altText",
+      "text": "Schwarze Mütze mit umgeschlagenem Rand."
+    },
+    {
+      "id": "de-holdout-v2-300",
+      "field": "altText",
+      "text": "Wollschal über einer Korbtasche."
+    },
+    {
+      "id": "de-holdout-v2-301",
+      "field": "altText",
+      "text": "Rosa Kleid mit geraffter Taille."
+    },
+    {
+      "id": "de-holdout-v2-302",
+      "field": "altText",
+      "text": "Graue Weste über einem Jeanshemd."
+    },
+    {
+      "id": "de-holdout-v2-303",
+      "field": "altText",
+      "text": "Weißer Kragen auf dunklem Stoff."
+    },
+    {
+      "id": "de-holdout-v2-304",
+      "field": "altText",
+      "text": "Brauner Mantel mit Gürtel im Rücken."
+    },
+    {
+      "id": "de-holdout-v2-305",
+      "field": "altText",
+      "text": "Blauer Rucksack mit Lederschlaufen."
+    },
+    {
+      "id": "de-holdout-v2-306",
+      "field": "altText",
+      "text": "Grünes Armband an einer Manschette."
+    },
+    {
+      "id": "de-holdout-v2-307",
+      "field": "altText",
+      "text": "Rote Sandalen auf einem Holzsteg."
+    },
+    {
+      "id": "de-holdout-v2-308",
+      "field": "altText",
+      "text": "Gelber Hut auf einem Garderobenhaken."
+    },
+    {
+      "id": "de-holdout-v2-309",
+      "field": "altText",
+      "text": "Leinenrock mit seitlichen Taschen."
+    },
+    {
+      "id": "de-holdout-v2-310",
+      "field": "altText",
+      "text": "Schwarze Jacke mit Satinkragen."
+    },
+    {
+      "id": "de-holdout-v2-311",
+      "field": "altText",
+      "text": "Cremefarbenes Cape an einem Holzständer."
+    },
+    {
+      "id": "de-holdout-v2-312",
+      "field": "altText",
+      "text": "Gestreiftes Hemd unter einer Latzhose."
+    },
+    {
+      "id": "de-holdout-v2-313",
+      "field": "altText",
+      "text": "Blauer Gürtel mit runder Schließe."
+    },
+    {
+      "id": "de-holdout-v2-314",
+      "field": "altText",
+      "text": "Dunkle Stiefel unter einem Wollsaum."
+    },
+    {
+      "id": "de-holdout-v2-315",
+      "field": "altText",
+      "text": "Grauer Schal mit schmaler Bordüre."
+    },
+    {
+      "id": "de-holdout-v2-316",
+      "field": "altText",
+      "text": "Grüne Tasche neben einer Steinbank."
+    },
+    {
+      "id": "de-holdout-v2-317",
+      "field": "altText",
+      "text": "Weißer Pullover mit schmalen Zöpfen."
+    },
+    {
+      "id": "de-holdout-v2-318",
+      "field": "altText",
+      "text": "Rote Bluse mit rundem Ausschnitt."
+    },
+    {
+      "id": "de-holdout-v2-319",
+      "field": "altText",
+      "text": "Braune Kappe mit abgesteppten Feldern."
+    },
+    {
+      "id": "de-holdout-v2-320",
+      "field": "altText",
+      "text": "Gelbe Jacke mit geripptem Saum."
+    },
+    {
+      "id": "de-holdout-v2-321",
+      "field": "altText",
+      "text": "Karierte Schürze auf einem Baumwollkleid."
+    },
+    {
+      "id": "de-holdout-v2-322",
+      "field": "altText",
+      "text": "Blauer Mantel mit Stehkragen."
+    },
+    {
+      "id": "de-holdout-v2-323",
+      "field": "altText",
+      "text": "Rosa Handschuhe auf einem gefalteten Tuch."
+    },
+    {
+      "id": "de-holdout-v2-324",
+      "field": "altText",
+      "text": "Dunkle Hose mit seitlichen Riegeln."
+    },
+    {
+      "id": "de-holdout-v2-325",
+      "field": "altText",
+      "text": "Silberne Kette an einem hohen Ausschnitt."
+    },
+    {
+      "id": "de-holdout-v2-326",
+      "field": "altText",
+      "text": "Grüner Hut mit geflochtenem Band."
+    },
+    {
+      "id": "de-holdout-v2-327",
+      "field": "altText",
+      "text": "Weiße Turnschuhe mit Klettverschluss."
+    },
+    {
+      "id": "de-holdout-v2-328",
+      "field": "altText",
+      "text": "Brauner Rock mit Wickelverschluss."
+    },
+    {
+      "id": "de-holdout-v2-329",
+      "field": "altText",
+      "text": "Graue Jacke mit heller Naht."
+    },
+    {
+      "id": "de-holdout-v2-330",
+      "field": "altText",
+      "text": "Rote Mütze auf einer Stofftasche."
+    },
+    {
+      "id": "de-holdout-v2-331",
+      "field": "altText",
+      "text": "Gelbes Kleid mit seitlichen Bindebändern."
+    },
+    {
+      "id": "de-holdout-v2-332",
+      "field": "altText",
+      "text": "Blaue Strickweste über schlichten Ärmeln."
+    },
+    {
+      "id": "de-holdout-v2-333",
+      "field": "altText",
+      "text": "Schwarze Tasche mit gewebtem Griff."
+    },
+    {
+      "id": "de-holdout-v2-334",
+      "field": "altText",
+      "text": "Weißes Hemd mit doppelten Manschetten."
+    },
+    {
+      "id": "de-holdout-v2-335",
+      "field": "altText",
+      "text": "Grüner Schal zu einem Dreieck gefaltet."
+    },
+    {
+      "id": "de-holdout-v2-336",
+      "field": "altText",
+      "text": "Beiger Anzug an einem Geländer."
+    },
+    {
+      "id": "de-holdout-v2-337",
+      "field": "altText",
+      "text": "Braune Sandalen neben einer Tür."
+    },
+    {
+      "id": "de-holdout-v2-338",
+      "field": "altText",
+      "text": "Rote Jacke mit einer Sturmblende."
+    },
+    {
+      "id": "de-holdout-v2-339",
+      "field": "altText",
+      "text": "Grauer Rock mit schräger Naht."
+    },
+    {
+      "id": "de-holdout-v2-340",
+      "field": "altText",
+      "text": "Silberne Ohrringe in Blattform."
+    },
+    {
+      "id": "de-holdout-v2-341",
+      "field": "altText",
+      "text": "Wollmantel mit aufgesetzten Taschen."
+    },
+    {
+      "id": "de-holdout-v2-342",
+      "field": "altText",
+      "text": "Rosa Tuch unter einer Kapuze."
+    },
+    {
+      "id": "de-holdout-v2-343",
+      "field": "altText",
+      "text": "Blaues Kleid mit Puffärmeln."
+    },
+    {
+      "id": "de-holdout-v2-344",
+      "field": "altText",
+      "text": "Gelbe Socken über schwarzen Slippern."
+    },
+    {
+      "id": "de-holdout-v2-345",
+      "field": "altText",
+      "text": "Grüne Bluse unter einer Jeansweste."
+    },
+    {
+      "id": "de-holdout-v2-346",
+      "field": "altText",
+      "text": "Braune Handschuhe neben einem Buch."
+    },
+    {
+      "id": "de-holdout-v2-347",
+      "field": "altText",
+      "text": "Dunkler Rock mit silbernem Reißverschluss."
+    },
+    {
+      "id": "de-holdout-v2-348",
+      "field": "altText",
+      "text": "Weiße Jacke mit hochgekrempelten Ärmeln."
+    },
+    {
+      "id": "de-holdout-v2-349",
+      "field": "altText",
+      "text": "Roter Hut mit abgestepptem Rand."
+    },
+    {
+      "id": "de-holdout-v2-350",
+      "field": "altText",
+      "text": "Graue Tasche mit einem Innenfach."
+    },
+    {
+      "id": "de-holdout-v2-351",
+      "field": "altText",
+      "text": "Leinenhemd neben einem Reisekoffer."
+    },
+    {
+      "id": "de-holdout-v2-352",
+      "field": "altText",
+      "text": "Schwarze Kappe mit schmalem Schirm."
+    },
+    {
+      "id": "de-holdout-v2-353",
+      "field": "altText",
+      "text": "Blauer Schal auf einer Holztruhe."
+    },
+    {
+      "id": "de-holdout-v2-354",
+      "field": "altText",
+      "text": "Cremefarbene Hose mit Bügelfalte."
+    },
+    {
+      "id": "de-holdout-v2-355",
+      "field": "altText",
+      "text": "Grüner Mantel mit Druckknöpfen."
+    },
+    {
+      "id": "de-holdout-v2-356",
+      "field": "altText",
+      "text": "Rosa Gürtel um eine Strickjacke."
+    },
+    {
+      "id": "de-holdout-v2-357",
+      "field": "altText",
+      "text": "Braune Schuhe mit breitem Absatz."
+    },
+    {
+      "id": "de-holdout-v2-358",
+      "field": "altText",
+      "text": "Rote Weste über kariertem Baumwollstoff."
+    },
+    {
+      "id": "de-holdout-v2-359",
+      "field": "altText",
+      "text": "Silberne Uhr mit gewebtem Band."
+    },
+    {
+      "id": "de-holdout-v2-360",
+      "field": "altText",
+      "text": "Gelber Rock vor einer weißen Wand."
+    },
+    {
+      "id": "de-holdout-v2-361",
+      "field": "altText",
+      "text": "Dunkles Hemd mit gebogener Taschennaht."
+    },
+    {
+      "id": "de-holdout-v2-362",
+      "field": "altText",
+      "text": "Graue Wollsocken mit gestopfter Ferse."
+    },
+    {
+      "id": "de-holdout-v2-363",
+      "field": "altText",
+      "text": "Blaues Cape am Hals geschlossen."
+    },
+    {
+      "id": "de-holdout-v2-364",
+      "field": "altText",
+      "text": "Grüne Jacke mit Ellbogennaht."
+    },
+    {
+      "id": "de-holdout-v2-365",
+      "field": "altText",
+      "text": "Weißer Rock mit Spitzenkante."
+    },
+    {
+      "id": "de-holdout-v2-366",
+      "field": "altText",
+      "text": "Braune Tasche mit geflickter Ecke."
+    },
+    {
+      "id": "de-holdout-v2-367",
+      "field": "altText",
+      "text": "Rotes Kleid über einer schlichten Bluse."
+    },
+    {
+      "id": "de-holdout-v2-368",
+      "field": "altText",
+      "text": "Gelber Schal mit bestickten Sternen."
+    },
+    {
+      "id": "de-holdout-v2-369",
+      "field": "altText",
+      "text": "Schwarzer Mantel über einem Leinenanzug."
+    },
+    {
+      "id": "de-holdout-v2-370",
+      "field": "altText",
+      "text": "Rosa Mütze auf einer Parkbank."
+    },
+    {
+      "id": "de-holdout-v2-371",
+      "field": "altText",
+      "text": "Baumwollbluse mit kleinem Schößchen."
+    },
+    {
+      "id": "de-holdout-v2-372",
+      "field": "altText",
+      "text": "Blauer Rock mit tiefem Saum."
+    },
+    {
+      "id": "de-holdout-v2-373",
+      "field": "altText",
+      "text": "Grauer Hut auf einem Hocker."
+    },
+    {
+      "id": "de-holdout-v2-374",
+      "field": "altText",
+      "text": "Grüne Weste mit Rautenmuster."
+    },
+    {
+      "id": "de-holdout-v2-375",
+      "field": "altText",
+      "text": "Weiße Schuhe mit hellen Schnürsenkeln."
+    },
+    {
+      "id": "de-holdout-v2-376",
+      "field": "altText",
+      "text": "Brauner Gürtel auf einem langen Hemd."
+    },
+    {
+      "id": "de-holdout-v2-377",
+      "field": "altText",
+      "text": "Roter Schal neben einer Brille."
+    },
+    {
+      "id": "de-holdout-v2-378",
+      "field": "altText",
+      "text": "Gelbe Tasche unter einer Garderobe."
+    },
+    {
+      "id": "de-holdout-v2-379",
+      "field": "altText",
+      "text": "Schwarze Jacke mit abgerundetem Kragen."
+    },
+    {
+      "id": "de-holdout-v2-380",
+      "field": "altText",
+      "text": "Leinenkleid an einem Holzbügel."
+    },
+    {
+      "id": "de-holdout-v2-381",
+      "field": "altText",
+      "text": "Rosa Pullover unter einer Steppweste."
+    },
+    {
+      "id": "de-holdout-v2-382",
+      "field": "altText",
+      "text": "Dunkler Anzug mit doppeltem Rückenschlitz."
+    },
+    {
+      "id": "de-holdout-v2-383",
+      "field": "altText",
+      "text": "Blaues Armband mit kleinem Verschluss."
+    },
+    {
+      "id": "de-holdout-v2-384",
+      "field": "altText",
+      "text": "Grüner Rock mit einem Bindegürtel."
+    },
+    {
+      "id": "de-holdout-v2-385",
+      "field": "altText",
+      "text": "Grauer Regenhut neben einer Gießkanne."
+    },
+    {
+      "id": "de-holdout-v2-386",
+      "field": "altText",
+      "text": "Weiße Bluse über dunklen Hosen."
+    },
+    {
+      "id": "de-holdout-v2-387",
+      "field": "altText",
+      "text": "Braune Stiefel auf hellem Kies."
+    },
+    {
+      "id": "de-holdout-v2-388",
+      "field": "altText",
+      "text": "Rote Handschuhe in einer Manteltasche."
+    },
+    {
+      "id": "de-holdout-v2-389",
+      "field": "altText",
+      "text": "Gelbe Schürze mit Stoffschlaufe."
+    },
+    {
+      "id": "de-holdout-v2-390",
+      "field": "altText",
+      "text": "Schwarzer Schal auf einem Schaukelstuhl."
+    },
+    {
+      "id": "de-holdout-v2-391",
+      "field": "altText",
+      "text": "Karierte Tasche neben einer Leinwand."
+    },
+    {
+      "id": "de-holdout-v2-392",
+      "field": "altText",
+      "text": "Blauer Mantel mit abnehmbarer Kapuze."
+    },
+    {
+      "id": "de-holdout-v2-393",
+      "field": "altText",
+      "text": "Cremefarbene Weste mit Hornknöpfen."
+    },
+    {
+      "id": "de-holdout-v2-394",
+      "field": "altText",
+      "text": "Grüner Schuh mit neuer Schnalle."
+    },
+    {
+      "id": "de-holdout-v2-395",
+      "field": "altText",
+      "text": "Rosa Kleid mit eckigem Ausschnitt."
+    },
+    {
+      "id": "de-holdout-v2-396",
+      "field": "altText",
+      "text": "Graue Hose unter einer kurzen Weste."
+    },
+    {
+      "id": "de-holdout-v2-397",
+      "field": "altText",
+      "text": "Roter Gürtel mit Stoffschlaufe."
+    },
+    {
+      "id": "de-holdout-v2-398",
+      "field": "altText",
+      "text": "Brauner Hut vor einer blauen Tür."
+    },
+    {
+      "id": "de-holdout-v2-399",
+      "field": "altText",
+      "text": "Weiße Handschuhe auf schwarzem Samt."
+    },
+    {
+      "id": "de-holdout-v2-400",
+      "field": "altText",
+      "text": "Gelbe Jacke mit verstärkter Schulternaht."
+    }
+  ]
+}

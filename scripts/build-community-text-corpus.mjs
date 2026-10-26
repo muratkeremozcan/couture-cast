@@ -26,6 +26,7 @@
  * Usage:
  *   node scripts/build-community-text-corpus.mjs [--import-clean <dir>]
  *   node scripts/build-community-text-corpus.mjs --import-holdout <dir>
+ *   node scripts/build-community-text-corpus.mjs --import-holdout <dir> --holdout-version holdout-v2
  */
 import crypto from 'node:crypto'
 import fs from 'node:fs'
@@ -246,18 +247,19 @@ async function writeCorpus(
   )
 }
 
-const HOLDOUT_DIRECTORY = path.join(corpusDir, 'holdout-v1')
-
 const sha256File = (filePath) =>
   crypto.createHash('sha256').update(fs.readFileSync(filePath)).digest('hex')
 
 /** Writes each language's frozen holdout once; an existing one is left alone. */
-async function importHoldout(importDir) {
+async function importHoldout(importDir, version = 'holdout-v1') {
+  if (!/^holdout-v[1-9]\d*$/.test(version)) {
+    throw new Error('holdout version must be holdout-v followed by a positive integer')
+  }
   const policy = readJson(
     path.join(projectRoot, 'apps/api/policies/community-screening/policy-v2.json')
   )
   for (const language of LANGUAGES) {
-    const filePath = path.join(HOLDOUT_DIRECTORY, `${language}.json`)
+    const filePath = path.join(corpusDir, version, `${language}.json`)
     if (fs.existsSync(filePath)) {
       console.log(`${language}: holdout already frozen, left unchanged`)
       continue
@@ -266,14 +268,14 @@ async function importHoldout(importDir) {
     const entries = labelExpectedReview(
       importClean(language, importDir, {
         file: `holdout-${language}.json`,
-        kind: 'holdout',
+        kind: version === 'holdout-v1' ? 'holdout' : version,
       })
     )
     await writeCorpus(
       language,
       {
         language,
-        corpusVersion: 'holdout-v1',
+        corpusVersion: version,
         description:
           "Frozen clean holdout: ordinary fashion captions and alt text written natively in the language after the allow list froze, independently of the clean half, and never used to tune the screener, the lists or the allow list. The release gate's clean-copy figure is computed here. Entries labelled expected review carry one of the policy's deliberate review terms.",
         expected: 'pass',
@@ -294,7 +296,11 @@ async function main() {
   const args = process.argv.slice(2)
   const holdoutIndex = args.indexOf('--import-holdout')
   if (holdoutIndex >= 0) {
-    await importHoldout(path.resolve(args[holdoutIndex + 1]))
+    const versionIndex = args.indexOf('--holdout-version')
+    await importHoldout(
+      path.resolve(args[holdoutIndex + 1]),
+      versionIndex >= 0 ? args[versionIndex + 1] : 'holdout-v1'
+    )
     return
   }
   const importIndex = args.indexOf('--import-clean')

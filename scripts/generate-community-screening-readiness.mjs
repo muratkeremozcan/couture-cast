@@ -87,6 +87,12 @@ const INPUTS = {
   heartbeatSource: 'apps/api/src/modules/community/community-worker-heartbeat.ts',
 }
 export const TEXT_LANGUAGES = ['de', 'en', 'es', 'fr', 'it', 'pt', 'tr']
+const TEXT_HOLDOUT_VERSION = readJson(
+  'apps/api/test/fixtures/community-text-corpus/active-holdout.json'
+)?.corpusVersion
+if (!/^holdout-v[1-9]\d*$/.test(TEXT_HOLDOUT_VERSION ?? '')) {
+  throw new Error('active text holdout version is invalid')
+}
 const DEFAULT_IMAGE = 'couture-cast-community-worker:local'
 const NODE_MODULES_BUDGET_MB = 150
 const SAFE_CORPUS_MINIMUM_HOLDOUT = 250
@@ -668,7 +674,7 @@ function textSection(current) {
       [
         `${language}-holdout`,
         sha256File(
-          `apps/api/test/fixtures/community-text-corpus/holdout-v1/${language}.json`
+          `apps/api/test/fixtures/community-text-corpus/${TEXT_HOLDOUT_VERSION}/${language}.json`
         ),
       ],
     ])
