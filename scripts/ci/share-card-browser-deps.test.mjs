@@ -223,6 +223,57 @@ test('browser installer uses the pinned CLI and a GNU deadline with TERM, kill g
     ],
   ])
 })
+test('API32 provisions only the Chromium engine required by the browser-mode accessibility bridge', async () => {
+  const { installPinnedPlaywrightBrowsers } = await helper()
+  let observed
+  installPinnedPlaywrightBrowsers({
+    node: '/owned/node',
+    cli: '/pinned/cli.js',
+    browsers: ['chromium'],
+    run: (...args) => {
+      observed = args
+      return { status: 0 }
+    },
+  })
+  assert.deepEqual(observed[1], [
+    '--signal=TERM',
+    '--kill-after=15s',
+    '600s',
+    '/owned/node',
+    '/pinned/cli.js',
+    'install',
+    '--with-deps',
+    'chromium',
+  ])
+})
+test('the installer accepts only the two required engine sets', async () => {
+  const { installPinnedPlaywrightBrowsers } = await helper()
+  for (const browsers of [[], ['firefox'], ['chromium', 'firefox'], 'chromium']) {
+    let called = false
+    assert.throws(
+      () =>
+        installPinnedPlaywrightBrowsers({
+          browsers,
+          run: () => {
+            called = true
+            return { status: 0 }
+          },
+        }),
+      /browser_dependency_engine_selection_required/
+    )
+    assert.equal(called, false)
+  }
+})
+test('CLI engine selection is explicit and rejects unknown or duplicate arguments', async () => {
+  const { shareCardBrowserEngines } = await helper()
+  assert.deepEqual(shareCardBrowserEngines([]), ['chromium', 'firefox', 'webkit'])
+  assert.deepEqual(shareCardBrowserEngines(['--chromium-only']), ['chromium'])
+  for (const args of [['chromium'], ['--chromium-only', '--chromium-only']])
+    assert.throws(
+      () => shareCardBrowserEngines(args),
+      /browser_dependency_engine_selection_required/
+    )
+})
 test('missing deadline, timeout and installer failure all fail closed', async () => {
   const { installPinnedPlaywrightBrowsers } = await helper()
   for (const result of [
@@ -242,7 +293,7 @@ test('missing deadline, timeout and installer failure all fail closed', async ()
     )
   }
 })
-test('mandatory API36 browser provisioning is separately bounded and common bridge does not reinstall browsers', async () => {
+test('every browser-mode mobile bridge has bounded pinned Chromium provisioning and API36 retains all three engines', async () => {
   const workflow = parse(
     await readFile(
       new URL('../../.github/workflows/pr-share-card-native.yml', import.meta.url),
@@ -251,11 +302,11 @@ test('mandatory API36 browser provisioning is separately bounded and common brid
   )
   const steps = workflow.jobs['original-resource'].steps
   const provisioning = steps.filter((step) =>
-    step.run?.split('\n').includes('node scripts/ci/share-card-browser-deps.mjs')
+    step.run?.includes('node scripts/ci/share-card-browser-deps.mjs')
   )
   assert.equal(provisioning.length, 1)
   const step = provisioning[0]
-  assert.equal(step.if, "matrix.platform == 'android' && matrix.api == 36")
+  assert.equal(step.if, "matrix.platform == 'android'")
   assert.equal(step['timeout-minutes'], 12)
   assert.equal(step['continue-on-error'], undefined)
   const controls = step.run.indexOf(
@@ -265,6 +316,26 @@ test('mandatory API36 browser provisioning is separately bounded and common brid
     controls >= 0 &&
       controls < step.run.indexOf('node scripts/ci/share-card-browser-deps.mjs')
   )
+  assert.ok(step.run.includes("if [ '${{ matrix.api }}' = '32' ]; then"))
+  assert.ok(
+    step.run.includes('node scripts/ci/share-card-browser-deps.mjs --chromium-only')
+  )
+  assert.ok(
+    step.run
+      .split('\n')
+      .some((line) => line.trim() === 'node scripts/ci/share-card-browser-deps.mjs')
+  )
+  const mac = steps.find((item) =>
+    item.run?.includes('npx --no-install playwright install chromium')
+  )
+  assert.ok(mac)
+  assert.equal(mac.if, "matrix.platform == 'ios'")
+  assert.equal(mac['timeout-minutes'], 6)
+  assert.equal(mac['continue-on-error'], undefined)
+  const bridge = steps.findIndex((item) =>
+    item.run?.includes('node scripts/e2e-share-card/bridge-a11y.mjs')
+  )
+  assert.ok(steps.indexOf(step) < bridge && steps.indexOf(mac) < bridge)
   assert.equal(
     steps.some((item) => item.run?.includes('npx playwright install --with-deps')),
     false

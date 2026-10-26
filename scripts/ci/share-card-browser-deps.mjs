@@ -89,7 +89,13 @@ export function installPinnedPlaywrightBrowsers({
   run = spawnSync,
   node = process.execPath,
   cli = createRequire(import.meta.url).resolve('@playwright/test/cli'),
+  browsers = ['chromium', 'firefox', 'webkit'],
 } = {}) {
+  if (
+    !Array.isArray(browsers) ||
+    !['chromium', 'chromium,firefox,webkit'].includes(browsers.join(','))
+  )
+    throw new Error('browser_dependency_engine_selection_required')
   const result = run(
     'timeout',
     [
@@ -100,9 +106,7 @@ export function installPinnedPlaywrightBrowsers({
       cli,
       'install',
       '--with-deps',
-      'chromium',
-      'firefox',
-      'webkit',
+      ...browsers,
     ],
     { stdio: 'inherit', timeout: 620000, killSignal: 'SIGKILL' }
   )
@@ -114,7 +118,14 @@ export function installPinnedPlaywrightBrowsers({
     throw new Error('browser_dependency_install_failed')
 }
 
+export function shareCardBrowserEngines(args) {
+  if (!args.length) return ['chromium', 'firefox', 'webkit']
+  if (args.length === 1 && args[0] === '--chromium-only') return ['chromium']
+  throw new Error('browser_dependency_engine_selection_required')
+}
+
 async function main() {
+  const browsers = shareCardBrowserEngines(process.argv.slice(2))
   if (
     process.platform !== 'linux' ||
     process.arch !== 'x64' ||
@@ -150,7 +161,7 @@ async function main() {
       if (result.error || result.status !== 0)
         throw new Error('browser_dependency_source_write_failed')
     },
-    install: installPinnedPlaywrightBrowsers,
+    install: () => installPinnedPlaywrightBrowsers({ browsers }),
   })
   console.log(
     'Pinned browser dependencies installed within the bounded provisioning step; original APT sources restored.'

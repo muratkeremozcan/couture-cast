@@ -36,12 +36,20 @@ jobs:
       - uses: ./.github/actions/reserve-supabase-ports
         if: runner.os == 'Linux'
       - uses: ./.github/actions/install
+      - name: Provision pinned iOS accessibility browser
+        if: matrix.platform == 'ios'
+        timeout-minutes: 6
+        run: npx --no-install playwright install chromium
       - name: Provision pinned share-card browser dependencies
-        if: matrix.platform == 'android' && matrix.api == 36
+        if: matrix.platform == 'android'
         timeout-minutes: 12
         run: |
           node --test scripts/ci/share-card-browser-deps.test.mjs
-          node scripts/ci/share-card-browser-deps.mjs
+          if [ '${{ matrix.api }}' = '32' ]; then
+            node scripts/ci/share-card-browser-deps.mjs --chromium-only
+          else
+            node scripts/ci/share-card-browser-deps.mjs
+          fi
       - uses: actions/setup-java@v4
         with:
           distribution: temurin
@@ -73,7 +81,7 @@ jobs:
           node scripts/e2e-share-card/bridge-a11y.mjs
           node --test apps/mobile/plugins/with-share-card-permissions.test.js apps/mobile/plugins/with-story68-release-network.test.js
           node --test scripts/lib/story68-rapid-watermark.test.mjs scripts/lib/story68-rapid-watermark-control.test.mjs scripts/lib/story68-rapid-watermark-flow.test.mjs scripts/lib/story68-native-build-env.test.mjs scripts/lib/story68-fallback-post.test.mjs scripts/lib/story68-fallback-focus.test.mjs scripts/lib/story68-cold-font-scale.test.mjs scripts/lib/story68-release-live-font.test.mjs scripts/lib/story68-ios-focus-observation.test.mjs scripts/lib/story68-browser-watermark.test.mjs
-          node --test scripts/ci/share-card-native-failure.spec.mjs scripts/ci/share-card-android.test.mjs scripts/lib/share-card-native-diagnostics.test.mjs
+          node --test scripts/ci/share-card-native-failure.spec.mjs scripts/ci/share-card-android.test.mjs scripts/lib/share-card-native-diagnostics.test.mjs scripts/lib/story68-bridge-unit-result.test.mjs
       - name: Verify native paragraph heading semantics
         if: runner.os == 'macOS'
         run: bash scripts/ci/share-card-header-semantics.sh

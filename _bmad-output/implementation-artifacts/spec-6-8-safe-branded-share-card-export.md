@@ -931,6 +931,30 @@ Evidence: `ci-79cd072c-api36/actual-job.log`, downloaded `share-card-android-36`
 the exact image script archived beside that log, and
 `runs/ci79-api36-mirror-uri-red-1` / `runs/ci79-api36-mirror-uri-green-1`.
 
+### Native CI accessibility bridge Chromium prerequisite
+
+Published head `2dfb82ff` failed API32 in the accessibility bridge before native generation
+or emulator startup. The actual job log reports the bridge guard; its artifact has all
+90 locale/state checks false and omitted the child output. The mobile Vitest configuration
+uses browser mode with Chromium. Removing common browser installation while retaining only
+API36 provisioning left API32 and iOS without this prerequisite. An actual empty-browser-cache
+bridge invocation reproduces the failed executable lookup and zero observed assertions in
+0.4 seconds. Installing lockfile-pinned Chromium into that same fresh cache takes 14.1 seconds
+locally and the bridge passes. The current bridge passes 121 assertions, including all 90
+required locale/state checks.
+
+Every native CI lane now provisions Chromium before invoking this bridge. API32 uses the
+bounded official-mirror installer with Chromium only; API36 retains all three engines for its
+browser matrix. iOS uses the installed Playwright CLI with a six-minute provisioning step.
+The Android installer retains its 600-second deadline, kill grace and source restoration.
+Explicit engine selection and workflow ordering controls fail before the repair and pass
+after it. The bridge clears only its own old report and log before each invocation and exports
+closed child-exit, report and assertion counts plus a fixed failure classification. A
+controlled missing-browser run proves `browser_missing`, exit1 and zero observed assertions
+reach the public artifact while raw logs and reports stay private. All 37 affected controls
+pass. Evidence: `ci-2dfb82ff-api32/actual-job.log`, downloaded `share-card-android-32`, and
+`runs/ci2dfb-bridge-*`. Product sources and the frozen Round6 inputs are unchanged.
+
 ## Spec Change Log
 
 - 2026-10-25, iteration 2 in progress, Astra round 1: accepted A1 and A2. iOS now imports the
